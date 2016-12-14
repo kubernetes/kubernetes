@@ -19,11 +19,14 @@ package options
 import (
 	"fmt"
 	"net"
+	"os"
 	"strings"
 
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
+	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/util/config"
 
@@ -82,7 +85,7 @@ func NewServerRunOptions() *ServerRunOptions {
 	}
 }
 
-func (s *ServerRunOptions) DefaultExternalAddress(secure *SecureServingOptions, insecure *ServingOptions) error {
+func (s *ServerRunOptions) DefaultAdvertiseAddress(secure *SecureServingOptions, insecure *ServingOptions) error {
 	if s.AdvertiseAddress == nil || s.AdvertiseAddress.IsUnspecified() {
 		switch {
 		case secure != nil:
@@ -100,6 +103,44 @@ func (s *ServerRunOptions) DefaultExternalAddress(secure *SecureServingOptions, 
 					"Try to set the AdvertiseAddress directly or provide a valid BindAddress to fix this.", err)
 			}
 			s.AdvertiseAddress = hostIP
+		}
+	}
+
+	return nil
+}
+
+func (options *ServerRunOptions) DefaultExternalHost() error {
+	if len(options.ExternalHost) != 0 {
+		return nil
+	}
+
+	// TODO: extend for other providers
+	if options.CloudProvider == "gce" || options.CloudProvider == "aws" {
+		cloud, err := cloudprovider.InitCloudProvider(options.CloudProvider, options.CloudConfigFile)
+		if err != nil {
+			return fmt.Errorf("%q cloud provider could not be initialized: %v", options.CloudProvider, err)
+		}
+		instances, supported := cloud.Instances()
+		if !supported {
+			return fmt.Errorf("%q cloud provider has no instances", options.CloudProvider)
+		}
+		hostname, err := os.Hostname()
+		if err != nil {
+			return fmt.Errorf("failed to get hostname: %v", err)
+		}
+		nodeName, err := instances.CurrentNodeName(hostname)
+		if err != nil {
+			return fmt.Errorf("failed to get NodeName from %q cloud provider: %v", options.CloudProvider, err)
+		}
+		addrs, err := instances.NodeAddresses(nodeName)
+		if err != nil {
+			return fmt.Errorf("failed to get external host address from %q cloud provider: %v", options.CloudProvider, err)
+		} else {
+			for _, addr := range addrs {
+				if addr.Type == v1.NodeExternalIP {
+					options.ExternalHost = addr.Address
+				}
+			}
 		}
 	}
 

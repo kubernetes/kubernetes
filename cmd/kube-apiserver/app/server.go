@@ -81,33 +81,30 @@ cluster's shared state through which all other components interact.`,
 
 // Run runs the specified APIServer.  This should never exit.
 func Run(s *options.ServerRunOptions) error {
-	if errs := s.Etcd.Validate(); len(errs) > 0 {
-		return utilerrors.NewAggregate(errs)
-	}
-	if err := s.GenericServerRunOptions.DefaultExternalAddress(s.SecureServing, s.InsecureServing); err != nil {
+	// set defaults
+	if err := s.GenericServerRunOptions.DefaultAdvertiseAddress(s.SecureServing, s.InsecureServing); err != nil {
 		return err
 	}
-
 	serviceIPRange, apiServerServiceIP, err := master.DefaultServiceIPRange(s.ServiceClusterIPRange)
 	if err != nil {
 		return fmt.Errorf("error determining service IP ranges: %v", err)
 	}
-
 	if err := s.SecureServing.MaybeDefaultWithSelfSignedCerts(s.GenericServerRunOptions.AdvertiseAddress.String(), apiServerServiceIP); err != nil {
 		return fmt.Errorf("error creating self-signed certificates: %v", err)
 	}
-
-	// TODO(sttts): change signature of DefaultAndValidateRunOptions to aggregate errors
-	genericapiserver.DefaultAndValidateRunOptions(s.GenericServerRunOptions)
-
-	// TODO(sttts): move all defaulting and validation above into cmd/kube-apiserver/app/options.DefaultAndValidateRunOptions()
-	if err != options.ValidateRunOptions(s) {
-		return err
+	if err := s.GenericServerRunOptions.DefaultExternalHost(); err != nil {
+		return fmt.Errorf("error setting the external host value: %v", err)
 	}
 
-	genericConfig := genericapiserver.NewConfig(). // create the new config
-							ApplyOptions(s.GenericServerRunOptions). // apply the options selected
-							ApplyInsecureServingOptions(s.InsecureServing)
+	// validate options
+	if errs := s.Validate(); len(errs) != 0 {
+		return utilerrors.NewAggregate(errs)
+	}
+
+	// create config from options
+	genericConfig := genericapiserver.NewConfig().
+		ApplyOptions(s.GenericServerRunOptions).
+		ApplyInsecureServingOptions(s.InsecureServing)
 
 	if _, err := genericConfig.ApplySecureServingOptions(s.SecureServing); err != nil {
 		return fmt.Errorf("failed to configure https: %s", err)
