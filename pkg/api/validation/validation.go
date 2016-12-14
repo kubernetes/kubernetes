@@ -688,6 +688,10 @@ func validateVolumeSource(source *api.VolumeSource, fldPath *field.Path) field.E
 		numVolumes++
 		allErrs = append(allErrs, validateAzureDisk(source.AzureDisk, fldPath.Child("azureDisk"))...)
 	}
+	if source.LocalDisk != nil {
+		numVolumes++
+		allErrs = append(allErrs, validateLocalDiskSource(source.LocalDisk, fldPath.Child("localDisk"))...)
+	}
 
 	if numVolumes == 0 {
 		allErrs = append(allErrs, field.Required(fldPath, "must specify a volume type"))
@@ -1032,6 +1036,12 @@ func validatePhotonPersistentDiskVolumeSource(cd *api.PhotonPersistentDiskVolume
 	if len(cd.PdID) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("pdID"), ""))
 	}
+	return allErrs
+}
+
+func validateLocalDiskSource(cd *api.LocalDiskSource, fldPath *field.Path) field.ErrorList {
+	// TODO: add some validation
+	allErrs := field.ErrorList{}
 	return allErrs
 }
 

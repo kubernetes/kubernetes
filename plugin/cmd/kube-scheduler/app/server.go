@@ -73,7 +73,7 @@ through the API as necessary.`,
 
 // Run runs the specified SchedulerServer.  This should never exit.
 func Run(s *options.SchedulerServer) error {
-	kubecli, err := createClient(s)
+	kubecli, err := createClient(s, "leader-election")
 	if err != nil {
 		return fmt.Errorf("unable to create kube client: %v", err)
 	}
@@ -81,6 +81,11 @@ func Run(s *options.SchedulerServer) error {
 	if err != nil {
 		return fmt.Errorf("failed to create scheduler configuration: %v", err)
 	}
+	kubeClient, err := createClient(s, "scheduler")
+	if err != nil {
+		glog.Fatalf("Failed to init a kubeClient: %v", err)
+	}
+	config.KubeClient = kubeClient
 	sched := scheduler.New(config)
 
 	go startHTTP(s)
@@ -152,7 +157,7 @@ func startHTTP(s *options.SchedulerServer) {
 	glog.Fatal(server.ListenAndServe())
 }
 
-func createClient(s *options.SchedulerServer) (*clientset.Clientset, error) {
+func createClient(s *options.SchedulerServer, description string) (*clientset.Clientset, error) {
 	kubeconfig, err := clientcmd.BuildConfigFromFlags(s.Master, s.Kubeconfig)
 	if err != nil {
 		return nil, fmt.Errorf("unable to build config from flags: %v", err)
@@ -163,7 +168,7 @@ func createClient(s *options.SchedulerServer) (*clientset.Clientset, error) {
 	kubeconfig.QPS = s.KubeAPIQPS
 	kubeconfig.Burst = int(s.KubeAPIBurst)
 
-	cli, err := clientset.NewForConfig(restclient.AddUserAgent(kubeconfig, "leader-election"))
+	cli, err := clientset.NewForConfig(restclient.AddUserAgent(kubeconfig, description))
 	if err != nil {
 		return nil, fmt.Errorf("invalid API configuration: %v", err)
 	}

@@ -324,6 +324,20 @@ type VolumeSource struct {
 	AzureDisk *AzureDiskVolumeSource `json:"azureDisk,omitempty" protobuf:"bytes,22,opt,name=azureDisk"`
 	// PhotonPersistentDisk represents a PhotonController persistent disk attached and mounted on kubelets host machine
 	PhotonPersistentDisk *PhotonPersistentDiskVolumeSource `json:"photonPersistentDisk,omitempty" protobuf:"bytes,23,opt,name=photonPersistentDisk"`
+	// LocalDisk represents a local disk request for a pod.
+	// +optional
+	LocalDisk *LocalDiskSource `json:"localDisk,omitempty" protobuf:"bytes,24,opt,name=localDisk"`
+}
+
+// Represents local disk claim for a pod
+type LocalDiskSource struct {
+	// Requested local disk size, the unit is Gi
+	DiskSize uint32 `json:"diskSize" protobuf:"bytes,1,opt,name=diskSize"`
+	// LocalPath represents the local disk path that pod will use. It will be
+	// backfilled by scheduler when scheduler find a fit local path on a
+	// kubelet node. If user specifies it, it might not be satisfied.
+	LocalPath string `json:"localPath,omitempty" protobuf:"bytes,2,opt,name=localPath"`
+	// TODO: Add labels to select local disk, e.g. kind=SSD.
 }
 
 // PersistentVolumeClaimVolumeSource references the user's PVC in the same namespace.
