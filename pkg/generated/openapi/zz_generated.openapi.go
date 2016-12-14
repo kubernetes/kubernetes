@@ -3760,7 +3760,7 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 		},
 		Dependencies: []string{},
 	},
-	"v1.NFSVolumeSource": {
+	"v1.MicroTime": v1.MicroTime{}.OpenAPIDefinition(), "v1.NFSVolumeSource": {
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
 				Description: "Represents an NFS mount that lasts the lifetime of a pod. NFS volumes do not support ownership management or SELinux relabeling.",

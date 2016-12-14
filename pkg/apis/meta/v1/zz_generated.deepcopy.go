@@ -47,6 +47,7 @@ func GetGeneratedDeepCopyFuncs() []conversion.GeneratedDeepCopyFunc {
 		{Fn: DeepCopy_v1_LabelSelector, InType: reflect.TypeOf(&LabelSelector{})},
 		{Fn: DeepCopy_v1_LabelSelectorRequirement, InType: reflect.TypeOf(&LabelSelectorRequirement{})},
 		{Fn: DeepCopy_v1_ListMeta, InType: reflect.TypeOf(&ListMeta{})},
+		{Fn: DeepCopy_v1_MicroTime, InType: reflect.TypeOf(&MicroTime{})},
 		{Fn: DeepCopy_v1_OwnerReference, InType: reflect.TypeOf(&OwnerReference{})},
 		{Fn: DeepCopy_v1_Patch, InType: reflect.TypeOf(&Patch{})},
 		{Fn: DeepCopy_v1_RootPaths, InType: reflect.TypeOf(&RootPaths{})},
@@ -297,6 +298,15 @@ func DeepCopy_v1_ListMeta(in interface{}, out interface{}, c *conversion.Cloner)
 		in := in.(*ListMeta)
 		out := out.(*ListMeta)
 		*out = *in
+		return nil
+	}
+}
+
+func DeepCopy_v1_MicroTime(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*MicroTime)
+		out := out.(*MicroTime)
+		*out = in.DeepCopy()
 		return nil
 	}
 }
