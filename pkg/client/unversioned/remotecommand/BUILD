@@ -54,5 +54,6 @@ go_test(
         "//pkg/util/httpstream:go_default_library",
         "//pkg/util/term:go_default_library",
         "//pkg/util/wait:go_default_library",
+        "//vendor:github.com/stretchr/testify/require",
     ],
 )
