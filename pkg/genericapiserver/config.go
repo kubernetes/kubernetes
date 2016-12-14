@@ -25,7 +25,6 @@ import (
 	"io/ioutil"
 	"net"
 	"net/http"
-	"os"
 	goruntime "runtime"
 	"sort"
 	"strconv"
@@ -34,13 +33,11 @@ import (
 
 	"github.com/emicklei/go-restful/swagger"
 	"github.com/go-openapi/spec"
-	"github.com/golang/glog"
 	"github.com/pborman/uuid"
 	"gopkg.in/natefinch/lumberjack.v2"
 
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/v1"
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	apiserverauthenticator "k8s.io/kubernetes/pkg/apiserver/authenticator"
 	apiserverfilters "k8s.io/kubernetes/pkg/apiserver/filters"
@@ -52,7 +49,6 @@ import (
 	authhandlers "k8s.io/kubernetes/pkg/auth/handlers"
 	"k8s.io/kubernetes/pkg/auth/user"
 	"k8s.io/kubernetes/pkg/client/restclient"
-	"k8s.io/kubernetes/pkg/cloudprovider"
 	apiserverauthorizer "k8s.io/kubernetes/pkg/genericapiserver/authorizer"
 	genericfilters "k8s.io/kubernetes/pkg/genericapiserver/filters"
 	"k8s.io/kubernetes/pkg/genericapiserver/mux"
@@ -627,43 +623,6 @@ func (s *GenericAPIServer) installAPI(c *Config) {
 	}
 	routes.Version{Version: c.Version}.Install(s.HandlerContainer)
 	s.HandlerContainer.Add(s.DynamicApisDiscovery())
-}
-
-func DefaultAndValidateRunOptions(options *options.ServerRunOptions) {
-	glog.Infof("Will report %v as public IP address.", options.AdvertiseAddress)
-
-	// Set default value for ExternalAddress if not specified.
-	if len(options.ExternalHost) == 0 {
-		// TODO: extend for other providers
-		if options.CloudProvider == "gce" || options.CloudProvider == "aws" {
-			cloud, err := cloudprovider.InitCloudProvider(options.CloudProvider, options.CloudConfigFile)
-			if err != nil {
-				glog.Fatalf("Cloud provider could not be initialized: %v", err)
-			}
-			instances, supported := cloud.Instances()
-			if !supported {
-				glog.Fatalf("%q cloud provider has no instances.  this shouldn't happen. exiting.", options.CloudProvider)
-			}
-			hostname, err := os.Hostname()
-			if err != nil {
-				glog.Fatalf("Failed to get hostname: %v", err)
-			}
-			nodeName, err := instances.CurrentNodeName(hostname)
-			if err != nil {
-				glog.Fatalf("Failed to get NodeName: %v", err)
-			}
-			addrs, err := instances.NodeAddresses(nodeName)
-			if err != nil {
-				glog.Warningf("Unable to obtain external host address from cloud provider: %v", err)
-			} else {
-				for _, addr := range addrs {
-					if addr.Type == v1.NodeExternalIP {
-						options.ExternalHost = addr.Address
-					}
-				}
-			}
-		}
-	}
 }
 
 func NewRequestInfoResolver(c *Config) *request.RequestInfoFactory {
