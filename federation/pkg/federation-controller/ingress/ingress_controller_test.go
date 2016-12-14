@@ -23,7 +23,7 @@ import (
 	"time"
 
 	federationapi "k8s.io/kubernetes/federation/apis/federation/v1beta1"
-	fakefedclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_5/fake"
+	fakefedclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset/fake"
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util"
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util/deletionhelper"
 	. "k8s.io/kubernetes/federation/pkg/federation-controller/util/test"
