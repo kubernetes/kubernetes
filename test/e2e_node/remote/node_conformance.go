@@ -200,7 +200,7 @@ func launchKubelet(host, workspace, results, testArgs string) error {
 			),
 		}
 	}
-	glog.Infof("Launch kubelet with command: %v", cmd)
+	glog.V(2).Infof("Launch kubelet with command: %v", cmd)
 	output, err := SSH(host, cmd...)
 	if err != nil {
 		return fmt.Errorf("failed to launch kubelet with command %v: error - %v output - %q",
@@ -285,7 +285,7 @@ func (c *ConformanceRemote) RunTest(host, workspace, results, junitFilePrefix, t
 	}()
 
 	// Run the tests
-	glog.Infof("Starting tests on %q", host)
+	glog.V(2).Infof("Starting tests on %q", host)
 	podManifestPath := getPodManifestPath(workspace)
 	cmd := fmt.Sprintf("'timeout -k 30s %fs docker run --rm --privileged=true --net=host -v /:/rootfs -v %s:%s -v %s:/var/result %s'",
 		timeout.Seconds(), podManifestPath, podManifestPath, results, getConformanceImageRepo())

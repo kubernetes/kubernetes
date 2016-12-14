@@ -34,7 +34,7 @@ const (
 
 // Install the cni plugin.
 func installCNI(host, workspace string) error {
-	glog.Infof("Install CNI on %q", host)
+	glog.V(2).Infof("Install CNI on %q", host)
 	cniPath := filepath.Join(workspace, cniDirectory)
 	cmd := getSSHCommand(" ; ",
 		fmt.Sprintf("mkdir -p %s", cniPath),
@@ -48,7 +48,7 @@ func installCNI(host, workspace string) error {
 
 // configureFirewall configures iptable firewall rules.
 func configureFirewall(host string) error {
-	glog.Infof("Configure iptables firewall rules on %q", host)
+	glog.V(2).Infof("Configure iptables firewall rules on %q", host)
 	// TODO: consider calling bootstrap script to configure host based on OS
 	output, err := SSH(host, "iptables", "-L", "INPUT")
 	if err != nil {
@@ -83,7 +83,7 @@ func configureFirewall(host string) error {
 
 // cleanupNodeProcesses kills all running node processes may conflict with the test.
 func cleanupNodeProcesses(host string) {
-	glog.Infof("Killing any existing node processes on %q", host)
+	glog.V(2).Infof("Killing any existing node processes on %q", host)
 	cmd := getSSHCommand(" ; ",
 		"pkill kubelet",
 		"pkill kube-apiserver",
