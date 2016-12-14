@@ -267,6 +267,23 @@ func TestInsufficentCapacityNodeDaemonDoesNotLaunchPod(t *testing.T) {
 	syncAndValidateDaemonSets(t, manager, ds, podControl, 0, 0)
 }
 
+// DaemonSets should not unschedule a daemonset pod from a node with insufficient free resource
+func TestInsufficentCapacityNodeDaemonDoesNotUnscheduleRunningPod(t *testing.T) {
+	podSpec := resourcePodSpec("too-much-mem", "75M", "75m")
+	podSpec.NodeName = "too-much-mem"
+	manager, podControl, _ := newTestController()
+	node := newNode("too-much-mem", nil)
+	node.Status.Allocatable = allocatableResources("100M", "200m")
+	manager.nodeStore.Add(node)
+	manager.podStore.Indexer.Add(&v1.Pod{
+		Spec: podSpec,
+	})
+	ds := newDaemonSet("foo")
+	ds.Spec.Template.Spec = podSpec
+	manager.dsStore.Add(ds)
+	syncAndValidateDaemonSets(t, manager, ds, podControl, 0, 0)
+}
+
 func TestSufficentCapacityWithTerminatedPodsDaemonLaunchesPod(t *testing.T) {
 	podSpec := resourcePodSpec("too-much-mem", "75M", "75m")
 	manager, podControl, _ := newTestController()
