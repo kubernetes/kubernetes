@@ -47,6 +47,9 @@ func (c *Clientset) Testgroup() internalversiontestgroup.TestgroupInterface {
 
 // Discovery retrieves the DiscoveryClient
 func (c *Clientset) Discovery() discovery.DiscoveryInterface {
+	if c == nil {
+		return nil
+	}
 	return c.DiscoveryClient
 }
 

@@ -290,6 +290,9 @@ func (c *Clientset) Storage() v1beta1storage.StorageV1beta1Interface {
 
 // Discovery retrieves the DiscoveryClient
 func (c *Clientset) Discovery() discovery.DiscoveryInterface {
+	if c == nil {
+		return nil
+	}
 	return c.DiscoveryClient
 }
 
