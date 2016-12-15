@@ -29,7 +29,7 @@ INSTANCE_PREFIX="${INSTANCE_PREFIX:-}"
 SERVICE_CLUSTER_IP_RANGE="${SERVICE_CLUSTER_IP_RANGE:-}"
 
 # Etcd related variables.
-ETCD_IMAGE="${ETCD_IMAGE:-}"
+ETCD_IMAGE="${ETCD_IMAGE:-2.2.1}"
 ETCD_VERSION="${ETCD_VERSION:-}"
 
 # Controller-manager related variables.
@@ -48,6 +48,8 @@ NUM_NODES="${NUM_NODES:-}"
 CUSTOM_ADMISSION_PLUGINS="${CUSTOM_ADMISSION_PLUGINS:-NamespaceLifecycle,LimitRanger,ServiceAccount,ResourceQuota}"
 EOF
 }
+
+writeEnvironmentFile
 
 MAKE_DIR="${KUBE_ROOT}/cluster/images/kubemark"
 
@@ -154,7 +156,6 @@ gcloud compute ssh --zone="${ZONE}" --project="${PROJECT}" "${MASTER_NAME}" \
     sudo bash -c \"echo \"${KUBE_PROXY_TOKEN},kube_proxy,kube_proxy\" >> /srv/kubernetes/known_tokens.csv\" && \
     sudo bash -c \"echo ${password},admin,admin > /srv/kubernetes/basic_auth.csv\""
 
-writeEnvironmentFile
 
 gcloud compute copy-files --zone="${ZONE}" --project="${PROJECT}" \
   "${SERVER_BINARY_TAR}" \
