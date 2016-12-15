@@ -535,7 +535,7 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 		var err error
 
 		switch kubeCfg.ContainerRuntime {
-		case "docker":
+		case "docker", "mixed":
 			streamingConfig := getStreamingConfig(kubeCfg, kubeDeps)
 			// Use the new CRI shim for docker.
 			ds, err := dockershim.NewDockerService(klet.dockerClient, kubeCfg.SeccompProfileRoot, kubeCfg.PodInfraContainerImage,
@@ -561,8 +561,10 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 					// The unix socket for kubelet <-> dockershim communication.
 					ep = "/var/run/dockershim.sock"
 				)
-				kubeCfg.RemoteRuntimeEndpoint = ep
-				kubeCfg.RemoteImageEndpoint = ep
+				if kubeCfg.ContainerRuntime == "docker" {
+					kubeCfg.RemoteRuntimeEndpoint = ep
+					kubeCfg.RemoteImageEndpoint = ep
+				}
 
 				server := dockerremote.NewDockerServer(ep, ds)
 				glog.V(2).Infof("Starting the GRPC server for the docker CRI shim.")
@@ -575,9 +577,13 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 					return nil, err
 				}
 			}
-			// TODO: Move the instrumented interface wrapping into kuberuntime.
-			runtimeService = kuberuntime.NewInstrumentedRuntimeService(rs)
-			imageService = is
+			if kubeCfg.ContainerRuntime == "docker" {
+				// TODO: Move the instrumented interface wrapping into kuberuntime.
+				runtimeService = kuberuntime.NewInstrumentedRuntimeService(rs)
+				imageService = is
+			} else if runtimeService, imageService, err = getRuntimeAndImageServices(kubeCfg); err != nil {
+				return nil, err
+			}
 		case "remote":
 			runtimeService, imageService, err = getRuntimeAndImageServices(kubeCfg)
 			if err != nil {

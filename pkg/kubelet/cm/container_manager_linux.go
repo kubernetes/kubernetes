@@ -368,7 +368,7 @@ func (cm *containerManagerImpl) setupNode() error {
 	}
 
 	systemContainers := []*systemContainer{}
-	if cm.ContainerRuntime == "docker" {
+	if cm.ContainerRuntime == "docker" || (cm.EnableCRI && cm.ContainerRuntime == "mixed") {
 		dockerVersion := getDockerVersion(cm.cadvisorInterface)
 		if cm.EnableCRI {
 			// If kubelet uses CRI, dockershim will manage the cgroups and oom
