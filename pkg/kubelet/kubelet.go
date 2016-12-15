@@ -2427,8 +2427,28 @@ func (kl *Kubelet) handleMirrorPod(mirrorPod *api.Pod, start time.Time) {
 // a config source.
 func (kl *Kubelet) HandlePodAdditions(pods []*api.Pod) {
 	start := kl.clock.Now()
-	sort.Sort(sliceutils.PodsByCreationTime(pods))
-	for _, pod := range pods {
+
+	// Pass critical pods through admission check first.
+	var criticalPods []*api.Pod
+	var nonCriticalPods []*api.Pod
+	for _, p := range pods {
+		if kubepod.IsCriticalPod(p) {
+			criticalPods = append(criticalPods, p)
+		} else {
+			nonCriticalPods = append(nonCriticalPods, p)
+		}
+	}
+	sort.Sort(sliceutils.PodsByCreationTime(criticalPods))
+	sort.Sort(sliceutils.PodsByCreationTime(nonCriticalPods))
+
+	for _, pod := range append(criticalPods, nonCriticalPods...) {
+		existingPods := kl.podManager.GetPods()
+		// Always add the pod to the pod manager. Kubelet relies on the pod
+		// manager as the source of truth for the desired state. If a pod does
+		// not exist in the pod manager, it means that it has been deleted in
+		// the apiserver and no action (other than cleanup) is required.
+		kl.podManager.AddPod(pod)
+
 		if kubepod.IsMirrorPod(pod) {
 			kl.podManager.AddPod(pod)
 			kl.handleMirrorPod(pod, start)
