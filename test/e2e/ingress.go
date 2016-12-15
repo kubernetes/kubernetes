@@ -21,6 +21,10 @@ import (
 	"path/filepath"
 	"time"
 
+	legacyv1 "k8s.io/kubernetes/pkg/api/v1"
+	rbacv1alpha1 "k8s.io/kubernetes/pkg/apis/rbac/v1alpha1"
+	"k8s.io/kubernetes/pkg/runtime/schema"
+	"k8s.io/kubernetes/pkg/serviceaccount"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
@@ -70,6 +74,32 @@ var _ = framework.KubeDescribe("Loadbalancing: L7", func() {
 		f.BeforeEach()
 		jig = newTestJig(f.ClientSet)
 		ns = f.Namespace.Name
+
+		// this test wants powerful permissions.  Since the namespace names are unique, we can leave this
+		// lying around so we don't have to race any caches
+		_, err := jig.client.Rbac().ClusterRoleBindings().Create(&rbacv1alpha1.ClusterRoleBinding{
+			ObjectMeta: legacyv1.ObjectMeta{
+				Name: f.Namespace.Name + "--cluster-admin",
+			},
+			RoleRef: rbacv1alpha1.RoleRef{
+				APIGroup: "rbac.authorization.k8s.io",
+				Kind:     "ClusterRole",
+				Name:     "cluster-admin",
+			},
+			Subjects: []rbacv1alpha1.Subject{
+				{
+					Kind:      rbacv1alpha1.ServiceAccountKind,
+					Namespace: f.Namespace.Name,
+					Name:      "default",
+				},
+			},
+		})
+		framework.ExpectNoError(err)
+
+		err = framework.WaitForAuthorizationUpdate(jig.client.Authorization(),
+			serviceaccount.MakeUsername(f.Namespace.Name, "default"),
+			"", "create", schema.GroupResource{Resource: "pods"}, true)
+		framework.ExpectNoError(err)
 	})
 
 	// Before enabling this loadbalancer test in any other test list you must
