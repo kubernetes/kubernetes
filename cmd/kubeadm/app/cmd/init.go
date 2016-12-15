@@ -216,7 +216,10 @@ func (i *Init) Validate() error {
 func (i *Init) Run(out io.Writer) error {
 
 	if i.cfg.Discovery.Token != nil {
-		if err := kubemaster.CreateTokenAuthFile(i.cfg.Discovery.Token); err != nil {
+		if err := kubemaster.PrepareTokenDiscovery(i.cfg.Discovery.Token); err != nil {
+			return err
+		}
+		if err := kubemaster.CreateTokenAuthFile(kubeadmutil.BearerToken(i.cfg.Discovery.Token)); err != nil {
 			return err
 		}
 	}

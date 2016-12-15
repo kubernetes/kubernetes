@@ -50,10 +50,10 @@ func TestValidTokenPopulatesSecrets(t *testing.T) {
 		if err != nil {
 			t.Errorf("generateTokenIfNeeded gave an error for a valid token: %v", err)
 		}
-		if s.ID != "" {
+		if s.ID == "" {
 			t.Errorf("generateTokenIfNeeded did not populate the TokenID correctly; expected ID to be non-empty")
 		}
-		if s.Secret != "" {
+		if s.Secret == "" {
 			t.Errorf("generateTokenIfNeeded did not populate the Token correctly; expected Secret to be non-empty")
 		}
 	})
