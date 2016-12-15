@@ -296,6 +296,9 @@ func (gc *GarbageCollector) classifyReferences(item *node, latestReferences []me
 		if err != nil {
 			return solid, dangling, waiting, err
 		}
+		// TODO: It's only necessary to talk to the API server if the owner node
+		// is a "virtual" node. The local graph could lag behind the real
+		// status, but in practice, the difference is small.
 		owner, err := client.Resource(resource, item.identity.Namespace).Get(reference.Name)
 		if err != nil {
 			if !errors.IsNotFound(err) {
@@ -350,7 +353,9 @@ func (gc *GarbageCollector) processItem(item *node) error {
 		glog.V(5).Infof("processing item %s returned at once", item.identity)
 		return nil
 	}
-	// Get the latest item from the API server
+	// TODO: It's only necessary to talk to the API server if this is a
+	// "virtual" node. The local graph could lag behind the real status, but in
+	// practice, the difference is small.
 	latest, err := gc.getObject(item.identity)
 	if err != nil {
 		if errors.IsNotFound(err) {
