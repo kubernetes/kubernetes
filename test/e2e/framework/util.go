@@ -4010,7 +4010,11 @@ func AllNodesReady(c clientset.Interface, timeout time.Duration) error {
 	}
 
 	if len(notReady) > TestContext.AllowedNotReadyNodes || !allowedNotReadyReasons(notReady) {
-		return fmt.Errorf("Not ready nodes: %#v", notReady)
+		msg := ""
+		for _, node := range notReady {
+			msg = fmt.Sprintf("%s, %s", msg, node.Name)
+		}
+		return fmt.Errorf("Not ready nodes: %#v", msg)
 	}
 	return nil
 }
