@@ -315,3 +315,19 @@ func IsCriticalPod(pod *v1.Pod) bool {
 	_, ok := pod.Annotations[kubetypes.CriticalPodAnnotationKey]
 	return ok
 }
+
+// Sort the container statuses by creation time.
+type SortPrioritizingCriticalPods []*v1.Pod
+
+func (s SortPrioritizingCriticalPods) Len() int {
+	return len(s)
+}
+func (s SortPrioritizingCriticalPods) Swap(i, j int) {
+	s[i], s[j] = s[j], s[i]
+}
+func (s SortPrioritizingCriticalPods) Less(i, j int) bool {
+	// If i is critical, we want it to move up the list.
+	// If both i and j are critical, it doesn't matter which we pick.
+	// TODO: consider breaking ties based on QoS?
+	return IsCriticalPod(s[i])
+}

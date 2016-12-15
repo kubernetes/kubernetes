@@ -461,6 +461,62 @@ func TestHandlePortConflicts(t *testing.T) {
 	require.Equal(t, v1.PodPending, status.Phase)
 }
 
+// Tests that we sort pods based on criticality.
+func TestCriticalPrioritySorting(t *testing.T) {
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	kl := testKubelet.kubelet
+	nodes := []v1.Node{
+		{ObjectMeta: v1.ObjectMeta{Name: testKubeletHostname},
+			Status: v1.NodeStatus{Capacity: v1.ResourceList{}, Allocatable: v1.ResourceList{
+				v1.ResourceCPU:    *resource.NewMilliQuantity(10, resource.DecimalSI),
+				v1.ResourceMemory: *resource.NewQuantity(100, resource.BinarySI),
+				v1.ResourcePods:   *resource.NewQuantity(40, resource.DecimalSI),
+			}}},
+	}
+	kl.nodeLister = testNodeLister{nodes: nodes}
+	kl.nodeInfo = testNodeInfo{nodes: nodes}
+	testKubelet.fakeCadvisor.On("MachineInfo").Return(&cadvisorapi.MachineInfo{}, nil)
+	testKubelet.fakeCadvisor.On("ImagesFsInfo").Return(cadvisorapiv2.FsInfo{}, nil)
+	testKubelet.fakeCadvisor.On("RootFsInfo").Return(cadvisorapiv2.FsInfo{}, nil)
+
+	spec := v1.PodSpec{NodeName: string(kl.nodeName),
+		Containers: []v1.Container{{Resources: v1.ResourceRequirements{
+			Requests: v1.ResourceList{
+				"memory": resource.MustParse("90"),
+			},
+		}}}}
+	pods := []*v1.Pod{
+		podWithUidNameNsSpec("123456789", "newpod", "foo", spec),
+		podWithUidNameNsSpec("987654321", "oldpod", "foo", spec),
+	}
+
+	// Make sure the Pods are in the same order of creation time.
+	pods[0].CreationTimestamp = metav1.NewTime(time.Now())
+	pods[1].CreationTimestamp = metav1.NewTime(time.Now().Add(1 * time.Second))
+
+	// Make the older pod more critical.
+	pods[0].Annotations = map[string]string{}
+	pods[1].Annotations = map[string]string{
+		kubetypes.CriticalPodAnnotationKey: "",
+	}
+
+	// The non-critical pod should be rejected
+	notfittingPod := pods[0]
+	fittingPod := pods[1]
+
+	kl.HandlePodAdditions(pods)
+	// Check pod status stored in the status map.
+	// notfittingPod should be Failed
+	status, found := kl.statusManager.GetPodStatus(notfittingPod.UID)
+	require.True(t, found, "Status of pod %q is not found in the status map", notfittingPod.UID)
+	require.Equal(t, v1.PodFailed, status.Phase)
+
+	// fittingPod should be Pending
+	status, found = kl.statusManager.GetPodStatus(fittingPod.UID)
+	require.True(t, found, "Status of pod %q is not found in the status map", fittingPod.UID)
+	require.Equal(t, v1.PodPending, status.Phase)
+}
+
 // Tests that we handle host name conflicts correctly by setting the failed status in status map.
 func TestHandleHostNameConflicts(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
