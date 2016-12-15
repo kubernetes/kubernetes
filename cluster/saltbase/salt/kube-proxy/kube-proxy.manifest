@@ -38,6 +38,14 @@ kind: Pod
 metadata:
   name: kube-proxy
   namespace: kube-system
+  # This annotation lowers the possibility that kube-proxy gets evicted when the
+  # node is under memory pressure, and prioritizes it for admission, even if
+  # the node is under memory pressure.
+  # Note that kube-proxy runs as a static pod so this annotation does NOT have
+  # any effect on rescheduler (default scheduler and rescheduler are not
+  # involved in scheduling kube-proxy).
+  annotations:
+    scheduler.alpha.kubernetes.io/critical-pod: ''
   labels:
     tier: node
     component: kube-proxy
