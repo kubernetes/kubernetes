@@ -540,6 +540,7 @@ func describePod(pod *api.Pod, events *api.EventList) (string, error) {
 		}
 		describeVolumes(pod.Spec.Volumes, w, "")
 		w.Write(LEVEL_0, "QoS Class:\t%s\n", qos.InternalGetPodQOS(pod))
+		printLabelsMultiline(w, "Node-Selectors", pod.Spec.NodeSelector)
 		printTolerationsInAnnotationMultiline(w, "Tolerations", pod.Annotations)
 		if events != nil {
 			DescribeEvents(events, w)
