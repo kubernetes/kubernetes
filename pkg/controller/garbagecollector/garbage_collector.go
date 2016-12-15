@@ -44,7 +44,7 @@ import (
 
 const ResourceResyncTime time.Duration = 0
 
-// GarbageCollector runs controllers to watch for changes of managed API
+// GarbageCollector runs monitors to watch for changes of managed API
 // objects, funnels the results to a single-threaded dependencyGraphBuilder,
 // which builds a graph caching the dependencies among objects. Triggered by the
 // graph changes, the dependencyGraphBuilder enqueues objects that can
@@ -64,7 +64,7 @@ type GarbageCollector struct {
 	attemptToDelete workqueue.RateLimitingInterface
 	// garbage collector attempts to orphan the dependents of the items in the attemptToOrphan queue, then deletes the items.
 	attemptToOrphan                     workqueue.RateLimitingInterface
-	controllers                         []*cache.Controller
+	monitors                            []*cache.Controller
 	dependencyGraphBuilder              *GraphBuilder
 	registeredRateLimiter               *RegisteredRateLimiter
 	registeredRateLimiterForControllers *RegisteredRateLimiter
@@ -112,7 +112,7 @@ func (gc *GarbageCollector) controllerFor(resource schema.GroupVersionResource, 
 		}
 		runtimeObject.GetObjectKind().SetGroupVersionKind(kind)
 	}
-	_, controller := cache.NewInformer(
+	_, monitor := cache.NewInformer(
 		gcListWatcher(client, resource),
 		nil,
 		ResourceResyncTime,
@@ -147,7 +147,7 @@ func (gc *GarbageCollector) controllerFor(resource schema.GroupVersionResource, 
 			},
 		},
 	)
-	return controller, nil
+	return monitor, nil
 }
 
 var ignoredResources = map[schema.GroupVersionResource]struct{}{
@@ -198,7 +198,7 @@ func NewGarbageCollector(metaOnlyClientPool dynamic.ClientPool, clientPool dynam
 		if err != nil {
 			return nil, err
 		}
-		gc.controllers = append(gc.controllers, controller)
+		gc.monitors = append(gc.monitors, monitor)
 	}
 	return gc, nil
 }
@@ -209,13 +209,13 @@ func (gc *GarbageCollector) Run(workers int, stopCh <-chan struct{}) {
 	defer gc.dependencyGraphBuilder.graphChanges.ShutDown()
 
 	glog.Infof("Garbage Collector: Initializing")
-	for _, controller := range gc.controllers {
-		go controller.Run(stopCh)
+	for _, monitor := range gc.monitors {
+		go monitor.Run(stopCh)
 	}
 
 	var syncs []cache.InformerSynced
-	for _, controller := range gc.controllers {
-		syncs = syncs.append(controller.HasSynced())
+	for _, monitor := range gc.monitors {
+		syncs = syncs.append(monitor.HasSynced())
 	}
 	if !cache.WaitForCacheSync(stopCh, syncs...) {
 		return
