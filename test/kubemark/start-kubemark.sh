@@ -25,36 +25,31 @@ source "${KUBE_ROOT}/test/kubemark/common.sh"
 function writeEnvironmentFile() {
   cat > "${RESOURCE_DIRECTORY}/kubemark-master-env.sh" <<EOF
 # Generic variables.
-INSTANCE_PREFIX=${INSTANCE_PREFIX}
-SERVICE_CLUSTER_IP_RANGE=${SERVICE_CLUSTER_IP_RANGE}
+INSTANCE_PREFIX="${INSTANCE_PREFIX:-}"
+SERVICE_CLUSTER_IP_RANGE="${SERVICE_CLUSTER_IP_RANGE:-}"
 
 # Etcd related variables.
-ETCD_IMAGE=2.2.1
+ETCD_IMAGE="${ETCD_IMAGE:-2.2.1}"
+ETCD_VERSION="${ETCD_VERSION:-}"
 
 # Controller-manager related variables.
-CONTROLLER_MANAGER_TEST_ARGS="${CONTROLLER_MANAGER_TEST_ARGS}"
-ALLOCATE_NODE_CIDRS=${ALLOCATE_NODE_CIDRS}
-CLUSTER_IP_RANGE=${CLUSTER_IP_RANGE}
-TERMINATED_POD_GC_THRESHOLD=${TERMINATED_POD_GC_THRESHOLD}
+CONTROLLER_MANAGER_TEST_ARGS="${CONTROLLER_MANAGER_TEST_ARGS:-}"
+ALLOCATE_NODE_CIDRS="${ALLOCATE_NODE_CIDRS:-}"
+CLUSTER_IP_RANGE="${CLUSTER_IP_RANGE:-}"
+TERMINATED_POD_GC_THRESHOLD="${TERMINATED_POD_GC_THRESHOLD:-}"
 
 # Scheduler related variables.
-SCHEDULER_TEST_ARGS="${SCHEDULER_TEST_ARGS}"
+SCHEDULER_TEST_ARGS="${SCHEDULER_TEST_ARGS:-}"
 
 # Apiserver related variables.
-APISERVER_TEST_ARGS="${APISERVER_TEST_ARGS}"
-STORAGE_BACKEND=${STORAGE_BACKEND}
-NUM_NODES=${NUM_NODES}
+APISERVER_TEST_ARGS="${APISERVER_TEST_ARGS:-}"
+STORAGE_BACKEND="${STORAGE_BACKEND:-}"
+NUM_NODES="${NUM_NODES:-}"
+CUSTOM_ADMISSION_PLUGINS="${CUSTOM_ADMISSION_PLUGINS:-NamespaceLifecycle,LimitRanger,ServiceAccount,ResourceQuota}"
 EOF
-if [ -z "${CUSTOM_ADMISSION_PLUGINS:-}" ]; then
-  cat >> "${RESOURCE_DIRECTORY}/kubemark-master-env.sh" <<EOF
-CUSTOM_ADMISSION_PLUGINS=NamespaceLifecycle,LimitRanger,ServiceAccount,ResourceQuota
-EOF
-else
-  cat >> "${RESOURCE_DIRECTORY}/kubemark-master-env.sh" <<EOF
-CUSTOM_ADMISSION_PLUGINS=${CUSTOM_ADMISSION_PLUGINS}
-EOF
-fi
 }
+
+writeEnvironmentFile
 
 MAKE_DIR="${KUBE_ROOT}/cluster/images/kubemark"
 
@@ -161,7 +156,6 @@ gcloud compute ssh --zone="${ZONE}" --project="${PROJECT}" "${MASTER_NAME}" \
     sudo bash -c \"echo \"${KUBE_PROXY_TOKEN},kube_proxy,kube_proxy\" >> /srv/kubernetes/known_tokens.csv\" && \
     sudo bash -c \"echo ${password},admin,admin > /srv/kubernetes/basic_auth.csv\""
 
-writeEnvironmentFile
 
 gcloud compute copy-files --zone="${ZONE}" --project="${PROJECT}" \
   "${SERVER_BINARY_TAR}" \
