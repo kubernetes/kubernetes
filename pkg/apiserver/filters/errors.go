@@ -26,6 +26,8 @@ import (
 
 // badGatewayError renders a simple bad gateway error.
 func badGatewayError(w http.ResponseWriter, req *http.Request) {
+	w.Header().Set("Content-Type", "text/plain")
+	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.WriteHeader(http.StatusBadGateway)
 	fmt.Fprintf(w, "Bad Gateway: %#v", req.RequestURI)
 }
@@ -33,6 +35,8 @@ func badGatewayError(w http.ResponseWriter, req *http.Request) {
 // forbidden renders a simple forbidden error
 func forbidden(attributes authorizer.Attributes, w http.ResponseWriter, req *http.Request, reason string) {
 	msg := forbiddenMessage(attributes)
+	w.Header().Set("Content-Type", "text/plain")
+	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.WriteHeader(http.StatusForbidden)
 	fmt.Fprintf(w, "%s: %q", msg, reason)
 }
@@ -57,6 +61,8 @@ func forbiddenMessage(attributes authorizer.Attributes) string {
 
 // internalError renders a simple internal error
 func internalError(w http.ResponseWriter, req *http.Request, err error) {
+	w.Header().Set("Content-Type", "text/plain")
+	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.WriteHeader(http.StatusInternalServerError)
 	fmt.Fprintf(w, "Internal Server Error: %#v", req.RequestURI)
 	runtime.HandleError(err)
