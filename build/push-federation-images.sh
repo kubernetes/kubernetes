@@ -14,21 +14,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Run a command in the docker build container.  Typically this will be one of
-# the commands in `hack/`.  When running in the build container the user is sure
-# to have a consistent reproducible build environment.
+# Pushes federation container images to existing repositories
 
 set -o errexit
 set -o nounset
 set -o pipefail
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
-source "$KUBE_ROOT/build-tools/common.sh"
 
-kube::build::verify_prereqs
-kube::build::build_image
-kube::build::run_build_command "$@"
+source "${KUBE_ROOT}/build/util.sh"
 
-if [[ ${KUBE_RUN_COPY_OUTPUT:-y} =~ ^[yY]$ ]]; then
-  kube::build::copy_output
-fi
+source "${KUBE_ROOT}/federation/cluster/common.sh"
+
+FEDERATION_IMAGE_TAG="$(kube::release::semantic_image_tag_version)" push-federation-images

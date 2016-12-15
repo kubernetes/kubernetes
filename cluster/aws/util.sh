@@ -1549,7 +1549,7 @@ function kube-push {
 #   KUBE_ROOT
 function test-build-release {
   # Make a release
-  "${KUBE_ROOT}/build-tools/release.sh"
+  "${KUBE_ROOT}/build/release.sh"
 }
 
 # Execute prior to running tests to initialize required structure. This is
