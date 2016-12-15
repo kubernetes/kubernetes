@@ -29,6 +29,7 @@ import (
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/controller/job"
 	"k8s.io/kubernetes/pkg/util/wait"
+	"k8s.io/kubernetes/pkg/version"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
 
@@ -46,6 +47,19 @@ var _ = framework.KubeDescribe("ScheduledJob", func() {
 	f := framework.NewFramework("scheduledjob", options, nil)
 
 	BeforeEach(func() {
+		// ScheduledJob was renamed to CronJob for the 1.5
+		// release. However, the ScheduledJob endpoint still
+		// exists, but returns CronJob objects. These tests
+		// can't work with that.
+		v := version.MustParse("1.5.0")
+		gte, err := framework.ServerVersionGTE(v, f.Client)
+		if err != nil {
+			framework.Failf("Failed to get server version: %v", err)
+		}
+		if gte {
+			framework.Skipf("Not supported for server versions after %q", v)
+		}
+
 		framework.SkipIfMissingResource(f.ClientPool, unversioned.GroupVersionResource{Group: batch.GroupName, Version: "v2alpha1", Resource: "scheduledjobs"}, f.Namespace.Name)
 	})
 
