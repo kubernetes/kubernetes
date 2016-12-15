@@ -12,6 +12,7 @@ go_library(
     srcs = ["fake.go"],
     tags = ["automanaged"],
     deps = [
+        "//federation/client/clientset_generated/federation_internalclientset:go_default_library",
         "//pkg/api:go_default_library",
         "//pkg/api/meta:go_default_library",
         "//pkg/api/testapi:go_default_library",
