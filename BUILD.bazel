@@ -10,6 +10,6 @@ go_prefix("k8s.io/kubernetes")
 gcs_upload(
     name = "ci-artifacts",
     data = [
-        "//build-tools/debs",
+        "//build/debs",
     ],
 )
