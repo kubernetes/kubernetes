@@ -17,9 +17,7 @@ limitations under the License.
 package cmd
 
 import (
-	"bytes"
 	"fmt"
-	"html/template"
 	"io"
 	"io/ioutil"
 
@@ -28,25 +26,15 @@ import (
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiext "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
+	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/flags"
+	"k8s.io/kubernetes/cmd/kubeadm/app/discovery"
 	kubemaster "k8s.io/kubernetes/cmd/kubeadm/app/master"
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/runtime"
 	netutil "k8s.io/kubernetes/pkg/util/net"
-)
-
-const (
-	joinArgsTemplateLiteral = `--token={{.Cfg.Secrets.GivenToken -}}
-		{{if ne .Cfg.API.BindPort .DefaultAPIBindPort -}}
-		{{" --api-port="}}{{.Cfg.API.BindPort -}}
-		{{end -}}
-		{{if ne .Cfg.Discovery.BindPort .DefaultDiscoveryBindPort -}}
-		{{" --discovery-port="}}{{.Cfg.Discovery.BindPort -}}
-		{{end -}}
-		{{" "}}{{index .Cfg.API.AdvertiseAddresses 0 -}}
-`
 )
 
 var (
@@ -59,7 +47,7 @@ var (
 
 		You can now join any number of machines by running the following on each node:
 
-		kubeadm join %s
+		kubeadm join --discovery %s
 		`)
 )
 
@@ -78,14 +66,11 @@ func NewCmdInit(out io.Writer) *cobra.Command {
 		Run: func(cmd *cobra.Command, args []string) {
 			i, err := NewInit(cfgPath, &cfg, skipPreFlight)
 			kubeadmutil.CheckErr(err)
+			kubeadmutil.CheckErr(i.Validate())
 			kubeadmutil.CheckErr(i.Run(out))
 		},
 	}
 
-	cmd.PersistentFlags().StringVar(
-		&cfg.Secrets.GivenToken, "token", cfg.Secrets.GivenToken,
-		"Shared secret used to secure cluster bootstrap; if none is provided, one will be generated for you",
-	)
 	cmd.PersistentFlags().StringSliceVar(
 		&cfg.API.AdvertiseAddresses, "api-advertise-addresses", cfg.API.AdvertiseAddresses,
 		"The IP addresses to advertise, in case autodetection fails",
@@ -148,14 +133,9 @@ func NewCmdInit(out io.Writer) *cobra.Command {
 		"skip preflight checks normally run before modifying the system",
 	)
 
-	cmd.PersistentFlags().Int32Var(
-		&cfg.API.BindPort, "api-port", cfg.API.BindPort,
-		"Port for API to bind to",
-	)
-
-	cmd.PersistentFlags().Int32Var(
-		&cfg.Discovery.BindPort, "discovery-port", cfg.Discovery.BindPort,
-		"Port for JWS discovery service to bind to",
+	cmd.PersistentFlags().Var(
+		discovery.NewDiscoveryValue(&cfg.Discovery), "discovery",
+		"The discovery method kubeadm will use for connecting nodes to the master",
 	)
 
 	return cmd
@@ -228,17 +208,20 @@ func NewInit(cfgPath string, cfg *kubeadmapi.MasterConfiguration, skipPreFlight 
 	return &Init{cfg: cfg}, nil
 }
 
-// joinArgsData denotes a data object which is needed by function generateJoinArgs to generate kubeadm join arguments.
-type joinArgsData struct {
-	Cfg                      *kubeadmapi.MasterConfiguration
-	DefaultAPIBindPort       int32
-	DefaultDiscoveryBindPort int32
+func (i *Init) Validate() error {
+	return validation.ValidateMasterConfiguration(i.cfg).ToAggregate()
 }
 
 // Run executes master node provisioning, including certificates, needed static pod manifests, etc.
 func (i *Init) Run(out io.Writer) error {
-	if err := kubemaster.CreateTokenAuthFile(&i.cfg.Secrets); err != nil {
-		return err
+
+	if i.cfg.Discovery.Token != nil {
+		if err := kubemaster.PrepareTokenDiscovery(i.cfg.Discovery.Token); err != nil {
+			return err
+		}
+		if err := kubemaster.CreateTokenAuthFile(kubeadmutil.BearerToken(i.cfg.Discovery.Token)); err != nil {
+			return err
+		}
 	}
 
 	if err := kubemaster.WriteStaticPodManifests(i.cfg); err != nil {
@@ -275,34 +258,25 @@ func (i *Init) Run(out io.Writer) error {
 		return err
 	}
 
-	schedulePodsOnMaster := false
-	if err := kubemaster.UpdateMasterRoleLabelsAndTaints(client, schedulePodsOnMaster); err != nil {
+	if err := kubemaster.UpdateMasterRoleLabelsAndTaints(client, false); err != nil {
 		return err
 	}
 
-	if err := kubemaster.CreateDiscoveryDeploymentAndSecret(i.cfg, client, caCert); err != nil {
-		return err
+	if i.cfg.Discovery.Token != nil {
+		if err := kubemaster.CreateDiscoveryDeploymentAndSecret(i.cfg, client, caCert); err != nil {
+			return err
+		}
 	}
 
 	if err := kubemaster.CreateEssentialAddons(i.cfg, client); err != nil {
 		return err
 	}
 
-	data := joinArgsData{i.cfg, kubeadmapiext.DefaultAPIBindPort, kubeadmapiext.DefaultDiscoveryBindPort}
-	if joinArgs, err := generateJoinArgs(data); err != nil {
-		return err
-	} else {
-		fmt.Fprintf(out, initDoneMsgf, joinArgs)
-	}
+	fmt.Fprintf(out, initDoneMsgf, generateJoinArgs(i.cfg))
 	return nil
 }
 
 // generateJoinArgs generates kubeadm join arguments
-func generateJoinArgs(data joinArgsData) (string, error) {
-	joinArgsTemplate := template.Must(template.New("joinArgsTemplate").Parse(joinArgsTemplateLiteral))
-	var b bytes.Buffer
-	if err := joinArgsTemplate.Execute(&b, data); err != nil {
-		return "", err
-	}
-	return b.String(), nil
+func generateJoinArgs(cfg *kubeadmapi.MasterConfiguration) string {
+	return discovery.NewDiscoveryValue(&cfg.Discovery).String()
 }

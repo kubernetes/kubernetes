@@ -292,7 +292,7 @@ func getAPIServerCommand(cfg *kubeadmapi.MasterConfiguration) []string {
 		"--tls-cert-file="+kubeadmapi.GlobalEnvParams.HostPKIPath+"/apiserver.pem",
 		"--tls-private-key-file="+kubeadmapi.GlobalEnvParams.HostPKIPath+"/apiserver-key.pem",
 		"--token-auth-file="+kubeadmapi.GlobalEnvParams.HostPKIPath+"/tokens.csv",
-		fmt.Sprintf("--secure-port=%d", cfg.API.BindPort),
+		fmt.Sprintf("--secure-port=%d", cfg.API.Port),
 		"--allow-privileged",
 	)
 

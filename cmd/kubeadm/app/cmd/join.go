@@ -26,10 +26,13 @@ import (
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiext "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
+	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
+	"k8s.io/kubernetes/cmd/kubeadm/app/discovery"
 	kubenode "k8s.io/kubernetes/cmd/kubeadm/app/node"
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/pkg/api"
+	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
 	"k8s.io/kubernetes/pkg/runtime"
 )
 
@@ -60,14 +63,10 @@ func NewCmdJoin(out io.Writer) *cobra.Command {
 		Run: func(cmd *cobra.Command, args []string) {
 			j, err := NewJoin(cfgPath, args, &cfg, skipPreFlight)
 			kubeadmutil.CheckErr(err)
+			kubeadmutil.CheckErr(j.Validate())
 			kubeadmutil.CheckErr(j.Run(out))
 		},
 	}
-
-	cmd.PersistentFlags().StringVar(
-		&cfg.Secrets.GivenToken, "token", cfg.Secrets.GivenToken,
-		"(required) Shared secret used to secure bootstrap. Must match the output of 'kubeadm init'",
-	)
 
 	cmd.PersistentFlags().StringVar(&cfgPath, "config", cfgPath, "Path to kubeadm config file")
 
@@ -76,14 +75,9 @@ func NewCmdJoin(out io.Writer) *cobra.Command {
 		"skip preflight checks normally run before modifying the system",
 	)
 
-	cmd.PersistentFlags().Int32Var(
-		&cfg.APIPort, "api-port", cfg.APIPort,
-		"(optional) API server port on the master",
-	)
-
-	cmd.PersistentFlags().Int32Var(
-		&cfg.DiscoveryPort, "discovery-port", cfg.DiscoveryPort,
-		"(optional) Discovery port on the master",
+	cmd.PersistentFlags().Var(
+		discovery.NewDiscoveryValue(&cfg.Discovery), "discovery",
+		"The discovery method kubeadm will use for connecting nodes to the master",
 	)
 
 	return cmd
@@ -107,14 +101,6 @@ func NewJoin(cfgPath string, args []string, cfg *kubeadmapi.NodeConfiguration, s
 		}
 	}
 
-	if len(args) == 0 && len(cfg.MasterAddresses) == 0 {
-		return nil, fmt.Errorf("must specify master address (see --help)")
-	}
-	cfg.MasterAddresses = append(cfg.MasterAddresses, args...)
-	if len(cfg.MasterAddresses) > 1 {
-		return nil, fmt.Errorf("must not specify more than one master address (see --help)")
-	}
-
 	if !skipPreFlight {
 		fmt.Println("[preflight] Running pre-flight checks")
 
@@ -134,40 +120,46 @@ func NewJoin(cfgPath string, args []string, cfg *kubeadmapi.NodeConfiguration, s
 	// Try to start the kubelet service in case it's inactive
 	preflight.TryStartKubelet()
 
-	ok, err := kubeadmutil.UseGivenTokenIfValid(&cfg.Secrets)
-	if !ok {
-		if err != nil {
-			return nil, fmt.Errorf("%v (see --help)", err)
-		}
-		return nil, fmt.Errorf("Must specify --token (see --help)")
-	}
-
 	return &Join{cfg: cfg}, nil
+}
+
+func (j *Join) Validate() error {
+	return validation.ValidateNodeConfiguration(j.cfg).ToAggregate()
 }
 
 // Run executes worked node provisioning and tries to join an existing cluster.
 func (j *Join) Run(out io.Writer) error {
-	clusterInfo, err := kubenode.RetrieveTrustedClusterInfo(j.cfg)
+	clusterInfo, err := kubenode.RetrieveTrustedClusterInfo(j.cfg.Discovery.Token)
 	if err != nil {
 		return err
 	}
 
-	connectionDetails, err := kubenode.EstablishMasterConnection(j.cfg, clusterInfo)
-	if err != nil {
-		return err
+	var cfg *clientcmdapi.Config
+	// TODO: delete this first block when we move Token to the discovery interface
+	if j.cfg.Discovery.Token != nil {
+		connectionDetails, err := kubenode.EstablishMasterConnection(j.cfg.Discovery.Token, clusterInfo)
+		if err != nil {
+			return err
+		}
+		err = kubenode.CheckForNodeNameDuplicates(connectionDetails)
+		if err != nil {
+			return err
+		}
+		cfg, err = kubenode.PerformTLSBootstrapDeprecated(connectionDetails)
+		if err != nil {
+			return err
+		}
+	} else {
+		cfg, err = discovery.For(j.cfg.Discovery)
+		if err != nil {
+			return err
+		}
+		if err := kubenode.PerformTLSBootstrap(cfg); err != nil {
+			return err
+		}
 	}
 
-	err = kubenode.CheckForNodeNameDuplicates(connectionDetails)
-	if err != nil {
-		return err
-	}
-
-	kubeconfig, err := kubenode.PerformTLSBootstrap(connectionDetails)
-	if err != nil {
-		return err
-	}
-
-	err = kubeadmutil.WriteKubeconfigIfNotExists("kubelet", kubeconfig)
+	err = kubeadmutil.WriteKubeconfigIfNotExists("kubelet", cfg)
 	if err != nil {
 		return err
 	}
