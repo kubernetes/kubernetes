@@ -44,11 +44,6 @@ import (
 
 const ResourceResyncTime time.Duration = 0
 
-type monitor struct {
-	store      cache.Store
-	controller *cache.Controller
-}
-
 // GarbageCollector is responsible for carrying out cascading deletion, and
 // removing ownerReferences from the dependents if the owner is deleted with
 // DeleteOptions.OrphanDependents=true.
@@ -59,13 +54,13 @@ type GarbageCollector struct {
 	metaOnlyClientPool dynamic.ClientPool
 	// clientPool uses the regular dynamicCodec. We need it to update
 	// finalizers. It can be removed if we support patching finalizers.
-	clientPool                       dynamic.ClientPool
-	dirtyQueue                       workqueue.RateLimitingInterface
-	orphanQueue                      workqueue.RateLimitingInterface
-	monitors                         []monitor
-	propagator                       *Propagator
-	registeredRateLimiter            *RegisteredRateLimiter
-	registeredRateLimiterForMonitors *RegisteredRateLimiter
+	clientPool                          dynamic.ClientPool
+	dirtyQueue                          workqueue.RateLimitingInterface
+	orphanQueue                         workqueue.RateLimitingInterface
+	controllers                         []*cache.Controller
+	propagator                          *Propagator
+	registeredRateLimiter               *RegisteredRateLimiter
+	registeredRateLimiterForControllers *RegisteredRateLimiter
 	// GC caches the owners that do not exist according to the API server.
 	absentOwnerCache *UIDCache
 }
@@ -95,15 +90,14 @@ func gcListWatcher(client *dynamic.Client, resource schema.GroupVersionResource)
 	}
 }
 
-func (gc *GarbageCollector) monitorFor(resource schema.GroupVersionResource, kind schema.GroupVersionKind) (monitor, error) {
+func (gc *GarbageCollector) controllerFor(resource schema.GroupVersionResource, kind schema.GroupVersionKind) (*cache.Controller, error) {
 	// TODO: consider store in one storage.
 	glog.V(6).Infof("create storage for resource %s", resource)
-	var monitor monitor
 	client, err := gc.metaOnlyClientPool.ClientForGroupVersionKind(kind)
 	if err != nil {
-		return monitor, err
+		return nil, err
 	}
-	gc.registeredRateLimiterForMonitors.registerIfNotPresent(resource.GroupVersion(), client, "garbage_collector_monitoring")
+	gc.registeredRateLimiterForControllers.registerIfNotPresent(resource.GroupVersion(), client, "garbage_collector_monitoring")
 	setObjectTypeMeta := func(obj interface{}) {
 		runtimeObject, ok := obj.(runtime.Object)
 		if !ok {
@@ -111,7 +105,7 @@ func (gc *GarbageCollector) monitorFor(resource schema.GroupVersionResource, kin
 		}
 		runtimeObject.GetObjectKind().SetGroupVersionKind(kind)
 	}
-	monitor.store, monitor.controller = cache.NewInformer(
+	_, controller := cache.NewInformer(
 		gcListWatcher(client, resource),
 		nil,
 		ResourceResyncTime,
@@ -144,7 +138,7 @@ func (gc *GarbageCollector) monitorFor(resource schema.GroupVersionResource, kin
 			},
 		},
 	)
-	return monitor, nil
+	return controller, nil
 }
 
 var ignoredResources = map[schema.GroupVersionResource]struct{}{
@@ -163,14 +157,14 @@ func NewGarbageCollector(metaOnlyClientPool dynamic.ClientPool, clientPool dynam
 	orphanQueue := workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "garbage_collector_orphan")
 	absentOwnerCache := NewUIDCache(500)
 	gc := &GarbageCollector{
-		metaOnlyClientPool:               metaOnlyClientPool,
-		clientPool:                       clientPool,
-		restMapper:                       mapper,
-		dirtyQueue:                       dirtyQueue,
-		orphanQueue:                      orphanQueue,
-		registeredRateLimiter:            NewRegisteredRateLimiter(deletableResources),
-		registeredRateLimiterForMonitors: NewRegisteredRateLimiter(deletableResources),
-		absentOwnerCache:                 absentOwnerCache,
+		metaOnlyClientPool:                  metaOnlyClientPool,
+		clientPool:                          clientPool,
+		restMapper:                          mapper,
+		dirtyQueue:                          dirtyQueue,
+		orphanQueue:                         orphanQueue,
+		registeredRateLimiter:               NewRegisteredRateLimiter(deletableResources),
+		registeredRateLimiterForControllers: NewRegisteredRateLimiter(deletableResources),
+		absentOwnerCache:                    absentOwnerCache,
 	}
 	gc.propagator = &Propagator{
 		eventQueue: workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "garbage_collector_event"),
@@ -191,11 +185,11 @@ func NewGarbageCollector(metaOnlyClientPool dynamic.ClientPool, clientPool dynam
 		if err != nil {
 			return nil, err
 		}
-		monitor, err := gc.monitorFor(resource, kind)
+		controller, err := gc.controllerFor(resource, kind)
 		if err != nil {
 			return nil, err
 		}
-		gc.monitors = append(gc.monitors, monitor)
+		gc.controllers = append(gc.controllers, controller)
 	}
 	return gc, nil
 }
@@ -206,13 +200,13 @@ func (gc *GarbageCollector) Run(workers int, stopCh <-chan struct{}) {
 	defer gc.propagator.eventQueue.ShutDown()
 
 	glog.Infof("Garbage Collector: Initializing")
-	for _, monitor := range gc.monitors {
-		go monitor.controller.Run(stopCh)
+	for _, controller := range gc.controllers {
+		go controller.Run(stopCh)
 	}
 
 	var syncs []cache.InformerSynced
-	for _, monitor := range gc.monitors {
-		syncs = syncs.append(monitor.controller.HasSynced())
+	for _, controller := range gc.controllers {
+		syncs = syncs.append(controller.HasSynced())
 	}
 	if !cache.WaitForCacheSync(stopCh, syncs...) {
 		return
