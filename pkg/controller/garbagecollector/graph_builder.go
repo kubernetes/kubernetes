@@ -83,7 +83,7 @@ func (p *GraphBuilder) addDependentToOwners(n *node, owners []metav1.OwnerRefere
 				},
 				dependents: make(map[*node]struct{}),
 			}
-			glog.V(6).Infof("add virtual node.identity: %s\n\n", ownerNode.identity)
+			glog.V(5).Infof("add virtual node.identity: %s\n\n", ownerNode.identity)
 			p.uidToNode.Write(ownerNode)
 			p.attemptToDelete.Add(ownerNode)
 		}
@@ -225,7 +225,7 @@ func (p *GraphBuilder) addUnblockedOwnersToDirtyQueue(removed []metav1.OwnerRefe
 		if ref.BlockOwnerDeletion != nil && *ref.BlockOwnerDeletion {
 			node, found := p.uidToNode.Read(ref.UID)
 			if !found {
-				glog.V(6).Infof("cannot find %s in uidToNode", ref.UID)
+				glog.V(5).Infof("cannot find %s in uidToNode", ref.UID)
 				continue
 			}
 			p.attemptToDelete.Add(node)
@@ -236,7 +236,7 @@ func (p *GraphBuilder) addUnblockedOwnersToDirtyQueue(removed []metav1.OwnerRefe
 			c.new.BlockOwnerDeletion != nil && !*c.new.BlockOwnerDeletion {
 			node, found := p.uidToNode.Read(c.new.UID)
 			if !found {
-				glog.V(6).Infof("cannot find %s in uidToNode", c.new.UID)
+				glog.V(5).Infof("cannot find %s in uidToNode", c.new.UID)
 				continue
 			}
 			p.attemptToDelete.Add(node)
@@ -267,7 +267,7 @@ func (p *GraphBuilder) processEvent() {
 		utilruntime.HandleError(fmt.Errorf("cannot access obj: %v", err))
 		return
 	}
-	glog.V(6).Infof("GraphBuilder process object: %s/%s, namespace %s, name %s, event type %s", typeAccessor.GetAPIVersion(), typeAccessor.GetKind(), accessor.GetNamespace(), accessor.GetName(), event.eventType)
+	glog.V(5).Infof("GraphBuilder process object: %s/%s, namespace %s, name %s, event type %s", typeAccessor.GetAPIVersion(), typeAccessor.GetKind(), accessor.GetNamespace(), accessor.GetName(), event.eventType)
 	// Check if the node already exsits
 	existingNode, found := p.uidToNode.Read(accessor.GetUID())
 	switch {
@@ -290,7 +290,7 @@ func (p *GraphBuilder) processEvent() {
 		p.insertNode(newNode)
 		// the underlying delta_fifo may combine a creation and deletion into one event
 		if shouldOrphanDependents(event, accessor) {
-			glog.V(6).Infof("add %s to the attemptToOrphan", newNode.identity)
+			glog.V(5).Infof("add %s to the attemptToOrphan", newNode.identity)
 			p.attemptToOrphan.Add(newNode)
 		}
 		if startsWaitingForDependentsDeletion(event, accessor) {
@@ -304,7 +304,7 @@ func (p *GraphBuilder) processEvent() {
 		// caveat: if GC observes the creation of the dependents later than the
 		// deletion of the owner, then the orphaning finalizer won't be effective.
 		if shouldOrphanDependents(event, accessor) {
-			glog.V(6).Infof("add %s to the attemptToOrphan", existingNode.identity)
+			glog.V(5).Infof("add %s to the attemptToOrphan", existingNode.identity)
 			p.attemptToOrphan.Add(existingNode)
 		}
 		if beingDeleted(accessor) {
@@ -322,11 +322,11 @@ func (p *GraphBuilder) processEvent() {
 		// add/remove owner refs
 		added, removed, changed := referencesDiffs(existingNode.owners, accessor.GetOwnerReferences())
 		if len(added) == 0 && len(removed) == 0 && len(changed) == 0 {
-			glog.V(6).Infof("The updateEvent %#v doesn't change node references, ignore", event)
+			glog.V(5).Infof("The updateEvent %#v doesn't change node references, ignore", event)
 			return
 		}
 		if len(changed) != 0 {
-			glog.V(6).Infof("references %#v changed for object %s", changed, existingNode.identity)
+			glog.V(5).Infof("references %#v changed for object %s", changed, existingNode.identity)
 		}
 		p.addUnblockedOwnersToDirtyQueue(removed, changed)
 		// update the node itself
@@ -338,7 +338,7 @@ func (p *GraphBuilder) processEvent() {
 		p.removeDependentFromOwners(existingNode, removed)
 	case event.eventType == deleteEvent:
 		if !found {
-			glog.V(6).Infof("%v doesn't exist in the graph, this shouldn't happen", accessor.GetUID())
+			glog.V(5).Infof("%v doesn't exist in the graph, this shouldn't happen", accessor.GetUID())
 			return
 		}
 		p.removeNode(existingNode)

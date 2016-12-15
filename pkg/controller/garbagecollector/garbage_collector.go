@@ -94,7 +94,7 @@ func gcListWatcher(client *dynamic.Client, resource schema.GroupVersionResource)
 
 func (gc *GarbageCollector) controllerFor(resource schema.GroupVersionResource, kind schema.GroupVersionKind) (*cache.Controller, error) {
 	// TODO: consider store in one storage.
-	glog.V(6).Infof("create storage for resource %s", resource)
+	glog.V(5).Infof("create storage for resource %s", resource)
 	client, err := gc.metaOnlyClientPool.ClientForGroupVersionKind(kind)
 	if err != nil {
 		return nil, err
@@ -180,7 +180,7 @@ func NewGarbageCollector(metaOnlyClientPool dynamic.ClientPool, clientPool dynam
 	}
 	for resource := range deletableResources {
 		if _, ok := ignoredResources[resource]; ok {
-			glog.V(6).Infof("ignore resource %#v", resource)
+			glog.V(5).Infof("ignore resource %#v", resource)
 			continue
 		}
 		kind, err := gc.restMapper.KindFor(resource)
@@ -270,7 +270,7 @@ func (gc *GarbageCollector) classifyReferences(item *node, latestReferences []me
 	solid, dangling, waiting []metav1.OwnerReference, err error) {
 	for _, reference := range latestReferences {
 		if gc.absentOwnerCache.Has(reference.UID) {
-			glog.V(6).Infof("according to the absentOwnerCache, object %s's owner %s/%s, %s does not exist", item.identity.UID, reference.APIVersion, reference.Kind, reference.Name)
+			glog.V(5).Infof("according to the absentOwnerCache, object %s's owner %s/%s, %s does not exist", item.identity.UID, reference.APIVersion, reference.Kind, reference.Name)
 			dangling = append(dangling, reference)
 			continue
 		}
@@ -295,12 +295,12 @@ func (gc *GarbageCollector) classifyReferences(item *node, latestReferences []me
 				return solid, dangling, waiting, err
 			}
 			gc.absentOwnerCache.Add(reference.UID)
-			glog.V(6).Infof("object %s's owner %s/%s, %s is not found", item.identity.UID, reference.APIVersion, reference.Kind, reference.Name)
+			glog.V(5).Infof("object %s's owner %s/%s, %s is not found", item.identity.UID, reference.APIVersion, reference.Kind, reference.Name)
 			dangling = append(dangling, reference)
 		}
 
 		if owner.GetUID() != reference.UID {
-			glog.V(6).Infof("object %s's owner %s/%s, %s is not found, UID mismatch", item.identity.UID, reference.APIVersion, reference.Kind, reference.Name)
+			glog.V(5).Infof("object %s's owner %s/%s, %s is not found, UID mismatch", item.identity.UID, reference.APIVersion, reference.Kind, reference.Name)
 			gc.absentOwnerCache.Add(reference.UID)
 			dangling = append(dangling, reference)
 			continue
@@ -324,7 +324,7 @@ func (gc *GarbageCollector) generateVirtualDeleteEvent(identity objectReference)
 		eventType: deleteEvent,
 		obj:       objectReferenceToMetadataOnlyObject(identity),
 	}
-	glog.V(6).Infof("generating virtual delete event for %s\n\n", event.obj)
+	glog.V(5).Infof("generating virtual delete event for %s\n\n", event.obj)
 	gc.dependencyGraphBuilder.graphChanges.Add(event)
 }
 
@@ -340,7 +340,7 @@ func (gc *GarbageCollector) processItem(item *node) error {
 	glog.V(2).Infof("processing item %s", item.identity)
 	// "being deleted" is an one-way trip to the final deletion. We'll just wait for the final deletion, and then process the object's dependents.
 	if item.beingDeleted && !item.deletingDependents {
-		glog.V(6).Infof("processing item %s returned at once", item.identity)
+		glog.V(5).Infof("processing item %s returned at once", item.identity)
 		return nil
 	}
 	// Get the latest item from the API server
@@ -350,14 +350,14 @@ func (gc *GarbageCollector) processItem(item *node) error {
 			// the GraphBuilder can add "virtual" node for an owner that doesn't
 			// exist yet, so we need to enqueue a virtual Delete event to remove
 			// the virtual node from GraphBuilder.uidToNode.
-			glog.V(6).Infof("item %v not found, generating a virtual delete event", item.identity)
+			glog.V(5).Infof("item %v not found, generating a virtual delete event", item.identity)
 			gc.generateVirtualDeleteEvent(item.identity)
 			return nil
 		}
 		return err
 	}
 	if latest.GetUID() != item.identity.UID {
-		glog.V(6).Infof("UID doesn't match, item %v not found, generating a virtual delete event", item.identity)
+		glog.V(5).Infof("UID doesn't match, item %v not found, generating a virtual delete event", item.identity)
 		gc.generateVirtualDeleteEvent(item.identity)
 		return nil
 	}
@@ -378,7 +378,7 @@ func (gc *GarbageCollector) processItem(item *node) error {
 	if err != nil {
 		return err
 	}
-	glog.V(6).Infof("classify references of %s.\nsolid: %#v\ndangling: %#v\nwaiting: %#v\n", item.identity, solid, dangling, waiting)
+	glog.V(5).Infof("classify references of %s.\nsolid: %#v\ndangling: %#v\nwaiting: %#v\n", item.identity, solid, dangling, waiting)
 
 	switch {
 	case len(solid) != 0:
@@ -448,7 +448,7 @@ func (gc *GarbageCollector) orhpanDependents(owner objectReference, dependents [
 	if len(failedDependents) != 0 {
 		return fmt.Errorf("failed to orphan dependents of owner %s, got errors: %s", owner, utilerrors.NewAggregate(errorsSlice).Error())
 	}
-	glog.V(6).Infof("successfully updated all dependents")
+	glog.V(5).Infof("successfully updated all dependents")
 	return nil
 }
 
@@ -477,14 +477,14 @@ func (gc *GarbageCollector) orphanFinalizer() {
 
 	err := gc.orhpanDependents(owner.identity, dependents)
 	if err != nil {
-		glog.V(6).Infof("orphanDependents for %s failed with %v", owner.identity, err)
+		glog.V(5).Infof("orphanDependents for %s failed with %v", owner.identity, err)
 		gc.orphanQueue.AddRateLimited(item)
 		return
 	}
 	// update the owner, remove "orphaningFinalizer" from its finalizers list
 	err = gc.removeFinalizer(owner, v1.FinalizerOrphanDependents)
 	if err != nil {
-		glog.V(6).Infof("removeOrphanFinalizer for %s failed with %v", owner.identity, err)
+		glog.V(5).Infof("removeOrphanFinalizer for %s failed with %v", owner.identity, err)
 		gc.orphanQueue.AddRateLimited(item)
 	}
 }

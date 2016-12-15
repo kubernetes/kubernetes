@@ -38,7 +38,7 @@ func (gc *GarbageCollector) apiResource(apiVersion, kind string, namespaced bool
 	if err != nil {
 		return nil, fmt.Errorf("unable to get REST mapping for kind: %s, version: %s", kind, apiVersion)
 	}
-	glog.V(6).Infof("map kind %s, version %s to resource %s", kind, apiVersion, mapping.Resource)
+	glog.V(5).Infof("map kind %s, version %s to resource %s", kind, apiVersion, mapping.Resource)
 	resource := metav1.APIResource{
 		Name:       mapping.Resource,
 		Namespaced: namespaced,
@@ -122,7 +122,7 @@ func (gc *GarbageCollector) removeFinalizer(owner *node, targetFinalizer string)
 			}
 		}
 		if !found {
-			glog.V(6).Infof("the orphan finalizer is already removed from object %s", owner.identity)
+			glog.V(5).Infof("the orphan finalizer is already removed from object %s", owner.identity)
 			return nil
 		}
 		// remove the owner from dependent's OwnerReferences
@@ -135,7 +135,7 @@ func (gc *GarbageCollector) removeFinalizer(owner *node, targetFinalizer string)
 			return fmt.Errorf("cannot update the finalizers of owner %s, with error: %v, tried %d times", owner.identity, err, count+1)
 		}
 		// retry if it's a conflict
-		glog.V(6).Infof("got conflict updating the owner object %s, tried %d times", owner.identity, count+1)
+		glog.V(5).Infof("got conflict updating the owner object %s, tried %d times", owner.identity, count+1)
 	}
 	return fmt.Errorf("updateMaxRetries(%d) has reached. The garbage collector will retry later for owner %v.", retries, owner.identity)
 }
