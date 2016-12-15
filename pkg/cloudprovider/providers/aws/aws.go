@@ -365,6 +365,9 @@ type Cloud struct {
 	// and then get a second request before we attach the volume
 	attachingMutex sync.Mutex
 	attaching      map[types.NodeName]map[mountDevice]awsVolumeID
+
+	// state of our device allocator for each node
+	deviceAllocators map[types.NodeName]DeviceAllocator
 }
 
 var _ Volumes = &Cloud{}
@@ -796,7 +799,8 @@ func newAWSCloud(config io.Reader, awsServices Services) (*Cloud, error) {
 		cfg:      cfg,
 		region:   regionName,
 
-		attaching: make(map[types.NodeName]map[mountDevice]awsVolumeID),
+		attaching:        make(map[types.NodeName]map[mountDevice]awsVolumeID),
+		deviceAllocators: make(map[types.NodeName]DeviceAllocator),
 	}
 
 	selfAWSInstance, err := awsCloud.buildSelfAWSInstance()
@@ -1210,20 +1214,17 @@ func (c *Cloud) getMountDevice(i *awsInstance, volumeID awsVolumeID, assign bool
 		return mountDevice(""), false, nil
 	}
 
-	// Find the first unused device in sequence 'ba', 'bb', 'bc', ... 'bz', 'ca', ... 'zz'
-	var chosen mountDevice
-	for first := 'b'; first <= 'z' && chosen == ""; first++ {
-		for second := 'a'; second <= 'z' && chosen == ""; second++ {
-			candidate := mountDevice(fmt.Sprintf("%c%c", first, second))
-			if _, found := deviceMappings[candidate]; !found {
-				chosen = candidate
-				break
-			}
-		}
+	// Find the next unused device name
+	deviceAllocator := c.deviceAllocators[i.nodeName]
+	if deviceAllocator == nil {
+		// we want device names with two significant characters, starting with
+		// /dev/xvdba (leaving xvda - xvdz and xvdaa-xvdaz to the system)
+		deviceAllocator = NewDeviceAllocator(2, "ba")
+		c.deviceAllocators[i.nodeName] = deviceAllocator
 	}
-
-	if chosen == "" {
-		glog.Warningf("Could not assign a mount device (all in use?).  mappings=%v", deviceMappings)
+	chosen, err := deviceAllocator.GetNext(deviceMappings)
+	if err != nil {
+		glog.Warningf("Could not assign a mount device.  mappings=%v, error: %v", deviceMappings, err)
 		return "", false, fmt.Errorf("Too many EBS volumes attached to node %s.", i.nodeName)
 	}
 
