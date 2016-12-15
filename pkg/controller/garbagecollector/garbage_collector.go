@@ -63,10 +63,16 @@ type GarbageCollector struct {
 	// garbage collector attempts to delete the items in attemptToDelete queue when the time is ripe.
 	attemptToDelete workqueue.RateLimitingInterface
 	// garbage collector attempts to orphan the dependents of the items in the attemptToOrphan queue, then deletes the items.
-	attemptToOrphan                     workqueue.RateLimitingInterface
-	monitors                            []*cache.Controller
-	dependencyGraphBuilder              *GraphBuilder
-	registeredRateLimiter               *RegisteredRateLimiter
+	attemptToOrphan workqueue.RateLimitingInterface
+	// each monitor list/watches a resource, the results are funneled to the
+	// dependencyGraphBuilder
+	monitors               []*cache.Controller
+	dependencyGraphBuilder *GraphBuilder
+	// used to register exactly once the rate limiter of the dynamic client
+	// used by the garbage collector controller.
+	registeredRateLimiter *RegisteredRateLimiter
+	// used to register exactly once the rate limiters of the clients used by
+	// the `monitors`.
 	registeredRateLimiterForControllers *RegisteredRateLimiter
 	// GC caches the owners that do not exist according to the API server.
 	absentOwnerCache *UIDCache
