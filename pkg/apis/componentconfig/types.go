@@ -98,6 +98,7 @@ type ProxyMode string
 const (
 	ProxyModeUserspace ProxyMode = "userspace"
 	ProxyModeIPTables  ProxyMode = "iptables"
+	ProxyModeIPVS      ProxyMode = "ipvs"
 )
 
 // HairpinMode denotes how the kubelet should configure networking to handle
