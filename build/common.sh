@@ -626,7 +626,7 @@ function kube::build::start_rsyncd_container() {
 
   local mapped_port
   if ! mapped_port=$("${DOCKER[@]}" port "${KUBE_RSYNC_CONTAINER_NAME}" ${KUBE_CONTAINER_RSYNC_PORT} 2> /dev/null | cut -d: -f 2) ; then
-    kube:log:error "Could not get effective rsync port"
+    kube::log::error "Could not get effective rsync port"
     return 1
   fi
 
