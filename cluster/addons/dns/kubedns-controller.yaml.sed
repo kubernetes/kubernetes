@@ -156,3 +156,4 @@ spec:
             memory: 20Mi
             cpu: 10m
       dnsPolicy: Default  # Don't use cluster DNS.
+      serviceAccountName: kube-dns
