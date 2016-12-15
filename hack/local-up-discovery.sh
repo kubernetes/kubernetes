@@ -29,6 +29,7 @@ ROOT_CA_FILE=$CERT_DIR/apiserver.crt
 # Ensure CERT_DIR is created for auto-generated crt/key and kubeconfig
 mkdir -p "${CERT_DIR}" &>/dev/null || sudo mkdir -p "${CERT_DIR}"
 sudo=$(test -w "${CERT_DIR}" || echo "sudo -E")
+username=$(whoami)
 
 
 kubectl=$(kube::util::find-binary kubectl)
@@ -53,22 +54,16 @@ function start_discovery {
 	# etcd doesn't seem to have separate signers for serving and client trust
 	kube::util::create_client_certkey "${sudo}" "${CERT_DIR}" "etcd-ca" discovery-etcd discovery-etcd
 
-	# create credentials for running delegated authn/authz checks
-	# "client-ca" is created when you start the apiserver
-	kube::util::create_client_certkey "${sudo}" "${CERT_DIR}" "client-ca" discovery-auth system:discovery-auth
-	kube::util::write_client_kubeconfig "${sudo}" "${CERT_DIR}" "${ROOT_CA_FILE}" "kubernetes.default.svc" 443 discovery-auth
-	# ${kubectl} config set-cluster local-up-cluster --kubeconfig="${CERT_DIR}/discovery-auth.kubeconfig" --insecure-skip-tls-verify
-
 	# don't fail if the namespace already exists or something
 	# If this fails for some reason, the script will fail during creation of other resources
 	kubectl_core create namespace kube-public || true
 
 	# grant permission to run delegated authentication and authorization checks
 	kubectl_core delete clusterrolebinding discovery:system:auth-delegator > /dev/null 2>&1 || true
-	kubectl_core create clusterrolebinding discovery:system:auth-delegator --clusterrole=system:auth-delegator --user=system:discovery-auth
+	kubectl_core create clusterrolebinding discovery:system:auth-delegator --clusterrole=system:auth-delegator --serviceaccount=kube-public:kubernetes-discovery
 
 	# make sure the resources we're about to create don't exist
-	kubectl_core -n kube-public delete secret auth-proxy-client serving-etcd serving-discovery discovery-etcd discovery-auth-kubeconfig > /dev/null 2>&1 || true
+	kubectl_core -n kube-public delete secret auth-proxy-client serving-etcd serving-discovery discovery-etcd > /dev/null 2>&1 || true
 	kubectl_core -n kube-public delete configmap etcd-ca discovery-ca client-ca request-header-ca > /dev/null 2>&1 || true
 	kubectl_core -n kube-public delete -f "${KUBE_ROOT}/cmd/kubernetes-discovery/artifacts/local-cluster-up" > /dev/null 2>&1 || true
 
@@ -76,7 +71,6 @@ function start_discovery {
 	sudo_kubectl_core -n kube-public create secret tls serving-etcd --cert="${CERT_DIR}/serving-etcd.crt" --key="${CERT_DIR}/serving-etcd.key"
 	sudo_kubectl_core -n kube-public create secret tls serving-discovery --cert="${CERT_DIR}/serving-discovery.crt" --key="${CERT_DIR}/serving-discovery.key"
 	sudo_kubectl_core -n kube-public create secret tls discovery-etcd --cert="${CERT_DIR}/client-discovery-etcd.crt" --key="${CERT_DIR}/client-discovery-etcd.key"
-	kubectl_core -n kube-public create secret generic discovery-auth-kubeconfig --from-file="kubeconfig=${CERT_DIR}/discovery-auth.kubeconfig"
 	kubectl_core -n kube-public create configmap etcd-ca --from-file="ca.crt=${CERT_DIR}/etcd-ca.crt" || true
 	kubectl_core -n kube-public create configmap discovery-ca --from-file="ca.crt=${CERT_DIR}/discovery-ca.crt" || true
 	kubectl_core -n kube-public create configmap client-ca --from-file="ca.crt=${CERT_DIR}/client-ca.crt" || true
