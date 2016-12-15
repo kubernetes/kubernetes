@@ -4010,7 +4010,7 @@ func AllNodesReady(c clientset.Interface, timeout time.Duration) error {
 	}
 
 	if len(notReady) > TestContext.AllowedNotReadyNodes || !allowedNotReadyReasons(notReady) {
-		return fmt.Errorf("Not ready nodes: %#v", notReady)
+		return fmt.Errorf("Not ready nodes: %v", getNodeNames(notReady))
 	}
 	return nil
 }
@@ -5123,4 +5123,11 @@ func GetNodeExternalIP(node *v1.Node) string {
 		Failf("Couldn't get the external IP of host %s with addresses %v", node.Name, node.Status.Addresses)
 	}
 	return host
+}
+func getNodeNames(nodes []*v1.Node) []string {
+	names := []string{}
+	for _, node := range nodes {
+		names = append(names, node.Name)
+	}
+	return names
 }
