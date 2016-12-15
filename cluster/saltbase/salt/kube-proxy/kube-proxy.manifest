@@ -41,6 +41,12 @@ metadata:
   labels:
     tier: node
     component: kube-proxy
+    # Even though kube-proxy runs as a static pod, this annotation lowers the
+    # possibility that kube-proxy gets evicted when the node is under memory
+    # pressure, and prioritize it for admission, even if the node is under memory
+    # pressure.
+    annotations:
+      scheduler.alpha.kubernetes.io/critical-pod: ''
 spec:
   hostNetwork: true
   containers:
