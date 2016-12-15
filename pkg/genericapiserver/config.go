@@ -65,8 +65,7 @@ import (
 	certutil "k8s.io/kubernetes/pkg/util/cert"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/version"
-	authenticatorunion "k8s.io/kubernetes/plugin/pkg/auth/authenticator/request/union"
-	etcdclient "github.com/coreos/etcd/client"
+	authenticatorunion "k8s.io/kubernetes/plugin/pkg/auth/authenticator/request/union"	
 )
 
 const (
@@ -667,11 +666,6 @@ func DefaultAndValidateRunOptions(options *options.ServerRunOptions) {
 				}
 			}
 		}
-	}
-
-	// enable curl debug info to stderr if enable-curl-debug is set
-	if options.EnableCURLDebug {
-		etcdclient.EnablecURLDebug()
 	}
 }
 
