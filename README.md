@@ -23,7 +23,7 @@ Kubernetes builds upon a decade and a half of experience at Google running produ
 ### Are you ...
 
   * Interested in learning more about using Kubernetes?
-    - See see our documentation on [kubernetes.io](http://kubernetes.io)
+    - See our documentation on [kubernetes.io](http://kubernetes.io)
     - Try our [interactive tutorial](http://kubernetes.io/docs/tutorials/kubernetes-basics/)
     - Take a free course on [Scalable Microservices with Kubernetes](https://www.udacity.com/course/scalable-microservices-with-kubernetes--ud615).
   * Interested in developing the core Kubernetes code base, developing tools using the Kubernetes API or helping in anyway possible ?  Keep reading!
@@ -50,13 +50,35 @@ Join a Special Interest Group ([SIG](https://github.com/kubernetes/community))
 
 If you're interested in being a contributor and want to get involved in developing Kubernetes, get started with with this reading:
 
-*  The community [expectations](docs/devel/community-expectations.md)
+*  The community [expectations](https://github.com/kubernetes/community/blob/master/contributors/devel/community-expectations.md)
 *  The [contributor guidelines](CONTRIBUTING.md)
-*  The [Kubernetes Developer Guide](docs/devel/README.md)
+*  The [Kubernetes Developer Guide](https://github.com/kubernetes/community/tree/master/contributors/devel)
 
 You will then most certainly gain a lot from joining a [SIG](https://github.com/kubernetes/community), attending the regular hangouts as well as the community [meeting](https://github.com/kubernetes/community/blob/master/community/README.md).
 
 If you have an idea for a new feature, see the [Kubernetes Features](https://github.com/kubernetes/features) repository for a list of features that are coming in new releases as well as details on how to propose one.
+
+### Building Kubernetes for the impatient
+
+If you want to build Kubernetes right away there are two options:
+
+* You have a working [Go environment](https://golang.org/doc/install).
+
+```
+$ go get -d k8s.io/kubernetes
+$ cd $GOPATH/src/k8s.io/kubernetes
+$ make
+```
+
+* You have a working [Docker environment](https://docs.docker.com/engine/).
+
+```
+$ git clone https://github.com/kubernetes/kubernetes
+$ cd kubernetes
+$ make quick-release
+```
+
+If you are less impatient, head over to the [developer's documentation](https://github.com/kubernetes/community/tree/master/contributors/devel).
 
 ## Support
 
