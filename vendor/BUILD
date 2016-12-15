@@ -12113,3 +12113,21 @@ go_library(
         "//pkg/api/v1:go_default_library",
     ],
 )
+
+go_test(
+    name = "github.com/tehnerd/gnl2go_test",
+    srcs = ["gnl2go_test.go"],
+    library = "github.com/tehnerd/gnl2go",
+    tags = ["automanaged"],
+    deps = [],
+)
+
+go_library(
+    name = "github.com/tehnerd/gnl2go",
+    srcs = [
+        "github.com/tehnerd/gnl2go/adr_conv_utils.go",
+        "github.com/tehnerd/gnl2go/gnl2go.go",
+        "github.com/tehnerd/gnl2go/ipvs.go",
+    ],
+    tags = ["automanaged"],
+)
