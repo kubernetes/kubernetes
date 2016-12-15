@@ -245,6 +245,20 @@ rather than "RESOURCE" or "KIND"
 
 * Use "NAME" for resource names
 
+## kubectl Factory conventions
+
+The kubectl `Factory` is a large interface which is used to provide access to clients,
+polymorphic inspection, and polymorphic mutation.  The `Factory` is layered in
+"rings" in which one ring may reference inner rings, but not peers or outer rings.
+This is done to allow composition by extenders.
+
+In order for composers to be able to provide alternative factory implementations
+they need to provide low level pieces of *certain* functions so that when the factory
+calls back into itself it uses the custom version of the function.  Rather than try
+to enumerate everything that someone would wnat to override we split the factory into
+rings, where each ring can depend on methods an earlier ring, but cannot depend upon
+peer methods in its own ring.
+
 ## Command implementation conventions
 
 For every command there should be a `NewCmd<CommandName>` function that creates
