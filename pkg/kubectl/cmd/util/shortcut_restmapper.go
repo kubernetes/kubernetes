@@ -71,23 +71,23 @@ func (e ShortcutExpander) getAll() []schema.GroupResource {
 }
 
 func (e ShortcutExpander) KindFor(resource schema.GroupVersionResource) (schema.GroupVersionKind, error) {
-	return e.RESTMapper.KindFor(expandResourceShortcut(resource))
+	return e.RESTMapper.KindFor(e.expandResourceShortcut(resource))
 }
 
 func (e ShortcutExpander) KindsFor(resource schema.GroupVersionResource) ([]schema.GroupVersionKind, error) {
-	return e.RESTMapper.KindsFor(expandResourceShortcut(resource))
+	return e.RESTMapper.KindsFor(e.expandResourceShortcut(resource))
 }
 
 func (e ShortcutExpander) ResourcesFor(resource schema.GroupVersionResource) ([]schema.GroupVersionResource, error) {
-	return e.RESTMapper.ResourcesFor(expandResourceShortcut(resource))
+	return e.RESTMapper.ResourcesFor(e.expandResourceShortcut(resource))
 }
 
 func (e ShortcutExpander) ResourceFor(resource schema.GroupVersionResource) (schema.GroupVersionResource, error) {
-	return e.RESTMapper.ResourceFor(expandResourceShortcut(resource))
+	return e.RESTMapper.ResourceFor(e.expandResourceShortcut(resource))
 }
 
 func (e ShortcutExpander) ResourceSingularizer(resource string) (string, error) {
-	return e.RESTMapper.ResourceSingularizer(expandResourceShortcut(schema.GroupVersionResource{Resource: resource}).Resource)
+	return e.RESTMapper.ResourceSingularizer(e.expandResourceShortcut(schema.GroupVersionResource{Resource: resource}).Resource)
 }
 
 func (e ShortcutExpander) RESTMapping(gk schema.GroupKind, versions ...string) (*meta.RESTMapping, error) {
@@ -124,14 +124,55 @@ func (e ShortcutExpander) AliasesForResource(resource string) ([]string, bool) {
 		}
 		return aliases, true
 	}
-	expanded := expandResourceShortcut(schema.GroupVersionResource{Resource: resource}).Resource
+	expanded := e.expandResourceShortcut(schema.GroupVersionResource{Resource: resource}).Resource
 	return []string{expanded}, (expanded != resource)
+}
+
+// resourceShortcuts represents a structure that holds the information how to
+// transition from resource's shortcut to its full name.
+type resourceShortcuts struct {
+	from schema.GroupResource
+	to   schema.GroupResource
+}
+
+// getServerRes returns a hardcoded set of tuples. Note that the list
+// is ordered by group priority.
+func (e ShortcutExpander) getServerRes() ([]resourceShortcuts, error) {
+	return []resourceShortcuts{
+		{
+			from: schema.GroupResource{Group: "storage.k8s.io", Resource: "sc"},
+			to:   schema.GroupResource{Group: "storage.k8s.io", Resource: "storageclasses"},
+		},
+	}, nil
 }
 
 // expandResourceShortcut will return the expanded version of resource
 // (something that a pkg/api/meta.RESTMapper can understand), if it is
-// indeed a shortcut. Otherwise, will return resource unmodified.
-func expandResourceShortcut(resource schema.GroupVersionResource) schema.GroupVersionResource {
+// indeed a shortcut. First the list of potential resources will be taken from
+// the instance variable which holds the anticipated result of the discovery API.
+// Next we will fall back to the hardcoded list of resources.
+// Lastly if no match has been found, we will return resource unmodified.
+func (e ShortcutExpander) expandResourceShortcut(resource schema.GroupVersionResource) schema.GroupVersionResource {
+	// get the server resources	and return on first match.
+	if resources, err := e.getServerRes(); err == nil {
+		for _, item := range resources {
+			if resource.Group != "" {
+				if resource.Group == item.from.Group &&
+					resource.Resource == item.from.Resource {
+					resource.Resource = item.to.Resource
+					return resource
+				}
+
+			} else {
+				if resource.Resource == item.from.Resource {
+					resource.Resource = item.to.Resource
+					return resource
+				}
+			}
+		}
+	}
+
+	// fall back to the hardcoded list
 	if expanded, ok := kubectl.ShortForms[resource.Resource]; ok {
 		resource.Resource = expanded
 		return resource
