@@ -337,7 +337,10 @@ func authorizedForPolicy(info user.Info, policy *extensions.PodSecurityPolicy, a
 		return true
 	}
 	attr := buildAttributes(info, policy)
-	allowed, _, _ := authz.Authorize(attr)
+	allowed, _, err := authz.Authorize(attr)
+	if err != nil {
+		glog.V(5).Infof("authorized for policy error: %v", err)
+	}
 	return allowed
 }
 
