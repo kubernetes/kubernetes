@@ -160,6 +160,12 @@ func DeleteStaticManifests() error {
 	if err := os.Remove(ctrlMgrStaticManifestPath); err != nil {
 		return fmt.Errorf("unable to delete temporary controller manager manifest [%v]", err)
 	}
+
+	schedulerStaticManifestPath := path.Join(kubeadmapi.GlobalEnvParams.KubernetesDir,
+		"manifests", kubeScheduler+".json")
+	if err := os.Remove(schedulerStaticManifestPath); err != nil {
+		return fmt.Errorf("unable to delete temporary scheduler manifest [%v]", err)
+	}
 	return nil
 }
 

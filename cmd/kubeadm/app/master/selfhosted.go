@@ -55,6 +55,11 @@ func CreateSelfHostedControlPlane(cfg *kubeadmapi.MasterConfiguration, client *c
 		return fmt.Errorf("failed to create self-hosted %q deployment [%v]", kubeControllerManager, err)
 	}
 
+	scheduler := getSchedulerDeployment(cfg)
+	if _, err := client.Extensions().Deployments(api.NamespaceSystem).Create(&scheduler); err != nil {
+		return fmt.Errorf("failed to create self-hosted %q deployment [%v]", kubeScheduler, err)
+	}
+
 	return nil
 }
 
@@ -154,15 +159,6 @@ func getAPIServerDS(cfg *kubeadmapi.MasterConfiguration,
 func getControllerManagerDeployment(cfg *kubeadmapi.MasterConfiguration,
 	volumes []v1.Volume, volumeMounts []v1.VolumeMount) ext.Deployment {
 
-	// Tolerate the master taint we add to our master nodes, as this can and should
-	// run there.
-	masterToleration, _ := json.Marshal([]v1.Toleration{v1.Toleration{
-		Key:      "dedicated",
-		Value:    "master",
-		Operator: v1.TolerationOpEqual,
-		Effect:   v1.TaintEffectNoSchedule,
-	}})
-
 	cmDep := ext.Deployment{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: "extensions/v1beta1",
@@ -182,23 +178,78 @@ func getControllerManagerDeployment(cfg *kubeadmapi.MasterConfiguration,
 						"tier":      "control-plane",
 					},
 					Annotations: map[string]string{
-						v1.TolerationsAnnotationKey: string(masterToleration),
+						v1.TolerationsAnnotationKey: getMasterToleration(),
 					},
 				},
 				Spec: v1.PodSpec{
 					// TODO: Make sure masters get this label
 					NodeSelector: map[string]string{metav1.NodeLabelKubeadmAlphaRole: metav1.NodeLabelRoleMaster},
-					HostNetwork:  true,
 					Volumes:      volumes,
 
 					Containers: []v1.Container{
 						v1.Container{
-							Name:          kubeAPIServer,
+							Name:          kubeControllerManager,
 							Image:         images.GetCoreImage(images.KubeControllerManagerImage, cfg, kubeadmapi.GlobalEnvParams.HyperkubeImage),
 							Command:       getControllerManagerCommand(cfg),
 							VolumeMounts:  volumeMounts,
 							LivenessProbe: componentProbe(10252, "/healthz"),
 							Resources:     componentResources("200m"),
+							Env:           getProxyEnvVars(),
+						},
+					},
+				},
+			},
+		},
+	}
+	return cmDep
+}
+
+func getMasterToleration() string {
+	// Tolerate the master taint we add to our master nodes, as this can and should
+	// run there.
+	// TODO: Duplicated above
+	masterToleration, _ := json.Marshal([]v1.Toleration{v1.Toleration{
+		Key:      "dedicated",
+		Value:    "master",
+		Operator: v1.TolerationOpEqual,
+		Effect:   v1.TaintEffectNoSchedule,
+	}})
+	return string(masterToleration)
+}
+
+func getSchedulerDeployment(cfg *kubeadmapi.MasterConfiguration) ext.Deployment {
+
+	cmDep := ext.Deployment{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "extensions/v1beta1",
+			Kind:       "Deployment",
+		},
+		ObjectMeta: v1.ObjectMeta{
+			Name:      kubeScheduler,
+			Namespace: "kube-system",
+		},
+		Spec: ext.DeploymentSpec{
+			Template: v1.PodTemplateSpec{
+				ObjectMeta: v1.ObjectMeta{
+					Labels: map[string]string{
+						"k8s-app":   kubeScheduler,
+						"component": kubeScheduler,
+						"tier":      "control-plane",
+					},
+					Annotations: map[string]string{
+						v1.TolerationsAnnotationKey: getMasterToleration(),
+					},
+				},
+				Spec: v1.PodSpec{
+					NodeSelector: map[string]string{metav1.NodeLabelKubeadmAlphaRole: metav1.NodeLabelRoleMaster},
+
+					Containers: []v1.Container{
+						v1.Container{
+							Name:          kubeScheduler,
+							Image:         images.GetCoreImage(images.KubeSchedulerImage, cfg, kubeadmapi.GlobalEnvParams.HyperkubeImage),
+							Command:       getSchedulerCommand(cfg),
+							LivenessProbe: componentProbe(10251, "/healthz"),
+							Resources:     componentResources("100m"),
 							Env:           getProxyEnvVars(),
 						},
 					},
