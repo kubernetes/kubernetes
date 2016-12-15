@@ -25,6 +25,7 @@ go_library(
         "//pkg/apiserver/authenticator:go_default_library",
         "//pkg/client/clientset_generated/clientset/typed/authentication/v1beta1:go_default_library",
         "//pkg/client/clientset_generated/clientset/typed/authorization/v1beta1:go_default_library",
+        "//pkg/client/restclient:go_default_library",
         "//pkg/client/unversioned/clientcmd:go_default_library",
         "//pkg/controller/informers:go_default_library",
         "//pkg/genericapiserver/authorizer:go_default_library",
