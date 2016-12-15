@@ -18,6 +18,8 @@ package fake
 
 import (
 	clientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset"
+	internalversionbatch "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset/typed/batch/internalversion"
+	fakeinternalversionbatch "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset/typed/batch/internalversion/fake"
 	internalversioncore "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset/typed/core/internalversion"
 	fakeinternalversioncore "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset/typed/core/internalversion/fake"
 	internalversionextensions "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset/typed/extensions/internalversion"
@@ -69,6 +71,11 @@ var _ clientset.Interface = &Clientset{}
 // Core retrieves the CoreClient
 func (c *Clientset) Core() internalversioncore.CoreInterface {
 	return &fakeinternalversioncore.FakeCore{Fake: &c.Fake}
+}
+
+// Batch retrieves the BatchClient
+func (c *Clientset) Batch() internalversionbatch.BatchInterface {
+	return &fakeinternalversionbatch.FakeBatch{Fake: &c.Fake}
 }
 
 // Extensions retrieves the ExtensionsClient
