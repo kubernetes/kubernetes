@@ -18,6 +18,9 @@ go_test(
     name = "go_default_test",
     srcs = ["token_test.go"],
     library = "go_default_library",
-    tags = ["automanaged"],
+    tags = [
+        "automanaged",
+        "skip",
+    ],
     deps = [],
 )
