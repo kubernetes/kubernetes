@@ -78,6 +78,7 @@ import (
 	utilyaml "k8s.io/kubernetes/pkg/util/yaml"
 	"k8s.io/kubernetes/pkg/version"
 	"k8s.io/kubernetes/pkg/watch"
+	testutils "k8s.io/kubernetes/test/utils"
 
 	"github.com/blang/semver"
 	"golang.org/x/crypto/ssh"
@@ -1456,6 +1457,17 @@ func WaitForPodNotPending(c *client.Client, ns, podName, resourceVersion string)
 	}
 	_, err = watch.Until(PodStartTimeout, w, client.PodNotPending)
 	return err
+}
+
+// WaitForTerminatedContainer returns an error if it took to long for the container
+// to terminate.
+func WaitForTerminatedContainer(c *client.Client, pod *api.Pod, namespace, containerName string) error {
+	return waitForPodCondition(c, namespace, pod.Name, "container terminated", PodStartTimeout, func(pod *api.Pod) (bool, error) {
+		if len(testutils.TerminatedContainers(pod)[containerName]) > 0 {
+			return true, nil
+		}
+		return false, nil
+	})
 }
 
 // waitForPodTerminatedInNamespace returns an error if it took too long for the pod
