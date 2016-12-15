@@ -57,6 +57,4 @@ rm "${RESOURCE_DIRECTORY}/ca.crt" \
 	"${RESOURCE_DIRECTORY}/kubecfg.crt" \
 	"${RESOURCE_DIRECTORY}/kubecfg.key" \
 	"${RESOURCE_DIRECTORY}/hollow-node.json" \
-	"${RESOURCE_DIRECTORY}/apiserver_flags" \
-	"${RESOURCE_DIRECTORY}/controllers_flags" \
-	"${RESOURCE_DIRECTORY}/scheduler_flags" &> /dev/null || true
+	"${RESOURCE_DIRECTORY}/kubemark-master-env.sh"  &> /dev/null || true
