@@ -52,6 +52,20 @@ items:
     creationTimestamp: null
     labels:
       kubernetes.io/bootstrapping: rbac-defaults
+    name: system:kube-controller-manager
+  roleRef:
+    apiGroup: rbac.authorization.k8s.io
+    kind: ClusterRole
+    name: system:kube-controller-manager
+  subjects:
+  - kind: User
+    name: system:kube-controller-manager
+- apiVersion: rbac.authorization.k8s.io/v1alpha1
+  kind: ClusterRoleBinding
+  metadata:
+    creationTimestamp: null
+    labels:
+      kubernetes.io/bootstrapping: rbac-defaults
     name: system:node
   roleRef:
     apiGroup: rbac.authorization.k8s.io
@@ -72,7 +86,7 @@ items:
     kind: ClusterRole
     name: system:node-proxier
   subjects:
-  - kind: Group
-    name: system:nodes
+  - kind: User
+    name: system:kube-proxy
 kind: List
 metadata: {}
