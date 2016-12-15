@@ -29,8 +29,12 @@ import (
 // handlers that do not show up in swagger or in /
 type APIContainer struct {
 	*restful.Container
+
+	// NonSwaggerRoutes are recorded and are visible at /, but do not show up in Swagger.
 	NonSwaggerRoutes PathRecorderMux
-	SecretRoutes     Mux
+
+	// SecretRoutes are not recorded, are not visible at / and do not show up in Swagger.
+	SecretRoutes *http.ServeMux
 }
 
 // NewAPIContainer constructs a new container for APIs
