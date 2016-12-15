@@ -159,16 +159,20 @@ var ignoredResources = map[schema.GroupVersionResource]struct{}{
 }
 
 func NewGarbageCollector(metaOnlyClientPool dynamic.ClientPool, clientPool dynamic.ClientPool, mapper meta.RESTMapper, deletableResources map[schema.GroupVersionResource]struct{}) (*GarbageCollector, error) {
+	dirtyQueue := workqueue.NewTimedWorkQueue()
+	orphanQueue := workqueue.NewTimedWorkQueue()
+	absentOwnerCache := NewUIDCache(500)
+	clock := clock.RealClock{}
 	gc := &GarbageCollector{
 		metaOnlyClientPool:               metaOnlyClientPool,
 		clientPool:                       clientPool,
 		restMapper:                       mapper,
-		clock:                            clock.RealClock{},
-		dirtyQueue:                       workqueue.NewTimedWorkQueue(),
-		orphanQueue:                      workqueue.NewTimedWorkQueue(),
+		clock:                            clock,
+		dirtyQueue:                       dirtyQueue,
+		orphanQueue:                      orphanQueue,
 		registeredRateLimiter:            NewRegisteredRateLimiter(deletableResources),
 		registeredRateLimiterForMonitors: NewRegisteredRateLimiter(deletableResources),
-		absentOwnerCache:                 NewUIDCache(500),
+		absentOwnerCache:                 absentOwnerCache,
 	}
 	gc.propagator = &Propagator{
 		eventQueue: workqueue.NewTimedWorkQueue(),
@@ -176,7 +180,10 @@ func NewGarbageCollector(metaOnlyClientPool dynamic.ClientPool, clientPool dynam
 			RWMutex:   &sync.RWMutex{},
 			uidToNode: make(map[types.UID]*node),
 		},
-		gc: gc,
+		dirtyQueue:       dirtyQueue,
+		orphanQueue:      orphanQueue,
+		absentOwnerCache: absentOwnerCache,
+		clock:            clock,
 	}
 	for resource := range deletableResources {
 		if _, ok := ignoredResources[resource]; ok {

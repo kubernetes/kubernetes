@@ -22,6 +22,7 @@ import (
 
 	"github.com/golang/glog"
 
+	"k8s.io/client-go/pkg/util/clock"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/v1"
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
@@ -53,7 +54,14 @@ type Propagator struct {
 	// uidToNode doesn't require a lock to protect, because only the
 	// single-threaded Propagator.processEvent() reads/writes it.
 	uidToNode *concurrentUIDToNode
-	gc        *GarbageCollector
+	// Propagator is the producer of dirtyQueue and orphanQueue, GC is the consumer.
+	dirtyQueue  *workqueue.TimedWorkQueue
+	orphanQueue *workqueue.TimedWorkQueue
+	// Propagator and GC share the absentOwnerCache. Objects that are known to
+	// be non-existent are added to the cached.
+	absentOwnerCache *UIDCache
+	// Propagator and GC share the same clock.
+	clock clock.Clock
 }
 
 // addDependentToOwners adds n to owners' dependents list. If the owner does not
@@ -78,7 +86,7 @@ func (p *Propagator) addDependentToOwners(n *node, owners []metav1.OwnerReferenc
 			}
 			glog.V(6).Infof("add virtual node.identity: %s\n\n", ownerNode.identity)
 			p.uidToNode.Write(ownerNode)
-			p.gc.dirtyQueue.Add(&workqueue.TimedWorkQueueItem{StartTime: p.gc.clock.Now(), Object: ownerNode})
+			p.dirtyQueue.Add(&workqueue.TimedWorkQueueItem{StartTime: p.clock.Now(), Object: ownerNode})
 		}
 		ownerNode.addDependent(n)
 	}
@@ -221,7 +229,7 @@ func (p *Propagator) addUnblockedOwnersToDirtyQueue(removed []metav1.OwnerRefere
 				glog.V(6).Infof("cannot find %s in uidToNode", ref.UID)
 				continue
 			}
-			p.gc.dirtyQueue.Add(&workqueue.TimedWorkQueueItem{StartTime: p.gc.clock.Now(), Object: node})
+			p.dirtyQueue.Add(&workqueue.TimedWorkQueueItem{StartTime: p.clock.Now(), Object: node})
 		}
 	}
 	for _, c := range changed {
@@ -232,7 +240,7 @@ func (p *Propagator) addUnblockedOwnersToDirtyQueue(removed []metav1.OwnerRefere
 				glog.V(6).Infof("cannot find %s in uidToNode", c.new.UID)
 				continue
 			}
-			p.gc.dirtyQueue.Add(&workqueue.TimedWorkQueueItem{StartTime: p.gc.clock.Now(), Object: node})
+			p.dirtyQueue.Add(&workqueue.TimedWorkQueueItem{StartTime: p.clock.Now(), Object: node})
 		}
 	}
 }
@@ -284,13 +292,13 @@ func (p *Propagator) processEvent() {
 		// the underlying delta_fifo may combine a creation and deletion into one event
 		if shouldOrphanDependents(event, accessor) {
 			glog.V(6).Infof("add %s to the orphanQueue", newNode.identity)
-			p.gc.orphanQueue.Add(&workqueue.TimedWorkQueueItem{StartTime: p.gc.clock.Now(), Object: newNode})
+			p.orphanQueue.Add(&workqueue.TimedWorkQueueItem{StartTime: p.clock.Now(), Object: newNode})
 		}
 		if startsWaitingForDependentsDeletion(event, accessor) {
 			glog.V(2).Infof("add %s to the dirtyQueue, because it's waiting for its dependents to be deleted", newNode.identity)
-			p.gc.dirtyQueue.Add(&workqueue.TimedWorkQueueItem{StartTime: p.gc.clock.Now(), Object: newNode})
+			p.dirtyQueue.Add(&workqueue.TimedWorkQueueItem{StartTime: p.clock.Now(), Object: newNode})
 			for dep := range newNode.dependents {
-				p.gc.dirtyQueue.Add(&workqueue.TimedWorkQueueItem{StartTime: p.gc.clock.Now(), Object: dep})
+				p.dirtyQueue.Add(&workqueue.TimedWorkQueueItem{StartTime: p.clock.Now(), Object: dep})
 			}
 		}
 	case (event.eventType == addEvent || event.eventType == updateEvent) && found:
@@ -298,7 +306,7 @@ func (p *Propagator) processEvent() {
 		// deletion of the owner, then the orphaning finalizer won't be effective.
 		if shouldOrphanDependents(event, accessor) {
 			glog.V(6).Infof("add %s to the orphanQueue", existingNode.identity)
-			p.gc.orphanQueue.Add(&workqueue.TimedWorkQueueItem{StartTime: p.gc.clock.Now(), Object: existingNode})
+			p.orphanQueue.Add(&workqueue.TimedWorkQueueItem{StartTime: p.clock.Now(), Object: existingNode})
 		}
 		if beingDeleted(accessor) {
 			existingNode.beingDeleted = true
@@ -307,9 +315,9 @@ func (p *Propagator) processEvent() {
 			glog.V(2).Infof("add %s to the dirtyQueue, because it's waiting for its dependents to be deleted", existingNode.identity)
 			// if the existingNode is added as a "virtual" node, its deletingDependents field is not properly set, so always set it here.
 			existingNode.deletingDependents = true
-			p.gc.dirtyQueue.Add(&workqueue.TimedWorkQueueItem{StartTime: p.gc.clock.Now(), Object: existingNode})
+			p.dirtyQueue.Add(&workqueue.TimedWorkQueueItem{StartTime: p.clock.Now(), Object: existingNode})
 			for dep := range existingNode.dependents {
-				p.gc.dirtyQueue.Add(&workqueue.TimedWorkQueueItem{StartTime: p.gc.clock.Now(), Object: dep})
+				p.dirtyQueue.Add(&workqueue.TimedWorkQueueItem{StartTime: p.clock.Now(), Object: dep})
 			}
 		}
 		// add/remove owner refs
@@ -338,10 +346,10 @@ func (p *Propagator) processEvent() {
 		existingNode.dependentsLock.RLock()
 		defer existingNode.dependentsLock.RUnlock()
 		if len(existingNode.dependents) > 0 {
-			p.gc.absentOwnerCache.Add(accessor.GetUID())
+			absentOwnerCache.Add(accessor.GetUID())
 		}
 		for dep := range existingNode.dependents {
-			p.gc.dirtyQueue.Add(&workqueue.TimedWorkQueueItem{StartTime: p.gc.clock.Now(), Object: dep})
+			p.dirtyQueue.Add(&workqueue.TimedWorkQueueItem{StartTime: p.clock.Now(), Object: dep})
 		}
 		for _, owner := range existingNode.owners {
 			ownerNode, found := p.uidToNode.Read(owner.UID)
@@ -349,8 +357,8 @@ func (p *Propagator) processEvent() {
 				continue
 			}
 			// this is to let processItem check if all the owner's dependents are deleted.
-			p.gc.dirtyQueue.Add(&workqueue.TimedWorkQueueItem{StartTime: p.gc.clock.Now(), Object: ownerNode})
+			p.dirtyQueue.Add(&workqueue.TimedWorkQueueItem{StartTime: p.clock.Now(), Object: ownerNode})
 		}
 	}
-	EventProcessingLatency.Observe(sinceInMicroseconds(p.gc.clock, timedItem.StartTime))
+	EventProcessingLatency.Observe(sinceInMicroseconds(p.clock, timedItem.StartTime))
 }
