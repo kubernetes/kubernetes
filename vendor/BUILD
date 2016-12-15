@@ -11764,13 +11764,14 @@ go_test(
     library = "k8s.io/client-go/tools/clientcmd",
     tags = ["automanaged"],
     deps = [
+        "//pkg/client/unversioned/clientcmd/api:go_default_library",
+        "//pkg/client/unversioned/clientcmd/api/latest:go_default_library",
+        "//pkg/runtime:go_default_library",
         "//vendor:github.com/ghodss/yaml",
         "//vendor:github.com/imdario/mergo",
-        "//vendor:k8s.io/client-go/pkg/runtime",
         "//vendor:k8s.io/client-go/pkg/util/errors",
         "//vendor:k8s.io/client-go/rest",
         "//vendor:k8s.io/client-go/tools/clientcmd/api",
-        "//vendor:k8s.io/client-go/tools/clientcmd/api/latest",
     ],
 )
 
