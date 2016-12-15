@@ -44,9 +44,14 @@ import (
 
 const ResourceResyncTime time.Duration = 0
 
-// GarbageCollector is responsible for carrying out cascading deletion, and
-// removing ownerReferences from the dependents if the owner is deleted with
-// DeleteOptions.OrphanDependents=true.
+// GarbageCollector runs controllers to watch for changes of managed API
+// objects, funnels the results to a single-threaded dependencyGraphBuilder,
+// which builds a graph caching the dependencies among objects. Triggered by the
+// graph changes, the dependencyGraphBuilder enqueues objects that can
+// potentially be garbage-collected to the `attemptToDelete` queue, and enqueues
+// objects whose dependents need to be orphaned to the `attemptToOrphan` queue.
+// The GarbageCollector has workers who consume these two queues, send requests
+// to the API server to delete/update the objects accordingly.
 type GarbageCollector struct {
 	restMapper meta.RESTMapper
 	// metaOnlyClientPool uses a special codec, which removes fields except for
@@ -123,6 +128,8 @@ func (gc *GarbageCollector) controllerFor(resource schema.GroupVersionResource, 
 			},
 			UpdateFunc: func(oldObj, newObj interface{}) {
 				setObjectTypeMeta(newObj)
+				// TODO: check if there are differences in the ownerRefs,
+				// finalizers, and DeletionTimestamp; if not, ignore the update.
 				event := &event{updateEvent, newObj, oldObj}
 				gc.dependencyGraphBuilder.graphChanges.Add(event)
 			},
@@ -219,15 +226,15 @@ func (gc *GarbageCollector) Run(workers int, stopCh <-chan struct{}) {
 	go wait.Until(gc.dependencyGraphBuilder.processEvent, 0, stopCh)
 
 	for i := 0; i < workers; i++ {
-		go wait.Until(gc.worker, 0, stopCh)
-		go wait.Until(gc.orphanFinalizer, 0, stopCh)
+		go wait.Until(gc.attemptToDeleteWorker, 0, stopCh)
+		go wait.Until(gc.attemptToOrphanWorker, 0, stopCh)
 	}
 	Register()
 	<-stopCh
 	glog.Infof("Garbage Collector: Shutting down")
 }
 
-func (gc *GarbageCollector) worker() {
+func (gc *GarbageCollector) attemptToDeleteWorker() {
 	item, quit := gc.attemptToDelete.Get()
 	if quit {
 		return
@@ -362,7 +369,8 @@ func (gc *GarbageCollector) processItem(item *node) error {
 		return nil
 	}
 
-	// TODO: orphanFinalizer() routine is similar. Consider merging orphanFinalizer() into processItem() as well.
+	// TODO: attemptToOrphanWorker() routine is similar. Consider merging
+	// attemptToOrphanWorker() into processItem() as well.
 	if item.deletingDependents {
 		return gc.processDeletingDependentsItem(item)
 	}
@@ -452,12 +460,12 @@ func (gc *GarbageCollector) orhpanDependents(owner objectReference, dependents [
 	return nil
 }
 
-// orphanFinalizer dequeues a node from the orphanQueue, then finds its dependents
-// based on the graph maintained by the GC, then removes it from the
+// attemptToOrphanWorker dequeues a node from the orphanQueue, then finds its
+// dependents based on the graph maintained by the GC, then removes it from the
 // OwnerReferences of its dependents, and finally updates the owner to remove
 // the "Orphan" finalizer. The node is added back into the orphanQueue if any of
 // these steps fail.
-func (gc *GarbageCollector) orphanFinalizer() {
+func (gc *GarbageCollector) attemptToOrphanWorker() {
 	item, quit := gc.orphanQueue.Get()
 	if quit {
 		return
