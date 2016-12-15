@@ -54,9 +54,11 @@ type GarbageCollector struct {
 	metaOnlyClientPool dynamic.ClientPool
 	// clientPool uses the regular dynamicCodec. We need it to update
 	// finalizers. It can be removed if we support patching finalizers.
-	clientPool                          dynamic.ClientPool
-	dirtyQueue                          workqueue.RateLimitingInterface
-	orphanQueue                         workqueue.RateLimitingInterface
+	clientPool dynamic.ClientPool
+	// garbage collector attempts to delete the items in attemptToDelete queue when the time is ripe.
+	attemptToDelete workqueue.RateLimitingInterface
+	// garbage collector attempts to orphan the dependents of the items in the attemptToOrphan queue, then deletes the items.
+	attemptToOrphan                     workqueue.RateLimitingInterface
 	controllers                         []*cache.Controller
 	dependencyGraphBuilder              *GraphBuilder
 	registeredRateLimiter               *RegisteredRateLimiter
@@ -110,19 +112,19 @@ func (gc *GarbageCollector) controllerFor(resource schema.GroupVersionResource, 
 		nil,
 		ResourceResyncTime,
 		cache.ResourceEventHandlerFuncs{
-			// add the event to the dependencyGraphBuilder's eventQueue.
+			// add the event to the dependencyGraphBuilder's graphChanges.
 			AddFunc: func(obj interface{}) {
 				setObjectTypeMeta(obj)
 				event := &event{
 					eventType: addEvent,
 					obj:       obj,
 				}
-				gc.dependencyGraphBuilder.eventQueue.Add(event)
+				gc.dependencyGraphBuilder.graphChanges.Add(event)
 			},
 			UpdateFunc: func(oldObj, newObj interface{}) {
 				setObjectTypeMeta(newObj)
 				event := &event{updateEvent, newObj, oldObj}
-				gc.dependencyGraphBuilder.eventQueue.Add(event)
+				gc.dependencyGraphBuilder.graphChanges.Add(event)
 			},
 			DeleteFunc: func(obj interface{}) {
 				// delta fifo may wrap the object in a cache.DeletedFinalStateUnknown, unwrap it
@@ -134,7 +136,7 @@ func (gc *GarbageCollector) controllerFor(resource schema.GroupVersionResource, 
 					eventType: deleteEvent,
 					obj:       obj,
 				}
-				gc.dependencyGraphBuilder.eventQueue.Add(event)
+				gc.dependencyGraphBuilder.graphChanges.Add(event)
 			},
 		},
 	)
@@ -153,27 +155,27 @@ var ignoredResources = map[schema.GroupVersionResource]struct{}{
 }
 
 func NewGarbageCollector(metaOnlyClientPool dynamic.ClientPool, clientPool dynamic.ClientPool, mapper meta.RESTMapper, deletableResources map[schema.GroupVersionResource]struct{}) (*GarbageCollector, error) {
-	dirtyQueue := workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "garbage_collector_dirty")
-	orphanQueue := workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "garbage_collector_orphan")
+	attemptToDelete := workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "garbage_collector_attempt_to_delete")
+	attemptToOrphan := workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "garbage_collector_attempt_to_orphan")
 	absentOwnerCache := NewUIDCache(500)
 	gc := &GarbageCollector{
 		metaOnlyClientPool:                  metaOnlyClientPool,
 		clientPool:                          clientPool,
 		restMapper:                          mapper,
-		dirtyQueue:                          dirtyQueue,
-		orphanQueue:                         orphanQueue,
+		attemptToDelete:                     attemptToDelete,
+		attemptToOrphan:                     attemptToOrphan,
 		registeredRateLimiter:               NewRegisteredRateLimiter(deletableResources),
 		registeredRateLimiterForControllers: NewRegisteredRateLimiter(deletableResources),
 		absentOwnerCache:                    absentOwnerCache,
 	}
 	gc.dependencyGraphBuilder = &GraphBuilder{
-		eventQueue: workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "garbage_collector_event"),
+		graphChanges: workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "garbage_collector_graph_changes"),
 		uidToNode: &concurrentUIDToNode{
 			RWMutex:   &sync.RWMutex{},
 			uidToNode: make(map[types.UID]*node),
 		},
-		dirtyQueue:       dirtyQueue,
-		orphanQueue:      orphanQueue,
+		attemptToDelete:  attemptToDelete,
+		attemptToOrphan:  attemptToOrphan,
 		absentOwnerCache: absentOwnerCache,
 	}
 	for resource := range deletableResources {
@@ -195,9 +197,9 @@ func NewGarbageCollector(metaOnlyClientPool dynamic.ClientPool, clientPool dynam
 }
 
 func (gc *GarbageCollector) Run(workers int, stopCh <-chan struct{}) {
-	defer gc.dirtyQueue.ShutDown()
-	defer gc.orphanQueue.ShutDown()
-	defer gc.dependencyGraphBuilder.eventQueue.ShutDown()
+	defer gc.attemptToDelete.ShutDown()
+	defer gc.attemptToOrphan.ShutDown()
+	defer gc.dependencyGraphBuilder.graphChanges.ShutDown()
 
 	glog.Infof("Garbage Collector: Initializing")
 	for _, controller := range gc.controllers {
@@ -226,11 +228,11 @@ func (gc *GarbageCollector) Run(workers int, stopCh <-chan struct{}) {
 }
 
 func (gc *GarbageCollector) worker() {
-	item, quit := gc.dirtyQueue.Get()
+	item, quit := gc.attemptToDelete.Get()
 	if quit {
 		return
 	}
-	defer gc.dirtyQueue.Done(item)
+	defer gc.attemptToDelete.Done(item)
 	n, ok := item.(*node)
 	if !ok {
 		utilruntime.HandleError(fmt.Errorf("expect *node, got %#v", item))
@@ -239,7 +241,7 @@ func (gc *GarbageCollector) worker() {
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("Error syncing item %#v: %v", n, err))
 		// retry if garbage collection of an object failed.
-		gc.dirtyQueue.AddRateLimited(item)
+		gc.attemptToDelete.AddRateLimited(item)
 		return
 	}
 }
@@ -323,7 +325,7 @@ func (gc *GarbageCollector) generateVirtualDeleteEvent(identity objectReference)
 		obj:       objectReferenceToMetadataOnlyObject(identity),
 	}
 	glog.V(6).Infof("generating virtual delete event for %s\n\n", event.obj)
-	gc.dependencyGraphBuilder.eventQueue.Add(event)
+	gc.dependencyGraphBuilder.graphChanges.Add(event)
 }
 
 func ownerRefsToUIDs(refs []metav1.OwnerReference) []types.UID {
@@ -421,8 +423,8 @@ func (gc *GarbageCollector) processDeletingDependentsItem(item *node) error {
 	} else {
 		for _, dep := range blockingDependents {
 			if !dep.deletingDependents {
-				glog.V(2).Infof("adding %s to dirtyQueue, because its owner %s is deletingDependents", dep.identity, item.identity)
-				gc.dirtyQueue.Add(dep)
+				glog.V(2).Infof("adding %s to attemptToDelete, because its owner %s is deletingDependents", dep.identity, item.identity)
+				gc.attemptToDelete.Add(dep)
 			}
 		}
 		return nil

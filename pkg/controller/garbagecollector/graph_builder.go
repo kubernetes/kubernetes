@@ -47,15 +47,17 @@ type event struct {
 
 // GraphBuilder: based on the events supplied by the informers, GraphBuilder updates
 // uidToNode, a graph that caches the dependencies as we know, and enqueues
-// items to the dirtyQueue and orphanQueue.
+// items to the attemptToDelete and attemptToOrphan.
 type GraphBuilder struct {
-	eventQueue workqueue.RateLimitingInterface
+	// monitors are the producer of the graphChanges queue, graphBuilder alters
+	// the in-memory graph according to the changes.
+	graphChanges workqueue.RateLimitingInterface
 	// uidToNode doesn't require a lock to protect, because only the
 	// single-threaded GraphBuilder.processEvent() reads/writes it.
 	uidToNode *concurrentUIDToNode
-	// GraphBuilder is the producer of dirtyQueue and orphanQueue, GC is the consumer.
-	dirtyQueue  workqueue.RateLimitingInterface
-	orphanQueue workqueue.RateLimitingInterface
+	// GraphBuilder is the producer of attemptToDelete and attemptToOrphan, GC is the consumer.
+	attemptToDelete workqueue.RateLimitingInterface
+	attemptToOrphan workqueue.RateLimitingInterface
 	// GraphBuilder and GC share the absentOwnerCache. Objects that are known to
 	// be non-existent are added to the cached.
 	absentOwnerCache *UIDCache
@@ -63,7 +65,7 @@ type GraphBuilder struct {
 
 // addDependentToOwners adds n to owners' dependents list. If the owner does not
 // exist in the p.uidToNode yet, a "virtual" node will be created to represent
-// the owner. The "virtual" node will be enqueued to the dirtyQueue, so that
+// the owner. The "virtual" node will be enqueued to the attemptToDelete, so that
 // processItem() will verify if the owner exists according to the API server.
 func (p *GraphBuilder) addDependentToOwners(n *node, owners []metav1.OwnerReference) {
 	for _, owner := range owners {
@@ -71,7 +73,7 @@ func (p *GraphBuilder) addDependentToOwners(n *node, owners []metav1.OwnerRefere
 		if !ok {
 			// Create a "virtual" node in the graph for the owner if it doesn't
 			// exist in the graph yet. Then enqueue the virtual node into the
-			// dirtyQueue. The garbage processor will enqueue a virtual delete
+			// attemptToDelete. The garbage processor will enqueue a virtual delete
 			// event to delete it from the graph if API server confirms this
 			// owner doesn't exist.
 			ownerNode = &node{
@@ -83,7 +85,7 @@ func (p *GraphBuilder) addDependentToOwners(n *node, owners []metav1.OwnerRefere
 			}
 			glog.V(6).Infof("add virtual node.identity: %s\n\n", ownerNode.identity)
 			p.uidToNode.Write(ownerNode)
-			p.dirtyQueue.Add(ownerNode)
+			p.attemptToDelete.Add(ownerNode)
 		}
 		ownerNode.addDependent(n)
 	}
@@ -226,7 +228,7 @@ func (p *GraphBuilder) addUnblockedOwnersToDirtyQueue(removed []metav1.OwnerRefe
 				glog.V(6).Infof("cannot find %s in uidToNode", ref.UID)
 				continue
 			}
-			p.dirtyQueue.Add(node)
+			p.attemptToDelete.Add(node)
 		}
 	}
 	for _, c := range changed {
@@ -237,18 +239,18 @@ func (p *GraphBuilder) addUnblockedOwnersToDirtyQueue(removed []metav1.OwnerRefe
 				glog.V(6).Infof("cannot find %s in uidToNode", c.new.UID)
 				continue
 			}
-			p.dirtyQueue.Add(node)
+			p.attemptToDelete.Add(node)
 		}
 	}
 }
 
-// Dequeueing an event from eventQueue, updating graph, populating dirty_queue.
+// Dequeueing an event from graphChanges, updating graph, populating dirty_queue.
 func (p *GraphBuilder) processEvent() {
-	item, quit := p.eventQueue.Get()
+	item, quit := p.graphChanges.Get()
 	if quit {
 		return
 	}
-	defer p.eventQueue.Done(item)
+	defer p.graphChanges.Done(item)
 	event, ok := item.(*event)
 	if !ok {
 		utilruntime.HandleError(fmt.Errorf("expect a *event, got %v", item))
@@ -288,33 +290,33 @@ func (p *GraphBuilder) processEvent() {
 		p.insertNode(newNode)
 		// the underlying delta_fifo may combine a creation and deletion into one event
 		if shouldOrphanDependents(event, accessor) {
-			glog.V(6).Infof("add %s to the orphanQueue", newNode.identity)
-			p.orphanQueue.Add(newNode)
+			glog.V(6).Infof("add %s to the attemptToOrphan", newNode.identity)
+			p.attemptToOrphan.Add(newNode)
 		}
 		if startsWaitingForDependentsDeletion(event, accessor) {
-			glog.V(2).Infof("add %s to the dirtyQueue, because it's waiting for its dependents to be deleted", newNode.identity)
-			p.dirtyQueue.Add(newNode)
+			glog.V(2).Infof("add %s to the attemptToDelete, because it's waiting for its dependents to be deleted", newNode.identity)
+			p.attemptToDelete.Add(newNode)
 			for dep := range newNode.dependents {
-				p.dirtyQueue.Add(dep)
+				p.attemptToDelete.Add(dep)
 			}
 		}
 	case (event.eventType == addEvent || event.eventType == updateEvent) && found:
 		// caveat: if GC observes the creation of the dependents later than the
 		// deletion of the owner, then the orphaning finalizer won't be effective.
 		if shouldOrphanDependents(event, accessor) {
-			glog.V(6).Infof("add %s to the orphanQueue", existingNode.identity)
-			p.orphanQueue.Add(existingNode)
+			glog.V(6).Infof("add %s to the attemptToOrphan", existingNode.identity)
+			p.attemptToOrphan.Add(existingNode)
 		}
 		if beingDeleted(accessor) {
 			existingNode.beingDeleted = true
 		}
 		if startsWaitingForDependentsDeletion(event, accessor) {
-			glog.V(2).Infof("add %s to the dirtyQueue, because it's waiting for its dependents to be deleted", existingNode.identity)
+			glog.V(2).Infof("add %s to the attemptToDelete, because it's waiting for its dependents to be deleted", existingNode.identity)
 			// if the existingNode is added as a "virtual" node, its deletingDependents field is not properly set, so always set it here.
 			existingNode.deletingDependents = true
-			p.dirtyQueue.Add(existingNode)
+			p.attemptToDelete.Add(existingNode)
 			for dep := range existingNode.dependents {
-				p.dirtyQueue.Add(dep)
+				p.attemptToDelete.Add(dep)
 			}
 		}
 		// add/remove owner refs
@@ -346,7 +348,7 @@ func (p *GraphBuilder) processEvent() {
 			absentOwnerCache.Add(accessor.GetUID())
 		}
 		for dep := range existingNode.dependents {
-			p.dirtyQueue.Add(dep)
+			p.attemptToDelete.Add(dep)
 		}
 		for _, owner := range existingNode.owners {
 			ownerNode, found := p.uidToNode.Read(owner.UID)
@@ -354,7 +356,7 @@ func (p *GraphBuilder) processEvent() {
 				continue
 			}
 			// this is to let processItem check if all the owner's dependents are deleted.
-			p.dirtyQueue.Add(ownerNode)
+			p.attemptToDelete.Add(ownerNode)
 		}
 	}
 }
