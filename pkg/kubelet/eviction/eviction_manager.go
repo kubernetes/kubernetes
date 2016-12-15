@@ -28,6 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
+	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
 	"k8s.io/kubernetes/pkg/kubelet/server/stats"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
@@ -102,6 +103,12 @@ func (m *managerImpl) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAd
 	m.RLock()
 	defer m.RUnlock()
 	if len(m.nodeConditions) == 0 {
+		return lifecycle.PodAdmitResult{Admit: true}
+	}
+	// As discussed in
+	// https://github.com/kubernetes/kubernetes/issues/38322#issuecomment-267207900,
+	// we should not reject static pods.
+	if kubepod.IsStaticPod(attrs.Pod) {
 		return lifecycle.PodAdmitResult{Admit: true}
 	}
 
