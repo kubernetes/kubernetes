@@ -30,6 +30,7 @@ import (
 var rolesWithAllowStar = sets.NewString(
 	saRolePrefix+"namespace-controller",
 	saRolePrefix+"generic-garbage-collector",
+	saRolePrefix+"resourcequota-controller",
 )
 
 // TestNoStarsForControllers confirms that no controller role has star verbs, groups,

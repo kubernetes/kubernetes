@@ -218,6 +218,7 @@ func ClusterRoles() []rbac.ClusterRole {
 			Rules: []rbac.PolicyRule{
 				// Used to build serviceLister
 				rbac.NewRule("list", "watch").Groups(legacyGroup).Resources("services", "endpoints").RuleOrDie(),
+				rbac.NewRule("get").Groups(legacyGroup).Resources("nodes").RuleOrDie(),
 			},
 		},
 		{
@@ -227,6 +228,23 @@ func ClusterRoles() []rbac.ClusterRole {
 				// These creates are non-mutating
 				rbac.NewRule("create").Groups(authenticationGroup).Resources("tokenreviews").RuleOrDie(),
 				rbac.NewRule("create").Groups(authorizationGroup).Resources("subjectaccessreviews").RuleOrDie(),
+			},
+		},
+		{
+			// a role to use for bootstrapping the kube-controller-manager so it can create the shared informers
+			// service accounts, and secrets that we need to create separate identities for other controllers
+			ObjectMeta: api.ObjectMeta{Name: "system:kube-controller-manager"},
+			Rules: []rbac.PolicyRule{
+				eventsRule(),
+				rbac.NewRule("create").Groups(legacyGroup).Resources("endpoints", "secrets", "serviceaccounts").RuleOrDie(),
+				rbac.NewRule("delete").Groups(legacyGroup).Resources("secrets").RuleOrDie(),
+				rbac.NewRule("get").Groups(legacyGroup).Resources("endpoints", "namespaces", "serviceaccounts").RuleOrDie(),
+				rbac.NewRule("update").Groups(legacyGroup).Resources("endpoints", "serviceaccounts").RuleOrDie(),
+
+				rbac.NewRule("list", "watch").Groups("*").Resources("namespaces", "nodes", "persistentvolumeclaims",
+					"persistentvolumes", "pods", "secrets", "serviceaccounts").RuleOrDie(),
+				rbac.NewRule("list", "watch").Groups(extensionsGroup).Resources("daemonsets", "deployments", "replicasets").RuleOrDie(),
+				rbac.NewRule("list", "watch").Groups(batchGroup).Resources("jobs", "cronjobs").RuleOrDie(),
 			},
 		},
 	}
@@ -241,7 +259,8 @@ func ClusterRoleBindings() []rbac.ClusterRoleBinding {
 		rbac.NewClusterBinding("system:discovery").Groups(user.AllAuthenticated, user.AllUnauthenticated).BindingOrDie(),
 		rbac.NewClusterBinding("system:basic-user").Groups(user.AllAuthenticated, user.AllUnauthenticated).BindingOrDie(),
 		rbac.NewClusterBinding("system:node").Groups(user.NodesGroup).BindingOrDie(),
-		rbac.NewClusterBinding("system:node-proxier").Groups(user.NodesGroup).BindingOrDie(),
+		rbac.NewClusterBinding("system:node-proxier").Users(user.KubeProxy).BindingOrDie(),
+		rbac.NewClusterBinding("system:kube-controller-manager").Users(user.KubeControllerManager).BindingOrDie(),
 	}
 	addClusterRoleBindingLabel(rolebindings)
 	return rolebindings
