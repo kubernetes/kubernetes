@@ -58,7 +58,7 @@ type GarbageCollector struct {
 	dirtyQueue                          workqueue.RateLimitingInterface
 	orphanQueue                         workqueue.RateLimitingInterface
 	controllers                         []*cache.Controller
-	propagator                          *Propagator
+	dependencyGraphBuilder              *GraphBuilder
 	registeredRateLimiter               *RegisteredRateLimiter
 	registeredRateLimiterForControllers *RegisteredRateLimiter
 	// GC caches the owners that do not exist according to the API server.
@@ -110,19 +110,19 @@ func (gc *GarbageCollector) controllerFor(resource schema.GroupVersionResource, 
 		nil,
 		ResourceResyncTime,
 		cache.ResourceEventHandlerFuncs{
-			// add the event to the propagator's eventQueue.
+			// add the event to the dependencyGraphBuilder's eventQueue.
 			AddFunc: func(obj interface{}) {
 				setObjectTypeMeta(obj)
 				event := &event{
 					eventType: addEvent,
 					obj:       obj,
 				}
-				gc.propagator.eventQueue.Add(event)
+				gc.dependencyGraphBuilder.eventQueue.Add(event)
 			},
 			UpdateFunc: func(oldObj, newObj interface{}) {
 				setObjectTypeMeta(newObj)
 				event := &event{updateEvent, newObj, oldObj}
-				gc.propagator.eventQueue.Add(event)
+				gc.dependencyGraphBuilder.eventQueue.Add(event)
 			},
 			DeleteFunc: func(obj interface{}) {
 				// delta fifo may wrap the object in a cache.DeletedFinalStateUnknown, unwrap it
@@ -134,7 +134,7 @@ func (gc *GarbageCollector) controllerFor(resource schema.GroupVersionResource, 
 					eventType: deleteEvent,
 					obj:       obj,
 				}
-				gc.propagator.eventQueue.Add(event)
+				gc.dependencyGraphBuilder.eventQueue.Add(event)
 			},
 		},
 	)
@@ -166,7 +166,7 @@ func NewGarbageCollector(metaOnlyClientPool dynamic.ClientPool, clientPool dynam
 		registeredRateLimiterForControllers: NewRegisteredRateLimiter(deletableResources),
 		absentOwnerCache:                    absentOwnerCache,
 	}
-	gc.propagator = &Propagator{
+	gc.dependencyGraphBuilder = &GraphBuilder{
 		eventQueue: workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "garbage_collector_event"),
 		uidToNode: &concurrentUIDToNode{
 			RWMutex:   &sync.RWMutex{},
@@ -197,7 +197,7 @@ func NewGarbageCollector(metaOnlyClientPool dynamic.ClientPool, clientPool dynam
 func (gc *GarbageCollector) Run(workers int, stopCh <-chan struct{}) {
 	defer gc.dirtyQueue.ShutDown()
 	defer gc.orphanQueue.ShutDown()
-	defer gc.propagator.eventQueue.ShutDown()
+	defer gc.dependencyGraphBuilder.eventQueue.ShutDown()
 
 	glog.Infof("Garbage Collector: Initializing")
 	for _, controller := range gc.controllers {
@@ -214,7 +214,7 @@ func (gc *GarbageCollector) Run(workers int, stopCh <-chan struct{}) {
 	glog.Infof("Garbage Collector: All monitored resources synced. Proceeding to collect garbage")
 
 	// worker
-	go wait.Until(gc.propagator.processEvent, 0, stopCh)
+	go wait.Until(gc.dependencyGraphBuilder.processEvent, 0, stopCh)
 
 	for i := 0; i < workers; i++ {
 		go wait.Until(gc.worker, 0, stopCh)
@@ -323,7 +323,7 @@ func (gc *GarbageCollector) generateVirtualDeleteEvent(identity objectReference)
 		obj:       objectReferenceToMetadataOnlyObject(identity),
 	}
 	glog.V(6).Infof("generating virtual delete event for %s\n\n", event.obj)
-	gc.propagator.eventQueue.Add(event)
+	gc.dependencyGraphBuilder.eventQueue.Add(event)
 }
 
 func ownerRefsToUIDs(refs []metav1.OwnerReference) []types.UID {
@@ -345,9 +345,9 @@ func (gc *GarbageCollector) processItem(item *node) error {
 	latest, err := gc.getObject(item.identity)
 	if err != nil {
 		if errors.IsNotFound(err) {
-			// the Propagator can add "virtual" node for an owner that doesn't
+			// the GraphBuilder can add "virtual" node for an owner that doesn't
 			// exist yet, so we need to enqueue a virtual Delete event to remove
-			// the virtual node from Propagator.uidToNode.
+			// the virtual node from GraphBuilder.uidToNode.
 			glog.V(6).Infof("item %v not found, generating a virtual delete event", item.identity)
 			gc.generateVirtualDeleteEvent(item.identity)
 			return nil
@@ -489,11 +489,11 @@ func (gc *GarbageCollector) orphanFinalizer() {
 
 // *FOR TEST USE ONLY* It's not safe to call this function when the GC is still
 // busy.
-// GraphHasUID returns if the Propagator has a particular UID store in its
+// GraphHasUID returns if the GraphBuilder has a particular UID store in its
 // uidToNode graph. It's useful for debugging.
 func (gc *GarbageCollector) GraphHasUID(UIDs []types.UID) bool {
 	for _, u := range UIDs {
-		if _, ok := gc.propagator.uidToNode.Read(u); ok {
+		if _, ok := gc.dependencyGraphBuilder.uidToNode.Read(u); ok {
 			return true
 		}
 	}

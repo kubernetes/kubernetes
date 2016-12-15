@@ -252,7 +252,7 @@ func TestProcessEvent(t *testing.T) {
 	var testScenarios = []struct {
 		name string
 		// a series of events that will be supplied to the
-		// Propagator.eventQueue.
+		// GraphBuilder.eventQueue.
 		events []event
 	}{
 		{
@@ -296,7 +296,7 @@ func TestProcessEvent(t *testing.T) {
 	}
 
 	for _, scenario := range testScenarios {
-		propagator := &Propagator{
+		dependencyGraphBuilder := &GraphBuilder{
 			eventQueue: workqueue.NewTimedWorkQueue(),
 			uidToNode: &concurrentUIDToNode{
 				RWMutex:   &sync.RWMutex{},
@@ -309,9 +309,9 @@ func TestProcessEvent(t *testing.T) {
 			},
 		}
 		for i := 0; i < len(scenario.events); i++ {
-			propagator.eventQueue.Add(&workqueue.TimedWorkQueueItem{StartTime: propagator.gc.clock.Now(), Object: &scenario.events[i]})
-			propagator.processEvent()
-			verifyGraphInvariants(scenario.name, propagator.uidToNode.uidToNode, t)
+			dependencyGraphBuilder.eventQueue.Add(&workqueue.TimedWorkQueueItem{StartTime: dependencyGraphBuilder.gc.clock.Now(), Object: &scenario.events[i]})
+			dependencyGraphBuilder.processEvent()
+			verifyGraphInvariants(scenario.name, dependencyGraphBuilder.uidToNode.uidToNode, t)
 		}
 	}
 }
@@ -324,12 +324,12 @@ func TestDependentsRace(t *testing.T) {
 	const updates = 100
 	owner := &node{dependents: make(map[*node]struct{})}
 	ownerUID := types.UID("owner")
-	gc.propagator.uidToNode.Write(owner)
+	gc.dependencyGraphBuilder.uidToNode.Write(owner)
 	go func() {
 		for i := 0; i < updates; i++ {
 			dependent := &node{}
-			gc.propagator.addDependentToOwners(dependent, []metav1.OwnerReference{{UID: ownerUID}})
-			gc.propagator.removeDependentFromOwners(dependent, []metav1.OwnerReference{{UID: ownerUID}})
+			gc.dependencyGraphBuilder.addDependentToOwners(dependent, []metav1.OwnerReference{{UID: ownerUID}})
+			gc.dependencyGraphBuilder.removeDependentFromOwners(dependent, []metav1.OwnerReference{{UID: ownerUID}})
 		}
 	}()
 	go func() {

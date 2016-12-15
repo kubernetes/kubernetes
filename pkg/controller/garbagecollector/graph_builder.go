@@ -45,18 +45,18 @@ type event struct {
 	oldObj interface{}
 }
 
-// Propagator: based on the events supplied by the informers, Propagator updates
+// GraphBuilder: based on the events supplied by the informers, GraphBuilder updates
 // uidToNode, a graph that caches the dependencies as we know, and enqueues
 // items to the dirtyQueue and orphanQueue.
-type Propagator struct {
+type GraphBuilder struct {
 	eventQueue workqueue.RateLimitingInterface
 	// uidToNode doesn't require a lock to protect, because only the
-	// single-threaded Propagator.processEvent() reads/writes it.
+	// single-threaded GraphBuilder.processEvent() reads/writes it.
 	uidToNode *concurrentUIDToNode
-	// Propagator is the producer of dirtyQueue and orphanQueue, GC is the consumer.
+	// GraphBuilder is the producer of dirtyQueue and orphanQueue, GC is the consumer.
 	dirtyQueue  workqueue.RateLimitingInterface
 	orphanQueue workqueue.RateLimitingInterface
-	// Propagator and GC share the absentOwnerCache. Objects that are known to
+	// GraphBuilder and GC share the absentOwnerCache. Objects that are known to
 	// be non-existent are added to the cached.
 	absentOwnerCache *UIDCache
 }
@@ -65,7 +65,7 @@ type Propagator struct {
 // exist in the p.uidToNode yet, a "virtual" node will be created to represent
 // the owner. The "virtual" node will be enqueued to the dirtyQueue, so that
 // processItem() will verify if the owner exists according to the API server.
-func (p *Propagator) addDependentToOwners(n *node, owners []metav1.OwnerReference) {
+func (p *GraphBuilder) addDependentToOwners(n *node, owners []metav1.OwnerReference) {
 	for _, owner := range owners {
 		ownerNode, ok := p.uidToNode.Read(owner.UID)
 		if !ok {
@@ -91,13 +91,13 @@ func (p *Propagator) addDependentToOwners(n *node, owners []metav1.OwnerReferenc
 
 // insertNode insert the node to p.uidToNode; then it finds all owners as listed
 // in n.owners, and adds the node to their dependents list.
-func (p *Propagator) insertNode(n *node) {
+func (p *GraphBuilder) insertNode(n *node) {
 	p.uidToNode.Write(n)
 	p.addDependentToOwners(n, n.owners)
 }
 
 // removeDependentFromOwners remove n from owners' dependents list.
-func (p *Propagator) removeDependentFromOwners(n *node, owners []metav1.OwnerReference) {
+func (p *GraphBuilder) removeDependentFromOwners(n *node, owners []metav1.OwnerReference) {
 	for _, owner := range owners {
 		ownerNode, ok := p.uidToNode.Read(owner.UID)
 		if !ok {
@@ -109,7 +109,7 @@ func (p *Propagator) removeDependentFromOwners(n *node, owners []metav1.OwnerRef
 
 // removeNode removes the node from p.uidToNode, then finds all
 // owners as listed in n.owners, and removes n from their dependents list.
-func (p *Propagator) removeNode(n *node) {
+func (p *GraphBuilder) removeNode(n *node) {
 	p.uidToNode.Delete(n.identity.UID)
 	p.removeDependentFromOwners(n, n.owners)
 }
@@ -218,7 +218,7 @@ func shouldOrphanDependents(e *event, accessor meta.Object) bool {
 
 // if an blocking ownerReference points to an object gets removed, or get set to
 // "BlockOwnerDeletion=false", add the object to the dirty queue.
-func (p *Propagator) addUnblockedOwnersToDirtyQueue(removed []metav1.OwnerReference, changed []ownerRefPair) {
+func (p *GraphBuilder) addUnblockedOwnersToDirtyQueue(removed []metav1.OwnerReference, changed []ownerRefPair) {
 	for _, ref := range removed {
 		if ref.BlockOwnerDeletion != nil && *ref.BlockOwnerDeletion {
 			node, found := p.uidToNode.Read(ref.UID)
@@ -243,7 +243,7 @@ func (p *Propagator) addUnblockedOwnersToDirtyQueue(removed []metav1.OwnerRefere
 }
 
 // Dequeueing an event from eventQueue, updating graph, populating dirty_queue.
-func (p *Propagator) processEvent() {
+func (p *GraphBuilder) processEvent() {
 	item, quit := p.eventQueue.Get()
 	if quit {
 		return
@@ -265,7 +265,7 @@ func (p *Propagator) processEvent() {
 		utilruntime.HandleError(fmt.Errorf("cannot access obj: %v", err))
 		return
 	}
-	glog.V(6).Infof("Propagator process object: %s/%s, namespace %s, name %s, event type %s", typeAccessor.GetAPIVersion(), typeAccessor.GetKind(), accessor.GetNamespace(), accessor.GetName(), event.eventType)
+	glog.V(6).Infof("GraphBuilder process object: %s/%s, namespace %s, name %s, event type %s", typeAccessor.GetAPIVersion(), typeAccessor.GetKind(), accessor.GetNamespace(), accessor.GetName(), event.eventType)
 	// Check if the node already exsits
 	existingNode, found := p.uidToNode.Read(accessor.GetUID())
 	switch {

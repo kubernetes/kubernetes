@@ -34,7 +34,7 @@ func (s objectReference) String() string {
 	return fmt.Sprintf("[%s/%s, namespace: %s, name: %s, uid: %s]", s.APIVersion, s.Kind, s.Namespace, s.Name, s.UID)
 }
 
-// The single-threaded Propagator.processEvent() is the sole writer of the
+// The single-threaded GraphBuilder.processEvent() is the sole writer of the
 // nodes. The multi-threaded GarbageCollector.processItem() reads the nodes.
 type node struct {
 	identity objectReference
