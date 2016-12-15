@@ -77,6 +77,12 @@ func BearerToken(d *kubeadmapi.TokenDiscovery) string {
 }
 
 func IsTokenValid(d *kubeadmapi.TokenDiscovery) (bool, error) {
+	if len(d.ID)+len(d.Secret) == 0 {
+		return false, nil
+	}
+	if _, _, err := ParseToken(d.ID + "." + d.Secret); err != nil {
+		return false, err
+	}
 	return true, nil
 }
 
