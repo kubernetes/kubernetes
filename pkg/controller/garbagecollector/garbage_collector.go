@@ -33,11 +33,12 @@ import (
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/types"
-	"k8s.io/kubernetes/pkg/util/clock"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/util/workqueue"
+	// install the prometheus plugin
+	_ "k8s.io/kubernetes/pkg/util/workqueue/prometheus"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
@@ -59,11 +60,10 @@ type GarbageCollector struct {
 	// clientPool uses the regular dynamicCodec. We need it to update
 	// finalizers. It can be removed if we support patching finalizers.
 	clientPool                       dynamic.ClientPool
-	dirtyQueue                       *workqueue.TimedWorkQueue
-	orphanQueue                      *workqueue.TimedWorkQueue
+	dirtyQueue                       workqueue.RateLimitingInterface
+	orphanQueue                      workqueue.RateLimitingInterface
 	monitors                         []monitor
 	propagator                       *Propagator
-	clock                            clock.Clock
 	registeredRateLimiter            *RegisteredRateLimiter
 	registeredRateLimiterForMonitors *RegisteredRateLimiter
 	// GC caches the owners that do not exist according to the API server.
@@ -123,12 +123,12 @@ func (gc *GarbageCollector) monitorFor(resource schema.GroupVersionResource, kin
 					eventType: addEvent,
 					obj:       obj,
 				}
-				gc.propagator.eventQueue.Add(&workqueue.TimedWorkQueueItem{StartTime: gc.clock.Now(), Object: event})
+				gc.propagator.eventQueue.Add(event)
 			},
 			UpdateFunc: func(oldObj, newObj interface{}) {
 				setObjectTypeMeta(newObj)
 				event := &event{updateEvent, newObj, oldObj}
-				gc.propagator.eventQueue.Add(&workqueue.TimedWorkQueueItem{StartTime: gc.clock.Now(), Object: event})
+				gc.propagator.eventQueue.Add(event)
 			},
 			DeleteFunc: func(obj interface{}) {
 				// delta fifo may wrap the object in a cache.DeletedFinalStateUnknown, unwrap it
@@ -140,7 +140,7 @@ func (gc *GarbageCollector) monitorFor(resource schema.GroupVersionResource, kin
 					eventType: deleteEvent,
 					obj:       obj,
 				}
-				gc.propagator.eventQueue.Add(&workqueue.TimedWorkQueueItem{StartTime: gc.clock.Now(), Object: event})
+				gc.propagator.eventQueue.Add(event)
 			},
 		},
 	)
@@ -159,15 +159,13 @@ var ignoredResources = map[schema.GroupVersionResource]struct{}{
 }
 
 func NewGarbageCollector(metaOnlyClientPool dynamic.ClientPool, clientPool dynamic.ClientPool, mapper meta.RESTMapper, deletableResources map[schema.GroupVersionResource]struct{}) (*GarbageCollector, error) {
-	dirtyQueue := workqueue.NewTimedWorkQueue()
-	orphanQueue := workqueue.NewTimedWorkQueue()
+	dirtyQueue := workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "garbage_collector_dirty")
+	orphanQueue := workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "garbage_collector_orphan")
 	absentOwnerCache := NewUIDCache(500)
-	clock := clock.RealClock{}
 	gc := &GarbageCollector{
 		metaOnlyClientPool:               metaOnlyClientPool,
 		clientPool:                       clientPool,
 		restMapper:                       mapper,
-		clock:                            clock,
 		dirtyQueue:                       dirtyQueue,
 		orphanQueue:                      orphanQueue,
 		registeredRateLimiter:            NewRegisteredRateLimiter(deletableResources),
@@ -175,7 +173,7 @@ func NewGarbageCollector(metaOnlyClientPool dynamic.ClientPool, clientPool dynam
 		absentOwnerCache:                 absentOwnerCache,
 	}
 	gc.propagator = &Propagator{
-		eventQueue: workqueue.NewTimedWorkQueue(),
+		eventQueue: workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "garbage_collector_event"),
 		uidToNode: &concurrentUIDToNode{
 			RWMutex:   &sync.RWMutex{},
 			uidToNode: make(map[types.UID]*node),
@@ -183,7 +181,6 @@ func NewGarbageCollector(metaOnlyClientPool dynamic.ClientPool, clientPool dynam
 		dirtyQueue:       dirtyQueue,
 		orphanQueue:      orphanQueue,
 		absentOwnerCache: absentOwnerCache,
-		clock:            clock,
 	}
 	for resource := range deletableResources {
 		if _, ok := ignoredResources[resource]; ok {
@@ -235,19 +232,22 @@ func (gc *GarbageCollector) Run(workers int, stopCh <-chan struct{}) {
 }
 
 func (gc *GarbageCollector) worker() {
-	timedItem, quit := gc.dirtyQueue.Get()
+	item, quit := gc.dirtyQueue.Get()
 	if quit {
 		return
 	}
-	defer gc.dirtyQueue.Done(timedItem)
-	err := gc.processItem(timedItem.Object.(*node))
+	defer gc.dirtyQueue.Done(item)
+	n, ok := item.(*node)
+	if !ok {
+		utilruntime.HandleError(fmt.Errorf("expect *node, got %#v", item))
+	}
+	err := gc.processItem(n)
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("Error syncing item %#v: %v", timedItem.Object, err))
+		utilruntime.HandleError(fmt.Errorf("Error syncing item %#v: %v", n, err))
 		// retry if garbage collection of an object failed.
-		gc.dirtyQueue.Add(timedItem)
+		gc.dirtyQueue.AddRateLimited(item)
 		return
 	}
-	DirtyProcessingLatency.Observe(sinceInMicroseconds(gc.clock, timedItem.StartTime))
 }
 
 func objectReferenceToMetadataOnlyObject(ref objectReference) *metaonly.MetadataOnlyObject {
@@ -329,7 +329,7 @@ func (gc *GarbageCollector) generateVirtualDeleteEvent(identity objectReference)
 		obj:       objectReferenceToMetadataOnlyObject(identity),
 	}
 	glog.V(6).Infof("generating virtual delete event for %s\n\n", event.obj)
-	gc.propagator.eventQueue.Add(&workqueue.TimedWorkQueueItem{StartTime: gc.clock.Now(), Object: event})
+	gc.propagator.eventQueue.Add(event)
 }
 
 func ownerRefsToUIDs(refs []metav1.OwnerReference) []types.UID {
@@ -428,7 +428,7 @@ func (gc *GarbageCollector) processDeletingDependentsItem(item *node) error {
 		for _, dep := range blockingDependents {
 			if !dep.deletingDependents {
 				glog.V(2).Infof("adding %s to dirtyQueue, because its owner %s is deletingDependents", dep.identity, item.identity)
-				gc.dirtyQueue.Add(&workqueue.TimedWorkQueueItem{StartTime: gc.clock.Now(), Object: dep})
+				gc.dirtyQueue.Add(dep)
 			}
 		}
 		return nil
@@ -462,14 +462,14 @@ func (gc *GarbageCollector) orhpanDependents(owner objectReference, dependents [
 // the "Orphan" finalizer. The node is added back into the orphanQueue if any of
 // these steps fail.
 func (gc *GarbageCollector) orphanFinalizer() {
-	timedItem, quit := gc.orphanQueue.Get()
+	item, quit := gc.orphanQueue.Get()
 	if quit {
 		return
 	}
-	defer gc.orphanQueue.Done(timedItem)
-	owner, ok := timedItem.Object.(*node)
+	defer gc.orphanQueue.Done(item)
+	owner, ok := item.(*node)
 	if !ok {
-		utilruntime.HandleError(fmt.Errorf("expect *node, got %#v", timedItem.Object))
+		utilruntime.HandleError(fmt.Errorf("expect *node, got %#v", item))
 	}
 	// we don't need to lock each element, because they never get updated
 	owner.dependentsLock.RLock()
@@ -482,16 +482,15 @@ func (gc *GarbageCollector) orphanFinalizer() {
 	err := gc.orhpanDependents(owner.identity, dependents)
 	if err != nil {
 		glog.V(6).Infof("orphanDependents for %s failed with %v", owner.identity, err)
-		gc.orphanQueue.Add(timedItem)
+		gc.orphanQueue.AddRateLimited(item)
 		return
 	}
 	// update the owner, remove "orphaningFinalizer" from its finalizers list
 	err = gc.removeFinalizer(owner, v1.FinalizerOrphanDependents)
 	if err != nil {
 		glog.V(6).Infof("removeOrphanFinalizer for %s failed with %v", owner.identity, err)
-		gc.orphanQueue.Add(timedItem)
+		gc.orphanQueue.AddRateLimited(item)
 	}
-	OrphanProcessingLatency.Observe(sinceInMicroseconds(gc.clock, timedItem.StartTime))
 }
 
 // *FOR TEST USE ONLY* It's not safe to call this function when the GC is still

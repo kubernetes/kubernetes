@@ -117,9 +117,9 @@ var InterestingApiServerMetrics = []string{
 }
 
 var InterestingControllerManagerMetrics = []string{
-	"garbage_collector_event_processing_latency_microseconds",
-	"garbage_collector_dirty_processing_latency_microseconds",
-	"garbage_collector_orphan_processing_latency_microseconds",
+	"garbage_collector_event_queue_latency",
+	"garbage_collector_dirty_queue_latency",
+	"garbage_collector_orhan_queue_latency",
 }
 
 var InterestingKubeletMetrics = []string{
