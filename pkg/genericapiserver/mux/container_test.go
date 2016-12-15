@@ -26,7 +26,7 @@ import (
 func TestNewAPIContainer(t *testing.T) {
 	mux := http.NewServeMux()
 	c := NewAPIContainer(mux, nil)
-	assert.Equal(t, mux, c.SecretRoutes.(*http.ServeMux), "SecretRoutes ServeMux's do not match")
+	assert.Equal(t, mux, c.SecretRoutes, "SecretRoutes ServeMux's do not match")
 	assert.Equal(t, mux, c.Container.ServeMux, "Container ServeMux's do not match")
 }
 
