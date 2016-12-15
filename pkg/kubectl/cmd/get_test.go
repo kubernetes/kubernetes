@@ -259,7 +259,7 @@ func TestGetSortedObjects(t *testing.T) {
 func verifyObjects(t *testing.T, expected, actual []runtime.Object) {
 	var actualObj runtime.Object
 	var err error
-	
+
 	if len(actual) != len(expected) {
 		t.Fatal(actual)
 	}
@@ -273,7 +273,7 @@ func verifyObjects(t *testing.T, expected, actual []runtime.Object) {
 			actualObj = obj
 			err = nil
 		}
-		
+
 		if err != nil {
 			t.Fatal(err)
 		}

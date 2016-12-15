@@ -460,7 +460,7 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 
 		// try to convert before apply filter func
 		decodedObj, _ := kubectl.DecodeUnknownObject(original)
-		
+
 		// filter objects if filter has been defined for current object
 		if isFiltered, err := filterFuncs.Filter(decodedObj, filterOpts); isFiltered {
 			if err == nil {
