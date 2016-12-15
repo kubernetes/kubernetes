@@ -539,6 +539,8 @@ Continuous integration builds have used the following versions of external depen
 
 ### Previous Releases Included in v1.5.0
 
+- [v1.5.0-beta.3](CHANGELOG.md#v150-beta3)
+- [v1.5.0-beta.2](CHANGELOG.md#v150-beta2)
 - [v1.5.0-beta.1](CHANGELOG.md#v150-beta1)
 - [v1.5.0-alpha.2](CHANGELOG.md#v150-alpha2)
 - [v1.5.0-alpha.1](CHANGELOG.md#v150-alpha1)
