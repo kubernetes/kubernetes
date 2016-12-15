@@ -69,9 +69,39 @@ const (
 // TODO: pass the various interfaces on the factory directly into the command constructors (so the
 // commands are decoupled from the factory).
 type Factory interface {
-	Ring0Factory
-	Ring1Factory
-	Ring2Factory
+	CommandIntegration
+
+	DiscoveryClientFactory
+	NegotiationFactory
+	ObjectMappingFactory
+	BuilderFactory
+
+	PolymorphicObjectFactory
+	PolymorphicClientFactory
+
+	BasePrinterFactory
+	ServerRequiringPrinterFactory
+	ObjectPrinterFactory
+}
+
+// CommandIntegration holds methods which are used to deal with the CLI aspects of the factory.
+// TODO I think a lot of this is due to the new flagset being created and bound to various values.
+// We should refactor to avoid this.
+type CommandIntegration interface {
+	// Returns internal flagset
+	FlagSet() *pflag.FlagSet
+	// Command will stringify and return all environment arguments ie. a command run by a client
+	// using the factory.
+	Command() string
+	// BindFlags adds any flags that are common to all kubectl sub commands.
+	BindFlags(flags *pflag.FlagSet)
+	// BindExternalFlags adds any flags defined by external projects (not part of pflags)
+	BindExternalFlags(flags *pflag.FlagSet)
+
+	// EditorEnvs returns a group of environment variables that the edit command
+	// can range over in order to determine if the user has specified an editor
+	// of their choice.
+	EditorEnvs() []string
 }
 
 type DiscoveryClientFactory interface {
@@ -79,18 +109,18 @@ type DiscoveryClientFactory interface {
 	DiscoveryClient() (discovery.CachedDiscoveryInterface, error)
 }
 
-// Ring0Factory holds the first level of factory methods.
-// Generally provides discovery, negotiation, and no-dep calls.
-// TODO The polymorphic calls probably deserve their own interface.
-type Ring0Factory interface {
-	DiscoveryClientFactory
-
+type NegotiationFactory interface {
 	// ClientSet gives you back an internal, generated clientset
 	ClientSet() (*internalclientset.Clientset, error)
 	// Returns a RESTClient for accessing Kubernetes resources or an error.
 	RESTClient() (*restclient.RESTClient, error)
 	// Returns a client.Config for accessing the Kubernetes server.
 	ClientConfig() (*restclient.Config, error)
+
+	// Returns the default namespace to use in cases where no
+	// other namespace is specified and whether the namespace was
+	// overridden.
+	DefaultNamespace() (string, bool, error)
 
 	// TODO this should probably be removed and collapsed into whatever we want to use long term
 	// probably returning a restclient for a version and leaving contruction up to someone else
@@ -101,14 +131,11 @@ type Ring0Factory interface {
 	ClientSetForVersion(requiredVersion *schema.GroupVersion) (*internalclientset.Clientset, error)
 	// TODO remove.  This should be rolled into `ClientConfig`
 	ClientConfigForVersion(requiredVersion *schema.GroupVersion) (*restclient.Config, error)
+}
 
-	// Returns interfaces for decoding objects - if toInternal is set, decoded objects will be converted
-	// into their internal form (if possible). Eventually the internal form will be removed as an option,
-	// and only versioned objects will be returned.
-	Decoder(toInternal bool) runtime.Decoder
-	// Returns an encoder capable of encoding a provided object into JSON in the default desired version.
-	JSONEncoder() runtime.Encoder
-
+// PolymorphicObjectFactory provides interfaces which have to interpet generic objects and find
+// commonality in them.
+type PolymorphicObjectFactory interface {
 	// UpdatePodSpecForObject will call the provided function on the pod spec this object supports,
 	// return false if no pod spec is supported, or return an error.
 	UpdatePodSpecForObject(obj runtime.Object, fn func(*api.PodSpec) error) (bool, error)
@@ -124,25 +151,12 @@ type Ring0Factory interface {
 	// LabelsForObject returns the labels associated with the provided object
 	LabelsForObject(object runtime.Object) (map[string]string, error)
 
-	// Returns internal flagset
-	FlagSet() *pflag.FlagSet
-	// Command will stringify and return all environment arguments ie. a command run by a client
-	// using the factory.
-	Command() string
-	// BindFlags adds any flags that are common to all kubectl sub commands.
-	BindFlags(flags *pflag.FlagSet)
-	// BindExternalFlags adds any flags defined by external projects (not part of pflags)
-	BindExternalFlags(flags *pflag.FlagSet)
-
-	DefaultResourceFilterOptions(cmd *cobra.Command, withNamespace bool) *kubectl.PrintOptions
-	// DefaultResourceFilterFunc returns a collection of FilterFuncs suitable for filtering specific resource types.
-	DefaultResourceFilterFunc() kubectl.Filters
-
 	// SuggestedPodTemplateResources returns a list of resource types that declare a pod template
 	SuggestedPodTemplateResources() []schema.GroupResource
-
-	// Returns a Printer for formatting objects of the given type or an error.
-	Printer(mapping *meta.RESTMapping, options kubectl.PrintOptions) (kubectl.ResourcePrinter, error)
+	// Check whether the kind of resources could be exposed
+	CanBeExposed(kind schema.GroupKind) error
+	// Check whether the kind of resources could be autoscaled
+	CanBeAutoscaled(kind schema.GroupKind) error
 	// Pauser marks the object in the info as paused ie. it will not be reconciled by its controller.
 	Pauser(info *resource.Info) (bool, error)
 	// Resumer resumes a paused object inside the info ie. it will be reconciled by its controller.
@@ -153,31 +167,24 @@ type Ring0Factory interface {
 	// third-party vendors.
 	ResolveImage(imageName string) (string, error)
 
-	// Returns the default namespace to use in cases where no
-	// other namespace is specified and whether the namespace was
-	// overridden.
-	DefaultNamespace() (string, bool, error)
+	// Returns interfaces for decoding objects - if toInternal is set, decoded objects will be converted
+	// into their internal form (if possible). Eventually the internal form will be removed as an option,
+	// and only versioned objects will be returned.
+	Decoder(toInternal bool) runtime.Decoder
+	// Returns an encoder capable of encoding a provided object into JSON in the default desired version.
+	JSONEncoder() runtime.Encoder
+
+	DefaultResourceFilterOptions(cmd *cobra.Command, withNamespace bool) *kubectl.PrintOptions
+	// DefaultResourceFilterFunc returns a collection of FilterFuncs suitable for filtering specific resource types.
+	DefaultResourceFilterFunc() kubectl.Filters
+
 	// Generators returns the generators for the provided command
 	Generators(cmdName string) map[string]kubectl.Generator
-	// Check whether the kind of resources could be exposed
-	CanBeExposed(kind schema.GroupKind) error
-	// Check whether the kind of resources could be autoscaled
-	CanBeAutoscaled(kind schema.GroupKind) error
-
-	// EditorEnvs returns a group of environment variables that the edit command
-	// can range over in order to determine if the user has specified an editor
-	// of their choice.
-	EditorEnvs() []string
-
-	// PrintObjectSpecificMessage prints object-specific messages on the provided writer
-	PrintObjectSpecificMessage(obj runtime.Object, out io.Writer)
 }
 
-// Ring1Factory holds the second level of factory methods.  These functions depend upon Ring0Factory methods.
-// Generally they provide object typing and functions that build requests based on the negotiated clients.
-type Ring1Factory interface {
-	ring0Factory() Ring0Factory
-
+// ObjectMappingFactory hold interfaces which are layered on top of clients retrieved from negotiation.
+// They provide mapping, typing, and other values which require negotiated server connections
+type ObjectMappingFactory interface {
 	// Returns interfaces for dealing with arbitrary runtime.Objects.
 	Object() (meta.RESTMapper, runtime.ObjectTyper)
 	// Returns interfaces for dealing with arbitrary
@@ -188,9 +195,15 @@ type Ring1Factory interface {
 	ClientForMapping(mapping *meta.RESTMapping) (resource.RESTClient, error)
 	// Returns a RESTClient for working with Unstructured objects.
 	UnstructuredClientForMapping(mapping *meta.RESTMapping) (resource.RESTClient, error)
-	// Returns a Describer for displaying the specified RESTMapping type or an error.
-	Describer(mapping *meta.RESTMapping) (kubectl.Describer, error)
 
+	// Returns a schema that can validate objects stored on disk.
+	Validator(validate bool, cacheDir string) (validation.Schema, error)
+	// SwaggerSchema returns the schema declaration for the provided group version kind.
+	SwaggerSchema(schema.GroupVersionKind) (*swagger.ApiDeclaration, error)
+}
+
+// PolymorphicClientFactory makes use of server APIs to perform polymorphic calls.
+type PolymorphicClientFactory interface {
 	// LogsForObject returns a request for the logs associated with the provided object
 	LogsForObject(object, options runtime.Object) (*restclient.Request, error)
 	// Returns a Scaler for changing the size of the specified RESTMapping type or an error
@@ -203,29 +216,54 @@ type Ring1Factory interface {
 	Rollbacker(mapping *meta.RESTMapping) (kubectl.Rollbacker, error)
 	// Returns a StatusViewer for printing rollout status.
 	StatusViewer(mapping *meta.RESTMapping) (kubectl.StatusViewer, error)
-
 	// AttachablePodForObject returns the pod to which to attach given an object.
 	AttachablePodForObject(object runtime.Object) (*api.Pod, error)
+}
 
+type BasePrinterFactory interface {
+	// Returns a Printer for formatting objects of the given type or an error.
+	Printer(mapping *meta.RESTMapping, options kubectl.PrintOptions) (kubectl.ResourcePrinter, error)
+
+	// PrintObjectSpecificMessage prints object-specific messages on the provided writer
+	PrintObjectSpecificMessage(obj runtime.Object, out io.Writer)
+}
+
+// ServerRequiringPrinterFactory holds printers that for one reason or another require server access
+type ServerRequiringPrinterFactory interface {
+	// Returns a Describer for displaying the specified RESTMapping type or an error.
+	Describer(mapping *meta.RESTMapping) (kubectl.Describer, error)
 	// PrinterForMapping returns a printer suitable for displaying the provided resource type.
 	// Requires that printer flags have been added to cmd (see AddPrinterFlags).
 	PrinterForMapping(cmd *cobra.Command, mapping *meta.RESTMapping, withNamespace bool) (kubectl.ResourcePrinter, error)
+}
 
-	// Returns a schema that can validate objects stored on disk.
-	Validator(validate bool, cacheDir string) (validation.Schema, error)
-	// SwaggerSchema returns the schema declaration for the provided group version kind.
-	SwaggerSchema(schema.GroupVersionKind) (*swagger.ApiDeclaration, error)
+// ObjectPrinterFactory holds the outer shell of printers.
+// TODO this seems weird.  How many layers do we really need?
+type ObjectPrinterFactory interface {
+	// PrintObject prints an api object given command line flags to modify the output format
+	PrintObject(cmd *cobra.Command, mapper meta.RESTMapper, obj runtime.Object, out io.Writer) error
+}
+
+// BuilderFactory creates a builder for you
+type BuilderFactory interface {
+	// One stop shopping for a Builder
+	NewBuilder() *resource.Builder
+}
+
+// Ring0Factory holds the first level of factory methods.
+// Generally provides discovery, negotiation, and no-dep calls.
+type Ring0Factory interface {
+	CommandIntegration
+	DiscoveryClientFactory
+	NegotiationFactory
+	PolymorphicObjectFactory
+	PrinterRing0Factory
 }
 
 // Ring1Factory holds the second level of factory methods.  These functions depend upon Ring1Factory and Ring0Factory methods.
 // Generally they depend upon client mapper functions
 type Ring2Factory interface {
 	ring1Factory() Ring1Factory
-
-	// PrintObject prints an api object given command line flags to modify the output format
-	PrintObject(cmd *cobra.Command, mapper meta.RESTMapper, obj runtime.Object, out io.Writer) error
-	// One stop shopping for a Builder
-	NewBuilder() *resource.Builder
 }
 
 func getGroupVersionKinds(gvks []schema.GroupVersionKind, group string) []schema.GroupVersionKind {
@@ -263,11 +301,12 @@ type factory struct {
 // if optionalClientConfig is nil, then flags will be bound to a new clientcmd.ClientConfig.
 // if optionalClientConfig is not nil, then this factory will make use of it.
 func NewFactory(optionalClientConfig clientcmd.ClientConfig) Factory {
+	ring0Factory := NewRing0Factory(optionalClientConfig)
+
 	// TODO pull the polymorphic command helpers out of the rings and run them separately.
 	ring2Factory :=
 		NewRing2Factory(
-			NewRing1Factory(
-				NewRing0Factory(optionalClientConfig)))
+			NewRing1Factory())
 
 	f := &factory{
 		Ring0Factory: ring2Factory.ring1Factory().ring0Factory(),

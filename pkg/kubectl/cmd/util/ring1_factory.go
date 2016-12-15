@@ -52,10 +52,12 @@ import (
 )
 
 type ring1Factory struct {
-	parent Ring0Factory
+	discoveryClientFactory DiscoveryClientFactory
+	negotiationFactory     NegotiationFactory
+	printerRing0Factory    PrinterRing0Factory
 }
 
-func NewRing1Factory(parent Ring0Factory) Ring1Factory {
+func NewRing1Factory(discoveryClientFactory DiscoveryClientFactory, negotiationFactory NegotiationFactory, printerRing0Factory PrinterRing0Factory) Ring1Factory {
 	f := &ring1Factory{
 		parent: parent,
 	}
