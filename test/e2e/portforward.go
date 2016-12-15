@@ -32,7 +32,6 @@ import (
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/version"
 	"k8s.io/kubernetes/test/e2e/framework"
-	testutils "k8s.io/kubernetes/test/utils"
 
 	. "github.com/onsi/ginkgo"
 )
@@ -100,15 +99,6 @@ func pfPod(expectedClientData, chunks, chunkSize, chunkIntervalMillis string) *a
 			RestartPolicy: api.RestartPolicyNever,
 		},
 	}
-}
-
-func WaitForTerminatedContainer(f *framework.Framework, pod *api.Pod, containerName string) error {
-	return framework.WaitForPodCondition(f.ClientSet, f.Namespace.Name, pod.Name, "container terminated", framework.PodStartTimeout, func(pod *api.Pod) (bool, error) {
-		if len(testutils.TerminatedContainers(pod)[containerName]) > 0 {
-			return true, nil
-		}
-		return false, nil
-	})
 }
 
 type portForwardCommand struct {
@@ -231,7 +221,7 @@ var _ = framework.KubeDescribe("Port forwarding", func() {
 			conn.Close()
 
 			By("Waiting for the target pod to stop running")
-			if err := WaitForTerminatedContainer(f, pod, "portforwardtester"); err != nil {
+			if err := framework.WaitForTerminatedContainer(f.Client, pod, f.Namespace.Name, "portforwardtester"); err != nil {
 				framework.Failf("Container did not terminate: %v", err)
 			}
 
@@ -297,7 +287,7 @@ var _ = framework.KubeDescribe("Port forwarding", func() {
 			}
 
 			By("Waiting for the target pod to stop running")
-			if err := WaitForTerminatedContainer(f, pod, "portforwardtester"); err != nil {
+			if err := framework.WaitForTerminatedContainer(f.Client, pod, f.Namespace.Name, "portforwardtester"); err != nil {
 				framework.Failf("Container did not terminate: %v", err)
 			}
 
@@ -355,7 +345,7 @@ var _ = framework.KubeDescribe("Port forwarding", func() {
 			}
 
 			By("Waiting for the target pod to stop running")
-			if err := WaitForTerminatedContainer(f, pod, "portforwardtester"); err != nil {
+			if err := framework.WaitForTerminatedContainer(f.Client, pod, f.Namespace.Name, "portforwardtester"); err != nil {
 				framework.Failf("Container did not terminate: %v", err)
 			}
 
