@@ -893,8 +893,10 @@ start_kube_addons() {
     setup_addon_manifests "addons" "dns"
     dns_controller_file="${addon_dst_dir}/dns/kubedns-controller.yaml"
     dns_svc_file="${addon_dst_dir}/dns/kubedns-svc.yaml"
+    dns_sa_file="${addon_dst_dir}/dns/kubedns-sa.yaml"
     mv "${addon_dst_dir}/dns/kubedns-controller.yaml.in" "${dns_controller_file}"
     mv "${addon_dst_dir}/dns/kubedns-svc.yaml.in" "${dns_svc_file}"
+    mv "${addon_dst_dir}/dns/kubedns-sa.yaml" "${dns_sa_file}"
     # Replace the salt configurations with variable values.
     sed -i -e "s@{{ *pillar\['dns_domain'\] *}}@${DNS_DOMAIN}@g" "${dns_controller_file}"
     sed -i -e "s@{{ *pillar\['dns_server'\] *}}@${DNS_SERVER_IP}@g" "${dns_svc_file}"

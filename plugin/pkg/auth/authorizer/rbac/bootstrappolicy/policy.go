@@ -229,6 +229,13 @@ func ClusterRoles() []rbac.ClusterRole {
 				rbac.NewRule("create").Groups(authorizationGroup).Resources("subjectaccessreviews").RuleOrDie(),
 			},
 		},
+		{
+			// a role to use for the kube-dns pod
+			ObjectMeta: api.ObjectMeta{Name: "system:kube-dns"},
+			Rules: []rbac.PolicyRule{
+				rbac.NewRule("list", "watch").Groups(legacyGroup).Resources("endpoints", "services").RuleOrDie(),
+			},
+		},
 	}
 	addClusterRoleLabel(roles)
 	return roles
@@ -242,6 +249,7 @@ func ClusterRoleBindings() []rbac.ClusterRoleBinding {
 		rbac.NewClusterBinding("system:basic-user").Groups(user.AllAuthenticated, user.AllUnauthenticated).BindingOrDie(),
 		rbac.NewClusterBinding("system:node").Groups(user.NodesGroup).BindingOrDie(),
 		rbac.NewClusterBinding("system:node-proxier").Groups(user.NodesGroup).BindingOrDie(),
+		rbac.NewClusterBinding("system:kube-dns").SAs("kube-system", "kube-dns").BindingOrDie(),
 	}
 	addClusterRoleBindingLabel(rolebindings)
 	return rolebindings

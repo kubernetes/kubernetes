@@ -166,3 +166,4 @@ spec:
         - containerPort: 8080
           protocol: TCP
       dnsPolicy: Default  # Don't use cluster DNS.
+      serviceAccountName: kube-dns
