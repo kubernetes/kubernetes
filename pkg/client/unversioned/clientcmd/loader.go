@@ -48,6 +48,7 @@ const (
 )
 
 var RecommendedHomeFile = path.Join(homedir.HomeDir(), RecommendedHomeDir, RecommendedFileName)
+var RecommendedHomeFileDir = path.Join(homedir.HomeDir(), RecommendedHomeDir, RecommendedFileName+".d")
 var RecommendedSchemaFile = path.Join(homedir.HomeDir(), RecommendedHomeDir, RecommendedSchemaName)
 
 // currentMigrationRules returns a map that holds the history of recommended home directories used in previous versions.
@@ -137,15 +138,38 @@ func NewDefaultClientConfigLoadingRules() *ClientConfigLoadingRules {
 	envVarFiles := os.Getenv(RecommendedConfigPathEnvVar)
 	if len(envVarFiles) != 0 {
 		chain = append(chain, filepath.SplitList(envVarFiles)...)
-
 	} else {
 		chain = append(chain, RecommendedHomeFile)
+		chain = append(chain, loadConfigDir(RecommendedHomeFileDir)...)
 	}
 
 	return &ClientConfigLoadingRules{
 		Precedence:     chain,
 		MigrationRules: currentMigrationRules(),
 	}
+}
+
+func loadConfigDir(dir string) []string {
+	stat, err := os.Lstat(RecommendedHomeFileDir)
+	if err != nil {
+		if !os.IsNotExist(err) {
+			glog.Warningf("Failed to stat config dir: %v", err)
+		}
+		return []string{}
+	}
+	if !stat.IsDir() {
+		glog.Warningf("Expected %s to be a directory", dir)
+	}
+	files, err := ioutil.ReadDir(dir)
+	if err != nil {
+		glog.Warningf("Failed to list config directory: %v", err)
+		return []string{}
+	}
+	result := []string{}
+	for _, file := range files {
+		result = append(result, path.Join(dir, file.Name()))
+	}
+	return result
 }
 
 // Load starts by running the MigrationRules and then

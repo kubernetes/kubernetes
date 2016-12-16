@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
 	clientcmdlatest "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api/latest"
+	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 var (
@@ -575,4 +576,59 @@ func Example_mergingEverythingNoConflicts() {
 	// - name: red-user
 	//   user:
 	//     token: red-token
+}
+
+func TestLoadConfigDirNotExists(t *testing.T) {
+	res := loadConfigDir("/foo/bar/baz")
+	if len(res) != 0 {
+		t.Errorf("Unexpected result: %v", res)
+	}
+}
+
+func TestLoadConfigDirFile(t *testing.T) {
+	commandLineFile, err := ioutil.TempFile("", "")
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+		t.FailNow()
+	}
+	defer os.Remove(commandLineFile.Name())
+
+	res := loadConfigDir(commandLineFile.Name())
+	if len(res) != 0 {
+		t.Errorf("Unexpected result: %v", res)
+	}
+}
+
+func TestLoadConfigDir(t *testing.T) {
+	dir, err := ioutil.TempDir("", "")
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+		t.FailNow()
+	}
+	defer os.RemoveAll(dir)
+
+	files := []string{"foo", "bar", "baz"}
+	expectedSet := sets.String{}
+
+	for _, file := range files {
+		filePath := path.Join(dir, file)
+		expectedSet.Insert(filePath)
+		f, err := os.Create(filePath)
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+			t.FailNow()
+		}
+		f.Write([]byte("data some here"))
+		f.Close()
+	}
+
+	res := loadConfigDir(dir)
+	if len(res) != len(files) {
+		t.Errorf("Unexpected result: %v, expected: %v", res, files)
+	}
+	for _, file := range res {
+		if !expectedSet.Has(file) {
+			t.Errorf("expected to find: %s in %v", file, expectedSet)
+		}
+	}
 }
