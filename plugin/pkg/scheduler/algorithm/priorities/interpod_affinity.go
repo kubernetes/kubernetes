@@ -20,7 +20,12 @@ import (
 	"sync"
 
 	"github.com/golang/glog"
+<<<<<<< HEAD
 	"k8s.io/kubernetes/pkg/api"
+=======
+	"k8s.io/kubernetes/pkg/api/v1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
+>>>>>>> 55b413f... Do not create selector and namespaces in a loop where possible
 	"k8s.io/kubernetes/pkg/util/workqueue"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/predicates"
@@ -84,11 +89,13 @@ func (p *podAffinityPriorityMap) setError(err error) {
 }
 
 func (p *podAffinityPriorityMap) processTerm(term *api.PodAffinityTerm, podDefiningAffinityTerm, podToCheck *api.Pod, fixedNode *api.Node, weight float64) {
-	match, err := priorityutil.PodMatchesTermsNamespaceAndSelector(podToCheck, podDefiningAffinityTerm, term)
+	namespaces := priorityutil.GetNamespacesFromPodAffinityTerm(podDefiningAffinityTerm, term)
+	selector, err := metav1.LabelSelectorAsSelector(term.LabelSelector)
 	if err != nil {
 		p.setError(err)
 		return
 	}
+	match := priorityutil.PodMatchesTermsNamespaceAndSelector(podToCheck, namespaces, selector)
 	if match {
 		func() {
 			p.Lock()
