@@ -742,6 +742,50 @@ func TestPrintNodeStatus(t *testing.T) {
 	}
 }
 
+func TestPrintNodeOSImage(t *testing.T) {
+	printer := NewHumanReadablePrinter(PrintOptions{
+		ColumnLabels: []string{},
+		Wide:         true,
+	})
+
+	fakeOSImage := "fake-os-image"
+	testNode := api.Node{
+		ObjectMeta: api.ObjectMeta{Name: "foo1"},
+		Status:     api.NodeStatus{NodeInfo: api.NodeSystemInfo{OSImage: fakeOSImage}},
+	}
+
+	buffer := &bytes.Buffer{}
+	err := printer.PrintObj(&testNode, buffer)
+	if err != nil {
+		t.Fatalf("An error occurred printing Node: %#v", err)
+	}
+	if !contains(strings.Fields(buffer.String()), fakeOSImage) {
+		t.Fatalf("Expect printing node %s with os image %#v, got: %#v", testNode.Name, fakeOSImage, buffer.String())
+	}
+}
+
+func TestPrintNodeKernelImage(t *testing.T) {
+	printer := NewHumanReadablePrinter(PrintOptions{
+		ColumnLabels: []string{},
+		Wide:         true,
+	})
+
+	fakeKernelVersion := "fake-kernel-version"
+	testNode := api.Node{
+		ObjectMeta: api.ObjectMeta{Name: "foo1"},
+		Status:     api.NodeStatus{NodeInfo: api.NodeSystemInfo{KernelVersion: fakeKernelVersion}},
+	}
+
+	buffer := &bytes.Buffer{}
+	err := printer.PrintObj(&testNode, buffer)
+	if err != nil {
+		t.Fatalf("An error occurred printing Node: %#v", err)
+	}
+	if !contains(strings.Fields(buffer.String()), fakeKernelVersion) {
+		t.Fatalf("Expect printing node %s with kernel version %#v, got: %#v", testNode.Name, fakeKernelVersion, buffer.String())
+	}
+}
+
 func TestPrintNodeExternalIP(t *testing.T) {
 	printer := NewHumanReadablePrinter(PrintOptions{
 		ColumnLabels: []string{},
