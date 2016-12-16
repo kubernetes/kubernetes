@@ -323,7 +323,7 @@ func TestCustomHandlerChain(t *testing.T) {
 	}
 
 	s.HandlerContainer.NonSwaggerRoutes.Handle("/nonswagger", handler)
-	s.HandlerContainer.SecretRoutes.Handle("/secret", handler)
+	s.HandlerContainer.UnlistedRoutes.Handle("/secret", handler)
 
 	type Test struct {
 		handler   http.Handler

@@ -33,8 +33,8 @@ type APIContainer struct {
 	// NonSwaggerRoutes are recorded and are visible at /, but do not show up in Swagger.
 	NonSwaggerRoutes PathRecorderMux
 
-	// SecretRoutes are not recorded, are not visible at / and do not show up in Swagger.
-	SecretRoutes *http.ServeMux
+	// UnlistedRoutes are not recorded, therefore not visible at / and do not show up in Swagger.
+	UnlistedRoutes *http.ServeMux
 }
 
 // NewAPIContainer constructs a new container for APIs
@@ -44,7 +44,7 @@ func NewAPIContainer(mux *http.ServeMux, s runtime.NegotiatedSerializer) *APICon
 		NonSwaggerRoutes: PathRecorderMux{
 			mux: mux,
 		},
-		SecretRoutes: mux,
+		UnlistedRoutes: mux,
 	}
 	c.Container.ServeMux = mux
 	c.Container.Router(restful.CurlyRouter{}) // e.g. for proxy/{kind}/{name}/{*}
