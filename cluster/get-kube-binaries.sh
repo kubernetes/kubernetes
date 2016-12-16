@@ -46,7 +46,7 @@ KUBERNETES_RELEASE_URL="${KUBERNETES_RELEASE_URL:-https://storage.googleapis.com
 function detect_kube_release() {
   if [[ ! -e "${KUBE_ROOT}/version" ]]; then
     echo "Can't determine Kubernetes release." >&2
-    echo "This script should only be run from a prebuilt Kubernetes release." >&2
+    echo "${BASH_SOURCE} should only be run from a prebuilt Kubernetes release." >&2
     echo "Did you mean to use get-kube.sh instead?" >&2
     exit 1
   fi
@@ -162,8 +162,8 @@ detect_client_info
 CLIENT_TAR="kubernetes-client-${CLIENT_PLATFORM}-${CLIENT_ARCH}.tar.gz"
 
 echo "Kubernetes release: ${KUBERNETES_RELEASE}"
-echo "Server: ${SERVER_PLATFORM}/${SERVER_ARCH}"
-echo "Client: ${CLIENT_PLATFORM}/${CLIENT_ARCH}"
+echo "Server: ${SERVER_PLATFORM}/${SERVER_ARCH}  (to override, set KUBERNETES_SERVER_ARCH)"
+echo "Client: ${CLIENT_PLATFORM}/${CLIENT_ARCH}  (autodetected)"
 echo
 
 # TODO: remove this check and default to true when we stop shipping server
@@ -201,7 +201,7 @@ if [[ -z "${KUBERNETES_SKIP_CONFIRM-}" ]]; then
   read confirm
   if [[ "${confirm}" =~ ^[nN]$ ]]; then
     echo "Aborting."
-    exit 0
+    exit 1
   fi
 fi
 
