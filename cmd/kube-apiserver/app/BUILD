@@ -36,7 +36,6 @@ go_library(
         "//pkg/master:go_default_library",
         "//pkg/registry/cachesize:go_default_library",
         "//pkg/runtime/schema:go_default_library",
-        "//pkg/util/errors:go_default_library",
         "//pkg/util/net:go_default_library",
         "//pkg/util/sets:go_default_library",
         "//pkg/util/wait:go_default_library",
