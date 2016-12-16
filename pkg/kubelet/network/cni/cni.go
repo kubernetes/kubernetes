@@ -160,7 +160,7 @@ func (plugin *cniNetworkPlugin) Init(host network.Host, hairpinMode componentcon
 func (plugin *cniNetworkPlugin) syncNetworkConfig() {
 	network, err := getDefaultCNINetwork(plugin.pluginDir, plugin.binDir, plugin.vendorCNIDirPrefix)
 	if err != nil {
-		glog.Warningf("Unable to update default cni network: %s", err)
+		glog.Warningf("Unable to update cni config: %s", err)
 		return
 	}
 	plugin.setDefaultNetwork(network)
