@@ -40,7 +40,7 @@ const (
 	pushTimeout = 5 * time.Second
 )
 
-// A structure that distributes eventes to multiple watchers.
+// A structure that distributes events to multiple watchers.
 type WatcherDispatcher struct {
 	sync.Mutex
 	watchers       []*watch.RaceFreeFakeWatcher

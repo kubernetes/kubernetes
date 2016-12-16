@@ -82,7 +82,7 @@ type cachedService struct {
 	serviceStatusMap map[string]v1.LoadBalancerStatus
 	// Ensures only one goroutine can operate on this service at any given time.
 	rwlock sync.Mutex
-	// Controls error back-off for procceeding federation service to k8s clusters
+	// Controls error back-off for proceeding federation service to k8s clusters
 	lastRetryDelay time.Duration
 	// Controls error back-off for updating federation service back to federation apiserver
 	lastFedUpdateDelay time.Duration
@@ -381,7 +381,7 @@ func (s *ServiceController) updateFederationService(key string, cachedService *c
 		}(cache, clusterName)
 	}
 	if hasErr {
-		// detail error has been dumpped inside the loop
+		// detail error has been dumped inside the loop
 		return fmt.Errorf("Service %s/%s was not successfully updated to all clusters", service.Namespace, service.Name), retryable
 	}
 	return nil, !retryable
@@ -633,7 +633,7 @@ func getClusterConditionPredicate() federationcache.ClusterConditionPredicate {
 			//We consider the cluster for load balancing only when its ClusterReady condition status
 			//is ConditionTrue
 			if cond.Type == v1beta1.ClusterReady && cond.Status != v1.ConditionTrue {
-				glog.V(4).Infof("Ignoring cluser %v with %v condition status %v", cluster.Name, cond.Type, cond.Status)
+				glog.V(4).Infof("Ignoring cluster %v with %v condition status %v", cluster.Name, cond.Type, cond.Status)
 				return false
 			}
 		}
@@ -880,7 +880,7 @@ func (s *ServiceController) processServiceUpdate(cachedService *cachedService, s
 
 	cachedService.appliedState = service
 	s.serviceCache.set(key, cachedService)
-	glog.V(4).Infof("Successfully procceeded services %s", key)
+	glog.V(4).Infof("Successfully proceeded services %s", key)
 	cachedService.resetRetryDelay()
 	return nil, doNotRetry
 }

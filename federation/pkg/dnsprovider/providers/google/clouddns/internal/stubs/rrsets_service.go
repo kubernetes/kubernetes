@@ -28,7 +28,7 @@ var _ interfaces.ResourceRecordSetsService = &ResourceRecordSetsService{}
 
 type ResourceRecordSetsService struct {
 	Service  *Service
-	ListCall interfaces.ResourceRecordSetsListCall // Use to override response if reqired for testing
+	ListCall interfaces.ResourceRecordSetsListCall // Use to override response if required for testing
 }
 
 func (s ResourceRecordSetsService) List(project string, managedZone string) interfaces.ResourceRecordSetsListCall {
