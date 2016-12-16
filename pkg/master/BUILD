@@ -19,6 +19,7 @@ go_library(
     ],
     tags = ["automanaged"],
     deps = [
+        "//cmd/kube-apiserver/app/options:go_default_library",
         "//pkg/api:go_default_library",
         "//pkg/api/endpoints:go_default_library",
         "//pkg/api/errors:go_default_library",
@@ -51,7 +52,6 @@ go_library(
         "//pkg/client/clientset_generated/clientset/typed/core/v1:go_default_library",
         "//pkg/client/clientset_generated/internalclientset/typed/core/internalversion:go_default_library",
         "//pkg/genericapiserver:go_default_library",
-        "//pkg/genericapiserver/options:go_default_library",
         "//pkg/healthz:go_default_library",
         "//pkg/kubelet/client:go_default_library",
         "//pkg/master/thirdparty:go_default_library",

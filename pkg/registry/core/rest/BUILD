@@ -16,7 +16,6 @@ go_library(
         "//pkg/api:go_default_library",
         "//pkg/api/rest:go_default_library",
         "//pkg/apimachinery/registered:go_default_library",
-        "//pkg/apiserver:go_default_library",
         "//pkg/client/clientset_generated/internalclientset/typed/policy/internalversion:go_default_library",
         "//pkg/client/restclient:go_default_library",
         "//pkg/genericapiserver:go_default_library",
