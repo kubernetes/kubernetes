@@ -72,6 +72,7 @@ func validNewPod() *api.Pod {
 				},
 			},
 			SecurityContext: &api.PodSecurityContext{},
+			Affinity:        &api.Affinity{},
 		},
 	}
 }
@@ -658,6 +659,7 @@ func TestEtcdUpdateScheduled(t *testing.T) {
 				},
 			},
 			SecurityContext: &api.PodSecurityContext{},
+			Affinity:        &api.Affinity{},
 		},
 	}, nil, 1)
 	if err != nil {
@@ -686,6 +688,7 @@ func TestEtcdUpdateScheduled(t *testing.T) {
 
 			TerminationGracePeriodSeconds: &grace,
 			SecurityContext:               &api.PodSecurityContext{},
+			Affinity:                      &api.Affinity{},
 		},
 	}
 	_, _, err = storage.Update(ctx, podIn.Name, rest.DefaultUpdatedObjectInfo(&podIn, api.Scheme))
@@ -726,6 +729,7 @@ func TestEtcdUpdateStatus(t *testing.T) {
 				},
 			},
 			SecurityContext: &api.PodSecurityContext{},
+			Affinity:        &api.Affinity{},
 		},
 	}
 	err := storage.Storage.Create(ctx, key, &podStart, nil, 0)
@@ -750,6 +754,7 @@ func TestEtcdUpdateStatus(t *testing.T) {
 				},
 			},
 			SecurityContext: &api.PodSecurityContext{},
+			Affinity:        &api.Affinity{},
 		},
 		Status: api.PodStatus{
 			Phase:   api.PodRunning,
