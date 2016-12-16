@@ -21,6 +21,7 @@ limitations under the License.
 package e2e
 
 import (
+	"strings"
 	"time"
 
 	. "github.com/onsi/ginkgo"
@@ -29,8 +30,6 @@ import (
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/test/e2e/framework"
-
-	"strings"
 )
 
 type testBody func(c clientset.Interface, f *framework.Framework, clientPod *v1.Pod, pvc *v1.PersistentVolumeClaim, pv *v1.PersistentVolume)
@@ -42,7 +41,7 @@ type kubeletOpt string
 
 const (
 	MIN_NODES                  = 2
-	NODE_STATE_WAIT            = 2 * time.Minute
+	NODE_STATE_WAIT            = 1 * time.Minute
 	kStart          kubeletOpt = "start"
 	kStop           kubeletOpt = "stop"
 	kRestart        kubeletOpt = "restart"
@@ -81,6 +80,7 @@ var _ = framework.KubeDescribe("PersistentVolumes:Disruptive", func() {
 
 			framework.Logf("[BeforeEach] Configuring PersistentVolume")
 			nfsServerIP = nfsServerPod.Status.PodIP
+			Expect(nfsServerIP).NotTo(BeEmpty())
 			nfsPVconfig = persistentVolumeConfig{
 				namePrefix: "nfs-",
 				pvSource: v1.PersistentVolumeSource{
@@ -99,6 +99,8 @@ var _ = framework.KubeDescribe("PersistentVolumes:Disruptive", func() {
 			for _, node := range nodes.Items {
 				if node.Name != nfsServerPod.Spec.NodeName {
 					clientNode = &node
+					clientNodeIP = framework.GetNodeExternalIP(clientNode)
+					Expect(clientNodeIP).NotTo(BeEmpty())
 					break
 				}
 			}
@@ -129,6 +131,7 @@ var _ = framework.KubeDescribe("PersistentVolumes:Disruptive", func() {
 		AfterEach(func() {
 			framework.Logf("Tearing down test spec")
 			tearDownTestCase(c, f, ns, clientPod, pvc, pv)
+			pv, pvc, clientPod = nil, nil, nil
 		})
 
 		// Test table housing the It() title string and test spec.  runTest is type testBody, defined at
@@ -174,16 +177,12 @@ func testKubeletRestartsAndRestoresMount(c clientset.Interface, f *framework.Fra
 func testVolumeUnmountsFromDeletedPod(c clientset.Interface, f *framework.Framework, clientPod *v1.Pod, pvc *v1.PersistentVolumeClaim, pv *v1.PersistentVolume) {
 
 	nodeIP, err := framework.GetHostExternalAddress(c, clientPod)
+	Expect(err).NotTo(HaveOccurred())
 	nodeIP = nodeIP + ":22"
-	Expect(err).NotTo(HaveOccurred())
 
-	result, err := framework.SSH("mount", nodeIP, framework.TestContext.Provider)
+	result, err := framework.SSH("mount | grep "+string(clientPod.UID), nodeIP, framework.TestContext.Provider)
 	Expect(err).NotTo(HaveOccurred())
-	if strings.Contains(result.Stdout, string(clientPod.UID)) {
-		framework.Logf("Sanity Check: Client UID %s found in `mount` output", clientPod.UID)
-	} else {
-		framework.Failf("Sanity Check: Client UID %s NOT found in `mount` output prior to pod deletion.  Something has gone wrong.", clientPod.UID)
-	}
+	Expect(result.Code).To(BeZero())
 
 	file := "/mnt/_SUCCESS"
 	_, err = podExec(clientPod, "touch "+file)
@@ -193,19 +192,15 @@ func testVolumeUnmountsFromDeletedPod(c clientset.Interface, f *framework.Framew
 	deletePod(f, c, clientPod.Namespace, clientPod)
 	kubeletCommand(kStart, c, clientPod)
 
-	result, err = framework.SSH("mount", nodeIP, framework.TestContext.Provider)
+	result, err = framework.SSH("mount| grep "+string(clientPod.UID), nodeIP, framework.TestContext.Provider)
 	Expect(err).NotTo(HaveOccurred())
-	if strings.Contains(result.Stdout, string(clientPod.UID)) {
-		framework.Failf("Client UID %s found in `mount` output.  Volume failed to unmount.", clientPod.UID)
-	} else {
-		framework.Logf("Client UID %s not found in `mount` output.  Volume has unmounted.", clientPod.UID)
-	}
+	Expect(result.Code).NotTo(BeZero())
 }
 
 // Initialize a test spec with a pv, pvc, and nfs client pod
-func initTestCase(f *framework.Framework, c clientset.Interface, pvConfig persistentVolumeConfig, ns, nodeName string) (pod *v1.Pod, pv *v1.PersistentVolume, pvc *v1.PersistentVolumeClaim) {
-	pv, pvc = createPVPVC(c, pvConfig, ns, false)
-	pod = makePod(ns, pvc.Name)
+func initTestCase(f *framework.Framework, c clientset.Interface, pvConfig persistentVolumeConfig, ns, nodeName string) (*v1.Pod, *v1.PersistentVolume, *v1.PersistentVolumeClaim) {
+	pv, pvc := createPVPVC(c, pvConfig, ns, false)
+	pod := makePod(ns, pvc.Name)
 	pod.Spec.NodeName = nodeName
 	framework.Logf("Creating nfs client Pod %s on node %s", pod.Name, nodeName)
 	pod, err := c.Core().Pods(ns).Create(pod)
@@ -219,7 +214,7 @@ func initTestCase(f *framework.Framework, c clientset.Interface, pvConfig persis
 	Expect(err).NotTo(HaveOccurred())
 	pv, err = c.Core().PersistentVolumes().Get(pv.Name, metav1.GetOptions{})
 	Expect(err).NotTo(HaveOccurred())
-	return
+	return pod, pv, pvc
 }
 
 // Post-spec clean up
@@ -248,10 +243,9 @@ func kubeletCommand(kOp kubeletOpt, c clientset.Interface, pod *v1.Pod) {
 	}
 	if kOp == kStart || kOp == kRestart {
 		if ok := framework.WaitForNodeToBeReady(c, pod.Spec.NodeName, NODE_STATE_WAIT); !ok {
-			framework.Failf("Node %s failed to enter NotReady state", pod.Spec.NodeName)
+			framework.Failf("Node %s failed to enter Ready state", pod.Spec.NodeName)
 		}
 	}
-
 }
 
 // Wraps RunKubectl to execute a bash cmd in target pod

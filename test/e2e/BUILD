@@ -80,6 +80,7 @@ go_library(
         "opaque_resource.go",
         "pd.go",
         "persistent_volumes.go",
+        "persistent_volumes-disruptive.go",
         "petset.go",
         "pod_gc.go",
         "pods.go",
