@@ -22,13 +22,13 @@ Cluster size autoscaling should increase cluster size if pending pods are small,
 Cluster size autoscaling should increase cluster size if pending pods are small and there is another node pool that is not autoscaled,apelisse,1
 Cluster size autoscaling should increase cluster size if pods are pending due to host port conflict,brendandburns,1
 Cluster size autoscaling should scale up correct target pool,mikedanese,1
-Cluster size autoscaling shouldn't increase cluster size if pending pod is too large,karlkfi,1
+Cluster size autoscaling shouldn't increase cluster size if pending pod is too large,kevin-wangzefeng,1
 ClusterDns should create pod that uses dns,sttts,0
 ConfigMap should be consumable from pods in volume,alex-mohr,1
 ConfigMap should be consumable from pods in volume as non-root,hurf,1
 ConfigMap should be consumable from pods in volume as non-root with FSGroup,roberthbailey,1
 ConfigMap should be consumable from pods in volume with defaultMode set,Random-Liu,1
-ConfigMap should be consumable from pods in volume with mappings,karlkfi,1
+ConfigMap should be consumable from pods in volume with mappings,thockin,1
 ConfigMap should be consumable from pods in volume with mappings and Item mode set,eparis,1
 ConfigMap should be consumable from pods in volume with mappings as non-root,apelisse,1
 ConfigMap should be consumable from pods in volume with mappings as non-root with FSGroup,zmerlynn,1
@@ -84,7 +84,7 @@ Deployment overlapping deployment should not fight with each other,thockin,1
 Deployment paused deployment should be able to scale,janetkuo,1
 Deployment paused deployment should be ignored by the controller,kargakis,0
 Deployment scaled rollout deployment should not block on annotation check,lavalamp,1
-DisruptionController should create a PodDisruptionBudget,quinton-hoole,1
+DisruptionController should create a PodDisruptionBudget,mwielgus,1
 DisruptionController should update PodDisruptionBudget status,bgrant0607,1
 Docker Containers should be able to override the image's default arguments (docker cmd),maisem,0
 Docker Containers should be able to override the image's default command and arguments,maisem,0
@@ -101,7 +101,7 @@ Downward API volume should provide container's memory limit,krousey,1
 Downward API volume should provide container's memory request,mikedanese,1
 Downward API volume should provide node allocatable (cpu) as default cpu limit if the limit is not set,lavalamp,1
 Downward API volume should provide node allocatable (memory) as default memory limit if the limit is not set,freehan,1
-Downward API volume should provide podname as non-root with fsgroup,karlkfi,1
+Downward API volume should provide podname as non-root with fsgroup,davidopp,1
 Downward API volume should provide podname only,mwielgus,1
 Downward API volume should set DefaultMode on files,davidopp,1
 Downward API volume should set mode on item file,mtaufen,1
@@ -143,8 +143,8 @@ Federation API server authentication should not accept cluster resources when th
 Federation API server authentication should not accept cluster resources when the client has no authentication credentials,nikhiljindal,1
 Federation apiserver Admission control should not be able to create resources if namespace does not exist,alex-mohr,1
 Federation apiserver Cluster objects should be created and deleted successfully,ghodss,1
-Federation events Event objects should be created and deleted successfully,karlkfi,1
 Federation ingresses Ingress objects should be created and deleted successfully,Random-Liu,1
+Federation events Event objects should be created and deleted successfully,rmmh,1
 Federation namespace Namespace objects should be created and deleted successfully,xiang90,1
 Federation replicasets ReplicaSet objects should be created and deleted successfully,apelisse,1
 Federation secrets Secret objects should be created and deleted successfully,pmorie,1
@@ -206,7 +206,7 @@ Kubectl client Kubectl expose should create services for rc,pwittrock,0
 Kubectl client Kubectl label should update the label on a resource,pwittrock,0
 Kubectl client Kubectl logs should be able to retrieve and filter logs,jlowdermilk,0
 Kubectl client Kubectl patch should add annotations for pods in rc,janetkuo,0
-Kubectl client Kubectl replace should update a single-container pod's image,karlkfi,1
+Kubectl client Kubectl replace should update a single-container pod's image,spxtr,1
 Kubectl client Kubectl rolling-update should support rolling-update to same image,janetkuo,0
 "Kubectl client Kubectl run --rm job should create a job from an image, then delete the job",soltysh,0
 Kubectl client Kubectl run default should create an rc or deployment from an image,janetkuo,0
@@ -231,7 +231,7 @@ Kubectl client Update Demo should scale a replication controller,sttts,0
 Kubelet Cgroup Manager QOS containers On enabling QOS cgroup hierarchy Top level QoS containers should have been created,davidopp,1
 Kubelet Container Manager oom score adjusting when scheduling a busybox command that always fails in a pod should be possible to delete,jbeda,1
 Kubelet Container Manager oom score adjusting when scheduling a busybox command that always fails in a pod should have an error terminated reason,vulpecula,1
-Kubelet Eviction Manager hard eviction test pod using the most disk space gets evicted when the node disk usage is above the eviction hard threshold should evict the pod using the most disk space,karlkfi,1
+Kubelet Eviction Manager hard eviction test pod using the most disk space gets evicted when the node disk usage is above the eviction hard threshold should evict the pod using the most disk space,kevin-wangzefeng,1
 Kubelet experimental resource usage tracking for 100 pods per node over 20m0s,yujuhong,0
 Kubelet experimental resource usage tracking resource tracking for 100 pods per node,ghodss,0
 Kubelet metrics api when querying /stats/summary it should report resource usage through the stats api,fabioy,1
@@ -360,7 +360,7 @@ Probing container should have monotonically increasing restart count,Random-Liu,
 Probing container with readiness probe should not be ready before initial delay and never restart,Random-Liu,0
 Probing container with readiness probe that fails should never be ready and never restart,Random-Liu,0
 Proxy version v1 should proxy logs on node,girishkalele,1
-Proxy version v1 should proxy logs on node using proxy subresource,karlkfi,1
+Proxy version v1 should proxy logs on node using proxy subresource,freehan,1
 Proxy version v1 should proxy logs on node with explicit kubelet port,mwielgus,1
 Proxy version v1 should proxy logs on node with explicit kubelet port using proxy subresource,bgrant0607,1
 Proxy version v1 should proxy through a service and a pod,mml,1
@@ -517,7 +517,7 @@ k8s.io/kubernetes/contrib/mesos/pkg/proc,apelisse,1
 k8s.io/kubernetes/contrib/mesos/pkg/queue,caesarxuchao,1
 k8s.io/kubernetes/contrib/mesos/pkg/redirfd,cjcullen,1
 k8s.io/kubernetes/contrib/mesos/pkg/runtime,davidopp,1
-k8s.io/kubernetes/contrib/mesos/pkg/scheduler/components/deleter,karlkfi,1
+k8s.io/kubernetes/contrib/mesos/pkg/scheduler/components/deleter,jbeda,1
 k8s.io/kubernetes/contrib/mesos/pkg/scheduler/components/framework,kevin-wangzefeng,1
 k8s.io/kubernetes/contrib/mesos/pkg/scheduler/config,dchen1107,1
 k8s.io/kubernetes/contrib/mesos/pkg/scheduler/constraint,dchen1107,1
@@ -588,7 +588,7 @@ k8s.io/kubernetes/pkg/auth/handlers,liggitt,0
 k8s.io/kubernetes/pkg/client/cache,xiang90,1
 k8s.io/kubernetes/pkg/client/chaosclient,deads2k,1
 k8s.io/kubernetes/pkg/client/leaderelection,xiang90,1
-k8s.io/kubernetes/pkg/client/record,karlkfi,1
+k8s.io/kubernetes/pkg/client/record,piosz,1
 k8s.io/kubernetes/pkg/client/restclient,kargakis,1
 k8s.io/kubernetes/pkg/client/testing/core,maisem,1
 k8s.io/kubernetes/pkg/client/transport,eparis,1
@@ -620,7 +620,7 @@ k8s.io/kubernetes/pkg/controller/garbagecollector,rmmh,1
 k8s.io/kubernetes/pkg/controller/garbagecollector/metaonly,cjcullen,1
 k8s.io/kubernetes/pkg/controller/gc,jdef,1
 k8s.io/kubernetes/pkg/controller/job,soltysh,0
-k8s.io/kubernetes/pkg/controller/namespace,karlkfi,1
+k8s.io/kubernetes/pkg/controller/namespace,jlowdermilk,1
 k8s.io/kubernetes/pkg/controller/node,gmarek,0
 k8s.io/kubernetes/pkg/controller/persistentvolume,jsafrane,0
 k8s.io/kubernetes/pkg/controller/petset,fgrzadkowski,1
@@ -666,7 +666,7 @@ k8s.io/kubernetes/pkg/kubelet/container,yujuhong,0
 k8s.io/kubernetes/pkg/kubelet/custommetrics,kevin-wangzefeng,0
 k8s.io/kubernetes/pkg/kubelet/dockershim,zmerlynn,1
 k8s.io/kubernetes/pkg/kubelet/dockertools,deads2k,1
-k8s.io/kubernetes/pkg/kubelet/envvars,karlkfi,1
+k8s.io/kubernetes/pkg/kubelet/envvars,sttts,1
 k8s.io/kubernetes/pkg/kubelet/eviction,childsb,1
 k8s.io/kubernetes/pkg/kubelet/images,caesarxuchao,1
 k8s.io/kubernetes/pkg/kubelet/kuberuntime,yifan-gu,1
@@ -720,7 +720,7 @@ k8s.io/kubernetes/pkg/registry/deployment/etcd,swagiaal,1
 k8s.io/kubernetes/pkg/registry/endpoint,smarterclayton,1
 k8s.io/kubernetes/pkg/registry/endpoint/etcd,timstclair,1
 k8s.io/kubernetes/pkg/registry/event,girishkalele,1
-k8s.io/kubernetes/pkg/registry/event/etcd,karlkfi,1
+k8s.io/kubernetes/pkg/registry/event/etcd,yifan-gu,1
 k8s.io/kubernetes/pkg/registry/experimental/controller/etcd,smarterclayton,1
 k8s.io/kubernetes/pkg/registry/generic,eparis,1
 k8s.io/kubernetes/pkg/registry/generic/etcd,fabioy,1
@@ -769,7 +769,7 @@ k8s.io/kubernetes/pkg/registry/service/etcd,alex-mohr,1
 k8s.io/kubernetes/pkg/registry/service/ipallocator,jlowdermilk,1
 k8s.io/kubernetes/pkg/registry/service/ipallocator/controller,lavalamp,1
 k8s.io/kubernetes/pkg/registry/service/ipallocator/etcd,andyzheng0831,1
-k8s.io/kubernetes/pkg/registry/service/portallocator,karlkfi,1
+k8s.io/kubernetes/pkg/registry/service/portallocator,vulpecula,1
 k8s.io/kubernetes/pkg/registry/serviceaccount,liggitt,0
 k8s.io/kubernetes/pkg/registry/serviceaccount/etcd,liggitt,0
 k8s.io/kubernetes/pkg/registry/storageclass,ixdy,1
@@ -808,8 +808,8 @@ k8s.io/kubernetes/pkg/util/async,spxtr,1
 k8s.io/kubernetes/pkg/util/atomic,kargakis,1
 k8s.io/kubernetes/pkg/util/bandwidth,thockin,1
 k8s.io/kubernetes/pkg/util/cache,thockin,1
-k8s.io/kubernetes/pkg/util/certificates,karlkfi,1
 k8s.io/kubernetes/pkg/util/clock,swagiaal,1
+k8s.io/kubernetes/pkg/util/certificates,janetkuo,1
 k8s.io/kubernetes/pkg/util/config,girishkalele,1
 k8s.io/kubernetes/pkg/util/configz,ixdy,1
 k8s.io/kubernetes/pkg/util/dbus,roberthbailey,1
