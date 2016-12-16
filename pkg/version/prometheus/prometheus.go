@@ -15,7 +15,8 @@ limitations under the License.
 */
 
 // Package prometheus registers Kubernetes version information as a
-// prometheus metric.
+// prometheus metrics which is a visualization solution to power your metrics
+// with monitor and alerting capabilities concerning git and version information. (https://prometheus.io/)
 package prometheus
 
 import (
