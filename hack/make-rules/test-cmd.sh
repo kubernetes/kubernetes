@@ -322,7 +322,7 @@ runTests() {
   labels_field=".metadata.labels"
   annotations_field=".metadata.annotations"
   service_selector_field=".spec.selector"
-  rc_replicas_field=".spec.replicas"
+  replicas_field=".spec.replicas"
   rc_status_replicas_field=".status.replicas"
   rc_container_image_field=".spec.template.spec.containers"
   rs_replicas_field=".spec.replicas"
@@ -1219,6 +1219,13 @@ __EOF__
   # Clean up
   kubectl delete deployment nginx "${kube_flags[@]}"
 
+  # Test kubectl create deployment
+  kubectl create deployment test-nginx --image=nginx --replicas=2
+  # Post-Condition: Deployment has 2 replicas defined in its spec.
+  kube::test::get_object_assert 'deploy test-nginx' "{{$replicas_field}}" '2'
+  # Clean up
+  kubectl delete deployment test-nginx "${kube_flags[@]}"
+
   ###############
   # Kubectl get #
   ###############
@@ -1536,8 +1543,8 @@ __EOF__
   # Pre-condition: busybox0 & busybox1 replication controllers exist & 1
   # replica each
   kube::test::get_object_assert rc "{{range.items}}{{$id_field}}:{{end}}" 'busybox0:busybox1:'
-  kube::test::get_object_assert 'rc busybox0' "{{$rc_replicas_field}}" '1'
-  kube::test::get_object_assert 'rc busybox1' "{{$rc_replicas_field}}" '1'
+  kube::test::get_object_assert 'rc busybox0' "{{$replicas_field}}" '1'
+  kube::test::get_object_assert 'rc busybox1' "{{$replicas_field}}" '1'
   # Command
   output_message=$(! kubectl autoscale --min=1 --max=2 -f hack/testdata/recursive/rc --recursive 2>&1 "${kube_flags[@]}")
   # Post-condition: busybox0 & busybox replication controllers are autoscaled
@@ -1552,8 +1559,8 @@ __EOF__
   # Pre-condition: busybox0 & busybox1 replication controllers exist & 1
   # replica each
   kube::test::get_object_assert rc "{{range.items}}{{$id_field}}:{{end}}" 'busybox0:busybox1:'
-  kube::test::get_object_assert 'rc busybox0' "{{$rc_replicas_field}}" '1'
-  kube::test::get_object_assert 'rc busybox1' "{{$rc_replicas_field}}" '1'
+  kube::test::get_object_assert 'rc busybox0' "{{$replicas_field}}" '1'
+  kube::test::get_object_assert 'rc busybox1' "{{$replicas_field}}" '1'
   # Command
   output_message=$(! kubectl expose -f hack/testdata/recursive/rc --recursive --port=80 2>&1 "${kube_flags[@]}")
   # Post-condition: service exists and the port is unnamed
@@ -1565,13 +1572,13 @@ __EOF__
   # Pre-condition: busybox0 & busybox1 replication controllers exist & 1
   # replica each
   kube::test::get_object_assert rc "{{range.items}}{{$id_field}}:{{end}}" 'busybox0:busybox1:'
-  kube::test::get_object_assert 'rc busybox0' "{{$rc_replicas_field}}" '1'
-  kube::test::get_object_assert 'rc busybox1' "{{$rc_replicas_field}}" '1'
+  kube::test::get_object_assert 'rc busybox0' "{{$replicas_field}}" '1'
+  kube::test::get_object_assert 'rc busybox1' "{{$replicas_field}}" '1'
   # Command
   output_message=$(! kubectl scale --current-replicas=1 --replicas=2 -f hack/testdata/recursive/rc --recursive 2>&1 "${kube_flags[@]}")
   # Post-condition: busybox0 & busybox1 replication controllers are scaled to 2 replicas, and since busybox2 is malformed, it should error
-  kube::test::get_object_assert 'rc busybox0' "{{$rc_replicas_field}}" '2'
-  kube::test::get_object_assert 'rc busybox1' "{{$rc_replicas_field}}" '2'
+  kube::test::get_object_assert 'rc busybox0' "{{$replicas_field}}" '2'
+  kube::test::get_object_assert 'rc busybox1' "{{$replicas_field}}" '2'
   kube::test::if_has_string "${output_message}" "Object 'Kind' is missing"
 
   ### Delete multiple busybox replication controllers recursively from directory of YAML files
@@ -2068,35 +2075,35 @@ __EOF__
 
   ### Scale replication controller frontend with current-replicas and replicas
   # Pre-condition: 3 replicas
-  kube::test::get_object_assert 'rc frontend' "{{$rc_replicas_field}}" '3'
+  kube::test::get_object_assert 'rc frontend' "{{$replicas_field}}" '3'
   # Command
   kubectl scale --current-replicas=3 --replicas=2 replicationcontrollers frontend "${kube_flags[@]}"
   # Post-condition: 2 replicas
-  kube::test::get_object_assert 'rc frontend' "{{$rc_replicas_field}}" '2'
+  kube::test::get_object_assert 'rc frontend' "{{$replicas_field}}" '2'
 
   ### Scale replication controller frontend with (wrong) current-replicas and replicas
   # Pre-condition: 2 replicas
-  kube::test::get_object_assert 'rc frontend' "{{$rc_replicas_field}}" '2'
+  kube::test::get_object_assert 'rc frontend' "{{$replicas_field}}" '2'
   # Command
   ! kubectl scale --current-replicas=3 --replicas=2 replicationcontrollers frontend "${kube_flags[@]}"
   # Post-condition: nothing changed
-  kube::test::get_object_assert 'rc frontend' "{{$rc_replicas_field}}" '2'
+  kube::test::get_object_assert 'rc frontend' "{{$replicas_field}}" '2'
 
   ### Scale replication controller frontend with replicas only
   # Pre-condition: 2 replicas
-  kube::test::get_object_assert 'rc frontend' "{{$rc_replicas_field}}" '2'
+  kube::test::get_object_assert 'rc frontend' "{{$replicas_field}}" '2'
   # Command
   kubectl scale  --replicas=3 replicationcontrollers frontend "${kube_flags[@]}"
   # Post-condition: 3 replicas
-  kube::test::get_object_assert 'rc frontend' "{{$rc_replicas_field}}" '3'
+  kube::test::get_object_assert 'rc frontend' "{{$replicas_field}}" '3'
 
   ### Scale replication controller from JSON with replicas only
   # Pre-condition: 3 replicas
-  kube::test::get_object_assert 'rc frontend' "{{$rc_replicas_field}}" '3'
+  kube::test::get_object_assert 'rc frontend' "{{$replicas_field}}" '3'
   # Command
   kubectl scale  --replicas=2 -f hack/testdata/frontend-controller.yaml "${kube_flags[@]}"
   # Post-condition: 2 replicas
-  kube::test::get_object_assert 'rc frontend' "{{$rc_replicas_field}}" '2'
+  kube::test::get_object_assert 'rc frontend' "{{$replicas_field}}" '2'
   # Clean-up
   kubectl delete rc frontend "${kube_flags[@]}"
 
@@ -2106,8 +2113,8 @@ __EOF__
   # Command
   kubectl scale rc/redis-master rc/redis-slave --replicas=4 "${kube_flags[@]}"
   # Post-condition: 4 replicas each
-  kube::test::get_object_assert 'rc redis-master' "{{$rc_replicas_field}}" '4'
-  kube::test::get_object_assert 'rc redis-slave' "{{$rc_replicas_field}}" '4'
+  kube::test::get_object_assert 'rc redis-master' "{{$replicas_field}}" '4'
+  kube::test::get_object_assert 'rc redis-slave' "{{$replicas_field}}" '4'
   # Clean-up
   kubectl delete rc redis-{master,slave} "${kube_flags[@]}"
 
@@ -2143,7 +2150,7 @@ __EOF__
   ### Expose replication controller as service
   kubectl create -f hack/testdata/frontend-controller.yaml "${kube_flags[@]}"
   # Pre-condition: 3 replicas
-  kube::test::get_object_assert 'rc frontend' "{{$rc_replicas_field}}" '3'
+  kube::test::get_object_assert 'rc frontend' "{{$replicas_field}}" '3'
   # Command
   kubectl expose rc frontend --port=80 "${kube_flags[@]}"
   # Post-condition: service exists and the port is unnamed

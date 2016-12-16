@@ -18,6 +18,7 @@ package kubectl
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 
 	"k8s.io/kubernetes/pkg/api"
@@ -28,8 +29,9 @@ import (
 
 // DeploymentGeneratorV1 supports stable generation of a deployment
 type DeploymentBasicGeneratorV1 struct {
-	Name   string
-	Images []string
+	Name     string
+	Images   []string
+	Replicas int32
 }
 
 // Ensure it supports the generator pattern that uses parameters specified during construction
@@ -39,6 +41,7 @@ func (DeploymentBasicGeneratorV1) ParamNames() []GeneratorParam {
 	return []GeneratorParam{
 		{"name", true},
 		{"image", true},
+		{"replicas", false},
 	}
 }
 
@@ -55,7 +58,17 @@ func (s DeploymentBasicGeneratorV1) Generate(params map[string]interface{}) (run
 	if !isArray {
 		return nil, fmt.Errorf("expected []string, found :%v", imageStrings)
 	}
-	delegate := &DeploymentBasicGeneratorV1{Name: name, Images: imageStrings}
+	replicas := 1
+	stringReplicas, isReplicas := params["replicas"].(string)
+	if isReplicas {
+		r, err := strconv.Atoi(stringReplicas)
+		if err != nil {
+			return nil, err
+		}
+		replicas = r
+	}
+
+	delegate := &DeploymentBasicGeneratorV1{Name: name, Images: imageStrings, Replicas: int32(replicas)}
 	return delegate.StructuredGenerate()
 }
 
@@ -82,7 +95,7 @@ func (s *DeploymentBasicGeneratorV1) StructuredGenerate() (runtime.Object, error
 			Labels: labels,
 		},
 		Spec: extensions.DeploymentSpec{
-			Replicas: 1,
+			Replicas: s.Replicas,
 			Selector: &selector,
 			Template: api.PodTemplateSpec{
 				ObjectMeta: api.ObjectMeta{
@@ -102,6 +115,9 @@ func (s *DeploymentBasicGeneratorV1) validate() error {
 	}
 	if len(s.Images) == 0 {
 		return fmt.Errorf("at least one image must be specified")
+	}
+	if s.Replicas < 0 {
+		return fmt.Errorf("replicas must be a non-negative number")
 	}
 	return nil
 }
