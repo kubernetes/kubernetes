@@ -23,6 +23,7 @@ import (
 	"github.com/spf13/pflag"
 
 	authorizationclient "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/authorization/v1beta1"
+	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	"k8s.io/kubernetes/pkg/controller/informers"
 	"k8s.io/kubernetes/pkg/genericapiserver/authorizer"
@@ -151,17 +152,23 @@ func (s *DelegatingAuthorizationOptions) ToAuthorizationConfig() (authorizer.Del
 }
 
 func (s *DelegatingAuthorizationOptions) newSubjectAccessReview() (authorizationclient.SubjectAccessReviewInterface, error) {
-	if len(s.RemoteKubeConfigFile) == 0 {
-		return nil, nil
+	var clientConfig *restclient.Config
+	var err error
+	if len(s.RemoteKubeConfigFile) > 0 {
+		loadingRules := &clientcmd.ClientConfigLoadingRules{ExplicitPath: s.RemoteKubeConfigFile}
+		loader := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(loadingRules, &clientcmd.ConfigOverrides{})
+
+		clientConfig, err = loader.ClientConfig()
+
+	} else {
+		// without the remote kubeconfig file, try to use the in-cluster config.  Most addon API servers will
+		// use this path
+		clientConfig, err = restclient.InClusterConfig()
 	}
-
-	loadingRules := &clientcmd.ClientConfigLoadingRules{ExplicitPath: s.RemoteKubeConfigFile}
-	loader := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(loadingRules, &clientcmd.ConfigOverrides{})
-
-	clientConfig, err := loader.ClientConfig()
 	if err != nil {
 		return nil, err
 	}
+
 	// set high qps/burst limits since this will effectively limit API server responsiveness
 	clientConfig.QPS = 200
 	clientConfig.Burst = 400

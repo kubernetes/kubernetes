@@ -399,7 +399,9 @@ func (c *Config) ApplyDelegatingAuthenticationOptions(o *options.DelegatingAuthe
 	}
 
 	c.Authenticator = authenticator
-	c.OpenAPIConfig.SecurityDefinitions = securityDefinitions
+	if c.OpenAPIConfig != nil {
+		c.OpenAPIConfig.SecurityDefinitions = securityDefinitions
+	}
 	c.SupportsBasicAuth = false
 
 	return c, nil

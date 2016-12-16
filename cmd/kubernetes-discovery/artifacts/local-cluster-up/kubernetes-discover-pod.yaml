@@ -24,8 +24,6 @@ spec:
         - "--tls-private-key-file=/var/run/serving-cert/tls.key"
         - "--tls-ca-file=/var/run/serving-ca/ca.crt"
         - "--client-ca-file=/var/run/client-ca/ca.crt"
-        - "--authentication-kubeconfig=/var/run/auth-kubeconfig/kubeconfig"
-        - "--authorization-kubeconfig=/var/run/auth-kubeconfig/kubeconfig"
         - "--requestheader-username-headers=X-Remote-User"
         - "--requestheader-group-headers=X-Remote-Group"
         - "--requestheader-extra-headers-prefix=X-Remote-Extra-"
@@ -43,8 +41,6 @@ spec:
           name: volume-client-ca
         - mountPath: /var/run/auth-proxy-client
           name: volume-auth-proxy-client
-        - mountPath: /var/run/auth-kubeconfig
-          name: volume-auth-kubeconfig
         - mountPath: /var/run/etcd-client-cert
           name: volume-etcd-client-cert
         - mountPath: /var/run/serving-ca
@@ -53,6 +49,7 @@ spec:
           name: volume-serving-cert
         - mountPath: /var/run/etcd-ca
           name: volume-etcd-ca
+      serviceAccountName: kubernetes-discovery
       volumes:
       - configMap:
           defaultMode: 420
@@ -66,10 +63,6 @@ spec:
         secret:
           defaultMode: 420
           secretName: auth-proxy-client
-      - name: volume-auth-kubeconfig
-        secret:
-          defaultMode: 420
-          secretName: discovery-auth-kubeconfig
       - name: volume-etcd-client-cert
         secret:
           defaultMode: 420
