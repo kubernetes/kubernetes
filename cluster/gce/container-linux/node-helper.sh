@@ -14,15 +14,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# A library of helper functions and constant for coreos os distro
+# A library of helper functions and constant for Container Linux os distro
 
 # $1: template name (required)
 function create-node-instance-template() {
   local template_name="$1"
   create-node-template "$template_name" "${scope_flags}" \
     "kube-env=${KUBE_TEMP}/node-kube-env.yaml" \
-    "user-data=${KUBE_ROOT}/cluster/gce/coreos/node-${CONTAINER_RUNTIME}.yaml" \
-    "configure-node=${KUBE_ROOT}/cluster/gce/coreos/configure-node.sh" \
-    "configure-kubelet=${KUBE_ROOT}/cluster/gce/coreos/configure-kubelet.sh" \
+    "user-data=${KUBE_ROOT}/cluster/gce/container-linux/node-${CONTAINER_RUNTIME}.yaml" \
+    "configure-node=${KUBE_ROOT}/cluster/gce/container-linux/configure-node.sh" \
+    "configure-kubelet=${KUBE_ROOT}/cluster/gce/container-linux/configure-kubelet.sh" \
     "cluster-name=${KUBE_TEMP}/cluster-name.txt"
 }

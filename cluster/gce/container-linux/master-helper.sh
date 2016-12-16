@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# A library of helper functions and constant for coreos os distro
+# A library of helper functions and constant for Container Linux os distro
 
 # create-master-instance creates the master instance. If called with
 # an argument, the argument is used as the name to a reserved IP
@@ -51,7 +51,7 @@ function create-master-instance() {
     --scopes "storage-ro,compute-rw,monitoring,logging-write" \
     --can-ip-forward \
     --metadata-from-file \
-      "kube-env=${KUBE_TEMP}/master-kube-env.yaml,user-data=${KUBE_ROOT}/cluster/gce/coreos/master-${CONTAINER_RUNTIME}.yaml,configure-node=${KUBE_ROOT}/cluster/gce/coreos/configure-node.sh,configure-kubelet=${KUBE_ROOT}/cluster/gce/coreos/configure-kubelet.sh,cluster-name=${KUBE_TEMP}/cluster-name.txt" \
+      "kube-env=${KUBE_TEMP}/master-kube-env.yaml,user-data=${KUBE_ROOT}/cluster/gce/container-linux/master-${CONTAINER_RUNTIME}.yaml,configure-node=${KUBE_ROOT}/cluster/gce/container-linux/configure-node.sh,configure-kubelet=${KUBE_ROOT}/cluster/gce/container-linux/configure-kubelet.sh,cluster-name=${KUBE_TEMP}/cluster-name.txt" \
     --disk "name=${MASTER_NAME}-pd,device-name=master-pd,mode=rw,boot=no,auto-delete=no" \
     --boot-disk-size "${MASTER_ROOT_DISK_SIZE:-10}" \
       ${preemptible_master}
