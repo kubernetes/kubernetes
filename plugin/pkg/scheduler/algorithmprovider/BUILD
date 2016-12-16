@@ -21,7 +21,6 @@ go_test(
     library = "go_default_library",
     tags = [
         "automanaged",
-        "skip",
     ],
     deps = ["//plugin/pkg/scheduler/factory:go_default_library"],
 )
