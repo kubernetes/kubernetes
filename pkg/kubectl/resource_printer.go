@@ -1538,7 +1538,14 @@ func printNode(node *api.Node, w io.Writer, options PrintOptions) error {
 	}
 
 	if options.Wide {
-		if _, err := fmt.Fprintf(w, "\t%s", getNodeExternalIP(node)); err != nil {
+		osImage, kernelVersion := node.Status.NodeInfo.OSImage, node.Status.NodeInfo.KernelVersion
+		if osImage == "" {
+			osImage = "<none>"
+		}
+		if kernelVersion == "" {
+			kernelVersion = "<none>"
+		}
+		if _, err := fmt.Fprintf(w, "\t%s\t%s\t%s", getNodeExternalIP(node), osImage, kernelVersion); err != nil {
 			return err
 		}
 	}
@@ -2356,7 +2363,7 @@ func formatWideHeaders(wide bool, t reflect.Type) []string {
 			return []string{"CONTAINER(S)", "IMAGE(S)", "SELECTOR"}
 		}
 		if t.String() == "*api.Node" || t.String() == "*api.NodeList" {
-			return []string{"EXTERNAL-IP"}
+			return []string{"EXTERNAL-IP", "OS-IMAGE", "KERNEL-VERSION"}
 		}
 		if t.String() == "*rbac.RoleBinding" || t.String() == "*rbac.RoleBindingList" {
 			return []string{"ROLE", "USERS", "GROUPS", "SERVICEACCOUNTS"}
