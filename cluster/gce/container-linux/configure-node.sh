@@ -331,7 +331,7 @@ SALT_DIR=/opt/kubernetes/saltbase
 SALT_OVERLAY=/srv/salt-overlay
 MANIFESTS_DIR=/opt/kube-manifests/kubernetes
 
-# On CoreOS, the hosts is in /usr/share/baselayout/hosts
+# On Container Linux, the hosts is in /usr/share/baselayout/hosts
 # So we need to manually populdate the hosts file here on gce.
 echo "127.0.0.1 localhost" >> /etc/hosts
 echo "::1 localhost" >> /etc/hosts
