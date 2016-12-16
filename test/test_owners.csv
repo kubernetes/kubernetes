@@ -66,7 +66,6 @@ Density should allow running maximum capacity pods on nodes,smarterclayton,1
 Density should allow starting * pods per node using *,derekwaynecarr,0
 Deployment RecreateDeployment should delete old pods and create new ones,pwittrock,0
 Deployment RollingUpdateDeployment should delete old pods and create new ones,pwittrock,0
-Deployment RollingUpdateDeployment should scale up and down in the right order,pwittrock,0
 Deployment deployment reaping should cascade to its replica sets and pods,wojtek-t,1
 Deployment deployment should create new pods,pwittrock,0
 Deployment deployment should delete old replica sets,pwittrock,0

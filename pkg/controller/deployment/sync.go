@@ -558,7 +558,7 @@ func (dc *DeploymentController) cleanupDeployment(oldRSs []*extensions.ReplicaSe
 
 // syncDeploymentStatus checks if the status is up-to-date and sync it if necessary
 func (dc *DeploymentController) syncDeploymentStatus(allRSs []*extensions.ReplicaSet, newRS *extensions.ReplicaSet, d *extensions.Deployment) error {
-	newStatus := dc.calculateStatus(allRSs, newRS, d)
+	newStatus := calculateStatus(allRSs, newRS, d)
 
 	if reflect.DeepEqual(d.Status, newStatus) {
 		return nil
@@ -570,7 +570,8 @@ func (dc *DeploymentController) syncDeploymentStatus(allRSs []*extensions.Replic
 	return err
 }
 
-func (dc *DeploymentController) calculateStatus(allRSs []*extensions.ReplicaSet, newRS *extensions.ReplicaSet, deployment *extensions.Deployment) extensions.DeploymentStatus {
+// calculateStatus calculates the latest status for the provided deployment by looking into the provided replica sets.
+func calculateStatus(allRSs []*extensions.ReplicaSet, newRS *extensions.ReplicaSet, deployment *extensions.Deployment) extensions.DeploymentStatus {
 	availableReplicas := deploymentutil.GetAvailableReplicaCountForReplicaSets(allRSs)
 	totalReplicas := deploymentutil.GetReplicaCountForReplicaSets(allRSs)
 	unavailableReplicas := totalReplicas - availableReplicas
@@ -580,23 +581,30 @@ func (dc *DeploymentController) calculateStatus(allRSs []*extensions.ReplicaSet,
 		unavailableReplicas = 0
 	}
 
-	if availableReplicas >= *(deployment.Spec.Replicas)-deploymentutil.MaxUnavailable(*deployment) {
-		minAvailability := deploymentutil.NewDeploymentCondition(extensions.DeploymentAvailable, v1.ConditionTrue, deploymentutil.MinimumReplicasAvailable, "Deployment has minimum availability.")
-		deploymentutil.SetDeploymentCondition(&deployment.Status, *minAvailability)
-	} else {
-		noMinAvailability := deploymentutil.NewDeploymentCondition(extensions.DeploymentAvailable, v1.ConditionFalse, deploymentutil.MinimumReplicasUnavailable, "Deployment does not have minimum availability.")
-		deploymentutil.SetDeploymentCondition(&deployment.Status, *noMinAvailability)
-	}
-
-	return extensions.DeploymentStatus{
+	status := extensions.DeploymentStatus{
 		// TODO: Ensure that if we start retrying status updates, we won't pick up a new Generation value.
 		ObservedGeneration:  deployment.Generation,
 		Replicas:            deploymentutil.GetActualReplicaCountForReplicaSets(allRSs),
 		UpdatedReplicas:     deploymentutil.GetActualReplicaCountForReplicaSets([]*extensions.ReplicaSet{newRS}),
 		AvailableReplicas:   availableReplicas,
 		UnavailableReplicas: unavailableReplicas,
-		Conditions:          deployment.Status.Conditions,
 	}
+
+	// Copy conditions one by one so we won't mutate the original object.
+	conditions := deployment.Status.Conditions
+	for i := range conditions {
+		status.Conditions = append(status.Conditions, conditions[i])
+	}
+
+	if availableReplicas >= *(deployment.Spec.Replicas)-deploymentutil.MaxUnavailable(*deployment) {
+		minAvailability := deploymentutil.NewDeploymentCondition(extensions.DeploymentAvailable, v1.ConditionTrue, deploymentutil.MinimumReplicasAvailable, "Deployment has minimum availability.")
+		deploymentutil.SetDeploymentCondition(&status, *minAvailability)
+	} else {
+		noMinAvailability := deploymentutil.NewDeploymentCondition(extensions.DeploymentAvailable, v1.ConditionFalse, deploymentutil.MinimumReplicasUnavailable, "Deployment does not have minimum availability.")
+		deploymentutil.SetDeploymentCondition(&status, *noMinAvailability)
+	}
+
+	return status
 }
 
 // isScalingEvent checks whether the provided deployment has been updated with a scaling event
