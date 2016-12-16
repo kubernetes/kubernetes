@@ -10,7 +10,10 @@ load(
 
 go_library(
     name = "go_default_library",
-    srcs = ["options.go"],
+    srcs = [
+        "options.go",
+        "validation.go",
+    ],
     tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
@@ -18,6 +21,7 @@ go_library(
         "//pkg/genericapiserver/options:go_default_library",
         "//pkg/kubelet/client:go_default_library",
         "//pkg/master/ports:go_default_library",
+        "//pkg/util/net:go_default_library",
         "//vendor:github.com/spf13/pflag",
     ],
 )

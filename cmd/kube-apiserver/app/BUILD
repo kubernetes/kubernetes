@@ -21,7 +21,6 @@ go_library(
         "//pkg/apis/autoscaling:go_default_library",
         "//pkg/apis/batch:go_default_library",
         "//pkg/apis/extensions:go_default_library",
-        "//pkg/apiserver:go_default_library",
         "//pkg/apiserver/authenticator:go_default_library",
         "//pkg/capabilities:go_default_library",
         "//pkg/client/clientset_generated/internalclientset:go_default_library",
