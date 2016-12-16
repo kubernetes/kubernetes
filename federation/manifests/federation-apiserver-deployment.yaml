@@ -17,7 +17,7 @@ spec:
       - name: apiserver
         image: {{.FEDERATION_APISERVER_IMAGE_REPO}}:{{.FEDERATION_APISERVER_IMAGE_TAG}}
         command:
-        - /usr/local/bin/hyperkube
+        - /hyperkube
         - federation-apiserver
         - --bind-address=0.0.0.0
         - --etcd-servers=http://localhost:2379
