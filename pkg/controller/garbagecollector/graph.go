@@ -43,12 +43,38 @@ type node struct {
 	dependents     map[*node]struct{}
 	// this is set by processEvent() if the object has non-nil DeletionTimestamp
 	// and has the FianlizerDeleteDependents.
-	deletingDependents bool
+	deletingDependents     bool
+	deletingDependentsLock sync.RWMutex
 	// this records if the object's deletionTimestamp is non-nil.
-	beingDeleted bool
+	beingDeleted     bool
+	beingDeletedLock sync.RWMutex
 	// when processing an Update event, we need to compare the updated
 	// ownerReferences with the owners recorded in the graph.
 	owners []metav1.OwnerReference
+}
+
+func (n *node) setBeingDeleted(v bool) {
+	n.beingDeletedLock.Lock()
+	defer n.beingDeletedLock.Unlock()
+	n.beingDeleted = v
+}
+
+func (n *node) isBeingDeleted() bool {
+	n.beingDeletedLock.RLock()
+	defer n.beingDeletedLock.RUnlock()
+	return n.beingDeleted
+}
+
+func (n *node) setDeletingDependents(v bool) {
+	n.deletingDependentsLock.Lock()
+	defer n.deletingDependentsLock.Unlock()
+	n.deletingDependents = v
+}
+
+func (n *node) isDeletingDependents() bool {
+	n.deletingDependentsLock.RLock()
+	defer n.deletingDependentsLock.RUnlock()
+	return n.deletingDependents
 }
 
 func (ownerNode *node) addDependent(dependent *node) {
