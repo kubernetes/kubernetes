@@ -1,0 +1,57 @@
+# please keep this file synchronized with cluster/saltbase/salt/fluentd-gcp/fluentd-gcp.yaml
+apiVersion: extensions/v1beta1
+kind: DaemonSet
+metadata:
+  name: fluentd-gcp-v1.30
+  namespace: kube-system
+  labels:
+    k8s-app: fluentd-gcp
+    kubernetes.io/cluster-service: "true"
+    version: v1.30
+spec:
+  template:
+    metadata:
+      labels:
+        k8s-app: fluentd-gcp
+        kubernetes.io/cluster-service: "true"
+        version: v1.30
+    spec:
+      containers:
+      - name: fluentd-gcp
+        image: gcr.io/google_containers/fluentd-gcp:1.30
+        # If fluentd consumes its own logs, the following situation may happen:
+        # fluentd fails to send a chunk to the server => writes it to the log =>
+        # tries to send this message to the server => fails to send a chunk and so on.
+        # Writing to a file, which is not exported to the back-end prevents it.
+        # It also allows to increase the fluentd verbosity by default.
+        command:
+          - '/bin/sh'
+          - '-c'
+          - '/run.sh $FLUENTD_ARGS 2>&1 >>/var/log/fluentd.log'
+        resources:
+          limits:
+            memory: 200Mi
+          requests:
+            cpu: 100m
+            memory: 200Mi
+        volumeMounts:
+        - name: varlog
+          mountPath: /var/log
+        - name: varlibdockercontainers
+          mountPath: /var/lib/docker/containers
+          readOnly: true
+        - name: libsystemddir
+          mountPath: /host/lib
+      nodeSelector:
+        alpha.kubernetes.io/fluentd-ds-ready: "true"
+      terminationGracePeriodSeconds: 30
+      volumes:
+      - name: varlog
+        hostPath:
+          path: /var/log
+      - name: varlibdockercontainers
+        hostPath:
+          path: /var/lib/docker/containers
+      - name: libsystemddir
+        hostPath:
+          path: /usr/lib64
