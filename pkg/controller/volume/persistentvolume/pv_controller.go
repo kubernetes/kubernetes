@@ -1079,7 +1079,7 @@ func (ctrl *PersistentVolumeController) deleteVolumeOperation(arg interface{}) e
 		} else {
 			// The plugin failed, mark the volume as Failed and send Warning
 			// event
-			if _, err = ctrl.updateVolumePhaseWithEvent(volume, api.VolumeFailed, api.EventTypeWarning, "VolumeFailedDelete", err.Error()); err != nil {
+			if _, err := ctrl.updateVolumePhaseWithEvent(volume, api.VolumeFailed, api.EventTypeWarning, "VolumeFailedDelete", err.Error()); err != nil {
 				glog.V(4).Infof("deleteVolumeOperation [%s]: failed to mark volume as failed: %v", volume.Name, err)
 				// Save failed, retry on the next deletion attempt
 				return err
