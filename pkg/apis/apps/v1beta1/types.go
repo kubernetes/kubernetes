@@ -86,7 +86,7 @@ type StatefulSetSpec struct {
 
 // StatefulSetStatus represents the current state of a StatefulSet.
 type StatefulSetStatus struct {
-	// most recent generation observed by this autoscaler.
+	// most recent generation observed by this StatefulSet.
 	// +optional
 	ObservedGeneration *int64 `json:"observedGeneration,omitempty" protobuf:"varint,1,opt,name=observedGeneration"`
 
