@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"os"
 	"testing"
 	"time"
 
@@ -44,10 +45,18 @@ var groupVersions = []schema.GroupVersion{
 }
 
 func TestRun(t *testing.T) {
+	certDir, err := ioutil.TempDir("", "")
+	if err != nil {
+		t.Fatalf("Failed to create temporary certificate directory: %v", err)
+	}
+	defer os.RemoveAll(certDir)
+
 	s := options.NewServerRunOptions()
 	s.SecureServing.ServingOptions.BindPort = securePort
 	s.InsecureServing.BindPort = insecurePort
 	s.Etcd.StorageConfig.ServerList = []string{"http://localhost:2379"}
+	s.SecureServing.ServerCert.CertDirectory = certDir
+
 	go func() {
 		if err := app.Run(s); err != nil {
 			t.Fatalf("Error in bringing up the server: %v", err)
