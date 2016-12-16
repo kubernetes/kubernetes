@@ -27,7 +27,7 @@ type Profiling struct{}
 
 // Install adds the Profiling webservice to the given mux.
 func (d Profiling) Install(c *mux.APIContainer) {
-	c.SecretRoutes.HandleFunc("/debug/pprof/", pprof.Index)
-	c.SecretRoutes.HandleFunc("/debug/pprof/profile", pprof.Profile)
-	c.SecretRoutes.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
+	c.UnlistedRoutes.HandleFunc("/debug/pprof/", pprof.Index)
+	c.UnlistedRoutes.HandleFunc("/debug/pprof/profile", pprof.Profile)
+	c.UnlistedRoutes.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
 }
