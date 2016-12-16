@@ -314,3 +314,36 @@ func testReadLines(t *testing.T, lineLengths []int) {
 		}
 	}
 }
+
+func TestTypedJSONOrYamlErrors(t *testing.T) {
+	s := NewYAMLOrJSONDecoder(bytes.NewReader([]byte(`{
+	"foo": {
+		"stuff": 1
+		"otherStuff": 2
+	}
+}
+  `)), 100)
+	obj := generic{}
+	err := s.Decode(&obj)
+	if err == nil {
+		t.Fatal("expected error with json: prefix, got no error")
+	}
+	if _, ok := err.(JSONSyntaxError); !ok {
+		t.Fatalf("expected %q to be of type JSONSyntaxError", err.Error())
+	}
+
+	s = NewYAMLOrJSONDecoder(bytes.NewReader([]byte(`---
+stuff: 1
+		test-foo: 1
+
+---
+  `)), 100)
+	obj = generic{}
+	err = s.Decode(&obj)
+	if err == nil {
+		t.Fatal("expected error with yaml: prefix, got no error")
+	}
+	if _, ok := err.(YAMLSyntaxError); !ok {
+		t.Fatalf("expected %q to be of type YAMLSyntaxError", err.Error())
+	}
+}
