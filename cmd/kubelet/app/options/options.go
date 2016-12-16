@@ -260,4 +260,8 @@ func (s *KubeletServer) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.RemoteImageEndpoint, "image-service-endpoint", s.RemoteImageEndpoint, "[Experimental] The unix socket endpoint of remote image service. If not specified, it will be the same with container-runtime-endpoint by default. The endpoint is used only when CRI integration is enabled (--experimental-cri)")
 
 	fs.BoolVar(&s.ExperimentalCheckNodeCapabilitiesBeforeMount, "experimental-check-node-capabilities-before-mount", s.ExperimentalCheckNodeCapabilitiesBeforeMount, "[Experimental] if set true, the kubelet will check the underlying node for required componenets (binaries, etc.) before performing the mount")
+
+	// Local disk
+	fs.StringSliceVar(&s.LocalDisks, "local-disks", s.LocalDisks, "local disks that are used by pods")
+	fs.Uint32Var(&s.ReservedLocalDiskCapacity, "reserved-local-disk-capacity", s.ReservedLocalDiskCapacity, "Reserved disk capacity for each local disk")
 }

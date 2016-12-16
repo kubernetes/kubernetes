@@ -25,6 +25,7 @@ import (
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/metrics"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 
 	"github.com/golang/glog"
 )
@@ -55,6 +56,7 @@ type Config struct {
 	// with scheduling, PodScheduled condition will be updated in apiserver in /bind
 	// handler so that binding and setting PodCondition it is atomic.
 	PodConditionUpdater PodConditionUpdater
+	KubeClient     *clientset.Clientset
 
 	// NextPod should be a function that blocks until the next pod
 	// is available. We don't use a channel for this, because scheduling
@@ -125,6 +127,30 @@ func (s *Scheduler) scheduleOne() {
 
 	go func() {
 		defer metrics.E2eSchedulingLatency.Observe(metrics.SinceInMicroseconds(start))
+
+		// Backfill Pod's LocalDisk' localPath if needed
+		var needUpdate bool
+		for _, volume := range assumed.Spec.Volumes {
+			localDisk := volume.LocalDisk
+			if localDisk != nil {
+				needUpdate = true
+				break
+			}
+		}
+		if needUpdate {
+			// TODO: Update Pod's LocalDisk' localPath.
+			// Now the error message is "spec: Forbidden: pod updates may not change fields other
+			// than `containers[*].image` or `spec.activeDeadlineSeconds`".
+			/*
+			if _, err := s.config.KubeClient.Pods(pod.Namespace).Update(pod); err != nil {
+				glog.Errorf("Failed to backfill pod's local disk: %v", err)
+				if err := s.config.SchedulerCache.ForgetPod(&assumed); err != nil {
+					glog.Errorf("scheduler cache ForgetPod failed: %v", err)
+				}
+				return
+			}
+			*/
+		}
 
 		b := &v1.Binding{
 			ObjectMeta: v1.ObjectMeta{Namespace: pod.Namespace, Name: pod.Name},

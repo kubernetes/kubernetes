@@ -291,6 +291,9 @@ type VolumeSource struct {
 	AzureDisk *AzureDiskVolumeSource
 	// PhotonPersistentDisk represents a Photon Controller persistent disk attached and mounted on kubelets host machine
 	PhotonPersistentDisk *PhotonPersistentDiskVolumeSource
+	// LocalDisk represents a local disk request for a pod.
+	// +optional
+	LocalDisk *LocalDiskSource
 }
 
 // Similar to VolumeSource but meant for the administrator who creates PVs.
@@ -568,6 +571,17 @@ const (
 	// ProtocolUDP is the UDP protocol.
 	ProtocolUDP Protocol = "UDP"
 )
+
+// Represents local disk claim for a pod
+type LocalDiskSource struct {
+	// Requested local disk size, the unit is Gi
+	DiskSize uint32
+	// LocalPath represents the local disk path that pod will use. It will be
+	// backfilled by scheduler when scheduler find a fit local path on a
+	// kubelet node. If user specifies it, it might not be satisfied.
+	LocalPath string
+	// TODO: Add labels to select local disk, e.g. kind=SSD.
+}
 
 // Represents a Persistent Disk resource in Google Compute Engine.
 //
@@ -2498,6 +2512,9 @@ type NodeStatus struct {
 	// Allocatable represents the resources of a node that are available for scheduling.
 	// +optional
 	Allocatable ResourceList
+	// List of local disks
+	// +optional
+	LocalDisks []LocalDisk
 	// NodePhase is the current lifecycle phase of the node.
 	// +optional
 	Phase NodePhase
@@ -2522,6 +2539,17 @@ type NodeStatus struct {
 	// List of volumes that are attached to the node.
 	// +optional
 	VolumesAttached []AttachedVolume
+}
+
+type LocalDisk struct {
+	// Local directory
+	LocalDir string
+	// Total capacity, unit is Gi
+	Capacity uint32
+	// Allocatable capacity represents the disk capacity that are available for scheduling, Unit is Gi
+	Allocatable uint32
+	// TODO: Add labels for local disk, e.g. kind=SSD. They will be helpful for scheduling.
+	// Labels map[string]string
 }
 
 type UniqueVolumeName string

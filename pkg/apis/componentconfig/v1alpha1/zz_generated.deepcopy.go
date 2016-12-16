@@ -481,6 +481,14 @@ func DeepCopy_v1alpha1_KubeletConfiguration(in interface{}, out interface{}, c *
 		out.EnableCRI = in.EnableCRI
 		out.ExperimentalFailSwapOn = in.ExperimentalFailSwapOn
 		out.ExperimentalCheckNodeCapabilitiesBeforeMount = in.ExperimentalCheckNodeCapabilitiesBeforeMount
+		if in.LocalDisks != nil {
+			in, out := &in.LocalDisks, &out.LocalDisks
+			*out = make([]string, len(*in))
+			copy(*out, *in)
+		} else {
+			out.LocalDisks = nil
+		}
+		out.ReservedLocalDiskCapacity = in.ReservedLocalDiskCapacity
 		return nil
 	}
 }

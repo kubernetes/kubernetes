@@ -524,6 +524,11 @@ type KubeletConfiguration struct {
 	// (binaries, etc.) to mount the volume are available on the underlying node. If the check is enabled
 	// and fails the mount operation fails.
 	ExperimentalCheckNodeCapabilitiesBeforeMount bool `json:"ExperimentalCheckNodeCapabilitiesBeforeMount,omitempty"`
+
+	// Local disks are disks used by pods
+	LocalDisks []string `json:"localDisks,omitempty"`
+	// Reserved disk capacity for each local disk
+	ReservedLocalDiskCapacity uint32 `json:"reservedLocalDiskCapacity,omitempty"`
 }
 
 type KubeletAuthorizationMode string

@@ -3303,6 +3303,61 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 		Dependencies: []string{
 			"v1.LoadBalancerIngress"},
 	},
+	"v1.LocalDisk": {
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Properties: map[string]spec.Schema{
+					"localDir": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Local directory",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"capacity": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Total capacity, unit is Gi",
+							Type:        []string{"integer"},
+							Format:      "int64",
+						},
+					},
+					"allocatable": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Allocatable capacity represents the disk capacity that are available for scheduling, Unit is Gi",
+							Type:        []string{"integer"},
+							Format:      "int64",
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{},
+	},
+	"v1.LocalDiskSource": {
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "Represents local disk claim for a pod",
+				Properties: map[string]spec.Schema{
+					"diskSize": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Requested local disk size, the unit is Gi",
+							Type:        []string{"integer"},
+							Format:      "int64",
+						},
+					},
+					"localPath": {
+						SchemaProps: spec.SchemaProps{
+							Description: "LocalPath represents the local disk path that pod will use. It will be backfilled by scheduler when scheduler find a fit local path on a kubelet node. If user specifies it, it might not be satisfied.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
+				Required: []string{"diskSize"},
+			},
+		},
+		Dependencies: []string{},
+	},
 	"v1.LocalObjectReference": {
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -3837,6 +3892,19 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 							},
 						},
 					},
+					"localDisks": {
+						SchemaProps: spec.SchemaProps{
+							Description: "List of local disks",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: spec.MustCreateRef("#/definitions/v1.LocalDisk"),
+									},
+								},
+							},
+						},
+					},
 					"phase": {
 						SchemaProps: spec.SchemaProps{
 							Description: "NodePhase is the recently observed lifecycle phase of the node. More info: http://releases.k8s.io/HEAD/docs/admin/node.md#node-phase The field is never populated, and now is deprecated.",
@@ -3926,7 +3994,7 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 			},
 		},
 		Dependencies: []string{
-			"resource.Quantity", "v1.AttachedVolume", "v1.ContainerImage", "v1.NodeAddress", "v1.NodeCondition", "v1.NodeDaemonEndpoints", "v1.NodeSystemInfo"},
+			"resource.Quantity", "v1.AttachedVolume", "v1.ContainerImage", "v1.LocalDisk", "v1.NodeAddress", "v1.NodeCondition", "v1.NodeDaemonEndpoints", "v1.NodeSystemInfo"},
 	},
 	"v1.NodeSystemInfo": {
 		Schema: spec.Schema{
@@ -7504,11 +7572,17 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 							Ref:         spec.MustCreateRef("#/definitions/v1.PhotonPersistentDiskVolumeSource"),
 						},
 					},
+					"localDisk": {
+						SchemaProps: spec.SchemaProps{
+							Description: "LocalDisk represents a local disk request for a pod.",
+							Ref:         spec.MustCreateRef("#/definitions/v1.LocalDiskSource"),
+						},
+					},
 				},
 			},
 		},
 		Dependencies: []string{
-			"v1.AWSElasticBlockStoreVolumeSource", "v1.AzureDiskVolumeSource", "v1.AzureFileVolumeSource", "v1.CephFSVolumeSource", "v1.CinderVolumeSource", "v1.ConfigMapVolumeSource", "v1.DownwardAPIVolumeSource", "v1.EmptyDirVolumeSource", "v1.FCVolumeSource", "v1.FlexVolumeSource", "v1.FlockerVolumeSource", "v1.GCEPersistentDiskVolumeSource", "v1.GitRepoVolumeSource", "v1.GlusterfsVolumeSource", "v1.HostPathVolumeSource", "v1.ISCSIVolumeSource", "v1.NFSVolumeSource", "v1.PersistentVolumeClaimVolumeSource", "v1.PhotonPersistentDiskVolumeSource", "v1.QuobyteVolumeSource", "v1.RBDVolumeSource", "v1.SecretVolumeSource", "v1.VsphereVirtualDiskVolumeSource"},
+			"v1.AWSElasticBlockStoreVolumeSource", "v1.AzureDiskVolumeSource", "v1.AzureFileVolumeSource", "v1.CephFSVolumeSource", "v1.CinderVolumeSource", "v1.ConfigMapVolumeSource", "v1.DownwardAPIVolumeSource", "v1.EmptyDirVolumeSource", "v1.FCVolumeSource", "v1.FlexVolumeSource", "v1.FlockerVolumeSource", "v1.GCEPersistentDiskVolumeSource", "v1.GitRepoVolumeSource", "v1.GlusterfsVolumeSource", "v1.HostPathVolumeSource", "v1.ISCSIVolumeSource", "v1.LocalDiskSource", "v1.NFSVolumeSource", "v1.PersistentVolumeClaimVolumeSource", "v1.PhotonPersistentDiskVolumeSource", "v1.QuobyteVolumeSource", "v1.RBDVolumeSource", "v1.SecretVolumeSource", "v1.VsphereVirtualDiskVolumeSource"},
 	},
 	"v1.VsphereVirtualDiskVolumeSource": {
 		Schema: spec.Schema{
@@ -9180,6 +9254,27 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 							Description: "This flag, if set, enables a check prior to mount operations to verify that the required components (binaries, etc.) to mount the volume are available on the underlying node. If the check is enabled and fails the mount operation fails.",
 							Type:        []string{"boolean"},
 							Format:      "",
+						},
+					},
+					"localDisks": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Local disks are disks used by pods",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Type:   []string{"string"},
+										Format: "",
+									},
+								},
+							},
+						},
+					},
+					"reservedLocalDiskCapacity": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Reserved disk capacity for each local disk",
+							Type:        []string{"integer"},
+							Format:      "int64",
 						},
 					},
 				},

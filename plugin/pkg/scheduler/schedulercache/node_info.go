@@ -45,6 +45,7 @@ type NodeInfo struct {
 	// We store allocatedResources (which is Node.Status.Allocatable.*) explicitly
 	// as int64, to avoid conversions and accessing map.
 	allocatableResource *Resource
+	localDiskResource []LocalDiskResource
 	// We store allowedPodNumber (which is Node.Status.Allocatable.Pods().Value())
 	// explicitly as int, to avoid conversions and improve performance.
 	allowedPodNumber int
@@ -68,6 +69,11 @@ type Resource struct {
 	Memory             int64
 	NvidiaGPU          int64
 	OpaqueIntResources map[v1.ResourceName]int64
+}
+
+type LocalDiskResource struct {
+	v1.LocalDisk
+	Requested uint32
 }
 
 func (r *Resource) ResourceList() v1.ResourceList {
@@ -175,12 +181,17 @@ func (n *NodeInfo) AllocatableResource() Resource {
 	return *n.allocatableResource
 }
 
+func (n *NodeInfo) AllocatableLocalDiskResource() []LocalDiskResource {
+	return n.localDiskResource
+}
+
 func (n *NodeInfo) Clone() *NodeInfo {
 	clone := &NodeInfo{
 		node:                    n.node,
 		requestedResource:       &(*n.requestedResource),
 		nonzeroRequest:          &(*n.nonzeroRequest),
 		allocatableResource:     &(*n.allocatableResource),
+		localDiskResource:       n.localDiskResource,
 		allowedPodNumber:        n.allowedPodNumber,
 		taintsErr:               n.taintsErr,
 		memoryPressureCondition: n.memoryPressureCondition,
@@ -231,11 +242,34 @@ func (n *NodeInfo) addPod(pod *v1.Pod) {
 	}
 	n.nonzeroRequest.MilliCPU += non0_cpu
 	n.nonzeroRequest.Memory += non0_mem
+	allocateLocalDisk(n, pod)
 	n.pods = append(n.pods, pod)
 	if hasPodAffinityConstraints(pod) {
 		n.podsWithAffinity = append(n.podsWithAffinity, pod)
 	}
 	n.generation++
+}
+
+func allocateLocalDisk(nodeInfo *NodeInfo, pod *v1.Pod) {
+	for i, volume := range pod.Spec.Volumes {
+		localDisk := volume.LocalDisk
+		if localDisk == nil {
+			continue
+		}
+		size := localDisk.DiskSize
+		for j, diskResource := range nodeInfo.localDiskResource {
+			if diskResource.Allocatable >= size + diskResource.Requested {
+				glog.Infof("Allocate local disk resource %+v for request %+v for pod(%s)",
+					diskResource, localDisk, pod.Name)
+				nodeInfo.localDiskResource[j].Requested += size
+				pod.Spec.Volumes[i].LocalDisk.LocalPath = diskResource.LocalDir
+				return
+			}
+		}
+		glog.Errorf("Failed to find a match local disk resource for request %+v for pod(%s)",
+			localDisk, pod.Name)
+		// FIXME: support only one local disk now
+	}
 }
 
 // removePod subtracts pod information to this NodeInfo.
@@ -282,6 +316,7 @@ func (n *NodeInfo) removePod(pod *v1.Pod) error {
 			}
 			n.nonzeroRequest.MilliCPU -= non0_cpu
 			n.nonzeroRequest.Memory -= non0_mem
+			freeLocalDisk(n, pod)
 			n.generation++
 			return nil
 		}
@@ -318,6 +353,27 @@ func calculateResource(pod *v1.Pod) (res Resource, non0_cpu int64, non0_mem int6
 	return
 }
 
+func freeLocalDisk(nodeInfo *NodeInfo, pod *v1.Pod) {
+	for i, volume := range pod.Spec.Volumes {
+		localDisk := volume.LocalDisk
+		if localDisk == nil {
+			continue
+		}
+
+		for j, diskResource := range nodeInfo.localDiskResource {
+			if diskResource.LocalDir == localDisk.LocalPath {
+				glog.Infof("Free local disk resource %+v for pod(%s)",
+					diskResource, localDisk, pod.Name)
+				nodeInfo.localDiskResource[j].Requested -= localDisk.DiskSize
+				pod.Spec.Volumes[i].LocalDisk.LocalPath = ""
+				return
+			}
+		}
+		glog.Errorf("Failed to free local disk resource for %+v for pod(%s)",
+			localDisk, pod.Name)
+	}
+}
+
 // Sets the overall node information.
 func (n *NodeInfo) SetNode(node *v1.Node) error {
 	n.node = node
@@ -352,6 +408,9 @@ func (n *NodeInfo) SetNode(node *v1.Node) error {
 		default:
 			// We ignore other conditions.
 		}
+	}
+	for _, localDisk := range node.Status.LocalDisks {
+		n.localDiskResource = append(n.localDiskResource, LocalDiskResource{LocalDisk: localDisk})
 	}
 	n.generation++
 	return nil
