@@ -62,7 +62,7 @@ func RegisterOpenAPIService(servePath string, webServices []*restful.WebService,
 		return err
 	}
 
-	container.SecretRoutes.HandleFunc(servePath, func(w http.ResponseWriter, r *http.Request) {
+	container.UnlistedRoutes.HandleFunc(servePath, func(w http.ResponseWriter, r *http.Request) {
 		resp := restful.NewResponse(w)
 		if r.URL.Path != servePath {
 			resp.WriteErrorString(http.StatusNotFound, "Path not found!")

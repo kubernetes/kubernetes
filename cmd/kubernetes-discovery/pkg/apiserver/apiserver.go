@@ -227,8 +227,8 @@ func (s *APIDiscoveryServer) AddAPIService(apiService *apiregistration.APIServic
 		lister:    s.lister,
 	}
 	// discovery is protected
-	s.GenericAPIServer.HandlerContainer.SecretRoutes.Handle(groupPath, groupDiscoveryHandler)
-	s.GenericAPIServer.HandlerContainer.SecretRoutes.Handle(groupPath+"/", groupDiscoveryHandler)
+	s.GenericAPIServer.HandlerContainer.UnlistedRoutes.Handle(groupPath, groupDiscoveryHandler)
+	s.GenericAPIServer.HandlerContainer.UnlistedRoutes.Handle(groupPath+"/", groupDiscoveryHandler)
 
 }
 
