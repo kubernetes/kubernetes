@@ -86,8 +86,8 @@ func (serverOptions *ServerRunOptions) Run(stopCh <-chan struct{}) error {
 	serverOptions.Etcd.StorageConfig.ServerList = []string{"http://127.0.0.1:2379"}
 
 	genericvalidation.ValidateRunOptions(serverOptions.GenericServerRunOptions)
-	if errs := serverOptions.Etcd.Validate(); len(errs) > 0 {
-		return utilerrors.NewAggregate(errs)
+	if err := serverOptions.Etcd.Validate(); err != nil {
+		return err
 	}
 	if errs := serverOptions.SecureServing.Validate(); len(errs) > 0 {
 		return utilerrors.NewAggregate(errs)

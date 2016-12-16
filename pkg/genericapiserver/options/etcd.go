@@ -45,13 +45,12 @@ func NewEtcdOptions() *EtcdOptions {
 	}
 }
 
-func (s *EtcdOptions) Validate() []error {
-	allErrors := []error{}
+func (s *EtcdOptions) Validate() error {
 	if len(s.StorageConfig.ServerList) == 0 {
-		allErrors = append(allErrors, fmt.Errorf("--etcd-servers must be specified"))
+		return fmt.Errorf("--etcd-servers must be specified")
 	}
 
-	return allErrors
+	return nil
 }
 
 // AddEtcdFlags adds flags related to etcd storage for a specific APIServer to the specified FlagSet
