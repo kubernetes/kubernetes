@@ -66,15 +66,19 @@ func setupProviderConfig() error {
 		glog.Info("The --provider flag is not set.  Treating as a conformance test.  Some tests may not be run.")
 
 	case "gce", "gke":
-		var err error
+		cloudConfig := framework.TestContext.CloudConfig
+		networkURL := fmt.Sprintf("https://www.googleapis.com/compute/v1/projects/%s/global/networks/%s", cloudConfig.ProjectID, cloudConfig.Network)
+
 		framework.Logf("Fetching cloud provider for %q\r\n", framework.TestContext.Provider)
-		zone := framework.TestContext.CloudConfig.Zone
+		zone := cloudConfig.Zone
+
+		var err error
 		region, err := gcecloud.GetGCERegion(zone)
 		if err != nil {
 			return fmt.Errorf("error parsing GCE/GKE region from zone %q: %v", zone, err)
 		}
 		managedZones := []string{zone} // Only single-zone for now
-		cloudConfig.Provider, err = gcecloud.CreateGCECloud(framework.TestContext.CloudConfig.ProjectID, region, zone, managedZones, "" /* networkUrl */, nil /* nodeTags */, "" /* nodeInstancePerfix */, nil /* tokenSource */, false /* useMetadataServer */)
+		cloudConfig.Provider, err = gcecloud.CreateGCECloud(cloudConfig.ProjectID, region, zone, managedZones, networkURL, nil /* nodeTags */, "" /* nodeInstancePerfix */, nil /* tokenSource */, false /* useMetadataServer */)
 		if err != nil {
 			return fmt.Errorf("Error building GCE/GKE provider: %v", err)
 		}
@@ -85,7 +89,7 @@ func setupProviderConfig() error {
 			framework.TestContext.CloudConfig.FederationProviders = make(map[string]cloudprovider.Interface)
 			for _, zone := range strings.Fields(fzones) {
 				managedZones := []string{zone}
-				provider, err := gcecloud.CreateGCECloud(framework.TestContext.CloudConfig.ProjectID, region, zone, managedZones, "" /* networkUrl */, nil /* nodeTags */, "" /* nodeInstancePerfix */, nil /* tokenSource */, false /* useMetadataServer */)
+				provider, err := gcecloud.CreateGCECloud(framework.TestContext.CloudConfig.ProjectID, region, zone, managedZones, networkURL, nil /* nodeTags */, "" /* nodeInstancePerfix */, nil /* tokenSource */, false /* useMetadataServer */)
 				if err != nil {
 					return fmt.Errorf("Error building GCE/GKE provider for zone %q: %v", zone, err)
 				}
