@@ -26,6 +26,9 @@ go_library(
 go_test(
     name = "go_default_xtest",
     srcs = ["policy_test.go"],
+    data = glob([
+        "testdata/*",
+    ]),
     tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
