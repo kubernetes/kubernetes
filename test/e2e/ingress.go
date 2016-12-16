@@ -115,7 +115,7 @@ var _ = framework.KubeDescribe("Loadbalancing: L7", func() {
 				By(t.entryLog)
 				t.execute()
 				By(t.exitLog)
-				jig.waitForIngress()
+				jig.waitForIngress(true)
 			}
 		})
 
@@ -197,7 +197,7 @@ var _ = framework.KubeDescribe("Loadbalancing: L7", func() {
 				By(t.entryLog)
 				t.execute()
 				By(t.exitLog)
-				jig.waitForIngress()
+				jig.waitForIngress(false)
 			}
 		})
 	})
