@@ -78,7 +78,7 @@ var _ = framework.KubeDescribe("Loadbalancing: L7", func() {
 	//
 	// Slow by design ~10m for each "It" block dominated by loadbalancer setup time
 	// TODO: write similar tests for nginx, haproxy and AWS Ingress.
-	framework.KubeDescribe("GCE [Slow] [Feature: Ingress]", func() {
+	framework.KubeDescribe("GCE [Slow] [Feature:Ingress]", func() {
 		var gceController *GCEIngressController
 
 		// Platform specific setup
