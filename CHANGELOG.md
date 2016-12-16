@@ -6,6 +6,7 @@
     - [Server Binaries](#server-binaries)
   - [Changelog since v1.5.0](#changelog-since-v150)
     - [Other notable changes](#other-notable-changes)
+  - [Known Issues for v1.5.1](#known-issues-for-v151)
 - [v1.5.0](#v150)
   - [Downloads for v1.5.0](#downloads-for-v150)
     - [Client Binaries](#client-binaries-1)
@@ -345,7 +346,10 @@ filename | sha256 hash
 * Changes the default value of the "anonymous-auth" flag to a safer default value of false. This affects kube apiserver and federation apiserver. See https://groups.google.com/forum/#!topic/kubernetes-announce/iclRj-6Nfsg for more details.  ([#38708](https://github.com/kubernetes/kubernetes/pull/38708), [@erictune](https://github.com/erictune))
 * Fixes issue where if the audit log is enabled and anonymous authentication is disabled, then an unauthenticated user request will cause a panic and crash the `kube-apiserver`. ([#38717](https://github.com/kubernetes/kubernetes/pull/38717), [@deads2k](https://github.com/deads2k))
 
+## Known Issues for v1.5.1
 
+- `hack/local-up-cluster.sh` script times out waiting for apiserver to answer, see [#38847](https://github.com/kubernetes/kubernetes/issues/38847).
+  To workaround this, modify the script to pass `--anonymous-auth=true` to `sudo -E "${GO_OUT}/hyperkube" apiserver ...` when starting `kube-apiserver`.
 
 # v1.5.0
 
