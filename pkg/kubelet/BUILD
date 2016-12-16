@@ -113,6 +113,7 @@ go_library(
         "//pkg/util/wait:go_default_library",
         "//pkg/version:go_default_library",
         "//pkg/volume:go_default_library",
+        "//pkg/volume/util:go_default_library",
         "//pkg/volume/util/types:go_default_library",
         "//pkg/volume/util/volumehelper:go_default_library",
         "//plugin/pkg/scheduler/algorithm/predicates:go_default_library",
