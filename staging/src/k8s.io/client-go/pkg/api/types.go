@@ -1824,6 +1824,8 @@ type PodSpec struct {
 	// If not specified, the pod will not have a domainname at all.
 	// +optional
 	Subdomain string `json:"subdomain,omitempty"`
+	// If specified, the pod's scheduling constraints
+	Affinity *Affinity `json:"affinity,omitempty"`
 }
 
 // Sysctl defines a kernel parameter to be set

@@ -582,14 +582,6 @@ func podMatchesNodeLabels(pod *v1.Pod, node *v1.Node) bool {
 		}
 	}
 
-	// Parse required node affinity scheduling requirements
-	// and check if the current node match the requirements.
-	affinity, err := v1.GetAffinityFromPodAnnotations(pod.Annotations)
-	if err != nil {
-		glog.V(10).Infof("Failed to get Affinity from Pod %+v, err: %+v", podName(pod), err)
-		return false
-	}
-
 	// 1. nil NodeSelector matches all nodes (i.e. does not filter out any nodes)
 	// 2. nil []NodeSelectorTerm (equivalent to non-nil empty NodeSelector) matches no nodes
 	// 3. zero-length non-nil []NodeSelectorTerm matches no nodes also, just for simplicity
@@ -597,6 +589,7 @@ func podMatchesNodeLabels(pod *v1.Pod, node *v1.Node) bool {
 	// 5. zero-length non-nil []NodeSelectorRequirement matches no nodes also, just for simplicity
 	// 6. non-nil empty NodeSelectorRequirement is not allowed
 	nodeAffinityMatches := true
+	affinity := pod.Spec.Affinity
 	if affinity != nil && affinity.NodeAffinity != nil {
 		nodeAffinity := affinity.NodeAffinity
 		// if no required NodeAffinity requirements, will do no-op, means select all nodes.

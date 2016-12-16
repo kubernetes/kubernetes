@@ -130,6 +130,9 @@ func FuzzerFor(t *testing.T, version schema.GroupVersion, src rand.Source) *fuzz
 			if s.SecurityContext == nil {
 				s.SecurityContext = new(api.PodSecurityContext)
 			}
+			if s.Affinity == nil {
+				s.Affinity = new(api.Affinity)
+			}
 		},
 		func(j *api.PodPhase, c fuzz.Continue) {
 			statuses := []api.PodPhase{api.PodPending, api.PodRunning, api.PodFailed, api.PodUnknown}

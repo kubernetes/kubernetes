@@ -314,17 +314,22 @@ func testNoWrappedVolumeRace(f *framework.Framework, volumes []v1.Volume, volume
 	targetNode := nodeList.Items[0]
 
 	By("Creating RC which spawns configmap-volume pods")
-	affinity := map[string]string{
-		v1.AffinityAnnotationKey: fmt.Sprintf(`
-				{"nodeAffinity": { "requiredDuringSchedulingIgnoredDuringExecution": {
-					"nodeSelectorTerms": [{
-						"matchExpressions": [{
-							"key": "kubernetes.io/hostname",
-							"operator": "In",
-							"values": ["%s"]
-					}]
-				}]
-			}}}`, targetNode.Name),
+	affinity := &v1.Affinity{
+		NodeAffinity: &v1.NodeAffinity{
+			RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+				NodeSelectorTerms: []v1.NodeSelectorTerm{
+					{
+						MatchExpressions: []v1.NodeSelectorRequirement{
+							{
+								Key:      "kubernetes.io/hostname",
+								Operator: v1.NodeSelectorOpIn,
+								Values:   []string{targetNode.Name},
+							},
+						},
+					},
+				},
+			},
+		},
 	}
 
 	rc := &v1.ReplicationController{
@@ -338,8 +343,7 @@ func testNoWrappedVolumeRace(f *framework.Framework, volumes []v1.Volume, volume
 			},
 			Template: &v1.PodTemplateSpec{
 				ObjectMeta: v1.ObjectMeta{
-					Annotations: affinity,
-					Labels:      map[string]string{"name": rcName},
+					Labels: map[string]string{"name": rcName},
 				},
 				Spec: v1.PodSpec{
 					Containers: []v1.Container{
@@ -355,6 +359,7 @@ func testNoWrappedVolumeRace(f *framework.Framework, volumes []v1.Volume, volume
 							VolumeMounts: volumeMounts,
 						},
 					},
+					Affinity:  affinity,
 					DNSPolicy: v1.DNSDefault,
 					Volumes:   volumes,
 				},

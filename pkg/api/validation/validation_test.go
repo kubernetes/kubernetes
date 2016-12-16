@@ -3482,50 +3482,60 @@ func TestValidatePod(t *testing.T) {
 				NodeName: "foobar",
 			},
 		},
-		{ // Serialized affinity requirements in annotations.
+		{ // Serialized node affinity requirements.
 			ObjectMeta: api.ObjectMeta{
 				Name:      "123",
 				Namespace: "ns",
-				// TODO: Uncomment and move this block into Annotations map once
-				// RequiredDuringSchedulingRequiredDuringExecution is implemented
-				//		"requiredDuringSchedulingRequiredDuringExecution": {
-				//			"nodeSelectorTerms": [{
-				//				"matchExpressions": [{
-				//					"key": "key1",
-				//					"operator": "Exists"
-				//				}]
-				//			}]
-				//		},
-				Annotations: map[string]string{
-					api.AffinityAnnotationKey: `
-					{"nodeAffinity": {
-						"requiredDuringSchedulingIgnoredDuringExecution": {
-							"nodeSelectorTerms": [{
-								"matchExpressions": [{
-									"key": "key2",
-									"operator": "In",
-									"values": ["value1", "value2"]
-								}]
-							}]
-						},
-						"preferredDuringSchedulingIgnoredDuringExecution": [
-							{
-								"weight": 10,
-								"preference": {"matchExpressions": [
-									{
-										"key": "foo",
-										"operator": "In", "values": ["bar"]
-									}
-								]}
-							}
-						]
-					}}`,
-				},
 			},
 			Spec: api.PodSpec{
 				Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
 				RestartPolicy: api.RestartPolicyAlways,
 				DNSPolicy:     api.DNSClusterFirst,
+				// TODO: Uncomment and move this block and move inside NodeAffinity once
+				// RequiredDuringSchedulingRequiredDuringExecution is implemented
+				//		RequiredDuringSchedulingRequiredDuringExecution: &api.NodeSelector{
+				//			NodeSelectorTerms: []api.NodeSelectorTerm{
+				//				{
+				//					MatchExpressions: []api.NodeSelectorRequirement{
+				//						{
+				//							Key: "key1",
+				//							Operator: api.NodeSelectorOpExists
+				//						},
+				//					},
+				//				},
+				//			},
+				//		},
+				Affinity: &api.Affinity{
+					NodeAffinity: &api.NodeAffinity{
+						RequiredDuringSchedulingIgnoredDuringExecution: &api.NodeSelector{
+							NodeSelectorTerms: []api.NodeSelectorTerm{
+								{
+									MatchExpressions: []api.NodeSelectorRequirement{
+										{
+											Key:      "key2",
+											Operator: api.NodeSelectorOpIn,
+											Values:   []string{"value1", "value2"},
+										},
+									},
+								},
+							},
+						},
+						PreferredDuringSchedulingIgnoredDuringExecution: []api.PreferredSchedulingTerm{
+							{
+								Weight: 10,
+								Preference: api.NodeSelectorTerm{
+									MatchExpressions: []api.NodeSelectorRequirement{
+										{
+											Key:      "foo",
+											Operator: api.NodeSelectorOpIn,
+											Values:   []string{"bar"},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
 			},
 		},
 		{ // Serialized pod affinity in affinity requirements in annotations.
@@ -3863,90 +3873,101 @@ func TestValidatePod(t *testing.T) {
 				Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
 			},
 		},
-		"invalid json of node affinity in pod annotations": {
+		"invalid node selector requirement in node affinity, operator can't be null": {
 			ObjectMeta: api.ObjectMeta{
 				Name:      "123",
 				Namespace: "ns",
-				Annotations: map[string]string{
-					api.AffinityAnnotationKey: `
-					{"nodeAffinity": {
-						"requiredDuringSchedulingIgnoredDuringExecution": {
-							"nodeSelectorTerms": [{
-					`,
-				},
 			},
-			Spec: validPodSpec,
-		},
-		"invalid node selector requirement in node affinity in pod annotations, operator can't be null": {
-			ObjectMeta: api.ObjectMeta{
-				Name:      "123",
-				Namespace: "ns",
-				Annotations: map[string]string{
-					api.AffinityAnnotationKey: `
-					{"nodeAffinity": {"requiredDuringSchedulingIgnoredDuringExecution": {
-						"nodeSelectorTerms": [{
-							"matchExpressions": [{
-								"key": "key1",
-							}]
-						}]
-					}}}`,
-				},
-			},
-			Spec: validPodSpec,
-		},
-		"invalid preferredSchedulingTerm in node affinity in pod annotations, weight should be in range 1-100": {
-			ObjectMeta: api.ObjectMeta{
-				Name:      "123",
-				Namespace: "ns",
-				Annotations: map[string]string{
-					api.AffinityAnnotationKey: `
-					{"nodeAffinity": {"preferredDuringSchedulingIgnoredDuringExecution": [
-						{
-							"weight": 199,
-							"preference": {"matchExpressions": [
+			Spec: api.PodSpec{
+				Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
+				RestartPolicy: api.RestartPolicyAlways,
+				DNSPolicy:     api.DNSClusterFirst,
+				Affinity: &api.Affinity{
+					NodeAffinity: &api.NodeAffinity{
+						RequiredDuringSchedulingIgnoredDuringExecution: &api.NodeSelector{
+							NodeSelectorTerms: []api.NodeSelectorTerm{
 								{
-									"key": "foo",
-									"operator": "In",
-									"values": ["bar"]
-								}
-							]}
-						}
-					]}}`,
+									MatchExpressions: []api.NodeSelectorRequirement{
+										{
+
+											Key: "key1",
+										},
+									},
+								},
+							},
+						},
+					},
 				},
 			},
-			Spec: validPodSpec,
+		},
+		"invalid preferredSchedulingTerm in node affinity, weight should be in range 1-100": {
+			ObjectMeta: api.ObjectMeta{
+				Name:      "123",
+				Namespace: "ns",
+			},
+			Spec: api.PodSpec{
+				Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
+				RestartPolicy: api.RestartPolicyAlways,
+				DNSPolicy:     api.DNSClusterFirst,
+				Affinity: &api.Affinity{
+					NodeAffinity: &api.NodeAffinity{
+						PreferredDuringSchedulingIgnoredDuringExecution: []api.PreferredSchedulingTerm{
+							{
+								Weight: 199,
+								Preference: api.NodeSelectorTerm{
+									MatchExpressions: []api.NodeSelectorRequirement{
+										{
+											Key:      "foo",
+											Operator: api.NodeSelectorOpIn,
+											Values:   []string{"bar"},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
 		},
 		"invalid requiredDuringSchedulingIgnoredDuringExecution node selector, nodeSelectorTerms must have at least one term": {
 			ObjectMeta: api.ObjectMeta{
 				Name:      "123",
 				Namespace: "ns",
-				Annotations: map[string]string{
-					api.AffinityAnnotationKey: `
-					{"nodeAffinity": {
-						"requiredDuringSchedulingIgnoredDuringExecution": {
-							"nodeSelectorTerms": []
+			},
+			Spec: api.PodSpec{
+				Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
+				RestartPolicy: api.RestartPolicyAlways,
+				DNSPolicy:     api.DNSClusterFirst,
+				Affinity: &api.Affinity{
+					NodeAffinity: &api.NodeAffinity{
+						RequiredDuringSchedulingIgnoredDuringExecution: &api.NodeSelector{
+							NodeSelectorTerms: []api.NodeSelectorTerm{},
 						},
-					}}`,
+					},
 				},
 			},
-			Spec: validPodSpec,
 		},
 		"invalid requiredDuringSchedulingIgnoredDuringExecution node selector term, matchExpressions must have at least one node selector requirement": {
 			ObjectMeta: api.ObjectMeta{
 				Name:      "123",
 				Namespace: "ns",
-				Annotations: map[string]string{
-					api.AffinityAnnotationKey: `
-					{"nodeAffinity": {
-						"requiredDuringSchedulingIgnoredDuringExecution": {
-							"nodeSelectorTerms": [{
-								"matchExpressions": []
-							}]
+			},
+			Spec: api.PodSpec{
+				Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
+				RestartPolicy: api.RestartPolicyAlways,
+				DNSPolicy:     api.DNSClusterFirst,
+				Affinity: &api.Affinity{
+					NodeAffinity: &api.NodeAffinity{
+						RequiredDuringSchedulingIgnoredDuringExecution: &api.NodeSelector{
+							NodeSelectorTerms: []api.NodeSelectorTerm{
+								{
+									MatchExpressions: []api.NodeSelectorRequirement{},
+								},
+							},
 						},
-					}}`,
+					},
 				},
 			},
-			Spec: validPodSpec,
 		},
 		"invalid weight in preferredDuringSchedulingIgnoredDuringExecution in pod affinity annotations, weight should be in range 1-100": {
 			ObjectMeta: api.ObjectMeta{
