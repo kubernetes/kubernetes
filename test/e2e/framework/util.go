@@ -49,6 +49,7 @@ import (
 	. "github.com/onsi/gomega"
 	gomegatypes "github.com/onsi/gomega/types"
 
+	federationapi "k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	"k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset"
 	"k8s.io/kubernetes/pkg/api"
 	apierrs "k8s.io/kubernetes/pkg/api/errors"
@@ -363,7 +364,7 @@ func SkipUnlessServerVersionGTE(v *utilversion.Version, c discovery.ServerVersio
 func SkipUnlessFederated(c clientset.Interface) {
 	federationNS := os.Getenv("FEDERATION_NAMESPACE")
 	if federationNS == "" {
-		federationNS = "federation-system"
+		federationNS = federationapi.FederationNamespaceSystem
 	}
 
 	_, err := c.Core().Namespaces().Get(federationNS, metav1.GetOptions{})
