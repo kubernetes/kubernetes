@@ -3290,6 +3290,40 @@ func WaitForDeploymentRollbackCleared(c clientset.Interface, ns, deploymentName 
 	return nil
 }
 
+// WatchRecreateDeployment watches Recreate deployments and ensures no new pods will run at the same time with
+// old pods.
+func WatchRecreateDeployment(c clientset.Interface, d *extensions.Deployment) error {
+	if d.Spec.Strategy.Type != extensions.RecreateDeploymentStrategyType {
+		return fmt.Errorf("deployment %q does not use a Recreate strategy: %s", d.Name, d.Spec.Strategy.Type)
+	}
+
+	w, err := c.Extensions().Deployments(d.Namespace).Watch(v1.SingleObject(v1.ObjectMeta{Name: d.Name, ResourceVersion: d.ResourceVersion}))
+	if err != nil {
+		return err
+	}
+
+	status := d.Status
+
+	condition := func(event watch.Event) (bool, error) {
+		d := event.Object.(*extensions.Deployment)
+		status = d.Status
+
+		if d.Status.UpdatedReplicas > 0 && d.Status.Replicas != d.Status.UpdatedReplicas {
+			return false, fmt.Errorf("deployment %q is running new pods alongside old pods: %#v", d.Name, status)
+		}
+
+		return *(d.Spec.Replicas) == d.Status.Replicas &&
+			*(d.Spec.Replicas) == d.Status.UpdatedReplicas &&
+			d.Generation <= d.Status.ObservedGeneration, nil
+	}
+
+	_, err = watch.Until(2*time.Minute, w, condition)
+	if err == wait.ErrWaitTimeout {
+		err = fmt.Errorf("deployment %q never completed: %#v", d.Name, status)
+	}
+	return err
+}
+
 // WaitForDeploymentRevisionAndImage waits for the deployment's and its new RS's revision and container image to match the given revision and image.
 // Note that deployment revision and its new RS revision should be updated shortly, so we only wait for 1 minute here to fail early.
 func WaitForDeploymentRevisionAndImage(c clientset.Interface, ns, deploymentName string, revision, image string) error {
