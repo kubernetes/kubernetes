@@ -17,7 +17,9 @@ limitations under the License.
 package e2e
 
 import (
+	"crypto/tls"
 	"fmt"
+	"net"
 	"net/http"
 	"os"
 	"reflect"
@@ -31,7 +33,9 @@ import (
 	"k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	gceprovider "k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
 	"k8s.io/kubernetes/pkg/util/intstr"
+	"k8s.io/kubernetes/pkg/util/net/sets"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
 
@@ -41,10 +45,72 @@ import (
 
 const (
 	MaxRetriesOnFederatedApiserver = 3
-	FederatedIngressTimeout        = 120 * time.Second
+	FederatedIngressTimeout        = 10 * time.Minute
 	FederatedIngressName           = "federated-ingress"
 	FederatedIngressServiceName    = "federated-ingress-service"
+	FederatedIngressTLSSecretName  = "federated-ingress-tls-secret"
 	FederatedIngressServicePodName = "federated-ingress-service-test-pod"
+	FederatedIngressFirewallPrefix = "f8n-ing-fw-e2e"
+	FederatedIngressFirewallDesc   = "Federated Ingress e2e GCE L7 firewall rule"
+	FederatedIngressHost           = "test-f8n.k8s.io."
+
+	// The source subnet range from which GCE L7 load balancer sends
+	// its health check requests. See
+	// https://cloud.google.com/compute/docs/load-balancing/http/
+	// for details.
+	FederatedIngressGCLBSrcRange = "130.211.0.0/22"
+
+	// TLS Certificate and Key for the ingress resource
+	FederatedIngressTLSCrt = `-----BEGIN CERTIFICATE-----
+MIIDaTCCAlGgAwIBAgIJANwsCbwxm9pyMA0GCSqGSIb3DQEBCwUAMEoxCzAJBgNV
+BAYTAlVTMRMwEQYDVQQIDApTb21lLVN0YXRlMQswCQYDVQQKDAJOQTEZMBcGA1UE
+AwwQdGVzdC1mOG4uazhzLmlvLjAgFw0xNjEyMTYwNjA1NDRaGA8yMDg1MDEwMzA2
+MDU0NFowSjELMAkGA1UEBhMCVVMxEzARBgNVBAgMClNvbWUtU3RhdGUxCzAJBgNV
+BAoMAk5BMRkwFwYDVQQDDBB0ZXN0LWY4bi5rOHMuaW8uMIIBIjANBgkqhkiG9w0B
+AQEFAAOCAQ8AMIIBCgKCAQEAmsHYnLhqSeO1Q6SEjaiPiLUQV8tyGfttwNQiOT5u
+ULz6ZWYA40m/1hhla9KH9sJZ515Iq+jTtiVH0rUjryT96SjxitLCAZlxVwQ63B50
+aZF2T2OPSzvrmN+J6VGcRIq0N8fUeyp2WTIEdWlpQ7DTmDNArQqFSIvJndkLow3d
+hec7O+PErnvZQQC9zqa23rGndDzlgDJ4HJGAQNm3uYVh5WHv+wziP67T/82bEGgO
+A6EdDPWzpYxzAA1wsqz9lX5jitlbKdI56698fPR2KRelySf7OXVvZCS4/ED1lF4k
+b7fQgtBhAWe1BkuAMUl7vdRjMps7nkxmBSuxBkVQ7sb5AwIDAQABo1AwTjAdBgNV
+HQ4EFgQUjf53O/W/iE2mxuJkNjZGUfjJ9RUwHwYDVR0jBBgwFoAUjf53O/W/iE2m
+xuJkNjZGUfjJ9RUwDAYDVR0TBAUwAwEB/zANBgkqhkiG9w0BAQsFAAOCAQEABE7B
+bAiORDBA3qE5lh6JCs/lEfz93E/gOhD9oDnm9SRND4kjy7qeGxk4Wzsd/Vr+R2mi
+EZ40d4MA/mCCPnYsNQoEXMFc8IvwAbzkhh2gqTNgG0/Ks0A1mIPQNpvUcSetS4IV
+732DvB3nSnFtlzf6afw+V1Vf5ydRNuM/c9GEOOHSz+rs+9M364d+wNaFD64M72ol
+iDMAdtcrhOqkQi0lUING904jlJcyYM5oVNCCtme4F8nkIX9bxP/9Ea6VhDGPeJiX
+tVwZuudkoEbrFlEYbyLrbVeVa9oTf4Jn66iz49/+th+bUtEoTt9gk9Cul5TFgfzx
+EscdahceC7afheq6zg==
+-----END CERTIFICATE-----`
+
+	FederatedIngressTLSKey = `-----BEGIN PRIVATE KEY-----
+MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQCawdicuGpJ47VD
+pISNqI+ItRBXy3IZ+23A1CI5Pm5QvPplZgDjSb/WGGVr0of2wlnnXkir6NO2JUfS
+tSOvJP3pKPGK0sIBmXFXBDrcHnRpkXZPY49LO+uY34npUZxEirQ3x9R7KnZZMgR1
+aWlDsNOYM0CtCoVIi8md2QujDd2F5zs748Sue9lBAL3Oprbesad0POWAMngckYBA
+2be5hWHlYe/7DOI/rtP/zZsQaA4DoR0M9bOljHMADXCyrP2VfmOK2Vsp0jnrr3x8
+9HYpF6XJJ/s5dW9kJLj8QPWUXiRvt9CC0GEBZ7UGS4AxSXu91GMymzueTGYFK7EG
+RVDuxvkDAgMBAAECggEAYrXGPqB6W0r88XpceibL9rzXAcjorJ3s8ZPdiHnDz4fa
+hxa69j6yOBMzjcSpqMFqquM+ozhM4d+BomqbqjmEI1ZUSuIHkRGYc5JlIMXkJvn7
+ZsPwQGKl8cqTotjFPgrizLmPVEhPWLFImsNzuxNsw6XdWQJe5VkUbrRkccqEQ8Wt
+xwq/SlRercIMnRVLOOESq8EyjOY4yDgOdIifq9K9xiI8W6nMiPs0X5AcIJoTMbCe
+cX0zUqW317awDWWP8u2GswwDDm4qPeWnXOrDkDx8Eo0dWJbmxw9su0XrM6KMvEMe
+2a/Fy/enr5Cc6/jgsh3gO5sa8dJ1Cu+wexcoEbez8QKBgQDMXlXJu/C7djke94s3
+vGxati7AGO95bBQHW+cPuN4l0rfPZ8YuUAWD4csW4BOlUPAOukreD/SKdanigR3N
+FqVPeI8rXd5kzy8/lPIOGuSkkVEpKsAJ7prFbSUVKjVPYQk2dsOEeR0r7pr2FxC9
+SBhVS/LgmPYh++iny9D0aU23hQKBgQDB2t55OE+00vgoauUc10LEY+J6tiwXuNm7
+43JtrH5ET4N+TJ2BOUl5f88TY/3QuTu6vYwlxjyn+LFuWQNhShX6lFMjt5zqPTdw
+ZPDA+9B6a45cV3YjXjRsYidpWj0D2lJgy0DbucC4f3eIhNGyFUbAQB9npKDzOeUh
+7Z+p/Grg5wKBgGUnVCLzySWgUImJUPkXZDJJ9j3SmcVpv0gdLvLTN/FUqPIZlTgb
+F3+9ZL4/zrmGpCtF/gSHtSxLLPkVm2CFkvEQ5Rw76/XNrr8zw9NDcGQcISXVKRRB
+a43IhhBBwf02NE8m3YNWRyAVi9G+fOSTKKgfXWnZjAoqG2/iK9ytum/ZAoGAYlP8
+KIxxkYy5Jvchg4GEck0f4ZJpxxaSCoWR0yN9YHTcg8Gk2pkONbyocnNzmN17+HqQ
+jdCBj8nLZedsmXqUr2dwzFskEoQ+jJoGrDyOQKoxqZELcWElQhx/VSbacAvbYRF3
+snwDzxGItgx4uNWl73oW8+FDalvhZ1Y6eGR6ad0CgYEAtlNa92Fbvd3r9O2mdyWe
+D2SXNMi45+wsNafX2sdkyb+qNN6qZXC9ylUl9h0zdky88JNgtAOgxIaRIdEZajnD
+/Zq17sTNtgpm53x16gOAgD8M+/wmBZxA+/IKfFCubuV77MbQoPfcjT5wBMRnFQnY
+Ks7c+dzaRlgDKZ6v/L/8iZU=
+-----END PRIVATE KEY-----`
 )
 
 var _ = framework.KubeDescribe("Federated ingresses [Feature:Federation]", func() {
@@ -63,7 +129,7 @@ var _ = framework.KubeDescribe("Federated ingresses [Feature:Federation]", func(
 			framework.SkipUnlessFederated(f.ClientSet)
 			framework.SkipUnlessProviderIs("gce", "gke") // TODO: Federated ingress is not yet supported on non-GCP platforms.
 			nsName := f.FederationNamespace.Name
-			ingress := createIngressOrFail(f.FederationClientset_1_5, nsName)
+			ingress := createIngressOrFail(f.FederationClientset_1_5, nsName, FederatedIngressServiceName, FederatedIngressTLSSecretName)
 			By(fmt.Sprintf("Creation of ingress %q in namespace %q succeeded.  Deleting ingress.", ingress.Name, nsName))
 			// Cleanup
 			err := f.FederationClientset_1_5.Extensions().Ingresses(nsName).Delete(ingress.Name, &v1.DeleteOptions{})
@@ -101,7 +167,7 @@ var _ = framework.KubeDescribe("Federated ingresses [Feature:Federation]", func(
 		})
 
 		It("should create and update matching ingresses in underlying clusters", func() {
-			ingress := createIngressOrFail(f.FederationClientset_1_5, ns)
+			ingress := createIngressOrFail(f.FederationClientset_1_5, ns, FederatedIngressServiceName, FederatedIngressTLSSecretName)
 			// wait for ingress shards being created
 			waitForIngressShardsOrFail(ns, ingress, clusters)
 			ingress = updateIngressOrFail(f.FederationClientset_1_5, ns)
@@ -135,18 +201,40 @@ var _ = framework.KubeDescribe("Federated ingresses [Feature:Federation]", func(
 
 			var (
 				service *v1.Service
+				secret  *v1.Secret
+				fwNames map[string]string
 			)
 
 			BeforeEach(func() {
 				framework.SkipUnlessFederated(f.ClientSet)
+
+				// This test as it is written now, is only applicable for
+				// GCE/GKE. See the comment for
+				// createFederatedIngressFirewallRulesOrFail() function below.
+				// TODO: This skipping might not be necessary when we remove
+				// the create firewall rule call below.
+				framework.SkipUnlessProviderIs("gce", "gke")
+
 				// create backend pod
 				createBackendPodsOrFail(clusters, ns, FederatedIngressServicePodName)
 				// create backend service
 				service = createServiceOrFail(f.FederationClientset_1_5, ns, FederatedIngressServiceName)
+				secret = createTLSSecretOrFail(f.FederationClientset_1_5, ns, FederatedIngressTLSSecretName)
+
 				// create ingress object
-				jig.ing = createIngressOrFail(f.FederationClientset_1_5, ns)
+				jig.ing = createIngressOrFail(f.FederationClientset_1_5, ns, service.Name, FederatedIngressTLSSecretName)
+				// Manually create a firewall rule for the backend pods as
+				// a temporary workaround. See
+				// https://github.com/kubernetes/kubernetes/issues/36327#issuecomment-262354506
+				// for details.
+				// TODO(madhusudancs): Remove this once
+				// https://github.com/kubernetes/kubernetes/issues/37306
+				// is implemented.
+				fwNames = createFederatedIngressFirewallRulesOrFail(ns, jig.ing.Name, clusters, service)
 				// wait for services objects sync
 				waitForServiceShardsOrFail(ns, service, clusters)
+				// wait for secrets objects to sync
+				waitForSecretShardsOrFail(ns, secret, clusters)
 				// wait for ingress objects sync
 				waitForIngressShardsOrFail(ns, jig.ing, clusters)
 			})
@@ -169,6 +257,14 @@ var _ = framework.KubeDescribe("Federated ingresses [Feature:Federation]", func(
 				} else {
 					By("No ingress to delete. Ingress is nil")
 				}
+				if secret != nil {
+					orphanDependents := false
+					deleteSecretOrFail(f.FederationClientset_1_5, ns, secret.Name, &orphanDependents)
+					secret = nil
+				} else {
+					By("No secret to delete. Secret is nil")
+				}
+				deleteFederatedIngressFirewallRulesOrFail(fwNames)
 			})
 
 			PIt("should be able to discover a federated ingress service via DNS", func() {
@@ -214,7 +310,7 @@ func equivalentIngress(federatedIngress, clusterIngress v1beta1.Ingress) bool {
 // underlying clusters when orphan dependents is false and they are not deleted
 // when orphan dependents is true.
 func verifyCascadingDeletionForIngress(clientset *fedclientset.Clientset, clusters map[string]*cluster, orphanDependents *bool, nsName string) {
-	ingress := createIngressOrFail(clientset, nsName)
+	ingress := createIngressOrFail(clientset, nsName, FederatedIngressServiceName, FederatedIngressTLSSecretName)
 	ingressName := ingress.Name
 	// Check subclusters if the ingress was created there.
 	By(fmt.Sprintf("Waiting for ingress %s to be created in all underlying clusters", ingressName))
@@ -250,7 +346,7 @@ func waitForIngressOrFail(clientset *kubeclientset.Clientset, namespace string, 
 	err := wait.PollImmediate(framework.Poll, timeout, func() (bool, error) {
 		clusterIngress, err := clientset.Ingresses(namespace).Get(ingress.Name, metav1.GetOptions{})
 		if (!present) && errors.IsNotFound(err) { // We want it gone, and it's gone.
-			By(fmt.Sprintf("Success: shard of federated ingress %q in namespace %q in cluster is absent", ingress.Name, namespace))
+			framework.Logf("shard of federated ingress %q in namespace %q in cluster is absent", ingress.Name, namespace)
 			return true, nil // Success
 		}
 		if present && err == nil { // We want it present, and the Get succeeded, so we're all good.
@@ -347,7 +443,7 @@ func deleteClusterIngressOrFail(clusterName string, clientset *kubeclientset.Cli
 	framework.ExpectNoError(err, "Error deleting cluster ingress %q/%q from cluster %q", namespace, ingressName, clusterName)
 }
 
-func createIngressOrFail(clientset *fedclientset.Clientset, namespace string) *v1beta1.Ingress {
+func createIngressOrFail(clientset *fedclientset.Clientset, namespace, serviceName, secretName string) *v1beta1.Ingress {
 	if clientset == nil || len(namespace) == 0 {
 		Fail(fmt.Sprintf("Internal error: invalid parameters passed to createIngressOrFail: clientset: %v, namespace: %v", clientset, namespace))
 	}
@@ -359,8 +455,13 @@ func createIngressOrFail(clientset *fedclientset.Clientset, namespace string) *v
 		},
 		Spec: v1beta1.IngressSpec{
 			Backend: &v1beta1.IngressBackend{
-				ServiceName: "testingress-service",
+				ServiceName: serviceName,
 				ServicePort: intstr.FromInt(80),
+			},
+			TLS: []v1beta1.IngressTLS{
+				{
+					SecretName: secretName,
+				},
 			},
 		},
 	}
@@ -414,17 +515,57 @@ func (j *federationTestJig) waitForFederatedIngress() {
 	}
 	j.address = address
 	framework.Logf("Found address %v for ingress %v", j.address, j.ing.Name)
-	timeoutClient := &http.Client{Timeout: reqTimeout}
 
-	// Check that all rules respond to a simple GET.
-	for _, rules := range j.ing.Spec.Rules {
-		proto := "http"
-		for _, p := range rules.IngressRuleValue.HTTP.Paths {
-			route := fmt.Sprintf("%v://%v%v", proto, address, p.Path)
-			framework.Logf("Testing route %v host %v with simple GET", route, rules.Host)
-			framework.ExpectNoError(pollURL(route, rules.Host, lbPollTimeout, lbPollInterval, timeoutClient, false))
-		}
+	client := &http.Client{
+		// This is mostly `http.DefaultTransport` except for the
+		// `TLSClientConfig`. `http.DefaultTransport` cannot be
+		// shallow copied due to the unexported `sync.Mutex` in
+		// the struct.
+		Transport: &http.Transport{
+			Proxy: http.ProxyFromEnvironment,
+			DialContext: (&net.Dialer{
+				Timeout:   30 * time.Second,
+				KeepAlive: 30 * time.Second,
+				DualStack: true,
+			}).DialContext,
+			MaxIdleConns:          100,
+			IdleConnTimeout:       90 * time.Second,
+			TLSHandshakeTimeout:   10 * time.Second,
+			ExpectContinueTimeout: 1 * time.Second,
+			TLSClientConfig: &tls.Config{
+				InsecureSkipVerify: true,
+			},
+		},
+		Timeout: reqTimeout,
 	}
+
+	// Verify that simple GET works.
+	route := fmt.Sprintf("https://%v", address)
+	framework.Logf("Testing route %v with simple GET", route)
+	framework.ExpectNoError(pollURL(route, FederatedIngressHost, lbPollTimeout, lbPollInterval, client, false))
+}
+
+func createTLSSecretOrFail(clientset *fedclientset.Clientset, namespace, secretName string) *v1.Secret {
+	if clientset == nil || len(namespace) == 0 {
+		Fail(fmt.Sprintf("Internal error: invalid parameters passed to createTLSSecretOrFail: clientset: %v, namespace: %v", clientset, namespace))
+	}
+	By(fmt.Sprintf("Creating federated secret %q in namespace %q", secretName, namespace))
+
+	secret := &v1.Secret{
+		ObjectMeta: v1.ObjectMeta{
+			Name: secretName,
+		},
+		Type: v1.SecretTypeOpaque,
+		Data: map[string][]byte{
+			"tls.crt": []byte(FederatedIngressTLSCrt),
+			"tls.key": []byte(FederatedIngressTLSKey),
+		},
+	}
+
+	By(fmt.Sprintf("Creating federated secret %q in namespace %q", secretName, namespace))
+	newSecret, err := clientset.Core().Secrets(namespace).Create(secret)
+	framework.ExpectNoError(err, "creating secret %q in namespace %q", secret.Name, namespace)
+	return newSecret
 }
 
 type federationTestJig struct {
@@ -483,4 +624,128 @@ func getFederatedIngressAddress(client *fedclientset.Clientset, ns, name string)
 		}
 	}
 	return addresses, nil
+}
+
+// getNodeNames returns the names of nodes in a cluster.
+func getZoneNodesMap(clientset *kubeclientset.Clientset) (map[string][]string, error) {
+	zoneNodes := make(map[string][]string)
+	nodes, err := clientset.Core().Nodes().List(v1.ListOptions{})
+	if err != nil {
+		return nil, err
+	}
+	// Only consider schedulable nodes, because we won't
+	// have backends in non-schedulable nodes and don't
+	// want to open port to those nodes.
+	// Also, master node is unschedulable and contains
+	// a different tag than all other nodes, so there
+	// is no point in considering that.
+	for _, n := range nodes.Items {
+		if n.Spec.Unschedulable {
+			continue
+		}
+		zone, ok := n.Labels[metav1.LabelZoneFailureDomain]
+		if !ok {
+			framework.Logf("skipping node %q from ZoneNode map because no zone label was found", n.Name)
+			continue
+		}
+		nodes, ok := zoneNodes[zone]
+		if !ok {
+			nodes = make([]string, 0)
+		}
+		nodes = append(nodes, n.Name)
+		zoneNodes[zone] = nodes
+	}
+	return zoneNodes, nil
+}
+
+func updateMap(merged, src map[string][]string) {
+	for zone, nodes := range src {
+		mNodes, ok := merged[zone]
+		if !ok {
+			mNodes = make([]string, 0)
+		}
+		mNodes = append(mNodes, nodes...)
+		merged[zone] = mNodes
+	}
+}
+
+// createFederatedIngressFirewallRule creates a firewall rule for the
+// federated ingress allowing traffic to the service shards in all the
+// underlying clusters.
+// TODO(madhusudancs): Remove this once
+// https://github.com/kubernetes/kubernetes/issues/37306
+// is implemented.
+func createFederatedIngressFirewallRules(ns, ingressName string, clusters map[string]*cluster, svc *v1.Service) (map[string]string, error) {
+	mergedZoneNodes := make(map[string][]string)
+	for clusterName, cluster := range clusters {
+		zoneNodes, err := getZoneNodesMap(cluster.Clientset)
+		if err != nil {
+			return nil, err
+		}
+		framework.Logf("nodes to zones map for cluster %q: %#v", clusterName, mergedZoneNodes)
+		updateMap(mergedZoneNodes, zoneNodes)
+	}
+	framework.Logf("merged nodes to zones map: %#v", mergedZoneNodes)
+
+	if len(svc.Spec.Ports) < 1 {
+		return nil, fmt.Errorf("no NodePort specified for the service %q", svc.Name)
+	}
+	nodeport := int64(svc.Spec.Ports[0].NodePort)
+
+	gclbSubnet, err := sets.ParseIPNets(FederatedIngressGCLBSrcRange)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't parse the GCLB source subnet range %q: %v", FederatedIngressGCLBSrcRange, err)
+	}
+
+	fwNames := make(map[string]string)
+	for zone, nodes := range mergedZoneNodes {
+		fwName := fmt.Sprintf("%s-%s", FederatedIngressFirewallPrefix, zone)
+		By(fmt.Sprintf("Creating firewall rule %q for zone %q: src subnet: %s, nodePort: %d, nodeNames: %#v", fwName, zone, FederatedIngressGCLBSrcRange, nodeport, nodes))
+		provider, ok := framework.TestContext.CloudConfig.FederationProviders[zone]
+		if !ok {
+			return fwNames, fmt.Errorf("no cloud provider for zone %q", zone)
+		}
+		gce := provider.(*gceprovider.GCECloud)
+		err := gce.CreateFirewall(fwName, FederatedIngressFirewallDesc, gclbSubnet, []int64{nodeport}, nodes)
+		if err != nil {
+			return fwNames, err
+		}
+		fwNames[zone] = fwName
+	}
+	return fwNames, nil
+}
+
+func createFederatedIngressFirewallRulesOrFail(ns, ingressName string, clusters map[string]*cluster, svc *v1.Service) map[string]string {
+	fwNames, err := createFederatedIngressFirewallRules(ns, ingressName, clusters, svc)
+	Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("Error creating firewall rule for Ingress %q in %q", ingressName, ns))
+	return fwNames
+}
+
+func deleteFederatedIngressFirewallRules(fwNames map[string]string) error {
+	var errs []string
+	for zone, fwName := range fwNames {
+		By(fmt.Sprintf("Deleting firewall rule %q", fwName))
+		provider, ok := framework.TestContext.CloudConfig.FederationProviders[zone]
+		if !ok {
+			return fmt.Errorf("no cloud provider for zone %q", zone)
+		}
+		gce, ok := provider.(*gceprovider.GCECloud)
+		if !ok {
+			return fmt.Errorf("want GCE cloud provider, got: %T", provider)
+		}
+		err := gce.DeleteFirewall(fwName)
+		// Collect the error and continue
+		if err != nil {
+			errs = append(errs, err.Error())
+		}
+	}
+	if len(errs) > 0 {
+		return fmt.Errorf(strings.Join(errs, ", "))
+	}
+	return nil
+}
+
+func deleteFederatedIngressFirewallRulesOrFail(fwNames map[string]string) {
+	err := deleteFederatedIngressFirewallRules(fwNames)
+	Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("Error deleting firewall rules %q: %v", fwNames, err))
 }

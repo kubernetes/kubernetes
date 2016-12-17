@@ -221,6 +221,7 @@ feature-gates
 federated-api-burst
 federated-api-qps
 federated-kube-context
+federation-gce-zones
 federation-name
 federation-system-namespace
 file-check-frequency

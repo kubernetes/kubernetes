@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -34,6 +35,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	"k8s.io/kubernetes/pkg/cloudprovider"
 	gcecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/logs"
@@ -64,19 +66,37 @@ func setupProviderConfig() error {
 		glog.Info("The --provider flag is not set.  Treating as a conformance test.  Some tests may not be run.")
 
 	case "gce", "gke":
-		var err error
+		cloudConfig := framework.TestContext.CloudConfig
+		networkURL := fmt.Sprintf("https://www.googleapis.com/compute/v1/projects/%s/global/networks/%s", cloudConfig.ProjectID, cloudConfig.Network)
+
 		framework.Logf("Fetching cloud provider for %q\r\n", framework.TestContext.Provider)
-		zone := framework.TestContext.CloudConfig.Zone
+		zone := cloudConfig.Zone
+
+		var err error
 		region, err := gcecloud.GetGCERegion(zone)
 		if err != nil {
 			return fmt.Errorf("error parsing GCE/GKE region from zone %q: %v", zone, err)
 		}
 		managedZones := []string{zone} // Only single-zone for now
-		cloudConfig.Provider, err = gcecloud.CreateGCECloud(framework.TestContext.CloudConfig.ProjectID, region, zone, managedZones, "" /* networkUrl */, nil /* nodeTags */, "" /* nodeInstancePerfix */, nil /* tokenSource */, false /* useMetadataServer */)
+		cloudConfig.Provider, err = gcecloud.CreateGCECloud(cloudConfig.ProjectID, region, zone, managedZones, networkURL, nil /* nodeTags */, "" /* nodeInstancePerfix */, nil /* tokenSource */, false /* useMetadataServer */)
 		if err != nil {
 			return fmt.Errorf("Error building GCE/GKE provider: %v", err)
 		}
 
+		// TODO(madhusudancs): Remove this once
+		// https://github.com/kubernetes/kubernetes/issues/37306 is fixed.
+		if fzones := framework.TestContext.CloudConfig.FederationZones; fzones != "" {
+			framework.TestContext.CloudConfig.FederationProviders = make(map[string]cloudprovider.Interface)
+			for _, zone := range strings.Fields(fzones) {
+				managedZones := []string{zone}
+				provider, err := gcecloud.CreateGCECloud(framework.TestContext.CloudConfig.ProjectID, region, zone, managedZones, networkURL, nil /* nodeTags */, "" /* nodeInstancePerfix */, nil /* tokenSource */, false /* useMetadataServer */)
+				if err != nil {
+					return fmt.Errorf("Error building GCE/GKE provider for zone %q: %v", zone, err)
+				}
+				framework.Logf("Instantiated cloud provider %q, for zone %q", framework.TestContext.Provider, zone)
+				framework.TestContext.CloudConfig.FederationProviders[zone] = provider
+			}
+		}
 	case "aws":
 		if cloudConfig.Zone == "" {
 			return fmt.Errorf("gce-zone must be specified for AWS")

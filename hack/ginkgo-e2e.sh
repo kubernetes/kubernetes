@@ -129,6 +129,7 @@ export PATH=$(dirname "${e2e_test}"):"${PATH}"
   --prefix="${KUBE_GCE_INSTANCE_PREFIX:-e2e}" \
   --network="${KUBE_GCE_NETWORK:-${KUBE_GKE_NETWORK:-e2e}}" \
   --federated-kube-context="${FEDERATION_KUBE_CONTEXT:-e2e-federation}" \
+  --federation-gce-zones="${E2E_ZONES:-us-central1-a us-central1-b us-central1-f}" \
   ${KUBE_CONTAINER_RUNTIME:+"--container-runtime=${KUBE_CONTAINER_RUNTIME}"} \
   ${MASTER_OS_DISTRIBUTION:+"--master-os-distro=${MASTER_OS_DISTRIBUTION}"} \
   ${NODE_OS_DISTRIBUTION:+"--node-os-distro=${NODE_OS_DISTRIBUTION}"} \

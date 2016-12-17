@@ -126,6 +126,12 @@ type CloudConfig struct {
 	Network           string
 
 	Provider cloudprovider.Interface
+
+	// TODO(madhusudancs): Remove this once
+	// https://github.com/kubernetes/kubernetes/issues/37306 is fixed.
+	FederationZones string
+	// Map of zone name to the corresponding provider interface.
+	FederationProviders map[string]cloudprovider.Interface
 }
 
 var TestContext TestContextType
@@ -197,6 +203,13 @@ func RegisterClusterFlags() {
 	flag.BoolVar(&TestContext.GarbageCollectorEnabled, "garbage-collector-enabled", true, "Set to true if the garbage collector is enabled in the kube-apiserver and kube-controller-manager, then some tests will rely on the garbage collector to delete dependent resources.")
 }
 
+func RegisterFederationFlags() {
+	// TODO(madhusudancs): This is a temporary workaround for Federated
+	// Ingress. Remove this once
+	// https://github.com/kubernetes/kubernetes/issues/37306 is fixed.
+	flag.StringVar(&TestContext.CloudConfig.FederationZones, "federation-gce-zones", "", "Comma separated list of GCE zones being used by clusters in federation, if applicable")
+}
+
 // Register flags specific to the node e2e test suite.
 func RegisterNodeFlags() {
 	// Mark the test as node e2e when node flags are registered.
@@ -230,6 +243,7 @@ func ViperizeFlags() {
 	// since go test 'flag's are sort of incompatible w/ flag, glog, etc.
 	RegisterCommonFlags()
 	RegisterClusterFlags()
+	RegisterFederationFlags()
 	flag.Parse()
 
 	// Part 2: Set Viper provided flags.
