@@ -163,7 +163,7 @@ function kube::build::verify_prereqs() {
     if kube::build::is_osx; then
         kube::build::docker_available_on_osx || return 1
     fi
-    kube::build::ensure_docker_daemon_connectivity || return 1
+    kube::util::ensure_docker_daemon_connectivity || return 1
 
     if (( ${KUBE_VERBOSE} > 6 )); then
       kube::log::status "Docker Version:"
@@ -268,29 +268,6 @@ function kube::build::ensure_docker_in_path() {
   if [[ -z "$(which docker)" ]]; then
     kube::log::error "Can't find 'docker' in PATH, please fix and retry."
     kube::log::error "See https://docs.docker.com/installation/#installation for installation instructions."
-    return 1
-  fi
-}
-
-function kube::build::ensure_docker_daemon_connectivity {
-  if ! "${DOCKER[@]}" info > /dev/null 2>&1 ; then
-    cat <<'EOF' >&2
-Can't connect to 'docker' daemon.  please fix and retry.
-
-Possible causes:
-  - Docker Daemon not started
-    - Linux: confirm via your init system
-    - macOS w/ docker-machine: run `docker-machine ls` and `docker-machine start <name>`
-    - macOS w/ Docker for Mac: Check the menu bar and start the Docker application
-  - DOCKER_HOST hasn't been set or is set incorrectly
-    - Linux: domain socket is used, DOCKER_* should be unset. In Bash run `unset ${!DOCKER_*}`
-    - macOS w/ docker-machine: run `eval "$(docker-machine env <name>)"`
-    - macOS w/ Docker for Mac: domain socket is used, DOCKER_* should be unset. In Bash run `unset ${!DOCKER_*}`
-  - Other things to check:
-    - Linux: User isn't in 'docker' group.  Add and relogin.
-      - Something like 'sudo usermod -a -G docker ${USER}'
-      - RHEL7 bug and workaround: https://bugzilla.redhat.com/show_bug.cgi?id=1119282#c8
-EOF
     return 1
   fi
 }
