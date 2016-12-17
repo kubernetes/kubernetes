@@ -74,15 +74,6 @@ function dirty_sha() {
   GIT_ALTERNATE_OBJECT_DIRECTORIES="${objects_dir}" GIT_OBJECT_DIRECTORY="${tmp_objects_dir}" GIT_INDEX_FILE="${tmp_index}" git write-tree
 }
 
-function update_config() {
-  local -r q="${1:-}"
-  local -r cfile="${2:-}"
-  local -r bname="$(basename ${cfile})"
-
-  jq "${q}" "${cfile}" > "${TMP_DIR}/${bname}"
-  mv "${TMP_DIR}/${bname}" "${cfile}"
-}
-
 function build_binaries() {
   cd "${KUBE_ROOT}"
   kube::build::verify_prereqs
@@ -107,8 +98,9 @@ function build_image() {
   # Write the generated version to the output versions file so that we can
   # reuse it.
   mkdir -p "${FEDERATION_OUTPUT_ROOT}"
-  jq -n --arg ver "${kube_version}" \
-    '{"KUBE_VERSION": $ver}' > "${VERSIONS_FILE}"
+  echo "{
+  \"KUBE_VERSION\": \"${kube_version}\"
+}" > "${VERSIONS_FILE}"
   kube::log::status "Wrote to version file ${VERSIONS_FILE}: ${kube_version}"
 
   BASEIMAGE="ubuntu:16.04" \
@@ -123,7 +115,9 @@ function get_version() {
     kube_version="${KUBE_VERSION}"
   else
     # Read the version back from the versions file if no version is given.
-    kube_version="$(jq -r '.KUBE_VERSION' ${VERSIONS_FILE})"
+    kube_version="$(cat ${VERSIONS_FILE} | python -c '\
+import json, sys;\
+print json.load(sys.stdin)["KUBE_VERSION"]')"
   fi
   echo "${kube_version}"
 }
@@ -133,33 +127,6 @@ function push() {
 
   kube::log::status "Pushing hyperkube image to the registry"
   gcloud docker -- push "${KUBE_REGISTRY}/hyperkube-amd64:${kube_version}"
-
-  # Update config after build and push, but before turning up the clusters
-  # to ensure the config has the right image version tags.
-  gen_or_update_config "${kube_version}"
-}
-
-function gen_or_update_config() {
-  local -r kube_version="${1:-}"
-
-  mkdir -p "${FEDERATION_OUTPUT_ROOT}"
-  cp "${DEPLOY_ROOT}/config.json.sample" "${FEDERATION_OUTPUT_ROOT}/config.json"
-
-  update_config \
-    '[.[] | .phase1.gce.project |= "'"${KUBE_PROJECT}"'"]' \
-        "${FEDERATION_OUTPUT_ROOT}/config.json"
-
-  # Not chaining for readability
-  update_config \
-    '[.[] | .phase2 = { docker_registry: "'"${KUBE_REGISTRY}"'", kubernetes_version: "'"${kube_version}"'" } ]' \
-    "${FEDERATION_OUTPUT_ROOT}/config.json"
-
-  cat <<EOF> "${FEDERATION_OUTPUT_ROOT}/values.yaml"
-apiserverRegistry: "${KUBE_REGISTRY}"
-apiserverVersion: "${kube_version}"
-controllerManagerRegistry: "${KUBE_REGISTRY}"
-controllerManagerVersion: "${kube_version}"
-EOF
 }
 
 readonly ACTION="${1:-}"
