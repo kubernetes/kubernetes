@@ -67,7 +67,7 @@ func encodeKubeDiscoverySecretData(dcfg *kubeadmapi.TokenDiscovery, apicfg kubea
 func newKubeDiscoveryPodSpec(cfg *kubeadmapi.MasterConfiguration) v1.PodSpec {
 	return v1.PodSpec{
 		// We have to use host network namespace, as `HostPort`/`HostIP` are Docker's
-		// buisness and CNI support isn't quite there yet (except for kubenet)
+		// business and CNI support isn't quite there yet (except for kubenet)
 		// (see https://github.com/kubernetes/kubernetes/issues/31307)
 		// TODO update this when #31307 is resolved
 		HostNetwork:     true,
