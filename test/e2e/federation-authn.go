@@ -42,7 +42,7 @@ var _ = framework.KubeDescribe("[Feature:Federation]", func() {
 
 			nsName := f.FederationNamespace.Name
 			svc := createServiceOrFail(f.FederationClientset_1_5, nsName, FederatedServiceName)
-			deleteServiceOrFail(f.FederationClientset_1_5, nsName, svc.Name)
+			deleteServiceOrFail(f.FederationClientset_1_5, nsName, svc.Name, nil)
 		})
 
 		It("should not accept cluster resources when the client has invalid authentication credentials", func() {
@@ -62,7 +62,7 @@ var _ = framework.KubeDescribe("[Feature:Federation]", func() {
 			svc, err := createService(fcs, nsName, FederatedServiceName)
 			Expect(errors.IsUnauthorized(err)).To(BeTrue())
 			if err == nil && svc != nil {
-				deleteServiceOrFail(fcs, nsName, svc.Name)
+				deleteServiceOrFail(fcs, nsName, svc.Name, nil)
 			}
 		})
 
@@ -76,7 +76,7 @@ var _ = framework.KubeDescribe("[Feature:Federation]", func() {
 			svc, err := createService(fcs, nsName, FederatedServiceName)
 			Expect(errors.IsUnauthorized(err)).To(BeTrue())
 			if err == nil && svc != nil {
-				deleteServiceOrFail(fcs, nsName, svc.Name)
+				deleteServiceOrFail(fcs, nsName, svc.Name, nil)
 			}
 		})
 	})
