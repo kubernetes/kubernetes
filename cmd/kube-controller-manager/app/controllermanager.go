@@ -220,6 +220,9 @@ func Run(s *options.CMServer) error {
 	panic("unreachable")
 }
 
+// StartControllers is start controller (replication controller,node controller,resourceQuota controller,
+// namespace controller,serviceAccount controller,token controller,server controller,
+// endpoint controller) in Controller manager
 func StartControllers(s *options.CMServer, kubeconfig *restclient.Config, rootClientBuilder, clientBuilder controller.ControllerClientBuilder, stop <-chan struct{}, recorder record.EventRecorder) error {
 	client := func(serviceAccountName string) clientset.Interface {
 		return rootClientBuilder.ClientOrDie(serviceAccountName)
