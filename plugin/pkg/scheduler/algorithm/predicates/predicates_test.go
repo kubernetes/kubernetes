@@ -18,17 +18,12 @@ package predicates
 
 import (
 	"fmt"
-	"os/exec"
-	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
 
-	"k8s.io/gengo/parser"
-	"k8s.io/gengo/types"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/util/codeinspector"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 	priorityutil "k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/priorities/util"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
@@ -1845,84 +1840,6 @@ func TestEBSVolumeCountConflicts(t *testing.T) {
 		}
 		if fits != test.fits {
 			t.Errorf("%s: expected %v, got %v", test.test, test.fits, fits)
-		}
-	}
-}
-
-func getPredicateSignature() (*types.Signature, error) {
-	filePath := "./../types.go"
-	pkgName := filepath.Dir(filePath)
-	builder := parser.New()
-	if err := builder.AddDir(pkgName); err != nil {
-		return nil, err
-	}
-	universe, err := builder.FindTypes()
-	if err != nil {
-		return nil, err
-	}
-	result, ok := universe[pkgName].Types["FitPredicate"]
-	if !ok {
-		return nil, fmt.Errorf("FitPredicate type not defined")
-	}
-	return result.Signature, nil
-}
-
-func TestPredicatesRegistered(t *testing.T) {
-	var functions []*types.Type
-
-	// Files and directories which predicates may be referenced
-	targetFiles := []string{
-		"./../../algorithmprovider/defaults/defaults.go", // Default algorithm
-		"./../../factory/plugins.go",                     // Registered in init()
-		"./../../../../../pkg/",                          // kubernetes/pkg, often used by kubelet or controller
-	}
-
-	// List all golang source files under ./predicates/, excluding test files and sub-directories.
-	files, err := codeinspector.GetSourceCodeFiles(".")
-
-	if err != nil {
-		t.Errorf("unexpected error: %v when listing files in current directory", err)
-	}
-
-	// Get all public predicates in files.
-	for _, filePath := range files {
-		fileFunctions, err := codeinspector.GetPublicFunctions("k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/predicates", filePath)
-		if err == nil {
-			functions = append(functions, fileFunctions...)
-		} else {
-			t.Errorf("unexpected error %s when parsing %s", err, filePath)
-		}
-	}
-
-	predSignature, err := getPredicateSignature()
-	if err != nil {
-		t.Fatalf("Couldn't get predicates signature")
-	}
-
-	// Check if all public predicates are referenced in target files.
-	for _, function := range functions {
-		// Ignore functions that don't match FitPredicate signature.
-		signature := function.Underlying.Signature
-		if len(predSignature.Parameters) != len(signature.Parameters) {
-			continue
-		}
-		if len(predSignature.Results) != len(signature.Results) {
-			continue
-		}
-		// TODO: Check exact types of parameters and results.
-
-		args := []string{"-rl", function.Name.Name}
-		args = append(args, targetFiles...)
-
-		err := exec.Command("grep", args...).Run()
-		if err != nil {
-			switch err.Error() {
-			case "exit status 2":
-				t.Errorf("unexpected error when checking %s", function.Name)
-			case "exit status 1":
-				t.Errorf("predicate %s is implemented as public but seems not registered or used in any other place",
-					function.Name)
-			}
 		}
 	}
 }
