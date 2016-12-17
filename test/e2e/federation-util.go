@@ -283,12 +283,23 @@ func createServiceOrFail(clientset *fedclientset.Clientset, namespace, name stri
 	return service
 }
 
-func deleteServiceOrFail(clientset *fedclientset.Clientset, namespace string, serviceName string) {
+func deleteServiceOrFail(clientset *fedclientset.Clientset, namespace string, serviceName string, orphanDependents *bool) {
 	if clientset == nil || len(namespace) == 0 || len(serviceName) == 0 {
 		Fail(fmt.Sprintf("Internal error: invalid parameters passed to deleteServiceOrFail: clientset: %v, namespace: %v, service: %v", clientset, namespace, serviceName))
 	}
-	err := clientset.Services(namespace).Delete(serviceName, v1.NewDeleteOptions(0))
+	err := clientset.Services(namespace).Delete(serviceName, &v1.DeleteOptions{OrphanDependents: orphanDependents})
 	framework.ExpectNoError(err, "Error deleting service %q from namespace %q", serviceName, namespace)
+	// Wait for the service to be deleted.
+	err = wait.Poll(5*time.Second, 3*wait.ForeverTestTimeout, func() (bool, error) {
+		_, err := clientset.Core().Services(namespace).Get(serviceName, metav1.GetOptions{})
+		if err != nil && errors.IsNotFound(err) {
+			return true, nil
+		}
+		return false, err
+	})
+	if err != nil {
+		framework.Failf("Error in deleting service %s: %v", serviceName, err)
+	}
 }
 
 func cleanupServiceShardsAndProviderResources(namespace string, service *v1.Service, clusters map[string]*cluster) {
