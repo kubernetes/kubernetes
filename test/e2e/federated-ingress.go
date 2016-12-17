@@ -154,7 +154,7 @@ var _ = framework.KubeDescribe("Federated ingresses [Feature:Federation]", func(
 			AfterEach(func() {
 				deleteBackendPodsOrFail(clusters, ns)
 				if service != nil {
-					deleteServiceOrFail(f.FederationClientset_1_5, ns, service.Name)
+					deleteServiceOrFail(f.FederationClientset_1_5, ns, service.Name, nil)
 					cleanupServiceShardsAndProviderResources(ns, service, clusters)
 					service = nil
 				} else {

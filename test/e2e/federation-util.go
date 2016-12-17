@@ -283,11 +283,11 @@ func createServiceOrFail(clientset *fedclientset.Clientset, namespace, name stri
 	return service
 }
 
-func deleteServiceOrFail(clientset *fedclientset.Clientset, namespace string, serviceName string) {
+func deleteServiceOrFail(clientset *fedclientset.Clientset, namespace string, serviceName string, orphanDependents *bool) {
 	if clientset == nil || len(namespace) == 0 || len(serviceName) == 0 {
 		Fail(fmt.Sprintf("Internal error: invalid parameters passed to deleteServiceOrFail: clientset: %v, namespace: %v, service: %v", clientset, namespace, serviceName))
 	}
-	err := clientset.Services(namespace).Delete(serviceName, v1.NewDeleteOptions(0))
+	err := clientset.Services(namespace).Delete(serviceName, &v1.DeleteOptions{OrphanDependents: orphanDependents})
 	framework.ExpectNoError(err, "Error deleting service %q from namespace %q", serviceName, namespace)
 }
 
