@@ -23,7 +23,7 @@ import (
 	"github.com/golang/glog"
 
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/fake"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
 
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/client/record"

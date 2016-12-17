@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 // The external controller manager is responsible for running controller loops that
-// are cloud provider dependent. It uses the API to listen for new events on resources.
+// are cloud provider dependent. It uses the API to listen to new events on resources.
 
 package main
 
@@ -43,7 +43,7 @@ func init() {
 }
 
 func main() {
-	s := options.NewExternalCMServer()
+	s := options.NewCloudControllerManagerServer()
 	s.AddFlags(pflag.CommandLine)
 
 	flag.InitFlags()
