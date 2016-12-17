@@ -17,7 +17,6 @@
 
 FROM gcr.io/google_containers/ubuntu-slim:0.4
 
-MAINTAINER Mik Vyatskov "vmik@google.com"
 
 ENV DEBIAN_FRONTEND noninteractive
 ENV KIBANA_VERSION 4.6.1

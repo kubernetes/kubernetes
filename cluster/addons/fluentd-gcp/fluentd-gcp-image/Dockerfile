@@ -22,7 +22,6 @@
 
 FROM gcr.io/google_containers/ubuntu-slim:0.4
 
-MAINTAINER Mik Vyatskov "vmik@google.com"
 
 # Disable prompts from apt
 ENV DEBIAN_FRONTEND noninteractive

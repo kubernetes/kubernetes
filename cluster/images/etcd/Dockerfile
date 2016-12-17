@@ -13,7 +13,6 @@
 # limitations under the License.
 
 FROM BASEIMAGE
-MAINTAINER Wojciech Tyczynski <wojtekt@google.com>
 
 EXPOSE 2379 2380 4001 7001
 COPY etcd* etcdctl* /usr/local/bin/
