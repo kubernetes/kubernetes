@@ -13,6 +13,5 @@
 # limitations under the License.
 
 FROM alpine
-MAINTAINER Bowei Du <bowei@google.com>
 COPY net /net
 RUN apk update && apk add curl

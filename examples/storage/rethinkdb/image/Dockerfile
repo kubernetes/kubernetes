@@ -14,7 +14,6 @@
 
 FROM rethinkdb:1.16.0
 
-MAINTAINER BinZhao <wo@zhaob.in>
 
 RUN apt-get update && \
     apt-get install -yq curl && \

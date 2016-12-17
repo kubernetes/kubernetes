@@ -14,7 +14,6 @@
 
 FROM quay.io/pires/docker-jre:8u45-2
 
-MAINTAINER Paulo Pires <pjpires@gmail.com>
 
 EXPOSE 5701
 

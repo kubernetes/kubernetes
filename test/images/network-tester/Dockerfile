@@ -13,7 +13,6 @@
 # limitations under the License.
 
 FROM scratch
-MAINTAINER Daniel Smith <dbsmith@google.com>
 ADD webserver webserver
 EXPOSE 8080
 ENTRYPOINT ["/webserver"]
