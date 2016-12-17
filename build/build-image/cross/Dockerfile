@@ -17,7 +17,7 @@
 
 FROM golang:1.7.4
 
-ENV GOARM 6
+ENV GOARM 7
 ENV KUBE_DYNAMIC_CROSSPLATFORMS \
   armel \
   arm64 \
@@ -79,15 +79,12 @@ RUN export ETCD_VERSION=v3.0.14; \
   && ln -s ../src/etcd/etcd-${ETCD_VERSION}-linux-amd64/etcd /usr/local/bin/
 
 # TODO: Remove the patched GOROOT when we have an official golang that has a working arm and ppc64le linker
-ENV K8S_PATCHED_GOLANG_VERSION=1.7.4 \
+ENV K8S_PATCHED_GOLANG_VERSION=go1.8beta2 \
     K8S_PATCHED_GOROOT=/usr/local/go_k8s_patched
 RUN mkdir -p ${K8S_PATCHED_GOROOT} \
-  && curl -sSL https://github.com/golang/go/archive/go${K8S_PATCHED_GOLANG_VERSION}.tar.gz | tar -xz -C ${K8S_PATCHED_GOROOT} --strip-components=1
+  && curl -sSL https://storage.googleapis.com/golang/${K8S_PATCHED_GOLANG_VERSION}.src.tar.gz | tar -xz -C ${K8S_PATCHED_GOROOT} --strip-components=1
 
-# We need a patched go1.7.1 for linux/arm (https://github.com/kubernetes/kubernetes/issues/29904)
-COPY golang-patches/CL28857-go1.7.1-luxas.patch ${K8S_PATCHED_GOROOT}/
-RUN cd ${K8S_PATCHED_GOROOT} \
-  && patch -p1 < CL28857-go1.7.1-luxas.patch \
-  && cd src \
+# We need go1.8 for linux/arm and linux/ppc64le (https://github.com/kubernetes/kubernetes/issues/29904)
+RUN cd ${K8S_PATCHED_GOROOT}/src \
   && GOROOT_FINAL=${K8S_PATCHED_GOROOT} GOROOT_BOOTSTRAP=/usr/local/go ./make.bash \
-  && for platform in linux/arm; do GOOS=${platform%/*} GOARCH=${platform##*/} GOROOT=${K8S_PATCHED_GOROOT} go install std; done
+  && for platform in linux/arm linux/ppc64le; do GOOS=${platform%/*} GOARCH=${platform##*/} GOROOT=${K8S_PATCHED_GOROOT} go install std; done

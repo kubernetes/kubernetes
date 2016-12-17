@@ -489,11 +489,6 @@ kube::golang::build_binaries_for_platform() {
       kube::golang::fallback_if_stdlib_not_installable;
   fi
 
-  # TODO: Remove this temporary workaround when we have the official golang linker working
-  if [[ ${platform} == "linux/arm" ]]; then
-    gogcflags="${gogcflags} -largemodel"
-  fi
-
   if [[ -n ${use_go_build:-} ]]; then
     kube::log::progress "    "
     for binary in "${statics[@]:+${statics[@]}}"; do
