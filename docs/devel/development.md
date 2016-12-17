@@ -243,8 +243,49 @@ See the [testing guide](testing.md) and [end-to-end tests](e2e-tests.md) for add
 hack/update-generated-docs.sh
 ```
 
+## Running Your Development Build
 
+As part of your development cycle, you might want to get a development build of
+Kubernetes running to live test your work.  Below are two ways to do this.
 
+### Locally
+
+The simplest approach to running Kubernetes locally is via the
+`hack/local-up-cluster.sh` script.  This script will perform a development
+build and will then launch a locally running instance of Kubernetes via
+[hyperkube](https://github.com/kubernetes/kubernetes/tree/master/cluster/images/hyperkube).
+Before running this script you need to make sure that `cfssl` is installed by
+running the following:
+
+```sh
+go get -u github.com/cloudflare/cfssl/cmd/...
+```
+
+You will also need to make sure that `etcd` is installed and on your `PATH`.
+The easiest way to do this, and to avoid version conflicts, is to run
+the following _(make sure to read and follow the instructions output after the
+script runs successfully)_:
+
+```sh
+hack/install-etcd.sh
+```
+
+At this point, you should be able to run `hack/local-up-cluster.sh` without
+issue, assuming your code builds properly and Docker is running.
+
+## As a Cluster
+
+Sometimes running locally is not enough and you want to spin up a real cluster.
+To facilitate this, you can use the `hack/dev-build-and-up.sh` script which
+will perform a development build and will then use `cluster/kube-up.sh` to
+create a new cluster using your development build.  If you already have a
+running cluster and just want to update it with your development build, you can
+use the `./hack/dev-build-and-push.sh` script which will also perform
+development build but then it will use `cluster/kube-push.sh` instead of
+`cluster/kube-up.sh` to update your running cluster.  For more details on how
+the `cluster/kube-*.sh` scripts work, feel free to read the
+[Getting Started Guide](http://kubernetes.io/docs/getting-started-guides/) for
+your respective environment.
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/devel/development.md?pixel)]()
