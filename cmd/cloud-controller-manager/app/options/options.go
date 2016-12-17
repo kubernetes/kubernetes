@@ -14,10 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package options provides the flags used for the controller manager.
-//
-// CAUTION: If you update code in this file, you may need to also update code
-//          in contrib/mesos/pkg/controllermanager/controllermanager.go
 package options
 
 import (
@@ -32,23 +28,22 @@ import (
 	"github.com/spf13/pflag"
 )
 
-// ExternalCMServer is the main context object for the controller manager.
-type ExternalCMServer struct {
+// CloudControllerMangerServer is the main context object for the controller manager.
+type CloudControllerManagerServer struct {
 	componentconfig.KubeControllerManagerConfiguration
 
 	Master     string
 	Kubeconfig string
 }
 
-// NewCMServer creates a new ExternalCMServer with a default config.
-func NewExternalCMServer() *ExternalCMServer {
-	s := ExternalCMServer{
+// NewCloudControllerManagerServer creates a new ExternalCMServer with a default config.
+func NewCloudControllerManagerServer() *CloudControllerManagerServer {
+	s := CloudControllerManagerServer{
 		KubeControllerManagerConfiguration: componentconfig.KubeControllerManagerConfiguration{
-			Port:                    ports.ControllerManagerPort,
+			Port:                    ports.CloudControllerManagerPort,
 			Address:                 "0.0.0.0",
 			ConcurrentServiceSyncs:  1,
 			MinResyncPeriod:         metav1.Duration{Duration: 12 * time.Hour},
-			RegisterRetryCount:      10,
 			NodeMonitorPeriod:       metav1.Duration{Duration: 5 * time.Second},
 			ClusterName:             "kubernetes",
 			ConfigureCloudRoutes:    true,
@@ -57,10 +52,6 @@ func NewExternalCMServer() *ExternalCMServer {
 			KubeAPIBurst:            30,
 			LeaderElection:          leaderelection.DefaultLeaderElectionConfiguration(),
 			ControllerStartInterval: metav1.Duration{Duration: 0 * time.Second},
-			EnableGarbageCollector:  true,
-			ConcurrentGCSyncs:       20,
-			ClusterSigningCertFile:  "/etc/kubernetes/ca/ca.pem",
-			ClusterSigningKeyFile:   "/etc/kubernetes/ca/ca.key",
 		},
 	}
 	s.LeaderElection.LeaderElect = true
@@ -68,8 +59,8 @@ func NewExternalCMServer() *ExternalCMServer {
 }
 
 // AddFlags adds flags for a specific ExternalCMServer to the specified FlagSet
-func (s *ExternalCMServer) AddFlags(fs *pflag.FlagSet) {
-	fs.Int32Var(&s.Port, "port", s.Port, "The port that the controller-manager's http service runs on")
+func (s *CloudControllerManagerServer) AddFlags(fs *pflag.FlagSet) {
+	fs.Int32Var(&s.Port, "port", s.Port, "The port that the cloud-controller-manager's http service runs on")
 	fs.Var(componentconfig.IPVar{Val: &s.Address}, "address", "The IP address to serve on (set to 0.0.0.0 for all interfaces)")
 	fs.StringVar(&s.CloudProvider, "cloud-provider", s.CloudProvider, "The provider of cloud services. Empty for no provider.")
 	fs.StringVar(&s.CloudConfigFile, "cloud-config", s.CloudConfigFile, "The path to the cloud provider configuration file.  Empty string for no configuration file.")
