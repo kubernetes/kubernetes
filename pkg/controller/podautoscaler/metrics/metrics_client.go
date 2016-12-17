@@ -122,10 +122,7 @@ func (h *HeapsterMetricsClient) GetResourceMetric(resource v1.ResourceName, name
 		}
 	}
 
-	timestamp := time.Time{}
-	if len(metrics.Items) > 0 {
-		timestamp = metrics.Items[0].Timestamp.Time
-	}
+	timestamp := metrics.Items[0].Timestamp.Time
 
 	return res, timestamp, nil
 }
