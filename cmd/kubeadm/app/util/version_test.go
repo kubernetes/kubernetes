@@ -28,7 +28,7 @@ func TestEmptyVersion(t *testing.T) {
 
 	ver, err := KubernetesReleaseVersion("")
 	if err == nil {
-		t.Error("KubernetesReleaseVersion returned succesfully, but error expected")
+		t.Error("KubernetesReleaseVersion returned successfully, but error expected")
 	}
 	if ver != "" {
 		t.Error("KubernetesReleaseVersion returned value, expected only error")
