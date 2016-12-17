@@ -36,6 +36,8 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	apiservice "k8s.io/kubernetes/pkg/api/service"
+	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/proxy"
 	"k8s.io/kubernetes/pkg/proxy/healthcheck"
 	"k8s.io/kubernetes/pkg/types"
@@ -180,6 +182,7 @@ type Proxier struct {
 	hostname       string
 	nodeIP         net.IP
 	portMapper     portOpener
+	recorder       record.EventRecorder
 }
 
 type localPort struct {
@@ -219,7 +222,18 @@ var _ proxy.ProxyProvider = &Proxier{}
 // An error will be returned if iptables fails to update or acquire the initial lock.
 // Once a proxier is created, it will keep iptables up to date in the background and
 // will not terminate if a particular iptables call fails.
-func NewProxier(ipt utiliptables.Interface, sysctl utilsysctl.Interface, exec utilexec.Interface, syncPeriod time.Duration, minSyncPeriod time.Duration, masqueradeAll bool, masqueradeBit int, clusterCIDR string, hostname string, nodeIP net.IP) (*Proxier, error) {
+func NewProxier(ipt utiliptables.Interface,
+	sysctl utilsysctl.Interface,
+	exec utilexec.Interface,
+	syncPeriod time.Duration,
+	minSyncPeriod time.Duration,
+	masqueradeAll bool,
+	masqueradeBit int,
+	clusterCIDR string,
+	hostname string,
+	nodeIP net.IP,
+	recorder record.EventRecorder,
+) (*Proxier, error) {
 	// check valid user input
 	if minSyncPeriod > syncPeriod {
 		return nil, fmt.Errorf("min-sync (%v) must be < sync(%v)", minSyncPeriod, syncPeriod)
@@ -278,6 +292,7 @@ func NewProxier(ipt utiliptables.Interface, sysctl utilsysctl.Interface, exec ut
 		hostname:       hostname,
 		nodeIP:         nodeIP,
 		portMapper:     &listenPortOpener{},
+		recorder:       recorder,
 	}, nil
 }
 
@@ -989,7 +1004,16 @@ func (proxier *Proxier) syncProxyRules() {
 				} else {
 					socket, err := proxier.portMapper.OpenLocalPort(&lp)
 					if err != nil {
-						glog.Errorf("can't open %s, skipping this externalIP: %v", lp.String(), err)
+						msg := fmt.Sprintf("can't open %s, skipping this externalIP: %v", lp.String(), err)
+
+						proxier.recorder.Eventf(
+							&v1.ObjectReference{
+								Kind:      "Node",
+								Name:      proxier.hostname,
+								UID:       types.UID(proxier.hostname),
+								Namespace: "",
+							}, api.EventTypeWarning, err.Error(), msg)
+						glog.Error(msg)
 						continue
 					}
 					replacementPortsMap[lp] = socket
