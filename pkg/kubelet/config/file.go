@@ -85,7 +85,7 @@ func (s *sourceFile) resetStoreFromPath() error {
 			return err
 		}
 		// Emit an update with an empty PodList to allow FileSource to be marked as seen
-		s.updates <- kubetypes.PodUpdate{Pods: []*v1.Pod{}, Op: kubetypes.SET, Source: kubetypes.FileSource}
+		s.updates <- kubetypes.PodUpdate{Pods: nil, Op: kubetypes.SET, Source: kubetypes.FileSource}
 		return fmt.Errorf("path does not exist, ignoring")
 	}
 
@@ -123,7 +123,7 @@ func (s *sourceFile) extractFromDir(name string) ([]*v1.Pod, error) {
 		return nil, fmt.Errorf("glob failed: %v", err)
 	}
 
-	pods := make([]*v1.Pod, 0)
+	var pods []*v1.Pod
 	if len(dirents) == 0 {
 		return pods, nil
 	}

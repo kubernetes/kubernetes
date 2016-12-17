@@ -86,7 +86,7 @@ func TestDeleteCallsPush(t *testing.T) {
 	if callcount != 2 {
 		t.Errorf("Expected 2 calls, got %d", callcount)
 	}
-	expected := []interface{}{}
+	expected := []interface{}(nil)
 	if !reflect.DeepEqual(expected, got) {
 		t.Errorf("Expected %#v, Got %#v", expected, got)
 	}

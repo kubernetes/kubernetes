@@ -71,10 +71,12 @@ func autoConvert_v1alpha1_ClusterRole_To_rbac_ClusterRole(in *ClusterRole, out *
 	}
 	if in.Rules != nil {
 		in, out := &in.Rules, &out.Rules
-		*out = make([]rbac.PolicyRule, len(*in))
-		for i := range *in {
-			if err := Convert_v1alpha1_PolicyRule_To_rbac_PolicyRule(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
+		if *in != nil {
+			*out = make([]rbac.PolicyRule, len(*in))
+			for i := range *in {
+				if err := Convert_v1alpha1_PolicyRule_To_rbac_PolicyRule(&(*in)[i], &(*out)[i], s); err != nil {
+					return err
+				}
 			}
 		}
 	} else {
@@ -94,10 +96,12 @@ func autoConvert_rbac_ClusterRole_To_v1alpha1_ClusterRole(in *rbac.ClusterRole, 
 	}
 	if in.Rules != nil {
 		in, out := &in.Rules, &out.Rules
-		*out = make([]PolicyRule, len(*in))
-		for i := range *in {
-			if err := Convert_rbac_PolicyRule_To_v1alpha1_PolicyRule(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
+		if *in != nil {
+			*out = make([]PolicyRule, len(*in))
+			for i := range *in {
+				if err := Convert_rbac_PolicyRule_To_v1alpha1_PolicyRule(&(*in)[i], &(*out)[i], s); err != nil {
+					return err
+				}
 			}
 		}
 	} else {
@@ -188,10 +192,12 @@ func autoConvert_v1alpha1_ClusterRoleList_To_rbac_ClusterRoleList(in *ClusterRol
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
-		*out = make([]rbac.ClusterRole, len(*in))
-		for i := range *in {
-			if err := Convert_v1alpha1_ClusterRole_To_rbac_ClusterRole(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
+		if *in != nil {
+			*out = make([]rbac.ClusterRole, len(*in))
+			for i := range *in {
+				if err := Convert_v1alpha1_ClusterRole_To_rbac_ClusterRole(&(*in)[i], &(*out)[i], s); err != nil {
+					return err
+				}
 			}
 		}
 	} else {
@@ -208,10 +214,12 @@ func autoConvert_rbac_ClusterRoleList_To_v1alpha1_ClusterRoleList(in *rbac.Clust
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
-		*out = make([]ClusterRole, len(*in))
-		for i := range *in {
-			if err := Convert_rbac_ClusterRole_To_v1alpha1_ClusterRole(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
+		if *in != nil {
+			*out = make([]ClusterRole, len(*in))
+			for i := range *in {
+				if err := Convert_rbac_ClusterRole_To_v1alpha1_ClusterRole(&(*in)[i], &(*out)[i], s); err != nil {
+					return err
+				}
 			}
 		}
 	} else {
@@ -285,10 +293,12 @@ func autoConvert_v1alpha1_Role_To_rbac_Role(in *Role, out *rbac.Role, s conversi
 	}
 	if in.Rules != nil {
 		in, out := &in.Rules, &out.Rules
-		*out = make([]rbac.PolicyRule, len(*in))
-		for i := range *in {
-			if err := Convert_v1alpha1_PolicyRule_To_rbac_PolicyRule(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
+		if *in != nil {
+			*out = make([]rbac.PolicyRule, len(*in))
+			for i := range *in {
+				if err := Convert_v1alpha1_PolicyRule_To_rbac_PolicyRule(&(*in)[i], &(*out)[i], s); err != nil {
+					return err
+				}
 			}
 		}
 	} else {
@@ -308,10 +318,12 @@ func autoConvert_rbac_Role_To_v1alpha1_Role(in *rbac.Role, out *Role, s conversi
 	}
 	if in.Rules != nil {
 		in, out := &in.Rules, &out.Rules
-		*out = make([]PolicyRule, len(*in))
-		for i := range *in {
-			if err := Convert_rbac_PolicyRule_To_v1alpha1_PolicyRule(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
+		if *in != nil {
+			*out = make([]PolicyRule, len(*in))
+			for i := range *in {
+				if err := Convert_rbac_PolicyRule_To_v1alpha1_PolicyRule(&(*in)[i], &(*out)[i], s); err != nil {
+					return err
+				}
 			}
 		}
 	} else {
@@ -380,10 +392,12 @@ func autoConvert_v1alpha1_RoleList_To_rbac_RoleList(in *RoleList, out *rbac.Role
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
-		*out = make([]rbac.Role, len(*in))
-		for i := range *in {
-			if err := Convert_v1alpha1_Role_To_rbac_Role(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
+		if *in != nil {
+			*out = make([]rbac.Role, len(*in))
+			for i := range *in {
+				if err := Convert_v1alpha1_Role_To_rbac_Role(&(*in)[i], &(*out)[i], s); err != nil {
+					return err
+				}
 			}
 		}
 	} else {
@@ -400,10 +414,12 @@ func autoConvert_rbac_RoleList_To_v1alpha1_RoleList(in *rbac.RoleList, out *Role
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
-		*out = make([]Role, len(*in))
-		for i := range *in {
-			if err := Convert_rbac_Role_To_v1alpha1_Role(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
+		if *in != nil {
+			*out = make([]Role, len(*in))
+			for i := range *in {
+				if err := Convert_rbac_Role_To_v1alpha1_Role(&(*in)[i], &(*out)[i], s); err != nil {
+					return err
+				}
 			}
 		}
 	} else {

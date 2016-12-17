@@ -89,10 +89,12 @@ func autoConvert_v1beta1_StatefulSetList_To_apps_StatefulSetList(in *StatefulSet
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
-		*out = make([]apps.StatefulSet, len(*in))
-		for i := range *in {
-			if err := Convert_v1beta1_StatefulSet_To_apps_StatefulSet(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
+		if *in != nil {
+			*out = make([]apps.StatefulSet, len(*in))
+			for i := range *in {
+				if err := Convert_v1beta1_StatefulSet_To_apps_StatefulSet(&(*in)[i], &(*out)[i], s); err != nil {
+					return err
+				}
 			}
 		}
 	} else {
@@ -109,10 +111,12 @@ func autoConvert_apps_StatefulSetList_To_v1beta1_StatefulSetList(in *apps.Statef
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
-		*out = make([]StatefulSet, len(*in))
-		for i := range *in {
-			if err := Convert_apps_StatefulSet_To_v1beta1_StatefulSet(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
+		if *in != nil {
+			*out = make([]StatefulSet, len(*in))
+			for i := range *in {
+				if err := Convert_apps_StatefulSet_To_v1beta1_StatefulSet(&(*in)[i], &(*out)[i], s); err != nil {
+					return err
+				}
 			}
 		}
 	} else {

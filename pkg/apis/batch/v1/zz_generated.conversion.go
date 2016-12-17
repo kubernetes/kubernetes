@@ -119,10 +119,12 @@ func autoConvert_v1_JobList_To_batch_JobList(in *JobList, out *batch.JobList, s 
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
-		*out = make([]batch.Job, len(*in))
-		for i := range *in {
-			if err := Convert_v1_Job_To_batch_Job(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
+		if *in != nil {
+			*out = make([]batch.Job, len(*in))
+			for i := range *in {
+				if err := Convert_v1_Job_To_batch_Job(&(*in)[i], &(*out)[i], s); err != nil {
+					return err
+				}
 			}
 		}
 	} else {
@@ -139,10 +141,12 @@ func autoConvert_batch_JobList_To_v1_JobList(in *batch.JobList, out *JobList, s 
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
-		*out = make([]Job, len(*in))
-		for i := range *in {
-			if err := Convert_batch_Job_To_v1_Job(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
+		if *in != nil {
+			*out = make([]Job, len(*in))
+			for i := range *in {
+				if err := Convert_batch_Job_To_v1_Job(&(*in)[i], &(*out)[i], s); err != nil {
+					return err
+				}
 			}
 		}
 	} else {
