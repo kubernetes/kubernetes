@@ -46,7 +46,7 @@ func (a *APIServer) Start() error {
 	if err != nil {
 		return err
 	}
-	config.GenericServerRunOptions.ServiceClusterIPRange = *ipnet
+	config.ServiceClusterIPRange = *ipnet
 	config.AllowPrivileged = true
 	errCh := make(chan error)
 	go func() {

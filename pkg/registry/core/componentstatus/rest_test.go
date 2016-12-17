@@ -28,7 +28,6 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/apiserver"
 	"k8s.io/kubernetes/pkg/probe"
 	"k8s.io/kubernetes/pkg/util/diff"
 )
@@ -51,8 +50,8 @@ type testResponse struct {
 
 func NewTestREST(resp testResponse) *REST {
 	return &REST{
-		GetServersToValidate: func() map[string]apiserver.Server {
-			return map[string]apiserver.Server{
+		GetServersToValidate: func() map[string]Server {
+			return map[string]Server{
 				"test1": {Addr: "testserver1", Port: 8000, Path: "/healthz"},
 			}
 		},

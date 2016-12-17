@@ -41,7 +41,6 @@ import (
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/extensions"
-	"k8s.io/kubernetes/pkg/apiserver"
 	"k8s.io/kubernetes/pkg/apiserver/authenticator"
 	"k8s.io/kubernetes/pkg/capabilities"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
@@ -81,27 +80,30 @@ cluster's shared state through which all other components interact.`,
 
 // Run runs the specified APIServer.  This should never exit.
 func Run(s *options.ServerRunOptions) error {
-	if errs := s.Etcd.Validate(); len(errs) > 0 {
-		return utilerrors.NewAggregate(errs)
-	}
-	if err := s.GenericServerRunOptions.DefaultExternalAddress(s.SecureServing, s.InsecureServing); err != nil {
+	// set defaults
+	if err := s.GenericServerRunOptions.DefaultAdvertiseAddress(s.SecureServing, s.InsecureServing); err != nil {
 		return err
 	}
-
-	serviceIPRange, apiServerServiceIP, err := master.DefaultServiceIPRange(s.GenericServerRunOptions.ServiceClusterIPRange)
+	serviceIPRange, apiServerServiceIP, err := master.DefaultServiceIPRange(s.ServiceClusterIPRange)
 	if err != nil {
 		return fmt.Errorf("error determining service IP ranges: %v", err)
 	}
-
 	if err := s.SecureServing.MaybeDefaultWithSelfSignedCerts(s.GenericServerRunOptions.AdvertiseAddress.String(), apiServerServiceIP); err != nil {
 		return fmt.Errorf("error creating self-signed certificates: %v", err)
 	}
+	if err := s.GenericServerRunOptions.DefaultExternalHost(); err != nil {
+		return fmt.Errorf("error setting the external host value: %v", err)
+	}
 
-	genericapiserver.DefaultAndValidateRunOptions(s.GenericServerRunOptions)
+	// validate options
+	if errs := s.Validate(); len(errs) != 0 {
+		return utilerrors.NewAggregate(errs)
+	}
 
-	genericConfig := genericapiserver.NewConfig(). // create the new config
-							ApplyOptions(s.GenericServerRunOptions). // apply the options selected
-							ApplyInsecureServingOptions(s.InsecureServing)
+	// create config from options
+	genericConfig := genericapiserver.NewConfig().
+		ApplyOptions(s.GenericServerRunOptions).
+		ApplyInsecureServingOptions(s.InsecureServing)
 
 	if _, err := genericConfig.ApplySecureServingOptions(s.SecureServing); err != nil {
 		return fmt.Errorf("failed to configure https: %s", err)
@@ -123,7 +125,7 @@ func Run(s *options.ServerRunOptions) error {
 
 	// Setup tunneler if needed
 	var tunneler genericapiserver.Tunneler
-	var proxyDialerFn apiserver.ProxyDialerFunc
+	var proxyDialerFn utilnet.DialFunc
 	if len(s.SSHUser) > 0 {
 		// Get ssh key distribution func, if supported
 		var installSSH genericapiserver.InstallSSHKey
@@ -312,10 +314,10 @@ func Run(s *options.ServerRunOptions) error {
 		APIServerServiceIP:   apiServerServiceIP,
 		APIServerServicePort: 443,
 
-		ServiceNodePortRange:      s.GenericServerRunOptions.ServiceNodePortRange,
-		KubernetesServiceNodePort: s.GenericServerRunOptions.KubernetesServiceNodePort,
+		ServiceNodePortRange:      s.ServiceNodePortRange,
+		KubernetesServiceNodePort: s.KubernetesServiceNodePort,
 
-		MasterCount: s.GenericServerRunOptions.MasterCount,
+		MasterCount: s.MasterCount,
 	}
 
 	if s.GenericServerRunOptions.EnableWatchCache {
