@@ -17,7 +17,7 @@ package walpb
 import (
 	"fmt"
 
-	proto "github.com/coreos/etcd237/Godeps/_workspace/src/github.com/gogo/protobuf/proto"
+	proto "github.com/golang/protobuf/proto"
 )
 
 import math "math"
