@@ -24,6 +24,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
 )
 
 const (
@@ -119,7 +120,7 @@ var _ = framework.KubeDescribe("Loadbalancing: L7", func() {
 			}
 		})
 
-		It("shoud create ingress with given static-ip ", func() {
+		It("shoud create ingress with given static-ip", func() {
 			// ip released when the rest of lb resources are deleted in cleanupGCE
 			ip := gceController.createStaticIP(ns)
 			By(fmt.Sprintf("allocated static ip %v: %v through the GCE cloud provider", ns, ip))
@@ -135,6 +136,14 @@ var _ = framework.KubeDescribe("Loadbalancing: L7", func() {
 
 			By("should reject HTTP traffic")
 			framework.ExpectNoError(pollURL(fmt.Sprintf("http://%v/", ip), "", lbPollTimeout, jig.pollInterval, httpClient, true))
+
+			By("should have correct firewall rule for ingress")
+			fw := gceController.getFirewallRule()
+			expFw := jig.constructFirewallForIngress(gceController)
+			// Passed the last argument as `true` to verify the backend ports is a subset
+			// of the allowed ports in firewall rule, given there may be other existing
+			// ingress resources and backends we are not aware of.
+			Expect(framework.VerifyFirewallRule(fw, expFw, gceController.cloud.Network, true)).NotTo(HaveOccurred())
 
 			// TODO: uncomment the restart test once we have a way to synchronize
 			// and know that the controller has resumed watching. If we delete
