@@ -43,7 +43,7 @@ func init() {
 }
 
 func main() {
-	s := options.NewExternalCMServer()
+	s := options.NewCloudControllerManagerServer()
 	s.AddFlags(pflag.CommandLine)
 
 	flag.InitFlags()

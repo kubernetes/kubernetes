@@ -14,12 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package app implements a server that runs a set of active
-// components.  This includes replication controllers, service endpoints and
-// nodes.
-//
-// CAUTION: If you update code in this file, you may need to also update code
-//          in contrib/mesos/pkg/controllermanager/controllermanager.go
 package app
 
 import (
@@ -33,8 +27,8 @@ import (
 
 	"k8s.io/kubernetes/cmd/cloud-controller-manager/app/options"
 	"k8s.io/kubernetes/pkg/api/v1"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
-	v1core "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/typed/core/v1"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	v1core "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/core/v1"
 	"k8s.io/kubernetes/pkg/client/leaderelection"
 	"k8s.io/kubernetes/pkg/client/leaderelection/resourcelock"
 	"k8s.io/kubernetes/pkg/client/record"
@@ -61,20 +55,14 @@ const (
 	ControllerStartJitter = 1.0
 )
 
-// NewControllerManagerCommand creates a *cobra.Command object with default parameters
-func NewControllerManagerCommand() *cobra.Command {
-	s := options.NewExternalCMServer()
+// NewCloudControllerManagerCommand creates a *cobra.Command object with default parameters
+func NewCloudControllerManagerCommand() *cobra.Command {
+	s := options.NewCloudControllerManagerServer()
 	s.AddFlags(pflag.CommandLine)
 	cmd := &cobra.Command{
 		Use: "cloud-controller-manager",
-		Long: `The Kubernetes controller manager is a daemon that embeds
-the core control loops shipped with Kubernetes. In applications of robotics and
-automation, a control loop is a non-terminating loop that regulates the state of
-the system. In Kubernetes, a controller is a control loop that watches the shared
-state of the cluster through the apiserver and makes changes attempting to move the
-current state towards the desired state. Examples of controllers that ship with
-Kubernetes today are the replication controller, endpoints controller, namespace
-controller, and serviceaccounts controller.`,
+		Long: `The Cloud controller manager is a daemon that embeds
+the cloud specific control loops shipped with Kubernetes.`,
 		Run: func(cmd *cobra.Command, args []string) {
 		},
 	}
@@ -82,7 +70,8 @@ controller, and serviceaccounts controller.`,
 	return cmd
 }
 
-func ResyncPeriod(s *options.ExternalCMServer) func() time.Duration {
+// ResyncPeriod computes the time interval a shared informer waits before resyncing with the api server
+func ResyncPeriod(s *options.CloudControllerManagerServer) func() time.Duration {
 	return func() time.Duration {
 		factor := rand.Float64() + 1
 		return time.Duration(float64(s.MinResyncPeriod.Nanoseconds()) * factor)
@@ -90,7 +79,7 @@ func ResyncPeriod(s *options.ExternalCMServer) func() time.Duration {
 }
 
 // Run runs the ExternalCMServer.  This should never exit.
-func Run(s *options.ExternalCMServer, cloud cloudprovider.Interface) error {
+func Run(s *options.CloudControllerManagerServer, cloud cloudprovider.Interface) error {
 	if c, err := configz.New("componentconfig"); err == nil {
 		c.Set(s.KubeControllerManagerConfiguration)
 	} else {
@@ -101,6 +90,7 @@ func Run(s *options.ExternalCMServer, cloud cloudprovider.Interface) error {
 		return err
 	}
 
+	// Set the ContentType of the requests from kube client
 	kubeconfig.ContentConfig.ContentType = s.ContentType
 	// Override kubeconfig qps/burst settings from flags
 	kubeconfig.QPS = s.KubeAPIQPS
@@ -111,6 +101,7 @@ func Run(s *options.ExternalCMServer, cloud cloudprovider.Interface) error {
 	}
 	leaderElectionClient := clientset.NewForConfigOrDie(restclient.AddUserAgent(kubeconfig, "leader-election"))
 
+	// Start the external controller manager server
 	go func() {
 		mux := http.NewServeMux()
 		healthz.InstallHandler(mux)
@@ -159,12 +150,13 @@ func Run(s *options.ExternalCMServer, cloud cloudprovider.Interface) error {
 		panic("unreachable")
 	}
 
+	// Identity used to distinguish between multiple cloud controller manager instances
 	id, err := os.Hostname()
 	if err != nil {
 		return err
 	}
 
-	// TODO: enable other lock types
+	// Lock required for leader election
 	rl := resourcelock.EndpointsLock{
 		EndpointsMeta: v1.ObjectMeta{
 			Namespace: "kube-system",
@@ -177,6 +169,7 @@ func Run(s *options.ExternalCMServer, cloud cloudprovider.Interface) error {
 		},
 	}
 
+	// Try and become the leader and start cloud controller manager loops
 	leaderelection.RunOrDie(leaderelection.LeaderElectionConfig{
 		Lock:          &rl,
 		LeaseDuration: s.LeaderElection.LeaseDuration.Duration,
@@ -192,7 +185,9 @@ func Run(s *options.ExternalCMServer, cloud cloudprovider.Interface) error {
 	panic("unreachable")
 }
 
-func StartControllers(s *options.ExternalCMServer, kubeconfig *restclient.Config, rootClientBuilder, clientBuilder controller.ControllerClientBuilder, stop <-chan struct{}, recorder record.EventRecorder, cloud cloudprovider.Interface) error {
+// StartControllers starts the cloud specific controller loops.
+func StartControllers(s *options.CloudControllerManagerServer, kubeconfig *restclient.Config, rootClientBuilder, clientBuilder controller.ControllerClientBuilder, stop <-chan struct{}, recorder record.EventRecorder, cloud cloudprovider.Interface) error {
+	// Function to build the kube client object
 	client := func(serviceAccountName string) clientset.Interface {
 		return rootClientBuilder.ClientOrDie(serviceAccountName)
 	}
@@ -203,6 +198,7 @@ func StartControllers(s *options.ExternalCMServer, kubeconfig *restclient.Config
 		glog.Warningf("Unsuccessful parsing of cluster CIDR %v: %v", s.ClusterCIDR, err)
 	}
 
+	// Start the CloudNodeController
 	nodeController, err := nodecontroller.NewCloudNodeController(
 		sharedInformers.Nodes(),
 		client("cloud-node-controller"), cloud,
@@ -213,6 +209,7 @@ func StartControllers(s *options.ExternalCMServer, kubeconfig *restclient.Config
 	nodeController.Run()
 	time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
 
+	// Start the service controller
 	serviceController, err := servicecontroller.New(cloud, client("service-controller"), s.ClusterName)
 	if err != nil {
 		glog.Errorf("Failed to start service controller: %v", err)
@@ -221,6 +218,7 @@ func StartControllers(s *options.ExternalCMServer, kubeconfig *restclient.Config
 	}
 	time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
 
+	// If CIDRs should be allocated for pods and set on the CloudProvider, then start the route controller
 	if s.AllocateNodeCIDRs && s.ConfigureCloudRoutes {
 		if routes, ok := cloud.Routes(); !ok {
 			glog.Warning("configure-cloud-routes is set, but cloud provider does not support routes. Will not configure cloud provider routes.")
