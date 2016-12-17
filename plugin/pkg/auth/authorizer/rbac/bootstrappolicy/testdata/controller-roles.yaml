@@ -440,7 +440,6 @@ items:
   rules:
   - apiGroups:
     - batch
-    - extensions
     attributeRestrictions: null
     resources:
     - jobs
@@ -451,7 +450,6 @@ items:
     - watch
   - apiGroups:
     - batch
-    - extensions
     attributeRestrictions: null
     resources:
     - jobs/status

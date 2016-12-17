@@ -114,7 +114,7 @@ func ClusterRoles() []rbac.ClusterRole {
 
 				rbac.NewRule(ReadWrite...).Groups(batchGroup).Resources("jobs", "cronjobs", "scheduledjobs").RuleOrDie(),
 
-				rbac.NewRule(ReadWrite...).Groups(extensionsGroup).Resources("jobs", "daemonsets", "horizontalpodautoscalers",
+				rbac.NewRule(ReadWrite...).Groups(extensionsGroup).Resources("daemonsets", "horizontalpodautoscalers",
 					"replicationcontrollers/scale", "replicasets", "replicasets/scale", "deployments", "deployments/scale").RuleOrDie(),
 
 				// additional admin powers
@@ -144,7 +144,7 @@ func ClusterRoles() []rbac.ClusterRole {
 
 				rbac.NewRule(ReadWrite...).Groups(batchGroup).Resources("jobs", "cronjobs", "scheduledjobs").RuleOrDie(),
 
-				rbac.NewRule(ReadWrite...).Groups(extensionsGroup).Resources("jobs", "daemonsets", "horizontalpodautoscalers",
+				rbac.NewRule(ReadWrite...).Groups(extensionsGroup).Resources("daemonsets", "horizontalpodautoscalers",
 					"replicationcontrollers/scale", "replicasets", "replicasets/scale", "deployments", "deployments/scale").RuleOrDie(),
 			},
 		},
@@ -167,7 +167,7 @@ func ClusterRoles() []rbac.ClusterRole {
 
 				rbac.NewRule(Read...).Groups(batchGroup).Resources("jobs", "cronjobs", "scheduledjobs").RuleOrDie(),
 
-				rbac.NewRule(Read...).Groups(extensionsGroup).Resources("jobs", "daemonsets", "horizontalpodautoscalers",
+				rbac.NewRule(Read...).Groups(extensionsGroup).Resources("daemonsets", "horizontalpodautoscalers",
 					"replicationcontrollers/scale", "replicasets", "replicasets/scale", "deployments", "deployments/scale").RuleOrDie(),
 			},
 		},

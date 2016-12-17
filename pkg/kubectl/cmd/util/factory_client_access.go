@@ -442,7 +442,6 @@ const (
 	HorizontalPodAutoscalerV1GeneratorName      = "horizontalpodautoscaler/v1"
 	DeploymentV1Beta1GeneratorName              = "deployment/v1beta1"
 	DeploymentBasicV1Beta1GeneratorName         = "deployment-basic/v1beta1"
-	JobV1Beta1GeneratorName                     = "job/v1beta1"
 	JobV1GeneratorName                          = "job/v1"
 	CronJobV2Alpha1GeneratorName                = "cronjob/v2alpha1"
 	ScheduledJobV2Alpha1GeneratorName           = "scheduledjob/v2alpha1"
@@ -487,7 +486,6 @@ func DefaultGenerators(cmdName string) map[string]kubectl.Generator {
 			RunV1GeneratorName:                kubectl.BasicReplicationController{},
 			RunPodV1GeneratorName:             kubectl.BasicPod{},
 			DeploymentV1Beta1GeneratorName:    kubectl.DeploymentV1Beta1{},
-			JobV1Beta1GeneratorName:           kubectl.JobV1Beta1{},
 			JobV1GeneratorName:                kubectl.JobV1{},
 			ScheduledJobV2Alpha1GeneratorName: kubectl.CronJobV2Alpha1{},
 			CronJobV2Alpha1GeneratorName:      kubectl.CronJobV2Alpha1{},

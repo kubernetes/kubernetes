@@ -42,14 +42,6 @@ type IngressListerExpansion interface{}
 // IngressNamespaeLister.
 type IngressNamespaceListerExpansion interface{}
 
-// JobListerExpansion allows custom methods to be added to
-// JobLister.
-type JobListerExpansion interface{}
-
-// JobNamespaceListerExpansion allows custom methods to be added to
-// JobNamespaeLister.
-type JobNamespaceListerExpansion interface{}
-
 // PodSecurityPolicyListerExpansion allows custom methods to be added to
 // PodSecurityPolicyLister.
 type PodSecurityPolicyListerExpansion interface{}

@@ -32,12 +32,6 @@ type GroupMeta struct {
 	// GroupVersions is Group + all versions in that group.
 	GroupVersions []schema.GroupVersion
 
-	// Codec is the default codec for serializing output that should use
-	// the preferred version.  Use this Codec when writing to
-	// disk, a data store that is not dynamically versioned, or in tests.
-	// This codec can decode any object that the schema is aware of.
-	Codec runtime.Codec
-
 	// SelfLinker can set or get the SelfLink field of all API types.
 	// TODO: when versioning changes, make this part of each API definition.
 	// TODO(lavalamp): Combine SelfLinker & ResourceVersioner interfaces, force all uses

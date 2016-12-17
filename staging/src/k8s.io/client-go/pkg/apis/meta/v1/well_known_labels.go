@@ -27,6 +27,12 @@ const (
 
 	LabelOS   = "beta.kubernetes.io/os"
 	LabelArch = "beta.kubernetes.io/arch"
+
+	// Historically fluentd was a manifest pod the was migrated to DaemonSet.
+	// To avoid situation during cluster upgrade when there are two instances
+	// of fluentd running on a node, kubelet need to mark node on which
+	// fluentd in not running as a manifest pod with LabelFluentdDsReady.
+	LabelFluentdDsReady = "alpha.kubernetes.io/fluentd-ds-ready"
 )
 
 // Role labels are applied to Nodes to mark their purpose.  In particular, we

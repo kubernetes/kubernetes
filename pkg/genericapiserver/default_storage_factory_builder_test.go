@@ -112,10 +112,10 @@ func TestParseRuntimeConfig(t *testing.T) {
 			err: false,
 		},
 		{
-			// Enable deployments and disable jobs.
+			// Enable deployments and disable daemonsets.
 			runtimeConfig: map[string]string{
-				"extensions/v1beta1/anything": "true",
-				"extensions/v1beta1/jobs":     "false",
+				"extensions/v1beta1/anything":   "true",
+				"extensions/v1beta1/daemonsets": "false",
 			},
 			defaultResourceConfig: func() *ResourceConfig {
 				config := NewResourceConfig()
@@ -126,7 +126,7 @@ func TestParseRuntimeConfig(t *testing.T) {
 			expectedAPIConfig: func() *ResourceConfig {
 				config := NewResourceConfig()
 				config.EnableVersions(extensionsGroupVersion)
-				config.DisableResources(extensionsGroupVersion.WithResource("jobs"))
+				config.DisableResources(extensionsGroupVersion.WithResource("daemonsets"))
 				config.EnableResources(extensionsGroupVersion.WithResource("anything"))
 				return config
 			},

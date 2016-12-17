@@ -169,9 +169,9 @@ func TestGetNonAPIRequestInfo(t *testing.T) {
 		"simple groupless":  {"/api/version/resource", true},
 		"simple group":      {"/apis/group/version/resource/name/subresource", true},
 		"more steps":        {"/api/version/resource/name/subresource", true},
-		"group list":        {"/apis/extensions/v1beta1/job", true},
-		"group get":         {"/apis/extensions/v1beta1/job/foo", true},
-		"group subresource": {"/apis/extensions/v1beta1/job/foo/scale", true},
+		"group list":        {"/apis/batch/v1/job", true},
+		"group get":         {"/apis/batch/v1/job/foo", true},
+		"group subresource": {"/apis/batch/v1/job/foo/scale", true},
 
 		"bad root":                     {"/not-api/version/resource", false},
 		"group without enough steps":   {"/apis/extensions/v1beta1", false},
