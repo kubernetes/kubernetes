@@ -21,6 +21,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api/v1"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/types"
 )
 
@@ -305,4 +306,12 @@ func (pm *basicManager) GetPodByMirrorPod(mirrorPod *v1.Pod) (*v1.Pod, bool) {
 	defer pm.lock.RUnlock()
 	pod, ok := pm.podByFullName[kubecontainer.GetPodFullName(mirrorPod)]
 	return pod, ok
+}
+
+// IsCriticalPod returns true if the pod bears the critical pod annotation
+// key. Both the rescheduler and the kubelet use this key to make admission
+// and scheduling decisions.
+func IsCriticalPod(pod *v1.Pod) bool {
+	_, ok := pod.Annotations[kubetypes.CriticalPodAnnotationKey]
+	return ok
 }

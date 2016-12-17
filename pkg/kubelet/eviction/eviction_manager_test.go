@@ -25,6 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/record"
 	statsapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/stats"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
+	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/clock"
 )
@@ -210,6 +211,8 @@ func TestMemoryPressure(t *testing.T) {
 	// create a best effort pod to test admission
 	bestEffortPodToAdmit, _ := podMaker("best-admit", newResourceList("", ""), newResourceList("", ""), "0Gi")
 	burstablePodToAdmit, _ := podMaker("burst-admit", newResourceList("100m", "100Mi"), newResourceList("200m", "200Mi"), "0Gi")
+	criticalBestEffortPodToAdmit, _ := podMaker("critical-best-admit", newResourceList("", ""), newResourceList("", ""), "0Gi")
+	criticalBestEffortPodToAdmit.ObjectMeta.Annotations = map[string]string{kubetypes.CriticalPodAnnotationKey: ""}
 
 	// synchronize
 	manager.synchronize(diskInfoProvider, activePodsFunc)
@@ -220,8 +223,8 @@ func TestMemoryPressure(t *testing.T) {
 	}
 
 	// try to admit our pods (they should succeed)
-	expected := []bool{true, true}
-	for i, pod := range []*v1.Pod{bestEffortPodToAdmit, burstablePodToAdmit} {
+	expected := []bool{true, true, true}
+	for i, pod := range []*v1.Pod{bestEffortPodToAdmit, burstablePodToAdmit, criticalBestEffortPodToAdmit} {
 		if result := manager.Admit(&lifecycle.PodAdmitAttributes{Pod: pod}); expected[i] != result.Admit {
 			t.Errorf("Admit pod: %v, expected: %v, actual: %v", pod, expected[i], result.Admit)
 		}
@@ -296,9 +299,10 @@ func TestMemoryPressure(t *testing.T) {
 		t.Errorf("Manager chose to kill pod with incorrect grace period.  Expected: %d, actual: %d", 0, observedGracePeriod)
 	}
 
-	// the best-effort pod should not admit, burstable should
-	expected = []bool{false, true}
-	for i, pod := range []*v1.Pod{bestEffortPodToAdmit, burstablePodToAdmit} {
+	// the best-effort pod without critical annotation should not admit,
+	// burstable and critical pods should
+	expected = []bool{false, true, true}
+	for i, pod := range []*v1.Pod{bestEffortPodToAdmit, burstablePodToAdmit, criticalBestEffortPodToAdmit} {
 		if result := manager.Admit(&lifecycle.PodAdmitAttributes{Pod: pod}); expected[i] != result.Admit {
 			t.Errorf("Admit pod: %v, expected: %v, actual: %v", pod, expected[i], result.Admit)
 		}
@@ -320,9 +324,9 @@ func TestMemoryPressure(t *testing.T) {
 		t.Errorf("Manager chose to kill pod: %v when no pod should have been killed", podKiller.pod.Name)
 	}
 
-	// the best-effort pod should not admit, burstable should
-	expected = []bool{false, true}
-	for i, pod := range []*v1.Pod{bestEffortPodToAdmit, burstablePodToAdmit} {
+	// the best-effort pod should not admit, burstable and critical pods should
+	expected = []bool{false, true, true}
+	for i, pod := range []*v1.Pod{bestEffortPodToAdmit, burstablePodToAdmit, criticalBestEffortPodToAdmit} {
 		if result := manager.Admit(&lifecycle.PodAdmitAttributes{Pod: pod}); expected[i] != result.Admit {
 			t.Errorf("Admit pod: %v, expected: %v, actual: %v", pod, expected[i], result.Admit)
 		}
@@ -345,8 +349,8 @@ func TestMemoryPressure(t *testing.T) {
 	}
 
 	// all pods should admit now
-	expected = []bool{true, true}
-	for i, pod := range []*v1.Pod{bestEffortPodToAdmit, burstablePodToAdmit} {
+	expected = []bool{true, true, true}
+	for i, pod := range []*v1.Pod{bestEffortPodToAdmit, burstablePodToAdmit, criticalBestEffortPodToAdmit} {
 		if result := manager.Admit(&lifecycle.PodAdmitAttributes{Pod: pod}); expected[i] != result.Admit {
 			t.Errorf("Admit pod: %v, expected: %v, actual: %v", pod, expected[i], result.Admit)
 		}
