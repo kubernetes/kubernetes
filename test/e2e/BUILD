@@ -14,7 +14,6 @@ go_library(
         "addon_update.go",
         "apparmor.go",
         "autoscaling_utils.go",
-        "batch_v1_jobs.go",
         "cadvisor.go",
         "cluster_logging_es.go",
         "cluster_logging_gcl.go",

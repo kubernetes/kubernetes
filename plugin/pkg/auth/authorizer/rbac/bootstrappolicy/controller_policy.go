@@ -148,8 +148,8 @@ func init() {
 	addControllerRole(rbac.ClusterRole{
 		ObjectMeta: api.ObjectMeta{Name: saRolePrefix + "job-controller"},
 		Rules: []rbac.PolicyRule{
-			rbac.NewRule("get", "list", "watch", "update").Groups(batchGroup, extensionsGroup).Resources("jobs").RuleOrDie(),
-			rbac.NewRule("update").Groups(batchGroup, extensionsGroup).Resources("jobs/status").RuleOrDie(),
+			rbac.NewRule("get", "list", "watch", "update").Groups(batchGroup).Resources("jobs").RuleOrDie(),
+			rbac.NewRule("update").Groups(batchGroup).Resources("jobs/status").RuleOrDie(),
 			rbac.NewRule("list", "watch", "create", "delete").Groups(legacyGroup).Resources("pods").RuleOrDie(),
 			eventsRule(),
 		},

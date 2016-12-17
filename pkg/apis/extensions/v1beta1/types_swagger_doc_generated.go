@@ -366,69 +366,6 @@ func (IngressTLS) SwaggerDoc() map[string]string {
 	return map_IngressTLS
 }
 
-var map_Job = map[string]string{
-	"":         "Job represents the configuration of a single job. DEPRECATED: extensions/v1beta1.Job is deprecated, use batch/v1.Job instead.",
-	"metadata": "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
-	"spec":     "Spec is a structure defining the expected behavior of a job. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status",
-	"status":   "Status is a structure describing current status of a job. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status",
-}
-
-func (Job) SwaggerDoc() map[string]string {
-	return map_Job
-}
-
-var map_JobCondition = map[string]string{
-	"":                   "JobCondition describes current state of a job.",
-	"type":               "Type of job condition, Complete or Failed.",
-	"status":             "Status of the condition, one of True, False, Unknown.",
-	"lastProbeTime":      "Last time the condition was checked.",
-	"lastTransitionTime": "Last time the condition transit from one status to another.",
-	"reason":             "(brief) reason for the condition's last transition.",
-	"message":            "Human readable message indicating details about last transition.",
-}
-
-func (JobCondition) SwaggerDoc() map[string]string {
-	return map_JobCondition
-}
-
-var map_JobList = map[string]string{
-	"":         "JobList is a collection of jobs. DEPRECATED: extensions/v1beta1.JobList is deprecated, use batch/v1.JobList instead.",
-	"metadata": "Standard list metadata More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
-	"items":    "Items is the list of Job.",
-}
-
-func (JobList) SwaggerDoc() map[string]string {
-	return map_JobList
-}
-
-var map_JobSpec = map[string]string{
-	"":                      "JobSpec describes how the job execution will look like.",
-	"parallelism":           "Parallelism specifies the maximum desired number of pods the job should run at any given time. The actual number of pods running in steady state will be less than this number when ((.spec.completions - .status.successful) < .spec.parallelism), i.e. when the work left to do is less than max parallelism. More info: http://kubernetes.io/docs/user-guide/jobs",
-	"completions":           "Completions specifies the desired number of successfully finished pods the job should be run with.  Setting to nil means that the success of any pod signals the success of all pods, and allows parallelism to have any positive value.  Setting to 1 means that parallelism is limited to 1 and the success of that pod signals the success of the job. More info: http://kubernetes.io/docs/user-guide/jobs",
-	"activeDeadlineSeconds": "Optional duration in seconds relative to the startTime that the job may be active before the system tries to terminate it; value must be positive integer",
-	"selector":              "Selector is a label query over pods that should match the pod count. Normally, the system sets this field for you. More info: http://kubernetes.io/docs/user-guide/labels#label-selectors",
-	"autoSelector":          "AutoSelector controls generation of pod labels and pod selectors. It was not present in the original extensions/v1beta1 Job definition, but exists to allow conversion from batch/v1 Jobs, where it corresponds to, but has the opposite meaning as, ManualSelector. More info: http://releases.k8s.io/HEAD/docs/design/selector-generation.md",
-	"template":              "Template is the object that describes the pod that will be created when executing a job. More info: http://kubernetes.io/docs/user-guide/jobs",
-}
-
-func (JobSpec) SwaggerDoc() map[string]string {
-	return map_JobSpec
-}
-
-var map_JobStatus = map[string]string{
-	"":               "JobStatus represents the current state of a Job.",
-	"conditions":     "Conditions represent the latest available observations of an object's current state. More info: http://kubernetes.io/docs/user-guide/jobs",
-	"startTime":      "StartTime represents time when the job was acknowledged by the Job Manager. It is not guaranteed to be set in happens-before order across separate operations. It is represented in RFC3339 form and is in UTC.",
-	"completionTime": "CompletionTime represents time when the job was completed. It is not guaranteed to be set in happens-before order across separate operations. It is represented in RFC3339 form and is in UTC.",
-	"active":         "Active is the number of actively running pods.",
-	"succeeded":      "Succeeded is the number of pods which reached Phase Succeeded.",
-	"failed":         "Failed is the number of pods which reached Phase Failed.",
-}
-
-func (JobStatus) SwaggerDoc() map[string]string {
-	return map_JobStatus
-}
-
 var map_NetworkPolicy = map[string]string{
 	"metadata": "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
 	"spec":     "Specification of the desired behavior for this NetworkPolicy.",

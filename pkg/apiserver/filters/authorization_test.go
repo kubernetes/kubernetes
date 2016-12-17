@@ -24,7 +24,7 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/auth/authorizer"
 )
 
@@ -88,13 +88,13 @@ func TestGetAuthorizerAttributes(t *testing.T) {
 		},
 		"API group resource": {
 			Verb: "GET",
-			Path: "/apis/extensions/v1beta1/namespaces/myns/jobs",
+			Path: "/apis/batch/v1/namespaces/myns/jobs",
 			ExpectedAttributes: &authorizer.AttributesRecord{
 				Verb:            "list",
-				Path:            "/apis/extensions/v1beta1/namespaces/myns/jobs",
+				Path:            "/apis/batch/v1/namespaces/myns/jobs",
 				ResourceRequest: true,
-				APIGroup:        extensions.GroupName,
-				APIVersion:      "v1beta1",
+				APIGroup:        batch.GroupName,
+				APIVersion:      "v1",
 				Namespace:       "myns",
 				Resource:        "jobs",
 			},

@@ -56,36 +56,36 @@ func NewForConfig(c *restclient.Config) (*Clientset, error) {
 	if configShallowCopy.RateLimiter == nil && configShallowCopy.QPS > 0 {
 		configShallowCopy.RateLimiter = flowcontrol.NewTokenBucketRateLimiter(configShallowCopy.QPS, configShallowCopy.Burst)
 	}
-	var clientset Clientset
+	var cs Clientset
 	var err error
-	clientset.TestgroupClient, err = internalversiontestgroup.NewForConfig(&configShallowCopy)
+	cs.TestgroupClient, err = internalversiontestgroup.NewForConfig(&configShallowCopy)
 	if err != nil {
 		return nil, err
 	}
 
-	clientset.DiscoveryClient, err = discovery.NewDiscoveryClientForConfig(&configShallowCopy)
+	cs.DiscoveryClient, err = discovery.NewDiscoveryClientForConfig(&configShallowCopy)
 	if err != nil {
 		glog.Errorf("failed to create the DiscoveryClient: %v", err)
 		return nil, err
 	}
-	return &clientset, nil
+	return &cs, nil
 }
 
 // NewForConfigOrDie creates a new Clientset for the given config and
 // panics if there is an error in the config.
 func NewForConfigOrDie(c *restclient.Config) *Clientset {
-	var clientset Clientset
-	clientset.TestgroupClient = internalversiontestgroup.NewForConfigOrDie(c)
+	var cs Clientset
+	cs.TestgroupClient = internalversiontestgroup.NewForConfigOrDie(c)
 
-	clientset.DiscoveryClient = discovery.NewDiscoveryClientForConfigOrDie(c)
-	return &clientset
+	cs.DiscoveryClient = discovery.NewDiscoveryClientForConfigOrDie(c)
+	return &cs
 }
 
 // New creates a new Clientset for the given RESTClient.
 func New(c restclient.Interface) *Clientset {
-	var clientset Clientset
-	clientset.TestgroupClient = internalversiontestgroup.New(c)
+	var cs Clientset
+	cs.TestgroupClient = internalversiontestgroup.New(c)
 
-	clientset.DiscoveryClient = discovery.NewDiscoveryClient(c)
-	return &clientset
+	cs.DiscoveryClient = discovery.NewDiscoveryClient(c)
+	return &cs
 }

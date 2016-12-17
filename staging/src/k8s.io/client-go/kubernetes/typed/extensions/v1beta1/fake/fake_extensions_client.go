@@ -38,10 +38,6 @@ func (c *FakeExtensionsV1beta1) Ingresses(namespace string) v1beta1.IngressInter
 	return &FakeIngresses{c, namespace}
 }
 
-func (c *FakeExtensionsV1beta1) Jobs(namespace string) v1beta1.JobInterface {
-	return &FakeJobs{c, namespace}
-}
-
 func (c *FakeExtensionsV1beta1) PodSecurityPolicies() v1beta1.PodSecurityPolicyInterface {
 	return &FakePodSecurityPolicies{c}
 }

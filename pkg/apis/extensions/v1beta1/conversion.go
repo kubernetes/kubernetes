@@ -22,7 +22,6 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	v1 "k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
-	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/conversion"
@@ -48,9 +47,6 @@ func addConversionFuncs(scheme *runtime.Scheme) error {
 		Convert_v1beta1_SubresourceReference_To_autoscaling_CrossVersionObjectReference,
 		Convert_autoscaling_HorizontalPodAutoscalerSpec_To_v1beta1_HorizontalPodAutoscalerSpec,
 		Convert_v1beta1_HorizontalPodAutoscalerSpec_To_autoscaling_HorizontalPodAutoscalerSpec,
-		// batch
-		Convert_batch_JobSpec_To_v1beta1_JobSpec,
-		Convert_v1beta1_JobSpec_To_batch_JobSpec,
 	)
 	if err != nil {
 		return err
@@ -74,16 +70,7 @@ func addConversionFuncs(scheme *runtime.Scheme) error {
 		}
 	}
 
-	return api.Scheme.AddFieldLabelConversionFunc("extensions/v1beta1", "Job",
-		func(label, value string) (string, string, error) {
-			switch label {
-			case "metadata.name", "metadata.namespace", "status.successful":
-				return label, value, nil
-			default:
-				return "", "", fmt.Errorf("field label not supported: %s", label)
-			}
-		},
-	)
+	return nil
 }
 
 func Convert_extensions_ScaleStatus_To_v1beta1_ScaleStatus(in *extensions.ScaleStatus, out *ScaleStatus, s conversion.Scope) error {
@@ -256,56 +243,6 @@ func Convert_v1beta1_ReplicaSetSpec_To_extensions_ReplicaSetSpec(in *ReplicaSetS
 	}
 	out.MinReadySeconds = in.MinReadySeconds
 	out.Selector = in.Selector
-	if err := v1.Convert_v1_PodTemplateSpec_To_api_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
-		return err
-	}
-	return nil
-}
-
-func Convert_batch_JobSpec_To_v1beta1_JobSpec(in *batch.JobSpec, out *JobSpec, s conversion.Scope) error {
-	out.Parallelism = in.Parallelism
-	out.Completions = in.Completions
-	out.ActiveDeadlineSeconds = in.ActiveDeadlineSeconds
-	out.Selector = in.Selector
-	// BEGIN non-standard conversion
-	// autoSelector has opposite meaning as manualSelector.
-	// in both cases, unset means false, and unset is always preferred to false.
-	// unset vs set-false distinction is not preserved.
-	manualSelector := in.ManualSelector != nil && *in.ManualSelector
-	autoSelector := !manualSelector
-	if autoSelector {
-		out.AutoSelector = new(bool)
-		*out.AutoSelector = true
-	} else {
-		out.AutoSelector = nil
-	}
-	// END non-standard conversion
-
-	if err := v1.Convert_api_PodTemplateSpec_To_v1_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
-		return err
-	}
-	return nil
-}
-
-func Convert_v1beta1_JobSpec_To_batch_JobSpec(in *JobSpec, out *batch.JobSpec, s conversion.Scope) error {
-	out.Parallelism = in.Parallelism
-	out.Completions = in.Completions
-	out.ActiveDeadlineSeconds = in.ActiveDeadlineSeconds
-	out.Selector = in.Selector
-	// BEGIN non-standard conversion
-	// autoSelector has opposite meaning as manualSelector.
-	// in both cases, unset means false, and unset is always preferred to false.
-	// unset vs set-false distinction is not preserved.
-	autoSelector := bool(in.AutoSelector != nil && *in.AutoSelector)
-	manualSelector := !autoSelector
-	if manualSelector {
-		out.ManualSelector = new(bool)
-		*out.ManualSelector = true
-	} else {
-		out.ManualSelector = nil
-	}
-	// END non-standard conversion
-
 	if err := v1.Convert_v1_PodTemplateSpec_To_api_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
 		return err
 	}

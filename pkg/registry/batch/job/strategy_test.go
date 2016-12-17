@@ -223,7 +223,7 @@ func TestJobStatusStrategy(t *testing.T) {
 
 func TestSelectableFieldLabelConversions(t *testing.T) {
 	apitesting.TestSelectableFieldLabelConversionsOfKind(t,
-		testapi.Extensions.GroupVersion().String(),
+		testapi.Batch.GroupVersion().String(),
 		"Job",
 		JobToSelectableFields(&batch.Job{}),
 		nil,
