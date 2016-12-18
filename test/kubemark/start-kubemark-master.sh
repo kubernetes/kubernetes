@@ -67,7 +67,7 @@ function mount-master-pd() {
 	# Format only if the disk is not already formatted.
 	if ! tune2fs -l "${pd_path}" ; then
 		echo "Formatting '${pd_path}'"
-		mkfs.ext4 -F -E lazy_itable_init=0,lazy_journal_init=0,discard "${pd_path}"
+		mkfs.ext4 -F "${pd_path}"
 	fi
 
 	echo "Mounting '${pd_path}' at '${mount_point}'"
