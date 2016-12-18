@@ -144,7 +144,7 @@ func (r *rangeAllocator) AllocateNext() (port int, err error) {
 
 func (r *rangeAllocator) Release(port int) {
 	port -= r.Base
-	if port < 0 || port >= r.Size {
+	if port < 0 || port > r.Size {
 		return
 	}
 	r.lock.Lock()
