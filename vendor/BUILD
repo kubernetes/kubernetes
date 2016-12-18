@@ -12056,3 +12056,90 @@ go_library(
         "//pkg/api/v1:go_default_library",
     ],
 )
+
+go_test(
+    name = "github.com/hkwi/nlgo_test",
+    srcs = [
+        "nla_test.go",
+        "rt_test.go",
+    ],
+    library = "github.com/hkwi/nlgo",
+    tags = ["automanaged"],
+    deps = [],
+)
+
+go_library(
+    name = "github.com/hkwi/nlgo",
+    srcs = [
+        "github.com/hkwi/nlgo/genl.go",
+        "github.com/hkwi/nlgo/genl_ctrl.go",
+        "github.com/hkwi/nlgo/genl_hub.go",
+        "github.com/hkwi/nlgo/genl_nl80211.go",
+        "github.com/hkwi/nlgo/itoa.go",
+        "github.com/hkwi/nlgo/nl.go",
+        "github.com/hkwi/nlgo/nla_type.go",
+        "github.com/hkwi/nlgo/rt.go",
+        "github.com/hkwi/nlgo/rt_hub.go",
+        "github.com/hkwi/nlgo/rt_msg.go",
+        "github.com/hkwi/nlgo/syscall.go",
+        "github.com/hkwi/nlgo/syscall_linux_amd64.go",
+    ],
+    tags = ["automanaged"],
+)
+
+go_binary(
+    name = "github.com/hkwi/nlgo/nl80211grp_bin",
+    srcs = ["github.com/hkwi/nlgo/nl80211grp/main.go"],
+    tags = ["automanaged"],
+    deps = ["//vendor:github.com/hkwi/nlgo"],
+)
+
+go_binary(
+    name = "github.com/hkwi/nlgo/nl80211grp_hub_bin",
+    srcs = ["github.com/hkwi/nlgo/nl80211grp_hub/main.go"],
+    tags = ["automanaged"],
+    deps = ["//vendor:github.com/hkwi/nlgo"],
+)
+
+go_test(
+    name = "github.com/hkwi/nlgo/rtlink_test",
+    srcs = ["util_test.go"],
+    library = "github.com/hkwi/nlgo/rtlink",
+    tags = ["automanaged"],
+    deps = ["//vendor:github.com/hkwi/nlgo"],
+)
+
+go_library(
+    name = "github.com/hkwi/nlgo/rtlink",
+    srcs = ["github.com/hkwi/nlgo/rtlink/util.go"],
+    tags = ["automanaged"],
+    deps = ["//vendor:github.com/hkwi/nlgo"],
+)
+
+go_test(
+    name = "github.com/mqliang/libipvs_test",
+    srcs = [
+        "ipvs_test.go",
+        "utils_test.go",
+    ],
+    library = "github.com/mqliang/libipvs",
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/hkwi/nlgo",
+        "//vendor:github.com/stretchr/testify/assert",
+        "//vendor:github.com/stretchr/testify/require",
+    ],
+)
+
+go_library(
+    name = "github.com/mqliang/libipvs",
+    srcs = [
+        "github.com/mqliang/libipvs/api.go",
+        "github.com/mqliang/libipvs/constants.go",
+        "github.com/mqliang/libipvs/ipvs.go",
+        "github.com/mqliang/libipvs/ipvs_nl_policy.go",
+        "github.com/mqliang/libipvs/utils.go",
+    ],
+    tags = ["automanaged"],
+    deps = ["//vendor:github.com/hkwi/nlgo"],
+)
