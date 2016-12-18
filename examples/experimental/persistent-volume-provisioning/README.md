@@ -96,7 +96,9 @@ Example of a secret can be found in [glusterfs-provisioning-secret.yaml](gluster
 
 * `gidMin` + `gidMax` : The minimum and maximum value of GID range for the storage class. A unique value (GID) in this range ( gidMin-gidMax ) will be used for dynamically provisioned volumes. These are optional values. If not specified, the volume will be provisioned with a value between 2000-2147483647 which are defaults for gidMin and gidMax respectively.
 
-Reference : ([How to configure Heketi](https://github.com/heketi/heketi/wiki/Setting-up-the-topology))
+Reference : ([How to configure Heketi](https://github.com/gluster/gluster-kubernetes/blob/master/docs/setup-guide.md))
+
+Reference : ([How to configure topology](https://github.com/heketi/heketi/wiki/Setting-up-the-topology))
 
 When the persistent volumes are dynamically provisioned, the Gluster plugin automatically create an endpoint and a headless service in the name `gluster-dynamic-<claimname>`. This dynamic endpoint and service will be deleted automatically when the persistent volume claim is deleted.
 
