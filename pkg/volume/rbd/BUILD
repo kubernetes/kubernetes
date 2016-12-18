@@ -15,6 +15,7 @@ go_library(
         "doc.go",
         "rbd.go",
         "rbd_util.go",
+        "rbd_backend_kernel.go",
     ],
     tags = ["automanaged"],
     deps = [
