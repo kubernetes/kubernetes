@@ -68,7 +68,7 @@ function safe-format-and-mount() {
   # Format only if the disk is not already formatted.
   if ! tune2fs -l "${device}" ; then
     echo "Formatting '${device}'"
-    mkfs.ext4 -F -E lazy_itable_init=0,lazy_journal_init=0,discard "${device}"
+    mkfs.ext4 -F "${device}"
   fi
 
   mkdir -p "${mountpoint}"
