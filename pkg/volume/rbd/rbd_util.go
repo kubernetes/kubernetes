@@ -87,7 +87,16 @@ type diskMapper interface {
 	UnmapDisk(disk rbdMounter, mntPath string) error
 }
 
+func createDiskMapper(backendType string) (diskMapper, error) {
+	glog.V(1).Infof("rbd: creating diskMapper for backendType %s", backendType)
 
+	switch strings.ToLower(backendType) {
+	case "krbd":
+		return &RBDKernel{}, nil
+	case "nbd":
+		return &RBDNbd{}, nil
+	}
+	return nil, fmt.Errorf("unsupported backendType %s", backendType)
 }
 
 func (util *RBDUtil) AttachDisk(b rbdMounter) error {
@@ -108,7 +117,10 @@ func (util *RBDUtil) AttachDisk(b rbdMounter) error {
 	}
 
 	// map a block device
-	mapper := &RBDKernel
+	mapper, err := createDiskMapper(b.BackendType)
+	if err != nil {
+		return fmt.Errorf("rbd: cannot create diskMapper: %v", err)
+	}
 	devicePath, err := mapper.MapDisk(b)
 	if err != nil {
 		return fmt.Errorf("rbd: cannot map block device")
@@ -146,7 +158,10 @@ func (util *RBDUtil) DetachDisk(c rbdUnmounter, mntPath string) error {
 			return fmt.Errorf("rbd detach disk: failed to load the persisted metadata\nError: %v", err)
 		}
 
-		mapper := &RBDKernel
+		mapper, err := createDiskMapper(c.rbdMounter.BackendType)
+		if err != nil {
+			return fmt.Errorf("rbd: cannot create diskMapper: %v", err)
+		}
 		if err := mapper.UnmapDisk(*c.rbdMounter, device); err != nil {
 			return fmt.Errorf("rbd detach disk: failed to unmap: %s\nError: %v", device, err)
 		}
@@ -171,8 +186,15 @@ func (util *RBDUtil) CreateImage(p *rbdVolumeProvisioner) (r *v1.RBDVolumeSource
 	for i := start; i < start+l; i++ {
 		mon := p.Mon[i%l]
 		glog.V(4).Infof("rbd: create %s size %s using mon %s, pool %s id %s key %s", p.rbdMounter.Image, volSz, mon, p.rbdMounter.Pool, p.rbdMounter.adminId, p.rbdMounter.adminSecret)
+
+		// TODO: krbd in 4.9 does support images in the v2 format with the exclusive-lock
+		// feature enabled. Its proliferation would hopefully allow us to remove this "if".
+		var imgFormatOpts []string
+		if p.rbdMounter.BackendType == "krbd" {
+			imgFormatOpts = []string{"--image-format", "1"}
+		}
 		output, err = p.rbdMounter.plugin.execCommand("rbd",
-			[]string{"create", p.rbdMounter.Image, "--size", volSz, "--pool", p.rbdMounter.Pool, "--id", p.rbdMounter.adminId, "-m", mon, "--key=" + p.rbdMounter.adminSecret, "--image-format", "1"})
+			append([]string{"create", p.rbdMounter.Image, "--size", volSz, "--pool", p.rbdMounter.Pool, "--id", p.rbdMounter.adminId, "-m", mon, "--key=" + p.rbdMounter.adminSecret}, imgFormatOpts...))
 		if err == nil {
 			break
 		} else {

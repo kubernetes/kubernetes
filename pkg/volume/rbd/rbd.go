@@ -150,6 +150,7 @@ func (plugin *rbdPlugin) newMounterInternal(spec *volume.Spec, podUID types.UID,
 		Secret:       secret,
 		fsType:       source.FSType,
 		mountOptions: volume.MountOptionFromSpec(spec),
+		BackendType:  source.BackendType,
 	}, nil
 }
 
@@ -373,6 +374,7 @@ type rbdMounter struct {
 	Id           string
 	Keyring      string
 	Secret       string
+	BackendType  string
 	fsType       string
 	adminSecret  string
 	adminId      string
@@ -435,6 +437,11 @@ func (c *rbdUnmounter) TearDownAt(dir string) error {
 func (plugin *rbdPlugin) execCommand(command string, args []string) ([]byte, error) {
 	cmd := plugin.exe.Command(command, args...)
 	return cmd.CombinedOutput()
+}
+
+func (plugin *rbdPlugin) execCommandStdOut(command string, args []string) ([]byte, error) {
+	cmd := plugin.exe.Command(command, args...)
+	return cmd.Output()
 }
 
 func getVolumeSource(
