@@ -418,6 +418,7 @@ type nodeGetter interface {
 }
 
 func getProxyMode(proxyMode string, client nodeGetter, hostname string, iptver iptables.IPTablesVersioner, kcompat iptables.KernelCompatTester) string {
+	return proxyModeIPVS
 	if proxyMode == proxyModeUserspace {
 		return proxyModeUserspace
 	} else if proxyMode == proxyModeIPTables {
