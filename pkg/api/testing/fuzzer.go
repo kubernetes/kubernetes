@@ -406,6 +406,10 @@ func coreFuncs(t apitesting.TestingCommon) []interface{} {
 			if r.Keyring == "" {
 				r.Keyring = "/etc/ceph/keyring"
 			}
+			r.BackendType = c.RandString()
+			if r.BackendType == "" {
+				r.BackendType = "krbd"
+			}
 		},
 		func(pv *api.PersistentVolume, c fuzz.Continue) {
 			c.FuzzNoCustom(pv) // fuzz self without calling this function again
