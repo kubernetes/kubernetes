@@ -143,8 +143,8 @@ metadata:
 spec:
   ports:
   - port: 12345
-type: ExternalName
-externalName: myapp.rds.whatever.aws.says
+  type: ExternalName
+  externalName: myapp.rds.whatever.aws.says
 ```
 
 There is one issue to take into account, that no other alternative considered
