@@ -203,6 +203,9 @@ func Test_AddPodToVolume_Positive_ExistingVolumeNewNode(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewUnmounter failed. Expected: <no error> Actual: <%v>", err)
 	}
+	if mounter == nil {
+		t.Fatalf("Got a nil Mounter")
+	}
 
 	// Act
 	err = asw.AddPodToVolume(
@@ -261,6 +264,9 @@ func Test_AddPodToVolume_Positive_ExistingVolumeExistingNode(t *testing.T) {
 	mounter, err := plugin.NewMounter(volumeSpec, pod, volume.VolumeOptions{})
 	if err != nil {
 		t.Fatalf("NewUnmounter failed. Expected: <no error> Actual: <%v>", err)
+	}
+	if mounter == nil {
+		t.Fatalf("Got a nil Mounter")
 	}
 
 	err = asw.AddPodToVolume(
@@ -326,6 +332,9 @@ func Test_AddPodToVolume_Negative_VolumeDoesntExist(t *testing.T) {
 	mounter, err := plugin.NewMounter(volumeSpec, pod, volume.VolumeOptions{})
 	if err != nil {
 		t.Fatalf("NewUnmounter failed. Expected: <no error> Actual: <%v>", err)
+	}
+	if mounter == nil {
+		t.Fatalf("Got a nil Mounter")
 	}
 
 	// Act
