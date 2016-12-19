@@ -33,6 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/informers"
+	"k8s.io/kubernetes/pkg/conversion"
 	"k8s.io/kubernetes/pkg/labels"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/util/metrics"
@@ -539,19 +540,26 @@ func storeDaemonSetStatus(dsClient unversionedextensions.DaemonSetInterface, ds 
 		return nil
 	}
 
+	clone, err := conversion.NewCloner().DeepCopy(ds)
+	if err != nil {
+		return err
+	}
+
+	toUpdate := clone.(*extensions.DaemonSet)
+
 	var updateErr, getErr error
 	for i := 0; i < StatusUpdateRetries; i++ {
-		ds.Status.DesiredNumberScheduled = int32(desiredNumberScheduled)
-		ds.Status.CurrentNumberScheduled = int32(currentNumberScheduled)
-		ds.Status.NumberMisscheduled = int32(numberMisscheduled)
-		ds.Status.NumberReady = int32(numberReady)
+		toUpdate.Status.DesiredNumberScheduled = int32(desiredNumberScheduled)
+		toUpdate.Status.CurrentNumberScheduled = int32(currentNumberScheduled)
+		toUpdate.Status.NumberMisscheduled = int32(numberMisscheduled)
+		toUpdate.Status.NumberReady = int32(numberReady)
 
-		if _, updateErr = dsClient.UpdateStatus(ds); updateErr == nil {
+		if _, updateErr = dsClient.UpdateStatus(toUpdate); updateErr == nil {
 			return nil
 		}
 
 		// Update the set with the latest resource version for the next poll
-		if ds, getErr = dsClient.Get(ds.Name, metav1.GetOptions{}); getErr != nil {
+		if toUpdate, getErr = dsClient.Get(ds.Name, metav1.GetOptions{}); getErr != nil {
 			// If the GET fails we can't trust status.Replicas anymore. This error
 			// is bound to be more interesting than the update failure.
 			return getErr

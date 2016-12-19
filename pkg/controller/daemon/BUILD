@@ -26,6 +26,7 @@ go_library(
         "//pkg/client/record:go_default_library",
         "//pkg/controller:go_default_library",
         "//pkg/controller/informers:go_default_library",
+        "//pkg/conversion:go_default_library",
         "//pkg/labels:go_default_library",
         "//pkg/util/errors:go_default_library",
         "//pkg/util/metrics:go_default_library",
