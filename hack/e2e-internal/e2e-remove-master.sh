@@ -19,6 +19,9 @@ KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
 if [[ ! -z "${1:-}" ]]; then
   export KUBE_GCE_ZONE="${1}"
 fi
+if [[ ! -z "${2:-}" ]]; then
+  export MULTIZONE="${2}"
+fi
 export KUBE_DELETE_NODES=false
 
 source "${KUBE_ROOT}/hack/e2e-internal/e2e-down.sh"
