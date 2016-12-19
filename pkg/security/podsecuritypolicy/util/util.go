@@ -63,6 +63,7 @@ func GetAllFSTypesAsSet() sets.String {
 		string(extensions.AzureDisk),
 		string(extensions.PhotonPersistentDisk),
 		string(extensions.Projected),
+		string(extensions.PortworxVolume),
 	)
 	return fstypes
 }
@@ -118,6 +119,8 @@ func GetVolumeFSType(v api.Volume) (extensions.FSType, error) {
 		return extensions.PhotonPersistentDisk, nil
 	case v.Projected != nil:
 		return extensions.Projected, nil
+	case v.PortworxVolume != nil:
+		return extensions.PortworxVolume, nil
 	}
 
 	return "", fmt.Errorf("unknown volume type for volume: %#v", v)
