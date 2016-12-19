@@ -11,3 +11,4 @@ parameters:
   secretName: "heketi-secret"
   gidMin: "40000"
   gidMax: "50000"
+  volumetype: "replicate:3"
