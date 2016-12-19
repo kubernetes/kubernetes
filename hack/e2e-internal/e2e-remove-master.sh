@@ -20,6 +20,7 @@ if [[ ! -z "${1:-}" ]]; then
   export KUBE_GCE_ZONE="${1}"
 fi
 export KUBE_DELETE_NODES=false
+export MULTIZONE=true
 
 source "${KUBE_ROOT}/hack/e2e-internal/e2e-down.sh"
 
