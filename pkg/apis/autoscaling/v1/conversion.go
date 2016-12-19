@@ -47,16 +47,27 @@ func Convert_autoscaling_HorizontalPodAutoscaler_To_v1_HorizontalPodAutoscaler(i
 		return err
 	}
 
-	otherMetrics := make([]autoscaling.MetricSpec, 0, len(in.Spec.Metrics))
+	otherMetrics := make([]MetricSpec, 0, len(in.Spec.Metrics))
 	for _, metric := range in.Spec.Metrics {
 		if metric.Type == autoscaling.ResourceSourceType && metric.Resource != nil && metric.Resource.Name == api.ResourceCPU && metric.Resource.TargetAverageUtilization != nil {
 			continue
 		}
 
-		otherMetrics = append(otherMetrics, metric)
+		convMetric := MetricSpec{}
+		if err := Convert_autoscaling_MetricSpec_To_v1_MetricSpec(&metric, &convMetric, s); err != nil {
+			return err
+		}
+		otherMetrics = append(otherMetrics, convMetric)
 	}
 
 	// NB: we need to save the status even if it maps to a CPU utilization status in order to save the raw value as well
+	currentMetrics := make([]MetricStatus, len(in.Status.CurrentMetrics))
+	for i, currentMetric := range in.Status.CurrentMetrics {
+		if err := Convert_autoscaling_MetricStatus_To_v1_MetricStatus(&currentMetric, &currentMetrics[i], s); err != nil {
+			return err
+		}
+	}
+
 	if len(otherMetrics) > 0 || len(in.Status.CurrentMetrics) > 0 {
 		old := out.Annotations
 		out.Annotations = make(map[string]string, len(old)+2)
@@ -76,7 +87,7 @@ func Convert_autoscaling_HorizontalPodAutoscaler_To_v1_HorizontalPodAutoscaler(i
 	}
 
 	if len(in.Status.CurrentMetrics) > 0 {
-		currentMetricsEnc, err := json.Marshal(in.Status.CurrentMetrics)
+		currentMetricsEnc, err := json.Marshal(currentMetrics)
 		if err != nil {
 			return err
 		}
@@ -92,21 +103,31 @@ func Convert_v1_HorizontalPodAutoscaler_To_autoscaling_HorizontalPodAutoscaler(i
 	}
 
 	if otherMetricsEnc, hasOtherMetrics := out.Annotations[autoscaling.OtherMetricsAnnotation]; hasOtherMetrics {
-		var otherMetrics []autoscaling.MetricSpec
+		var otherMetrics []MetricSpec
 		if err := json.Unmarshal([]byte(otherMetricsEnc), &otherMetrics); err != nil {
 			return err
 		}
 
-		for _, metric := range otherMetrics {
-			out.Spec.Metrics = append(out.Spec.Metrics, metric)
+		out.Spec.Metrics = make([]autoscaling.MetricSpec, len(otherMetrics))
+		for i, metric := range otherMetrics {
+			if err := Convert_v1_MetricSpec_To_autoscaling_MetricSpec(&metric, &out.Spec.Metrics[i], s); err != nil {
+				return err
+			}
 		}
 	}
 
 	if currentMetricsEnc, hasCurrentMetrics := out.Annotations[autoscaling.CurrentMetricsAnnotation]; hasCurrentMetrics {
 		// ignore any existing status values -- the ones here have more information
-		out.Status.CurrentMetrics = nil
-		if err := json.Unmarshal([]byte(currentMetricsEnc), &out.Status.CurrentMetrics); err != nil {
+		var currentMetrics []MetricStatus
+		if err := json.Unmarshal([]byte(currentMetricsEnc), &currentMetrics); err != nil {
 			return err
+		}
+
+		out.Status.CurrentMetrics = make([]autoscaling.MetricStatus, len(currentMetrics))
+		for i, currentMetric := range currentMetrics {
+			if err := Convert_v1_MetricStatus_To_autoscaling_MetricStatus(&currentMetric, &out.Status.CurrentMetrics[i], s); err != nil {
+				return err
+			}
 		}
 	}
 

@@ -16,7 +16,11 @@ limitations under the License.
 
 package v1
 
-import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+import (
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/kubernetes/pkg/api/resource"
+	"k8s.io/kubernetes/pkg/api/v1"
+)
 
 // CrossVersionObjectReference contains enough information to let you identify the referred resource.
 type CrossVersionObjectReference struct {
@@ -131,4 +135,137 @@ type ScaleStatus struct {
 	// More info about label selectors: http://kubernetes.io/docs/user-guide/labels#label-selectors
 	// +optional
 	Selector string `json:"selector,omitempty" protobuf:"bytes,2,opt,name=selector"`
+}
+
+// the types below are used in the alpha metrics annotation
+
+// a type of metric source
+type MetricSourceType string
+
+var (
+	// a metric describing a kubernetes object (for example, hits-per-second on an Ingress object)
+	ObjectSourceType MetricSourceType = "Object"
+	// a metric describing each pod in the current scale target (for example, transactions-processed-per-second).
+	// The values will be averaged together before being compared to the target value
+	PodsSourceType MetricSourceType = "Pods"
+	// a resource metric known to Kubernetes, as specified in requests and limits, describing each pod
+	// in the current scale target (e.g. CPU or memory).  Such metrics are built in to Kubernetes,
+	// and have special scaling options on top of those available to normal per-pod metrics (the "pods" source)
+	ResourceSourceType MetricSourceType = "Resource"
+)
+
+// a specification for how to scale based on a single metric
+// (only `type` and one other matching field should be set at once)
+type MetricSpec struct {
+	// the type of metric source (should match one of the fields below)
+	Type MetricSourceType `json:"type" protobuf:"bytes,1,name=type"`
+
+	// a metric describing a single kubernetes object (for example, hits-per-second on an Ingress object)
+	// +optional
+	Object *ObjectMetricSource `json:"object,omitempty" protobuf:"bytes,2,opt,name=object"`
+	// a metric describing each pod in the current scale target (for example, transactions-processed-per-second).
+	// The values will be averaged together before being compared to the target value
+	// +optional
+	Pods *PodsMetricSource `json:"pods,omitempty" protobuf:"bytes,3,opt,name=pods"`
+	// a resource metric (such as those specified in requests and limits) known to Kubernetes
+	// describing each pod in the current scale target (e.g. CPU or memory). Such metrics are
+	// built in to Kubernetes, and have special scaling options on top of those available to
+	// normal per-pod metrics using the "pods" source.
+	// +optional
+	Resource *ResourceMetricSource `json:"resource,omitempty" protobuf:"bytes,4,opt,name=resource"`
+}
+
+// a metric describing a single kubernetes object (for example, hits-per-second on an Ingress object)
+type ObjectMetricSource struct {
+	// the described Kubernetes object
+	Target CrossVersionObjectReference `json:"target" protobuf:"bytes,1,name=target"`
+
+	// the name of the metric in question
+	MetricName string `json:"metricName" protobuf:"bytes,2,name=metricName"`
+	// the target value of the metric (as a quantity)
+	TargetValue resource.Quantity `json:"targetValue" protobuf:"bytes,3,name=targetValue"`
+}
+
+// a metric describing each pod in the current scale target (for example, transactions-processed-per-second).
+// The values will be averaged together before being compared to the target value
+type PodsMetricSource struct {
+	// the name of the metric in question
+	MetricName string `json:"metricName" protobuf:"bytes,1,name=metricName"`
+	// the target value of the metric (as a quantity)
+	TargetAverageValue resource.Quantity `json:"targetAverageValue" protobuf:"bytes,2,name=targetAverageValue"`
+}
+
+// a resource metric known to Kubernetes, as specified in requests and limits, describing each pod
+// in the current scale target (e.g. CPU or memory).  The values will be averaged together before
+// being compared to the target.  Such metrics are built in to Kubernetes, and have special
+// scaling options on top of those available to normal per-pod metrics using the "pods" source.
+// Only one "target" type should be set.
+type ResourceMetricSource struct {
+	// the name of the resource in question
+	Name v1.ResourceName `json:"name" protobuf:"bytes,1,name=name"`
+	// the target value of the resource metric, represented as
+	// a percentage of the requested value of the resource on the pods.
+	// +optional
+	TargetAverageUtilization *int32 `json:"targetAverageUtilization,omitempty" protobuf:"varint,2,opt,name=targetAverageUtilization"`
+	// the target value of the resource metric as a raw value, similarly
+	// to the "pods" metric source type.
+	// +optional
+	TargetAverageValue *resource.Quantity `json:"targetAverageValue,omitempty" protobuf:"bytes,3,opt,name=targetAverageValue"`
+}
+
+// the status of a single metric
+type MetricStatus struct {
+	// the type of metric source
+	Type MetricSourceType `json:"type" protobuf:"bytes,1,name=type"`
+
+	// a metric describing a single kubernetes object (for example, hits-per-second on an Ingress object)
+	// +optional
+	Object *ObjectMetricStatus `json:"object,omitempty" protobuf:"bytes,2,opt,name=object"`
+	// a metric describing each pod in the current scale target (for example, transactions-processed-per-second).
+	// The values will be averaged together before being compared to the target value
+	// +optional
+	Pods *PodsMetricStatus `json:"pods,omitempty" protobuf:"bytes,3,opt,name=pods"`
+	// a resource metric known to Kubernetes, as specified in requests and limits, describing each pod
+	// in the current scale target (e.g. CPU or memory).  Such metrics are built in to Kubernetes,
+	// and have special scaling options on top of those available to normal per-pod metrics using the "pods" source.
+	// +optional
+	Resource *ResourceMetricStatus `json:"resource,omitempty" protobuf:"bytes,4,opt,name=resource"`
+}
+
+// a metric describing a single kubernetes object (for example, hits-per-second on an Ingress object)
+type ObjectMetricStatus struct {
+	// the described Kubernetes object
+	Target CrossVersionObjectReference `json:"target" protobuf:"bytes,1,name=target"`
+
+	// the name of the metric in question
+	MetricName string `json:"metricName" protobuf:"bytes,2,name=metricName"`
+	// the current value of the metric (as a quantity)
+	CurrentValue resource.Quantity `json:"currentValue" protobuf:"bytes,3,name=currentValue"`
+}
+
+// a metric describing each pod in the current scale target (for example, transactions-processed-per-second).
+// The values will be averaged together before being compared to the target value
+type PodsMetricStatus struct {
+	// the name of the metric in question
+	MetricName string `json:"metricName" protobuf:"bytes,1,name=metricName"`
+	// the current value of the metric (as a quantity)
+	CurrentAverageValue resource.Quantity `json:"currentAverageValue" protobuf:"bytes,2,name=currentAverageValue"`
+}
+
+// a resource metric known to Kubernetes, as specified in requests and limits, describing each pod
+// in the current scale target (e.g. CPU or memory).  The values will be averaged together before
+// being compared to the target.  Such metrics are built in to Kubernetes, and have special
+// scaling options on top of those available to normal per-pod metrics using the "pods" source.
+// Only one "target" type should be set.  Note that the current raw value is always displayed
+// (even when the current values as request utilization is also displayed).
+type ResourceMetricStatus struct {
+	// the name of the resource in question
+	Name v1.ResourceName `json:"name" protobuf:"bytes,1,name=name"`
+	// the target value of the resource metric, represented as
+	// a percentage of the requested value of the resource on the pods
+	// (only populated if the corresponding request target was set)
+	// +optional
+	CurrentAverageUtilization *int32 `json:"currentAverageUtilization,omitempty" protobuf:"bytes,2,opt,name=currentAverageUtilization"`
+	// the current value of the resource metric as a raw value
+	CurrentAverageValue resource.Quantity `json:"currentAverageValue" protobuf:"bytes,3,name=currentAverageValue"`
 }
