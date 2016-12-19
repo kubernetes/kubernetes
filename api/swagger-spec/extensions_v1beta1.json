@@ -4115,976 +4115,6 @@
     ]
    },
    {
-    "path": "/apis/extensions/v1beta1/namespaces/{namespace}/jobs",
-    "description": "API at /apis/extensions/v1beta1",
-    "operations": [
-     {
-      "type": "v1beta1.JobList",
-      "method": "GET",
-      "summary": "list or watch objects of kind Job",
-      "nickname": "listNamespacedJob",
-      "parameters": [
-       {
-        "type": "string",
-        "paramType": "query",
-        "name": "pretty",
-        "description": "If 'true', then the output is pretty printed.",
-        "required": false,
-        "allowMultiple": false
-       },
-       {
-        "type": "string",
-        "paramType": "query",
-        "name": "labelSelector",
-        "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
-        "required": false,
-        "allowMultiple": false
-       },
-       {
-        "type": "string",
-        "paramType": "query",
-        "name": "fieldSelector",
-        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
-        "required": false,
-        "allowMultiple": false
-       },
-       {
-        "type": "boolean",
-        "paramType": "query",
-        "name": "watch",
-        "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
-        "required": false,
-        "allowMultiple": false
-       },
-       {
-        "type": "string",
-        "paramType": "query",
-        "name": "resourceVersion",
-        "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history. When specified for list: - if unset, then the result is returned from remote storage based on quorum-read flag; - if it's 0, then we simply return what we currently have in cache, no guarantee; - if set to non zero, then the result is at least as fresh as given rv.",
-        "required": false,
-        "allowMultiple": false
-       },
-       {
-        "type": "integer",
-        "paramType": "query",
-        "name": "timeoutSeconds",
-        "description": "Timeout for the list/watch call.",
-        "required": false,
-        "allowMultiple": false
-       },
-       {
-        "type": "string",
-        "paramType": "path",
-        "name": "namespace",
-        "description": "object name and auth scope, such as for teams and projects",
-        "required": true,
-        "allowMultiple": false
-       }
-      ],
-      "responseMessages": [
-       {
-        "code": 200,
-        "message": "OK",
-        "responseModel": "v1beta1.JobList"
-       }
-      ],
-      "produces": [
-       "application/json",
-       "application/yaml",
-       "application/vnd.kubernetes.protobuf",
-       "application/json;stream=watch",
-       "application/vnd.kubernetes.protobuf;stream=watch"
-      ],
-      "consumes": [
-       "*/*"
-      ]
-     },
-     {
-      "type": "v1beta1.Job",
-      "method": "POST",
-      "summary": "create a Job",
-      "nickname": "createNamespacedJob",
-      "parameters": [
-       {
-        "type": "string",
-        "paramType": "query",
-        "name": "pretty",
-        "description": "If 'true', then the output is pretty printed.",
-        "required": false,
-        "allowMultiple": false
-       },
-       {
-        "type": "v1beta1.Job",
-        "paramType": "body",
-        "name": "body",
-        "description": "",
-        "required": true,
-        "allowMultiple": false
-       },
-       {
-        "type": "string",
-        "paramType": "path",
-        "name": "namespace",
-        "description": "object name and auth scope, such as for teams and projects",
-        "required": true,
-        "allowMultiple": false
-       }
-      ],
-      "responseMessages": [
-       {
-        "code": 200,
-        "message": "OK",
-        "responseModel": "v1beta1.Job"
-       }
-      ],
-      "produces": [
-       "application/json",
-       "application/yaml",
-       "application/vnd.kubernetes.protobuf"
-      ],
-      "consumes": [
-       "*/*"
-      ]
-     },
-     {
-      "type": "v1.Status",
-      "method": "DELETE",
-      "summary": "delete collection of Job",
-      "nickname": "deletecollectionNamespacedJob",
-      "parameters": [
-       {
-        "type": "string",
-        "paramType": "query",
-        "name": "pretty",
-        "description": "If 'true', then the output is pretty printed.",
-        "required": false,
-        "allowMultiple": false
-       },
-       {
-        "type": "string",
-        "paramType": "query",
-        "name": "labelSelector",
-        "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
-        "required": false,
-        "allowMultiple": false
-       },
-       {
-        "type": "string",
-        "paramType": "query",
-        "name": "fieldSelector",
-        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
-        "required": false,
-        "allowMultiple": false
-       },
-       {
-        "type": "boolean",
-        "paramType": "query",
-        "name": "watch",
-        "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
-        "required": false,
-        "allowMultiple": false
-       },
-       {
-        "type": "string",
-        "paramType": "query",
-        "name": "resourceVersion",
-        "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history. When specified for list: - if unset, then the result is returned from remote storage based on quorum-read flag; - if it's 0, then we simply return what we currently have in cache, no guarantee; - if set to non zero, then the result is at least as fresh as given rv.",
-        "required": false,
-        "allowMultiple": false
-       },
-       {
-        "type": "integer",
-        "paramType": "query",
-        "name": "timeoutSeconds",
-        "description": "Timeout for the list/watch call.",
-        "required": false,
-        "allowMultiple": false
-       },
-       {
-        "type": "string",
-        "paramType": "path",
-        "name": "namespace",
-        "description": "object name and auth scope, such as for teams and projects",
-        "required": true,
-        "allowMultiple": false
-       }
-      ],
-      "responseMessages": [
-       {
-        "code": 200,
-        "message": "OK",
-        "responseModel": "v1.Status"
-       }
-      ],
-      "produces": [
-       "application/json",
-       "application/yaml",
-       "application/vnd.kubernetes.protobuf"
-      ],
-      "consumes": [
-       "*/*"
-      ]
-     }
-    ]
-   },
-   {
-    "path": "/apis/extensions/v1beta1/watch/namespaces/{namespace}/jobs",
-    "description": "API at /apis/extensions/v1beta1",
-    "operations": [
-     {
-      "type": "versioned.Event",
-      "method": "GET",
-      "summary": "watch individual changes to a list of Job",
-      "nickname": "watchNamespacedJobList",
-      "parameters": [
-       {
-        "type": "string",
-        "paramType": "query",
-        "name": "pretty",
-        "description": "If 'true', then the output is pretty printed.",
-        "required": false,
-        "allowMultiple": false
-       },
-       {
-        "type": "string",
-        "paramType": "query",
-        "name": "labelSelector",
-        "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
-        "required": false,
-        "allowMultiple": false
-       },
-       {
-        "type": "string",
-        "paramType": "query",
-        "name": "fieldSelector",
-        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
-        "required": false,
-        "allowMultiple": false
-       },
-       {
-        "type": "boolean",
-        "paramType": "query",
-        "name": "watch",
-        "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
-        "required": false,
-        "allowMultiple": false
-       },
-       {
-        "type": "string",
-        "paramType": "query",
-        "name": "resourceVersion",
-        "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history. When specified for list: - if unset, then the result is returned from remote storage based on quorum-read flag; - if it's 0, then we simply return what we currently have in cache, no guarantee; - if set to non zero, then the result is at least as fresh as given rv.",
-        "required": false,
-        "allowMultiple": false
-       },
-       {
-        "type": "integer",
-        "paramType": "query",
-        "name": "timeoutSeconds",
-        "description": "Timeout for the list/watch call.",
-        "required": false,
-        "allowMultiple": false
-       },
-       {
-        "type": "string",
-        "paramType": "path",
-        "name": "namespace",
-        "description": "object name and auth scope, such as for teams and projects",
-        "required": true,
-        "allowMultiple": false
-       }
-      ],
-      "responseMessages": [
-       {
-        "code": 200,
-        "message": "OK",
-        "responseModel": "versioned.Event"
-       }
-      ],
-      "produces": [
-       "application/json",
-       "application/yaml",
-       "application/vnd.kubernetes.protobuf",
-       "application/json;stream=watch",
-       "application/vnd.kubernetes.protobuf;stream=watch"
-      ],
-      "consumes": [
-       "*/*"
-      ]
-     }
-    ]
-   },
-   {
-    "path": "/apis/extensions/v1beta1/namespaces/{namespace}/jobs/{name}",
-    "description": "API at /apis/extensions/v1beta1",
-    "operations": [
-     {
-      "type": "v1beta1.Job",
-      "method": "GET",
-      "summary": "read the specified Job",
-      "nickname": "readNamespacedJob",
-      "parameters": [
-       {
-        "type": "string",
-        "paramType": "query",
-        "name": "pretty",
-        "description": "If 'true', then the output is pretty printed.",
-        "required": false,
-        "allowMultiple": false
-       },
-       {
-        "type": "boolean",
-        "paramType": "query",
-        "name": "export",
-        "description": "Should this value be exported.  Export strips fields that a user can not specify.",
-        "required": false,
-        "allowMultiple": false
-       },
-       {
-        "type": "boolean",
-        "paramType": "query",
-        "name": "exact",
-        "description": "Should the export be exact.  Exact export maintains cluster-specific fields like 'Namespace'.",
-        "required": false,
-        "allowMultiple": false
-       },
-       {
-        "type": "string",
-        "paramType": "path",
-        "name": "namespace",
-        "description": "object name and auth scope, such as for teams and projects",
-        "required": true,
-        "allowMultiple": false
-       },
-       {
-        "type": "string",
-        "paramType": "path",
-        "name": "name",
-        "description": "name of the Job",
-        "required": true,
-        "allowMultiple": false
-       }
-      ],
-      "responseMessages": [
-       {
-        "code": 200,
-        "message": "OK",
-        "responseModel": "v1beta1.Job"
-       }
-      ],
-      "produces": [
-       "application/json",
-       "application/yaml",
-       "application/vnd.kubernetes.protobuf"
-      ],
-      "consumes": [
-       "*/*"
-      ]
-     },
-     {
-      "type": "v1beta1.Job",
-      "method": "PUT",
-      "summary": "replace the specified Job",
-      "nickname": "replaceNamespacedJob",
-      "parameters": [
-       {
-        "type": "string",
-        "paramType": "query",
-        "name": "pretty",
-        "description": "If 'true', then the output is pretty printed.",
-        "required": false,
-        "allowMultiple": false
-       },
-       {
-        "type": "v1beta1.Job",
-        "paramType": "body",
-        "name": "body",
-        "description": "",
-        "required": true,
-        "allowMultiple": false
-       },
-       {
-        "type": "string",
-        "paramType": "path",
-        "name": "namespace",
-        "description": "object name and auth scope, such as for teams and projects",
-        "required": true,
-        "allowMultiple": false
-       },
-       {
-        "type": "string",
-        "paramType": "path",
-        "name": "name",
-        "description": "name of the Job",
-        "required": true,
-        "allowMultiple": false
-       }
-      ],
-      "responseMessages": [
-       {
-        "code": 200,
-        "message": "OK",
-        "responseModel": "v1beta1.Job"
-       }
-      ],
-      "produces": [
-       "application/json",
-       "application/yaml",
-       "application/vnd.kubernetes.protobuf"
-      ],
-      "consumes": [
-       "*/*"
-      ]
-     },
-     {
-      "type": "v1beta1.Job",
-      "method": "PATCH",
-      "summary": "partially update the specified Job",
-      "nickname": "patchNamespacedJob",
-      "parameters": [
-       {
-        "type": "string",
-        "paramType": "query",
-        "name": "pretty",
-        "description": "If 'true', then the output is pretty printed.",
-        "required": false,
-        "allowMultiple": false
-       },
-       {
-        "type": "v1.Patch",
-        "paramType": "body",
-        "name": "body",
-        "description": "",
-        "required": true,
-        "allowMultiple": false
-       },
-       {
-        "type": "string",
-        "paramType": "path",
-        "name": "namespace",
-        "description": "object name and auth scope, such as for teams and projects",
-        "required": true,
-        "allowMultiple": false
-       },
-       {
-        "type": "string",
-        "paramType": "path",
-        "name": "name",
-        "description": "name of the Job",
-        "required": true,
-        "allowMultiple": false
-       }
-      ],
-      "responseMessages": [
-       {
-        "code": 200,
-        "message": "OK",
-        "responseModel": "v1beta1.Job"
-       }
-      ],
-      "produces": [
-       "application/json",
-       "application/yaml",
-       "application/vnd.kubernetes.protobuf"
-      ],
-      "consumes": [
-       "application/json-patch+json",
-       "application/merge-patch+json",
-       "application/strategic-merge-patch+json"
-      ]
-     },
-     {
-      "type": "v1.Status",
-      "method": "DELETE",
-      "summary": "delete a Job",
-      "nickname": "deleteNamespacedJob",
-      "parameters": [
-       {
-        "type": "string",
-        "paramType": "query",
-        "name": "pretty",
-        "description": "If 'true', then the output is pretty printed.",
-        "required": false,
-        "allowMultiple": false
-       },
-       {
-        "type": "v1.DeleteOptions",
-        "paramType": "body",
-        "name": "body",
-        "description": "",
-        "required": true,
-        "allowMultiple": false
-       },
-       {
-        "type": "integer",
-        "paramType": "query",
-        "name": "gracePeriodSeconds",
-        "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",
-        "required": false,
-        "allowMultiple": false
-       },
-       {
-        "type": "boolean",
-        "paramType": "query",
-        "name": "orphanDependents",
-        "description": "Should the dependent objects be orphaned. If true/false, the \"orphan\" finalizer will be added to/removed from the object's finalizers list.",
-        "required": false,
-        "allowMultiple": false
-       },
-       {
-        "type": "string",
-        "paramType": "path",
-        "name": "namespace",
-        "description": "object name and auth scope, such as for teams and projects",
-        "required": true,
-        "allowMultiple": false
-       },
-       {
-        "type": "string",
-        "paramType": "path",
-        "name": "name",
-        "description": "name of the Job",
-        "required": true,
-        "allowMultiple": false
-       }
-      ],
-      "responseMessages": [
-       {
-        "code": 200,
-        "message": "OK",
-        "responseModel": "v1.Status"
-       }
-      ],
-      "produces": [
-       "application/json",
-       "application/yaml",
-       "application/vnd.kubernetes.protobuf"
-      ],
-      "consumes": [
-       "*/*"
-      ]
-     }
-    ]
-   },
-   {
-    "path": "/apis/extensions/v1beta1/watch/namespaces/{namespace}/jobs/{name}",
-    "description": "API at /apis/extensions/v1beta1",
-    "operations": [
-     {
-      "type": "versioned.Event",
-      "method": "GET",
-      "summary": "watch changes to an object of kind Job",
-      "nickname": "watchNamespacedJob",
-      "parameters": [
-       {
-        "type": "string",
-        "paramType": "query",
-        "name": "pretty",
-        "description": "If 'true', then the output is pretty printed.",
-        "required": false,
-        "allowMultiple": false
-       },
-       {
-        "type": "string",
-        "paramType": "query",
-        "name": "labelSelector",
-        "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
-        "required": false,
-        "allowMultiple": false
-       },
-       {
-        "type": "string",
-        "paramType": "query",
-        "name": "fieldSelector",
-        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
-        "required": false,
-        "allowMultiple": false
-       },
-       {
-        "type": "boolean",
-        "paramType": "query",
-        "name": "watch",
-        "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
-        "required": false,
-        "allowMultiple": false
-       },
-       {
-        "type": "string",
-        "paramType": "query",
-        "name": "resourceVersion",
-        "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history. When specified for list: - if unset, then the result is returned from remote storage based on quorum-read flag; - if it's 0, then we simply return what we currently have in cache, no guarantee; - if set to non zero, then the result is at least as fresh as given rv.",
-        "required": false,
-        "allowMultiple": false
-       },
-       {
-        "type": "integer",
-        "paramType": "query",
-        "name": "timeoutSeconds",
-        "description": "Timeout for the list/watch call.",
-        "required": false,
-        "allowMultiple": false
-       },
-       {
-        "type": "string",
-        "paramType": "path",
-        "name": "namespace",
-        "description": "object name and auth scope, such as for teams and projects",
-        "required": true,
-        "allowMultiple": false
-       },
-       {
-        "type": "string",
-        "paramType": "path",
-        "name": "name",
-        "description": "name of the Job",
-        "required": true,
-        "allowMultiple": false
-       }
-      ],
-      "responseMessages": [
-       {
-        "code": 200,
-        "message": "OK",
-        "responseModel": "versioned.Event"
-       }
-      ],
-      "produces": [
-       "application/json",
-       "application/yaml",
-       "application/vnd.kubernetes.protobuf",
-       "application/json;stream=watch",
-       "application/vnd.kubernetes.protobuf;stream=watch"
-      ],
-      "consumes": [
-       "*/*"
-      ]
-     }
-    ]
-   },
-   {
-    "path": "/apis/extensions/v1beta1/jobs",
-    "description": "API at /apis/extensions/v1beta1",
-    "operations": [
-     {
-      "type": "v1beta1.JobList",
-      "method": "GET",
-      "summary": "list or watch objects of kind Job",
-      "nickname": "listJobForAllNamespaces",
-      "parameters": [
-       {
-        "type": "string",
-        "paramType": "query",
-        "name": "pretty",
-        "description": "If 'true', then the output is pretty printed.",
-        "required": false,
-        "allowMultiple": false
-       },
-       {
-        "type": "string",
-        "paramType": "query",
-        "name": "labelSelector",
-        "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
-        "required": false,
-        "allowMultiple": false
-       },
-       {
-        "type": "string",
-        "paramType": "query",
-        "name": "fieldSelector",
-        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
-        "required": false,
-        "allowMultiple": false
-       },
-       {
-        "type": "boolean",
-        "paramType": "query",
-        "name": "watch",
-        "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
-        "required": false,
-        "allowMultiple": false
-       },
-       {
-        "type": "string",
-        "paramType": "query",
-        "name": "resourceVersion",
-        "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history. When specified for list: - if unset, then the result is returned from remote storage based on quorum-read flag; - if it's 0, then we simply return what we currently have in cache, no guarantee; - if set to non zero, then the result is at least as fresh as given rv.",
-        "required": false,
-        "allowMultiple": false
-       },
-       {
-        "type": "integer",
-        "paramType": "query",
-        "name": "timeoutSeconds",
-        "description": "Timeout for the list/watch call.",
-        "required": false,
-        "allowMultiple": false
-       }
-      ],
-      "responseMessages": [
-       {
-        "code": 200,
-        "message": "OK",
-        "responseModel": "v1beta1.JobList"
-       }
-      ],
-      "produces": [
-       "application/json",
-       "application/yaml",
-       "application/vnd.kubernetes.protobuf",
-       "application/json;stream=watch",
-       "application/vnd.kubernetes.protobuf;stream=watch"
-      ],
-      "consumes": [
-       "*/*"
-      ]
-     }
-    ]
-   },
-   {
-    "path": "/apis/extensions/v1beta1/watch/jobs",
-    "description": "API at /apis/extensions/v1beta1",
-    "operations": [
-     {
-      "type": "versioned.Event",
-      "method": "GET",
-      "summary": "watch individual changes to a list of Job",
-      "nickname": "watchJobListForAllNamespaces",
-      "parameters": [
-       {
-        "type": "string",
-        "paramType": "query",
-        "name": "pretty",
-        "description": "If 'true', then the output is pretty printed.",
-        "required": false,
-        "allowMultiple": false
-       },
-       {
-        "type": "string",
-        "paramType": "query",
-        "name": "labelSelector",
-        "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
-        "required": false,
-        "allowMultiple": false
-       },
-       {
-        "type": "string",
-        "paramType": "query",
-        "name": "fieldSelector",
-        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
-        "required": false,
-        "allowMultiple": false
-       },
-       {
-        "type": "boolean",
-        "paramType": "query",
-        "name": "watch",
-        "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
-        "required": false,
-        "allowMultiple": false
-       },
-       {
-        "type": "string",
-        "paramType": "query",
-        "name": "resourceVersion",
-        "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history. When specified for list: - if unset, then the result is returned from remote storage based on quorum-read flag; - if it's 0, then we simply return what we currently have in cache, no guarantee; - if set to non zero, then the result is at least as fresh as given rv.",
-        "required": false,
-        "allowMultiple": false
-       },
-       {
-        "type": "integer",
-        "paramType": "query",
-        "name": "timeoutSeconds",
-        "description": "Timeout for the list/watch call.",
-        "required": false,
-        "allowMultiple": false
-       }
-      ],
-      "responseMessages": [
-       {
-        "code": 200,
-        "message": "OK",
-        "responseModel": "versioned.Event"
-       }
-      ],
-      "produces": [
-       "application/json",
-       "application/yaml",
-       "application/vnd.kubernetes.protobuf",
-       "application/json;stream=watch",
-       "application/vnd.kubernetes.protobuf;stream=watch"
-      ],
-      "consumes": [
-       "*/*"
-      ]
-     }
-    ]
-   },
-   {
-    "path": "/apis/extensions/v1beta1/namespaces/{namespace}/jobs/{name}/status",
-    "description": "API at /apis/extensions/v1beta1",
-    "operations": [
-     {
-      "type": "v1beta1.Job",
-      "method": "GET",
-      "summary": "read status of the specified Job",
-      "nickname": "readNamespacedJobStatus",
-      "parameters": [
-       {
-        "type": "string",
-        "paramType": "query",
-        "name": "pretty",
-        "description": "If 'true', then the output is pretty printed.",
-        "required": false,
-        "allowMultiple": false
-       },
-       {
-        "type": "string",
-        "paramType": "path",
-        "name": "namespace",
-        "description": "object name and auth scope, such as for teams and projects",
-        "required": true,
-        "allowMultiple": false
-       },
-       {
-        "type": "string",
-        "paramType": "path",
-        "name": "name",
-        "description": "name of the Job",
-        "required": true,
-        "allowMultiple": false
-       }
-      ],
-      "responseMessages": [
-       {
-        "code": 200,
-        "message": "OK",
-        "responseModel": "v1beta1.Job"
-       }
-      ],
-      "produces": [
-       "application/json",
-       "application/yaml",
-       "application/vnd.kubernetes.protobuf"
-      ],
-      "consumes": [
-       "*/*"
-      ]
-     },
-     {
-      "type": "v1beta1.Job",
-      "method": "PUT",
-      "summary": "replace status of the specified Job",
-      "nickname": "replaceNamespacedJobStatus",
-      "parameters": [
-       {
-        "type": "string",
-        "paramType": "query",
-        "name": "pretty",
-        "description": "If 'true', then the output is pretty printed.",
-        "required": false,
-        "allowMultiple": false
-       },
-       {
-        "type": "v1beta1.Job",
-        "paramType": "body",
-        "name": "body",
-        "description": "",
-        "required": true,
-        "allowMultiple": false
-       },
-       {
-        "type": "string",
-        "paramType": "path",
-        "name": "namespace",
-        "description": "object name and auth scope, such as for teams and projects",
-        "required": true,
-        "allowMultiple": false
-       },
-       {
-        "type": "string",
-        "paramType": "path",
-        "name": "name",
-        "description": "name of the Job",
-        "required": true,
-        "allowMultiple": false
-       }
-      ],
-      "responseMessages": [
-       {
-        "code": 200,
-        "message": "OK",
-        "responseModel": "v1beta1.Job"
-       }
-      ],
-      "produces": [
-       "application/json",
-       "application/yaml",
-       "application/vnd.kubernetes.protobuf"
-      ],
-      "consumes": [
-       "*/*"
-      ]
-     },
-     {
-      "type": "v1beta1.Job",
-      "method": "PATCH",
-      "summary": "partially update status of the specified Job",
-      "nickname": "patchNamespacedJobStatus",
-      "parameters": [
-       {
-        "type": "string",
-        "paramType": "query",
-        "name": "pretty",
-        "description": "If 'true', then the output is pretty printed.",
-        "required": false,
-        "allowMultiple": false
-       },
-       {
-        "type": "v1.Patch",
-        "paramType": "body",
-        "name": "body",
-        "description": "",
-        "required": true,
-        "allowMultiple": false
-       },
-       {
-        "type": "string",
-        "paramType": "path",
-        "name": "namespace",
-        "description": "object name and auth scope, such as for teams and projects",
-        "required": true,
-        "allowMultiple": false
-       },
-       {
-        "type": "string",
-        "paramType": "path",
-        "name": "name",
-        "description": "name of the Job",
-        "required": true,
-        "allowMultiple": false
-       }
-      ],
-      "responseMessages": [
-       {
-        "code": 200,
-        "message": "OK",
-        "responseModel": "v1beta1.Job"
-       }
-      ],
-      "produces": [
-       "application/json",
-       "application/yaml",
-       "application/vnd.kubernetes.protobuf"
-      ],
-      "consumes": [
-       "application/json-patch+json",
-       "application/merge-patch+json",
-       "application/strategic-merge-patch+json"
-      ]
-     }
-    ]
-   },
-   {
     "path": "/apis/extensions/v1beta1/namespaces/{namespace}/networkpolicies",
     "description": "API at /apis/extensions/v1beta1",
     "operations": [
@@ -8121,6 +7151,10 @@
      "subdomain": {
       "type": "string",
       "description": "If specified, the fully qualified Pod hostname will be \"\u003chostname\u003e.\u003csubdomain\u003e.\u003cpod namespace\u003e.svc.\u003ccluster domain\u003e\". If not specified, the pod will not have a domainname at all."
+     },
+     "affinity": {
+      "$ref": "v1.Affinity",
+      "description": "If specified, the pod's scheduling constraints"
      }
     }
    },
@@ -9379,6 +8413,200 @@
      }
     }
    },
+   "v1.Affinity": {
+    "id": "v1.Affinity",
+    "description": "Affinity is a group of affinity scheduling rules.",
+    "properties": {
+     "nodeAffinity": {
+      "$ref": "v1.NodeAffinity",
+      "description": "Describes node affinity scheduling rules for the pod."
+     },
+     "podAffinity": {
+      "$ref": "v1.PodAffinity",
+      "description": "Describes pod affinity scheduling rules (e.g. co-locate this pod in the same node, zone, etc. as some other pod(s))."
+     },
+     "podAntiAffinity": {
+      "$ref": "v1.PodAntiAffinity",
+      "description": "Describes pod anti-affinity scheduling rules (e.g. avoid putting this pod in the same node, zone, etc. as some other pod(s))."
+     }
+    }
+   },
+   "v1.NodeAffinity": {
+    "id": "v1.NodeAffinity",
+    "description": "Node affinity is a group of node affinity scheduling rules.",
+    "properties": {
+     "requiredDuringSchedulingIgnoredDuringExecution": {
+      "$ref": "v1.NodeSelector",
+      "description": "If the affinity requirements specified by this field are not met at scheduling time, the pod will not be scheduled onto the node. If the affinity requirements specified by this field cease to be met at some point during pod execution (e.g. due to an update), the system may or may not try to eventually evict the pod from its node."
+     },
+     "preferredDuringSchedulingIgnoredDuringExecution": {
+      "type": "array",
+      "items": {
+       "$ref": "v1.PreferredSchedulingTerm"
+      },
+      "description": "The scheduler will prefer to schedule pods to nodes that satisfy the affinity expressions specified by this field, but it may choose a node that violates one or more of the expressions. The node that is most preferred is the one with the greatest sum of weights, i.e. for each node that meets all of the scheduling requirements (resource request, requiredDuringScheduling affinity expressions, etc.), compute a sum by iterating through the elements of this field and adding \"weight\" to the sum if the node matches the corresponding matchExpressions; the node(s) with the highest sum are the most preferred."
+     }
+    }
+   },
+   "v1.NodeSelector": {
+    "id": "v1.NodeSelector",
+    "description": "A node selector represents the union of the results of one or more label queries over a set of nodes; that is, it represents the OR of the selectors represented by the node selector terms.",
+    "required": [
+     "nodeSelectorTerms"
+    ],
+    "properties": {
+     "nodeSelectorTerms": {
+      "type": "array",
+      "items": {
+       "$ref": "v1.NodeSelectorTerm"
+      },
+      "description": "Required. A list of node selector terms. The terms are ORed."
+     }
+    }
+   },
+   "v1.NodeSelectorTerm": {
+    "id": "v1.NodeSelectorTerm",
+    "description": "A null or empty node selector term matches no objects.",
+    "required": [
+     "matchExpressions"
+    ],
+    "properties": {
+     "matchExpressions": {
+      "type": "array",
+      "items": {
+       "$ref": "v1.NodeSelectorRequirement"
+      },
+      "description": "Required. A list of node selector requirements. The requirements are ANDed."
+     }
+    }
+   },
+   "v1.NodeSelectorRequirement": {
+    "id": "v1.NodeSelectorRequirement",
+    "description": "A node selector requirement is a selector that contains values, a key, and an operator that relates the key and values.",
+    "required": [
+     "key",
+     "operator"
+    ],
+    "properties": {
+     "key": {
+      "type": "string",
+      "description": "The label key that the selector applies to."
+     },
+     "operator": {
+      "type": "string",
+      "description": "Represents a key's relationship to a set of values. Valid operators are In, NotIn, Exists, DoesNotExist. Gt, and Lt."
+     },
+     "values": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      },
+      "description": "An array of string values. If the operator is In or NotIn, the values array must be non-empty. If the operator is Exists or DoesNotExist, the values array must be empty. If the operator is Gt or Lt, the values array must have a single element, which will be interpreted as an integer. This array is replaced during a strategic merge patch."
+     }
+    }
+   },
+   "v1.PreferredSchedulingTerm": {
+    "id": "v1.PreferredSchedulingTerm",
+    "description": "An empty preferred scheduling term matches all objects with implicit weight 0 (i.e. it's a no-op). A null preferred scheduling term matches no objects (i.e. is also a no-op).",
+    "required": [
+     "weight",
+     "preference"
+    ],
+    "properties": {
+     "weight": {
+      "type": "integer",
+      "format": "int32",
+      "description": "Weight associated with matching the corresponding nodeSelectorTerm, in the range 1-100."
+     },
+     "preference": {
+      "$ref": "v1.NodeSelectorTerm",
+      "description": "A node selector term, associated with the corresponding weight."
+     }
+    }
+   },
+   "v1.PodAffinity": {
+    "id": "v1.PodAffinity",
+    "description": "Pod affinity is a group of inter pod affinity scheduling rules.",
+    "properties": {
+     "requiredDuringSchedulingIgnoredDuringExecution": {
+      "type": "array",
+      "items": {
+       "$ref": "v1.PodAffinityTerm"
+      },
+      "description": "NOT YET IMPLEMENTED. TODO: Uncomment field once it is implemented. If the affinity requirements specified by this field are not met at scheduling time, the pod will not be scheduled onto the node. If the affinity requirements specified by this field cease to be met at some point during pod execution (e.g. due to a pod label update), the system will try to eventually evict the pod from its node. When there are multiple elements, the lists of nodes corresponding to each podAffinityTerm are intersected, i.e. all terms must be satisfied. RequiredDuringSchedulingRequiredDuringExecution []PodAffinityTerm  `json:\"requiredDuringSchedulingRequiredDuringExecution,omitempty\"` If the affinity requirements specified by this field are not met at scheduling time, the pod will not be scheduled onto the node. If the affinity requirements specified by this field cease to be met at some point during pod execution (e.g. due to a pod label update), the system may or may not try to eventually evict the pod from its node. When there are multiple elements, the lists of nodes corresponding to each podAffinityTerm are intersected, i.e. all terms must be satisfied."
+     },
+     "preferredDuringSchedulingIgnoredDuringExecution": {
+      "type": "array",
+      "items": {
+       "$ref": "v1.WeightedPodAffinityTerm"
+      },
+      "description": "The scheduler will prefer to schedule pods to nodes that satisfy the affinity expressions specified by this field, but it may choose a node that violates one or more of the expressions. The node that is most preferred is the one with the greatest sum of weights, i.e. for each node that meets all of the scheduling requirements (resource request, requiredDuringScheduling affinity expressions, etc.), compute a sum by iterating through the elements of this field and adding \"weight\" to the sum if the node has pods which matches the corresponding podAffinityTerm; the node(s) with the highest sum are the most preferred."
+     }
+    }
+   },
+   "v1.PodAffinityTerm": {
+    "id": "v1.PodAffinityTerm",
+    "description": "Defines a set of pods (namely those matching the labelSelector relative to the given namespace(s)) that this pod should be co-located (affinity) or not co-located (anti-affinity) with, where co-located is defined as running on a node whose value of the label with key \u003ctopologyKey\u003e tches that of any node on which a pod of the set of pods is running",
+    "required": [
+     "namespaces"
+    ],
+    "properties": {
+     "labelSelector": {
+      "$ref": "v1.LabelSelector",
+      "description": "A label query over a set of resources, in this case pods."
+     },
+     "namespaces": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      },
+      "description": "namespaces specifies which namespaces the labelSelector applies to (matches against); nil list means \"this pod's namespace,\" empty list means \"all namespaces\" The json tag here is not \"omitempty\" since we need to distinguish nil and empty. See https://golang.org/pkg/encoding/json/#Marshal for more details."
+     },
+     "topologyKey": {
+      "type": "string",
+      "description": "This pod should be co-located (affinity) or not co-located (anti-affinity) with the pods matching the labelSelector in the specified namespaces, where co-located is defined as running on a node whose value of the label with key topologyKey matches that of any node on which any of the selected pods is running. For PreferredDuringScheduling pod anti-affinity, empty topologyKey is interpreted as \"all topologies\" (\"all topologies\" here means all the topologyKeys indicated by scheduler command-line argument --failure-domains); for affinity and for RequiredDuringScheduling pod anti-affinity, empty topologyKey is not allowed."
+     }
+    }
+   },
+   "v1.WeightedPodAffinityTerm": {
+    "id": "v1.WeightedPodAffinityTerm",
+    "description": "The weights of all of the matched WeightedPodAffinityTerm fields are added per-node to find the most preferred node(s)",
+    "required": [
+     "weight",
+     "podAffinityTerm"
+    ],
+    "properties": {
+     "weight": {
+      "type": "integer",
+      "format": "int32",
+      "description": "weight associated with matching the corresponding podAffinityTerm, in the range 1-100."
+     },
+     "podAffinityTerm": {
+      "$ref": "v1.PodAffinityTerm",
+      "description": "Required. A pod affinity term, associated with the corresponding weight."
+     }
+    }
+   },
+   "v1.PodAntiAffinity": {
+    "id": "v1.PodAntiAffinity",
+    "description": "Pod anti affinity is a group of inter pod anti affinity scheduling rules.",
+    "properties": {
+     "requiredDuringSchedulingIgnoredDuringExecution": {
+      "type": "array",
+      "items": {
+       "$ref": "v1.PodAffinityTerm"
+      },
+      "description": "NOT YET IMPLEMENTED. TODO: Uncomment field once it is implemented. If the anti-affinity requirements specified by this field are not met at scheduling time, the pod will not be scheduled onto the node. If the anti-affinity requirements specified by this field cease to be met at some point during pod execution (e.g. due to a pod label update), the system will try to eventually evict the pod from its node. When there are multiple elements, the lists of nodes corresponding to each podAffinityTerm are intersected, i.e. all terms must be satisfied. RequiredDuringSchedulingRequiredDuringExecution []PodAffinityTerm  `json:\"requiredDuringSchedulingRequiredDuringExecution,omitempty\"` If the anti-affinity requirements specified by this field are not met at scheduling time, the pod will not be scheduled onto the node. If the anti-affinity requirements specified by this field cease to be met at some point during pod execution (e.g. due to a pod label update), the system may or may not try to eventually evict the pod from its node. When there are multiple elements, the lists of nodes corresponding to each podAffinityTerm are intersected, i.e. all terms must be satisfied."
+     },
+     "preferredDuringSchedulingIgnoredDuringExecution": {
+      "type": "array",
+      "items": {
+       "$ref": "v1.WeightedPodAffinityTerm"
+      },
+      "description": "The scheduler will prefer to schedule pods to nodes that satisfy the anti-affinity expressions specified by this field, but it may choose a node that violates one or more of the expressions. The node that is most preferred is the one with the greatest sum of weights, i.e. for each node that meets all of the scheduling requirements (resource request, requiredDuringScheduling anti-affinity expressions, etc.), compute a sum by iterating through the elements of this field and adding \"weight\" to the sum if the node has pods which matches the corresponding podAffinityTerm; the node(s) with the highest sum are the most preferred."
+     }
+    }
+   },
    "v1beta1.DaemonSetStatus": {
     "id": "v1beta1.DaemonSetStatus",
     "description": "DaemonSetStatus represents the current status of a daemon set.",
@@ -10205,166 +9433,6 @@
      "hostname": {
       "type": "string",
       "description": "Hostname is set for load-balancer ingress points that are DNS based (typically AWS load-balancers)"
-     }
-    }
-   },
-   "v1beta1.JobList": {
-    "id": "v1beta1.JobList",
-    "description": "JobList is a collection of jobs. DEPRECATED: extensions/v1beta1.JobList is deprecated, use batch/v1.JobList instead.",
-    "required": [
-     "items"
-    ],
-    "properties": {
-     "kind": {
-      "type": "string",
-      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
-     },
-     "apiVersion": {
-      "type": "string",
-      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
-     },
-     "metadata": {
-      "$ref": "v1.ListMeta",
-      "description": "Standard list metadata More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata"
-     },
-     "items": {
-      "type": "array",
-      "items": {
-       "$ref": "v1beta1.Job"
-      },
-      "description": "Items is the list of Job."
-     }
-    }
-   },
-   "v1beta1.Job": {
-    "id": "v1beta1.Job",
-    "description": "Job represents the configuration of a single job. DEPRECATED: extensions/v1beta1.Job is deprecated, use batch/v1.Job instead.",
-    "properties": {
-     "kind": {
-      "type": "string",
-      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
-     },
-     "apiVersion": {
-      "type": "string",
-      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
-     },
-     "metadata": {
-      "$ref": "v1.ObjectMeta",
-      "description": "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata"
-     },
-     "spec": {
-      "$ref": "v1beta1.JobSpec",
-      "description": "Spec is a structure defining the expected behavior of a job. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status"
-     },
-     "status": {
-      "$ref": "v1beta1.JobStatus",
-      "description": "Status is a structure describing current status of a job. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status"
-     }
-    }
-   },
-   "v1beta1.JobSpec": {
-    "id": "v1beta1.JobSpec",
-    "description": "JobSpec describes how the job execution will look like.",
-    "required": [
-     "template"
-    ],
-    "properties": {
-     "parallelism": {
-      "type": "integer",
-      "format": "int32",
-      "description": "Parallelism specifies the maximum desired number of pods the job should run at any given time. The actual number of pods running in steady state will be less than this number when ((.spec.completions - .status.successful) \u003c .spec.parallelism), i.e. when the work left to do is less than max parallelism. More info: http://kubernetes.io/docs/user-guide/jobs"
-     },
-     "completions": {
-      "type": "integer",
-      "format": "int32",
-      "description": "Completions specifies the desired number of successfully finished pods the job should be run with.  Setting to nil means that the success of any pod signals the success of all pods, and allows parallelism to have any positive value.  Setting to 1 means that parallelism is limited to 1 and the success of that pod signals the success of the job. More info: http://kubernetes.io/docs/user-guide/jobs"
-     },
-     "activeDeadlineSeconds": {
-      "type": "integer",
-      "format": "int64",
-      "description": "Optional duration in seconds relative to the startTime that the job may be active before the system tries to terminate it; value must be positive integer"
-     },
-     "selector": {
-      "$ref": "v1.LabelSelector",
-      "description": "Selector is a label query over pods that should match the pod count. Normally, the system sets this field for you. More info: http://kubernetes.io/docs/user-guide/labels#label-selectors"
-     },
-     "autoSelector": {
-      "type": "boolean",
-      "description": "AutoSelector controls generation of pod labels and pod selectors. It was not present in the original extensions/v1beta1 Job definition, but exists to allow conversion from batch/v1 Jobs, where it corresponds to, but has the opposite meaning as, ManualSelector. More info: http://releases.k8s.io/HEAD/docs/design/selector-generation.md"
-     },
-     "template": {
-      "$ref": "v1.PodTemplateSpec",
-      "description": "Template is the object that describes the pod that will be created when executing a job. More info: http://kubernetes.io/docs/user-guide/jobs"
-     }
-    }
-   },
-   "v1beta1.JobStatus": {
-    "id": "v1beta1.JobStatus",
-    "description": "JobStatus represents the current state of a Job.",
-    "properties": {
-     "conditions": {
-      "type": "array",
-      "items": {
-       "$ref": "v1beta1.JobCondition"
-      },
-      "description": "Conditions represent the latest available observations of an object's current state. More info: http://kubernetes.io/docs/user-guide/jobs"
-     },
-     "startTime": {
-      "type": "string",
-      "description": "StartTime represents time when the job was acknowledged by the Job Manager. It is not guaranteed to be set in happens-before order across separate operations. It is represented in RFC3339 form and is in UTC."
-     },
-     "completionTime": {
-      "type": "string",
-      "description": "CompletionTime represents time when the job was completed. It is not guaranteed to be set in happens-before order across separate operations. It is represented in RFC3339 form and is in UTC."
-     },
-     "active": {
-      "type": "integer",
-      "format": "int32",
-      "description": "Active is the number of actively running pods."
-     },
-     "succeeded": {
-      "type": "integer",
-      "format": "int32",
-      "description": "Succeeded is the number of pods which reached Phase Succeeded."
-     },
-     "failed": {
-      "type": "integer",
-      "format": "int32",
-      "description": "Failed is the number of pods which reached Phase Failed."
-     }
-    }
-   },
-   "v1beta1.JobCondition": {
-    "id": "v1beta1.JobCondition",
-    "description": "JobCondition describes current state of a job.",
-    "required": [
-     "type",
-     "status"
-    ],
-    "properties": {
-     "type": {
-      "type": "string",
-      "description": "Type of job condition, Complete or Failed."
-     },
-     "status": {
-      "type": "string",
-      "description": "Status of the condition, one of True, False, Unknown."
-     },
-     "lastProbeTime": {
-      "type": "string",
-      "description": "Last time the condition was checked."
-     },
-     "lastTransitionTime": {
-      "type": "string",
-      "description": "Last time the condition transit from one status to another."
-     },
-     "reason": {
-      "type": "string",
-      "description": "(brief) reason for the condition's last transition."
-     },
-     "message": {
-      "type": "string",
-      "description": "Human readable message indicating details about last transition."
      }
     }
    },

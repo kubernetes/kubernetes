@@ -5373,12 +5373,18 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 							Format:      "",
 						},
 					},
+					"affinity": {
+						SchemaProps: spec.SchemaProps{
+							Description: "If specified, the pod's scheduling constraints",
+							Ref:         spec.MustCreateRef("#/definitions/v1.Affinity"),
+						},
+					},
 				},
 				Required: []string{"containers"},
 			},
 		},
 		Dependencies: []string{
-			"v1.Container", "v1.LocalObjectReference", "v1.PodSecurityContext", "v1.Volume"},
+			"v1.Affinity", "v1.Container", "v1.LocalObjectReference", "v1.PodSecurityContext", "v1.Volume"},
 	},
 	"v1.PodStatus": {
 		Schema: spec.Schema{
@@ -10847,227 +10853,6 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 			},
 		},
 		Dependencies: []string{},
-	},
-	"v1beta1.Job": {
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "Job represents the configuration of a single job. DEPRECATED: extensions/v1beta1.Job is deprecated, use batch/v1.Job instead.",
-				Properties: map[string]spec.Schema{
-					"metadata": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
-							Ref:         spec.MustCreateRef("#/definitions/v1.ObjectMeta"),
-						},
-					},
-					"spec": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Spec is a structure defining the expected behavior of a job. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status",
-							Ref:         spec.MustCreateRef("#/definitions/v1beta1.JobSpec"),
-						},
-					},
-					"status": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Status is a structure describing current status of a job. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status",
-							Ref:         spec.MustCreateRef("#/definitions/v1beta1.JobStatus"),
-						},
-					},
-				},
-			},
-		},
-		Dependencies: []string{
-			"v1.ObjectMeta", "v1beta1.JobSpec", "v1beta1.JobStatus"},
-	},
-	"v1beta1.JobCondition": {
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "JobCondition describes current state of a job.",
-				Properties: map[string]spec.Schema{
-					"type": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Type of job condition, Complete or Failed.",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-					"status": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Status of the condition, one of True, False, Unknown.",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-					"lastProbeTime": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Last time the condition was checked.",
-							Ref:         spec.MustCreateRef("#/definitions/v1.Time"),
-						},
-					},
-					"lastTransitionTime": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Last time the condition transit from one status to another.",
-							Ref:         spec.MustCreateRef("#/definitions/v1.Time"),
-						},
-					},
-					"reason": {
-						SchemaProps: spec.SchemaProps{
-							Description: "(brief) reason for the condition's last transition.",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-					"message": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Human readable message indicating details about last transition.",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-				},
-				Required: []string{"type", "status"},
-			},
-		},
-		Dependencies: []string{
-			"v1.Time"},
-	},
-	"v1beta1.JobList": {
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "JobList is a collection of jobs. DEPRECATED: extensions/v1beta1.JobList is deprecated, use batch/v1.JobList instead.",
-				Properties: map[string]spec.Schema{
-					"metadata": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Standard list metadata More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
-							Ref:         spec.MustCreateRef("#/definitions/v1.ListMeta"),
-						},
-					},
-					"items": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Items is the list of Job.",
-							Type:        []string{"array"},
-							Items: &spec.SchemaOrArray{
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Ref: spec.MustCreateRef("#/definitions/v1beta1.Job"),
-									},
-								},
-							},
-						},
-					},
-				},
-				Required: []string{"items"},
-			},
-		},
-		Dependencies: []string{
-			"v1.ListMeta", "v1beta1.Job"},
-	},
-	"v1beta1.JobSpec": {
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "JobSpec describes how the job execution will look like.",
-				Properties: map[string]spec.Schema{
-					"parallelism": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Parallelism specifies the maximum desired number of pods the job should run at any given time. The actual number of pods running in steady state will be less than this number when ((.spec.completions - .status.successful) < .spec.parallelism), i.e. when the work left to do is less than max parallelism. More info: http://kubernetes.io/docs/user-guide/jobs",
-							Type:        []string{"integer"},
-							Format:      "int32",
-						},
-					},
-					"completions": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Completions specifies the desired number of successfully finished pods the job should be run with.  Setting to nil means that the success of any pod signals the success of all pods, and allows parallelism to have any positive value.  Setting to 1 means that parallelism is limited to 1 and the success of that pod signals the success of the job. More info: http://kubernetes.io/docs/user-guide/jobs",
-							Type:        []string{"integer"},
-							Format:      "int32",
-						},
-					},
-					"activeDeadlineSeconds": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Optional duration in seconds relative to the startTime that the job may be active before the system tries to terminate it; value must be positive integer",
-							Type:        []string{"integer"},
-							Format:      "int64",
-						},
-					},
-					"selector": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Selector is a label query over pods that should match the pod count. Normally, the system sets this field for you. More info: http://kubernetes.io/docs/user-guide/labels#label-selectors",
-							Ref:         spec.MustCreateRef("#/definitions/v1.LabelSelector"),
-						},
-					},
-					"autoSelector": {
-						SchemaProps: spec.SchemaProps{
-							Description: "AutoSelector controls generation of pod labels and pod selectors. It was not present in the original extensions/v1beta1 Job definition, but exists to allow conversion from batch/v1 Jobs, where it corresponds to, but has the opposite meaning as, ManualSelector. More info: http://releases.k8s.io/HEAD/docs/design/selector-generation.md",
-							Type:        []string{"boolean"},
-							Format:      "",
-						},
-					},
-					"template": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Template is the object that describes the pod that will be created when executing a job. More info: http://kubernetes.io/docs/user-guide/jobs",
-							Ref:         spec.MustCreateRef("#/definitions/v1.PodTemplateSpec"),
-						},
-					},
-				},
-				Required: []string{"template"},
-			},
-		},
-		Dependencies: []string{
-			"v1.LabelSelector", "v1.PodTemplateSpec"},
-	},
-	"v1beta1.JobStatus": {
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "JobStatus represents the current state of a Job.",
-				Properties: map[string]spec.Schema{
-					"conditions": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Conditions represent the latest available observations of an object's current state. More info: http://kubernetes.io/docs/user-guide/jobs",
-							Type:        []string{"array"},
-							Items: &spec.SchemaOrArray{
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Ref: spec.MustCreateRef("#/definitions/v1beta1.JobCondition"),
-									},
-								},
-							},
-						},
-					},
-					"startTime": {
-						SchemaProps: spec.SchemaProps{
-							Description: "StartTime represents time when the job was acknowledged by the Job Manager. It is not guaranteed to be set in happens-before order across separate operations. It is represented in RFC3339 form and is in UTC.",
-							Ref:         spec.MustCreateRef("#/definitions/v1.Time"),
-						},
-					},
-					"completionTime": {
-						SchemaProps: spec.SchemaProps{
-							Description: "CompletionTime represents time when the job was completed. It is not guaranteed to be set in happens-before order across separate operations. It is represented in RFC3339 form and is in UTC.",
-							Ref:         spec.MustCreateRef("#/definitions/v1.Time"),
-						},
-					},
-					"active": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Active is the number of actively running pods.",
-							Type:        []string{"integer"},
-							Format:      "int32",
-						},
-					},
-					"succeeded": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Succeeded is the number of pods which reached Phase Succeeded.",
-							Type:        []string{"integer"},
-							Format:      "int32",
-						},
-					},
-					"failed": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Failed is the number of pods which reached Phase Failed.",
-							Type:        []string{"integer"},
-							Format:      "int32",
-						},
-					},
-				},
-			},
-		},
-		Dependencies: []string{
-			"v1.Time", "v1beta1.JobCondition"},
 	},
 	"v1beta1.LocalSubjectAccessReview": {
 		Schema: spec.Schema{

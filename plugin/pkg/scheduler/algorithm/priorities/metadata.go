@@ -38,9 +38,14 @@ func PriorityMetadata(pod *v1.Pod, nodeNameToInfo map[string]*schedulercache.Nod
 	if err != nil {
 		return nil
 	}
-	affinity, err := v1.GetAffinityFromPodAnnotations(pod.Annotations)
+	affinity := pod.Spec.Affinity
+	annotationAffinity, err := v1.GetAffinityFromPodAnnotations(pod.Annotations)
 	if err != nil {
 		return nil
+	}
+	if annotationAffinity != nil {
+		affinity.PodAffinity = annotationAffinity.PodAffinity
+		affinity.PodAntiAffinity = annotationAffinity.PodAntiAffinity
 	}
 	return &priorityMetadata{
 		nonZeroRequest: getNonZeroRequests(pod),

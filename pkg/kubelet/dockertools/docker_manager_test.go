@@ -25,7 +25,6 @@ import (
 	"path"
 	"reflect"
 	"regexp"
-	goruntime "runtime"
 	"sort"
 	"strconv"
 	"strings"
@@ -1896,8 +1895,7 @@ func TestSeccompLocalhostProfileIsLoaded(t *testing.T) {
 		recorder := record.NewFakeRecorder(20)
 		dm.recorder = recorder
 
-		_, filename, _, _ := goruntime.Caller(0)
-		dm.seccompProfileRoot = path.Join(path.Dir(filename), "fixtures", "seccomp")
+		dm.seccompProfileRoot = path.Join("fixtures", "seccomp")
 
 		pod := makePod("foo2", &v1.PodSpec{
 			Containers: []v1.Container{

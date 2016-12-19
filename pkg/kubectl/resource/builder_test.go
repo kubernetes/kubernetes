@@ -24,6 +24,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
@@ -1179,6 +1180,7 @@ func TestReceiveMultipleErrors(t *testing.T) {
 }
 
 func TestHasNames(t *testing.T) {
+	basename := filepath.Base(os.Args[0])
 	tests := []struct {
 		args            []string
 		expectedHasName bool
@@ -1222,13 +1224,13 @@ func TestHasNames(t *testing.T) {
 		{
 			args:            []string{"rc/foo", "bar"},
 			expectedHasName: false,
-			expectedError:   fmt.Errorf("there is no need to specify a resource type as a separate argument when passing arguments in resource/name form (e.g. 'resource.test get resource/<resource_name>' instead of 'resource.test get resource resource/<resource_name>'"),
+			expectedError:   fmt.Errorf("there is no need to specify a resource type as a separate argument when passing arguments in resource/name form (e.g. '" + basename + " get resource/<resource_name>' instead of '" + basename + " get resource resource/<resource_name>'"),
 		},
 	}
 	for _, test := range tests {
 		hasNames, err := HasNames(test.args)
 		if !reflect.DeepEqual(test.expectedError, err) {
-			t.Errorf("expected HasName to error %v, got %s", test.expectedError, err)
+			t.Errorf("expected HasName to error:\n%s\tgot:\n%s", test.expectedError, err)
 		}
 		if hasNames != test.expectedHasName {
 			t.Errorf("expected HasName to return %v for %s", test.expectedHasName, test.args)

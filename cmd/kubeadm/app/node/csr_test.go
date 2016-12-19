@@ -67,7 +67,7 @@ func TestPerformTLSBootstrap(t *testing.T) {
 			t.Fatalf("encountered an error while trying to get New Cert Client: %v", err)
 		}
 		cd.CertClient = tmpConfig
-		_, actual := PerformTLSBootstrap(cd)
+		_, actual := PerformTLSBootstrapDeprecated(cd)
 		if (actual == nil) != rt.expect {
 			t.Errorf(
 				"failed createClients:\n\texpected: %t\n\t  actual: %t",

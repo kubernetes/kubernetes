@@ -193,7 +193,7 @@ func (r *ProxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	alreadyRewriting := false
 	if roundTripper != nil {
 		_, alreadyRewriting = roundTripper.(*proxyutil.Transport)
-		glog.V(5).Infof("[%x] Not making a reriting transport for proxy %s...", proxyHandlerTraceID, req.URL)
+		glog.V(5).Infof("[%x] Not making a rewriting transport for proxy %s...", proxyHandlerTraceID, req.URL)
 	}
 	if !alreadyRewriting {
 		glog.V(5).Infof("[%x] making a transport for proxy %s...", proxyHandlerTraceID, req.URL)

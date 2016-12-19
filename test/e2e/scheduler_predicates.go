@@ -45,6 +45,7 @@ var masterNodes sets.String
 type pausePodConfig struct {
 	Name                              string
 	Affinity                          string
+	NodeAffinity                      *v1.Affinity
 	Annotations, Labels, NodeSelector map[string]string
 	Resources                         *v1.ResourceRequirements
 }
@@ -240,15 +241,17 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		podName := "without-label"
 		_, err := cs.Core().Pods(ns).Create(initPausePod(f, pausePodConfig{
 			Name: podName,
-			Affinity: `{
-				"nodeAffinity": {
-					"requiredDuringSchedulingIgnoredDuringExecution": {
-						"nodeSelectorTerms": [{
-							"matchExpressions": []
-						}]
+			NodeAffinity: &v1.Affinity{
+				NodeAffinity: &v1.NodeAffinity{
+					RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+						NodeSelectorTerms: []v1.NodeSelectorTerm{
+							{
+								MatchExpressions: []v1.NodeSelectorRequirement{},
+							},
+						},
 					},
-				}
-			}`,
+				},
+			},
 		}))
 
 		if err == nil || !errors.IsInvalid(err) {
@@ -300,28 +303,31 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 
 		createPausePod(f, pausePodConfig{
 			Name: podName,
-			Affinity: `{
-				"nodeAffinity": {
-					"requiredDuringSchedulingIgnoredDuringExecution": {
-						"nodeSelectorTerms": [
+			NodeAffinity: &v1.Affinity{
+				NodeAffinity: &v1.NodeAffinity{
+					RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+						NodeSelectorTerms: []v1.NodeSelectorTerm{
 							{
-								"matchExpressions": [{
-									"key": "foo",
-									"operator": "In",
-									"values": ["bar", "value2"]
-								}]
+								MatchExpressions: []v1.NodeSelectorRequirement{
+									{
+										Key:      "foo",
+										Operator: v1.NodeSelectorOpIn,
+										Values:   []string{"bar", "value2"},
+									},
+								},
+							}, {
+								MatchExpressions: []v1.NodeSelectorRequirement{
+									{
+										Key:      "diffkey",
+										Operator: v1.NodeSelectorOpIn,
+										Values:   []string{"wrong", "value2"},
+									},
+								},
 							},
-							{
-								"matchExpressions": [{
-									"key": "diffkey",
-									"operator": "In",
-									"values": ["wrong", "value2"]
-								}]
-							}
-						]
-					}
-				}
-			}`,
+						},
+					},
+				},
+			},
 			Labels: map[string]string{"name": "restricted"},
 		})
 		waitForScheduler()
@@ -344,23 +350,27 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		labelPodName := "with-labels"
 		pod := createPausePod(f, pausePodConfig{
 			Name: labelPodName,
-			Affinity: `{
-				"nodeAffinity": {
-					"requiredDuringSchedulingIgnoredDuringExecution": {
-						"nodeSelectorTerms": [{
-							"matchExpressions": [{
-								"key": "kubernetes.io/hostname",
-								"operator": "In",
-								"values": ["` + nodeName + `"]
-							},{
-								"key": "` + k + `",
-								"operator": "In",
-								"values": ["` + v + `"]
-							}]
-						}]
-					}
-				}
-			}`,
+			NodeAffinity: &v1.Affinity{
+				NodeAffinity: &v1.NodeAffinity{
+					RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+						NodeSelectorTerms: []v1.NodeSelectorTerm{
+							{
+								MatchExpressions: []v1.NodeSelectorRequirement{
+									{
+										Key:      "kubernetes.io/hostname",
+										Operator: v1.NodeSelectorOpIn,
+										Values:   []string{nodeName},
+									}, {
+										Key:      k,
+										Operator: v1.NodeSelectorOpIn,
+										Values:   []string{v},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
 		})
 
 		// check that pod got scheduled. We intentionally DO NOT check that the
@@ -370,31 +380,6 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		// kubelet will then refuse to launch the pod.
 		framework.ExpectNoError(framework.WaitForPodNotPending(cs, ns, labelPodName, pod.ResourceVersion))
 		labelPod, err := cs.Core().Pods(ns).Get(labelPodName, metav1.GetOptions{})
-		framework.ExpectNoError(err)
-		Expect(labelPod.Spec.NodeName).To(Equal(nodeName))
-	})
-
-	// Verify that an escaped JSON string of NodeAffinity in a YAML PodSpec works.
-	It("validates that embedding the JSON NodeAffinity setting as a string in the annotation value work", func() {
-		nodeName := getNodeThatCanRunPod(f)
-
-		By("Trying to apply a label with fake az info on the found node.")
-		k := "kubernetes.io/e2e-az-name"
-		v := "e2e-az1"
-		framework.AddOrUpdateLabelOnNode(cs, nodeName, k, v)
-		framework.ExpectNodeHasLabel(cs, nodeName, k, v)
-		defer framework.RemoveLabelOffNode(cs, nodeName, k)
-
-		By("Trying to launch a pod that with NodeAffinity setting as embedded JSON string in the annotation value.")
-		pod := createPodWithNodeAffinity(f)
-
-		// check that pod got scheduled. We intentionally DO NOT check that the
-		// pod is running because this will create a race condition with the
-		// kubelet and the scheduler: the scheduler might have scheduled a pod
-		// already when the kubelet does not know about its new label yet. The
-		// kubelet will then refuse to launch the pod.
-		framework.ExpectNoError(framework.WaitForPodNotPending(cs, ns, pod.Name, ""))
-		labelPod, err := cs.Core().Pods(ns).Get(pod.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 		Expect(labelPod.Spec.NodeName).To(Equal(nodeName))
 	})
@@ -777,6 +762,7 @@ func initPausePod(f *framework.Framework, conf pausePodConfig) *v1.Pod {
 		},
 		Spec: v1.PodSpec{
 			NodeSelector: conf.NodeSelector,
+			Affinity:     conf.NodeAffinity,
 			Containers: []v1.Container{
 				{
 					Name:  podName,
@@ -822,19 +808,23 @@ func runPodAndGetNodeName(f *framework.Framework, conf pausePodConfig) string {
 func createPodWithNodeAffinity(f *framework.Framework) *v1.Pod {
 	return createPausePod(f, pausePodConfig{
 		Name: "with-nodeaffinity-" + string(uuid.NewUUID()),
-		Affinity: `{
-			"nodeAffinity": {
-				"requiredDuringSchedulingIgnoredDuringExecution": {
-					"nodeSelectorTerms": [{
-						"matchExpressions": [{
-							"key": "kubernetes.io/e2e-az-name",
-							"operator": "In",
-							"values": ["e2e-az1", "e2e-az2"]
-						}]
-					}]
-				}
-			}
-		}`,
+		NodeAffinity: &v1.Affinity{
+			NodeAffinity: &v1.NodeAffinity{
+				RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+					NodeSelectorTerms: []v1.NodeSelectorTerm{
+						{
+							MatchExpressions: []v1.NodeSelectorRequirement{
+								{
+									Key:      "kubernetes.io/e2e-az-name",
+									Operator: v1.NodeSelectorOpIn,
+									Values:   []string{"e2e-az1", "e2e-az2"},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
 	})
 }
 

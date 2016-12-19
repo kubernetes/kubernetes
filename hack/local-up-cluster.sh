@@ -94,6 +94,7 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 
 function usage {
             echo "This script starts a local kube cluster. "
+            echo "Example 0: hack/local-up-cluster.sh -h  (this 'help' usage description)"
             echo "Example 1: hack/local-up-cluster.sh -o _output/dockerized/bin/linux/amd64/ (run from docker output)"
             echo "Example 2: hack/local-up-cluster.sh -O (auto-guess the bin path for your platform)"
             echo "Example 3: hack/local-up-cluster.sh (build a local copy of the source)"
@@ -111,7 +112,7 @@ function guess_built_binary_path {
 
 ### Allow user to supply the source directory.
 GO_OUT=${GO_OUT:-}
-while getopts "o:O" OPTION
+while getopts "ho:O" OPTION
 do
     case $OPTION in
         o)
@@ -126,6 +127,10 @@ do
                 exit 1
             fi
             ;;
+        h)
+            usage
+            exit
+            ;;
         ?)
             usage
             exit
@@ -138,14 +143,6 @@ if [ "x$GO_OUT" == "x" ]; then
 else
     echo "skipped the build."
 fi
-
-function test_docker {
-    ${DOCKER[@]} ps 2> /dev/null 1> /dev/null
-    if [ "$?" != "0" ]; then
-      echo "Failed to successfully run 'docker ps', please verify that docker is installed and \$DOCKER_HOST is set correctly."
-      exit 1
-    fi
-}
 
 function test_rkt {
     if [[ -n "${RKT_PATH}" ]]; then
@@ -680,8 +677,11 @@ EOF
 fi
 }
 
-if [[ "${CONTAINER_RUNTIME}" == "docker" ]]; then
-  test_docker
+# validate that etcd is: not running, in path, and has minimum required version.
+kube::etcd::validate
+
+if [ "${CONTAINER_RUNTIME}" == "docker" ] && ! kube::util::ensure_docker_daemon_connectivity; then
+  exit 1
 fi
 
 if [[ "${CONTAINER_RUNTIME}" == "rkt" ]]; then

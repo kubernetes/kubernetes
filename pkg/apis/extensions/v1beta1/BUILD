@@ -29,7 +29,6 @@ go_library(
         "//pkg/api/resource:go_default_library",
         "//pkg/api/v1:go_default_library",
         "//pkg/apis/autoscaling:go_default_library",
-        "//pkg/apis/batch:go_default_library",
         "//pkg/apis/extensions:go_default_library",
         "//pkg/apis/meta/v1:go_default_library",
         "//pkg/conversion:go_default_library",
@@ -46,17 +45,13 @@ go_library(
 
 go_test(
     name = "go_default_xtest",
-    srcs = [
-        "conversion_test.go",
-        "defaults_test.go",
-    ],
+    srcs = ["defaults_test.go"],
     tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/install:go_default_library",
         "//pkg/api/resource:go_default_library",
         "//pkg/api/v1:go_default_library",
-        "//pkg/apis/batch:go_default_library",
         "//pkg/apis/extensions/install:go_default_library",
         "//pkg/apis/extensions/v1beta1:go_default_library",
         "//pkg/apis/meta/v1:go_default_library",

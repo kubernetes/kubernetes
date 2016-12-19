@@ -67,8 +67,15 @@ func (s *DeploymentBasicGeneratorV1) StructuredGenerate() (runtime.Object, error
 
 	podSpec := api.PodSpec{Containers: []api.Container{}}
 	for _, imageString := range s.Images {
+		// Retain just the image name
 		imageSplit := strings.Split(imageString, "/")
 		name := imageSplit[len(imageSplit)-1]
+		// Remove any tag or hash
+		if strings.Contains(name, ":") {
+			name = strings.Split(name, ":")[0]
+		} else if strings.Contains(name, "@") {
+			name = strings.Split(name, "@")[0]
+		}
 		podSpec.Containers = append(podSpec.Containers, api.Container{Name: name, Image: imageString})
 	}
 

@@ -60,7 +60,7 @@ func (dc *DeploymentController) hasFailed(d *extensions.Deployment) (bool, error
 	// See https://github.com/kubernetes/kubernetes/issues/18568
 
 	allRSs := append(oldRSs, newRS)
-	newStatus := dc.calculateStatus(allRSs, newRS, d)
+	newStatus := calculateStatus(allRSs, newRS, d)
 
 	// If the deployment is complete or it is progressing, there is no need to check if it
 	// has timed out.
@@ -77,7 +77,7 @@ func (dc *DeploymentController) hasFailed(d *extensions.Deployment) (bool, error
 // for example a resync of the deployment after it was scaled up. In those cases,
 // we shouldn't try to estimate any progress.
 func (dc *DeploymentController) syncRolloutStatus(allRSs []*extensions.ReplicaSet, newRS *extensions.ReplicaSet, d *extensions.Deployment) error {
-	newStatus := dc.calculateStatus(allRSs, newRS, d)
+	newStatus := calculateStatus(allRSs, newRS, d)
 
 	// If there is no progressDeadlineSeconds set, remove any Progressing condition.
 	if d.Spec.ProgressDeadlineSeconds == nil {
@@ -88,23 +88,25 @@ func (dc *DeploymentController) syncRolloutStatus(allRSs []*extensions.ReplicaSe
 	// a new rollout and this is a resync where we don't need to estimate any progress.
 	// In such a case, we should simply not estimate any progress for this deployment.
 	currentCond := util.GetDeploymentCondition(d.Status, extensions.DeploymentProgressing)
-	isResyncEvent := newStatus.Replicas == newStatus.UpdatedReplicas && currentCond != nil && currentCond.Reason == util.NewRSAvailableReason
+	isCompleteDeployment := newStatus.Replicas == newStatus.UpdatedReplicas && currentCond != nil && currentCond.Reason == util.NewRSAvailableReason
 	// Check for progress only if there is a progress deadline set and the latest rollout
-	// hasn't completed yet. We also need to ensure the new replica set exists, otherwise
-	// we cannot estimate any progress.
-	if d.Spec.ProgressDeadlineSeconds != nil && !isResyncEvent && newRS != nil {
+	// hasn't completed yet.
+	if d.Spec.ProgressDeadlineSeconds != nil && !isCompleteDeployment {
 		switch {
 		case util.DeploymentComplete(d, &newStatus):
 			// Update the deployment conditions with a message for the new replica set that
 			// was successfully deployed. If the condition already exists, we ignore this update.
-			msg := fmt.Sprintf("Replica set %q has successfully progressed.", newRS.Name)
+			msg := fmt.Sprintf("ReplicaSet %q has successfully progressed.", newRS.Name)
 			condition := util.NewDeploymentCondition(extensions.DeploymentProgressing, v1.ConditionTrue, util.NewRSAvailableReason, msg)
 			util.SetDeploymentCondition(&newStatus, *condition)
 
 		case util.DeploymentProgressing(d, &newStatus):
 			// If there is any progress made, continue by not checking if the deployment failed. This
 			// behavior emulates the rolling updater progressDeadline check.
-			msg := fmt.Sprintf("Replica set %q is progressing.", newRS.Name)
+			msg := fmt.Sprintf("Deployment %q is progressing.", d.Name)
+			if newRS != nil {
+				msg = fmt.Sprintf("ReplicaSet %q is progressing.", newRS.Name)
+			}
 			condition := util.NewDeploymentCondition(extensions.DeploymentProgressing, v1.ConditionTrue, util.ReplicaSetUpdatedReason, msg)
 			// Update the current Progressing condition or add a new one if it doesn't exist.
 			// If a Progressing condition with status=true already exists, we should update
@@ -124,7 +126,10 @@ func (dc *DeploymentController) syncRolloutStatus(allRSs []*extensions.ReplicaSe
 		case util.DeploymentTimedOut(d, &newStatus):
 			// Update the deployment with a timeout condition. If the condition already exists,
 			// we ignore this update.
-			msg := fmt.Sprintf("Replica set %q has timed out progressing.", newRS.Name)
+			msg := fmt.Sprintf("Deployment %q has timed out progressing.", d.Name)
+			if newRS != nil {
+				msg = fmt.Sprintf("ReplicaSet %q has timed out progressing.", newRS.Name)
+			}
 			condition := util.NewDeploymentCondition(extensions.DeploymentProgressing, v1.ConditionFalse, util.TimedOutReason, msg)
 			util.SetDeploymentCondition(&newStatus, *condition)
 		}
@@ -154,7 +159,7 @@ func (dc *DeploymentController) syncRolloutStatus(allRSs []*extensions.ReplicaSe
 
 			after := time.Now().Add(time.Duration(*d.Spec.ProgressDeadlineSeconds) * time.Second).Sub(currentCond.LastUpdateTime.Time)
 			glog.V(4).Infof("Queueing up deployment %q for a progress check after %ds", d.Name, int(after.Seconds()))
-			dc.enqueueAfter(d, after)
+			dc.checkProgressAfter(d, after)
 		}
 		return nil
 	}

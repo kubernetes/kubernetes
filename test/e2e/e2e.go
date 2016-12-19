@@ -30,6 +30,7 @@ import (
 	"github.com/onsi/ginkgo/reporters"
 	"github.com/onsi/gomega"
 
+	federationapi "k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
@@ -108,7 +109,7 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 	// Delete any namespaces except default and kube-system. This ensures no
 	// lingering resources are left over from a previous test run.
 	if framework.TestContext.CleanStart {
-		deleted, err := framework.DeleteNamespaces(c, nil /* deleteFilter */, []string{api.NamespaceSystem, v1.NamespaceDefault})
+		deleted, err := framework.DeleteNamespaces(c, nil /* deleteFilter */, []string{api.NamespaceSystem, v1.NamespaceDefault, federationapi.FederationNamespaceSystem})
 		if err != nil {
 			framework.Failf("Error deleting orphaned namespaces: %v", err)
 		}

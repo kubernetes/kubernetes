@@ -4247,7 +4247,7 @@ func (x codecSelfer1234) decSliceJob(v *[]Job, d *codec1978.Decoder) {
 
 			yyrg370 := len(yyv370) > 0
 			yyv2370 := yyv370
-			yyrl370, yyrt370 = z.DecInferLen(yyl370, z.DecBasicHandle().MaxInitLen, 824)
+			yyrl370, yyrt370 = z.DecInferLen(yyl370, z.DecBasicHandle().MaxInitLen, 832)
 			if yyrt370 {
 				if yyrl370 <= cap(yyv370) {
 					yyv370 = yyv370[:yyrl370]
@@ -4479,7 +4479,7 @@ func (x codecSelfer1234) decSliceCronJob(v *[]CronJob, d *codec1978.Decoder) {
 
 			yyrg382 := len(yyv382) > 0
 			yyv2382 := yyv382
-			yyrl382, yyrt382 = z.DecInferLen(yyl382, z.DecBasicHandle().MaxInitLen, 1072)
+			yyrl382, yyrt382 = z.DecInferLen(yyl382, z.DecBasicHandle().MaxInitLen, 1080)
 			if yyrt382 {
 				if yyrl382 <= cap(yyv382) {
 					yyv382 = yyv382[:yyrl382]

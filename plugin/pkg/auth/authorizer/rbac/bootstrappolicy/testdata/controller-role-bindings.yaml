@@ -96,6 +96,21 @@ items:
     creationTimestamp: null
     labels:
       kubernetes.io/bootstrapping: rbac-defaults
+    name: system:controller:generic-garbage-collector
+  roleRef:
+    apiGroup: rbac.authorization.k8s.io
+    kind: ClusterRole
+    name: system:controller:generic-garbage-collector
+  subjects:
+  - kind: ServiceAccount
+    name: generic-garbage-collector
+    namespace: kube-system
+- apiVersion: rbac.authorization.k8s.io/v1alpha1
+  kind: ClusterRoleBinding
+  metadata:
+    creationTimestamp: null
+    labels:
+      kubernetes.io/bootstrapping: rbac-defaults
     name: system:controller:horizontal-pod-autoscaler
   roleRef:
     apiGroup: rbac.authorization.k8s.io
@@ -134,6 +149,21 @@ items:
   subjects:
   - kind: ServiceAccount
     name: namespace-controller
+    namespace: kube-system
+- apiVersion: rbac.authorization.k8s.io/v1alpha1
+  kind: ClusterRoleBinding
+  metadata:
+    creationTimestamp: null
+    labels:
+      kubernetes.io/bootstrapping: rbac-defaults
+    name: system:controller:node-controller
+  roleRef:
+    apiGroup: rbac.authorization.k8s.io
+    kind: ClusterRole
+    name: system:controller:node-controller
+  subjects:
+  - kind: ServiceAccount
+    name: node-controller
     namespace: kube-system
 - apiVersion: rbac.authorization.k8s.io/v1alpha1
   kind: ClusterRoleBinding
@@ -194,6 +224,51 @@ items:
   subjects:
   - kind: ServiceAccount
     name: replication-controller
+    namespace: kube-system
+- apiVersion: rbac.authorization.k8s.io/v1alpha1
+  kind: ClusterRoleBinding
+  metadata:
+    creationTimestamp: null
+    labels:
+      kubernetes.io/bootstrapping: rbac-defaults
+    name: system:controller:resourcequota-controller
+  roleRef:
+    apiGroup: rbac.authorization.k8s.io
+    kind: ClusterRole
+    name: system:controller:resourcequota-controller
+  subjects:
+  - kind: ServiceAccount
+    name: resourcequota-controller
+    namespace: kube-system
+- apiVersion: rbac.authorization.k8s.io/v1alpha1
+  kind: ClusterRoleBinding
+  metadata:
+    creationTimestamp: null
+    labels:
+      kubernetes.io/bootstrapping: rbac-defaults
+    name: system:controller:route-controller
+  roleRef:
+    apiGroup: rbac.authorization.k8s.io
+    kind: ClusterRole
+    name: system:controller:route-controller
+  subjects:
+  - kind: ServiceAccount
+    name: route-controller
+    namespace: kube-system
+- apiVersion: rbac.authorization.k8s.io/v1alpha1
+  kind: ClusterRoleBinding
+  metadata:
+    creationTimestamp: null
+    labels:
+      kubernetes.io/bootstrapping: rbac-defaults
+    name: system:controller:service-account-controller
+  roleRef:
+    apiGroup: rbac.authorization.k8s.io
+    kind: ClusterRole
+    name: system:controller:service-account-controller
+  subjects:
+  - kind: ServiceAccount
+    name: service-account-controller
     namespace: kube-system
 - apiVersion: rbac.authorization.k8s.io/v1alpha1
   kind: ClusterRoleBinding

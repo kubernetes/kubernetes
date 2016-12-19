@@ -231,7 +231,9 @@ func TestSyncDeploymentDontDoAnythingDuringDeletion(t *testing.T) {
 	now := metav1.Now()
 	d.DeletionTimestamp = &now
 	f.dLister = append(f.dLister, d)
+	f.objects = append(f.objects, d)
 
+	f.expectUpdateDeploymentStatusAction(d)
 	f.run(getKey(d, t))
 }
 

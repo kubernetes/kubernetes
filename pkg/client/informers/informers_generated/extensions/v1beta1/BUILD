@@ -14,7 +14,6 @@ go_library(
         "deployment.go",
         "ingress.go",
         "interface.go",
-        "job.go",
         "podsecuritypolicy.go",
         "replicaset.go",
         "thirdpartyresource.go",

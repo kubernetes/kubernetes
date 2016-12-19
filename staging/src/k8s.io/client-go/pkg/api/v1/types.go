@@ -2107,6 +2107,9 @@ type PodSpec struct {
 	// If not specified, the pod will not have a domainname at all.
 	// +optional
 	Subdomain string `json:"subdomain,omitempty" protobuf:"bytes,17,opt,name=subdomain"`
+	// If specified, the pod's scheduling constraints
+	// +optional
+	Affinity *Affinity `json:"affinity,omitempty" protobuf:"bytes,18,opt,name=affinity"`
 }
 
 // PodSecurityContext holds pod-level security attributes and common container settings.
@@ -2153,6 +2156,18 @@ type PodSecurityContext struct {
 	FSGroup *int64 `json:"fsGroup,omitempty" protobuf:"varint,5,opt,name=fsGroup"`
 }
 
+// PodQOSClass defines the supported qos classes of Pods.
+type PodQOSClass string
+
+const (
+	// PodQOSGuaranteed is the Guaranteed qos class.
+	PodQOSGuaranteed PodQOSClass = "Guaranteed"
+	// PodQOSBurstable is the Burstable qos class.
+	PodQOSBurstable PodQOSClass = "Burstable"
+	// PodQOSBestEffort is the BestEffort qos class.
+	PodQOSBestEffort PodQOSClass = "BestEffort"
+)
+
 // PodStatus represents information about the status of a pod. Status may trail the actual
 // state of a system.
 type PodStatus struct {
@@ -2196,6 +2211,11 @@ type PodStatus struct {
 	// More info: http://kubernetes.io/docs/user-guide/pod-states#container-statuses
 	// +optional
 	ContainerStatuses []ContainerStatus `json:"containerStatuses,omitempty" protobuf:"bytes,8,rep,name=containerStatuses"`
+	// The Quality of Service (QOS) classification assigned to the pod based on resource requirements
+	// See PodQOSClass type for available QOS classes
+	// More info: https://github.com/kubernetes/kubernetes/blob/master/docs/design/resource-qos.md
+	// +optional
+	QOSClass PodQOSClass `json:"qosClass,omitempty" protobuf:"bytes,9,rep,name=qosClass"`
 }
 
 // PodStatusResult is a wrapper for PodStatus returned by kubelet that can be encode/decoded
@@ -3103,6 +3123,7 @@ type NodeList struct {
 	Items []Node `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
 
+// FinalizerName is the name identifying a finalizer during namespace lifecycle.
 type FinalizerName string
 
 // These are internal finalizer values to Kubernetes, must be qualified name unless defined here

@@ -120,3 +120,8 @@ type ClusterList struct {
 	// List of Cluster objects.
 	Items []Cluster `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
+
+const (
+	// FederationNamespaceSystem is the system namespace where we place federation control plane components.
+	FederationNamespaceSystem string = "federation-system"
+)

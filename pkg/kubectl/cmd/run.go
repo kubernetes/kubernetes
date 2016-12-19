@@ -220,17 +220,12 @@ func Run(f cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *cobr
 		case api.RestartPolicyOnFailure:
 			if contains(resourcesList, batchv1.SchemeGroupVersion.WithResource("jobs")) {
 				generatorName = "job/v1"
-			} else if contains(resourcesList, v1beta1.SchemeGroupVersion.WithResource("jobs")) {
-				generatorName = "job/v1beta1"
 			} else {
 				generatorName = "run-pod/v1"
 			}
 		case api.RestartPolicyNever:
 			generatorName = "run-pod/v1"
 		}
-	}
-	if generatorName == "job/v1beta1" {
-		fmt.Fprintf(cmdErr, "DEPRECATED: --generator=job/v1beta1 is deprecated, use job/v1 instead.\n")
 	}
 	generators := f.Generators("run")
 	generator, found := generators[generatorName]

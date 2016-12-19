@@ -2517,6 +2517,10 @@ message PodSpec {
   // If not specified, the pod will not have a domainname at all.
   // +optional
   optional string subdomain = 17;
+
+  // If specified, the pod's scheduling constraints
+  // +optional
+  optional Affinity affinity = 18;
 }
 
 // PodStatus represents information about the status of a pod. Status may trail the actual

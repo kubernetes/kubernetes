@@ -20,65 +20,82 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
+	"regexp"
+	"strconv"
 	"strings"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	kubeadmapiext "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
 )
 
 const (
-	TokenIDLen = 6
-	TokenBytes = 8
+	TokenIDBytes = 3
+	TokenBytes   = 8
 )
 
-func RandBytes(length int) ([]byte, string, error) {
+func RandBytes(length int) (string, error) {
 	b := make([]byte, length)
 	_, err := rand.Read(b)
 	if err != nil {
-		return nil, "", err
+		return "", err
 	}
-	// It's only the tokenID that doesn't care about raw byte slice,
-	// so we just encoded it in place and ignore bytes slice where we
-	// do not want it
-	return b, hex.EncodeToString(b), nil
+	return hex.EncodeToString(b), nil
 }
 
-func GenerateToken(s *kubeadmapi.Secrets) error {
-	_, tokenID, err := RandBytes(TokenIDLen / 2)
+func GenerateToken(d *kubeadmapi.TokenDiscovery) error {
+	tokenID, err := RandBytes(TokenIDBytes)
 	if err != nil {
 		return err
 	}
 
-	tokenBytes, token, err := RandBytes(TokenBytes)
+	token, err := RandBytes(TokenBytes)
 	if err != nil {
 		return err
 	}
 
-	s.TokenID = tokenID
-	s.BearerToken = token
-	s.Token = tokenBytes
-	s.GivenToken = fmt.Sprintf("%s.%s", tokenID, token)
+	d.ID = tokenID
+	d.Secret = token
 	return nil
 }
 
-func UseGivenTokenIfValid(s *kubeadmapi.Secrets) (bool, error) {
-	if s.GivenToken == "" {
-		return false, nil // not given
+var (
+	tokenRegexpString = "^([a-zA-Z0-9]{6})\\.([a-zA-Z0-9]{16})$"
+	tokenRegexp       = regexp.MustCompile(tokenRegexpString)
+)
+
+func ParseToken(s string) (string, string, error) {
+	split := tokenRegexp.FindStringSubmatch(s)
+	if len(split) != 3 {
+		return "", "", fmt.Errorf("token %q was not of form %q", s, tokenRegexpString)
 	}
-	fmt.Println("[tokens] Validating provided token")
-	givenToken := strings.Split(strings.ToLower(s.GivenToken), ".")
-	// TODO(phase1+) could also print more specific messages in each case
-	invalidErr := "[tokens] Provided token does not match expected <6 characters>.<16 characters> format - %s"
-	if len(givenToken) != 2 {
-		return false, fmt.Errorf(invalidErr, "not in 2-part dot-separated format")
+	return split[1], split[2], nil
+
+}
+
+func BearerToken(d *kubeadmapi.TokenDiscovery) string {
+	return fmt.Sprintf("%s.%s", d.ID, d.Secret)
+}
+
+func IsTokenValid(d *kubeadmapi.TokenDiscovery) (bool, error) {
+	if len(d.ID)+len(d.Secret) == 0 {
+		return false, nil
 	}
-	if len(givenToken[0]) != TokenIDLen {
-		return false, fmt.Errorf(invalidErr, fmt.Sprintf(
-			"length of first part is incorrect [%d (given) != %d (expected) ]",
-			len(givenToken[0]), TokenIDLen))
+	if _, _, err := ParseToken(d.ID + "." + d.Secret); err != nil {
+		return false, err
 	}
-	tokenBytes := []byte(givenToken[1])
-	s.TokenID = givenToken[0]
-	s.BearerToken = givenToken[1]
-	s.Token = tokenBytes
-	return true, nil // given and valid
+	return true, nil
+}
+
+func DiscoveryPort(d *kubeadmapi.TokenDiscovery) int32 {
+	if len(d.Addresses) == 0 {
+		return kubeadmapiext.DefaultDiscoveryBindPort
+	}
+	split := strings.Split(d.Addresses[0], ":")
+	if len(split) == 1 {
+		return kubeadmapiext.DefaultDiscoveryBindPort
+	}
+	if i, err := strconv.Atoi(split[1]); err != nil {
+		return int32(i)
+	}
+	return kubeadmapiext.DefaultDiscoveryBindPort
 }

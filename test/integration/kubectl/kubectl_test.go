@@ -40,8 +40,8 @@ func TestKubectlValidation(t *testing.T) {
 		// The following test the experimental api.
 		// TODO: Replace with something more robust. These may move.
 		{`{"apiVersion": "extensions/v1beta1", "kind": "Ingress"}`, false},
-		{`{"apiVersion": "extensions/v1beta1", "kind": "Job"}`, false},
-		{`{"apiVersion": "vNotAVersion", "kind": "Job"}`, false},
+		{`{"apiVersion": "extensions/v1beta1", "kind": "DaemonSet"}`, false},
+		{`{"apiVersion": "vNotAVersion", "kind": "DaemonSet"}`, false},
 	}
 	components := framework.NewMasterComponents(&framework.Config{})
 	defer components.Stop(true, true)

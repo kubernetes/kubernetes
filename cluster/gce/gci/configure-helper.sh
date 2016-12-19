@@ -345,10 +345,13 @@ EOF
 
 # Uses KUBELET_CA_CERT (falling back to CA_CERT), KUBELET_CERT, and KUBELET_KEY
 # to generate a kubeconfig file for the kubelet to securely connect to the apiserver.
+# Set REGISTER_MASTER_KUBELET to true if kubelet on the master node
+# should register to the apiserver.
 function create-master-kubelet-auth {
   # Only configure the kubelet on the master if the required variables are
   # set in the environment.
   if [[ -n "${KUBELET_APISERVER:-}" && -n "${KUBELET_CERT:-}" && -n "${KUBELET_KEY:-}" ]]; then
+    REGISTER_MASTER_KUBELET="true"
     create-kubelet-kubeconfig
   fi
 }
@@ -504,7 +507,7 @@ function start-kubelet {
   if [[ "${KUBERNETES_MASTER:-}" == "true" ]]; then
     flags+=" --enable-debugging-handlers=false"
     flags+=" --hairpin-mode=none"
-    if [[ ! -z "${KUBELET_APISERVER:-}" && ! -z "${KUBELET_CERT:-}" && ! -z "${KUBELET_KEY:-}" ]]; then
+    if [[ "${REGISTER_MASTER_KUBELET:-false}" == "true" ]]; then
       flags+=" --api-servers=https://${KUBELET_APISERVER}"
       flags+=" --register-schedulable=false"
       flags+=" --register-with-taints=node.alpha.kubernetes.io/ismaster=:NoSchedule"
@@ -1102,10 +1105,17 @@ function start-kube-addons {
     sed -i -e "s@{{ *pillar\['cluster_registry_disk_size'\] *}}@${CLUSTER_REGISTRY_DISK_SIZE}@g" "${registry_pvc_file}"
     sed -i -e "s@{{ *pillar\['cluster_registry_disk_name'\] *}}@${CLUSTER_REGISTRY_DISK}@g" "${registry_pvc_file}"
   fi
+  # TODO(piosz): figure out how to not run fluentd-es pod from fluentd daemon set on master.
+  #              Running fluentd-es on the master is pointless, as it can't communicate
+  #              with elasticsearch from there in the default configuration.
   if [[ "${ENABLE_NODE_LOGGING:-}" == "true" ]] && \
      [[ "${LOGGING_DESTINATION:-}" == "elasticsearch" ]] && \
      [[ "${ENABLE_CLUSTER_LOGGING:-}" == "true" ]]; then
     setup-addon-manifests "addons" "fluentd-elasticsearch"
+  fi
+  if [[ "${ENABLE_NODE_LOGGING:-}" == "true" ]] && \
+     [[ "${LOGGING_DESTINATION:-}" == "gcp" ]]; then
+    setup-addon-manifests "addons" "fluentd-gcp"
   fi
   if [[ "${ENABLE_CLUSTER_UI:-}" == "true" ]]; then
     setup-addon-manifests "addons" "dashboard"
@@ -1127,17 +1137,14 @@ function start-kube-addons {
   cp "${src_dir}/kube-addon-manager.yaml" /etc/kubernetes/manifests
 }
 
-# Starts a fluentd static pod for logging.
-function start-fluentd {
+# Starts a fluentd static pod for logging for gcp in case master is not registered.
+function start-fluentd-static-pod {
   echo "Start fluentd pod"
-  if [[ "${ENABLE_NODE_LOGGING:-}" == "true" ]]; then
-    if [[ "${LOGGING_DESTINATION:-}" == "gcp" ]]; then
-      cp "${KUBE_HOME}/kube-manifests/kubernetes/fluentd-gcp.yaml" /etc/kubernetes/manifests/
-    elif [[ "${LOGGING_DESTINATION:-}" == "elasticsearch" && "${KUBERNETES_MASTER:-}" != "true" ]]; then
-      # Running fluentd-es on the master is pointless, as it can't communicate
-      # with elasticsearch from there in the default configuration.
-      cp "${KUBE_HOME}/kube-manifests/kubernetes/fluentd-es.yaml" /etc/kubernetes/manifests/
-    fi
+  if [[ "${ENABLE_NODE_LOGGING:-}" == "true" ]] && \
+     [[ "${LOGGING_DESTINATION:-}" == "gcp" ]] && \
+     [[ "${KUBERNETES_MASTER:-}" == "true" ]] && \
+     [[ "${REGISTER_MASTER_KUBELET:-false}" == "false" ]]; then
+    cp "${KUBE_HOME}/kube-manifests/kubernetes/fluentd-gcp.yaml" /etc/kubernetes/manifests/
   fi
 }
 
@@ -1280,6 +1287,7 @@ if [[ "${KUBERNETES_MASTER:-}" == "true" ]]; then
   start-cluster-autoscaler
   start-lb-controller
   start-rescheduler
+  start-fluentd-static-pod
 else
   start-kube-proxy
   # Kube-registry-proxy.
@@ -1290,6 +1298,5 @@ else
     start-image-puller
   fi
 fi
-start-fluentd
 reset-motd
 echo "Done for the configuration for kubernetes"

@@ -49,6 +49,7 @@ import (
 	. "github.com/onsi/gomega"
 	gomegatypes "github.com/onsi/gomega/types"
 
+	federationapi "k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	"k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset"
 	"k8s.io/kubernetes/pkg/api"
 	apierrs "k8s.io/kubernetes/pkg/api/errors"
@@ -363,7 +364,7 @@ func SkipUnlessServerVersionGTE(v *utilversion.Version, c discovery.ServerVersio
 func SkipUnlessFederated(c clientset.Interface) {
 	federationNS := os.Getenv("FEDERATION_NAMESPACE")
 	if federationNS == "" {
-		federationNS = "federation"
+		federationNS = federationapi.FederationNamespaceSystem
 	}
 
 	_, err := c.Core().Namespaces().Get(federationNS, metav1.GetOptions{})
@@ -500,8 +501,6 @@ func WaitForPodsSuccess(c clientset.Interface, ns string, successPodLabels map[s
 	return nil
 }
 
-var ReadyReplicaVersion = utilversion.MustParseSemantic("v1.4.0")
-
 // WaitForPodsRunningReady waits up to timeout to ensure that all pods in
 // namespace ns are either running and ready, or failed but controlled by a
 // controller. Also, it ensures that at least minPods are running and
@@ -517,12 +516,6 @@ var ReadyReplicaVersion = utilversion.MustParseSemantic("v1.4.0")
 // means "Ready" or not.
 // If skipSucceeded is true, any pods that are Succeeded are not counted.
 func WaitForPodsRunningReady(c clientset.Interface, ns string, minPods int32, timeout time.Duration, ignoreLabels map[string]string, skipSucceeded bool) error {
-	// This can be removed when we no longer have 1.3 servers running with upgrade tests.
-	hasReadyReplicas, err := ServerVersionGTE(ReadyReplicaVersion, c.Discovery())
-	if err != nil {
-		Logf("Error getting the server version: %v", err)
-		return err
-	}
 
 	ignoreSelector := labels.SelectorFromSet(ignoreLabels)
 	start := time.Now()
@@ -545,26 +538,24 @@ func WaitForPodsRunningReady(c clientset.Interface, ns string, minPods int32, ti
 		// checked.
 		replicas, replicaOk := int32(0), int32(0)
 
-		if hasReadyReplicas {
-			rcList, err := c.Core().ReplicationControllers(ns).List(v1.ListOptions{})
-			if err != nil {
-				Logf("Error getting replication controllers in namespace '%s': %v", ns, err)
-				return false, nil
-			}
-			for _, rc := range rcList.Items {
-				replicas += *rc.Spec.Replicas
-				replicaOk += rc.Status.ReadyReplicas
-			}
+		rcList, err := c.Core().ReplicationControllers(ns).List(v1.ListOptions{})
+		if err != nil {
+			Logf("Error getting replication controllers in namespace '%s': %v", ns, err)
+			return false, nil
+		}
+		for _, rc := range rcList.Items {
+			replicas += *rc.Spec.Replicas
+			replicaOk += rc.Status.ReadyReplicas
+		}
 
-			rsList, err := c.Extensions().ReplicaSets(ns).List(v1.ListOptions{})
-			if err != nil {
-				Logf("Error getting replication sets in namespace %q: %v", ns, err)
-				return false, nil
-			}
-			for _, rs := range rsList.Items {
-				replicas += *rs.Spec.Replicas
-				replicaOk += rs.Status.ReadyReplicas
-			}
+		rsList, err := c.Extensions().ReplicaSets(ns).List(v1.ListOptions{})
+		if err != nil {
+			Logf("Error getting replication sets in namespace %q: %v", ns, err)
+			return false, nil
+		}
+		for _, rs := range rsList.Items {
+			replicas += *rs.Spec.Replicas
+			replicaOk += rs.Status.ReadyReplicas
 		}
 
 		podList, err := c.Core().Pods(ns).List(v1.ListOptions{})
@@ -605,9 +596,7 @@ func WaitForPodsRunningReady(c clientset.Interface, ns string, minPods int32, ti
 
 		Logf("%d / %d pods in namespace '%s' are running and ready (%d seconds elapsed)",
 			nOk, len(podList.Items), ns, int(time.Since(start).Seconds()))
-		if hasReadyReplicas {
-			Logf("expected %d pod replicas in namespace '%s', %d are Running and Ready.", replicas, ns, replicaOk)
-		}
+		Logf("expected %d pod replicas in namespace '%s', %d are Running and Ready.", replicas, ns, replicaOk)
 
 		if replicaOk == replicas && nOk >= minPods && len(badPods) == 0 {
 			return true, nil
@@ -3301,6 +3290,40 @@ func WaitForDeploymentRollbackCleared(c clientset.Interface, ns, deploymentName 
 	return nil
 }
 
+// WatchRecreateDeployment watches Recreate deployments and ensures no new pods will run at the same time with
+// old pods.
+func WatchRecreateDeployment(c clientset.Interface, d *extensions.Deployment) error {
+	if d.Spec.Strategy.Type != extensions.RecreateDeploymentStrategyType {
+		return fmt.Errorf("deployment %q does not use a Recreate strategy: %s", d.Name, d.Spec.Strategy.Type)
+	}
+
+	w, err := c.Extensions().Deployments(d.Namespace).Watch(v1.SingleObject(v1.ObjectMeta{Name: d.Name, ResourceVersion: d.ResourceVersion}))
+	if err != nil {
+		return err
+	}
+
+	status := d.Status
+
+	condition := func(event watch.Event) (bool, error) {
+		d := event.Object.(*extensions.Deployment)
+		status = d.Status
+
+		if d.Status.UpdatedReplicas > 0 && d.Status.Replicas != d.Status.UpdatedReplicas {
+			return false, fmt.Errorf("deployment %q is running new pods alongside old pods: %#v", d.Name, status)
+		}
+
+		return *(d.Spec.Replicas) == d.Status.Replicas &&
+			*(d.Spec.Replicas) == d.Status.UpdatedReplicas &&
+			d.Generation <= d.Status.ObservedGeneration, nil
+	}
+
+	_, err = watch.Until(2*time.Minute, w, condition)
+	if err == wait.ErrWaitTimeout {
+		err = fmt.Errorf("deployment %q never completed: %#v", d.Name, status)
+	}
+	return err
+}
+
 // WaitForDeploymentRevisionAndImage waits for the deployment's and its new RS's revision and container image to match the given revision and image.
 // Note that deployment revision and its new RS revision should be updated shortly, so we only wait for 1 minute here to fail early.
 func WaitForDeploymentRevisionAndImage(c clientset.Interface, ns, deploymentName string, revision, image string) error {
@@ -4010,7 +4033,11 @@ func AllNodesReady(c clientset.Interface, timeout time.Duration) error {
 	}
 
 	if len(notReady) > TestContext.AllowedNotReadyNodes || !allowedNotReadyReasons(notReady) {
-		return fmt.Errorf("Not ready nodes: %#v", notReady)
+		msg := ""
+		for _, node := range notReady {
+			msg = fmt.Sprintf("%s, %s", msg, node.Name)
+		}
+		return fmt.Errorf("Not ready nodes: %#v", msg)
 	}
 	return nil
 }

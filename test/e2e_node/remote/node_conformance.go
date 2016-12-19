@@ -85,7 +85,7 @@ func buildConformanceTest(binDir string) error {
 			commandToString(cmd), err, output)
 	}
 	// Save docker image into tar file.
-	cmd = exec.Command("docker", "save", getConformanceImageRepo(), "-o", filepath.Join(binDir, conformanceTarfile))
+	cmd = exec.Command("docker", "save", "-o", filepath.Join(binDir, conformanceTarfile), getConformanceImageRepo())
 	if output, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("failed to save node conformance docker image into tar file: command - %q, error - %v, output - %q",
 			commandToString(cmd), err, output)
@@ -287,8 +287,8 @@ func (c *ConformanceRemote) RunTest(host, workspace, results, junitFilePrefix, t
 	// Run the tests
 	glog.V(2).Infof("Starting tests on %q", host)
 	podManifestPath := getPodManifestPath(workspace)
-	cmd := fmt.Sprintf("'timeout -k 30s %fs docker run --rm --privileged=true --net=host -v /:/rootfs -v %s:%s -v %s:/var/result %s'",
-		timeout.Seconds(), podManifestPath, podManifestPath, results, getConformanceImageRepo())
+	cmd := fmt.Sprintf("'timeout -k 30s %fs docker run --rm --privileged=true --net=host -v /:/rootfs -v %s:%s -v %s:/var/result -e TEST_ARGS=--report-prefix=%s %s'",
+		timeout.Seconds(), podManifestPath, podManifestPath, results, junitFilePrefix, getConformanceImageRepo())
 	testOutput, err := SSH(host, "sh", "-c", cmd)
 	if err != nil {
 		return testOutput, err

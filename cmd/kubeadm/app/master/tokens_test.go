@@ -17,67 +17,44 @@ limitations under the License.
 package master
 
 import (
-	"fmt"
-	"io/ioutil"
-	"os"
 	"testing"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 )
 
-func TestGenerateTokenIfNeeded(t *testing.T) {
-	var tests = []struct {
-		s        kubeadmapi.Secrets
-		expected bool
-	}{
-		{kubeadmapi.Secrets{GivenToken: "noperiod"}, false}, // not 2-part '.' format
-		{kubeadmapi.Secrets{GivenToken: "abcd.a"}, false},   // len(tokenID) != 6
-		{kubeadmapi.Secrets{GivenToken: "abcdef.a"}, true},
-		{kubeadmapi.Secrets{GivenToken: ""}, true},
-	}
-
-	for _, rt := range tests {
-		actual := generateTokenIfNeeded(&rt.s)
-		if (actual == nil) != rt.expected {
-			t.Errorf(
-				"failed UseGivenTokenIfValid:\n\texpected: %t\n\t  actual: %t\n\t token:%s",
-				rt.expected,
-				(actual == nil),
-				rt.s.GivenToken,
-			)
+func TestValidTokenPopulatesSecrets(t *testing.T) {
+	t.Run("provided", func(t *testing.T) {
+		expectedID := "123456"
+		expectedSecret := "0123456789abcdef"
+		s := &kubeadmapi.TokenDiscovery{
+			ID:     expectedID,
+			Secret: expectedSecret,
 		}
-	}
-}
 
-func TestCreateTokenAuthFile(t *testing.T) {
-	tmpdir, err := ioutil.TempDir("", "")
-	if err != nil {
-		t.Fatalf("Couldn't create tmpdir")
-	}
-	defer os.Remove(tmpdir)
-
-	// set up tmp GlobalEnvParams values for testing
-	oldEnv := kubeadmapi.GlobalEnvParams
-	kubeadmapi.GlobalEnvParams.HostPKIPath = fmt.Sprintf("%s/etc/kubernetes/pki", tmpdir)
-	defer func() { kubeadmapi.GlobalEnvParams = oldEnv }()
-
-	var tests = []struct {
-		s        kubeadmapi.Secrets
-		expected bool
-	}{
-		{kubeadmapi.Secrets{GivenToken: "noperiod"}, false}, // not 2-part '.' format
-		{kubeadmapi.Secrets{GivenToken: "abcd.a"}, false},   // len(tokenID) != 6
-		{kubeadmapi.Secrets{GivenToken: "abcdef.a"}, true},
-		{kubeadmapi.Secrets{GivenToken: ""}, true},
-	}
-	for _, rt := range tests {
-		actual := CreateTokenAuthFile(&rt.s)
-		if (actual == nil) != rt.expected {
-			t.Errorf(
-				"failed WriteKubeconfigIfNotExists with an error:\n\texpected: %t\n\t  actual: %t",
-				rt.expected,
-				(actual == nil),
-			)
+		err := generateTokenIfNeeded(s)
+		if err != nil {
+			t.Errorf("generateTokenIfNeeded gave an error for a valid token: %v", err)
 		}
-	}
+		if s.ID != expectedID {
+			t.Errorf("generateTokenIfNeeded did not populate the TokenID correctly; expected [%s] but got [%s]", expectedID, s.ID)
+		}
+		if s.Secret != expectedSecret {
+			t.Errorf("generateTokenIfNeeded did not populate the Token correctly; expected %v but got %v", expectedSecret, s.Secret)
+		}
+	})
+
+	t.Run("not provided", func(t *testing.T) {
+		s := &kubeadmapi.TokenDiscovery{}
+
+		err := generateTokenIfNeeded(s)
+		if err != nil {
+			t.Errorf("generateTokenIfNeeded gave an error for a valid token: %v", err)
+		}
+		if s.ID == "" {
+			t.Errorf("generateTokenIfNeeded did not populate the TokenID correctly; expected ID to be non-empty")
+		}
+		if s.Secret == "" {
+			t.Errorf("generateTokenIfNeeded did not populate the Token correctly; expected Secret to be non-empty")
+		}
+	})
 }

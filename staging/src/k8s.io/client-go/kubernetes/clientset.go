@@ -299,102 +299,102 @@ func NewForConfig(c *rest.Config) (*Clientset, error) {
 	if configShallowCopy.RateLimiter == nil && configShallowCopy.QPS > 0 {
 		configShallowCopy.RateLimiter = flowcontrol.NewTokenBucketRateLimiter(configShallowCopy.QPS, configShallowCopy.Burst)
 	}
-	var clientset Clientset
+	var cs Clientset
 	var err error
-	clientset.CoreV1Client, err = v1core.NewForConfig(&configShallowCopy)
+	cs.CoreV1Client, err = v1core.NewForConfig(&configShallowCopy)
 	if err != nil {
 		return nil, err
 	}
-	clientset.AppsV1beta1Client, err = v1beta1apps.NewForConfig(&configShallowCopy)
+	cs.AppsV1beta1Client, err = v1beta1apps.NewForConfig(&configShallowCopy)
 	if err != nil {
 		return nil, err
 	}
-	clientset.AuthenticationV1beta1Client, err = v1beta1authentication.NewForConfig(&configShallowCopy)
+	cs.AuthenticationV1beta1Client, err = v1beta1authentication.NewForConfig(&configShallowCopy)
 	if err != nil {
 		return nil, err
 	}
-	clientset.AuthorizationV1beta1Client, err = v1beta1authorization.NewForConfig(&configShallowCopy)
+	cs.AuthorizationV1beta1Client, err = v1beta1authorization.NewForConfig(&configShallowCopy)
 	if err != nil {
 		return nil, err
 	}
-	clientset.AutoscalingV1Client, err = v1autoscaling.NewForConfig(&configShallowCopy)
+	cs.AutoscalingV1Client, err = v1autoscaling.NewForConfig(&configShallowCopy)
 	if err != nil {
 		return nil, err
 	}
-	clientset.BatchV1Client, err = v1batch.NewForConfig(&configShallowCopy)
+	cs.BatchV1Client, err = v1batch.NewForConfig(&configShallowCopy)
 	if err != nil {
 		return nil, err
 	}
-	clientset.BatchV2alpha1Client, err = v2alpha1batch.NewForConfig(&configShallowCopy)
+	cs.BatchV2alpha1Client, err = v2alpha1batch.NewForConfig(&configShallowCopy)
 	if err != nil {
 		return nil, err
 	}
-	clientset.CertificatesV1alpha1Client, err = v1alpha1certificates.NewForConfig(&configShallowCopy)
+	cs.CertificatesV1alpha1Client, err = v1alpha1certificates.NewForConfig(&configShallowCopy)
 	if err != nil {
 		return nil, err
 	}
-	clientset.ExtensionsV1beta1Client, err = v1beta1extensions.NewForConfig(&configShallowCopy)
+	cs.ExtensionsV1beta1Client, err = v1beta1extensions.NewForConfig(&configShallowCopy)
 	if err != nil {
 		return nil, err
 	}
-	clientset.PolicyV1beta1Client, err = v1beta1policy.NewForConfig(&configShallowCopy)
+	cs.PolicyV1beta1Client, err = v1beta1policy.NewForConfig(&configShallowCopy)
 	if err != nil {
 		return nil, err
 	}
-	clientset.RbacV1alpha1Client, err = v1alpha1rbac.NewForConfig(&configShallowCopy)
+	cs.RbacV1alpha1Client, err = v1alpha1rbac.NewForConfig(&configShallowCopy)
 	if err != nil {
 		return nil, err
 	}
-	clientset.StorageV1beta1Client, err = v1beta1storage.NewForConfig(&configShallowCopy)
+	cs.StorageV1beta1Client, err = v1beta1storage.NewForConfig(&configShallowCopy)
 	if err != nil {
 		return nil, err
 	}
 
-	clientset.DiscoveryClient, err = discovery.NewDiscoveryClientForConfig(&configShallowCopy)
+	cs.DiscoveryClient, err = discovery.NewDiscoveryClientForConfig(&configShallowCopy)
 	if err != nil {
 		glog.Errorf("failed to create the DiscoveryClient: %v", err)
 		return nil, err
 	}
-	return &clientset, nil
+	return &cs, nil
 }
 
 // NewForConfigOrDie creates a new Clientset for the given config and
 // panics if there is an error in the config.
 func NewForConfigOrDie(c *rest.Config) *Clientset {
-	var clientset Clientset
-	clientset.CoreV1Client = v1core.NewForConfigOrDie(c)
-	clientset.AppsV1beta1Client = v1beta1apps.NewForConfigOrDie(c)
-	clientset.AuthenticationV1beta1Client = v1beta1authentication.NewForConfigOrDie(c)
-	clientset.AuthorizationV1beta1Client = v1beta1authorization.NewForConfigOrDie(c)
-	clientset.AutoscalingV1Client = v1autoscaling.NewForConfigOrDie(c)
-	clientset.BatchV1Client = v1batch.NewForConfigOrDie(c)
-	clientset.BatchV2alpha1Client = v2alpha1batch.NewForConfigOrDie(c)
-	clientset.CertificatesV1alpha1Client = v1alpha1certificates.NewForConfigOrDie(c)
-	clientset.ExtensionsV1beta1Client = v1beta1extensions.NewForConfigOrDie(c)
-	clientset.PolicyV1beta1Client = v1beta1policy.NewForConfigOrDie(c)
-	clientset.RbacV1alpha1Client = v1alpha1rbac.NewForConfigOrDie(c)
-	clientset.StorageV1beta1Client = v1beta1storage.NewForConfigOrDie(c)
+	var cs Clientset
+	cs.CoreV1Client = v1core.NewForConfigOrDie(c)
+	cs.AppsV1beta1Client = v1beta1apps.NewForConfigOrDie(c)
+	cs.AuthenticationV1beta1Client = v1beta1authentication.NewForConfigOrDie(c)
+	cs.AuthorizationV1beta1Client = v1beta1authorization.NewForConfigOrDie(c)
+	cs.AutoscalingV1Client = v1autoscaling.NewForConfigOrDie(c)
+	cs.BatchV1Client = v1batch.NewForConfigOrDie(c)
+	cs.BatchV2alpha1Client = v2alpha1batch.NewForConfigOrDie(c)
+	cs.CertificatesV1alpha1Client = v1alpha1certificates.NewForConfigOrDie(c)
+	cs.ExtensionsV1beta1Client = v1beta1extensions.NewForConfigOrDie(c)
+	cs.PolicyV1beta1Client = v1beta1policy.NewForConfigOrDie(c)
+	cs.RbacV1alpha1Client = v1alpha1rbac.NewForConfigOrDie(c)
+	cs.StorageV1beta1Client = v1beta1storage.NewForConfigOrDie(c)
 
-	clientset.DiscoveryClient = discovery.NewDiscoveryClientForConfigOrDie(c)
-	return &clientset
+	cs.DiscoveryClient = discovery.NewDiscoveryClientForConfigOrDie(c)
+	return &cs
 }
 
 // New creates a new Clientset for the given RESTClient.
 func New(c rest.Interface) *Clientset {
-	var clientset Clientset
-	clientset.CoreV1Client = v1core.New(c)
-	clientset.AppsV1beta1Client = v1beta1apps.New(c)
-	clientset.AuthenticationV1beta1Client = v1beta1authentication.New(c)
-	clientset.AuthorizationV1beta1Client = v1beta1authorization.New(c)
-	clientset.AutoscalingV1Client = v1autoscaling.New(c)
-	clientset.BatchV1Client = v1batch.New(c)
-	clientset.BatchV2alpha1Client = v2alpha1batch.New(c)
-	clientset.CertificatesV1alpha1Client = v1alpha1certificates.New(c)
-	clientset.ExtensionsV1beta1Client = v1beta1extensions.New(c)
-	clientset.PolicyV1beta1Client = v1beta1policy.New(c)
-	clientset.RbacV1alpha1Client = v1alpha1rbac.New(c)
-	clientset.StorageV1beta1Client = v1beta1storage.New(c)
+	var cs Clientset
+	cs.CoreV1Client = v1core.New(c)
+	cs.AppsV1beta1Client = v1beta1apps.New(c)
+	cs.AuthenticationV1beta1Client = v1beta1authentication.New(c)
+	cs.AuthorizationV1beta1Client = v1beta1authorization.New(c)
+	cs.AutoscalingV1Client = v1autoscaling.New(c)
+	cs.BatchV1Client = v1batch.New(c)
+	cs.BatchV2alpha1Client = v2alpha1batch.New(c)
+	cs.CertificatesV1alpha1Client = v1alpha1certificates.New(c)
+	cs.ExtensionsV1beta1Client = v1beta1extensions.New(c)
+	cs.PolicyV1beta1Client = v1beta1policy.New(c)
+	cs.RbacV1alpha1Client = v1alpha1rbac.New(c)
+	cs.StorageV1beta1Client = v1beta1storage.New(c)
 
-	clientset.DiscoveryClient = discovery.NewDiscoveryClient(c)
-	return &clientset
+	cs.DiscoveryClient = discovery.NewDiscoveryClient(c)
+	return &cs
 }

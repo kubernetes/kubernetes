@@ -38,6 +38,7 @@ go_library(
         "//pkg/registry/core/service/ipallocator:go_default_library",
         "//pkg/util/cert:go_default_library",
         "//pkg/util/intstr:go_default_library",
+        "//pkg/util/net:go_default_library",
         "//pkg/util/uuid:go_default_library",
         "//pkg/util/wait:go_default_library",
         "//vendor:github.com/blang/semver",

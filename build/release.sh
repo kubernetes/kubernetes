@@ -42,13 +42,5 @@ fi
 
 kube::build::copy_output
 
-if [[ "${FEDERATION:-}" == "true" ]];then
-    (
-	source "${KUBE_ROOT}/build/util.sh"
-	# Write federated docker image tag to workspace
-	kube::release::semantic_image_tag_version > "${KUBE_ROOT}/federation/manifests/federated-image.tag"
-    )
-fi
-
 kube::release::package_tarballs
 kube::release::package_hyperkube

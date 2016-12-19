@@ -26,10 +26,12 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = ["procfs_linux_test.go"],
+    data = [
+        "example_proc_cgroup",
+    ],
     library = "go_default_library",
     tags = [
         "automanaged",
-        "skip",
     ],
     deps = ["//vendor:github.com/stretchr/testify/assert"],
 )

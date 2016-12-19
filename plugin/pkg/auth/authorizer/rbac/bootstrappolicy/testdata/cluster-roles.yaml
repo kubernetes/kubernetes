@@ -133,7 +133,6 @@ items:
     - deployments
     - deployments/scale
     - horizontalpodautoscalers
-    - jobs
     - replicasets
     - replicasets/scale
     - replicationcontrollers/scale
@@ -321,7 +320,6 @@ items:
     - deployments
     - deployments/scale
     - horizontalpodautoscalers
-    - jobs
     - replicasets
     - replicasets/scale
     - replicationcontrollers/scale
@@ -388,6 +386,89 @@ items:
     - /version
     verbs:
     - get
+- apiVersion: rbac.authorization.k8s.io/v1alpha1
+  kind: ClusterRole
+  metadata:
+    creationTimestamp: null
+    labels:
+      kubernetes.io/bootstrapping: rbac-defaults
+    name: system:kube-controller-manager
+  rules:
+  - apiGroups:
+    - ""
+    attributeRestrictions: null
+    resources:
+    - events
+    verbs:
+    - create
+    - patch
+    - update
+  - apiGroups:
+    - ""
+    attributeRestrictions: null
+    resources:
+    - endpoints
+    - secrets
+    - serviceaccounts
+    verbs:
+    - create
+  - apiGroups:
+    - ""
+    attributeRestrictions: null
+    resources:
+    - secrets
+    verbs:
+    - delete
+  - apiGroups:
+    - ""
+    attributeRestrictions: null
+    resources:
+    - endpoints
+    - namespaces
+    - serviceaccounts
+    verbs:
+    - get
+  - apiGroups:
+    - ""
+    attributeRestrictions: null
+    resources:
+    - endpoints
+    - serviceaccounts
+    verbs:
+    - update
+  - apiGroups:
+    - '*'
+    attributeRestrictions: null
+    resources:
+    - namespaces
+    - nodes
+    - persistentvolumeclaims
+    - persistentvolumes
+    - pods
+    - secrets
+    - serviceaccounts
+    verbs:
+    - list
+    - watch
+  - apiGroups:
+    - extensions
+    attributeRestrictions: null
+    resources:
+    - daemonsets
+    - deployments
+    - replicasets
+    verbs:
+    - list
+    - watch
+  - apiGroups:
+    - batch
+    attributeRestrictions: null
+    resources:
+    - cronjobs
+    - jobs
+    verbs:
+    - list
+    - watch
 - apiVersion: rbac.authorization.k8s.io/v1alpha1
   kind: ClusterRole
   metadata:
@@ -512,6 +593,13 @@ items:
     verbs:
     - list
     - watch
+  - apiGroups:
+    - ""
+    attributeRestrictions: null
+    resources:
+    - nodes
+    verbs:
+    - get
 - apiVersion: rbac.authorization.k8s.io/v1alpha1
   kind: ClusterRole
   metadata:
@@ -599,7 +687,6 @@ items:
     - deployments
     - deployments/scale
     - horizontalpodautoscalers
-    - jobs
     - replicasets
     - replicasets/scale
     - replicationcontrollers/scale

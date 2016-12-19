@@ -22,7 +22,6 @@ go_library(
         "//pkg/api:go_default_library",
         "//pkg/api/resource:go_default_library",
         "//pkg/apis/autoscaling:go_default_library",
-        "//pkg/apis/batch:go_default_library",
         "//pkg/apis/meta/v1:go_default_library",
         "//pkg/conversion:go_default_library",
         "//pkg/runtime:go_default_library",

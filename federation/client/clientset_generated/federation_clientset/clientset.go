@@ -18,6 +18,7 @@ package federation_clientset
 
 import (
 	"github.com/golang/glog"
+	v1batch "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset/typed/batch/v1"
 	v1core "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset/typed/core/v1"
 	v1beta1extensions "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset/typed/extensions/v1beta1"
 	v1beta1federation "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset/typed/federation/v1beta1"
@@ -32,6 +33,9 @@ type Interface interface {
 	CoreV1() v1core.CoreV1Interface
 	// Deprecated: please explicitly pick a version if possible.
 	Core() v1core.CoreV1Interface
+	BatchV1() v1batch.BatchV1Interface
+	// Deprecated: please explicitly pick a version if possible.
+	Batch() v1batch.BatchV1Interface
 	ExtensionsV1beta1() v1beta1extensions.ExtensionsV1beta1Interface
 	// Deprecated: please explicitly pick a version if possible.
 	Extensions() v1beta1extensions.ExtensionsV1beta1Interface
@@ -45,6 +49,7 @@ type Interface interface {
 type Clientset struct {
 	*discovery.DiscoveryClient
 	*v1core.CoreV1Client
+	*v1batch.BatchV1Client
 	*v1beta1extensions.ExtensionsV1beta1Client
 	*v1beta1federation.FederationV1beta1Client
 }
@@ -64,6 +69,23 @@ func (c *Clientset) Core() v1core.CoreV1Interface {
 		return nil
 	}
 	return c.CoreV1Client
+}
+
+// BatchV1 retrieves the BatchV1Client
+func (c *Clientset) BatchV1() v1batch.BatchV1Interface {
+	if c == nil {
+		return nil
+	}
+	return c.BatchV1Client
+}
+
+// Deprecated: Batch retrieves the default version of BatchClient.
+// Please explicitly pick a version.
+func (c *Clientset) Batch() v1batch.BatchV1Interface {
+	if c == nil {
+		return nil
+	}
+	return c.BatchV1Client
 }
 
 // ExtensionsV1beta1 retrieves the ExtensionsV1beta1Client
@@ -111,48 +133,54 @@ func NewForConfig(c *restclient.Config) (*Clientset, error) {
 	if configShallowCopy.RateLimiter == nil && configShallowCopy.QPS > 0 {
 		configShallowCopy.RateLimiter = flowcontrol.NewTokenBucketRateLimiter(configShallowCopy.QPS, configShallowCopy.Burst)
 	}
-	var clientset Clientset
+	var cs Clientset
 	var err error
-	clientset.CoreV1Client, err = v1core.NewForConfig(&configShallowCopy)
+	cs.CoreV1Client, err = v1core.NewForConfig(&configShallowCopy)
 	if err != nil {
 		return nil, err
 	}
-	clientset.ExtensionsV1beta1Client, err = v1beta1extensions.NewForConfig(&configShallowCopy)
+	cs.BatchV1Client, err = v1batch.NewForConfig(&configShallowCopy)
 	if err != nil {
 		return nil, err
 	}
-	clientset.FederationV1beta1Client, err = v1beta1federation.NewForConfig(&configShallowCopy)
+	cs.ExtensionsV1beta1Client, err = v1beta1extensions.NewForConfig(&configShallowCopy)
+	if err != nil {
+		return nil, err
+	}
+	cs.FederationV1beta1Client, err = v1beta1federation.NewForConfig(&configShallowCopy)
 	if err != nil {
 		return nil, err
 	}
 
-	clientset.DiscoveryClient, err = discovery.NewDiscoveryClientForConfig(&configShallowCopy)
+	cs.DiscoveryClient, err = discovery.NewDiscoveryClientForConfig(&configShallowCopy)
 	if err != nil {
 		glog.Errorf("failed to create the DiscoveryClient: %v", err)
 		return nil, err
 	}
-	return &clientset, nil
+	return &cs, nil
 }
 
 // NewForConfigOrDie creates a new Clientset for the given config and
 // panics if there is an error in the config.
 func NewForConfigOrDie(c *restclient.Config) *Clientset {
-	var clientset Clientset
-	clientset.CoreV1Client = v1core.NewForConfigOrDie(c)
-	clientset.ExtensionsV1beta1Client = v1beta1extensions.NewForConfigOrDie(c)
-	clientset.FederationV1beta1Client = v1beta1federation.NewForConfigOrDie(c)
+	var cs Clientset
+	cs.CoreV1Client = v1core.NewForConfigOrDie(c)
+	cs.BatchV1Client = v1batch.NewForConfigOrDie(c)
+	cs.ExtensionsV1beta1Client = v1beta1extensions.NewForConfigOrDie(c)
+	cs.FederationV1beta1Client = v1beta1federation.NewForConfigOrDie(c)
 
-	clientset.DiscoveryClient = discovery.NewDiscoveryClientForConfigOrDie(c)
-	return &clientset
+	cs.DiscoveryClient = discovery.NewDiscoveryClientForConfigOrDie(c)
+	return &cs
 }
 
 // New creates a new Clientset for the given RESTClient.
 func New(c restclient.Interface) *Clientset {
-	var clientset Clientset
-	clientset.CoreV1Client = v1core.New(c)
-	clientset.ExtensionsV1beta1Client = v1beta1extensions.New(c)
-	clientset.FederationV1beta1Client = v1beta1federation.New(c)
+	var cs Clientset
+	cs.CoreV1Client = v1core.New(c)
+	cs.BatchV1Client = v1batch.New(c)
+	cs.ExtensionsV1beta1Client = v1beta1extensions.New(c)
+	cs.FederationV1beta1Client = v1beta1federation.New(c)
 
-	clientset.DiscoveryClient = discovery.NewDiscoveryClient(c)
-	return &clientset
+	cs.DiscoveryClient = discovery.NewDiscoveryClient(c)
+	return &cs
 }

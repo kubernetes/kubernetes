@@ -879,9 +879,6 @@ func (e *Store) Watch(ctx api.Context, options *api.ListOptions) (watch.Interfac
 func (e *Store) WatchPredicate(ctx api.Context, p storage.SelectionPredicate, resourceVersion string) (watch.Interface, error) {
 	if name, ok := p.MatchesSingle(); ok {
 		if key, err := e.KeyFunc(ctx, name); err == nil {
-			if err != nil {
-				return nil, err
-			}
 			w, err := e.Storage.Watch(ctx, key, resourceVersion, p)
 			if err != nil {
 				return nil, err

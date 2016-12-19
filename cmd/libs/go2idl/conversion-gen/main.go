@@ -64,6 +64,8 @@ func main() {
 	}
 	pflag.CommandLine.StringSliceVar(&customArgs.ExtraPeerDirs, "extra-peer-dirs", customArgs.ExtraPeerDirs,
 		"Comma-separated list of import paths which are considered, after tag-specified peers, for conversions.")
+	pflag.CommandLine.BoolVar(&customArgs.SkipUnsafe, "skip-unsafe", customArgs.SkipUnsafe,
+		"If true, will not generate code using unsafe pointer conversions; resulting code may be slower.")
 	arguments.CustomArgs = customArgs
 
 	// Run it.

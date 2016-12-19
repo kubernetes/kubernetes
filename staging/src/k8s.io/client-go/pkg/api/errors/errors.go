@@ -308,7 +308,8 @@ func NewGenericServerResponse(code int, verb string, qualifiedResource schema.Gr
 		message = "the server has asked for the client to provide credentials"
 	case http.StatusForbidden:
 		reason = metav1.StatusReasonForbidden
-		message = "the server does not allow access to the requested resource"
+		// the server message has details about who is trying to perform what action.  Keep its message.
+		message = serverMessage
 	case http.StatusMethodNotAllowed:
 		reason = metav1.StatusReasonMethodNotAllowed
 		message = "the server does not allow this method on the requested resource"
