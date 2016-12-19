@@ -208,8 +208,9 @@ function create-master-auth {
   local -r known_tokens_csv="${auth_dir}/known_tokens.csv"
   if [[ ! -e "${known_tokens_csv}" ]]; then
     echo "${KUBE_BEARER_TOKEN},admin,admin" > "${known_tokens_csv}"
-    echo "${KUBELET_TOKEN},kubelet,kubelet" >> "${known_tokens_csv}"
-    echo "${KUBE_PROXY_TOKEN},kube_proxy,kube_proxy" >> "${known_tokens_csv}"
+    echo "${KUBE_CONTROLLER_MANAGER_TOKEN},system:kube-controller-manager,uid:system:kube-controller-manager" >> "${known_tokens_csv}"
+    echo "${KUBELET_TOKEN},system:node:node-name,uid:kubelet,system:nodes" >> "${known_tokens_csv}"
+    echo "${KUBE_PROXY_TOKEN},system:kube-proxy,uid:kube_proxy" >> "${known_tokens_csv}"
   fi
   local use_cloud_config="false"
   cat <<EOF >/etc/gce.conf
@@ -328,8 +329,7 @@ kind: Config
 users:
 - name: kubelet
   user:
-    client-certificate-data: ${KUBELET_CERT}
-    client-key-data: ${KUBELET_KEY}
+    token: ${KUBELET_TOKEN}
 clusters:
 - name: local
   cluster:
@@ -352,8 +352,9 @@ function create-master-kubelet-auth {
   # set in the environment.
   if [[ -n "${KUBELET_APISERVER:-}" && -n "${KUBELET_CERT:-}" && -n "${KUBELET_KEY:-}" ]]; then
     REGISTER_MASTER_KUBELET="true"
-    create-kubelet-kubeconfig
   fi
+  
+  create-kubelet-kubeconfig
 }
 
 function create-kubeproxy-kubeconfig {
@@ -373,6 +374,30 @@ contexts:
 - context:
     cluster: local
     user: kube-proxy
+  name: service-account-context
+current-context: service-account-context
+EOF
+}
+
+function create-kubecontrollermanager-kubeconfig {
+  echo "Creating kube-controller-manager kubeconfig file"
+  mkdir -p /etc/srv/kubernetes/kube-controller-manager
+  cat <<EOF >/etc/srv/kubernetes/kube-controller-manager/kubeconfig
+apiVersion: v1
+kind: Config
+users:
+- name: kube-controller-manager
+  user:
+    token: ${KUBE_CONTROLLER_MANAGER_TOKEN}
+clusters:
+- name: local
+  cluster:
+    certificate-authority-data: ${CA_CERT}
+    server: https://${MASTER_ADVERTISE_ADDRESS}:443
+contexts:
+- context:
+    cluster: local
+    user: kube-controller-manager
   name: service-account-context
 current-context: service-account-context
 EOF
@@ -838,7 +863,7 @@ function start-kube-apiserver {
     webhook_authn_config_volume="{\"name\": \"webhookauthnconfigmount\",\"hostPath\": {\"path\": \"/etc/gcp_authn.config\"}},"
   fi
 
-  params+=" --authorization-mode=ABAC"
+  params+=" --authorization-mode=RBAC,ABAC"
   local webhook_config_mount=""
   local webhook_config_volume=""
   if [[ -n "${GCP_AUTHZ_URL:-}" ]]; then
@@ -897,11 +922,13 @@ function start-kube-apiserver {
 #   DOCKER_REGISTRY
 function start-kube-controller-manager {
   echo "Start kubernetes controller-manager"
+  create-kubecontrollermanager-kubeconfig
   prepare-log-file /var/log/kube-controller-manager.log
   # Calculate variables and assemble the command line.
   local params="${CONTROLLER_MANAGER_TEST_LOG_LEVEL:-"--v=2"} ${CONTROLLER_MANAGER_TEST_ARGS:-} ${CLOUD_CONFIG_OPT}"
+  params+=" --use-service-account-credentials"
   params+=" --cloud-provider=gce"
-  params+=" --master=127.0.0.1:8080"
+  params+=" --kubeconfig=/etc/srv/kubernetes/kube-controller-manager/kubeconfig"
   params+=" --root-ca-file=/etc/srv/kubernetes/ca.crt"
   params+=" --service-account-private-key-file=/etc/srv/kubernetes/server.key"
   if [[ -n "${ENABLE_GARBAGE_COLLECTOR:-}" ]]; then
