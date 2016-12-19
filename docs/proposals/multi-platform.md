@@ -277,7 +277,7 @@ A great blog post [that is describing this](https://medium.com/@rakyll/go-1-5-cr
 Before Go 1.5, the whole Go project had to be cross-compiled from source for **all** platforms that _might_ be used, and that was quite a slow process:
 
 ```console
-# From build-tools/build-image/cross/Dockerfile when we used Go 1.4
+# From build/build-image/cross/Dockerfile when we used Go 1.4
 $ cd /usr/src/go/src
 $ for platform in ${PLATFORMS}; do GOOS=${platform%/*} GOARCH=${platform##*/} ./make.bash --no-clean; done
 ```
@@ -288,7 +288,7 @@ If you cross-compile multiple times, Go will build parts of `std`, throw it away
 However, there is an easy way of cross-compiling all `std` packages in advance with Go 1.5+:
 
 ```console
-# From build-tools/build-image/cross/Dockerfile when we're using Go 1.5+
+# From build/build-image/cross/Dockerfile when we're using Go 1.5+
 $ for platform in ${PLATFORMS}; do GOOS=${platform%/*} GOARCH=${platform##*/} go install std; done
 ```
 
@@ -377,7 +377,7 @@ In order to dynamically compile a go binary with `cgo`, we need `gcc` installed 
 
 The only Kubernetes binary that is using C code is the `kubelet`, or in fact `cAdvisor` on which `kubelet` depends. `hyperkube` is also dynamically linked as long as `kubelet` is. We should aim to make `kubelet` statically linked.
 
-The normal `x86_64-linux-gnu` can't cross-compile binaries, so we have to install gcc cross-compilers for every platform. We do this in the [`kube-cross`](../../build-tools/build-image/cross/Dockerfile) image,
+The normal `x86_64-linux-gnu` can't cross-compile binaries, so we have to install gcc cross-compilers for every platform. We do this in the [`kube-cross`](../../build/build-image/cross/Dockerfile) image,
 and depend on the [`emdebian.org` repository](https://wiki.debian.org/CrossToolchains). Depending on `emdebian` isn't ideal, so we should consider using the latest `gcc` cross-compiler packages from the `ubuntu` main repositories in the future.
 
 Here's an example when cross-compiling plain C code:

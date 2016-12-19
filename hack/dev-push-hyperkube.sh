@@ -27,7 +27,7 @@ set -o nounset
 set -o pipefail
 
 KUBE_ROOT="$(dirname "${BASH_SOURCE}")/.."
-source "${KUBE_ROOT}/build-tools/common.sh"
+source "${KUBE_ROOT}/build/common.sh"
 
 if [[ -z "${REGISTRY:-}" ]]; then
 	echo "REGISTRY must be set"
