@@ -557,12 +557,12 @@ func (c *Cacher) triggerValues(event *watchCacheEvent) ([]string, bool) {
 	return result, len(result) > 0
 }
 
-func (c *Cacher) processEvent(event watchCacheEvent) {
+func (c *Cacher) processEvent(event *watchCacheEvent) {
 	if curLen := int64(len(c.incoming)); c.incomingHWM.Update(curLen) {
 		// Monitor if this gets backed up, and how much.
 		glog.V(1).Infof("cacher (%v): %v objects queued in incoming channel.", c.objectType.String(), curLen)
 	}
-	c.incoming <- event
+	c.incoming <- *event
 }
 
 func (c *Cacher) dispatchEvents() {
@@ -756,7 +756,7 @@ type cacheWatcher struct {
 	forget  func(bool)
 }
 
-func newCacheWatcher(resourceVersion uint64, chanSize int, initEvents []watchCacheEvent, filter watchFilterFunc, forget func(bool)) *cacheWatcher {
+func newCacheWatcher(resourceVersion uint64, chanSize int, initEvents []*watchCacheEvent, filter watchFilterFunc, forget func(bool)) *cacheWatcher {
 	watcher := &cacheWatcher{
 		input:   make(chan watchCacheEvent, chanSize),
 		result:  make(chan watch.Event, chanSize),
@@ -866,7 +866,7 @@ func (c *cacheWatcher) sendWatchCacheEvent(event *watchCacheEvent) {
 	}
 }
 
-func (c *cacheWatcher) process(initEvents []watchCacheEvent, resourceVersion uint64) {
+func (c *cacheWatcher) process(initEvents []*watchCacheEvent, resourceVersion uint64) {
 	defer utilruntime.HandleCrash()
 
 	// Check how long we are processing initEvents.
@@ -885,7 +885,7 @@ func (c *cacheWatcher) process(initEvents []watchCacheEvent, resourceVersion uin
 	const initProcessThreshold = 500 * time.Millisecond
 	startTime := time.Now()
 	for _, event := range initEvents {
-		c.sendWatchCacheEvent(&event)
+		c.sendWatchCacheEvent(event)
 	}
 	processingTime := time.Since(startTime)
 	if processingTime > initProcessThreshold {
