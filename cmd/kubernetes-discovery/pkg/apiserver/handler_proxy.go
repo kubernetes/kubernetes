@@ -23,6 +23,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apiserver"
+	v1listers "k8s.io/kubernetes/pkg/client/listers/core/v1"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/transport"
 	genericrest "k8s.io/kubernetes/pkg/registry/generic/rest"
@@ -36,6 +37,8 @@ import (
 // specified by items implementing Redirector.
 type proxyHandler struct {
 	contextMapper api.RequestContextMapper
+
+	serviceLister v1listers.ServiceLister
 
 	// proxyClientCert/Key are the client cert used to identify this proxy. Backing APIServices use
 	// this to confirm the proxy's identity
@@ -52,10 +55,20 @@ type proxyHandler struct {
 	// proxyRoundTripper is the re-useable portion of the transport.  It does not vary with any request.
 	proxyRoundTripper http.RoundTripper
 	// destinationHost is the hostname of the backing API server
-	destinationHost string
+	destinationHost  string
+	serviceNamespace string
+	serviceName      string
 }
 
 func (r *proxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+	serviceNamespace, serviceName := r.getServiceRef()
+	if len(serviceName) == 0 || len(serviceNamespace) == 0 {
+		http.Error(w, "", http.StatusNotFound)
+	}
+	if _, err := r.serviceLister.Services(serviceNamespace).Get(serviceName); err != nil {
+		http.Error(w, "", http.StatusNotFound)
+	}
+
 	proxyRoundTripper, err := r.getRoundTripper()
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -170,6 +183,8 @@ func (r *proxyHandler) updateAPIService(apiService *apiregistrationapi.APIServic
 	r.transportBuildingError = nil
 	r.proxyRoundTripper = nil
 
+	r.serviceNamespace = apiService.Spec.Service.Namespace
+	r.serviceName = apiService.Spec.Service.Name
 	r.destinationHost = apiService.Spec.Service.Name + "." + apiService.Spec.Service.Namespace + ".svc"
 	r.restConfig = &restclient.Config{
 		Insecure: apiService.Spec.InsecureSkipTLSVerify,
@@ -188,6 +203,9 @@ func (r *proxyHandler) removeAPIService() {
 
 	r.transportBuildingError = nil
 	r.proxyRoundTripper = nil
+	r.destinationHost = ""
+	r.serviceNamespace = ""
+	r.serviceName = ""
 }
 
 func (r *proxyHandler) getRoundTripper() (http.RoundTripper, error) {
@@ -201,6 +219,12 @@ func (r *proxyHandler) getDestinationHost() string {
 	r.lock.RLock()
 	defer r.lock.RUnlock()
 	return r.destinationHost
+}
+
+func (r *proxyHandler) getServiceRef() (string, string) {
+	r.lock.RLock()
+	defer r.lock.RUnlock()
+	return r.serviceNamespace, r.serviceName
 }
 
 func (r *proxyHandler) getRESTConfig() *restclient.Config {
