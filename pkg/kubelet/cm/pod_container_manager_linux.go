@@ -99,11 +99,11 @@ func (m *podContainerManagerImpl) GetPodContainerName(pod *v1.Pod) (CgroupName, 
 	// Get the parent QOS container name
 	var parentContainer string
 	switch podQOS {
-	case qos.Guaranteed:
+	case v1.PodQOSGuaranteed:
 		parentContainer = m.qosContainersInfo.Guaranteed
-	case qos.Burstable:
+	case v1.PodQOSBurstable:
 		parentContainer = m.qosContainersInfo.Burstable
-	case qos.BestEffort:
+	case v1.PodQOSBestEffort:
 		parentContainer = m.qosContainersInfo.BestEffort
 	}
 	podContainer := podCgroupNamePrefix + string(pod.UID)

@@ -109,7 +109,7 @@ func (m *managerImpl) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAd
 
 	// the node has memory pressure, admit if not best-effort
 	if hasNodeCondition(m.nodeConditions, v1.NodeMemoryPressure) {
-		notBestEffort := qos.BestEffort != qos.GetPodQOS(attrs.Pod)
+		notBestEffort := v1.PodQOSBestEffort != qos.GetPodQOS(attrs.Pod)
 		if notBestEffort || kubetypes.IsCriticalPod(attrs.Pod) {
 			return lifecycle.PodAdmitResult{Admit: true}
 		}
