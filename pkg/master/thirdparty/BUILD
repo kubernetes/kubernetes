@@ -19,6 +19,7 @@ go_library(
         "//pkg/apis/extensions:go_default_library",
         "//pkg/apis/meta/v1:go_default_library",
         "//pkg/apiserver:go_default_library",
+        "//pkg/apiserver/handlers:go_default_library",
         "//pkg/genericapiserver:go_default_library",
         "//pkg/registry/extensions/rest:go_default_library",
         "//pkg/registry/extensions/thirdpartyresourcedata:go_default_library",
