@@ -298,3 +298,49 @@ func Convert_v1beta1_HorizontalPodAutoscalerSpec_To_autoscaling_HorizontalPodAut
 	}
 	return nil
 }
+
+func Convert_extensions_NetworkPolicyIngressRule_To_v1beta1_NetworkPolicyIngressRule(in *extensions.NetworkPolicyIngressRule, out *NetworkPolicyIngressRule, s conversion.Scope) error {
+	if in.AllowPorts != nil {
+		if len(in.AllowPorts.Ports) == 0 {
+			out.Ports = []NetworkPolicyPort{}
+		} else {
+			if err := s.Convert(&in.AllowPorts.Ports, &out.Ports, 0); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Ports = nil
+	}
+	if in.AllowFrom != nil {
+		if len(in.AllowFrom.From) == 0 {
+			out.From = []NetworkPolicyPeer{}
+		} else {
+			if err := s.Convert(&in.AllowFrom.From, &out.From, 0); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.From = nil
+	}
+	return nil
+}
+
+func Convert_v1beta1_NetworkPolicyIngressRule_To_extensions_NetworkPolicyIngressRule(in *NetworkPolicyIngressRule, out *extensions.NetworkPolicyIngressRule, s conversion.Scope) error {
+	if in.Ports == nil {
+		out.AllowPorts = nil
+	} else {
+		out.AllowPorts = &extensions.NetworkPolicyAllowPorts{}
+		if err := s.Convert(&in.Ports, &out.AllowPorts.Ports, 0); err != nil {
+			return err
+		}
+	}
+	if in.From == nil {
+		out.AllowFrom = nil
+	} else {
+		out.AllowFrom = &extensions.NetworkPolicyAllowFrom{}
+		if err := s.Convert(&in.From, &out.AllowFrom.From, 0); err != nil {
+			return err
+		}
+	}
+	return nil
+}

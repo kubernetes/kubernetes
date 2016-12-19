@@ -803,8 +803,10 @@ func ValidateNetworkPolicySpec(spec *extensions.NetworkPolicySpec, fldPath *fiel
 
 	// Validate ingress rules.
 	for _, i := range spec.Ingress {
-		// TODO: Update From to be a pointer to slice as soon as auto-generation supports it.
-		for _, f := range i.From {
+		if i.AllowFrom == nil {
+			continue
+		}
+		for _, f := range i.AllowFrom.From {
 			numFroms := 0
 			if f.PodSelector != nil {
 				numFroms++
