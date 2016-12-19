@@ -917,6 +917,7 @@ var (
 	AzureDisk             FSType = "azureDisk"
 	PhotonPersistentDisk  FSType = "photonPersistentDisk"
 	Projected             FSType = "projected"
+	PortworxVolume        FSType = "portworxVolume"
 	All                   FSType = "*"
 )
 
