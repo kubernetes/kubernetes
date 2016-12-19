@@ -16,13 +16,13 @@ limitations under the License.
 
 package autoscaling
 
-// OtherMetricsAnnotation is the annotation which holds non-CPU-utilization HPA metric
+// MetricSpecsAnnotation is the annotation which holds non-CPU-utilization HPA metric
 // specs when converting the `Metrics` field from autoscaling/v2alpha1
-const OtherMetricsAnnotation = "autoscaling.alpha.kubernetes.io/metrics"
+const MetricSpecsAnnotation = "autoscaling.alpha.kubernetes.io/metrics"
 
-// CurrentMetricsAnnotation is the annotation which holds non-CPU-utilization HPA metric
+// MetricStatusesAnnotation is the annotation which holds non-CPU-utilization HPA metric
 // statuses when converting the `CurrentMetrics` field from autoscaling/v2alpha1
-const CurrentMetricsAnnotation = "autoscaling.alpha.kubernetes.io/current-metrics"
+const MetricStatusesAnnotation = "autoscaling.alpha.kubernetes.io/current-metrics"
 
 // DefaultCPUUtilization is the default value for CPU utilization, provided no other
 // metrics are present.  This is here because it's used by both the v2alpha1 defaulting
