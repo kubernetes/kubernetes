@@ -1,7 +1,7 @@
 # Elasticsearch for Kubernetes
 
 Kubernetes makes it trivial for anyone to easily build and scale [Elasticsearch](http://www.elasticsearch.org/) clusters. Here, you'll find how to do so.
-Current Elasticsearch version is `1.7.1`.
+Current Elasticsearch version is `5.1`.
 
 [A more robust example that follows Elasticsearch best-practices of separating nodes concern is also available](production_cluster/README.md).
 
@@ -21,7 +21,7 @@ kubectl create -f examples/elasticsearch/es-svc.yaml
 kubectl create -f examples/elasticsearch/es-rc.yaml
 ```
 
-Let's see if it worked:
+Let's see if it works:
 
 ```
 $ kubectl get pods
@@ -59,7 +59,7 @@ Scaling is as easy as:
 kubectl scale --replicas=3 rc es
 ```
 
-Did it work?
+Does it work?
 
 ```
 $ kubectl get pods
