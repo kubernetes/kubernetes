@@ -112,7 +112,7 @@ func TestDefaulting(t *testing.T) {
 		{Group: "rbac.authorization.k8s.io", Version: "v1alpha1", Kind: "RoleBindingList"}:        {},
 	}
 
-	f := fuzz.New().NilChance(.5).NumElements(1, 1).RandSource(rand.NewSource(1))
+	f := fuzz.New().NilChance(.5).NumElements(1, 1).RandSource(rand.NewSource(2))
 	f.Funcs(
 		func(s *runtime.RawExtension, c fuzz.Continue) {},
 		func(s *metav1.LabelSelector, c fuzz.Continue) {
