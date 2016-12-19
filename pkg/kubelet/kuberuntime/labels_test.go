@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api/v1"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/util/intstr"
 )
@@ -192,6 +193,7 @@ func TestPodLabels(t *testing.T) {
 }
 
 func TestPodAnnotations(t *testing.T) {
+	seccompProfileRoot := "/tmp/"
 	pod := &v1.Pod{
 		ObjectMeta: v1.ObjectMeta{
 			Name:        "test_pod",
@@ -203,14 +205,17 @@ func TestPodAnnotations(t *testing.T) {
 			Containers: []v1.Container{},
 		},
 	}
-	expected := &annotatedPodSandboxInfo{
-		Annotations: map[string]string{"foo": "bar"},
+	expectedSandboxInfo := &annotatedPodSandboxInfo{
+		Annotations: map[string]string{
+			"foo": "bar",
+			runtimeapi.SeccompPathAnnotationKey: seccompProfileRoot,
+		},
 	}
 
 	// Test whether we can get right information from annotations
-	annotations := newPodAnnotations(pod)
+	annotations := newPodAnnotations(pod, seccompProfileRoot)
 	podSandboxInfo := getPodSandboxInfoFromAnnotations(annotations)
-	if !reflect.DeepEqual(podSandboxInfo, expected) {
-		t.Errorf("expected %v, got %v", expected, podSandboxInfo)
+	if !reflect.DeepEqual(podSandboxInfo, expectedSandboxInfo) {
+		t.Errorf("expected %v, got %v", expectedSandboxInfo, podSandboxInfo)
 	}
 }

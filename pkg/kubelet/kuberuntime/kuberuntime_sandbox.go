@@ -71,7 +71,7 @@ func (m *kubeGenericRuntimeManager) generatePodSandboxConfig(pod *v1.Pod, attemp
 			Attempt:   &attempt,
 		},
 		Labels:      newPodLabels(pod),
-		Annotations: newPodAnnotations(pod),
+		Annotations: newPodAnnotations(pod, m.seccompProfileRoot),
 	}
 
 	if !kubecontainer.IsHostNetworkPod(pod) {
