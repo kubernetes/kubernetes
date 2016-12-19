@@ -385,7 +385,6 @@ func (dsc *DaemonSetsController) addNode(obj interface{}) {
 		shouldEnqueue := dsc.nodeShouldRunDaemonPod(node, ds)
 		if shouldEnqueue {
 			dsc.enqueueDaemonSet(ds)
-			return
 		}
 	}
 }
@@ -407,7 +406,6 @@ func (dsc *DaemonSetsController) updateNode(old, cur interface{}) {
 		shouldEnqueue := (dsc.nodeShouldRunDaemonPod(oldNode, ds) != dsc.nodeShouldRunDaemonPod(curNode, ds))
 		if shouldEnqueue {
 			dsc.enqueueDaemonSet(ds)
-			return
 		}
 	}
 	// TODO: it'd be nice to pass a hint with these enqueues, so that each ds would only examine the added node (unless it has other work to do, too).
