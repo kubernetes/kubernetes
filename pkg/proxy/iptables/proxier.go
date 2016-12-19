@@ -471,6 +471,11 @@ func buildServiceMap(allServices []api.Service, oldServiceMap proxyServiceMap) (
 			glog.V(3).Infof("Skipping service %s due to clusterIP = %q", svcName, service.Spec.ClusterIP)
 			continue
 		}
+		// Even if ClusterIP is set, ServiceTypeExternalName services don't get proxied
+		if service.Spec.Type == api.ServiceTypeExternalName {
+			glog.V(3).Infof("Skipping service %s due to Type=ExternalName", svcName)
+			continue
+		}
 
 		for i := range service.Spec.Ports {
 			servicePort := &service.Spec.Ports[i]
