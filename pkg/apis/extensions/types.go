@@ -905,6 +905,7 @@ var (
 	Quobyte               FSType = "quobyte"
 	AzureDisk             FSType = "azureDisk"
 	PhotonPersistentDisk  FSType = "photonPersistentDisk"
+	PortworxVolume        FSType = "portworxVolume"
 	All                   FSType = "*"
 )
 
