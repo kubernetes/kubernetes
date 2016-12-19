@@ -103,11 +103,11 @@ Before continuing to the gory details, we also recommend you to read [Quick walk
 
 #### Define a Deployment
 
-To start the redis master, use the file `examples/guestbook/redis-master-deployment.yaml`, which describes a single [pod](../../docs/user-guide/pods.md) running a redis key-value server in a container.
+To start the redis master, use the file [redis-master-deployment.yaml](redis-master-deployment.yaml), which describes a single [pod](../../docs/user-guide/pods.md) running a redis key-value server in a container.
 
 Although we have a single instance of our redis master, we are using a [Deployment](../../docs/user-guide/deployments.md) to enforce that exactly one pod keeps running. E.g., if the node were to go down, the Deployment will ensure that the redis master gets restarted on a healthy node. (In our simplified example, this could result in data loss.)
 
-The file `examples/guestbook/redis-master-deployment.yaml` defines the redis master Deployment:
+The file [redis-master-deployment.yaml](redis-master-deployment.yaml) defines the redis master Deployment:
 
 <!-- BEGIN MUNGE: EXAMPLE redis-master-deployment.yaml -->
 
@@ -161,7 +161,7 @@ A Kubernetes [Service](../../docs/user-guide/services.md) is a named load balanc
 Services find the pods to load balance based on the pods' labels.
 The selector field of the Service description determines which pods will receive the traffic sent to the Service, and the `port` and `targetPort` information defines what port the Service proxy will run at.
 
-The file `examples/guestbook/redis-master-service.yaml` defines the redis master Service:
+The file [redis-master-service.yaml](redis-master-deployment.yaml) defines the redis master Service:
 
 <!-- BEGIN MUNGE: EXAMPLE redis-master-service.yaml -->
 
@@ -233,7 +233,7 @@ This example has been configured to use the DNS service by default.
 
 If your cluster does not have the DNS service enabled, then you can use environment variables by setting the
 `GET_HOSTS_FROM` env value in both
-`examples/guestbook/redis-slave-deployment.yaml` and `examples/guestbook/frontend-deployment.yaml`
+[redis-slave-deployment.yaml](redis-slave-deployment.yaml) and [frontend-deployment.yaml](frontend-deployment.yaml)
 from `dns` to `env` before you start up the app.
 (However, this is unlikely to be necessary. You can check for the DNS service in the list of the cluster's services by
 running `kubectl --namespace=kube-system get rc -l k8s-app=kube-dns`.)
@@ -345,7 +345,7 @@ In Kubernetes, a Deployment is responsible for managing multiple instances of a 
 Just like the master, we want to have a Service to proxy connections to the redis slaves. In this case, in addition to discovery, the slave Service will provide transparent load balancing to web app clients.
 
 This time we put the Service and Deployment into one [file](../../docs/user-guide/managing-deployments.md#organizing-resource-configurations). Grouping related objects together in a single file is often better than having separate files.
-The specification for the slaves is in `examples/guestbook/all-in-one/redis-slave.yaml`:
+The specification for the slaves is in [all-in-one/redis-slave.yaml](all-in-one/redis-slave.yaml):
 
 <!-- BEGIN MUNGE: EXAMPLE all-in-one/redis-slave.yaml -->
 
@@ -455,7 +455,7 @@ A frontend pod is a simple PHP server that is configured to talk to either the s
 Again we'll create a set of replicated frontend pods instantiated by a Deployment — this time, with three replicas.
 
 As with the other pods, we now want to create a Service to group the frontend pods.
-The Deployment and Service are described in the file `frontend.yaml`:
+The Deployment and Service are described in the file [all-in-one/frontend.yaml](all-in-one/frontend.yaml):
 
 <!-- BEGIN MUNGE: EXAMPLE all-in-one/frontend.yaml -->
 
@@ -529,7 +529,7 @@ spec:
 
 For supported cloud providers, such as Google Compute Engine or Google Container Engine, you can specify to use an external load balancer
 in the service `spec`, to expose the service onto an external load balancer IP.
-To do this, uncomment the `type: LoadBalancer` line in the `frontend.yaml` file before you start the service.
+To do this, uncomment the `type: LoadBalancer` line in the [all-in-one/frontend.yaml](all-in-one/frontend.yaml) file before you start the service.
 
 [See the appendix below](#appendix-accessing-the-guestbook-site-externally) on accessing the guestbook site externally for more details.
 
