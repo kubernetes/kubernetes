@@ -828,4 +828,82 @@ var _ = framework.KubeDescribe("Volumes [Feature:Volumes]", func() {
 			testVolumeClient(cs, config, &fsGroup, tests)
 		})
 	})
+
+	////////////////////////////////////////////////////////////////////////
+	// ConfigMap
+	////////////////////////////////////////////////////////////////////////
+
+	framework.KubeDescribe("ConfigMap", func() {
+		It("should be mountable", func() {
+			config := VolumeTestConfig{
+				namespace: namespace.Name,
+				prefix:    "configmap",
+			}
+
+			defer func() {
+				if clean {
+					volumeTestCleanup(f, config)
+				}
+			}()
+			configMap := &v1.ConfigMap{
+				TypeMeta: metav1.TypeMeta{
+					Kind:       "ConfigMap",
+					APIVersion: "v1",
+				},
+				ObjectMeta: v1.ObjectMeta{
+					Name: config.prefix + "-map",
+				},
+				Data: map[string]string{
+					"first":  "this is the first file",
+					"second": "this is the second file",
+					"third":  "this is the third file",
+				},
+			}
+			if _, err := cs.Core().ConfigMaps(namespace.Name).Create(configMap); err != nil {
+				framework.Failf("unable to create test configmap: %v", err)
+			}
+			defer func() {
+				_ = cs.Core().ConfigMaps(namespace.Name).Delete(configMap.Name, nil)
+			}()
+
+			// Test one ConfigMap mounted several times to test #28502
+			tests := []VolumeTest{
+				{
+					volume: v1.VolumeSource{
+						ConfigMap: &v1.ConfigMapVolumeSource{
+							LocalObjectReference: v1.LocalObjectReference{
+								Name: config.prefix + "-map",
+							},
+							Items: []v1.KeyToPath{
+								{
+									Key:  "first",
+									Path: "firstfile",
+								},
+							},
+						},
+					},
+					file:            "firstfile",
+					expectedContent: "this is the first file",
+				},
+				{
+					volume: v1.VolumeSource{
+						ConfigMap: &v1.ConfigMapVolumeSource{
+							LocalObjectReference: v1.LocalObjectReference{
+								Name: config.prefix + "-map",
+							},
+							Items: []v1.KeyToPath{
+								{
+									Key:  "second",
+									Path: "secondfile",
+								},
+							},
+						},
+					},
+					file:            "secondfile",
+					expectedContent: "this is the second file",
+				},
+			}
+			testVolumeClient(cs, config, nil, tests)
+		})
+	})
 })
