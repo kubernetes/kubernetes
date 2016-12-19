@@ -5,6 +5,7 @@ licenses(["notice"])
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
+    "go_test",
 )
 
 go_library(
@@ -30,5 +31,28 @@ go_library(
         "//pkg/util/flowcontrol:go_default_library",
         "//pkg/watch:go_default_library",
         "//vendor:github.com/golang/glog",
+    ],
+)
+
+go_test(
+    name = "go_default_test",
+    srcs = ["autoscalercontroller_test.go"],
+    library = "go_default_library",
+    tags = ["automanaged"],
+    deps = [
+        "//federation/apis/federation/v1beta1:go_default_library",
+        "//federation/client/clientset_generated/federation_clientset/fake:go_default_library",
+        "//federation/pkg/federation-controller/util:go_default_library",
+        "//federation/pkg/federation-controller/util/deletionhelper:go_default_library",
+        "//federation/pkg/federation-controller/util/test:go_default_library",
+        "//pkg/api/v1:go_default_library",
+        "//pkg/apis/autoscaling/v1:go_default_library",
+        "//pkg/client/clientset_generated/clientset:go_default_library",
+        "//pkg/client/clientset_generated/clientset/fake:go_default_library",
+        "//pkg/runtime:go_default_library",
+        "//pkg/types:go_default_library",
+        "//pkg/util/wait:go_default_library",
+        "//vendor:github.com/golang/glog",
+        "//vendor:github.com/stretchr/testify/assert",
     ],
 )
