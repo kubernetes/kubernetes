@@ -1,39 +1,63 @@
 # The Kubernetes Scheduler
 
-The Kubernetes scheduler runs as a process alongside the other master
-components such as the API server. Its interface to the API server is to watch
-for Pods with an empty PodSpec.NodeName, and for each Pod, it posts a Binding
-indicating where the Pod should be scheduled.
+The Kubernetes scheduler runs as a process alongside the other master components such as the API server.
+Its interface to the API server is to watch for Pods with an empty PodSpec.NodeName,
+and for each Pod, it posts a Binding indicating where the Pod should be scheduled.
 
-## The scheduling process
+## Exploring the code
+
+We are dividng scheduler into three layers from high level:
+- [plugin/cmd/kube-scheduler/scheduler.go](http://releases.k8s.io/HEAD/plugin/cmd/kube-scheduler/scheduler.go):
+  This is the main() entry that does initialization before calling the scheduler framework.
+- [pkg/scheduler/scheduler.go](http://releases.k8s.io/HEAD/pkg/scheduler/scheduler.go):
+  This is the scheduler framework that handles stuff (e.g. binding) beyond the scheduling algorithm.
+- [pkg/scheduler/generic_scheduler.go](http://releases.k8s.io/HEAD/pkg/scheduler/generic_scheduler.go):
+  This is the scheduling algorithm that basically assigns nodes for pods.
+
+## The scheduling algorithm
 
 ```
-                          +-------+
-          +---------------+ node 1|
-          |               +-------+
-          |
-   +----> |  Apply pred. filters
-   |      |
-   |      |                +-------+
-   |      +----+---------->+node 2 |
-   |           |           +--+----+
-   |  watch    |              |
-   |           |              |        +------+
-   |           +---------------------->+node 3|
-+--+---------------+               |   +--+---+
-| Pods in apiserver|               |      |
-+------------------+               |      |
-                                   |      |
-                                   |      |
-                      +------------V------v--------+
-                      |      Priority function     |
-                      +-------------+--------------+
-                                    |
-                                    | node 1: p=2
-                                    | node 2: p=5
-                                    v
-                               select max{node priority} = node 2
+For given pod:
 
+    +---------------------------------------------+
+    |               Schedulable nodes:            |
+    |                                             |
+    | +--------+    +--------+      +--------+    |
+    | | node 1 |    | node 2 |      | node 3 |    |
+    | +--------+    +--------+      +--------+    |
+    |                                             |
+    +-------------------+-------------------------+
+                        |
+                        |
+                        v
+    +-------------------+-------------------------+
+
+    Pred. filters: node 3 doesn't have enough resource
+
+    +-------------------+-------------------------+
+                        |
+                        |
+                        v
+    +-------------------+-------------------------+
+    |                left nodes:                  |
+    |   +--------+                 +--------+     |
+    |   | node 1 |                 | node 2 |     |
+    |   +--------+                 +--------+     |
+    |                                             |
+    +-------------------+-------------------------+
+                        |
+                        |
+                        v
+    +-------------------+-------------------------+
+
+    Priority function:    node 1: p=2
+                          node 2: p=5
+
+    +-------------------+-------------------------+
+                        |
+                        |
+                        v
+            select max{node priority} = node 2
 ```
 
 The Scheduler tries to find a node for each Pod, one at a time.
@@ -61,11 +85,6 @@ the policies used are selected by the functions `defaultPredicates()` and `defau
 However, the choice of policies can be overridden by passing the command-line flag `--policy-config-file` to the scheduler, pointing to a JSON file specifying which scheduling policies to use. See [examples/scheduler-policy-config.json](../../examples/scheduler-policy-config.json) for an example
 config file. (Note that the config file format is versioned; the API is defined in [plugin/pkg/scheduler/api](http://releases.k8s.io/HEAD/plugin/pkg/scheduler/api/)).
 Thus to add a new scheduling policy, you should modify predicates.go or priorities.go, and either register the policy in `defaultPredicates()` or `defaultPriorities()`, or use a policy config file.
-
-## Exploring the code
-
-If you want to get a global picture of how the scheduler works, you can start in
-[plugin/cmd/kube-scheduler/app/server.go](http://releases.k8s.io/HEAD/plugin/cmd/kube-scheduler/app/server.go)
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/devel/scheduler.md?pixel)]()
