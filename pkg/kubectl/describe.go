@@ -650,6 +650,8 @@ func describeVolumes(volumes []api.Volume, w *PrefixWriter, space string) {
 			printCinderVolumeSource(volume.VolumeSource.Cinder, w)
 		case volume.VolumeSource.PhotonPersistentDisk != nil:
 			printPhotonPersistentDiskVolumeSource(volume.VolumeSource.PhotonPersistentDisk, w)
+		case volume.VolumeSource.PortworxVolume != nil:
+			printPortworxVolumeSource(volume.VolumeSource.PortworxVolume, w)
 		default:
 			w.Write(LEVEL_1, "<unknown>\n")
 		}
@@ -721,6 +723,12 @@ func printQuobyteVolumeSource(quobyte *api.QuobyteVolumeSource, w *PrefixWriter)
 		"    Volume:\t%v\n"+
 		"    ReadOnly:\t%v\n",
 		quobyte.Registry, quobyte.Volume, quobyte.ReadOnly)
+}
+
+func printPortworxVolumeSource(pwxVolume *api.PortworxVolumeSource, w *PrefixWriter) {
+	w.Write(LEVEL_2, "Type:\tPortworxVolume (a Portworx Volume resource)\n"+
+		"    VolumeID:\t%v\n",
+		pwxVolume.VolumeID)
 }
 
 func printISCSIVolumeSource(iscsi *api.ISCSIVolumeSource, w *PrefixWriter) {
@@ -867,6 +875,8 @@ func (d *PersistentVolumeDescriber) Describe(namespace, name string, describerSe
 			printAzureDiskVolumeSource(pv.Spec.AzureDisk, w)
 		case pv.Spec.PhotonPersistentDisk != nil:
 			printPhotonPersistentDiskVolumeSource(pv.Spec.PhotonPersistentDisk, w)
+		case pv.Spec.PortworxVolume != nil:
+			printPortworxVolumeSource(pv.Spec.PortworxVolume, w)
 		}
 
 		if events != nil {
