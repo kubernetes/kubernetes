@@ -1121,4 +1121,44 @@ func TestBuildServiceMapServiceHeadless(t *testing.T) {
 	}
 }
 
+func TestBuildServiceMapServiceTypeExternalName(t *testing.T) {
+	services := []api.Service{
+		{
+			ObjectMeta: api.ObjectMeta{
+				Name:      "external-name",
+				Namespace: "somewhere-else",
+			},
+			Spec: api.ServiceSpec{
+				Type: api.ServiceTypeExternalName,
+				Ports: []api.ServicePort{
+					{
+						Name:     "blah",
+						Protocol: "UDP",
+						Port:     1235,
+						NodePort: 5321,
+					},
+				},
+				ExternalName: "foo2.bar.com",
+				// Should be ignored
+				ClusterIP: "172.16.55.4",
+			},
+		},
+	}
+
+	serviceMap, hcAdd, hcDel, staleUDPServices := buildServiceMap(services, make(proxyServiceMap))
+	if len(serviceMap) != 0 {
+		t.Errorf("expected service map length 0, got %v", serviceMap)
+	}
+	// No proxied services, so no healthchecks
+	if len(hcAdd) != 0 {
+		t.Errorf("expected healthcheck add length 0, got %v", hcAdd)
+	}
+	if len(hcDel) != 0 {
+		t.Errorf("expected healthcheck del length 0, got %v", hcDel)
+	}
+	if len(staleUDPServices) != 0 {
+		t.Errorf("expected stale UDP services length 0, got %v", staleUDPServices)
+	}
+}
+
 // TODO(thockin): add *more* tests for syncProxyRules() or break it down further and test the pieces.
