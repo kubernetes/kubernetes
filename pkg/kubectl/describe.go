@@ -51,7 +51,6 @@ import (
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
 	"k8s.io/kubernetes/pkg/fieldpath"
 	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/kubelet/qos"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/types"
@@ -538,7 +537,7 @@ func describePod(pod *api.Pod, events *api.EventList) (string, error) {
 			}
 		}
 		describeVolumes(pod.Spec.Volumes, w, "")
-		w.Write(LEVEL_0, "QoS Class:\t%s\n", qos.InternalGetPodQOS(pod))
+		w.Write(LEVEL_0, "QoS Class:\t%s\n", pod.Status.QOSClass)
 		printLabelsMultiline(w, "Node-Selectors", pod.Spec.NodeSelector)
 		printTolerationsInAnnotationMultiline(w, "Tolerations", pod.Annotations)
 		if events != nil {
