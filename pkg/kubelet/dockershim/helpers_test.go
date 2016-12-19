@@ -95,7 +95,7 @@ func TestGetContainerSecurityOpts(t *testing.T) {
 	}}
 
 	for i, test := range tests {
-		opts, err := getContainerSecurityOpts(containerName, test.config, "test/seccomp/profile/root")
+		opts, err := getContainerSecurityOpts(containerName, test.config)
 		assert.NoError(t, err, "TestCase[%d]: %s", i, test.msg)
 		assert.Len(t, opts, len(test.expectedOpts), "TestCase[%d]: %s", i, test.msg)
 		for _, opt := range test.expectedOpts {
@@ -140,7 +140,7 @@ func TestGetSandboxSecurityOpts(t *testing.T) {
 	}}
 
 	for i, test := range tests {
-		opts, err := getSandboxSecurityOpts(test.config, "test/seccomp/profile/root")
+		opts, err := getSandboxSecurityOpts(test.config)
 		assert.NoError(t, err, "TestCase[%d]: %s", i, test.msg)
 		assert.Len(t, opts, len(test.expectedOpts), "TestCase[%d]: %s", i, test.msg)
 		for _, opt := range test.expectedOpts {
