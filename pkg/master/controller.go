@@ -41,9 +41,10 @@ import (
 
 const kubernetesServiceName = "kubernetes"
 
-// Controller is the controller manager for the core bootstrap Kubernetes controller
-// loops, which manage creating the "kubernetes" service, the "default" and "kube-system"
-// namespace, and provide the IP repair check on service IPs
+// Controller is the controller manager for the core bootstrap Kubernetes
+// controller loops, which manage creating the "kubernetes" service, the
+// "default", "kube-system" and "kube-public" namespaces, and provide the IP
+// repair check on service IPs
 type Controller struct {
 	ServiceClient   coreclient.ServicesGetter
 	NamespaceClient coreclient.NamespacesGetter
@@ -84,7 +85,7 @@ func (c *Config) NewBootstrapController(legacyRESTStorage corerest.LegacyRESTSto
 		EndpointReconciler: c.EndpointReconcilerConfig.Reconciler,
 		EndpointInterval:   c.EndpointReconcilerConfig.Interval,
 
-		SystemNamespaces:         []string{metav1.NamespaceSystem},
+		SystemNamespaces:         []string{metav1.NamespaceSystem, metav1.NamespacePublic},
 		SystemNamespacesInterval: 1 * time.Minute,
 
 		ServiceClusterIPRegistry: legacyRESTStorage.ServiceClusterIPAllocator,
