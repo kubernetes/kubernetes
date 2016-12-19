@@ -20,7 +20,6 @@ import (
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
-	"k8s.io/kubernetes/pkg/kubelet/qos"
 	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
 
@@ -146,7 +145,7 @@ var _ = framework.KubeDescribe("Kubelet Cgroup Manager", func() {
 				if !framework.TestContext.KubeletConfig.ExperimentalCgroupsPerQOS {
 					return
 				}
-				cgroupsToVerify := []cm.CgroupName{cm.CgroupName(qos.Burstable), cm.CgroupName(qos.BestEffort)}
+				cgroupsToVerify := []cm.CgroupName{cm.CgroupName(v1.PodQOSBurstable), cm.CgroupName(v1.PodQOSBestEffort)}
 				pod := makePodToVerifyCgroups(cgroupsToVerify)
 				f.PodClient().Create(pod)
 				err := framework.WaitForPodSuccessInNamespace(f.ClientSet, pod.Name, f.Namespace.Name)
