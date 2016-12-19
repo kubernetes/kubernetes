@@ -31,14 +31,25 @@ func TestRangeAllocatorEmpty(t *testing.T) {
 			t.Fatalf("expected panic because of empty port range: %#v", r)
 		}
 	}()
-	_ = newPortRangeAllocator(*r)
+	_ = newPortRangeAllocator(*r, true)
 }
 
 func TestRangeAllocatorFullyAllocated(t *testing.T) {
 	r := &net.PortRange{}
 	r.Set("1-1")
-	pra := newPortRangeAllocator(*r)
+	// Don't auto-fill ports, we'll manually turn the crank
+	pra := newPortRangeAllocator(*r, false)
 	a := pra.(*rangeAllocator)
+
+	// Fill in the one available port
+	if !a.fillPortsOnce() {
+		t.Fatalf("Expected to be able to fill ports")
+	}
+
+	// There should be no ports available
+	if a.fillPortsOnce() {
+		t.Fatalf("Expected to be unable to fill ports")
+	}
 
 	p, err := a.AllocateNext()
 	if err != nil {
@@ -68,6 +79,11 @@ func TestRangeAllocatorFullyAllocated(t *testing.T) {
 	}
 	a.lock.Unlock()
 
+	// Fill in the one available port
+	if !a.fillPortsOnce() {
+		t.Fatalf("Expected to be able to fill ports")
+	}
+
 	p, err = a.AllocateNext()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -91,13 +107,16 @@ func TestRangeAllocatorFullyAllocated(t *testing.T) {
 func TestRangeAllocator_RandomishAllocation(t *testing.T) {
 	r := &net.PortRange{}
 	r.Set("1-100")
-	pra := newPortRangeAllocator(*r)
+	pra := newPortRangeAllocator(*r, false)
 	a := pra.(*rangeAllocator)
 
 	// allocate all the ports
 	var err error
 	ports := make([]int, 100, 100)
 	for i := 0; i < 100; i++ {
+		if !a.fillPortsOnce() {
+			t.Fatalf("Expected to be able to fill ports")
+		}
 		ports[i], err = a.AllocateNext()
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
@@ -111,6 +130,10 @@ func TestRangeAllocator_RandomishAllocation(t *testing.T) {
 			t.Fatalf("unexpected used bit for allocated port: %d", ports[i])
 		}
 		a.lock.Unlock()
+	}
+
+	if a.fillPortsOnce() {
+		t.Fatalf("Expected to be unable to fill ports")
 	}
 
 	// release them all
@@ -127,6 +150,9 @@ func TestRangeAllocator_RandomishAllocation(t *testing.T) {
 	// allocate the ports again
 	rports := make([]int, 100, 100)
 	for i := 0; i < 100; i++ {
+		if !a.fillPortsOnce() {
+			t.Fatalf("Expected to be able to fill ports")
+		}
 		rports[i], err = a.AllocateNext()
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
@@ -140,6 +166,10 @@ func TestRangeAllocator_RandomishAllocation(t *testing.T) {
 			t.Fatalf("unexpected used bit for allocated port: %d", rports[i])
 		}
 		a.lock.Unlock()
+	}
+
+	if a.fillPortsOnce() {
+		t.Fatalf("Expected to be unable to fill ports")
 	}
 
 	if reflect.DeepEqual(ports, rports) {
