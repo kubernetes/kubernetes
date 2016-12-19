@@ -541,8 +541,6 @@ func (proxier *Proxier) OnServiceUpdate(allServices []api.Service) {
 	proxier.haveReceivedServiceUpdate = true
 
 	newServiceMap, hcAdd, hcDel, staleUDPServices := buildServiceMap(allServices, proxier.serviceMap)
-	proxier.serviceMap = newServiceMap
-
 	for _, hc := range hcAdd {
 		glog.V(4).Infof("Adding health check for %+v, port %v", hc.namespace, hc.nodeport)
 		// Turn on healthcheck responder to listen on the health check nodePort
@@ -555,7 +553,11 @@ func (proxier *Proxier) OnServiceUpdate(allServices []api.Service) {
 		healthcheck.DeleteServiceListener(hc.namespace, hc.nodeport)
 	}
 
-	proxier.syncProxyRules()
+	if !reflect.DeepEqual(newServiceMap, proxier.serviceMap) {
+		proxier.serviceMap = newServiceMap
+		proxier.syncProxyRules()
+	}
+
 	proxier.deleteServiceConnections(staleUDPServices.List())
 }
 
