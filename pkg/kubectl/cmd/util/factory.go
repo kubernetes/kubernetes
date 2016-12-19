@@ -91,6 +91,9 @@ type ClientAccessFactory interface {
 	RESTClient() (*restclient.RESTClient, error)
 	// Returns a client.Config for accessing the Kubernetes server.
 	ClientConfig() (*restclient.Config, error)
+	// BareClientConfig returns a client.Config that has NOT been negotiated. It's
+	// just directions to the server. People use this to build RESTMappers on top of
+	BareClientConfig() (*restclient.Config, error)
 
 	// TODO this should probably be removed and collapsed into whatever we want to use long term
 	// probably returning a restclient for a version and leaving contruction up to someone else
