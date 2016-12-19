@@ -18,6 +18,7 @@ package federation_clientset
 
 import (
 	"github.com/golang/glog"
+	v1autoscaling "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset/typed/autoscaling/v1"
 	v1batch "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset/typed/batch/v1"
 	v1core "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset/typed/core/v1"
 	v1beta1extensions "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset/typed/extensions/v1beta1"
@@ -33,6 +34,9 @@ type Interface interface {
 	CoreV1() v1core.CoreV1Interface
 	// Deprecated: please explicitly pick a version if possible.
 	Core() v1core.CoreV1Interface
+	AutoscalingV1() v1autoscaling.AutoscalingV1Interface
+	// Deprecated: please explicitly pick a version if possible.
+	Autoscaling() v1autoscaling.AutoscalingV1Interface
 	BatchV1() v1batch.BatchV1Interface
 	// Deprecated: please explicitly pick a version if possible.
 	Batch() v1batch.BatchV1Interface
@@ -49,6 +53,7 @@ type Interface interface {
 type Clientset struct {
 	*discovery.DiscoveryClient
 	*v1core.CoreV1Client
+	*v1autoscaling.AutoscalingV1Client
 	*v1batch.BatchV1Client
 	*v1beta1extensions.ExtensionsV1beta1Client
 	*v1beta1federation.FederationV1beta1Client
@@ -69,6 +74,23 @@ func (c *Clientset) Core() v1core.CoreV1Interface {
 		return nil
 	}
 	return c.CoreV1Client
+}
+
+// AutoscalingV1 retrieves the AutoscalingV1Client
+func (c *Clientset) AutoscalingV1() v1autoscaling.AutoscalingV1Interface {
+	if c == nil {
+		return nil
+	}
+	return c.AutoscalingV1Client
+}
+
+// Deprecated: Autoscaling retrieves the default version of AutoscalingClient.
+// Please explicitly pick a version.
+func (c *Clientset) Autoscaling() v1autoscaling.AutoscalingV1Interface {
+	if c == nil {
+		return nil
+	}
+	return c.AutoscalingV1Client
 }
 
 // BatchV1 retrieves the BatchV1Client
@@ -139,6 +161,10 @@ func NewForConfig(c *restclient.Config) (*Clientset, error) {
 	if err != nil {
 		return nil, err
 	}
+	cs.AutoscalingV1Client, err = v1autoscaling.NewForConfig(&configShallowCopy)
+	if err != nil {
+		return nil, err
+	}
 	cs.BatchV1Client, err = v1batch.NewForConfig(&configShallowCopy)
 	if err != nil {
 		return nil, err
@@ -165,6 +191,7 @@ func NewForConfig(c *restclient.Config) (*Clientset, error) {
 func NewForConfigOrDie(c *restclient.Config) *Clientset {
 	var cs Clientset
 	cs.CoreV1Client = v1core.NewForConfigOrDie(c)
+	cs.AutoscalingV1Client = v1autoscaling.NewForConfigOrDie(c)
 	cs.BatchV1Client = v1batch.NewForConfigOrDie(c)
 	cs.ExtensionsV1beta1Client = v1beta1extensions.NewForConfigOrDie(c)
 	cs.FederationV1beta1Client = v1beta1federation.NewForConfigOrDie(c)
@@ -177,6 +204,7 @@ func NewForConfigOrDie(c *restclient.Config) *Clientset {
 func New(c restclient.Interface) *Clientset {
 	var cs Clientset
 	cs.CoreV1Client = v1core.New(c)
+	cs.AutoscalingV1Client = v1autoscaling.New(c)
 	cs.BatchV1Client = v1batch.New(c)
 	cs.ExtensionsV1beta1Client = v1beta1extensions.New(c)
 	cs.FederationV1beta1Client = v1beta1federation.New(c)
