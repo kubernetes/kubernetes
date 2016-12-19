@@ -32,6 +32,7 @@ import (
 	"k8s.io/kubernetes/pkg/fields"
 	genericapirequest "k8s.io/kubernetes/pkg/genericapiserver/api/request"
 	"k8s.io/kubernetes/pkg/kubelet/client"
+	"k8s.io/kubernetes/pkg/kubelet/qos"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/generic"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -60,7 +61,8 @@ func (podStrategy) NamespaceScoped() bool {
 func (podStrategy) PrepareForCreate(ctx genericapirequest.Context, obj runtime.Object) {
 	pod := obj.(*api.Pod)
 	pod.Status = api.PodStatus{
-		Phase: api.PodPending,
+		Phase:    api.PodPending,
+		QOSClass: qos.InternalGetPodQOS(pod),
 	}
 }
 
