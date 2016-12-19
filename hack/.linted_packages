@@ -75,6 +75,7 @@ pkg/api/v1
 pkg/api/v1/service
 pkg/apimachinery
 pkg/apis/abac/v0
+pkg/apis/abac/v1beta1
 pkg/apis/apps/install
 pkg/apis/authentication.k8s.io/install
 pkg/apis/authentication/install
