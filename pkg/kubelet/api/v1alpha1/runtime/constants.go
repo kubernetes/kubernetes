@@ -24,4 +24,7 @@ const (
 	RuntimeReady = "RuntimeReady"
 	// NetworkReady means the runtime network is up and ready to accept containers which require network.
 	NetworkReady = "NetworkReady"
+
+	// SeccompPathAnnotationKey represents the key of the seccomp profile root path.
+	SeccompPathAnnotationKey = "security.alpha.kubernetes.io/seccomp/root"
 )

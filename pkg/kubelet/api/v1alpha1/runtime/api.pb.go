@@ -672,7 +672,11 @@ type PodSandboxConfig struct {
 	//
 	//      key: security.alpha.kubernetes.io/seccomp/container/<container name>
 	//      description: the seccomp profile for the container (overides pod).
-	//      values: see below
+	//      values: see below.
+	//
+	//      key: security.alpha.kubernetes.io/seccomp/root
+	//      description: the root path of seccomp profile for localhost profiles.
+	//      value: the root path of seccomp profile.
 	//
 	//      The value of seccomp is runtime agnostic:
 	//      * runtime/default: the default profile for the container runtime
