@@ -408,14 +408,13 @@ func (nc *NodeController) Run() {
 // post "NodeReady==ConditionUnknown". It also evicts all pods if node is not ready or
 // not reachable for a long period of time.
 func (nc *NodeController) monitorNodeStatus() error {
-	// It is enough to list Nodes from apiserver, since we can tolerate some small
-	// delays comparing to state from etcd and there is eventual consistency anyway.
-	// TODO: We should list them from local cache: nodeStore.
-	nodes, err := nc.kubeClient.Core().Nodes().List(v1.ListOptions{ResourceVersion: "0"})
+	// We are listing nodes from local cache as we can tolerate some small delays
+	// comparing to state from etcd and there is eventual consistency anyway.
+	nodes, err := nc.nodeStore.List()
 	if err != nil {
 		return err
 	}
-	added, deleted := nc.checkForNodeAddedDeleted(nodes)
+	added, deleted := nc.checkForNodeAddedDeleted(&nodes)
 	for i := range added {
 		glog.V(1).Infof("NodeController observed a new Node: %#v", added[i].Name)
 		recordNodeEvent(nc.recorder, added[i].Name, string(added[i].UID), v1.EventTypeNormal, "RegisteredNode", fmt.Sprintf("Registered Node %v in NodeController", added[i].Name))
@@ -522,7 +521,7 @@ func (nc *NodeController) monitorNodeStatus() error {
 			}
 		}
 	}
-	nc.handleDisruption(zoneToNodeConditions, nodes)
+	nc.handleDisruption(zoneToNodeConditions, &nodes)
 
 	return nil
 }
