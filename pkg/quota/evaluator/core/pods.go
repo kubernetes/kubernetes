@@ -256,7 +256,7 @@ func PodUsageFunc(obj runtime.Object) (api.ResourceList, error) {
 }
 
 func isBestEffort(pod *api.Pod) bool {
-	return qos.InternalGetPodQOS(pod) == qos.BestEffort
+	return qos.InternalGetPodQOS(pod) == api.PodQOSBestEffort
 }
 
 func isTerminating(pod *api.Pod) bool {
