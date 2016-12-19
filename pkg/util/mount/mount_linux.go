@@ -160,10 +160,12 @@ func (*Mounter) List() ([]MountPoint, error) {
 
 // IsLikelyNotMountPoint determines if a directory is not a mountpoint.
 // It is fast but not necessarily ALWAYS correct. If the path is in fact
-// a bind mount from one part of a mount to another it will not be detected.
+// a bind mount from one part of a mount to another it will not be detected, unless
+// the source itself is a mount point.
 // mkdir /tmp/a /tmp/b; mount --bin /tmp/a /tmp/b; IsLikelyNotMountPoint("/tmp/b")
 // will return true. When in fact /tmp/b is a mount point. If this situation
-// if of interest to you, don't use this function...
+// is of interest to you, don't use this function. The function would return correctly
+// however if /tmp/a itself is a mount point.
 func (mounter *Mounter) IsLikelyNotMountPoint(file string) (bool, error) {
 	return IsNotMountPoint(file)
 }
