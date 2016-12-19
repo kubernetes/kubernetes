@@ -32,6 +32,7 @@ go_library(
         "quota.go",
         "resource_filter.go",
         "resource_printer.go",
+        "rolebinding.go",
         "rollback.go",
         "rolling_updater.go",
         "rollout_status.go",
