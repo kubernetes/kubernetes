@@ -24,3 +24,8 @@ aliases:
     - soltysh
     - sttts
     - ymqytw
+  test-infra-maintainers:
+    - fejta
+    - ixdy
+    - rmmh
+    - spxtr
