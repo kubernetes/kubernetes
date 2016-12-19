@@ -22,6 +22,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
+	"k8s.io/kubernetes/pkg/api/resource"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
@@ -88,6 +89,80 @@ func TestMatchPod(t *testing.T) {
 		}
 		if result != testCase.expectMatch {
 			t.Errorf("Result %v, Expected %v, Selector: %v, Pod: %v", result, testCase.expectMatch, testCase.fieldSelector.String(), testCase.in)
+		}
+	}
+}
+
+func getResourceList(cpu, memory string) api.ResourceList {
+	res := api.ResourceList{}
+	if cpu != "" {
+		res[api.ResourceCPU] = resource.MustParse(cpu)
+	}
+	if memory != "" {
+		res[api.ResourceMemory] = resource.MustParse(memory)
+	}
+	return res
+}
+
+func addResource(rName, value string, rl api.ResourceList) api.ResourceList {
+	rl[api.ResourceName(rName)] = resource.MustParse(value)
+	return rl
+}
+
+func getResourceRequirements(requests, limits api.ResourceList) api.ResourceRequirements {
+	res := api.ResourceRequirements{}
+	res.Requests = requests
+	res.Limits = limits
+	return res
+}
+
+func newContainer(name string, requests api.ResourceList, limits api.ResourceList) api.Container {
+	return api.Container{
+		Name:      name,
+		Resources: getResourceRequirements(requests, limits),
+	}
+}
+
+func newPod(name string, containers []api.Container) *api.Pod {
+	return &api.Pod{
+		ObjectMeta: api.ObjectMeta{
+			Name: name,
+		},
+		Spec: api.PodSpec{
+			Containers: containers,
+		},
+	}
+}
+
+func TestGetPodQOS(t *testing.T) {
+	testCases := []struct {
+		pod      *api.Pod
+		expected api.PodQOSClass
+	}{
+		{
+			pod: newPod("guaranteed", []api.Container{
+				newContainer("guaranteed", getResourceList("100m", "100Mi"), getResourceList("100m", "100Mi")),
+			}),
+			expected: api.PodQOSGuaranteed,
+		},
+		{
+			pod: newPod("best-effort", []api.Container{
+				newContainer("best-effort", getResourceList("", ""), getResourceList("", "")),
+			}),
+			expected: api.PodQOSBestEffort,
+		},
+		{
+			pod: newPod("burstable", []api.Container{
+				newContainer("burstable", getResourceList("100m", "100Mi"), getResourceList("", "")),
+			}),
+			expected: api.PodQOSBurstable,
+		},
+	}
+	for id, testCase := range testCases {
+		Strategy.PrepareForCreate(genericapirequest.NewContext(), testCase.pod)
+		actual := testCase.pod.Status.QOSClass
+		if actual != testCase.expected {
+			t.Errorf("[%d]: invalid qos pod %s, expected: %s, actual: %s", id, testCase.pod.Name, testCase.expected, actual)
 		}
 	}
 }
