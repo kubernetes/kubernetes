@@ -440,6 +440,24 @@ func (proxier *Proxier) SyncLoop() {
 	}
 }
 
+// Tests whether two maps are equivalent with an initial size check optimization
+func mapsEquiv(lhs, rhs interface{}) bool {
+	map1, ok1 := lhs.(map[interface{}]interface{})
+	map2, ok2 := rhs.(map[interface{}]interface{})
+	if !ok1 || !ok2 {
+		glog.Warningf("Failed to convert map")
+		return false
+	}
+
+	if len(map1) != len(map2) {
+		return false
+	}
+	if reflect.DeepEqual(lhs, rhs) {
+		return true
+	}
+	return false
+}
+
 type healthCheckPort struct {
 	namespace types.NamespacedName
 	nodeport  int
@@ -556,8 +574,6 @@ func (proxier *Proxier) OnServiceUpdate(allServices []api.Service) {
 	proxier.haveReceivedServiceUpdate = true
 
 	newServiceMap, hcAdd, hcDel, staleUDPServices := buildServiceMap(allServices, proxier.serviceMap)
-	proxier.serviceMap = newServiceMap
-
 	for _, hc := range hcAdd {
 		glog.V(4).Infof("Adding health check for %+v, port %v", hc.namespace, hc.nodeport)
 		// Turn on healthcheck responder to listen on the health check nodePort
@@ -572,7 +588,13 @@ func (proxier *Proxier) OnServiceUpdate(allServices []api.Service) {
 		healthcheck.DeleteServiceListener(hc.namespace, hc.nodeport)
 	}
 
-	proxier.syncProxyRules()
+	if !mapsEquiv(newServiceMap, proxier.serviceMap) {
+		proxier.serviceMap = newServiceMap
+		proxier.syncProxyRules()
+	} else {
+		glog.V(4).Infof("Skipping proxy iptables rule sync on service update because nothing changed")
+	}
+
 	proxier.deleteServiceConnections(staleUDPServices.List())
 }
 
