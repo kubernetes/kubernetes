@@ -24,9 +24,11 @@ import (
 	"strings"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/service"
 	"k8s.io/kubernetes/pkg/proxy"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/exec"
+	"k8s.io/kubernetes/pkg/util/intstr"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
 	iptablestest "k8s.io/kubernetes/pkg/util/iptables/testing"
 )
@@ -880,6 +882,242 @@ func onlyLocalNodePorts(t *testing.T, fp *Proxier, ipt *iptablestest.FakeIPTable
 	}
 	if !hasJump(lbRules, localEpChain, "", "") {
 		errorf(fmt.Sprintf("Didn't find jump from lb chain %v to local ep %v", lbChain, nonLocalEp), lbRules, t)
+	}
+}
+
+func TestBuildServiceMapAddRemove(t *testing.T) {
+	services := []api.Service{
+		{
+			ObjectMeta: api.ObjectMeta{
+				Name:      "cluster-ip",
+				Namespace: "somewhere-else",
+			},
+			Spec: api.ServiceSpec{
+				Type: api.ServiceTypeClusterIP,
+				Ports: []api.ServicePort{
+					{
+						Name:     "something",
+						Protocol: "UDP",
+						Port:     1234,
+						NodePort: 4321,
+					},
+					{
+						Name:     "somethingelse",
+						Protocol: "UDP",
+						Port:     1235,
+						NodePort: 5321,
+					},
+				},
+				ClusterIP: "172.16.55.4",
+			},
+		},
+		{
+			ObjectMeta: api.ObjectMeta{
+				Name:      "node-port",
+				Namespace: "somewhere-else",
+			},
+			Spec: api.ServiceSpec{
+				Type: api.ServiceTypeNodePort,
+				Ports: []api.ServicePort{
+					{
+						Name:     "blahblah",
+						Protocol: "UDP",
+						Port:     345,
+						NodePort: 678,
+					},
+					{
+						Name:     "moreblahblah",
+						Protocol: "TCP",
+						Port:     344,
+						NodePort: 677,
+					},
+				},
+				ClusterIP: "172.16.55.10",
+			},
+		},
+		{
+			ObjectMeta: api.ObjectMeta{
+				Name:      "load-balancer",
+				Namespace: "somewhere",
+			},
+			Spec: api.ServiceSpec{
+				Type: api.ServiceTypeLoadBalancer,
+				Ports: []api.ServicePort{
+					{
+						Name:       "foobar",
+						Protocol:   "UDP",
+						Port:       8675,
+						TargetPort: intstr.FromInt(7000),
+						NodePort:   30061,
+					},
+					{
+						Name:       "baz",
+						Protocol:   "UDP",
+						Port:       8676,
+						TargetPort: intstr.FromInt(7001),
+						NodePort:   30062,
+					},
+				},
+				ClusterIP:      "172.16.55.11",
+				LoadBalancerIP: "5.6.7.8",
+			},
+			Status: api.ServiceStatus{
+				LoadBalancer: api.LoadBalancerStatus{
+					Ingress: []api.LoadBalancerIngress{
+						{IP: "10.1.2.4"},
+					},
+				},
+			},
+		},
+		{
+			ObjectMeta: api.ObjectMeta{
+				Name:      "only-local-load-balancer",
+				Namespace: "somewhere",
+				Annotations: map[string]string{
+					service.BetaAnnotationExternalTraffic:     service.AnnotationValueExternalTrafficLocal,
+					service.BetaAnnotationHealthCheckNodePort: "345",
+				},
+			},
+			Spec: api.ServiceSpec{
+				Type: api.ServiceTypeLoadBalancer,
+				Ports: []api.ServicePort{
+					{
+						Name:       "foobar2",
+						Protocol:   "UDP",
+						Port:       8677,
+						TargetPort: intstr.FromInt(7002),
+						NodePort:   30063,
+					},
+					{
+						Name:       "baz2",
+						Protocol:   "UDP",
+						Port:       8678,
+						TargetPort: intstr.FromInt(7003),
+						NodePort:   30064,
+					},
+				},
+				ClusterIP:      "172.16.55.12",
+				LoadBalancerIP: "5.6.7.8",
+			},
+			Status: api.ServiceStatus{
+				LoadBalancer: api.LoadBalancerStatus{
+					Ingress: []api.LoadBalancerIngress{
+						{IP: "10.1.2.3"},
+					},
+				},
+			},
+		},
+	}
+
+	serviceMap, hcAdd, hcDel, staleUDPServices := buildServiceMap(services, make(proxyServiceMap))
+	if len(serviceMap) != 8 {
+		t.Errorf("expected service map length 8, got %v", serviceMap)
+	}
+
+	// The only-local-loadbalancer ones get added
+	if len(hcAdd) != 2 {
+		t.Errorf("expected healthcheck add length 2, got %v", hcAdd)
+	} else {
+		for _, hc := range hcAdd {
+			if hc.namespace.Namespace != "somewhere" || hc.namespace.Name != "only-local-load-balancer" {
+				t.Errorf("unexpected healthcheck listener added: %v", hc)
+			}
+		}
+	}
+
+	// All the rest get deleted
+	if len(hcDel) != 6 {
+		t.Errorf("expected healthcheck del length 6, got %v", hcDel)
+	} else {
+		for _, hc := range hcDel {
+			if hc.namespace.Namespace == "somewhere" && hc.namespace.Name == "only-local-load-balancer" {
+				t.Errorf("unexpected healthcheck listener deleted: %v", hc)
+			}
+		}
+	}
+
+	if len(staleUDPServices) != 0 {
+		// Services only added, so nothing stale yet
+		t.Errorf("expected stale UDP services length 0, got %d", len(staleUDPServices))
+	}
+
+	// Remove some stuff
+	services = []api.Service{services[0]}
+	services[0].Spec.Ports = []api.ServicePort{services[0].Spec.Ports[1]}
+	serviceMap, hcAdd, hcDel, staleUDPServices = buildServiceMap(services, serviceMap)
+	if len(serviceMap) != 1 {
+		t.Errorf("expected service map length 1, got %v", serviceMap)
+	}
+
+	if len(hcAdd) != 0 {
+		t.Errorf("expected healthcheck add length 1, got %v", hcAdd)
+	}
+
+	// The only OnlyLocal annotation was removed above, so we expect a delete now.
+	// FIXME: Since the BetaAnnotationHealthCheckNodePort is the same for all
+	// ServicePorts, we'll get one delete per ServicePort, even though they all
+	// contain the same information
+	if len(hcDel) != 2 {
+		t.Errorf("expected healthcheck del length 2, got %v", hcDel)
+	} else {
+		for _, hc := range hcDel {
+			if hc.namespace.Namespace != "somewhere" || hc.namespace.Name != "only-local-load-balancer" {
+				t.Errorf("unexpected healthcheck listener deleted: %v", hc)
+			}
+		}
+	}
+
+	// All services but one were deleted. While you'd expect only the ClusterIPs
+	// from the three deleted services here, we still have the ClusterIP for
+	// the not-deleted service, because one of it's ServicePorts was deleted.
+	expectedStaleUDPServices := []string{"172.16.55.10", "172.16.55.4", "172.16.55.11", "172.16.55.12"}
+	if len(staleUDPServices) != len(expectedStaleUDPServices) {
+		t.Errorf("expected stale UDP services length %d, got %v", len(expectedStaleUDPServices), staleUDPServices.List())
+	}
+	for _, ip := range expectedStaleUDPServices {
+		if !staleUDPServices.Has(ip) {
+			t.Errorf("expected stale UDP service service %s", ip)
+		}
+	}
+}
+
+func TestBuildServiceMapServiceHeadless(t *testing.T) {
+	services := []api.Service{
+		{
+			ObjectMeta: api.ObjectMeta{
+				Name:      "headless",
+				Namespace: "somewhere-else",
+			},
+			Spec: api.ServiceSpec{
+				Type: api.ServiceTypeClusterIP,
+				Ports: []api.ServicePort{
+					{
+						Name:     "rpc",
+						Protocol: "UDP",
+						Port:     1235,
+					},
+				},
+				ClusterIP: api.ClusterIPNone,
+			},
+		},
+	}
+
+	// Headless service should be ignored
+	serviceMap, hcAdd, hcDel, staleUDPServices := buildServiceMap(services, make(proxyServiceMap))
+	if len(serviceMap) != 0 {
+		t.Errorf("expected service map length 0, got %d", len(serviceMap))
+	}
+
+	// No proxied services, so no healthchecks
+	if len(hcAdd) != 0 {
+		t.Errorf("expected healthcheck add length 0, got %d", len(hcAdd))
+	}
+	if len(hcDel) != 0 {
+		t.Errorf("expected healthcheck del length 0, got %d", len(hcDel))
+	}
+
+	if len(staleUDPServices) != 0 {
+		t.Errorf("expected stale UDP services length 0, got %d", len(staleUDPServices))
 	}
 }
 
