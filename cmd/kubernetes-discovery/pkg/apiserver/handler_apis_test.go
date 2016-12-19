@@ -24,8 +24,10 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
+	corev1 "k8s.io/kubernetes/pkg/api/v1"
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/client/cache"
+	v1listers "k8s.io/kubernetes/pkg/client/listers/core/v1"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/diff"
 
@@ -111,6 +113,10 @@ func TestAPIs(t *testing.T) {
 				{
 					ObjectMeta: api.ObjectMeta{Name: "v1.foo"},
 					Spec: apiregistration.APIServiceSpec{
+						Service: apiregistration.ServiceReference{
+							Namespace: "ns",
+							Name:      "api",
+						},
 						Group:    "foo",
 						Version:  "v1",
 						Priority: 10,
@@ -119,6 +125,10 @@ func TestAPIs(t *testing.T) {
 				{
 					ObjectMeta: api.ObjectMeta{Name: "v1.bar"},
 					Spec: apiregistration.APIServiceSpec{
+						Service: apiregistration.ServiceReference{
+							Namespace: "ns",
+							Name:      "api",
+						},
 						Group:    "bar",
 						Version:  "v1",
 						Priority: 11,
@@ -164,6 +174,10 @@ func TestAPIs(t *testing.T) {
 				{
 					ObjectMeta: api.ObjectMeta{Name: "v1.foo"},
 					Spec: apiregistration.APIServiceSpec{
+						Service: apiregistration.ServiceReference{
+							Namespace: "ns",
+							Name:      "api",
+						},
 						Group:    "foo",
 						Version:  "v1",
 						Priority: 20,
@@ -172,6 +186,10 @@ func TestAPIs(t *testing.T) {
 				{
 					ObjectMeta: api.ObjectMeta{Name: "v2.bar"},
 					Spec: apiregistration.APIServiceSpec{
+						Service: apiregistration.ServiceReference{
+							Namespace: "ns",
+							Name:      "api",
+						},
 						Group:    "bar",
 						Version:  "v2",
 						Priority: 11,
@@ -180,6 +198,10 @@ func TestAPIs(t *testing.T) {
 				{
 					ObjectMeta: api.ObjectMeta{Name: "v2.foo"},
 					Spec: apiregistration.APIServiceSpec{
+						Service: apiregistration.ServiceReference{
+							Namespace: "ns",
+							Name:      "api",
+						},
 						Group:    "foo",
 						Version:  "v2",
 						Priority: 1,
@@ -188,6 +210,10 @@ func TestAPIs(t *testing.T) {
 				{
 					ObjectMeta: api.ObjectMeta{Name: "v1.bar"},
 					Spec: apiregistration.APIServiceSpec{
+						Service: apiregistration.ServiceReference{
+							Namespace: "ns",
+							Name:      "api",
+						},
 						Group:    "bar",
 						Version:  "v1",
 						Priority: 11,
@@ -239,14 +265,26 @@ func TestAPIs(t *testing.T) {
 
 	for _, tc := range tests {
 		indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
+		serviceIndexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
+		endpointsIndexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 		delegate := &delegationHTTPHandler{}
 		handler := &apisHandler{
-			lister:   listers.NewAPIServiceLister(indexer),
-			delegate: delegate,
+			serviceLister:   v1listers.NewServiceLister(serviceIndexer),
+			endpointsLister: v1listers.NewEndpointsLister(endpointsIndexer),
+			lister:          listers.NewAPIServiceLister(indexer),
+			delegate:        delegate,
 		}
 		for _, o := range tc.apiservices {
 			indexer.Add(o)
 		}
+		serviceIndexer.Add(&corev1.Service{ObjectMeta: corev1.ObjectMeta{Namespace: "ns", Name: "api"}})
+		endpointsIndexer.Add(&corev1.Endpoints{
+			ObjectMeta: corev1.ObjectMeta{Namespace: "ns", Name: "api"},
+			Subsets: []corev1.EndpointSubset{
+				{Addresses: []corev1.EndpointAddress{{}}},
+			},
+		},
+		)
 
 		server := httptest.NewServer(handler)
 		defer server.Close()
@@ -316,6 +354,10 @@ func TestAPIGroup(t *testing.T) {
 				{
 					ObjectMeta: api.ObjectMeta{Name: "v1.foo"},
 					Spec: apiregistration.APIServiceSpec{
+						Service: apiregistration.ServiceReference{
+							Namespace: "ns",
+							Name:      "api",
+						},
 						Group:    "foo",
 						Version:  "v1",
 						Priority: 20,
@@ -324,6 +366,10 @@ func TestAPIGroup(t *testing.T) {
 				{
 					ObjectMeta: api.ObjectMeta{Name: "v2.bar"},
 					Spec: apiregistration.APIServiceSpec{
+						Service: apiregistration.ServiceReference{
+							Namespace: "ns",
+							Name:      "api",
+						},
 						Group:    "bar",
 						Version:  "v2",
 						Priority: 11,
@@ -332,6 +378,10 @@ func TestAPIGroup(t *testing.T) {
 				{
 					ObjectMeta: api.ObjectMeta{Name: "v2.foo"},
 					Spec: apiregistration.APIServiceSpec{
+						Service: apiregistration.ServiceReference{
+							Namespace: "ns",
+							Name:      "api",
+						},
 						Group:    "foo",
 						Version:  "v2",
 						Priority: 1,
@@ -340,6 +390,10 @@ func TestAPIGroup(t *testing.T) {
 				{
 					ObjectMeta: api.ObjectMeta{Name: "v1.bar"},
 					Spec: apiregistration.APIServiceSpec{
+						Service: apiregistration.ServiceReference{
+							Namespace: "ns",
+							Name:      "api",
+						},
 						Group:    "bar",
 						Version:  "v1",
 						Priority: 11,
@@ -369,13 +423,25 @@ func TestAPIGroup(t *testing.T) {
 
 	for _, tc := range tests {
 		indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
+		serviceIndexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
+		endpointsIndexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 		handler := &apiGroupHandler{
-			lister:    listers.NewAPIServiceLister(indexer),
-			groupName: "foo",
+			lister:          listers.NewAPIServiceLister(indexer),
+			serviceLister:   v1listers.NewServiceLister(serviceIndexer),
+			endpointsLister: v1listers.NewEndpointsLister(endpointsIndexer),
+			groupName:       "foo",
 		}
 		for _, o := range tc.apiservices {
 			indexer.Add(o)
 		}
+		serviceIndexer.Add(&corev1.Service{ObjectMeta: corev1.ObjectMeta{Namespace: "ns", Name: "api"}})
+		endpointsIndexer.Add(&corev1.Endpoints{
+			ObjectMeta: corev1.ObjectMeta{Namespace: "ns", Name: "api"},
+			Subsets: []corev1.EndpointSubset{
+				{Addresses: []corev1.EndpointAddress{{}}},
+			},
+		},
+		)
 
 		server := httptest.NewServer(handler)
 		defer server.Close()
@@ -386,8 +452,8 @@ func TestAPIGroup(t *testing.T) {
 			continue
 		}
 		if resp.StatusCode != http.StatusOK {
-			httputil.DumpResponse(resp, true)
-			t.Errorf("%s", tc.name)
+			response, _ := httputil.DumpResponse(resp, true)
+			t.Errorf("%s: %v", tc.name, string(response))
 			continue
 		}
 		bytes, err := ioutil.ReadAll(resp.Body)
