@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -40,11 +40,11 @@ type disruptiveTest struct {
 type kubeletOpt string
 
 const (
-	MIN_NODES                  = 2
-	NODE_STATE_WAIT            = 1 * time.Minute
-	kStart          kubeletOpt = "start"
-	kStop           kubeletOpt = "stop"
-	kRestart        kubeletOpt = "restart"
+	MinNodes                    = 2
+	NodeStateTimeout            = 1 * time.Minute
+	kStart           kubeletOpt = "start"
+	kStop            kubeletOpt = "stop"
+	kRestart         kubeletOpt = "restart"
 )
 
 var _ = framework.KubeDescribe("PersistentVolumes:Disruptive", func() {
@@ -69,7 +69,7 @@ var _ = framework.KubeDescribe("PersistentVolumes:Disruptive", func() {
 
 	BeforeEach(func() {
 		// To protect the NFS volume pod from the kubelet restart, we isolate it on its own node.
-		framework.SkipUnlessNodeCountIsAtLeast(MIN_NODES)
+		framework.SkipUnlessNodeCountIsAtLeast(MinNodes)
 		c = f.ClientSet
 		ns = f.Namespace.Name
 
@@ -143,7 +143,7 @@ var _ = framework.KubeDescribe("PersistentVolumes:Disruptive", func() {
 				runTest:    testKubeletRestartsAndRestoresMount,
 			},
 			{
-				testItStmt: "Should test that a volume mount to a pod that is deleted while the kubelet is down unmounts when the kubelet returns.",
+				testItStmt: "Should test that a volume mounted to a pod that is deleted while the kubelet is down unmounts when the kubelet returns.",
 				runTest:    testVolumeUnmountsFromDeletedPod,
 			},
 		}
@@ -160,44 +160,47 @@ var _ = framework.KubeDescribe("PersistentVolumes:Disruptive", func() {
 	})
 })
 
-// SPEC: Test that a volume mounted to a pod remains mounted after a kubelet restarts
+// testKubeletRestartsAndRestoresMount tests that a volume mounted to a pod remains mounted after a kubelet restarts
 func testKubeletRestartsAndRestoresMount(c clientset.Interface, f *framework.Framework, clientPod *v1.Pod, pvc *v1.PersistentVolumeClaim, pv *v1.PersistentVolume) {
+	By("Writing to the volume.")
 	file := "/mnt/_SUCCESS"
 	_, err := podExec(clientPod, "touch "+file)
 	Expect(err).NotTo(HaveOccurred())
 
+	By("Restarting kubelet")
 	kubeletCommand(kRestart, c, clientPod)
 
+	By("Testing that written file is accessible.")
 	_, err = podExec(clientPod, "cat "+file)
 	Expect(err).NotTo(HaveOccurred())
 	framework.Logf("Pod %s detected %s after kubelet restart", clientPod.Name, file)
 }
 
-// SPEC: Test that a volume unmounts if the client pod was deleted while the kubelet was down.
+// testVolumeUnmountsFromDeletedPod tests that a volume unmounts if the client pod was deleted while the kubelet was down.
 func testVolumeUnmountsFromDeletedPod(c clientset.Interface, f *framework.Framework, clientPod *v1.Pod, pvc *v1.PersistentVolumeClaim, pv *v1.PersistentVolume) {
-
 	nodeIP, err := framework.GetHostExternalAddress(c, clientPod)
 	Expect(err).NotTo(HaveOccurred())
 	nodeIP = nodeIP + ":22"
 
+	By("Expecting the volume mount to be found.")
 	result, err := framework.SSH("mount | grep "+string(clientPod.UID), nodeIP, framework.TestContext.Provider)
 	Expect(err).NotTo(HaveOccurred())
 	Expect(result.Code).To(BeZero())
 
-	file := "/mnt/_SUCCESS"
-	_, err = podExec(clientPod, "touch "+file)
-	Expect(err).NotTo(HaveOccurred())
-
+	By("Restarting the kubelet.")
 	kubeletCommand(kStop, c, clientPod)
 	deletePod(f, c, clientPod.Namespace, clientPod)
 	kubeletCommand(kStart, c, clientPod)
 
+	By("Expecting the volume mount not to be found.")
 	result, err = framework.SSH("mount| grep "+string(clientPod.UID), nodeIP, framework.TestContext.Provider)
 	Expect(err).NotTo(HaveOccurred())
 	Expect(result.Code).NotTo(BeZero())
+
+	framework.Logf("Volume mount detected on pod and written file is readable post-restart.")
 }
 
-// Initialize a test spec with a pv, pvc, and nfs client pod
+// initTestCase initializes spec resources (pv, pvc, and pod) and returns pointers to be consumed by the test
 func initTestCase(f *framework.Framework, c clientset.Interface, pvConfig persistentVolumeConfig, ns, nodeName string) (*v1.Pod, *v1.PersistentVolume, *v1.PersistentVolumeClaim) {
 	pv, pvc := createPVPVC(c, pvConfig, ns, false)
 	pod := makePod(ns, pvc.Name)
@@ -217,14 +220,14 @@ func initTestCase(f *framework.Framework, c clientset.Interface, pvConfig persis
 	return pod, pv, pvc
 }
 
-// Post-spec clean up
+// tearDownTestCase destroy resources created by initTestCase.
 func tearDownTestCase(c clientset.Interface, f *framework.Framework, ns string, pod *v1.Pod, pvc *v1.PersistentVolumeClaim, pv *v1.PersistentVolume) {
 	deletePod(f, c, ns, pod)
 	deletePersistentVolumeClaim(c, pvc.Name, ns)
 	deletePersistentVolume(c, pv.Name)
 }
 
-// Start, Restart, or Stop the kubelet running on the node of the target pod.
+// kubeletCommand performs `start`, `restart`, or `stop` on the kubelet running on the node of the target pod.
 // Allowed kubeltOps are `kStart`, `kStop`, and `kRestart`
 func kubeletCommand(kOp kubeletOpt, c clientset.Interface, pod *v1.Pod) {
 	nodeIP, err := framework.GetHostExternalAddress(c, pod)
@@ -237,18 +240,18 @@ func kubeletCommand(kOp kubeletOpt, c clientset.Interface, pod *v1.Pod) {
 	// On restart, waiting for node NotReady prevents a race condition where the node takes a few moments to leave the
 	// Ready state which in turn short circuits WaitForNodeToBeReady()
 	if kOp == kStop || kOp == kRestart {
-		if ok := framework.WaitForNodeToBeNotReady(c, pod.Spec.NodeName, NODE_STATE_WAIT); !ok {
+		if ok := framework.WaitForNodeToBeNotReady(c, pod.Spec.NodeName, NodeStateTimeout); !ok {
 			framework.Failf("Node %s failed to enter NotReady state", pod.Spec.NodeName)
 		}
 	}
 	if kOp == kStart || kOp == kRestart {
-		if ok := framework.WaitForNodeToBeReady(c, pod.Spec.NodeName, NODE_STATE_WAIT); !ok {
+		if ok := framework.WaitForNodeToBeReady(c, pod.Spec.NodeName, NodeStateTimeout); !ok {
 			framework.Failf("Node %s failed to enter Ready state", pod.Spec.NodeName)
 		}
 	}
 }
 
-// Wraps RunKubectl to execute a bash cmd in target pod
+// podExec wraps RunKubectl to execute a bash cmd in target pod
 func podExec(pod *v1.Pod, bashExec string) (string, error) {
 	args := strings.Split(bashExec, " ")
 	cmd := []string{"exec", "--namespace=" + pod.Namespace, pod.Name}
