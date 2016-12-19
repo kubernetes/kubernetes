@@ -22,7 +22,6 @@ import (
 	"bytes"
 	"fmt"
 	"os/exec"
-	"strconv"
 	"strings"
 	"syscall"
 
@@ -72,32 +71,19 @@ func Du(path string) (*resource.Quantity, error) {
 // Find uses the command `find <path> -dev -printf '.' | wc -c` to count files and directories.
 // While this is not an exact measure of inodes used, it is a very good approximation.
 func Find(path string) (int64, error) {
-	var stdout, stdwcerr, stdfinderr bytes.Buffer
-	var err error
+	var stderr bytes.Buffer
+	var counter byteCounter
 	findCmd := exec.Command("find", path, "-xdev", "-printf", ".")
-	wcCmd := exec.Command("wc", "-c")
-	if wcCmd.Stdin, err = findCmd.StdoutPipe(); err != nil {
-		return 0, fmt.Errorf("failed to setup stdout for cmd %v - %v", findCmd.Args, err)
+	findCmd.Stdout, findCmd.Stderr = &counter, &stderr
+	if err := findCmd.Run(); err != nil {
+		return 0, fmt.Errorf("cmd %v failed. stderr: %s; err: %v", findCmd.Args, stderr.String(), err)
 	}
-	wcCmd.Stdout, wcCmd.Stderr, findCmd.Stderr = &stdout, &stdwcerr, &stdfinderr
-	if err = findCmd.Start(); err != nil {
-		return 0, fmt.Errorf("failed to exec cmd %v - %v; stderr: %v", findCmd.Args, err, stdfinderr.String())
-	}
+	return counter.bytesWritten, nil
+}
 
-	if err = wcCmd.Start(); err != nil {
-		return 0, fmt.Errorf("failed to exec cmd %v - %v; stderr %v", wcCmd.Args, err, stdwcerr.String())
-	}
-	err = findCmd.Wait()
-	if err != nil {
-		return 0, fmt.Errorf("cmd %v failed. stderr: %s; err: %v", findCmd.Args, stdfinderr.String(), err)
-	}
-	err = wcCmd.Wait()
-	if err != nil {
-		return 0, fmt.Errorf("cmd %v failed. stderr: %s; err: %v", wcCmd.Args, stdwcerr.String(), err)
-	}
-	inodeUsage, err := strconv.ParseInt(strings.TrimSpace(stdout.String()), 10, 64)
-	if err != nil {
-		return 0, fmt.Errorf("cannot parse cmds: %v, %v output %s - %s", findCmd.Args, wcCmd.Args, stdout.String(), err)
-	}
-	return inodeUsage, nil
+type byteCounter struct{ bytesWritten int64 }
+
+func (b *byteCounter) Write(p []byte) (int, error) {
+	b.bytesWritten += int64(len(p))
+	return len(p), nil
 }
