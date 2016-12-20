@@ -105,7 +105,7 @@ coreos:
         --network-plugin=${NETWORK_PROVIDER}
         Restart=always
         RestartSec=10
-        KillMode=process
+        KillMode=control-group
 
     - name: kube-proxy.service
       command: start
