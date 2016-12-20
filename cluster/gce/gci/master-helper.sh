@@ -15,7 +15,6 @@
 # limitations under the License.
 
 # A library of helper functions and constant for GCI distro
-
 source "${KUBE_ROOT}/cluster/gce/gci/helper.sh"
 
 # create-master-instance creates the master instance. If called with
@@ -72,6 +71,12 @@ function replicate-master-instance() {
 function create-master-instance-internal() {
   local -r master_name="${1}"
   local -r address_option="${2:-}"
+
+  local preemptible_master=""
+  if [[ "${PREEMPTIBLE_MASTER:-}" == "true" ]]; then
+    preemptible_master="--preemptible --maintenance-policy TERMINATE"
+  fi
+
   gcloud compute instances create "${master_name}" \
     ${address_option} \
     --project "${PROJECT}" \
@@ -86,7 +91,8 @@ function create-master-instance-internal() {
     --metadata-from-file \
       "kube-env=${KUBE_TEMP}/master-kube-env.yaml,user-data=${KUBE_ROOT}/cluster/gce/gci/master.yaml,configure-sh=${KUBE_ROOT}/cluster/gce/gci/configure.sh,cluster-name=${KUBE_TEMP}/cluster-name.txt,gci-update-strategy=${KUBE_TEMP}/gci-update.txt,gci-ensure-gke-docker=${KUBE_TEMP}/gci-ensure-gke-docker.txt,gci-docker-version=${KUBE_TEMP}/gci-docker-version.txt" \
     --disk "name=${master_name}-pd,device-name=master-pd,mode=rw,boot=no,auto-delete=no" \
-    --boot-disk-size "${MASTER_ROOT_DISK_SIZE:-10}"
+    --boot-disk-size "${MASTER_ROOT_DISK_SIZE:-10}" \
+    ${preemptible_master}
 }
 
 function get-metadata() {

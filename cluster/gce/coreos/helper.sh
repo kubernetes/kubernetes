@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2015 The Kubernetes Authors.
+# Copyright 2016 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,20 +14,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-set -o errexit
-set -o nounset
-set -o pipefail
+# A library of helper functions and constants for the CoreOS distro
 
-MANIFESTS_DIR=/opt/kube-manifests/kubernetes
-
-echo "Configuring hostname"
-hostnamectl set-hostname $(hostname | cut -f1 -d.)
-
-echo "Configuring kubelet"
-mkdir -p /var/lib/kubelet
-mkdir -p /etc/kubernetes/manifests
-src=${MANIFESTS_DIR}/kubelet-config.yaml
-dst=/var/lib/kubelet/kubeconfig
-cp ${src} ${dst}
-sed -i 's/\"/\\\"/g' ${dst} # eval will remove the double quotes if they are not escaped
-eval "echo \"$(< ${dst})\"" > ${dst}
+# This file intentionally left blank
