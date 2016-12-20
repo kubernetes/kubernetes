@@ -21,7 +21,7 @@ a web site served by webserver running in a container on K8s), but who do not
 have K8s API access.
    - K8s Users: People who access the K8s API (e.g. create K8s API objects like
 Pods)
-   - K8s Project Admins: People who manage access for some K8s Users
+   - K8s Project Admins: People who manage access for some K8s Users.
    - K8s Cluster Admins: People who control the machines, networks, or binaries
 that make up a K8s cluster.
    - K8s Admin means K8s Cluster Admins and K8s Project Admins taken together.
@@ -56,8 +56,8 @@ K8s User assets:
   - things private to the K8s app, like:
     - credentials for accessing other services (docker private repos, storage
 services, facebook, etc)
-    - SSL certificates for web servers
-    - proprietary data and code
+    - SSL certificates for web servers.
+    - proprietary data and code.
 
 K8s Cluster assets:
   - Assets of each K8s User.
@@ -240,7 +240,7 @@ accounts, and no https proxy required.
 - Allow for authentication to be handled by a system external to Kubernetes, to
 allow integration with existing to enterprise authorization systems. The
 Kubernetes namespace itself should avoid taking contributions of multiple
-authorization schemes. Instead, a trusted proxy in front of the apiserver can be
+authorization schemes. Instead, a trusted proxy in front of the APIserver can be
 used to authenticate users.
   - For organizations whose security requirements only allow FIPS compliant
 implementations (e.g. apache) for authentication.
