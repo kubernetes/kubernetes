@@ -29,9 +29,11 @@ import (
 
 var sshOptions = flag.String("ssh-options", "", "Commandline options passed to ssh.")
 var sshEnv = flag.String("ssh-env", "", "Use predefined ssh options for environment.  Options: gce")
+var sshKey = flag.String("ssh-key", "", "Path to ssh private key.")
 var sshUser = flag.String("ssh-user", "", "Use predefined user for ssh.")
 
 var sshOptionsMap map[string]string
+var sshDefaultKeyMap map[string]string
 
 func init() {
 	usr, err := user.Current()
@@ -39,7 +41,10 @@ func init() {
 		glog.Fatal(err)
 	}
 	sshOptionsMap = map[string]string{
-		"gce": fmt.Sprintf("-i %s/.ssh/google_compute_engine -o UserKnownHostsFile=/dev/null -o IdentitiesOnly=yes -o CheckHostIP=no -o StrictHostKeyChecking=no -o ServerAliveInterval=30 -o LogLevel=ERROR", usr.HomeDir),
+		"gce": "-o UserKnownHostsFile=/dev/null -o IdentitiesOnly=yes -o CheckHostIP=no -o StrictHostKeyChecking=no -o ServerAliveInterval=30 -o LogLevel=ERROR",
+	}
+	sshDefaultKeyMap = map[string]string{
+		"gce": fmt.Sprintf("%s/.ssh/google_compute_engine", usr.HomeDir),
 	}
 }
 
@@ -87,6 +92,11 @@ func SSHNoSudo(host string, cmd ...string) (string, error) {
 
 // runSSHCommand executes the ssh or scp command, adding the flag provided --ssh-options
 func runSSHCommand(cmd string, args ...string) (string, error) {
+	if *sshKey != "" {
+		args = append([]string{"-i", *sshKey}, args...)
+	} else if key, found := sshDefaultKeyMap[*sshEnv]; found {
+		args = append([]string{"-i", key}, args...)
+	}
 	if env, found := sshOptionsMap[*sshEnv]; found {
 		args = append(strings.Split(env, " "), args...)
 	}
