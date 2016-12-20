@@ -131,15 +131,15 @@ const (
 
 // Account is the storage account.
 type Account struct {
-	autorest.Response `json:"-"`
-	ID                *string             `json:"id,omitempty"`
-	Name              *string             `json:"name,omitempty"`
-	Type              *string             `json:"type,omitempty"`
-	Location          *string             `json:"location,omitempty"`
-	Tags              *map[string]*string `json:"tags,omitempty"`
-	Sku               *Sku                `json:"sku,omitempty"`
-	Kind              Kind                `json:"kind,omitempty"`
-	Properties        *AccountProperties  `json:"properties,omitempty"`
+	autorest.Response  `json:"-"`
+	ID                 *string             `json:"id,omitempty"`
+	Name               *string             `json:"name,omitempty"`
+	Type               *string             `json:"type,omitempty"`
+	Location           *string             `json:"location,omitempty"`
+	Tags               *map[string]*string `json:"tags,omitempty"`
+	Sku                *Sku                `json:"sku,omitempty"`
+	Kind               Kind                `json:"kind,omitempty"`
+	*AccountProperties `json:"properties,omitempty"`
 }
 
 // AccountCheckNameAvailabilityParameters is
@@ -148,13 +148,14 @@ type AccountCheckNameAvailabilityParameters struct {
 	Type *string `json:"type,omitempty"`
 }
 
-// AccountCreateParameters is the parameters to provide for the account.
+// AccountCreateParameters is the parameters used when creating a storage
+// account.
 type AccountCreateParameters struct {
-	Sku        *Sku                               `json:"sku,omitempty"`
-	Kind       Kind                               `json:"kind,omitempty"`
-	Location   *string                            `json:"location,omitempty"`
-	Tags       *map[string]*string                `json:"tags,omitempty"`
-	Properties *AccountPropertiesCreateParameters `json:"properties,omitempty"`
+	Sku                                *Sku                `json:"sku,omitempty"`
+	Kind                               Kind                `json:"kind,omitempty"`
+	Location                           *string             `json:"location,omitempty"`
+	Tags                               *map[string]*string `json:"tags,omitempty"`
+	*AccountPropertiesCreateParameters `json:"properties,omitempty"`
 }
 
 // AccountKey is an access key for the storage account.
@@ -164,13 +165,13 @@ type AccountKey struct {
 	Permissions KeyPermission `json:"permissions,omitempty"`
 }
 
-// AccountListKeysResult is the ListKeys operation response.
+// AccountListKeysResult is the response from the ListKeys operation.
 type AccountListKeysResult struct {
 	autorest.Response `json:"-"`
 	Keys              *[]AccountKey `json:"keys,omitempty"`
 }
 
-// AccountListResult is the list storage accounts operation response.
+// AccountListResult is the response from the List Storage Accounts operation.
 type AccountListResult struct {
 	autorest.Response `json:"-"`
 	Value             *[]Account `json:"value,omitempty"`
@@ -211,11 +212,12 @@ type AccountRegenerateKeyParameters struct {
 	KeyName *string `json:"keyName,omitempty"`
 }
 
-// AccountUpdateParameters is the parameters to provide for the account.
+// AccountUpdateParameters is the parameters that can be provided when
+// updating the storage account properties.
 type AccountUpdateParameters struct {
-	Sku        *Sku                               `json:"sku,omitempty"`
-	Tags       *map[string]*string                `json:"tags,omitempty"`
-	Properties *AccountPropertiesUpdateParameters `json:"properties,omitempty"`
+	Sku                                *Sku                `json:"sku,omitempty"`
+	Tags                               *map[string]*string `json:"tags,omitempty"`
+	*AccountPropertiesUpdateParameters `json:"properties,omitempty"`
 }
 
 // CheckNameAvailabilityResult is the CheckNameAvailability operation response.
@@ -233,25 +235,26 @@ type CustomDomain struct {
 	UseSubDomain *bool   `json:"useSubDomain,omitempty"`
 }
 
-// Encryption is the encryption settings on the account.
+// Encryption is the encryption settings on the storage account.
 type Encryption struct {
 	Services  *EncryptionServices `json:"services,omitempty"`
 	KeySource *string             `json:"keySource,omitempty"`
 }
 
-// EncryptionService is an encrypted service.
+// EncryptionService is a service that allows server-side encryption to be
+// used.
 type EncryptionService struct {
 	Enabled         *bool      `json:"enabled,omitempty"`
 	LastEnabledTime *date.Time `json:"lastEnabledTime,omitempty"`
 }
 
-// EncryptionServices is the encrypted services.
+// EncryptionServices is a list of services that support encryption.
 type EncryptionServices struct {
 	Blob *EncryptionService `json:"blob,omitempty"`
 }
 
 // Endpoints is the URIs that are used to perform a retrieval of a public
-// blob, queue or table object.
+// blob, queue, or table object.
 type Endpoints struct {
 	Blob  *string `json:"blob,omitempty"`
 	Queue *string `json:"queue,omitempty"`
@@ -282,13 +285,14 @@ type Usage struct {
 	Name         *UsageName `json:"name,omitempty"`
 }
 
-// UsageListResult is the List Usages operation response.
+// UsageListResult is the response from the List Usages operation.
 type UsageListResult struct {
 	autorest.Response `json:"-"`
 	Value             *[]Usage `json:"value,omitempty"`
 }
 
-// UsageName is the Usage Names.
+// UsageName is the usage names that can be used; currently limited to
+// StorageAccount.
 type UsageName struct {
 	Value          *string `json:"value,omitempty"`
 	LocalizedValue *string `json:"localizedValue,omitempty"`

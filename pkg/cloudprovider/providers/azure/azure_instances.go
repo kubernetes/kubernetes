@@ -68,7 +68,7 @@ func (az *Cloud) InstanceType(name types.NodeName) (string, error) {
 	} else if !exists {
 		return "", cloudprovider.InstanceNotFound
 	}
-	return string(machine.Properties.HardwareProfile.VMSize), nil
+	return string(machine.HardwareProfile.VMSize), nil
 }
 
 // List lists instances that match 'filter' which is a regular expression which must match the entire instance name (fqdn)

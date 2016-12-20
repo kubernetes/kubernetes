@@ -26,8 +26,8 @@ import (
 
 // ExpressRouteServiceProvidersClient is the the Microsoft Azure Network
 // management API provides a RESTful set of web services that interact with
-// Microsoft Azure Networks service to manage your network resrources. The
-// API has entities that capture the relationship between an end user and the
+// Microsoft Azure Networks service to manage your network resources. The API
+// has entities that capture the relationship between an end user and the
 // Microsoft Azure Networks service.
 type ExpressRouteServiceProvidersClient struct {
 	ManagementClient
@@ -45,8 +45,7 @@ func NewExpressRouteServiceProvidersClientWithBaseURI(baseURI string, subscripti
 	return ExpressRouteServiceProvidersClient{NewWithBaseURI(baseURI, subscriptionID)}
 }
 
-// List the List ExpressRouteServiceProvider operation retrieves all the
-// available ExpressRouteServiceProviders.
+// List gets all the available express route service providers.
 func (client ExpressRouteServiceProvidersClient) List() (result ExpressRouteServiceProviderListResult, err error) {
 	req, err := client.ListPreparer()
 	if err != nil {
@@ -108,7 +107,7 @@ func (client ExpressRouteServiceProvidersClient) ListResponder(resp *http.Respon
 func (client ExpressRouteServiceProvidersClient) ListNextResults(lastResults ExpressRouteServiceProviderListResult) (result ExpressRouteServiceProviderListResult, err error) {
 	req, err := lastResults.ExpressRouteServiceProviderListResultPreparer()
 	if err != nil {
-		return result, autorest.NewErrorWithError(err, "network.ExpressRouteServiceProvidersClient", "List", nil, "Failure preparing next results request request")
+		return result, autorest.NewErrorWithError(err, "network.ExpressRouteServiceProvidersClient", "List", nil, "Failure preparing next results request")
 	}
 	if req == nil {
 		return
@@ -117,12 +116,12 @@ func (client ExpressRouteServiceProvidersClient) ListNextResults(lastResults Exp
 	resp, err := client.ListSender(req)
 	if err != nil {
 		result.Response = autorest.Response{Response: resp}
-		return result, autorest.NewErrorWithError(err, "network.ExpressRouteServiceProvidersClient", "List", resp, "Failure sending next results request request")
+		return result, autorest.NewErrorWithError(err, "network.ExpressRouteServiceProvidersClient", "List", resp, "Failure sending next results request")
 	}
 
 	result, err = client.ListResponder(resp)
 	if err != nil {
-		err = autorest.NewErrorWithError(err, "network.ExpressRouteServiceProvidersClient", "List", resp, "Failure responding to next results request request")
+		err = autorest.NewErrorWithError(err, "network.ExpressRouteServiceProvidersClient", "List", resp, "Failure responding to next results request")
 	}
 
 	return
