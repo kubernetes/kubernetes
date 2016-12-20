@@ -59,7 +59,9 @@ function start_discovery {
 
 	# grant permission to run delegated authentication and authorization checks
 	kubectl_core delete clusterrolebinding discovery:system:auth-delegator > /dev/null 2>&1 || true
+	kubectl_core delete clusterrolebinding discovery:system:kubernetes-discovery > /dev/null 2>&1 || true
 	kubectl_core create clusterrolebinding discovery:system:auth-delegator --clusterrole=system:auth-delegator --serviceaccount=kube-public:kubernetes-discovery
+	kubectl_core create clusterrolebinding discovery:system:kubernetes-discovery --clusterrole=system:kubernetes-discovery --serviceaccount=kube-public:kubernetes-discovery
 
 	# make sure the resources we're about to create don't exist
 	kubectl_core -n kube-public delete secret auth-proxy-client serving-etcd serving-discovery discovery-etcd > /dev/null 2>&1 || true

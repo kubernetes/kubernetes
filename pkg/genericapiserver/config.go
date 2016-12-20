@@ -42,7 +42,7 @@ import (
 	apiserverauthenticator "k8s.io/kubernetes/pkg/apiserver/authenticator"
 	apiserverfilters "k8s.io/kubernetes/pkg/apiserver/filters"
 	apiserveropenapi "k8s.io/kubernetes/pkg/apiserver/openapi"
-	"k8s.io/kubernetes/pkg/apiserver/request"
+	apiserverrequest "k8s.io/kubernetes/pkg/apiserver/request"
 	"k8s.io/kubernetes/pkg/auth/authenticator"
 	"k8s.io/kubernetes/pkg/auth/authorizer"
 	authorizerunion "k8s.io/kubernetes/pkg/auth/authorizer/union"
@@ -627,7 +627,7 @@ func (s *GenericAPIServer) installAPI(c *Config) {
 	s.HandlerContainer.Add(s.DynamicApisDiscovery())
 }
 
-func NewRequestInfoResolver(c *Config) *request.RequestInfoFactory {
+func NewRequestInfoResolver(c *Config) *apiserverrequest.RequestInfoFactory {
 	apiPrefixes := sets.NewString(strings.Trim(APIGroupPrefix, "/")) // all possible API prefixes
 	legacyAPIPrefixes := sets.String{}                               // APIPrefixes that won't have groups (legacy)
 	for legacyAPIPrefix := range c.LegacyAPIGroupPrefixes {
@@ -635,7 +635,7 @@ func NewRequestInfoResolver(c *Config) *request.RequestInfoFactory {
 		legacyAPIPrefixes.Insert(strings.Trim(legacyAPIPrefix, "/"))
 	}
 
-	return &request.RequestInfoFactory{
+	return &apiserverrequest.RequestInfoFactory{
 		APIPrefixes:          apiPrefixes,
 		GrouplessAPIPrefixes: legacyAPIPrefixes,
 	}

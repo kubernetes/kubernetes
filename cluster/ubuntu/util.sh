@@ -19,6 +19,7 @@
 set -e
 
 SSH_OPTS="-oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null -oLogLevel=ERROR -C"
+source "${KUBE_ROOT}/cluster/common.sh"
 
 MASTER=""
 MASTER_IP=""
@@ -413,8 +414,6 @@ function kube-up() {
   export CONTEXT="ubuntu"
   export KUBE_SERVER="http://${KUBE_MASTER_IP}:8080"
 
-  source "${KUBE_ROOT}/cluster/common.sh"
-
   # set kubernetes user and password
   load-or-gen-kube-basicauth
 
@@ -709,8 +708,6 @@ function kube-down() {
 
   export KUBE_CONFIG_FILE=${KUBE_CONFIG_FILE:-${KUBE_ROOT}/cluster/ubuntu/config-default.sh}
   source "${KUBE_CONFIG_FILE}"
-
-  source "${KUBE_ROOT}/cluster/common.sh"
 
   tear_down_alive_resources
   check-pods-torn-down

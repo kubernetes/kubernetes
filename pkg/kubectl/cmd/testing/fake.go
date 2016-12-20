@@ -230,6 +230,10 @@ func (f *FakeFactory) ClientConfig() (*restclient.Config, error) {
 	return f.tf.ClientConfig, f.tf.Err
 }
 
+func (f *FakeFactory) BareClientConfig() (*restclient.Config, error) {
+	return f.tf.ClientConfig, f.tf.Err
+}
+
 func (f *FakeFactory) ClientForMapping(*meta.RESTMapping) (resource.RESTClient, error) {
 	return f.tf.Client, f.tf.Err
 }

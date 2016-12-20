@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"math/rand"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -38,10 +39,12 @@ import (
 	apierrs "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/rest"
+	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	"k8s.io/kubernetes/pkg/api/v1"
 	apiv1 "k8s.io/kubernetes/pkg/api/v1"
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/apiserver/filters"
+	"k8s.io/kubernetes/pkg/apiserver/handlers/responsewriters"
 	"k8s.io/kubernetes/pkg/apiserver/request"
 	apiservertesting "k8s.io/kubernetes/pkg/apiserver/testing"
 	"k8s.io/kubernetes/pkg/fields"
@@ -57,10 +60,6 @@ import (
 
 	"github.com/emicklei/go-restful"
 )
-
-func convert(obj runtime.Object) (runtime.Object, error) {
-	return obj, nil
-}
 
 // This creates fake API versions, similar to api/latest.go.
 var testAPIGroup = "test.group"
@@ -79,12 +78,10 @@ var grouplessPrefix = "api"
 var groupVersions = []schema.GroupVersion{grouplessGroupVersion, testGroupVersion, newGroupVersion}
 
 var codec = api.Codecs.LegacyCodec(groupVersions...)
-var grouplessCodec = api.Codecs.LegacyCodec(grouplessGroupVersion)
 var testCodec = api.Codecs.LegacyCodec(testGroupVersion)
 var newCodec = api.Codecs.LegacyCodec(newGroupVersion)
 
 var accessor = meta.NewAccessor()
-var versioner runtime.ResourceVersioner = accessor
 var selfLinker runtime.SelfLinker = accessor
 var mapper, namespaceMapper meta.RESTMapper // The mappers with namespace and with legacy namespace scopes.
 var admissionControl admission.Interface
@@ -2773,18 +2770,6 @@ func TestUpdateChecksDecode(t *testing.T) {
 	}
 }
 
-func TestParseTimeout(t *testing.T) {
-	if d := parseTimeout(""); d != 30*time.Second {
-		t.Errorf("blank timeout produces %v", d)
-	}
-	if d := parseTimeout("not a timeout"); d != 30*time.Second {
-		t.Errorf("bad timeout produces %v", d)
-	}
-	if d := parseTimeout("10s"); d != 10*time.Second {
-		t.Errorf("10s timeout produced: %v", d)
-	}
-}
-
 type setTestSelfLinker struct {
 	t           *testing.T
 	expectedSet string
@@ -3089,7 +3074,7 @@ func (obj *UnregisteredAPIObject) GetObjectKind() schema.ObjectKind {
 
 func TestWriteJSONDecodeError(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		writeNegotiated(api.Codecs, newGroupVersion, w, req, http.StatusOK, &UnregisteredAPIObject{"Undecodable"})
+		responsewriters.WriteObjectNegotiated(api.Codecs, newGroupVersion, w, req, http.StatusOK, &UnregisteredAPIObject{"Undecodable"})
 	}))
 	defer server.Close()
 	// We send a 200 status code before we encode the object, so we expect OK, but there will
@@ -3114,7 +3099,7 @@ func (m *marshalError) MarshalJSON() ([]byte, error) {
 
 func TestWriteRAWJSONMarshalError(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		WriteRawJSON(http.StatusOK, &marshalError{errors.New("Undecodable")}, w)
+		responsewriters.WriteRawJSON(http.StatusOK, &marshalError{errors.New("Undecodable")}, w)
 	}))
 	defer server.Close()
 	client := http.Client{}
@@ -3424,4 +3409,16 @@ func newTestRequestInfoResolver() *request.RequestInfoFactory {
 		APIPrefixes:          sets.NewString("api", "apis"),
 		GrouplessAPIPrefixes: sets.NewString("api"),
 	}
+}
+
+const benchmarkSeed = 100
+
+func benchmarkItems() []api.Pod {
+	apiObjectFuzzer := apitesting.FuzzerFor(nil, api.SchemeGroupVersion, rand.NewSource(benchmarkSeed))
+	items := make([]api.Pod, 3)
+	for i := range items {
+		apiObjectFuzzer.Fuzz(&items[i])
+		items[i].Spec.InitContainers, items[i].Status.InitContainerStatuses = nil, nil
+	}
+	return items
 }

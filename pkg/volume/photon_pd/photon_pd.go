@@ -29,6 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/mount"
 	utilstrings "k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
+	"k8s.io/kubernetes/pkg/volume/util"
 )
 
 // This is the primary entrypoint for volume plugins.
@@ -264,29 +265,7 @@ func (c *photonPersistentDiskUnmounter) TearDown() error {
 // Unmounts the bind mount, and detaches the disk only if the PD
 // resource was the last reference to that disk on the kubelet.
 func (c *photonPersistentDiskUnmounter) TearDownAt(dir string) error {
-	glog.V(4).Infof("Photon Controller Volume TearDown of %s", dir)
-	notmnt, err := c.mounter.IsLikelyNotMountPoint(dir)
-	if err != nil {
-		return err
-	}
-	if notmnt {
-		return os.Remove(dir)
-	}
-
-	if err := c.mounter.Unmount(dir); err != nil {
-		glog.Errorf("Unmount failed: %v", err)
-		return err
-	}
-
-	notmnt, mntErr := c.mounter.IsLikelyNotMountPoint(dir)
-	if mntErr != nil {
-		glog.Errorf("IsLikelyNotMountPoint check failed: %v", mntErr)
-		return err
-	}
-	if notmnt {
-		return os.Remove(dir)
-	}
-	return fmt.Errorf("Failed to unmount volume dir")
+	return util.UnmountPath(dir, c.mounter)
 }
 
 func makeGlobalPDPath(host volume.VolumeHost, devName string) string {

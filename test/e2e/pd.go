@@ -19,6 +19,7 @@ package e2e
 import (
 	"fmt"
 	mathrand "math/rand"
+	"os/exec"
 	"strings"
 	"time"
 
@@ -419,6 +420,61 @@ var _ = framework.KubeDescribe("Pod Disks", func() {
 		By("Test completed successfully, waiting for PD to safely detach")
 		waitForPDDetach(disk1Name, host0Name)
 		waitForPDDetach(disk2Name, host0Name)
+	})
+
+	It("should be able to detach from a node which was deleted [Slow] [Disruptive]", func() {
+		framework.SkipUnlessProviderIs("gce")
+
+		initialGroupSize, err := GroupSize(framework.TestContext.CloudConfig.NodeInstanceGroup)
+		framework.ExpectNoError(err, "Error getting group size")
+
+		By("Creating a pd")
+		diskName, err := createPDWithRetry()
+		framework.ExpectNoError(err, "Error creating a pd")
+
+		host0Pod := testPDPod([]string{diskName}, host0Name, false, 1)
+
+		containerName := "mycontainer"
+
+		defer func() {
+			By("Cleaning up PD-RW test env")
+			podClient.Delete(host0Pod.Name, v1.NewDeleteOptions(0))
+			detachAndDeletePDs(diskName, []types.NodeName{host0Name})
+		}()
+
+		By("submitting host0Pod to kubernetes")
+		_, err = podClient.Create(host0Pod)
+		framework.ExpectNoError(err, fmt.Sprintf("Failed to create host0pod: %v", err))
+
+		framework.ExpectNoError(f.WaitForPodRunningSlow(host0Pod.Name))
+
+		testFile := "/testpd1/tracker"
+		testFileContents := fmt.Sprintf("%v", mathrand.Int())
+
+		framework.ExpectNoError(f.WriteFileViaContainer(host0Pod.Name, containerName, testFile, testFileContents))
+		framework.Logf("Wrote value: %v", testFileContents)
+
+		// Verify that disk shows up in node 0's volumeInUse list
+		framework.ExpectNoError(waitForPDInVolumesInUse(nodeClient, diskName, host0Name, nodeStatusTimeout, true /* should exist*/))
+
+		output, err := exec.Command("gcloud", "compute", "instances", "list").CombinedOutput()
+		framework.ExpectNoError(err, fmt.Sprintf("Unable to get list of node instances %v", err))
+		Expect(true, strings.Contains(string(output), string(host0Name)))
+
+		By("deleting host0")
+
+		output, err = exec.Command("gcloud", "compute", "instances", "delete", string(host0Name), "--project="+framework.TestContext.CloudConfig.ProjectID, "--zone="+framework.TestContext.CloudConfig.Zone).CombinedOutput()
+		framework.ExpectNoError(err, fmt.Sprintf("Failed to delete host0pod: %v", err))
+
+		output, err = exec.Command("gcloud", "compute", "instances", "list").CombinedOutput()
+		framework.ExpectNoError(err, fmt.Sprintf("Unable to get list of node instances %v", err))
+		Expect(false, strings.Contains(string(output), string(host0Name)))
+
+		// The disk should be detached from host0 on it's deletion
+		By("Waiting for pd to detach from host0")
+		waitForPDDetach(diskName, host0Name)
+		framework.ExpectNoError(WaitForGroupSize(framework.TestContext.CloudConfig.NodeInstanceGroup, int32(initialGroupSize)), "Unable to get back the cluster to inital size")
+		return
 	})
 })
 
