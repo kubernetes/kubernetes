@@ -28,7 +28,7 @@ spec:
       timeoutSeconds: 15
     volumeMounts:
     - name: srvkube
-      mountPath: /srv/kubernetes
+      mountPath: /etc/srv/kubernetes
       readOnly: true
     - name: logfile
       mountPath: /var/log/kube-controller-manager.log
@@ -41,7 +41,7 @@ spec:
   volumes:
   - name: srvkube
     hostPath:
-      path: /srv/kubernetes
+      path: /etc/srv/kubernetes
   - name: logfile
     hostPath:
       path: /var/log/kube-controller-manager.log
