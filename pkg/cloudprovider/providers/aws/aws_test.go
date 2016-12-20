@@ -211,11 +211,6 @@ func TestNewAWSCloud(t *testing.T) {
 			true, "",
 		},
 		{
-			"Config specified invalid zone",
-			strings.NewReader("[global]\nzone = blahonga"), NewFakeAWSServices(),
-			true, "",
-		},
-		{
 			"Config specifies valid zone",
 			strings.NewReader("[global]\nzone = eu-west-1a"), NewFakeAWSServices(),
 			false, "eu-west-1",
