@@ -25,9 +25,14 @@ import (
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/v1"
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
+	"k8s.io/kubernetes/pkg/client/cache"
+	"k8s.io/kubernetes/pkg/client/typed/dynamic"
+	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/workqueue"
+	"k8s.io/kubernetes/pkg/watch"
 )
 
 type eventType int
@@ -49,6 +54,16 @@ type event struct {
 // uidToNode, a graph that caches the dependencies as we know, and enqueues
 // items to the attemptToDelete and attemptToOrphan.
 type GraphBuilder struct {
+	restMapper meta.RESTMapper
+	// each monitor list/watches a resource, the results are funneled to the
+	// dependencyGraphBuilder
+	monitors []*cache.Controller
+	// metaOnlyClientPool uses a special codec, which removes fields except for
+	// apiVersion, kind, and metadata during decoding.
+	metaOnlyClientPool dynamic.ClientPool
+	// used to register exactly once the rate limiters of the clients used by
+	// the `monitors`.
+	registeredRateLimiterForControllers *RegisteredRateLimiter
 	// monitors are the producer of the graphChanges queue, graphBuilder alters
 	// the in-memory graph according to the changes.
 	graphChanges workqueue.RateLimitingInterface
@@ -61,6 +76,129 @@ type GraphBuilder struct {
 	// GraphBuilder and GC share the absentOwnerCache. Objects that are known to
 	// be non-existent are added to the cached.
 	absentOwnerCache *UIDCache
+}
+
+func listWatcher(client *dynamic.Client, resource schema.GroupVersionResource) *cache.ListWatch {
+	return &cache.ListWatch{
+		ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
+			// APIResource.Kind is not used by the dynamic client, so
+			// leave it empty. We want to list this resource in all
+			// namespaces if it's namespace scoped, so leave
+			// APIResource.Namespaced as false is all right.
+			apiResource := metav1.APIResource{Name: resource.Resource}
+			return client.ParameterCodec(dynamic.VersionedParameterEncoderWithV1Fallback).
+				Resource(&apiResource, v1.NamespaceAll).
+				List(&options)
+		},
+		WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
+			// APIResource.Kind is not used by the dynamic client, so
+			// leave it empty. We want to list this resource in all
+			// namespaces if it's namespace scoped, so leave
+			// APIResource.Namespaced as false is all right.
+			apiResource := metav1.APIResource{Name: resource.Resource}
+			return client.ParameterCodec(dynamic.VersionedParameterEncoderWithV1Fallback).
+				Resource(&apiResource, v1.NamespaceAll).
+				Watch(&options)
+		},
+	}
+}
+
+func (gb *GraphBuilder) controllerFor(resource schema.GroupVersionResource, kind schema.GroupVersionKind) (*cache.Controller, error) {
+	// TODO: consider store in one storage.
+	glog.V(5).Infof("create storage for resource %s", resource)
+	client, err := gb.metaOnlyClientPool.ClientForGroupVersionKind(kind)
+	if err != nil {
+		return nil, err
+	}
+	gb.registeredRateLimiterForControllers.registerIfNotPresent(resource.GroupVersion(), client, "garbage_collector_monitoring")
+	setObjectTypeMeta := func(obj interface{}) {
+		runtimeObject, ok := obj.(runtime.Object)
+		if !ok {
+			utilruntime.HandleError(fmt.Errorf("expected runtime.Object, got %#v", obj))
+		}
+		runtimeObject.GetObjectKind().SetGroupVersionKind(kind)
+	}
+	_, monitor := cache.NewInformer(
+		listWatcher(client, resource),
+		nil,
+		ResourceResyncTime,
+		cache.ResourceEventHandlerFuncs{
+			// add the event to the dependencyGraphBuilder's graphChanges.
+			AddFunc: func(obj interface{}) {
+				setObjectTypeMeta(obj)
+				event := &event{
+					eventType: addEvent,
+					obj:       obj,
+				}
+				gb.graphChanges.Add(event)
+			},
+			UpdateFunc: func(oldObj, newObj interface{}) {
+				setObjectTypeMeta(newObj)
+				// TODO: check if there are differences in the ownerRefs,
+				// finalizers, and DeletionTimestamp; if not, ignore the update.
+				event := &event{updateEvent, newObj, oldObj}
+				gb.graphChanges.Add(event)
+			},
+			DeleteFunc: func(obj interface{}) {
+				// delta fifo may wrap the object in a cache.DeletedFinalStateUnknown, unwrap it
+				if deletedFinalStateUnknown, ok := obj.(cache.DeletedFinalStateUnknown); ok {
+					obj = deletedFinalStateUnknown.Obj
+				}
+				setObjectTypeMeta(obj)
+				event := &event{
+					eventType: deleteEvent,
+					obj:       obj,
+				}
+				gb.graphChanges.Add(event)
+			},
+		},
+	)
+	return monitor, nil
+}
+
+func (gb *GraphBuilder) monitorsForResources(resources map[schema.GroupVersionResource]struct{}) error {
+	for resource := range resources {
+		if _, ok := ignoredResources[resource]; ok {
+			glog.V(5).Infof("ignore resource %#v", resource)
+			continue
+		}
+		kind, err := gb.restMapper.KindFor(resource)
+		if err != nil {
+			return err
+		}
+		monitor, err := gb.controllerFor(resource, kind)
+		if err != nil {
+			return err
+		}
+		gb.monitors = append(gb.monitors, monitor)
+	}
+	return nil
+}
+
+func (gb *GraphBuilder) startMonitors(stopCh <-chan struct{}) {
+	for _, monitor := range gb.monitors {
+		go monitor.Run(stopCh)
+	}
+}
+
+func (gb *GraphBuilder) MonitorsSynced() bool {
+	for _, monitor := range gb.monitors {
+		if !monitor.HasSynced() {
+			return false
+		}
+	}
+	return true
+}
+
+var ignoredResources = map[schema.GroupVersionResource]struct{}{
+	schema.GroupVersionResource{Group: "extensions", Version: "v1beta1", Resource: "replicationcontrollers"}:              {},
+	schema.GroupVersionResource{Group: "", Version: "v1", Resource: "bindings"}:                                           {},
+	schema.GroupVersionResource{Group: "", Version: "v1", Resource: "componentstatuses"}:                                  {},
+	schema.GroupVersionResource{Group: "", Version: "v1", Resource: "events"}:                                             {},
+	schema.GroupVersionResource{Group: "authentication.k8s.io", Version: "v1beta1", Resource: "tokenreviews"}:             {},
+	schema.GroupVersionResource{Group: "authorization.k8s.io", Version: "v1beta1", Resource: "subjectaccessreviews"}:      {},
+	schema.GroupVersionResource{Group: "authorization.k8s.io", Version: "v1beta1", Resource: "selfsubjectaccessreviews"}:  {},
+	schema.GroupVersionResource{Group: "authorization.k8s.io", Version: "v1beta1", Resource: "localsubjectaccessreviews"}: {},
 }
 
 func (gb *GraphBuilder) enqueueChanges(e *event) {

@@ -30,7 +30,6 @@ import (
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/client/typed/dynamic"
 	"k8s.io/kubernetes/pkg/controller/garbagecollector/metaonly"
-	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/types"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
@@ -39,7 +38,6 @@ import (
 	"k8s.io/kubernetes/pkg/util/workqueue"
 	// install the prometheus plugin
 	_ "k8s.io/kubernetes/pkg/util/workqueue/prometheus"
-	"k8s.io/kubernetes/pkg/watch"
 )
 
 const ResourceResyncTime time.Duration = 0
@@ -57,117 +55,19 @@ const ResourceResyncTime time.Duration = 0
 // up to date as the notification is sent.
 type GarbageCollector struct {
 	restMapper meta.RESTMapper
-	// metaOnlyClientPool uses a special codec, which removes fields except for
-	// apiVersion, kind, and metadata during decoding.
-	metaOnlyClientPool dynamic.ClientPool
 	// clientPool uses the regular dynamicCodec. We need it to update
 	// finalizers. It can be removed if we support patching finalizers.
 	clientPool dynamic.ClientPool
 	// garbage collector attempts to delete the items in attemptToDelete queue when the time is ripe.
 	attemptToDelete workqueue.RateLimitingInterface
 	// garbage collector attempts to orphan the dependents of the items in the attemptToOrphan queue, then deletes the items.
-	attemptToOrphan workqueue.RateLimitingInterface
-	// each monitor list/watches a resource, the results are funneled to the
-	// dependencyGraphBuilder
-	monitors               []*cache.Controller
+	attemptToOrphan        workqueue.RateLimitingInterface
 	dependencyGraphBuilder *GraphBuilder
 	// used to register exactly once the rate limiter of the dynamic client
 	// used by the garbage collector controller.
 	registeredRateLimiter *RegisteredRateLimiter
-	// used to register exactly once the rate limiters of the clients used by
-	// the `monitors`.
-	registeredRateLimiterForControllers *RegisteredRateLimiter
 	// GC caches the owners that do not exist according to the API server.
 	absentOwnerCache *UIDCache
-}
-
-func gcListWatcher(client *dynamic.Client, resource schema.GroupVersionResource) *cache.ListWatch {
-	return &cache.ListWatch{
-		ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
-			// APIResource.Kind is not used by the dynamic client, so
-			// leave it empty. We want to list this resource in all
-			// namespaces if it's namespace scoped, so leave
-			// APIResource.Namespaced as false is all right.
-			apiResource := metav1.APIResource{Name: resource.Resource}
-			return client.ParameterCodec(dynamic.VersionedParameterEncoderWithV1Fallback).
-				Resource(&apiResource, v1.NamespaceAll).
-				List(&options)
-		},
-		WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
-			// APIResource.Kind is not used by the dynamic client, so
-			// leave it empty. We want to list this resource in all
-			// namespaces if it's namespace scoped, so leave
-			// APIResource.Namespaced as false is all right.
-			apiResource := metav1.APIResource{Name: resource.Resource}
-			return client.ParameterCodec(dynamic.VersionedParameterEncoderWithV1Fallback).
-				Resource(&apiResource, v1.NamespaceAll).
-				Watch(&options)
-		},
-	}
-}
-
-func (gc *GarbageCollector) controllerFor(resource schema.GroupVersionResource, kind schema.GroupVersionKind) (*cache.Controller, error) {
-	// TODO: consider store in one storage.
-	glog.V(5).Infof("create storage for resource %s", resource)
-	client, err := gc.metaOnlyClientPool.ClientForGroupVersionKind(kind)
-	if err != nil {
-		return nil, err
-	}
-	gc.registeredRateLimiterForControllers.registerIfNotPresent(resource.GroupVersion(), client, "garbage_collector_monitoring")
-	setObjectTypeMeta := func(obj interface{}) {
-		runtimeObject, ok := obj.(runtime.Object)
-		if !ok {
-			utilruntime.HandleError(fmt.Errorf("expected runtime.Object, got %#v", obj))
-		}
-		runtimeObject.GetObjectKind().SetGroupVersionKind(kind)
-	}
-	_, monitor := cache.NewInformer(
-		gcListWatcher(client, resource),
-		nil,
-		ResourceResyncTime,
-		cache.ResourceEventHandlerFuncs{
-			// add the event to the dependencyGraphBuilder's graphChanges.
-			AddFunc: func(obj interface{}) {
-				setObjectTypeMeta(obj)
-				event := &event{
-					eventType: addEvent,
-					obj:       obj,
-				}
-				gc.dependencyGraphBuilder.enqueueChanges(event)
-			},
-			UpdateFunc: func(oldObj, newObj interface{}) {
-				setObjectTypeMeta(newObj)
-				// TODO: check if there are differences in the ownerRefs,
-				// finalizers, and DeletionTimestamp; if not, ignore the update.
-				event := &event{updateEvent, newObj, oldObj}
-				gc.dependencyGraphBuilder.enqueueChanges(event)
-			},
-			DeleteFunc: func(obj interface{}) {
-				// delta fifo may wrap the object in a cache.DeletedFinalStateUnknown, unwrap it
-				if deletedFinalStateUnknown, ok := obj.(cache.DeletedFinalStateUnknown); ok {
-					obj = deletedFinalStateUnknown.Obj
-				}
-				setObjectTypeMeta(obj)
-				event := &event{
-					eventType: deleteEvent,
-					obj:       obj,
-				}
-				gc.dependencyGraphBuilder.enqueueChanges(event)
-			},
-		},
-	)
-	return monitor, nil
-}
-
-var ignoredResources = map[schema.GroupVersionResource]struct{}{
-	schema.GroupVersionResource{Group: "extensions", Version: "v1beta1", Resource: "replicationcontrollers"}:              {},
-	schema.GroupVersionResource{Group: "", Version: "v1", Resource: "bindings"}:                                           {},
-	schema.GroupVersionResource{Group: "", Version: "v1", Resource: "componentstatuses"}:                                  {},
-	schema.GroupVersionResource{Group: "", Version: "v1", Resource: "events"}:                                             {},
-	schema.GroupVersionResource{Group: "authentication.k8s.io", Version: "v1beta1", Resource: "tokenreviews"}:             {},
-	schema.GroupVersionResource{Group: "authorization.k8s.io", Version: "v1beta1", Resource: "subjectaccessreviews"}:      {},
-	schema.GroupVersionResource{Group: "authorization.k8s.io", Version: "v1beta1", Resource: "selfsubjectaccessreviews"}:  {},
-	schema.GroupVersionResource{Group: "authorization.k8s.io", Version: "v1beta1", Resource: "localsubjectaccessreviews"}: {},
 }
 
 func NewGarbageCollector(metaOnlyClientPool dynamic.ClientPool, clientPool dynamic.ClientPool, mapper meta.RESTMapper, deletableResources map[schema.GroupVersionResource]struct{}) (*GarbageCollector, error) {
@@ -175,17 +75,18 @@ func NewGarbageCollector(metaOnlyClientPool dynamic.ClientPool, clientPool dynam
 	attemptToOrphan := workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "garbage_collector_attempt_to_orphan")
 	absentOwnerCache := NewUIDCache(500)
 	gc := &GarbageCollector{
-		metaOnlyClientPool:                  metaOnlyClientPool,
-		clientPool:                          clientPool,
-		restMapper:                          mapper,
-		attemptToDelete:                     attemptToDelete,
-		attemptToOrphan:                     attemptToOrphan,
-		registeredRateLimiter:               NewRegisteredRateLimiter(deletableResources),
-		registeredRateLimiterForControllers: NewRegisteredRateLimiter(deletableResources),
-		absentOwnerCache:                    absentOwnerCache,
+		clientPool:            clientPool,
+		restMapper:            mapper,
+		attemptToDelete:       attemptToDelete,
+		attemptToOrphan:       attemptToOrphan,
+		registeredRateLimiter: NewRegisteredRateLimiter(deletableResources),
+		absentOwnerCache:      absentOwnerCache,
 	}
-	gc.dependencyGraphBuilder = &GraphBuilder{
-		graphChanges: workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "garbage_collector_graph_changes"),
+	gb := &GraphBuilder{
+		metaOnlyClientPool:                  metaOnlyClientPool,
+		registeredRateLimiterForControllers: NewRegisteredRateLimiter(deletableResources),
+		restMapper:                          mapper,
+		graphChanges:                        workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "garbage_collector_graph_changes"),
 		uidToNode: &concurrentUIDToNode{
 			RWMutex:   &sync.RWMutex{},
 			uidToNode: make(map[types.UID]*node),
@@ -194,21 +95,11 @@ func NewGarbageCollector(metaOnlyClientPool dynamic.ClientPool, clientPool dynam
 		attemptToOrphan:  attemptToOrphan,
 		absentOwnerCache: absentOwnerCache,
 	}
-	for resource := range deletableResources {
-		if _, ok := ignoredResources[resource]; ok {
-			glog.V(5).Infof("ignore resource %#v", resource)
-			continue
-		}
-		kind, err := gc.restMapper.KindFor(resource)
-		if err != nil {
-			return nil, err
-		}
-		monitor, err := gc.controllerFor(resource, kind)
-		if err != nil {
-			return nil, err
-		}
-		gc.monitors = append(gc.monitors, monitor)
+	if err := gb.monitorsForResources(deletableResources); err != nil {
+		return nil, err
 	}
+	gc.dependencyGraphBuilder = gb
+
 	return gc, nil
 }
 
@@ -218,18 +109,11 @@ func (gc *GarbageCollector) Run(workers int, stopCh <-chan struct{}) {
 	defer gc.dependencyGraphBuilder.graphChanges.ShutDown()
 
 	glog.Infof("Garbage Collector: Initializing")
-	for _, monitor := range gc.monitors {
-		go monitor.Run(stopCh)
-	}
-
-	var syncs []cache.InformerSynced
-	for _, monitor := range gc.monitors {
-		syncs = append(syncs, monitor.HasSynced)
-	}
-	if !cache.WaitForCacheSync(stopCh, syncs...) {
+	gc.dependencyGraphBuilder.startMonitors(stopCh)
+	if !cache.WaitForCacheSync(stopCh, gc.dependencyGraphBuilder.MonitorsSynced) {
 		return
 	}
-	glog.Infof("Garbage Collector: All monitored resources synced. Proceeding to collect garbage")
+	glog.Infof("Garbage Collector: All resource monitors have synced. Proceeding to collect garbage")
 
 	// worker
 	go wait.Until(gc.dependencyGraphBuilder.runProcessEvent, 1*time.Second, stopCh)
