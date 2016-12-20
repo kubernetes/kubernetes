@@ -75,24 +75,46 @@ func (s *SecureServingInfo) NewSelfClientConfig(token string) (*restclient.Confi
 		BearerToken: token,
 	}
 
-	// find certificate for host: either explicitly given, from the server cert bundle or one of the SNI certs
+	// find certificate for host: either explicitly given, from the server cert bundle or one of the SNI certs,
+	// but only return CA:TRUE certificates.
 	var derCA []byte
 	if s.CACert != nil {
 		derCA = s.CACert.Certificate[0]
 	}
+	if derCA == nil && net.ParseIP(host) == nil {
+		if cert, found := s.SNICerts[host]; found {
+			chain, err := parseChain(cert.Certificate)
+			if err != nil {
+				return nil, fmt.Errorf("failed to parse SNI certificate for host %q: %v", host, err)
+			}
+
+			if trustedChain(chain) {
+				return clientConfig, nil
+			}
+
+			ca, err := findCA(chain)
+			if err != nil {
+				return nil, fmt.Errorf("no CA certificate found in SNI server certificate bundle for host %q: %v", host, err)
+			}
+			derCA = ca.Raw
+		}
+	}
 	if derCA == nil && s.Cert != nil {
-		x509Cert, err := x509.ParseCertificate(s.Cert.Certificate[0])
+		chain, err := parseChain(s.Cert.Certificate)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse server certificate: %v", err)
 		}
 
-		if (net.ParseIP(host) != nil && certMatchesIP(x509Cert, host)) || certMatchesName(x509Cert, host) {
-			derCA = s.Cert.Certificate[0]
-		}
-	}
-	if derCA == nil && net.ParseIP(host) == nil {
-		if cert, found := s.SNICerts[host]; found {
-			derCA = cert.Certificate[0]
+		if (net.ParseIP(host) != nil && certMatchesIP(chain[0], host)) || certMatchesName(chain[0], host) {
+			if trustedChain(chain) {
+				return clientConfig, nil
+			}
+
+			ca, err := findCA(chain)
+			if err != nil {
+				return nil, fmt.Errorf("no CA certificate found in server certificate bundle: %v", err)
+			}
+			derCA = ca.Raw
 		}
 	}
 	if derCA == nil {
@@ -105,6 +127,41 @@ func (s *SecureServingInfo) NewSelfClientConfig(token string) (*restclient.Confi
 	clientConfig.CAData = pemCA.Bytes()
 
 	return clientConfig, nil
+}
+
+func trustedChain(chain []*x509.Certificate) bool {
+	intermediates := x509.NewCertPool()
+	for _, cert := range chain[1:] {
+		intermediates.AddCert(cert)
+	}
+	_, err := chain[0].Verify(x509.VerifyOptions{
+		Intermediates: intermediates,
+		KeyUsages:     []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
+	})
+	return err == nil
+}
+
+func parseChain(bss [][]byte) ([]*x509.Certificate, error) {
+	var result []*x509.Certificate
+	for _, bs := range bss {
+		x509Cert, err := x509.ParseCertificate(bs)
+		if err != nil {
+			return nil, err
+		}
+		result = append(result, x509Cert)
+	}
+
+	return result, nil
+}
+
+func findCA(chain []*x509.Certificate) (*x509.Certificate, error) {
+	for _, cert := range chain {
+		if cert.IsCA {
+			return cert, nil
+		}
+	}
+
+	return nil, fmt.Errorf("no certificate with CA:TRUE found in chain")
 }
 
 func (s *ServingInfo) NewSelfClientConfig(token string) (*restclient.Config, error) {
