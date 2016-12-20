@@ -157,7 +157,6 @@ func (m PriorityRESTMapper) RESTMapping(gk schema.GroupKind, versions ...string)
 	if err != nil {
 		return nil, err
 	}
-
 	// any versions the user provides take priority
 	priorities := m.KindPriority
 	if len(versions) > 0 {

@@ -17,9 +17,11 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
+        "//pkg/api/meta:go_default_library",
         "//pkg/api/rest:go_default_library",
         "//pkg/apis/extensions:go_default_library",
         "//pkg/apis/extensions/v1beta1:go_default_library",
+        "//pkg/apis/meta/v1:go_default_library",
         "//pkg/client/clientset_generated/internalclientset/typed/extensions/internalversion:go_default_library",
         "//pkg/genericapiserver:go_default_library",
         "//pkg/registry/autoscaling/horizontalpodautoscaler/etcd:go_default_library",
@@ -35,6 +37,7 @@ go_library(
         "//pkg/registry/extensions/thirdpartyresourcedata:go_default_library",
         "//pkg/registry/generic:go_default_library",
         "//pkg/runtime:go_default_library",
+        "//pkg/runtime/schema:go_default_library",
         "//pkg/util/runtime:go_default_library",
         "//pkg/util/sets:go_default_library",
         "//pkg/util/wait:go_default_library",
@@ -49,8 +52,11 @@ go_test(
     tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
+        "//pkg/api/meta:go_default_library",
         "//pkg/apis/extensions:go_default_library",
+        "//pkg/apis/meta/v1:go_default_library",
         "//pkg/registry/extensions/thirdpartyresourcedata:go_default_library",
+        "//pkg/runtime/schema:go_default_library",
         "//pkg/util/sets:go_default_library",
     ],
 )

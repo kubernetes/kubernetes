@@ -18,28 +18,32 @@ package rest
 
 import (
 	"fmt"
+	"reflect"
 	"strings"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/apis/extensions"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	extensionsclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/extensions/internalversion"
 	"k8s.io/kubernetes/pkg/registry/extensions/thirdpartyresourcedata"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 // ResourceInterface is the interface for the parts of the master that know how to add/remove
 // third party resources.  Extracted into an interface for injection for testing.
 type ResourceInterface interface {
-	// Remove a third party resource based on the RESTful path for that resource, the path is <api-group-path>/<resource-plural-name>
-	RemoveThirdPartyResource(path string) error
+	// Remove a third party resource based on the groupVersionResource
+	RemoveThirdPartyResource(gvr metav1.GroupVersionResource) error
 	// Install a third party resource described by 'rsrc'
 	InstallThirdPartyResource(rsrc *extensions.ThirdPartyResource) error
 	// Is a particular third party resource currently installed?
 	HasThirdPartyResource(rsrc *extensions.ThirdPartyResource) (bool, error)
-	// List all currently installed third party resources, the returned
-	// names are of the form <api-group-path>/<resource-plural-name>
-	ListThirdPartyResources() []string
+	// List all currently installed third party resources, return
+	// collection of all groupVersionResource
+	ListThirdPartyResources() []metav1.GroupVersionResource
 }
 
 const thirdpartyprefix = "/apis"
@@ -53,9 +57,7 @@ type ThirdPartyController struct {
 
 // SyncOneResource synchronizes a single resource with RESTful resources on the master
 func (t *ThirdPartyController) SyncOneResource(rsrc *extensions.ThirdPartyResource) error {
-	// TODO: we also need to test if the existing installed resource matches the resource we are sync-ing.
-	// Currently, if there is an older, incompatible resource installed, we won't remove it.  We should detect
-	// older, incompatible resources and remove them before testing if the resource exists.
+	// Check whether we have this resource installed.
 	hasResource, err := t.master.HasThirdPartyResource(rsrc)
 	if err != nil {
 		return err
@@ -76,19 +78,31 @@ func (t *ThirdPartyController) SyncResources() error {
 }
 
 func (t *ThirdPartyController) syncResourceList(list runtime.Object) error {
-	existing := sets.String{}
+	existing := map[metav1.GroupVersionResource]sets.Empty{}
 	switch list := list.(type) {
 	case *extensions.ThirdPartyResourceList:
 		// Loop across all schema objects for third party resources
 		for ix := range list.Items {
 			item := &list.Items[ix]
 			// extract the api group and resource kind from the schema
-			_, group, err := thirdpartyresourcedata.ExtractApiGroupAndKind(item)
+			kind, group, err := thirdpartyresourcedata.ExtractApiGroupAndKind(item)
 			if err != nil {
 				return err
 			}
-			// place it in the set of resources that we expect, so that we don't delete it in the delete pass
-			existing.Insert(MakeThirdPartyPath(group))
+			for _, version := range item.Versions {
+				plural, _ := meta.KindToResource(schema.GroupVersionKind{
+					Group:   group,
+					Version: version.Name,
+					Kind:    kind,
+				})
+				// place it in the set of resources that we expect, so that we don't delete it in the delete pass
+				gvr := metav1.GroupVersionResource{
+					Group:    group,
+					Version:  version.Name,
+					Resource: plural.Resource,
+				}
+				existing[gvr] = sets.Empty{}
+			}
 			// ensure a RESTful resource for this schema exists on the master
 			if err := t.SyncOneResource(item); err != nil {
 				return err
@@ -99,18 +113,18 @@ func (t *ThirdPartyController) syncResourceList(list runtime.Object) error {
 	}
 	// deletion phase, get all installed RESTful resources
 	installed := t.master.ListThirdPartyResources()
-	for _, installedAPI := range installed {
+	for _, installedGvr := range installed {
 		found := false
 		// search across the expected restful resources to see if this resource belongs to one of the expected ones
-		for _, apiPath := range existing.List() {
-			if installedAPI == apiPath || strings.HasPrefix(installedAPI, apiPath+"/") {
+		for gvr := range existing {
+			if reflect.DeepEqual(installedGvr, gvr) {
 				found = true
 				break
 			}
 		}
 		// not expected, delete the resource
 		if !found {
-			if err := t.master.RemoveThirdPartyResource(installedAPI); err != nil {
+			if err := t.master.RemoveThirdPartyResource(installedGvr); err != nil {
 				return err
 			}
 		}
