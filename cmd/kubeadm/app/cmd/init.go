@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"time"
 
 	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
@@ -70,7 +71,7 @@ func NewCmdInit(out io.Writer) *cobra.Command {
 		Run: func(cmd *cobra.Command, args []string) {
 			i, err := NewInit(cfgPath, &cfg, skipPreFlight, deploymentType)
 			kubeadmutil.CheckErr(err)
-			kubeadmutil.CheckErr(i.Validate())
+			kubeadmutil.CheckErr(Validate(i.Cfg()))
 			kubeadmutil.CheckErr(i.Run(out))
 		},
 	}
@@ -140,16 +141,13 @@ func NewCmdInit(out io.Writer) *cobra.Command {
 	cmd.PersistentFlags().Var(
 		discovery.NewDiscoveryValue(&cfg.Discovery), "discovery",
 		"The discovery method kubeadm will use for connecting nodes to the master",
+	)
 
 	cmd.PersistentFlags().StringVar(
 		&deploymentType, "deployment", deploymentType,
 		fmt.Sprintf("specify a deployment type from %v", deploymentTypes),
 	)
 
-	cmd.PersistentFlags().Int32Var(
-		&cfg.API.BindPort, "api-port", cfg.API.BindPort,
-		"Port for API to bind to",
-	)
 	return cmd
 }
 
@@ -231,8 +229,8 @@ func NewInit(cfgPath string, cfg *kubeadmapi.MasterConfiguration, skipPreFlight 
 	return &StaticPodInit{cfg: cfg}, nil
 }
 
-func (i *Init) Validate() error {
-	return validation.ValidateMasterConfiguration(i.cfg).ToAggregate()
+func Validate(cfg *kubeadmapi.MasterConfiguration) error {
+	return validation.ValidateMasterConfiguration(cfg).ToAggregate()
 }
 
 // Init structs define implementations of the cluster setup for each supported
@@ -325,8 +323,14 @@ func (spi *SelfHostedInit) Cfg() *kubeadmapi.MasterConfiguration {
 
 // Run executes master node provisioning, including certificates, needed pod manifests, etc.
 func (i *SelfHostedInit) Run(out io.Writer) error {
-	if err := kubemaster.CreateTokenAuthFile(&i.cfg.Secrets); err != nil {
-		return err
+
+	if i.cfg.Discovery.Token != nil {
+		if err := kubemaster.PrepareTokenDiscovery(i.cfg.Discovery.Token); err != nil {
+			return err
+		}
+		if err := kubemaster.CreateTokenAuthFile(kubeadmutil.BearerToken(i.cfg.Discovery.Token)); err != nil {
+			return err
+		}
 	}
 
 	if err := kubemaster.WriteStaticPodManifests(i.cfg); err != nil {
@@ -348,7 +352,7 @@ func (i *SelfHostedInit) Run(out io.Writer) error {
 	// write a file that has already been written (the kubelet will be up and
 	// running in that case - they'd need to stop the kubelet, remove the file, and
 	// start it again in that case).
-	// TODO(phase1+) this is no longer the right place to guard agains foo-shooting,
+	// TODO(phase1+) this is no longer the right place to guard against foo-shooting,
 	// we need to decide how to handle existing files (it may be handy to support
 	// importing existing files, may be we could even make our command idempotant,
 	// or at least allow for external PKI and stuff)
@@ -363,8 +367,7 @@ func (i *SelfHostedInit) Run(out io.Writer) error {
 		return err
 	}
 
-	schedulePodsOnMaster := false
-	if err := kubemaster.UpdateMasterRoleLabelsAndTaints(client, schedulePodsOnMaster); err != nil {
+	if err := kubemaster.UpdateMasterRoleLabelsAndTaints(client, false); err != nil {
 		return err
 	}
 
@@ -374,39 +377,33 @@ func (i *SelfHostedInit) Run(out io.Writer) error {
 	if err := kubemaster.CreateSelfHostedControlPlane(i.cfg, client); err != nil {
 		return err
 	}
-
-	// Query DaemonSet, ensure status.currentNumberScheduled = status.desiredNumberScheduled
-	if err := kubemaster.WaitForSelfHostedControlPlane(client); err != nil {
-		return err
-	}
-
 	// At this point the API server is running but cannot get the port it wants
-	// because of our temporary API server. Remove the static pod manifests and wait
-	// for the self-hosted components to take over.
+	// because of our temporary API server.
 
-	//fmt.Println("[init] Removing static pod manifests to transition to self-hosted control plane...")
+	// TODO: Make sure the self hosted apiserver is up before we proceed here:
+	time.Sleep(20 * time.Second)
+
+	// Now we can remove the static pod manifests written earlier and let the
+	// self-hosted components take over:
+	fmt.Println("[init] Removing static pod manifests to transition to self-hosted control plane...")
 	if err := kubemaster.DeleteStaticManifests(); err != nil {
 		return err
 	}
 
-	// Wait again until all API components are healthy. The self-hosted apiserver was polling
-	// waiting for it's port to be available, and may take a few seconds to come back up.
-	kubemaster.WaitForAPI(client)
+	// TODO: Let kubelet restart and come back up:
+	time.Sleep(20 * time.Second)
 
-	if err := kubemaster.CreateDiscoveryDeploymentAndSecret(i.cfg, client, caCert); err != nil {
-		return err
+	if i.cfg.Discovery.Token != nil {
+		if err := kubemaster.CreateDiscoveryDeploymentAndSecret(i.cfg, client, caCert); err != nil {
+			return err
+		}
 	}
 
 	if err := kubemaster.CreateEssentialAddons(i.cfg, client); err != nil {
 		return err
 	}
 
-	data := joinArgsData{i.cfg, kubeadmapiext.DefaultAPIBindPort, kubeadmapiext.DefaultDiscoveryBindPort}
-	if joinArgs, err := generateJoinArgs(data); err != nil {
-		return err
-	} else {
-		fmt.Fprintf(out, initDoneMsgf, joinArgs)
-	}
+	fmt.Fprintf(out, initDoneMsgf, generateJoinArgs(i.cfg))
 	return nil
 }
 
