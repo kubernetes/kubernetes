@@ -194,7 +194,18 @@ func (p *Parser) parseIdentifier(cur *ListNode) error {
 		}
 	}
 	value := p.consumeText()
-	cur.append(newIdentifier(value))
+
+	if isBool(value) {
+		v, err := strconv.ParseBool(value)
+		if err != nil {
+			return fmt.Errorf("can not parse bool '%s': %s", value, err.Error())
+		}
+
+		cur.append(newBool(v))
+	} else {
+		cur.append(newIdentifier(value))
+	}
+
 	return p.parseInsideAction(cur)
 }
 
@@ -430,4 +441,9 @@ func isEndOfLine(r rune) bool {
 // isAlphaNumeric reports whether r is an alphabetic, digit, or underscore.
 func isAlphaNumeric(r rune) bool {
 	return r == '_' || unicode.IsLetter(r) || unicode.IsDigit(r)
+}
+
+// isBool reports whether s is a boolean value.
+func isBool(s string) bool {
+	return s == "true" || s == "false"
 }
