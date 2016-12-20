@@ -149,6 +149,9 @@ func GetSecretForPV(secretNamespace, secretName, volumePluginName string, kubeCl
 }
 
 func GetClassForVolume(kubeClient clientset.Interface, pv *v1.PersistentVolume) (*storage.StorageClass, error) {
+	if kubeClient == nil {
+		return nil, fmt.Errorf("Cannot get kube client")
+	}
 	// TODO: replace with a real attribute after beta
 	className, found := pv.Annotations["volume.beta.kubernetes.io/storage-class"]
 	if !found {
