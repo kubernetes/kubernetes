@@ -18,6 +18,7 @@ package genericapiserver
 
 import (
 	"bytes"
+	"crypto/tls"
 	"crypto/x509"
 	"encoding/pem"
 	"errors"
@@ -75,7 +76,8 @@ func (s *SecureServingInfo) NewSelfClientConfig(token string) (*restclient.Confi
 		BearerToken: token,
 	}
 
-	// find certificate for host: either explicitly given, from the server cert bundle or one of the SNI certs
+	// find certificate for host: either explicitly given, from the server cert bundle or one of the SNI certs,
+	// but only return CA:TRUE certificates.
 	var derCA []byte
 	if s.CACert != nil {
 		derCA = s.CACert.Certificate[0]
@@ -87,12 +89,18 @@ func (s *SecureServingInfo) NewSelfClientConfig(token string) (*restclient.Confi
 		}
 
 		if (net.ParseIP(host) != nil && certMatchesIP(x509Cert, host)) || certMatchesName(x509Cert, host) {
-			derCA = s.Cert.Certificate[0]
+			derCA, err = findCAinChain(s.Cert)
+			if err != nil {
+				return nil, fmt.Errorf("no CA certificate found in server certificate bundle: %v", err)
+			}
 		}
 	}
 	if derCA == nil && net.ParseIP(host) == nil {
 		if cert, found := s.SNICerts[host]; found {
-			derCA = cert.Certificate[0]
+			derCA, err = findCAinChain(cert)
+			if err != nil {
+				return nil, fmt.Errorf("no CA certificate found in SNI server certificate bundle for host %q: %v", host, err)
+			}
 		}
 	}
 	if derCA == nil {
@@ -105,6 +113,20 @@ func (s *SecureServingInfo) NewSelfClientConfig(token string) (*restclient.Confi
 	clientConfig.CAData = pemCA.Bytes()
 
 	return clientConfig, nil
+}
+
+func findCAinChain(cert *tls.Certificate) ([]byte, error) {
+	for _, bs := range cert.Certificate {
+		x509Cert, err := x509.ParseCertificate(bs)
+		if err != nil {
+			return nil, err
+		}
+		if x509Cert.IsCA {
+			return bs, nil
+		}
+	}
+
+	return nil, fmt.Errorf("no certificate with CA:TRUE found in chain")
 }
 
 func (s *ServingInfo) NewSelfClientConfig(token string) (*restclient.Config, error) {
