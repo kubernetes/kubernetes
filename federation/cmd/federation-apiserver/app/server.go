@@ -33,7 +33,9 @@ import (
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apiserver/authenticator"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	"k8s.io/kubernetes/pkg/client/informers/informers_generated"
 	"k8s.io/kubernetes/pkg/controller/informers"
 	"k8s.io/kubernetes/pkg/generated/openapi"
 	"k8s.io/kubernetes/pkg/genericapiserver"
@@ -145,21 +147,26 @@ func Run(s *options.ServerRunOptions) error {
 	if err != nil {
 		return fmt.Errorf("failed to create clientset: %v", err)
 	}
-	client, err := internalclientset.NewForConfig(selfClientConfig)
+	internalclient, err := internalclientset.NewForConfig(selfClientConfig)
+	if err != nil {
+		return fmt.Errorf("failed to create internalclientset: %v", err)
+	}
+	client, err := clientset.NewForConfig(selfClientConfig)
 	if err != nil {
 		return fmt.Errorf("failed to create clientset: %v", err)
 	}
-	sharedInformers := informers.NewSharedInformerFactory(nil, client, 10*time.Minute)
+	nongeneratedInformers := informers.NewSharedInformerFactory(nil, internalclient, 10*time.Minute)
+	sharedInformers := informers_generated.NewSharedInformerFactory(nil, client, 10*time.Minute)
 
-	authorizerconfig := s.Authorization.ToAuthorizationConfig(sharedInformers)
+	authorizerconfig := s.Authorization.ToAuthorizationConfig(sharedInformers.Rbac().V1alpha1())
 	apiAuthorizer, err := authorizer.NewAuthorizerFromAuthorizationConfig(authorizerconfig)
 	if err != nil {
 		return fmt.Errorf("invalid Authorization Config: %v", err)
 	}
 
 	admissionControlPluginNames := strings.Split(s.GenericServerRunOptions.AdmissionControl, ",")
-	pluginInitializer := admission.NewPluginInitializer(sharedInformers, apiAuthorizer)
-	admissionController, err := admission.NewFromPlugins(client, admissionControlPluginNames, s.GenericServerRunOptions.AdmissionControlConfigFile, pluginInitializer)
+	pluginInitializer := admission.NewPluginInitializer(nongeneratedInformers, apiAuthorizer)
+	admissionController, err := admission.NewFromPlugins(internalclient, admissionControlPluginNames, s.GenericServerRunOptions.AdmissionControlConfigFile, pluginInitializer)
 	if err != nil {
 		return fmt.Errorf("failed to initialize plugins: %v", err)
 	}
@@ -208,6 +215,7 @@ func Run(s *options.ServerRunOptions) error {
 	installCoreAPIs(s, m, restOptionsFactory)
 	installExtensionsAPIs(m, restOptionsFactory)
 
+	nongeneratedInformers.Start(wait.NeverStop)
 	sharedInformers.Start(wait.NeverStop)
 	m.PrepareRun().Run(wait.NeverStop)
 	return nil

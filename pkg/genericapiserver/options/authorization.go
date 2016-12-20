@@ -23,9 +23,9 @@ import (
 	"github.com/spf13/pflag"
 
 	authorizationclient "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/authorization/v1beta1"
+	rbacinformerv1alpha1 "k8s.io/kubernetes/pkg/client/informers/informers_generated/rbac/v1alpha1"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
-	"k8s.io/kubernetes/pkg/controller/informers"
 	"k8s.io/kubernetes/pkg/genericapiserver/authorizer"
 )
 
@@ -79,7 +79,7 @@ func (s *BuiltInAuthorizationOptions) AddFlags(fs *pflag.FlagSet) {
 
 }
 
-func (s *BuiltInAuthorizationOptions) ToAuthorizationConfig(informerFactory informers.SharedInformerFactory) authorizer.AuthorizationConfig {
+func (s *BuiltInAuthorizationOptions) ToAuthorizationConfig(rbacInformerFactory rbacinformerv1alpha1.Interface) authorizer.AuthorizationConfig {
 	modes := []string{}
 	if len(s.Mode) > 0 {
 		modes = strings.Split(s.Mode, ",")
@@ -91,7 +91,7 @@ func (s *BuiltInAuthorizationOptions) ToAuthorizationConfig(informerFactory info
 		WebhookConfigFile:           s.WebhookConfigFile,
 		WebhookCacheAuthorizedTTL:   s.WebhookCacheAuthorizedTTL,
 		WebhookCacheUnauthorizedTTL: s.WebhookCacheUnauthorizedTTL,
-		InformerFactory:             informerFactory,
+		RBACInformerFactory:         rbacInformerFactory,
 	}
 }
 

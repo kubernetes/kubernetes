@@ -20,8 +20,9 @@ go_library(
         "//pkg/auth/authorizer/abac:go_default_library",
         "//pkg/auth/authorizer/union:go_default_library",
         "//pkg/client/clientset_generated/clientset/typed/authorization/v1beta1:go_default_library",
-        "//pkg/controller/informers:go_default_library",
+        "//pkg/client/informers/informers_generated/rbac/v1alpha1:go_default_library",
         "//plugin/pkg/auth/authorizer/rbac:go_default_library",
+        "//plugin/pkg/auth/authorizer/rbac/cacheadapter:go_default_library",
         "//plugin/pkg/auth/authorizer/webhook:go_default_library",
     ],
 )
