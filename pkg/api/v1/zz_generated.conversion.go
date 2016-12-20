@@ -3357,6 +3357,7 @@ func autoConvert_v1_QuobyteVolumeSource_To_api_QuobyteVolumeSource(in *QuobyteVo
 	out.ReadOnly = in.ReadOnly
 	out.User = in.User
 	out.Group = in.Group
+	out.TenantID = in.TenantID
 	return nil
 }
 
@@ -3370,6 +3371,7 @@ func autoConvert_api_QuobyteVolumeSource_To_v1_QuobyteVolumeSource(in *api.Quoby
 	out.ReadOnly = in.ReadOnly
 	out.User = in.User
 	out.Group = in.Group
+	out.TenantID = in.TenantID
 	return nil
 }
 

@@ -5724,14 +5724,21 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 					},
 					"user": {
 						SchemaProps: spec.SchemaProps{
-							Description: "User to map volume access to Defaults to serivceaccount user",
+							Description: "User to map volume access to Defaults to root",
 							Type:        []string{"string"},
 							Format:      "",
 						},
 					},
 					"group": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Group to map volume access to Default is no group",
+							Description: "Group to map volume access to Default is nfsnobody",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"tenantid": {
+						SchemaProps: spec.SchemaProps{
+							Description: "TenantID to map volume access to Default is no \"DEFAULT\"",
 							Type:        []string{"string"},
 							Format:      "",
 						},
