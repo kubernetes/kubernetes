@@ -811,7 +811,18 @@ func (r *Request) request(fn func(*http.Request, *http.Response)) error {
 			r.backoffMgr.UpdateBackoff(r.URL(), err, resp.StatusCode)
 		}
 		if err != nil {
-			return err
+			if !net.IsConnectionReset(err) {
+				return err
+			}
+			// "Connection reset by peer" is usually a transient error.
+			// Thus, if possible, we retry those errors.
+			// For that purpose, we set the artificial "retry-after" response.
+			// TODO: Should we clean the original response if it exists?
+			resp = &http.Response{
+				StatusCode: 500,
+				Header:     http.Header{"Retry-After": []string{"1"}},
+				Body:       ioutil.NopCloser(bytes.NewReader([]byte{})),
+			}
 		}
 
 		done := func() bool {
