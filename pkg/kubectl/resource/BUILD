@@ -37,6 +37,8 @@ go_library(
         "//pkg/util/sets:go_default_library",
         "//pkg/util/yaml:go_default_library",
         "//pkg/watch:go_default_library",
+        "//vendor:golang.org/x/text/encoding/unicode",
+        "//vendor:golang.org/x/text/transform",
     ],
 )
 
