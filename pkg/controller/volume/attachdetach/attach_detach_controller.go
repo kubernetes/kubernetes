@@ -124,11 +124,11 @@ func NewAttachDetachController(
 	adc.desiredStateOfWorld = cache.NewDesiredStateOfWorld(&adc.volumePluginMgr)
 	adc.actualStateOfWorld = cache.NewActualStateOfWorld(&adc.volumePluginMgr)
 	adc.attacherDetacher =
-		operationexecutor.NewOperationExecutor(
+		operationexecutor.NewOperationExecutor(operationexecutor.NewOperationGenerator(
 			kubeClient,
 			&adc.volumePluginMgr,
 			recorder,
-			false) // flag for experimental binary check for volume mount
+			false)) // flag for experimental binary check for volume mount
 	adc.nodeStatusUpdater = statusupdater.NewNodeStatusUpdater(
 		kubeClient, nodeInformer, adc.actualStateOfWorld)
 	adc.reconciler = reconciler.NewReconciler(
