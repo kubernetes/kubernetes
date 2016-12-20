@@ -47,5 +47,6 @@ go_test(
         "//pkg/util/intstr:go_default_library",
         "//pkg/util/iptables:go_default_library",
         "//pkg/util/iptables/testing:go_default_library",
+        "//pkg/util/sets:go_default_library",
     ],
 )

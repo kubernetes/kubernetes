@@ -21,6 +21,7 @@ import (
 
 	"fmt"
 	"net"
+	"reflect"
 	"strings"
 
 	"k8s.io/kubernetes/pkg/api"
@@ -31,6 +32,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/intstr"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
 	iptablestest "k8s.io/kubernetes/pkg/util/iptables/testing"
+	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 func checkAllLines(t *testing.T, table utiliptables.Table, save []byte, expectedLines map[utiliptables.Chain]string) {
@@ -1168,6 +1170,255 @@ func TestBuildServiceMapServiceUpdate(t *testing.T) {
 	if len(staleUDPServices) != 0 {
 		// Services only added, so nothing stale yet
 		t.Errorf("expected stale UDP services length 0, got %d", len(staleUDPServices))
+	}
+}
+
+func makeTestEndpoint(namespace, name string, subsetsFunc func(*api.EndpointSubset)) api.Endpoints {
+	eps := api.Endpoints{
+		ObjectMeta: api.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+		},
+		Subsets: []api.EndpointSubset{{}},
+	}
+	subsetsFunc(&eps.Subsets[0])
+	return eps
+}
+
+func addTestEndpointAddress(array []api.EndpointAddress, ip, hostname string, nodename *string) []api.EndpointAddress {
+	addr := api.EndpointAddress{
+		IP:       ip,
+		Hostname: hostname,
+		NodeName: nodename,
+	}
+	return append(array, addr)
+}
+
+func addTestEndpointPort(array []api.EndpointPort, name string, protocol api.Protocol, port int32) []api.EndpointPort {
+	p := api.EndpointPort{
+		Name:     name,
+		Protocol: protocol,
+		Port:     port,
+	}
+	return append(array, p)
+}
+
+func TestBuildEndpointsMap(t *testing.T) {
+	node1 := "node-1"
+	node2 := "node-2"
+	first := []api.Endpoints{
+		makeTestEndpoint("somewhere", "some-endpoint", func(s *api.EndpointSubset) {
+			s.Addresses = addTestEndpointAddress(s.Addresses, "1.2.3.4", "foobar.com", &node1)
+			s.Addresses = addTestEndpointAddress(s.Addresses, "1.2.3.5", "foobar.com", &node2)
+			s.Addresses = addTestEndpointAddress(s.Addresses, "1.2.3.6", "foobar.com", nil)
+			s.Ports = addTestEndpointPort(s.Ports, "blah", "UDP", 1235)
+			s.Ports = addTestEndpointPort(s.Ports, "bar", "TCP", 4567)
+		}),
+		makeTestEndpoint("somewhere", "empty-service", func(s *api.EndpointSubset) {
+			s.Ports = addTestEndpointPort(s.Ports, "first", "UDP", 2222)
+			s.Ports = addTestEndpointPort(s.Ports, "second", "TCP", 3333)
+		}),
+		makeTestEndpoint("somewhere", "invalid-addresses", func(s *api.EndpointSubset) {
+			s.Addresses = addTestEndpointAddress(s.Addresses, "", "foobar.com", &node1)
+			s.Addresses = addTestEndpointAddress(s.Addresses, "", "foobar.com", nil)
+			s.Ports = addTestEndpointPort(s.Ports, "first", "UDP", 4444)
+			s.Ports = addTestEndpointPort(s.Ports, "second", "TCP", 5555)
+		}),
+		makeTestEndpoint("somewhere-else", "another-endpoint", func(s *api.EndpointSubset) {
+			s.Addresses = addTestEndpointAddress(s.Addresses, "1.2.3.6", "baz.com", nil)
+			s.Ports = addTestEndpointPort(s.Ports, "foo", "TCP", 1111)
+		}),
+	}
+
+	name1 := types.NamespacedName{Namespace: "somewhere", Name: "some-endpoint"}
+	name1port1 := proxy.ServicePortName{NamespacedName: name1, Port: "blah"}
+	name1port2 := proxy.ServicePortName{NamespacedName: name1, Port: "bar"}
+
+	name2 := types.NamespacedName{Namespace: "somewhere", Name: "invalid-addresses"}
+	name2port1 := proxy.ServicePortName{NamespacedName: name2, Port: "first"}
+	name2port2 := proxy.ServicePortName{NamespacedName: name2, Port: "second"}
+
+	name3 := types.NamespacedName{Namespace: "somewhere-else", Name: "another-endpoint"}
+	name3port1 := proxy.ServicePortName{NamespacedName: name3, Port: "foo"}
+
+	expectedEndpointsMap := proxyEndpointsMap{
+		name1port1: []*endpointsInfo{
+			{ip: "1.2.3.4:1235", localEndpoint: true},
+			{ip: "1.2.3.5:1235", localEndpoint: false},
+			{ip: "1.2.3.6:1235", localEndpoint: false},
+		},
+		name1port2: []*endpointsInfo{
+			{ip: "1.2.3.4:4567", localEndpoint: true},
+			{ip: "1.2.3.5:4567", localEndpoint: false},
+			{ip: "1.2.3.6:4567", localEndpoint: false},
+		},
+		name2port1: []*endpointsInfo{},
+		name2port2: []*endpointsInfo{},
+		name3port1: []*endpointsInfo{
+			{ip: "1.2.3.6:1111", localEndpoint: false},
+		},
+	}
+
+	expectedHCUpdateMap := map[types.NamespacedName]sets.String{
+		name1: {
+			"somewhere/some-endpoint": sets.Empty{},
+		},
+		name2: {
+			"somewhere/invalid-addresses": sets.Empty{},
+		},
+		name3: {},
+	}
+
+	endpointsMap, hcUpdates, staleConnections := buildEndpointsMap(first, "node-1", make(proxyEndpointsMap))
+	// For some reason, reflect.DeepEqual() fails to compare two empty
+	// []*endpointsInfo slices so we have to compare manually
+	if len(endpointsMap) != len(expectedEndpointsMap) {
+		t.Errorf("expected endpoints map %v, got %v", expectedEndpointsMap, endpointsMap)
+	} else {
+		for key, val := range endpointsMap {
+			expected := expectedEndpointsMap[key]
+			if len(val) != len(expected) {
+				t.Errorf("expected endpoints info %v, got %v", expected, val)
+			} else if len(val) != 0 && !reflect.DeepEqual(val, expected) {
+				t.Errorf("expected endpoints info %v, got %v", expected, val)
+			}
+		}
+	}
+
+	hcUpdateMap := make(map[types.NamespacedName]sets.String)
+	for _, hc := range hcUpdates {
+		hcUpdateMap[hc.name] = getHealthCheckEntries(hc.name, hc.endpoints)
+	}
+	if !reflect.DeepEqual(hcUpdateMap, expectedHCUpdateMap) {
+		t.Errorf("expected healthcheck updates %v but got %v", expectedHCUpdateMap, hcUpdateMap)
+	}
+
+	if len(staleConnections) != 0 {
+		t.Errorf("expected stale connections length 0, got %v", staleConnections)
+	}
+
+	second := []api.Endpoints{
+		makeTestEndpoint("somewhere", "some-endpoint", func(s *api.EndpointSubset) {
+			s.Addresses = addTestEndpointAddress(s.Addresses, "1.2.3.4", "foobar.com", &node1)
+			s.Ports = addTestEndpointPort(s.Ports, "bar", "TCP", 4567)
+		}),
+		makeTestEndpoint("somewhere-else", "another-endpoint", func(s *api.EndpointSubset) {
+			s.Addresses = addTestEndpointAddress(s.Addresses, "1.2.3.6", "baz.com", nil)
+			s.Ports = addTestEndpointPort(s.Ports, "foo", "TCP", 1111)
+		}),
+	}
+
+	expectedEndpointsMap = proxyEndpointsMap{
+		name1port2: []*endpointsInfo{
+			{ip: "1.2.3.4:4567", localEndpoint: true},
+		},
+		name3port1: []*endpointsInfo{
+			{ip: "1.2.3.6:1111", localEndpoint: false},
+		},
+	}
+
+	expectedHCUpdateMap = map[types.NamespacedName]sets.String{
+		name1: {
+			"somewhere/some-endpoint": sets.Empty{},
+		},
+		name2: {},
+		name3: {},
+	}
+
+	expectedStaleConnections := map[endpointServicePair]bool{
+		endpointServicePair{endpoint: "1.2.3.4:1235", servicePortName: proxy.ServicePortName{NamespacedName: name1, Port: "blah"}}: true,
+		endpointServicePair{endpoint: "1.2.3.5:1235", servicePortName: proxy.ServicePortName{NamespacedName: name1, Port: "blah"}}: true,
+		endpointServicePair{endpoint: "1.2.3.6:1235", servicePortName: proxy.ServicePortName{NamespacedName: name1, Port: "blah"}}: true,
+		endpointServicePair{endpoint: "1.2.3.5:4567", servicePortName: proxy.ServicePortName{NamespacedName: name1, Port: "bar"}}:  true,
+		endpointServicePair{endpoint: "1.2.3.6:4567", servicePortName: proxy.ServicePortName{NamespacedName: name1, Port: "bar"}}:  true,
+	}
+
+	endpointsMap, hcUpdates, staleConnections = buildEndpointsMap(second, "node-1", endpointsMap)
+	// For some reason, reflect.DeepEqual() fails to compare two empty
+	// []*endpointsInfo slices so we have to compare manually
+	if len(endpointsMap) != len(expectedEndpointsMap) {
+		t.Errorf("expected endpoints map %v, got %v", expectedEndpointsMap, endpointsMap)
+	} else {
+		for key, val := range endpointsMap {
+			expected := expectedEndpointsMap[key]
+			if len(val) != len(expected) {
+				t.Errorf("expected endpoints info %v, got %v", expected, val)
+			} else if len(val) != 0 && !reflect.DeepEqual(val, expected) {
+				t.Errorf("expected endpoints info %v, got %v", expected, val)
+			}
+		}
+	}
+
+	hcUpdateMap = make(map[types.NamespacedName]sets.String)
+	for _, hc := range hcUpdates {
+		hcUpdateMap[hc.name] = getHealthCheckEntries(hc.name, hc.endpoints)
+	}
+	if !reflect.DeepEqual(hcUpdateMap, expectedHCUpdateMap) {
+		t.Errorf("expected healthcheck updates %v but got %v", expectedHCUpdateMap, hcUpdateMap)
+	}
+
+	if !reflect.DeepEqual(staleConnections, expectedStaleConnections) {
+		t.Errorf("expected healthcheck updates %v but got %v", expectedStaleConnections, staleConnections)
+	}
+}
+
+func TestBuildEndpointsMapInvalidEndpoints(t *testing.T) {
+	node1 := "node-1"
+	endpoints := []api.Endpoints{
+		// Endpoints with all invalid ports and addresses
+		makeTestEndpoint("somewhere", "some-endpoint", func(s *api.EndpointSubset) {
+			s.Addresses = addTestEndpointAddress(s.Addresses, "", "foobar.com", &node1)
+			s.Addresses = addTestEndpointAddress(s.Addresses, "", "foobar.com", nil)
+			s.Ports = addTestEndpointPort(s.Ports, "blah", "UDP", 0)
+			s.Ports = addTestEndpointPort(s.Ports, "bar", "TCP", 0)
+		}),
+		// Endpoints with one invalid port and one invalid endpoint address
+		makeTestEndpoint("somewhere", "another-endpoint", func(s *api.EndpointSubset) {
+			s.Addresses = addTestEndpointAddress(s.Addresses, "", "foobar.com", &node1)
+			s.Addresses = addTestEndpointAddress(s.Addresses, "5.4.3.2", "foobar.com", nil)
+			s.Ports = addTestEndpointPort(s.Ports, "blah", "UDP", 0)
+			s.Ports = addTestEndpointPort(s.Ports, "bar", "TCP", 3322)
+		}),
+	}
+
+	name1 := types.NamespacedName{Namespace: "somewhere", Name: "some-endpoint"}
+	name2 := types.NamespacedName{Namespace: "somewhere", Name: "another-endpoint"}
+	expectedHCUpdateMap := map[types.NamespacedName]sets.String{
+		name1: {
+			"somewhere/some-endpoint": sets.Empty{},
+		},
+		name2: {
+			"somewhere/another-endpoint": sets.Empty{},
+		},
+	}
+
+	endpointsMap, hcUpdates, staleConnections := buildEndpointsMap(endpoints, "node-1", make(proxyEndpointsMap))
+	if len(endpointsMap) != 4 {
+		t.Errorf("expected endpoints map length 4, got %v", endpointsMap)
+	} else {
+		var numEmpty uint
+		for _, val := range endpointsMap {
+			if len(val) == 0 {
+				numEmpty++
+			} else if len(val) != 1 {
+				t.Errorf("expected endpoints info length 1, got %v", val)
+			}
+		}
+		if numEmpty != 3 {
+			t.Errorf("expected three empty endpoints info, got %v", endpointsMap)
+		}
+	}
+
+	hcUpdateMap := make(map[types.NamespacedName]sets.String)
+	for _, hc := range hcUpdates {
+		hcUpdateMap[hc.name] = getHealthCheckEntries(hc.name, hc.endpoints)
+	}
+	if !reflect.DeepEqual(hcUpdateMap, expectedHCUpdateMap) {
+		t.Errorf("expected healthcheck updates %v but got %v", expectedHCUpdateMap, hcUpdateMap)
+	}
+
+	if len(staleConnections) != 0 {
+		t.Errorf("expected stale connections length 0, got %v", staleConnections)
 	}
 }
 
