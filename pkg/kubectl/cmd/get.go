@@ -324,9 +324,7 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 		}
 
 		var obj runtime.Object
-		if singular {
-			obj = infos[0].Object
-		} else {
+		if !singular || len(infos) > 1 {
 			// we have more than one item, so coerce all items into a list
 			list := &unstructured.UnstructuredList{
 				Object: map[string]interface{}{
@@ -339,6 +337,8 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 				list.Items = append(list.Items, info.Object.(*unstructured.Unstructured))
 			}
 			obj = list
+		} else {
+			obj = infos[0].Object
 		}
 
 		isList := meta.IsListType(obj)

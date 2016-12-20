@@ -1267,6 +1267,17 @@ __EOF__
   kube::test::if_has_string "${output_message}" "/apis/extensions/v1beta1/namespaces/default/deployments 200 OK"
   kube::test::if_has_string "${output_message}" "/apis/extensions/v1beta1/namespaces/default/replicasets 200 OK"
 
+  ### Test 'kubectl get -f <file> -o <non default printer>' prints all the items in the file's list
+  # Pre-condition: no POD exists
+  # Post-condition: PODs redis-master and redis-proxy exist
+  kubectl create -f test/fixtures/doc-yaml/user-guide/multi-pod.yaml "${kube_flags[@]}"
+  output_message=$(kubectl get -f test/fixtures/doc-yaml/user-guide/multi-pod.yaml -o jsonpath="{..metadata.name}" "${kube_flags[@]}")
+  kube::test::if_has_string "${output_message}" "redis-master redis-proxy"
+
+  # cleanup
+  # Post-condition: no POD exists
+  kubectl delete pods redis-master redis-proxy "${kube_flags[@]}"
+
 
   ##################
   # Global timeout #
