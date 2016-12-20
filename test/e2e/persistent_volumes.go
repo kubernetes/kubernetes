@@ -27,7 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -509,7 +509,7 @@ var _ = framework.KubeDescribe("PersistentVolumes", func() {
 		NFSconfig = VolumeTestConfig{
 			namespace:   v1.NamespaceDefault,
 			prefix:      "nfs",
-			serverImage: "gcr.io/google_containers/volume-nfs:0.7",
+			serverImage: NfsServerImage,
 			serverPorts: []int{2049},
 			serverArgs:  []string{"-G", "777", "/exports"},
 		}

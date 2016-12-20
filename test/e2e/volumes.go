@@ -49,7 +49,7 @@ import (
 	apierrs "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/v1"
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	"github.com/golang/glog"
@@ -82,6 +82,15 @@ type VolumeTest struct {
 	file            string
 	expectedContent string
 }
+
+// Current supported images for e2e volume testing to be assigned to VolumeTestConfig.serverImage
+const (
+	NfsServerImage       string = "gcr.io/google_containers/volume-nfs:0.8"
+	IscsiServerImage     string = "gcr.io/google_containers/volume-iscsi:0.1"
+	GlusterfsServerImage string = "gcr.io/google_containers/volume-gluster:0.2"
+	CephServerImage      string = "gcr.io/google_containers/volume-ceph:0.1"
+	RbdServerImage       string = "gcr.io/google_containers/volume-rbd:0.1"
+)
 
 // Starts a container specified by config.serverImage and exports all
 // config.serverPorts from it. The returned pod should be used to get the server
@@ -384,7 +393,7 @@ var _ = framework.KubeDescribe("Volumes [Feature:Volumes]", func() {
 			config := VolumeTestConfig{
 				namespace:   namespace.Name,
 				prefix:      "nfs",
-				serverImage: "gcr.io/google_containers/volume-nfs:0.8",
+				serverImage: NfsServerImage,
 				serverPorts: []int{2049},
 			}
 
@@ -424,7 +433,7 @@ var _ = framework.KubeDescribe("Volumes [Feature:Volumes]", func() {
 			config := VolumeTestConfig{
 				namespace:   namespace.Name,
 				prefix:      "gluster",
-				serverImage: "gcr.io/google_containers/volume-gluster:0.2",
+				serverImage: GlusterfsServerImage,
 				serverPorts: []int{24007, 24008, 49152},
 			}
 
@@ -509,7 +518,7 @@ var _ = framework.KubeDescribe("Volumes [Feature:Volumes]", func() {
 			config := VolumeTestConfig{
 				namespace:   namespace.Name,
 				prefix:      "iscsi",
-				serverImage: "gcr.io/google_containers/volume-iscsi:0.1",
+				serverImage: IscsiServerImage,
 				serverPorts: []int{3260},
 				serverVolumes: map[string]string{
 					// iSCSI container needs to insert modules from the host
@@ -556,7 +565,7 @@ var _ = framework.KubeDescribe("Volumes [Feature:Volumes]", func() {
 			config := VolumeTestConfig{
 				namespace:   namespace.Name,
 				prefix:      "rbd",
-				serverImage: "gcr.io/google_containers/volume-rbd:0.1",
+				serverImage: RbdServerImage,
 				serverPorts: []int{6789},
 				serverVolumes: map[string]string{
 					// iSCSI container needs to insert modules from the host
@@ -634,7 +643,7 @@ var _ = framework.KubeDescribe("Volumes [Feature:Volumes]", func() {
 			config := VolumeTestConfig{
 				namespace:   namespace.Name,
 				prefix:      "cephfs",
-				serverImage: "gcr.io/google_containers/volume-ceph:0.1",
+				serverImage: CephServerImage,
 				serverPorts: []int{6789},
 			}
 
