@@ -932,9 +932,19 @@ function generate-certs {
     tar xzf easy-rsa.tar.gz
     cd easy-rsa-master/easyrsa3
     ./easyrsa init-pki
+    # this puts the cert into pki/ca.crt and the key into pki/private/ca.key
     ./easyrsa --batch "--req-cn=${PRIMARY_CN}@$(date +%s)" build-ca nopass
     ./easyrsa --subject-alt-name="${SANS}" build-server-full "${MASTER_NAME}" nopass
-    ./easyrsa build-client-full kubelet nopass
+
+    which cfssl
+    # make the config for the signer
+    echo '{"signing":{"default":{"expiry":"43800h","usages":["signing","key encipherment","client auth"]}}}' > "ca-config.json"
+    # create the kubelet client cert with the correct groups
+    echo '{"CN":"kubelet","names":[{"O":"system:nodes"}],"hosts":[""],"key":{"algo":"rsa","size":2048}}' | cfssl gencert -ca=pki/ca.crt -ca-key=pki/private/ca.key -config=ca-config.json - | cfssljson -bare kubelet
+    mv "kubelet-key.pem" "pki/private/kubelet.key"
+    mv "kubelet.pem" "pki/issued/kubelet.crt"
+    rm -f "kubelet.csr"
+
     ./easyrsa build-client-full kubecfg nopass) &>${cert_create_debug_output} || {
     # If there was an error in the subshell, just die.
     # TODO(roberthbailey): add better error handling here
@@ -942,6 +952,9 @@ function generate-certs {
     echo "=== Failed to generate certificates: Aborting ===" >&2
     exit 2
   }
+  cat "${cert_create_debug_output}"
+  cat "${cert_create_debug_output}" >&2
+
 }
 
 #
