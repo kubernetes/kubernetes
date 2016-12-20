@@ -31,7 +31,7 @@ import (
 func newETCD3Storage(c storagebackend.Config, codec runtime.Codec) (storage.Interface, error) {
 	endpoints := c.ServerList
 	for i, s := range endpoints {
-		endpoints[i] = strings.TrimLeft(s, "http://")
+		endpoints[i] = strings.TrimPrefix(s, "http://")
 	}
 	cfg := clientv3.Config{
 		Endpoints: endpoints,
