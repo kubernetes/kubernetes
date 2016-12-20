@@ -257,13 +257,23 @@ func TestGetSortedObjects(t *testing.T) {
 }
 
 func verifyObjects(t *testing.T, expected, actual []runtime.Object) {
+	var actualObj runtime.Object
+	var err error
+
 	if len(actual) != len(expected) {
 		t.Fatal(actual)
 	}
 	for i, obj := range actual {
-		actualObj, err := runtime.Decode(
-			api.Codecs.UniversalDecoder(),
-			[]byte(runtime.EncodeOrDie(api.Codecs.LegacyCodec(), obj)))
+		switch obj.(type) {
+		case runtime.Unstructured, *runtime.Unknown:
+			actualObj, err = runtime.Decode(
+				api.Codecs.UniversalDecoder(),
+				[]byte(runtime.EncodeOrDie(api.Codecs.LegacyCodec(), obj)))
+		default:
+			actualObj = obj
+			err = nil
+		}
+
 		if err != nil {
 			t.Fatal(err)
 		}
