@@ -6,14 +6,13 @@ support for sharing the PID namespace in the docker runtime.
 
 ## Motivation
 
-Sharing a common PID namespace between containers is desirable for several
-reasons:
+Sharing a PID namespace is discussed in #1615, and enables:
 
-  1. It enables signaling between containers, which is useful for side cars
-     (e.g. for signaling a daemon process after rotating logs).
-  2. It eases troubleshooting of pods.
-  3. It allows us to address [Docker's zombie problem][1] by reaping process
-     zombies in the infra container.
+  1. signaling between containers, which is useful for side cars (e.g. for
+     signaling a daemon process after rotating logs).
+  2. easier troubleshooting of pods.
+  3. addressing [Docker's zombie problem][1] by reaping orphaned zombies in the
+     infra container.
 
 ## Goals and Non-Goals
 
@@ -43,6 +42,10 @@ the course of multiple releases.
      namespace when running with Docker >= 1.12.
 
 With each step we will add a release note that clearly describes the change.
+After each release we will poll kubernetes-users to determine what, if any,
+applications were impacted by this change. If we discover a use case which
+cannot be accommodated by a shared PID namespace, we will abort step 3 and
+instead formalize a shared-pid field into the pod spec.
 
 ## Alternatives Considered
 
