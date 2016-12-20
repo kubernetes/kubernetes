@@ -42,6 +42,7 @@ const (
 	NodeWildcard
 	NodeRecursive
 	NodeUnion
+	NodeBool
 )
 
 var NodeTypeName = map[NodeType]string{
@@ -56,6 +57,7 @@ var NodeTypeName = map[NodeType]string{
 	NodeWildcard:   "NodeWildcard",
 	NodeRecursive:  "NodeRecursive",
 	NodeUnion:      "NodeUnion",
+	NodeBool:       "NodeBool",
 }
 
 type Node interface {
@@ -236,4 +238,18 @@ func newUnion(nodes []*ListNode) *UnionNode {
 
 func (u *UnionNode) String() string {
 	return fmt.Sprintf("%s", u.Type())
+}
+
+// BoolNode holds bool value
+type BoolNode struct {
+	NodeType
+	Value bool
+}
+
+func newBool(value bool) *BoolNode {
+	return &BoolNode{NodeType: NodeBool, Value: value}
+}
+
+func (b *BoolNode) String() string {
+	return fmt.Sprintf("%s: %t", b.Type(), b.Value)
 }
