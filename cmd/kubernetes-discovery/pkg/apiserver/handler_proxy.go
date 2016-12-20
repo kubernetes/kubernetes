@@ -22,7 +22,7 @@ import (
 	"sync"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/apiserver"
+	"k8s.io/kubernetes/pkg/apiserver/handlers/responsewriters"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/transport"
 	genericrest "k8s.io/kubernetes/pkg/registry/generic/rest"
@@ -154,7 +154,7 @@ type responder struct {
 // TODO this should properly handle content type negotiation
 // if the caller asked for protobuf and you write JSON bad things happen.
 func (r *responder) Object(statusCode int, obj runtime.Object) {
-	apiserver.WriteRawJSON(statusCode, obj, r.w)
+	responsewriters.WriteRawJSON(statusCode, obj, r.w)
 }
 
 func (r *responder) Error(err error) {

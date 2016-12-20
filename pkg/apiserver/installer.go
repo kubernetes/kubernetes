@@ -33,6 +33,8 @@ import (
 	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
+	"k8s.io/kubernetes/pkg/apiserver/handlers"
+	"k8s.io/kubernetes/pkg/apiserver/handlers/negotiation"
 	"k8s.io/kubernetes/pkg/apiserver/metrics"
 	"k8s.io/kubernetes/pkg/conversion"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -53,7 +55,7 @@ type action struct {
 	Verb          string               // Verb identifying the action ("GET", "POST", "WATCH", PROXY", etc).
 	Path          string               // The path of the action
 	Params        []*restful.Parameter // List of parameters associated with the action.
-	Namer         ScopeNamer
+	Namer         handlers.ScopeNamer
 	AllNamespaces bool // true iff the action is namespaced but works on aggregate result for all namespaces
 }
 
@@ -84,11 +86,11 @@ var errEmptyName = errors.NewBadRequest("name must be provided")
 func (a *APIInstaller) Install(ws *restful.WebService) (apiResources []metav1.APIResource, errors []error) {
 	errors = make([]error, 0)
 
-	proxyHandler := (&ProxyHandler{
-		prefix:     a.prefix + "/proxy/",
-		storage:    a.group.Storage,
-		serializer: a.group.Serializer,
-		mapper:     a.group.Context,
+	proxyHandler := (&handlers.ProxyHandler{
+		Prefix:     a.prefix + "/proxy/",
+		Storage:    a.group.Storage,
+		Serializer: a.group.Serializer,
+		Mapper:     a.group.Context,
 	})
 
 	// Register the paths in a deterministic (sorted) order to get a deterministic swagger spec.
@@ -121,7 +123,7 @@ func (a *APIInstaller) NewWebService() *restful.WebService {
 	// If we stop using go-restful, we can default empty content-type to application/json on an
 	// endpoint by endpoint basis
 	ws.Consumes("*/*")
-	mediaTypes, streamMediaTypes := mediaTypesForSerializer(a.group.Serializer)
+	mediaTypes, streamMediaTypes := negotiation.MediaTypesForSerializer(a.group.Serializer)
 	ws.Produces(append(mediaTypes, streamMediaTypes...)...)
 	ws.ApiVersion(a.group.GroupVersion.String())
 
@@ -338,7 +340,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		}
 	}
 
-	var ctxFn ContextFunc
+	var ctxFn handlers.ContextFunc
 	ctxFn = func(req *restful.Request) api.Context {
 		if context == nil {
 			return api.WithUserAgent(api.NewContext(), req.HeaderParameter("User-Agent"))
@@ -501,12 +503,12 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	//
 	// test/integration/auth_test.go is currently the most comprehensive status code test
 
-	mediaTypes, streamMediaTypes := mediaTypesForSerializer(a.group.Serializer)
+	mediaTypes, streamMediaTypes := negotiation.MediaTypesForSerializer(a.group.Serializer)
 	allMediaTypes := append(mediaTypes, streamMediaTypes...)
 	ws.Produces(allMediaTypes...)
 
 	kubeVerbs := map[string]struct{}{}
-	reqScope := RequestScope{
+	reqScope := handlers.RequestScope{
 		ContextFunc:    ctxFn,
 		Serializer:     a.group.Serializer,
 		ParameterCodec: a.group.ParameterCodec,
@@ -550,9 +552,9 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		case "GET": // Get a resource.
 			var handler restful.RouteFunction
 			if isGetterWithOptions {
-				handler = GetResourceWithOptions(getterWithOptions, reqScope)
+				handler = handlers.GetResourceWithOptions(getterWithOptions, reqScope)
 			} else {
-				handler = GetResource(getter, exporter, reqScope)
+				handler = handlers.GetResource(getter, exporter, reqScope)
 			}
 			handler = metrics.InstrumentRouteFunc(action.Verb, resource, handler)
 			doc := "read the specified " + kind
@@ -583,7 +585,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			if hasSubresource {
 				doc = "list " + subresource + " of objects of kind " + kind
 			}
-			handler := metrics.InstrumentRouteFunc(action.Verb, resource, ListResource(lister, watcher, reqScope, false, a.minRequestTimeout))
+			handler := metrics.InstrumentRouteFunc(action.Verb, resource, handlers.ListResource(lister, watcher, reqScope, false, a.minRequestTimeout))
 			route := ws.GET(action.Path).To(handler).
 				Doc(doc).
 				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
@@ -615,7 +617,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			if hasSubresource {
 				doc = "replace " + subresource + " of the specified " + kind
 			}
-			handler := metrics.InstrumentRouteFunc(action.Verb, resource, UpdateResource(updater, reqScope, a.group.Typer, admit))
+			handler := metrics.InstrumentRouteFunc(action.Verb, resource, handlers.UpdateResource(updater, reqScope, a.group.Typer, admit))
 			route := ws.PUT(action.Path).To(handler).
 				Doc(doc).
 				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
@@ -631,7 +633,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			if hasSubresource {
 				doc = "partially update " + subresource + " of the specified " + kind
 			}
-			handler := metrics.InstrumentRouteFunc(action.Verb, resource, PatchResource(patcher, reqScope, a.group.Typer, admit, mapping.ObjectConvertor))
+			handler := metrics.InstrumentRouteFunc(action.Verb, resource, handlers.PatchResource(patcher, reqScope, a.group.Typer, admit, mapping.ObjectConvertor))
 			route := ws.PATCH(action.Path).To(handler).
 				Doc(doc).
 				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
@@ -646,9 +648,9 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		case "POST": // Create a resource.
 			var handler restful.RouteFunction
 			if isNamedCreater {
-				handler = CreateNamedResource(namedCreater, reqScope, a.group.Typer, admit)
+				handler = handlers.CreateNamedResource(namedCreater, reqScope, a.group.Typer, admit)
 			} else {
-				handler = CreateResource(creater, reqScope, a.group.Typer, admit)
+				handler = handlers.CreateResource(creater, reqScope, a.group.Typer, admit)
 			}
 			handler = metrics.InstrumentRouteFunc(action.Verb, resource, handler)
 			article := utilstrings.GetArticleForNoun(kind, " ")
@@ -672,7 +674,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			if hasSubresource {
 				doc = "delete " + subresource + " of" + article + kind
 			}
-			handler := metrics.InstrumentRouteFunc(action.Verb, resource, DeleteResource(gracefulDeleter, isGracefulDeleter, reqScope, admit))
+			handler := metrics.InstrumentRouteFunc(action.Verb, resource, handlers.DeleteResource(gracefulDeleter, isGracefulDeleter, reqScope, admit))
 			route := ws.DELETE(action.Path).To(handler).
 				Doc(doc).
 				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
@@ -693,7 +695,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			if hasSubresource {
 				doc = "delete collection of " + subresource + " of a " + kind
 			}
-			handler := metrics.InstrumentRouteFunc(action.Verb, resource, DeleteCollection(collectionDeleter, isCollectionDeleter, reqScope, admit))
+			handler := metrics.InstrumentRouteFunc(action.Verb, resource, handlers.DeleteCollection(collectionDeleter, isCollectionDeleter, reqScope, admit))
 			route := ws.DELETE(action.Path).To(handler).
 				Doc(doc).
 				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
@@ -712,7 +714,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			if hasSubresource {
 				doc = "watch changes to " + subresource + " of an object of kind " + kind
 			}
-			handler := metrics.InstrumentRouteFunc(action.Verb, resource, ListResource(lister, watcher, reqScope, true, a.minRequestTimeout))
+			handler := metrics.InstrumentRouteFunc(action.Verb, resource, handlers.ListResource(lister, watcher, reqScope, true, a.minRequestTimeout))
 			route := ws.GET(action.Path).To(handler).
 				Doc(doc).
 				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
@@ -731,7 +733,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			if hasSubresource {
 				doc = "watch individual changes to a list of " + subresource + " of " + kind
 			}
-			handler := metrics.InstrumentRouteFunc(action.Verb, resource, ListResource(lister, watcher, reqScope, true, a.minRequestTimeout))
+			handler := metrics.InstrumentRouteFunc(action.Verb, resource, handlers.ListResource(lister, watcher, reqScope, true, a.minRequestTimeout))
 			route := ws.GET(action.Path).To(handler).
 				Doc(doc).
 				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
@@ -761,7 +763,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 				if hasSubresource {
 					doc = "connect " + method + " requests to " + subresource + " of " + kind
 				}
-				handler := metrics.InstrumentRouteFunc(action.Verb, resource, ConnectResource(connecter, reqScope, admit, path))
+				handler := metrics.InstrumentRouteFunc(action.Verb, resource, handlers.ConnectResource(connecter, reqScope, admit, path))
 				route := ws.Method(method).Path(action.Path).
 					To(handler).
 					Doc(doc).
@@ -802,7 +804,7 @@ type rootScopeNaming struct {
 }
 
 // rootScopeNaming implements ScopeNamer
-var _ ScopeNamer = rootScopeNaming{}
+var _ handlers.ScopeNamer = rootScopeNaming{}
 
 // Namespace returns an empty string because root scoped objects have no namespace.
 func (n rootScopeNaming) Namespace(req *restful.Request) (namespace string, err error) {
@@ -866,7 +868,7 @@ type scopeNaming struct {
 }
 
 // scopeNaming implements ScopeNamer
-var _ ScopeNamer = scopeNaming{}
+var _ handlers.ScopeNamer = scopeNaming{}
 
 // Namespace returns the namespace from the path or the default.
 func (n scopeNaming) Namespace(req *restful.Request) (namespace string, err error) {
