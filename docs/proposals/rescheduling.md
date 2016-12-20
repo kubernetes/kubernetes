@@ -298,7 +298,7 @@ server will also enforce a bounded size on the list. All schedulers will have a
 highest-weighted priority function that gives a node the worst priority if the pod it is
 scheduling appears in that node's `PreferAvoidPods` list. Thus appearing in
 `PreferAvoidPods` is similar to
-[RequiredDuringScheduling node anti-affinity](../../docs/user-guide/node-selection/README.md)
+[RequiredDuringScheduling node anti-affinity](../../docs/user-guide/node-selection.md)
 but it takes precedence over all other priority criteria and is not explicitly listed in
 the `NodeAffinity` of the pod.
 
