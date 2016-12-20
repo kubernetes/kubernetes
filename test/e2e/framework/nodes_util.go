@@ -18,6 +18,7 @@ package framework
 
 import (
 	"fmt"
+	"os"
 	"path"
 	"strings"
 	"time"
@@ -66,8 +67,7 @@ var NodeUpgrade = func(f *Framework, v string, img string) error {
 	var err error
 	switch TestContext.Provider {
 	case "gce":
-		// TODO(maisem): add GCE support for upgrading to different images.
-		err = nodeUpgradeGCE(v)
+		err = nodeUpgradeGCE(v, img)
 	case "gke":
 		err = nodeUpgradeGKE(v, img)
 	default:
@@ -88,8 +88,13 @@ var NodeUpgrade = func(f *Framework, v string, img string) error {
 	return nil
 }
 
-func nodeUpgradeGCE(rawV string) error {
+func nodeUpgradeGCE(rawV, img string) error {
 	v := "v" + rawV
+	if img != "" {
+		env := append(os.Environ(), "KUBE_NODE_OS_DISTRIBUTION="+img)
+		_, _, err := RunCmdEnv(env, path.Join(TestContext.RepoRoot, "cluster/gce/upgrade.sh"), "-N", "-o", v)
+		return err
+	}
 	_, _, err := RunCmd(path.Join(TestContext.RepoRoot, "cluster/gce/upgrade.sh"), "-N", v)
 	return err
 }
