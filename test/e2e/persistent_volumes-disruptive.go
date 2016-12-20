@@ -21,7 +21,7 @@ limitations under the License.
 package e2e
 
 import (
-	"strings"
+	"fmt"
 	"time"
 
 	. "github.com/onsi/ginkgo"
@@ -47,7 +47,7 @@ const (
 	kRestart         kubeletOpt = "restart"
 )
 
-var _ = framework.KubeDescribe("PersistentVolumes:Disruptive", func() {
+var _ = framework.KubeDescribe("PersistentVolumes [Disruptive]", func() {
 
 	f := framework.NewDefaultFramework("disruptive-pv")
 	var (
@@ -62,7 +62,7 @@ var _ = framework.KubeDescribe("PersistentVolumes:Disruptive", func() {
 	nfsServerConfig := VolumeTestConfig{
 		namespace:   v1.NamespaceDefault,
 		prefix:      "nfs",
-		serverImage: "gcr.io/google_containers/volume-nfs:0.7",
+		serverImage: NfsServerImage,
 		serverPorts: []int{2049},
 		serverArgs:  []string{"-G", "777", "/exports"},
 	}
@@ -151,7 +151,7 @@ var _ = framework.KubeDescribe("PersistentVolumes:Disruptive", func() {
 		// Test loop executes each disruptiveTest iteratively.
 		for _, test := range disruptiveTestTable {
 			func(t disruptiveTest) {
-				It(t.testItStmt+" [Disruptive]", func() {
+				It(t.testItStmt, func() {
 					By("Executing Spec")
 					t.runTest(c, f, clientPod, pvc, pv)
 				})
@@ -253,8 +253,5 @@ func kubeletCommand(kOp kubeletOpt, c clientset.Interface, pod *v1.Pod) {
 
 // podExec wraps RunKubectl to execute a bash cmd in target pod
 func podExec(pod *v1.Pod, bashExec string) (string, error) {
-	args := strings.Split(bashExec, " ")
-	cmd := []string{"exec", "--namespace=" + pod.Namespace, pod.Name}
-	cmd = append(cmd, args...)
-	return framework.RunKubectl(cmd...)
+	return framework.RunKubectl("exec", fmt.Sprintf("--namespace=%s", pod.Namespace), pod.Name, "--", "/bin/sh", "-c", bashExec)
 }
