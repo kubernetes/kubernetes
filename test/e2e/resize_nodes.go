@@ -120,8 +120,8 @@ func GroupSize(group string) (int, error) {
 }
 
 func WaitForGroupSize(group string, size int32) error {
-	timeout := 10 * time.Minute
-	for start := time.Now(); time.Since(start) < timeout; time.Sleep(5 * time.Second) {
+	timeout := 30 * time.Minute
+	for start := time.Now(); time.Since(start) < timeout; time.Sleep(20 * time.Second) {
 		currentSize, err := GroupSize(group)
 		if err != nil {
 			framework.Logf("Failed to get node instance group size: %v", err)
