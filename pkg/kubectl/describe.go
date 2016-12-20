@@ -672,8 +672,9 @@ func printQuobyteVolumeSource(quobyte *api.QuobyteVolumeSource, w *PrefixWriter)
 	w.Write(LEVEL_2, "Type:\tQuobyte (a Quobyte mount on the host that shares a pod's lifetime)\n"+
 		"    Registry:\t%v\n"+
 		"    Volume:\t%v\n"+
-		"    ReadOnly:\t%v\n",
-		quobyte.Registry, quobyte.Volume, quobyte.ReadOnly)
+		"    ReadOnly:\t%v\n"+
+		"    TenantID:\t%v\n",
+		quobyte.Registry, quobyte.Volume, quobyte.ReadOnly, quobyte.TenantID)
 }
 
 func printISCSIVolumeSource(iscsi *api.ISCSIVolumeSource, w *PrefixWriter) {

@@ -41,7 +41,7 @@ func (manager *quobyteVolumeManager) createVolume(provisioner *quobyteVolumeProv
 		Name:              provisioner.volume,
 		RootUserID:        provisioner.user,
 		RootGroupID:       provisioner.group,
-		TenantID:          provisioner.tenant,
+		TenantID:          provisioner.tenantID,
 		ConfigurationName: provisioner.config,
 	}
 
@@ -55,11 +55,12 @@ func (manager *quobyteVolumeManager) createVolume(provisioner *quobyteVolumeProv
 		Volume:   provisioner.volume,
 		User:     provisioner.user,
 		Group:    provisioner.group,
+		TenantID: provisioner.tenantID,
 	}, volumeSize, nil
 }
 
 func (manager *quobyteVolumeManager) deleteVolume(deleter *quobyteVolumeDeleter) error {
-	return manager.createQuobyteClient().DeleteVolumeByName(deleter.volume, deleter.tenant)
+	return manager.createQuobyteClient().DeleteVolumeByName(deleter.volume, deleter.tenantID)
 }
 
 func (manager *quobyteVolumeManager) createQuobyteClient() *quobyteapi.QuobyteClient {

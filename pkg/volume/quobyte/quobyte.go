@@ -59,7 +59,9 @@ var _ volume.Provisioner = &quobyteVolumeProvisioner{}
 var _ volume.Deleter = &quobyteVolumeDeleter{}
 
 const (
-	quobytePluginName = "kubernetes.io/quobyte"
+	quobytePluginName      = "kubernetes.io/quobyte"
+	quobyteDefaultConfig   = "BASE"
+	quobyteDefaultTenantID = "DEFAULT"
 
 	annotationQuobyteAPIServer          = "quobyte.kubernetes.io/api"
 	annotationQuobyteAPISecret          = "quobyte.kubernetes.io/apiuser"
@@ -160,13 +162,14 @@ func (plugin *quobytePlugin) newMounterInternal(spec *volume.Spec, pod *v1.Pod, 
 
 	return &quobyteMounter{
 		quobyte: &quobyte{
-			volName: spec.Name(),
-			user:    source.User,
-			group:   source.Group,
-			mounter: mounter,
-			pod:     pod,
-			volume:  source.Volume,
-			plugin:  plugin,
+			volName:  spec.Name(),
+			user:     source.User,
+			group:    source.Group,
+			tenantID: source.TenantID,
+			mounter:  mounter,
+			pod:      pod,
+			volume:   source.Volume,
+			plugin:   plugin,
 		},
 		registry: source.Registry,
 		readOnly: readOnly,
@@ -190,15 +193,15 @@ func (plugin *quobytePlugin) newUnmounterInternal(volName string, podUID types.U
 
 // Quobyte volumes represent a bare host directory mount of an quobyte export.
 type quobyte struct {
-	volName string
-	pod     *v1.Pod
-	user    string
-	group   string
-	volume  string
-	tenant  string
-	config  string
-	mounter mount.Interface
-	plugin  *quobytePlugin
+	volName  string
+	pod      *v1.Pod
+	user     string
+	group    string
+	volume   string
+	tenantID string
+	config   string
+	mounter  mount.Interface
+	plugin   *quobytePlugin
 	volume.MetricsNil
 }
 
@@ -258,22 +261,16 @@ func (mounter *quobyteMounter) SetUpAt(dir string, fsGroup *int64) error {
 }
 
 // GetPath returns the path to the user specific mount of a Quobyte volume
-// Returns a path in the format ../user#group@volume
+// Returns a path in the format ../user#group#tenantID@volume
 func (quobyteVolume *quobyte) GetPath() string {
-	user := quobyteVolume.user
-	if len(user) == 0 {
-		user = "root"
-	}
-
-	group := quobyteVolume.group
-	if len(group) == 0 {
-		group = "nfsnobody"
-	}
-
 	// Quobyte has only one mount in the PluginDir where all Volumes are mounted
 	// The Quobyte client does a fixed-user mapping
 	pluginDir := quobyteVolume.plugin.host.GetPluginDir(strings.EscapeQualifiedNameForDisk(quobytePluginName))
-	return path.Join(pluginDir, fmt.Sprintf("%s#%s@%s", user, group, quobyteVolume.volume))
+	if gostrings.ToUpper(quobyteVolume.tenantID) == quobyteDefaultTenantID || quobyteVolume.tenantID == "" {
+		return path.Join(pluginDir, fmt.Sprintf("%s#%s@%s", quobyteVolume.user, quobyteVolume.group, quobyteVolume.volume))
+	}
+
+	return path.Join(pluginDir, fmt.Sprintf("%s#%s#%s@%s", quobyteVolume.user, quobyteVolume.group, quobyteVolume.tenantID, quobyteVolume.volume))
 }
 
 type quobyteUnmounter struct {
@@ -313,11 +310,12 @@ func (plugin *quobytePlugin) newDeleterInternal(spec *volume.Spec) (volume.Delet
 	return &quobyteVolumeDeleter{
 		quobyteMounter: &quobyteMounter{
 			quobyte: &quobyte{
-				volName: spec.Name(),
-				user:    source.User,
-				group:   source.Group,
-				volume:  source.Volume,
-				plugin:  plugin,
+				volName:  spec.Name(),
+				user:     source.User,
+				group:    source.Group,
+				tenantID: source.TenantID,
+				volume:   source.Volume,
+				plugin:   plugin,
 			},
 			registry: source.Registry,
 			readOnly: readOnly,
@@ -350,8 +348,8 @@ func (provisioner *quobyteVolumeProvisioner) Provision() (*v1.PersistentVolume, 
 	if provisioner.options.PVC.Spec.Selector != nil {
 		return nil, fmt.Errorf("claim Selector is not supported")
 	}
-	provisioner.config = "BASE"
-	provisioner.tenant = "DEFAULT"
+	provisioner.config = quobyteDefaultConfig
+	provisioner.tenantID = quobyteDefaultTenantID
 
 	cfg, err := parseAPIConfig(provisioner.plugin, provisioner.options.Parameters)
 	if err != nil {
@@ -365,8 +363,8 @@ func (provisioner *quobyteVolumeProvisioner) Provision() (*v1.PersistentVolume, 
 			provisioner.user = v
 		case "group":
 			provisioner.group = v
-		case "quobytetenant":
-			provisioner.tenant = v
+		case "quobytetenantid":
+			provisioner.tenantID = v
 		case "quobyteconfig":
 			provisioner.config = v
 		case "adminsecretname",

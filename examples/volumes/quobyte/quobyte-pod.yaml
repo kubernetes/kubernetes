@@ -17,3 +17,4 @@ spec:
       readOnly: false
       user: root
       group: root
+      tenantid: DEFAULT

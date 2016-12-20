@@ -11,4 +11,4 @@ parameters:
     user: "root"
     group: "root"
     quobyteConfig: "BASE"
-    quobyteTenant: "DEFAULT"
+    quobyteTenantID: "DEFAULT"

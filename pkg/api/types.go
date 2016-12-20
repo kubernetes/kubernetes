@@ -778,9 +778,14 @@ type QuobyteVolumeSource struct {
 	User string
 
 	// Group to map volume access to
-	// Default is no group
+	// Default is nfsnobody
 	// +optional
 	Group string
+
+	// Tenant to map volume access to
+	// Default is no "DEFAULT"
+	// +optional
+	TenantID string
 }
 
 // Represents a Glusterfs mount that lasts the lifetime of a pod.

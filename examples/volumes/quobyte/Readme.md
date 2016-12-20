@@ -23,6 +23,7 @@ The example assumes that you already have a running Kubernetes cluster and you a
 - To get access to Quobyte and the documentation please [contact us](http://www.quobyte.com/get-quobyte)
 - Already created Quobyte Volume
 - Added the line `allow-usermapping-in-volumename` in `/etc/quobyte/client.cfg` to allow the fixed user mounts
+- For the tenant mapping Quobyte client 1.3.12+ is needed
 
 ### Fixed user Mounts
 
@@ -54,6 +55,7 @@ spec:
       readOnly: false
       user: root
       group: root
+      tenantid: DEFAULT
 ```
 
 [Download example](quobyte-pod.yaml?raw=true)
@@ -65,6 +67,7 @@ Parameters:
 * **readOnly** is the boolean that sets the mountpoint readOnly or readWrite.
 * **user** maps all access to this user. Default is `root`.
 * **group** maps all access to this group. Default is `nfsnobody`.
+* **tenantid** maps all access to the specified tenant. Default is `DEFAULT`.
 
 Creating the pod:
 

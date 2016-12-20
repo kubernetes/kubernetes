@@ -82,7 +82,7 @@ func contains(modes []v1.PersistentVolumeAccessMode, mode v1.PersistentVolumeAcc
 	return false
 }
 
-func doTestPlugin(t *testing.T, spec *volume.Spec) {
+func doTestPlugin(t *testing.T, spec *volume.Spec, expectedMapping string) {
 	tmpDir, err := utiltesting.MkTmpdir("quobyte_test")
 	if err != nil {
 		t.Fatalf("error creating temp dir: %v", err)
@@ -105,9 +105,9 @@ func doTestPlugin(t *testing.T, spec *volume.Spec) {
 	if mounter == nil {
 		t.Error("Got a nil Mounter")
 	}
-
-	if volumePath != fmt.Sprintf("%s/plugins/kubernetes.io~quobyte/root#root@vol", tmpDir) {
-		t.Errorf("Got unexpected path: %s expected: %s", volumePath, fmt.Sprintf("%s/plugins/kubernetes.io~quobyte/root#root@vol", tmpDir))
+	//expectedMapping
+	if volumePath != fmt.Sprintf("%s/plugins/kubernetes.io~quobyte/%s", tmpDir, expectedMapping) {
+		t.Errorf("Got unexpected path: %s expected: %s", volumePath, fmt.Sprintf("%s/plugins/kubernetes.io~quobyte/%s", tmpDir, expectedMapping))
 	}
 	if err := mounter.SetUp(nil); err != nil {
 		t.Errorf("Expected success, got: %v", err)
@@ -129,10 +129,20 @@ func TestPluginVolume(t *testing.T) {
 	vol := &v1.Volume{
 		Name: "vol1",
 		VolumeSource: v1.VolumeSource{
-			Quobyte: &v1.QuobyteVolumeSource{Registry: "reg:7861", Volume: "vol", ReadOnly: false, User: "root", Group: "root"},
+			Quobyte: &v1.QuobyteVolumeSource{Registry: "reg:7861", Volume: "vol", ReadOnly: false, User: "root", Group: "root", TenantID: "DEFAULT"},
 		},
 	}
-	doTestPlugin(t, volume.NewSpecFromVolume(vol))
+	doTestPlugin(t, volume.NewSpecFromVolume(vol), "root#root@vol")
+}
+
+func TestPluginVolumeDifferentMapping(t *testing.T) {
+	vol := &v1.Volume{
+		Name: "vol1",
+		VolumeSource: v1.VolumeSource{
+			Quobyte: &v1.QuobyteVolumeSource{Registry: "reg:7861", Volume: "vol", ReadOnly: false, User: "quobyte", Group: "quobyte", TenantID: "123456789"},
+		},
+	}
+	doTestPlugin(t, volume.NewSpecFromVolume(vol), "quobyte#quobyte#123456789@vol")
 }
 
 func TestPluginPersistentVolume(t *testing.T) {
@@ -142,12 +152,12 @@ func TestPluginPersistentVolume(t *testing.T) {
 		},
 		Spec: v1.PersistentVolumeSpec{
 			PersistentVolumeSource: v1.PersistentVolumeSource{
-				Quobyte: &v1.QuobyteVolumeSource{Registry: "reg:7861", Volume: "vol", ReadOnly: false, User: "root", Group: "root"},
+				Quobyte: &v1.QuobyteVolumeSource{Registry: "reg:7861", Volume: "vol", ReadOnly: false, User: "root", Group: "root", TenantID: "DEFAULT"},
 			},
 		},
 	}
 
-	doTestPlugin(t, volume.NewSpecFromPersistentVolume(vol, false))
+	doTestPlugin(t, volume.NewSpecFromPersistentVolume(vol, false), "root#root@vol")
 }
 
 func TestPersistentClaimReadOnlyFlag(t *testing.T) {
@@ -157,7 +167,7 @@ func TestPersistentClaimReadOnlyFlag(t *testing.T) {
 		},
 		Spec: v1.PersistentVolumeSpec{
 			PersistentVolumeSource: v1.PersistentVolumeSource{
-				Quobyte: &v1.QuobyteVolumeSource{Registry: "reg:7861", Volume: "vol", ReadOnly: false, User: "root", Group: "root"},
+				Quobyte: &v1.QuobyteVolumeSource{Registry: "reg:7861", Volume: "vol", ReadOnly: false, User: "root", Group: "root", TenantID: "DEFAULT"},
 			},
 			ClaimRef: &v1.ObjectReference{
 				Name: "claimA",
