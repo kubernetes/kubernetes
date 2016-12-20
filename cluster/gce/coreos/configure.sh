@@ -14,29 +14,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Due to the GCE custom metadata size limit, we split the entire script into two
-# files configure.sh and configure-helper.sh. The functionality of downloading
-# kubernetes configuration, manifests, docker images, and binary files are
-# put in configure.sh, which is uploaded via GCE custom metadata.
-
 set -o errexit
 set -o nounset
 set -o pipefail
-
-function set-broken-motd {
-  cat > /etc/motd <<EOF
-Broken (or in progress) Kubernetes node setup! Check the cluster initialization status
-using the following commands.
-
-Master instance:
-  - sudo systemctl status kube-master-installation
-  - sudo systemctl status kube-master-configuration
-
-Node instance:
-  - sudo systemctl status kube-node-installation
-  - sudo systemctl status kube-node-configuration
-EOF
-}
 
 function download-kube-env {
   # Fetch kube-env from GCE metadata server.
@@ -46,11 +26,7 @@ function download-kube-env {
     -o "${tmp_kube_env}" \
     http://metadata.google.internal/computeMetadata/v1/instance/attributes/kube-env
   # Convert the yaml format file into a shell-style file.
-  eval $(python -c '''
-import pipes,sys,yaml
-for k,v in yaml.load(sys.stdin).iteritems():
-  print("readonly {var}={value}".format(var = k, value = pipes.quote(str(v))))
-''' < "${tmp_kube_env}" > "${KUBE_HOME}/kube-env")
+  sed 's/: /=/' < "${tmp_kube_env}" > "${KUBE_HOME}/kube-env"
   rm -f "${tmp_kube_env}"
 }
 
@@ -64,6 +40,7 @@ function validate-hash {
     return 1
   fi
 }
+
 
 # Retry a download until we get it. Takes a hash and a set of URLs.
 #
@@ -98,24 +75,8 @@ function split-commas {
   echo $1 | tr "," "\n"
 }
 
-function install-gci-mounter-tools {
-    local -r rkt_version="v1.18.0"
-    local -r gci_mounter_version="v2"
-    local -r rkt_binary_sha1="75fc8f29c79bc9e505f3e7f6e8fadf2425c21967"
-    local -r rkt_stage1_fly_sha1="474df5a1f934960ba669b360ab713d0a54283091"
-    local -r gci_mounter_sha1="851e841d8640d6a05e64e22c493f5ac3c4cba561"
-    download-or-bust "${rkt_binary_sha1}" "https://storage.googleapis.com/kubernetes-release/rkt/${rkt_version}/rkt"
-    download-or-bust "${rkt_stage1_fly_sha1}" "https://storage.googleapis.com/kubernetes-release/rkt/${rkt_version}/stage1-fly.aci"
-    download-or-bust "${gci_mounter_sha1}" "https://storage.googleapis.com/kubernetes-release/gci-mounter/gci-mounter-${gci_mounter_version}.aci"
-    local -r rkt_dst="${KUBE_HOME}/bin/"
-    mv "${KUBE_HOME}/rkt" "${rkt_dst}/rkt"
-    mv "${KUBE_HOME}/stage1-fly.aci" "${rkt_dst}/stage1-fly.aci"
-    mv "${KUBE_HOME}/gci-mounter-${gci_mounter_version}.aci" "${rkt_dst}/gci-mounter-${gci_mounter_version}.aci"
-    chmod a+x "${rkt_dst}/rkt"
-}
-
 # Downloads kubernetes binaries and kube-system manifest tarball, unpacks them,
-# and places them into suitable directories. Files are placed in /home/kubernetes.
+# and places them into suitable directories. Files are placed in /opt/kubernetes.
 function install-kube-binary-config {
   cd "${KUBE_HOME}"
   local -r server_binary_tar_urls=( $(split-commas "${SERVER_BINARY_TAR_URL}") )
@@ -186,14 +147,9 @@ function install-kube-binary-config {
     find "${dst_dir}" -name \*.manifest -or -name \*.json | \
       xargs sed -ri "s@(image\":\s+\")gcr.io/google_containers@\1${kube_addon_registry}@"
   fi
-  cp "${dst_dir}/kubernetes/gci-trusty/gci-configure-helper.sh" "${KUBE_HOME}/bin/configure-helper.sh"
-  cp "${dst_dir}/kubernetes/gci-trusty/gci-mounter" "${KUBE_HOME}/bin/mounter"
-  cp "${dst_dir}/kubernetes/gci-trusty/health-monitor.sh" "${KUBE_HOME}/bin/health-monitor.sh"
+  cp "${dst_dir}/kubernetes/gci-trusty/coreos-configure-helper.sh" "${KUBE_HOME}/bin/configure-helper.sh"
   chmod -R 755 "${kube_bin}"
 
-  # Install gci mounter related artifacts to allow mounting storage volumes in GCI
-  install-gci-mounter-tools
-  
   # Clean up.
   rm -rf "${KUBE_HOME}/kubernetes"
   rm -f "${KUBE_HOME}/${server_binary_tar}"
@@ -204,10 +160,17 @@ function install-kube-binary-config {
 
 ######### Main Function ##########
 echo "Start to install kubernetes files"
-set-broken-motd
-KUBE_HOME="/home/kubernetes"
+KUBE_HOME="/opt/kubernetes"
+mkdir -p "${KUBE_HOME}"
 download-kube-env
 source "${KUBE_HOME}/kube-env"
 install-kube-binary-config
 echo "Done for installing kubernetes files"
 
+# On CoreOS, the hosts is in /usr/share/baselayout/hosts
+# So we need to manually populdate the hosts file here on gce.
+echo "127.0.0.1 localhost" >> /etc/hosts
+echo "::1 localhost" >> /etc/hosts
+
+echo "Configuring hostname"
+hostnamectl set-hostname $(hostname | cut -f1 -d.)
