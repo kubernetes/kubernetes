@@ -49,6 +49,7 @@ go_test(
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/types",
         "//vendor:k8s.io/apimachinery/pkg/util/intstr",
+        "//vendor:k8s.io/apimachinery/pkg/util/sets",
     ],
 )
 
