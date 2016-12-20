@@ -131,51 +131,50 @@ func (e ShortcutExpander) AliasesForResource(resource string) ([]string, bool) {
 // resourceShortcuts represents a structure that holds the information how to
 // transition from resource's shortcut to its full name.
 type resourceShortcuts struct {
-	from schema.GroupResource
-	to   schema.GroupResource
+	shortForm schema.GroupResource
+	longForm  schema.GroupResource
 }
 
-// getServerRes returns a hardcoded set of tuples. Note that the list
-// is ordered by group priority.
-func (e ShortcutExpander) getServerRes() ([]resourceShortcuts, error) {
-	return []resourceShortcuts{
+// getShortcutMappings returns a hardcoded set of tuples.
+// First the list of potential resources will be taken from the instance variable
+// which holds the anticipated result of the discovery API.
+// Next we will fall back to the hardcoded list of resources.
+// Note that the list is ordered by group priority.
+// TODO: Wire this to discovery API.
+func (e ShortcutExpander) getShortcutMappings() ([]resourceShortcuts, error) {
+	res := []resourceShortcuts{
 		{
-			from: schema.GroupResource{Group: "storage.k8s.io", Resource: "sc"},
-			to:   schema.GroupResource{Group: "storage.k8s.io", Resource: "storageclasses"},
+			shortForm: schema.GroupResource{Group: "storage.k8s.io", Resource: "sc"},
+			longForm:  schema.GroupResource{Group: "storage.k8s.io", Resource: "storageclasses"},
 		},
-	}, nil
+	}
+
+	// append hardcoded short forms at the end of the list
+	for short, long := range kubectl.ShortForms {
+		res = append(res, resourceShortcuts{
+			shortForm: schema.GroupResource{Resource: short},
+			longForm:  schema.GroupResource{Resource: long},
+		})
+	}
+	return res, nil
 }
 
 // expandResourceShortcut will return the expanded version of resource
 // (something that a pkg/api/meta.RESTMapper can understand), if it is
-// indeed a shortcut. First the list of potential resources will be taken from
-// the instance variable which holds the anticipated result of the discovery API.
-// Next we will fall back to the hardcoded list of resources.
-// Lastly if no match has been found, we will return resource unmodified.
+// indeed a shortcut. If no match has been found, we will return resource unmodified.
 func (e ShortcutExpander) expandResourceShortcut(resource schema.GroupVersionResource) schema.GroupVersionResource {
-	// get the server resources	and return on first match.
-	if resources, err := e.getServerRes(); err == nil {
+	// get the shortcut mappings and return on first match.
+	if resources, err := e.getShortcutMappings(); err == nil {
 		for _, item := range resources {
-			if resource.Group != "" {
-				if resource.Group == item.from.Group &&
-					resource.Resource == item.from.Resource {
-					resource.Resource = item.to.Resource
-					return resource
-				}
-
-			} else {
-				if resource.Resource == item.from.Resource {
-					resource.Resource = item.to.Resource
-					return resource
-				}
+			if len(resource.Group) != 0 && resource.Group != item.shortForm.Group {
+				continue
+			}
+			if resource.Resource == item.shortForm.Resource {
+				resource.Resource = item.longForm.Resource
+				return resource
 			}
 		}
 	}
 
-	// fall back to the hardcoded list
-	if expanded, ok := kubectl.ShortForms[resource.Resource]; ok {
-		resource.Resource = expanded
-		return resource
-	}
 	return resource
 }
