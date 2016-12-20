@@ -516,11 +516,7 @@ type NodeResources struct {
 // Tries to add a taint to annotations list. Returns a new copy of updated Node and true if something was updated
 // false otherwise.
 func AddOrUpdateTaint(node *Node, taint *Taint) (*Node, bool, error) {
-	objCopy, err := api.Scheme.DeepCopy(node)
-	if err != nil {
-		return nil, false, err
-	}
-	newNode := objCopy.(*Node)
+	newNode := node.DeepCopy()
 	nodeTaints := newNode.Spec.Taints
 
 	var newTaints []Taint
@@ -558,11 +554,7 @@ func TaintExists(taints []Taint, taintToFind *Taint) bool {
 // Tries to remove a taint from annotations list. Returns a new copy of updated Node and true if something was updated
 // false otherwise.
 func RemoveTaint(node *Node, taint *Taint) (*Node, bool, error) {
-	objCopy, err := api.Scheme.DeepCopy(node)
-	if err != nil {
-		return nil, false, err
-	}
-	newNode := objCopy.(*Node)
+	newNode := node.DeepCopy()
 	nodeTaints := newNode.Spec.Taints
 	if len(nodeTaints) == 0 {
 		return newNode, false, nil

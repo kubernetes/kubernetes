@@ -21,7 +21,6 @@ import (
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/pkg/api"
 	"k8s.io/client-go/pkg/api/v1"
 )
 
@@ -119,11 +118,7 @@ func TestMultiIndexKeys(t *testing.T) {
 		t.Errorf("Expected 0 pods but got %v", len(elmoPods))
 	}
 
-	obj, err := api.Scheme.DeepCopy(pod2)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-	copyOfPod2 := obj.(*v1.Pod)
+	copyOfPod2 := pod2.DeepCopy()
 	copyOfPod2.Annotations["users"] = "oscar"
 	index.Update(copyOfPod2)
 	bertPods, err = index.ByIndex("byUser", "bert")

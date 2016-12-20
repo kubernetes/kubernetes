@@ -85,18 +85,8 @@ func ExtractResourceValueByContainerNameAndNodeAllocatable(fs *v1.ResourceFieldS
 		return "", err
 	}
 
-	containerCopy, err := api.Scheme.DeepCopy(realContainer)
-	if err != nil {
-		return "", fmt.Errorf("failed to perform a deep copy of container object: %v", err)
-	}
-
-	container, ok := containerCopy.(*v1.Container)
-	if !ok {
-		return "", fmt.Errorf("unexpected type returned from deep copy of container object")
-	}
-
+	container := realContainer.DeepCopy()
 	MergeContainerResourceLimits(container, nodeAllocatable)
-
 	return ExtractContainerResourceValue(fs, container)
 }
 

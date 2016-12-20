@@ -18,7 +18,6 @@ package testing
 
 import (
 	"encoding/hex"
-	"fmt"
 	"reflect"
 	"strings"
 	"testing"
@@ -218,11 +217,7 @@ func roundTrip(t *testing.T, scheme *runtime.Scheme, codec runtime.Codec, object
 	original := object
 
 	// deep copy the original object
-	copied, err := scheme.DeepCopy(object)
-	if err != nil {
-		panic(fmt.Sprintf("unable to copy: %v", err))
-	}
-	object = copied.(runtime.Object)
+	object = object.DeepCopyObject()
 	name := reflect.TypeOf(object).Elem().Name()
 
 	// encode (serialize) the deep copy using the provided codec

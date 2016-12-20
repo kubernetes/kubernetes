@@ -161,11 +161,7 @@ func runTest(f *framework.Framework) error {
 	if err := createTemporaryCgroupsForReservation(cgroupManager); err != nil {
 		return err
 	}
-	clone, err := api.Scheme.DeepCopy(oldCfg)
-	if err != nil {
-		return err
-	}
-	newCfg := clone.(*componentconfig.KubeletConfiguration)
+	newCfg := oldCfg.DeepCopy()
 	// Change existing kubelet configuration
 	setDesiredConfiguration(newCfg)
 	// Set the new kubelet configuration.

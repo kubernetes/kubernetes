@@ -405,8 +405,8 @@ func TestAddKnownTypesIdemPotent(t *testing.T) {
 	s := runtime.NewScheme()
 
 	gv := schema.GroupVersion{Group: "foo", Version: "v1"}
-	s.AddKnownTypes(gv, &InternalSimple{})
-	s.AddKnownTypes(gv, &InternalSimple{})
+	s.AddKnownTypes(gv, &runtimetesting.InternalSimple{})
+	s.AddKnownTypes(gv, &runtimetesting.InternalSimple{})
 	if len(s.KnownTypes(gv)) != 1 {
 		t.Errorf("expected only one %v type after double registration", gv)
 	}
@@ -414,8 +414,8 @@ func TestAddKnownTypesIdemPotent(t *testing.T) {
 		t.Errorf("expected only one type after double registration")
 	}
 
-	s.AddKnownTypeWithName(gv.WithKind("InternalSimple"), &InternalSimple{})
-	s.AddKnownTypeWithName(gv.WithKind("InternalSimple"), &InternalSimple{})
+	s.AddKnownTypeWithName(gv.WithKind("InternalSimple"), &runtimetesting.InternalSimple{})
+	s.AddKnownTypeWithName(gv.WithKind("InternalSimple"), &runtimetesting.InternalSimple{})
 	if len(s.KnownTypes(gv)) != 1 {
 		t.Errorf("expected only one %v type after double registration with custom name", gv)
 	}
@@ -423,7 +423,7 @@ func TestAddKnownTypesIdemPotent(t *testing.T) {
 		t.Errorf("expected only one type after double registration with custom name")
 	}
 
-	s.AddUnversionedTypes(gv, &InternalSimple{})
+	s.AddUnversionedTypes(gv, &runtimetesting.InternalSimple{})
 	if len(s.KnownTypes(gv)) != 1 {
 		t.Errorf("expected only one %v type after double registration with custom name", gv)
 	}
@@ -431,7 +431,7 @@ func TestAddKnownTypesIdemPotent(t *testing.T) {
 		t.Errorf("expected only one type after double registration with custom name")
 	}
 
-	kinds, _, err := s.ObjectKinds(&InternalSimple{})
+	kinds, _, err := s.ObjectKinds(&runtimetesting.InternalSimple{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -451,8 +451,8 @@ func TestConflictingAddKnownTypes(t *testing.T) {
 				panicked <- true
 			}
 		}()
-		s.AddKnownTypeWithName(gv.WithKind("InternalSimple"), &InternalSimple{})
-		s.AddKnownTypeWithName(gv.WithKind("InternalSimple"), &ExternalSimple{})
+		s.AddKnownTypeWithName(gv.WithKind("InternalSimple"), &runtimetesting.InternalSimple{})
+		s.AddKnownTypeWithName(gv.WithKind("InternalSimple"), &runtimetesting.ExternalSimple{})
 		panicked <- false
 	}()
 	if !<-panicked {
@@ -465,8 +465,8 @@ func TestConflictingAddKnownTypes(t *testing.T) {
 				panicked <- true
 			}
 		}()
-		s.AddUnversionedTypes(gv, &InternalSimple{})
-		s.AddUnversionedTypes(gv, &InternalSimple{})
+		s.AddUnversionedTypes(gv, &runtimetesting.InternalSimple{})
+		s.AddUnversionedTypes(gv, &runtimetesting.InternalSimple{})
 		panicked <- false
 	}()
 	if !<-panicked {
@@ -701,7 +701,7 @@ func TestConvertToVersion(t *testing.T) {
 		},
 	}
 	for i, test := range testCases {
-		original, _ := test.scheme.DeepCopy(test.in)
+		original := test.in.DeepCopyObject()
 		out, err := test.scheme.ConvertToVersion(test.in, test.gv)
 		switch {
 		case test.errFn != nil:

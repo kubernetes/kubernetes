@@ -508,7 +508,7 @@ func (s *ServiceController) updateFederationService(key string, cachedService *c
 	// Clone federation service, and create them in underlying k8s cluster
 	desiredService := &v1.Service{
 		ObjectMeta: util.DeepCopyRelevantObjectMeta(cachedService.lastState.ObjectMeta),
-		Spec:       *(util.DeepCopyApiTypeOrPanic(&cachedService.lastState.Spec).(*v1.ServiceSpec)),
+		Spec:       *cachedService.lastState.Spec.DeepCopy(),
 	}
 
 	// handle available clusters one by one

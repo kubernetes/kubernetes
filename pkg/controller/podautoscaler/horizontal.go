@@ -344,14 +344,8 @@ func (a *HorizontalController) reconcileKey(key string) error {
 
 func (a *HorizontalController) reconcileAutoscaler(hpav1Shared *autoscalingv1.HorizontalPodAutoscaler) error {
 	// make a copy so that we never mutate the shared informer cache (conversion can mutate the object)
-	hpav1Raw, err := api.Scheme.DeepCopy(hpav1Shared)
-	if err != nil {
-		a.eventRecorder.Event(hpav1Shared, v1.EventTypeWarning, "FailedConvertHPA", err.Error())
-		return fmt.Errorf("failed to deep-copy the HPA: %v", err)
-	}
-
+	hpav1 := hpav1Shared.DeepCopy()
 	// then, convert to autoscaling/v2, which makes our lives easier when calculating metrics
-	hpav1 := hpav1Raw.(*autoscalingv1.HorizontalPodAutoscaler)
 	hpaRaw, err := UnsafeConvertToVersionVia(hpav1, autoscalingv2.SchemeGroupVersion)
 	if err != nil {
 		a.eventRecorder.Event(hpav1, v1.EventTypeWarning, "FailedConvertHPA", err.Error())

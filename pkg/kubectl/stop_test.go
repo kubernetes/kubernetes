@@ -202,10 +202,7 @@ func TestReplicationControllerStop(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		copiedForWatch, err := api.Scheme.Copy(test.Objs[0])
-		if err != nil {
-			t.Fatalf("%s unexpected error: %v", test.Name, err)
-		}
+		copiedForWatch := test.Objs[0].DeepCopyObject()
 		fake := fake.NewSimpleClientset(test.Objs...)
 		fakeWatch := watch.NewFake()
 		fake.PrependWatchReactor("replicationcontrollers", testcore.DefaultWatchReactor(fakeWatch, nil))
@@ -215,7 +212,7 @@ func TestReplicationControllerStop(t *testing.T) {
 		}()
 
 		reaper := ReplicationControllerReaper{fake.Core(), time.Millisecond, time.Millisecond}
-		err = reaper.Stop(ns, name, 0, nil)
+		err := reaper.Stop(ns, name, 0, nil)
 		if !reflect.DeepEqual(err, test.StopError) {
 			t.Errorf("%s unexpected error: %v", test.Name, err)
 			continue

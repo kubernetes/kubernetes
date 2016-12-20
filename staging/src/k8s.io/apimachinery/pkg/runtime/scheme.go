@@ -554,11 +554,7 @@ func (s *Scheme) convertToVersion(copy bool, in Object, target GroupVersioner) (
 	}
 
 	if copy {
-		copied, err := s.Copy(in)
-		if err != nil {
-			return nil, err
-		}
-		in = copied
+		in = in.DeepCopyObject()
 	}
 
 	flags, meta := s.generateConvertMeta(in)

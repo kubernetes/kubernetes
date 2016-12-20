@@ -17,10 +17,8 @@ limitations under the License.
 package statefulset
 
 import (
-	"fmt"
 	"sort"
 
-	"k8s.io/client-go/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	apps "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
 
@@ -101,11 +99,7 @@ func (ssc *defaultStatefulSetControl) UpdateStatefulSet(set *apps.StatefulSet, p
 
 	// if the current number of replicas has changed update the statefulSets replicas
 	if set.Status.Replicas != int32(ready) || set.Status.ObservedGeneration == nil || set.Generation > *set.Status.ObservedGeneration {
-		obj, err := api.Scheme.Copy(set)
-		if err != nil {
-			return fmt.Errorf("unable to copy set: %v", err)
-		}
-		set = obj.(*apps.StatefulSet)
+		set = set.DeepCopy()
 
 		if err := ssc.podControl.UpdateStatefulSetStatus(set, int32(ready), set.Generation); err != nil {
 			return err
@@ -145,11 +139,7 @@ func (ssc *defaultStatefulSetControl) UpdateStatefulSet(set *apps.StatefulSet, p
 			continue
 		}
 		// Make a deep copy so we don't mutate the shared cache
-		copy, err := api.Scheme.DeepCopy(replicas[i])
-		if err != nil {
-			return err
-		}
-		replica := copy.(*v1.Pod)
+		replica := replicas[i].DeepCopy()
 		if err := ssc.podControl.UpdateStatefulPod(set, replica); err != nil {
 			return err
 		}

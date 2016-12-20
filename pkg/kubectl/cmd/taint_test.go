@@ -49,10 +49,9 @@ func generateNodeAndTaintedNode(oldTaints []v1.Taint, newTaints []v1.Taint) (*v1
 		},
 		Status: v1.NodeStatus{},
 	}
-	clone, _ := api.Scheme.DeepCopy(node)
 
 	// A copy of the same node, but tainted.
-	taintedNode = clone.(*v1.Node)
+	taintedNode = node.DeepCopy()
 	taintedNode.Spec.Taints = newTaints
 
 	return node, taintedNode

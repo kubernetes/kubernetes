@@ -178,11 +178,7 @@ func (e *BootstrapSigner) signConfigMap() {
 
 	var needUpdate = false
 
-	newCM, err := copyConfigMap(origCM)
-	if err != nil {
-		utilruntime.HandleError(err)
-		return
-	}
+	newCM := origCM.DeepCopy()
 
 	// First capture the config we are signing
 	content, ok := newCM.Data[bootstrapapi.KubeConfigKey]
@@ -288,12 +284,4 @@ func (e *BootstrapSigner) getTokens() map[string]string {
 	}
 
 	return ret
-}
-
-func copyConfigMap(orig *v1.ConfigMap) (*v1.ConfigMap, error) {
-	newCMObj, err := api.Scheme.DeepCopy(orig)
-	if err != nil {
-		return nil, err
-	}
-	return newCMObj.(*v1.ConfigMap), nil
 }

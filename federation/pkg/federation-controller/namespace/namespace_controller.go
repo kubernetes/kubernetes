@@ -355,13 +355,7 @@ func (nc *NamespaceController) reconcileNamespace(namespace string) {
 	}
 	// Create a copy before modifying the namespace to prevent race condition with
 	// other readers of namespace from store.
-	namespaceObj, err := api.Scheme.DeepCopy(namespaceObjFromStore)
-	baseNamespace, ok := namespaceObj.(*apiv1.Namespace)
-	if err != nil || !ok {
-		glog.Errorf("Error in retrieving obj from store: %v, %v", ok, err)
-		nc.deliverNamespace(namespace, 0, true)
-		return
-	}
+	baseNamespace := namespaceObjFromStore.(*apiv1.Namespace).DeepCopy()
 	if baseNamespace.DeletionTimestamp != nil {
 		if err := nc.delete(baseNamespace); err != nil {
 			glog.Errorf("Failed to delete %s: %v", namespace, err)
@@ -407,7 +401,7 @@ func (nc *NamespaceController) reconcileNamespace(namespace string) {
 		// The object should not be modified.
 		desiredNamespace := &apiv1.Namespace{
 			ObjectMeta: util.DeepCopyRelevantObjectMeta(baseNamespace.ObjectMeta),
-			Spec:       *(util.DeepCopyApiTypeOrPanic(&baseNamespace.Spec).(*apiv1.NamespaceSpec)),
+			Spec:       *baseNamespace.Spec.DeepCopy(),
 		}
 		glog.V(5).Infof("Desired namespace in underlying clusters: %+v", desiredNamespace)
 
