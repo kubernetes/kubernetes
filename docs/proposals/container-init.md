@@ -110,7 +110,7 @@ being initialized is in the `Pending` phase but should have a distinct
 condition. Each app container and all future init containers should have
 the reason `PodInitializing`. The pod should have a condition `Initializing`
 set to `false` until all init containers have succeeded, and `true` thereafter.
-If the pod is restarted, the `Initializing` condition should be set to `false.
+If the pod is restarted, the `Initializing` condition should be set to `false`.
 
 If the pod is "restarted" all containers stopped and started due to
 a node restart, change to the pod definition, or admin interaction, all
@@ -169,7 +169,7 @@ app containers are started at once.
 The name of each app and init container in a pod must be unique - it is a
 validation error for any container to share a name.
 
-While pod containers are in alpha state, they will be serialized as an annotation
+While init containers are in alpha state, they will be serialized as an annotation
 on the pod with the name `pod.alpha.kubernetes.io/init-containers` and the status
 of the containers will be stored as `pod.alpha.kubernetes.io/init-container-statuses`.
 Mutation of these annotations is prohibited on existing pods.
