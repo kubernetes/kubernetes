@@ -187,7 +187,8 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 	if err != nil {
 		return err
 	}
-	if len(options.Filenames) > 0 || argsHasNames {
+	output := cmdutil.GetFlagString(cmd, "output")
+	if len(options.Filenames) > 0 || argsHasNames || output == "json" || output == "yaml" {
 		cmd.Flag("show-all").Value.Set("true")
 	}
 	export := cmdutil.GetFlagBool(cmd, "export")
