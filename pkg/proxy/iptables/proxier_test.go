@@ -1079,4 +1079,96 @@ func TestBuildServiceMapServiceTypeExternalName(t *testing.T) {
 	}
 }
 
+func TestBuildServiceMapServiceUpdate(t *testing.T) {
+	first := []api.Service{
+		makeTestService("somewhere", "some-service", func(svc *api.Service) {
+			svc.Spec.Type = api.ServiceTypeClusterIP
+			svc.Spec.ClusterIP = "172.16.55.4"
+			svc.Spec.Ports = addTestPort(svc.Spec.Ports, "something", "UDP", 1234, 4321, 0)
+			svc.Spec.Ports = addTestPort(svc.Spec.Ports, "somethingelse", "TCP", 1235, 5321, 0)
+		}),
+	}
+
+	second := []api.Service{
+		makeTestService("somewhere", "some-service", func(svc *api.Service) {
+			svc.ObjectMeta.Annotations = map[string]string{
+				service.BetaAnnotationExternalTraffic:     service.AnnotationValueExternalTrafficLocal,
+				service.BetaAnnotationHealthCheckNodePort: "345",
+			}
+			svc.Spec.Type = api.ServiceTypeLoadBalancer
+			svc.Spec.ClusterIP = "172.16.55.4"
+			svc.Spec.LoadBalancerIP = "5.6.7.8"
+			svc.Spec.Ports = addTestPort(svc.Spec.Ports, "something", "UDP", 1234, 4321, 7002)
+			svc.Spec.Ports = addTestPort(svc.Spec.Ports, "somethingelse", "TCP", 1235, 5321, 7003)
+			svc.Status.LoadBalancer = api.LoadBalancerStatus{
+				Ingress: []api.LoadBalancerIngress{
+					{IP: "10.1.2.3"},
+				},
+			}
+		}),
+	}
+
+	serviceMap, hcAdd, hcDel, staleUDPServices := buildServiceMap(first, make(proxyServiceMap))
+	if len(serviceMap) != 2 {
+		t.Errorf("expected service map length 2, got %v", serviceMap)
+	}
+	if len(hcAdd) != 0 {
+		t.Errorf("expected healthcheck add length 0, got %v", hcAdd)
+	}
+	if len(hcDel) != 2 {
+		t.Errorf("expected healthcheck del length 2, got %v", hcDel)
+	}
+	if len(staleUDPServices) != 0 {
+		// Services only added, so nothing stale yet
+		t.Errorf("expected stale UDP services length 0, got %d", len(staleUDPServices))
+	}
+
+	// Change service to load-balancer
+	serviceMap, hcAdd, hcDel, staleUDPServices = buildServiceMap(second, serviceMap)
+	if len(serviceMap) != 2 {
+		t.Errorf("expected service map length 2, got %v", serviceMap)
+	}
+	if len(hcAdd) != 2 {
+		t.Errorf("expected healthcheck add length 2, got %v", hcAdd)
+	}
+	if len(hcDel) != 0 {
+		t.Errorf("expected healthcheck add length 2, got %v", hcDel)
+	}
+	if len(staleUDPServices) != 0 {
+		t.Errorf("expected stale UDP services length 0, got %v", staleUDPServices.List())
+	}
+
+	// No change; make sure the service map stays the same and there are
+	// no health-check changes
+	serviceMap, hcAdd, hcDel, staleUDPServices = buildServiceMap(second, serviceMap)
+	if len(serviceMap) != 2 {
+		t.Errorf("expected service map length 2, got %v", serviceMap)
+	}
+	if len(hcAdd) != 0 {
+		t.Errorf("expected healthcheck add length 0, got %v", hcAdd)
+	}
+	if len(hcDel) != 0 {
+		t.Errorf("expected healthcheck add length 2, got %v", hcDel)
+	}
+	if len(staleUDPServices) != 0 {
+		t.Errorf("expected stale UDP services length 0, got %v", staleUDPServices.List())
+	}
+
+	// And back to ClusterIP
+	serviceMap, hcAdd, hcDel, staleUDPServices = buildServiceMap(first, serviceMap)
+	if len(serviceMap) != 2 {
+		t.Errorf("expected service map length 2, got %v", serviceMap)
+	}
+	if len(hcAdd) != 0 {
+		t.Errorf("expected healthcheck add length 0, got %v", hcAdd)
+	}
+	if len(hcDel) != 2 {
+		t.Errorf("expected healthcheck del length 2, got %v", hcDel)
+	}
+	if len(staleUDPServices) != 0 {
+		// Services only added, so nothing stale yet
+		t.Errorf("expected stale UDP services length 0, got %d", len(staleUDPServices))
+	}
+}
+
 // TODO(thockin): add *more* tests for syncProxyRules() or break it down further and test the pieces.

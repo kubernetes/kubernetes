@@ -153,11 +153,35 @@ type endpointsInfo struct {
 }
 
 // returns a new serviceInfo struct
-func newServiceInfo(service proxy.ServicePortName) *serviceInfo {
-	return &serviceInfo{
-		sessionAffinityType: api.ServiceAffinityNone, // default
-		stickyMaxAgeMinutes: 180,                     // TODO: paramaterize this in the API.
+func newServiceInfo(serviceName proxy.ServicePortName, port *api.ServicePort, service *api.Service) *serviceInfo {
+	onlyNodeLocalEndpoints := apiservice.NeedsHealthCheck(service) && featuregate.DefaultFeatureGate.ExternalTrafficLocalOnly() && (service.Spec.Type == api.ServiceTypeLoadBalancer || service.Spec.Type == api.ServiceTypeNodePort)
+	info := &serviceInfo{
+		clusterIP: net.ParseIP(service.Spec.ClusterIP),
+		port:      int(port.Port),
+		protocol:  port.Protocol,
+		nodePort:  int(port.NodePort),
+		// Deep-copy in case the service instance changes
+		loadBalancerStatus:       *api.LoadBalancerStatusDeepCopy(&service.Status.LoadBalancer),
+		sessionAffinityType:      service.Spec.SessionAffinity,
+		stickyMaxAgeMinutes:      180, // TODO: paramaterize this in the API.
+		externalIPs:              make([]string, len(service.Spec.ExternalIPs)),
+		loadBalancerSourceRanges: make([]string, len(service.Spec.LoadBalancerSourceRanges)),
+		onlyNodeLocalEndpoints:   onlyNodeLocalEndpoints,
 	}
+	copy(info.loadBalancerSourceRanges, service.Spec.LoadBalancerSourceRanges)
+	copy(info.externalIPs, service.Spec.ExternalIPs)
+
+	if info.onlyNodeLocalEndpoints {
+		p := apiservice.GetServiceHealthCheckNodePort(service)
+		if p == 0 {
+			glog.Errorf("Service does not contain necessary annotation %v",
+				apiservice.BetaAnnotationHealthCheckNodePort)
+		} else {
+			info.healthCheckNodePort = int(p)
+		}
+	}
+
+	return info
 }
 
 type proxyServiceMap map[proxy.ServicePortName]*serviceInfo
@@ -384,44 +408,6 @@ func CleanupLeftovers(ipt utiliptables.Interface) (encounteredError bool) {
 	return encounteredError
 }
 
-func sameConfig(info *serviceInfo, service *api.Service, port *api.ServicePort) bool {
-	if info.protocol != port.Protocol || info.port != int(port.Port) || info.nodePort != int(port.NodePort) {
-		return false
-	}
-	if !info.clusterIP.Equal(net.ParseIP(service.Spec.ClusterIP)) {
-		return false
-	}
-	if !ipsEqual(info.externalIPs, service.Spec.ExternalIPs) {
-		return false
-	}
-	if !api.LoadBalancerStatusEqual(&info.loadBalancerStatus, &service.Status.LoadBalancer) {
-		return false
-	}
-	if info.sessionAffinityType != service.Spec.SessionAffinity {
-		return false
-	}
-	onlyNodeLocalEndpoints := apiservice.NeedsHealthCheck(service) && featuregate.DefaultFeatureGate.ExternalTrafficLocalOnly()
-	if info.onlyNodeLocalEndpoints != onlyNodeLocalEndpoints {
-		return false
-	}
-	if !reflect.DeepEqual(info.loadBalancerSourceRanges, service.Spec.LoadBalancerSourceRanges) {
-		return false
-	}
-	return true
-}
-
-func ipsEqual(lhs, rhs []string) bool {
-	if len(lhs) != len(rhs) {
-		return false
-	}
-	for i := range lhs {
-		if lhs[i] != rhs[i] {
-			return false
-		}
-	}
-	return true
-}
-
 // Sync is called to immediately synchronize the proxier state to iptables
 func (proxier *Proxier) Sync() {
 	proxier.mu.Lock()
@@ -449,15 +435,9 @@ type healthCheckPort struct {
 // service map, a list of healthcheck ports to add to or remove from the health
 // checking listener service, and a set of stale UDP services.
 func buildServiceMap(allServices []api.Service, oldServiceMap proxyServiceMap) (proxyServiceMap, []healthCheckPort, []healthCheckPort, sets.String) {
+	newServiceMap := make(proxyServiceMap)
 	healthCheckAdd := make([]healthCheckPort, 0)
 	healthCheckDel := make([]healthCheckPort, 0)
-
-	newServiceMap := make(proxyServiceMap)
-	for key, value := range oldServiceMap {
-		newServiceMap[key] = value
-	}
-
-	activeServices := make(map[proxy.ServicePortName]bool) // use a map as a set
 
 	for i := range allServices {
 		service := &allServices[i]
@@ -484,57 +464,37 @@ func buildServiceMap(allServices []api.Service, oldServiceMap proxyServiceMap) (
 				NamespacedName: svcName,
 				Port:           servicePort.Name,
 			}
-			activeServices[serviceName] = true
-			info, exists := newServiceMap[serviceName]
-			if exists {
-				if sameConfig(info, service, servicePort) {
-					// Nothing changed.
-					continue
-				}
-				// Something changed.
-				glog.V(3).Infof("Something changed for service %q: removing it", serviceName)
-				delete(newServiceMap, serviceName)
-			}
-			serviceIP := net.ParseIP(service.Spec.ClusterIP)
-			glog.V(1).Infof("Adding new service %q at %s:%d/%s", serviceName, serviceIP, servicePort.Port, servicePort.Protocol)
-			info = newServiceInfo(serviceName)
-			info.clusterIP = serviceIP
-			info.port = int(servicePort.Port)
-			info.protocol = servicePort.Protocol
-			info.nodePort = int(servicePort.NodePort)
-			info.externalIPs = service.Spec.ExternalIPs
-			// Deep-copy in case the service instance changes
-			info.loadBalancerStatus = *api.LoadBalancerStatusDeepCopy(&service.Status.LoadBalancer)
-			info.sessionAffinityType = service.Spec.SessionAffinity
-			info.loadBalancerSourceRanges = service.Spec.LoadBalancerSourceRanges
-			info.onlyNodeLocalEndpoints = apiservice.NeedsHealthCheck(service) && featuregate.DefaultFeatureGate.ExternalTrafficLocalOnly() && (service.Spec.Type == api.ServiceTypeLoadBalancer || service.Spec.Type == api.ServiceTypeNodePort)
-			if info.onlyNodeLocalEndpoints {
-				p := apiservice.GetServiceHealthCheckNodePort(service)
-				if p == 0 {
-					glog.Errorf("Service does not contain necessary annotation %v",
-						apiservice.BetaAnnotationHealthCheckNodePort)
-				} else {
-					info.healthCheckNodePort = int(p)
-					healthCheckAdd = append(healthCheckAdd, healthCheckPort{serviceName.NamespacedName, info.healthCheckNodePort})
-				}
-			} else {
-				healthCheckDel = append(healthCheckDel, healthCheckPort{serviceName.NamespacedName, 0})
-			}
-			newServiceMap[serviceName] = info
 
+			info := newServiceInfo(serviceName, servicePort, service)
+			oldInfo, exists := oldServiceMap[serviceName]
+			equal := reflect.DeepEqual(info, oldInfo)
+			if !exists {
+				glog.V(1).Infof("Adding new service %q at %s:%d/%s", serviceName, info.clusterIP, servicePort.Port, servicePort.Protocol)
+			} else if !equal {
+				glog.V(1).Infof("Updating existing service %q at %s:%d/%s", serviceName, info.clusterIP, servicePort.Port, servicePort.Protocol)
+			}
+
+			if !exists || !equal {
+				if info.onlyNodeLocalEndpoints && info.healthCheckNodePort > 0 {
+					healthCheckAdd = append(healthCheckAdd, healthCheckPort{serviceName.NamespacedName, info.healthCheckNodePort})
+				} else {
+					healthCheckDel = append(healthCheckDel, healthCheckPort{serviceName.NamespacedName, 0})
+				}
+			}
+
+			newServiceMap[serviceName] = info
 			glog.V(4).Infof("added serviceInfo(%s): %s", serviceName, spew.Sdump(info))
 		}
 	}
 
 	staleUDPServices := sets.NewString()
 	// Remove serviceports missing from the update.
-	for name, info := range newServiceMap {
-		if !activeServices[name] {
+	for name, info := range oldServiceMap {
+		if _, exists := newServiceMap[name]; !exists {
 			glog.V(1).Infof("Removing service %q", name)
 			if info.protocol == api.ProtocolUDP {
 				staleUDPServices.Insert(info.clusterIP.String())
 			}
-			delete(newServiceMap, name)
 			if info.onlyNodeLocalEndpoints && info.healthCheckNodePort > 0 {
 				healthCheckDel = append(healthCheckDel, healthCheckPort{name.NamespacedName, info.healthCheckNodePort})
 			}
