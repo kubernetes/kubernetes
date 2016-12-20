@@ -609,7 +609,16 @@ func (oe *operationExecutor) generateAttachVolumeFunc(
 				volumeToAttach.NodeName,
 				attachErr)
 			for _, pod := range volumeToAttach.ScheduledPods {
-				oe.recorder.Eventf(pod, v1.EventTypeWarning, kevents.FailedMountVolume, err.Error())
+				// if pod is removed, reference to pod could be undefined
+				if pod != nil {
+					oe.recorder.Eventf(pod, v1.EventTypeWarning, kevents.FailedMountVolume, err.Error())
+				} else {
+					glog.Errorf("Pod is not found while attaching volume  %q on node %q. Attach Error: %v",
+						volumeToAttach.VolumeSpec.Name(),
+						volumeToAttach.NodeName,
+						attachErr)
+				}
+
 			}
 			return err
 		}
