@@ -144,7 +144,7 @@ for current in "${index[@]}"; do
   # We use '-d 1234' flag to have a deterministic output every time.
   # The constant was just randomly chosen.
   ###echo "DBG: running ${CODECGEN} -d 1234 -o ${base_generated_file} ${base_file}"
-  ${CODECGEN} -d 1234 -o "${base_generated_file}" "${base_file}"
+  ${CODECGEN} -d 1234 -o "${base_generated_file}" -nr 'ObjectMeta' "${base_file}"
   # Add boilerplate at the beginning of the generated file.
   sed 's/YEAR/2016/' "${initial_dir}/hack/boilerplate/boilerplate.go.txt" > "${base_generated_file}.tmp"
   cat "${base_generated_file}" >> "${base_generated_file}.tmp"
