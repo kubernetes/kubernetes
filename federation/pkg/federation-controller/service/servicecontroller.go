@@ -633,7 +633,7 @@ func getClusterConditionPredicate() federationcache.ClusterConditionPredicate {
 			//We consider the cluster for load balancing only when its ClusterReady condition status
 			//is ConditionTrue
 			if cond.Type == v1beta1.ClusterReady && cond.Status != v1.ConditionTrue {
-				glog.V(4).Infof("Ignoring cluser %v with %v condition status %v", cluster.Name, cond.Type, cond.Status)
+				glog.V(4).Infof("Ignoring cluster %v with %v condition status %v", cluster.Name, cond.Type, cond.Status)
 				return false
 			}
 		}
