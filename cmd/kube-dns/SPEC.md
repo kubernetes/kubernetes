@@ -151,11 +151,11 @@ Unnamed ports do not have an `SRV` record.
 - Question Example:
   - `_https._tcp.headless.default.svc.cluster.local. IN SRV`
 - Answer Example:
-  ```
+```
         _https._tcp.headless.default.svc.cluster.local. 4 IN SRV 10 100 443 my-pet.headless.default.svc.cluster.local.
         _https._tcp.headless.default.svc.cluster.local. 4 IN SRV 10 100 443 my-pet-2.headless.default.svc.cluster.local.
         _https._tcp.headless.default.svc.cluster.local. 4 IN SRV 10 100 443 438934893.headless.default.svc.cluster.local.
-  ```
+```
 
 The Additional section of the response may include the `A` records
 referred to in the `SRV` records.
