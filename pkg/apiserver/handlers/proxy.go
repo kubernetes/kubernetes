@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package apiserver
+package handlers
 
 import (
 	"errors"
@@ -30,7 +30,9 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	apierrors "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/rest"
+	"k8s.io/kubernetes/pkg/apiserver/handlers/responsewriters"
 	"k8s.io/kubernetes/pkg/apiserver/metrics"
+	"k8s.io/kubernetes/pkg/apiserver/request"
 	"k8s.io/kubernetes/pkg/httplog"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/runtime/schema"
@@ -39,16 +41,15 @@ import (
 	proxyutil "k8s.io/kubernetes/pkg/util/proxy"
 
 	"github.com/golang/glog"
-	"k8s.io/kubernetes/pkg/apiserver/request"
 )
 
 // ProxyHandler provides a http.Handler which will proxy traffic to locations
 // specified by items implementing Redirector.
 type ProxyHandler struct {
-	prefix     string
-	storage    map[string]rest.Storage
-	serializer runtime.NegotiatedSerializer
-	mapper     api.RequestContextMapper
+	Prefix     string
+	Storage    map[string]rest.Storage
+	Serializer runtime.NegotiatedSerializer
+	Mapper     api.RequestContextMapper
 }
 
 func (r *ProxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
@@ -60,21 +61,21 @@ func (r *ProxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	reqStart := time.Now()
 	defer metrics.Monitor(&verb, &apiResource, net.GetHTTPClient(req), w.Header().Get("Content-Type"), httpCode, reqStart)
 
-	ctx, ok := r.mapper.Get(req)
+	ctx, ok := r.Mapper.Get(req)
 	if !ok {
-		internalError(w, req, errors.New("Error getting request context"))
+		responsewriters.InternalError(w, req, errors.New("Error getting request context"))
 		httpCode = http.StatusInternalServerError
 		return
 	}
 
 	requestInfo, ok := request.RequestInfoFrom(ctx)
 	if !ok {
-		internalError(w, req, errors.New("Error getting RequestInfo from context"))
+		responsewriters.InternalError(w, req, errors.New("Error getting RequestInfo from context"))
 		httpCode = http.StatusInternalServerError
 		return
 	}
 	if !requestInfo.IsResourceRequest {
-		notFound(w, req)
+		responsewriters.NotFound(w, req)
 		httpCode = http.StatusNotFound
 		return
 	}
@@ -83,7 +84,7 @@ func (r *ProxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 	ctx = api.WithNamespace(ctx, namespace)
 	if len(parts) < 2 {
-		notFound(w, req)
+		responsewriters.NotFound(w, req)
 		httpCode = http.StatusNotFound
 		return
 	}
@@ -99,10 +100,10 @@ func (r *ProxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			remainder = remainder + "/"
 		}
 	}
-	storage, ok := r.storage[resource]
+	storage, ok := r.Storage[resource]
 	if !ok {
 		httplog.LogOf(req, w).Addf("'%v' has no storage object", resource)
-		notFound(w, req)
+		responsewriters.NotFound(w, req)
 		httpCode = http.StatusNotFound
 		return
 	}
@@ -113,19 +114,19 @@ func (r *ProxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	redirector, ok := storage.(rest.Redirector)
 	if !ok {
 		httplog.LogOf(req, w).Addf("'%v' is not a redirector", resource)
-		httpCode = errorNegotiated(apierrors.NewMethodNotSupported(api.Resource(resource), "proxy"), r.serializer, gv, w, req)
+		httpCode = responsewriters.ErrorNegotiated(apierrors.NewMethodNotSupported(api.Resource(resource), "proxy"), r.Serializer, gv, w, req)
 		return
 	}
 
 	location, roundTripper, err := redirector.ResourceLocation(ctx, id)
 	if err != nil {
 		httplog.LogOf(req, w).Addf("Error getting ResourceLocation: %v", err)
-		httpCode = errorNegotiated(err, r.serializer, gv, w, req)
+		httpCode = responsewriters.ErrorNegotiated(err, r.Serializer, gv, w, req)
 		return
 	}
 	if location == nil {
 		httplog.LogOf(req, w).Addf("ResourceLocation for %v returned nil", id)
-		notFound(w, req)
+		responsewriters.NotFound(w, req)
 		httpCode = http.StatusNotFound
 		return
 	}
@@ -153,7 +154,7 @@ func (r *ProxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 	newReq, err := http.NewRequest(req.Method, location.String(), req.Body)
 	if err != nil {
-		httpCode = errorNegotiated(err, r.serializer, gv, w, req)
+		httpCode = responsewriters.ErrorNegotiated(err, r.Serializer, gv, w, req)
 		return
 	}
 	httpCode = http.StatusOK
@@ -197,9 +198,9 @@ func (r *ProxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	}
 	if !alreadyRewriting {
 		glog.V(5).Infof("[%x] making a transport for proxy %s...", proxyHandlerTraceID, req.URL)
-		prepend := path.Join(r.prefix, resource, id)
+		prepend := path.Join(r.Prefix, resource, id)
 		if len(namespace) > 0 {
-			prepend = path.Join(r.prefix, "namespaces", namespace, resource, id)
+			prepend = path.Join(r.Prefix, "namespaces", namespace, resource, id)
 		}
 		pTransport := &proxyutil.Transport{
 			Scheme:       req.URL.Scheme,
@@ -221,7 +222,7 @@ func (r *ProxyHandler) tryUpgrade(w http.ResponseWriter, req, newReq *http.Reque
 	}
 	backendConn, err := proxyutil.DialURL(location, transport)
 	if err != nil {
-		errorNegotiated(err, r.serializer, gv, w, req)
+		responsewriters.ErrorNegotiated(err, r.Serializer, gv, w, req)
 		return true
 	}
 	defer backendConn.Close()
@@ -231,13 +232,13 @@ func (r *ProxyHandler) tryUpgrade(w http.ResponseWriter, req, newReq *http.Reque
 	// hijack, just for reference...
 	requestHijackedConn, _, err := w.(http.Hijacker).Hijack()
 	if err != nil {
-		errorNegotiated(err, r.serializer, gv, w, req)
+		responsewriters.ErrorNegotiated(err, r.Serializer, gv, w, req)
 		return true
 	}
 	defer requestHijackedConn.Close()
 
 	if err = newReq.Write(backendConn); err != nil {
-		errorNegotiated(err, r.serializer, gv, w, req)
+		responsewriters.ErrorNegotiated(err, r.Serializer, gv, w, req)
 		return true
 	}
 

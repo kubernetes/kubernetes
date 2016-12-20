@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package apiserver
+package handlers
 
 import (
 	"errors"
@@ -470,5 +470,17 @@ func TestHasUID(t *testing.T) {
 		if tc.hasUID != actual {
 			t.Errorf("%d: expected %v, got %v", i, tc.hasUID, actual)
 		}
+	}
+}
+
+func TestParseTimeout(t *testing.T) {
+	if d := parseTimeout(""); d != 30*time.Second {
+		t.Errorf("blank timeout produces %v", d)
+	}
+	if d := parseTimeout("not a timeout"); d != 30*time.Second {
+		t.Errorf("bad timeout produces %v", d)
+	}
+	if d := parseTimeout("10s"); d != 10*time.Second {
+		t.Errorf("10s timeout produced: %v", d)
 	}
 }
