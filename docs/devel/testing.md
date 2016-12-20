@@ -196,7 +196,7 @@ for those internal etcd instances with the `TEST_ETCD_DIR` environment variable.
 ### Run integration tests
 
 The integration tests are run using `make test-integration`.
-The Kubernetes integration tests are writting using the normal golang testing
+The Kubernetes integration tests are writing using the normal golang testing
 package but expect to have a running etcd instance to connect to.  The `test-
 integration.sh` script wraps `make test` and sets up an etcd instance
 for the integration tests to use.

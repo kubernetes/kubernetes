@@ -480,7 +480,7 @@ breaking changes, it does *not* block the merge-queue, and thus should run in
 some separate test suites owned by the feature owner(s)
 (see [Continuous Integration](#continuous-integration) below).
 
-### Viper configuration and hierarchichal test parameters.
+### Viper configuration and hierarchical test parameters.
 
 The future of e2e test configuration idioms will be increasingly defined using viper, and decreasingly via flags.
 
@@ -490,7 +490,7 @@ To use viper, rather than flags, to configure your tests:
 
 - Just add "e2e.json" to the current directory you are in, and define parameters in it... i.e. `"kubeconfig":"/tmp/x"`.
 
-Note that advanced testing parameters, and hierarchichally defined parameters, are only defined in viper, to see what they are, you can dive into [TestContextType](../../test/e2e/framework/test_context.go).
+Note that advanced testing parameters, and hierarchically defined parameters, are only defined in viper, to see what they are, you can dive into [TestContextType](../../test/e2e/framework/test_context.go).
 
 In time, it is our intent to add or autogenerate a sample viper configuration that includes all e2e parameters, to ship with kubernetes.
 
