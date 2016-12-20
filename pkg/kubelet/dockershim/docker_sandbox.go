@@ -26,6 +26,7 @@ import (
 
 	runtimeApi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/kubelet/dockertools"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
 	"k8s.io/kubernetes/pkg/kubelet/types"
 )
@@ -370,7 +371,7 @@ func sharesHostNetwork(container *dockertypes.ContainerJSON) bool {
 
 func setSandboxResources(hc *dockercontainer.HostConfig) {
 	hc.Resources = dockercontainer.Resources{
-		MemorySwap: -1,
+		MemorySwap: dockertools.DefaultMemorySwap(),
 		CPUShares:  defaultSandboxCPUshares,
 		// Use docker's default cpu quota/period.
 	}
