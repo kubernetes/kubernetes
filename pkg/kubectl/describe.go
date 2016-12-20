@@ -1779,10 +1779,18 @@ func (d *ServiceAccountDescriber) Describe(namespace, name string, describerSett
 		}
 	}
 
-	return describeServiceAccount(serviceAccount, tokens)
+	existingPullSecrets := map[string]api.Secret{}
+	pullSecrets, err := d.Core().Secrets(namespace).List(api.ListOptions{})
+	if err == nil {
+		for _, s := range pullSecrets.Items {
+			existingPullSecrets[s.GetName()] = s
+		}
+	}
+
+	return describeServiceAccount(serviceAccount, tokens, existingPullSecrets)
 }
 
-func describeServiceAccount(serviceAccount *api.ServiceAccount, tokens []api.Secret) (string, error) {
+func describeServiceAccount(serviceAccount *api.ServiceAccount, tokens []api.Secret, existingPullSecrets map[string]api.Secret) (string, error) {
 	return tabbedString(func(out io.Writer) error {
 		w := &PrefixWriter{out}
 		w.Write(LEVEL_0, "Name:\t%s\n", serviceAccount.Name)
@@ -1802,7 +1810,9 @@ func describeServiceAccount(serviceAccount *api.ServiceAccount, tokens []api.Sec
 		)
 
 		for _, s := range serviceAccount.ImagePullSecrets {
-			pullSecretNames = append(pullSecretNames, s.Name)
+			if _, exists := existingPullSecrets[s.Name]; exists {
+				pullSecretNames = append(pullSecretNames, s.Name)
+			}
 		}
 		for _, s := range serviceAccount.Secrets {
 			mountSecretNames = append(mountSecretNames, s.Name)
