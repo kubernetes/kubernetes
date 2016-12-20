@@ -59,6 +59,7 @@ var _ = framework.KubeDescribe("Pod Disks", func() {
 		nodeClient v1core.NodeInterface
 		host0Name  types.NodeName
 		host1Name  types.NodeName
+		nodes      *v1.NodeList
 	)
 	f := framework.NewDefaultFramework("pod-disks")
 
@@ -67,7 +68,7 @@ var _ = framework.KubeDescribe("Pod Disks", func() {
 
 		podClient = f.ClientSet.Core().Pods(f.Namespace.Name)
 		nodeClient = f.ClientSet.Core().Nodes()
-		nodes := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
+		nodes = framework.GetReadySchedulableNodesOrDie(f.ClientSet)
 
 		Expect(len(nodes.Items)).To(BeNumerically(">=", 2), "Requires at least 2 nodes")
 
@@ -475,6 +476,58 @@ var _ = framework.KubeDescribe("Pod Disks", func() {
 		waitForPDDetach(diskName, host0Name)
 		framework.ExpectNoError(WaitForGroupSize(framework.TestContext.CloudConfig.NodeInstanceGroup, int32(initialGroupSize)), "Unable to get back the cluster to inital size")
 		return
+	})
+
+	It("should be able to detach from a node whose api object was deleted [Slow] [Disruptive]", func() {
+		framework.SkipUnlessProviderIs("gce")
+		initialGroupSize, err := GroupSize(framework.TestContext.CloudConfig.NodeInstanceGroup)
+		framework.ExpectNoError(err, "Error getting group size")
+		By("Creating a pd")
+		diskName, err := createPDWithRetry()
+		framework.ExpectNoError(err, "Error creating a pd")
+
+		host0Pod := testPDPod([]string{diskName}, host0Name, false, 1)
+		originalCount := len(nodes.Items)
+		containerName := "mycontainer"
+		nodeToDelete := &nodes.Items[0]
+		defer func() error {
+			By("Cleaning up PD-RW test env")
+			detachAndDeletePDs(diskName, []types.NodeName{host0Name})
+			nodeToDelete.ObjectMeta.SetResourceVersion("0")
+			// need to set the resource version or else the Create() fails
+			_, err := nodeClient.Create(nodeToDelete)
+			framework.ExpectNoError(err, "Unable to re-create the deleted node")
+			framework.ExpectNoError(WaitForGroupSize(framework.TestContext.CloudConfig.NodeInstanceGroup, int32(initialGroupSize)), "Unable to get the node group back to the original size")
+			framework.WaitForNodeToBeReady(f.ClientSet, nodeToDelete.Name, nodeStatusTimeout)
+			if len(nodes.Items) != originalCount {
+				return fmt.Errorf("The node count is not back to original count")
+			}
+			return nil
+		}()
+
+		By("submitting host0Pod to kubernetes")
+		_, err = podClient.Create(host0Pod)
+		framework.ExpectNoError(err, fmt.Sprintf("Failed to create host0pod: %v", err))
+
+		framework.ExpectNoError(f.WaitForPodRunningSlow(host0Pod.Name))
+
+		testFile := "/testpd1/tracker"
+		testFileContents := fmt.Sprintf("%v", mathrand.Int())
+
+		framework.ExpectNoError(f.WriteFileViaContainer(host0Pod.Name, containerName, testFile, testFileContents))
+		framework.Logf("Wrote value: %v", testFileContents)
+
+		// Verify that disk shows up in node 0's volumeInUse list
+		framework.ExpectNoError(waitForPDInVolumesInUse(nodeClient, diskName, host0Name, nodeStatusTimeout, true /* should exist*/))
+
+		By("deleting api object of host0")
+		framework.ExpectNoError(nodeClient.Delete(string(host0Name), v1.NewDeleteOptions(0)), "Unable to delete host0")
+
+		By("deleting host0pod")
+		framework.ExpectNoError(podClient.Delete(host0Pod.Name, v1.NewDeleteOptions(0)), "Unable to delete host0Pod")
+		// The disk should be detached from host0 on its deletion
+		By("Waiting for pd to detach from host0")
+		framework.ExpectNoError(waitForPDDetach(diskName, host0Name), "Timed out waiting for detach pd")
 	})
 })
 
