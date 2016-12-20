@@ -107,7 +107,7 @@ no ClusterIP), the following records must exist.
 There must be an `A` record for each _ready_ endpoint of the Service with IP
 address `<endpoint-ip>` as shown below. If there are no _ready_ endpoints,
 there must be no `A` records of this form; however, a query for them will have
-an empty result rather than `NXDOMAIN`, since the Service exists.
+an empty answer with `rcode` 0 rather than `NXDOMAIN`, since the Service exists.
 
 - Record Format:
   - `<service>.<ns>.svc.<zone>. <ttl> IN A <endpoint-ip>`
