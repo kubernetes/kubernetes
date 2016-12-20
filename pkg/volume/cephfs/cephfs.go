@@ -27,6 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/mount"
 	utilstrings "k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
+	"k8s.io/kubernetes/pkg/volume/util"
 )
 
 // This is the primary entrypoint for volume plugins.
@@ -226,7 +227,7 @@ func (cephfsVolume *cephfsMounter) SetUpAt(dir string, fsGroup *int64) error {
 	}
 
 	// cleanup upon failure
-	cephfsVolume.cleanup(dir)
+	util.UnmountPath(dir, cephfsVolume.mounter)
 	// return error
 	return err
 }
@@ -244,38 +245,13 @@ func (cephfsVolume *cephfsUnmounter) TearDown() error {
 
 // TearDownAt unmounts the bind mount
 func (cephfsVolume *cephfsUnmounter) TearDownAt(dir string) error {
-	return cephfsVolume.cleanup(dir)
+	return util.UnmountPath(dir, cephfsVolume.mounter)
 }
 
 // GatePath creates global mount path
 func (cephfsVolume *cephfs) GetPath() string {
 	name := cephfsPluginName
 	return cephfsVolume.plugin.host.GetPodVolumeDir(cephfsVolume.podUID, utilstrings.EscapeQualifiedNameForDisk(name), cephfsVolume.volName)
-}
-
-func (cephfsVolume *cephfs) cleanup(dir string) error {
-	noMnt, err := cephfsVolume.mounter.IsLikelyNotMountPoint(dir)
-	if err != nil && !os.IsNotExist(err) {
-		return fmt.Errorf("CephFS: Error checking IsLikelyNotMountPoint: %v", err)
-	}
-	if noMnt {
-		return os.RemoveAll(dir)
-	}
-
-	if err := cephfsVolume.mounter.Unmount(dir); err != nil {
-		return fmt.Errorf("CephFS: Unmounting failed: %v", err)
-	}
-	noMnt, mntErr := cephfsVolume.mounter.IsLikelyNotMountPoint(dir)
-	if mntErr != nil {
-		return fmt.Errorf("CephFS: IsMountpoint check failed: %v", mntErr)
-	}
-	if noMnt {
-		if err := os.RemoveAll(dir); err != nil {
-			return fmt.Errorf("CephFS: removeAll %s/%v", dir, err)
-		}
-	}
-
-	return nil
 }
 
 func (cephfsVolume *cephfs) execMount(mountpoint string) error {
