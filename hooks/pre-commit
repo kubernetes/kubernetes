@@ -65,8 +65,8 @@ echo "${reset}"
 echo -ne "Checking for package aliases... "
 if ! hack/verify-pkg-names.sh > /dev/null; then
   echo "${red}ERROR!"
-  echo "Some package aliase break go conventions. To fix these errors, "
-  echo "do not use capitalizaed or underlined characters in pkg aliases. "
+  echo "Some package aliases break go conventions. To fix these errors, "
+  echo "do not use capitalized or underlined characters in pkg aliases. "
   echo "Refer to https://blog.golang.org/package-names for more info."
   exit_code=1
 else
