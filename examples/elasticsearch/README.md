@@ -1,7 +1,7 @@
 # Elasticsearch for Kubernetes
 
 Kubernetes makes it trivial for anyone to easily build and scale [Elasticsearch](http://www.elasticsearch.org/) clusters. Here, you'll find how to do so.
-Current Elasticsearch version is `1.7.1`.
+Current Elasticsearch version is `5.1`.
 
 [A more robust example that follows Elasticsearch best-practices of separating nodes concern is also available](production_cluster/README.md).
 

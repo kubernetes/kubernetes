@@ -8,7 +8,7 @@ https://github.com/kubernetes/kubernetes/blob/master/docs/user-guide/prereqs.md
 
 ### Start MySQL Pod
 
-In Kubernetes a [_Pod_](../../docs/user-guide/pods.md) is the smallest deployable unit that can be created, scheduled, and managed. It's a collocated group of containers that share an IP and storage volume.
+In Kubernetes a [_Pod_](../../docs/user-guide/pods.md) is the smallest deployable unit that can be created, scheduled and managed. It's a collocated group of containers that share an IP and storage volume.
 
 Here is the config for MySQL pod: [mysql-pod.yaml](mysql-pod.yaml)
 
@@ -36,11 +36,11 @@ Wait for the status to `1/1` and `Running`.
 
 ### Start MySQL Service
 
-We are creating a [_Service_](../../docs/user-guide/services.md) to expose the TCP port of the MySQL server. A Service distributes traffic across a set of Pods. The order of Service and the targeted Pods does not matter. However Service needs to be started before any other Pods consuming the Service are started.
+We are creating a [_Service_](../../docs/user-guide/services.md) to expose the TCP port of the MySQL server. A Service distributes traffic across a set of Pods. The order of Service and the targeted Pods do not matter. However the Service needs to be started before any other Pods consuming the Service are started.
 
-In this application, we will use a Kubernetes Service to provide a discoverable endpoints for the MySQL endpoint in the cluster.  MySQL service target pods with the labels `name: mysql-pod` and `context: docker-k8s-lab`.
+In this application, we will use a Kubernetes Service to provide  discoverable endpoints for the MySQL endpoint in the cluster.  MySQL service target pods with the labels `name: mysql-pod` and `context: docker-k8s-lab`.
 
-Here is definition of the MySQL service: [mysql-service.yaml](mysql-service.yaml)
+Here is definition of the MySQL Service: [mysql-service.yaml](mysql-service.yaml)
 
 <!-- BEGIN MUNGE: mysql-service.yaml -->
 <!-- END MUNGE: EXAMPLE -->
@@ -51,7 +51,7 @@ Create this service:
 kubectl create -f examples/javaee/mysql-service.yaml
 ```
 
-Get status of the service:
+Get status of the Service:
 
 ```sh
 kubectl get -w svc
@@ -60,7 +60,7 @@ kubernetes      component=apiserver,provider=kubernetes   <none>                
 mysql-service   context=docker-k8s-lab,name=mysql-pod     context=docker-k8s-lab,name=mysql-pod   10.247.63.43   3306/TCP
 ```
 
-If multiple services are running, then it can be narrowed by specifying labels:
+If multiple Services are running, then it can be narrowed by specifying labels:
 
 ```sh
 kubectl get -w po -l context=docker-k8s-lab,name=mysql-pod
@@ -70,9 +70,9 @@ mysql-pod   1/1       Running   0          4m
 
 This is also the selector label used by service to target pods.
 
-When a Service is run on a node, the kubelet adds a set of environment variables for each active Service. It supports both Docker links compatible variables and simpler `{SVCNAME}_SERVICE_HOST` and `{SVCNAME}_SERVICE_PORT` variables, where the Service name is upper-cased and dashes are converted to underscores.
+When a Service is running on a node, the kubelet adds a set of environment variables for each active Service. It supports both Docker links compatible variables and simpler `{SVCNAME}_SERVICE_HOST` and `{SVCNAME}_SERVICE_PORT` variables, where the Service name is upper-cased and dashes are converted to underscores.
 
-Our service name is ``mysql-service'' and so ``MYSQL_SERVICE_SERVICE_HOST'' and ``MYSQL_SERVICE_SERVICE_PORT'' variables are available to other pods. This host and port variables are then used to create the JDBC resource in WildFly.
+Our service name is ``mysql-service`` and so ``MYSQL_SERVICE_SERVICE_HOST`` and ``MYSQL_SERVICE_SERVICE_PORT'' variables are available to other pods. This host and port variables are then used to create the JDBC resource in WildFly.
 
 ### Start WildFly Replication Controller
 
@@ -80,7 +80,7 @@ WildFly is a lightweight Java EE 7 compliant application server. It is wrapped i
 
 In Kubernetes a [_Replication Controller_](../../docs/user-guide/replication-controller.md) is responsible for replicating sets of identical pods. Like a _Service_ it has a selector query which identifies the members of it's set.  Unlike a service it also has a desired number of replicas, and it will create or delete pods to ensure that the number of pods matches up with it's desired state.
 
-Here is definition of the MySQL service: [wildfly-rc.yaml](wildfly-rc.yaml).
+Here is definition of the MySQL Service: [wildfly-rc.yaml](wildfly-rc.yaml).
 
 <!-- BEGIN MUNGE: wildfly-rc.yaml -->
 <!-- END MUNGE: EXAMPLE -->
