@@ -116,7 +116,7 @@ func (gc *GarbageCollector) Run(workers int, stopCh <-chan struct{}) {
 	glog.Infof("Garbage Collector: All resource monitors have synced. Proceeding to collect garbage")
 
 	// worker
-	go wait.Until(gc.dependencyGraphBuilder.runProcessEvent, 1*time.Second, stopCh)
+	go wait.Until(gc.dependencyGraphBuilder.runProcessGraphChanges, 1*time.Second, stopCh)
 
 	for i := 0; i < workers; i++ {
 		go wait.Until(gc.runAttemptToDeleteWorker, 1*time.Second, stopCh)

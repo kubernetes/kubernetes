@@ -38,7 +38,6 @@ import (
 	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/runtime/serializer"
 	"k8s.io/kubernetes/pkg/types"
-	"k8s.io/kubernetes/pkg/util/clock"
 	"k8s.io/kubernetes/pkg/util/json"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/strategicpatch"
@@ -56,7 +55,7 @@ func TestNewGarbageCollector(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	assert.Equal(t, 1, len(gc.monitors))
+	assert.Equal(t, 1, len(gc.dependencyGraphBuilder.monitors))
 }
 
 // fakeAction records information about requests to aid in testing.
@@ -145,8 +144,8 @@ func serilizeOrDie(t *testing.T, object interface{}) []byte {
 	return data
 }
 
-// test the processItem function making the expected actions.
-func TestProcessItem(t *testing.T) {
+// test the attempToDeleteItem function making the expected actions.
+func TestAttemptToDeleteItem(t *testing.T) {
 	pod := getPod("ToBeDeletedPod", []metav1.OwnerReference{
 		{
 			Kind:       "ReplicationController",
@@ -180,10 +179,10 @@ func TestProcessItem(t *testing.T) {
 			},
 			Namespace: pod.Namespace,
 		},
-		// owners are intentionally left empty. The processItem routine should get the latest item from the server.
+		// owners are intentionally left empty. The attempToDeleteItem routine should get the latest item from the server.
 		owners: nil,
 	}
-	err := gc.processItem(item)
+	err := gc.attempToDeleteItem(item)
 	if err != nil {
 		t.Errorf("Unexpected Error: %v", err)
 	}
@@ -297,20 +296,17 @@ func TestProcessEvent(t *testing.T) {
 
 	for _, scenario := range testScenarios {
 		dependencyGraphBuilder := &GraphBuilder{
-			eventQueue: workqueue.NewTimedWorkQueue(),
+			graphChanges: workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter()),
 			uidToNode: &concurrentUIDToNode{
 				RWMutex:   &sync.RWMutex{},
 				uidToNode: make(map[types.UID]*node),
 			},
-			gc: &GarbageCollector{
-				dirtyQueue:       workqueue.NewTimedWorkQueue(),
-				clock:            clock.RealClock{},
-				absentOwnerCache: NewUIDCache(2),
-			},
+			attemptToDelete:  workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter()),
+			absentOwnerCache: NewUIDCache(2),
 		}
 		for i := 0; i < len(scenario.events); i++ {
-			dependencyGraphBuilder.eventQueue.Add(&workqueue.TimedWorkQueueItem{StartTime: dependencyGraphBuilder.gc.clock.Now(), Object: &scenario.events[i]})
-			dependencyGraphBuilder.processEvent()
+			dependencyGraphBuilder.graphChanges.Add(&scenario.events[i])
+			dependencyGraphBuilder.processGraphChanges()
 			verifyGraphInvariants(scenario.name, dependencyGraphBuilder.uidToNode.uidToNode, t)
 		}
 	}
@@ -333,9 +329,9 @@ func TestDependentsRace(t *testing.T) {
 		}
 	}()
 	go func() {
-		gc.orphanQueue.Add(&workqueue.TimedWorkQueueItem{StartTime: gc.clock.Now(), Object: owner})
+		gc.attemptToOrphan.Add(owner)
 		for i := 0; i < updates; i++ {
-			gc.orphanFinalizer()
+			gc.attemptToOrphanWorker()
 		}
 	}()
 }
@@ -351,7 +347,7 @@ func TestGCListWatcher(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	lw := gcListWatcher(client, podResource)
+	lw := listWatcher(client, podResource)
 	lw.Watch(v1.ListOptions{ResourceVersion: "1"})
 	lw.List(v1.ListOptions{ResourceVersion: "1"})
 	if e, a := 2, len(testHandler.actions); e != a {
@@ -376,7 +372,7 @@ func podToGCNode(pod *v1.Pod) *node {
 			},
 			Namespace: pod.Namespace,
 		},
-		// owners are intentionally left empty. The processItem routine should get the latest item from the server.
+		// owners are intentionally left empty. The attempToDeleteItem routine should get the latest item from the server.
 		owners: nil,
 	}
 }
@@ -450,12 +446,12 @@ func TestAbsentUIDCache(t *testing.T) {
 	defer srv.Close()
 	gc := setupGC(t, clientConfig)
 	gc.absentOwnerCache = NewUIDCache(2)
-	gc.processItem(podToGCNode(rc1Pod1))
-	gc.processItem(podToGCNode(rc2Pod1))
+	gc.attempToDeleteItem(podToGCNode(rc1Pod1))
+	gc.attempToDeleteItem(podToGCNode(rc2Pod1))
 	// rc1 should already be in the cache, no request should be sent. rc1 should be promoted in the UIDCache
-	gc.processItem(podToGCNode(rc1Pod2))
+	gc.attempToDeleteItem(podToGCNode(rc1Pod2))
 	// after this call, rc2 should be evicted from the UIDCache
-	gc.processItem(podToGCNode(rc3Pod1))
+	gc.attempToDeleteItem(podToGCNode(rc3Pod1))
 	// check cache
 	if !gc.absentOwnerCache.Has(types.UID("1")) {
 		t.Errorf("expected rc1 to be in the cache")

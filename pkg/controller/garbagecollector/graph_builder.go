@@ -68,7 +68,7 @@ type GraphBuilder struct {
 	// the in-memory graph according to the changes.
 	graphChanges workqueue.RateLimitingInterface
 	// uidToNode doesn't require a lock to protect, because only the
-	// single-threaded GraphBuilder.processEvent() reads/writes it.
+	// single-threaded GraphBuilder.processGraphChanges() reads/writes it.
 	uidToNode *concurrentUIDToNode
 	// GraphBuilder is the producer of attemptToDelete and attemptToOrphan, GC is the consumer.
 	attemptToDelete workqueue.RateLimitingInterface
@@ -394,13 +394,13 @@ func (gb *GraphBuilder) processTransitions(oldObj interface{}, newAccessor meta.
 	}
 }
 
-func (gb *GraphBuilder) runProcessEvent() {
-	for gb.processEvent() {
+func (gb *GraphBuilder) runProcessGraphChanges() {
+	for gb.processGraphChanges() {
 	}
 }
 
 // Dequeueing an event from graphChanges, updating graph, populating dirty_queue.
-func (gb *GraphBuilder) processEvent() bool {
+func (gb *GraphBuilder) processGraphChanges() bool {
 	item, quit := gb.graphChanges.Get()
 	if quit {
 		return false
