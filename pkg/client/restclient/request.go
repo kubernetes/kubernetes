@@ -23,12 +23,14 @@ import (
 	"io"
 	"io/ioutil"
 	"mime"
+	"net"
 	"net/http"
 	"net/url"
 	"path"
 	"reflect"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/golang/glog"
@@ -43,7 +45,7 @@ import (
 	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/runtime/serializer/streaming"
 	"k8s.io/kubernetes/pkg/util/flowcontrol"
-	"k8s.io/kubernetes/pkg/util/net"
+	utilnet "k8s.io/kubernetes/pkg/util/net"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/watch"
 	"k8s.io/kubernetes/pkg/watch/versioned"
@@ -669,7 +671,7 @@ func (r *Request) Watch() (watch.Interface, error) {
 	if err != nil {
 		// The watch stream mechanism handles many common partial data errors, so closed
 		// connections can be retried in many cases.
-		if net.IsProbableEOF(err) {
+		if utilnet.IsProbableEOF(err) {
 			return watch.NewEmptyWatch(), nil
 		}
 		return nil, err
@@ -811,7 +813,14 @@ func (r *Request) request(fn func(*http.Request, *http.Response)) error {
 			r.backoffMgr.UpdateBackoff(r.URL(), err, resp.StatusCode)
 		}
 		if err != nil {
-			return err
+			operr, ok := err.(*net.OpError)
+			if ok && operr.Err.Error() == syscall.ECONNRESET.Error() {
+				// "Connection reset by peer" is usually a transient error.
+				// Thus, if possible, we retry those errors.
+				// TODO: Set artificial Response to retry in a second.
+			} else {
+				return err
+			}
 		}
 
 		done := func() bool {
