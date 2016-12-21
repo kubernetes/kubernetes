@@ -58,6 +58,9 @@ func waitForPathToExistInternal(devicePath string, maxRetries int, deviceTranspo
 		if err != nil && !os.IsNotExist(err) {
 			return false
 		}
+		if i == maxRetries-1 {
+			break
+		}
 		time.Sleep(time.Second)
 	}
 	return false
