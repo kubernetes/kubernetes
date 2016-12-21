@@ -28,6 +28,11 @@ go_test(
         "util_test.go",
         "whitespace_test.go",
     ],
+    data = [
+        "mungedocs.go",
+        ":testdata",
+        "//docs:srcs",
+    ],
     library = ":go_default_library",
     tags = ["automanaged"],
     deps = ["//vendor:github.com/stretchr/testify/assert"],
@@ -49,4 +54,9 @@ go_library(
     ],
     tags = ["automanaged"],
     deps = ["//vendor:github.com/spf13/pflag"],
+)
+
+filegroup(
+    name = "testdata",
+    srcs = glob(["testdata/*"]),
 )
