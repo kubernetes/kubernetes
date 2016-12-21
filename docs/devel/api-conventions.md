@@ -28,6 +28,9 @@ resources](../user-guide/working-with-resources.md).*
     - [PATCH operations](#patch-operations)
       - [Strategic Merge Patch](#strategic-merge-patch)
     - [List Operations](#list-operations)
+      - [List of Scalars](#list-of-scalars)
+        - [Merging List of Scalars](#merging-list-of-scalars)
+      - [List of Maps](#list-of-maps)
     - [Map Operations](#map-operations)
   - [Idempotency](#idempotency)
   - [Optional vs. Required](#optional-vs-required)
@@ -562,6 +565,43 @@ first deduplicated and then merged.
 Strategic Merge Patch also supports special operations as listed below.
 
 ### List Operations
+
+#### List of Scalars
+
+We have two merge strategies for list of scalars: replace and merge. Default strategy is replace,
+which will preserve the order; while merge strategy works like an unordered set. We call a list
+using merge strategy a merging list.
+
+##### Merging List of Scalars
+
+To add items "a" and "b" in the finalizers list which is a merging list of strings, the patch is:
+
+```yaml
+finalizers:
+  - a
+  - b
+```
+
+To delete items "c" and "d" in a merging list, we use a parallel list.
+The key for the parallel list is "$deleteFromScalarList/\<keyOfScalarList\>".
+The patch is:
+
+```yaml
+$deleteFromScalarList/finalizers:
+  - c
+  - d
+```
+
+To replace "a" with "b" in a merging list, we combine a deletion and an addition. The patch is:
+
+```yaml
+$deleteFromScalarList/finalizers:
+  - a
+finalizers:
+  - b
+```
+
+#### List of Maps
 
 To override the container list to be strictly replaced, regardless of the
 default:
