@@ -21,7 +21,7 @@ import (
 	"k8s.io/kubernetes/federation/pkg/dnsprovider/providers/aws/route53/stubs"
 )
 
-// Compile time check for interface adeherence
+// Compile time check for interface adherence
 var _ dnsprovider.Interface = Interface{}
 
 type Interface struct {

@@ -115,7 +115,7 @@ func CreateKubeconfigSecret(clientset *client.Clientset, kubeconfig *clientcmdap
 		return nil, err
 	}
 
-	// Build the secret object with the minified and flattened
+	// Build the secret object with the minimized and flattened
 	// kubeconfig content.
 	secret := &api.Secret{
 		ObjectMeta: api.ObjectMeta{

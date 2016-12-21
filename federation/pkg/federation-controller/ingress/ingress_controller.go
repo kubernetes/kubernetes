@@ -67,16 +67,16 @@ var (
 
 type IngressController struct {
 	sync.Mutex // Lock used for leader election
-	// For triggering single ingress reconcilation. This is used when there is an
+	// For triggering single ingress reconciliation. This is used when there is an
 	// add/update/delete operation on an ingress in either federated API server or
 	// in some member of the federation.
 	ingressDeliverer *util.DelayingDeliverer
 
-	// For triggering reconcilation of cluster ingress controller configmap and
+	// For triggering reconciliation of cluster ingress controller configmap and
 	// all ingresses. This is used when a new cluster becomes available.
 	clusterDeliverer *util.DelayingDeliverer
 
-	// For triggering reconcilation of cluster ingress controller configmap.
+	// For triggering reconciliation of cluster ingress controller configmap.
 	// This is used when a configmap is updated in the cluster.
 	configMapDeliverer *util.DelayingDeliverer
 
@@ -208,7 +208,7 @@ func NewIngressController(client federationclientset.Interface) *IngressControll
 				},
 				&v1.ConfigMap{},
 				controller.NoResyncPeriodFunc(),
-				// Trigger reconcilation whenever the ingress controller's configmap in a federated cluster is changed. In most cases it
+				// Trigger reconciliation whenever the ingress controller's configmap in a federated cluster is changed. In most cases it
 				// would be just confirmation that the configmap for the ingress controller is correct.
 				util.NewTriggerOnAllChanges(
 					func(obj pkgruntime.Object) {
@@ -362,7 +362,7 @@ func (ic *IngressController) Run(stopChan <-chan struct{}) {
 		ic.ingressFederatedInformer.Stop()
 		glog.Infof("Stopping ConfigMap Federated Informer")
 		ic.configMapFederatedInformer.Stop()
-		glog.Infof("Stopoing ingress deliverer")
+		glog.Infof("Stopping ingress deliverer")
 		ic.ingressDeliverer.Stop()
 		glog.Infof("Stopping configmap deliverer")
 		ic.configMapDeliverer.Stop()
@@ -465,7 +465,7 @@ func (ic *IngressController) isSynced() bool {
 	return true
 }
 
-// The function triggers reconcilation of all federated ingresses.  clusterName is the name of the cluster that changed
+// The function triggers reconciliation of all federated ingresses.  clusterName is the name of the cluster that changed
 // but all ingresses in all clusters are reconciled
 func (ic *IngressController) reconcileIngressesOnClusterChange(clusterName string) {
 	glog.V(4).Infof("Reconciling ingresses on cluster change for cluster %q", clusterName)
