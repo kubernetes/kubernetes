@@ -18,10 +18,18 @@ package qos
 
 import (
 	"k8s.io/kubernetes/pkg/api"
+	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 )
 
 const (
+	// PodInfraOOMAdj is very docker specific. For arbitrary runtime, it may not make
+	// sense to set sandbox level oom score, e.g. a sandbox could only be a namespace
+	// without a process.
+	// TODO: Handle infra container oom score adj in a runtime agnostic way.
+	// TODO: Should handle critical pod oom score adj with a proper preemption priority.
+	// This is the workaround for https://github.com/kubernetes/kubernetes/issues/38322.
 	PodInfraOOMAdj        int = -998
+	CriticalPodOOMAdj     int = -998
 	KubeletOOMScoreAdj    int = -999
 	DockerOOMScoreAdj     int = -999
 	KubeProxyOOMScoreAdj  int = -999
@@ -36,6 +44,10 @@ const (
 // and 1000. Containers with higher OOM scores are killed if the system runs out of memory.
 // See https://lwn.net/Articles/391222/ for more information.
 func GetContainerOOMScoreAdjust(pod *api.Pod, container *api.Container, memoryCapacity int64) int {
+	if kubepod.IsCriticalPod(pod) {
+		return CriticalPodOOMAdj
+	}
+
 	switch GetPodQOS(pod) {
 	case Guaranteed:
 		// Guaranteed containers should be the last to get killed.

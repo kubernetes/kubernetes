@@ -22,6 +22,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
+	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 )
 
 const (
@@ -135,6 +136,25 @@ var (
 			},
 		},
 	}
+	criticalPodWithNoLimit = api.Pod{
+		ObjectMeta: api.ObjectMeta{
+			Annotations: map[string]string{
+				kubetypes.CriticalPodAnnotationKey: "",
+			},
+		},
+		Spec: api.PodSpec{
+			Containers: []api.Container{
+				{
+					Resources: api.ResourceRequirements{
+						Requests: api.ResourceList{
+							api.ResourceName(api.ResourceMemory): resource.MustParse(strconv.Itoa(standardMemoryAmount - 1)),
+							api.ResourceName(api.ResourceCPU):    resource.MustParse("5m"),
+						},
+					},
+				},
+			},
+		},
+	}
 )
 
 type oomTest struct {
@@ -187,6 +207,12 @@ func TestGetContainerOOMScoreAdjust(t *testing.T) {
 			memoryCapacity:  standardMemoryAmount,
 			lowOOMScoreAdj:  2,
 			highOOMScoreAdj: 2,
+		},
+		{
+			pod:             &criticalPodWithNoLimit,
+			memoryCapacity:  standardMemoryAmount,
+			lowOOMScoreAdj:  -998,
+			highOOMScoreAdj: -998,
 		},
 	}
 	for _, test := range oomTests {
