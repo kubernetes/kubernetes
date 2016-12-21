@@ -34,6 +34,7 @@ import (
 
 var sshOptions = flag.String("ssh-options", "", "Commandline options passed to ssh.")
 var sshEnv = flag.String("ssh-env", "", "Use predefined ssh options for environment.  Options: gce")
+var sshUser = flag.String("ssh-user", "", "Use predefined user for ssh.")
 var testTimeoutSeconds = flag.Int("test-timeout", 45*60, "How long (in seconds) to wait for ginkgo tests to complete.")
 var resultsDir = flag.String("results-dir", "/tmp/", "Directory to scp test results to.")
 var ginkgoFlags = flag.String("ginkgo-flags", "", "Passed to ginkgo to specify additional flags such as --skip=.")
@@ -66,10 +67,14 @@ func AddHostnameIp(hostname, ip string) {
 func GetHostnameOrIp(hostname string) string {
 	hostnameIpOverrides.RLock()
 	defer hostnameIpOverrides.RUnlock()
+	host := hostname
 	if ip, found := hostnameIpOverrides.m[hostname]; found {
-		return ip
+		host = ip
 	}
-	return hostname
+	if *sshUser != "" {
+		host = fmt.Sprintf("%s@%s", *sshUser, host)
+	}
+	return host
 }
 
 // CreateTestArchive builds the local source and creates a tar archive e2e_node_test.tar.gz containing

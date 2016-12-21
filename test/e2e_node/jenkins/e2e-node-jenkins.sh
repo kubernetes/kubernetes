@@ -34,8 +34,8 @@ WORKSPACE=${WORKSPACE:-"/tmp/"}
 ARTIFACTS=${WORKSPACE}/_artifacts
 
 mkdir -p ${ARTIFACTS}
-go run test/e2e_node/runner/run_e2e.go  --logtostderr --vmodule=*=2 --ssh-env="gce" \
-  --zone="$GCE_ZONE" --project="$GCE_PROJECT" --image-project="$GCE_IMAGE_PROJECT" \
-  --hosts="$GCE_HOSTS" --images="$GCE_IMAGES" --cleanup="$CLEANUP" \
-  --results-dir="$ARTIFACTS" --ginkgo-flags="$GINKGO_FLAGS" \
+go run test/e2e_node/runner/run_e2e.go  --logtostderr --vmodule=*=2 \
+  --ssh-env="gce" --ssh-user="$GCE_USER" --zone="$GCE_ZONE" --project="$GCE_PROJECT" \
+  --image-project="$GCE_IMAGE_PROJECT" --hosts="$GCE_HOSTS" --images="$GCE_IMAGES" \
+  --cleanup="$CLEANUP" --results-dir="$ARTIFACTS" --ginkgo-flags="$GINKGO_FLAGS" \
   --setup-node="$SETUP_NODE"
