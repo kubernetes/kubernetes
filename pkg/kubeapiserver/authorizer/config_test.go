@@ -18,9 +18,6 @@ package authorizer
 
 import (
 	"testing"
-
-	// needed to keep bazel happy
-	_ "k8s.io/kubernetes/pkg/auth/authorizer/abac"
 )
 
 // New has multiple return possibilities. This test

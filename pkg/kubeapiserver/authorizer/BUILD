@@ -11,9 +11,12 @@ load(
 go_test(
     name = "go_default_test",
     srcs = ["config_test.go"],
+    data = [
+        "//pkg/auth/authorizer/abac:example_policy",
+    ],
     library = "go_default_library",
     tags = ["automanaged"],
-    deps = ["//pkg/auth/authorizer/abac:go_default_library"],
+    deps = [],
 )
 
 go_library(
