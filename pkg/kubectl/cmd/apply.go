@@ -527,14 +527,11 @@ func (p *patcher) patchSimple(obj runtime.Object, modified []byte, source, names
 		return nil, cmdutil.AddSourceToErr(fmt.Sprintf("retrieving original configuration from:\n%v\nfor:", obj), source, err)
 	}
 
-	// Create the versioned struct from the original from the server for
-	// strategic patch.
-	// TODO: Move all structs in apply to use raw data. Can be done once
-	// builder has a RawResult method which delivers raw data instead of
-	// internal objects.
-	versionedObject, _, err := p.decoder.Decode(current, nil, nil)
+	// Create the versioned struct from the type defined in the restmapping
+	// (which is the API version we'll be submitting the patch to)
+	versionedObject, err := api.Scheme.New(p.mapping.GroupVersionKind)
 	if err != nil {
-		return nil, cmdutil.AddSourceToErr(fmt.Sprintf("converting encoded server-side object back to versioned struct:\n%v\nfor:", obj), source, err)
+		return nil, cmdutil.AddSourceToErr(fmt.Sprintf("getting instance of versioned object for %v:", p.mapping.GroupVersionKind), source, err)
 	}
 
 	// Compute a three way strategic merge patch to send to server.
