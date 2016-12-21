@@ -59,6 +59,16 @@ func podWithID(id, desiredHost string) *v1.Pod {
 	}
 }
 
+func deletingPod(id string) *v1.Pod {
+	deletionTimestamp := metav1.Now()
+	return &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: id, SelfLink: testapi.Default.SelfLink("pods", id), DeletionTimestamp: &deletionTimestamp},
+		Spec: v1.PodSpec{
+			NodeName: "",
+		},
+	}
+}
+
 func podWithPort(id, desiredHost string, port int) *v1.Pod {
 	pod := podWithID(id, desiredHost)
 	pod.Spec.Containers = []v1.Container{
@@ -122,6 +132,10 @@ func TestScheduler(t *testing.T) {
 			expectError:      errB,
 			expectErrorPod:   podWithID("foo", ""),
 			eventReason:      "FailedScheduling",
+		}, {
+			sendPod:     deletingPod("foo"),
+			algo:        mockScheduler{"", nil},
+			eventReason: "FailedScheduling",
 		},
 	}
 
