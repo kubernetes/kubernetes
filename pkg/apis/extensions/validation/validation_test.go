@@ -96,6 +96,118 @@ func TestValidateDaemonSetStatusUpdate(t *testing.T) {
 				},
 			},
 		},
+		"negative CurrentNumberScheduled": {
+			old: extensions.DaemonSet{
+				ObjectMeta: api.ObjectMeta{
+					Name:            "abc",
+					Namespace:       api.NamespaceDefault,
+					ResourceVersion: "10",
+				},
+				Status: extensions.DaemonSetStatus{
+					CurrentNumberScheduled: 1,
+					NumberMisscheduled:     2,
+					DesiredNumberScheduled: 3,
+					NumberReady:            1,
+				},
+			},
+			update: extensions.DaemonSet{
+				ObjectMeta: api.ObjectMeta{
+					Name:            "abc",
+					Namespace:       api.NamespaceDefault,
+					ResourceVersion: "10",
+				},
+				Status: extensions.DaemonSetStatus{
+					CurrentNumberScheduled: -1,
+					NumberMisscheduled:     1,
+					DesiredNumberScheduled: 3,
+					NumberReady:            1,
+				},
+			},
+		},
+		"negative NumberMisscheduled": {
+			old: extensions.DaemonSet{
+				ObjectMeta: api.ObjectMeta{
+					Name:            "abc",
+					Namespace:       api.NamespaceDefault,
+					ResourceVersion: "10",
+				},
+				Status: extensions.DaemonSetStatus{
+					CurrentNumberScheduled: 1,
+					NumberMisscheduled:     2,
+					DesiredNumberScheduled: 3,
+					NumberReady:            1,
+				},
+			},
+			update: extensions.DaemonSet{
+				ObjectMeta: api.ObjectMeta{
+					Name:            "abc",
+					Namespace:       api.NamespaceDefault,
+					ResourceVersion: "10",
+				},
+				Status: extensions.DaemonSetStatus{
+					CurrentNumberScheduled: 1,
+					NumberMisscheduled:     -1,
+					DesiredNumberScheduled: 3,
+					NumberReady:            1,
+				},
+			},
+		},
+		"negative DesiredNumberScheduled": {
+			old: extensions.DaemonSet{
+				ObjectMeta: api.ObjectMeta{
+					Name:            "abc",
+					Namespace:       api.NamespaceDefault,
+					ResourceVersion: "10",
+				},
+				Status: extensions.DaemonSetStatus{
+					CurrentNumberScheduled: 1,
+					NumberMisscheduled:     2,
+					DesiredNumberScheduled: 3,
+					NumberReady:            1,
+				},
+			},
+			update: extensions.DaemonSet{
+				ObjectMeta: api.ObjectMeta{
+					Name:            "abc",
+					Namespace:       api.NamespaceDefault,
+					ResourceVersion: "10",
+				},
+				Status: extensions.DaemonSetStatus{
+					CurrentNumberScheduled: 1,
+					NumberMisscheduled:     1,
+					DesiredNumberScheduled: -3,
+					NumberReady:            1,
+				},
+			},
+		},
+		"negative NumberReady": {
+			old: extensions.DaemonSet{
+				ObjectMeta: api.ObjectMeta{
+					Name:            "abc",
+					Namespace:       api.NamespaceDefault,
+					ResourceVersion: "10",
+				},
+				Status: extensions.DaemonSetStatus{
+					CurrentNumberScheduled: 1,
+					NumberMisscheduled:     2,
+					DesiredNumberScheduled: 3,
+					NumberReady:            1,
+				},
+			},
+			update: extensions.DaemonSet{
+				ObjectMeta: api.ObjectMeta{
+					Name:            "abc",
+					Namespace:       api.NamespaceDefault,
+					ResourceVersion: "10",
+				},
+				Status: extensions.DaemonSetStatus{
+					CurrentNumberScheduled: 1,
+					NumberMisscheduled:     1,
+					DesiredNumberScheduled: 3,
+					NumberReady:            -1,
+				},
+			},
+		},
 	}
 
 	for testName, errorCase := range errorCases {
