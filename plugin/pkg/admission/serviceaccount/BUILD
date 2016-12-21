@@ -24,6 +24,7 @@ go_library(
         "//pkg/client/cache:go_default_library",
         "//pkg/client/clientset_generated/internalclientset:go_default_library",
         "//pkg/fields:go_default_library",
+        "//pkg/kubeapiserver/admission:go_default_library",
         "//pkg/kubelet/types:go_default_library",
         "//pkg/runtime:go_default_library",
         "//pkg/runtime/schema:go_default_library",

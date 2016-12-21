@@ -404,7 +404,8 @@ func startServiceAccountTestServer(t *testing.T) (*clientset.Clientset, restclie
 	})
 
 	// Set up admission plugin to auto-assign serviceaccounts to pods
-	serviceAccountAdmission := serviceaccountadmission.NewServiceAccount(internalRootClientset)
+	serviceAccountAdmission := serviceaccountadmission.NewServiceAccount()
+	serviceAccountAdmission.SetInternalClientSet(internalRootClientset)
 
 	masterConfig := framework.NewMasterConfig()
 	masterConfig.GenericConfig.EnableIndex = true

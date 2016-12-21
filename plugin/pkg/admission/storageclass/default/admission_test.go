@@ -192,7 +192,8 @@ func TestAdmission(t *testing.T) {
 		}
 		claim := clone.(*api.PersistentVolumeClaim)
 
-		ctrl := newPlugin(nil)
+		ctrl := newPlugin()
+		ctrl.SetInternalClientSet(nil)
 		for _, c := range test.classes {
 			ctrl.store.Add(c)
 		}

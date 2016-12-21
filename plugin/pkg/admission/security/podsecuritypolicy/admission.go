@@ -31,7 +31,8 @@ import (
 	"k8s.io/kubernetes/pkg/auth/authorizer"
 	"k8s.io/kubernetes/pkg/auth/user"
 	"k8s.io/kubernetes/pkg/client/cache"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	kubeapiserveradmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
 	"k8s.io/kubernetes/pkg/runtime"
 	psp "k8s.io/kubernetes/pkg/security/podsecuritypolicy"
 	psputil "k8s.io/kubernetes/pkg/security/podsecuritypolicy/util"
@@ -47,9 +48,8 @@ const (
 )
 
 func init() {
-	admission.RegisterPlugin(PluginName, func(client clientset.Interface, config io.Reader) (admission.Interface, error) {
-		plugin := NewPlugin(client, psp.NewSimpleStrategyFactory(), getMatchingPolicies, true)
-		plugin.Run()
+	admission.RegisterPlugin(PluginName, func(config io.Reader) (admission.Interface, error) {
+		plugin := NewPlugin(psp.NewSimpleStrategyFactory(), getMatchingPolicies, true)
 		return plugin, nil
 	})
 }
@@ -60,7 +60,6 @@ type PSPMatchFn func(store cache.Store, user user.Info, sa user.Info, authz auth
 // podSecurityPolicyPlugin holds state for and implements the admission plugin.
 type podSecurityPolicyPlugin struct {
 	*admission.Handler
-	client           clientset.Interface
 	strategyFactory  psp.StrategyFactory
 	pspMatcher       PSPMatchFn
 	failOnNoPolicies bool
@@ -81,43 +80,50 @@ func (plugin *podSecurityPolicyPlugin) Validate() error {
 	if plugin.authz == nil {
 		return fmt.Errorf("%s requires an authorizer", PluginName)
 	}
+	if plugin.store == nil {
+		return fmt.Errorf("%s requires an client", PluginName)
+	}
+	if plugin.store == nil {
+		return fmt.Errorf("%s requires an client", PluginName)
+	}
 	return nil
 }
 
 var _ admission.Interface = &podSecurityPolicyPlugin{}
-var _ admission.WantsAuthorizer = &podSecurityPolicyPlugin{}
+var _ kubeapiserveradmission.WantsAuthorizer = &podSecurityPolicyPlugin{}
+var _ kubeapiserveradmission.WantsInternalClientSet = &podSecurityPolicyPlugin{}
 
 // NewPlugin creates a new PSP admission plugin.
-func NewPlugin(kclient clientset.Interface, strategyFactory psp.StrategyFactory, pspMatcher PSPMatchFn, failOnNoPolicies bool) *podSecurityPolicyPlugin {
-	store := cache.NewStore(cache.MetaNamespaceKeyFunc)
-	reflector := cache.NewReflector(
+func NewPlugin(strategyFactory psp.StrategyFactory, pspMatcher PSPMatchFn, failOnNoPolicies bool) *podSecurityPolicyPlugin {
+
+	return &podSecurityPolicyPlugin{
+		Handler:          admission.NewHandler(admission.Create, admission.Update),
+		strategyFactory:  strategyFactory,
+		pspMatcher:       pspMatcher,
+		failOnNoPolicies: failOnNoPolicies,
+	}
+}
+
+func (a *podSecurityPolicyPlugin) SetInternalClientSet(client internalclientset.Interface) {
+	a.store = cache.NewStore(cache.MetaNamespaceKeyFunc)
+	a.reflector = cache.NewReflector(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
 				internalOptions := api.ListOptions{}
 				v1.Convert_v1_ListOptions_To_api_ListOptions(&options, &internalOptions, nil)
-				return kclient.Extensions().PodSecurityPolicies().List(internalOptions)
+				return client.Extensions().PodSecurityPolicies().List(internalOptions)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
 				internalOptions := api.ListOptions{}
 				v1.Convert_v1_ListOptions_To_api_ListOptions(&options, &internalOptions, nil)
-				return kclient.Extensions().PodSecurityPolicies().Watch(internalOptions)
+				return client.Extensions().PodSecurityPolicies().Watch(internalOptions)
 			},
 		},
 		&extensions.PodSecurityPolicy{},
-		store,
+		a.store,
 		0,
 	)
-
-	return &podSecurityPolicyPlugin{
-		Handler:          admission.NewHandler(admission.Create, admission.Update),
-		client:           kclient,
-		strategyFactory:  strategyFactory,
-		pspMatcher:       pspMatcher,
-		failOnNoPolicies: failOnNoPolicies,
-
-		store:     store,
-		reflector: reflector,
-	}
+	a.Run()
 }
 
 func (a *podSecurityPolicyPlugin) Run() {

@@ -19,7 +19,6 @@ go_library(
         "//pkg/admission:go_default_library",
         "//pkg/api:go_default_library",
         "//pkg/apis/meta/v1:go_default_library",
-        "//pkg/client/clientset_generated/internalclientset:go_default_library",
         "//pkg/cloudprovider:go_default_library",
         "//pkg/cloudprovider/providers/aws:go_default_library",
         "//pkg/cloudprovider/providers/gce:go_default_library",
