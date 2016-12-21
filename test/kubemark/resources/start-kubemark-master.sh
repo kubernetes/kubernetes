@@ -141,7 +141,7 @@ function assemble-docker-flags {
 	# TODO(shyamjvs): Incorporate network plugin options, etc later.
 	echo "DOCKER_OPTS=\"${docker_opts}\"" > /etc/default/docker
 	echo "DOCKER_NOFILE=65536" >> /etc/default/docker  # For setting ulimit -n
-	systemd restart docker
+	systemctl restart docker
 }
 
 # A helper function for loading a docker image. It keeps trying up to 5 times.
@@ -224,6 +224,9 @@ function start-kubelet {
 	# Create systemd config.
 	local -r kubelet_bin="/usr/bin/kubelet"
 	create-kubelet-conf "${kubelet_bin}"
+
+	# Flush iptables nat table
+  	iptables -t nat -F || true
 
 	# Start the kubelet service.
 	systemctl start kubelet.service
