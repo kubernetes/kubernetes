@@ -31,7 +31,8 @@ some of which may be incompatible in subtle ways, so we recommend
 Kubernetes is written in the [Go](http://golang.org) programming language.
 To build Kubernetes without using Docker containers, you'll need a Go
 development environment. Builds for Kubernetes 1.0 - 1.2 require Go version
-1.4.2. Builds for Kubernetes 1.3 and higher require Go version 1.6.0. If you
+1.4.2. Builds for Kubernetes 1.3 and 1.4 require Go version 1.6.0. Builds for
+Kubernetes 1.5 and higher require Go version 1.7.0. If you
 haven't set up a Go development environment, please follow [these
 instructions](http://golang.org/doc/code.html) to install the go tools.
 
