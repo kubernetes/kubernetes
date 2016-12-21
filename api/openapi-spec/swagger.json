@@ -35210,6 +35210,11 @@
       "type": "integer",
       "format": "int64"
      },
+     "readyReplicas": {
+      "description": "Total number of ready pods targeted by this deployment.",
+      "type": "integer",
+      "format": "int32"
+     },
      "replicas": {
       "description": "Total number of non-terminated pods targeted by this deployment (their labels match the selector).",
       "type": "integer",
