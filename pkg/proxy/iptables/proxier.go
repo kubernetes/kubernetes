@@ -676,12 +676,17 @@ func (proxier *Proxier) OnEndpointsUpdate(allEndpoints []api.Endpoints) {
 	proxier.haveReceivedEndpointsUpdate = true
 
 	endpointsMap, hcUpdates, staleConnections := buildEndpointsMap(allEndpoints, proxier.hostname, proxier.endpointsMap)
-	proxier.endpointsMap = endpointsMap
 	for name, endpoints := range hcUpdates {
 		healthcheck.UpdateEndpoints(name, endpoints)
 	}
 
-	proxier.syncProxyRules()
+	if len(endpointsMap) != len(proxier.endpointsMap) || !reflect.DeepEqual(endpointsMap, proxier.endpointsMap) {
+		proxier.endpointsMap = endpointsMap
+		proxier.syncProxyRules()
+	} else {
+		glog.V(4).Infof("Skipping proxy iptables rule sync on endpoints update because nothing changed")
+	}
+
 	proxier.deleteEndpointConnections(staleConnections)
 }
 
