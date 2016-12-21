@@ -398,16 +398,16 @@ func (f *ring0Factory) Printer(mapping *meta.RESTMapping, options kubectl.PrintO
 	return kubectl.NewHumanReadablePrinter(options), nil
 }
 
-func (f *ring0Factory) Pauser(info *resource.Info) (bool, error) {
+func (f *ring0Factory) Pauser(info *resource.Info) ([]byte, error) {
 	switch obj := info.Object.(type) {
 	case *extensions.Deployment:
 		if obj.Spec.Paused {
-			return true, errors.New("is already paused")
+			return nil, errors.New("is already paused")
 		}
 		obj.Spec.Paused = true
-		return true, nil
+		return runtime.Encode(f.JSONEncoder(), info.Object)
 	default:
-		return false, fmt.Errorf("pausing is not supported")
+		return nil, fmt.Errorf("pausing is not supported")
 	}
 }
 
@@ -415,16 +415,16 @@ func (f *ring0Factory) ResolveImage(name string) (string, error) {
 	return name, nil
 }
 
-func (f *ring0Factory) Resumer(info *resource.Info) (bool, error) {
+func (f *ring0Factory) Resumer(info *resource.Info) ([]byte, error) {
 	switch obj := info.Object.(type) {
 	case *extensions.Deployment:
 		if !obj.Spec.Paused {
-			return true, errors.New("is not paused")
+			return nil, errors.New("is not paused")
 		}
 		obj.Spec.Paused = false
-		return true, nil
+		return runtime.Encode(f.JSONEncoder(), info.Object)
 	default:
-		return false, fmt.Errorf("resuming is not supported")
+		return nil, fmt.Errorf("resuming is not supported")
 	}
 }
 
