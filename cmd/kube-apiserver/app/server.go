@@ -49,7 +49,6 @@ import (
 	serviceaccountcontroller "k8s.io/kubernetes/pkg/controller/serviceaccount"
 	generatedopenapi "k8s.io/kubernetes/pkg/generated/openapi"
 	"k8s.io/kubernetes/pkg/genericapiserver"
-	"k8s.io/kubernetes/pkg/genericapiserver/authorizer"
 	"k8s.io/kubernetes/pkg/genericapiserver/filters"
 	"k8s.io/kubernetes/pkg/master"
 	"k8s.io/kubernetes/pkg/registry/cachesize"
@@ -261,7 +260,7 @@ func Run(s *options.ServerRunOptions) error {
 	sharedInformers := informers.NewSharedInformerFactory(nil, client, 10*time.Minute)
 
 	authorizationConfig := s.Authorization.ToAuthorizationConfig(sharedInformers)
-	apiAuthorizer, err := authorizer.NewAuthorizerFromAuthorizationConfig(authorizationConfig)
+	apiAuthorizer, err := authorizationConfig.New()
 	if err != nil {
 		return fmt.Errorf("invalid Authorization Config: %v", err)
 	}
