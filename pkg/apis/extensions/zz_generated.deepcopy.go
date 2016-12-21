@@ -224,6 +224,7 @@ func DeepCopy_extensions_DaemonSetStatus(in interface{}, out interface{}, c *con
 	{
 		in := in.(*DaemonSetStatus)
 		out := out.(*DaemonSetStatus)
+		out.ObservedGeneration = in.ObservedGeneration
 		out.CurrentNumberScheduled = in.CurrentNumberScheduled
 		out.NumberMisscheduled = in.NumberMisscheduled
 		out.DesiredNumberScheduled = in.DesiredNumberScheduled

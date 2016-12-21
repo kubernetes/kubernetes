@@ -362,6 +362,7 @@ func autoConvert_v1beta1_DaemonSetStatus_To_extensions_DaemonSetStatus(in *Daemo
 	out.NumberMisscheduled = in.NumberMisscheduled
 	out.DesiredNumberScheduled = in.DesiredNumberScheduled
 	out.NumberReady = in.NumberReady
+	out.ObservedGeneration = in.ObservedGeneration
 	return nil
 }
 
@@ -370,6 +371,7 @@ func Convert_v1beta1_DaemonSetStatus_To_extensions_DaemonSetStatus(in *DaemonSet
 }
 
 func autoConvert_extensions_DaemonSetStatus_To_v1beta1_DaemonSetStatus(in *extensions.DaemonSetStatus, out *DaemonSetStatus, s conversion.Scope) error {
+	out.ObservedGeneration = in.ObservedGeneration
 	out.CurrentNumberScheduled = in.CurrentNumberScheduled
 	out.NumberMisscheduled = in.NumberMisscheduled
 	out.DesiredNumberScheduled = in.DesiredNumberScheduled
