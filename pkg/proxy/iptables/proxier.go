@@ -588,18 +588,15 @@ func buildEndpointInfoList(endPoints []hostPortInfo, endpointIPs []string) []*en
 // healthcheck.UpdateEndpoints() is a silly API.
 type healthCheckMap map[types.NamespacedName]sets.String
 
-func addHealthCheckUpdate(hcMap healthCheckMap, name types.NamespacedName, hostPorts []hostPortInfo) {
+func addHealthCheckUpdate(hcMap healthCheckMap, name types.NamespacedName, isLocal bool) {
 	endpoints, ok := hcMap[name]
 	if !ok {
 		endpoints = sets.NewString()
 	}
 
-	// Use a set instead of a slice to provide deduplication
-	for _, portInfo := range hostPorts {
-		if portInfo.localEndpoint {
-			// kube-proxy health check only needs local endpoints
-			endpoints.Insert(fmt.Sprintf("%s/%s", name.Namespace, name.Name))
-		}
+	if isLocal {
+		// kube-proxy health check only needs local endpoints
+		endpoints.Insert(fmt.Sprintf("%s/%s", name.Namespace, name.Name))
 	}
 
 	hcMap[name] = endpoints
@@ -608,13 +605,13 @@ func addHealthCheckUpdate(hcMap healthCheckMap, name types.NamespacedName, hostP
 func buildEndpointsMap(allEndpoints []api.Endpoints, hostname string, oldEndpointsMap proxyEndpointsMap) (proxyEndpointsMap, healthCheckMap, map[endpointServicePair]bool) {
 	activeEndpoints := make(map[proxy.ServicePortName]bool) // use a map as a set
 	staleConnections := make(map[endpointServicePair]bool)
-	svcPortToInfoMap := make(map[proxy.ServicePortName][]hostPortInfo)
-	newEndpointsMap := make(map[proxy.ServicePortName][]*endpointsInfo)
+	newEndpointsMap := make(proxyEndpointsMap)
 	hcUpdates := make(healthCheckMap)
 
 	// Update endpoints for services.
 	for i := range allEndpoints {
 		svcEndpoints := &allEndpoints[i]
+		namespacedName := types.NamespacedName{Namespace: svcEndpoints.Namespace, Name: svcEndpoints.Name}
 
 		// We need to build a map of portname -> all ip:ports for that
 		// portname.  Explode Endpoints.Subsets[*] into this structure.
@@ -637,12 +634,12 @@ func buildEndpointsMap(allEndpoints []api.Endpoints, hostname string, oldEndpoin
 						localEndpoint: isLocalEndpoint,
 					}
 					portsToEndpoints[port.Name] = append(portsToEndpoints[port.Name], hostPortObject)
+					addHealthCheckUpdate(hcUpdates, namespacedName, isLocalEndpoint)
 				}
 			}
 		}
 		for portname, endpoints := range portsToEndpoints {
-			svcPort := proxy.ServicePortName{NamespacedName: types.NamespacedName{Namespace: svcEndpoints.Namespace, Name: svcEndpoints.Name}, Port: portname}
-			svcPortToInfoMap[svcPort] = endpoints
+			svcPort := proxy.ServicePortName{NamespacedName: namespacedName, Port: portname}
 			curEndpoints := oldEndpointsMap[svcPort]
 			newEndpoints := flattenValidEndpoints(endpoints)
 			// Flatten the list of current endpoint infos to just a list of ips as strings
@@ -658,7 +655,6 @@ func buildEndpointsMap(allEndpoints []api.Endpoints, hostname string, oldEndpoin
 			// Once the set operations using the list of ips are complete, build the list of endpoint infos
 			newEndpointsMap[svcPort] = buildEndpointInfoList(portsToEndpoints[portname], newEndpoints)
 			activeEndpoints[svcPort] = true
-			addHealthCheckUpdate(hcUpdates, svcPort.NamespacedName, endpoints)
 		}
 	}
 
@@ -670,7 +666,7 @@ func buildEndpointsMap(allEndpoints []api.Endpoints, hostname string, oldEndpoin
 			for _, ep := range oldEndpointsMap[svcPort] {
 				staleConnections[endpointServicePair{endpoint: ep.ip, servicePortName: svcPort}] = true
 			}
-			addHealthCheckUpdate(hcUpdates, svcPort.NamespacedName, svcPortToInfoMap[svcPort])
+			addHealthCheckUpdate(hcUpdates, svcPort.NamespacedName, false)
 		}
 	}
 
