@@ -325,8 +325,7 @@ func applyRequest(r *pb.Request, applyV2 etcdserver.ApplierV2) {
 		applyV2.Put(r)
 	case "DELETE":
 		applyV2.Delete(r)
-	//case "POST", "QGET", "SYNC":
-	case "POST", "GET", "SYNC":
+	case "POST", "QGET", "SYNC":
 		return
 	default:
 		glog.Fatal("unknown command")
