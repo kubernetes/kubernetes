@@ -41,7 +41,6 @@ go_library(
         "//pkg/controller/informers:go_default_library",
         "//pkg/generated/openapi:go_default_library",
         "//pkg/genericapiserver:go_default_library",
-        "//pkg/genericapiserver/authorizer:go_default_library",
         "//pkg/genericapiserver/filters:go_default_library",
         "//pkg/registry/batch/job/etcd:go_default_library",
         "//pkg/registry/cachesize:go_default_library",
