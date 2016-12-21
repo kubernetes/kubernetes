@@ -1849,7 +1849,7 @@ __EOF__
 
   # test invalid config
   kubectl config view | sed -E "s/apiVersion: .*/apiVersion: v-1/g" > "${TMPDIR:-/tmp}"/newconfig.yaml
-  output_message=$(! "${KUBE_OUTPUT_HOSTBIN}/kubectl" get pods --context="" --user="" --kubeconfig=/tmp/newconfig.yaml 2>&1)
+  output_message=$(! "${KUBE_OUTPUT_HOSTBIN}/kubectl" get pods --context="" --user="" --kubeconfig="${TMPDIR:-/tmp}"/newconfig.yaml 2>&1)
   kube::test::if_has_string "${output_message}" "Error loading config file"
 
   output_message=$(! kubectl get pod --kubeconfig=missing-config 2>&1)
