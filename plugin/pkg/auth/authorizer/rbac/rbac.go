@@ -18,6 +18,8 @@ limitations under the License.
 package rbac
 
 import (
+	"github.com/golang/glog"
+
 	"k8s.io/kubernetes/pkg/apis/rbac"
 	"k8s.io/kubernetes/pkg/apis/rbac/validation"
 	"k8s.io/kubernetes/pkg/auth/authorizer"
@@ -41,6 +43,9 @@ func (r *RBACAuthorizer) Authorize(requestAttributes authorizer.Attributes) (boo
 	if RulesAllow(requestAttributes, rules...) {
 		return true, "", nil
 	}
+
+	glog.V(2).Infof("RBAC DENY: user %q groups %v cannot %q on \"%v.%v/%v\"", requestAttributes.GetUser().GetName(), requestAttributes.GetUser().GetGroups(),
+		requestAttributes.GetVerb(), requestAttributes.GetResource(), requestAttributes.GetAPIGroup(), requestAttributes.GetSubresource())
 
 	return false, "", ruleResolutionError
 }
