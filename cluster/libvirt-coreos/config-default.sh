@@ -58,9 +58,16 @@ ENABLE_CLUSTER_DNS="${KUBE_ENABLE_CLUSTER_DNS:-true}"
 DNS_SERVER_IP="${SERVICE_CLUSTER_IP_RANGE%.*}.254"
 DNS_DOMAIN="cluster.local"
 
+# Optional: Install cluster registry
+ENABLE_CLUSTER_REGISTRY="${KUBE_ENABLE_CLUSTER_REGISTRY:-true}"
+
 # Optional: Enable DNS horizontal autoscaler
 ENABLE_DNS_HORIZONTAL_AUTOSCALER="${KUBE_ENABLE_DNS_HORIZONTAL_AUTOSCALER:-false}"
 
 #Generate dns files
 sed -f "${KUBE_ROOT}/cluster/addons/dns/transforms2sed.sed" < "${KUBE_ROOT}/cluster/addons/dns/kubedns-controller.yaml.base" | sed -f "${KUBE_ROOT}/cluster/libvirt-coreos/forShellEval.sed"  > "${KUBE_ROOT}/cluster/libvirt-coreos/kubedns-controller.yaml"
 sed -f "${KUBE_ROOT}/cluster/addons/dns/transforms2sed.sed" < "${KUBE_ROOT}/cluster/addons/dns/kubedns-svc.yaml.base" | sed -f "${KUBE_ROOT}/cluster/libvirt-coreos/forShellEval.sed"  > "${KUBE_ROOT}/cluster/libvirt-coreos/kubedns-svc.yaml"
+
+
+#Generate registry files
+sed -f "${KUBE_ROOT}/cluster/libvirt-coreos/forEmptyDirRegistry.sed" < "${KUBE_ROOT}/cluster/addons/registry/registry-rc.yaml"  > "${KUBE_ROOT}/cluster/libvirt-coreos/registry-rc.yaml"
