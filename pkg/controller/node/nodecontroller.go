@@ -521,7 +521,6 @@ func (nc *NodeController) monitorNodeStatus() error {
 							glog.Errorf("Unable to forcefully delete node %q: %v", nodeName, err)
 						}
 					}(node.Name)
-					continue
 				}
 			}
 		}
