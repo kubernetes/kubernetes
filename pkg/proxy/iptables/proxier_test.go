@@ -33,6 +33,7 @@ import (
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
 	iptablestest "k8s.io/kubernetes/pkg/util/iptables/testing"
 	"k8s.io/kubernetes/pkg/util/sets"
+	"k8s.io/kubernetes/pkg/util/slice"
 )
 
 func checkAllLines(t *testing.T, table utiliptables.Table, save []byte, expectedLines map[utiliptables.Chain]string) {
@@ -169,35 +170,46 @@ func TestGetChainLinesMultipleTables(t *testing.T) {
 	checkAllLines(t, utiliptables.TableNAT, []byte(iptables_save), expected)
 }
 
+// Tests whether two slices are equivalent.  This sorts both slices in-place.
+func slicesEquiv(lhs, rhs []string) bool {
+	if len(lhs) != len(rhs) {
+		return false
+	}
+	if reflect.DeepEqual(slice.SortStrings(lhs), slice.SortStrings(rhs)) {
+		return true
+	}
+	return false
+}
+
 func TestGetRemovedEndpoints(t *testing.T) {
 	testCases := []struct {
-		currentEndpoints []string
-		newEndpoints     []string
+		currentEndpoints endpointsInfoSlice
+		newEndpoints     endpointsInfoSlice
 		removedEndpoints []string
 	}{
 		{
-			currentEndpoints: []string{"10.0.2.1:80", "10.0.2.2:80"},
-			newEndpoints:     []string{"10.0.2.1:80", "10.0.2.2:80"},
+			currentEndpoints: endpointsInfoSlice{{ip: "10.0.2.1:80"}, {ip: "10.0.2.2:80"}},
+			newEndpoints:     endpointsInfoSlice{{ip: "10.0.2.1:80"}, {ip: "10.0.2.2:80"}},
 			removedEndpoints: []string{},
 		},
 		{
-			currentEndpoints: []string{"10.0.2.1:80", "10.0.2.2:80", "10.0.2.3:80"},
-			newEndpoints:     []string{"10.0.2.1:80", "10.0.2.2:80"},
+			currentEndpoints: endpointsInfoSlice{{ip: "10.0.2.1:80"}, {ip: "10.0.2.2:80"}, {ip: "10.0.2.3:80"}},
+			newEndpoints:     endpointsInfoSlice{{ip: "10.0.2.1:80"}, {ip: "10.0.2.2:80"}},
 			removedEndpoints: []string{"10.0.2.3:80"},
 		},
 		{
-			currentEndpoints: []string{},
-			newEndpoints:     []string{"10.0.2.1:80", "10.0.2.2:80"},
+			currentEndpoints: endpointsInfoSlice{},
+			newEndpoints:     endpointsInfoSlice{{ip: "10.0.2.1:80"}, {ip: "10.0.2.2:80"}},
 			removedEndpoints: []string{},
 		},
 		{
-			currentEndpoints: []string{"10.0.2.1:80", "10.0.2.2:80"},
-			newEndpoints:     []string{},
+			currentEndpoints: endpointsInfoSlice{{ip: "10.0.2.1:80"}, {ip: "10.0.2.2:80"}},
+			newEndpoints:     endpointsInfoSlice{},
 			removedEndpoints: []string{"10.0.2.1:80", "10.0.2.2:80"},
 		},
 		{
-			currentEndpoints: []string{"10.0.2.1:80", "10.0.2.2:80", "10.0.2.2:443"},
-			newEndpoints:     []string{"10.0.2.1:80", "10.0.2.2:80"},
+			currentEndpoints: endpointsInfoSlice{{ip: "10.0.2.1:80"}, {ip: "10.0.2.2:80"}, {ip: "10.0.2.2:443"}},
+			newEndpoints:     endpointsInfoSlice{{ip: "10.0.2.1:80"}, {ip: "10.0.2.2:80"}},
 			removedEndpoints: []string{"10.0.2.2:443"},
 		},
 	}
@@ -499,7 +511,7 @@ func NewFakeProxier(ipt utiliptables.Interface) *Proxier {
 		exec:                        &exec.FakeExec{},
 		serviceMap:                  make(map[proxy.ServicePortName]*serviceInfo),
 		iptables:                    ipt,
-		endpointsMap:                make(map[proxy.ServicePortName][]*endpointsInfo),
+		endpointsMap:                make(map[proxy.ServicePortName]endpointsInfoSlice),
 		clusterCIDR:                 "10.0.0.0/24",
 		haveReceivedEndpointsUpdate: true,
 		haveReceivedServiceUpdate:   true,

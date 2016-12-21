@@ -27,6 +27,7 @@ import (
 	"fmt"
 	"net"
 	"reflect"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -46,7 +47,6 @@ import (
 	"k8s.io/kubernetes/pkg/util/flowcontrol"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
 	"k8s.io/kubernetes/pkg/util/sets"
-	"k8s.io/kubernetes/pkg/util/slice"
 	utilsysctl "k8s.io/kubernetes/pkg/util/sysctl"
 	utilversion "k8s.io/kubernetes/pkg/util/version"
 )
@@ -156,6 +156,20 @@ func (e *endpointsInfo) String() string {
 	return fmt.Sprintf("%v", *e)
 }
 
+type endpointsInfoSlice []*endpointsInfo
+
+func (l endpointsInfoSlice) Len() int           { return len(l) }
+func (l endpointsInfoSlice) Less(i, j int) bool { return strings.Compare(l[i].ip, l[j].ip) < 0 }
+func (l endpointsInfoSlice) Swap(i, j int)      { l[i], l[j] = l[j], l[i] }
+
+func (l endpointsInfoSlice) Flatten() sets.String {
+	ips := sets.NewString()
+	for _, ep := range l {
+		ips.Insert(ep.ip)
+	}
+	return ips
+}
+
 // returns a new serviceInfo struct
 func newServiceInfo(service proxy.ServicePortName, port *api.ServicePort, spec *api.ServiceSpec, status *api.ServiceStatus) *serviceInfo {
 	return &serviceInfo{
@@ -173,7 +187,7 @@ func newServiceInfo(service proxy.ServicePortName, port *api.ServicePort, spec *
 }
 
 type proxyServiceMap map[proxy.ServicePortName]*serviceInfo
-type proxyEndpointsMap map[proxy.ServicePortName][]*endpointsInfo
+type proxyEndpointsMap map[proxy.ServicePortName]endpointsInfoSlice
 
 // Proxier is an iptables based proxy for connections between a localhost:lport
 // and services that provide the actual backends.
@@ -567,41 +581,6 @@ func (proxier *Proxier) OnServiceUpdate(allServices []api.Service) {
 	proxier.deleteServiceConnections(staleUDPServices.List())
 }
 
-// Generate a list of ip strings from the list of endpoint infos
-func flattenEndpointsInfo(endPoints []*endpointsInfo) []string {
-	var endpointIPs []string
-	for _, ep := range endPoints {
-		endpointIPs = append(endpointIPs, ep.ip)
-	}
-	return endpointIPs
-}
-
-// Reconstruct the list of endpoint infos from the endpointIP list
-// Use the slice of endpointIPs to rebuild a slice of corresponding {endpointIP, localEndpointOnly} infos
-// from the full []hostPortInfo slice.
-//
-// For e.g. if input is
-// endpoints =  []hostPortInfo{ {host="1.1.1.1", port=22, localEndpointOnly=<bool>}, {host="2.2.2.2", port=80, localEndpointOnly=<bool>} }
-// endpointIPs = []string{ "2.2.2.2:80" }
-//
-// then output will be
-//
-// []endpointsInfo{ {"2.2.2.2:80", localEndpointOnly=<bool>} }
-func buildEndpointInfoList(endPoints []hostPortInfo, endpointIPs []string) []*endpointsInfo {
-	lookupSet := sets.NewString()
-	for _, ip := range endpointIPs {
-		lookupSet.Insert(ip)
-	}
-	var filteredEndpoints []*endpointsInfo
-	for _, hpp := range endPoints {
-		key := net.JoinHostPort(hpp.host, strconv.Itoa(hpp.port))
-		if lookupSet.Has(key) {
-			filteredEndpoints = append(filteredEndpoints, &endpointsInfo{ip: key, localEndpoint: hpp.localEndpoint})
-		}
-	}
-	return filteredEndpoints
-}
-
 // Map of namespaced names (eg, service namespace/name) of a service to either
 // an empty set, or a set container exactly the same namespaced service name as
 // a string when the service has local endpoints.  We need this later because
@@ -618,6 +597,22 @@ func addHcUpdate(updateMap hcUpdateMap, name types.NamespacedName, isLocal bool)
 		// kube-proxy health check only needs local endpoints
 		set.Insert(fmt.Sprintf("%s/%s", name.Namespace, name.Name))
 	}
+}
+
+func addEndpointToMap(endpointsMap map[string]endpointsInfoSlice, ip string, port *api.EndpointPort, isLocal bool) {
+	// Only add the hostport if the address is valid,
+	// but keep track of port names with invalid addresses
+	// so we can clean them up later
+	endpoints := endpointsMap[port.Name]
+	if ip != "" && port.Port > 0 {
+		endpoints = append(endpoints, &endpointsInfo{
+			ip:            net.JoinHostPort(ip, strconv.Itoa(int(port.Port))),
+			localEndpoint: isLocal,
+		})
+	} else {
+		glog.Warningf("got invalid endpoint: %s/%d %v", ip, port.Port, isLocal)
+	}
+	endpointsMap[port.Name] = endpoints
 }
 
 func buildEndpointsMap(allEndpoints []api.Endpoints, hostname string, oldEndpointsMap proxyEndpointsMap) (proxyEndpointsMap, hcUpdateMap, map[endpointServicePair]bool) {
@@ -637,7 +632,7 @@ func buildEndpointsMap(allEndpoints []api.Endpoints, hostname string, oldEndpoin
 
 		// We need to build a map of portname -> all ip:ports for that
 		// portname.  Explode Endpoints.Subsets[*] into this structure.
-		portsToEndpoints := map[string][]hostPortInfo{}
+		portsToEndpoints := map[string]endpointsInfoSlice{}
 		for i := range svcEndpoints.Subsets {
 			ss := &svcEndpoints.Subsets[i]
 			for i := range ss.Ports {
@@ -650,31 +645,23 @@ func buildEndpointsMap(allEndpoints []api.Endpoints, hostname string, oldEndpoin
 						isLocalEndpoint = *addr.NodeName == hostname
 						isLocalEndpoint = featuregate.DefaultFeatureGate.ExternalTrafficLocalOnly() && isLocalEndpoint
 					}
-					hostPortObject := hostPortInfo{
-						host:          addr.IP,
-						port:          int(port.Port),
-						localEndpoint: isLocalEndpoint,
-					}
-					portsToEndpoints[port.Name] = append(portsToEndpoints[port.Name], hostPortObject)
+					addEndpointToMap(portsToEndpoints, addr.IP, port, isLocalEndpoint)
 					addHcUpdate(hcUpdates, namespacedName, isLocalEndpoint)
 				}
 			}
 		}
-		for portname, endpoints := range portsToEndpoints {
+		for portname, newEndpoints := range portsToEndpoints {
 			svcPort := proxy.ServicePortName{NamespacedName: namespacedName, Port: portname}
 			curEndpoints := newEndpointsMap[svcPort]
-			newEndpoints := flattenValidEndpoints(endpoints)
-			// Flatten the list of current endpoint infos to just a list of ips as strings
-			curEndpointIPs := flattenEndpointsInfo(curEndpoints)
-			if len(curEndpointIPs) != len(newEndpoints) || !slicesEquiv(slice.CopyStrings(curEndpointIPs), newEndpoints) {
-				removedEndpoints := getRemovedEndpoints(curEndpointIPs, newEndpoints)
+			sort.Sort(newEndpoints)
+			if len(curEndpoints) != len(newEndpoints) || !reflect.DeepEqual(curEndpoints, newEndpoints) {
+				removedEndpoints := getRemovedEndpoints(curEndpoints, newEndpoints)
 				for _, ep := range removedEndpoints {
 					staleConnections[endpointServicePair{endpoint: ep, servicePortName: svcPort}] = true
 				}
-				glog.V(3).Infof("Setting endpoints for %q to %+v", svcPort, newEndpoints)
-				// Once the set operations using the list of ips are complete, build the list of endpoint infos
-				newEndpointsMap[svcPort] = buildEndpointInfoList(endpoints, newEndpoints)
 			}
+			glog.V(3).Infof("Setting endpoints for %q to %+v", svcPort, newEndpoints)
+			newEndpointsMap[svcPort] = newEndpoints
 			activeEndpoints[svcPort] = true
 		}
 	}
@@ -718,42 +705,6 @@ func (proxier *Proxier) OnEndpointsUpdate(allEndpoints []api.Endpoints) {
 	proxier.deleteEndpointConnections(staleConnections)
 }
 
-// used in OnEndpointsUpdate
-type hostPortInfo struct {
-	host          string
-	port          int
-	localEndpoint bool
-}
-
-func isValidEndpoint(hpp *hostPortInfo) bool {
-	return hpp.host != "" && hpp.port > 0
-}
-
-// Tests whether two slices are equivalent.  This sorts both slices in-place.
-func slicesEquiv(lhs, rhs []string) bool {
-	if len(lhs) != len(rhs) {
-		return false
-	}
-	if reflect.DeepEqual(slice.SortStrings(lhs), slice.SortStrings(rhs)) {
-		return true
-	}
-	return false
-}
-
-func flattenValidEndpoints(endpoints []hostPortInfo) []string {
-	// Convert Endpoint objects into strings for easier use later.
-	var result []string
-	for i := range endpoints {
-		hpp := &endpoints[i]
-		if isValidEndpoint(hpp) {
-			result = append(result, net.JoinHostPort(hpp.host, strconv.Itoa(hpp.port)))
-		} else {
-			glog.Warningf("got invalid endpoint: %+v", *hpp)
-		}
-	}
-	return result
-}
-
 // portProtoHash takes the ServicePortName and protocol for a service
 // returns the associated 16 character hash. This is computed by hashing (sha256)
 // then encoding to base32 and truncating to 16 chars. We do this because IPTables
@@ -795,8 +746,8 @@ func servicePortEndpointChainName(s proxy.ServicePortName, protocol string, endp
 }
 
 // getRemovedEndpoints returns the endpoint IPs that are missing in the new endpoints
-func getRemovedEndpoints(curEndpoints, newEndpoints []string) []string {
-	return sets.NewString(curEndpoints...).Difference(sets.NewString(newEndpoints...)).List()
+func getRemovedEndpoints(curEndpoints, newEndpoints endpointsInfoSlice) []string {
+	return curEndpoints.Flatten().Difference(newEndpoints.Flatten()).List()
 }
 
 type endpointServicePair struct {
@@ -1223,7 +1174,7 @@ func (proxier *Proxier) syncProxyRules() {
 		// Generate the per-endpoint chains.  We do this in multiple passes so we
 		// can group rules together.
 		// These two slices parallel each other - keep in sync
-		endpoints := make([]*endpointsInfo, 0)
+		endpoints := make(endpointsInfoSlice, 0)
 		endpointChains := make([]utiliptables.Chain, 0)
 		for _, ep := range proxier.endpointsMap[svcName] {
 			endpoints = append(endpoints, ep)
@@ -1295,7 +1246,7 @@ func (proxier *Proxier) syncProxyRules() {
 
 		// Now write ingress loadbalancing & DNAT rules only for services that have a localOnly annotation
 		// TODO - This logic may be combinable with the block above that creates the svc balancer chain
-		localEndpoints := make([]*endpointsInfo, 0)
+		localEndpoints := make(endpointsInfoSlice, 0)
 		localEndpointChains := make([]utiliptables.Chain, 0)
 		for i := range endpointChains {
 			if endpoints[i].localEndpoint {

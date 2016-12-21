@@ -25,7 +25,6 @@ go_library(
         "//pkg/util/flowcontrol:go_default_library",
         "//pkg/util/iptables:go_default_library",
         "//pkg/util/sets:go_default_library",
-        "//pkg/util/slice:go_default_library",
         "//pkg/util/sysctl:go_default_library",
         "//pkg/util/version:go_default_library",
         "//vendor:github.com/davecgh/go-spew/spew",
@@ -48,5 +47,6 @@ go_test(
         "//pkg/util/iptables:go_default_library",
         "//pkg/util/iptables/testing:go_default_library",
         "//pkg/util/sets:go_default_library",
+        "//pkg/util/slice:go_default_library",
     ],
 )
