@@ -101,7 +101,7 @@ message StatefulSetSpec {
 
 // StatefulSetStatus represents the current state of a StatefulSet.
 message StatefulSetStatus {
-  // most recent generation observed by this autoscaler.
+  // most recent generation observed by this StatefulSet.
   // +optional
   optional int64 observedGeneration = 1;
 

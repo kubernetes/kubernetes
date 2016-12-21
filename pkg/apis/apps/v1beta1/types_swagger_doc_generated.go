@@ -60,7 +60,7 @@ func (StatefulSetSpec) SwaggerDoc() map[string]string {
 
 var map_StatefulSetStatus = map[string]string{
 	"":                   "StatefulSetStatus represents the current state of a StatefulSet.",
-	"observedGeneration": "most recent generation observed by this autoscaler.",
+	"observedGeneration": "most recent generation observed by this StatefulSet.",
 	"replicas":           "Replicas is the number of actual replicas.",
 }
 

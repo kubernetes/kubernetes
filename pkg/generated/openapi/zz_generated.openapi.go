@@ -12127,7 +12127,7 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 				Properties: map[string]spec.Schema{
 					"observedGeneration": {
 						SchemaProps: spec.SchemaProps{
-							Description: "most recent generation observed by this autoscaler.",
+							Description: "most recent generation observed by this StatefulSet.",
 							Type:        []string{"integer"},
 							Format:      "int64",
 						},
