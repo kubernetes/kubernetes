@@ -1260,8 +1260,8 @@ func TestBuildEndpointsMap(t *testing.T) {
 		},
 	}
 
-	expectedHCUpdateMap := map[types.NamespacedName]sets.String{
-		name1: {
+	expectedHCUpdates := hcUpdateMap{
+		name1: sets.String{
 			"somewhere/some-endpoint": sets.Empty{},
 		},
 		name2: {
@@ -1286,12 +1286,8 @@ func TestBuildEndpointsMap(t *testing.T) {
 		}
 	}
 
-	hcUpdateMap := make(map[types.NamespacedName]sets.String)
-	for _, hc := range hcUpdates {
-		hcUpdateMap[hc.name] = getHealthCheckEntries(hc.name, hc.endpoints)
-	}
-	if !reflect.DeepEqual(hcUpdateMap, expectedHCUpdateMap) {
-		t.Errorf("expected healthcheck updates %v but got %v", expectedHCUpdateMap, hcUpdateMap)
+	if !reflect.DeepEqual(hcUpdates, expectedHCUpdates) {
+		t.Errorf("expected healthcheck updates %v but got %v", expectedHCUpdates, hcUpdates)
 	}
 
 	if len(staleConnections) != 0 {
@@ -1318,8 +1314,8 @@ func TestBuildEndpointsMap(t *testing.T) {
 		},
 	}
 
-	expectedHCUpdateMap = map[types.NamespacedName]sets.String{
-		name1: {
+	expectedHCUpdates = hcUpdateMap{
+		name1: sets.String{
 			"somewhere/some-endpoint": sets.Empty{},
 		},
 		name2: {},
@@ -1350,12 +1346,8 @@ func TestBuildEndpointsMap(t *testing.T) {
 		}
 	}
 
-	hcUpdateMap = make(map[types.NamespacedName]sets.String)
-	for _, hc := range hcUpdates {
-		hcUpdateMap[hc.name] = getHealthCheckEntries(hc.name, hc.endpoints)
-	}
-	if !reflect.DeepEqual(hcUpdateMap, expectedHCUpdateMap) {
-		t.Errorf("expected healthcheck updates %v but got %v", expectedHCUpdateMap, hcUpdateMap)
+	if !reflect.DeepEqual(hcUpdates, expectedHCUpdates) {
+		t.Errorf("expected healthcheck updates %v but got %v", expectedHCUpdates, hcUpdates)
 	}
 
 	if !reflect.DeepEqual(staleConnections, expectedStaleConnections) {
@@ -1384,8 +1376,8 @@ func TestBuildEndpointsMapInvalidEndpoints(t *testing.T) {
 
 	name1 := types.NamespacedName{Namespace: "somewhere", Name: "some-endpoint"}
 	name2 := types.NamespacedName{Namespace: "somewhere", Name: "another-endpoint"}
-	expectedHCUpdateMap := map[types.NamespacedName]sets.String{
-		name1: {
+	expectedHCUpdates := hcUpdateMap{
+		name1: sets.String{
 			"somewhere/some-endpoint": sets.Empty{},
 		},
 		name2: {
@@ -1410,12 +1402,8 @@ func TestBuildEndpointsMapInvalidEndpoints(t *testing.T) {
 		}
 	}
 
-	hcUpdateMap := make(map[types.NamespacedName]sets.String)
-	for _, hc := range hcUpdates {
-		hcUpdateMap[hc.name] = getHealthCheckEntries(hc.name, hc.endpoints)
-	}
-	if !reflect.DeepEqual(hcUpdateMap, expectedHCUpdateMap) {
-		t.Errorf("expected healthcheck updates %v but got %v", expectedHCUpdateMap, hcUpdateMap)
+	if !reflect.DeepEqual(hcUpdates, expectedHCUpdates) {
+		t.Errorf("expected healthcheck updates %v but got %v", expectedHCUpdates, hcUpdates)
 	}
 
 	if len(staleConnections) != 0 {
