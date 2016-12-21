@@ -128,34 +128,22 @@ func (e ShortcutExpander) AliasesForResource(resource string) ([]string, bool) {
 	return []string{expanded}, (expanded != resource)
 }
 
-// resourceShortcuts represents a structure that holds the information how to
-// transition from resource's shortcut to its full name.
-type resourceShortcuts struct {
-	shortForm schema.GroupResource
-	longForm  schema.GroupResource
-}
-
 // getShortcutMappings returns a hardcoded set of tuples.
 // First the list of potential resources will be taken from the instance variable
 // which holds the anticipated result of the discovery API.
 // Next we will fall back to the hardcoded list of resources.
 // Note that the list is ordered by group priority.
 // TODO: Wire this to discovery API.
-func (e ShortcutExpander) getShortcutMappings() ([]resourceShortcuts, error) {
-	res := []resourceShortcuts{
+func (e ShortcutExpander) getShortcutMappings() ([]kubectl.ResourceShortcuts, error) {
+	res := []kubectl.ResourceShortcuts{
 		{
-			shortForm: schema.GroupResource{Group: "storage.k8s.io", Resource: "sc"},
-			longForm:  schema.GroupResource{Group: "storage.k8s.io", Resource: "storageclasses"},
+			ShortForm: schema.GroupResource{Group: "storage.k8s.io", Resource: "sc"},
+			LongForm:  schema.GroupResource{Group: "storage.k8s.io", Resource: "storageclasses"},
 		},
 	}
 
 	// append hardcoded short forms at the end of the list
-	for short, long := range kubectl.ShortForms {
-		res = append(res, resourceShortcuts{
-			shortForm: schema.GroupResource{Resource: short},
-			longForm:  schema.GroupResource{Resource: long},
-		})
-	}
+	res = append(res, kubectl.ResourcesShortcutStatic...)
 	return res, nil
 }
 
@@ -166,11 +154,11 @@ func (e ShortcutExpander) expandResourceShortcut(resource schema.GroupVersionRes
 	// get the shortcut mappings and return on first match.
 	if resources, err := e.getShortcutMappings(); err == nil {
 		for _, item := range resources {
-			if len(resource.Group) != 0 && resource.Group != item.shortForm.Group {
+			if len(resource.Group) != 0 && resource.Group != item.ShortForm.Group {
 				continue
 			}
-			if resource.Resource == item.shortForm.Resource {
-				resource.Resource = item.longForm.Resource
+			if resource.Resource == item.ShortForm.Resource {
+				resource.Resource = item.LongForm.Resource
 				return resource
 			}
 		}
