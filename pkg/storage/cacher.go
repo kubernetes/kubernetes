@@ -859,10 +859,19 @@ func (c *cacheWatcher) sendWatchCacheEvent(event *watchCacheEvent) {
 	case !curObjPasses && oldObjPasses:
 		watchEvent = watch.Event{Type: watch.Deleted, Object: object}
 	}
+
+	// We don't want to block on c.result if c.done is already closed.
+	//
+	// TODO: This doesn't protect with the situation when c.result is
+	// already full and we are handing on it and in the meantime c.done
+	// is being closed and noone will clear the result channel.
+	// However, we can't heve select of two cases, as this may lead to
+	// delivering random part of events after c.done is closed but we
+	// are still sending them for a moment.
 	select {
-	case c.result <- watchEvent:
-	// don't block on c.result if c.done is closed
 	case <-c.done:
+	default:
+		c.result <- watchEvent
 	}
 }
 
