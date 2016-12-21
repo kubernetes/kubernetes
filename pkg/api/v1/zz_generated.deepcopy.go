@@ -2858,6 +2858,7 @@ func DeepCopy_v1_QuobyteVolumeSource(in interface{}, out interface{}, c *convers
 		out.ReadOnly = in.ReadOnly
 		out.User = in.User
 		out.Group = in.Group
+		out.TenantID = in.TenantID
 		return nil
 	}
 }

@@ -7851,11 +7851,15 @@
      },
      "user": {
       "type": "string",
-      "description": "User to map volume access to Defaults to serivceaccount user"
+      "description": "User to map volume access to Defaults to root"
      },
      "group": {
       "type": "string",
-      "description": "Group to map volume access to Default is no group"
+      "description": "Group to map volume access to Default is nfsnobody"
+     },
+     "tenantid": {
+      "type": "string",
+      "description": "TenantID to map volume access to Default is no \"DEFAULT\""
      }
     }
    },

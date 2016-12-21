@@ -53,6 +53,7 @@ func addDefaultingFuncs(scheme *runtime.Scheme) error {
 		SetDefaults_ConfigMap,
 		SetDefaults_RBDVolumeSource,
 		SetDefaults_ResourceList,
+		SetDefaults_QuobyteVolumeSource,
 	)
 }
 
@@ -348,5 +349,19 @@ func SetDefaults_RBDVolumeSource(obj *RBDVolumeSource) {
 	}
 	if obj.Keyring == "" {
 		obj.Keyring = "/etc/ceph/keyring"
+	}
+}
+
+func SetDefaults_QuobyteVolumeSource(source *QuobyteVolumeSource) {
+	if source.User == "" {
+		source.User = "root"
+	}
+
+	if source.Group == "" {
+		source.Group = "nfsnobody"
+	}
+
+	if source.TenantID == "" {
+		source.TenantID = "DEFAULT"
 	}
 }

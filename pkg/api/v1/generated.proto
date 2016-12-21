@@ -2710,14 +2710,19 @@ message QuobyteVolumeSource {
   optional bool readOnly = 3;
 
   // User to map volume access to
-  // Defaults to serivceaccount user
+  // Defaults to root
   // +optional
   optional string user = 4;
 
   // Group to map volume access to
-  // Default is no group
+  // Default is nfsnobody
   // +optional
   optional string group = 5;
+
+  // TenantID to map volume access to
+  // Default is no "DEFAULT"
+  // +optional
+  optional string tenantid = 6;
 }
 
 // Represents a Rados Block Device mount that lasts the lifetime of a pod.

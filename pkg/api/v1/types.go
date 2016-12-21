@@ -824,14 +824,19 @@ type QuobyteVolumeSource struct {
 	ReadOnly bool `json:"readOnly,omitempty" protobuf:"varint,3,opt,name=readOnly"`
 
 	// User to map volume access to
-	// Defaults to serivceaccount user
+	// Defaults to root
 	// +optional
 	User string `json:"user,omitempty" protobuf:"bytes,4,opt,name=user"`
 
 	// Group to map volume access to
-	// Default is no group
+	// Default is nfsnobody
 	// +optional
 	Group string `json:"group,omitempty" protobuf:"bytes,5,opt,name=group"`
+
+	// TenantID to map volume access to
+	// Default is no "DEFAULT"
+	// +optional
+	TenantID string `json:"tenantid,omitempty" protobuf:"bytes,6,opt,name=tenantid"`
 }
 
 // FlexVolume represents a generic volume resource that is

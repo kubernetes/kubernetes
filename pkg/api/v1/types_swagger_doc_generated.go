@@ -1387,8 +1387,9 @@ var map_QuobyteVolumeSource = map[string]string{
 	"registry": "Registry represents a single or multiple Quobyte Registry services specified as a string as host:port pair (multiple entries are separated with commas) which acts as the central registry for volumes",
 	"volume":   "Volume is a string that references an already created Quobyte volume by name.",
 	"readOnly": "ReadOnly here will force the Quobyte volume to be mounted with read-only permissions. Defaults to false.",
-	"user":     "User to map volume access to Defaults to serivceaccount user",
-	"group":    "Group to map volume access to Default is no group",
+	"user":     "User to map volume access to Defaults to root",
+	"group":    "Group to map volume access to Default is nfsnobody",
+	"tenantid": "TenantID to map volume access to Default is no \"DEFAULT\"",
 }
 
 func (QuobyteVolumeSource) SwaggerDoc() map[string]string {
