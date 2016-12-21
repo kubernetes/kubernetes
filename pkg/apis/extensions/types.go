@@ -459,6 +459,10 @@ const (
 
 // DaemonSetStatus represents the current status of a daemon set.
 type DaemonSetStatus struct {
+	// ObservedGeneration is the most recent generation observed by the daemon set controller.
+	// +optional
+	ObservedGeneration int64
+
 	// CurrentNumberScheduled is the number of nodes that are running at least 1
 	// daemon pod and are supposed to run the daemon pod.
 	CurrentNumberScheduled int32
