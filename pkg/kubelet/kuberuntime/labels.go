@@ -22,6 +22,7 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api/v1"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
@@ -92,8 +93,17 @@ func newPodLabels(pod *v1.Pod) map[string]string {
 }
 
 // newPodAnnotations creates pod annotations from v1.Pod.
-func newPodAnnotations(pod *v1.Pod) map[string]string {
-	return pod.Annotations
+func newPodAnnotations(pod *v1.Pod, seccompProfileRoot string) map[string]string {
+	annotations := map[string]string{}
+
+	// get annotations from v1.Pod
+	for k, v := range pod.Annotations {
+		annotations[k] = v
+	}
+
+	annotations[runtimeapi.SeccompPathAnnotationKey] = seccompProfileRoot
+
+	return annotations
 }
 
 // newContainerLabels creates container labels from v1.Container and v1.Pod.

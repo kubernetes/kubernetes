@@ -69,6 +69,7 @@ type podGetter interface {
 
 type kubeGenericRuntimeManager struct {
 	runtimeName         string
+	seccompProfileRoot  string
 	recorder            record.EventRecorder
 	osInterface         kubecontainer.OSInterface
 	containerRefManager *kubecontainer.RefManager
@@ -117,6 +118,7 @@ type KubeGenericRuntime interface {
 // NewKubeGenericRuntimeManager creates a new kubeGenericRuntimeManager
 func NewKubeGenericRuntimeManager(
 	recorder record.EventRecorder,
+	seccompProfileRoot string,
 	livenessManager proberesults.Manager,
 	containerRefManager *kubecontainer.RefManager,
 	machineInfo *cadvisorapi.MachineInfo,
@@ -138,6 +140,7 @@ func NewKubeGenericRuntimeManager(
 		cpuCFSQuota:         cpuCFSQuota,
 		livenessManager:     livenessManager,
 		containerRefManager: containerRefManager,
+		seccompProfileRoot:  seccompProfileRoot,
 		machineInfo:         machineInfo,
 		osInterface:         osInterface,
 		networkPlugin:       networkPlugin,
