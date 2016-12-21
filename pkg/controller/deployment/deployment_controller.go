@@ -73,6 +73,8 @@ type DeploymentController struct {
 
 	// To allow injection of syncDeployment for testing.
 	syncHandler func(dKey string) error
+	// used for unit testing
+	enqueueDeployment func(deployment *extensions.Deployment)
 
 	// A store of deployments, populated by the dController
 	dLister *cache.StoreToDeploymentLister
@@ -134,6 +136,8 @@ func NewDeploymentController(dInformer informers.DeploymentInformer, rsInformer 
 	})
 
 	dc.syncHandler = dc.syncDeployment
+	dc.enqueueDeployment = dc.enqueue
+
 	dc.dLister = dInformer.Lister()
 	dc.rsLister = rsInformer.Lister()
 	dc.podLister = podInformer.Lister()
@@ -343,7 +347,7 @@ func (dc *DeploymentController) deletePod(obj interface{}) {
 	}
 }
 
-func (dc *DeploymentController) enqueueDeployment(deployment *extensions.Deployment) {
+func (dc *DeploymentController) enqueue(deployment *extensions.Deployment) {
 	key, err := controller.KeyFunc(deployment)
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("Couldn't get key for object %#v: %v", deployment, err))
