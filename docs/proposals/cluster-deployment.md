@@ -47,7 +47,7 @@ ship with all of the requirements for the node specification by default.
 8. Create node machines
 9. Install docker on all machines
 
-**Exit critera**:
+**Exit criteria**:
 
 1. Can ```ssh``` to all machines and run a test docker image
 2. Can ```ssh``` to master and nodes and ping other machines
@@ -104,7 +104,7 @@ Each node can be deployed separately and the implementation should make it ~impo
 1. kubelet config file - we will read kubelet configuration file from disk instead of apiserver; it will
 be generated locally and copied to all nodes.
 
-**Exit critera**:
+**Exit criteria**:
 
 1. All nodes are registered, but not ready due to lack of kubernetes networking.
 
