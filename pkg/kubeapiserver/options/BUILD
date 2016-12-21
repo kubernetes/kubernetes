@@ -9,14 +9,11 @@ load(
 
 go_library(
     name = "go_default_library",
-    srcs = [
-        "options.go",
-        "validation.go",
-    ],
+    srcs = ["authorization.go"],
     tags = ["automanaged"],
     deps = [
-        "//pkg/genericapiserver/options:go_default_library",
-        "//pkg/kubeapiserver/options:go_default_library",
+        "//pkg/controller/informers:go_default_library",
+        "//pkg/kubeapiserver/authorizer:go_default_library",
         "//vendor:github.com/spf13/pflag",
     ],
 )

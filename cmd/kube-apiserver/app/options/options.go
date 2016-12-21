@@ -24,6 +24,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/validation"
 	genericoptions "k8s.io/kubernetes/pkg/genericapiserver/options"
+	kubeoptions "k8s.io/kubernetes/pkg/kubeapiserver/options"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/master/ports"
 	utilnet "k8s.io/kubernetes/pkg/util/net"
@@ -41,7 +42,7 @@ type ServerRunOptions struct {
 	SecureServing           *genericoptions.SecureServingOptions
 	InsecureServing         *genericoptions.ServingOptions
 	Authentication          *genericoptions.BuiltInAuthenticationOptions
-	Authorization           *genericoptions.BuiltInAuthorizationOptions
+	Authorization           *kubeoptions.BuiltInAuthorizationOptions
 
 	AllowPrivileged           bool
 	EventTTL                  time.Duration
@@ -63,7 +64,7 @@ func NewServerRunOptions() *ServerRunOptions {
 		SecureServing:   genericoptions.NewSecureServingOptions(),
 		InsecureServing: genericoptions.NewInsecureServingOptions(),
 		Authentication:  genericoptions.NewBuiltInAuthenticationOptions().WithAll(),
-		Authorization:   genericoptions.NewBuiltInAuthorizationOptions(),
+		Authorization:   kubeoptions.NewBuiltInAuthorizationOptions(),
 
 		EventTTL:    1 * time.Hour,
 		MasterCount: 1,

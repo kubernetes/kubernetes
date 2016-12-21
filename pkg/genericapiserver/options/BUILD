@@ -29,7 +29,6 @@ go_library(
         "//pkg/client/restclient:go_default_library",
         "//pkg/client/unversioned/clientcmd:go_default_library",
         "//pkg/cloudprovider:go_default_library",
-        "//pkg/controller/informers:go_default_library",
         "//pkg/genericapiserver/authorizer:go_default_library",
         "//pkg/runtime/schema:go_default_library",
         "//pkg/storage/storagebackend:go_default_library",
