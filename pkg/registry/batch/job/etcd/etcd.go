@@ -27,6 +27,21 @@ import (
 	"k8s.io/kubernetes/pkg/runtime"
 )
 
+// JobStorage includes dummy storage for Job.
+type JobStorage struct {
+	Job    *REST
+	Status *StatusREST
+}
+
+func NewStorage(optsGetter generic.RESTOptionsGetter) JobStorage {
+	jobRest, jobStatusRest := NewREST(optsGetter)
+
+	return JobStorage{
+		Job:    jobRest,
+		Status: jobStatusRest,
+	}
+}
+
 // REST implements a RESTStorage for jobs against etcd
 type REST struct {
 	*genericregistry.Store
