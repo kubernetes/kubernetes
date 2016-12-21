@@ -41,6 +41,7 @@ go_library(
         "//pkg/generated/openapi:go_default_library",
         "//pkg/genericapiserver:go_default_library",
         "//pkg/genericapiserver/filters:go_default_library",
+        "//pkg/kubeapiserver/admission:go_default_library",
         "//pkg/registry/batch/job/etcd:go_default_library",
         "//pkg/registry/cachesize:go_default_library",
         "//pkg/registry/core/configmap/etcd:go_default_library",

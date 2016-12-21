@@ -29,7 +29,8 @@ import (
 	"k8s.io/kubernetes/pkg/apis/storage"
 	storageutil "k8s.io/kubernetes/pkg/apis/storage/util"
 	"k8s.io/kubernetes/pkg/client/cache"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	kubeapiserveradmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/watch"
 )
@@ -39,9 +40,8 @@ const (
 )
 
 func init() {
-	admission.RegisterPlugin(PluginName, func(client clientset.Interface, config io.Reader) (admission.Interface, error) {
-		plugin := newPlugin(client)
-		plugin.Run()
+	admission.RegisterPlugin(PluginName, func(config io.Reader) (admission.Interface, error) {
+		plugin := newPlugin()
 		return plugin, nil
 	})
 }
@@ -49,7 +49,7 @@ func init() {
 // claimDefaulterPlugin holds state for and implements the admission plugin.
 type claimDefaulterPlugin struct {
 	*admission.Handler
-	client clientset.Interface
+	client internalclientset.Interface
 
 	reflector *cache.Reflector
 	stopChan  chan struct{}
@@ -57,34 +57,53 @@ type claimDefaulterPlugin struct {
 }
 
 var _ admission.Interface = &claimDefaulterPlugin{}
+var _ = kubeapiserveradmission.WantsInternalClientSet(&claimDefaulterPlugin{})
 
 // newPlugin creates a new admission plugin.
-func newPlugin(kclient clientset.Interface) *claimDefaulterPlugin {
-	store := cache.NewStore(cache.MetaNamespaceKeyFunc)
-	reflector := cache.NewReflector(
+func newPlugin() *claimDefaulterPlugin {
+	return &claimDefaulterPlugin{
+		Handler: admission.NewHandler(admission.Create),
+	}
+}
+
+func (a *claimDefaulterPlugin) SetInternalClientSet(client internalclientset.Interface) {
+	a.client = client
+	a.store = cache.NewStore(cache.MetaNamespaceKeyFunc)
+	a.reflector = cache.NewReflector(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
 				internalOptions := api.ListOptions{}
 				v1.Convert_v1_ListOptions_To_api_ListOptions(&options, &internalOptions, nil)
-				return kclient.Storage().StorageClasses().List(internalOptions)
+				return client.Storage().StorageClasses().List(internalOptions)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
 				internalOptions := api.ListOptions{}
 				v1.Convert_v1_ListOptions_To_api_ListOptions(&options, &internalOptions, nil)
-				return kclient.Storage().StorageClasses().Watch(internalOptions)
+				return client.Storage().StorageClasses().Watch(internalOptions)
 			},
 		},
 		&storage.StorageClass{},
-		store,
+		a.store,
 		0,
 	)
 
-	return &claimDefaulterPlugin{
-		Handler:   admission.NewHandler(admission.Create),
-		client:    kclient,
-		store:     store,
-		reflector: reflector,
+	if client != nil {
+		a.Run()
 	}
+}
+
+// Validate ensures an authorizer is set.
+func (a *claimDefaulterPlugin) Validate() error {
+	if a.client == nil {
+		return fmt.Errorf("missing client")
+	}
+	if a.reflector == nil {
+		return fmt.Errorf("missing reflector")
+	}
+	if a.store == nil {
+		return fmt.Errorf("missing store")
+	}
+	return nil
 }
 
 func (a *claimDefaulterPlugin) Run() {

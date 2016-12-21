@@ -21,6 +21,7 @@ go_library(
         "//pkg/apis/storage/util:go_default_library",
         "//pkg/client/cache:go_default_library",
         "//pkg/client/clientset_generated/internalclientset:go_default_library",
+        "//pkg/kubeapiserver/admission:go_default_library",
         "//pkg/runtime:go_default_library",
         "//pkg/watch:go_default_library",
         "//vendor:github.com/golang/glog",
