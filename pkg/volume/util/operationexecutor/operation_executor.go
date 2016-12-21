@@ -108,6 +108,9 @@ type OperationExecutor interface {
 	// IsOperationPending returns true if an operation for the given volumeName and podName is pending,
 	// otherwise it returns false
 	IsOperationPending(volumeName v1.UniqueVolumeName, podName volumetypes.UniquePodName) bool
+
+	// GetNestedPendingOperations returns the pending operations held by the operation executor
+	GetNestedPendingOperations() nestedpendingoperations.NestedPendingOperations
 }
 
 // NewOperationExecutor returns a new instance of OperationExecutor.
@@ -467,6 +470,10 @@ func (oe *operationExecutor) VerifyControllerAttachedVolume(
 
 	return oe.pendingOperations.Run(
 		volumeToMount.VolumeName, "" /* podName */, verifyControllerAttachedVolumeFunc)
+}
+
+func (oe *operationExecutor) GetNestedPendingOperations() nestedpendingoperations.NestedPendingOperations {
+	return oe.pendingOperations
 }
 
 // TODO: this is a workaround for the unmount device issue caused by gci mounter.

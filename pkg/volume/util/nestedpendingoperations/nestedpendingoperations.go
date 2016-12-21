@@ -65,6 +65,9 @@ type NestedPendingOperations interface {
 	// IsOperationPending returns true if an operation for the given volumeName and podName is pending,
 	// otherwise it returns false
 	IsOperationPending(volumeName v1.UniqueVolumeName, podName types.UniquePodName) bool
+
+	// GetOperations returns the list of operations
+	GetOperations() []operation
 }
 
 // NewNestedPendingOperations returns a new instance of NestedPendingOperations.
@@ -152,6 +155,10 @@ func (grm *nestedPendingOperations) IsOperationPending(
 		return true
 	}
 	return false
+}
+
+func (grm *nestedPendingOperations) GetOperations() []operation {
+	return grm.operations
 }
 
 // This is an internal function and caller should acquire and release the lock
