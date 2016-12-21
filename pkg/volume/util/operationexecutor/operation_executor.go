@@ -108,6 +108,9 @@ type OperationExecutor interface {
 	// IsOperationPending returns true if an operation for the given volumeName and podName is pending,
 	// otherwise it returns false
 	IsOperationPending(volumeName v1.UniqueVolumeName, podName volumetypes.UniquePodName) bool
+
+	// GetNestedPendingOperations returns the pending operations held by the operation executor
+	GetNestedPendingOperations() nestedpendingoperations.NestedPendingOperations
 }
 
 // NewOperationExecutor returns a new instance of OperationExecutor.
@@ -117,7 +120,7 @@ func NewOperationExecutor(
 	return &operationExecutor{
 		pendingOperations: nestedpendingoperations.NewNestedPendingOperations(
 			true /* exponentialBackOffOnError */),
-		opertaionGenerator: operationGenerator,
+		operationGenerator: operationGenerator,
 	}
 }
 
@@ -354,7 +357,7 @@ type operationExecutor struct {
 
 	// operationGenerator is an interface that provides implementations for
 	// generating volume function
-	opertaionGenerator OperationGenerator
+	operationGenerator OperationGenerator
 }
 
 func (oe *operationExecutor) IsOperationPending(volumeName v1.UniqueVolumeName, podName volumetypes.UniquePodName) bool {
@@ -365,7 +368,7 @@ func (oe *operationExecutor) AttachVolume(
 	volumeToAttach VolumeToAttach,
 	actualStateOfWorld ActualStateOfWorldAttacherUpdater) error {
 	attachFunc, err :=
-		oe.opertaionGenerator.GenerateAttachVolumeFunc(volumeToAttach, actualStateOfWorld)
+		oe.operationGenerator.GenerateAttachVolumeFunc(volumeToAttach, actualStateOfWorld)
 	if err != nil {
 		return err
 	}
@@ -379,7 +382,7 @@ func (oe *operationExecutor) DetachVolume(
 	verifySafeToDetach bool,
 	actualStateOfWorld ActualStateOfWorldAttacherUpdater) error {
 	detachFunc, err :=
-		oe.opertaionGenerator.GenerateDetachVolumeFunc(volumeToDetach, verifySafeToDetach, actualStateOfWorld)
+		oe.operationGenerator.GenerateDetachVolumeFunc(volumeToDetach, verifySafeToDetach, actualStateOfWorld)
 	if err != nil {
 		return err
 	}
@@ -393,7 +396,7 @@ func (oe *operationExecutor) VerifyVolumesAreAttached(
 	nodeName types.NodeName,
 	actualStateOfWorld ActualStateOfWorldAttacherUpdater) error {
 	volumesAreAttachedFunc, err :=
-		oe.opertaionGenerator.GenerateVolumesAreAttachedFunc(attachedVolumes, nodeName, actualStateOfWorld)
+		oe.operationGenerator.GenerateVolumesAreAttachedFunc(attachedVolumes, nodeName, actualStateOfWorld)
 	if err != nil {
 		return err
 	}
@@ -405,7 +408,7 @@ func (oe *operationExecutor) MountVolume(
 	waitForAttachTimeout time.Duration,
 	volumeToMount VolumeToMount,
 	actualStateOfWorld ActualStateOfWorldMounterUpdater) error {
-	mountFunc, err := oe.opertaionGenerator.GenerateMountVolumeFunc(
+	mountFunc, err := oe.operationGenerator.GenerateMountVolumeFunc(
 		waitForAttachTimeout, volumeToMount, actualStateOfWorld)
 	if err != nil {
 		return err
@@ -428,7 +431,7 @@ func (oe *operationExecutor) UnmountVolume(
 	actualStateOfWorld ActualStateOfWorldMounterUpdater) error {
 
 	unmountFunc, err :=
-		oe.opertaionGenerator.GenerateUnmountVolumeFunc(volumeToUnmount, actualStateOfWorld)
+		oe.operationGenerator.GenerateUnmountVolumeFunc(volumeToUnmount, actualStateOfWorld)
 	if err != nil {
 		return err
 	}
@@ -446,7 +449,7 @@ func (oe *operationExecutor) UnmountDevice(
 	actualStateOfWorld ActualStateOfWorldMounterUpdater,
 	mounter mount.Interface) error {
 	unmountDeviceFunc, err :=
-		oe.opertaionGenerator.GenerateUnmountDeviceFunc(deviceToDetach, actualStateOfWorld, mounter)
+		oe.operationGenerator.GenerateUnmountDeviceFunc(deviceToDetach, actualStateOfWorld, mounter)
 	if err != nil {
 		return err
 	}
@@ -460,13 +463,17 @@ func (oe *operationExecutor) VerifyControllerAttachedVolume(
 	nodeName types.NodeName,
 	actualStateOfWorld ActualStateOfWorldAttacherUpdater) error {
 	verifyControllerAttachedVolumeFunc, err :=
-		oe.opertaionGenerator.GenerateVerifyControllerAttachedVolumeFunc(volumeToMount, nodeName, actualStateOfWorld)
+		oe.operationGenerator.GenerateVerifyControllerAttachedVolumeFunc(volumeToMount, nodeName, actualStateOfWorld)
 	if err != nil {
 		return err
 	}
 
 	return oe.pendingOperations.Run(
 		volumeToMount.VolumeName, "" /* podName */, verifyControllerAttachedVolumeFunc)
+}
+
+func (oe *operationExecutor) GetNestedPendingOperations() nestedpendingoperations.NestedPendingOperations {
+	return oe.pendingOperations
 }
 
 // TODO: this is a workaround for the unmount device issue caused by gci mounter.

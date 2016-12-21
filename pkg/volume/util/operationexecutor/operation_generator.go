@@ -68,19 +68,25 @@ func NewOperationGenerator(kubeClient clientset.Interface,
 
 // OperationGenerator interface that extracts out the functions from operation_executor to make it dependency injectable
 type OperationGenerator interface {
-	// Generates the MountVolume function needed to perform the mount of a volume
+	// Generates the MountVolume function needed to perform the mount of a volume plugin
 	GenerateMountVolumeFunc(waitForAttachTimeout time.Duration, volumeToMount VolumeToMount, actualStateOfWorldMounterUpdater ActualStateOfWorldMounterUpdater) (func() error, error)
-	// Generates the UnmountVolume function needed to perform the unmount of a volume
+
+	// Generates the UnmountVolume function needed to perform the unmount of a volume plugin
 	GenerateUnmountVolumeFunc(volumeToUnmount MountedVolume, actualStateOfWorld ActualStateOfWorldMounterUpdater) (func() error, error)
-	// Generates the AttachVolume function needed to perform attach of a volume
+
+	// Generates the AttachVolume function needed to perform attach of a volume plugin
 	GenerateAttachVolumeFunc(volumeToAttach VolumeToAttach, actualStateOfWorld ActualStateOfWorldAttacherUpdater) (func() error, error)
-	// Generates the DetachVolume function needed to perform the detach of a volume
+
+	// Generates the DetachVolume function needed to perform the detach of a volume plugin
 	GenerateDetachVolumeFunc(volumeToDetach AttachedVolume, verifySafeToDetach bool, actualStateOfWorld ActualStateOfWorldAttacherUpdater) (func() error, error)
-	// Generates the VolumesAreAttached function needed to verify if volumes are attached
+
+	// Generates the VolumesAreAttached function needed to verify if volume plugins are attached
 	GenerateVolumesAreAttachedFunc(attachedVolumes []AttachedVolume, nodeName types.NodeName, actualStateOfWorld ActualStateOfWorldAttacherUpdater) (func() error, error)
+
 	// Generates the UnMountDevice function needed to perform the unmount of a device
 	GenerateUnmountDeviceFunc(deviceToDetach AttachedVolume, actualStateOfWorld ActualStateOfWorldMounterUpdater, mounter mount.Interface) (func() error, error)
-	// Generates the VerifyControllerAttachedVolume function needed to check for controller attached volume
+
+	// Generates the function needed to check if the attach_detach controller has attached the volume plugin
 	GenerateVerifyControllerAttachedVolumeFunc(volumeToMount VolumeToMount, nodeName types.NodeName, actualStateOfWorld ActualStateOfWorldAttacherUpdater) (func() error, error)
 }
 
