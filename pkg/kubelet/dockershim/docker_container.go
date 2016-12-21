@@ -208,6 +208,23 @@ func (ds *dockerService) createContainerLogSymlink(containerID string) error {
 	return nil
 }
 
+// isContainerExist checks if container exist by container ID (including sandbox container).
+func (ds *dockerService) isContainerExist(containerID string) (bool, error) {
+	opts := dockertypes.ContainerListOptions{All: true}
+
+	opts.Filter = dockerfilters.NewArgs()
+	f := newDockerFilter(&opts.Filter)
+
+	f.Add("id", containerID)
+
+	containers, err := ds.client.ListContainers(opts)
+	if err != nil {
+		return false, err
+	}
+
+	return len(containers) != 0, nil
+}
+
 // removeContainerLogSymlink removes the symlink for docker container log.
 func (ds *dockerService) removeContainerLogSymlink(containerID string) error {
 	path, _, err := ds.getContainerLogPath(containerID)
@@ -249,10 +266,18 @@ func (ds *dockerService) StopContainer(containerID string, timeout int64) error 
 // RemoveContainer removes the container.
 // TODO: If a container is still running, should we forcibly remove it?
 func (ds *dockerService) RemoveContainer(containerID string) error {
+	exist, err := ds.isContainerExist(containerID)
+	if err != nil {
+		return err
+	}
+	// no-op if container has already been removed.
+	if !exist {
+		return nil
+	}
 	// Ideally, log lifecycle should be independent of container lifecycle.
 	// However, docker will remove container log after container is removed,
 	// we can't prevent that now, so we also clean up the symlink here.
-	err := ds.removeContainerLogSymlink(containerID)
+	err = ds.removeContainerLogSymlink(containerID)
 	if err != nil {
 		return err
 	}
