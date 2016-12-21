@@ -38,7 +38,7 @@ import (
 type PauseConfig struct {
 	resource.FilenameOptions
 
-	Pauser  func(info *resource.Info) (bool, error)
+	Pauser  func(info *resource.Info) ([]byte, error)
 	Mapper  meta.RESTMapper
 	Typer   runtime.ObjectTyper
 	Encoder runtime.Encoder
