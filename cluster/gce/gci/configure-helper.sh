@@ -329,7 +329,8 @@ kind: Config
 users:
 - name: kubelet
   user:
-    token: ${KUBELET_TOKEN}
+    client-certificate-data: ${KUBELET_CERT}
+    client-key-data: ${KUBELET_KEY}
 clusters:
 - name: local
   cluster:
@@ -352,9 +353,9 @@ function create-master-kubelet-auth {
   # set in the environment.
   if [[ -n "${KUBELET_APISERVER:-}" && -n "${KUBELET_CERT:-}" && -n "${KUBELET_KEY:-}" ]]; then
     REGISTER_MASTER_KUBELET="true"
+    create-kubelet-kubeconfig
   fi
   
-  create-kubelet-kubeconfig
 }
 
 function create-kubeproxy-kubeconfig {
@@ -392,8 +393,8 @@ users:
 clusters:
 - name: local
   cluster:
-    certificate-authority-data: ${CA_CERT}
-    server: https://${MASTER_ADVERTISE_ADDRESS}:443
+    insecure-skip-tls-verify: true
+    server: https://localhost:443
 contexts:
 - context:
     cluster: local
@@ -1279,6 +1280,9 @@ if [[ -n "${KUBE_USER:-}" ]]; then
     exit 1
   fi
 fi
+
+# generate the controller manager token here since its only used on the master.
+KUBE_CONTROLLER_MANAGER_TOKEN=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)
 
 setup-os-params
 config-ip-firewall

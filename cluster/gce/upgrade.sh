@@ -226,7 +226,6 @@ function prepare-node-upgrade() {
 
   # Get required node env vars from exiting template.
   local node_env=$(get-node-env)
-  KUBE_CONTROLLER_MANAGER_TOKEN=$(get-env-val "${node_env}" "KUBE_CONTROLLER_MANAGER_TOKEN")
   KUBELET_TOKEN=$(get-env-val "${node_env}" "KUBELET_TOKEN")
   KUBE_PROXY_TOKEN=$(get-env-val "${node_env}" "KUBE_PROXY_TOKEN")
   CA_CERT_BASE64=$(get-env-val "${node_env}" "CA_CERT")
