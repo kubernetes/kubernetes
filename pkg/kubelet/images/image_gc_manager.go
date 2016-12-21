@@ -44,7 +44,7 @@ type ImageGCManager interface {
 	GarbageCollect() error
 
 	// Start async garbage collection of images.
-	Start() error
+	Start()
 
 	GetImageList() ([]kubecontainer.Image, error)
 
@@ -152,7 +152,7 @@ func NewImageGCManager(runtime container.Runtime, cadvisorInterface cadvisor.Int
 	return im, nil
 }
 
-func (im *realImageGCManager) Start() error {
+func (im *realImageGCManager) Start() {
 	go wait.Until(func() {
 		// Initial detection make detected time "unknown" in the past.
 		var ts time.Time
@@ -178,7 +178,6 @@ func (im *realImageGCManager) Start() error {
 		}
 	}, 30*time.Second, wait.NeverStop)
 
-	return nil
 }
 
 // Get a list of images on this node
