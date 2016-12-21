@@ -337,7 +337,7 @@ func (f *federatedInformerImpl) GetUnreadyClusters() ([]*federationapi.Cluster, 
 	return result, nil
 }
 
-// GetReadyClusers returns all clusters for which the sub-informers are run.
+// GetReadyClusters returns all clusters for which the sub-informers are run.
 func (f *federatedInformerImpl) GetReadyClusters() ([]*federationapi.Cluster, error) {
 	f.Lock()
 	defer f.Unlock()

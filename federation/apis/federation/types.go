@@ -125,7 +125,7 @@ type ClusterList struct {
 
 // A set of preferences that can be added to federated version of ReplicaSet as a json-serialized annotation.
 // The preferences allow the user to express in which culsters he wants to put his replicas within the
-// mentiond FederatedReplicaSet.
+// mentioned FederatedReplicaSet.
 type FederatedReplicaSetPreferences struct {
 	// If set to true then already scheduled and running replicas may be moved to other clusters to
 	// in order to bring cluster replicasets towards a desired state. Otherwise, if set to false,

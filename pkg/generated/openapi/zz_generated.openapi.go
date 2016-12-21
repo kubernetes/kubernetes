@@ -9782,7 +9782,7 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 	"v1beta1.ClusterStatus": {
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "ClusterStatus is information about the current status of a cluster updated by cluster controller peridocally.",
+				Description: "ClusterStatus is information about the current status of a cluster updated by cluster controller periodically.",
 				Properties: map[string]spec.Schema{
 					"conditions": {
 						SchemaProps: spec.SchemaProps{

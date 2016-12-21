@@ -63,7 +63,7 @@ func NewPlanner(preferences *fedapi.FederatedReplicaSetPreferences) *Planner {
 // Two maps are returned:
 // * a map that contains information how many replicas will be possible to run in a cluster.
 // * a map that contains information how many extra replicas would be nice to schedule in a cluster so,
-//   if by chance, they are scheudled we will be closer to the desired replicas layout.
+//   if by chance, they are scheduled we will be closer to the desired replicas layout.
 func (p *Planner) Plan(replicasToDistribute int64, availableClusters []string, currentReplicaCount map[string]int64,
 	estimatedCapacity map[string]int64, replicaSetKey string) (map[string]int64, map[string]int64) {
 
