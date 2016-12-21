@@ -26,6 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/v1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	clientcache "k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/labels"
@@ -54,6 +55,16 @@ func podWithID(id, desiredHost string) *v1.Pod {
 		ObjectMeta: v1.ObjectMeta{Name: id, SelfLink: testapi.Default.SelfLink("pods", id)},
 		Spec: v1.PodSpec{
 			NodeName: desiredHost,
+		},
+	}
+}
+
+func deletingPod(id string) *v1.Pod {
+	deletionTimestamp := metav1.Now()
+	return &v1.Pod{
+		ObjectMeta: v1.ObjectMeta{Name: id, SelfLink: testapi.Default.SelfLink("pods", id), DeletionTimestamp: &deletionTimestamp},
+		Spec: v1.PodSpec{
+			NodeName: "",
 		},
 	}
 }
@@ -121,6 +132,10 @@ func TestScheduler(t *testing.T) {
 			expectError:      errB,
 			expectErrorPod:   podWithID("foo", ""),
 			eventReason:      "FailedScheduling",
+		}, {
+			sendPod:     deletingPod("foo"),
+			algo:        mockScheduler{"", nil},
+			eventReason: "FailedScheduling",
 		},
 	}
 
