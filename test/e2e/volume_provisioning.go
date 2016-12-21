@@ -19,6 +19,8 @@ package e2e
 import (
 	"time"
 
+	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/v1"
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
@@ -26,9 +28,6 @@ import (
 	storageutil "k8s.io/kubernetes/pkg/apis/storage/v1beta1/util"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/test/e2e/framework"
-
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
 )
 
 const (
@@ -102,6 +101,58 @@ func testDynamicProvisioning(client clientset.Interface, claim *v1.PersistentVol
 	framework.ExpectNoError(framework.WaitForPersistentVolumeDeleted(client, pv.Name, 5*time.Second, 20*time.Minute))
 }
 
+func testGlusterDynamicProvisioning(client clientset.Interface, claim *v1.PersistentVolumeClaim) {
+	err := framework.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, client, claim.Namespace, claim.Name, framework.Poll, framework.ClaimProvisionTimeout)
+	Expect(err).NotTo(HaveOccurred())
+
+	By("checking the claim")
+	// Get new copy of the claim
+	claim, err = client.Core().PersistentVolumeClaims(claim.Namespace).Get(claim.Name, metav1.GetOptions{})
+	Expect(err).NotTo(HaveOccurred())
+
+	// Get the bound PV
+	pv, err := client.Core().PersistentVolumes().Get(claim.Spec.VolumeName, metav1.GetOptions{})
+	Expect(err).NotTo(HaveOccurred())
+
+	// Check sizes
+	expectedCapacity := resource.MustParse(expectedSize)
+	pvCapacity := pv.Spec.Capacity[v1.ResourceName(v1.ResourceStorage)]
+	Expect(pvCapacity.Value()).To(Equal(expectedCapacity.Value()))
+
+	requestedCapacity := resource.MustParse(requestedSize)
+	claimCapacity := claim.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
+	Expect(claimCapacity.Value()).To(Equal(requestedCapacity.Value()))
+
+	// Check PV properties
+	Expect(pv.Spec.PersistentVolumeReclaimPolicy).To(Equal(v1.PersistentVolumeReclaimDelete))
+	expectedAccessModes := []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}
+	Expect(pv.Spec.AccessModes).To(Equal(expectedAccessModes))
+	Expect(pv.Spec.ClaimRef.Name).To(Equal(claim.ObjectMeta.Name))
+	Expect(pv.Spec.ClaimRef.Namespace).To(Equal(claim.ObjectMeta.Namespace))
+
+	// Ugly hack: if we delete the AWS/GCE/OpenStack volume here, it will
+	// probably collide with destruction of the pods above - the pods
+	// still have the volume attached (kubelet is slow...) and deletion
+	// of attached volume is not allowed by AWS/GCE/OpenStack.
+	// Kubernetes *will* retry deletion several times in
+	// pvclaimbinder-sync-period.
+	// So, technically, this sleep is not needed. On the other hand,
+	// the sync perion is 10 minutes and we really don't want to wait
+	// 10 minutes here. There is no way how to see if kubelet is
+	// finished with cleaning volumes. A small sleep here actually
+	// speeds up the test!
+	// Three minutes should be enough to clean up the pods properly.
+	// We've seen GCE PD detach to take more than 1 minute.
+	By("Sleeping to let kubelet destroy all pods")
+	time.Sleep(3 * time.Minute)
+
+	By("deleting the claim")
+	framework.ExpectNoError(client.Core().PersistentVolumeClaims(claim.Namespace).Delete(claim.Name, nil))
+
+	// Wait for the PV to get deleted too.
+	framework.ExpectNoError(framework.WaitForPersistentVolumeDeleted(client, pv.Name, 5*time.Second, 20*time.Minute))
+}
+
 var _ = framework.KubeDescribe("Dynamic provisioning", func() {
 	f := framework.NewDefaultFramework("volume-provisioning")
 
@@ -114,12 +165,11 @@ var _ = framework.KubeDescribe("Dynamic provisioning", func() {
 		ns = f.Namespace.Name
 	})
 
-	framework.KubeDescribe("DynamicProvisioner", func() {
+	framework.KubeDescribe("CloudDynamicProvisioner", func() {
 		It("should create and delete persistent volumes [Slow]", func() {
 			framework.SkipUnlessProviderIs("openstack", "gce", "aws", "gke")
-
 			By("creating a StorageClass")
-			class := newStorageClass()
+			class := newCloudStorageClass()
 			_, err := c.Storage().StorageClasses().Create(class)
 			defer c.Storage().StorageClasses().Delete(class.Name, nil)
 			Expect(err).NotTo(HaveOccurred())
@@ -149,6 +199,29 @@ var _ = framework.KubeDescribe("Dynamic provisioning", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			testDynamicProvisioning(c, claim)
+		})
+	})
+
+	framework.KubeDescribe("GlusterDynamicProvisioner", func() {
+		It("should create and delete persistent volumes [fast]", func() {
+			By("creating a Gluster DP server Pod")
+			podIp := startGlusterDpServerPod()
+			serverUrl := "https://" + podIp + ":8081"
+			By("creating a StorageClass")
+			class := newGlusterStorageClass(serverUrl)
+			_, err := c.Storage().StorageClasses().Create(class)
+			defer c.Storage().StorageClasses().Delete(class.Name, nil)
+			Expect(err).NotTo(HaveOccurred())
+
+			By("creating a claim with an alpha dynamic provisioning annotation")
+			claim := newClaim(ns, true)
+			defer func() {
+				c.Core().PersistentVolumeClaims(ns).Delete(claim.Name, nil)
+			}()
+			claim, err = c.Core().PersistentVolumeClaims(ns).Create(claim)
+			Expect(err).NotTo(HaveOccurred())
+
+			testGlusterDynamicProvisioning(c, claim)
 		})
 	})
 })
@@ -232,7 +305,7 @@ func runInPodWithVolume(c clientset.Interface, ns, claimName, command string) {
 	framework.ExpectNoError(framework.WaitForPodSuccessInNamespaceSlow(c, pod.Name, pod.Namespace))
 }
 
-func newStorageClass() *storage.StorageClass {
+func newCloudStorageClass() *storage.StorageClass {
 	var pluginName string
 
 	switch {
@@ -253,4 +326,49 @@ func newStorageClass() *storage.StorageClass {
 		},
 		Provisioner: pluginName,
 	}
+}
+
+func newGlusterStorageClass(url string) *storage.StorageClass {
+	var pluginName string
+	switch {
+	case framework.ProviderIs("glusterfs"):
+		pluginName = "kubernetes.io/glusterfs"
+	}
+
+	return &storage.StorageClass{
+		TypeMeta: metav1.TypeMeta{
+			Kind: "StorageClass",
+		},
+		ObjectMeta: v1.ObjectMeta{
+			Name: "fast",
+		},
+		Provisioner: pluginName,
+		Parameters:  map[string]string{"resturl": url},
+	}
+}
+
+func startGlusterDpServerPod() string {
+
+	f := framework.NewDefaultFramework("volume-provisioning")
+	// filled in BeforeEach
+	//var c *client.Client
+	//var namespace *api.Namespace
+	var cs clientset.Interface
+	var namespace *v1.Namespace
+
+	BeforeEach(func() {
+		cs = f.ClientSet
+		namespace = f.Namespace
+	})
+
+	config := VolumeTestConfig{
+		namespace:   namespace.Name,
+		prefix:      "gluster",
+		serverImage: "gcr.io/google_containers/volume-manager-gluster:0.1",
+		serverPorts: []int{8081},
+	}
+	pod := startVolumeServer(cs, config)
+	serverIP := pod.Status.PodIP
+	framework.Logf("Gluster DP server Pod IP address : %v", serverIP)
+	return serverIP
 }
