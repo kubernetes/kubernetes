@@ -23,7 +23,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/uuid"
 )
 
-// Compile time check for interface adeherence
+// Compile time check for interface adherence
 var _ dnsprovider.Zones = Zones{}
 
 type Zones struct {

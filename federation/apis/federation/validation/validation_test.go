@@ -76,7 +76,7 @@ func TestValidateCluster(t *testing.T) {
 	for testName, errorCase := range errorCases {
 		errs := ValidateCluster(&errorCase)
 		if len(errs) == 0 {
-			t.Errorf("expected failur for %s", testName)
+			t.Errorf("expected failure for %s", testName)
 		}
 	}
 }

@@ -71,7 +71,7 @@ function setClusterInfo() {
 # Sanity check on $CNI_PLUGIN_CONF and $CNI_PLUGIN_EXES
 function check-CNI-config() {
   if [ -z "$CNI_PLUGIN_CONF" ] && [ -n "$CNI_PLUGIN_EXES" ]; then
-    echo "Warning: CNI_PLUGIN_CONF is emtpy but CNI_PLUGIN_EXES is not (it is $CNI_PLUGIN_EXES); Flannel will be used" >& 2
+    echo "Warning: CNI_PLUGIN_CONF is empty but CNI_PLUGIN_EXES is not (it is $CNI_PLUGIN_EXES); Flannel will be used" >& 2
   elif [ -n "$CNI_PLUGIN_CONF" ] && [ -z "$CNI_PLUGIN_EXES" ]; then
     echo "Warning: CNI_PLUGIN_EXES is empty but CNI_PLUGIN_CONF is not (it is $CNI_PLUGIN_CONF); Flannel will be used" & 2
   elif [ -n "$CNI_PLUGIN_CONF" ] && [ -n "$CNI_PLUGIN_EXES" ]; then
@@ -545,7 +545,7 @@ function provision-node() {
     BASH_DEBUG_FLAGS="set -x"
   fi
 
-  # remote login to node and configue k8s node
+  # remote login to node and configure k8s node
   ssh $SSH_OPTS -t "$1" "
     set +e
     ${BASH_DEBUG_FLAGS}
@@ -638,7 +638,7 @@ function provision-masterandnode() {
     BASH_DEBUG_FLAGS="set -x"
   fi
 
-  # remote login to the master/node and configue k8s
+  # remote login to the master/node and configure k8s
   ssh $SSH_OPTS -t "$MASTER" "
     set +e
     ${BASH_DEBUG_FLAGS}

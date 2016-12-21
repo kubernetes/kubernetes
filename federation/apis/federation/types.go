@@ -76,7 +76,7 @@ type ClusterCondition struct {
 	Message string
 }
 
-// ClusterStatus is information about the current status of a cluster updated by cluster controller peridocally.
+// ClusterStatus is information about the current status of a cluster updated by cluster controller periodically.
 type ClusterStatus struct {
 	// Conditions is an array of current cluster conditions.
 	// +optional
@@ -124,8 +124,8 @@ type ClusterList struct {
 // Temporary/alpha structures to support custom replica assignments within FederatedReplicaSet.
 
 // A set of preferences that can be added to federated version of ReplicaSet as a json-serialized annotation.
-// The preferences allow the user to express in which culsters he wants to put his replicas within the
-// mentiond FederatedReplicaSet.
+// The preferences allow the user to express in which clusters he wants to put his replicas within the
+// mentioned FederatedReplicaSet.
 type FederatedReplicaSetPreferences struct {
 	// If set to true then already scheduled and running replicas may be moved to other clusters to
 	// in order to bring cluster replicasets towards a desired state. Otherwise, if set to false,

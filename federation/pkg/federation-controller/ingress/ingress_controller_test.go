@@ -138,7 +138,7 @@ func TestIngressController(t *testing.T) {
 	assert.NotNil(t, cluster)
 	assert.Equal(t, cluster.ObjectMeta.Annotations[uidAnnotationKey], cfg1.Data[uidKey])
 
-	t.Logf("Checking that approproate finalizers are added")
+	t.Logf("Checking that appropriate finalizers are added")
 	// There should be 2 updates to add both the finalizers.
 	updatedIngress := GetIngressFromChan(t, fedIngressUpdateChan)
 	assert.True(t, ingressController.hasFinalizerFunc(updatedIngress, deletionhelper.FinalizerDeleteFromUnderlyingClusters))
