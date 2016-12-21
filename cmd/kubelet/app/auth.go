@@ -22,12 +22,12 @@ import (
 	"reflect"
 
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
-	apiserverauthenticator "k8s.io/kubernetes/pkg/apiserver/authenticator"
 	"k8s.io/kubernetes/pkg/auth/authenticator"
 	"k8s.io/kubernetes/pkg/auth/authorizer"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	authenticationclient "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/authentication/v1beta1"
 	authorizationclient "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/authorization/v1beta1"
+	apiserverauthenticator "k8s.io/kubernetes/pkg/genericapiserver/authenticator"
 	alwaysallowauthorizer "k8s.io/kubernetes/pkg/genericapiserver/authorizer"
 	apiserverauthorizer "k8s.io/kubernetes/pkg/genericapiserver/authorizer"
 	"k8s.io/kubernetes/pkg/kubelet/server"

@@ -39,7 +39,6 @@ import (
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
-	apiserverauthenticator "k8s.io/kubernetes/pkg/apiserver/authenticator"
 	apiserverfilters "k8s.io/kubernetes/pkg/apiserver/filters"
 	apiserveropenapi "k8s.io/kubernetes/pkg/apiserver/openapi"
 	apiserverrequest "k8s.io/kubernetes/pkg/apiserver/request"
@@ -49,6 +48,7 @@ import (
 	authhandlers "k8s.io/kubernetes/pkg/auth/handlers"
 	"k8s.io/kubernetes/pkg/auth/user"
 	"k8s.io/kubernetes/pkg/client/restclient"
+	apiserverauthenticator "k8s.io/kubernetes/pkg/genericapiserver/authenticator"
 	apiserverauthorizer "k8s.io/kubernetes/pkg/genericapiserver/authorizer"
 	genericfilters "k8s.io/kubernetes/pkg/genericapiserver/filters"
 	"k8s.io/kubernetes/pkg/genericapiserver/mux"
@@ -327,30 +327,7 @@ func (c *Config) ApplyInsecureServingOptions(insecureServing *options.ServingOpt
 	return c
 }
 
-func (c *Config) ApplyAuthenticationOptions(o *options.BuiltInAuthenticationOptions) (*Config, error) {
-	if o == nil || o.PasswordFile == nil {
-		return c, nil
-	}
-
-	var err error
-	if o.ClientCert != nil {
-		c, err = c.applyClientCert(o.ClientCert.ClientCA)
-		if err != nil {
-			return nil, fmt.Errorf("unable to load client CA file: %v", err)
-		}
-	}
-	if o.RequestHeader != nil {
-		c, err = c.applyClientCert(o.RequestHeader.ClientCAFile)
-		if err != nil {
-			return nil, fmt.Errorf("unable to load client CA file: %v", err)
-		}
-	}
-
-	c.SupportsBasicAuth = len(o.PasswordFile.BasicAuthFile) > 0
-	return c, nil
-}
-
-func (c *Config) applyClientCert(clientCAFile string) (*Config, error) {
+func (c *Config) ApplyClientCert(clientCAFile string) (*Config, error) {
 	if c.SecureServingInfo != nil {
 		if len(clientCAFile) > 0 {
 			clientCAs, err := certutil.CertsFromFile(clientCAFile)
@@ -375,11 +352,11 @@ func (c *Config) ApplyDelegatingAuthenticationOptions(o *options.DelegatingAuthe
 	}
 
 	var err error
-	c, err = c.applyClientCert(o.ClientCert.ClientCA)
+	c, err = c.ApplyClientCert(o.ClientCert.ClientCA)
 	if err != nil {
 		return nil, fmt.Errorf("unable to load client CA file: %v", err)
 	}
-	c, err = c.applyClientCert(o.RequestHeader.ClientCAFile)
+	c, err = c.ApplyClientCert(o.RequestHeader.ClientCAFile)
 	if err != nil {
 		return nil, fmt.Errorf("unable to load client CA file: %v", err)
 	}

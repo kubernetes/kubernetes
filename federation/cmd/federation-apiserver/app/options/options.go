@@ -32,7 +32,7 @@ type ServerRunOptions struct {
 	Etcd                    *genericoptions.EtcdOptions
 	SecureServing           *genericoptions.SecureServingOptions
 	InsecureServing         *genericoptions.ServingOptions
-	Authentication          *genericoptions.BuiltInAuthenticationOptions
+	Authentication          *kubeoptions.BuiltInAuthenticationOptions
 	Authorization           *kubeoptions.BuiltInAuthorizationOptions
 
 	EventTTL time.Duration
@@ -45,7 +45,7 @@ func NewServerRunOptions() *ServerRunOptions {
 		Etcd:            genericoptions.NewEtcdOptions(),
 		SecureServing:   genericoptions.NewSecureServingOptions(),
 		InsecureServing: genericoptions.NewInsecureServingOptions(),
-		Authentication:  genericoptions.NewBuiltInAuthenticationOptions().WithAll(),
+		Authentication:  kubeoptions.NewBuiltInAuthenticationOptions().WithAll(),
 		Authorization:   kubeoptions.NewBuiltInAuthorizationOptions(),
 
 		EventTTL: 1 * time.Hour,

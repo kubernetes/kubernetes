@@ -9,17 +9,14 @@ load(
 
 go_library(
     name = "go_default_library",
-    srcs = [
-        "builtin.go",
-        "delegating.go",
-    ],
+    srcs = ["config.go"],
     tags = ["automanaged"],
     deps = [
         "//pkg/auth/authenticator:go_default_library",
         "//pkg/auth/authenticator/bearertoken:go_default_library",
         "//pkg/auth/group:go_default_library",
         "//pkg/auth/user:go_default_library",
-        "//pkg/client/clientset_generated/clientset/typed/authentication/v1beta1:go_default_library",
+        "//pkg/genericapiserver/authenticator:go_default_library",
         "//pkg/serviceaccount:go_default_library",
         "//pkg/util/cert:go_default_library",
         "//plugin/pkg/auth/authenticator/password/keystone:go_default_library",
