@@ -25,6 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/auth/authenticator/bearertoken"
 	"k8s.io/kubernetes/pkg/auth/group"
 	"k8s.io/kubernetes/pkg/auth/user"
+	genericauthenticator "k8s.io/kubernetes/pkg/genericapiserver/authenticator"
 	"k8s.io/kubernetes/pkg/serviceaccount"
 	certutil "k8s.io/kubernetes/pkg/util/cert"
 	"k8s.io/kubernetes/plugin/pkg/auth/authenticator/password/keystone"
@@ -39,20 +40,6 @@ import (
 	"k8s.io/kubernetes/plugin/pkg/auth/authenticator/token/tokenfile"
 	"k8s.io/kubernetes/plugin/pkg/auth/authenticator/token/webhook"
 )
-
-type RequestHeaderConfig struct {
-	// UsernameHeaders are the headers to check (in order, case-insensitively) for an identity. The first header with a value wins.
-	UsernameHeaders []string
-	// GroupHeaders are the headers to check (case-insensitively) for a group names.  All values will be used.
-	GroupHeaders []string
-	// ExtraHeaderPrefixes are the head prefixes to check (case-insentively) for filling in
-	// the user.Info.Extra.  All values of all matching headers will be added.
-	ExtraHeaderPrefixes []string
-	// ClientCA points to CA bundle file which is used verify the identity of the front proxy
-	ClientCA string
-	// AllowedClientNames is a list of common names that may be presented by the authenticating front proxy.  Empty means: accept any.
-	AllowedClientNames []string
-}
 
 type AuthenticatorConfig struct {
 	Anonymous                   bool
@@ -72,7 +59,7 @@ type AuthenticatorConfig struct {
 	WebhookTokenAuthnConfigFile string
 	WebhookTokenAuthnCacheTTL   time.Duration
 
-	RequestHeaderConfig *RequestHeaderConfig
+	RequestHeaderConfig *genericauthenticator.RequestHeaderConfig
 
 	// TODO, this is the only non-serializable part of the entire config.  Factor it out into a clientconfig
 	ServiceAccountTokenGetter serviceaccount.ServiceAccountTokenGetter
@@ -80,7 +67,7 @@ type AuthenticatorConfig struct {
 
 // New returns an authenticator.Request or an error that supports the standard
 // Kubernetes authentication mechanisms.
-func New(config AuthenticatorConfig) (authenticator.Request, *spec.SecurityDefinitions, error) {
+func (config AuthenticatorConfig) New() (authenticator.Request, *spec.SecurityDefinitions, error) {
 	var authenticators []authenticator.Request
 	securityDefinitions := spec.SecurityDefinitions{}
 	hasBasicAuth := false
@@ -241,11 +228,6 @@ func newAuthenticatorFromTokenFile(tokenAuthFile string) (authenticator.Request,
 	}
 
 	return bearertoken.New(tokenAuthenticator), nil
-}
-
-// newAuthenticatorFromToken returns an authenticator.Request or an error
-func NewAuthenticatorFromTokens(tokens map[string]*user.DefaultInfo) authenticator.Request {
-	return bearertoken.New(tokenfile.New(tokens))
 }
 
 // newAuthenticatorFromOIDCIssuerURL returns an authenticator.Request or an error.
