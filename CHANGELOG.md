@@ -419,7 +419,7 @@ Features for this release were tracked via the use of the [kubernetes/features](
 - **AWS**
   - [stable] Roles should appear in kubectl get nodes ([kubernetes/features#113](https://github.com/kubernetes/features/issues/113))
 - **Cluster Lifecycle**
-  - [alpha] Improved UX and usability for the kubeadm binary that makes it easy to get a new cluster running. ([docs](http://kubernetes.io/docs/getting-started-guides/kubeadm/)) ([kubernetes/features#11](https://github.com/kubernetes/features/issues/11))
+  - [alpha] Improved UX and usability for the kubeadm binary that makes it easy to get a new cluster running. ([docs](http://kubernetes.io/docs/getting-started-guides/kubeadm/)) ([changelog](https://github.com/kubernetes/kubeadm/blob/master/CHANGELOG.md)) ([kubernetes/features#11](https://github.com/kubernetes/features/issues/11))
 - **Cluster Ops**
   - [alpha] Added ability to create/remove clusters w/highly available (replicated) masters on GCE using kube-up/kube-down scripts. ([docs](http://kubernetes.io/docs/admin/ha-master-gce/)) ([kubernetes/features#48](https://github.com/kubernetes/features/issues/48))
 - **Federation**
