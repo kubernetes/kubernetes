@@ -859,9 +859,27 @@ func (c *cacheWatcher) sendWatchCacheEvent(event *watchCacheEvent) {
 	case !curObjPasses && oldObjPasses:
 		watchEvent = watch.Event{Type: watch.Deleted, Object: object}
 	}
+
+	// We need to ensure that if we put event X to the c.result, all
+	// previous events were already put into it before, no matter whether
+	// c.done is close or not.
+	// Thus we cannot simply select from c.done and c.result and this
+	// would give us non-determinism.
+	// At the same time, we don't want to block infinitely on putting
+	// to c.result, when c.done is already closed.
+
+	// This ensures that with c.done already close, we at most once go
+	// into the next select after this. With that, no matter which
+	// statement we choose there, we will deliver only consecutive
+	// events.
+	select {
+	case <-c.done:
+		return
+	default:
+	}
+
 	select {
 	case c.result <- watchEvent:
-	// don't block on c.result if c.done is closed
 	case <-c.done:
 	}
 }
