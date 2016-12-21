@@ -469,10 +469,6 @@ func (oe *operationExecutor) VerifyControllerAttachedVolume(
 		volumeToMount.VolumeName, "" /* podName */, verifyControllerAttachedVolumeFunc)
 }
 
-func (oe *operationExecutor) GetNestedPendingOperations() nestedpendingoperations.NestedPendingOperations {
-	return oe.pendingOperations
-}
-
 // TODO: this is a workaround for the unmount device issue caused by gci mounter.
 // In GCI cluster, if gci mounter is used for mounting, the container started by mounter
 // script will cause additional mounts created in the container. Since these mounts are

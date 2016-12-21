@@ -154,10 +154,6 @@ func (grm *nestedPendingOperations) IsOperationPending(
 	return false
 }
 
-func (grm *nestedPendingOperations) GetOperations() []operation {
-	return grm.operations
-}
-
 // This is an internal function and caller should acquire and release the lock
 func (grm *nestedPendingOperations) isOperationExists(
 	volumeName v1.UniqueVolumeName,
