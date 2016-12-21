@@ -13,7 +13,7 @@ go_test(
     srcs = ["config_test.go"],
     library = "go_default_library",
     tags = ["automanaged"],
-    deps = [],
+    deps = ["//pkg/auth/authorizer/abac:go_default_library"],
 )
 
 go_library(
