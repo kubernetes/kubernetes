@@ -576,6 +576,7 @@ k8s.io/kubernetes/pkg/apimachinery,gmarek,1
 k8s.io/kubernetes/pkg/apimachinery/announced,kargakis,1
 k8s.io/kubernetes/pkg/apimachinery/registered,jlowdermilk,1
 k8s.io/kubernetes/pkg/apis/abac/v0,liggitt,0
+k8s.io/kubernetes/pkg/apis/abac/v1beta1,liggitt,0
 k8s.io/kubernetes/pkg/apis/apps/validation,derekwaynecarr,1
 k8s.io/kubernetes/pkg/apis/authorization/validation,erictune,0
 k8s.io/kubernetes/pkg/apis/autoscaling/v1,yarntime,0

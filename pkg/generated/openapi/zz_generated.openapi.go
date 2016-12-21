@@ -11406,6 +11406,83 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 		Dependencies: []string{
 			"v1beta1.FSGroupStrategyOptions", "v1beta1.HostPortRange", "v1beta1.RunAsUserStrategyOptions", "v1beta1.SELinuxStrategyOptions", "v1beta1.SupplementalGroupsStrategyOptions"},
 	},
+	"v1beta1.Policy": {
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "Policy contains a single ABAC policy rule",
+				Properties: map[string]spec.Schema{
+					"spec": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Spec describes the policy rule",
+							Ref:         spec.MustCreateRef("#/definitions/v1beta1.PolicySpec"),
+						},
+					},
+				},
+				Required: []string{"spec"},
+			},
+		},
+		Dependencies: []string{
+			"v1beta1.PolicySpec"},
+	},
+	"v1beta1.PolicySpec": {
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "PolicySpec contains the attributes for a policy rule",
+				Properties: map[string]spec.Schema{
+					"user": {
+						SchemaProps: spec.SchemaProps{
+							Description: "User is the username this rule applies to. Either user or group is required to match the request. \"*\" matches all users.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"group": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Group is the group this rule applies to. Either user or group is required to match the request. \"*\" matches all groups.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"readonly": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Readonly matches readonly requests when true, and all requests when false",
+							Type:        []string{"boolean"},
+							Format:      "",
+						},
+					},
+					"apiGroup": {
+						SchemaProps: spec.SchemaProps{
+							Description: "APIGroup is the name of an API group. APIGroup, Resource, and Namespace are required to match resource requests. \"*\" matches all API groups",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"resource": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Resource is the name of a resource. APIGroup, Resource, and Namespace are required to match resource requests. \"*\" matches all resources",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"namespace": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Namespace is the name of a namespace. APIGroup, Resource, and Namespace are required to match resource requests. \"*\" matches all namespaces (including unnamespaced requests)",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"nonResourcePath": {
+						SchemaProps: spec.SchemaProps{
+							Description: "NonResourcePath matches non-resource request paths. \"*\" matches all paths \"/foo/*\" matches all subpaths of foo",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{},
+	},
 	"v1beta1.ReplicaSet": {
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
