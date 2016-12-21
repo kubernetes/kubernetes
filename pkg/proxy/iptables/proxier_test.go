@@ -34,6 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/exec"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
 	iptablestest "k8s.io/kubernetes/pkg/util/iptables/testing"
+	"k8s.io/kubernetes/pkg/util/slice"
 )
 
 func checkAllLines(t *testing.T, table utiliptables.Table, save []byte, expectedLines map[utiliptables.Chain]string) {
@@ -170,35 +171,46 @@ func TestGetChainLinesMultipleTables(t *testing.T) {
 	checkAllLines(t, utiliptables.TableNAT, []byte(iptables_save), expected)
 }
 
+// Tests whether two slices are equivalent.  This sorts both slices in-place.
+func slicesEquiv(lhs, rhs []string) bool {
+	if len(lhs) != len(rhs) {
+		return false
+	}
+	if reflect.DeepEqual(slice.SortStrings(lhs), slice.SortStrings(rhs)) {
+		return true
+	}
+	return false
+}
+
 func TestGetRemovedEndpoints(t *testing.T) {
 	testCases := []struct {
-		currentEndpoints []string
-		newEndpoints     []string
+		currentEndpoints endpointsInfoSlice
+		newEndpoints     endpointsInfoSlice
 		removedEndpoints []string
 	}{
 		{
-			currentEndpoints: []string{"10.0.2.1:80", "10.0.2.2:80"},
-			newEndpoints:     []string{"10.0.2.1:80", "10.0.2.2:80"},
+			currentEndpoints: endpointsInfoSlice{{ip: "10.0.2.1:80"}, {ip: "10.0.2.2:80"}},
+			newEndpoints:     endpointsInfoSlice{{ip: "10.0.2.1:80"}, {ip: "10.0.2.2:80"}},
 			removedEndpoints: []string{},
 		},
 		{
-			currentEndpoints: []string{"10.0.2.1:80", "10.0.2.2:80", "10.0.2.3:80"},
-			newEndpoints:     []string{"10.0.2.1:80", "10.0.2.2:80"},
+			currentEndpoints: endpointsInfoSlice{{ip: "10.0.2.1:80"}, {ip: "10.0.2.2:80"}, {ip: "10.0.2.3:80"}},
+			newEndpoints:     endpointsInfoSlice{{ip: "10.0.2.1:80"}, {ip: "10.0.2.2:80"}},
 			removedEndpoints: []string{"10.0.2.3:80"},
 		},
 		{
-			currentEndpoints: []string{},
-			newEndpoints:     []string{"10.0.2.1:80", "10.0.2.2:80"},
+			currentEndpoints: endpointsInfoSlice{},
+			newEndpoints:     endpointsInfoSlice{{ip: "10.0.2.1:80"}, {ip: "10.0.2.2:80"}},
 			removedEndpoints: []string{},
 		},
 		{
-			currentEndpoints: []string{"10.0.2.1:80", "10.0.2.2:80"},
-			newEndpoints:     []string{},
+			currentEndpoints: endpointsInfoSlice{{ip: "10.0.2.1:80"}, {ip: "10.0.2.2:80"}},
+			newEndpoints:     endpointsInfoSlice{},
 			removedEndpoints: []string{"10.0.2.1:80", "10.0.2.2:80"},
 		},
 		{
-			currentEndpoints: []string{"10.0.2.1:80", "10.0.2.2:80", "10.0.2.2:443"},
-			newEndpoints:     []string{"10.0.2.1:80", "10.0.2.2:80"},
+			currentEndpoints: endpointsInfoSlice{{ip: "10.0.2.1:80"}, {ip: "10.0.2.2:80"}, {ip: "10.0.2.2:443"}},
+			newEndpoints:     endpointsInfoSlice{{ip: "10.0.2.1:80"}, {ip: "10.0.2.2:80"}},
 			removedEndpoints: []string{"10.0.2.2:443"},
 		},
 	}
@@ -500,7 +512,7 @@ func NewFakeProxier(ipt utiliptables.Interface) *Proxier {
 		exec:                        &exec.FakeExec{},
 		serviceMap:                  make(map[proxy.ServicePortName]*serviceInfo),
 		iptables:                    ipt,
-		endpointsMap:                make(map[proxy.ServicePortName][]*endpointsInfo),
+		endpointsMap:                make(map[proxy.ServicePortName]endpointsInfoSlice),
 		clusterCIDR:                 "10.0.0.0/24",
 		haveReceivedEndpointsUpdate: true,
 		haveReceivedServiceUpdate:   true,
@@ -1235,10 +1247,6 @@ func TestBuildEndpointsMap(t *testing.T) {
 	name1port1 := proxy.ServicePortName{NamespacedName: name1, Port: "blah"}
 	name1port2 := proxy.ServicePortName{NamespacedName: name1, Port: "bar"}
 
-	name2 := types.NamespacedName{Namespace: "somewhere", Name: "invalid-addresses"}
-	name2port1 := proxy.ServicePortName{NamespacedName: name2, Port: "first"}
-	name2port2 := proxy.ServicePortName{NamespacedName: name2, Port: "second"}
-
 	name3 := types.NamespacedName{Namespace: "somewhere-else", Name: "another-endpoint"}
 	name3port1 := proxy.ServicePortName{NamespacedName: name3, Port: "foo"}
 
@@ -1253,8 +1261,6 @@ func TestBuildEndpointsMap(t *testing.T) {
 			{ip: "1.2.3.5:4567", localEndpoint: false},
 			{ip: "1.2.3.6:4567", localEndpoint: false},
 		},
-		name2port1: []*endpointsInfo{},
-		name2port2: []*endpointsInfo{},
 		name3port1: []*endpointsInfo{
 			{ip: "1.2.3.6:1111", localEndpoint: false},
 		},
@@ -1263,9 +1269,6 @@ func TestBuildEndpointsMap(t *testing.T) {
 	expectedHCUpdateMap := healthCheckMap{
 		name1: {
 			"somewhere/some-endpoint": sets.Empty{},
-		},
-		name2: {
-			"somewhere/invalid-addresses": sets.Empty{},
 		},
 		name3: {},
 	}
@@ -1318,7 +1321,6 @@ func TestBuildEndpointsMap(t *testing.T) {
 		name1: {
 			"somewhere/some-endpoint": sets.Empty{},
 		},
-		name2: {},
 		name3: {},
 	}
 
@@ -1374,20 +1376,15 @@ func TestBuildEndpointsMapInvalidEndpoints(t *testing.T) {
 		}),
 	}
 
-	name1 := types.NamespacedName{Namespace: "somewhere", Name: "some-endpoint"}
 	name2 := types.NamespacedName{Namespace: "somewhere", Name: "another-endpoint"}
 	expectedHCUpdateMap := healthCheckMap{
-		name1: {
-			"somewhere/some-endpoint": sets.Empty{},
-		},
-		name2: {
-			"somewhere/another-endpoint": sets.Empty{},
-		},
+		name2: {},
 	}
 
+	// Only one valid endpoint should be returned
 	endpointsMap, hcUpdateMap, staleConnections := buildEndpointsMap(endpoints, "node-1", make(proxyEndpointsMap))
-	if len(endpointsMap) != 4 {
-		t.Errorf("expected endpoints map length 4, got %v", endpointsMap)
+	if len(endpointsMap) != 1 {
+		t.Errorf("expected endpoints map size 1, got %v", endpointsMap)
 	} else {
 		var numEmpty uint
 		for _, val := range endpointsMap {
@@ -1397,8 +1394,8 @@ func TestBuildEndpointsMapInvalidEndpoints(t *testing.T) {
 				t.Errorf("expected endpoints info length 1, got %v", val)
 			}
 		}
-		if numEmpty != 3 {
-			t.Errorf("expected three empty endpoints info, got %v", endpointsMap)
+		if numEmpty != 0 {
+			t.Errorf("expected no empty endpoints info, got %v", endpointsMap)
 		}
 	}
 
