@@ -551,3 +551,8 @@ const (
 	LabelSelectorOpExists       LabelSelectorOperator = "Exists"
 	LabelSelectorOpDoesNotExist LabelSelectorOperator = "DoesNotExist"
 )
+
+// KubernetesUserAgentHeader is a custom http header alternative to the
+// standard User-Agent header, which might be modified when a request goes
+// through a proxy.
+const KubernetesUserAgentHeader = "Kubernetes-User-Agent"

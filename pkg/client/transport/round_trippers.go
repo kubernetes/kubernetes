@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 )
 
 // HTTPWrappersForConfig wraps a round tripper with any relevant layered
@@ -153,10 +154,12 @@ func NewUserAgentRoundTripper(agent string, rt http.RoundTripper) http.RoundTrip
 
 func (rt *userAgentRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 	if len(req.Header.Get("User-Agent")) != 0 {
+		req.Header.Set(metav1.KubernetesUserAgentHeader, req.Header.Get("User-Agent"))
 		return rt.rt.RoundTrip(req)
 	}
 	req = cloneRequest(req)
 	req.Header.Set("User-Agent", rt.agent)
+	req.Header.Set(metav1.KubernetesUserAgentHeader, rt.agent)
 	return rt.rt.RoundTrip(req)
 }
 

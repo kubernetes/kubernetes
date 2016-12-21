@@ -21,6 +21,8 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 )
 
 type testRoundTripper struct {
@@ -88,6 +90,9 @@ func TestUserAgentRoundTripper(t *testing.T) {
 	if rt.Request.Header.Get("User-Agent") != "other" {
 		t.Errorf("unexpected user agent header: %#v", rt.Request)
 	}
+	if rt.Request.Header.Get(metav1.KubernetesUserAgentHeader) != "other" {
+		t.Errorf("unexpected customized kubernetes user agent header: %#v", rt.Request)
+	}
 
 	req = &http.Request{}
 	NewUserAgentRoundTripper("test", rt).RoundTrip(req)
@@ -99,6 +104,9 @@ func TestUserAgentRoundTripper(t *testing.T) {
 	}
 	if rt.Request.Header.Get("User-Agent") != "test" {
 		t.Errorf("unexpected user agent header: %#v", rt.Request)
+	}
+	if rt.Request.Header.Get(metav1.KubernetesUserAgentHeader) != "test" {
+		t.Errorf("unexpected customized kubernetes user agent header: %#v", rt.Request)
 	}
 }
 
