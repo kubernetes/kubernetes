@@ -380,6 +380,7 @@ func DeepCopy_v1beta1_DeploymentStatus(in interface{}, out interface{}, c *conve
 		out.ObservedGeneration = in.ObservedGeneration
 		out.Replicas = in.Replicas
 		out.UpdatedReplicas = in.UpdatedReplicas
+		out.ReadyReplicas = in.ReadyReplicas
 		out.AvailableReplicas = in.AvailableReplicas
 		out.UnavailableReplicas = in.UnavailableReplicas
 		if in.Conditions != nil {

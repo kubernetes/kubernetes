@@ -262,6 +262,10 @@ message DeploymentStatus {
   // +optional
   optional int32 updatedReplicas = 3;
 
+  // Total number of ready pods targeted by this deployment.
+  // +optional
+  optional int32 readyReplicas = 7;
+
   // Total number of available pods (ready for at least minReadySeconds) targeted by this deployment.
   // +optional
   optional int32 availableReplicas = 4;

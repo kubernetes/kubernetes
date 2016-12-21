@@ -10275,6 +10275,13 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 							Format:      "int32",
 						},
 					},
+					"readyReplicas": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Total number of ready pods targeted by this deployment.",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
 					"availableReplicas": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Total number of available pods (ready for at least minReadySeconds) targeted by this deployment.",
