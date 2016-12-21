@@ -24,9 +24,19 @@ type chainAdmissionHandler []Interface
 // NewFromPlugins returns an admission.Interface that will enforce admission control decisions of all
 // the given plugins.
 func NewFromPlugins(client clientset.Interface, pluginNames []string, configFilePath string, plugInit PluginInitializer) (Interface, error) {
+	// load config file path into a componentconfig.AdmissionConfiguration
+	admissionCfg, err := ReadAdmissionConfiguration(configFilePath)
+	if err != nil {
+		return nil, err
+	}
+
 	plugins := []Interface{}
 	for _, pluginName := range pluginNames {
-		plugin := InitPlugin(pluginName, client, configFilePath)
+		pluginFile, err := GetAdmissionPluginConfigurationFileName(admissionCfg, pluginName, configFilePath)
+		if err != nil {
+			return nil, err
+		}
+		plugin := InitPlugin(pluginName, client, pluginFile)
 		if plugin != nil {
 			plugins = append(plugins, plugin)
 		}

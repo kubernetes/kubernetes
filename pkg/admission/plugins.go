@@ -131,7 +131,6 @@ func InitPlugin(name string, client clientset.Interface, configFilePath string) 
 			glog.Fatalf("Couldn't open admission plugin configuration %s: %#v",
 				configFilePath, err)
 		}
-
 		defer config.Close()
 	}
 

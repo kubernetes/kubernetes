@@ -13,6 +13,7 @@ go_library(
     srcs = [
         "attributes.go",
         "chain.go",
+        "config.go",
         "errors.go",
         "handler.go",
         "init.go",
@@ -22,8 +23,11 @@ go_library(
     ],
     tags = ["automanaged"],
     deps = [
+        "//pkg/api:go_default_library",
         "//pkg/api/errors:go_default_library",
         "//pkg/api/meta:go_default_library",
+        "//pkg/apis/componentconfig:go_default_library",
+        "//pkg/apis/componentconfig/v1alpha1:go_default_library",
         "//pkg/auth/authorizer:go_default_library",
         "//pkg/auth/user:go_default_library",
         "//pkg/client/clientset_generated/internalclientset:go_default_library",
@@ -32,6 +36,7 @@ go_library(
         "//pkg/runtime/schema:go_default_library",
         "//pkg/util/errors:go_default_library",
         "//pkg/util/sets:go_default_library",
+        "//vendor:github.com/ghodss/yaml",
         "//vendor:github.com/golang/glog",
     ],
 )
