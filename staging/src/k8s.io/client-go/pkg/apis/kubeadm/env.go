@@ -19,6 +19,7 @@ package kubeadm
 import (
 	"fmt"
 	"os"
+	"path"
 	"runtime"
 	"strings"
 )
@@ -46,9 +47,9 @@ func SetEnvParams() *EnvParams {
 	}
 
 	return &EnvParams{
-		KubernetesDir:    envParams["kubernetes_dir"],
-		HostPKIPath:      envParams["host_pki_path"],
-		HostEtcdPath:     envParams["host_etcd_path"],
+		KubernetesDir:    path.Clean(envParams["kubernetes_dir"]),
+		HostPKIPath:      path.Clean(envParams["host_pki_path"]),
+		HostEtcdPath:     path.Clean(envParams["host_etcd_path"]),
 		HyperkubeImage:   envParams["hyperkube_image"],
 		RepositoryPrefix: envParams["repo_prefix"],
 		DiscoveryImage:   envParams["discovery_image"],
