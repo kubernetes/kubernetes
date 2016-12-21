@@ -54,7 +54,8 @@ func TestOperationExecutor_MountVolume_ParallelMountForNonAttachablePlugins(t *t
 	}
 
 	// Assert
-	loop: for {
+loop:
+	for {
 		select {
 		case <-ch:
 			numMountOperationsStarted++
@@ -93,7 +94,8 @@ func TestOperationExecutor_MountVolume_ParallelMountForAttachablePlugins(t *test
 	}
 
 	// Assert
-	loop: for {
+loop:
+	for {
 		select {
 		case <-ch:
 			numMountOperationsStarted++
