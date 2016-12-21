@@ -46,6 +46,7 @@ import (
 	"k8s.io/kubernetes/pkg/auth/authenticator/bearertoken"
 	"k8s.io/kubernetes/pkg/auth/authorizer"
 	"k8s.io/kubernetes/pkg/auth/authorizer/abac"
+	"k8s.io/kubernetes/pkg/auth/group"
 	"k8s.io/kubernetes/pkg/auth/user"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api/v1"
 	apiserverauthorizer "k8s.io/kubernetes/pkg/genericapiserver/authorizer"
@@ -67,7 +68,7 @@ func getTestTokenAuth() authenticator.Request {
 	tokenAuthenticator := tokentest.New()
 	tokenAuthenticator.Tokens[AliceToken] = &user.DefaultInfo{Name: "alice", UID: "1"}
 	tokenAuthenticator.Tokens[BobToken] = &user.DefaultInfo{Name: "bob", UID: "2"}
-	return bearertoken.New(tokenAuthenticator)
+	return group.NewGroupAdder(bearertoken.New(tokenAuthenticator), []string{user.AllAuthenticated})
 }
 
 func getTestWebhookTokenAuth(serverURL string) (authenticator.Request, error) {
