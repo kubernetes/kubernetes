@@ -243,7 +243,7 @@ func NewDockerManager(
 	// if there are any problems.
 	dockerRoot := "/var/lib/docker"
 
-	// cgroup driver is only detectable in docker 1.12+
+	// cgroup driver is only detectable in docker 1.11+
 	// when the execution driver is not detectable, we provide the cgroupfs form.
 	// if your docker engine is configured to use the systemd cgroup driver, and you
 	// want to use pod level cgroups, you must be on docker 1.12+ to ensure cgroup-parent
