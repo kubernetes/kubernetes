@@ -182,6 +182,8 @@ RKT_STAGE1_IMAGE=${RKT_STAGE1_IMAGE:-""}
 CHAOS_CHANCE=${CHAOS_CHANCE:-0.0}
 CPU_CFS_QUOTA=${CPU_CFS_QUOTA:-true}
 ENABLE_HOSTPATH_PROVISIONER=${ENABLE_HOSTPATH_PROVISIONER:-"false"}
+# Allow override of default FLEX plugin directory.  This is the current default (specified in options.go)
+FLEX_VOLUME_PLUGIN_DIR=${FLEX_VOLUME_PLUGIN_DIR:-"/usr/libexec/kubernetes/kubelet-plugins/volume/exec/"}
 CLAIM_BINDER_SYNC_PERIOD=${CLAIM_BINDER_SYNC_PERIOD:-"15s"} # current k8s default
 ENABLE_CONTROLLER_ATTACH_DETACH=${ENABLE_CONTROLLER_ATTACH_DETACH:-"true"} # current default
 # This is the default dir and filename where the apiserver will generate a self-signed cert
@@ -451,6 +453,7 @@ function start_controller_manager {
     CTLRMGR_LOG=/tmp/kube-controller-manager.log
     ${CONTROLPLANE_SUDO} "${GO_OUT}/hyperkube" controller-manager \
       --v=${LOG_LEVEL} \
+      --flex-volume-plugin-dir="${FLEX_VOLUME_PLUGIN_DIR}" \
       --service-account-private-key-file="${SERVICE_ACCOUNT_KEY}" \
       --root-ca-file="${ROOT_CA_FILE}" \
       --enable-hostpath-provisioner="${ENABLE_HOSTPATH_PROVISIONER}" \
@@ -517,6 +520,7 @@ function start_kubelet {
 
       sudo -E "${GO_OUT}/hyperkube" kubelet ${priv_arg}\
         --v=${LOG_LEVEL} \
+        --volume-plugin-dir="${FLEX_VOLUME_PLUGIN_DIR}" \
         --chaos-chance="${CHAOS_CHANCE}" \
         --container-runtime="${CONTAINER_RUNTIME}" \
         --experimental-cri=${EXPERIMENTAL_CRI} \
