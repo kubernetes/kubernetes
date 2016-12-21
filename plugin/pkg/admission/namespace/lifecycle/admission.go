@@ -23,14 +23,14 @@ import (
 
 	"github.com/golang/glog"
 
-	"k8s.io/kubernetes/pkg/client/cache"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	"k8s.io/kubernetes/pkg/controller/informers"
-
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
+	"k8s.io/kubernetes/pkg/client/cache"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	"k8s.io/kubernetes/pkg/controller/informers"
+	kubeapiserveradmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
 	utilcache "k8s.io/kubernetes/pkg/util/cache"
 	"k8s.io/kubernetes/pkg/util/clock"
 	"k8s.io/kubernetes/pkg/util/sets"
@@ -50,8 +50,8 @@ const (
 )
 
 func init() {
-	admission.RegisterPlugin(PluginName, func(client clientset.Interface, config io.Reader) (admission.Interface, error) {
-		return NewLifecycle(client, sets.NewString(api.NamespaceDefault, api.NamespaceSystem))
+	admission.RegisterPlugin(PluginName, func(config io.Reader) (admission.Interface, error) {
+		return NewLifecycle(sets.NewString(api.NamespaceDefault, api.NamespaceSystem))
 	})
 }
 
@@ -59,7 +59,7 @@ func init() {
 // It enforces life-cycle constraints around a Namespace depending on its Phase
 type lifecycle struct {
 	*admission.Handler
-	client             clientset.Interface
+	client             internalclientset.Interface
 	immortalNamespaces sets.String
 	namespaceInformer  cache.SharedIndexInformer
 	// forceLiveLookupCache holds a list of entries for namespaces that we have a strong reason to believe are stale in our local cache.
@@ -71,7 +71,8 @@ type forceLiveLookupEntry struct {
 	expiry time.Time
 }
 
-var _ = admission.WantsInformerFactory(&lifecycle{})
+var _ = kubeapiserveradmission.WantsInformerFactory(&lifecycle{})
+var _ = kubeapiserveradmission.WantsInternalClientSet(&lifecycle{})
 
 func makeNamespaceKey(namespace string) *api.Namespace {
 	return &api.Namespace{
@@ -167,15 +168,14 @@ func (l *lifecycle) Admit(a admission.Attributes) error {
 }
 
 // NewLifecycle creates a new namespace lifecycle admission control handler
-func NewLifecycle(c clientset.Interface, immortalNamespaces sets.String) (admission.Interface, error) {
-	return newLifecycleWithClock(c, immortalNamespaces, clock.RealClock{})
+func NewLifecycle(immortalNamespaces sets.String) (admission.Interface, error) {
+	return newLifecycleWithClock(immortalNamespaces, clock.RealClock{})
 }
 
-func newLifecycleWithClock(c clientset.Interface, immortalNamespaces sets.String, clock utilcache.Clock) (admission.Interface, error) {
+func newLifecycleWithClock(immortalNamespaces sets.String, clock utilcache.Clock) (admission.Interface, error) {
 	forceLiveLookupCache := utilcache.NewLRUExpireCacheWithClock(100, clock)
 	return &lifecycle{
 		Handler:              admission.NewHandler(admission.Create, admission.Update, admission.Delete),
-		client:               c,
 		immortalNamespaces:   immortalNamespaces,
 		forceLiveLookupCache: forceLiveLookupCache,
 	}, nil
@@ -186,9 +186,16 @@ func (l *lifecycle) SetInformerFactory(f informers.SharedInformerFactory) {
 	l.SetReadyFunc(l.namespaceInformer.HasSynced)
 }
 
+func (l *lifecycle) SetInternalClientSet(client internalclientset.Interface) {
+	l.client = client
+}
+
 func (l *lifecycle) Validate() error {
 	if l.namespaceInformer == nil {
 		return fmt.Errorf("missing namespaceInformer")
+	}
+	if l.client == nil {
+		return fmt.Errorf("missing client")
 	}
 	return nil
 }

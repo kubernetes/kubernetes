@@ -18,6 +18,7 @@ package admission
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
@@ -26,15 +27,13 @@ import (
 	"sync"
 
 	"github.com/golang/glog"
-
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 )
 
 // Factory is a function that returns an Interface for admission decisions.
 // The config parameter provides an io.Reader handler to the factory in
 // order to load specific configurations. If no configuration is provided
 // the parameter is nil.
-type Factory func(client clientset.Interface, config io.Reader) (Interface, error)
+type Factory func(config io.Reader) (Interface, error)
 
 // All registered admission options.
 var (
@@ -79,7 +78,7 @@ func RegisterPlugin(name string, plugin Factory) {
 // the name is not known. The error is returned only when the named provider was
 // known but failed to initialize.  The config parameter specifies the io.Reader
 // handler of the configuration file for the cloud provider, or nil for no configuration.
-func getPlugin(name string, client clientset.Interface, config io.Reader) (Interface, bool, error) {
+func getPlugin(name string, config io.Reader) (Interface, bool, error) {
 	pluginsMutex.Lock()
 	defer pluginsMutex.Unlock()
 	f, found := plugins[name]
@@ -95,7 +94,7 @@ func getPlugin(name string, client clientset.Interface, config io.Reader) (Inter
 		return nil, true, nil
 	}
 
-	ret, err := f(client, config2)
+	ret, err := f(config2)
 	return ret, true, err
 }
 
@@ -113,8 +112,24 @@ func splitStream(config io.Reader) (io.Reader, io.Reader, error) {
 	return bytes.NewBuffer(configBytes), bytes.NewBuffer(configBytes), nil
 }
 
+// NewFromPlugins returns an admission.Interface that will enforce admission control decisions of all
+// the given plugins.
+func NewFromPlugins(pluginNames []string, configFilePath string, pluginInitializer PluginInitializer) (Interface, error) {
+	plugins := []Interface{}
+	for _, pluginName := range pluginNames {
+		plugin, err := InitPlugin(pluginName, configFilePath, pluginInitializer)
+		if err != nil {
+			return nil, err
+		}
+		if plugin != nil {
+			plugins = append(plugins, plugin)
+		}
+	}
+	return chainAdmissionHandler(plugins), nil
+}
+
 // InitPlugin creates an instance of the named interface.
-func InitPlugin(name string, client clientset.Interface, configFilePath string) Interface {
+func InitPlugin(name string, configFilePath string, pluginInitializer PluginInitializer) (Interface, error) {
 	var (
 		config *os.File
 		err    error
@@ -122,7 +137,7 @@ func InitPlugin(name string, client clientset.Interface, configFilePath string) 
 
 	if name == "" {
 		glog.Info("No admission plugin specified.")
-		return nil
+		return nil, nil
 	}
 
 	if configFilePath != "" {
@@ -135,13 +150,39 @@ func InitPlugin(name string, client clientset.Interface, configFilePath string) 
 		defer config.Close()
 	}
 
-	plugin, found, err := getPlugin(name, client, config)
+	plugin, found, err := getPlugin(name, config)
 	if err != nil {
-		glog.Fatalf("Couldn't init admission plugin %q: %v", name, err)
+		return nil, fmt.Errorf("Couldn't init admission plugin %q: %v", name, err)
 	}
 	if !found {
-		glog.Fatalf("Unknown admission plugin: %s", name)
+		return nil, fmt.Errorf("Unknown admission plugin: %s", name)
 	}
 
-	return plugin
+	pluginInitializer.Initialize(plugin)
+	// ensure that plugins have been properly initialized
+	if err := Validate(plugin); err != nil {
+		return nil, err
+	}
+
+	return plugin, nil
+}
+
+// Validate will call the Validate function in each plugin if they implement
+// the Validator interface.
+func Validate(plugin Interface) error {
+	if validater, ok := plugin.(Validator); ok {
+		err := validater.Validate()
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+type PluginInitializers []PluginInitializer
+
+func (pp PluginInitializers) Initialize(plugin Interface) {
+	for _, p := range pp {
+		p.Initialize(plugin)
+	}
 }

@@ -20,6 +20,7 @@ go_library(
         "//pkg/client/cache:go_default_library",
         "//pkg/client/clientset_generated/internalclientset:go_default_library",
         "//pkg/controller/informers:go_default_library",
+        "//pkg/kubeapiserver/admission:go_default_library",
         "//pkg/labels:go_default_library",
         "//pkg/util/yaml:go_default_library",
         "//vendor:github.com/golang/glog",

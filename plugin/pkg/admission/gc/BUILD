@@ -17,7 +17,6 @@ go_library(
         "//pkg/api:go_default_library",
         "//pkg/api/meta:go_default_library",
         "//pkg/auth/authorizer:go_default_library",
-        "//pkg/client/clientset_generated/internalclientset:go_default_library",
         "//pkg/runtime:go_default_library",
     ],
 )

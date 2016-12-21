@@ -16,7 +16,6 @@ go_library(
         "//pkg/admission:go_default_library",
         "//pkg/api:go_default_library",
         "//pkg/api/errors:go_default_library",
-        "//pkg/client/clientset_generated/internalclientset:go_default_library",
     ],
 )
 

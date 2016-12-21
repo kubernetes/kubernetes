@@ -37,6 +37,7 @@ import (
 	"k8s.io/kubernetes/pkg/generated/openapi"
 	"k8s.io/kubernetes/pkg/genericapiserver"
 	"k8s.io/kubernetes/pkg/genericapiserver/filters"
+	kubeapiserveradmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
 	"k8s.io/kubernetes/pkg/registry/cachesize"
 	"k8s.io/kubernetes/pkg/registry/generic"
 	genericregistry "k8s.io/kubernetes/pkg/registry/generic/registry"
@@ -156,8 +157,8 @@ func Run(s *options.ServerRunOptions) error {
 	}
 
 	admissionControlPluginNames := strings.Split(s.GenericServerRunOptions.AdmissionControl, ",")
-	pluginInitializer := admission.NewPluginInitializer(sharedInformers, apiAuthorizer)
-	admissionController, err := admission.NewFromPlugins(client, admissionControlPluginNames, s.GenericServerRunOptions.AdmissionControlConfigFile, pluginInitializer)
+	pluginInitializer := kubeapiserveradmission.NewPluginInitializer(client, sharedInformers, apiAuthorizer)
+	admissionController, err := admission.NewFromPlugins(admissionControlPluginNames, s.GenericServerRunOptions.AdmissionControlConfigFile, pluginInitializer)
 	if err != nil {
 		return fmt.Errorf("failed to initialize plugins: %v", err)
 	}

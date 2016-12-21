@@ -69,3 +69,15 @@ const (
 	Delete  Operation = "DELETE"
 	Connect Operation = "CONNECT"
 )
+
+// PluginInitializer is used for initialization of shareable resources between admission plugins.
+// After initialization the resources have to be set separately
+type PluginInitializer interface {
+	Initialize(plugin Interface)
+}
+
+// Validator holds Validate functions, which are responsible for validation of initialized shared resources
+// and should be implemented on admission plugins
+type Validator interface {
+	Validate() error
+}

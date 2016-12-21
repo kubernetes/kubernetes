@@ -24,12 +24,11 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/auth/authorizer"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/runtime"
 )
 
 func init() {
-	admission.RegisterPlugin("OwnerReferencesPermissionEnforcement", func(client clientset.Interface, config io.Reader) (admission.Interface, error) {
+	admission.RegisterPlugin("OwnerReferencesPermissionEnforcement", func(config io.Reader) (admission.Interface, error) {
 		return &gcPermissionsEnforcement{
 			Handler: admission.NewHandler(admission.Create, admission.Update),
 		}, nil
