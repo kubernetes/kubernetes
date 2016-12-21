@@ -58,12 +58,12 @@ func NewPlanner(preferences *fedapi.FederatedReplicaSetPreferences) *Planner {
 // have all of the replicas assigned. In such case a cluster with higher weight has priority over
 // cluster with lower weight (or with lexicographically smaller name in case of draw).
 // It can also use the current replica count and estimated capacity to provide better planning and
-// adhere to rebalance policy. To avoid prioritization of clusters with smaller lexiconographical names
+// adhere to rebalance policy. To avoid prioritization of clusters with smaller lexicographical names
 // a semi-random string (like replica set name) can be provided.
 // Two maps are returned:
 // * a map that contains information how many replicas will be possible to run in a cluster.
 // * a map that contains information how many extra replicas would be nice to schedule in a cluster so,
-//   if by chance, they are scheudled we will be closer to the desired replicas layout.
+//   if by chance, they are scheduled we will be closer to the desired replicas layout.
 func (p *Planner) Plan(replicasToDistribute int64, availableClusters []string, currentReplicaCount map[string]int64,
 	estimatedCapacity map[string]int64, replicaSetKey string) (map[string]int64, map[string]int64) {
 
@@ -140,7 +140,7 @@ func (p *Planner) Plan(replicasToDistribute int64, availableClusters []string, c
 
 	modified := true
 
-	// It is possible single pass of the loop is not enough to distribue all replicas among clusters due
+	// It is possible single pass of the loop is not enough to distribute all replicas among clusters due
 	// to weight, max and rounding corner cases. In such case we iterate until either
 	// there is no replicas or no cluster gets any more replicas or the number
 	// of attempts is less than available cluster count. If there is no preallocated pods

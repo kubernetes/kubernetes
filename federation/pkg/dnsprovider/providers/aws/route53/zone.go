@@ -24,7 +24,7 @@ import (
 	"k8s.io/kubernetes/federation/pkg/dnsprovider"
 )
 
-// Compile time check for interface adeherence
+// Compile time check for interface adherence
 var _ dnsprovider.Zone = &Zone{}
 
 type Zone struct {

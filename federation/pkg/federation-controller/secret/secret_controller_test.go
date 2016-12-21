@@ -176,7 +176,7 @@ func setClientFactory(informer util.FederatedInformer, informerClientFactory fun
 
 func secretsEqual(a, b apiv1.Secret) bool {
 	// Clear the SelfLink and ObjectMeta.Finalizers since they will be different
-	// in resoure in federation control plane and resource in underlying cluster.
+	// in resource in federation control plane and resource in underlying cluster.
 	a.SelfLink = ""
 	b.SelfLink = ""
 	a.ObjectMeta.Finalizers = []string{}
