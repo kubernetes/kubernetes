@@ -150,27 +150,6 @@ func WriteStaticPodManifests(cfg *kubeadmapi.MasterConfiguration) error {
 	return nil
 }
 
-func DeleteStaticManifests() error {
-	apiServerStaticManifestPath := path.Join(kubeadmapi.GlobalEnvParams.KubernetesDir,
-		"manifests", kubeAPIServer+".json")
-	if err := os.Remove(apiServerStaticManifestPath); err != nil {
-		return fmt.Errorf("unable to delete temporary API server manifest [%v]", err)
-	}
-
-	ctrlMgrStaticManifestPath := path.Join(kubeadmapi.GlobalEnvParams.KubernetesDir,
-		"manifests", kubeControllerManager+".json")
-	if err := os.Remove(ctrlMgrStaticManifestPath); err != nil {
-		return fmt.Errorf("unable to delete temporary controller manager manifest [%v]", err)
-	}
-
-	schedulerStaticManifestPath := path.Join(kubeadmapi.GlobalEnvParams.KubernetesDir,
-		"manifests", kubeScheduler+".json")
-	if err := os.Remove(schedulerStaticManifestPath); err != nil {
-		return fmt.Errorf("unable to delete temporary scheduler manifest [%v]", err)
-	}
-	return nil
-}
-
 // etcdVolume exposes a path on the host in order to guarantee data survival during reboot.
 func etcdVolume(cfg *kubeadmapi.MasterConfiguration) api.Volume {
 	return api.Volume{

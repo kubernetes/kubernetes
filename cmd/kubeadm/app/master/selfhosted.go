@@ -19,6 +19,8 @@ package master
 import (
 	"encoding/json"
 	"fmt"
+	"os"
+	"path"
 	"time"
 
 	"k8s.io/kubernetes/cmd/kubeadm/app/images"
@@ -45,29 +47,32 @@ func CreateSelfHostedControlPlane(cfg *kubeadmapi.MasterConfiguration, client *c
 		volumeMounts = append(volumeMounts, pkiVolumeMount())
 	}
 
+	if err := LaunchSelfHostedAPIServer(cfg, client, volumes, volumeMounts); err != nil {
+		return err
+	}
+
+	if err := LaunchSelfHostedScheduler(cfg, client, volumes, volumeMounts); err != nil {
+		return err
+	}
+
+	if err := LaunchSelfHostedControllerManager(cfg, client, volumes, volumeMounts); err != nil {
+		return err
+	}
+	return nil
+}
+
+func LaunchSelfHostedAPIServer(cfg *kubeadmapi.MasterConfiguration, client *clientset.Clientset, volumes []v1.Volume, volumeMounts []v1.VolumeMount) error {
+	start := time.Now()
+
 	apiServer := getAPIServerDS(cfg, volumes, volumeMounts)
 	if _, err := client.Extensions().DaemonSets(api.NamespaceSystem).Create(&apiServer); err != nil {
 		return fmt.Errorf("failed to create self-hosted %q daemon set [%v]", kubeAPIServer, err)
 	}
 
-	ctrlMgr := getControllerManagerDeployment(cfg, volumes, volumeMounts)
-	if _, err := client.Extensions().Deployments(api.NamespaceSystem).Create(&ctrlMgr); err != nil {
-		return fmt.Errorf("failed to create self-hosted %q deployment [%v]", kubeControllerManager, err)
-	}
-
-	scheduler := getSchedulerDeployment(cfg)
-	if _, err := client.Extensions().Deployments(api.NamespaceSystem).Create(&scheduler); err != nil {
-		return fmt.Errorf("failed to create self-hosted %q deployment [%v]", kubeScheduler, err)
-	}
-
-	return nil
-}
-
-func WaitForSelfHostedControlPlane(client *clientset.Clientset) error {
-	start := time.Now()
-	// TODO: Break this up into multiple wait's so we don't re-do every step:
 	wait.PollInfinite(apiCallRetryInterval, func() (bool, error) {
 		// TODO: This might be pointless, checking the pods is probably enough.
+		// It does however get us a count of how many there should be which may be useful
+		// with HA.
 		apiDS, err := client.DaemonSets(api.NamespaceSystem).Get(kubeAPIServer,
 			metav1.GetOptions{})
 		if err != nil {
@@ -101,10 +106,107 @@ func WaitForSelfHostedControlPlane(client *clientset.Clientset) error {
 			}
 		}
 
-		fmt.Printf("[debug] self-hosted control plane components ready after %f seconds\n", time.Since(start).Seconds())
 		return true, nil
 	})
-	// TODO: Timeout eventually
+
+	apiServerStaticManifestPath := path.Join(kubeadmapi.GlobalEnvParams.KubernetesDir,
+		"manifests", kubeAPIServer+".json")
+	if err := os.Remove(apiServerStaticManifestPath); err != nil {
+		return fmt.Errorf("unable to delete temporary API server manifest [%v]", err)
+	}
+
+	// Wait until kubernetes detects the static pod removal and our newly created
+	// API server comes online:
+	// TODO: Should we verify that either the API is down, or the static apiserver pod is gone before
+	// waiting?
+	WaitForAPI(client)
+
+	fmt.Printf("[debug] self-hosted kube-apiserver ready after %f seconds\n", time.Since(start).Seconds())
+	return nil
+}
+
+func LaunchSelfHostedControllerManager(cfg *kubeadmapi.MasterConfiguration, client *clientset.Clientset, volumes []v1.Volume, volumeMounts []v1.VolumeMount) error {
+	start := time.Now()
+
+	ctrlMgr := getControllerManagerDeployment(cfg, volumes, volumeMounts)
+	if _, err := client.Extensions().Deployments(api.NamespaceSystem).Create(&ctrlMgr); err != nil {
+		return fmt.Errorf("failed to create self-hosted %q deployment [%v]", kubeControllerManager, err)
+	}
+
+	wait.PollInfinite(apiCallRetryInterval, func() (bool, error) {
+		// TODO: Do we need a stronger label link than this?
+		listOpts := v1.ListOptions{LabelSelector: "k8s-app=kube-controller-manager"}
+		apiPods, err := client.Pods(api.NamespaceSystem).List(listOpts)
+		if err != nil {
+			fmt.Println("[debug] error getting controller manager pods:", err)
+			return false, nil
+		}
+		fmt.Printf("[debug] Found %d controller manager pods\n", len(apiPods.Items))
+		// TODO: HA
+		if int32(len(apiPods.Items)) != 1 {
+			return false, nil
+		}
+		for _, pod := range apiPods.Items {
+			fmt.Printf("[debug] Pod %s status: %s\n", pod.Name, pod.Status.Phase)
+			if pod.Status.Phase != "Running" {
+				return false, nil
+			}
+		}
+
+		return true, nil
+	})
+
+	ctrlMgrStaticManifestPath := path.Join(kubeadmapi.GlobalEnvParams.KubernetesDir,
+		"manifests", kubeControllerManager+".json")
+	if err := os.Remove(ctrlMgrStaticManifestPath); err != nil {
+		return fmt.Errorf("unable to delete temporary controller manager manifest [%v]", err)
+	}
+
+	fmt.Printf("[debug] self-hosted kube-controller-manager ready after %f seconds\n", time.Since(start).Seconds())
+	return nil
+
+}
+
+func LaunchSelfHostedScheduler(cfg *kubeadmapi.MasterConfiguration, client *clientset.Clientset, volumes []v1.Volume, volumeMounts []v1.VolumeMount) error {
+
+	scheduler := getSchedulerDeployment(cfg)
+	if _, err := client.Extensions().Deployments(api.NamespaceSystem).Create(&scheduler); err != nil {
+		return fmt.Errorf("failed to create self-hosted %q deployment [%v]", kubeScheduler, err)
+	}
+
+	start := time.Now()
+	// Wait for the scheduler and controller manager to be ready:
+	wait.PollInfinite(apiCallRetryInterval, func() (bool, error) {
+		// TODO: Do we need a stronger label link than this?
+		listOpts := v1.ListOptions{LabelSelector: "k8s-app=kube-scheduler"}
+		apiPods, err := client.Pods(api.NamespaceSystem).List(listOpts)
+		if err != nil {
+			fmt.Println("[debug] error getting scheduler pods:", err)
+			return false, nil
+		}
+		fmt.Printf("[debug] Found %d scheduler pods\n", len(apiPods.Items))
+		// TODO: HA
+		if int32(len(apiPods.Items)) != 1 {
+			return false, nil
+		}
+		for _, pod := range apiPods.Items {
+			fmt.Printf("[debug] Pod %s status: %s\n", pod.Name, pod.Status.Phase)
+			if pod.Status.Phase != "Running" {
+				return false, nil
+			}
+		}
+
+		fmt.Printf("[debug] self-hosted kube-scheduler ready after %f seconds\n", time.Since(start).Seconds())
+		return true, nil
+	})
+
+	schedulerStaticManifestPath := path.Join(kubeadmapi.GlobalEnvParams.KubernetesDir,
+		"manifests", kubeScheduler+".json")
+	if err := os.Remove(schedulerStaticManifestPath); err != nil {
+		return fmt.Errorf("unable to delete temporary scheduler manifest [%v]", err)
+	}
+
+	fmt.Printf("[debug] self-hosted kube-scheduler ready after %f seconds\n", time.Since(start).Seconds())
 	return nil
 }
 
