@@ -540,7 +540,8 @@ func storeDaemonSetStatus(dsClient unversionedextensions.DaemonSetInterface, ds 
 	if int(ds.Status.DesiredNumberScheduled) == desiredNumberScheduled &&
 		int(ds.Status.CurrentNumberScheduled) == currentNumberScheduled &&
 		int(ds.Status.NumberMisscheduled) == numberMisscheduled &&
-		int(ds.Status.NumberReady) == numberReady {
+		int(ds.Status.NumberReady) == numberReady &&
+		ds.Status.ObservedGeneration >= ds.Generation {
 		return nil
 	}
 
@@ -553,6 +554,7 @@ func storeDaemonSetStatus(dsClient unversionedextensions.DaemonSetInterface, ds 
 
 	var updateErr, getErr error
 	for i := 0; i < StatusUpdateRetries; i++ {
+		toUpdate.Status.ObservedGeneration = ds.Generation
 		toUpdate.Status.DesiredNumberScheduled = int32(desiredNumberScheduled)
 		toUpdate.Status.CurrentNumberScheduled = int32(currentNumberScheduled)
 		toUpdate.Status.NumberMisscheduled = int32(numberMisscheduled)
