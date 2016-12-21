@@ -609,3 +609,28 @@ func TestNumberReadyStatus(t *testing.T) {
 		t.Errorf("Wrong daemon %s status: %v", updated.Name, updated.Status)
 	}
 }
+
+func TestObservedGeneration(t *testing.T) {
+	daemon := newDaemonSet("foo")
+	daemon.Generation = 1
+	manager, podControl, clientset := newTestController()
+	var updated *extensions.DaemonSet
+	clientset.PrependReactor("update", "daemonsets", func(action core.Action) (handled bool, ret runtime.Object, err error) {
+		if action.GetSubresource() != "status" {
+			return false, nil, nil
+		}
+		if u, ok := action.(core.UpdateAction); ok {
+			updated = u.GetObject().(*extensions.DaemonSet)
+		}
+		return false, nil, nil
+	})
+
+	addNodes(manager.nodeStore.Store, 0, 1, simpleNodeLabel)
+	addPods(manager.podStore.Indexer, "node-0", simpleDaemonSetLabel, 1)
+	manager.dsStore.Add(daemon)
+
+	syncAndValidateDaemonSets(t, manager, daemon, podControl, 0, 0)
+	if updated.Status.ObservedGeneration != daemon.Generation {
+		t.Errorf("Wrong ObservedGeneration for daemon %s in status. Expected %d, got %d", updated.Name, daemon.Generation, updated.Status.ObservedGeneration)
+	}
+}

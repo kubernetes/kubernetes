@@ -80,6 +80,7 @@ func TestValidateDaemonSetStatusUpdate(t *testing.T) {
 					NumberMisscheduled:     2,
 					DesiredNumberScheduled: 3,
 					NumberReady:            1,
+					ObservedGeneration:     3,
 				},
 			},
 			update: extensions.DaemonSet{
@@ -93,6 +94,7 @@ func TestValidateDaemonSetStatusUpdate(t *testing.T) {
 					NumberMisscheduled:     -1,
 					DesiredNumberScheduled: -3,
 					NumberReady:            -1,
+					ObservedGeneration:     -3,
 				},
 			},
 		},
@@ -108,6 +110,7 @@ func TestValidateDaemonSetStatusUpdate(t *testing.T) {
 					NumberMisscheduled:     2,
 					DesiredNumberScheduled: 3,
 					NumberReady:            1,
+					ObservedGeneration:     3,
 				},
 			},
 			update: extensions.DaemonSet{
@@ -121,6 +124,7 @@ func TestValidateDaemonSetStatusUpdate(t *testing.T) {
 					NumberMisscheduled:     1,
 					DesiredNumberScheduled: 3,
 					NumberReady:            1,
+					ObservedGeneration:     3,
 				},
 			},
 		},
@@ -136,6 +140,7 @@ func TestValidateDaemonSetStatusUpdate(t *testing.T) {
 					NumberMisscheduled:     2,
 					DesiredNumberScheduled: 3,
 					NumberReady:            1,
+					ObservedGeneration:     3,
 				},
 			},
 			update: extensions.DaemonSet{
@@ -149,6 +154,7 @@ func TestValidateDaemonSetStatusUpdate(t *testing.T) {
 					NumberMisscheduled:     -1,
 					DesiredNumberScheduled: 3,
 					NumberReady:            1,
+					ObservedGeneration:     3,
 				},
 			},
 		},
@@ -164,6 +170,7 @@ func TestValidateDaemonSetStatusUpdate(t *testing.T) {
 					NumberMisscheduled:     2,
 					DesiredNumberScheduled: 3,
 					NumberReady:            1,
+					ObservedGeneration:     3,
 				},
 			},
 			update: extensions.DaemonSet{
@@ -177,6 +184,7 @@ func TestValidateDaemonSetStatusUpdate(t *testing.T) {
 					NumberMisscheduled:     1,
 					DesiredNumberScheduled: -3,
 					NumberReady:            1,
+					ObservedGeneration:     3,
 				},
 			},
 		},
@@ -192,6 +200,7 @@ func TestValidateDaemonSetStatusUpdate(t *testing.T) {
 					NumberMisscheduled:     2,
 					DesiredNumberScheduled: 3,
 					NumberReady:            1,
+					ObservedGeneration:     3,
 				},
 			},
 			update: extensions.DaemonSet{
@@ -205,6 +214,37 @@ func TestValidateDaemonSetStatusUpdate(t *testing.T) {
 					NumberMisscheduled:     1,
 					DesiredNumberScheduled: 3,
 					NumberReady:            -1,
+					ObservedGeneration:     3,
+				},
+			},
+		},
+		"negative ObservedGeneration": {
+			old: extensions.DaemonSet{
+				ObjectMeta: api.ObjectMeta{
+					Name:            "abc",
+					Namespace:       api.NamespaceDefault,
+					ResourceVersion: "10",
+				},
+				Status: extensions.DaemonSetStatus{
+					CurrentNumberScheduled: 1,
+					NumberMisscheduled:     2,
+					DesiredNumberScheduled: 3,
+					NumberReady:            1,
+					ObservedGeneration:     3,
+				},
+			},
+			update: extensions.DaemonSet{
+				ObjectMeta: api.ObjectMeta{
+					Name:            "abc",
+					Namespace:       api.NamespaceDefault,
+					ResourceVersion: "10",
+				},
+				Status: extensions.DaemonSetStatus{
+					CurrentNumberScheduled: 1,
+					NumberMisscheduled:     1,
+					DesiredNumberScheduled: 3,
+					NumberReady:            1,
+					ObservedGeneration:     -3,
 				},
 			},
 		},
