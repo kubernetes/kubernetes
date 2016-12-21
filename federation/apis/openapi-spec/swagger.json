@@ -11350,7 +11350,7 @@
     }
    },
    "v1beta1.ClusterStatus": {
-    "description": "ClusterStatus is information about the current status of a cluster updated by cluster controller peridocally.",
+    "description": "ClusterStatus is information about the current status of a cluster updated by cluster controller periodically.",
     "properties": {
      "conditions": {
       "description": "Conditions is an array of current cluster conditions.",

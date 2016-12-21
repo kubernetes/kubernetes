@@ -199,7 +199,7 @@ func initFederation(cmdOut io.Writer, config util.AdminConfig, cmd *cobra.Comman
 	}
 
 	// Since only one IP address can be specified as advertise address,
-	// we arbitrarily pick the first availabe IP address
+	// we arbitrarily pick the first available IP address
 	advertiseAddress := ""
 	if len(ips) > 0 {
 		advertiseAddress = ips[0]
