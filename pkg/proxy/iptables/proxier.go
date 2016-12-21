@@ -599,7 +599,6 @@ func addEndpointToMap(endpointsMap map[string]endpointsInfoSlice, ip string, por
 }
 
 func buildEndpointsMap(allEndpoints []api.Endpoints, hostname string, oldEndpointsMap proxyEndpointsMap) (proxyEndpointsMap, healthCheckMap, map[endpointServicePair]bool) {
-	activeEndpoints := make(map[proxy.ServicePortName]bool) // use a map as a set
 	staleConnections := make(map[endpointServicePair]bool)
 	newEndpointsMap := make(proxyEndpointsMap)
 	hcUpdates := make(healthCheckMap)
@@ -632,28 +631,19 @@ func buildEndpointsMap(allEndpoints []api.Endpoints, hostname string, oldEndpoin
 		}
 		for portname, newEndpoints := range portsToEndpoints {
 			svcPort := proxy.ServicePortName{NamespacedName: namespacedName, Port: portname}
-			curEndpoints := oldEndpointsMap[svcPort]
 			sort.Sort(newEndpoints)
-			if len(curEndpoints) != len(newEndpoints) || !reflect.DeepEqual(curEndpoints, newEndpoints) {
-				glog.V(3).Infof("Setting endpoints for %q to %+v", svcPort, newEndpoints)
-				// Gather stale connections to removed endpoints
-				removedEndpoints := getRemovedEndpoints(curEndpoints, newEndpoints)
-				for _, ep := range removedEndpoints {
-					staleConnections[endpointServicePair{endpoint: ep, servicePortName: svcPort}] = true
-				}
-			}
 			newEndpointsMap[svcPort] = newEndpoints
-			activeEndpoints[svcPort] = true
 		}
 	}
 
-	// Check stale connections against endpoints missing from the update.
-	for svcPort := range oldEndpointsMap {
-		if !activeEndpoints[svcPort] {
+	// Find old endpoints and stale connections
+	for svcPort, oldEndpoints := range oldEndpointsMap {
+		newEndpoints := newEndpointsMap[svcPort]
+		if len(oldEndpoints) != len(newEndpoints) || !reflect.DeepEqual(oldEndpoints, newEndpoints) {
 			glog.V(2).Infof("Removing endpoints for %q", svcPort)
-			// record endpoints of unactive service to stale connections
-			for _, ep := range oldEndpointsMap[svcPort] {
-				staleConnections[endpointServicePair{endpoint: ep.ip, servicePortName: svcPort}] = true
+			removedEndpoints := getRemovedEndpoints(oldEndpoints, newEndpoints)
+			for _, ep := range removedEndpoints {
+				staleConnections[endpointServicePair{endpoint: ep, servicePortName: svcPort}] = true
 			}
 			addHealthCheckUpdate(hcUpdates, svcPort.NamespacedName, false)
 		}

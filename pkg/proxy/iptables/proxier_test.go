@@ -1297,6 +1297,18 @@ func TestBuildEndpointsMap(t *testing.T) {
 		t.Errorf("expected stale connections length 0, got %v", staleConnections)
 	}
 
+	// Rebuild with same data; nothing should have changed
+	sameEndpointsMap, sameHCUpdateMap, sameStaleConnections := buildEndpointsMap(first, "node-1", endpointsMap)
+	if !reflect.DeepEqual(endpointsMap, sameEndpointsMap) {
+		t.Errorf("expected healthcheck updates %v but got %v", endpointsMap, sameEndpointsMap)
+	}
+	if !reflect.DeepEqual(hcUpdateMap, sameHCUpdateMap) {
+		t.Errorf("expected healthcheck updates %v but got %v", hcUpdateMap, sameHCUpdateMap)
+	}
+	if len(sameStaleConnections) != 0 {
+		t.Errorf("expected stale connections length 0, got %v", sameStaleConnections)
+	}
+
 	second := []api.Endpoints{
 		makeTestEndpoint("somewhere", "some-endpoint", func(s *api.EndpointSubset) {
 			s.Addresses = addTestEndpointAddress(s.Addresses, "1.2.3.4", "foobar.com", &node1)
