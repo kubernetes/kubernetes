@@ -3249,6 +3249,9 @@ const (
 	// - Secret.Data["token"] - a token that identifies the service account to the API
 	SecretTypeServiceAccountToken SecretType = "kubernetes.io/service-account-token"
 
+	// SecretTypeBootstrapToken is the key for tokens used by kubeadm to validate cluster info during discovery.
+	SecretTypeBootstrapToken = "bootstrap.kubernetes.io/token"
+
 	// ServiceAccountNameKey is the key of the required annotation for SecretTypeServiceAccountToken secrets
 	ServiceAccountNameKey = "kubernetes.io/service-account.name"
 	// ServiceAccountUIDKey is the key of the required annotation for SecretTypeServiceAccountToken secrets
