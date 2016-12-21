@@ -83,31 +83,15 @@ func LaunchSelfHostedAPIServer(cfg *kubeadmapi.MasterConfiguration, client *clie
 			kubeAPIServer,
 			apiDS.Status.CurrentNumberScheduled,
 			apiDS.Status.DesiredNumberScheduled)
+
 		if apiDS.Status.CurrentNumberScheduled != apiDS.Status.DesiredNumberScheduled {
 			return false, nil
 		}
 
-		// Check that all API Server pods are running:
-		// TODO: Do we need a stronger label link than this?
-		listOpts := v1.ListOptions{LabelSelector: "k8s-app=kube-apiserver"}
-		apiPods, err := client.Pods(api.NamespaceSystem).List(listOpts)
-		if err != nil {
-			fmt.Println("[debug] error getting apiserver pods:", err)
-			return false, nil
-		}
-		fmt.Printf("[debug] Found %d apiserver pods\n", len(apiPods.Items))
-		if int32(len(apiPods.Items)) != apiDS.Status.DesiredNumberScheduled {
-			return false, nil
-		}
-		for _, pod := range apiPods.Items {
-			fmt.Printf("[debug] Pod %s status: %s\n", pod.Name, pod.Status.Phase)
-			if pod.Status.Phase != "Running" {
-				return false, nil
-			}
-		}
-
 		return true, nil
 	})
+
+	waitForPodsWithLabel(client, kubeAPIServer)
 
 	apiServerStaticManifestPath := path.Join(kubeadmapi.GlobalEnvParams.KubernetesDir,
 		"manifests", kubeAPIServer+".json")
@@ -133,28 +117,7 @@ func LaunchSelfHostedControllerManager(cfg *kubeadmapi.MasterConfiguration, clie
 		return fmt.Errorf("failed to create self-hosted %q deployment [%v]", kubeControllerManager, err)
 	}
 
-	wait.PollInfinite(apiCallRetryInterval, func() (bool, error) {
-		// TODO: Do we need a stronger label link than this?
-		listOpts := v1.ListOptions{LabelSelector: "k8s-app=kube-controller-manager"}
-		apiPods, err := client.Pods(api.NamespaceSystem).List(listOpts)
-		if err != nil {
-			fmt.Println("[debug] error getting controller manager pods:", err)
-			return false, nil
-		}
-		fmt.Printf("[debug] Found %d controller manager pods\n", len(apiPods.Items))
-		// TODO: HA
-		if int32(len(apiPods.Items)) != 1 {
-			return false, nil
-		}
-		for _, pod := range apiPods.Items {
-			fmt.Printf("[debug] Pod %s status: %s\n", pod.Name, pod.Status.Phase)
-			if pod.Status.Phase != "Running" {
-				return false, nil
-			}
-		}
-
-		return true, nil
-	})
+	waitForPodsWithLabel(client, kubeControllerManager)
 
 	ctrlMgrStaticManifestPath := path.Join(kubeadmapi.GlobalEnvParams.KubernetesDir,
 		"manifests", kubeControllerManager+".json")
@@ -169,22 +132,37 @@ func LaunchSelfHostedControllerManager(cfg *kubeadmapi.MasterConfiguration, clie
 
 func LaunchSelfHostedScheduler(cfg *kubeadmapi.MasterConfiguration, client *clientset.Clientset, volumes []v1.Volume, volumeMounts []v1.VolumeMount) error {
 
+	start := time.Now()
 	scheduler := getSchedulerDeployment(cfg)
 	if _, err := client.Extensions().Deployments(api.NamespaceSystem).Create(&scheduler); err != nil {
 		return fmt.Errorf("failed to create self-hosted %q deployment [%v]", kubeScheduler, err)
 	}
 
-	start := time.Now()
-	// Wait for the scheduler and controller manager to be ready:
+	waitForPodsWithLabel(client, kubeScheduler)
+
+	schedulerStaticManifestPath := path.Join(kubeadmapi.GlobalEnvParams.KubernetesDir,
+		"manifests", kubeScheduler+".json")
+	if err := os.Remove(schedulerStaticManifestPath); err != nil {
+		return fmt.Errorf("unable to delete temporary scheduler manifest [%v]", err)
+	}
+
+	fmt.Printf("[debug] self-hosted kube-scheduler ready after %f seconds\n", time.Since(start).Seconds())
+	return nil
+}
+
+// waitForPodsWithLabel will lookup pods with the given label and wait until they are all
+// reporting status as running.
+func waitForPodsWithLabel(client *clientset.Clientset, appLabel string) {
 	wait.PollInfinite(apiCallRetryInterval, func() (bool, error) {
 		// TODO: Do we need a stronger label link than this?
-		listOpts := v1.ListOptions{LabelSelector: "k8s-app=kube-scheduler"}
+		listOpts := v1.ListOptions{LabelSelector: fmt.Sprintf("k8s-app=%s", appLabel)}
 		apiPods, err := client.Pods(api.NamespaceSystem).List(listOpts)
 		if err != nil {
-			fmt.Println("[debug] error getting scheduler pods:", err)
+			fmt.Printf("[debug] error getting %s pods [%v]\n", appLabel, err)
 			return false, nil
 		}
-		fmt.Printf("[debug] Found %d scheduler pods\n", len(apiPods.Items))
+		fmt.Printf("[debug] Found %d %s pods\n", len(apiPods.Items), appLabel)
+
 		// TODO: HA
 		if int32(len(apiPods.Items)) != 1 {
 			return false, nil
@@ -196,18 +174,10 @@ func LaunchSelfHostedScheduler(cfg *kubeadmapi.MasterConfiguration, client *clie
 			}
 		}
 
-		fmt.Printf("[debug] self-hosted kube-scheduler ready after %f seconds\n", time.Since(start).Seconds())
 		return true, nil
 	})
 
-	schedulerStaticManifestPath := path.Join(kubeadmapi.GlobalEnvParams.KubernetesDir,
-		"manifests", kubeScheduler+".json")
-	if err := os.Remove(schedulerStaticManifestPath); err != nil {
-		return fmt.Errorf("unable to delete temporary scheduler manifest [%v]", err)
-	}
-
-	fmt.Printf("[debug] self-hosted kube-scheduler ready after %f seconds\n", time.Since(start).Seconds())
-	return nil
+	return
 }
 
 // Sources from bootkube templates.go
