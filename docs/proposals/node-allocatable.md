@@ -99,7 +99,7 @@ behavior is equivalent to the 1.1 behavior with scheduling based on Capacity.
 #### System-Reserved
 
 In the initial implementation, `SystemReserved` will be functionally equivalent to
-[`KubeReserved`](#system-reserved), but with a different semantic meaning. While KubeReserved
+[`KubeReserved`](#kube-reserved), but with a different semantic meaning. While KubeReserved
 designates resources set aside for kubernetes components, SystemReserved designates resources set
 aside for non-kubernetes components (currently this is reported as all the processes lumped
 together in the `/system` raw container).
