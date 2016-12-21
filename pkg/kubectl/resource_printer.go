@@ -141,7 +141,10 @@ func GetPrinter(format, formatArgument string, noHeaders bool) (ResourcePrinter,
 			return nil, false, err
 		}
 	case "wide":
-		fallthrough
+		return NewHumanReadablePrinter(PrintOptions{
+			NoHeaders: noHeaders,
+			Wide:      true,
+		}), false, nil
 	case "":
 		return nil, false, nil
 	default:
