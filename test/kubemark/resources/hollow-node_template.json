@@ -27,9 +27,21 @@
 						}
 					},
 					{
+						"name": "npdconfig-volume",
+						"configMap": {
+							"name": "node-problem-detector-config"
+						}
+					},
+					{
 						"name": "logs-volume",
 						"hostPath": {
 							"path": "/var/logs"
+						}
+					},
+					{
+						"name": "kernellog-volume",
+						"hostPath": {
+							"path": "/var/log"
 						}
 					}
 				],
@@ -57,7 +69,7 @@
 							"valueFrom": {
 								"fieldRef": {
 									"fieldPath": "metadata.name"
-									}
+								}
 							}
 						}
 					],
@@ -105,7 +117,7 @@
 							"valueFrom": {
 								"fieldRef": {
 									"fieldPath": "metadata.name"
-									}
+								}
 							}
 						}
 					],
@@ -129,6 +141,41 @@
 							"cpu": "20m",
 							"memory": "100M"
 						}
+					}
+				},
+				{
+					"name": "hollow-node-problem-detector",
+					"image": "gcr.io/google_containers/node-problem-detector:v0.2",
+					"env": [
+						{
+							"name": "NODE_NAME",
+							"valueFrom": {
+								"fieldRef": {
+									"fieldPath": "spec.nodeName"
+								}
+							}
+						}
+					],
+					"volumeMounts": [
+						{
+							"name": "npdconfig-volume",
+							"mountPath": "/config",
+							"readOnly": true
+						},
+						{
+							"name": "kernellog-volume",
+							"mountPath": "/log",
+							"readOnly": true
+						}
+					],
+					"resources": {
+						"requests": {
+							"cpu": "20m",
+							"memory": "20Mi"
+						}
+					},
+					"securityContext": {
+						"privileged": true
 					}
 				}]
 			}
