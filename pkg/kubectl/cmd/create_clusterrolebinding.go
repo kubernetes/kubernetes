@@ -39,7 +39,7 @@ var (
 // ClusterRoleBinding is a command to ease creating ClusterRoleBindings.
 func NewCmdCreateClusterRoleBinding(f cmdutil.Factory, cmdOut io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "clusterrolebinding NAME --clusterrole=NAME [--user=username] [--group=groupname] [--dry-run]",
+		Use:     "clusterrolebinding NAME --clusterrole=NAME [--user=username] [--group=groupname] [--serviceaccount=namespace:serviceaccountname] [--dry-run]",
 		Short:   "Create a ClusterRoleBinding for a particular ClusterRole",
 		Long:    clusterRoleBindingLong,
 		Example: clusterRoleBindingExample,
