@@ -4,8 +4,6 @@ kind: Pod
 metadata:
   name: fluentd-cloud-logging
   namespace: kube-system
-  annotations:
-    scheduler.alpha.kubernetes.io/critical-pod: ''
   labels:
     k8s-app: fluentd-logging
 spec:
