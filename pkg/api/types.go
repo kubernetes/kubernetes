@@ -2999,6 +2999,10 @@ type NodeList struct {
 type NamespaceSpec struct {
 	// Finalizers is an opaque list of values that must be empty to permanently remove object from storage
 	Finalizers []FinalizerName
+
+	// NetworkPolicy describes the use of NetworkPolicy objects in this namespace. If not specified, then default policies will be applied and NetworkPolicy objects in the Namespace will be ignored
+	// +optional
+	NetworkPolicy *NamespaceNetworkPolicy
 }
 
 // FinalizerName is the name identifying a finalizer during namespace lifecycle.
@@ -3008,6 +3012,28 @@ type FinalizerName string
 // in metav1.
 const (
 	FinalizerKubernetes FinalizerName = "kubernetes"
+)
+
+// NamespaceNetworkPolicy describes the use of NetworkPolicy objects in a namespace
+type NamespaceNetworkPolicy struct {
+	// The base policy for incoming traffic to pods in this namespace, which may be modified by NetworkPolicy objects. If not specified, default policies are applied
+	// +optional
+	Ingress *NamespaceIngressPolicy
+}
+
+// NamespaceIngressPolicy describes the base policy for incoming traffic to a Namespace
+type NamespaceIngressPolicy struct {
+	// The base policy for network isolation for incoming traffic to the Namespace, which may be modified by NetworkPolicy objects. If not specified, a default policy is applied (allow all)
+	// +optional
+	Isolation *IngressIsolationPolicy
+}
+
+// IngressIsolationPolicy gives the policy for isolating incoming network traffic to pods in a Namespace
+type IngressIsolationPolicy string
+
+const (
+	// DefaultDeny blocks all incoming traffic to pods in this namespace by default. (It can be overridden by NetworkPolicy objects.)
+	DefaultDeny IngressIsolationPolicy = "DefaultDeny"
 )
 
 // NamespaceStatus is information about the current status of a Namespace.
