@@ -35,7 +35,7 @@ source "${KUBE_ROOT}/federation/cluster/common.sh"
 # For `get_version` function and $KUBE_REGISTRY.
 # TODO(madhusudancs): Remove this when the code here is moved
 # to federation/develop.sh
-source "${KUBE_ROOT}/federation/develop/develop.sh"
+source "${KUBE_ROOT}/federation/develop/release.sh"
 
 FEDERATION_NAME="${FEDERATION_NAME:-e2e-federation}"
 FEDERATION_KUBE_CONTEXT="${FEDERATION_KUBE_CONTEXT:-e2e-federation}"
