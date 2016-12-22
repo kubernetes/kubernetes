@@ -43,7 +43,7 @@ const (
 // multiplied by 10 (barring exceptional cases) + a configurable quantity which is between -1000
 // and 1000. Containers with higher OOM scores are killed if the system runs out of memory.
 // See https://lwn.net/Articles/391222/ for more information.
-func GetContainerOOMScoreAdjust(pod *api.Pod, container *v1.Container, memoryCapacity int64) int {
+func GetContainerOOMScoreAdjust(pod *api.Pod, container *api.Container, memoryCapacity int64) int {
 	if kubepod.IsCriticalPod(pod) {
 		return CriticalPodOOMAdj
 	}
