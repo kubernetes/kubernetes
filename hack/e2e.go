@@ -948,7 +948,7 @@ func finishRunning(cmd *exec.Cmd) error {
 		log.Printf("Step '%s' finished in %s", stepName, time.Since(start))
 	}(time.Now())
 
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	//	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	if err := cmd.Start(); err != nil {
 		return fmt.Errorf("error starting %v: %v", stepName, err)
 	}

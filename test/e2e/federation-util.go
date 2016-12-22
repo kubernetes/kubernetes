@@ -289,6 +289,17 @@ func deleteServiceOrFail(clientset *fedclientset.Clientset, namespace string, se
 	}
 	err := clientset.Services(namespace).Delete(serviceName, &v1.DeleteOptions{OrphanDependents: orphanDependents})
 	framework.ExpectNoError(err, "Error deleting service %q from namespace %q", serviceName, namespace)
+	// Wait for the service to be deleted.
+	err = wait.Poll(5*time.Second, 3*wait.ForeverTestTimeout, func() (bool, error) {
+		_, err := clientset.Core().Services(namespace).Get(serviceName, metav1.GetOptions{})
+		if err != nil && errors.IsNotFound(err) {
+			return true, nil
+		}
+		return false, err
+	})
+	if err != nil {
+		framework.Failf("Error in deleting service %s: %v", serviceName, err)
+	}
 }
 
 func cleanupServiceShardsAndProviderResources(namespace string, service *v1.Service, clusters map[string]*cluster) {

@@ -20,12 +20,12 @@ import (
 	"fmt"
 	"os"
 	"reflect"
-	"strconv"
+	//	"strconv"
 	"strings"
 	"time"
 
 	fedclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset"
-	"k8s.io/kubernetes/pkg/api"
+	//	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/v1"
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
@@ -49,7 +49,7 @@ var FederatedServiceLabels = map[string]string{
 	"foo": "bar",
 }
 
-var _ = framework.KubeDescribe("[Feature:Federation]", func() {
+var _ = framework.KubeDescribe("[Feature:Federation12]", func() {
 	f := framework.NewDefaultFederatedFramework("federated-service")
 	var clusters map[string]*cluster // All clusters, keyed by cluster name
 	var federationName string
@@ -94,31 +94,33 @@ var _ = framework.KubeDescribe("[Feature:Federation]", func() {
 				}
 			})
 
-			It("should succeed", func() {
-				framework.SkipUnlessFederated(f.ClientSet)
+			/*
+				It("should succeed", func() {
+					framework.SkipUnlessFederated(f.ClientSet)
 
-				nsName = f.FederationNamespace.Name
-				service = createServiceOrFail(f.FederationClientset_1_5, nsName, FederatedServiceName)
-				By(fmt.Sprintf("Creation of service %q in namespace %q succeeded.  Deleting service.", service.Name, nsName))
+					nsName = f.FederationNamespace.Name
+					service = createServiceOrFail(f.FederationClientset_1_5, nsName, FederatedServiceName)
+					By(fmt.Sprintf("Creation of service %q in namespace %q succeeded.  Deleting service.", service.Name, nsName))
 
-				// Cleanup
-				err := f.FederationClientset_1_5.Services(nsName).Delete(service.Name, &v1.DeleteOptions{})
-				framework.ExpectNoError(err, "Error deleting service %q in namespace %q", service.Name, service.Namespace)
-				By(fmt.Sprintf("Deletion of service %q in namespace %q succeeded.", service.Name, nsName))
-			})
-
-			It("should create matching services in underlying clusters", func() {
-				framework.SkipUnlessFederated(f.ClientSet)
-
-				nsName = f.FederationNamespace.Name
-				service = createServiceOrFail(f.FederationClientset_1_5, nsName, FederatedServiceName)
-				defer func() { // Cleanup
-					By(fmt.Sprintf("Deleting service %q in namespace %q", service.Name, nsName))
+					// Cleanup
 					err := f.FederationClientset_1_5.Services(nsName).Delete(service.Name, &v1.DeleteOptions{})
-					framework.ExpectNoError(err, "Error deleting service %q in namespace %q", service.Name, nsName)
-				}()
-				waitForServiceShardsOrFail(nsName, service, clusters)
-			})
+					framework.ExpectNoError(err, "Error deleting service %q in namespace %q", service.Name, service.Namespace)
+					By(fmt.Sprintf("Deletion of service %q in namespace %q succeeded.", service.Name, nsName))
+				})
+
+				It("should create matching services in underlying clusters", func() {
+					framework.SkipUnlessFederated(f.ClientSet)
+
+					nsName = f.FederationNamespace.Name
+					service = createServiceOrFail(f.FederationClientset_1_5, nsName, FederatedServiceName)
+					defer func() { // Cleanup
+						By(fmt.Sprintf("Deleting service %q in namespace %q", service.Name, nsName))
+						err := f.FederationClientset_1_5.Services(nsName).Delete(service.Name, &v1.DeleteOptions{})
+						framework.ExpectNoError(err, "Error deleting service %q in namespace %q", service.Name, nsName)
+					}()
+					waitForServiceShardsOrFail(nsName, service, clusters)
+				})
+			*/
 			It("should be deleted from underlying clusters when OrphanDependents is false", func() {
 				framework.SkipUnlessFederated(f.ClientSet)
 				nsName := f.FederationNamespace.Name
@@ -127,189 +129,192 @@ var _ = framework.KubeDescribe("[Feature:Federation]", func() {
 				By(fmt.Sprintf("Verified that services were deleted from underlying clusters"))
 			})
 
-			It("should not be deleted from underlying clusters when OrphanDependents is true", func() {
-				framework.SkipUnlessFederated(f.ClientSet)
-				nsName := f.FederationNamespace.Name
-				orphanDependents := true
-				verifyCascadingDeletionForService(f.FederationClientset_1_5, clusters, &orphanDependents, nsName)
-				By(fmt.Sprintf("Verified that services were not deleted from underlying clusters"))
-			})
+			/*
+				It("should not be deleted from underlying clusters when OrphanDependents is true", func() {
+					framework.SkipUnlessFederated(f.ClientSet)
+					nsName := f.FederationNamespace.Name
+					orphanDependents := true
+					verifyCascadingDeletionForService(f.FederationClientset_1_5, clusters, &orphanDependents, nsName)
+					By(fmt.Sprintf("Verified that services were not deleted from underlying clusters"))
+				})
 
-			It("should not be deleted from underlying clusters when OrphanDependents is nil", func() {
-				framework.SkipUnlessFederated(f.ClientSet)
-				nsName := f.FederationNamespace.Name
-				verifyCascadingDeletionForService(f.FederationClientset_1_5, clusters, nil, nsName)
-				By(fmt.Sprintf("Verified that services were not deleted from underlying clusters"))
-			})
+				It("should not be deleted from underlying clusters when OrphanDependents is nil", func() {
+					framework.SkipUnlessFederated(f.ClientSet)
+					nsName := f.FederationNamespace.Name
+					verifyCascadingDeletionForService(f.FederationClientset_1_5, clusters, nil, nsName)
+					By(fmt.Sprintf("Verified that services were not deleted from underlying clusters"))
+				})
+			*/
 		})
+		/*
+			var _ = Describe("DNS", func() {
 
-		var _ = Describe("DNS", func() {
+				var (
+					service      *v1.Service
+					serviceShard *v1.Service
+				)
 
-			var (
-				service      *v1.Service
-				serviceShard *v1.Service
-			)
-
-			BeforeEach(func() {
-				framework.SkipUnlessFederated(f.ClientSet)
-
-				nsName := f.FederationNamespace.Name
-				// Create kube-dns configmap for kube-dns to accept federation queries.
-				federationsDomainMap := os.Getenv("FEDERATIONS_DOMAIN_MAP")
-				if federationsDomainMap == "" {
-					framework.Failf("missing required env var FEDERATIONS_DOMAIN_MAP")
-				}
-				kubeDNSConfigMap := v1.ConfigMap{
-					ObjectMeta: v1.ObjectMeta{
-						Name:      KubeDNSConfigMapName,
-						Namespace: KubeDNSConfigMapNamespace,
-					},
-					Data: map[string]string{
-						"federations": federationsDomainMap,
-					},
-				}
-				// Create this configmap in all clusters.
-				for clusterName, cluster := range clusters {
-					By(fmt.Sprintf("Creating kube dns config map in cluster: %s", clusterName))
-					_, err := cluster.Clientset.Core().ConfigMaps(KubeDNSConfigMapNamespace).Create(&kubeDNSConfigMap)
-					framework.ExpectNoError(err, fmt.Sprintf("Error in creating config map in cluster %s", clusterName))
-				}
-
-				createBackendPodsOrFail(clusters, nsName, FederatedServicePodName)
-
-				service = createServiceOrFail(f.FederationClientset_1_5, nsName, FederatedServiceName)
-				obj, err := api.Scheme.DeepCopy(service)
-				// Cloning shouldn't fail. On the off-chance it does, we
-				// should shallow copy service to serviceShard before
-				// failing. If we don't do this we will never really
-				// get a chance to clean up the underlying services
-				// when the cloner fails for reasons not in our
-				// control. For example, cloner bug. That will cause
-				// the resources to leak, which in turn causes the
-				// test project to run out of quota and the entire
-				// suite starts failing. So we must try as hard as
-				// possible to cleanup the underlying services. So
-				// if DeepCopy fails, we are going to try with shallow
-				// copy as a last resort.
-				if err != nil {
-					serviceCopy := *service
-					serviceShard = &serviceCopy
-					framework.ExpectNoError(err, fmt.Sprintf("Error in deep copying service %q", service.Name))
-				}
-				var ok bool
-				serviceShard, ok = obj.(*v1.Service)
-				// Same argument as above about using shallow copy
-				// as a last resort.
-				if !ok {
-					serviceCopy := *service
-					serviceShard = &serviceCopy
-					framework.ExpectNoError(err, fmt.Sprintf("Unexpected service object copied %T", obj))
-				}
-
-				waitForServiceShardsOrFail(nsName, serviceShard, clusters)
-			})
-
-			AfterEach(func() {
-				framework.SkipUnlessFederated(f.ClientSet)
-
-				nsName := f.FederationNamespace.Name
-				deleteBackendPodsOrFail(clusters, nsName)
-
-				if service != nil {
-					deleteServiceOrFail(f.FederationClientset_1_5, nsName, service.Name, nil)
-					service = nil
-				} else {
-					By("No service to delete.  Service is nil")
-				}
-
-				if serviceShard != nil {
-					By(fmt.Sprintf("Deleting service shards and their provider resources in underlying clusters for service %q in namespace %q", serviceShard.Name, nsName))
-					cleanupServiceShardsAndProviderResources(nsName, serviceShard, clusters)
-					serviceShard = nil
-				} else {
-					By("No service shards to delete. `serviceShard` is nil")
-				}
-
-				// Delete the kube-dns config map from all clusters.
-				for clusterName, cluster := range clusters {
-					By(fmt.Sprintf("Deleting kube dns config map from cluster: %s", clusterName))
-					err := cluster.Clientset.Core().ConfigMaps(KubeDNSConfigMapNamespace).Delete(KubeDNSConfigMapName, nil)
-					framework.ExpectNoError(err, fmt.Sprintf("Error in deleting config map from cluster %s", clusterName))
-				}
-			})
-
-			It("should be able to discover a federated service", func() {
-				framework.SkipUnlessFederated(f.ClientSet)
-
-				nsName := f.FederationNamespace.Name
-				svcDNSNames := []string{
-					FederatedServiceName,
-					fmt.Sprintf("%s.%s", FederatedServiceName, nsName),
-					fmt.Sprintf("%s.%s.svc.cluster.local.", FederatedServiceName, nsName),
-					fmt.Sprintf("%s.%s.%s", FederatedServiceName, nsName, federationName),
-					fmt.Sprintf("%s.%s.%s.svc.cluster.local.", FederatedServiceName, nsName, federationName),
-				}
-				// TODO(mml): This could be much faster.  We can launch all the test
-				// pods, perhaps in the BeforeEach, and then just poll until we get
-				// successes/failures from them all.
-				for i, DNSName := range svcDNSNames {
-					discoverService(f, DNSName, true, "federated-service-e2e-discovery-pod-"+strconv.Itoa(i))
-				}
-				By("Verified that DNS rules are working as expected")
-
-				By("Deleting the service to verify that DNS rules still work")
-				err := f.FederationClientset_1_5.Services(nsName).Delete(FederatedServiceName, &v1.DeleteOptions{})
-				framework.ExpectNoError(err, "Error deleting service %q in namespace %q", service.Name, service.Namespace)
-				// Service is deleted, unset the test block-global service variable.
-				service = nil
-
-				for i, DNSName := range svcDNSNames {
-					discoverService(f, DNSName, true, "federated-service-e2e-discovery-pod-"+strconv.Itoa(i))
-				}
-				By("Verified that deleting the service does not affect DNS records")
-			})
-
-			Context("non-local federated service", func() {
 				BeforeEach(func() {
 					framework.SkipUnlessFederated(f.ClientSet)
 
-					// Delete all the backend pods from the shard which is local to the discovery pod.
-					deleteOneBackendPodOrFail(clusters[primaryClusterName])
+					nsName := f.FederationNamespace.Name
+					// Create kube-dns configmap for kube-dns to accept federation queries.
+					federationsDomainMap := os.Getenv("FEDERATIONS_DOMAIN_MAP")
+					if federationsDomainMap == "" {
+						framework.Failf("missing required env var FEDERATIONS_DOMAIN_MAP")
+					}
+					kubeDNSConfigMap := v1.ConfigMap{
+						ObjectMeta: v1.ObjectMeta{
+							Name:      KubeDNSConfigMapName,
+							Namespace: KubeDNSConfigMapNamespace,
+						},
+						Data: map[string]string{
+							"federations": federationsDomainMap,
+						},
+					}
+					// Create this configmap in all clusters.
+					for clusterName, cluster := range clusters {
+						By(fmt.Sprintf("Creating kube dns config map in cluster: %s", clusterName))
+						_, err := cluster.Clientset.Core().ConfigMaps(KubeDNSConfigMapNamespace).Create(&kubeDNSConfigMap)
+						framework.ExpectNoError(err, fmt.Sprintf("Error in creating config map in cluster %s", clusterName))
+					}
 
+					createBackendPodsOrFail(clusters, nsName, FederatedServicePodName)
+
+					service = createServiceOrFail(f.FederationClientset_1_5, nsName, FederatedServiceName)
+					obj, err := api.Scheme.DeepCopy(service)
+					// Cloning shouldn't fail. On the off-chance it does, we
+					// should shallow copy service to serviceShard before
+					// failing. If we don't do this we will never really
+					// get a chance to clean up the underlying services
+					// when the cloner fails for reasons not in our
+					// control. For example, cloner bug. That will cause
+					// the resources to leak, which in turn causes the
+					// test project to run out of quota and the entire
+					// suite starts failing. So we must try as hard as
+					// possible to cleanup the underlying services. So
+					// if DeepCopy fails, we are going to try with shallow
+					// copy as a last resort.
+					if err != nil {
+						serviceCopy := *service
+						serviceShard = &serviceCopy
+						framework.ExpectNoError(err, fmt.Sprintf("Error in deep copying service %q", service.Name))
+					}
+					var ok bool
+					serviceShard, ok = obj.(*v1.Service)
+					// Same argument as above about using shallow copy
+					// as a last resort.
+					if !ok {
+						serviceCopy := *service
+						serviceShard = &serviceCopy
+						framework.ExpectNoError(err, fmt.Sprintf("Unexpected service object copied %T", obj))
+					}
+
+					waitForServiceShardsOrFail(nsName, serviceShard, clusters)
 				})
 
-				It("should be able to discover a non-local federated service", func() {
+				AfterEach(func() {
+					framework.SkipUnlessFederated(f.ClientSet)
+
+					nsName := f.FederationNamespace.Name
+					deleteBackendPodsOrFail(clusters, nsName)
+
+					if service != nil {
+						deleteServiceOrFail(f.FederationClientset_1_5, nsName, service.Name, nil)
+						service = nil
+					} else {
+						By("No service to delete.  Service is nil")
+					}
+
+					if serviceShard != nil {
+						By(fmt.Sprintf("Deleting service shards and their provider resources in underlying clusters for service %q in namespace %q", serviceShard.Name, nsName))
+						cleanupServiceShardsAndProviderResources(nsName, serviceShard, clusters)
+						serviceShard = nil
+					} else {
+						By("No service shards to delete. `serviceShard` is nil")
+					}
+
+					// Delete the kube-dns config map from all clusters.
+					for clusterName, cluster := range clusters {
+						By(fmt.Sprintf("Deleting kube dns config map from cluster: %s", clusterName))
+						err := cluster.Clientset.Core().ConfigMaps(KubeDNSConfigMapNamespace).Delete(KubeDNSConfigMapName, nil)
+						framework.ExpectNoError(err, fmt.Sprintf("Error in deleting config map from cluster %s", clusterName))
+					}
+				})
+
+				It("should be able to discover a federated service", func() {
 					framework.SkipUnlessFederated(f.ClientSet)
 
 					nsName := f.FederationNamespace.Name
 					svcDNSNames := []string{
+						FederatedServiceName,
+						fmt.Sprintf("%s.%s", FederatedServiceName, nsName),
+						fmt.Sprintf("%s.%s.svc.cluster.local.", FederatedServiceName, nsName),
 						fmt.Sprintf("%s.%s.%s", FederatedServiceName, nsName, federationName),
 						fmt.Sprintf("%s.%s.%s.svc.cluster.local.", FederatedServiceName, nsName, federationName),
 					}
-					for i, name := range svcDNSNames {
-						discoverService(f, name, true, "federated-service-e2e-discovery-pod-"+strconv.Itoa(i))
+					// TODO(mml): This could be much faster.  We can launch all the test
+					// pods, perhaps in the BeforeEach, and then just poll until we get
+					// successes/failures from them all.
+					for i, DNSName := range svcDNSNames {
+						discoverService(f, DNSName, true, "federated-service-e2e-discovery-pod-"+strconv.Itoa(i))
 					}
+					By("Verified that DNS rules are working as expected")
+
+					By("Deleting the service to verify that DNS rules still work")
+					err := f.FederationClientset_1_5.Services(nsName).Delete(FederatedServiceName, &v1.DeleteOptions{})
+					framework.ExpectNoError(err, "Error deleting service %q in namespace %q", service.Name, service.Namespace)
+					// Service is deleted, unset the test block-global service variable.
+					service = nil
+
+					for i, DNSName := range svcDNSNames {
+						discoverService(f, DNSName, true, "federated-service-e2e-discovery-pod-"+strconv.Itoa(i))
+					}
+					By("Verified that deleting the service does not affect DNS records")
 				})
 
-				// TODO(mml): This currently takes 9 minutes.  Consider reducing the
-				// TTL and/or running the pods in parallel.
-				Context("[Slow] missing local service", func() {
-					It("should never find DNS entries for a missing local service", func() {
+				Context("non-local federated service", func() {
+					BeforeEach(func() {
+						framework.SkipUnlessFederated(f.ClientSet)
+
+						// Delete all the backend pods from the shard which is local to the discovery pod.
+						deleteOneBackendPodOrFail(clusters[primaryClusterName])
+
+					})
+
+					It("should be able to discover a non-local federated service", func() {
 						framework.SkipUnlessFederated(f.ClientSet)
 
 						nsName := f.FederationNamespace.Name
-						localSvcDNSNames := []string{
-							FederatedServiceName,
-							fmt.Sprintf("%s.%s", FederatedServiceName, nsName),
-							fmt.Sprintf("%s.%s.svc.cluster.local.", FederatedServiceName, nsName),
+						svcDNSNames := []string{
+							fmt.Sprintf("%s.%s.%s", FederatedServiceName, nsName, federationName),
+							fmt.Sprintf("%s.%s.%s.svc.cluster.local.", FederatedServiceName, nsName, federationName),
 						}
-						for i, name := range localSvcDNSNames {
-							discoverService(f, name, false, "federated-service-e2e-discovery-pod-"+strconv.Itoa(i))
+						for i, name := range svcDNSNames {
+							discoverService(f, name, true, "federated-service-e2e-discovery-pod-"+strconv.Itoa(i))
 						}
+					})
+
+					// TODO(mml): This currently takes 9 minutes.  Consider reducing the
+					// TTL and/or running the pods in parallel.
+					Context("[Slow] missing local service", func() {
+						It("should never find DNS entries for a missing local service", func() {
+							framework.SkipUnlessFederated(f.ClientSet)
+
+							nsName := f.FederationNamespace.Name
+							localSvcDNSNames := []string{
+								FederatedServiceName,
+								fmt.Sprintf("%s.%s", FederatedServiceName, nsName),
+								fmt.Sprintf("%s.%s.svc.cluster.local.", FederatedServiceName, nsName),
+							}
+							for i, name := range localSvcDNSNames {
+								discoverService(f, name, false, "federated-service-e2e-discovery-pod-"+strconv.Itoa(i))
+							}
+						})
 					})
 				})
 			})
-		})
+		*/
 	})
 })
 
