@@ -55,7 +55,6 @@ var hosts = flag.String("hosts", "", "hosts to test")
 var cleanup = flag.Bool("cleanup", true, "If true remove files from remote hosts and delete temporary instances")
 var deleteInstances = flag.Bool("delete-instances", true, "If true, delete any instances created")
 var buildOnly = flag.Bool("build-only", false, "If true, build e2e_node_test.tar.gz and exit.")
-var setupNode = flag.Bool("setup-node", false, "When true, current user will be added to docker group on the test machine")
 var instanceMetadata = flag.String("instance-metadata", "", "key/value metadata for instances separated by '=' or '<', 'k=v' means the key is 'k' and the value is 'v'; 'k<p' means the key is 'k' and the value is extracted from the local path 'p', e.g. k1=v1,k2<p2")
 var gubernator = flag.Bool("gubernator", false, "If true, output Gubernator link to view logs")
 var ginkgoFlags = flag.String("ginkgo-flags", "", "Passed to ginkgo to specify additional flags such as --skip=.")
@@ -67,6 +66,7 @@ const (
 var (
 	computeService *compute.Service
 	arc            Archive
+	suite          remote.TestSuite
 )
 
 type Archive struct {
@@ -126,12 +126,32 @@ type internalGCEImage struct {
 	tests    []string
 }
 
+// parseFlags parse subcommands and flags
+func parseFlags() {
+	if len(os.Args) <= 1 {
+		glog.Fatalf("Too few flags specified: %v", os.Args)
+	}
+	// Parse subcommand.
+	subcommand := os.Args[1]
+	switch subcommand {
+	case "conformance":
+		suite = remote.InitConformanceRemote()
+	// TODO: Add subcommand for node soaking, node conformance, cri validation.
+	default:
+		// Use node e2e suite by default if no subcommand is specified.
+		suite = remote.InitNodeE2ERemote()
+	}
+	// Parse test flags.
+	flag.CommandLine.Parse(os.Args[2:])
+}
+
 func main() {
-	flag.Parse()
+	parseFlags()
+
 	rand.Seed(time.Now().UTC().UnixNano())
 	if *buildOnly {
 		// Build the archive and exit
-		remote.CreateTestArchive()
+		remote.CreateTestArchive(suite)
 		return
 	}
 
@@ -248,7 +268,7 @@ func main() {
 			fmt.Printf("Initializing e2e tests using host %s.\n", host)
 			running++
 			go func(host string, junitFilePrefix string) {
-				results <- testHost(host, *cleanup, junitFilePrefix, *setupNode, *ginkgoFlags)
+				results <- testHost(host, *cleanup, junitFilePrefix, *ginkgoFlags)
 			}(host, host)
 		}
 	}
@@ -302,7 +322,7 @@ func callGubernator(gubernator bool) {
 }
 
 func (a *Archive) getArchive() (string, error) {
-	a.Do(func() { a.path, a.err = remote.CreateTestArchive() })
+	a.Do(func() { a.path, a.err = remote.CreateTestArchive(suite) })
 	return a.path, a.err
 }
 
@@ -334,7 +354,7 @@ func getImageMetadata(input string) *compute.Metadata {
 }
 
 // Run tests in archive against host
-func testHost(host string, deleteFiles bool, junitFilePrefix string, setupNode bool, ginkgoFlagsStr string) *TestResult {
+func testHost(host string, deleteFiles bool, junitFilePrefix string, ginkgoFlagsStr string) *TestResult {
 	instance, err := computeService.Instances.Get(*project, *zone, host).Do()
 	if err != nil {
 		return &TestResult{
@@ -364,7 +384,7 @@ func testHost(host string, deleteFiles bool, junitFilePrefix string, setupNode b
 		}
 	}
 
-	output, exitOk, err := remote.RunRemote(path, host, deleteFiles, junitFilePrefix, setupNode, *testArgs, ginkgoFlagsStr)
+	output, exitOk, err := remote.RunRemote(suite, path, host, deleteFiles, junitFilePrefix, *testArgs, ginkgoFlagsStr)
 	return &TestResult{
 		output: output,
 		err:    err,
@@ -449,7 +469,21 @@ func testImage(imageConfig *internalGCEImage, junitFilePrefix string) *TestResul
 	// Only delete the files if we are keeping the instance and want it cleaned up.
 	// If we are going to delete the instance, don't bother with cleaning up the files
 	deleteFiles := !*deleteInstances && *cleanup
-	return testHost(host, deleteFiles, junitFilePrefix, *setupNode, ginkgoFlagsStr)
+
+	result := testHost(host, deleteFiles, junitFilePrefix, ginkgoFlagsStr)
+	// This is a temporary solution to collect serial node serial log. Only port 1 contains useful information.
+	// TODO(random-liu): Extract out and unify log collection logic with cluste e2e.
+	serialPortOutput, err := computeService.Instances.GetSerialPortOutput(*project, *zone, host).Port(1).Do()
+	if err != nil {
+		glog.Errorf("Failed to collect serial output from node %q: %v", host, err)
+	} else {
+		logFilename := "serial-1.log"
+		err := remote.WriteLog(host, logFilename, serialPortOutput.Contents)
+		if err != nil {
+			glog.Errorf("Failed to write serial output from node %q to %q: %v", host, logFilename, err)
+		}
+	}
+	return result
 }
 
 // Provision a gce instance using image
@@ -507,7 +541,7 @@ func createInstance(imageConfig *internalGCEImage) (string, error) {
 			remote.AddHostnameIp(name, externalIp)
 		}
 		var output string
-		output, err = remote.RunSshCommand("ssh", remote.GetHostnameOrIp(name), "--", "sudo", "docker", "version")
+		output, err = remote.SSH(name, "docker", "version")
 		if err != nil {
 			err = fmt.Errorf("instance %s not running docker daemon - Command failed: %s", name, output)
 			continue

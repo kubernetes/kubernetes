@@ -21,8 +21,8 @@ package options
 import (
 	"time"
 
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/client/leaderelection"
 	"k8s.io/kubernetes/pkg/master/ports"
 	"k8s.io/kubernetes/pkg/util/config"
@@ -57,19 +57,19 @@ func NewCMServer() *CMServer {
 			LookupCacheSizeForRC:              4096,
 			LookupCacheSizeForRS:              4096,
 			LookupCacheSizeForDaemonSet:       1024,
-			ServiceSyncPeriod:                 unversioned.Duration{Duration: 5 * time.Minute},
-			RouteReconciliationPeriod:         unversioned.Duration{Duration: 10 * time.Second},
-			ResourceQuotaSyncPeriod:           unversioned.Duration{Duration: 5 * time.Minute},
-			NamespaceSyncPeriod:               unversioned.Duration{Duration: 5 * time.Minute},
-			PVClaimBinderSyncPeriod:           unversioned.Duration{Duration: 15 * time.Second},
-			HorizontalPodAutoscalerSyncPeriod: unversioned.Duration{Duration: 30 * time.Second},
-			DeploymentControllerSyncPeriod:    unversioned.Duration{Duration: 30 * time.Second},
-			MinResyncPeriod:                   unversioned.Duration{Duration: 12 * time.Hour},
+			ServiceSyncPeriod:                 metav1.Duration{Duration: 5 * time.Minute},
+			RouteReconciliationPeriod:         metav1.Duration{Duration: 10 * time.Second},
+			ResourceQuotaSyncPeriod:           metav1.Duration{Duration: 5 * time.Minute},
+			NamespaceSyncPeriod:               metav1.Duration{Duration: 5 * time.Minute},
+			PVClaimBinderSyncPeriod:           metav1.Duration{Duration: 15 * time.Second},
+			HorizontalPodAutoscalerSyncPeriod: metav1.Duration{Duration: 30 * time.Second},
+			DeploymentControllerSyncPeriod:    metav1.Duration{Duration: 30 * time.Second},
+			MinResyncPeriod:                   metav1.Duration{Duration: 12 * time.Hour},
 			RegisterRetryCount:                10,
-			PodEvictionTimeout:                unversioned.Duration{Duration: 5 * time.Minute},
-			NodeMonitorGracePeriod:            unversioned.Duration{Duration: 40 * time.Second},
-			NodeStartupGracePeriod:            unversioned.Duration{Duration: 60 * time.Second},
-			NodeMonitorPeriod:                 unversioned.Duration{Duration: 5 * time.Second},
+			PodEvictionTimeout:                metav1.Duration{Duration: 5 * time.Minute},
+			NodeMonitorGracePeriod:            metav1.Duration{Duration: 40 * time.Second},
+			NodeStartupGracePeriod:            metav1.Duration{Duration: 60 * time.Second},
+			NodeMonitorPeriod:                 metav1.Duration{Duration: 5 * time.Second},
 			ClusterName:                       "kubernetes",
 			NodeCIDRMaskSize:                  24,
 			ConfigureCloudRoutes:              true,
@@ -90,7 +90,7 @@ func NewCMServer() *CMServer {
 			KubeAPIQPS:              20.0,
 			KubeAPIBurst:            30,
 			LeaderElection:          leaderelection.DefaultLeaderElectionConfiguration(),
-			ControllerStartInterval: unversioned.Duration{Duration: 0 * time.Second},
+			ControllerStartInterval: metav1.Duration{Duration: 0 * time.Second},
 			EnableGarbageCollector:  true,
 			ConcurrentGCSyncs:       20,
 			ClusterSigningCertFile:  "/etc/kubernetes/ca/ca.pem",
@@ -105,6 +105,7 @@ func NewCMServer() *CMServer {
 func (s *CMServer) AddFlags(fs *pflag.FlagSet) {
 	fs.Int32Var(&s.Port, "port", s.Port, "The port that the controller-manager's http service runs on")
 	fs.Var(componentconfig.IPVar{Val: &s.Address}, "address", "The IP address to serve on (set to 0.0.0.0 for all interfaces)")
+	fs.BoolVar(&s.UseServiceAccountCredentials, "use-service-account-credentials", s.UseServiceAccountCredentials, "If true, use individual service account credentials for each controller.")
 	fs.StringVar(&s.CloudProvider, "cloud-provider", s.CloudProvider, "The provider for cloud services.  Empty string for no provider.")
 	fs.StringVar(&s.CloudConfigFile, "cloud-config", s.CloudConfigFile, "The path to the cloud provider configuration file.  Empty string for no configuration file.")
 	fs.Int32Var(&s.ConcurrentEndpointSyncs, "concurrent-endpoint-syncs", s.ConcurrentEndpointSyncs, "The number of endpoint syncing operations that will be done concurrently. Larger number = faster endpoint updating, but more CPU (and network) load")

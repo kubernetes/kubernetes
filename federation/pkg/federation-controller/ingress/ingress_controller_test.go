@@ -22,54 +22,64 @@ import (
 	"testing"
 	"time"
 
-	federation_api "k8s.io/kubernetes/federation/apis/federation/v1beta1"
-	fake_fedclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_5/fake"
+	federationapi "k8s.io/kubernetes/federation/apis/federation/v1beta1"
+	fakefedclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset/fake"
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util"
+	"k8s.io/kubernetes/federation/pkg/federation-controller/util/deletionhelper"
 	. "k8s.io/kubernetes/federation/pkg/federation-controller/util/test"
-	api_v1 "k8s.io/kubernetes/pkg/api/v1"
-	extensions_v1beta1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
-	kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
-	fake_kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/fake"
+	"k8s.io/kubernetes/pkg/api/errors"
+	apiv1 "k8s.io/kubernetes/pkg/api/v1"
+	extensionsv1beta1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
+	"k8s.io/kubernetes/pkg/client/cache"
+	kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	fakekubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/types"
+	"k8s.io/kubernetes/pkg/util/wait"
 
+	"github.com/golang/glog"
 	"github.com/stretchr/testify/assert"
 )
 
+const (
+	maxTrials = 20
+)
+
 func TestIngressController(t *testing.T) {
-	fakeClusterList := federation_api.ClusterList{Items: []federation_api.Cluster{}}
-	fakeConfigMapList1 := api_v1.ConfigMapList{Items: []api_v1.ConfigMap{}}
-	fakeConfigMapList2 := api_v1.ConfigMapList{Items: []api_v1.ConfigMap{}}
-	cluster1 := NewCluster("cluster1", api_v1.ConditionTrue)
-	cluster2 := NewCluster("cluster2", api_v1.ConditionTrue)
+	fakeClusterList := federationapi.ClusterList{Items: []federationapi.Cluster{}}
+	fakeConfigMapList1 := apiv1.ConfigMapList{Items: []apiv1.ConfigMap{}}
+	fakeConfigMapList2 := apiv1.ConfigMapList{Items: []apiv1.ConfigMap{}}
+	cluster1 := NewCluster("cluster1", apiv1.ConditionTrue)
+	cluster2 := NewCluster("cluster2", apiv1.ConditionTrue)
 	cfg1 := NewConfigMap("foo")
 	cfg2 := NewConfigMap("bar") // Different UID from cfg1, so that we can check that they get reconciled.
 
 	t.Log("Creating fake infrastructure")
-	fedClient := &fake_fedclientset.Clientset{}
+	fedClient := &fakefedclientset.Clientset{}
 	RegisterFakeList("clusters", &fedClient.Fake, &fakeClusterList)
-	RegisterFakeList("ingresses", &fedClient.Fake, &extensions_v1beta1.IngressList{Items: []extensions_v1beta1.Ingress{}})
+	RegisterFakeList("ingresses", &fedClient.Fake, &extensionsv1beta1.IngressList{Items: []extensionsv1beta1.Ingress{}})
 	fedIngressWatch := RegisterFakeWatch("ingresses", &fedClient.Fake)
 	clusterWatch := RegisterFakeWatch("clusters", &fedClient.Fake)
 	fedClusterUpdateChan := RegisterFakeCopyOnUpdate("clusters", &fedClient.Fake, clusterWatch)
 	fedIngressUpdateChan := RegisterFakeCopyOnUpdate("ingresses", &fedClient.Fake, fedIngressWatch)
 
-	cluster1Client := &fake_kubeclientset.Clientset{}
-	RegisterFakeList("ingresses", &cluster1Client.Fake, &extensions_v1beta1.IngressList{Items: []extensions_v1beta1.Ingress{}})
+	cluster1Client := &fakekubeclientset.Clientset{}
+	RegisterFakeList("ingresses", &cluster1Client.Fake, &extensionsv1beta1.IngressList{Items: []extensionsv1beta1.Ingress{}})
 	RegisterFakeList("configmaps", &cluster1Client.Fake, &fakeConfigMapList1)
 	cluster1IngressWatch := RegisterFakeWatch("ingresses", &cluster1Client.Fake)
 	cluster1ConfigMapWatch := RegisterFakeWatch("configmaps", &cluster1Client.Fake)
 	cluster1IngressCreateChan := RegisterFakeCopyOnCreate("ingresses", &cluster1Client.Fake, cluster1IngressWatch)
 	cluster1IngressUpdateChan := RegisterFakeCopyOnUpdate("ingresses", &cluster1Client.Fake, cluster1IngressWatch)
 
-	cluster2Client := &fake_kubeclientset.Clientset{}
-	RegisterFakeList("ingresses", &cluster2Client.Fake, &extensions_v1beta1.IngressList{Items: []extensions_v1beta1.Ingress{}})
+	cluster2Client := &fakekubeclientset.Clientset{}
+	RegisterFakeList("ingresses", &cluster2Client.Fake, &extensionsv1beta1.IngressList{Items: []extensionsv1beta1.Ingress{}})
 	RegisterFakeList("configmaps", &cluster2Client.Fake, &fakeConfigMapList2)
 	cluster2IngressWatch := RegisterFakeWatch("ingresses", &cluster2Client.Fake)
 	cluster2ConfigMapWatch := RegisterFakeWatch("configmaps", &cluster2Client.Fake)
 	cluster2IngressCreateChan := RegisterFakeCopyOnCreate("ingresses", &cluster2Client.Fake, cluster2IngressWatch)
 	cluster2ConfigMapUpdateChan := RegisterFakeCopyOnUpdate("configmaps", &cluster2Client.Fake, cluster2ConfigMapWatch)
 
-	clientFactoryFunc := func(cluster *federation_api.Cluster) (kubeclientset.Interface, error) {
+	clientFactoryFunc := func(cluster *federationapi.Cluster) (kubeclientset.Interface, error) {
 		switch cluster.Name {
 		case cluster1.Name:
 			return cluster1Client, nil
@@ -85,24 +95,30 @@ func TestIngressController(t *testing.T) {
 	configMapInformer := ToFederatedInformerForTestOnly(ingressController.configMapFederatedInformer)
 	configMapInformer.SetClientFactory(clientFactoryFunc)
 	ingressController.clusterAvailableDelay = time.Second
-	ingressController.ingressReviewDelay = 50 * time.Millisecond
-	ingressController.configMapReviewDelay = 50 * time.Millisecond
-	ingressController.smallDelay = 20 * time.Millisecond
+	ingressController.ingressReviewDelay = 100 * time.Millisecond
+	ingressController.configMapReviewDelay = 100 * time.Millisecond
+	ingressController.smallDelay = 100 * time.Millisecond
 	ingressController.updateTimeout = 5 * time.Second
 
 	stop := make(chan struct{})
 	t.Log("Running Ingress Controller")
 	ingressController.Run(stop)
 
-	ing1 := extensions_v1beta1.Ingress{
-		ObjectMeta: api_v1.ObjectMeta{
+	// TODO: Here we are creating the ingress with first cluster annotation.
+	// Add another test without that annotation when
+	// https://github.com/kubernetes/kubernetes/issues/36540 is fixed.
+	fedIngress := extensionsv1beta1.Ingress{
+		ObjectMeta: apiv1.ObjectMeta{
 			Name:      "test-ingress",
 			Namespace: "mynamespace",
 			SelfLink:  "/api/v1/namespaces/mynamespace/ingress/test-ingress",
+			Annotations: map[string]string{
+				firstClusterAnnotation: cluster1.Name,
+			},
 		},
-		Status: extensions_v1beta1.IngressStatus{
-			LoadBalancer: api_v1.LoadBalancerStatus{
-				Ingress: make([]api_v1.LoadBalancerIngress, 0, 0),
+		Status: extensionsv1beta1.IngressStatus{
+			LoadBalancer: apiv1.LoadBalancerStatus{
+				Ingress: make([]apiv1.LoadBalancerIngress, 0, 0),
 			},
 		},
 	}
@@ -113,47 +129,116 @@ func TestIngressController(t *testing.T) {
 	t.Log("Adding Ingress UID ConfigMap to cluster 1")
 	cluster1ConfigMapWatch.Add(cfg1)
 
-	t.Log("Checking that UID annotation on Cluster 1 annotation was correctly updated")
+	// Test add federated ingress.
+	t.Log("Adding Federated Ingress")
+	fedIngressWatch.Add(&fedIngress)
+
+	t.Log("Checking that UID annotation on Cluster 1 annotation was correctly updated after adding Federated Ingress")
 	cluster := GetClusterFromChan(fedClusterUpdateChan)
 	assert.NotNil(t, cluster)
 	assert.Equal(t, cluster.ObjectMeta.Annotations[uidAnnotationKey], cfg1.Data[uidKey])
 
-	// Test add federated ingress.
-	t.Log("Adding Federated Ingress")
-	fedIngressWatch.Add(&ing1)
+	t.Logf("Checking that appropriate finalizers are added")
+	// There should be 2 updates to add both the finalizers.
+	updatedIngress := GetIngressFromChan(t, fedIngressUpdateChan)
+	assert.True(t, ingressController.hasFinalizerFunc(updatedIngress, deletionhelper.FinalizerDeleteFromUnderlyingClusters))
+	updatedIngress = GetIngressFromChan(t, fedIngressUpdateChan)
+	assert.True(t, ingressController.hasFinalizerFunc(updatedIngress, apiv1.FinalizerOrphan), fmt.Sprintf("ingress does not have the orphan finalizer: %v", updatedIngress))
+	fedIngress = *updatedIngress
+
 	t.Log("Checking that Ingress was correctly created in cluster 1")
 	createdIngress := GetIngressFromChan(t, cluster1IngressCreateChan)
 	assert.NotNil(t, createdIngress)
-	assert.True(t, reflect.DeepEqual(ing1.Spec, createdIngress.Spec), "Spec of created ingress is not equal")
-	assert.True(t, util.ObjectMetaEquivalent(ing1.ObjectMeta, createdIngress.ObjectMeta), "Metadata of created object is not equivalent")
+	cluster1Ingress := *createdIngress
+	assert.True(t, reflect.DeepEqual(fedIngress.Spec, cluster1Ingress.Spec), "Spec of created ingress is not equal")
+	assert.True(t, util.ObjectMetaEquivalent(fedIngress.ObjectMeta, cluster1Ingress.ObjectMeta),
+		"Metadata of created object is not equivalent")
+
+	// Wait for finalizers to appear in federation store.
+	assert.NoError(t, WaitForFinalizersInFederationStore(ingressController, ingressController.ingressInformerStore,
+		types.NamespacedName{Namespace: fedIngress.Namespace, Name: fedIngress.Name}.String()), "finalizers not found in federated ingress")
+
+	// Wait for the cluster ingress to appear in cluster store.
+	assert.NoError(t, WaitForIngressInClusterStore(ingressController.ingressFederatedInformer.GetTargetStore(), cluster1.Name,
+		types.NamespacedName{Namespace: createdIngress.Namespace, Name: createdIngress.Name}.String()),
+		"Created ingress not found in underlying cluster store")
 
 	// Test that IP address gets transferred from cluster ingress to federated ingress.
 	t.Log("Checking that IP address gets transferred from cluster ingress to federated ingress")
-	createdIngress.Status.LoadBalancer.Ingress = append(createdIngress.Status.LoadBalancer.Ingress, api_v1.LoadBalancerIngress{IP: "1.2.3.4"})
-	cluster1IngressWatch.Modify(createdIngress)
-	updatedIngress := GetIngressFromChan(t, fedIngressUpdateChan)
-	assert.NotNil(t, updatedIngress, "Cluster's ingress load balancer status was not correctly transferred to the federated ingress")
-	if updatedIngress != nil {
-		assert.True(t, reflect.DeepEqual(createdIngress.Status.LoadBalancer.Ingress, updatedIngress.Status.LoadBalancer.Ingress), fmt.Sprintf("Ingress IP was not transferred from cluster ingress to federated ingress.  %v is not equal to %v", createdIngress.Status.LoadBalancer.Ingress, updatedIngress.Status.LoadBalancer.Ingress))
+	cluster1Ingress.Status.LoadBalancer.Ingress = append(cluster1Ingress.Status.LoadBalancer.Ingress,
+		apiv1.LoadBalancerIngress{IP: "1.2.3.4"})
+	glog.Infof("Setting artificial IP address for cluster1 ingress")
+
+	for trial := 0; trial < maxTrials; trial++ {
+		cluster1IngressWatch.Modify(&cluster1Ingress)
+		// Wait for store to see the updated cluster ingress.
+		key := types.NamespacedName{Namespace: createdIngress.Namespace, Name: createdIngress.Name}.String()
+		if err := WaitForStatusUpdate(t, ingressController.ingressFederatedInformer.GetTargetStore(),
+			cluster1.Name, key, cluster1Ingress.Status.LoadBalancer, time.Second); err != nil {
+			continue
+		}
+		if err := WaitForFedStatusUpdate(t, ingressController.ingressInformerStore,
+			key, cluster1Ingress.Status.LoadBalancer, time.Second); err != nil {
+			continue
+		}
 	}
 
-	// Test update federated ingress.
-	if updatedIngress.ObjectMeta.Annotations == nil {
-		updatedIngress.ObjectMeta.Annotations = make(map[string]string)
+	for trial := 0; trial < maxTrials; trial++ {
+		updatedIngress = GetIngressFromChan(t, fedIngressUpdateChan)
+		assert.NotNil(t, updatedIngress, "Cluster's ingress load balancer status was not correctly transferred to the federated ingress")
+		if updatedIngress == nil {
+			return
+		}
+		if reflect.DeepEqual(cluster1Ingress.Status.LoadBalancer.Ingress, updatedIngress.Status.LoadBalancer.Ingress) {
+			fedIngress.Status.LoadBalancer = updatedIngress.Status.LoadBalancer
+			break
+		} else {
+			glog.Infof("Status check failed: expected: %v actual: %v", cluster1Ingress.Status, updatedIngress.Status)
+		}
 	}
-	updatedIngress.ObjectMeta.Annotations["A"] = "B"
+	glog.Infof("Status check: expected: %v actual: %v", cluster1Ingress.Status, updatedIngress.Status)
+	assert.True(t, reflect.DeepEqual(cluster1Ingress.Status.LoadBalancer.Ingress, updatedIngress.Status.LoadBalancer.Ingress),
+		fmt.Sprintf("Ingress IP was not transferred from cluster ingress to federated ingress.  %v is not equal to %v",
+			cluster1Ingress.Status.LoadBalancer.Ingress, updatedIngress.Status.LoadBalancer.Ingress))
+
+	assert.NoError(t, WaitForStatusUpdate(t, ingressController.ingressFederatedInformer.GetTargetStore(),
+		cluster1.Name, types.NamespacedName{Namespace: createdIngress.Namespace, Name: createdIngress.Name}.String(),
+		cluster1Ingress.Status.LoadBalancer, time.Second))
+	assert.NoError(t, WaitForFedStatusUpdate(t, ingressController.ingressInformerStore,
+		types.NamespacedName{Namespace: createdIngress.Namespace, Name: createdIngress.Name}.String(),
+		cluster1Ingress.Status.LoadBalancer, time.Second))
+	t.Logf("expected: %v, actual: %v", createdIngress, updatedIngress)
+
+	// Test update federated ingress.
+	if fedIngress.ObjectMeta.Annotations == nil {
+		fedIngress.ObjectMeta.Annotations = make(map[string]string)
+	}
+	fedIngress.ObjectMeta.Annotations["A"] = "B"
 	t.Log("Modifying Federated Ingress")
-	fedIngressWatch.Modify(updatedIngress)
+	fedIngressWatch.Modify(&fedIngress)
 	t.Log("Checking that Ingress was correctly updated in cluster 1")
-	updatedIngress2 := GetIngressFromChan(t, cluster1IngressUpdateChan)
-	assert.NotNil(t, updatedIngress2)
-	assert.True(t, reflect.DeepEqual(updatedIngress2.Spec, updatedIngress.Spec), "Spec of updated ingress is not equal")
-	assert.Equal(t, updatedIngress2.ObjectMeta.Annotations["A"], updatedIngress.ObjectMeta.Annotations["A"], "Updated annotation not transferred from federated to cluster ingress.")
+	var updatedIngress2 *extensionsv1beta1.Ingress
+
+	for trial := 0; trial < maxTrials; trial++ {
+		updatedIngress2 = GetIngressFromChan(t, cluster1IngressUpdateChan)
+		assert.NotNil(t, updatedIngress2)
+		if updatedIngress2 == nil {
+			return
+		}
+		if reflect.DeepEqual(fedIngress.Spec, updatedIngress.Spec) &&
+			updatedIngress2.ObjectMeta.Annotations["A"] == fedIngress.ObjectMeta.Annotations["A"] {
+			break
+		}
+	}
+
+	assert.True(t, reflect.DeepEqual(updatedIngress2.Spec, fedIngress.Spec), "Spec of updated ingress is not equal")
+	assert.Equal(t, updatedIngress2.ObjectMeta.Annotations["A"], fedIngress.ObjectMeta.Annotations["A"], "Updated annotation not transferred from federated to cluster ingress.")
+
 	// Test add cluster
 	t.Log("Adding a second cluster")
-	ing1.Annotations = make(map[string]string)
-	ing1.Annotations[staticIPNameKeyWritable] = "foo" // Make sure that the base object has a static IP name first.
-	fedIngressWatch.Modify(&ing1)
+
+	fedIngress.Annotations[staticIPNameKeyWritable] = "foo" // Make sure that the base object has a static IP name first.
+	fedIngressWatch.Modify(&fedIngress)
 	clusterWatch.Add(cluster2)
 	// First check that the original values are not equal - see above comment
 	assert.NotEqual(t, cfg1.Data[uidKey], cfg2.Data[uidKey], fmt.Sprintf("ConfigMap in cluster 2 must initially not equal that in cluster 1 for this test - please fix test"))
@@ -161,8 +246,9 @@ func TestIngressController(t *testing.T) {
 	t.Log("Checking that the ingress got created in cluster 2")
 	createdIngress2 := GetIngressFromChan(t, cluster2IngressCreateChan)
 	assert.NotNil(t, createdIngress2)
-	assert.True(t, reflect.DeepEqual(ing1.Spec, createdIngress2.Spec), "Spec of created ingress is not equal")
-	assert.True(t, util.ObjectMetaEquivalent(ing1.ObjectMeta, createdIngress2.ObjectMeta), "Metadata of created object is not equivalent")
+	assert.True(t, reflect.DeepEqual(fedIngress.Spec, createdIngress2.Spec), "Spec of created ingress is not equal")
+	t.Logf("created meta: %v fed meta: %v", createdIngress2.ObjectMeta, fedIngress.ObjectMeta)
+	assert.True(t, util.ObjectMetaEquivalent(fedIngress.ObjectMeta, createdIngress2.ObjectMeta), "Metadata of created object is not equivalent")
 
 	t.Log("Checking that the configmap in cluster 2 got updated.")
 	updatedConfigMap2 := GetConfigMapFromChan(cluster2ConfigMapUpdateChan)
@@ -175,28 +261,28 @@ func TestIngressController(t *testing.T) {
 	close(stop)
 }
 
-func GetIngressFromChan(t *testing.T, c chan runtime.Object) *extensions_v1beta1.Ingress {
+func GetIngressFromChan(t *testing.T, c chan runtime.Object) *extensionsv1beta1.Ingress {
 	obj := GetObjectFromChan(c)
-	ingress, ok := obj.(*extensions_v1beta1.Ingress)
+	ingress, ok := obj.(*extensionsv1beta1.Ingress)
 	if !ok {
-		t.Logf("Object on channel was not of type *extensions_v1beta1.Ingress: %v", obj)
+		t.Logf("Object on channel was not of type *extensionsv1beta1.Ingress: %v", obj)
 	}
 	return ingress
 }
 
-func GetConfigMapFromChan(c chan runtime.Object) *api_v1.ConfigMap {
-	configMap, _ := GetObjectFromChan(c).(*api_v1.ConfigMap)
+func GetConfigMapFromChan(c chan runtime.Object) *apiv1.ConfigMap {
+	configMap, _ := GetObjectFromChan(c).(*apiv1.ConfigMap)
 	return configMap
 }
 
-func GetClusterFromChan(c chan runtime.Object) *federation_api.Cluster {
-	cluster, _ := GetObjectFromChan(c).(*federation_api.Cluster)
+func GetClusterFromChan(c chan runtime.Object) *federationapi.Cluster {
+	cluster, _ := GetObjectFromChan(c).(*federationapi.Cluster)
 	return cluster
 }
 
-func NewConfigMap(uid string) *api_v1.ConfigMap {
-	return &api_v1.ConfigMap{
-		ObjectMeta: api_v1.ObjectMeta{
+func NewConfigMap(uid string) *apiv1.ConfigMap {
+	return &apiv1.ConfigMap{
+		ObjectMeta: apiv1.ObjectMeta{
 			Name:      uidConfigMapName,
 			Namespace: uidConfigMapNamespace,
 			SelfLink:  "/api/v1/namespaces/" + uidConfigMapNamespace + "/configmap/" + uidConfigMapName,
@@ -206,4 +292,68 @@ func NewConfigMap(uid string) *api_v1.ConfigMap {
 			uidKey: uid,
 		},
 	}
+}
+
+// Wait for finalizers to appear in federation store.
+func WaitForFinalizersInFederationStore(ingressController *IngressController, store cache.Store, key string) error {
+	retryInterval := 100 * time.Millisecond
+	timeout := wait.ForeverTestTimeout
+	err := wait.PollImmediate(retryInterval, timeout, func() (bool, error) {
+		obj, found, err := store.GetByKey(key)
+		if !found || err != nil {
+			return false, err
+		}
+		ingress := obj.(*extensionsv1beta1.Ingress)
+		if ingressController.hasFinalizerFunc(ingress, apiv1.FinalizerOrphan) &&
+			ingressController.hasFinalizerFunc(ingress, deletionhelper.FinalizerDeleteFromUnderlyingClusters) {
+			return true, nil
+		}
+		return false, nil
+	})
+	return err
+}
+
+// Wait for the cluster ingress to appear in cluster store.
+func WaitForIngressInClusterStore(store util.FederatedReadOnlyStore, clusterName, key string) error {
+	retryInterval := 100 * time.Millisecond
+	timeout := wait.ForeverTestTimeout
+	err := wait.PollImmediate(retryInterval, timeout, func() (bool, error) {
+		_, found, err := store.GetByKey(clusterName, key)
+		if found && err == nil {
+			return true, nil
+		}
+		if errors.IsNotFound(err) {
+			return false, nil
+		}
+		return false, err
+	})
+	return err
+}
+
+// Wait for ingress status to be updated to match the desiredStatus.
+func WaitForStatusUpdate(t *testing.T, store util.FederatedReadOnlyStore, clusterName, key string, desiredStatus apiv1.LoadBalancerStatus, timeout time.Duration) error {
+	retryInterval := 100 * time.Millisecond
+	err := wait.PollImmediate(retryInterval, timeout, func() (bool, error) {
+		obj, found, err := store.GetByKey(clusterName, key)
+		if !found || err != nil {
+			return false, err
+		}
+		ingress := obj.(*extensionsv1beta1.Ingress)
+		return reflect.DeepEqual(ingress.Status.LoadBalancer, desiredStatus), nil
+	})
+	return err
+}
+
+// Wait for ingress status to be updated to match the desiredStatus.
+func WaitForFedStatusUpdate(t *testing.T, store cache.Store, key string, desiredStatus apiv1.LoadBalancerStatus, timeout time.Duration) error {
+	retryInterval := 100 * time.Millisecond
+	err := wait.PollImmediate(retryInterval, timeout, func() (bool, error) {
+		obj, found, err := store.GetByKey(key)
+		if !found || err != nil {
+			return false, err
+		}
+		ingress := obj.(*extensionsv1beta1.Ingress)
+		return reflect.DeepEqual(ingress.Status.LoadBalancer, desiredStatus), nil
+	})
+	return err
 }

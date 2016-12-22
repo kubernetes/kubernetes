@@ -19,10 +19,11 @@ package hostport
 import (
 	"fmt"
 	"net"
+	"reflect"
 	"strings"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
 )
@@ -61,27 +62,27 @@ func TestOpenPodHostports(t *testing.T) {
 	}
 
 	tests := []struct {
-		pod     *api.Pod
+		pod     *v1.Pod
 		ip      string
 		matches []*ruleMatch
 	}{
 		// New pod that we are going to add
 		{
-			&api.Pod{
-				ObjectMeta: api.ObjectMeta{
+			&v1.Pod{
+				ObjectMeta: v1.ObjectMeta{
 					Name:      "test-pod",
-					Namespace: api.NamespaceDefault,
+					Namespace: v1.NamespaceDefault,
 				},
-				Spec: api.PodSpec{
-					Containers: []api.Container{{
-						Ports: []api.ContainerPort{{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{
+						Ports: []v1.ContainerPort{{
 							HostPort:      4567,
 							ContainerPort: 80,
-							Protocol:      api.ProtocolTCP,
+							Protocol:      v1.ProtocolTCP,
 						}, {
 							HostPort:      5678,
 							ContainerPort: 81,
-							Protocol:      api.ProtocolUDP,
+							Protocol:      v1.ProtocolUDP,
 						}},
 					}},
 				},
@@ -122,17 +123,17 @@ func TestOpenPodHostports(t *testing.T) {
 		},
 		// Already running pod
 		{
-			&api.Pod{
-				ObjectMeta: api.ObjectMeta{
+			&v1.Pod{
+				ObjectMeta: v1.ObjectMeta{
 					Name:      "another-test-pod",
-					Namespace: api.NamespaceDefault,
+					Namespace: v1.NamespaceDefault,
 				},
-				Spec: api.PodSpec{
-					Containers: []api.Container{{
-						Ports: []api.ContainerPort{{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{
+						Ports: []v1.ContainerPort{{
 							HostPort:      123,
 							ContainerPort: 654,
-							Protocol:      api.ProtocolTCP,
+							Protocol:      v1.ProtocolTCP,
 						}},
 					}},
 				},
@@ -185,6 +186,17 @@ func TestOpenPodHostports(t *testing.T) {
 		})
 	}
 
+	// Already running pod's host port
+	hp := hostport{
+		tests[1].pod.Spec.Containers[0].Ports[0].HostPort,
+		strings.ToLower(string(tests[1].pod.Spec.Containers[0].Ports[0].Protocol)),
+	}
+	h.hostPortMap[hp] = &fakeSocket{
+		tests[1].pod.Spec.Containers[0].Ports[0].HostPort,
+		strings.ToLower(string(tests[1].pod.Spec.Containers[0].Ports[0].Protocol)),
+		false,
+	}
+
 	err := h.OpenPodHostportsAndSync(&ActivePod{Pod: tests[0].pod, IP: net.ParseIP(tests[0].ip)}, "br0", activePods)
 	if err != nil {
 		t.Fatalf("Failed to OpenPodHostportsAndSync: %v", err)
@@ -219,6 +231,16 @@ func TestOpenPodHostports(t *testing.T) {
 				t.Fatalf("Expected NAT chain %s rule containing '%s' not found", match.chain, match.match)
 			}
 		}
+	}
+
+	// Socket
+	hostPortMap := map[hostport]closeable{
+		hostport{123, "tcp"}:  &fakeSocket{123, "tcp", false},
+		hostport{4567, "tcp"}: &fakeSocket{4567, "tcp", false},
+		hostport{5678, "udp"}: &fakeSocket{5678, "udp", false},
+	}
+	if !reflect.DeepEqual(hostPortMap, h.hostPortMap) {
+		t.Fatalf("Mismatch in expected hostPortMap. Expected '%v', got '%v'", hostPortMap, h.hostPortMap)
 	}
 }
 

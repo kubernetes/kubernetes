@@ -17,13 +17,13 @@ limitations under the License.
 package eventsink
 
 import (
-	fedclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_5"
+	fedclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset"
 	api "k8s.io/kubernetes/pkg/api"
 	api_v1 "k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/record"
 )
 
-// Implemnts k8s.io/kubernetes/pkg/client/record.EventSink.
+// Implements k8s.io/kubernetes/pkg/client/record.EventSink.
 type FederatedEventSink struct {
 	clientset fedclientset.Interface
 }
@@ -37,36 +37,14 @@ func NewFederatedEventSink(clientset fedclientset.Interface) *FederatedEventSink
 	}
 }
 
-func (fes *FederatedEventSink) Create(event *api.Event) (*api.Event, error) {
-	return fes.executeOperation(event, func(eventV1 *api_v1.Event) (*api_v1.Event, error) {
-		return fes.clientset.Core().Events(event.Namespace).Create(eventV1)
-	})
+func (fes *FederatedEventSink) Create(event *api_v1.Event) (*api_v1.Event, error) {
+	return fes.clientset.Core().Events(event.Namespace).Create(event)
 }
 
-func (fes *FederatedEventSink) Update(event *api.Event) (*api.Event, error) {
-	return fes.executeOperation(event, func(eventV1 *api_v1.Event) (*api_v1.Event, error) {
-		return fes.clientset.Core().Events(event.Namespace).Update(eventV1)
-	})
+func (fes *FederatedEventSink) Update(event *api_v1.Event) (*api_v1.Event, error) {
+	return fes.clientset.Core().Events(event.Namespace).Update(event)
 }
 
-func (fes *FederatedEventSink) Patch(event *api.Event, data []byte) (*api.Event, error) {
-	return fes.executeOperation(event, func(eventV1 *api_v1.Event) (*api_v1.Event, error) {
-		return fes.clientset.Core().Events(event.Namespace).Patch(event.Name, api.StrategicMergePatchType, data)
-	})
-}
-
-func (fes *FederatedEventSink) executeOperation(event *api.Event, operation func(*api_v1.Event) (*api_v1.Event, error)) (*api.Event, error) {
-	var versionedEvent api_v1.Event
-	if err := api.Scheme.Convert(event, &versionedEvent, nil); err != nil {
-		return nil, err
-	}
-	versionedEventPtr, err := operation(&versionedEvent)
-	if err != nil {
-		return nil, err
-	}
-	var unversionedEvent api.Event
-	if err := api.Scheme.Convert(versionedEventPtr, &unversionedEvent, nil); err != nil {
-		return nil, err
-	}
-	return &unversionedEvent, nil
+func (fes *FederatedEventSink) Patch(event *api_v1.Event, data []byte) (*api_v1.Event, error) {
+	return fes.clientset.Core().Events(event.Namespace).Patch(event.Name, api.StrategicMergePatchType, data)
 }

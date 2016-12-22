@@ -17,17 +17,24 @@ spec:
       - name: ssl-certs
         hostPath:
           path: /etc/ssl/certs
+      - name: kubeconfig
+        secret:
+          secretName: federation-apiserver-kubeconfig
       containers:
       - name: controller-manager
         volumeMounts:
         - name: ssl-certs
           readOnly: true
           mountPath: /etc/ssl/certs
+        - name: kubeconfig
+          readOnly: true
+          mountPath: "/etc/federation/controller-manager"
         image: {{.FEDERATION_CONTROLLER_MANAGER_IMAGE_REPO}}:{{.FEDERATION_CONTROLLER_MANAGER_IMAGE_TAG}}
         command:
-        - /usr/local/bin/hyperkube
+        - /hyperkube
         - federation-controller-manager
         - --master=https://{{.FEDERATION_APISERVER_DEPLOYMENT_NAME}}:443
+        - --kubeconfig=/etc/federation/controller-manager/kubeconfig
         - --dns-provider={{.FEDERATION_DNS_PROVIDER}}
         - --dns-provider-config={{.FEDERATION_DNS_PROVIDER_CONFIG}}
         - --federation-name={{.FEDERATION_NAME}}

@@ -17,7 +17,6 @@ limitations under the License.
 package registry
 
 import (
-	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/registry/generic"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage"
@@ -32,8 +31,9 @@ func StorageWithCacher(
 	capacity int,
 	objectType runtime.Object,
 	resourcePrefix string,
-	scopeStrategy rest.NamespaceScopedStrategy,
+	keyFunc func(obj runtime.Object) (string, error),
 	newListFunc func() runtime.Object,
+	getAttrsFunc storage.AttrFunc,
 	triggerFunc storage.TriggerPublisherFunc) (storage.Interface, factory.DestroyFunc) {
 
 	s, d := generic.NewRawStorage(storageConfig)
@@ -45,18 +45,11 @@ func StorageWithCacher(
 		Versioner:            etcdstorage.APIObjectVersioner{},
 		Type:                 objectType,
 		ResourcePrefix:       resourcePrefix,
+		KeyFunc:              keyFunc,
 		NewListFunc:          newListFunc,
+		GetAttrsFunc:         getAttrsFunc,
 		TriggerPublisherFunc: triggerFunc,
 		Codec:                storageConfig.Codec,
-	}
-	if scopeStrategy.NamespaceScoped() {
-		cacherConfig.KeyFunc = func(obj runtime.Object) (string, error) {
-			return storage.NamespaceKeyFunc(resourcePrefix, obj)
-		}
-	} else {
-		cacherConfig.KeyFunc = func(obj runtime.Object) (string, error) {
-			return storage.NoNamespaceKeyFunc(resourcePrefix, obj)
-		}
 	}
 	cacher := storage.NewCacherFromConfig(cacherConfig)
 	destroyFunc := func() {

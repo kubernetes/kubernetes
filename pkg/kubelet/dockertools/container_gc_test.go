@@ -24,7 +24,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/types"
 )
@@ -65,8 +65,8 @@ func makeUndefinedContainer(id string, running bool, created time.Time) *FakeCon
 func addPods(podGetter podGetter, podUIDs ...types.UID) {
 	fakePodGetter := podGetter.(*fakePodGetter)
 	for _, uid := range podUIDs {
-		fakePodGetter.pods[uid] = &api.Pod{
-			ObjectMeta: api.ObjectMeta{
+		fakePodGetter.pods[uid] = &v1.Pod{
+			ObjectMeta: v1.ObjectMeta{
 				Name:      "pod" + string(uid),
 				Namespace: "test",
 				UID:       uid,
@@ -148,6 +148,7 @@ func TestGarbageCollectNoMaxLimit(t *testing.T) {
 	})
 	addPods(gc.podGetter, "foo", "foo1", "foo2", "foo3", "foo4")
 
+	assert.Nil(t, gc.GarbageCollect(kubecontainer.ContainerGCPolicy{MinAge: time.Minute, MaxPerPodContainer: -1, MaxContainers: -1}, true))
 	assert.Len(t, fakeDocker.Removed, 0)
 }
 

@@ -21,14 +21,14 @@ import (
 	"os"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/mount"
 	utiltesting "k8s.io/kubernetes/pkg/util/testing"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 
-	flockerApi "github.com/clusterhq/flocker-go"
+	flockerapi "github.com/clusterhq/flocker-go"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -37,14 +37,14 @@ const datasetOneID = "11111111-1111-1111-1111-111111111100"
 const nodeOneID = "11111111-1111-1111-1111-111111111111"
 const nodeTwoID = "22222222-2222-2222-2222-222222222222"
 
-var _ flockerApi.Clientable = &fakeFlockerClient{}
+var _ flockerapi.Clientable = &fakeFlockerClient{}
 
 type fakeFlockerClient struct {
 	DatasetID string
 	Primary   string
 	Deleted   bool
 	Metadata  map[string]string
-	Nodes     []flockerApi.NodeState
+	Nodes     []flockerapi.NodeState
 	Error     error
 }
 
@@ -54,7 +54,7 @@ func newFakeFlockerClient() *fakeFlockerClient {
 		Primary:   nodeOneID,
 		Deleted:   false,
 		Metadata:  map[string]string{"Name": "dataset-one"},
-		Nodes: []flockerApi.NodeState{
+		Nodes: []flockerapi.NodeState{
 			{
 				Host: "1.2.3.4",
 				UUID: nodeOneID,
@@ -67,13 +67,13 @@ func newFakeFlockerClient() *fakeFlockerClient {
 	}
 }
 
-func (c *fakeFlockerClient) CreateDataset(options *flockerApi.CreateDatasetOptions) (*flockerApi.DatasetState, error) {
+func (c *fakeFlockerClient) CreateDataset(options *flockerapi.CreateDatasetOptions) (*flockerapi.DatasetState, error) {
 
 	if c.Error != nil {
 		return nil, c.Error
 	}
 
-	return &flockerApi.DatasetState{
+	return &flockerapi.DatasetState{
 		DatasetID: c.DatasetID,
 	}, nil
 }
@@ -84,8 +84,8 @@ func (c *fakeFlockerClient) DeleteDataset(datasetID string) error {
 	return nil
 }
 
-func (c *fakeFlockerClient) GetDatasetState(datasetID string) (*flockerApi.DatasetState, error) {
-	return &flockerApi.DatasetState{}, nil
+func (c *fakeFlockerClient) GetDatasetState(datasetID string) (*flockerapi.DatasetState, error) {
+	return &flockerapi.DatasetState{}, nil
 }
 
 func (c *fakeFlockerClient) GetDatasetID(metaName string) (datasetID string, err error) {
@@ -99,12 +99,12 @@ func (c *fakeFlockerClient) GetPrimaryUUID() (primaryUUID string, err error) {
 	return
 }
 
-func (c *fakeFlockerClient) ListNodes() (nodes []flockerApi.NodeState, err error) {
+func (c *fakeFlockerClient) ListNodes() (nodes []flockerapi.NodeState, err error) {
 	return c.Nodes, nil
 }
 
-func (c *fakeFlockerClient) UpdatePrimaryForDataset(primaryUUID, datasetID string) (*flockerApi.DatasetState, error) {
-	return &flockerApi.DatasetState{}, nil
+func (c *fakeFlockerClient) UpdatePrimaryForDataset(primaryUUID, datasetID string) (*flockerapi.DatasetState, error) {
+	return &flockerapi.DatasetState{}, nil
 }
 
 type fakeFlockerUtil struct {
@@ -127,7 +127,7 @@ func newInitializedVolumePlugMgr(t *testing.T) (*volume.VolumePluginMgr, string)
 	plugMgr := &volume.VolumePluginMgr{}
 	dir, err := utiltesting.MkTmpdir("flocker")
 	assert.NoError(t, err)
-	plugMgr.InitPlugins(ProbeVolumePlugins(), volumetest.NewFakeVolumeHost(dir, nil, nil, "" /* rootContext */))
+	plugMgr.InitPlugins(ProbeVolumePlugins(), volumetest.NewFakeVolumeHost(dir, nil, nil))
 	return plugMgr, dir
 }
 
@@ -138,16 +138,16 @@ func TestPlugin(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 	plugMgr := volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(), volumetest.NewFakeVolumeHost(tmpDir, nil, nil, "" /* rootContext */))
+	plugMgr.InitPlugins(ProbeVolumePlugins(), volumetest.NewFakeVolumeHost(tmpDir, nil, nil))
 
 	plug, err := plugMgr.FindPluginByName("kubernetes.io/flocker")
 	if err != nil {
 		t.Errorf("Can't find the plugin by name")
 	}
-	spec := &api.Volume{
+	spec := &v1.Volume{
 		Name: "vol1",
-		VolumeSource: api.VolumeSource{
-			Flocker: &api.FlockerVolumeSource{
+		VolumeSource: v1.VolumeSource{
+			Flocker: &v1.FlockerVolumeSource{
 				DatasetUUID: "uuid1",
 			},
 		},
@@ -181,24 +181,24 @@ func TestCanSupport(t *testing.T) {
 
 	specs := map[*volume.Spec]bool{
 		&volume.Spec{
-			Volume: &api.Volume{
-				VolumeSource: api.VolumeSource{
-					Flocker: &api.FlockerVolumeSource{},
+			Volume: &v1.Volume{
+				VolumeSource: v1.VolumeSource{
+					Flocker: &v1.FlockerVolumeSource{},
 				},
 			},
 		}: true,
 		&volume.Spec{
-			PersistentVolume: &api.PersistentVolume{
-				Spec: api.PersistentVolumeSpec{
-					PersistentVolumeSource: api.PersistentVolumeSource{
-						Flocker: &api.FlockerVolumeSource{},
+			PersistentVolume: &v1.PersistentVolume{
+				Spec: v1.PersistentVolumeSpec{
+					PersistentVolumeSource: v1.PersistentVolumeSource{
+						Flocker: &v1.FlockerVolumeSource{},
 					},
 				},
 			},
 		}: true,
 		&volume.Spec{
-			Volume: &api.Volume{
-				VolumeSource: api.VolumeSource{},
+			Volume: &v1.Volume{
+				VolumeSource: v1.VolumeSource{},
 			},
 		}: false,
 	}
@@ -215,9 +215,9 @@ func TestGetFlockerVolumeSource(t *testing.T) {
 	p := flockerPlugin{}
 
 	spec := &volume.Spec{
-		Volume: &api.Volume{
-			VolumeSource: api.VolumeSource{
-				Flocker: &api.FlockerVolumeSource{},
+		Volume: &v1.Volume{
+			VolumeSource: v1.VolumeSource{
+				Flocker: &v1.FlockerVolumeSource{},
 			},
 		},
 	}
@@ -226,10 +226,10 @@ func TestGetFlockerVolumeSource(t *testing.T) {
 	assert.Equal(spec.Volume.Flocker, vs)
 
 	spec = &volume.Spec{
-		PersistentVolume: &api.PersistentVolume{
-			Spec: api.PersistentVolumeSpec{
-				PersistentVolumeSource: api.PersistentVolumeSource{
-					Flocker: &api.FlockerVolumeSource{},
+		PersistentVolume: &v1.PersistentVolume{
+			Spec: v1.PersistentVolumeSpec{
+				PersistentVolumeSource: v1.PersistentVolumeSource{
+					Flocker: &v1.FlockerVolumeSource{},
 				},
 			},
 		},
@@ -247,16 +247,16 @@ func TestNewMounterDatasetName(t *testing.T) {
 	assert.NoError(err)
 
 	spec := &volume.Spec{
-		Volume: &api.Volume{
-			VolumeSource: api.VolumeSource{
-				Flocker: &api.FlockerVolumeSource{
+		Volume: &v1.Volume{
+			VolumeSource: v1.VolumeSource{
+				Flocker: &v1.FlockerVolumeSource{
 					DatasetName: "something",
 				},
 			},
 		},
 	}
 
-	_, err = plug.NewMounter(spec, &api.Pod{}, volume.VolumeOptions{})
+	_, err = plug.NewMounter(spec, &v1.Pod{}, volume.VolumeOptions{})
 	assert.NoError(err)
 }
 
@@ -268,16 +268,16 @@ func TestNewMounterDatasetUUID(t *testing.T) {
 	assert.NoError(err)
 
 	spec := &volume.Spec{
-		Volume: &api.Volume{
-			VolumeSource: api.VolumeSource{
-				Flocker: &api.FlockerVolumeSource{
+		Volume: &v1.Volume{
+			VolumeSource: v1.VolumeSource{
+				Flocker: &v1.FlockerVolumeSource{
 					DatasetUUID: "uuid1",
 				},
 			},
 		},
 	}
 
-	mounter, err := plug.NewMounter(spec, &api.Pod{}, volume.VolumeOptions{})
+	mounter, err := plug.NewMounter(spec, &v1.Pod{}, volume.VolumeOptions{})
 	assert.NoError(err)
 	assert.NotNil(mounter, "got a nil mounter")
 
@@ -301,7 +301,7 @@ func TestIsReadOnly(t *testing.T) {
 
 type mockFlockerClient struct {
 	datasetID, primaryUUID, path string
-	datasetState                 *flockerApi.DatasetState
+	datasetState                 *flockerapi.DatasetState
 }
 
 func newMockFlockerClient(mockDatasetID, mockPrimaryUUID, mockPath string) *mockFlockerClient {
@@ -309,7 +309,7 @@ func newMockFlockerClient(mockDatasetID, mockPrimaryUUID, mockPath string) *mock
 		datasetID:   mockDatasetID,
 		primaryUUID: mockPrimaryUUID,
 		path:        mockPath,
-		datasetState: &flockerApi.DatasetState{
+		datasetState: &flockerapi.DatasetState{
 			Path:      mockPath,
 			DatasetID: mockDatasetID,
 			Primary:   mockPrimaryUUID,
@@ -317,10 +317,10 @@ func newMockFlockerClient(mockDatasetID, mockPrimaryUUID, mockPath string) *mock
 	}
 }
 
-func (m mockFlockerClient) CreateDataset(metaName string) (*flockerApi.DatasetState, error) {
+func (m mockFlockerClient) CreateDataset(metaName string) (*flockerapi.DatasetState, error) {
 	return m.datasetState, nil
 }
-func (m mockFlockerClient) GetDatasetState(datasetID string) (*flockerApi.DatasetState, error) {
+func (m mockFlockerClient) GetDatasetState(datasetID string) (*flockerapi.DatasetState, error) {
 	return m.datasetState, nil
 }
 func (m mockFlockerClient) GetDatasetID(metaName string) (string, error) {
@@ -329,7 +329,7 @@ func (m mockFlockerClient) GetDatasetID(metaName string) (string, error) {
 func (m mockFlockerClient) GetPrimaryUUID() (string, error) {
 	return m.primaryUUID, nil
 }
-func (m mockFlockerClient) UpdatePrimaryForDataset(primaryUUID, datasetID string) (*flockerApi.DatasetState, error) {
+func (m mockFlockerClient) UpdatePrimaryForDataset(primaryUUID, datasetID string) (*flockerapi.DatasetState, error) {
 	return m.datasetState, nil
 }
 
@@ -349,7 +349,7 @@ func TestSetUpAtInternal(t *testing.T) {
 	plug, err := plugMgr.FindPluginByName(flockerPluginName)
 	assert.NoError(err)
 
-	pod := &api.Pod{ObjectMeta: api.ObjectMeta{UID: types.UID("poduid")}}
+	pod := &v1.Pod{ObjectMeta: v1.ObjectMeta{UID: types.UID("poduid")}}
 	b := flockerVolumeMounter{flockerVolume: &flockerVolume{pod: pod, plugin: plug.(*flockerPlugin)}}
 	b.client = newMockFlockerClient("dataset-id", "primary-uid", mockPath)
 

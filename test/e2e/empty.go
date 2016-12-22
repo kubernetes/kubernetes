@@ -24,20 +24,20 @@ import (
 	. "github.com/onsi/ginkgo"
 )
 
-var _ = framework.KubeDescribe("[Feature:Empty]", func() {
+var _ = framework.KubeDescribe("Empty [Feature:Empty]", func() {
 	f := framework.NewDefaultFramework("empty")
 
 	BeforeEach(func() {
-		c := f.Client
+		c := f.ClientSet
 		ns := f.Namespace.Name
 
 		// TODO: respect --allow-notready-nodes flag in those functions.
-		framework.ExpectNoError(framework.WaitForAllNodesSchedulable(c))
+		framework.ExpectNoError(framework.WaitForAllNodesSchedulable(c, framework.TestContext.NodeSchedulableTimeout))
 		framework.WaitForAllNodesHealthy(c, time.Minute)
 
 		err := framework.CheckTestingNSDeletedExcept(c, ns)
 		framework.ExpectNoError(err)
 	})
 
-	It("Does nothing", func() {})
+	It("does nothing", func() {})
 })

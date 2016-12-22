@@ -62,17 +62,18 @@ func New() *Generator {
 		Packages: strings.Join([]string{
 			`+k8s.io/kubernetes/pkg/util/intstr`,
 			`+k8s.io/kubernetes/pkg/api/resource`,
+			`+k8s.io/kubernetes/pkg/runtime/schema`,
 			`+k8s.io/kubernetes/pkg/runtime`,
 			`+k8s.io/kubernetes/pkg/watch/versioned`,
-			`k8s.io/kubernetes/pkg/api/unversioned`,
+			`k8s.io/kubernetes/pkg/apis/meta/v1`,
 			`k8s.io/kubernetes/pkg/api/v1`,
-			`k8s.io/kubernetes/pkg/apis/policy/v1alpha1`,
+			`k8s.io/kubernetes/pkg/apis/policy/v1beta1`,
 			`k8s.io/kubernetes/pkg/apis/extensions/v1beta1`,
 			`k8s.io/kubernetes/pkg/apis/autoscaling/v1`,
 			`k8s.io/kubernetes/pkg/apis/authorization/v1beta1`,
 			`k8s.io/kubernetes/pkg/apis/batch/v1`,
 			`k8s.io/kubernetes/pkg/apis/batch/v2alpha1`,
-			`k8s.io/kubernetes/pkg/apis/apps/v1alpha1`,
+			`k8s.io/kubernetes/pkg/apis/apps/v1beta1`,
 			`k8s.io/kubernetes/pkg/apis/authentication/v1beta1`,
 			`k8s.io/kubernetes/pkg/apis/rbac/v1alpha1`,
 			`k8s.io/kubernetes/federation/apis/federation/v1beta1`,
@@ -80,7 +81,7 @@ func New() *Generator {
 			`k8s.io/kubernetes/pkg/apis/imagepolicy/v1alpha1`,
 			`k8s.io/kubernetes/pkg/apis/storage/v1beta1`,
 		}, ","),
-		DropEmbeddedFields: "k8s.io/kubernetes/pkg/api/unversioned.TypeMeta",
+		DropEmbeddedFields: "k8s.io/kubernetes/pkg/apis/meta/v1.TypeMeta",
 	}
 }
 
@@ -137,9 +138,6 @@ func Run(g *Generator) {
 		case strings.HasPrefix(d, "-"):
 			d = d[1:]
 			outputPackage = false
-		}
-		if strings.Contains(d, "-") {
-			log.Fatalf("Package names must be valid protobuf package identifiers, which allow only [a-z0-9_]: %s", d)
 		}
 		name := protoSafePackage(d)
 		parts := strings.SplitN(d, "=", 2)

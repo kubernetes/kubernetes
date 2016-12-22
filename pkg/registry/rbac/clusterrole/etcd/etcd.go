@@ -17,59 +17,36 @@ limitations under the License.
 package etcd
 
 import (
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/rbac"
-	"k8s.io/kubernetes/pkg/registry/cachesize"
 	"k8s.io/kubernetes/pkg/registry/generic"
-	"k8s.io/kubernetes/pkg/registry/generic/registry"
+	genericregistry "k8s.io/kubernetes/pkg/registry/generic/registry"
 	"k8s.io/kubernetes/pkg/registry/rbac/clusterrole"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/storage"
 )
 
 // REST implements a RESTStorage for ClusterRole against etcd
 type REST struct {
-	*registry.Store
+	*genericregistry.Store
 }
 
 // NewREST returns a RESTStorage object that will work against ClusterRole objects.
-func NewREST(opts generic.RESTOptions) *REST {
-	prefix := "/" + opts.ResourcePrefix
-
-	newListFunc := func() runtime.Object { return &rbac.ClusterRoleList{} }
-	storageInterface, dFunc := opts.Decorator(
-		opts.StorageConfig,
-		cachesize.GetWatchCacheSizeByResource(cachesize.ClusterRoles),
-		&rbac.ClusterRole{},
-		prefix,
-		clusterrole.Strategy,
-		newListFunc,
-		storage.NoTriggerPublisher,
-	)
-
-	store := &registry.Store{
+func NewREST(optsGetter generic.RESTOptionsGetter) *REST {
+	store := &genericregistry.Store{
 		NewFunc:     func() runtime.Object { return &rbac.ClusterRole{} },
-		NewListFunc: newListFunc,
-		KeyRootFunc: func(ctx api.Context) string {
-			return registry.NamespaceKeyRootFunc(ctx, prefix)
-		},
-		KeyFunc: func(ctx api.Context, id string) (string, error) {
-			return registry.NoNamespaceKeyFunc(ctx, prefix, id)
-		},
+		NewListFunc: func() runtime.Object { return &rbac.ClusterRoleList{} },
 		ObjectNameFunc: func(obj runtime.Object) (string, error) {
 			return obj.(*rbac.ClusterRole).Name, nil
 		},
-		PredicateFunc:           clusterrole.Matcher,
-		QualifiedResource:       rbac.Resource("clusterroles"),
-		EnableGarbageCollection: opts.EnableGarbageCollection,
-		DeleteCollectionWorkers: opts.DeleteCollectionWorkers,
+		PredicateFunc:     clusterrole.Matcher,
+		QualifiedResource: rbac.Resource("clusterroles"),
 
 		CreateStrategy: clusterrole.Strategy,
 		UpdateStrategy: clusterrole.Strategy,
 		DeleteStrategy: clusterrole.Strategy,
-
-		Storage:     storageInterface,
-		DestroyFunc: dFunc,
+	}
+	options := &generic.StoreOptions{RESTOptions: optsGetter, AttrFunc: clusterrole.GetAttrs}
+	if err := store.CompleteWithOptions(options); err != nil {
+		panic(err) // TODO: Propagate error up
 	}
 
 	return &REST{store}

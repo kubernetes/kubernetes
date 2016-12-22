@@ -23,17 +23,20 @@ import (
 	"strconv"
 	"testing"
 
+	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/extensions"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
+	"k8s.io/kubernetes/pkg/apis/policy"
 	"k8s.io/kubernetes/pkg/apis/rbac"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/intstr"
 
@@ -41,8 +44,8 @@ import (
 )
 
 // FuzzerFor can randomly populate api objects that are destined for version.
-func FuzzerFor(t *testing.T, version unversioned.GroupVersion, src rand.Source) *fuzz.Fuzzer {
-	f := fuzz.New().NilChance(.5).NumElements(1, 1)
+func FuzzerFor(t *testing.T, version schema.GroupVersion, src rand.Source) *fuzz.Fuzzer {
+	f := fuzz.New().NilChance(.5).NumElements(0, 1)
 	if src != nil {
 		f.RandSource(src)
 	}
@@ -67,7 +70,7 @@ func FuzzerFor(t *testing.T, version unversioned.GroupVersion, src rand.Source) 
 			j.APIVersion = ""
 			j.Kind = ""
 		},
-		func(j *unversioned.TypeMeta, c fuzz.Continue) {
+		func(j *metav1.TypeMeta, c fuzz.Continue) {
 			// We have to customize the randomization of TypeMetas because their
 			// APIVersion and Kind must remain blank in memory.
 			j.APIVersion = ""
@@ -83,7 +86,7 @@ func FuzzerFor(t *testing.T, version unversioned.GroupVersion, src rand.Source) 
 			var sec, nsec int64
 			c.Fuzz(&sec)
 			c.Fuzz(&nsec)
-			j.CreationTimestamp = unversioned.Unix(sec, nsec).Rfc3339Copy()
+			j.CreationTimestamp = metav1.Unix(sec, nsec).Rfc3339Copy()
 		},
 		func(j *api.ObjectReference, c fuzz.Continue) {
 			// We have to customize the randomization of TypeMetas because their
@@ -95,7 +98,7 @@ func FuzzerFor(t *testing.T, version unversioned.GroupVersion, src rand.Source) 
 			j.ResourceVersion = strconv.FormatUint(c.RandUint64(), 10)
 			j.FieldPath = c.RandString()
 		},
-		func(j *unversioned.ListMeta, c fuzz.Continue) {
+		func(j *metav1.ListMeta, c fuzz.Continue) {
 			j.ResourceVersion = strconv.FormatUint(c.RandUint64(), 10)
 			j.SelfLink = c.RandString()
 		},
@@ -127,6 +130,9 @@ func FuzzerFor(t *testing.T, version unversioned.GroupVersion, src rand.Source) 
 			if s.SecurityContext == nil {
 				s.SecurityContext = new(api.PodSecurityContext)
 			}
+			if s.Affinity == nil {
+				s.Affinity = new(api.Affinity)
+			}
 		},
 		func(j *api.PodPhase, c fuzz.Continue) {
 			statuses := []api.PodPhase{api.PodPending, api.PodRunning, api.PodFailed, api.PodUnknown}
@@ -150,10 +156,10 @@ func FuzzerFor(t *testing.T, version unversioned.GroupVersion, src rand.Source) 
 			} else {
 				rollingUpdate := extensions.RollingUpdateDeployment{}
 				if c.RandBool() {
-					rollingUpdate.MaxUnavailable = intstr.FromInt(int(c.RandUint64()))
-					rollingUpdate.MaxSurge = intstr.FromInt(int(c.RandUint64()))
+					rollingUpdate.MaxUnavailable = intstr.FromInt(int(c.Rand.Int31()))
+					rollingUpdate.MaxSurge = intstr.FromInt(int(c.Rand.Int31()))
 				} else {
-					rollingUpdate.MaxSurge = intstr.FromString(fmt.Sprintf("%d%%", c.RandUint64()))
+					rollingUpdate.MaxSurge = intstr.FromString(fmt.Sprintf("%d%%", c.Rand.Int31()))
 				}
 				j.RollingUpdate = &rollingUpdate
 			}
@@ -170,7 +176,7 @@ func FuzzerFor(t *testing.T, version unversioned.GroupVersion, src rand.Source) 
 				j.ManualSelector = nil
 			}
 		},
-		func(sj *batch.ScheduledJobSpec, c fuzz.Continue) {
+		func(sj *batch.CronJobSpec, c fuzz.Continue) {
 			c.FuzzNoCustom(sj)
 			suspend := c.RandBool()
 			sj.Suspend = &suspend
@@ -361,7 +367,7 @@ func FuzzerFor(t *testing.T, version unversioned.GroupVersion, src rand.Source) 
 				ev.ValueFrom = &api.EnvVarSource{}
 				ev.ValueFrom.FieldRef = &api.ObjectFieldSelector{}
 
-				var versions []unversioned.GroupVersion
+				var versions []schema.GroupVersion
 				for _, testGroup := range testapi.Groups {
 					versions = append(versions, *testGroup.GroupVersion())
 				}
@@ -485,14 +491,14 @@ func FuzzerFor(t *testing.T, version unversioned.GroupVersion, src rand.Source) 
 			// TODO: Implement a fuzzer to generate valid keys, values and operators for
 			// selector requirements.
 			if s.Status.Selector != nil {
-				s.Status.Selector = &unversioned.LabelSelector{
+				s.Status.Selector = &metav1.LabelSelector{
 					MatchLabels: map[string]string{
 						"testlabelkey": "testlabelval",
 					},
-					MatchExpressions: []unversioned.LabelSelectorRequirement{
+					MatchExpressions: []metav1.LabelSelectorRequirement{
 						{
 							Key:      "testkey",
-							Operator: unversioned.LabelSelectorOpIn,
+							Operator: metav1.LabelSelectorOpIn,
 							Values:   []string{"val1", "val2", "val3"},
 						},
 					},
@@ -537,6 +543,17 @@ func FuzzerFor(t *testing.T, version unversioned.GroupVersion, src rand.Source) 
 
 			// Set the bytes field on the RawExtension
 			r.Raw = bytes
+		},
+		func(obj *kubeadm.MasterConfiguration, c fuzz.Continue) {
+			c.FuzzNoCustom(obj)
+			obj.KubernetesVersion = "v10"
+			obj.API.Port = 20
+			obj.Networking.ServiceSubnet = "foo"
+			obj.Networking.DNSDomain = "foo"
+		},
+		func(s *policy.PodDisruptionBudgetStatus, c fuzz.Continue) {
+			c.FuzzNoCustom(s) // fuzz self without calling this function again
+			s.PodDisruptionsAllowed = int32(c.Rand.Intn(2))
 		},
 	)
 	return f

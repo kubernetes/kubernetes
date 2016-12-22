@@ -17,10 +17,15 @@ limitations under the License.
 package fake
 
 import (
+	"fmt"
+
 	"github.com/emicklei/go-restful/swagger"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+
 	"k8s.io/kubernetes/pkg/api/v1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
+	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/testing/core"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/version"
 )
 
@@ -28,55 +33,64 @@ type FakeDiscovery struct {
 	*core.Fake
 }
 
-func (c *FakeDiscovery) ServerResourcesForGroupVersion(groupVersion string) (*unversioned.APIResourceList, error) {
+func (c *FakeDiscovery) ServerResourcesForGroupVersion(groupVersion string) (*metav1.APIResourceList, error) {
 	action := core.ActionImpl{
 		Verb:     "get",
-		Resource: unversioned.GroupVersionResource{Resource: "resource"},
+		Resource: schema.GroupVersionResource{Resource: "resource"},
 	}
 	c.Invokes(action, nil)
-	return c.Resources[groupVersion], nil
+	for _, resourceList := range c.Resources {
+		if resourceList.GroupVersion == groupVersion {
+			return resourceList, nil
+		}
+	}
+	return nil, fmt.Errorf("GroupVersion %q not found", groupVersion)
 }
 
-func (c *FakeDiscovery) ServerResources() (map[string]*unversioned.APIResourceList, error) {
+func (c *FakeDiscovery) ServerResources() ([]*metav1.APIResourceList, error) {
 	action := core.ActionImpl{
 		Verb:     "get",
-		Resource: unversioned.GroupVersionResource{Resource: "resource"},
+		Resource: schema.GroupVersionResource{Resource: "resource"},
 	}
 	c.Invokes(action, nil)
 	return c.Resources, nil
 }
 
-func (c *FakeDiscovery) ServerPreferredResources() ([]unversioned.GroupVersionResource, error) {
+func (c *FakeDiscovery) ServerPreferredResources() ([]*metav1.APIResourceList, error) {
 	return nil, nil
 }
 
-func (c *FakeDiscovery) ServerPreferredNamespacedResources() ([]unversioned.GroupVersionResource, error) {
+func (c *FakeDiscovery) ServerPreferredNamespacedResources() ([]*metav1.APIResourceList, error) {
 	return nil, nil
 }
 
-func (c *FakeDiscovery) ServerGroups() (*unversioned.APIGroupList, error) {
+func (c *FakeDiscovery) ServerGroups() (*metav1.APIGroupList, error) {
 	return nil, nil
 }
 
 func (c *FakeDiscovery) ServerVersion() (*version.Info, error) {
 	action := core.ActionImpl{}
 	action.Verb = "get"
-	action.Resource = unversioned.GroupVersionResource{Resource: "version"}
+	action.Resource = schema.GroupVersionResource{Resource: "version"}
 
 	c.Invokes(action, nil)
 	versionInfo := version.Get()
 	return &versionInfo, nil
 }
 
-func (c *FakeDiscovery) SwaggerSchema(version unversioned.GroupVersion) (*swagger.ApiDeclaration, error) {
+func (c *FakeDiscovery) SwaggerSchema(version schema.GroupVersion) (*swagger.ApiDeclaration, error) {
 	action := core.ActionImpl{}
 	action.Verb = "get"
 	if version == v1.SchemeGroupVersion {
-		action.Resource = unversioned.GroupVersionResource{Resource: "/swaggerapi/api/" + version.Version}
+		action.Resource = schema.GroupVersionResource{Resource: "/swaggerapi/api/" + version.Version}
 	} else {
-		action.Resource = unversioned.GroupVersionResource{Resource: "/swaggerapi/apis/" + version.Group + "/" + version.Version}
+		action.Resource = schema.GroupVersionResource{Resource: "/swaggerapi/apis/" + version.Group + "/" + version.Version}
 	}
 
 	c.Invokes(action, nil)
 	return &swagger.ApiDeclaration{}, nil
+}
+
+func (c *FakeDiscovery) RESTClient() restclient.Interface {
+	return nil
 }

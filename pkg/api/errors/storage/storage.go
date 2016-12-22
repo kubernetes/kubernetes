@@ -18,13 +18,13 @@ package storage
 
 import (
 	"k8s.io/kubernetes/pkg/api/errors"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/storage"
 )
 
 // InterpretListError converts a generic error on a retrieval
 // operation into the appropriate API error.
-func InterpretListError(err error, qualifiedResource unversioned.GroupResource) error {
+func InterpretListError(err error, qualifiedResource schema.GroupResource) error {
 	switch {
 	case storage.IsNotFound(err):
 		return errors.NewNotFound(qualifiedResource, "")
@@ -37,7 +37,7 @@ func InterpretListError(err error, qualifiedResource unversioned.GroupResource) 
 
 // InterpretGetError converts a generic error on a retrieval
 // operation into the appropriate API error.
-func InterpretGetError(err error, qualifiedResource unversioned.GroupResource, name string) error {
+func InterpretGetError(err error, qualifiedResource schema.GroupResource, name string) error {
 	switch {
 	case storage.IsNotFound(err):
 		return errors.NewNotFound(qualifiedResource, name)
@@ -50,7 +50,7 @@ func InterpretGetError(err error, qualifiedResource unversioned.GroupResource, n
 
 // InterpretCreateError converts a generic error on a create
 // operation into the appropriate API error.
-func InterpretCreateError(err error, qualifiedResource unversioned.GroupResource, name string) error {
+func InterpretCreateError(err error, qualifiedResource schema.GroupResource, name string) error {
 	switch {
 	case storage.IsNodeExist(err):
 		return errors.NewAlreadyExists(qualifiedResource, name)
@@ -63,7 +63,7 @@ func InterpretCreateError(err error, qualifiedResource unversioned.GroupResource
 
 // InterpretUpdateError converts a generic error on an update
 // operation into the appropriate API error.
-func InterpretUpdateError(err error, qualifiedResource unversioned.GroupResource, name string) error {
+func InterpretUpdateError(err error, qualifiedResource schema.GroupResource, name string) error {
 	switch {
 	case storage.IsTestFailed(err), storage.IsNodeExist(err), storage.IsInvalidObj(err):
 		return errors.NewConflict(qualifiedResource, name, err)
@@ -80,7 +80,7 @@ func InterpretUpdateError(err error, qualifiedResource unversioned.GroupResource
 
 // InterpretDeleteError converts a generic error on a delete
 // operation into the appropriate API error.
-func InterpretDeleteError(err error, qualifiedResource unversioned.GroupResource, name string) error {
+func InterpretDeleteError(err error, qualifiedResource schema.GroupResource, name string) error {
 	switch {
 	case storage.IsNotFound(err):
 		return errors.NewNotFound(qualifiedResource, name)
@@ -97,11 +97,11 @@ func InterpretDeleteError(err error, qualifiedResource unversioned.GroupResource
 
 // InterpretWatchError converts a generic error on a watch
 // operation into the appropriate API error.
-func InterpretWatchError(err error, resource unversioned.GroupResource, name string) error {
+func InterpretWatchError(err error, resource schema.GroupResource, name string) error {
 	switch {
 	case storage.IsInvalidError(err):
 		invalidError, _ := err.(storage.InvalidError)
-		return errors.NewInvalid(unversioned.GroupKind{Group: resource.Group, Kind: resource.Resource}, name, invalidError.Errs)
+		return errors.NewInvalid(schema.GroupKind{Group: resource.Group, Kind: resource.Resource}, name, invalidError.Errs)
 	default:
 		return err
 	}

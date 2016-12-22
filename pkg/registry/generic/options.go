@@ -16,7 +16,11 @@ limitations under the License.
 
 package generic
 
-import "k8s.io/kubernetes/pkg/storage/storagebackend"
+import (
+	"k8s.io/kubernetes/pkg/runtime/schema"
+	"k8s.io/kubernetes/pkg/storage"
+	"k8s.io/kubernetes/pkg/storage/storagebackend"
+)
 
 // RESTOptions is set of configuration options to generic registries.
 type RESTOptions struct {
@@ -26,4 +30,20 @@ type RESTOptions struct {
 	EnableGarbageCollection bool
 	DeleteCollectionWorkers int
 	ResourcePrefix          string
+}
+
+// Implement RESTOptionsGetter so that RESTOptions can directly be used when available (i.e. tests)
+func (opts RESTOptions) GetRESTOptions(schema.GroupResource) (RESTOptions, error) {
+	return opts, nil
+}
+
+type RESTOptionsGetter interface {
+	GetRESTOptions(resource schema.GroupResource) (RESTOptions, error)
+}
+
+// StoreOptions is set of configuration options used to complete generic registries.
+type StoreOptions struct {
+	RESTOptions RESTOptionsGetter
+	TriggerFunc storage.TriggerPublisherFunc
+	AttrFunc    storage.AttrFunc
 }

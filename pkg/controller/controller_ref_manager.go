@@ -21,26 +21,27 @@ import (
 	"strings"
 
 	"github.com/golang/glog"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/api/v1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/labels"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 )
 
 type PodControllerRefManager struct {
 	podControl         PodControlInterface
-	controllerObject   api.ObjectMeta
+	controllerObject   v1.ObjectMeta
 	controllerSelector labels.Selector
-	controllerKind     unversioned.GroupVersionKind
+	controllerKind     schema.GroupVersionKind
 }
 
 // NewPodControllerRefManager returns a PodControllerRefManager that exposes
 // methods to manage the controllerRef of pods.
 func NewPodControllerRefManager(
 	podControl PodControlInterface,
-	controllerObject api.ObjectMeta,
+	controllerObject v1.ObjectMeta,
 	controllerSelector labels.Selector,
-	controllerKind unversioned.GroupVersionKind,
+	controllerKind schema.GroupVersionKind,
 ) *PodControllerRefManager {
 	return &PodControllerRefManager{podControl, controllerObject, controllerSelector, controllerKind}
 }
@@ -53,10 +54,10 @@ func NewPodControllerRefManager(
 // controllerRef pointing to other object are ignored) 3. controlledDoesNotMatch
 // are the pods that have a controllerRef pointing to the controller, but their
 // labels no longer match the selector.
-func (m *PodControllerRefManager) Classify(pods []*api.Pod) (
-	matchesAndControlled []*api.Pod,
-	matchesNeedsController []*api.Pod,
-	controlledDoesNotMatch []*api.Pod) {
+func (m *PodControllerRefManager) Classify(pods []*v1.Pod) (
+	matchesAndControlled []*v1.Pod,
+	matchesNeedsController []*v1.Pod,
+	controlledDoesNotMatch []*v1.Pod) {
 	for i := range pods {
 		pod := pods[i]
 		if !IsPodActive(pod) {
@@ -64,7 +65,7 @@ func (m *PodControllerRefManager) Classify(pods []*api.Pod) (
 				pod.Namespace, pod.Name, pod.Status.Phase, pod.DeletionTimestamp)
 			continue
 		}
-		controllerRef := getControllerOf(pod.ObjectMeta)
+		controllerRef := GetControllerOf(pod.ObjectMeta)
 		if controllerRef != nil {
 			if controllerRef.UID == m.controllerObject.UID {
 				// already controlled
@@ -89,9 +90,9 @@ func (m *PodControllerRefManager) Classify(pods []*api.Pod) (
 	return matchesAndControlled, matchesNeedsController, controlledDoesNotMatch
 }
 
-// getControllerOf returns the controllerRef if controllee has a controller,
+// GetControllerOf returns the controllerRef if controllee has a controller,
 // otherwise returns nil.
-func getControllerOf(controllee api.ObjectMeta) *api.OwnerReference {
+func GetControllerOf(controllee v1.ObjectMeta) *metav1.OwnerReference {
 	for _, owner := range controllee.OwnerReferences {
 		// controlled by other controller
 		if owner.Controller != nil && *owner.Controller == true {
@@ -103,7 +104,7 @@ func getControllerOf(controllee api.ObjectMeta) *api.OwnerReference {
 
 // AdoptPod sends a patch to take control of the pod. It returns the error if
 // the patching fails.
-func (m *PodControllerRefManager) AdoptPod(pod *api.Pod) error {
+func (m *PodControllerRefManager) AdoptPod(pod *v1.Pod) error {
 	// we should not adopt any pods if the controller is about to be deleted
 	if m.controllerObject.DeletionTimestamp != nil {
 		return fmt.Errorf("cancel the adopt attempt for pod %s because the controlller is being deleted",
@@ -118,7 +119,7 @@ func (m *PodControllerRefManager) AdoptPod(pod *api.Pod) error {
 
 // ReleasePod sends a patch to free the pod from the control of the controller.
 // It returns the error if the patching fails. 404 and 422 errors are ignored.
-func (m *PodControllerRefManager) ReleasePod(pod *api.Pod) error {
+func (m *PodControllerRefManager) ReleasePod(pod *v1.Pod) error {
 	glog.V(2).Infof("patching pod %s_%s to remove its controllerRef to %s/%s:%s",
 		pod.Namespace, pod.Name, m.controllerKind.GroupVersion(), m.controllerKind.Kind, m.controllerObject.Name)
 	deleteOwnerRefPatch := fmt.Sprintf(`{"metadata":{"ownerReferences":[{"$patch":"delete","uid":"%s"}],"uid":"%s"}}`, m.controllerObject.UID, pod.UID)

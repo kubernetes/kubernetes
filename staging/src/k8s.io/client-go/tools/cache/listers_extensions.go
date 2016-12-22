@@ -19,10 +19,11 @@ package cache
 import (
 	"fmt"
 
-	"k8s.io/client-go/pkg/api"
 	"k8s.io/client-go/pkg/api/errors"
-	"k8s.io/client-go/pkg/api/unversioned"
-	"k8s.io/client-go/pkg/apis/extensions"
+	"k8s.io/client-go/pkg/api/v1"
+	extensionsinternal "k8s.io/client-go/pkg/apis/extensions"
+	extensions "k8s.io/client-go/pkg/apis/extensions/v1beta1"
+	metav1 "k8s.io/client-go/pkg/apis/meta/v1"
 	"k8s.io/client-go/pkg/labels"
 )
 
@@ -71,7 +72,7 @@ func (s storeDeploymentsNamespacer) Get(name string) (*extensions.Deployment, er
 		return nil, err
 	}
 	if !exists {
-		return nil, errors.NewNotFound(extensions.Resource("deployment"), name)
+		return nil, errors.NewNotFound(extensionsinternal.Resource("deployment"), name)
 	}
 	return obj.(*extensions.Deployment), nil
 }
@@ -89,7 +90,7 @@ func (s *StoreToDeploymentLister) GetDeploymentsForReplicaSet(rs *extensions.Rep
 		return
 	}
 	for _, d := range dList {
-		selector, err := unversioned.LabelSelectorAsSelector(d.Spec.Selector)
+		selector, err := metav1.LabelSelectorAsSelector(d.Spec.Selector)
 		if err != nil {
 			return nil, fmt.Errorf("invalid label selector: %v", err)
 		}
@@ -107,7 +108,7 @@ func (s *StoreToDeploymentLister) GetDeploymentsForReplicaSet(rs *extensions.Rep
 
 // GetDeploymentsForDeployments returns a list of deployments managing a pod. Returns an error only if no matching deployments are found.
 // TODO eliminate shallow copies
-func (s *StoreToDeploymentLister) GetDeploymentsForPod(pod *api.Pod) (deployments []*extensions.Deployment, err error) {
+func (s *StoreToDeploymentLister) GetDeploymentsForPod(pod *v1.Pod) (deployments []*extensions.Deployment, err error) {
 	if len(pod.Labels) == 0 {
 		err = fmt.Errorf("no deployments found for Pod %v because it has no labels", pod.Name)
 		return
@@ -122,7 +123,7 @@ func (s *StoreToDeploymentLister) GetDeploymentsForPod(pod *api.Pod) (deployment
 		return
 	}
 	for _, d := range dList {
-		selector, err := unversioned.LabelSelectorAsSelector(d.Spec.Selector)
+		selector, err := metav1.LabelSelectorAsSelector(d.Spec.Selector)
 		if err != nil {
 			return nil, fmt.Errorf("invalid label selector: %v", err)
 		}
@@ -172,13 +173,13 @@ func (s storeReplicaSetsNamespacer) Get(name string) (*extensions.ReplicaSet, er
 		return nil, err
 	}
 	if !exists {
-		return nil, errors.NewNotFound(extensions.Resource("replicaset"), name)
+		return nil, errors.NewNotFound(extensionsinternal.Resource("replicaset"), name)
 	}
 	return obj.(*extensions.ReplicaSet), nil
 }
 
 // GetPodReplicaSets returns a list of ReplicaSets managing a pod. Returns an error only if no matching ReplicaSets are found.
-func (s *StoreToReplicaSetLister) GetPodReplicaSets(pod *api.Pod) (rss []*extensions.ReplicaSet, err error) {
+func (s *StoreToReplicaSetLister) GetPodReplicaSets(pod *v1.Pod) (rss []*extensions.ReplicaSet, err error) {
 	if len(pod.Labels) == 0 {
 		err = fmt.Errorf("no ReplicaSets found for pod %v because it has no labels", pod.Name)
 		return
@@ -192,7 +193,7 @@ func (s *StoreToReplicaSetLister) GetPodReplicaSets(pod *api.Pod) (rss []*extens
 		if rs.Namespace != pod.Namespace {
 			continue
 		}
-		selector, err := unversioned.LabelSelectorAsSelector(rs.Spec.Selector)
+		selector, err := metav1.LabelSelectorAsSelector(rs.Spec.Selector)
 		if err != nil {
 			return nil, fmt.Errorf("invalid selector: %v", err)
 		}

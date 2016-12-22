@@ -13,7 +13,7 @@
     "description": "get available API versions",
     "operations": [
      {
-      "type": "unversioned.APIVersions",
+      "type": "v1.APIVersions",
       "method": "GET",
       "summary": "get available API versions",
       "nickname": "getAPIVersions",
@@ -33,8 +33,8 @@
    }
   ],
   "models": {
-   "unversioned.APIVersions": {
-    "id": "unversioned.APIVersions",
+   "v1.APIVersions": {
+    "id": "v1.APIVersions",
     "description": "APIVersions lists the versions that are available, to allow clients to discover the API at /api, which is the root path of the legacy v1 API.",
     "required": [
      "versions",
@@ -59,14 +59,14 @@
      "serverAddressByClientCIDRs": {
       "type": "array",
       "items": {
-       "$ref": "unversioned.ServerAddressByClientCIDR"
+       "$ref": "v1.ServerAddressByClientCIDR"
       },
       "description": "a map of client CIDR to server address that is serving this group. This is to help clients reach servers in the most network-efficient way possible. Clients can use the appropriate server address as per the CIDR that they match. In case of multiple matches, clients should use the longest matching CIDR. The server returns only those CIDRs that it thinks that the client can match. For example: the master will return an internal IP CIDR only, if the client reaches the server using an internal IP. Server looks at X-Forwarded-For header or X-Real-Ip header or request.RemoteAddr (in that order) to get the client IP."
      }
     }
    },
-   "unversioned.ServerAddressByClientCIDR": {
-    "id": "unversioned.ServerAddressByClientCIDR",
+   "v1.ServerAddressByClientCIDR": {
+    "id": "v1.ServerAddressByClientCIDR",
     "description": "ServerAddressByClientCIDR helps the client to determine the server address that they should use, depending on the clientCIDR that they match.",
     "required": [
      "clientCIDR",

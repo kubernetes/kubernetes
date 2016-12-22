@@ -18,9 +18,10 @@ package federation_internalclientset
 
 import (
 	"github.com/golang/glog"
-	unversionedcore "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset/typed/core/unversioned"
-	unversionedextensions "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset/typed/extensions/unversioned"
-	unversionedfederation "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset/typed/federation/unversioned"
+	internalversionbatch "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset/typed/batch/internalversion"
+	internalversioncore "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset/typed/core/internalversion"
+	internalversionextensions "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset/typed/extensions/internalversion"
+	internalversionfederation "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset/typed/federation/internalversion"
 	restclient "k8s.io/kubernetes/pkg/client/restclient"
 	discovery "k8s.io/kubernetes/pkg/client/typed/discovery"
 	"k8s.io/kubernetes/pkg/util/flowcontrol"
@@ -29,42 +30,55 @@ import (
 
 type Interface interface {
 	Discovery() discovery.DiscoveryInterface
-	Federation() unversionedfederation.FederationInterface
-	Core() unversionedcore.CoreInterface
-	Extensions() unversionedextensions.ExtensionsInterface
+	Core() internalversioncore.CoreInterface
+
+	Batch() internalversionbatch.BatchInterface
+
+	Extensions() internalversionextensions.ExtensionsInterface
+
+	Federation() internalversionfederation.FederationInterface
 }
 
 // Clientset contains the clients for groups. Each group has exactly one
 // version included in a Clientset.
 type Clientset struct {
 	*discovery.DiscoveryClient
-	*unversionedfederation.FederationClient
-	*unversionedcore.CoreClient
-	*unversionedextensions.ExtensionsClient
-}
-
-// Federation retrieves the FederationClient
-func (c *Clientset) Federation() unversionedfederation.FederationInterface {
-	if c == nil {
-		return nil
-	}
-	return c.FederationClient
+	*internalversioncore.CoreClient
+	*internalversionbatch.BatchClient
+	*internalversionextensions.ExtensionsClient
+	*internalversionfederation.FederationClient
 }
 
 // Core retrieves the CoreClient
-func (c *Clientset) Core() unversionedcore.CoreInterface {
+func (c *Clientset) Core() internalversioncore.CoreInterface {
 	if c == nil {
 		return nil
 	}
 	return c.CoreClient
 }
 
+// Batch retrieves the BatchClient
+func (c *Clientset) Batch() internalversionbatch.BatchInterface {
+	if c == nil {
+		return nil
+	}
+	return c.BatchClient
+}
+
 // Extensions retrieves the ExtensionsClient
-func (c *Clientset) Extensions() unversionedextensions.ExtensionsInterface {
+func (c *Clientset) Extensions() internalversionextensions.ExtensionsInterface {
 	if c == nil {
 		return nil
 	}
 	return c.ExtensionsClient
+}
+
+// Federation retrieves the FederationClient
+func (c *Clientset) Federation() internalversionfederation.FederationInterface {
+	if c == nil {
+		return nil
+	}
+	return c.FederationClient
 }
 
 // Discovery retrieves the DiscoveryClient
@@ -78,48 +92,54 @@ func NewForConfig(c *restclient.Config) (*Clientset, error) {
 	if configShallowCopy.RateLimiter == nil && configShallowCopy.QPS > 0 {
 		configShallowCopy.RateLimiter = flowcontrol.NewTokenBucketRateLimiter(configShallowCopy.QPS, configShallowCopy.Burst)
 	}
-	var clientset Clientset
+	var cs Clientset
 	var err error
-	clientset.FederationClient, err = unversionedfederation.NewForConfig(&configShallowCopy)
+	cs.CoreClient, err = internalversioncore.NewForConfig(&configShallowCopy)
 	if err != nil {
 		return nil, err
 	}
-	clientset.CoreClient, err = unversionedcore.NewForConfig(&configShallowCopy)
+	cs.BatchClient, err = internalversionbatch.NewForConfig(&configShallowCopy)
 	if err != nil {
 		return nil, err
 	}
-	clientset.ExtensionsClient, err = unversionedextensions.NewForConfig(&configShallowCopy)
+	cs.ExtensionsClient, err = internalversionextensions.NewForConfig(&configShallowCopy)
+	if err != nil {
+		return nil, err
+	}
+	cs.FederationClient, err = internalversionfederation.NewForConfig(&configShallowCopy)
 	if err != nil {
 		return nil, err
 	}
 
-	clientset.DiscoveryClient, err = discovery.NewDiscoveryClientForConfig(&configShallowCopy)
+	cs.DiscoveryClient, err = discovery.NewDiscoveryClientForConfig(&configShallowCopy)
 	if err != nil {
 		glog.Errorf("failed to create the DiscoveryClient: %v", err)
 		return nil, err
 	}
-	return &clientset, nil
+	return &cs, nil
 }
 
 // NewForConfigOrDie creates a new Clientset for the given config and
 // panics if there is an error in the config.
 func NewForConfigOrDie(c *restclient.Config) *Clientset {
-	var clientset Clientset
-	clientset.FederationClient = unversionedfederation.NewForConfigOrDie(c)
-	clientset.CoreClient = unversionedcore.NewForConfigOrDie(c)
-	clientset.ExtensionsClient = unversionedextensions.NewForConfigOrDie(c)
+	var cs Clientset
+	cs.CoreClient = internalversioncore.NewForConfigOrDie(c)
+	cs.BatchClient = internalversionbatch.NewForConfigOrDie(c)
+	cs.ExtensionsClient = internalversionextensions.NewForConfigOrDie(c)
+	cs.FederationClient = internalversionfederation.NewForConfigOrDie(c)
 
-	clientset.DiscoveryClient = discovery.NewDiscoveryClientForConfigOrDie(c)
-	return &clientset
+	cs.DiscoveryClient = discovery.NewDiscoveryClientForConfigOrDie(c)
+	return &cs
 }
 
 // New creates a new Clientset for the given RESTClient.
-func New(c *restclient.RESTClient) *Clientset {
-	var clientset Clientset
-	clientset.FederationClient = unversionedfederation.New(c)
-	clientset.CoreClient = unversionedcore.New(c)
-	clientset.ExtensionsClient = unversionedextensions.New(c)
+func New(c restclient.Interface) *Clientset {
+	var cs Clientset
+	cs.CoreClient = internalversioncore.New(c)
+	cs.BatchClient = internalversionbatch.New(c)
+	cs.ExtensionsClient = internalversionextensions.New(c)
+	cs.FederationClient = internalversionfederation.New(c)
 
-	clientset.DiscoveryClient = discovery.NewDiscoveryClient(c)
-	return &clientset
+	cs.DiscoveryClient = discovery.NewDiscoveryClient(c)
+	return &cs
 }

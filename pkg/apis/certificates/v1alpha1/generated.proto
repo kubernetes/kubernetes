@@ -22,9 +22,10 @@ syntax = 'proto2';
 package k8s.io.kubernetes.pkg.apis.certificates.v1alpha1;
 
 import "k8s.io/kubernetes/pkg/api/resource/generated.proto";
-import "k8s.io/kubernetes/pkg/api/unversioned/generated.proto";
 import "k8s.io/kubernetes/pkg/api/v1/generated.proto";
+import "k8s.io/kubernetes/pkg/apis/meta/v1/generated.proto";
 import "k8s.io/kubernetes/pkg/runtime/generated.proto";
+import "k8s.io/kubernetes/pkg/runtime/schema/generated.proto";
 import "k8s.io/kubernetes/pkg/util/intstr/generated.proto";
 
 // Package-wide variables from generator "generated".
@@ -58,12 +59,12 @@ message CertificateSigningRequestCondition {
 
   // timestamp for the last update to this condition
   // +optional
-  optional k8s.io.kubernetes.pkg.api.unversioned.Time lastUpdateTime = 4;
+  optional k8s.io.kubernetes.pkg.apis.meta.v1.Time lastUpdateTime = 4;
 }
 
 message CertificateSigningRequestList {
   // +optional
-  optional k8s.io.kubernetes.pkg.api.unversioned.ListMeta metadata = 1;
+  optional k8s.io.kubernetes.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   repeated CertificateSigningRequest items = 2;
 }

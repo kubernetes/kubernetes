@@ -115,6 +115,40 @@ func (attacher *azureDiskAttacher) Attach(spec *volume.Spec, nodeName types.Node
 	return strconv.Itoa(int(lun)), err
 }
 
+func (attacher *azureDiskAttacher) VolumesAreAttached(specs []*volume.Spec, nodeName types.NodeName) (map[*volume.Spec]bool, error) {
+	volumesAttachedCheck := make(map[*volume.Spec]bool)
+	volumeSpecMap := make(map[string]*volume.Spec)
+	volumeIDList := []string{}
+	for _, spec := range specs {
+		volumeSource, err := getVolumeSource(spec)
+		if err != nil {
+			glog.Errorf("Error getting volume (%q) source : %v", spec.Name(), err)
+			continue
+		}
+
+		volumeIDList = append(volumeIDList, volumeSource.DiskName)
+		volumesAttachedCheck[spec] = true
+		volumeSpecMap[volumeSource.DiskName] = spec
+	}
+	attachedResult, err := attacher.azureProvider.DisksAreAttached(volumeIDList, nodeName)
+	if err != nil {
+		// Log error and continue with attach
+		glog.Errorf(
+			"Error checking if volumes (%v) are attached to current node (%q). err=%v",
+			volumeIDList, nodeName, err)
+		return volumesAttachedCheck, err
+	}
+
+	for volumeID, attached := range attachedResult {
+		if !attached {
+			spec := volumeSpecMap[volumeID]
+			volumesAttachedCheck[spec] = false
+			glog.V(2).Infof("VolumesAreAttached: check volume %q (specName: %q) is no longer attached", volumeID, spec.Name())
+		}
+	}
+	return volumesAttachedCheck, nil
+}
+
 // WaitForAttach runs on the node to detect if the volume (referenced by LUN) is attached. If attached, the device path is returned
 func (attacher *azureDiskAttacher) WaitForAttach(spec *volume.Spec, lunStr string, timeout time.Duration) (string, error) {
 	volumeSource, err := getVolumeSource(spec)
@@ -234,20 +268,6 @@ func (detacher *azureDiskDetacher) Detach(diskName string, nodeName types.NodeNa
 	}
 
 	return err
-}
-
-// WaitForDetach detects if the disk is detached on the node
-func (detacher *azureDiskDetacher) WaitForDetach(devicePath string, timeout time.Duration) error {
-	return wait.Poll(checkSleepDuration, timeout, func() (bool, error) {
-		glog.V(4).Infof("Checking device %q is detached.", devicePath)
-		if pathExists, err := util.PathExists(devicePath); err != nil {
-			return false, fmt.Errorf("Error checking if device path exists: %v", err)
-		} else if !pathExists {
-			return true, nil
-		} else {
-			return false, nil
-		}
-	})
 }
 
 // UnmountDevice unmounts the volume on the node

@@ -20,28 +20,28 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	unversionedapps "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/apps/unversioned"
-	fakeunversionedapps "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/apps/unversioned/fake"
-	unversionedauthentication "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/authentication/unversioned"
-	fakeunversionedauthentication "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/authentication/unversioned/fake"
-	unversionedauthorization "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/authorization/unversioned"
-	fakeunversionedauthorization "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/authorization/unversioned/fake"
-	unversionedautoscaling "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/autoscaling/unversioned"
-	fakeunversionedautoscaling "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/autoscaling/unversioned/fake"
-	unversionedbatch "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/batch/unversioned"
-	fakeunversionedbatch "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/batch/unversioned/fake"
-	unversionedcertificates "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/certificates/unversioned"
-	fakeunversionedcertificates "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/certificates/unversioned/fake"
-	unversionedcore "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/unversioned"
-	fakeunversionedcore "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/unversioned/fake"
-	unversionedextensions "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/extensions/unversioned"
-	fakeunversionedextensions "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/extensions/unversioned/fake"
-	unversionedpolicy "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/policy/unversioned"
-	fakeunversionedpolicy "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/policy/unversioned/fake"
-	unversionedrbac "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/rbac/unversioned"
-	fakeunversionedrbac "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/rbac/unversioned/fake"
-	unversionedstorage "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/storage/unversioned"
-	fakeunversionedstorage "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/storage/unversioned/fake"
+	internalversionapps "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/apps/internalversion"
+	fakeinternalversionapps "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/apps/internalversion/fake"
+	internalversionauthentication "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/authentication/internalversion"
+	fakeinternalversionauthentication "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/authentication/internalversion/fake"
+	internalversionauthorization "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/authorization/internalversion"
+	fakeinternalversionauthorization "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/authorization/internalversion/fake"
+	internalversionautoscaling "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/autoscaling/internalversion"
+	fakeinternalversionautoscaling "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/autoscaling/internalversion/fake"
+	internalversionbatch "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/batch/internalversion"
+	fakeinternalversionbatch "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/batch/internalversion/fake"
+	internalversioncertificates "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/certificates/internalversion"
+	fakeinternalversioncertificates "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/certificates/internalversion/fake"
+	internalversioncore "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
+	fakeinternalversioncore "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion/fake"
+	internalversionextensions "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/extensions/internalversion"
+	fakeinternalversionextensions "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/extensions/internalversion/fake"
+	internalversionpolicy "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/policy/internalversion"
+	fakeinternalversionpolicy "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/policy/internalversion/fake"
+	internalversionrbac "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/rbac/internalversion"
+	fakeinternalversionrbac "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/rbac/internalversion/fake"
+	internalversionstorage "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/storage/internalversion"
+	fakeinternalversionstorage "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/storage/internalversion/fake"
 	"k8s.io/kubernetes/pkg/client/testing/core"
 	"k8s.io/kubernetes/pkg/client/typed/discovery"
 	fakediscovery "k8s.io/kubernetes/pkg/client/typed/discovery/fake"
@@ -83,56 +83,56 @@ func (c *Clientset) Discovery() discovery.DiscoveryInterface {
 var _ clientset.Interface = &Clientset{}
 
 // Core retrieves the CoreClient
-func (c *Clientset) Core() unversionedcore.CoreInterface {
-	return &fakeunversionedcore.FakeCore{Fake: &c.Fake}
-}
-
-// Authentication retrieves the AuthenticationClient
-func (c *Clientset) Authentication() unversionedauthentication.AuthenticationInterface {
-	return &fakeunversionedauthentication.FakeAuthentication{Fake: &c.Fake}
-}
-
-// Authorization retrieves the AuthorizationClient
-func (c *Clientset) Authorization() unversionedauthorization.AuthorizationInterface {
-	return &fakeunversionedauthorization.FakeAuthorization{Fake: &c.Fake}
-}
-
-// Autoscaling retrieves the AutoscalingClient
-func (c *Clientset) Autoscaling() unversionedautoscaling.AutoscalingInterface {
-	return &fakeunversionedautoscaling.FakeAutoscaling{Fake: &c.Fake}
-}
-
-// Batch retrieves the BatchClient
-func (c *Clientset) Batch() unversionedbatch.BatchInterface {
-	return &fakeunversionedbatch.FakeBatch{Fake: &c.Fake}
-}
-
-// Certificates retrieves the CertificatesClient
-func (c *Clientset) Certificates() unversionedcertificates.CertificatesInterface {
-	return &fakeunversionedcertificates.FakeCertificates{Fake: &c.Fake}
-}
-
-// Extensions retrieves the ExtensionsClient
-func (c *Clientset) Extensions() unversionedextensions.ExtensionsInterface {
-	return &fakeunversionedextensions.FakeExtensions{Fake: &c.Fake}
-}
-
-// Rbac retrieves the RbacClient
-func (c *Clientset) Rbac() unversionedrbac.RbacInterface {
-	return &fakeunversionedrbac.FakeRbac{Fake: &c.Fake}
-}
-
-// Storage retrieves the StorageClient
-func (c *Clientset) Storage() unversionedstorage.StorageInterface {
-	return &fakeunversionedstorage.FakeStorage{Fake: &c.Fake}
+func (c *Clientset) Core() internalversioncore.CoreInterface {
+	return &fakeinternalversioncore.FakeCore{Fake: &c.Fake}
 }
 
 // Apps retrieves the AppsClient
-func (c *Clientset) Apps() unversionedapps.AppsInterface {
-	return &fakeunversionedapps.FakeApps{Fake: &c.Fake}
+func (c *Clientset) Apps() internalversionapps.AppsInterface {
+	return &fakeinternalversionapps.FakeApps{Fake: &c.Fake}
+}
+
+// Authentication retrieves the AuthenticationClient
+func (c *Clientset) Authentication() internalversionauthentication.AuthenticationInterface {
+	return &fakeinternalversionauthentication.FakeAuthentication{Fake: &c.Fake}
+}
+
+// Authorization retrieves the AuthorizationClient
+func (c *Clientset) Authorization() internalversionauthorization.AuthorizationInterface {
+	return &fakeinternalversionauthorization.FakeAuthorization{Fake: &c.Fake}
+}
+
+// Autoscaling retrieves the AutoscalingClient
+func (c *Clientset) Autoscaling() internalversionautoscaling.AutoscalingInterface {
+	return &fakeinternalversionautoscaling.FakeAutoscaling{Fake: &c.Fake}
+}
+
+// Batch retrieves the BatchClient
+func (c *Clientset) Batch() internalversionbatch.BatchInterface {
+	return &fakeinternalversionbatch.FakeBatch{Fake: &c.Fake}
+}
+
+// Certificates retrieves the CertificatesClient
+func (c *Clientset) Certificates() internalversioncertificates.CertificatesInterface {
+	return &fakeinternalversioncertificates.FakeCertificates{Fake: &c.Fake}
+}
+
+// Extensions retrieves the ExtensionsClient
+func (c *Clientset) Extensions() internalversionextensions.ExtensionsInterface {
+	return &fakeinternalversionextensions.FakeExtensions{Fake: &c.Fake}
 }
 
 // Policy retrieves the PolicyClient
-func (c *Clientset) Policy() unversionedpolicy.PolicyInterface {
-	return &fakeunversionedpolicy.FakePolicy{Fake: &c.Fake}
+func (c *Clientset) Policy() internalversionpolicy.PolicyInterface {
+	return &fakeinternalversionpolicy.FakePolicy{Fake: &c.Fake}
+}
+
+// Rbac retrieves the RbacClient
+func (c *Clientset) Rbac() internalversionrbac.RbacInterface {
+	return &fakeinternalversionrbac.FakeRbac{Fake: &c.Fake}
+}
+
+// Storage retrieves the StorageClient
+func (c *Clientset) Storage() internalversionstorage.StorageInterface {
+	return &fakeinternalversionstorage.FakeStorage{Fake: &c.Fake}
 }

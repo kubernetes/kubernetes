@@ -22,6 +22,7 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/custommetrics"
 	"k8s.io/kubernetes/pkg/kubelet/types"
@@ -62,11 +63,11 @@ type labelledContainerInfo struct {
 	Hash                      string
 	RestartCount              int
 	TerminationMessagePath    string
-	PreStopHandler            *api.Handler
-	Ports                     []api.ContainerPort
+	PreStopHandler            *v1.Handler
+	Ports                     []v1.ContainerPort
 }
 
-func newLabels(container *api.Container, pod *api.Pod, restartCount int, enableCustomMetrics bool) map[string]string {
+func newLabels(container *v1.Container, pod *v1.Pod, restartCount int, enableCustomMetrics bool) map[string]string {
 	labels := map[string]string{}
 	labels[types.KubernetesPodNameLabel] = pod.Name
 	labels[types.KubernetesPodNamespaceLabel] = pod.Namespace
@@ -128,13 +129,13 @@ func getContainerInfoFromLabel(labels map[string]string) *labelledContainerInfo 
 	if containerInfo.PodTerminationGracePeriod, err = getInt64PointerFromLabel(labels, kubernetesPodTerminationGracePeriodLabel); err != nil {
 		logError(containerInfo, kubernetesPodTerminationGracePeriodLabel, err)
 	}
-	preStopHandler := &api.Handler{}
+	preStopHandler := &v1.Handler{}
 	if found, err := getJsonObjectFromLabel(labels, kubernetesContainerPreStopHandlerLabel, preStopHandler); err != nil {
 		logError(containerInfo, kubernetesContainerPreStopHandlerLabel, err)
 	} else if found {
 		containerInfo.PreStopHandler = preStopHandler
 	}
-	containerPorts := []api.ContainerPort{}
+	containerPorts := []v1.ContainerPort{}
 	if found, err := getJsonObjectFromLabel(labels, kubernetesContainerPortsLabel, &containerPorts); err != nil {
 		logError(containerInfo, kubernetesContainerPortsLabel, err)
 	} else if found {
@@ -192,7 +193,7 @@ func getJsonObjectFromLabel(labels map[string]string, label string, value interf
 	return false, nil
 }
 
-// The label kubernetesPodLabel is added a long time ago (#7421), it serialized the whole api.Pod to a docker label.
+// The label kubernetesPodLabel is added a long time ago (#7421), it serialized the whole v1.Pod to a docker label.
 // We want to remove this label because it serialized too much useless information. However kubelet may still work
 // with old containers which only have this label for a long time until we completely deprecate the old label.
 // Before that to ensure correctness we have to supply information with the old labels when newly added labels
@@ -200,15 +201,15 @@ func getJsonObjectFromLabel(labels map[string]string, label string, value interf
 // TODO(random-liu): Remove this function when we can completely remove label kubernetesPodLabel, probably after
 // dropping support for v1.1.
 func supplyContainerInfoWithOldLabel(labels map[string]string, containerInfo *labelledContainerInfo) {
-	// Get api.Pod from old label
-	var pod *api.Pod
+	// Get v1.Pod from old label
+	var pod *v1.Pod
 	data, found := labels[kubernetesPodLabel]
 	if !found {
 		// Don't report any error here, because it's normal that a container has no pod label, especially
 		// when we gradually deprecate the old label
 		return
 	}
-	pod = &api.Pod{}
+	pod = &v1.Pod{}
 	if err := runtime.DecodeInto(api.Codecs.UniversalDecoder(), []byte(data), pod); err != nil {
 		// If the pod label can't be parsed, we should report an error
 		logError(containerInfo, kubernetesPodLabel, err)
@@ -221,8 +222,8 @@ func supplyContainerInfoWithOldLabel(labels map[string]string, containerInfo *la
 		containerInfo.PodTerminationGracePeriod = pod.Spec.TerminationGracePeriodSeconds
 	}
 
-	// Get api.Container from api.Pod
-	var container *api.Container
+	// Get v1.Container from v1.Pod
+	var container *v1.Container
 	for i := range pod.Spec.Containers {
 		if pod.Spec.Containers[i].Name == containerInfo.Name {
 			container = &pod.Spec.Containers[i]

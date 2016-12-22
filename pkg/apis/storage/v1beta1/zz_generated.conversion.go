@@ -21,10 +21,10 @@ limitations under the License.
 package v1beta1
 
 import (
-	api "k8s.io/kubernetes/pkg/api"
 	storage "k8s.io/kubernetes/pkg/apis/storage"
 	conversion "k8s.io/kubernetes/pkg/conversion"
 	runtime "k8s.io/kubernetes/pkg/runtime"
+	unsafe "unsafe"
 )
 
 func init() {
@@ -43,15 +43,12 @@ func RegisterConversions(scheme *runtime.Scheme) error {
 }
 
 func autoConvert_v1beta1_StorageClass_To_storage_StorageClass(in *StorageClass, out *storage.StorageClass, s conversion.Scope) error {
-	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
-		return err
-	}
 	// TODO: Inefficient conversion - can we improve it?
 	if err := s.Convert(&in.ObjectMeta, &out.ObjectMeta, 0); err != nil {
 		return err
 	}
 	out.Provisioner = in.Provisioner
-	out.Parameters = in.Parameters
+	out.Parameters = *(*map[string]string)(unsafe.Pointer(&in.Parameters))
 	return nil
 }
 
@@ -60,15 +57,12 @@ func Convert_v1beta1_StorageClass_To_storage_StorageClass(in *StorageClass, out 
 }
 
 func autoConvert_storage_StorageClass_To_v1beta1_StorageClass(in *storage.StorageClass, out *StorageClass, s conversion.Scope) error {
-	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
-		return err
-	}
 	// TODO: Inefficient conversion - can we improve it?
 	if err := s.Convert(&in.ObjectMeta, &out.ObjectMeta, 0); err != nil {
 		return err
 	}
 	out.Provisioner = in.Provisioner
-	out.Parameters = in.Parameters
+	out.Parameters = *(*map[string]string)(unsafe.Pointer(&in.Parameters))
 	return nil
 }
 
@@ -77,23 +71,8 @@ func Convert_storage_StorageClass_To_v1beta1_StorageClass(in *storage.StorageCla
 }
 
 func autoConvert_v1beta1_StorageClassList_To_storage_StorageClassList(in *StorageClassList, out *storage.StorageClassList, s conversion.Scope) error {
-	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
-		return err
-	}
-	if err := api.Convert_unversioned_ListMeta_To_unversioned_ListMeta(&in.ListMeta, &out.ListMeta, s); err != nil {
-		return err
-	}
-	if in.Items != nil {
-		in, out := &in.Items, &out.Items
-		*out = make([]storage.StorageClass, len(*in))
-		for i := range *in {
-			if err := Convert_v1beta1_StorageClass_To_storage_StorageClass(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.Items = nil
-	}
+	out.ListMeta = in.ListMeta
+	out.Items = *(*[]storage.StorageClass)(unsafe.Pointer(&in.Items))
 	return nil
 }
 
@@ -102,23 +81,8 @@ func Convert_v1beta1_StorageClassList_To_storage_StorageClassList(in *StorageCla
 }
 
 func autoConvert_storage_StorageClassList_To_v1beta1_StorageClassList(in *storage.StorageClassList, out *StorageClassList, s conversion.Scope) error {
-	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
-		return err
-	}
-	if err := api.Convert_unversioned_ListMeta_To_unversioned_ListMeta(&in.ListMeta, &out.ListMeta, s); err != nil {
-		return err
-	}
-	if in.Items != nil {
-		in, out := &in.Items, &out.Items
-		*out = make([]StorageClass, len(*in))
-		for i := range *in {
-			if err := Convert_storage_StorageClass_To_v1beta1_StorageClass(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.Items = nil
-	}
+	out.ListMeta = in.ListMeta
+	out.Items = *(*[]StorageClass)(unsafe.Pointer(&in.Items))
 	return nil
 }
 

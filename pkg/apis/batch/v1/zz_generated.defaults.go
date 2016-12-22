@@ -80,6 +80,8 @@ func SetObjectDefaults_Job(in *Job) {
 				}
 			}
 		}
+		api_v1.SetDefaults_ResourceList(&a.Resources.Limits)
+		api_v1.SetDefaults_ResourceList(&a.Resources.Requests)
 		if a.LivenessProbe != nil {
 			api_v1.SetDefaults_Probe(a.LivenessProbe)
 			if a.LivenessProbe.Handler.HTTPGet != nil {
@@ -120,6 +122,8 @@ func SetObjectDefaults_Job(in *Job) {
 				}
 			}
 		}
+		api_v1.SetDefaults_ResourceList(&a.Resources.Limits)
+		api_v1.SetDefaults_ResourceList(&a.Resources.Requests)
 		if a.LivenessProbe != nil {
 			api_v1.SetDefaults_Probe(a.LivenessProbe)
 			if a.LivenessProbe.Handler.HTTPGet != nil {

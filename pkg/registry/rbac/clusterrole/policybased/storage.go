@@ -33,17 +33,14 @@ type Storage struct {
 	rest.StandardStorage
 
 	ruleResolver validation.AuthorizationRuleResolver
-
-	// user which skips privilege escalation checks
-	superUser string
 }
 
-func NewStorage(s rest.StandardStorage, ruleResolver validation.AuthorizationRuleResolver, superUser string) *Storage {
-	return &Storage{s, ruleResolver, superUser}
+func NewStorage(s rest.StandardStorage, ruleResolver validation.AuthorizationRuleResolver) *Storage {
+	return &Storage{s, ruleResolver}
 }
 
 func (s *Storage) Create(ctx api.Context, obj runtime.Object) (runtime.Object, error) {
-	if rbacregistry.EscalationAllowed(ctx, s.superUser) {
+	if rbacregistry.EscalationAllowed(ctx) {
 		return s.StandardStorage.Create(ctx, obj)
 	}
 
@@ -56,7 +53,7 @@ func (s *Storage) Create(ctx api.Context, obj runtime.Object) (runtime.Object, e
 }
 
 func (s *Storage) Update(ctx api.Context, name string, obj rest.UpdatedObjectInfo) (runtime.Object, bool, error) {
-	if rbacregistry.EscalationAllowed(ctx, s.superUser) {
+	if rbacregistry.EscalationAllowed(ctx) {
 		return s.StandardStorage.Update(ctx, name, obj)
 	}
 

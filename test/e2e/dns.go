@@ -24,10 +24,11 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/pod"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/pkg/util/wait"
@@ -42,37 +43,37 @@ var dnsServiceLabelSelector = labels.Set{
 	"kubernetes.io/cluster-service": "true",
 }.AsSelector()
 
-func createDNSPod(namespace, wheezyProbeCmd, jessieProbeCmd string, useAnnotation bool) *api.Pod {
-	dnsPod := &api.Pod{
-		TypeMeta: unversioned.TypeMeta{
+func createDNSPod(namespace, wheezyProbeCmd, jessieProbeCmd string, useAnnotation bool) *v1.Pod {
+	dnsPod := &v1.Pod{
+		TypeMeta: metav1.TypeMeta{
 			Kind:       "Pod",
-			APIVersion: registered.GroupOrDie(api.GroupName).GroupVersion.String(),
+			APIVersion: registered.GroupOrDie(v1.GroupName).GroupVersion.String(),
 		},
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: v1.ObjectMeta{
 			Name:      "dns-test-" + string(uuid.NewUUID()),
 			Namespace: namespace,
 		},
-		Spec: api.PodSpec{
-			Volumes: []api.Volume{
+		Spec: v1.PodSpec{
+			Volumes: []v1.Volume{
 				{
 					Name: "results",
-					VolumeSource: api.VolumeSource{
-						EmptyDir: &api.EmptyDirVolumeSource{},
+					VolumeSource: v1.VolumeSource{
+						EmptyDir: &v1.EmptyDirVolumeSource{},
 					},
 				},
 			},
-			Containers: []api.Container{
+			Containers: []v1.Container{
 				// TODO: Consider scraping logs instead of running a webserver.
 				{
 					Name:  "webserver",
 					Image: "gcr.io/google_containers/test-webserver:e2e",
-					Ports: []api.ContainerPort{
+					Ports: []v1.ContainerPort{
 						{
 							Name:          "http",
 							ContainerPort: 80,
 						},
 					},
-					VolumeMounts: []api.VolumeMount{
+					VolumeMounts: []v1.VolumeMount{
 						{
 							Name:      "results",
 							MountPath: "/results",
@@ -83,7 +84,7 @@ func createDNSPod(namespace, wheezyProbeCmd, jessieProbeCmd string, useAnnotatio
 					Name:    "querier",
 					Image:   "gcr.io/google_containers/dnsutils:e2e",
 					Command: []string{"sh", "-c", wheezyProbeCmd},
-					VolumeMounts: []api.VolumeMount{
+					VolumeMounts: []v1.VolumeMount{
 						{
 							Name:      "results",
 							MountPath: "/results",
@@ -94,7 +95,7 @@ func createDNSPod(namespace, wheezyProbeCmd, jessieProbeCmd string, useAnnotatio
 					Name:    "jessie-querier",
 					Image:   "gcr.io/google_containers/jessie-dnsutils:e2e",
 					Command: []string{"sh", "-c", jessieProbeCmd},
-					VolumeMounts: []api.VolumeMount{
+					VolumeMounts: []v1.VolumeMount{
 						{
 							Name:      "results",
 							MountPath: "/results",
@@ -171,23 +172,23 @@ func createTargetedProbeCommand(nameToResolve string, lookup string, fileNamePre
 	return probeCmd, fileName
 }
 
-func assertFilesExist(fileNames []string, fileDir string, pod *api.Pod, client *client.Client) {
+func assertFilesExist(fileNames []string, fileDir string, pod *v1.Pod, client clientset.Interface) {
 	assertFilesContain(fileNames, fileDir, pod, client, false, "")
 }
 
-func assertFilesContain(fileNames []string, fileDir string, pod *api.Pod, client *client.Client, check bool, expected string) {
+func assertFilesContain(fileNames []string, fileDir string, pod *v1.Pod, client clientset.Interface, check bool, expected string) {
 	var failed []string
 
 	framework.ExpectNoError(wait.Poll(time.Second*2, time.Second*60, func() (bool, error) {
 		failed = []string{}
-		subResourceProxyAvailable, err := framework.ServerVersionGTE(framework.SubResourcePodProxyVersion, client)
+		subResourceProxyAvailable, err := framework.ServerVersionGTE(framework.SubResourcePodProxyVersion, client.Discovery())
 		if err != nil {
 			return false, err
 		}
 		var contents []byte
 		for _, fileName := range fileNames {
 			if subResourceProxyAvailable {
-				contents, err = client.Get().
+				contents, err = client.Core().RESTClient().Get().
 					Namespace(pod.Namespace).
 					Resource("pods").
 					SubResource("proxy").
@@ -195,7 +196,7 @@ func assertFilesContain(fileNames []string, fileDir string, pod *api.Pod, client
 					Suffix(fileDir, fileName).
 					Do().Raw()
 			} else {
-				contents, err = client.Get().
+				contents, err = client.Core().RESTClient().Get().
 					Prefix("proxy").
 					Resource("pods").
 					Namespace(pod.Namespace).
@@ -220,14 +221,14 @@ func assertFilesContain(fileNames []string, fileDir string, pod *api.Pod, client
 	Expect(len(failed)).To(Equal(0))
 }
 
-func validateDNSResults(f *framework.Framework, pod *api.Pod, fileNames []string) {
+func validateDNSResults(f *framework.Framework, pod *v1.Pod, fileNames []string) {
 
 	By("submitting the pod to kubernetes")
-	podClient := f.Client.Pods(f.Namespace.Name)
+	podClient := f.ClientSet.Core().Pods(f.Namespace.Name)
 	defer func() {
 		By("deleting the pod")
 		defer GinkgoRecover()
-		podClient.Delete(pod.Name, api.NewDeleteOptions(0))
+		podClient.Delete(pod.Name, v1.NewDeleteOptions(0))
 	}()
 	if _, err := podClient.Create(pod); err != nil {
 		framework.Failf("Failed to create %s pod: %v", pod.Name, err)
@@ -236,27 +237,27 @@ func validateDNSResults(f *framework.Framework, pod *api.Pod, fileNames []string
 	framework.ExpectNoError(f.WaitForPodRunning(pod.Name))
 
 	By("retrieving the pod")
-	pod, err := podClient.Get(pod.Name)
+	pod, err := podClient.Get(pod.Name, metav1.GetOptions{})
 	if err != nil {
 		framework.Failf("Failed to get pod %s: %v", pod.Name, err)
 	}
 	// Try to find results for each expected name.
 	By("looking for the results for each expected name from probers")
-	assertFilesExist(fileNames, "results", pod, f.Client)
+	assertFilesExist(fileNames, "results", pod, f.ClientSet)
 
 	// TODO: probe from the host, too.
 
 	framework.Logf("DNS probes using %s succeeded\n", pod.Name)
 }
 
-func validateTargetedProbeOutput(f *framework.Framework, pod *api.Pod, fileNames []string, value string) {
+func validateTargetedProbeOutput(f *framework.Framework, pod *v1.Pod, fileNames []string, value string) {
 
 	By("submitting the pod to kubernetes")
-	podClient := f.Client.Pods(f.Namespace.Name)
+	podClient := f.ClientSet.Core().Pods(f.Namespace.Name)
 	defer func() {
 		By("deleting the pod")
 		defer GinkgoRecover()
-		podClient.Delete(pod.Name, api.NewDeleteOptions(0))
+		podClient.Delete(pod.Name, v1.NewDeleteOptions(0))
 	}()
 	if _, err := podClient.Create(pod); err != nil {
 		framework.Failf("Failed to create %s pod: %v", pod.Name, err)
@@ -265,21 +266,21 @@ func validateTargetedProbeOutput(f *framework.Framework, pod *api.Pod, fileNames
 	framework.ExpectNoError(f.WaitForPodRunning(pod.Name))
 
 	By("retrieving the pod")
-	pod, err := podClient.Get(pod.Name)
+	pod, err := podClient.Get(pod.Name, metav1.GetOptions{})
 	if err != nil {
 		framework.Failf("Failed to get pod %s: %v", pod.Name, err)
 	}
 	// Try to find the expected value for each expected name.
 	By("looking for the results for each expected name from probers")
-	assertFilesContain(fileNames, "results", pod, f.Client, true, value)
+	assertFilesContain(fileNames, "results", pod, f.ClientSet, true, value)
 
 	framework.Logf("DNS probes using %s succeeded\n", pod.Name)
 }
 
 func verifyDNSPodIsRunning(f *framework.Framework) {
-	systemClient := f.Client.Pods(api.NamespaceSystem)
+	systemClient := f.ClientSet.Core().Pods(api.NamespaceSystem)
 	By("Waiting for DNS Service to be Running")
-	options := api.ListOptions{LabelSelector: dnsServiceLabelSelector}
+	options := v1.ListOptions{LabelSelector: dnsServiceLabelSelector.String()}
 	dnsPods, err := systemClient.List(options)
 	if err != nil {
 		framework.Failf("Failed to list all dns service pods")
@@ -288,23 +289,23 @@ func verifyDNSPodIsRunning(f *framework.Framework) {
 		framework.Failf("No pods match the label selector %v", dnsServiceLabelSelector.String())
 	}
 	pod := dnsPods.Items[0]
-	framework.ExpectNoError(framework.WaitForPodRunningInNamespace(f.Client, &pod))
+	framework.ExpectNoError(framework.WaitForPodRunningInNamespace(f.ClientSet, &pod))
 }
 
-func createServiceSpec(serviceName, externalName string, isHeadless bool, selector map[string]string) *api.Service {
-	headlessService := &api.Service{
-		ObjectMeta: api.ObjectMeta{
+func createServiceSpec(serviceName, externalName string, isHeadless bool, selector map[string]string) *v1.Service {
+	headlessService := &v1.Service{
+		ObjectMeta: v1.ObjectMeta{
 			Name: serviceName,
 		},
-		Spec: api.ServiceSpec{
+		Spec: v1.ServiceSpec{
 			Selector: selector,
 		},
 	}
 	if externalName != "" {
-		headlessService.Spec.Type = api.ServiceTypeExternalName
+		headlessService.Spec.Type = v1.ServiceTypeExternalName
 		headlessService.Spec.ExternalName = externalName
 	} else {
-		headlessService.Spec.Ports = []api.ServicePort{
+		headlessService.Spec.Ports = []v1.ServicePort{
 			{Port: 80, Name: "http", Protocol: "TCP"},
 		}
 	}
@@ -358,21 +359,21 @@ var _ = framework.KubeDescribe("DNS", func() {
 			"dns-test": "true",
 		}
 		headlessService := createServiceSpec(dnsTestServiceName, "", true, testServiceSelector)
-		_, err := f.Client.Services(f.Namespace.Name).Create(headlessService)
+		_, err := f.ClientSet.Core().Services(f.Namespace.Name).Create(headlessService)
 		Expect(err).NotTo(HaveOccurred())
 		defer func() {
 			By("deleting the test headless service")
 			defer GinkgoRecover()
-			f.Client.Services(f.Namespace.Name).Delete(headlessService.Name)
+			f.ClientSet.Core().Services(f.Namespace.Name).Delete(headlessService.Name, nil)
 		}()
 
 		regularService := createServiceSpec("test-service-2", "", false, testServiceSelector)
-		regularService, err = f.Client.Services(f.Namespace.Name).Create(regularService)
+		regularService, err = f.ClientSet.Core().Services(f.Namespace.Name).Create(regularService)
 		Expect(err).NotTo(HaveOccurred())
 		defer func() {
 			By("deleting the test service")
 			defer GinkgoRecover()
-			f.Client.Services(f.Namespace.Name).Delete(regularService.Name)
+			f.ClientSet.Core().Services(f.Namespace.Name).Delete(regularService.Name, nil)
 		}()
 
 		// All the names we need to be able to resolve.
@@ -408,12 +409,12 @@ var _ = framework.KubeDescribe("DNS", func() {
 		serviceName := "dns-test-service-2"
 		podHostname := "dns-querier-2"
 		headlessService := createServiceSpec(serviceName, "", true, testServiceSelector)
-		_, err := f.Client.Services(f.Namespace.Name).Create(headlessService)
+		_, err := f.ClientSet.Core().Services(f.Namespace.Name).Create(headlessService)
 		Expect(err).NotTo(HaveOccurred())
 		defer func() {
 			By("deleting the test headless service")
 			defer GinkgoRecover()
-			f.Client.Services(f.Namespace.Name).Delete(headlessService.Name)
+			f.ClientSet.Core().Services(f.Namespace.Name).Delete(headlessService.Name, nil)
 		}()
 
 		hostFQDN := fmt.Sprintf("%s.%s.%s.svc.cluster.local", podHostname, serviceName, f.Namespace.Name)
@@ -441,12 +442,12 @@ var _ = framework.KubeDescribe("DNS", func() {
 		By("Creating a test externalName service")
 		serviceName := "dns-test-service-3"
 		externalNameService := createServiceSpec(serviceName, "foo.example.com", false, nil)
-		_, err := f.Client.Services(f.Namespace.Name).Create(externalNameService)
+		_, err := f.ClientSet.Core().Services(f.Namespace.Name).Create(externalNameService)
 		Expect(err).NotTo(HaveOccurred())
 		defer func() {
 			By("deleting the test externalName service")
 			defer GinkgoRecover()
-			f.Client.Services(f.Namespace.Name).Delete(externalNameService.Name)
+			f.ClientSet.Core().Services(f.Namespace.Name).Delete(externalNameService.Name, nil)
 		}()
 
 		hostFQDN := fmt.Sprintf("%s.%s.svc.cluster.local", serviceName, f.Namespace.Name)
@@ -463,7 +464,7 @@ var _ = framework.KubeDescribe("DNS", func() {
 
 		// Test changing the externalName field
 		By("changing the externalName to bar.example.com")
-		_, err = updateService(f.Client, f.Namespace.Name, serviceName, func(s *api.Service) {
+		_, err = updateService(f.ClientSet, f.Namespace.Name, serviceName, func(s *v1.Service) {
 			s.Spec.ExternalName = "bar.example.com"
 		})
 		Expect(err).NotTo(HaveOccurred())
@@ -480,10 +481,10 @@ var _ = framework.KubeDescribe("DNS", func() {
 
 		// Test changing type from ExternalName to ClusterIP
 		By("changing the service to type=ClusterIP")
-		_, err = updateService(f.Client, f.Namespace.Name, serviceName, func(s *api.Service) {
-			s.Spec.Type = api.ServiceTypeClusterIP
+		_, err = updateService(f.ClientSet, f.Namespace.Name, serviceName, func(s *v1.Service) {
+			s.Spec.Type = v1.ServiceTypeClusterIP
 			s.Spec.ClusterIP = "127.1.2.3"
-			s.Spec.Ports = []api.ServicePort{
+			s.Spec.Ports = []v1.ServicePort{
 				{Port: 80, Name: "http", Protocol: "TCP"},
 			}
 		})

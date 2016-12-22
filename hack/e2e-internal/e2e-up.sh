@@ -43,14 +43,11 @@ if [[ "${FEDERATION:-}" == "true" ]]; then
         )
         cur_ip_octet2="$((cur_ip_octet2 + 1))"
     done
-    tagfile="${KUBE_ROOT}/federation/manifests/federated-image.tag"
-    if [[ ! -f "$tagfile" ]]; then
-        echo "FATAL: tagfile ${tagfile} does not exist. Make sure that you have run build/push-federation-images.sh"
-        exit 1
-    fi
-    export FEDERATION_IMAGE_TAG="$(cat "${KUBE_ROOT}/federation/manifests/federated-image.tag")"
 
-    "${KUBE_ROOT}/federation/cluster/federation-up.sh"
+    # Sets ${CLUSTER_CONTEXT}
+    kubeconfig-federation-context "${zone}"
+
+    "${KUBE_ROOT}/federation/cluster/federation-up.sh" "${CLUSTER_CONTEXT}"
 else
     test-setup
 fi

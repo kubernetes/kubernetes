@@ -24,6 +24,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
@@ -35,10 +36,10 @@ import (
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
-	"k8s.io/kubernetes/pkg/client/unversioned/fake"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
+	"k8s.io/kubernetes/pkg/client/restclient/fake"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/runtime/serializer/streaming"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
@@ -95,7 +96,7 @@ func fakeClientWith(testName string, t *testing.T, data map[string]string) Clien
 
 func testData() (*api.PodList, *api.ServiceList) {
 	pods := &api.PodList{
-		ListMeta: unversioned.ListMeta{
+		ListMeta: metav1.ListMeta{
 			ResourceVersion: "15",
 		},
 		Items: []api.Pod{
@@ -110,7 +111,7 @@ func testData() (*api.PodList, *api.ServiceList) {
 		},
 	}
 	svc := &api.ServiceList{
-		ListMeta: unversioned.ListMeta{
+		ListMeta: metav1.ListMeta{
 			ResourceVersion: "16",
 		},
 		Items: []api.Service{
@@ -711,7 +712,7 @@ func TestResourceByNameAndEmptySelector(t *testing.T) {
 
 func TestSelector(t *testing.T) {
 	pods, svc := testData()
-	labelKey := unversioned.LabelSelectorQueryParam(registered.GroupOrDie(api.GroupName).GroupVersion.String())
+	labelKey := metav1.LabelSelectorQueryParam(registered.GroupOrDie(api.GroupName).GroupVersion.String())
 	b := NewBuilder(testapi.Default.RESTMapper(), api.Scheme, fakeClientWith("", t, map[string]string{
 		"/namespaces/test/pods?" + labelKey + "=a%3Db":     runtime.EncodeOrDie(testapi.Default.Codec(), pods),
 		"/namespaces/test/services?" + labelKey + "=a%3Db": runtime.EncodeOrDie(testapi.Default.Codec(), svc),
@@ -1006,7 +1007,7 @@ func TestSingularRootScopedObject(t *testing.T) {
 
 func TestListObject(t *testing.T) {
 	pods, _ := testData()
-	labelKey := unversioned.LabelSelectorQueryParam(registered.GroupOrDie(api.GroupName).GroupVersion.String())
+	labelKey := metav1.LabelSelectorQueryParam(registered.GroupOrDie(api.GroupName).GroupVersion.String())
 	b := NewBuilder(testapi.Default.RESTMapper(), api.Scheme, fakeClientWith("", t, map[string]string{
 		"/namespaces/test/pods?" + labelKey + "=a%3Db": runtime.EncodeOrDie(testapi.Default.Codec(), pods),
 	}), testapi.Default.Codec()).
@@ -1039,7 +1040,7 @@ func TestListObject(t *testing.T) {
 
 func TestListObjectWithDifferentVersions(t *testing.T) {
 	pods, svc := testData()
-	labelKey := unversioned.LabelSelectorQueryParam(registered.GroupOrDie(api.GroupName).GroupVersion.String())
+	labelKey := metav1.LabelSelectorQueryParam(registered.GroupOrDie(api.GroupName).GroupVersion.String())
 	obj, err := NewBuilder(testapi.Default.RESTMapper(), api.Scheme, fakeClientWith("", t, map[string]string{
 		"/namespaces/test/pods?" + labelKey + "=a%3Db":     runtime.EncodeOrDie(testapi.Default.Codec(), pods),
 		"/namespaces/test/services?" + labelKey + "=a%3Db": runtime.EncodeOrDie(testapi.Default.Codec(), svc),
@@ -1179,6 +1180,7 @@ func TestReceiveMultipleErrors(t *testing.T) {
 }
 
 func TestHasNames(t *testing.T) {
+	basename := filepath.Base(os.Args[0])
 	tests := []struct {
 		args            []string
 		expectedHasName bool
@@ -1222,16 +1224,70 @@ func TestHasNames(t *testing.T) {
 		{
 			args:            []string{"rc/foo", "bar"},
 			expectedHasName: false,
-			expectedError:   fmt.Errorf("there is no need to specify a resource type as a separate argument when passing arguments in resource/name form (e.g. 'resource.test get resource/<resource_name>' instead of 'resource.test get resource resource/<resource_name>'"),
+			expectedError:   fmt.Errorf("there is no need to specify a resource type as a separate argument when passing arguments in resource/name form (e.g. '" + basename + " get resource/<resource_name>' instead of '" + basename + " get resource resource/<resource_name>'"),
 		},
 	}
 	for _, test := range tests {
 		hasNames, err := HasNames(test.args)
 		if !reflect.DeepEqual(test.expectedError, err) {
-			t.Errorf("expected HasName to error %v, got %s", test.expectedError, err)
+			t.Errorf("expected HasName to error:\n%s\tgot:\n%s", test.expectedError, err)
 		}
 		if hasNames != test.expectedHasName {
 			t.Errorf("expected HasName to return %v for %s", test.expectedHasName, test.args)
+		}
+	}
+}
+
+func TestMultipleTypesRequested(t *testing.T) {
+	tests := []struct {
+		args                  []string
+		expectedMultipleTypes bool
+	}{
+		{
+			args: []string{""},
+			expectedMultipleTypes: false,
+		},
+		{
+			args: []string{"all"},
+			expectedMultipleTypes: true,
+		},
+		{
+			args: []string{"rc"},
+			expectedMultipleTypes: false,
+		},
+		{
+			args: []string{"rc,pod,svc"},
+			expectedMultipleTypes: true,
+		},
+		{
+			args: []string{"rc/foo"},
+			expectedMultipleTypes: false,
+		},
+		{
+			args: []string{"rc/foo", "rc/bar"},
+			expectedMultipleTypes: false,
+		},
+		{
+			args: []string{"rc", "foo"},
+			expectedMultipleTypes: false,
+		},
+		{
+			args: []string{"rc,pod,svc", "foo"},
+			expectedMultipleTypes: true,
+		},
+		{
+			args: []string{"rc,secrets"},
+			expectedMultipleTypes: true,
+		},
+		{
+			args: []string{"rc/foo", "rc/bar", "svc/svc"},
+			expectedMultipleTypes: true,
+		},
+	}
+	for _, test := range tests {
+		hasMultipleTypes := MultipleTypesRequested(test.args)
+		if hasMultipleTypes != test.expectedMultipleTypes {
+			t.Errorf("expected HasName to return %v for %s", test.expectedMultipleTypes, test.args)
 		}
 	}
 }

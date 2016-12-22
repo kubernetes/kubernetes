@@ -19,6 +19,7 @@ package transport
 import (
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/golang/glog"
@@ -48,7 +49,9 @@ func HTTPWrappersForConfig(config *Config, rt http.RoundTripper) (http.RoundTrip
 	if len(config.UserAgent) > 0 {
 		rt = NewUserAgentRoundTripper(config.UserAgent, rt)
 	}
-	if len(config.Impersonate) > 0 {
+	if len(config.Impersonate.UserName) > 0 ||
+		len(config.Impersonate.Groups) > 0 ||
+		len(config.Impersonate.Extra) > 0 {
 		rt = NewImpersonatingRoundTripper(config.Impersonate, rt)
 	}
 	return rt, nil
@@ -73,6 +76,71 @@ func DebugWrappers(rt http.RoundTripper) http.RoundTripper {
 type requestCanceler interface {
 	CancelRequest(*http.Request)
 }
+
+type authProxyRoundTripper struct {
+	username string
+	groups   []string
+	extra    map[string][]string
+
+	rt http.RoundTripper
+}
+
+// NewAuthProxyRoundTripper provides a roundtripper which will add auth proxy fields to requests for
+// authentication terminating proxy cases
+// assuming you pull the user from the context:
+// username is the user.Info.GetName() of the user
+// groups is the user.Info.GetGroups() of the user
+// extra is the user.Info.GetExtra() of the user
+// extra can contain any additional information that the authenticator
+// thought was interesting, for example authorization scopes.
+// In order to faithfully round-trip through an impersonation flow, these keys
+// MUST be lowercase.
+func NewAuthProxyRoundTripper(username string, groups []string, extra map[string][]string, rt http.RoundTripper) http.RoundTripper {
+	return &authProxyRoundTripper{
+		username: username,
+		groups:   groups,
+		extra:    extra,
+		rt:       rt,
+	}
+}
+
+func (rt *authProxyRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
+	req = cloneRequest(req)
+	SetAuthProxyHeaders(req, rt.username, rt.groups, rt.extra)
+
+	return rt.rt.RoundTrip(req)
+}
+
+// SetAuthProxyHeaders stomps the auth proxy header fields.  It mutates its argument.
+func SetAuthProxyHeaders(req *http.Request, username string, groups []string, extra map[string][]string) {
+	req.Header.Del("X-Remote-User")
+	req.Header.Del("X-Remote-Group")
+	for key := range req.Header {
+		if strings.HasPrefix(strings.ToLower(key), strings.ToLower("X-Remote-Extra-")) {
+			req.Header.Del(key)
+		}
+	}
+
+	req.Header.Set("X-Remote-User", username)
+	for _, group := range groups {
+		req.Header.Add("X-Remote-Group", group)
+	}
+	for key, values := range extra {
+		for _, value := range values {
+			req.Header.Add("X-Remote-Extra-"+key, value)
+		}
+	}
+}
+
+func (rt *authProxyRoundTripper) CancelRequest(req *http.Request) {
+	if canceler, ok := rt.rt.(requestCanceler); ok {
+		canceler.CancelRequest(req)
+	} else {
+		glog.Errorf("CancelRequest not implemented")
+	}
+}
+
+func (rt *authProxyRoundTripper) WrappedRoundTripper() http.RoundTripper { return rt.rt }
 
 type userAgentRoundTripper struct {
 	agent string
@@ -133,22 +201,53 @@ func (rt *basicAuthRoundTripper) CancelRequest(req *http.Request) {
 
 func (rt *basicAuthRoundTripper) WrappedRoundTripper() http.RoundTripper { return rt.rt }
 
+// These correspond to the headers used in pkg/apis/authentication.  We don't want the package dependency,
+// but you must not change the values.
+const (
+	// ImpersonateUserHeader is used to impersonate a particular user during an API server request
+	ImpersonateUserHeader = "Impersonate-User"
+
+	// ImpersonateGroupHeader is used to impersonate a particular group during an API server request.
+	// It can be repeated multiplied times for multiple groups.
+	ImpersonateGroupHeader = "Impersonate-Group"
+
+	// ImpersonateUserExtraHeaderPrefix is a prefix for a header used to impersonate an entry in the
+	// extra map[string][]string for user.Info.  The key for the `extra` map is suffix.
+	// The same key can be repeated multiple times to have multiple elements in the slice under a single key.
+	// For instance:
+	// Impersonate-Extra-Foo: one
+	// Impersonate-Extra-Foo: two
+	// results in extra["Foo"] = []string{"one", "two"}
+	ImpersonateUserExtraHeaderPrefix = "Impersonate-Extra-"
+)
+
 type impersonatingRoundTripper struct {
-	impersonate string
+	impersonate ImpersonationConfig
 	delegate    http.RoundTripper
 }
 
 // NewImpersonatingRoundTripper will add an Act-As header to a request unless it has already been set.
-func NewImpersonatingRoundTripper(impersonate string, delegate http.RoundTripper) http.RoundTripper {
+func NewImpersonatingRoundTripper(impersonate ImpersonationConfig, delegate http.RoundTripper) http.RoundTripper {
 	return &impersonatingRoundTripper{impersonate, delegate}
 }
 
 func (rt *impersonatingRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
-	if len(req.Header.Get("Impersonate-User")) != 0 {
+	// use the user header as marker for the rest.
+	if len(req.Header.Get(ImpersonateUserHeader)) != 0 {
 		return rt.delegate.RoundTrip(req)
 	}
 	req = cloneRequest(req)
-	req.Header.Set("Impersonate-User", rt.impersonate)
+	req.Header.Set(ImpersonateUserHeader, rt.impersonate.UserName)
+
+	for _, group := range rt.impersonate.Groups {
+		req.Header.Add(ImpersonateGroupHeader, group)
+	}
+	for k, vv := range rt.impersonate.Extra {
+		for _, v := range vv {
+			req.Header.Add(ImpersonateUserExtraHeaderPrefix+k, v)
+		}
+	}
+
 	return rt.delegate.RoundTrip(req)
 }
 

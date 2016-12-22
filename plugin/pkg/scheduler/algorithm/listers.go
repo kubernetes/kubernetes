@@ -19,39 +19,39 @@ package algorithm
 import (
 	"fmt"
 
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/api/v1"
+	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/labels"
 )
 
 // NodeLister interface represents anything that can list nodes for a scheduler.
 type NodeLister interface {
-	// We explicitly return []*api.Node, instead of api.NodeList, to avoid
+	// We explicitly return []*v1.Node, instead of v1.NodeList, to avoid
 	// performing expensive copies that are unneded.
-	List() ([]*api.Node, error)
+	List() ([]*v1.Node, error)
 }
 
 // FakeNodeLister implements NodeLister on a []string for test purposes.
-type FakeNodeLister []*api.Node
+type FakeNodeLister []*v1.Node
 
 // List returns nodes as a []string.
-func (f FakeNodeLister) List() ([]*api.Node, error) {
+func (f FakeNodeLister) List() ([]*v1.Node, error) {
 	return f, nil
 }
 
 // PodLister interface represents anything that can list pods for a scheduler.
 type PodLister interface {
-	// We explicitly return []*api.Pod, instead of api.PodList, to avoid
+	// We explicitly return []*v1.Pod, instead of v1.PodList, to avoid
 	// performing expensive copies that are unneded.
-	List(labels.Selector) ([]*api.Pod, error)
+	List(labels.Selector) ([]*v1.Pod, error)
 }
 
-// FakePodLister implements PodLister on an []api.Pods for test purposes.
-type FakePodLister []*api.Pod
+// FakePodLister implements PodLister on an []v1.Pods for test purposes.
+type FakePodLister []*v1.Pod
 
-// List returns []*api.Pod matching a query.
-func (f FakePodLister) List(s labels.Selector) (selected []*api.Pod, err error) {
+// List returns []*v1.Pod matching a query.
+func (f FakePodLister) List(s labels.Selector) (selected []*v1.Pod, err error) {
 	for _, pod := range f {
 		if s.Matches(labels.Set(pod.Labels)) {
 			selected = append(selected, pod)
@@ -63,21 +63,21 @@ func (f FakePodLister) List(s labels.Selector) (selected []*api.Pod, err error) 
 // ServiceLister interface represents anything that can produce a list of services; the list is consumed by a scheduler.
 type ServiceLister interface {
 	// Lists all the services
-	List(labels.Selector) ([]*api.Service, error)
+	List(labels.Selector) ([]*v1.Service, error)
 	// Gets the services for the given pod
-	GetPodServices(*api.Pod) ([]*api.Service, error)
+	GetPodServices(*v1.Pod) ([]*v1.Service, error)
 }
 
-// FakeServiceLister implements ServiceLister on []api.Service for test purposes.
-type FakeServiceLister []*api.Service
+// FakeServiceLister implements ServiceLister on []v1.Service for test purposes.
+type FakeServiceLister []*v1.Service
 
-// List returns api.ServiceList, the list of all services.
-func (f FakeServiceLister) List(labels.Selector) ([]*api.Service, error) {
+// List returns v1.ServiceList, the list of all services.
+func (f FakeServiceLister) List(labels.Selector) ([]*v1.Service, error) {
 	return f, nil
 }
 
 // GetPodServices gets the services that have the selector that match the labels on the given pod.
-func (f FakeServiceLister) GetPodServices(pod *api.Pod) (services []*api.Service, err error) {
+func (f FakeServiceLister) GetPodServices(pod *v1.Pod) (services []*v1.Service, err error) {
 	var selector labels.Selector
 
 	for i := range f {
@@ -97,34 +97,34 @@ func (f FakeServiceLister) GetPodServices(pod *api.Pod) (services []*api.Service
 // ControllerLister interface represents anything that can produce a list of ReplicationController; the list is consumed by a scheduler.
 type ControllerLister interface {
 	// Lists all the replication controllers
-	List(labels.Selector) ([]*api.ReplicationController, error)
+	List(labels.Selector) ([]*v1.ReplicationController, error)
 	// Gets the services for the given pod
-	GetPodControllers(*api.Pod) ([]*api.ReplicationController, error)
+	GetPodControllers(*v1.Pod) ([]*v1.ReplicationController, error)
 }
 
-// EmptyControllerLister implements ControllerLister on []api.ReplicationController returning empty data
+// EmptyControllerLister implements ControllerLister on []v1.ReplicationController returning empty data
 type EmptyControllerLister struct{}
 
 // List returns nil
-func (f EmptyControllerLister) List(labels.Selector) ([]*api.ReplicationController, error) {
+func (f EmptyControllerLister) List(labels.Selector) ([]*v1.ReplicationController, error) {
 	return nil, nil
 }
 
 // GetPodControllers returns nil
-func (f EmptyControllerLister) GetPodControllers(pod *api.Pod) (controllers []*api.ReplicationController, err error) {
+func (f EmptyControllerLister) GetPodControllers(pod *v1.Pod) (controllers []*v1.ReplicationController, err error) {
 	return nil, nil
 }
 
-// FakeControllerLister implements ControllerLister on []api.ReplicationController for test purposes.
-type FakeControllerLister []*api.ReplicationController
+// FakeControllerLister implements ControllerLister on []v1.ReplicationController for test purposes.
+type FakeControllerLister []*v1.ReplicationController
 
-// List returns []api.ReplicationController, the list of all ReplicationControllers.
-func (f FakeControllerLister) List(labels.Selector) ([]*api.ReplicationController, error) {
+// List returns []v1.ReplicationController, the list of all ReplicationControllers.
+func (f FakeControllerLister) List(labels.Selector) ([]*v1.ReplicationController, error) {
 	return f, nil
 }
 
 // GetPodControllers gets the ReplicationControllers that have the selector that match the labels on the given pod
-func (f FakeControllerLister) GetPodControllers(pod *api.Pod) (controllers []*api.ReplicationController, err error) {
+func (f FakeControllerLister) GetPodControllers(pod *v1.Pod) (controllers []*v1.ReplicationController, err error) {
 	var selector labels.Selector
 
 	for i := range f {
@@ -147,14 +147,14 @@ func (f FakeControllerLister) GetPodControllers(pod *api.Pod) (controllers []*ap
 // ReplicaSetLister interface represents anything that can produce a list of ReplicaSet; the list is consumed by a scheduler.
 type ReplicaSetLister interface {
 	// Gets the replicasets for the given pod
-	GetPodReplicaSets(*api.Pod) ([]*extensions.ReplicaSet, error)
+	GetPodReplicaSets(*v1.Pod) ([]*extensions.ReplicaSet, error)
 }
 
 // EmptyReplicaSetLister implements ReplicaSetLister on []extensions.ReplicaSet returning empty data
 type EmptyReplicaSetLister struct{}
 
 // GetPodReplicaSets returns nil
-func (f EmptyReplicaSetLister) GetPodReplicaSets(pod *api.Pod) (rss []*extensions.ReplicaSet, err error) {
+func (f EmptyReplicaSetLister) GetPodReplicaSets(pod *v1.Pod) (rss []*extensions.ReplicaSet, err error) {
 	return nil, nil
 }
 
@@ -162,14 +162,14 @@ func (f EmptyReplicaSetLister) GetPodReplicaSets(pod *api.Pod) (rss []*extension
 type FakeReplicaSetLister []*extensions.ReplicaSet
 
 // GetPodReplicaSets gets the ReplicaSets that have the selector that match the labels on the given pod
-func (f FakeReplicaSetLister) GetPodReplicaSets(pod *api.Pod) (rss []*extensions.ReplicaSet, err error) {
+func (f FakeReplicaSetLister) GetPodReplicaSets(pod *v1.Pod) (rss []*extensions.ReplicaSet, err error) {
 	var selector labels.Selector
 
 	for _, rs := range f {
 		if rs.Namespace != pod.Namespace {
 			continue
 		}
-		selector, err = unversioned.LabelSelectorAsSelector(rs.Spec.Selector)
+		selector, err = metav1.LabelSelectorAsSelector(rs.Spec.Selector)
 		if err != nil {
 			return
 		}

@@ -30,8 +30,9 @@ import (
 	"github.com/golang/glog"
 
 	"k8s.io/client-go/pkg/api"
-	"k8s.io/client-go/pkg/api/unversioned"
+	metav1 "k8s.io/client-go/pkg/apis/meta/v1"
 	"k8s.io/client-go/pkg/runtime"
+	"k8s.io/client-go/pkg/runtime/schema"
 	certutil "k8s.io/client-go/pkg/util/cert"
 	"k8s.io/client-go/pkg/util/flowcontrol"
 	"k8s.io/client-go/pkg/version"
@@ -70,8 +71,8 @@ type Config struct {
 	// TODO: demonstrate an OAuth2 compatible client.
 	BearerToken string
 
-	// Impersonate is the username that this RESTClient will impersonate
-	Impersonate string
+	// Impersonate is the configuration that RESTClient will use for impersonation.
+	Impersonate ImpersonationConfig
 
 	// Server requires plugin-specified authentication.
 	AuthProvider *clientcmdapi.AuthProviderConfig
@@ -118,6 +119,17 @@ type Config struct {
 	// Version string
 }
 
+// ImpersonationConfig has all the available impersonation options
+type ImpersonationConfig struct {
+	// UserName is the username to impersonate on each request.
+	UserName string
+	// Groups are the groups to impersonate on each request.
+	Groups []string
+	// Extra is a free-form field which can be used to link some authentication information
+	// to authorization information.  This field allows you to impersonate it.
+	Extra map[string][]string
+}
+
 // TLSClientConfig contains settings to enable transport layer security
 type TLSClientConfig struct {
 	// Server requires TLS client certificate authentication
@@ -150,7 +162,7 @@ type ContentConfig struct {
 	// GroupVersion is the API version to talk to. Must be provided when initializing
 	// a RESTClient directly. When initializing a Client, will be set with the default
 	// code version.
-	GroupVersion *unversioned.GroupVersion
+	GroupVersion *schema.GroupVersion
 	// NegotiatedSerializer is used for obtaining encoders and decoders for multiple
 	// supported media types.
 	NegotiatedSerializer runtime.NegotiatedSerializer
@@ -224,7 +236,7 @@ func UnversionedRESTClientFor(config *Config) (*RESTClient, error) {
 
 	versionConfig := config.ContentConfig
 	if versionConfig.GroupVersion == nil {
-		v := unversioned.SchemeGroupVersion
+		v := metav1.SchemeGroupVersion
 		versionConfig.GroupVersion = &v
 	}
 

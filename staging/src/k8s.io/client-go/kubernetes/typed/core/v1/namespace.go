@@ -19,7 +19,9 @@ package v1
 import (
 	api "k8s.io/client-go/pkg/api"
 	v1 "k8s.io/client-go/pkg/api/v1"
+	meta_v1 "k8s.io/client-go/pkg/apis/meta/v1"
 	watch "k8s.io/client-go/pkg/watch"
+	rest "k8s.io/client-go/rest"
 )
 
 // NamespacesGetter has a method to return a NamespaceInterface.
@@ -35,7 +37,7 @@ type NamespaceInterface interface {
 	UpdateStatus(*v1.Namespace) (*v1.Namespace, error)
 	Delete(name string, options *v1.DeleteOptions) error
 	DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error
-	Get(name string) (*v1.Namespace, error)
+	Get(name string, options meta_v1.GetOptions) (*v1.Namespace, error)
 	List(opts v1.ListOptions) (*v1.NamespaceList, error)
 	Watch(opts v1.ListOptions) (watch.Interface, error)
 	Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *v1.Namespace, err error)
@@ -44,13 +46,13 @@ type NamespaceInterface interface {
 
 // namespaces implements NamespaceInterface
 type namespaces struct {
-	client *CoreClient
+	client rest.Interface
 }
 
 // newNamespaces returns a Namespaces
-func newNamespaces(c *CoreClient) *namespaces {
+func newNamespaces(c *CoreV1Client) *namespaces {
 	return &namespaces{
-		client: c,
+		client: c.RESTClient(),
 	}
 }
 
@@ -76,6 +78,9 @@ func (c *namespaces) Update(namespace *v1.Namespace) (result *v1.Namespace, err 
 		Into(result)
 	return
 }
+
+// UpdateStatus was generated because the type contains a Status member.
+// Add a +genclientstatus=false comment above the type to avoid generating UpdateStatus().
 
 func (c *namespaces) UpdateStatus(namespace *v1.Namespace) (result *v1.Namespace, err error) {
 	result = &v1.Namespace{}
@@ -110,11 +115,12 @@ func (c *namespaces) DeleteCollection(options *v1.DeleteOptions, listOptions v1.
 }
 
 // Get takes name of the namespace, and returns the corresponding namespace object, and an error if there is any.
-func (c *namespaces) Get(name string) (result *v1.Namespace, err error) {
+func (c *namespaces) Get(name string, options meta_v1.GetOptions) (result *v1.Namespace, err error) {
 	result = &v1.Namespace{}
 	err = c.client.Get().
 		Resource("namespaces").
 		Name(name).
+		VersionedParams(&options, api.ParameterCodec).
 		Do().
 		Into(result)
 	return

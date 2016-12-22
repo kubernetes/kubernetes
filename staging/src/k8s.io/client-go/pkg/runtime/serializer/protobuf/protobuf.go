@@ -24,8 +24,8 @@ import (
 
 	"github.com/gogo/protobuf/proto"
 
-	"k8s.io/client-go/pkg/api/unversioned"
 	"k8s.io/client-go/pkg/runtime"
+	"k8s.io/client-go/pkg/runtime/schema"
 	"k8s.io/client-go/pkg/runtime/serializer/recognizer"
 	"k8s.io/client-go/pkg/util/framer"
 )
@@ -85,7 +85,7 @@ var _ recognizer.RecognizingDecoder = &Serializer{}
 // be straight decoded using normal protobuf unmarshalling (the MarshalTo interface). If into is provided and the original data is
 // not fully qualified with kind/version/group, the type of the into will be used to alter the returned gvk. On success or most
 // errors, the method will return the calculated schema kind.
-func (s *Serializer) Decode(originalData []byte, gvk *unversioned.GroupVersionKind, into runtime.Object) (runtime.Object, *unversioned.GroupVersionKind, error) {
+func (s *Serializer) Decode(originalData []byte, gvk *schema.GroupVersionKind, into runtime.Object) (runtime.Object, *schema.GroupVersionKind, error) {
 	if versioned, ok := into.(*runtime.VersionedObjects); ok {
 		into = versioned.Last()
 		obj, actual, err := s.Decode(originalData, gvk, into)
@@ -255,7 +255,7 @@ func (s *Serializer) RecognizesData(peek io.Reader) (bool, bool, error) {
 }
 
 // copyKindDefaults defaults dst to the value in src if dst does not have a value set.
-func copyKindDefaults(dst, src *unversioned.GroupVersionKind) {
+func copyKindDefaults(dst, src *schema.GroupVersionKind) {
 	if src == nil {
 		return
 	}
@@ -316,7 +316,7 @@ var _ runtime.Serializer = &RawSerializer{}
 // be straight decoded using normal protobuf unmarshalling (the MarshalTo interface). If into is provided and the original data is
 // not fully qualified with kind/version/group, the type of the into will be used to alter the returned gvk. On success or most
 // errors, the method will return the calculated schema kind.
-func (s *RawSerializer) Decode(originalData []byte, gvk *unversioned.GroupVersionKind, into runtime.Object) (runtime.Object, *unversioned.GroupVersionKind, error) {
+func (s *RawSerializer) Decode(originalData []byte, gvk *schema.GroupVersionKind, into runtime.Object) (runtime.Object, *schema.GroupVersionKind, error) {
 	if into == nil {
 		return nil, nil, fmt.Errorf("this serializer requires an object to decode into: %#v", s)
 	}
@@ -341,7 +341,7 @@ func (s *RawSerializer) Decode(originalData []byte, gvk *unversioned.GroupVersio
 	}
 	data := originalData
 
-	actual := &unversioned.GroupVersionKind{}
+	actual := &schema.GroupVersionKind{}
 	copyKindDefaults(actual, gvk)
 
 	if intoUnknown, ok := into.(*runtime.Unknown); ok && intoUnknown != nil {
@@ -386,7 +386,7 @@ func (s *RawSerializer) Decode(originalData []byte, gvk *unversioned.GroupVersio
 }
 
 // unmarshalToObject is the common code between decode in the raw and normal serializer.
-func unmarshalToObject(typer runtime.ObjectTyper, creater runtime.ObjectCreater, actual *unversioned.GroupVersionKind, into runtime.Object, data []byte) (runtime.Object, *unversioned.GroupVersionKind, error) {
+func unmarshalToObject(typer runtime.ObjectTyper, creater runtime.ObjectCreater, actual *schema.GroupVersionKind, into runtime.Object, data []byte) (runtime.Object, *schema.GroupVersionKind, error) {
 	// use the target if necessary
 	obj, err := runtime.UseOrCreateObject(typer, creater, *actual, into)
 	if err != nil {

@@ -21,18 +21,18 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/batch"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/types"
 )
 
-func getValidManualSelector() *unversioned.LabelSelector {
-	return &unversioned.LabelSelector{
+func getValidManualSelector() *metav1.LabelSelector {
+	return &metav1.LabelSelector{
 		MatchLabels: map[string]string{"a": "b"},
 	}
 }
 
-func getValidPodTemplateSpecForManual(selector *unversioned.LabelSelector) api.PodTemplateSpec {
+func getValidPodTemplateSpecForManual(selector *metav1.LabelSelector) api.PodTemplateSpec {
 	return api.PodTemplateSpec{
 		ObjectMeta: api.ObjectMeta{
 			Labels: selector.MatchLabels,
@@ -45,13 +45,13 @@ func getValidPodTemplateSpecForManual(selector *unversioned.LabelSelector) api.P
 	}
 }
 
-func getValidGeneratedSelector() *unversioned.LabelSelector {
-	return &unversioned.LabelSelector{
+func getValidGeneratedSelector() *metav1.LabelSelector {
+	return &metav1.LabelSelector{
 		MatchLabels: map[string]string{"controller-uid": "1a2b3c", "job-name": "myjob"},
 	}
 }
 
-func getValidPodTemplateSpecForGenerated(selector *unversioned.LabelSelector) api.PodTemplateSpec {
+func getValidPodTemplateSpecForGenerated(selector *metav1.LabelSelector) api.PodTemplateSpec {
 	return api.PodTemplateSpec{
 		ObjectMeta: api.ObjectMeta{
 			Labels: selector.MatchLabels,
@@ -304,19 +304,19 @@ func TestValidateJobUpdateStatus(t *testing.T) {
 	}
 }
 
-func TestValidateScheduledJob(t *testing.T) {
+func TestValidateCronJob(t *testing.T) {
 	validManualSelector := getValidManualSelector()
 	validPodTemplateSpec := getValidPodTemplateSpecForGenerated(getValidGeneratedSelector())
 	validPodTemplateSpec.Labels = map[string]string{}
 
-	successCases := map[string]batch.ScheduledJob{
+	successCases := map[string]batch.CronJob{
 		"basic scheduled job": {
 			ObjectMeta: api.ObjectMeta{
-				Name:      "myscheduledjob",
+				Name:      "mycronjob",
 				Namespace: api.NamespaceDefault,
 				UID:       types.UID("1a2b3c"),
 			},
-			Spec: batch.ScheduledJobSpec{
+			Spec: batch.CronJobSpec{
 				Schedule:          "* * * * ?",
 				ConcurrencyPolicy: batch.AllowConcurrent,
 				JobTemplate: batch.JobTemplateSpec{
@@ -328,11 +328,11 @@ func TestValidateScheduledJob(t *testing.T) {
 		},
 		"non-standard scheduled": {
 			ObjectMeta: api.ObjectMeta{
-				Name:      "myscheduledjob",
+				Name:      "mycronjob",
 				Namespace: api.NamespaceDefault,
 				UID:       types.UID("1a2b3c"),
 			},
-			Spec: batch.ScheduledJobSpec{
+			Spec: batch.CronJobSpec{
 				Schedule:          "@hourly",
 				ConcurrencyPolicy: batch.AllowConcurrent,
 				JobTemplate: batch.JobTemplateSpec{
@@ -344,7 +344,7 @@ func TestValidateScheduledJob(t *testing.T) {
 		},
 	}
 	for k, v := range successCases {
-		if errs := ValidateScheduledJob(&v); len(errs) != 0 {
+		if errs := ValidateCronJob(&v); len(errs) != 0 {
 			t.Errorf("expected success for %s: %v", k, errs)
 		}
 	}
@@ -352,14 +352,14 @@ func TestValidateScheduledJob(t *testing.T) {
 	negative := int32(-1)
 	negative64 := int64(-1)
 
-	errorCases := map[string]batch.ScheduledJob{
+	errorCases := map[string]batch.CronJob{
 		"spec.schedule: Invalid value": {
 			ObjectMeta: api.ObjectMeta{
-				Name:      "myscheduledjob",
+				Name:      "mycronjob",
 				Namespace: api.NamespaceDefault,
 				UID:       types.UID("1a2b3c"),
 			},
-			Spec: batch.ScheduledJobSpec{
+			Spec: batch.CronJobSpec{
 				Schedule:          "error",
 				ConcurrencyPolicy: batch.AllowConcurrent,
 				JobTemplate: batch.JobTemplateSpec{
@@ -371,11 +371,11 @@ func TestValidateScheduledJob(t *testing.T) {
 		},
 		"spec.schedule: Required value": {
 			ObjectMeta: api.ObjectMeta{
-				Name:      "myscheduledjob",
+				Name:      "mycronjob",
 				Namespace: api.NamespaceDefault,
 				UID:       types.UID("1a2b3c"),
 			},
-			Spec: batch.ScheduledJobSpec{
+			Spec: batch.CronJobSpec{
 				Schedule:          "",
 				ConcurrencyPolicy: batch.AllowConcurrent,
 				JobTemplate: batch.JobTemplateSpec{
@@ -387,11 +387,11 @@ func TestValidateScheduledJob(t *testing.T) {
 		},
 		"spec.startingDeadlineSeconds:must be greater than or equal to 0": {
 			ObjectMeta: api.ObjectMeta{
-				Name:      "myscheduledjob",
+				Name:      "mycronjob",
 				Namespace: api.NamespaceDefault,
 				UID:       types.UID("1a2b3c"),
 			},
-			Spec: batch.ScheduledJobSpec{
+			Spec: batch.CronJobSpec{
 				Schedule:                "* * * * ?",
 				ConcurrencyPolicy:       batch.AllowConcurrent,
 				StartingDeadlineSeconds: &negative64,
@@ -404,11 +404,11 @@ func TestValidateScheduledJob(t *testing.T) {
 		},
 		"spec.concurrencyPolicy: Required value": {
 			ObjectMeta: api.ObjectMeta{
-				Name:      "myscheduledjob",
+				Name:      "mycronjob",
 				Namespace: api.NamespaceDefault,
 				UID:       types.UID("1a2b3c"),
 			},
-			Spec: batch.ScheduledJobSpec{
+			Spec: batch.CronJobSpec{
 				Schedule: "* * * * ?",
 				JobTemplate: batch.JobTemplateSpec{
 					Spec: batch.JobSpec{
@@ -419,11 +419,11 @@ func TestValidateScheduledJob(t *testing.T) {
 		},
 		"spec.jobTemplate.spec.parallelism:must be greater than or equal to 0": {
 			ObjectMeta: api.ObjectMeta{
-				Name:      "myscheduledjob",
+				Name:      "mycronjob",
 				Namespace: api.NamespaceDefault,
 				UID:       types.UID("1a2b3c"),
 			},
-			Spec: batch.ScheduledJobSpec{
+			Spec: batch.CronJobSpec{
 				Schedule:          "* * * * ?",
 				ConcurrencyPolicy: batch.AllowConcurrent,
 				JobTemplate: batch.JobTemplateSpec{
@@ -436,11 +436,11 @@ func TestValidateScheduledJob(t *testing.T) {
 		},
 		"spec.jobTemplate.spec.completions:must be greater than or equal to 0": {
 			ObjectMeta: api.ObjectMeta{
-				Name:      "myscheduledjob",
+				Name:      "mycronjob",
 				Namespace: api.NamespaceDefault,
 				UID:       types.UID("1a2b3c"),
 			},
-			Spec: batch.ScheduledJobSpec{
+			Spec: batch.CronJobSpec{
 				Schedule:          "* * * * ?",
 				ConcurrencyPolicy: batch.AllowConcurrent,
 				JobTemplate: batch.JobTemplateSpec{
@@ -454,11 +454,11 @@ func TestValidateScheduledJob(t *testing.T) {
 		},
 		"spec.jobTemplate.spec.activeDeadlineSeconds:must be greater than or equal to 0": {
 			ObjectMeta: api.ObjectMeta{
-				Name:      "myscheduledjob",
+				Name:      "mycronjob",
 				Namespace: api.NamespaceDefault,
 				UID:       types.UID("1a2b3c"),
 			},
-			Spec: batch.ScheduledJobSpec{
+			Spec: batch.CronJobSpec{
 				Schedule:          "* * * * ?",
 				ConcurrencyPolicy: batch.AllowConcurrent,
 				JobTemplate: batch.JobTemplateSpec{
@@ -471,11 +471,11 @@ func TestValidateScheduledJob(t *testing.T) {
 		},
 		"spec.jobTemplate.spec.selector: Invalid value: {\"matchLabels\":{\"a\":\"b\"}}: `selector` will be auto-generated": {
 			ObjectMeta: api.ObjectMeta{
-				Name:      "myscheduledjob",
+				Name:      "mycronjob",
 				Namespace: api.NamespaceDefault,
 				UID:       types.UID("1a2b3c"),
 			},
-			Spec: batch.ScheduledJobSpec{
+			Spec: batch.CronJobSpec{
 				Schedule:          "* * * * ?",
 				ConcurrencyPolicy: batch.AllowConcurrent,
 				JobTemplate: batch.JobTemplateSpec{
@@ -488,11 +488,11 @@ func TestValidateScheduledJob(t *testing.T) {
 		},
 		"spec.jobTemplate.spec.manualSelector: Unsupported value": {
 			ObjectMeta: api.ObjectMeta{
-				Name:      "myscheduledjob",
+				Name:      "mycronjob",
 				Namespace: api.NamespaceDefault,
 				UID:       types.UID("1a2b3c"),
 			},
-			Spec: batch.ScheduledJobSpec{
+			Spec: batch.CronJobSpec{
 				Schedule:          "* * * * ?",
 				ConcurrencyPolicy: batch.AllowConcurrent,
 				JobTemplate: batch.JobTemplateSpec{
@@ -505,11 +505,11 @@ func TestValidateScheduledJob(t *testing.T) {
 		},
 		"spec.jobTemplate.spec.template.spec.restartPolicy: Unsupported value": {
 			ObjectMeta: api.ObjectMeta{
-				Name:      "myscheduledjob",
+				Name:      "mycronjob",
 				Namespace: api.NamespaceDefault,
 				UID:       types.UID("1a2b3c"),
 			},
-			Spec: batch.ScheduledJobSpec{
+			Spec: batch.CronJobSpec{
 				Schedule:          "* * * * ?",
 				ConcurrencyPolicy: batch.AllowConcurrent,
 				JobTemplate: batch.JobTemplateSpec{
@@ -528,7 +528,7 @@ func TestValidateScheduledJob(t *testing.T) {
 	}
 
 	for k, v := range errorCases {
-		errs := ValidateScheduledJob(&v)
+		errs := ValidateCronJob(&v)
 		if len(errs) == 0 {
 			t.Errorf("expected failure for %s", k)
 		} else {

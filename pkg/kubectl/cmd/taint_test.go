@@ -26,12 +26,13 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/client/unversioned/fake"
-	"k8s.io/kubernetes/pkg/conversion"
+	"k8s.io/kubernetes/pkg/api/v1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
+	"k8s.io/kubernetes/pkg/client/restclient/fake"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/util/strategicpatch"
 )
 
 func generateNodeAndTaintedNode(oldTaints []api.Taint, newTaints []api.Taint) (*api.Node, *api.Node) {
@@ -42,7 +43,7 @@ func generateNodeAndTaintedNode(oldTaints []api.Taint, newTaints []api.Taint) (*
 	node := &api.Node{
 		ObjectMeta: api.ObjectMeta{
 			Name:              "node-name",
-			CreationTimestamp: unversioned.Time{Time: time.Now()},
+			CreationTimestamp: metav1.Time{Time: time.Now()},
 			Annotations: map[string]string{
 				api.TaintsAnnotationKey: string(oldTaintsData),
 			},
@@ -52,7 +53,7 @@ func generateNodeAndTaintedNode(oldTaints []api.Taint, newTaints []api.Taint) (*
 		},
 		Status: api.NodeStatus{},
 	}
-	clone, _ := conversion.NewCloner().DeepCopy(node)
+	clone, _ := api.Scheme.DeepCopy(node)
 
 	newTaintsData, _ := json.Marshal(newTaints)
 	// A copy of the same node, but tainted.
@@ -264,7 +265,33 @@ func TestTaint(t *testing.T) {
 				switch {
 				case m.isFor("GET", "/nodes/node-name"):
 					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, oldNode)}, nil
-				case m.isFor("PATCH", "/nodes/node-name"), m.isFor("PUT", "/nodes/node-name"):
+				case m.isFor("PATCH", "/nodes/node-name"):
+					tainted = true
+					data, err := ioutil.ReadAll(req.Body)
+					if err != nil {
+						t.Fatalf("%s: unexpected error: %v", test.description, err)
+					}
+					defer req.Body.Close()
+
+					// apply the patch
+					oldJSON, err := runtime.Encode(codec, oldNode)
+					if err != nil {
+						t.Fatalf("%s: unexpected error: %v", test.description, err)
+					}
+					appliedPatch, err := strategicpatch.StrategicMergePatch(oldJSON, data, &v1.Node{})
+					if err != nil {
+						t.Fatalf("%s: unexpected error: %v", test.description, err)
+					}
+
+					// decode the patch
+					if err := runtime.DecodeInto(codec, appliedPatch, new_node); err != nil {
+						t.Fatalf("%s: unexpected error: %v", test.description, err)
+					}
+					if !AnnotationsHaveEqualTaints(expectNewNode.Annotations, new_node.Annotations) {
+						t.Fatalf("%s: expected:\n%v\nsaw:\n%v\n", test.description, expectNewNode.Annotations, new_node.Annotations)
+					}
+					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, new_node)}, nil
+				case m.isFor("PUT", "/nodes/node-name"):
 					tainted = true
 					data, err := ioutil.ReadAll(req.Body)
 					if err != nil {

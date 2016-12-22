@@ -19,7 +19,7 @@ package apparmor
 import (
 	"strings"
 
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 )
 
 // TODO: Move these values into the API package.
@@ -38,7 +38,7 @@ const (
 )
 
 // Checks whether app armor is required for pod to be run.
-func isRequired(pod *api.Pod) bool {
+func isRequired(pod *v1.Pod) bool {
 	for key := range pod.Annotations {
 		if strings.HasPrefix(key, ContainerAnnotationKeyPrefix) {
 			return true
@@ -48,7 +48,7 @@ func isRequired(pod *api.Pod) bool {
 }
 
 // Returns the name of the profile to use with the container.
-func GetProfileName(pod *api.Pod, containerName string) string {
+func GetProfileName(pod *v1.Pod, containerName string) string {
 	return GetProfileNameFromPodAnnotations(pod.Annotations, containerName)
 }
 
@@ -59,10 +59,19 @@ func GetProfileNameFromPodAnnotations(annotations map[string]string, containerNa
 }
 
 // Sets the name of the profile to use with the container.
-func SetProfileName(pod *api.Pod, containerName, profileName string) error {
+func SetProfileName(pod *v1.Pod, containerName, profileName string) error {
 	if pod.Annotations == nil {
 		pod.Annotations = map[string]string{}
 	}
 	pod.Annotations[ContainerAnnotationKeyPrefix+containerName] = profileName
+	return nil
+}
+
+// Sets the name of the profile to use with the container.
+func SetProfileNameFromPodAnnotations(annotations map[string]string, containerName, profileName string) error {
+	if annotations == nil {
+		return nil
+	}
+	annotations[ContainerAnnotationKeyPrefix+containerName] = profileName
 	return nil
 }

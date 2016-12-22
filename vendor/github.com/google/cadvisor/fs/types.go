@@ -67,7 +67,10 @@ type FsInfo interface {
 	GetFsInfoForPath(mountSet map[string]struct{}) ([]Fs, error)
 
 	// Returns number of bytes occupied by 'dir'.
-	GetDirUsage(dir string, timeout time.Duration) (uint64, error)
+	GetDirDiskUsage(dir string, timeout time.Duration) (uint64, error)
+
+	// Returns number of inodes used by 'dir'.
+	GetDirInodeUsage(dir string, timeout time.Duration) (uint64, error)
 
 	// Returns the block device info of the filesystem on which 'dir' resides.
 	GetDirFsDevice(dir string) (*DeviceInfo, error)

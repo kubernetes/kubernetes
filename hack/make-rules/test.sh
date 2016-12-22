@@ -35,6 +35,7 @@ kube::test::find_dirs() {
           -path './_artifacts/*' \
           -o -path './_output/*' \
           -o -path './_gopath/*' \
+          -o -path './cmd/kubeadm/test/*' \
           -o -path './contrib/podex/*' \
           -o -path './output/*' \
           -o -path './release/*' \
@@ -52,6 +53,7 @@ kube::test::find_dirs() {
     find -L . \
         -path './_output' -prune \
         -o -path './vendor/k8s.io/client-go/*' \
+        -o -path './test/e2e_node/system/*' \
       -name '*_test.go' -print0 | xargs -0n1 dirname | sed 's|^\./||' | LC_ALL=C sort -u
   )
 }
@@ -243,25 +245,28 @@ runTests() {
   # `go test` does not install the things it builds. `go test -i` installs
   # the build artifacts but doesn't run the tests.  The two together provide
   # a large speedup for tests that do not need to be rebuilt.
-  printf "%s\n" "${@}" | grep -Ev $cover_ignore_dirs | xargs -I{} -n1 -P${KUBE_COVERPROCS} \
-    bash -c "set -o pipefail; _pkg=\"{}\"; _pkg_out=\${_pkg//\//_}; \
-        go test -i ${goflags[@]:+${goflags[@]}} \
-          ${KUBE_RACE} \
-          ${KUBE_TIMEOUT} \
-          -cover -covermode=\"${KUBE_COVERMODE}\" \
-          -coverprofile=\"${cover_report_dir}/\${_pkg}/${cover_profile}\" \
-          \"${KUBE_GO_PACKAGE}/\${_pkg}\" \
-          ${testargs[@]:+${testargs[@]}}
-        go test ${goflags[@]:+${goflags[@]}} \
-          ${KUBE_RACE} \
-          ${KUBE_TIMEOUT} \
-          -cover -covermode=\"${KUBE_COVERMODE}\" \
-          -coverprofile=\"${cover_report_dir}/\${_pkg}/${cover_profile}\" \
-          \"${KUBE_GO_PACKAGE}/\${_pkg}\" \
-          ${testargs[@]:+${testargs[@]}} \
-        | tee ${junit_filename_prefix:+\"${junit_filename_prefix}-\$_pkg_out.stdout\"} \
-        | grep \"${go_test_grep_pattern}\"" \
-      && test_result=$? || test_result=$?
+  printf "%s\n" "${@}" \
+    | grep -Ev $cover_ignore_dirs \
+    | xargs -I{} -n 1 -P ${KUBE_COVERPROCS} \
+    bash -c "set -o pipefail; _pkg=\"\$0\"; _pkg_out=\${_pkg//\//_}; \
+      go test -i ${goflags[@]:+${goflags[@]}} \
+        ${KUBE_RACE} \
+        ${KUBE_TIMEOUT} \
+        -cover -covermode=\"${KUBE_COVERMODE}\" \
+        -coverprofile=\"${cover_report_dir}/\${_pkg}/${cover_profile}\" \
+        \"${KUBE_GO_PACKAGE}/\${_pkg}\" \
+        ${testargs[@]:+${testargs[@]}}
+      go test ${goflags[@]:+${goflags[@]}} \
+        ${KUBE_RACE} \
+        ${KUBE_TIMEOUT} \
+        -cover -covermode=\"${KUBE_COVERMODE}\" \
+        -coverprofile=\"${cover_report_dir}/\${_pkg}/${cover_profile}\" \
+        \"${KUBE_GO_PACKAGE}/\${_pkg}\" \
+        ${testargs[@]:+${testargs[@]}} \
+      | tee ${junit_filename_prefix:+\"${junit_filename_prefix}-\$_pkg_out.stdout\"} \
+      | grep \"${go_test_grep_pattern}\"" \
+    {} \
+    && test_result=$? || test_result=$?
 
   produceJUnitXMLReport "${junit_filename_prefix}"
 

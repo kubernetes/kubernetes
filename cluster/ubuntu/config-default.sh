@@ -86,8 +86,8 @@ FLANNEL_OTHER_NET_CONFIG=${FLANNEL_OTHER_NET_CONFIG:-""}
 
 export ADMISSION_CONTROL=NamespaceLifecycle,LimitRanger,ServiceAccount,DefaultStorageClass,ResourceQuota
 
-# Path to the config file or directory of files of kubelet
-export KUBELET_CONFIG=${KUBELET_CONFIG:-""}
+# Path to the pod manifest file or directory of files of kubelet
+export KUBELET_POD_MANIFEST_PATH=${KUBELET_POD_MANIFEST_PATH:-""}
 
 # A port range to reserve for services with NodePort visibility
 SERVICE_NODE_PORT_RANGE=${SERVICE_NODE_PORT_RANGE:-"30000-32767"}
@@ -116,7 +116,9 @@ ENABLE_CLUSTER_DNS="${KUBE_ENABLE_CLUSTER_DNS:-true}"
 # DNS_SERVER_IP must be a IP in SERVICE_CLUSTER_IP_RANGE
 DNS_SERVER_IP=${DNS_SERVER_IP:-"192.168.3.10"}
 DNS_DOMAIN=${DNS_DOMAIN:-"cluster.local"}
-DNS_REPLICAS=${DNS_REPLICAS:-1}
+
+# Optional: Enable DNS horizontal autoscaler
+ENABLE_DNS_HORIZONTAL_AUTOSCALER="${KUBE_ENABLE_DNS_HORIZONTAL_AUTOSCALER:-false}"
 
 # Optional: Install Kubernetes UI
 ENABLE_CLUSTER_UI="${KUBE_ENABLE_CLUSTER_UI:-true}"
@@ -128,7 +130,7 @@ ENABLE_CLUSTER_UI="${KUBE_ENABLE_CLUSTER_UI:-true}"
 # Add environment variable separated with blank space like "http_proxy=http://10.x.x.x:8080 https_proxy=https://10.x.x.x:8443"
 PROXY_SETTING=${PROXY_SETTING:-""}
 
-# Optional: Allows kublet/kube-api to be run in privileged mode
+# Optional: Allows kubelet/kube-api to be run in privileged mode
 ALLOW_PRIVILEGED=${ALLOW_PRIVILEGED:-"false"}
 
 DEBUG=${DEBUG:-"false"}

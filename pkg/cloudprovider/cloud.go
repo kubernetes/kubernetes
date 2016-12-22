@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"strings"
 
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/types"
 )
 
@@ -53,7 +53,7 @@ type Clusters interface {
 
 // TODO(#6812): Use a shorter name that's less likely to be longer than cloud
 // providers' name length limits.
-func GetLoadBalancerName(service *api.Service) string {
+func GetLoadBalancerName(service *v1.Service) string {
 	//GCE requires that the name of a load balancer starts with a lower case letter.
 	ret := "a" + string(service.UID)
 	ret = strings.Replace(ret, "-", "", -1)
@@ -81,26 +81,28 @@ type LoadBalancer interface {
 	// TODO: Break this up into different interfaces (LB, etc) when we have more than one type of service
 	// GetLoadBalancer returns whether the specified load balancer exists, and
 	// if so, what its status is.
-	// Implementations must treat the *api.Service parameter as read-only and not modify it.
+	// Implementations must treat the *v1.Service parameter as read-only and not modify it.
 	// Parameter 'clusterName' is the name of the cluster as presented to kube-controller-manager
-	GetLoadBalancer(clusterName string, service *api.Service) (status *api.LoadBalancerStatus, exists bool, err error)
+	GetLoadBalancer(clusterName string, service *v1.Service) (status *v1.LoadBalancerStatus, exists bool, err error)
 	// EnsureLoadBalancer creates a new load balancer 'name', or updates the existing one. Returns the status of the balancer
-	// Implementations must treat the *api.Service parameter as read-only and not modify it.
+	// Implementations must treat the *v1.Service and *v1.Node
+	// parameters as read-only and not modify them.
 	// Parameter 'clusterName' is the name of the cluster as presented to kube-controller-manager
-	EnsureLoadBalancer(clusterName string, service *api.Service, nodeNames []string) (*api.LoadBalancerStatus, error)
+	EnsureLoadBalancer(clusterName string, service *v1.Service, nodes []*v1.Node) (*v1.LoadBalancerStatus, error)
 	// UpdateLoadBalancer updates hosts under the specified load balancer.
-	// Implementations must treat the *api.Service parameter as read-only and not modify it.
+	// Implementations must treat the *v1.Service and *v1.Node
+	// parameters as read-only and not modify them.
 	// Parameter 'clusterName' is the name of the cluster as presented to kube-controller-manager
-	UpdateLoadBalancer(clusterName string, service *api.Service, nodeNames []string) error
+	UpdateLoadBalancer(clusterName string, service *v1.Service, nodes []*v1.Node) error
 	// EnsureLoadBalancerDeleted deletes the specified load balancer if it
 	// exists, returning nil if the load balancer specified either didn't exist or
 	// was successfully deleted.
 	// This construction is useful because many cloud providers' load balancers
 	// have multiple underlying components, meaning a Get could say that the LB
 	// doesn't exist even if some part of it is still laying around.
-	// Implementations must treat the *api.Service parameter as read-only and not modify it.
+	// Implementations must treat the *v1.Service parameter as read-only and not modify it.
 	// Parameter 'clusterName' is the name of the cluster as presented to kube-controller-manager
-	EnsureLoadBalancerDeleted(clusterName string, service *api.Service) error
+	EnsureLoadBalancerDeleted(clusterName string, service *v1.Service) error
 }
 
 // Instances is an abstract, pluggable interface for sets of instances.
@@ -109,7 +111,7 @@ type Instances interface {
 	// TODO(roberthbailey): This currently is only used in such a way that it
 	// returns the address of the calling instance. We should do a rename to
 	// make this clearer.
-	NodeAddresses(name types.NodeName) ([]api.NodeAddress, error)
+	NodeAddresses(name types.NodeName) ([]v1.NodeAddress, error)
 	// ExternalID returns the cloud provider ID of the node with the specified NodeName.
 	// Note that if the instance does not exist or is no longer running, we must return ("", cloudprovider.InstanceNotFound)
 	ExternalID(nodeName types.NodeName) (string, error)
@@ -117,8 +119,6 @@ type Instances interface {
 	InstanceID(nodeName types.NodeName) (string, error)
 	// InstanceType returns the type of the specified instance.
 	InstanceType(name types.NodeName) (string, error)
-	// List lists instances that match 'filter' which is a regular expression which must match the entire instance name (fqdn)
-	List(filter string) ([]types.NodeName, error)
 	// AddSSHKeyToAllInstances adds an SSH public key as a legal identity for all instances
 	// expected format for the key is standard ssh-keygen format: <protocol> <blob>
 	AddSSHKeyToAllInstances(user string, keyData []byte) error

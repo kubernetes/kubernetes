@@ -18,23 +18,24 @@ package apiserver
 
 import (
 	"fmt"
-	"net"
 
-	"k8s.io/kubernetes/cmd/libs/go2idl/client-gen/test_apis/testgroup.k8s.io/v1"
+	"k8s.io/kubernetes/cmd/libs/go2idl/client-gen/test_apis/testgroup/v1"
 	testgroupetcd "k8s.io/kubernetes/examples/apiserver/rest"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/rest"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/genericapiserver"
 	"k8s.io/kubernetes/pkg/genericapiserver/authorizer"
 	genericoptions "k8s.io/kubernetes/pkg/genericapiserver/options"
-	genericvalidation "k8s.io/kubernetes/pkg/genericapiserver/validation"
 	"k8s.io/kubernetes/pkg/registry/generic"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/storage/storagebackend"
+	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 
 	// Install the testgroup API
-	_ "k8s.io/kubernetes/cmd/libs/go2idl/client-gen/test_apis/testgroup.k8s.io/install"
+	_ "k8s.io/kubernetes/cmd/libs/go2idl/client-gen/test_apis/testgroup/install"
+
+	"github.com/golang/glog"
 )
 
 const (
@@ -54,27 +55,66 @@ func newStorageFactory() genericapiserver.StorageFactory {
 	return storageFactory
 }
 
-func NewServerRunOptions() *genericoptions.ServerRunOptions {
-	serverOptions := genericoptions.NewServerRunOptions().WithEtcdOptions()
-	serverOptions.InsecurePort = InsecurePort
-	return serverOptions
+type ServerRunOptions struct {
+	GenericServerRunOptions *genericoptions.ServerRunOptions
+	Etcd                    *genericoptions.EtcdOptions
+	SecureServing           *genericoptions.SecureServingOptions
+	InsecureServing         *genericoptions.ServingOptions
+	Authentication          *genericoptions.BuiltInAuthenticationOptions
 }
 
-func Run(serverOptions *genericoptions.ServerRunOptions) error {
-	// Set ServiceClusterIPRange
-	_, serviceClusterIPRange, _ := net.ParseCIDR("10.0.0.0/24")
-	serverOptions.ServiceClusterIPRange = *serviceClusterIPRange
-	serverOptions.StorageConfig.ServerList = []string{"http://127.0.0.1:2379"}
-	genericvalidation.ValidateRunOptions(serverOptions)
-	genericvalidation.VerifyEtcdServersList(serverOptions)
-	config := genericapiserver.NewConfig().ApplyOptions(serverOptions).Complete()
-	if err := config.MaybeGenerateServingCerts(); err != nil {
-		// this wasn't treated as fatal for this process before
-		fmt.Printf("Error creating cert: %v", err)
+func NewServerRunOptions() *ServerRunOptions {
+	s := ServerRunOptions{
+		GenericServerRunOptions: genericoptions.NewServerRunOptions(),
+		Etcd:            genericoptions.NewEtcdOptions(),
+		SecureServing:   genericoptions.NewSecureServingOptions(),
+		InsecureServing: genericoptions.NewInsecureServingOptions(),
+		Authentication:  genericoptions.NewBuiltInAuthenticationOptions().WithAll(),
+	}
+	s.InsecureServing.BindPort = InsecurePort
+	s.SecureServing.ServingOptions.BindPort = SecurePort
+
+	return &s
+}
+
+func (serverOptions *ServerRunOptions) Run(stopCh <-chan struct{}) error {
+	serverOptions.Etcd.StorageConfig.ServerList = []string{"http://127.0.0.1:2379"}
+
+	// set defaults
+	if err := serverOptions.GenericServerRunOptions.DefaultExternalHost(); err != nil {
+		return err
+	}
+	if err := serverOptions.SecureServing.MaybeDefaultWithSelfSignedCerts(serverOptions.GenericServerRunOptions.AdvertiseAddress.String()); err != nil {
+		glog.Fatalf("Error creating self-signed certificates: %v", err)
+	}
+
+	// validate options
+	if errs := serverOptions.Etcd.Validate(); len(errs) > 0 {
+		return utilerrors.NewAggregate(errs)
+	}
+	if errs := serverOptions.SecureServing.Validate(); len(errs) > 0 {
+		return utilerrors.NewAggregate(errs)
+	}
+	if errs := serverOptions.InsecureServing.Validate("insecure-port"); len(errs) > 0 {
+		return utilerrors.NewAggregate(errs)
+	}
+
+	// create config from options
+	config := genericapiserver.NewConfig().
+		ApplyOptions(serverOptions.GenericServerRunOptions).
+		ApplyInsecureServingOptions(serverOptions.InsecureServing)
+
+	if _, err := config.ApplySecureServingOptions(serverOptions.SecureServing); err != nil {
+		return fmt.Errorf("failed to configure https: %s", err)
+	}
+	if _, err := config.ApplyAuthenticationOptions(serverOptions.Authentication); err != nil {
+		return fmt.Errorf("failed to configure authentication: %s", err)
 	}
 
 	config.Authorizer = authorizer.NewAlwaysAllowAuthorizer()
-	s, err := config.New()
+	config.SwaggerConfig = genericapiserver.DefaultSwaggerConfig()
+
+	s, err := config.Complete().New()
 	if err != nil {
 		return fmt.Errorf("Error in bringing up the server: %v", err)
 	}
@@ -86,13 +126,20 @@ func Run(serverOptions *genericoptions.ServerRunOptions) error {
 		return fmt.Errorf("%v", err)
 	}
 	storageFactory := newStorageFactory()
-	storageConfig, err := storageFactory.NewConfig(unversioned.GroupResource{Group: groupName, Resource: "testtype"})
+	storageConfig, err := storageFactory.NewConfig(schema.GroupResource{Group: groupName, Resource: "testtype"})
 	if err != nil {
 		return fmt.Errorf("Unable to get storage config: %v", err)
 	}
 
+	testTypeOpts := generic.RESTOptions{
+		StorageConfig:           storageConfig,
+		Decorator:               generic.UndecoratedStorage,
+		ResourcePrefix:          "testtypes",
+		DeleteCollectionWorkers: 1,
+	}
+
 	restStorageMap := map[string]rest.Storage{
-		"testtypes": testgroupetcd.NewREST(storageConfig, generic.UndecoratedStorage),
+		"testtypes": testgroupetcd.NewREST(testTypeOpts),
 	}
 	apiGroupInfo := genericapiserver.APIGroupInfo{
 		GroupMeta: *groupMeta,
@@ -105,6 +152,6 @@ func Run(serverOptions *genericoptions.ServerRunOptions) error {
 	if err := s.InstallAPIGroup(&apiGroupInfo); err != nil {
 		return fmt.Errorf("Error in installing API: %v", err)
 	}
-	s.Run()
+	s.PrepareRun().Run(stopCh)
 	return nil
 }

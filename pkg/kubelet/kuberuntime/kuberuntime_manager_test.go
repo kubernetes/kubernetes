@@ -24,14 +24,15 @@ import (
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	"github.com/stretchr/testify/assert"
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	apitest "k8s.io/kubernetes/pkg/kubelet/api/testing"
-	runtimeApi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/network"
 	nettest "k8s.io/kubernetes/pkg/kubelet/network/testing"
+	"k8s.io/kubernetes/pkg/types"
 	kubetypes "k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/flowcontrol"
 )
@@ -60,88 +61,141 @@ func createTestRuntimeManager() (*apitest.FakeRuntimeService, *apitest.FakeImage
 	return fakeRuntimeService, fakeImageService, manager, err
 }
 
-func makeAndSetFakePod(m *kubeGenericRuntimeManager, fakeRuntime *apitest.FakeRuntimeService, pod *api.Pod) (*apitest.FakePodSandbox, []*apitest.FakeContainer, error) {
-	fakePodSandbox, err := makeFakePodSandbox(m, pod, fakeCreatedAt)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	fakeContainers, err := makeFakeContainers(m, pod, pod.Spec.Containers, fakeCreatedAt, runtimeApi.ContainerState_RUNNING)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	fakeInitContainers, err := makeFakeContainers(m, pod, pod.Spec.InitContainers, fakeCreatedAt, runtimeApi.ContainerState_EXITED)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	fakeContainers = append(fakeContainers, fakeInitContainers...)
-	fakeRuntime.SetFakeSandboxes([]*apitest.FakePodSandbox{fakePodSandbox})
-	fakeRuntime.SetFakeContainers(fakeContainers)
-	return fakePodSandbox, fakeContainers, nil
+// sandboxTemplate is a sandbox template to create fake sandbox.
+type sandboxTemplate struct {
+	pod       *v1.Pod
+	attempt   uint32
+	createdAt int64
+	state     runtimeapi.PodSandboxState
 }
 
-func makeFakePodSandbox(m *kubeGenericRuntimeManager, pod *api.Pod, createdAt int64) (*apitest.FakePodSandbox, error) {
-	config, err := m.generatePodSandboxConfig(pod, 0)
-	if err != nil {
-		return nil, err
+// containerTemplate is a container template to create fake container.
+type containerTemplate struct {
+	pod            *v1.Pod
+	container      *v1.Container
+	sandboxAttempt uint32
+	attempt        int
+	createdAt      int64
+	state          runtimeapi.ContainerState
+}
+
+// makeAndSetFakePod is a helper function to create and set one fake sandbox for a pod and
+// one fake container for each of its container.
+func makeAndSetFakePod(t *testing.T, m *kubeGenericRuntimeManager, fakeRuntime *apitest.FakeRuntimeService,
+	pod *v1.Pod) (*apitest.FakePodSandbox, []*apitest.FakeContainer) {
+	sandbox := makeFakePodSandbox(t, m, sandboxTemplate{
+		pod:       pod,
+		createdAt: fakeCreatedAt,
+		state:     runtimeapi.PodSandboxState_SANDBOX_READY,
+	})
+
+	var containers []*apitest.FakeContainer
+	newTemplate := func(c *v1.Container) containerTemplate {
+		return containerTemplate{
+			pod:       pod,
+			container: c,
+			createdAt: fakeCreatedAt,
+			state:     runtimeapi.ContainerState_CONTAINER_RUNNING,
+		}
 	}
+	for i := range pod.Spec.Containers {
+		containers = append(containers, makeFakeContainer(t, m, newTemplate(&pod.Spec.Containers[i])))
+	}
+	for i := range pod.Spec.InitContainers {
+		containers = append(containers, makeFakeContainer(t, m, newTemplate(&pod.Spec.InitContainers[i])))
+	}
+
+	fakeRuntime.SetFakeSandboxes([]*apitest.FakePodSandbox{sandbox})
+	fakeRuntime.SetFakeContainers(containers)
+	return sandbox, containers
+}
+
+// makeFakePodSandbox creates a fake pod sandbox based on a sandbox template.
+func makeFakePodSandbox(t *testing.T, m *kubeGenericRuntimeManager, template sandboxTemplate) *apitest.FakePodSandbox {
+	config, err := m.generatePodSandboxConfig(template.pod, template.attempt)
+	assert.NoError(t, err, "generatePodSandboxConfig for sandbox template %+v", template)
 
 	podSandboxID := apitest.BuildSandboxName(config.Metadata)
-	readyState := runtimeApi.PodSandBoxState_READY
 	return &apitest.FakePodSandbox{
-		PodSandboxStatus: runtimeApi.PodSandboxStatus{
+		PodSandboxStatus: runtimeapi.PodSandboxStatus{
 			Id:        &podSandboxID,
 			Metadata:  config.Metadata,
-			State:     &readyState,
-			CreatedAt: &createdAt,
-			Labels:    config.Labels,
+			State:     &template.state,
+			CreatedAt: &template.createdAt,
+			Network: &runtimeapi.PodSandboxNetworkStatus{
+				Ip: &apitest.FakePodSandboxIP,
+			},
+			Labels: config.Labels,
 		},
-	}, nil
+	}
 }
 
-func makeFakeContainer(m *kubeGenericRuntimeManager, pod *api.Pod, container api.Container, sandboxConfig *runtimeApi.PodSandboxConfig, createdAt int64, state runtimeApi.ContainerState) (*apitest.FakeContainer, error) {
-	containerConfig, err := m.generateContainerConfig(&container, pod, 0, "")
-	if err != nil {
-		return nil, err
+// makeFakePodSandboxes creates a group of fake pod sandboxes based on the sandbox templates.
+// The function guarantees the order of the fake pod sandboxes is the same with the templates.
+func makeFakePodSandboxes(t *testing.T, m *kubeGenericRuntimeManager, templates []sandboxTemplate) []*apitest.FakePodSandbox {
+	var fakePodSandboxes []*apitest.FakePodSandbox
+	for _, template := range templates {
+		fakePodSandboxes = append(fakePodSandboxes, makeFakePodSandbox(t, m, template))
 	}
+	return fakePodSandboxes
+}
 
-	containerID := apitest.BuildContainerName(containerConfig.Metadata)
+// makeFakeContainer creates a fake container based on a container template.
+func makeFakeContainer(t *testing.T, m *kubeGenericRuntimeManager, template containerTemplate) *apitest.FakeContainer {
+	sandboxConfig, err := m.generatePodSandboxConfig(template.pod, template.sandboxAttempt)
+	assert.NoError(t, err, "generatePodSandboxConfig for container template %+v", template)
+
+	containerConfig, err := m.generateContainerConfig(template.container, template.pod, template.attempt, "")
+	assert.NoError(t, err, "generateContainerConfig for container template %+v", template)
+
 	podSandboxID := apitest.BuildSandboxName(sandboxConfig.Metadata)
+	containerID := apitest.BuildContainerName(containerConfig.Metadata, podSandboxID)
 	imageRef := containerConfig.Image.GetImage()
 	return &apitest.FakeContainer{
-		ContainerStatus: runtimeApi.ContainerStatus{
+		ContainerStatus: runtimeapi.ContainerStatus{
 			Id:          &containerID,
 			Metadata:    containerConfig.Metadata,
 			Image:       containerConfig.Image,
 			ImageRef:    &imageRef,
-			CreatedAt:   &createdAt,
-			State:       &state,
+			CreatedAt:   &template.createdAt,
+			State:       &template.state,
 			Labels:      containerConfig.Labels,
 			Annotations: containerConfig.Annotations,
 		},
 		SandboxID: podSandboxID,
-	}, nil
+	}
 }
 
-func makeFakeContainers(m *kubeGenericRuntimeManager, pod *api.Pod, containers []api.Container, createdAt int64, state runtimeApi.ContainerState) ([]*apitest.FakeContainer, error) {
-	sandboxConfig, err := m.generatePodSandboxConfig(pod, 0)
-	if err != nil {
-		return nil, err
+// makeFakeContainers creates a group of fake containers based on the container templates.
+// The function guarantees the order of the fake containers is the same with the templates.
+func makeFakeContainers(t *testing.T, m *kubeGenericRuntimeManager, templates []containerTemplate) []*apitest.FakeContainer {
+	var fakeContainers []*apitest.FakeContainer
+	for _, template := range templates {
+		fakeContainers = append(fakeContainers, makeFakeContainer(t, m, template))
 	}
+	return fakeContainers
+}
 
-	result := make([]*apitest.FakeContainer, len(containers))
-	for idx, c := range containers {
-		containerWithState, err := makeFakeContainer(m, pod, c, sandboxConfig, createdAt, state)
-		if err != nil {
-			return nil, err
-		}
-
-		result[idx] = containerWithState
+// makeTestContainer creates a test api container.
+func makeTestContainer(name, image string) v1.Container {
+	return v1.Container{
+		Name:  name,
+		Image: image,
 	}
+}
 
-	return result, nil
+// makeTestPod creates a test api pod.
+func makeTestPod(podName, podNamespace, podUID string, containers []v1.Container) *v1.Pod {
+	return &v1.Pod{
+		ObjectMeta: v1.ObjectMeta{
+			UID:       types.UID(podUID),
+			Name:      podName,
+			Namespace: podNamespace,
+		},
+		Spec: v1.PodSpec{
+			Containers: containers,
+		},
+	}
 }
 
 // verifyPods returns true if the two pod slices are equal.
@@ -202,32 +256,31 @@ func TestGetPodStatus(t *testing.T) {
 	fakeRuntime, _, m, err := createTestRuntimeManager()
 	assert.NoError(t, err)
 
-	containers := []api.Container{
+	containers := []v1.Container{
 		{
 			Name:            "foo1",
 			Image:           "busybox",
-			ImagePullPolicy: api.PullIfNotPresent,
+			ImagePullPolicy: v1.PullIfNotPresent,
 		},
 		{
 			Name:            "foo2",
 			Image:           "busybox",
-			ImagePullPolicy: api.PullIfNotPresent,
+			ImagePullPolicy: v1.PullIfNotPresent,
 		},
 	}
-	pod := &api.Pod{
-		ObjectMeta: api.ObjectMeta{
+	pod := &v1.Pod{
+		ObjectMeta: v1.ObjectMeta{
 			UID:       "12345678",
 			Name:      "foo",
 			Namespace: "new",
 		},
-		Spec: api.PodSpec{
+		Spec: v1.PodSpec{
 			Containers: containers,
 		},
 	}
 
 	// Set fake sandbox and faked containers to fakeRuntime.
-	_, _, err = makeAndSetFakePod(m, fakeRuntime, pod)
-	assert.NoError(t, err)
+	makeAndSetFakePod(t, m, fakeRuntime, pod)
 
 	podStatus, err := m.GetPodStatus(pod.UID, pod.Name, pod.Namespace)
 	assert.NoError(t, err)
@@ -241,14 +294,14 @@ func TestGetPods(t *testing.T) {
 	fakeRuntime, _, m, err := createTestRuntimeManager()
 	assert.NoError(t, err)
 
-	pod := &api.Pod{
-		ObjectMeta: api.ObjectMeta{
+	pod := &v1.Pod{
+		ObjectMeta: v1.ObjectMeta{
 			UID:       "12345678",
 			Name:      "foo",
 			Namespace: "new",
 		},
-		Spec: api.PodSpec{
-			Containers: []api.Container{
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
 				{
 					Name:  "foo1",
 					Image: "busybox",
@@ -262,14 +315,13 @@ func TestGetPods(t *testing.T) {
 	}
 
 	// Set fake sandbox and fake containers to fakeRuntime.
-	fakeSandbox, fakeContainers, err := makeAndSetFakePod(m, fakeRuntime, pod)
-	assert.NoError(t, err)
+	fakeSandbox, fakeContainers := makeAndSetFakePod(t, m, fakeRuntime, pod)
 
 	// Convert the fakeContainers to kubecontainer.Container
 	containers := make([]*kubecontainer.Container, len(fakeContainers))
 	for i := range containers {
 		fakeContainer := fakeContainers[i]
-		c, err := m.toKubeContainer(&runtimeApi.Container{
+		c, err := m.toKubeContainer(&runtimeapi.Container{
 			Id:          fakeContainer.Id,
 			Metadata:    fakeContainer.Metadata,
 			State:       fakeContainer.State,
@@ -284,7 +336,7 @@ func TestGetPods(t *testing.T) {
 		containers[i] = c
 	}
 	// Convert fakeSandbox to kubecontainer.Container
-	sandbox, err := m.sandboxToKubeContainer(&runtimeApi.PodSandbox{
+	sandbox, err := m.sandboxToKubeContainer(&runtimeapi.PodSandbox{
 		Id:          fakeSandbox.Id,
 		Metadata:    fakeSandbox.Metadata,
 		State:       fakeSandbox.State,
@@ -318,14 +370,14 @@ func TestGetPodContainerID(t *testing.T) {
 	fakeRuntime, _, m, err := createTestRuntimeManager()
 	assert.NoError(t, err)
 
-	pod := &api.Pod{
-		ObjectMeta: api.ObjectMeta{
+	pod := &v1.Pod{
+		ObjectMeta: v1.ObjectMeta{
 			UID:       "12345678",
 			Name:      "foo",
 			Namespace: "new",
 		},
-		Spec: api.PodSpec{
-			Containers: []api.Container{
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
 				{
 					Name:  "foo1",
 					Image: "busybox",
@@ -338,11 +390,10 @@ func TestGetPodContainerID(t *testing.T) {
 		},
 	}
 	// Set fake sandbox and fake containers to fakeRuntime.
-	fakeSandbox, _, err := makeAndSetFakePod(m, fakeRuntime, pod)
-	assert.NoError(t, err)
+	fakeSandbox, _ := makeAndSetFakePod(t, m, fakeRuntime, pod)
 
 	// Convert fakeSandbox to kubecontainer.Container
-	sandbox, err := m.sandboxToKubeContainer(&runtimeApi.PodSandbox{
+	sandbox, err := m.sandboxToKubeContainer(&runtimeapi.PodSandbox{
 		Id:        fakeSandbox.Id,
 		Metadata:  fakeSandbox.Metadata,
 		State:     fakeSandbox.State,
@@ -366,14 +417,14 @@ func TestGetNetNS(t *testing.T) {
 	fakeRuntime, _, m, err := createTestRuntimeManager()
 	assert.NoError(t, err)
 
-	pod := &api.Pod{
-		ObjectMeta: api.ObjectMeta{
+	pod := &v1.Pod{
+		ObjectMeta: v1.ObjectMeta{
 			UID:       "12345678",
 			Name:      "foo",
 			Namespace: "new",
 		},
-		Spec: api.PodSpec{
-			Containers: []api.Container{
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
 				{
 					Name:  "foo1",
 					Image: "busybox",
@@ -387,8 +438,7 @@ func TestGetNetNS(t *testing.T) {
 	}
 
 	// Set fake sandbox and fake containers to fakeRuntime.
-	sandbox, _, err := makeAndSetFakePod(m, fakeRuntime, pod)
-	assert.NoError(t, err)
+	sandbox, _ := makeAndSetFakePod(t, m, fakeRuntime, pod)
 
 	actual, err := m.GetNetNS(kubecontainer.ContainerID{ID: sandbox.GetId()})
 	assert.Equal(t, "", actual)
@@ -399,14 +449,14 @@ func TestKillPod(t *testing.T) {
 	fakeRuntime, _, m, err := createTestRuntimeManager()
 	assert.NoError(t, err)
 
-	pod := &api.Pod{
-		ObjectMeta: api.ObjectMeta{
+	pod := &v1.Pod{
+		ObjectMeta: v1.ObjectMeta{
 			UID:       "12345678",
 			Name:      "foo",
 			Namespace: "new",
 		},
-		Spec: api.PodSpec{
-			Containers: []api.Container{
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
 				{
 					Name:  "foo1",
 					Image: "busybox",
@@ -420,14 +470,13 @@ func TestKillPod(t *testing.T) {
 	}
 
 	// Set fake sandbox and fake containers to fakeRuntime.
-	fakeSandbox, fakeContainers, err := makeAndSetFakePod(m, fakeRuntime, pod)
-	assert.NoError(t, err)
+	fakeSandbox, fakeContainers := makeAndSetFakePod(t, m, fakeRuntime, pod)
 
 	// Convert the fakeContainers to kubecontainer.Container
 	containers := make([]*kubecontainer.Container, len(fakeContainers))
 	for i := range containers {
 		fakeContainer := fakeContainers[i]
-		c, err := m.toKubeContainer(&runtimeApi.Container{
+		c, err := m.toKubeContainer(&runtimeapi.Container{
 			Id:       fakeContainer.Id,
 			Metadata: fakeContainer.Metadata,
 			State:    fakeContainer.State,
@@ -460,10 +509,10 @@ func TestKillPod(t *testing.T) {
 	assert.Equal(t, 2, len(fakeRuntime.Containers))
 	assert.Equal(t, 1, len(fakeRuntime.Sandboxes))
 	for _, sandbox := range fakeRuntime.Sandboxes {
-		assert.Equal(t, runtimeApi.PodSandBoxState_NOTREADY, sandbox.GetState())
+		assert.Equal(t, runtimeapi.PodSandboxState_SANDBOX_NOTREADY, sandbox.GetState())
 	}
 	for _, c := range fakeRuntime.Containers {
-		assert.Equal(t, runtimeApi.ContainerState_EXITED, c.GetState())
+		assert.Equal(t, runtimeapi.ContainerState_CONTAINER_EXITED, c.GetState())
 	}
 }
 
@@ -471,40 +520,40 @@ func TestSyncPod(t *testing.T) {
 	fakeRuntime, fakeImage, m, err := createTestRuntimeManager()
 	assert.NoError(t, err)
 
-	containers := []api.Container{
+	containers := []v1.Container{
 		{
 			Name:            "foo1",
 			Image:           "busybox",
-			ImagePullPolicy: api.PullIfNotPresent,
+			ImagePullPolicy: v1.PullIfNotPresent,
 		},
 		{
 			Name:            "foo2",
 			Image:           "alpine",
-			ImagePullPolicy: api.PullIfNotPresent,
+			ImagePullPolicy: v1.PullIfNotPresent,
 		},
 	}
-	pod := &api.Pod{
-		ObjectMeta: api.ObjectMeta{
+	pod := &v1.Pod{
+		ObjectMeta: v1.ObjectMeta{
 			UID:       "12345678",
 			Name:      "foo",
 			Namespace: "new",
 		},
-		Spec: api.PodSpec{
+		Spec: v1.PodSpec{
 			Containers: containers,
 		},
 	}
 
 	backOff := flowcontrol.NewBackOff(time.Second, time.Minute)
-	result := m.SyncPod(pod, api.PodStatus{}, &kubecontainer.PodStatus{}, []api.Secret{}, backOff)
+	result := m.SyncPod(pod, v1.PodStatus{}, &kubecontainer.PodStatus{}, []v1.Secret{}, backOff)
 	assert.NoError(t, result.Error())
 	assert.Equal(t, 2, len(fakeRuntime.Containers))
 	assert.Equal(t, 2, len(fakeImage.Images))
 	assert.Equal(t, 1, len(fakeRuntime.Sandboxes))
 	for _, sandbox := range fakeRuntime.Sandboxes {
-		assert.Equal(t, runtimeApi.PodSandBoxState_READY, sandbox.GetState())
+		assert.Equal(t, runtimeapi.PodSandboxState_SANDBOX_READY, sandbox.GetState())
 	}
 	for _, c := range fakeRuntime.Containers {
-		assert.Equal(t, runtimeApi.ContainerState_RUNNING, c.GetState())
+		assert.Equal(t, runtimeapi.ContainerState_CONTAINER_RUNNING, c.GetState())
 	}
 }
 
@@ -512,43 +561,34 @@ func TestPruneInitContainers(t *testing.T) {
 	fakeRuntime, _, m, err := createTestRuntimeManager()
 	assert.NoError(t, err)
 
-	pod := &api.Pod{
-		ObjectMeta: api.ObjectMeta{
+	init1 := makeTestContainer("init1", "busybox")
+	init2 := makeTestContainer("init2", "busybox")
+	pod := &v1.Pod{
+		ObjectMeta: v1.ObjectMeta{
 			UID:       "12345678",
 			Name:      "foo",
 			Namespace: "new",
 		},
-		Spec: api.PodSpec{
-			InitContainers: []api.Container{
-				{
-					Name:  "init1",
-					Image: "busybox",
-				},
-				{
-					Name:  "init2",
-					Image: "busybox",
-				},
-			},
+		Spec: v1.PodSpec{
+			InitContainers: []v1.Container{init1, init2},
 		},
 	}
 
-	// Set fake sandbox and fake containers to fakeRuntime.
-	_, _, err = makeAndSetFakePod(m, fakeRuntime, pod)
+	templates := []containerTemplate{
+		{pod: pod, container: &init1, attempt: 2, createdAt: 2, state: runtimeapi.ContainerState_CONTAINER_EXITED},
+		{pod: pod, container: &init1, attempt: 1, createdAt: 1, state: runtimeapi.ContainerState_CONTAINER_EXITED},
+		{pod: pod, container: &init2, attempt: 1, createdAt: 1, state: runtimeapi.ContainerState_CONTAINER_EXITED},
+		{pod: pod, container: &init2, attempt: 0, createdAt: 0, state: runtimeapi.ContainerState_CONTAINER_EXITED},
+		{pod: pod, container: &init1, attempt: 0, createdAt: 0, state: runtimeapi.ContainerState_CONTAINER_EXITED},
+	}
+	fakes := makeFakeContainers(t, m, templates)
+	fakeRuntime.SetFakeContainers(fakes)
+	podStatus, err := m.GetPodStatus(pod.UID, pod.Name, pod.Namespace)
 	assert.NoError(t, err)
 
-	status := &kubecontainer.PodStatus{
-		ContainerStatuses: []*kubecontainer.ContainerStatus{
-			{Name: "init2", ID: kubecontainer.ContainerID{ID: "init2_0"}, State: kubecontainer.ContainerStateExited},
-			{Name: "init1", ID: kubecontainer.ContainerID{ID: "init1_0"}, State: kubecontainer.ContainerStateExited},
-			{Name: "init1", ID: kubecontainer.ContainerID{ID: "init1_1"}, State: kubecontainer.ContainerStateExited},
-			{Name: "init1", ID: kubecontainer.ContainerID{ID: "init1_2"}, State: kubecontainer.ContainerStateExited},
-			{Name: "init2", ID: kubecontainer.ContainerID{ID: "init2_1"}, State: kubecontainer.ContainerStateExited},
-		},
-	}
-
 	keep := map[kubecontainer.ContainerID]int{}
-	m.pruneInitContainersBeforeStart(pod, status, keep)
-	expectedContainers := []string{"init1_0", "init2_0"}
+	m.pruneInitContainersBeforeStart(pod, podStatus, keep)
+	expectedContainers := []string{fakes[0].GetId(), fakes[2].GetId()}
 	if actual, ok := verifyFakeContainerList(fakeRuntime, expectedContainers); !ok {
 		t.Errorf("expected %q, got %q", expectedContainers, actual)
 	}
@@ -558,47 +598,83 @@ func TestSyncPodWithInitContainers(t *testing.T) {
 	fakeRuntime, _, m, err := createTestRuntimeManager()
 	assert.NoError(t, err)
 
-	initContainers := []api.Container{
+	initContainers := []v1.Container{
 		{
 			Name:            "init1",
 			Image:           "init",
-			ImagePullPolicy: api.PullIfNotPresent,
+			ImagePullPolicy: v1.PullIfNotPresent,
 		},
 	}
-	containers := []api.Container{
+	containers := []v1.Container{
 		{
 			Name:            "foo1",
 			Image:           "busybox",
-			ImagePullPolicy: api.PullIfNotPresent,
+			ImagePullPolicy: v1.PullIfNotPresent,
 		},
 		{
 			Name:            "foo2",
 			Image:           "alpine",
-			ImagePullPolicy: api.PullIfNotPresent,
+			ImagePullPolicy: v1.PullIfNotPresent,
 		},
 	}
-	pod := &api.Pod{
-		ObjectMeta: api.ObjectMeta{
+	pod := &v1.Pod{
+		ObjectMeta: v1.ObjectMeta{
 			UID:       "12345678",
 			Name:      "foo",
 			Namespace: "new",
 		},
-		Spec: api.PodSpec{
+		Spec: v1.PodSpec{
 			Containers:     containers,
 			InitContainers: initContainers,
 		},
 	}
 
-	_, _, err = makeAndSetFakePod(m, fakeRuntime, pod)
-	assert.NoError(t, err)
+	// buildContainerID is an internal helper function to build container id from api pod
+	// and container with default attempt number 0.
+	buildContainerID := func(pod *v1.Pod, container v1.Container) string {
+		uid := string(pod.UID)
+		sandboxID := apitest.BuildSandboxName(&runtimeapi.PodSandboxMetadata{
+			Name:      &pod.Name,
+			Uid:       &uid,
+			Namespace: &pod.Namespace,
+		})
+		return apitest.BuildContainerName(&runtimeapi.ContainerMetadata{Name: &container.Name}, sandboxID)
+	}
 
 	backOff := flowcontrol.NewBackOff(time.Second, time.Minute)
+
+	// 1. should only create the init container.
 	podStatus, err := m.GetPodStatus(pod.UID, pod.Name, pod.Namespace)
 	assert.NoError(t, err)
-	result := m.SyncPod(pod, api.PodStatus{}, podStatus, []api.Secret{}, backOff)
+	result := m.SyncPod(pod, v1.PodStatus{}, podStatus, []v1.Secret{}, backOff)
+	assert.NoError(t, result.Error())
+	assert.Equal(t, 1, len(fakeRuntime.Containers))
+	initContainerID := buildContainerID(pod, initContainers[0])
+	expectedContainers := []string{initContainerID}
+	if actual, ok := verifyFakeContainerList(fakeRuntime, expectedContainers); !ok {
+		t.Errorf("expected %q, got %q", expectedContainers, actual)
+	}
+
+	// 2. should not create app container because init container is still running.
+	podStatus, err = m.GetPodStatus(pod.UID, pod.Name, pod.Namespace)
+	assert.NoError(t, err)
+	result = m.SyncPod(pod, v1.PodStatus{}, podStatus, []v1.Secret{}, backOff)
+	assert.NoError(t, result.Error())
+	assert.Equal(t, 1, len(fakeRuntime.Containers))
+	expectedContainers = []string{initContainerID}
+	if actual, ok := verifyFakeContainerList(fakeRuntime, expectedContainers); !ok {
+		t.Errorf("expected %q, got %q", expectedContainers, actual)
+	}
+
+	// 3. should create all app containers because init container finished.
+	fakeRuntime.StopContainer(initContainerID, 0)
+	podStatus, err = m.GetPodStatus(pod.UID, pod.Name, pod.Namespace)
+	assert.NoError(t, err)
+	result = m.SyncPod(pod, v1.PodStatus{}, podStatus, []v1.Secret{}, backOff)
 	assert.NoError(t, result.Error())
 	assert.Equal(t, 3, len(fakeRuntime.Containers))
-	expectedContainers := []string{"foo1_0", "foo2_0", "init1_0"}
+	expectedContainers = []string{initContainerID, buildContainerID(pod, containers[0]),
+		buildContainerID(pod, containers[1])}
 	if actual, ok := verifyFakeContainerList(fakeRuntime, expectedContainers); !ok {
 		t.Errorf("expected %q, got %q", expectedContainers, actual)
 	}

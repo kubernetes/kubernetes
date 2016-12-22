@@ -14,14 +14,15 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// +k8s:openapi-gen=true
 package abac
 
-import "k8s.io/kubernetes/pkg/api/unversioned"
+import (
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
+)
 
 // Policy contains a single ABAC policy rule
 type Policy struct {
-	unversioned.TypeMeta
+	metav1.TypeMeta
 
 	// Spec describes the policy rule
 	Spec PolicySpec

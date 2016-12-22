@@ -18,12 +18,30 @@
 
 # Uses the config file specified in $KUBE_CONFIG_FILE, or defaults to config-default.sh
 
-KUBE_PROMPT_FOR_UPDATE=y
-KUBE_SKIP_UPDATE=${KUBE_SKIP_UPDATE-"n"}
+KUBE_PROMPT_FOR_UPDATE=${KUBE_PROMPT_FOR_UPDATE:-"n"}
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
 source "${KUBE_ROOT}/cluster/gke/${KUBE_CONFIG_FILE:-config-default.sh}"
 source "${KUBE_ROOT}/cluster/common.sh"
 source "${KUBE_ROOT}/cluster/lib/util.sh"
+
+function with-retry() {
+  local retry_limit=$1
+  local cmd=("${@:2}")
+
+  local retry_count=0
+  local rc=0
+
+  until [[ ${retry_count} -ge ${retry_limit} ]]; do
+    ((retry_count+=1))
+    "${cmd[@]}" && rc=0 || rc=$?
+    if [[ ${rc} == 0 ]]; then
+      return 0
+    fi
+    sleep 3
+  done
+
+  return ${rc}
+}
 
 # Perform preparations required to run e2e tests
 #
@@ -78,8 +96,6 @@ function verify-prereqs() {
     if [[ "${KUBE_PROMPT_FOR_UPDATE}" == "y" ]]; then
       echo "Can't find gcloud in PATH.  Do you wish to install the Google Cloud SDK? [Y/n]"
       read resp
-    else
-      resp="y"
     fi
     if [[ "${resp}" != "n" && "${resp}" != "N" ]]; then
       curl https://sdk.cloud.google.com | bash
@@ -90,21 +106,7 @@ function verify-prereqs() {
       exit 1
     fi
   fi
-  if [[ "${KUBE_SKIP_UPDATE}" == "y" ]]; then
-    return
-  fi
-  # update and install components as needed
-  if [[ "${KUBE_PROMPT_FOR_UPDATE}" != "y" ]]; then
-    gcloud_prompt="-q"
-  fi
-  local sudo_prefix=""
-  if [ ! -w $(dirname `which gcloud`) ]; then
-    sudo_prefix="sudo"
-  fi
-  ${sudo_prefix} gcloud ${gcloud_prompt:-} components install alpha || true
-  ${sudo_prefix} gcloud ${gcloud_prompt:-} components install beta || true
-  ${sudo_prefix} gcloud ${gcloud_prompt:-} components install kubectl|| true
-  ${sudo_prefix} gcloud ${gcloud_prompt:-} components update || true
+  update-or-verify-gcloud
 }
 
 # Validate a kubernetes cluster
@@ -140,7 +142,7 @@ function kube-up() {
   # Make the specified network if we need to.
   if ! "${GCLOUD}" compute networks --project "${PROJECT}" describe "${NETWORK}" &>/dev/null; then
     echo "Creating new network: ${NETWORK}" >&2
-    "${GCLOUD}" compute networks create "${NETWORK}" --project="${PROJECT}" --range "${NETWORK_RANGE}"
+    with-retry 3 "${GCLOUD}" compute networks create "${NETWORK}" --project="${PROJECT}" --range "${NETWORK_RANGE}"
   else
     echo "... Using network: ${NETWORK}" >&2
   fi
@@ -149,7 +151,7 @@ function kube-up() {
   # such a rule exists, only whether we've created this exact rule.
   if ! "${GCLOUD}" compute firewall-rules --project "${PROJECT}" describe "${FIREWALL_SSH}" &>/dev/null; then
     echo "Creating new firewall for SSH: ${FIREWALL_SSH}" >&2
-    "${GCLOUD}" compute firewall-rules create "${FIREWALL_SSH}" \
+    with-retry 3 "${GCLOUD}" compute firewall-rules create "${FIREWALL_SSH}" \
       --allow="tcp:22" \
       --network="${NETWORK}" \
       --project="${PROJECT}" \
@@ -226,14 +228,14 @@ function test-setup() {
   OLD_NODE_TAG="k8s-${CLUSTER_NAME}-node"
 
   # Open up port 80 & 8080 so common containers on minions can be reached.
-  "${GCLOUD}" compute firewall-rules create \
+  with-retry 3 "${GCLOUD}" compute firewall-rules create \
     "${CLUSTER_NAME}-http-alt" \
     --allow tcp:80,tcp:8080 \
     --project "${PROJECT}" \
     --target-tags "${NODE_TAG},${OLD_NODE_TAG}" \
     --network="${NETWORK}" &
 
-  "${GCLOUD}" compute firewall-rules create \
+  with-retry 3 "${GCLOUD}" compute firewall-rules create \
     "${CLUSTER_NAME}-nodeports" \
     --allow tcp:30000-32767,udp:30000-32767 \
     --project "${PROJECT}" \
@@ -372,7 +374,7 @@ function test-teardown() {
   # NOTE: Keep in sync with names above in test-setup.
   for fw in "${CLUSTER_NAME}-http-alt" "${CLUSTER_NAME}-nodeports" "${FIREWALL_SSH}"; do
     if [[ -n $("${GCLOUD}" compute firewall-rules --project "${PROJECT}" describe "${fw}" --format='value(name)' 2>/dev/null || true) ]]; then
-      "${GCLOUD}" compute firewall-rules delete "${fw}" --project="${PROJECT}" --quiet &
+      with-retry 3 "${GCLOUD}" compute firewall-rules delete "${fw}" --project="${PROJECT}" --quiet &
     fi
   done
 
@@ -384,7 +386,7 @@ function test-teardown() {
   # symmetry.
   if [[ "${KUBE_DELETE_NETWORK}" == "true" ]]; then
     if [[ -n $("${GCLOUD}" compute networks --project "${PROJECT}" describe "${NETWORK}" --format='value(name)' 2>/dev/null || true) ]]; then
-      if ! "${GCLOUD}" compute networks delete --project "${PROJECT}" --quiet "${NETWORK}"; then
+      if ! with-retry 3 "${GCLOUD}" compute networks delete --project "${PROJECT}" --quiet "${NETWORK}"; then
         echo "Failed to delete network '${NETWORK}'. Listing firewall-rules:"
         "${GCLOUD}" compute firewall-rules --project "${PROJECT}" list --filter="network=${NETWORK}"
       fi
@@ -401,6 +403,8 @@ function test-teardown() {
 function kube-down() {
   echo "... in gke:kube-down()" >&2
   detect-project >&2
-  "${GCLOUD}" ${CMD_GROUP:-} container clusters delete --project="${PROJECT}" \
-    --zone="${ZONE}" "${CLUSTER_NAME}" --quiet
+  if "${GCLOUD}" ${CMD_GROUP:-} container clusters describe --project="${PROJECT}" --zone="${ZONE}" "${CLUSTER_NAME}" --quiet &>/dev/null; then
+    with-retry 3 "${GCLOUD}" ${CMD_GROUP:-} container clusters delete --project="${PROJECT}" \
+      --zone="${ZONE}" "${CLUSTER_NAME}" --quiet
+  fi
 }

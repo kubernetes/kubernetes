@@ -1,25 +1,22 @@
-apiVersion: v1
-kind: ReplicationController
+apiVersion: extensions/v1beta1
+kind: Deployment
 metadata:
-  name: l7-default-backend-v1.0
+  name: l7-default-backend
   namespace: kube-system
   labels:
     k8s-app: glbc
-    version: v1.0
-    kubernetes.io/cluster-service: "true"
     kubernetes.io/name: "GLBC"
+    kubernetes.io/cluster-service: "true"
 spec:
   replicas: 1
   selector:
-    k8s-app: glbc
-    version: v1.0
+    matchLabels:
+      k8s-app: glbc
   template:
     metadata:
       labels:
         k8s-app: glbc
-        version: v1.0
         name: glbc
-        kubernetes.io/cluster-service: "true"
     spec:
       containers:
       - name: default-http-backend

@@ -22,7 +22,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/registry/generic"
-	"k8s.io/kubernetes/pkg/registry/generic/registry"
+	genericregistry "k8s.io/kubernetes/pkg/registry/generic/registry"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
 )
 
@@ -31,7 +31,7 @@ func TestPodLogValidates(t *testing.T) {
 	defer server.Terminate(t)
 	s, destroyFunc := generic.NewRawStorage(config)
 	defer destroyFunc()
-	store := &registry.Store{
+	store := &genericregistry.Store{
 		Storage: s,
 	}
 	logRest := &LogREST{Store: store, KubeletConn: nil}

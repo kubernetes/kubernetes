@@ -17,4 +17,8 @@
 export ELASTICSEARCH_URL=${ELASTICSEARCH_URL:-"http://localhost:9200"}
 echo ELASTICSEARCH_URL=${ELASTICSEARCH_URL}
 
+export KIBANA_BASE_URL=${KIBANA_BASE_URL:-"''"}
+echo "server.basePath: ${KIBANA_BASE_URL}"
+echo "server.basePath: ${KIBANA_BASE_URL}" >> /kibana/config/kibana.yml
+
 /kibana/bin/kibana -e ${ELASTICSEARCH_URL}

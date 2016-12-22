@@ -26,8 +26,8 @@ import (
 
 // ExpressRouteCircuitPeeringsClient is the the Microsoft Azure Network
 // management API provides a RESTful set of web services that interact with
-// Microsoft Azure Networks service to manage your network resrources. The
-// API has entities that capture the relationship between an end user and the
+// Microsoft Azure Networks service to manage your network resources. The API
+// has entities that capture the relationship between an end user and the
 // Microsoft Azure Networks service.
 type ExpressRouteCircuitPeeringsClient struct {
 	ManagementClient
@@ -36,18 +36,24 @@ type ExpressRouteCircuitPeeringsClient struct {
 // NewExpressRouteCircuitPeeringsClient creates an instance of the
 // ExpressRouteCircuitPeeringsClient client.
 func NewExpressRouteCircuitPeeringsClient(subscriptionID string) ExpressRouteCircuitPeeringsClient {
-	return ExpressRouteCircuitPeeringsClient{New(subscriptionID)}
+	return NewExpressRouteCircuitPeeringsClientWithBaseURI(DefaultBaseURI, subscriptionID)
 }
 
-// CreateOrUpdate the Put Pering operation creates/updates an peering in the
-// specified ExpressRouteCircuits This method may poll for completion.
-// Polling can be canceled by passing the cancel channel argument. The
-// channel will be used to cancel polling and any outstanding HTTP requests.
+// NewExpressRouteCircuitPeeringsClientWithBaseURI creates an instance of the
+// ExpressRouteCircuitPeeringsClient client.
+func NewExpressRouteCircuitPeeringsClientWithBaseURI(baseURI string, subscriptionID string) ExpressRouteCircuitPeeringsClient {
+	return ExpressRouteCircuitPeeringsClient{NewWithBaseURI(baseURI, subscriptionID)}
+}
+
+// CreateOrUpdate creates or updates a peering in the specified express route
+// circuits. This method may poll for completion. Polling can be canceled by
+// passing the cancel channel argument. The channel will be used to cancel
+// polling and any outstanding HTTP requests.
 //
 // resourceGroupName is the name of the resource group. circuitName is the
 // name of the express route circuit. peeringName is the name of the peering.
-// peeringParameters is parameters supplied to the create/update
-// ExpressRouteCircuit Peering operation
+// peeringParameters is parameters supplied to the create or update express
+// route circuit peering operation.
 func (client ExpressRouteCircuitPeeringsClient) CreateOrUpdate(resourceGroupName string, circuitName string, peeringName string, peeringParameters ExpressRouteCircuitPeering, cancel <-chan struct{}) (result autorest.Response, err error) {
 	req, err := client.CreateOrUpdatePreparer(resourceGroupName, circuitName, peeringName, peeringParameters, cancel)
 	if err != nil {
@@ -111,10 +117,10 @@ func (client ExpressRouteCircuitPeeringsClient) CreateOrUpdateResponder(resp *ht
 	return
 }
 
-// Delete the delete peering operation deletes the specified peering from the
-// ExpressRouteCircuit. This method may poll for completion. Polling can be
-// canceled by passing the cancel channel argument. The channel will be used
-// to cancel polling and any outstanding HTTP requests.
+// Delete deletes the specified peering from the specified express route
+// circuit. This method may poll for completion. Polling can be canceled by
+// passing the cancel channel argument. The channel will be used to cancel
+// polling and any outstanding HTTP requests.
 //
 // resourceGroupName is the name of the resource group. circuitName is the
 // name of the express route circuit. peeringName is the name of the peering.
@@ -179,8 +185,8 @@ func (client ExpressRouteCircuitPeeringsClient) DeleteResponder(resp *http.Respo
 	return
 }
 
-// Get the GET peering operation retrieves the specified authorization from
-// the ExpressRouteCircuit.
+// Get gets the specified authorization from the specified express route
+// circuit.
 //
 // resourceGroupName is the name of the resource group. circuitName is the
 // name of the express route circuit. peeringName is the name of the peering.
@@ -244,11 +250,10 @@ func (client ExpressRouteCircuitPeeringsClient) GetResponder(resp *http.Response
 	return
 }
 
-// List the List peering operation retrieves all the peerings in an
-// ExpressRouteCircuit.
+// List gets all peerings in a specified express route circuit.
 //
 // resourceGroupName is the name of the resource group. circuitName is the
-// name of the curcuit.
+// name of the express route circuit.
 func (client ExpressRouteCircuitPeeringsClient) List(resourceGroupName string, circuitName string) (result ExpressRouteCircuitPeeringListResult, err error) {
 	req, err := client.ListPreparer(resourceGroupName, circuitName)
 	if err != nil {
@@ -312,7 +317,7 @@ func (client ExpressRouteCircuitPeeringsClient) ListResponder(resp *http.Respons
 func (client ExpressRouteCircuitPeeringsClient) ListNextResults(lastResults ExpressRouteCircuitPeeringListResult) (result ExpressRouteCircuitPeeringListResult, err error) {
 	req, err := lastResults.ExpressRouteCircuitPeeringListResultPreparer()
 	if err != nil {
-		return result, autorest.NewErrorWithError(err, "network.ExpressRouteCircuitPeeringsClient", "List", nil, "Failure preparing next results request request")
+		return result, autorest.NewErrorWithError(err, "network.ExpressRouteCircuitPeeringsClient", "List", nil, "Failure preparing next results request")
 	}
 	if req == nil {
 		return
@@ -321,12 +326,12 @@ func (client ExpressRouteCircuitPeeringsClient) ListNextResults(lastResults Expr
 	resp, err := client.ListSender(req)
 	if err != nil {
 		result.Response = autorest.Response{Response: resp}
-		return result, autorest.NewErrorWithError(err, "network.ExpressRouteCircuitPeeringsClient", "List", resp, "Failure sending next results request request")
+		return result, autorest.NewErrorWithError(err, "network.ExpressRouteCircuitPeeringsClient", "List", resp, "Failure sending next results request")
 	}
 
 	result, err = client.ListResponder(resp)
 	if err != nil {
-		err = autorest.NewErrorWithError(err, "network.ExpressRouteCircuitPeeringsClient", "List", resp, "Failure responding to next results request request")
+		err = autorest.NewErrorWithError(err, "network.ExpressRouteCircuitPeeringsClient", "List", resp, "Failure responding to next results request")
 	}
 
 	return

@@ -19,49 +19,47 @@ package etcd
 import (
 	"strings"
 
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/registry/extensions/thirdpartyresourcedata"
 	"k8s.io/kubernetes/pkg/registry/generic"
-	"k8s.io/kubernetes/pkg/registry/generic/registry"
+	genericregistry "k8s.io/kubernetes/pkg/registry/generic/registry"
 	"k8s.io/kubernetes/pkg/runtime"
 )
 
 // REST implements a RESTStorage for ThirdPartyResourceDatas against etcd
 type REST struct {
-	*registry.Store
+	*genericregistry.Store
 	kind string
 }
 
 // NewREST returns a registry which will store ThirdPartyResourceData in the given helper
-func NewREST(opts generic.RESTOptions, group, kind string) *REST {
-	prefix := "/ThirdPartyResourceData/" + group + "/" + strings.ToLower(kind) + "s"
+func NewREST(optsGetter generic.RESTOptionsGetter, group, kind string) *REST {
+	resource := extensions.Resource("thirdpartyresourcedatas")
+	opts, err := optsGetter.GetRESTOptions(resource)
+	if err != nil {
+		panic(err) // TODO: Propagate error up
+	}
 
 	// We explicitly do NOT do any decoration here yet.
-	storageInterface, dFunc := generic.NewRawStorage(opts.StorageConfig)
+	opts.Decorator = generic.UndecoratedStorage // TODO use watchCacheSize=-1 to signal UndecoratedStorage
+	opts.ResourcePrefix = "/ThirdPartyResourceData/" + group + "/" + strings.ToLower(kind) + "s"
 
-	store := &registry.Store{
+	store := &genericregistry.Store{
 		NewFunc:     func() runtime.Object { return &extensions.ThirdPartyResourceData{} },
 		NewListFunc: func() runtime.Object { return &extensions.ThirdPartyResourceDataList{} },
-		KeyRootFunc: func(ctx api.Context) string {
-			return registry.NamespaceKeyRootFunc(ctx, prefix)
-		},
-		KeyFunc: func(ctx api.Context, id string) (string, error) {
-			return registry.NamespaceKeyFunc(ctx, prefix, id)
-		},
 		ObjectNameFunc: func(obj runtime.Object) (string, error) {
 			return obj.(*extensions.ThirdPartyResourceData).Name, nil
 		},
-		PredicateFunc:           thirdpartyresourcedata.Matcher,
-		QualifiedResource:       extensions.Resource("thirdpartyresourcedatas"),
-		EnableGarbageCollection: opts.EnableGarbageCollection,
-		DeleteCollectionWorkers: opts.DeleteCollectionWorkers,
-		CreateStrategy:          thirdpartyresourcedata.Strategy,
-		UpdateStrategy:          thirdpartyresourcedata.Strategy,
-		DeleteStrategy:          thirdpartyresourcedata.Strategy,
+		PredicateFunc:     thirdpartyresourcedata.Matcher,
+		QualifiedResource: resource,
 
-		Storage:     storageInterface,
-		DestroyFunc: dFunc,
+		CreateStrategy: thirdpartyresourcedata.Strategy,
+		UpdateStrategy: thirdpartyresourcedata.Strategy,
+		DeleteStrategy: thirdpartyresourcedata.Strategy,
+	}
+	options := &generic.StoreOptions{RESTOptions: opts, AttrFunc: thirdpartyresourcedata.GetAttrs} // Pass in opts to use UndecoratedStorage and custom ResourcePrefix
+	if err := store.CompleteWithOptions(options); err != nil {
+		panic(err) // TODO: Propagate error up
 	}
 
 	return &REST{

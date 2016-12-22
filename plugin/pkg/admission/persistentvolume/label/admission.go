@@ -25,7 +25,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/aws"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
@@ -118,12 +118,13 @@ func (l *persistentVolumeLabel) findAWSEBSLabels(volume *api.PersistentVolume) (
 
 	// TODO: GetVolumeLabels is actually a method on the Volumes interface
 	// If that gets standardized we can refactor to reduce code duplication
-	labels, err := ebsVolumes.GetVolumeLabels(volume.Spec.AWSElasticBlockStore.VolumeID)
+	spec := aws.KubernetesVolumeID(volume.Spec.AWSElasticBlockStore.VolumeID)
+	labels, err := ebsVolumes.GetVolumeLabels(spec)
 	if err != nil {
 		return nil, err
 	}
 
-	return labels, err
+	return labels, nil
 }
 
 // getEBSVolumes returns the AWS Volumes interface for ebs
@@ -161,14 +162,14 @@ func (l *persistentVolumeLabel) findGCEPDLabels(volume *api.PersistentVolume) (m
 	}
 
 	// If the zone is already labeled, honor the hint
-	zone := volume.Labels[unversioned.LabelZoneFailureDomain]
+	zone := volume.Labels[metav1.LabelZoneFailureDomain]
 
 	labels, err := provider.GetAutoLabelsForPD(volume.Spec.GCEPersistentDisk.PDName, zone)
 	if err != nil {
 		return nil, err
 	}
 
-	return labels, err
+	return labels, nil
 }
 
 // getGCECloudProvider returns the GCE cloud provider, for use for querying volume labels

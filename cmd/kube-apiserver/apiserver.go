@@ -38,7 +38,7 @@ import (
 func main() {
 	rand.Seed(time.Now().UTC().UnixNano())
 
-	s := options.NewAPIServer()
+	s := options.NewServerRunOptions()
 	s.AddFlags(pflag.CommandLine)
 
 	flag.InitFlags()

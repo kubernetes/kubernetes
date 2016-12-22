@@ -17,70 +17,36 @@ limitations under the License.
 package etcd
 
 import (
-	"k8s.io/kubernetes/pkg/api"
 	extensionsapi "k8s.io/kubernetes/pkg/apis/extensions"
-	"k8s.io/kubernetes/pkg/registry/cachesize"
 	"k8s.io/kubernetes/pkg/registry/extensions/networkpolicy"
 	"k8s.io/kubernetes/pkg/registry/generic"
-	"k8s.io/kubernetes/pkg/registry/generic/registry"
+	genericregistry "k8s.io/kubernetes/pkg/registry/generic/registry"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/storage"
 )
 
 // rest implements a RESTStorage for network policies against etcd
 type REST struct {
-	*registry.Store
+	*genericregistry.Store
 }
 
 // NewREST returns a RESTStorage object that will work against network policies.
-func NewREST(opts generic.RESTOptions) *REST {
-	prefix := "/" + opts.ResourcePrefix
-
-	newListFunc := func() runtime.Object { return &extensionsapi.NetworkPolicyList{} }
-	storageInterface, dFunc := opts.Decorator(
-		opts.StorageConfig,
-		cachesize.GetWatchCacheSizeByResource(cachesize.NetworkPolicys),
-		&extensionsapi.NetworkPolicy{},
-		prefix,
-		networkpolicy.Strategy,
-		newListFunc,
-		storage.NoTriggerPublisher,
-	)
-
-	store := &registry.Store{
-		NewFunc: func() runtime.Object { return &extensionsapi.NetworkPolicy{} },
-
-		// NewListFunc returns an object capable of storing results of an etcd list.
-		NewListFunc: newListFunc,
-		// Produces a NetworkPolicy that etcd understands, to the root of the resource
-		// by combining the namespace in the context with the given prefix
-		KeyRootFunc: func(ctx api.Context) string {
-			return registry.NamespaceKeyRootFunc(ctx, prefix)
-		},
-		// Produces a NetworkPolicy that etcd understands, to the resource by combining
-		// the namespace in the context with the given prefix
-		KeyFunc: func(ctx api.Context, name string) (string, error) {
-			return registry.NamespaceKeyFunc(ctx, prefix, name)
-		},
-		// Retrieve the name field of a network policy
+func NewREST(optsGetter generic.RESTOptionsGetter) *REST {
+	store := &genericregistry.Store{
+		NewFunc:     func() runtime.Object { return &extensionsapi.NetworkPolicy{} },
+		NewListFunc: func() runtime.Object { return &extensionsapi.NetworkPolicyList{} },
 		ObjectNameFunc: func(obj runtime.Object) (string, error) {
 			return obj.(*extensionsapi.NetworkPolicy).Name, nil
 		},
-		// Used to match objects based on labels/fields for list and watch
-		PredicateFunc:           networkpolicy.MatchNetworkPolicy,
-		QualifiedResource:       extensionsapi.Resource("networkpolicies"),
-		EnableGarbageCollection: opts.EnableGarbageCollection,
-		DeleteCollectionWorkers: opts.DeleteCollectionWorkers,
+		PredicateFunc:     networkpolicy.MatchNetworkPolicy,
+		QualifiedResource: extensionsapi.Resource("networkpolicies"),
 
-		// Used to validate controller creation
 		CreateStrategy: networkpolicy.Strategy,
-
-		// Used to validate controller updates
 		UpdateStrategy: networkpolicy.Strategy,
 		DeleteStrategy: networkpolicy.Strategy,
-
-		Storage:     storageInterface,
-		DestroyFunc: dFunc,
+	}
+	options := &generic.StoreOptions{RESTOptions: optsGetter, AttrFunc: networkpolicy.GetAttrs}
+	if err := store.CompleteWithOptions(options); err != nil {
+		panic(err) // TODO: Propagate error up
 	}
 	return &REST{store}
 }

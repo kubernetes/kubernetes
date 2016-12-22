@@ -63,7 +63,7 @@ type EtcdTestServer struct {
 
 	// The following are lumped etcd3 test server params
 	v3Cluster *integration.ClusterV3
-	v3Client  *clientv3.Client
+	V3Client  *clientv3.Client
 }
 
 // newLocalListener opens a port localhost using any port
@@ -314,11 +314,11 @@ func NewUnsecuredEtcd3TestClientServer(t *testing.T) (*EtcdTestServer, *storageb
 	server := &EtcdTestServer{
 		v3Cluster: integration.NewClusterV3(t, &integration.ClusterConfig{Size: 1}),
 	}
-	server.v3Client = server.v3Cluster.RandClient()
+	server.V3Client = server.v3Cluster.RandClient()
 	config := &storagebackend.Config{
 		Type:                     "etcd3",
 		Prefix:                   etcdtest.PathPrefix(),
-		ServerList:               server.v3Client.Endpoints(),
+		ServerList:               server.V3Client.Endpoints(),
 		DeserializationCacheSize: etcdtest.DeserializationCacheSize,
 	}
 	return server, config

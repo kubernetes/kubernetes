@@ -24,16 +24,14 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"reflect"
-	"strings"
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	apiv1 "k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/apis/apps"
-	appsapiv1alpha1 "k8s.io/kubernetes/pkg/apis/apps/v1alpha1"
+	appsapiv1beta1 "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	autoscalingapiv1 "k8s.io/kubernetes/pkg/apis/autoscaling/v1"
 	"k8s.io/kubernetes/pkg/apis/batch"
@@ -42,16 +40,15 @@ import (
 	"k8s.io/kubernetes/pkg/apis/certificates"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	extensionsapiv1beta1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/apis/rbac"
-	"k8s.io/kubernetes/pkg/apiserver/openapi"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	openapigen "k8s.io/kubernetes/pkg/generated/openapi"
 	"k8s.io/kubernetes/pkg/genericapiserver"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
-	ipallocator "k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
-	"k8s.io/kubernetes/pkg/registry/registrytest"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 	etcdtesting "k8s.io/kubernetes/pkg/storage/etcd/testing"
 	utilnet "k8s.io/kubernetes/pkg/util/net"
 	"k8s.io/kubernetes/pkg/util/sets"
@@ -69,29 +66,31 @@ func setUp(t *testing.T) (*Master, *etcdtesting.EtcdTestServer, Config, *assert.
 	server, storageConfig := etcdtesting.NewUnsecuredEtcd3TestClientServer(t)
 
 	config := &Config{
-		GenericConfig: genericapiserver.NewConfig(),
+		GenericConfig:           genericapiserver.NewConfig(),
+		APIResourceConfigSource: DefaultAPIResourceConfigSource(),
+		APIServerServicePort:    443,
+		MasterCount:             1,
 	}
 
 	resourceEncoding := genericapiserver.NewDefaultResourceEncodingConfig()
-	resourceEncoding.SetVersionEncoding(api.GroupName, registered.GroupOrDie(api.GroupName).GroupVersion, unversioned.GroupVersion{Group: api.GroupName, Version: runtime.APIVersionInternal})
-	resourceEncoding.SetVersionEncoding(autoscaling.GroupName, *testapi.Autoscaling.GroupVersion(), unversioned.GroupVersion{Group: autoscaling.GroupName, Version: runtime.APIVersionInternal})
-	resourceEncoding.SetVersionEncoding(batch.GroupName, *testapi.Batch.GroupVersion(), unversioned.GroupVersion{Group: batch.GroupName, Version: runtime.APIVersionInternal})
-	resourceEncoding.SetVersionEncoding(apps.GroupName, *testapi.Apps.GroupVersion(), unversioned.GroupVersion{Group: apps.GroupName, Version: runtime.APIVersionInternal})
-	resourceEncoding.SetVersionEncoding(extensions.GroupName, *testapi.Extensions.GroupVersion(), unversioned.GroupVersion{Group: extensions.GroupName, Version: runtime.APIVersionInternal})
-	resourceEncoding.SetVersionEncoding(rbac.GroupName, *testapi.Rbac.GroupVersion(), unversioned.GroupVersion{Group: rbac.GroupName, Version: runtime.APIVersionInternal})
-	resourceEncoding.SetVersionEncoding(certificates.GroupName, *testapi.Certificates.GroupVersion(), unversioned.GroupVersion{Group: certificates.GroupName, Version: runtime.APIVersionInternal})
+	resourceEncoding.SetVersionEncoding(api.GroupName, registered.GroupOrDie(api.GroupName).GroupVersion, schema.GroupVersion{Group: api.GroupName, Version: runtime.APIVersionInternal})
+	resourceEncoding.SetVersionEncoding(autoscaling.GroupName, *testapi.Autoscaling.GroupVersion(), schema.GroupVersion{Group: autoscaling.GroupName, Version: runtime.APIVersionInternal})
+	resourceEncoding.SetVersionEncoding(batch.GroupName, *testapi.Batch.GroupVersion(), schema.GroupVersion{Group: batch.GroupName, Version: runtime.APIVersionInternal})
+	resourceEncoding.SetVersionEncoding(apps.GroupName, *testapi.Apps.GroupVersion(), schema.GroupVersion{Group: apps.GroupName, Version: runtime.APIVersionInternal})
+	resourceEncoding.SetVersionEncoding(extensions.GroupName, *testapi.Extensions.GroupVersion(), schema.GroupVersion{Group: extensions.GroupName, Version: runtime.APIVersionInternal})
+	resourceEncoding.SetVersionEncoding(rbac.GroupName, *testapi.Rbac.GroupVersion(), schema.GroupVersion{Group: rbac.GroupName, Version: runtime.APIVersionInternal})
+	resourceEncoding.SetVersionEncoding(certificates.GroupName, *testapi.Certificates.GroupVersion(), schema.GroupVersion{Group: certificates.GroupName, Version: runtime.APIVersionInternal})
 	storageFactory := genericapiserver.NewDefaultStorageFactory(*storageConfig, testapi.StorageMediaType(), api.Codecs, resourceEncoding, DefaultAPIResourceConfigSource())
 
 	kubeVersion := version.Get()
 	config.GenericConfig.Version = &kubeVersion
 	config.StorageFactory = storageFactory
 	config.GenericConfig.LoopbackClientConfig = &restclient.Config{APIPath: "/api", ContentConfig: restclient.ContentConfig{NegotiatedSerializer: api.Codecs}}
-	config.GenericConfig.APIResourceConfigSource = DefaultAPIResourceConfigSource()
 	config.GenericConfig.PublicAddress = net.ParseIP("192.168.10.4")
 	config.GenericConfig.LegacyAPIGroupPrefixes = sets.NewString("/api")
-	config.GenericConfig.APIResourceConfigSource = DefaultAPIResourceConfigSource()
 	config.GenericConfig.RequestContextMapper = api.NewRequestContextMapper()
 	config.GenericConfig.LoopbackClientConfig = &restclient.Config{APIPath: "/api", ContentConfig: restclient.ContentConfig{NegotiatedSerializer: api.Codecs}}
+	config.GenericConfig.EnableMetrics = true
 	config.EnableCoreControllers = false
 	config.KubeletClientConfig = kubeletclient.KubeletClientConfig{Port: 10250}
 	config.ProxyTransport = utilnet.SetTransportDefaults(&http.Transport{
@@ -103,9 +102,6 @@ func setUp(t *testing.T) (*Master, *etcdtesting.EtcdTestServer, Config, *assert.
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	fakeNodeClient := fake.NewSimpleClientset(registrytest.MakeNodeList([]string{"node1", "node2"}, api.NodeResources{}))
-	master.nodeClient = fakeNodeClient.Core().Nodes()
 
 	return master, server, *config, assert.New(t)
 }
@@ -129,7 +125,7 @@ func limitedAPIResourceConfigSource() *genericapiserver.ResourceConfig {
 		extensionsapiv1beta1.SchemeGroupVersion,
 		batchapiv1.SchemeGroupVersion,
 		batchapiv2alpha1.SchemeGroupVersion,
-		appsapiv1alpha1.SchemeGroupVersion,
+		appsapiv1beta1.SchemeGroupVersion,
 		autoscalingapiv1.SchemeGroupVersion,
 	)
 	return ret
@@ -138,26 +134,13 @@ func limitedAPIResourceConfigSource() *genericapiserver.ResourceConfig {
 // newLimitedMaster only enables the core group, the extensions group, the batch group, and the autoscaling group.
 func newLimitedMaster(t *testing.T) (*Master, *etcdtesting.EtcdTestServer, Config, *assert.Assertions) {
 	_, etcdserver, config, assert := setUp(t)
-	config.GenericConfig.APIResourceConfigSource = limitedAPIResourceConfigSource()
+	config.APIResourceConfigSource = limitedAPIResourceConfigSource()
 	master, err := config.Complete().New()
 	if err != nil {
 		t.Fatalf("Error in bringing up the master: %v", err)
 	}
 
 	return master, etcdserver, config, assert
-}
-
-// TestNew verifies that the New function returns a Master
-// using the configuration properly.
-func TestNew(t *testing.T) {
-	master, etcdserver, _, assert := newMaster(t)
-	defer etcdserver.Terminate(t)
-
-	// these values get defaulted
-	_, serviceClusterIPRange, _ := net.ParseCIDR("10.0.0.0/24")
-	serviceReadWriteIP, _ := ipallocator.GetIndexedIP(serviceClusterIPRange, 1)
-	assert.Equal(master.GenericAPIServer.MasterCount, 1)
-	assert.Equal(master.GenericAPIServer.ServiceReadWriteIP, serviceReadWriteIP)
 }
 
 // TestVersion tests /version
@@ -183,83 +166,56 @@ func TestVersion(t *testing.T) {
 	}
 }
 
-// TestGetServersToValidate verifies the unexported getServersToValidate function
-func TestGetServersToValidate(t *testing.T) {
-	_, etcdserver, config, assert := setUp(t)
-	defer etcdserver.Terminate(t)
-
-	servers := getServersToValidate(config.StorageFactory)
-
-	// Expected servers to validate: scheduler, controller-manager and etcd.
-	assert.Equal(3, len(servers), "unexpected server list: %#v", servers)
-
-	for _, server := range []string{"scheduler", "controller-manager", "etcd-0"} {
-		if _, ok := servers[server]; !ok {
-			t.Errorf("server list missing: %s", server)
-		}
-	}
-}
-
-// TestFindExternalAddress verifies both pass and fail cases for the unexported
-// findExternalAddress function
-func TestFindExternalAddress(t *testing.T) {
-	assert := assert.New(t)
-	expectedIP := "172.0.0.1"
-
-	nodes := []*api.Node{new(api.Node), new(api.Node), new(api.Node)}
-	nodes[0].Status.Addresses = []api.NodeAddress{{Type: "ExternalIP", Address: expectedIP}}
-	nodes[1].Status.Addresses = []api.NodeAddress{{Type: "LegacyHostIP", Address: expectedIP}}
-	nodes[2].Status.Addresses = []api.NodeAddress{{Type: "ExternalIP", Address: expectedIP}, {Type: "LegacyHostIP", Address: "172.0.0.2"}}
-
-	// Pass Case
-	for _, node := range nodes {
-		ip, err := findExternalAddress(node)
-		assert.NoError(err, "error getting node external address")
-		assert.Equal(expectedIP, ip, "expected ip to be %s, but was %s", expectedIP, ip)
-	}
-
-	// Fail case
-	_, err := findExternalAddress(new(api.Node))
-	assert.Error(err, "expected findExternalAddress to fail on a node with missing ip information")
-}
-
 type fakeEndpointReconciler struct{}
 
 func (*fakeEndpointReconciler) ReconcileEndpoints(serviceName string, ip net.IP, endpointPorts []api.EndpointPort, reconcilePorts bool) error {
 	return nil
 }
 
+func makeNodeList(nodes []string, nodeResources apiv1.NodeResources) *apiv1.NodeList {
+	list := apiv1.NodeList{
+		Items: make([]apiv1.Node, len(nodes)),
+	}
+	for i := range nodes {
+		list.Items[i].Name = nodes[i]
+		list.Items[i].Status.Capacity = nodeResources.Capacity
+	}
+	return &list
+}
+
 // TestGetNodeAddresses verifies that proper results are returned
 // when requesting node addresses.
 func TestGetNodeAddresses(t *testing.T) {
-	master, etcdserver, _, assert := setUp(t)
-	defer etcdserver.Terminate(t)
+	assert := assert.New(t)
+
+	fakeNodeClient := fake.NewSimpleClientset(makeNodeList([]string{"node1", "node2"}, apiv1.NodeResources{})).Core().Nodes()
+	addressProvider := nodeAddressProvider{fakeNodeClient}
 
 	// Fail case (no addresses associated with nodes)
-	nodes, _ := master.nodeClient.List(api.ListOptions{})
-	addrs, err := master.getNodeAddresses()
+	nodes, _ := fakeNodeClient.List(apiv1.ListOptions{})
+	addrs, err := addressProvider.externalAddresses()
 
-	assert.Error(err, "getNodeAddresses should have caused an error as there are no addresses.")
+	assert.Error(err, "addresses should have caused an error as there are no addresses.")
 	assert.Equal([]string(nil), addrs)
 
 	// Pass case with External type IP
-	nodes, _ = master.nodeClient.List(api.ListOptions{})
+	nodes, _ = fakeNodeClient.List(apiv1.ListOptions{})
 	for index := range nodes.Items {
-		nodes.Items[index].Status.Addresses = []api.NodeAddress{{Type: api.NodeExternalIP, Address: "127.0.0.1"}}
-		master.nodeClient.Update(&nodes.Items[index])
+		nodes.Items[index].Status.Addresses = []apiv1.NodeAddress{{Type: apiv1.NodeExternalIP, Address: "127.0.0.1"}}
+		fakeNodeClient.Update(&nodes.Items[index])
 	}
-	addrs, err = master.getNodeAddresses()
-	assert.NoError(err, "getNodeAddresses should not have returned an error.")
+	addrs, err = addressProvider.externalAddresses()
+	assert.NoError(err, "addresses should not have returned an error.")
 	assert.Equal([]string{"127.0.0.1", "127.0.0.1"}, addrs)
 
 	// Pass case with LegacyHost type IP
-	nodes, _ = master.nodeClient.List(api.ListOptions{})
+	nodes, _ = fakeNodeClient.List(apiv1.ListOptions{})
 	for index := range nodes.Items {
-		nodes.Items[index].Status.Addresses = []api.NodeAddress{{Type: api.NodeLegacyHostIP, Address: "127.0.0.2"}}
-		master.nodeClient.Update(&nodes.Items[index])
+		nodes.Items[index].Status.Addresses = []apiv1.NodeAddress{{Type: apiv1.NodeLegacyHostIP, Address: "127.0.0.2"}}
+		fakeNodeClient.Update(&nodes.Items[index])
 	}
-	addrs, err = master.getNodeAddresses()
-	assert.NoError(err, "getNodeAddresses failback should not have returned an error.")
+	addrs, err = addressProvider.externalAddresses()
+	assert.NoError(err, "addresses failback should not have returned an error.")
 	assert.Equal([]string{"127.0.0.2", "127.0.0.2"}, addrs)
 }
 
@@ -289,7 +245,7 @@ func TestAPIVersionOfDiscoveryEndpoints(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	apiVersions := unversioned.APIVersions{}
+	apiVersions := metav1.APIVersions{}
 	assert.NoError(decodeResponse(resp, &apiVersions))
 	assert.Equal(apiVersions.APIVersion, "")
 
@@ -298,7 +254,7 @@ func TestAPIVersionOfDiscoveryEndpoints(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	resourceList := unversioned.APIResourceList{}
+	resourceList := metav1.APIResourceList{}
 	assert.NoError(decodeResponse(resp, &resourceList))
 	assert.Equal(resourceList.APIVersion, "")
 
@@ -307,7 +263,7 @@ func TestAPIVersionOfDiscoveryEndpoints(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	groupList := unversioned.APIGroupList{}
+	groupList := metav1.APIGroupList{}
 	assert.NoError(decodeResponse(resp, &groupList))
 	assert.Equal(groupList.APIVersion, "")
 
@@ -316,7 +272,7 @@ func TestAPIVersionOfDiscoveryEndpoints(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	group := unversioned.APIGroup{}
+	group := metav1.APIGroup{}
 	assert.NoError(decodeResponse(resp, &group))
 	assert.Equal(group.APIVersion, "")
 
@@ -325,7 +281,7 @@ func TestAPIVersionOfDiscoveryEndpoints(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	resourceList = unversioned.APIResourceList{}
+	resourceList = metav1.APIResourceList{}
 	assert.NoError(decodeResponse(resp, &resourceList))
 	assert.Equal(resourceList.APIVersion, "")
 
@@ -335,7 +291,7 @@ func TestAPIVersionOfDiscoveryEndpoints(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	group = unversioned.APIGroup{}
+	group = metav1.APIGroup{}
 	assert.NoError(decodeResponse(resp, &group))
 	assert.Equal(group.APIVersion, "v1")
 
@@ -346,130 +302,10 @@ func TestAPIVersionOfDiscoveryEndpoints(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	resourceList = unversioned.APIResourceList{}
+	resourceList = metav1.APIResourceList{}
 	assert.NoError(decodeResponse(resp, &resourceList))
 	assert.Equal(resourceList.APIVersion, "v1")
 
-}
-
-func TestDiscoveryAtAPIS(t *testing.T) {
-	master, etcdserver, _, assert := newLimitedMaster(t)
-	defer etcdserver.Terminate(t)
-
-	server := httptest.NewServer(master.GenericAPIServer.HandlerContainer.ServeMux)
-	resp, err := http.Get(server.URL + "/apis")
-	if !assert.NoError(err) {
-		t.Errorf("unexpected error: %v", err)
-	}
-
-	assert.Equal(http.StatusOK, resp.StatusCode)
-
-	groupList := unversioned.APIGroupList{}
-	assert.NoError(decodeResponse(resp, &groupList))
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	expectGroupNames := sets.NewString(autoscaling.GroupName, batch.GroupName, apps.GroupName, extensions.GroupName)
-	expectVersions := map[string][]unversioned.GroupVersionForDiscovery{
-		autoscaling.GroupName: {
-			{
-				GroupVersion: testapi.Autoscaling.GroupVersion().String(),
-				Version:      testapi.Autoscaling.GroupVersion().Version,
-			},
-		},
-		// batch is using its pkg/apis/batch/ types here since during installation
-		// both versions get installed and testapi.go currently does not support
-		// multi-versioned clients
-		batch.GroupName: {
-			{
-				GroupVersion: batchapiv1.SchemeGroupVersion.String(),
-				Version:      batchapiv1.SchemeGroupVersion.Version,
-			},
-			{
-				GroupVersion: batchapiv2alpha1.SchemeGroupVersion.String(),
-				Version:      batchapiv2alpha1.SchemeGroupVersion.Version,
-			},
-		},
-		apps.GroupName: {
-			{
-				GroupVersion: testapi.Apps.GroupVersion().String(),
-				Version:      testapi.Apps.GroupVersion().Version,
-			},
-		},
-		extensions.GroupName: {
-			{
-				GroupVersion: testapi.Extensions.GroupVersion().String(),
-				Version:      testapi.Extensions.GroupVersion().Version,
-			},
-		},
-	}
-	expectPreferredVersion := map[string]unversioned.GroupVersionForDiscovery{
-		autoscaling.GroupName: {
-			GroupVersion: registered.GroupOrDie(autoscaling.GroupName).GroupVersion.String(),
-			Version:      registered.GroupOrDie(autoscaling.GroupName).GroupVersion.Version,
-		},
-		batch.GroupName: {
-			GroupVersion: registered.GroupOrDie(batch.GroupName).GroupVersion.String(),
-			Version:      registered.GroupOrDie(batch.GroupName).GroupVersion.Version,
-		},
-		apps.GroupName: {
-			GroupVersion: registered.GroupOrDie(apps.GroupName).GroupVersion.String(),
-			Version:      registered.GroupOrDie(apps.GroupName).GroupVersion.Version,
-		},
-		extensions.GroupName: {
-			GroupVersion: registered.GroupOrDie(extensions.GroupName).GroupVersion.String(),
-			Version:      registered.GroupOrDie(extensions.GroupName).GroupVersion.Version,
-		},
-	}
-
-	assert.Equal(4, len(groupList.Groups))
-	for _, group := range groupList.Groups {
-		if !expectGroupNames.Has(group.Name) {
-			t.Errorf("got unexpected group %s", group.Name)
-		}
-		assert.Equal(expectVersions[group.Name], group.Versions)
-		assert.Equal(expectPreferredVersion[group.Name], group.PreferredVersion)
-	}
-
-	thirdPartyGV := unversioned.GroupVersionForDiscovery{GroupVersion: "company.com/v1", Version: "v1"}
-	master.thirdPartyResourceServer.InstallThirdPartyResource(&extensions.ThirdPartyResource{
-		ObjectMeta: api.ObjectMeta{Name: "foo.company.com"},
-		Versions:   []extensions.APIVersion{{Name: "v1"}},
-	})
-
-	resp, err = http.Get(server.URL + "/apis")
-	if !assert.NoError(err) {
-		t.Errorf("unexpected error: %v", err)
-	}
-	assert.Equal(http.StatusOK, resp.StatusCode)
-	assert.NoError(decodeResponse(resp, &groupList))
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	assert.Equal(5, len(groupList.Groups))
-
-	expectGroupNames.Insert("company.com")
-	expectVersions["company.com"] = []unversioned.GroupVersionForDiscovery{thirdPartyGV}
-	expectPreferredVersion["company.com"] = thirdPartyGV
-	for _, group := range groupList.Groups {
-		if !expectGroupNames.Has(group.Name) {
-			t.Errorf("got unexpected group %s", group.Name)
-		}
-		assert.Equal(expectVersions[group.Name], group.Versions)
-		assert.Equal(expectPreferredVersion[group.Name], group.PreferredVersion)
-	}
-}
-
-func writeResponseToFile(resp *http.Response, filename string) error {
-	defer resp.Body.Close()
-
-	data, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return err
-	}
-	return ioutil.WriteFile(filename, data, 0755)
 }
 
 // TestValidOpenAPISpec verifies that the open api is added
@@ -478,30 +314,32 @@ func TestValidOpenAPISpec(t *testing.T) {
 	_, etcdserver, config, assert := setUp(t)
 	defer etcdserver.Terminate(t)
 
-	config.GenericConfig.OpenAPIConfig.Definitions = openapigen.OpenAPIDefinitions
-	config.GenericConfig.EnableOpenAPISupport = true
 	config.GenericConfig.EnableIndex = true
+	config.GenericConfig.OpenAPIConfig = genericapiserver.DefaultOpenAPIConfig(openapigen.OpenAPIDefinitions)
 	config.GenericConfig.OpenAPIConfig.Info = &spec.Info{
 		InfoProps: spec.InfoProps{
 			Title:   "Kubernetes",
 			Version: "unversioned",
 		},
 	}
-	config.GenericConfig.OpenAPIConfig.GetOperationID = openapi.GetOperationID
+	config.GenericConfig.SwaggerConfig = genericapiserver.DefaultSwaggerConfig()
+
 	master, err := config.Complete().New()
 	if err != nil {
 		t.Fatalf("Error in bringing up the master: %v", err)
 	}
 
-	// make sure swagger.json is not registered before calling install api.
+	// make sure swagger.json is not registered before calling PrepareRun.
 	server := httptest.NewServer(master.GenericAPIServer.HandlerContainer.ServeMux)
+	defer server.Close()
 	resp, err := http.Get(server.URL + "/swagger.json")
 	if !assert.NoError(err) {
 		t.Errorf("unexpected error: %v", err)
 	}
 	assert.Equal(http.StatusNotFound, resp.StatusCode)
 
-	master.GenericAPIServer.InstallOpenAPI()
+	master.GenericAPIServer.PrepareRun()
+
 	resp, err = http.Get(server.URL + "/swagger.json")
 	if !assert.NoError(err) {
 		t.Errorf("unexpected error: %v", err)
@@ -516,67 +354,14 @@ func TestValidOpenAPISpec(t *testing.T) {
 		assert.NoError(res.AsError())
 	}
 
-	// TODO(mehdy): The actual validation part of these tests are timing out on jerkin but passing locally. Enable it after debugging timeout issue.
-	disableValidation := true
-
-	// Saving specs to a temporary folder is a good way to debug spec generation without bringing up an actual
-	// api server.
-	saveSwaggerSpecs := false
-
 	// Validate OpenApi spec
 	doc, err := loads.Spec(server.URL + "/swagger.json")
 	if assert.NoError(err) {
 		validator := validate.NewSpecValidator(doc.Schema(), strfmt.Default)
-		if !disableValidation {
-			res, warns := validator.Validate(doc)
-			assert.NoError(res.AsError())
-			if !warns.IsValid() {
-				t.Logf("Open API spec on root has some warnings : %v", warns)
-			}
-		} else {
-			t.Logf("Validation is disabled because it is timing out on jenkins put passing locally.")
+		res, warns := validator.Validate(doc)
+		assert.NoError(res.AsError())
+		if !warns.IsValid() {
+			t.Logf("Open API spec on root has some warnings : %v", warns)
 		}
 	}
-
-	// validate specs on each end-point
-	resp, err = http.Get(server.URL)
-	if !assert.NoError(err) {
-		t.Errorf("unexpected error: %v", err)
-	}
-	assert.Equal(http.StatusOK, resp.StatusCode)
-	var list unversioned.RootPaths
-	if assert.NoError(decodeResponse(resp, &list)) {
-		for _, path := range list.Paths {
-			if !strings.HasPrefix(path, "/api") {
-				continue
-			}
-			t.Logf("Validating open API spec on %v ...", path)
-
-			if saveSwaggerSpecs {
-				resp, err = http.Get(server.URL + path + "/swagger.json")
-				if !assert.NoError(err) {
-					t.Errorf("unexpected error: %v", err)
-				}
-				assert.Equal(http.StatusOK, resp.StatusCode)
-				assert.NoError(writeResponseToFile(resp, "/tmp/swagger_"+strings.Replace(path, "/", "_", -1)+".json"))
-			}
-
-			// Validate OpenApi spec on path
-			doc, err := loads.Spec(server.URL + path + "/swagger.json")
-			if assert.NoError(err) {
-				validator := validate.NewSpecValidator(doc.Schema(), strfmt.Default)
-				if !disableValidation {
-					res, warns := validator.Validate(doc)
-					assert.NoError(res.AsError())
-					if !warns.IsValid() {
-						t.Logf("Open API spec on %v has some warnings : %v", path, warns)
-					}
-				} else {
-					t.Logf("Validation is disabled because it is timing out on jenkins but passing locally.")
-				}
-			}
-
-		}
-	}
-
 }

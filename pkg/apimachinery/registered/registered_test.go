@@ -19,8 +19,8 @@ package registered
 import (
 	"testing"
 
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apimachinery"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 )
 
 func TestAddThirdPartyVersionsBasic(t *testing.T) {
@@ -29,14 +29,14 @@ func TestAddThirdPartyVersionsBasic(t *testing.T) {
 		t.Fatalf("Unexpected failure to make a manager: %v", err)
 	}
 
-	registered := []unversioned.GroupVersion{
+	registered := []schema.GroupVersion{
 		{
 			Group:   "",
 			Version: "v1",
 		},
 	}
 	skipped := registered
-	thirdParty := []unversioned.GroupVersion{
+	thirdParty := []schema.GroupVersion{
 		{
 			Group:   "company.com",
 			Version: "v1",
@@ -73,7 +73,7 @@ func TestAddThirdPartyVersionsBasic(t *testing.T) {
 }
 
 func TestAddThirdPartyVersionsMultiple(t *testing.T) {
-	thirdParty := []unversioned.GroupVersion{
+	thirdParty := []schema.GroupVersion{
 		{
 			Group:   "company.com",
 			Version: "v1",
@@ -108,13 +108,13 @@ func TestAllPreferredGroupVersions(t *testing.T) {
 		{
 			groupMetas: []apimachinery.GroupMeta{
 				{
-					GroupVersion: unversioned.GroupVersion{Group: "group1", Version: "v1"},
+					GroupVersion: schema.GroupVersion{Group: "group1", Version: "v1"},
 				},
 				{
-					GroupVersion: unversioned.GroupVersion{Group: "group2", Version: "v2"},
+					GroupVersion: schema.GroupVersion{Group: "group2", Version: "v2"},
 				},
 				{
-					GroupVersion: unversioned.GroupVersion{Group: "", Version: "v1"},
+					GroupVersion: schema.GroupVersion{Group: "", Version: "v1"},
 				},
 			},
 			expect: "group1/v1,group2/v2,v1",
@@ -122,7 +122,7 @@ func TestAllPreferredGroupVersions(t *testing.T) {
 		{
 			groupMetas: []apimachinery.GroupMeta{
 				{
-					GroupVersion: unversioned.GroupVersion{Group: "", Version: "v1"},
+					GroupVersion: schema.GroupVersion{Group: "", Version: "v1"},
 				},
 			},
 			expect: "v1",

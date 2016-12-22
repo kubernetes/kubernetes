@@ -1,37 +1,3 @@
-<!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
-
-<!-- BEGIN STRIP_FOR_RELEASE -->
-
-<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
-     width="25" height="25">
-
-<h2>PLEASE NOTE: This document applies to the HEAD of the source tree</h2>
-
-If you are using a released version of Kubernetes, you should
-refer to the docs that go with that version.
-
-<!-- TAG RELEASE_LINK, added by the munger automatically -->
-<strong>
-The latest release of this document can be found
-[here](http://releases.k8s.io/release-1.4/docs/proposals/scheduledjob.md).
-
-Documentation for other releases can be found at
-[releases.k8s.io](http://releases.k8s.io).
-</strong>
---
-
-<!-- END STRIP_FOR_RELEASE -->
-
-<!-- END MUNGE: UNVERSIONED_WARNING -->
-
 # ScheduledJob Controller
 
 ## Abstract
@@ -337,7 +303,7 @@ in namespace `ns1` might create a job `nightly-earnings-report-3m4d3`, and later
 a job called `nightly-earnings-report-6k7ts`.  This is consistent with pods, but
 does not give the user much information.
 
-Alternatively, we can use time as a uniqifier.  For example, the same scheduledJob could
+Alternatively, we can use time as a uniquifier.  For example, the same scheduledJob could
 create a job called `nightly-earnings-report-2016-May-19`.
 However, for Jobs that run more than once per day, we would need to represent
 time as well as date.  Standard date formats (e.g. RFC 3339) use colons for time.

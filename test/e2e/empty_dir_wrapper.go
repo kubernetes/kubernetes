@@ -17,8 +17,8 @@ limitations under the License.
 package e2e
 
 import (
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -57,8 +57,8 @@ var _ = framework.KubeDescribe("EmptyDir wrapper volumes", func() {
 		volumeName := "secret-volume"
 		volumeMountPath := "/etc/secret-volume"
 
-		secret := &api.Secret{
-			ObjectMeta: api.ObjectMeta{
+		secret := &v1.Secret{
+			ObjectMeta: v1.ObjectMeta{
 				Namespace: f.Namespace.Name,
 				Name:      name,
 			},
@@ -68,7 +68,7 @@ var _ = framework.KubeDescribe("EmptyDir wrapper volumes", func() {
 		}
 
 		var err error
-		if secret, err = f.Client.Secrets(f.Namespace.Name).Create(secret); err != nil {
+		if secret, err = f.ClientSet.Core().Secrets(f.Namespace.Name).Create(secret); err != nil {
 			framework.Failf("unable to create test secret %s: %v", secret.Name, err)
 		}
 
@@ -77,35 +77,35 @@ var _ = framework.KubeDescribe("EmptyDir wrapper volumes", func() {
 		gitURL, gitRepo, gitCleanup := createGitServer(f)
 		defer gitCleanup()
 
-		pod := &api.Pod{
-			ObjectMeta: api.ObjectMeta{
+		pod := &v1.Pod{
+			ObjectMeta: v1.ObjectMeta{
 				Name: "pod-secrets-" + string(uuid.NewUUID()),
 			},
-			Spec: api.PodSpec{
-				Volumes: []api.Volume{
+			Spec: v1.PodSpec{
+				Volumes: []v1.Volume{
 					{
 						Name: volumeName,
-						VolumeSource: api.VolumeSource{
-							Secret: &api.SecretVolumeSource{
+						VolumeSource: v1.VolumeSource{
+							Secret: &v1.SecretVolumeSource{
 								SecretName: name,
 							},
 						},
 					},
 					{
 						Name: gitVolumeName,
-						VolumeSource: api.VolumeSource{
-							GitRepo: &api.GitRepoVolumeSource{
+						VolumeSource: v1.VolumeSource{
+							GitRepo: &v1.GitRepoVolumeSource{
 								Repository: gitURL,
 								Directory:  gitRepo,
 							},
 						},
 					},
 				},
-				Containers: []api.Container{
+				Containers: []v1.Container{
 					{
 						Name:  "secret-test",
 						Image: "gcr.io/google_containers/test-webserver:e2e",
-						VolumeMounts: []api.VolumeMount{
+						VolumeMounts: []v1.VolumeMount{
 							{
 								Name:      volumeName,
 								MountPath: volumeMountPath,
@@ -124,11 +124,11 @@ var _ = framework.KubeDescribe("EmptyDir wrapper volumes", func() {
 
 		defer func() {
 			By("Cleaning up the secret")
-			if err := f.Client.Secrets(f.Namespace.Name).Delete(secret.Name); err != nil {
+			if err := f.ClientSet.Core().Secrets(f.Namespace.Name).Delete(secret.Name, nil); err != nil {
 				framework.Failf("unable to delete secret %v: %v", secret.Name, err)
 			}
 			By("Cleaning up the git vol pod")
-			if err = f.Client.Pods(f.Namespace.Name).Delete(pod.Name, api.NewDeleteOptions(0)); err != nil {
+			if err = f.ClientSet.Core().Pods(f.Namespace.Name).Delete(pod.Name, v1.NewDeleteOptions(0)); err != nil {
 				framework.Failf("unable to delete git vol pod %v: %v", pod.Name, err)
 			}
 		}()
@@ -177,18 +177,18 @@ func createGitServer(f *framework.Framework) (gitURL string, gitRepo string, cle
 
 	labels := map[string]string{"name": gitServerPodName}
 
-	gitServerPod := &api.Pod{
-		ObjectMeta: api.ObjectMeta{
+	gitServerPod := &v1.Pod{
+		ObjectMeta: v1.ObjectMeta{
 			Name:   gitServerPodName,
 			Labels: labels,
 		},
-		Spec: api.PodSpec{
-			Containers: []api.Container{
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
 				{
 					Name:            "git-repo",
 					Image:           "gcr.io/google_containers/fakegitserver:0.1",
 					ImagePullPolicy: "IfNotPresent",
-					Ports: []api.ContainerPort{
+					Ports: []v1.ContainerPort{
 						{ContainerPort: int32(containerPort)},
 					},
 				},
@@ -200,13 +200,13 @@ func createGitServer(f *framework.Framework) (gitURL string, gitRepo string, cle
 	// Portal IP and port
 	httpPort := 2345
 
-	gitServerSvc := &api.Service{
-		ObjectMeta: api.ObjectMeta{
+	gitServerSvc := &v1.Service{
+		ObjectMeta: v1.ObjectMeta{
 			Name: "git-server-svc",
 		},
-		Spec: api.ServiceSpec{
+		Spec: v1.ServiceSpec{
 			Selector: labels,
-			Ports: []api.ServicePort{
+			Ports: []v1.ServicePort{
 				{
 					Name:       "http-portal",
 					Port:       int32(httpPort),
@@ -216,35 +216,35 @@ func createGitServer(f *framework.Framework) (gitURL string, gitRepo string, cle
 		},
 	}
 
-	if gitServerSvc, err = f.Client.Services(f.Namespace.Name).Create(gitServerSvc); err != nil {
+	if gitServerSvc, err = f.ClientSet.Core().Services(f.Namespace.Name).Create(gitServerSvc); err != nil {
 		framework.Failf("unable to create test git server service %s: %v", gitServerSvc.Name, err)
 	}
 
 	return "http://" + gitServerSvc.Spec.ClusterIP + ":" + strconv.Itoa(httpPort), "test", func() {
 		By("Cleaning up the git server pod")
-		if err := f.Client.Pods(f.Namespace.Name).Delete(gitServerPod.Name, api.NewDeleteOptions(0)); err != nil {
+		if err := f.ClientSet.Core().Pods(f.Namespace.Name).Delete(gitServerPod.Name, v1.NewDeleteOptions(0)); err != nil {
 			framework.Failf("unable to delete git server pod %v: %v", gitServerPod.Name, err)
 		}
 		By("Cleaning up the git server svc")
-		if err := f.Client.Services(f.Namespace.Name).Delete(gitServerSvc.Name); err != nil {
+		if err := f.ClientSet.Core().Services(f.Namespace.Name).Delete(gitServerSvc.Name, nil); err != nil {
 			framework.Failf("unable to delete git server svc %v: %v", gitServerSvc.Name, err)
 		}
 	}
 }
 
-func makeGitRepoVolumes(gitURL, gitRepo string) (volumes []api.Volume, volumeMounts []api.VolumeMount) {
+func makeGitRepoVolumes(gitURL, gitRepo string) (volumes []v1.Volume, volumeMounts []v1.VolumeMount) {
 	for i := 0; i < wrappedVolumeRaceGitRepoVolumeCount; i++ {
 		volumeName := fmt.Sprintf("racey-git-repo-%d", i)
-		volumes = append(volumes, api.Volume{
+		volumes = append(volumes, v1.Volume{
 			Name: volumeName,
-			VolumeSource: api.VolumeSource{
-				GitRepo: &api.GitRepoVolumeSource{
+			VolumeSource: v1.VolumeSource{
+				GitRepo: &v1.GitRepoVolumeSource{
 					Repository: gitURL,
 					Directory:  gitRepo,
 				},
 			},
 		})
-		volumeMounts = append(volumeMounts, api.VolumeMount{
+		volumeMounts = append(volumeMounts, v1.VolumeMount{
 			Name:      volumeName,
 			MountPath: fmt.Sprintf("/etc/git-volume-%d", i),
 		})
@@ -257,8 +257,8 @@ func createConfigmapsForRace(f *framework.Framework) (configMapNames []string) {
 	for i := 0; i < wrappedVolumeRaceConfigMapVolumeCount; i++ {
 		configMapName := fmt.Sprintf("racey-configmap-%d", i)
 		configMapNames = append(configMapNames, configMapName)
-		configMap := &api.ConfigMap{
-			ObjectMeta: api.ObjectMeta{
+		configMap := &v1.ConfigMap{
+			ObjectMeta: v1.ObjectMeta{
 				Namespace: f.Namespace.Name,
 				Name:      configMapName,
 			},
@@ -266,7 +266,7 @@ func createConfigmapsForRace(f *framework.Framework) (configMapNames []string) {
 				"data-1": "value-1",
 			},
 		}
-		_, err := f.Client.ConfigMaps(f.Namespace.Name).Create(configMap)
+		_, err := f.ClientSet.Core().ConfigMaps(f.Namespace.Name).Create(configMap)
 		framework.ExpectNoError(err)
 	}
 	return
@@ -275,22 +275,22 @@ func createConfigmapsForRace(f *framework.Framework) (configMapNames []string) {
 func deleteConfigMaps(f *framework.Framework, configMapNames []string) {
 	By("Cleaning up the configMaps")
 	for _, configMapName := range configMapNames {
-		err := f.Client.ConfigMaps(f.Namespace.Name).Delete(configMapName)
+		err := f.ClientSet.Core().ConfigMaps(f.Namespace.Name).Delete(configMapName, nil)
 		Expect(err).NotTo(HaveOccurred(), "unable to delete configMap %v", configMapName)
 	}
 }
 
-func makeConfigMapVolumes(configMapNames []string) (volumes []api.Volume, volumeMounts []api.VolumeMount) {
+func makeConfigMapVolumes(configMapNames []string) (volumes []v1.Volume, volumeMounts []v1.VolumeMount) {
 	for i, configMapName := range configMapNames {
 		volumeName := fmt.Sprintf("racey-configmap-%d", i)
-		volumes = append(volumes, api.Volume{
+		volumes = append(volumes, v1.Volume{
 			Name: volumeName,
-			VolumeSource: api.VolumeSource{
-				ConfigMap: &api.ConfigMapVolumeSource{
-					LocalObjectReference: api.LocalObjectReference{
+			VolumeSource: v1.VolumeSource{
+				ConfigMap: &v1.ConfigMapVolumeSource{
+					LocalObjectReference: v1.LocalObjectReference{
 						Name: configMapName,
 					},
-					Items: []api.KeyToPath{
+					Items: []v1.KeyToPath{
 						{
 							Key:  "data-1",
 							Path: "data-1",
@@ -299,7 +299,7 @@ func makeConfigMapVolumes(configMapNames []string) (volumes []api.Volume, volume
 				},
 			},
 		})
-		volumeMounts = append(volumeMounts, api.VolumeMount{
+		volumeMounts = append(volumeMounts, v1.VolumeMount{
 			Name:      volumeName,
 			MountPath: fmt.Sprintf("/etc/config-%d", i),
 		})
@@ -307,69 +307,74 @@ func makeConfigMapVolumes(configMapNames []string) (volumes []api.Volume, volume
 	return
 }
 
-func testNoWrappedVolumeRace(f *framework.Framework, volumes []api.Volume, volumeMounts []api.VolumeMount, podCount int32) {
+func testNoWrappedVolumeRace(f *framework.Framework, volumes []v1.Volume, volumeMounts []v1.VolumeMount, podCount int32) {
 	rcName := wrappedVolumeRaceRCNamePrefix + string(uuid.NewUUID())
 	nodeList := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
 	Expect(len(nodeList.Items)).To(BeNumerically(">", 0))
 	targetNode := nodeList.Items[0]
 
 	By("Creating RC which spawns configmap-volume pods")
-	affinity := map[string]string{
-		api.AffinityAnnotationKey: fmt.Sprintf(`
-				{"nodeAffinity": { "requiredDuringSchedulingIgnoredDuringExecution": {
-					"nodeSelectorTerms": [{
-						"matchExpressions": [{
-							"key": "kubernetes.io/hostname",
-							"operator": "In",
-							"values": ["%s"]
-					}]
-				}]
-			}}}`, targetNode.Name),
+	affinity := &v1.Affinity{
+		NodeAffinity: &v1.NodeAffinity{
+			RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+				NodeSelectorTerms: []v1.NodeSelectorTerm{
+					{
+						MatchExpressions: []v1.NodeSelectorRequirement{
+							{
+								Key:      "kubernetes.io/hostname",
+								Operator: v1.NodeSelectorOpIn,
+								Values:   []string{targetNode.Name},
+							},
+						},
+					},
+				},
+			},
+		},
 	}
 
-	rc := &api.ReplicationController{
-		ObjectMeta: api.ObjectMeta{
+	rc := &v1.ReplicationController{
+		ObjectMeta: v1.ObjectMeta{
 			Name: rcName,
 		},
-		Spec: api.ReplicationControllerSpec{
-			Replicas: podCount,
+		Spec: v1.ReplicationControllerSpec{
+			Replicas: &podCount,
 			Selector: map[string]string{
 				"name": rcName,
 			},
-			Template: &api.PodTemplateSpec{
-				ObjectMeta: api.ObjectMeta{
-					Annotations: affinity,
-					Labels:      map[string]string{"name": rcName},
+			Template: &v1.PodTemplateSpec{
+				ObjectMeta: v1.ObjectMeta{
+					Labels: map[string]string{"name": rcName},
 				},
-				Spec: api.PodSpec{
-					Containers: []api.Container{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
 						{
 							Name:    "test-container",
 							Image:   "gcr.io/google_containers/busybox:1.24",
 							Command: []string{"sleep", "10000"},
-							Resources: api.ResourceRequirements{
-								Requests: api.ResourceList{
-									api.ResourceCPU: resource.MustParse("10m"),
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceCPU: resource.MustParse("10m"),
 								},
 							},
 							VolumeMounts: volumeMounts,
 						},
 					},
-					DNSPolicy: api.DNSDefault,
+					Affinity:  affinity,
+					DNSPolicy: v1.DNSDefault,
 					Volumes:   volumes,
 				},
 			},
 		},
 	}
-	_, err := f.Client.ReplicationControllers(f.Namespace.Name).Create(rc)
+	_, err := f.ClientSet.Core().ReplicationControllers(f.Namespace.Name).Create(rc)
 	Expect(err).NotTo(HaveOccurred(), "error creating replication controller")
 
 	defer func() {
-		err := framework.DeleteRCAndPods(f.Client, f.ClientSet, f.Namespace.Name, rcName)
+		err := framework.DeleteRCAndPods(f.ClientSet, f.InternalClientset, f.Namespace.Name, rcName)
 		framework.ExpectNoError(err)
 	}()
 
-	pods, err := framework.PodsCreated(f.Client, f.Namespace.Name, rcName, podCount)
+	pods, err := framework.PodsCreated(f.ClientSet, f.Namespace.Name, rcName, podCount)
 
 	By("Ensuring each pod is running")
 

@@ -19,22 +19,22 @@ package util
 import (
 	"testing"
 
-	api_v1 "k8s.io/kubernetes/pkg/api/v1"
-	pkg_runtime "k8s.io/kubernetes/pkg/runtime"
+	apiv1 "k8s.io/kubernetes/pkg/api/v1"
+	pkgruntime "k8s.io/kubernetes/pkg/runtime"
 
 	"github.com/stretchr/testify/assert"
 )
 
 func TestHandlers(t *testing.T) {
 	// There is a single service ns1/s1 in cluster mycluster.
-	service := api_v1.Service{
-		ObjectMeta: api_v1.ObjectMeta{
+	service := apiv1.Service{
+		ObjectMeta: apiv1.ObjectMeta{
 			Namespace: "ns1",
 			Name:      "s1",
 		},
 	}
-	service2 := api_v1.Service{
-		ObjectMeta: api_v1.ObjectMeta{
+	service2 := apiv1.Service{
+		ObjectMeta: apiv1.ObjectMeta{
 			Namespace: "ns1",
 			Name:      "s1",
 			Annotations: map[string]string{
@@ -53,7 +53,7 @@ func TestHandlers(t *testing.T) {
 	}
 
 	trigger := NewTriggerOnAllChanges(
-		func(obj pkg_runtime.Object) {
+		func(obj pkgruntime.Object) {
 			triggerChan <- struct{}{}
 		})
 
@@ -67,7 +67,7 @@ func TestHandlers(t *testing.T) {
 	assert.True(t, triggered())
 
 	trigger2 := NewTriggerOnMetaAndSpecChanges(
-		func(obj pkg_runtime.Object) {
+		func(obj pkgruntime.Object) {
 			triggerChan <- struct{}{}
 		},
 	)
@@ -81,14 +81,14 @@ func TestHandlers(t *testing.T) {
 	trigger2.OnUpdate(&service, &service2)
 	assert.True(t, triggered())
 
-	service3 := api_v1.Service{
-		ObjectMeta: api_v1.ObjectMeta{
+	service3 := apiv1.Service{
+		ObjectMeta: apiv1.ObjectMeta{
 			Namespace: "ns1",
 			Name:      "s1",
 		},
-		Status: api_v1.ServiceStatus{
-			LoadBalancer: api_v1.LoadBalancerStatus{
-				Ingress: []api_v1.LoadBalancerIngress{{
+		Status: apiv1.ServiceStatus{
+			LoadBalancer: apiv1.LoadBalancerStatus{
+				Ingress: []apiv1.LoadBalancerIngress{{
 					Hostname: "A",
 				}},
 			},

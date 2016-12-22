@@ -17,129 +17,98 @@ limitations under the License.
 package common
 
 import (
-	"encoding/json"
 	"fmt"
-	"net/url"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
 
-const (
-	privilegedPodName          = "privileged-pod"
-	privilegedContainerName    = "privileged-container"
-	privilegedHttpPort         = 8080
-	privilegedUdpPort          = 8081
-	notPrivilegedHttpPort      = 9090
-	notPrivilegedUdpPort       = 9091
-	notPrivilegedContainerName = "not-privileged-container"
-	privilegedContainerImage   = "gcr.io/google_containers/netexec:1.7"
-	privilegedCommand          = "ip link add dummy1 type dummy"
-)
-
 type PrivilegedPodTestConfig struct {
-	privilegedPod *api.Pod
-	f             *framework.Framework
-	hostExecPod   *api.Pod
+	f *framework.Framework
+
+	privilegedPod          string
+	privilegedContainer    string
+	notPrivilegedContainer string
+
+	pod *v1.Pod
 }
 
 var _ = framework.KubeDescribe("PrivilegedPod", func() {
-	f := framework.NewDefaultFramework("e2e-privilegedpod")
 	config := &PrivilegedPodTestConfig{
-		f: f,
+		f:                      framework.NewDefaultFramework("e2e-privileged-pod"),
+		privilegedPod:          "privileged-pod",
+		privilegedContainer:    "privileged-container",
+		notPrivilegedContainer: "not-privileged-container",
 	}
-	It("should test privileged pod", func() {
-		By("Creating a hostexec pod")
-		config.createHostExecPod()
 
-		By("Creating a privileged pod")
-		config.createPrivilegedPod()
+	It("should enable privileged commands", func() {
+		By("Creating a pod with a privileged container")
+		config.createPods()
 
-		By("Executing privileged command on privileged container")
-		config.runPrivilegedCommandOnPrivilegedContainer()
+		By("Executing in the privileged container")
+		config.run(config.privilegedContainer, true)
 
-		By("Executing privileged command on non-privileged container")
-		config.runPrivilegedCommandOnNonPrivilegedContainer()
+		By("Executing in the non-privileged container")
+		config.run(config.notPrivilegedContainer, false)
 	})
 })
 
-func (config *PrivilegedPodTestConfig) runPrivilegedCommandOnPrivilegedContainer() {
-	outputMap := config.dialFromContainer(config.privilegedPod.Status.PodIP, privilegedHttpPort)
-	if len(outputMap["error"]) > 0 {
-		framework.Failf("Privileged command failed unexpectedly on privileged container, output:%v", outputMap)
+func (c *PrivilegedPodTestConfig) run(containerName string, expectSuccess bool) {
+	cmd := []string{"ip", "link", "add", "dummy1", "type", "dummy"}
+	reverseCmd := []string{"ip", "link", "del", "dummy1"}
+
+	stdout, stderr, err := c.f.ExecCommandInContainerWithFullOutput(
+		c.privilegedPod, containerName, cmd...)
+	msg := fmt.Sprintf("cmd %v, stdout %q, stderr %q", cmd, stdout, stderr)
+
+	if expectSuccess {
+		Expect(err).NotTo(HaveOccurred(), msg)
+		// We need to clean up the dummy link that was created, as it
+		// leaks out into the node level -- yuck.
+		_, _, err := c.f.ExecCommandInContainerWithFullOutput(
+			c.privilegedPod, containerName, reverseCmd...)
+		Expect(err).NotTo(HaveOccurred(),
+			fmt.Sprintf("could not remove dummy1 link: %v", err))
+	} else {
+		Expect(err).To(HaveOccurred(), msg)
 	}
 }
 
-func (config *PrivilegedPodTestConfig) runPrivilegedCommandOnNonPrivilegedContainer() {
-	outputMap := config.dialFromContainer(config.privilegedPod.Status.PodIP, notPrivilegedHttpPort)
-	if len(outputMap["error"]) == 0 {
-		framework.Failf("Privileged command should have failed on non-privileged container, output:%v", outputMap)
-	}
-}
-
-func (config *PrivilegedPodTestConfig) dialFromContainer(containerIP string, containerHttpPort int) map[string]string {
-	v := url.Values{}
-	v.Set("shellCommand", "ip link add dummy1 type dummy")
-	cmd := fmt.Sprintf("curl -q 'http://%s:%d/shell?%s'",
-		containerIP,
-		containerHttpPort,
-		v.Encode())
-
-	By(fmt.Sprintf("Exec-ing into container over http. Running command:%s", cmd))
-	stdout := config.f.ExecShellInPod(config.hostExecPod.Name, cmd)
-	var output map[string]string
-	err := json.Unmarshal([]byte(stdout), &output)
-	Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("Could not unmarshal curl response: %s", stdout))
-	framework.Logf("Deserialized output is %v", stdout)
-	return output
-}
-
-func (config *PrivilegedPodTestConfig) createPrivilegedPodSpec() *api.Pod {
+func (c *PrivilegedPodTestConfig) createPodsSpec() *v1.Pod {
 	isPrivileged := true
 	notPrivileged := false
-	pod := &api.Pod{
-		ObjectMeta: api.ObjectMeta{
-			Name:      privilegedPodName,
-			Namespace: config.f.Namespace.Name,
+
+	const image = "gcr.io/google_containers/busybox:1.24"
+
+	return &v1.Pod{
+		ObjectMeta: v1.ObjectMeta{
+			Name:      c.privilegedPod,
+			Namespace: c.f.Namespace.Name,
 		},
-		Spec: api.PodSpec{
-			Containers: []api.Container{
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
 				{
-					Name:            privilegedContainerName,
-					Image:           privilegedContainerImage,
-					ImagePullPolicy: api.PullIfNotPresent,
-					SecurityContext: &api.SecurityContext{Privileged: &isPrivileged},
-					Command: []string{
-						"/netexec",
-						fmt.Sprintf("--http-port=%d", privilegedHttpPort),
-						fmt.Sprintf("--udp-port=%d", privilegedUdpPort),
-					},
+					Name:            c.privilegedContainer,
+					Image:           image,
+					ImagePullPolicy: v1.PullIfNotPresent,
+					SecurityContext: &v1.SecurityContext{Privileged: &isPrivileged},
+					Command:         []string{"/bin/sleep", "10000"},
 				},
 				{
-					Name:            notPrivilegedContainerName,
-					Image:           privilegedContainerImage,
-					ImagePullPolicy: api.PullIfNotPresent,
-					SecurityContext: &api.SecurityContext{Privileged: &notPrivileged},
-					Command: []string{
-						"/netexec",
-						fmt.Sprintf("--http-port=%d", notPrivilegedHttpPort),
-						fmt.Sprintf("--udp-port=%d", notPrivilegedUdpPort),
-					},
+					Name:            c.notPrivilegedContainer,
+					Image:           image,
+					ImagePullPolicy: v1.PullIfNotPresent,
+					SecurityContext: &v1.SecurityContext{Privileged: &notPrivileged},
+					Command:         []string{"/bin/sleep", "10000"},
 				},
 			},
 		},
 	}
-	return pod
 }
 
-func (config *PrivilegedPodTestConfig) createHostExecPod() {
-	podSpec := framework.NewHostExecPodSpec(config.f.Namespace.Name, "hostexec")
-	config.hostExecPod = config.f.PodClient().CreateSync(podSpec)
-}
-
-func (config *PrivilegedPodTestConfig) createPrivilegedPod() {
-	podSpec := config.createPrivilegedPodSpec()
-	config.privilegedPod = config.f.PodClient().CreateSync(podSpec)
+func (c *PrivilegedPodTestConfig) createPods() {
+	podSpec := c.createPodsSpec()
+	c.pod = c.f.PodClient().CreateSync(podSpec)
 }

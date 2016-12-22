@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"regexp"
 
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 
 	"github.com/Azure/azure-sdk-for-go/arm/compute"
@@ -28,15 +28,15 @@ import (
 )
 
 // NodeAddresses returns the addresses of the specified instance.
-func (az *Cloud) NodeAddresses(name types.NodeName) ([]api.NodeAddress, error) {
+func (az *Cloud) NodeAddresses(name types.NodeName) ([]v1.NodeAddress, error) {
 	ip, err := az.getIPForMachine(name)
 	if err != nil {
 		return nil, err
 	}
 
-	return []api.NodeAddress{
-		{Type: api.NodeInternalIP, Address: ip},
-		{Type: api.NodeHostName, Address: string(name)},
+	return []v1.NodeAddress{
+		{Type: v1.NodeInternalIP, Address: ip},
+		{Type: v1.NodeHostName, Address: string(name)},
 	}, nil
 }
 
@@ -68,27 +68,7 @@ func (az *Cloud) InstanceType(name types.NodeName) (string, error) {
 	} else if !exists {
 		return "", cloudprovider.InstanceNotFound
 	}
-	return string(machine.Properties.HardwareProfile.VMSize), nil
-}
-
-// List lists instances that match 'filter' which is a regular expression which must match the entire instance name (fqdn)
-func (az *Cloud) List(filter string) ([]types.NodeName, error) {
-	allNodes, err := az.listAllNodesInResourceGroup()
-	if err != nil {
-		return nil, err
-	}
-
-	filteredNodes, err := filterNodes(allNodes, filter)
-	if err != nil {
-		return nil, err
-	}
-
-	nodeNames := make([]types.NodeName, len(filteredNodes))
-	for i, v := range filteredNodes {
-		nodeNames[i] = types.NodeName(*v.Name)
-	}
-
-	return nodeNames, nil
+	return string(machine.HardwareProfile.VMSize), nil
 }
 
 // AddSSHKeyToAllInstances adds an SSH public key as a legal identity for all instances

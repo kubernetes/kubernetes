@@ -21,18 +21,15 @@ import (
 	"net/http/httptest"
 
 	"github.com/golang/glog"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/resource"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	unversionedcore "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/unversioned"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	v1core "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/core/v1"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/client/restclient"
-	"k8s.io/kubernetes/pkg/util/workqueue"
 	"k8s.io/kubernetes/plugin/pkg/scheduler"
 	_ "k8s.io/kubernetes/plugin/pkg/scheduler/algorithmprovider"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/factory"
-	e2e "k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
@@ -55,20 +52,20 @@ func mustSetupScheduler() (schedulerConfigFactory *factory.ConfigFactory, destro
 
 	clientSet := clientset.NewForConfigOrDie(&restclient.Config{
 		Host:          s.URL,
-		ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(api.GroupName).GroupVersion},
+		ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(v1.GroupName).GroupVersion},
 		QPS:           5000.0,
 		Burst:         5000,
 	})
 
-	schedulerConfigFactory = factory.NewConfigFactory(clientSet, api.DefaultSchedulerName, api.DefaultHardPodAffinitySymmetricWeight, api.DefaultFailureDomains)
+	schedulerConfigFactory = factory.NewConfigFactory(clientSet, v1.DefaultSchedulerName, v1.DefaultHardPodAffinitySymmetricWeight, v1.DefaultFailureDomains)
 
 	schedulerConfig, err := schedulerConfigFactory.Create()
 	if err != nil {
 		panic("Couldn't create scheduler config")
 	}
 	eventBroadcaster := record.NewBroadcaster()
-	schedulerConfig.Recorder = eventBroadcaster.NewRecorder(api.EventSource{Component: "scheduler"})
-	eventBroadcaster.StartRecordingToSink(&unversionedcore.EventSinkImpl{Interface: clientSet.Core().Events("")})
+	schedulerConfig.Recorder = eventBroadcaster.NewRecorder(v1.EventSource{Component: "scheduler"})
+	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: clientSet.Core().Events("")})
 	scheduler.New(schedulerConfig).Run()
 
 	destroyFunc = func() {
@@ -78,63 +75,4 @@ func mustSetupScheduler() (schedulerConfigFactory *factory.ConfigFactory, destro
 		glog.Infof("destroyed")
 	}
 	return
-}
-
-func makePodSpec() api.PodSpec {
-	return api.PodSpec{
-		Containers: []api.Container{{
-			Name:  "pause",
-			Image: e2e.GetPauseImageNameForHostArch(),
-			Ports: []api.ContainerPort{{ContainerPort: 80}},
-			Resources: api.ResourceRequirements{
-				Limits: api.ResourceList{
-					api.ResourceCPU:    resource.MustParse("100m"),
-					api.ResourceMemory: resource.MustParse("500Mi"),
-				},
-				Requests: api.ResourceList{
-					api.ResourceCPU:    resource.MustParse("100m"),
-					api.ResourceMemory: resource.MustParse("500Mi"),
-				},
-			},
-		}},
-	}
-}
-
-// makePodsFromRC will create a ReplicationController object and
-// a given number of pods (imitating the controller).
-func makePodsFromRC(c clientset.Interface, name string, podCount int) {
-	rc := &api.ReplicationController{
-		ObjectMeta: api.ObjectMeta{
-			Name: name,
-		},
-		Spec: api.ReplicationControllerSpec{
-			Replicas: int32(podCount),
-			Selector: map[string]string{"name": name},
-			Template: &api.PodTemplateSpec{
-				ObjectMeta: api.ObjectMeta{
-					Labels: map[string]string{"name": name},
-				},
-				Spec: makePodSpec(),
-			},
-		},
-	}
-	if _, err := c.Core().ReplicationControllers("default").Create(rc); err != nil {
-		glog.Fatalf("unexpected error: %v", err)
-	}
-
-	basePod := &api.Pod{
-		ObjectMeta: api.ObjectMeta{
-			GenerateName: "scheduler-test-pod-",
-			Labels:       map[string]string{"name": name},
-		},
-		Spec: makePodSpec(),
-	}
-	createPod := func(i int) {
-		for {
-			if _, err := c.Core().Pods("default").Create(basePod); err == nil {
-				break
-			}
-		}
-	}
-	workqueue.Parallelize(30, podCount, createPod)
 }

@@ -25,7 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/registry/core/pod"
-	"k8s.io/kubernetes/pkg/registry/generic/registry"
+	genericregistry "k8s.io/kubernetes/pkg/registry/generic/registry"
 	genericrest "k8s.io/kubernetes/pkg/registry/generic/rest"
 	"k8s.io/kubernetes/pkg/runtime"
 )
@@ -33,7 +33,7 @@ import (
 // LogREST implements the log endpoint for a Pod
 type LogREST struct {
 	KubeletConn client.ConnectionInfoGetter
-	Store       *registry.Store
+	Store       *genericregistry.Store
 }
 
 // LogREST implements GetterWithOptions
@@ -53,6 +53,11 @@ func (r *LogREST) ProducesMIMETypes(verb string) []string {
 	return []string{
 		"text/plain",
 	}
+}
+
+// LogREST implements StorageMetadata, return string as the generating object
+func (r *LogREST) ProducesObject(verb string) interface{} {
+	return ""
 }
 
 // Get retrieves a runtime.Object that will stream the contents of the pod log

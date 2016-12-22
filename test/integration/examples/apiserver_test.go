@@ -25,28 +25,30 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/kubernetes/cmd/libs/go2idl/client-gen/test_apis/testgroup.k8s.io/v1"
+	"k8s.io/kubernetes/cmd/libs/go2idl/client-gen/test_apis/testgroup/v1"
 
 	"github.com/golang/glog"
 	"github.com/stretchr/testify/assert"
 	"k8s.io/kubernetes/examples/apiserver"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 )
 
 var groupVersion = v1.SchemeGroupVersion
 
-var groupVersionForDiscovery = unversioned.GroupVersionForDiscovery{
+var groupVersionForDiscovery = metav1.GroupVersionForDiscovery{
 	GroupVersion: groupVersion.String(),
 	Version:      groupVersion.Version,
 }
 
 func TestRunServer(t *testing.T) {
 	serverIP := fmt.Sprintf("http://localhost:%d", apiserver.InsecurePort)
+	stopCh := make(chan struct{})
 	go func() {
-		if err := apiserver.Run(apiserver.NewServerRunOptions()); err != nil {
+		if err := apiserver.NewServerRunOptions().Run(stopCh); err != nil {
 			t.Fatalf("Error in bringing up the server: %v", err)
 		}
 	}()
+	defer close(stopCh)
 	if err := waitForApiserverUp(serverIP); err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -58,14 +60,16 @@ func TestRunServer(t *testing.T) {
 
 func TestRunSecureServer(t *testing.T) {
 	serverIP := fmt.Sprintf("https://localhost:%d", apiserver.SecurePort)
+	stopCh := make(chan struct{})
 	go func() {
 		options := apiserver.NewServerRunOptions()
-		options.InsecurePort = 0
-		options.SecurePort = apiserver.SecurePort
-		if err := apiserver.Run(options); err != nil {
+		options.InsecureServing.BindPort = 0
+		options.SecureServing.ServingOptions.BindPort = apiserver.SecurePort
+		if err := options.Run(stopCh); err != nil {
 			t.Fatalf("Error in bringing up the server: %v", err)
 		}
 	}()
+	defer close(stopCh)
 	if err := waitForApiserverUp(serverIP); err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -126,7 +130,7 @@ func testAPIGroupList(t *testing.T, serverIP string) {
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
-	var apiGroupList unversioned.APIGroupList
+	var apiGroupList metav1.APIGroupList
 	err = json.Unmarshal(contents, &apiGroupList)
 	if err != nil {
 		t.Fatalf("Error in unmarshalling response from server %s: %v", serverURL, err)
@@ -144,7 +148,7 @@ func testAPIGroup(t *testing.T, serverIP string) {
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
-	var apiGroup unversioned.APIGroup
+	var apiGroup metav1.APIGroup
 	err = json.Unmarshal(contents, &apiGroup)
 	if err != nil {
 		t.Fatalf("Error in unmarshalling response from server %s: %v", serverURL, err)
@@ -163,7 +167,7 @@ func testAPIResourceList(t *testing.T, serverIP string) {
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
-	var apiResourceList unversioned.APIResourceList
+	var apiResourceList metav1.APIResourceList
 	err = json.Unmarshal(contents, &apiResourceList)
 	if err != nil {
 		t.Fatalf("Error in unmarshalling response from server %s: %v", serverURL, err)

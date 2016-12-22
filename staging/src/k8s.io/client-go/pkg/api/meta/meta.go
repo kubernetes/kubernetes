@@ -20,10 +20,10 @@ import (
 	"fmt"
 	"reflect"
 
-	"k8s.io/client-go/pkg/api/meta/metatypes"
-	"k8s.io/client-go/pkg/api/unversioned"
+	metav1 "k8s.io/client-go/pkg/apis/meta/v1"
 	"k8s.io/client-go/pkg/conversion"
 	"k8s.io/client-go/pkg/runtime"
+	"k8s.io/client-go/pkg/runtime/schema"
 	"k8s.io/client-go/pkg/types"
 
 	"github.com/golang/glog"
@@ -42,14 +42,14 @@ func ListAccessor(obj interface{}) (List, error) {
 	switch t := obj.(type) {
 	case List:
 		return t, nil
-	case unversioned.List:
+	case metav1.List:
 		return t, nil
 	case ListMetaAccessor:
 		if m := t.GetListMeta(); m != nil {
 			return m, nil
 		}
 		return nil, errNotList
-	case unversioned.ListMetaAccessor:
+	case metav1.ListMetaAccessor:
 		if m := t.GetListMeta(); m != nil {
 			return m, nil
 		}
@@ -84,7 +84,7 @@ func Accessor(obj interface{}) (Object, error) {
 			return m, nil
 		}
 		return nil, errNotObject
-	case List, unversioned.List, ListMetaAccessor, unversioned.ListMetaAccessor:
+	case List, metav1.List, ListMetaAccessor, metav1.ListMetaAccessor:
 		return nil, errNotObject
 	default:
 		return nil, errNotObject
@@ -140,9 +140,9 @@ func (obj objectAccessor) GetAPIVersion() string {
 
 func (obj objectAccessor) SetAPIVersion(version string) {
 	gvk := obj.GetObjectKind().GroupVersionKind()
-	gv, err := unversioned.ParseGroupVersion(version)
+	gv, err := schema.ParseGroupVersion(version)
 	if err != nil {
-		gv = unversioned.GroupVersion{Version: version}
+		gv = schema.GroupVersion{Version: version}
 	}
 	gvk.Group, gvk.Version = gv.Group, gv.Version
 	obj.GetObjectKind().SetGroupVersionKind(gvk)
@@ -313,7 +313,7 @@ func (resourceAccessor) SetResourceVersion(obj runtime.Object, version string) e
 }
 
 // extractFromOwnerReference extracts v to o. v is the OwnerReferences field of an object.
-func extractFromOwnerReference(v reflect.Value, o *metatypes.OwnerReference) error {
+func extractFromOwnerReference(v reflect.Value, o *metav1.OwnerReference) error {
 	if err := runtime.Field(v, "APIVersion", &o.APIVersion); err != nil {
 		return err
 	}
@@ -338,7 +338,7 @@ func extractFromOwnerReference(v reflect.Value, o *metatypes.OwnerReference) err
 }
 
 // setOwnerReference sets v to o. v is the OwnerReferences field of an object.
-func setOwnerReference(v reflect.Value, o *metatypes.OwnerReference) error {
+func setOwnerReference(v reflect.Value, o *metav1.OwnerReference) error {
 	if err := runtime.SetField(o.APIVersion, v, "APIVersion"); err != nil {
 		return err
 	}
@@ -371,8 +371,8 @@ type genericAccessor struct {
 	kind              *string
 	resourceVersion   *string
 	selfLink          *string
-	creationTimestamp *unversioned.Time
-	deletionTimestamp **unversioned.Time
+	creationTimestamp *metav1.Time
+	deletionTimestamp **metav1.Time
 	labels            *map[string]string
 	annotations       *map[string]string
 	ownerReferences   reflect.Value
@@ -467,19 +467,19 @@ func (a genericAccessor) SetSelfLink(selfLink string) {
 	*a.selfLink = selfLink
 }
 
-func (a genericAccessor) GetCreationTimestamp() unversioned.Time {
+func (a genericAccessor) GetCreationTimestamp() metav1.Time {
 	return *a.creationTimestamp
 }
 
-func (a genericAccessor) SetCreationTimestamp(timestamp unversioned.Time) {
+func (a genericAccessor) SetCreationTimestamp(timestamp metav1.Time) {
 	*a.creationTimestamp = timestamp
 }
 
-func (a genericAccessor) GetDeletionTimestamp() *unversioned.Time {
+func (a genericAccessor) GetDeletionTimestamp() *metav1.Time {
 	return *a.deletionTimestamp
 }
 
-func (a genericAccessor) SetDeletionTimestamp(timestamp *unversioned.Time) {
+func (a genericAccessor) SetDeletionTimestamp(timestamp *metav1.Time) {
 	*a.deletionTimestamp = timestamp
 }
 
@@ -520,8 +520,8 @@ func (a genericAccessor) SetFinalizers(finalizers []string) {
 	*a.finalizers = finalizers
 }
 
-func (a genericAccessor) GetOwnerReferences() []metatypes.OwnerReference {
-	var ret []metatypes.OwnerReference
+func (a genericAccessor) GetOwnerReferences() []metav1.OwnerReference {
+	var ret []metav1.OwnerReference
 	s := a.ownerReferences
 	if s.Kind() != reflect.Ptr || s.Elem().Kind() != reflect.Slice {
 		glog.Errorf("expect %v to be a pointer to slice", s)
@@ -529,7 +529,7 @@ func (a genericAccessor) GetOwnerReferences() []metatypes.OwnerReference {
 	}
 	s = s.Elem()
 	// Set the capacity to one element greater to avoid copy if the caller later append an element.
-	ret = make([]metatypes.OwnerReference, s.Len(), s.Len()+1)
+	ret = make([]metav1.OwnerReference, s.Len(), s.Len()+1)
 	for i := 0; i < s.Len(); i++ {
 		if err := extractFromOwnerReference(s.Index(i), &ret[i]); err != nil {
 			glog.Errorf("extractFromOwnerReference failed: %v", err)
@@ -539,7 +539,7 @@ func (a genericAccessor) GetOwnerReferences() []metatypes.OwnerReference {
 	return ret
 }
 
-func (a genericAccessor) SetOwnerReferences(references []metatypes.OwnerReference) {
+func (a genericAccessor) SetOwnerReferences(references []metav1.OwnerReference) {
 	s := a.ownerReferences
 	if s.Kind() != reflect.Ptr || s.Elem().Kind() != reflect.Slice {
 		glog.Errorf("expect %v to be a pointer to slice", s)

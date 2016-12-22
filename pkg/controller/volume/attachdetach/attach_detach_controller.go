@@ -25,8 +25,10 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	kcache "k8s.io/kubernetes/pkg/client/cache"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	v1core "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/core/v1"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/cache"
@@ -56,23 +58,27 @@ const (
 	// desiredStateOfWorldPopulatorLoopSleepPeriod is the amount of time the
 	// DesiredStateOfWorldPopulator loop waits between successive executions
 	desiredStateOfWorldPopulatorLoopSleepPeriod time.Duration = 1 * time.Minute
+
+	// reconcilerSyncDuration is the amount of time the reconciler sync states loop
+	// wait between successive executions
+	reconcilerSyncDuration time.Duration = 5 * time.Second
 )
 
 // AttachDetachController defines the operations supported by this controller.
 type AttachDetachController interface {
 	Run(stopCh <-chan struct{})
+	GetDesiredStateOfWorld() cache.DesiredStateOfWorld
 }
 
 // NewAttachDetachController returns a new instance of AttachDetachController.
 func NewAttachDetachController(
-	kubeClient internalclientset.Interface,
+	kubeClient clientset.Interface,
 	podInformer kcache.SharedInformer,
 	nodeInformer kcache.SharedInformer,
 	pvcInformer kcache.SharedInformer,
 	pvInformer kcache.SharedInformer,
 	cloud cloudprovider.Interface,
-	plugins []volume.VolumePlugin,
-	recorder record.EventRecorder) (AttachDetachController, error) {
+	plugins []volume.VolumePlugin) (AttachDetachController, error) {
 	// TODO: The default resyncPeriod for shared informers is 12 hours, this is
 	// unacceptable for the attach/detach controller. For example, if a pod is
 	// skipped because the node it is scheduled to didn't set its annotation in
@@ -110,18 +116,25 @@ func NewAttachDetachController(
 		return nil, fmt.Errorf("Could not initialize volume plugins for Attach/Detach Controller: %+v", err)
 	}
 
+	eventBroadcaster := record.NewBroadcaster()
+	eventBroadcaster.StartLogging(glog.Infof)
+	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: kubeClient.Core().Events("")})
+	recorder := eventBroadcaster.NewRecorder(v1.EventSource{Component: "attachdetach"})
+
 	adc.desiredStateOfWorld = cache.NewDesiredStateOfWorld(&adc.volumePluginMgr)
 	adc.actualStateOfWorld = cache.NewActualStateOfWorld(&adc.volumePluginMgr)
 	adc.attacherDetacher =
 		operationexecutor.NewOperationExecutor(
 			kubeClient,
 			&adc.volumePluginMgr,
-			recorder)
+			recorder,
+			false) // flag for experimental binary check for volume mount
 	adc.nodeStatusUpdater = statusupdater.NewNodeStatusUpdater(
 		kubeClient, nodeInformer, adc.actualStateOfWorld)
 	adc.reconciler = reconciler.NewReconciler(
 		reconcilerLoopPeriod,
 		reconcilerMaxWaitForUnmountDuration,
+		reconcilerSyncDuration,
 		adc.desiredStateOfWorld,
 		adc.actualStateOfWorld,
 		adc.attacherDetacher,
@@ -138,7 +151,7 @@ func NewAttachDetachController(
 type attachDetachController struct {
 	// kubeClient is the kube API client used by volumehost to communicate with
 	// the API server.
-	kubeClient internalclientset.Interface
+	kubeClient clientset.Interface
 
 	// pvcInformer is the shared PVC informer used to fetch and store PVC
 	// objects from the API server. It is shared with other controllers and
@@ -204,11 +217,10 @@ func (adc *attachDetachController) Run(stopCh <-chan struct{}) {
 }
 
 func (adc *attachDetachController) podAdd(obj interface{}) {
-	pod, ok := obj.(*api.Pod)
+	pod, ok := obj.(*v1.Pod)
 	if pod == nil || !ok {
 		return
 	}
-
 	if pod.Spec.NodeName == "" {
 		// Ignore pods without NodeName, indicating they are not scheduled.
 		return
@@ -217,13 +229,18 @@ func (adc *attachDetachController) podAdd(obj interface{}) {
 	adc.processPodVolumes(pod, true /* addVolumes */)
 }
 
+// GetDesiredStateOfWorld returns desired state of world associated with controller
+func (adc *attachDetachController) GetDesiredStateOfWorld() cache.DesiredStateOfWorld {
+	return adc.desiredStateOfWorld
+}
+
 func (adc *attachDetachController) podUpdate(oldObj, newObj interface{}) {
 	// The flow for update is the same as add.
 	adc.podAdd(newObj)
 }
 
 func (adc *attachDetachController) podDelete(obj interface{}) {
-	pod, ok := obj.(*api.Pod)
+	pod, ok := obj.(*v1.Pod)
 	if pod == nil || !ok {
 		return
 	}
@@ -232,7 +249,24 @@ func (adc *attachDetachController) podDelete(obj interface{}) {
 }
 
 func (adc *attachDetachController) nodeAdd(obj interface{}) {
-	node, ok := obj.(*api.Node)
+	node, ok := obj.(*v1.Node)
+	// TODO: investigate if nodeName is empty then if we can return
+	// kubernetes/kubernetes/issues/37777
+	if node == nil || !ok {
+		return
+	}
+	nodeName := types.NodeName(node.Name)
+	adc.nodeUpdate(nil, obj)
+	// kubernetes/kubernetes/issues/37586
+	// This is to workaround the case when a node add causes to wipe out
+	// the attached volumes field. This function ensures that we sync with
+	// the actual status.
+	adc.actualStateOfWorld.SetNodeStatusUpdateNeeded(nodeName)
+}
+
+func (adc *attachDetachController) nodeUpdate(oldObj, newObj interface{}) {
+	node, ok := newObj.(*v1.Node)
+	// TODO: investigate if nodeName is empty then if we can return
 	if node == nil || !ok {
 		return
 	}
@@ -243,17 +277,11 @@ func (adc *attachDetachController) nodeAdd(obj interface{}) {
 		// detach controller. Add it to desired state of world.
 		adc.desiredStateOfWorld.AddNode(nodeName)
 	}
-
 	adc.processVolumesInUse(nodeName, node.Status.VolumesInUse)
 }
 
-func (adc *attachDetachController) nodeUpdate(oldObj, newObj interface{}) {
-	// The flow for update is the same as add.
-	adc.nodeAdd(newObj)
-}
-
 func (adc *attachDetachController) nodeDelete(obj interface{}) {
-	node, ok := obj.(*api.Node)
+	node, ok := obj.(*v1.Node)
 	if node == nil || !ok {
 		return
 	}
@@ -269,7 +297,7 @@ func (adc *attachDetachController) nodeDelete(obj interface{}) {
 // processPodVolumes processes the volumes in the given pod and adds them to the
 // desired state of the world if addVolumes is true, otherwise it removes them.
 func (adc *attachDetachController) processPodVolumes(
-	pod *api.Pod, addVolumes bool) {
+	pod *v1.Pod, addVolumes bool) {
 	if pod == nil {
 		return
 	}
@@ -357,7 +385,7 @@ func (adc *attachDetachController) processPodVolumes(
 // createVolumeSpec creates and returns a mutatable volume.Spec object for the
 // specified volume. It dereference any PVC to get PV objects, if needed.
 func (adc *attachDetachController) createVolumeSpec(
-	podVolume api.Volume, podNamespace string) (*volume.Spec, error) {
+	podVolume v1.Volume, podNamespace string) (*volume.Spec, error) {
 	if pvcSource := podVolume.VolumeSource.PersistentVolumeClaim; pvcSource != nil {
 		glog.V(10).Infof(
 			"Found PVC, ClaimName: %q/%q",
@@ -406,18 +434,18 @@ func (adc *attachDetachController) createVolumeSpec(
 
 	// Do not return the original volume object, since it's from the shared
 	// informer it may be mutated by another consumer.
-	clonedPodVolumeObj, err := api.Scheme.DeepCopy(podVolume)
+	clonedPodVolumeObj, err := api.Scheme.DeepCopy(&podVolume)
 	if err != nil || clonedPodVolumeObj == nil {
 		return nil, fmt.Errorf(
 			"failed to deep copy %q volume object. err=%v", podVolume.Name, err)
 	}
 
-	clonedPodVolume, ok := clonedPodVolumeObj.(api.Volume)
+	clonedPodVolume, ok := clonedPodVolumeObj.(*v1.Volume)
 	if !ok {
-		return nil, fmt.Errorf("failed to cast clonedPodVolume %#v to api.Volume", clonedPodVolumeObj)
+		return nil, fmt.Errorf("failed to cast clonedPodVolume %#v to v1.Volume", clonedPodVolumeObj)
 	}
 
-	return volume.NewSpecFromVolume(&clonedPodVolume), nil
+	return volume.NewSpecFromVolume(clonedPodVolume), nil
 }
 
 // getPVCFromCacheExtractPV fetches the PVC object with the given namespace and
@@ -441,7 +469,7 @@ func (adc *attachDetachController) getPVCFromCacheExtractPV(
 			err)
 	}
 
-	pvc, ok := pvcObj.(*api.PersistentVolumeClaim)
+	pvc, ok := pvcObj.(*v1.PersistentVolumeClaim)
 	if !ok || pvc == nil {
 		return "", "", fmt.Errorf(
 			"failed to cast %q object %#v to PersistentVolumeClaim",
@@ -449,7 +477,7 @@ func (adc *attachDetachController) getPVCFromCacheExtractPV(
 			pvcObj)
 	}
 
-	if pvc.Status.Phase != api.ClaimBound || pvc.Spec.VolumeName == "" {
+	if pvc.Status.Phase != v1.ClaimBound || pvc.Spec.VolumeName == "" {
 		return "", "", fmt.Errorf(
 			"PVC %q has non-bound phase (%q) or empty pvc.Spec.VolumeName (%q)",
 			key,
@@ -476,7 +504,7 @@ func (adc *attachDetachController) getPVSpecFromCache(
 			"failed to find PV %q in PVInformer cache. %v", name, err)
 	}
 
-	pv, ok := pvObj.(*api.PersistentVolume)
+	pv, ok := pvObj.(*v1.PersistentVolume)
 	if !ok || pv == nil {
 		return nil, fmt.Errorf(
 			"failed to cast %q object %#v to PersistentVolume", name, pvObj)
@@ -498,19 +526,19 @@ func (adc *attachDetachController) getPVSpecFromCache(
 
 	// Do not return the object from the informer, since the store is shared it
 	// may be mutated by another consumer.
-	clonedPVObj, err := api.Scheme.DeepCopy(*pv)
+	clonedPVObj, err := api.Scheme.DeepCopy(pv)
 	if err != nil || clonedPVObj == nil {
 		return nil, fmt.Errorf(
 			"failed to deep copy %q PV object. err=%v", name, err)
 	}
 
-	clonedPV, ok := clonedPVObj.(api.PersistentVolume)
+	clonedPV, ok := clonedPVObj.(*v1.PersistentVolume)
 	if !ok {
 		return nil, fmt.Errorf(
 			"failed to cast %q clonedPV %#v to PersistentVolume", name, pvObj)
 	}
 
-	return volume.NewSpecFromPersistentVolume(&clonedPV, pvcReadOnly), nil
+	return volume.NewSpecFromPersistentVolume(clonedPV, pvcReadOnly), nil
 }
 
 // processVolumesInUse processes the list of volumes marked as "in-use"
@@ -518,7 +546,7 @@ func (adc *attachDetachController) getPVSpecFromCache(
 // corresponding volume in the actual state of the world to indicate that it is
 // mounted.
 func (adc *attachDetachController) processVolumesInUse(
-	nodeName types.NodeName, volumesInUse []api.UniqueVolumeName) {
+	nodeName types.NodeName, volumesInUse []v1.UniqueVolumeName) {
 	glog.V(4).Infof("processVolumesInUse for node %q", nodeName)
 	for _, attachedVolume := range adc.actualStateOfWorld.GetAttachedVolumesForNode(nodeName) {
 		mounted := false
@@ -556,11 +584,11 @@ func (adc *attachDetachController) GetPodPluginDir(podUID types.UID, pluginName 
 	return ""
 }
 
-func (adc *attachDetachController) GetKubeClient() internalclientset.Interface {
+func (adc *attachDetachController) GetKubeClient() clientset.Interface {
 	return adc.kubeClient
 }
 
-func (adc *attachDetachController) NewWrapperMounter(volName string, spec volume.Spec, pod *api.Pod, opts volume.VolumeOptions) (volume.Mounter, error) {
+func (adc *attachDetachController) NewWrapperMounter(volName string, spec volume.Spec, pod *v1.Pod, opts volume.VolumeOptions) (volume.Mounter, error) {
 	return nil, fmt.Errorf("NewWrapperMounter not supported by Attach/Detach controller's VolumeHost implementation")
 }
 
@@ -588,10 +616,6 @@ func (adc *attachDetachController) GetHostIP() (net.IP, error) {
 	return nil, fmt.Errorf("GetHostIP() not supported by Attach/Detach controller's VolumeHost implementation")
 }
 
-func (adc *attachDetachController) GetRootContext() string {
-	return ""
-}
-
-func (adc *attachDetachController) GetNodeAllocatable() (api.ResourceList, error) {
-	return api.ResourceList{}, nil
+func (adc *attachDetachController) GetNodeAllocatable() (v1.ResourceList, error) {
+	return v1.ResourceList{}, nil
 }

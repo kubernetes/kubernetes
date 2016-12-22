@@ -23,11 +23,13 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/extensions"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 	sliceutil "k8s.io/kubernetes/pkg/util/slice"
 )
 
@@ -40,7 +42,7 @@ type HistoryViewer interface {
 	ViewHistory(namespace, name string, revision int64) (string, error)
 }
 
-func HistoryViewerFor(kind unversioned.GroupKind, c clientset.Interface) (HistoryViewer, error) {
+func HistoryViewerFor(kind schema.GroupKind, c clientset.Interface) (HistoryViewer, error) {
 	switch kind {
 	case extensions.Kind("Deployment"):
 		return &DeploymentHistoryViewer{c}, nil
@@ -54,11 +56,12 @@ type DeploymentHistoryViewer struct {
 
 // ViewHistory returns a revision-to-replicaset map as the revision history of a deployment
 func (h *DeploymentHistoryViewer) ViewHistory(namespace, name string, revision int64) (string, error) {
-	deployment, err := h.c.Extensions().Deployments(namespace).Get(name)
+	versionedClient := versionedClientsetForDeployment(h.c)
+	deployment, err := versionedClient.Extensions().Deployments(namespace).Get(name, metav1.GetOptions{})
 	if err != nil {
 		return "", fmt.Errorf("failed to retrieve deployment %s: %v", name, err)
 	}
-	_, allOldRSs, newRS, err := deploymentutil.GetAllReplicaSets(deployment, h.c)
+	_, allOldRSs, newRS, err := deploymentutil.GetAllReplicaSets(deployment, versionedClient)
 	if err != nil {
 		return "", fmt.Errorf("failed to retrieve replica sets from deployment %s: %v", name, err)
 	}
@@ -67,7 +70,7 @@ func (h *DeploymentHistoryViewer) ViewHistory(namespace, name string, revision i
 		allRSs = append(allRSs, newRS)
 	}
 
-	historyInfo := make(map[int64]*api.PodTemplateSpec)
+	historyInfo := make(map[int64]*v1.PodTemplateSpec)
 	for _, rs := range allRSs {
 		v, err := deploymentutil.Revision(rs)
 		if err != nil {
@@ -94,7 +97,11 @@ func (h *DeploymentHistoryViewer) ViewHistory(namespace, name string, revision i
 			return "", fmt.Errorf("unable to find the specified revision")
 		}
 		buf := bytes.NewBuffer([]byte{})
-		DescribePodTemplate(template, buf)
+		internalTemplate := &api.PodTemplateSpec{}
+		if err := v1.Convert_v1_PodTemplateSpec_To_api_PodTemplateSpec(template, internalTemplate, nil); err != nil {
+			return "", fmt.Errorf("failed to convert podtemplate, %v", err)
+		}
+		DescribePodTemplate(internalTemplate, buf)
 		return buf.String(), nil
 	}
 

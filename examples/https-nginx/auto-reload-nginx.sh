@@ -17,7 +17,7 @@
 nginx "$@"
 oldcksum=`cksum /etc/nginx/conf.d/default.conf`
 
-inotifywait -mr --timefmt '%d/%m/%y %H:%M' --format '%T' \
+inotifywait -e modify,move,create,delete -mr --timefmt '%d/%m/%y %H:%M' --format '%T' \
 /etc/nginx/conf.d/ | while read date time; do
 
 	newcksum=`cksum /etc/nginx/conf.d/default.conf`

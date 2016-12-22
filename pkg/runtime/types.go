@@ -25,7 +25,7 @@ package runtime
 //      runtime.TypeMeta    `json:",inline"`
 //      ... // other fields
 // }
-// func (obj *MyAwesomeAPIObject) SetGroupVersionKind(gvk *unversioned.GroupVersionKind) { unversioned.UpdateTypeMeta(obj,gvk) }; GroupVersionKind() *GroupVersionKind
+// func (obj *MyAwesomeAPIObject) SetGroupVersionKind(gvk *metav1.GroupVersionKind) { metav1.UpdateTypeMeta(obj,gvk) }; GroupVersionKind() *GroupVersionKind
 //
 // TypeMeta is provided here for convenience. You may use it directly from this package or define
 // your own with the same fields.
@@ -120,17 +120,6 @@ type Unknown struct {
 	// ContentType  is serialization method used to serialize 'Raw'.
 	// Unspecified means ContentTypeJSON.
 	ContentType string `protobuf:"bytes,4,opt,name=contentType"`
-}
-
-// Unstructured allows objects that do not have Golang structs registered to be manipulated
-// generically. This can be used to deal with the API objects from a plug-in. Unstructured
-// objects still have functioning TypeMeta features-- kind, version, etc.
-// TODO: Make this object have easy access to field based accessors and settors for
-// metadata and field mutatation.
-type Unstructured struct {
-	// Object is a JSON compatible map with string, float, int, []interface{}, or map[string]interface{}
-	// children.
-	Object map[string]interface{}
 }
 
 // VersionedObjects is used by Decoders to give callers a way to access all versions

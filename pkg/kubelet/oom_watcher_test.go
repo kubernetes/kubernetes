@@ -19,7 +19,7 @@ package kubelet
 import (
 	"testing"
 
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/record"
 	cadvisortest "k8s.io/kubernetes/pkg/kubelet/cadvisor/testing"
 )
@@ -27,7 +27,7 @@ import (
 func TestBasic(t *testing.T) {
 	fakeRecorder := &record.FakeRecorder{}
 	mockCadvisor := &cadvisortest.Fake{}
-	node := &api.ObjectReference{}
+	node := &v1.ObjectReference{}
 	oomWatcher := NewOOMWatcher(mockCadvisor, fakeRecorder)
 	err := oomWatcher.Start(node)
 	if err != nil {

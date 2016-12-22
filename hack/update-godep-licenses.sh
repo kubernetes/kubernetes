@@ -57,13 +57,13 @@ process_content () {
                # Sadly inconsistent in the wild, but mostly license files
                # containing copyrights, but no readme/notice files containing
                # licenses (except to "see license file")
-               ensure_pattern="License|Copyright"
+               ensure_pattern="license|copyright"
                ;;
     # We search READMEs for copyrights and this includes notice files as well
     # Look in as many places as we find files matching
     COPYRIGHT) find_names=(-iname 'notice*' -o -iname 'readme*')
                find_maxdepth=3
-               ensure_pattern="Copyright"
+               ensure_pattern="copyright"
                ;;
   esac
 
@@ -97,7 +97,7 @@ process_content () {
   if [[ -z "${CONTENT[${index}]-}" ]]; then
     for f in ${local_files[@]-}; do
       # Find some copyright info in any file and break
-      if egrep -wq "${ensure_pattern}" "${f}"; then
+      if egrep -i -wq "${ensure_pattern}" "${f}"; then
         CONTENT[${index}]="${f}"
         break
       fi

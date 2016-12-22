@@ -20,7 +20,9 @@ import (
 	api "k8s.io/client-go/pkg/api"
 	v1 "k8s.io/client-go/pkg/api/v1"
 	v1beta1 "k8s.io/client-go/pkg/apis/extensions/v1beta1"
+	meta_v1 "k8s.io/client-go/pkg/apis/meta/v1"
 	watch "k8s.io/client-go/pkg/watch"
+	rest "k8s.io/client-go/rest"
 )
 
 // ThirdPartyResourcesGetter has a method to return a ThirdPartyResourceInterface.
@@ -35,7 +37,7 @@ type ThirdPartyResourceInterface interface {
 	Update(*v1beta1.ThirdPartyResource) (*v1beta1.ThirdPartyResource, error)
 	Delete(name string, options *v1.DeleteOptions) error
 	DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error
-	Get(name string) (*v1beta1.ThirdPartyResource, error)
+	Get(name string, options meta_v1.GetOptions) (*v1beta1.ThirdPartyResource, error)
 	List(opts v1.ListOptions) (*v1beta1.ThirdPartyResourceList, error)
 	Watch(opts v1.ListOptions) (watch.Interface, error)
 	Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *v1beta1.ThirdPartyResource, err error)
@@ -44,13 +46,13 @@ type ThirdPartyResourceInterface interface {
 
 // thirdPartyResources implements ThirdPartyResourceInterface
 type thirdPartyResources struct {
-	client *ExtensionsClient
+	client rest.Interface
 }
 
 // newThirdPartyResources returns a ThirdPartyResources
-func newThirdPartyResources(c *ExtensionsClient) *thirdPartyResources {
+func newThirdPartyResources(c *ExtensionsV1beta1Client) *thirdPartyResources {
 	return &thirdPartyResources{
-		client: c,
+		client: c.RESTClient(),
 	}
 }
 
@@ -98,11 +100,12 @@ func (c *thirdPartyResources) DeleteCollection(options *v1.DeleteOptions, listOp
 }
 
 // Get takes name of the thirdPartyResource, and returns the corresponding thirdPartyResource object, and an error if there is any.
-func (c *thirdPartyResources) Get(name string) (result *v1beta1.ThirdPartyResource, err error) {
+func (c *thirdPartyResources) Get(name string, options meta_v1.GetOptions) (result *v1beta1.ThirdPartyResource, err error) {
 	result = &v1beta1.ThirdPartyResource{}
 	err = c.client.Get().
 		Resource("thirdpartyresources").
 		Name(name).
+		VersionedParams(&options, api.ParameterCodec).
 		Do().
 		Into(result)
 	return

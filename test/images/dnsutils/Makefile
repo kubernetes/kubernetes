@@ -13,8 +13,8 @@
 # limitations under the License.
 
 # This image does not tag
-#TAG =
-PREFIX = gcr.io/google_containers
+TAG ?=
+PREFIX ?= gcr.io/google_containers
 
 all: push
 

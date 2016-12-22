@@ -19,8 +19,10 @@ package v1alpha1
 import (
 	api "k8s.io/client-go/pkg/api"
 	v1 "k8s.io/client-go/pkg/api/v1"
+	meta_v1 "k8s.io/client-go/pkg/apis/meta/v1"
 	v1alpha1 "k8s.io/client-go/pkg/apis/rbac/v1alpha1"
 	watch "k8s.io/client-go/pkg/watch"
+	rest "k8s.io/client-go/rest"
 )
 
 // RolesGetter has a method to return a RoleInterface.
@@ -35,7 +37,7 @@ type RoleInterface interface {
 	Update(*v1alpha1.Role) (*v1alpha1.Role, error)
 	Delete(name string, options *v1.DeleteOptions) error
 	DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error
-	Get(name string) (*v1alpha1.Role, error)
+	Get(name string, options meta_v1.GetOptions) (*v1alpha1.Role, error)
 	List(opts v1.ListOptions) (*v1alpha1.RoleList, error)
 	Watch(opts v1.ListOptions) (watch.Interface, error)
 	Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *v1alpha1.Role, err error)
@@ -44,14 +46,14 @@ type RoleInterface interface {
 
 // roles implements RoleInterface
 type roles struct {
-	client *RbacClient
+	client rest.Interface
 	ns     string
 }
 
 // newRoles returns a Roles
-func newRoles(c *RbacClient, namespace string) *roles {
+func newRoles(c *RbacV1alpha1Client, namespace string) *roles {
 	return &roles{
-		client: c,
+		client: c.RESTClient(),
 		ns:     namespace,
 	}
 }
@@ -104,12 +106,13 @@ func (c *roles) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListO
 }
 
 // Get takes name of the role, and returns the corresponding role object, and an error if there is any.
-func (c *roles) Get(name string) (result *v1alpha1.Role, err error) {
+func (c *roles) Get(name string, options meta_v1.GetOptions) (result *v1alpha1.Role, err error) {
 	result = &v1alpha1.Role{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("roles").
 		Name(name).
+		VersionedParams(&options, api.ParameterCodec).
 		Do().
 		Into(result)
 	return

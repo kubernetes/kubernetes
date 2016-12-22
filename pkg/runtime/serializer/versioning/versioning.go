@@ -19,8 +19,8 @@ package versioning
 import (
 	"io"
 
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
 )
 
@@ -93,7 +93,7 @@ type codec struct {
 // Decode attempts a decode of the object, then tries to convert it to the internal version. If into is provided and the decoding is
 // successful, the returned runtime.Object will be the value passed as into. Note that this may bypass conversion if you pass an
 // into that matches the serialized version.
-func (c *codec) Decode(data []byte, defaultGVK *unversioned.GroupVersionKind, into runtime.Object) (runtime.Object, *unversioned.GroupVersionKind, error) {
+func (c *codec) Decode(data []byte, defaultGVK *schema.GroupVersionKind, into runtime.Object) (runtime.Object, *schema.GroupVersionKind, error) {
 	versioned, isVersioned := into.(*runtime.VersionedObjects)
 	if isVersioned {
 		into = versioned.Last()
@@ -181,7 +181,7 @@ func (c *codec) Decode(data []byte, defaultGVK *unversioned.GroupVersionKind, in
 // conversion if necessary. Unversioned objects (according to the ObjectTyper) are output as is.
 func (c *codec) Encode(obj runtime.Object, w io.Writer) error {
 	switch obj.(type) {
-	case *runtime.Unknown, *runtime.Unstructured, *runtime.UnstructuredList:
+	case *runtime.Unknown, runtime.Unstructured:
 		return c.encoder.Encode(obj, w)
 	}
 
@@ -227,6 +227,7 @@ func (c *codec) Encode(obj runtime.Object, w io.Writer) error {
 
 // DirectEncoder serializes an object and ensures the GVK is set.
 type DirectEncoder struct {
+	Version runtime.GroupVersioner
 	runtime.Encoder
 	runtime.ObjectTyper
 }
@@ -242,7 +243,14 @@ func (e DirectEncoder) Encode(obj runtime.Object, stream io.Writer) error {
 	}
 	kind := obj.GetObjectKind()
 	oldGVK := kind.GroupVersionKind()
-	kind.SetGroupVersionKind(gvks[0])
+	gvk := gvks[0]
+	if e.Version != nil {
+		preferredGVK, ok := e.Version.KindForGroupVersionKinds(gvks)
+		if ok {
+			gvk = preferredGVK
+		}
+	}
+	kind.SetGroupVersionKind(gvk)
 	err = e.Encoder.Encode(obj, stream)
 	kind.SetGroupVersionKind(oldGVK)
 	return err
@@ -254,12 +262,12 @@ type DirectDecoder struct {
 }
 
 // Decode does not do conversion. It removes the gvk during deserialization.
-func (d DirectDecoder) Decode(data []byte, defaults *unversioned.GroupVersionKind, into runtime.Object) (runtime.Object, *unversioned.GroupVersionKind, error) {
+func (d DirectDecoder) Decode(data []byte, defaults *schema.GroupVersionKind, into runtime.Object) (runtime.Object, *schema.GroupVersionKind, error) {
 	obj, gvk, err := d.Decoder.Decode(data, defaults, into)
 	if obj != nil {
 		kind := obj.GetObjectKind()
 		// clearing the gvk is just a convention of a codec
-		kind.SetGroupVersionKind(unversioned.GroupVersionKind{})
+		kind.SetGroupVersionKind(schema.GroupVersionKind{})
 	}
 	return obj, gvk, err
 }

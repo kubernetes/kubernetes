@@ -25,6 +25,10 @@ limitations under the License.
 		k8s.io/kubernetes/pkg/apis/batch/v2alpha1/generated.proto
 
 	It has these top-level messages:
+		CronJob
+		CronJobList
+		CronJobSpec
+		CronJobStatus
 		Job
 		JobCondition
 		JobList
@@ -32,12 +36,6 @@ limitations under the License.
 		JobStatus
 		JobTemplate
 		JobTemplateSpec
-		LabelSelector
-		LabelSelectorRequirement
-		ScheduledJob
-		ScheduledJobList
-		ScheduledJobSpec
-		ScheduledJobStatus
 */
 package v2alpha1
 
@@ -45,12 +43,11 @@ import proto "github.com/gogo/protobuf/proto"
 import fmt "fmt"
 import math "math"
 
-import k8s_io_kubernetes_pkg_api_unversioned "k8s.io/client-go/pkg/api/unversioned"
 import k8s_io_kubernetes_pkg_api_v1 "k8s.io/client-go/pkg/api/v1"
+import k8s_io_kubernetes_pkg_apis_meta_v1 "k8s.io/client-go/pkg/apis/meta/v1"
 
 import strings "strings"
 import reflect "reflect"
-import github_com_gogo_protobuf_sortkeys "github.com/gogo/protobuf/sortkeys"
 
 import io "io"
 
@@ -63,61 +60,55 @@ var _ = math.Inf
 // is compatible with the proto package it is being compiled against.
 const _ = proto.GoGoProtoPackageIsVersion1
 
+func (m *CronJob) Reset()                    { *m = CronJob{} }
+func (*CronJob) ProtoMessage()               {}
+func (*CronJob) Descriptor() ([]byte, []int) { return fileDescriptorGenerated, []int{0} }
+
+func (m *CronJobList) Reset()                    { *m = CronJobList{} }
+func (*CronJobList) ProtoMessage()               {}
+func (*CronJobList) Descriptor() ([]byte, []int) { return fileDescriptorGenerated, []int{1} }
+
+func (m *CronJobSpec) Reset()                    { *m = CronJobSpec{} }
+func (*CronJobSpec) ProtoMessage()               {}
+func (*CronJobSpec) Descriptor() ([]byte, []int) { return fileDescriptorGenerated, []int{2} }
+
+func (m *CronJobStatus) Reset()                    { *m = CronJobStatus{} }
+func (*CronJobStatus) ProtoMessage()               {}
+func (*CronJobStatus) Descriptor() ([]byte, []int) { return fileDescriptorGenerated, []int{3} }
+
 func (m *Job) Reset()                    { *m = Job{} }
 func (*Job) ProtoMessage()               {}
-func (*Job) Descriptor() ([]byte, []int) { return fileDescriptorGenerated, []int{0} }
+func (*Job) Descriptor() ([]byte, []int) { return fileDescriptorGenerated, []int{4} }
 
 func (m *JobCondition) Reset()                    { *m = JobCondition{} }
 func (*JobCondition) ProtoMessage()               {}
-func (*JobCondition) Descriptor() ([]byte, []int) { return fileDescriptorGenerated, []int{1} }
+func (*JobCondition) Descriptor() ([]byte, []int) { return fileDescriptorGenerated, []int{5} }
 
 func (m *JobList) Reset()                    { *m = JobList{} }
 func (*JobList) ProtoMessage()               {}
-func (*JobList) Descriptor() ([]byte, []int) { return fileDescriptorGenerated, []int{2} }
+func (*JobList) Descriptor() ([]byte, []int) { return fileDescriptorGenerated, []int{6} }
 
 func (m *JobSpec) Reset()                    { *m = JobSpec{} }
 func (*JobSpec) ProtoMessage()               {}
-func (*JobSpec) Descriptor() ([]byte, []int) { return fileDescriptorGenerated, []int{3} }
+func (*JobSpec) Descriptor() ([]byte, []int) { return fileDescriptorGenerated, []int{7} }
 
 func (m *JobStatus) Reset()                    { *m = JobStatus{} }
 func (*JobStatus) ProtoMessage()               {}
-func (*JobStatus) Descriptor() ([]byte, []int) { return fileDescriptorGenerated, []int{4} }
+func (*JobStatus) Descriptor() ([]byte, []int) { return fileDescriptorGenerated, []int{8} }
 
 func (m *JobTemplate) Reset()                    { *m = JobTemplate{} }
 func (*JobTemplate) ProtoMessage()               {}
-func (*JobTemplate) Descriptor() ([]byte, []int) { return fileDescriptorGenerated, []int{5} }
+func (*JobTemplate) Descriptor() ([]byte, []int) { return fileDescriptorGenerated, []int{9} }
 
 func (m *JobTemplateSpec) Reset()                    { *m = JobTemplateSpec{} }
 func (*JobTemplateSpec) ProtoMessage()               {}
-func (*JobTemplateSpec) Descriptor() ([]byte, []int) { return fileDescriptorGenerated, []int{6} }
-
-func (m *LabelSelector) Reset()                    { *m = LabelSelector{} }
-func (*LabelSelector) ProtoMessage()               {}
-func (*LabelSelector) Descriptor() ([]byte, []int) { return fileDescriptorGenerated, []int{7} }
-
-func (m *LabelSelectorRequirement) Reset()      { *m = LabelSelectorRequirement{} }
-func (*LabelSelectorRequirement) ProtoMessage() {}
-func (*LabelSelectorRequirement) Descriptor() ([]byte, []int) {
-	return fileDescriptorGenerated, []int{8}
-}
-
-func (m *ScheduledJob) Reset()                    { *m = ScheduledJob{} }
-func (*ScheduledJob) ProtoMessage()               {}
-func (*ScheduledJob) Descriptor() ([]byte, []int) { return fileDescriptorGenerated, []int{9} }
-
-func (m *ScheduledJobList) Reset()                    { *m = ScheduledJobList{} }
-func (*ScheduledJobList) ProtoMessage()               {}
-func (*ScheduledJobList) Descriptor() ([]byte, []int) { return fileDescriptorGenerated, []int{10} }
-
-func (m *ScheduledJobSpec) Reset()                    { *m = ScheduledJobSpec{} }
-func (*ScheduledJobSpec) ProtoMessage()               {}
-func (*ScheduledJobSpec) Descriptor() ([]byte, []int) { return fileDescriptorGenerated, []int{11} }
-
-func (m *ScheduledJobStatus) Reset()                    { *m = ScheduledJobStatus{} }
-func (*ScheduledJobStatus) ProtoMessage()               {}
-func (*ScheduledJobStatus) Descriptor() ([]byte, []int) { return fileDescriptorGenerated, []int{12} }
+func (*JobTemplateSpec) Descriptor() ([]byte, []int) { return fileDescriptorGenerated, []int{10} }
 
 func init() {
+	proto.RegisterType((*CronJob)(nil), "k8s.io.client-go.pkg.apis.batch.v2alpha1.CronJob")
+	proto.RegisterType((*CronJobList)(nil), "k8s.io.client-go.pkg.apis.batch.v2alpha1.CronJobList")
+	proto.RegisterType((*CronJobSpec)(nil), "k8s.io.client-go.pkg.apis.batch.v2alpha1.CronJobSpec")
+	proto.RegisterType((*CronJobStatus)(nil), "k8s.io.client-go.pkg.apis.batch.v2alpha1.CronJobStatus")
 	proto.RegisterType((*Job)(nil), "k8s.io.client-go.pkg.apis.batch.v2alpha1.Job")
 	proto.RegisterType((*JobCondition)(nil), "k8s.io.client-go.pkg.apis.batch.v2alpha1.JobCondition")
 	proto.RegisterType((*JobList)(nil), "k8s.io.client-go.pkg.apis.batch.v2alpha1.JobList")
@@ -125,14 +116,8 @@ func init() {
 	proto.RegisterType((*JobStatus)(nil), "k8s.io.client-go.pkg.apis.batch.v2alpha1.JobStatus")
 	proto.RegisterType((*JobTemplate)(nil), "k8s.io.client-go.pkg.apis.batch.v2alpha1.JobTemplate")
 	proto.RegisterType((*JobTemplateSpec)(nil), "k8s.io.client-go.pkg.apis.batch.v2alpha1.JobTemplateSpec")
-	proto.RegisterType((*LabelSelector)(nil), "k8s.io.client-go.pkg.apis.batch.v2alpha1.LabelSelector")
-	proto.RegisterType((*LabelSelectorRequirement)(nil), "k8s.io.client-go.pkg.apis.batch.v2alpha1.LabelSelectorRequirement")
-	proto.RegisterType((*ScheduledJob)(nil), "k8s.io.client-go.pkg.apis.batch.v2alpha1.ScheduledJob")
-	proto.RegisterType((*ScheduledJobList)(nil), "k8s.io.client-go.pkg.apis.batch.v2alpha1.ScheduledJobList")
-	proto.RegisterType((*ScheduledJobSpec)(nil), "k8s.io.client-go.pkg.apis.batch.v2alpha1.ScheduledJobSpec")
-	proto.RegisterType((*ScheduledJobStatus)(nil), "k8s.io.client-go.pkg.apis.batch.v2alpha1.ScheduledJobStatus")
 }
-func (m *Job) Marshal() (data []byte, err error) {
+func (m *CronJob) Marshal() (data []byte, err error) {
 	size := m.Size()
 	data = make([]byte, size)
 	n, err := m.MarshalTo(data)
@@ -142,7 +127,7 @@ func (m *Job) Marshal() (data []byte, err error) {
 	return data[:n], nil
 }
 
-func (m *Job) MarshalTo(data []byte) (int, error) {
+func (m *CronJob) MarshalTo(data []byte) (int, error) {
 	var i int
 	_ = i
 	var l int
@@ -174,6 +159,175 @@ func (m *Job) MarshalTo(data []byte) (int, error) {
 	return i, nil
 }
 
+func (m *CronJobList) Marshal() (data []byte, err error) {
+	size := m.Size()
+	data = make([]byte, size)
+	n, err := m.MarshalTo(data)
+	if err != nil {
+		return nil, err
+	}
+	return data[:n], nil
+}
+
+func (m *CronJobList) MarshalTo(data []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	data[i] = 0xa
+	i++
+	i = encodeVarintGenerated(data, i, uint64(m.ListMeta.Size()))
+	n4, err := m.ListMeta.MarshalTo(data[i:])
+	if err != nil {
+		return 0, err
+	}
+	i += n4
+	if len(m.Items) > 0 {
+		for _, msg := range m.Items {
+			data[i] = 0x12
+			i++
+			i = encodeVarintGenerated(data, i, uint64(msg.Size()))
+			n, err := msg.MarshalTo(data[i:])
+			if err != nil {
+				return 0, err
+			}
+			i += n
+		}
+	}
+	return i, nil
+}
+
+func (m *CronJobSpec) Marshal() (data []byte, err error) {
+	size := m.Size()
+	data = make([]byte, size)
+	n, err := m.MarshalTo(data)
+	if err != nil {
+		return nil, err
+	}
+	return data[:n], nil
+}
+
+func (m *CronJobSpec) MarshalTo(data []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	data[i] = 0xa
+	i++
+	i = encodeVarintGenerated(data, i, uint64(len(m.Schedule)))
+	i += copy(data[i:], m.Schedule)
+	if m.StartingDeadlineSeconds != nil {
+		data[i] = 0x10
+		i++
+		i = encodeVarintGenerated(data, i, uint64(*m.StartingDeadlineSeconds))
+	}
+	data[i] = 0x1a
+	i++
+	i = encodeVarintGenerated(data, i, uint64(len(m.ConcurrencyPolicy)))
+	i += copy(data[i:], m.ConcurrencyPolicy)
+	if m.Suspend != nil {
+		data[i] = 0x20
+		i++
+		if *m.Suspend {
+			data[i] = 1
+		} else {
+			data[i] = 0
+		}
+		i++
+	}
+	data[i] = 0x2a
+	i++
+	i = encodeVarintGenerated(data, i, uint64(m.JobTemplate.Size()))
+	n5, err := m.JobTemplate.MarshalTo(data[i:])
+	if err != nil {
+		return 0, err
+	}
+	i += n5
+	return i, nil
+}
+
+func (m *CronJobStatus) Marshal() (data []byte, err error) {
+	size := m.Size()
+	data = make([]byte, size)
+	n, err := m.MarshalTo(data)
+	if err != nil {
+		return nil, err
+	}
+	return data[:n], nil
+}
+
+func (m *CronJobStatus) MarshalTo(data []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	if len(m.Active) > 0 {
+		for _, msg := range m.Active {
+			data[i] = 0xa
+			i++
+			i = encodeVarintGenerated(data, i, uint64(msg.Size()))
+			n, err := msg.MarshalTo(data[i:])
+			if err != nil {
+				return 0, err
+			}
+			i += n
+		}
+	}
+	if m.LastScheduleTime != nil {
+		data[i] = 0x22
+		i++
+		i = encodeVarintGenerated(data, i, uint64(m.LastScheduleTime.Size()))
+		n6, err := m.LastScheduleTime.MarshalTo(data[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n6
+	}
+	return i, nil
+}
+
+func (m *Job) Marshal() (data []byte, err error) {
+	size := m.Size()
+	data = make([]byte, size)
+	n, err := m.MarshalTo(data)
+	if err != nil {
+		return nil, err
+	}
+	return data[:n], nil
+}
+
+func (m *Job) MarshalTo(data []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	data[i] = 0xa
+	i++
+	i = encodeVarintGenerated(data, i, uint64(m.ObjectMeta.Size()))
+	n7, err := m.ObjectMeta.MarshalTo(data[i:])
+	if err != nil {
+		return 0, err
+	}
+	i += n7
+	data[i] = 0x12
+	i++
+	i = encodeVarintGenerated(data, i, uint64(m.Spec.Size()))
+	n8, err := m.Spec.MarshalTo(data[i:])
+	if err != nil {
+		return 0, err
+	}
+	i += n8
+	data[i] = 0x1a
+	i++
+	i = encodeVarintGenerated(data, i, uint64(m.Status.Size()))
+	n9, err := m.Status.MarshalTo(data[i:])
+	if err != nil {
+		return 0, err
+	}
+	i += n9
+	return i, nil
+}
+
 func (m *JobCondition) Marshal() (data []byte, err error) {
 	size := m.Size()
 	data = make([]byte, size)
@@ -200,19 +354,19 @@ func (m *JobCondition) MarshalTo(data []byte) (int, error) {
 	data[i] = 0x1a
 	i++
 	i = encodeVarintGenerated(data, i, uint64(m.LastProbeTime.Size()))
-	n4, err := m.LastProbeTime.MarshalTo(data[i:])
+	n10, err := m.LastProbeTime.MarshalTo(data[i:])
 	if err != nil {
 		return 0, err
 	}
-	i += n4
+	i += n10
 	data[i] = 0x22
 	i++
 	i = encodeVarintGenerated(data, i, uint64(m.LastTransitionTime.Size()))
-	n5, err := m.LastTransitionTime.MarshalTo(data[i:])
+	n11, err := m.LastTransitionTime.MarshalTo(data[i:])
 	if err != nil {
 		return 0, err
 	}
-	i += n5
+	i += n11
 	data[i] = 0x2a
 	i++
 	i = encodeVarintGenerated(data, i, uint64(len(m.Reason)))
@@ -242,11 +396,11 @@ func (m *JobList) MarshalTo(data []byte) (int, error) {
 	data[i] = 0xa
 	i++
 	i = encodeVarintGenerated(data, i, uint64(m.ListMeta.Size()))
-	n6, err := m.ListMeta.MarshalTo(data[i:])
+	n12, err := m.ListMeta.MarshalTo(data[i:])
 	if err != nil {
 		return 0, err
 	}
-	i += n6
+	i += n12
 	if len(m.Items) > 0 {
 		for _, msg := range m.Items {
 			data[i] = 0x12
@@ -296,11 +450,11 @@ func (m *JobSpec) MarshalTo(data []byte) (int, error) {
 		data[i] = 0x22
 		i++
 		i = encodeVarintGenerated(data, i, uint64(m.Selector.Size()))
-		n7, err := m.Selector.MarshalTo(data[i:])
+		n13, err := m.Selector.MarshalTo(data[i:])
 		if err != nil {
 			return 0, err
 		}
-		i += n7
+		i += n13
 	}
 	if m.ManualSelector != nil {
 		data[i] = 0x28
@@ -315,11 +469,11 @@ func (m *JobSpec) MarshalTo(data []byte) (int, error) {
 	data[i] = 0x32
 	i++
 	i = encodeVarintGenerated(data, i, uint64(m.Template.Size()))
-	n8, err := m.Template.MarshalTo(data[i:])
+	n14, err := m.Template.MarshalTo(data[i:])
 	if err != nil {
 		return 0, err
 	}
-	i += n8
+	i += n14
 	return i, nil
 }
 
@@ -354,21 +508,21 @@ func (m *JobStatus) MarshalTo(data []byte) (int, error) {
 		data[i] = 0x12
 		i++
 		i = encodeVarintGenerated(data, i, uint64(m.StartTime.Size()))
-		n9, err := m.StartTime.MarshalTo(data[i:])
+		n15, err := m.StartTime.MarshalTo(data[i:])
 		if err != nil {
 			return 0, err
 		}
-		i += n9
+		i += n15
 	}
 	if m.CompletionTime != nil {
 		data[i] = 0x1a
 		i++
 		i = encodeVarintGenerated(data, i, uint64(m.CompletionTime.Size()))
-		n10, err := m.CompletionTime.MarshalTo(data[i:])
+		n16, err := m.CompletionTime.MarshalTo(data[i:])
 		if err != nil {
 			return 0, err
 		}
-		i += n10
+		i += n16
 	}
 	data[i] = 0x20
 	i++
@@ -400,19 +554,19 @@ func (m *JobTemplate) MarshalTo(data []byte) (int, error) {
 	data[i] = 0xa
 	i++
 	i = encodeVarintGenerated(data, i, uint64(m.ObjectMeta.Size()))
-	n11, err := m.ObjectMeta.MarshalTo(data[i:])
+	n17, err := m.ObjectMeta.MarshalTo(data[i:])
 	if err != nil {
 		return 0, err
 	}
-	i += n11
+	i += n17
 	data[i] = 0x12
 	i++
 	i = encodeVarintGenerated(data, i, uint64(m.Template.Size()))
-	n12, err := m.Template.MarshalTo(data[i:])
+	n18, err := m.Template.MarshalTo(data[i:])
 	if err != nil {
 		return 0, err
 	}
-	i += n12
+	i += n18
 	return i, nil
 }
 
@@ -434,276 +588,19 @@ func (m *JobTemplateSpec) MarshalTo(data []byte) (int, error) {
 	data[i] = 0xa
 	i++
 	i = encodeVarintGenerated(data, i, uint64(m.ObjectMeta.Size()))
-	n13, err := m.ObjectMeta.MarshalTo(data[i:])
-	if err != nil {
-		return 0, err
-	}
-	i += n13
-	data[i] = 0x12
-	i++
-	i = encodeVarintGenerated(data, i, uint64(m.Spec.Size()))
-	n14, err := m.Spec.MarshalTo(data[i:])
-	if err != nil {
-		return 0, err
-	}
-	i += n14
-	return i, nil
-}
-
-func (m *LabelSelector) Marshal() (data []byte, err error) {
-	size := m.Size()
-	data = make([]byte, size)
-	n, err := m.MarshalTo(data)
-	if err != nil {
-		return nil, err
-	}
-	return data[:n], nil
-}
-
-func (m *LabelSelector) MarshalTo(data []byte) (int, error) {
-	var i int
-	_ = i
-	var l int
-	_ = l
-	if len(m.MatchLabels) > 0 {
-		for k := range m.MatchLabels {
-			data[i] = 0xa
-			i++
-			v := m.MatchLabels[k]
-			mapSize := 1 + len(k) + sovGenerated(uint64(len(k))) + 1 + len(v) + sovGenerated(uint64(len(v)))
-			i = encodeVarintGenerated(data, i, uint64(mapSize))
-			data[i] = 0xa
-			i++
-			i = encodeVarintGenerated(data, i, uint64(len(k)))
-			i += copy(data[i:], k)
-			data[i] = 0x12
-			i++
-			i = encodeVarintGenerated(data, i, uint64(len(v)))
-			i += copy(data[i:], v)
-		}
-	}
-	if len(m.MatchExpressions) > 0 {
-		for _, msg := range m.MatchExpressions {
-			data[i] = 0x12
-			i++
-			i = encodeVarintGenerated(data, i, uint64(msg.Size()))
-			n, err := msg.MarshalTo(data[i:])
-			if err != nil {
-				return 0, err
-			}
-			i += n
-		}
-	}
-	return i, nil
-}
-
-func (m *LabelSelectorRequirement) Marshal() (data []byte, err error) {
-	size := m.Size()
-	data = make([]byte, size)
-	n, err := m.MarshalTo(data)
-	if err != nil {
-		return nil, err
-	}
-	return data[:n], nil
-}
-
-func (m *LabelSelectorRequirement) MarshalTo(data []byte) (int, error) {
-	var i int
-	_ = i
-	var l int
-	_ = l
-	data[i] = 0xa
-	i++
-	i = encodeVarintGenerated(data, i, uint64(len(m.Key)))
-	i += copy(data[i:], m.Key)
-	data[i] = 0x12
-	i++
-	i = encodeVarintGenerated(data, i, uint64(len(m.Operator)))
-	i += copy(data[i:], m.Operator)
-	if len(m.Values) > 0 {
-		for _, s := range m.Values {
-			data[i] = 0x1a
-			i++
-			l = len(s)
-			for l >= 1<<7 {
-				data[i] = uint8(uint64(l)&0x7f | 0x80)
-				l >>= 7
-				i++
-			}
-			data[i] = uint8(l)
-			i++
-			i += copy(data[i:], s)
-		}
-	}
-	return i, nil
-}
-
-func (m *ScheduledJob) Marshal() (data []byte, err error) {
-	size := m.Size()
-	data = make([]byte, size)
-	n, err := m.MarshalTo(data)
-	if err != nil {
-		return nil, err
-	}
-	return data[:n], nil
-}
-
-func (m *ScheduledJob) MarshalTo(data []byte) (int, error) {
-	var i int
-	_ = i
-	var l int
-	_ = l
-	data[i] = 0xa
-	i++
-	i = encodeVarintGenerated(data, i, uint64(m.ObjectMeta.Size()))
-	n15, err := m.ObjectMeta.MarshalTo(data[i:])
-	if err != nil {
-		return 0, err
-	}
-	i += n15
-	data[i] = 0x12
-	i++
-	i = encodeVarintGenerated(data, i, uint64(m.Spec.Size()))
-	n16, err := m.Spec.MarshalTo(data[i:])
-	if err != nil {
-		return 0, err
-	}
-	i += n16
-	data[i] = 0x1a
-	i++
-	i = encodeVarintGenerated(data, i, uint64(m.Status.Size()))
-	n17, err := m.Status.MarshalTo(data[i:])
-	if err != nil {
-		return 0, err
-	}
-	i += n17
-	return i, nil
-}
-
-func (m *ScheduledJobList) Marshal() (data []byte, err error) {
-	size := m.Size()
-	data = make([]byte, size)
-	n, err := m.MarshalTo(data)
-	if err != nil {
-		return nil, err
-	}
-	return data[:n], nil
-}
-
-func (m *ScheduledJobList) MarshalTo(data []byte) (int, error) {
-	var i int
-	_ = i
-	var l int
-	_ = l
-	data[i] = 0xa
-	i++
-	i = encodeVarintGenerated(data, i, uint64(m.ListMeta.Size()))
-	n18, err := m.ListMeta.MarshalTo(data[i:])
-	if err != nil {
-		return 0, err
-	}
-	i += n18
-	if len(m.Items) > 0 {
-		for _, msg := range m.Items {
-			data[i] = 0x12
-			i++
-			i = encodeVarintGenerated(data, i, uint64(msg.Size()))
-			n, err := msg.MarshalTo(data[i:])
-			if err != nil {
-				return 0, err
-			}
-			i += n
-		}
-	}
-	return i, nil
-}
-
-func (m *ScheduledJobSpec) Marshal() (data []byte, err error) {
-	size := m.Size()
-	data = make([]byte, size)
-	n, err := m.MarshalTo(data)
-	if err != nil {
-		return nil, err
-	}
-	return data[:n], nil
-}
-
-func (m *ScheduledJobSpec) MarshalTo(data []byte) (int, error) {
-	var i int
-	_ = i
-	var l int
-	_ = l
-	data[i] = 0xa
-	i++
-	i = encodeVarintGenerated(data, i, uint64(len(m.Schedule)))
-	i += copy(data[i:], m.Schedule)
-	if m.StartingDeadlineSeconds != nil {
-		data[i] = 0x10
-		i++
-		i = encodeVarintGenerated(data, i, uint64(*m.StartingDeadlineSeconds))
-	}
-	data[i] = 0x1a
-	i++
-	i = encodeVarintGenerated(data, i, uint64(len(m.ConcurrencyPolicy)))
-	i += copy(data[i:], m.ConcurrencyPolicy)
-	if m.Suspend != nil {
-		data[i] = 0x20
-		i++
-		if *m.Suspend {
-			data[i] = 1
-		} else {
-			data[i] = 0
-		}
-		i++
-	}
-	data[i] = 0x2a
-	i++
-	i = encodeVarintGenerated(data, i, uint64(m.JobTemplate.Size()))
-	n19, err := m.JobTemplate.MarshalTo(data[i:])
+	n19, err := m.ObjectMeta.MarshalTo(data[i:])
 	if err != nil {
 		return 0, err
 	}
 	i += n19
-	return i, nil
-}
-
-func (m *ScheduledJobStatus) Marshal() (data []byte, err error) {
-	size := m.Size()
-	data = make([]byte, size)
-	n, err := m.MarshalTo(data)
+	data[i] = 0x12
+	i++
+	i = encodeVarintGenerated(data, i, uint64(m.Spec.Size()))
+	n20, err := m.Spec.MarshalTo(data[i:])
 	if err != nil {
-		return nil, err
+		return 0, err
 	}
-	return data[:n], nil
-}
-
-func (m *ScheduledJobStatus) MarshalTo(data []byte) (int, error) {
-	var i int
-	_ = i
-	var l int
-	_ = l
-	if len(m.Active) > 0 {
-		for _, msg := range m.Active {
-			data[i] = 0xa
-			i++
-			i = encodeVarintGenerated(data, i, uint64(msg.Size()))
-			n, err := msg.MarshalTo(data[i:])
-			if err != nil {
-				return 0, err
-			}
-			i += n
-		}
-	}
-	if m.LastScheduleTime != nil {
-		data[i] = 0x22
-		i++
-		i = encodeVarintGenerated(data, i, uint64(m.LastScheduleTime.Size()))
-		n20, err := m.LastScheduleTime.MarshalTo(data[i:])
-		if err != nil {
-			return 0, err
-		}
-		i += n20
-	}
+	i += n20
 	return i, nil
 }
 
@@ -734,6 +631,66 @@ func encodeVarintGenerated(data []byte, offset int, v uint64) int {
 	data[offset] = uint8(v)
 	return offset + 1
 }
+func (m *CronJob) Size() (n int) {
+	var l int
+	_ = l
+	l = m.ObjectMeta.Size()
+	n += 1 + l + sovGenerated(uint64(l))
+	l = m.Spec.Size()
+	n += 1 + l + sovGenerated(uint64(l))
+	l = m.Status.Size()
+	n += 1 + l + sovGenerated(uint64(l))
+	return n
+}
+
+func (m *CronJobList) Size() (n int) {
+	var l int
+	_ = l
+	l = m.ListMeta.Size()
+	n += 1 + l + sovGenerated(uint64(l))
+	if len(m.Items) > 0 {
+		for _, e := range m.Items {
+			l = e.Size()
+			n += 1 + l + sovGenerated(uint64(l))
+		}
+	}
+	return n
+}
+
+func (m *CronJobSpec) Size() (n int) {
+	var l int
+	_ = l
+	l = len(m.Schedule)
+	n += 1 + l + sovGenerated(uint64(l))
+	if m.StartingDeadlineSeconds != nil {
+		n += 1 + sovGenerated(uint64(*m.StartingDeadlineSeconds))
+	}
+	l = len(m.ConcurrencyPolicy)
+	n += 1 + l + sovGenerated(uint64(l))
+	if m.Suspend != nil {
+		n += 2
+	}
+	l = m.JobTemplate.Size()
+	n += 1 + l + sovGenerated(uint64(l))
+	return n
+}
+
+func (m *CronJobStatus) Size() (n int) {
+	var l int
+	_ = l
+	if len(m.Active) > 0 {
+		for _, e := range m.Active {
+			l = e.Size()
+			n += 1 + l + sovGenerated(uint64(l))
+		}
+	}
+	if m.LastScheduleTime != nil {
+		l = m.LastScheduleTime.Size()
+		n += 1 + l + sovGenerated(uint64(l))
+	}
+	return n
+}
+
 func (m *Job) Size() (n int) {
 	var l int
 	_ = l
@@ -845,102 +802,6 @@ func (m *JobTemplateSpec) Size() (n int) {
 	return n
 }
 
-func (m *LabelSelector) Size() (n int) {
-	var l int
-	_ = l
-	if len(m.MatchLabels) > 0 {
-		for k, v := range m.MatchLabels {
-			_ = k
-			_ = v
-			mapEntrySize := 1 + len(k) + sovGenerated(uint64(len(k))) + 1 + len(v) + sovGenerated(uint64(len(v)))
-			n += mapEntrySize + 1 + sovGenerated(uint64(mapEntrySize))
-		}
-	}
-	if len(m.MatchExpressions) > 0 {
-		for _, e := range m.MatchExpressions {
-			l = e.Size()
-			n += 1 + l + sovGenerated(uint64(l))
-		}
-	}
-	return n
-}
-
-func (m *LabelSelectorRequirement) Size() (n int) {
-	var l int
-	_ = l
-	l = len(m.Key)
-	n += 1 + l + sovGenerated(uint64(l))
-	l = len(m.Operator)
-	n += 1 + l + sovGenerated(uint64(l))
-	if len(m.Values) > 0 {
-		for _, s := range m.Values {
-			l = len(s)
-			n += 1 + l + sovGenerated(uint64(l))
-		}
-	}
-	return n
-}
-
-func (m *ScheduledJob) Size() (n int) {
-	var l int
-	_ = l
-	l = m.ObjectMeta.Size()
-	n += 1 + l + sovGenerated(uint64(l))
-	l = m.Spec.Size()
-	n += 1 + l + sovGenerated(uint64(l))
-	l = m.Status.Size()
-	n += 1 + l + sovGenerated(uint64(l))
-	return n
-}
-
-func (m *ScheduledJobList) Size() (n int) {
-	var l int
-	_ = l
-	l = m.ListMeta.Size()
-	n += 1 + l + sovGenerated(uint64(l))
-	if len(m.Items) > 0 {
-		for _, e := range m.Items {
-			l = e.Size()
-			n += 1 + l + sovGenerated(uint64(l))
-		}
-	}
-	return n
-}
-
-func (m *ScheduledJobSpec) Size() (n int) {
-	var l int
-	_ = l
-	l = len(m.Schedule)
-	n += 1 + l + sovGenerated(uint64(l))
-	if m.StartingDeadlineSeconds != nil {
-		n += 1 + sovGenerated(uint64(*m.StartingDeadlineSeconds))
-	}
-	l = len(m.ConcurrencyPolicy)
-	n += 1 + l + sovGenerated(uint64(l))
-	if m.Suspend != nil {
-		n += 2
-	}
-	l = m.JobTemplate.Size()
-	n += 1 + l + sovGenerated(uint64(l))
-	return n
-}
-
-func (m *ScheduledJobStatus) Size() (n int) {
-	var l int
-	_ = l
-	if len(m.Active) > 0 {
-		for _, e := range m.Active {
-			l = e.Size()
-			n += 1 + l + sovGenerated(uint64(l))
-		}
-	}
-	if m.LastScheduleTime != nil {
-		l = m.LastScheduleTime.Size()
-		n += 1 + l + sovGenerated(uint64(l))
-	}
-	return n
-}
-
 func sovGenerated(x uint64) (n int) {
 	for {
 		n++
@@ -953,6 +814,54 @@ func sovGenerated(x uint64) (n int) {
 }
 func sozGenerated(x uint64) (n int) {
 	return sovGenerated(uint64((x << 1) ^ uint64((int64(x) >> 63))))
+}
+func (this *CronJob) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&CronJob{`,
+		`ObjectMeta:` + strings.Replace(strings.Replace(this.ObjectMeta.String(), "ObjectMeta", "k8s_io_kubernetes_pkg_api_v1.ObjectMeta", 1), `&`, ``, 1) + `,`,
+		`Spec:` + strings.Replace(strings.Replace(this.Spec.String(), "CronJobSpec", "CronJobSpec", 1), `&`, ``, 1) + `,`,
+		`Status:` + strings.Replace(strings.Replace(this.Status.String(), "CronJobStatus", "CronJobStatus", 1), `&`, ``, 1) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *CronJobList) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&CronJobList{`,
+		`ListMeta:` + strings.Replace(strings.Replace(this.ListMeta.String(), "ListMeta", "k8s_io_kubernetes_pkg_apis_meta_v1.ListMeta", 1), `&`, ``, 1) + `,`,
+		`Items:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.Items), "CronJob", "CronJob", 1), `&`, ``, 1) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *CronJobSpec) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&CronJobSpec{`,
+		`Schedule:` + fmt.Sprintf("%v", this.Schedule) + `,`,
+		`StartingDeadlineSeconds:` + valueToStringGenerated(this.StartingDeadlineSeconds) + `,`,
+		`ConcurrencyPolicy:` + fmt.Sprintf("%v", this.ConcurrencyPolicy) + `,`,
+		`Suspend:` + valueToStringGenerated(this.Suspend) + `,`,
+		`JobTemplate:` + strings.Replace(strings.Replace(this.JobTemplate.String(), "JobTemplateSpec", "JobTemplateSpec", 1), `&`, ``, 1) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *CronJobStatus) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&CronJobStatus{`,
+		`Active:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.Active), "ObjectReference", "k8s_io_kubernetes_pkg_api_v1.ObjectReference", 1), `&`, ``, 1) + `,`,
+		`LastScheduleTime:` + strings.Replace(fmt.Sprintf("%v", this.LastScheduleTime), "Time", "k8s_io_kubernetes_pkg_apis_meta_v1.Time", 1) + `,`,
+		`}`,
+	}, "")
+	return s
 }
 func (this *Job) String() string {
 	if this == nil {
@@ -973,8 +882,8 @@ func (this *JobCondition) String() string {
 	s := strings.Join([]string{`&JobCondition{`,
 		`Type:` + fmt.Sprintf("%v", this.Type) + `,`,
 		`Status:` + fmt.Sprintf("%v", this.Status) + `,`,
-		`LastProbeTime:` + strings.Replace(strings.Replace(this.LastProbeTime.String(), "Time", "k8s_io_kubernetes_pkg_api_unversioned.Time", 1), `&`, ``, 1) + `,`,
-		`LastTransitionTime:` + strings.Replace(strings.Replace(this.LastTransitionTime.String(), "Time", "k8s_io_kubernetes_pkg_api_unversioned.Time", 1), `&`, ``, 1) + `,`,
+		`LastProbeTime:` + strings.Replace(strings.Replace(this.LastProbeTime.String(), "Time", "k8s_io_kubernetes_pkg_apis_meta_v1.Time", 1), `&`, ``, 1) + `,`,
+		`LastTransitionTime:` + strings.Replace(strings.Replace(this.LastTransitionTime.String(), "Time", "k8s_io_kubernetes_pkg_apis_meta_v1.Time", 1), `&`, ``, 1) + `,`,
 		`Reason:` + fmt.Sprintf("%v", this.Reason) + `,`,
 		`Message:` + fmt.Sprintf("%v", this.Message) + `,`,
 		`}`,
@@ -986,7 +895,7 @@ func (this *JobList) String() string {
 		return "nil"
 	}
 	s := strings.Join([]string{`&JobList{`,
-		`ListMeta:` + strings.Replace(strings.Replace(this.ListMeta.String(), "ListMeta", "k8s_io_kubernetes_pkg_api_unversioned.ListMeta", 1), `&`, ``, 1) + `,`,
+		`ListMeta:` + strings.Replace(strings.Replace(this.ListMeta.String(), "ListMeta", "k8s_io_kubernetes_pkg_apis_meta_v1.ListMeta", 1), `&`, ``, 1) + `,`,
 		`Items:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.Items), "Job", "Job", 1), `&`, ``, 1) + `,`,
 		`}`,
 	}, "")
@@ -1000,7 +909,7 @@ func (this *JobSpec) String() string {
 		`Parallelism:` + valueToStringGenerated(this.Parallelism) + `,`,
 		`Completions:` + valueToStringGenerated(this.Completions) + `,`,
 		`ActiveDeadlineSeconds:` + valueToStringGenerated(this.ActiveDeadlineSeconds) + `,`,
-		`Selector:` + strings.Replace(fmt.Sprintf("%v", this.Selector), "LabelSelector", "LabelSelector", 1) + `,`,
+		`Selector:` + strings.Replace(fmt.Sprintf("%v", this.Selector), "LabelSelector", "k8s_io_kubernetes_pkg_apis_meta_v1.LabelSelector", 1) + `,`,
 		`ManualSelector:` + valueToStringGenerated(this.ManualSelector) + `,`,
 		`Template:` + strings.Replace(strings.Replace(this.Template.String(), "PodTemplateSpec", "k8s_io_kubernetes_pkg_api_v1.PodTemplateSpec", 1), `&`, ``, 1) + `,`,
 		`}`,
@@ -1013,8 +922,8 @@ func (this *JobStatus) String() string {
 	}
 	s := strings.Join([]string{`&JobStatus{`,
 		`Conditions:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.Conditions), "JobCondition", "JobCondition", 1), `&`, ``, 1) + `,`,
-		`StartTime:` + strings.Replace(fmt.Sprintf("%v", this.StartTime), "Time", "k8s_io_kubernetes_pkg_api_unversioned.Time", 1) + `,`,
-		`CompletionTime:` + strings.Replace(fmt.Sprintf("%v", this.CompletionTime), "Time", "k8s_io_kubernetes_pkg_api_unversioned.Time", 1) + `,`,
+		`StartTime:` + strings.Replace(fmt.Sprintf("%v", this.StartTime), "Time", "k8s_io_kubernetes_pkg_apis_meta_v1.Time", 1) + `,`,
+		`CompletionTime:` + strings.Replace(fmt.Sprintf("%v", this.CompletionTime), "Time", "k8s_io_kubernetes_pkg_apis_meta_v1.Time", 1) + `,`,
 		`Active:` + fmt.Sprintf("%v", this.Active) + `,`,
 		`Succeeded:` + fmt.Sprintf("%v", this.Succeeded) + `,`,
 		`Failed:` + fmt.Sprintf("%v", this.Failed) + `,`,
@@ -1044,87 +953,6 @@ func (this *JobTemplateSpec) String() string {
 	}, "")
 	return s
 }
-func (this *LabelSelector) String() string {
-	if this == nil {
-		return "nil"
-	}
-	keysForMatchLabels := make([]string, 0, len(this.MatchLabels))
-	for k := range this.MatchLabels {
-		keysForMatchLabels = append(keysForMatchLabels, k)
-	}
-	github_com_gogo_protobuf_sortkeys.Strings(keysForMatchLabels)
-	mapStringForMatchLabels := "map[string]string{"
-	for _, k := range keysForMatchLabels {
-		mapStringForMatchLabels += fmt.Sprintf("%v: %v,", k, this.MatchLabels[k])
-	}
-	mapStringForMatchLabels += "}"
-	s := strings.Join([]string{`&LabelSelector{`,
-		`MatchLabels:` + mapStringForMatchLabels + `,`,
-		`MatchExpressions:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.MatchExpressions), "LabelSelectorRequirement", "LabelSelectorRequirement", 1), `&`, ``, 1) + `,`,
-		`}`,
-	}, "")
-	return s
-}
-func (this *LabelSelectorRequirement) String() string {
-	if this == nil {
-		return "nil"
-	}
-	s := strings.Join([]string{`&LabelSelectorRequirement{`,
-		`Key:` + fmt.Sprintf("%v", this.Key) + `,`,
-		`Operator:` + fmt.Sprintf("%v", this.Operator) + `,`,
-		`Values:` + fmt.Sprintf("%v", this.Values) + `,`,
-		`}`,
-	}, "")
-	return s
-}
-func (this *ScheduledJob) String() string {
-	if this == nil {
-		return "nil"
-	}
-	s := strings.Join([]string{`&ScheduledJob{`,
-		`ObjectMeta:` + strings.Replace(strings.Replace(this.ObjectMeta.String(), "ObjectMeta", "k8s_io_kubernetes_pkg_api_v1.ObjectMeta", 1), `&`, ``, 1) + `,`,
-		`Spec:` + strings.Replace(strings.Replace(this.Spec.String(), "ScheduledJobSpec", "ScheduledJobSpec", 1), `&`, ``, 1) + `,`,
-		`Status:` + strings.Replace(strings.Replace(this.Status.String(), "ScheduledJobStatus", "ScheduledJobStatus", 1), `&`, ``, 1) + `,`,
-		`}`,
-	}, "")
-	return s
-}
-func (this *ScheduledJobList) String() string {
-	if this == nil {
-		return "nil"
-	}
-	s := strings.Join([]string{`&ScheduledJobList{`,
-		`ListMeta:` + strings.Replace(strings.Replace(this.ListMeta.String(), "ListMeta", "k8s_io_kubernetes_pkg_api_unversioned.ListMeta", 1), `&`, ``, 1) + `,`,
-		`Items:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.Items), "ScheduledJob", "ScheduledJob", 1), `&`, ``, 1) + `,`,
-		`}`,
-	}, "")
-	return s
-}
-func (this *ScheduledJobSpec) String() string {
-	if this == nil {
-		return "nil"
-	}
-	s := strings.Join([]string{`&ScheduledJobSpec{`,
-		`Schedule:` + fmt.Sprintf("%v", this.Schedule) + `,`,
-		`StartingDeadlineSeconds:` + valueToStringGenerated(this.StartingDeadlineSeconds) + `,`,
-		`ConcurrencyPolicy:` + fmt.Sprintf("%v", this.ConcurrencyPolicy) + `,`,
-		`Suspend:` + valueToStringGenerated(this.Suspend) + `,`,
-		`JobTemplate:` + strings.Replace(strings.Replace(this.JobTemplate.String(), "JobTemplateSpec", "JobTemplateSpec", 1), `&`, ``, 1) + `,`,
-		`}`,
-	}, "")
-	return s
-}
-func (this *ScheduledJobStatus) String() string {
-	if this == nil {
-		return "nil"
-	}
-	s := strings.Join([]string{`&ScheduledJobStatus{`,
-		`Active:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.Active), "ObjectReference", "k8s_io_kubernetes_pkg_api_v1.ObjectReference", 1), `&`, ``, 1) + `,`,
-		`LastScheduleTime:` + strings.Replace(fmt.Sprintf("%v", this.LastScheduleTime), "Time", "k8s_io_kubernetes_pkg_api_unversioned.Time", 1) + `,`,
-		`}`,
-	}, "")
-	return s
-}
 func valueToStringGenerated(v interface{}) string {
 	rv := reflect.ValueOf(v)
 	if rv.IsNil() {
@@ -1132,6 +960,550 @@ func valueToStringGenerated(v interface{}) string {
 	}
 	pv := reflect.Indirect(rv).Interface()
 	return fmt.Sprintf("*%v", pv)
+}
+func (m *CronJob) Unmarshal(data []byte) error {
+	l := len(data)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowGenerated
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := data[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: CronJob: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: CronJob: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ObjectMeta", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if err := m.ObjectMeta.Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Spec", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if err := m.Spec.Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 3:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Status", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if err := m.Status.Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipGenerated(data[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *CronJobList) Unmarshal(data []byte) error {
+	l := len(data)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowGenerated
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := data[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: CronJobList: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: CronJobList: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ListMeta", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if err := m.ListMeta.Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Items", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Items = append(m.Items, CronJob{})
+			if err := m.Items[len(m.Items)-1].Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipGenerated(data[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *CronJobSpec) Unmarshal(data []byte) error {
+	l := len(data)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowGenerated
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := data[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: CronJobSpec: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: CronJobSpec: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Schedule", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Schedule = string(data[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 2:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field StartingDeadlineSeconds", wireType)
+			}
+			var v int64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				v |= (int64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			m.StartingDeadlineSeconds = &v
+		case 3:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ConcurrencyPolicy", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.ConcurrencyPolicy = ConcurrencyPolicy(data[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 4:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Suspend", wireType)
+			}
+			var v int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				v |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			b := bool(v != 0)
+			m.Suspend = &b
+		case 5:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field JobTemplate", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if err := m.JobTemplate.Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipGenerated(data[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *CronJobStatus) Unmarshal(data []byte) error {
+	l := len(data)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowGenerated
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := data[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: CronJobStatus: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: CronJobStatus: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Active", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Active = append(m.Active, k8s_io_kubernetes_pkg_api_v1.ObjectReference{})
+			if err := m.Active[len(m.Active)-1].Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 4:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field LastScheduleTime", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.LastScheduleTime == nil {
+				m.LastScheduleTime = &k8s_io_kubernetes_pkg_apis_meta_v1.Time{}
+			}
+			if err := m.LastScheduleTime.Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipGenerated(data[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
 }
 func (m *Job) Unmarshal(data []byte) error {
 	l := len(data)
@@ -1726,7 +2098,7 @@ func (m *JobSpec) Unmarshal(data []byte) error {
 				return io.ErrUnexpectedEOF
 			}
 			if m.Selector == nil {
-				m.Selector = &LabelSelector{}
+				m.Selector = &k8s_io_kubernetes_pkg_apis_meta_v1.LabelSelector{}
 			}
 			if err := m.Selector.Unmarshal(data[iNdEx:postIndex]); err != nil {
 				return err
@@ -1891,7 +2263,7 @@ func (m *JobStatus) Unmarshal(data []byte) error {
 				return io.ErrUnexpectedEOF
 			}
 			if m.StartTime == nil {
-				m.StartTime = &k8s_io_kubernetes_pkg_api_unversioned.Time{}
+				m.StartTime = &k8s_io_kubernetes_pkg_apis_meta_v1.Time{}
 			}
 			if err := m.StartTime.Unmarshal(data[iNdEx:postIndex]); err != nil {
 				return err
@@ -1924,7 +2296,7 @@ func (m *JobStatus) Unmarshal(data []byte) error {
 				return io.ErrUnexpectedEOF
 			}
 			if m.CompletionTime == nil {
-				m.CompletionTime = &k8s_io_kubernetes_pkg_api_unversioned.Time{}
+				m.CompletionTime = &k8s_io_kubernetes_pkg_apis_meta_v1.Time{}
 			}
 			if err := m.CompletionTime.Unmarshal(data[iNdEx:postIndex]); err != nil {
 				return err
@@ -2228,879 +2600,6 @@ func (m *JobTemplateSpec) Unmarshal(data []byte) error {
 	}
 	return nil
 }
-func (m *LabelSelector) Unmarshal(data []byte) error {
-	l := len(data)
-	iNdEx := 0
-	for iNdEx < l {
-		preIndex := iNdEx
-		var wire uint64
-		for shift := uint(0); ; shift += 7 {
-			if shift >= 64 {
-				return ErrIntOverflowGenerated
-			}
-			if iNdEx >= l {
-				return io.ErrUnexpectedEOF
-			}
-			b := data[iNdEx]
-			iNdEx++
-			wire |= (uint64(b) & 0x7F) << shift
-			if b < 0x80 {
-				break
-			}
-		}
-		fieldNum := int32(wire >> 3)
-		wireType := int(wire & 0x7)
-		if wireType == 4 {
-			return fmt.Errorf("proto: LabelSelector: wiretype end group for non-group")
-		}
-		if fieldNum <= 0 {
-			return fmt.Errorf("proto: LabelSelector: illegal tag %d (wire type %d)", fieldNum, wire)
-		}
-		switch fieldNum {
-		case 1:
-			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field MatchLabels", wireType)
-			}
-			var msglen int
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowGenerated
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := data[iNdEx]
-				iNdEx++
-				msglen |= (int(b) & 0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			if msglen < 0 {
-				return ErrInvalidLengthGenerated
-			}
-			postIndex := iNdEx + msglen
-			if postIndex > l {
-				return io.ErrUnexpectedEOF
-			}
-			var keykey uint64
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowGenerated
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := data[iNdEx]
-				iNdEx++
-				keykey |= (uint64(b) & 0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			var stringLenmapkey uint64
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowGenerated
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := data[iNdEx]
-				iNdEx++
-				stringLenmapkey |= (uint64(b) & 0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			intStringLenmapkey := int(stringLenmapkey)
-			if intStringLenmapkey < 0 {
-				return ErrInvalidLengthGenerated
-			}
-			postStringIndexmapkey := iNdEx + intStringLenmapkey
-			if postStringIndexmapkey > l {
-				return io.ErrUnexpectedEOF
-			}
-			mapkey := string(data[iNdEx:postStringIndexmapkey])
-			iNdEx = postStringIndexmapkey
-			var valuekey uint64
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowGenerated
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := data[iNdEx]
-				iNdEx++
-				valuekey |= (uint64(b) & 0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			var stringLenmapvalue uint64
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowGenerated
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := data[iNdEx]
-				iNdEx++
-				stringLenmapvalue |= (uint64(b) & 0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			intStringLenmapvalue := int(stringLenmapvalue)
-			if intStringLenmapvalue < 0 {
-				return ErrInvalidLengthGenerated
-			}
-			postStringIndexmapvalue := iNdEx + intStringLenmapvalue
-			if postStringIndexmapvalue > l {
-				return io.ErrUnexpectedEOF
-			}
-			mapvalue := string(data[iNdEx:postStringIndexmapvalue])
-			iNdEx = postStringIndexmapvalue
-			if m.MatchLabels == nil {
-				m.MatchLabels = make(map[string]string)
-			}
-			m.MatchLabels[mapkey] = mapvalue
-			iNdEx = postIndex
-		case 2:
-			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field MatchExpressions", wireType)
-			}
-			var msglen int
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowGenerated
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := data[iNdEx]
-				iNdEx++
-				msglen |= (int(b) & 0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			if msglen < 0 {
-				return ErrInvalidLengthGenerated
-			}
-			postIndex := iNdEx + msglen
-			if postIndex > l {
-				return io.ErrUnexpectedEOF
-			}
-			m.MatchExpressions = append(m.MatchExpressions, LabelSelectorRequirement{})
-			if err := m.MatchExpressions[len(m.MatchExpressions)-1].Unmarshal(data[iNdEx:postIndex]); err != nil {
-				return err
-			}
-			iNdEx = postIndex
-		default:
-			iNdEx = preIndex
-			skippy, err := skipGenerated(data[iNdEx:])
-			if err != nil {
-				return err
-			}
-			if skippy < 0 {
-				return ErrInvalidLengthGenerated
-			}
-			if (iNdEx + skippy) > l {
-				return io.ErrUnexpectedEOF
-			}
-			iNdEx += skippy
-		}
-	}
-
-	if iNdEx > l {
-		return io.ErrUnexpectedEOF
-	}
-	return nil
-}
-func (m *LabelSelectorRequirement) Unmarshal(data []byte) error {
-	l := len(data)
-	iNdEx := 0
-	for iNdEx < l {
-		preIndex := iNdEx
-		var wire uint64
-		for shift := uint(0); ; shift += 7 {
-			if shift >= 64 {
-				return ErrIntOverflowGenerated
-			}
-			if iNdEx >= l {
-				return io.ErrUnexpectedEOF
-			}
-			b := data[iNdEx]
-			iNdEx++
-			wire |= (uint64(b) & 0x7F) << shift
-			if b < 0x80 {
-				break
-			}
-		}
-		fieldNum := int32(wire >> 3)
-		wireType := int(wire & 0x7)
-		if wireType == 4 {
-			return fmt.Errorf("proto: LabelSelectorRequirement: wiretype end group for non-group")
-		}
-		if fieldNum <= 0 {
-			return fmt.Errorf("proto: LabelSelectorRequirement: illegal tag %d (wire type %d)", fieldNum, wire)
-		}
-		switch fieldNum {
-		case 1:
-			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field Key", wireType)
-			}
-			var stringLen uint64
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowGenerated
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := data[iNdEx]
-				iNdEx++
-				stringLen |= (uint64(b) & 0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			intStringLen := int(stringLen)
-			if intStringLen < 0 {
-				return ErrInvalidLengthGenerated
-			}
-			postIndex := iNdEx + intStringLen
-			if postIndex > l {
-				return io.ErrUnexpectedEOF
-			}
-			m.Key = string(data[iNdEx:postIndex])
-			iNdEx = postIndex
-		case 2:
-			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field Operator", wireType)
-			}
-			var stringLen uint64
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowGenerated
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := data[iNdEx]
-				iNdEx++
-				stringLen |= (uint64(b) & 0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			intStringLen := int(stringLen)
-			if intStringLen < 0 {
-				return ErrInvalidLengthGenerated
-			}
-			postIndex := iNdEx + intStringLen
-			if postIndex > l {
-				return io.ErrUnexpectedEOF
-			}
-			m.Operator = LabelSelectorOperator(data[iNdEx:postIndex])
-			iNdEx = postIndex
-		case 3:
-			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field Values", wireType)
-			}
-			var stringLen uint64
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowGenerated
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := data[iNdEx]
-				iNdEx++
-				stringLen |= (uint64(b) & 0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			intStringLen := int(stringLen)
-			if intStringLen < 0 {
-				return ErrInvalidLengthGenerated
-			}
-			postIndex := iNdEx + intStringLen
-			if postIndex > l {
-				return io.ErrUnexpectedEOF
-			}
-			m.Values = append(m.Values, string(data[iNdEx:postIndex]))
-			iNdEx = postIndex
-		default:
-			iNdEx = preIndex
-			skippy, err := skipGenerated(data[iNdEx:])
-			if err != nil {
-				return err
-			}
-			if skippy < 0 {
-				return ErrInvalidLengthGenerated
-			}
-			if (iNdEx + skippy) > l {
-				return io.ErrUnexpectedEOF
-			}
-			iNdEx += skippy
-		}
-	}
-
-	if iNdEx > l {
-		return io.ErrUnexpectedEOF
-	}
-	return nil
-}
-func (m *ScheduledJob) Unmarshal(data []byte) error {
-	l := len(data)
-	iNdEx := 0
-	for iNdEx < l {
-		preIndex := iNdEx
-		var wire uint64
-		for shift := uint(0); ; shift += 7 {
-			if shift >= 64 {
-				return ErrIntOverflowGenerated
-			}
-			if iNdEx >= l {
-				return io.ErrUnexpectedEOF
-			}
-			b := data[iNdEx]
-			iNdEx++
-			wire |= (uint64(b) & 0x7F) << shift
-			if b < 0x80 {
-				break
-			}
-		}
-		fieldNum := int32(wire >> 3)
-		wireType := int(wire & 0x7)
-		if wireType == 4 {
-			return fmt.Errorf("proto: ScheduledJob: wiretype end group for non-group")
-		}
-		if fieldNum <= 0 {
-			return fmt.Errorf("proto: ScheduledJob: illegal tag %d (wire type %d)", fieldNum, wire)
-		}
-		switch fieldNum {
-		case 1:
-			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field ObjectMeta", wireType)
-			}
-			var msglen int
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowGenerated
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := data[iNdEx]
-				iNdEx++
-				msglen |= (int(b) & 0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			if msglen < 0 {
-				return ErrInvalidLengthGenerated
-			}
-			postIndex := iNdEx + msglen
-			if postIndex > l {
-				return io.ErrUnexpectedEOF
-			}
-			if err := m.ObjectMeta.Unmarshal(data[iNdEx:postIndex]); err != nil {
-				return err
-			}
-			iNdEx = postIndex
-		case 2:
-			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field Spec", wireType)
-			}
-			var msglen int
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowGenerated
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := data[iNdEx]
-				iNdEx++
-				msglen |= (int(b) & 0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			if msglen < 0 {
-				return ErrInvalidLengthGenerated
-			}
-			postIndex := iNdEx + msglen
-			if postIndex > l {
-				return io.ErrUnexpectedEOF
-			}
-			if err := m.Spec.Unmarshal(data[iNdEx:postIndex]); err != nil {
-				return err
-			}
-			iNdEx = postIndex
-		case 3:
-			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field Status", wireType)
-			}
-			var msglen int
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowGenerated
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := data[iNdEx]
-				iNdEx++
-				msglen |= (int(b) & 0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			if msglen < 0 {
-				return ErrInvalidLengthGenerated
-			}
-			postIndex := iNdEx + msglen
-			if postIndex > l {
-				return io.ErrUnexpectedEOF
-			}
-			if err := m.Status.Unmarshal(data[iNdEx:postIndex]); err != nil {
-				return err
-			}
-			iNdEx = postIndex
-		default:
-			iNdEx = preIndex
-			skippy, err := skipGenerated(data[iNdEx:])
-			if err != nil {
-				return err
-			}
-			if skippy < 0 {
-				return ErrInvalidLengthGenerated
-			}
-			if (iNdEx + skippy) > l {
-				return io.ErrUnexpectedEOF
-			}
-			iNdEx += skippy
-		}
-	}
-
-	if iNdEx > l {
-		return io.ErrUnexpectedEOF
-	}
-	return nil
-}
-func (m *ScheduledJobList) Unmarshal(data []byte) error {
-	l := len(data)
-	iNdEx := 0
-	for iNdEx < l {
-		preIndex := iNdEx
-		var wire uint64
-		for shift := uint(0); ; shift += 7 {
-			if shift >= 64 {
-				return ErrIntOverflowGenerated
-			}
-			if iNdEx >= l {
-				return io.ErrUnexpectedEOF
-			}
-			b := data[iNdEx]
-			iNdEx++
-			wire |= (uint64(b) & 0x7F) << shift
-			if b < 0x80 {
-				break
-			}
-		}
-		fieldNum := int32(wire >> 3)
-		wireType := int(wire & 0x7)
-		if wireType == 4 {
-			return fmt.Errorf("proto: ScheduledJobList: wiretype end group for non-group")
-		}
-		if fieldNum <= 0 {
-			return fmt.Errorf("proto: ScheduledJobList: illegal tag %d (wire type %d)", fieldNum, wire)
-		}
-		switch fieldNum {
-		case 1:
-			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field ListMeta", wireType)
-			}
-			var msglen int
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowGenerated
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := data[iNdEx]
-				iNdEx++
-				msglen |= (int(b) & 0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			if msglen < 0 {
-				return ErrInvalidLengthGenerated
-			}
-			postIndex := iNdEx + msglen
-			if postIndex > l {
-				return io.ErrUnexpectedEOF
-			}
-			if err := m.ListMeta.Unmarshal(data[iNdEx:postIndex]); err != nil {
-				return err
-			}
-			iNdEx = postIndex
-		case 2:
-			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field Items", wireType)
-			}
-			var msglen int
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowGenerated
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := data[iNdEx]
-				iNdEx++
-				msglen |= (int(b) & 0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			if msglen < 0 {
-				return ErrInvalidLengthGenerated
-			}
-			postIndex := iNdEx + msglen
-			if postIndex > l {
-				return io.ErrUnexpectedEOF
-			}
-			m.Items = append(m.Items, ScheduledJob{})
-			if err := m.Items[len(m.Items)-1].Unmarshal(data[iNdEx:postIndex]); err != nil {
-				return err
-			}
-			iNdEx = postIndex
-		default:
-			iNdEx = preIndex
-			skippy, err := skipGenerated(data[iNdEx:])
-			if err != nil {
-				return err
-			}
-			if skippy < 0 {
-				return ErrInvalidLengthGenerated
-			}
-			if (iNdEx + skippy) > l {
-				return io.ErrUnexpectedEOF
-			}
-			iNdEx += skippy
-		}
-	}
-
-	if iNdEx > l {
-		return io.ErrUnexpectedEOF
-	}
-	return nil
-}
-func (m *ScheduledJobSpec) Unmarshal(data []byte) error {
-	l := len(data)
-	iNdEx := 0
-	for iNdEx < l {
-		preIndex := iNdEx
-		var wire uint64
-		for shift := uint(0); ; shift += 7 {
-			if shift >= 64 {
-				return ErrIntOverflowGenerated
-			}
-			if iNdEx >= l {
-				return io.ErrUnexpectedEOF
-			}
-			b := data[iNdEx]
-			iNdEx++
-			wire |= (uint64(b) & 0x7F) << shift
-			if b < 0x80 {
-				break
-			}
-		}
-		fieldNum := int32(wire >> 3)
-		wireType := int(wire & 0x7)
-		if wireType == 4 {
-			return fmt.Errorf("proto: ScheduledJobSpec: wiretype end group for non-group")
-		}
-		if fieldNum <= 0 {
-			return fmt.Errorf("proto: ScheduledJobSpec: illegal tag %d (wire type %d)", fieldNum, wire)
-		}
-		switch fieldNum {
-		case 1:
-			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field Schedule", wireType)
-			}
-			var stringLen uint64
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowGenerated
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := data[iNdEx]
-				iNdEx++
-				stringLen |= (uint64(b) & 0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			intStringLen := int(stringLen)
-			if intStringLen < 0 {
-				return ErrInvalidLengthGenerated
-			}
-			postIndex := iNdEx + intStringLen
-			if postIndex > l {
-				return io.ErrUnexpectedEOF
-			}
-			m.Schedule = string(data[iNdEx:postIndex])
-			iNdEx = postIndex
-		case 2:
-			if wireType != 0 {
-				return fmt.Errorf("proto: wrong wireType = %d for field StartingDeadlineSeconds", wireType)
-			}
-			var v int64
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowGenerated
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := data[iNdEx]
-				iNdEx++
-				v |= (int64(b) & 0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			m.StartingDeadlineSeconds = &v
-		case 3:
-			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field ConcurrencyPolicy", wireType)
-			}
-			var stringLen uint64
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowGenerated
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := data[iNdEx]
-				iNdEx++
-				stringLen |= (uint64(b) & 0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			intStringLen := int(stringLen)
-			if intStringLen < 0 {
-				return ErrInvalidLengthGenerated
-			}
-			postIndex := iNdEx + intStringLen
-			if postIndex > l {
-				return io.ErrUnexpectedEOF
-			}
-			m.ConcurrencyPolicy = ConcurrencyPolicy(data[iNdEx:postIndex])
-			iNdEx = postIndex
-		case 4:
-			if wireType != 0 {
-				return fmt.Errorf("proto: wrong wireType = %d for field Suspend", wireType)
-			}
-			var v int
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowGenerated
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := data[iNdEx]
-				iNdEx++
-				v |= (int(b) & 0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			b := bool(v != 0)
-			m.Suspend = &b
-		case 5:
-			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field JobTemplate", wireType)
-			}
-			var msglen int
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowGenerated
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := data[iNdEx]
-				iNdEx++
-				msglen |= (int(b) & 0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			if msglen < 0 {
-				return ErrInvalidLengthGenerated
-			}
-			postIndex := iNdEx + msglen
-			if postIndex > l {
-				return io.ErrUnexpectedEOF
-			}
-			if err := m.JobTemplate.Unmarshal(data[iNdEx:postIndex]); err != nil {
-				return err
-			}
-			iNdEx = postIndex
-		default:
-			iNdEx = preIndex
-			skippy, err := skipGenerated(data[iNdEx:])
-			if err != nil {
-				return err
-			}
-			if skippy < 0 {
-				return ErrInvalidLengthGenerated
-			}
-			if (iNdEx + skippy) > l {
-				return io.ErrUnexpectedEOF
-			}
-			iNdEx += skippy
-		}
-	}
-
-	if iNdEx > l {
-		return io.ErrUnexpectedEOF
-	}
-	return nil
-}
-func (m *ScheduledJobStatus) Unmarshal(data []byte) error {
-	l := len(data)
-	iNdEx := 0
-	for iNdEx < l {
-		preIndex := iNdEx
-		var wire uint64
-		for shift := uint(0); ; shift += 7 {
-			if shift >= 64 {
-				return ErrIntOverflowGenerated
-			}
-			if iNdEx >= l {
-				return io.ErrUnexpectedEOF
-			}
-			b := data[iNdEx]
-			iNdEx++
-			wire |= (uint64(b) & 0x7F) << shift
-			if b < 0x80 {
-				break
-			}
-		}
-		fieldNum := int32(wire >> 3)
-		wireType := int(wire & 0x7)
-		if wireType == 4 {
-			return fmt.Errorf("proto: ScheduledJobStatus: wiretype end group for non-group")
-		}
-		if fieldNum <= 0 {
-			return fmt.Errorf("proto: ScheduledJobStatus: illegal tag %d (wire type %d)", fieldNum, wire)
-		}
-		switch fieldNum {
-		case 1:
-			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field Active", wireType)
-			}
-			var msglen int
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowGenerated
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := data[iNdEx]
-				iNdEx++
-				msglen |= (int(b) & 0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			if msglen < 0 {
-				return ErrInvalidLengthGenerated
-			}
-			postIndex := iNdEx + msglen
-			if postIndex > l {
-				return io.ErrUnexpectedEOF
-			}
-			m.Active = append(m.Active, k8s_io_kubernetes_pkg_api_v1.ObjectReference{})
-			if err := m.Active[len(m.Active)-1].Unmarshal(data[iNdEx:postIndex]); err != nil {
-				return err
-			}
-			iNdEx = postIndex
-		case 4:
-			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field LastScheduleTime", wireType)
-			}
-			var msglen int
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowGenerated
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := data[iNdEx]
-				iNdEx++
-				msglen |= (int(b) & 0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			if msglen < 0 {
-				return ErrInvalidLengthGenerated
-			}
-			postIndex := iNdEx + msglen
-			if postIndex > l {
-				return io.ErrUnexpectedEOF
-			}
-			if m.LastScheduleTime == nil {
-				m.LastScheduleTime = &k8s_io_kubernetes_pkg_api_unversioned.Time{}
-			}
-			if err := m.LastScheduleTime.Unmarshal(data[iNdEx:postIndex]); err != nil {
-				return err
-			}
-			iNdEx = postIndex
-		default:
-			iNdEx = preIndex
-			skippy, err := skipGenerated(data[iNdEx:])
-			if err != nil {
-				return err
-			}
-			if skippy < 0 {
-				return ErrInvalidLengthGenerated
-			}
-			if (iNdEx + skippy) > l {
-				return io.ErrUnexpectedEOF
-			}
-			iNdEx += skippy
-		}
-	}
-
-	if iNdEx > l {
-		return io.ErrUnexpectedEOF
-	}
-	return nil
-}
 func skipGenerated(data []byte) (n int, err error) {
 	l := len(data)
 	iNdEx := 0
@@ -3207,87 +2706,77 @@ var (
 )
 
 var fileDescriptorGenerated = []byte{
-	// 1300 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x09, 0x6e, 0x88, 0x02, 0xff, 0xd4, 0x57, 0xcf, 0x6f, 0x1b, 0xc5,
-	0x17, 0xaf, 0xed, 0xd8, 0xb1, 0xc7, 0xf9, 0xe1, 0xcc, 0xb7, 0x51, 0xfd, 0x35, 0x22, 0xa9, 0x2c,
-	0x81, 0x1a, 0x68, 0x76, 0x95, 0xa8, 0xa8, 0x21, 0x88, 0x4a, 0x6c, 0x08, 0x52, 0x21, 0x51, 0xa2,
-	0x71, 0xa8, 0x10, 0xb4, 0x87, 0xf1, 0x7a, 0x62, 0x6f, 0xb3, 0xde, 0x75, 0x77, 0x67, 0x0d, 0xbe,
-	0xf5, 0xca, 0x09, 0x24, 0xfe, 0x05, 0xce, 0xfc, 0x05, 0xf4, 0xc0, 0x2d, 0x37, 0x0a, 0x27, 0xc4,
-	0x21, 0x82, 0xf2, 0x5f, 0xf4, 0xc4, 0x9b, 0xd9, 0xd9, 0xf5, 0xfa, 0x57, 0x14, 0x1b, 0x15, 0x89,
-	0xc3, 0x4a, 0x9e, 0x37, 0xef, 0xf3, 0x99, 0x37, 0xf3, 0x3e, 0xf3, 0xe6, 0x19, 0xbd, 0x7b, 0xb6,
-	0xe3, 0x6b, 0x96, 0xab, 0x9f, 0x05, 0x75, 0xe6, 0x39, 0x8c, 0x33, 0x5f, 0xef, 0x9c, 0x35, 0x75,
-	0xda, 0xb1, 0x7c, 0xbd, 0x4e, 0xb9, 0xd9, 0xd2, 0xbb, 0xdb, 0xd4, 0xee, 0xb4, 0xe8, 0x96, 0xde,
-	0x64, 0x0e, 0xf3, 0x28, 0x67, 0x0d, 0xad, 0xe3, 0xb9, 0xdc, 0xc5, 0x1b, 0x21, 0x54, 0xeb, 0x43,
-	0x35, 0x80, 0x6a, 0x02, 0xaa, 0x49, 0xa8, 0x16, 0x41, 0x2b, 0x9b, 0x4d, 0x8b, 0xb7, 0x82, 0xba,
-	0x66, 0xba, 0x6d, 0xbd, 0xe9, 0x36, 0x5d, 0x5d, 0x32, 0xd4, 0x83, 0x53, 0x39, 0x92, 0x03, 0xf9,
-	0x2b, 0x64, 0xae, 0x6c, 0x4f, 0x0c, 0x4a, 0xf7, 0x98, 0xef, 0x06, 0x9e, 0xc9, 0x86, 0xa3, 0xa9,
-	0xbc, 0x33, 0x19, 0x13, 0x38, 0x5d, 0xe6, 0xf9, 0x96, 0xeb, 0xb0, 0xc6, 0x08, 0xec, 0xf6, 0x64,
-	0x58, 0x77, 0x64, 0xcb, 0x95, 0xcd, 0xf1, 0xde, 0x5e, 0xe0, 0x70, 0xab, 0x3d, 0x1a, 0xd3, 0xd6,
-	0x78, 0xf7, 0x80, 0x5b, 0xb6, 0x6e, 0x39, 0xdc, 0xe7, 0xde, 0x30, 0xa4, 0xfa, 0x5d, 0x1a, 0x65,
-	0x3e, 0x76, 0xeb, 0xf8, 0x33, 0x94, 0x6f, 0x33, 0x4e, 0x1b, 0x94, 0xd3, 0x72, 0xea, 0x66, 0xea,
-	0x56, 0x71, 0xfb, 0x96, 0x36, 0xf1, 0xbc, 0xb5, 0xee, 0x96, 0x76, 0x54, 0x7f, 0xcc, 0x4c, 0x7e,
-	0x08, 0x18, 0x03, 0x9f, 0x5f, 0xac, 0x5f, 0x7b, 0x71, 0xb1, 0x8e, 0xfa, 0x36, 0x12, 0xb3, 0xe1,
-	0x13, 0x34, 0xe7, 0x77, 0x98, 0x59, 0x4e, 0x4b, 0xd6, 0x6d, 0xed, 0xca, 0x59, 0xd4, 0x20, 0xae,
-	0x1a, 0x20, 0x8d, 0x05, 0xc5, 0x3f, 0x27, 0x46, 0x44, 0xb2, 0xe1, 0x87, 0x28, 0xe7, 0x73, 0xca,
-	0x03, 0xbf, 0x9c, 0x91, 0xbc, 0x77, 0xa6, 0xe4, 0x95, 0x58, 0x63, 0x49, 0x31, 0xe7, 0xc2, 0x31,
-	0x51, 0x9c, 0xd5, 0x5f, 0x33, 0x68, 0x01, 0xbc, 0xf6, 0x5c, 0xa7, 0x61, 0x71, 0x48, 0x24, 0xbe,
-	0x83, 0xe6, 0x78, 0xaf, 0xc3, 0xe4, 0xd1, 0x14, 0x8c, 0x9b, 0x51, 0x40, 0x27, 0x60, 0x7b, 0x79,
-	0xb1, 0x5e, 0x4a, 0xfa, 0x0a, 0x1b, 0x91, 0xde, 0xf8, 0x41, 0x1c, 0x64, 0x5a, 0xe2, 0xee, 0x0d,
-	0x2e, 0x07, 0xc8, 0x4b, 0xe5, 0xa0, 0xc5, 0x9c, 0x83, 0xe1, 0xe1, 0x16, 0x5a, 0xb4, 0xa9, 0xcf,
-	0x8f, 0x3d, 0xb7, 0xce, 0x4e, 0x40, 0x08, 0xea, 0x0c, 0xde, 0xbe, 0x24, 0x63, 0x09, 0x4d, 0x6a,
-	0x02, 0x62, 0xac, 0xaa, 0x58, 0x16, 0x0f, 0x92, 0x4c, 0x64, 0x90, 0x18, 0x7f, 0x89, 0xb0, 0x30,
-	0x9c, 0x78, 0xd4, 0xf1, 0xc3, 0xdd, 0x89, 0xe5, 0xe6, 0xa6, 0x5f, 0xae, 0xa2, 0x96, 0xc3, 0x07,
-	0x23, 0x74, 0x64, 0xcc, 0x12, 0xf8, 0x4d, 0x94, 0xf3, 0x18, 0xf5, 0x5d, 0xa7, 0x9c, 0x95, 0x47,
-	0x17, 0x67, 0x8a, 0x48, 0x2b, 0x51, 0xb3, 0x78, 0x03, 0xcd, 0xb7, 0x99, 0xef, 0xd3, 0x26, 0x2b,
-	0xe7, 0xa4, 0xe3, 0xb2, 0x72, 0x9c, 0x3f, 0x0c, 0xcd, 0x24, 0x9a, 0xaf, 0x3e, 0x4b, 0xa1, 0x79,
-	0x48, 0xd4, 0x81, 0xe5, 0x73, 0xfc, 0x68, 0x44, 0xee, 0xfa, 0x15, 0x77, 0x23, 0xe0, 0x52, 0xf5,
-	0x25, 0xb5, 0x50, 0x3e, 0xb2, 0x24, 0x34, 0x5f, 0x43, 0x59, 0x8b, 0xb3, 0xb6, 0xc8, 0x7b, 0x06,
-	0xb8, 0xb5, 0xe9, 0xc4, 0x69, 0x2c, 0x2a, 0xea, 0xec, 0x7d, 0x41, 0x42, 0x42, 0xae, 0xea, 0xb3,
-	0x8c, 0x8c, 0x5f, 0x5c, 0x02, 0xbc, 0x85, 0x8a, 0x1d, 0xea, 0x51, 0xdb, 0x66, 0xb6, 0xe5, 0xb7,
-	0xe5, 0x16, 0xb2, 0xc6, 0x32, 0x40, 0x8a, 0xc7, 0x7d, 0x33, 0x49, 0xfa, 0x08, 0x08, 0x94, 0xc3,
-	0x8e, 0xcd, 0xc4, 0x19, 0x87, 0x8a, 0x54, 0x90, 0xbd, 0xbe, 0x99, 0x24, 0x7d, 0xf0, 0x11, 0x5a,
-	0xa5, 0x26, 0xb7, 0xba, 0xec, 0x43, 0x46, 0x1b, 0xb6, 0xe5, 0xb0, 0x1a, 0x33, 0x41, 0x92, 0xe1,
-	0x9d, 0xcb, 0x18, 0xff, 0x07, 0xf0, 0xea, 0x07, 0xe3, 0x1c, 0xc8, 0x78, 0x1c, 0xae, 0xa3, 0xbc,
-	0xcf, 0x6c, 0xa8, 0x11, 0xae, 0xa7, 0x44, 0xb4, 0x33, 0xc5, 0xd1, 0x1c, 0xd0, 0x3a, 0xb3, 0x6b,
-	0x0a, 0x6f, 0x2c, 0x88, 0xb3, 0x8f, 0x46, 0x24, 0xe6, 0xc5, 0xbb, 0x68, 0xa9, 0x4d, 0x9d, 0x80,
-	0xc6, 0x9e, 0x52, 0x41, 0x79, 0x03, 0x83, 0xff, 0xd2, 0xe1, 0xc0, 0x0c, 0x19, 0xf2, 0xc4, 0x5f,
-	0xa0, 0x3c, 0x1c, 0x75, 0xc7, 0x86, 0x02, 0x29, 0xe5, 0x54, 0xdc, 0xde, 0xbc, 0xbc, 0x0a, 0x1e,
-	0xbb, 0x8d, 0x13, 0x05, 0x90, 0xa5, 0x2a, 0x16, 0x45, 0x64, 0x25, 0x31, 0x61, 0xf5, 0xc7, 0x0c,
-	0x2a, 0xc4, 0xa5, 0x07, 0x9f, 0x21, 0x64, 0x46, 0xd7, 0xdb, 0x87, 0x04, 0x0a, 0x9d, 0xdc, 0x9d,
-	0x4e, 0x27, 0x71, 0x79, 0xe8, 0x57, 0xe0, 0xd8, 0xe4, 0x93, 0x04, 0x3d, 0x54, 0xf7, 0x02, 0x94,
-	0x0e, 0x8f, 0xcb, 0xdb, 0x9b, 0x9e, 0xfe, 0xf6, 0x2e, 0x02, 0x77, 0xa1, 0x16, 0x31, 0x90, 0x3e,
-	0x19, 0x6e, 0xa2, 0xa5, 0xbe, 0x62, 0x66, 0xad, 0x45, 0x32, 0x35, 0x7b, 0x03, 0x34, 0x64, 0x88,
-	0x56, 0x14, 0x84, 0x50, 0x53, 0x52, 0x38, 0xd9, 0x7e, 0x41, 0x08, 0x05, 0x48, 0xd4, 0x2c, 0xd6,
-	0x61, 0xab, 0x81, 0x69, 0x32, 0xd6, 0x60, 0x0d, 0x99, 0xf9, 0xac, 0xb1, 0xa2, 0x5c, 0x0b, 0xb5,
-	0x68, 0x82, 0xf4, 0x7d, 0x04, 0xf1, 0x29, 0xb5, 0x6c, 0xf0, 0xce, 0x0d, 0x12, 0x7f, 0x24, 0xad,
-	0x44, 0xcd, 0x56, 0x7f, 0x49, 0xa1, 0x22, 0x1c, 0x7a, 0x94, 0xd8, 0x57, 0xf8, 0x62, 0xb6, 0x12,
-	0x2a, 0x0c, 0x93, 0xb5, 0x3b, 0x9d, 0x30, 0xae, 0x2c, 0xc9, 0x9f, 0x52, 0x68, 0x79, 0xc8, 0xff,
-	0xbf, 0xd6, 0x09, 0x54, 0x2f, 0xd2, 0x68, 0x71, 0xa0, 0x32, 0xe0, 0xa7, 0x90, 0xa9, 0xb6, 0x20,
-	0x90, 0xe6, 0xe8, 0x72, 0xdd, 0x9f, 0xb5, 0xd2, 0x68, 0x87, 0x7d, 0xae, 0x7d, 0x87, 0x7b, 0x3d,
-	0xe3, 0x7f, 0x2a, 0x8c, 0x62, 0x62, 0x86, 0x24, 0x97, 0xc4, 0x5f, 0xa7, 0x50, 0x49, 0x8e, 0xf7,
-	0xbf, 0xea, 0x40, 0x0b, 0xe9, 0xab, 0x92, 0x2b, 0xe2, 0xd8, 0x9b, 0x35, 0x0e, 0xc2, 0x9e, 0x04,
-	0x96, 0xc7, 0xda, 0xcc, 0xe1, 0x46, 0x59, 0x45, 0x50, 0x3a, 0x1c, 0x5a, 0x84, 0x8c, 0x2c, 0x5b,
-	0xb9, 0x87, 0x4a, 0xc3, 0x3b, 0xc0, 0x25, 0x94, 0x39, 0x63, 0xbd, 0xb0, 0x9d, 0x21, 0xe2, 0x27,
-	0xbe, 0x8e, 0xb2, 0x5d, 0x6a, 0x07, 0xa1, 0xe2, 0x0a, 0x24, 0x1c, 0xec, 0xa6, 0x77, 0x52, 0xd5,
-	0xef, 0x53, 0xa8, 0x3c, 0x29, 0x10, 0xfc, 0x7a, 0x82, 0xc8, 0x28, 0xaa, 0xa8, 0x32, 0x9f, 0xb0,
-	0x5e, 0xc8, 0xba, 0x8f, 0xf2, 0x6e, 0x47, 0x34, 0x9c, 0x50, 0x86, 0xc3, 0x1e, 0x68, 0x23, 0x92,
-	0xe3, 0x91, 0xb2, 0x43, 0x17, 0xb4, 0x3a, 0x40, 0x1f, 0x4d, 0x90, 0x18, 0x8a, 0xab, 0x28, 0x27,
-	0xe3, 0x11, 0x2f, 0x4f, 0x06, 0x48, 0x90, 0xb8, 0x9f, 0x0f, 0xa4, 0x85, 0xa8, 0x99, 0xea, 0x0f,
-	0x69, 0xb4, 0x50, 0x33, 0x5b, 0xac, 0x11, 0xc0, 0x6d, 0x7d, 0xb5, 0x2d, 0xed, 0xa3, 0x01, 0x21,
-	0xbf, 0x37, 0x45, 0x42, 0x93, 0x01, 0x4e, 0xec, 0x6d, 0xd9, 0x50, 0x6f, 0xfb, 0xfe, 0xac, 0x0b,
-	0x5c, 0xde, 0xe4, 0xfe, 0x0c, 0x1a, 0x4d, 0xba, 0xff, 0x1b, 0x8d, 0xd1, 0xc3, 0xc1, 0xc6, 0xe8,
-	0xee, 0x8c, 0x3b, 0x9b, 0xd0, 0x21, 0x7d, 0x93, 0x19, 0xdc, 0x91, 0xac, 0x67, 0xb7, 0xa1, 0xe7,
-	0x50, 0x36, 0x25, 0xd3, 0x38, 0xc0, 0xc8, 0x97, 0xc4, 0x1e, 0xf8, 0x53, 0x74, 0x43, 0x3e, 0x6e,
-	0x96, 0xd3, 0x1c, 0x6e, 0x7a, 0xd2, 0xb2, 0xe9, 0x79, 0x0d, 0x80, 0x37, 0x6a, 0xe3, 0x5d, 0xc8,
-	0x24, 0x2c, 0xec, 0x7b, 0x05, 0x7e, 0x98, 0x81, 0xe7, 0x31, 0xc7, 0xec, 0x1d, 0xbb, 0xb6, 0x65,
-	0xf6, 0x64, 0x76, 0x0b, 0x86, 0xa6, 0xa2, 0x59, 0xd9, 0x1b, 0x76, 0x78, 0x39, 0xce, 0x48, 0x46,
-	0x89, 0xf0, 0x1b, 0x68, 0xde, 0x0f, 0x40, 0x3a, 0x4e, 0x43, 0x3e, 0x8e, 0x79, 0xa3, 0x28, 0x1a,
-	0xe0, 0x5a, 0x68, 0x22, 0xd1, 0x1c, 0x7e, 0x82, 0x8a, 0x8f, 0xfb, 0xc5, 0x5e, 0x3e, 0x8e, 0xff,
-	0xec, 0x69, 0x89, 0xeb, 0x60, 0x62, 0x82, 0x24, 0xd7, 0xa8, 0xfe, 0x9e, 0x42, 0x78, 0x54, 0x92,
-	0x70, 0xca, 0xd1, 0x63, 0x1e, 0xd6, 0xe6, 0xcd, 0xab, 0x5c, 0x4c, 0xc2, 0x4e, 0x99, 0xd8, 0x35,
-	0x9b, 0xf8, 0xf6, 0xb7, 0x51, 0x49, 0xfc, 0x95, 0x88, 0x16, 0x9c, 0xf5, 0xbf, 0xca, 0x75, 0x51,
-	0x58, 0x0f, 0x86, 0x88, 0xc8, 0x08, 0xb5, 0xf1, 0xd6, 0xf9, 0x9f, 0x6b, 0xd7, 0x9e, 0xc3, 0xf7,
-	0x1b, 0x7c, 0x4f, 0x5f, 0xac, 0xa5, 0xce, 0xe1, 0x7b, 0x0e, 0xdf, 0x1f, 0xf0, 0x7d, 0xfb, 0xd7,
-	0xda, 0xb5, 0xcf, 0xf3, 0xd1, 0xd1, 0xfd, 0x1d, 0x00, 0x00, 0xff, 0xff, 0x67, 0x5d, 0xb9, 0x32,
-	0xf8, 0x10, 0x00, 0x00,
+	// 1137 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x09, 0x6e, 0x88, 0x02, 0xff, 0xd4, 0x56, 0x4b, 0x6f, 0x23, 0x45,
+	0x17, 0x4d, 0xdb, 0x89, 0x1f, 0xe5, 0x3c, 0xeb, 0xfb, 0xa2, 0x31, 0x41, 0xb2, 0x23, 0x4b, 0xa0,
+	0x0c, 0x4a, 0xba, 0x15, 0x2b, 0x82, 0x61, 0x16, 0x48, 0xd3, 0x41, 0x48, 0x44, 0x89, 0x26, 0x2a,
+	0x27, 0x30, 0x1a, 0x66, 0x41, 0xb9, 0xbb, 0xe2, 0x74, 0xd2, 0xee, 0x6a, 0xba, 0xaa, 0x23, 0x65,
+	0xc7, 0x9a, 0x15, 0x12, 0x3f, 0x80, 0x7f, 0xc1, 0x82, 0x1d, 0xac, 0xb2, 0x60, 0x31, 0xb0, 0x62,
+	0x65, 0x91, 0xe6, 0x5f, 0x64, 0x85, 0xaa, 0x5c, 0xfd, 0xf0, 0x93, 0x38, 0x68, 0x90, 0xd8, 0xb9,
+	0x6f, 0x9d, 0x73, 0xea, 0x56, 0xdd, 0x53, 0xf7, 0x1a, 0x7c, 0x78, 0xf9, 0x84, 0xe9, 0x0e, 0x35,
+	0x2e, 0xc3, 0x36, 0x09, 0x3c, 0xc2, 0x09, 0x33, 0xfc, 0xcb, 0x8e, 0x81, 0x7d, 0x87, 0x19, 0x6d,
+	0xcc, 0xad, 0x73, 0xe3, 0xaa, 0x89, 0x5d, 0xff, 0x1c, 0xef, 0x1a, 0x1d, 0xe2, 0x91, 0x00, 0x73,
+	0x62, 0xeb, 0x7e, 0x40, 0x39, 0x85, 0x8f, 0xfb, 0x54, 0x3d, 0xa5, 0xea, 0xfe, 0x65, 0x47, 0x17,
+	0x54, 0x5d, 0x52, 0xf5, 0x98, 0xba, 0xb1, 0xd3, 0x71, 0xf8, 0x79, 0xd8, 0xd6, 0x2d, 0xda, 0x35,
+	0x3a, 0xb4, 0x43, 0x0d, 0xa9, 0xd0, 0x0e, 0xcf, 0xe4, 0x97, 0xfc, 0x90, 0xbf, 0xfa, 0xca, 0x1b,
+	0xcd, 0x89, 0x49, 0x19, 0x01, 0x61, 0x34, 0x0c, 0x2c, 0x32, 0x9c, 0xcd, 0xc6, 0xf6, 0x64, 0xce,
+	0xd5, 0x48, 0xee, 0x53, 0x76, 0x60, 0x46, 0x97, 0x70, 0x3c, 0x8e, 0xb3, 0x33, 0x9e, 0x13, 0x84,
+	0x1e, 0x77, 0xba, 0xa3, 0x09, 0xed, 0x4d, 0x87, 0x33, 0xeb, 0x9c, 0x74, 0xf1, 0x08, 0x6b, 0x77,
+	0x3c, 0x2b, 0xe4, 0x8e, 0x6b, 0x38, 0x1e, 0x67, 0x3c, 0x18, 0xa6, 0x34, 0xbe, 0xcf, 0x81, 0xe2,
+	0x7e, 0x40, 0xbd, 0x03, 0xda, 0x86, 0x2f, 0x40, 0x49, 0xa4, 0x6f, 0x63, 0x8e, 0xab, 0xda, 0xa6,
+	0xb6, 0x55, 0x69, 0x6e, 0xe9, 0x13, 0xcb, 0xa4, 0x5f, 0xed, 0xea, 0xcf, 0xdb, 0x17, 0xc4, 0xe2,
+	0x47, 0x84, 0x63, 0x13, 0xde, 0xf4, 0xea, 0x73, 0x51, 0xaf, 0x0e, 0xd2, 0x18, 0x4a, 0xd4, 0xe0,
+	0x0b, 0x30, 0xcf, 0x7c, 0x62, 0x55, 0x73, 0x52, 0xf5, 0x7d, 0xfd, 0xde, 0xc5, 0xd7, 0x55, 0x6e,
+	0x2d, 0x9f, 0x58, 0xe6, 0xa2, 0xda, 0x63, 0x5e, 0x7c, 0x21, 0xa9, 0x08, 0xbf, 0x04, 0x05, 0xc6,
+	0x31, 0x0f, 0x59, 0x35, 0x2f, 0xb5, 0x9f, 0x3c, 0x40, 0x5b, 0xf2, 0xcd, 0x65, 0xa5, 0x5e, 0xe8,
+	0x7f, 0x23, 0xa5, 0xdb, 0xf8, 0x59, 0x03, 0x15, 0x85, 0x3c, 0x74, 0x18, 0x87, 0x2f, 0x47, 0x6e,
+	0x69, 0x7b, 0xda, 0x9e, 0x02, 0x2b, 0xee, 0x4a, 0x70, 0xe5, 0x4d, 0xad, 0xaa, 0x7d, 0x4a, 0x71,
+	0x24, 0x73, 0x4f, 0x9f, 0x83, 0x05, 0x87, 0x93, 0x2e, 0xab, 0xe6, 0x36, 0xf3, 0x5b, 0x95, 0x66,
+	0x73, 0xf6, 0xc3, 0x98, 0x4b, 0x4a, 0x7e, 0xe1, 0x53, 0x21, 0x84, 0xfa, 0x7a, 0x8d, 0x6f, 0xf2,
+	0xc9, 0x21, 0xc4, 0xe5, 0xc1, 0x6d, 0x50, 0x12, 0x1e, 0xb2, 0x43, 0x97, 0xc8, 0x43, 0x94, 0xd3,
+	0xb4, 0x5a, 0x2a, 0x8e, 0x12, 0x04, 0x3c, 0x05, 0x8f, 0x18, 0xc7, 0x01, 0x77, 0xbc, 0xce, 0xc7,
+	0x04, 0xdb, 0xae, 0xe3, 0x91, 0x16, 0xb1, 0xa8, 0x67, 0x33, 0x59, 0xd1, 0xbc, 0xf9, 0x76, 0xd4,
+	0xab, 0x3f, 0x6a, 0x8d, 0x87, 0xa0, 0x49, 0x5c, 0xf8, 0x0a, 0xac, 0x59, 0xd4, 0xb3, 0xc2, 0x20,
+	0x20, 0x9e, 0x75, 0x7d, 0x4c, 0x5d, 0xc7, 0xba, 0x96, 0x65, 0x2c, 0x9b, 0xba, 0xca, 0x66, 0x6d,
+	0x7f, 0x18, 0x70, 0x37, 0x2e, 0x88, 0x46, 0x85, 0xe0, 0x3b, 0xa0, 0xc8, 0x42, 0xe6, 0x13, 0xcf,
+	0xae, 0xce, 0x6f, 0x6a, 0x5b, 0x25, 0xb3, 0x12, 0xf5, 0xea, 0xc5, 0x56, 0x3f, 0x84, 0xe2, 0x35,
+	0xf8, 0x15, 0xa8, 0x5c, 0xd0, 0xf6, 0x09, 0xe9, 0xfa, 0x2e, 0xe6, 0xa4, 0xba, 0x20, 0x2b, 0xfa,
+	0x74, 0x86, 0x8b, 0x3f, 0x48, 0xd9, 0xd2, 0xa5, 0xff, 0x53, 0xa9, 0x57, 0x32, 0x0b, 0x28, 0xbb,
+	0x47, 0xe3, 0x37, 0x0d, 0x2c, 0x0d, 0x78, 0x0f, 0x9e, 0x82, 0x02, 0xb6, 0xb8, 0x73, 0x25, 0x8a,
+	0x21, 0x0a, 0xbf, 0x73, 0x9f, 0x77, 0x87, 0xc8, 0x19, 0x11, 0x07, 0x26, 0xa9, 0x75, 0x9f, 0x49,
+	0x11, 0xa4, 0xc4, 0xe0, 0x05, 0x58, 0x75, 0x31, 0xe3, 0x71, 0x45, 0x4f, 0x9c, 0x2e, 0x91, 0x77,
+	0x31, 0xf5, 0x61, 0xa7, 0x96, 0x15, 0x78, 0xf3, 0xff, 0x51, 0xaf, 0xbe, 0x7a, 0x38, 0xa4, 0x82,
+	0x46, 0x74, 0x1b, 0xdf, 0xe5, 0x40, 0xfe, 0xcd, 0x36, 0x91, 0x93, 0x81, 0x26, 0xd2, 0x9c, 0xad,
+	0x44, 0x13, 0x1b, 0xc8, 0xab, 0xa1, 0x06, 0xb2, 0x37, 0xa3, 0xee, 0xf4, 0xe6, 0xf1, 0x4b, 0x1e,
+	0x2c, 0x1e, 0xd0, 0xf6, 0x3e, 0xf5, 0x6c, 0x87, 0x3b, 0xd4, 0x83, 0x7b, 0x60, 0x9e, 0x5f, 0xfb,
+	0xf1, 0xa3, 0xdb, 0x8c, 0x13, 0x3a, 0xb9, 0xf6, 0xc9, 0x5d, 0xaf, 0xbe, 0x9a, 0xc5, 0x8a, 0x18,
+	0x92, 0x68, 0xf8, 0x59, 0x92, 0x64, 0x4e, 0xf2, 0x3e, 0x1a, 0xdc, 0xee, 0xae, 0x57, 0x9f, 0x3a,
+	0xc1, 0xf4, 0x44, 0x73, 0x30, 0x3d, 0x48, 0xc0, 0x92, 0x28, 0xe4, 0x71, 0x40, 0xdb, 0x7d, 0x77,
+	0xe4, 0x67, 0x74, 0xc7, 0xba, 0x4a, 0x64, 0xe9, 0x30, 0x2b, 0x83, 0x06, 0x55, 0x21, 0x07, 0x50,
+	0x04, 0x4e, 0x02, 0xec, 0xb1, 0xfe, 0xd1, 0x1e, 0xe2, 0xc4, 0x0d, 0xb5, 0x17, 0x3c, 0x1c, 0xd1,
+	0x42, 0x63, 0xf4, 0xe1, 0xbb, 0xa0, 0x10, 0x10, 0xcc, 0xa8, 0x27, 0x1f, 0x75, 0x39, 0xad, 0x11,
+	0x92, 0x51, 0xa4, 0x56, 0xe1, 0x63, 0x50, 0xec, 0x12, 0xc6, 0x70, 0x87, 0x54, 0x0b, 0x12, 0xb8,
+	0xa2, 0x80, 0xc5, 0xa3, 0x7e, 0x18, 0xc5, 0xeb, 0x8d, 0x1f, 0x35, 0x50, 0xfc, 0x37, 0xe6, 0x40,
+	0x6b, 0x70, 0x0e, 0xe8, 0xb3, 0x79, 0x72, 0xc2, 0x0c, 0xf8, 0x21, 0x2f, 0x93, 0x97, 0xfd, 0x7f,
+	0x17, 0x54, 0x7c, 0x1c, 0x60, 0xd7, 0x25, 0xae, 0xc3, 0xba, 0x32, 0xff, 0x05, 0x73, 0x45, 0x74,
+	0xad, 0xe3, 0x34, 0x8c, 0xb2, 0x18, 0x41, 0xb1, 0x68, 0xd7, 0x77, 0x89, 0xb8, 0xe0, 0xbe, 0x11,
+	0x15, 0x65, 0x3f, 0x0d, 0xa3, 0x2c, 0x06, 0x3e, 0x07, 0xeb, 0xfd, 0x4e, 0x34, 0x3c, 0x35, 0xf2,
+	0x72, 0x6a, 0xbc, 0x15, 0xf5, 0xea, 0xeb, 0xcf, 0xc6, 0x01, 0xd0, 0x78, 0x1e, 0xfc, 0x02, 0x94,
+	0x18, 0x71, 0x89, 0xc5, 0x69, 0xa0, 0xec, 0xb3, 0x7b, 0xaf, 0x3b, 0xc7, 0x6d, 0xe2, 0xb6, 0x14,
+	0xd1, 0x5c, 0x94, 0x53, 0x4e, 0x7d, 0xa1, 0x44, 0x10, 0x3e, 0x05, 0xcb, 0x5d, 0xec, 0x85, 0x38,
+	0x41, 0x4a, 0xdf, 0x94, 0x4c, 0x18, 0xf5, 0xea, 0xcb, 0x47, 0x03, 0x2b, 0x68, 0x08, 0x29, 0x12,
+	0xe3, 0xf1, 0x08, 0x29, 0xc8, 0xc4, 0xfe, 0xa6, 0x85, 0x1f, 0x53, 0x7b, 0x60, 0x6a, 0x24, 0x6e,
+	0x48, 0x46, 0x46, 0x22, 0x28, 0x0a, 0x57, 0x4e, 0x67, 0xc5, 0x25, 0x00, 0x56, 0xfc, 0x9c, 0x99,
+	0x9a, 0x17, 0x1f, 0xcc, 0x66, 0x90, 0xa4, 0x1d, 0xa4, 0x1d, 0x37, 0x09, 0x31, 0x94, 0x91, 0x87,
+	0xa7, 0xa0, 0x2c, 0xa7, 0xb7, 0x7c, 0xb0, 0xb9, 0x19, 0x1f, 0xec, 0x52, 0xd4, 0xab, 0x97, 0x5b,
+	0x31, 0x1d, 0xa5, 0x4a, 0xd0, 0x06, 0xcb, 0xa9, 0x4f, 0x1e, 0xd4, 0x78, 0x64, 0x51, 0xf6, 0x07,
+	0x34, 0xd0, 0x90, 0xa6, 0x68, 0x00, 0x6a, 0xaa, 0xce, 0x4b, 0xb3, 0x4e, 0x1a, 0x93, 0x06, 0x28,
+	0xb3, 0xd0, 0xb2, 0x08, 0xb1, 0x89, 0x2d, 0x6b, 0xbe, 0x60, 0xae, 0x29, 0x68, 0xb9, 0x15, 0x2f,
+	0xa0, 0x14, 0x23, 0x84, 0xcf, 0xb0, 0xe3, 0x12, 0x5b, 0xd6, 0x3a, 0x23, 0xfc, 0x89, 0x8c, 0x22,
+	0xb5, 0xda, 0xf8, 0x55, 0x03, 0xd9, 0x7f, 0x01, 0x6f, 0x70, 0x36, 0x9e, 0x67, 0xfc, 0x97, 0xfb,
+	0xc7, 0x7f, 0x61, 0xa6, 0x99, 0xf1, 0x27, 0x0d, 0xac, 0x0c, 0xe1, 0xff, 0x6b, 0x33, 0xdf, 0x7c,
+	0xef, 0xe6, 0xb6, 0x36, 0xf7, 0xfa, 0xb6, 0x36, 0xf7, 0xfb, 0x6d, 0x6d, 0xee, 0xeb, 0xa8, 0xa6,
+	0xdd, 0x44, 0x35, 0xed, 0x75, 0x54, 0xd3, 0xfe, 0x88, 0x6a, 0xda, 0xb7, 0x7f, 0xd6, 0xe6, 0x5e,
+	0x96, 0x62, 0x9d, 0xbf, 0x02, 0x00, 0x00, 0xff, 0xff, 0xf5, 0x1c, 0xb0, 0x5a, 0xe4, 0x0e, 0x00,
+	0x00,
 }

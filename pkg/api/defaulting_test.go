@@ -25,15 +25,16 @@ import (
 	"github.com/google/gofuzz"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	apiv1 "k8s.io/kubernetes/pkg/api/v1"
 	batchv2alpha1 "k8s.io/kubernetes/pkg/apis/batch/v2alpha1"
 	extensionsv1beta1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/util/diff"
 )
 
-type orderedGroupVersionKinds []unversioned.GroupVersionKind
+type orderedGroupVersionKinds []schema.GroupVersionKind
 
 func (o orderedGroupVersionKinds) Len() int      { return len(o) }
 func (o orderedGroupVersionKinds) Swap(i, j int) { o[i], o[j] = o[j], o[i] }
@@ -52,53 +53,57 @@ func TestVerifyDefaulting(t *testing.T) {
 // TODO: add a reflexive test that verifies that all SetDefaults functions are registered
 func TestDefaulting(t *testing.T) {
 	// these are the known types with defaulters - you must add to this list if you add a top level defaulter
-	typesWithDefaulting := map[unversioned.GroupVersionKind]struct{}{
-		{Group: "", Version: "v1", Kind: "ConfigMap"}:                                             {},
-		{Group: "", Version: "v1", Kind: "ConfigMapList"}:                                         {},
-		{Group: "", Version: "v1", Kind: "Endpoints"}:                                             {},
-		{Group: "", Version: "v1", Kind: "EndpointsList"}:                                         {},
-		{Group: "", Version: "v1", Kind: "Namespace"}:                                             {},
-		{Group: "", Version: "v1", Kind: "NamespaceList"}:                                         {},
-		{Group: "", Version: "v1", Kind: "Node"}:                                                  {},
-		{Group: "", Version: "v1", Kind: "NodeList"}:                                              {},
-		{Group: "", Version: "v1", Kind: "PersistentVolume"}:                                      {},
-		{Group: "", Version: "v1", Kind: "PersistentVolumeList"}:                                  {},
-		{Group: "", Version: "v1", Kind: "PersistentVolumeClaim"}:                                 {},
-		{Group: "", Version: "v1", Kind: "PersistentVolumeClaimList"}:                             {},
-		{Group: "", Version: "v1", Kind: "PodAttachOptions"}:                                      {},
-		{Group: "", Version: "v1", Kind: "PodExecOptions"}:                                        {},
-		{Group: "", Version: "v1", Kind: "Pod"}:                                                   {},
-		{Group: "", Version: "v1", Kind: "PodList"}:                                               {},
-		{Group: "", Version: "v1", Kind: "PodTemplate"}:                                           {},
-		{Group: "", Version: "v1", Kind: "PodTemplateList"}:                                       {},
-		{Group: "", Version: "v1", Kind: "ReplicationController"}:                                 {},
-		{Group: "", Version: "v1", Kind: "ReplicationControllerList"}:                             {},
-		{Group: "", Version: "v1", Kind: "Secret"}:                                                {},
-		{Group: "", Version: "v1", Kind: "SecretList"}:                                            {},
-		{Group: "", Version: "v1", Kind: "Service"}:                                               {},
-		{Group: "", Version: "v1", Kind: "ServiceList"}:                                           {},
-		{Group: "apps", Version: "v1alpha1", Kind: "PetSet"}:                                      {},
-		{Group: "apps", Version: "v1alpha1", Kind: "PetSetList"}:                                  {},
-		{Group: "autoscaling", Version: "v1", Kind: "HorizontalPodAutoscaler"}:                    {},
-		{Group: "autoscaling", Version: "v1", Kind: "HorizontalPodAutoscalerList"}:                {},
-		{Group: "batch", Version: "v1", Kind: "Job"}:                                              {},
-		{Group: "batch", Version: "v1", Kind: "JobList"}:                                          {},
-		{Group: "batch", Version: "v2alpha1", Kind: "Job"}:                                        {},
-		{Group: "batch", Version: "v2alpha1", Kind: "JobList"}:                                    {},
-		{Group: "batch", Version: "v2alpha1", Kind: "JobTemplate"}:                                {},
-		{Group: "batch", Version: "v2alpha1", Kind: "ScheduledJob"}:                               {},
-		{Group: "batch", Version: "v2alpha1", Kind: "ScheduledJobList"}:                           {},
-		{Group: "componentconfig", Version: "v1alpha1", Kind: "KubeProxyConfiguration"}:           {},
-		{Group: "componentconfig", Version: "v1alpha1", Kind: "KubeSchedulerConfiguration"}:       {},
-		{Group: "componentconfig", Version: "v1alpha1", Kind: "KubeletConfiguration"}:             {},
+	typesWithDefaulting := map[schema.GroupVersionKind]struct{}{
+		{Group: "", Version: "v1", Kind: "ConfigMap"}:                                       {},
+		{Group: "", Version: "v1", Kind: "ConfigMapList"}:                                   {},
+		{Group: "", Version: "v1", Kind: "Endpoints"}:                                       {},
+		{Group: "", Version: "v1", Kind: "EndpointsList"}:                                   {},
+		{Group: "", Version: "v1", Kind: "Namespace"}:                                       {},
+		{Group: "", Version: "v1", Kind: "NamespaceList"}:                                   {},
+		{Group: "", Version: "v1", Kind: "Node"}:                                            {},
+		{Group: "", Version: "v1", Kind: "NodeList"}:                                        {},
+		{Group: "", Version: "v1", Kind: "PersistentVolume"}:                                {},
+		{Group: "", Version: "v1", Kind: "PersistentVolumeList"}:                            {},
+		{Group: "", Version: "v1", Kind: "PersistentVolumeClaim"}:                           {},
+		{Group: "", Version: "v1", Kind: "PersistentVolumeClaimList"}:                       {},
+		{Group: "", Version: "v1", Kind: "PodAttachOptions"}:                                {},
+		{Group: "", Version: "v1", Kind: "PodExecOptions"}:                                  {},
+		{Group: "", Version: "v1", Kind: "Pod"}:                                             {},
+		{Group: "", Version: "v1", Kind: "PodList"}:                                         {},
+		{Group: "", Version: "v1", Kind: "PodTemplate"}:                                     {},
+		{Group: "", Version: "v1", Kind: "PodTemplateList"}:                                 {},
+		{Group: "", Version: "v1", Kind: "ReplicationController"}:                           {},
+		{Group: "", Version: "v1", Kind: "ReplicationControllerList"}:                       {},
+		{Group: "", Version: "v1", Kind: "Secret"}:                                          {},
+		{Group: "", Version: "v1", Kind: "SecretList"}:                                      {},
+		{Group: "", Version: "v1", Kind: "Service"}:                                         {},
+		{Group: "", Version: "v1", Kind: "ServiceList"}:                                     {},
+		{Group: "apps", Version: "v1beta1", Kind: "StatefulSet"}:                            {},
+		{Group: "apps", Version: "v1beta1", Kind: "StatefulSetList"}:                        {},
+		{Group: "autoscaling", Version: "v1", Kind: "HorizontalPodAutoscaler"}:              {},
+		{Group: "autoscaling", Version: "v1", Kind: "HorizontalPodAutoscalerList"}:          {},
+		{Group: "batch", Version: "v1", Kind: "Job"}:                                        {},
+		{Group: "batch", Version: "v1", Kind: "JobList"}:                                    {},
+		{Group: "batch", Version: "v2alpha1", Kind: "CronJob"}:                              {},
+		{Group: "batch", Version: "v2alpha1", Kind: "CronJobList"}:                          {},
+		{Group: "batch", Version: "v2alpha1", Kind: "Job"}:                                  {},
+		{Group: "batch", Version: "v2alpha1", Kind: "JobList"}:                              {},
+		{Group: "batch", Version: "v2alpha1", Kind: "JobTemplate"}:                          {},
+		{Group: "batch", Version: "v2alpha1", Kind: "ScheduledJob"}:                         {},
+		{Group: "batch", Version: "v2alpha1", Kind: "ScheduledJobList"}:                     {},
+		{Group: "componentconfig", Version: "v1alpha1", Kind: "KubeProxyConfiguration"}:     {},
+		{Group: "componentconfig", Version: "v1alpha1", Kind: "KubeSchedulerConfiguration"}: {},
+		{Group: "componentconfig", Version: "v1alpha1", Kind: "KubeletConfiguration"}:       {},
+		{Group: "kubeadm.k8s.io", Version: "v1alpha1", Kind: "MasterConfiguration"}:         {},
+		// This object contains only int fields which currently breaks the defaulting test because
+		// it's pretty stupid. Once we add non integer fields, we should uncomment this.
+		// {Group: "kubeadm.k8s.io", Version: "v1alpha1", Kind: "NodeConfiguration"}:                 {},
 		{Group: "extensions", Version: "v1beta1", Kind: "DaemonSet"}:                              {},
 		{Group: "extensions", Version: "v1beta1", Kind: "DaemonSetList"}:                          {},
 		{Group: "extensions", Version: "v1beta1", Kind: "Deployment"}:                             {},
 		{Group: "extensions", Version: "v1beta1", Kind: "DeploymentList"}:                         {},
 		{Group: "extensions", Version: "v1beta1", Kind: "HorizontalPodAutoscaler"}:                {},
 		{Group: "extensions", Version: "v1beta1", Kind: "HorizontalPodAutoscalerList"}:            {},
-		{Group: "extensions", Version: "v1beta1", Kind: "Job"}:                                    {},
-		{Group: "extensions", Version: "v1beta1", Kind: "JobList"}:                                {},
 		{Group: "extensions", Version: "v1beta1", Kind: "ReplicaSet"}:                             {},
 		{Group: "extensions", Version: "v1beta1", Kind: "ReplicaSetList"}:                         {},
 		{Group: "rbac.authorization.k8s.io", Version: "v1alpha1", Kind: "ClusterRoleBinding"}:     {},
@@ -110,7 +115,7 @@ func TestDefaulting(t *testing.T) {
 	f := fuzz.New().NilChance(.5).NumElements(1, 1).RandSource(rand.NewSource(1))
 	f.Funcs(
 		func(s *runtime.RawExtension, c fuzz.Continue) {},
-		func(s *unversioned.LabelSelector, c fuzz.Continue) {
+		func(s *metav1.LabelSelector, c fuzz.Continue) {
 			c.FuzzNoCustom(s)
 			s.MatchExpressions = nil // need to fuzz this specially
 		},
@@ -159,7 +164,7 @@ func TestDefaulting(t *testing.T) {
 			}
 			f.Fuzz(src)
 
-			src.GetObjectKind().SetGroupVersionKind(unversioned.GroupVersionKind{})
+			src.GetObjectKind().SetGroupVersionKind(schema.GroupVersionKind{})
 
 			original, err := scheme.DeepCopy(src)
 			if err != nil {

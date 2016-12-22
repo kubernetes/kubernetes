@@ -26,11 +26,10 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/client/cache"
-	internalclientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_3"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/controller/informers"
 	"k8s.io/kubernetes/pkg/controller/replication"
@@ -45,7 +44,7 @@ func testLabels() map[string]string {
 func newRC(name, namespace string, replicas int) *v1.ReplicationController {
 	replicasCopy := int32(replicas)
 	return &v1.ReplicationController{
-		TypeMeta: unversioned.TypeMeta{
+		TypeMeta: metav1.TypeMeta{
 			Kind:       "ReplicationController",
 			APIVersion: "v1",
 		},
@@ -75,7 +74,7 @@ func newRC(name, namespace string, replicas int) *v1.ReplicationController {
 
 func newMatchingPod(podName, namespace string) *v1.Pod {
 	return &v1.Pod{
-		TypeMeta: unversioned.TypeMeta{
+		TypeMeta: metav1.TypeMeta{
 			Kind:       "Pod",
 			APIVersion: "v1",
 		},
@@ -104,7 +103,7 @@ func newMatchingPod(podName, namespace string) *v1.Pod {
 func verifyRemainingObjects(t *testing.T, clientSet clientset.Interface, namespace string, rcNum, podNum int) (bool, error) {
 	rcClient := clientSet.Core().ReplicationControllers(namespace)
 	podClient := clientSet.Core().Pods(namespace)
-	pods, err := podClient.List(api.ListOptions{})
+	pods, err := podClient.List(v1.ListOptions{})
 	if err != nil {
 		return false, fmt.Errorf("Failed to list pods: %v", err)
 	}
@@ -113,7 +112,7 @@ func verifyRemainingObjects(t *testing.T, clientSet clientset.Interface, namespa
 		ret = false
 		t.Logf("expect %d pods, got %d pods", podNum, len(pods.Items))
 	}
-	rcs, err := rcClient.List(api.ListOptions{})
+	rcs, err := rcClient.List(v1.ListOptions{})
 	if err != nil {
 		return false, fmt.Errorf("Failed to list replication controllers: %v", err)
 	}
@@ -137,10 +136,10 @@ func rmSetup(t *testing.T, enableGarbageCollector bool) (*httptest.Server, *repl
 	resyncPeriodFunc := func() time.Duration {
 		return resyncPeriod
 	}
-	podInformer := informers.NewPodInformer(internalclientset.NewForConfigOrDie(restclient.AddUserAgent(&config, "pod-informer")), resyncPeriod)
+	podInformer := informers.NewPodInformer(clientset.NewForConfigOrDie(restclient.AddUserAgent(&config, "pod-informer")), resyncPeriod)
 	rm := replication.NewReplicationManager(
 		podInformer,
-		internalclientset.NewForConfigOrDie(restclient.AddUserAgent(&config, "replication-controller")),
+		clientset.NewForConfigOrDie(restclient.AddUserAgent(&config, "replication-controller")),
 		resyncPeriodFunc,
 		replication.BurstReplicas,
 		4096,
@@ -173,46 +172,46 @@ func TestAdoption(t *testing.T) {
 	var trueVar = true
 	testCases := []struct {
 		name                    string
-		existingOwnerReferences func(rc *v1.ReplicationController) []v1.OwnerReference
-		expectedOwnerReferences func(rc *v1.ReplicationController) []v1.OwnerReference
+		existingOwnerReferences func(rc *v1.ReplicationController) []metav1.OwnerReference
+		expectedOwnerReferences func(rc *v1.ReplicationController) []metav1.OwnerReference
 	}{
 		{
 			"pod refers rc as an owner, not a controller",
-			func(rc *v1.ReplicationController) []v1.OwnerReference {
-				return []v1.OwnerReference{{UID: rc.UID, Name: rc.Name, APIVersion: "v1", Kind: "ReplicationController"}}
+			func(rc *v1.ReplicationController) []metav1.OwnerReference {
+				return []metav1.OwnerReference{{UID: rc.UID, Name: rc.Name, APIVersion: "v1", Kind: "ReplicationController"}}
 			},
-			func(rc *v1.ReplicationController) []v1.OwnerReference {
-				return []v1.OwnerReference{{UID: rc.UID, Name: rc.Name, APIVersion: "v1", Kind: "ReplicationController", Controller: &trueVar}}
+			func(rc *v1.ReplicationController) []metav1.OwnerReference {
+				return []metav1.OwnerReference{{UID: rc.UID, Name: rc.Name, APIVersion: "v1", Kind: "ReplicationController", Controller: &trueVar}}
 			},
 		},
 		{
 			"pod doesn't have owner references",
-			func(rc *v1.ReplicationController) []v1.OwnerReference {
-				return []v1.OwnerReference{}
+			func(rc *v1.ReplicationController) []metav1.OwnerReference {
+				return []metav1.OwnerReference{}
 			},
-			func(rc *v1.ReplicationController) []v1.OwnerReference {
-				return []v1.OwnerReference{{UID: rc.UID, Name: rc.Name, APIVersion: "v1", Kind: "ReplicationController", Controller: &trueVar}}
+			func(rc *v1.ReplicationController) []metav1.OwnerReference {
+				return []metav1.OwnerReference{{UID: rc.UID, Name: rc.Name, APIVersion: "v1", Kind: "ReplicationController", Controller: &trueVar}}
 			},
 		},
 		{
 			"pod refers rc as a controller",
-			func(rc *v1.ReplicationController) []v1.OwnerReference {
-				return []v1.OwnerReference{{UID: rc.UID, Name: rc.Name, APIVersion: "v1", Kind: "ReplicationController", Controller: &trueVar}}
+			func(rc *v1.ReplicationController) []metav1.OwnerReference {
+				return []metav1.OwnerReference{{UID: rc.UID, Name: rc.Name, APIVersion: "v1", Kind: "ReplicationController", Controller: &trueVar}}
 			},
-			func(rc *v1.ReplicationController) []v1.OwnerReference {
-				return []v1.OwnerReference{{UID: rc.UID, Name: rc.Name, APIVersion: "v1", Kind: "ReplicationController", Controller: &trueVar}}
+			func(rc *v1.ReplicationController) []metav1.OwnerReference {
+				return []metav1.OwnerReference{{UID: rc.UID, Name: rc.Name, APIVersion: "v1", Kind: "ReplicationController", Controller: &trueVar}}
 			},
 		},
 		{
 			"pod refers other rc as the controller, refers the rc as an owner",
-			func(rc *v1.ReplicationController) []v1.OwnerReference {
-				return []v1.OwnerReference{
+			func(rc *v1.ReplicationController) []metav1.OwnerReference {
+				return []metav1.OwnerReference{
 					{UID: "1", Name: "anotherRC", APIVersion: "v1", Kind: "ReplicationController", Controller: &trueVar},
 					{UID: rc.UID, Name: rc.Name, APIVersion: "v1", Kind: "ReplicationController"},
 				}
 			},
-			func(rc *v1.ReplicationController) []v1.OwnerReference {
-				return []v1.OwnerReference{
+			func(rc *v1.ReplicationController) []metav1.OwnerReference {
+				return []metav1.OwnerReference{
 					{UID: "1", Name: "anotherRC", APIVersion: "v1", Kind: "ReplicationController", Controller: &trueVar},
 					{UID: rc.UID, Name: rc.Name, APIVersion: "v1", Kind: "ReplicationController"},
 				}
@@ -244,7 +243,7 @@ func TestAdoption(t *testing.T) {
 		waitToObservePods(t, podInformer, 1)
 		go rm.Run(5, stopCh)
 		if err := wait.Poll(10*time.Second, 60*time.Second, func() (bool, error) {
-			updatedPod, err := podClient.Get(pod.Name)
+			updatedPod, err := podClient.Get(pod.Name, metav1.GetOptions{})
 			if err != nil {
 				return false, err
 			}
@@ -279,7 +278,7 @@ func createRCsPods(t *testing.T, clientSet clientset.Interface, rcs []*v1.Replic
 func waitRCStable(t *testing.T, clientSet clientset.Interface, rc *v1.ReplicationController, ns string) {
 	rcClient := clientSet.Core().ReplicationControllers(ns)
 	if err := wait.Poll(10*time.Second, 60*time.Second, func() (bool, error) {
-		updatedRC, err := rcClient.Get(rc.Name)
+		updatedRC, err := rcClient.Get(rc.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -368,7 +367,7 @@ func TestUpdateSelectorToRemoveControllerRef(t *testing.T) {
 		t.Fatal(err)
 	}
 	podClient := clientSet.Core().Pods(ns.Name)
-	pod2, err = podClient.Get(pod2.Name)
+	pod2, err = podClient.Get(pod2.Name, metav1.GetOptions{})
 	if err != nil {
 		t.Fatalf("Failed to get pod2: %v", err)
 	}
@@ -410,7 +409,7 @@ func TestUpdateLabelToRemoveControllerRef(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
-	pod2, err = podClient.Get(pod2.Name)
+	pod2, err = podClient.Get(pod2.Name, metav1.GetOptions{})
 	if err != nil {
 		t.Fatalf("Failed to get pod2: %v", err)
 	}

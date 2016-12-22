@@ -22,9 +22,10 @@ syntax = 'proto2';
 package k8s.io.kubernetes.pkg.apis.autoscaling.v1;
 
 import "k8s.io/kubernetes/pkg/api/resource/generated.proto";
-import "k8s.io/kubernetes/pkg/api/unversioned/generated.proto";
 import "k8s.io/kubernetes/pkg/api/v1/generated.proto";
+import "k8s.io/kubernetes/pkg/apis/meta/v1/generated.proto";
 import "k8s.io/kubernetes/pkg/runtime/generated.proto";
+import "k8s.io/kubernetes/pkg/runtime/schema/generated.proto";
 import "k8s.io/kubernetes/pkg/util/intstr/generated.proto";
 
 // Package-wide variables from generator "generated".
@@ -62,7 +63,7 @@ message HorizontalPodAutoscaler {
 message HorizontalPodAutoscalerList {
   // Standard list metadata.
   // +optional
-  optional k8s.io.kubernetes.pkg.api.unversioned.ListMeta metadata = 1;
+  optional k8s.io.kubernetes.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // list of horizontal pod autoscaler objects.
   repeated HorizontalPodAutoscaler items = 2;
@@ -96,7 +97,7 @@ message HorizontalPodAutoscalerStatus {
   // last time the HorizontalPodAutoscaler scaled the number of pods;
   // used by the autoscaler to control how often the number of pods is changed.
   // +optional
-  optional k8s.io.kubernetes.pkg.api.unversioned.Time lastScaleTime = 2;
+  optional k8s.io.kubernetes.pkg.apis.meta.v1.Time lastScaleTime = 2;
 
   // current number of replicas of pods managed by this autoscaler.
   optional int32 currentReplicas = 3;

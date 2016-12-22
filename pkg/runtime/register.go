@@ -16,32 +16,27 @@ limitations under the License.
 
 package runtime
 
-import (
-	"k8s.io/kubernetes/pkg/api/unversioned"
-)
+import "k8s.io/kubernetes/pkg/runtime/schema"
 
 // SetGroupVersionKind satisfies the ObjectKind interface for all objects that embed TypeMeta
-func (obj *TypeMeta) SetGroupVersionKind(gvk unversioned.GroupVersionKind) {
+func (obj *TypeMeta) SetGroupVersionKind(gvk schema.GroupVersionKind) {
 	obj.APIVersion, obj.Kind = gvk.ToAPIVersionAndKind()
 }
 
 // GroupVersionKind satisfies the ObjectKind interface for all objects that embed TypeMeta
-func (obj *TypeMeta) GroupVersionKind() unversioned.GroupVersionKind {
-	return unversioned.FromAPIVersionAndKind(obj.APIVersion, obj.Kind)
+func (obj *TypeMeta) GroupVersionKind() schema.GroupVersionKind {
+	return schema.FromAPIVersionAndKind(obj.APIVersion, obj.Kind)
 }
 
-func (obj *Unknown) GetObjectKind() unversioned.ObjectKind { return &obj.TypeMeta }
-
-func (obj *Unstructured) GetObjectKind() unversioned.ObjectKind     { return obj }
-func (obj *UnstructuredList) GetObjectKind() unversioned.ObjectKind { return obj }
+func (obj *Unknown) GetObjectKind() schema.ObjectKind { return &obj.TypeMeta }
 
 // GetObjectKind implements Object for VersionedObjects, returning an empty ObjectKind
 // interface if no objects are provided, or the ObjectKind interface of the object in the
 // highest array position.
-func (obj *VersionedObjects) GetObjectKind() unversioned.ObjectKind {
+func (obj *VersionedObjects) GetObjectKind() schema.ObjectKind {
 	last := obj.Last()
 	if last == nil {
-		return unversioned.EmptyObjectKind
+		return schema.EmptyObjectKind
 	}
 	return last.GetObjectKind()
 }

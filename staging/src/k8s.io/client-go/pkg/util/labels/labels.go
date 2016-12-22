@@ -19,7 +19,7 @@ package labels
 import (
 	"fmt"
 
-	"k8s.io/client-go/pkg/api/unversioned"
+	metav1 "k8s.io/client-go/pkg/apis/meta/v1"
 )
 
 // Clones the given map and returns a new map with the given key and value added.
@@ -69,14 +69,14 @@ func AddLabel(labels map[string]string, labelKey string, labelValue string) map[
 
 // Clones the given selector and returns a new selector with the given key and value added.
 // Returns the given selector, if labelKey is empty.
-func CloneSelectorAndAddLabel(selector *unversioned.LabelSelector, labelKey string, labelValue uint32) *unversioned.LabelSelector {
+func CloneSelectorAndAddLabel(selector *metav1.LabelSelector, labelKey string, labelValue uint32) *metav1.LabelSelector {
 	if labelKey == "" {
 		// Don't need to add a label.
 		return selector
 	}
 
 	// Clone.
-	newSelector := new(unversioned.LabelSelector)
+	newSelector := new(metav1.LabelSelector)
 
 	// TODO(madhusudancs): Check if you can use deepCopy_extensions_LabelSelector here.
 	newSelector.MatchLabels = make(map[string]string)
@@ -88,7 +88,7 @@ func CloneSelectorAndAddLabel(selector *unversioned.LabelSelector, labelKey stri
 	newSelector.MatchLabels[labelKey] = fmt.Sprintf("%d", labelValue)
 
 	if selector.MatchExpressions != nil {
-		newMExps := make([]unversioned.LabelSelectorRequirement, len(selector.MatchExpressions))
+		newMExps := make([]metav1.LabelSelectorRequirement, len(selector.MatchExpressions))
 		for i, me := range selector.MatchExpressions {
 			newMExps[i].Key = me.Key
 			newMExps[i].Operator = me.Operator
@@ -108,7 +108,7 @@ func CloneSelectorAndAddLabel(selector *unversioned.LabelSelector, labelKey stri
 }
 
 // AddLabelToSelector returns a selector with the given key and value added to the given selector's MatchLabels.
-func AddLabelToSelector(selector *unversioned.LabelSelector, labelKey string, labelValue string) *unversioned.LabelSelector {
+func AddLabelToSelector(selector *metav1.LabelSelector, labelKey string, labelValue string) *metav1.LabelSelector {
 	if labelKey == "" {
 		// Don't need to add a label.
 		return selector
@@ -121,6 +121,6 @@ func AddLabelToSelector(selector *unversioned.LabelSelector, labelKey string, la
 }
 
 // SelectorHasLabel checks if the given selector contains the given label key in its MatchLabels
-func SelectorHasLabel(selector *unversioned.LabelSelector, labelKey string) bool {
+func SelectorHasLabel(selector *metav1.LabelSelector, labelKey string) bool {
 	return len(selector.MatchLabels[labelKey]) > 0
 }

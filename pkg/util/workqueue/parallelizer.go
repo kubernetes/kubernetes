@@ -33,6 +33,10 @@ func Parallelize(workers, pieces int, doWorkPiece DoWorkPieceFunc) {
 	}
 	close(toProcess)
 
+	if pieces < workers {
+		workers = pieces
+	}
+
 	wg := sync.WaitGroup{}
 	wg.Add(workers)
 	for i := 0; i < workers; i++ {

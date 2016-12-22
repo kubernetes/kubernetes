@@ -17,49 +17,45 @@ limitations under the License.
 package etcd
 
 import (
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/registry/extensions/thirdpartyresource"
 	"k8s.io/kubernetes/pkg/registry/generic"
-	"k8s.io/kubernetes/pkg/registry/generic/registry"
+	genericregistry "k8s.io/kubernetes/pkg/registry/generic/registry"
 	"k8s.io/kubernetes/pkg/runtime"
 )
 
 // REST implements a RESTStorage for ThirdPartyResources against etcd
 type REST struct {
-	*registry.Store
+	*genericregistry.Store
 }
 
 // NewREST returns a registry which will store ThirdPartyResource in the given helper
-func NewREST(opts generic.RESTOptions) *REST {
-	prefix := "/" + opts.ResourcePrefix
+func NewREST(optsGetter generic.RESTOptionsGetter) *REST {
+	resource := extensions.Resource("thirdpartyresources")
+	opts, err := optsGetter.GetRESTOptions(resource)
+	if err != nil {
+		panic(err) // TODO: Propagate error up
+	}
 
-	// We explicitly do NOT do any decoration here yet.
-	storageInterface, dFunc := generic.NewRawStorage(opts.StorageConfig)
+	// We explicitly do NOT do any decoration here yet. // TODO determine why we do not want to cache here
+	opts.Decorator = generic.UndecoratedStorage // TODO use watchCacheSize=-1 to signal UndecoratedStorage
 
-	store := &registry.Store{
+	store := &genericregistry.Store{
 		NewFunc:     func() runtime.Object { return &extensions.ThirdPartyResource{} },
 		NewListFunc: func() runtime.Object { return &extensions.ThirdPartyResourceList{} },
-		KeyRootFunc: func(ctx api.Context) string {
-			return prefix
-		},
-		KeyFunc: func(ctx api.Context, id string) (string, error) {
-			return registry.NoNamespaceKeyFunc(ctx, prefix, id)
-		},
 		ObjectNameFunc: func(obj runtime.Object) (string, error) {
 			return obj.(*extensions.ThirdPartyResource).Name, nil
 		},
-		PredicateFunc:           thirdpartyresource.Matcher,
-		QualifiedResource:       extensions.Resource("thirdpartyresources"),
-		EnableGarbageCollection: opts.EnableGarbageCollection,
-		DeleteCollectionWorkers: opts.DeleteCollectionWorkers,
-		CreateStrategy:          thirdpartyresource.Strategy,
-		UpdateStrategy:          thirdpartyresource.Strategy,
-		DeleteStrategy:          thirdpartyresource.Strategy,
+		PredicateFunc:     thirdpartyresource.Matcher,
+		QualifiedResource: resource,
 
-		Storage:     storageInterface,
-		DestroyFunc: dFunc,
+		CreateStrategy: thirdpartyresource.Strategy,
+		UpdateStrategy: thirdpartyresource.Strategy,
+		DeleteStrategy: thirdpartyresource.Strategy,
 	}
-
+	options := &generic.StoreOptions{RESTOptions: opts, AttrFunc: thirdpartyresource.GetAttrs} // Pass in opts to use UndecoratedStorage
+	if err := store.CompleteWithOptions(options); err != nil {
+		panic(err) // TODO: Propagate error up
+	}
 	return &REST{store}
 }

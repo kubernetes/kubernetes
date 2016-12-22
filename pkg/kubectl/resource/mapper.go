@@ -21,8 +21,8 @@ import (
 	"reflect"
 
 	"k8s.io/kubernetes/pkg/api/meta"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 )
 
 // DisabledClientForMapping allows callers to avoid allowing remote calls when handling
@@ -84,7 +84,7 @@ func (m *Mapper) InfoForData(data []byte, source string) (*Info, error) {
 // InfoForObject creates an Info object for the given Object. An error is returned
 // if the object cannot be introspected. Name and namespace will be set into Info
 // if the mapping's MetadataAccessor can retrieve them.
-func (m *Mapper) InfoForObject(obj runtime.Object, preferredGVKs []unversioned.GroupVersionKind) (*Info, error) {
+func (m *Mapper) InfoForObject(obj runtime.Object, preferredGVKs []schema.GroupVersionKind) (*Info, error) {
 	groupVersionKinds, _, err := m.ObjectKinds(obj)
 	if err != nil {
 		return nil, fmt.Errorf("unable to get type info from the object %q: %v", reflect.TypeOf(obj), err)
@@ -121,7 +121,7 @@ func (m *Mapper) InfoForObject(obj runtime.Object, preferredGVKs []unversioned.G
 // GroupVersionKind matches (exact match)
 // GroupKind matches
 // Group matches
-func preferredObjectKind(possibilities []unversioned.GroupVersionKind, preferences []unversioned.GroupVersionKind) unversioned.GroupVersionKind {
+func preferredObjectKind(possibilities []schema.GroupVersionKind, preferences []schema.GroupVersionKind) schema.GroupVersionKind {
 	// Exact match
 	for _, priority := range preferences {
 		for _, possibility := range possibilities {

@@ -23,7 +23,7 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage"
 	etcdutil "k8s.io/kubernetes/pkg/storage/etcd/util"
@@ -266,25 +266,25 @@ func (w *etcdWatcher) translate() {
 		select {
 		case err := <-w.etcdError:
 			if err != nil {
-				var status *unversioned.Status
+				var status *metav1.Status
 				switch {
 				case etcdutil.IsEtcdWatchExpired(err):
-					status = &unversioned.Status{
-						Status:  unversioned.StatusFailure,
+					status = &metav1.Status{
+						Status:  metav1.StatusFailure,
 						Message: err.Error(),
 						Code:    http.StatusGone, // Gone
-						Reason:  unversioned.StatusReasonExpired,
+						Reason:  metav1.StatusReasonExpired,
 					}
 				// TODO: need to generate errors using api/errors which has a circular dependency on this package
 				//   no other way to inject errors
 				// case etcdutil.IsEtcdUnreachable(err):
 				//   status = errors.NewServerTimeout(...)
 				default:
-					status = &unversioned.Status{
-						Status:  unversioned.StatusFailure,
+					status = &metav1.Status{
+						Status:  metav1.StatusFailure,
 						Message: err.Error(),
 						Code:    http.StatusInternalServerError,
-						Reason:  unversioned.StatusReasonInternalError,
+						Reason:  metav1.StatusReasonInternalError,
 					}
 				}
 				w.emit(watch.Event{
@@ -359,9 +359,6 @@ func (w *etcdWatcher) sendAdd(res *etcd.Response) {
 		return
 	}
 	action := watch.Added
-	if res.Node.ModifiedIndex != res.Node.CreatedIndex {
-		action = watch.Modified
-	}
 	w.emit(watch.Event{
 		Type:   action,
 		Object: obj,
@@ -454,6 +451,8 @@ func (w *etcdWatcher) sendDelete(res *etcd.Response) {
 func (w *etcdWatcher) sendResult(res *etcd.Response) {
 	switch res.Action {
 	case EtcdCreate, EtcdGet:
+		// "Get" will only happen in watch 0 case, where we explicitly want ADDED event
+		// for initial state.
 		w.sendAdd(res)
 	case EtcdSet, EtcdCAS:
 		w.sendModify(res)

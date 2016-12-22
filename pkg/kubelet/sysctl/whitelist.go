@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"strings"
 
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/api/validation"
 	extvalidation "k8s.io/kubernetes/pkg/apis/extensions/validation"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
@@ -47,9 +47,9 @@ func SafeSysctlWhitelist() []string {
 // Whitelist provides a list of allowed sysctls and sysctl patterns (ending in *)
 // and a function to check whether a given sysctl matches this list.
 type Whitelist interface {
-	// Validate checks that all sysctls given in a api.SysctlsPodAnnotationKey annotation
+	// Validate checks that all sysctls given in a v1.SysctlsPodAnnotationKey annotation
 	// are valid according to the whitelist.
-	Validate(pod *api.Pod) error
+	Validate(pod *v1.Pod) error
 }
 
 // patternWhitelist takes a list of sysctls or sysctl patterns (ending in *) and
@@ -129,7 +129,7 @@ func (w *patternWhitelist) validateSysctl(sysctl string, hostNet, hostIPC bool) 
 	return fmt.Errorf("%q not whitelisted", sysctl)
 }
 
-// Admit checks that all sysctls given in a api.SysctlsPodAnnotationKey annotation
+// Admit checks that all sysctls given in a v1.SysctlsPodAnnotationKey annotation
 // are valid according to the whitelist.
 func (w *patternWhitelist) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
 	pod := attrs.Pod
@@ -140,7 +140,7 @@ func (w *patternWhitelist) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.
 		}
 	}
 
-	sysctls, err := api.SysctlsFromPodAnnotation(a)
+	sysctls, err := v1.SysctlsFromPodAnnotation(a)
 	if err != nil {
 		return lifecycle.PodAdmitResult{
 			Admit:   false,
@@ -151,8 +151,8 @@ func (w *patternWhitelist) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.
 
 	var hostNet, hostIPC bool
 	if pod.Spec.SecurityContext != nil {
-		hostNet = pod.Spec.SecurityContext.HostNetwork
-		hostIPC = pod.Spec.SecurityContext.HostIPC
+		hostNet = pod.Spec.HostNetwork
+		hostIPC = pod.Spec.HostIPC
 	}
 	for _, s := range sysctls {
 		if err := w.validateSysctl(s.Name, hostNet, hostIPC); err != nil {

@@ -21,7 +21,7 @@ import (
 	"reflect"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 )
 
 func TestMultiRESTMapperResourceFor(t *testing.T) {
@@ -29,29 +29,29 @@ func TestMultiRESTMapperResourceFor(t *testing.T) {
 		name string
 
 		mapper MultiRESTMapper
-		input  unversioned.GroupVersionResource
-		result unversioned.GroupVersionResource
+		input  schema.GroupVersionResource
+		result schema.GroupVersionResource
 		err    error
 	}{
 		{
 			name:   "empty",
 			mapper: MultiRESTMapper{},
-			input:  unversioned.GroupVersionResource{Resource: "foo"},
-			result: unversioned.GroupVersionResource{},
-			err:    &NoResourceMatchError{PartialResource: unversioned.GroupVersionResource{Resource: "foo"}},
+			input:  schema.GroupVersionResource{Resource: "foo"},
+			result: schema.GroupVersionResource{},
+			err:    &NoResourceMatchError{PartialResource: schema.GroupVersionResource{Resource: "foo"}},
 		},
 		{
 			name:   "ignore not found",
-			mapper: MultiRESTMapper{fixedRESTMapper{err: &NoResourceMatchError{PartialResource: unversioned.GroupVersionResource{Resource: "IGNORE_THIS"}}}},
-			input:  unversioned.GroupVersionResource{Resource: "foo"},
-			result: unversioned.GroupVersionResource{},
-			err:    &NoResourceMatchError{PartialResource: unversioned.GroupVersionResource{Resource: "foo"}},
+			mapper: MultiRESTMapper{fixedRESTMapper{err: &NoResourceMatchError{PartialResource: schema.GroupVersionResource{Resource: "IGNORE_THIS"}}}},
+			input:  schema.GroupVersionResource{Resource: "foo"},
+			result: schema.GroupVersionResource{},
+			err:    &NoResourceMatchError{PartialResource: schema.GroupVersionResource{Resource: "foo"}},
 		},
 		{
 			name:   "accept first failure",
-			mapper: MultiRESTMapper{fixedRESTMapper{err: errors.New("fail on this")}, fixedRESTMapper{resourcesFor: []unversioned.GroupVersionResource{{Resource: "unused"}}}},
-			input:  unversioned.GroupVersionResource{Resource: "foo"},
-			result: unversioned.GroupVersionResource{},
+			mapper: MultiRESTMapper{fixedRESTMapper{err: errors.New("fail on this")}, fixedRESTMapper{resourcesFor: []schema.GroupVersionResource{{Resource: "unused"}}}},
+			input:  schema.GroupVersionResource{Resource: "foo"},
+			result: schema.GroupVersionResource{},
 			err:    errors.New("fail on this"),
 		},
 	}
@@ -78,48 +78,48 @@ func TestMultiRESTMapperResourcesFor(t *testing.T) {
 		name string
 
 		mapper MultiRESTMapper
-		input  unversioned.GroupVersionResource
-		result []unversioned.GroupVersionResource
+		input  schema.GroupVersionResource
+		result []schema.GroupVersionResource
 		err    error
 	}{
 		{
 			name:   "empty",
 			mapper: MultiRESTMapper{},
-			input:  unversioned.GroupVersionResource{Resource: "foo"},
+			input:  schema.GroupVersionResource{Resource: "foo"},
 			result: nil,
-			err:    &NoResourceMatchError{PartialResource: unversioned.GroupVersionResource{Resource: "foo"}},
+			err:    &NoResourceMatchError{PartialResource: schema.GroupVersionResource{Resource: "foo"}},
 		},
 		{
 			name:   "ignore not found",
-			mapper: MultiRESTMapper{fixedRESTMapper{err: &NoResourceMatchError{PartialResource: unversioned.GroupVersionResource{Resource: "IGNORE_THIS"}}}},
-			input:  unversioned.GroupVersionResource{Resource: "foo"},
+			mapper: MultiRESTMapper{fixedRESTMapper{err: &NoResourceMatchError{PartialResource: schema.GroupVersionResource{Resource: "IGNORE_THIS"}}}},
+			input:  schema.GroupVersionResource{Resource: "foo"},
 			result: nil,
-			err:    &NoResourceMatchError{PartialResource: unversioned.GroupVersionResource{Resource: "foo"}},
+			err:    &NoResourceMatchError{PartialResource: schema.GroupVersionResource{Resource: "foo"}},
 		},
 		{
 			name:   "accept first failure",
-			mapper: MultiRESTMapper{fixedRESTMapper{err: errors.New("fail on this")}, fixedRESTMapper{resourcesFor: []unversioned.GroupVersionResource{{Resource: "unused"}}}},
-			input:  unversioned.GroupVersionResource{Resource: "foo"},
+			mapper: MultiRESTMapper{fixedRESTMapper{err: errors.New("fail on this")}, fixedRESTMapper{resourcesFor: []schema.GroupVersionResource{{Resource: "unused"}}}},
+			input:  schema.GroupVersionResource{Resource: "foo"},
 			result: nil,
 			err:    errors.New("fail on this"),
 		},
 		{
 			name: "union and dedup",
 			mapper: MultiRESTMapper{
-				fixedRESTMapper{resourcesFor: []unversioned.GroupVersionResource{{Resource: "dupe"}, {Resource: "first"}}},
-				fixedRESTMapper{resourcesFor: []unversioned.GroupVersionResource{{Resource: "dupe"}, {Resource: "second"}}},
+				fixedRESTMapper{resourcesFor: []schema.GroupVersionResource{{Resource: "dupe"}, {Resource: "first"}}},
+				fixedRESTMapper{resourcesFor: []schema.GroupVersionResource{{Resource: "dupe"}, {Resource: "second"}}},
 			},
-			input:  unversioned.GroupVersionResource{Resource: "foo"},
-			result: []unversioned.GroupVersionResource{{Resource: "dupe"}, {Resource: "first"}, {Resource: "second"}},
+			input:  schema.GroupVersionResource{Resource: "foo"},
+			result: []schema.GroupVersionResource{{Resource: "dupe"}, {Resource: "first"}, {Resource: "second"}},
 		},
 		{
 			name: "skip not and continue",
 			mapper: MultiRESTMapper{
-				fixedRESTMapper{err: &NoResourceMatchError{PartialResource: unversioned.GroupVersionResource{Resource: "IGNORE_THIS"}}},
-				fixedRESTMapper{resourcesFor: []unversioned.GroupVersionResource{{Resource: "first"}, {Resource: "second"}}},
+				fixedRESTMapper{err: &NoResourceMatchError{PartialResource: schema.GroupVersionResource{Resource: "IGNORE_THIS"}}},
+				fixedRESTMapper{resourcesFor: []schema.GroupVersionResource{{Resource: "first"}, {Resource: "second"}}},
 			},
-			input:  unversioned.GroupVersionResource{Resource: "foo"},
-			result: []unversioned.GroupVersionResource{{Resource: "first"}, {Resource: "second"}},
+			input:  schema.GroupVersionResource{Resource: "foo"},
+			result: []schema.GroupVersionResource{{Resource: "first"}, {Resource: "second"}},
 		},
 	}
 
@@ -145,48 +145,48 @@ func TestMultiRESTMapperKindsFor(t *testing.T) {
 		name string
 
 		mapper MultiRESTMapper
-		input  unversioned.GroupVersionResource
-		result []unversioned.GroupVersionKind
+		input  schema.GroupVersionResource
+		result []schema.GroupVersionKind
 		err    error
 	}{
 		{
 			name:   "empty",
 			mapper: MultiRESTMapper{},
-			input:  unversioned.GroupVersionResource{Resource: "foo"},
+			input:  schema.GroupVersionResource{Resource: "foo"},
 			result: nil,
-			err:    &NoResourceMatchError{PartialResource: unversioned.GroupVersionResource{Resource: "foo"}},
+			err:    &NoResourceMatchError{PartialResource: schema.GroupVersionResource{Resource: "foo"}},
 		},
 		{
 			name:   "ignore not found",
-			mapper: MultiRESTMapper{fixedRESTMapper{err: &NoResourceMatchError{PartialResource: unversioned.GroupVersionResource{Resource: "IGNORE_THIS"}}}},
-			input:  unversioned.GroupVersionResource{Resource: "foo"},
+			mapper: MultiRESTMapper{fixedRESTMapper{err: &NoResourceMatchError{PartialResource: schema.GroupVersionResource{Resource: "IGNORE_THIS"}}}},
+			input:  schema.GroupVersionResource{Resource: "foo"},
 			result: nil,
-			err:    &NoResourceMatchError{PartialResource: unversioned.GroupVersionResource{Resource: "foo"}},
+			err:    &NoResourceMatchError{PartialResource: schema.GroupVersionResource{Resource: "foo"}},
 		},
 		{
 			name:   "accept first failure",
-			mapper: MultiRESTMapper{fixedRESTMapper{err: errors.New("fail on this")}, fixedRESTMapper{kindsFor: []unversioned.GroupVersionKind{{Kind: "unused"}}}},
-			input:  unversioned.GroupVersionResource{Resource: "foo"},
+			mapper: MultiRESTMapper{fixedRESTMapper{err: errors.New("fail on this")}, fixedRESTMapper{kindsFor: []schema.GroupVersionKind{{Kind: "unused"}}}},
+			input:  schema.GroupVersionResource{Resource: "foo"},
 			result: nil,
 			err:    errors.New("fail on this"),
 		},
 		{
 			name: "union and dedup",
 			mapper: MultiRESTMapper{
-				fixedRESTMapper{kindsFor: []unversioned.GroupVersionKind{{Kind: "dupe"}, {Kind: "first"}}},
-				fixedRESTMapper{kindsFor: []unversioned.GroupVersionKind{{Kind: "dupe"}, {Kind: "second"}}},
+				fixedRESTMapper{kindsFor: []schema.GroupVersionKind{{Kind: "dupe"}, {Kind: "first"}}},
+				fixedRESTMapper{kindsFor: []schema.GroupVersionKind{{Kind: "dupe"}, {Kind: "second"}}},
 			},
-			input:  unversioned.GroupVersionResource{Resource: "foo"},
-			result: []unversioned.GroupVersionKind{{Kind: "dupe"}, {Kind: "first"}, {Kind: "second"}},
+			input:  schema.GroupVersionResource{Resource: "foo"},
+			result: []schema.GroupVersionKind{{Kind: "dupe"}, {Kind: "first"}, {Kind: "second"}},
 		},
 		{
 			name: "skip not and continue",
 			mapper: MultiRESTMapper{
-				fixedRESTMapper{err: &NoResourceMatchError{PartialResource: unversioned.GroupVersionResource{Resource: "IGNORE_THIS"}}},
-				fixedRESTMapper{kindsFor: []unversioned.GroupVersionKind{{Kind: "first"}, {Kind: "second"}}},
+				fixedRESTMapper{err: &NoResourceMatchError{PartialResource: schema.GroupVersionResource{Resource: "IGNORE_THIS"}}},
+				fixedRESTMapper{kindsFor: []schema.GroupVersionKind{{Kind: "first"}, {Kind: "second"}}},
 			},
-			input:  unversioned.GroupVersionResource{Resource: "foo"},
-			result: []unversioned.GroupVersionKind{{Kind: "first"}, {Kind: "second"}},
+			input:  schema.GroupVersionResource{Resource: "foo"},
+			result: []schema.GroupVersionKind{{Kind: "first"}, {Kind: "second"}},
 		},
 	}
 
@@ -212,29 +212,29 @@ func TestMultiRESTMapperKindFor(t *testing.T) {
 		name string
 
 		mapper MultiRESTMapper
-		input  unversioned.GroupVersionResource
-		result unversioned.GroupVersionKind
+		input  schema.GroupVersionResource
+		result schema.GroupVersionKind
 		err    error
 	}{
 		{
 			name:   "empty",
 			mapper: MultiRESTMapper{},
-			input:  unversioned.GroupVersionResource{Resource: "foo"},
-			result: unversioned.GroupVersionKind{},
-			err:    &NoResourceMatchError{PartialResource: unversioned.GroupVersionResource{Resource: "foo"}},
+			input:  schema.GroupVersionResource{Resource: "foo"},
+			result: schema.GroupVersionKind{},
+			err:    &NoResourceMatchError{PartialResource: schema.GroupVersionResource{Resource: "foo"}},
 		},
 		{
 			name:   "ignore not found",
-			mapper: MultiRESTMapper{fixedRESTMapper{err: &NoResourceMatchError{PartialResource: unversioned.GroupVersionResource{Resource: "IGNORE_THIS"}}}},
-			input:  unversioned.GroupVersionResource{Resource: "foo"},
-			result: unversioned.GroupVersionKind{},
-			err:    &NoResourceMatchError{PartialResource: unversioned.GroupVersionResource{Resource: "foo"}},
+			mapper: MultiRESTMapper{fixedRESTMapper{err: &NoResourceMatchError{PartialResource: schema.GroupVersionResource{Resource: "IGNORE_THIS"}}}},
+			input:  schema.GroupVersionResource{Resource: "foo"},
+			result: schema.GroupVersionKind{},
+			err:    &NoResourceMatchError{PartialResource: schema.GroupVersionResource{Resource: "foo"}},
 		},
 		{
 			name:   "accept first failure",
-			mapper: MultiRESTMapper{fixedRESTMapper{err: errors.New("fail on this")}, fixedRESTMapper{kindsFor: []unversioned.GroupVersionKind{{Kind: "unused"}}}},
-			input:  unversioned.GroupVersionResource{Resource: "foo"},
-			result: unversioned.GroupVersionKind{},
+			mapper: MultiRESTMapper{fixedRESTMapper{err: errors.New("fail on this")}, fixedRESTMapper{kindsFor: []schema.GroupVersionKind{{Kind: "unused"}}}},
+			input:  schema.GroupVersionResource{Resource: "foo"},
+			result: schema.GroupVersionKind{},
 			err:    errors.New("fail on this"),
 		},
 	}
@@ -262,35 +262,35 @@ func TestMultiRESTMapperRESTMappings(t *testing.T) {
 		name string
 
 		mapper MultiRESTMapper
-		input  unversioned.GroupKind
+		input  schema.GroupKind
 		result []*RESTMapping
 		err    error
 	}{
 		{
 			name:   "empty",
 			mapper: MultiRESTMapper{},
-			input:  unversioned.GroupKind{Kind: "Foo"},
+			input:  schema.GroupKind{Kind: "Foo"},
 			result: nil,
-			err:    &NoKindMatchError{PartialKind: unversioned.GroupVersionKind{Kind: "Foo"}},
+			err:    &NoKindMatchError{PartialKind: schema.GroupVersionKind{Kind: "Foo"}},
 		},
 		{
 			name:   "ignore not found",
-			mapper: MultiRESTMapper{fixedRESTMapper{err: &NoKindMatchError{PartialKind: unversioned.GroupVersionKind{Kind: "IGNORE_THIS"}}}},
-			input:  unversioned.GroupKind{Kind: "Foo"},
+			mapper: MultiRESTMapper{fixedRESTMapper{err: &NoKindMatchError{PartialKind: schema.GroupVersionKind{Kind: "IGNORE_THIS"}}}},
+			input:  schema.GroupKind{Kind: "Foo"},
 			result: nil,
-			err:    &NoKindMatchError{PartialKind: unversioned.GroupVersionKind{Kind: "Foo"}},
+			err:    &NoKindMatchError{PartialKind: schema.GroupVersionKind{Kind: "Foo"}},
 		},
 		{
 			name:   "accept first failure",
 			mapper: MultiRESTMapper{fixedRESTMapper{err: errors.New("fail on this")}, fixedRESTMapper{mappings: []*RESTMapping{mapping1}}},
-			input:  unversioned.GroupKind{Kind: "Foo"},
+			input:  schema.GroupKind{Kind: "Foo"},
 			result: nil,
 			err:    errors.New("fail on this"),
 		},
 		{
 			name:   "return both",
 			mapper: MultiRESTMapper{fixedRESTMapper{mappings: []*RESTMapping{mapping1}}, fixedRESTMapper{mappings: []*RESTMapping{mapping2}}},
-			input:  unversioned.GroupKind{Kind: "Foo"},
+			input:  schema.GroupKind{Kind: "Foo"},
 			result: []*RESTMapping{mapping1, mapping2},
 		},
 	}
@@ -313,10 +313,10 @@ func TestMultiRESTMapperRESTMappings(t *testing.T) {
 }
 
 type fixedRESTMapper struct {
-	resourcesFor []unversioned.GroupVersionResource
-	kindsFor     []unversioned.GroupVersionKind
-	resourceFor  unversioned.GroupVersionResource
-	kindFor      unversioned.GroupVersionKind
+	resourcesFor []schema.GroupVersionResource
+	kindsFor     []schema.GroupVersionKind
+	resourceFor  schema.GroupVersionResource
+	kindFor      schema.GroupVersionKind
 	mappings     []*RESTMapping
 
 	err error
@@ -326,27 +326,27 @@ func (m fixedRESTMapper) ResourceSingularizer(resource string) (singular string,
 	return "", m.err
 }
 
-func (m fixedRESTMapper) ResourcesFor(resource unversioned.GroupVersionResource) ([]unversioned.GroupVersionResource, error) {
+func (m fixedRESTMapper) ResourcesFor(resource schema.GroupVersionResource) ([]schema.GroupVersionResource, error) {
 	return m.resourcesFor, m.err
 }
 
-func (m fixedRESTMapper) KindsFor(resource unversioned.GroupVersionResource) (gvk []unversioned.GroupVersionKind, err error) {
+func (m fixedRESTMapper) KindsFor(resource schema.GroupVersionResource) (gvk []schema.GroupVersionKind, err error) {
 	return m.kindsFor, m.err
 }
 
-func (m fixedRESTMapper) ResourceFor(resource unversioned.GroupVersionResource) (unversioned.GroupVersionResource, error) {
+func (m fixedRESTMapper) ResourceFor(resource schema.GroupVersionResource) (schema.GroupVersionResource, error) {
 	return m.resourceFor, m.err
 }
 
-func (m fixedRESTMapper) KindFor(resource unversioned.GroupVersionResource) (unversioned.GroupVersionKind, error) {
+func (m fixedRESTMapper) KindFor(resource schema.GroupVersionResource) (schema.GroupVersionKind, error) {
 	return m.kindFor, m.err
 }
 
-func (m fixedRESTMapper) RESTMapping(gk unversioned.GroupKind, versions ...string) (mapping *RESTMapping, err error) {
+func (m fixedRESTMapper) RESTMapping(gk schema.GroupKind, versions ...string) (mapping *RESTMapping, err error) {
 	return nil, m.err
 }
 
-func (m fixedRESTMapper) RESTMappings(gk unversioned.GroupKind) (mappings []*RESTMapping, err error) {
+func (m fixedRESTMapper) RESTMappings(gk schema.GroupKind, versions ...string) (mappings []*RESTMapping, err error) {
 	return m.mappings, m.err
 }
 
@@ -354,6 +354,6 @@ func (m fixedRESTMapper) AliasesForResource(alias string) (aliases []string, ok 
 	return nil, false
 }
 
-func (m fixedRESTMapper) ResourceIsValid(resource unversioned.GroupVersionResource) bool {
+func (m fixedRESTMapper) ResourceIsValid(resource schema.GroupVersionResource) bool {
 	return false
 }

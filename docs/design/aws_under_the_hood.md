@@ -1,37 +1,3 @@
-<!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
-
-<!-- BEGIN STRIP_FOR_RELEASE -->
-
-<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
-     width="25" height="25">
-
-<h2>PLEASE NOTE: This document applies to the HEAD of the source tree</h2>
-
-If you are using a released version of Kubernetes, you should
-refer to the docs that go with that version.
-
-<!-- TAG RELEASE_LINK, added by the munger automatically -->
-<strong>
-The latest release of this document can be found
-[here](http://releases.k8s.io/release-1.4/docs/design/aws_under_the_hood.md).
-
-Documentation for other releases can be found at
-[releases.k8s.io](http://releases.k8s.io).
-</strong>
---
-
-<!-- END STRIP_FOR_RELEASE -->
-
-<!-- END MUNGE: UNVERSIONED_WARNING -->
-
 # Peeking under the hood of Kubernetes on AWS
 
 This document provides high-level insight into how Kubernetes works on AWS and
@@ -65,7 +31,7 @@ you manually created or configured your cluster.
 
 Kubernetes is a cluster of several machines that consists of a Kubernetes
 master and a set number of nodes (previously known as 'nodes') for which the
-master which is responsible. See the [Architecture](architecture.md) topic for
+master is responsible. See the [Architecture](architecture.md) topic for
 more details.
 
 By default on AWS:
@@ -232,7 +198,7 @@ Within the AWS cloud provider logic, we filter requests to the AWS APIs to
 match resources with our cluster tag. By filtering the requests, we ensure
 that we see only our own AWS objects.
 
-** Important: ** If you choose not to use kube-up, you must pick a unique
+**Important:** If you choose not to use kube-up, you must pick a unique
 cluster-id value, and ensure that all AWS resources have a tag with
 `Name=KubernetesCluster,Value=<clusterid>`.
 

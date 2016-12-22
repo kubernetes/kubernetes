@@ -17,43 +17,50 @@ limitations under the License.
 package genericapiserver
 
 import (
+	"crypto/tls"
+	"crypto/x509"
+	"encoding/pem"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"net"
 	"net/http"
-	"os"
-	"path"
-	"regexp"
+	goruntime "runtime"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/emicklei/go-restful/swagger"
 	"github.com/go-openapi/spec"
-	"github.com/golang/glog"
+	"github.com/pborman/uuid"
 	"gopkg.in/natefinch/lumberjack.v2"
 
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
+	apiserverauthenticator "k8s.io/kubernetes/pkg/apiserver/authenticator"
 	apiserverfilters "k8s.io/kubernetes/pkg/apiserver/filters"
-	"k8s.io/kubernetes/pkg/apiserver/request"
+	apiserveropenapi "k8s.io/kubernetes/pkg/apiserver/openapi"
+	apiserverrequest "k8s.io/kubernetes/pkg/apiserver/request"
 	"k8s.io/kubernetes/pkg/auth/authenticator"
 	"k8s.io/kubernetes/pkg/auth/authorizer"
+	authorizerunion "k8s.io/kubernetes/pkg/auth/authorizer/union"
 	authhandlers "k8s.io/kubernetes/pkg/auth/handlers"
+	"k8s.io/kubernetes/pkg/auth/user"
 	"k8s.io/kubernetes/pkg/client/restclient"
-	"k8s.io/kubernetes/pkg/cloudprovider"
+	apiserverauthorizer "k8s.io/kubernetes/pkg/genericapiserver/authorizer"
 	genericfilters "k8s.io/kubernetes/pkg/genericapiserver/filters"
 	"k8s.io/kubernetes/pkg/genericapiserver/mux"
-	"k8s.io/kubernetes/pkg/genericapiserver/openapi/common"
+	openapicommon "k8s.io/kubernetes/pkg/genericapiserver/openapi/common"
 	"k8s.io/kubernetes/pkg/genericapiserver/options"
 	"k8s.io/kubernetes/pkg/genericapiserver/routes"
-	genericvalidation "k8s.io/kubernetes/pkg/genericapiserver/validation"
-	ipallocator "k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
+	"k8s.io/kubernetes/pkg/healthz"
 	"k8s.io/kubernetes/pkg/runtime"
 	certutil "k8s.io/kubernetes/pkg/util/cert"
-	utilnet "k8s.io/kubernetes/pkg/util/net"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/version"
+	authenticatorunion "k8s.io/kubernetes/plugin/pkg/auth/authenticator/request/union"
 )
 
 const (
@@ -65,174 +72,353 @@ const (
 )
 
 // Config is a structure used to configure a GenericAPIServer.
+// It's members are sorted rougly in order of importance for composers.
 type Config struct {
-	// Destination for audit logs
-	AuditWriter io.Writer
-	// Allow downstream consumers to disable swagger.
-	// This includes returning the generated swagger spec at /swaggerapi and swagger ui at /swagger-ui.
-	EnableSwaggerSupport bool
-	// Allow downstream consumers to disable swagger ui.
-	// Note that this is ignored if EnableSwaggerSupport is false
-	EnableSwaggerUI bool
-	// Allows api group versions or specific resources to be conditionally enabled/disabled.
-	APIResourceConfigSource APIResourceConfigSource
-	// allow downstream consumers to disable the index route
-	EnableIndex             bool
-	EnableProfiling         bool
-	EnableGarbageCollection bool
-
-	Version               *version.Info
-	APIGroupPrefix        string
-	CorsAllowedOriginList []string
-	Authenticator         authenticator.Request
-	// TODO(roberthbailey): Remove once the server no longer supports http basic auth.
-	SupportsBasicAuth      bool
-	Authorizer             authorizer.Authorizer
-	AdmissionControl       admission.Interface
-	MasterServiceNamespace string
-	// TODO(ericchiang): Determine if policy escalation checks should be an admission controller.
-	AuthorizerRBACSuperUser string
+	// SecureServingInfo is required to serve https
+	SecureServingInfo *SecureServingInfo
 
 	// LoopbackClientConfig is a config for a privileged loopback connection to the API server
+	// This is required for proper functioning of the PostStartHooks on a GenericAPIServer
 	LoopbackClientConfig *restclient.Config
+	// Authenticator determines which subject is making the request
+	Authenticator authenticator.Request
+	// Authorizer determines whether the subject is allowed to make the request based only
+	// on the RequestURI
+	Authorizer authorizer.Authorizer
+	// AdmissionControl performs deep inspection of a given request (including content)
+	// to set values and determine whether its allowed
+	AdmissionControl      admission.Interface
+	CorsAllowedOriginList []string
 
-	// Map requests to contexts. Exported so downstream consumers can provider their own mappers
+	EnableSwaggerUI bool
+	EnableIndex     bool
+	EnableProfiling bool
+	// Requires generic profiling enabled
+	EnableContentionProfiling bool
+	EnableGarbageCollection   bool
+	EnableMetrics             bool
+
+	// Version will enable the /version endpoint if non-nil
+	Version *version.Info
+	// AuditWriter is the destination for audit logs.  If nil, they will not be written.
+	AuditWriter io.Writer
+	// SupportsBasicAuth indicates that's at least one Authenticator supports basic auth
+	// If this is true, a basic auth challenge is returned on authentication failure
+	// TODO(roberthbailey): Remove once the server no longer supports http basic auth.
+	SupportsBasicAuth bool
+	// ExternalAddress is the host name to use for external (public internet) facing URLs (e.g. Swagger)
+	// Will default to a value based on secure serving info and available ipv4 IPs.
+	ExternalAddress string
+
+	//===========================================================================
+	// Fields you probably don't care about changing
+	//===========================================================================
+
+	// BuildHandlerChainsFunc allows you to build custom handler chains by decorating the apiHandler.
+	BuildHandlerChainsFunc func(apiHandler http.Handler, c *Config) (secure, insecure http.Handler)
+	// DiscoveryAddresses is used to build the IPs pass to discovery.  If nil, the ExternalAddress is
+	// always reported
+	DiscoveryAddresses DiscoveryAddresses
+	// The default set of healthz checks. There might be more added via AddHealthzChecks dynamically.
+	HealthzChecks []healthz.HealthzChecker
+	// LegacyAPIGroupPrefixes is used to set up URL parsing for authorization and for validating requests
+	// to InstallLegacyAPIGroup.  New API servers don't generally have legacy groups at all.
+	LegacyAPIGroupPrefixes sets.String
+	// RequestContextMapper maps requests to contexts. Exported so downstream consumers can provider their own mappers
+	// TODO confirm that anyone downstream actually uses this and doesn't just need an accessor
 	RequestContextMapper api.RequestContextMapper
-
-	// Required, the interface for serializing and converting objects to and from the wire
+	// Serializer is required and provides the interface for serializing and converting objects to and from the wire
+	// The default (api.Codecs) usually works fine.
 	Serializer runtime.NegotiatedSerializer
+	// OpenAPIConfig will be used in generating OpenAPI spec. This is nil by default. Use DefaultOpenAPIConfig for "working" defaults.
+	OpenAPIConfig *openapicommon.Config
+	// SwaggerConfig will be used in generating Swagger spec. This is nil by default. Use DefaultSwaggerConfig for "working" defaults.
+	SwaggerConfig *swagger.Config
 
 	// If specified, requests will be allocated a random timeout between this value, and twice this value.
 	// Note that it is up to the request handlers to ignore or honor this timeout. In seconds.
 	MinRequestTimeout int
+	// MaxRequestsInFlight is the maximum number of parallel non-long-running requests. Every further
+	// request has to wait. Applies only to non-mutating requests.
+	MaxRequestsInFlight int
+	// MaxMutatingRequestsInFlight is the maximum number of parallel mutating requests. Every further
+	// request has to wait.
+	MaxMutatingRequestsInFlight int
+	// Predicate which is true for paths of long-running http requests
+	LongRunningFunc genericfilters.LongRunningRequestCheck
 
-	// Number of masters running; all masters must be started with the
-	// same value for this field. (Numbers > 1 currently untested.)
-	MasterCount int
-
-	SecureServingInfo   *ServingInfo
+	// InsecureServingInfo is required to serve http.  HTTP does NOT include authentication or authorization.
+	// You shouldn't be using this.  It makes sig-auth sad.
 	InsecureServingInfo *ServingInfo
+
+	//===========================================================================
+	// values below here are targets for removal
+	//===========================================================================
 
 	// The port on PublicAddress where a read-write server will be installed.
 	// Defaults to 6443 if not set.
 	ReadWritePort int
-
-	// ExternalHost is the host name to use for external (public internet) facing URLs (e.g. Swagger)
-	ExternalHost string
-
 	// PublicAddress is the IP address where members of the cluster (kubelet,
 	// kube-proxy, services, etc.) can reach the GenericAPIServer.
 	// If nil or 0.0.0.0, the host's default interface will be used.
 	PublicAddress net.IP
-
-	// The range of IPs to be assigned to services with type=ClusterIP or greater
-	ServiceClusterIPRange *net.IPNet
-
-	// The IP address for the GenericAPIServer service (must be inside ServiceClusterIPRange)
-	ServiceReadWriteIP net.IP
-
-	// Port for the apiserver service.
-	ServiceReadWritePort int
-
-	// The range of ports to be assigned to services with type=NodePort or greater
-	ServiceNodePortRange utilnet.PortRange
-
-	// Additional ports to be exposed on the GenericAPIServer service
-	// extraServicePorts is injectable in the event that more ports
-	// (other than the default 443/tcp) are exposed on the GenericAPIServer
-	// and those ports need to be load balanced by the GenericAPIServer
-	// service because this pkg is linked by out-of-tree projects
-	// like openshift which want to use the GenericAPIServer but also do
-	// more stuff.
-	ExtraServicePorts []api.ServicePort
-	// Additional ports to be exposed on the GenericAPIServer endpoints
-	// Port names should align with ports defined in ExtraServicePorts
-	ExtraEndpointPorts []api.EndpointPort
-
-	// If non-zero, the "kubernetes" services uses this port as NodePort.
-	// TODO(sttts): move into master
-	KubernetesServiceNodePort int
-
-	// EnableOpenAPISupport enables OpenAPI support. Allow downstream customers to disable OpenAPI spec.
-	EnableOpenAPISupport bool
-
-	// OpenAPIConfig will be used in generating OpenAPI spec.
-	OpenAPIConfig *common.Config
-
-	// MaxRequestsInFlight is the maximum number of parallel non-long-running requests. Every further
-	// request has to wait.
-	MaxRequestsInFlight int
-
-	// Predicate which is true for paths of long-running http requests
-	LongRunningFunc genericfilters.LongRunningRequestCheck
-
-	// Build the handler chains by decorating the apiHandler.
-	BuildHandlerChainsFunc func(apiHandler http.Handler, c *Config) (secure, insecure http.Handler)
-
-	// LegacyAPIGroupPrefixes is used to set up URL parsing for authorization and for validating requests
-	// to InstallLegacyAPIGroup
-	LegacyAPIGroupPrefixes sets.String
 }
 
 type ServingInfo struct {
 	// BindAddress is the ip:port to serve on
 	BindAddress string
-	// ServerCert is the TLS cert info for serving secure traffic
-	ServerCert CertInfo
-	// ClientCA is the certificate bundle for all the signers that you'll recognize for incoming client certificates
-	ClientCA string
+	// BindNetwork is the type of network to bind to - defaults to "tcp", accepts "tcp",
+	// "tcp4", and "tcp6".
+	BindNetwork string
 }
 
-type CertInfo struct {
-	// CertFile is a file containing a PEM-encoded certificate
-	CertFile string
-	// KeyFile is a file containing a PEM-encoded private key for the certificate specified by CertFile
-	KeyFile string
-	// Generate indicates that the cert/key pair should be generated if its not present.
-	Generate bool
+type SecureServingInfo struct {
+	ServingInfo
+
+	// Cert is the main server cert which is used if SNI does not match. Cert must be non-nil and is
+	// allowed to be in SNICerts.
+	Cert *tls.Certificate
+
+	// CACert is an optional certificate authority used for the loopback connection of the Admission controllers.
+	// If this is nil, the certificate authority is extracted from Cert or a matching SNI certificate.
+	CACert *tls.Certificate
+
+	// SNICerts are the TLS certificates by name used for SNI.
+	SNICerts map[string]*tls.Certificate
+
+	// ClientCA is the certificate bundle for all the signers that you'll recognize for incoming client certificates
+	ClientCA *x509.CertPool
 }
 
 // NewConfig returns a Config struct with the default values
 func NewConfig() *Config {
-	longRunningRE := regexp.MustCompile(options.DefaultLongRunningRequestRE)
-
 	config := &Config{
 		Serializer:             api.Codecs,
-		MasterCount:            1,
 		ReadWritePort:          6443,
-		ServiceReadWritePort:   443,
 		RequestContextMapper:   api.NewRequestContextMapper(),
 		BuildHandlerChainsFunc: DefaultBuildHandlerChain,
 		LegacyAPIGroupPrefixes: sets.NewString(DefaultLegacyAPIPrefix),
+		HealthzChecks:          []healthz.HealthzChecker{healthz.PingHealthz},
+		EnableIndex:            true,
 
-		EnableIndex:          true,
-		EnableSwaggerSupport: true,
-		OpenAPIConfig: &common.Config{
-			ProtocolList:   []string{"https"},
-			IgnorePrefixes: []string{"/swaggerapi"},
-			Info: &spec.Info{
-				InfoProps: spec.InfoProps{
-					Title:   "Generic API Server",
-					Version: "unversioned",
-				},
-			},
-			DefaultResponse: &spec.Response{
-				ResponseProps: spec.ResponseProps{
-					Description: "Default Response.",
-				},
-			},
-		},
-		LongRunningFunc: genericfilters.BasicLongRunningRequestCheck(longRunningRE, map[string]string{"watch": "true"}),
+		// Default to treating watch as a long-running operation
+		// Generic API servers have no inherent long-running subresources
+		LongRunningFunc: genericfilters.BasicLongRunningRequestCheck(sets.NewString("watch"), sets.NewString()),
 	}
 
 	// this keeps the defaults in sync
 	defaultOptions := options.NewServerRunOptions()
 	// unset fields that can be overridden to avoid setting values so that we won't end up with lingering values.
 	// TODO we probably want to run the defaults the other way.  A default here drives it in the CLI flags
-	defaultOptions.SecurePort = 0
-	defaultOptions.InsecurePort = 0
 	defaultOptions.AuditLogPath = ""
 	return config.ApplyOptions(defaultOptions)
+}
+
+func DefaultOpenAPIConfig(definitions *openapicommon.OpenAPIDefinitions) *openapicommon.Config {
+	return &openapicommon.Config{
+		ProtocolList:   []string{"https"},
+		IgnorePrefixes: []string{"/swaggerapi"},
+		Info: &spec.Info{
+			InfoProps: spec.InfoProps{
+				Title:   "Generic API Server",
+				Version: "unversioned",
+			},
+		},
+		DefaultResponse: &spec.Response{
+			ResponseProps: spec.ResponseProps{
+				Description: "Default Response.",
+			},
+		},
+		GetOperationIDAndTags: apiserveropenapi.GetOperationIDAndTags,
+		Definitions:           definitions,
+	}
+}
+
+// DefaultSwaggerConfig returns a default configuration without WebServiceURL and
+// WebServices set.
+func DefaultSwaggerConfig() *swagger.Config {
+	return &swagger.Config{
+		ApiPath:         "/swaggerapi/",
+		SwaggerPath:     "/swaggerui/",
+		SwaggerFilePath: "/swagger-ui/",
+		SchemaFormatHandler: func(typeName string) string {
+			switch typeName {
+			case "metav1.Time", "*metav1.Time":
+				return "date-time"
+			}
+			return ""
+		},
+	}
+}
+
+func (c *Config) ApplySecureServingOptions(secureServing *options.SecureServingOptions) (*Config, error) {
+	if secureServing == nil || secureServing.ServingOptions.BindPort <= 0 {
+		return c, nil
+	}
+
+	secureServingInfo := &SecureServingInfo{
+		ServingInfo: ServingInfo{
+			BindAddress: net.JoinHostPort(secureServing.ServingOptions.BindAddress.String(), strconv.Itoa(secureServing.ServingOptions.BindPort)),
+		},
+	}
+
+	serverCertFile, serverKeyFile := secureServing.ServerCert.CertKey.CertFile, secureServing.ServerCert.CertKey.KeyFile
+
+	// load main cert
+	if len(serverCertFile) != 0 || len(serverKeyFile) != 0 {
+		tlsCert, err := tls.LoadX509KeyPair(serverCertFile, serverKeyFile)
+		if err != nil {
+			return nil, fmt.Errorf("unable to load server certificate: %v", err)
+		}
+		secureServingInfo.Cert = &tlsCert
+	}
+
+	// optionally load CA cert
+	if len(secureServing.ServerCert.CACertFile) != 0 {
+		pemData, err := ioutil.ReadFile(secureServing.ServerCert.CACertFile)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read certificate authority from %q: %v", secureServing.ServerCert.CACertFile, err)
+		}
+		block, pemData := pem.Decode(pemData)
+		if block == nil {
+			return nil, fmt.Errorf("no certificate found in certificate authority file %q", secureServing.ServerCert.CACertFile)
+		}
+		if block.Type != "CERTIFICATE" {
+			return nil, fmt.Errorf("expected CERTIFICATE block in certiticate authority file %q, found: %s", secureServing.ServerCert.CACertFile, block.Type)
+		}
+		secureServingInfo.CACert = &tls.Certificate{
+			Certificate: [][]byte{block.Bytes},
+		}
+	}
+
+	// load SNI certs
+	namedTlsCerts := make([]namedTlsCert, 0, len(secureServing.SNICertKeys))
+	for _, nck := range secureServing.SNICertKeys {
+		tlsCert, err := tls.LoadX509KeyPair(nck.CertFile, nck.KeyFile)
+		namedTlsCerts = append(namedTlsCerts, namedTlsCert{
+			tlsCert: tlsCert,
+			names:   nck.Names,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to load SNI cert and key: %v", err)
+		}
+	}
+	var err error
+	secureServingInfo.SNICerts, err = getNamedCertificateMap(namedTlsCerts)
+	if err != nil {
+		return nil, err
+	}
+
+	c.SecureServingInfo = secureServingInfo
+	c.ReadWritePort = secureServing.ServingOptions.BindPort
+
+	return c, nil
+}
+
+func (c *Config) ApplyInsecureServingOptions(insecureServing *options.ServingOptions) *Config {
+	if insecureServing == nil || insecureServing.BindPort <= 0 {
+		return c
+	}
+
+	c.InsecureServingInfo = &ServingInfo{
+		BindAddress: net.JoinHostPort(insecureServing.BindAddress.String(), strconv.Itoa(insecureServing.BindPort)),
+	}
+
+	return c
+}
+
+func (c *Config) ApplyAuthenticationOptions(o *options.BuiltInAuthenticationOptions) (*Config, error) {
+	if o == nil || o.PasswordFile == nil {
+		return c, nil
+	}
+
+	var err error
+	if o.ClientCert != nil {
+		c, err = c.applyClientCert(o.ClientCert.ClientCA)
+		if err != nil {
+			return nil, fmt.Errorf("unable to load client CA file: %v", err)
+		}
+	}
+	if o.RequestHeader != nil {
+		c, err = c.applyClientCert(o.RequestHeader.ClientCAFile)
+		if err != nil {
+			return nil, fmt.Errorf("unable to load client CA file: %v", err)
+		}
+	}
+
+	c.SupportsBasicAuth = len(o.PasswordFile.BasicAuthFile) > 0
+	return c, nil
+}
+
+func (c *Config) applyClientCert(clientCAFile string) (*Config, error) {
+	if c.SecureServingInfo != nil {
+		if len(clientCAFile) > 0 {
+			clientCAs, err := certutil.CertsFromFile(clientCAFile)
+			if err != nil {
+				return nil, fmt.Errorf("unable to load client CA file: %v", err)
+			}
+			if c.SecureServingInfo.ClientCA == nil {
+				c.SecureServingInfo.ClientCA = x509.NewCertPool()
+			}
+			for _, cert := range clientCAs {
+				c.SecureServingInfo.ClientCA.AddCert(cert)
+			}
+		}
+	}
+
+	return c, nil
+}
+
+func (c *Config) ApplyDelegatingAuthenticationOptions(o *options.DelegatingAuthenticationOptions) (*Config, error) {
+	if o == nil {
+		return c, nil
+	}
+
+	var err error
+	c, err = c.applyClientCert(o.ClientCert.ClientCA)
+	if err != nil {
+		return nil, fmt.Errorf("unable to load client CA file: %v", err)
+	}
+	c, err = c.applyClientCert(o.RequestHeader.ClientCAFile)
+	if err != nil {
+		return nil, fmt.Errorf("unable to load client CA file: %v", err)
+	}
+
+	cfg, err := o.ToAuthenticationConfig()
+	if err != nil {
+		return nil, err
+	}
+	authenticator, securityDefinitions, err := cfg.New()
+	if err != nil {
+		return nil, err
+	}
+
+	c.Authenticator = authenticator
+	if c.OpenAPIConfig != nil {
+		c.OpenAPIConfig.SecurityDefinitions = securityDefinitions
+	}
+	c.SupportsBasicAuth = false
+
+	return c, nil
+}
+
+func (c *Config) ApplyDelegatingAuthorizationOptions(o *options.DelegatingAuthorizationOptions) (*Config, error) {
+	if o == nil {
+		return c, nil
+	}
+
+	cfg, err := o.ToAuthorizationConfig()
+	if err != nil {
+		return nil, err
+	}
+	authorizer, err := cfg.New()
+	if err != nil {
+		return nil, err
+	}
+
+	c.Authorizer = authorizer
+
+	return c, nil
 }
 
 // ApplyOptions applies the run options to the method receiver and returns self
@@ -246,44 +432,16 @@ func (c *Config) ApplyOptions(options *options.ServerRunOptions) *Config {
 		}
 	}
 
-	if options.SecurePort > 0 {
-		secureServingInfo := &ServingInfo{
-			BindAddress: net.JoinHostPort(options.BindAddress.String(), strconv.Itoa(options.SecurePort)),
-			ServerCert: CertInfo{
-				CertFile: options.TLSCertFile,
-				KeyFile:  options.TLSPrivateKeyFile,
-			},
-			ClientCA: options.ClientCAFile,
-		}
-		if options.TLSCertFile == "" && options.TLSPrivateKeyFile == "" {
-			secureServingInfo.ServerCert.Generate = true
-			secureServingInfo.ServerCert.CertFile = path.Join(options.CertDirectory, "apiserver.crt")
-			secureServingInfo.ServerCert.KeyFile = path.Join(options.CertDirectory, "apiserver.key")
-		}
-
-		c.SecureServingInfo = secureServingInfo
-		c.ReadWritePort = options.SecurePort
-	}
-
-	if options.InsecurePort > 0 {
-		insecureServingInfo := &ServingInfo{
-			BindAddress: net.JoinHostPort(options.InsecureBindAddress.String(), strconv.Itoa(options.InsecurePort)),
-		}
-		c.InsecureServingInfo = insecureServingInfo
-	}
-
 	c.CorsAllowedOriginList = options.CorsAllowedOriginList
 	c.EnableGarbageCollection = options.EnableGarbageCollection
 	c.EnableProfiling = options.EnableProfiling
+	c.EnableContentionProfiling = options.EnableContentionProfiling
 	c.EnableSwaggerUI = options.EnableSwaggerUI
-	c.ExternalHost = options.ExternalHost
-	c.KubernetesServiceNodePort = options.KubernetesServiceNodePort
-	c.MasterCount = options.MasterCount
+	c.ExternalAddress = options.ExternalHost
+	c.MaxRequestsInFlight = options.MaxRequestsInFlight
+	c.MaxMutatingRequestsInFlight = options.MaxMutatingRequestsInFlight
 	c.MinRequestTimeout = options.MinRequestTimeout
 	c.PublicAddress = options.AdvertiseAddress
-	c.ServiceClusterIPRange = &options.ServiceClusterIPRange
-	c.ServiceNodePortRange = options.ServiceNodePortRange
-	c.MaxRequestsInFlight = options.MaxRequestsInFlight
 
 	return c
 }
@@ -295,42 +453,65 @@ type completedConfig struct {
 // Complete fills in any fields not set that are required to have valid data and can be derived
 // from other fields.  If you're going to `ApplyOptions`, do that first.  It's mutating the receiver.
 func (c *Config) Complete() completedConfig {
-	if c.ServiceClusterIPRange == nil || c.ServiceClusterIPRange.IP == nil {
-		defaultNet := "10.0.0.0/24"
-		glog.Warningf("Network range for service cluster IPs is unspecified. Defaulting to %v.", defaultNet)
-		_, serviceClusterIPRange, err := net.ParseCIDR(defaultNet)
-		if err != nil {
-			glog.Fatalf("Unable to parse CIDR: %v", err)
-		}
-		if size := ipallocator.RangeSize(serviceClusterIPRange); size < 8 {
-			glog.Fatalf("The service cluster IP range must be at least %d IP addresses", 8)
-		}
-		c.ServiceClusterIPRange = serviceClusterIPRange
-	}
-	if c.ServiceReadWriteIP == nil {
-		// Select the first valid IP from ServiceClusterIPRange to use as the GenericAPIServer service IP.
-		serviceReadWriteIP, err := ipallocator.GetIndexedIP(c.ServiceClusterIPRange, 1)
-		if err != nil {
-			glog.Fatalf("Failed to generate service read-write IP for GenericAPIServer service: %v", err)
-		}
-		glog.V(4).Infof("Setting GenericAPIServer service IP to %q (read-write).", serviceReadWriteIP)
-		c.ServiceReadWriteIP = serviceReadWriteIP
-	}
-	if c.ServiceNodePortRange.Size == 0 {
-		// TODO: Currently no way to specify an empty range (do we need to allow this?)
-		// We should probably allow this for clouds that don't require NodePort to do load-balancing (GCE)
-		// but then that breaks the strict nestedness of ServiceType.
-		// Review post-v1
-		c.ServiceNodePortRange = options.DefaultServiceNodePortRange
-		glog.Infof("Node port range unspecified. Defaulting to %v.", c.ServiceNodePortRange)
-	}
-	if len(c.ExternalHost) == 0 && c.PublicAddress != nil {
+	if len(c.ExternalAddress) == 0 && c.PublicAddress != nil {
 		hostAndPort := c.PublicAddress.String()
 		if c.ReadWritePort != 0 {
 			hostAndPort = net.JoinHostPort(hostAndPort, strconv.Itoa(c.ReadWritePort))
 		}
-		c.ExternalHost = hostAndPort
+		c.ExternalAddress = hostAndPort
 	}
+	if c.OpenAPIConfig != nil && c.OpenAPIConfig.SecurityDefinitions != nil {
+		// Setup OpenAPI security: all APIs will have the same authentication for now.
+		c.OpenAPIConfig.DefaultSecurity = []map[string][]string{}
+		keys := []string{}
+		for k := range *c.OpenAPIConfig.SecurityDefinitions {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		for _, k := range keys {
+			c.OpenAPIConfig.DefaultSecurity = append(c.OpenAPIConfig.DefaultSecurity, map[string][]string{k: {}})
+		}
+		if c.OpenAPIConfig.CommonResponses == nil {
+			c.OpenAPIConfig.CommonResponses = map[int]spec.Response{}
+		}
+		if _, exists := c.OpenAPIConfig.CommonResponses[http.StatusUnauthorized]; !exists {
+			c.OpenAPIConfig.CommonResponses[http.StatusUnauthorized] = spec.Response{
+				ResponseProps: spec.ResponseProps{
+					Description: "Unauthorized",
+				},
+			}
+		}
+	}
+	if c.SwaggerConfig != nil && len(c.SwaggerConfig.WebServicesUrl) == 0 {
+		if c.SecureServingInfo != nil {
+			c.SwaggerConfig.WebServicesUrl = "https://" + c.ExternalAddress
+		} else {
+			c.SwaggerConfig.WebServicesUrl = "http://" + c.ExternalAddress
+		}
+	}
+	if c.DiscoveryAddresses == nil {
+		c.DiscoveryAddresses = DefaultDiscoveryAddresses{DefaultAddress: c.ExternalAddress}
+	}
+
+	// If the loopbackclientconfig is specified AND it has a token for use against the API server
+	// wrap the authenticator and authorizer in loopback authentication logic
+	if c.Authenticator != nil && c.Authorizer != nil && c.LoopbackClientConfig != nil && len(c.LoopbackClientConfig.BearerToken) > 0 {
+		privilegedLoopbackToken := c.LoopbackClientConfig.BearerToken
+		var uid = uuid.NewRandom().String()
+		tokens := make(map[string]*user.DefaultInfo)
+		tokens[privilegedLoopbackToken] = &user.DefaultInfo{
+			Name:   user.APIServerUser,
+			UID:    uid,
+			Groups: []string{user.SystemPrivilegedGroup},
+		}
+
+		tokenAuthenticator := apiserverauthenticator.NewAuthenticatorFromTokens(tokens)
+		c.Authenticator = authenticatorunion.New(tokenAuthenticator, c.Authenticator)
+
+		tokenAuthorizer := apiserverauthorizer.NewPrivilegedGroups(user.SystemPrivilegedGroup)
+		c.Authorizer = authorizerunion.New(tokenAuthorizer, c.Authorizer)
+	}
+
 	return completedConfig{c}
 }
 
@@ -367,28 +548,26 @@ func (c completedConfig) New() (*GenericAPIServer, error) {
 	}
 
 	s := &GenericAPIServer{
-		ServiceClusterIPRange:  c.ServiceClusterIPRange,
+		discoveryAddresses:     c.DiscoveryAddresses,
 		LoopbackClientConfig:   c.LoopbackClientConfig,
 		legacyAPIGroupPrefixes: c.LegacyAPIGroupPrefixes,
 		admissionControl:       c.AdmissionControl,
 		requestContextMapper:   c.RequestContextMapper,
 		Serializer:             c.Serializer,
 
-		minRequestTimeout:    time.Duration(c.MinRequestTimeout) * time.Second,
-		enableSwaggerSupport: c.EnableSwaggerSupport,
+		minRequestTimeout: time.Duration(c.MinRequestTimeout) * time.Second,
 
-		MasterCount:          c.MasterCount,
-		SecureServingInfo:    c.SecureServingInfo,
-		InsecureServingInfo:  c.InsecureServingInfo,
-		ExternalAddress:      c.ExternalHost,
-		ServiceReadWriteIP:   c.ServiceReadWriteIP,
-		ServiceReadWritePort: c.ServiceReadWritePort,
+		SecureServingInfo:   c.SecureServingInfo,
+		InsecureServingInfo: c.InsecureServingInfo,
+		ExternalAddress:     c.ExternalAddress,
 
-		KubernetesServiceNodePort: c.KubernetesServiceNodePort,
-		apiGroupsForDiscovery:     map[string]unversioned.APIGroup{},
+		apiGroupsForDiscovery: map[string]metav1.APIGroup{},
 
-		enableOpenAPISupport: c.EnableOpenAPISupport,
-		openAPIConfig:        c.OpenAPIConfig,
+		swaggerConfig: c.SwaggerConfig,
+		openAPIConfig: c.OpenAPIConfig,
+
+		postStartHooks: map[string]postStartHookEntry{},
+		healthzChecks:  c.HealthzChecks,
 	}
 
 	s.HandlerContainer = mux.NewAPIContainer(http.NewServeMux(), c.Serializer)
@@ -400,42 +579,21 @@ func (c completedConfig) New() (*GenericAPIServer, error) {
 	return s, nil
 }
 
-// MaybeGenerateServingCerts generates serving certificates if requested and needed.
-func (c completedConfig) MaybeGenerateServingCerts() error {
-	// It would be nice to set a fqdn subject alt name, but only the kubelets know, the apiserver is clueless
-	// alternateDNS = append(alternateDNS, "kubernetes.default.svc.CLUSTER.DNS.NAME")
-	if c.SecureServingInfo != nil && c.SecureServingInfo.ServerCert.Generate && !certutil.CanReadCertOrKey(c.SecureServingInfo.ServerCert.CertFile, c.SecureServingInfo.ServerCert.KeyFile) {
-		// TODO (cjcullen): Is ClusterIP the right address to sign a cert with?
-		alternateIPs := []net.IP{c.ServiceReadWriteIP}
-		alternateDNS := []string{"kubernetes.default.svc", "kubernetes.default", "kubernetes", "localhost"}
-
-		if err := certutil.GenerateSelfSignedCert(c.PublicAddress.String(), c.SecureServingInfo.ServerCert.CertFile, c.SecureServingInfo.ServerCert.KeyFile, alternateIPs, alternateDNS); err != nil {
-			return fmt.Errorf("Unable to generate self signed cert: %v", err)
-		} else {
-			glog.Infof("Generated self-signed cert (%s, %s)", c.SecureServingInfo.ServerCert.CertFile, c.SecureServingInfo.ServerCert.KeyFile)
-		}
-	}
-
-	return nil
-}
-
 func DefaultBuildHandlerChain(apiHandler http.Handler, c *Config) (secure, insecure http.Handler) {
-	attributeGetter := apiserverfilters.NewRequestAttributeGetter(c.RequestContextMapper)
-
 	generic := func(handler http.Handler) http.Handler {
 		handler = genericfilters.WithCORS(handler, c.CorsAllowedOriginList, nil, nil, nil, "true")
 		handler = genericfilters.WithPanicRecovery(handler, c.RequestContextMapper)
+		handler = genericfilters.WithTimeoutForNonLongRunningRequests(handler, c.RequestContextMapper, c.LongRunningFunc)
+		handler = genericfilters.WithMaxInFlightLimit(handler, c.MaxRequestsInFlight, c.MaxMutatingRequestsInFlight, c.RequestContextMapper, c.LongRunningFunc)
 		handler = apiserverfilters.WithRequestInfo(handler, NewRequestInfoResolver(c), c.RequestContextMapper)
 		handler = api.WithRequestContext(handler, c.RequestContextMapper)
-		handler = genericfilters.WithTimeoutForNonLongRunningRequests(handler, c.LongRunningFunc)
-		handler = genericfilters.WithMaxInFlightLimit(handler, c.MaxRequestsInFlight, c.LongRunningFunc)
 		return handler
 	}
 	audit := func(handler http.Handler) http.Handler {
-		return apiserverfilters.WithAudit(handler, attributeGetter, c.AuditWriter)
+		return apiserverfilters.WithAudit(handler, c.RequestContextMapper, c.AuditWriter)
 	}
 	protect := func(handler http.Handler) http.Handler {
-		handler = apiserverfilters.WithAuthorization(handler, attributeGetter, c.Authorizer)
+		handler = apiserverfilters.WithAuthorization(handler, c.RequestContextMapper, c.Authorizer)
 		handler = apiserverfilters.WithImpersonation(handler, c.RequestContextMapper, c.Authorizer)
 		handler = audit(handler) // before impersonation to read original user
 		handler = authhandlers.WithAuthentication(handler, c.RequestContextMapper, c.Authenticator, authhandlers.Unauthorized(c.SupportsBasicAuth))
@@ -449,67 +607,27 @@ func (s *GenericAPIServer) installAPI(c *Config) {
 	if c.EnableIndex {
 		routes.Index{}.Install(s.HandlerContainer)
 	}
-	if c.EnableSwaggerSupport && c.EnableSwaggerUI {
+	if c.SwaggerConfig != nil && c.EnableSwaggerUI {
 		routes.SwaggerUI{}.Install(s.HandlerContainer)
 	}
 	if c.EnableProfiling {
 		routes.Profiling{}.Install(s.HandlerContainer)
+		if c.EnableContentionProfiling {
+			goruntime.SetBlockProfileRate(1)
+		}
+	}
+	if c.EnableMetrics {
+		if c.EnableProfiling {
+			routes.MetricsWithReset{}.Install(s.HandlerContainer)
+		} else {
+			routes.DefaultMetrics{}.Install(s.HandlerContainer)
+		}
 	}
 	routes.Version{Version: c.Version}.Install(s.HandlerContainer)
 	s.HandlerContainer.Add(s.DynamicApisDiscovery())
 }
 
-func DefaultAndValidateRunOptions(options *options.ServerRunOptions) {
-	genericvalidation.ValidateRunOptions(options)
-
-	// If advertise-address is not specified, use bind-address. If bind-address
-	// is not usable (unset, 0.0.0.0, or loopback), we will use the host's default
-	// interface as valid public addr for master (see: util/net#ValidPublicAddrForMaster)
-	if options.AdvertiseAddress == nil || options.AdvertiseAddress.IsUnspecified() {
-		hostIP, err := utilnet.ChooseBindAddress(options.BindAddress)
-		if err != nil {
-			glog.Fatalf("Unable to find suitable network address.error='%v' . "+
-				"Try to set the AdvertiseAddress directly or provide a valid BindAddress to fix this.", err)
-		}
-		options.AdvertiseAddress = hostIP
-	}
-	glog.Infof("Will report %v as public IP address.", options.AdvertiseAddress)
-
-	// Set default value for ExternalHost if not specified.
-	if len(options.ExternalHost) == 0 {
-		// TODO: extend for other providers
-		if options.CloudProvider == "gce" {
-			cloud, err := cloudprovider.InitCloudProvider(options.CloudProvider, options.CloudConfigFile)
-			if err != nil {
-				glog.Fatalf("Cloud provider could not be initialized: %v", err)
-			}
-			instances, supported := cloud.Instances()
-			if !supported {
-				glog.Fatalf("GCE cloud provider has no instances.  this shouldn't happen. exiting.")
-			}
-			hostname, err := os.Hostname()
-			if err != nil {
-				glog.Fatalf("Failed to get hostname: %v", err)
-			}
-			nodeName, err := instances.CurrentNodeName(hostname)
-			if err != nil {
-				glog.Fatalf("Failed to get NodeName: %v", err)
-			}
-			addrs, err := instances.NodeAddresses(nodeName)
-			if err != nil {
-				glog.Warningf("Unable to obtain external host address from cloud provider: %v", err)
-			} else {
-				for _, addr := range addrs {
-					if addr.Type == api.NodeExternalIP {
-						options.ExternalHost = addr.Address
-					}
-				}
-			}
-		}
-	}
-}
-
-func NewRequestInfoResolver(c *Config) *request.RequestInfoFactory {
+func NewRequestInfoResolver(c *Config) *apiserverrequest.RequestInfoFactory {
 	apiPrefixes := sets.NewString(strings.Trim(APIGroupPrefix, "/")) // all possible API prefixes
 	legacyAPIPrefixes := sets.String{}                               // APIPrefixes that won't have groups (legacy)
 	for legacyAPIPrefix := range c.LegacyAPIGroupPrefixes {
@@ -517,7 +635,7 @@ func NewRequestInfoResolver(c *Config) *request.RequestInfoFactory {
 		legacyAPIPrefixes.Insert(strings.Trim(legacyAPIPrefix, "/"))
 	}
 
-	return &request.RequestInfoFactory{
+	return &apiserverrequest.RequestInfoFactory{
 		APIPrefixes:          apiPrefixes,
 		GrouplessAPIPrefixes: legacyAPIPrefixes,
 	}

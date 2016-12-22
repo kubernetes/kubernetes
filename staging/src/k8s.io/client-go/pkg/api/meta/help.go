@@ -26,6 +26,12 @@ import (
 
 // IsListType returns true if the provided Object has a slice called Items
 func IsListType(obj runtime.Object) bool {
+	// if we're a runtime.Unstructured, check whether this is a list.
+	// TODO: refactor GetItemsPtr to use an interface that returns []runtime.Object
+	if unstructured, ok := obj.(runtime.Unstructured); ok {
+		return unstructured.IsList()
+	}
+
 	_, err := GetItemsPtr(obj)
 	return err == nil
 }
@@ -39,6 +45,7 @@ func GetItemsPtr(list runtime.Object) (interface{}, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	items := v.FieldByName("Items")
 	if !items.IsValid() {
 		return nil, fmt.Errorf("no Items field in %#v", list)
@@ -55,6 +62,57 @@ func GetItemsPtr(list runtime.Object) (interface{}, error) {
 	default:
 		return nil, fmt.Errorf("items: Expected slice, got %s", items.Kind())
 	}
+}
+
+// EachListItem invokes fn on each runtime.Object in the list. Any error immediately terminates
+// the loop.
+func EachListItem(obj runtime.Object, fn func(runtime.Object) error) error {
+	// TODO: Change to an interface call?
+	itemsPtr, err := GetItemsPtr(obj)
+	if err != nil {
+		return err
+	}
+	items, err := conversion.EnforcePtr(itemsPtr)
+	if err != nil {
+		return err
+	}
+	len := items.Len()
+	if len == 0 {
+		return nil
+	}
+	takeAddr := false
+	if elemType := items.Type().Elem(); elemType.Kind() != reflect.Ptr && elemType.Kind() != reflect.Interface {
+		if !items.Index(0).CanAddr() {
+			return fmt.Errorf("unable to take address of items in %T for EachListItem", obj)
+		}
+		takeAddr = true
+	}
+
+	for i := 0; i < len; i++ {
+		raw := items.Index(i)
+		if takeAddr {
+			raw = raw.Addr()
+		}
+		switch item := raw.Interface().(type) {
+		case *runtime.RawExtension:
+			if err := fn(item.Object); err != nil {
+				return err
+			}
+		case runtime.Object:
+			if err := fn(item); err != nil {
+				return err
+			}
+		default:
+			obj, ok := item.(runtime.Object)
+			if !ok {
+				return fmt.Errorf("%v: item[%v]: Expected object, got %#v(%s)", obj, i, raw.Interface(), raw.Kind())
+			}
+			if err := fn(obj); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
 
 // ExtractList returns obj's Items element as an array of runtime.Objects.
@@ -117,6 +175,13 @@ func SetList(list runtime.Object, objects []runtime.Object) error {
 	slice := reflect.MakeSlice(items.Type(), len(objects), len(objects))
 	for i := range objects {
 		dest := slice.Index(i)
+
+		// check to see if you're directly assignable
+		if reflect.TypeOf(objects[i]).AssignableTo(dest.Type()) {
+			dest.Set(reflect.ValueOf(objects[i]))
+			continue
+		}
+
 		src, err := conversion.EnforcePtr(objects[i])
 		if err != nil {
 			return err

@@ -17,8 +17,14 @@ limitations under the License.
 package server
 
 import (
+	"net/http"
+	"strings"
+
+	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/auth/authenticator"
 	"k8s.io/kubernetes/pkg/auth/authorizer"
+	"k8s.io/kubernetes/pkg/auth/user"
+	"k8s.io/kubernetes/pkg/types"
 )
 
 // KubeletAuth implements AuthInterface
@@ -34,4 +40,75 @@ type KubeletAuth struct {
 // NewKubeletAuth returns a kubelet.AuthInterface composed of the given authenticator, attribute getter, and authorizer
 func NewKubeletAuth(authenticator authenticator.Request, authorizerAttributeGetter authorizer.RequestAttributesGetter, authorizer authorizer.Authorizer) AuthInterface {
 	return &KubeletAuth{authenticator, authorizerAttributeGetter, authorizer}
+}
+
+func NewNodeAuthorizerAttributesGetter(nodeName types.NodeName) authorizer.RequestAttributesGetter {
+	return nodeAuthorizerAttributesGetter{nodeName: nodeName}
+}
+
+type nodeAuthorizerAttributesGetter struct {
+	nodeName types.NodeName
+}
+
+func isSubpath(subpath, path string) bool {
+	path = strings.TrimSuffix(path, "/")
+	return subpath == path || (strings.HasPrefix(subpath, path) && subpath[len(path)] == '/')
+}
+
+// GetRequestAttributes populates authorizer attributes for the requests to the kubelet API.
+// Default attributes are: {apiVersion=v1,verb=<http verb from request>,resource=nodes,name=<node name>,subresource=proxy}
+// More specific verb/resource is set for the following request patterns:
+//    /stats/*   => verb=<api verb from request>, resource=nodes, name=<node name>, subresource=stats
+//    /metrics/* => verb=<api verb from request>, resource=nodes, name=<node name>, subresource=metrics
+//    /logs/*    => verb=<api verb from request>, resource=nodes, name=<node name>, subresource=log
+//    /spec/*    => verb=<api verb from request>, resource=nodes, name=<node name>, subresource=spec
+func (n nodeAuthorizerAttributesGetter) GetRequestAttributes(u user.Info, r *http.Request) authorizer.Attributes {
+
+	apiVerb := ""
+	switch r.Method {
+	case "POST":
+		apiVerb = "create"
+	case "GET":
+		apiVerb = "get"
+	case "PUT":
+		apiVerb = "update"
+	case "PATCH":
+		apiVerb = "patch"
+	case "DELETE":
+		apiVerb = "delete"
+	}
+
+	requestPath := r.URL.Path
+
+	// Default attributes mirror the API attributes that would allow this access to the kubelet API
+	attrs := authorizer.AttributesRecord{
+		User:            u,
+		Verb:            apiVerb,
+		Namespace:       "",
+		APIGroup:        "",
+		APIVersion:      "v1",
+		Resource:        "nodes",
+		Subresource:     "proxy",
+		Name:            string(n.nodeName),
+		ResourceRequest: true,
+		Path:            requestPath,
+	}
+
+	// Override subresource for specific paths
+	// This allows subdividing access to the kubelet API
+	switch {
+	case isSubpath(requestPath, statsPath):
+		attrs.Subresource = "stats"
+	case isSubpath(requestPath, metricsPath):
+		attrs.Subresource = "metrics"
+	case isSubpath(requestPath, logsPath):
+		// "log" to match other log subresources (pods/log, etc)
+		attrs.Subresource = "log"
+	case isSubpath(requestPath, specPath):
+		attrs.Subresource = "spec"
+	}
+
+	glog.V(5).Infof("Node request attributes: attrs=%#v", attrs)
+
+	return attrs
 }

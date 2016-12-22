@@ -39,6 +39,10 @@ const (
 	PodWorkerStartLatencyKey      = "pod_worker_start_latency_microseconds"
 	PLEGRelistLatencyKey          = "pleg_relist_latency_microseconds"
 	PLEGRelistIntervalKey         = "pleg_relist_interval_microseconds"
+	// Metrics keys of remote runtime operations
+	RuntimeOperationsKey        = "runtime_operations"
+	RuntimeOperationsLatencyKey = "runtime_operations_latency_microseconds"
+	RuntimeOperationsErrorsKey  = "runtime_operations_errors"
 )
 
 var (
@@ -93,6 +97,7 @@ var (
 			Help:      "Latency in microseconds from seeing a pod to starting a worker.",
 		},
 	)
+	// TODO(random-liu): Move the following docker metrics into shim once dockertools is deprecated.
 	DockerOperationsLatency = prometheus.NewSummaryVec(
 		prometheus.SummaryOpts{
 			Subsystem: KubeletSubsystem,
@@ -139,6 +144,31 @@ var (
 			Help:      "Interval in microseconds between relisting in PLEG.",
 		},
 	)
+	// Metrics of remote runtime operations.
+	RuntimeOperations = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Subsystem: KubeletSubsystem,
+			Name:      RuntimeOperationsKey,
+			Help:      "Cumulative number of runtime operations by operation type.",
+		},
+		[]string{"operation_type"},
+	)
+	RuntimeOperationsLatency = prometheus.NewSummaryVec(
+		prometheus.SummaryOpts{
+			Subsystem: KubeletSubsystem,
+			Name:      RuntimeOperationsLatencyKey,
+			Help:      "Latency in microseconds of runtime operations. Broken down by operation type.",
+		},
+		[]string{"operation_type"},
+	)
+	RuntimeOperationsErrors = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Subsystem: KubeletSubsystem,
+			Name:      RuntimeOperationsErrorsKey,
+			Help:      "Cumulative number of runtime operation errors by operation type.",
+		},
+		[]string{"operation_type"},
+	)
 )
 
 var registerMetrics sync.Once
@@ -161,6 +191,9 @@ func Register(containerCache kubecontainer.RuntimeCache) {
 		prometheus.MustRegister(newPodAndContainerCollector(containerCache))
 		prometheus.MustRegister(PLEGRelistLatency)
 		prometheus.MustRegister(PLEGRelistInterval)
+		prometheus.MustRegister(RuntimeOperations)
+		prometheus.MustRegister(RuntimeOperationsLatency)
+		prometheus.MustRegister(RuntimeOperationsErrors)
 	})
 }
 

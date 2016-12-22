@@ -34,20 +34,22 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/apis/extensions"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
+	manualfake "k8s.io/kubernetes/pkg/client/restclient/fake"
 	testcore "k8s.io/kubernetes/pkg/client/testing/core"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
-	manualfake "k8s.io/kubernetes/pkg/client/unversioned/fake"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/util/flag"
 	"k8s.io/kubernetes/pkg/watch"
 )
@@ -161,7 +163,7 @@ func TestLabelsForObject(t *testing.T) {
 			name: "successful re-use of labels",
 			object: &api.Service{
 				ObjectMeta: api.ObjectMeta{Name: "baz", Namespace: "test", Labels: map[string]string{"svc": "test"}},
-				TypeMeta:   unversioned.TypeMeta{Kind: "Service", APIVersion: "v1"},
+				TypeMeta:   metav1.TypeMeta{Kind: "Service", APIVersion: "v1"},
 			},
 			expected: "svc=test",
 			err:      nil,
@@ -170,7 +172,7 @@ func TestLabelsForObject(t *testing.T) {
 			name: "empty labels",
 			object: &api.Service{
 				ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "test", Labels: map[string]string{}},
-				TypeMeta:   unversioned.TypeMeta{Kind: "Service", APIVersion: "v1"},
+				TypeMeta:   metav1.TypeMeta{Kind: "Service", APIVersion: "v1"},
 			},
 			expected: "",
 			err:      nil,
@@ -179,7 +181,7 @@ func TestLabelsForObject(t *testing.T) {
 			name: "nil labels",
 			object: &api.Service{
 				ObjectMeta: api.ObjectMeta{Name: "zen", Namespace: "test", Labels: nil},
-				TypeMeta:   unversioned.TypeMeta{Kind: "Service", APIVersion: "v1"},
+				TypeMeta:   metav1.TypeMeta{Kind: "Service", APIVersion: "v1"},
 			},
 			expected: "",
 			err:      nil,
@@ -202,7 +204,7 @@ func TestLabelsForObject(t *testing.T) {
 func TestCanBeExposed(t *testing.T) {
 	factory := NewFactory(nil)
 	tests := []struct {
-		kind      unversioned.GroupKind
+		kind      schema.GroupKind
 		expectErr bool
 	}{
 		{
@@ -439,7 +441,7 @@ func newPodList(count, isUnready, isUnhealthy int, labels map[string]string) *ap
 			ObjectMeta: api.ObjectMeta{
 				Name:              fmt.Sprintf("pod-%d", i+1),
 				Namespace:         api.NamespaceDefault,
-				CreationTimestamp: unversioned.Date(2016, time.April, 1, 1, 0, i, 0, time.UTC),
+				CreationTimestamp: metav1.Date(2016, time.April, 1, 1, 0, i, 0, time.UTC),
 				Labels:            labels,
 			},
 			Status: api.PodStatus{
@@ -471,7 +473,7 @@ func TestGetFirstPod(t *testing.T) {
 
 		podList  *api.PodList
 		watching []watch.Event
-		sortBy   func([]*api.Pod) sort.Interface
+		sortBy   func([]*v1.Pod) sort.Interface
 
 		expected    *api.Pod
 		expectedNum int
@@ -480,12 +482,12 @@ func TestGetFirstPod(t *testing.T) {
 		{
 			name:    "kubectl logs - two ready pods",
 			podList: newPodList(2, -1, -1, labelSet),
-			sortBy:  func(pods []*api.Pod) sort.Interface { return controller.ByLogging(pods) },
+			sortBy:  func(pods []*v1.Pod) sort.Interface { return controller.ByLogging(pods) },
 			expected: &api.Pod{
 				ObjectMeta: api.ObjectMeta{
 					Name:              "pod-1",
 					Namespace:         api.NamespaceDefault,
-					CreationTimestamp: unversioned.Date(2016, time.April, 1, 1, 0, 0, 0, time.UTC),
+					CreationTimestamp: metav1.Date(2016, time.April, 1, 1, 0, 0, 0, time.UTC),
 					Labels:            map[string]string{"test": "selector"},
 				},
 				Status: api.PodStatus{
@@ -502,12 +504,12 @@ func TestGetFirstPod(t *testing.T) {
 		{
 			name:    "kubectl logs - one unhealthy, one healthy",
 			podList: newPodList(2, -1, 1, labelSet),
-			sortBy:  func(pods []*api.Pod) sort.Interface { return controller.ByLogging(pods) },
+			sortBy:  func(pods []*v1.Pod) sort.Interface { return controller.ByLogging(pods) },
 			expected: &api.Pod{
 				ObjectMeta: api.ObjectMeta{
 					Name:              "pod-2",
 					Namespace:         api.NamespaceDefault,
-					CreationTimestamp: unversioned.Date(2016, time.April, 1, 1, 0, 1, 0, time.UTC),
+					CreationTimestamp: metav1.Date(2016, time.April, 1, 1, 0, 1, 0, time.UTC),
 					Labels:            map[string]string{"test": "selector"},
 				},
 				Status: api.PodStatus{
@@ -525,12 +527,12 @@ func TestGetFirstPod(t *testing.T) {
 		{
 			name:    "kubectl attach - two ready pods",
 			podList: newPodList(2, -1, -1, labelSet),
-			sortBy:  func(pods []*api.Pod) sort.Interface { return sort.Reverse(controller.ActivePods(pods)) },
+			sortBy:  func(pods []*v1.Pod) sort.Interface { return sort.Reverse(controller.ActivePods(pods)) },
 			expected: &api.Pod{
 				ObjectMeta: api.ObjectMeta{
 					Name:              "pod-1",
 					Namespace:         api.NamespaceDefault,
-					CreationTimestamp: unversioned.Date(2016, time.April, 1, 1, 0, 0, 0, time.UTC),
+					CreationTimestamp: metav1.Date(2016, time.April, 1, 1, 0, 0, 0, time.UTC),
 					Labels:            map[string]string{"test": "selector"},
 				},
 				Status: api.PodStatus{
@@ -554,7 +556,7 @@ func TestGetFirstPod(t *testing.T) {
 						ObjectMeta: api.ObjectMeta{
 							Name:              "pod-1",
 							Namespace:         api.NamespaceDefault,
-							CreationTimestamp: unversioned.Date(2016, time.April, 1, 1, 0, 0, 0, time.UTC),
+							CreationTimestamp: metav1.Date(2016, time.April, 1, 1, 0, 0, 0, time.UTC),
 							Labels:            map[string]string{"test": "selector"},
 						},
 						Status: api.PodStatus{
@@ -568,12 +570,12 @@ func TestGetFirstPod(t *testing.T) {
 					},
 				},
 			},
-			sortBy: func(pods []*api.Pod) sort.Interface { return sort.Reverse(controller.ActivePods(pods)) },
+			sortBy: func(pods []*v1.Pod) sort.Interface { return sort.Reverse(controller.ActivePods(pods)) },
 			expected: &api.Pod{
 				ObjectMeta: api.ObjectMeta{
 					Name:              "pod-1",
 					Namespace:         api.NamespaceDefault,
-					CreationTimestamp: unversioned.Date(2016, time.April, 1, 1, 0, 0, 0, time.UTC),
+					CreationTimestamp: metav1.Date(2016, time.April, 1, 1, 0, 0, 0, time.UTC),
 					Labels:            map[string]string{"test": "selector"},
 				},
 				Status: api.PodStatus{
@@ -607,6 +609,7 @@ func TestGetFirstPod(t *testing.T) {
 		selector := labels.Set(labelSet).AsSelector()
 
 		pod, numPods, err := GetFirstPod(fake.Core(), api.NamespaceDefault, selector, 1*time.Minute, test.sortBy)
+		pod.Spec.SecurityContext = nil
 		if !test.expectedErr && err != nil {
 			t.Errorf("%s: unexpected error: %v", test.name, err)
 			continue
@@ -736,12 +739,12 @@ func TestDiscoveryReplaceAliases(t *testing.T) {
 		{
 			name:     "all-replacement",
 			arg:      "all",
-			expected: "pods,replicationcontrollers,services,petsets,horizontalpodautoscalers,jobs,deployments,replicasets",
+			expected: "pods,replicationcontrollers,services,statefulsets,horizontalpodautoscalers,jobs,deployments,replicasets",
 		},
 		{
 			name:     "alias-in-comma-separated-arg",
 			arg:      "all,secrets",
-			expected: "pods,replicationcontrollers,services,petsets,horizontalpodautoscalers,jobs,deployments,replicasets,secrets",
+			expected: "pods,replicationcontrollers,services,statefulsets,horizontalpodautoscalers,jobs,deployments,replicasets,secrets",
 		},
 	}
 

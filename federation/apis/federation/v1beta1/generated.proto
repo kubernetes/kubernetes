@@ -22,9 +22,10 @@ syntax = 'proto2';
 package k8s.io.kubernetes.federation.apis.federation.v1beta1;
 
 import "k8s.io/kubernetes/pkg/api/resource/generated.proto";
-import "k8s.io/kubernetes/pkg/api/unversioned/generated.proto";
 import "k8s.io/kubernetes/pkg/api/v1/generated.proto";
+import "k8s.io/kubernetes/pkg/apis/meta/v1/generated.proto";
 import "k8s.io/kubernetes/pkg/runtime/generated.proto";
+import "k8s.io/kubernetes/pkg/runtime/schema/generated.proto";
 import "k8s.io/kubernetes/pkg/util/intstr/generated.proto";
 
 // Package-wide variables from generator "generated".
@@ -56,11 +57,11 @@ message ClusterCondition {
 
   // Last time the condition was checked.
   // +optional
-  optional k8s.io.kubernetes.pkg.api.unversioned.Time lastProbeTime = 3;
+  optional k8s.io.kubernetes.pkg.apis.meta.v1.Time lastProbeTime = 3;
 
   // Last time the condition transit from one status to another.
   // +optional
-  optional k8s.io.kubernetes.pkg.api.unversioned.Time lastTransitionTime = 4;
+  optional k8s.io.kubernetes.pkg.apis.meta.v1.Time lastTransitionTime = 4;
 
   // (brief) reason for the condition's last transition.
   // +optional
@@ -76,7 +77,7 @@ message ClusterList {
   // Standard list metadata.
   // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds
   // +optional
-  optional k8s.io.kubernetes.pkg.api.unversioned.ListMeta metadata = 1;
+  optional k8s.io.kubernetes.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // List of Cluster objects.
   repeated Cluster items = 2;

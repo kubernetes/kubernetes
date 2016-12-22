@@ -22,7 +22,7 @@ import (
 	"strings"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/util/bandwidth"
 )
 
@@ -66,15 +66,6 @@ func TestNodeIPParam(t *testing.T) {
 	}
 }
 
-type countingDNSScrubber struct {
-	counter *int
-}
-
-func (cds countingDNSScrubber) ScrubDNS(nameservers, searches []string) (nsOut, srchOut []string) {
-	(*cds.counter)++
-	return nameservers, searches
-}
-
 func TestParseResolvConf(t *testing.T) {
 	testCases := []struct {
 		data        string
@@ -104,8 +95,10 @@ func TestParseResolvConf(t *testing.T) {
 		{"nameserver 1.2.3.4\nsearch foo\nnameserver 5.6.7.8\nsearch bar", []string{"1.2.3.4", "5.6.7.8"}, []string{"bar"}},
 		{"#comment\nnameserver 1.2.3.4\n#comment\nsearch foo\ncomment", []string{"1.2.3.4"}, []string{"foo"}},
 	}
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	kubelet := testKubelet.kubelet
 	for i, tc := range testCases {
-		ns, srch, err := parseResolvConf(strings.NewReader(tc.data), nil)
+		ns, srch, err := kubelet.parseResolvConf(strings.NewReader(tc.data))
 		if err != nil {
 			t.Errorf("expected success, got %v", err)
 			continue
@@ -115,29 +108,12 @@ func TestParseResolvConf(t *testing.T) {
 		}
 		if !reflect.DeepEqual(srch, tc.searches) {
 			t.Errorf("[%d] expected searches %#v, got %#v", i, tc.searches, srch)
-		}
-
-		counter := 0
-		cds := countingDNSScrubber{&counter}
-		ns, srch, err = parseResolvConf(strings.NewReader(tc.data), cds)
-		if err != nil {
-			t.Errorf("expected success, got %v", err)
-			continue
-		}
-		if !reflect.DeepEqual(ns, tc.nameservers) {
-			t.Errorf("[%d] expected nameservers %#v, got %#v", i, tc.nameservers, ns)
-		}
-		if !reflect.DeepEqual(srch, tc.searches) {
-			t.Errorf("[%d] expected searches %#v, got %#v", i, tc.searches, srch)
-		}
-		if counter != 1 {
-			t.Errorf("[%d] expected dnsScrubber to have been called: got %d", i, counter)
 		}
 	}
 }
 
 func TestCleanupBandwidthLimits(t *testing.T) {
-	testPod := func(name, ingress string) *api.Pod {
+	testPod := func(name, ingress string) *v1.Pod {
 		pod := podWithUidNameNs("", name, "")
 
 		if len(ingress) != 0 {
@@ -150,18 +126,18 @@ func TestCleanupBandwidthLimits(t *testing.T) {
 	// TODO(random-liu): We removed the test case for pod status not cached here. We should add a higher
 	// layer status getter function and test that function instead.
 	tests := []struct {
-		status           *api.PodStatus
-		pods             []*api.Pod
+		status           *v1.PodStatus
+		pods             []*v1.Pod
 		inputCIDRs       []string
 		expectResetCIDRs []string
 		name             string
 	}{
 		{
-			status: &api.PodStatus{
+			status: &v1.PodStatus{
 				PodIP: "1.2.3.4",
-				Phase: api.PodRunning,
+				Phase: v1.PodRunning,
 			},
-			pods: []*api.Pod{
+			pods: []*v1.Pod{
 				testPod("foo", "10M"),
 				testPod("bar", ""),
 			},
@@ -170,11 +146,11 @@ func TestCleanupBandwidthLimits(t *testing.T) {
 			name:             "pod running",
 		},
 		{
-			status: &api.PodStatus{
+			status: &v1.PodStatus{
 				PodIP: "1.2.3.4",
-				Phase: api.PodFailed,
+				Phase: v1.PodFailed,
 			},
-			pods: []*api.Pod{
+			pods: []*v1.Pod{
 				testPod("foo", "10M"),
 				testPod("bar", ""),
 			},
@@ -183,11 +159,11 @@ func TestCleanupBandwidthLimits(t *testing.T) {
 			name:             "pod not running",
 		},
 		{
-			status: &api.PodStatus{
+			status: &v1.PodStatus{
 				PodIP: "1.2.3.4",
-				Phase: api.PodFailed,
+				Phase: v1.PodFailed,
 			},
-			pods: []*api.Pod{
+			pods: []*v1.Pod{
 				testPod("foo", ""),
 				testPod("bar", ""),
 			},

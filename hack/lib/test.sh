@@ -23,7 +23,7 @@ readonly   red=$(tput setaf 1)
 readonly green=$(tput setaf 2)
 
 kube::test::clear_all() {
-  kubectl delete "${kube_flags[@]}" rc,pods --all --grace-period=0
+  kubectl delete "${kube_flags[@]}" rc,pods --all --grace-period=0 --force
 }
 
 # Force exact match of a returned result for a object query.  Wrap this with || to support multiple
@@ -34,7 +34,7 @@ kube::test::get_object_assert() {
   local expected=$3
   local args=${4:-}
 
-  res=$(eval kubectl ${args} get "${kube_flags[@]}" $object -o go-template=\"$request\")
+  res=$(eval kubectl get "${kube_flags[@]}" ${args} $object -o go-template=\"$request\")
 
   if [[ "$res" =~ ^$expected$ ]]; then
       echo -n ${green}

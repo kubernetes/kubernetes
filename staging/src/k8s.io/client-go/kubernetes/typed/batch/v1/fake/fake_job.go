@@ -18,21 +18,22 @@ package fake
 
 import (
 	api "k8s.io/client-go/pkg/api"
-	unversioned "k8s.io/client-go/pkg/api/unversioned"
 	api_v1 "k8s.io/client-go/pkg/api/v1"
 	v1 "k8s.io/client-go/pkg/apis/batch/v1"
+	meta_v1 "k8s.io/client-go/pkg/apis/meta/v1"
 	labels "k8s.io/client-go/pkg/labels"
+	schema "k8s.io/client-go/pkg/runtime/schema"
 	watch "k8s.io/client-go/pkg/watch"
 	testing "k8s.io/client-go/testing"
 )
 
 // FakeJobs implements JobInterface
 type FakeJobs struct {
-	Fake *FakeBatch
+	Fake *FakeBatchV1
 	ns   string
 }
 
-var jobsResource = unversioned.GroupVersionResource{Group: "batch", Version: "v1", Resource: "jobs"}
+var jobsResource = schema.GroupVersionResource{Group: "batch", Version: "v1", Resource: "jobs"}
 
 func (c *FakeJobs) Create(job *v1.Job) (result *v1.Job, err error) {
 	obj, err := c.Fake.
@@ -78,7 +79,7 @@ func (c *FakeJobs) DeleteCollection(options *api_v1.DeleteOptions, listOptions a
 	return err
 }
 
-func (c *FakeJobs) Get(name string) (result *v1.Job, err error) {
+func (c *FakeJobs) Get(name string, options meta_v1.GetOptions) (result *v1.Job, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewGetAction(jobsResource, c.ns, name), &v1.Job{})
 

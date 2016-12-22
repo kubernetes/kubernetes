@@ -18,72 +18,35 @@ package etcd
 
 import (
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/registry/cachesize"
 	"k8s.io/kubernetes/pkg/registry/core/configmap"
 	"k8s.io/kubernetes/pkg/registry/generic"
-	"k8s.io/kubernetes/pkg/registry/generic/registry"
+	genericregistry "k8s.io/kubernetes/pkg/registry/generic/registry"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/storage"
 )
 
 // REST implements a RESTStorage for ConfigMap against etcd
 type REST struct {
-	*registry.Store
+	*genericregistry.Store
 }
 
 // NewREST returns a RESTStorage object that will work with ConfigMap objects.
-func NewREST(opts generic.RESTOptions) *REST {
-	prefix := "/" + opts.ResourcePrefix
-
-	newListFunc := func() runtime.Object { return &api.ConfigMapList{} }
-	storageInterface, dFunc := opts.Decorator(
-		opts.StorageConfig,
-		cachesize.GetWatchCacheSizeByResource(cachesize.ConfigMaps),
-		&api.ConfigMap{},
-		prefix,
-		configmap.Strategy,
-		newListFunc,
-		storage.NoTriggerPublisher)
-
-	store := &registry.Store{
-		NewFunc: func() runtime.Object {
-			return &api.ConfigMap{}
-		},
-
-		// NewListFunc returns an object to store results of an etcd list.
-		NewListFunc: newListFunc,
-
-		// Produces a path that etcd understands, to the root of the resource
-		// by combining the namespace in the context with the given prefix.
-		KeyRootFunc: func(ctx api.Context) string {
-			return registry.NamespaceKeyRootFunc(ctx, prefix)
-		},
-
-		// Produces a path that etcd understands, to the resource by combining
-		// the namespace in the context with the given prefix
-		KeyFunc: func(ctx api.Context, name string) (string, error) {
-			return registry.NamespaceKeyFunc(ctx, prefix, name)
-		},
-
-		// Retrieves the name field of a ConfigMap object.
+func NewREST(optsGetter generic.RESTOptionsGetter) *REST {
+	store := &genericregistry.Store{
+		NewFunc:     func() runtime.Object { return &api.ConfigMap{} },
+		NewListFunc: func() runtime.Object { return &api.ConfigMapList{} },
 		ObjectNameFunc: func(obj runtime.Object) (string, error) {
 			return obj.(*api.ConfigMap).Name, nil
 		},
-
-		// Matches objects based on labels/fields for list and watch
-		PredicateFunc: configmap.MatchConfigMap,
-
+		PredicateFunc:     configmap.MatchConfigMap,
 		QualifiedResource: api.Resource("configmaps"),
-
-		EnableGarbageCollection: opts.EnableGarbageCollection,
-		DeleteCollectionWorkers: opts.DeleteCollectionWorkers,
 
 		CreateStrategy: configmap.Strategy,
 		UpdateStrategy: configmap.Strategy,
 		DeleteStrategy: configmap.Strategy,
-
-		Storage:     storageInterface,
-		DestroyFunc: dFunc,
+	}
+	options := &generic.StoreOptions{RESTOptions: optsGetter, AttrFunc: configmap.GetAttrs}
+	if err := store.CompleteWithOptions(options); err != nil {
+		panic(err) // TODO: Propagate error up
 	}
 	return &REST{store}
 }

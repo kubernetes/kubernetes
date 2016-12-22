@@ -23,10 +23,10 @@ package configmap
 import (
 	"testing"
 
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/client/restclient"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/test/integration"
 	"k8s.io/kubernetes/test/integration/framework"
 )
@@ -36,7 +36,7 @@ func TestConfigMap(t *testing.T) {
 	_, s := framework.RunAMaster(nil)
 	defer s.Close()
 
-	client := client.NewOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(api.GroupName).GroupVersion}})
+	client := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(v1.GroupName).GroupVersion}})
 
 	ns := framework.CreateTestingNamespace("config-map", s, t)
 	defer framework.DeleteTestingNamespace(ns, s, t)
@@ -44,9 +44,9 @@ func TestConfigMap(t *testing.T) {
 	DoTestConfigMap(t, client, ns)
 }
 
-func DoTestConfigMap(t *testing.T, client *client.Client, ns *api.Namespace) {
-	cfg := api.ConfigMap{
-		ObjectMeta: api.ObjectMeta{
+func DoTestConfigMap(t *testing.T, client clientset.Interface, ns *v1.Namespace) {
+	cfg := v1.ConfigMap{
+		ObjectMeta: v1.ObjectMeta{
 			Name:      "configmap",
 			Namespace: ns.Name,
 		},
@@ -57,27 +57,27 @@ func DoTestConfigMap(t *testing.T, client *client.Client, ns *api.Namespace) {
 		},
 	}
 
-	if _, err := client.ConfigMaps(cfg.Namespace).Create(&cfg); err != nil {
+	if _, err := client.Core().ConfigMaps(cfg.Namespace).Create(&cfg); err != nil {
 		t.Errorf("unable to create test configMap: %v", err)
 	}
 	defer deleteConfigMapOrErrorf(t, client, cfg.Namespace, cfg.Name)
 
-	pod := &api.Pod{
-		ObjectMeta: api.ObjectMeta{
+	pod := &v1.Pod{
+		ObjectMeta: v1.ObjectMeta{
 			Name:      "XXX",
 			Namespace: ns.Name,
 		},
-		Spec: api.PodSpec{
-			Containers: []api.Container{
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
 				{
 					Name:  "fake-name",
 					Image: "fakeimage",
-					Env: []api.EnvVar{
+					Env: []v1.EnvVar{
 						{
 							Name: "CONFIG_DATA_1",
-							ValueFrom: &api.EnvVarSource{
-								ConfigMapKeyRef: &api.ConfigMapKeySelector{
-									LocalObjectReference: api.LocalObjectReference{
+							ValueFrom: &v1.EnvVarSource{
+								ConfigMapKeyRef: &v1.ConfigMapKeySelector{
+									LocalObjectReference: v1.LocalObjectReference{
 										Name: "configmap",
 									},
 									Key: "data-1",
@@ -86,9 +86,9 @@ func DoTestConfigMap(t *testing.T, client *client.Client, ns *api.Namespace) {
 						},
 						{
 							Name: "CONFIG_DATA_2",
-							ValueFrom: &api.EnvVarSource{
-								ConfigMapKeyRef: &api.ConfigMapKeySelector{
-									LocalObjectReference: api.LocalObjectReference{
+							ValueFrom: &v1.EnvVarSource{
+								ConfigMapKeyRef: &v1.ConfigMapKeySelector{
+									LocalObjectReference: v1.LocalObjectReference{
 										Name: "configmap",
 									},
 									Key: "data-2",
@@ -96,9 +96,9 @@ func DoTestConfigMap(t *testing.T, client *client.Client, ns *api.Namespace) {
 							},
 						}, {
 							Name: "CONFIG_DATA_3",
-							ValueFrom: &api.EnvVarSource{
-								ConfigMapKeyRef: &api.ConfigMapKeySelector{
-									LocalObjectReference: api.LocalObjectReference{
+							ValueFrom: &v1.EnvVarSource{
+								ConfigMapKeyRef: &v1.ConfigMapKeySelector{
+									LocalObjectReference: v1.LocalObjectReference{
 										Name: "configmap",
 									},
 									Key: "data-3",
@@ -112,14 +112,14 @@ func DoTestConfigMap(t *testing.T, client *client.Client, ns *api.Namespace) {
 	}
 
 	pod.ObjectMeta.Name = "uses-configmap"
-	if _, err := client.Pods(ns.Name).Create(pod); err != nil {
+	if _, err := client.Core().Pods(ns.Name).Create(pod); err != nil {
 		t.Errorf("Failed to create pod: %v", err)
 	}
 	defer integration.DeletePodOrErrorf(t, client, ns.Name, pod.Name)
 }
 
-func deleteConfigMapOrErrorf(t *testing.T, c *client.Client, ns, name string) {
-	if err := c.ConfigMaps(ns).Delete(name); err != nil {
+func deleteConfigMapOrErrorf(t *testing.T, c clientset.Interface, ns, name string) {
+	if err := c.Core().ConfigMaps(ns).Delete(name, nil); err != nil {
 		t.Errorf("unable to delete ConfigMap %v: %v", name, err)
 	}
 }

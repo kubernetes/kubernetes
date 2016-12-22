@@ -22,6 +22,7 @@ import (
 	"io"
 	"os"
 
+	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/auth/user"
 )
 
@@ -43,6 +44,7 @@ func NewCSV(path string) (*PasswordAuthenticator, error) {
 	}
 	defer file.Close()
 
+	recordNum := 0
 	users := make(map[string]*userPasswordInfo)
 	reader := csv.NewReader(file)
 	for {
@@ -59,6 +61,10 @@ func NewCSV(path string) (*PasswordAuthenticator, error) {
 		obj := &userPasswordInfo{
 			info:     &user.DefaultInfo{Name: record[1], UID: record[2]},
 			password: record[0],
+		}
+		recordNum++
+		if _, exist := users[obj.info.Name]; exist {
+			glog.Warningf("duplicate username '%s' has been found in password file '%s', record number '%d'", obj.info.Name, path, recordNum)
 		}
 		users[obj.info.Name] = obj
 	}

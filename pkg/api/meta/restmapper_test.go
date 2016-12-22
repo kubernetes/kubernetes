@@ -22,8 +22,8 @@ import (
 	"strings"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 )
 
 type fakeConvertor struct{}
@@ -43,35 +43,35 @@ func (fakeConvertor) ConvertFieldLabel(version, kind, label, value string) (stri
 var validAccessor = resourceAccessor{}
 var validConvertor = fakeConvertor{}
 
-func fakeInterfaces(version unversioned.GroupVersion) (*VersionInterfaces, error) {
+func fakeInterfaces(version schema.GroupVersion) (*VersionInterfaces, error) {
 	return &VersionInterfaces{ObjectConvertor: validConvertor, MetadataAccessor: validAccessor}, nil
 }
 
 var unmatchedErr = errors.New("no version")
 
-func unmatchedVersionInterfaces(version unversioned.GroupVersion) (*VersionInterfaces, error) {
+func unmatchedVersionInterfaces(version schema.GroupVersion) (*VersionInterfaces, error) {
 	return nil, unmatchedErr
 }
 
 func TestRESTMapperVersionAndKindForResource(t *testing.T) {
 	testGroup := "test.group"
 	testVersion := "test"
-	testGroupVersion := unversioned.GroupVersion{Group: testGroup, Version: testVersion}
+	testGroupVersion := schema.GroupVersion{Group: testGroup, Version: testVersion}
 
 	testCases := []struct {
-		Resource               unversioned.GroupVersionResource
-		GroupVersionToRegister unversioned.GroupVersion
-		ExpectedGVK            unversioned.GroupVersionKind
+		Resource               schema.GroupVersionResource
+		GroupVersionToRegister schema.GroupVersion
+		ExpectedGVK            schema.GroupVersionKind
 		Err                    bool
 	}{
-		{Resource: unversioned.GroupVersionResource{Resource: "internalobjec"}, Err: true},
-		{Resource: unversioned.GroupVersionResource{Resource: "internalObjec"}, Err: true},
+		{Resource: schema.GroupVersionResource{Resource: "internalobjec"}, Err: true},
+		{Resource: schema.GroupVersionResource{Resource: "internalObjec"}, Err: true},
 
-		{Resource: unversioned.GroupVersionResource{Resource: "internalobject"}, ExpectedGVK: testGroupVersion.WithKind("InternalObject")},
-		{Resource: unversioned.GroupVersionResource{Resource: "internalobjects"}, ExpectedGVK: testGroupVersion.WithKind("InternalObject")},
+		{Resource: schema.GroupVersionResource{Resource: "internalobject"}, ExpectedGVK: testGroupVersion.WithKind("InternalObject")},
+		{Resource: schema.GroupVersionResource{Resource: "internalobjects"}, ExpectedGVK: testGroupVersion.WithKind("InternalObject")},
 	}
 	for i, testCase := range testCases {
-		mapper := NewDefaultRESTMapper([]unversioned.GroupVersion{testGroupVersion}, fakeInterfaces)
+		mapper := NewDefaultRESTMapper([]schema.GroupVersion{testGroupVersion}, fakeInterfaces)
 		if len(testCase.ExpectedGVK.Kind) != 0 {
 			mapper.Add(testCase.ExpectedGVK, RESTScopeNamespace)
 		}
@@ -94,17 +94,17 @@ func TestRESTMapperVersionAndKindForResource(t *testing.T) {
 
 func TestRESTMapperGroupForResource(t *testing.T) {
 	testCases := []struct {
-		Resource         unversioned.GroupVersionResource
-		GroupVersionKind unversioned.GroupVersionKind
+		Resource         schema.GroupVersionResource
+		GroupVersionKind schema.GroupVersionKind
 		Err              bool
 	}{
-		{Resource: unversioned.GroupVersionResource{Resource: "myObject"}, GroupVersionKind: unversioned.GroupVersionKind{Group: "testapi", Version: "test", Kind: "MyObject"}},
-		{Resource: unversioned.GroupVersionResource{Resource: "myobject"}, GroupVersionKind: unversioned.GroupVersionKind{Group: "testapi2", Version: "test", Kind: "MyObject"}},
-		{Resource: unversioned.GroupVersionResource{Resource: "myObje"}, Err: true, GroupVersionKind: unversioned.GroupVersionKind{Group: "testapi", Version: "test", Kind: "MyObject"}},
-		{Resource: unversioned.GroupVersionResource{Resource: "myobje"}, Err: true, GroupVersionKind: unversioned.GroupVersionKind{Group: "testapi", Version: "test", Kind: "MyObject"}},
+		{Resource: schema.GroupVersionResource{Resource: "myObject"}, GroupVersionKind: schema.GroupVersionKind{Group: "testapi", Version: "test", Kind: "MyObject"}},
+		{Resource: schema.GroupVersionResource{Resource: "myobject"}, GroupVersionKind: schema.GroupVersionKind{Group: "testapi2", Version: "test", Kind: "MyObject"}},
+		{Resource: schema.GroupVersionResource{Resource: "myObje"}, Err: true, GroupVersionKind: schema.GroupVersionKind{Group: "testapi", Version: "test", Kind: "MyObject"}},
+		{Resource: schema.GroupVersionResource{Resource: "myobje"}, Err: true, GroupVersionKind: schema.GroupVersionKind{Group: "testapi", Version: "test", Kind: "MyObject"}},
 	}
 	for i, testCase := range testCases {
-		mapper := NewDefaultRESTMapper([]unversioned.GroupVersion{testCase.GroupVersionKind.GroupVersion()}, fakeInterfaces)
+		mapper := NewDefaultRESTMapper([]schema.GroupVersion{testCase.GroupVersionKind.GroupVersion()}, fakeInterfaces)
 		mapper.Add(testCase.GroupVersionKind, RESTScopeNamespace)
 
 		actualGVK, err := mapper.KindFor(testCase.Resource)
@@ -123,27 +123,27 @@ func TestRESTMapperGroupForResource(t *testing.T) {
 func TestRESTMapperKindsFor(t *testing.T) {
 	testCases := []struct {
 		Name                     string
-		PreferredOrder           []unversioned.GroupVersion
-		KindsToRegister          []unversioned.GroupVersionKind
-		PartialResourceToRequest unversioned.GroupVersionResource
+		PreferredOrder           []schema.GroupVersion
+		KindsToRegister          []schema.GroupVersionKind
+		PartialResourceToRequest schema.GroupVersionResource
 
-		ExpectedKinds   []unversioned.GroupVersionKind
+		ExpectedKinds   []schema.GroupVersionKind
 		ExpectedKindErr string
 	}{
 		{
 			// exact matches are prefered
 			Name: "groups, with group exact",
-			PreferredOrder: []unversioned.GroupVersion{
+			PreferredOrder: []schema.GroupVersion{
 				{Group: "first-group-1", Version: "first-version"},
 				{Group: "first-group", Version: "first-version"},
 			},
-			KindsToRegister: []unversioned.GroupVersionKind{
+			KindsToRegister: []schema.GroupVersionKind{
 				{Group: "first-group-1", Version: "first-version", Kind: "my-kind"},
 				{Group: "first-group", Version: "first-version", Kind: "my-kind"},
 			},
-			PartialResourceToRequest: unversioned.GroupVersionResource{Group: "first-group", Resource: "my-kind"},
+			PartialResourceToRequest: schema.GroupVersionResource{Group: "first-group", Resource: "my-kind"},
 
-			ExpectedKinds: []unversioned.GroupVersionKind{
+			ExpectedKinds: []schema.GroupVersionKind{
 				{Group: "first-group", Version: "first-version", Kind: "my-kind"},
 			},
 		},
@@ -151,17 +151,17 @@ func TestRESTMapperKindsFor(t *testing.T) {
 		{
 			// group prefixes work
 			Name: "groups, with group prefix",
-			PreferredOrder: []unversioned.GroupVersion{
+			PreferredOrder: []schema.GroupVersion{
 				{Group: "second-group", Version: "first-version"},
 				{Group: "first-group", Version: "first-version"},
 			},
-			KindsToRegister: []unversioned.GroupVersionKind{
+			KindsToRegister: []schema.GroupVersionKind{
 				{Group: "first-group", Version: "first-version", Kind: "my-kind"},
 				{Group: "second-group", Version: "first-version", Kind: "my-kind"},
 			},
-			PartialResourceToRequest: unversioned.GroupVersionResource{Group: "first", Resource: "my-kind"},
+			PartialResourceToRequest: schema.GroupVersionResource{Group: "first", Resource: "my-kind"},
 
-			ExpectedKinds: []unversioned.GroupVersionKind{
+			ExpectedKinds: []schema.GroupVersionKind{
 				{Group: "first-group", Version: "first-version", Kind: "my-kind"},
 			},
 		},
@@ -169,17 +169,17 @@ func TestRESTMapperKindsFor(t *testing.T) {
 		{
 			// group prefixes can be ambiguous
 			Name: "groups, with ambiguous group prefix",
-			PreferredOrder: []unversioned.GroupVersion{
+			PreferredOrder: []schema.GroupVersion{
 				{Group: "first-group-1", Version: "first-version"},
 				{Group: "first-group", Version: "first-version"},
 			},
-			KindsToRegister: []unversioned.GroupVersionKind{
+			KindsToRegister: []schema.GroupVersionKind{
 				{Group: "first-group-1", Version: "first-version", Kind: "my-kind"},
 				{Group: "first-group", Version: "first-version", Kind: "my-kind"},
 			},
-			PartialResourceToRequest: unversioned.GroupVersionResource{Group: "first", Resource: "my-kind"},
+			PartialResourceToRequest: schema.GroupVersionResource{Group: "first", Resource: "my-kind"},
 
-			ExpectedKinds: []unversioned.GroupVersionKind{
+			ExpectedKinds: []schema.GroupVersionKind{
 				{Group: "first-group-1", Version: "first-version", Kind: "my-kind"},
 				{Group: "first-group", Version: "first-version", Kind: "my-kind"},
 			},
@@ -188,19 +188,19 @@ func TestRESTMapperKindsFor(t *testing.T) {
 
 		{
 			Name: "ambiguous groups, with preference order",
-			PreferredOrder: []unversioned.GroupVersion{
+			PreferredOrder: []schema.GroupVersion{
 				{Group: "second-group", Version: "first-version"},
 				{Group: "first-group", Version: "first-version"},
 			},
-			KindsToRegister: []unversioned.GroupVersionKind{
+			KindsToRegister: []schema.GroupVersionKind{
 				{Group: "first-group", Version: "first-version", Kind: "my-kind"},
 				{Group: "first-group", Version: "first-version", Kind: "your-kind"},
 				{Group: "second-group", Version: "first-version", Kind: "my-kind"},
 				{Group: "second-group", Version: "first-version", Kind: "your-kind"},
 			},
-			PartialResourceToRequest: unversioned.GroupVersionResource{Resource: "my-kinds"},
+			PartialResourceToRequest: schema.GroupVersionResource{Resource: "my-kinds"},
 
-			ExpectedKinds: []unversioned.GroupVersionKind{
+			ExpectedKinds: []schema.GroupVersionKind{
 				{Group: "second-group", Version: "first-version", Kind: "my-kind"},
 				{Group: "first-group", Version: "first-version", Kind: "my-kind"},
 			},
@@ -209,38 +209,38 @@ func TestRESTMapperKindsFor(t *testing.T) {
 
 		{
 			Name: "ambiguous groups, with explicit group match",
-			PreferredOrder: []unversioned.GroupVersion{
+			PreferredOrder: []schema.GroupVersion{
 				{Group: "second-group", Version: "first-version"},
 				{Group: "first-group", Version: "first-version"},
 			},
-			KindsToRegister: []unversioned.GroupVersionKind{
+			KindsToRegister: []schema.GroupVersionKind{
 				{Group: "first-group", Version: "first-version", Kind: "my-kind"},
 				{Group: "first-group", Version: "first-version", Kind: "your-kind"},
 				{Group: "second-group", Version: "first-version", Kind: "my-kind"},
 				{Group: "second-group", Version: "first-version", Kind: "your-kind"},
 			},
-			PartialResourceToRequest: unversioned.GroupVersionResource{Group: "first-group", Resource: "my-kinds"},
+			PartialResourceToRequest: schema.GroupVersionResource{Group: "first-group", Resource: "my-kinds"},
 
-			ExpectedKinds: []unversioned.GroupVersionKind{
+			ExpectedKinds: []schema.GroupVersionKind{
 				{Group: "first-group", Version: "first-version", Kind: "my-kind"},
 			},
 		},
 
 		{
 			Name: "ambiguous groups, with ambiguous version match",
-			PreferredOrder: []unversioned.GroupVersion{
+			PreferredOrder: []schema.GroupVersion{
 				{Group: "first-group", Version: "first-version"},
 				{Group: "second-group", Version: "first-version"},
 			},
-			KindsToRegister: []unversioned.GroupVersionKind{
+			KindsToRegister: []schema.GroupVersionKind{
 				{Group: "first-group", Version: "first-version", Kind: "my-kind"},
 				{Group: "first-group", Version: "first-version", Kind: "your-kind"},
 				{Group: "second-group", Version: "first-version", Kind: "my-kind"},
 				{Group: "second-group", Version: "first-version", Kind: "your-kind"},
 			},
-			PartialResourceToRequest: unversioned.GroupVersionResource{Version: "first-version", Resource: "my-kinds"},
+			PartialResourceToRequest: schema.GroupVersionResource{Version: "first-version", Resource: "my-kinds"},
 
-			ExpectedKinds: []unversioned.GroupVersionKind{
+			ExpectedKinds: []schema.GroupVersionKind{
 				{Group: "first-group", Version: "first-version", Kind: "my-kind"},
 				{Group: "second-group", Version: "first-version", Kind: "my-kind"},
 			},
@@ -291,29 +291,29 @@ func TestRESTMapperKindsFor(t *testing.T) {
 func TestRESTMapperResourcesFor(t *testing.T) {
 	testCases := []struct {
 		Name                             string
-		PreferredOrder                   []unversioned.GroupVersion
-		KindsToRegister                  []unversioned.GroupVersionKind
-		PluralPartialResourceToRequest   unversioned.GroupVersionResource
-		SingularPartialResourceToRequest unversioned.GroupVersionResource
+		PreferredOrder                   []schema.GroupVersion
+		KindsToRegister                  []schema.GroupVersionKind
+		PluralPartialResourceToRequest   schema.GroupVersionResource
+		SingularPartialResourceToRequest schema.GroupVersionResource
 
-		ExpectedResources   []unversioned.GroupVersionResource
+		ExpectedResources   []schema.GroupVersionResource
 		ExpectedResourceErr string
 	}{
 		{
 			// exact matches are prefered
 			Name: "groups, with group exact",
-			PreferredOrder: []unversioned.GroupVersion{
+			PreferredOrder: []schema.GroupVersion{
 				{Group: "first-group-1", Version: "first-version"},
 				{Group: "first-group", Version: "first-version"},
 			},
-			KindsToRegister: []unversioned.GroupVersionKind{
+			KindsToRegister: []schema.GroupVersionKind{
 				{Group: "first-group-1", Version: "first-version", Kind: "my-kind"},
 				{Group: "first-group", Version: "first-version", Kind: "my-kind"},
 			},
-			PluralPartialResourceToRequest:   unversioned.GroupVersionResource{Group: "first-group", Resource: "my-kinds"},
-			SingularPartialResourceToRequest: unversioned.GroupVersionResource{Group: "first-group", Resource: "my-kind"},
+			PluralPartialResourceToRequest:   schema.GroupVersionResource{Group: "first-group", Resource: "my-kinds"},
+			SingularPartialResourceToRequest: schema.GroupVersionResource{Group: "first-group", Resource: "my-kind"},
 
-			ExpectedResources: []unversioned.GroupVersionResource{
+			ExpectedResources: []schema.GroupVersionResource{
 				{Group: "first-group", Version: "first-version", Resource: "my-kinds"},
 			},
 		},
@@ -321,18 +321,18 @@ func TestRESTMapperResourcesFor(t *testing.T) {
 		{
 			// group prefixes work
 			Name: "groups, with group prefix",
-			PreferredOrder: []unversioned.GroupVersion{
+			PreferredOrder: []schema.GroupVersion{
 				{Group: "second-group", Version: "first-version"},
 				{Group: "first-group", Version: "first-version"},
 			},
-			KindsToRegister: []unversioned.GroupVersionKind{
+			KindsToRegister: []schema.GroupVersionKind{
 				{Group: "first-group", Version: "first-version", Kind: "my-kind"},
 				{Group: "second-group", Version: "first-version", Kind: "my-kind"},
 			},
-			PluralPartialResourceToRequest:   unversioned.GroupVersionResource{Group: "first", Resource: "my-kinds"},
-			SingularPartialResourceToRequest: unversioned.GroupVersionResource{Group: "first", Resource: "my-kind"},
+			PluralPartialResourceToRequest:   schema.GroupVersionResource{Group: "first", Resource: "my-kinds"},
+			SingularPartialResourceToRequest: schema.GroupVersionResource{Group: "first", Resource: "my-kind"},
 
-			ExpectedResources: []unversioned.GroupVersionResource{
+			ExpectedResources: []schema.GroupVersionResource{
 				{Group: "first-group", Version: "first-version", Resource: "my-kinds"},
 			},
 		},
@@ -340,18 +340,18 @@ func TestRESTMapperResourcesFor(t *testing.T) {
 		{
 			// group prefixes can be ambiguous
 			Name: "groups, with ambiguous group prefix",
-			PreferredOrder: []unversioned.GroupVersion{
+			PreferredOrder: []schema.GroupVersion{
 				{Group: "first-group-1", Version: "first-version"},
 				{Group: "first-group", Version: "first-version"},
 			},
-			KindsToRegister: []unversioned.GroupVersionKind{
+			KindsToRegister: []schema.GroupVersionKind{
 				{Group: "first-group-1", Version: "first-version", Kind: "my-kind"},
 				{Group: "first-group", Version: "first-version", Kind: "my-kind"},
 			},
-			PluralPartialResourceToRequest:   unversioned.GroupVersionResource{Group: "first", Resource: "my-kinds"},
-			SingularPartialResourceToRequest: unversioned.GroupVersionResource{Group: "first", Resource: "my-kind"},
+			PluralPartialResourceToRequest:   schema.GroupVersionResource{Group: "first", Resource: "my-kinds"},
+			SingularPartialResourceToRequest: schema.GroupVersionResource{Group: "first", Resource: "my-kind"},
 
-			ExpectedResources: []unversioned.GroupVersionResource{
+			ExpectedResources: []schema.GroupVersionResource{
 				{Group: "first-group-1", Version: "first-version", Resource: "my-kinds"},
 				{Group: "first-group", Version: "first-version", Resource: "my-kinds"},
 			},
@@ -360,20 +360,20 @@ func TestRESTMapperResourcesFor(t *testing.T) {
 
 		{
 			Name: "ambiguous groups, with preference order",
-			PreferredOrder: []unversioned.GroupVersion{
+			PreferredOrder: []schema.GroupVersion{
 				{Group: "second-group", Version: "first-version"},
 				{Group: "first-group", Version: "first-version"},
 			},
-			KindsToRegister: []unversioned.GroupVersionKind{
+			KindsToRegister: []schema.GroupVersionKind{
 				{Group: "first-group", Version: "first-version", Kind: "my-kind"},
 				{Group: "first-group", Version: "first-version", Kind: "your-kind"},
 				{Group: "second-group", Version: "first-version", Kind: "my-kind"},
 				{Group: "second-group", Version: "first-version", Kind: "your-kind"},
 			},
-			PluralPartialResourceToRequest:   unversioned.GroupVersionResource{Resource: "my-kinds"},
-			SingularPartialResourceToRequest: unversioned.GroupVersionResource{Resource: "my-kind"},
+			PluralPartialResourceToRequest:   schema.GroupVersionResource{Resource: "my-kinds"},
+			SingularPartialResourceToRequest: schema.GroupVersionResource{Resource: "my-kind"},
 
-			ExpectedResources: []unversioned.GroupVersionResource{
+			ExpectedResources: []schema.GroupVersionResource{
 				{Group: "second-group", Version: "first-version", Resource: "my-kinds"},
 				{Group: "first-group", Version: "first-version", Resource: "my-kinds"},
 			},
@@ -382,40 +382,40 @@ func TestRESTMapperResourcesFor(t *testing.T) {
 
 		{
 			Name: "ambiguous groups, with explicit group match",
-			PreferredOrder: []unversioned.GroupVersion{
+			PreferredOrder: []schema.GroupVersion{
 				{Group: "second-group", Version: "first-version"},
 				{Group: "first-group", Version: "first-version"},
 			},
-			KindsToRegister: []unversioned.GroupVersionKind{
+			KindsToRegister: []schema.GroupVersionKind{
 				{Group: "first-group", Version: "first-version", Kind: "my-kind"},
 				{Group: "first-group", Version: "first-version", Kind: "your-kind"},
 				{Group: "second-group", Version: "first-version", Kind: "my-kind"},
 				{Group: "second-group", Version: "first-version", Kind: "your-kind"},
 			},
-			PluralPartialResourceToRequest:   unversioned.GroupVersionResource{Group: "first-group", Resource: "my-kinds"},
-			SingularPartialResourceToRequest: unversioned.GroupVersionResource{Group: "first-group", Resource: "my-kind"},
+			PluralPartialResourceToRequest:   schema.GroupVersionResource{Group: "first-group", Resource: "my-kinds"},
+			SingularPartialResourceToRequest: schema.GroupVersionResource{Group: "first-group", Resource: "my-kind"},
 
-			ExpectedResources: []unversioned.GroupVersionResource{
+			ExpectedResources: []schema.GroupVersionResource{
 				{Group: "first-group", Version: "first-version", Resource: "my-kinds"},
 			},
 		},
 
 		{
 			Name: "ambiguous groups, with ambiguous version match",
-			PreferredOrder: []unversioned.GroupVersion{
+			PreferredOrder: []schema.GroupVersion{
 				{Group: "first-group", Version: "first-version"},
 				{Group: "second-group", Version: "first-version"},
 			},
-			KindsToRegister: []unversioned.GroupVersionKind{
+			KindsToRegister: []schema.GroupVersionKind{
 				{Group: "first-group", Version: "first-version", Kind: "my-kind"},
 				{Group: "first-group", Version: "first-version", Kind: "your-kind"},
 				{Group: "second-group", Version: "first-version", Kind: "my-kind"},
 				{Group: "second-group", Version: "first-version", Kind: "your-kind"},
 			},
-			PluralPartialResourceToRequest:   unversioned.GroupVersionResource{Version: "first-version", Resource: "my-kinds"},
-			SingularPartialResourceToRequest: unversioned.GroupVersionResource{Version: "first-version", Resource: "my-kind"},
+			PluralPartialResourceToRequest:   schema.GroupVersionResource{Version: "first-version", Resource: "my-kinds"},
+			SingularPartialResourceToRequest: schema.GroupVersionResource{Version: "first-version", Resource: "my-kind"},
 
-			ExpectedResources: []unversioned.GroupVersionResource{
+			ExpectedResources: []schema.GroupVersionResource{
 				{Group: "first-group", Version: "first-version", Resource: "my-kinds"},
 				{Group: "second-group", Version: "first-version", Resource: "my-kinds"},
 			},
@@ -425,7 +425,7 @@ func TestRESTMapperResourcesFor(t *testing.T) {
 	for _, testCase := range testCases {
 		tcName := testCase.Name
 
-		for _, partialResource := range []unversioned.GroupVersionResource{testCase.PluralPartialResourceToRequest, testCase.SingularPartialResourceToRequest} {
+		for _, partialResource := range []schema.GroupVersionResource{testCase.PluralPartialResourceToRequest, testCase.SingularPartialResourceToRequest} {
 			mapper := NewDefaultRESTMapper(testCase.PreferredOrder, fakeInterfaces)
 			for _, kind := range testCase.KindsToRegister {
 				mapper.Add(kind, RESTScopeNamespace)
@@ -483,7 +483,7 @@ func TestKindToResource(t *testing.T) {
 		{Kind: "lowercase", Plural: "lowercases", Singular: "lowercase"},
 	}
 	for i, testCase := range testCases {
-		version := unversioned.GroupVersion{}
+		version := schema.GroupVersion{}
 
 		plural, singular := KindToResource(version.WithKind(testCase.Kind))
 		if singular != version.WithResource(testCase.Singular) || plural != version.WithResource(testCase.Plural) {
@@ -493,7 +493,7 @@ func TestKindToResource(t *testing.T) {
 }
 
 func TestRESTMapperResourceSingularizer(t *testing.T) {
-	testGroupVersion := unversioned.GroupVersion{Group: "tgroup", Version: "test"}
+	testGroupVersion := schema.GroupVersion{Group: "tgroup", Version: "test"}
 
 	testCases := []struct {
 		Kind     string
@@ -511,7 +511,7 @@ func TestRESTMapperResourceSingularizer(t *testing.T) {
 		{Kind: "lowercases", Plural: "lowercaseses", Singular: "lowercases"},
 	}
 	for i, testCase := range testCases {
-		mapper := NewDefaultRESTMapper([]unversioned.GroupVersion{testGroupVersion}, fakeInterfaces)
+		mapper := NewDefaultRESTMapper([]schema.GroupVersion{testGroupVersion}, fakeInterfaces)
 		// create singular/plural mapping
 		mapper.Add(testGroupVersion.WithKind(testCase.Kind), RESTScopeNamespace)
 
@@ -527,31 +527,31 @@ func TestRESTMapperResourceSingularizer(t *testing.T) {
 
 func TestRESTMapperRESTMapping(t *testing.T) {
 	testGroup := "tgroup"
-	testGroupVersion := unversioned.GroupVersion{Group: testGroup, Version: "test"}
-	internalGroupVersion := unversioned.GroupVersion{Group: testGroup, Version: "test"}
+	testGroupVersion := schema.GroupVersion{Group: testGroup, Version: "test"}
+	internalGroupVersion := schema.GroupVersion{Group: testGroup, Version: "test"}
 
 	testCases := []struct {
 		Kind             string
-		APIGroupVersions []unversioned.GroupVersion
-		DefaultVersions  []unversioned.GroupVersion
+		APIGroupVersions []schema.GroupVersion
+		DefaultVersions  []schema.GroupVersion
 
 		Resource             string
-		ExpectedGroupVersion *unversioned.GroupVersion
+		ExpectedGroupVersion *schema.GroupVersion
 		Err                  bool
 	}{
 		{Kind: "Unknown", Err: true},
 		{Kind: "InternalObject", Err: true},
 
-		{DefaultVersions: []unversioned.GroupVersion{testGroupVersion}, Kind: "Unknown", Err: true},
+		{DefaultVersions: []schema.GroupVersion{testGroupVersion}, Kind: "Unknown", Err: true},
 
-		{DefaultVersions: []unversioned.GroupVersion{testGroupVersion}, Kind: "InternalObject", APIGroupVersions: []unversioned.GroupVersion{{Group: testGroup, Version: "test"}}, Resource: "internalobjects"},
-		{DefaultVersions: []unversioned.GroupVersion{testGroupVersion}, Kind: "InternalObject", APIGroupVersions: []unversioned.GroupVersion{{Group: testGroup, Version: "test"}}, Resource: "internalobjects"},
+		{DefaultVersions: []schema.GroupVersion{testGroupVersion}, Kind: "InternalObject", APIGroupVersions: []schema.GroupVersion{{Group: testGroup, Version: "test"}}, Resource: "internalobjects"},
+		{DefaultVersions: []schema.GroupVersion{testGroupVersion}, Kind: "InternalObject", APIGroupVersions: []schema.GroupVersion{{Group: testGroup, Version: "test"}}, Resource: "internalobjects"},
 
-		{DefaultVersions: []unversioned.GroupVersion{testGroupVersion}, Kind: "InternalObject", APIGroupVersions: []unversioned.GroupVersion{{Group: testGroup, Version: "test"}}, Resource: "internalobjects"},
+		{DefaultVersions: []schema.GroupVersion{testGroupVersion}, Kind: "InternalObject", APIGroupVersions: []schema.GroupVersion{{Group: testGroup, Version: "test"}}, Resource: "internalobjects"},
 
-		{DefaultVersions: []unversioned.GroupVersion{testGroupVersion}, Kind: "InternalObject", APIGroupVersions: []unversioned.GroupVersion{}, Resource: "internalobjects", ExpectedGroupVersion: &unversioned.GroupVersion{Group: testGroup, Version: "test"}},
+		{DefaultVersions: []schema.GroupVersion{testGroupVersion}, Kind: "InternalObject", APIGroupVersions: []schema.GroupVersion{}, Resource: "internalobjects", ExpectedGroupVersion: &schema.GroupVersion{Group: testGroup, Version: "test"}},
 
-		{DefaultVersions: []unversioned.GroupVersion{testGroupVersion}, Kind: "InternalObject", APIGroupVersions: []unversioned.GroupVersion{{Group: testGroup, Version: "test"}}, Resource: "internalobjects"},
+		{DefaultVersions: []schema.GroupVersion{testGroupVersion}, Kind: "InternalObject", APIGroupVersions: []schema.GroupVersion{{Group: testGroup, Version: "test"}}, Resource: "internalobjects"},
 
 		// TODO: add test for a resource that exists in one version but not another
 	}
@@ -563,7 +563,7 @@ func TestRESTMapperRESTMapping(t *testing.T) {
 		for _, gv := range testCase.APIGroupVersions {
 			preferredVersions = append(preferredVersions, gv.Version)
 		}
-		gk := unversioned.GroupKind{Group: testGroup, Kind: testCase.Kind}
+		gk := schema.GroupKind{Group: testGroup, Kind: testCase.Kind}
 
 		mapping, err := mapper.RESTMapping(gk, preferredVersions...)
 		hasErr := err != nil
@@ -593,13 +593,13 @@ func TestRESTMapperRESTMapping(t *testing.T) {
 }
 
 func TestRESTMapperRESTMappingSelectsVersion(t *testing.T) {
-	expectedGroupVersion1 := unversioned.GroupVersion{Group: "tgroup", Version: "test1"}
-	expectedGroupVersion2 := unversioned.GroupVersion{Group: "tgroup", Version: "test2"}
-	expectedGroupVersion3 := unversioned.GroupVersion{Group: "tgroup", Version: "test3"}
-	internalObjectGK := unversioned.GroupKind{Group: "tgroup", Kind: "InternalObject"}
-	otherObjectGK := unversioned.GroupKind{Group: "tgroup", Kind: "OtherObject"}
+	expectedGroupVersion1 := schema.GroupVersion{Group: "tgroup", Version: "test1"}
+	expectedGroupVersion2 := schema.GroupVersion{Group: "tgroup", Version: "test2"}
+	expectedGroupVersion3 := schema.GroupVersion{Group: "tgroup", Version: "test3"}
+	internalObjectGK := schema.GroupKind{Group: "tgroup", Kind: "InternalObject"}
+	otherObjectGK := schema.GroupKind{Group: "tgroup", Kind: "OtherObject"}
 
-	mapper := NewDefaultRESTMapper([]unversioned.GroupVersion{expectedGroupVersion1, expectedGroupVersion2}, fakeInterfaces)
+	mapper := NewDefaultRESTMapper([]schema.GroupVersion{expectedGroupVersion1, expectedGroupVersion2}, fakeInterfaces)
 	mapper.Add(expectedGroupVersion1.WithKind("InternalObject"), RESTScopeNamespace)
 	mapper.Add(expectedGroupVersion2.WithKind("OtherObject"), RESTScopeNamespace)
 
@@ -651,12 +651,98 @@ func TestRESTMapperRESTMappingSelectsVersion(t *testing.T) {
 	}
 }
 
-func TestRESTMapperReportsErrorOnBadVersion(t *testing.T) {
-	expectedGroupVersion1 := unversioned.GroupVersion{Group: "tgroup", Version: "test1"}
-	expectedGroupVersion2 := unversioned.GroupVersion{Group: "tgroup", Version: "test2"}
-	internalObjectGK := unversioned.GroupKind{Group: "tgroup", Kind: "InternalObject"}
+func TestRESTMapperRESTMappings(t *testing.T) {
+	testGroup := "tgroup"
+	testGroupVersion := schema.GroupVersion{Group: testGroup, Version: "v1"}
 
-	mapper := NewDefaultRESTMapper([]unversioned.GroupVersion{expectedGroupVersion1, expectedGroupVersion2}, unmatchedVersionInterfaces)
+	testCases := []struct {
+		Kind                string
+		APIGroupVersions    []schema.GroupVersion
+		DefaultVersions     []schema.GroupVersion
+		AddGroupVersionKind []schema.GroupVersionKind
+
+		ExpectedRESTMappings []*RESTMapping
+		Err                  bool
+	}{
+		{Kind: "Unknown", Err: true},
+		{Kind: "InternalObject", Err: true},
+
+		{DefaultVersions: []schema.GroupVersion{testGroupVersion}, Kind: "Unknown", Err: true},
+
+		// ask for specific version - not available - thus error
+		{DefaultVersions: []schema.GroupVersion{testGroupVersion}, Kind: "InternalObject", APIGroupVersions: []schema.GroupVersion{{Group: testGroup, Version: "v2"}}, Err: true},
+
+		// ask for specific version - available - check ExpectedRESTMappings
+		{
+			DefaultVersions:      []schema.GroupVersion{testGroupVersion},
+			Kind:                 "InternalObject",
+			APIGroupVersions:     []schema.GroupVersion{{Group: testGroup, Version: "v2"}},
+			AddGroupVersionKind:  []schema.GroupVersionKind{schema.GroupVersion{Group: testGroup, Version: "v2"}.WithKind("InternalObject")},
+			ExpectedRESTMappings: []*RESTMapping{{Resource: "internalobjects", GroupVersionKind: schema.GroupVersionKind{Group: testGroup, Version: "v2", Kind: "InternalObject"}}},
+		},
+
+		// ask for specific versions - only one available - check ExpectedRESTMappings
+		{
+			DefaultVersions:      []schema.GroupVersion{testGroupVersion},
+			Kind:                 "InternalObject",
+			APIGroupVersions:     []schema.GroupVersion{{Group: testGroup, Version: "v3"}, {Group: testGroup, Version: "v2"}},
+			AddGroupVersionKind:  []schema.GroupVersionKind{schema.GroupVersion{Group: testGroup, Version: "v2"}.WithKind("InternalObject")},
+			ExpectedRESTMappings: []*RESTMapping{{Resource: "internalobjects", GroupVersionKind: schema.GroupVersionKind{Group: testGroup, Version: "v2", Kind: "InternalObject"}}},
+		},
+
+		// do not ask for specific version - search through default versions - check ExpectedRESTMappings
+		{
+			DefaultVersions:      []schema.GroupVersion{testGroupVersion, {Group: testGroup, Version: "v2"}},
+			Kind:                 "InternalObject",
+			AddGroupVersionKind:  []schema.GroupVersionKind{schema.GroupVersion{Group: testGroup, Version: "v1"}.WithKind("InternalObject"), schema.GroupVersion{Group: testGroup, Version: "v2"}.WithKind("InternalObject")},
+			ExpectedRESTMappings: []*RESTMapping{{Resource: "internalobjects", GroupVersionKind: schema.GroupVersionKind{Group: testGroup, Version: "v1", Kind: "InternalObject"}}, {Resource: "internalobjects", GroupVersionKind: schema.GroupVersionKind{Group: testGroup, Version: "v2", Kind: "InternalObject"}}},
+		},
+	}
+
+	for i, testCase := range testCases {
+		mapper := NewDefaultRESTMapper(testCase.DefaultVersions, fakeInterfaces)
+		for _, gvk := range testCase.AddGroupVersionKind {
+			mapper.Add(gvk, RESTScopeNamespace)
+		}
+
+		preferredVersions := []string{}
+		for _, gv := range testCase.APIGroupVersions {
+			preferredVersions = append(preferredVersions, gv.Version)
+		}
+		gk := schema.GroupKind{Group: testGroup, Kind: testCase.Kind}
+
+		mappings, err := mapper.RESTMappings(gk, preferredVersions...)
+		hasErr := err != nil
+		if hasErr != testCase.Err {
+			t.Errorf("%d: unexpected error behavior %t: %v", i, testCase.Err, err)
+		}
+		if hasErr {
+			continue
+		}
+		if len(mappings) != len(testCase.ExpectedRESTMappings) {
+			t.Errorf("%d: unexpected number = %d of rest mappings was returned, expected = %d", i, len(mappings), len(testCase.ExpectedRESTMappings))
+		}
+		for j, mapping := range mappings {
+			exp := testCase.ExpectedRESTMappings[j]
+			if mapping.Resource != exp.Resource {
+				t.Errorf("%d - %d: unexpected resource: %#v", i, j, mapping)
+			}
+			if mapping.MetadataAccessor == nil || mapping.ObjectConvertor == nil {
+				t.Errorf("%d - %d: missing codec and accessor: %#v", i, j, mapping)
+			}
+			if mapping.GroupVersionKind != exp.GroupVersionKind {
+				t.Errorf("%d - %d: unexpected GroupVersionKind: %#v", i, j, mapping)
+			}
+		}
+	}
+}
+
+func TestRESTMapperReportsErrorOnBadVersion(t *testing.T) {
+	expectedGroupVersion1 := schema.GroupVersion{Group: "tgroup", Version: "test1"}
+	expectedGroupVersion2 := schema.GroupVersion{Group: "tgroup", Version: "test2"}
+	internalObjectGK := schema.GroupKind{Group: "tgroup", Kind: "InternalObject"}
+
+	mapper := NewDefaultRESTMapper([]schema.GroupVersion{expectedGroupVersion1, expectedGroupVersion2}, unmatchedVersionInterfaces)
 	mapper.Add(expectedGroupVersion1.WithKind("InternalObject"), RESTScopeNamespace)
 	_, err := mapper.RESTMapping(internalObjectGK, expectedGroupVersion1.Version)
 	if err == nil {

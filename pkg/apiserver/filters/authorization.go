@@ -28,18 +28,24 @@ import (
 )
 
 // WithAuthorizationCheck passes all authorized requests on to handler, and returns a forbidden error otherwise.
-func WithAuthorization(handler http.Handler, getAttribs RequestAttributeGetter, a authorizer.Authorizer) http.Handler {
+func WithAuthorization(handler http.Handler, requestContextMapper api.RequestContextMapper, a authorizer.Authorizer) http.Handler {
 	if a == nil {
 		glog.Warningf("Authorization is disabled")
 		return handler
 	}
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		attrs, err := getAttribs.GetAttribs(req)
+		ctx, ok := requestContextMapper.Get(req)
+		if !ok {
+			internalError(w, req, errors.New("no context found for request"))
+			return
+		}
+
+		attributes, err := GetAuthorizerAttributes(ctx)
 		if err != nil {
 			internalError(w, req, err)
 			return
 		}
-		authorized, reason, err := a.Authorize(attrs)
+		authorized, reason, err := a.Authorize(attributes)
 		if authorized {
 			handler.ServeHTTP(w, req)
 			return
@@ -49,32 +55,13 @@ func WithAuthorization(handler http.Handler, getAttribs RequestAttributeGetter, 
 			return
 		}
 
-		glog.V(4).Infof("Forbidden: %#v, Reason: %s", req.RequestURI, reason)
-		forbidden(w, req)
+		glog.V(4).Infof("Forbidden: %#v, Reason: %q", req.RequestURI, reason)
+		forbidden(attributes, w, req, reason)
 	})
 }
 
-// RequestAttributeGetter is a function that extracts authorizer.Attributes from an http.Request
-type RequestAttributeGetter interface {
-	GetAttribs(req *http.Request) (authorizer.Attributes, error)
-}
-
-type requestAttributeGetter struct {
-	requestContextMapper api.RequestContextMapper
-}
-
-// NewAttributeGetter returns an object which implements the RequestAttributeGetter interface.
-func NewRequestAttributeGetter(requestContextMapper api.RequestContextMapper) RequestAttributeGetter {
-	return &requestAttributeGetter{requestContextMapper}
-}
-
-func (r *requestAttributeGetter) GetAttribs(req *http.Request) (authorizer.Attributes, error) {
+func GetAuthorizerAttributes(ctx api.Context) (authorizer.Attributes, error) {
 	attribs := authorizer.AttributesRecord{}
-
-	ctx, ok := r.requestContextMapper.Get(req)
-	if !ok {
-		return nil, errors.New("no context found for request")
-	}
 
 	user, ok := api.UserFrom(ctx)
 	if ok {

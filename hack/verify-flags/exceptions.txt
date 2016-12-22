@@ -1,7 +1,5 @@
 Vagrantfile:      node_ip = $node_ips[n]
 cluster/addons/addon-manager/kube-addons.sh:# Create admission_control objects if defined before any other addon services. If the limits
-cluster/addons/registry/images/Dockerfile:ADD run_proxy.sh /usr/bin/run_proxy
-cluster/addons/registry/images/Dockerfile:CMD ["/usr/bin/run_proxy"]
 cluster/aws/templates/configure-vm-aws.sh:  # We set the hostname_override to the full EC2 private dns name
 cluster/aws/templates/configure-vm-aws.sh:  api_servers: '${API_SERVERS}'
 cluster/aws/templates/configure-vm-aws.sh:  env-to-grains "hostname_override"
@@ -14,9 +12,10 @@ cluster/gce/configure-vm.sh:  cloud_config: ${CLOUD_CONFIG}
 cluster/gce/configure-vm.sh:  env-to-grains "feature_gates"
 cluster/gce/configure-vm.sh:  env-to-grains "runtime_config"
 cluster/gce/configure-vm.sh:  kubelet_api_servers: '${KUBELET_APISERVER}'
-cluster/gce/gci/configure-helper.sh:      reconcile_cidr="false"
+cluster/gce/coreos/configure-helper.sh:  local api_servers="--master=https://${KUBERNETES_MASTER_NAME}"
+cluster/gce/coreos/configure-helper.sh:  sed -i -e "s@{{ *storage_backend *}}@${STORAGE_BACKEND:-}@g" "${temp_file}"
+cluster/gce/coreos/configure-helper.sh:  sed -i -e "s@{{pillar\['allow_privileged'\]}}@true@g" "${src_file}"
 cluster/gce/gci/configure-helper.sh:  local api_servers="--master=https://${KUBERNETES_MASTER_NAME}"
-cluster/gce/gci/configure-helper.sh:  local reconcile_cidr="true"
 cluster/gce/gci/configure-helper.sh:  sed -i -e "s@{{ *storage_backend *}}@${STORAGE_BACKEND:-}@g" "${temp_file}"
 cluster/gce/gci/configure-helper.sh:  sed -i -e "s@{{pillar\['allow_privileged'\]}}@true@g" "${src_file}"
 cluster/gce/trusty/configure-helper.sh:  sed -i -e "s@{{ *storage_backend *}}@${STORAGE_BACKEND:-}@g" "${temp_file}"
@@ -32,7 +31,6 @@ cluster/lib/logging.sh:    local source_file=${BASH_SOURCE[$stack_skip]}
 cluster/log-dump.sh:    local -r node_name="${1}"
 cluster/log-dump.sh:  for node_name in "${node_names[@]}"; do
 cluster/log-dump.sh:readonly report_dir="${1:-_artifacts}"
-cluster/mesos/docker/km/build.sh:  km_path=$(find-binary km darwin/amd64)
 cluster/photon-controller/templates/salt-master.sh:  api_servers: $MASTER_NAME
 cluster/photon-controller/templates/salt-minion.sh:  hostname_override: $(ip route get 1.1.1.1 | awk '{print $7}')
 cluster/photon-controller/util.sh:    node_ip=$(${PHOTON} vm networks "${node_id}" | grep -i $'\t'"00:0C:29" | grep -E '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' | head -1 | awk -F'\t' '{print $3}')
@@ -41,9 +39,10 @@ cluster/photon-controller/util.sh:  node_name=${1}
 cluster/rackspace/util.sh:    local node_ip=$(nova show --minimal ${NODE_NAMES[$i]} \
 cluster/saltbase/salt/cluster-autoscaler/cluster-autoscaler.manifest:{% set params = pillar['autoscaler_mig_config'] + " " + cloud_config -%}
 cluster/saltbase/salt/etcd/etcd.manifest:        "value": "{{ storage_backend }}"
+cluster/saltbase/salt/etcd/etcd.manifest:{% if pillar.get('storage_backend', 'etcd2') == 'etcd3' -%}
 cluster/saltbase/salt/etcd/etcd.manifest:{% set storage_backend = pillar.get('storage_backend', 'etcd2') -%}
 cluster/saltbase/salt/kube-admission-controls/init.sls:{% if 'LimitRanger' in pillar.get('admission_control', '') %}
-cluster/saltbase/salt/kube-apiserver/kube-apiserver.manifest:{% set params = address + " " + storage_backend + " " + etcd_servers + " " + etcd_servers_overrides + " " + cloud_provider + " " + cloud_config + " " + runtime_config + " " + feature_gates + " " + admission_control + " " + target_ram_mb + " " + service_cluster_ip_range + " " + client_ca_file + basic_auth_file + " " + min_request_timeout + " " + enable_garbage_collector -%}
+cluster/saltbase/salt/kube-apiserver/kube-apiserver.manifest:{% set params = address + " " + storage_backend + " " + etcd_servers + " " + etcd_servers_overrides + " " + cloud_provider + " " + cloud_config + " " + runtime_config + " " + feature_gates + " " + admission_control + " " + max_requests_inflight + " " + target_ram_mb + " " + service_cluster_ip_range + " " + client_ca_file + basic_auth_file + " " + min_request_timeout + " " + enable_garbage_collector + " " + etcd_quorum_read -%}
 cluster/saltbase/salt/kube-controller-manager/kube-controller-manager.manifest:{% if pillar.get('enable_hostpath_provisioner', '').lower() == 'true' -%}
 cluster/saltbase/salt/kube-controller-manager/kube-controller-manager.manifest:{% set params = "--master=127.0.0.1:8080" + " " + cluster_name + " " + cluster_cidr + " " + allocate_node_cidrs + " " + service_cluster_ip_range + " " + terminated_pod_gc + " " + enable_garbage_collector + " " + cloud_provider  + " " + cloud_config + " " + service_account_key + " " + log_level + " " + root_ca_file -%}
 cluster/saltbase/salt/kube-controller-manager/kube-controller-manager.manifest:{% set params = params + " " + feature_gates -%}
@@ -86,6 +85,10 @@ federation/deploy/config.json.sample:      "cluster_name": "cluster3-kubernetes"
 federation/deploy/config.json.sample:      "num_nodes": 3,
 federation/deploy/config.json.sample:      "num_nodes": 3,
 federation/deploy/config.json.sample:      "num_nodes": 3,
+hack/e2e.go:.phase1.cloud_provider="gce"
+hack/e2e.go:.phase1.cluster_name="{{.Cluster}}"
+hack/e2e.go:.phase1.num_nodes=4
+hack/lib/util.sh:    local api_port=$5
 hack/local-up-cluster.sh:        advertise_address="--advertise_address=${API_HOST_IP}"
 hack/local-up-cluster.sh:      runtime_config="--runtime-config=${RUNTIME_CONFIG}"
 hack/local-up-cluster.sh:    advertise_address=""
@@ -122,9 +125,6 @@ test/e2e/common/host_path.go:			fmt.Sprintf("--file_content_in_loop=%v", filePat
 test/e2e/common/host_path.go:			fmt.Sprintf("--file_content_in_loop=%v", filePathInReader),
 test/e2e/common/host_path.go:			fmt.Sprintf("--retry_time=%d", retryDuration),
 test/e2e/common/host_path.go:			fmt.Sprintf("--retry_time=%d", retryDuration),
-test/e2e/cluster_logging_es.go:		return fmt.Errorf("No cluster_name field in Elasticsearch response: %v", esResponse)
-test/e2e/cluster_logging_es.go:	// Check to see if have a cluster_name field.
-test/e2e/cluster_logging_es.go:	clusterName, ok := esResponse["cluster_name"]
 test/e2e_node/container_manager_test.go:		return fmt.Errorf("expected pid %d's oom_score_adj to be %d; found %d", pid, expectedOOMScoreAdj, oomScore)
 test/e2e_node/container_manager_test.go:		return fmt.Errorf("expected pid %d's oom_score_adj to be < %d; found %d", pid, expectedMaxOOMScoreAdj, oomScore)
 test/e2e_node/container_manager_test.go:		return fmt.Errorf("expected pid %d's oom_score_adj to be >= %d; found %d", pid, expectedMinOOMScoreAdj, oomScore)

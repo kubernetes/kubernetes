@@ -20,8 +20,8 @@ import (
 	"reflect"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 )
 
 type InternalComplex struct {
@@ -42,12 +42,12 @@ type ExternalComplex struct {
 	Bool             bool `json:"bool"`
 }
 
-func (obj *InternalComplex) GetObjectKind() unversioned.ObjectKind { return &obj.TypeMeta }
-func (obj *ExternalComplex) GetObjectKind() unversioned.ObjectKind { return &obj.TypeMeta }
+func (obj *InternalComplex) GetObjectKind() schema.ObjectKind { return &obj.TypeMeta }
+func (obj *ExternalComplex) GetObjectKind() schema.ObjectKind { return &obj.TypeMeta }
 
 func TestStringMapConversion(t *testing.T) {
-	internalGV := unversioned.GroupVersion{Group: "test.group", Version: runtime.APIVersionInternal}
-	externalGV := unversioned.GroupVersion{Group: "test.group", Version: "external"}
+	internalGV := schema.GroupVersion{Group: "test.group", Version: runtime.APIVersionInternal}
+	externalGV := schema.GroupVersion{Group: "test.group", Version: "external"}
 
 	scheme := runtime.NewScheme()
 	scheme.Log(t)

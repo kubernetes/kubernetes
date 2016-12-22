@@ -22,7 +22,7 @@ package policy
 
 import (
 	api "k8s.io/client-go/pkg/api"
-	unversioned "k8s.io/client-go/pkg/api/unversioned"
+	v1 "k8s.io/client-go/pkg/apis/meta/v1"
 	conversion "k8s.io/client-go/pkg/conversion"
 	runtime "k8s.io/client-go/pkg/runtime"
 	reflect "reflect"
@@ -76,7 +76,9 @@ func DeepCopy_policy_PodDisruptionBudget(in interface{}, out interface{}, c *con
 		if err := DeepCopy_policy_PodDisruptionBudgetSpec(&in.Spec, &out.Spec, c); err != nil {
 			return err
 		}
-		out.Status = in.Status
+		if err := DeepCopy_policy_PodDisruptionBudgetStatus(&in.Status, &out.Status, c); err != nil {
+			return err
+		}
 		return nil
 	}
 }
@@ -109,8 +111,8 @@ func DeepCopy_policy_PodDisruptionBudgetSpec(in interface{}, out interface{}, c 
 		out.MinAvailable = in.MinAvailable
 		if in.Selector != nil {
 			in, out := &in.Selector, &out.Selector
-			*out = new(unversioned.LabelSelector)
-			if err := unversioned.DeepCopy_unversioned_LabelSelector(*in, *out, c); err != nil {
+			*out = new(v1.LabelSelector)
+			if err := v1.DeepCopy_v1_LabelSelector(*in, *out, c); err != nil {
 				return err
 			}
 		} else {
@@ -124,7 +126,17 @@ func DeepCopy_policy_PodDisruptionBudgetStatus(in interface{}, out interface{}, 
 	{
 		in := in.(*PodDisruptionBudgetStatus)
 		out := out.(*PodDisruptionBudgetStatus)
-		out.PodDisruptionAllowed = in.PodDisruptionAllowed
+		out.ObservedGeneration = in.ObservedGeneration
+		if in.DisruptedPods != nil {
+			in, out := &in.DisruptedPods, &out.DisruptedPods
+			*out = make(map[string]v1.Time)
+			for key, val := range *in {
+				(*out)[key] = val.DeepCopy()
+			}
+		} else {
+			out.DisruptedPods = nil
+		}
+		out.PodDisruptionsAllowed = in.PodDisruptionsAllowed
 		out.CurrentHealthy = in.CurrentHealthy
 		out.DesiredHealthy = in.DesiredHealthy
 		out.ExpectedPods = in.ExpectedPods

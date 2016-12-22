@@ -22,13 +22,15 @@ import (
 	"os"
 	"reflect"
 	"strconv"
+	"strings"
 	"time"
 
-	fedclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_5"
+	fedclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
-	kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
+	kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -53,17 +55,12 @@ var _ = framework.KubeDescribe("Federated ingresses [Feature:Federation]", func(
 	Describe("Federated Ingresses", func() {
 		AfterEach(func() {
 			nsName := f.FederationNamespace.Name
-			// Delete registered ingresses.
-			ingressList, err := f.FederationClientset_1_5.Extensions().Ingresses(nsName).List(v1.ListOptions{})
-			Expect(err).NotTo(HaveOccurred())
-			for _, ingress := range ingressList.Items {
-				err := f.FederationClientset_1_5.Extensions().Ingresses(nsName).Delete(ingress.Name, &v1.DeleteOptions{})
-				Expect(err).NotTo(HaveOccurred())
-			}
+			// Delete all ingresses.
+			deleteAllIngressesOrFail(f.FederationClientset_1_5, nsName)
 		})
 
 		It("should be created and deleted successfully", func() {
-			framework.SkipUnlessFederated(f.Client)
+			framework.SkipUnlessFederated(f.ClientSet)
 			framework.SkipUnlessProviderIs("gce", "gke") // TODO: Federated ingress is not yet supported on non-GCP platforms.
 			nsName := f.FederationNamespace.Name
 			ingress := createIngressOrFail(f.FederationClientset_1_5, nsName)
@@ -85,7 +82,7 @@ var _ = framework.KubeDescribe("Federated ingresses [Feature:Federation]", func(
 
 		// register clusters in federation apiserver
 		BeforeEach(func() {
-			framework.SkipUnlessFederated(f.Client)
+			framework.SkipUnlessFederated(f.ClientSet)
 			framework.SkipUnlessProviderIs("gce", "gke") // TODO: Federated ingress is not yet supported on non-GCP platforms.
 			if federationName = os.Getenv("FEDERATION_NAME"); federationName == "" {
 				federationName = DefaultFederationName
@@ -97,24 +94,41 @@ var _ = framework.KubeDescribe("Federated ingresses [Feature:Federation]", func(
 		})
 
 		AfterEach(func() {
+			// Delete all ingresses.
+			nsName := f.FederationNamespace.Name
+			deleteAllIngressesOrFail(f.FederationClientset_1_5, nsName)
 			unregisterClusters(clusters, f)
 		})
 
 		It("should create and update matching ingresses in underlying clusters", func() {
 			ingress := createIngressOrFail(f.FederationClientset_1_5, ns)
-			defer func() { // Cleanup
-				By(fmt.Sprintf("Deleting ingress %q in namespace %q", ingress.Name, ns))
-				err := f.FederationClientset_1_5.Ingresses(ns).Delete(ingress.Name, &v1.DeleteOptions{})
-				framework.ExpectNoError(err, "Error deleting ingress %q/%q in federation", ns, ingress.Name)
-				for clusterName, cluster := range clusters {
-					err := cluster.Ingresses(ns).Delete(ingress.Name, &v1.DeleteOptions{})
-					framework.ExpectNoError(err, "Error deleting ingress %q/%q in cluster %q", ns, ingress.Name, clusterName)
-				}
-			}()
 			// wait for ingress shards being created
 			waitForIngressShardsOrFail(ns, ingress, clusters)
 			ingress = updateIngressOrFail(f.FederationClientset_1_5, ns)
 			waitForIngressShardsUpdatedOrFail(ns, ingress, clusters)
+		})
+
+		It("should be deleted from underlying clusters when OrphanDependents is false", func() {
+			framework.SkipUnlessFederated(f.ClientSet)
+			nsName := f.FederationNamespace.Name
+			orphanDependents := false
+			verifyCascadingDeletionForIngress(f.FederationClientset_1_5, clusters, &orphanDependents, nsName)
+			By(fmt.Sprintf("Verified that ingresses were deleted from underlying clusters"))
+		})
+
+		It("should not be deleted from underlying clusters when OrphanDependents is true", func() {
+			framework.SkipUnlessFederated(f.ClientSet)
+			nsName := f.FederationNamespace.Name
+			orphanDependents := true
+			verifyCascadingDeletionForIngress(f.FederationClientset_1_5, clusters, &orphanDependents, nsName)
+			By(fmt.Sprintf("Verified that ingresses were not deleted from underlying clusters"))
+		})
+
+		It("should not be deleted from underlying clusters when OrphanDependents is nil", func() {
+			framework.SkipUnlessFederated(f.ClientSet)
+			nsName := f.FederationNamespace.Name
+			verifyCascadingDeletionForIngress(f.FederationClientset_1_5, clusters, nil, nsName)
+			By(fmt.Sprintf("Verified that ingresses were not deleted from underlying clusters"))
 		})
 
 		var _ = Describe("Ingress connectivity and DNS", func() {
@@ -124,7 +138,7 @@ var _ = framework.KubeDescribe("Federated ingresses [Feature:Federation]", func(
 			)
 
 			BeforeEach(func() {
-				framework.SkipUnlessFederated(f.Client)
+				framework.SkipUnlessFederated(f.ClientSet)
 				// create backend pod
 				createBackendPodsOrFail(clusters, ns, FederatedIngressServicePodName)
 				// create backend service
@@ -147,7 +161,7 @@ var _ = framework.KubeDescribe("Federated ingresses [Feature:Federation]", func(
 					By("No service to delete. Service is nil")
 				}
 				if jig.ing != nil {
-					deleteIngressOrFail(f.FederationClientset_1_5, ns, jig.ing.Name)
+					deleteIngressOrFail(f.FederationClientset_1_5, ns, jig.ing.Name, nil)
 					for clusterName, cluster := range clusters {
 						deleteClusterIngressOrFail(clusterName, cluster.Clientset, ns, jig.ing.Name)
 					}
@@ -182,11 +196,48 @@ var _ = framework.KubeDescribe("Federated ingresses [Feature:Federation]", func(
 	})
 })
 
+// Deletes all Ingresses in the given namespace name.
+func deleteAllIngressesOrFail(clientset *fedclientset.Clientset, nsName string) {
+	orphanDependents := false
+	err := clientset.Extensions().Ingresses(nsName).DeleteCollection(&v1.DeleteOptions{OrphanDependents: &orphanDependents}, v1.ListOptions{})
+	Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("Error in deleting ingresses in namespace: %s", nsName))
+}
+
 /*
    equivalent returns true if the two ingress spec are equivalent.
 */
 func equivalentIngress(federatedIngress, clusterIngress v1beta1.Ingress) bool {
 	return reflect.DeepEqual(clusterIngress.Spec, federatedIngress.Spec)
+}
+
+// verifyCascadingDeletionForIngress verifies that ingresses are deleted from
+// underlying clusters when orphan dependents is false and they are not deleted
+// when orphan dependents is true.
+func verifyCascadingDeletionForIngress(clientset *fedclientset.Clientset, clusters map[string]*cluster, orphanDependents *bool, nsName string) {
+	ingress := createIngressOrFail(clientset, nsName)
+	ingressName := ingress.Name
+	// Check subclusters if the ingress was created there.
+	By(fmt.Sprintf("Waiting for ingress %s to be created in all underlying clusters", ingressName))
+	waitForIngressShardsOrFail(nsName, ingress, clusters)
+
+	By(fmt.Sprintf("Deleting ingress %s", ingressName))
+	deleteIngressOrFail(clientset, nsName, ingressName, orphanDependents)
+
+	By(fmt.Sprintf("Verifying ingresses %s in underlying clusters", ingressName))
+	errMessages := []string{}
+	// ingress should be present in underlying clusters unless orphanDependents is false.
+	shouldExist := orphanDependents == nil || *orphanDependents == true
+	for clusterName, clusterClientset := range clusters {
+		_, err := clusterClientset.Extensions().Ingresses(nsName).Get(ingressName, metav1.GetOptions{})
+		if shouldExist && errors.IsNotFound(err) {
+			errMessages = append(errMessages, fmt.Sprintf("unexpected NotFound error for ingress %s in cluster %s, expected ingress to exist", ingressName, clusterName))
+		} else if !shouldExist && !errors.IsNotFound(err) {
+			errMessages = append(errMessages, fmt.Sprintf("expected NotFound error for ingress %s in cluster %s, got error: %v", ingressName, clusterName, err))
+		}
+	}
+	if len(errMessages) != 0 {
+		framework.Failf("%s", strings.Join(errMessages, "; "))
+	}
 }
 
 /*
@@ -197,7 +248,7 @@ func waitForIngressOrFail(clientset *kubeclientset.Clientset, namespace string, 
 	By(fmt.Sprintf("Fetching a federated ingress shard of ingress %q in namespace %q from cluster", ingress.Name, namespace))
 	var clusterIngress *v1beta1.Ingress
 	err := wait.PollImmediate(framework.Poll, timeout, func() (bool, error) {
-		clusterIngress, err := clientset.Ingresses(namespace).Get(ingress.Name)
+		clusterIngress, err := clientset.Ingresses(namespace).Get(ingress.Name, metav1.GetOptions{})
 		if (!present) && errors.IsNotFound(err) { // We want it gone, and it's gone.
 			By(fmt.Sprintf("Success: shard of federated ingress %q in namespace %q in cluster is absent", ingress.Name, namespace))
 			return true, nil // Success
@@ -243,7 +294,7 @@ func waitForIngressShardsUpdatedOrFail(namespace string, ingress *v1beta1.Ingres
 func waitForIngressUpdateOrFail(clientset *kubeclientset.Clientset, namespace string, ingress *v1beta1.Ingress, timeout time.Duration) {
 	By(fmt.Sprintf("Fetching a federated ingress shard of ingress %q in namespace %q from cluster", ingress.Name, namespace))
 	err := wait.PollImmediate(framework.Poll, timeout, func() (bool, error) {
-		clusterIngress, err := clientset.Ingresses(namespace).Get(ingress.Name)
+		clusterIngress, err := clientset.Ingresses(namespace).Get(ingress.Name, metav1.GetOptions{})
 		if err == nil { // We want it present, and the Get succeeded, so we're all good.
 			if equivalentIngress(*clusterIngress, *ingress) {
 				By(fmt.Sprintf("Success: shard of federated ingress %q in namespace %q in cluster is updated", ingress.Name, namespace))
@@ -268,12 +319,23 @@ func waitForIngressShardsGoneOrFail(namespace string, ingress *v1beta1.Ingress, 
 	}
 }
 
-func deleteIngressOrFail(clientset *fedclientset.Clientset, namespace string, ingressName string) {
+func deleteIngressOrFail(clientset *fedclientset.Clientset, namespace string, ingressName string, orphanDependents *bool) {
 	if clientset == nil || len(namespace) == 0 || len(ingressName) == 0 {
 		Fail(fmt.Sprintf("Internal error: invalid parameters passed to deleteIngressOrFail: clientset: %v, namespace: %v, ingress: %v", clientset, namespace, ingressName))
 	}
-	err := clientset.Ingresses(namespace).Delete(ingressName, v1.NewDeleteOptions(0))
+	err := clientset.Ingresses(namespace).Delete(ingressName, &v1.DeleteOptions{OrphanDependents: orphanDependents})
 	framework.ExpectNoError(err, "Error deleting ingress %q from namespace %q", ingressName, namespace)
+	// Wait for the ingress to be deleted.
+	err = wait.Poll(framework.Poll, wait.ForeverTestTimeout, func() (bool, error) {
+		_, err := clientset.Extensions().Ingresses(namespace).Get(ingressName, metav1.GetOptions{})
+		if err != nil && errors.IsNotFound(err) {
+			return true, nil
+		}
+		return false, err
+	})
+	if err != nil {
+		framework.Failf("Error in deleting ingress %s: %v", ingressName, err)
+	}
 }
 
 // TODO: quinton: This is largely a cut 'n paste of the above.  Yuck! Refactor as soon as we have a common interface implmented by both fedclientset.Clientset and kubeclientset.Clientset
@@ -360,7 +422,7 @@ func (j *federationTestJig) waitForFederatedIngress() {
 		for _, p := range rules.IngressRuleValue.HTTP.Paths {
 			route := fmt.Sprintf("%v://%v%v", proto, address, p.Path)
 			framework.Logf("Testing route %v host %v with simple GET", route, rules.Host)
-			ExpectNoError(pollURL(route, rules.Host, lbPollTimeout, timeoutClient, false))
+			framework.ExpectNoError(pollURL(route, rules.Host, lbPollTimeout, lbPollInterval, timeoutClient, false))
 		}
 	}
 }
@@ -395,7 +457,7 @@ func waitForFederatedIngressAddress(c *fedclientset.Clientset, ns, ingName strin
 // waitForFederatedIngressExists waits for the Ingress object exists.
 func waitForFederatedIngressExists(c *fedclientset.Clientset, ns, ingName string, timeout time.Duration) error {
 	err := wait.PollImmediate(10*time.Second, timeout, func() (bool, error) {
-		_, err := c.Extensions().Ingresses(ns).Get(ingName)
+		_, err := c.Extensions().Ingresses(ns).Get(ingName, metav1.GetOptions{})
 		if err != nil {
 			framework.Logf("Waiting for Ingress %v, error %v", ingName, err)
 			return false, nil
@@ -407,7 +469,7 @@ func waitForFederatedIngressExists(c *fedclientset.Clientset, ns, ingName string
 
 // getFederatedIngressAddress returns the ips/hostnames associated with the Ingress.
 func getFederatedIngressAddress(client *fedclientset.Clientset, ns, name string) ([]string, error) {
-	ing, err := client.Extensions().Ingresses(ns).Get(name)
+	ing, err := client.Extensions().Ingresses(ns).Get(name, metav1.GetOptions{})
 	if err != nil {
 		return nil, err
 	}

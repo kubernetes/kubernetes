@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2015 The Kubernetes Authors.
+# Copyright 2016 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,15 +14,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# A library of helper functions and constant for coreos os distro
+# A library of helper functions and constant for the CoreOS distro
+source "${KUBE_ROOT}/cluster/gce/coreos/helper.sh"
 
-# $1: template name (required)
-function create-node-instance-template() {
+# $1: template name (required).
+function create-node-instance-template {
   local template_name="$1"
-  create-node-template "$template_name" "${scope_flags}" \
+
+  create-node-template "$template_name" "${scope_flags[*]}" \
     "kube-env=${KUBE_TEMP}/node-kube-env.yaml" \
-    "user-data=${KUBE_ROOT}/cluster/gce/coreos/node-${CONTAINER_RUNTIME}.yaml" \
-    "configure-node=${KUBE_ROOT}/cluster/gce/coreos/configure-node.sh" \
-    "configure-kubelet=${KUBE_ROOT}/cluster/gce/coreos/configure-kubelet.sh" \
+    "user-data=${KUBE_ROOT}/cluster/gce/coreos/node.yaml" \
+    "configure-sh=${KUBE_ROOT}/cluster/gce/coreos/configure.sh" \
     "cluster-name=${KUBE_TEMP}/cluster-name.txt"
+  # TODO(euank): We should include update-strategy here. We should also switch to ignition
 }

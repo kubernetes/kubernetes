@@ -277,6 +277,9 @@ func ParsePublicKeyFromFile(keyFile string) (*rsa.PublicKey, error) {
 		return nil, fmt.Errorf("error reading SSH key %s: '%v'", keyFile, err)
 	}
 	keyBlock, _ := pem.Decode(buffer)
+	if keyBlock == nil {
+		return nil, fmt.Errorf("error parsing SSH key %s: 'invalid PEM format'", keyFile)
+	}
 	key, err := x509.ParsePKIXPublicKey(keyBlock.Bytes)
 	if err != nil {
 		return nil, fmt.Errorf("error parsing SSH key %s: '%v'", keyFile, err)
@@ -361,6 +364,9 @@ func (l *SSHTunnelList) healthCheck(e sshTunnelEntry) error {
 		Dial: e.Tunnel.Dial,
 		// TODO(cjcullen): Plumb real TLS options through.
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		// We don't reuse the clients, so disable the keep-alive to properly
+		// close the connection.
+		DisableKeepAlives: true,
 	})
 	client := &http.Client{Transport: transport}
 	resp, err := client.Get(l.healthCheckURL.String())
@@ -374,15 +380,18 @@ func (l *SSHTunnelList) healthCheck(e sshTunnelEntry) error {
 func (l *SSHTunnelList) removeAndReAdd(e sshTunnelEntry) {
 	// Find the entry to replace.
 	l.tunnelsLock.Lock()
-	defer l.tunnelsLock.Unlock()
 	for i, entry := range l.entries {
 		if entry.Tunnel == e.Tunnel {
 			l.entries = append(l.entries[:i], l.entries[i+1:]...)
 			l.adding[e.Address] = true
-			go l.createAndAddTunnel(e.Address)
-			return
+			break
 		}
 	}
+	l.tunnelsLock.Unlock()
+	if err := e.Tunnel.Close(); err != nil {
+		glog.Infof("Failed to close removed tunnel: %v", err)
+	}
+	go l.createAndAddTunnel(e.Address)
 }
 
 func (l *SSHTunnelList) Dial(net, addr string) (net.Conn, error) {

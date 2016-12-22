@@ -18,7 +18,8 @@ package dockershim
 
 import (
 	"fmt"
-	"io"
+	"os"
+	"path/filepath"
 	"time"
 
 	dockertypes "github.com/docker/engine-api/types"
@@ -27,12 +28,12 @@ import (
 	dockerstrslice "github.com/docker/engine-api/types/strslice"
 	"github.com/golang/glog"
 
-	runtimeApi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
 )
 
 // ListContainers lists all containers matching the filter.
-func (ds *dockerService) ListContainers(filter *runtimeApi.ContainerFilter) ([]*runtimeApi.Container, error) {
+func (ds *dockerService) ListContainers(filter *runtimeapi.ContainerFilter) ([]*runtimeapi.Container, error) {
 	opts := dockertypes.ContainerListOptions{All: true}
 
 	opts.Filter = dockerfilters.NewArgs()
@@ -62,13 +63,13 @@ func (ds *dockerService) ListContainers(filter *runtimeApi.ContainerFilter) ([]*
 		return nil, err
 	}
 	// Convert docker to runtime api containers.
-	result := []*runtimeApi.Container{}
+	result := []*runtimeapi.Container{}
 	for i := range containers {
 		c := containers[i]
 
 		converted, err := toRuntimeAPIContainer(&c)
 		if err != nil {
-			glog.V(5).Infof("Unable to convert docker to runtime API container: %v", err)
+			glog.V(4).Infof("Unable to convert docker to runtime API container: %v", err)
 			continue
 		}
 
@@ -78,9 +79,10 @@ func (ds *dockerService) ListContainers(filter *runtimeApi.ContainerFilter) ([]*
 }
 
 // CreateContainer creates a new container in the given PodSandbox
-// Note: docker doesn't use LogPath yet.
+// Docker cannot store the log to an arbitrary location (yet), so we create an
+// symlink at LogPath, linking to the actual path of the log.
 // TODO: check if the default values returned by the runtime API are ok.
-func (ds *dockerService) CreateContainer(podSandboxID string, config *runtimeApi.ContainerConfig, sandboxConfig *runtimeApi.PodSandboxConfig) (string, error) {
+func (ds *dockerService) CreateContainer(podSandboxID string, config *runtimeapi.ContainerConfig, sandboxConfig *runtimeapi.PodSandboxConfig) (string, error) {
 	if config == nil {
 		return "", fmt.Errorf("container config is nil")
 	}
@@ -91,6 +93,8 @@ func (ds *dockerService) CreateContainer(podSandboxID string, config *runtimeApi
 	labels := makeLabels(config.GetLabels(), config.GetAnnotations())
 	// Apply a the container type label.
 	labels[containerTypeLabelKey] = containerTypeLabelContainer
+	// Write the container log path in the labels.
+	labels[containerLogPathLabelKey] = filepath.Join(sandboxConfig.GetLogDirectory(), config.GetLogPath())
 	// Write the sandbox ID in the labels.
 	labels[sandboxIDLabelKey] = podSandboxID
 
@@ -117,33 +121,7 @@ func (ds *dockerService) CreateContainer(podSandboxID string, config *runtimeApi
 
 	// Fill the HostConfig.
 	hc := &dockercontainer.HostConfig{
-		Binds:          generateMountBindings(config.GetMounts()),
-		ReadonlyRootfs: config.GetReadonlyRootfs(),
-		Privileged:     config.GetPrivileged(),
-	}
-
-	// Apply options derived from the sandbox config.
-	if lc := sandboxConfig.GetLinux(); lc != nil {
-		// Apply Cgroup options.
-		// TODO: Check if this works with per-pod cgroups.
-		hc.CgroupParent = lc.GetCgroupParent()
-
-		// Apply namespace options.
-		sandboxNSMode := fmt.Sprintf("container:%v", podSandboxID)
-		hc.NetworkMode = dockercontainer.NetworkMode(sandboxNSMode)
-		hc.IpcMode = dockercontainer.IpcMode(sandboxNSMode)
-		hc.UTSMode = ""
-		hc.PidMode = ""
-
-		nsOpts := lc.GetNamespaceOptions()
-		if nsOpts != nil {
-			if nsOpts.GetHostNetwork() {
-				hc.UTSMode = namespaceModeHost
-			}
-			if nsOpts.GetHostPid() {
-				hc.PidMode = namespaceModeHost
-			}
-		}
+		Binds: generateMountBindings(config.GetMounts()),
 	}
 
 	// Apply Linux-specific options if applicable.
@@ -155,35 +133,114 @@ func (ds *dockerService) CreateContainer(podSandboxID string, config *runtimeApi
 		if rOpts != nil {
 			hc.Resources = dockercontainer.Resources{
 				Memory:     rOpts.GetMemoryLimitInBytes(),
-				MemorySwap: -1, // Always disable memory swap.
+				MemorySwap: -1,
 				CPUShares:  rOpts.GetCpuShares(),
 				CPUQuota:   rOpts.GetCpuQuota(),
 				CPUPeriod:  rOpts.GetCpuPeriod(),
-				// TODO: Need to set devices.
 			}
 			hc.OomScoreAdj = int(rOpts.GetOomScoreAdj())
 		}
 		// Note: ShmSize is handled in kube_docker_client.go
+
+		// Apply security context.
+		applyContainerSecurityContext(lc, podSandboxID, createConfig.Config, hc)
 	}
 
-	var err error
-	hc.SecurityOpt, err = getContainerSecurityOpts(config.Metadata.GetName(), sandboxConfig, ds.seccompProfileRoot)
+	// Apply cgroupsParent derived from the sandbox config.
+	if lc := sandboxConfig.GetLinux(); lc != nil {
+		// Apply Cgroup options.
+		cgroupParent, err := ds.GenerateExpectedCgroupParent(lc.GetCgroupParent())
+		if err != nil {
+			return "", fmt.Errorf("failed to generate cgroup parent in expected syntax for container %q: %v", config.Metadata.GetName(), err)
+		}
+		hc.CgroupParent = cgroupParent
+	}
+
+	// Set devices for container.
+	devices := make([]dockercontainer.DeviceMapping, len(config.Devices))
+	for i, device := range config.Devices {
+		devices[i] = dockercontainer.DeviceMapping{
+			PathOnHost:        device.GetHostPath(),
+			PathInContainer:   device.GetContainerPath(),
+			CgroupPermissions: device.GetPermissions(),
+		}
+	}
+	hc.Resources.Devices = devices
+
+	// Apply appArmor and seccomp options.
+	securityOpts, err := getContainerSecurityOpts(config.Metadata.GetName(), sandboxConfig, ds.seccompProfileRoot)
 	if err != nil {
 		return "", fmt.Errorf("failed to generate container security options for container %q: %v", config.Metadata.GetName(), err)
 	}
-	// TODO: Add or drop capabilities.
+	hc.SecurityOpt = append(hc.SecurityOpt, securityOpts...)
 
 	createConfig.HostConfig = hc
 	createResp, err := ds.client.CreateContainer(createConfig)
+	recoverFromConflictIfNeeded(ds.client, err)
+
 	if createResp != nil {
 		return createResp.ID, err
 	}
 	return "", err
 }
 
+// getContainerLogPath returns the container log path specified by kubelet and the real
+// path where docker stores the container log.
+func (ds *dockerService) getContainerLogPath(containerID string) (string, string, error) {
+	info, err := ds.client.InspectContainer(containerID)
+	if err != nil {
+		return "", "", fmt.Errorf("failed to inspect container %q: %v", containerID, err)
+	}
+	return info.Config.Labels[containerLogPathLabelKey], info.LogPath, nil
+}
+
+// createContainerLogSymlink creates the symlink for docker container log.
+func (ds *dockerService) createContainerLogSymlink(containerID string) error {
+	path, realPath, err := ds.getContainerLogPath(containerID)
+	if err != nil {
+		return fmt.Errorf("failed to get container %q log path: %v", containerID, err)
+	}
+	if path != "" {
+		// Only create the symlink when container log path is specified.
+		if err = ds.os.Symlink(realPath, path); err != nil {
+			return fmt.Errorf("failed to create symbolic link %q to the container log file %q for container %q: %v",
+				path, realPath, containerID, err)
+		}
+	}
+	return nil
+}
+
+// removeContainerLogSymlink removes the symlink for docker container log.
+func (ds *dockerService) removeContainerLogSymlink(containerID string) error {
+	path, _, err := ds.getContainerLogPath(containerID)
+	if err != nil {
+		return fmt.Errorf("failed to get container %q log path: %v", containerID, err)
+	}
+	if path != "" {
+		// Only remove the symlink when container log path is specified.
+		err := ds.os.Remove(path)
+		if err != nil && !os.IsNotExist(err) {
+			return fmt.Errorf("failed to remove container %q log symlink %q: %v", containerID, path, err)
+		}
+	}
+	return nil
+}
+
 // StartContainer starts the container.
 func (ds *dockerService) StartContainer(containerID string) error {
-	return ds.client.StartContainer(containerID)
+	err := ds.client.StartContainer(containerID)
+	if err != nil {
+		return fmt.Errorf("failed to start container %q: %v", containerID, err)
+	}
+	// Create container log symlink.
+	if err := ds.createContainerLogSymlink(containerID); err != nil {
+		// Do not stop the container if we failed to create symlink because:
+		//   1. This is not a critical failure.
+		//   2. We don't have enough information to properly stop container here.
+		// Kubelet will surface this error to user via an event.
+		return err
+	}
+	return nil
 }
 
 // StopContainer stops a running container with a grace period (i.e., timeout).
@@ -194,7 +251,18 @@ func (ds *dockerService) StopContainer(containerID string, timeout int64) error 
 // RemoveContainer removes the container.
 // TODO: If a container is still running, should we forcibly remove it?
 func (ds *dockerService) RemoveContainer(containerID string) error {
-	return ds.client.RemoveContainer(containerID, dockertypes.ContainerRemoveOptions{RemoveVolumes: true})
+	// Ideally, log lifecycle should be independent of container lifecycle.
+	// However, docker will remove container log after container is removed,
+	// we can't prevent that now, so we also clean up the symlink here.
+	err := ds.removeContainerLogSymlink(containerID)
+	if err != nil {
+		return err
+	}
+	err = ds.client.RemoveContainer(containerID, dockertypes.ContainerRemoveOptions{RemoveVolumes: true})
+	if err != nil {
+		return fmt.Errorf("failed to remove container %q: %v", containerID, err)
+	}
+	return nil
 }
 
 func getContainerTimestamps(r *dockertypes.ContainerJSON) (time.Time, time.Time, time.Time, error) {
@@ -216,8 +284,8 @@ func getContainerTimestamps(r *dockertypes.ContainerJSON) (time.Time, time.Time,
 	return createdAt, startedAt, finishedAt, nil
 }
 
-// ContainerStatus returns the container status.
-func (ds *dockerService) ContainerStatus(containerID string) (*runtimeApi.ContainerStatus, error) {
+// ContainerStatus inspects the docker container and returns the status.
+func (ds *dockerService) ContainerStatus(containerID string) (*runtimeapi.ContainerStatus, error) {
 	r, err := ds.client.InspectContainer(containerID)
 	if err != nil {
 		return nil, err
@@ -229,7 +297,7 @@ func (ds *dockerService) ContainerStatus(containerID string) (*runtimeApi.Contai
 		return nil, fmt.Errorf("failed to parse timestamp for container %q: %v", containerID, err)
 	}
 
-	// Convert the image id to pullable id.
+	// Convert the image id to a pullable id.
 	ir, err := ds.client.InspectImageByID(r.Image)
 	if err != nil {
 		return nil, fmt.Errorf("unable to inspect docker image %q while inspecting docker container %q: %v", r.Image, containerID, err)
@@ -237,11 +305,11 @@ func (ds *dockerService) ContainerStatus(containerID string) (*runtimeApi.Contai
 	imageID := toPullableImageID(r.Image, ir)
 
 	// Convert the mounts.
-	mounts := []*runtimeApi.Mount{}
+	mounts := []*runtimeapi.Mount{}
 	for i := range r.Mounts {
 		m := r.Mounts[i]
 		readonly := !m.RW
-		mounts = append(mounts, &runtimeApi.Mount{
+		mounts = append(mounts, &runtimeapi.Mount{
 			HostPath:      &m.Source,
 			ContainerPath: &m.Destination,
 			Readonly:      &readonly,
@@ -249,11 +317,11 @@ func (ds *dockerService) ContainerStatus(containerID string) (*runtimeApi.Contai
 		})
 	}
 	// Interpret container states.
-	var state runtimeApi.ContainerState
+	var state runtimeapi.ContainerState
 	var reason, message string
 	if r.State.Running {
 		// Container is running.
-		state = runtimeApi.ContainerState_RUNNING
+		state = runtimeapi.ContainerState_CONTAINER_RUNNING
 	} else {
 		// Container is *not* running. We need to get more details.
 		//    * Case 1: container has run and exited with non-zero finishedAt
@@ -262,7 +330,7 @@ func (ds *dockerService) ContainerStatus(containerID string) (*runtimeApi.Contai
 		//              time, but a non-zero exit code.
 		//    * Case 3: container has been created, but not started (yet).
 		if !finishedAt.IsZero() { // Case 1
-			state = runtimeApi.ContainerState_EXITED
+			state = runtimeapi.ContainerState_CONTAINER_EXITED
 			switch {
 			case r.State.OOMKilled:
 				// TODO: consider exposing OOMKilled via the runtimeAPI.
@@ -275,13 +343,13 @@ func (ds *dockerService) ContainerStatus(containerID string) (*runtimeApi.Contai
 				reason = "Error"
 			}
 		} else if r.State.ExitCode != 0 { // Case 2
-			state = runtimeApi.ContainerState_EXITED
+			state = runtimeapi.ContainerState_CONTAINER_EXITED
 			// Adjust finshedAt and startedAt time to createdAt time to avoid
 			// the confusion.
 			finishedAt, startedAt = createdAt, createdAt
 			reason = "ContainerCannotRun"
 		} else { // Case 3
-			state = runtimeApi.ContainerState_CREATED
+			state = runtimeapi.ContainerState_CONTAINER_CREATED
 		}
 		message = r.State.Error
 	}
@@ -296,10 +364,10 @@ func (ds *dockerService) ContainerStatus(containerID string) (*runtimeApi.Contai
 	}
 
 	labels, annotations := extractLabels(r.Config.Labels)
-	return &runtimeApi.ContainerStatus{
+	return &runtimeapi.ContainerStatus{
 		Id:          &r.ID,
 		Metadata:    metadata,
-		Image:       &runtimeApi.ImageSpec{Image: &r.Config.Image},
+		Image:       &runtimeapi.ImageSpec{Image: &r.Config.Image},
 		ImageRef:    &imageID,
 		Mounts:      mounts,
 		ExitCode:    &exitCode,
@@ -312,11 +380,4 @@ func (ds *dockerService) ContainerStatus(containerID string) (*runtimeApi.Contai
 		Labels:      labels,
 		Annotations: annotations,
 	}, nil
-}
-
-// Exec execute a command in the container.
-// TODO: Need to handle terminal resizing before implementing this function.
-// https://github.com/kubernetes/kubernetes/issues/29579.
-func (ds *dockerService) Exec(containerID string, cmd []string, tty bool, stdin io.Reader, stdout, stderr io.WriteCloser) error {
-	return fmt.Errorf("not implemented")
 }

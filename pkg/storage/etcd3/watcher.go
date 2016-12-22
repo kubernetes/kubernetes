@@ -22,7 +22,7 @@ import (
 	"strings"
 	"sync"
 
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage"
 	"k8s.io/kubernetes/pkg/watch"
@@ -146,6 +146,7 @@ func (wc *watchChan) ResultChan() <-chan watch.Event {
 
 // sync tries to retrieve existing data and send them to process.
 // The revision to watch will be set to the revision in response.
+// All events sent will have isCreated=true
 func (wc *watchChan) sync() error {
 	opts := []clientv3.OpOption{}
 	if wc.recursive {
@@ -156,17 +157,8 @@ func (wc *watchChan) sync() error {
 		return err
 	}
 	wc.initialRev = getResp.Header.Revision
-
 	for _, kv := range getResp.Kvs {
-		prevResp, err := wc.watcher.client.Get(wc.ctx, string(kv.Key), clientv3.WithRev(kv.ModRevision-1), clientv3.WithSerializable())
-		if err != nil {
-			return err
-		}
-		var prevVal []byte
-		if len(prevResp.Kvs) > 0 {
-			prevVal = prevResp.Kvs[0].Value
-		}
-		wc.sendEvent(parseKV(kv, prevVal))
+		wc.sendEvent(parseKV(kv))
 	}
 	return nil
 }
@@ -304,21 +296,21 @@ func (wc *watchChan) transform(e *event) (res *watch.Event) {
 }
 
 func parseError(err error) *watch.Event {
-	var status *unversioned.Status
+	var status *metav1.Status
 	switch {
 	case err == etcdrpc.ErrCompacted:
-		status = &unversioned.Status{
-			Status:  unversioned.StatusFailure,
+		status = &metav1.Status{
+			Status:  metav1.StatusFailure,
 			Message: err.Error(),
 			Code:    http.StatusGone,
-			Reason:  unversioned.StatusReasonExpired,
+			Reason:  metav1.StatusReasonExpired,
 		}
 	default:
-		status = &unversioned.Status{
-			Status:  unversioned.StatusFailure,
+		status = &metav1.Status{
+			Status:  metav1.StatusFailure,
 			Message: err.Error(),
 			Code:    http.StatusInternalServerError,
-			Reason:  unversioned.StatusReasonInternalError,
+			Reason:  metav1.StatusReasonInternalError,
 		}
 	}
 

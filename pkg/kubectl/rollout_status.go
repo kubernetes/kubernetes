@@ -19,11 +19,12 @@ package kubectl
 import (
 	"fmt"
 
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	extensionsclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/extensions/unversioned"
+	extensionsclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/extensions/internalversion"
 	"k8s.io/kubernetes/pkg/controller/deployment/util"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 )
 
 // StatusViewer provides an interface for resources that have rollout status.
@@ -31,7 +32,7 @@ type StatusViewer interface {
 	Status(namespace, name string, revision int64) (string, bool, error)
 }
 
-func StatusViewerFor(kind unversioned.GroupKind, c internalclientset.Interface) (StatusViewer, error) {
+func StatusViewerFor(kind schema.GroupKind, c internalclientset.Interface) (StatusViewer, error) {
 	switch kind {
 	case extensions.Kind("Deployment"):
 		return &DeploymentStatusViewer{c.Extensions()}, nil
@@ -45,7 +46,7 @@ type DeploymentStatusViewer struct {
 
 // Status returns a message describing deployment status, and a bool value indicating if the status is considered done
 func (s *DeploymentStatusViewer) Status(namespace, name string, revision int64) (string, bool, error) {
-	deployment, err := s.c.Deployments(namespace).Get(name)
+	deployment, err := s.c.Deployments(namespace).Get(name, metav1.GetOptions{})
 	if err != nil {
 		return "", false, err
 	}
@@ -59,6 +60,10 @@ func (s *DeploymentStatusViewer) Status(namespace, name string, revision int64) 
 		}
 	}
 	if deployment.Generation <= deployment.Status.ObservedGeneration {
+		cond := util.GetDeploymentConditionInternal(deployment.Status, extensions.DeploymentProgressing)
+		if cond != nil && cond.Reason == util.TimedOutReason {
+			return "", false, fmt.Errorf("deployment %q exceeded its progress deadline", name)
+		}
 		if deployment.Status.UpdatedReplicas < deployment.Spec.Replicas {
 			return fmt.Sprintf("Waiting for rollout to finish: %d out of %d new replicas have been updated...\n", deployment.Status.UpdatedReplicas, deployment.Spec.Replicas), false, nil
 		}

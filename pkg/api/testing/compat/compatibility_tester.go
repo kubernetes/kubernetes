@@ -27,9 +27,9 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/util/validation/field"
 )
 
@@ -40,7 +40,7 @@ import (
 // keys in the resulting JSON.
 func TestCompatibility(
 	t *testing.T,
-	version unversioned.GroupVersion,
+	version schema.GroupVersion,
 	input []byte,
 	validator func(obj runtime.Object) field.ErrorList,
 	expectedKeys map[string]string,

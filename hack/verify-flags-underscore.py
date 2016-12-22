@@ -67,6 +67,8 @@ def get_all_files(rootdir):
             dirs.remove('.git')
         if '.make' in dirs:
             dirs.remove('.make')
+        if 'BUILD' in files:
+           files.remove('BUILD')
         if 'exceptions.txt' in files:
             files.remove('exceptions.txt')
         if 'known-flags.txt' in files:

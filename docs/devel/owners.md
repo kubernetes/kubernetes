@@ -1,40 +1,6 @@
-<!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
-
-<!-- BEGIN STRIP_FOR_RELEASE -->
-
-<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
-     width="25" height="25">
-
-<h2>PLEASE NOTE: This document applies to the HEAD of the source tree</h2>
-
-If you are using a released version of Kubernetes, you should
-refer to the docs that go with that version.
-
-<!-- TAG RELEASE_LINK, added by the munger automatically -->
-<strong>
-The latest release of this document can be found
-[here](http://releases.k8s.io/release-1.4/docs/devel/owners.md).
-
-Documentation for other releases can be found at
-[releases.k8s.io](http://releases.k8s.io).
-</strong>
---
-
-<!-- END STRIP_FOR_RELEASE -->
-
-<!-- END MUNGE: UNVERSIONED_WARNING -->
-
 # Owners files
 
-_Note_: This is a design for a feature that is not yet implemented.
+_Note_: This is a design for a feature that is not yet implemented. See the [contrib PR](https://github.com/kubernetes/contrib/issues/1389) for the current progress.
 
 ## Overview
 
@@ -42,6 +8,8 @@ We want to establish owners for different parts of the code in the Kubernetes co
 will serve as the approvers for code to be submitted to these parts of the repository.  Notably, owners
 are not necessarily expected to do the first code review for all commits to these areas, but they are
 required to approve changes before they can be merged.
+
+**Note** The Kubernetes project has a hiatus on adding new approvers to OWNERS files. At this time we are [adding more reviewers](https://github.com/kubernetes/kubernetes/pulls?utf8=%E2%9C%93&q=is%3Apr%20%22Curating%20owners%3A%22%20) to take the load off of the current set of approvers and once we have had a chance to flush this out for a release we will begin adding new approvers again. Adding new approvers is planned for after the Kubernetes 1.6.0 release.
 
 ## High Level flow
 

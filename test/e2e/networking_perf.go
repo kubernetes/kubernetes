@@ -24,7 +24,7 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
 
@@ -59,9 +59,9 @@ var _ = framework.KubeDescribe("Networking IPerf [Experimental] [Slow] [Feature:
 			8001,
 			8002,
 			appName,
-			func(n api.Node) api.PodSpec {
-				return api.PodSpec{
-					Containers: []api.Container{{
+			func(n v1.Node) v1.PodSpec {
+				return v1.PodSpec{
+					Containers: []v1.Container{{
 						Name:  "iperf-server",
 						Image: "gcr.io/google_containers/iperf:e2e",
 						Args: []string{
@@ -69,10 +69,10 @@ var _ = framework.KubeDescribe("Networking IPerf [Experimental] [Slow] [Feature:
 							"-c",
 							"/usr/local/bin/iperf -s -p 8001 ",
 						},
-						Ports: []api.ContainerPort{{ContainerPort: 8001}},
+						Ports: []v1.ContainerPort{{ContainerPort: 8001}},
 					}},
 					NodeName:      n.Name,
-					RestartPolicy: api.RestartPolicyOnFailure,
+					RestartPolicy: v1.RestartPolicyOnFailure,
 				}
 			},
 			// this will be used to generate the -service name which all iperf clients point at.
@@ -86,9 +86,9 @@ var _ = framework.KubeDescribe("Networking IPerf [Experimental] [Slow] [Feature:
 
 		iperfClientPodLabels := f.CreatePodsPerNodeForSimpleApp(
 			"iperf-e2e-cli",
-			func(n api.Node) api.PodSpec {
-				return api.PodSpec{
-					Containers: []api.Container{
+			func(n v1.Node) v1.PodSpec {
+				return v1.PodSpec{
+					Containers: []v1.Container{
 						{
 							Name:  "iperf-client",
 							Image: "gcr.io/google_containers/iperf:e2e",
@@ -99,7 +99,7 @@ var _ = framework.KubeDescribe("Networking IPerf [Experimental] [Slow] [Feature:
 							},
 						},
 					},
-					RestartPolicy: api.RestartPolicyOnFailure, // let them successfully die.
+					RestartPolicy: v1.RestartPolicyOnFailure, // let them successfully die.
 				}
 			},
 			numClient,
@@ -119,9 +119,10 @@ var _ = framework.KubeDescribe("Networking IPerf [Experimental] [Slow] [Feature:
 		iperfResults := &IPerfResults{}
 
 		iperfClusterVerification := f.NewClusterVerification(
+			f.Namespace,
 			framework.PodStateVerification{
 				Selectors:   iperfClientPodLabels,
-				ValidPhases: []api.PodPhase{api.PodSucceeded},
+				ValidPhases: []v1.PodPhase{v1.PodSucceeded},
 			},
 		)
 
@@ -133,7 +134,7 @@ var _ = framework.KubeDescribe("Networking IPerf [Experimental] [Slow] [Feature:
 		} else {
 			// For each builds up a collection of IPerfRecords
 			iperfClusterVerification.ForEach(
-				func(p api.Pod) {
+				func(p v1.Pod) {
 					resultS, err := framework.LookForStringInLog(f.Namespace.Name, p.Name, "iperf-client", "0-", 1*time.Second)
 					if err == nil {
 						framework.Logf(resultS)

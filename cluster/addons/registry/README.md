@@ -91,7 +91,7 @@ spec:
 This tells Kubernetes that you want to use storage, and the `PersistentVolume`
 you created before will be bound to this claim (unless you have other
 `PersistentVolumes` in which case those might get bound instead).  This claim
-gives you the rigth to use this storage until you release the claim.
+gives you the right to use this storage until you release the claim.
 
 ## Run the registry
 
@@ -175,35 +175,44 @@ spec:
 
 Now that we have a running `Service`, we need to expose it onto each Kubernetes
 `Node` so that Docker will see it as `localhost`.  We can load a `Pod` on every
-node by dropping a YAML file into the kubelet config directory
-(/etc/kubernetes/manifests by default).
+node by creating following daemonset.
 
 <!-- BEGIN MUNGE: EXAMPLE ../../saltbase/salt/kube-registry-proxy/kube-registry-proxy.yaml -->
 ```yaml
-apiVersion: v1
-kind: Pod
+apiVersion: extensions/v1beta1
+kind: DaemonSet
 metadata:
   name: kube-registry-proxy
   namespace: kube-system
+  labels:
+    k8s-app: kube-registry
+    kubernetes.io/cluster-service: "true"
+    version: v0.4
 spec:
-  containers:
-  - name: kube-registry-proxy
-    image: gcr.io/google_containers/kube-registry-proxy:0.3
-    resources:
-      limits:
-        cpu: 100m
-        memory: 50Mi
-    env:
-    - name: REGISTRY_HOST
-      value: kube-registry.kube-system.svc.cluster.local
-    - name: REGISTRY_PORT
-      value: "5000"
-    - name: FORWARD_PORT
-      value: "5000"
-    ports:
-    - name: registry
-      containerPort: 5000
-      hostPort: 5000
+  template:
+    metadata:
+      labels:
+        k8s-app: kube-registry
+        kubernetes.io/name: "kube-registry-proxy"
+        kubernetes.io/cluster-service: "true"
+        version: v0.4
+    spec:
+      containers:
+      - name: kube-registry-proxy
+        image: gcr.io/google_containers/kube-registry-proxy:0.4
+        resources:
+          limits:
+            cpu: 100m
+            memory: 50Mi
+        env:
+        - name: REGISTRY_HOST
+          value: kube-registry.kube-system.svc.cluster.local
+        - name: REGISTRY_PORT
+          value: "5000"
+        ports:
+        - name: registry
+          containerPort: 80
+          hostPort: 5000
 ```
 <!-- END MUNGE: EXAMPLE ../../saltbase/salt/kube-registry-proxy/kube-registry-proxy.yaml -->
 

@@ -408,6 +408,13 @@ func (s *store) restore() error {
 		s.currentRev = rev
 	}
 
+	// keys in the range [compacted revision -N, compaction] might all be deleted due to compaction.
+	// the correct revision should be set to compaction revision in the case, not the largest revision
+	// we have seen.
+	if s.currentRev.main < s.compactMainRev {
+		s.currentRev.main = s.compactMainRev
+	}
+
 	for key, lid := range keyToLease {
 		if s.le == nil {
 			panic("no lessor to attach lease")

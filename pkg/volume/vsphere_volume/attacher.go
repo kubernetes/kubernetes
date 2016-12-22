@@ -84,6 +84,39 @@ func (attacher *vsphereVMDKAttacher) Attach(spec *volume.Spec, nodeName types.No
 	return path.Join(diskByIDPath, diskSCSIPrefix+diskUUID), nil
 }
 
+func (attacher *vsphereVMDKAttacher) VolumesAreAttached(specs []*volume.Spec, nodeName types.NodeName) (map[*volume.Spec]bool, error) {
+	volumesAttachedCheck := make(map[*volume.Spec]bool)
+	volumeSpecMap := make(map[string]*volume.Spec)
+	volumePathList := []string{}
+	for _, spec := range specs {
+		volumeSource, _, err := getVolumeSource(spec)
+		if err != nil {
+			glog.Errorf("Error getting volume (%q) source : %v", spec.Name(), err)
+			continue
+		}
+
+		volumePathList = append(volumePathList, volumeSource.VolumePath)
+		volumesAttachedCheck[spec] = true
+		volumeSpecMap[volumeSource.VolumePath] = spec
+	}
+	attachedResult, err := attacher.vsphereVolumes.DisksAreAttached(volumePathList, nodeName)
+	if err != nil {
+		glog.Errorf(
+			"Error checking if volumes (%v) are attached to current node (%q). err=%v",
+			volumePathList, nodeName, err)
+		return volumesAttachedCheck, err
+	}
+
+	for volumePath, attached := range attachedResult {
+		if !attached {
+			spec := volumeSpecMap[volumePath]
+			volumesAttachedCheck[spec] = false
+			glog.V(2).Infof("VolumesAreAttached: check volume %q (specName: %q) is no longer attached", volumePath, spec.Name())
+		}
+	}
+	return volumesAttachedCheck, nil
+}
+
 func (attacher *vsphereVMDKAttacher) WaitForAttach(spec *volume.Spec, devicePath string, timeout time.Duration) (string, error) {
 	volumeSource, _, err := getVolumeSource(spec)
 	if err != nil {
@@ -216,27 +249,6 @@ func (detacher *vsphereVMDKDetacher) Detach(deviceMountPath string, nodeName typ
 		return err
 	}
 	return nil
-}
-
-func (detacher *vsphereVMDKDetacher) WaitForDetach(devicePath string, timeout time.Duration) error {
-	ticker := time.NewTicker(checkSleepDuration)
-	defer ticker.Stop()
-	timer := time.NewTimer(timeout)
-	defer timer.Stop()
-
-	for {
-		select {
-		case <-ticker.C:
-			glog.V(5).Infof("Checking device %q is detached.", devicePath)
-			if pathExists, err := volumeutil.PathExists(devicePath); err != nil {
-				return fmt.Errorf("Error checking if device path exists: %v", err)
-			} else if !pathExists {
-				return nil
-			}
-		case <-timer.C:
-			return fmt.Errorf("Timeout reached; Device %v is still attached", devicePath)
-		}
-	}
 }
 
 func (detacher *vsphereVMDKDetacher) UnmountDevice(deviceMountPath string) error {

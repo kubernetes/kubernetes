@@ -1,37 +1,3 @@
-<!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
-
-<!-- BEGIN STRIP_FOR_RELEASE -->
-
-<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
-     width="25" height="25">
-
-<h2>PLEASE NOTE: This document applies to the HEAD of the source tree</h2>
-
-If you are using a released version of Kubernetes, you should
-refer to the docs that go with that version.
-
-<!-- TAG RELEASE_LINK, added by the munger automatically -->
-<strong>
-The latest release of this document can be found
-[here](http://releases.k8s.io/release-1.4/docs/proposals/templates.md).
-
-Documentation for other releases can be found at
-[releases.k8s.io](http://releases.k8s.io).
-</strong>
---
-
-<!-- END STRIP_FOR_RELEASE -->
-
-<!-- END MUNGE: UNVERSIONED_WARNING -->
-
 # Templates+Parameterization: Repeatedly instantiating user-customized application topologies.
 
 ## Motivation
@@ -44,8 +10,8 @@ There are two main motivators for Template functionality in Kubernetes:  Control
 
 Today the replication controller defines a PodTemplate which allows it to instantiate multiple pods with identical characteristics.
 This is useful but limited.  Stateful applications have a need to instantiate multiple instances of a more sophisticated topology
-than just a single pod (eg they also need Volume definitions).  A Template concept would allow a Controller to stamp out multiple
-instances of a given Template definition.  This capability would be immediately useful to the [PetSet](https://github.com/kubernetes/kubernetes/pull/18016) proposal.
+than just a single pod (e.g. they also need Volume definitions).  A Template concept would allow a Controller to stamp out multiple
+instances of a given Template definition.  This capability would be immediately useful to the [StatefulSet](https://github.com/kubernetes/kubernetes/pull/18016) proposal.
 
 Similarly the [Service Catalog proposal](https://github.com/kubernetes/kubernetes/pull/17543) could leverage template instantiation as a mechanism for claiming service instances.
 
@@ -56,7 +22,7 @@ Kubernetes gives developers a platform on which to run images and many configura
 constructing a cohesive application made up of images and configuration objects is currently difficult.  Applications
 require:
 
-* Information sharing between images (eg one image provides a DB service, another consumes it)
+* Information sharing between images (e.g. one image provides a DB service, another consumes it)
 * Configuration/tuning settings (memory sizes, queue limits)
 * Unique/customizable identifiers (service names, routes)
 
@@ -64,7 +30,7 @@ Application authors know which values should be tunable and what information mus
 consistent way for an application author to define that set of information so that application consumers can easily deploy
 an application and make appropriate decisions about the tunable parameters the author intended to expose.
 
-Furthermore, even if an application author provides consumers with a set of API object definitions (eg a set of yaml files)
+Furthermore, even if an application author provides consumers with a set of API object definitions (e.g. a set of yaml files)
 it is difficult to build a UI around those objects that would allow the deployer to modify names in one place without
 potentially breaking assumed linkages to other pieces.  There is also no prescriptive way to define which configuration
 values are appropriate for a deployer to tune or what the parameters control.
@@ -74,14 +40,14 @@ values are appropriate for a deployer to tune or what the parameters control.
 ### Use cases for templates in general
 
 * Providing a full baked application experience in a single portable object that can be repeatably deployed in different environments.
-  * eg Wordpress deployment with separate database pod/replica controller
+  * e.g. Wordpress deployment with separate database pod/replica controller
   * Complex service/replication controller/volume topologies
 * Bulk object creation
 * Provide a management mechanism for deleting/uninstalling an entire set of components related to a single deployed application
 * Providing a library of predefined application definitions that users can select from
 * Enabling the creation of user interfaces that can guide an application deployer through the deployment process with descriptive help about the configuration value decisions they are making, and useful default values where appropriate
 * Exporting a set of objects in a namespace as a template so the topology can be inspected/visualized or recreated in another environment
-* Controllers that need to instantiate multiple instances of identical objects (eg PetSets).
+* Controllers that need to instantiate multiple instances of identical objects (e.g. StatefulSets).
 
 
 ### Use cases for parameters within templates
@@ -93,13 +59,13 @@ values are appropriate for a deployer to tune or what the parameters control.
 * Allow simple, declarative defaulting of parameter values and expose them to end users in an approachable way - a parameter
   like “MySQL table space” can be parameterized in images as an env var - the template parameters declare the parameter, give
   it a friendly name, give it a reasonable default, and informs the user what tuning options are available.
-* Customization of component names to avoid collisions and ensure matched labeling (eg replica selector value and pod label are
+* Customization of component names to avoid collisions and ensure matched labeling (e.g. replica selector value and pod label are
   user provided and in sync).
-* Customize cross-component references (eg user provides the name of a secret that already exists in their namespace, to use in
+* Customize cross-component references (e.g. user provides the name of a secret that already exists in their namespace, to use in
   a pod as a TLS cert).
 * Provide guidance to users for parameters such as default values, descriptions, and whether or not a particular parameter value
   is required or can be left blank.
-* Parameterize the replica count of a deployment or [PetSet](https://github.com/kubernetes/kubernetes/pull/18016)
+* Parameterize the replica count of a deployment or [StatefulSet](https://github.com/kubernetes/kubernetes/pull/18016)
 * Parameterize part of the labels and selector for a DaemonSet
 * Parameterize quota/limit values for a pod
 * Parameterize a secret value so a user can provide a custom password or other secret at deployment time
@@ -444,7 +410,7 @@ The api endpoint will then:
     returned.
 5. Return the processed template object. (or List, depending on the choice made when this is implemented)
 
-The client can now either return the processed template to the user in a desired form (eg json or yaml), or directly iterate the
+The client can now either return the processed template to the user in a desired form (e.g. json or yaml), or directly iterate the
 api objects within the template, invoking the appropriate object creation api endpoint for each element.  (If the api returns
 a List, the client would simply iterate the list to create the objects).
 
@@ -487,9 +453,9 @@ automatic generation of passwords.
 (mapped to use cases described above)
 
 * [Share passwords](https://github.com/jboss-openshift/application-templates/blob/master/eap/eap64-mongodb-s2i.json#L146-L152)
-* [Simple deployment-time customization of “app” configuration via environment values](https://github.com/jboss-openshift/application-templates/blob/master/eap/eap64-mongodb-s2i.json#L108-L126) (eg memory tuning, resource limits, etc)
+* [Simple deployment-time customization of “app” configuration via environment values](https://github.com/jboss-openshift/application-templates/blob/master/eap/eap64-mongodb-s2i.json#L108-L126) (e.g. memory tuning, resource limits, etc)
 * [Customization of component names with referential integrity](https://github.com/jboss-openshift/application-templates/blob/master/eap/eap64-mongodb-s2i.json#L199-L207)
-* [Customize cross-component references](https://github.com/jboss-openshift/application-templates/blob/master/eap/eap64-mongodb-s2i.json#L78-L83) (eg user provides the name of a secret that already exists in their namespace, to use in a pod as a TLS cert)
+* [Customize cross-component references](https://github.com/jboss-openshift/application-templates/blob/master/eap/eap64-mongodb-s2i.json#L78-L83) (e.g. user provides the name of a secret that already exists in their namespace, to use in a pod as a TLS cert)
 
 ## Requirements analysis
 
@@ -580,7 +546,7 @@ fields to be substituted by a parameter value use the "$(parameter)" syntax whic
 value of `parameter` should be matched to a parameter with that name, and the value of the matched parameter substituted into
 the field value.
 
-Other suggestions include a path/map approach in which a list of field paths (eg json path expressions) and corresponding
+Other suggestions include a path/map approach in which a list of field paths (e.g. json path expressions) and corresponding
 parameter names are provided.  The substitution process would walk the map, replacing fields with the appropriate
 parameter value.  This approach makes templates more fragile from the perspective of editing/refactoring as field paths
 may change, thus breaking the map.  There is of course also risk of breaking references with the previous scheme, but
@@ -594,7 +560,7 @@ Openshift defines templates as a first class resource so they can be created/ret
 
 Openshift handles template processing via a server endpoint which consumes a template object from the client and returns the list of objects
 produced by processing the template.  It is also possible to handle the entire template processing flow via the client, but this was deemed
-undesirable as it would force each client tool to reimplement template processing (eg the standard CLI tool, an eclipse plugin, a plugin for a CI system like Jenkins, etc).  The assumption in this proposal is that server side template processing is the preferred implementation approach for
+undesirable as it would force each client tool to reimplement template processing (e.g. the standard CLI tool, an eclipse plugin, a plugin for a CI system like Jenkins, etc).  The assumption in this proposal is that server side template processing is the preferred implementation approach for
 this reason.
 
 

@@ -20,23 +20,49 @@ import (
 	"fmt"
 	"net/http"
 
+	"k8s.io/kubernetes/pkg/auth/authorizer"
 	"k8s.io/kubernetes/pkg/util/runtime"
 )
 
 // badGatewayError renders a simple bad gateway error.
 func badGatewayError(w http.ResponseWriter, req *http.Request) {
+	w.Header().Set("Content-Type", "text/plain")
+	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.WriteHeader(http.StatusBadGateway)
 	fmt.Fprintf(w, "Bad Gateway: %#v", req.RequestURI)
 }
 
 // forbidden renders a simple forbidden error
-func forbidden(w http.ResponseWriter, req *http.Request) {
+func forbidden(attributes authorizer.Attributes, w http.ResponseWriter, req *http.Request, reason string) {
+	msg := forbiddenMessage(attributes)
+	w.Header().Set("Content-Type", "text/plain")
+	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.WriteHeader(http.StatusForbidden)
-	fmt.Fprintf(w, "Forbidden: %#v", req.RequestURI)
+	fmt.Fprintf(w, "%s: %q", msg, reason)
+}
+
+func forbiddenMessage(attributes authorizer.Attributes) string {
+	username := ""
+	if user := attributes.GetUser(); user != nil {
+		username = user.GetName()
+	}
+
+	resource := attributes.GetResource()
+	if group := attributes.GetAPIGroup(); len(group) > 0 {
+		resource = resource + "." + group
+	}
+
+	if ns := attributes.GetNamespace(); len(ns) > 0 {
+		return fmt.Sprintf("User %q cannot %s %s in the namespace %q.", username, attributes.GetVerb(), resource, ns)
+	}
+
+	return fmt.Sprintf("User %q cannot %s %s at the cluster scope.", username, attributes.GetVerb(), resource)
 }
 
 // internalError renders a simple internal error
 func internalError(w http.ResponseWriter, req *http.Request, err error) {
+	w.Header().Set("Content-Type", "text/plain")
+	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.WriteHeader(http.StatusInternalServerError)
 	fmt.Fprintf(w, "Internal Server Error: %#v", req.RequestURI)
 	runtime.HandleError(err)

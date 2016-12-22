@@ -1,0 +1,56 @@
+#cloud-config
+
+coreos:
+  update:
+    reboot-strategy: off
+  units:
+    - name: locksmithd.service
+      mask: true
+    - name: kube-master-installation.service
+      command: start
+      content: |
+        [Unit]
+        Description=Download and install k8s binaries and configurations
+        After=network-online.target
+
+        [Service]
+        Type=oneshot
+        RemainAfterExit=yes
+        ExecStartPre=/bin/mkdir -p /opt/kubernetes/bin
+        ExecStartPre=/usr/bin/curl --fail --retry 5 --retry-delay 3 --silent --show-error	-H "X-Google-Metadata-Request: True" -o /opt/kubernetes/bin/configure.sh http://metadata.google.internal/computeMetadata/v1/instance/attributes/configure-sh
+        ExecStartPre=/bin/chmod 544 /opt/kubernetes/bin/configure.sh
+        ExecStart=/opt/kubernetes/bin/configure.sh
+
+        [Install]
+        WantedBy=kubernetes.target
+    - name: kube-master-configuration.service
+      command: start
+      content: |
+        [Unit]
+        Description=Configure kubernetes master
+        After=kube-master-installation.service
+
+        [Service]
+        Type=oneshot
+        RemainAfterExit=yes
+        ExecStartPre=/bin/chmod 544 /opt/kubernetes/bin/configure-helper.sh
+        ExecStart=/opt/kubernetes/bin/configure-helper.sh
+
+        [Install]
+        WantedBy=kubernetes.target
+    - name: kubernetes.target
+      enable: true
+      command: start
+      content: |
+        [Unit]
+        Description=Kubernetes
+
+        [Install]
+        WantedBy=multi-user.target
+    - name: docker.service
+      drop-ins:
+        - name: "use-cgroupfs-driver.conf"
+          # This is required for setting cgroup parent in the current ~1.4 per-pod cgroup impl
+          content: |
+            [Service]
+            Environment="DOCKER_CGROUPS=--exec-opt native.cgroupdriver="

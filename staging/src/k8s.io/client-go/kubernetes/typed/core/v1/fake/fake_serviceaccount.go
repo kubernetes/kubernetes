@@ -18,20 +18,21 @@ package fake
 
 import (
 	api "k8s.io/client-go/pkg/api"
-	unversioned "k8s.io/client-go/pkg/api/unversioned"
 	v1 "k8s.io/client-go/pkg/api/v1"
+	meta_v1 "k8s.io/client-go/pkg/apis/meta/v1"
 	labels "k8s.io/client-go/pkg/labels"
+	schema "k8s.io/client-go/pkg/runtime/schema"
 	watch "k8s.io/client-go/pkg/watch"
 	testing "k8s.io/client-go/testing"
 )
 
 // FakeServiceAccounts implements ServiceAccountInterface
 type FakeServiceAccounts struct {
-	Fake *FakeCore
+	Fake *FakeCoreV1
 	ns   string
 }
 
-var serviceaccountsResource = unversioned.GroupVersionResource{Group: "", Version: "v1", Resource: "serviceaccounts"}
+var serviceaccountsResource = schema.GroupVersionResource{Group: "", Version: "v1", Resource: "serviceaccounts"}
 
 func (c *FakeServiceAccounts) Create(serviceAccount *v1.ServiceAccount) (result *v1.ServiceAccount, err error) {
 	obj, err := c.Fake.
@@ -67,7 +68,7 @@ func (c *FakeServiceAccounts) DeleteCollection(options *v1.DeleteOptions, listOp
 	return err
 }
 
-func (c *FakeServiceAccounts) Get(name string) (result *v1.ServiceAccount, err error) {
+func (c *FakeServiceAccounts) Get(name string, options meta_v1.GetOptions) (result *v1.ServiceAccount, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewGetAction(serviceaccountsResource, c.ns, name), &v1.ServiceAccount{})
 

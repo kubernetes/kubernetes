@@ -1,37 +1,3 @@
-<!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
-
-<!-- BEGIN STRIP_FOR_RELEASE -->
-
-<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
-     width="25" height="25">
-
-<h2>PLEASE NOTE: This document applies to the HEAD of the source tree</h2>
-
-If you are using a released version of Kubernetes, you should
-refer to the docs that go with that version.
-
-<!-- TAG RELEASE_LINK, added by the munger automatically -->
-<strong>
-The latest release of this document can be found
-[here](http://releases.k8s.io/release-1.4/docs/proposals/kubectl-login.md).
-
-Documentation for other releases can be found at
-[releases.k8s.io](http://releases.k8s.io).
-</strong>
---
-
-<!-- END STRIP_FOR_RELEASE -->
-
-<!-- END MUNGE: UNVERSIONED_WARNING -->
-
 # Kubectl Login Subcommand
 
 **Authors**: Eric Chiang (@ericchiang)
@@ -97,10 +63,10 @@ by the latter command.
 When clusters utilize authorization plugins access decisions are based on the
 correct configuration of an auth-N plugin, an auth-Z plugin, and client side
 credentials. Being rejected then begs several questions. Is the user's
-kubeconfig mis-configured? Is the authorization plugin setup wrong? Is the user
+kubeconfig misconfigured? Is the authorization plugin setup wrong? Is the user
 authenticating as a different user than the one they assume?
 
-To help `kubectl login` diagnose mis-configured credentials, responses from the
+To help `kubectl login` diagnose misconfigured credentials, responses from the
 API server to authenticated requests SHOULD include the `Authentication-Info`
 header as defined in [RFC 7615](https://tools.ietf.org/html/rfc7615). The value
 will hold name value pairs for `username` and `uid`. Since usernames and IDs

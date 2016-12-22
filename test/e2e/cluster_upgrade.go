@@ -21,9 +21,8 @@ import (
 	"path"
 	"strings"
 
-	"k8s.io/kubernetes/pkg/api"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/api/v1"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/chaosmonkey"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -44,7 +43,7 @@ var _ = framework.KubeDescribe("Upgrade [Feature:Upgrade]", func() {
 				v, err := realVersion(framework.TestContext.UpgradeTarget)
 				framework.ExpectNoError(err)
 				framework.ExpectNoError(framework.MasterUpgrade(v))
-				framework.ExpectNoError(checkMasterVersion(f.Client, v))
+				framework.ExpectNoError(checkMasterVersion(f.ClientSet, v))
 			})
 			cm.Register(func(sem *chaosmonkey.Semaphore) {
 				// Close over f.
@@ -90,7 +89,7 @@ var _ = framework.KubeDescribe("Upgrade [Feature:Upgrade]", func() {
 				v, err := realVersion(framework.TestContext.UpgradeTarget)
 				framework.ExpectNoError(err)
 				framework.ExpectNoError(framework.MasterUpgrade(v))
-				framework.ExpectNoError(checkMasterVersion(f.Client, v))
+				framework.ExpectNoError(checkMasterVersion(f.ClientSet, v))
 				framework.ExpectNoError(framework.NodeUpgrade(f, v, framework.TestContext.UpgradeImage))
 				framework.ExpectNoError(checkNodesVersions(f.ClientSet, v))
 			})
@@ -106,7 +105,7 @@ var _ = framework.KubeDescribe("Upgrade [Feature:Upgrade]", func() {
 				v, err := realVersion(framework.TestContext.UpgradeTarget)
 				framework.ExpectNoError(err)
 				framework.ExpectNoError(framework.MasterUpgrade(v))
-				framework.ExpectNoError(checkMasterVersion(f.Client, v))
+				framework.ExpectNoError(checkMasterVersion(f.ClientSet, v))
 				framework.ExpectNoError(framework.NodeUpgrade(f, v, framework.TestContext.UpgradeImage))
 				framework.ExpectNoError(checkNodesVersions(f.ClientSet, v))
 			})
@@ -147,17 +146,17 @@ func testService(f *framework.Framework, sem *chaosmonkey.Semaphore, testDuringD
 	// Setup
 	serviceName := "service-test"
 
-	jig := NewServiceTestJig(f.Client, f.ClientSet, serviceName)
+	jig := NewServiceTestJig(f.ClientSet, serviceName)
 	// nodeIP := pickNodeIP(jig.Client) // for later
 
 	By("creating a TCP service " + serviceName + " with type=LoadBalancer in namespace " + f.Namespace.Name)
 	// TODO it's weird that we have to do this and then wait WaitForLoadBalancer which changes
 	// tcpService.
-	tcpService := jig.CreateTCPServiceOrFail(f.Namespace.Name, func(s *api.Service) {
-		s.Spec.Type = api.ServiceTypeLoadBalancer
+	tcpService := jig.CreateTCPServiceOrFail(f.Namespace.Name, func(s *v1.Service) {
+		s.Spec.Type = v1.ServiceTypeLoadBalancer
 	})
 	tcpService = jig.WaitForLoadBalancerOrFail(f.Namespace.Name, tcpService.Name, loadBalancerCreateTimeoutDefault)
-	jig.SanityCheckService(tcpService, api.ServiceTypeLoadBalancer)
+	jig.SanityCheckService(tcpService, v1.ServiceTypeLoadBalancer)
 
 	// Get info to hit it with
 	tcpIngressIP := getIngressPoint(&tcpService.Status.LoadBalancer.Ingress[0])
@@ -189,10 +188,10 @@ func testService(f *framework.Framework, sem *chaosmonkey.Semaphore, testDuringD
 	// Sanity check and hit it once more
 	By("hitting the pod through the service's LoadBalancer")
 	jig.TestReachableHTTP(tcpIngressIP, svcPort, loadBalancerLagTimeoutDefault)
-	jig.SanityCheckService(tcpService, api.ServiceTypeLoadBalancer)
+	jig.SanityCheckService(tcpService, v1.ServiceTypeLoadBalancer)
 }
 
-func checkMasterVersion(c *client.Client, want string) error {
+func checkMasterVersion(c clientset.Interface, want string) error {
 	framework.Logf("Checking master version")
 	v, err := c.Discovery().ServerVersion()
 	if err != nil {

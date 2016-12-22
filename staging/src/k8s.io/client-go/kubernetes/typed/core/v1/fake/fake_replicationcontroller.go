@@ -18,20 +18,21 @@ package fake
 
 import (
 	api "k8s.io/client-go/pkg/api"
-	unversioned "k8s.io/client-go/pkg/api/unversioned"
 	v1 "k8s.io/client-go/pkg/api/v1"
+	meta_v1 "k8s.io/client-go/pkg/apis/meta/v1"
 	labels "k8s.io/client-go/pkg/labels"
+	schema "k8s.io/client-go/pkg/runtime/schema"
 	watch "k8s.io/client-go/pkg/watch"
 	testing "k8s.io/client-go/testing"
 )
 
 // FakeReplicationControllers implements ReplicationControllerInterface
 type FakeReplicationControllers struct {
-	Fake *FakeCore
+	Fake *FakeCoreV1
 	ns   string
 }
 
-var replicationcontrollersResource = unversioned.GroupVersionResource{Group: "", Version: "v1", Resource: "replicationcontrollers"}
+var replicationcontrollersResource = schema.GroupVersionResource{Group: "", Version: "v1", Resource: "replicationcontrollers"}
 
 func (c *FakeReplicationControllers) Create(replicationController *v1.ReplicationController) (result *v1.ReplicationController, err error) {
 	obj, err := c.Fake.
@@ -77,7 +78,7 @@ func (c *FakeReplicationControllers) DeleteCollection(options *v1.DeleteOptions,
 	return err
 }
 
-func (c *FakeReplicationControllers) Get(name string) (result *v1.ReplicationController, err error) {
+func (c *FakeReplicationControllers) Get(name string, options meta_v1.GetOptions) (result *v1.ReplicationController, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewGetAction(replicationcontrollersResource, c.ns, name), &v1.ReplicationController{})
 

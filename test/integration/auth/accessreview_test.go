@@ -103,7 +103,7 @@ func TestSubjectAccessReview(t *testing.T) {
 			},
 			expectedStatus: authorizationapi.SubjectAccessReviewStatus{
 				Allowed:         false,
-				Reason:          "Not in privileged list.\nno",
+				Reason:          "no",
 				EvaluationError: "I'm sorry, Dave",
 			},
 		},
@@ -198,7 +198,7 @@ func TestSelfSubjectAccessReview(t *testing.T) {
 			},
 			expectedStatus: authorizationapi.SubjectAccessReviewStatus{
 				Allowed:         false,
-				Reason:          "Not in privileged list.\nno",
+				Reason:          "no",
 				EvaluationError: "I'm sorry, Dave",
 			},
 		},
@@ -284,7 +284,7 @@ func TestLocalSubjectAccessReview(t *testing.T) {
 			},
 			expectedStatus: authorizationapi.SubjectAccessReviewStatus{
 				Allowed:         false,
-				Reason:          "Not in privileged list.\nno",
+				Reason:          "no",
 				EvaluationError: "I'm sorry, Dave",
 			},
 		},

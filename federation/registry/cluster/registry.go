@@ -20,6 +20,7 @@ import (
 	"k8s.io/kubernetes/federation/apis/federation"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/rest"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
@@ -27,7 +28,7 @@ import (
 type Registry interface {
 	ListClusters(ctx api.Context, options *api.ListOptions) (*federation.ClusterList, error)
 	WatchCluster(ctx api.Context, options *api.ListOptions) (watch.Interface, error)
-	GetCluster(ctx api.Context, name string) (*federation.Cluster, error)
+	GetCluster(ctx api.Context, name string, options *metav1.GetOptions) (*federation.Cluster, error)
 	CreateCluster(ctx api.Context, cluster *federation.Cluster) error
 	UpdateCluster(ctx api.Context, cluster *federation.Cluster) error
 	DeleteCluster(ctx api.Context, name string) error
@@ -56,8 +57,8 @@ func (s *storage) WatchCluster(ctx api.Context, options *api.ListOptions) (watch
 	return s.Watch(ctx, options)
 }
 
-func (s *storage) GetCluster(ctx api.Context, name string) (*federation.Cluster, error) {
-	obj, err := s.Get(ctx, name)
+func (s *storage) GetCluster(ctx api.Context, name string, options *metav1.GetOptions) (*federation.Cluster, error) {
+	obj, err := s.Get(ctx, name, options)
 	if err != nil {
 		return nil, err
 	}

@@ -24,7 +24,7 @@ import (
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
 )
 
-// DelayingInterface is an Interface that can Add an item at a later time.  This makes it easier to
+// DelayingInterface is an Interface that can Add an item at a later time. This makes it easier to
 // requeue items after failures without ending up in a hot-loop.
 type DelayingInterface interface {
 	Interface
@@ -68,6 +68,9 @@ type delayingType struct {
 	stopCh chan struct{}
 
 	// heartbeat ensures we wait no more than maxWait before firing
+	//
+	// TODO: replace with Ticker (and add to clock) so this can be cleaned up.
+	// clock.Tick will leak.
 	heartbeat <-chan time.Time
 
 	// waitingForAdd is an ordered slice of items to be added to the contained work queue
@@ -115,7 +118,7 @@ func (q *delayingType) AddAfter(item interface{}, duration time.Duration) {
 	}
 }
 
-// maxWait keeps a max bound on the wait time.  It's just insurance against weird things happening.
+// maxWait keeps a max bound on the wait time. It's just insurance against weird things happening.
 // Checking the queue every 10 seconds isn't expensive and we know that we'll never end up with an
 // expired item sitting for more than 10 seconds.
 const maxWait = 10 * time.Second
@@ -192,6 +195,9 @@ func (q *delayingType) waitingLoop() {
 // inserts the given entry into the sorted entries list
 // same semantics as append()... the given slice may be modified,
 // and the returned value should be used
+//
+// TODO: This should probably be converted to use container/heap to improve
+// running time for a large number of items.
 func insert(entries []waitFor, knownEntries map[t]time.Time, entry waitFor) []waitFor {
 	// if the entry is already in our retry list and the existing time is before the new one, just skip it
 	existingTime, exists := knownEntries[entry.data]

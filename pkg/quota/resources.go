@@ -19,11 +19,35 @@ package quota
 import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 // Equals returns true if the two lists are equivalent
 func Equals(a api.ResourceList, b api.ResourceList) bool {
+	for key, value1 := range a {
+		value2, found := b[key]
+		if !found {
+			return false
+		}
+		if value1.Cmp(value2) != 0 {
+			return false
+		}
+	}
+	for key, value1 := range b {
+		value2, found := a[key]
+		if !found {
+			return false
+		}
+		if value1.Cmp(value2) != 0 {
+			return false
+		}
+	}
+	return true
+}
+
+// V1Equals returns true if the two lists are equivalent
+func V1Equals(a v1.ResourceList, b v1.ResourceList) bool {
 	for key, value1 := range a {
 		value2, found := b[key]
 		if !found {
@@ -199,18 +223,21 @@ func CalculateUsage(namespaceName string, scopes []api.ResourceQuotaScope, hardL
 	potentialResources := []api.ResourceName{}
 	evaluators := registry.Evaluators()
 	for _, evaluator := range evaluators {
-		potentialResources = append(potentialResources, evaluator.MatchesResources()...)
+		potentialResources = append(potentialResources, evaluator.MatchingResources(hardResources)...)
 	}
+	// NOTE: the intersection just removes duplicates since the evaluator match intersects wtih hard
 	matchedResources := Intersection(hardResources, potentialResources)
 
 	// sum the observed usage from each evaluator
 	newUsage := api.ResourceList{}
-	usageStatsOptions := UsageStatsOptions{Namespace: namespaceName, Scopes: scopes}
 	for _, evaluator := range evaluators {
 		// only trigger the evaluator if it matches a resource in the quota, otherwise, skip calculating anything
-		if intersection := Intersection(evaluator.MatchesResources(), matchedResources); len(intersection) == 0 {
+		intersection := evaluator.MatchingResources(matchedResources)
+		if len(intersection) == 0 {
 			continue
 		}
+
+		usageStatsOptions := UsageStatsOptions{Namespace: namespaceName, Scopes: scopes, Resources: intersection}
 		stats, err := evaluator.UsageStats(usageStatsOptions)
 		if err != nil {
 			return nil, err

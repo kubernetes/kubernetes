@@ -21,11 +21,12 @@ import (
 	"strings"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/runtime/schema"
+	"k8s.io/kubernetes/pkg/util/sets"
 )
 
-func RoleRefGroupKind(roleRef RoleRef) unversioned.GroupKind {
-	return unversioned.GroupKind{Group: roleRef.APIGroup, Kind: roleRef.Kind}
+func RoleRefGroupKind(roleRef RoleRef) schema.GroupKind {
+	return schema.GroupKind{Group: roleRef.APIGroup, Kind: roleRef.Kind}
 }
 
 func VerbMatches(rule PolicyRule, requestedVerb string) bool {
@@ -97,6 +98,32 @@ func NonResourceURLMatches(rule PolicyRule, requestedURL string) bool {
 	return false
 }
 
+// subjectsStrings returns users, groups, serviceaccounts, unknown for display purposes.
+func SubjectsStrings(subjects []Subject) ([]string, []string, []string, []string) {
+	users := []string{}
+	groups := []string{}
+	sas := []string{}
+	others := []string{}
+
+	for _, subject := range subjects {
+		switch subject.Kind {
+		case ServiceAccountKind:
+			sas = append(sas, fmt.Sprintf("%s/%s", subject.Namespace, subject.Name))
+
+		case UserKind:
+			users = append(users, subject.Name)
+
+		case GroupKind:
+			groups = append(groups, subject.Name)
+
+		default:
+			others = append(others, fmt.Sprintf("%s/%s/%s", subject.Kind, subject.Namespace, subject.Name))
+		}
+	}
+
+	return users, groups, sas, others
+}
+
 // +k8s:deepcopy-gen=false
 // PolicyRuleBuilder let's us attach methods.  A no-no for API types.
 // We use it to construct rules in code.  It's more compact than trying to write them
@@ -107,27 +134,27 @@ type PolicyRuleBuilder struct {
 
 func NewRule(verbs ...string) *PolicyRuleBuilder {
 	return &PolicyRuleBuilder{
-		PolicyRule: PolicyRule{Verbs: verbs},
+		PolicyRule: PolicyRule{Verbs: sets.NewString(verbs...).List()},
 	}
 }
 
 func (r *PolicyRuleBuilder) Groups(groups ...string) *PolicyRuleBuilder {
-	r.PolicyRule.APIGroups = append(r.PolicyRule.APIGroups, groups...)
+	r.PolicyRule.APIGroups = combine(r.PolicyRule.APIGroups, groups)
 	return r
 }
 
 func (r *PolicyRuleBuilder) Resources(resources ...string) *PolicyRuleBuilder {
-	r.PolicyRule.Resources = append(r.PolicyRule.Resources, resources...)
+	r.PolicyRule.Resources = combine(r.PolicyRule.Resources, resources)
 	return r
 }
 
 func (r *PolicyRuleBuilder) Names(names ...string) *PolicyRuleBuilder {
-	r.PolicyRule.ResourceNames = append(r.PolicyRule.ResourceNames, names...)
+	r.PolicyRule.ResourceNames = combine(r.PolicyRule.ResourceNames, names)
 	return r
 }
 
 func (r *PolicyRuleBuilder) URLs(urls ...string) *PolicyRuleBuilder {
-	r.PolicyRule.NonResourceURLs = append(r.PolicyRule.NonResourceURLs, urls...)
+	r.PolicyRule.NonResourceURLs = combine(r.PolicyRule.NonResourceURLs, urls)
 	return r
 }
 
@@ -137,6 +164,12 @@ func (r *PolicyRuleBuilder) RuleOrDie() PolicyRule {
 		panic(err)
 	}
 	return ret
+}
+
+func combine(s1, s2 []string) []string {
+	s := sets.NewString(s1...)
+	s.Insert(s2...)
+	return s.List()
 }
 
 func (r *PolicyRuleBuilder) Rule() (PolicyRule, error) {

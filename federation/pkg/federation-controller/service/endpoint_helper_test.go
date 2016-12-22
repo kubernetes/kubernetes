@@ -29,11 +29,12 @@ var fakeDns, _ = clouddns.NewFakeInterface() // No need to check for unsupported
 var fakeDnsZones, _ = fakeDns.Zones()
 
 var fakeServiceController = ServiceController{
-	dns:            fakeDns,
-	dnsZones:       fakeDnsZones,
-	federationName: "fed1",
-	zoneName:       "example.com",
-	serviceCache:   &serviceCache{fedServiceMap: make(map[string]*cachedService)},
+	dns:              fakeDns,
+	dnsZones:         fakeDnsZones,
+	federationName:   "fed1",
+	zoneName:         "example.com",
+	serviceDnsSuffix: "federation.example.com",
+	serviceCache:     &serviceCache{fedServiceMap: make(map[string]*cachedService)},
 	clusterCache: &clusterClientCache{
 		clientMap: make(map[string]*clusterCache),
 	},

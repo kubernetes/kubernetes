@@ -22,10 +22,10 @@ import (
 	"time"
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/api/v1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -67,16 +67,14 @@ const (
 //
 // Flaky issue #20015.  We have no clear path for how to test this functionality in a non-flaky way.
 var _ = framework.KubeDescribe("NodeOutOfDisk [Serial] [Flaky] [Disruptive]", func() {
-	var c *client.Client
-	var cs clientset.Interface
+	var c clientset.Interface
 	var unfilledNodeName, recoveredNodeName string
 	f := framework.NewDefaultFramework("node-outofdisk")
 
 	BeforeEach(func() {
-		c = f.Client
-		cs = f.ClientSet
+		c = f.ClientSet
 
-		nodelist := framework.GetReadySchedulableNodesOrDie(cs)
+		nodelist := framework.GetReadySchedulableNodesOrDie(c)
 
 		// Skip this test on small clusters.  No need to fail since it is not a use
 		// case that any cluster of small size needs to support.
@@ -90,7 +88,7 @@ var _ = framework.KubeDescribe("NodeOutOfDisk [Serial] [Flaky] [Disruptive]", fu
 
 	AfterEach(func() {
 
-		nodelist := framework.GetReadySchedulableNodesOrDie(cs)
+		nodelist := framework.GetReadySchedulableNodesOrDie(c)
 		Expect(len(nodelist.Items)).ToNot(BeZero())
 		for _, node := range nodelist.Items {
 			if unfilledNodeName == node.Name || recoveredNodeName == node.Name {
@@ -101,7 +99,7 @@ var _ = framework.KubeDescribe("NodeOutOfDisk [Serial] [Flaky] [Disruptive]", fu
 	})
 
 	It("runs out of disk space", func() {
-		unfilledNode, err := c.Nodes().Get(unfilledNodeName)
+		unfilledNode, err := c.Core().Nodes().Get(unfilledNodeName, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 
 		By(fmt.Sprintf("Calculating CPU availability on node %s", unfilledNode.Name))
@@ -116,7 +114,7 @@ var _ = framework.KubeDescribe("NodeOutOfDisk [Serial] [Flaky] [Disruptive]", fu
 		podCPU := int64(float64(milliCpu/(numNodeOODPods-1)) * 0.99)
 
 		ns := f.Namespace.Name
-		podClient := c.Pods(ns)
+		podClient := c.Core().Pods(ns)
 
 		By("Creating pods and waiting for all but one pods to be scheduled")
 
@@ -125,7 +123,7 @@ var _ = framework.KubeDescribe("NodeOutOfDisk [Serial] [Flaky] [Disruptive]", fu
 			createOutOfDiskPod(c, ns, name, podCPU)
 
 			framework.ExpectNoError(f.WaitForPodRunning(name))
-			pod, err := podClient.Get(name)
+			pod, err := podClient.Get(name, metav1.GetOptions{})
 			framework.ExpectNoError(err)
 			Expect(pod.Spec.NodeName).To(Equal(unfilledNodeName))
 		}
@@ -139,11 +137,11 @@ var _ = framework.KubeDescribe("NodeOutOfDisk [Serial] [Flaky] [Disruptive]", fu
 				"involvedObject.kind":      "Pod",
 				"involvedObject.name":      pendingPodName,
 				"involvedObject.namespace": ns,
-				"source":                   api.DefaultSchedulerName,
+				"source":                   v1.DefaultSchedulerName,
 				"reason":                   "FailedScheduling",
-			}.AsSelector()
-			options := api.ListOptions{FieldSelector: selector}
-			schedEvents, err := c.Events(ns).List(options)
+			}.AsSelector().String()
+			options := v1.ListOptions{FieldSelector: selector}
+			schedEvents, err := c.Core().Events(ns).List(options)
 			framework.ExpectNoError(err)
 
 			if len(schedEvents.Items) > 0 {
@@ -153,7 +151,7 @@ var _ = framework.KubeDescribe("NodeOutOfDisk [Serial] [Flaky] [Disruptive]", fu
 			}
 		})
 
-		nodelist := framework.GetReadySchedulableNodesOrDie(cs)
+		nodelist := framework.GetReadySchedulableNodesOrDie(c)
 		Expect(len(nodelist.Items)).To(BeNumerically(">", 1))
 
 		nodeToRecover := nodelist.Items[1]
@@ -164,29 +162,29 @@ var _ = framework.KubeDescribe("NodeOutOfDisk [Serial] [Flaky] [Disruptive]", fu
 
 		By(fmt.Sprintf("Verifying that pod %s schedules on node %s", pendingPodName, recoveredNodeName))
 		framework.ExpectNoError(f.WaitForPodRunning(pendingPodName))
-		pendingPod, err := podClient.Get(pendingPodName)
+		pendingPod, err := podClient.Get(pendingPodName, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 		Expect(pendingPod.Spec.NodeName).To(Equal(recoveredNodeName))
 	})
 })
 
 // createOutOfDiskPod creates a pod in the given namespace with the requested amount of CPU.
-func createOutOfDiskPod(c *client.Client, ns, name string, milliCPU int64) {
-	podClient := c.Pods(ns)
+func createOutOfDiskPod(c clientset.Interface, ns, name string, milliCPU int64) {
+	podClient := c.Core().Pods(ns)
 
-	pod := &api.Pod{
-		ObjectMeta: api.ObjectMeta{
+	pod := &v1.Pod{
+		ObjectMeta: v1.ObjectMeta{
 			Name: name,
 		},
-		Spec: api.PodSpec{
-			Containers: []api.Container{
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
 				{
 					Name:  "pause",
 					Image: framework.GetPauseImageName(c),
-					Resources: api.ResourceRequirements{
-						Requests: api.ResourceList{
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
 							// Request enough CPU to fit only two pods on a given node.
-							api.ResourceCPU: *resource.NewMilliQuantity(milliCPU, resource.DecimalSI),
+							v1.ResourceCPU: *resource.NewMilliQuantity(milliCPU, resource.DecimalSI),
 						},
 					},
 				},
@@ -200,11 +198,11 @@ func createOutOfDiskPod(c *client.Client, ns, name string, milliCPU int64) {
 
 // availCpu calculates the available CPU on a given node by subtracting the CPU requested by
 // all the pods from the total available CPU capacity on the node.
-func availCpu(c *client.Client, node *api.Node) (int64, error) {
-	podClient := c.Pods(api.NamespaceAll)
+func availCpu(c clientset.Interface, node *v1.Node) (int64, error) {
+	podClient := c.Core().Pods(v1.NamespaceAll)
 
-	selector := fields.Set{"spec.nodeName": node.Name}.AsSelector()
-	options := api.ListOptions{FieldSelector: selector}
+	selector := fields.Set{"spec.nodeName": node.Name}.AsSelector().String()
+	options := v1.ListOptions{FieldSelector: selector}
 	pods, err := podClient.List(options)
 	if err != nil {
 		return 0, fmt.Errorf("failed to retrieve all the pods on node %s: %v", node.Name, err)
@@ -220,10 +218,10 @@ func availCpu(c *client.Client, node *api.Node) (int64, error) {
 
 // availSize returns the available disk space on a given node by querying node stats which
 // is in turn obtained internally from cadvisor.
-func availSize(c *client.Client, node *api.Node) (uint64, error) {
+func availSize(c clientset.Interface, node *v1.Node) (uint64, error) {
 	statsResource := fmt.Sprintf("api/v1/proxy/nodes/%s/stats/", node.Name)
 	framework.Logf("Querying stats for node %s using url %s", node.Name, statsResource)
-	res, err := c.Get().AbsPath(statsResource).Timeout(time.Minute).Do().Raw()
+	res, err := c.Core().RESTClient().Get().AbsPath(statsResource).Timeout(time.Minute).Do().Raw()
 	if err != nil {
 		return 0, fmt.Errorf("error querying cAdvisor API: %v", err)
 	}
@@ -238,7 +236,7 @@ func availSize(c *client.Client, node *api.Node) (uint64, error) {
 // fillDiskSpace fills the available disk space on a given node by creating a large file. The disk
 // space on the node is filled in such a way that the available space after filling the disk is just
 // below the lowDiskSpaceThreshold mark.
-func fillDiskSpace(c *client.Client, node *api.Node) {
+func fillDiskSpace(c clientset.Interface, node *v1.Node) {
 	avail, err := availSize(c, node)
 	framework.ExpectNoError(err, "Node %s: couldn't obtain available disk size %v", node.Name, err)
 
@@ -250,7 +248,7 @@ func fillDiskSpace(c *client.Client, node *api.Node) {
 	cmd := fmt.Sprintf("fallocate -l %d test.img", fillSize)
 	framework.ExpectNoError(framework.IssueSSHCommand(cmd, framework.TestContext.Provider, node))
 
-	ood := framework.WaitForNodeToBe(c, node.Name, api.NodeOutOfDisk, true, nodeOODTimeOut)
+	ood := framework.WaitForNodeToBe(c, node.Name, v1.NodeOutOfDisk, true, nodeOODTimeOut)
 	Expect(ood).To(BeTrue(), "Node %s did not run out of disk within %v", node.Name, nodeOODTimeOut)
 
 	avail, err = availSize(c, node)
@@ -259,11 +257,11 @@ func fillDiskSpace(c *client.Client, node *api.Node) {
 }
 
 // recoverDiskSpace recovers disk space, filled by creating a large file, on a given node.
-func recoverDiskSpace(c *client.Client, node *api.Node) {
+func recoverDiskSpace(c clientset.Interface, node *v1.Node) {
 	By(fmt.Sprintf("Recovering disk space on node %s", node.Name))
 	cmd := "rm -f test.img"
 	framework.ExpectNoError(framework.IssueSSHCommand(cmd, framework.TestContext.Provider, node))
 
-	ood := framework.WaitForNodeToBe(c, node.Name, api.NodeOutOfDisk, false, nodeOODTimeOut)
+	ood := framework.WaitForNodeToBe(c, node.Name, v1.NodeOutOfDisk, false, nodeOODTimeOut)
 	Expect(ood).To(BeTrue(), "Node %s's out of disk condition status did not change to false within %v", node.Name, nodeOODTimeOut)
 }

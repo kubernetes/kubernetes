@@ -1,6 +1,6 @@
 # Cluster Configuration
 
-##### Deprecation Notice: This directory has entered maintainence mode and will not be accepting new providers. Please submit new automation deployments to [kube-deploy](https://github.com/kubernetes/kube-deploy). Deployments in this directory will continue to be maintained and supported at their current level of support.
+##### Deprecation Notice: This directory has entered maintenance mode and will not be accepting new providers. Please submit new automation deployments to [kube-deploy](https://github.com/kubernetes/kube-deploy). Deployments in this directory will continue to be maintained and supported at their current level of support.
 
 The scripts and data in this directory automate creation and configuration of a Kubernetes cluster, including networking, DNS, nodes, and master components.
 

@@ -50,6 +50,11 @@ func (md *metricsDu) GetMetrics() (*Metrics, error) {
 		return metrics, err
 	}
 
+	err = md.runFind(metrics)
+	if err != nil {
+		return metrics, err
+	}
+
 	err = md.getFsInfo(metrics)
 	if err != nil {
 		return metrics, err
@@ -68,14 +73,26 @@ func (md *metricsDu) runDu(metrics *Metrics) error {
 	return nil
 }
 
+// runFind executes the "find" command and writes the results to metrics.InodesUsed
+func (md *metricsDu) runFind(metrics *Metrics) error {
+	inodesUsed, err := util.Find(md.path)
+	if err != nil {
+		return err
+	}
+	metrics.InodesUsed = resource.NewQuantity(inodesUsed, resource.BinarySI)
+	return nil
+}
+
 // getFsInfo writes metrics.Capacity and metrics.Available from the filesystem
 // info
 func (md *metricsDu) getFsInfo(metrics *Metrics) error {
-	available, capacity, _, err := util.FsInfo(md.path)
+	available, capacity, _, inodes, inodesFree, _, err := util.FsInfo(md.path)
 	if err != nil {
 		return NewFsInfoFailedError(err)
 	}
 	metrics.Available = resource.NewQuantity(available, resource.BinarySI)
 	metrics.Capacity = resource.NewQuantity(capacity, resource.BinarySI)
+	metrics.Inodes = resource.NewQuantity(inodes, resource.BinarySI)
+	metrics.InodesFree = resource.NewQuantity(inodesFree, resource.BinarySI)
 	return nil
 }

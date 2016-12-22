@@ -20,9 +20,9 @@ import (
 	"fmt"
 	"os/exec"
 
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
 
@@ -65,28 +65,28 @@ func doTestWriteAndReadToLocalSsd(f *framework.Framework) {
 	f.TestContainerOutput(msg, pod, 0, out)
 }
 
-func testPodWithSsd(command string) *api.Pod {
+func testPodWithSsd(command string) *v1.Pod {
 	containerName := "test-container"
 	volumeName := "test-ssd-volume"
 	path := "/mnt/disks/ssd0"
 	podName := "pod-" + string(uuid.NewUUID())
 	image := "ubuntu:14.04"
-	return &api.Pod{
-		TypeMeta: unversioned.TypeMeta{
+	return &v1.Pod{
+		TypeMeta: metav1.TypeMeta{
 			Kind:       "Pod",
-			APIVersion: registered.GroupOrDie(api.GroupName).GroupVersion.String(),
+			APIVersion: registered.GroupOrDie(v1.GroupName).GroupVersion.String(),
 		},
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: v1.ObjectMeta{
 			Name: podName,
 		},
-		Spec: api.PodSpec{
-			Containers: []api.Container{
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
 				{
 					Name:    containerName,
 					Image:   image,
 					Command: []string{"/bin/sh"},
 					Args:    []string{"-c", command},
-					VolumeMounts: []api.VolumeMount{
+					VolumeMounts: []v1.VolumeMount{
 						{
 							Name:      volumeName,
 							MountPath: path,
@@ -94,12 +94,12 @@ func testPodWithSsd(command string) *api.Pod {
 					},
 				},
 			},
-			RestartPolicy: api.RestartPolicyNever,
-			Volumes: []api.Volume{
+			RestartPolicy: v1.RestartPolicyNever,
+			Volumes: []v1.Volume{
 				{
 					Name: volumeName,
-					VolumeSource: api.VolumeSource{
-						HostPath: &api.HostPathVolumeSource{
+					VolumeSource: v1.VolumeSource{
+						HostPath: &v1.HostPathVolumeSource{
 							Path: path,
 						},
 					},

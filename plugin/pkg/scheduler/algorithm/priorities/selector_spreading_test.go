@@ -21,19 +21,19 @@ import (
 	"sort"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/api/v1"
+	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 	schedulerapi "k8s.io/kubernetes/plugin/pkg/scheduler/api"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
 )
 
-func controllerRef(kind, name, uid string) []api.OwnerReference {
+func controllerRef(kind, name, uid string) []metav1.OwnerReference {
 	// TODO: When ControllerRef will be implemented uncomment code below.
 	return nil
 	//trueVar := true
-	//return []api.OwnerReference{
+	//return []metav1.OwnerReference{
 	//	{Kind: kind, Name: name, UID: types.UID(uid), Controller: &trueVar},
 	//}
 }
@@ -47,236 +47,236 @@ func TestSelectorSpreadPriority(t *testing.T) {
 		"bar": "foo",
 		"baz": "blah",
 	}
-	zone1Spec := api.PodSpec{
+	zone1Spec := v1.PodSpec{
 		NodeName: "machine1",
 	}
-	zone2Spec := api.PodSpec{
+	zone2Spec := v1.PodSpec{
 		NodeName: "machine2",
 	}
 	tests := []struct {
-		pod          *api.Pod
-		pods         []*api.Pod
+		pod          *v1.Pod
+		pods         []*v1.Pod
 		nodes        []string
-		rcs          []*api.ReplicationController
+		rcs          []*v1.ReplicationController
 		rss          []*extensions.ReplicaSet
-		services     []*api.Service
+		services     []*v1.Service
 		expectedList schedulerapi.HostPriorityList
 		test         string
 	}{
 		{
-			pod:          new(api.Pod),
+			pod:          new(v1.Pod),
 			nodes:        []string{"machine1", "machine2"},
 			expectedList: []schedulerapi.HostPriority{{Host: "machine1", Score: 10}, {Host: "machine2", Score: 10}},
 			test:         "nothing scheduled",
 		},
 		{
-			pod:          &api.Pod{ObjectMeta: api.ObjectMeta{Labels: labels1}},
-			pods:         []*api.Pod{{Spec: zone1Spec}},
+			pod:          &v1.Pod{ObjectMeta: v1.ObjectMeta{Labels: labels1}},
+			pods:         []*v1.Pod{{Spec: zone1Spec}},
 			nodes:        []string{"machine1", "machine2"},
 			expectedList: []schedulerapi.HostPriority{{Host: "machine1", Score: 10}, {Host: "machine2", Score: 10}},
 			test:         "no services",
 		},
 		{
-			pod:          &api.Pod{ObjectMeta: api.ObjectMeta{Labels: labels1}},
-			pods:         []*api.Pod{{Spec: zone1Spec, ObjectMeta: api.ObjectMeta{Labels: labels2}}},
+			pod:          &v1.Pod{ObjectMeta: v1.ObjectMeta{Labels: labels1}},
+			pods:         []*v1.Pod{{Spec: zone1Spec, ObjectMeta: v1.ObjectMeta{Labels: labels2}}},
 			nodes:        []string{"machine1", "machine2"},
-			services:     []*api.Service{{Spec: api.ServiceSpec{Selector: map[string]string{"key": "value"}}}},
+			services:     []*v1.Service{{Spec: v1.ServiceSpec{Selector: map[string]string{"key": "value"}}}},
 			expectedList: []schedulerapi.HostPriority{{Host: "machine1", Score: 10}, {Host: "machine2", Score: 10}},
 			test:         "different services",
 		},
 		{
-			pod: &api.Pod{ObjectMeta: api.ObjectMeta{Labels: labels1}},
-			pods: []*api.Pod{
-				{Spec: zone1Spec, ObjectMeta: api.ObjectMeta{Labels: labels2}},
-				{Spec: zone2Spec, ObjectMeta: api.ObjectMeta{Labels: labels1}},
+			pod: &v1.Pod{ObjectMeta: v1.ObjectMeta{Labels: labels1}},
+			pods: []*v1.Pod{
+				{Spec: zone1Spec, ObjectMeta: v1.ObjectMeta{Labels: labels2}},
+				{Spec: zone2Spec, ObjectMeta: v1.ObjectMeta{Labels: labels1}},
 			},
 			nodes:        []string{"machine1", "machine2"},
-			services:     []*api.Service{{Spec: api.ServiceSpec{Selector: labels1}}},
+			services:     []*v1.Service{{Spec: v1.ServiceSpec{Selector: labels1}}},
 			expectedList: []schedulerapi.HostPriority{{Host: "machine1", Score: 10}, {Host: "machine2", Score: 0}},
 			test:         "two pods, one service pod",
 		},
 		{
-			pod: &api.Pod{ObjectMeta: api.ObjectMeta{Labels: labels1}},
-			pods: []*api.Pod{
-				{Spec: zone1Spec, ObjectMeta: api.ObjectMeta{Labels: labels2}},
-				{Spec: zone1Spec, ObjectMeta: api.ObjectMeta{Labels: labels1, Namespace: api.NamespaceDefault}},
-				{Spec: zone1Spec, ObjectMeta: api.ObjectMeta{Labels: labels1, Namespace: "ns1"}},
-				{Spec: zone2Spec, ObjectMeta: api.ObjectMeta{Labels: labels1}},
-				{Spec: zone2Spec, ObjectMeta: api.ObjectMeta{Labels: labels2}},
+			pod: &v1.Pod{ObjectMeta: v1.ObjectMeta{Labels: labels1}},
+			pods: []*v1.Pod{
+				{Spec: zone1Spec, ObjectMeta: v1.ObjectMeta{Labels: labels2}},
+				{Spec: zone1Spec, ObjectMeta: v1.ObjectMeta{Labels: labels1, Namespace: v1.NamespaceDefault}},
+				{Spec: zone1Spec, ObjectMeta: v1.ObjectMeta{Labels: labels1, Namespace: "ns1"}},
+				{Spec: zone2Spec, ObjectMeta: v1.ObjectMeta{Labels: labels1}},
+				{Spec: zone2Spec, ObjectMeta: v1.ObjectMeta{Labels: labels2}},
 			},
 			nodes:        []string{"machine1", "machine2"},
-			services:     []*api.Service{{Spec: api.ServiceSpec{Selector: labels1}}},
+			services:     []*v1.Service{{Spec: v1.ServiceSpec{Selector: labels1}}},
 			expectedList: []schedulerapi.HostPriority{{Host: "machine1", Score: 10}, {Host: "machine2", Score: 0}},
 			test:         "five pods, one service pod in no namespace",
 		},
 		{
-			pod: &api.Pod{ObjectMeta: api.ObjectMeta{Labels: labels1, Namespace: api.NamespaceDefault}},
-			pods: []*api.Pod{
-				{Spec: zone1Spec, ObjectMeta: api.ObjectMeta{Labels: labels1}},
-				{Spec: zone1Spec, ObjectMeta: api.ObjectMeta{Labels: labels1, Namespace: "ns1"}},
-				{Spec: zone2Spec, ObjectMeta: api.ObjectMeta{Labels: labels1, Namespace: api.NamespaceDefault}},
-				{Spec: zone2Spec, ObjectMeta: api.ObjectMeta{Labels: labels2}},
+			pod: &v1.Pod{ObjectMeta: v1.ObjectMeta{Labels: labels1, Namespace: v1.NamespaceDefault}},
+			pods: []*v1.Pod{
+				{Spec: zone1Spec, ObjectMeta: v1.ObjectMeta{Labels: labels1}},
+				{Spec: zone1Spec, ObjectMeta: v1.ObjectMeta{Labels: labels1, Namespace: "ns1"}},
+				{Spec: zone2Spec, ObjectMeta: v1.ObjectMeta{Labels: labels1, Namespace: v1.NamespaceDefault}},
+				{Spec: zone2Spec, ObjectMeta: v1.ObjectMeta{Labels: labels2}},
 			},
 			nodes:        []string{"machine1", "machine2"},
-			services:     []*api.Service{{Spec: api.ServiceSpec{Selector: labels1}, ObjectMeta: api.ObjectMeta{Namespace: api.NamespaceDefault}}},
+			services:     []*v1.Service{{Spec: v1.ServiceSpec{Selector: labels1}, ObjectMeta: v1.ObjectMeta{Namespace: v1.NamespaceDefault}}},
 			expectedList: []schedulerapi.HostPriority{{Host: "machine1", Score: 10}, {Host: "machine2", Score: 0}},
 			test:         "four pods, one service pod in default namespace",
 		},
 		{
-			pod: &api.Pod{ObjectMeta: api.ObjectMeta{Labels: labels1, Namespace: "ns1"}},
-			pods: []*api.Pod{
-				{Spec: zone1Spec, ObjectMeta: api.ObjectMeta{Labels: labels1}},
-				{Spec: zone1Spec, ObjectMeta: api.ObjectMeta{Labels: labels1, Namespace: api.NamespaceDefault}},
-				{Spec: zone1Spec, ObjectMeta: api.ObjectMeta{Labels: labels1, Namespace: "ns2"}},
-				{Spec: zone2Spec, ObjectMeta: api.ObjectMeta{Labels: labels1, Namespace: "ns1"}},
-				{Spec: zone2Spec, ObjectMeta: api.ObjectMeta{Labels: labels2}},
+			pod: &v1.Pod{ObjectMeta: v1.ObjectMeta{Labels: labels1, Namespace: "ns1"}},
+			pods: []*v1.Pod{
+				{Spec: zone1Spec, ObjectMeta: v1.ObjectMeta{Labels: labels1}},
+				{Spec: zone1Spec, ObjectMeta: v1.ObjectMeta{Labels: labels1, Namespace: v1.NamespaceDefault}},
+				{Spec: zone1Spec, ObjectMeta: v1.ObjectMeta{Labels: labels1, Namespace: "ns2"}},
+				{Spec: zone2Spec, ObjectMeta: v1.ObjectMeta{Labels: labels1, Namespace: "ns1"}},
+				{Spec: zone2Spec, ObjectMeta: v1.ObjectMeta{Labels: labels2}},
 			},
 			nodes:        []string{"machine1", "machine2"},
-			services:     []*api.Service{{Spec: api.ServiceSpec{Selector: labels1}, ObjectMeta: api.ObjectMeta{Namespace: "ns1"}}},
+			services:     []*v1.Service{{Spec: v1.ServiceSpec{Selector: labels1}, ObjectMeta: v1.ObjectMeta{Namespace: "ns1"}}},
 			expectedList: []schedulerapi.HostPriority{{Host: "machine1", Score: 10}, {Host: "machine2", Score: 0}},
 			test:         "five pods, one service pod in specific namespace",
 		},
 		{
-			pod: &api.Pod{ObjectMeta: api.ObjectMeta{Labels: labels1}},
-			pods: []*api.Pod{
-				{Spec: zone1Spec, ObjectMeta: api.ObjectMeta{Labels: labels2}},
-				{Spec: zone1Spec, ObjectMeta: api.ObjectMeta{Labels: labels1}},
-				{Spec: zone2Spec, ObjectMeta: api.ObjectMeta{Labels: labels1}},
+			pod: &v1.Pod{ObjectMeta: v1.ObjectMeta{Labels: labels1}},
+			pods: []*v1.Pod{
+				{Spec: zone1Spec, ObjectMeta: v1.ObjectMeta{Labels: labels2}},
+				{Spec: zone1Spec, ObjectMeta: v1.ObjectMeta{Labels: labels1}},
+				{Spec: zone2Spec, ObjectMeta: v1.ObjectMeta{Labels: labels1}},
 			},
 			nodes:        []string{"machine1", "machine2"},
-			services:     []*api.Service{{Spec: api.ServiceSpec{Selector: labels1}}},
+			services:     []*v1.Service{{Spec: v1.ServiceSpec{Selector: labels1}}},
 			expectedList: []schedulerapi.HostPriority{{Host: "machine1", Score: 0}, {Host: "machine2", Score: 0}},
 			test:         "three pods, two service pods on different machines",
 		},
 		{
-			pod: &api.Pod{ObjectMeta: api.ObjectMeta{Labels: labels1}},
-			pods: []*api.Pod{
-				{Spec: zone1Spec, ObjectMeta: api.ObjectMeta{Labels: labels2}},
-				{Spec: zone1Spec, ObjectMeta: api.ObjectMeta{Labels: labels1}},
-				{Spec: zone2Spec, ObjectMeta: api.ObjectMeta{Labels: labels1}},
-				{Spec: zone2Spec, ObjectMeta: api.ObjectMeta{Labels: labels1}},
+			pod: &v1.Pod{ObjectMeta: v1.ObjectMeta{Labels: labels1}},
+			pods: []*v1.Pod{
+				{Spec: zone1Spec, ObjectMeta: v1.ObjectMeta{Labels: labels2}},
+				{Spec: zone1Spec, ObjectMeta: v1.ObjectMeta{Labels: labels1}},
+				{Spec: zone2Spec, ObjectMeta: v1.ObjectMeta{Labels: labels1}},
+				{Spec: zone2Spec, ObjectMeta: v1.ObjectMeta{Labels: labels1}},
 			},
 			nodes:        []string{"machine1", "machine2"},
-			services:     []*api.Service{{Spec: api.ServiceSpec{Selector: labels1}}},
+			services:     []*v1.Service{{Spec: v1.ServiceSpec{Selector: labels1}}},
 			expectedList: []schedulerapi.HostPriority{{Host: "machine1", Score: 5}, {Host: "machine2", Score: 0}},
 			test:         "four pods, three service pods",
 		},
 		{
-			pod: &api.Pod{ObjectMeta: api.ObjectMeta{Labels: labels1}},
-			pods: []*api.Pod{
-				{Spec: zone1Spec, ObjectMeta: api.ObjectMeta{Labels: labels2}},
-				{Spec: zone1Spec, ObjectMeta: api.ObjectMeta{Labels: labels1}},
-				{Spec: zone2Spec, ObjectMeta: api.ObjectMeta{Labels: labels1}},
+			pod: &v1.Pod{ObjectMeta: v1.ObjectMeta{Labels: labels1}},
+			pods: []*v1.Pod{
+				{Spec: zone1Spec, ObjectMeta: v1.ObjectMeta{Labels: labels2}},
+				{Spec: zone1Spec, ObjectMeta: v1.ObjectMeta{Labels: labels1}},
+				{Spec: zone2Spec, ObjectMeta: v1.ObjectMeta{Labels: labels1}},
 			},
 			nodes:        []string{"machine1", "machine2"},
-			services:     []*api.Service{{Spec: api.ServiceSpec{Selector: map[string]string{"baz": "blah"}}}},
+			services:     []*v1.Service{{Spec: v1.ServiceSpec{Selector: map[string]string{"baz": "blah"}}}},
 			expectedList: []schedulerapi.HostPriority{{Host: "machine1", Score: 0}, {Host: "machine2", Score: 5}},
 			test:         "service with partial pod label matches",
 		},
 		{
-			pod: &api.Pod{ObjectMeta: api.ObjectMeta{Labels: labels1, OwnerReferences: controllerRef("ReplicationController", "name", "abc123")}},
-			pods: []*api.Pod{
-				{Spec: zone1Spec, ObjectMeta: api.ObjectMeta{Labels: labels2}},
-				{Spec: zone1Spec, ObjectMeta: api.ObjectMeta{Labels: labels1, OwnerReferences: controllerRef("ReplicationController", "name", "abc123")}},
-				{Spec: zone2Spec, ObjectMeta: api.ObjectMeta{Labels: labels1, OwnerReferences: controllerRef("ReplicationController", "name", "abc123")}},
+			pod: &v1.Pod{ObjectMeta: v1.ObjectMeta{Labels: labels1, OwnerReferences: controllerRef("ReplicationController", "name", "abc123")}},
+			pods: []*v1.Pod{
+				{Spec: zone1Spec, ObjectMeta: v1.ObjectMeta{Labels: labels2}},
+				{Spec: zone1Spec, ObjectMeta: v1.ObjectMeta{Labels: labels1, OwnerReferences: controllerRef("ReplicationController", "name", "abc123")}},
+				{Spec: zone2Spec, ObjectMeta: v1.ObjectMeta{Labels: labels1, OwnerReferences: controllerRef("ReplicationController", "name", "abc123")}},
 			},
 			nodes:    []string{"machine1", "machine2"},
-			rcs:      []*api.ReplicationController{{Spec: api.ReplicationControllerSpec{Selector: map[string]string{"foo": "bar"}}}},
-			services: []*api.Service{{Spec: api.ServiceSpec{Selector: map[string]string{"baz": "blah"}}}},
+			rcs:      []*v1.ReplicationController{{Spec: v1.ReplicationControllerSpec{Selector: map[string]string{"foo": "bar"}}}},
+			services: []*v1.Service{{Spec: v1.ServiceSpec{Selector: map[string]string{"baz": "blah"}}}},
 			// "baz=blah" matches both labels1 and labels2, and "foo=bar" matches only labels 1. This means that we assume that we want to
 			// do spreading between all pods. The result should be exactly as above.
 			expectedList: []schedulerapi.HostPriority{{Host: "machine1", Score: 0}, {Host: "machine2", Score: 5}},
 			test:         "service with partial pod label matches with service and replication controller",
 		},
 		{
-			pod: &api.Pod{ObjectMeta: api.ObjectMeta{Labels: labels1, OwnerReferences: controllerRef("ReplicaSet", "name", "abc123")}},
-			pods: []*api.Pod{
-				{Spec: zone1Spec, ObjectMeta: api.ObjectMeta{Labels: labels2}},
-				{Spec: zone1Spec, ObjectMeta: api.ObjectMeta{Labels: labels1, OwnerReferences: controllerRef("ReplicaSet", "name", "abc123")}},
-				{Spec: zone2Spec, ObjectMeta: api.ObjectMeta{Labels: labels1, OwnerReferences: controllerRef("ReplicaSet", "name", "abc123")}},
+			pod: &v1.Pod{ObjectMeta: v1.ObjectMeta{Labels: labels1, OwnerReferences: controllerRef("ReplicaSet", "name", "abc123")}},
+			pods: []*v1.Pod{
+				{Spec: zone1Spec, ObjectMeta: v1.ObjectMeta{Labels: labels2}},
+				{Spec: zone1Spec, ObjectMeta: v1.ObjectMeta{Labels: labels1, OwnerReferences: controllerRef("ReplicaSet", "name", "abc123")}},
+				{Spec: zone2Spec, ObjectMeta: v1.ObjectMeta{Labels: labels1, OwnerReferences: controllerRef("ReplicaSet", "name", "abc123")}},
 			},
 			nodes:    []string{"machine1", "machine2"},
-			services: []*api.Service{{Spec: api.ServiceSpec{Selector: map[string]string{"baz": "blah"}}}},
-			rss:      []*extensions.ReplicaSet{{Spec: extensions.ReplicaSetSpec{Selector: &unversioned.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}}}}},
+			services: []*v1.Service{{Spec: v1.ServiceSpec{Selector: map[string]string{"baz": "blah"}}}},
+			rss:      []*extensions.ReplicaSet{{Spec: extensions.ReplicaSetSpec{Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}}}}},
 			// We use ReplicaSet, instead of ReplicationController. The result should be exactly as above.
 			expectedList: []schedulerapi.HostPriority{{Host: "machine1", Score: 0}, {Host: "machine2", Score: 5}},
 			test:         "service with partial pod label matches with service and replica set",
 		},
 		{
-			pod: &api.Pod{ObjectMeta: api.ObjectMeta{Labels: map[string]string{"foo": "bar", "bar": "foo"}, OwnerReferences: controllerRef("ReplicationController", "name", "abc123")}},
-			pods: []*api.Pod{
-				{Spec: zone1Spec, ObjectMeta: api.ObjectMeta{Labels: labels2}},
-				{Spec: zone1Spec, ObjectMeta: api.ObjectMeta{Labels: labels1, OwnerReferences: controllerRef("ReplicationController", "name", "abc123")}},
-				{Spec: zone2Spec, ObjectMeta: api.ObjectMeta{Labels: labels1, OwnerReferences: controllerRef("ReplicationController", "name", "abc123")}},
+			pod: &v1.Pod{ObjectMeta: v1.ObjectMeta{Labels: map[string]string{"foo": "bar", "bar": "foo"}, OwnerReferences: controllerRef("ReplicationController", "name", "abc123")}},
+			pods: []*v1.Pod{
+				{Spec: zone1Spec, ObjectMeta: v1.ObjectMeta{Labels: labels2}},
+				{Spec: zone1Spec, ObjectMeta: v1.ObjectMeta{Labels: labels1, OwnerReferences: controllerRef("ReplicationController", "name", "abc123")}},
+				{Spec: zone2Spec, ObjectMeta: v1.ObjectMeta{Labels: labels1, OwnerReferences: controllerRef("ReplicationController", "name", "abc123")}},
 			},
 			nodes:    []string{"machine1", "machine2"},
-			rcs:      []*api.ReplicationController{{Spec: api.ReplicationControllerSpec{Selector: map[string]string{"foo": "bar"}}}},
-			services: []*api.Service{{Spec: api.ServiceSpec{Selector: map[string]string{"bar": "foo"}}}},
+			rcs:      []*v1.ReplicationController{{Spec: v1.ReplicationControllerSpec{Selector: map[string]string{"foo": "bar"}}}},
+			services: []*v1.Service{{Spec: v1.ServiceSpec{Selector: map[string]string{"bar": "foo"}}}},
 			// Taken together Service and Replication Controller should match all Pods, hence result should be equal to one above.
 			expectedList: []schedulerapi.HostPriority{{Host: "machine1", Score: 0}, {Host: "machine2", Score: 5}},
 			test:         "disjoined service and replication controller should be treated equally",
 		},
 		{
-			pod: &api.Pod{ObjectMeta: api.ObjectMeta{Labels: map[string]string{"foo": "bar", "bar": "foo"}, OwnerReferences: controllerRef("ReplicaSet", "name", "abc123")}},
-			pods: []*api.Pod{
-				{Spec: zone1Spec, ObjectMeta: api.ObjectMeta{Labels: labels2}},
-				{Spec: zone1Spec, ObjectMeta: api.ObjectMeta{Labels: labels1, OwnerReferences: controllerRef("ReplicaSet", "name", "abc123")}},
-				{Spec: zone2Spec, ObjectMeta: api.ObjectMeta{Labels: labels1, OwnerReferences: controllerRef("ReplicaSet", "name", "abc123")}},
+			pod: &v1.Pod{ObjectMeta: v1.ObjectMeta{Labels: map[string]string{"foo": "bar", "bar": "foo"}, OwnerReferences: controllerRef("ReplicaSet", "name", "abc123")}},
+			pods: []*v1.Pod{
+				{Spec: zone1Spec, ObjectMeta: v1.ObjectMeta{Labels: labels2}},
+				{Spec: zone1Spec, ObjectMeta: v1.ObjectMeta{Labels: labels1, OwnerReferences: controllerRef("ReplicaSet", "name", "abc123")}},
+				{Spec: zone2Spec, ObjectMeta: v1.ObjectMeta{Labels: labels1, OwnerReferences: controllerRef("ReplicaSet", "name", "abc123")}},
 			},
 			nodes:    []string{"machine1", "machine2"},
-			services: []*api.Service{{Spec: api.ServiceSpec{Selector: map[string]string{"bar": "foo"}}}},
-			rss:      []*extensions.ReplicaSet{{Spec: extensions.ReplicaSetSpec{Selector: &unversioned.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}}}}},
+			services: []*v1.Service{{Spec: v1.ServiceSpec{Selector: map[string]string{"bar": "foo"}}}},
+			rss:      []*extensions.ReplicaSet{{Spec: extensions.ReplicaSetSpec{Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}}}}},
 			// We use ReplicaSet, instead of ReplicationController. The result should be exactly as above.
 			expectedList: []schedulerapi.HostPriority{{Host: "machine1", Score: 0}, {Host: "machine2", Score: 5}},
 			test:         "disjoined service and replica set should be treated equally",
 		},
 		{
-			pod: &api.Pod{ObjectMeta: api.ObjectMeta{Labels: labels1, OwnerReferences: controllerRef("ReplicationController", "name", "abc123")}},
-			pods: []*api.Pod{
-				{Spec: zone1Spec, ObjectMeta: api.ObjectMeta{Labels: labels2}},
-				{Spec: zone1Spec, ObjectMeta: api.ObjectMeta{Labels: labels1, OwnerReferences: controllerRef("ReplicationController", "name", "abc123")}},
-				{Spec: zone2Spec, ObjectMeta: api.ObjectMeta{Labels: labels1, OwnerReferences: controllerRef("ReplicationController", "name", "abc123")}},
+			pod: &v1.Pod{ObjectMeta: v1.ObjectMeta{Labels: labels1, OwnerReferences: controllerRef("ReplicationController", "name", "abc123")}},
+			pods: []*v1.Pod{
+				{Spec: zone1Spec, ObjectMeta: v1.ObjectMeta{Labels: labels2}},
+				{Spec: zone1Spec, ObjectMeta: v1.ObjectMeta{Labels: labels1, OwnerReferences: controllerRef("ReplicationController", "name", "abc123")}},
+				{Spec: zone2Spec, ObjectMeta: v1.ObjectMeta{Labels: labels1, OwnerReferences: controllerRef("ReplicationController", "name", "abc123")}},
 			},
 			nodes: []string{"machine1", "machine2"},
-			rcs:   []*api.ReplicationController{{Spec: api.ReplicationControllerSpec{Selector: map[string]string{"foo": "bar"}}}},
+			rcs:   []*v1.ReplicationController{{Spec: v1.ReplicationControllerSpec{Selector: map[string]string{"foo": "bar"}}}},
 			// Both Nodes have one pod from the given RC, hence both get 0 score.
 			expectedList: []schedulerapi.HostPriority{{Host: "machine1", Score: 0}, {Host: "machine2", Score: 0}},
 			test:         "Replication controller with partial pod label matches",
 		},
 		{
-			pod: &api.Pod{ObjectMeta: api.ObjectMeta{Labels: labels1, OwnerReferences: controllerRef("ReplicaSet", "name", "abc123")}},
-			pods: []*api.Pod{
-				{Spec: zone1Spec, ObjectMeta: api.ObjectMeta{Labels: labels2}},
-				{Spec: zone1Spec, ObjectMeta: api.ObjectMeta{Labels: labels1, OwnerReferences: controllerRef("ReplicaSet", "name", "abc123")}},
-				{Spec: zone2Spec, ObjectMeta: api.ObjectMeta{Labels: labels1, OwnerReferences: controllerRef("ReplicaSet", "name", "abc123")}},
+			pod: &v1.Pod{ObjectMeta: v1.ObjectMeta{Labels: labels1, OwnerReferences: controllerRef("ReplicaSet", "name", "abc123")}},
+			pods: []*v1.Pod{
+				{Spec: zone1Spec, ObjectMeta: v1.ObjectMeta{Labels: labels2}},
+				{Spec: zone1Spec, ObjectMeta: v1.ObjectMeta{Labels: labels1, OwnerReferences: controllerRef("ReplicaSet", "name", "abc123")}},
+				{Spec: zone2Spec, ObjectMeta: v1.ObjectMeta{Labels: labels1, OwnerReferences: controllerRef("ReplicaSet", "name", "abc123")}},
 			},
 			nodes: []string{"machine1", "machine2"},
-			rss:   []*extensions.ReplicaSet{{Spec: extensions.ReplicaSetSpec{Selector: &unversioned.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}}}}},
+			rss:   []*extensions.ReplicaSet{{Spec: extensions.ReplicaSetSpec{Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}}}}},
 			// We use ReplicaSet, instead of ReplicationController. The result should be exactly as above.
 			expectedList: []schedulerapi.HostPriority{{Host: "machine1", Score: 0}, {Host: "machine2", Score: 0}},
 			test:         "Replica set with partial pod label matches",
 		},
 		{
-			pod: &api.Pod{ObjectMeta: api.ObjectMeta{Labels: labels1, OwnerReferences: controllerRef("ReplicationController", "name", "abc123")}},
-			pods: []*api.Pod{
-				{Spec: zone1Spec, ObjectMeta: api.ObjectMeta{Labels: labels2, OwnerReferences: controllerRef("ReplicationController", "name", "abc123")}},
-				{Spec: zone1Spec, ObjectMeta: api.ObjectMeta{Labels: labels1, OwnerReferences: controllerRef("ReplicationController", "name", "abc123")}},
-				{Spec: zone2Spec, ObjectMeta: api.ObjectMeta{Labels: labels1, OwnerReferences: controllerRef("ReplicationController", "name", "abc123")}},
+			pod: &v1.Pod{ObjectMeta: v1.ObjectMeta{Labels: labels1, OwnerReferences: controllerRef("ReplicationController", "name", "abc123")}},
+			pods: []*v1.Pod{
+				{Spec: zone1Spec, ObjectMeta: v1.ObjectMeta{Labels: labels2, OwnerReferences: controllerRef("ReplicationController", "name", "abc123")}},
+				{Spec: zone1Spec, ObjectMeta: v1.ObjectMeta{Labels: labels1, OwnerReferences: controllerRef("ReplicationController", "name", "abc123")}},
+				{Spec: zone2Spec, ObjectMeta: v1.ObjectMeta{Labels: labels1, OwnerReferences: controllerRef("ReplicationController", "name", "abc123")}},
 			},
 			nodes:        []string{"machine1", "machine2"},
-			rcs:          []*api.ReplicationController{{Spec: api.ReplicationControllerSpec{Selector: map[string]string{"baz": "blah"}}}},
+			rcs:          []*v1.ReplicationController{{Spec: v1.ReplicationControllerSpec{Selector: map[string]string{"baz": "blah"}}}},
 			expectedList: []schedulerapi.HostPriority{{Host: "machine1", Score: 0}, {Host: "machine2", Score: 5}},
 			test:         "Another replication controller with partial pod label matches",
 		},
 		{
-			pod: &api.Pod{ObjectMeta: api.ObjectMeta{Labels: labels1, OwnerReferences: controllerRef("ReplicaSet", "name", "abc123")}},
-			pods: []*api.Pod{
-				{Spec: zone1Spec, ObjectMeta: api.ObjectMeta{Labels: labels2, OwnerReferences: controllerRef("ReplicaSet", "name", "abc123")}},
-				{Spec: zone1Spec, ObjectMeta: api.ObjectMeta{Labels: labels1, OwnerReferences: controllerRef("ReplicaSet", "name", "abc123")}},
-				{Spec: zone2Spec, ObjectMeta: api.ObjectMeta{Labels: labels1, OwnerReferences: controllerRef("ReplicaSet", "name", "abc123")}},
+			pod: &v1.Pod{ObjectMeta: v1.ObjectMeta{Labels: labels1, OwnerReferences: controllerRef("ReplicaSet", "name", "abc123")}},
+			pods: []*v1.Pod{
+				{Spec: zone1Spec, ObjectMeta: v1.ObjectMeta{Labels: labels2, OwnerReferences: controllerRef("ReplicaSet", "name", "abc123")}},
+				{Spec: zone1Spec, ObjectMeta: v1.ObjectMeta{Labels: labels1, OwnerReferences: controllerRef("ReplicaSet", "name", "abc123")}},
+				{Spec: zone2Spec, ObjectMeta: v1.ObjectMeta{Labels: labels1, OwnerReferences: controllerRef("ReplicaSet", "name", "abc123")}},
 			},
 			nodes: []string{"machine1", "machine2"},
-			rss:   []*extensions.ReplicaSet{{Spec: extensions.ReplicaSetSpec{Selector: &unversioned.LabelSelector{MatchLabels: map[string]string{"baz": "blah"}}}}},
+			rss:   []*extensions.ReplicaSet{{Spec: extensions.ReplicaSetSpec{Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"baz": "blah"}}}}},
 			// We use ReplicaSet, instead of ReplicationController. The result should be exactly as above.
 			expectedList: []schedulerapi.HostPriority{{Host: "machine1", Score: 0}, {Host: "machine2", Score: 5}},
 			test:         "Another replication set with partial pod label matches",
@@ -300,10 +300,10 @@ func TestSelectorSpreadPriority(t *testing.T) {
 	}
 }
 
-func buildPod(nodeName string, labels map[string]string, ownerRefs []api.OwnerReference) *api.Pod {
-	return &api.Pod{
-		ObjectMeta: api.ObjectMeta{Labels: labels, OwnerReferences: ownerRefs},
-		Spec:       api.PodSpec{NodeName: nodeName},
+func buildPod(nodeName string, labels map[string]string, ownerRefs []metav1.OwnerReference) *v1.Pod {
+	return &v1.Pod{
+		ObjectMeta: v1.ObjectMeta{Labels: labels, OwnerReferences: ownerRefs},
+		Spec:       v1.PodSpec{NodeName: nodeName},
 	}
 }
 
@@ -326,7 +326,7 @@ func TestZoneSelectorSpreadPriority(t *testing.T) {
 
 	buildNodeLabels := func(failureDomain string) map[string]string {
 		labels := map[string]string{
-			unversioned.LabelZoneFailureDomain: failureDomain,
+			metav1.LabelZoneFailureDomain: failureDomain,
 		}
 		return labels
 	}
@@ -340,17 +340,17 @@ func TestZoneSelectorSpreadPriority(t *testing.T) {
 	}
 
 	tests := []struct {
-		pod          *api.Pod
-		pods         []*api.Pod
+		pod          *v1.Pod
+		pods         []*v1.Pod
 		nodes        []string
-		rcs          []*api.ReplicationController
+		rcs          []*v1.ReplicationController
 		rss          []*extensions.ReplicaSet
-		services     []*api.Service
+		services     []*v1.Service
 		expectedList schedulerapi.HostPriorityList
 		test         string
 	}{
 		{
-			pod: new(api.Pod),
+			pod: new(v1.Pod),
 			expectedList: []schedulerapi.HostPriority{
 				{Host: nodeMachine1Zone1, Score: 10},
 				{Host: nodeMachine1Zone2, Score: 10},
@@ -363,7 +363,7 @@ func TestZoneSelectorSpreadPriority(t *testing.T) {
 		},
 		{
 			pod:  buildPod("", labels1, nil),
-			pods: []*api.Pod{buildPod(nodeMachine1Zone1, nil, nil)},
+			pods: []*v1.Pod{buildPod(nodeMachine1Zone1, nil, nil)},
 			expectedList: []schedulerapi.HostPriority{
 				{Host: nodeMachine1Zone1, Score: 10},
 				{Host: nodeMachine1Zone2, Score: 10},
@@ -376,8 +376,8 @@ func TestZoneSelectorSpreadPriority(t *testing.T) {
 		},
 		{
 			pod:      buildPod("", labels1, nil),
-			pods:     []*api.Pod{buildPod(nodeMachine1Zone1, labels2, nil)},
-			services: []*api.Service{{Spec: api.ServiceSpec{Selector: map[string]string{"key": "value"}}}},
+			pods:     []*v1.Pod{buildPod(nodeMachine1Zone1, labels2, nil)},
+			services: []*v1.Service{{Spec: v1.ServiceSpec{Selector: map[string]string{"key": "value"}}}},
 			expectedList: []schedulerapi.HostPriority{
 				{Host: nodeMachine1Zone1, Score: 10},
 				{Host: nodeMachine1Zone2, Score: 10},
@@ -390,11 +390,11 @@ func TestZoneSelectorSpreadPriority(t *testing.T) {
 		},
 		{
 			pod: buildPod("", labels1, nil),
-			pods: []*api.Pod{
+			pods: []*v1.Pod{
 				buildPod(nodeMachine1Zone1, labels2, nil),
 				buildPod(nodeMachine1Zone2, labels1, nil),
 			},
-			services: []*api.Service{{Spec: api.ServiceSpec{Selector: labels1}}},
+			services: []*v1.Service{{Spec: v1.ServiceSpec{Selector: labels1}}},
 			expectedList: []schedulerapi.HostPriority{
 				{Host: nodeMachine1Zone1, Score: 10},
 				{Host: nodeMachine1Zone2, Score: 0}, // Already have pod on machine
@@ -407,14 +407,14 @@ func TestZoneSelectorSpreadPriority(t *testing.T) {
 		},
 		{
 			pod: buildPod("", labels1, nil),
-			pods: []*api.Pod{
+			pods: []*v1.Pod{
 				buildPod(nodeMachine1Zone1, labels2, nil),
 				buildPod(nodeMachine1Zone2, labels1, nil),
 				buildPod(nodeMachine2Zone2, labels1, nil),
 				buildPod(nodeMachine1Zone3, labels2, nil),
 				buildPod(nodeMachine2Zone3, labels1, nil),
 			},
-			services: []*api.Service{{Spec: api.ServiceSpec{Selector: labels1}}},
+			services: []*v1.Service{{Spec: v1.ServiceSpec{Selector: labels1}}},
 			expectedList: []schedulerapi.HostPriority{
 				{Host: nodeMachine1Zone1, Score: 10},
 				{Host: nodeMachine1Zone2, Score: 0}, // Pod on node
@@ -427,13 +427,13 @@ func TestZoneSelectorSpreadPriority(t *testing.T) {
 		},
 		{
 			pod: buildPod("", labels1, nil),
-			pods: []*api.Pod{
+			pods: []*v1.Pod{
 				buildPod(nodeMachine1Zone1, labels1, nil),
 				buildPod(nodeMachine1Zone2, labels1, nil),
 				buildPod(nodeMachine2Zone2, labels2, nil),
 				buildPod(nodeMachine1Zone3, labels1, nil),
 			},
-			services: []*api.Service{{Spec: api.ServiceSpec{Selector: labels1}}},
+			services: []*v1.Service{{Spec: v1.ServiceSpec{Selector: labels1}}},
 			expectedList: []schedulerapi.HostPriority{
 				{Host: nodeMachine1Zone1, Score: 0}, // Pod on node
 				{Host: nodeMachine1Zone2, Score: 0}, // Pod on node
@@ -446,13 +446,13 @@ func TestZoneSelectorSpreadPriority(t *testing.T) {
 		},
 		{
 			pod: buildPod("", labels1, nil),
-			pods: []*api.Pod{
+			pods: []*v1.Pod{
 				buildPod(nodeMachine1Zone1, labels1, nil),
 				buildPod(nodeMachine1Zone2, labels1, nil),
 				buildPod(nodeMachine1Zone3, labels1, nil),
 				buildPod(nodeMachine2Zone2, labels2, nil),
 			},
-			services: []*api.Service{{Spec: api.ServiceSpec{Selector: labels1}}},
+			services: []*v1.Service{{Spec: v1.ServiceSpec{Selector: labels1}}},
 			expectedList: []schedulerapi.HostPriority{
 				{Host: nodeMachine1Zone1, Score: 0}, // Pod on node
 				{Host: nodeMachine1Zone2, Score: 0}, // Pod on node
@@ -465,12 +465,12 @@ func TestZoneSelectorSpreadPriority(t *testing.T) {
 		},
 		{
 			pod: buildPod("", labels1, controllerRef("ReplicationController", "name", "abc123")),
-			pods: []*api.Pod{
+			pods: []*v1.Pod{
 				buildPod(nodeMachine1Zone3, labels1, controllerRef("ReplicationController", "name", "abc123")),
 				buildPod(nodeMachine1Zone2, labels1, controllerRef("ReplicationController", "name", "abc123")),
 				buildPod(nodeMachine1Zone3, labels1, controllerRef("ReplicationController", "name", "abc123")),
 			},
-			rcs: []*api.ReplicationController{{Spec: api.ReplicationControllerSpec{Selector: labels1}}},
+			rcs: []*v1.ReplicationController{{Spec: v1.ReplicationControllerSpec{Selector: labels1}}},
 			expectedList: []schedulerapi.HostPriority{
 				// Note that because we put two pods on the same node (nodeMachine1Zone3),
 				// the values here are questionable for zone2, in particular for nodeMachine1Zone2.
@@ -528,13 +528,13 @@ func TestZoneSpreadPriority(t *testing.T) {
 	nozone := map[string]string{
 		"name": "value",
 	}
-	zone0Spec := api.PodSpec{
+	zone0Spec := v1.PodSpec{
 		NodeName: "machine01",
 	}
-	zone1Spec := api.PodSpec{
+	zone1Spec := v1.PodSpec{
 		NodeName: "machine11",
 	}
-	zone2Spec := api.PodSpec{
+	zone2Spec := v1.PodSpec{
 		NodeName: "machine21",
 	}
 	labeledNodes := map[string]map[string]string{
@@ -543,15 +543,15 @@ func TestZoneSpreadPriority(t *testing.T) {
 		"machine21": zone2, "machine22": zone2,
 	}
 	tests := []struct {
-		pod          *api.Pod
-		pods         []*api.Pod
+		pod          *v1.Pod
+		pods         []*v1.Pod
 		nodes        map[string]map[string]string
-		services     []*api.Service
+		services     []*v1.Service
 		expectedList schedulerapi.HostPriorityList
 		test         string
 	}{
 		{
-			pod:   new(api.Pod),
+			pod:   new(v1.Pod),
 			nodes: labeledNodes,
 			expectedList: []schedulerapi.HostPriority{{Host: "machine11", Score: 10}, {Host: "machine12", Score: 10},
 				{Host: "machine21", Score: 10}, {Host: "machine22", Score: 10},
@@ -559,8 +559,8 @@ func TestZoneSpreadPriority(t *testing.T) {
 			test: "nothing scheduled",
 		},
 		{
-			pod:   &api.Pod{ObjectMeta: api.ObjectMeta{Labels: labels1}},
-			pods:  []*api.Pod{{Spec: zone1Spec}},
+			pod:   &v1.Pod{ObjectMeta: v1.ObjectMeta{Labels: labels1}},
+			pods:  []*v1.Pod{{Spec: zone1Spec}},
 			nodes: labeledNodes,
 			expectedList: []schedulerapi.HostPriority{{Host: "machine11", Score: 10}, {Host: "machine12", Score: 10},
 				{Host: "machine21", Score: 10}, {Host: "machine22", Score: 10},
@@ -568,97 +568,97 @@ func TestZoneSpreadPriority(t *testing.T) {
 			test: "no services",
 		},
 		{
-			pod:      &api.Pod{ObjectMeta: api.ObjectMeta{Labels: labels1}},
-			pods:     []*api.Pod{{Spec: zone1Spec, ObjectMeta: api.ObjectMeta{Labels: labels2}}},
+			pod:      &v1.Pod{ObjectMeta: v1.ObjectMeta{Labels: labels1}},
+			pods:     []*v1.Pod{{Spec: zone1Spec, ObjectMeta: v1.ObjectMeta{Labels: labels2}}},
 			nodes:    labeledNodes,
-			services: []*api.Service{{Spec: api.ServiceSpec{Selector: map[string]string{"key": "value"}}}},
+			services: []*v1.Service{{Spec: v1.ServiceSpec{Selector: map[string]string{"key": "value"}}}},
 			expectedList: []schedulerapi.HostPriority{{Host: "machine11", Score: 10}, {Host: "machine12", Score: 10},
 				{Host: "machine21", Score: 10}, {Host: "machine22", Score: 10},
 				{Host: "machine01", Score: 0}, {Host: "machine02", Score: 0}},
 			test: "different services",
 		},
 		{
-			pod: &api.Pod{ObjectMeta: api.ObjectMeta{Labels: labels1}},
-			pods: []*api.Pod{
-				{Spec: zone0Spec, ObjectMeta: api.ObjectMeta{Labels: labels2}},
-				{Spec: zone1Spec, ObjectMeta: api.ObjectMeta{Labels: labels2}},
-				{Spec: zone2Spec, ObjectMeta: api.ObjectMeta{Labels: labels1}},
+			pod: &v1.Pod{ObjectMeta: v1.ObjectMeta{Labels: labels1}},
+			pods: []*v1.Pod{
+				{Spec: zone0Spec, ObjectMeta: v1.ObjectMeta{Labels: labels2}},
+				{Spec: zone1Spec, ObjectMeta: v1.ObjectMeta{Labels: labels2}},
+				{Spec: zone2Spec, ObjectMeta: v1.ObjectMeta{Labels: labels1}},
 			},
 			nodes:    labeledNodes,
-			services: []*api.Service{{Spec: api.ServiceSpec{Selector: labels1}}},
+			services: []*v1.Service{{Spec: v1.ServiceSpec{Selector: labels1}}},
 			expectedList: []schedulerapi.HostPriority{{Host: "machine11", Score: 10}, {Host: "machine12", Score: 10},
 				{Host: "machine21", Score: 0}, {Host: "machine22", Score: 0},
 				{Host: "machine01", Score: 0}, {Host: "machine02", Score: 0}},
 			test: "three pods, one service pod",
 		},
 		{
-			pod: &api.Pod{ObjectMeta: api.ObjectMeta{Labels: labels1}},
-			pods: []*api.Pod{
-				{Spec: zone1Spec, ObjectMeta: api.ObjectMeta{Labels: labels2}},
-				{Spec: zone1Spec, ObjectMeta: api.ObjectMeta{Labels: labels1}},
-				{Spec: zone2Spec, ObjectMeta: api.ObjectMeta{Labels: labels1}},
+			pod: &v1.Pod{ObjectMeta: v1.ObjectMeta{Labels: labels1}},
+			pods: []*v1.Pod{
+				{Spec: zone1Spec, ObjectMeta: v1.ObjectMeta{Labels: labels2}},
+				{Spec: zone1Spec, ObjectMeta: v1.ObjectMeta{Labels: labels1}},
+				{Spec: zone2Spec, ObjectMeta: v1.ObjectMeta{Labels: labels1}},
 			},
 			nodes:    labeledNodes,
-			services: []*api.Service{{Spec: api.ServiceSpec{Selector: labels1}}},
+			services: []*v1.Service{{Spec: v1.ServiceSpec{Selector: labels1}}},
 			expectedList: []schedulerapi.HostPriority{{Host: "machine11", Score: 5}, {Host: "machine12", Score: 5},
 				{Host: "machine21", Score: 5}, {Host: "machine22", Score: 5},
 				{Host: "machine01", Score: 0}, {Host: "machine02", Score: 0}},
 			test: "three pods, two service pods on different machines",
 		},
 		{
-			pod: &api.Pod{ObjectMeta: api.ObjectMeta{Labels: labels1, Namespace: api.NamespaceDefault}},
-			pods: []*api.Pod{
-				{Spec: zone1Spec, ObjectMeta: api.ObjectMeta{Labels: labels1}},
-				{Spec: zone1Spec, ObjectMeta: api.ObjectMeta{Labels: labels1, Namespace: api.NamespaceDefault}},
-				{Spec: zone2Spec, ObjectMeta: api.ObjectMeta{Labels: labels1}},
-				{Spec: zone2Spec, ObjectMeta: api.ObjectMeta{Labels: labels1, Namespace: "ns1"}},
+			pod: &v1.Pod{ObjectMeta: v1.ObjectMeta{Labels: labels1, Namespace: v1.NamespaceDefault}},
+			pods: []*v1.Pod{
+				{Spec: zone1Spec, ObjectMeta: v1.ObjectMeta{Labels: labels1}},
+				{Spec: zone1Spec, ObjectMeta: v1.ObjectMeta{Labels: labels1, Namespace: v1.NamespaceDefault}},
+				{Spec: zone2Spec, ObjectMeta: v1.ObjectMeta{Labels: labels1}},
+				{Spec: zone2Spec, ObjectMeta: v1.ObjectMeta{Labels: labels1, Namespace: "ns1"}},
 			},
 			nodes:    labeledNodes,
-			services: []*api.Service{{Spec: api.ServiceSpec{Selector: labels1}, ObjectMeta: api.ObjectMeta{Namespace: api.NamespaceDefault}}},
+			services: []*v1.Service{{Spec: v1.ServiceSpec{Selector: labels1}, ObjectMeta: v1.ObjectMeta{Namespace: v1.NamespaceDefault}}},
 			expectedList: []schedulerapi.HostPriority{{Host: "machine11", Score: 0}, {Host: "machine12", Score: 0},
 				{Host: "machine21", Score: 10}, {Host: "machine22", Score: 10},
 				{Host: "machine01", Score: 0}, {Host: "machine02", Score: 0}},
 			test: "three service label match pods in different namespaces",
 		},
 		{
-			pod: &api.Pod{ObjectMeta: api.ObjectMeta{Labels: labels1}},
-			pods: []*api.Pod{
-				{Spec: zone1Spec, ObjectMeta: api.ObjectMeta{Labels: labels2}},
-				{Spec: zone1Spec, ObjectMeta: api.ObjectMeta{Labels: labels1}},
-				{Spec: zone2Spec, ObjectMeta: api.ObjectMeta{Labels: labels1}},
-				{Spec: zone2Spec, ObjectMeta: api.ObjectMeta{Labels: labels1}},
+			pod: &v1.Pod{ObjectMeta: v1.ObjectMeta{Labels: labels1}},
+			pods: []*v1.Pod{
+				{Spec: zone1Spec, ObjectMeta: v1.ObjectMeta{Labels: labels2}},
+				{Spec: zone1Spec, ObjectMeta: v1.ObjectMeta{Labels: labels1}},
+				{Spec: zone2Spec, ObjectMeta: v1.ObjectMeta{Labels: labels1}},
+				{Spec: zone2Spec, ObjectMeta: v1.ObjectMeta{Labels: labels1}},
 			},
 			nodes:    labeledNodes,
-			services: []*api.Service{{Spec: api.ServiceSpec{Selector: labels1}}},
+			services: []*v1.Service{{Spec: v1.ServiceSpec{Selector: labels1}}},
 			expectedList: []schedulerapi.HostPriority{{Host: "machine11", Score: 6}, {Host: "machine12", Score: 6},
 				{Host: "machine21", Score: 3}, {Host: "machine22", Score: 3},
 				{Host: "machine01", Score: 0}, {Host: "machine02", Score: 0}},
 			test: "four pods, three service pods",
 		},
 		{
-			pod: &api.Pod{ObjectMeta: api.ObjectMeta{Labels: labels1}},
-			pods: []*api.Pod{
-				{Spec: zone1Spec, ObjectMeta: api.ObjectMeta{Labels: labels2}},
-				{Spec: zone1Spec, ObjectMeta: api.ObjectMeta{Labels: labels1}},
-				{Spec: zone2Spec, ObjectMeta: api.ObjectMeta{Labels: labels1}},
+			pod: &v1.Pod{ObjectMeta: v1.ObjectMeta{Labels: labels1}},
+			pods: []*v1.Pod{
+				{Spec: zone1Spec, ObjectMeta: v1.ObjectMeta{Labels: labels2}},
+				{Spec: zone1Spec, ObjectMeta: v1.ObjectMeta{Labels: labels1}},
+				{Spec: zone2Spec, ObjectMeta: v1.ObjectMeta{Labels: labels1}},
 			},
 			nodes:    labeledNodes,
-			services: []*api.Service{{Spec: api.ServiceSpec{Selector: map[string]string{"baz": "blah"}}}},
+			services: []*v1.Service{{Spec: v1.ServiceSpec{Selector: map[string]string{"baz": "blah"}}}},
 			expectedList: []schedulerapi.HostPriority{{Host: "machine11", Score: 3}, {Host: "machine12", Score: 3},
 				{Host: "machine21", Score: 6}, {Host: "machine22", Score: 6},
 				{Host: "machine01", Score: 0}, {Host: "machine02", Score: 0}},
 			test: "service with partial pod label matches",
 		},
 		{
-			pod: &api.Pod{ObjectMeta: api.ObjectMeta{Labels: labels1}},
-			pods: []*api.Pod{
-				{Spec: zone0Spec, ObjectMeta: api.ObjectMeta{Labels: labels1}},
-				{Spec: zone1Spec, ObjectMeta: api.ObjectMeta{Labels: labels1}},
-				{Spec: zone2Spec, ObjectMeta: api.ObjectMeta{Labels: labels1}},
-				{Spec: zone2Spec, ObjectMeta: api.ObjectMeta{Labels: labels1}},
+			pod: &v1.Pod{ObjectMeta: v1.ObjectMeta{Labels: labels1}},
+			pods: []*v1.Pod{
+				{Spec: zone0Spec, ObjectMeta: v1.ObjectMeta{Labels: labels1}},
+				{Spec: zone1Spec, ObjectMeta: v1.ObjectMeta{Labels: labels1}},
+				{Spec: zone2Spec, ObjectMeta: v1.ObjectMeta{Labels: labels1}},
+				{Spec: zone2Spec, ObjectMeta: v1.ObjectMeta{Labels: labels1}},
 			},
 			nodes:    labeledNodes,
-			services: []*api.Service{{Spec: api.ServiceSpec{Selector: labels1}}},
+			services: []*v1.Service{{Spec: v1.ServiceSpec{Selector: labels1}}},
 			expectedList: []schedulerapi.HostPriority{{Host: "machine11", Score: 7}, {Host: "machine12", Score: 7},
 				{Host: "machine21", Score: 5}, {Host: "machine22", Score: 5},
 				{Host: "machine01", Score: 0}, {Host: "machine02", Score: 0}},
@@ -682,18 +682,18 @@ func TestZoneSpreadPriority(t *testing.T) {
 	}
 }
 
-func makeLabeledNodeList(nodeMap map[string]map[string]string) []*api.Node {
-	nodes := make([]*api.Node, 0, len(nodeMap))
+func makeLabeledNodeList(nodeMap map[string]map[string]string) []*v1.Node {
+	nodes := make([]*v1.Node, 0, len(nodeMap))
 	for nodeName, labels := range nodeMap {
-		nodes = append(nodes, &api.Node{ObjectMeta: api.ObjectMeta{Name: nodeName, Labels: labels}})
+		nodes = append(nodes, &v1.Node{ObjectMeta: v1.ObjectMeta{Name: nodeName, Labels: labels}})
 	}
 	return nodes
 }
 
-func makeNodeList(nodeNames []string) []*api.Node {
-	nodes := make([]*api.Node, 0, len(nodeNames))
+func makeNodeList(nodeNames []string) []*v1.Node {
+	nodes := make([]*v1.Node, 0, len(nodeNames))
 	for _, nodeName := range nodeNames {
-		nodes = append(nodes, &api.Node{ObjectMeta: api.ObjectMeta{Name: nodeName}})
+		nodes = append(nodes, &v1.Node{ObjectMeta: v1.ObjectMeta{Name: nodeName}})
 	}
 	return nodes
 }

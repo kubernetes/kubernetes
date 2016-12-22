@@ -17,12 +17,11 @@ limitations under the License.
 package system
 
 import (
-	"strings"
-
-	"k8s.io/kubernetes/pkg/api"
+	"regexp"
 )
 
 // TODO: find a better way of figuring out if given node is a registered master.
-func IsMasterNode(node *api.Node) bool {
-	return strings.HasSuffix(node.Name, "master")
+func IsMasterNode(nodeName string) bool {
+	r := regexp.MustCompile("master(-...)?$")
+	return r.MatchString(nodeName)
 }

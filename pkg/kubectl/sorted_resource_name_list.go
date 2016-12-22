@@ -79,7 +79,7 @@ func (list SortableVolumeMounts) Less(i, j int) bool {
 func SortedQoSResourceNames(list qos.QOSList) []api.ResourceName {
 	resources := make([]api.ResourceName, 0, len(list))
 	for res := range list {
-		resources = append(resources, res)
+		resources = append(resources, api.ResourceName(res))
 	}
 	sort.Sort(SortableResourceNames(resources))
 	return resources

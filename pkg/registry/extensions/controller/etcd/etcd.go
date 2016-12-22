@@ -22,7 +22,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/rest"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/registry/core/controller"
 	"k8s.io/kubernetes/pkg/registry/core/controller/etcd"
 	"k8s.io/kubernetes/pkg/registry/generic"
@@ -39,9 +39,9 @@ type ContainerStorage struct {
 	Scale                 *ScaleREST
 }
 
-func NewStorage(opts generic.RESTOptions) ContainerStorage {
+func NewStorage(optsGetter generic.RESTOptionsGetter) ContainerStorage {
 	// scale does not set status, only updates spec so we ignore the status
-	controllerREST, _ := etcd.NewREST(opts)
+	controllerREST, _ := etcd.NewREST(optsGetter)
 	rcRegistry := controller.NewRegistry(controllerREST)
 
 	return ContainerStorage{
@@ -62,8 +62,8 @@ func (r *ScaleREST) New() runtime.Object {
 	return &extensions.Scale{}
 }
 
-func (r *ScaleREST) Get(ctx api.Context, name string) (runtime.Object, error) {
-	rc, err := (*r.registry).GetController(ctx, name)
+func (r *ScaleREST) Get(ctx api.Context, name string, options *metav1.GetOptions) (runtime.Object, error) {
+	rc, err := (*r.registry).GetController(ctx, name, options)
 	if err != nil {
 		return nil, errors.NewNotFound(extensions.Resource("replicationcontrollers/scale"), name)
 	}
@@ -71,7 +71,7 @@ func (r *ScaleREST) Get(ctx api.Context, name string) (runtime.Object, error) {
 }
 
 func (r *ScaleREST) Update(ctx api.Context, name string, objInfo rest.UpdatedObjectInfo) (runtime.Object, bool, error) {
-	rc, err := (*r.registry).GetController(ctx, name)
+	rc, err := (*r.registry).GetController(ctx, name, &metav1.GetOptions{})
 	if err != nil {
 		return nil, false, errors.NewNotFound(extensions.Resource("replicationcontrollers/scale"), name)
 	}
@@ -115,7 +115,7 @@ func scaleFromRC(rc *api.ReplicationController) *extensions.Scale {
 		},
 		Status: extensions.ScaleStatus{
 			Replicas: rc.Status.Replicas,
-			Selector: &unversioned.LabelSelector{
+			Selector: &metav1.LabelSelector{
 				MatchLabels: rc.Spec.Selector,
 			},
 		},

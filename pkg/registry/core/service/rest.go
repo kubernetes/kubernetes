@@ -29,8 +29,8 @@ import (
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/rest"
 	apiservice "k8s.io/kubernetes/pkg/api/service"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/validation"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/registry/core/endpoint"
 	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
 	"k8s.io/kubernetes/pkg/registry/core/service/portallocator"
@@ -206,7 +206,7 @@ func (rs *REST) Create(ctx api.Context, obj runtime.Object) (runtime.Object, err
 }
 
 func (rs *REST) Delete(ctx api.Context, id string) (runtime.Object, error) {
-	service, err := rs.registry.GetService(ctx, id)
+	service, err := rs.registry.GetService(ctx, id, &metav1.GetOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -245,11 +245,11 @@ func (rs *REST) Delete(ctx api.Context, id string) (runtime.Object, error) {
 			}
 		}
 	}
-	return &unversioned.Status{Status: unversioned.StatusSuccess}, nil
+	return &metav1.Status{Status: metav1.StatusSuccess}, nil
 }
 
-func (rs *REST) Get(ctx api.Context, id string) (runtime.Object, error) {
-	return rs.registry.GetService(ctx, id)
+func (rs *REST) Get(ctx api.Context, id string, options *metav1.GetOptions) (runtime.Object, error) {
+	return rs.registry.GetService(ctx, id, options)
 }
 
 func (rs *REST) List(ctx api.Context, options *api.ListOptions) (runtime.Object, error) {
@@ -264,7 +264,7 @@ func (rs *REST) Watch(ctx api.Context, options *api.ListOptions) (watch.Interfac
 
 // Export returns Service stripped of cluster-specific information.
 // It implements rest.Exporter.
-func (rs *REST) Export(ctx api.Context, name string, opts unversioned.ExportOptions) (runtime.Object, error) {
+func (rs *REST) Export(ctx api.Context, name string, opts metav1.ExportOptions) (runtime.Object, error) {
 	return rs.registry.ExportService(ctx, name, opts)
 }
 
@@ -369,7 +369,7 @@ func (rs *REST) healthCheckNodePortUpdate(oldService, service *api.Service) (boo
 }
 
 func (rs *REST) Update(ctx api.Context, name string, objInfo rest.UpdatedObjectInfo) (runtime.Object, bool, error) {
-	oldService, err := rs.registry.GetService(ctx, name)
+	oldService, err := rs.registry.GetService(ctx, name, &metav1.GetOptions{})
 	if err != nil {
 		return nil, false, err
 	}
@@ -476,7 +476,7 @@ func (rs *REST) ResourceLocation(ctx api.Context, id string) (*url.URL, http.Rou
 
 	// If a port *number* was specified, find the corresponding service port name
 	if portNum, err := strconv.ParseInt(portStr, 10, 64); err == nil {
-		svc, err := rs.registry.GetService(ctx, svcName)
+		svc, err := rs.registry.GetService(ctx, svcName, &metav1.GetOptions{})
 		if err != nil {
 			return nil, nil, err
 		}
@@ -494,7 +494,7 @@ func (rs *REST) ResourceLocation(ctx api.Context, id string) (*url.URL, http.Rou
 		}
 	}
 
-	eps, err := rs.endpoints.GetEndpoints(ctx, svcName)
+	eps, err := rs.endpoints.GetEndpoints(ctx, svcName, &metav1.GetOptions{})
 	if err != nil {
 		return nil, nil, err
 	}

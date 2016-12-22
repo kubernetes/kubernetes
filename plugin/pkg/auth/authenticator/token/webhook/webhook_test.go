@@ -30,8 +30,8 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/authentication/v1beta1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/auth/user"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api/v1"
 )
@@ -309,7 +309,7 @@ func TestWebhookTokenAuthenticator(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	expTypeMeta := unversioned.TypeMeta{
+	expTypeMeta := metav1.TypeMeta{
 		APIVersion: "authentication.k8s.io/v1beta1",
 		Kind:       "TokenReview",
 	}

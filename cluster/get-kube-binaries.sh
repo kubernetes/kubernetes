@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Copyright 2016 The Kubernetes Authors.
 #
@@ -27,6 +27,7 @@
 #    * arm
 #    * arm64
 #    * ppc64le
+#    * s390x
 #
 #  Set KUBERNETES_SKIP_CONFIRM to skip the installation confirmation prompt.
 #  Set KUBERNETES_RELEASE_URL to choose where to download binaries from.
@@ -45,7 +46,7 @@ KUBERNETES_RELEASE_URL="${KUBERNETES_RELEASE_URL:-https://storage.googleapis.com
 function detect_kube_release() {
   if [[ ! -e "${KUBE_ROOT}/version" ]]; then
     echo "Can't determine Kubernetes release." >&2
-    echo "This script should only be run from a prebuilt Kubernetes release." >&2
+    echo "${BASH_SOURCE} should only be run from a prebuilt Kubernetes release." >&2
     echo "Did you mean to use get-kube.sh instead?" >&2
     exit 1
   fi
@@ -86,9 +87,12 @@ function detect_client_info() {
     i?86*)
       CLIENT_ARCH="386"
       ;;
+    s390x*)
+      CLIENT_ARCH="s390x"
+      ;;	  
     *)
       echo "Unknown, unsupported architecture (${machine})." >&2
-      echo "Supported architectures x86_64, i686, arm, arm64." >&2
+      echo "Supported architectures x86_64, i686, arm, arm64, s390x." >&2
       echo "Bailing out." >&2
       exit 3
       ;;
@@ -104,10 +108,10 @@ function md5sum_file() {
 }
 
 function sha1sum_file() {
-  if which shasum >/dev/null 2>&1; then
-    shasum -a1 "$1" | awk '{ print $1 }'
-  else
+  if which sha1sum >/dev/null 2>&1; then
     sha1sum "$1" | awk '{ print $1 }'
+  else
+    shasum -a1 "$1" | awk '{ print $1 }'
   fi
 }
 
@@ -117,7 +121,7 @@ function download_tarball() {
   url="${DOWNLOAD_URL_PREFIX}/${file}"
   mkdir -p "${download_path}"
   if [[ $(which curl) ]]; then
-    curl -L "${url}" -o "${download_path}/${file}"
+    curl -fL --retry 3 --keepalive-time 2 "${url}" -o "${download_path}/${file}"
   elif [[ $(which wget) ]]; then
     wget "${url}" -O "${download_path}/${file}"
   else
@@ -158,8 +162,8 @@ detect_client_info
 CLIENT_TAR="kubernetes-client-${CLIENT_PLATFORM}-${CLIENT_ARCH}.tar.gz"
 
 echo "Kubernetes release: ${KUBERNETES_RELEASE}"
-echo "Server: ${SERVER_PLATFORM}/${SERVER_ARCH}"
-echo "Client: ${CLIENT_PLATFORM}/${CLIENT_ARCH}"
+echo "Server: ${SERVER_PLATFORM}/${SERVER_ARCH}  (to override, set KUBERNETES_SERVER_ARCH)"
+echo "Client: ${CLIENT_PLATFORM}/${CLIENT_ARCH}  (autodetected)"
 echo
 
 # TODO: remove this check and default to true when we stop shipping server
@@ -197,7 +201,7 @@ if [[ -z "${KUBERNETES_SKIP_CONFIRM-}" ]]; then
   read confirm
   if [[ "${confirm}" =~ ^[nN]$ ]]; then
     echo "Aborting."
-    exit 0
+    exit 1
   fi
 fi
 

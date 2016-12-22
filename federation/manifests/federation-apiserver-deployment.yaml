@@ -17,7 +17,7 @@ spec:
       - name: apiserver
         image: {{.FEDERATION_APISERVER_IMAGE_REPO}}:{{.FEDERATION_APISERVER_IMAGE_TAG}}
         command:
-        - /usr/local/bin/hyperkube
+        - /hyperkube
         - federation-apiserver
         - --bind-address=0.0.0.0
         - --etcd-servers=http://localhost:2379
@@ -32,6 +32,7 @@ spec:
         - --tls-private-key-file=/srv/kubernetes/server.key
         - --admission-control={{.FEDERATION_ADMISSION_CONTROL}}
         - --token-auth-file=/srv/kubernetes/known-tokens.csv
+        - --anonymous-auth=false
         ports:
         - containerPort: 443
           name: https

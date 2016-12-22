@@ -26,13 +26,13 @@ import (
 	lru "github.com/hashicorp/golang-lru"
 
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	coreinternallisters "k8s.io/kubernetes/pkg/client/listers/core/internalversion"
 	"k8s.io/kubernetes/pkg/controller/informers"
 
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/resource"
-	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
@@ -53,7 +53,7 @@ type limitRanger struct {
 	*admission.Handler
 	client  clientset.Interface
 	actions LimitRangerActions
-	lister  *cache.StoreToLimitRangeLister
+	lister  coreinternallisters.LimitRangeLister
 
 	// liveLookups holds the last few live lookups we've done to help ammortize cost on repeated lookup failures.
 	// This let's us handle the case of latent caches, by looking up actual results for a namespace on cache miss/no results.
@@ -68,9 +68,9 @@ type liveLookupEntry struct {
 }
 
 func (l *limitRanger) SetInformerFactory(f informers.SharedInformerFactory) {
-	limitRangeInformer := f.LimitRanges().Informer()
+	limitRangeInformer := f.InternalLimitRanges().Informer()
 	l.SetReadyFunc(limitRangeInformer.HasSynced)
-	l.lister = f.LimitRanges().Lister()
+	l.lister = f.InternalLimitRanges().Lister()
 }
 
 func (l *limitRanger) Validate() error {
@@ -162,22 +162,6 @@ func NewLimitRanger(client clientset.Interface, actions LimitRangerActions) (adm
 		liveLookupCache: liveLookupCache,
 		liveTTL:         time.Duration(30 * time.Second),
 	}, nil
-}
-
-// Min returns the lesser of its 2 arguments
-func Min(a int64, b int64) int64 {
-	if a < b {
-		return a
-	}
-	return b
-}
-
-// Max returns the greater of its 2 arguments
-func Max(a int64, b int64) int64 {
-	if a > b {
-		return a
-	}
-	return b
 }
 
 // defaultContainerResourceRequirements returns the default requirements for a container
@@ -291,6 +275,21 @@ func minConstraint(limitType api.LimitType, resourceName api.ResourceName, enfor
 	}
 	if limExists && (observedLimValue < enforcedValue) {
 		return fmt.Errorf("minimum %s usage per %s is %s, but limit is %s.", resourceName, limitType, enforced.String(), lim.String())
+	}
+	return nil
+}
+
+// maxRequestConstraint enforces the max constraint over the specified resource
+// use when specify LimitType resource doesn't recognize limit values
+func maxRequestConstraint(limitType api.LimitType, resourceName api.ResourceName, enforced resource.Quantity, request api.ResourceList) error {
+	req, reqExists := request[resourceName]
+	observedReqValue, _, enforcedValue := requestLimitEnforcedValues(req, resource.Quantity{}, enforced)
+
+	if !reqExists {
+		return fmt.Errorf("maximum %s usage per %s is %s.  No request is specified.", resourceName, limitType, enforced.String())
+	}
+	if observedReqValue > enforcedValue {
+		return fmt.Errorf("maximum %s usage per %s is %s, but request is %s.", resourceName, limitType, enforced.String(), req.String())
 	}
 	return nil
 }
@@ -431,9 +430,9 @@ func PersistentVolumeClaimLimitFunc(limitRange *api.LimitRange, pvc *api.Persist
 				}
 			}
 			for k, v := range limit.Max {
-				// reverse usage of maxConstraint. We want to enforce the max of the LimitRange against what
+				// We want to enforce the max of the LimitRange against what
 				// the user requested.
-				if err := maxConstraint(limitType, k, v, api.ResourceList{}, pvc.Spec.Resources.Requests); err != nil {
+				if err := maxRequestConstraint(limitType, k, v, pvc.Spec.Resources.Requests); err != nil {
 					errs = append(errs, err)
 				}
 			}

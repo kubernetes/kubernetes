@@ -21,6 +21,10 @@ RUN touch /kube-build-image
 # To run as non-root we sometimes need to rebuild go stdlib packages.
 RUN chmod -R a+rwx /usr/local/go/pkg ${K8S_PATCHED_GOROOT}/pkg
 
+# For running integration tests /var/run/kubernetes is required
+# and should be writable by user
+RUN mkdir /var/run/kubernetes && chmod a+rwx /var/run/kubernetes
+
 # The kubernetes source is expected to be mounted here.  This will be the base
 # of operations.
 ENV HOME /go/src/k8s.io/kubernetes

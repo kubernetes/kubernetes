@@ -69,6 +69,7 @@ if [[ "${push_to_master}" == "true" ]] && [[ "${push_to_node}" == "true" ]]; the
 fi
 
 verify-prereqs
+verify-kube-binaries
 KUBE_VERSION=${1-}
 
 if [[ "${push_to_master}" == "false" ]] && [[ "${push_to_node}" == "false" ]]; then

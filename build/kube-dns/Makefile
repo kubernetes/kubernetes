@@ -22,7 +22,7 @@
 # Default registry, arch and tag. This can be overwritten by arguments to make
 PLATFORM?=linux
 ARCH?=amd64
-TAG?=1.8
+TAG?=1.9
 REGISTRY?=gcr.io/google_containers
 
 GOLANG_VERSION=1.6
@@ -40,6 +40,9 @@ ifeq ($(ARCH),arm64)
 endif
 ifeq ($(ARCH),ppc64le)
 	BASEIMAGE?=ppc64le/busybox
+endif
+ifeq ($(ARCH),s390x)
+	BASEIMAGE?=s390x/busybox
 endif
 
 

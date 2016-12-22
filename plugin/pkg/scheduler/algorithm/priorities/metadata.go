@@ -17,19 +17,19 @@ limitations under the License.
 package priorities
 
 import (
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
 )
 
 // priorityMetadata is a type that is passed as metadata for priority functions
 type priorityMetadata struct {
 	nonZeroRequest *schedulercache.Resource
-	podTolerations []api.Toleration
-	affinity       *api.Affinity
+	podTolerations []v1.Toleration
+	affinity       *v1.Affinity
 }
 
 // PriorityMetadata is a MetadataProducer.  Node info can be nil.
-func PriorityMetadata(pod *api.Pod, nodeNameToInfo map[string]*schedulercache.NodeInfo) interface{} {
+func PriorityMetadata(pod *v1.Pod, nodeNameToInfo map[string]*schedulercache.NodeInfo) interface{} {
 	// If we cannot compute metadata, just return nil
 	if pod == nil {
 		return nil
@@ -38,9 +38,14 @@ func PriorityMetadata(pod *api.Pod, nodeNameToInfo map[string]*schedulercache.No
 	if err != nil {
 		return nil
 	}
-	affinity, err := api.GetAffinityFromPodAnnotations(pod.Annotations)
+	affinity := pod.Spec.Affinity
+	annotationAffinity, err := v1.GetAffinityFromPodAnnotations(pod.Annotations)
 	if err != nil {
 		return nil
+	}
+	if annotationAffinity != nil {
+		affinity.PodAffinity = annotationAffinity.PodAffinity
+		affinity.PodAntiAffinity = annotationAffinity.PodAntiAffinity
 	}
 	return &priorityMetadata{
 		nonZeroRequest: getNonZeroRequests(pod),

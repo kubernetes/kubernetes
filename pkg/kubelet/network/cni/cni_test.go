@@ -29,11 +29,11 @@ import (
 	"testing"
 	"text/template"
 
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 
 	cnitypes "github.com/containernetworking/cni/pkg/types"
 	"github.com/stretchr/testify/mock"
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
@@ -126,7 +126,7 @@ func NewFakeHost(kubeClient clientset.Interface, pods []*containertest.FakePod) 
 	return host
 }
 
-func (fnh *fakeNetworkHost) GetPodByName(name, namespace string) (*api.Pod, bool) {
+func (fnh *fakeNetworkHost) GetPodByName(name, namespace string) (*v1.Pod, bool) {
 	return nil, false
 }
 
@@ -136,6 +136,14 @@ func (fnh *fakeNetworkHost) GetKubeClient() clientset.Interface {
 
 func (fnh *fakeNetworkHost) GetRuntime() kubecontainer.Runtime {
 	return fnh.runtime
+}
+
+func (fnh *fakeNetworkHost) GetNetNS(containerID string) (string, error) {
+	return fnh.GetRuntime().GetNetNS(kubecontainer.ContainerID{Type: "test", ID: containerID})
+}
+
+func (fnh *fakeNetworkHost) SupportsLegacyFeatures() bool {
+	return true
 }
 
 func TestCNIPlugin(t *testing.T) {

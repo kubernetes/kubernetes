@@ -23,13 +23,13 @@ import (
 
 	"testing"
 
-	"k8s.io/kubernetes/pkg/api"
-	api_pod "k8s.io/kubernetes/pkg/api/pod"
+	"k8s.io/kubernetes/pkg/api/v1"
+	apipod "k8s.io/kubernetes/pkg/api/v1/pod"
 )
 
 func TestPetIDName(t *testing.T) {
 	replicas := 3
-	ps := newPetSet(replicas)
+	ps := newStatefulSet(replicas)
 	for i := 0; i < replicas; i++ {
 		petName := fmt.Sprintf("%v-%d", ps.Name, i)
 		pcb, err := newPCB(fmt.Sprintf("%d", i), ps)
@@ -45,7 +45,7 @@ func TestPetIDName(t *testing.T) {
 
 func TestPetIDDNS(t *testing.T) {
 	replicas := 3
-	ps := newPetSet(replicas)
+	ps := newStatefulSet(replicas)
 	for i := 0; i < replicas; i++ {
 		petName := fmt.Sprintf("%v-%d", ps.Name, i)
 		petSubdomain := ps.Spec.ServiceName
@@ -54,18 +54,18 @@ func TestPetIDDNS(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Failed to generate pet %v", err)
 		}
-		if hostname, ok := pod.Annotations[api_pod.PodHostnameAnnotation]; !ok || hostname != petName {
+		if hostname, ok := pod.Annotations[apipod.PodHostnameAnnotation]; !ok || hostname != petName {
 			t.Errorf("Wrong hostname: %v", hostname)
 		}
 		// TODO: Check this against the governing service.
-		if subdomain, ok := pod.Annotations[api_pod.PodSubdomainAnnotation]; !ok || subdomain != petSubdomain {
+		if subdomain, ok := pod.Annotations[apipod.PodSubdomainAnnotation]; !ok || subdomain != petSubdomain {
 			t.Errorf("Wrong subdomain: %v", subdomain)
 		}
 	}
 }
 func TestPetIDVolume(t *testing.T) {
 	replicas := 3
-	ps := newPetSet(replicas)
+	ps := newStatefulSet(replicas)
 	for i := 0; i < replicas; i++ {
 		pcb, err := newPCB(fmt.Sprintf("%d", i), ps)
 		if err != nil {
@@ -99,7 +99,7 @@ func TestPetIDVolume(t *testing.T) {
 
 func TestPetIDVolumeClaims(t *testing.T) {
 	replicas := 3
-	ps := newPetSet(replicas)
+	ps := newStatefulSet(replicas)
 	for i := 0; i < replicas; i++ {
 		pcb, err := newPCB(fmt.Sprintf("%v", i), ps)
 		if err != nil {
@@ -116,7 +116,7 @@ func TestPetIDVolumeClaims(t *testing.T) {
 
 func TestPetIDCrossAssignment(t *testing.T) {
 	replicas := 3
-	ps := newPetSet(replicas)
+	ps := newStatefulSet(replicas)
 
 	nameMapper := &NameIdentityMapper{ps}
 	volumeMapper := &VolumeIdentityMapper{ps}
@@ -144,16 +144,16 @@ func TestPetIDCrossAssignment(t *testing.T) {
 
 func TestPetIDReset(t *testing.T) {
 	replicas := 2
-	ps := newPetSet(replicas)
+	ps := newStatefulSet(replicas)
 	firstPCB, err := newPCB("1", ps)
 	secondPCB, err := newPCB("2", ps)
 	if identityHash(ps, firstPCB.pod) == identityHash(ps, secondPCB.pod) {
 		t.Fatalf("Failed to generate uniquey identities:\n%+v\n%+v", firstPCB.pod.Spec, secondPCB.pod.Spec)
 	}
-	userAdded := api.Volume{
+	userAdded := v1.Volume{
 		Name: "test",
-		VolumeSource: api.VolumeSource{
-			EmptyDir: &api.EmptyDirVolumeSource{Medium: api.StorageMediumMemory},
+		VolumeSource: v1.VolumeSource{
+			EmptyDir: &v1.EmptyDirVolumeSource{Medium: v1.StorageMediumMemory},
 		},
 	}
 	firstPCB.pod.Spec.Volumes = append(firstPCB.pod.Spec.Volumes, userAdded)

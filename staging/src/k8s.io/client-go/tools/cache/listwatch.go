@@ -20,17 +20,28 @@ import (
 	"time"
 
 	"k8s.io/client-go/pkg/api"
+	"k8s.io/client-go/pkg/api/meta"
+	"k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/pkg/fields"
 	"k8s.io/client-go/pkg/runtime"
 	"k8s.io/client-go/pkg/watch"
 	"k8s.io/client-go/rest"
 )
 
+// ListerWatcher is any object that knows how to perform an initial list and start a watch on a resource.
+type ListerWatcher interface {
+	// List should return a list type object; the Items field will be extracted, and the
+	// ResourceVersion field will be used to start the watch in the right place.
+	List(options v1.ListOptions) (runtime.Object, error)
+	// Watch should begin a watch at the specified version.
+	Watch(options v1.ListOptions) (watch.Interface, error)
+}
+
 // ListFunc knows how to list resources
-type ListFunc func(options api.ListOptions) (runtime.Object, error)
+type ListFunc func(options v1.ListOptions) (runtime.Object, error)
 
 // WatchFunc knows how to watch resources
-type WatchFunc func(options api.ListOptions) (watch.Interface, error)
+type WatchFunc func(options v1.ListOptions) (watch.Interface, error)
 
 // ListWatch knows how to list and watch a set of apiserver resources.  It satisfies the ListerWatcher interface.
 // It is a convenience function for users of NewReflector, etc.
@@ -47,7 +58,7 @@ type Getter interface {
 
 // NewListWatchFromClient creates a new ListWatch from the specified client, resource, namespace and field selector.
 func NewListWatchFromClient(c Getter, resource string, namespace string, fieldSelector fields.Selector) *ListWatch {
-	listFunc := func(options api.ListOptions) (runtime.Object, error) {
+	listFunc := func(options v1.ListOptions) (runtime.Object, error) {
 		return c.Get().
 			Namespace(namespace).
 			Resource(resource).
@@ -56,7 +67,7 @@ func NewListWatchFromClient(c Getter, resource string, namespace string, fieldSe
 			Do().
 			Get()
 	}
-	watchFunc := func(options api.ListOptions) (watch.Interface, error) {
+	watchFunc := func(options v1.ListOptions) (watch.Interface, error) {
 		return c.Get().
 			Prefix("watch").
 			Namespace(namespace).
@@ -68,7 +79,7 @@ func NewListWatchFromClient(c Getter, resource string, namespace string, fieldSe
 	return &ListWatch{ListFunc: listFunc, WatchFunc: watchFunc}
 }
 
-func timeoutFromListOptions(options api.ListOptions) time.Duration {
+func timeoutFromListOptions(options v1.ListOptions) time.Duration {
 	if options.TimeoutSeconds != nil {
 		return time.Duration(*options.TimeoutSeconds) * time.Second
 	}
@@ -76,11 +87,77 @@ func timeoutFromListOptions(options api.ListOptions) time.Duration {
 }
 
 // List a set of apiserver resources
-func (lw *ListWatch) List(options api.ListOptions) (runtime.Object, error) {
+func (lw *ListWatch) List(options v1.ListOptions) (runtime.Object, error) {
 	return lw.ListFunc(options)
 }
 
 // Watch a set of apiserver resources
-func (lw *ListWatch) Watch(options api.ListOptions) (watch.Interface, error) {
+func (lw *ListWatch) Watch(options v1.ListOptions) (watch.Interface, error) {
 	return lw.WatchFunc(options)
+}
+
+// TODO: check for watch expired error and retry watch from latest point?  Same issue exists for Until.
+func ListWatchUntil(timeout time.Duration, lw ListerWatcher, conditions ...watch.ConditionFunc) (*watch.Event, error) {
+	if len(conditions) == 0 {
+		return nil, nil
+	}
+
+	list, err := lw.List(v1.ListOptions{})
+	if err != nil {
+		return nil, err
+	}
+	initialItems, err := meta.ExtractList(list)
+	if err != nil {
+		return nil, err
+	}
+
+	// use the initial items as simulated "adds"
+	var lastEvent *watch.Event
+	currIndex := 0
+	passedConditions := 0
+	for _, condition := range conditions {
+		// check the next condition against the previous event and short circuit waiting for the next watch
+		if lastEvent != nil {
+			done, err := condition(*lastEvent)
+			if err != nil {
+				return lastEvent, err
+			}
+			if done {
+				passedConditions = passedConditions + 1
+				continue
+			}
+		}
+
+	ConditionSucceeded:
+		for currIndex < len(initialItems) {
+			lastEvent = &watch.Event{Type: watch.Added, Object: initialItems[currIndex]}
+			currIndex++
+
+			done, err := condition(*lastEvent)
+			if err != nil {
+				return lastEvent, err
+			}
+			if done {
+				passedConditions = passedConditions + 1
+				break ConditionSucceeded
+			}
+		}
+	}
+	if passedConditions == len(conditions) {
+		return lastEvent, nil
+	}
+	remainingConditions := conditions[passedConditions:]
+
+	metaObj, err := meta.ListAccessor(list)
+	if err != nil {
+		return nil, err
+	}
+	currResourceVersion := metaObj.GetResourceVersion()
+
+	watchInterface, err := lw.Watch(v1.ListOptions{ResourceVersion: currResourceVersion})
+	if err != nil {
+		return nil, err
+	}
+
+	return watch.Until(timeout, watchInterface, remainingConditions...)
 }

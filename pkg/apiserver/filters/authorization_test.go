@@ -17,19 +17,19 @@ limitations under the License.
 package filters
 
 import (
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/auth/authorizer"
 )
 
-func TestGetAttribs(t *testing.T) {
+func TestGetAuthorizerAttributes(t *testing.T) {
 	mapper := api.NewRequestContextMapper()
-	attributeGetter := NewRequestAttributeGetter(mapper)
 
 	testcases := map[string]struct {
 		Verb               string
@@ -88,13 +88,13 @@ func TestGetAttribs(t *testing.T) {
 		},
 		"API group resource": {
 			Verb: "GET",
-			Path: "/apis/extensions/v1beta1/namespaces/myns/jobs",
+			Path: "/apis/batch/v1/namespaces/myns/jobs",
 			ExpectedAttributes: &authorizer.AttributesRecord{
 				Verb:            "list",
-				Path:            "/apis/extensions/v1beta1/namespaces/myns/jobs",
+				Path:            "/apis/batch/v1/namespaces/myns/jobs",
 				ResourceRequest: true,
-				APIGroup:        extensions.GroupName,
-				APIVersion:      "v1beta1",
+				APIGroup:        batch.GroupName,
+				APIVersion:      "v1",
 				Namespace:       "myns",
 				Resource:        "jobs",
 			},
@@ -108,7 +108,12 @@ func TestGetAttribs(t *testing.T) {
 		var attribs authorizer.Attributes
 		var err error
 		var handler http.Handler = http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-			attribs, err = attributeGetter.GetAttribs(req)
+			ctx, ok := mapper.Get(req)
+			if !ok {
+				internalError(w, req, errors.New("no context found for request"))
+				return
+			}
+			attribs, err = GetAuthorizerAttributes(ctx)
 		})
 		handler = WithRequestInfo(handler, newTestRequestInfoResolver(), mapper)
 		handler = api.WithRequestContext(handler, mapper)

@@ -23,7 +23,7 @@ import (
 	"time"
 
 	apierrors "k8s.io/kubernetes/pkg/api/errors"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/term"
@@ -38,8 +38,8 @@ type Attacher interface {
 
 // ServeAttach handles requests to attach to a container. After creating/receiving the required
 // streams, it delegates the actual attaching to attacher.
-func ServeAttach(w http.ResponseWriter, req *http.Request, attacher Attacher, podName string, uid types.UID, container string, idleTimeout, streamCreationTimeout time.Duration, supportedProtocols []string) {
-	ctx, ok := createStreams(req, w, supportedProtocols, idleTimeout, streamCreationTimeout)
+func ServeAttach(w http.ResponseWriter, req *http.Request, attacher Attacher, podName string, uid types.UID, container string, streamOpts *Options, idleTimeout, streamCreationTimeout time.Duration, supportedProtocols []string) {
+	ctx, ok := createStreams(req, w, streamOpts, supportedProtocols, idleTimeout, streamCreationTimeout)
 	if !ok {
 		// error is handled by createStreams
 		return
@@ -52,8 +52,8 @@ func ServeAttach(w http.ResponseWriter, req *http.Request, attacher Attacher, po
 		runtime.HandleError(err)
 		ctx.writeStatus(apierrors.NewInternalError(err))
 	} else {
-		ctx.writeStatus(&apierrors.StatusError{ErrStatus: unversioned.Status{
-			Status: unversioned.StatusSuccess,
+		ctx.writeStatus(&apierrors.StatusError{ErrStatus: metav1.Status{
+			Status: metav1.StatusSuccess,
 		}})
 	}
 }

@@ -21,10 +21,10 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/genericapiserver/options"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 )
 
 func TestGenerateStorageVersionMap(t *testing.T) {
@@ -32,12 +32,12 @@ func TestGenerateStorageVersionMap(t *testing.T) {
 		legacyVersion   string
 		storageVersions string
 		defaultVersions string
-		expectedMap     map[string]unversioned.GroupVersion
+		expectedMap     map[string]schema.GroupVersion
 	}{
 		{
 			legacyVersion:   "v1",
 			storageVersions: "v1,extensions/v1beta1",
-			expectedMap: map[string]unversioned.GroupVersion{
+			expectedMap: map[string]schema.GroupVersion{
 				api.GroupName:        {Version: "v1"},
 				extensions.GroupName: {Group: "extensions", Version: "v1beta1"},
 			},
@@ -45,7 +45,7 @@ func TestGenerateStorageVersionMap(t *testing.T) {
 		{
 			legacyVersion:   "",
 			storageVersions: "extensions/v1beta1,v1",
-			expectedMap: map[string]unversioned.GroupVersion{
+			expectedMap: map[string]schema.GroupVersion{
 				api.GroupName:        {Version: "v1"},
 				extensions.GroupName: {Group: "extensions", Version: "v1beta1"},
 			},
@@ -54,7 +54,7 @@ func TestGenerateStorageVersionMap(t *testing.T) {
 			legacyVersion:   "",
 			storageVersions: "autoscaling=extensions/v1beta1,v1",
 			defaultVersions: "extensions/v1beta1,v1,autoscaling/v1",
-			expectedMap: map[string]unversioned.GroupVersion{
+			expectedMap: map[string]schema.GroupVersion{
 				api.GroupName:         {Version: "v1"},
 				autoscaling.GroupName: {Group: "extensions", Version: "v1beta1"},
 				extensions.GroupName:  {Group: "extensions", Version: "v1beta1"},
@@ -63,7 +63,7 @@ func TestGenerateStorageVersionMap(t *testing.T) {
 		{
 			legacyVersion:   "",
 			storageVersions: "",
-			expectedMap:     map[string]unversioned.GroupVersion{},
+			expectedMap:     map[string]schema.GroupVersion{},
 		},
 	}
 	for i, test := range testCases {

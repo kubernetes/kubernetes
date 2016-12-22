@@ -20,13 +20,13 @@ import (
 	"fmt"
 
 	"github.com/golang/glog"
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/predicates"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
 )
 
-type getNodeAnyWayFuncType func() (*api.Node, error)
+type getNodeAnyWayFuncType func() (*v1.Node, error)
 type predicateAdmitHandler struct {
 	getNodeAnyWayFunc getNodeAnyWayFuncType
 }
@@ -84,7 +84,7 @@ func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult 
 			glog.V(2).Infof("Predicate failed on Pod: %v, for reason: %v", format.Pod(pod), message)
 		case *predicates.InsufficientResourceError:
 			reason = fmt.Sprintf("OutOf%s", re.ResourceName)
-			message := re.Error()
+			message = re.Error()
 			glog.V(2).Infof("Predicate failed on Pod: %v, for reason: %v", format.Pod(pod), message)
 		case *predicates.FailureReason:
 			reason = re.GetReason()
@@ -92,7 +92,7 @@ func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult 
 			glog.V(2).Infof("Predicate failed on Pod: %v, for reason: %v", format.Pod(pod), message)
 		default:
 			reason = "UnexpectedPredicateFailureType"
-			message := fmt.Sprintf("GeneralPredicates failed due to %v, which is unexpected.", r)
+			message = fmt.Sprintf("GeneralPredicates failed due to %v, which is unexpected.", r)
 			glog.Warningf("Failed to admit pod %v - %s", format.Pod(pod), message)
 		}
 		return PodAdmitResult{

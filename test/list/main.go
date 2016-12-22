@@ -237,7 +237,8 @@ func (t *testList) handlePath(path string, info os.FileInfo, err error) error {
 		return err
 	}
 	if strings.Contains(path, "third_party") ||
-		strings.Contains(path, "staging") {
+		strings.Contains(path, "staging") ||
+		strings.Contains(path, "_output") {
 		return filepath.SkipDir
 	}
 	if strings.HasSuffix(path, ".go") && strings.Contains(path, "e2e") ||

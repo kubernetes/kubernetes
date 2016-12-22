@@ -32,7 +32,13 @@ type VirtualMachineExtensionImagesClient struct {
 // NewVirtualMachineExtensionImagesClient creates an instance of the
 // VirtualMachineExtensionImagesClient client.
 func NewVirtualMachineExtensionImagesClient(subscriptionID string) VirtualMachineExtensionImagesClient {
-	return VirtualMachineExtensionImagesClient{New(subscriptionID)}
+	return NewVirtualMachineExtensionImagesClientWithBaseURI(DefaultBaseURI, subscriptionID)
+}
+
+// NewVirtualMachineExtensionImagesClientWithBaseURI creates an instance of
+// the VirtualMachineExtensionImagesClient client.
+func NewVirtualMachineExtensionImagesClientWithBaseURI(baseURI string, subscriptionID string) VirtualMachineExtensionImagesClient {
+	return VirtualMachineExtensionImagesClient{NewWithBaseURI(baseURI, subscriptionID)}
 }
 
 // Get gets a virtual machine extension image.

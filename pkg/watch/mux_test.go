@@ -22,7 +22,7 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/util/wait"
 )
 
@@ -31,7 +31,7 @@ type myType struct {
 	Value string
 }
 
-func (obj *myType) GetObjectKind() unversioned.ObjectKind { return unversioned.EmptyObjectKind }
+func (obj *myType) GetObjectKind() schema.ObjectKind { return schema.EmptyObjectKind }
 
 func TestBroadcaster(t *testing.T) {
 	table := []Event{

@@ -19,8 +19,9 @@ package versioning
 import (
 	"io"
 
-	"k8s.io/client-go/pkg/api/unversioned"
 	"k8s.io/client-go/pkg/runtime"
+	"k8s.io/client-go/pkg/runtime/schema"
+	utilruntime "k8s.io/client-go/pkg/util/runtime"
 )
 
 // NewCodecForScheme is a convenience method for callers that are using a scheme.
@@ -32,7 +33,19 @@ func NewCodecForScheme(
 	encodeVersion runtime.GroupVersioner,
 	decodeVersion runtime.GroupVersioner,
 ) runtime.Codec {
-	return NewCodec(encoder, decoder, runtime.UnsafeObjectConvertor(scheme), scheme, scheme, scheme, encodeVersion, decodeVersion)
+	return NewCodec(encoder, decoder, runtime.UnsafeObjectConvertor(scheme), scheme, scheme, scheme, nil, encodeVersion, decodeVersion)
+}
+
+// NewDefaultingCodecForScheme is a convenience method for callers that are using a scheme.
+func NewDefaultingCodecForScheme(
+	// TODO: I should be a scheme interface?
+	scheme *runtime.Scheme,
+	encoder runtime.Encoder,
+	decoder runtime.Decoder,
+	encodeVersion runtime.GroupVersioner,
+	decodeVersion runtime.GroupVersioner,
+) runtime.Codec {
+	return NewCodec(encoder, decoder, runtime.UnsafeObjectConvertor(scheme), scheme, scheme, scheme, scheme, encodeVersion, decodeVersion)
 }
 
 // NewCodec takes objects in their internal versions and converts them to external versions before
@@ -45,6 +58,7 @@ func NewCodec(
 	creater runtime.ObjectCreater,
 	copier runtime.ObjectCopier,
 	typer runtime.ObjectTyper,
+	defaulter runtime.ObjectDefaulter,
 	encodeVersion runtime.GroupVersioner,
 	decodeVersion runtime.GroupVersioner,
 ) runtime.Codec {
@@ -55,6 +69,7 @@ func NewCodec(
 		creater:   creater,
 		copier:    copier,
 		typer:     typer,
+		defaulter: defaulter,
 
 		encodeVersion: encodeVersion,
 		decodeVersion: decodeVersion,
@@ -69,6 +84,7 @@ type codec struct {
 	creater   runtime.ObjectCreater
 	copier    runtime.ObjectCopier
 	typer     runtime.ObjectTyper
+	defaulter runtime.ObjectDefaulter
 
 	encodeVersion runtime.GroupVersioner
 	decodeVersion runtime.GroupVersioner
@@ -77,7 +93,7 @@ type codec struct {
 // Decode attempts a decode of the object, then tries to convert it to the internal version. If into is provided and the decoding is
 // successful, the returned runtime.Object will be the value passed as into. Note that this may bypass conversion if you pass an
 // into that matches the serialized version.
-func (c *codec) Decode(data []byte, defaultGVK *unversioned.GroupVersionKind, into runtime.Object) (runtime.Object, *unversioned.GroupVersionKind, error) {
+func (c *codec) Decode(data []byte, defaultGVK *schema.GroupVersionKind, into runtime.Object) (runtime.Object, *schema.GroupVersionKind, error) {
 	versioned, isVersioned := into.(*runtime.VersionedObjects)
 	if isVersioned {
 		into = versioned.Last()
@@ -102,11 +118,31 @@ func (c *codec) Decode(data []byte, defaultGVK *unversioned.GroupVersionKind, in
 			}
 			return into, gvk, nil
 		}
+
+		// perform defaulting if requested
+		if c.defaulter != nil {
+			// create a copy to ensure defaulting is not applied to the original versioned objects
+			if isVersioned {
+				copied, err := c.copier.Copy(obj)
+				if err != nil {
+					utilruntime.HandleError(err)
+					copied = obj
+				}
+				versioned.Objects = []runtime.Object{copied}
+			}
+			c.defaulter.Default(obj)
+		} else {
+			if isVersioned {
+				versioned.Objects = []runtime.Object{obj}
+			}
+		}
+
 		if err := c.convertor.Convert(obj, into, c.decodeVersion); err != nil {
 			return nil, gvk, err
 		}
+
 		if isVersioned {
-			versioned.Objects = []runtime.Object{obj, into}
+			versioned.Objects = append(versioned.Objects, into)
 			return versioned, gvk, nil
 		}
 		return into, gvk, nil
@@ -117,10 +153,17 @@ func (c *codec) Decode(data []byte, defaultGVK *unversioned.GroupVersionKind, in
 		// create a copy, because ConvertToVersion does not guarantee non-mutation of objects
 		copied, err := c.copier.Copy(obj)
 		if err != nil {
+			utilruntime.HandleError(err)
 			copied = obj
 		}
 		versioned.Objects = []runtime.Object{copied}
 	}
+
+	// perform defaulting if requested
+	if c.defaulter != nil {
+		c.defaulter.Default(obj)
+	}
+
 	out, err := c.convertor.ConvertToVersion(obj, c.decodeVersion)
 	if err != nil {
 		return nil, gvk, err
@@ -138,7 +181,7 @@ func (c *codec) Decode(data []byte, defaultGVK *unversioned.GroupVersionKind, in
 // conversion if necessary. Unversioned objects (according to the ObjectTyper) are output as is.
 func (c *codec) Encode(obj runtime.Object, w io.Writer) error {
 	switch obj.(type) {
-	case *runtime.Unknown, *runtime.Unstructured, *runtime.UnstructuredList:
+	case *runtime.Unknown, runtime.Unstructured:
 		return c.encoder.Encode(obj, w)
 	}
 
@@ -184,6 +227,7 @@ func (c *codec) Encode(obj runtime.Object, w io.Writer) error {
 
 // DirectEncoder serializes an object and ensures the GVK is set.
 type DirectEncoder struct {
+	Version runtime.GroupVersioner
 	runtime.Encoder
 	runtime.ObjectTyper
 }
@@ -199,7 +243,14 @@ func (e DirectEncoder) Encode(obj runtime.Object, stream io.Writer) error {
 	}
 	kind := obj.GetObjectKind()
 	oldGVK := kind.GroupVersionKind()
-	kind.SetGroupVersionKind(gvks[0])
+	gvk := gvks[0]
+	if e.Version != nil {
+		preferredGVK, ok := e.Version.KindForGroupVersionKinds(gvks)
+		if ok {
+			gvk = preferredGVK
+		}
+	}
+	kind.SetGroupVersionKind(gvk)
 	err = e.Encoder.Encode(obj, stream)
 	kind.SetGroupVersionKind(oldGVK)
 	return err
@@ -211,12 +262,12 @@ type DirectDecoder struct {
 }
 
 // Decode does not do conversion. It removes the gvk during deserialization.
-func (d DirectDecoder) Decode(data []byte, defaults *unversioned.GroupVersionKind, into runtime.Object) (runtime.Object, *unversioned.GroupVersionKind, error) {
+func (d DirectDecoder) Decode(data []byte, defaults *schema.GroupVersionKind, into runtime.Object) (runtime.Object, *schema.GroupVersionKind, error) {
 	obj, gvk, err := d.Decoder.Decode(data, defaults, into)
 	if obj != nil {
 		kind := obj.GetObjectKind()
 		// clearing the gvk is just a convention of a codec
-		kind.SetGroupVersionKind(unversioned.GroupVersionKind{})
+		kind.SetGroupVersionKind(schema.GroupVersionKind{})
 	}
 	return obj, gvk, err
 }

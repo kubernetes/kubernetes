@@ -19,7 +19,9 @@ package v1
 import (
 	api "k8s.io/client-go/pkg/api"
 	v1 "k8s.io/client-go/pkg/api/v1"
+	meta_v1 "k8s.io/client-go/pkg/apis/meta/v1"
 	watch "k8s.io/client-go/pkg/watch"
+	rest "k8s.io/client-go/rest"
 )
 
 // EndpointsGetter has a method to return a EndpointsInterface.
@@ -34,7 +36,7 @@ type EndpointsInterface interface {
 	Update(*v1.Endpoints) (*v1.Endpoints, error)
 	Delete(name string, options *v1.DeleteOptions) error
 	DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error
-	Get(name string) (*v1.Endpoints, error)
+	Get(name string, options meta_v1.GetOptions) (*v1.Endpoints, error)
 	List(opts v1.ListOptions) (*v1.EndpointsList, error)
 	Watch(opts v1.ListOptions) (watch.Interface, error)
 	Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *v1.Endpoints, err error)
@@ -43,14 +45,14 @@ type EndpointsInterface interface {
 
 // endpoints implements EndpointsInterface
 type endpoints struct {
-	client *CoreClient
+	client rest.Interface
 	ns     string
 }
 
 // newEndpoints returns a Endpoints
-func newEndpoints(c *CoreClient, namespace string) *endpoints {
+func newEndpoints(c *CoreV1Client, namespace string) *endpoints {
 	return &endpoints{
-		client: c,
+		client: c.RESTClient(),
 		ns:     namespace,
 	}
 }
@@ -103,12 +105,13 @@ func (c *endpoints) DeleteCollection(options *v1.DeleteOptions, listOptions v1.L
 }
 
 // Get takes name of the endpoints, and returns the corresponding endpoints object, and an error if there is any.
-func (c *endpoints) Get(name string) (result *v1.Endpoints, err error) {
+func (c *endpoints) Get(name string, options meta_v1.GetOptions) (result *v1.Endpoints, err error) {
 	result = &v1.Endpoints{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("endpoints").
 		Name(name).
+		VersionedParams(&options, api.ParameterCodec).
 		Do().
 		Into(result)
 	return

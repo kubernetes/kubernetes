@@ -1,10 +1,10 @@
 // Package network implements the Azure ARM Network service API version
-// 2016-03-30.
+// 2016-09-01.
 //
 // The Microsoft Azure Network management API provides a RESTful set of web
 // services that interact with Microsoft Azure Networks service to manage
-// your network resrources. The API has entities that capture the
-// relationship between an end user and the Microsoft Azure Networks service.
+// your network resources. The API has entities that capture the relationship
+// between an end user and the Microsoft Azure Networks service.
 package network
 
 // Copyright (c) Microsoft and contributors.  All rights reserved.
@@ -33,7 +33,7 @@ import (
 
 const (
 	// APIVersion is the version of the Network
-	APIVersion = "2016-03-30"
+	APIVersion = "2016-09-01"
 
 	// DefaultBaseURI is the default URI used for the service Network
 	DefaultBaseURI = "https://management.azure.com"
@@ -49,9 +49,14 @@ type ManagementClient struct {
 
 // New creates an instance of the ManagementClient client.
 func New(subscriptionID string) ManagementClient {
+	return NewWithBaseURI(DefaultBaseURI, subscriptionID)
+}
+
+// NewWithBaseURI creates an instance of the ManagementClient client.
+func NewWithBaseURI(baseURI string, subscriptionID string) ManagementClient {
 	return ManagementClient{
 		Client:         autorest.NewClientWithUserAgent(UserAgent()),
-		BaseURI:        DefaultBaseURI,
+		BaseURI:        baseURI,
 		APIVersion:     APIVersion,
 		SubscriptionID: subscriptionID,
 	}
@@ -60,7 +65,7 @@ func New(subscriptionID string) ManagementClient {
 // CheckDNSNameAvailability checks whether a domain name in the cloudapp.net
 // zone is available for use.
 //
-// location is the location of the domain name domainNameLabel is the domain
+// location is the location of the domain name. domainNameLabel is the domain
 // name to be verified. It must conform to the following regular expression:
 // ^[a-z][a-z0-9-]{1,61}[a-z0-9]$.
 func (client ManagementClient) CheckDNSNameAvailability(location string, domainNameLabel string) (result DNSNameAvailabilityResult, err error) {

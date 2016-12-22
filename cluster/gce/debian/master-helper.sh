@@ -52,6 +52,17 @@ function replicate-master-instance() {
   # Substitute INITIAL_ETCD_CLUSTER to enable etcd clustering.
   kube_env="$(echo "${kube_env}" | grep -v "INITIAL_ETCD_CLUSTER")"
   kube_env="$(echo -e "${kube_env}\nINITIAL_ETCD_CLUSTER: '${existing_master_replicas},${REPLICA_NAME}'")"
+
+  ETCD_CA_KEY="$(echo "${kube_env}" | grep "ETCD_CA_KEY" |  sed "s/^.*: '//" | sed "s/'$//")"
+  ETCD_CA_CERT="$(echo "${kube_env}" | grep "ETCD_CA_CERT" |  sed "s/^.*: '//" | sed "s/'$//")"
+
+  create-etcd-certs "${REPLICA_NAME}" "${ETCD_CA_CERT}" "${ETCD_CA_KEY}"
+
+  kube_env="$(echo "${kube_env}" | grep -v "ETCD_PEER_KEY")"
+  kube_env="$(echo -e "${kube_env}\nETCD_PEER_KEY: '${ETCD_PEER_KEY_BASE64}'")"
+  kube_env="$(echo "${kube_env}" | grep -v "ETCD_PEER_CERT")"
+  kube_env="$(echo -e "${kube_env}\nETCD_PEER_CERT: '${ETCD_PEER_CERT_BASE64}'")"
+
   echo "${kube_env}" > ${KUBE_TEMP}/master-kube-env.yaml
   get-metadata "${existing_master_zone}" "${existing_master_name}" cluster-name > ${KUBE_TEMP}/cluster-name.txt
   get-metadata "${existing_master_zone}" "${existing_master_name}" startup-script > ${KUBE_TEMP}/configure-vm.sh

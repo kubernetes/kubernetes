@@ -19,6 +19,7 @@ package role
 import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/rest"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/apis/rbac"
 	"k8s.io/kubernetes/pkg/watch"
 )
@@ -28,7 +29,7 @@ type Registry interface {
 	ListRoles(ctx api.Context, options *api.ListOptions) (*rbac.RoleList, error)
 	CreateRole(ctx api.Context, role *rbac.Role) error
 	UpdateRole(ctx api.Context, role *rbac.Role) error
-	GetRole(ctx api.Context, name string) (*rbac.Role, error)
+	GetRole(ctx api.Context, name string, options *metav1.GetOptions) (*rbac.Role, error)
 	DeleteRole(ctx api.Context, name string) error
 	WatchRoles(ctx api.Context, options *api.ListOptions) (watch.Interface, error)
 }
@@ -67,8 +68,8 @@ func (s *storage) WatchRoles(ctx api.Context, options *api.ListOptions) (watch.I
 	return s.Watch(ctx, options)
 }
 
-func (s *storage) GetRole(ctx api.Context, name string) (*rbac.Role, error) {
-	obj, err := s.Get(ctx, name)
+func (s *storage) GetRole(ctx api.Context, name string, options *metav1.GetOptions) (*rbac.Role, error) {
+	obj, err := s.Get(ctx, name, options)
 	if err != nil {
 		return nil, err
 	}
@@ -86,5 +87,5 @@ type AuthorizerAdapter struct {
 }
 
 func (a AuthorizerAdapter) GetRole(namespace, name string) (*rbac.Role, error) {
-	return a.Registry.GetRole(api.WithNamespace(api.NewContext(), namespace), name)
+	return a.Registry.GetRole(api.WithNamespace(api.NewContext(), namespace), name, &metav1.GetOptions{})
 }

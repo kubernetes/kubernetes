@@ -21,9 +21,9 @@ import (
 	"os"
 	"path"
 
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
@@ -41,7 +41,7 @@ var _ = framework.KubeDescribe("HostPath", func() {
 
 	It("should give a volume the correct mode [Conformance]", func() {
 		volumePath := "/test-volume"
-		source := &api.HostPathVolumeSource{
+		source := &v1.HostPathVolumeSource{
 			Path: "/tmp",
 		}
 		pod := testPodWithHostVol(volumePath, source)
@@ -60,7 +60,7 @@ var _ = framework.KubeDescribe("HostPath", func() {
 		volumePath := "/test-volume"
 		filePath := path.Join(volumePath, "test-file")
 		retryDuration := 180
-		source := &api.HostPathVolumeSource{
+		source := &v1.HostPathVolumeSource{
 			Path: "/tmp",
 		}
 		pod := testPodWithHostVol(volumePath, source)
@@ -90,7 +90,7 @@ var _ = framework.KubeDescribe("HostPath", func() {
 		filePathInWriter := path.Join(volumePath, fileName)
 		filePathInReader := path.Join(volumePath, subPath, fileName)
 
-		source := &api.HostPathVolumeSource{
+		source := &v1.HostPathVolumeSource{
 			Path: "/tmp",
 		}
 		pod := testPodWithHostVol(volumePath, source)
@@ -118,11 +118,11 @@ var _ = framework.KubeDescribe("HostPath", func() {
 const containerName1 = "test-container-1"
 const containerName2 = "test-container-2"
 
-func mount(source *api.HostPathVolumeSource) []api.Volume {
-	return []api.Volume{
+func mount(source *v1.HostPathVolumeSource) []v1.Volume {
+	return []v1.Volume{
 		{
 			Name: volumeName,
-			VolumeSource: api.VolumeSource{
+			VolumeSource: v1.VolumeSource{
 				HostPath: source,
 			},
 		},
@@ -130,23 +130,23 @@ func mount(source *api.HostPathVolumeSource) []api.Volume {
 }
 
 //TODO: To merge this with the emptyDir tests, we can make source a lambda.
-func testPodWithHostVol(path string, source *api.HostPathVolumeSource) *api.Pod {
+func testPodWithHostVol(path string, source *v1.HostPathVolumeSource) *v1.Pod {
 	podName := "pod-host-path-test"
 
-	return &api.Pod{
-		TypeMeta: unversioned.TypeMeta{
+	return &v1.Pod{
+		TypeMeta: metav1.TypeMeta{
 			Kind:       "Pod",
-			APIVersion: registered.GroupOrDie(api.GroupName).GroupVersion.String(),
+			APIVersion: registered.GroupOrDie(v1.GroupName).GroupVersion.String(),
 		},
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: v1.ObjectMeta{
 			Name: podName,
 		},
-		Spec: api.PodSpec{
-			Containers: []api.Container{
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
 				{
 					Name:  containerName1,
 					Image: "gcr.io/google_containers/mounttest:0.7",
-					VolumeMounts: []api.VolumeMount{
+					VolumeMounts: []v1.VolumeMount{
 						{
 							Name:      volumeName,
 							MountPath: path,
@@ -156,7 +156,7 @@ func testPodWithHostVol(path string, source *api.HostPathVolumeSource) *api.Pod 
 				{
 					Name:  containerName2,
 					Image: "gcr.io/google_containers/mounttest:0.7",
-					VolumeMounts: []api.VolumeMount{
+					VolumeMounts: []v1.VolumeMount{
 						{
 							Name:      volumeName,
 							MountPath: path,
@@ -164,7 +164,7 @@ func testPodWithHostVol(path string, source *api.HostPathVolumeSource) *api.Pod 
 					},
 				},
 			},
-			RestartPolicy: api.RestartPolicyNever,
+			RestartPolicy: v1.RestartPolicyNever,
 			Volumes:       mount(source),
 		},
 	}

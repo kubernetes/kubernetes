@@ -20,24 +20,26 @@ import (
 	"fmt"
 
 	"k8s.io/client-go/pkg/api/meta"
-	"k8s.io/client-go/pkg/api/unversioned"
+	metav1 "k8s.io/client-go/pkg/apis/meta/v1"
+	"k8s.io/client-go/pkg/apis/meta/v1/unstructured"
 	"k8s.io/client-go/pkg/runtime"
+	"k8s.io/client-go/pkg/runtime/schema"
 )
 
 // VersionInterfaces provides an object converter and metadata
 // accessor appropriate for use with unstructured objects.
-func VersionInterfaces(unversioned.GroupVersion) (*meta.VersionInterfaces, error) {
+func VersionInterfaces(schema.GroupVersion) (*meta.VersionInterfaces, error) {
 	return &meta.VersionInterfaces{
-		ObjectConvertor:  &runtime.UnstructuredObjectConverter{},
+		ObjectConvertor:  &unstructured.UnstructuredObjectConverter{},
 		MetadataAccessor: meta.NewAccessor(),
 	}, nil
 }
 
 // NewDiscoveryRESTMapper returns a RESTMapper based on discovery information.
-func NewDiscoveryRESTMapper(resources []*unversioned.APIResourceList, versionFunc meta.VersionInterfacesFunc) (*meta.DefaultRESTMapper, error) {
+func NewDiscoveryRESTMapper(resources []*metav1.APIResourceList, versionFunc meta.VersionInterfacesFunc) (*meta.DefaultRESTMapper, error) {
 	rm := meta.NewDefaultRESTMapper(nil, versionFunc)
 	for _, resourceList := range resources {
-		gv, err := unversioned.ParseGroupVersion(resourceList.GroupVersion)
+		gv, err := schema.ParseGroupVersion(resourceList.GroupVersion)
 		if err != nil {
 			return nil, err
 		}
@@ -55,16 +57,16 @@ func NewDiscoveryRESTMapper(resources []*unversioned.APIResourceList, versionFun
 }
 
 // ObjectTyper provides an ObjectTyper implementation for
-// runtime.Unstructured object based on discovery information.
+// unstructured.Unstructured object based on discovery information.
 type ObjectTyper struct {
-	registered map[unversioned.GroupVersionKind]bool
+	registered map[schema.GroupVersionKind]bool
 }
 
 // NewObjectTyper constructs an ObjectTyper from discovery information.
-func NewObjectTyper(resources []*unversioned.APIResourceList) (runtime.ObjectTyper, error) {
-	ot := &ObjectTyper{registered: make(map[unversioned.GroupVersionKind]bool)}
+func NewObjectTyper(resources []*metav1.APIResourceList) (runtime.ObjectTyper, error) {
+	ot := &ObjectTyper{registered: make(map[schema.GroupVersionKind]bool)}
 	for _, resourceList := range resources {
-		gv, err := unversioned.ParseGroupVersion(resourceList.GroupVersion)
+		gv, err := schema.ParseGroupVersion(resourceList.GroupVersion)
 		if err != nil {
 			return nil, err
 		}
@@ -78,17 +80,17 @@ func NewObjectTyper(resources []*unversioned.APIResourceList) (runtime.ObjectTyp
 
 // ObjectKinds returns a slice of one element with the
 // group,version,kind of the provided object, or an error if the
-// object is not *runtime.Unstructured or has no group,version,kind
+// object is not *unstructured.Unstructured or has no group,version,kind
 // information.
-func (ot *ObjectTyper) ObjectKinds(obj runtime.Object) ([]unversioned.GroupVersionKind, bool, error) {
-	if _, ok := obj.(*runtime.Unstructured); !ok {
+func (ot *ObjectTyper) ObjectKinds(obj runtime.Object) ([]schema.GroupVersionKind, bool, error) {
+	if _, ok := obj.(*unstructured.Unstructured); !ok {
 		return nil, false, fmt.Errorf("type %T is invalid for dynamic object typer", obj)
 	}
-	return []unversioned.GroupVersionKind{obj.GetObjectKind().GroupVersionKind()}, false, nil
+	return []schema.GroupVersionKind{obj.GetObjectKind().GroupVersionKind()}, false, nil
 }
 
 // Recognizes returns true if the provided group,version,kind was in
 // the discovery information.
-func (ot *ObjectTyper) Recognizes(gvk unversioned.GroupVersionKind) bool {
+func (ot *ObjectTyper) Recognizes(gvk schema.GroupVersionKind) bool {
 	return ot.registered[gvk]
 }

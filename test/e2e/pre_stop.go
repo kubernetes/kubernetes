@@ -21,8 +21,9 @@ import (
 	"fmt"
 	"time"
 
-	"k8s.io/kubernetes/pkg/api"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/api/v1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
 
@@ -34,30 +35,30 @@ type State struct {
 	Received map[string]int
 }
 
-func testPreStop(c *client.Client, ns string) {
+func testPreStop(c clientset.Interface, ns string) {
 	// This is the server that will receive the preStop notification
-	podDescr := &api.Pod{
-		ObjectMeta: api.ObjectMeta{
+	podDescr := &v1.Pod{
+		ObjectMeta: v1.ObjectMeta{
 			Name: "server",
 		},
-		Spec: api.PodSpec{
-			Containers: []api.Container{
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
 				{
 					Name:  "server",
 					Image: "gcr.io/google_containers/nettest:1.7",
-					Ports: []api.ContainerPort{{ContainerPort: 8080}},
+					Ports: []v1.ContainerPort{{ContainerPort: 8080}},
 				},
 			},
 		},
 	}
 	By(fmt.Sprintf("Creating server pod %s in namespace %s", podDescr.Name, ns))
-	podDescr, err := c.Pods(ns).Create(podDescr)
+	podDescr, err := c.Core().Pods(ns).Create(podDescr)
 	framework.ExpectNoError(err, fmt.Sprintf("creating pod %s", podDescr.Name))
 
 	// At the end of the test, clean up by removing the pod.
 	defer func() {
 		By("Deleting the server pod")
-		c.Pods(ns).Delete(podDescr.Name, nil)
+		c.Core().Pods(ns).Delete(podDescr.Name, nil)
 	}()
 
 	By("Waiting for pods to come up.")
@@ -66,22 +67,22 @@ func testPreStop(c *client.Client, ns string) {
 
 	val := "{\"Source\": \"prestop\"}"
 
-	podOut, err := c.Pods(ns).Get(podDescr.Name)
+	podOut, err := c.Core().Pods(ns).Get(podDescr.Name, metav1.GetOptions{})
 	framework.ExpectNoError(err, "getting pod info")
 
-	preStopDescr := &api.Pod{
-		ObjectMeta: api.ObjectMeta{
+	preStopDescr := &v1.Pod{
+		ObjectMeta: v1.ObjectMeta{
 			Name: "tester",
 		},
-		Spec: api.PodSpec{
-			Containers: []api.Container{
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
 				{
 					Name:    "tester",
 					Image:   "gcr.io/google_containers/busybox:1.24",
 					Command: []string{"sleep", "600"},
-					Lifecycle: &api.Lifecycle{
-						PreStop: &api.Handler{
-							Exec: &api.ExecAction{
+					Lifecycle: &v1.Lifecycle{
+						PreStop: &v1.Handler{
+							Exec: &v1.ExecAction{
 								Command: []string{
 									"wget", "-O-", "--post-data=" + val, fmt.Sprintf("http://%s:8080/write", podOut.Status.PodIP),
 								},
@@ -94,7 +95,7 @@ func testPreStop(c *client.Client, ns string) {
 	}
 
 	By(fmt.Sprintf("Creating tester pod %s in namespace %s", preStopDescr.Name, ns))
-	preStopDescr, err = c.Pods(ns).Create(preStopDescr)
+	preStopDescr, err = c.Core().Pods(ns).Create(preStopDescr)
 	framework.ExpectNoError(err, fmt.Sprintf("creating pod %s", preStopDescr.Name))
 	deletePreStop := true
 
@@ -102,7 +103,7 @@ func testPreStop(c *client.Client, ns string) {
 	defer func() {
 		if deletePreStop {
 			By("Deleting the tester pod")
-			c.Pods(ns).Delete(preStopDescr.Name, nil)
+			c.Core().Pods(ns).Delete(preStopDescr.Name, nil)
 		}
 	}()
 
@@ -111,20 +112,20 @@ func testPreStop(c *client.Client, ns string) {
 
 	// Delete the pod with the preStop handler.
 	By("Deleting pre-stop pod")
-	if err := c.Pods(ns).Delete(preStopDescr.Name, nil); err == nil {
+	if err := c.Core().Pods(ns).Delete(preStopDescr.Name, nil); err == nil {
 		deletePreStop = false
 	}
 	framework.ExpectNoError(err, fmt.Sprintf("deleting pod: %s", preStopDescr.Name))
 
 	// Validate that the server received the web poke.
 	err = wait.Poll(time.Second*5, time.Second*60, func() (bool, error) {
-		subResourceProxyAvailable, err := framework.ServerVersionGTE(framework.SubResourcePodProxyVersion, c)
+		subResourceProxyAvailable, err := framework.ServerVersionGTE(framework.SubResourcePodProxyVersion, c.Discovery())
 		if err != nil {
 			return false, err
 		}
 		var body []byte
 		if subResourceProxyAvailable {
-			body, err = c.Get().
+			body, err = c.Core().RESTClient().Get().
 				Namespace(ns).
 				Resource("pods").
 				SubResource("proxy").
@@ -132,7 +133,7 @@ func testPreStop(c *client.Client, ns string) {
 				Suffix("read").
 				DoRaw()
 		} else {
-			body, err = c.Get().
+			body, err = c.Core().RESTClient().Get().
 				Prefix("proxy").
 				Namespace(ns).
 				Resource("pods").
@@ -163,6 +164,6 @@ var _ = framework.KubeDescribe("PreStop", func() {
 	f := framework.NewDefaultFramework("prestop")
 
 	It("should call prestop when killing a pod [Conformance]", func() {
-		testPreStop(f.Client, f.Namespace.Name)
+		testPreStop(f.ClientSet, f.Namespace.Name)
 	})
 })

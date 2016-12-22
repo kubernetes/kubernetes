@@ -17,10 +17,10 @@ limitations under the License.
 package latest
 
 import (
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api/v1"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/runtime/serializer/json"
 	"k8s.io/kubernetes/pkg/runtime/serializer/versioning"
 )
@@ -28,7 +28,7 @@ import (
 // Version is the string that represents the current external default version.
 const Version = "v1"
 
-var ExternalVersion = unversioned.GroupVersion{Group: "", Version: "v1"}
+var ExternalVersion = schema.GroupVersion{Group: "", Version: "v1"}
 
 // OldestVersion is the string that represents the oldest server version supported,
 // for client code that wants to hardcode the lowest common denominator.
@@ -60,7 +60,7 @@ func init() {
 		Scheme,
 		yamlSerializer,
 		yamlSerializer,
-		unversioned.GroupVersion{Version: Version},
+		schema.GroupVersion{Version: Version},
 		runtime.InternalGroupVersioner,
 	)
 }

@@ -27,14 +27,13 @@ import (
 
 	_ "k8s.io/kubernetes/pkg/api/install"
 
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/meta/metatypes"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/typed/dynamic"
 	"k8s.io/kubernetes/pkg/controller/garbagecollector/metaonly"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/runtime/serializer"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/clock"
@@ -49,7 +48,7 @@ func TestNewGarbageCollector(t *testing.T) {
 	metaOnlyClientPool := dynamic.NewClientPool(config, registered.RESTMapper(), dynamic.LegacyAPIPathResolverFunc)
 	config.ContentConfig.NegotiatedSerializer = nil
 	clientPool := dynamic.NewClientPool(config, registered.RESTMapper(), dynamic.LegacyAPIPathResolverFunc)
-	podResource := []unversioned.GroupVersionResource{{Version: "v1", Resource: "pods"}}
+	podResource := map[schema.GroupVersionResource]struct{}{schema.GroupVersionResource{Version: "v1", Resource: "pods"}: {}}
 	gc, err := NewGarbageCollector(metaOnlyClientPool, clientPool, registered.RESTMapper(), podResource)
 	if err != nil {
 		t.Fatal(err)
@@ -94,6 +93,7 @@ func (f *fakeActionHandler) ServeHTTP(response http.ResponseWriter, request *htt
 		fakeResponse.statusCode = 200
 		fakeResponse.content = []byte("{\"kind\": \"List\"}")
 	}
+	response.Header().Set("Content-Type", "application/json")
 	response.WriteHeader(fakeResponse.statusCode)
 	response.Write(fakeResponse.content)
 }
@@ -112,7 +112,7 @@ func setupGC(t *testing.T, config *restclient.Config) *GarbageCollector {
 	metaOnlyClientPool := dynamic.NewClientPool(config, registered.RESTMapper(), dynamic.LegacyAPIPathResolverFunc)
 	config.ContentConfig.NegotiatedSerializer = nil
 	clientPool := dynamic.NewClientPool(config, registered.RESTMapper(), dynamic.LegacyAPIPathResolverFunc)
-	podResource := []unversioned.GroupVersionResource{{Version: "v1", Resource: "pods"}}
+	podResource := map[schema.GroupVersionResource]struct{}{schema.GroupVersionResource{Version: "v1", Resource: "pods"}: {}}
 	gc, err := NewGarbageCollector(metaOnlyClientPool, clientPool, registered.RESTMapper(), podResource)
 	if err != nil {
 		t.Fatal(err)
@@ -120,9 +120,9 @@ func setupGC(t *testing.T, config *restclient.Config) *GarbageCollector {
 	return gc
 }
 
-func getPod(podName string, ownerReferences []v1.OwnerReference) *v1.Pod {
+func getPod(podName string, ownerReferences []metav1.OwnerReference) *v1.Pod {
 	return &v1.Pod{
-		TypeMeta: unversioned.TypeMeta{
+		TypeMeta: metav1.TypeMeta{
 			Kind:       "Pod",
 			APIVersion: "v1",
 		},
@@ -144,7 +144,7 @@ func serilizeOrDie(t *testing.T, object interface{}) []byte {
 
 // test the processItem function making the expected actions.
 func TestProcessItem(t *testing.T) {
-	pod := getPod("ToBeDeletedPod", []v1.OwnerReference{
+	pod := getPod("ToBeDeletedPod", []metav1.OwnerReference{
 		{
 			Kind:       "ReplicationController",
 			Name:       "owner1",
@@ -169,7 +169,7 @@ func TestProcessItem(t *testing.T) {
 	gc := setupGC(t, clientConfig)
 	item := &node{
 		identity: objectReference{
-			OwnerReference: metatypes.OwnerReference{
+			OwnerReference: metav1.OwnerReference{
 				Kind:       pod.Kind,
 				APIVersion: pod.APIVersion,
 				Name:       pod.Name,
@@ -230,14 +230,14 @@ func verifyGraphInvariants(scenario string, uidToNode map[types.UID]*node, t *te
 }
 
 func createEvent(eventType eventType, selfUID string, owners []string) event {
-	var ownerReferences []api.OwnerReference
+	var ownerReferences []metav1.OwnerReference
 	for i := 0; i < len(owners); i++ {
-		ownerReferences = append(ownerReferences, api.OwnerReference{UID: types.UID(owners[i])})
+		ownerReferences = append(ownerReferences, metav1.OwnerReference{UID: types.UID(owners[i])})
 	}
 	return event{
 		eventType: eventType,
-		obj: &api.Pod{
-			ObjectMeta: api.ObjectMeta{
+		obj: &v1.Pod{
+			ObjectMeta: v1.ObjectMeta{
 				UID:             types.UID(selfUID),
 				OwnerReferences: ownerReferences,
 			},
@@ -325,8 +325,8 @@ func TestDependentsRace(t *testing.T) {
 	go func() {
 		for i := 0; i < updates; i++ {
 			dependent := &node{}
-			gc.propagator.addDependentToOwners(dependent, []metatypes.OwnerReference{{UID: ownerUID}})
-			gc.propagator.removeDependentFromOwners(dependent, []metatypes.OwnerReference{{UID: ownerUID}})
+			gc.propagator.addDependentToOwners(dependent, []metav1.OwnerReference{{UID: ownerUID}})
+			gc.propagator.removeDependentFromOwners(dependent, []metav1.OwnerReference{{UID: ownerUID}})
 		}
 	}()
 	go func() {
@@ -343,14 +343,14 @@ func TestGCListWatcher(t *testing.T) {
 	srv, clientConfig := testServerAndClientConfig(testHandler.ServeHTTP)
 	defer srv.Close()
 	clientPool := dynamic.NewClientPool(clientConfig, registered.RESTMapper(), dynamic.LegacyAPIPathResolverFunc)
-	podResource := unversioned.GroupVersionResource{Version: "v1", Resource: "pods"}
+	podResource := schema.GroupVersionResource{Version: "v1", Resource: "pods"}
 	client, err := clientPool.ClientForGroupVersionResource(podResource)
 	if err != nil {
 		t.Fatal(err)
 	}
 	lw := gcListWatcher(client, podResource)
-	lw.Watch(api.ListOptions{ResourceVersion: "1"})
-	lw.List(api.ListOptions{ResourceVersion: "1"})
+	lw.Watch(v1.ListOptions{ResourceVersion: "1"})
+	lw.List(v1.ListOptions{ResourceVersion: "1"})
 	if e, a := 2, len(testHandler.actions); e != a {
 		t.Errorf("expect %d requests, got %d", e, a)
 	}
@@ -365,7 +365,7 @@ func TestGCListWatcher(t *testing.T) {
 func podToGCNode(pod *v1.Pod) *node {
 	return &node{
 		identity: objectReference{
-			OwnerReference: metatypes.OwnerReference{
+			OwnerReference: metav1.OwnerReference{
 				Kind:       pod.Kind,
 				APIVersion: pod.APIVersion,
 				Name:       pod.Name,
@@ -379,7 +379,7 @@ func podToGCNode(pod *v1.Pod) *node {
 }
 
 func TestAbsentUIDCache(t *testing.T) {
-	rc1Pod1 := getPod("rc1Pod1", []v1.OwnerReference{
+	rc1Pod1 := getPod("rc1Pod1", []metav1.OwnerReference{
 		{
 			Kind:       "ReplicationController",
 			Name:       "rc1",
@@ -387,7 +387,7 @@ func TestAbsentUIDCache(t *testing.T) {
 			APIVersion: "v1",
 		},
 	})
-	rc1Pod2 := getPod("rc1Pod2", []v1.OwnerReference{
+	rc1Pod2 := getPod("rc1Pod2", []metav1.OwnerReference{
 		{
 			Kind:       "ReplicationController",
 			Name:       "rc1",
@@ -395,7 +395,7 @@ func TestAbsentUIDCache(t *testing.T) {
 			APIVersion: "v1",
 		},
 	})
-	rc2Pod1 := getPod("rc2Pod1", []v1.OwnerReference{
+	rc2Pod1 := getPod("rc2Pod1", []metav1.OwnerReference{
 		{
 			Kind:       "ReplicationController",
 			Name:       "rc2",
@@ -403,7 +403,7 @@ func TestAbsentUIDCache(t *testing.T) {
 			APIVersion: "v1",
 		},
 	})
-	rc3Pod1 := getPod("rc3Pod1", []v1.OwnerReference{
+	rc3Pod1 := getPod("rc3Pod1", []metav1.OwnerReference{
 		{
 			Kind:       "ReplicationController",
 			Name:       "rc3",

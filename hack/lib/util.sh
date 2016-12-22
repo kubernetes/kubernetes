@@ -32,7 +32,7 @@ kube::util::wait_for_url() {
   local i
   for i in $(seq 1 $times); do
     local out
-    if out=$(curl -gkfs $url 2>/dev/null); then
+    if out=$(curl --max-time 1 -gkfs $url 2>/dev/null); then
       kube::log::status "On try ${i}, ${prefix}: ${out}"
       return 0
     fi
@@ -387,60 +387,6 @@ kube::util::fetch-swagger-spec() {
   curl -w "\n" -fs "${SWAGGER_API_PATH}logs" > "${SWAGGER_ROOT_DIR}/logs.json"
 }
 
-# Takes a group/version and returns the openapi-spec file name.
-# default behavior: extensions/v1beta1 -> v1beta1.extensions
-# special case for v1: v1 -> v1
-kube::util::gv-to-openapi-name() {
-  local group_version="$1"
-  case "${group_version}" in
-    v1)
-      echo "v1"
-      ;;
-    *)
-      echo "${group_version#*/}.${group_version%/*}"
-      ;;
-  esac
-}
-
-
-# Fetches openapi spec from apiserver.
-# Assumed vars:
-# OPENAPI_API_PATH: Base path for openapi on apiserver. normally APIServer root. i.e., http://localhost:8080/
-# OPENAPI_ROOT_DIR: Root dir where we want to to save the fetched spec.
-# VERSIONS: Array of group versions to include in swagger spec.
-kube::util::fetch-openapi-spec() {
-  for ver in ${VERSIONS}; do
-    if [[ " ${KUBE_NONSERVER_GROUP_VERSIONS} " == *" ${ver} "* ]]; then
-      continue
-    fi
-    # fetch the openapi spec for each group version.
-    if [[ ${ver} == "v1" ]]; then
-      SUBPATH="api"
-    else
-      SUBPATH="apis"
-    fi
-    SUBPATH="${SUBPATH}/${ver}"
-    OPENAPI_JSON_NAME="$(kube::util::gv-to-openapi-name ${ver}).json"
-    curl -w "\n" -fs "${OPENAPI_PATH}${SUBPATH}/swagger.json" > "${OPENAPI_ROOT_DIR}/${OPENAPI_JSON_NAME}"
-
-    # fetch the openapi spec for the discovery mechanism at group level.
-    if [[ ${ver} == "v1" ]]; then
-      continue
-    fi
-    SUBPATH="apis/"${ver%/*}
-    OPENAPI_JSON_NAME="${ver%/*}.json"
-    curl -w "\n" -fs "${OPENAPI_PATH}${SUBPATH}/swagger.json" > "${OPENAPI_ROOT_DIR}/${OPENAPI_JSON_NAME}"
-  done
-
-  # fetch openapi specs for other discovery mechanism.
-  curl -w "\n" -fs "${OPENAPI_PATH}swagger.json" > "${OPENAPI_ROOT_DIR}/root_swagger.json"
-  curl -w "\n" -fs "${OPENAPI_PATH}version/swagger.json" > "${OPENAPI_ROOT_DIR}/version.json"
-  curl -w "\n" -fs "${OPENAPI_PATH}api/swagger.json" > "${OPENAPI_ROOT_DIR}/api.json"
-  curl -w "\n" -fs "${OPENAPI_PATH}apis/swagger.json" > "${OPENAPI_ROOT_DIR}/apis.json"
-  curl -w "\n" -fs "${OPENAPI_PATH}logs/swagger.json" > "${OPENAPI_ROOT_DIR}/logs.json"
-}
-
-
 # Returns the name of the upstream remote repository name for the local git
 # repo, e.g. "upstream" or "origin".
 kube::util::git_upstream_remote_name() {
@@ -496,5 +442,164 @@ kube::util::download_file() {
   done
   return 1
 }
+
+# Test whether cfssl and cfssljson are installed.
+# Sets:
+#  CFSSL_BIN: The path of the installed cfssl binary
+#  CFSSLJSON_BIN: The path of the installed cfssljson binary
+function kube::util::test_cfssl_installed {
+    if ! command -v cfssl &>/dev/null || ! command -v cfssljson &>/dev/null; then
+      echo "Failed to successfully run 'cfssl', please verify that cfssl and cfssljson are in \$PATH."
+      echo "Hint: export PATH=\$PATH:\$GOPATH/bin; go get -u github.com/cloudflare/cfssl/cmd/..."
+      exit 1
+    fi
+    CFSSL_BIN=$(command -v cfssl)
+    CFSSLJSON_BIN=$(command -v cfssljson)
+}
+
+# Test whether openssl is installed.
+# Sets:
+#  OPENSSL_BIN: The path to the openssl binary to use
+function kube::util::test_openssl_installed {
+    openssl version >& /dev/null
+    if [ "$?" != "0" ]; then
+      echo "Failed to run openssl. Please ensure openssl is installed"
+      exit 1
+    fi
+    OPENSSL_BIN=$(command -v openssl)
+}
+
+# creates a client CA, args are sudo, dest-dir, ca-id, purpose
+# purpose is dropped in after "key encipherment", you usually want
+# '"client auth"'
+# '"server auth"'
+# '"client auth","server auth"'
+function kube::util::create_signing_certkey {
+    local sudo=$1
+    local dest_dir=$2
+    local id=$3
+    local purpose=$4
+    # Create client ca
+    ${sudo} /bin/bash -e <<EOF
+    rm -f "${dest_dir}/${id}-ca.crt" "${dest_dir}/${id}-ca.key"
+    ${OPENSSL_BIN} req -x509 -sha256 -new -nodes -days 365 -newkey rsa:2048 -keyout "${dest_dir}/${id}-ca.key" -out "${dest_dir}/${id}-ca.crt" -subj "/C=xx/ST=x/L=x/O=x/OU=x/CN=ca/emailAddress=x/"
+    echo '{"signing":{"default":{"expiry":"43800h","usages":["signing","key encipherment",${purpose}]}}}' > "${dest_dir}/${id}-ca-config.json"
+EOF
+}
+
+# signs a client certificate: args are sudo, dest-dir, CA, filename (roughly), username, groups...
+function kube::util::create_client_certkey {
+    local sudo=$1
+    local dest_dir=$2
+    local ca=$3
+    local id=$4
+    local cn=${5:-$4}
+    local groups=""
+    local SEP=""
+    shift 5
+    while [ -n "${1:-}" ]; do
+        groups+="${SEP}{\"O\":\"$1\"}"
+        SEP=","
+        shift 1
+    done
+    ${sudo} /bin/bash -e <<EOF
+    cd ${dest_dir}
+    echo '{"CN":"${cn}","names":[${groups}],"hosts":[""],"key":{"algo":"rsa","size":2048}}' | ${CFSSL_BIN} gencert -ca=${ca}.crt -ca-key=${ca}.key -config=${ca}-config.json - | ${CFSSLJSON_BIN} -bare client-${id}
+    mv "client-${id}-key.pem" "client-${id}.key"
+    mv "client-${id}.pem" "client-${id}.crt"
+    rm -f "client-${id}.csr"
+EOF
+}
+
+# signs a serving certificate: args are sudo, dest-dir, ca, filename (roughly), subject, hosts...
+function kube::util::create_serving_certkey {
+    local sudo=$1
+    local dest_dir=$2
+    local ca=$3
+    local id=$4
+    local cn=${5:-$4}
+    local hosts=""
+    local SEP=""
+    shift 5
+    while [ -n "${1:-}" ]; do
+        hosts+="${SEP}\"$1\""
+        SEP=","
+        shift 1
+    done
+    ${sudo} /bin/bash -e <<EOF
+    cd ${dest_dir}
+    echo '{"CN":"${cn}","hosts":[${hosts}],"key":{"algo":"rsa","size":2048}}' | ${CFSSL_BIN} gencert -ca=${ca}.crt -ca-key=${ca}.key -config=${ca}-config.json - | ${CFSSLJSON_BIN} -bare serving-${id}
+    mv "serving-${id}-key.pem" "serving-${id}.key"
+    mv "serving-${id}.pem" "serving-${id}.crt"
+    rm -f "serving-${id}.csr"
+EOF
+}
+
+# creates a self-contained kubeconfig: args are sudo, dest-dir, ca file, host, port, client id, token(optional)
+function kube::util::write_client_kubeconfig {
+    local sudo=$1
+    local dest_dir=$2
+    local ca_file=$3
+    local api_host=$4
+    local api_port=$5
+    local client_id=$6
+    local token=${7:-}
+    cat <<EOF | ${sudo} tee "${dest_dir}"/${client_id}.kubeconfig > /dev/null
+apiVersion: v1
+kind: Config
+clusters:
+  - cluster:
+      certificate-authority: ${ca_file}
+      server: https://${api_host}:${api_port}/
+    name: local-up-cluster
+users:
+  - user:
+      token: ${token}
+      client-certificate: ${dest_dir}/client-${client_id}.crt
+      client-key: ${dest_dir}/client-${client_id}.key
+    name: local-up-cluster
+contexts:
+  - context:
+      cluster: local-up-cluster
+      user: local-up-cluster
+    name: local-up-cluster
+current-context: local-up-cluster
+EOF
+
+    # flatten the kubeconfig files to make them self contained
+    username=$(whoami)
+    ${sudo} /bin/bash -e <<EOF
+    $(kube::util::find-binary kubectl) --kubeconfig="${dest_dir}/${client_id}.kubeconfig" config view --minify --flatten > "/tmp/${client_id}.kubeconfig"
+    mv -f "/tmp/${client_id}.kubeconfig" "${dest_dir}/${client_id}.kubeconfig"
+    chown ${username} "${dest_dir}/${client_id}.kubeconfig"
+EOF
+}
+
+# Determines if docker can be run, failures may simply require that the user be added to the docker group.
+function kube::util::ensure_docker_daemon_connectivity {
+  DOCKER=(docker ${DOCKER_OPTS})
+  if ! "${DOCKER[@]}" info > /dev/null 2>&1 ; then
+    cat <<'EOF' >&2
+Can't connect to 'docker' daemon.  please fix and retry.
+
+Possible causes:
+  - Docker Daemon not started
+    - Linux: confirm via your init system
+    - macOS w/ docker-machine: run `docker-machine ls` and `docker-machine start <name>`
+    - macOS w/ Docker for Mac: Check the menu bar and start the Docker application
+  - DOCKER_HOST hasn't been set or is set incorrectly
+    - Linux: domain socket is used, DOCKER_* should be unset. In Bash run `unset ${!DOCKER_*}`
+    - macOS w/ docker-machine: run `eval "$(docker-machine env <name>)"`
+    - macOS w/ Docker for Mac: domain socket is used, DOCKER_* should be unset. In Bash run `unset ${!DOCKER_*}`
+  - Other things to check:
+    - Linux: User isn't in 'docker' group.  Add and relogin.
+      - Something like 'sudo usermod -a -G docker ${USER}'
+      - RHEL7 bug and workaround: https://bugzilla.redhat.com/show_bug.cgi?id=1119282#c8
+EOF
+    return 1
+  fi
+}
+
+
 
 # ex: ts=2 sw=2 et filetype=sh

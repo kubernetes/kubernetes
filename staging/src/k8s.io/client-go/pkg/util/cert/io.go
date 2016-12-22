@@ -25,14 +25,25 @@ import (
 	"path/filepath"
 )
 
-// CanReadCertOrKey returns true if the certificate or key files already exists,
-// otherwise returns false.
-func CanReadCertOrKey(certPath, keyPath string) bool {
-	if canReadFile(certPath) || canReadFile(keyPath) {
-		return true
+// CanReadCertAndKey returns true if the certificate and key files already exists,
+// otherwise returns false. If lost one of cert and key, returns error.
+func CanReadCertAndKey(certPath, keyPath string) (bool, error) {
+	certReadable := canReadFile(certPath)
+	keyReadable := canReadFile(keyPath)
+
+	if certReadable == false && keyReadable == false {
+		return false, nil
 	}
 
-	return false
+	if certReadable == false {
+		return false, fmt.Errorf("error reading %s, certificate and key must be supplied as a pair", certPath)
+	}
+
+	if keyReadable == false {
+		return false, fmt.Errorf("error reading %s, certificate and key must be supplied as a pair", keyPath)
+	}
+
+	return true, nil
 }
 
 // If the file represented by path exists and
@@ -79,7 +90,7 @@ func WriteKey(keyPath string, data []byte) error {
 // NewPool returns an x509.CertPool containing the certificates in the given PEM-encoded file.
 // Returns an error if the file could not be read, a certificate could not be parsed, or if the file does not contain any certificates
 func NewPool(filename string) (*x509.CertPool, error) {
-	certs, err := certsFromFile(filename)
+	certs, err := CertsFromFile(filename)
 	if err != nil {
 		return nil, err
 	}
@@ -90,9 +101,9 @@ func NewPool(filename string) (*x509.CertPool, error) {
 	return pool, nil
 }
 
-// certsFromFile returns the x509.Certificates contained in the given PEM-encoded file.
+// CertsFromFile returns the x509.Certificates contained in the given PEM-encoded file.
 // Returns an error if the file could not be read, a certificate could not be parsed, or if the file does not contain any certificates
-func certsFromFile(file string) ([]*x509.Certificate, error) {
+func CertsFromFile(file string) ([]*x509.Certificate, error) {
 	if len(file) == 0 {
 		return nil, errors.New("error reading certificates from an empty filename")
 	}

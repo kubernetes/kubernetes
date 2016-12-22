@@ -21,23 +21,24 @@ import (
 	"errors"
 	"fmt"
 
-	"k8s.io/kubernetes/pkg/api"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	"k8s.io/kubernetes/pkg/api/v1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 )
 
 type EndpointsLock struct {
 	// EndpointsMeta should contain a Name and a Namespace of an
 	// Endpoints object that the LeaderElector will attempt to lead.
-	EndpointsMeta api.ObjectMeta
+	EndpointsMeta v1.ObjectMeta
 	Client        clientset.Interface
 	LockConfig    ResourceLockConfig
-	e             *api.Endpoints
+	e             *v1.Endpoints
 }
 
 func (el *EndpointsLock) Get() (*LeaderElectionRecord, error) {
 	var record LeaderElectionRecord
 	var err error
-	el.e, err = el.Client.Core().Endpoints(el.EndpointsMeta.Namespace).Get(el.EndpointsMeta.Name)
+	el.e, err = el.Client.Core().Endpoints(el.EndpointsMeta.Namespace).Get(el.EndpointsMeta.Name, metav1.GetOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -58,8 +59,8 @@ func (el *EndpointsLock) Create(ler LeaderElectionRecord) error {
 	if err != nil {
 		return err
 	}
-	el.e, err = el.Client.Core().Endpoints(el.EndpointsMeta.Namespace).Create(&api.Endpoints{
-		ObjectMeta: api.ObjectMeta{
+	el.e, err = el.Client.Core().Endpoints(el.EndpointsMeta.Namespace).Create(&v1.Endpoints{
+		ObjectMeta: v1.ObjectMeta{
 			Name:      el.EndpointsMeta.Name,
 			Namespace: el.EndpointsMeta.Namespace,
 			Annotations: map[string]string{
@@ -87,7 +88,7 @@ func (el *EndpointsLock) Update(ler LeaderElectionRecord) error {
 // RecordEvent in leader election while adding meta-data
 func (el *EndpointsLock) RecordEvent(s string) {
 	events := fmt.Sprintf("%v %v", el.LockConfig.Identity, s)
-	el.LockConfig.EventRecorder.Eventf(&api.Endpoints{ObjectMeta: el.e.ObjectMeta}, api.EventTypeNormal, "LeaderElection", events)
+	el.LockConfig.EventRecorder.Eventf(&v1.Endpoints{ObjectMeta: el.e.ObjectMeta}, v1.EventTypeNormal, "LeaderElection", events)
 }
 
 // Describe is used to convert details on current resource lock

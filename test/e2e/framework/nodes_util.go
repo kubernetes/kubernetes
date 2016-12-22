@@ -18,12 +18,13 @@ package framework
 
 import (
 	"fmt"
+	"os"
 	"path"
 	"strings"
 	"time"
 
-	"k8s.io/kubernetes/pkg/api"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/api/v1"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/util/wait"
 )
@@ -66,8 +67,7 @@ var NodeUpgrade = func(f *Framework, v string, img string) error {
 	var err error
 	switch TestContext.Provider {
 	case "gce":
-		// TODO(maisem): add GCE support for upgrading to different images.
-		err = nodeUpgradeGCE(v)
+		err = nodeUpgradeGCE(v, img)
 	case "gke":
 		err = nodeUpgradeGKE(v, img)
 	default:
@@ -82,14 +82,19 @@ var NodeUpgrade = func(f *Framework, v string, img string) error {
 	// TODO(ihmccreery) We shouldn't have to wait for nodes to be ready in
 	// GKE; the operation shouldn't return until they all are.
 	Logf("Waiting up to %v for all nodes to be ready after the upgrade", RestartNodeReadyAgainTimeout)
-	if _, err := CheckNodesReady(f.Client, RestartNodeReadyAgainTimeout, TestContext.CloudConfig.NumNodes); err != nil {
+	if _, err := CheckNodesReady(f.ClientSet, RestartNodeReadyAgainTimeout, TestContext.CloudConfig.NumNodes); err != nil {
 		return err
 	}
 	return nil
 }
 
-func nodeUpgradeGCE(rawV string) error {
+func nodeUpgradeGCE(rawV, img string) error {
 	v := "v" + rawV
+	if img != "" {
+		env := append(os.Environ(), "KUBE_NODE_OS_DISTRIBUTION="+img)
+		_, _, err := RunCmdEnv(env, path.Join(TestContext.RepoRoot, "cluster/gce/upgrade.sh"), "-N", "-o", v)
+		return err
+	}
 	_, _, err := RunCmd(path.Join(TestContext.RepoRoot, "cluster/gce/upgrade.sh"), "-N", v)
 	return err
 }
@@ -139,17 +144,17 @@ func nodeUpgradeGKE(v string, img string) error {
 // CheckNodesReady waits up to nt for expect nodes accessed by c to be ready,
 // returning an error if this doesn't happen in time. It returns the names of
 // nodes it finds.
-func CheckNodesReady(c *client.Client, nt time.Duration, expect int) ([]string, error) {
+func CheckNodesReady(c clientset.Interface, nt time.Duration, expect int) ([]string, error) {
 	// First, keep getting all of the nodes until we get the number we expect.
-	var nodeList *api.NodeList
+	var nodeList *v1.NodeList
 	var errLast error
 	start := time.Now()
 	found := wait.Poll(Poll, nt, func() (bool, error) {
 		// A rolling-update (GCE/GKE implementation of restart) can complete before the apiserver
 		// knows about all of the nodes. Thus, we retry the list nodes call
 		// until we get the expected number of nodes.
-		nodeList, errLast = c.Nodes().List(api.ListOptions{
-			FieldSelector: fields.Set{"spec.unschedulable": "false"}.AsSelector()})
+		nodeList, errLast = c.Core().Nodes().List(v1.ListOptions{
+			FieldSelector: fields.Set{"spec.unschedulable": "false"}.AsSelector().String()})
 		if errLast != nil {
 			return false, nil
 		}

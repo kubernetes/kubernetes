@@ -21,9 +21,9 @@ import (
 	"strconv"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/batch/validation"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/generic"
@@ -99,7 +99,7 @@ func generateSelector(obj *batch.Job) {
 	}
 	// Select the controller-uid label.  This is sufficient for uniqueness.
 	if obj.Spec.Selector == nil {
-		obj.Spec.Selector = &unversioned.LabelSelector{}
+		obj.Spec.Selector = &metav1.LabelSelector{}
 	}
 	if obj.Spec.Selector.MatchLabels == nil {
 		obj.Spec.Selector.MatchLabels = make(map[string]string)
@@ -164,19 +164,22 @@ func JobToSelectableFields(job *batch.Job) fields.Set {
 	return generic.MergeFieldsSets(objectMetaFieldsSet, specificFieldsSet)
 }
 
+// GetAttrs returns labels and fields of a given object for filtering purposes.
+func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
+	job, ok := obj.(*batch.Job)
+	if !ok {
+		return nil, nil, fmt.Errorf("Given object is not a job.")
+	}
+	return labels.Set(job.ObjectMeta.Labels), JobToSelectableFields(job), nil
+}
+
 // MatchJob is the filter used by the generic etcd backend to route
 // watch events from etcd to clients of the apiserver only interested in specific
 // labels/fields.
 func MatchJob(label labels.Selector, field fields.Selector) storage.SelectionPredicate {
 	return storage.SelectionPredicate{
-		Label: label,
-		Field: field,
-		GetAttrs: func(obj runtime.Object) (labels.Set, fields.Set, error) {
-			job, ok := obj.(*batch.Job)
-			if !ok {
-				return nil, nil, fmt.Errorf("Given object is not a job.")
-			}
-			return labels.Set(job.ObjectMeta.Labels), JobToSelectableFields(job), nil
-		},
+		Label:    label,
+		Field:    field,
+		GetAttrs: GetAttrs,
 	}
 }

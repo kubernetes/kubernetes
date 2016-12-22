@@ -25,8 +25,10 @@ import (
 
 	"github.com/emicklei/go-restful/swagger"
 
-	"k8s.io/client-go/pkg/api/unversioned"
 	"k8s.io/client-go/pkg/api/v1"
+	metav1 "k8s.io/client-go/pkg/apis/meta/v1"
+	"k8s.io/client-go/pkg/runtime/schema"
+	"k8s.io/client-go/pkg/util/sets"
 	"k8s.io/client-go/pkg/version"
 	"k8s.io/client-go/rest"
 )
@@ -64,7 +66,7 @@ func TestGetServerGroupsWithV1Server(t *testing.T) {
 		var obj interface{}
 		switch req.URL.Path {
 		case "/api":
-			obj = &unversioned.APIVersions{
+			obj = &metav1.APIVersions{
 				Versions: []string{
 					"v1",
 				},
@@ -89,7 +91,7 @@ func TestGetServerGroupsWithV1Server(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	groupVersions := unversioned.ExtractGroupVersions(apiGroupList)
+	groupVersions := metav1.ExtractGroupVersions(apiGroupList)
 	if !reflect.DeepEqual(groupVersions, []string{"v1"}) {
 		t.Errorf("expected: %q, got: %q", []string{"v1"}, groupVersions)
 	}
@@ -107,7 +109,7 @@ func TestGetServerGroupsWithBrokenServer(t *testing.T) {
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
-		groupVersions := unversioned.ExtractGroupVersions(apiGroupList)
+		groupVersions := metav1.ExtractGroupVersions(apiGroupList)
 		if len(groupVersions) != 0 {
 			t.Errorf("expected empty list, got: %q", groupVersions)
 		}
@@ -119,7 +121,7 @@ func TestGetServerResourcesWithV1Server(t *testing.T) {
 		var obj interface{}
 		switch req.URL.Path {
 		case "/api":
-			obj = &unversioned.APIVersions{
+			obj = &metav1.APIVersions{
 				Versions: []string{
 					"v1",
 				},
@@ -140,35 +142,35 @@ func TestGetServerResourcesWithV1Server(t *testing.T) {
 	defer server.Close()
 	client := NewDiscoveryClientForConfigOrDie(&rest.Config{Host: server.URL})
 	// ServerResources should not return an error even if server returns error at /api/v1.
-	resourceMap, err := client.ServerResources()
+	serverResources, err := client.ServerResources()
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	if _, found := resourceMap["v1"]; !found {
-		t.Errorf("missing v1 in resource map")
+	gvs := groupVersions(serverResources)
+	if !sets.NewString(gvs...).Has("v1") {
+		t.Errorf("missing v1 in resource list: %v", serverResources)
 	}
-
 }
 
 func TestGetServerResources(t *testing.T) {
-	stable := unversioned.APIResourceList{
+	stable := metav1.APIResourceList{
 		GroupVersion: "v1",
-		APIResources: []unversioned.APIResource{
+		APIResources: []metav1.APIResource{
 			{Name: "pods", Namespaced: true, Kind: "Pod"},
 			{Name: "services", Namespaced: true, Kind: "Service"},
 			{Name: "namespaces", Namespaced: false, Kind: "Namespace"},
 		},
 	}
-	beta := unversioned.APIResourceList{
-		GroupVersion: "extensions/v1",
-		APIResources: []unversioned.APIResource{
+	beta := metav1.APIResourceList{
+		GroupVersion: "extensions/v1beta1",
+		APIResources: []metav1.APIResource{
 			{Name: "deployments", Namespaced: true, Kind: "Deployment"},
 			{Name: "ingresses", Namespaced: true, Kind: "Ingress"},
 			{Name: "jobs", Namespaced: true, Kind: "Job"},
 		},
 	}
 	tests := []struct {
-		resourcesList *unversioned.APIResourceList
+		resourcesList *metav1.APIResourceList
 		path          string
 		request       string
 		expectErr     bool
@@ -200,16 +202,16 @@ func TestGetServerResources(t *testing.T) {
 		case "/apis/extensions/v1beta1":
 			list = &beta
 		case "/api":
-			list = &unversioned.APIVersions{
+			list = &metav1.APIVersions{
 				Versions: []string{
 					"v1",
 				},
 			}
 		case "/apis":
-			list = &unversioned.APIGroupList{
-				Groups: []unversioned.APIGroup{
+			list = &metav1.APIGroupList{
+				Groups: []metav1.APIGroup{
 					{
-						Versions: []unversioned.GroupVersionForDiscovery{
+						Versions: []metav1.GroupVersionForDiscovery{
 							{GroupVersion: "extensions/v1beta1"},
 						},
 					},
@@ -248,13 +250,14 @@ func TestGetServerResources(t *testing.T) {
 		}
 	}
 
-	resourceMap, err := client.ServerResources()
+	serverResources, err := client.ServerResources()
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
+	serverGroupVersions := sets.NewString(groupVersions(serverResources)...)
 	for _, api := range []string{"v1", "extensions/v1beta1"} {
-		if _, found := resourceMap[api]; !found {
-			t.Errorf("missing expected api: %s", api)
+		if !serverGroupVersions.Has(api) {
+			t.Errorf("missing expected api %q in %v", api, serverResources)
 		}
 	}
 }
@@ -266,7 +269,7 @@ func swaggerSchemaFakeServer() (*httptest.Server, error) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		var resp interface{}
 		if request == 1 {
-			resp = unversioned.APIVersions{Versions: []string{"v1", "v2", "v3"}}
+			resp = metav1.APIVersions{Versions: []string{"v1", "v2", "v3"}}
 			request++
 		} else {
 			resp = swagger.ApiDeclaration{}
@@ -312,7 +315,7 @@ func TestGetSwaggerSchemaFail(t *testing.T) {
 	defer server.Close()
 
 	client := NewDiscoveryClientForConfigOrDie(&rest.Config{Host: server.URL})
-	got, err := client.SwaggerSchema(unversioned.GroupVersion{Group: "api.group", Version: "v4"})
+	got, err := client.SwaggerSchema(schema.GroupVersion{Group: "api.group", Version: "v4"})
 	if got != nil {
 		t.Fatalf("unexpected response: %v", got)
 	}
@@ -321,30 +324,22 @@ func TestGetSwaggerSchemaFail(t *testing.T) {
 	}
 }
 
-func TestGetServerPreferredResources(t *testing.T) {
-	stable := unversioned.APIResourceList{
+func TestServerPreferredResources(t *testing.T) {
+	stable := metav1.APIResourceList{
 		GroupVersion: "v1",
-		APIResources: []unversioned.APIResource{
+		APIResources: []metav1.APIResource{
 			{Name: "pods", Namespaced: true, Kind: "Pod"},
 			{Name: "services", Namespaced: true, Kind: "Service"},
 			{Name: "namespaces", Namespaced: false, Kind: "Namespace"},
 		},
 	}
-	/*beta := unversioned.APIResourceList{
-		GroupVersion: "extensions/v1",
-		APIResources: []unversioned.APIResource{
-			{Name: "deployments", Namespaced: true, Kind: "Deployment"},
-			{Name: "ingresses", Namespaced: true, Kind: "Ingress"},
-			{Name: "jobs", Namespaced: true, Kind: "Job"},
-		},
-	}*/
 	tests := []struct {
-		resourcesList *unversioned.APIResourceList
+		resourcesList []*metav1.APIResourceList
 		response      func(w http.ResponseWriter, req *http.Request)
 		expectErr     func(err error) bool
 	}{
 		{
-			resourcesList: &stable,
+			resourcesList: []*metav1.APIResourceList{&stable},
 			expectErr:     IsGroupDiscoveryFailedError,
 			response: func(w http.ResponseWriter, req *http.Request) {
 				var list interface{}
@@ -355,16 +350,16 @@ func TestGetServerPreferredResources(t *testing.T) {
 				case "/api/v1":
 					list = &stable
 				case "/api":
-					list = &unversioned.APIVersions{
+					list = &metav1.APIVersions{
 						Versions: []string{
 							"v1",
 						},
 					}
 				case "/apis":
-					list = &unversioned.APIGroupList{
-						Groups: []unversioned.APIGroup{
+					list = &metav1.APIGroupList{
+						Groups: []metav1.APIGroup{
 							{
-								Versions: []unversioned.GroupVersionForDiscovery{
+								Versions: []metav1.GroupVersionForDiscovery{
 									{GroupVersion: "extensions/v1beta1"},
 								},
 							},
@@ -397,16 +392,16 @@ func TestGetServerPreferredResources(t *testing.T) {
 				case "/api/v1":
 					w.WriteHeader(http.StatusInternalServerError)
 				case "/api":
-					list = &unversioned.APIVersions{
+					list = &metav1.APIVersions{
 						Versions: []string{
 							"v1",
 						},
 					}
 				case "/apis":
-					list = &unversioned.APIGroupList{
-						Groups: []unversioned.APIGroup{
+					list = &metav1.APIGroupList{
+						Groups: []metav1.APIGroup{
 							{
-								Versions: []unversioned.GroupVersionForDiscovery{
+								Versions: []metav1.GroupVersionForDiscovery{
 									{GroupVersion: "extensions/v1beta1"},
 								},
 							},
@@ -427,16 +422,13 @@ func TestGetServerPreferredResources(t *testing.T) {
 				w.Write(output)
 			},
 		},
-		/*{
-			resourcesList: &stable,
-		},*/
 	}
 	for _, test := range tests {
 		server := httptest.NewServer(http.HandlerFunc(test.response))
 		defer server.Close()
 
 		client := NewDiscoveryClientForConfigOrDie(&rest.Config{Host: server.URL})
-		got, err := client.ServerPreferredResources()
+		resources, err := client.ServerPreferredResources()
 		if test.expectErr != nil {
 			if err == nil {
 				t.Error("unexpected non-error")
@@ -448,23 +440,29 @@ func TestGetServerPreferredResources(t *testing.T) {
 			t.Errorf("unexpected error: %v", err)
 			continue
 		}
-		if !reflect.DeepEqual(got, test.resourcesList) {
+		got, err := GroupVersionResources(resources)
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+			continue
+		}
+		expected, _ := GroupVersionResources(test.resourcesList)
+		if !reflect.DeepEqual(got, expected) {
 			t.Errorf("expected:\n%v\ngot:\n%v\n", test.resourcesList, got)
 		}
 		server.Close()
 	}
 }
 
-func TestGetServerPreferredResourcesRetries(t *testing.T) {
-	stable := unversioned.APIResourceList{
+func TestServerPreferredResourcesRetries(t *testing.T) {
+	stable := metav1.APIResourceList{
 		GroupVersion: "v1",
-		APIResources: []unversioned.APIResource{
+		APIResources: []metav1.APIResource{
 			{Name: "pods", Namespaced: true, Kind: "Pod"},
 		},
 	}
-	beta := unversioned.APIResourceList{
+	beta := metav1.APIResourceList{
 		GroupVersion: "extensions/v1",
-		APIResources: []unversioned.APIResource{
+		APIResources: []metav1.APIResource{
 			{Name: "deployments", Namespaced: true, Kind: "Deployment"},
 		},
 	}
@@ -484,20 +482,20 @@ func TestGetServerPreferredResourcesRetries(t *testing.T) {
 			case "/api/v1":
 				list = &stable
 			case "/api":
-				list = &unversioned.APIVersions{
+				list = &metav1.APIVersions{
 					Versions: []string{
 						"v1",
 					},
 				}
 			case "/apis":
-				list = &unversioned.APIGroupList{
-					Groups: []unversioned.APIGroup{
+				list = &metav1.APIGroupList{
+					Groups: []metav1.APIGroup{
 						{
 							Name: "extensions",
-							Versions: []unversioned.GroupVersionForDiscovery{
+							Versions: []metav1.GroupVersionForDiscovery{
 								{GroupVersion: "extensions/v1beta1"},
 							},
-							PreferredVersion: unversioned.GroupVersionForDiscovery{
+							PreferredVersion: metav1.GroupVersionForDiscovery{
 								GroupVersion: "extensions/v1beta1",
 								Version:      "v1beta1",
 							},
@@ -543,8 +541,12 @@ func TestGetServerPreferredResourcesRetries(t *testing.T) {
 		defer server.Close()
 
 		client := NewDiscoveryClientForConfigOrDie(&rest.Config{Host: server.URL})
-		got, err := client.ServerPreferredResources()
+		resources, err := client.ServerPreferredResources()
 		if !tc.expectedError(err) {
+			t.Errorf("case %d: unexpected error: %v", i, err)
+		}
+		got, err := GroupVersionResources(resources)
+		if err != nil {
 			t.Errorf("case %d: unexpected error: %v", i, err)
 		}
 		if len(got) != tc.expectResources {
@@ -552,4 +554,186 @@ func TestGetServerPreferredResourcesRetries(t *testing.T) {
 		}
 		server.Close()
 	}
+}
+
+func TestServerPreferredNamespacedResources(t *testing.T) {
+	stable := metav1.APIResourceList{
+		GroupVersion: "v1",
+		APIResources: []metav1.APIResource{
+			{Name: "pods", Namespaced: true, Kind: "Pod"},
+			{Name: "services", Namespaced: true, Kind: "Service"},
+			{Name: "namespaces", Namespaced: false, Kind: "Namespace"},
+		},
+	}
+	batchv1 := metav1.APIResourceList{
+		GroupVersion: "batch/v1",
+		APIResources: []metav1.APIResource{
+			{Name: "jobs", Namespaced: true, Kind: "Job"},
+		},
+	}
+	batchv2alpha1 := metav1.APIResourceList{
+		GroupVersion: "batch/v2alpha1",
+		APIResources: []metav1.APIResource{
+			{Name: "jobs", Namespaced: true, Kind: "Job"},
+			{Name: "cronjobs", Namespaced: true, Kind: "CronJob"},
+		},
+	}
+	batchv3alpha1 := metav1.APIResourceList{
+		GroupVersion: "batch/v3alpha1",
+		APIResources: []metav1.APIResource{
+			{Name: "jobs", Namespaced: true, Kind: "Job"},
+			{Name: "cronjobs", Namespaced: true, Kind: "CronJob"},
+		},
+	}
+	tests := []struct {
+		response func(w http.ResponseWriter, req *http.Request)
+		expected map[schema.GroupVersionResource]struct{}
+	}{
+		{
+			response: func(w http.ResponseWriter, req *http.Request) {
+				var list interface{}
+				switch req.URL.Path {
+				case "/api/v1":
+					list = &stable
+				case "/api":
+					list = &metav1.APIVersions{
+						Versions: []string{
+							"v1",
+						},
+					}
+				default:
+					t.Logf("unexpected request: %s", req.URL.Path)
+					w.WriteHeader(http.StatusNotFound)
+					return
+				}
+				output, err := json.Marshal(list)
+				if err != nil {
+					t.Errorf("unexpected encoding error: %v", err)
+					return
+				}
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusOK)
+				w.Write(output)
+			},
+			expected: map[schema.GroupVersionResource]struct{}{
+				schema.GroupVersionResource{Group: "", Version: "v1", Resource: "pods"}:     {},
+				schema.GroupVersionResource{Group: "", Version: "v1", Resource: "services"}: {},
+			},
+		},
+		{
+			response: func(w http.ResponseWriter, req *http.Request) {
+				var list interface{}
+				switch req.URL.Path {
+				case "/apis":
+					list = &metav1.APIGroupList{
+						Groups: []metav1.APIGroup{
+							{
+								Name: "batch",
+								Versions: []metav1.GroupVersionForDiscovery{
+									{GroupVersion: "batch/v1", Version: "v1"},
+									{GroupVersion: "batch/v2alpha1", Version: "v2alpha1"},
+									{GroupVersion: "batch/v3alpha1", Version: "v3alpha1"},
+								},
+								PreferredVersion: metav1.GroupVersionForDiscovery{GroupVersion: "batch/v1", Version: "v1"},
+							},
+						},
+					}
+				case "/apis/batch/v1":
+					list = &batchv1
+				case "/apis/batch/v2alpha1":
+					list = &batchv2alpha1
+				case "/apis/batch/v3alpha1":
+					list = &batchv3alpha1
+				default:
+					t.Logf("unexpected request: %s", req.URL.Path)
+					w.WriteHeader(http.StatusNotFound)
+					return
+				}
+				output, err := json.Marshal(list)
+				if err != nil {
+					t.Errorf("unexpected encoding error: %v", err)
+					return
+				}
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusOK)
+				w.Write(output)
+			},
+			expected: map[schema.GroupVersionResource]struct{}{
+				schema.GroupVersionResource{Group: "batch", Version: "v1", Resource: "jobs"}:           {},
+				schema.GroupVersionResource{Group: "batch", Version: "v2alpha1", Resource: "cronjobs"}: {},
+			},
+		},
+		{
+			response: func(w http.ResponseWriter, req *http.Request) {
+				var list interface{}
+				switch req.URL.Path {
+				case "/apis":
+					list = &metav1.APIGroupList{
+						Groups: []metav1.APIGroup{
+							{
+								Name: "batch",
+								Versions: []metav1.GroupVersionForDiscovery{
+									{GroupVersion: "batch/v1", Version: "v1"},
+									{GroupVersion: "batch/v2alpha1", Version: "v2alpha1"},
+									{GroupVersion: "batch/v3alpha1", Version: "v3alpha1"},
+								},
+								PreferredVersion: metav1.GroupVersionForDiscovery{GroupVersion: "batch/v2alpha", Version: "v2alpha1"},
+							},
+						},
+					}
+				case "/apis/batch/v1":
+					list = &batchv1
+				case "/apis/batch/v2alpha1":
+					list = &batchv2alpha1
+				case "/apis/batch/v3alpha1":
+					list = &batchv3alpha1
+				default:
+					t.Logf("unexpected request: %s", req.URL.Path)
+					w.WriteHeader(http.StatusNotFound)
+					return
+				}
+				output, err := json.Marshal(list)
+				if err != nil {
+					t.Errorf("unexpected encoding error: %v", err)
+					return
+				}
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusOK)
+				w.Write(output)
+			},
+			expected: map[schema.GroupVersionResource]struct{}{
+				schema.GroupVersionResource{Group: "batch", Version: "v2alpha1", Resource: "jobs"}:     {},
+				schema.GroupVersionResource{Group: "batch", Version: "v2alpha1", Resource: "cronjobs"}: {},
+			},
+		},
+	}
+	for i, test := range tests {
+		server := httptest.NewServer(http.HandlerFunc(test.response))
+		defer server.Close()
+
+		client := NewDiscoveryClientForConfigOrDie(&rest.Config{Host: server.URL})
+		resources, err := client.ServerPreferredNamespacedResources()
+		if err != nil {
+			t.Errorf("[%d] unexpected error: %v", i, err)
+			continue
+		}
+		got, err := GroupVersionResources(resources)
+		if err != nil {
+			t.Errorf("[%d] unexpected error: %v", i, err)
+			continue
+		}
+
+		if !reflect.DeepEqual(got, test.expected) {
+			t.Errorf("[%d] expected:\n%v\ngot:\n%v\n", i, test.expected, got)
+		}
+		server.Close()
+	}
+}
+
+func groupVersions(resources []*metav1.APIResourceList) []string {
+	result := []string{}
+	for _, resourceList := range resources {
+		result = append(result, resourceList.GroupVersion)
+	}
+	return result
 }

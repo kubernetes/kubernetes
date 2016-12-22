@@ -25,6 +25,10 @@ KUBE_OUTPUT_SUBPATH="${KUBE_OUTPUT_SUBPATH:-_output/local}"
 KUBE_OUTPUT="${KUBE_ROOT}/${KUBE_OUTPUT_SUBPATH}"
 KUBE_OUTPUT_BINPATH="${KUBE_OUTPUT}/bin"
 
+# This controls rsync compression. Set to a value > 0 to enable rsync
+# compression for build container
+KUBE_RSYNC_COMPRESS="${KUBE_RSYNC_COMPRESS:-0}"
+
 # Set no_proxy for localhost if behind a proxy, otherwise, 
 # the connections to localhost in scripts will time out
 export no_proxy=127.0.0.1,localhost
@@ -49,7 +53,7 @@ KUBE_OUTPUT_HOSTBIN="${KUBE_OUTPUT_BINPATH}/$(kube::util::host_platform)"
 # most preferred version for a group should appear first
 KUBE_AVAILABLE_GROUP_VERSIONS="${KUBE_AVAILABLE_GROUP_VERSIONS:-\
 v1 \
-apps/v1alpha1 \
+apps/v1beta1 \
 authentication.k8s.io/v1beta1 \
 authorization.k8s.io/v1beta1 \
 autoscaling/v1 \
@@ -58,7 +62,7 @@ batch/v2alpha1 \
 certificates.k8s.io/v1alpha1 \
 extensions/v1beta1 \
 imagepolicy.k8s.io/v1alpha1 \
-policy/v1alpha1 \
+policy/v1beta1 \
 rbac.authorization.k8s.io/v1alpha1 \
 storage.k8s.io/v1beta1\
 }"
@@ -66,7 +70,10 @@ storage.k8s.io/v1beta1\
 # not all group versions are exposed by the server.  This list contains those
 # which are not available so we don't generate clients or swagger for them
 KUBE_NONSERVER_GROUP_VERSIONS="
- imagepolicy.k8s.io/v1alpha1 
+ abac.authorization.kubernetes.io/v0 \
+ abac.authorization.kubernetes.io/v1beta1 \
+ componentconfig/v1alpha1 \
+ imagepolicy.k8s.io/v1alpha1\
 "
 
 # This emulates "readlink -f" which is not available on MacOS X.
@@ -149,3 +156,4 @@ kube::realpath() {
   fi
   kube::readlinkdashf "$1"
 }
+

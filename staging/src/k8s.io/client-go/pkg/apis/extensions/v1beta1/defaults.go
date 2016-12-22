@@ -18,15 +18,16 @@ package v1beta1
 
 import (
 	"k8s.io/client-go/pkg/api/v1"
+	metav1 "k8s.io/client-go/pkg/apis/meta/v1"
 	"k8s.io/client-go/pkg/runtime"
 	"k8s.io/client-go/pkg/util/intstr"
 )
 
 func addDefaultingFuncs(scheme *runtime.Scheme) error {
+	RegisterDefaults(scheme)
 	return scheme.AddDefaultingFuncs(
 		SetDefaults_DaemonSet,
 		SetDefaults_Deployment,
-		SetDefaults_Job,
 		SetDefaults_HorizontalPodAutoscaler,
 		SetDefaults_ReplicaSet,
 		SetDefaults_NetworkPolicy,
@@ -39,7 +40,7 @@ func SetDefaults_DaemonSet(obj *DaemonSet) {
 	// TODO: support templates defined elsewhere when we support them in the API
 	if labels != nil {
 		if obj.Spec.Selector == nil {
-			obj.Spec.Selector = &LabelSelector{
+			obj.Spec.Selector = &metav1.LabelSelector{
 				MatchLabels: labels,
 			}
 		}
@@ -55,7 +56,7 @@ func SetDefaults_Deployment(obj *Deployment) {
 
 	if labels != nil {
 		if obj.Spec.Selector == nil {
-			obj.Spec.Selector = &LabelSelector{MatchLabels: labels}
+			obj.Spec.Selector = &metav1.LabelSelector{MatchLabels: labels}
 		}
 		if len(obj.Labels) == 0 {
 			obj.Labels = labels
@@ -71,7 +72,7 @@ func SetDefaults_Deployment(obj *Deployment) {
 	if strategy.Type == "" {
 		strategy.Type = RollingUpdateDeploymentStrategyType
 	}
-	if strategy.Type == RollingUpdateDeploymentStrategyType {
+	if strategy.Type == RollingUpdateDeploymentStrategyType || strategy.RollingUpdate != nil {
 		if strategy.RollingUpdate == nil {
 			rollingUpdate := RollingUpdateDeployment{}
 			strategy.RollingUpdate = &rollingUpdate
@@ -86,40 +87,6 @@ func SetDefaults_Deployment(obj *Deployment) {
 			maxSurge := intstr.FromInt(1)
 			strategy.RollingUpdate.MaxSurge = &maxSurge
 		}
-	}
-}
-
-func SetDefaults_Job(obj *Job) {
-	labels := obj.Spec.Template.Labels
-	// TODO: support templates defined elsewhere when we support them in the API
-	if labels != nil {
-		// if an autoselector is requested, we'll build the selector later with controller-uid and job-name
-		autoSelector := bool(obj.Spec.AutoSelector != nil && *obj.Spec.AutoSelector)
-
-		// otherwise, we are using a manual selector
-		manualSelector := !autoSelector
-
-		// and default behavior for an unspecified manual selector is to use the pod template labels
-		if manualSelector && obj.Spec.Selector == nil {
-			obj.Spec.Selector = &LabelSelector{
-				MatchLabels: labels,
-			}
-		}
-		if len(obj.Labels) == 0 {
-			obj.Labels = labels
-		}
-	}
-	// For a non-parallel job, you can leave both `.spec.completions` and
-	// `.spec.parallelism` unset.  When both are unset, both are defaulted to 1.
-	if obj.Spec.Completions == nil && obj.Spec.Parallelism == nil {
-		obj.Spec.Completions = new(int32)
-		*obj.Spec.Completions = 1
-		obj.Spec.Parallelism = new(int32)
-		*obj.Spec.Parallelism = 1
-	}
-	if obj.Spec.Parallelism == nil {
-		obj.Spec.Parallelism = new(int32)
-		*obj.Spec.Parallelism = 1
 	}
 }
 
@@ -139,7 +106,7 @@ func SetDefaults_ReplicaSet(obj *ReplicaSet) {
 	// TODO: support templates defined elsewhere when we support them in the API
 	if labels != nil {
 		if obj.Spec.Selector == nil {
-			obj.Spec.Selector = &LabelSelector{
+			obj.Spec.Selector = &metav1.LabelSelector{
 				MatchLabels: labels,
 			}
 		}

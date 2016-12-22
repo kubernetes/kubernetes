@@ -19,7 +19,9 @@ package v1
 import (
 	api "k8s.io/client-go/pkg/api"
 	v1 "k8s.io/client-go/pkg/api/v1"
+	meta_v1 "k8s.io/client-go/pkg/apis/meta/v1"
 	watch "k8s.io/client-go/pkg/watch"
+	rest "k8s.io/client-go/rest"
 )
 
 // LimitRangesGetter has a method to return a LimitRangeInterface.
@@ -34,7 +36,7 @@ type LimitRangeInterface interface {
 	Update(*v1.LimitRange) (*v1.LimitRange, error)
 	Delete(name string, options *v1.DeleteOptions) error
 	DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error
-	Get(name string) (*v1.LimitRange, error)
+	Get(name string, options meta_v1.GetOptions) (*v1.LimitRange, error)
 	List(opts v1.ListOptions) (*v1.LimitRangeList, error)
 	Watch(opts v1.ListOptions) (watch.Interface, error)
 	Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *v1.LimitRange, err error)
@@ -43,14 +45,14 @@ type LimitRangeInterface interface {
 
 // limitRanges implements LimitRangeInterface
 type limitRanges struct {
-	client *CoreClient
+	client rest.Interface
 	ns     string
 }
 
 // newLimitRanges returns a LimitRanges
-func newLimitRanges(c *CoreClient, namespace string) *limitRanges {
+func newLimitRanges(c *CoreV1Client, namespace string) *limitRanges {
 	return &limitRanges{
-		client: c,
+		client: c.RESTClient(),
 		ns:     namespace,
 	}
 }
@@ -103,12 +105,13 @@ func (c *limitRanges) DeleteCollection(options *v1.DeleteOptions, listOptions v1
 }
 
 // Get takes name of the limitRange, and returns the corresponding limitRange object, and an error if there is any.
-func (c *limitRanges) Get(name string) (result *v1.LimitRange, err error) {
+func (c *limitRanges) Get(name string, options meta_v1.GetOptions) (result *v1.LimitRange, err error) {
 	result = &v1.LimitRange{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("limitranges").
 		Name(name).
+		VersionedParams(&options, api.ParameterCodec).
 		Do().
 		Into(result)
 	return

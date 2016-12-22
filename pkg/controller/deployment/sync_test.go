@@ -20,10 +20,11 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/apis/extensions"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
+	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
 	"k8s.io/kubernetes/pkg/client/record"
+	testclient "k8s.io/kubernetes/pkg/client/testing/core"
 	"k8s.io/kubernetes/pkg/controller"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
 	"k8s.io/kubernetes/pkg/controller/informers"
@@ -36,9 +37,9 @@ func maxSurge(val int) *intstr.IntOrString {
 }
 
 func TestScale(t *testing.T) {
-	newTimestamp := unversioned.Date(2016, 5, 20, 2, 0, 0, 0, time.UTC)
-	oldTimestamp := unversioned.Date(2016, 5, 20, 1, 0, 0, 0, time.UTC)
-	olderTimestamp := unversioned.Date(2016, 5, 20, 0, 0, 0, 0, time.UTC)
+	newTimestamp := metav1.Date(2016, 5, 20, 2, 0, 0, 0, time.UTC)
+	oldTimestamp := metav1.Date(2016, 5, 20, 1, 0, 0, 0, time.UTC)
+	olderTimestamp := metav1.Date(2016, 5, 20, 0, 0, 0, 0, time.UTC)
 
 	var updatedTemplate = func(replicas int) *extensions.Deployment {
 		d := newDeployment("foo", replicas, nil, nil, nil, map[string]string{"foo": "bar"})
@@ -54,8 +55,9 @@ func TestScale(t *testing.T) {
 		newRS  *extensions.ReplicaSet
 		oldRSs []*extensions.ReplicaSet
 
-		expectedNew *extensions.ReplicaSet
-		expectedOld []*extensions.ReplicaSet
+		expectedNew  *extensions.ReplicaSet
+		expectedOld  []*extensions.ReplicaSet
+		wasntUpdated map[string]bool
 
 		desiredReplicasAnnotations map[string]int32
 	}{
@@ -193,8 +195,9 @@ func TestScale(t *testing.T) {
 			newRS:  rs("foo-v3", 0, nil, newTimestamp),
 			oldRSs: []*extensions.ReplicaSet{rs("foo-v2", 0, nil, oldTimestamp), rs("foo-v1", 0, nil, olderTimestamp)},
 
-			expectedNew: rs("foo-v3", 6, nil, newTimestamp),
-			expectedOld: []*extensions.ReplicaSet{rs("foo-v2", 0, nil, oldTimestamp), rs("foo-v1", 0, nil, olderTimestamp)},
+			expectedNew:  rs("foo-v3", 6, nil, newTimestamp),
+			expectedOld:  []*extensions.ReplicaSet{rs("foo-v2", 0, nil, oldTimestamp), rs("foo-v1", 0, nil, olderTimestamp)},
+			wasntUpdated: map[string]bool{"foo-v2": true, "foo-v1": true},
 		},
 		// Scenario: deployment.spec.replicas == 3 ( foo-v1.spec.replicas == foo-v2.spec.replicas == foo-v3.spec.replicas == 1 )
 		// Deployment is scaled to 5. foo-v3.spec.replicas and foo-v2.spec.replicas should increment by 1 but foo-v2 fails to
@@ -207,8 +210,9 @@ func TestScale(t *testing.T) {
 			newRS:  rs("foo-v3", 2, nil, newTimestamp),
 			oldRSs: []*extensions.ReplicaSet{rs("foo-v2", 1, nil, oldTimestamp), rs("foo-v1", 1, nil, olderTimestamp)},
 
-			expectedNew: rs("foo-v3", 2, nil, newTimestamp),
-			expectedOld: []*extensions.ReplicaSet{rs("foo-v2", 2, nil, oldTimestamp), rs("foo-v1", 1, nil, olderTimestamp)},
+			expectedNew:  rs("foo-v3", 2, nil, newTimestamp),
+			expectedOld:  []*extensions.ReplicaSet{rs("foo-v2", 2, nil, oldTimestamp), rs("foo-v1", 1, nil, olderTimestamp)},
+			wasntUpdated: map[string]bool{"foo-v3": true, "foo-v1": true},
 
 			desiredReplicasAnnotations: map[string]int32{"foo-v2": int32(3)},
 		},
@@ -257,7 +261,7 @@ func TestScale(t *testing.T) {
 		}
 
 		if test.newRS != nil {
-			desiredReplicas := test.oldDeployment.Spec.Replicas
+			desiredReplicas := *(test.oldDeployment.Spec.Replicas)
 			if desired, ok := test.desiredReplicasAnnotations[test.newRS.Name]; ok {
 				desiredReplicas = desired
 			}
@@ -268,7 +272,7 @@ func TestScale(t *testing.T) {
 			if rs == nil {
 				continue
 			}
-			desiredReplicas := test.oldDeployment.Spec.Replicas
+			desiredReplicas := *(test.oldDeployment.Spec.Replicas)
 			if desired, ok := test.desiredReplicasAnnotations[rs.Name]; ok {
 				desiredReplicas = desired
 			}
@@ -279,8 +283,28 @@ func TestScale(t *testing.T) {
 			t.Errorf("%s: unexpected error: %v", test.name, err)
 			continue
 		}
-		if test.expectedNew != nil && test.newRS != nil && test.expectedNew.Spec.Replicas != test.newRS.Spec.Replicas {
-			t.Errorf("%s: expected new replicas: %d, got: %d", test.name, test.expectedNew.Spec.Replicas, test.newRS.Spec.Replicas)
+
+		// Construct the nameToSize map that will hold all the sizes we got our of tests
+		// Skip updating the map if the replica set wasn't updated since there will be
+		// no update action for it.
+		nameToSize := make(map[string]int32)
+		if test.newRS != nil {
+			nameToSize[test.newRS.Name] = *(test.newRS.Spec.Replicas)
+		}
+		for i := range test.oldRSs {
+			rs := test.oldRSs[i]
+			nameToSize[rs.Name] = *(rs.Spec.Replicas)
+		}
+		// Get all the UPDATE actions and update nameToSize with all the updated sizes.
+		for _, action := range fake.Actions() {
+			rs := action.(testclient.UpdateAction).GetObject().(*extensions.ReplicaSet)
+			if !test.wasntUpdated[rs.Name] {
+				nameToSize[rs.Name] = *(rs.Spec.Replicas)
+			}
+		}
+
+		if test.expectedNew != nil && test.newRS != nil && *(test.expectedNew.Spec.Replicas) != nameToSize[test.newRS.Name] {
+			t.Errorf("%s: expected new replicas: %d, got: %d", test.name, *(test.expectedNew.Spec.Replicas), nameToSize[test.newRS.Name])
 			continue
 		}
 		if len(test.expectedOld) != len(test.oldRSs) {
@@ -290,8 +314,8 @@ func TestScale(t *testing.T) {
 		for n := range test.oldRSs {
 			rs := test.oldRSs[n]
 			expected := test.expectedOld[n]
-			if expected.Spec.Replicas != rs.Spec.Replicas {
-				t.Errorf("%s: expected old (%s) replicas: %d, got: %d", test.name, rs.Name, expected.Spec.Replicas, rs.Spec.Replicas)
+			if *(expected.Spec.Replicas) != nameToSize[rs.Name] {
+				t.Errorf("%s: expected old (%s) replicas: %d, got: %d", test.name, rs.Name, *(expected.Spec.Replicas), nameToSize[rs.Name])
 			}
 		}
 	}
@@ -347,7 +371,7 @@ func TestDeploymentController_cleanupDeployment(t *testing.T) {
 	for i := range tests {
 		test := tests[i]
 		fake := &fake.Clientset{}
-		informers := informers.NewSharedInformerFactory(fake, controller.NoResyncPeriodFunc())
+		informers := informers.NewSharedInformerFactory(fake, nil, controller.NoResyncPeriodFunc())
 		controller := NewDeploymentController(informers.Deployments(), informers.ReplicaSets(), informers.Pods(), fake)
 
 		controller.eventRecorder = &record.FakeRecorder{}

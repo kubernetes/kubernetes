@@ -17,11 +17,14 @@ limitations under the License.
 package genericapiserver
 
 import (
+	"errors"
 	"fmt"
+	"net/http"
 
 	"github.com/golang/glog"
 
 	"k8s.io/kubernetes/pkg/client/restclient"
+	"k8s.io/kubernetes/pkg/healthz"
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
 )
 
@@ -47,6 +50,13 @@ type PostStartHookProvider interface {
 	PostStartHook() (string, PostStartHookFunc, error)
 }
 
+type postStartHookEntry struct {
+	hook PostStartHookFunc
+
+	// done will be closed when the postHook is finished
+	done chan struct{}
+}
+
 // AddPostStartHook allows you to add a PostStartHook.
 func (s *GenericAPIServer) AddPostStartHook(name string, hook PostStartHookFunc) error {
 	if len(name) == 0 {
@@ -62,14 +72,15 @@ func (s *GenericAPIServer) AddPostStartHook(name string, hook PostStartHookFunc)
 	if s.postStartHooksCalled {
 		return fmt.Errorf("unable to add %q because PostStartHooks have already been called", name)
 	}
-	if s.postStartHooks == nil {
-		s.postStartHooks = map[string]PostStartHookFunc{}
-	}
 	if _, exists := s.postStartHooks[name]; exists {
 		return fmt.Errorf("unable to add %q because it is already registered", name)
 	}
 
-	s.postStartHooks[name] = hook
+	// done is closed when the poststarthook is finished.  This is used by the health check to be able to indicate
+	// that the poststarthook is finished
+	done := make(chan struct{})
+	s.AddHealthzChecks(postStartHookHealthz{name: "poststarthook/" + name, done: done})
+	s.postStartHooks[name] = postStartHookEntry{hook: hook, done: done}
 
 	return nil
 }
@@ -82,20 +93,48 @@ func (s *GenericAPIServer) RunPostStartHooks() {
 
 	context := PostStartHookContext{LoopbackClientConfig: s.LoopbackClientConfig}
 
-	for hookName, hook := range s.postStartHooks {
-		go runPostStartHook(hookName, hook, context)
+	for hookName, hookEntry := range s.postStartHooks {
+		go runPostStartHook(hookName, hookEntry, context)
 	}
 }
 
-func runPostStartHook(name string, hook PostStartHookFunc, context PostStartHookContext) {
+func runPostStartHook(name string, entry postStartHookEntry, context PostStartHookContext) {
 	var err error
 	func() {
 		// don't let the hook *accidentally* panic and kill the server
 		defer utilruntime.HandleCrash()
-		err = hook(context)
+		err = entry.hook(context)
 	}()
 	// if the hook intentionally wants to kill server, let it.
 	if err != nil {
 		glog.Fatalf("PostStartHook %q failed: %v", name, err)
+	}
+
+	close(entry.done)
+}
+
+// postStartHookHealthz implements a healthz check for poststarthooks.  It will return a "hookNotFinished"
+// error until the poststarthook is finished.
+type postStartHookHealthz struct {
+	name string
+
+	// done will be closed when the postStartHook is finished
+	done chan struct{}
+}
+
+var _ healthz.HealthzChecker = postStartHookHealthz{}
+
+func (h postStartHookHealthz) Name() string {
+	return h.name
+}
+
+var hookNotFinished = errors.New("not finished")
+
+func (h postStartHookHealthz) Check(req *http.Request) error {
+	select {
+	case <-h.done:
+		return nil
+	default:
+		return hookNotFinished
 	}
 }

@@ -21,43 +21,42 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/rest"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/apps"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/generic"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
-	"k8s.io/kubernetes/pkg/storage/etcd/etcdtest"
 	etcdtesting "k8s.io/kubernetes/pkg/storage/etcd/testing"
 )
 
 func newStorage(t *testing.T) (*REST, *StatusREST, *etcdtesting.EtcdTestServer) {
 	etcdStorage, server := registrytest.NewEtcdStorage(t, apps.GroupName)
-	restOptions := generic.RESTOptions{StorageConfig: etcdStorage, Decorator: generic.UndecoratedStorage, DeleteCollectionWorkers: 1, ResourcePrefix: "petsets"}
-	petSetStorage, statusStorage := NewREST(restOptions)
-	return petSetStorage, statusStorage, server
+	restOptions := generic.RESTOptions{StorageConfig: etcdStorage, Decorator: generic.UndecoratedStorage, DeleteCollectionWorkers: 1, ResourcePrefix: "statefulsets"}
+	statefulSetStorage, statusStorage := NewREST(restOptions)
+	return statefulSetStorage, statusStorage, server
 }
 
-// createPetSet is a helper function that returns a PetSet with the updated resource version.
-func createPetSet(storage *REST, ps apps.PetSet, t *testing.T) (apps.PetSet, error) {
+// createStatefulSet is a helper function that returns a StatefulSet with the updated resource version.
+func createStatefulSet(storage *REST, ps apps.StatefulSet, t *testing.T) (apps.StatefulSet, error) {
 	ctx := api.WithNamespace(api.NewContext(), ps.Namespace)
 	obj, err := storage.Create(ctx, &ps)
 	if err != nil {
-		t.Errorf("Failed to create PetSet, %v", err)
+		t.Errorf("Failed to create StatefulSet, %v", err)
 	}
-	newPS := obj.(*apps.PetSet)
+	newPS := obj.(*apps.StatefulSet)
 	return *newPS, nil
 }
 
-func validNewPetSet() *apps.PetSet {
-	return &apps.PetSet{
+func validNewStatefulSet() *apps.StatefulSet {
+	return &apps.StatefulSet{
 		ObjectMeta: api.ObjectMeta{
 			Name:      "foo",
 			Namespace: api.NamespaceDefault,
 			Labels:    map[string]string{"a": "b"},
 		},
-		Spec: apps.PetSetSpec{
-			Selector: &unversioned.LabelSelector{MatchLabels: map[string]string{"a": "b"}},
+		Spec: apps.StatefulSetSpec{
+			Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"a": "b"}},
 			Template: api.PodTemplateSpec{
 				ObjectMeta: api.ObjectMeta{
 					Labels: map[string]string{"a": "b"},
@@ -76,7 +75,7 @@ func validNewPetSet() *apps.PetSet {
 			},
 			Replicas: 7,
 		},
-		Status: apps.PetSetStatus{},
+		Status: apps.StatefulSetStatus{},
 	}
 }
 
@@ -85,7 +84,7 @@ func TestCreate(t *testing.T) {
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
 	test := registrytest.New(t, storage.Store)
-	ps := validNewPetSet()
+	ps := validNewStatefulSet()
 	ps.ObjectMeta = api.ObjectMeta{}
 	test.TestCreate(
 		// valid
@@ -101,17 +100,17 @@ func TestStatusUpdate(t *testing.T) {
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
 	ctx := api.WithNamespace(api.NewContext(), api.NamespaceDefault)
-	key := etcdtest.AddPrefix("/petsets/" + api.NamespaceDefault + "/foo")
-	validPetSet := validNewPetSet()
-	if err := storage.Storage.Create(ctx, key, validPetSet, nil, 0); err != nil {
+	key := "/statefulsets/" + api.NamespaceDefault + "/foo"
+	validStatefulSet := validNewStatefulSet()
+	if err := storage.Storage.Create(ctx, key, validStatefulSet, nil, 0); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	update := apps.PetSet{
-		ObjectMeta: validPetSet.ObjectMeta,
-		Spec: apps.PetSetSpec{
+	update := apps.StatefulSet{
+		ObjectMeta: validStatefulSet.ObjectMeta,
+		Spec: apps.StatefulSetSpec{
 			Replicas: 7,
 		},
-		Status: apps.PetSetStatus{
+		Status: apps.StatefulSetStatus{
 			Replicas: 7,
 		},
 	}
@@ -119,12 +118,12 @@ func TestStatusUpdate(t *testing.T) {
 	if _, _, err := statusStorage.Update(ctx, update.Name, rest.DefaultUpdatedObjectInfo(&update, api.Scheme)); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	obj, err := storage.Get(ctx, "foo")
+	obj, err := storage.Get(ctx, "foo", &metav1.GetOptions{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	ps := obj.(*apps.PetSet)
+	ps := obj.(*apps.StatefulSet)
 	if ps.Spec.Replicas != 7 {
 		t.Errorf("we expected .spec.replicas to not be updated but it was updated to %v", ps.Spec.Replicas)
 	}
@@ -138,7 +137,7 @@ func TestGet(t *testing.T) {
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
 	test := registrytest.New(t, storage.Store)
-	test.TestGet(validNewPetSet())
+	test.TestGet(validNewStatefulSet())
 }
 
 func TestList(t *testing.T) {
@@ -146,7 +145,7 @@ func TestList(t *testing.T) {
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
 	test := registrytest.New(t, storage.Store)
-	test.TestList(validNewPetSet())
+	test.TestList(validNewStatefulSet())
 }
 
 func TestDelete(t *testing.T) {
@@ -154,7 +153,7 @@ func TestDelete(t *testing.T) {
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
 	test := registrytest.New(t, storage.Store)
-	test.TestDelete(validNewPetSet())
+	test.TestDelete(validNewStatefulSet())
 }
 
 func TestWatch(t *testing.T) {
@@ -163,7 +162,7 @@ func TestWatch(t *testing.T) {
 	defer storage.Store.DestroyFunc()
 	test := registrytest.New(t, storage.Store)
 	test.TestWatch(
-		validNewPetSet(),
+		validNewStatefulSet(),
 		// matching labels
 		[]labels.Set{
 			{"a": "b"},

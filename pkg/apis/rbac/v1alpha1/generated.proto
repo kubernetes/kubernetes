@@ -22,9 +22,10 @@ syntax = 'proto2';
 package k8s.io.kubernetes.pkg.apis.rbac.v1alpha1;
 
 import "k8s.io/kubernetes/pkg/api/resource/generated.proto";
-import "k8s.io/kubernetes/pkg/api/unversioned/generated.proto";
 import "k8s.io/kubernetes/pkg/api/v1/generated.proto";
+import "k8s.io/kubernetes/pkg/apis/meta/v1/generated.proto";
 import "k8s.io/kubernetes/pkg/runtime/generated.proto";
+import "k8s.io/kubernetes/pkg/runtime/schema/generated.proto";
 import "k8s.io/kubernetes/pkg/util/intstr/generated.proto";
 
 // Package-wide variables from generator "generated".
@@ -55,11 +56,19 @@ message ClusterRoleBinding {
   optional RoleRef roleRef = 3;
 }
 
+// +k8s:deepcopy-gen=false
+// ClusterRoleBindingBuilder let's us attach methods.  A no-no for API types.
+// We use it to construct bindings in code.  It's more compact than trying to write them
+// out in a literal.
+message ClusterRoleBindingBuilder {
+  optional ClusterRoleBinding clusterRoleBinding = 1;
+}
+
 // ClusterRoleBindingList is a collection of ClusterRoleBindings
 message ClusterRoleBindingList {
   // Standard object's metadata.
   // +optional
-  optional k8s.io.kubernetes.pkg.api.unversioned.ListMeta metadata = 1;
+  optional k8s.io.kubernetes.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // Items is a list of ClusterRoleBindings
   repeated ClusterRoleBinding items = 2;
@@ -69,7 +78,7 @@ message ClusterRoleBindingList {
 message ClusterRoleList {
   // Standard object's metadata.
   // +optional
-  optional k8s.io.kubernetes.pkg.api.unversioned.ListMeta metadata = 1;
+  optional k8s.io.kubernetes.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // Items is a list of ClusterRoles
   repeated ClusterRole items = 2;
@@ -107,6 +116,14 @@ message PolicyRule {
   repeated string nonResourceURLs = 6;
 }
 
+// +k8s:deepcopy-gen=false
+// PolicyRuleBuilder let's us attach methods.  A no-no for API types.
+// We use it to construct rules in code.  It's more compact than trying to write them
+// out in a literal and allows us to perform some basic checking during construction
+message PolicyRuleBuilder {
+  optional PolicyRule policyRule = 1;
+}
+
 // Role is a namespaced, logical grouping of PolicyRules that can be referenced as a unit by a RoleBinding.
 message Role {
   // Standard object's metadata.
@@ -137,7 +154,7 @@ message RoleBinding {
 message RoleBindingList {
   // Standard object's metadata.
   // +optional
-  optional k8s.io.kubernetes.pkg.api.unversioned.ListMeta metadata = 1;
+  optional k8s.io.kubernetes.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // Items is a list of RoleBindings
   repeated RoleBinding items = 2;
@@ -147,7 +164,7 @@ message RoleBindingList {
 message RoleList {
   // Standard object's metadata.
   // +optional
-  optional k8s.io.kubernetes.pkg.api.unversioned.ListMeta metadata = 1;
+  optional k8s.io.kubernetes.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // Items is a list of Roles
   repeated Role items = 2;

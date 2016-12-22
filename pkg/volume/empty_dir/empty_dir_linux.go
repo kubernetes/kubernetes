@@ -23,7 +23,6 @@ import (
 	"syscall"
 
 	"github.com/golang/glog"
-	"github.com/opencontainers/runc/libcontainer/selinux"
 	"k8s.io/kubernetes/pkg/util/mount"
 )
 
@@ -51,9 +50,4 @@ func (m *realMountDetector) GetMountMedium(path string) (storageMedium, bool, er
 		return mediumMemory, !notMnt, nil
 	}
 	return mediumUnknown, !notMnt, nil
-}
-
-// selinuxEnabled determines whether SELinux is enabled.
-func selinuxEnabled() bool {
-	return selinux.SelinuxEnabled()
 }

@@ -19,13 +19,13 @@ package cache
 import (
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/federation/apis/federation/v1beta1"
-	kubeCache "k8s.io/kubernetes/pkg/client/cache"
+	kubecache "k8s.io/kubernetes/pkg/client/cache"
 )
 
-// StoreToClusterLister makes a Store have the List method of the unversioned.ClusterInterface
+// StoreToClusterLister makes a Store have the List method of the metav1.ClusterInterface
 // The Store must contain (only) clusters.
 type StoreToClusterLister struct {
-	kubeCache.Store
+	kubecache.Store
 }
 
 func (s *StoreToClusterLister) List() (clusters v1beta1.ClusterList, err error) {
@@ -41,7 +41,7 @@ type ClusterConditionPredicate func(cluster v1beta1.Cluster) bool
 
 // storeToClusterConditionLister filters and returns nodes matching the given type and status from the store.
 type storeToClusterConditionLister struct {
-	store     kubeCache.Store
+	store     kubecache.Store
 	predicate ClusterConditionPredicate
 }
 

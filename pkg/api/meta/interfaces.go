@@ -17,9 +17,10 @@ limitations under the License.
 package meta
 
 import (
-	"k8s.io/kubernetes/pkg/api/meta/metatypes"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
+	"k8s.io/kubernetes/pkg/apis/meta/v1/unstructured"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/types"
 )
 
@@ -50,23 +51,24 @@ type Object interface {
 	SetResourceVersion(version string)
 	GetSelfLink() string
 	SetSelfLink(selfLink string)
-	GetCreationTimestamp() unversioned.Time
-	SetCreationTimestamp(timestamp unversioned.Time)
-	GetDeletionTimestamp() *unversioned.Time
-	SetDeletionTimestamp(timestamp *unversioned.Time)
+	GetCreationTimestamp() metav1.Time
+	SetCreationTimestamp(timestamp metav1.Time)
+	GetDeletionTimestamp() *metav1.Time
+	SetDeletionTimestamp(timestamp *metav1.Time)
 	GetLabels() map[string]string
 	SetLabels(labels map[string]string)
 	GetAnnotations() map[string]string
 	SetAnnotations(annotations map[string]string)
 	GetFinalizers() []string
 	SetFinalizers(finalizers []string)
-	GetOwnerReferences() []metatypes.OwnerReference
-	SetOwnerReferences([]metatypes.OwnerReference)
+	GetOwnerReferences() []metav1.OwnerReference
+	SetOwnerReferences([]metav1.OwnerReference)
 	GetClusterName() string
 	SetClusterName(clusterName string)
 }
 
-var _ Object = &runtime.Unstructured{}
+// TODO: move me to pkg/apis/meta/v1/unstructured once Object is moved to pkg/apis/meta/v1
+var _ Object = &unstructured.Unstructured{}
 
 type ListMetaAccessor interface {
 	GetListMeta() List
@@ -75,10 +77,10 @@ type ListMetaAccessor interface {
 // List lets you work with list metadata from any of the versioned or
 // internal API objects. Attempting to set or retrieve a field on an object that does
 // not support that field will be a no-op and return a default value.
-type List unversioned.List
+type List metav1.List
 
 // Type exposes the type and APIVersion of versioned or internal API objects.
-type Type unversioned.Type
+type Type metav1.Type
 
 // MetadataAccessor lets you work with object and list metadata from any of the versioned or
 // internal API objects. Attempting to set or retrieve a field on an object that does
@@ -143,7 +145,7 @@ type RESTMapping struct {
 	// Resource is a string representing the name of this resource as a REST client would see it
 	Resource string
 
-	GroupVersionKind unversioned.GroupVersionKind
+	GroupVersionKind schema.GroupVersionKind
 
 	// Scope contains the information needed to deal with REST Resources that are in a resource hierarchy
 	Scope RESTScope
@@ -163,21 +165,23 @@ type RESTMapping struct {
 // TODO: split into sub-interfaces
 type RESTMapper interface {
 	// KindFor takes a partial resource and returns the single match.  Returns an error if there are multiple matches
-	KindFor(resource unversioned.GroupVersionResource) (unversioned.GroupVersionKind, error)
+	KindFor(resource schema.GroupVersionResource) (schema.GroupVersionKind, error)
 
 	// KindsFor takes a partial resource and returns the list of potential kinds in priority order
-	KindsFor(resource unversioned.GroupVersionResource) ([]unversioned.GroupVersionKind, error)
+	KindsFor(resource schema.GroupVersionResource) ([]schema.GroupVersionKind, error)
 
 	// ResourceFor takes a partial resource and returns the single match.  Returns an error if there are multiple matches
-	ResourceFor(input unversioned.GroupVersionResource) (unversioned.GroupVersionResource, error)
+	ResourceFor(input schema.GroupVersionResource) (schema.GroupVersionResource, error)
 
 	// ResourcesFor takes a partial resource and returns the list of potential resource in priority order
-	ResourcesFor(input unversioned.GroupVersionResource) ([]unversioned.GroupVersionResource, error)
+	ResourcesFor(input schema.GroupVersionResource) ([]schema.GroupVersionResource, error)
 
 	// RESTMapping identifies a preferred resource mapping for the provided group kind.
-	RESTMapping(gk unversioned.GroupKind, versions ...string) (*RESTMapping, error)
-	// RESTMappings returns all resource mappings for the provided group kind.
-	RESTMappings(gk unversioned.GroupKind) ([]*RESTMapping, error)
+	RESTMapping(gk schema.GroupKind, versions ...string) (*RESTMapping, error)
+	// RESTMappings returns all resource mappings for the provided group kind if no
+	// version search is provided. Otherwise identifies a preferred resource mapping for
+	// the provided version(s).
+	RESTMappings(gk schema.GroupKind, versions ...string) ([]*RESTMapping, error)
 
 	AliasesForResource(resource string) ([]string, bool)
 	ResourceSingularizer(resource string) (singular string, err error)

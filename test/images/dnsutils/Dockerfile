@@ -12,9 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM debian:wheezy
-MAINTAINER Tim Hockin "thockin@google.com"
+FROM alpine
+MAINTAINER Bowei Du "bowei@google.com"
 
-RUN apt-get -q update && \
-    apt-get install -y dnsutils && \
-    apt-get clean
+RUN apk update --no-cache
+RUN apk add bind-tools

@@ -16,5 +16,4 @@ limitations under the License.
 
 // +k8s:deepcopy-gen=package,register
 // +groupName=storage.k8s.io
-// +g8k:openapi-gen=true
 package storage

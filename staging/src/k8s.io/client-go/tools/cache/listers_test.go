@@ -19,11 +19,10 @@ package cache
 import (
 	"testing"
 
-	"k8s.io/client-go/pkg/api"
 	apierrors "k8s.io/client-go/pkg/api/errors"
-	"k8s.io/client-go/pkg/api/unversioned"
-	"k8s.io/client-go/pkg/apis/batch"
-	"k8s.io/client-go/pkg/apis/extensions"
+	"k8s.io/client-go/pkg/api/v1"
+	extensions "k8s.io/client-go/pkg/apis/extensions/v1beta1"
+	metav1 "k8s.io/client-go/pkg/apis/meta/v1"
 	"k8s.io/client-go/pkg/labels"
 	"k8s.io/client-go/pkg/util/sets"
 )
@@ -32,7 +31,7 @@ func TestStoreToNodeLister(t *testing.T) {
 	store := NewStore(MetaNamespaceKeyFunc)
 	ids := sets.NewString("foo", "bar", "baz")
 	for id := range ids {
-		store.Add(&api.Node{ObjectMeta: api.ObjectMeta{Name: id}})
+		store.Add(&v1.Node{ObjectMeta: v1.ObjectMeta{Name: id}})
 	}
 	sml := StoreToNodeLister{store}
 
@@ -51,44 +50,44 @@ func TestStoreToNodeLister(t *testing.T) {
 
 func TestStoreToNodeConditionLister(t *testing.T) {
 	store := NewStore(MetaNamespaceKeyFunc)
-	nodes := []*api.Node{
+	nodes := []*v1.Node{
 		{
-			ObjectMeta: api.ObjectMeta{Name: "foo"},
-			Status: api.NodeStatus{
-				Conditions: []api.NodeCondition{
+			ObjectMeta: v1.ObjectMeta{Name: "foo"},
+			Status: v1.NodeStatus{
+				Conditions: []v1.NodeCondition{
 					{
-						Type:   api.NodeReady,
-						Status: api.ConditionTrue,
+						Type:   v1.NodeReady,
+						Status: v1.ConditionTrue,
 					},
 					{
-						Type:   api.NodeOutOfDisk,
-						Status: api.ConditionFalse,
+						Type:   v1.NodeOutOfDisk,
+						Status: v1.ConditionFalse,
 					},
 				},
 			},
 		},
 		{
-			ObjectMeta: api.ObjectMeta{Name: "bar"},
-			Status: api.NodeStatus{
-				Conditions: []api.NodeCondition{
+			ObjectMeta: v1.ObjectMeta{Name: "bar"},
+			Status: v1.NodeStatus{
+				Conditions: []v1.NodeCondition{
 					{
-						Type:   api.NodeOutOfDisk,
-						Status: api.ConditionTrue,
+						Type:   v1.NodeOutOfDisk,
+						Status: v1.ConditionTrue,
 					},
 				},
 			},
 		},
 		{
-			ObjectMeta: api.ObjectMeta{Name: "baz"},
-			Status: api.NodeStatus{
-				Conditions: []api.NodeCondition{
+			ObjectMeta: v1.ObjectMeta{Name: "baz"},
+			Status: v1.NodeStatus{
+				Conditions: []v1.NodeCondition{
 					{
-						Type:   api.NodeReady,
-						Status: api.ConditionFalse,
+						Type:   v1.NodeReady,
+						Status: v1.ConditionFalse,
 					},
 					{
-						Type:   api.NodeOutOfDisk,
-						Status: api.ConditionUnknown,
+						Type:   v1.NodeOutOfDisk,
+						Status: v1.ConditionUnknown,
 					},
 				},
 			},
@@ -98,9 +97,9 @@ func TestStoreToNodeConditionLister(t *testing.T) {
 		store.Add(n)
 	}
 
-	predicate := func(node *api.Node) bool {
+	predicate := func(node *v1.Node) bool {
 		for _, cond := range node.Status.Conditions {
-			if cond.Type == api.NodeOutOfDisk && cond.Status == api.ConditionTrue {
+			if cond.Type == v1.NodeOutOfDisk && cond.Status == v1.ConditionTrue {
 				return false
 			}
 		}
@@ -127,65 +126,65 @@ func TestStoreToNodeConditionLister(t *testing.T) {
 func TestStoreToReplicationControllerLister(t *testing.T) {
 	testCases := []struct {
 		description              string
-		inRCs                    []*api.ReplicationController
-		list                     func(StoreToReplicationControllerLister) ([]*api.ReplicationController, error)
+		inRCs                    []*v1.ReplicationController
+		list                     func(StoreToReplicationControllerLister) ([]*v1.ReplicationController, error)
 		outRCNames               sets.String
 		expectErr                bool
 		onlyIfIndexedByNamespace bool
 	}{
 		{
 			description: "Verify we can search all namespaces",
-			inRCs: []*api.ReplicationController{
+			inRCs: []*v1.ReplicationController{
 				{
-					ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "bar"},
+					ObjectMeta: v1.ObjectMeta{Name: "foo", Namespace: "bar"},
 				},
 				{
-					ObjectMeta: api.ObjectMeta{Name: "hmm", Namespace: "hmm"},
+					ObjectMeta: v1.ObjectMeta{Name: "hmm", Namespace: "hmm"},
 				},
 			},
-			list: func(lister StoreToReplicationControllerLister) ([]*api.ReplicationController, error) {
-				return lister.ReplicationControllers(api.NamespaceAll).List(labels.Set{}.AsSelectorPreValidated())
+			list: func(lister StoreToReplicationControllerLister) ([]*v1.ReplicationController, error) {
+				return lister.ReplicationControllers(v1.NamespaceAll).List(labels.Set{}.AsSelectorPreValidated())
 			},
 			outRCNames: sets.NewString("hmm", "foo"),
 		},
 		{
 			description: "Verify we can search a specific namespace",
-			inRCs: []*api.ReplicationController{
+			inRCs: []*v1.ReplicationController{
 				{
-					ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "bar"},
+					ObjectMeta: v1.ObjectMeta{Name: "foo", Namespace: "bar"},
 				},
 				{
-					ObjectMeta: api.ObjectMeta{Name: "hmm", Namespace: "hmm"},
+					ObjectMeta: v1.ObjectMeta{Name: "hmm", Namespace: "hmm"},
 				},
 			},
-			list: func(lister StoreToReplicationControllerLister) ([]*api.ReplicationController, error) {
+			list: func(lister StoreToReplicationControllerLister) ([]*v1.ReplicationController, error) {
 				return lister.ReplicationControllers("hmm").List(labels.Set{}.AsSelectorPreValidated())
 			},
 			outRCNames: sets.NewString("hmm"),
 		},
 		{
 			description: "Basic listing with all labels and no selectors",
-			inRCs: []*api.ReplicationController{
-				{ObjectMeta: api.ObjectMeta{Name: "basic"}},
+			inRCs: []*v1.ReplicationController{
+				{ObjectMeta: v1.ObjectMeta{Name: "basic"}},
 			},
-			list: func(lister StoreToReplicationControllerLister) ([]*api.ReplicationController, error) {
+			list: func(lister StoreToReplicationControllerLister) ([]*v1.ReplicationController, error) {
 				return lister.List(labels.Everything())
 			},
 			outRCNames: sets.NewString("basic"),
 		},
 		{
 			description: "No pod labels",
-			inRCs: []*api.ReplicationController{
+			inRCs: []*v1.ReplicationController{
 				{
-					ObjectMeta: api.ObjectMeta{Name: "basic", Namespace: "ns"},
-					Spec: api.ReplicationControllerSpec{
+					ObjectMeta: v1.ObjectMeta{Name: "basic", Namespace: "ns"},
+					Spec: v1.ReplicationControllerSpec{
 						Selector: map[string]string{"foo": "baz"},
 					},
 				},
 			},
-			list: func(lister StoreToReplicationControllerLister) ([]*api.ReplicationController, error) {
-				pod := &api.Pod{
-					ObjectMeta: api.ObjectMeta{Name: "pod1", Namespace: "ns"},
+			list: func(lister StoreToReplicationControllerLister) ([]*v1.ReplicationController, error) {
+				pod := &v1.Pod{
+					ObjectMeta: v1.ObjectMeta{Name: "pod1", Namespace: "ns"},
 				}
 				return lister.GetPodControllers(pod)
 			},
@@ -194,14 +193,14 @@ func TestStoreToReplicationControllerLister(t *testing.T) {
 		},
 		{
 			description: "No RC selectors",
-			inRCs: []*api.ReplicationController{
+			inRCs: []*v1.ReplicationController{
 				{
-					ObjectMeta: api.ObjectMeta{Name: "basic", Namespace: "ns"},
+					ObjectMeta: v1.ObjectMeta{Name: "basic", Namespace: "ns"},
 				},
 			},
-			list: func(lister StoreToReplicationControllerLister) ([]*api.ReplicationController, error) {
-				pod := &api.Pod{
-					ObjectMeta: api.ObjectMeta{
+			list: func(lister StoreToReplicationControllerLister) ([]*v1.ReplicationController, error) {
+				pod := &v1.Pod{
+					ObjectMeta: v1.ObjectMeta{
 						Name:      "pod1",
 						Namespace: "ns",
 						Labels:    map[string]string{"foo": "bar"},
@@ -214,23 +213,23 @@ func TestStoreToReplicationControllerLister(t *testing.T) {
 		},
 		{
 			description: "Matching labels to selectors and namespace",
-			inRCs: []*api.ReplicationController{
+			inRCs: []*v1.ReplicationController{
 				{
-					ObjectMeta: api.ObjectMeta{Name: "foo"},
-					Spec: api.ReplicationControllerSpec{
+					ObjectMeta: v1.ObjectMeta{Name: "foo"},
+					Spec: v1.ReplicationControllerSpec{
 						Selector: map[string]string{"foo": "bar"},
 					},
 				},
 				{
-					ObjectMeta: api.ObjectMeta{Name: "bar", Namespace: "ns"},
-					Spec: api.ReplicationControllerSpec{
+					ObjectMeta: v1.ObjectMeta{Name: "bar", Namespace: "ns"},
+					Spec: v1.ReplicationControllerSpec{
 						Selector: map[string]string{"foo": "bar"},
 					},
 				},
 			},
-			list: func(lister StoreToReplicationControllerLister) ([]*api.ReplicationController, error) {
-				pod := &api.Pod{
-					ObjectMeta: api.ObjectMeta{
+			list: func(lister StoreToReplicationControllerLister) ([]*v1.ReplicationController, error) {
+				pod := &v1.Pod{
+					ObjectMeta: v1.ObjectMeta{
 						Name:      "pod1",
 						Labels:    map[string]string{"foo": "bar"},
 						Namespace: "ns",
@@ -291,7 +290,7 @@ func TestStoreToReplicaSetLister(t *testing.T) {
 		// Basic listing with all labels and no selectors
 		{
 			inRSs: []*extensions.ReplicaSet{
-				{ObjectMeta: api.ObjectMeta{Name: "basic"}},
+				{ObjectMeta: v1.ObjectMeta{Name: "basic"}},
 			},
 			list: func() ([]*extensions.ReplicaSet, error) {
 				return lister.List(labels.Everything())
@@ -302,15 +301,15 @@ func TestStoreToReplicaSetLister(t *testing.T) {
 		{
 			inRSs: []*extensions.ReplicaSet{
 				{
-					ObjectMeta: api.ObjectMeta{Name: "basic", Namespace: "ns"},
+					ObjectMeta: v1.ObjectMeta{Name: "basic", Namespace: "ns"},
 					Spec: extensions.ReplicaSetSpec{
-						Selector: &unversioned.LabelSelector{MatchLabels: map[string]string{"foo": "baz"}},
+						Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "baz"}},
 					},
 				},
 			},
 			list: func() ([]*extensions.ReplicaSet, error) {
-				pod := &api.Pod{
-					ObjectMeta: api.ObjectMeta{Name: "pod1", Namespace: "ns"},
+				pod := &v1.Pod{
+					ObjectMeta: v1.ObjectMeta{Name: "pod1", Namespace: "ns"},
 				}
 				return lister.GetPodReplicaSets(pod)
 			},
@@ -321,12 +320,12 @@ func TestStoreToReplicaSetLister(t *testing.T) {
 		{
 			inRSs: []*extensions.ReplicaSet{
 				{
-					ObjectMeta: api.ObjectMeta{Name: "basic", Namespace: "ns"},
+					ObjectMeta: v1.ObjectMeta{Name: "basic", Namespace: "ns"},
 				},
 			},
 			list: func() ([]*extensions.ReplicaSet, error) {
-				pod := &api.Pod{
-					ObjectMeta: api.ObjectMeta{
+				pod := &v1.Pod{
+					ObjectMeta: v1.ObjectMeta{
 						Name:      "pod1",
 						Namespace: "ns",
 						Labels:    map[string]string{"foo": "bar"},
@@ -341,21 +340,21 @@ func TestStoreToReplicaSetLister(t *testing.T) {
 		{
 			inRSs: []*extensions.ReplicaSet{
 				{
-					ObjectMeta: api.ObjectMeta{Name: "foo"},
+					ObjectMeta: v1.ObjectMeta{Name: "foo"},
 					Spec: extensions.ReplicaSetSpec{
-						Selector: &unversioned.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
+						Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
 					},
 				},
 				{
-					ObjectMeta: api.ObjectMeta{Name: "bar", Namespace: "ns"},
+					ObjectMeta: v1.ObjectMeta{Name: "bar", Namespace: "ns"},
 					Spec: extensions.ReplicaSetSpec{
-						Selector: &unversioned.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
+						Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
 					},
 				},
 			},
 			list: func() ([]*extensions.ReplicaSet, error) {
-				pod := &api.Pod{
-					ObjectMeta: api.ObjectMeta{
+				pod := &v1.Pod{
+					ObjectMeta: v1.ObjectMeta{
 						Name:      "pod1",
 						Labels:    map[string]string{"foo": "bar"},
 						Namespace: "ns",
@@ -403,7 +402,7 @@ func TestStoreToDaemonSetLister(t *testing.T) {
 		// Basic listing
 		{
 			inDSs: []*extensions.DaemonSet{
-				{ObjectMeta: api.ObjectMeta{Name: "basic"}},
+				{ObjectMeta: v1.ObjectMeta{Name: "basic"}},
 			},
 			list: func() ([]extensions.DaemonSet, error) {
 				list, err := lister.List()
@@ -414,9 +413,9 @@ func TestStoreToDaemonSetLister(t *testing.T) {
 		// Listing multiple daemon sets
 		{
 			inDSs: []*extensions.DaemonSet{
-				{ObjectMeta: api.ObjectMeta{Name: "basic"}},
-				{ObjectMeta: api.ObjectMeta{Name: "complex"}},
-				{ObjectMeta: api.ObjectMeta{Name: "complex2"}},
+				{ObjectMeta: v1.ObjectMeta{Name: "basic"}},
+				{ObjectMeta: v1.ObjectMeta{Name: "complex"}},
+				{ObjectMeta: v1.ObjectMeta{Name: "complex2"}},
 			},
 			list: func() ([]extensions.DaemonSet, error) {
 				list, err := lister.List()
@@ -428,15 +427,15 @@ func TestStoreToDaemonSetLister(t *testing.T) {
 		{
 			inDSs: []*extensions.DaemonSet{
 				{
-					ObjectMeta: api.ObjectMeta{Name: "basic", Namespace: "ns"},
+					ObjectMeta: v1.ObjectMeta{Name: "basic", Namespace: "ns"},
 					Spec: extensions.DaemonSetSpec{
-						Selector: &unversioned.LabelSelector{MatchLabels: map[string]string{"foo": "baz"}},
+						Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "baz"}},
 					},
 				},
 			},
 			list: func() ([]extensions.DaemonSet, error) {
-				pod := &api.Pod{
-					ObjectMeta: api.ObjectMeta{Name: "pod1", Namespace: "ns"},
+				pod := &v1.Pod{
+					ObjectMeta: v1.ObjectMeta{Name: "pod1", Namespace: "ns"},
 				}
 				return lister.GetPodDaemonSets(pod)
 			},
@@ -447,12 +446,12 @@ func TestStoreToDaemonSetLister(t *testing.T) {
 		{
 			inDSs: []*extensions.DaemonSet{
 				{
-					ObjectMeta: api.ObjectMeta{Name: "basic", Namespace: "ns"},
+					ObjectMeta: v1.ObjectMeta{Name: "basic", Namespace: "ns"},
 				},
 			},
 			list: func() ([]extensions.DaemonSet, error) {
-				pod := &api.Pod{
-					ObjectMeta: api.ObjectMeta{
+				pod := &v1.Pod{
+					ObjectMeta: v1.ObjectMeta{
 						Name:      "pod1",
 						Namespace: "ns",
 						Labels:    map[string]string{"foo": "bar"},
@@ -467,21 +466,21 @@ func TestStoreToDaemonSetLister(t *testing.T) {
 		{
 			inDSs: []*extensions.DaemonSet{
 				{
-					ObjectMeta: api.ObjectMeta{Name: "foo"},
+					ObjectMeta: v1.ObjectMeta{Name: "foo"},
 					Spec: extensions.DaemonSetSpec{
-						Selector: &unversioned.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
+						Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
 					},
 				},
 				{
-					ObjectMeta: api.ObjectMeta{Name: "bar", Namespace: "ns"},
+					ObjectMeta: v1.ObjectMeta{Name: "bar", Namespace: "ns"},
 					Spec: extensions.DaemonSetSpec{
-						Selector: &unversioned.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
+						Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
 					},
 				},
 			},
 			list: func() ([]extensions.DaemonSet, error) {
-				pod := &api.Pod{
-					ObjectMeta: api.ObjectMeta{
+				pod := &v1.Pod{
+					ObjectMeta: v1.ObjectMeta{
 						Name:      "pod1",
 						Labels:    map[string]string{"foo": "bar"},
 						Namespace: "ns",
@@ -517,177 +516,6 @@ func TestStoreToDaemonSetLister(t *testing.T) {
 	}
 }
 
-func TestStoreToJobLister(t *testing.T) {
-	store := NewStore(MetaNamespaceKeyFunc)
-	lister := StoreToJobLister{store}
-	testCases := []struct {
-		inJobs      []*batch.Job
-		list        func() ([]batch.Job, error)
-		outJobNames sets.String
-		expectErr   bool
-		msg         string
-	}{
-		// Basic listing
-		{
-			inJobs: []*batch.Job{
-				{ObjectMeta: api.ObjectMeta{Name: "basic"}},
-			},
-			list: func() ([]batch.Job, error) {
-				list, err := lister.List()
-				return list.Items, err
-			},
-			outJobNames: sets.NewString("basic"),
-			msg:         "basic listing failed",
-		},
-		// Listing multiple jobs
-		{
-			inJobs: []*batch.Job{
-				{ObjectMeta: api.ObjectMeta{Name: "basic"}},
-				{ObjectMeta: api.ObjectMeta{Name: "complex"}},
-				{ObjectMeta: api.ObjectMeta{Name: "complex2"}},
-			},
-			list: func() ([]batch.Job, error) {
-				list, err := lister.List()
-				return list.Items, err
-			},
-			outJobNames: sets.NewString("basic", "complex", "complex2"),
-			msg:         "listing multiple jobs failed",
-		},
-		// No pod labels
-		{
-			inJobs: []*batch.Job{
-				{
-					ObjectMeta: api.ObjectMeta{Name: "basic", Namespace: "ns"},
-					Spec: batch.JobSpec{
-						Selector: &unversioned.LabelSelector{
-							MatchLabels: map[string]string{"foo": "baz"},
-						},
-					},
-				},
-			},
-			list: func() ([]batch.Job, error) {
-				pod := &api.Pod{
-					ObjectMeta: api.ObjectMeta{Name: "pod", Namespace: "ns"},
-				}
-				return lister.GetPodJobs(pod)
-			},
-			outJobNames: sets.NewString(),
-			expectErr:   true,
-			msg:         "listing jobs failed when pod has no labels: expected error, got none",
-		},
-		// No Job selectors
-		{
-			inJobs: []*batch.Job{
-				{
-					ObjectMeta: api.ObjectMeta{Name: "basic", Namespace: "ns"},
-				},
-			},
-			list: func() ([]batch.Job, error) {
-				pod := &api.Pod{
-					ObjectMeta: api.ObjectMeta{
-						Name:      "pod",
-						Namespace: "ns",
-						Labels:    map[string]string{"foo": "bar"},
-					},
-				}
-				return lister.GetPodJobs(pod)
-			},
-			outJobNames: sets.NewString(),
-			expectErr:   true,
-			msg:         "listing jobs failed when job has no selector: expected error, got none",
-		},
-		// Matching labels to selectors and namespace
-		{
-			inJobs: []*batch.Job{
-				{
-					ObjectMeta: api.ObjectMeta{Name: "foo"},
-					Spec: batch.JobSpec{
-						Selector: &unversioned.LabelSelector{
-							MatchLabels: map[string]string{"foo": "bar"},
-						},
-					},
-				},
-				{
-					ObjectMeta: api.ObjectMeta{Name: "bar", Namespace: "ns"},
-					Spec: batch.JobSpec{
-						Selector: &unversioned.LabelSelector{
-							MatchLabels: map[string]string{"foo": "bar"},
-						},
-					},
-				},
-			},
-			list: func() ([]batch.Job, error) {
-				pod := &api.Pod{
-					ObjectMeta: api.ObjectMeta{
-						Name:      "pod",
-						Labels:    map[string]string{"foo": "bar"},
-						Namespace: "ns",
-					},
-				}
-				return lister.GetPodJobs(pod)
-			},
-			outJobNames: sets.NewString("bar"),
-			msg:         "listing jobs with namespace and selector failed",
-		},
-		// Matching labels to selectors and namespace, error case
-		{
-			inJobs: []*batch.Job{
-				{
-					ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "foo"},
-					Spec: batch.JobSpec{
-						Selector: &unversioned.LabelSelector{
-							MatchLabels: map[string]string{"foo": "bar"},
-						},
-					},
-				},
-				{
-					ObjectMeta: api.ObjectMeta{Name: "bar", Namespace: "bar"},
-					Spec: batch.JobSpec{
-						Selector: &unversioned.LabelSelector{
-							MatchLabels: map[string]string{"foo": "bar"},
-						},
-					},
-				},
-			},
-			list: func() ([]batch.Job, error) {
-				pod := &api.Pod{
-					ObjectMeta: api.ObjectMeta{
-						Name:      "pod",
-						Labels:    map[string]string{"foo": "bar"},
-						Namespace: "baz",
-					},
-				}
-				return lister.GetPodJobs(pod)
-			},
-			expectErr: true,
-			msg:       "listing jobs with namespace and selector failed: expected error, got none",
-		},
-	}
-	for _, c := range testCases {
-		for _, r := range c.inJobs {
-			store.Add(r)
-		}
-
-		Jobs, err := c.list()
-		if err != nil && c.expectErr {
-			continue
-		} else if c.expectErr {
-			t.Errorf("%v", c.msg)
-			continue
-		} else if err != nil {
-			t.Errorf("Unexpected error %#v", err)
-			continue
-		}
-		JobNames := make([]string, len(Jobs))
-		for ix := range Jobs {
-			JobNames[ix] = Jobs[ix].Name
-		}
-		if !c.outJobNames.HasAll(JobNames...) || len(JobNames) != len(c.outJobNames) {
-			t.Errorf("%v : expected %v, got %v", c.msg, JobNames, c.outJobNames)
-		}
-	}
-}
-
 func TestStoreToPodLister(t *testing.T) {
 	// We test with and without a namespace index, because StoreToPodLister has
 	// special logic to work on namespaces even when no namespace index is
@@ -699,25 +527,25 @@ func TestStoreToPodLister(t *testing.T) {
 	for _, store := range stores {
 		ids := []string{"foo", "bar", "baz"}
 		for _, id := range ids {
-			store.Add(&api.Pod{
-				ObjectMeta: api.ObjectMeta{
+			store.Add(&v1.Pod{
+				ObjectMeta: v1.ObjectMeta{
 					Namespace: "other",
 					Name:      id,
 					Labels:    map[string]string{"name": id},
 				},
 			})
 		}
-		store.Add(&api.Pod{
-			ObjectMeta: api.ObjectMeta{
+		store.Add(&v1.Pod{
+			ObjectMeta: v1.ObjectMeta{
 				Name:      "quux",
-				Namespace: api.NamespaceDefault,
+				Namespace: v1.NamespaceDefault,
 				Labels:    map[string]string{"name": "quux"},
 			},
 		})
 		spl := StoreToPodLister{store}
 
 		// Verify that we can always look up by Namespace.
-		defaultPods, err := spl.Pods(api.NamespaceDefault).List(labels.Set{}.AsSelectorPreValidated())
+		defaultPods, err := spl.Pods(v1.NamespaceDefault).List(labels.Set{}.AsSelectorPreValidated())
 		if err != nil {
 			t.Errorf("Unexpected error: %v", err)
 		} else if e, a := 1, len(defaultPods); e != a {
@@ -755,17 +583,17 @@ func TestStoreToPodLister(t *testing.T) {
 
 func TestStoreToServiceLister(t *testing.T) {
 	store := NewIndexer(MetaNamespaceKeyFunc, Indexers{NamespaceIndex: MetaNamespaceIndexFunc})
-	store.Add(&api.Service{
-		ObjectMeta: api.ObjectMeta{Name: "foo"},
-		Spec: api.ServiceSpec{
+	store.Add(&v1.Service{
+		ObjectMeta: v1.ObjectMeta{Name: "foo"},
+		Spec: v1.ServiceSpec{
 			Selector: map[string]string{},
 		},
 	})
-	store.Add(&api.Service{ObjectMeta: api.ObjectMeta{Name: "bar"}})
+	store.Add(&v1.Service{ObjectMeta: v1.ObjectMeta{Name: "bar"}})
 	ssl := StoreToServiceLister{store}
 
-	pod := &api.Pod{
-		ObjectMeta: api.ObjectMeta{
+	pod := &v1.Pod{
+		ObjectMeta: v1.ObjectMeta{
 			Name:   "foopod",
 			Labels: map[string]string{"role": "foo"},
 		},

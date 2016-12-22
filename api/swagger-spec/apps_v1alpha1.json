@@ -9,14 +9,14 @@
   },
   "apis": [
    {
-    "path": "/apis/apps/v1alpha1/namespaces/{namespace}/petsets",
+    "path": "/apis/apps/v1alpha1/namespaces/{namespace}/statefulsets",
     "description": "API at /apis/apps/v1alpha1",
     "operations": [
      {
-      "type": "v1alpha1.PetSetList",
+      "type": "v1alpha1.StatefulSetList",
       "method": "GET",
-      "summary": "list or watch objects of kind PetSet",
-      "nickname": "listNamespacedPetSet",
+      "summary": "list or watch objects of kind StatefulSet",
+      "nickname": "listNamespacedStatefulSet",
       "parameters": [
        {
         "type": "string",
@@ -79,23 +79,25 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1alpha1.PetSetList"
+        "responseModel": "v1alpha1.StatefulSetList"
        }
       ],
       "produces": [
        "application/json",
        "application/yaml",
-       "application/vnd.kubernetes.protobuf"
+       "application/vnd.kubernetes.protobuf",
+       "application/json;stream=watch",
+       "application/vnd.kubernetes.protobuf;stream=watch"
       ],
       "consumes": [
        "*/*"
       ]
      },
      {
-      "type": "v1alpha1.PetSet",
+      "type": "v1alpha1.StatefulSet",
       "method": "POST",
-      "summary": "create a PetSet",
-      "nickname": "createNamespacedPetSet",
+      "summary": "create a StatefulSet",
+      "nickname": "createNamespacedStatefulSet",
       "parameters": [
        {
         "type": "string",
@@ -106,7 +108,7 @@
         "allowMultiple": false
        },
        {
-        "type": "v1alpha1.PetSet",
+        "type": "v1alpha1.StatefulSet",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -126,7 +128,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1alpha1.PetSet"
+        "responseModel": "v1alpha1.StatefulSet"
        }
       ],
       "produces": [
@@ -141,8 +143,8 @@
      {
       "type": "unversioned.Status",
       "method": "DELETE",
-      "summary": "delete collection of PetSet",
-      "nickname": "deletecollectionNamespacedPetSet",
+      "summary": "delete collection of StatefulSet",
+      "nickname": "deletecollectionNamespacedStatefulSet",
       "parameters": [
        {
         "type": "string",
@@ -220,14 +222,14 @@
     ]
    },
    {
-    "path": "/apis/apps/v1alpha1/watch/namespaces/{namespace}/petsets",
+    "path": "/apis/apps/v1alpha1/watch/namespaces/{namespace}/statefulsets",
     "description": "API at /apis/apps/v1alpha1",
     "operations": [
      {
       "type": "versioned.Event",
       "method": "GET",
-      "summary": "watch individual changes to a list of PetSet",
-      "nickname": "watchNamespacedPetSetList",
+      "summary": "watch individual changes to a list of StatefulSet",
+      "nickname": "watchNamespacedStatefulSetList",
       "parameters": [
        {
         "type": "string",
@@ -295,8 +297,9 @@
       ],
       "produces": [
        "application/json",
-       "application/json;stream=watch",
+       "application/yaml",
        "application/vnd.kubernetes.protobuf",
+       "application/json;stream=watch",
        "application/vnd.kubernetes.protobuf;stream=watch"
       ],
       "consumes": [
@@ -306,14 +309,14 @@
     ]
    },
    {
-    "path": "/apis/apps/v1alpha1/namespaces/{namespace}/petsets/{name}",
+    "path": "/apis/apps/v1alpha1/namespaces/{namespace}/statefulsets/{name}",
     "description": "API at /apis/apps/v1alpha1",
     "operations": [
      {
-      "type": "v1alpha1.PetSet",
+      "type": "v1alpha1.StatefulSet",
       "method": "GET",
-      "summary": "read the specified PetSet",
-      "nickname": "readNamespacedPetSet",
+      "summary": "read the specified StatefulSet",
+      "nickname": "readNamespacedStatefulSet",
       "parameters": [
        {
         "type": "string",
@@ -351,7 +354,7 @@
         "type": "string",
         "paramType": "path",
         "name": "name",
-        "description": "name of the PetSet",
+        "description": "name of the StatefulSet",
         "required": true,
         "allowMultiple": false
        }
@@ -360,7 +363,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1alpha1.PetSet"
+        "responseModel": "v1alpha1.StatefulSet"
        }
       ],
       "produces": [
@@ -373,10 +376,10 @@
       ]
      },
      {
-      "type": "v1alpha1.PetSet",
+      "type": "v1alpha1.StatefulSet",
       "method": "PUT",
-      "summary": "replace the specified PetSet",
-      "nickname": "replaceNamespacedPetSet",
+      "summary": "replace the specified StatefulSet",
+      "nickname": "replaceNamespacedStatefulSet",
       "parameters": [
        {
         "type": "string",
@@ -387,7 +390,7 @@
         "allowMultiple": false
        },
        {
-        "type": "v1alpha1.PetSet",
+        "type": "v1alpha1.StatefulSet",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -406,7 +409,7 @@
         "type": "string",
         "paramType": "path",
         "name": "name",
-        "description": "name of the PetSet",
+        "description": "name of the StatefulSet",
         "required": true,
         "allowMultiple": false
        }
@@ -415,7 +418,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1alpha1.PetSet"
+        "responseModel": "v1alpha1.StatefulSet"
        }
       ],
       "produces": [
@@ -428,10 +431,10 @@
       ]
      },
      {
-      "type": "v1alpha1.PetSet",
+      "type": "v1alpha1.StatefulSet",
       "method": "PATCH",
-      "summary": "partially update the specified PetSet",
-      "nickname": "patchNamespacedPetSet",
+      "summary": "partially update the specified StatefulSet",
+      "nickname": "patchNamespacedStatefulSet",
       "parameters": [
        {
         "type": "string",
@@ -461,7 +464,7 @@
         "type": "string",
         "paramType": "path",
         "name": "name",
-        "description": "name of the PetSet",
+        "description": "name of the StatefulSet",
         "required": true,
         "allowMultiple": false
        }
@@ -470,7 +473,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1alpha1.PetSet"
+        "responseModel": "v1alpha1.StatefulSet"
        }
       ],
       "produces": [
@@ -487,8 +490,8 @@
      {
       "type": "unversioned.Status",
       "method": "DELETE",
-      "summary": "delete a PetSet",
-      "nickname": "deleteNamespacedPetSet",
+      "summary": "delete a StatefulSet",
+      "nickname": "deleteNamespacedStatefulSet",
       "parameters": [
        {
         "type": "string",
@@ -507,6 +510,22 @@
         "allowMultiple": false
        },
        {
+        "type": "integer",
+        "paramType": "query",
+        "name": "gracePeriodSeconds",
+        "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "orphanDependents",
+        "description": "Should the dependent objects be orphaned. If true/false, the \"orphan\" finalizer will be added to/removed from the object's finalizers list.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
         "type": "string",
         "paramType": "path",
         "name": "namespace",
@@ -518,7 +537,7 @@
         "type": "string",
         "paramType": "path",
         "name": "name",
-        "description": "name of the PetSet",
+        "description": "name of the StatefulSet",
         "required": true,
         "allowMultiple": false
        }
@@ -542,14 +561,14 @@
     ]
    },
    {
-    "path": "/apis/apps/v1alpha1/watch/namespaces/{namespace}/petsets/{name}",
+    "path": "/apis/apps/v1alpha1/watch/namespaces/{namespace}/statefulsets/{name}",
     "description": "API at /apis/apps/v1alpha1",
     "operations": [
      {
       "type": "versioned.Event",
       "method": "GET",
-      "summary": "watch changes to an object of kind PetSet",
-      "nickname": "watchNamespacedPetSet",
+      "summary": "watch changes to an object of kind StatefulSet",
+      "nickname": "watchNamespacedStatefulSet",
       "parameters": [
        {
         "type": "string",
@@ -611,7 +630,7 @@
         "type": "string",
         "paramType": "path",
         "name": "name",
-        "description": "name of the PetSet",
+        "description": "name of the StatefulSet",
         "required": true,
         "allowMultiple": false
        }
@@ -621,90 +640,14 @@
         "code": 200,
         "message": "OK",
         "responseModel": "versioned.Event"
-       }
-      ],
-      "produces": [
-       "application/json",
-       "application/json;stream=watch",
-       "application/vnd.kubernetes.protobuf",
-       "application/vnd.kubernetes.protobuf;stream=watch"
-      ],
-      "consumes": [
-       "*/*"
-      ]
-     }
-    ]
-   },
-   {
-    "path": "/apis/apps/v1alpha1/petsets",
-    "description": "API at /apis/apps/v1alpha1",
-    "operations": [
-     {
-      "type": "v1alpha1.PetSetList",
-      "method": "GET",
-      "summary": "list or watch objects of kind PetSet",
-      "nickname": "listPetSetForAllNamespaces",
-      "parameters": [
-       {
-        "type": "string",
-        "paramType": "query",
-        "name": "pretty",
-        "description": "If 'true', then the output is pretty printed.",
-        "required": false,
-        "allowMultiple": false
-       },
-       {
-        "type": "string",
-        "paramType": "query",
-        "name": "labelSelector",
-        "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
-        "required": false,
-        "allowMultiple": false
-       },
-       {
-        "type": "string",
-        "paramType": "query",
-        "name": "fieldSelector",
-        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
-        "required": false,
-        "allowMultiple": false
-       },
-       {
-        "type": "boolean",
-        "paramType": "query",
-        "name": "watch",
-        "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
-        "required": false,
-        "allowMultiple": false
-       },
-       {
-        "type": "string",
-        "paramType": "query",
-        "name": "resourceVersion",
-        "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history.",
-        "required": false,
-        "allowMultiple": false
-       },
-       {
-        "type": "integer",
-        "paramType": "query",
-        "name": "timeoutSeconds",
-        "description": "Timeout for the list/watch call.",
-        "required": false,
-        "allowMultiple": false
-       }
-      ],
-      "responseMessages": [
-       {
-        "code": 200,
-        "message": "OK",
-        "responseModel": "v1alpha1.PetSetList"
        }
       ],
       "produces": [
        "application/json",
        "application/yaml",
-       "application/vnd.kubernetes.protobuf"
+       "application/vnd.kubernetes.protobuf",
+       "application/json;stream=watch",
+       "application/vnd.kubernetes.protobuf;stream=watch"
       ],
       "consumes": [
        "*/*"
@@ -713,14 +656,93 @@
     ]
    },
    {
-    "path": "/apis/apps/v1alpha1/watch/petsets",
+    "path": "/apis/apps/v1alpha1/statefulsets",
+    "description": "API at /apis/apps/v1alpha1",
+    "operations": [
+     {
+      "type": "v1alpha1.StatefulSetList",
+      "method": "GET",
+      "summary": "list or watch objects of kind StatefulSet",
+      "nickname": "listStatefulSetForAllNamespaces",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "labelSelector",
+        "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "fieldSelector",
+        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "watch",
+        "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "resourceVersion",
+        "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "integer",
+        "paramType": "query",
+        "name": "timeoutSeconds",
+        "description": "Timeout for the list/watch call.",
+        "required": false,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1alpha1.StatefulSetList"
+       }
+      ],
+      "produces": [
+       "application/json",
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf",
+       "application/json;stream=watch",
+       "application/vnd.kubernetes.protobuf;stream=watch"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
+    "path": "/apis/apps/v1alpha1/watch/statefulsets",
     "description": "API at /apis/apps/v1alpha1",
     "operations": [
      {
       "type": "versioned.Event",
       "method": "GET",
-      "summary": "watch individual changes to a list of PetSet",
-      "nickname": "watchPetSetListForAllNamespaces",
+      "summary": "watch individual changes to a list of StatefulSet",
+      "nickname": "watchStatefulSetListForAllNamespaces",
       "parameters": [
        {
         "type": "string",
@@ -780,8 +802,9 @@
       ],
       "produces": [
        "application/json",
-       "application/json;stream=watch",
+       "application/yaml",
        "application/vnd.kubernetes.protobuf",
+       "application/json;stream=watch",
        "application/vnd.kubernetes.protobuf;stream=watch"
       ],
       "consumes": [
@@ -791,14 +814,14 @@
     ]
    },
    {
-    "path": "/apis/apps/v1alpha1/namespaces/{namespace}/petsets/{name}/status",
+    "path": "/apis/apps/v1alpha1/namespaces/{namespace}/statefulsets/{name}/status",
     "description": "API at /apis/apps/v1alpha1",
     "operations": [
      {
-      "type": "v1alpha1.PetSet",
+      "type": "v1alpha1.StatefulSet",
       "method": "GET",
-      "summary": "read status of the specified PetSet",
-      "nickname": "readNamespacedPetSetStatus",
+      "summary": "read status of the specified StatefulSet",
+      "nickname": "readNamespacedStatefulSetStatus",
       "parameters": [
        {
         "type": "string",
@@ -820,7 +843,7 @@
         "type": "string",
         "paramType": "path",
         "name": "name",
-        "description": "name of the PetSet",
+        "description": "name of the StatefulSet",
         "required": true,
         "allowMultiple": false
        }
@@ -829,7 +852,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1alpha1.PetSet"
+        "responseModel": "v1alpha1.StatefulSet"
        }
       ],
       "produces": [
@@ -842,10 +865,10 @@
       ]
      },
      {
-      "type": "v1alpha1.PetSet",
+      "type": "v1alpha1.StatefulSet",
       "method": "PUT",
-      "summary": "replace status of the specified PetSet",
-      "nickname": "replaceNamespacedPetSetStatus",
+      "summary": "replace status of the specified StatefulSet",
+      "nickname": "replaceNamespacedStatefulSetStatus",
       "parameters": [
        {
         "type": "string",
@@ -856,7 +879,7 @@
         "allowMultiple": false
        },
        {
-        "type": "v1alpha1.PetSet",
+        "type": "v1alpha1.StatefulSet",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -875,7 +898,7 @@
         "type": "string",
         "paramType": "path",
         "name": "name",
-        "description": "name of the PetSet",
+        "description": "name of the StatefulSet",
         "required": true,
         "allowMultiple": false
        }
@@ -884,7 +907,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1alpha1.PetSet"
+        "responseModel": "v1alpha1.StatefulSet"
        }
       ],
       "produces": [
@@ -897,10 +920,10 @@
       ]
      },
      {
-      "type": "v1alpha1.PetSet",
+      "type": "v1alpha1.StatefulSet",
       "method": "PATCH",
-      "summary": "partially update status of the specified PetSet",
-      "nickname": "patchNamespacedPetSetStatus",
+      "summary": "partially update status of the specified StatefulSet",
+      "nickname": "patchNamespacedStatefulSetStatus",
       "parameters": [
        {
         "type": "string",
@@ -930,7 +953,7 @@
         "type": "string",
         "paramType": "path",
         "name": "name",
-        "description": "name of the PetSet",
+        "description": "name of the StatefulSet",
         "required": true,
         "allowMultiple": false
        }
@@ -939,7 +962,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1alpha1.PetSet"
+        "responseModel": "v1alpha1.StatefulSet"
        }
       ],
       "produces": [
@@ -980,9 +1003,9 @@
    }
   ],
   "models": {
-   "v1alpha1.PetSetList": {
-    "id": "v1alpha1.PetSetList",
-    "description": "PetSetList is a collection of PetSets.",
+   "v1alpha1.StatefulSetList": {
+    "id": "v1alpha1.StatefulSetList",
+    "description": "StatefulSetList is a collection of StatefulSets.",
     "required": [
      "items"
     ],
@@ -1001,7 +1024,7 @@
      "items": {
       "type": "array",
       "items": {
-       "$ref": "v1alpha1.PetSet"
+       "$ref": "v1alpha1.StatefulSet"
       }
      }
     }
@@ -1020,9 +1043,9 @@
      }
     }
    },
-   "v1alpha1.PetSet": {
-    "id": "v1alpha1.PetSet",
-    "description": "PetSet represents a set of pods with consistent identities. Identities are defined as:\n - Network: A single stable DNS and hostname.\n - Storage: As many VolumeClaims as requested.\nThe PetSet guarantees that a given network identity will always map to the same storage identity. PetSet is currently in alpha and subject to change without notice.",
+   "v1alpha1.StatefulSet": {
+    "id": "v1alpha1.StatefulSet",
+    "description": "StatefulSet represents a set of pods with consistent identities. Identities are defined as:\n - Network: A single stable DNS and hostname.\n - Storage: As many VolumeClaims as requested.\nThe StatefulSet guarantees that a given network identity will always map to the same storage identity. StatefulSet is currently in alpha and subject to change without notice.",
     "properties": {
      "kind": {
       "type": "string",
@@ -1036,12 +1059,12 @@
       "$ref": "v1.ObjectMeta"
      },
      "spec": {
-      "$ref": "v1alpha1.PetSetSpec",
-      "description": "Spec defines the desired identities of pets in this set."
+      "$ref": "v1alpha1.StatefulSetSpec",
+      "description": "Spec defines the desired identities of pods in this set."
      },
      "status": {
-      "$ref": "v1alpha1.PetSetStatus",
-      "description": "Status is the current status of Pets in this PetSet. This data may be out of date by some window of time."
+      "$ref": "v1alpha1.StatefulSetStatus",
+      "description": "Status is the current status of Pods in this StatefulSet. This data may be out of date by some window of time."
      }
     }
    },
@@ -1153,9 +1176,9 @@
      }
     }
    },
-   "v1alpha1.PetSetSpec": {
-    "id": "v1alpha1.PetSetSpec",
-    "description": "A PetSetSpec is the specification of a PetSet.",
+   "v1alpha1.StatefulSetSpec": {
+    "id": "v1alpha1.StatefulSetSpec",
+    "description": "A StatefulSetSpec is the specification of a StatefulSet.",
     "required": [
      "template",
      "serviceName"
@@ -1172,18 +1195,18 @@
      },
      "template": {
       "$ref": "v1.PodTemplateSpec",
-      "description": "Template is the object that describes the pod that will be created if insufficient replicas are detected. Each pod stamped out by the PetSet will fulfill this Template, but have a unique identity from the rest of the PetSet."
+      "description": "Template is the object that describes the pod that will be created if insufficient replicas are detected. Each pod stamped out by the StatefulSet will fulfill this Template, but have a unique identity from the rest of the StatefulSet."
      },
      "volumeClaimTemplates": {
       "type": "array",
       "items": {
        "$ref": "v1.PersistentVolumeClaim"
       },
-      "description": "VolumeClaimTemplates is a list of claims that pets are allowed to reference. The PetSet controller is responsible for mapping network identities to claims in a way that maintains the identity of a pet. Every claim in this list must have at least one matching (by name) volumeMount in one container in the template. A claim in this list takes precedence over any volumes in the template, with the same name."
+      "description": "VolumeClaimTemplates is a list of claims that pods are allowed to reference. The StatefulSet controller is responsible for mapping network identities to claims in a way that maintains the identity of a pod. Every claim in this list must have at least one matching (by name) volumeMount in one container in the template. A claim in this list takes precedence over any volumes in the template, with the same name."
      },
      "serviceName": {
       "type": "string",
-      "description": "ServiceName is the name of the service that governs this PetSet. This service must exist before the PetSet, and is responsible for the network identity of the set. Pets get DNS/hostnames that follow the pattern: pet-specific-string.serviceName.default.svc.cluster.local where \"pet-specific-string\" is managed by the PetSet controller."
+      "description": "ServiceName is the name of the service that governs this StatefulSet. This service must exist before the StatefulSet, and is responsible for the network identity of the set. Pods get DNS/hostnames that follow the pattern: pod-specific-string.serviceName.default.svc.cluster.local where \"pod-specific-string\" is managed by the StatefulSet controller."
      }
     }
    },
@@ -1328,6 +1351,9 @@
      "subdomain": {
       "type": "string",
       "description": "If specified, the fully qualified Pod hostname will be \"\u003chostname\u003e.\u003csubdomain\u003e.\u003cpod namespace\u003e.svc.\u003ccluster domain\u003e\". If not specified, the pod will not have a domainname at all."
+     },
+     "affinity": {
+      "$ref": "v1.Affinity"
      }
     }
    },
@@ -1429,6 +1455,10 @@
      "azureDisk": {
       "$ref": "v1.AzureDiskVolumeSource",
       "description": "AzureDisk represents an Azure Data Disk mount on the host and bind mount to the pod."
+     },
+     "photonPersistentDisk": {
+      "$ref": "v1.PhotonPersistentDiskVolumeSource",
+      "description": "PhotonPersistentDisk represents a PhotonController persistent disk attached and mounted on kubelets host machine"
      }
     }
    },
@@ -2062,6 +2092,23 @@
     "id": "v1.AzureDataDiskCachingMode",
     "properties": {}
    },
+   "v1.PhotonPersistentDiskVolumeSource": {
+    "id": "v1.PhotonPersistentDiskVolumeSource",
+    "description": "Represents a Photon Controller persistent disk resource.",
+    "required": [
+     "pdID"
+    ],
+    "properties": {
+     "pdID": {
+      "type": "string",
+      "description": "ID that identifies Photon Controller persistent disk"
+     },
+     "fsType": {
+      "type": "string",
+      "description": "Filesystem type to mount. Must be a filesystem type supported by the host operating system. Ex. \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified."
+     }
+    }
+   },
    "v1.Container": {
     "id": "v1.Container",
     "description": "A single application container that you want to run within a pod.",
@@ -2565,6 +2612,200 @@
      }
     }
    },
+   "v1.Affinity": {
+    "id": "v1.Affinity",
+    "description": "Affinity is a group of affinity scheduling rules.",
+    "properties": {
+     "nodeAffinity": {
+      "$ref": "v1.NodeAffinity",
+      "description": "Describes node affinity scheduling rules for the pod."
+     },
+     "podAffinity": {
+      "$ref": "v1.PodAffinity",
+      "description": "Describes pod affinity scheduling rules (e.g. co-locate this pod in the same node, zone, etc. as some other pod(s))."
+     },
+     "podAntiAffinity": {
+      "$ref": "v1.PodAntiAffinity",
+      "description": "Describes pod anti-affinity scheduling rules (e.g. avoid putting this pod in the same node, zone, etc. as some other pod(s))."
+     }
+    }
+   },
+   "v1.NodeAffinity": {
+    "id": "v1.NodeAffinity",
+    "description": "Node affinity is a group of node affinity scheduling rules.",
+    "properties": {
+     "requiredDuringSchedulingIgnoredDuringExecution": {
+      "$ref": "v1.NodeSelector",
+      "description": "If the affinity requirements specified by this field are not met at scheduling time, the pod will not be scheduled onto the node. If the affinity requirements specified by this field cease to be met at some point during pod execution (e.g. due to an update), the system may or may not try to eventually evict the pod from its node."
+     },
+     "preferredDuringSchedulingIgnoredDuringExecution": {
+      "type": "array",
+      "items": {
+       "$ref": "v1.PreferredSchedulingTerm"
+      },
+      "description": "The scheduler will prefer to schedule pods to nodes that satisfy the affinity expressions specified by this field, but it may choose a node that violates one or more of the expressions. The node that is most preferred is the one with the greatest sum of weights, i.e. for each node that meets all of the scheduling requirements (resource request, requiredDuringScheduling affinity expressions, etc.), compute a sum by iterating through the elements of this field and adding \"weight\" to the sum if the node matches the corresponding matchExpressions; the node(s) with the highest sum are the most preferred."
+     }
+    }
+   },
+   "v1.NodeSelector": {
+    "id": "v1.NodeSelector",
+    "description": "A node selector represents the union of the results of one or more label queries over a set of nodes; that is, it represents the OR of the selectors represented by the node selector terms.",
+    "required": [
+     "nodeSelectorTerms"
+    ],
+    "properties": {
+     "nodeSelectorTerms": {
+      "type": "array",
+      "items": {
+       "$ref": "v1.NodeSelectorTerm"
+      },
+      "description": "Required. A list of node selector terms. The terms are ORed."
+     }
+    }
+   },
+   "v1.NodeSelectorTerm": {
+    "id": "v1.NodeSelectorTerm",
+    "description": "A null or empty node selector term matches no objects.",
+    "required": [
+     "matchExpressions"
+    ],
+    "properties": {
+     "matchExpressions": {
+      "type": "array",
+      "items": {
+       "$ref": "v1.NodeSelectorRequirement"
+      },
+      "description": "Required. A list of node selector requirements. The requirements are ANDed."
+     }
+    }
+   },
+   "v1.NodeSelectorRequirement": {
+    "id": "v1.NodeSelectorRequirement",
+    "description": "A node selector requirement is a selector that contains values, a key, and an operator that relates the key and values.",
+    "required": [
+     "key",
+     "operator"
+    ],
+    "properties": {
+     "key": {
+      "type": "string",
+      "description": "The label key that the selector applies to."
+     },
+     "operator": {
+      "type": "string",
+      "description": "Represents a key's relationship to a set of values. Valid operators are In, NotIn, Exists, DoesNotExist. Gt, and Lt."
+     },
+     "values": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      },
+      "description": "An array of string values. If the operator is In or NotIn, the values array must be non-empty. If the operator is Exists or DoesNotExist, the values array must be empty. If the operator is Gt or Lt, the values array must have a single element, which will be interpreted as an integer. This array is replaced during a strategic merge patch."
+     }
+    }
+   },
+   "v1.PreferredSchedulingTerm": {
+    "id": "v1.PreferredSchedulingTerm",
+    "description": "An empty preferred scheduling term matches all objects with implicit weight 0 (i.e. it's a no-op). A null preferred scheduling term matches no objects (i.e. is also a no-op).",
+    "required": [
+     "weight",
+     "preference"
+    ],
+    "properties": {
+     "weight": {
+      "type": "integer",
+      "format": "int32",
+      "description": "Weight associated with matching the corresponding nodeSelectorTerm, in the range 1-100."
+     },
+     "preference": {
+      "$ref": "v1.NodeSelectorTerm",
+      "description": "A node selector term, associated with the corresponding weight."
+     }
+    }
+   },
+   "v1.PodAffinity": {
+    "id": "v1.PodAffinity",
+    "description": "Pod affinity is a group of inter pod affinity scheduling rules.",
+    "properties": {
+     "requiredDuringSchedulingIgnoredDuringExecution": {
+      "type": "array",
+      "items": {
+       "$ref": "v1.PodAffinityTerm"
+      },
+      "description": "NOT YET IMPLEMENTED. TODO: Uncomment field once it is implemented. If the affinity requirements specified by this field are not met at scheduling time, the pod will not be scheduled onto the node. If the affinity requirements specified by this field cease to be met at some point during pod execution (e.g. due to a pod label update), the system will try to eventually evict the pod from its node. When there are multiple elements, the lists of nodes corresponding to each podAffinityTerm are intersected, i.e. all terms must be satisfied. RequiredDuringSchedulingRequiredDuringExecution []PodAffinityTerm  `json:\"requiredDuringSchedulingRequiredDuringExecution,omitempty\"` If the affinity requirements specified by this field are not met at scheduling time, the pod will not be scheduled onto the node. If the affinity requirements specified by this field cease to be met at some point during pod execution (e.g. due to a pod label update), the system may or may not try to eventually evict the pod from its node. When there are multiple elements, the lists of nodes corresponding to each podAffinityTerm are intersected, i.e. all terms must be satisfied."
+     },
+     "preferredDuringSchedulingIgnoredDuringExecution": {
+      "type": "array",
+      "items": {
+       "$ref": "v1.WeightedPodAffinityTerm"
+      },
+      "description": "The scheduler will prefer to schedule pods to nodes that satisfy the affinity expressions specified by this field, but it may choose a node that violates one or more of the expressions. The node that is most preferred is the one with the greatest sum of weights, i.e. for each node that meets all of the scheduling requirements (resource request, requiredDuringScheduling affinity expressions, etc.), compute a sum by iterating through the elements of this field and adding \"weight\" to the sum if the node has pods which matches the corresponding podAffinityTerm; the node(s) with the highest sum are the most preferred."
+     }
+    }
+   },
+   "v1.PodAffinityTerm": {
+    "id": "v1.PodAffinityTerm",
+    "description": "Defines a set of pods (namely those matching the labelSelector relative to the given namespace(s)) that this pod should be co-located (affinity) or not co-located (anti-affinity) with, where co-located is defined as running on a node whose value of the label with key \u003ctopologyKey\u003e tches that of any node on which a pod of the set of pods is running",
+    "required": [
+     "namespaces"
+    ],
+    "properties": {
+     "labelSelector": {
+      "$ref": "unversioned.LabelSelector",
+      "description": "A label query over a set of resources, in this case pods."
+     },
+     "namespaces": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      },
+      "description": "namespaces specifies which namespaces the labelSelector applies to (matches against); nil list means \"this pod's namespace,\" empty list means \"all namespaces\" The json tag here is not \"omitempty\" since we need to distinguish nil and empty. See https://golang.org/pkg/encoding/json/#Marshal for more details."
+     },
+     "topologyKey": {
+      "type": "string",
+      "description": "This pod should be co-located (affinity) or not co-located (anti-affinity) with the pods matching the labelSelector in the specified namespaces, where co-located is defined as running on a node whose value of the label with key topologyKey matches that of any node on which any of the selected pods is running. For PreferredDuringScheduling pod anti-affinity, empty topologyKey is interpreted as \"all topologies\" (\"all topologies\" here means all the topologyKeys indicated by scheduler command-line argument --failure-domains); for affinity and for RequiredDuringScheduling pod anti-affinity, empty topologyKey is not allowed."
+     }
+    }
+   },
+   "v1.WeightedPodAffinityTerm": {
+    "id": "v1.WeightedPodAffinityTerm",
+    "description": "The weights of all of the matched WeightedPodAffinityTerm fields are added per-node to find the most preferred node(s)",
+    "required": [
+     "weight",
+     "podAffinityTerm"
+    ],
+    "properties": {
+     "weight": {
+      "type": "integer",
+      "format": "int32",
+      "description": "weight associated with matching the corresponding podAffinityTerm, in the range 1-100."
+     },
+     "podAffinityTerm": {
+      "$ref": "v1.PodAffinityTerm",
+      "description": "Required. A pod affinity term, associated with the corresponding weight."
+     }
+    }
+   },
+   "v1.PodAntiAffinity": {
+    "id": "v1.PodAntiAffinity",
+    "description": "Pod anti affinity is a group of inter pod anti affinity scheduling rules.",
+    "properties": {
+     "requiredDuringSchedulingIgnoredDuringExecution": {
+      "type": "array",
+      "items": {
+       "$ref": "v1.PodAffinityTerm"
+      },
+      "description": "NOT YET IMPLEMENTED. TODO: Uncomment field once it is implemented. If the anti-affinity requirements specified by this field are not met at scheduling time, the pod will not be scheduled onto the node. If the anti-affinity requirements specified by this field cease to be met at some point during pod execution (e.g. due to a pod label update), the system will try to eventually evict the pod from its node. When there are multiple elements, the lists of nodes corresponding to each podAffinityTerm are intersected, i.e. all terms must be satisfied. RequiredDuringSchedulingRequiredDuringExecution []PodAffinityTerm  `json:\"requiredDuringSchedulingRequiredDuringExecution,omitempty\"` If the anti-affinity requirements specified by this field are not met at scheduling time, the pod will not be scheduled onto the node. If the anti-affinity requirements specified by this field cease to be met at some point during pod execution (e.g. due to a pod label update), the system may or may not try to eventually evict the pod from its node. When there are multiple elements, the lists of nodes corresponding to each podAffinityTerm are intersected, i.e. all terms must be satisfied."
+     },
+     "preferredDuringSchedulingIgnoredDuringExecution": {
+      "type": "array",
+      "items": {
+       "$ref": "v1.WeightedPodAffinityTerm"
+      },
+      "description": "The scheduler will prefer to schedule pods to nodes that satisfy the anti-affinity expressions specified by this field, but it may choose a node that violates one or more of the expressions. The node that is most preferred is the one with the greatest sum of weights, i.e. for each node that meets all of the scheduling requirements (resource request, requiredDuringScheduling anti-affinity expressions, etc.), compute a sum by iterating through the elements of this field and adding \"weight\" to the sum if the node has pods which matches the corresponding podAffinityTerm; the node(s) with the highest sum are the most preferred."
+     }
+    }
+   },
    "v1.PersistentVolumeClaim": {
     "id": "v1.PersistentVolumeClaim",
     "description": "PersistentVolumeClaim is a user's request for and claim to a persistent volume",
@@ -2641,9 +2882,9 @@
      }
     }
    },
-   "v1alpha1.PetSetStatus": {
-    "id": "v1alpha1.PetSetStatus",
-    "description": "PetSetStatus represents the current state of a PetSet.",
+   "v1alpha1.StatefulSetStatus": {
+    "id": "v1alpha1.StatefulSetStatus",
+    "description": "StatefulSetStatus represents the current state of a StatefulSet.",
     "required": [
      "replicas"
     ],

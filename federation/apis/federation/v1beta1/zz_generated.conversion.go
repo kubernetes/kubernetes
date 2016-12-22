@@ -26,6 +26,7 @@ import (
 	v1 "k8s.io/kubernetes/pkg/api/v1"
 	conversion "k8s.io/kubernetes/pkg/conversion"
 	runtime "k8s.io/kubernetes/pkg/runtime"
+	unsafe "unsafe"
 )
 
 func init() {
@@ -52,9 +53,6 @@ func RegisterConversions(scheme *runtime.Scheme) error {
 }
 
 func autoConvert_v1beta1_Cluster_To_federation_Cluster(in *Cluster, out *federation.Cluster, s conversion.Scope) error {
-	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
-		return err
-	}
 	// TODO: Inefficient conversion - can we improve it?
 	if err := s.Convert(&in.ObjectMeta, &out.ObjectMeta, 0); err != nil {
 		return err
@@ -73,9 +71,6 @@ func Convert_v1beta1_Cluster_To_federation_Cluster(in *Cluster, out *federation.
 }
 
 func autoConvert_federation_Cluster_To_v1beta1_Cluster(in *federation.Cluster, out *Cluster, s conversion.Scope) error {
-	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
-		return err
-	}
 	// TODO: Inefficient conversion - can we improve it?
 	if err := s.Convert(&in.ObjectMeta, &out.ObjectMeta, 0); err != nil {
 		return err
@@ -96,12 +91,8 @@ func Convert_federation_Cluster_To_v1beta1_Cluster(in *federation.Cluster, out *
 func autoConvert_v1beta1_ClusterCondition_To_federation_ClusterCondition(in *ClusterCondition, out *federation.ClusterCondition, s conversion.Scope) error {
 	out.Type = federation.ClusterConditionType(in.Type)
 	out.Status = api.ConditionStatus(in.Status)
-	if err := api.Convert_unversioned_Time_To_unversioned_Time(&in.LastProbeTime, &out.LastProbeTime, s); err != nil {
-		return err
-	}
-	if err := api.Convert_unversioned_Time_To_unversioned_Time(&in.LastTransitionTime, &out.LastTransitionTime, s); err != nil {
-		return err
-	}
+	out.LastProbeTime = in.LastProbeTime
+	out.LastTransitionTime = in.LastTransitionTime
 	out.Reason = in.Reason
 	out.Message = in.Message
 	return nil
@@ -114,12 +105,8 @@ func Convert_v1beta1_ClusterCondition_To_federation_ClusterCondition(in *Cluster
 func autoConvert_federation_ClusterCondition_To_v1beta1_ClusterCondition(in *federation.ClusterCondition, out *ClusterCondition, s conversion.Scope) error {
 	out.Type = ClusterConditionType(in.Type)
 	out.Status = v1.ConditionStatus(in.Status)
-	if err := api.Convert_unversioned_Time_To_unversioned_Time(&in.LastProbeTime, &out.LastProbeTime, s); err != nil {
-		return err
-	}
-	if err := api.Convert_unversioned_Time_To_unversioned_Time(&in.LastTransitionTime, &out.LastTransitionTime, s); err != nil {
-		return err
-	}
+	out.LastProbeTime = in.LastProbeTime
+	out.LastTransitionTime = in.LastTransitionTime
 	out.Reason = in.Reason
 	out.Message = in.Message
 	return nil
@@ -130,23 +117,8 @@ func Convert_federation_ClusterCondition_To_v1beta1_ClusterCondition(in *federat
 }
 
 func autoConvert_v1beta1_ClusterList_To_federation_ClusterList(in *ClusterList, out *federation.ClusterList, s conversion.Scope) error {
-	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
-		return err
-	}
-	if err := api.Convert_unversioned_ListMeta_To_unversioned_ListMeta(&in.ListMeta, &out.ListMeta, s); err != nil {
-		return err
-	}
-	if in.Items != nil {
-		in, out := &in.Items, &out.Items
-		*out = make([]federation.Cluster, len(*in))
-		for i := range *in {
-			if err := Convert_v1beta1_Cluster_To_federation_Cluster(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.Items = nil
-	}
+	out.ListMeta = in.ListMeta
+	out.Items = *(*[]federation.Cluster)(unsafe.Pointer(&in.Items))
 	return nil
 }
 
@@ -155,23 +127,8 @@ func Convert_v1beta1_ClusterList_To_federation_ClusterList(in *ClusterList, out 
 }
 
 func autoConvert_federation_ClusterList_To_v1beta1_ClusterList(in *federation.ClusterList, out *ClusterList, s conversion.Scope) error {
-	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
-		return err
-	}
-	if err := api.Convert_unversioned_ListMeta_To_unversioned_ListMeta(&in.ListMeta, &out.ListMeta, s); err != nil {
-		return err
-	}
-	if in.Items != nil {
-		in, out := &in.Items, &out.Items
-		*out = make([]Cluster, len(*in))
-		for i := range *in {
-			if err := Convert_federation_Cluster_To_v1beta1_Cluster(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.Items = nil
-	}
+	out.ListMeta = in.ListMeta
+	out.Items = *(*[]Cluster)(unsafe.Pointer(&in.Items))
 	return nil
 }
 
@@ -180,27 +137,8 @@ func Convert_federation_ClusterList_To_v1beta1_ClusterList(in *federation.Cluste
 }
 
 func autoConvert_v1beta1_ClusterSpec_To_federation_ClusterSpec(in *ClusterSpec, out *federation.ClusterSpec, s conversion.Scope) error {
-	if in.ServerAddressByClientCIDRs != nil {
-		in, out := &in.ServerAddressByClientCIDRs, &out.ServerAddressByClientCIDRs
-		*out = make([]federation.ServerAddressByClientCIDR, len(*in))
-		for i := range *in {
-			if err := Convert_v1beta1_ServerAddressByClientCIDR_To_federation_ServerAddressByClientCIDR(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.ServerAddressByClientCIDRs = nil
-	}
-	if in.SecretRef != nil {
-		in, out := &in.SecretRef, &out.SecretRef
-		*out = new(api.LocalObjectReference)
-		// TODO: Inefficient conversion - can we improve it?
-		if err := s.Convert(*in, *out, 0); err != nil {
-			return err
-		}
-	} else {
-		out.SecretRef = nil
-	}
+	out.ServerAddressByClientCIDRs = *(*[]federation.ServerAddressByClientCIDR)(unsafe.Pointer(&in.ServerAddressByClientCIDRs))
+	out.SecretRef = (*api.LocalObjectReference)(unsafe.Pointer(in.SecretRef))
 	return nil
 }
 
@@ -209,27 +147,8 @@ func Convert_v1beta1_ClusterSpec_To_federation_ClusterSpec(in *ClusterSpec, out 
 }
 
 func autoConvert_federation_ClusterSpec_To_v1beta1_ClusterSpec(in *federation.ClusterSpec, out *ClusterSpec, s conversion.Scope) error {
-	if in.ServerAddressByClientCIDRs != nil {
-		in, out := &in.ServerAddressByClientCIDRs, &out.ServerAddressByClientCIDRs
-		*out = make([]ServerAddressByClientCIDR, len(*in))
-		for i := range *in {
-			if err := Convert_federation_ServerAddressByClientCIDR_To_v1beta1_ServerAddressByClientCIDR(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.ServerAddressByClientCIDRs = nil
-	}
-	if in.SecretRef != nil {
-		in, out := &in.SecretRef, &out.SecretRef
-		*out = new(v1.LocalObjectReference)
-		// TODO: Inefficient conversion - can we improve it?
-		if err := s.Convert(*in, *out, 0); err != nil {
-			return err
-		}
-	} else {
-		out.SecretRef = nil
-	}
+	out.ServerAddressByClientCIDRs = *(*[]ServerAddressByClientCIDR)(unsafe.Pointer(&in.ServerAddressByClientCIDRs))
+	out.SecretRef = (*v1.LocalObjectReference)(unsafe.Pointer(in.SecretRef))
 	return nil
 }
 
@@ -238,18 +157,8 @@ func Convert_federation_ClusterSpec_To_v1beta1_ClusterSpec(in *federation.Cluste
 }
 
 func autoConvert_v1beta1_ClusterStatus_To_federation_ClusterStatus(in *ClusterStatus, out *federation.ClusterStatus, s conversion.Scope) error {
-	if in.Conditions != nil {
-		in, out := &in.Conditions, &out.Conditions
-		*out = make([]federation.ClusterCondition, len(*in))
-		for i := range *in {
-			if err := Convert_v1beta1_ClusterCondition_To_federation_ClusterCondition(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.Conditions = nil
-	}
-	out.Zones = in.Zones
+	out.Conditions = *(*[]federation.ClusterCondition)(unsafe.Pointer(&in.Conditions))
+	out.Zones = *(*[]string)(unsafe.Pointer(&in.Zones))
 	out.Region = in.Region
 	return nil
 }
@@ -259,18 +168,8 @@ func Convert_v1beta1_ClusterStatus_To_federation_ClusterStatus(in *ClusterStatus
 }
 
 func autoConvert_federation_ClusterStatus_To_v1beta1_ClusterStatus(in *federation.ClusterStatus, out *ClusterStatus, s conversion.Scope) error {
-	if in.Conditions != nil {
-		in, out := &in.Conditions, &out.Conditions
-		*out = make([]ClusterCondition, len(*in))
-		for i := range *in {
-			if err := Convert_federation_ClusterCondition_To_v1beta1_ClusterCondition(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.Conditions = nil
-	}
-	out.Zones = in.Zones
+	out.Conditions = *(*[]ClusterCondition)(unsafe.Pointer(&in.Conditions))
+	out.Zones = *(*[]string)(unsafe.Pointer(&in.Zones))
 	out.Region = in.Region
 	return nil
 }

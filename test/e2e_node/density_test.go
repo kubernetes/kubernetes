@@ -25,8 +25,8 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/api/v1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/stats"
 	kubemetrics "k8s.io/kubernetes/pkg/kubelet/metrics"
@@ -319,7 +319,7 @@ func runDensityBatchTest(f *framework.Framework, rc *ResourceCollector, testArg 
 	)
 	var (
 		mutex      = &sync.Mutex{}
-		watchTimes = make(map[string]unversioned.Time, 0)
+		watchTimes = make(map[string]metav1.Time, 0)
 		stopCh     = make(chan struct{})
 	)
 
@@ -358,8 +358,8 @@ func runDensityBatchTest(f *framework.Framework, rc *ResourceCollector, testArg 
 
 	// Analyze results
 	var (
-		firstCreate unversioned.Time
-		lastRunning unversioned.Time
+		firstCreate metav1.Time
+		lastRunning metav1.Time
 		init        = true
 		e2eLags     = make([]framework.PodLatencyData, 0)
 	)
@@ -429,10 +429,10 @@ func runDensitySeqTest(f *framework.Framework, rc *ResourceCollector, testArg de
 
 // createBatchPodWithRateControl creates a batch of pods concurrently, uses one goroutine for each creation.
 // between creations there is an interval for throughput control
-func createBatchPodWithRateControl(f *framework.Framework, pods []*api.Pod, interval time.Duration) map[string]unversioned.Time {
-	createTimes := make(map[string]unversioned.Time)
+func createBatchPodWithRateControl(f *framework.Framework, pods []*v1.Pod, interval time.Duration) map[string]metav1.Time {
+	createTimes := make(map[string]metav1.Time)
 	for _, pod := range pods {
-		createTimes[pod.ObjectMeta.Name] = unversioned.Now()
+		createTimes[pod.ObjectMeta.Name] = metav1.Now()
 		go f.PodClient().Create(pod)
 		time.Sleep(interval)
 	}
@@ -469,49 +469,50 @@ func verifyPodStartupLatency(expect, actual framework.LatencyMetric) error {
 	if actual.Perc90 > expect.Perc90 {
 		return fmt.Errorf("too high pod startup latency 90th percentile: %v", actual.Perc90)
 	}
-	if actual.Perc99 > actual.Perc99 {
-		return fmt.Errorf("too high pod startup latency 99th percentil: %v", actual.Perc99)
+	if actual.Perc99 > expect.Perc99 {
+		return fmt.Errorf("too high pod startup latency 99th percentile: %v", actual.Perc99)
 	}
 	return nil
 }
 
 // newInformerWatchPod creates an informer to check whether all pods are running.
-func newInformerWatchPod(f *framework.Framework, mutex *sync.Mutex, watchTimes map[string]unversioned.Time,
+func newInformerWatchPod(f *framework.Framework, mutex *sync.Mutex, watchTimes map[string]metav1.Time,
 	podType string) *cache.Controller {
 	ns := f.Namespace.Name
-	checkPodRunning := func(p *api.Pod) {
+	checkPodRunning := func(p *v1.Pod) {
 		mutex.Lock()
 		defer mutex.Unlock()
 		defer GinkgoRecover()
 
-		if p.Status.Phase == api.PodRunning {
+		if p.Status.Phase == v1.PodRunning {
 			if _, found := watchTimes[p.Name]; !found {
-				watchTimes[p.Name] = unversioned.Now()
+				watchTimes[p.Name] = metav1.Now()
 			}
 		}
 	}
 
 	_, controller := cache.NewInformer(
 		&cache.ListWatch{
-			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
-				options.LabelSelector = labels.SelectorFromSet(labels.Set{"type": podType})
-				return f.Client.Pods(ns).List(options)
+			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
+				options.LabelSelector = labels.SelectorFromSet(labels.Set{"type": podType}).String()
+				obj, err := f.ClientSet.Core().Pods(ns).List(options)
+				return runtime.Object(obj), err
 			},
-			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-				options.LabelSelector = labels.SelectorFromSet(labels.Set{"type": podType})
-				return f.Client.Pods(ns).Watch(options)
+			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
+				options.LabelSelector = labels.SelectorFromSet(labels.Set{"type": podType}).String()
+				return f.ClientSet.Core().Pods(ns).Watch(options)
 			},
 		},
-		&api.Pod{},
+		&v1.Pod{},
 		0,
 		cache.ResourceEventHandlerFuncs{
 			AddFunc: func(obj interface{}) {
-				p, ok := obj.(*api.Pod)
+				p, ok := obj.(*v1.Pod)
 				Expect(ok).To(Equal(true))
 				go checkPodRunning(p)
 			},
 			UpdateFunc: func(oldObj, newObj interface{}) {
-				p, ok := newObj.(*api.Pod)
+				p, ok := newObj.(*v1.Pod)
 				Expect(ok).To(Equal(true))
 				go checkPodRunning(p)
 			},
@@ -521,16 +522,16 @@ func newInformerWatchPod(f *framework.Framework, mutex *sync.Mutex, watchTimes m
 }
 
 // createBatchPodSequential creats pods back-to-back in sequence.
-func createBatchPodSequential(f *framework.Framework, pods []*api.Pod) (time.Duration, []framework.PodLatencyData) {
-	batchStartTime := unversioned.Now()
+func createBatchPodSequential(f *framework.Framework, pods []*v1.Pod) (time.Duration, []framework.PodLatencyData) {
+	batchStartTime := metav1.Now()
 	e2eLags := make([]framework.PodLatencyData, 0)
 	for _, pod := range pods {
-		create := unversioned.Now()
+		create := metav1.Now()
 		f.PodClient().CreateSync(pod)
 		e2eLags = append(e2eLags,
-			framework.PodLatencyData{Name: pod.Name, Latency: unversioned.Now().Time.Sub(create.Time)})
+			framework.PodLatencyData{Name: pod.Name, Latency: metav1.Now().Time.Sub(create.Time)})
 	}
-	batchLag := unversioned.Now().Time.Sub(batchStartTime.Time)
+	batchLag := metav1.Now().Time.Sub(batchStartTime.Time)
 	sort.Sort(framework.LatencySlice(e2eLags))
 	return batchLag, e2eLags
 }

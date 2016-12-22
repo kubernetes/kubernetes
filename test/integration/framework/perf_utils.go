@@ -17,9 +17,9 @@ limitations under the License.
 package framework
 
 import (
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	"k8s.io/kubernetes/pkg/api/v1"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	e2eframework "k8s.io/kubernetes/test/e2e/framework"
 	testutils "k8s.io/kubernetes/test/utils"
 
@@ -32,11 +32,11 @@ const (
 
 type IntegrationTestNodePreparer struct {
 	client          clientset.Interface
-	countToStrategy map[int]testutils.PrepareNodeStrategy
+	countToStrategy []testutils.CountToStrategy
 	nodeNamePrefix  string
 }
 
-func NewIntegrationTestNodePreparer(client clientset.Interface, countToStrategy map[int]testutils.PrepareNodeStrategy, nodeNamePrefix string) testutils.TestNodePreparer {
+func NewIntegrationTestNodePreparer(client clientset.Interface, countToStrategy []testutils.CountToStrategy, nodeNamePrefix string) testutils.TestNodePreparer {
 	return &IntegrationTestNodePreparer{
 		client:          client,
 		countToStrategy: countToStrategy,
@@ -46,28 +46,28 @@ func NewIntegrationTestNodePreparer(client clientset.Interface, countToStrategy 
 
 func (p *IntegrationTestNodePreparer) PrepareNodes() error {
 	numNodes := 0
-	for k := range p.countToStrategy {
-		numNodes += k
+	for _, v := range p.countToStrategy {
+		numNodes += v.Count
 	}
 
 	glog.Infof("Making %d nodes", numNodes)
-	baseNode := &api.Node{
-		ObjectMeta: api.ObjectMeta{
+	baseNode := &v1.Node{
+		ObjectMeta: v1.ObjectMeta{
 			GenerateName: p.nodeNamePrefix,
 		},
-		Spec: api.NodeSpec{
+		Spec: v1.NodeSpec{
 			// TODO: investigate why this is needed.
 			ExternalID: "foo",
 		},
-		Status: api.NodeStatus{
-			Capacity: api.ResourceList{
-				api.ResourcePods:   *resource.NewQuantity(110, resource.DecimalSI),
-				api.ResourceCPU:    resource.MustParse("4"),
-				api.ResourceMemory: resource.MustParse("32Gi"),
+		Status: v1.NodeStatus{
+			Capacity: v1.ResourceList{
+				v1.ResourcePods:   *resource.NewQuantity(110, resource.DecimalSI),
+				v1.ResourceCPU:    resource.MustParse("4"),
+				v1.ResourceMemory: resource.MustParse("32Gi"),
 			},
-			Phase: api.NodeRunning,
-			Conditions: []api.NodeCondition{
-				{Type: api.NodeReady, Status: api.ConditionTrue},
+			Phase: v1.NodeRunning,
+			Conditions: []v1.NodeCondition{
+				{Type: v1.NodeReady, Status: v1.ConditionTrue},
 			},
 		},
 	}
@@ -80,10 +80,10 @@ func (p *IntegrationTestNodePreparer) PrepareNodes() error {
 	nodes := e2eframework.GetReadySchedulableNodesOrDie(p.client)
 	index := 0
 	sum := 0
-	for k, strategy := range p.countToStrategy {
-		sum += k
+	for _, v := range p.countToStrategy {
+		sum += v.Count
 		for ; index < sum; index++ {
-			if err := testutils.DoPrepareNode(p.client, &nodes.Items[index], strategy); err != nil {
+			if err := testutils.DoPrepareNode(p.client, &nodes.Items[index], v.Strategy); err != nil {
 				glog.Errorf("Aborting node preparation: %v", err)
 				return err
 			}
@@ -95,7 +95,7 @@ func (p *IntegrationTestNodePreparer) PrepareNodes() error {
 func (p *IntegrationTestNodePreparer) CleanupNodes() error {
 	nodes := e2eframework.GetReadySchedulableNodesOrDie(p.client)
 	for i := range nodes.Items {
-		if err := p.client.Core().Nodes().Delete(nodes.Items[i].Name, &api.DeleteOptions{}); err != nil {
+		if err := p.client.Core().Nodes().Delete(nodes.Items[i].Name, &v1.DeleteOptions{}); err != nil {
 			glog.Errorf("Error while deleting Node: %v", err)
 		}
 	}

@@ -453,6 +453,7 @@ func (b *Builder) findTypesIn(pkgPath string, u *types.Universe) error {
 		if ok {
 			t := b.walkType(*u, nil, tn.Type())
 			c1 := b.priorCommentLines(obj.Pos(), 1)
+			// c1.Text() is safe if c1 is nil
 			t.CommentLines = splitLines(c1.Text())
 			if c1 == nil {
 				t.SecondClosestCommentLines = splitLines(b.priorCommentLines(obj.Pos(), 2).Text())
@@ -463,7 +464,15 @@ func (b *Builder) findTypesIn(pkgPath string, u *types.Universe) error {
 		tf, ok := obj.(*tc.Func)
 		// We only care about functions, not concrete/abstract methods.
 		if ok && tf.Type() != nil && tf.Type().(*tc.Signature).Recv() == nil {
-			b.addFunction(*u, nil, tf)
+			t := b.addFunction(*u, nil, tf)
+			c1 := b.priorCommentLines(obj.Pos(), 1)
+			// c1.Text() is safe if c1 is nil
+			t.CommentLines = splitLines(c1.Text())
+			if c1 == nil {
+				t.SecondClosestCommentLines = splitLines(b.priorCommentLines(obj.Pos(), 2).Text())
+			} else {
+				t.SecondClosestCommentLines = splitLines(b.priorCommentLines(c1.List[0].Slash, 2).Text())
+			}
 		}
 		tv, ok := obj.(*tc.Var)
 		if ok && !tv.IsField() {

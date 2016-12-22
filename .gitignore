@@ -56,6 +56,7 @@ network_closure.sh
 
 # Also ignore etcd installed by hack/install-etcd.sh
 /third_party/etcd*
+/default.etcd
 
 # User cluster configs
 .kubeconfig
@@ -114,3 +115,6 @@ kubernetes.tar.gz
 
 # This file used by some vendor repos (e.g. github.com/go-openapi/...) to store secret variables and should not be ignored
 !\.drone\.sec
+
+/bazel-*
+*.pyc

@@ -19,8 +19,10 @@ package v1alpha1
 import (
 	api "k8s.io/client-go/pkg/api"
 	v1 "k8s.io/client-go/pkg/api/v1"
+	meta_v1 "k8s.io/client-go/pkg/apis/meta/v1"
 	v1alpha1 "k8s.io/client-go/pkg/apis/rbac/v1alpha1"
 	watch "k8s.io/client-go/pkg/watch"
+	rest "k8s.io/client-go/rest"
 )
 
 // RoleBindingsGetter has a method to return a RoleBindingInterface.
@@ -35,7 +37,7 @@ type RoleBindingInterface interface {
 	Update(*v1alpha1.RoleBinding) (*v1alpha1.RoleBinding, error)
 	Delete(name string, options *v1.DeleteOptions) error
 	DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error
-	Get(name string) (*v1alpha1.RoleBinding, error)
+	Get(name string, options meta_v1.GetOptions) (*v1alpha1.RoleBinding, error)
 	List(opts v1.ListOptions) (*v1alpha1.RoleBindingList, error)
 	Watch(opts v1.ListOptions) (watch.Interface, error)
 	Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *v1alpha1.RoleBinding, err error)
@@ -44,14 +46,14 @@ type RoleBindingInterface interface {
 
 // roleBindings implements RoleBindingInterface
 type roleBindings struct {
-	client *RbacClient
+	client rest.Interface
 	ns     string
 }
 
 // newRoleBindings returns a RoleBindings
-func newRoleBindings(c *RbacClient, namespace string) *roleBindings {
+func newRoleBindings(c *RbacV1alpha1Client, namespace string) *roleBindings {
 	return &roleBindings{
-		client: c,
+		client: c.RESTClient(),
 		ns:     namespace,
 	}
 }
@@ -104,12 +106,13 @@ func (c *roleBindings) DeleteCollection(options *v1.DeleteOptions, listOptions v
 }
 
 // Get takes name of the roleBinding, and returns the corresponding roleBinding object, and an error if there is any.
-func (c *roleBindings) Get(name string) (result *v1alpha1.RoleBinding, err error) {
+func (c *roleBindings) Get(name string, options meta_v1.GetOptions) (result *v1alpha1.RoleBinding, err error) {
 	result = &v1alpha1.RoleBinding{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("rolebindings").
 		Name(name).
+		VersionedParams(&options, api.ParameterCodec).
 		Do().
 		Into(result)
 	return

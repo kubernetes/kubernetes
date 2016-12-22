@@ -21,22 +21,19 @@ import (
 	"net/url"
 	"path"
 
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 )
 
 // DefaultServerURL converts a host, host:port, or URL string to the default base server API path
 // to use with a Client at a given API version following the standard conventions for a
 // Kubernetes API.
-func DefaultServerURL(host, apiPath string, groupVersion unversioned.GroupVersion, defaultTLS bool) (*url.URL, string, error) {
+func DefaultServerURL(host, apiPath string, groupVersion schema.GroupVersion, defaultTLS bool) (*url.URL, string, error) {
 	if host == "" {
 		return nil, "", fmt.Errorf("host must be a URL or a host:port pair")
 	}
 	base := host
 	hostURL, err := url.Parse(base)
-	if err != nil {
-		return nil, "", err
-	}
-	if hostURL.Scheme == "" || hostURL.Host == "" {
+	if err != nil || hostURL.Scheme == "" || hostURL.Host == "" {
 		scheme := "http://"
 		if defaultTLS {
 			scheme = "https://"
@@ -89,5 +86,5 @@ func defaultServerUrlFor(config *Config) (*url.URL, string, error) {
 	if config.GroupVersion != nil {
 		return DefaultServerURL(host, config.APIPath, *config.GroupVersion, defaultTLS)
 	}
-	return DefaultServerURL(host, config.APIPath, unversioned.GroupVersion{}, defaultTLS)
+	return DefaultServerURL(host, config.APIPath, schema.GroupVersion{}, defaultTLS)
 }

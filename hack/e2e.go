@@ -18,6 +18,7 @@ limitations under the License.
 package main
 
 import (
+	"bytes"
 	"encoding/xml"
 	"flag"
 	"fmt"
@@ -28,12 +29,17 @@ import (
 	"os/signal"
 	"os/user"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
+	"syscall"
+	"text/template"
 	"time"
 )
 
 var (
+	interrupt = time.NewTimer(time.Duration(0)) // interrupt testing at this time.
+	terminate = time.NewTimer(time.Duration(0)) // terminate testing at this time.
 	// TODO(fejta): change all these _ flags to -
 	build            = flag.Bool("build", false, "If true, build a new release. Otherwise, use whatever is there.")
 	checkVersionSkew = flag.Bool("check_version_skew", true, ""+
@@ -41,13 +47,14 @@ var (
 		"You can explicitly set to false if you're, e.g., testing client changes "+
 		"for which the server version doesn't make a difference.")
 	checkLeakedResources = flag.Bool("check_leaked_resources", false, "Ensure project ends with the same resources")
-	deployment           = flag.String("deployment", "bash", "up/down mechanism (defaults to cluster/kube-{up,down}.sh) (choices: bash/kops)")
+	deployment           = flag.String("deployment", "bash", "up/down mechanism (defaults to cluster/kube-{up,down}.sh) (choices: bash/kops/kubernetes-anywhere)")
 	down                 = flag.Bool("down", false, "If true, tear down the cluster before exiting.")
 	dump                 = flag.String("dump", "", "If set, dump cluster logs to this location on test or cluster-up failure")
 	kubemark             = flag.Bool("kubemark", false, "If true, run kubemark tests.")
 	skewTests            = flag.Bool("skew", false, "If true, run tests in another version at ../kubernetes/hack/e2e.go")
 	testArgs             = flag.String("test_args", "", "Space-separated list of arguments to pass to Ginkgo test runner.")
 	test                 = flag.Bool("test", false, "Run Ginkgo tests.")
+	timeout              = flag.Duration("timeout", time.Duration(0), "Terminate testing after the timeout duration (s/m/h)")
 	up                   = flag.Bool("up", false, "If true, start the the e2e cluster. If cluster is already up, recreate it.")
 	upgradeArgs          = flag.String("upgrade_args", "", "If set, run upgrade tests before other tests")
 	verbose              = flag.Bool("v", false, "If true, print all command output.")
@@ -60,12 +67,44 @@ var (
 	kopsKubeVersion = flag.String("kops-kubernetes-version", "", "(kops only) If set, the version of Kubernetes to deploy (can be a URL to a GCS path where the release is stored) (Defaults to kops default, latest stable release.).")
 	kopsZones       = flag.String("kops-zones", "us-west-2a", "(kops AWS only) AWS zones for kops deployment, comma delimited.")
 	kopsNodes       = flag.Int("kops-nodes", 2, "(kops only) Number of nodes to create.")
+	kopsUpTimeout   = flag.Duration("kops-up-timeout", 20*time.Minute, "(kops only) Time limit between 'kops config / kops update' and a response from the Kubernetes API.")
+	kopsAdminAccess = flag.String("kops-admin-access", "", "(kops only) If set, restrict apiserver access to this CIDR range.")
+
+	// kubernetes-anywhere specific flags.
+	kubernetesAnywherePath           = flag.String("kubernetes-anywhere-path", "", "(kubernetes-anywhere only) Path to the kubernetes-anywhere directory. Must be set for kubernetes-anywhere.")
+	kubernetesAnywherePhase2Provider = flag.String("kubernetes-anywhere-phase2-provider", "ignition", "(kubernetes-anywhere only) Provider for phase2 bootstrapping. (Defaults to ignition).")
+	kubernetesAnywhereCluster        = flag.String("kubernetes-anywhere-cluster", "", "(kubernetes-anywhere only) Cluster name. Must be set for kubernetes-anywhere.")
+	kubernetesAnywhereUpTimeout      = flag.Duration("kubernetes-anywhere-up-timeout", 20*time.Minute, "(kubernetes-anywhere only) Time limit between starting a cluster and making a successful call to the Kubernetes API.")
 
 	// Deprecated flags.
 	deprecatedPush   = flag.Bool("push", false, "Deprecated. Does nothing.")
 	deprecatedPushup = flag.Bool("pushup", false, "Deprecated. Does nothing.")
 	deprecatedCtlCmd = flag.String("ctl", "", "Deprecated. Does nothing.")
 )
+
+const kubernetesAnywhereConfigTemplate = `
+.phase1.num_nodes=4
+.phase1.cluster_name="{{.Cluster}}"
+.phase1.cloud_provider="gce"
+
+.phase1.gce.os_image="ubuntu-1604-xenial-v20160420c"
+.phase1.gce.instance_type="n1-standard-2"
+.phase1.gce.project="{{.Project}}"
+.phase1.gce.region="us-central1"
+.phase1.gce.zone="us-central1-b"
+.phase1.gce.network="default"
+
+.phase2.installer_container="docker.io/colemickens/k8s-ignition:latest"
+.phase2.docker_registry="gcr.io/google-containers"
+.phase2.kubernetes_version="v1.4.1"
+.phase2.provider="{{.Phase2Provider}}"
+
+.phase3.run_addons=y
+.phase3.kube_proxy=y
+.phase3.dashboard=y
+.phase3.heapster=y
+.phase3.kube_dns=y
+`
 
 func appendError(errs []error, err error) []error {
 	if err != nil {
@@ -151,6 +190,18 @@ func main() {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 	flag.Parse()
 
+	if !terminate.Stop() {
+		<-terminate.C // Drain the value if necessary.
+	}
+	if !interrupt.Stop() {
+		<-interrupt.C // Drain value
+	}
+
+	if *timeout > 0 {
+		log.Printf("Limiting testing to %s", *timeout)
+		interrupt.Reset(*timeout)
+	}
+
 	if err := validWorkingDirectory(); err != nil {
 		log.Fatalf("Called from invalid working directory: %v", err)
 	}
@@ -201,7 +252,7 @@ func run(deploy deployer) error {
 	os.Setenv("KUBE_RUNTIME_CONFIG", "batch/v2alpha1=true")
 
 	if *up {
-		if err := xmlWrap("TearDown", deploy.Down); err != nil {
+		if err := xmlWrap("TearDown Previous", deploy.Down); err != nil {
 			return fmt.Errorf("error tearing down previous cluster: %s", err)
 		}
 	}
@@ -212,6 +263,7 @@ func run(deploy deployer) error {
 	var (
 		beforeResources []byte
 		upResources     []byte
+		downResources   []byte
 		afterResources  []byte
 	)
 
@@ -234,21 +286,15 @@ func run(deploy deployer) error {
 		}
 		// Start the cluster using this version.
 		if err := xmlWrap("Up", deploy.Up); err != nil {
+			if *dump != "" {
+				xmlWrap("DumpClusterLogs", func() error {
+					return DumpClusterLogs(*dump)
+				})
+			}
 			return fmt.Errorf("starting e2e cluster: %s", err)
 		}
 		if *dump != "" {
-			cmd := exec.Command("./cluster/kubectl.sh", "--match-server-version=false", "get", "nodes", "-oyaml")
-			b, err := cmd.CombinedOutput()
-			if *verbose {
-				log.Printf("kubectl get nodes:\n%s", string(b))
-			}
-			if err == nil {
-				if err := ioutil.WriteFile(filepath.Join(*dump, "nodes.yaml"), b, 0644); err != nil {
-					errs = appendError(errs, fmt.Errorf("error writing nodes.yaml: %v", err))
-				}
-			} else {
-				errs = appendError(errs, fmt.Errorf("error running get nodes: %v", err))
-			}
+			errs = appendError(errs, xmlWrap("list nodes", listNodes))
 		}
 	}
 
@@ -268,27 +314,33 @@ func run(deploy deployer) error {
 	if *test {
 		errs = appendError(errs, xmlWrap("get kubeconfig", deploy.SetupKubecfg))
 		errs = appendError(errs, xmlWrap("kubectl version", func() error {
-			return finishRunning("kubectl version", exec.Command("./cluster/kubectl.sh", "version", "--match-server-version=false"))
+			return finishRunning(exec.Command("./cluster/kubectl.sh", "version", "--match-server-version=false"))
 		}))
-		// Individual tests will create their own JUnit, so don't xmlWrap.
 		if *skewTests {
-			errs = appendError(errs, SkewTest())
+			errs = appendError(errs, xmlWrap("SkewTest", SkewTest))
 		} else {
 			if err := xmlWrap("IsUp", deploy.IsUp); err != nil {
 				errs = appendError(errs, err)
 			} else {
-				errs = appendError(errs, Test())
+				errs = appendError(errs, xmlWrap("Test", Test))
 			}
 		}
 	}
 
 	if *kubemark {
-		errs = appendError(errs, KubemarkTest())
+		errs = appendError(errs, xmlWrap("Kubemark", KubemarkTest))
 	}
 
 	if len(errs) > 0 && *dump != "" {
 		errs = appendError(errs, xmlWrap("DumpClusterLogs", func() error {
 			return DumpClusterLogs(*dump)
+		}))
+	}
+
+	if *checkLeakedResources {
+		errs = appendError(errs, xmlWrap("ListResources Down", func() error {
+			downResources, err = ListResources()
+			return err
 		}))
 	}
 
@@ -306,7 +358,7 @@ func run(deploy deployer) error {
 			errs = append(errs, err)
 		} else {
 			errs = appendError(errs, xmlWrap("DiffResources", func() error {
-				return DiffResources(beforeResources, upResources, afterResources, *dump)
+				return DiffResources(beforeResources, upResources, downResources, afterResources, *dump)
 			}))
 		}
 	}
@@ -317,7 +369,19 @@ func run(deploy deployer) error {
 	return nil
 }
 
-func DiffResources(before, clusterUp, after []byte, location string) error {
+func listNodes() error {
+	cmd := exec.Command("./cluster/kubectl.sh", "--match-server-version=false", "get", "nodes", "-oyaml")
+	b, err := cmd.CombinedOutput()
+	if *verbose {
+		log.Printf("kubectl get nodes:\n%s", string(b))
+	}
+	if err != nil {
+		return err
+	}
+	return ioutil.WriteFile(filepath.Join(*dump, "nodes.yaml"), b, 0644)
+}
+
+func DiffResources(before, clusterUp, clusterDown, after []byte, location string) error {
 	if location == "" {
 		var err error
 		location, err = ioutil.TempDir("", "e2e-check-resources")
@@ -329,6 +393,7 @@ func DiffResources(before, clusterUp, after []byte, location string) error {
 	var mode os.FileMode = 0664
 	bp := filepath.Join(location, "gcp-resources-before.txt")
 	up := filepath.Join(location, "gcp-resources-cluster-up.txt")
+	cdp := filepath.Join(location, "gcp-resources-cluster-down.txt")
 	ap := filepath.Join(location, "gcp-resources-after.txt")
 	dp := filepath.Join(location, "gcp-resources-diff.txt")
 
@@ -336,6 +401,9 @@ func DiffResources(before, clusterUp, after []byte, location string) error {
 		return err
 	}
 	if err := ioutil.WriteFile(up, clusterUp, mode); err != nil {
+		return err
+	}
+	if err := ioutil.WriteFile(cdp, clusterDown, mode); err != nil {
 		return err
 	}
 	if err := ioutil.WriteFile(ap, after, mode); err != nil {
@@ -359,14 +427,19 @@ func DiffResources(before, clusterUp, after []byte, location string) error {
 	}
 	lines = lines[2:]
 
-	var added []string
+	var added, report []string
+	resourceTypeRE := regexp.MustCompile(`^@@.+\s(\[\s\S+\s\])$`)
 	for _, l := range lines {
+		if matches := resourceTypeRE.FindStringSubmatch(l); matches != nil {
+			report = append(report, matches[1])
+		}
 		if strings.HasPrefix(l, "+") && len(strings.TrimPrefix(l, "+")) > 0 {
 			added = append(added, l)
+			report = append(report, l)
 		}
 	}
 	if len(added) > 0 {
-		return fmt.Errorf("Error: %d leaked resources\n%v", len(added), strings.Join(added, "\n"))
+		return fmt.Errorf("Error: %d leaked resources\n%v", len(added), strings.Join(report, "\n"))
 	}
 	return nil
 }
@@ -389,7 +462,7 @@ func Build() error {
 	// it's OK to download the docker image.
 	cmd := exec.Command("make", "quick-release")
 	cmd.Stdin = os.Stdin
-	if err := finishRunning("build-release", cmd); err != nil {
+	if err := finishRunning(cmd); err != nil {
 		return fmt.Errorf("error building kubernetes: %v", err)
 	}
 	return nil
@@ -408,6 +481,8 @@ func getDeployer() (deployer, error) {
 		return bash{}, nil
 	case "kops":
 		return NewKops()
+	case "kubernetes-anywhere":
+		return NewKubernetesAnywhere()
 	default:
 		return nil, fmt.Errorf("Unknown deployment strategy %q", *deployment)
 	}
@@ -416,11 +491,11 @@ func getDeployer() (deployer, error) {
 type bash struct{}
 
 func (b bash) Up() error {
-	return finishRunning("up", exec.Command("./hack/e2e-internal/e2e-up.sh"))
+	return finishRunning(exec.Command("./hack/e2e-internal/e2e-up.sh"))
 }
 
 func (b bash) IsUp() error {
-	return finishRunning("get status", exec.Command("./hack/e2e-internal/e2e-status.sh"))
+	return finishRunning(exec.Command("./hack/e2e-internal/e2e-status.sh"))
 }
 
 func (b bash) SetupKubecfg() error {
@@ -428,7 +503,7 @@ func (b bash) SetupKubecfg() error {
 }
 
 func (b bash) Down() error {
-	return finishRunning("teardown", exec.Command("./hack/e2e-internal/e2e-down.sh"))
+	return finishRunning(exec.Command("./hack/e2e-internal/e2e-down.sh"))
 }
 
 type kops struct {
@@ -437,6 +512,7 @@ type kops struct {
 	sshKey      string
 	zones       []string
 	nodes       int
+	adminAccess string
 	cluster     string
 	kubecfg     string
 }
@@ -499,6 +575,7 @@ func NewKops() (*kops, error) {
 		sshKey:      sshKey + ".pub", // kops only needs the public key, e2es need the private key.
 		zones:       zones,
 		nodes:       *kopsNodes,
+		adminAccess: *kopsAdminAccess,
 		cluster:     *kopsCluster,
 		kubecfg:     kubecfg,
 	}, nil
@@ -515,39 +592,23 @@ func (k kops) Up() error {
 	if k.kubeVersion != "" {
 		createArgs = append(createArgs, "--kubernetes-version", k.kubeVersion)
 	}
-	if err := finishRunning("kops config", exec.Command(k.path, createArgs...)); err != nil {
+	if k.adminAccess != "" {
+		createArgs = append(createArgs, "--admin-access", k.adminAccess)
+	}
+	if err := finishRunning(exec.Command(k.path, createArgs...)); err != nil {
 		return fmt.Errorf("kops configuration failed: %v", err)
 	}
-	if err := finishRunning("kops update", exec.Command(k.path, "update", "cluster", k.cluster, "--yes")); err != nil {
+	if err := finishRunning(exec.Command(k.path, "update", "cluster", k.cluster, "--yes")); err != nil {
 		return fmt.Errorf("kops bringup failed: %v", err)
 	}
 	// TODO(zmerlynn): More cluster validation. This should perhaps be
 	// added to kops and not here, but this is a fine place to loop
 	// for now.
-	for stop := time.Now().Add(10 * time.Minute); time.Now().Before(stop); time.Sleep(30 * time.Second) {
-		n, err := clusterSize(k)
-		if err != nil {
-			log.Printf("Can't get cluster size, sleeping: %v", err)
-			continue
-		}
-		if n < k.nodes+1 {
-			log.Printf("%d (current nodes) < %d (requested instances), sleeping", n, k.nodes+1)
-			continue
-		}
-		return nil
-	}
-	return fmt.Errorf("kops bringup timed out")
+	return waitForNodes(k, k.nodes+1, *kopsUpTimeout)
 }
 
 func (k kops) IsUp() error {
-	n, err := clusterSize(k)
-	if err != nil {
-		return err
-	}
-	if n <= 0 {
-		return fmt.Errorf("kops cluster found, but %d nodes reported", n)
-	}
-	return nil
+	return isUp(k)
 }
 
 func (k kops) SetupKubecfg() error {
@@ -559,7 +620,7 @@ func (k kops) SetupKubecfg() error {
 		// Assume that if we already have it, it's good.
 		return nil
 	}
-	if err := finishRunning("kops export", exec.Command(k.path, "export", "kubecfg", k.cluster)); err != nil {
+	if err := finishRunning(exec.Command(k.path, "export", "kubecfg", k.cluster)); err != nil {
 		return fmt.Errorf("Failure exporting kops kubecfg: %v", err)
 	}
 	return nil
@@ -569,12 +630,121 @@ func (k kops) Down() error {
 	// We do a "kops get" first so the exit status of "kops delete" is
 	// more sensical in the case of a non-existant cluster. ("kops
 	// delete" will exit with status 1 on a non-existant cluster)
-	err := finishRunning("kops get", exec.Command(k.path, "get", "clusters", k.cluster))
+	err := finishRunning(exec.Command(k.path, "get", "clusters", k.cluster))
 	if err != nil {
 		// This is expected if the cluster doesn't exist.
 		return nil
 	}
-	return finishRunning("kops delete", exec.Command(k.path, "delete", "cluster", k.cluster, "--yes"))
+	return finishRunning(exec.Command(k.path, "delete", "cluster", k.cluster, "--yes"))
+}
+
+type kubernetesAnywhere struct {
+	path string
+	// These are exported only because their use in the config template requires it.
+	Phase2Provider string
+	Project        string
+	Cluster        string
+}
+
+func NewKubernetesAnywhere() (*kubernetesAnywhere, error) {
+	if *kubernetesAnywherePath == "" {
+		return nil, fmt.Errorf("--kubernetes-anywhere-path is required")
+	}
+
+	if *kubernetesAnywhereCluster == "" {
+		return nil, fmt.Errorf("--kubernetes-anywhere-cluster is required")
+	}
+
+	project, ok := os.LookupEnv("PROJECT")
+	if !ok {
+		return nil, fmt.Errorf("The PROJECT environment variable is required to be set for kubernetes-anywhere")
+	}
+
+	// Set KUBERNETES_CONFORMANCE_TEST so the auth info is picked up
+	// from kubectl instead of bash inference.
+	if err := os.Setenv("KUBERNETES_CONFORMANCE_TEST", "yes"); err != nil {
+		return nil, err
+	}
+
+	k := &kubernetesAnywhere{
+		path:           *kubernetesAnywherePath,
+		Phase2Provider: *kubernetesAnywherePhase2Provider,
+		Project:        project,
+		Cluster:        *kubernetesAnywhereCluster,
+	}
+
+	if err := k.writeConfig(); err != nil {
+		return nil, err
+	}
+	return k, nil
+}
+
+func (k kubernetesAnywhere) getConfig() (string, error) {
+	// As needed, plumb through more CLI options to replace these defaults
+	tmpl, err := template.New("kubernetes-anywhere-config").Parse(kubernetesAnywhereConfigTemplate)
+
+	if err != nil {
+		return "", fmt.Errorf("Error creating template for KubernetesAnywhere config: %v", err)
+	}
+
+	var buf bytes.Buffer
+	if err = tmpl.Execute(&buf, k); err != nil {
+		return "", fmt.Errorf("Error executing template for KubernetesAnywhere config: %v", err)
+	}
+
+	return buf.String(), nil
+}
+
+func (k kubernetesAnywhere) writeConfig() error {
+	config, err := k.getConfig()
+	if err != nil {
+		return fmt.Errorf("Could not generate config: %v", err)
+	}
+
+	f, err := os.Create(k.path + "/.config")
+	if err != nil {
+		return fmt.Errorf("Could not create file: %v", err)
+	}
+	defer f.Close()
+
+	fmt.Fprint(f, config)
+	return nil
+}
+
+func (k kubernetesAnywhere) Up() error {
+	cmd := exec.Command("make", "-C", k.path, "WAIT_FOR_KUBECONFIG=y", "deploy-cluster")
+	if err := finishRunning(cmd); err != nil {
+		return err
+	}
+
+	nodes := 4 // For now, this is hardcoded in the config
+	return waitForNodes(k, nodes+1, *kubernetesAnywhereUpTimeout)
+}
+
+func (k kubernetesAnywhere) IsUp() error {
+	return isUp(k)
+}
+
+func (k kubernetesAnywhere) SetupKubecfg() error {
+	output, err := exec.Command("make", "--silent", "-C", k.path, "kubeconfig-path").Output()
+	if err != nil {
+		return fmt.Errorf("Could not get kubeconfig-path: %v", err)
+	}
+	kubecfg := strings.TrimSuffix(string(output), "\n")
+
+	if err = os.Setenv("KUBECONFIG", kubecfg); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (k kubernetesAnywhere) Down() error {
+	err := finishRunning(exec.Command("make", "-C", k.path, "kubeconfig-path"))
+	if err != nil {
+		// This is expected if the cluster doesn't exist.
+		return nil
+	}
+	return finishRunning(exec.Command("make", "-C", k.path, "FORCE_DESTROY=y", "destroy-cluster"))
 }
 
 func clusterSize(deploy deployer) (int, error) {
@@ -583,7 +753,7 @@ func clusterSize(deploy deployer) (int, error) {
 	}
 	o, err := exec.Command("kubectl", "get", "nodes", "--no-headers").Output()
 	if err != nil {
-		log.Printf("kubectl get nodes failed: %v", err)
+		log.Printf("kubectl get nodes failed: %s\n%s", WrapError(err).Error(), string(o))
 		return -1, err
 	}
 	stdout := strings.TrimSpace(string(o))
@@ -591,14 +761,70 @@ func clusterSize(deploy deployer) (int, error) {
 	return len(strings.Split(stdout, "\n")), nil
 }
 
+// CommandError will provide stderr output (if available) from structured
+// exit errors
+type CommandError struct {
+	err error
+}
+
+func WrapError(err error) *CommandError {
+	if err == nil {
+		return nil
+	}
+	return &CommandError{err: err}
+}
+
+func (e *CommandError) Error() string {
+	if e == nil {
+		return ""
+	}
+	exitErr, ok := e.err.(*exec.ExitError)
+	if !ok {
+		return e.err.Error()
+	}
+
+	stderr := ""
+	if exitErr.Stderr != nil {
+		stderr = string(stderr)
+	}
+	return fmt.Sprintf("%q: %q", exitErr.Error(), stderr)
+}
+
+func isUp(d deployer) error {
+	n, err := clusterSize(d)
+	if err != nil {
+		return err
+	}
+	if n <= 0 {
+		return fmt.Errorf("cluster found, but %d nodes reported", n)
+	}
+	return nil
+}
+
+func waitForNodes(d deployer, nodes int, timeout time.Duration) error {
+	for stop := time.Now().Add(timeout); time.Now().Before(stop); time.Sleep(30 * time.Second) {
+		n, err := clusterSize(d)
+		if err != nil {
+			log.Printf("Can't get cluster size, sleeping: %v", err)
+			continue
+		}
+		if n < nodes {
+			log.Printf("%d (current nodes) < %d (requested instances), sleeping", n, nodes)
+			continue
+		}
+		return nil
+	}
+	return fmt.Errorf("waiting for nodes timed out")
+}
+
 func DumpClusterLogs(location string) error {
 	log.Printf("Dumping cluster logs to: %v", location)
-	return finishRunning("dump cluster logs", exec.Command("./cluster/log-dump.sh", location))
+	return finishRunning(exec.Command("./cluster/log-dump.sh", location))
 }
 
 func KubemarkTest() error {
 	// Stop previous run
-	err := finishRunning("Stop kubemark", exec.Command("./test/kubemark/stop-kubemark.sh"))
+	err := finishRunning(exec.Command("./test/kubemark/stop-kubemark.sh"))
 	if err != nil {
 		return err
 	}
@@ -609,7 +835,7 @@ func KubemarkTest() error {
 	// stop the leaking resources for now, we want to be on the safe side
 	// and call it explictly in defer if the other one is not called.
 	defer xmlWrap("Deferred Stop kubemark", func() error {
-		return finishRunning("Stop kubemark", exec.Command("./test/kubemark/stop-kubemark.sh"))
+		return finishRunning(exec.Command("./test/kubemark/stop-kubemark.sh"))
 	})
 
 	// Start new run
@@ -625,7 +851,7 @@ func KubemarkTest() error {
 	os.Setenv("NUM_NODES", os.Getenv("KUBEMARK_NUM_NODES"))
 	os.Setenv("MASTER_SIZE", os.Getenv("KUBEMARK_MASTER_SIZE"))
 	err = xmlWrap("Start kubemark", func() error {
-		return finishRunning("Start kubemark", exec.Command("./test/kubemark/start-kubemark.sh"))
+		return finishRunning(exec.Command("./test/kubemark/start-kubemark.sh"))
 	})
 	if err != nil {
 		return err
@@ -638,13 +864,13 @@ func KubemarkTest() error {
 	}
 	test_args := os.Getenv("KUBEMARK_TEST_ARGS")
 
-	err = finishRunning("Run kubemark tests", exec.Command("./test/kubemark/run-e2e-tests.sh", "--ginkgo.focus="+focus, test_args))
+	err = finishRunning(exec.Command("./test/kubemark/run-e2e-tests.sh", "--ginkgo.focus="+focus, test_args))
 	if err != nil {
 		return err
 	}
 
 	err = xmlWrap("Stop kubemark", func() error {
-		return finishRunning("Stop kubemark", exec.Command("./test/kubemark/stop-kubemark.sh"))
+		return finishRunning(exec.Command("./test/kubemark/stop-kubemark.sh"))
 	})
 	if err != nil {
 		return err
@@ -677,13 +903,12 @@ func UpgradeTest(args string) error {
 		defer os.Unsetenv("E2E_REPORT_PREFIX")
 	}
 	os.Setenv("E2E_REPORT_PREFIX", "upgrade")
-	return finishRunning("Upgrade Ginkgo tests",
-		exec.Command(
-			"go", "run", "./hack/e2e.go",
-			"--test",
-			"--test_args="+args,
-			fmt.Sprintf("--v=%t", *verbose),
-			fmt.Sprintf("--check_version_skew=%t", *checkVersionSkew)))
+	return finishRunning(exec.Command(
+		"go", "run", "./hack/e2e.go",
+		"--test",
+		"--test_args="+args,
+		fmt.Sprintf("--v=%t", *verbose),
+		fmt.Sprintf("--check_version_skew=%t", *checkVersionSkew)))
 }
 
 func SkewTest() error {
@@ -692,28 +917,28 @@ func SkewTest() error {
 		return err
 	}
 	defer os.Chdir(old)
-	return finishRunning("Skewed Ginkgo tests",
-		exec.Command(
-			"go", "run", "./hack/e2e.go",
-			"--test",
-			"--test_args="+*testArgs,
-			fmt.Sprintf("--v=%t", *verbose),
-			fmt.Sprintf("--check_version_skew=%t", *checkVersionSkew)))
+	return finishRunning(exec.Command(
+		"go", "run", "./hack/e2e.go",
+		"--test",
+		"--test_args="+*testArgs,
+		fmt.Sprintf("--v=%t", *verbose),
+		fmt.Sprintf("--check_version_skew=%t", *checkVersionSkew)))
 }
 
 func Test() error {
 	// TODO(fejta): add a --federated or something similar
 	if os.Getenv("FEDERATION") != "true" {
-		return finishRunning("Ginkgo tests", exec.Command("./hack/ginkgo-e2e.sh", strings.Fields(*testArgs)...))
+		return finishRunning(exec.Command("./hack/ginkgo-e2e.sh", strings.Fields(*testArgs)...))
 	}
 
 	if *testArgs == "" {
 		*testArgs = "--ginkgo.focus=\\[Feature:Federation\\]"
 	}
-	return finishRunning("Federated Ginkgo tests", exec.Command("./hack/federated-ginkgo-e2e.sh", strings.Fields(*testArgs)...))
+	return finishRunning(exec.Command("./hack/federated-ginkgo-e2e.sh", strings.Fields(*testArgs)...))
 }
 
-func finishRunning(stepName string, cmd *exec.Cmd) error {
+func finishRunning(cmd *exec.Cmd) error {
+	stepName := strings.Join(cmd.Args, " ")
 	if *verbose {
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
@@ -723,8 +948,34 @@ func finishRunning(stepName string, cmd *exec.Cmd) error {
 		log.Printf("Step '%s' finished in %s", stepName, time.Since(start))
 	}(time.Now())
 
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("error running %v: %v", stepName, err)
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	if err := cmd.Start(); err != nil {
+		return fmt.Errorf("error starting %v: %v", stepName, err)
 	}
-	return nil
+
+	finished := make(chan error)
+
+	go func() {
+		finished <- cmd.Wait()
+	}()
+
+	for {
+		select {
+		case <-terminate.C:
+			terminate.Reset(time.Duration(0)) // Kill subsequent processes immediately.
+			syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
+			cmd.Process.Kill()
+			return fmt.Errorf("Terminate testing after 15m after %s timeout during %s", *timeout, stepName)
+		case <-interrupt.C:
+			log.Printf("Interrupt testing after %s timeout. Will terminate in another 15m", *timeout)
+			terminate.Reset(15 * time.Minute)
+			if err := syscall.Kill(-cmd.Process.Pid, syscall.SIGINT); err != nil {
+				log.Printf("Failed to interrupt %v. Will terminate immediately: %v", stepName, err)
+				syscall.Kill(-cmd.Process.Pid, syscall.SIGTERM)
+				cmd.Process.Kill()
+			}
+		case err := <-finished:
+			return err
+		}
+	}
 }

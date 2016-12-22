@@ -20,10 +20,10 @@ import (
 	"reflect"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	apiv1 "k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	extensionsapiv1beta1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 )
 
 func TestParseRuntimeConfig(t *testing.T) {
@@ -112,10 +112,10 @@ func TestParseRuntimeConfig(t *testing.T) {
 			err: false,
 		},
 		{
-			// Enable deployments and disable jobs.
+			// Enable deployments and disable daemonsets.
 			runtimeConfig: map[string]string{
-				"extensions/v1beta1/anything": "true",
-				"extensions/v1beta1/jobs":     "false",
+				"extensions/v1beta1/anything":   "true",
+				"extensions/v1beta1/daemonsets": "false",
 			},
 			defaultResourceConfig: func() *ResourceConfig {
 				config := NewResourceConfig()
@@ -126,7 +126,7 @@ func TestParseRuntimeConfig(t *testing.T) {
 			expectedAPIConfig: func() *ResourceConfig {
 				config := NewResourceConfig()
 				config.EnableVersions(extensionsGroupVersion)
-				config.DisableResources(extensionsGroupVersion.WithResource("jobs"))
+				config.DisableResources(extensionsGroupVersion.WithResource("daemonsets"))
 				config.EnableResources(extensionsGroupVersion.WithResource("anything"))
 				return config
 			},
@@ -155,7 +155,7 @@ func TestParseRuntimeConfig(t *testing.T) {
 			},
 			expectedAPIConfig: func() *ResourceConfig {
 				config := NewResourceConfig()
-				config.DisableResources(unversioned.GroupVersionResource{Group: "", Version: "v1", Resource: "pods"})
+				config.DisableResources(schema.GroupVersionResource{Group: "", Version: "v1", Resource: "pods"})
 				return config
 			},
 			err: true,

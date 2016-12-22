@@ -20,15 +20,19 @@ import (
 	"fmt"
 
 	"github.com/golang/glog"
-	"k8s.io/client-go/pkg/api"
+	"k8s.io/client-go/pkg/api/errors"
 	"k8s.io/client-go/pkg/api/meta"
-	"k8s.io/client-go/pkg/api/unversioned"
-	"k8s.io/client-go/pkg/apis/apps"
-	"k8s.io/client-go/pkg/apis/batch"
-	"k8s.io/client-go/pkg/apis/certificates"
-	"k8s.io/client-go/pkg/apis/extensions"
-	"k8s.io/client-go/pkg/apis/policy"
+	"k8s.io/client-go/pkg/api/v1"
+	apps "k8s.io/client-go/pkg/apis/apps/v1beta1"
+	certificates "k8s.io/client-go/pkg/apis/certificates/v1alpha1"
+	extensions "k8s.io/client-go/pkg/apis/extensions/v1beta1"
+	metav1 "k8s.io/client-go/pkg/apis/meta/v1"
+	policy "k8s.io/client-go/pkg/apis/policy/v1beta1"
+	storageinternal "k8s.io/client-go/pkg/apis/storage"
+	storage "k8s.io/client-go/pkg/apis/storage/v1beta1"
 	"k8s.io/client-go/pkg/labels"
+	"k8s.io/client-go/pkg/runtime"
+	"k8s.io/client-go/pkg/runtime/schema"
 )
 
 // AppendFunc is used to add a matching item to whatever list the caller is using
@@ -48,7 +52,7 @@ func ListAll(store Store, selector labels.Selector, appendFn AppendFunc) error {
 }
 
 func ListAllByNamespace(indexer Indexer, namespace string, selector labels.Selector, appendFn AppendFunc) error {
-	if namespace == api.NamespaceAll {
+	if namespace == v1.NamespaceAll {
 		for _, m := range indexer.List() {
 			metadata, err := meta.Accessor(m)
 			if err != nil {
@@ -61,7 +65,7 @@ func ListAllByNamespace(indexer Indexer, namespace string, selector labels.Selec
 		return nil
 	}
 
-	items, err := indexer.Index(NamespaceIndex, &api.ObjectMeta{Namespace: namespace})
+	items, err := indexer.Index(NamespaceIndex, &v1.ObjectMeta{Namespace: namespace})
 	if err != nil {
 		// Ignore error; do slow search without index.
 		glog.Warningf("can not retrieve list of objects using index : %v", err)
@@ -90,12 +94,85 @@ func ListAllByNamespace(indexer Indexer, namespace string, selector labels.Selec
 	return nil
 }
 
+// GenericLister is a lister skin on a generic Indexer
+type GenericLister interface {
+	// List will return all objects across namespaces
+	List(selector labels.Selector) (ret []runtime.Object, err error)
+	// Get will attempt to retrieve assuming that name==key
+	Get(name string) (runtime.Object, error)
+	// ByNamespace will give you a GenericNamespaceLister for one namespace
+	ByNamespace(namespace string) GenericNamespaceLister
+}
+
+// GenericNamespaceLister is a lister skin on a generic Indexer
+type GenericNamespaceLister interface {
+	// List will return all objects in this namespace
+	List(selector labels.Selector) (ret []runtime.Object, err error)
+	// Get will attempt to retrieve by namespace and name
+	Get(name string) (runtime.Object, error)
+}
+
+func NewGenericLister(indexer Indexer, resource schema.GroupResource) GenericLister {
+	return &genericLister{indexer: indexer, resource: resource}
+}
+
+type genericLister struct {
+	indexer  Indexer
+	resource schema.GroupResource
+}
+
+func (s *genericLister) List(selector labels.Selector) (ret []runtime.Object, err error) {
+	err = ListAll(s.indexer, selector, func(m interface{}) {
+		ret = append(ret, m.(runtime.Object))
+	})
+	return ret, err
+}
+
+func (s *genericLister) ByNamespace(namespace string) GenericNamespaceLister {
+	return &genericNamespaceLister{indexer: s.indexer, namespace: namespace, resource: s.resource}
+}
+
+func (s *genericLister) Get(name string) (runtime.Object, error) {
+	obj, exists, err := s.indexer.GetByKey(name)
+	if err != nil {
+		return nil, err
+	}
+	if !exists {
+		return nil, errors.NewNotFound(s.resource, name)
+	}
+	return obj.(runtime.Object), nil
+}
+
+type genericNamespaceLister struct {
+	indexer   Indexer
+	namespace string
+	resource  schema.GroupResource
+}
+
+func (s *genericNamespaceLister) List(selector labels.Selector) (ret []runtime.Object, err error) {
+	err = ListAllByNamespace(s.indexer, s.namespace, selector, func(m interface{}) {
+		ret = append(ret, m.(runtime.Object))
+	})
+	return ret, err
+}
+
+func (s *genericNamespaceLister) Get(name string) (runtime.Object, error) {
+	obj, exists, err := s.indexer.GetByKey(s.namespace + "/" + name)
+	if err != nil {
+		return nil, err
+	}
+	if !exists {
+		return nil, errors.NewNotFound(s.resource, name)
+	}
+	return obj.(runtime.Object), nil
+}
+
 //  TODO: generate these classes and methods for all resources of interest using
 // a script.  Can use "go generate" once 1.4 is supported by all users.
 
 // NodeConditionPredicate is a function that indicates whether the given node's conditions meet
 // some set of criteria defined by the function.
-type NodeConditionPredicate func(node *api.Node) bool
+type NodeConditionPredicate func(node *v1.Node) bool
 
 // StoreToNodeLister makes a Store have the List method of the client.NodeInterface
 // The Store must contain (only) Nodes.
@@ -103,9 +180,9 @@ type StoreToNodeLister struct {
 	Store
 }
 
-func (s *StoreToNodeLister) List() (machines api.NodeList, err error) {
+func (s *StoreToNodeLister) List() (machines v1.NodeList, err error) {
 	for _, m := range s.Store.List() {
-		machines.Items = append(machines.Items, *(m.(*api.Node)))
+		machines.Items = append(machines.Items, *(m.(*v1.Node)))
 	}
 	return machines, nil
 }
@@ -124,9 +201,9 @@ type storeToNodeConditionLister struct {
 }
 
 // List returns a list of nodes that match the conditions defined by the predicate functions in the storeToNodeConditionLister.
-func (s storeToNodeConditionLister) List() (nodes []*api.Node, err error) {
+func (s storeToNodeConditionLister) List() (nodes []*v1.Node, err error) {
 	for _, m := range s.store.List() {
-		node := m.(*api.Node)
+		node := m.(*v1.Node)
 		if s.predicate(node) {
 			nodes = append(nodes, node)
 		} else {
@@ -161,7 +238,7 @@ func (s *StoreToDaemonSetLister) List() (dss extensions.DaemonSetList, err error
 
 // GetPodDaemonSets returns a list of daemon sets managing a pod.
 // Returns an error if and only if no matching daemon sets are found.
-func (s *StoreToDaemonSetLister) GetPodDaemonSets(pod *api.Pod) (daemonSets []extensions.DaemonSet, err error) {
+func (s *StoreToDaemonSetLister) GetPodDaemonSets(pod *v1.Pod) (daemonSets []extensions.DaemonSet, err error) {
 	var selector labels.Selector
 	var daemonSet extensions.DaemonSet
 
@@ -175,7 +252,7 @@ func (s *StoreToDaemonSetLister) GetPodDaemonSets(pod *api.Pod) (daemonSets []ex
 		if daemonSet.Namespace != pod.Namespace {
 			continue
 		}
-		selector, err = unversioned.LabelSelectorAsSelector(daemonSet.Spec.Selector)
+		selector, err = metav1.LabelSelectorAsSelector(daemonSet.Spec.Selector)
 		if err != nil {
 			// this should not happen if the DaemonSet passed validation
 			return nil, err
@@ -199,72 +276,22 @@ type StoreToEndpointsLister struct {
 }
 
 // List lists all endpoints in the store.
-func (s *StoreToEndpointsLister) List() (services api.EndpointsList, err error) {
+func (s *StoreToEndpointsLister) List() (services v1.EndpointsList, err error) {
 	for _, m := range s.Store.List() {
-		services.Items = append(services.Items, *(m.(*api.Endpoints)))
+		services.Items = append(services.Items, *(m.(*v1.Endpoints)))
 	}
 	return services, nil
 }
 
 // GetServiceEndpoints returns the endpoints of a service, matched on service name.
-func (s *StoreToEndpointsLister) GetServiceEndpoints(svc *api.Service) (ep api.Endpoints, err error) {
+func (s *StoreToEndpointsLister) GetServiceEndpoints(svc *v1.Service) (ep v1.Endpoints, err error) {
 	for _, m := range s.Store.List() {
-		ep = *m.(*api.Endpoints)
+		ep = *m.(*v1.Endpoints)
 		if svc.Name == ep.Name && svc.Namespace == ep.Namespace {
 			return ep, nil
 		}
 	}
 	err = fmt.Errorf("could not find endpoints for service: %v", svc.Name)
-	return
-}
-
-// StoreToJobLister gives a store List and Exists methods. The store must contain only Jobs.
-type StoreToJobLister struct {
-	Store
-}
-
-// Exists checks if the given job exists in the store.
-func (s *StoreToJobLister) Exists(job *batch.Job) (bool, error) {
-	_, exists, err := s.Store.Get(job)
-	if err != nil {
-		return false, err
-	}
-	return exists, nil
-}
-
-// StoreToJobLister lists all jobs in the store.
-func (s *StoreToJobLister) List() (jobs batch.JobList, err error) {
-	for _, c := range s.Store.List() {
-		jobs.Items = append(jobs.Items, *(c.(*batch.Job)))
-	}
-	return jobs, nil
-}
-
-// GetPodJobs returns a list of jobs managing a pod. Returns an error only if no matching jobs are found.
-func (s *StoreToJobLister) GetPodJobs(pod *api.Pod) (jobs []batch.Job, err error) {
-	var selector labels.Selector
-	var job batch.Job
-
-	if len(pod.Labels) == 0 {
-		err = fmt.Errorf("no jobs found for pod %v because it has no labels", pod.Name)
-		return
-	}
-
-	for _, m := range s.Store.List() {
-		job = *m.(*batch.Job)
-		if job.Namespace != pod.Namespace {
-			continue
-		}
-
-		selector, _ = unversioned.LabelSelectorAsSelector(job.Spec.Selector)
-		if !selector.Matches(labels.Set(pod.Labels)) {
-			continue
-		}
-		jobs = append(jobs, job)
-	}
-	if len(jobs) == 0 {
-		err = fmt.Errorf("could not find jobs for pod %s in namespace %s with labels: %v", pod.Name, pod.Namespace, pod.Labels)
-	}
 	return
 }
 
@@ -274,8 +301,8 @@ type StoreToPVFetcher struct {
 }
 
 // GetPersistentVolumeInfo returns cached data for the PersistentVolume 'id'.
-func (s *StoreToPVFetcher) GetPersistentVolumeInfo(id string) (*api.PersistentVolume, error) {
-	o, exists, err := s.Get(&api.PersistentVolume{ObjectMeta: api.ObjectMeta{Name: id}})
+func (s *StoreToPVFetcher) GetPersistentVolumeInfo(id string) (*v1.PersistentVolume, error) {
+	o, exists, err := s.Get(&v1.PersistentVolume{ObjectMeta: v1.ObjectMeta{Name: id}})
 
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving PersistentVolume '%v' from cache: %v", id, err)
@@ -285,35 +312,16 @@ func (s *StoreToPVFetcher) GetPersistentVolumeInfo(id string) (*api.PersistentVo
 		return nil, fmt.Errorf("PersistentVolume '%v' not found", id)
 	}
 
-	return o.(*api.PersistentVolume), nil
+	return o.(*v1.PersistentVolume), nil
 }
 
-// Typed wrapper around a store of PersistentVolumeClaims
-type StoreToPVCFetcher struct {
+// StoreToStatefulSetLister gives a store List and Exists methods. The store must contain only StatefulSets.
+type StoreToStatefulSetLister struct {
 	Store
 }
 
-// GetPersistentVolumeClaimInfo returns cached data for the PersistentVolumeClaim 'id'.
-func (s *StoreToPVCFetcher) GetPersistentVolumeClaimInfo(namespace string, id string) (*api.PersistentVolumeClaim, error) {
-	o, exists, err := s.Get(&api.PersistentVolumeClaim{ObjectMeta: api.ObjectMeta{Namespace: namespace, Name: id}})
-	if err != nil {
-		return nil, fmt.Errorf("error retrieving PersistentVolumeClaim '%s/%s' from cache: %v", namespace, id, err)
-	}
-
-	if !exists {
-		return nil, fmt.Errorf("PersistentVolumeClaim '%s/%s' not found", namespace, id)
-	}
-
-	return o.(*api.PersistentVolumeClaim), nil
-}
-
-// StoreToPetSetLister gives a store List and Exists methods. The store must contain only PetSets.
-type StoreToPetSetLister struct {
-	Store
-}
-
-// Exists checks if the given PetSet exists in the store.
-func (s *StoreToPetSetLister) Exists(ps *apps.PetSet) (bool, error) {
+// Exists checks if the given StatefulSet exists in the store.
+func (s *StoreToStatefulSetLister) Exists(ps *apps.StatefulSet) (bool, error) {
 	_, exists, err := s.Store.Get(ps)
 	if err != nil {
 		return false, err
@@ -321,52 +329,52 @@ func (s *StoreToPetSetLister) Exists(ps *apps.PetSet) (bool, error) {
 	return exists, nil
 }
 
-// List lists all PetSets in the store.
-func (s *StoreToPetSetLister) List() (psList []apps.PetSet, err error) {
+// List lists all StatefulSets in the store.
+func (s *StoreToStatefulSetLister) List() (psList []apps.StatefulSet, err error) {
 	for _, ps := range s.Store.List() {
-		psList = append(psList, *(ps.(*apps.PetSet)))
+		psList = append(psList, *(ps.(*apps.StatefulSet)))
 	}
 	return psList, nil
 }
 
-type storePetSetsNamespacer struct {
+type storeStatefulSetsNamespacer struct {
 	store     Store
 	namespace string
 }
 
-func (s *StoreToPetSetLister) PetSets(namespace string) storePetSetsNamespacer {
-	return storePetSetsNamespacer{s.Store, namespace}
+func (s *StoreToStatefulSetLister) StatefulSets(namespace string) storeStatefulSetsNamespacer {
+	return storeStatefulSetsNamespacer{s.Store, namespace}
 }
 
-// GetPodPetSets returns a list of PetSets managing a pod. Returns an error only if no matching PetSets are found.
-func (s *StoreToPetSetLister) GetPodPetSets(pod *api.Pod) (psList []apps.PetSet, err error) {
+// GetPodStatefulSets returns a list of StatefulSets managing a pod. Returns an error only if no matching StatefulSets are found.
+func (s *StoreToStatefulSetLister) GetPodStatefulSets(pod *v1.Pod) (psList []apps.StatefulSet, err error) {
 	var selector labels.Selector
-	var ps apps.PetSet
+	var ps apps.StatefulSet
 
 	if len(pod.Labels) == 0 {
-		err = fmt.Errorf("no PetSets found for pod %v because it has no labels", pod.Name)
+		err = fmt.Errorf("no StatefulSets found for pod %v because it has no labels", pod.Name)
 		return
 	}
 
 	for _, m := range s.Store.List() {
-		ps = *m.(*apps.PetSet)
+		ps = *m.(*apps.StatefulSet)
 		if ps.Namespace != pod.Namespace {
 			continue
 		}
-		selector, err = unversioned.LabelSelectorAsSelector(ps.Spec.Selector)
+		selector, err = metav1.LabelSelectorAsSelector(ps.Spec.Selector)
 		if err != nil {
 			err = fmt.Errorf("invalid selector: %v", err)
 			return
 		}
 
-		// If a PetSet with a nil or empty selector creeps in, it should match nothing, not everything.
+		// If a StatefulSet with a nil or empty selector creeps in, it should match nothing, not everything.
 		if selector.Empty() || !selector.Matches(labels.Set(pod.Labels)) {
 			continue
 		}
 		psList = append(psList, ps)
 	}
 	if len(psList) == 0 {
-		err = fmt.Errorf("could not find PetSet for pod %s in namespace %s with labels: %v", pod.Name, pod.Namespace, pod.Labels)
+		err = fmt.Errorf("could not find StatefulSet for pod %s in namespace %s with labels: %v", pod.Name, pod.Namespace, pod.Labels)
 	}
 	return
 }
@@ -393,29 +401,12 @@ func (s *StoreToCertificateRequestLister) List() (csrs certificates.CertificateS
 	return csrs, nil
 }
 
-// IndexerToNamespaceLister gives an Indexer List method
-type IndexerToNamespaceLister struct {
-	Indexer
-}
-
-// List returns a list of namespaces
-func (i *IndexerToNamespaceLister) List(selector labels.Selector) (namespaces []*api.Namespace, err error) {
-	for _, m := range i.Indexer.List() {
-		namespace := m.(*api.Namespace)
-		if selector.Matches(labels.Set(namespace.Labels)) {
-			namespaces = append(namespaces, namespace)
-		}
-	}
-
-	return namespaces, nil
-}
-
 type StoreToPodDisruptionBudgetLister struct {
 	Store
 }
 
 // GetPodPodDisruptionBudgets returns a list of PodDisruptionBudgets matching a pod.  Returns an error only if no matching PodDisruptionBudgets are found.
-func (s *StoreToPodDisruptionBudgetLister) GetPodPodDisruptionBudgets(pod *api.Pod) (pdbList []policy.PodDisruptionBudget, err error) {
+func (s *StoreToPodDisruptionBudgetLister) GetPodPodDisruptionBudgets(pod *v1.Pod) (pdbList []policy.PodDisruptionBudget, err error) {
 	var selector labels.Selector
 
 	if len(pod.Labels) == 0 {
@@ -432,7 +423,7 @@ func (s *StoreToPodDisruptionBudgetLister) GetPodPodDisruptionBudgets(pod *api.P
 		if pdb.Namespace != pod.Namespace {
 			continue
 		}
-		selector, err = unversioned.LabelSelectorAsSelector(pdb.Spec.Selector)
+		selector, err = metav1.LabelSelectorAsSelector(pdb.Spec.Selector)
 		if err != nil {
 			glog.Warningf("invalid selector: %v", err)
 			// TODO(mml): add an event to the PDB
@@ -449,4 +440,41 @@ func (s *StoreToPodDisruptionBudgetLister) GetPodPodDisruptionBudgets(pod *api.P
 		err = fmt.Errorf("could not find PodDisruptionBudget for pod %s in namespace %s with labels: %v", pod.Name, pod.Namespace, pod.Labels)
 	}
 	return
+}
+
+// StorageClassLister knows how to list storage classes
+type StorageClassLister interface {
+	List(selector labels.Selector) (ret []*storage.StorageClass, err error)
+	Get(name string) (*storage.StorageClass, error)
+}
+
+// storageClassLister implements StorageClassLister
+type storageClassLister struct {
+	indexer Indexer
+}
+
+// NewStorageClassLister returns a new lister.
+func NewStorageClassLister(indexer Indexer) StorageClassLister {
+	return &storageClassLister{indexer: indexer}
+}
+
+// List returns a list of storage classes
+func (s *storageClassLister) List(selector labels.Selector) (ret []*storage.StorageClass, err error) {
+	err = ListAll(s.indexer, selector, func(m interface{}) {
+		ret = append(ret, m.(*storage.StorageClass))
+	})
+	return ret, err
+}
+
+// Get returns storage class with name 'name'.
+func (s *storageClassLister) Get(name string) (*storage.StorageClass, error) {
+	key := &storage.StorageClass{ObjectMeta: v1.ObjectMeta{Name: name}}
+	obj, exists, err := s.indexer.Get(key)
+	if err != nil {
+		return nil, err
+	}
+	if !exists {
+		return nil, errors.NewNotFound(storageinternal.Resource("storageclass"), name)
+	}
+	return obj.(*storage.StorageClass), nil
 }

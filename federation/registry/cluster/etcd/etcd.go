@@ -22,17 +22,16 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/registry/generic"
-	"k8s.io/kubernetes/pkg/registry/generic/registry"
+	genericregistry "k8s.io/kubernetes/pkg/registry/generic/registry"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/storage"
 )
 
 type REST struct {
-	*registry.Store
+	*genericregistry.Store
 }
 
 type StatusREST struct {
-	store *registry.Store
+	store *genericregistry.Store
 }
 
 func (r *StatusREST) New() runtime.Object {
@@ -45,44 +44,24 @@ func (r *StatusREST) Update(ctx api.Context, name string, objInfo rest.UpdatedOb
 }
 
 // NewREST returns a RESTStorage object that will work against clusters.
-func NewREST(opts generic.RESTOptions) (*REST, *StatusREST) {
-	prefix := "/" + opts.ResourcePrefix
-
-	newListFunc := func() runtime.Object { return &federation.ClusterList{} }
-	storageInterface, _ := opts.Decorator(
-		opts.StorageConfig,
-		100,
-		&federation.Cluster{},
-		prefix,
-		cluster.Strategy,
-		newListFunc,
-		storage.NoTriggerPublisher,
-	)
-
-	store := &registry.Store{
+func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST) {
+	store := &genericregistry.Store{
 		NewFunc:     func() runtime.Object { return &federation.Cluster{} },
-		NewListFunc: newListFunc,
-		KeyRootFunc: func(ctx api.Context) string {
-			return prefix
-		},
-		KeyFunc: func(ctx api.Context, name string) (string, error) {
-			return registry.NoNamespaceKeyFunc(ctx, prefix, name)
-		},
+		NewListFunc: func() runtime.Object { return &federation.ClusterList{} },
 		ObjectNameFunc: func(obj runtime.Object) (string, error) {
 			return obj.(*federation.Cluster).Name, nil
 		},
-		PredicateFunc:           cluster.MatchCluster,
-		QualifiedResource:       federation.Resource("clusters"),
-		EnableGarbageCollection: opts.EnableGarbageCollection,
-		DeleteCollectionWorkers: opts.DeleteCollectionWorkers,
+		PredicateFunc:     cluster.MatchCluster,
+		QualifiedResource: federation.Resource("clusters"),
 
-		CreateStrategy: cluster.Strategy,
-		UpdateStrategy: cluster.Strategy,
-		DeleteStrategy: cluster.Strategy,
-
+		CreateStrategy:      cluster.Strategy,
+		UpdateStrategy:      cluster.Strategy,
+		DeleteStrategy:      cluster.Strategy,
 		ReturnDeletedObject: true,
-
-		Storage: storageInterface,
+	}
+	options := &generic.StoreOptions{RESTOptions: optsGetter, AttrFunc: cluster.GetAttrs}
+	if err := store.CompleteWithOptions(options); err != nil {
+		panic(err) // TODO: Propagate error up
 	}
 
 	statusStore := *store

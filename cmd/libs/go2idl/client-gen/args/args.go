@@ -16,22 +16,19 @@ limitations under the License.
 
 package args
 
-import "k8s.io/kubernetes/pkg/api/unversioned"
+import "k8s.io/kubernetes/cmd/libs/go2idl/client-gen/types"
 
 // ClientGenArgs is a wrapper for arguments to client-gen.
 type Args struct {
-	// TODO: we should make another type declaration of GroupVersion out of the
-	// unversioned package, which is part of our API. Tools like client-gen
-	// shouldn't depend on an API.
-	GroupVersions []unversioned.GroupVersion
+	Groups []types.GroupVersions
 
 	// GroupVersionToInputPath is a map between GroupVersion and the path to
 	// the respective types.go. We still need GroupVersions in the struct because
 	// we need an order.
-	GroupVersionToInputPath map[unversioned.GroupVersion]string
+	GroupVersionToInputPath map[types.GroupVersion]string
 
 	// Overrides for which types should be included in the client.
-	IncludedTypesOverrides map[unversioned.GroupVersion][]string
+	IncludedTypesOverrides map[types.GroupVersion][]string
 
 	// ClientsetName is the name of the clientset to be generated. It's
 	// populated from command-line arguments.

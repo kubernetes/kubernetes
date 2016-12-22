@@ -1,16 +1,12 @@
 {% set base_metrics_memory = "140Mi" -%}
-{% set metrics_memory = base_metrics_memory -%}
 {% set metrics_memory_per_node = 4 -%}
 {% set base_metrics_cpu = "80m" -%}
-{% set metrics_cpu = base_metrics_cpu -%}
 {% set metrics_cpu_per_node = 0.5 -%}
 {% set num_nodes = pillar.get('num_nodes', -1) -%}
 {% set nanny_memory = "90Mi" -%}
 {% set nanny_memory_per_node = 200 -%}
 {% if num_nodes >= 0 -%}
-  {% set metrics_memory = (200 + num_nodes * metrics_memory_per_node)|string + "Mi" -%}
   {% set nanny_memory = (90 * 1024 + num_nodes * nanny_memory_per_node)|string + "Ki" -%}
-  {% set metrics_cpu = (80 + num_nodes * metrics_cpu_per_node)|string + "m" -%}
 {% endif -%}
 
 apiVersion: extensions/v1beta1
@@ -47,14 +43,6 @@ spec:
               scheme: HTTP
             initialDelaySeconds: 180
             timeoutSeconds: 5
-          resources:
-            # keep request = limit to keep this container in guaranteed class
-            limits:
-              cpu: {{ metrics_cpu }}
-              memory: {{ metrics_memory }}
-            requests:
-              cpu: {{ metrics_cpu }}
-              memory: {{ metrics_memory }}
           command:
             - /heapster
             - --source=kubernetes.summary_api:''

@@ -18,6 +18,27 @@ bridge-utils:
     - mode: 644
     - makedirs: true
 
+{% if grains.cloud is defined and grains.cloud == 'openstack' %}
+
+cbr0:
+  # workaround https://github.com/saltstack/salt/issues/20570
+  kmod.present:
+    - name: bridge
+
+  network.managed:
+    - enabled: True
+    - type: bridge
+    - proto: none
+    - ports: none
+    - bridge: cbr0
+    - delay: 0
+    - bypassfirewall: True
+    - require_in:
+      - service: docker
+    - require:
+      - kmod: cbr0
+{% endif %}
+
 {% if (grains.os == 'Fedora' and grains.osrelease_info[0] >= 22) or (grains.os == 'CentOS' and grains.osrelease_info[0] >= 7) %}
 
 docker:
@@ -261,6 +282,20 @@ net.ipv4.ip_forward:
   sysctl.present:
     - value: 1
 
+{% if pillar.get('softlockup_panic', '').lower() == 'true' %}
+# TODO(dchen1107) Remove this once kernel.softlockup_panic is built into the CVM image.
+/etc/sysctl.conf:
+  file.append:
+    - text:
+      - "kernel.softlockup_panic = 1"
+      - "kernel.softlockup_all_cpu_backtrace = 1"
+
+'sysctl-reload':
+  cmd.run:
+    - name: 'sysctl --system'
+    - unless: 'sysctl -a | grep "kernel.softlockup_panic = 1"'
+{% endif %}
+ 
 {{ environment_file }}:
   file.managed:
     - source: salt://docker/docker-defaults
@@ -498,4 +533,3 @@ docker:
       - cmd: fix-service-docker
 {% endif %}
 {% endif %} # end grains.os_family != 'RedHat'
-

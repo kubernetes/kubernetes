@@ -1,0 +1,28 @@
+# Spdystream maintainers file
+#
+# This file describes who runs the docker/spdystream project and how.
+# This is a living document - if you see something out of date or missing, speak up!
+#
+# It is structured to be consumable by both humans and programs.
+# To extract its contents programmatically, use any TOML-compliant parser.
+#
+# This file is compiled into the MAINTAINERS file in docker/opensource.
+#
+[Org]
+	[Org."Core maintainers"]
+		people = [
+			"dmcgowan",
+		]
+
+[people]
+
+# A reference list of all people associated with the project.
+# All other sections should refer to people by their canonical key
+# in the people section.
+
+	# ADD YOURSELF HERE IN ALPHABETICAL ORDER
+
+	[people.dmcgowan]
+	Name = "Derek McGowan"
+	Email = "derek@docker.com"
+	GitHub = "dmcgowan"

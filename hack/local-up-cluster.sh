@@ -14,19 +14,34 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
+
 # This command builds and runs a local kubernetes cluster. It's just like
 # local-up.sh, but this one launches the three separate binaries.
-# You may need to run this as root to allow kubelet to open docker's socket.
+# You may need to run this as root to allow kubelet to open docker's socket,
+# and to write the test CA in /var/run/kubernetes.
 DOCKER_OPTS=${DOCKER_OPTS:-""}
 DOCKER=(docker ${DOCKER_OPTS})
 DOCKERIZE_KUBELET=${DOCKERIZE_KUBELET:-""}
 ALLOW_PRIVILEGED=${ALLOW_PRIVILEGED:-""}
 ALLOW_SECURITY_CONTEXT=${ALLOW_SECURITY_CONTEXT:-""}
+PSP_ADMISSION=${PSP_ADMISSION:-""}
 RUNTIME_CONFIG=${RUNTIME_CONFIG:-""}
+KUBELET_AUTHORIZATION_WEBHOOK=${KUBELET_AUTHORIZATION_WEBHOOK:-""}
+KUBELET_AUTHENTICATION_WEBHOOK=${KUBELET_AUTHENTICATION_WEBHOOK:-""}
+# Name of the network plugin, eg: "kubenet"
 NET_PLUGIN=${NET_PLUGIN:-""}
+# Place the binaries required by NET_PLUGIN in this directory, eg: "/home/kubernetes/bin".
 NET_PLUGIN_DIR=${NET_PLUGIN_DIR:-""}
-KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 SERVICE_CLUSTER_IP_RANGE=${SERVICE_CLUSTER_IP_RANGE:-10.0.0.0/24}
+# if enabled, must set CGROUP_ROOT
+EXPERIMENTAL_CGROUPS_PER_QOS=${EXPERIMENTAL_CGROUPS_PER_QOS:-false}
+# this is not defaulted to preserve backward compatibility.
+# if EXPERIMENTAL_CGROUPS_PER_QOS is enabled, recommend setting to /
+CGROUP_ROOT=${CGROUP_ROOT:-""}
+# name of the cgroup driver, i.e. cgroupfs or systemd
+CGROUP_DRIVER=${CGROUP_DRIVER:-""}
+
 # We disable cluster DNS by default because this script uses docker0 (or whatever
 # container bridge docker is currently using) and we don't know the IP of the
 # DNS pod to pass in as --cluster-dns. To set this up by hand, set this flag
@@ -34,7 +49,6 @@ SERVICE_CLUSTER_IP_RANGE=${SERVICE_CLUSTER_IP_RANGE:-10.0.0.0/24}
 ENABLE_CLUSTER_DNS=${KUBE_ENABLE_CLUSTER_DNS:-false}
 DNS_SERVER_IP=${KUBE_DNS_SERVER_IP:-10.0.0.10}
 DNS_DOMAIN=${KUBE_DNS_NAME:-"cluster.local"}
-DNS_REPLICAS=${KUBE_DNS_REPLICAS:-1}
 KUBECTL=${KUBECTL:-cluster/kubectl.sh}
 WAIT_FOR_URL_API_SERVER=${WAIT_FOR_URL_API_SERVER:-10}
 ENABLE_DAEMON=${ENABLE_DAEMON:-false}
@@ -43,10 +57,15 @@ CLOUD_PROVIDER=${CLOUD_PROVIDER:-""}
 CLOUD_CONFIG=${CLOUD_CONFIG:-""}
 FEATURE_GATES=${FEATURE_GATES:-"AllAlpha=true"}
 
+# RBAC Mode options
+ALLOW_ANY_TOKEN=${ALLOW_ANY_TOKEN:-false}
+ENABLE_RBAC=${ENABLE_RBAC:-false}
+KUBECONFIG_TOKEN=${KUBECONFIG_TOKEN:-""}
+AUTH_ARGS=${AUTH_ARGS:-""}
+
 # start the cache mutation detector by default so that cache mutators will be found
 KUBE_CACHE_MUTATION_DETECTOR="${KUBE_CACHE_MUTATION_DETECTOR:-true}"
 export KUBE_CACHE_MUTATION_DETECTOR
-
 
 
 # START_MODE can be 'all', 'kubeletonly', or 'nokubelet'
@@ -75,6 +94,7 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 
 function usage {
             echo "This script starts a local kube cluster. "
+            echo "Example 0: hack/local-up-cluster.sh -h  (this 'help' usage description)"
             echo "Example 1: hack/local-up-cluster.sh -o _output/dockerized/bin/linux/amd64/ (run from docker output)"
             echo "Example 2: hack/local-up-cluster.sh -O (auto-guess the bin path for your platform)"
             echo "Example 3: hack/local-up-cluster.sh (build a local copy of the source)"
@@ -91,8 +111,8 @@ function guess_built_binary_path {
 }
 
 ### Allow user to supply the source directory.
-GO_OUT=""
-while getopts "o:O" OPTION
+GO_OUT=${GO_OUT:-}
+while getopts "ho:O" OPTION
 do
     case $OPTION in
         o)
@@ -107,6 +127,10 @@ do
                 exit 1
             fi
             ;;
+        h)
+            usage
+            exit
+            ;;
         ?)
             usage
             exit
@@ -115,26 +139,27 @@ do
 done
 
 if [ "x$GO_OUT" == "x" ]; then
-    make -C "${KUBE_ROOT}" WHAT="cmd/kubectl cmd/hyperkube"
+    make -C "${KUBE_ROOT}" WHAT="cmd/kubectl cmd/hyperkube cmd/kubernetes-discovery"
 else
     echo "skipped the build."
 fi
 
-function test_docker {
-    ${DOCKER[@]} ps 2> /dev/null 1> /dev/null
-    if [ "$?" != "0" ]; then
-      echo "Failed to successfully run 'docker ps', please verify that docker is installed and \$DOCKER_HOST is set correctly."
-      exit 1
+function test_rkt {
+    if [[ -n "${RKT_PATH}" ]]; then
+      ${RKT_PATH} list 2> /dev/null 1> /dev/null
+      if [ "$?" != "0" ]; then
+        echo "Failed to successfully run 'rkt list', please verify that ${RKT_PATH} is the path of rkt binary."
+        exit 1
+      fi
+    else
+      rkt list 2> /dev/null 1> /dev/null
+      if [ "$?" != "0" ]; then
+        echo "Failed to successfully run 'rkt list', please verify that rkt is in \$PATH."
+        exit 1
+      fi
     fi
 }
 
-function test_openssl_installed {
-    openssl version >& /dev/null
-    if [ "$?" != "0" ]; then
-      echo "Failed to run openssl. Please ensure openssl is installed"
-      exit 1
-    fi
-}
 
 # Shut down anyway if there's an error.
 set +e
@@ -159,9 +184,16 @@ CPU_CFS_QUOTA=${CPU_CFS_QUOTA:-true}
 ENABLE_HOSTPATH_PROVISIONER=${ENABLE_HOSTPATH_PROVISIONER:-"false"}
 CLAIM_BINDER_SYNC_PERIOD=${CLAIM_BINDER_SYNC_PERIOD:-"15s"} # current k8s default
 ENABLE_CONTROLLER_ATTACH_DETACH=${ENABLE_CONTROLLER_ATTACH_DETACH:-"true"} # current default
+# This is the default dir and filename where the apiserver will generate a self-signed cert
+# which should be able to be used as the CA to verify itself
 CERT_DIR=${CERT_DIR:-"/var/run/kubernetes"}
 ROOT_CA_FILE=$CERT_DIR/apiserver.crt
+EXPERIMENTAL_CRI=${EXPERIMENTAL_CRI:-"false"}
 
+
+# Ensure CERT_DIR is created for auto-generated crt/key and kubeconfig
+mkdir -p "${CERT_DIR}" &>/dev/null || sudo mkdir -p "${CERT_DIR}"
+CONTROLPLANE_SUDO=$(test -w "${CERT_DIR}" || echo "sudo -E")
 
 function test_apiserver_off {
     # For the common local scenario, fail fast if server is already running.
@@ -303,21 +335,27 @@ function set_service_accounts {
 }
 
 function start_apiserver {
-    # Admission Controllers to invoke prior to persisting objects in cluster
+    security_admission=""
     if [[ -z "${ALLOW_SECURITY_CONTEXT}" ]]; then
-      ADMISSION_CONTROL=NamespaceLifecycle,LimitRanger,SecurityContextDeny,ServiceAccount,ResourceQuota,DefaultStorageClass
-    else
-      ADMISSION_CONTROL=NamespaceLifecycle,LimitRanger,ServiceAccount,ResourceQuota,DefaultStorageClass
+      security_admission=",SecurityContextDeny"
     fi
+    if [[ -n "${PSP_ADMISSION}" ]]; then
+      security_admission=",PodSecurityPolicy"
+    fi
+
+    # Admission Controllers to invoke prior to persisting objects in cluster
+    ADMISSION_CONTROL=NamespaceLifecycle,LimitRanger,ServiceAccount${security_admission},ResourceQuota,DefaultStorageClass
+
     # This is the default dir and filename where the apiserver will generate a self-signed cert
     # which should be able to be used as the CA to verify itself
 
     anytoken_arg=""
-    if [[ -n "${ALLOW_ANY_TOKEN:-}" ]]; then
+    if [[ "${ALLOW_ANY_TOKEN}" = true ]]; then
       anytoken_arg="--insecure-allow-any-token "
+      KUBECONFIG_TOKEN="${KUBECONFIG_TOKEN:-system:admin/system:masters}"
     fi
     authorizer_arg=""
-    if [[ -n "${ENABLE_RBAC:-}" ]]; then
+    if [[ "${ENABLE_RBAC}" = true ]]; then
       authorizer_arg="--authorization-mode=RBAC "
     fi
     priv_arg=""
@@ -329,22 +367,34 @@ function start_apiserver {
       runtime_config="--runtime-config=${RUNTIME_CONFIG}"
     fi
 
-    # Let the API server pick a default address when API_HOST
+    # Let the API server pick a default address when API_HOST_IP
     # is set to 127.0.0.1
     advertise_address=""
-    if [[ "${API_HOST}" != "127.0.0.1" ]]; then
+    if [[ "${API_HOST_IP}" != "127.0.0.1" ]]; then
         advertise_address="--advertise_address=${API_HOST_IP}"
     fi
 
-    # Ensure CERT_DIR is created for auto-generated crt/key and kubeconfig
-    sudo mkdir -p "${CERT_DIR}"
+    # Create client ca
+    kube::util::create_signing_certkey "${CONTROLPLANE_SUDO}" "${CERT_DIR}" client '"client auth"'
 
+    # Create client certs signed with client-ca, given id, given CN and a number of groups
+    # NOTE: system:masters will be removed in the future
+    kube::util::create_client_certkey "${CONTROLPLANE_SUDO}" "${CERT_DIR}" 'client-ca' kubelet system:node:${HOSTNAME_OVERRIDE} system:nodes
+    kube::util::create_client_certkey "${CONTROLPLANE_SUDO}" "${CERT_DIR}" 'client-ca' kube-proxy system:kube-proxy system:nodes
+    kube::util::create_client_certkey "${CONTROLPLANE_SUDO}" "${CERT_DIR}" 'client-ca' controller system:controller system:masters
+    kube::util::create_client_certkey "${CONTROLPLANE_SUDO}" "${CERT_DIR}" 'client-ca' scheduler system:scheduler system:masters
+    kube::util::create_client_certkey "${CONTROLPLANE_SUDO}" "${CERT_DIR}" 'client-ca' admin system:admin system:masters
+
+    # Create auth proxy client ca
+    kube::util::create_signing_certkey "${CONTROLPLANE_SUDO}" "${CERT_DIR}" request-header '"client auth"'
+    kube::util::create_client_certkey "${CONTROLPLANE_SUDO}" "${CERT_DIR}" request-header-ca auth-proxy system:auth-proxy
 
     APISERVER_LOG=/tmp/kube-apiserver.log
-    sudo -E "${GO_OUT}/hyperkube" apiserver ${anytoken_arg} ${authorizer_arg} ${priv_arg} ${runtime_config}\
+    ${CONTROLPLANE_SUDO} "${GO_OUT}/hyperkube" apiserver ${anytoken_arg} ${authorizer_arg} ${priv_arg} ${runtime_config}\
       ${advertise_address} \
       --v=${LOG_LEVEL} \
       --cert-dir="${CERT_DIR}" \
+      --client-ca-file="${CERT_DIR}/client-ca.crt" \
       --service-account-key-file="${SERVICE_ACCOUNT_KEY}" \
       --service-account-lookup="${SERVICE_ACCOUNT_LOOKUP}" \
       --admission-control="${ADMISSION_CONTROL}" \
@@ -358,28 +408,38 @@ function start_apiserver {
       --feature-gates="${FEATURE_GATES}" \
       --cloud-provider="${CLOUD_PROVIDER}" \
       --cloud-config="${CLOUD_CONFIG}" \
+      --requestheader-username-headers=X-Remote-User \
+      --requestheader-group-headers=X-Remote-Group \
+      --requestheader-extra-headers-prefix=X-Remote-Extra- \
+      --requestheader-client-ca-file="${CERT_DIR}/request-header-ca.crt" \
+      --requestheader-allowed-names=system:auth-proxy \
       --cors-allowed-origins="${API_CORS_ALLOWED_ORIGINS}" >"${APISERVER_LOG}" 2>&1 &
     APISERVER_PID=$!
 
-    # We created a kubeconfig that uses the apiserver.crt
-    cat <<EOF | sudo tee "${CERT_DIR}"/kubeconfig > /dev/null
-apiVersion: v1
-kind: Config
-clusters:
-  - cluster:
-      certificate-authority: ${ROOT_CA_FILE}
-      server: https://${API_HOST}:${API_SECURE_PORT}/
-    name: local-up-cluster
-contexts:
-  - context:
-      cluster: local-up-cluster
-    name: service-to-apiserver
-current-context: service-to-apiserver
-EOF
-
     # Wait for kube-apiserver to come up before launching the rest of the components.
     echo "Waiting for apiserver to come up"
-    kube::util::wait_for_url "https://${API_HOST}:${API_SECURE_PORT}/api/v1/pods" "apiserver: " 1 ${WAIT_FOR_URL_API_SERVER} || exit 1
+    kube::util::wait_for_url "https://${API_HOST}:${API_SECURE_PORT}/version" "apiserver: " 1 ${WAIT_FOR_URL_API_SERVER} || exit 1
+
+    # Create kubeconfigs for all components, using client certs
+    kube::util::write_client_kubeconfig "${CONTROLPLANE_SUDO}" "${CERT_DIR}" "${ROOT_CA_FILE}" "${API_HOST}" "${API_SECURE_PORT}" admin
+    kube::util::write_client_kubeconfig "${CONTROLPLANE_SUDO}" "${CERT_DIR}" "${ROOT_CA_FILE}" "${API_HOST}" "${API_SECURE_PORT}" kubelet
+    kube::util::write_client_kubeconfig "${CONTROLPLANE_SUDO}" "${CERT_DIR}" "${ROOT_CA_FILE}" "${API_HOST}" "${API_SECURE_PORT}" kube-proxy
+    kube::util::write_client_kubeconfig "${CONTROLPLANE_SUDO}" "${CERT_DIR}" "${ROOT_CA_FILE}" "${API_HOST}" "${API_SECURE_PORT}" controller
+    kube::util::write_client_kubeconfig "${CONTROLPLANE_SUDO}" "${CERT_DIR}" "${ROOT_CA_FILE}" "${API_HOST}" "${API_SECURE_PORT}" scheduler
+
+    if [[ -z "${AUTH_ARGS}"  ]]; then
+        if [[ "${ALLOW_ANY_TOKEN}" = true  ]]; then
+            # use token authentication
+            if [[ -n "${KUBECONFIG_TOKEN}"  ]]; then
+                AUTH_ARGS="--token=${KUBECONFIG_TOKEN}"
+            else
+                AUTH_ARGS="--token=system:admin/system:masters"
+            fi
+        else
+            # default to use basic authentication
+            AUTH_ARGS="--username=admin --password=admin"
+        fi
+    fi
 }
 
 function start_controller_manager {
@@ -389,7 +449,7 @@ function start_controller_manager {
     fi
 
     CTLRMGR_LOG=/tmp/kube-controller-manager.log
-    sudo -E "${GO_OUT}/hyperkube" controller-manager \
+    ${CONTROLPLANE_SUDO} "${GO_OUT}/hyperkube" controller-manager \
       --v=${LOG_LEVEL} \
       --service-account-private-key-file="${SERVICE_ACCOUNT_KEY}" \
       --root-ca-file="${ROOT_CA_FILE}" \
@@ -399,7 +459,7 @@ function start_controller_manager {
       --feature-gates="${FEATURE_GATES}" \
       --cloud-provider="${CLOUD_PROVIDER}" \
       --cloud-config="${CLOUD_CONFIG}" \
-      --kubeconfig "$CERT_DIR"/kubeconfig \
+      --kubeconfig "$CERT_DIR"/controller.kubeconfig \
       --master="https://${API_HOST}:${API_SECURE_PORT}" >"${CTLRMGR_LOG}" 2>&1 &
     CTLRMGR_PID=$!
 }
@@ -414,18 +474,6 @@ function start_kubelet {
 
     mkdir -p /var/lib/kubelet
     if [[ -z "${DOCKERIZE_KUBELET}" ]]; then
-      # On selinux enabled systems, it might
-      # require to relabel /var/lib/kubelet
-      if which selinuxenabled &> /dev/null && \
-         selinuxenabled && \
-         which chcon > /dev/null ; then
-         if [[ ! $(ls -Zd /var/lib/kubelet) =~ system_u:object_r:svirt_sandbox_file_t:s0 ]] ; then
-            echo "Applying SELinux label to /var/lib/kubelet directory."
-            if ! sudo chcon -Rt svirt_sandbox_file_t /var/lib/kubelet; then
-               echo "Failed to apply selinux label to /var/lib/kubelet."
-            fi
-         fi
-      fi
       # Enable dns
       if [[ "${ENABLE_CLUSTER_DNS}" = true ]]; then
          dns_args="--cluster-dns=${DNS_SERVER_IP} --cluster-domain=${DNS_DOMAIN}"
@@ -441,14 +489,20 @@ function start_kubelet {
         net_plugin_args="--network-plugin=${NET_PLUGIN}"
       fi
 
+      auth_args=""
+      if [[ -n "${KUBELET_AUTHORIZATION_WEBHOOK:-}" ]]; then
+        auth_args="${auth_args} --authorization-mode=Webhook"
+      fi
+      if [[ -n "${KUBELET_AUTHENTICATION_WEBHOOK:-}" ]]; then
+        auth_args="${auth_args} --authentication-token-webhook"
+      fi
+      if [[ -n "${CLIENT_CA_FILE:-}" ]]; then
+        auth_args="${auth_args} --client-ca-file=${CLIENT_CA_FILE}"
+      fi
+
       net_plugin_dir_args=""
       if [[ -n "${NET_PLUGIN_DIR}" ]]; then
         net_plugin_dir_args="--network-plugin-dir=${NET_PLUGIN_DIR}"
-      fi
-
-      kubenet_plugin_args=""
-      if [[ "${NET_PLUGIN}" == "kubenet" ]]; then
-        kubenet_plugin_args="--reconcile-cidr=true "
       fi
 
       container_runtime_endpoint_args=""
@@ -458,13 +512,14 @@ function start_kubelet {
 
       image_service_endpoint_args=""
       if [[ -n "${IMAGE_SERVICE_ENDPOINT}" ]]; then
-	image_service_endpoint_args="--image-service-endpoint=${IMAGE_SERVICE_ENDPOINT}"
+        image_service_endpoint_args="--image-service-endpoint=${IMAGE_SERVICE_ENDPOINT}"
       fi
 
       sudo -E "${GO_OUT}/hyperkube" kubelet ${priv_arg}\
         --v=${LOG_LEVEL} \
         --chaos-chance="${CHAOS_CHANCE}" \
         --container-runtime="${CONTAINER_RUNTIME}" \
+        --experimental-cri=${EXPERIMENTAL_CRI} \
         --rkt-path="${RKT_PATH}" \
         --rkt-stage1-image="${RKT_STAGE1_IMAGE}" \
         --hostname-override="${HOSTNAME_OVERRIDE}" \
@@ -472,25 +527,34 @@ function start_kubelet {
         --cloud-config="${CLOUD_CONFIG}" \
         --address="${KUBELET_HOST}" \
         --require-kubeconfig \
-        --kubeconfig "$CERT_DIR"/kubeconfig \
+        --kubeconfig "$CERT_DIR"/kubelet.kubeconfig \
         --feature-gates="${FEATURE_GATES}" \
         --cpu-cfs-quota=${CPU_CFS_QUOTA} \
         --enable-controller-attach-detach="${ENABLE_CONTROLLER_ATTACH_DETACH}" \
+        --experimental-cgroups-per-qos=${EXPERIMENTAL_CGROUPS_PER_QOS} \
+        --cgroup-driver=${CGROUP_DRIVER} \
+        --cgroup-root=${CGROUP_ROOT} \
+        ${auth_args} \
         ${dns_args} \
         ${net_plugin_dir_args} \
         ${net_plugin_args} \
-        ${kubenet_plugin_args} \
         ${container_runtime_endpoint_args} \
         ${image_service_endpoint_args} \
         --port="$KUBELET_PORT" >"${KUBELET_LOG}" 2>&1 &
       KUBELET_PID=$!
+      # Quick check that kubelet is running.
+      if ps -p $KUBELET_PID > /dev/null ; then 
+	echo "kubelet ( $KUBELET_PID ) is running."
+      else
+	cat ${KUBELET_LOG} ; exit 1
+      fi	
     else
       # Docker won't run a container with a cidfile (container id file)
       # unless that file does not already exist; clean up an existing
       # dockerized kubelet that might be running.
       cleanup_dockerized_kubelet
       cred_bind=""
-      # path to cloud credentails.
+      # path to cloud credentials.
       cloud_cred=""
       if [ "${CLOUD_PROVIDER}" == "aws" ]; then
           cloud_cred="${HOME}/.aws/credentials"
@@ -510,7 +574,7 @@ function start_kubelet {
         --volume=/var/run:/var/run:rw \
         --volume=/sys:/sys:ro \
         --volume=/var/lib/docker/:/var/lib/docker:ro \
-        --volume=/var/lib/kubelet/:/var/lib/kubelet:rw,z \
+        --volume=/var/lib/kubelet/:/var/lib/kubelet:rw \
         --volume=/dev:/dev \
         ${cred_bind} \
         --net=host \
@@ -518,64 +582,55 @@ function start_kubelet {
         -i \
         --cidfile=$KUBELET_CIDFILE \
         gcr.io/google_containers/kubelet \
-        /kubelet --v=${LOG_LEVEL} --containerized ${priv_arg}--chaos-chance="${CHAOS_CHANCE}" --hostname-override="${HOSTNAME_OVERRIDE}" --cloud-provider="${CLOUD_PROVIDER}" --cloud-config="${CLOUD_CONFIG}" \ --address="127.0.0.1" --require-kubeconfig --kubeconfig "$CERT_DIR"/kubeconfig --api-servers="https://${API_HOST}:${API_SECURE_PORT}" --port="$KUBELET_PORT"  --enable-controller-attach-detach="${ENABLE_CONTROLLER_ATTACH_DETACH}" &> $KUBELET_LOG &
+        /kubelet --v=${LOG_LEVEL} --containerized ${priv_arg}--chaos-chance="${CHAOS_CHANCE}" --hostname-override="${HOSTNAME_OVERRIDE}" --cloud-provider="${CLOUD_PROVIDER}" --cloud-config="${CLOUD_CONFIG}" \ --address="127.0.0.1" --require-kubeconfig --kubeconfig "$CERT_DIR"/kubelet.kubeconfig --api-servers="https://${API_HOST}:${API_SECURE_PORT}" --port="$KUBELET_PORT"  --enable-controller-attach-detach="${ENABLE_CONTROLLER_ATTACH_DETACH}" &> $KUBELET_LOG &
     fi
 }
 
 function start_kubeproxy {
     PROXY_LOG=/tmp/kube-proxy.log
-    sudo -E "${GO_OUT}/hyperkube" proxy \
+    sudo "${GO_OUT}/hyperkube" proxy \
       --v=${LOG_LEVEL} \
       --hostname-override="${HOSTNAME_OVERRIDE}" \
       --feature-gates="${FEATURE_GATES}" \
-      --kubeconfig "$CERT_DIR"/kubeconfig \
+      --kubeconfig "$CERT_DIR"/kube-proxy.kubeconfig \
       --master="https://${API_HOST}:${API_SECURE_PORT}" >"${PROXY_LOG}" 2>&1 &
     PROXY_PID=$!
 
     SCHEDULER_LOG=/tmp/kube-scheduler.log
-    sudo -E "${GO_OUT}/hyperkube" scheduler \
+    ${CONTROLPLANE_SUDO} "${GO_OUT}/hyperkube" scheduler \
       --v=${LOG_LEVEL} \
-      --kubeconfig "$CERT_DIR"/kubeconfig \
+      --kubeconfig "$CERT_DIR"/scheduler.kubeconfig \
       --master="https://${API_HOST}:${API_SECURE_PORT}" >"${SCHEDULER_LOG}" 2>&1 &
     SCHEDULER_PID=$!
 }
 
 function start_kubedns {
-
     if [[ "${ENABLE_CLUSTER_DNS}" = true ]]; then
         echo "Creating kube-system namespace"
-        sed -e "s/{{ pillar\['dns_replicas'\] }}/${DNS_REPLICAS}/g;s/{{ pillar\['dns_domain'\] }}/${DNS_DOMAIN}/g;" "${KUBE_ROOT}/cluster/addons/dns/skydns-rc.yaml.in" >| skydns-rc.yaml
+        sed -e "s/{{ pillar\['dns_domain'\] }}/${DNS_DOMAIN}/g" "${KUBE_ROOT}/cluster/addons/dns/kubedns-controller.yaml.in" >| kubedns-deployment.yaml
         if [[ "${FEDERATION:-}" == "true" ]]; then
           FEDERATIONS_DOMAIN_MAP="${FEDERATIONS_DOMAIN_MAP:-}"
           if [[ -z "${FEDERATIONS_DOMAIN_MAP}" && -n "${FEDERATION_NAME:-}" && -n "${DNS_ZONE_NAME:-}" ]]; then
             FEDERATIONS_DOMAIN_MAP="${FEDERATION_NAME}=${DNS_ZONE_NAME}"
           fi
           if [[ -n "${FEDERATIONS_DOMAIN_MAP}" ]]; then
-            sed -i -e "s/{{ pillar\['federations_domain_map'\] }}/- --federations=${FEDERATIONS_DOMAIN_MAP}/g" skydns-rc.yaml
+            sed -i -e "s/{{ pillar\['federations_domain_map'\] }}/- --federations=${FEDERATIONS_DOMAIN_MAP}/g" kubedns-deployment.yaml
           else
-            sed -i -e "/{{ pillar\['federations_domain_map'\] }}/d" skydns-rc.yaml
+            sed -i -e "/{{ pillar\['federations_domain_map'\] }}/d" kubedns-deployment.yaml
           fi
         else
-          sed -i -e "/{{ pillar\['federations_domain_map'\] }}/d" skydns-rc.yaml
+          sed -i -e "/{{ pillar\['federations_domain_map'\] }}/d" kubedns-deployment.yaml
         fi
-        sed -e "s/{{ pillar\['dns_server'\] }}/${DNS_SERVER_IP}/g" "${KUBE_ROOT}/cluster/addons/dns/skydns-svc.yaml.in" >| skydns-svc.yaml
-        cat <<EOF >namespace.yaml
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: kube-system
-EOF
-        ${KUBECTL} config set-cluster local --server=https://${API_HOST}:${API_SECURE_PORT} --certificate-authority=$(ROOT_CA_FILE)
-        ${KUBECTL} config set-context local --cluster=local
-        ${KUBECTL} config use-context local
-
-        ${KUBECTL} create -f namespace.yaml
-        # use kubectl to create skydns rc and service
-        ${KUBECTL} --namespace=kube-system create -f skydns-rc.yaml
-        ${KUBECTL} --namespace=kube-system create -f skydns-svc.yaml
+        sed -e "s/{{ pillar\['dns_server'\] }}/${DNS_SERVER_IP}/g" "${KUBE_ROOT}/cluster/addons/dns/kubedns-svc.yaml.in" >| kubedns-svc.yaml
+        
+        # TODO update to dns role once we have one.
+        ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" create clusterrolebinding system:kube-dns --clusterrole=cluster-admin --serviceaccount=kube-system:default
+        # use kubectl to create kubedns rc and service
+        ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" --namespace=kube-system create -f kubedns-deployment.yaml
+        ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" --namespace=kube-system create -f kubedns-svc.yaml
         echo "Kube-dns rc and service successfully deployed."
+        rm  kubedns-deployment.yaml kubedns-svc.yaml
     fi
-
 }
 
 function print_success {
@@ -607,7 +662,7 @@ To start using your cluster, open up another terminal/tab and run:
   export KUBERNETES_PROVIDER=local
 
   cluster/kubectl.sh config set-cluster local --server=https://${API_HOST}:${API_SECURE_PORT} --certificate-authority=${ROOT_CA_FILE}
-  cluster/kubectl.sh config set-credentials myself --username=admin --password=admin
+  cluster/kubectl.sh config set-credentials myself ${AUTH_ARGS}
   cluster/kubectl.sh config set-context local --cluster=local --user=myself
   cluster/kubectl.sh config use-context local
   cluster/kubectl.sh
@@ -622,13 +677,23 @@ EOF
 fi
 }
 
-test_docker
+# validate that etcd is: not running, in path, and has minimum required version.
+kube::etcd::validate
+
+if [ "${CONTAINER_RUNTIME}" == "docker" ] && ! kube::util::ensure_docker_daemon_connectivity; then
+  exit 1
+fi
+
+if [[ "${CONTAINER_RUNTIME}" == "rkt" ]]; then
+  test_rkt
+fi
 
 if [[ "${START_MODE}" != "kubeletonly" ]]; then
   test_apiserver_off
 fi
 
-test_openssl_installed
+kube::util::test_openssl_installed
+kube::util::test_cfssl_installed
 
 ### IF the user didn't supply an output/ for the build... Then we detect.
 if [ "$GO_OUT" == "" ]; then

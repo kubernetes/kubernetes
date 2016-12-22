@@ -31,7 +31,7 @@ import (
 
 	"gopkg.in/gcfg.v1"
 
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/types"
 )
@@ -151,7 +151,7 @@ func (v *OVirtCloud) Routes() (cloudprovider.Routes, bool) {
 }
 
 // NodeAddresses returns the NodeAddresses of the instance with the specified nodeName.
-func (v *OVirtCloud) NodeAddresses(nodeName types.NodeName) ([]api.NodeAddress, error) {
+func (v *OVirtCloud) NodeAddresses(nodeName types.NodeName) ([]v1.NodeAddress, error) {
 	name := mapNodeNameToInstanceName(nodeName)
 	instance, err := v.fetchInstance(name)
 	if err != nil {
@@ -173,7 +173,11 @@ func (v *OVirtCloud) NodeAddresses(nodeName types.NodeName) ([]api.NodeAddress, 
 		address = resolved[0]
 	}
 
-	return []api.NodeAddress{{Type: api.NodeLegacyHostIP, Address: address.String()}}, nil
+	return []v1.NodeAddress{
+		{Type: v1.NodeLegacyHostIP, Address: address.String()},
+		{Type: v1.NodeInternalIP, Address: address.String()},
+		{Type: v1.NodeExternalIP, Address: address.String()},
+	}, nil
 }
 
 // mapNodeNameToInstanceName maps from a k8s NodeName to an ovirt instance name (the hostname)
@@ -281,19 +285,6 @@ func (m *OVirtInstanceMap) ListSortedNames() []string {
 	sort.Strings(names)
 
 	return names
-}
-
-// List enumerates the set of nodes instances known by the cloud provider
-func (v *OVirtCloud) List(filter string) ([]types.NodeName, error) {
-	instances, err := v.fetchAllInstances()
-	if err != nil {
-		return nil, err
-	}
-	var nodeNames []types.NodeName
-	for _, s := range instances.ListSortedNames() {
-		nodeNames = append(nodeNames, types.NodeName(s))
-	}
-	return nodeNames, nil
 }
 
 // Implementation of Instances.CurrentNodeName

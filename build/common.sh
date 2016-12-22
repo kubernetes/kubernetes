@@ -97,6 +97,7 @@ kube::build::get_docker_wrapped_binaries() {
           kube-apiserver,busybox
           kube-controller-manager,busybox
           kube-scheduler,busybox
+          kubernetes-discovery,busybox
           kube-proxy,gcr.io/google_containers/debian-iptables-amd64:v4
         );;
     "arm")
@@ -104,6 +105,7 @@ kube::build::get_docker_wrapped_binaries() {
           kube-apiserver,armel/busybox
           kube-controller-manager,armel/busybox
           kube-scheduler,armel/busybox
+          kubernetes-discovery,armel/busybox
           kube-proxy,gcr.io/google_containers/debian-iptables-arm:v4
         );;
     "arm64")
@@ -111,6 +113,7 @@ kube::build::get_docker_wrapped_binaries() {
           kube-apiserver,aarch64/busybox
           kube-controller-manager,aarch64/busybox
           kube-scheduler,aarch64/busybox
+          kubernetes-discovery,aarch64/busybox
           kube-proxy,gcr.io/google_containers/debian-iptables-arm64:v4
         );;
     "ppc64le")
@@ -118,8 +121,17 @@ kube::build::get_docker_wrapped_binaries() {
           kube-apiserver,ppc64le/busybox
           kube-controller-manager,ppc64le/busybox
           kube-scheduler,ppc64le/busybox
+          kubernetes-discovery,ppc64le/busybox
           kube-proxy,gcr.io/google_containers/debian-iptables-ppc64le:v4
         );;
+    "s390x")
+        local targets=(
+          kube-apiserver,s390x/busybox
+          kube-controller-manager,s390x/busybox
+          kube-scheduler,s390x/busybox
+          kubernetes-discovery,s390x/busybox
+          kube-proxy,gcr.io/google_containers/debian-iptables-s390x:v4
+        );;		
   esac
 
   echo "${targets[@]}"
@@ -130,6 +142,8 @@ kube::build::get_docker_wrapped_binaries() {
 
 # Verify that the right utilities and such are installed for building Kube. Set
 # up some dynamic constants.
+# Args:
+#   $1 - boolean of whether to require functioning docker (default true)
 #
 # Vars set:
 #   KUBE_ROOT_HASH
@@ -145,18 +159,21 @@ kube::build::get_docker_wrapped_binaries() {
 #   DOCKER_MOUNT_ARGS
 #   LOCAL_OUTPUT_BUILD_CONTEXT
 function kube::build::verify_prereqs() {
+  local -r require_docker=${1:-true}
   kube::log::status "Verifying Prerequisites...."
   kube::build::ensure_tar || return 1
   kube::build::ensure_rsync || return 1
-  kube::build::ensure_docker_in_path || return 1
-  if kube::build::is_osx; then
-      kube::build::docker_available_on_osx || return 1
-  fi
-  kube::build::ensure_docker_daemon_connectivity || return 1
+  if ${require_docker}; then
+    kube::build::ensure_docker_in_path || return 1
+    if kube::build::is_osx; then
+        kube::build::docker_available_on_osx || return 1
+    fi
+    kube::util::ensure_docker_daemon_connectivity || return 1
 
-  if (( ${KUBE_VERBOSE} > 6 )); then
-    kube::log::status "Docker Version:"
-    "${DOCKER[@]}" version | kube::log::info_from_stdin
+    if (( ${KUBE_VERBOSE} > 6 )); then
+      kube::log::status "Docker Version:"
+      "${DOCKER[@]}" version | kube::log::info_from_stdin
+    fi
   fi
 
   KUBE_ROOT_HASH=$(kube::build::short_hash "${HOSTNAME:-}:${KUBE_ROOT}")
@@ -256,29 +273,6 @@ function kube::build::ensure_docker_in_path() {
   if [[ -z "$(which docker)" ]]; then
     kube::log::error "Can't find 'docker' in PATH, please fix and retry."
     kube::log::error "See https://docs.docker.com/installation/#installation for installation instructions."
-    return 1
-  fi
-}
-
-function kube::build::ensure_docker_daemon_connectivity {
-  if ! "${DOCKER[@]}" info > /dev/null 2>&1 ; then
-    cat <<'EOF' >&2
-Can't connect to 'docker' daemon.  please fix and retry.
-
-Possible causes:
-  - Docker Daemon not started
-    - Linux: confirm via your init system
-    - macOS w/ docker-machine: run `docker-machine ls` and `docker-machine start <name>`
-    - macOS w/ Docker for Mac: Check the menu bar and start the Docker application
-  - DOCKER_HOST hasn't been set or is set incorrectly
-    - Linux: domain socket is used, DOCKER_* should be unset. In Bash run `unset ${!DOCKER_*}`
-    - macOS w/ docker-machine: run `eval "$(docker-machine env <name>)"`
-    - macOS w/ Docker for Mac: domain socket is used, DOCKER_* should be unset. In Bash run `unset ${!DOCKER_*}`
-  - Other things to check:
-    - Linux: User isn't in 'docker' group.  Add and relogin.
-      - Something like 'sudo usermod -a -G docker ${USER}'
-      - RHEL7 bug and workaround: https://bugzilla.redhat.com/show_bug.cgi?id=1119282#c8
-EOF
     return 1
   fi
 }
@@ -410,26 +404,19 @@ function kube::build::clean() {
   rm -rf "${LOCAL_OUTPUT_ROOT}"
 }
 
-function kube::build::build_image_built() {
-  kube::build::docker_image_exists "${KUBE_BUILD_IMAGE_REPO}" "${KUBE_BUILD_IMAGE_TAG}"
-}
-
 # Set up the context directory for the kube-build image and build it.
 function kube::build::build_image() {
-  if ! kube::build::build_image_built; then
-    mkdir -p "${LOCAL_OUTPUT_BUILD_CONTEXT}"
+  mkdir -p "${LOCAL_OUTPUT_BUILD_CONTEXT}"
 
-    cp /etc/localtime "${LOCAL_OUTPUT_BUILD_CONTEXT}/"
+  cp /etc/localtime "${LOCAL_OUTPUT_BUILD_CONTEXT}/"
 
-    cp build/build-image/Dockerfile "${LOCAL_OUTPUT_BUILD_CONTEXT}/Dockerfile"
-    cp build/build-image/rsyncd.sh "${LOCAL_OUTPUT_BUILD_CONTEXT}/"
-    dd if=/dev/urandom bs=512 count=1 2>/dev/null | LC_ALL=C tr -dc 'A-Za-z0-9' | dd bs=32 count=1 2>/dev/null > "${LOCAL_OUTPUT_BUILD_CONTEXT}/rsyncd.password"
-    chmod go= "${LOCAL_OUTPUT_BUILD_CONTEXT}/rsyncd.password"
+  cp build/build-image/Dockerfile "${LOCAL_OUTPUT_BUILD_CONTEXT}/Dockerfile"
+  cp build/build-image/rsyncd.sh "${LOCAL_OUTPUT_BUILD_CONTEXT}/"
+  dd if=/dev/urandom bs=512 count=1 2>/dev/null | LC_ALL=C tr -dc 'A-Za-z0-9' | dd bs=32 count=1 2>/dev/null > "${LOCAL_OUTPUT_BUILD_CONTEXT}/rsyncd.password"
+  chmod go= "${LOCAL_OUTPUT_BUILD_CONTEXT}/rsyncd.password"
 
-    kube::build::update_dockerfile
-
-    kube::build::docker_build "${KUBE_BUILD_IMAGE}" "${LOCAL_OUTPUT_BUILD_CONTEXT}" 'false'
-  fi
+  kube::build::update_dockerfile
+  kube::build::docker_build "${KUBE_BUILD_IMAGE}" "${LOCAL_OUTPUT_BUILD_CONTEXT}" 'false'
 
   # Clean up old versions of everything
   kube::build::docker_delete_old_containers "${KUBE_BUILD_CONTAINER_NAME_BASE}" "${KUBE_BUILD_CONTAINER_NAME}"
@@ -567,6 +554,7 @@ function kube::build::run_build_command_ex() {
     --env "KUBE_FASTBUILD=${KUBE_FASTBUILD:-false}"
     --env "KUBE_BUILDER_OS=${OSTYPE:-notdetected}"
     --env "KUBE_BUILD_PPC64LE=${KUBE_BUILD_PPC64LE}"  # TODO(IBM): remove
+    --env "KUBE_VERBOSE=${KUBE_VERBOSE}"
   )
 
   # If we have stdin we can run interactive.  This allows things like 'shell.sh'
@@ -620,7 +608,7 @@ function kube::build::start_rsyncd_container() {
 
   local mapped_port
   if ! mapped_port=$("${DOCKER[@]}" port "${KUBE_RSYNC_CONTAINER_NAME}" ${KUBE_CONTAINER_RSYNC_PORT} 2> /dev/null | cut -d: -f 2) ; then
-    kube:log:error "Could not get effective rsync port"
+    kube::log::error "Could not get effective rsync port"
     return 1
   fi
 
@@ -650,6 +638,22 @@ function kube::build::stop_rsyncd_container() {
   kube::build::destroy_container "${KUBE_RSYNC_CONTAINER_NAME}"
 }
 
+function kube::build::rsync {
+  local -a rsync_opts=(
+    --archive
+    --prune-empty-dirs
+    --password-file="${LOCAL_OUTPUT_BUILD_CONTEXT}/rsyncd.password"
+  )
+  if (( ${KUBE_VERBOSE} >= 6 )); then
+    rsync_opts+=("-iv")
+  fi
+  if (( ${KUBE_RSYNC_COMPRESS} > 0 )); then
+     rsync_opts+=("--compress-level=${KUBE_RSYNC_COMPRESS}")
+  fi
+  V=3 kube::log::status "Running rsync"
+  rsync "${rsync_opts[@]}" "$@"
+}
+
 # This will launch rsyncd in a container and then sync the source tree to the
 # container over the local network.
 function kube::build::sync_to_container() {
@@ -657,26 +661,22 @@ function kube::build::sync_to_container() {
 
   kube::build::start_rsyncd_container
 
-  local rsync_extra=""
-  if (( ${KUBE_VERBOSE} >= 6 )); then
-    rsync_extra="-iv"
-  fi
-
   # rsync filters are a bit confusing.  Here we are syncing everything except
   # output only directories and things that are not necessary like the git
-  # directory. The '- /' filter prevents rsync from trying to set the
-  # uid/gid/perms on the root of the sync tree.
-  V=3 kube::log::status "Running rsync"
-  rsync ${rsync_extra} \
-    --archive \
+  # directory and generated files. The '- /' filter prevents rsync
+  # from trying to set the uid/gid/perms on the root of the sync tree.
+  # As an exception, we need to sync generated files in staging/, because
+  # they will not be re-generated by 'make'.
+  kube::build::rsync \
     --delete \
-    --prune-empty-dirs \
-    --password-file="${LOCAL_OUTPUT_BUILD_CONTEXT}/rsyncd.password" \
+    --filter='+ /staging/**' \
     --filter='- /.git/' \
     --filter='- /.make/' \
     --filter='- /_tmp/' \
     --filter='- /_output/' \
     --filter='- /' \
+    --filter='- zz_generated.*' \
+    --filter='- generated.proto' \
     "${KUBE_ROOT}/" "rsync://k8s@${KUBE_RSYNC_ADDR}/k8s/"
 
   kube::build::stop_rsyncd_container
@@ -701,11 +701,7 @@ function kube::build::copy_output() {
   #
   # We are looking to copy out all of the built binaries along with various
   # generated files.
-  V=3 kube::log::status "Running rsync"
-  rsync ${rsync_extra} \
-    --archive \
-    --prune-empty-dirs \
-    --password-file="${LOCAL_OUTPUT_BUILD_CONTEXT}/rsyncd.password" \
+  kube::build::rsync \
     --filter='- /vendor/' \
     --filter='- /_temp/' \
     --filter='+ /_output/dockerized/bin/**' \

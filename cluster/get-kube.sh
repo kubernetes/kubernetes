@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Copyright 2014 The Kubernetes Authors.
 #
@@ -18,7 +18,7 @@
 # Usage:
 #   wget -q -O - https://get.k8s.io | bash
 # or
-#   curl -sS https://get.k8s.io | bash
+#   curl -fsSL https://get.k8s.io | bash
 #
 # Advanced options
 #  Set KUBERNETES_PROVIDER to choose between different providers:
@@ -63,7 +63,31 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-KUBERNETES_RELEASE_URL="${KUBERNETES_RELEASE_URL:-https://storage.googleapis.com/kubernetes-release/release}"
+# If KUBERNETES_RELEASE_URL is overridden but KUBERNETES_CI_RELEASE_URL is not then set KUBERNETES_CI_RELEASE_URL to KUBERNETES_RELEASE_URL.
+KUBERNETES_CI_RELEASE_URL="${KUBERNETES_CI_RELEASE_URL:-${KUBERNETES_RELEASE_URL:-https://dl.k8s.io/ci}}"
+KUBERNETES_RELEASE_URL="${KUBERNETES_RELEASE_URL:-https://dl.k8s.io}"
+
+KUBE_RELEASE_VERSION_REGEX="^v(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(-(beta|alpha)\\.(0|[1-9][0-9]*))?$"
+KUBE_CI_VERSION_REGEX="^v(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)-(beta|alpha)\\.(0|[1-9][0-9]*)(\\.(0|[1-9][0-9]*)\\+[-0-9a-z]*)?$"
+
+# Sets KUBE_VERSION variable if an explicit version number was provided (e.g. "v1.0.6",
+# "v1.2.0-alpha.1.881+376438b69c7612") or resolves the "published" version
+# <path>/<version> (e.g. "release/stable",' "ci/latest-1") by reading from GCS.
+#
+# See the docs on getting builds for more information about version
+# publication.
+#
+# Args:
+#   $1 version string from command line
+# Vars set:
+#   KUBE_VERSION
+function set_binary_version() {
+  if [[ "${1}" =~ "/" ]]; then
+    KUBE_VERSION=$(curl -fL "https://dl.k8s.io/${1}.txt")
+  else
+    KUBE_VERSION=${1}
+  fi
+}
 
 # Use the script from inside the Kubernetes tarball to fetch the client and
 # server binaries (if not included in kubernetes.tar.gz).
@@ -110,21 +134,6 @@ if [[ -d "./kubernetes" ]]; then
   fi
 fi
 
-function get_latest_version_number {
-  local -r latest_url="https://storage.googleapis.com/kubernetes-release/release/stable.txt"
-  if [[ $(which wget) ]]; then
-    wget -qO- ${latest_url}
-  elif [[ $(which curl) ]]; then
-    curl -Ss ${latest_url}
-  else
-    echo "Couldn't find curl or wget.  Bailing out." >&2
-    exit 4
-  fi
-}
-
-release=${KUBERNETES_RELEASE:-$(get_latest_version_number)}
-release_url="${KUBERNETES_RELEASE_URL}/${release}/kubernetes.tar.gz"
-
 # TODO: remove client checks once kubernetes.tar.gz no longer includes client
 # binaries by default.
 kernel=$(uname -s)
@@ -165,10 +174,48 @@ case "${machine}" in
 esac
 
 file=kubernetes.tar.gz
+release=${KUBERNETES_RELEASE:-"release/stable"}
 
-echo "Downloading kubernetes release ${release}"
-echo "  from ${release_url}"
-echo "  to ${PWD}/kubernetes.tar.gz"
+# Validate Kubernetes release version.
+# Translate a published version <bucket>/<version> (e.g. "release/stable") to version number.
+set_binary_version "${release}"
+if [[ ${KUBE_VERSION} =~ ${KUBE_RELEASE_VERSION_REGEX} ]]; then
+  release_url="${KUBERNETES_RELEASE_URL}/${KUBE_VERSION}/${file}"
+elif [[ ${KUBE_VERSION} =~ ${KUBE_CI_VERSION_REGEX} ]]; then
+  release_url="${KUBERNETES_CI_RELEASE_URL}/${KUBE_VERSION}/${file}"
+else
+  echo "Version doesn't match regexp" >&2
+  exit 1
+fi
+
+
+need_download=true
+if [[ -r "${PWD}/${file}" ]]; then
+  downloaded_version=$(tar -xzOf "${PWD}/${file}" kubernetes/version 2>/dev/null || true)
+  echo "Found preexisting ${file}, release ${downloaded_version}"
+  if [[ "${downloaded_version}" == "${KUBE_VERSION}" ]]; then
+    echo "Using preexisting kubernetes.tar.gz"
+    need_download=false
+  fi
+fi
+
+if "${need_download}"; then
+  echo "Downloading kubernetes release ${KUBE_VERSION}"
+  echo "  from ${release_url}"
+  echo "  to ${PWD}/${file}"
+fi
+
+if [[ -e "${PWD}/kubernetes" ]]; then
+  # Let's try not to accidentally nuke something that isn't a kubernetes
+  # release dir.
+  if [[ ! -f "${PWD}/kubernetes/version" ]]; then
+    echo "${PWD}/kubernetes exists but does not look like a Kubernetes release."
+    echo "Aborting!"
+    exit 5
+  fi
+  echo "Will also delete preexisting 'kubernetes' directory."
+fi
+
 if [[ -z "${KUBERNETES_SKIP_CONFIRM-}" ]]; then
   echo "Is this ok? [Y]/n"
   read confirm
@@ -178,16 +225,19 @@ if [[ -z "${KUBERNETES_SKIP_CONFIRM-}" ]]; then
   fi
 fi
 
-if [[ $(which curl) ]]; then
-  curl -L -z ${file} ${release_url} -o ${file}
-elif [[ $(which wget) ]]; then
-  wget -N ${release_url}
-else
-  echo "Couldn't find curl or wget.  Bailing out."
-  exit 1
+if "${need_download}"; then
+  if [[ $(which curl) ]]; then
+    curl -fL --retry 3 --keepalive-time 2 "${release_url}" -o "${file}"
+  elif [[ $(which wget) ]]; then
+    wget "${release_url}"
+  else
+    echo "Couldn't find curl or wget.  Bailing out."
+    exit 1
+  fi
 fi
 
-echo "Unpacking kubernetes release ${release}"
+echo "Unpacking kubernetes release ${KUBE_VERSION}"
+rm -rf "${PWD}/kubernetes"
 tar -xzf ${file}
 
 download_kube_binaries

@@ -18,20 +18,21 @@ package fake
 
 import (
 	api "k8s.io/client-go/pkg/api"
-	unversioned "k8s.io/client-go/pkg/api/unversioned"
 	v1 "k8s.io/client-go/pkg/api/v1"
+	meta_v1 "k8s.io/client-go/pkg/apis/meta/v1"
 	labels "k8s.io/client-go/pkg/labels"
+	schema "k8s.io/client-go/pkg/runtime/schema"
 	watch "k8s.io/client-go/pkg/watch"
 	testing "k8s.io/client-go/testing"
 )
 
 // FakePods implements PodInterface
 type FakePods struct {
-	Fake *FakeCore
+	Fake *FakeCoreV1
 	ns   string
 }
 
-var podsResource = unversioned.GroupVersionResource{Group: "", Version: "v1", Resource: "pods"}
+var podsResource = schema.GroupVersionResource{Group: "", Version: "v1", Resource: "pods"}
 
 func (c *FakePods) Create(pod *v1.Pod) (result *v1.Pod, err error) {
 	obj, err := c.Fake.
@@ -77,7 +78,7 @@ func (c *FakePods) DeleteCollection(options *v1.DeleteOptions, listOptions v1.Li
 	return err
 }
 
-func (c *FakePods) Get(name string) (result *v1.Pod, err error) {
+func (c *FakePods) Get(name string, options meta_v1.GetOptions) (result *v1.Pod, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewGetAction(podsResource, c.ns, name), &v1.Pod{})
 

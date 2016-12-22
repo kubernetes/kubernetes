@@ -19,6 +19,7 @@ package secret
 import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/rest"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
@@ -26,7 +27,7 @@ import (
 type Registry interface {
 	ListSecrets(ctx api.Context, options *api.ListOptions) (*api.SecretList, error)
 	WatchSecrets(ctx api.Context, options *api.ListOptions) (watch.Interface, error)
-	GetSecret(ctx api.Context, name string) (*api.Secret, error)
+	GetSecret(ctx api.Context, name string, options *metav1.GetOptions) (*api.Secret, error)
 	CreateSecret(ctx api.Context, Secret *api.Secret) (*api.Secret, error)
 	UpdateSecret(ctx api.Context, Secret *api.Secret) (*api.Secret, error)
 	DeleteSecret(ctx api.Context, name string) error
@@ -55,8 +56,8 @@ func (s *storage) WatchSecrets(ctx api.Context, options *api.ListOptions) (watch
 	return s.Watch(ctx, options)
 }
 
-func (s *storage) GetSecret(ctx api.Context, name string) (*api.Secret, error) {
-	obj, err := s.Get(ctx, name)
+func (s *storage) GetSecret(ctx api.Context, name string, options *metav1.GetOptions) (*api.Secret, error) {
+	obj, err := s.Get(ctx, name, options)
 	if err != nil {
 		return nil, err
 	}

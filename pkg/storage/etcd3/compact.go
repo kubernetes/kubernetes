@@ -27,7 +27,7 @@ import (
 )
 
 const (
-	compactInterval = 10 * time.Minute
+	compactInterval = 5 * time.Minute
 	compactRevKey   = "compact_rev_key"
 )
 

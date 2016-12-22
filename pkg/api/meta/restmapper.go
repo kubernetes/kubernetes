@@ -22,8 +22,8 @@ import (
 	"sort"
 	"strings"
 
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 )
 
 // Implements RESTScope interface
@@ -70,13 +70,13 @@ var RESTScopeRoot = &restScope{
 // TODO: Only accept plural for some operations for increased control?
 // (`get pod bar` vs `get pods bar`)
 type DefaultRESTMapper struct {
-	defaultGroupVersions []unversioned.GroupVersion
+	defaultGroupVersions []schema.GroupVersion
 
-	resourceToKind       map[unversioned.GroupVersionResource]unversioned.GroupVersionKind
-	kindToPluralResource map[unversioned.GroupVersionKind]unversioned.GroupVersionResource
-	kindToScope          map[unversioned.GroupVersionKind]RESTScope
-	singularToPlural     map[unversioned.GroupVersionResource]unversioned.GroupVersionResource
-	pluralToSingular     map[unversioned.GroupVersionResource]unversioned.GroupVersionResource
+	resourceToKind       map[schema.GroupVersionResource]schema.GroupVersionKind
+	kindToPluralResource map[schema.GroupVersionKind]schema.GroupVersionResource
+	kindToScope          map[schema.GroupVersionKind]RESTScope
+	singularToPlural     map[schema.GroupVersionResource]schema.GroupVersionResource
+	pluralToSingular     map[schema.GroupVersionResource]schema.GroupVersionResource
 
 	interfacesFunc VersionInterfacesFunc
 
@@ -92,19 +92,19 @@ var _ RESTMapper = &DefaultRESTMapper{}
 
 // VersionInterfacesFunc returns the appropriate typer, and metadata accessor for a
 // given api version, or an error if no such api version exists.
-type VersionInterfacesFunc func(version unversioned.GroupVersion) (*VersionInterfaces, error)
+type VersionInterfacesFunc func(version schema.GroupVersion) (*VersionInterfaces, error)
 
 // NewDefaultRESTMapper initializes a mapping between Kind and APIVersion
 // to a resource name and back based on the objects in a runtime.Scheme
 // and the Kubernetes API conventions. Takes a group name, a priority list of the versions
 // to search when an object has no default version (set empty to return an error),
 // and a function that retrieves the correct metadata for a given version.
-func NewDefaultRESTMapper(defaultGroupVersions []unversioned.GroupVersion, f VersionInterfacesFunc) *DefaultRESTMapper {
-	resourceToKind := make(map[unversioned.GroupVersionResource]unversioned.GroupVersionKind)
-	kindToPluralResource := make(map[unversioned.GroupVersionKind]unversioned.GroupVersionResource)
-	kindToScope := make(map[unversioned.GroupVersionKind]RESTScope)
-	singularToPlural := make(map[unversioned.GroupVersionResource]unversioned.GroupVersionResource)
-	pluralToSingular := make(map[unversioned.GroupVersionResource]unversioned.GroupVersionResource)
+func NewDefaultRESTMapper(defaultGroupVersions []schema.GroupVersion, f VersionInterfacesFunc) *DefaultRESTMapper {
+	resourceToKind := make(map[schema.GroupVersionResource]schema.GroupVersionKind)
+	kindToPluralResource := make(map[schema.GroupVersionKind]schema.GroupVersionResource)
+	kindToScope := make(map[schema.GroupVersionKind]RESTScope)
+	singularToPlural := make(map[schema.GroupVersionResource]schema.GroupVersionResource)
+	pluralToSingular := make(map[schema.GroupVersionResource]schema.GroupVersionResource)
 	aliasToResource := make(map[string][]string)
 	// TODO: verify name mappings work correctly when versions differ
 
@@ -120,7 +120,7 @@ func NewDefaultRESTMapper(defaultGroupVersions []unversioned.GroupVersion, f Ver
 	}
 }
 
-func (m *DefaultRESTMapper) Add(kind unversioned.GroupVersionKind, scope RESTScope) {
+func (m *DefaultRESTMapper) Add(kind schema.GroupVersionKind, scope RESTScope) {
 	plural, singular := KindToResource(kind)
 
 	m.singularToPlural[singular] = plural
@@ -144,10 +144,10 @@ var unpluralizedSuffixes = []string{
 // KindToResource converts Kind to a resource name.
 // Broken. This method only "sort of" works when used outside of this package.  It assumes that Kinds and Resources match
 // and they aren't guaranteed to do so.
-func KindToResource(kind unversioned.GroupVersionKind) ( /*plural*/ unversioned.GroupVersionResource /*singular*/, unversioned.GroupVersionResource) {
+func KindToResource(kind schema.GroupVersionKind) ( /*plural*/ schema.GroupVersionResource /*singular*/, schema.GroupVersionResource) {
 	kindName := kind.Kind
 	if len(kindName) == 0 {
-		return unversioned.GroupVersionResource{}, unversioned.GroupVersionResource{}
+		return schema.GroupVersionResource{}, schema.GroupVersionResource{}
 	}
 	singularName := strings.ToLower(kindName)
 	singular := kind.GroupVersion().WithResource(singularName)
@@ -171,13 +171,13 @@ func KindToResource(kind unversioned.GroupVersionKind) ( /*plural*/ unversioned.
 // ResourceSingularizer implements RESTMapper
 // It converts a resource name from plural to singular (e.g., from pods to pod)
 func (m *DefaultRESTMapper) ResourceSingularizer(resourceType string) (string, error) {
-	partialResource := unversioned.GroupVersionResource{Resource: resourceType}
+	partialResource := schema.GroupVersionResource{Resource: resourceType}
 	resources, err := m.ResourcesFor(partialResource)
 	if err != nil {
 		return resourceType, err
 	}
 
-	singular := unversioned.GroupVersionResource{}
+	singular := schema.GroupVersionResource{}
 	for _, curr := range resources {
 		currSingular, ok := m.pluralToSingular[curr]
 		if !ok {
@@ -201,7 +201,7 @@ func (m *DefaultRESTMapper) ResourceSingularizer(resourceType string) (string, e
 }
 
 // coerceResourceForMatching makes the resource lower case and converts internal versions to unspecified (legacy behavior)
-func coerceResourceForMatching(resource unversioned.GroupVersionResource) unversioned.GroupVersionResource {
+func coerceResourceForMatching(resource schema.GroupVersionResource) schema.GroupVersionResource {
 	resource.Resource = strings.ToLower(resource.Resource)
 	if resource.Version == runtime.APIVersionInternal {
 		resource.Version = ""
@@ -210,7 +210,7 @@ func coerceResourceForMatching(resource unversioned.GroupVersionResource) unvers
 	return resource
 }
 
-func (m *DefaultRESTMapper) ResourcesFor(input unversioned.GroupVersionResource) ([]unversioned.GroupVersionResource, error) {
+func (m *DefaultRESTMapper) ResourcesFor(input schema.GroupVersionResource) ([]schema.GroupVersionResource, error) {
 	resource := coerceResourceForMatching(input)
 
 	hasResource := len(resource.Resource) > 0
@@ -221,7 +221,7 @@ func (m *DefaultRESTMapper) ResourcesFor(input unversioned.GroupVersionResource)
 		return nil, fmt.Errorf("a resource must be present, got: %v", resource)
 	}
 
-	ret := []unversioned.GroupVersionResource{}
+	ret := []schema.GroupVersionResource{}
 	switch {
 	case hasGroup && hasVersion:
 		// fully qualified.  Find the exact match
@@ -297,19 +297,19 @@ func (m *DefaultRESTMapper) ResourcesFor(input unversioned.GroupVersionResource)
 	return ret, nil
 }
 
-func (m *DefaultRESTMapper) ResourceFor(resource unversioned.GroupVersionResource) (unversioned.GroupVersionResource, error) {
+func (m *DefaultRESTMapper) ResourceFor(resource schema.GroupVersionResource) (schema.GroupVersionResource, error) {
 	resources, err := m.ResourcesFor(resource)
 	if err != nil {
-		return unversioned.GroupVersionResource{}, err
+		return schema.GroupVersionResource{}, err
 	}
 	if len(resources) == 1 {
 		return resources[0], nil
 	}
 
-	return unversioned.GroupVersionResource{}, &AmbiguousResourceError{PartialResource: resource, MatchingResources: resources}
+	return schema.GroupVersionResource{}, &AmbiguousResourceError{PartialResource: resource, MatchingResources: resources}
 }
 
-func (m *DefaultRESTMapper) KindsFor(input unversioned.GroupVersionResource) ([]unversioned.GroupVersionKind, error) {
+func (m *DefaultRESTMapper) KindsFor(input schema.GroupVersionResource) ([]schema.GroupVersionKind, error) {
 	resource := coerceResourceForMatching(input)
 
 	hasResource := len(resource.Resource) > 0
@@ -320,7 +320,7 @@ func (m *DefaultRESTMapper) KindsFor(input unversioned.GroupVersionResource) ([]
 		return nil, fmt.Errorf("a resource must be present, got: %v", resource)
 	}
 
-	ret := []unversioned.GroupVersionKind{}
+	ret := []schema.GroupVersionKind{}
 	switch {
 	// fully qualified.  Find the exact match
 	case hasGroup && hasVersion:
@@ -376,21 +376,21 @@ func (m *DefaultRESTMapper) KindsFor(input unversioned.GroupVersionResource) ([]
 	return ret, nil
 }
 
-func (m *DefaultRESTMapper) KindFor(resource unversioned.GroupVersionResource) (unversioned.GroupVersionKind, error) {
+func (m *DefaultRESTMapper) KindFor(resource schema.GroupVersionResource) (schema.GroupVersionKind, error) {
 	kinds, err := m.KindsFor(resource)
 	if err != nil {
-		return unversioned.GroupVersionKind{}, err
+		return schema.GroupVersionKind{}, err
 	}
 	if len(kinds) == 1 {
 		return kinds[0], nil
 	}
 
-	return unversioned.GroupVersionKind{}, &AmbiguousResourceError{PartialResource: resource, MatchingKinds: kinds}
+	return schema.GroupVersionKind{}, &AmbiguousResourceError{PartialResource: resource, MatchingKinds: kinds}
 }
 
 type kindByPreferredGroupVersion struct {
-	list      []unversioned.GroupVersionKind
-	sortOrder []unversioned.GroupVersion
+	list      []schema.GroupVersionKind
+	sortOrder []schema.GroupVersion
 }
 
 func (o kindByPreferredGroupVersion) Len() int      { return len(o.list) }
@@ -427,8 +427,8 @@ func (o kindByPreferredGroupVersion) Less(i, j int) bool {
 }
 
 type resourceByPreferredGroupVersion struct {
-	list      []unversioned.GroupVersionResource
-	sortOrder []unversioned.GroupVersion
+	list      []schema.GroupVersionResource
+	sortOrder []schema.GroupVersion
 }
 
 func (o resourceByPreferredGroupVersion) Len() int      { return len(o.list) }
@@ -468,91 +468,56 @@ func (o resourceByPreferredGroupVersion) Less(i, j int) bool {
 // RESTClient should use to operate on the provided group/kind in order of versions. If a version search
 // order is not provided, the search order provided to DefaultRESTMapper will be used to resolve which
 // version should be used to access the named group/kind.
-// TODO: consider refactoring to use RESTMappings in a way that preserves version ordering and preference
-func (m *DefaultRESTMapper) RESTMapping(gk unversioned.GroupKind, versions ...string) (*RESTMapping, error) {
-	// Pick an appropriate version
-	var gvk *unversioned.GroupVersionKind
+func (m *DefaultRESTMapper) RESTMapping(gk schema.GroupKind, versions ...string) (*RESTMapping, error) {
+	mappings, err := m.RESTMappings(gk, versions...)
+	if err != nil {
+		return nil, err
+	}
+	if len(mappings) == 0 {
+		return nil, &NoKindMatchError{PartialKind: gk.WithVersion("")}
+	}
+	// since we rely on RESTMappings method
+	// take the first match and return to the caller
+	// as this was the existing behavior.
+	return mappings[0], nil
+}
+
+// RESTMappings returns the RESTMappings for the provided group kind. If a version search order
+// is not provided, the search order provided to DefaultRESTMapper will be used.
+func (m *DefaultRESTMapper) RESTMappings(gk schema.GroupKind, versions ...string) ([]*RESTMapping, error) {
+	mappings := make([]*RESTMapping, 0)
+	potentialGVK := make([]schema.GroupVersionKind, 0)
 	hadVersion := false
+
+	// Pick an appropriate version
 	for _, version := range versions {
 		if len(version) == 0 || version == runtime.APIVersionInternal {
 			continue
 		}
-
 		currGVK := gk.WithVersion(version)
 		hadVersion = true
 		if _, ok := m.kindToPluralResource[currGVK]; ok {
-			gvk = &currGVK
+			potentialGVK = append(potentialGVK, currGVK)
 			break
 		}
 	}
 	// Use the default preferred versions
-	if !hadVersion && (gvk == nil) {
+	if !hadVersion && len(potentialGVK) == 0 {
 		for _, gv := range m.defaultGroupVersions {
 			if gv.Group != gk.Group {
 				continue
 			}
-
-			currGVK := gk.WithVersion(gv.Version)
-			if _, ok := m.kindToPluralResource[currGVK]; ok {
-				gvk = &currGVK
-				break
-			}
+			potentialGVK = append(potentialGVK, gk.WithVersion(gv.Version))
 		}
 	}
-	if gvk == nil {
+
+	if len(potentialGVK) == 0 {
 		return nil, &NoKindMatchError{PartialKind: gk.WithVersion("")}
 	}
 
-	// Ensure we have a REST mapping
-	resource, ok := m.kindToPluralResource[*gvk]
-	if !ok {
-		found := []unversioned.GroupVersion{}
-		for _, gv := range m.defaultGroupVersions {
-			if _, ok := m.kindToPluralResource[*gvk]; ok {
-				found = append(found, gv)
-			}
-		}
-		if len(found) > 0 {
-			return nil, fmt.Errorf("object with kind %q exists in versions %v, not %v", gvk.Kind, found, gvk.GroupVersion().String())
-		}
-		return nil, fmt.Errorf("the provided version %q and kind %q cannot be mapped to a supported object", gvk.GroupVersion().String(), gvk.Kind)
-	}
-
-	// Ensure we have a REST scope
-	scope, ok := m.kindToScope[*gvk]
-	if !ok {
-		return nil, fmt.Errorf("the provided version %q and kind %q cannot be mapped to a supported scope", gvk.GroupVersion().String(), gvk.Kind)
-	}
-
-	interfaces, err := m.interfacesFunc(gvk.GroupVersion())
-	if err != nil {
-		return nil, fmt.Errorf("the provided version %q has no relevant versions: %v", gvk.GroupVersion().String(), err)
-	}
-
-	retVal := &RESTMapping{
-		Resource:         resource.Resource,
-		GroupVersionKind: *gvk,
-		Scope:            scope,
-
-		ObjectConvertor:  interfaces.ObjectConvertor,
-		MetadataAccessor: interfaces.MetadataAccessor,
-	}
-
-	return retVal, nil
-}
-
-// RESTMappings returns the RESTMappings for the provided group kind in a rough internal preferred order. If no
-// kind is found it will return a NoResourceMatchError.
-func (m *DefaultRESTMapper) RESTMappings(gk unversioned.GroupKind) ([]*RESTMapping, error) {
-	// Use the default preferred versions
-	var mappings []*RESTMapping
-	for _, gv := range m.defaultGroupVersions {
-		if gv.Group != gk.Group {
-			continue
-		}
-
-		gvk := gk.WithVersion(gv.Version)
-		gvr, ok := m.kindToPluralResource[gvk]
+	for _, gvk := range potentialGVK {
+		//Ensure we have a REST mapping
+		res, ok := m.kindToPluralResource[gvk]
 		if !ok {
 			continue
 		}
@@ -569,7 +534,7 @@ func (m *DefaultRESTMapper) RESTMappings(gk unversioned.GroupKind) ([]*RESTMappi
 		}
 
 		mappings = append(mappings, &RESTMapping{
-			Resource:         gvr.Resource,
+			Resource:         res.Resource,
 			GroupVersionKind: gvk,
 			Scope:            scope,
 
@@ -579,7 +544,7 @@ func (m *DefaultRESTMapper) RESTMappings(gk unversioned.GroupKind) ([]*RESTMappi
 	}
 
 	if len(mappings) == 0 {
-		return nil, &NoResourceMatchError{PartialResource: unversioned.GroupVersionResource{Group: gk.Group, Resource: gk.Kind}}
+		return nil, &NoResourceMatchError{PartialResource: schema.GroupVersionResource{Group: gk.Group, Resource: gk.Kind}}
 	}
 	return mappings, nil
 }

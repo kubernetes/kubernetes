@@ -20,6 +20,7 @@ limitations under the License.
 package app
 
 import (
+	"fmt"
 	"strings"
 	"time"
 
@@ -31,23 +32,22 @@ import (
 	"k8s.io/kubernetes/federation/cmd/federation-apiserver/app/options"
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apiserver/authenticator"
-	apiserveropenapi "k8s.io/kubernetes/pkg/apiserver/openapi"
-	authorizerunion "k8s.io/kubernetes/pkg/auth/authorizer/union"
-	"k8s.io/kubernetes/pkg/auth/user"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/controller/informers"
 	"k8s.io/kubernetes/pkg/generated/openapi"
 	"k8s.io/kubernetes/pkg/genericapiserver"
 	"k8s.io/kubernetes/pkg/genericapiserver/authorizer"
-	genericvalidation "k8s.io/kubernetes/pkg/genericapiserver/validation"
+	"k8s.io/kubernetes/pkg/genericapiserver/filters"
 	"k8s.io/kubernetes/pkg/registry/cachesize"
 	"k8s.io/kubernetes/pkg/registry/generic"
-	"k8s.io/kubernetes/pkg/registry/generic/registry"
+	genericregistry "k8s.io/kubernetes/pkg/registry/generic/registry"
 	"k8s.io/kubernetes/pkg/routes"
+	"k8s.io/kubernetes/pkg/runtime/schema"
+	utilerrors "k8s.io/kubernetes/pkg/util/errors"
+	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/version"
-	authenticatorunion "k8s.io/kubernetes/plugin/pkg/auth/authenticator/request/union"
 )
 
 // NewAPIServerCommand creates a *cobra.Command object with default parameters
@@ -68,36 +68,54 @@ cluster's shared state through which all other components interact.`,
 
 // Run runs the specified APIServer.  This should never exit.
 func Run(s *options.ServerRunOptions) error {
-	genericvalidation.VerifyEtcdServersList(s.ServerRunOptions)
-	genericapiserver.DefaultAndValidateRunOptions(s.ServerRunOptions)
-	genericConfig := genericapiserver.NewConfig(). // create the new config
-							ApplyOptions(s.ServerRunOptions). // apply the options selected
-							Complete()                        // set default values based on the known values
+	// set defaults
+	if err := s.GenericServerRunOptions.DefaultAdvertiseAddress(s.SecureServing, s.InsecureServing); err != nil {
+		return err
+	}
+	if err := s.SecureServing.MaybeDefaultWithSelfSignedCerts(s.GenericServerRunOptions.AdvertiseAddress.String()); err != nil {
+		return fmt.Errorf("error creating self-signed certificates: %v", err)
+	}
+	if err := s.GenericServerRunOptions.DefaultExternalHost(); err != nil {
+		return fmt.Errorf("error setting the external host value: %v", err)
+	}
 
-	if err := genericConfig.MaybeGenerateServingCerts(); err != nil {
-		glog.Fatalf("Failed to generate service certificate: %v", err)
+	// validate options
+	if errs := s.Validate(); len(errs) != 0 {
+		return utilerrors.NewAggregate(errs)
+	}
+
+	// create config from options
+	genericConfig := genericapiserver.NewConfig(). // create the new config
+							ApplyOptions(s.GenericServerRunOptions). // apply the options selected
+							ApplyInsecureServingOptions(s.InsecureServing)
+
+	if _, err := genericConfig.ApplySecureServingOptions(s.SecureServing); err != nil {
+		return fmt.Errorf("failed to configure https: %s", err)
+	}
+	if _, err := genericConfig.ApplyAuthenticationOptions(s.Authentication); err != nil {
+		return fmt.Errorf("failed to configure authentication: %s", err)
 	}
 
 	// TODO: register cluster federation resources here.
 	resourceConfig := genericapiserver.NewResourceConfig()
 
-	if s.StorageConfig.DeserializationCacheSize == 0 {
+	if s.Etcd.StorageConfig.DeserializationCacheSize == 0 {
 		// When size of cache is not explicitly set, set it to 50000
-		s.StorageConfig.DeserializationCacheSize = 50000
+		s.Etcd.StorageConfig.DeserializationCacheSize = 50000
 	}
-	storageGroupsToEncodingVersion, err := s.StorageGroupsToEncodingVersion()
+	storageGroupsToEncodingVersion, err := s.GenericServerRunOptions.StorageGroupsToEncodingVersion()
 	if err != nil {
-		glog.Fatalf("error generating storage version map: %s", err)
+		return fmt.Errorf("error generating storage version map: %s", err)
 	}
 	storageFactory, err := genericapiserver.BuildDefaultStorageFactory(
-		s.StorageConfig, s.DefaultStorageMediaType, api.Codecs,
+		s.Etcd.StorageConfig, s.GenericServerRunOptions.DefaultStorageMediaType, api.Codecs,
 		genericapiserver.NewDefaultResourceEncodingConfig(), storageGroupsToEncodingVersion,
-		[]unversioned.GroupVersionResource{}, resourceConfig, s.RuntimeConfig)
+		[]schema.GroupVersionResource{}, resourceConfig, s.GenericServerRunOptions.RuntimeConfig)
 	if err != nil {
-		glog.Fatalf("error in initializing storage factory: %s", err)
+		return fmt.Errorf("error in initializing storage factory: %s", err)
 	}
 
-	for _, override := range s.EtcdServersOverrides {
+	for _, override := range s.Etcd.EtcdServersOverrides {
 		tokens := strings.Split(override, "#")
 		if len(tokens) != 2 {
 			glog.Errorf("invalid value of etcd server overrides: %s", override)
@@ -111,103 +129,62 @@ func Run(s *options.ServerRunOptions) error {
 		}
 		group := apiresource[0]
 		resource := apiresource[1]
-		groupResource := unversioned.GroupResource{Group: group, Resource: resource}
+		groupResource := schema.GroupResource{Group: group, Resource: resource}
 
 		servers := strings.Split(tokens[1], ";")
 		storageFactory.SetEtcdLocation(groupResource, servers)
 	}
 
-	apiAuthenticator, err := authenticator.New(authenticator.AuthenticatorConfig{
-		Anonymous:         s.AnonymousAuth,
-		AnyToken:          s.EnableAnyToken,
-		BasicAuthFile:     s.BasicAuthFile,
-		ClientCAFile:      s.ClientCAFile,
-		TokenAuthFile:     s.TokenAuthFile,
-		OIDCIssuerURL:     s.OIDCIssuerURL,
-		OIDCClientID:      s.OIDCClientID,
-		OIDCCAFile:        s.OIDCCAFile,
-		OIDCUsernameClaim: s.OIDCUsernameClaim,
-		OIDCGroupsClaim:   s.OIDCGroupsClaim,
-		KeystoneURL:       s.KeystoneURL,
-	})
+	apiAuthenticator, securityDefinitions, err := authenticator.New(s.Authentication.ToAuthenticationConfig())
 	if err != nil {
-		glog.Fatalf("Invalid Authentication Config: %v", err)
+		return fmt.Errorf("invalid Authentication Config: %v", err)
 	}
 
 	privilegedLoopbackToken := uuid.NewRandom().String()
-	selfClientConfig, err := s.NewSelfClientConfig(privilegedLoopbackToken)
+	selfClientConfig, err := genericapiserver.NewSelfClientConfig(genericConfig.SecureServingInfo, genericConfig.InsecureServingInfo, privilegedLoopbackToken)
 	if err != nil {
-		glog.Fatalf("Failed to create clientset: %v", err)
+		return fmt.Errorf("failed to create clientset: %v", err)
 	}
-	client, err := s.NewSelfClient(privilegedLoopbackToken)
+	client, err := internalclientset.NewForConfig(selfClientConfig)
 	if err != nil {
-		glog.Errorf("Failed to create clientset: %v", err)
+		return fmt.Errorf("failed to create clientset: %v", err)
 	}
-	sharedInformers := informers.NewSharedInformerFactory(client, 10*time.Minute)
+	sharedInformers := informers.NewSharedInformerFactory(nil, client, 10*time.Minute)
 
-	authorizationConfig := authorizer.AuthorizationConfig{
-		PolicyFile:                  s.AuthorizationPolicyFile,
-		WebhookConfigFile:           s.AuthorizationWebhookConfigFile,
-		WebhookCacheAuthorizedTTL:   s.AuthorizationWebhookCacheAuthorizedTTL,
-		WebhookCacheUnauthorizedTTL: s.AuthorizationWebhookCacheUnauthorizedTTL,
-		RBACSuperUser:               s.AuthorizationRBACSuperUser,
-		InformerFactory:             sharedInformers,
-	}
-	authorizationModeNames := strings.Split(s.AuthorizationMode, ",")
-	apiAuthorizer, err := authorizer.NewAuthorizerFromAuthorizationConfig(authorizationModeNames, authorizationConfig)
+	authorizerconfig := s.Authorization.ToAuthorizationConfig(sharedInformers)
+	apiAuthorizer, err := authorizer.NewAuthorizerFromAuthorizationConfig(authorizerconfig)
 	if err != nil {
-		glog.Fatalf("Invalid Authorization Config: %v", err)
+		return fmt.Errorf("invalid Authorization Config: %v", err)
 	}
 
-	admissionControlPluginNames := strings.Split(s.AdmissionControl, ",")
-
-	// TODO(dims): We probably need to add an option "EnableLoopbackToken"
-	if apiAuthenticator != nil {
-		var uid = uuid.NewRandom().String()
-		tokens := make(map[string]*user.DefaultInfo)
-		tokens[privilegedLoopbackToken] = &user.DefaultInfo{
-			Name:   user.APIServerUser,
-			UID:    uid,
-			Groups: []string{user.SystemPrivilegedGroup},
-		}
-
-		tokenAuthenticator := authenticator.NewAuthenticatorFromTokens(tokens)
-		apiAuthenticator = authenticatorunion.New(tokenAuthenticator, apiAuthenticator)
-
-		tokenAuthorizer := authorizer.NewPrivilegedGroups(user.SystemPrivilegedGroup)
-		apiAuthorizer = authorizerunion.New(tokenAuthorizer, apiAuthorizer)
-	}
-
+	admissionControlPluginNames := strings.Split(s.GenericServerRunOptions.AdmissionControl, ",")
 	pluginInitializer := admission.NewPluginInitializer(sharedInformers, apiAuthorizer)
-
-	admissionController, err := admission.NewFromPlugins(client, admissionControlPluginNames, s.AdmissionControlConfigFile, pluginInitializer)
+	admissionController, err := admission.NewFromPlugins(client, admissionControlPluginNames, s.GenericServerRunOptions.AdmissionControlConfigFile, pluginInitializer)
 	if err != nil {
-		glog.Fatalf("Failed to initialize plugins: %v", err)
+		return fmt.Errorf("failed to initialize plugins: %v", err)
 	}
 
 	kubeVersion := version.Get()
 	genericConfig.Version = &kubeVersion
 	genericConfig.LoopbackClientConfig = selfClientConfig
 	genericConfig.Authenticator = apiAuthenticator
-	genericConfig.SupportsBasicAuth = len(s.BasicAuthFile) > 0
 	genericConfig.Authorizer = apiAuthorizer
-	genericConfig.AuthorizerRBACSuperUser = s.AuthorizationRBACSuperUser
 	genericConfig.AdmissionControl = admissionController
-	genericConfig.APIResourceConfigSource = storageFactory.APIResourceConfigSource
-	genericConfig.MasterServiceNamespace = s.MasterServiceNamespace
-	genericConfig.OpenAPIConfig.Definitions = openapi.OpenAPIDefinitions
-	// Reusing api-server's GetOperationID function. if federation and api-server spec diverge and
-	// this method does not provide good operation IDs for federation, we should create federation's own GetOperationID.
-	genericConfig.OpenAPIConfig.GetOperationID = apiserveropenapi.GetOperationID
-	genericConfig.EnableOpenAPISupport = true
+	genericConfig.OpenAPIConfig = genericapiserver.DefaultOpenAPIConfig(openapi.OpenAPIDefinitions)
+	genericConfig.OpenAPIConfig.SecurityDefinitions = securityDefinitions
+	genericConfig.SwaggerConfig = genericapiserver.DefaultSwaggerConfig()
+	genericConfig.LongRunningFunc = filters.BasicLongRunningRequestCheck(
+		sets.NewString("watch", "proxy"),
+		sets.NewString("attach", "exec", "proxy", "log", "portforward"),
+	)
 
 	// TODO: Move this to generic api server (Need to move the command line flag).
-	if s.EnableWatchCache {
-		cachesize.InitializeWatchCacheSizes(s.TargetRAMMB)
-		cachesize.SetWatchCacheSizes(s.WatchCacheSizes)
+	if s.GenericServerRunOptions.EnableWatchCache {
+		cachesize.InitializeWatchCacheSizes(s.GenericServerRunOptions.TargetRAMMB)
+		cachesize.SetWatchCacheSizes(s.GenericServerRunOptions.WatchCacheSizes)
 	}
 
-	m, err := genericConfig.New()
+	m, err := genericConfig.Complete().New()
 	if err != nil {
 		return err
 	}
@@ -215,12 +192,14 @@ func Run(s *options.ServerRunOptions) error {
 	routes.UIRedirect{}.Install(m.HandlerContainer)
 	routes.Logs{}.Install(m.HandlerContainer)
 
-	restOptionsFactory := restOptionsFactory{
+	// TODO: Refactor this code to share it with kube-apiserver rather than duplicating it here.
+	restOptionsFactory := &restOptionsFactory{
 		storageFactory:          storageFactory,
-		deleteCollectionWorkers: s.DeleteCollectionWorkers,
+		enableGarbageCollection: s.GenericServerRunOptions.EnableGarbageCollection,
+		deleteCollectionWorkers: s.GenericServerRunOptions.DeleteCollectionWorkers,
 	}
-	if s.EnableWatchCache {
-		restOptionsFactory.storageDecorator = registry.StorageWithCacher
+	if s.GenericServerRunOptions.EnableWatchCache {
+		restOptionsFactory.storageDecorator = genericregistry.StorageWithCacher
 	} else {
 		restOptionsFactory.storageDecorator = generic.UndecoratedStorage
 	}
@@ -228,9 +207,10 @@ func Run(s *options.ServerRunOptions) error {
 	installFederationAPIs(m, restOptionsFactory)
 	installCoreAPIs(s, m, restOptionsFactory)
 	installExtensionsAPIs(m, restOptionsFactory)
+	installBatchAPIs(m, restOptionsFactory)
 
 	sharedInformers.Start(wait.NeverStop)
-	m.Run()
+	m.PrepareRun().Run(wait.NeverStop)
 	return nil
 }
 
@@ -238,17 +218,19 @@ type restOptionsFactory struct {
 	storageFactory          genericapiserver.StorageFactory
 	storageDecorator        generic.StorageDecorator
 	deleteCollectionWorkers int
+	enableGarbageCollection bool
 }
 
-func (f restOptionsFactory) NewFor(resource unversioned.GroupResource) generic.RESTOptions {
+func (f *restOptionsFactory) GetRESTOptions(resource schema.GroupResource) (generic.RESTOptions, error) {
 	config, err := f.storageFactory.NewConfig(resource)
 	if err != nil {
-		glog.Fatalf("Unable to find storage config for %v, due to %v", resource, err.Error())
+		return generic.RESTOptions{}, fmt.Errorf("Unable to find storage config for %v, due to %v", resource, err.Error())
 	}
 	return generic.RESTOptions{
 		StorageConfig:           config,
 		Decorator:               f.storageDecorator,
 		DeleteCollectionWorkers: f.deleteCollectionWorkers,
+		EnableGarbageCollection: f.enableGarbageCollection,
 		ResourcePrefix:          f.storageFactory.ResourcePrefix(resource),
-	}
+	}, nil
 }

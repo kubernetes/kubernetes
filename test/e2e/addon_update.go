@@ -25,8 +25,9 @@ import (
 	"time"
 
 	"golang.org/x/crypto/ssh"
-	"k8s.io/kubernetes/pkg/api"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/api/v1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
@@ -134,6 +135,7 @@ spec:
     k8s-app: addon-test
 `
 
+// Wrong label case
 var invalid_addon_controller_v1 = `
 apiVersion: v1
 kind: ReplicationController
@@ -163,6 +165,7 @@ spec:
           protocol: TCP
 `
 
+// Wrong label case
 var invalid_addon_service_v1 = `
 apiVersion: v1
 kind: Service
@@ -181,9 +184,31 @@ spec:
     k8s-app: invalid-addon-test
 `
 
-var addonTestPollInterval = 3 * time.Second
-var addonTestPollTimeout = 5 * time.Minute
-var defaultNsName = api.NamespaceDefault
+// Wrong namespace case
+var invalid_addon_service_v2 = `
+apiVersion: v1
+kind: Service
+metadata:
+  name: ivalid-addon-test-v2
+  namespace: %s
+  labels:
+    k8s-app: invalid-addon-test-v2
+    kubernetes.io/cluster-service: "true"
+spec:
+  ports:
+  - port: 9377
+    protocol: TCP
+    targetPort: 9376
+  selector:
+    k8s-app: invalid-addon-test
+`
+
+const (
+	addonTestPollInterval = 3 * time.Second
+	addonTestPollTimeout  = 5 * time.Minute
+	defaultNsName         = v1.NamespaceDefault
+	addonNsName           = "kube-system"
+)
 
 type stringPair struct {
 	data, fileName string
@@ -240,14 +265,16 @@ var _ = framework.KubeDescribe("Addon update", func() {
 		svcv1 := "addon-service-v1.yaml"
 		svcv2 := "addon-service-v2.yaml"
 		svcInvalid := "invalid-addon-service-v1.yaml"
+		svcInvalidv2 := "invalid-addon-service-v2.yaml"
 
 		var remoteFiles []stringPair = []stringPair{
-			{fmt.Sprintf(addon_controller_v1, defaultNsName), rcv1},
-			{fmt.Sprintf(addon_controller_v2, f.Namespace.Name), rcv2},
-			{fmt.Sprintf(addon_service_v1, f.Namespace.Name), svcv1},
-			{fmt.Sprintf(addon_service_v2, f.Namespace.Name), svcv2},
-			{fmt.Sprintf(invalid_addon_controller_v1, f.Namespace.Name), rcInvalid},
-			{fmt.Sprintf(invalid_addon_service_v1, defaultNsName), svcInvalid},
+			{fmt.Sprintf(addon_controller_v1, addonNsName), rcv1},
+			{fmt.Sprintf(addon_controller_v2, addonNsName), rcv2},
+			{fmt.Sprintf(addon_service_v1, addonNsName), svcv1},
+			{fmt.Sprintf(addon_service_v2, addonNsName), svcv2},
+			{fmt.Sprintf(invalid_addon_controller_v1, addonNsName), rcInvalid},
+			{fmt.Sprintf(invalid_addon_service_v1, addonNsName), svcInvalid},
+			{fmt.Sprintf(invalid_addon_service_v2, defaultNsName), svcInvalidv2},
 		}
 
 		for _, p := range remoteFiles {
@@ -275,8 +302,8 @@ var _ = framework.KubeDescribe("Addon update", func() {
 		sshExecAndVerify(sshClient, fmt.Sprintf("sudo cp %s/%s %s/%s", temporaryRemotePath, rcv1, destinationDir, rcv1))
 		sshExecAndVerify(sshClient, fmt.Sprintf("sudo cp %s/%s %s/%s", temporaryRemotePath, svcv1, destinationDir, svcv1))
 
-		waitForServiceInAddonTest(f.Client, f.Namespace.Name, "addon-test", true)
-		waitForReplicationControllerInAddonTest(f.Client, defaultNsName, "addon-test-v1", true)
+		waitForServiceInAddonTest(f.ClientSet, addonNsName, "addon-test", true)
+		waitForReplicationControllerInAddonTest(f.ClientSet, addonNsName, "addon-test-v1", true)
 
 		By("update manifests")
 		sshExecAndVerify(sshClient, fmt.Sprintf("sudo cp %s/%s %s/%s", temporaryRemotePath, rcv2, destinationDir, rcv2))
@@ -289,38 +316,36 @@ var _ = framework.KubeDescribe("Addon update", func() {
 		 * But it is ok - as long as we don't have rolling update, the result will be the same
 		 */
 
-		waitForServiceInAddonTest(f.Client, f.Namespace.Name, "addon-test-updated", true)
-		waitForReplicationControllerInAddonTest(f.Client, f.Namespace.Name, "addon-test-v2", true)
+		waitForServiceInAddonTest(f.ClientSet, addonNsName, "addon-test-updated", true)
+		waitForReplicationControllerInAddonTest(f.ClientSet, addonNsName, "addon-test-v2", true)
 
-		waitForServiceInAddonTest(f.Client, f.Namespace.Name, "addon-test", false)
-		waitForReplicationControllerInAddonTest(f.Client, defaultNsName, "addon-test-v1", false)
+		waitForServiceInAddonTest(f.ClientSet, addonNsName, "addon-test", false)
+		waitForReplicationControllerInAddonTest(f.ClientSet, addonNsName, "addon-test-v1", false)
 
 		By("remove manifests")
 		sshExecAndVerify(sshClient, fmt.Sprintf("sudo rm %s/%s", destinationDir, rcv2))
 		sshExecAndVerify(sshClient, fmt.Sprintf("sudo rm %s/%s", destinationDir, svcv2))
 
-		waitForServiceInAddonTest(f.Client, f.Namespace.Name, "addon-test-updated", false)
-		waitForReplicationControllerInAddonTest(f.Client, f.Namespace.Name, "addon-test-v2", false)
+		waitForServiceInAddonTest(f.ClientSet, addonNsName, "addon-test-updated", false)
+		waitForReplicationControllerInAddonTest(f.ClientSet, addonNsName, "addon-test-v2", false)
 
 		By("verify invalid API addons weren't created")
-		_, err = f.Client.ReplicationControllers(f.Namespace.Name).Get("invalid-addon-test-v1")
+		_, err = f.ClientSet.Core().ReplicationControllers(addonNsName).Get("invalid-addon-test-v1", metav1.GetOptions{})
 		Expect(err).To(HaveOccurred())
-		_, err = f.Client.ReplicationControllers(defaultNsName).Get("invalid-addon-test-v1")
+		_, err = f.ClientSet.Core().Services(addonNsName).Get("ivalid-addon-test", metav1.GetOptions{})
 		Expect(err).To(HaveOccurred())
-		_, err = f.Client.Services(f.Namespace.Name).Get("ivalid-addon-test")
-		Expect(err).To(HaveOccurred())
-		_, err = f.Client.Services(defaultNsName).Get("ivalid-addon-test")
+		_, err = f.ClientSet.Core().Services(defaultNsName).Get("ivalid-addon-test-v2", metav1.GetOptions{})
 		Expect(err).To(HaveOccurred())
 
 		// invalid addons will be deleted by the deferred function
 	})
 })
 
-func waitForServiceInAddonTest(c *client.Client, addonNamespace, name string, exist bool) {
+func waitForServiceInAddonTest(c clientset.Interface, addonNamespace, name string, exist bool) {
 	framework.ExpectNoError(framework.WaitForService(c, addonNamespace, name, exist, addonTestPollInterval, addonTestPollTimeout))
 }
 
-func waitForReplicationControllerInAddonTest(c *client.Client, addonNamespace, name string, exist bool) {
+func waitForReplicationControllerInAddonTest(c clientset.Interface, addonNamespace, name string, exist bool) {
 	framework.ExpectNoError(framework.WaitForReplicationController(c, addonNamespace, name, exist, addonTestPollInterval, addonTestPollTimeout))
 }
 

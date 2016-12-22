@@ -19,7 +19,9 @@ package v1
 import (
 	api "k8s.io/client-go/pkg/api"
 	v1 "k8s.io/client-go/pkg/api/v1"
+	meta_v1 "k8s.io/client-go/pkg/apis/meta/v1"
 	watch "k8s.io/client-go/pkg/watch"
+	rest "k8s.io/client-go/rest"
 )
 
 // ConfigMapsGetter has a method to return a ConfigMapInterface.
@@ -34,7 +36,7 @@ type ConfigMapInterface interface {
 	Update(*v1.ConfigMap) (*v1.ConfigMap, error)
 	Delete(name string, options *v1.DeleteOptions) error
 	DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error
-	Get(name string) (*v1.ConfigMap, error)
+	Get(name string, options meta_v1.GetOptions) (*v1.ConfigMap, error)
 	List(opts v1.ListOptions) (*v1.ConfigMapList, error)
 	Watch(opts v1.ListOptions) (watch.Interface, error)
 	Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *v1.ConfigMap, err error)
@@ -43,14 +45,14 @@ type ConfigMapInterface interface {
 
 // configMaps implements ConfigMapInterface
 type configMaps struct {
-	client *CoreClient
+	client rest.Interface
 	ns     string
 }
 
 // newConfigMaps returns a ConfigMaps
-func newConfigMaps(c *CoreClient, namespace string) *configMaps {
+func newConfigMaps(c *CoreV1Client, namespace string) *configMaps {
 	return &configMaps{
-		client: c,
+		client: c.RESTClient(),
 		ns:     namespace,
 	}
 }
@@ -103,12 +105,13 @@ func (c *configMaps) DeleteCollection(options *v1.DeleteOptions, listOptions v1.
 }
 
 // Get takes name of the configMap, and returns the corresponding configMap object, and an error if there is any.
-func (c *configMaps) Get(name string) (result *v1.ConfigMap, err error) {
+func (c *configMaps) Get(name string, options meta_v1.GetOptions) (result *v1.ConfigMap, err error) {
 	result = &v1.ConfigMap{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("configmaps").
 		Name(name).
+		VersionedParams(&options, api.ParameterCodec).
 		Do().
 		Into(result)
 	return

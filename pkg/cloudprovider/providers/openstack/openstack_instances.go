@@ -26,15 +26,15 @@ import (
 	"github.com/rackspace/gophercloud/openstack/compute/v2/servers"
 	"github.com/rackspace/gophercloud/pagination"
 
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/types"
 )
 
 type Instances struct {
 	compute            *gophercloud.ServiceClient
-	flavor_to_resource map[string]*api.NodeResources // keyed by flavor id
+	flavor_to_resource map[string]*v1.NodeResources // keyed by flavor id
 }
 
 // Instances returns an implementation of Instances for OpenStack.
@@ -51,17 +51,17 @@ func (os *OpenStack) Instances() (cloudprovider.Instances, bool) {
 
 	pager := flavors.ListDetail(compute, nil)
 
-	flavor_to_resource := make(map[string]*api.NodeResources)
+	flavor_to_resource := make(map[string]*v1.NodeResources)
 	err = pager.EachPage(func(page pagination.Page) (bool, error) {
 		flavorList, err := flavors.ExtractFlavors(page)
 		if err != nil {
 			return false, err
 		}
 		for _, flavor := range flavorList {
-			rsrc := api.NodeResources{
-				Capacity: api.ResourceList{
-					api.ResourceCPU:            *resource.NewQuantity(int64(flavor.VCPUs), resource.DecimalSI),
-					api.ResourceMemory:         *resource.NewQuantity(int64(flavor.RAM)*MiB, resource.BinarySI),
+			rsrc := v1.NodeResources{
+				Capacity: v1.ResourceList{
+					v1.ResourceCPU:             *resource.NewQuantity(int64(flavor.VCPUs), resource.DecimalSI),
+					v1.ResourceMemory:          *resource.NewQuantity(int64(flavor.RAM)*MiB, resource.BinarySI),
 					"openstack.org/disk":       *resource.NewQuantity(int64(flavor.Disk)*GB, resource.DecimalSI),
 					"openstack.org/rxTxFactor": *resource.NewMilliQuantity(int64(flavor.RxTxFactor)*1000, resource.DecimalSI),
 					"openstack.org/swap":       *resource.NewQuantity(int64(flavor.Swap)*MiB, resource.BinarySI),
@@ -126,7 +126,7 @@ func (i *Instances) AddSSHKeyToAllInstances(user string, keyData []byte) error {
 	return errors.New("unimplemented")
 }
 
-func (i *Instances) NodeAddresses(name types.NodeName) ([]api.NodeAddress, error) {
+func (i *Instances) NodeAddresses(name types.NodeName) ([]v1.NodeAddress, error) {
 	glog.V(4).Infof("NodeAddresses(%v) called", name)
 
 	addrs, err := getAddressesByName(i.compute, name)

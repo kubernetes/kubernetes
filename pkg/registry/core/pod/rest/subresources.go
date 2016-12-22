@@ -27,14 +27,14 @@ import (
 	"k8s.io/kubernetes/pkg/capabilities"
 	"k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/registry/core/pod"
-	"k8s.io/kubernetes/pkg/registry/generic/registry"
+	genericregistry "k8s.io/kubernetes/pkg/registry/generic/registry"
 	genericrest "k8s.io/kubernetes/pkg/registry/generic/rest"
 	"k8s.io/kubernetes/pkg/runtime"
 )
 
 // ProxyREST implements the proxy subresource for a Pod
 type ProxyREST struct {
-	Store          *registry.Store
+	Store          *genericregistry.Store
 	ProxyTransport http.RoundTripper
 }
 
@@ -70,7 +70,7 @@ func (r *ProxyREST) Connect(ctx api.Context, id string, opts runtime.Object, res
 	}
 	location.Path = path.Join(location.Path, proxyOpts.Path)
 	// Return a proxy handler that uses the desired transport, wrapped with additional proxy handling (to get URL rewriting, X-Forwarded-* headers, etc)
-	return newThrottledUpgradeAwareProxyHandler(location, transport, true, false, responder), nil
+	return newThrottledUpgradeAwareProxyHandler(location, transport, true, false, false, responder), nil
 }
 
 // Support both GET and POST methods. We must support GET for browsers that want to use WebSockets.
@@ -78,7 +78,7 @@ var upgradeableMethods = []string{"GET", "POST"}
 
 // AttachREST implements the attach subresource for a Pod
 type AttachREST struct {
-	Store       *registry.Store
+	Store       *genericregistry.Store
 	KubeletConn client.ConnectionInfoGetter
 }
 
@@ -100,7 +100,7 @@ func (r *AttachREST) Connect(ctx api.Context, name string, opts runtime.Object, 
 	if err != nil {
 		return nil, err
 	}
-	return newThrottledUpgradeAwareProxyHandler(location, transport, false, true, responder), nil
+	return newThrottledUpgradeAwareProxyHandler(location, transport, false, true, true, responder), nil
 }
 
 // NewConnectOptions returns the versioned object that represents exec parameters
@@ -115,7 +115,7 @@ func (r *AttachREST) ConnectMethods() []string {
 
 // ExecREST implements the exec subresource for a Pod
 type ExecREST struct {
-	Store       *registry.Store
+	Store       *genericregistry.Store
 	KubeletConn client.ConnectionInfoGetter
 }
 
@@ -137,7 +137,7 @@ func (r *ExecREST) Connect(ctx api.Context, name string, opts runtime.Object, re
 	if err != nil {
 		return nil, err
 	}
-	return newThrottledUpgradeAwareProxyHandler(location, transport, false, true, responder), nil
+	return newThrottledUpgradeAwareProxyHandler(location, transport, false, true, true, responder), nil
 }
 
 // NewConnectOptions returns the versioned object that represents exec parameters
@@ -152,7 +152,7 @@ func (r *ExecREST) ConnectMethods() []string {
 
 // PortForwardREST implements the portforward subresource for a Pod
 type PortForwardREST struct {
-	Store       *registry.Store
+	Store       *genericregistry.Store
 	KubeletConn client.ConnectionInfoGetter
 }
 
@@ -180,11 +180,12 @@ func (r *PortForwardREST) Connect(ctx api.Context, name string, opts runtime.Obj
 	if err != nil {
 		return nil, err
 	}
-	return newThrottledUpgradeAwareProxyHandler(location, transport, false, true, responder), nil
+	return newThrottledUpgradeAwareProxyHandler(location, transport, false, true, true, responder), nil
 }
 
-func newThrottledUpgradeAwareProxyHandler(location *url.URL, transport http.RoundTripper, wrapTransport, upgradeRequired bool, responder rest.Responder) *genericrest.UpgradeAwareProxyHandler {
+func newThrottledUpgradeAwareProxyHandler(location *url.URL, transport http.RoundTripper, wrapTransport, upgradeRequired, interceptRedirects bool, responder rest.Responder) *genericrest.UpgradeAwareProxyHandler {
 	handler := genericrest.NewUpgradeAwareProxyHandler(location, transport, wrapTransport, upgradeRequired, responder)
+	handler.InterceptRedirects = interceptRedirects
 	handler.MaxBytesPerSec = capabilities.Get().PerConnectionBandwidthLimitBytesPerSec
 	return handler
 }

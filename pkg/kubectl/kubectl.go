@@ -25,7 +25,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 )
 
 const (
@@ -48,28 +48,6 @@ func makeImageList(spec *api.PodSpec) string {
 	return strings.Join(listOfImages(spec), ",")
 }
 
-func NewThirdPartyResourceMapper(gvs []unversioned.GroupVersion, gvks []unversioned.GroupVersionKind) (meta.RESTMapper, error) {
-	mapper := meta.NewDefaultRESTMapper(gvs, func(gv unversioned.GroupVersion) (*meta.VersionInterfaces, error) {
-		for ix := range gvs {
-			if gvs[ix].Group == gv.Group && gvs[ix].Version == gv.Version {
-				return &meta.VersionInterfaces{
-					ObjectConvertor:  api.Scheme,
-					MetadataAccessor: meta.NewAccessor(),
-				}, nil
-			}
-		}
-		groupVersions := make([]string, 0, len(gvs))
-		for ix := range gvs {
-			groupVersions = append(groupVersions, gvs[ix].String())
-		}
-		return nil, fmt.Errorf("unsupported storage version: %s (valid: %s)", gv.String(), strings.Join(groupVersions, ", "))
-	})
-	for ix := range gvks {
-		mapper.Add(gvks[ix], meta.RESTScopeNamespace)
-	}
-	return mapper, nil
-}
-
 // OutputVersionMapper is a RESTMapper that will prefer mappings that
 // correspond to a preferred output version (if feasible)
 type OutputVersionMapper struct {
@@ -78,11 +56,11 @@ type OutputVersionMapper struct {
 	// output versions takes a list of preferred GroupVersions. Only the first
 	// hit for a given group will have effect.  This allows different output versions
 	// depending upon the group of the kind being requested
-	OutputVersions []unversioned.GroupVersion
+	OutputVersions []schema.GroupVersion
 }
 
 // RESTMapping implements meta.RESTMapper by prepending the output version to the preferred version list.
-func (m OutputVersionMapper) RESTMapping(gk unversioned.GroupKind, versions ...string) (*meta.RESTMapping, error) {
+func (m OutputVersionMapper) RESTMapping(gk schema.GroupKind, versions ...string) (*meta.RESTMapping, error) {
 	for _, preferredVersion := range m.OutputVersions {
 		if gk.Group == preferredVersion.Group {
 			mapping, err := m.RESTMapper.RESTMapping(gk, preferredVersion.Version)
@@ -114,6 +92,7 @@ var ShortForms = map[string]string{
 	"limits": "limitranges",
 	"no":     "nodes",
 	"ns":     "namespaces",
+	"pdb":    "poddisruptionbudgets",
 	"po":     "pods",
 	"psp":    "podSecurityPolicies",
 	"pvc":    "persistentvolumeclaims",

@@ -19,6 +19,7 @@ package container
 import (
 	"io/ioutil"
 	"os"
+	"path/filepath"
 	"time"
 )
 
@@ -29,11 +30,13 @@ type OSInterface interface {
 	Symlink(oldname string, newname string) error
 	Stat(path string) (os.FileInfo, error)
 	Remove(path string) error
+	RemoveAll(path string) error
 	Create(path string) (*os.File, error)
 	Hostname() (name string, err error)
 	Chtimes(path string, atime time.Time, mtime time.Time) error
 	Pipe() (r *os.File, w *os.File, err error)
 	ReadDir(dirname string) ([]os.FileInfo, error)
+	Glob(pattern string) ([]string, error)
 }
 
 // RealOS is used to dispatch the real system level operations.
@@ -57,6 +60,11 @@ func (RealOS) Stat(path string) (os.FileInfo, error) {
 // Remove will call os.Remove to remove the path.
 func (RealOS) Remove(path string) error {
 	return os.Remove(path)
+}
+
+// RemoveAll will call os.RemoveAll to remove the path and its children.
+func (RealOS) RemoveAll(path string) error {
+	return os.RemoveAll(path)
 }
 
 // Create will call os.Create to create and return a file
@@ -83,4 +91,10 @@ func (RealOS) Pipe() (r *os.File, w *os.File, err error) {
 // ReadDir will call ioutil.ReadDir to return the files under the directory.
 func (RealOS) ReadDir(dirname string) ([]os.FileInfo, error) {
 	return ioutil.ReadDir(dirname)
+}
+
+// Glob will call filepath.Glob to return the names of all files matching
+// pattern.
+func (RealOS) Glob(pattern string) ([]string, error) {
+	return filepath.Glob(pattern)
 }

@@ -22,9 +22,10 @@ import (
 	"net"
 	"sync"
 
-	"k8s.io/kubernetes/pkg/api"
 	apierrors "k8s.io/kubernetes/pkg/api/errors"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	"k8s.io/kubernetes/pkg/api/v1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/wait"
@@ -50,8 +51,8 @@ type nodeAndCIDR struct {
 
 // CIDRAllocator is an interface implemented by things that know how to allocate/occupy/recycle CIDR for nodes.
 type CIDRAllocator interface {
-	AllocateOrOccupyCIDR(node *api.Node) error
-	ReleaseCIDR(node *api.Node) error
+	AllocateOrOccupyCIDR(node *v1.Node) error
+	ReleaseCIDR(node *v1.Node) error
 }
 
 type rangeAllocator struct {
@@ -72,9 +73,9 @@ type rangeAllocator struct {
 // Caller must ensure subNetMaskSize is not less than cluster CIDR mask size.
 // Caller must always pass in a list of existing nodes so the new allocator
 // can initialize its CIDR map. NodeList is only nil in testing.
-func NewCIDRRangeAllocator(client clientset.Interface, clusterCIDR *net.IPNet, serviceCIDR *net.IPNet, subNetMaskSize int, nodeList *api.NodeList) (CIDRAllocator, error) {
+func NewCIDRRangeAllocator(client clientset.Interface, clusterCIDR *net.IPNet, serviceCIDR *net.IPNet, subNetMaskSize int, nodeList *v1.NodeList) (CIDRAllocator, error) {
 	eventBroadcaster := record.NewBroadcaster()
-	recorder := eventBroadcaster.NewRecorder(api.EventSource{Component: "cidrAllocator"})
+	recorder := eventBroadcaster.NewRecorder(v1.EventSource{Component: "cidrAllocator"})
 	eventBroadcaster.StartLogging(glog.Infof)
 
 	ra := &rangeAllocator{
@@ -145,7 +146,7 @@ func (r *rangeAllocator) removeNodeFromProcessing(nodeName string) {
 	r.nodesInProcessing.Delete(nodeName)
 }
 
-func (r *rangeAllocator) occupyCIDR(node *api.Node) error {
+func (r *rangeAllocator) occupyCIDR(node *v1.Node) error {
 	defer r.removeNodeFromProcessing(node.Name)
 	if node.Spec.PodCIDR == "" {
 		return nil
@@ -164,7 +165,7 @@ func (r *rangeAllocator) occupyCIDR(node *api.Node) error {
 // if it doesn't currently have one or mark the CIDR as used if the node already have one.
 // WARNING: If you're adding any return calls or defer any more work from this function
 // you have to handle correctly nodesInProcessing.
-func (r *rangeAllocator) AllocateOrOccupyCIDR(node *api.Node) error {
+func (r *rangeAllocator) AllocateOrOccupyCIDR(node *v1.Node) error {
 	if node == nil {
 		return nil
 	}
@@ -191,7 +192,7 @@ func (r *rangeAllocator) AllocateOrOccupyCIDR(node *api.Node) error {
 }
 
 // ReleaseCIDR releases the CIDR of the removed node
-func (r *rangeAllocator) ReleaseCIDR(node *api.Node) error {
+func (r *rangeAllocator) ReleaseCIDR(node *v1.Node) error {
 	if node == nil || node.Spec.PodCIDR == "" {
 		return nil
 	}
@@ -225,11 +226,11 @@ func (r *rangeAllocator) filterOutServiceRange(serviceCIDR *net.IPNet) {
 // Assigns CIDR to Node and sends an update to the API server.
 func (r *rangeAllocator) updateCIDRAllocation(data nodeAndCIDR) error {
 	var err error
-	var node *api.Node
+	var node *v1.Node
 	defer r.removeNodeFromProcessing(data.nodeName)
 	for rep := 0; rep < podCIDRUpdateRetry; rep++ {
 		// TODO: change it to using PATCH instead of full Node updates.
-		node, err = r.client.Core().Nodes().Get(data.nodeName)
+		node, err = r.client.Core().Nodes().Get(data.nodeName, metav1.GetOptions{})
 		if err != nil {
 			glog.Errorf("Failed while getting node %v to retry updating Node.Spec.PodCIDR: %v", data.nodeName, err)
 			continue

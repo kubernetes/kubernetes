@@ -21,7 +21,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/rest"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
@@ -29,11 +29,11 @@ import (
 type Registry interface {
 	ListServices(ctx api.Context, options *api.ListOptions) (*api.ServiceList, error)
 	CreateService(ctx api.Context, svc *api.Service) (*api.Service, error)
-	GetService(ctx api.Context, name string) (*api.Service, error)
+	GetService(ctx api.Context, name string, options *metav1.GetOptions) (*api.Service, error)
 	DeleteService(ctx api.Context, name string) error
 	UpdateService(ctx api.Context, svc *api.Service) (*api.Service, error)
 	WatchServices(ctx api.Context, options *api.ListOptions) (watch.Interface, error)
-	ExportService(ctx api.Context, name string, options unversioned.ExportOptions) (*api.Service, error)
+	ExportService(ctx api.Context, name string, options metav1.ExportOptions) (*api.Service, error)
 }
 
 // storage puts strong typing around storage calls
@@ -63,8 +63,8 @@ func (s *storage) CreateService(ctx api.Context, svc *api.Service) (*api.Service
 	return obj.(*api.Service), nil
 }
 
-func (s *storage) GetService(ctx api.Context, name string) (*api.Service, error) {
-	obj, err := s.Get(ctx, name)
+func (s *storage) GetService(ctx api.Context, name string, options *metav1.GetOptions) (*api.Service, error) {
+	obj, err := s.Get(ctx, name, options)
 	if err != nil {
 		return nil, err
 	}
@@ -90,7 +90,7 @@ func (s *storage) WatchServices(ctx api.Context, options *api.ListOptions) (watc
 
 // If StandardStorage implements rest.Exporter, returns exported service.
 // Otherwise export is not supported.
-func (s *storage) ExportService(ctx api.Context, name string, options unversioned.ExportOptions) (*api.Service, error) {
+func (s *storage) ExportService(ctx api.Context, name string, options metav1.ExportOptions) (*api.Service, error) {
 	exporter, isExporter := s.StandardStorage.(rest.Exporter)
 	if !isExporter {
 		return nil, fmt.Errorf("export is not supported")

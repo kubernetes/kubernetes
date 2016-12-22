@@ -19,7 +19,9 @@ package v1
 import (
 	api "k8s.io/client-go/pkg/api"
 	v1 "k8s.io/client-go/pkg/api/v1"
+	meta_v1 "k8s.io/client-go/pkg/apis/meta/v1"
 	watch "k8s.io/client-go/pkg/watch"
+	rest "k8s.io/client-go/rest"
 )
 
 // PodsGetter has a method to return a PodInterface.
@@ -35,7 +37,7 @@ type PodInterface interface {
 	UpdateStatus(*v1.Pod) (*v1.Pod, error)
 	Delete(name string, options *v1.DeleteOptions) error
 	DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error
-	Get(name string) (*v1.Pod, error)
+	Get(name string, options meta_v1.GetOptions) (*v1.Pod, error)
 	List(opts v1.ListOptions) (*v1.PodList, error)
 	Watch(opts v1.ListOptions) (watch.Interface, error)
 	Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *v1.Pod, err error)
@@ -44,14 +46,14 @@ type PodInterface interface {
 
 // pods implements PodInterface
 type pods struct {
-	client *CoreClient
+	client rest.Interface
 	ns     string
 }
 
 // newPods returns a Pods
-func newPods(c *CoreClient, namespace string) *pods {
+func newPods(c *CoreV1Client, namespace string) *pods {
 	return &pods{
-		client: c,
+		client: c.RESTClient(),
 		ns:     namespace,
 	}
 }
@@ -80,6 +82,9 @@ func (c *pods) Update(pod *v1.Pod) (result *v1.Pod, err error) {
 		Into(result)
 	return
 }
+
+// UpdateStatus was generated because the type contains a Status member.
+// Add a +genclientstatus=false comment above the type to avoid generating UpdateStatus().
 
 func (c *pods) UpdateStatus(pod *v1.Pod) (result *v1.Pod, err error) {
 	result = &v1.Pod{}
@@ -117,12 +122,13 @@ func (c *pods) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOp
 }
 
 // Get takes name of the pod, and returns the corresponding pod object, and an error if there is any.
-func (c *pods) Get(name string) (result *v1.Pod, err error) {
+func (c *pods) Get(name string, options meta_v1.GetOptions) (result *v1.Pod, err error) {
 	result = &v1.Pod{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("pods").
 		Name(name).
+		VersionedParams(&options, api.ParameterCodec).
 		Do().
 		Into(result)
 	return

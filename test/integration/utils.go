@@ -17,46 +17,18 @@ limitations under the License.
 package integration
 
 import (
-	"fmt"
-	"math/rand"
 	"testing"
 	"time"
 
-	etcd "github.com/coreos/etcd/client"
-	"github.com/golang/glog"
-	"golang.org/x/net/context"
 	"k8s.io/kubernetes/pkg/api/errors"
-	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/typed/core/v1"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/core/v1"
 	"k8s.io/kubernetes/pkg/util/wait"
-	"k8s.io/kubernetes/test/integration/framework"
 )
 
-func newEtcdClient() etcd.Client {
-	cfg := etcd.Config{
-		Endpoints: []string{framework.GetEtcdURLFromEnv()},
-	}
-	client, err := etcd.New(cfg)
-	if err != nil {
-		glog.Fatalf("unable to connect to etcd for testing: %v", err)
-	}
-	return client
-}
-
-func RequireEtcd() {
-	if _, err := etcd.NewKeysAPI(newEtcdClient()).Get(context.TODO(), "/", nil); err != nil {
-		glog.Fatalf("unable to connect to etcd for integration testing: %v", err)
-	}
-}
-
-func withEtcdKey(f func(string)) {
-	prefix := fmt.Sprintf("/test-%d", rand.Int63())
-	defer etcd.NewKeysAPI(newEtcdClient()).Delete(context.TODO(), prefix, &etcd.DeleteOptions{Recursive: true})
-	f(prefix)
-}
-
-func DeletePodOrErrorf(t *testing.T, c *client.Client, ns, name string) {
-	if err := c.Pods(ns).Delete(name, nil); err != nil {
+func DeletePodOrErrorf(t *testing.T, c clientset.Interface, ns, name string) {
+	if err := c.Core().Pods(ns).Delete(name, nil); err != nil {
 		t.Errorf("unable to delete pod %v: %v", name, err)
 	}
 }
@@ -77,7 +49,7 @@ var Code503 = map[int]bool{503: true}
 // WaitForPodToDisappear polls the API server if the pod has been deleted.
 func WaitForPodToDisappear(podClient coreclient.PodInterface, podName string, interval, timeout time.Duration) error {
 	return wait.PollImmediate(interval, timeout, func() (bool, error) {
-		_, err := podClient.Get(podName)
+		_, err := podClient.Get(podName, metav1.GetOptions{})
 		if err == nil {
 			return false, nil
 		} else {

@@ -22,9 +22,10 @@ import (
 	"path"
 
 	"github.com/golang/glog"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/apis/storage"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	"k8s.io/kubernetes/pkg/api/v1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
+	storage "k8s.io/kubernetes/pkg/apis/storage/v1beta1"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/util/mount"
 )
 
@@ -94,10 +95,10 @@ func UnmountPath(mountPath string, mounter mount.Interface) error {
 		return err
 	}
 	if notMnt {
-		glog.V(4).Info("%q is unmounted, deleting the directory", mountPath)
+		glog.V(4).Infof("%q is unmounted, deleting the directory", mountPath)
 		return os.Remove(mountPath)
 	}
-	return nil
+	return fmt.Errorf("Failed to unmount path %v", mountPath)
 }
 
 // PathExists returns true if the specified path exists.
@@ -112,14 +113,13 @@ func PathExists(path string) (bool, error) {
 	}
 }
 
-// GetSecret locates secret by name and namespace and returns secret map
-func GetSecret(namespace, secretName string, kubeClient clientset.Interface) (map[string]string, error) {
+// GetSecretForPod locates secret by name in the pod's namespace and returns secret map
+func GetSecretForPod(pod *v1.Pod, secretName string, kubeClient clientset.Interface) (map[string]string, error) {
 	secret := make(map[string]string)
 	if kubeClient == nil {
 		return secret, fmt.Errorf("Cannot get kube client")
 	}
-
-	secrets, err := kubeClient.Core().Secrets(namespace).Get(secretName)
+	secrets, err := kubeClient.Core().Secrets(pod.Namespace).Get(secretName, metav1.GetOptions{})
 	if err != nil {
 		return secret, err
 	}
@@ -129,44 +129,33 @@ func GetSecret(namespace, secretName string, kubeClient clientset.Interface) (ma
 	return secret, nil
 }
 
-// AddVolumeAnnotations adds a golang Map as annotation to a PersistentVolume
-func AddVolumeAnnotations(pv *api.PersistentVolume, annotations map[string]string) {
-	if pv.Annotations == nil {
-		pv.Annotations = map[string]string{}
+// GetSecretForPV locates secret by name and namespace, verifies the secret type, and returns secret map
+func GetSecretForPV(secretNamespace, secretName, volumePluginName string, kubeClient clientset.Interface) (map[string]string, error) {
+	secret := make(map[string]string)
+	if kubeClient == nil {
+		return secret, fmt.Errorf("Cannot get kube client")
 	}
-
-	for k, v := range annotations {
-		pv.Annotations[k] = v
+	secrets, err := kubeClient.Core().Secrets(secretNamespace).Get(secretName, metav1.GetOptions{})
+	if err != nil {
+		return secret, err
 	}
+	if secrets.Type != v1.SecretType(volumePluginName) {
+		return secret, fmt.Errorf("Cannot get secret of type %s", volumePluginName)
+	}
+	for name, data := range secrets.Data {
+		secret[name] = string(data)
+	}
+	return secret, nil
 }
 
-// ParseVolumeAnnotations reads the defined annoations from a PersistentVolume
-func ParseVolumeAnnotations(pv *api.PersistentVolume, parseAnnotations []string) (map[string]string, error) {
-	result := map[string]string{}
-
-	if pv.Annotations == nil {
-		return result, fmt.Errorf("cannot parse volume annotations: no annotations found")
-	}
-
-	for _, annotation := range parseAnnotations {
-		if val, ok := pv.Annotations[annotation]; ok {
-			result[annotation] = val
-		} else {
-			return result, fmt.Errorf("cannot parse volume annotations: annotation %s not found", annotation)
-		}
-	}
-
-	return result, nil
-}
-
-func GetClassForVolume(kubeClient clientset.Interface, pv *api.PersistentVolume) (*storage.StorageClass, error) {
+func GetClassForVolume(kubeClient clientset.Interface, pv *v1.PersistentVolume) (*storage.StorageClass, error) {
 	// TODO: replace with a real attribute after beta
 	className, found := pv.Annotations["volume.beta.kubernetes.io/storage-class"]
 	if !found {
 		return nil, fmt.Errorf("Volume has no class annotation")
 	}
 
-	class, err := kubeClient.Storage().StorageClasses().Get(className)
+	class, err := kubeClient.Storage().StorageClasses().Get(className, metav1.GetOptions{})
 	if err != nil {
 		return nil, err
 	}

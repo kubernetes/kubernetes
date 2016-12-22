@@ -1,37 +1,3 @@
-<!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
-
-<!-- BEGIN STRIP_FOR_RELEASE -->
-
-<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
-     width="25" height="25">
-
-<h2>PLEASE NOTE: This document applies to the HEAD of the source tree</h2>
-
-If you are using a released version of Kubernetes, you should
-refer to the docs that go with that version.
-
-<!-- TAG RELEASE_LINK, added by the munger automatically -->
-<strong>
-The latest release of this document can be found
-[here](http://releases.k8s.io/release-1.4/docs/proposals/multi-platform.md).
-
-Documentation for other releases can be found at
-[releases.k8s.io](http://releases.k8s.io).
-</strong>
---
-
-<!-- END STRIP_FOR_RELEASE -->
-
-<!-- END MUNGE: UNVERSIONED_WARNING -->
-
 # Kubernetes for multiple platforms
 
 **Author**: Lucas Käldström ([@luxas](https://github.com/luxas))
@@ -80,12 +46,12 @@ For a large enterprise where computing power is the king, one may imagine the fo
  - `linux/ppc64le`: For running highly-optimized software; especially massive compute tasks
  - `windows/amd64`: For running services that are only compatible on windows; e.g. business applications written in C# .NET
 
-For a mid-sized business where efficency is most important, these could be combinations:
+For a mid-sized business where efficiency is most important, these could be combinations:
  - `linux/amd64`: For running most of the general-purpose computing tasks, plus tasks that require very high single-core performance.
  - `linux/arm64`: For running webservices and high-density tasks => the cluster could autoscale in a way that `linux/amd64` machines could hibernate at night in order to minimize power usage.
 
-For a small business or university, arm is often sufficent:
- - `linux/arm`: Draws very little power, and can run web sites and app backends efficently on Scaleway for example.
+For a small business or university, arm is often sufficient:
+ - `linux/arm`: Draws very little power, and can run web sites and app backends efficiently on Scaleway for example.
 
 And last but not least; Raspberry Pi's should be used for [education at universities](http://kubecloud.io/) and are great for **demoing Kubernetes' features at conferences.**
 
@@ -311,7 +277,7 @@ A great blog post [that is describing this](https://medium.com/@rakyll/go-1-5-cr
 Before Go 1.5, the whole Go project had to be cross-compiled from source for **all** platforms that _might_ be used, and that was quite a slow process:
 
 ```console
-# From build/build-image/cross/Dockerfile when we used Go 1.4
+# From build-tools/build-image/cross/Dockerfile when we used Go 1.4
 $ cd /usr/src/go/src
 $ for platform in ${PLATFORMS}; do GOOS=${platform%/*} GOARCH=${platform##*/} ./make.bash --no-clean; done
 ```
@@ -322,7 +288,7 @@ If you cross-compile multiple times, Go will build parts of `std`, throw it away
 However, there is an easy way of cross-compiling all `std` packages in advance with Go 1.5+:
 
 ```console
-# From build/build-image/cross/Dockerfile when we're using Go 1.5+
+# From build-tools/build-image/cross/Dockerfile when we're using Go 1.5+
 $ for platform in ${PLATFORMS}; do GOOS=${platform%/*} GOARCH=${platform##*/} go install std; done
 ```
 
@@ -411,7 +377,7 @@ In order to dynamically compile a go binary with `cgo`, we need `gcc` installed 
 
 The only Kubernetes binary that is using C code is the `kubelet`, or in fact `cAdvisor` on which `kubelet` depends. `hyperkube` is also dynamically linked as long as `kubelet` is. We should aim to make `kubelet` statically linked.
 
-The normal `x86_64-linux-gnu` can't cross-compile binaries, so we have to install gcc cross-compilers for every platform. We do this in the [`kube-cross`](../../build/build-image/cross/Dockerfile) image,
+The normal `x86_64-linux-gnu` can't cross-compile binaries, so we have to install gcc cross-compilers for every platform. We do this in the [`kube-cross`](../../build-tools/build-image/cross/Dockerfile) image,
 and depend on the [`emdebian.org` repository](https://wiki.debian.org/CrossToolchains). Depending on `emdebian` isn't ideal, so we should consider using the latest `gcc` cross-compiler packages from the `ubuntu` main repositories in the future.
 
 Here's an example when cross-compiling plain C code:
@@ -548,14 +514,14 @@ Linux 0a7da80f1665 4.2.0-25-generic #30-Ubuntu SMP Mon Jan 18 12:31:50 UTC 2016 
 
 Here a linux module called `binfmt_misc` registered the "magic numbers" in the kernel, so the kernel may detect which architecture a binary is, and prepend the call with `/usr/bin/qemu-(arm|aarch64|ppc64le)-static`. For example, `/usr/bin/qemu-arm-static` is a statically linked `amd64` binary that translates all ARM syscalls to `amd64` syscalls.
 
-The multiarch guys have done a great job here, you may find the source for this and other images at [Github](https://github.com/multiarch)
+The multiarch guys have done a great job here, you may find the source for this and other images at [GitHub](https://github.com/multiarch)
 
 
 ## Implementation
 
 ## History
 
-32-bit ARM (`linux/arm`) was the first platform Kubernetes was ported to, and luxas' project [`Kubernetes on ARM`](https://github.com/luxas/kubernetes-on-arm) (released on Github the 31st of September 2015)
+32-bit ARM (`linux/arm`) was the first platform Kubernetes was ported to, and luxas' project [`Kubernetes on ARM`](https://github.com/luxas/kubernetes-on-arm) (released on GitHub the 31st of September 2015)
 served as a way of running Kubernetes on ARM devices easily.
 The 30th of November 2015, a tracking issue about making Kubernetes run on ARM was opened: [#17981](https://github.com/kubernetes/kubernetes/issues/17981). It later shifted focus to how to make Kubernetes a more platform-independent system.
 

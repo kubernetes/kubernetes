@@ -21,7 +21,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/stats"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"k8s.io/kubernetes/pkg/util/wait"
@@ -34,7 +34,7 @@ import (
 type volumeStatCalculator struct {
 	statsProvider StatsProvider
 	jitterPeriod  time.Duration
-	pod           *api.Pod
+	pod           *v1.Pod
 	stopChannel   chan struct{}
 	startO        sync.Once
 	stopO         sync.Once
@@ -47,7 +47,7 @@ type PodVolumeStats struct {
 }
 
 // newVolumeStatCalculator creates a new VolumeStatCalculator
-func newVolumeStatCalculator(statsProvider StatsProvider, jitterPeriod time.Duration, pod *api.Pod) *volumeStatCalculator {
+func newVolumeStatCalculator(statsProvider StatsProvider, jitterPeriod time.Duration, pod *v1.Pod) *volumeStatCalculator {
 	return &volumeStatCalculator{
 		statsProvider: statsProvider,
 		jitterPeriod:  jitterPeriod,
@@ -114,9 +114,13 @@ func (s *volumeStatCalculator) calcAndStoreStats() {
 func (s *volumeStatCalculator) parsePodVolumeStats(podName string, metric *volume.Metrics) stats.VolumeStats {
 	available := uint64(metric.Available.Value())
 	capacity := uint64(metric.Capacity.Value())
-	used := uint64((metric.Used.Value()))
+	used := uint64(metric.Used.Value())
+	inodes := uint64(metric.Inodes.Value())
+	inodesFree := uint64(metric.InodesFree.Value())
+	inodesUsed := uint64(metric.InodesUsed.Value())
 	return stats.VolumeStats{
-		Name:    podName,
-		FsStats: stats.FsStats{AvailableBytes: &available, CapacityBytes: &capacity, UsedBytes: &used},
+		Name: podName,
+		FsStats: stats.FsStats{AvailableBytes: &available, CapacityBytes: &capacity, UsedBytes: &used,
+			Inodes: &inodes, InodesFree: &inodesFree, InodesUsed: &inodesUsed},
 	}
 }

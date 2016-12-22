@@ -20,21 +20,26 @@ import (
 	"encoding/json"
 	"fmt"
 	"net"
+	"reflect"
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	etcd "github.com/coreos/etcd/client"
 	"github.com/miekg/dns"
 	skymsg "github.com/skynetservices/skydns/msg"
-	skyServer "github.com/skynetservices/skydns/server"
+	skyserver "github.com/skynetservices/skydns/server"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	kapi "k8s.io/kubernetes/pkg/api"
-	endpointsapi "k8s.io/kubernetes/pkg/api/endpoints"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/api/v1"
+	endpointsapi "k8s.io/kubernetes/pkg/api/v1/endpoints"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/client/cache"
-	fake "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
+	fake "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
+	"k8s.io/kubernetes/pkg/dns/config"
+	"k8s.io/kubernetes/pkg/dns/treecache"
+	"k8s.io/kubernetes/pkg/dns/util"
 	"k8s.io/kubernetes/pkg/util/sets"
 )
 
@@ -46,25 +51,22 @@ const (
 )
 
 func newKubeDNS() *KubeDNS {
-	kd := &KubeDNS{
-		domain:              testDomain,
-		endpointsStore:      cache.NewStore(cache.MetaNamespaceKeyFunc),
-		servicesStore:       cache.NewStore(cache.MetaNamespaceKeyFunc),
-		cache:               NewTreeCache(),
-		reverseRecordMap:    make(map[string]*skymsg.Service),
-		clusterIPServiceMap: make(map[string]*kapi.Service),
-		cacheLock:           sync.RWMutex{},
-		domainPath:          reverseArray(strings.Split(strings.TrimRight(testDomain, "."), ".")),
-		nodesStore:          cache.NewStore(cache.MetaNamespaceKeyFunc),
-	}
-	return kd
-}
+	return &KubeDNS{
+		domain:     testDomain,
+		domainPath: util.ReverseArray(strings.Split(strings.TrimRight(testDomain, "."), ".")),
 
-func TestNewKubeDNS(t *testing.T) {
-	// Verify that it returns an error for invalid federation names.
-	_, err := NewKubeDNS(nil, "domainName", map[string]string{"invalid.name.with.dot": "example.come"})
-	if err == nil {
-		t.Errorf("Expected an error due to invalid federation name")
+		endpointsStore: cache.NewStore(cache.MetaNamespaceKeyFunc),
+		servicesStore:  cache.NewStore(cache.MetaNamespaceKeyFunc),
+		nodesStore:     cache.NewStore(cache.MetaNamespaceKeyFunc),
+
+		cache:               treecache.NewTreeCache(),
+		reverseRecordMap:    make(map[string]*skymsg.Service),
+		clusterIPServiceMap: make(map[string]*v1.Service),
+		cacheLock:           sync.RWMutex{},
+
+		config:     config.NewDefaultConfig(),
+		configLock: sync.RWMutex{},
+		configSync: config.NewNopSync(config.NewDefaultConfig()),
 	}
 }
 
@@ -169,9 +171,9 @@ func assertSRVRecordsMatchPort(t *testing.T, records []dns.RR, port ...int) {
 
 func TestSkySimpleSRVLookup(t *testing.T) {
 	kd := newKubeDNS()
-	skydnsConfig := &skyServer.Config{Domain: testDomain, DnsAddr: "0.0.0.0:53"}
-	skyServer.SetDefaults(skydnsConfig)
-	s := skyServer.New(kd, skydnsConfig)
+	skydnsConfig := &skyserver.Config{Domain: testDomain, DnsAddr: "0.0.0.0:53"}
+	skyserver.SetDefaults(skydnsConfig)
+	s := skyserver.New(kd, skydnsConfig)
 
 	service := newHeadlessService()
 	endpointIPs := []string{"10.0.0.1", "10.0.0.2"}
@@ -190,16 +192,18 @@ func TestSkySimpleSRVLookup(t *testing.T) {
 	targets := []string{}
 	for _, eip := range endpointIPs {
 		// A portal service is always created with a port of '0'
-		targets = append(targets, fmt.Sprintf("%v.%v", fmt.Sprintf("%x", hashServiceRecord(newServiceRecord(eip, 0))), name))
+		targets = append(targets,
+			fmt.Sprintf("%x.%v",
+				util.HashServiceRecord(util.NewServiceRecord(eip, 0)), name))
 	}
 	assertSRVRecordsMatchTarget(t, rec, targets...)
 }
 
 func TestSkyPodHostnameSRVLookup(t *testing.T) {
 	kd := newKubeDNS()
-	skydnsConfig := &skyServer.Config{Domain: testDomain, DnsAddr: "0.0.0.0:53"}
-	skyServer.SetDefaults(skydnsConfig)
-	s := skyServer.New(kd, skydnsConfig)
+	skydnsConfig := &skyserver.Config{Domain: testDomain, DnsAddr: "0.0.0.0:53"}
+	skyserver.SetDefaults(skydnsConfig)
+	s := skyserver.New(kd, skydnsConfig)
 
 	service := newHeadlessService()
 	endpointIPs := []string{"10.0.0.1", "10.0.0.2"}
@@ -236,9 +240,9 @@ func TestSkyPodHostnameSRVLookup(t *testing.T) {
 
 func TestSkyNamedPortSRVLookup(t *testing.T) {
 	kd := newKubeDNS()
-	skydnsConfig := &skyServer.Config{Domain: testDomain, DnsAddr: "0.0.0.0:53"}
-	skyServer.SetDefaults(skydnsConfig)
-	s := skyServer.New(kd, skydnsConfig)
+	skydnsConfig := &skyserver.Config{Domain: testDomain, DnsAddr: "0.0.0.0:53"}
+	skyserver.SetDefaults(skydnsConfig)
+	s := skyserver.New(kd, skydnsConfig)
 
 	service := newHeadlessService()
 	eip := "10.0.0.1"
@@ -255,7 +259,8 @@ func TestSkyNamedPortSRVLookup(t *testing.T) {
 
 	svcDomain := strings.Join([]string{testService, testNamespace, "svc", testDomain}, ".")
 	assertARecordsMatchIPs(t, extra, eip)
-	assertSRVRecordsMatchTarget(t, rec, fmt.Sprintf("%v.%v", fmt.Sprintf("%x", hashServiceRecord(newServiceRecord(eip, 0))), svcDomain))
+	assertSRVRecordsMatchTarget(
+		t, rec, fmt.Sprintf("%x.%v", util.HashServiceRecord(util.NewServiceRecord(eip, 0)), svcDomain))
 	assertSRVRecordsMatchPort(t, rec, 8081)
 }
 
@@ -334,7 +339,7 @@ func TestHeadlessServiceEndpointsUpdate(t *testing.T) {
 	assertDNSForHeadlessService(t, kd, endpoints)
 
 	// remove all endpoints
-	endpoints.Subsets = []kapi.EndpointSubset{}
+	endpoints.Subsets = []v1.EndpointSubset{}
 	kd.handleEndpointAdd(endpoints)
 	assertNoDNSForHeadlessService(t, kd, service)
 
@@ -379,93 +384,95 @@ func verifyRecord(q, a string, t *testing.T, kd *KubeDNS) {
 	assert.Equal(t, a, records[0].Host)
 }
 
-// Verifies that quering KubeDNS for a headless federation service returns the DNS hostname when a local service does not exist and returns the endpoint IP when a local service exists.
+const federatedServiceFQDN = "testservice.default.myfederation.svc.testcontinent-testreg-testzone.testcontinent-testreg.example.com."
+
+// Verifies that querying KubeDNS for a headless federation service
+// returns the DNS hostname when a local service does not exist and
+// returns the endpoint IP when a local service exists.
 func TestFederationHeadlessService(t *testing.T) {
 	kd := newKubeDNS()
-	kd.federations = map[string]string{
+	kd.config.Federations = map[string]string{
 		"myfederation": "example.com",
 	}
 	kd.kubeClient = fake.NewSimpleClientset(newNodes())
 
-	// Verify that quering for federation service returns a federation domain name.
+	// Verify that querying for federation service returns a federation domain name.
 	verifyRecord("testservice.default.myfederation.svc.cluster.local.",
-		"testservice.default.myfederation.svc.testcontinent-testreg-testzone.testcontinent-testreg.example.com.",
-		t, kd)
+		federatedServiceFQDN, t, kd)
 
 	// Add a local service without any endpoint.
 	s := newHeadlessService()
 	assert.NoError(t, kd.servicesStore.Add(s))
 	kd.newService(s)
 
-	// Verify that quering for federation service still returns the federation domain name.
+	// Verify that querying for federation service still returns the federation domain name.
 	verifyRecord(getFederationServiceFQDN(kd, s, "myfederation"),
-		"testservice.default.myfederation.svc.testcontinent-testreg-testzone.testcontinent-testreg.example.com.",
-		t, kd)
+		federatedServiceFQDN, t, kd)
 
 	// Now add an endpoint.
 	endpoints := newEndpoints(s, newSubsetWithOnePort("", 80, "10.0.0.1"))
 	assert.NoError(t, kd.endpointsStore.Add(endpoints))
 	kd.updateService(s, s)
 
-	// Verify that quering for federation service returns the local service domain name this time.
-	verifyRecord(getFederationServiceFQDN(kd, s, "myfederation"), "testservice.default.svc.cluster.local.", t, kd)
+	// Verify that querying for federation service returns the local service domain name this time.
+	verifyRecord(getFederationServiceFQDN(kd, s, "myfederation"),
+		"testservice.default.svc.cluster.local.", t, kd)
 
 	// Delete the endpoint.
-	endpoints.Subsets = []kapi.EndpointSubset{}
+	endpoints.Subsets = []v1.EndpointSubset{}
 	kd.handleEndpointAdd(endpoints)
 	kd.updateService(s, s)
 
-	// Verify that quering for federation service returns the federation domain name again.
+	// Verify that querying for federation service returns the federation domain name again.
 	verifyRecord(getFederationServiceFQDN(kd, s, "myfederation"),
-		"testservice.default.myfederation.svc.testcontinent-testreg-testzone.testcontinent-testreg.example.com.",
-		t, kd)
+		federatedServiceFQDN, t, kd)
 }
 
-// Verifies that quering KubeDNS for a federation service returns the DNS hostname if no endpoint exists and returns the local cluster IP if endpoints exist.
+// Verifies that querying KubeDNS for a federation service returns the
+// DNS hostname if no endpoint exists and returns the local cluster IP
+// if endpoints exist.
 func TestFederationService(t *testing.T) {
 	kd := newKubeDNS()
-	kd.federations = map[string]string{
+	kd.config.Federations = map[string]string{
 		"myfederation": "example.com",
 	}
 	kd.kubeClient = fake.NewSimpleClientset(newNodes())
 
-	// Verify that quering for federation service returns the federation domain name.
+	// Verify that querying for federation service returns the federation domain name.
 	verifyRecord("testservice.default.myfederation.svc.cluster.local.",
-		"testservice.default.myfederation.svc.testcontinent-testreg-testzone.testcontinent-testreg.example.com.",
-		t, kd)
+		federatedServiceFQDN, t, kd)
 
 	// Add a local service without any endpoint.
 	s := newService(testNamespace, testService, "1.2.3.4", "", 80)
 	assert.NoError(t, kd.servicesStore.Add(s))
 	kd.newService(s)
 
-	// Verify that quering for federation service still returns the federation domain name.
+	// Verify that querying for federation service still returns the federation domain name.
 	verifyRecord(getFederationServiceFQDN(kd, s, "myfederation"),
-		"testservice.default.myfederation.svc.testcontinent-testreg-testzone.testcontinent-testreg.example.com.",
-		t, kd)
+		federatedServiceFQDN, t, kd)
 
 	// Now add an endpoint.
 	endpoints := newEndpoints(s, newSubsetWithOnePort("", 80, "10.0.0.1"))
 	assert.NoError(t, kd.endpointsStore.Add(endpoints))
 	kd.updateService(s, s)
 
-	// Verify that quering for federation service returns the local service domain name this time.
-	verifyRecord(getFederationServiceFQDN(kd, s, "myfederation"), "testservice.default.svc.cluster.local.", t, kd)
+	// Verify that querying for federation service returns the local service domain name this time.
+	verifyRecord(getFederationServiceFQDN(kd, s, "myfederation"),
+		"testservice.default.svc.cluster.local.", t, kd)
 
 	// Remove the endpoint.
-	endpoints.Subsets = []kapi.EndpointSubset{}
+	endpoints.Subsets = []v1.EndpointSubset{}
 	kd.handleEndpointAdd(endpoints)
 	kd.updateService(s, s)
 
-	// Verify that quering for federation service returns the federation domain name again.
+	// Verify that querying for federation service returns the federation domain name again.
 	verifyRecord(getFederationServiceFQDN(kd, s, "myfederation"),
-		"testservice.default.myfederation.svc.testcontinent-testreg-testzone.testcontinent-testreg.example.com.",
-		t, kd)
+		federatedServiceFQDN, t, kd)
 }
 
 func TestFederationQueryWithoutCache(t *testing.T) {
 	kd := newKubeDNS()
-	kd.federations = map[string]string{
+	kd.config.Federations = map[string]string{
 		"myfederation":     "example.com",
 		"secondfederation": "second.example.com",
 	}
@@ -477,7 +484,7 @@ func TestFederationQueryWithoutCache(t *testing.T) {
 
 func TestFederationQueryWithCache(t *testing.T) {
 	kd := newKubeDNS()
-	kd.federations = map[string]string{
+	kd.config.Federations = map[string]string{
 		"myfederation":     "example.com",
 		"secondfederation": "second.example.com",
 	}
@@ -525,30 +532,82 @@ func testInvalidFederationQueries(t *testing.T, kd *KubeDNS) {
 			t.Errorf("expected not found error, got nil")
 		}
 		if etcdErr, ok := err.(etcd.Error); !ok || etcdErr.Code != etcd.ErrorCodeKeyNotFound {
-			t.Errorf("expected not found error, got %v", etcdErr)
+			t.Errorf("expected not found error, got %v", err)
 		}
 		assert.Equal(t, 0, len(records))
 	}
 }
 
-func newNodes() *kapi.NodeList {
-	return &kapi.NodeList{
-		Items: []kapi.Node{
+func checkConfigEqual(t *testing.T, kd *KubeDNS, expected *config.Config) {
+	const timeout = time.Duration(5)
+
+	start := time.Now()
+
+	ok := false
+
+	for time.Since(start) < timeout*time.Second {
+		kd.configLock.RLock()
+		isEqual := reflect.DeepEqual(expected.Federations, kd.config.Federations)
+		kd.configLock.RUnlock()
+
+		if isEqual {
+			ok = true
+			break
+		}
+	}
+
+	if !ok {
+		t.Errorf("Federations should be %v, got %v",
+			expected.Federations, kd.config.Federations)
+	}
+}
+
+func TestConfigSync(t *testing.T) {
+	kd := newKubeDNS()
+	mockSync := config.NewMockSync(
+		&config.Config{Federations: make(map[string]string)}, nil)
+	kd.configSync = mockSync
+
+	kd.startConfigMapSync()
+
+	checkConfigEqual(t, kd, &config.Config{Federations: make(map[string]string)})
+	// update
+	mockSync.Chan <- &config.Config{Federations: map[string]string{"name1": "domain1"}}
+	checkConfigEqual(t, kd, &config.Config{Federations: map[string]string{"name1": "domain1"}})
+	// update
+	mockSync.Chan <- &config.Config{Federations: map[string]string{"name2": "domain2"}}
+	checkConfigEqual(t, kd, &config.Config{Federations: map[string]string{"name2": "domain2"}})
+}
+
+func TestConfigSyncInitialMap(t *testing.T) {
+	// start with different initial map
+	kd := newKubeDNS()
+	mockSync := config.NewMockSync(
+		&config.Config{Federations: map[string]string{"name3": "domain3"}}, nil)
+	kd.configSync = mockSync
+
+	kd.startConfigMapSync()
+	checkConfigEqual(t, kd, &config.Config{Federations: map[string]string{"name3": "domain3"}})
+}
+
+func newNodes() *v1.NodeList {
+	return &v1.NodeList{
+		Items: []v1.Node{
 			// Node without annotation.
 			{
-				ObjectMeta: kapi.ObjectMeta{
+				ObjectMeta: v1.ObjectMeta{
 					Name: "testnode-0",
 				},
 			},
 			{
-				ObjectMeta: kapi.ObjectMeta{
+				ObjectMeta: v1.ObjectMeta{
 					Name: "testnode-1",
 					Labels: map[string]string{
 						// Note: The zone name here is an arbitrary string and doesn't exactly follow the
 						// format used by the cloud providers to name their zones. But that shouldn't matter
 						// for these tests here.
-						unversioned.LabelZoneFailureDomain: "testcontinent-testreg-testzone",
-						unversioned.LabelZoneRegion:        "testcontinent-testreg",
+						metav1.LabelZoneFailureDomain: "testcontinent-testreg-testzone",
+						metav1.LabelZoneRegion:        "testcontinent-testreg",
 					},
 				},
 			},
@@ -556,15 +615,15 @@ func newNodes() *kapi.NodeList {
 	}
 }
 
-func newService(namespace, serviceName, clusterIP, portName string, portNumber int32) *kapi.Service {
-	service := kapi.Service{
-		ObjectMeta: kapi.ObjectMeta{
+func newService(namespace, serviceName, clusterIP, portName string, portNumber int32) *v1.Service {
+	service := v1.Service{
+		ObjectMeta: v1.ObjectMeta{
 			Name:      serviceName,
 			Namespace: namespace,
 		},
-		Spec: kapi.ServiceSpec{
+		Spec: v1.ServiceSpec{
 			ClusterIP: clusterIP,
-			Ports: []kapi.ServicePort{
+			Ports: []v1.ServicePort{
 				{Port: portNumber, Name: portName, Protocol: "TCP"},
 			},
 		},
@@ -572,17 +631,17 @@ func newService(namespace, serviceName, clusterIP, portName string, portNumber i
 	return &service
 }
 
-func newExternalNameService() *kapi.Service {
-	service := kapi.Service{
-		ObjectMeta: kapi.ObjectMeta{
+func newExternalNameService() *v1.Service {
+	service := v1.Service{
+		ObjectMeta: v1.ObjectMeta{
 			Name:      testService,
 			Namespace: testNamespace,
 		},
-		Spec: kapi.ServiceSpec{
+		Spec: v1.ServiceSpec{
 			ClusterIP:    "None",
-			Type:         kapi.ServiceTypeExternalName,
+			Type:         v1.ServiceTypeExternalName,
 			ExternalName: testExternalName,
-			Ports: []kapi.ServicePort{
+			Ports: []v1.ServicePort{
 				{Port: 0},
 			},
 		},
@@ -590,15 +649,15 @@ func newExternalNameService() *kapi.Service {
 	return &service
 }
 
-func newHeadlessService() *kapi.Service {
-	service := kapi.Service{
-		ObjectMeta: kapi.ObjectMeta{
+func newHeadlessService() *v1.Service {
+	service := v1.Service{
+		ObjectMeta: v1.ObjectMeta{
 			Name:      testService,
 			Namespace: testNamespace,
 		},
-		Spec: kapi.ServiceSpec{
+		Spec: v1.ServiceSpec{
 			ClusterIP: "None",
-			Ports: []kapi.ServicePort{
+			Ports: []v1.ServicePort{
 				{Port: 0},
 			},
 		},
@@ -606,40 +665,40 @@ func newHeadlessService() *kapi.Service {
 	return &service
 }
 
-func newEndpoints(service *kapi.Service, subsets ...kapi.EndpointSubset) *kapi.Endpoints {
-	endpoints := kapi.Endpoints{
+func newEndpoints(service *v1.Service, subsets ...v1.EndpointSubset) *v1.Endpoints {
+	endpoints := v1.Endpoints{
 		ObjectMeta: service.ObjectMeta,
-		Subsets:    []kapi.EndpointSubset{},
+		Subsets:    []v1.EndpointSubset{},
 	}
 
 	endpoints.Subsets = append(endpoints.Subsets, subsets...)
 	return &endpoints
 }
 
-func newSubsetWithOnePort(portName string, port int32, ips ...string) kapi.EndpointSubset {
+func newSubsetWithOnePort(portName string, port int32, ips ...string) v1.EndpointSubset {
 	subset := newSubset()
-	subset.Ports = append(subset.Ports, kapi.EndpointPort{Port: port, Name: portName, Protocol: "TCP"})
+	subset.Ports = append(subset.Ports, v1.EndpointPort{Port: port, Name: portName, Protocol: "TCP"})
 	for _, ip := range ips {
-		subset.Addresses = append(subset.Addresses, kapi.EndpointAddress{IP: ip})
+		subset.Addresses = append(subset.Addresses, v1.EndpointAddress{IP: ip})
 	}
 	return subset
 }
 
-func newSubsetWithTwoPorts(portName1 string, portNumber1 int32, portName2 string, portNumber2 int32, ips ...string) kapi.EndpointSubset {
+func newSubsetWithTwoPorts(portName1 string, portNumber1 int32, portName2 string, portNumber2 int32, ips ...string) v1.EndpointSubset {
 	subset := newSubsetWithOnePort(portName1, portNumber1, ips...)
-	subset.Ports = append(subset.Ports, kapi.EndpointPort{Port: portNumber2, Name: portName2, Protocol: "TCP"})
+	subset.Ports = append(subset.Ports, v1.EndpointPort{Port: portNumber2, Name: portName2, Protocol: "TCP"})
 	return subset
 }
 
-func newSubset() kapi.EndpointSubset {
-	subset := kapi.EndpointSubset{
-		Addresses: []kapi.EndpointAddress{},
-		Ports:     []kapi.EndpointPort{},
+func newSubset() v1.EndpointSubset {
+	subset := v1.EndpointSubset{
+		Addresses: []v1.EndpointAddress{},
+		Ports:     []v1.EndpointPort{},
 	}
 	return subset
 }
 
-func assertSRVForHeadlessService(t *testing.T, kd *KubeDNS, s *kapi.Service, e *kapi.Endpoints) {
+func assertSRVForHeadlessService(t *testing.T, kd *KubeDNS, s *v1.Service, e *v1.Endpoints) {
 	for _, subset := range e.Subsets {
 		for _, port := range subset.Ports {
 			records, err := kd.Records(getSRVFQDN(kd, s, port.Name), false)
@@ -650,7 +709,7 @@ func assertSRVForHeadlessService(t *testing.T, kd *KubeDNS, s *kapi.Service, e *
 	}
 }
 
-func assertDNSForHeadlessService(t *testing.T, kd *KubeDNS, e *kapi.Endpoints) {
+func assertDNSForHeadlessService(t *testing.T, kd *KubeDNS, e *v1.Endpoints) {
 	records, err := kd.Records(getEndpointsFQDN(kd, e), false)
 	require.NoError(t, err)
 	endpoints := map[string]bool{}
@@ -666,8 +725,8 @@ func assertDNSForHeadlessService(t *testing.T, kd *KubeDNS, e *kapi.Endpoints) {
 	}
 }
 
-func assertDNSForExternalService(t *testing.T, kd *KubeDNS, s *kapi.Service) {
-	records, err := kd.Records(getServiceFQDN(kd, s), false)
+func assertDNSForExternalService(t *testing.T, kd *KubeDNS, s *v1.Service) {
+	records, err := kd.Records(getServiceFQDN(kd.domain, s), false)
 	require.NoError(t, err)
 	assert.Equal(t, 1, len(records))
 	assert.Equal(t, testExternalName, records[0].Host)
@@ -679,7 +738,7 @@ func assertRecordPortsMatchPort(t *testing.T, port int32, records []skymsg.Servi
 	}
 }
 
-func assertCNameRecordsMatchEndpointIPs(t *testing.T, kd *KubeDNS, e []kapi.EndpointAddress, records []skymsg.Service) {
+func assertCNameRecordsMatchEndpointIPs(t *testing.T, kd *KubeDNS, e []v1.EndpointAddress, records []skymsg.Service) {
 	endpoints := map[string]bool{}
 	for _, endpointAddress := range e {
 		endpoints[endpointAddress.IP] = true
@@ -699,33 +758,33 @@ func getIPForCName(t *testing.T, kd *KubeDNS, cname string) string {
 	return records[0].Host
 }
 
-func assertNoDNSForHeadlessService(t *testing.T, kd *KubeDNS, s *kapi.Service) {
-	records, err := kd.Records(getServiceFQDN(kd, s), false)
+func assertNoDNSForHeadlessService(t *testing.T, kd *KubeDNS, s *v1.Service) {
+	records, err := kd.Records(getServiceFQDN(kd.domain, s), false)
 	require.Error(t, err)
 	assert.Equal(t, 0, len(records))
 }
 
-func assertNoDNSForExternalService(t *testing.T, kd *KubeDNS, s *kapi.Service) {
-	records, err := kd.Records(getServiceFQDN(kd, s), false)
+func assertNoDNSForExternalService(t *testing.T, kd *KubeDNS, s *v1.Service) {
+	records, err := kd.Records(getServiceFQDN(kd.domain, s), false)
 	require.Error(t, err)
 	assert.Equal(t, 0, len(records))
 }
 
-func assertSRVForNamedPort(t *testing.T, kd *KubeDNS, s *kapi.Service, portName string) {
+func assertSRVForNamedPort(t *testing.T, kd *KubeDNS, s *v1.Service, portName string) {
 	records, err := kd.Records(getSRVFQDN(kd, s, portName), false)
 	require.NoError(t, err)
 	assert.Equal(t, 1, len(records))
-	assert.Equal(t, getServiceFQDN(kd, s), records[0].Host)
+	assert.Equal(t, getServiceFQDN(kd.domain, s), records[0].Host)
 }
 
-func assertNoSRVForNamedPort(t *testing.T, kd *KubeDNS, s *kapi.Service, portName string) {
+func assertNoSRVForNamedPort(t *testing.T, kd *KubeDNS, s *v1.Service, portName string) {
 	records, err := kd.Records(getSRVFQDN(kd, s, portName), false)
 	require.Error(t, err)
 	assert.Equal(t, 0, len(records))
 }
 
-func assertNoDNSForClusterIP(t *testing.T, kd *KubeDNS, s *kapi.Service) {
-	serviceFQDN := getServiceFQDN(kd, s)
+func assertNoDNSForClusterIP(t *testing.T, kd *KubeDNS, s *v1.Service) {
+	serviceFQDN := getServiceFQDN(kd.domain, s)
 	queries := getEquivalentQueries(serviceFQDN, s.Namespace)
 	for _, query := range queries {
 		records, err := kd.Records(query, false)
@@ -734,8 +793,8 @@ func assertNoDNSForClusterIP(t *testing.T, kd *KubeDNS, s *kapi.Service) {
 	}
 }
 
-func assertDNSForClusterIP(t *testing.T, kd *KubeDNS, s *kapi.Service) {
-	serviceFQDN := getServiceFQDN(kd, s)
+func assertDNSForClusterIP(t *testing.T, kd *KubeDNS, s *v1.Service) {
+	serviceFQDN := getServiceFQDN(kd.domain, s)
 	queries := getEquivalentQueries(serviceFQDN, s.Namespace)
 	for _, query := range queries {
 		records, err := kd.Records(query, false)
@@ -745,17 +804,17 @@ func assertDNSForClusterIP(t *testing.T, kd *KubeDNS, s *kapi.Service) {
 	}
 }
 
-func assertReverseRecord(t *testing.T, kd *KubeDNS, s *kapi.Service) {
-	segments := reverseArray(strings.Split(s.Spec.ClusterIP, "."))
-	reverseLookup := fmt.Sprintf("%s%s", strings.Join(segments, "."), arpaSuffix)
+func assertReverseRecord(t *testing.T, kd *KubeDNS, s *v1.Service) {
+	segments := util.ReverseArray(strings.Split(s.Spec.ClusterIP, "."))
+	reverseLookup := fmt.Sprintf("%s%s", strings.Join(segments, "."), util.ArpaSuffix)
 	reverseRecord, err := kd.ReverseRecord(reverseLookup)
 	require.NoError(t, err)
-	assert.Equal(t, kd.getServiceFQDN(s), reverseRecord.Host)
+	assert.Equal(t, getServiceFQDN(kd.domain, s), reverseRecord.Host)
 }
 
-func assertNoReverseRecord(t *testing.T, kd *KubeDNS, s *kapi.Service) {
-	segments := reverseArray(strings.Split(s.Spec.ClusterIP, "."))
-	reverseLookup := fmt.Sprintf("%s%s", strings.Join(segments, "."), arpaSuffix)
+func assertNoReverseRecord(t *testing.T, kd *KubeDNS, s *v1.Service) {
+	segments := util.ReverseArray(strings.Split(s.Spec.ClusterIP, "."))
+	reverseLookup := fmt.Sprintf("%s%s", strings.Join(segments, "."), util.ArpaSuffix)
 	reverseRecord, err := kd.ReverseRecord(reverseLookup)
 	require.Error(t, err)
 	require.Nil(t, reverseRecord)
@@ -771,18 +830,14 @@ func getEquivalentQueries(serviceFQDN, namespace string) []string {
 	}
 }
 
-func getFederationServiceFQDN(kd *KubeDNS, s *kapi.Service, federationName string) string {
+func getFederationServiceFQDN(kd *KubeDNS, s *v1.Service, federationName string) string {
 	return fmt.Sprintf("%s.%s.%s.svc.%s", s.Name, s.Namespace, federationName, kd.domain)
 }
 
-func getServiceFQDN(kd *KubeDNS, s *kapi.Service) string {
-	return fmt.Sprintf("%s.%s.svc.%s", s.Name, s.Namespace, kd.domain)
-}
-
-func getEndpointsFQDN(kd *KubeDNS, e *kapi.Endpoints) string {
+func getEndpointsFQDN(kd *KubeDNS, e *v1.Endpoints) string {
 	return fmt.Sprintf("%s.%s.svc.%s", e.Name, e.Namespace, kd.domain)
 }
 
-func getSRVFQDN(kd *KubeDNS, s *kapi.Service, portName string) string {
+func getSRVFQDN(kd *KubeDNS, s *v1.Service, portName string) string {
 	return fmt.Sprintf("_%s._tcp.%s.%s.svc.%s", portName, s.Name, s.Namespace, kd.domain)
 }

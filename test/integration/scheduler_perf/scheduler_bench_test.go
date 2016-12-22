@@ -60,14 +60,18 @@ func benchmarkScheduling(numNodes, numScheduledPods int, b *testing.B) {
 
 	nodePreparer := framework.NewIntegrationTestNodePreparer(
 		c,
-		map[int]testutils.PrepareNodeStrategy{numNodes: &testutils.TrivialNodePrepareStrategy{}},
+		[]testutils.CountToStrategy{{Count: numNodes, Strategy: &testutils.TrivialNodePrepareStrategy{}}},
 		"scheduler-perf-",
 	)
 	if err := nodePreparer.PrepareNodes(); err != nil {
 		glog.Fatalf("%v", err)
 	}
 	defer nodePreparer.CleanupNodes()
-	makePodsFromRC(c, "rc1", numScheduledPods)
+
+	config := testutils.NewTestPodCreatorConfig()
+	config.AddStrategy("sched-test", numScheduledPods, testutils.NewSimpleWithControllerCreatePodStrategy("rc1"))
+	podCreator := testutils.NewTestPodCreator(c, config)
+	podCreator.CreatePods()
 
 	for {
 		scheduled := schedulerConfigFactory.ScheduledPodLister.Indexer.List()
@@ -78,7 +82,10 @@ func benchmarkScheduling(numNodes, numScheduledPods int, b *testing.B) {
 	}
 	// start benchmark
 	b.ResetTimer()
-	makePodsFromRC(c, "rc2", b.N)
+	config = testutils.NewTestPodCreatorConfig()
+	config.AddStrategy("sched-test", b.N, testutils.NewSimpleWithControllerCreatePodStrategy("rc2"))
+	podCreator = testutils.NewTestPodCreator(c, config)
+	podCreator.CreatePods()
 	for {
 		// This can potentially affect performance of scheduler, since List() is done under mutex.
 		// TODO: Setup watch on apiserver and wait until all pods scheduled.

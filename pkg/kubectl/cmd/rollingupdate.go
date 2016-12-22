@@ -31,6 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/v1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
@@ -179,7 +180,7 @@ func RunRollingUpdate(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args
 
 	var newRc *api.ReplicationController
 	// fetch rc
-	oldRc, err := coreClient.ReplicationControllers(cmdNamespace).Get(oldName)
+	oldRc, err := coreClient.ReplicationControllers(cmdNamespace).Get(oldName, metav1.GetOptions{})
 	if err != nil {
 		if !errors.IsNotFound(err) || len(image) == 0 || len(args) > 1 {
 			return err
@@ -243,7 +244,7 @@ func RunRollingUpdate(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args
 	// than the old rc. This selector is the hash of the rc, with a suffix to provide uniqueness for
 	// same-image updates.
 	if len(image) != 0 {
-		codec := api.Codecs.LegacyCodec(clientset.CoreClient.APIVersion())
+		codec := api.Codecs.LegacyCodec(clientset.CoreClient.RESTClient().APIVersion())
 		keepOldName = len(args) == 1
 		newName := findNewName(args, oldRc)
 		if newRc, err = kubectl.LoadExistingNextReplicationController(coreClient, cmdNamespace, newName); err != nil {
@@ -375,7 +376,7 @@ func RunRollingUpdate(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args
 	} else {
 		message = fmt.Sprintf("rolling updated to %q", newRc.Name)
 	}
-	newRc, err = coreClient.ReplicationControllers(cmdNamespace).Get(newRc.Name)
+	newRc, err = coreClient.ReplicationControllers(cmdNamespace).Get(newRc.Name, metav1.GetOptions{})
 	if err != nil {
 		return err
 	}

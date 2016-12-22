@@ -83,22 +83,33 @@ function kube::release::package_tarballs() {
   # Clean out any old releases
   rm -rf "${RELEASE_DIR}"
   mkdir -p "${RELEASE_DIR}"
-  kube::release::package_build_image_tarball &
+  kube::release::package_src_tarball &
   kube::release::package_client_tarballs &
+  kube::release::package_node_tarballs &
   kube::release::package_server_tarballs &
   kube::release::package_salt_tarball &
   kube::release::package_kube_manifests_tarball &
   kube::util::wait-for-jobs || { kube::log::error "previous tarball phase failed"; return 1; }
 
-  kube::release::package_full_tarball & # _full depends on all the previous phases
+  kube::release::package_final_tarball & # _final depends on some of the previous phases
   kube::release::package_test_tarball & # _test doesn't depend on anything
   kube::util::wait-for-jobs || { kube::log::error "previous tarball phase failed"; return 1; }
 }
 
-# Package the build image we used from the previous stage, for compliance/licensing/audit/yadda.
-function kube::release::package_build_image_tarball() {
+# Package the source code we built, for compliance/licensing/audit/yadda.
+function kube::release::package_src_tarball() {
   kube::log::status "Building tarball: src"
-  "${TAR}" czf "${RELEASE_DIR}/kubernetes-src.tar.gz" -C "${LOCAL_OUTPUT_BUILD_CONTEXT}" .
+  local source_files=(
+    $(cd "${KUBE_ROOT}" && find . -mindepth 1 -maxdepth 1 \
+      -not \( \
+        \( -path ./_\*        -o \
+           -path ./.git\*     -o \
+           -path ./.config\* -o \
+           -path ./.gsutil\*    \
+        \) -prune \
+      \))
+  )
+  "${TAR}" czf "${RELEASE_DIR}/kubernetes-src.tar.gz" -C "${KUBE_ROOT}" "${source_files[@]}"
 }
 
 # Package up all of the cross compiled clients. Over time this should grow into
@@ -136,6 +147,50 @@ function kube::release::package_client_tarballs() {
 
   kube::log::status "Waiting on tarballs"
   kube::util::wait-for-jobs || { kube::log::error "client tarball creation failed"; exit 1; }
+}
+
+# Package up all of the node binaries
+function kube::release::package_node_tarballs() {
+  local platform
+  for platform in "${KUBE_NODE_PLATFORMS[@]}"; do
+    local platform_tag=${platform/\//-} # Replace a "/" for a "-"
+    local arch=$(basename ${platform})
+    kube::log::status "Building tarball: node $platform_tag"
+
+    local release_stage="${RELEASE_STAGE}/node/${platform_tag}/kubernetes"
+    rm -rf "${release_stage}"
+    mkdir -p "${release_stage}/node/bin"
+
+    local node_bins=("${KUBE_NODE_BINARIES[@]}")
+    if [[ "${platform%/*}" == "windows" ]]; then
+      node_bins=("${KUBE_NODE_BINARIES_WIN[@]}")
+    fi
+    # This fancy expression will expand to prepend a path
+    # (${LOCAL_OUTPUT_BINPATH}/${platform}/) to every item in the
+    # KUBE_NODE_BINARIES array.
+    cp "${node_bins[@]/#/${LOCAL_OUTPUT_BINPATH}/${platform}/}" \
+      "${release_stage}/node/bin/"
+
+    # TODO: Docker images here
+    # kube::release::create_docker_images_for_server "${release_stage}/server/bin" "${arch}"
+
+    # Include the client binaries here too as they are useful debugging tools.
+    local client_bins=("${KUBE_CLIENT_BINARIES[@]}")
+    if [[ "${platform%/*}" == "windows" ]]; then
+      client_bins=("${KUBE_CLIENT_BINARIES_WIN[@]}")
+    fi
+    cp "${client_bins[@]/#/${LOCAL_OUTPUT_BINPATH}/${platform}/}" \
+      "${release_stage}/node/bin/"
+
+    cp "${KUBE_ROOT}/Godeps/LICENSES" "${release_stage}/"
+
+    cp "${RELEASE_DIR}/kubernetes-src.tar.gz" "${release_stage}/"
+
+    kube::release::clean_cruft
+
+    local package_name="${RELEASE_DIR}/kubernetes-node-${platform_tag}.tar.gz"
+    kube::release::create_tarball "${package_name}" "${release_stage}/.."
+  done
 }
 
 # Package up all of the server binaries
@@ -187,10 +242,10 @@ function kube::release::md5() {
 }
 
 function kube::release::sha1() {
-  if which shasum >/dev/null 2>&1; then
-    shasum -a1 "$1" | awk '{ print $1 }'
-  else
+  if which sha1sum >/dev/null 2>&1; then
     sha1sum "$1" | awk '{ print $1 }'
+  else
+    shasum -a1 "$1" | awk '{ print $1 }'
   fi
 }
 
@@ -305,7 +360,6 @@ function kube::release::package_kube_manifests_tarball() {
 
   local salt_dir="${KUBE_ROOT}/cluster/saltbase/salt"
   cp "${salt_dir}/cluster-autoscaler/cluster-autoscaler.manifest" "${dst_dir}/"
-  cp "${salt_dir}/fluentd-es/fluentd-es.yaml" "${release_stage}/"
   cp "${salt_dir}/fluentd-gcp/fluentd-gcp.yaml" "${release_stage}/"
   cp "${salt_dir}/kube-registry-proxy/kube-registry-proxy.yaml" "${release_stage}/"
   cp "${salt_dir}/kube-proxy/kube-proxy.manifest" "${release_stage}/"
@@ -320,14 +374,13 @@ function kube::release::package_kube_manifests_tarball() {
   cp "${salt_dir}/e2e-image-puller/e2e-image-puller.manifest" "${dst_dir}/"
   cp "${KUBE_ROOT}/cluster/gce/trusty/configure-helper.sh" "${dst_dir}/trusty-configure-helper.sh"
   cp "${KUBE_ROOT}/cluster/gce/gci/configure-helper.sh" "${dst_dir}/gci-configure-helper.sh"
+  cp "${KUBE_ROOT}/cluster/gce/gci/mounter/mounter" "${dst_dir}/gci-mounter"
   cp "${KUBE_ROOT}/cluster/gce/gci/health-monitor.sh" "${dst_dir}/health-monitor.sh"
+  cp "${KUBE_ROOT}/cluster/gce/coreos/configure-helper.sh" "${dst_dir}/coreos-configure-helper.sh"
   cp -r "${salt_dir}/kube-admission-controls/limit-range" "${dst_dir}"
   local objects
   objects=$(cd "${KUBE_ROOT}/cluster/addons" && find . \( -name \*.yaml -or -name \*.yaml.in -or -name \*.json \) | grep -v demo)
   tar c -C "${KUBE_ROOT}/cluster/addons" ${objects} | tar x -C "${dst_dir}"
-
-  # This is for coreos only. ContainerVM, GCI, or Trusty does not use it.
-  cp -r "${KUBE_ROOT}/cluster/gce/coreos/kube-manifests"/* "${release_stage}/"
 
   kube::release::clean_cruft
 
@@ -370,30 +423,30 @@ function kube::release::package_test_tarball() {
   kube::release::create_tarball "${package_name}" "${release_stage}/.."
 }
 
-# This is all the stuff you need to run/install kubernetes.  This includes:
-#   - precompiled binaries for client
+# This is all the platform-independent stuff you need to run/install kubernetes.
+# Arch-specific binaries will need to be downloaded separately (possibly by
+# using the bundled cluster/get-kube-binaries.sh script).
+# Included in this tarball:
 #   - Cluster spin up/down scripts and configs for various cloud providers
-#   - tarballs for server binary and salt configs that are ready to be uploaded
+#   - Tarballs for salt configs that are ready to be uploaded
 #     to master by whatever means appropriate.
-function kube::release::package_full_tarball() {
-  kube::log::status "Building tarball: full"
+#   - Examples (which may or may not still work)
+#   - The remnants of the docs/ directory
+function kube::release::package_final_tarball() {
+  kube::log::status "Building tarball: final"
 
+  # This isn't a "full" tarball anymore, but the release lib still expects
+  # artifacts under "full/kubernetes/"
   local release_stage="${RELEASE_STAGE}/full/kubernetes"
   rm -rf "${release_stage}"
   mkdir -p "${release_stage}"
 
-  # Copy all of the client binaries in here, but not test or server binaries.
-  # The server binaries are included with the server binary tarball.
-  local platform
-  for platform in "${KUBE_CLIENT_PLATFORMS[@]}"; do
-    local client_bins=("${KUBE_CLIENT_BINARIES[@]}")
-    if [[ "${platform%/*}" == "windows" ]]; then
-      client_bins=("${KUBE_CLIENT_BINARIES_WIN[@]}")
-    fi
-    mkdir -p "${release_stage}/platforms/${platform}"
-    cp "${client_bins[@]/#/${LOCAL_OUTPUT_BINPATH}/${platform}/}" \
-      "${release_stage}/platforms/${platform}"
-  done
+  mkdir -p "${release_stage}/client"
+  cat <<EOF > "${release_stage}/client/README"
+Client binaries are no longer included in the Kubernetes final tarball.
+
+Run cluster/get-kube-binaries.sh to download client and server binaries.
+EOF
 
   # We want everything in /cluster except saltbase.  That is only needed on the
   # server.
@@ -402,8 +455,12 @@ function kube::release::package_full_tarball() {
 
   mkdir -p "${release_stage}/server"
   cp "${RELEASE_DIR}/kubernetes-salt.tar.gz" "${release_stage}/server/"
-  cp "${RELEASE_DIR}"/kubernetes-server-*.tar.gz "${release_stage}/server/"
   cp "${RELEASE_DIR}/kubernetes-manifests.tar.gz" "${release_stage}/server/"
+  cat <<EOF > "${release_stage}/server/README"
+Server binary tarballs are no longer included in the Kubernetes final tarball.
+
+Run cluster/get-kube-binaries.sh to download client and server binaries.
+EOF
 
   mkdir -p "${release_stage}/third_party"
   cp -R "${KUBE_ROOT}/third_party/htpasswd" "${release_stage}/third_party/htpasswd"

@@ -29,14 +29,16 @@ import (
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
+	corepod "k8s.io/kubernetes/pkg/registry/core/pod"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage"
 	etcdstorage "k8s.io/kubernetes/pkg/storage/etcd"
 	"k8s.io/kubernetes/pkg/storage/etcd/etcdtest"
 	etcdtesting "k8s.io/kubernetes/pkg/storage/etcd/testing"
+	"k8s.io/kubernetes/pkg/storage/etcd3"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/watch"
@@ -45,20 +47,21 @@ import (
 )
 
 func newEtcdTestStorage(t *testing.T, codec runtime.Codec, prefix string) (*etcdtesting.EtcdTestServer, storage.Interface) {
-	server := etcdtesting.NewEtcdTestClientServer(t)
-	storage := etcdstorage.NewEtcdStorage(server.Client, codec, prefix, false, etcdtest.DeserializationCacheSize)
+	server, _ := etcdtesting.NewUnsecuredEtcd3TestClientServer(t)
+	storage := etcd3.New(server.V3Client, codec, prefix)
 	return server, storage
 }
 
-func newTestCacher(s storage.Interface) *storage.Cacher {
+func newTestCacher(s storage.Interface, cap int) *storage.Cacher {
 	prefix := "pods"
 	config := storage.CacherConfig{
-		CacheCapacity:  10,
+		CacheCapacity:  cap,
 		Storage:        s,
 		Versioner:      etcdstorage.APIObjectVersioner{},
 		Type:           &api.Pod{},
 		ResourcePrefix: prefix,
 		KeyFunc:        func(obj runtime.Object) (string, error) { return storage.NamespaceKeyFunc(prefix, obj) },
+		GetAttrsFunc:   corepod.GetAttrs,
 		NewListFunc:    func() runtime.Object { return &api.PodList{} },
 		Codec:          testapi.Default.Codec(),
 	}
@@ -81,22 +84,53 @@ func updatePod(t *testing.T, s storage.Interface, obj, old *api.Pod) *api.Pod {
 		}
 		return newObj.(*api.Pod), nil, nil
 	}
-	key := etcdtest.AddPrefix("pods/" + obj.Namespace + "/" + obj.Name)
+	key := "pods/" + obj.Namespace + "/" + obj.Name
 	if err := s.GuaranteedUpdate(context.TODO(), key, &api.Pod{}, old == nil, nil, updateFn); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 	obj.ResourceVersion = ""
 	result := &api.Pod{}
-	if err := s.Get(context.TODO(), key, result, false); err != nil {
+	if err := s.Get(context.TODO(), key, "", result, false); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 	return result
 }
 
+func TestGet(t *testing.T) {
+	server, etcdStorage := newEtcdTestStorage(t, testapi.Default.Codec(), etcdtest.PathPrefix())
+	defer server.Terminate(t)
+	cacher := newTestCacher(etcdStorage, 10)
+	defer cacher.Stop()
+
+	podFoo := makeTestPod("foo")
+	fooCreated := updatePod(t, etcdStorage, podFoo, nil)
+
+	// We pass the ResourceVersion from the above Create() operation.
+	result := &api.Pod{}
+	if err := cacher.Get(context.TODO(), "pods/ns/foo", fooCreated.ResourceVersion, result, true); err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+	if e, a := *fooCreated, *result; !reflect.DeepEqual(e, a) {
+		t.Errorf("Expected: %#v, got: %#v", e, a)
+	}
+
+	if err := cacher.Get(context.TODO(), "pods/ns/bar", fooCreated.ResourceVersion, result, true); err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+	emptyPod := api.Pod{}
+	if e, a := emptyPod, *result; !reflect.DeepEqual(e, a) {
+		t.Errorf("Expected: %#v, got: %#v", e, a)
+	}
+
+	if err := cacher.Get(context.TODO(), "pods/ns/bar", fooCreated.ResourceVersion, result, false); !storage.IsNotFound(err) {
+		t.Errorf("Unexpected error: %v", err)
+	}
+}
+
 func TestList(t *testing.T) {
 	server, etcdStorage := newEtcdTestStorage(t, testapi.Default.Codec(), etcdtest.PathPrefix())
 	defer server.Terminate(t)
-	cacher := newTestCacher(etcdStorage)
+	cacher := newTestCacher(etcdStorage, 10)
 	defer cacher.Stop()
 
 	podFoo := makeTestPod("foo")
@@ -119,7 +153,7 @@ func TestList(t *testing.T) {
 	updatePod(t, etcdStorage, podFooNS2, nil)
 
 	deleted := api.Pod{}
-	if err := etcdStorage.Delete(context.TODO(), etcdtest.AddPrefix("pods/ns/bar"), &deleted, nil); err != nil {
+	if err := etcdStorage.Delete(context.TODO(), "pods/ns/bar", &deleted, nil); err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
 
@@ -153,7 +187,7 @@ func TestList(t *testing.T) {
 	for _, item := range result.Items {
 		// unset fields that are set by the infrastructure
 		item.ResourceVersion = ""
-		item.CreationTimestamp = unversioned.Time{}
+		item.CreationTimestamp = metav1.Time{}
 
 		if item.Namespace != "ns" {
 			t.Errorf("Unexpected namespace: %s", item.Namespace)
@@ -171,6 +205,29 @@ func TestList(t *testing.T) {
 		if e, a := *expected, item; !reflect.DeepEqual(e, a) {
 			t.Errorf("Expected: %#v, got: %#v", e, a)
 		}
+	}
+}
+
+func TestInfiniteList(t *testing.T) {
+	server, etcdStorage := newEtcdTestStorage(t, testapi.Default.Codec(), etcdtest.PathPrefix())
+	defer server.Terminate(t)
+	cacher := newTestCacher(etcdStorage, 10)
+	defer cacher.Stop()
+
+	podFoo := makeTestPod("foo")
+	fooCreated := updatePod(t, etcdStorage, podFoo, nil)
+
+	// Set up List at fooCreated.ResourceVersion + 10
+	rv, err := storage.ParseWatchResourceVersion(fooCreated.ResourceVersion)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	listRV := strconv.Itoa(int(rv + 10))
+
+	result := &api.PodList{}
+	err = cacher.List(context.TODO(), "pods/ns", listRV, storage.Everything, result)
+	if !errors.IsTimeout(err) {
+		t.Errorf("Unexpected error: %v", err)
 	}
 }
 
@@ -210,7 +267,7 @@ func TestWatch(t *testing.T) {
 	// Inject one list error to make sure we test the relist case.
 	etcdStorage = &injectListError{errors: 1, Interface: etcdStorage}
 	defer server.Terminate(t)
-	cacher := newTestCacher(etcdStorage)
+	cacher := newTestCacher(etcdStorage, 3) // small capacity to trigger "too old version" error
 	defer cacher.Stop()
 
 	podFoo := makeTestPod("foo")
@@ -285,7 +342,7 @@ func TestWatch(t *testing.T) {
 func TestWatcherTimeout(t *testing.T) {
 	server, etcdStorage := newEtcdTestStorage(t, testapi.Default.Codec(), etcdtest.PathPrefix())
 	defer server.Terminate(t)
-	cacher := newTestCacher(etcdStorage)
+	cacher := newTestCacher(etcdStorage, 10)
 	defer cacher.Stop()
 
 	// initialVersion is used to initate the watcher at the beginning of the world,
@@ -296,12 +353,15 @@ func TestWatcherTimeout(t *testing.T) {
 	}
 	startVersion := strconv.Itoa(int(initialVersion))
 
-	// Create a watcher that will not be reading any result.
-	watcher, err := cacher.WatchList(context.TODO(), "pods/ns", startVersion, storage.Everything)
-	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
+	// Create a number of watchers that will not be reading any result.
+	nonReadingWatchers := 50
+	for i := 0; i < nonReadingWatchers; i++ {
+		watcher, err := cacher.WatchList(context.TODO(), "pods/ns", startVersion, storage.Everything)
+		if err != nil {
+			t.Fatalf("Unexpected error: %v", err)
+		}
+		defer watcher.Stop()
 	}
-	defer watcher.Stop()
 
 	// Create a second watcher that will be reading result.
 	readingWatcher, err := cacher.WatchList(context.TODO(), "pods/ns", startVersion, storage.Everything)
@@ -310,17 +370,21 @@ func TestWatcherTimeout(t *testing.T) {
 	}
 	defer readingWatcher.Stop()
 
+	startTime := time.Now()
 	for i := 1; i <= 22; i++ {
 		pod := makeTestPod(strconv.Itoa(i))
 		_ = updatePod(t, etcdStorage, pod, nil)
 		verifyWatchEvent(t, readingWatcher, watch.Added, pod)
+	}
+	if time.Since(startTime) > time.Duration(250*nonReadingWatchers)*time.Millisecond {
+		t.Errorf("waiting for events took too long: %v", time.Since(startTime))
 	}
 }
 
 func TestFiltering(t *testing.T) {
 	server, etcdStorage := newEtcdTestStorage(t, testapi.Default.Codec(), etcdtest.PathPrefix())
 	defer server.Terminate(t)
-	cacher := newTestCacher(etcdStorage)
+	cacher := newTestCacher(etcdStorage, 10)
 	defer cacher.Stop()
 
 	// Ensure that the cacher is initialized, before creating any pods,
@@ -351,7 +415,7 @@ func TestFiltering(t *testing.T) {
 	_ = updatePod(t, etcdStorage, podFooPrime, fooUnfiltered)
 
 	deleted := api.Pod{}
-	if err := etcdStorage.Delete(context.TODO(), etcdtest.AddPrefix("pods/ns/foo"), &deleted, nil); err != nil {
+	if err := etcdStorage.Delete(context.TODO(), "pods/ns/foo", &deleted, nil); err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
 
@@ -382,7 +446,7 @@ func TestFiltering(t *testing.T) {
 func TestStartingResourceVersion(t *testing.T) {
 	server, etcdStorage := newEtcdTestStorage(t, testapi.Default.Codec(), etcdtest.PathPrefix())
 	defer server.Terminate(t)
-	cacher := newTestCacher(etcdStorage)
+	cacher := newTestCacher(etcdStorage, 10)
 	defer cacher.Stop()
 
 	// add 1 object

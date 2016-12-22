@@ -20,36 +20,37 @@ import (
 	"fmt"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
-	"k8s.io/kubernetes/pkg/apis/extensions"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
+	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/client/testing/core"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/informers"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/util/uuid"
 )
 
 var (
 	alwaysReady = func() bool { return true }
-	noTimestamp = unversioned.Time{}
+	noTimestamp = metav1.Time{}
 )
 
-func rs(name string, replicas int, selector map[string]string, timestamp unversioned.Time) *extensions.ReplicaSet {
+func rs(name string, replicas int, selector map[string]string, timestamp metav1.Time) *extensions.ReplicaSet {
 	return &extensions.ReplicaSet{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: v1.ObjectMeta{
 			Name:              name,
 			CreationTimestamp: timestamp,
-			Namespace:         api.NamespaceDefault,
+			Namespace:         v1.NamespaceDefault,
 		},
 		Spec: extensions.ReplicaSetSpec{
-			Replicas: int32(replicas),
-			Selector: &unversioned.LabelSelector{MatchLabels: selector},
-			Template: api.PodTemplateSpec{},
+			Replicas: func() *int32 { i := int32(replicas); return &i }(),
+			Selector: &metav1.LabelSelector{MatchLabels: selector},
+			Template: v1.PodTemplateSpec{},
 		},
 	}
 }
@@ -64,25 +65,28 @@ func newRSWithStatus(name string, specReplicas, statusReplicas int, selector map
 
 func newDeployment(name string, replicas int, revisionHistoryLimit *int32, maxSurge, maxUnavailable *intstr.IntOrString, selector map[string]string) *extensions.Deployment {
 	d := extensions.Deployment{
-		TypeMeta: unversioned.TypeMeta{APIVersion: registered.GroupOrDie(extensions.GroupName).GroupVersion.String()},
-		ObjectMeta: api.ObjectMeta{
+		TypeMeta: metav1.TypeMeta{APIVersion: registered.GroupOrDie(extensions.GroupName).GroupVersion.String()},
+		ObjectMeta: v1.ObjectMeta{
 			UID:       uuid.NewUUID(),
 			Name:      name,
-			Namespace: api.NamespaceDefault,
+			Namespace: v1.NamespaceDefault,
 		},
 		Spec: extensions.DeploymentSpec{
 			Strategy: extensions.DeploymentStrategy{
-				Type:          extensions.RollingUpdateDeploymentStrategyType,
-				RollingUpdate: &extensions.RollingUpdateDeployment{},
+				Type: extensions.RollingUpdateDeploymentStrategyType,
+				RollingUpdate: &extensions.RollingUpdateDeployment{
+					MaxUnavailable: func() *intstr.IntOrString { i := intstr.FromInt(0); return &i }(),
+					MaxSurge:       func() *intstr.IntOrString { i := intstr.FromInt(0); return &i }(),
+				},
 			},
-			Replicas: int32(replicas),
-			Selector: &unversioned.LabelSelector{MatchLabels: selector},
-			Template: api.PodTemplateSpec{
-				ObjectMeta: api.ObjectMeta{
+			Replicas: func() *int32 { i := int32(replicas); return &i }(),
+			Selector: &metav1.LabelSelector{MatchLabels: selector},
+			Template: v1.PodTemplateSpec{
+				ObjectMeta: v1.ObjectMeta{
 					Labels: selector,
 				},
-				Spec: api.PodSpec{
-					Containers: []api.Container{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
 						{
 							Image: "foo/bar",
 						},
@@ -93,22 +97,22 @@ func newDeployment(name string, replicas int, revisionHistoryLimit *int32, maxSu
 		},
 	}
 	if maxSurge != nil {
-		d.Spec.Strategy.RollingUpdate.MaxSurge = *maxSurge
+		d.Spec.Strategy.RollingUpdate.MaxSurge = maxSurge
 	}
 	if maxUnavailable != nil {
-		d.Spec.Strategy.RollingUpdate.MaxUnavailable = *maxUnavailable
+		d.Spec.Strategy.RollingUpdate.MaxUnavailable = maxUnavailable
 	}
 	return &d
 }
 
 func newReplicaSet(d *extensions.Deployment, name string, replicas int) *extensions.ReplicaSet {
 	return &extensions.ReplicaSet{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: v1.ObjectMeta{
 			Name:      name,
-			Namespace: api.NamespaceDefault,
+			Namespace: v1.NamespaceDefault,
 		},
 		Spec: extensions.ReplicaSetSpec{
-			Replicas: int32(replicas),
+			Replicas: func() *int32 { i := int32(replicas); return &i }(),
 			Template: d.Spec.Template,
 		},
 	}
@@ -130,7 +134,7 @@ type fixture struct {
 	// Objects to put in the store.
 	dLister   []*extensions.Deployment
 	rsLister  []*extensions.ReplicaSet
-	podLister []*api.Pod
+	podLister []*v1.Pod
 
 	// Actions expected to happen on the client. Objects from here are also
 	// preloaded into NewSimpleFake.
@@ -139,25 +143,17 @@ type fixture struct {
 }
 
 func (f *fixture) expectUpdateDeploymentAction(d *extensions.Deployment) {
-	f.actions = append(f.actions, core.NewUpdateAction(unversioned.GroupVersionResource{Resource: "deployments"}, d.Namespace, d))
+	f.actions = append(f.actions, core.NewUpdateAction(schema.GroupVersionResource{Resource: "deployments"}, d.Namespace, d))
 }
 
 func (f *fixture) expectUpdateDeploymentStatusAction(d *extensions.Deployment) {
-	action := core.NewUpdateAction(unversioned.GroupVersionResource{Resource: "deployments"}, d.Namespace, d)
+	action := core.NewUpdateAction(schema.GroupVersionResource{Resource: "deployments"}, d.Namespace, d)
 	action.Subresource = "status"
 	f.actions = append(f.actions, action)
 }
 
 func (f *fixture) expectCreateRSAction(rs *extensions.ReplicaSet) {
-	f.actions = append(f.actions, core.NewCreateAction(unversioned.GroupVersionResource{Resource: "replicasets"}, rs.Namespace, rs))
-}
-
-func (f *fixture) expectUpdateRSAction(rs *extensions.ReplicaSet) {
-	f.actions = append(f.actions, core.NewUpdateAction(unversioned.GroupVersionResource{Resource: "replicasets"}, rs.Namespace, rs))
-}
-
-func (f *fixture) expectListPodAction(namespace string, opt api.ListOptions) {
-	f.actions = append(f.actions, core.NewListAction(unversioned.GroupVersionResource{Resource: "pods"}, namespace, opt))
+	f.actions = append(f.actions, core.NewCreateAction(schema.GroupVersionResource{Resource: "replicasets"}, rs.Namespace, rs))
 }
 
 func newFixture(t *testing.T) *fixture {
@@ -169,7 +165,7 @@ func newFixture(t *testing.T) *fixture {
 
 func (f *fixture) run(deploymentName string) {
 	f.client = fake.NewSimpleClientset(f.objects...)
-	informers := informers.NewSharedInformerFactory(f.client, controller.NoResyncPeriodFunc())
+	informers := informers.NewSharedInformerFactory(f.client, nil, controller.NoResyncPeriodFunc())
 	c := NewDeploymentController(informers.Deployments(), informers.ReplicaSets(), informers.Pods(), f.client)
 	c.eventRecorder = &record.FakeRecorder{}
 	c.dListerSynced = alwaysReady
@@ -232,17 +228,19 @@ func TestSyncDeploymentDontDoAnythingDuringDeletion(t *testing.T) {
 	f := newFixture(t)
 
 	d := newDeployment("foo", 1, nil, nil, nil, map[string]string{"foo": "bar"})
-	now := unversioned.Now()
+	now := metav1.Now()
 	d.DeletionTimestamp = &now
 	f.dLister = append(f.dLister, d)
+	f.objects = append(f.objects, d)
 
+	f.expectUpdateDeploymentStatusAction(d)
 	f.run(getKey(d, t))
 }
 
 // issue: https://github.com/kubernetes/kubernetes/issues/23218
 func TestDeploymentController_dontSyncDeploymentsWithEmptyPodSelector(t *testing.T) {
 	fake := &fake.Clientset{}
-	informers := informers.NewSharedInformerFactory(fake, controller.NoResyncPeriodFunc())
+	informers := informers.NewSharedInformerFactory(fake, nil, controller.NoResyncPeriodFunc())
 	controller := NewDeploymentController(informers.Deployments(), informers.ReplicaSets(), informers.Pods(), fake)
 	controller.eventRecorder = &record.FakeRecorder{}
 	controller.dListerSynced = alwaysReady
@@ -254,7 +252,7 @@ func TestDeploymentController_dontSyncDeploymentsWithEmptyPodSelector(t *testing
 	informers.Start(stopCh)
 
 	d := newDeployment("foo", 1, nil, nil, nil, map[string]string{"foo": "bar"})
-	empty := unversioned.LabelSelector{}
+	empty := metav1.LabelSelector{}
 	d.Spec.Selector = &empty
 	controller.dLister.Indexer.Add(d)
 	// We expect the deployment controller to not take action here since it's configuration

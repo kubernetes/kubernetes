@@ -26,11 +26,11 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
 	_ "k8s.io/kubernetes/pkg/apis/extensions"
 	_ "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/runtime/serializer/protobuf"
 	"k8s.io/kubernetes/pkg/util/diff"
 	"k8s.io/kubernetes/pkg/util/sets"
@@ -41,7 +41,7 @@ var nonProtobaleAPIGroups = sets.NewString(
 )
 
 func init() {
-	codecsToTest = append(codecsToTest, func(version unversioned.GroupVersion, item runtime.Object) (runtime.Codec, bool, error) {
+	codecsToTest = append(codecsToTest, func(version schema.GroupVersion, item runtime.Object) (runtime.Codec, bool, error) {
 		if nonProtobaleAPIGroups.Has(version.Group) {
 			return nil, false, nil
 		}
@@ -54,15 +54,15 @@ func TestUniversalDeserializer(t *testing.T) {
 	expected := &v1.Pod{ObjectMeta: v1.ObjectMeta{Name: "test"}}
 	d := api.Codecs.UniversalDeserializer()
 	for _, mediaType := range []string{"application/json", "application/yaml", "application/vnd.kubernetes.protobuf"} {
-		e, ok := api.Codecs.SerializerForMediaType(mediaType, nil)
+		info, ok := runtime.SerializerInfoForMediaType(api.Codecs.SupportedMediaTypes(), mediaType)
 		if !ok {
 			t.Fatal(mediaType)
 		}
 		buf := &bytes.Buffer{}
-		if err := e.Encode(expected, buf); err != nil {
+		if err := info.Serializer.Encode(expected, buf); err != nil {
 			t.Fatalf("%s: %v", mediaType, err)
 		}
-		obj, _, err := d.Decode(buf.Bytes(), &unversioned.GroupVersionKind{Kind: "Pod", Version: "v1"}, nil)
+		obj, _, err := d.Decode(buf.Bytes(), &schema.GroupVersionKind{Kind: "Pod", Version: "v1"}, nil)
 		if err != nil {
 			t.Fatalf("%s: %v", mediaType, err)
 		}

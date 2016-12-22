@@ -20,18 +20,18 @@ import (
 	"fmt"
 	"io"
 	"path/filepath"
+	"strings"
 
 	"k8s.io/gengo/generator"
 	"k8s.io/gengo/namer"
 	"k8s.io/gengo/types"
-	"k8s.io/kubernetes/cmd/libs/go2idl/client-gen/generators/normalization"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	clientgentypes "k8s.io/kubernetes/cmd/libs/go2idl/client-gen/types"
 )
 
 // genClientset generates a package for a clientset.
 type genClientset struct {
 	generator.DefaultGen
-	groupVersions      []unversioned.GroupVersion
+	groups             []clientgentypes.GroupVersions
 	typedClientPath    string
 	outputPackage      string
 	imports            namer.ImportTracker
@@ -57,14 +57,13 @@ func (g *genClientset) Filter(c *generator.Context, t *types.Type) bool {
 
 func (g *genClientset) Imports(c *generator.Context) (imports []string) {
 	imports = append(imports, g.imports.ImportLines()...)
-	for _, gv := range g.groupVersions {
-		group := normalization.Group(gv.Group)
-		version := normalization.Version(gv.Version)
-		undotted_group := normalization.BeforeFirstDot(group)
-		typedClientPath := filepath.Join(g.typedClientPath, group, version)
-		imports = append(imports, fmt.Sprintf("%s%s \"%s\"", version, undotted_group, typedClientPath))
-		fakeTypedClientPath := filepath.Join(typedClientPath, "fake")
-		imports = append(imports, fmt.Sprintf("fake%s%s \"%s\"", version, undotted_group, fakeTypedClientPath))
+	for _, group := range g.groups {
+		for _, version := range group.Versions {
+			typedClientPath := filepath.Join(g.typedClientPath, group.Group.NonEmpty(), version.NonEmpty())
+			imports = append(imports, strings.ToLower(fmt.Sprintf("%s%s \"%s\"", version.NonEmpty(), group.Group.NonEmpty(), typedClientPath)))
+			fakeTypedClientPath := filepath.Join(typedClientPath, "fake")
+			imports = append(imports, strings.ToLower(fmt.Sprintf("fake%s%s \"%s\"", version.NonEmpty(), group.Group.NonEmpty(), fakeTypedClientPath)))
+		}
 	}
 	// the package that has the clientset Interface
 	imports = append(imports, fmt.Sprintf("clientset \"%s\"", g.clientsetPath))
@@ -91,19 +90,14 @@ func (g *genClientset) GenerateType(c *generator.Context, t *types.Type, w io.Wr
 
 	sw.Do(checkImpl, nil)
 
-	type arg struct {
-		Group       string
-		PackageName string
-	}
-	allGroups := []arg{}
-	for _, gv := range g.groupVersions {
-		group := normalization.BeforeFirstDot(normalization.Group(gv.Group))
-		version := normalization.Version(gv.Version)
-		allGroups = append(allGroups, arg{namer.IC(group), version + group})
-	}
+	allGroups := clientgentypes.ToGroupVersionPackages(g.groups)
 
 	for _, g := range allGroups {
 		sw.Do(clientsetInterfaceImplTemplate, g)
+		// don't generated the default method if generating internalversion clientset
+		if g.IsDefaultVersion && g.Version != "" {
+			sw.Do(clientsetInterfaceDefaultVersionImpl, g)
+		}
 	}
 
 	return sw.Error()
@@ -148,8 +142,15 @@ var _ clientset.Interface = &Clientset{}
 `
 
 var clientsetInterfaceImplTemplate = `
-// $.Group$ retrieves the $.Group$Client
-func (c *Clientset) $.Group$() $.PackageName$.$.Group$Interface {
-	return &fake$.PackageName$.Fake$.Group${Fake: &c.Fake}
+// $.GroupVersion$ retrieves the $.GroupVersion$Client
+func (c *Clientset) $.GroupVersion$() $.PackageName$.$.GroupVersion$Interface {
+	return &fake$.PackageName$.Fake$.GroupVersion${Fake: &c.Fake}
+}
+`
+
+var clientsetInterfaceDefaultVersionImpl = `
+// $.Group$ retrieves the $.GroupVersion$Client
+func (c *Clientset) $.Group$() $.PackageName$.$.GroupVersion$Interface {
+	return &fake$.PackageName$.Fake$.GroupVersion${Fake: &c.Fake}
 }
 `

@@ -1,37 +1,3 @@
-<!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
-
-<!-- BEGIN STRIP_FOR_RELEASE -->
-
-<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
-     width="25" height="25">
-
-<h2>PLEASE NOTE: This document applies to the HEAD of the source tree</h2>
-
-If you are using a released version of Kubernetes, you should
-refer to the docs that go with that version.
-
-<!-- TAG RELEASE_LINK, added by the munger automatically -->
-<strong>
-The latest release of this document can be found
-[here](http://releases.k8s.io/release-1.4/docs/design/podaffinity.md).
-
-Documentation for other releases can be found at
-[releases.k8s.io](http://releases.k8s.io).
-</strong>
---
-
-<!-- END STRIP_FOR_RELEASE -->
-
-<!-- END MUNGE: UNVERSIONED_WARNING -->
-
 # Inter-pod topological affinity and anti-affinity
 
 ## Introduction
@@ -213,7 +179,7 @@ are satisfied for each node, and the node(s) with the highest weight(s) are the
 most preferred.
 
 In reality there are two variants of `RequiredDuringScheduling`: one suffixed
-with `RequiredDuringEecution` and one suffixed with `IgnoredDuringExecution`.
+with `RequiredDuringExecution` and one suffixed with `IgnoredDuringExecution`.
 For the first variant, if the affinity/anti-affinity ceases to be met at some
 point during pod execution (e.g. due to a pod label update), the system will try
 to eventually evict the pod from its node. In the second variant, the system may

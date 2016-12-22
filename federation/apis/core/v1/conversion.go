@@ -28,8 +28,6 @@ func addConversionFuncs(scheme *runtime.Scheme) error {
 	err := scheme.AddConversionFuncs(
 		v1.Convert_v1_DeleteOptions_To_api_DeleteOptions,
 		v1.Convert_api_DeleteOptions_To_v1_DeleteOptions,
-		v1.Convert_v1_ExportOptions_To_api_ExportOptions,
-		v1.Convert_api_ExportOptions_To_v1_ExportOptions,
 		v1.Convert_v1_List_To_api_List,
 		v1.Convert_api_List_To_v1_List,
 		v1.Convert_v1_ListOptions_To_api_ListOptions,
@@ -40,8 +38,6 @@ func addConversionFuncs(scheme *runtime.Scheme) error {
 		v1.Convert_api_ObjectMeta_To_v1_ObjectMeta,
 		v1.Convert_v1_ObjectReference_To_api_ObjectReference,
 		v1.Convert_api_ObjectReference_To_v1_ObjectReference,
-		v1.Convert_v1_OwnerReference_To_api_OwnerReference,
-		v1.Convert_api_OwnerReference_To_v1_OwnerReference,
 		v1.Convert_v1_Secret_To_api_Secret,
 		v1.Convert_api_Secret_To_v1_Secret,
 		v1.Convert_v1_SecretList_To_api_SecretList,

@@ -19,14 +19,14 @@ package genericapiserver
 import (
 	"testing"
 
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 )
 
 func TestDisabledVersion(t *testing.T) {
-	g1v1 := unversioned.GroupVersion{Group: "group1", Version: "version1"}
-	g1v2 := unversioned.GroupVersion{Group: "group1", Version: "version2"}
-	g2v1 := unversioned.GroupVersion{Group: "group2", Version: "version1"}
-	g3v1 := unversioned.GroupVersion{Group: "group3", Version: "version1"}
+	g1v1 := schema.GroupVersion{Group: "group1", Version: "version1"}
+	g1v2 := schema.GroupVersion{Group: "group1", Version: "version2"}
+	g2v1 := schema.GroupVersion{Group: "group2", Version: "version1"}
+	g3v1 := schema.GroupVersion{Group: "group3", Version: "version1"}
 
 	resourceType := "the-resource"
 	disabledResourceType := "the-disabled-resource"
@@ -38,11 +38,11 @@ func TestDisabledVersion(t *testing.T) {
 	config.EnableResources(g1v1.WithResource(resourceType), g2v1.WithResource(resourceType))
 	config.DisableResources(g1v2.WithResource(disabledResourceType))
 
-	expectedEnabledResources := []unversioned.GroupVersionResource{
+	expectedEnabledResources := []schema.GroupVersionResource{
 		g1v2.WithResource(resourceType),
 		g2v1.WithResource(resourceType),
 	}
-	expectedDisabledResources := []unversioned.GroupVersionResource{
+	expectedDisabledResources := []schema.GroupVersionResource{
 		g1v1.WithResource(resourceType), g1v1.WithResource(disabledResourceType),
 		g1v2.WithResource(disabledResourceType),
 		g2v1.WithResource(disabledResourceType),
@@ -78,10 +78,10 @@ func TestDisabledVersion(t *testing.T) {
 		t.Errorf("expected %v, got %v", e, a)
 	}
 
-	expectedEnabledAnyVersionResources := []unversioned.GroupResource{
+	expectedEnabledAnyVersionResources := []schema.GroupResource{
 		{Group: "group1", Resource: resourceType},
 	}
-	expectedDisabledAnyResources := []unversioned.GroupResource{
+	expectedDisabledAnyResources := []schema.GroupResource{
 		{Group: "group1", Resource: disabledResourceType},
 	}
 
@@ -119,7 +119,7 @@ func TestAnyResourcesForGroupEnabled(t *testing.T) {
 			name: "present, but disabled",
 			creator: func() APIResourceConfigSource {
 				ret := NewResourceConfig()
-				ret.DisableVersions(unversioned.GroupVersion{Group: "one", Version: "version1"})
+				ret.DisableVersions(schema.GroupVersion{Group: "one", Version: "version1"})
 				return ret
 			},
 			testGroup: "one",
@@ -130,8 +130,8 @@ func TestAnyResourcesForGroupEnabled(t *testing.T) {
 			name: "present, and one version enabled",
 			creator: func() APIResourceConfigSource {
 				ret := NewResourceConfig()
-				ret.DisableVersions(unversioned.GroupVersion{Group: "one", Version: "version1"})
-				ret.EnableVersions(unversioned.GroupVersion{Group: "one", Version: "version2"})
+				ret.DisableVersions(schema.GroupVersion{Group: "one", Version: "version1"})
+				ret.EnableVersions(schema.GroupVersion{Group: "one", Version: "version2"})
 				return ret
 			},
 			testGroup: "one",
@@ -142,8 +142,8 @@ func TestAnyResourcesForGroupEnabled(t *testing.T) {
 			name: "present, and one resource",
 			creator: func() APIResourceConfigSource {
 				ret := NewResourceConfig()
-				ret.DisableVersions(unversioned.GroupVersion{Group: "one", Version: "version1"})
-				ret.EnableResources(unversioned.GroupVersionResource{Group: "one", Version: "version2", Resource: "foo"})
+				ret.DisableVersions(schema.GroupVersion{Group: "one", Version: "version1"})
+				ret.EnableResources(schema.GroupVersionResource{Group: "one", Version: "version2", Resource: "foo"})
 				return ret
 			},
 			testGroup: "one",

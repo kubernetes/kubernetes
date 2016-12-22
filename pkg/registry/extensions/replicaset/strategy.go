@@ -119,20 +119,23 @@ func ReplicaSetToSelectableFields(rs *extensions.ReplicaSet) fields.Set {
 	return generic.MergeFieldsSets(objectMetaFieldsSet, rsSpecificFieldsSet)
 }
 
+// GetAttrs returns labels and fields of a given object for filtering purposes.
+func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
+	rs, ok := obj.(*extensions.ReplicaSet)
+	if !ok {
+		return nil, nil, fmt.Errorf("Given object is not a ReplicaSet.")
+	}
+	return labels.Set(rs.ObjectMeta.Labels), ReplicaSetToSelectableFields(rs), nil
+}
+
 // MatchReplicaSet is the filter used by the generic etcd backend to route
 // watch events from etcd to clients of the apiserver only interested in specific
 // labels/fields.
 func MatchReplicaSet(label labels.Selector, field fields.Selector) apistorage.SelectionPredicate {
 	return apistorage.SelectionPredicate{
-		Label: label,
-		Field: field,
-		GetAttrs: func(obj runtime.Object) (labels.Set, fields.Set, error) {
-			rs, ok := obj.(*extensions.ReplicaSet)
-			if !ok {
-				return nil, nil, fmt.Errorf("Given object is not a ReplicaSet.")
-			}
-			return labels.Set(rs.ObjectMeta.Labels), ReplicaSetToSelectableFields(rs), nil
-		},
+		Label:    label,
+		Field:    field,
+		GetAttrs: GetAttrs,
 	}
 }
 

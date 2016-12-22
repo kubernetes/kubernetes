@@ -18,9 +18,10 @@ package testing
 
 import (
 	"io"
+	"time"
 
 	"github.com/stretchr/testify/mock"
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	. "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/flowcontrol"
@@ -54,9 +55,9 @@ func (r *Mock) APIVersion() (Version, error) {
 	return args.Get(0).(Version), args.Error(1)
 }
 
-func (r *Mock) Status() error {
+func (r *Mock) Status() (*RuntimeStatus, error) {
 	args := r.Called()
-	return args.Error(0)
+	return args.Get(0).(*RuntimeStatus), args.Error(0)
 }
 
 func (r *Mock) GetPods(all bool) ([]*Pod, error) {
@@ -64,22 +65,22 @@ func (r *Mock) GetPods(all bool) ([]*Pod, error) {
 	return args.Get(0).([]*Pod), args.Error(1)
 }
 
-func (r *Mock) SyncPod(pod *api.Pod, apiStatus api.PodStatus, status *PodStatus, secrets []api.Secret, backOff *flowcontrol.Backoff) PodSyncResult {
+func (r *Mock) SyncPod(pod *v1.Pod, apiStatus v1.PodStatus, status *PodStatus, secrets []v1.Secret, backOff *flowcontrol.Backoff) PodSyncResult {
 	args := r.Called(pod, apiStatus, status, secrets, backOff)
 	return args.Get(0).(PodSyncResult)
 }
 
-func (r *Mock) KillPod(pod *api.Pod, runningPod Pod, gracePeriodOverride *int64) error {
+func (r *Mock) KillPod(pod *v1.Pod, runningPod Pod, gracePeriodOverride *int64) error {
 	args := r.Called(pod, runningPod, gracePeriodOverride)
 	return args.Error(0)
 }
 
-func (r *Mock) RunContainerInPod(container api.Container, pod *api.Pod, volumeMap map[string]volume.VolumePlugin) error {
+func (r *Mock) RunContainerInPod(container v1.Container, pod *v1.Pod, volumeMap map[string]volume.VolumePlugin) error {
 	args := r.Called(pod, pod, volumeMap)
 	return args.Error(0)
 }
 
-func (r *Mock) KillContainerInPod(container api.Container, pod *api.Pod) error {
+func (r *Mock) KillContainerInPod(container v1.Container, pod *v1.Pod) error {
 	args := r.Called(pod, pod)
 	return args.Error(0)
 }
@@ -89,7 +90,7 @@ func (r *Mock) GetPodStatus(uid types.UID, name, namespace string) (*PodStatus, 
 	return args.Get(0).(*PodStatus), args.Error(1)
 }
 
-func (r *Mock) ExecInContainer(containerID ContainerID, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan term.Size) error {
+func (r *Mock) ExecInContainer(containerID ContainerID, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan term.Size, timeout time.Duration) error {
 	args := r.Called(containerID, cmd, stdin, stdout, stderr, tty)
 	return args.Error(0)
 }
@@ -99,12 +100,12 @@ func (r *Mock) AttachContainer(containerID ContainerID, stdin io.Reader, stdout,
 	return args.Error(0)
 }
 
-func (r *Mock) GetContainerLogs(pod *api.Pod, containerID ContainerID, logOptions *api.PodLogOptions, stdout, stderr io.Writer) (err error) {
+func (r *Mock) GetContainerLogs(pod *v1.Pod, containerID ContainerID, logOptions *v1.PodLogOptions, stdout, stderr io.Writer) (err error) {
 	args := r.Called(pod, containerID, logOptions, stdout, stderr)
 	return args.Error(0)
 }
 
-func (r *Mock) PullImage(image ImageSpec, pullSecrets []api.Secret) error {
+func (r *Mock) PullImage(image ImageSpec, pullSecrets []v1.Secret) error {
 	args := r.Called(image, pullSecrets)
 	return args.Error(0)
 }
@@ -152,4 +153,9 @@ func (r *Mock) DeleteContainer(containerID ContainerID) error {
 func (r *Mock) ImageStats() (*ImageStats, error) {
 	args := r.Called()
 	return args.Get(0).(*ImageStats), args.Error(1)
+}
+
+// UpdatePodCIDR fulfills the cri interface.
+func (r *Mock) UpdatePodCIDR(c string) error {
+	return nil
 }

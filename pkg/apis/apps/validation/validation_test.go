@@ -21,11 +21,11 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/apps"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 )
 
-func TestValidatePetSet(t *testing.T) {
+func TestValidateStatefulSet(t *testing.T) {
 	validLabels := map[string]string{"a": "b"}
 	validPodTemplate := api.PodTemplate{
 		Template: api.PodTemplateSpec{
@@ -51,67 +51,67 @@ func TestValidatePetSet(t *testing.T) {
 			},
 		},
 	}
-	successCases := []apps.PetSet{
+	successCases := []apps.StatefulSet{
 		{
 			ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
-			Spec: apps.PetSetSpec{
-				Selector: &unversioned.LabelSelector{MatchLabels: validLabels},
+			Spec: apps.StatefulSetSpec{
+				Selector: &metav1.LabelSelector{MatchLabels: validLabels},
 				Template: validPodTemplate.Template,
 			},
 		},
 		{
 			ObjectMeta: api.ObjectMeta{Name: "abc-123", Namespace: api.NamespaceDefault},
-			Spec: apps.PetSetSpec{
-				Selector: &unversioned.LabelSelector{MatchLabels: validLabels},
+			Spec: apps.StatefulSetSpec{
+				Selector: &metav1.LabelSelector{MatchLabels: validLabels},
 				Template: validPodTemplate.Template,
 			},
 		},
 	}
 	for _, successCase := range successCases {
-		if errs := ValidatePetSet(&successCase); len(errs) != 0 {
+		if errs := ValidateStatefulSet(&successCase); len(errs) != 0 {
 			t.Errorf("expected success: %v", errs)
 		}
 	}
 
-	errorCases := map[string]apps.PetSet{
+	errorCases := map[string]apps.StatefulSet{
 		"zero-length ID": {
 			ObjectMeta: api.ObjectMeta{Name: "", Namespace: api.NamespaceDefault},
-			Spec: apps.PetSetSpec{
-				Selector: &unversioned.LabelSelector{MatchLabels: validLabels},
+			Spec: apps.StatefulSetSpec{
+				Selector: &metav1.LabelSelector{MatchLabels: validLabels},
 				Template: validPodTemplate.Template,
 			},
 		},
 		"missing-namespace": {
 			ObjectMeta: api.ObjectMeta{Name: "abc-123"},
-			Spec: apps.PetSetSpec{
-				Selector: &unversioned.LabelSelector{MatchLabels: validLabels},
+			Spec: apps.StatefulSetSpec{
+				Selector: &metav1.LabelSelector{MatchLabels: validLabels},
 				Template: validPodTemplate.Template,
 			},
 		},
 		"empty selector": {
 			ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
-			Spec: apps.PetSetSpec{
+			Spec: apps.StatefulSetSpec{
 				Template: validPodTemplate.Template,
 			},
 		},
 		"selector_doesnt_match": {
 			ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
-			Spec: apps.PetSetSpec{
-				Selector: &unversioned.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
+			Spec: apps.StatefulSetSpec{
+				Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
 				Template: validPodTemplate.Template,
 			},
 		},
 		"invalid manifest": {
 			ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
-			Spec: apps.PetSetSpec{
-				Selector: &unversioned.LabelSelector{MatchLabels: validLabels},
+			Spec: apps.StatefulSetSpec{
+				Selector: &metav1.LabelSelector{MatchLabels: validLabels},
 			},
 		},
 		"negative_replicas": {
 			ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
-			Spec: apps.PetSetSpec{
+			Spec: apps.StatefulSetSpec{
 				Replicas: -1,
-				Selector: &unversioned.LabelSelector{MatchLabels: validLabels},
+				Selector: &metav1.LabelSelector{MatchLabels: validLabels},
 			},
 		},
 		"invalid_label": {
@@ -122,8 +122,8 @@ func TestValidatePetSet(t *testing.T) {
 					"NoUppercaseOrSpecialCharsLike=Equals": "bar",
 				},
 			},
-			Spec: apps.PetSetSpec{
-				Selector: &unversioned.LabelSelector{MatchLabels: validLabels},
+			Spec: apps.StatefulSetSpec{
+				Selector: &metav1.LabelSelector{MatchLabels: validLabels},
 				Template: validPodTemplate.Template,
 			},
 		},
@@ -135,7 +135,7 @@ func TestValidatePetSet(t *testing.T) {
 					"NoUppercaseOrSpecialCharsLike=Equals": "bar",
 				},
 			},
-			Spec: apps.PetSetSpec{
+			Spec: apps.StatefulSetSpec{
 				Template: invalidPodTemplate.Template,
 			},
 		},
@@ -147,8 +147,8 @@ func TestValidatePetSet(t *testing.T) {
 					"NoUppercaseOrSpecialCharsLike=Equals": "bar",
 				},
 			},
-			Spec: apps.PetSetSpec{
-				Selector: &unversioned.LabelSelector{MatchLabels: validLabels},
+			Spec: apps.StatefulSetSpec{
+				Selector: &metav1.LabelSelector{MatchLabels: validLabels},
 				Template: validPodTemplate.Template,
 			},
 		},
@@ -157,8 +157,8 @@ func TestValidatePetSet(t *testing.T) {
 				Name:      "abc-123",
 				Namespace: api.NamespaceDefault,
 			},
-			Spec: apps.PetSetSpec{
-				Selector: &unversioned.LabelSelector{MatchLabels: validLabels},
+			Spec: apps.StatefulSetSpec{
+				Selector: &metav1.LabelSelector{MatchLabels: validLabels},
 				Template: api.PodTemplateSpec{
 					Spec: api.PodSpec{
 						RestartPolicy: api.RestartPolicyOnFailure,
@@ -176,8 +176,8 @@ func TestValidatePetSet(t *testing.T) {
 				Name:      "abc-123",
 				Namespace: api.NamespaceDefault,
 			},
-			Spec: apps.PetSetSpec{
-				Selector: &unversioned.LabelSelector{MatchLabels: validLabels},
+			Spec: apps.StatefulSetSpec{
+				Selector: &metav1.LabelSelector{MatchLabels: validLabels},
 				Template: api.PodTemplateSpec{
 					Spec: api.PodSpec{
 						RestartPolicy: api.RestartPolicyNever,
@@ -192,7 +192,7 @@ func TestValidatePetSet(t *testing.T) {
 		},
 	}
 	for k, v := range errorCases {
-		errs := ValidatePetSet(&v)
+		errs := ValidateStatefulSet(&v)
 		if len(errs) == 0 {
 			t.Errorf("expected failure for %s", k)
 		}
@@ -215,7 +215,7 @@ func TestValidatePetSet(t *testing.T) {
 	}
 }
 
-func TestValidatePetSetUpdate(t *testing.T) {
+func TestValidateStatefulSetUpdate(t *testing.T) {
 	validLabels := map[string]string{"a": "b"}
 	validPodTemplate := api.PodTemplate{
 		Template: api.PodTemplateSpec{
@@ -255,23 +255,23 @@ func TestValidatePetSetUpdate(t *testing.T) {
 		},
 	}
 	type psUpdateTest struct {
-		old    apps.PetSet
-		update apps.PetSet
+		old    apps.StatefulSet
+		update apps.StatefulSet
 	}
 	successCases := []psUpdateTest{
 		{
-			old: apps.PetSet{
+			old: apps.StatefulSet{
 				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
-				Spec: apps.PetSetSpec{
-					Selector: &unversioned.LabelSelector{MatchLabels: validLabels},
+				Spec: apps.StatefulSetSpec{
+					Selector: &metav1.LabelSelector{MatchLabels: validLabels},
 					Template: validPodTemplate.Template,
 				},
 			},
-			update: apps.PetSet{
+			update: apps.StatefulSet{
 				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
-				Spec: apps.PetSetSpec{
+				Spec: apps.StatefulSetSpec{
 					Replicas: 3,
-					Selector: &unversioned.LabelSelector{MatchLabels: validLabels},
+					Selector: &metav1.LabelSelector{MatchLabels: validLabels},
 					Template: validPodTemplate.Template,
 				},
 			},
@@ -280,99 +280,99 @@ func TestValidatePetSetUpdate(t *testing.T) {
 	for _, successCase := range successCases {
 		successCase.old.ObjectMeta.ResourceVersion = "1"
 		successCase.update.ObjectMeta.ResourceVersion = "1"
-		if errs := ValidatePetSetUpdate(&successCase.update, &successCase.old); len(errs) != 0 {
+		if errs := ValidateStatefulSetUpdate(&successCase.update, &successCase.old); len(errs) != 0 {
 			t.Errorf("expected success: %v", errs)
 		}
 	}
 	errorCases := map[string]psUpdateTest{
 		"more than one read/write": {
-			old: apps.PetSet{
+			old: apps.StatefulSet{
 				ObjectMeta: api.ObjectMeta{Name: "", Namespace: api.NamespaceDefault},
-				Spec: apps.PetSetSpec{
-					Selector: &unversioned.LabelSelector{MatchLabels: validLabels},
+				Spec: apps.StatefulSetSpec{
+					Selector: &metav1.LabelSelector{MatchLabels: validLabels},
 					Template: validPodTemplate.Template,
 				},
 			},
-			update: apps.PetSet{
+			update: apps.StatefulSet{
 				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
-				Spec: apps.PetSetSpec{
+				Spec: apps.StatefulSetSpec{
 					Replicas: 2,
-					Selector: &unversioned.LabelSelector{MatchLabels: validLabels},
+					Selector: &metav1.LabelSelector{MatchLabels: validLabels},
 					Template: readWriteVolumePodTemplate.Template,
 				},
 			},
 		},
 		"updates to a field other than spec.Replicas": {
-			old: apps.PetSet{
+			old: apps.StatefulSet{
 				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
-				Spec: apps.PetSetSpec{
-					Selector: &unversioned.LabelSelector{MatchLabels: validLabels},
+				Spec: apps.StatefulSetSpec{
+					Selector: &metav1.LabelSelector{MatchLabels: validLabels},
 					Template: validPodTemplate.Template,
 				},
 			},
-			update: apps.PetSet{
+			update: apps.StatefulSet{
 				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
-				Spec: apps.PetSetSpec{
+				Spec: apps.StatefulSetSpec{
 					Replicas: 1,
-					Selector: &unversioned.LabelSelector{MatchLabels: validLabels},
+					Selector: &metav1.LabelSelector{MatchLabels: validLabels},
 					Template: readWriteVolumePodTemplate.Template,
 				},
 			},
 		},
 		"invalid selector": {
-			old: apps.PetSet{
+			old: apps.StatefulSet{
 				ObjectMeta: api.ObjectMeta{Name: "", Namespace: api.NamespaceDefault},
-				Spec: apps.PetSetSpec{
-					Selector: &unversioned.LabelSelector{MatchLabels: validLabels},
+				Spec: apps.StatefulSetSpec{
+					Selector: &metav1.LabelSelector{MatchLabels: validLabels},
 					Template: validPodTemplate.Template,
 				},
 			},
-			update: apps.PetSet{
+			update: apps.StatefulSet{
 				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
-				Spec: apps.PetSetSpec{
+				Spec: apps.StatefulSetSpec{
 					Replicas: 2,
-					Selector: &unversioned.LabelSelector{MatchLabels: invalidLabels},
+					Selector: &metav1.LabelSelector{MatchLabels: invalidLabels},
 					Template: validPodTemplate.Template,
 				},
 			},
 		},
 		"invalid pod": {
-			old: apps.PetSet{
+			old: apps.StatefulSet{
 				ObjectMeta: api.ObjectMeta{Name: "", Namespace: api.NamespaceDefault},
-				Spec: apps.PetSetSpec{
-					Selector: &unversioned.LabelSelector{MatchLabels: validLabels},
+				Spec: apps.StatefulSetSpec{
+					Selector: &metav1.LabelSelector{MatchLabels: validLabels},
 					Template: validPodTemplate.Template,
 				},
 			},
-			update: apps.PetSet{
+			update: apps.StatefulSet{
 				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
-				Spec: apps.PetSetSpec{
+				Spec: apps.StatefulSetSpec{
 					Replicas: 2,
-					Selector: &unversioned.LabelSelector{MatchLabels: validLabels},
+					Selector: &metav1.LabelSelector{MatchLabels: validLabels},
 					Template: invalidPodTemplate.Template,
 				},
 			},
 		},
 		"negative replicas": {
-			old: apps.PetSet{
+			old: apps.StatefulSet{
 				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
-				Spec: apps.PetSetSpec{
-					Selector: &unversioned.LabelSelector{MatchLabels: validLabels},
+				Spec: apps.StatefulSetSpec{
+					Selector: &metav1.LabelSelector{MatchLabels: validLabels},
 					Template: validPodTemplate.Template,
 				},
 			},
-			update: apps.PetSet{
+			update: apps.StatefulSet{
 				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
-				Spec: apps.PetSetSpec{
+				Spec: apps.StatefulSetSpec{
 					Replicas: -1,
-					Selector: &unversioned.LabelSelector{MatchLabels: validLabels},
+					Selector: &metav1.LabelSelector{MatchLabels: validLabels},
 					Template: validPodTemplate.Template,
 				},
 			},
 		},
 	}
 	for testName, errorCase := range errorCases {
-		if errs := ValidatePetSetUpdate(&errorCase.update, &errorCase.old); len(errs) == 0 {
+		if errs := ValidateStatefulSetUpdate(&errorCase.update, &errorCase.old); len(errs) == 0 {
 			t.Errorf("expected failure: %s", testName)
 		}
 	}

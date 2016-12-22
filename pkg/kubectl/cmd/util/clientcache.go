@@ -17,21 +17,25 @@ limitations under the License.
 package util
 
 import (
-	fed_clientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	"sync"
+
+	fedclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/restclient"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/client/typed/discovery"
+	oldclient "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 )
 
-func NewClientCache(loader clientcmd.ClientConfig) *ClientCache {
+func NewClientCache(loader clientcmd.ClientConfig, discoveryClientFactory DiscoveryClientFactory) *ClientCache {
 	return &ClientCache{
-		clientsets:    make(map[unversioned.GroupVersion]*internalclientset.Clientset),
-		configs:       make(map[unversioned.GroupVersion]*restclient.Config),
-		fedClientSets: make(map[unversioned.GroupVersion]fed_clientset.Interface),
-		loader:        loader,
+		clientsets:             make(map[schema.GroupVersion]*internalclientset.Clientset),
+		configs:                make(map[schema.GroupVersion]*restclient.Config),
+		fedClientSets:          make(map[schema.GroupVersion]fedclientset.Interface),
+		loader:                 loader,
+		discoveryClientFactory: discoveryClientFactory,
 	}
 }
 
@@ -39,53 +43,81 @@ func NewClientCache(loader clientcmd.ClientConfig) *ClientCache {
 // is invoked only once
 type ClientCache struct {
 	loader        clientcmd.ClientConfig
-	clientsets    map[unversioned.GroupVersion]*internalclientset.Clientset
-	fedClientSets map[unversioned.GroupVersion]fed_clientset.Interface
-	configs       map[unversioned.GroupVersion]*restclient.Config
-	defaultConfig *restclient.Config
-	defaultClient *client.Client
-	matchVersion  bool
+	clientsets    map[schema.GroupVersion]*internalclientset.Clientset
+	fedClientSets map[schema.GroupVersion]fedclientset.Interface
+	configs       map[schema.GroupVersion]*restclient.Config
+
+	matchVersion bool
+
+	defaultConfigLock sync.Mutex
+	defaultConfig     *restclient.Config
+	// discoveryClientFactory comes as a factory method so that we can defer resolution until after
+	// argument evaluation
+	discoveryClientFactory DiscoveryClientFactory
+	discoveryClient        discovery.DiscoveryInterface
+}
+
+// also looks up the discovery client.  We can't do this during init because the flags won't have been set
+// because this is constructed pre-command execution before the command tree is even set up
+func (c *ClientCache) getDefaultConfig() (restclient.Config, discovery.DiscoveryInterface, error) {
+	c.defaultConfigLock.Lock()
+	defer c.defaultConfigLock.Unlock()
+
+	if c.defaultConfig != nil && c.discoveryClient != nil {
+		return *c.defaultConfig, c.discoveryClient, nil
+	}
+
+	config, err := c.loader.ClientConfig()
+	if err != nil {
+		return restclient.Config{}, nil, err
+	}
+	discoveryClient, err := c.discoveryClientFactory.DiscoveryClient()
+	if err != nil {
+		return restclient.Config{}, nil, err
+	}
+	if c.matchVersion {
+		if err := discovery.MatchesServerVersion(discoveryClient); err != nil {
+			return restclient.Config{}, nil, err
+		}
+	}
+
+	c.defaultConfig = config
+	c.discoveryClient = discoveryClient
+	return *c.defaultConfig, c.discoveryClient, nil
 }
 
 // ClientConfigForVersion returns the correct config for a server
-func (c *ClientCache) ClientConfigForVersion(version *unversioned.GroupVersion) (*restclient.Config, error) {
-	if c.defaultConfig == nil {
-		config, err := c.loader.ClientConfig()
-		if err != nil {
-			return nil, err
-		}
-		c.defaultConfig = config
-		if c.matchVersion {
-			if err := client.MatchesServerVersion(c.defaultClient, config); err != nil {
-				return nil, err
-			}
-		}
+func (c *ClientCache) ClientConfigForVersion(requiredVersion *schema.GroupVersion) (*restclient.Config, error) {
+	// TODO: have a better config copy method
+	config, discoveryClient, err := c.getDefaultConfig()
+	if err != nil {
+		return nil, err
 	}
-	if version != nil {
-		if config, ok := c.configs[*version]; ok {
+	if requiredVersion == nil && config.GroupVersion != nil {
+		// if someone has set the values via flags, our config will have the groupVersion set
+		// that means it is required.
+		requiredVersion = config.GroupVersion
+	}
+
+	// required version may still be nil, since config.GroupVersion may have been nil.  Do the check
+	// before looking up from the cache
+	if requiredVersion != nil {
+		if config, ok := c.configs[*requiredVersion]; ok {
 			return config, nil
 		}
 	}
 
-	// TODO: have a better config copy method
-	config := *c.defaultConfig
-
-	// TODO these fall out when we finish the refactor
-	var preferredGV *unversioned.GroupVersion
-	if version != nil {
-		versionCopy := *version
-		preferredGV = &versionCopy
-	}
-
-	client.SetKubernetesDefaults(&config)
-	negotiatedVersion, err := client.NegotiateVersion(c.defaultClient, &config, preferredGV, registered.EnabledVersions())
+	negotiatedVersion, err := discovery.NegotiateVersion(discoveryClient, requiredVersion, registered.EnabledVersions())
 	if err != nil {
 		return nil, err
 	}
 	config.GroupVersion = negotiatedVersion
 
-	if version != nil {
-		c.configs[*version] = &config
+	// TODO this isn't what we want.  Each clientset should be setting defaults as it sees fit.
+	oldclient.SetKubernetesDefaults(&config)
+
+	if requiredVersion != nil {
+		c.configs[*requiredVersion] = &config
 	}
 
 	// `version` does not necessarily equal `config.Version`.  However, we know that we call this method again with
@@ -98,13 +130,13 @@ func (c *ClientCache) ClientConfigForVersion(version *unversioned.GroupVersion) 
 
 // ClientSetForVersion initializes or reuses a clientset for the specified version, or returns an
 // error if that is not possible
-func (c *ClientCache) ClientSetForVersion(version *unversioned.GroupVersion) (*internalclientset.Clientset, error) {
-	if version != nil {
-		if clientset, ok := c.clientsets[*version]; ok {
+func (c *ClientCache) ClientSetForVersion(requiredVersion *schema.GroupVersion) (*internalclientset.Clientset, error) {
+	if requiredVersion != nil {
+		if clientset, ok := c.clientsets[*requiredVersion]; ok {
 			return clientset, nil
 		}
 	}
-	config, err := c.ClientConfigForVersion(version)
+	config, err := c.ClientConfigForVersion(requiredVersion)
 	if err != nil {
 		return nil, err
 	}
@@ -118,19 +150,19 @@ func (c *ClientCache) ClientSetForVersion(version *unversioned.GroupVersion) (*i
 	// `version` does not necessarily equal `config.Version`.  However, we know that if we call this method again with
 	// `version`, we should get a client based on the same config we just found.  There's no guarantee that a client
 	// is copiable, so create a new client and save it in the cache.
-	if version != nil {
+	if requiredVersion != nil {
 		configCopy := *config
 		clientset, err := internalclientset.NewForConfig(&configCopy)
 		if err != nil {
 			return nil, err
 		}
-		c.clientsets[*version] = clientset
+		c.clientsets[*requiredVersion] = clientset
 	}
 
 	return clientset, nil
 }
 
-func (c *ClientCache) FederationClientSetForVersion(version *unversioned.GroupVersion) (fed_clientset.Interface, error) {
+func (c *ClientCache) FederationClientSetForVersion(version *schema.GroupVersion) (fedclientset.Interface, error) {
 	if version != nil {
 		if clientSet, found := c.fedClientSets[*version]; found {
 			return clientSet, nil
@@ -142,7 +174,7 @@ func (c *ClientCache) FederationClientSetForVersion(version *unversioned.GroupVe
 	}
 
 	// TODO: support multi versions of client with clientset
-	clientSet, err := fed_clientset.NewForConfig(config)
+	clientSet, err := fedclientset.NewForConfig(config)
 	if err != nil {
 		return nil, err
 	}
@@ -150,7 +182,7 @@ func (c *ClientCache) FederationClientSetForVersion(version *unversioned.GroupVe
 
 	if version != nil {
 		configCopy := *config
-		clientSet, err := fed_clientset.NewForConfig(&configCopy)
+		clientSet, err := fedclientset.NewForConfig(&configCopy)
 		if err != nil {
 			return nil, err
 		}
@@ -160,10 +192,10 @@ func (c *ClientCache) FederationClientSetForVersion(version *unversioned.GroupVe
 	return clientSet, nil
 }
 
-func (c *ClientCache) FederationClientForVersion(version *unversioned.GroupVersion) (*restclient.RESTClient, error) {
+func (c *ClientCache) FederationClientForVersion(version *schema.GroupVersion) (*restclient.RESTClient, error) {
 	fedClientSet, err := c.FederationClientSetForVersion(version)
 	if err != nil {
 		return nil, err
 	}
-	return fedClientSet.(*fed_clientset.Clientset).FederationClient.RESTClient, nil
+	return fedClientSet.Federation().RESTClient().(*restclient.RESTClient), nil
 }

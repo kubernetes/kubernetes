@@ -20,11 +20,10 @@ import (
 	"fmt"
 
 	"k8s.io/client-go/pkg/api"
-	"k8s.io/client-go/pkg/api/unversioned"
 	v1 "k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/pkg/apis/autoscaling"
-	"k8s.io/client-go/pkg/apis/batch"
 	"k8s.io/client-go/pkg/apis/extensions"
+	metav1 "k8s.io/client-go/pkg/apis/meta/v1"
 	"k8s.io/client-go/pkg/conversion"
 	"k8s.io/client-go/pkg/runtime"
 	"k8s.io/client-go/pkg/util/intstr"
@@ -48,9 +47,6 @@ func addConversionFuncs(scheme *runtime.Scheme) error {
 		Convert_v1beta1_SubresourceReference_To_autoscaling_CrossVersionObjectReference,
 		Convert_autoscaling_HorizontalPodAutoscalerSpec_To_v1beta1_HorizontalPodAutoscalerSpec,
 		Convert_v1beta1_HorizontalPodAutoscalerSpec_To_autoscaling_HorizontalPodAutoscalerSpec,
-		// batch
-		Convert_batch_JobSpec_To_v1beta1_JobSpec,
-		Convert_v1beta1_JobSpec_To_batch_JobSpec,
 	)
 	if err != nil {
 		return err
@@ -74,16 +70,7 @@ func addConversionFuncs(scheme *runtime.Scheme) error {
 		}
 	}
 
-	return api.Scheme.AddFieldLabelConversionFunc("extensions/v1beta1", "Job",
-		func(label, value string) (string, string, error) {
-			switch label {
-			case "metadata.name", "metadata.namespace", "status.successful":
-				return label, value, nil
-			default:
-				return "", "", fmt.Errorf("field label not supported: %s", label)
-			}
-		},
-	)
+	return nil
 }
 
 func Convert_extensions_ScaleStatus_To_v1beta1_ScaleStatus(in *extensions.ScaleStatus, out *ScaleStatus, s conversion.Scope) error {
@@ -96,7 +83,7 @@ func Convert_extensions_ScaleStatus_To_v1beta1_ScaleStatus(in *extensions.ScaleS
 			out.Selector = in.Selector.MatchLabels
 		}
 
-		selector, err := unversioned.LabelSelectorAsSelector(in.Selector)
+		selector, err := metav1.LabelSelectorAsSelector(in.Selector)
 		if err != nil {
 			return fmt.Errorf("invalid label selector: %v", err)
 		}
@@ -113,14 +100,14 @@ func Convert_v1beta1_ScaleStatus_To_extensions_ScaleStatus(in *ScaleStatus, out 
 	// new field can be expected to know about the old field (though that's not quite true, due
 	// to kubectl apply). However, these fields are readonly, so any non-nil value should work.
 	if in.TargetSelector != "" {
-		labelSelector, err := unversioned.ParseToLabelSelector(in.TargetSelector)
+		labelSelector, err := metav1.ParseToLabelSelector(in.TargetSelector)
 		if err != nil {
 			out.Selector = nil
 			return fmt.Errorf("failed to parse target selector: %v", err)
 		}
 		out.Selector = labelSelector
 	} else if in.Selector != nil {
-		out.Selector = new(unversioned.LabelSelector)
+		out.Selector = new(metav1.LabelSelector)
 		selector := make(map[string]string)
 		for key, val := range in.Selector {
 			selector[key] = val
@@ -134,14 +121,7 @@ func Convert_v1beta1_ScaleStatus_To_extensions_ScaleStatus(in *ScaleStatus, out 
 
 func Convert_extensions_DeploymentSpec_To_v1beta1_DeploymentSpec(in *extensions.DeploymentSpec, out *DeploymentSpec, s conversion.Scope) error {
 	out.Replicas = &in.Replicas
-	if in.Selector != nil {
-		out.Selector = new(LabelSelector)
-		if err := Convert_unversioned_LabelSelector_To_v1beta1_LabelSelector(in.Selector, out.Selector, s); err != nil {
-			return err
-		}
-	} else {
-		out.Selector = nil
-	}
+	out.Selector = in.Selector
 	if err := v1.Convert_api_PodTemplateSpec_To_v1_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
 		return err
 	}
@@ -160,6 +140,10 @@ func Convert_extensions_DeploymentSpec_To_v1beta1_DeploymentSpec(in *extensions.
 	} else {
 		out.RollbackTo = nil
 	}
+	if in.ProgressDeadlineSeconds != nil {
+		out.ProgressDeadlineSeconds = new(int32)
+		*out.ProgressDeadlineSeconds = *in.ProgressDeadlineSeconds
+	}
 	return nil
 }
 
@@ -167,15 +151,7 @@ func Convert_v1beta1_DeploymentSpec_To_extensions_DeploymentSpec(in *DeploymentS
 	if in.Replicas != nil {
 		out.Replicas = *in.Replicas
 	}
-
-	if in.Selector != nil {
-		out.Selector = new(unversioned.LabelSelector)
-		if err := Convert_v1beta1_LabelSelector_To_unversioned_LabelSelector(in.Selector, out.Selector, s); err != nil {
-			return err
-		}
-	} else {
-		out.Selector = nil
-	}
+	out.Selector = in.Selector
 	if err := v1.Convert_v1_PodTemplateSpec_To_api_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
 		return err
 	}
@@ -190,6 +166,10 @@ func Convert_v1beta1_DeploymentSpec_To_extensions_DeploymentSpec(in *DeploymentS
 		out.RollbackTo.Revision = in.RollbackTo.Revision
 	} else {
 		out.RollbackTo = nil
+	}
+	if in.ProgressDeadlineSeconds != nil {
+		out.ProgressDeadlineSeconds = new(int32)
+		*out.ProgressDeadlineSeconds = *in.ProgressDeadlineSeconds
 	}
 	return nil
 }
@@ -250,15 +230,7 @@ func Convert_extensions_ReplicaSetSpec_To_v1beta1_ReplicaSetSpec(in *extensions.
 	out.Replicas = new(int32)
 	*out.Replicas = int32(in.Replicas)
 	out.MinReadySeconds = in.MinReadySeconds
-	if in.Selector != nil {
-		out.Selector = new(LabelSelector)
-		if err := Convert_unversioned_LabelSelector_To_v1beta1_LabelSelector(in.Selector, out.Selector, s); err != nil {
-			return err
-		}
-	} else {
-		out.Selector = nil
-	}
-
+	out.Selector = in.Selector
 	if err := v1.Convert_api_PodTemplateSpec_To_v1_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
 		return err
 	}
@@ -270,82 +242,7 @@ func Convert_v1beta1_ReplicaSetSpec_To_extensions_ReplicaSetSpec(in *ReplicaSetS
 		out.Replicas = *in.Replicas
 	}
 	out.MinReadySeconds = in.MinReadySeconds
-	if in.Selector != nil {
-		out.Selector = new(unversioned.LabelSelector)
-		if err := Convert_v1beta1_LabelSelector_To_unversioned_LabelSelector(in.Selector, out.Selector, s); err != nil {
-			return err
-		}
-	} else {
-		out.Selector = nil
-	}
-	if err := v1.Convert_v1_PodTemplateSpec_To_api_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
-		return err
-	}
-	return nil
-}
-
-func Convert_batch_JobSpec_To_v1beta1_JobSpec(in *batch.JobSpec, out *JobSpec, s conversion.Scope) error {
-	out.Parallelism = in.Parallelism
-	out.Completions = in.Completions
-	out.ActiveDeadlineSeconds = in.ActiveDeadlineSeconds
-	// unable to generate simple pointer conversion for unversioned.LabelSelector -> v1beta1.LabelSelector
-	if in.Selector != nil {
-		out.Selector = new(LabelSelector)
-		if err := Convert_unversioned_LabelSelector_To_v1beta1_LabelSelector(in.Selector, out.Selector, s); err != nil {
-			return err
-		}
-	} else {
-		out.Selector = nil
-	}
-
-	// BEGIN non-standard conversion
-	// autoSelector has opposite meaning as manualSelector.
-	// in both cases, unset means false, and unset is always preferred to false.
-	// unset vs set-false distinction is not preserved.
-	manualSelector := in.ManualSelector != nil && *in.ManualSelector
-	autoSelector := !manualSelector
-	if autoSelector {
-		out.AutoSelector = new(bool)
-		*out.AutoSelector = true
-	} else {
-		out.AutoSelector = nil
-	}
-	// END non-standard conversion
-
-	if err := v1.Convert_api_PodTemplateSpec_To_v1_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
-		return err
-	}
-	return nil
-}
-
-func Convert_v1beta1_JobSpec_To_batch_JobSpec(in *JobSpec, out *batch.JobSpec, s conversion.Scope) error {
-	out.Parallelism = in.Parallelism
-	out.Completions = in.Completions
-	out.ActiveDeadlineSeconds = in.ActiveDeadlineSeconds
-	// unable to generate simple pointer conversion for v1beta1.LabelSelector -> unversioned.LabelSelector
-	if in.Selector != nil {
-		out.Selector = new(unversioned.LabelSelector)
-		if err := Convert_v1beta1_LabelSelector_To_unversioned_LabelSelector(in.Selector, out.Selector, s); err != nil {
-			return err
-		}
-	} else {
-		out.Selector = nil
-	}
-
-	// BEGIN non-standard conversion
-	// autoSelector has opposite meaning as manualSelector.
-	// in both cases, unset means false, and unset is always preferred to false.
-	// unset vs set-false distinction is not preserved.
-	autoSelector := bool(in.AutoSelector != nil && *in.AutoSelector)
-	manualSelector := !autoSelector
-	if manualSelector {
-		out.ManualSelector = new(bool)
-		*out.ManualSelector = true
-	} else {
-		out.ManualSelector = nil
-	}
-	// END non-standard conversion
-
+	out.Selector = in.Selector
 	if err := v1.Convert_v1_PodTemplateSpec_To_api_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
 		return err
 	}

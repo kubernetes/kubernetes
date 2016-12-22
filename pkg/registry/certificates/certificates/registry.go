@@ -20,6 +20,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/apis/certificates"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
@@ -28,7 +29,7 @@ type Registry interface {
 	ListCSRs(ctx api.Context, options *api.ListOptions) (*certificates.CertificateSigningRequestList, error)
 	CreateCSR(ctx api.Context, csr *certificates.CertificateSigningRequest) error
 	UpdateCSR(ctx api.Context, csr *certificates.CertificateSigningRequest) error
-	GetCSR(ctx api.Context, csrID string) (*certificates.CertificateSigningRequest, error)
+	GetCSR(ctx api.Context, csrID string, options *metav1.GetOptions) (*certificates.CertificateSigningRequest, error)
 	DeleteCSR(ctx api.Context, csrID string) error
 	WatchCSRs(ctx api.Context, options *api.ListOptions) (watch.Interface, error)
 }
@@ -67,8 +68,8 @@ func (s *storage) WatchCSRs(ctx api.Context, options *api.ListOptions) (watch.In
 	return s.Watch(ctx, options)
 }
 
-func (s *storage) GetCSR(ctx api.Context, name string) (*certificates.CertificateSigningRequest, error) {
-	obj, err := s.Get(ctx, name)
+func (s *storage) GetCSR(ctx api.Context, name string, options *metav1.GetOptions) (*certificates.CertificateSigningRequest, error) {
+	obj, err := s.Get(ctx, name, options)
 	if err != nil {
 		return nil, err
 	}

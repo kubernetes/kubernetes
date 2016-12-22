@@ -28,7 +28,6 @@ import (
 	"k8s.io/kubernetes/pkg/registry/generic"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
 	"k8s.io/kubernetes/pkg/storage"
-	"k8s.io/kubernetes/pkg/storage/etcd/etcdtest"
 	etcdtesting "k8s.io/kubernetes/pkg/storage/etcd/testing"
 	"k8s.io/kubernetes/pkg/storage/storagebackend/factory"
 
@@ -65,8 +64,7 @@ func validNewRangeAllocation() *api.RangeAllocation {
 }
 
 func key() string {
-	s := "/ranges/serviceips"
-	return etcdtest.AddPrefix(s)
+	return "/ranges/serviceips"
 }
 
 func TestEmpty(t *testing.T) {

@@ -26,9 +26,9 @@ func TestAddFlagsFlag(t *testing.T) {
 	// TODO: This only tests the enable-swagger-ui flag for now.
 	// Expand the test to include other flags as well.
 	f := pflag.NewFlagSet("addflagstest", pflag.ContinueOnError)
-	s := NewAPIServer()
+	s := NewServerRunOptions()
 	s.AddFlags(f)
-	if s.EnableSwaggerUI {
+	if s.GenericServerRunOptions.EnableSwaggerUI {
 		t.Errorf("Expected s.EnableSwaggerUI to be false by default")
 	}
 
@@ -36,7 +36,7 @@ func TestAddFlagsFlag(t *testing.T) {
 		"--enable-swagger-ui=true",
 	}
 	f.Parse(args)
-	if !s.EnableSwaggerUI {
+	if !s.GenericServerRunOptions.EnableSwaggerUI {
 		t.Errorf("Expected s.EnableSwaggerUI to be true")
 	}
 }

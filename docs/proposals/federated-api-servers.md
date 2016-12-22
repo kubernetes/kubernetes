@@ -1,37 +1,3 @@
-<!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
-
-<!-- BEGIN STRIP_FOR_RELEASE -->
-
-<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
-     width="25" height="25">
-
-<h2>PLEASE NOTE: This document applies to the HEAD of the source tree</h2>
-
-If you are using a released version of Kubernetes, you should
-refer to the docs that go with that version.
-
-<!-- TAG RELEASE_LINK, added by the munger automatically -->
-<strong>
-The latest release of this document can be found
-[here](http://releases.k8s.io/release-1.4/docs/proposals/federated-api-servers.md).
-
-Documentation for other releases can be found at
-[releases.k8s.io](http://releases.k8s.io).
-</strong>
---
-
-<!-- END STRIP_FOR_RELEASE -->
-
-<!-- END MUNGE: UNVERSIONED_WARNING -->
-
 # Federated API Servers
 
 ## Abstract
@@ -50,7 +16,7 @@ federated servers.
 * Unblock new APIs from core kubernetes team review: A lot of new API proposals
   are currently blocked on review from the core kubernetes team. By allowing
   developers to expose their APIs as a separate server and enabling the cluster
-  admin to use it without any change to the core kubernetes reporsitory, we
+  admin to use it without any change to the core kubernetes repository, we
   unblock these APIs.
 * Place for staging experimental APIs: New APIs can remain in separate
   federated servers until they become stable, at which point, they can be moved
@@ -201,7 +167,7 @@ resource.
 
 This proposal is not enough for hosted cluster users, but allows us to improve
 that in the future.
-On a hosted kubernetes cluster, for eg on GKE - where Google manages the kubernetes
+On a hosted kubernetes cluster, for e.g. on GKE - where Google manages the kubernetes
 API server, users will have to bring up and maintain the proxy and federated servers
 themselves.
 Other system components like the various controllers, will not be aware of the

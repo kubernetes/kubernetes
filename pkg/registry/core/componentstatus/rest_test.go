@@ -27,7 +27,7 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/apiserver"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/probe"
 	"k8s.io/kubernetes/pkg/util/diff"
 )
@@ -50,8 +50,8 @@ type testResponse struct {
 
 func NewTestREST(resp testResponse) *REST {
 	return &REST{
-		GetServersToValidate: func() map[string]apiserver.Server {
-			return map[string]apiserver.Server{
+		GetServersToValidate: func() map[string]Server {
+			return map[string]Server{
 				"test1": {Addr: "testserver1", Port: 8000, Path: "/healthz"},
 			}
 		},
@@ -119,7 +119,7 @@ func TestList_UnknownError(t *testing.T) {
 
 func TestGet_NoError(t *testing.T) {
 	r := NewTestREST(testResponse{result: probe.Success, data: "ok"})
-	got, err := r.Get(api.NewContext(), "test1")
+	got, err := r.Get(api.NewContext(), "test1", &metav1.GetOptions{})
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -131,7 +131,7 @@ func TestGet_NoError(t *testing.T) {
 
 func TestGet_BadName(t *testing.T) {
 	r := NewTestREST(testResponse{result: probe.Success, data: "ok"})
-	_, err := r.Get(api.NewContext(), "invalidname")
+	_, err := r.Get(api.NewContext(), "invalidname", &metav1.GetOptions{})
 	if err == nil {
 		t.Fatalf("Expected error, but did not get one")
 	}

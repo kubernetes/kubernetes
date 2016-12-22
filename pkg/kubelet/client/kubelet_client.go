@@ -17,12 +17,13 @@ limitations under the License.
 package client
 
 import (
-	"net"
 	"net/http"
 	"strconv"
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/transport"
 	"k8s.io/kubernetes/pkg/types"
@@ -35,6 +36,9 @@ type KubeletClientConfig struct {
 	Port        uint
 	EnableHttps bool
 
+	// PreferredAddressTypes - used to select an address from Node.NodeStatus.Addresses
+	PreferredAddressTypes []string
+
 	// TLSClientConfig contains settings to enable transport layer security
 	restclient.TLSClientConfig
 
@@ -45,7 +49,7 @@ type KubeletClientConfig struct {
 	HTTPTimeout time.Duration
 
 	// Dial is a custom dialer used for the client
-	Dial func(net, addr string) (net.Conn, error)
+	Dial utilnet.DialFunc
 }
 
 // ConnectionInfo provides the information needed to connect to a kubelet
@@ -99,14 +103,14 @@ func (c *KubeletClientConfig) transportConfig() *transport.Config {
 
 // NodeGetter defines an interface for looking up a node by name
 type NodeGetter interface {
-	Get(name string) (*api.Node, error)
+	Get(name string, options metav1.GetOptions) (*v1.Node, error)
 }
 
 // NodeGetterFunc allows implementing NodeGetter with a function
-type NodeGetterFunc func(name string) (*api.Node, error)
+type NodeGetterFunc func(name string, options metav1.GetOptions) (*v1.Node, error)
 
-func (f NodeGetterFunc) Get(name string) (*api.Node, error) {
-	return f(name)
+func (f NodeGetterFunc) Get(name string, options metav1.GetOptions) (*v1.Node, error) {
+	return f(name, options)
 }
 
 // NodeConnectionInfoGetter obtains connection info from the status of a Node API object
@@ -119,6 +123,8 @@ type NodeConnectionInfoGetter struct {
 	defaultPort int
 	// transport is the transport to use to send a request to all kubelets
 	transport http.RoundTripper
+	// preferredAddressTypes specifies the preferred order to use to find a node address
+	preferredAddressTypes []v1.NodeAddressType
 }
 
 func NewNodeConnectionInfoGetter(nodes NodeGetter, config KubeletClientConfig) (ConnectionInfoGetter, error) {
@@ -132,26 +138,32 @@ func NewNodeConnectionInfoGetter(nodes NodeGetter, config KubeletClientConfig) (
 		return nil, err
 	}
 
+	types := []v1.NodeAddressType{}
+	for _, t := range config.PreferredAddressTypes {
+		types = append(types, v1.NodeAddressType(t))
+	}
+
 	return &NodeConnectionInfoGetter{
 		nodes:       nodes,
 		scheme:      scheme,
 		defaultPort: int(config.Port),
 		transport:   transport,
+
+		preferredAddressTypes: types,
 	}, nil
 }
 
 func (k *NodeConnectionInfoGetter) GetConnectionInfo(ctx api.Context, nodeName types.NodeName) (*ConnectionInfo, error) {
-	node, err := k.nodes.Get(string(nodeName))
+	node, err := k.nodes.Get(string(nodeName), metav1.GetOptions{})
 	if err != nil {
 		return nil, err
 	}
 
 	// Find a kubelet-reported address, using preferred address type
-	hostIP, err := nodeutil.GetNodeHostIP(node)
+	host, err := nodeutil.GetPreferredNodeAddress(node, k.preferredAddressTypes)
 	if err != nil {
 		return nil, err
 	}
-	host := hostIP.String()
 
 	// Use the kubelet-reported port, if present
 	port := int(node.Status.DaemonEndpoints.KubeletEndpoint.Port)

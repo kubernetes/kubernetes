@@ -25,10 +25,10 @@ type Container struct {
 	ServeMux               *http.ServeMux
 	isRegisteredOnRoot     bool
 	containerFilters       []FilterFunction
-	doNotRecover           bool // default is false
+	doNotRecover           bool // default is true
 	recoverHandleFunc      RecoverHandleFunction
 	serviceErrorHandleFunc ServiceErrorHandleFunction
-	router                 RouteSelector // default is a RouterJSR311, CurlyRouter is the faster alternative
+	router                 RouteSelector // default is a CurlyRouter (RouterJSR311 is a slower alternative)
 	contentEncodingEnabled bool          // default is false
 }
 
@@ -39,10 +39,10 @@ func NewContainer() *Container {
 		ServeMux:               http.NewServeMux(),
 		isRegisteredOnRoot:     false,
 		containerFilters:       []FilterFunction{},
-		doNotRecover:           false,
+		doNotRecover:           true,
 		recoverHandleFunc:      logStackOnRecover,
 		serviceErrorHandleFunc: writeServiceError,
-		router:                 RouterJSR311{},
+		router:                 CurlyRouter{},
 		contentEncodingEnabled: false}
 }
 
@@ -69,7 +69,7 @@ func (c *Container) ServiceErrorHandler(handler ServiceErrorHandleFunction) {
 
 // DoNotRecover controls whether panics will be caught to return HTTP 500.
 // If set to true, Route functions are responsible for handling any error situation.
-// Default value is false = recover from panics. This has performance implications.
+// Default value is true.
 func (c *Container) DoNotRecover(doNot bool) {
 	c.doNotRecover = doNot
 }

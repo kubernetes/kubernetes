@@ -28,14 +28,12 @@ import (
 )
 
 // NewCmdCreateSecret groups subcommands to create various types of secrets
-func NewCmdCreateSecret(f cmdutil.Factory, cmdOut io.Writer) *cobra.Command {
+func NewCmdCreateSecret(f cmdutil.Factory, cmdOut, errOut io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "secret",
 		Short: "Create a secret using specified subcommand",
 		Long:  "Create a secret using specified subcommand.",
-		Run: func(cmd *cobra.Command, args []string) {
-			cmd.Help()
-		},
+		Run:   cmdutil.DefaultSubCommandRun(errOut),
 	}
 	cmd.AddCommand(NewCmdCreateSecretDockerRegistry(f, cmdOut))
 	cmd.AddCommand(NewCmdCreateSecretTLS(f, cmdOut))

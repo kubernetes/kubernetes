@@ -18,103 +18,118 @@ package autoscaling
 
 import (
 	"k8s.io/client-go/pkg/api"
-	"k8s.io/client-go/pkg/api/unversioned"
+	metav1 "k8s.io/client-go/pkg/apis/meta/v1"
 )
 
 // Scale represents a scaling request for a resource.
 type Scale struct {
-	unversioned.TypeMeta `json:",inline"`
+	metav1.TypeMeta
 	// Standard object metadata; More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata.
-	api.ObjectMeta `json:"metadata,omitempty"`
+	// +optional
+	api.ObjectMeta
 
 	// defines the behavior of the scale. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status.
-	Spec ScaleSpec `json:"spec,omitempty"`
+	// +optional
+	Spec ScaleSpec
 
 	// current status of the scale. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status. Read-only.
-	Status ScaleStatus `json:"status,omitempty"`
+	// +optional
+	Status ScaleStatus
 }
 
 // ScaleSpec describes the attributes of a scale subresource.
 type ScaleSpec struct {
 	// desired number of instances for the scaled object.
-	Replicas int32 `json:"replicas,omitempty"`
+	// +optional
+	Replicas int32
 }
 
 // ScaleStatus represents the current status of a scale subresource.
 type ScaleStatus struct {
 	// actual number of observed instances of the scaled object.
-	Replicas int32 `json:"replicas"`
+	Replicas int32
 
 	// label query over pods that should match the replicas count. This is same
 	// as the label selector but in the string format to avoid introspection
 	// by clients. The string will be in the same format as the query-param syntax.
 	// More info: http://kubernetes.io/docs/user-guide/labels#label-selectors
-	Selector string `json:"selector,omitempty"`
+	// +optional
+	Selector string
 }
 
 // CrossVersionObjectReference contains enough information to let you identify the referred resource.
 type CrossVersionObjectReference struct {
 	// Kind of the referent; More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
-	Kind string `json:"kind" protobuf:"bytes,1,opt,name=kind"`
+	Kind string
 	// Name of the referent; More info: http://kubernetes.io/docs/user-guide/identifiers#names
-	Name string `json:"name" protobuf:"bytes,2,opt,name=name"`
+	Name string
 	// API version of the referent
-	APIVersion string `json:"apiVersion,omitempty" protobuf:"bytes,3,opt,name=apiVersion"`
+	// +optional
+	APIVersion string
 }
 
 // specification of a horizontal pod autoscaler.
 type HorizontalPodAutoscalerSpec struct {
 	// reference to scaled resource; horizontal pod autoscaler will learn the current resource consumption
 	// and will set the desired number of pods by using its Scale subresource.
-	ScaleTargetRef CrossVersionObjectReference `json:"scaleTargetRef"`
+	ScaleTargetRef CrossVersionObjectReference
 	// lower limit for the number of pods that can be set by the autoscaler, default 1.
-	MinReplicas *int32 `json:"minReplicas,omitempty"`
+	// +optional
+	MinReplicas *int32
 	// upper limit for the number of pods that can be set by the autoscaler. It cannot be smaller than MinReplicas.
-	MaxReplicas int32 `json:"maxReplicas"`
+	MaxReplicas int32
 	// target average CPU utilization (represented as a percentage of requested CPU) over all the pods;
 	// if not specified the default autoscaling policy will be used.
-	TargetCPUUtilizationPercentage *int32 `json:"targetCPUUtilizationPercentage,omitempty"`
+	// +optional
+	TargetCPUUtilizationPercentage *int32
 }
 
 // current status of a horizontal pod autoscaler
 type HorizontalPodAutoscalerStatus struct {
 	// most recent generation observed by this autoscaler.
-	ObservedGeneration *int64 `json:"observedGeneration,omitempty"`
+	// +optional
+	ObservedGeneration *int64
 
 	// last time the HorizontalPodAutoscaler scaled the number of pods;
 	// used by the autoscaler to control how often the number of pods is changed.
-	LastScaleTime *unversioned.Time `json:"lastScaleTime,omitempty"`
+	// +optional
+	LastScaleTime *metav1.Time
 
 	// current number of replicas of pods managed by this autoscaler.
-	CurrentReplicas int32 `json:"currentReplicas"`
+	CurrentReplicas int32
 
 	// desired number of replicas of pods managed by this autoscaler.
-	DesiredReplicas int32 `json:"desiredReplicas"`
+	DesiredReplicas int32
 
 	// current average CPU utilization over all pods, represented as a percentage of requested CPU,
 	// e.g. 70 means that an average pod is using now 70% of its requested CPU.
-	CurrentCPUUtilizationPercentage *int32 `json:"currentCPUUtilizationPercentage,omitempty"`
+	// +optional
+	CurrentCPUUtilizationPercentage *int32
 }
 
 // +genclient=true
 
 // configuration of a horizontal pod autoscaler.
 type HorizontalPodAutoscaler struct {
-	unversioned.TypeMeta `json:",inline"`
-	api.ObjectMeta       `json:"metadata,omitempty"`
+	metav1.TypeMeta
+	// +optional
+	api.ObjectMeta
 
 	// behaviour of autoscaler. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status.
-	Spec HorizontalPodAutoscalerSpec `json:"spec,omitempty"`
+	// +optional
+	Spec HorizontalPodAutoscalerSpec
 
 	// current information about the autoscaler.
-	Status HorizontalPodAutoscalerStatus `json:"status,omitempty"`
+	// +optional
+	Status HorizontalPodAutoscalerStatus
 }
 
 // list of horizontal pod autoscaler objects.
 type HorizontalPodAutoscalerList struct {
-	unversioned.TypeMeta `json:",inline"`
-	unversioned.ListMeta `json:"metadata,omitempty"`
+	metav1.TypeMeta
+	// +optional
+	metav1.ListMeta
 
 	// list of horizontal pod autoscaler objects.
-	Items []HorizontalPodAutoscaler `json:"items"`
+	Items []HorizontalPodAutoscaler
 }

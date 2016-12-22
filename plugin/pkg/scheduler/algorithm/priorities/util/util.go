@@ -17,10 +17,11 @@ limitations under the License.
 package util
 
 import (
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 )
 
-func GetControllerRef(pod *api.Pod) *api.OwnerReference {
+func GetControllerRef(pod *v1.Pod) *metav1.OwnerReference {
 	if len(pod.OwnerReferences) == 0 {
 		return nil
 	}

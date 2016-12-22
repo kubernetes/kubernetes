@@ -51,6 +51,17 @@ func SetVolumeOwnership(mounter Mounter, fsGroup *int64) error {
 			return err
 		}
 
+		// chown and chmod pass through to the underlying file for symlinks.
+		// Symlinks have a mode of 777 but this really doesn't mean anything.
+		// The permissions of the underlying file are what matter.
+		// However, if one reads the mode of a symlink then chmods the symlink
+		// with that mode, it changes the mode of the underlying file, overridden
+		// the defaultMode and permissions initialized by the volume plugin, which
+		// is not what we want; thus, we skip chown/chmod for symlinks.
+		if info.Mode()&os.ModeSymlink != 0 {
+			return nil
+		}
+
 		stat, ok := info.Sys().(*syscall.Stat_t)
 		if !ok {
 			return nil
@@ -71,7 +82,11 @@ func SetVolumeOwnership(mounter Mounter, fsGroup *int64) error {
 			mask = roMask
 		}
 
-		err = chmodRunner.Chmod(path, info.Mode()|mask|os.ModeSetgid)
+		if info.IsDir() {
+			mask |= os.ModeSetgid
+		}
+
+		err = chmodRunner.Chmod(path, info.Mode()|mask)
 		if err != nil {
 			glog.Errorf("Chmod failed on %v: %v", path, err)
 		}

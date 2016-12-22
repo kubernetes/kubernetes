@@ -23,22 +23,20 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/pkg/api/unversioned"
-	api "k8s.io/client-go/pkg/api/v1"
+	"k8s.io/client-go/pkg/api/v1"
 	extensions "k8s.io/client-go/pkg/apis/extensions/v1beta1"
-	policy "k8s.io/client-go/pkg/apis/policy/v1alpha1"
+	metav1 "k8s.io/client-go/pkg/apis/meta/v1"
+	policy "k8s.io/client-go/pkg/apis/policy/v1beta1"
 	"k8s.io/client-go/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
 
-// timeout is used for most polling/waiting activities
-const timeout = 60 * time.Second
-
 // schedulingTimeout is longer specifically because sometimes we need to wait
 // awhile to guarantee that we've been patient waiting for something ordinary
 // to happen: a pod to get scheduled and move into Ready
 const schedulingTimeout = 10 * time.Minute
+const bigClusterSize = 7
 
 var _ = framework.KubeDescribe("DisruptionController", func() {
 	f := framework.NewDefaultFramework("disruption")
@@ -46,9 +44,6 @@ var _ = framework.KubeDescribe("DisruptionController", func() {
 	var cs *kubernetes.Clientset
 
 	BeforeEach(func() {
-		// skip on GKE since alpha features are disabled
-		framework.SkipIfProviderIs("gke")
-
 		cs = f.StagingClient
 		ns = f.Namespace.Name
 	})
@@ -63,26 +58,27 @@ var _ = framework.KubeDescribe("DisruptionController", func() {
 		createPodsOrDie(cs, ns, 3)
 		waitForPodsOrDie(cs, ns, 3)
 
-		// Since disruptionAllowed starts out false, if we see it ever become true,
+		// Since disruptionAllowed starts out 0, if we see it ever become positive,
 		// that means the controller is working.
 		err := wait.PollImmediate(framework.Poll, timeout, func() (bool, error) {
-			pdb, err := cs.Policy().PodDisruptionBudgets(ns).Get("foo")
+			pdb, err := cs.Policy().PodDisruptionBudgets(ns).Get("foo", metav1.GetOptions{})
 			if err != nil {
 				return false, err
 			}
-			return pdb.Status.PodDisruptionAllowed, nil
+			return pdb.Status.PodDisruptionsAllowed > 0, nil
 		})
 		Expect(err).NotTo(HaveOccurred())
 
 	})
 
 	evictionCases := []struct {
-		description    string
-		minAvailable   intstr.IntOrString
-		podCount       int
-		replicaSetSize int32
-		shouldDeny     bool
-		exclusive      bool
+		description        string
+		minAvailable       intstr.IntOrString
+		podCount           int
+		replicaSetSize     int32
+		shouldDeny         bool
+		exclusive          bool
+		skipForBigClusters bool
 	}{
 		{
 			description:  "no PDB",
@@ -111,6 +107,8 @@ var _ = framework.KubeDescribe("DisruptionController", func() {
 			replicaSetSize: 10,
 			exclusive:      true,
 			shouldDeny:     true,
+			// This tests assumes that there is less than replicaSetSize nodes in the cluster.
+			skipForBigClusters: true,
 		},
 	}
 	for i := range evictionCases {
@@ -120,6 +118,9 @@ var _ = framework.KubeDescribe("DisruptionController", func() {
 			expectation = "should not allow an eviction"
 		}
 		It(fmt.Sprintf("evictions: %s => %s", c.description, expectation), func() {
+			if c.skipForBigClusters {
+				framework.SkipUnlessNodeCountIsAtMost(bigClusterSize - 1)
+			}
 			createPodsOrDie(cs, ns, c.podCount)
 			if c.replicaSetSize > 0 {
 				createReplicaSetOrDie(cs, ns, c.replicaSetSize, c.exclusive)
@@ -130,15 +131,15 @@ var _ = framework.KubeDescribe("DisruptionController", func() {
 			}
 
 			// Locate a running pod.
-			var pod api.Pod
+			var pod v1.Pod
 			err := wait.PollImmediate(framework.Poll, schedulingTimeout, func() (bool, error) {
-				podList, err := cs.Pods(ns).List(api.ListOptions{})
+				podList, err := cs.Pods(ns).List(v1.ListOptions{})
 				if err != nil {
 					return false, err
 				}
 
 				for i := range podList.Items {
-					if podList.Items[i].Status.Phase == api.PodRunning {
+					if podList.Items[i].Status.Phase == v1.PodRunning {
 						pod = podList.Items[i]
 						return true, nil
 					}
@@ -149,7 +150,7 @@ var _ = framework.KubeDescribe("DisruptionController", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			e := &policy.Eviction{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: v1.ObjectMeta{
 					Name:      pod.Name,
 					Namespace: ns,
 				},
@@ -163,6 +164,11 @@ var _ = framework.KubeDescribe("DisruptionController", func() {
 				err = cs.Pods(ns).Evict(e)
 				Expect(err).Should(MatchError("Cannot evict pod as it would violate the pod's disruption budget."))
 			} else {
+				// Only wait for running pods in the "allow" case
+				// because one of shouldDeny cases relies on the
+				// replicaSet not fitting on the cluster.
+				waitForPodsOrDie(cs, ns, c.podCount+int(c.replicaSetSize))
+
 				// Since disruptionAllowed starts out false, if an eviction is ever allowed,
 				// that means the controller is working.
 				err = wait.PollImmediate(framework.Poll, timeout, func() (bool, error) {
@@ -182,12 +188,12 @@ var _ = framework.KubeDescribe("DisruptionController", func() {
 
 func createPodDisruptionBudgetOrDie(cs *kubernetes.Clientset, ns string, minAvailable intstr.IntOrString) {
 	pdb := policy.PodDisruptionBudget{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: v1.ObjectMeta{
 			Name:      "foo",
 			Namespace: ns,
 		},
 		Spec: policy.PodDisruptionBudgetSpec{
-			Selector:     &unversioned.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
+			Selector:     &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
 			MinAvailable: minAvailable,
 		},
 	}
@@ -197,20 +203,20 @@ func createPodDisruptionBudgetOrDie(cs *kubernetes.Clientset, ns string, minAvai
 
 func createPodsOrDie(cs *kubernetes.Clientset, ns string, n int) {
 	for i := 0; i < n; i++ {
-		pod := &api.Pod{
-			ObjectMeta: api.ObjectMeta{
+		pod := &v1.Pod{
+			ObjectMeta: v1.ObjectMeta{
 				Name:      fmt.Sprintf("pod-%d", i),
 				Namespace: ns,
 				Labels:    map[string]string{"foo": "bar"},
 			},
-			Spec: api.PodSpec{
-				Containers: []api.Container{
+			Spec: v1.PodSpec{
+				Containers: []v1.Container{
 					{
 						Name:  "busybox",
 						Image: "gcr.io/google_containers/echoserver:1.4",
 					},
 				},
-				RestartPolicy: api.RestartPolicyAlways,
+				RestartPolicy: v1.RestartPolicyAlways,
 			},
 		}
 
@@ -222,7 +228,7 @@ func createPodsOrDie(cs *kubernetes.Clientset, ns string, n int) {
 func waitForPodsOrDie(cs *kubernetes.Clientset, ns string, n int) {
 	By("Waiting for all pods to be running")
 	err := wait.PollImmediate(framework.Poll, schedulingTimeout, func() (bool, error) {
-		pods, err := cs.Core().Pods(ns).List(api.ListOptions{LabelSelector: "foo=bar"})
+		pods, err := cs.Core().Pods(ns).List(v1.ListOptions{LabelSelector: "foo=bar"})
 		if err != nil {
 			return false, err
 		}
@@ -235,7 +241,7 @@ func waitForPodsOrDie(cs *kubernetes.Clientset, ns string, n int) {
 		}
 		ready := 0
 		for i := 0; i < n; i++ {
-			if pods.Items[i].Status.Phase == api.PodRunning {
+			if pods.Items[i].Status.Phase == v1.PodRunning {
 				ready++
 			}
 		}
@@ -249,32 +255,32 @@ func waitForPodsOrDie(cs *kubernetes.Clientset, ns string, n int) {
 }
 
 func createReplicaSetOrDie(cs *kubernetes.Clientset, ns string, size int32, exclusive bool) {
-	container := api.Container{
+	container := v1.Container{
 		Name:  "busybox",
 		Image: "gcr.io/google_containers/echoserver:1.4",
 	}
 	if exclusive {
-		container.Ports = []api.ContainerPort{
+		container.Ports = []v1.ContainerPort{
 			{HostPort: 5555, ContainerPort: 5555},
 		}
 	}
 
 	rs := &extensions.ReplicaSet{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: v1.ObjectMeta{
 			Name:      "rs",
 			Namespace: ns,
 		},
 		Spec: extensions.ReplicaSetSpec{
 			Replicas: &size,
-			Selector: &extensions.LabelSelector{
+			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{"foo": "bar"},
 			},
-			Template: api.PodTemplateSpec{
-				ObjectMeta: api.ObjectMeta{
+			Template: v1.PodTemplateSpec{
+				ObjectMeta: v1.ObjectMeta{
 					Labels: map[string]string{"foo": "bar"},
 				},
-				Spec: api.PodSpec{
-					Containers: []api.Container{container},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{container},
 				},
 			},
 		},

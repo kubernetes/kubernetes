@@ -21,13 +21,12 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/rest"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/apis/policy"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/generic"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
-	"k8s.io/kubernetes/pkg/storage/etcd/etcdtest"
 	etcdtesting "k8s.io/kubernetes/pkg/storage/etcd/testing"
 	"k8s.io/kubernetes/pkg/util/intstr"
 )
@@ -58,7 +57,7 @@ func validNewPodDisruptionBudget() *policy.PodDisruptionBudget {
 			Labels:    map[string]string{"a": "b"},
 		},
 		Spec: policy.PodDisruptionBudgetSpec{
-			Selector:     &unversioned.LabelSelector{MatchLabels: map[string]string{"a": "b"}},
+			Selector:     &metav1.LabelSelector{MatchLabels: map[string]string{"a": "b"}},
 			MinAvailable: intstr.FromInt(7),
 		},
 		Status: policy.PodDisruptionBudgetStatus{},
@@ -86,13 +85,20 @@ func TestStatusUpdate(t *testing.T) {
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
 	ctx := api.WithNamespace(api.NewContext(), api.NamespaceDefault)
-	key := etcdtest.AddPrefix("/poddisruptionbudgets/" + api.NamespaceDefault + "/foo")
+	key := "/poddisruptionbudgets/" + api.NamespaceDefault + "/foo"
 	validPodDisruptionBudget := validNewPodDisruptionBudget()
 	if err := storage.Storage.Create(ctx, key, validPodDisruptionBudget, nil, 0); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+
+	obj, err := storage.Get(ctx, "foo", &metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("failed to get pdb: %v", err)
+	}
+	obtainedPdb := obj.(*policy.PodDisruptionBudget)
+
 	update := policy.PodDisruptionBudget{
-		ObjectMeta: validPodDisruptionBudget.ObjectMeta,
+		ObjectMeta: obtainedPdb.ObjectMeta,
 		Spec: policy.PodDisruptionBudgetSpec{
 			MinAvailable: intstr.FromInt(8),
 		},
@@ -104,7 +110,7 @@ func TestStatusUpdate(t *testing.T) {
 	if _, _, err := statusStorage.Update(ctx, update.Name, rest.DefaultUpdatedObjectInfo(&update, api.Scheme)); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	obj, err := storage.Get(ctx, "foo")
+	obj, err = storage.Get(ctx, "foo", &metav1.GetOptions{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

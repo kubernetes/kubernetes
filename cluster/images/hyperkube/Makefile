@@ -19,7 +19,7 @@
 
 REGISTRY?=gcr.io/google_containers
 ARCH?=amd64
-TEMP_DIR:=$(shell mktemp -d)
+TEMP_DIR:=$(shell mktemp -d -t hyperkubeXXXXXX)
 CNI_RELEASE=07a8a28637e97b22eb8dfe710eeae1344f69d16e
 
 UNAME_S:=$(shell uname -s)
@@ -45,6 +45,10 @@ ifeq ($(ARCH),ppc64le)
 	BASEIMAGE?=ppc64le/debian:jessie
 	QEMUARCH=ppc64le
 endif
+ifeq ($(ARCH),s390x)
+	BASEIMAGE?=s390x/debian:jessie
+	QEMUARCH=s390x
+endif
 
 all: build
 
@@ -58,8 +62,8 @@ endif
 	cp ../../saltbase/salt/generate-cert/make-ca-cert.sh ${TEMP_DIR}
 
 	# Singlenode addons
-	cp ../../addons/dns/skydns-rc.yaml.base ${TEMP_DIR}/addons/singlenode/skydns-rc.yaml
-	cp ../../addons/dns/skydns-svc.yaml.base ${TEMP_DIR}/addons/singlenode/skydns-svc.yaml
+	cp ../../addons/dns/kubedns-controller.yaml.base ${TEMP_DIR}/addons/singlenode/kubedns-controller.yaml
+	cp ../../addons/dns/kubedns-svc.yaml.base ${TEMP_DIR}/addons/singlenode/kubedns-svc.yaml
 	cp ../../addons/dashboard/dashboard-controller.yaml ${TEMP_DIR}/addons/singlenode/
 	cp ../../addons/dashboard/dashboard-service.yaml ${TEMP_DIR}/addons/singlenode/
 
@@ -76,8 +80,8 @@ endif
 	cd ${TEMP_DIR} && sed -i.back "s|BASEIMAGE|${BASEIMAGE}|g" Dockerfile
 	cd ${TEMP_DIR} && sed -i.back "s|CACHEBUST|$(shell uuidgen)|g" Dockerfile
 	cd ${TEMP_DIR} && sed -i.back "s|-amd64|-${ARCH}|g" addons/singlenode/*.yaml addons/multinode/*.yaml
-	cd ${TEMP_DIR} && sed -i.back "s|__PILLAR__DNS__REPLICAS__|1|g;s|__PILLAR__DNS__SERVER__|10.0.0.10|g;" addons/singlenode/skydns*.yaml addons/multinode/skydns*.yaml
-	cd ${TEMP_DIR} && sed -i.back "s|__PILLAR__DNS__DOMAIN__|cluster.local|g;s|__PILLAR__FEDERATIONS__DOMAIN__MAP__||g;" addons/singlenode/skydns*.yaml addons/multinode/skydns*.yaml
+	cd ${TEMP_DIR} && sed -i.back "s|__PILLAR__DNS__SERVER__|10.0.0.10|g" addons/singlenode/kubedns*.yaml addons/multinode/kubedns*.yaml
+	cd ${TEMP_DIR} && sed -i.back "s|__PILLAR__DNS__DOMAIN__|cluster.local|g;s|__PILLAR__FEDERATIONS__DOMAIN__MAP__||g;" addons/singlenode/kubedns*.yaml addons/multinode/kubedns*.yaml
 	cd ${TEMP_DIR} && rm -f addons/singlenode/*.back addons/multinode/*.back static-pods/*.back
 
 	# Make scripts executable before they are copied into the Docker image. If we make them executable later, in another layer

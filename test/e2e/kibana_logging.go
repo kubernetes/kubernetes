@@ -20,6 +20,8 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/test/e2e/framework"
 
@@ -50,16 +52,16 @@ const (
 // ClusterLevelLoggingWithKibana is an end to end test that checks to see if Kibana is alive.
 func ClusterLevelLoggingWithKibana(f *framework.Framework) {
 	// graceTime is how long to keep retrying requests for status information.
-	const graceTime = 2 * time.Minute
+	const graceTime = 20 * time.Minute
 
 	// Check for the existence of the Kibana service.
 	By("Checking the Kibana service exists.")
-	s := f.Client.Services(api.NamespaceSystem)
+	s := f.ClientSet.Core().Services(api.NamespaceSystem)
 	// Make a few attempts to connect. This makes the test robust against
 	// being run as the first e2e test just after the e2e cluster has been created.
 	var err error
 	for start := time.Now(); time.Since(start) < graceTime; time.Sleep(5 * time.Second) {
-		if _, err = s.Get("kibana-logging"); err == nil {
+		if _, err = s.Get("kibana-logging", metav1.GetOptions{}); err == nil {
 			break
 		}
 		framework.Logf("Attempt to check for the existence of the Kibana service failed after %v", time.Since(start))
@@ -69,20 +71,21 @@ func ClusterLevelLoggingWithKibana(f *framework.Framework) {
 	// Wait for the Kibana pod(s) to enter the running state.
 	By("Checking to make sure the Kibana pods are running")
 	label := labels.SelectorFromSet(labels.Set(map[string]string{kibanaKey: kibanaValue}))
-	options := api.ListOptions{LabelSelector: label}
-	pods, err := f.Client.Pods(api.NamespaceSystem).List(options)
+	options := v1.ListOptions{LabelSelector: label.String()}
+	pods, err := f.ClientSet.Core().Pods(api.NamespaceSystem).List(options)
 	Expect(err).NotTo(HaveOccurred())
 	for _, pod := range pods.Items {
-		err = framework.WaitForPodRunningInNamespace(f.Client, &pod)
+		err = framework.WaitForPodRunningInNamespace(f.ClientSet, &pod)
 		Expect(err).NotTo(HaveOccurred())
 	}
 
 	By("Checking to make sure we get a response from the Kibana UI.")
 	err = nil
 	for start := time.Now(); time.Since(start) < graceTime; time.Sleep(5 * time.Second) {
-		proxyRequest, errProxy := framework.GetServicesProxyRequest(f.Client, f.Client.Get())
+		proxyRequest, errProxy := framework.GetServicesProxyRequest(f.ClientSet, f.ClientSet.Core().RESTClient().Get())
 		if errProxy != nil {
 			framework.Logf("After %v failed to get services proxy request: %v", time.Since(start), errProxy)
+			err = errProxy
 			continue
 		}
 		// Query against the root URL for Kibana.

@@ -24,6 +24,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
 )
 
 const (
@@ -43,7 +44,8 @@ const (
 	cloudResourcePollTimeout = 5 * time.Minute
 
 	// Time required by the loadbalancer to cleanup, proportional to numApps/Ing.
-	lbCleanupTimeout = 5 * time.Minute
+	// Bring the cleanup timeout back down to 5m once b/33588344 is resolved.
+	lbCleanupTimeout = 15 * time.Minute
 	lbPollInterval   = 30 * time.Second
 
 	// Name of the config-map and key the ingress controller stores its uid in.
@@ -55,7 +57,7 @@ const (
 	nameLenLimit = 62
 )
 
-var _ = framework.KubeDescribe("Loadbalancing: L7 [Feature:Ingress]", func() {
+var _ = framework.KubeDescribe("Loadbalancing: L7", func() {
 	defer GinkgoRecover()
 	var (
 		ns               string
@@ -66,7 +68,7 @@ var _ = framework.KubeDescribe("Loadbalancing: L7 [Feature:Ingress]", func() {
 
 	BeforeEach(func() {
 		f.BeforeEach()
-		jig = newTestJig(f.Client)
+		jig = newTestJig(f.ClientSet)
 		ns = f.Namespace.Name
 	})
 
@@ -77,7 +79,7 @@ var _ = framework.KubeDescribe("Loadbalancing: L7 [Feature:Ingress]", func() {
 	//
 	// Slow by design ~10m for each "It" block dominated by loadbalancer setup time
 	// TODO: write similar tests for nginx, haproxy and AWS Ingress.
-	framework.KubeDescribe("GCE [Slow] [Feature: Ingress]", func() {
+	framework.KubeDescribe("GCE [Slow] [Feature:Ingress]", func() {
 		var gceController *GCEIngressController
 
 		// Platform specific setup
@@ -114,12 +116,13 @@ var _ = framework.KubeDescribe("Loadbalancing: L7 [Feature:Ingress]", func() {
 				By(t.entryLog)
 				t.execute()
 				By(t.exitLog)
-				jig.waitForIngress()
+				jig.waitForIngress(true)
 			}
 		})
 
-		It("shoud create ingress with given static-ip ", func() {
-			ip := gceController.staticIP(ns)
+		It("shoud create ingress with given static-ip", func() {
+			// ip released when the rest of lb resources are deleted in cleanupGCE
+			ip := gceController.createStaticIP(ns)
 			By(fmt.Sprintf("allocated static ip %v: %v through the GCE cloud provider", ns, ip))
 
 			jig.createIngress(filepath.Join(ingressManifestPath, "static-ip"), ns, map[string]string{
@@ -129,10 +132,18 @@ var _ = framework.KubeDescribe("Loadbalancing: L7 [Feature:Ingress]", func() {
 
 			By("waiting for Ingress to come up with ip: " + ip)
 			httpClient := buildInsecureClient(reqTimeout)
-			ExpectNoError(pollURL(fmt.Sprintf("https://%v/", ip), "", lbPollTimeout, httpClient, false))
+			framework.ExpectNoError(pollURL(fmt.Sprintf("https://%v/", ip), "", lbPollTimeout, jig.pollInterval, httpClient, false))
 
 			By("should reject HTTP traffic")
-			ExpectNoError(pollURL(fmt.Sprintf("http://%v/", ip), "", lbPollTimeout, httpClient, true))
+			framework.ExpectNoError(pollURL(fmt.Sprintf("http://%v/", ip), "", lbPollTimeout, jig.pollInterval, httpClient, true))
+
+			By("should have correct firewall rule for ingress")
+			fw := gceController.getFirewallRule()
+			expFw := jig.constructFirewallForIngress(gceController)
+			// Passed the last argument as `true` to verify the backend ports is a subset
+			// of the allowed ports in firewall rule, given there may be other existing
+			// ingress resources and backends we are not aware of.
+			Expect(framework.VerifyFirewallRule(fw, expFw, gceController.cloud.Network, true)).NotTo(HaveOccurred())
 
 			// TODO: uncomment the restart test once we have a way to synchronize
 			// and know that the controller has resumed watching. If we delete
@@ -150,7 +161,7 @@ var _ = framework.KubeDescribe("Loadbalancing: L7 [Feature:Ingress]", func() {
 	})
 
 	// Time: borderline 5m, slow by design
-	framework.KubeDescribe("Nginx [Slow]", func() {
+	framework.KubeDescribe("Nginx", func() {
 		var nginxController *NginxIngressController
 
 		BeforeEach(func() {
@@ -163,7 +174,7 @@ var _ = framework.KubeDescribe("Loadbalancing: L7 [Feature:Ingress]", func() {
 			// but we want to allow easy testing where a user might've hand
 			// configured firewalls.
 			if framework.ProviderIs("gce", "gke") {
-				ExpectNoError(gcloudCreate("firewall-rules", fmt.Sprintf("ingress-80-443-%v", ns), framework.TestContext.CloudConfig.ProjectID, "--allow", "tcp:80,tcp:443", "--network", framework.TestContext.CloudConfig.Network))
+				framework.ExpectNoError(gcloudCreate("firewall-rules", fmt.Sprintf("ingress-80-443-%v", ns), framework.TestContext.CloudConfig.ProjectID, "--allow", "tcp:80,tcp:443", "--network", framework.TestContext.CloudConfig.Network))
 			} else {
 				framework.Logf("WARNING: Not running on GCE/GKE, cannot create firewall rules for :80, :443. Assuming traffic can reach the external ips of all nodes in cluster on those ports.")
 			}
@@ -173,7 +184,7 @@ var _ = framework.KubeDescribe("Loadbalancing: L7 [Feature:Ingress]", func() {
 
 		AfterEach(func() {
 			if framework.ProviderIs("gce", "gke") {
-				ExpectNoError(gcloudDelete("firewall-rules", fmt.Sprintf("ingress-80-443-%v", ns), framework.TestContext.CloudConfig.ProjectID))
+				framework.ExpectNoError(gcloudDelete("firewall-rules", fmt.Sprintf("ingress-80-443-%v", ns), framework.TestContext.CloudConfig.ProjectID))
 			}
 			if CurrentGinkgoTestDescription().Failed {
 				describeIng(ns)
@@ -187,12 +198,15 @@ var _ = framework.KubeDescribe("Loadbalancing: L7 [Feature:Ingress]", func() {
 		})
 
 		It("should conform to Ingress spec", func() {
+			// Poll more frequently to reduce e2e completion time.
+			// This test runs in presubmit.
+			jig.pollInterval = 5 * time.Second
 			conformanceTests = createComformanceTests(jig, ns)
 			for _, t := range conformanceTests {
 				By(t.entryLog)
 				t.execute()
 				By(t.exitLog)
-				jig.waitForIngress()
+				jig.waitForIngress(false)
 			}
 		})
 	})

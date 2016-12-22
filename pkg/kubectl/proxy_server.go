@@ -97,18 +97,14 @@ func matchesRegexp(str string, regexps []*regexp.Regexp) bool {
 
 func (f *FilterServer) accept(method, path, host string) bool {
 	if matchesRegexp(path, f.RejectPaths) {
-		glog.V(3).Infof("Filter rejecting %v %v %v", method, path, host)
 		return false
 	}
 	if matchesRegexp(method, f.RejectMethods) {
-		glog.V(3).Infof("Filter rejecting %v %v %v", method, path, host)
 		return false
 	}
 	if matchesRegexp(path, f.AcceptPaths) && matchesRegexp(host, f.AcceptHosts) {
-		glog.V(3).Infof("Filter accepting %v %v %v", method, path, host)
 		return true
 	}
-	glog.V(3).Infof("Filter rejecting %v %v %v", method, path, host)
 	return false
 }
 
@@ -131,9 +127,11 @@ func extractHost(header string) (host string) {
 func (f *FilterServer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	host := extractHost(req.Host)
 	if f.accept(req.Method, req.URL.Path, host) {
+		glog.V(3).Infof("Filter accepting %v %v %v", req.Method, req.URL.Path, host)
 		f.delegate.ServeHTTP(rw, req)
 		return
 	}
+	glog.V(3).Infof("Filter rejecting %v %v %v", req.Method, req.URL.Path, host)
 	rw.WriteHeader(http.StatusForbidden)
 	rw.Write([]byte("<h3>Unauthorized</h3>"))
 }

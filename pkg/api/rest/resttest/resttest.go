@@ -26,8 +26,8 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/rest"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/validation/path"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/conversion"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
@@ -415,7 +415,7 @@ func (t *Tester) testCreateRejectsMismatchedNamespace(valid runtime.Object) {
 
 func (t *Tester) testCreateResetsUserData(valid runtime.Object) {
 	objectMeta := t.getObjectMetaOrFail(valid)
-	now := unversioned.Now()
+	now := metav1.Now()
 	objectMeta.UID = "bad-uid"
 	objectMeta.CreationTimestamp = now
 
@@ -761,9 +761,9 @@ func (t *Tester) testDeleteNoGraceful(obj runtime.Object, createFn CreateFunc, g
 		t.Errorf("unexpected error: %v", err)
 	}
 	if !t.returnDeletedObject {
-		if status, ok := obj.(*unversioned.Status); !ok {
+		if status, ok := obj.(*metav1.Status); !ok {
 			t.Errorf("expected status of delete, got %v", status)
-		} else if status.Status != unversioned.StatusSuccess {
+		} else if status.Status != metav1.StatusSuccess {
 			t.Errorf("expected success, got: %v", status.Status)
 		}
 	}
@@ -807,9 +807,9 @@ func (t *Tester) testDeleteWithUID(obj runtime.Object, createFn CreateFunc, getF
 	}
 
 	if !t.returnDeletedObject {
-		if status, ok := obj.(*unversioned.Status); !ok {
+		if status, ok := obj.(*metav1.Status); !ok {
 			t.Errorf("expected status of delete, got %v", status)
-		} else if status.Status != unversioned.StatusSuccess {
+		} else if status.Status != metav1.StatusSuccess {
 			t.Errorf("expected success, got: %v", status.Status)
 		}
 	}
@@ -841,7 +841,7 @@ func (t *Tester) testDeleteGracefulHasDefault(obj runtime.Object, createFn Creat
 		t.Fatalf("did not gracefully delete resource: %v", err)
 	}
 
-	object, err := t.storage.(rest.Getter).Get(ctx, objectMeta.Name)
+	object, err := t.storage.(rest.Getter).Get(ctx, objectMeta.Name, &metav1.GetOptions{})
 	if err != nil {
 		t.Fatalf("unexpected error, object should exist: %v", err)
 	}
@@ -872,7 +872,7 @@ func (t *Tester) testDeleteGracefulWithValue(obj runtime.Object, createFn Create
 		t.Fatalf("did not gracefully delete resource: %v", err)
 	}
 
-	object, err := t.storage.(rest.Getter).Get(ctx, objectMeta.Name)
+	object, err := t.storage.(rest.Getter).Get(ctx, objectMeta.Name, &metav1.GetOptions{})
 	if err != nil {
 		t.Errorf("unexpected error, object should exist: %v", err)
 	}
@@ -908,7 +908,7 @@ func (t *Tester) testDeleteGracefulExtend(obj runtime.Object, createFn CreateFun
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	object, err := t.storage.(rest.Getter).Get(ctx, objectMeta.Name)
+	object, err := t.storage.(rest.Getter).Get(ctx, objectMeta.Name, &metav1.GetOptions{})
 	if err != nil {
 		t.Errorf("unexpected error, object should exist: %v", err)
 	}
@@ -944,7 +944,7 @@ func (t *Tester) testDeleteGracefulImmediate(obj runtime.Object, createFn Create
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	_, err = t.storage.(rest.Getter).Get(ctx, objectMeta.Name)
+	_, err = t.storage.(rest.Getter).Get(ctx, objectMeta.Name, &metav1.GetOptions{})
 	if !errors.IsNotFound(err) {
 		t.Errorf("unexpected error, object should be deleted immediately: %v", err)
 	}
@@ -971,7 +971,7 @@ func (t *Tester) testDeleteGracefulUsesZeroOnNil(obj runtime.Object, createFn Cr
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	if _, err := t.storage.(rest.Getter).Get(ctx, objectMeta.Name); !errors.IsNotFound(err) {
+	if _, err := t.storage.(rest.Getter).Get(ctx, objectMeta.Name, &metav1.GetOptions{}); !errors.IsNotFound(err) {
 		t.Errorf("unexpected error, object should not exist: %v", err)
 	}
 }
@@ -1006,7 +1006,7 @@ func (t *Tester) testDeleteGracefulShorten(obj runtime.Object, createFn CreateFu
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	object, err = t.storage.(rest.Getter).Get(ctx, objectMeta.Name)
+	object, err = t.storage.(rest.Getter).Get(ctx, objectMeta.Name, &metav1.GetOptions{})
 	if err != nil {
 		t.Errorf("unexpected error, object should exist: %v", err)
 	}
@@ -1043,7 +1043,7 @@ func (t *Tester) testGetDifferentNamespace(obj runtime.Object) {
 		t.Errorf("unexpected error: %v", err)
 	}
 
-	got1, err := t.storage.(rest.Getter).Get(ctx1, objMeta.Name)
+	got1, err := t.storage.(rest.Getter).Get(ctx1, objMeta.Name, &metav1.GetOptions{})
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -1055,7 +1055,7 @@ func (t *Tester) testGetDifferentNamespace(obj runtime.Object) {
 		t.Errorf("unexpected namespace of object: %#v, expected: %s", got1, api.NamespaceValue(ctx1))
 	}
 
-	got2, err := t.storage.(rest.Getter).Get(ctx2, objMeta.Name)
+	got2, err := t.storage.(rest.Getter).Get(ctx2, objMeta.Name, &metav1.GetOptions{})
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -1078,7 +1078,7 @@ func (t *Tester) testGetFound(obj runtime.Object) {
 	}
 	existingMeta := t.getObjectMetaOrFail(existing)
 
-	got, err := t.storage.(rest.Getter).Get(ctx, t.namer(1))
+	got, err := t.storage.(rest.Getter).Get(ctx, t.namer(1), &metav1.GetOptions{})
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -1099,7 +1099,7 @@ func (t *Tester) testGetMimatchedNamespace(obj runtime.Object) {
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	_, err = t.storage.(rest.Getter).Get(ctx2, t.namer(4))
+	_, err = t.storage.(rest.Getter).Get(ctx2, t.namer(4), &metav1.GetOptions{})
 	if t.clusterScope {
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
@@ -1118,7 +1118,7 @@ func (t *Tester) testGetNotFound(obj runtime.Object) {
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	_, err = t.storage.(rest.Getter).Get(ctx, t.namer(3))
+	_, err = t.storage.(rest.Getter).Get(ctx, t.namer(3), &metav1.GetOptions{})
 	if !errors.IsNotFound(err) {
 		t.Errorf("unexpected error returned: %#v", err)
 	}

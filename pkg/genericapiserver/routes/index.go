@@ -20,8 +20,8 @@ import (
 	"net/http"
 	"sort"
 
-	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/apiserver"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
+	"k8s.io/kubernetes/pkg/apiserver/handlers/responsewriters"
 	"k8s.io/kubernetes/pkg/genericapiserver/mux"
 )
 
@@ -30,7 +30,7 @@ type Index struct{}
 
 // Install adds the Index webservice to the given mux.
 func (i Index) Install(c *mux.APIContainer) {
-	c.SecretRoutes.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+	c.UnlistedRoutes.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		status := http.StatusOK
 		if r.URL.Path != "/" && r.URL.Path != "/index.html" {
 			// Since "/" matches all paths, handleIndex is called for all paths for which there is no handler registered.
@@ -45,6 +45,6 @@ func (i Index) Install(c *mux.APIContainer) {
 		// Extract the paths handled using mux handler.
 		handledPaths = append(handledPaths, c.NonSwaggerRoutes.HandledPaths()...)
 		sort.Strings(handledPaths)
-		apiserver.WriteRawJSON(status, unversioned.RootPaths{Paths: handledPaths}, w)
+		responsewriters.WriteRawJSON(status, metav1.RootPaths{Paths: handledPaths}, w)
 	})
 }

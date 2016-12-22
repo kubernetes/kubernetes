@@ -26,7 +26,7 @@ import (
 	"time"
 
 	"github.com/golang/glog"
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	iptablesproxy "k8s.io/kubernetes/pkg/proxy/iptables"
 	utildbus "k8s.io/kubernetes/pkg/util/dbus"
@@ -47,7 +47,7 @@ type HostportHandler interface {
 }
 
 type ActivePod struct {
-	Pod *api.Pod
+	Pod *v1.Pod
 	IP  net.IP
 }
 
@@ -87,7 +87,7 @@ func (hp *hostport) String() string {
 }
 
 //openPodHostports opens all hostport for pod and returns the map of hostport and socket
-func (h *handler) openHostports(pod *api.Pod) error {
+func (h *handler) openHostports(pod *v1.Pod) error {
 	var retErr error
 	ports := make(map[hostport]closeable)
 	for _, container := range pod.Spec.Containers {
@@ -131,15 +131,15 @@ func (h *handler) openHostports(pod *api.Pod) error {
 // gatherAllHostports returns all hostports that should be presented on node,
 // given the list of pods running on that node and ignoring host network
 // pods (which don't need hostport <-> container port mapping).
-func gatherAllHostports(activePods []*ActivePod) (map[api.ContainerPort]targetPod, error) {
-	podHostportMap := make(map[api.ContainerPort]targetPod)
+func gatherAllHostports(activePods []*ActivePod) (map[v1.ContainerPort]targetPod, error) {
+	podHostportMap := make(map[v1.ContainerPort]targetPod)
 	for _, r := range activePods {
 		if r.IP.To4() == nil {
 			return nil, fmt.Errorf("Invalid or missing pod %s IP", kubecontainer.GetPodFullName(r.Pod))
 		}
 
 		// should not handle hostports for hostnetwork pods
-		if r.Pod.Spec.SecurityContext != nil && r.Pod.Spec.SecurityContext.HostNetwork {
+		if r.Pod.Spec.HostNetwork {
 			continue
 		}
 
@@ -164,7 +164,7 @@ func writeLine(buf *bytes.Buffer, words ...string) {
 // then encoding to base32 and truncating with the prefix "KUBE-SVC-".  We do
 // this because IPTables Chain Names must be <= 28 chars long, and the longer
 // they are the harder they are to read.
-func hostportChainName(cp api.ContainerPort, podFullName string) utiliptables.Chain {
+func hostportChainName(cp v1.ContainerPort, podFullName string) utiliptables.Chain {
 	hash := sha256.Sum256([]byte(string(cp.HostPort) + string(cp.Protocol) + podFullName))
 	encoded := base32.StdEncoding.EncodeToString(hash[:])
 	return utiliptables.Chain(kubeHostportChainPrefix + encoded[:16])
@@ -364,13 +364,13 @@ func openLocalPort(hp *hostport) (closeable, error) {
 }
 
 // cleanupHostportMap closes obsolete hostports
-func (h *handler) cleanupHostportMap(containerPortMap map[api.ContainerPort]targetPod) {
+func (h *handler) cleanupHostportMap(containerPortMap map[v1.ContainerPort]targetPod) {
 	// compute hostports that are supposed to be open
 	currentHostports := make(map[hostport]bool)
 	for containerPort := range containerPortMap {
 		hp := hostport{
 			port:     containerPort.HostPort,
-			protocol: string(containerPort.Protocol),
+			protocol: strings.ToLower(string(containerPort.Protocol)),
 		}
 		currentHostports[hp] = true
 	}
@@ -379,6 +379,7 @@ func (h *handler) cleanupHostportMap(containerPortMap map[api.ContainerPort]targ
 	for hp, socket := range h.hostPortMap {
 		if _, ok := currentHostports[hp]; !ok {
 			socket.Close()
+			glog.V(3).Infof("Closed local port %s", hp.String())
 			delete(h.hostPortMap, hp)
 		}
 	}

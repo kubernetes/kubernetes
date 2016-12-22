@@ -19,7 +19,7 @@ package e2e
 import (
 	"fmt"
 
-	"k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_5"
+	"k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
@@ -34,11 +34,11 @@ var _ = framework.KubeDescribe("[Feature:Federation]", func() {
 
 	var _ = Describe("Federation API server authentication", func() {
 		BeforeEach(func() {
-			framework.SkipUnlessFederated(f.Client)
+			framework.SkipUnlessFederated(f.ClientSet)
 		})
 
 		It("should accept cluster resources when the client has right authentication credentials", func() {
-			framework.SkipUnlessFederated(f.Client)
+			framework.SkipUnlessFederated(f.ClientSet)
 
 			nsName := f.FederationNamespace.Name
 			svc := createServiceOrFail(f.FederationClientset_1_5, nsName, FederatedServiceName)
@@ -46,7 +46,7 @@ var _ = framework.KubeDescribe("[Feature:Federation]", func() {
 		})
 
 		It("should not accept cluster resources when the client has invalid authentication credentials", func() {
-			framework.SkipUnlessFederated(f.Client)
+			framework.SkipUnlessFederated(f.ClientSet)
 
 			contexts := f.GetUnderlyingFederatedContexts()
 
@@ -67,10 +67,10 @@ var _ = framework.KubeDescribe("[Feature:Federation]", func() {
 		})
 
 		It("should not accept cluster resources when the client has no authentication credentials", func() {
-			framework.SkipUnlessFederated(f.Client)
+			framework.SkipUnlessFederated(f.ClientSet)
 
 			fcs, err := invalidAuthFederationClientSet(nil)
-			ExpectNoError(err)
+			framework.ExpectNoError(err)
 
 			nsName := f.FederationNamespace.Name
 			svc, err := createService(fcs, nsName, FederatedServiceName)
@@ -82,7 +82,7 @@ var _ = framework.KubeDescribe("[Feature:Federation]", func() {
 	})
 })
 
-func invalidAuthFederationClientSet(user *framework.KubeUser) (*federation_release_1_5.Clientset, error) {
+func invalidAuthFederationClientSet(user *framework.KubeUser) (*federation_clientset.Clientset, error) {
 	overrides := &clientcmd.ConfigOverrides{}
 	if user != nil {
 		overrides = &clientcmd.ConfigOverrides{
@@ -105,7 +105,7 @@ func invalidAuthFederationClientSet(user *framework.KubeUser) (*federation_relea
 		config.Username = ""
 	}
 
-	c, err := federation_release_1_5.NewForConfig(config)
+	c, err := federation_clientset.NewForConfig(config)
 	if err != nil {
 		return nil, fmt.Errorf("error creating federation clientset: %v", err)
 	}

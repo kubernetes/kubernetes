@@ -24,7 +24,7 @@ import (
 	"time"
 
 	"github.com/golang/glog"
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	"k8s.io/kubernetes/pkg/kubelet/container"
@@ -85,10 +85,35 @@ type realImageGCManager struct {
 	recorder record.EventRecorder
 
 	// Reference to this node.
-	nodeRef *api.ObjectReference
+	nodeRef *v1.ObjectReference
 
 	// Track initialization
 	initialized bool
+
+	// imageCache is the cache of latest image list.
+	imageCache imageCache
+}
+
+// imageCache caches latest result of ListImages.
+type imageCache struct {
+	// sync.RWMutex is the mutex protects the image cache.
+	sync.RWMutex
+	// images is the image cache.
+	images []kubecontainer.Image
+}
+
+// set updates image cache.
+func (i *imageCache) set(images []kubecontainer.Image) {
+	i.Lock()
+	defer i.Unlock()
+	i.images = images
+}
+
+// get gets image list from image cache.
+func (i *imageCache) get() []kubecontainer.Image {
+	i.RLock()
+	defer i.RUnlock()
+	return i.images
 }
 
 // Information about the images we track.
@@ -103,7 +128,7 @@ type imageRecord struct {
 	size int64
 }
 
-func NewImageGCManager(runtime container.Runtime, cadvisorInterface cadvisor.Interface, recorder record.EventRecorder, nodeRef *api.ObjectReference, policy ImageGCPolicy) (ImageGCManager, error) {
+func NewImageGCManager(runtime container.Runtime, cadvisorInterface cadvisor.Interface, recorder record.EventRecorder, nodeRef *v1.ObjectReference, policy ImageGCPolicy) (ImageGCManager, error) {
 	// Validate policy.
 	if policy.HighThresholdPercent < 0 || policy.HighThresholdPercent > 100 {
 		return nil, fmt.Errorf("invalid HighThresholdPercent %d, must be in range [0-100]", policy.HighThresholdPercent)
@@ -142,16 +167,23 @@ func (im *realImageGCManager) Start() error {
 		}
 	}, 5*time.Minute, wait.NeverStop)
 
+	// Start a goroutine periodically updates image cache.
+	// TODO(random-liu): Merge this with the previous loop.
+	go wait.Until(func() {
+		images, err := im.runtime.ListImages()
+		if err != nil {
+			glog.Warningf("[imageGCManager] Failed to update image list: %v", err)
+		} else {
+			im.imageCache.set(images)
+		}
+	}, 30*time.Second, wait.NeverStop)
+
 	return nil
 }
 
 // Get a list of images on this node
 func (im *realImageGCManager) GetImageList() ([]kubecontainer.Image, error) {
-	images, err := im.runtime.ListImages()
-	if err != nil {
-		return nil, err
-	}
-	return images, nil
+	return im.imageCache.get(), nil
 }
 
 func (im *realImageGCManager) detectImages(detectTime time.Time) error {
@@ -227,7 +259,7 @@ func (im *realImageGCManager) GarbageCollect() error {
 	// Check valid capacity.
 	if capacity == 0 {
 		err := fmt.Errorf("invalid capacity %d on device %q at mount point %q", capacity, fsInfo.Device, fsInfo.Mountpoint)
-		im.recorder.Eventf(im.nodeRef, api.EventTypeWarning, events.InvalidDiskCapacity, err.Error())
+		im.recorder.Eventf(im.nodeRef, v1.EventTypeWarning, events.InvalidDiskCapacity, err.Error())
 		return err
 	}
 
@@ -243,7 +275,7 @@ func (im *realImageGCManager) GarbageCollect() error {
 
 		if freed < amountToFree {
 			err := fmt.Errorf("failed to garbage collect required amount of images. Wanted to free %d, but freed %d", amountToFree, freed)
-			im.recorder.Eventf(im.nodeRef, api.EventTypeWarning, events.FreeDiskSpaceFailed, err.Error())
+			im.recorder.Eventf(im.nodeRef, v1.EventTypeWarning, events.FreeDiskSpaceFailed, err.Error())
 			return err
 		}
 	}

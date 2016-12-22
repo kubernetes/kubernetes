@@ -24,6 +24,8 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/test/e2e/framework"
 
@@ -52,8 +54,8 @@ var _ = framework.KubeDescribe("Cluster level logging using Elasticsearch [Featu
 
 		By("Running synthetic logger")
 		createSynthLogger(f, expectedLinesCount)
-		defer f.PodClient().Delete(synthLoggerPodName, &api.DeleteOptions{})
-		err = framework.WaitForPodSuccessInNamespace(f.Client, synthLoggerPodName, f.Namespace.Name)
+		defer f.PodClient().Delete(synthLoggerPodName, &v1.DeleteOptions{})
+		err = framework.WaitForPodSuccessInNamespace(f.ClientSet, synthLoggerPodName, f.Namespace.Name)
 		framework.ExpectNoError(err, fmt.Sprintf("Should've successfully waited for pod %s to succeed", synthLoggerPodName))
 
 		By("Waiting for logs to ingest")
@@ -86,12 +88,12 @@ var _ = framework.KubeDescribe("Cluster level logging using Elasticsearch [Featu
 func checkElasticsearchReadiness(f *framework.Framework) error {
 	// Check for the existence of the Elasticsearch service.
 	By("Checking the Elasticsearch service exists.")
-	s := f.Client.Services(api.NamespaceSystem)
+	s := f.ClientSet.Core().Services(api.NamespaceSystem)
 	// Make a few attempts to connect. This makes the test robust against
 	// being run as the first e2e test just after the e2e cluster has been created.
 	var err error
 	for start := time.Now(); time.Since(start) < graceTime; time.Sleep(5 * time.Second) {
-		if _, err = s.Get("elasticsearch-logging"); err == nil {
+		if _, err = s.Get("elasticsearch-logging", metav1.GetOptions{}); err == nil {
 			break
 		}
 		framework.Logf("Attempt to check for the existence of the Elasticsearch service failed after %v", time.Since(start))
@@ -101,11 +103,11 @@ func checkElasticsearchReadiness(f *framework.Framework) error {
 	// Wait for the Elasticsearch pods to enter the running state.
 	By("Checking to make sure the Elasticsearch pods are running")
 	label := labels.SelectorFromSet(labels.Set(map[string]string{"k8s-app": "elasticsearch-logging"}))
-	options := api.ListOptions{LabelSelector: label}
-	pods, err := f.Client.Pods(api.NamespaceSystem).List(options)
+	options := v1.ListOptions{LabelSelector: label.String()}
+	pods, err := f.ClientSet.Core().Pods(api.NamespaceSystem).List(options)
 	Expect(err).NotTo(HaveOccurred())
 	for _, pod := range pods.Items {
-		err = framework.WaitForPodRunningInNamespace(f.Client, &pod)
+		err = framework.WaitForPodRunningInNamespace(f.ClientSet, &pod)
 		Expect(err).NotTo(HaveOccurred())
 	}
 
@@ -115,7 +117,7 @@ func checkElasticsearchReadiness(f *framework.Framework) error {
 	err = nil
 	var body []byte
 	for start := time.Now(); time.Since(start) < graceTime; time.Sleep(10 * time.Second) {
-		proxyRequest, errProxy := framework.GetServicesProxyRequest(f.Client, f.Client.Get())
+		proxyRequest, errProxy := framework.GetServicesProxyRequest(f.ClientSet, f.ClientSet.Core().RESTClient().Get())
 		if errProxy != nil {
 			framework.Logf("After %v failed to get services proxy request: %v", time.Since(start), errProxy)
 			continue
@@ -147,7 +149,7 @@ func checkElasticsearchReadiness(f *framework.Framework) error {
 	By("Checking health of Elasticsearch service.")
 	healthy := false
 	for start := time.Now(); time.Since(start) < graceTime; time.Sleep(5 * time.Second) {
-		proxyRequest, errProxy := framework.GetServicesProxyRequest(f.Client, f.Client.Get())
+		proxyRequest, errProxy := framework.GetServicesProxyRequest(f.ClientSet, f.ClientSet.Core().RESTClient().Get())
 		if errProxy != nil {
 			framework.Logf("After %v failed to get services proxy request: %v", time.Since(start), errProxy)
 			continue
@@ -189,7 +191,7 @@ func checkElasticsearchReadiness(f *framework.Framework) error {
 }
 
 func getMissingLinesCountElasticsearch(f *framework.Framework, expectedCount int) (int, error) {
-	proxyRequest, errProxy := framework.GetServicesProxyRequest(f.Client, f.Client.Get())
+	proxyRequest, errProxy := framework.GetServicesProxyRequest(f.ClientSet, f.ClientSet.Core().RESTClient().Get())
 	if errProxy != nil {
 		return 0, fmt.Errorf("Failed to get services proxy request: %v", errProxy)
 	}

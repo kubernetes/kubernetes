@@ -62,6 +62,18 @@ else
 fi
 echo "${reset}"
 
+echo -ne "Checking for package aliases... "
+if ! hack/verify-pkg-names.sh > /dev/null; then
+  echo "${red}ERROR!"
+  echo "Some package aliases break go conventions. To fix these errors, "
+  echo "do not use capitalized or underlined characters in pkg aliases. "
+  echo "Refer to https://blog.golang.org/package-names for more info."
+  exit_code=1
+else
+  echo "${green}OK"
+fi
+echo "${reset}"
+
 echo -ne "Checking for files that need boilerplate... "
 files=($(git diff --cached --name-only --diff-filter ACM))
 # We always make sure there is one file in the files list. Some tools check
@@ -122,18 +134,6 @@ else
 fi
 echo "${reset}"
 
-echo -ne "Checking for docs that need updating... "
-if ! hack/verify-munge-docs.sh > /dev/null; then
-  echo "${red}ERROR!"
-  echo "Some docs are out of sync between CLI and markdown."
-  echo "To regenerate docs, run:"
-  echo "  hack/update-munge-docs.sh"
-  exit_code=1
-else
-  echo "${green}OK"
-fi
-echo "${reset}"
-
 echo -ne "Checking for swagger type documentation that need updating... "
 if ! hack/verify-generated-swagger-docs.sh > /dev/null; then
   echo "${red}ERROR!"
@@ -164,6 +164,18 @@ if ! hack/verify-openapi-spec.sh > /dev/null; then
   echo "Openapi spec needs to be updated."
   echo "To regenerate the spec, run:"
   echo "  hack/update-openapi-spec.sh"
+  exit_code=1
+else
+  echo "${green}OK"
+fi
+echo "${reset}"
+
+echo -ne "Checking for federation openapi spec that need updating... "
+if ! hack/verify-federation-openapi-spec.sh > /dev/null; then
+  echo "${red}ERROR!"
+  echo "Federation OpenAPI spec needs to be updated."
+  echo "To regenerate the spec, run:"
+  echo "  hack/update-federation-openapi-spec.sh"
   exit_code=1
 else
   echo "${green}OK"

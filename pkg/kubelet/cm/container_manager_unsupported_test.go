@@ -1,4 +1,4 @@
-// +build !linux
+// +build !linux,!windows
 
 /*
 Copyright 2015 The Kubernetes Authors.
@@ -55,6 +55,10 @@ func (mi *fakeMountInterface) DeviceOpened(pathname string) (bool, error) {
 
 func (mi *fakeMountInterface) PathIsDevice(pathname string) (bool, error) {
 	return true, nil
+}
+
+func (mi *fakeMountInterface) GetDeviceNameFromMount(mountPath, pluginDir string) (string, error) {
+	return "", nil
 }
 
 func fakeContainerMgrMountInt() mount.Interface {

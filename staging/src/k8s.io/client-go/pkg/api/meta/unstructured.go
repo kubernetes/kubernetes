@@ -17,15 +17,15 @@ limitations under the License.
 package meta
 
 import (
-	"k8s.io/client-go/pkg/api/unversioned"
-	"k8s.io/client-go/pkg/runtime"
+	"k8s.io/client-go/pkg/apis/meta/v1/unstructured"
+	"k8s.io/client-go/pkg/runtime/schema"
 )
 
 // InterfacesForUnstructured returns VersionInterfaces suitable for
-// dealing with runtime.Unstructured objects.
-func InterfacesForUnstructured(unversioned.GroupVersion) (*VersionInterfaces, error) {
+// dealing with unstructured.Unstructured objects.
+func InterfacesForUnstructured(schema.GroupVersion) (*VersionInterfaces, error) {
 	return &VersionInterfaces{
-		ObjectConvertor:  &runtime.UnstructuredObjectConverter{},
+		ObjectConvertor:  &unstructured.UnstructuredObjectConverter{},
 		MetadataAccessor: NewAccessor(),
 	}, nil
 }

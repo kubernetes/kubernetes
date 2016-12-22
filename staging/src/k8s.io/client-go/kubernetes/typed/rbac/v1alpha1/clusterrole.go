@@ -19,8 +19,10 @@ package v1alpha1
 import (
 	api "k8s.io/client-go/pkg/api"
 	v1 "k8s.io/client-go/pkg/api/v1"
+	meta_v1 "k8s.io/client-go/pkg/apis/meta/v1"
 	v1alpha1 "k8s.io/client-go/pkg/apis/rbac/v1alpha1"
 	watch "k8s.io/client-go/pkg/watch"
+	rest "k8s.io/client-go/rest"
 )
 
 // ClusterRolesGetter has a method to return a ClusterRoleInterface.
@@ -35,7 +37,7 @@ type ClusterRoleInterface interface {
 	Update(*v1alpha1.ClusterRole) (*v1alpha1.ClusterRole, error)
 	Delete(name string, options *v1.DeleteOptions) error
 	DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error
-	Get(name string) (*v1alpha1.ClusterRole, error)
+	Get(name string, options meta_v1.GetOptions) (*v1alpha1.ClusterRole, error)
 	List(opts v1.ListOptions) (*v1alpha1.ClusterRoleList, error)
 	Watch(opts v1.ListOptions) (watch.Interface, error)
 	Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *v1alpha1.ClusterRole, err error)
@@ -44,13 +46,13 @@ type ClusterRoleInterface interface {
 
 // clusterRoles implements ClusterRoleInterface
 type clusterRoles struct {
-	client *RbacClient
+	client rest.Interface
 }
 
 // newClusterRoles returns a ClusterRoles
-func newClusterRoles(c *RbacClient) *clusterRoles {
+func newClusterRoles(c *RbacV1alpha1Client) *clusterRoles {
 	return &clusterRoles{
-		client: c,
+		client: c.RESTClient(),
 	}
 }
 
@@ -98,11 +100,12 @@ func (c *clusterRoles) DeleteCollection(options *v1.DeleteOptions, listOptions v
 }
 
 // Get takes name of the clusterRole, and returns the corresponding clusterRole object, and an error if there is any.
-func (c *clusterRoles) Get(name string) (result *v1alpha1.ClusterRole, err error) {
+func (c *clusterRoles) Get(name string, options meta_v1.GetOptions) (result *v1alpha1.ClusterRole, err error) {
 	result = &v1alpha1.ClusterRole{}
 	err = c.client.Get().
 		Resource("clusterroles").
 		Name(name).
+		VersionedParams(&options, api.ParameterCodec).
 		Do().
 		Into(result)
 	return

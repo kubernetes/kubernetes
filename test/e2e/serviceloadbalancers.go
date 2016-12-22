@@ -22,19 +22,21 @@ import (
 	"net/http"
 
 	"k8s.io/kubernetes/pkg/api"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/api/v1"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/wait"
 	utilyaml "k8s.io/kubernetes/pkg/util/yaml"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/generated"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
 
 // getLoadBalancerControllers returns a list of LBCtesters.
-func getLoadBalancerControllers(client *client.Client) []LBCTester {
+func getLoadBalancerControllers(client clientset.Interface) []LBCTester {
 	return []LBCTester{
 		&haproxyControllerTester{
 			name:   "haproxy",
@@ -45,7 +47,7 @@ func getLoadBalancerControllers(client *client.Client) []LBCTester {
 }
 
 // getIngManagers returns a list of ingManagers.
-func getIngManagers(client *client.Client) []*ingManager {
+func getIngManagers(client clientset.Interface) []*ingManager {
 	return []*ingManager{
 		{
 			name:        "netexec",
@@ -71,7 +73,7 @@ type LBCTester interface {
 
 // haproxyControllerTester implements LBCTester for bare metal haproxy LBs.
 type haproxyControllerTester struct {
-	client      *client.Client
+	client      clientset.Interface
 	cfg         string
 	rcName      string
 	rcNamespace string
@@ -98,11 +100,11 @@ func (h *haproxyControllerTester) start(namespace string) (err error) {
 		framework.Logf("Container args %+v", rc.Spec.Template.Spec.Containers[i].Args)
 	}
 
-	rc, err = h.client.ReplicationControllers(rc.Namespace).Create(rc)
+	rc, err = h.client.Core().ReplicationControllers(rc.Namespace).Create(rc)
 	if err != nil {
 		return
 	}
-	if err = framework.WaitForRCPodsRunning(h.client, namespace, rc.Name); err != nil {
+	if err = framework.WaitForControlledPodsRunning(h.client, namespace, rc.Name, api.Kind("ReplicationController")); err != nil {
 		return
 	}
 	h.rcName = rc.Name
@@ -111,8 +113,8 @@ func (h *haproxyControllerTester) start(namespace string) (err error) {
 	// Find the pods of the rc we just created.
 	labelSelector := labels.SelectorFromSet(
 		labels.Set(map[string]string{"name": h.rcName}))
-	options := api.ListOptions{LabelSelector: labelSelector}
-	pods, err := h.client.Pods(h.rcNamespace).List(options)
+	options := v1.ListOptions{LabelSelector: labelSelector.String()}
+	pods, err := h.client.Core().Pods(h.rcNamespace).List(options)
 	if err != nil {
 		return err
 	}
@@ -136,7 +138,7 @@ func (h *haproxyControllerTester) start(namespace string) (err error) {
 }
 
 func (h *haproxyControllerTester) stop() error {
-	return h.client.ReplicationControllers(h.rcNamespace).Delete(h.rcName, nil)
+	return h.client.Core().ReplicationControllers(h.rcNamespace).Delete(h.rcName, nil)
 }
 
 func (h *haproxyControllerTester) lookup(ingressKey string) string {
@@ -151,7 +153,7 @@ type ingManager struct {
 	ingCfgPath  string
 	name        string
 	namespace   string
-	client      *client.Client
+	client      clientset.Interface
 	svcNames    []string
 }
 
@@ -165,11 +167,11 @@ func (s *ingManager) start(namespace string) (err error) {
 		rc := rcFromManifest(rcPath)
 		rc.Namespace = namespace
 		rc.Spec.Template.Labels["name"] = rc.Name
-		rc, err = s.client.ReplicationControllers(rc.Namespace).Create(rc)
+		rc, err = s.client.Core().ReplicationControllers(rc.Namespace).Create(rc)
 		if err != nil {
 			return
 		}
-		if err = framework.WaitForRCPodsRunning(s.client, rc.Namespace, rc.Name); err != nil {
+		if err = framework.WaitForControlledPodsRunning(s.client, rc.Namespace, rc.Name, api.Kind("ReplicationController")); err != nil {
 			return
 		}
 	}
@@ -179,7 +181,7 @@ func (s *ingManager) start(namespace string) (err error) {
 	for _, svcPath := range s.svcCfgPaths {
 		svc := svcFromManifest(svcPath)
 		svc.Namespace = namespace
-		svc, err = s.client.Services(svc.Namespace).Create(svc)
+		svc, err = s.client.Core().Services(svc.Namespace).Create(svc)
 		if err != nil {
 			return
 		}
@@ -207,12 +209,12 @@ func (s *ingManager) test(path string) error {
 var _ = framework.KubeDescribe("ServiceLoadBalancer [Feature:ServiceLoadBalancer]", func() {
 	// These variables are initialized after framework's beforeEach.
 	var ns string
-	var client *client.Client
+	var client clientset.Interface
 
 	f := framework.NewDefaultFramework("servicelb")
 
 	BeforeEach(func() {
-		client = f.Client
+		client = f.ClientSet
 		ns = f.Namespace.Name
 	})
 
@@ -262,10 +264,10 @@ func simpleGET(c *http.Client, url, host string) (string, error) {
 }
 
 // rcFromManifest reads a .json/yaml file and returns the rc in it.
-func rcFromManifest(fileName string) *api.ReplicationController {
-	var controller api.ReplicationController
+func rcFromManifest(fileName string) *v1.ReplicationController {
+	var controller v1.ReplicationController
 	framework.Logf("Parsing rc from %v", fileName)
-	data := framework.ReadOrDie(fileName)
+	data := generated.ReadOrDie(fileName)
 
 	json, err := utilyaml.ToJSON(data)
 	Expect(err).NotTo(HaveOccurred())
@@ -275,10 +277,10 @@ func rcFromManifest(fileName string) *api.ReplicationController {
 }
 
 // svcFromManifest reads a .json/yaml file and returns the rc in it.
-func svcFromManifest(fileName string) *api.Service {
-	var svc api.Service
+func svcFromManifest(fileName string) *v1.Service {
+	var svc v1.Service
 	framework.Logf("Parsing service from %v", fileName)
-	data := framework.ReadOrDie(fileName)
+	data := generated.ReadOrDie(fileName)
 
 	json, err := utilyaml.ToJSON(data)
 	Expect(err).NotTo(HaveOccurred())

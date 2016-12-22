@@ -20,20 +20,29 @@ import (
 	"reflect"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/api/errors"
+	"k8s.io/kubernetes/pkg/apimachinery/registered"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
+	"k8s.io/kubernetes/pkg/client/restclient"
+	"k8s.io/kubernetes/pkg/client/restclient/fake"
+	"k8s.io/kubernetes/pkg/runtime/schema"
+	"k8s.io/kubernetes/pkg/version"
+
+	"github.com/emicklei/go-restful/swagger"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestRESTMapper(t *testing.T) {
 	resources := []*APIGroupResources{
 		{
-			Group: unversioned.APIGroup{
-				Versions: []unversioned.GroupVersionForDiscovery{
+			Group: metav1.APIGroup{
+				Versions: []metav1.GroupVersionForDiscovery{
 					{Version: "v1"},
 					{Version: "v2"},
 				},
-				PreferredVersion: unversioned.GroupVersionForDiscovery{Version: "v1"},
+				PreferredVersion: metav1.GroupVersionForDiscovery{Version: "v1"},
 			},
-			VersionedResources: map[string][]unversioned.APIResource{
+			VersionedResources: map[string][]metav1.APIResource{
 				"v1": {
 					{Name: "pods", Namespaced: true, Kind: "Pod"},
 				},
@@ -43,14 +52,14 @@ func TestRESTMapper(t *testing.T) {
 			},
 		},
 		{
-			Group: unversioned.APIGroup{
+			Group: metav1.APIGroup{
 				Name: "extensions",
-				Versions: []unversioned.GroupVersionForDiscovery{
+				Versions: []metav1.GroupVersionForDiscovery{
 					{Version: "v1beta"},
 				},
-				PreferredVersion: unversioned.GroupVersionForDiscovery{Version: "v1beta"},
+				PreferredVersion: metav1.GroupVersionForDiscovery{Version: "v1beta"},
 			},
-			VersionedResources: map[string][]unversioned.APIResource{
+			VersionedResources: map[string][]metav1.APIResource{
 				"v1beta": {
 					{Name: "jobs", Namespaced: true, Kind: "Job"},
 				},
@@ -61,43 +70,43 @@ func TestRESTMapper(t *testing.T) {
 	restMapper := NewRESTMapper(resources, nil)
 
 	kindTCs := []struct {
-		input unversioned.GroupVersionResource
-		want  unversioned.GroupVersionKind
+		input schema.GroupVersionResource
+		want  schema.GroupVersionKind
 	}{
 		{
-			input: unversioned.GroupVersionResource{
+			input: schema.GroupVersionResource{
 				Version:  "v1",
 				Resource: "pods",
 			},
-			want: unversioned.GroupVersionKind{
+			want: schema.GroupVersionKind{
 				Version: "v1",
 				Kind:    "Pod",
 			},
 		},
 		{
-			input: unversioned.GroupVersionResource{
+			input: schema.GroupVersionResource{
 				Version:  "v2",
 				Resource: "pods",
 			},
-			want: unversioned.GroupVersionKind{
+			want: schema.GroupVersionKind{
 				Version: "v2",
 				Kind:    "Pod",
 			},
 		},
 		{
-			input: unversioned.GroupVersionResource{
+			input: schema.GroupVersionResource{
 				Resource: "pods",
 			},
-			want: unversioned.GroupVersionKind{
+			want: schema.GroupVersionKind{
 				Version: "v1",
 				Kind:    "Pod",
 			},
 		},
 		{
-			input: unversioned.GroupVersionResource{
+			input: schema.GroupVersionResource{
 				Resource: "jobs",
 			},
-			want: unversioned.GroupVersionKind{
+			want: schema.GroupVersionKind{
 				Group:   "extensions",
 				Version: "v1beta",
 				Kind:    "Job",
@@ -118,43 +127,43 @@ func TestRESTMapper(t *testing.T) {
 	}
 
 	resourceTCs := []struct {
-		input unversioned.GroupVersionResource
-		want  unversioned.GroupVersionResource
+		input schema.GroupVersionResource
+		want  schema.GroupVersionResource
 	}{
 		{
-			input: unversioned.GroupVersionResource{
+			input: schema.GroupVersionResource{
 				Version:  "v1",
 				Resource: "pods",
 			},
-			want: unversioned.GroupVersionResource{
+			want: schema.GroupVersionResource{
 				Version:  "v1",
 				Resource: "pods",
 			},
 		},
 		{
-			input: unversioned.GroupVersionResource{
+			input: schema.GroupVersionResource{
 				Version:  "v2",
 				Resource: "pods",
 			},
-			want: unversioned.GroupVersionResource{
+			want: schema.GroupVersionResource{
 				Version:  "v2",
 				Resource: "pods",
 			},
 		},
 		{
-			input: unversioned.GroupVersionResource{
+			input: schema.GroupVersionResource{
 				Resource: "pods",
 			},
-			want: unversioned.GroupVersionResource{
+			want: schema.GroupVersionResource{
 				Version:  "v1",
 				Resource: "pods",
 			},
 		},
 		{
-			input: unversioned.GroupVersionResource{
+			input: schema.GroupVersionResource{
 				Resource: "jobs",
 			},
-			want: unversioned.GroupVersionResource{
+			want: schema.GroupVersionResource{
 				Group:    "extensions",
 				Version:  "v1beta",
 				Resource: "jobs",
@@ -173,4 +182,148 @@ func TestRESTMapper(t *testing.T) {
 			t.Errorf("ResourceFor(%#v) = %#v, want %#v", tc.input, got, tc.want)
 		}
 	}
+}
+
+func TestDeferredDiscoveryRESTMapper_CacheMiss(t *testing.T) {
+	assert := assert.New(t)
+
+	cdc := fakeCachedDiscoveryInterface{fresh: false}
+	m := NewDeferredDiscoveryRESTMapper(&cdc, registered.InterfacesFor)
+	assert.False(cdc.fresh, "should NOT be fresh after instantiation")
+	assert.Zero(cdc.invalidateCalls, "should not have called Invalidate()")
+
+	gvk, err := m.KindFor(schema.GroupVersionResource{
+		Group:    "a",
+		Version:  "v1",
+		Resource: "foo",
+	})
+	assert.NoError(err)
+	assert.True(cdc.fresh, "should be fresh after a cache-miss")
+	assert.Equal(cdc.invalidateCalls, 1, "should have called Invalidate() once")
+	assert.Equal(gvk.Kind, "Foo")
+
+	gvk, err = m.KindFor(schema.GroupVersionResource{
+		Group:    "a",
+		Version:  "v1",
+		Resource: "foo",
+	})
+	assert.NoError(err)
+	assert.Equal(cdc.invalidateCalls, 1, "should NOT have called Invalidate() again")
+
+	gvk, err = m.KindFor(schema.GroupVersionResource{
+		Group:    "a",
+		Version:  "v1",
+		Resource: "bar",
+	})
+	assert.Error(err)
+	assert.Equal(cdc.invalidateCalls, 1, "should NOT have called Invalidate() again after another cache-miss, but with fresh==true")
+
+	cdc.fresh = false
+	gvk, err = m.KindFor(schema.GroupVersionResource{
+		Group:    "a",
+		Version:  "v1",
+		Resource: "bar",
+	})
+	assert.Error(err)
+	assert.Equal(cdc.invalidateCalls, 2, "should HAVE called Invalidate() again after another cache-miss, but with fresh==false")
+}
+
+type fakeCachedDiscoveryInterface struct {
+	invalidateCalls int
+	fresh           bool
+	enabledA        bool
+}
+
+var _ CachedDiscoveryInterface = &fakeCachedDiscoveryInterface{}
+
+func (c *fakeCachedDiscoveryInterface) Fresh() bool {
+	return c.fresh
+}
+
+func (c *fakeCachedDiscoveryInterface) Invalidate() {
+	c.invalidateCalls = c.invalidateCalls + 1
+	c.fresh = true
+	c.enabledA = true
+}
+
+func (c *fakeCachedDiscoveryInterface) RESTClient() restclient.Interface {
+	return &fake.RESTClient{}
+}
+
+func (c *fakeCachedDiscoveryInterface) ServerGroups() (*metav1.APIGroupList, error) {
+	if c.enabledA {
+		return &metav1.APIGroupList{
+			Groups: []metav1.APIGroup{
+				{
+					Name: "a",
+					Versions: []metav1.GroupVersionForDiscovery{
+						{
+							GroupVersion: "a/v1",
+							Version:      "v1",
+						},
+					},
+					PreferredVersion: metav1.GroupVersionForDiscovery{
+						GroupVersion: "a/v1",
+						Version:      "v1",
+					},
+				},
+			},
+		}, nil
+	}
+	return &metav1.APIGroupList{}, nil
+}
+
+func (c *fakeCachedDiscoveryInterface) ServerResourcesForGroupVersion(groupVersion string) (*metav1.APIResourceList, error) {
+	if c.enabledA && groupVersion == "a/v1" {
+		return &metav1.APIResourceList{
+			GroupVersion: "a/v1",
+			APIResources: []metav1.APIResource{
+				{
+					Name:       "foo",
+					Kind:       "Foo",
+					Namespaced: false,
+				},
+			},
+		}, nil
+	}
+
+	return nil, errors.NewNotFound(schema.GroupResource{}, "")
+}
+
+func (c *fakeCachedDiscoveryInterface) ServerResources() ([]*metav1.APIResourceList, error) {
+	if c.enabledA {
+		av1, _ := c.ServerResourcesForGroupVersion("a/v1")
+		return []*metav1.APIResourceList{av1}, nil
+	}
+	return []*metav1.APIResourceList{}, nil
+}
+
+func (c *fakeCachedDiscoveryInterface) ServerPreferredResources() ([]*metav1.APIResourceList, error) {
+	if c.enabledA {
+		return []*metav1.APIResourceList{
+			{
+				GroupVersion: "a/v1",
+				APIResources: []metav1.APIResource{
+					{
+						Name:  "foo",
+						Kind:  "Foo",
+						Verbs: []string{},
+					},
+				},
+			},
+		}, nil
+	}
+	return nil, nil
+}
+
+func (c *fakeCachedDiscoveryInterface) ServerPreferredNamespacedResources() ([]*metav1.APIResourceList, error) {
+	return nil, nil
+}
+
+func (c *fakeCachedDiscoveryInterface) ServerVersion() (*version.Info, error) {
+	return &version.Info{}, nil
+}
+
+func (c *fakeCachedDiscoveryInterface) SwaggerSchema(version schema.GroupVersion) (*swagger.ApiDeclaration, error) {
+	return &swagger.ApiDeclaration{}, nil
 }

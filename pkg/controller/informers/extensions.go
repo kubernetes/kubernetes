@@ -18,10 +18,9 @@ package informers
 
 import (
 	"reflect"
-	"time"
 
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/api/v1"
+	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/watch"
@@ -49,11 +48,11 @@ func (f *daemonSetInformer) Informer() cache.SharedIndexInformer {
 	}
 	informer = cache.NewSharedIndexInformer(
 		&cache.ListWatch{
-			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
-				return f.client.Extensions().DaemonSets(api.NamespaceAll).List(options)
+			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
+				return f.client.Extensions().DaemonSets(v1.NamespaceAll).List(options)
 			},
-			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-				return f.client.Extensions().DaemonSets(api.NamespaceAll).Watch(options)
+			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
+				return f.client.Extensions().DaemonSets(v1.NamespaceAll).Watch(options)
 			},
 		},
 		&extensions.DaemonSet{},
@@ -91,17 +90,15 @@ func (f *deploymentInformer) Informer() cache.SharedIndexInformer {
 	}
 	informer = cache.NewSharedIndexInformer(
 		&cache.ListWatch{
-			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
-				return f.client.Extensions().Deployments(api.NamespaceAll).List(options)
+			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
+				return f.client.Extensions().Deployments(v1.NamespaceAll).List(options)
 			},
-			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-				return f.client.Extensions().Deployments(api.NamespaceAll).Watch(options)
+			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
+				return f.client.Extensions().Deployments(v1.NamespaceAll).Watch(options)
 			},
 		},
 		&extensions.Deployment{},
-		// TODO remove this.  It is hardcoded so that "Waiting for the second deployment to clear overlapping annotation" in
-		// "overlapping deployment should not fight with each other" will work since it requires a full resync to work properly.
-		30*time.Second,
+		f.defaultResync,
 		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
 	)
 	f.informers[informerType] = informer
@@ -135,11 +132,11 @@ func (f *replicaSetInformer) Informer() cache.SharedIndexInformer {
 	}
 	informer = cache.NewSharedIndexInformer(
 		&cache.ListWatch{
-			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
-				return f.client.Extensions().ReplicaSets(api.NamespaceAll).List(options)
+			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
+				return f.client.Extensions().ReplicaSets(v1.NamespaceAll).List(options)
 			},
-			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-				return f.client.Extensions().ReplicaSets(api.NamespaceAll).Watch(options)
+			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
+				return f.client.Extensions().ReplicaSets(v1.NamespaceAll).Watch(options)
 			},
 		},
 		&extensions.ReplicaSet{},

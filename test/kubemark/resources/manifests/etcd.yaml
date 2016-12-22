@@ -1,0 +1,49 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: etcd-server
+  namespace: kube-system
+spec:
+  hostNetwork: true
+  containers:
+  - name: etcd-container
+    image: {{kube_docker_registry}}/etcd:{{etcd_image}}
+    imagePullPolicy: IfNotPresent
+    resources:
+      requests:
+        cpu: 200m
+    command:
+    - /bin/sh
+    - -c
+    - /usr/local/bin/etcd
+      {{params}}
+      1>>/var/log/etcd.log 2>&1
+    livenessProbe:
+      httpGet:
+        host: 127.0.0.1
+        path: /health
+        port: 2379
+        scheme: HTTP
+      initialDelaySeconds: 15
+      timeoutSeconds: 15
+    ports:
+    - name: serverport
+      containerPort: 2380
+      hostPort: 2380
+      protocol: TCP
+    - name: clientport
+      containerPort: 2379
+      hostPort: 2379
+      protocol: TCP
+    volumeMounts:
+    - name: varetcd
+      mountPath: /var/etcd
+    - name: varlogetcd
+      mountPath: /var/log/etcd.log
+  volumes:
+  - name: varetcd
+    hostPath:
+      path: /var/etcd
+  - name: varlogetcd
+    hostPath:
+      path: /var/log/etcd.log

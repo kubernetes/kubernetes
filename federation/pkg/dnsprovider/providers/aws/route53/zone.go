@@ -17,13 +17,14 @@ limitations under the License.
 package route53
 
 import (
+	"strings"
+
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/route53"
 	"k8s.io/kubernetes/federation/pkg/dnsprovider"
-	"strings"
 )
 
-// Compile time check for interface adeherence
+// Compile time check for interface adherence
 var _ dnsprovider.Zone = &Zone{}
 
 type Zone struct {

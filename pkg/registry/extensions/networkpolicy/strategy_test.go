@@ -20,8 +20,8 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 )
 
 func TestNetworkPolicyStrategy(t *testing.T) {
@@ -37,7 +37,7 @@ func TestNetworkPolicyStrategy(t *testing.T) {
 	np := &extensions.NetworkPolicy{
 		ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
 		Spec: extensions.NetworkPolicySpec{
-			PodSelector: unversioned.LabelSelector{MatchLabels: validMatchLabels},
+			PodSelector: metav1.LabelSelector{MatchLabels: validMatchLabels},
 			Ingress:     []extensions.NetworkPolicyIngressRule{},
 		},
 	}

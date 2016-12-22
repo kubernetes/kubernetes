@@ -19,7 +19,9 @@ package v1
 import (
 	api "k8s.io/client-go/pkg/api"
 	v1 "k8s.io/client-go/pkg/api/v1"
+	meta_v1 "k8s.io/client-go/pkg/apis/meta/v1"
 	watch "k8s.io/client-go/pkg/watch"
+	rest "k8s.io/client-go/rest"
 )
 
 // NodesGetter has a method to return a NodeInterface.
@@ -35,7 +37,7 @@ type NodeInterface interface {
 	UpdateStatus(*v1.Node) (*v1.Node, error)
 	Delete(name string, options *v1.DeleteOptions) error
 	DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error
-	Get(name string) (*v1.Node, error)
+	Get(name string, options meta_v1.GetOptions) (*v1.Node, error)
 	List(opts v1.ListOptions) (*v1.NodeList, error)
 	Watch(opts v1.ListOptions) (watch.Interface, error)
 	Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *v1.Node, err error)
@@ -44,13 +46,13 @@ type NodeInterface interface {
 
 // nodes implements NodeInterface
 type nodes struct {
-	client *CoreClient
+	client rest.Interface
 }
 
 // newNodes returns a Nodes
-func newNodes(c *CoreClient) *nodes {
+func newNodes(c *CoreV1Client) *nodes {
 	return &nodes{
-		client: c,
+		client: c.RESTClient(),
 	}
 }
 
@@ -76,6 +78,9 @@ func (c *nodes) Update(node *v1.Node) (result *v1.Node, err error) {
 		Into(result)
 	return
 }
+
+// UpdateStatus was generated because the type contains a Status member.
+// Add a +genclientstatus=false comment above the type to avoid generating UpdateStatus().
 
 func (c *nodes) UpdateStatus(node *v1.Node) (result *v1.Node, err error) {
 	result = &v1.Node{}
@@ -110,11 +115,12 @@ func (c *nodes) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListO
 }
 
 // Get takes name of the node, and returns the corresponding node object, and an error if there is any.
-func (c *nodes) Get(name string) (result *v1.Node, err error) {
+func (c *nodes) Get(name string, options meta_v1.GetOptions) (result *v1.Node, err error) {
 	result = &v1.Node{}
 	err = c.client.Get().
 		Resource("nodes").
 		Name(name).
+		VersionedParams(&options, api.ParameterCodec).
 		Do().
 		Into(result)
 	return

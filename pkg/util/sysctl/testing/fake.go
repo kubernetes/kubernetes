@@ -17,8 +17,9 @@ limitations under the License.
 package testing
 
 import (
-	"k8s.io/kubernetes/pkg/util/sysctl"
 	"os"
+
+	"k8s.io/kubernetes/pkg/util/sysctl"
 )
 
 // fake is a map-backed implementation of sysctl.Interface, for testing/mocking

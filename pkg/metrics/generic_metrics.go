@@ -99,7 +99,7 @@ func parseMetrics(data string, output *Metrics) error {
 }
 
 func (g *MetricsGrabber) getMetricsFromPod(podName string, namespace string, port int) (string, error) {
-	rawOutput, err := g.client.Get().
+	rawOutput, err := g.client.Core().RESTClient().Get().
 		Prefix("proxy").
 		Namespace(namespace).
 		Resource("pods").

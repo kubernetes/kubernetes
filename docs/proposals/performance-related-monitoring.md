@@ -1,37 +1,3 @@
-<!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
-
-<!-- BEGIN STRIP_FOR_RELEASE -->
-
-<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
-     width="25" height="25">
-
-<h2>PLEASE NOTE: This document applies to the HEAD of the source tree</h2>
-
-If you are using a released version of Kubernetes, you should
-refer to the docs that go with that version.
-
-<!-- TAG RELEASE_LINK, added by the munger automatically -->
-<strong>
-The latest release of this document can be found
-[here](http://releases.k8s.io/release-1.4/docs/proposals/performance-related-monitoring.md).
-
-Documentation for other releases can be found at
-[releases.k8s.io](http://releases.k8s.io).
-</strong>
---
-
-<!-- END STRIP_FOR_RELEASE -->
-
-<!-- END MUNGE: UNVERSIONED_WARNING -->
-
 # Performance Monitoring
 
 ## Reason for this document
@@ -82,7 +48,7 @@ Basic ideas:
 
 ### Logging monitoring
 
-Log spam is a serious problem and we need to keep it under control. Simplest way to check for regressions, suggested by @bredanburns, is to compute the rate in which log files
+Log spam is a serious problem and we need to keep it under control. Simplest way to check for regressions, suggested by @brendandburns, is to compute the rate in which log files
 grow in e2e tests.
 
 Basic ideas:
@@ -104,7 +70,7 @@ Basic ideas:
 Reverse of REST call monitoring done in the API server. We need to know when a given component increases a pressure it puts on the API server. As a proxy for number of
 requests sent we can track how saturated are rate limiters. This has additional advantage of giving us data needed to fine-tune rate limiter constants.
 
-Because we have rate limitting on both ends (client and API server) we should monitor number of inflight requests in API server and how it relates to `max-requests-inflight`.
+Because we have rate limiting on both ends (client and API server) we should monitor number of inflight requests in API server and how it relates to `max-requests-inflight`.
 
 Basic ideas:
 - percentage of used non-burst limit,

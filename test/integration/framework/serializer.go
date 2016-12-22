@@ -22,39 +22,26 @@ import (
 )
 
 // NewSingleContentTypeSerializer wraps a serializer in a NegotiatedSerializer that handles one content type
-func NewSingleContentTypeSerializer(scheme *runtime.Scheme, serializer runtime.Serializer, contentType string) runtime.StorageSerializer {
+func NewSingleContentTypeSerializer(scheme *runtime.Scheme, info runtime.SerializerInfo) runtime.StorageSerializer {
 	return &wrappedSerializer{
-		scheme:      scheme,
-		serializer:  serializer,
-		contentType: contentType,
+		scheme: scheme,
+		info:   info,
 	}
 }
 
 type wrappedSerializer struct {
-	scheme      *runtime.Scheme
-	serializer  runtime.Serializer
-	contentType string
+	scheme *runtime.Scheme
+	info   runtime.SerializerInfo
 }
 
 var _ runtime.StorageSerializer = &wrappedSerializer{}
 
-func (s *wrappedSerializer) SupportedMediaTypes() []string {
-	return []string{s.contentType}
-}
-func (s *wrappedSerializer) SerializerForMediaType(mediaType string, options map[string]string) (runtime.SerializerInfo, bool) {
-	if mediaType != s.contentType {
-		return runtime.SerializerInfo{}, false
-	}
-
-	return runtime.SerializerInfo{
-		Serializer:    s.serializer,
-		MediaType:     mediaType,
-		EncodesAsText: true, // TODO: this should be parameterized
-	}, true
+func (s *wrappedSerializer) SupportedMediaTypes() []runtime.SerializerInfo {
+	return []runtime.SerializerInfo{s.info}
 }
 
 func (s *wrappedSerializer) UniversalDeserializer() runtime.Decoder {
-	return s.serializer
+	return s.info.Serializer
 }
 
 func (s *wrappedSerializer) EncoderForVersion(encoder runtime.Encoder, gv runtime.GroupVersioner) runtime.Encoder {

@@ -17,9 +17,9 @@ limitations under the License.
 package core
 
 import (
-	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	"k8s.io/kubernetes/pkg/api/v1"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/quota"
 	"k8s.io/kubernetes/pkg/quota/generic"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -27,19 +27,20 @@ import (
 
 // NewSecretEvaluator returns an evaluator that can evaluate secrets
 func NewSecretEvaluator(kubeClient clientset.Interface) quota.Evaluator {
-	allResources := []api.ResourceName{api.ResourceSecrets}
-	return &generic.GenericEvaluator{
-		Name:              "Evaluator.Secret",
-		InternalGroupKind: api.Kind("Secret"),
-		InternalOperationResources: map[admission.Operation][]api.ResourceName{
-			admission.Create: allResources,
-		},
-		MatchedResourceNames: allResources,
-		MatchesScopeFunc:     generic.MatchesNoScopeFunc,
-		ConstraintsFunc:      generic.ObjectCountConstraintsFunc(api.ResourceSecrets),
-		UsageFunc:            generic.ObjectCountUsageFunc(api.ResourceSecrets),
-		ListFuncByNamespace: func(namespace string, options api.ListOptions) (runtime.Object, error) {
-			return kubeClient.Core().Secrets(namespace).List(options)
+	return &generic.ObjectCountEvaluator{
+		AllowCreateOnUpdate: false,
+		InternalGroupKind:   api.Kind("Secret"),
+		ResourceName:        api.ResourceSecrets,
+		ListFuncByNamespace: func(namespace string, options v1.ListOptions) ([]runtime.Object, error) {
+			itemList, err := kubeClient.Core().Secrets(namespace).List(options)
+			if err != nil {
+				return nil, err
+			}
+			results := make([]runtime.Object, 0, len(itemList.Items))
+			for i := range itemList.Items {
+				results = append(results, &itemList.Items[i])
+			}
+			return results, nil
 		},
 	}
 }

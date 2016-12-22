@@ -83,7 +83,7 @@ func forceMultiLine(s string) string {
 }
 
 func genFlagResult(flags *pflag.FlagSet) []cmdOption {
-	result := make([]cmdOption, 0)
+	result := []cmdOption{}
 
 	flags.VisitAll(func(flag *pflag.Flag) {
 		// Todo, when we mark a shorthand is deprecated, but specify an empty message.
@@ -131,7 +131,7 @@ func genYaml(command *cobra.Command, parent, docsDir string) {
 	}
 
 	if len(command.Commands()) > 0 || len(parent) > 0 {
-		result := make([]string, 0)
+		result := []string{}
 		if len(parent) > 0 {
 			result = append(result, parent)
 		}

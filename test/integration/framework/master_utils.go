@@ -29,27 +29,27 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
-	"k8s.io/kubernetes/pkg/apis/apps"
-	"k8s.io/kubernetes/pkg/apis/autoscaling"
+	apps "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
+	autoscaling "k8s.io/kubernetes/pkg/apis/autoscaling/v1"
 	"k8s.io/kubernetes/pkg/apis/batch"
-	"k8s.io/kubernetes/pkg/apis/certificates"
-	"k8s.io/kubernetes/pkg/apis/extensions"
-	"k8s.io/kubernetes/pkg/apis/policy"
-	"k8s.io/kubernetes/pkg/apis/rbac"
-	"k8s.io/kubernetes/pkg/apis/storage"
+	certificates "k8s.io/kubernetes/pkg/apis/certificates/v1alpha1"
+	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
+	policy "k8s.io/kubernetes/pkg/apis/policy/v1alpha1"
+	rbac "k8s.io/kubernetes/pkg/apis/rbac/v1alpha1"
+	storage "k8s.io/kubernetes/pkg/apis/storage/v1beta1"
 	"k8s.io/kubernetes/pkg/apiserver/authenticator"
 	authauthenticator "k8s.io/kubernetes/pkg/auth/authenticator"
 	authauthorizer "k8s.io/kubernetes/pkg/auth/authorizer"
 	authorizerunion "k8s.io/kubernetes/pkg/auth/authorizer/union"
 	"k8s.io/kubernetes/pkg/auth/user"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/typed/core/v1"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/core/v1"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/client/restclient"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/controller"
 	replicationcontroller "k8s.io/kubernetes/pkg/controller/replication"
 	"k8s.io/kubernetes/pkg/generated/openapi"
@@ -59,7 +59,9 @@ import (
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/master"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/storage/storagebackend"
+	"k8s.io/kubernetes/pkg/util/env"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/version"
 	"k8s.io/kubernetes/pkg/watch"
@@ -90,7 +92,7 @@ type MasterComponents struct {
 	// Kubernetes master, contains an embedded etcd storage
 	KubeMaster *master.Master
 	// Restclient used to talk to the kubernetes master
-	RestClient *client.Client
+	ClientSet clientset.Interface
 	// Replication controller manager
 	ControllerManager *replicationcontroller.ReplicationManager
 	// Channel for stop signals to rc manager
@@ -117,8 +119,7 @@ func NewMasterComponents(c *Config) *MasterComponents {
 	// TODO: Allow callers to pipe through a different master url and create a client/start components using it.
 	glog.Infof("Master %+v", s.URL)
 	// TODO: caesarxuchao: remove this client when the refactoring of client libraray is done.
-	restClient := client.NewOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(api.GroupName).GroupVersion}, QPS: c.QPS, Burst: c.Burst})
-	clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(api.GroupName).GroupVersion}, QPS: c.QPS, Burst: c.Burst})
+	clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(v1.GroupName).GroupVersion}, QPS: c.QPS, Burst: c.Burst})
 	rcStopCh := make(chan struct{})
 	controllerManager := replicationcontroller.NewReplicationManagerFromClient(clientset, controller.NoResyncPeriodFunc, c.Burst, 4096)
 
@@ -130,7 +131,7 @@ func NewMasterComponents(c *Config) *MasterComponents {
 	return &MasterComponents{
 		ApiServer:         s,
 		KubeMaster:        m,
-		RestClient:        restClient,
+		ClientSet:         clientset,
 		ControllerManager: controllerManager,
 		rcStopCh:          rcStopCh,
 	}
@@ -182,8 +183,8 @@ func startMasterOrDie(masterConfig *master.Config, incomingServer *httptest.Serv
 	if masterConfig == nil {
 		masterConfig = NewMasterConfig()
 		masterConfig.GenericConfig.EnableProfiling = true
-		masterConfig.GenericConfig.EnableSwaggerSupport = true
-		masterConfig.GenericConfig.EnableOpenAPISupport = true
+		masterConfig.GenericConfig.EnableMetrics = true
+		masterConfig.GenericConfig.OpenAPIConfig = genericapiserver.DefaultOpenAPIConfig(openapi.OpenAPIDefinitions)
 		masterConfig.GenericConfig.OpenAPIConfig.Info = &spec.Info{
 			InfoProps: spec.InfoProps{
 				Title:   "Kubernetes",
@@ -196,6 +197,7 @@ func startMasterOrDie(masterConfig *master.Config, incomingServer *httptest.Serv
 			},
 		}
 		masterConfig.GenericConfig.OpenAPIConfig.Definitions = openapi.OpenAPIDefinitions
+		masterConfig.GenericConfig.SwaggerConfig = genericapiserver.DefaultSwaggerConfig()
 	}
 
 	// set the loopback client config
@@ -237,8 +239,14 @@ func startMasterOrDie(masterConfig *master.Config, incomingServer *httptest.Serv
 		masterReceiver.SetMaster(m)
 	}
 
+	// TODO have this start method actually use the normal start sequence for the API server
+	// this method never actually calls the `Run` method for the API server
+	// fire the post hooks ourselves
+	m.GenericAPIServer.PrepareRun()
+	m.GenericAPIServer.RunPostStartHooks()
+
 	cfg := *masterConfig.GenericConfig.LoopbackClientConfig
-	cfg.ContentConfig.GroupVersion = &unversioned.GroupVersion{}
+	cfg.ContentConfig.GroupVersion = &schema.GroupVersion{}
 	privilegedClient, err := restclient.RESTClientFor(&cfg)
 	if err != nil {
 		glog.Fatal(err)
@@ -256,16 +264,11 @@ func startMasterOrDie(masterConfig *master.Config, incomingServer *httptest.Serv
 		glog.Fatal(err)
 	}
 
-	// TODO have this start method actually use the normal start sequence for the API server
-	// this method never actually calls the `Run` method for the API server
-	// fire the post hooks ourselves
-	m.GenericAPIServer.RunPostStartHooks()
-
 	// wait for services to be ready
 	if masterConfig.EnableCoreControllers {
 		// TODO Once /healthz is updated for posthooks, we'll wait for good health
 		coreClient := coreclient.NewForConfigOrDie(&cfg)
-		svcWatch, err := coreClient.Services(api.NamespaceDefault).Watch(v1.ListOptions{})
+		svcWatch, err := coreClient.Services(v1.NamespaceDefault).Watch(v1.ListOptions{})
 		if err != nil {
 			glog.Fatal(err)
 		}
@@ -294,6 +297,13 @@ func parseCIDROrDie(cidr string) *net.IPNet {
 	return parsed
 }
 
+// return the EtcdURL
+func GetEtcdURLFromEnv() string {
+	url := env.GetEnvAsStringOrFallback("KUBE_INTEGRATION_ETCD_URL", "http://127.0.0.1:2379")
+	glog.V(4).Infof("Using KUBE_INTEGRATION_ETCD_URL=%q", url)
+	return url
+}
+
 // Returns a basic master config.
 func NewMasterConfig() *master.Config {
 	config := storagebackend.Config{
@@ -304,60 +314,63 @@ func NewMasterConfig() *master.Config {
 		Prefix: uuid.New(),
 	}
 
-	negotiatedSerializer := NewSingleContentTypeSerializer(api.Scheme, testapi.Default.Codec(), runtime.ContentTypeJSON)
+	info, _ := runtime.SerializerInfoForMediaType(api.Codecs.SupportedMediaTypes(), runtime.ContentTypeJSON)
+	ns := NewSingleContentTypeSerializer(api.Scheme, info)
 
-	storageFactory := genericapiserver.NewDefaultStorageFactory(config, runtime.ContentTypeJSON, negotiatedSerializer, genericapiserver.NewDefaultResourceEncodingConfig(), master.DefaultAPIResourceConfigSource())
+	storageFactory := genericapiserver.NewDefaultStorageFactory(config, runtime.ContentTypeJSON, ns, genericapiserver.NewDefaultResourceEncodingConfig(), master.DefaultAPIResourceConfigSource())
 	storageFactory.SetSerializer(
-		unversioned.GroupResource{Group: api.GroupName, Resource: genericapiserver.AllResources},
+		schema.GroupResource{Group: v1.GroupName, Resource: genericapiserver.AllResources},
 		"",
-		NewSingleContentTypeSerializer(api.Scheme, testapi.Default.Codec(), runtime.ContentTypeJSON))
+		ns)
 	storageFactory.SetSerializer(
-		unversioned.GroupResource{Group: autoscaling.GroupName, Resource: genericapiserver.AllResources},
+		schema.GroupResource{Group: autoscaling.GroupName, Resource: genericapiserver.AllResources},
 		"",
-		NewSingleContentTypeSerializer(api.Scheme, testapi.Autoscaling.Codec(), runtime.ContentTypeJSON))
+		ns)
 	storageFactory.SetSerializer(
-		unversioned.GroupResource{Group: batch.GroupName, Resource: genericapiserver.AllResources},
+		schema.GroupResource{Group: batch.GroupName, Resource: genericapiserver.AllResources},
 		"",
-		NewSingleContentTypeSerializer(api.Scheme, testapi.Batch.Codec(), runtime.ContentTypeJSON))
+		ns)
 	storageFactory.SetSerializer(
-		unversioned.GroupResource{Group: apps.GroupName, Resource: genericapiserver.AllResources},
+		schema.GroupResource{Group: apps.GroupName, Resource: genericapiserver.AllResources},
 		"",
-		NewSingleContentTypeSerializer(api.Scheme, testapi.Apps.Codec(), runtime.ContentTypeJSON))
+		ns)
 	storageFactory.SetSerializer(
-		unversioned.GroupResource{Group: extensions.GroupName, Resource: genericapiserver.AllResources},
+		schema.GroupResource{Group: extensions.GroupName, Resource: genericapiserver.AllResources},
 		"",
-		NewSingleContentTypeSerializer(api.Scheme, testapi.Extensions.Codec(), runtime.ContentTypeJSON))
+		ns)
 	storageFactory.SetSerializer(
-		unversioned.GroupResource{Group: policy.GroupName, Resource: genericapiserver.AllResources},
+		schema.GroupResource{Group: policy.GroupName, Resource: genericapiserver.AllResources},
 		"",
-		NewSingleContentTypeSerializer(api.Scheme, testapi.Policy.Codec(), runtime.ContentTypeJSON))
+		ns)
 	storageFactory.SetSerializer(
-		unversioned.GroupResource{Group: rbac.GroupName, Resource: genericapiserver.AllResources},
+		schema.GroupResource{Group: rbac.GroupName, Resource: genericapiserver.AllResources},
 		"",
-		NewSingleContentTypeSerializer(api.Scheme, testapi.Rbac.Codec(), runtime.ContentTypeJSON))
+		ns)
 	storageFactory.SetSerializer(
-		unversioned.GroupResource{Group: certificates.GroupName, Resource: genericapiserver.AllResources},
+		schema.GroupResource{Group: certificates.GroupName, Resource: genericapiserver.AllResources},
 		"",
-		NewSingleContentTypeSerializer(api.Scheme, testapi.Certificates.Codec(), runtime.ContentTypeJSON))
+		ns)
 	storageFactory.SetSerializer(
-		unversioned.GroupResource{Group: storage.GroupName, Resource: genericapiserver.AllResources},
+		schema.GroupResource{Group: storage.GroupName, Resource: genericapiserver.AllResources},
 		"",
-		NewSingleContentTypeSerializer(api.Scheme, testapi.Storage.Codec(), runtime.ContentTypeJSON))
+		ns)
 
 	genericConfig := genericapiserver.NewConfig()
 	kubeVersion := version.Get()
 	genericConfig.Version = &kubeVersion
-	genericConfig.APIResourceConfigSource = master.DefaultAPIResourceConfigSource()
 	genericConfig.Authorizer = authorizer.NewAlwaysAllowAuthorizer()
 	genericConfig.AdmissionControl = admit.NewAlwaysAdmit()
-	genericConfig.EnableOpenAPISupport = true
+	genericConfig.EnableMetrics = true
 
 	return &master.Config{
-		GenericConfig:         genericConfig,
-		StorageFactory:        storageFactory,
-		EnableCoreControllers: true,
-		EnableWatchCache:      true,
-		KubeletClientConfig:   kubeletclient.KubeletClientConfig{Port: 10250},
+		GenericConfig:           genericConfig,
+		APIResourceConfigSource: master.DefaultAPIResourceConfigSource(),
+		StorageFactory:          storageFactory,
+		EnableCoreControllers:   true,
+		EnableWatchCache:        true,
+		KubeletClientConfig:     kubeletclient.KubeletClientConfig{Port: 10250},
+		APIServerServicePort:    443,
+		MasterCount:             1,
 	}
 }
 
@@ -366,7 +379,7 @@ func NewIntegrationTestMasterConfig() *master.Config {
 	masterConfig := NewMasterConfig()
 	masterConfig.EnableCoreControllers = true
 	masterConfig.GenericConfig.PublicAddress = net.ParseIP("192.168.10.4")
-	masterConfig.GenericConfig.APIResourceConfigSource = master.DefaultAPIResourceConfigSource()
+	masterConfig.APIResourceConfigSource = master.DefaultAPIResourceConfigSource()
 	return masterConfig
 }
 
@@ -386,29 +399,29 @@ func (m *MasterComponents) Stop(apiServer, rcManager bool) {
 	}
 }
 
-func CreateTestingNamespace(baseName string, apiserver *httptest.Server, t *testing.T) *api.Namespace {
+func CreateTestingNamespace(baseName string, apiserver *httptest.Server, t *testing.T) *v1.Namespace {
 	// TODO: Create a namespace with a given basename.
 	// Currently we neither create the namespace nor delete all its contents at the end.
 	// But as long as tests are not using the same namespaces, this should work fine.
-	return &api.Namespace{
-		ObjectMeta: api.ObjectMeta{
+	return &v1.Namespace{
+		ObjectMeta: v1.ObjectMeta{
 			// TODO: Once we start creating namespaces, switch to GenerateName.
 			Name: baseName,
 		},
 	}
 }
 
-func DeleteTestingNamespace(ns *api.Namespace, apiserver *httptest.Server, t *testing.T) {
+func DeleteTestingNamespace(ns *v1.Namespace, apiserver *httptest.Server, t *testing.T) {
 	// TODO: Remove all resources from a given namespace once we implement CreateTestingNamespace.
 }
 
 // RCFromManifest reads a .json file and returns the rc in it.
-func RCFromManifest(fileName string) *api.ReplicationController {
+func RCFromManifest(fileName string) *v1.ReplicationController {
 	data, err := ioutil.ReadFile(fileName)
 	if err != nil {
 		glog.Fatalf("Unexpected error reading rc manifest %v", err)
 	}
-	var controller api.ReplicationController
+	var controller v1.ReplicationController
 	if err := runtime.DecodeInto(testapi.Default.Codec(), data, &controller); err != nil {
 		glog.Fatalf("Unexpected error reading rc manifest %v", err)
 	}
@@ -416,7 +429,7 @@ func RCFromManifest(fileName string) *api.ReplicationController {
 }
 
 // StopRC stops the rc via kubectl's stop library
-func StopRC(rc *api.ReplicationController, clientset clientset.Interface) error {
+func StopRC(rc *v1.ReplicationController, clientset internalclientset.Interface) error {
 	reaper, err := kubectl.ReaperFor(api.Kind("ReplicationController"), clientset)
 	if err != nil || reaper == nil {
 		return err
@@ -429,7 +442,7 @@ func StopRC(rc *api.ReplicationController, clientset clientset.Interface) error 
 }
 
 // ScaleRC scales the given rc to the given replicas.
-func ScaleRC(name, ns string, replicas int32, clientset clientset.Interface) (*api.ReplicationController, error) {
+func ScaleRC(name, ns string, replicas int32, clientset internalclientset.Interface) (*api.ReplicationController, error) {
 	scaler, err := kubectl.ScalerFor(api.Kind("ReplicationController"), clientset)
 	if err != nil {
 		return nil, err
@@ -440,7 +453,7 @@ func ScaleRC(name, ns string, replicas int32, clientset clientset.Interface) (*a
 	if err != nil {
 		return nil, err
 	}
-	scaled, err := clientset.Core().ReplicationControllers(ns).Get(name)
+	scaled, err := clientset.Core().ReplicationControllers(ns).Get(name, metav1.GetOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -451,6 +464,7 @@ func RunAMaster(masterConfig *master.Config) (*master.Master, *httptest.Server) 
 	if masterConfig == nil {
 		masterConfig = NewMasterConfig()
 		masterConfig.GenericConfig.EnableProfiling = true
+		masterConfig.GenericConfig.EnableMetrics = true
 	}
 	return startMasterOrDie(masterConfig, nil, nil)
 }

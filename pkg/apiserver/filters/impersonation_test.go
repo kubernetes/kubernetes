@@ -118,7 +118,7 @@ func TestImpersonationFilter(t *testing.T) {
 			expectedUser: &user.DefaultInfo{
 				Name: "tester",
 			},
-			expectedCode: http.StatusForbidden,
+			expectedCode: http.StatusInternalServerError,
 		},
 		{
 			name: "impersonating-extra-without-user",
@@ -129,7 +129,7 @@ func TestImpersonationFilter(t *testing.T) {
 			expectedUser: &user.DefaultInfo{
 				Name: "tester",
 			},
-			expectedCode: http.StatusForbidden,
+			expectedCode: http.StatusInternalServerError,
 		},
 		{
 			name: "disallowed-group",

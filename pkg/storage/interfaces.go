@@ -112,6 +112,8 @@ type Interface interface {
 	// resourceVersion may be used to specify what version to begin watching,
 	// which should be the current resourceVersion, and no longer rv+1
 	// (e.g. reconnecting without missing any updates).
+	// If resource version is "0", this interface will get current object at given key
+	// and send it in an "ADDED" event, before watch starts.
 	Watch(ctx context.Context, key string, resourceVersion string, p SelectionPredicate) (watch.Interface, error)
 
 	// WatchList begins watching the specified key's items. Items are decoded into API
@@ -119,16 +121,22 @@ type Interface interface {
 	// resourceVersion may be used to specify what version to begin watching,
 	// which should be the current resourceVersion, and no longer rv+1
 	// (e.g. reconnecting without missing any updates).
+	// If resource version is "0", this interface will list current objects directory defined by key
+	// and send them in "ADDED" events, before watch starts.
 	WatchList(ctx context.Context, key string, resourceVersion string, p SelectionPredicate) (watch.Interface, error)
 
 	// Get unmarshals json found at key into objPtr. On a not found error, will either
 	// return a zero object of the requested type, or an error, depending on ignoreNotFound.
 	// Treats empty responses and nil response nodes exactly like a not found error.
-	Get(ctx context.Context, key string, objPtr runtime.Object, ignoreNotFound bool) error
+	// The returned contents may be delayed, but it is guaranteed that they will
+	// be have at least 'resourceVersion'.
+	Get(ctx context.Context, key string, resourceVersion string, objPtr runtime.Object, ignoreNotFound bool) error
 
 	// GetToList unmarshals json found at key and opaque it into *List api object
 	// (an object that satisfies the runtime.IsList definition).
-	GetToList(ctx context.Context, key string, p SelectionPredicate, listObj runtime.Object) error
+	// The returned contents may be delayed, but it is guaranteed that they will
+	// be have at least 'resourceVersion'.
+	GetToList(ctx context.Context, key string, resourceVersion string, p SelectionPredicate, listObj runtime.Object) error
 
 	// List unmarshalls jsons found at directory defined by key and opaque them
 	// into *List api object (an object that satisfies runtime.IsList definition).
@@ -145,6 +153,9 @@ type Interface interface {
 	// or zero value in 'ptrToType' parameter otherwise.
 	// If the object to update has the same value as previous, it won't do any update
 	// but will return the object in 'ptrToType' parameter.
+	// If 'suggestion' can contain zero or one element - in such case this can be used as
+	// a suggestion about the current version of the object to avoid read operation from
+	// storage to get it.
 	//
 	// Example:
 	//
@@ -164,5 +175,7 @@ type Interface interface {
 	//       return cur, nil, nil
 	//    }
 	// })
-	GuaranteedUpdate(ctx context.Context, key string, ptrToType runtime.Object, ignoreNotFound bool, precondtions *Preconditions, tryUpdate UpdateFunc) error
+	GuaranteedUpdate(
+		ctx context.Context, key string, ptrToType runtime.Object, ignoreNotFound bool,
+		precondtions *Preconditions, tryUpdate UpdateFunc, suggestion ...runtime.Object) error
 }

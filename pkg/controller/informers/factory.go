@@ -21,8 +21,12 @@ import (
 	"sync"
 	"time"
 
+	"github.com/golang/glog"
+
 	"k8s.io/kubernetes/pkg/client/cache"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 )
 
 // SharedInformerFactory provides interface which holds unique informers for pods, nodes, namespaces, persistent volume
@@ -31,9 +35,16 @@ type SharedInformerFactory interface {
 	// Start starts informers that can start AFTER the API server and controllers have started
 	Start(stopCh <-chan struct{})
 
+	ForResource(schema.GroupResource) (GenericInformer, error)
+
+	// when you update these, update generic.go/ForResource, same package
+
 	Pods() PodInformer
-	Nodes() NodeInformer
+	LimitRanges() LimitRangeInformer
+	InternalLimitRanges() InternalLimitRangeInformer
 	Namespaces() NamespaceInformer
+	InternalNamespaces() InternalNamespaceInformer
+	Nodes() NodeInformer
 	PersistentVolumeClaims() PVCInformer
 	PersistentVolumes() PVInformer
 	ServiceAccounts() ServiceAccountInformer
@@ -42,20 +53,22 @@ type SharedInformerFactory interface {
 	Deployments() DeploymentInformer
 	ReplicaSets() ReplicaSetInformer
 
-	ClusterRoles() ClusterRoleInformer
 	ClusterRoleBindings() ClusterRoleBindingInformer
-	Roles() RoleInformer
+	ClusterRoles() ClusterRoleInformer
 	RoleBindings() RoleBindingInformer
-
-	LimitRanges() LimitRangeInformer
+	Roles() RoleInformer
 
 	StorageClasses() StorageClassInformer
+
+	Jobs() JobInformer
 }
 
 type sharedInformerFactory struct {
-	client        clientset.Interface
-	lock          sync.Mutex
-	defaultResync time.Duration
+	client clientset.Interface
+	// for admission plugins etc.
+	internalclient internalclientset.Interface
+	lock           sync.Mutex
+	defaultResync  time.Duration
 
 	informers map[reflect.Type]cache.SharedIndexInformer
 	// startedInformers is used for tracking which informers have been started
@@ -64,9 +77,10 @@ type sharedInformerFactory struct {
 }
 
 // NewSharedInformerFactory constructs a new instance of sharedInformerFactory
-func NewSharedInformerFactory(client clientset.Interface, defaultResync time.Duration) SharedInformerFactory {
+func NewSharedInformerFactory(client clientset.Interface, internalclient internalclientset.Interface, defaultResync time.Duration) SharedInformerFactory {
 	return &sharedInformerFactory{
 		client:           client,
+		internalclient:   internalclient,
 		defaultResync:    defaultResync,
 		informers:        make(map[reflect.Type]cache.SharedIndexInformer),
 		startedInformers: make(map[reflect.Type]bool),
@@ -78,8 +92,11 @@ func (f *sharedInformerFactory) Start(stopCh <-chan struct{}) {
 	f.lock.Lock()
 	defer f.lock.Unlock()
 
+	glog.V(1).Infoln("Starting informer factory")
+
 	for informerType, informer := range f.informers {
 		if !f.startedInformers[informerType] {
+			glog.V(2).Infof("Starting informer for %v", informerType)
 			go informer.Run(stopCh)
 			f.startedInformers[informerType] = true
 		}
@@ -99,6 +116,11 @@ func (f *sharedInformerFactory) Nodes() NodeInformer {
 // Namespaces returns a SharedIndexInformer that lists and watches all namespaces
 func (f *sharedInformerFactory) Namespaces() NamespaceInformer {
 	return &namespaceInformer{sharedInformerFactory: f}
+}
+
+// InternalNamespaces returns a SharedIndexInformer that lists and watches all namespaces
+func (f *sharedInformerFactory) InternalNamespaces() InternalNamespaceInformer {
+	return &internalNamespaceInformer{sharedInformerFactory: f}
 }
 
 // PersistentVolumeClaims returns a SharedIndexInformer that lists and watches all persistent volume claims
@@ -150,7 +172,17 @@ func (f *sharedInformerFactory) LimitRanges() LimitRangeInformer {
 	return &limitRangeInformer{sharedInformerFactory: f}
 }
 
+// InternalLimitRanges returns a SharedIndexInformer that lists and watches all limit ranges.
+func (f *sharedInformerFactory) InternalLimitRanges() InternalLimitRangeInformer {
+	return &internalLimitRangeInformer{sharedInformerFactory: f}
+}
+
 // StorageClasses returns a SharedIndexInformer that lists and watches all storage classes
 func (f *sharedInformerFactory) StorageClasses() StorageClassInformer {
 	return &storageClassInformer{sharedInformerFactory: f}
+}
+
+// Jobs returns a SharedIndexInformer that lists and watches all storage jobs
+func (f *sharedInformerFactory) Jobs() JobInformer {
+	return &jobInformer{sharedInformerFactory: f}
 }

@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 
@@ -202,8 +202,7 @@ func newPlugin() *gcePersistentDiskPlugin {
 	host := volumetest.NewFakeVolumeHost(
 		"/tmp", /* rootDir */
 		nil,    /* kubeClient */
-		nil,    /* plugins */
-		"" /* rootContext */)
+		nil /* plugins */)
 	plugins := ProbeVolumePlugins()
 	plugin := plugins[0]
 	plugin.Init(host)
@@ -225,9 +224,9 @@ func newDetacher(testcase *testcase) *gcePersistentDiskDetacher {
 
 func createVolSpec(name string, readOnly bool) *volume.Spec {
 	return &volume.Spec{
-		Volume: &api.Volume{
-			VolumeSource: api.VolumeSource{
-				GCEPersistentDisk: &api.GCEPersistentDiskVolumeSource{
+		Volume: &v1.Volume{
+			VolumeSource: v1.VolumeSource{
+				GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{
 					PDName:   name,
 					ReadOnly: readOnly,
 				},
@@ -238,10 +237,10 @@ func createVolSpec(name string, readOnly bool) *volume.Spec {
 
 func createPVSpec(name string, readOnly bool) *volume.Spec {
 	return &volume.Spec{
-		PersistentVolume: &api.PersistentVolume{
-			Spec: api.PersistentVolumeSpec{
-				PersistentVolumeSource: api.PersistentVolumeSource{
-					GCEPersistentDisk: &api.GCEPersistentDiskVolumeSource{
+		PersistentVolume: &v1.PersistentVolume{
+			Spec: v1.PersistentVolumeSpec{
+				PersistentVolumeSource: v1.PersistentVolumeSource{
+					GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{
 						PDName:   name,
 						ReadOnly: readOnly,
 					},
@@ -351,6 +350,10 @@ func (testcase *testcase) DiskIsAttached(diskName string, nodeName types.NodeNam
 	glog.V(4).Infof("DiskIsAttached call: %s, %s, returning %v, %v", diskName, nodeName, expected.isAttached, expected.ret)
 
 	return expected.isAttached, expected.ret
+}
+
+func (testcase *testcase) DisksAreAttached(diskNames []string, nodeName types.NodeName) (map[string]bool, error) {
+	return nil, errors.New("Not implemented")
 }
 
 func (testcase *testcase) CreateDisk(name string, diskType string, zone string, sizeGb int64, tags map[string]string) error {

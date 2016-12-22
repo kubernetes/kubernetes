@@ -20,8 +20,8 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 )
 
 func TestReplicaSetStrategy(t *testing.T) {
@@ -49,7 +49,7 @@ func TestReplicaSetStrategy(t *testing.T) {
 	rs := &extensions.ReplicaSet{
 		ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
 		Spec: extensions.ReplicaSetSpec{
-			Selector: &unversioned.LabelSelector{MatchLabels: validSelector},
+			Selector: &metav1.LabelSelector{MatchLabels: validSelector},
 			Template: validPodTemplate.Template,
 		},
 		Status: extensions.ReplicaSetStatus{
@@ -108,7 +108,7 @@ func TestReplicaSetStatusStrategy(t *testing.T) {
 		ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault, ResourceVersion: "10"},
 		Spec: extensions.ReplicaSetSpec{
 			Replicas: 3,
-			Selector: &unversioned.LabelSelector{MatchLabels: validSelector},
+			Selector: &metav1.LabelSelector{MatchLabels: validSelector},
 			Template: validPodTemplate.Template,
 		},
 		Status: extensions.ReplicaSetStatus{
@@ -120,7 +120,7 @@ func TestReplicaSetStatusStrategy(t *testing.T) {
 		ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault, ResourceVersion: "9"},
 		Spec: extensions.ReplicaSetSpec{
 			Replicas: 1,
-			Selector: &unversioned.LabelSelector{MatchLabels: validSelector},
+			Selector: &metav1.LabelSelector{MatchLabels: validSelector},
 			Template: validPodTemplate.Template,
 		},
 		Status: extensions.ReplicaSetStatus{

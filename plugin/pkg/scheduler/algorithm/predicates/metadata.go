@@ -18,7 +18,7 @@ package predicates
 
 import (
 	"github.com/golang/glog"
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
 )
@@ -35,7 +35,7 @@ func NewPredicateMetadataFactory(podLister algorithm.PodLister) algorithm.Metada
 }
 
 // GetMetadata returns the predicateMetadata used which will be used by various predicates.
-func (pfactory *PredicateMetadataFactory) GetMetadata(pod *api.Pod, nodeNameToInfoMap map[string]*schedulercache.NodeInfo) interface{} {
+func (pfactory *PredicateMetadataFactory) GetMetadata(pod *v1.Pod, nodeNameToInfoMap map[string]*schedulercache.NodeInfo) interface{} {
 	// If we cannot compute metadata, just return nil
 	if pod == nil {
 		return nil
@@ -52,7 +52,7 @@ func (pfactory *PredicateMetadataFactory) GetMetadata(pod *api.Pod, nodeNameToIn
 		matchingAntiAffinityTerms: matchingTerms,
 	}
 	for predicateName, precomputeFunc := range predicatePrecomputations {
-		glog.V(4).Info("Precompute: %v", predicateName)
+		glog.V(10).Info("Precompute: %v", predicateName)
 		precomputeFunc(predicateMetadata)
 	}
 	return predicateMetadata

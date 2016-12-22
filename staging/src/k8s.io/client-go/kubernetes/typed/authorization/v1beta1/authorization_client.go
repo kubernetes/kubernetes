@@ -17,38 +17,40 @@ limitations under the License.
 package v1beta1
 
 import (
+	fmt "fmt"
 	api "k8s.io/client-go/pkg/api"
 	registered "k8s.io/client-go/pkg/apimachinery/registered"
+	schema "k8s.io/client-go/pkg/runtime/schema"
 	serializer "k8s.io/client-go/pkg/runtime/serializer"
 	rest "k8s.io/client-go/rest"
 )
 
-type AuthorizationInterface interface {
-	GetRESTClient() *rest.RESTClient
+type AuthorizationV1beta1Interface interface {
+	RESTClient() rest.Interface
 	LocalSubjectAccessReviewsGetter
 	SelfSubjectAccessReviewsGetter
 	SubjectAccessReviewsGetter
 }
 
-// AuthorizationClient is used to interact with features provided by the Authorization group.
-type AuthorizationClient struct {
-	*rest.RESTClient
+// AuthorizationV1beta1Client is used to interact with features provided by the k8s.io/kubernetes/pkg/apimachinery/registered.Group group.
+type AuthorizationV1beta1Client struct {
+	restClient rest.Interface
 }
 
-func (c *AuthorizationClient) LocalSubjectAccessReviews(namespace string) LocalSubjectAccessReviewInterface {
+func (c *AuthorizationV1beta1Client) LocalSubjectAccessReviews(namespace string) LocalSubjectAccessReviewInterface {
 	return newLocalSubjectAccessReviews(c, namespace)
 }
 
-func (c *AuthorizationClient) SelfSubjectAccessReviews() SelfSubjectAccessReviewInterface {
+func (c *AuthorizationV1beta1Client) SelfSubjectAccessReviews() SelfSubjectAccessReviewInterface {
 	return newSelfSubjectAccessReviews(c)
 }
 
-func (c *AuthorizationClient) SubjectAccessReviews() SubjectAccessReviewInterface {
+func (c *AuthorizationV1beta1Client) SubjectAccessReviews() SubjectAccessReviewInterface {
 	return newSubjectAccessReviews(c)
 }
 
-// NewForConfig creates a new AuthorizationClient for the given config.
-func NewForConfig(c *rest.Config) (*AuthorizationClient, error) {
+// NewForConfig creates a new AuthorizationV1beta1Client for the given config.
+func NewForConfig(c *rest.Config) (*AuthorizationV1beta1Client, error) {
 	config := *c
 	if err := setConfigDefaults(&config); err != nil {
 		return nil, err
@@ -57,12 +59,12 @@ func NewForConfig(c *rest.Config) (*AuthorizationClient, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &AuthorizationClient{client}, nil
+	return &AuthorizationV1beta1Client{client}, nil
 }
 
-// NewForConfigOrDie creates a new AuthorizationClient for the given config and
+// NewForConfigOrDie creates a new AuthorizationV1beta1Client for the given config and
 // panics if there is an error in the config.
-func NewForConfigOrDie(c *rest.Config) *AuthorizationClient {
+func NewForConfigOrDie(c *rest.Config) *AuthorizationV1beta1Client {
 	client, err := NewForConfig(c)
 	if err != nil {
 		panic(err)
@@ -70,37 +72,37 @@ func NewForConfigOrDie(c *rest.Config) *AuthorizationClient {
 	return client
 }
 
-// New creates a new AuthorizationClient for the given RESTClient.
-func New(c *rest.RESTClient) *AuthorizationClient {
-	return &AuthorizationClient{c}
+// New creates a new AuthorizationV1beta1Client for the given RESTClient.
+func New(c rest.Interface) *AuthorizationV1beta1Client {
+	return &AuthorizationV1beta1Client{c}
 }
 
 func setConfigDefaults(config *rest.Config) error {
-	// if authorization group is not registered, return an error
-	g, err := registered.Group("authorization.k8s.io")
+	gv, err := schema.ParseGroupVersion("authorization.k8s.io/v1beta1")
 	if err != nil {
 		return err
+	}
+	// if authorization.k8s.io/v1beta1 is not enabled, return an error
+	if !registered.IsEnabledVersion(gv) {
+		return fmt.Errorf("authorization.k8s.io/v1beta1 is not enabled")
 	}
 	config.APIPath = "/apis"
 	if config.UserAgent == "" {
 		config.UserAgent = rest.DefaultKubernetesUserAgent()
 	}
-	// TODO: Unconditionally set the config.Version, until we fix the config.
-	//if config.Version == "" {
-	copyGroupVersion := g.GroupVersion
+	copyGroupVersion := gv
 	config.GroupVersion = &copyGroupVersion
-	//}
 
 	config.NegotiatedSerializer = serializer.DirectCodecFactory{CodecFactory: api.Codecs}
 
 	return nil
 }
 
-// GetRESTClient returns a RESTClient that is used to communicate
+// RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
-func (c *AuthorizationClient) GetRESTClient() *rest.RESTClient {
+func (c *AuthorizationV1beta1Client) RESTClient() rest.Interface {
 	if c == nil {
 		return nil
 	}
-	return c.RESTClient
+	return c.restClient
 }

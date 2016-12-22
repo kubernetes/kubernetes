@@ -22,14 +22,14 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/api/v1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/util/clock"
 	"k8s.io/kubernetes/pkg/util/diff"
 )
 
-func makeObjectReference(kind, name, namespace string) api.ObjectReference {
-	return api.ObjectReference{
+func makeObjectReference(kind, name, namespace string) v1.ObjectReference {
+	return v1.ObjectReference{
 		Kind:       kind,
 		Name:       name,
 		Namespace:  namespace,
@@ -38,34 +38,34 @@ func makeObjectReference(kind, name, namespace string) api.ObjectReference {
 	}
 }
 
-func makeEvent(reason, message string, involvedObject api.ObjectReference) api.Event {
-	eventTime := unversioned.Now()
-	event := api.Event{
+func makeEvent(reason, message string, involvedObject v1.ObjectReference) v1.Event {
+	eventTime := metav1.Now()
+	event := v1.Event{
 		Reason:         reason,
 		Message:        message,
 		InvolvedObject: involvedObject,
-		Source: api.EventSource{
+		Source: v1.EventSource{
 			Component: "kubelet",
 			Host:      "kublet.node1",
 		},
 		Count:          1,
 		FirstTimestamp: eventTime,
 		LastTimestamp:  eventTime,
-		Type:           api.EventTypeNormal,
+		Type:           v1.EventTypeNormal,
 	}
 	return event
 }
 
-func makeEvents(num int, template api.Event) []api.Event {
-	events := []api.Event{}
+func makeEvents(num int, template v1.Event) []v1.Event {
+	events := []v1.Event{}
 	for i := 0; i < num; i++ {
 		events = append(events, template)
 	}
 	return events
 }
 
-func makeUniqueEvents(num int) []api.Event {
-	events := []api.Event{}
+func makeUniqueEvents(num int) []v1.Event {
+	events := []v1.Event{}
 	kind := "Pod"
 	for i := 0; i < num; i++ {
 		reason := strings.Join([]string{"reason", string(i)}, "-")
@@ -78,7 +78,7 @@ func makeUniqueEvents(num int) []api.Event {
 	return events
 }
 
-func makeSimilarEvents(num int, template api.Event, messagePrefix string) []api.Event {
+func makeSimilarEvents(num int, template v1.Event, messagePrefix string) []v1.Event {
 	events := makeEvents(num, template)
 	for i := range events {
 		events[i].Message = strings.Join([]string{messagePrefix, string(i), events[i].Message}, "-")
@@ -86,12 +86,12 @@ func makeSimilarEvents(num int, template api.Event, messagePrefix string) []api.
 	return events
 }
 
-func setCount(event api.Event, count int) api.Event {
+func setCount(event v1.Event, count int) v1.Event {
 	event.Count = int32(count)
 	return event
 }
 
-func validateEvent(messagePrefix string, actualEvent *api.Event, expectedEvent *api.Event, t *testing.T) (*api.Event, error) {
+func validateEvent(messagePrefix string, actualEvent *v1.Event, expectedEvent *v1.Event, t *testing.T) (*v1.Event, error) {
 	recvEvent := *actualEvent
 	expectCompression := expectedEvent.Count > 1
 	t.Logf("%v - expectedEvent.Count is %d\n", messagePrefix, expectedEvent.Count)
@@ -172,13 +172,13 @@ func TestEventCorrelator(t *testing.T) {
 	similarEvent := makeEvent("similar", "similar message", makeObjectReference("Pod", "my-pod", "my-ns"))
 	aggregateEvent := makeEvent(similarEvent.Reason, EventAggregatorByReasonMessageFunc(&similarEvent), similarEvent.InvolvedObject)
 	scenario := map[string]struct {
-		previousEvents  []api.Event
-		newEvent        api.Event
-		expectedEvent   api.Event
+		previousEvents  []v1.Event
+		newEvent        v1.Event
+		expectedEvent   v1.Event
 		intervalSeconds int
 	}{
 		"create-a-single-event": {
-			previousEvents:  []api.Event{},
+			previousEvents:  []v1.Event{},
 			newEvent:        firstEvent,
 			expectedEvent:   setCount(firstEvent, 1),
 			intervalSeconds: 5,
@@ -227,7 +227,7 @@ func TestEventCorrelator(t *testing.T) {
 		correlator := NewEventCorrelator(&clock)
 		for i := range testInput.previousEvents {
 			event := testInput.previousEvents[i]
-			now := unversioned.NewTime(clock.Now())
+			now := metav1.NewTime(clock.Now())
 			event.FirstTimestamp = now
 			event.LastTimestamp = now
 			result, err := correlator.EventCorrelate(&event)
@@ -238,7 +238,7 @@ func TestEventCorrelator(t *testing.T) {
 		}
 
 		// update the input to current clock value
-		now := unversioned.NewTime(clock.Now())
+		now := metav1.NewTime(clock.Now())
 		testInput.newEvent.FirstTimestamp = now
 		testInput.newEvent.LastTimestamp = now
 		result, err := correlator.EventCorrelate(&testInput.newEvent)

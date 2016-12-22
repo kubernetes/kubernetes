@@ -18,19 +18,20 @@ package fake
 
 import (
 	api "k8s.io/client-go/pkg/api"
-	unversioned "k8s.io/client-go/pkg/api/unversioned"
 	v1 "k8s.io/client-go/pkg/api/v1"
+	meta_v1 "k8s.io/client-go/pkg/apis/meta/v1"
 	labels "k8s.io/client-go/pkg/labels"
+	schema "k8s.io/client-go/pkg/runtime/schema"
 	watch "k8s.io/client-go/pkg/watch"
 	testing "k8s.io/client-go/testing"
 )
 
 // FakeComponentStatuses implements ComponentStatusInterface
 type FakeComponentStatuses struct {
-	Fake *FakeCore
+	Fake *FakeCoreV1
 }
 
-var componentstatusesResource = unversioned.GroupVersionResource{Group: "", Version: "v1", Resource: "componentstatuses"}
+var componentstatusesResource = schema.GroupVersionResource{Group: "", Version: "v1", Resource: "componentstatuses"}
 
 func (c *FakeComponentStatuses) Create(componentStatus *v1.ComponentStatus) (result *v1.ComponentStatus, err error) {
 	obj, err := c.Fake.
@@ -63,7 +64,7 @@ func (c *FakeComponentStatuses) DeleteCollection(options *v1.DeleteOptions, list
 	return err
 }
 
-func (c *FakeComponentStatuses) Get(name string) (result *v1.ComponentStatus, err error) {
+func (c *FakeComponentStatuses) Get(name string, options meta_v1.GetOptions) (result *v1.ComponentStatus, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootGetAction(componentstatusesResource, name), &v1.ComponentStatus{})
 	if obj == nil {

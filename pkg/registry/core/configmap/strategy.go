@@ -88,18 +88,20 @@ func ConfigMapToSelectableFields(cfg *api.ConfigMap) fields.Set {
 	return generic.ObjectMetaFieldsSet(&cfg.ObjectMeta, true)
 }
 
+// GetAttrs returns labels and fields of a given object for filtering purposes.
+func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
+	cfg, ok := obj.(*api.ConfigMap)
+	if !ok {
+		return nil, nil, fmt.Errorf("given object is not a ConfigMap")
+	}
+	return labels.Set(cfg.ObjectMeta.Labels), ConfigMapToSelectableFields(cfg), nil
+}
+
 // MatchConfigMap returns a generic matcher for a given label and field selector.
 func MatchConfigMap(label labels.Selector, field fields.Selector) apistorage.SelectionPredicate {
 	return apistorage.SelectionPredicate{
-		Label: label,
-		Field: field,
-		GetAttrs: func(obj runtime.Object) (labels.Set, fields.Set, error) {
-			cfg, ok := obj.(*api.ConfigMap)
-			if !ok {
-				return nil, nil, fmt.Errorf("given object is not of type ConfigMap")
-			}
-
-			return labels.Set(cfg.ObjectMeta.Labels), ConfigMapToSelectableFields(cfg), nil
-		},
+		Label:    label,
+		Field:    field,
+		GetAttrs: GetAttrs,
 	}
 }

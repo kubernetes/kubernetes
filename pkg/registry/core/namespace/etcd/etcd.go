@@ -23,70 +23,49 @@ import (
 	apierrors "k8s.io/kubernetes/pkg/api/errors"
 	storageerr "k8s.io/kubernetes/pkg/api/errors/storage"
 	"k8s.io/kubernetes/pkg/api/rest"
-	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/registry/cachesize"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/registry/core/namespace"
 	"k8s.io/kubernetes/pkg/registry/generic"
-	"k8s.io/kubernetes/pkg/registry/generic/registry"
+	genericregistry "k8s.io/kubernetes/pkg/registry/generic/registry"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage"
 )
 
 // rest implements a RESTStorage for namespaces against etcd
 type REST struct {
-	*registry.Store
-	status *registry.Store
+	*genericregistry.Store
+	status *genericregistry.Store
 }
 
 // StatusREST implements the REST endpoint for changing the status of a namespace.
 type StatusREST struct {
-	store *registry.Store
+	store *genericregistry.Store
 }
 
 // FinalizeREST implements the REST endpoint for finalizing a namespace.
 type FinalizeREST struct {
-	store *registry.Store
+	store *genericregistry.Store
 }
 
 // NewREST returns a RESTStorage object that will work against namespaces.
-func NewREST(opts generic.RESTOptions) (*REST, *StatusREST, *FinalizeREST) {
-	prefix := "/" + opts.ResourcePrefix
-
-	newListFunc := func() runtime.Object { return &api.NamespaceList{} }
-	storageInterface, dFunc := opts.Decorator(
-		opts.StorageConfig,
-		cachesize.GetWatchCacheSizeByResource(cachesize.Namespaces),
-		&api.Namespace{},
-		prefix,
-		namespace.Strategy,
-		newListFunc,
-		storage.NoTriggerPublisher,
-	)
-
-	store := &registry.Store{
+func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, *FinalizeREST) {
+	store := &genericregistry.Store{
 		NewFunc:     func() runtime.Object { return &api.Namespace{} },
-		NewListFunc: newListFunc,
-		KeyRootFunc: func(ctx api.Context) string {
-			return prefix
-		},
-		KeyFunc: func(ctx api.Context, name string) (string, error) {
-			return registry.NoNamespaceKeyFunc(ctx, prefix, name)
-		},
+		NewListFunc: func() runtime.Object { return &api.NamespaceList{} },
 		ObjectNameFunc: func(obj runtime.Object) (string, error) {
 			return obj.(*api.Namespace).Name, nil
 		},
-		PredicateFunc:           namespace.MatchNamespace,
-		QualifiedResource:       api.Resource("namespaces"),
-		EnableGarbageCollection: opts.EnableGarbageCollection,
-		DeleteCollectionWorkers: opts.DeleteCollectionWorkers,
+		PredicateFunc:     namespace.MatchNamespace,
+		QualifiedResource: api.Resource("namespaces"),
 
 		CreateStrategy:      namespace.Strategy,
 		UpdateStrategy:      namespace.Strategy,
 		DeleteStrategy:      namespace.Strategy,
 		ReturnDeletedObject: true,
-
-		Storage:     storageInterface,
-		DestroyFunc: dFunc,
+	}
+	options := &generic.StoreOptions{RESTOptions: optsGetter, AttrFunc: namespace.GetAttrs}
+	if err := store.CompleteWithOptions(options); err != nil {
+		panic(err) // TODO: Propagate error up
 	}
 
 	statusStore := *store
@@ -100,7 +79,7 @@ func NewREST(opts generic.RESTOptions) (*REST, *StatusREST, *FinalizeREST) {
 
 // Delete enforces life-cycle rules for namespace termination
 func (r *REST) Delete(ctx api.Context, name string, options *api.DeleteOptions) (runtime.Object, error) {
-	nsObj, err := r.Get(ctx, name)
+	nsObj, err := r.Get(ctx, name, &metav1.GetOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -146,12 +125,25 @@ func (r *REST) Delete(ctx api.Context, name string, options *api.DeleteOptions) 
 				}
 				// Set the deletion timestamp if needed
 				if existingNamespace.DeletionTimestamp.IsZero() {
-					now := unversioned.Now()
+					now := metav1.Now()
 					existingNamespace.DeletionTimestamp = &now
 				}
 				// Set the namespace phase to terminating, if needed
 				if existingNamespace.Status.Phase != api.NamespaceTerminating {
 					existingNamespace.Status.Phase = api.NamespaceTerminating
+				}
+
+				// Remove orphan finalizer if options.OrphanDependents = false.
+				if options.OrphanDependents != nil && *options.OrphanDependents == false {
+					// remove Orphan finalizer.
+					newFinalizers := []string{}
+					for i := range existingNamespace.ObjectMeta.Finalizers {
+						finalizer := existingNamespace.ObjectMeta.Finalizers[i]
+						if string(finalizer) != api.FinalizerOrphan {
+							newFinalizers = append(newFinalizers, finalizer)
+						}
+					}
+					existingNamespace.ObjectMeta.Finalizers = newFinalizers
 				}
 				return existingNamespace, nil
 			}),
@@ -182,8 +174,8 @@ func (r *StatusREST) New() runtime.Object {
 }
 
 // Get retrieves the object from the storage. It is required to support Patch.
-func (r *StatusREST) Get(ctx api.Context, name string) (runtime.Object, error) {
-	return r.store.Get(ctx, name)
+func (r *StatusREST) Get(ctx api.Context, name string, options *metav1.GetOptions) (runtime.Object, error) {
+	return r.store.Get(ctx, name, options)
 }
 
 // Update alters the status subset of an object.

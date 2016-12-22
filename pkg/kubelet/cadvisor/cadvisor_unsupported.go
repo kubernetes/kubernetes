@@ -1,4 +1,4 @@
-// +build !cgo !linux
+// +build !linux,!windows
 
 /*
 Copyright 2015 The Kubernetes Authors.
@@ -31,7 +31,7 @@ type cadvisorUnsupported struct {
 
 var _ Interface = new(cadvisorUnsupported)
 
-func New(port uint, runtime string) (Interface, error) {
+func New(port uint, runtime string, rootPath string) (Interface, error) {
 	return &cadvisorUnsupported{}, nil
 }
 

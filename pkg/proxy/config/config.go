@@ -108,7 +108,6 @@ func (c *EndpointsConfig) Channel(source string) chan EndpointsUpdate {
 		for update := range endpointsCh {
 			ch <- update
 		}
-		close(ch)
 	}()
 	return endpointsCh
 }
@@ -217,7 +216,6 @@ func (c *ServiceConfig) Channel(source string) chan ServiceUpdate {
 		for update := range serviceCh {
 			ch <- update
 		}
-		close(ch)
 	}()
 	return serviceCh
 }

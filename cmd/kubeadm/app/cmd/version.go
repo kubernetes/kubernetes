@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -22,7 +22,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/pkg/version"
 )
 
@@ -32,7 +32,7 @@ func NewCmdVersion(out io.Writer) *cobra.Command {
 		Short: "Print the version of kubeadm",
 		Run: func(cmd *cobra.Command, args []string) {
 			err := RunVersion(out, cmd)
-			cmdutil.CheckErr(err)
+			kubeadmutil.CheckErr(err)
 		},
 	}
 	return cmd

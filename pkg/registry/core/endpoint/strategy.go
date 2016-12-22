@@ -79,27 +79,21 @@ func (endpointsStrategy) AllowUnconditionalUpdate() bool {
 	return true
 }
 
+// GetAttrs returns labels and fields of a given object for filtering purposes.
+func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
+	endpoints, ok := obj.(*api.Endpoints)
+	if !ok {
+		return nil, nil, fmt.Errorf("invalid object type %#v", obj)
+	}
+	return endpoints.Labels, EndpointsToSelectableFields(endpoints), nil
+}
+
 // MatchEndpoints returns a generic matcher for a given label and field selector.
 func MatchEndpoints(label labels.Selector, field fields.Selector) pkgstorage.SelectionPredicate {
 	return pkgstorage.SelectionPredicate{
-		Label: label,
-		Field: field,
-		GetAttrs: func(obj runtime.Object) (labels.Set, fields.Set, error) {
-			endpoints, ok := obj.(*api.Endpoints)
-			if !ok {
-				return nil, nil, fmt.Errorf("invalid object type %#v", obj)
-			}
-
-			// Compute fields only if field selectors is non-empty
-			// (otherwise those won't be used).
-			// Those are generally also not needed if label selector does
-			// not match labels, but additional computation of it is expensive.
-			var endpointsFields fields.Set
-			if !field.Empty() {
-				endpointsFields = EndpointsToSelectableFields(endpoints)
-			}
-			return endpoints.Labels, endpointsFields, nil
-		},
+		Label:    label,
+		Field:    field,
+		GetAttrs: GetAttrs,
 	}
 }
 

@@ -73,20 +73,31 @@ addon-dir-create:
 {% endif %}
 
 {% if pillar.get('enable_cluster_dns', '').lower() == 'true' %}
-/etc/kubernetes/addons/dns/skydns-svc.yaml:
+/etc/kubernetes/addons/dns/kubedns-svc.yaml:
   file.managed:
-    - source: salt://kube-addons/dns/skydns-svc.yaml.in
+    - source: salt://kube-addons/dns/kubedns-svc.yaml.in
     - template: jinja
     - group: root
     - dir_mode: 755
     - makedirs: True
 
-/etc/kubernetes/addons/dns/skydns-rc.yaml:
+/etc/kubernetes/addons/dns/kubedns-controller.yaml:
   file.managed:
-    - source: salt://kube-addons/dns/skydns-rc.yaml.in
+    - source: salt://kube-addons/dns/kubedns-controller.yaml.in
     - template: jinja
     - group: root
     - dir_mode: 755
+    - makedirs: True
+{% endif %}
+
+{% if pillar.get('enable_dns_horizontal_autoscaler', '').lower() == 'true'
+   and pillar.get('enable_cluster_dns', '').lower() == 'true' %}
+/etc/kubernetes/addons/dns-horizontal-autoscaler/dns-horizontal-autoscaler.yaml:
+  file.managed:
+    - source: salt://kube-addons/dns-horizontal-autoscaler/dns-horizontal-autoscaler.yaml
+    - user: root
+    - group: root
+    - file_mode: 644
     - makedirs: True
 {% endif %}
 
@@ -127,11 +138,11 @@ addon-dir-create:
 {% endif %}
 
 {% if pillar.get('enable_node_logging', '').lower() == 'true'
-   and pillar.get('logging_destination', '').lower() == 'elasticsearch'
+   and 'logging_destination' in pillar
    and pillar.get('enable_cluster_logging', '').lower() == 'true' %}
-/etc/kubernetes/addons/fluentd-elasticsearch:
+/etc/kubernetes/addons/fluentd-{{ pillar.get('logging_destination') }}:
   file.recurse:
-    - source: salt://kube-addons/fluentd-elasticsearch
+    - source: salt://kube-addons/fluentd-{{ pillar.get('logging_destination') }}
     - include_pat: E@^.+\.yaml$
     - user: root
     - group: root
@@ -166,3 +177,13 @@ addon-dir-create:
     - user: root
     - group: root
     - mode: 755
+
+{% if pillar.get('enable_default_storage_class', '').lower() == 'true' and grains['cloud'] is defined and grains['cloud'] in ['aws', 'gce', 'openstack'] %}
+/etc/kubernetes/addons/storage-class/default.yaml:
+  file.managed:
+    - source: salt://kube-addons/storage-class/{{ grains['cloud'] }}/default.yaml
+    - user: root
+    - group: root
+    - mode: 644
+    - makedirs: True
+{% endif %}

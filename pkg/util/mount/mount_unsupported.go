@@ -18,7 +18,9 @@ limitations under the License.
 
 package mount
 
-type Mounter struct{}
+type Mounter struct {
+	mounterPath string
+}
 
 func (mounter *Mounter) Mount(source string, target string, fstype string, options []string) error {
 	return nil
@@ -53,5 +55,9 @@ func (mounter *SafeFormatAndMount) formatAndMount(source string, target string, 
 }
 
 func (mounter *SafeFormatAndMount) diskLooksUnformatted(disk string) (bool, error) {
+	return true, nil
+}
+
+func IsNotMountPoint(file string) (bool, error) {
 	return true, nil
 }

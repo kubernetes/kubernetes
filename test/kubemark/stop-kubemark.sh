@@ -32,6 +32,9 @@ gcloud compute instances delete "${MASTER_NAME}" \
 gcloud compute disks delete "${MASTER_NAME}-pd" \
     ${GCLOUD_COMMON_ARGS} || true
 
+gcloud compute disks delete "${MASTER_NAME}-event-pd" \
+    ${GCLOUD_COMMON_ARGS} &> /dev/null || true
+
 gcloud compute addresses delete "${MASTER_NAME}-ip" \
     --project "${PROJECT}" \
     --region "${REGION}" \
@@ -54,6 +57,4 @@ rm "${RESOURCE_DIRECTORY}/ca.crt" \
 	"${RESOURCE_DIRECTORY}/kubecfg.crt" \
 	"${RESOURCE_DIRECTORY}/kubecfg.key" \
 	"${RESOURCE_DIRECTORY}/hollow-node.json" \
-	"${RESOURCE_DIRECTORY}/apiserver_flags" \
-	"${RESOURCE_DIRECTORY}/controllers_flags" \
-	"${RESOURCE_DIRECTORY}/scheduler_flags" &> /dev/null || true
+	"${RESOURCE_DIRECTORY}/kubemark-master-env.sh"  &> /dev/null || true

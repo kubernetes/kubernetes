@@ -20,7 +20,9 @@ import (
 	api "k8s.io/client-go/pkg/api"
 	api_v1 "k8s.io/client-go/pkg/api/v1"
 	v1 "k8s.io/client-go/pkg/apis/batch/v1"
+	meta_v1 "k8s.io/client-go/pkg/apis/meta/v1"
 	watch "k8s.io/client-go/pkg/watch"
+	rest "k8s.io/client-go/rest"
 )
 
 // JobsGetter has a method to return a JobInterface.
@@ -36,7 +38,7 @@ type JobInterface interface {
 	UpdateStatus(*v1.Job) (*v1.Job, error)
 	Delete(name string, options *api_v1.DeleteOptions) error
 	DeleteCollection(options *api_v1.DeleteOptions, listOptions api_v1.ListOptions) error
-	Get(name string) (*v1.Job, error)
+	Get(name string, options meta_v1.GetOptions) (*v1.Job, error)
 	List(opts api_v1.ListOptions) (*v1.JobList, error)
 	Watch(opts api_v1.ListOptions) (watch.Interface, error)
 	Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *v1.Job, err error)
@@ -45,14 +47,14 @@ type JobInterface interface {
 
 // jobs implements JobInterface
 type jobs struct {
-	client *BatchClient
+	client rest.Interface
 	ns     string
 }
 
 // newJobs returns a Jobs
-func newJobs(c *BatchClient, namespace string) *jobs {
+func newJobs(c *BatchV1Client, namespace string) *jobs {
 	return &jobs{
-		client: c,
+		client: c.RESTClient(),
 		ns:     namespace,
 	}
 }
@@ -81,6 +83,9 @@ func (c *jobs) Update(job *v1.Job) (result *v1.Job, err error) {
 		Into(result)
 	return
 }
+
+// UpdateStatus was generated because the type contains a Status member.
+// Add a +genclientstatus=false comment above the type to avoid generating UpdateStatus().
 
 func (c *jobs) UpdateStatus(job *v1.Job) (result *v1.Job, err error) {
 	result = &v1.Job{}
@@ -118,12 +123,13 @@ func (c *jobs) DeleteCollection(options *api_v1.DeleteOptions, listOptions api_v
 }
 
 // Get takes name of the job, and returns the corresponding job object, and an error if there is any.
-func (c *jobs) Get(name string) (result *v1.Job, err error) {
+func (c *jobs) Get(name string, options meta_v1.GetOptions) (result *v1.Job, err error) {
 	result = &v1.Job{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("jobs").
 		Name(name).
+		VersionedParams(&options, api.ParameterCodec).
 		Do().
 		Into(result)
 	return

@@ -17,26 +17,12 @@ limitations under the License.
 package util
 
 import (
-	"bytes"
 	"testing"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 )
 
-func TestUsingEmptyTokenFails(t *testing.T) {
-	// Simulates what happens when you omit --token on the CLI
-	s := newSecretsWithToken("")
-
-	given, err := UseGivenTokenIfValid(s)
-	if err != nil {
-		t.Errorf("UseGivenTokenIfValid returned an error when the token was omitted: %v", err)
-	}
-	if given {
-		t.Error("UseGivenTokenIfValid returned given = true when the token was omitted; expected false")
-	}
-}
-
-func TestTokenValidationFailures(t *testing.T) {
+func TestTokenParseErrors(t *testing.T) {
 	invalidTokens := []string{
 		"1234567890123456789012",
 		"12345.1234567890123456",
@@ -45,41 +31,40 @@ func TestTokenValidationFailures(t *testing.T) {
 	}
 
 	for _, token := range invalidTokens {
-		s := newSecretsWithToken(token)
-		_, err := UseGivenTokenIfValid(s)
-
-		if err == nil {
-			t.Errorf("UseGivenTokenIfValid did not return an error for this invalid token: [%s]", token)
+		if _, _, err := ParseToken(token); err == nil {
+			t.Errorf("generateTokenIfNeeded did not return an error for this invalid token: [%s]", token)
 		}
 	}
 }
 
-func TestValidTokenPopulatesSecrets(t *testing.T) {
-	s := newSecretsWithToken("123456.0123456789AbCdEf")
-	expectedToken := []byte("0123456789abcdef")
-	expectedTokenID := "123456"
-	expectedBearerToken := "0123456789abcdef"
+func TestGenerateToken(t *testing.T) {
+	var cfg kubeadmapi.TokenDiscovery
 
-	given, err := UseGivenTokenIfValid(s)
-	if err != nil {
-		t.Errorf("UseGivenTokenIfValid gave an error for a valid token: %v", err)
+	GenerateToken(&cfg)
+	if len(cfg.ID) != 6 {
+		t.Errorf("failed GenerateToken first part length:\n\texpected: 6\n\t  actual: %d", len(cfg.ID))
 	}
-	if !given {
-		t.Error("UseGivenTokenIfValid returned given = false when given a valid token")
-	}
-	if s.TokenID != expectedTokenID {
-		t.Errorf("UseGivenTokenIfValid did not populate the TokenID correctly; expected [%s] but got [%s]", expectedTokenID, s.TokenID)
-	}
-	if s.BearerToken != expectedBearerToken {
-		t.Errorf("UseGivenTokenIfValid did not populate the BearerToken correctly; expected [%s] but got [%s]", expectedBearerToken, s.BearerToken)
-	}
-	if !bytes.Equal(s.Token, expectedToken) {
-		t.Errorf("UseGivenTokenIfValid did not populate the Token correctly; expected %v but got %v", expectedToken, s.Token)
+	if len(cfg.Secret) != 16 {
+		t.Errorf("failed GenerateToken first part length:\n\texpected: 16\n\t  actual: %d", len(cfg.Secret))
 	}
 }
 
-func newSecretsWithToken(token string) *kubeadmapi.Secrets {
-	s := new(kubeadmapi.Secrets)
-	s.GivenToken = token
-	return s
+func TestRandBytes(t *testing.T) {
+	var randTest = []int{
+		0,
+		1,
+		2,
+		3,
+		100,
+	}
+
+	for _, rt := range randTest {
+		actual, err := RandBytes(rt)
+		if err != nil {
+			t.Errorf("failed RandBytes: %v", err)
+		}
+		if len(actual) != rt*2 {
+			t.Errorf("failed RandBytes:\n\texpected: %d\n\t  actual: %d\n", rt*2, len(actual))
+		}
+	}
 }

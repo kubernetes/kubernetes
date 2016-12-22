@@ -28,6 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/validation"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/labels"
@@ -155,27 +156,21 @@ func (podStatusStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object
 	return validation.ValidatePodStatusUpdate(obj.(*api.Pod), old.(*api.Pod))
 }
 
+// GetAttrs returns labels and fields of a given object for filtering purposes.
+func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
+	pod, ok := obj.(*api.Pod)
+	if !ok {
+		return nil, nil, fmt.Errorf("not a pod")
+	}
+	return labels.Set(pod.ObjectMeta.Labels), PodToSelectableFields(pod), nil
+}
+
 // MatchPod returns a generic matcher for a given label and field selector.
 func MatchPod(label labels.Selector, field fields.Selector) storage.SelectionPredicate {
 	return storage.SelectionPredicate{
-		Label: label,
-		Field: field,
-		GetAttrs: func(obj runtime.Object) (labels.Set, fields.Set, error) {
-			pod, ok := obj.(*api.Pod)
-			if !ok {
-				return nil, nil, fmt.Errorf("not a pod")
-			}
-
-			// Compute fields only if field selectors is non-empty
-			// (otherwise those won't be used).
-			// Those are generally also not needed if label selector does
-			// not match labels, but additional computation of it is expensive.
-			var podFields fields.Set
-			if !field.Empty() {
-				podFields = PodToSelectableFields(pod)
-			}
-			return labels.Set(pod.ObjectMeta.Labels), podFields, nil
-		},
+		Label:       label,
+		Field:       field,
+		GetAttrs:    GetAttrs,
 		IndexFields: []string{"spec.nodeName"},
 	}
 }
@@ -202,11 +197,11 @@ func PodToSelectableFields(pod *api.Pod) fields.Set {
 
 // ResourceGetter is an interface for retrieving resources by ResourceLocation.
 type ResourceGetter interface {
-	Get(api.Context, string) (runtime.Object, error)
+	Get(api.Context, string, *metav1.GetOptions) (runtime.Object, error)
 }
 
 func getPod(getter ResourceGetter, ctx api.Context, name string) (*api.Pod, error) {
-	obj, err := getter.Get(ctx, name)
+	obj, err := getter.Get(ctx, name, &metav1.GetOptions{})
 	if err != nil {
 		return nil, err
 	}

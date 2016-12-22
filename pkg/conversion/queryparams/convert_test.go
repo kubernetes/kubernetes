@@ -22,8 +22,9 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/conversion/queryparams"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 )
 
 type namedString string
@@ -40,7 +41,7 @@ type bar struct {
 	Ignored2 string
 }
 
-func (obj *bar) GetObjectKind() unversioned.ObjectKind { return unversioned.EmptyObjectKind }
+func (obj *bar) GetObjectKind() schema.ObjectKind { return schema.EmptyObjectKind }
 
 type foo struct {
 	Str       string            `json:"str"`
@@ -53,27 +54,27 @@ type foo struct {
 	Testmap   map[string]string `json:"testmap,omitempty"`
 }
 
-func (obj *foo) GetObjectKind() unversioned.ObjectKind { return unversioned.EmptyObjectKind }
+func (obj *foo) GetObjectKind() schema.ObjectKind { return schema.EmptyObjectKind }
 
 type baz struct {
 	Ptr  *int  `json:"ptr"`
 	Bptr *bool `json:"bptr,omitempty"`
 }
 
-func (obj *baz) GetObjectKind() unversioned.ObjectKind { return unversioned.EmptyObjectKind }
+func (obj *baz) GetObjectKind() schema.ObjectKind { return schema.EmptyObjectKind }
 
 // childStructs tests some of the types we serialize to query params for log API calls
 // notably, the nested time struct
 type childStructs struct {
-	Container    string            `json:"container,omitempty"`
-	Follow       bool              `json:"follow,omitempty"`
-	Previous     bool              `json:"previous,omitempty"`
-	SinceSeconds *int64            `json:"sinceSeconds,omitempty"`
-	SinceTime    *unversioned.Time `json:"sinceTime,omitempty"`
-	EmptyTime    *unversioned.Time `json:"emptyTime"`
+	Container    string       `json:"container,omitempty"`
+	Follow       bool         `json:"follow,omitempty"`
+	Previous     bool         `json:"previous,omitempty"`
+	SinceSeconds *int64       `json:"sinceSeconds,omitempty"`
+	SinceTime    *metav1.Time `json:"sinceTime,omitempty"`
+	EmptyTime    *metav1.Time `json:"emptyTime"`
 }
 
-func (obj *childStructs) GetObjectKind() unversioned.ObjectKind { return unversioned.EmptyObjectKind }
+func (obj *childStructs) GetObjectKind() schema.ObjectKind { return schema.EmptyObjectKind }
 
 func validateResult(t *testing.T, input interface{}, actual, expected url.Values) {
 	local := url.Values{}
@@ -97,7 +98,7 @@ func validateResult(t *testing.T, input interface{}, actual, expected url.Values
 
 func TestConvert(t *testing.T) {
 	sinceSeconds := int64(123)
-	sinceTime := unversioned.Date(2000, 1, 1, 12, 34, 56, 0, time.UTC)
+	sinceTime := metav1.Date(2000, 1, 1, 12, 34, 56, 0, time.UTC)
 
 	tests := []struct {
 		input    interface{}

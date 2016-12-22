@@ -18,20 +18,20 @@ package cm
 
 import (
 	"github.com/golang/glog"
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 )
 
 type containerManagerStub struct{}
 
 var _ ContainerManager = &containerManagerStub{}
 
-func (cm *containerManagerStub) Start(_ *api.Node) error {
+func (cm *containerManagerStub) Start(_ *v1.Node) error {
 	glog.V(2).Infof("Starting stub container manager")
 	return nil
 }
 
-func (cm *containerManagerStub) SystemCgroupsLimit() api.ResourceList {
-	return api.ResourceList{}
+func (cm *containerManagerStub) SystemCgroupsLimit() v1.ResourceList {
+	return v1.ResourceList{}
 }
 
 func (cm *containerManagerStub) GetNodeConfig() NodeConfig {

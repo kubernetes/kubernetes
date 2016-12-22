@@ -30,14 +30,15 @@ type event struct {
 	isCreated bool
 }
 
-func parseKV(kv *mvccpb.KeyValue, prevVal []byte) *event {
+// parseKV converts a KeyValue retrieved from an initial sync() listing to a synthetic isCreated event.
+func parseKV(kv *mvccpb.KeyValue) *event {
 	return &event{
 		key:       string(kv.Key),
 		value:     kv.Value,
-		prevValue: prevVal,
+		prevValue: nil,
 		rev:       kv.ModRevision,
 		isDeleted: false,
-		isCreated: kv.ModRevision == kv.CreateRevision,
+		isCreated: true,
 	}
 }
 

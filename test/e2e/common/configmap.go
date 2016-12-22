@@ -21,7 +21,7 @@ import (
 	"os"
 	"time"
 
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
 
@@ -39,6 +39,11 @@ var _ = framework.KubeDescribe("ConfigMap", func() {
 	It("should be consumable from pods in volume with defaultMode set [Conformance]", func() {
 		defaultMode := int32(0400)
 		doConfigMapE2EWithoutMappings(f, 0, 0, &defaultMode)
+	})
+
+	It("should be consumable from pods in volume as non-root with defaultMode and fsGroup set [Feature:FSGroup]", func() {
+		defaultMode := int32(0440) /* setting fsGroup sets mode to at least 440 */
+		doConfigMapE2EWithoutMappings(f, 1000, 1001, &defaultMode)
 	})
 
 	It("should be consumable from pods in volume as non-root [Conformance]", func() {
@@ -79,8 +84,8 @@ var _ = framework.KubeDescribe("ConfigMap", func() {
 		volumeMountPath := "/etc/configmap-volume"
 		containerName := "configmap-volume-test"
 
-		configMap := &api.ConfigMap{
-			ObjectMeta: api.ObjectMeta{
+		configMap := &v1.ConfigMap{
+			ObjectMeta: v1.ObjectMeta{
 				Namespace: f.Namespace.Name,
 				Name:      name,
 			},
@@ -91,33 +96,33 @@ var _ = framework.KubeDescribe("ConfigMap", func() {
 
 		By(fmt.Sprintf("Creating configMap with name %s", configMap.Name))
 		var err error
-		if configMap, err = f.Client.ConfigMaps(f.Namespace.Name).Create(configMap); err != nil {
+		if configMap, err = f.ClientSet.Core().ConfigMaps(f.Namespace.Name).Create(configMap); err != nil {
 			framework.Failf("unable to create test configMap %s: %v", configMap.Name, err)
 		}
 
-		pod := &api.Pod{
-			ObjectMeta: api.ObjectMeta{
+		pod := &v1.Pod{
+			ObjectMeta: v1.ObjectMeta{
 				Name: "pod-configmaps-" + string(uuid.NewUUID()),
 			},
-			Spec: api.PodSpec{
-				Volumes: []api.Volume{
+			Spec: v1.PodSpec{
+				Volumes: []v1.Volume{
 					{
 						Name: volumeName,
-						VolumeSource: api.VolumeSource{
-							ConfigMap: &api.ConfigMapVolumeSource{
-								LocalObjectReference: api.LocalObjectReference{
+						VolumeSource: v1.VolumeSource{
+							ConfigMap: &v1.ConfigMapVolumeSource{
+								LocalObjectReference: v1.LocalObjectReference{
 									Name: name,
 								},
 							},
 						},
 					},
 				},
-				Containers: []api.Container{
+				Containers: []v1.Container{
 					{
 						Name:    containerName,
 						Image:   "gcr.io/google_containers/mounttest:0.7",
 						Command: []string{"/mt", "--break_on_expected_content=false", "--retry_time=120", "--file_content_in_loop=/etc/configmap-volume/data-1"},
-						VolumeMounts: []api.VolumeMount{
+						VolumeMounts: []v1.VolumeMount{
 							{
 								Name:      volumeName,
 								MountPath: volumeMountPath,
@@ -126,14 +131,14 @@ var _ = framework.KubeDescribe("ConfigMap", func() {
 						},
 					},
 				},
-				RestartPolicy: api.RestartPolicyNever,
+				RestartPolicy: v1.RestartPolicyNever,
 			},
 		}
 		By("Creating the pod")
 		f.PodClient().CreateSync(pod)
 
 		pollLogs := func() (string, error) {
-			return framework.GetPodLogs(f.Client, f.Namespace.Name, pod.Name, containerName)
+			return framework.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, containerName)
 		}
 
 		Eventually(pollLogs, podLogTimeout, framework.Poll).Should(ContainSubstring("value-1"))
@@ -141,7 +146,7 @@ var _ = framework.KubeDescribe("ConfigMap", func() {
 		By(fmt.Sprintf("Updating configmap %v", configMap.Name))
 		configMap.ResourceVersion = "" // to force update
 		configMap.Data["data-1"] = "value-2"
-		_, err = f.Client.ConfigMaps(f.Namespace.Name).Update(configMap)
+		_, err = f.ClientSet.Core().ConfigMaps(f.Namespace.Name).Update(configMap)
 		Expect(err).NotTo(HaveOccurred(), "Failed to update configmap %q in namespace %q", configMap.Name, f.Namespace.Name)
 
 		By("waiting to observe update in volume")
@@ -153,26 +158,26 @@ var _ = framework.KubeDescribe("ConfigMap", func() {
 		configMap := newConfigMap(f, name)
 		By(fmt.Sprintf("Creating configMap %v/%v", f.Namespace.Name, configMap.Name))
 		var err error
-		if configMap, err = f.Client.ConfigMaps(f.Namespace.Name).Create(configMap); err != nil {
+		if configMap, err = f.ClientSet.Core().ConfigMaps(f.Namespace.Name).Create(configMap); err != nil {
 			framework.Failf("unable to create test configMap %s: %v", configMap.Name, err)
 		}
 
-		pod := &api.Pod{
-			ObjectMeta: api.ObjectMeta{
+		pod := &v1.Pod{
+			ObjectMeta: v1.ObjectMeta{
 				Name: "pod-configmaps-" + string(uuid.NewUUID()),
 			},
-			Spec: api.PodSpec{
-				Containers: []api.Container{
+			Spec: v1.PodSpec{
+				Containers: []v1.Container{
 					{
 						Name:    "env-test",
 						Image:   "gcr.io/google_containers/busybox:1.24",
 						Command: []string{"sh", "-c", "env"},
-						Env: []api.EnvVar{
+						Env: []v1.EnvVar{
 							{
 								Name: "CONFIG_DATA_1",
-								ValueFrom: &api.EnvVarSource{
-									ConfigMapKeyRef: &api.ConfigMapKeySelector{
-										LocalObjectReference: api.LocalObjectReference{
+								ValueFrom: &v1.EnvVarSource{
+									ConfigMapKeyRef: &v1.ConfigMapKeySelector{
+										LocalObjectReference: v1.LocalObjectReference{
 											Name: name,
 										},
 										Key: "data-1",
@@ -182,7 +187,7 @@ var _ = framework.KubeDescribe("ConfigMap", func() {
 						},
 					},
 				},
-				RestartPolicy: api.RestartPolicyNever,
+				RestartPolicy: v1.RestartPolicyNever,
 			},
 		}
 
@@ -191,7 +196,7 @@ var _ = framework.KubeDescribe("ConfigMap", func() {
 		})
 	})
 
-	It("should be consumable in multiple volumes in the same pod", func() {
+	It("should be consumable in multiple volumes in the same pod [Conformance]", func() {
 		var (
 			name             = "configmap-test-volume-" + string(uuid.NewUUID())
 			volumeName       = "configmap-volume"
@@ -203,21 +208,21 @@ var _ = framework.KubeDescribe("ConfigMap", func() {
 
 		By(fmt.Sprintf("Creating configMap with name %s", configMap.Name))
 		var err error
-		if configMap, err = f.Client.ConfigMaps(f.Namespace.Name).Create(configMap); err != nil {
+		if configMap, err = f.ClientSet.Core().ConfigMaps(f.Namespace.Name).Create(configMap); err != nil {
 			framework.Failf("unable to create test configMap %s: %v", configMap.Name, err)
 		}
 
-		pod := &api.Pod{
-			ObjectMeta: api.ObjectMeta{
+		pod := &v1.Pod{
+			ObjectMeta: v1.ObjectMeta{
 				Name: "pod-configmaps-" + string(uuid.NewUUID()),
 			},
-			Spec: api.PodSpec{
-				Volumes: []api.Volume{
+			Spec: v1.PodSpec{
+				Volumes: []v1.Volume{
 					{
 						Name: volumeName,
-						VolumeSource: api.VolumeSource{
-							ConfigMap: &api.ConfigMapVolumeSource{
-								LocalObjectReference: api.LocalObjectReference{
+						VolumeSource: v1.VolumeSource{
+							ConfigMap: &v1.ConfigMapVolumeSource{
+								LocalObjectReference: v1.LocalObjectReference{
 									Name: name,
 								},
 							},
@@ -225,21 +230,21 @@ var _ = framework.KubeDescribe("ConfigMap", func() {
 					},
 					{
 						Name: volumeName2,
-						VolumeSource: api.VolumeSource{
-							ConfigMap: &api.ConfigMapVolumeSource{
-								LocalObjectReference: api.LocalObjectReference{
+						VolumeSource: v1.VolumeSource{
+							ConfigMap: &v1.ConfigMapVolumeSource{
+								LocalObjectReference: v1.LocalObjectReference{
 									Name: name,
 								},
 							},
 						},
 					},
 				},
-				Containers: []api.Container{
+				Containers: []v1.Container{
 					{
 						Name:  "configmap-volume-test",
 						Image: "gcr.io/google_containers/mounttest:0.7",
 						Args:  []string{"--file_content=/etc/configmap-volume/data-1"},
-						VolumeMounts: []api.VolumeMount{
+						VolumeMounts: []v1.VolumeMount{
 							{
 								Name:      volumeName,
 								MountPath: volumeMountPath,
@@ -253,7 +258,7 @@ var _ = framework.KubeDescribe("ConfigMap", func() {
 						},
 					},
 				},
-				RestartPolicy: api.RestartPolicyNever,
+				RestartPolicy: v1.RestartPolicyNever,
 			},
 		}
 
@@ -264,9 +269,9 @@ var _ = framework.KubeDescribe("ConfigMap", func() {
 	})
 })
 
-func newConfigMap(f *framework.Framework, name string) *api.ConfigMap {
-	return &api.ConfigMap{
-		ObjectMeta: api.ObjectMeta{
+func newConfigMap(f *framework.Framework, name string) *v1.ConfigMap {
+	return &v1.ConfigMap{
+		ObjectMeta: v1.ObjectMeta{
 			Namespace: f.Namespace.Name,
 			Name:      name,
 		},
@@ -288,36 +293,36 @@ func doConfigMapE2EWithoutMappings(f *framework.Framework, uid, fsGroup int64, d
 
 	By(fmt.Sprintf("Creating configMap with name %s", configMap.Name))
 	var err error
-	if configMap, err = f.Client.ConfigMaps(f.Namespace.Name).Create(configMap); err != nil {
+	if configMap, err = f.ClientSet.Core().ConfigMaps(f.Namespace.Name).Create(configMap); err != nil {
 		framework.Failf("unable to create test configMap %s: %v", configMap.Name, err)
 	}
 
-	pod := &api.Pod{
-		ObjectMeta: api.ObjectMeta{
+	pod := &v1.Pod{
+		ObjectMeta: v1.ObjectMeta{
 			Name: "pod-configmaps-" + string(uuid.NewUUID()),
 		},
-		Spec: api.PodSpec{
-			SecurityContext: &api.PodSecurityContext{},
-			Volumes: []api.Volume{
+		Spec: v1.PodSpec{
+			SecurityContext: &v1.PodSecurityContext{},
+			Volumes: []v1.Volume{
 				{
 					Name: volumeName,
-					VolumeSource: api.VolumeSource{
-						ConfigMap: &api.ConfigMapVolumeSource{
-							LocalObjectReference: api.LocalObjectReference{
+					VolumeSource: v1.VolumeSource{
+						ConfigMap: &v1.ConfigMapVolumeSource{
+							LocalObjectReference: v1.LocalObjectReference{
 								Name: name,
 							},
 						},
 					},
 				},
 			},
-			Containers: []api.Container{
+			Containers: []v1.Container{
 				{
 					Name:  "configmap-volume-test",
 					Image: "gcr.io/google_containers/mounttest:0.7",
 					Args: []string{
 						"--file_content=/etc/configmap-volume/data-1",
 						"--file_mode=/etc/configmap-volume/data-1"},
-					VolumeMounts: []api.VolumeMount{
+					VolumeMounts: []v1.VolumeMount{
 						{
 							Name:      volumeName,
 							MountPath: volumeMountPath,
@@ -325,7 +330,7 @@ func doConfigMapE2EWithoutMappings(f *framework.Framework, uid, fsGroup int64, d
 					},
 				},
 			},
-			RestartPolicy: api.RestartPolicyNever,
+			RestartPolicy: v1.RestartPolicyNever,
 		},
 	}
 
@@ -343,17 +348,12 @@ func doConfigMapE2EWithoutMappings(f *framework.Framework, uid, fsGroup int64, d
 		defaultMode = &mode
 	}
 
-	// Just check file mode if fsGroup is not set. If fsGroup is set, the
-	// final mode is adjusted and we are not testing that case.
+	modeString := fmt.Sprintf("%v", os.FileMode(*defaultMode))
 	output := []string{
 		"content of file \"/etc/configmap-volume/data-1\": value-1",
-	}
-	if fsGroup == 0 {
-		modeString := fmt.Sprintf("%v", os.FileMode(*defaultMode))
-		output = append(output, "mode of file \"/etc/configmap-volume/data-1\": "+modeString)
+		"mode of file \"/etc/configmap-volume/data-1\": " + modeString,
 	}
 	f.TestContainerOutput("consume configMaps", pod, 0, output)
-
 }
 
 func doConfigMapE2EWithMappings(f *framework.Framework, uid, fsGroup int64, itemMode *int32) {
@@ -367,25 +367,25 @@ func doConfigMapE2EWithMappings(f *framework.Framework, uid, fsGroup int64, item
 	By(fmt.Sprintf("Creating configMap with name %s", configMap.Name))
 
 	var err error
-	if configMap, err = f.Client.ConfigMaps(f.Namespace.Name).Create(configMap); err != nil {
+	if configMap, err = f.ClientSet.Core().ConfigMaps(f.Namespace.Name).Create(configMap); err != nil {
 		framework.Failf("unable to create test configMap %s: %v", configMap.Name, err)
 	}
 
-	pod := &api.Pod{
-		ObjectMeta: api.ObjectMeta{
+	pod := &v1.Pod{
+		ObjectMeta: v1.ObjectMeta{
 			Name: "pod-configmaps-" + string(uuid.NewUUID()),
 		},
-		Spec: api.PodSpec{
-			SecurityContext: &api.PodSecurityContext{},
-			Volumes: []api.Volume{
+		Spec: v1.PodSpec{
+			SecurityContext: &v1.PodSecurityContext{},
+			Volumes: []v1.Volume{
 				{
 					Name: volumeName,
-					VolumeSource: api.VolumeSource{
-						ConfigMap: &api.ConfigMapVolumeSource{
-							LocalObjectReference: api.LocalObjectReference{
+					VolumeSource: v1.VolumeSource{
+						ConfigMap: &v1.ConfigMapVolumeSource{
+							LocalObjectReference: v1.LocalObjectReference{
 								Name: name,
 							},
-							Items: []api.KeyToPath{
+							Items: []v1.KeyToPath{
 								{
 									Key:  "data-2",
 									Path: "path/to/data-2",
@@ -395,13 +395,13 @@ func doConfigMapE2EWithMappings(f *framework.Framework, uid, fsGroup int64, item
 					},
 				},
 			},
-			Containers: []api.Container{
+			Containers: []v1.Container{
 				{
 					Name:  "configmap-volume-test",
 					Image: "gcr.io/google_containers/mounttest:0.7",
 					Args: []string{"--file_content=/etc/configmap-volume/path/to/data-2",
 						"--file_mode=/etc/configmap-volume/path/to/data-2"},
-					VolumeMounts: []api.VolumeMount{
+					VolumeMounts: []v1.VolumeMount{
 						{
 							Name:      volumeName,
 							MountPath: volumeMountPath,
@@ -410,7 +410,7 @@ func doConfigMapE2EWithMappings(f *framework.Framework, uid, fsGroup int64, item
 					},
 				},
 			},
-			RestartPolicy: api.RestartPolicyNever,
+			RestartPolicy: v1.RestartPolicyNever,
 		},
 	}
 

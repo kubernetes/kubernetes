@@ -27,16 +27,18 @@ import (
 
 	fed "k8s.io/kubernetes/federation/apis/federation"
 	fedv1 "k8s.io/kubernetes/federation/apis/federation/v1beta1"
-	fedclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_5"
+	fedclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset"
 	fedutil "k8s.io/kubernetes/federation/pkg/federation-controller/util"
+	"k8s.io/kubernetes/federation/pkg/federation-controller/util/deletionhelper"
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util/eventsink"
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util/planner"
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util/podanalyzer"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/errors"
 	apiv1 "k8s.io/kubernetes/pkg/api/v1"
 	extensionsv1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/client/cache"
-	kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
+	kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -94,6 +96,8 @@ type ReplicaSetController struct {
 	// For events
 	eventRecorder record.EventRecorder
 
+	deletionHelper *deletionhelper.DeletionHelper
+
 	defaultPlanner *planner.Planner
 }
 
@@ -101,7 +105,7 @@ type ReplicaSetController struct {
 func NewReplicaSetController(federationClient fedclientset.Interface) *ReplicaSetController {
 	broadcaster := record.NewBroadcaster()
 	broadcaster.StartRecordingToSink(eventsink.NewFederatedEventSink(federationClient))
-	recorder := broadcaster.NewRecorder(api.EventSource{Component: "federated-replicaset-controller"})
+	recorder := broadcaster.NewRecorder(apiv1.EventSource{Component: "federated-replicaset-controller"})
 
 	frsc := &ReplicaSetController{
 		fedClient:           federationClient,
@@ -120,13 +124,11 @@ func NewReplicaSetController(federationClient fedclientset.Interface) *ReplicaSe
 	replicaSetFedInformerFactory := func(cluster *fedv1.Cluster, clientset kubeclientset.Interface) (cache.Store, cache.ControllerInterface) {
 		return cache.NewInformer(
 			&cache.ListWatch{
-				ListFunc: func(options api.ListOptions) (runtime.Object, error) {
-					versionedOptions := fedutil.VersionizeV1ListOptions(options)
-					return clientset.Extensions().ReplicaSets(apiv1.NamespaceAll).List(versionedOptions)
+				ListFunc: func(options apiv1.ListOptions) (runtime.Object, error) {
+					return clientset.Extensions().ReplicaSets(apiv1.NamespaceAll).List(options)
 				},
-				WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-					versionedOptions := fedutil.VersionizeV1ListOptions(options)
-					return clientset.Extensions().ReplicaSets(apiv1.NamespaceAll).Watch(versionedOptions)
+				WatchFunc: func(options apiv1.ListOptions) (watch.Interface, error) {
+					return clientset.Extensions().ReplicaSets(apiv1.NamespaceAll).Watch(options)
 				},
 			},
 			&extensionsv1.ReplicaSet{},
@@ -149,13 +151,11 @@ func NewReplicaSetController(federationClient fedclientset.Interface) *ReplicaSe
 	podFedInformerFactory := func(cluster *fedv1.Cluster, clientset kubeclientset.Interface) (cache.Store, cache.ControllerInterface) {
 		return cache.NewInformer(
 			&cache.ListWatch{
-				ListFunc: func(options api.ListOptions) (runtime.Object, error) {
-					versionedOptions := fedutil.VersionizeV1ListOptions(options)
-					return clientset.Core().Pods(apiv1.NamespaceAll).List(versionedOptions)
+				ListFunc: func(options apiv1.ListOptions) (runtime.Object, error) {
+					return clientset.Core().Pods(apiv1.NamespaceAll).List(options)
 				},
-				WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-					versionedOptions := fedutil.VersionizeV1ListOptions(options)
-					return clientset.Core().Pods(apiv1.NamespaceAll).Watch(versionedOptions)
+				WatchFunc: func(options apiv1.ListOptions) (watch.Interface, error) {
+					return clientset.Core().Pods(apiv1.NamespaceAll).Watch(options)
 				},
 			},
 			&apiv1.Pod{},
@@ -171,13 +171,11 @@ func NewReplicaSetController(federationClient fedclientset.Interface) *ReplicaSe
 
 	frsc.replicaSetStore.Indexer, frsc.replicaSetController = cache.NewIndexerInformer(
 		&cache.ListWatch{
-			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
-				versionedOptions := fedutil.VersionizeV1ListOptions(options)
-				return frsc.fedClient.Extensions().ReplicaSets(apiv1.NamespaceAll).List(versionedOptions)
+			ListFunc: func(options apiv1.ListOptions) (runtime.Object, error) {
+				return frsc.fedClient.Extensions().ReplicaSets(apiv1.NamespaceAll).List(options)
 			},
-			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-				versionedOptions := fedutil.VersionizeV1ListOptions(options)
-				return frsc.fedClient.Extensions().ReplicaSets(apiv1.NamespaceAll).Watch(versionedOptions)
+			WatchFunc: func(options apiv1.ListOptions) (watch.Interface, error) {
+				return frsc.fedClient.Extensions().ReplicaSets(apiv1.NamespaceAll).Watch(options)
 			},
 		},
 		&extensionsv1.ReplicaSet{},
@@ -205,7 +203,70 @@ func NewReplicaSetController(federationClient fedclientset.Interface) *ReplicaSe
 			return err
 		})
 
+	frsc.deletionHelper = deletionhelper.NewDeletionHelper(
+		frsc.hasFinalizerFunc,
+		frsc.removeFinalizerFunc,
+		frsc.addFinalizerFunc,
+		// objNameFunc
+		func(obj runtime.Object) string {
+			replicaset := obj.(*extensionsv1.ReplicaSet)
+			return replicaset.Name
+		},
+		updateTimeout,
+		frsc.eventRecorder,
+		frsc.fedReplicaSetInformer,
+		frsc.fedUpdater,
+	)
+
 	return frsc
+}
+
+// Returns true if the given object has the given finalizer in its ObjectMeta.
+func (frsc *ReplicaSetController) hasFinalizerFunc(obj runtime.Object, finalizer string) bool {
+	replicaset := obj.(*extensionsv1.ReplicaSet)
+	for i := range replicaset.ObjectMeta.Finalizers {
+		if string(replicaset.ObjectMeta.Finalizers[i]) == finalizer {
+			return true
+		}
+	}
+	return false
+}
+
+// Removes the finalizer from the given objects ObjectMeta.
+// Assumes that the given object is a replicaset.
+func (frsc *ReplicaSetController) removeFinalizerFunc(obj runtime.Object, finalizer string) (runtime.Object, error) {
+	replicaset := obj.(*extensionsv1.ReplicaSet)
+	newFinalizers := []string{}
+	hasFinalizer := false
+	for i := range replicaset.ObjectMeta.Finalizers {
+		if string(replicaset.ObjectMeta.Finalizers[i]) != finalizer {
+			newFinalizers = append(newFinalizers, replicaset.ObjectMeta.Finalizers[i])
+		} else {
+			hasFinalizer = true
+		}
+	}
+	if !hasFinalizer {
+		// Nothing to do.
+		return obj, nil
+	}
+	replicaset.ObjectMeta.Finalizers = newFinalizers
+	replicaset, err := frsc.fedClient.Extensions().ReplicaSets(replicaset.Namespace).Update(replicaset)
+	if err != nil {
+		return nil, fmt.Errorf("failed to remove finalizer %s from replicaset %s: %v", finalizer, replicaset.Name, err)
+	}
+	return replicaset, nil
+}
+
+// Adds the given finalizer to the given objects ObjectMeta.
+// Assumes that the given object is a replicaset.
+func (frsc *ReplicaSetController) addFinalizerFunc(obj runtime.Object, finalizer string) (runtime.Object, error) {
+	replicaset := obj.(*extensionsv1.ReplicaSet)
+	replicaset.ObjectMeta.Finalizers = append(replicaset.ObjectMeta.Finalizers, finalizer)
+	replicaset, err := frsc.fedClient.Extensions().ReplicaSets(replicaset.Namespace).Update(replicaset)
+	if err != nil {
+		return nil, fmt.Errorf("failed to add finalizer %s to replicaset %s: %v", finalizer, replicaset.Name, err)
+	}
+	return replicaset, nil
 }
 
 func (frsc *ReplicaSetController) Run(workers int, stopCh <-chan struct{}) {
@@ -413,7 +474,7 @@ func (frsc *ReplicaSetController) reconcileReplicaSet(key string) (reconciliatio
 	startTime := time.Now()
 	defer glog.V(4).Infof("Finished reconcile replicaset %q (%v)", key, time.Now().Sub(startTime))
 
-	obj, exists, err := frsc.replicaSetStore.Indexer.GetByKey(key)
+	objFromStore, exists, err := frsc.replicaSetStore.Indexer.GetByKey(key)
 	if err != nil {
 		return statusError, err
 	}
@@ -421,7 +482,37 @@ func (frsc *ReplicaSetController) reconcileReplicaSet(key string) (reconciliatio
 		// don't delete local replicasets for now. Do not reconcile it anymore.
 		return statusAllOk, nil
 	}
-	frs := obj.(*extensionsv1.ReplicaSet)
+	obj, err := api.Scheme.DeepCopy(objFromStore)
+	frs, ok := obj.(*extensionsv1.ReplicaSet)
+	if err != nil || !ok {
+		glog.Errorf("Error in retrieving obj from store: %v, %v", ok, err)
+		frsc.deliverReplicaSetByKey(key, 0, true)
+		return statusError, err
+	}
+	if frs.DeletionTimestamp != nil {
+		if err := frsc.delete(frs); err != nil {
+			glog.Errorf("Failed to delete %s: %v", frs, err)
+			frsc.eventRecorder.Eventf(frs, api.EventTypeNormal, "DeleteFailed",
+				"ReplicaSet delete failed: %v", err)
+			frsc.deliverReplicaSetByKey(key, 0, true)
+			return statusError, err
+		}
+		return statusAllOk, nil
+	}
+
+	glog.V(3).Infof("Ensuring delete object from underlying clusters finalizer for replicaset: %s",
+		frs.Name)
+	// Add the required finalizers before creating a replicaset in underlying clusters.
+	updatedRsObj, err := frsc.deletionHelper.EnsureFinalizers(frs)
+	if err != nil {
+		glog.Errorf("Failed to ensure delete object from underlying clusters finalizer in replicaset %s: %v",
+			frs.Name, err)
+		frsc.deliverReplicaSetByKey(key, 0, false)
+		return statusError, err
+	}
+	frs = updatedRsObj.(*extensionsv1.ReplicaSet)
+
+	glog.V(3).Infof("Syncing replicaset %s in underlying clusters", frs.Name)
 
 	clusters, err := frsc.fedReplicaSetInformer.GetReadyClusters()
 	if err != nil {
@@ -464,9 +555,10 @@ func (frsc *ReplicaSetController) reconcileReplicaSet(key string) (reconciliatio
 			return statusError, err
 		}
 
+		// The object can be modified.
 		lrs := &extensionsv1.ReplicaSet{
-			ObjectMeta: fedutil.CopyObjectMeta(frs.ObjectMeta),
-			Spec:       frs.Spec,
+			ObjectMeta: fedutil.DeepCopyRelevantObjectMeta(frs.ObjectMeta),
+			Spec:       *fedutil.DeepCopyApiTypeOrPanic(&frs.Spec).(*extensionsv1.ReplicaSetSpec),
 		}
 		specReplicas := int32(replicas)
 		lrs.Spec.Replicas = &specReplicas
@@ -497,10 +589,12 @@ func (frsc *ReplicaSetController) reconcileReplicaSet(key string) (reconciliatio
 			}
 			fedStatus.Replicas += currentLrs.Status.Replicas
 			fedStatus.FullyLabeledReplicas += currentLrs.Status.FullyLabeledReplicas
-			// leave the replicaset even the replicas dropped to 0
+			fedStatus.ReadyReplicas += currentLrs.Status.ReadyReplicas
+			fedStatus.AvailableReplicas += currentLrs.Status.AvailableReplicas
 		}
 	}
-	if fedStatus.Replicas != frs.Status.Replicas || fedStatus.FullyLabeledReplicas != frs.Status.FullyLabeledReplicas {
+	if fedStatus.Replicas != frs.Status.Replicas || fedStatus.FullyLabeledReplicas != frs.Status.FullyLabeledReplicas ||
+		fedStatus.ReadyReplicas != frs.Status.ReadyReplicas || fedStatus.AvailableReplicas != frs.Status.AvailableReplicas {
 		frs.Status = fedStatus
 		_, err = frsc.fedClient.Extensions().ReplicaSets(frs.Namespace).UpdateStatus(frs)
 		if err != nil {
@@ -534,4 +628,24 @@ func (frsc *ReplicaSetController) reconcileReplicaSetsOnClusterChange() {
 		key, _ := controller.KeyFunc(rs)
 		frsc.deliverReplicaSetByKey(key, 0, false)
 	}
+}
+
+// delete deletes the given replicaset or returns error if the deletion was not complete.
+func (frsc *ReplicaSetController) delete(replicaset *extensionsv1.ReplicaSet) error {
+	glog.V(3).Infof("Handling deletion of replicaset: %v", *replicaset)
+	_, err := frsc.deletionHelper.HandleObjectInUnderlyingClusters(replicaset)
+	if err != nil {
+		return err
+	}
+
+	err = frsc.fedClient.Extensions().ReplicaSets(replicaset.Namespace).Delete(replicaset.Name, nil)
+	if err != nil {
+		// Its all good if the error is not found error. That means it is deleted already and we do not have to do anything.
+		// This is expected when we are processing an update as a result of replicaset finalizer deletion.
+		// The process that deleted the last finalizer is also going to delete the replicaset and we do not have to do anything.
+		if !errors.IsNotFound(err) {
+			return fmt.Errorf("failed to delete replicaset: %v", err)
+		}
+	}
+	return nil
 }

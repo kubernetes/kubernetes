@@ -26,12 +26,11 @@ import (
 	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	extvalidation "k8s.io/kubernetes/pkg/apis/extensions/validation"
-	"k8s.io/kubernetes/pkg/registry/cachesize"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/registry/extensions/replicaset"
 	"k8s.io/kubernetes/pkg/registry/generic"
-	"k8s.io/kubernetes/pkg/registry/generic/registry"
+	genericregistry "k8s.io/kubernetes/pkg/registry/generic/registry"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/storage"
 )
 
 // ReplicaSetStorage includes dummy storage for ReplicaSets and for Scale subresource.
@@ -41,8 +40,8 @@ type ReplicaSetStorage struct {
 	Scale      *ScaleREST
 }
 
-func NewStorage(opts generic.RESTOptions) ReplicaSetStorage {
-	replicaSetRest, replicaSetStatusRest := NewREST(opts)
+func NewStorage(optsGetter generic.RESTOptionsGetter) ReplicaSetStorage {
+	replicaSetRest, replicaSetStatusRest := NewREST(optsGetter)
 	replicaSetRegistry := replicaset.NewRegistry(replicaSetRest)
 
 	return ReplicaSetStorage{
@@ -53,59 +52,29 @@ func NewStorage(opts generic.RESTOptions) ReplicaSetStorage {
 }
 
 type REST struct {
-	*registry.Store
+	*genericregistry.Store
 }
 
 // NewREST returns a RESTStorage object that will work against ReplicaSet.
-func NewREST(opts generic.RESTOptions) (*REST, *StatusREST) {
-	prefix := "/" + opts.ResourcePrefix
-
-	newListFunc := func() runtime.Object { return &extensions.ReplicaSetList{} }
-	storageInterface, dFunc := opts.Decorator(
-		opts.StorageConfig,
-		cachesize.GetWatchCacheSizeByResource(cachesize.Replicasets),
-		&extensions.ReplicaSet{},
-		prefix,
-		replicaset.Strategy,
-		newListFunc,
-		storage.NoTriggerPublisher,
-	)
-
-	store := &registry.Store{
-		NewFunc: func() runtime.Object { return &extensions.ReplicaSet{} },
-
-		// NewListFunc returns an object capable of storing results of an etcd list.
-		NewListFunc: newListFunc,
-		// Produces a path that etcd understands, to the root of the resource
-		// by combining the namespace in the context with the given prefix
-		KeyRootFunc: func(ctx api.Context) string {
-			return registry.NamespaceKeyRootFunc(ctx, prefix)
-		},
-		// Produces a path that etcd understands, to the resource by combining
-		// the namespace in the context with the given prefix
-		KeyFunc: func(ctx api.Context, name string) (string, error) {
-			return registry.NamespaceKeyFunc(ctx, prefix, name)
-		},
-		// Retrieve the name field of a ReplicaSet
+func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST) {
+	store := &genericregistry.Store{
+		NewFunc:     func() runtime.Object { return &extensions.ReplicaSet{} },
+		NewListFunc: func() runtime.Object { return &extensions.ReplicaSetList{} },
 		ObjectNameFunc: func(obj runtime.Object) (string, error) {
 			return obj.(*extensions.ReplicaSet).Name, nil
 		},
-		// Used to match objects based on labels/fields for list and watch
-		PredicateFunc:           replicaset.MatchReplicaSet,
-		QualifiedResource:       api.Resource("replicasets"),
-		EnableGarbageCollection: opts.EnableGarbageCollection,
-		DeleteCollectionWorkers: opts.DeleteCollectionWorkers,
+		PredicateFunc:     replicaset.MatchReplicaSet,
+		QualifiedResource: extensions.Resource("replicasets"),
 
-		// Used to validate ReplicaSet creation
 		CreateStrategy: replicaset.Strategy,
-
-		// Used to validate ReplicaSet updates
 		UpdateStrategy: replicaset.Strategy,
 		DeleteStrategy: replicaset.Strategy,
-
-		Storage:     storageInterface,
-		DestroyFunc: dFunc,
 	}
+	options := &generic.StoreOptions{RESTOptions: optsGetter, AttrFunc: replicaset.GetAttrs}
+	if err := store.CompleteWithOptions(options); err != nil {
+		panic(err) // TODO: Propagate error up
+	}
+
 	statusStore := *store
 	statusStore.UpdateStrategy = replicaset.StatusStrategy
 
@@ -114,7 +83,7 @@ func NewREST(opts generic.RESTOptions) (*REST, *StatusREST) {
 
 // StatusREST implements the REST endpoint for changing the status of a ReplicaSet
 type StatusREST struct {
-	store *registry.Store
+	store *genericregistry.Store
 }
 
 func (r *StatusREST) New() runtime.Object {
@@ -122,8 +91,8 @@ func (r *StatusREST) New() runtime.Object {
 }
 
 // Get retrieves the object from the storage. It is required to support Patch.
-func (r *StatusREST) Get(ctx api.Context, name string) (runtime.Object, error) {
-	return r.store.Get(ctx, name)
+func (r *StatusREST) Get(ctx api.Context, name string, options *metav1.GetOptions) (runtime.Object, error) {
+	return r.store.Get(ctx, name, options)
 }
 
 // Update alters the status subset of an object.
@@ -143,8 +112,8 @@ func (r *ScaleREST) New() runtime.Object {
 	return &extensions.Scale{}
 }
 
-func (r *ScaleREST) Get(ctx api.Context, name string) (runtime.Object, error) {
-	rs, err := r.registry.GetReplicaSet(ctx, name)
+func (r *ScaleREST) Get(ctx api.Context, name string, options *metav1.GetOptions) (runtime.Object, error) {
+	rs, err := r.registry.GetReplicaSet(ctx, name, options)
 	if err != nil {
 		return nil, errors.NewNotFound(extensions.Resource("replicasets/scale"), name)
 	}
@@ -156,7 +125,7 @@ func (r *ScaleREST) Get(ctx api.Context, name string) (runtime.Object, error) {
 }
 
 func (r *ScaleREST) Update(ctx api.Context, name string, objInfo rest.UpdatedObjectInfo) (runtime.Object, bool, error) {
-	rs, err := r.registry.GetReplicaSet(ctx, name)
+	rs, err := r.registry.GetReplicaSet(ctx, name, &metav1.GetOptions{})
 	if err != nil {
 		return nil, false, errors.NewNotFound(extensions.Resource("replicasets/scale"), name)
 	}

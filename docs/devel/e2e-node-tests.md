@@ -1,37 +1,3 @@
-<!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
-
-<!-- BEGIN STRIP_FOR_RELEASE -->
-
-<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
-     width="25" height="25">
-
-<h2>PLEASE NOTE: This document applies to the HEAD of the source tree</h2>
-
-If you are using a released version of Kubernetes, you should
-refer to the docs that go with that version.
-
-<!-- TAG RELEASE_LINK, added by the munger automatically -->
-<strong>
-The latest release of this document can be found
-[here](http://releases.k8s.io/release-1.4/docs/devel/e2e-node-tests.md).
-
-Documentation for other releases can be found at
-[releases.k8s.io](http://releases.k8s.io).
-</strong>
---
-
-<!-- END STRIP_FOR_RELEASE -->
-
-<!-- END MUNGE: UNVERSIONED_WARNING -->
-
 # Node End-To-End tests
 
 Node e2e tests are component tests meant for testing the Kubelet code on a custom host environment.
@@ -242,12 +208,10 @@ make test_e2e_node TEST_ARGS="--disable-kubenet=false" # disable kubenet
 
 ## Additional QoS Cgroups Hierarchy level testing
 
-For testing with the QoS Cgroup Hierarchy enabled, you can pass --cgroups-per-qos flag as an argument into Ginkgo using TEST_ARGS
-
-*Note: Disabled pending feature stabilization.*
+For testing with the QoS Cgroup Hierarchy enabled, you can pass --experimental-cgroups-per-qos flag as an argument into Ginkgo using TEST_ARGS
 
 ```sh
-make test_e2e_node TEST_ARGS="--cgroups-per-qos=true"
+make test_e2e_node TEST_ARGS="--experimental-cgroups-per-qos=true"
 ```
 
 # Notes on tests run by the Kubernetes project during pre-, post- submit.

@@ -21,14 +21,14 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 )
 
 const (
@@ -50,11 +50,11 @@ const (
 var _ = framework.KubeDescribe("Kubelet Eviction Manager [Serial] [Disruptive]", func() {
 	f := framework.NewDefaultFramework("kubelet-eviction-manager")
 	var podClient *framework.PodClient
-	var c *client.Client
+	var c clientset.Interface
 
 	BeforeEach(func() {
 		podClient = f.PodClient()
-		c = f.Client
+		c = f.ClientSet
 	})
 
 	Describe("hard eviction test", func() {
@@ -73,13 +73,13 @@ var _ = framework.KubeDescribe("Kubelet Eviction Manager [Serial] [Disruptive]",
 				idlePodName = "idle" + string(uuid.NewUUID())
 				verifyPodName = "verify" + string(uuid.NewUUID())
 				createIdlePod(idlePodName, podClient)
-				podClient.Create(&api.Pod{
-					ObjectMeta: api.ObjectMeta{
+				podClient.Create(&v1.Pod{
+					ObjectMeta: v1.ObjectMeta{
 						Name: busyPodName,
 					},
-					Spec: api.PodSpec{
-						RestartPolicy: api.RestartPolicyNever,
-						Containers: []api.Container{
+					Spec: v1.PodSpec{
+						RestartPolicy: v1.RestartPolicyNever,
+						Containers: []v1.Container{
 							{
 								Image: "gcr.io/google_containers/busybox:1.24",
 								Name:  busyPodName,
@@ -97,9 +97,9 @@ var _ = framework.KubeDescribe("Kubelet Eviction Manager [Serial] [Disruptive]",
 				if !isImageSupported() || !evictionOptionIsSet() { // Skip the after each
 					return
 				}
-				podClient.DeleteSync(busyPodName, &api.DeleteOptions{}, podDisappearTimeout)
-				podClient.DeleteSync(idlePodName, &api.DeleteOptions{}, podDisappearTimeout)
-				podClient.DeleteSync(verifyPodName, &api.DeleteOptions{}, podDisappearTimeout)
+				podClient.DeleteSync(busyPodName, &v1.DeleteOptions{}, podDisappearTimeout)
+				podClient.DeleteSync(idlePodName, &v1.DeleteOptions{}, podDisappearTimeout)
+				podClient.DeleteSync(verifyPodName, &v1.DeleteOptions{}, podDisappearTimeout)
 
 				// Wait for 2 container gc loop to ensure that the containers are deleted. The containers
 				// created in this test consume a lot of disk, we don't want them to trigger disk eviction
@@ -126,7 +126,7 @@ var _ = framework.KubeDescribe("Kubelet Eviction Manager [Serial] [Disruptive]",
 
 					// The pod should be evicted.
 					if !evictionOccurred {
-						podData, err := podClient.Get(busyPodName)
+						podData, err := podClient.Get(busyPodName, metav1.GetOptions{})
 						if err != nil {
 							return err
 						}
@@ -136,12 +136,12 @@ var _ = framework.KubeDescribe("Kubelet Eviction Manager [Serial] [Disruptive]",
 							return err
 						}
 
-						podData, err = podClient.Get(idlePodName)
+						podData, err = podClient.Get(idlePodName, metav1.GetOptions{})
 						if err != nil {
 							return err
 						}
 
-						if podData.Status.Phase != api.PodRunning {
+						if podData.Status.Phase != v1.PodRunning {
 							err = verifyPodEviction(podData)
 							if err != nil {
 								return err
@@ -171,11 +171,11 @@ var _ = framework.KubeDescribe("Kubelet Eviction Manager [Serial] [Disruptive]",
 					}
 
 					// The new pod should be able to be scheduled and run after the disk pressure is relieved.
-					podData, err := podClient.Get(verifyPodName)
+					podData, err := podClient.Get(verifyPodName, metav1.GetOptions{})
 					if err != nil {
 						return err
 					}
-					if podData.Status.Phase != api.PodRunning {
+					if podData.Status.Phase != v1.PodRunning {
 						return fmt.Errorf("waiting for the new pod to be running")
 					}
 
@@ -187,13 +187,13 @@ var _ = framework.KubeDescribe("Kubelet Eviction Manager [Serial] [Disruptive]",
 })
 
 func createIdlePod(podName string, podClient *framework.PodClient) {
-	podClient.Create(&api.Pod{
-		ObjectMeta: api.ObjectMeta{
+	podClient.Create(&v1.Pod{
+		ObjectMeta: v1.ObjectMeta{
 			Name: podName,
 		},
-		Spec: api.PodSpec{
-			RestartPolicy: api.RestartPolicyNever,
-			Containers: []api.Container{
+		Spec: v1.PodSpec{
+			RestartPolicy: v1.RestartPolicyNever,
+			Containers: []v1.Container{
 				{
 					Image: framework.GetPauseImageNameForHostArch(),
 					Name:  podName,
@@ -203,8 +203,8 @@ func createIdlePod(podName string, podClient *framework.PodClient) {
 	})
 }
 
-func verifyPodEviction(podData *api.Pod) error {
-	if podData.Status.Phase != api.PodFailed {
+func verifyPodEviction(podData *v1.Pod) error {
+	if podData.Status.Phase != v1.PodFailed {
 		return fmt.Errorf("expected phase to be failed. got %+v", podData.Status.Phase)
 	}
 	if podData.Status.Reason != "Evicted" {
@@ -216,15 +216,15 @@ func verifyPodEviction(podData *api.Pod) error {
 func nodeHasDiskPressure(cs clientset.Interface) bool {
 	nodeList := framework.GetReadySchedulableNodesOrDie(cs)
 	for _, condition := range nodeList.Items[0].Status.Conditions {
-		if condition.Type == api.NodeDiskPressure {
-			return condition.Status == api.ConditionTrue
+		if condition.Type == v1.NodeDiskPressure {
+			return condition.Status == v1.ConditionTrue
 		}
 	}
 	return false
 }
 
 func evictionOptionIsSet() bool {
-	return len(framework.TestContext.EvictionHard) > 0
+	return len(framework.TestContext.KubeletConfig.EvictionHard) > 0
 }
 
 // TODO(random-liu): Use OSImage in node status to do the check.

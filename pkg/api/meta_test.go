@@ -24,10 +24,10 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta"
-	"k8s.io/kubernetes/pkg/api/meta/metatypes"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/util/uuid"
 )
 
@@ -66,12 +66,12 @@ func TestHasObjectMetaSystemFieldValues(t *testing.T) {
 	}
 }
 
-func getObjectMetaAndOwnerReferences() (objectMeta api.ObjectMeta, metaOwnerReferences []metatypes.OwnerReference) {
+func getObjectMetaAndOwnerReferences() (objectMeta api.ObjectMeta, metaOwnerReferences []metav1.OwnerReference) {
 	fuzz.New().NilChance(.5).NumElements(1, 5).Fuzz(&objectMeta)
 	references := objectMeta.OwnerReferences
-	metaOwnerReferences = make([]metatypes.OwnerReference, 0)
+	metaOwnerReferences = make([]metav1.OwnerReference, 0)
 	for i := 0; i < len(references); i++ {
-		metaOwnerReferences = append(metaOwnerReferences, metatypes.OwnerReference{
+		metaOwnerReferences = append(metaOwnerReferences, metav1.OwnerReference{
 			Kind:       references[i].Kind,
 			Name:       references[i].Name,
 			UID:        references[i].UID,
@@ -80,7 +80,7 @@ func getObjectMetaAndOwnerReferences() (objectMeta api.ObjectMeta, metaOwnerRefe
 		})
 	}
 	if len(references) == 0 {
-		objectMeta.OwnerReferences = make([]api.OwnerReference, 0)
+		objectMeta.OwnerReferences = make([]metav1.OwnerReference, 0)
 	}
 	return objectMeta, metaOwnerReferences
 }
@@ -112,8 +112,8 @@ func TestAccessOwnerReferences(t *testing.T) {
 
 func TestAccessorImplementations(t *testing.T) {
 	for _, gv := range registered.EnabledVersions() {
-		internalGV := unversioned.GroupVersion{Group: gv.Group, Version: runtime.APIVersionInternal}
-		for _, gv := range []unversioned.GroupVersion{gv, internalGV} {
+		internalGV := schema.GroupVersion{Group: gv.Group, Version: runtime.APIVersionInternal}
+		for _, gv := range []schema.GroupVersion{gv, internalGV} {
 			for kind, knownType := range api.Scheme.KnownTypes(gv) {
 				value := reflect.New(knownType)
 				obj := value.Interface()
@@ -165,7 +165,7 @@ func TestAccessorImplementations(t *testing.T) {
 						continue
 					}
 				default:
-					if _, ok := obj.(unversioned.ListMetaAccessor); ok {
+					if _, ok := obj.(metav1.ListMetaAccessor); ok {
 						continue
 					}
 					if _, ok := value.Elem().Type().FieldByName("ObjectMeta"); ok {

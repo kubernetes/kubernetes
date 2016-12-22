@@ -23,7 +23,6 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/registry/core/service/allocator"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
-	"k8s.io/kubernetes/pkg/storage/etcd/etcdtest"
 	etcdtesting "k8s.io/kubernetes/pkg/storage/etcd/testing"
 	"k8s.io/kubernetes/pkg/storage/storagebackend"
 
@@ -44,8 +43,7 @@ func validNewRangeAllocation() *api.RangeAllocation {
 }
 
 func key() string {
-	s := "/ranges/serviceips"
-	return etcdtest.AddPrefix(s)
+	return "/ranges/serviceips"
 }
 
 func TestEmpty(t *testing.T) {
@@ -80,7 +78,7 @@ func TestStore(t *testing.T) {
 	other := allocator.NewAllocationMap(100, "rangeSpecValue")
 
 	allocation := &api.RangeAllocation{}
-	if err := storage.storage.Get(context.TODO(), key(), allocation, false); err != nil {
+	if err := storage.storage.Get(context.TODO(), key(), "", allocation, false); err != nil {
 		t.Fatal(err)
 	}
 	if allocation.Range != "rangeSpecValue" {

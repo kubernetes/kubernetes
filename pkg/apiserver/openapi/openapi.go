@@ -48,10 +48,11 @@ func ToValidOperationID(s string, capitalizeFirstLetter bool) string {
 	return buffer.String()
 }
 
-// GetOperationID returns a customize operation ID for kubernetes API server's OpenAPI spec to prevent duplicate IDs.
-func GetOperationID(servePath string, r *restful.Route) (string, error) {
+// GetOperationIDAndTags returns a customize operation ID and a list of tags for kubernetes API server's OpenAPI spec to prevent duplicate IDs.
+func GetOperationIDAndTags(servePath string, r *restful.Route) (string, []string, error) {
 	op := r.Operation
 	path := r.Path
+	var tags []string
 	// TODO: This is hacky, figure out where this name conflict is created and fix it at the root.
 	if strings.HasPrefix(path, "/apis/extensions/v1beta1/namespaces/{namespace}/") && strings.HasSuffix(op, "ScaleScale") {
 		op = op[:len(op)-10] + strings.Title(strings.Split(path[48:], "/")[0]) + "Scale"
@@ -60,7 +61,7 @@ func GetOperationID(servePath string, r *restful.Route) (string, error) {
 	case "/swagger.json":
 		prefix, exists := verbs.GetPrefix(op)
 		if !exists {
-			return op, fmt.Errorf("operation names should start with a verb. Cannot determine operation verb from %v", op)
+			return op, tags, fmt.Errorf("operation names should start with a verb. Cannot determine operation verb from %v", op)
 		}
 		op = op[len(prefix):]
 		parts := strings.Split(strings.Trim(path, "/"), "/")
@@ -70,12 +71,17 @@ func GetOperationID(servePath string, r *restful.Route) (string, error) {
 		}
 		if len(parts) >= 2 && parts[0] == "apis" {
 			prefix = prefix + ToValidOperationID(strings.TrimSuffix(parts[1], ".k8s.io"), prefix != "")
+			tag := ToValidOperationID(strings.TrimSuffix(parts[1], ".k8s.io"), false)
 			if len(parts) > 2 {
 				prefix = prefix + ToValidOperationID(parts[2], prefix != "")
+				tag = tag + "_" + ToValidOperationID(parts[2], false)
 			}
+			tags = append(tags, tag)
+		} else if len(parts) >= 1 {
+			tags = append(tags, ToValidOperationID(parts[0], false))
 		}
-		return prefix + ToValidOperationID(op, prefix != ""), nil
+		return prefix + ToValidOperationID(op, prefix != ""), tags, nil
 	default:
-		return op, nil
+		return op, tags, nil
 	}
 }

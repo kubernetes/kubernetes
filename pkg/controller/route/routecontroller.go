@@ -23,11 +23,11 @@ import (
 	"time"
 
 	"github.com/golang/glog"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/api/v1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/client/cache"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -59,8 +59,8 @@ type RouteController struct {
 }
 
 func New(routes cloudprovider.Routes, kubeClient clientset.Interface, clusterName string, clusterCIDR *net.IPNet) *RouteController {
-	if kubeClient != nil && kubeClient.Core().GetRESTClient().GetRateLimiter() != nil {
-		metrics.RegisterMetricAndTrackRateLimiterUsage("route_controller", kubeClient.Core().GetRESTClient().GetRateLimiter())
+	if kubeClient != nil && kubeClient.Core().RESTClient().GetRateLimiter() != nil {
+		metrics.RegisterMetricAndTrackRateLimiterUsage("route_controller", kubeClient.Core().RESTClient().GetRateLimiter())
 	}
 	rc := &RouteController{
 		routes:      routes,
@@ -71,14 +71,14 @@ func New(routes cloudprovider.Routes, kubeClient clientset.Interface, clusterNam
 
 	rc.nodeStore.Store, rc.nodeController = cache.NewInformer(
 		&cache.ListWatch{
-			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
+			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
 				return rc.kubeClient.Core().Nodes().List(options)
 			},
-			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
+			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
 				return rc.kubeClient.Core().Nodes().Watch(options)
 			},
 		},
-		&api.Node{},
+		&v1.Node{},
 		controller.NoResyncPeriodFunc(),
 		cache.ResourceEventHandlerFuncs{},
 	)
@@ -116,7 +116,7 @@ func (rc *RouteController) reconcileNodeRoutes() error {
 	return rc.reconcile(nodeList.Items, routeList)
 }
 
-func (rc *RouteController) reconcile(nodes []api.Node, routes []*cloudprovider.Route) error {
+func (rc *RouteController) reconcile(nodes []v1.Node, routes []*cloudprovider.Route) error {
 	// nodeCIDRs maps nodeName->nodeCIDR
 	nodeCIDRs := make(map[types.NodeName]string)
 	// routeMap maps routeTargetNode->route
@@ -166,8 +166,8 @@ func (rc *RouteController) reconcile(nodes []api.Node, routes []*cloudprovider.R
 			}(nodeName, nameHint, route)
 		} else {
 			// Update condition only if it doesn't reflect the current state.
-			_, condition := api.GetNodeCondition(&node.Status, api.NodeNetworkUnavailable)
-			if condition == nil || condition.Status != api.ConditionFalse {
+			_, condition := v1.GetNodeCondition(&node.Status, v1.NodeNetworkUnavailable)
+			if condition == nil || condition.Status != v1.ConditionFalse {
 				rc.updateNetworkingCondition(types.NodeName(node.Name), true)
 			}
 		}
@@ -201,19 +201,19 @@ func (rc *RouteController) updateNetworkingCondition(nodeName types.NodeName, ro
 	for i := 0; i < updateNodeStatusMaxRetries; i++ {
 		// Patch could also fail, even though the chance is very slim. So we still do
 		// patch in the retry loop.
-		currentTime := unversioned.Now()
+		currentTime := metav1.Now()
 		if routeCreated {
-			err = nodeutil.SetNodeCondition(rc.kubeClient, nodeName, api.NodeCondition{
-				Type:               api.NodeNetworkUnavailable,
-				Status:             api.ConditionFalse,
+			err = nodeutil.SetNodeCondition(rc.kubeClient, nodeName, v1.NodeCondition{
+				Type:               v1.NodeNetworkUnavailable,
+				Status:             v1.ConditionFalse,
 				Reason:             "RouteCreated",
 				Message:            "RouteController created a route",
 				LastTransitionTime: currentTime,
 			})
 		} else {
-			err = nodeutil.SetNodeCondition(rc.kubeClient, nodeName, api.NodeCondition{
-				Type:               api.NodeNetworkUnavailable,
-				Status:             api.ConditionTrue,
+			err = nodeutil.SetNodeCondition(rc.kubeClient, nodeName, v1.NodeCondition{
+				Type:               v1.NodeNetworkUnavailable,
+				Status:             v1.ConditionTrue,
 				Reason:             "NoRouteCreated",
 				Message:            "RouteController failed to create a route",
 				LastTransitionTime: currentTime,

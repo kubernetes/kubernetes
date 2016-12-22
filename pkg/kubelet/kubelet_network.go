@@ -23,7 +23,7 @@ import (
 	"strings"
 
 	"github.com/golang/glog"
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	"k8s.io/kubernetes/pkg/kubelet/network"
 	"k8s.io/kubernetes/pkg/util/bandwidth"
@@ -89,25 +89,10 @@ func (kl *Kubelet) providerRequiresNetworkingConfiguration() bool {
 	return supported
 }
 
-// Returns the list of DNS servers and DNS search domains.
-func (kl *Kubelet) parseResolvConf(reader io.Reader) (nameservers []string, searches []string, err error) {
-	var scrubber dnsScrubber
-	if kl.cloud != nil {
-		scrubber = kl.cloud
-	}
-	return parseResolvConf(reader, scrubber)
-}
-
-// A helper for testing.
-type dnsScrubber interface {
-	ScrubDNS(nameservers, searches []string) (nsOut, srchOut []string)
-}
-
 // parseResolveConf reads a resolv.conf file from the given reader, and parses
-// it into nameservers and searches, possibly returning an error.  The given
-// dnsScrubber allows cloud providers to post-process dns names.
+// it into nameservers and searches, possibly returning an error.
 // TODO: move to utility package
-func parseResolvConf(reader io.Reader, dnsScrubber dnsScrubber) (nameservers []string, searches []string, err error) {
+func (kl *Kubelet) parseResolvConf(reader io.Reader) (nameservers []string, searches []string, err error) {
 	file, err := ioutil.ReadAll(reader)
 	if err != nil {
 		return nil, nil, err
@@ -137,16 +122,16 @@ func parseResolvConf(reader io.Reader, dnsScrubber dnsScrubber) (nameservers []s
 		}
 	}
 
-	// Give the cloud-provider a chance to post-process DNS settings.
-	if dnsScrubber != nil {
-		nameservers, searches = dnsScrubber.ScrubDNS(nameservers, searches)
-	}
+	// There used to be code here to scrub DNS for each cloud, but doesn't
+	// make sense anymore since cloudproviders are being factored out.
+	// contact @thockin or @wlan0 for more information
+
 	return nameservers, searches, nil
 }
 
 // cleanupBandwidthLimits updates the status of bandwidth-limited containers
 // and ensures that only the appropriate CIDRs are active on the node.
-func (kl *Kubelet) cleanupBandwidthLimits(allPods []*api.Pod) error {
+func (kl *Kubelet) cleanupBandwidthLimits(allPods []*v1.Pod) error {
 	if kl.shaper == nil {
 		return nil
 	}
@@ -174,7 +159,7 @@ func (kl *Kubelet) cleanupBandwidthLimits(allPods []*api.Pod) error {
 			}
 			status = kl.generateAPIPodStatus(pod, s)
 		}
-		if status.Phase == api.PodRunning {
+		if status.Phase == v1.PodRunning {
 			possibleCIDRs.Insert(fmt.Sprintf("%s/32", status.PodIP))
 		}
 	}
@@ -191,7 +176,12 @@ func (kl *Kubelet) cleanupBandwidthLimits(allPods []*api.Pod) error {
 
 // syncNetworkStatus updates the network state
 func (kl *Kubelet) syncNetworkStatus() {
-	kl.runtimeState.setNetworkState(kl.networkPlugin.Status())
+	// For cri integration, network state will be updated in updateRuntimeUp,
+	// we'll get runtime network status through cri directly.
+	// TODO: Remove this once we completely switch to cri integration.
+	if kl.networkPlugin != nil {
+		kl.runtimeState.setNetworkState(kl.networkPlugin.Status())
+	}
 }
 
 // updatePodCIDR updates the pod CIDR in the runtime state if it is different
@@ -203,14 +193,23 @@ func (kl *Kubelet) updatePodCIDR(cidr string) {
 		return
 	}
 
-	glog.Infof("Setting Pod CIDR: %v -> %v", podCIDR, cidr)
-	kl.runtimeState.setPodCIDR(cidr)
-
+	// kubelet -> network plugin
+	// cri runtime shims are responsible for their own network plugins
 	if kl.networkPlugin != nil {
 		details := make(map[string]interface{})
 		details[network.NET_PLUGIN_EVENT_POD_CIDR_CHANGE_DETAIL_CIDR] = cidr
 		kl.networkPlugin.Event(network.NET_PLUGIN_EVENT_POD_CIDR_CHANGE, details)
 	}
+
+	// kubelet -> generic runtime -> runtime shim -> network plugin
+	// docker/rkt non-cri implementations have a passthrough UpdatePodCIDR
+	if err := kl.GetRuntime().UpdatePodCIDR(cidr); err != nil {
+		glog.Errorf("Failed to update pod CIDR: %v", err)
+		return
+	}
+
+	glog.Infof("Setting Pod CIDR: %v -> %v", podCIDR, cidr)
+	kl.runtimeState.setPodCIDR(cidr)
 }
 
 // shapingEnabled returns whether traffic shaping is enabled.
@@ -219,6 +218,16 @@ func (kl *Kubelet) shapingEnabled() bool {
 	if kl.networkPlugin != nil && kl.networkPlugin.Capabilities().Has(network.NET_PLUGIN_CAPABILITY_SHAPING) {
 		return false
 	}
+	// This is not strictly true but we need to figure out how to handle
+	// bandwidth shaping anyway. If the kubelet doesn't have a networkPlugin,
+	// it could mean:
+	// a. the kubelet is responsible for bandwidth shaping
+	// b. the kubelet is using cri, and the cri has a network plugin
+	// Today, the only plugin that understands bandwidth shaping is kubenet, and
+	// it doesn't support bandwidth shaping when invoked through cri, so it
+	// effectively boils down to letting the kubelet decide how to handle
+	// shaping annotations. The combination of (cri + network plugin that
+	// handles bandwidth shaping) may not work because of this.
 	return true
 }
 

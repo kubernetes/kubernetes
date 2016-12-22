@@ -22,8 +22,9 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	federationapi "k8s.io/kubernetes/federation/apis/federation/v1beta1"
-	"k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_5"
+	"k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset"
 	"k8s.io/kubernetes/pkg/api/v1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
 
@@ -36,7 +37,7 @@ var _ = framework.KubeDescribe("Federation apiserver [Feature:Federation]", func
 
 	Describe("Cluster objects", func() {
 		AfterEach(func() {
-			framework.SkipUnlessFederated(f.Client)
+			framework.SkipUnlessFederated(f.ClientSet)
 
 			// Delete registered clusters.
 			// This is if a test failed, it should not affect other tests.
@@ -49,7 +50,7 @@ var _ = framework.KubeDescribe("Federation apiserver [Feature:Federation]", func
 		})
 
 		It("should be created and deleted successfully", func() {
-			framework.SkipUnlessFederated(f.Client)
+			framework.SkipUnlessFederated(f.ClientSet)
 
 			contexts := f.GetUnderlyingFederatedContexts()
 
@@ -85,11 +86,11 @@ var _ = framework.KubeDescribe("Federation apiserver [Feature:Federation]", func
 	})
 	Describe("Admission control", func() {
 		AfterEach(func() {
-			framework.SkipUnlessFederated(f.Client)
+			framework.SkipUnlessFederated(f.ClientSet)
 		})
 
 		It("should not be able to create resources if namespace does not exist", func() {
-			framework.SkipUnlessFederated(f.Client)
+			framework.SkipUnlessFederated(f.ClientSet)
 
 			// Creating a service in a non-existing namespace should fail.
 			svcNamespace := "federation-admission-test-ns"
@@ -122,9 +123,9 @@ func newService(name, namespace string) *v1.Service {
 }
 
 // Verify that the cluster is marked ready.
-func isReady(clusterName string, clientset *federation_release_1_5.Clientset) error {
+func isReady(clusterName string, clientset *federation_clientset.Clientset) error {
 	return wait.PollImmediate(time.Second, 5*time.Minute, func() (bool, error) {
-		c, err := clientset.Federation().Clusters().Get(clusterName)
+		c, err := clientset.Federation().Clusters().Get(clusterName, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}

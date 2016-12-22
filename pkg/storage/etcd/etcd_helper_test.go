@@ -24,11 +24,11 @@ import (
 	"time"
 
 	etcd "github.com/coreos/etcd/client"
-	"github.com/stretchr/testify/assert"
 	"golang.org/x/net/context"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
+	apiv1 "k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/conversion"
 	"k8s.io/kubernetes/pkg/fields"
@@ -99,8 +99,7 @@ func createPodList(t *testing.T, helper etcdHelper, list *api.PodList) error {
 func TestList(t *testing.T) {
 	server := etcdtesting.NewEtcdTestClientServer(t)
 	defer server.Terminate(t)
-	key := etcdtest.AddPrefix("/some/key")
-	helper := newEtcdHelper(server.Client, testapi.Default.Codec(), key)
+	helper := newEtcdHelper(server.Client, testapi.Default.Codec(), etcdtest.PathPrefix())
 
 	list := api.PodList{
 		Items: []api.Pod{
@@ -123,7 +122,7 @@ func TestList(t *testing.T) {
 	var got api.PodList
 	// TODO: a sorted filter function could be applied such implied
 	// ordering on the returned list doesn't matter.
-	err := helper.List(context.TODO(), key, "", storage.Everything, &got)
+	err := helper.List(context.TODO(), "/", "", storage.Everything, &got)
 	if err != nil {
 		t.Errorf("Unexpected error %v", err)
 	}
@@ -136,8 +135,7 @@ func TestList(t *testing.T) {
 func TestListFiltered(t *testing.T) {
 	server := etcdtesting.NewEtcdTestClientServer(t)
 	defer server.Terminate(t)
-	key := etcdtest.AddPrefix("/some/key")
-	helper := newEtcdHelper(server.Client, testapi.Default.Codec(), key)
+	helper := newEtcdHelper(server.Client, testapi.Default.Codec(), etcdtest.PathPrefix())
 
 	list := api.PodList{
 		Items: []api.Pod{
@@ -167,7 +165,7 @@ func TestListFiltered(t *testing.T) {
 		},
 	}
 	var got api.PodList
-	err := helper.List(context.TODO(), key, "", p, &got)
+	err := helper.List(context.TODO(), "/", "", p, &got)
 	if err != nil {
 		t.Errorf("Unexpected error %v", err)
 	}
@@ -181,13 +179,10 @@ func TestListFiltered(t *testing.T) {
 func TestListAcrossDirectories(t *testing.T) {
 	server := etcdtesting.NewEtcdTestClientServer(t)
 	defer server.Terminate(t)
-	rootkey := etcdtest.AddPrefix("/some/key")
-	key1 := etcdtest.AddPrefix("/some/key/directory1")
-	key2 := etcdtest.AddPrefix("/some/key/directory2")
 
-	roothelper := newEtcdHelper(server.Client, testapi.Default.Codec(), rootkey)
-	helper1 := newEtcdHelper(server.Client, testapi.Default.Codec(), key1)
-	helper2 := newEtcdHelper(server.Client, testapi.Default.Codec(), key2)
+	roothelper := newEtcdHelper(server.Client, testapi.Default.Codec(), etcdtest.PathPrefix())
+	helper1 := newEtcdHelper(server.Client, testapi.Default.Codec(), etcdtest.PathPrefix()+"/dir1")
+	helper2 := newEtcdHelper(server.Client, testapi.Default.Codec(), etcdtest.PathPrefix()+"/dir2")
 
 	list := api.PodList{
 		Items: []api.Pod{
@@ -217,7 +212,7 @@ func TestListAcrossDirectories(t *testing.T) {
 	list.Items[2] = *returnedObj
 
 	var got api.PodList
-	err := roothelper.List(context.TODO(), rootkey, "", storage.Everything, &got)
+	err := roothelper.List(context.TODO(), "/", "", storage.Everything, &got)
 	if err != nil {
 		t.Errorf("Unexpected error %v", err)
 	}
@@ -229,8 +224,8 @@ func TestListAcrossDirectories(t *testing.T) {
 func TestGet(t *testing.T) {
 	server := etcdtesting.NewEtcdTestClientServer(t)
 	defer server.Terminate(t)
-	key := etcdtest.AddPrefix("/some/key")
-	helper := newEtcdHelper(server.Client, testapi.Default.Codec(), key)
+	key := "/some/key"
+	helper := newEtcdHelper(server.Client, testapi.Default.Codec(), etcdtest.PathPrefix())
 	expect := api.Pod{
 		ObjectMeta: api.ObjectMeta{Name: "foo"},
 		Spec:       apitesting.DeepEqualSafePodSpec(),
@@ -240,7 +235,7 @@ func TestGet(t *testing.T) {
 		t.Errorf("Unexpected error %#v", err)
 	}
 	expect = got
-	if err := helper.Get(context.TODO(), key, &got, false); err != nil {
+	if err := helper.Get(context.TODO(), key, "", &got, false); err != nil {
 		t.Errorf("Unexpected error %#v", err)
 	}
 	if !reflect.DeepEqual(got, expect) {
@@ -251,14 +246,13 @@ func TestGet(t *testing.T) {
 func TestGetNotFoundErr(t *testing.T) {
 	server := etcdtesting.NewEtcdTestClientServer(t)
 	defer server.Terminate(t)
-	key := etcdtest.AddPrefix("/some/key")
-	boguskey := etcdtest.AddPrefix("/some/boguskey")
-	helper := newEtcdHelper(server.Client, testapi.Default.Codec(), key)
+	boguskey := "/some/boguskey"
+	helper := newEtcdHelper(server.Client, testapi.Default.Codec(), etcdtest.PathPrefix())
 
 	var got api.Pod
-	err := helper.Get(context.TODO(), boguskey, &got, false)
+	err := helper.Get(context.TODO(), boguskey, "", &got, false)
 	if !storage.IsNotFound(err) {
-		t.Errorf("Unexpected reponse on key=%v, err=%v", key, err)
+		t.Errorf("Unexpected reponse on key=%v, err=%v", boguskey, err)
 	}
 }
 
@@ -276,7 +270,7 @@ func TestCreate(t *testing.T) {
 	if err != nil {
 		t.Errorf("Unexpected error %#v", err)
 	}
-	err = helper.Get(context.TODO(), "/some/key", returnedObj, false)
+	err = helper.Get(context.TODO(), "/some/key", "", returnedObj, false)
 	if err != nil {
 		t.Errorf("Unexpected error %#v", err)
 	}
@@ -304,10 +298,10 @@ func TestGuaranteedUpdate(t *testing.T) {
 	_, codec := testScheme(t)
 	server := etcdtesting.NewEtcdTestClientServer(t)
 	defer server.Terminate(t)
-	key := etcdtest.AddPrefix("/some/key")
-	helper := newEtcdHelper(server.Client, codec, key)
+	key := "/some/key"
+	helper := newEtcdHelper(server.Client, codec, etcdtest.PathPrefix())
 
-	obj := &storagetesting.TestResource{ObjectMeta: api.ObjectMeta{Name: "foo"}, Value: 1}
+	obj := &storagetesting.TestResource{ObjectMeta: apiv1.ObjectMeta{Name: "foo"}, Value: 1}
 	err := helper.GuaranteedUpdate(context.TODO(), key, &storagetesting.TestResource{}, true, nil, storage.SimpleUpdate(func(in runtime.Object) (runtime.Object, error) {
 		return obj, nil
 	}))
@@ -317,7 +311,7 @@ func TestGuaranteedUpdate(t *testing.T) {
 
 	// Update an existing node.
 	callbackCalled := false
-	objUpdate := &storagetesting.TestResource{ObjectMeta: api.ObjectMeta{Name: "foo"}, Value: 2}
+	objUpdate := &storagetesting.TestResource{ObjectMeta: apiv1.ObjectMeta{Name: "foo"}, Value: 2}
 	err = helper.GuaranteedUpdate(context.TODO(), key, &storagetesting.TestResource{}, true, nil, storage.SimpleUpdate(func(in runtime.Object) (runtime.Object, error) {
 		callbackCalled = true
 
@@ -332,7 +326,7 @@ func TestGuaranteedUpdate(t *testing.T) {
 	}
 
 	objCheck := &storagetesting.TestResource{}
-	err = helper.Get(context.TODO(), key, objCheck, false)
+	err = helper.Get(context.TODO(), key, "", objCheck, false)
 	if err != nil {
 		t.Errorf("Unexpected error %#v", err)
 	}
@@ -349,10 +343,10 @@ func TestGuaranteedUpdateNoChange(t *testing.T) {
 	_, codec := testScheme(t)
 	server := etcdtesting.NewEtcdTestClientServer(t)
 	defer server.Terminate(t)
-	key := etcdtest.AddPrefix("/some/key")
-	helper := newEtcdHelper(server.Client, codec, key)
+	key := "/some/key"
+	helper := newEtcdHelper(server.Client, codec, etcdtest.PathPrefix())
 
-	obj := &storagetesting.TestResource{ObjectMeta: api.ObjectMeta{Name: "foo"}, Value: 1}
+	obj := &storagetesting.TestResource{ObjectMeta: apiv1.ObjectMeta{Name: "foo"}, Value: 1}
 	err := helper.GuaranteedUpdate(context.TODO(), key, &storagetesting.TestResource{}, true, nil, storage.SimpleUpdate(func(in runtime.Object) (runtime.Object, error) {
 		return obj, nil
 	}))
@@ -362,7 +356,7 @@ func TestGuaranteedUpdateNoChange(t *testing.T) {
 
 	// Update an existing node with the same data
 	callbackCalled := false
-	objUpdate := &storagetesting.TestResource{ObjectMeta: api.ObjectMeta{Name: "foo"}, Value: 1}
+	objUpdate := &storagetesting.TestResource{ObjectMeta: apiv1.ObjectMeta{Name: "foo"}, Value: 1}
 	err = helper.GuaranteedUpdate(context.TODO(), key, &storagetesting.TestResource{}, true, nil, storage.SimpleUpdate(func(in runtime.Object) (runtime.Object, error) {
 		callbackCalled = true
 		return objUpdate, nil
@@ -379,11 +373,11 @@ func TestGuaranteedUpdateKeyNotFound(t *testing.T) {
 	_, codec := testScheme(t)
 	server := etcdtesting.NewEtcdTestClientServer(t)
 	defer server.Terminate(t)
-	key := etcdtest.AddPrefix("/some/key")
-	helper := newEtcdHelper(server.Client, codec, key)
+	key := "/some/key"
+	helper := newEtcdHelper(server.Client, codec, etcdtest.PathPrefix())
 
 	// Create a new node.
-	obj := &storagetesting.TestResource{ObjectMeta: api.ObjectMeta{Name: "foo"}, Value: 1}
+	obj := &storagetesting.TestResource{ObjectMeta: apiv1.ObjectMeta{Name: "foo"}, Value: 1}
 
 	f := storage.SimpleUpdate(func(in runtime.Object) (runtime.Object, error) {
 		return obj, nil
@@ -406,7 +400,7 @@ func TestGuaranteedUpdate_CreateCollision(t *testing.T) {
 	_, codec := testScheme(t)
 	server := etcdtesting.NewEtcdTestClientServer(t)
 	defer server.Terminate(t)
-	key := etcdtest.AddPrefix("/some/key")
+	key := "/some/key"
 	helper := newEtcdHelper(server.Client, codec, etcdtest.PathPrefix())
 
 	const concurrency = 10
@@ -431,7 +425,7 @@ func TestGuaranteedUpdate_CreateCollision(t *testing.T) {
 				}
 
 				currValue := in.(*storagetesting.TestResource).Value
-				obj := &storagetesting.TestResource{ObjectMeta: api.ObjectMeta{Name: "foo"}, Value: currValue + 1}
+				obj := &storagetesting.TestResource{ObjectMeta: apiv1.ObjectMeta{Name: "foo"}, Value: currValue + 1}
 				return obj, nil
 			}))
 			if err != nil {
@@ -442,7 +436,7 @@ func TestGuaranteedUpdate_CreateCollision(t *testing.T) {
 	wgDone.Wait()
 
 	stored := &storagetesting.TestResource{}
-	err := helper.Get(context.TODO(), key, stored, false)
+	err := helper.Get(context.TODO(), key, "", stored, false)
 	if err != nil {
 		t.Errorf("Unexpected error %#v", stored)
 	}
@@ -469,27 +463,6 @@ func TestGuaranteedUpdateUIDMismatch(t *testing.T) {
 	if !storage.IsInvalidObj(err) {
 		t.Fatalf("Expect a Test Failed (write conflict) error, got: %v", err)
 	}
-}
-
-func TestPrefixEtcdKey(t *testing.T) {
-	server := etcdtesting.NewEtcdTestClientServer(t)
-	defer server.Terminate(t)
-	prefix := path.Join("/", etcdtest.PathPrefix())
-	helper := newEtcdHelper(server.Client, testapi.Default.Codec(), prefix)
-
-	baseKey := "/some/key"
-
-	// Verify prefix is added
-	keyBefore := baseKey
-	keyAfter := helper.prefixEtcdKey(keyBefore)
-
-	assert.Equal(t, keyAfter, path.Join(prefix, baseKey), "Prefix incorrectly added by EtcdHelper")
-
-	// Verify prefix is not added
-	keyBefore = path.Join(prefix, baseKey)
-	keyAfter = helper.prefixEtcdKey(keyBefore)
-
-	assert.Equal(t, keyBefore, keyAfter, "Prefix incorrectly added by EtcdHelper")
 }
 
 func TestDeleteUIDMismatch(t *testing.T) {
@@ -562,7 +535,7 @@ func TestDeleteWithRetry(t *testing.T) {
 	if fake.getCount != expectedRetries {
 		t.Errorf("Expect %d retries, got %d", expectedRetries, fake.getCount)
 	}
-	err = helper.Get(context.TODO(), "/some/key", obj, false)
+	err = helper.Get(context.TODO(), "/some/key", "", obj, false)
 	if !storage.IsNotFound(err) {
 		t.Errorf("Expect an NotFound error, got %v", err)
 	}

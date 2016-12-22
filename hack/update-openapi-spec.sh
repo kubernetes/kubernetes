@@ -52,6 +52,8 @@ API_HOST=${API_HOST:-127.0.0.1}
 
 kube::etcd::start
 
+echo "dummy_token,admin,admin" > $TMP_DIR/tokenauth.csv
+
 # Start kube-apiserver
 kube::log::status "Starting kube-apiserver"
 "${KUBE_OUTPUT_HOSTBIN}/kube-apiserver" \
@@ -61,6 +63,8 @@ kube::log::status "Starting kube-apiserver"
   --etcd-servers="http://${ETCD_HOST}:${ETCD_PORT}" \
   --advertise-address="10.10.10.10" \
   --cert-dir="${TMP_DIR}/certs" \
+  --runtime-config="api/all=true" \
+  --token-auth-file=$TMP_DIR/tokenauth.csv \
   --service-cluster-ip-range="10.0.0.0/24" >/tmp/openapi-api-server.log 2>&1 &
 APISERVER_PID=$!
 
@@ -68,7 +72,7 @@ kube::util::wait_for_url "${API_HOST}:${API_PORT}/healthz" "apiserver: "
 
 kube::log::status "Updating " ${OPENAPI_ROOT_DIR}
 
-OPENAPI_PATH="${API_HOST}:${API_PORT}/" OPENAPI_ROOT_DIR="${OPENAPI_ROOT_DIR}" VERSIONS="${KUBE_AVAILABLE_GROUP_VERSIONS}" KUBE_NONSERVER_GROUP_VERSIONS="${KUBE_NONSERVER_GROUP_VERSIONS}" kube::util::fetch-openapi-spec
+curl -w "\n" -fs "${API_HOST}:${API_PORT}/swagger.json" > "${OPENAPI_ROOT_DIR}/swagger.json"
 
 kube::log::status "SUCCESS"
 

@@ -24,7 +24,8 @@ import (
 
 	influxdb "github.com/influxdata/influxdb/client"
 	"k8s.io/kubernetes/pkg/api"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/api/v1"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/test/e2e/framework"
 
@@ -39,7 +40,7 @@ var _ = framework.KubeDescribe("Monitoring", func() {
 	})
 
 	It("should verify monitoring pods and all cluster nodes are available on influxdb using heapster.", func() {
-		testMonitoringUsingHeapsterInfluxdb(f.Client)
+		testMonitoringUsingHeapsterInfluxdb(f.ClientSet)
 	})
 })
 
@@ -61,8 +62,8 @@ var (
 )
 
 // Query sends a command to the server and returns the Response
-func Query(c *client.Client, query string) (*influxdb.Response, error) {
-	result, err := c.Get().
+func Query(c clientset.Interface, query string) (*influxdb.Response, error) {
+	result, err := c.Core().RESTClient().Get().
 		Prefix("proxy").
 		Namespace("kube-system").
 		Resource("services").
@@ -89,7 +90,7 @@ func Query(c *client.Client, query string) (*influxdb.Response, error) {
 	return &response, nil
 }
 
-func verifyExpectedRcsExistAndGetExpectedPods(c *client.Client) ([]string, error) {
+func verifyExpectedRcsExistAndGetExpectedPods(c clientset.Interface) ([]string, error) {
 	expectedPods := []string{}
 	// Iterate over the labels that identify the replication controllers that we
 	// want to check. The rcLabels contains the value values for the k8s-app key
@@ -101,16 +102,16 @@ func verifyExpectedRcsExistAndGetExpectedPods(c *client.Client) ([]string, error
 	// is running (which would be an error except during a rolling update).
 	for _, rcLabel := range rcLabels {
 		selector := labels.Set{"k8s-app": rcLabel}.AsSelector()
-		options := api.ListOptions{LabelSelector: selector}
-		deploymentList, err := c.Deployments(api.NamespaceSystem).List(options)
+		options := v1.ListOptions{LabelSelector: selector.String()}
+		deploymentList, err := c.Extensions().Deployments(api.NamespaceSystem).List(options)
 		if err != nil {
 			return nil, err
 		}
-		rcList, err := c.ReplicationControllers(api.NamespaceSystem).List(options)
+		rcList, err := c.Core().ReplicationControllers(api.NamespaceSystem).List(options)
 		if err != nil {
 			return nil, err
 		}
-		psList, err := c.Apps().PetSets(api.NamespaceSystem).List(options)
+		psList, err := c.Apps().StatefulSets(api.NamespaceSystem).List(options)
 		if err != nil {
 			return nil, err
 		}
@@ -121,8 +122,8 @@ func verifyExpectedRcsExistAndGetExpectedPods(c *client.Client) ([]string, error
 		// Check all the replication controllers.
 		for _, rc := range rcList.Items {
 			selector := labels.Set(rc.Spec.Selector).AsSelector()
-			options := api.ListOptions{LabelSelector: selector}
-			podList, err := c.Pods(api.NamespaceSystem).List(options)
+			options := v1.ListOptions{LabelSelector: selector.String()}
+			podList, err := c.Core().Pods(api.NamespaceSystem).List(options)
 			if err != nil {
 				return nil, err
 			}
@@ -136,8 +137,8 @@ func verifyExpectedRcsExistAndGetExpectedPods(c *client.Client) ([]string, error
 		// Do the same for all deployments.
 		for _, rc := range deploymentList.Items {
 			selector := labels.Set(rc.Spec.Selector.MatchLabels).AsSelector()
-			options := api.ListOptions{LabelSelector: selector}
-			podList, err := c.Pods(api.NamespaceSystem).List(options)
+			options := v1.ListOptions{LabelSelector: selector.String()}
+			podList, err := c.Core().Pods(api.NamespaceSystem).List(options)
 			if err != nil {
 				return nil, err
 			}
@@ -151,8 +152,8 @@ func verifyExpectedRcsExistAndGetExpectedPods(c *client.Client) ([]string, error
 		// And for pet sets.
 		for _, ps := range psList.Items {
 			selector := labels.Set(ps.Spec.Selector.MatchLabels).AsSelector()
-			options := api.ListOptions{LabelSelector: selector}
-			podList, err := c.Pods(api.NamespaceSystem).List(options)
+			options := v1.ListOptions{LabelSelector: selector.String()}
+			podList, err := c.Core().Pods(api.NamespaceSystem).List(options)
 			if err != nil {
 				return nil, err
 			}
@@ -167,8 +168,8 @@ func verifyExpectedRcsExistAndGetExpectedPods(c *client.Client) ([]string, error
 	return expectedPods, nil
 }
 
-func expectedServicesExist(c *client.Client) error {
-	serviceList, err := c.Services(api.NamespaceSystem).List(api.ListOptions{})
+func expectedServicesExist(c clientset.Interface) error {
+	serviceList, err := c.Core().Services(api.NamespaceSystem).List(v1.ListOptions{})
 	if err != nil {
 		return err
 	}
@@ -185,9 +186,9 @@ func expectedServicesExist(c *client.Client) error {
 	return nil
 }
 
-func getAllNodesInCluster(c *client.Client) ([]string, error) {
+func getAllNodesInCluster(c clientset.Interface) ([]string, error) {
 	// It should be OK to list unschedulable Nodes here.
-	nodeList, err := c.Nodes().List(api.ListOptions{})
+	nodeList, err := c.Core().Nodes().List(v1.ListOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -198,7 +199,7 @@ func getAllNodesInCluster(c *client.Client) ([]string, error) {
 	return result, nil
 }
 
-func getInfluxdbData(c *client.Client, query string, tag string) (map[string]bool, error) {
+func getInfluxdbData(c clientset.Interface, query string, tag string) (map[string]bool, error) {
 	response, err := Query(c, query)
 	if err != nil {
 		return nil, err
@@ -232,7 +233,7 @@ func expectedItemsExist(expectedItems []string, actualItems map[string]bool) boo
 	return true
 }
 
-func validatePodsAndNodes(c *client.Client, expectedPods, expectedNodes []string) bool {
+func validatePodsAndNodes(c clientset.Interface, expectedPods, expectedNodes []string) bool {
 	pods, err := getInfluxdbData(c, podlistQuery, "pod_id")
 	if err != nil {
 		// We don't fail the test here because the influxdb service might still not be running.
@@ -255,7 +256,7 @@ func validatePodsAndNodes(c *client.Client, expectedPods, expectedNodes []string
 	return true
 }
 
-func testMonitoringUsingHeapsterInfluxdb(c *client.Client) {
+func testMonitoringUsingHeapsterInfluxdb(c clientset.Interface) {
 	// Check if heapster pods and services are up.
 	expectedPods, err := verifyExpectedRcsExistAndGetExpectedPods(c)
 	framework.ExpectNoError(err)
@@ -279,10 +280,10 @@ func testMonitoringUsingHeapsterInfluxdb(c *client.Client) {
 	framework.Failf("monitoring using heapster and influxdb test failed")
 }
 
-func printDebugInfo(c *client.Client) {
+func printDebugInfo(c clientset.Interface) {
 	set := labels.Set{"k8s-app": "heapster"}
-	options := api.ListOptions{LabelSelector: set.AsSelector()}
-	podList, err := c.Pods(api.NamespaceSystem).List(options)
+	options := v1.ListOptions{LabelSelector: set.AsSelector().String()}
+	podList, err := c.Core().Pods(api.NamespaceSystem).List(options)
 	if err != nil {
 		framework.Logf("Error while listing pods %v", err)
 		return

@@ -19,6 +19,7 @@ package serviceaccount
 import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/rest"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
@@ -26,7 +27,7 @@ import (
 type Registry interface {
 	ListServiceAccounts(ctx api.Context, options *api.ListOptions) (*api.ServiceAccountList, error)
 	WatchServiceAccounts(ctx api.Context, options *api.ListOptions) (watch.Interface, error)
-	GetServiceAccount(ctx api.Context, name string) (*api.ServiceAccount, error)
+	GetServiceAccount(ctx api.Context, name string, options *metav1.GetOptions) (*api.ServiceAccount, error)
 	CreateServiceAccount(ctx api.Context, ServiceAccount *api.ServiceAccount) error
 	UpdateServiceAccount(ctx api.Context, ServiceAccount *api.ServiceAccount) error
 	DeleteServiceAccount(ctx api.Context, name string) error
@@ -55,8 +56,8 @@ func (s *storage) WatchServiceAccounts(ctx api.Context, options *api.ListOptions
 	return s.Watch(ctx, options)
 }
 
-func (s *storage) GetServiceAccount(ctx api.Context, name string) (*api.ServiceAccount, error) {
-	obj, err := s.Get(ctx, name)
+func (s *storage) GetServiceAccount(ctx api.Context, name string, options *metav1.GetOptions) (*api.ServiceAccount, error) {
+	obj, err := s.Get(ctx, name, options)
 	if err != nil {
 		return nil, err
 	}
