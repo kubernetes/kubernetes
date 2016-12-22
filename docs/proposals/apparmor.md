@@ -272,7 +272,7 @@ already underway for Docker, called
 ## Container Runtime Interface
 
 Other container runtimes will likely add AppArmor support eventually, so the
-[Container Runtime Interface](container-runtime-interface-v1.md) (CRI) needs to be made compatible
+[Container Runtime Interface](container-runtime-interface/container-runtime-interface-v1.md) (CRI) needs to be made compatible
 with this design. The two important pieces are a way to report whether AppArmor is supported by the
 runtime, and a way to specify the profile to load (likely through the `LinuxContainerConfig`).
 
