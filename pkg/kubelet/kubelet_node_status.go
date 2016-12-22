@@ -27,12 +27,12 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	"k8s.io/kubernetes/pkg/api"
 	apierrors "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/v1"
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/cloudprovider"
-	"k8s.io/kubernetes/pkg/conversion"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/util/sliceutils"
@@ -112,7 +112,7 @@ func (kl *Kubelet) tryRegisterWithApiServer(node *v1.Node) bool {
 		return false
 	}
 
-	clonedNode, err := conversion.NewCloner().DeepCopy(existingNode)
+	clonedNode, err := api.Scheme.DeepCopy(existingNode)
 	if err != nil {
 		glog.Errorf("Unable to clone %q node object %#v: %v", kl.nodeName, existingNode, err)
 		return false
@@ -350,7 +350,7 @@ func (kl *Kubelet) tryUpdateNodeStatus(tryNumber int) error {
 		return fmt.Errorf("error getting node %q: %v", kl.nodeName, err)
 	}
 
-	clonedNode, err := conversion.NewCloner().DeepCopy(node)
+	clonedNode, err := api.Scheme.DeepCopy(node)
 	if err != nil {
 		return fmt.Errorf("error clone node %q: %v", kl.nodeName, err)
 	}
