@@ -114,7 +114,7 @@ func (ngm *NvidiaGPUManager) Capacity() int {
 }
 
 // Check whether the GPU device could be assigned to a container.
-// If a container is dead but still mapping GPUs, it will not be available.
+// Only check alive containers.
 func (ngm *NvidiaGPUManager) isAvailable(path string) bool {
 	containers, err := ngm.dockerClient.ListContainers(dockertypes.ContainerListOptions{All: true})
 
@@ -124,14 +124,17 @@ func (ngm *NvidiaGPUManager) isAvailable(path string) bool {
 
 	for i := range containers {
 		containerJSON, err := ngm.dockerClient.InspectContainer(containers[i].ID)
-
 		if err != nil {
 			continue
 		}
 
 		devices := containerJSON.HostConfig.Devices
-
 		if devices == nil {
+			continue
+		}
+
+		status := containerJSON.State.Status
+		if status == "exited" || status == "dead" {
 			continue
 		}
 
