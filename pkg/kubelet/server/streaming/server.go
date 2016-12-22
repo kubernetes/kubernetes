@@ -142,34 +142,34 @@ type server struct {
 }
 
 func (s *server) GetExec(req *runtimeapi.ExecRequest) (*runtimeapi.ExecResponse, error) {
-	url := s.buildURL("exec", req.GetContainerId(), streamOpts{
-		stdin:   req.GetStdin(),
+	url := s.buildURL("exec", req.ContainerId, streamOpts{
+		stdin:   req.Stdin,
 		stdout:  true,
-		stderr:  !req.GetTty(), // For TTY connections, both stderr is combined with stdout.
-		tty:     req.GetTty(),
-		command: req.GetCmd(),
+		stderr:  !req.Tty, // For TTY connections, both stderr is combined with stdout.
+		tty:     req.Tty,
+		command: req.Cmd,
 	})
 	return &runtimeapi.ExecResponse{
-		Url: &url,
+		Url: url,
 	}, nil
 }
 
 func (s *server) GetAttach(req *runtimeapi.AttachRequest) (*runtimeapi.AttachResponse, error) {
-	url := s.buildURL("attach", req.GetContainerId(), streamOpts{
-		stdin:  req.GetStdin(),
+	url := s.buildURL("attach", req.ContainerId, streamOpts{
+		stdin:  req.Stdin,
 		stdout: true,
-		stderr: !req.GetTty(), // For TTY connections, both stderr is combined with stdout.
-		tty:    req.GetTty(),
+		stderr: !req.Tty, // For TTY connections, both stderr is combined with stdout.
+		tty:    req.Tty,
 	})
 	return &runtimeapi.AttachResponse{
-		Url: &url,
+		Url: url,
 	}, nil
 }
 
 func (s *server) GetPortForward(req *runtimeapi.PortForwardRequest) (*runtimeapi.PortForwardResponse, error) {
-	url := s.buildURL("portforward", req.GetPodSandboxId(), streamOpts{})
+	url := s.buildURL("portforward", req.PodSandboxId, streamOpts{})
 	return &runtimeapi.PortForwardResponse{
-		Url: &url,
+		Url: url,
 	}, nil
 }
 

@@ -82,28 +82,28 @@ func TestGetExec(t *testing.T) {
 	containerID := testContainerID
 	for _, test := range testcases {
 		request := &runtimeapi.ExecRequest{
-			ContainerId: &containerID,
+			ContainerId: containerID,
 			Cmd:         test.cmd,
-			Tty:         &test.tty,
-			Stdin:       &test.stdin,
+			Tty:         test.tty,
+			Stdin:       test.stdin,
 		}
 		// Non-TLS
 		resp, err := server.GetExec(request)
 		assert.NoError(t, err, "testcase=%+v", test)
 		expectedURL := "http://" + testAddr + "/exec/" + testContainerID + test.expectedQuery
-		assert.Equal(t, expectedURL, resp.GetUrl(), "testcase=%+v", test)
+		assert.Equal(t, expectedURL, resp.Url, "testcase=%+v", test)
 
 		// TLS
 		resp, err = tlsServer.GetExec(request)
 		assert.NoError(t, err, "testcase=%+v", test)
 		expectedURL = "https://" + testAddr + "/exec/" + testContainerID + test.expectedQuery
-		assert.Equal(t, expectedURL, resp.GetUrl(), "testcase=%+v", test)
+		assert.Equal(t, expectedURL, resp.Url, "testcase=%+v", test)
 
 		// Path prefix
 		resp, err = prefixServer.GetExec(request)
 		assert.NoError(t, err, "testcase=%+v", test)
 		expectedURL = "http://" + testAddr + "/" + pathPrefix + "/exec/" + testContainerID + test.expectedQuery
-		assert.Equal(t, expectedURL, resp.GetUrl(), "testcase=%+v", test)
+		assert.Equal(t, expectedURL, resp.Url, "testcase=%+v", test)
 	}
 }
 
@@ -132,28 +132,28 @@ func TestGetAttach(t *testing.T) {
 	containerID := testContainerID
 	for _, test := range testcases {
 		request := &runtimeapi.AttachRequest{
-			ContainerId: &containerID,
-			Stdin:       &test.stdin,
-			Tty:         &test.tty,
+			ContainerId: containerID,
+			Stdin:       test.stdin,
+			Tty:         test.tty,
 		}
 		// Non-TLS
 		resp, err := server.GetAttach(request)
 		assert.NoError(t, err, "testcase=%+v", test)
 		expectedURL := "http://" + testAddr + "/attach/" + testContainerID + test.expectedQuery
-		assert.Equal(t, expectedURL, resp.GetUrl(), "testcase=%+v", test)
+		assert.Equal(t, expectedURL, resp.Url, "testcase=%+v", test)
 
 		// TLS
 		resp, err = tlsServer.GetAttach(request)
 		assert.NoError(t, err, "testcase=%+v", test)
 		expectedURL = "https://" + testAddr + "/attach/" + testContainerID + test.expectedQuery
-		assert.Equal(t, expectedURL, resp.GetUrl(), "testcase=%+v", test)
+		assert.Equal(t, expectedURL, resp.Url, "testcase=%+v", test)
 	}
 }
 
 func TestGetPortForward(t *testing.T) {
 	podSandboxID := testPodSandboxID
 	request := &runtimeapi.PortForwardRequest{
-		PodSandboxId: &podSandboxID,
+		PodSandboxId: podSandboxID,
 		Port:         []int32{1, 2, 3, 4},
 	}
 
@@ -165,7 +165,7 @@ func TestGetPortForward(t *testing.T) {
 	resp, err := server.GetPortForward(request)
 	assert.NoError(t, err)
 	expectedURL := "http://" + testAddr + "/portforward/" + testPodSandboxID
-	assert.Equal(t, expectedURL, resp.GetUrl())
+	assert.Equal(t, expectedURL, resp.Url)
 
 	// TLS
 	tlsServer, err := NewServer(Config{
@@ -176,7 +176,7 @@ func TestGetPortForward(t *testing.T) {
 	resp, err = tlsServer.GetPortForward(request)
 	assert.NoError(t, err)
 	expectedURL = "https://" + testAddr + "/portforward/" + testPodSandboxID
-	assert.Equal(t, expectedURL, resp.GetUrl())
+	assert.Equal(t, expectedURL, resp.Url)
 }
 
 func TestServeExec(t *testing.T) {
