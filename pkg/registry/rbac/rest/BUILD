@@ -33,6 +33,7 @@ go_library(
         "//pkg/registry/rbac/rolebinding/etcd:go_default_library",
         "//pkg/registry/rbac/rolebinding/policybased:go_default_library",
         "//pkg/util/runtime:go_default_library",
+        "//pkg/util/wait:go_default_library",
         "//plugin/pkg/auth/authorizer/rbac/bootstrappolicy:go_default_library",
         "//vendor:github.com/golang/glog",
     ],
