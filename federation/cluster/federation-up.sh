@@ -82,6 +82,6 @@ if [[ "${USE_KUBEFED}" == "true" ]]; then
   init
   create_cluster_secrets
 else
-  export FEDERATION_IMAGE_TAG="$(get_version)"
+  export FEDERATION_IMAGE_TAG="$(echo ${KUBERNETES_RELEASE:-} | tr + _)"
   create-federation-api-objects
 fi

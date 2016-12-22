@@ -160,7 +160,7 @@ function create-federation-api-objects {
     gen-kube-basicauth
     export FEDERATION_API_BASIC_AUTH="${KUBE_PASSWORD},${KUBE_USER},admin"
 
-    # Create a kubeconfig with credentails for federation-apiserver. We will
+    # Create a kubeconfig with credentials for federation-apiserver. We will
     # then use this kubeconfig to create a secret which the federation
     # controller manager can use to talk to the federation-apiserver.
     # Note that the file name should be "kubeconfig" so that the secret key gets the same name.
@@ -203,12 +203,14 @@ function create-federation-api-objects {
     export FEDERATION_ADMISSION_CONTROL="${FEDERATION_ADMISSION_CONTROL:-NamespaceLifecycle}"
 
     for file in federation-etcd-pvc.yaml federation-apiserver-{deployment,secrets}.yaml federation-controller-manager-deployment.yaml; do
+      echo "Creating manifest: ${file}"
+      $template "${manifests_root}/${file}"
       $template "${manifests_root}/${file}" | $host_kubectl create -f -
     done
 
     # Update the users kubeconfig to include federation-apiserver credentials.
     CONTEXT=${FEDERATION_KUBE_CONTEXT} \
-	   KUBE_BEARER_TOKEN="$FEDERATION_API_TOKEN" \
+	   KUBE_BEARER_TOKEN="${FEDERATION_API_TOKEN}" \
            KUBE_USER="${KUBE_USER}" \
            KUBE_PASSWORD="${KUBE_PASSWORD}" \
 	   SECONDARY_KUBECONFIG=true \
