@@ -10,8 +10,6 @@ metadata:
 spec:
   template:
     metadata:
-      annotations:
-        scheduler.alpha.kubernetes.io/critical-pod: ''
       labels:
         k8s-app: fluentd-es
         kubernetes.io/cluster-service: "true"
