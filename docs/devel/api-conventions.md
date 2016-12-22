@@ -693,10 +693,10 @@ Late-initializers should only make the following types of modifications:
 These conventions:
  1. allow a user (with sufficient privilege) to override any system-default
  behaviors by setting the fields that would otherwise have been defaulted.
- 1. enables updates from users to be merged with changes made during late
+ 2. enable updates from users to be merged with changes made during late
 initialization, using strategic merge patch, as opposed to clobbering the
 change.
- 1. allow the component which does the late-initialization to use strategic
+ 3. allow the component which does the late-initialization to use strategic
 merge patch, which facilitates composition and concurrency of such components.
 
 Although the apiserver Admission Control stage acts prior to object creation,
