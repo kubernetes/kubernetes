@@ -1257,6 +1257,19 @@ const (
 	PullIfNotPresent PullPolicy = "IfNotPresent"
 )
 
+// TerminationMessagePolicy describes how termination messages are retrieved from a container.
+type TerminationMessagePolicy string
+
+const (
+	// TerminationMessageReadFile is the default behavior and will set the container status message to
+	// the contents of the container's terminationMessagePath when the container exits.
+	TerminationMessageReadFile TerminationMessagePolicy = "File"
+	// TerminationMessageFallbackToLogsOnError will read the most recent contents of the container logs
+	// for the container status message when the container exits with an error and the
+	// terminationMessagePath has no contents.
+	TerminationMessageFallbackToLogsOnError TerminationMessagePolicy = "FallbackToLogsOnError"
+)
+
 // Capability represent POSIX capabilities type
 type Capability string
 
@@ -1332,6 +1345,8 @@ type Container struct {
 	// Required.
 	// +optional
 	TerminationMessagePath string
+	// +optional
+	TerminationMessagePolicy TerminationMessagePolicy
 	// Required: Policy for pulling images for this container
 	ImagePullPolicy PullPolicy
 	// Optional: SecurityContext defines the security options the container should be run with.
