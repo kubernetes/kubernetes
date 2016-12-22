@@ -115,7 +115,7 @@ var _ = framework.KubeDescribe("Dynamic provisioning", func() {
 	})
 
 	framework.KubeDescribe("DynamicProvisioner", func() {
-		It("should create and delete persistent volumes [Slow]", func() {
+		It("should create and delete persistent volumes [Slow] [Volume]", func() {
 			framework.SkipUnlessProviderIs("openstack", "gce", "aws", "gke")
 
 			By("creating a StorageClass")
@@ -137,7 +137,7 @@ var _ = framework.KubeDescribe("Dynamic provisioning", func() {
 	})
 
 	framework.KubeDescribe("DynamicProvisioner Alpha", func() {
-		It("should create and delete alpha persistent volumes [Slow]", func() {
+		It("should create and delete alpha persistent volumes [Slow] [Volume]", func() {
 			framework.SkipUnlessProviderIs("openstack", "gce", "aws", "gke")
 
 			By("creating a claim with an alpha dynamic provisioning annotation")

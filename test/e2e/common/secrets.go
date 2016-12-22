@@ -30,32 +30,32 @@ import (
 var _ = framework.KubeDescribe("Secrets", func() {
 	f := framework.NewDefaultFramework("secrets")
 
-	It("should be consumable from pods in volume [Conformance]", func() {
+	It("should be consumable from pods in volume [Conformance] [Volume]", func() {
 		doSecretE2EWithoutMapping(f, nil /* default mode */, "secret-test-"+string(uuid.NewUUID()), nil, nil)
 	})
 
-	It("should be consumable from pods in volume with defaultMode set [Conformance]", func() {
+	It("should be consumable from pods in volume with defaultMode set [Conformance] [Volume]", func() {
 		defaultMode := int32(0400)
 		doSecretE2EWithoutMapping(f, &defaultMode, "secret-test-"+string(uuid.NewUUID()), nil, nil)
 	})
 
-	It("should be consumable from pods in volume as non-root with defaultMode and fsGroup set [Conformance]", func() {
+	It("should be consumable from pods in volume as non-root with defaultMode and fsGroup set [Conformance] [Volume]", func() {
 		defaultMode := int32(0440) /* setting fsGroup sets mode to at least 440 */
 		fsGroup := int64(1001)
 		uid := int64(1000)
 		doSecretE2EWithoutMapping(f, &defaultMode, "secret-test-"+string(uuid.NewUUID()), &fsGroup, &uid)
 	})
 
-	It("should be consumable from pods in volume with mappings [Conformance]", func() {
+	It("should be consumable from pods in volume with mappings [Conformance] [Volume]", func() {
 		doSecretE2EWithMapping(f, nil)
 	})
 
-	It("should be consumable from pods in volume with mappings and Item Mode set [Conformance]", func() {
+	It("should be consumable from pods in volume with mappings and Item Mode set [Conformance] [Volume]", func() {
 		mode := int32(0400)
 		doSecretE2EWithMapping(f, &mode)
 	})
 
-	It("should be able to mount in a volume regardless of a different secret existing with same name in different namespace", func() {
+	It("should be able to mount in a volume regardless of a different secret existing with same name in different namespace [Volume]", func() {
 		var (
 			namespace2  *v1.Namespace
 			err         error
@@ -76,7 +76,7 @@ var _ = framework.KubeDescribe("Secrets", func() {
 		doSecretE2EWithoutMapping(f, nil /* default mode */, secret2.Name, nil, nil)
 	})
 
-	It("should be consumable in multiple volumes in a pod [Conformance]", func() {
+	It("should be consumable in multiple volumes in a pod [Conformance] [Volume]", func() {
 		// This test ensures that the same secret can be mounted in multiple
 		// volumes in the same pod.  This test case exists to prevent
 		// regressions that break this use-case.

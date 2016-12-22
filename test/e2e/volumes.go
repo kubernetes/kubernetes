@@ -389,7 +389,7 @@ var _ = framework.KubeDescribe("Volumes [Feature:Volumes]", func() {
 	////////////////////////////////////////////////////////////////////////
 
 	framework.KubeDescribe("NFS", func() {
-		It("should be mountable", func() {
+		It("should be mountable [Volume]", func() {
 			config := VolumeTestConfig{
 				namespace:   namespace.Name,
 				prefix:      "nfs",
@@ -429,7 +429,7 @@ var _ = framework.KubeDescribe("Volumes [Feature:Volumes]", func() {
 	////////////////////////////////////////////////////////////////////////
 
 	framework.KubeDescribe("GlusterFS", func() {
-		It("should be mountable", func() {
+		It("should be mountable [Volume]", func() {
 			config := VolumeTestConfig{
 				namespace:   namespace.Name,
 				prefix:      "gluster",
@@ -514,7 +514,7 @@ var _ = framework.KubeDescribe("Volumes [Feature:Volumes]", func() {
 	// Run the test with "go run hack/e2e.go ... --ginkgo.focus=iSCSI"
 
 	framework.KubeDescribe("iSCSI", func() {
-		It("should be mountable", func() {
+		It("should be mountable [Volume]", func() {
 			config := VolumeTestConfig{
 				namespace:   namespace.Name,
 				prefix:      "iscsi",
@@ -561,7 +561,7 @@ var _ = framework.KubeDescribe("Volumes [Feature:Volumes]", func() {
 	////////////////////////////////////////////////////////////////////////
 
 	framework.KubeDescribe("Ceph RBD", func() {
-		It("should be mountable", func() {
+		It("should be mountable [Volume]", func() {
 			config := VolumeTestConfig{
 				namespace:   namespace.Name,
 				prefix:      "rbd",
@@ -639,7 +639,7 @@ var _ = framework.KubeDescribe("Volumes [Feature:Volumes]", func() {
 	////////////////////////////////////////////////////////////////////////
 
 	framework.KubeDescribe("CephFS", func() {
-		It("should be mountable", func() {
+		It("should be mountable [Volume]", func() {
 			config := VolumeTestConfig{
 				namespace:   namespace.Name,
 				prefix:      "cephfs",
@@ -717,7 +717,7 @@ var _ = framework.KubeDescribe("Volumes [Feature:Volumes]", func() {
 	// (OS_USERNAME, OS_PASSWORD, OS_TENANT_NAME at least).
 
 	framework.KubeDescribe("Cinder", func() {
-		It("should be mountable", func() {
+		It("should be mountable [Volume]", func() {
 			framework.SkipUnlessProviderIs("openstack")
 			config := VolumeTestConfig{
 				namespace: namespace.Name,
@@ -793,7 +793,7 @@ var _ = framework.KubeDescribe("Volumes [Feature:Volumes]", func() {
 	////////////////////////////////////////////////////////////////////////
 
 	framework.KubeDescribe("PD", func() {
-		It("should be mountable", func() {
+		It("should be mountable [Volume]", func() {
 			framework.SkipUnlessProviderIs("gce", "gke")
 			config := VolumeTestConfig{
 				namespace: namespace.Name,
@@ -843,7 +843,7 @@ var _ = framework.KubeDescribe("Volumes [Feature:Volumes]", func() {
 	////////////////////////////////////////////////////////////////////////
 
 	framework.KubeDescribe("ConfigMap", func() {
-		It("should be mountable", func() {
+		It("should be mountable [Volume]", func() {
 			config := VolumeTestConfig{
 				namespace: namespace.Name,
 				prefix:    "configmap",
