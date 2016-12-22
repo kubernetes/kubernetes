@@ -126,7 +126,7 @@ func ValidateRoleBinding(roleBinding *rbac.RoleBinding) field.ErrorList {
 
 	subjectsPath := field.NewPath("subjects")
 	for i, subject := range roleBinding.Subjects {
-		allErrs = append(allErrs, validateRoleBindingSubject(subject, true, subjectsPath.Index(i))...)
+		allErrs = append(allErrs, validateRoleBindingSubject(subject, roleBinding.Namespace, subjectsPath.Index(i))...)
 	}
 
 	return allErrs
@@ -170,7 +170,7 @@ func ValidateClusterRoleBinding(roleBinding *rbac.ClusterRoleBinding) field.Erro
 
 	subjectsPath := field.NewPath("subjects")
 	for i, subject := range roleBinding.Subjects {
-		allErrs = append(allErrs, validateRoleBindingSubject(subject, false, subjectsPath.Index(i))...)
+		allErrs = append(allErrs, validateRoleBindingSubject(subject, "", subjectsPath.Index(i))...)
 	}
 
 	return allErrs
@@ -187,7 +187,7 @@ func ValidateClusterRoleBindingUpdate(roleBinding *rbac.ClusterRoleBinding, oldR
 	return allErrs
 }
 
-func validateRoleBindingSubject(subject rbac.Subject, isNamespaced bool, fldPath *field.Path) field.ErrorList {
+func validateRoleBindingSubject(subject rbac.Subject, namespace string, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	if len(subject.Name) == 0 {
@@ -201,9 +201,15 @@ func validateRoleBindingSubject(subject rbac.Subject, isNamespaced bool, fldPath
 				allErrs = append(allErrs, field.Invalid(fldPath.Child("name"), subject.Name, msg))
 			}
 		}
-		if !isNamespaced && len(subject.Namespace) == 0 {
-			allErrs = append(allErrs, field.Required(fldPath.Child("namespace"), ""))
-		}
+        if len(namespace) > 0 {
+            if len(subject.Namespace) > 0 && subject.Namespace != namespace {
+                allErrs = append(allErrs, field.Invalid(fldPath.Child("namespace"), namespace, "namespace cannot be different"))
+            }
+        } else {
+            if len(subject.Namespace) == 0 {
+                allErrs = append(allErrs, field.Required(fldPath.Child("namespace"), ""))
+            }
+        }
 
 	case rbac.UserKind:
 		// TODO(ericchiang): What other restrictions on user name are there?
