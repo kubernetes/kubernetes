@@ -103,7 +103,9 @@ function run_kubelet() {
   fi
 }
 
-function create_fake_node() {
+# Creates a node object with name 127.0.0.1 if it doesnt exist already.
+# This is required for non-linux platforms where we do not run kubelet.
+function create_node() {
   if [[ "$(go env GOHOSTOS)" == "linux" ]]; then
     kube::util::wait_for_url "http://127.0.0.1:${API_PORT}/api/v1/nodes/127.0.0.1" "apiserver(nodes)"
   else
@@ -131,7 +133,12 @@ setup
 run_kube_apiserver
 run_kube_controller_manager
 run_kubelet
-create_fake_node
-runTests
+create_node
+SUPPORTED_RESOURCES=("*")
+output_message=$(runTests "SUPPORTED_RESOURCES=${SUPPORTED_RESOURCES[@]}")
+# Ensure that tests were run. We cannot check all resources here. We check a few
+# to catch bugs due to which no tests run.
+kube::test::if_has_string "${output_message}" "Testing kubectl(v1:pods)"
+kube::test::if_has_string "${output_message}" "Testing kubectl(v1:services)"
 
 kube::log::status "TESTS PASSED"

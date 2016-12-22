@@ -1367,9 +1367,7 @@ run_recursive_resources_tests() {
 }
 
 run_namespace_tests() {
-  if !kube::test::if_supports_resource "namespaces" ; then
-    return
-  fi
+  kube::log::status "Testing kubectl(v1:namespaces)"
   ### Create a new namespace
   # Pre-condition: only the "default" namespace exists
   # The Pre-condition doesn't hold anymore after we create and switch namespaces before creating pods with same name in the test.
@@ -1420,16 +1418,6 @@ run_namespace_tests() {
 }
 
 run_secrets_test() {
-  if !kube::test::if_supports_resource "namespaces" || !kube::test::if_supports_resource "secrets" ; then
-    return
-  fi
-
-#  if kube::test::if_supports_resource "namespaces" ; then
-#    return
-#  fi
-#  if kube::test::if_supports_resource "secrets" ; then
-#    return
-#  fi
   ### Create a new namespace
   # Pre-condition: the test-secrets namespace does not exist
   kube::test::get_object_assert 'namespaces' '{{range.items}}{{ if eq $id_field \"test-secrets\" }}found{{end}}{{end}}:' ':'
@@ -2305,8 +2293,14 @@ run_multi_resources_tests() {
 
 }
 
+# Runs all kubectl tests.
+# Requires an env var SUPPORTED_RESOURCES which is a comma separated list of
+# resources for which tests should be run.
 runTests() {
-  SUPPORTED_RESOURCES=${SUPPORTED_RESOURCES:-("*")}
+  if [ -z "${SUPPORTED_RESOURCES}" ]; then
+    echo "Need to set SUPPORTED_RESOURCES env var. It is a comma separated list of resources that are supported and hence should be tested. Set it to (*) to test all resources"
+    return
+  fi
   kube::log::status "Checking kubectl version"
   kubectl version
 
@@ -2555,14 +2549,20 @@ runTests() {
   ##############
   # Namespaces #
   ##############
+  if kube::test::if_supports_resource "namespaces" ; then
+    run_namespace_tests
+  fi
 
-  run_namespace_tests
 
   ###########
   # Secrets #
   ###########
+  if kube::test::if_supports_resource "namespaces" ; then
+    if kube::test::if_supports_resource "secrets" ; then
+      run_secrets_test
+    fi
+  fi
 
-  run_secrets_test
 
   ######################
   # ConfigMap          #

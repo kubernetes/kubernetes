@@ -231,8 +231,9 @@ kube::test::if_has_string() {
 
 # Returns true if the required resource is part of supported resources.
 # Expects env vars:
-#   SUPPORTED_RESOURCES: Array of all resources supported by the apiserver. (*)
-#   means it supports all resources.
+#   SUPPORTED_RESOURCES: Array of all resources supported by the apiserver. "*"
+#   means it supports all resources. For ex: ("*") or ("rc" "*") both mean that
+#   all resources are supported.
 #   $1: Name of the resource to be tested.
 kube::test::if_supports_resource() {
   SUPPORTED_RESOURCES=${SUPPORTED_RESOURCES:-""}

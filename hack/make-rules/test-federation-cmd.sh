@@ -75,6 +75,10 @@ run_federation_apiserver
 run_federation_controller_manager
 # TODO: Fix for replicasets and deployments.
 SUPPORTED_RESOURCES=("configmaps" "daemonsets" "events" "ingress" "namespaces" "secrets" "services")
-runTests SUPPORTED_RESOURCES="${SUPPORTED_RESOURCES[@]}"
+output_message=$(runTests "SUPPORTED_RESOURCES=${SUPPORTED_RESOURCES[@]}")
+# Ensure that tests were run. We cannot check all resources here. We check a few
+# to catch bugs due to which no tests run.
+kube::test::if_has_string "${output_message}" "Testing kubectl(v1:namespaces)"
+kube::test::if_has_string "${output_message}" "Testing kubectl(v1:services)"
 
 kube::log::status "TESTS PASSED"
