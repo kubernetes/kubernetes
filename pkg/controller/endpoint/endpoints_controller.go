@@ -22,8 +22,6 @@ import (
 	"strconv"
 	"time"
 
-	"encoding/json"
-
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/api/v1/endpoints"
@@ -371,7 +369,6 @@ func (e *EndpointController) syncService(key string) error {
 	}
 
 	subsets := []v1.EndpointSubset{}
-	podHostNames := map[string]endpoints.HostRecord{}
 
 	var tolerateUnreadyEndpoints bool
 	if v, ok := service.Annotations[TolerateUnreadyEndpointsAnnotation]; ok {
@@ -424,11 +421,6 @@ func (e *EndpointController) syncService(key string) error {
 			if len(hostname) > 0 &&
 				getSubdomain(pod) == service.Name &&
 				service.Namespace == pod.Namespace {
-				hostRecord := endpoints.HostRecord{
-					HostName: hostname,
-				}
-				// TODO: stop populating podHostNames annotation in 1.4
-				podHostNames[string(pod.Status.PodIP)] = hostRecord
 				epa.Hostname = hostname
 			}
 
@@ -465,17 +457,6 @@ func (e *EndpointController) syncService(key string) error {
 		}
 	}
 
-	serializedPodHostNames := ""
-	if len(podHostNames) > 0 {
-		b, err := json.Marshal(podHostNames)
-		if err != nil {
-			return err
-		}
-		serializedPodHostNames = string(b)
-	}
-
-	newAnnotations := make(map[string]string)
-	newAnnotations[endpoints.PodHostnamesAnnotation] = serializedPodHostNames
 	if reflect.DeepEqual(currentEndpoints.Subsets, subsets) &&
 		reflect.DeepEqual(currentEndpoints.Labels, service.Labels) {
 		glog.V(5).Infof("endpoints are equal for %s/%s, skipping update", service.Namespace, service.Name)
@@ -486,11 +467,6 @@ func (e *EndpointController) syncService(key string) error {
 	newEndpoints.Labels = service.Labels
 	if newEndpoints.Annotations == nil {
 		newEndpoints.Annotations = make(map[string]string)
-	}
-	if len(serializedPodHostNames) == 0 {
-		delete(newEndpoints.Annotations, endpoints.PodHostnamesAnnotation)
-	} else {
-		newEndpoints.Annotations[endpoints.PodHostnamesAnnotation] = serializedPodHostNames
 	}
 
 	glog.V(4).Infof("Update endpoints for %v/%v, ready: %d not ready: %d", service.Namespace, service.Name, readyEps, notReadyEps)
