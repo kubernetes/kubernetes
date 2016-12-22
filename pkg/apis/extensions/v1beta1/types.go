@@ -1123,6 +1123,8 @@ type PodSecurityPolicyList struct {
 	Items []PodSecurityPolicy `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
 
+// +genclient=true
+
 type NetworkPolicy struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard object's metadata.

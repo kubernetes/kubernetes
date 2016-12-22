@@ -1,5 +1,5 @@
 /*
-Copyright 2017 The Kubernetes Authors.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,67 +19,50 @@ limitations under the License.
 package v1beta1
 
 import (
+	v1 "k8s.io/kubernetes/pkg/api/v1"
+	extensions_v1beta1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
+	cache "k8s.io/kubernetes/pkg/client/cache"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	internalinterfaces "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalinterfaces"
+	v1beta1 "k8s.io/kubernetes/pkg/client/listers/extensions/v1beta1"
+	runtime "k8s.io/kubernetes/pkg/runtime"
+	watch "k8s.io/kubernetes/pkg/watch"
+	time "time"
 )
 
-// Interface provides access to all the informers in this group version.
-type Interface interface {
-	// DaemonSets returns a DaemonSetInformer.
-	DaemonSets() DaemonSetInformer
-	// Deployments returns a DeploymentInformer.
-	Deployments() DeploymentInformer
-	// Ingresses returns a IngressInformer.
-	Ingresses() IngressInformer
-	// NetworkPolicies returns a NetworkPolicyInformer.
-	NetworkPolicies() NetworkPolicyInformer
-	// PodSecurityPolicies returns a PodSecurityPolicyInformer.
-	PodSecurityPolicies() PodSecurityPolicyInformer
-	// ReplicaSets returns a ReplicaSetInformer.
-	ReplicaSets() ReplicaSetInformer
-	// ThirdPartyResources returns a ThirdPartyResourceInformer.
-	ThirdPartyResources() ThirdPartyResourceInformer
+// NetworkPolicyInformer provides access to a shared informer and lister for
+// NetworkPolicies.
+type NetworkPolicyInformer interface {
+	Informer() cache.SharedIndexInformer
+	Lister() v1beta1.NetworkPolicyLister
 }
 
-type version struct {
-	internalinterfaces.SharedInformerFactory
+type networkPolicyInformer struct {
+	factory internalinterfaces.SharedInformerFactory
 }
 
-// New returns a new Interface.
-func New(f internalinterfaces.SharedInformerFactory) Interface {
-	return &version{f}
+func newNetworkPolicyInformer(client clientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+	sharedIndexInformer := cache.NewSharedIndexInformer(
+		&cache.ListWatch{
+			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
+				return client.ExtensionsV1beta1().NetworkPolicies(v1.NamespaceAll).List(options)
+			},
+			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
+				return client.ExtensionsV1beta1().NetworkPolicies(v1.NamespaceAll).Watch(options)
+			},
+		},
+		&extensions_v1beta1.NetworkPolicy{},
+		resyncPeriod,
+		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
+	)
+
+	return sharedIndexInformer
 }
 
-// DaemonSets returns a DaemonSetInformer.
-func (v *version) DaemonSets() DaemonSetInformer {
-	return &daemonSetInformer{factory: v.SharedInformerFactory}
+func (f *networkPolicyInformer) Informer() cache.SharedIndexInformer {
+	return f.factory.VersionedInformerFor(&extensions_v1beta1.NetworkPolicy{}, newNetworkPolicyInformer)
 }
 
-// Deployments returns a DeploymentInformer.
-func (v *version) Deployments() DeploymentInformer {
-	return &deploymentInformer{factory: v.SharedInformerFactory}
-}
-
-// Ingresses returns a IngressInformer.
-func (v *version) Ingresses() IngressInformer {
-	return &ingressInformer{factory: v.SharedInformerFactory}
-}
-
-// NetworkPolicies returns a NetworkPolicyInformer.
-func (v *version) NetworkPolicies() NetworkPolicyInformer {
-	return &networkPolicyInformer{factory: v.SharedInformerFactory}
-}
-
-// PodSecurityPolicies returns a PodSecurityPolicyInformer.
-func (v *version) PodSecurityPolicies() PodSecurityPolicyInformer {
-	return &podSecurityPolicyInformer{factory: v.SharedInformerFactory}
-}
-
-// ReplicaSets returns a ReplicaSetInformer.
-func (v *version) ReplicaSets() ReplicaSetInformer {
-	return &replicaSetInformer{factory: v.SharedInformerFactory}
-}
-
-// ThirdPartyResources returns a ThirdPartyResourceInformer.
-func (v *version) ThirdPartyResources() ThirdPartyResourceInformer {
-	return &thirdPartyResourceInformer{factory: v.SharedInformerFactory}
+func (f *networkPolicyInformer) Lister() v1beta1.NetworkPolicyLister {
+	return v1beta1.NewNetworkPolicyLister(f.Informer().GetIndexer())
 }
