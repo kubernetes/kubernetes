@@ -61,7 +61,7 @@ type podSandboxByCreated []*runtimeapi.PodSandbox
 
 func (p podSandboxByCreated) Len() int           { return len(p) }
 func (p podSandboxByCreated) Swap(i, j int)      { p[i], p[j] = p[j], p[i] }
-func (p podSandboxByCreated) Less(i, j int) bool { return p[i].GetCreatedAt() > p[j].GetCreatedAt() }
+func (p podSandboxByCreated) Less(i, j int) bool { return p[i].CreatedAt > p[j].CreatedAt }
 
 type containerStatusByCreated []*kubecontainer.ContainerStatus
 
@@ -100,18 +100,18 @@ func toRuntimeProtocol(protocol v1.Protocol) runtimeapi.Protocol {
 
 // toKubeContainer converts runtimeapi.Container to kubecontainer.Container.
 func (m *kubeGenericRuntimeManager) toKubeContainer(c *runtimeapi.Container) (*kubecontainer.Container, error) {
-	if c == nil || c.Id == nil || c.Image == nil || c.State == nil {
+	if c == nil || c.Id == "" || c.Image == nil {
 		return nil, fmt.Errorf("unable to convert a nil pointer to a runtime container")
 	}
 
 	labeledInfo := getContainerInfoFromLabels(c.Labels)
 	annotatedInfo := getContainerInfoFromAnnotations(c.Annotations)
 	return &kubecontainer.Container{
-		ID:    kubecontainer.ContainerID{Type: m.runtimeName, ID: c.GetId()},
+		ID:    kubecontainer.ContainerID{Type: m.runtimeName, ID: c.Id},
 		Name:  labeledInfo.ContainerName,
-		Image: c.Image.GetImage(),
+		Image: c.Image.Image,
 		Hash:  annotatedInfo.Hash,
-		State: toKubeContainerState(c.GetState()),
+		State: toKubeContainerState(c.State),
 	}, nil
 }
 
@@ -120,34 +120,34 @@ func (m *kubeGenericRuntimeManager) toKubeContainer(c *runtimeapi.Container) (*k
 // kubecontainer.Containers to avoid substantial changes to PLEG.
 // TODO: Remove this once it becomes obsolete.
 func (m *kubeGenericRuntimeManager) sandboxToKubeContainer(s *runtimeapi.PodSandbox) (*kubecontainer.Container, error) {
-	if s == nil || s.Id == nil || s.State == nil {
+	if s == nil || s.Id == "" {
 		return nil, fmt.Errorf("unable to convert a nil pointer to a runtime container")
 	}
 
 	return &kubecontainer.Container{
-		ID:    kubecontainer.ContainerID{Type: m.runtimeName, ID: s.GetId()},
-		State: kubecontainer.SandboxToContainerState(s.GetState()),
+		ID:    kubecontainer.ContainerID{Type: m.runtimeName, ID: s.Id},
+		State: kubecontainer.SandboxToContainerState(s.State),
 	}, nil
 }
 
 // getImageUser gets uid or user name that will run the command(s) from image. The function
 // guarantees that only one of them is set.
-func (m *kubeGenericRuntimeManager) getImageUser(image string) (*int64, *string, error) {
-	imageStatus, err := m.imageService.ImageStatus(&runtimeapi.ImageSpec{Image: &image})
+func (m *kubeGenericRuntimeManager) getImageUser(image string) (int64, string, error) {
+	imageStatus, err := m.imageService.ImageStatus(&runtimeapi.ImageSpec{Image: image})
 	if err != nil {
-		return nil, nil, err
+		return 0, "", err
 	}
 
-	if imageStatus != nil && imageStatus.Uid != nil {
+	if imageStatus != nil && imageStatus.Uid != 0 {
 		// If uid is set, return uid.
-		return imageStatus.Uid, nil, nil
+		return imageStatus.Uid, "", nil
 	}
-	if imageStatus != nil && imageStatus.Username != nil {
+	if imageStatus != nil && imageStatus.Username != "" {
 		// If uid is not set, but user name is set, return user name.
-		return nil, imageStatus.Username, nil
+		return 0, imageStatus.Username, nil
 	}
 	// If non of them is set, treat it as root.
-	return new(int64), nil, nil
+	return 0, "", nil
 }
 
 // isContainerFailed returns true if container has exited and exitcode is not zero.
@@ -226,10 +226,10 @@ func toKubeRuntimeStatus(status *runtimeapi.RuntimeStatus) *kubecontainer.Runtim
 	conditions := []kubecontainer.RuntimeCondition{}
 	for _, c := range status.GetConditions() {
 		conditions = append(conditions, kubecontainer.RuntimeCondition{
-			Type:    kubecontainer.RuntimeConditionType(c.GetType()),
-			Status:  c.GetStatus(),
-			Reason:  c.GetReason(),
-			Message: c.GetMessage(),
+			Type:    kubecontainer.RuntimeConditionType(c.Type),
+			Status:  c.Status,
+			Reason:  c.Reason,
+			Message: c.Message,
 		})
 	}
 	return &kubecontainer.RuntimeStatus{Conditions: conditions}

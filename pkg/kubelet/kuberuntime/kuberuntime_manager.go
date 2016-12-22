@@ -155,18 +155,18 @@ func NewKubeGenericRuntimeManager(
 
 	// Only matching kubeRuntimeAPIVersion is supported now
 	// TODO: Runtime API machinery is under discussion at https://github.com/kubernetes/kubernetes/issues/28642
-	if typedVersion.GetVersion() != kubeRuntimeAPIVersion {
+	if typedVersion.Version != kubeRuntimeAPIVersion {
 		glog.Errorf("Runtime api version %s is not supported, only %s is supported now",
-			typedVersion.GetVersion(),
+			typedVersion.Version,
 			kubeRuntimeAPIVersion)
 		return nil, ErrVersionNotSupported
 	}
 
-	kubeRuntimeManager.runtimeName = typedVersion.GetRuntimeName()
+	kubeRuntimeManager.runtimeName = typedVersion.RuntimeName
 	glog.Infof("Container runtime %s initialized, version: %s, apiVersion: %s",
-		typedVersion.GetRuntimeName(),
-		typedVersion.GetRuntimeVersion(),
-		typedVersion.GetRuntimeApiVersion())
+		typedVersion.RuntimeName,
+		typedVersion.RuntimeVersion,
+		typedVersion.RuntimeApiVersion)
 
 	// If the container logs directory does not exist, create it.
 	// TODO: create podLogsRootDirectory at kubelet.go when kubelet is refactored to
@@ -223,7 +223,7 @@ func (m *kubeGenericRuntimeManager) Version() (kubecontainer.Version, error) {
 		return nil, err
 	}
 
-	return newRuntimeVersion(typedVersion.GetVersion())
+	return newRuntimeVersion(typedVersion.Version)
 }
 
 // APIVersion returns the cached API version information of the container
@@ -236,7 +236,7 @@ func (m *kubeGenericRuntimeManager) APIVersion() (kubecontainer.Version, error) 
 	}
 	typedVersion := versionObject.(*runtimeapi.VersionResponse)
 
-	return newRuntimeVersion(typedVersion.GetRuntimeApiVersion())
+	return newRuntimeVersion(typedVersion.RuntimeApiVersion)
 }
 
 // Status returns the status of the runtime. An error is returned if the Status
@@ -264,12 +264,12 @@ func (m *kubeGenericRuntimeManager) GetPods(all bool) ([]*kubecontainer.Pod, err
 			glog.V(4).Infof("Sandbox does not have metadata: %+v", s)
 			continue
 		}
-		podUID := kubetypes.UID(s.Metadata.GetUid())
+		podUID := kubetypes.UID(s.Metadata.Uid)
 		if _, ok := pods[podUID]; !ok {
 			pods[podUID] = &kubecontainer.Pod{
 				ID:        podUID,
-				Name:      s.Metadata.GetName(),
-				Namespace: s.Metadata.GetNamespace(),
+				Name:      s.Metadata.Name,
+				Namespace: s.Metadata.Namespace,
 			}
 		}
 		p := pods[podUID]
@@ -371,26 +371,26 @@ func (m *kubeGenericRuntimeManager) podSandboxChanged(pod *v1.Pod, podStatus *ku
 
 	readySandboxCount := 0
 	for _, s := range podStatus.SandboxStatuses {
-		if s.GetState() == runtimeapi.PodSandboxState_SANDBOX_READY {
+		if s.State == runtimeapi.PodSandboxState_SANDBOX_READY {
 			readySandboxCount++
 		}
 	}
 
 	// Needs to create a new sandbox when readySandboxCount > 1 or the ready sandbox is not the latest one.
 	sandboxStatus := podStatus.SandboxStatuses[0]
-	if readySandboxCount > 1 || sandboxStatus.GetState() != runtimeapi.PodSandboxState_SANDBOX_READY {
+	if readySandboxCount > 1 || sandboxStatus.State != runtimeapi.PodSandboxState_SANDBOX_READY {
 		glog.V(2).Infof("No ready sandbox for pod %q can be found. Need to start a new one", format.Pod(pod))
-		return true, sandboxStatus.Metadata.GetAttempt() + 1, sandboxStatus.GetId()
+		return true, sandboxStatus.Metadata.Attempt + 1, sandboxStatus.Id
 	}
 
 	// Needs to create a new sandbox when network namespace changed.
 	if sandboxStatus.Linux != nil && sandboxStatus.Linux.Namespaces.Options != nil &&
-		sandboxStatus.Linux.Namespaces.Options.GetHostNetwork() != kubecontainer.IsHostNetworkPod(pod) {
+		sandboxStatus.Linux.Namespaces.Options.HostNetwork != kubecontainer.IsHostNetworkPod(pod) {
 		glog.V(2).Infof("Sandbox for pod %q has changed. Need to start a new one", format.Pod(pod))
-		return true, sandboxStatus.Metadata.GetAttempt() + 1, ""
+		return true, sandboxStatus.Metadata.Attempt + 1, ""
 	}
 
-	return false, sandboxStatus.Metadata.GetAttempt(), sandboxStatus.GetId()
+	return false, sandboxStatus.Metadata.Attempt, sandboxStatus.Id
 }
 
 // checkAndKeepInitContainers keeps all successfully completed init containers. If there
@@ -793,10 +793,8 @@ func (m *kubeGenericRuntimeManager) isHostNetwork(podSandBoxID string, pod *v1.P
 		return false, err
 	}
 
-	if podStatus.Linux != nil && podStatus.Linux.Namespaces != nil && podStatus.Linux.Namespaces.Options != nil {
-		if podStatus.Linux.Namespaces.Options.HostNetwork != nil {
-			return podStatus.Linux.Namespaces.Options.GetHostNetwork(), nil
-		}
+	if nsOpts := podStatus.GetLinux().GetNamespaces().GetOptions(); nsOpts != nil {
+		return nsOpts.HostNetwork, nil
 	}
 
 	return false, nil
@@ -843,7 +841,7 @@ func (m *kubeGenericRuntimeManager) GetPodStatus(uid kubetypes.UID, name, namesp
 		sandboxStatuses[idx] = podSandboxStatus
 
 		// Only get pod IP from latest sandbox
-		if idx == 0 && podSandboxStatus.GetState() == runtimeapi.PodSandboxState_SANDBOX_READY {
+		if idx == 0 && podSandboxStatus.State == runtimeapi.PodSandboxState_SANDBOX_READY {
 			podIP = m.determinePodSandboxIP(namespace, name, podSandboxStatus)
 		}
 	}
@@ -899,7 +897,7 @@ func (m *kubeGenericRuntimeManager) UpdatePodCIDR(podCIDR string) error {
 	return m.runtimeService.UpdateRuntimeConfig(
 		&runtimeapi.RuntimeConfig{
 			NetworkConfig: &runtimeapi.NetworkConfig{
-				PodCidr: &podCIDR,
+				PodCidr: podCIDR,
 			},
 		})
 }
