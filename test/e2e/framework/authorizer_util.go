@@ -19,6 +19,7 @@ package framework
 import (
 	"time"
 
+	apierrors "k8s.io/kubernetes/pkg/api/errors"
 	authorizationv1beta1 "k8s.io/kubernetes/pkg/apis/authorization/v1beta1"
 	v1beta1authorization "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/authorization/v1beta1"
 	"k8s.io/kubernetes/pkg/runtime/schema"
@@ -46,6 +47,12 @@ func WaitForAuthorizationUpdate(c v1beta1authorization.SubjectAccessReviewsGette
 	}
 	err := wait.Poll(policyCachePollInterval, policyCachePollTimeout, func() (bool, error) {
 		response, err := c.SubjectAccessReviews().Create(review)
+		// GKE doesn't enable the SAR endpoint.  Without this endpoint, we cannot determine if the policy engine
+		// has adjusted as expected.  In this case, simply wait one second and hope it's up to date
+		if apierrors.IsNotFound(err) {
+			time.Sleep(1 * time.Second)
+			return true, nil
+		}
 		if err != nil {
 			return false, err
 		}
