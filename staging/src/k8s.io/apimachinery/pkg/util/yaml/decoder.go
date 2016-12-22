@@ -246,10 +246,10 @@ func (d *YAMLOrJSONDecoder) Decode(into interface{}) error {
 		}
 	}
 
-	if err == nil || err == io.EOF {
-		return err
+	if err != nil && err != io.EOF && hasPrefix([]byte(err.Error()), []byte("yaml: line")) {
+		return YAMLSyntaxError{err}
 	}
-	return YAMLSyntaxError{err}
+	return err
 }
 
 type Reader interface {
