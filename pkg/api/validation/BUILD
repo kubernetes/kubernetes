@@ -19,7 +19,6 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
-        "//pkg/api/endpoints:go_default_library",
         "//pkg/api/meta:go_default_library",
         "//pkg/api/pod:go_default_library",
         "//pkg/api/resource:go_default_library",

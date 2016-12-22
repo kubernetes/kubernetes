@@ -28,7 +28,6 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/endpoints"
 	utilpod "k8s.io/kubernetes/pkg/api/pod"
 	"k8s.io/kubernetes/pkg/api/resource"
 	apiservice "k8s.io/kubernetes/pkg/api/service"
@@ -183,13 +182,6 @@ func ValidatePodSpecificAnnotationUpdates(newPod, oldPod *api.Pod, fldPath *fiel
 
 func ValidateEndpointsSpecificAnnotations(annotations map[string]string, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	// TODO: remove this after we EOL the annotation.
-	hostnamesMap, exists := annotations[endpoints.PodHostnamesAnnotation]
-	if exists && !isValidHostnamesMap(hostnamesMap) {
-		allErrs = append(allErrs, field.Invalid(fldPath, endpoints.PodHostnamesAnnotation,
-			`must be a valid json representation of map[string(IP)][HostRecord] e.g. "{"10.245.1.6":{"HostName":"my-webserver"}}"`))
-	}
-
 	return allErrs
 }
 
@@ -3723,28 +3715,6 @@ func ValidateLoadBalancerStatus(status *api.LoadBalancerStatus, fldPath *field.P
 		}
 	}
 	return allErrs
-}
-
-// TODO: remove this after we EOL the annotation that carries it.
-func isValidHostnamesMap(serializedPodHostNames string) bool {
-	if len(serializedPodHostNames) == 0 {
-		return false
-	}
-	podHostNames := map[string]endpoints.HostRecord{}
-	err := json.Unmarshal([]byte(serializedPodHostNames), &podHostNames)
-	if err != nil {
-		return false
-	}
-
-	for ip, hostRecord := range podHostNames {
-		if len(validation.IsDNS1123Label(hostRecord.HostName)) != 0 {
-			return false
-		}
-		if net.ParseIP(ip) == nil {
-			return false
-		}
-	}
-	return true
 }
 
 func sysctlIntersection(a []api.Sysctl, b []api.Sysctl) []string {
