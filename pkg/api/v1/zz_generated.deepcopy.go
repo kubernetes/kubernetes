@@ -603,6 +603,7 @@ func DeepCopy_v1_Container(in interface{}, out interface{}, c *conversion.Cloner
 			out.Lifecycle = nil
 		}
 		out.TerminationMessagePath = in.TerminationMessagePath
+		out.TerminationMessagePolicy = in.TerminationMessagePolicy
 		out.ImagePullPolicy = in.ImagePullPolicy
 		if in.SecurityContext != nil {
 			in, out := &in.SecurityContext, &out.SecurityContext

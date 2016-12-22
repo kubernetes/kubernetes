@@ -996,7 +996,14 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 					},
 					"terminationMessagePath": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Optional: Path at which the file to which the container's termination message will be written is mounted into the container's filesystem. Message written is intended to be brief final status, such as an assertion failure message. Defaults to /dev/termination-log. Cannot be updated.",
+							Description: "Optional: Path at which the file to which the container's termination message will be written is mounted into the container's filesystem. Message written is intended to be brief final status, such as an assertion failure message. Will be truncated by the node if too large. Defaults to /dev/termination-log. Cannot be updated.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"terminationMessagePolicy": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Indicate how the termination message should be populated. If not specified, the contents of the terminationMessagePath will populate message. FallbackToLogsOnError will use the last chunk of container log output if the termination message file is empty and the container exited with an error. Will be truncated by the node if too large. Cannot be updated",
 							Type:        []string{"string"},
 							Format:      "",
 						},
