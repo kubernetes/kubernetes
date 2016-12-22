@@ -1178,9 +1178,7 @@ func (kl *Kubelet) initializeModules() error {
 	}
 
 	// Step 4: Start the image manager.
-	if err := kl.imageManager.Start(); err != nil {
-		return fmt.Errorf("Failed to start ImageManager, images may not be garbage collected: %v", err)
-	}
+	kl.imageManager.Start()
 
 	// Step 5: Start container manager.
 	node, err := kl.getNodeAnyWay()
