@@ -33,6 +33,7 @@ static void sigreap(int signo) {
 
 int main() {
   if (getpid() != 1)
+    /* Not an error because pause sees use outside of infra containers. */
     fprintf(stderr, "Warning: pause should be the first process in a pod\n");
 
   if (sigaction(SIGINT, &(struct sigaction){.sa_handler = sigdown}, NULL) < 0)
