@@ -123,6 +123,7 @@ install_kube_binary_config() {
   else
     cp "${src_dir}/kube-apiserver.tar" "${dst_dir}"
     cp "${src_dir}/kube-controller-manager.tar" "${dst_dir}"
+    cp "${src_dir}/kube-aggregator.tar" "${dst_dir}"
     cp "${src_dir}/kube-scheduler.tar" "${dst_dir}"
     cp -r "${kube_home}/kubernetes/addons" "${dst_dir}"
   fi

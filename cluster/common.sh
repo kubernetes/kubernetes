@@ -499,6 +499,7 @@ function stage-images() {
     "kube-controller-manager"
     "kube-scheduler"
     "kube-proxy"
+    "kube-aggregator"
   )
 
   local docker_cmd=("docker")

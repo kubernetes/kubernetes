@@ -200,6 +200,7 @@ function load-docker-images {
 	local -r img_dir="${KUBE_BINDIR}"
 	try-load-docker-image "${img_dir}/kube-apiserver.tar"
 	try-load-docker-image "${img_dir}/kube-controller-manager.tar"
+	try-load-docker-image "${img_dir}/kube-aggregator.tar"
 	try-load-docker-image "${img_dir}/kube-scheduler.tar"
 }
 

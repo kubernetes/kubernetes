@@ -457,6 +457,7 @@ function load-docker-images {
   if [[ "${KUBERNETES_MASTER:-}" == "true" ]]; then
     try-load-docker-image "${img_dir}/kube-apiserver.tar"
     try-load-docker-image "${img_dir}/kube-controller-manager.tar"
+    try-load-docker-image "${img_dir}/kube-aggregator.tar"
     try-load-docker-image "${img_dir}/kube-scheduler.tar"
   else
     try-load-docker-image "${img_dir}/kube-proxy.tar"
