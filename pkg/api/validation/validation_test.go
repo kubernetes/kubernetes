@@ -2994,6 +2994,12 @@ func TestValidateContainers(t *testing.T) {
 			},
 			ImagePullPolicy: "IfNotPresent",
 		},
+		{
+			Name:                     "fallback-to-logs-termination-message",
+			Image:                    "image",
+			ImagePullPolicy:          "IfNotPresent",
+			TerminationMessagePolicy: api.FallbackToLogsOnErrorTerminationMessage,
+		},
 		{Name: "abc-1234", Image: "image", ImagePullPolicy: "IfNotPresent", SecurityContext: fakeValidSecurityContext(true)},
 	}
 	if errs := validateContainers(successCase, volumes, field.NewPath("field")); len(errs) != 0 {
@@ -3105,6 +3111,14 @@ func TestValidateContainers(t *testing.T) {
 					Handler: api.Handler{},
 				},
 				ImagePullPolicy: "IfNotPresent",
+			},
+		},
+		"invalid message termination policy": {
+			{
+				Name:                     "life-123",
+				Image:                    "image",
+				ImagePullPolicy:          "IfNotPresent",
+				TerminationMessagePolicy: "Unknown",
 			},
 		},
 		"privilege disabled": {

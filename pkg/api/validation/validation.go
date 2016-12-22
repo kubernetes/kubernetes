@@ -1736,6 +1736,12 @@ func validateContainers(containers []api.Container, volumes sets.String, fldPath
 			allErrs = append(allErrs, field.Invalid(idxPath.Child("livenessProbe", "successThreshold"), ctr.LivenessProbe.SuccessThreshold, "must be 1"))
 		}
 
+		switch ctr.TerminationMessagePolicy {
+		case "", api.FallbackToLogsOnErrorTerminationMessage:
+		default:
+			allErrs = append(allErrs, field.Invalid(idxPath.Child("terminationMessagePolicy"), ctr.TerminationMessagePolicy, "must be empty or 'FallbackToLogsOnError'"))
+		}
+
 		allErrs = append(allErrs, validateProbe(ctr.ReadinessProbe, idxPath.Child("readinessProbe"))...)
 		allErrs = append(allErrs, validateContainerPorts(ctr.Ports, idxPath.Child("ports"))...)
 		allErrs = append(allErrs, validateEnv(ctr.Env, idxPath.Child("env"))...)
