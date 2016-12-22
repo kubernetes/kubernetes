@@ -42,6 +42,25 @@ spec:
           readOnly: true
         - name: libsystemddir
           mountPath: /host/lib
+        # Liveness probe is aimed to help in situarions where fluentd
+        # silently hangs for no apparent reasons until manual restart.
+        # The idea of this probe is that if fluentd is not queueing or
+        # flushing chunks for 5 minutes, something is not right. If
+        # you want to change the fluentd configuration, reducing amount of
+        # logs fluentd collects, consider changing the threshold or turning
+        # liveness probe off completely.
+        livenessProbe:
+          initialDelaySeconds: 600
+          periodSeconds: 60
+          exec:
+            command:
+            - '/bin/sh'
+            - '-c'
+            - >
+              LIVENESS_THRESHOLD_SECONDS=${LIVENESS_THRESHOLD_SECONDS:-600};
+              LAST_MODIFIED_DATE=`stat /var/log/fluentd-buffers | grep Modify | sed -r "s/Modify: (.*)/\1/"`;
+              LAST_MODIFIED_TIMESTAMP=`date -d "$LAST_MODIFIED_DATE" +%s`;
+              if [ `date +%s` -gt `expr $LAST_MODIFIED_TIMESTAMP + $LIVENESS_THRESHOLD_SECONDS` ]; then exit 1; fi;
       nodeSelector:
         alpha.kubernetes.io/fluentd-ds-ready: "true"
       terminationGracePeriodSeconds: 30
