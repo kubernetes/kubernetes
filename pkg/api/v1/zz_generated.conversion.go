@@ -787,6 +787,7 @@ func autoConvert_v1_Container_To_api_Container(in *Container, out *api.Container
 	out.ReadinessProbe = (*api.Probe)(unsafe.Pointer(in.ReadinessProbe))
 	out.Lifecycle = (*api.Lifecycle)(unsafe.Pointer(in.Lifecycle))
 	out.TerminationMessagePath = in.TerminationMessagePath
+	out.TerminationMessagePolicy = api.TerminationMessagePolicy(in.TerminationMessagePolicy)
 	out.ImagePullPolicy = api.PullPolicy(in.ImagePullPolicy)
 	out.SecurityContext = (*api.SecurityContext)(unsafe.Pointer(in.SecurityContext))
 	out.Stdin = in.Stdin
@@ -816,6 +817,7 @@ func autoConvert_api_Container_To_v1_Container(in *api.Container, out *Container
 	out.ReadinessProbe = (*Probe)(unsafe.Pointer(in.ReadinessProbe))
 	out.Lifecycle = (*Lifecycle)(unsafe.Pointer(in.Lifecycle))
 	out.TerminationMessagePath = in.TerminationMessagePath
+	out.TerminationMessagePolicy = TerminationMessagePolicy(in.TerminationMessagePolicy)
 	out.ImagePullPolicy = PullPolicy(in.ImagePullPolicy)
 	out.SecurityContext = (*SecurityContext)(unsafe.Pointer(in.SecurityContext))
 	out.Stdin = in.Stdin

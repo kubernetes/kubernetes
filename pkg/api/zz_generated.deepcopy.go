@@ -628,6 +628,7 @@ func DeepCopy_api_Container(in interface{}, out interface{}, c *conversion.Clone
 			out.Lifecycle = nil
 		}
 		out.TerminationMessagePath = in.TerminationMessagePath
+		out.TerminationMessagePolicy = in.TerminationMessagePolicy
 		out.ImagePullPolicy = in.ImagePullPolicy
 		if in.SecurityContext != nil {
 			in, out := &in.SecurityContext, &out.SecurityContext

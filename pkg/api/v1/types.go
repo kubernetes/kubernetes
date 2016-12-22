@@ -1490,7 +1490,7 @@ type Container struct {
 	// and the container exited with an error. Will be truncated by the node if too large.
 	// Cannot be updated
 	// +optional
-	TerminationMessagePolicy TerminationMessagePolicy `json:"terminationMessagePolicy,omitempty" protobuf:"bytes,19,opt,name=terminationMessagePolicy,casttype=TerminationMessagePolicy"`
+	TerminationMessagePolicy TerminationMessagePolicy `json:"terminationMessagePolicy,omitempty" protobuf:"bytes,20,opt,name=terminationMessagePolicy,casttype=TerminationMessagePolicy"`
 	// Image pull policy.
 	// One of Always, Never, IfNotPresent.
 	// Defaults to Always if :latest tag is specified, or IfNotPresent otherwise.
