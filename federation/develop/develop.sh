@@ -38,14 +38,15 @@ source "${KUBE_ROOT}/build/util.sh"
 source "${KUBE_ROOT}/cluster/kube-util.sh"
 # Provides logging facilities
 source "${KUBE_ROOT}/cluster/lib/logging.sh"
-# Provides $FEDERATION_OUTPUT_ROOT, $VERSIONS_FILE, $KUBE_REGISTRY and
-# get_version() function.
-source "${KUBE_ROOT}/federation/develop/release.sh"
 
 readonly TMP_DIR="$(mktemp -d)"
+readonly FEDERATION_OUTPUT_ROOT="${LOCAL_OUTPUT_ROOT}/federation"
+readonly VERSIONS_FILE="${FEDERATION_OUTPUT_ROOT}/versions"
 
 detect-project
+readonly KUBE_PROJECT="${KUBE_PROJECT:-${PROJECT:-}}"
 
+readonly KUBE_REGISTRY="${KUBE_REGISTRY:-gcr.io/${KUBE_PROJECT}}"
 # In dev environments this value must be recomputed after build. See
 # the build_image() function. So not making it readonly
 KUBE_VERSION="${KUBE_VERSION:-}"
@@ -108,8 +109,21 @@ function build_image() {
     make -C "${KUBE_ROOT}/cluster/images/hyperkube" build
 }
 
+function get_version() {
+  local kube_version=""
+  if [[ -n "${KUBE_VERSION:-}" ]]; then
+    kube_version="${KUBE_VERSION}"
+  else
+    # Read the version back from the versions file if no version is given.
+    kube_version="$(cat ${VERSIONS_FILE} | python -c '\
+import json, sys;\
+print json.load(sys.stdin)["KUBE_VERSION"]')"
+  fi
+  echo "${kube_version}"
+}
+
 function push() {
-  local -r kube_version="$(KUBERNETES_RELEASE=${KUBE_VERSION} get_version)"
+  local -r kube_version="$(get_version)"
 
   kube::log::status "Pushing hyperkube image to the registry"
   gcloud docker -- push "${KUBE_REGISTRY}/hyperkube-amd64:${kube_version}"
