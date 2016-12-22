@@ -93,7 +93,9 @@ func RunRemote(suite TestSuite, archive string, host string, cleanup bool, junit
 		fmt.Sprintf("tar -xzvf ./%s", archiveName),
 	)
 	glog.V(2).Infof("Extracting tar on %q", host)
-	if output, err := SSH(host, "sh", "-c", cmd); err != nil {
+	// Do not use sudo here, because `sudo tar -x` will recover the file ownership inside the tar ball, but
+	// we want the extracted files to be owned by the current user.
+	if output, err := SSHNoSudo(host, "sh", "-c", cmd); err != nil {
 		// Exit failure with the error
 		return "", false, fmt.Errorf("failed to extract test archive: %v, output: %q", err, output)
 	}
