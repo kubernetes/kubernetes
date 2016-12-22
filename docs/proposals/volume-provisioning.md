@@ -485,15 +485,55 @@ parameters:
    type: spinning
 ```
 
+### AWS provisioner and a PVC w
+
+This example shows how a PVC can require a volume from given zone. If there is
+a matching available PV, it will be bound to the PVC. If no such PV exists,
+a new one in the right zone will be provisioned by AWS provisioner.
+
+```
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: myclaim
+  annotations:
+    "volume.beta.kubernetes.io/storage-class": "aws-fast"
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1500Mi
+  selector:
+    matchLabels:
+      "failure-domain.beta.kubernetes.io/zone": "us-east-1a"
+```
+
+When used with the StorageClass from the previous example, this PVC would never
+been provisioned as it requires zone "us-east-1a", while the class allows only
+"us-east-1b". It's up to the provisioner plugin to emit appropriate warning
+event on the PVC to let the user know why it can't be provisioned and how to fix
+it.
+
 # Additional Implementation Details
 
-0. Annotation `volume.alpha.kubernetes.io/storage-class` is used instead of `claim.Spec.Class` and `volume.Spec.Class` during incubation.
+0. Annotation `volume.beta.kubernetes.io/storage-class` is used instead of
+`claim.Spec.Class` and `volume.Spec.Class` during incubation.
 
-1. `claim.Spec.Selector` and `claim.Spec.Class` are mutually exclusive for now (1.4). User can either match existing volumes with `Selector` XOR match existing volumes with `Class` and get dynamic provisioning by using `Class`. This simplifies initial PR and also provisioners. This limitation may be lifted in future releases.
+1. `claim.Spec.Selector` and `claim.Spec.Class` were mutually exclusive in
+Kubernetes 1.4. In 1.5, they were allowed both to be set, however all internal
+provisioners have refused any `claim.Spec.Selector`. In 1.6, provisioners for
+AWS and GCE allow users to choose a zone or region where a volume should be
+provisioned using `claim.Spec.Selector`, assuming that this zone is allowed by
+appropriate StorageClass.
+
+2. Since Kubernetes 1.5 user can match existing volumes both with `Selector` and
+`Class` simultaneously.
 
 # Cloud Providers
 
-Since the `volume.alpha.kubernetes.io/storage-class` is in use a `StorageClass` must be defined to support provisioning.  No default is assumed as before.
+Since the `volume.beta.kubernetes.io/storage-class` is in use a `StorageClass`
+must be defined to support provisioning.  No default is assumed as before.
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/proposals/volume-provisioning.md?pixel)]()
