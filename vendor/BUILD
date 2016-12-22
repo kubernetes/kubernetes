@@ -13683,3 +13683,9 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/util/sets",
     ],
 )
+
+go_library(
+    name = "github.com/armon/circbuf",
+    srcs = ["github.com/armon/circbuf/circbuf.go"],
+    tags = ["automanaged"],
+)
