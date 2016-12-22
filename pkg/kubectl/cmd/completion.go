@@ -97,7 +97,7 @@ func runCompletionBash(out io.Writer, kubectl *cobra.Command) error {
 }
 
 func runCompletionZsh(out io.Writer, kubectl *cobra.Command) error {
-	zsh_initialilzation := `# Copyright 2016 The Kubernetes Authors.
+	zsh_initialization := `# Copyright 2016 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -259,7 +259,7 @@ __kubectl_convert_bash_to_zsh() {
 	-e "s/\\\$(type${RWORD}/\$(__kubectl_type/g" \
 	<<'BASH_COMPLETION_EOF'
 `
-	out.Write([]byte(zsh_initialilzation))
+	out.Write([]byte(zsh_initialization))
 
 	buf := new(bytes.Buffer)
 	kubectl.GenBashCompletion(buf)
