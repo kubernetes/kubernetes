@@ -24,11 +24,15 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
+	legacyv1 "k8s.io/kubernetes/pkg/api/v1"
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
+	rbacv1alpha1 "k8s.io/kubernetes/pkg/apis/rbac/v1alpha1"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	coreclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/core/v1"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
+	"k8s.io/kubernetes/pkg/runtime/schema"
+	"k8s.io/kubernetes/pkg/serviceaccount"
 	"k8s.io/kubernetes/pkg/util/system"
 	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -57,6 +61,32 @@ var _ = framework.KubeDescribe("NodeProblemDetector", func() {
 		configName = "node-problem-detector-config-" + uid
 		// There is no namespace for Node, event recorder will set default namespace for node events.
 		eventNamespace = v1.NamespaceDefault
+
+		// this test wants extra permissions.  Since the namespace names are unique, we can leave this
+		// lying around so we don't have to race any caches
+		_, err := f.ClientSet.Rbac().ClusterRoleBindings().Create(&rbacv1alpha1.ClusterRoleBinding{
+			ObjectMeta: legacyv1.ObjectMeta{
+				Name: f.Namespace.Name + "--cluster-admin",
+			},
+			RoleRef: rbacv1alpha1.RoleRef{
+				APIGroup: "rbac.authorization.k8s.io",
+				Kind:     "ClusterRole",
+				Name:     "cluster-admin",
+			},
+			Subjects: []rbacv1alpha1.Subject{
+				{
+					Kind:      rbacv1alpha1.ServiceAccountKind,
+					Namespace: f.Namespace.Name,
+					Name:      "default",
+				},
+			},
+		})
+		framework.ExpectNoError(err)
+
+		err = framework.WaitForAuthorizationUpdate(f.ClientSet.Authorization(),
+			serviceaccount.MakeUsername(f.Namespace.Name, "default"),
+			"", "create", schema.GroupResource{Resource: "pods"}, true)
+		framework.ExpectNoError(err)
 	})
 
 	// Test kernel monitor. We may add other tests if we have more problem daemons in the future.
