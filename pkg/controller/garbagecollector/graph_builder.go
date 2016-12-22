@@ -19,9 +19,11 @@ package garbagecollector
 import (
 	"fmt"
 	"reflect"
+	"time"
 
 	"github.com/golang/glog"
 
+	"k8s.io/client-go/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/v1"
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
@@ -175,19 +177,20 @@ func (gb *GraphBuilder) monitorsForResources(resources map[schema.GroupVersionRe
 	return nil
 }
 
-func (gb *GraphBuilder) startMonitors(stopCh <-chan struct{}) {
-	for _, monitor := range gb.monitors {
-		go monitor.Run(stopCh)
-	}
-}
-
-func (gb *GraphBuilder) MonitorsSynced() bool {
+func (gb *GraphBuilder) HasSynced() bool {
 	for _, monitor := range gb.monitors {
 		if !monitor.HasSynced() {
 			return false
 		}
 	}
 	return true
+}
+
+func (gb *GraphBuilder) Run(stopCh <-chan struct{}) {
+	for _, monitor := range gb.monitors {
+		go monitor.Run(stopCh)
+	}
+	go wait.Until(gb.runProcessGraphChanges, 1*time.Second, stopCh)
 }
 
 var ignoredResources = map[schema.GroupVersionResource]struct{}{
@@ -259,8 +262,8 @@ func (gb *GraphBuilder) removeNode(n *node) {
 }
 
 type ownerRefPair struct {
-	old metav1.OwnerReference
-	new metav1.OwnerReference
+	oldRef metav1.OwnerReference
+	newRef metav1.OwnerReference
 }
 
 // TODO: profile this function to see if a naive N^2 algorithm performs better
@@ -289,7 +292,7 @@ func referencesDiffs(old []metav1.OwnerReference, new []metav1.OwnerReference) (
 	}
 	for uid := range intersection {
 		if !reflect.DeepEqual(oldUIDToRef[uid], newUIDToRef[uid]) {
-			changed = append(changed, ownerRefPair{old: oldUIDToRef[uid], new: newUIDToRef[uid]})
+			changed = append(changed, ownerRefPair{oldRef: oldUIDToRef[uid], newRef: newUIDToRef[uid]})
 		}
 	}
 	return added, removed, changed
@@ -367,11 +370,11 @@ func (gb *GraphBuilder) addUnblockedOwnersToDeleteQueue(removed []metav1.OwnerRe
 		}
 	}
 	for _, c := range changed {
-		if c.old.BlockOwnerDeletion != nil && *c.old.BlockOwnerDeletion &&
-			c.new.BlockOwnerDeletion != nil && !*c.new.BlockOwnerDeletion {
-			node, found := gb.uidToNode.Read(c.new.UID)
+		if c.oldRef.BlockOwnerDeletion != nil && *c.oldRef.BlockOwnerDeletion &&
+			c.newRef.BlockOwnerDeletion != nil && !*c.newRef.BlockOwnerDeletion {
+			node, found := gb.uidToNode.Read(c.newRef.UID)
 			if !found {
-				glog.V(5).Infof("cannot find %s in uidToNode", c.new.UID)
+				glog.V(5).Infof("cannot find %s in uidToNode", c.newRef.UID)
 				continue
 			}
 			gb.attemptToDelete.Add(node)
