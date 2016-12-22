@@ -17,7 +17,7 @@ The workflow includes three steps:
 $ client-gen --input="api/v1,extensions/v1beta1" --clientset-name="my_release"
 ```
 
-3. ***Adding expansion methods***: client-gen only generates the common methods, such as CRUD. You can manually add additional methods through the expansion interface. For example, this [file](../../pkg/client/clientset_generated/release_1_5/typed/core/v1/pod_expansion.go) adds additional methods to Pod's client. As a convention, we put the expansion interface and its methods in file ${TYPE}_expansion.go. In most cases, you don't want to remove existing expansion files. So to make life easier, instead of creating a new clientset from scratch, ***you can copy and rename an existing clientset (so that all the expansion files are copied)***, and then run client-gen.
+3. ***Adding expansion methods***: client-gen only generates the common methods, such as CRUD. You can manually add additional methods through the expansion interface. For example, this [file](../../pkg/client/clientset_generated/clientset/typed/core/v1/pod_expansion.go) adds additional methods to Pod's client. As a convention, we put the expansion interface and its methods in file ${TYPE}_expansion.go. In most cases, you don't want to remove existing expansion files. So to make life easier, instead of creating a new clientset from scratch, ***you can copy and rename an existing clientset (so that all the expansion files are copied)***, and then run client-gen.
 
 ## Output of client-gen
 
