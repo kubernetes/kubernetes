@@ -58,6 +58,9 @@ func (c *Clientset) Apiregistration() v1alpha1apiregistration.ApiregistrationV1a
 
 // Discovery retrieves the DiscoveryClient
 func (c *Clientset) Discovery() discovery.DiscoveryInterface {
+	if c == nil {
+		return nil
+	}
 	return c.DiscoveryClient
 }
 
