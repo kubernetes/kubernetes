@@ -253,7 +253,7 @@ func (s *SwaggerSchema) ValidateObject(obj interface{}, fieldName, typeName stri
 	if !ok && s.delegate != nil {
 		fields, mapOk := obj.(map[string]interface{})
 		if !mapOk {
-			return append(allErrs, fmt.Errorf("field %s: expected object of type map[string]interface{}, but the actual type is %T", fieldName, obj))
+			return append(allErrs, fmt.Errorf("expected object '%s' of type 'map[string]interface{}', but the actual type is '%T'", fieldName, obj))
 		}
 		if delegated, err := s.delegateIfDifferentApiVersion(&unstructured.Unstructured{Object: fields}); delegated {
 			if err != nil {
@@ -273,7 +273,7 @@ func (s *SwaggerSchema) ValidateObject(obj interface{}, fieldName, typeName stri
 	}
 	fields, ok := obj.(map[string]interface{})
 	if !ok {
-		return append(allErrs, fmt.Errorf("field %s: expected object of type map[string]interface{}, but the actual type is %T", fieldName, obj))
+		return append(allErrs, fmt.Errorf("expected object '%s' of type 'map[string]interface{}', but the actual type is '%T'", fieldName, obj))
 	}
 	if len(fieldName) > 0 {
 		fieldName = fieldName + "."
@@ -281,7 +281,7 @@ func (s *SwaggerSchema) ValidateObject(obj interface{}, fieldName, typeName stri
 	// handle required fields
 	for _, requiredKey := range model.Required {
 		if _, ok := fields[requiredKey]; !ok {
-			allErrs = append(allErrs, fmt.Errorf("field %s: is required", requiredKey))
+			allErrs = append(allErrs, fmt.Errorf("field '%s%s' is required, but not provided", fieldName, requiredKey))
 		}
 	}
 	for key, value := range fields {
@@ -298,11 +298,11 @@ func (s *SwaggerSchema) ValidateObject(obj interface{}, fieldName, typeName stri
 			continue
 		}
 		if !ok {
-			allErrs = append(allErrs, fmt.Errorf("found invalid field %s for %s", key, typeName))
+			allErrs = append(allErrs, fmt.Errorf("found invalid field '%s' for '%s'", key, typeName))
 			continue
 		}
 		if details.Type == nil && details.Ref == nil {
-			allErrs = append(allErrs, fmt.Errorf("could not find the type of %s from object: %v", key, details))
+			allErrs = append(allErrs, fmt.Errorf("could not find the type of '%s%s' from object '%v'", fieldName, key, details))
 		}
 		var fieldType string
 		if details.Type != nil {
@@ -311,7 +311,7 @@ func (s *SwaggerSchema) ValidateObject(obj interface{}, fieldName, typeName stri
 			fieldType = *details.Ref
 		}
 		if value == nil {
-			glog.V(2).Infof("Skipping nil field: %s", key)
+			glog.V(2).Infof("Skipping nil field: '%s%s'", fieldName, key)
 			continue
 		}
 		errs := s.validateField(value, fieldName+key, fieldType, &details)
