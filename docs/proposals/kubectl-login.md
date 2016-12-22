@@ -6,12 +6,12 @@
 
 `kubectl login` is an entrypoint for any user attempting to connect to an
 existing server. It should provide a more tailored experience than the existing
-`kubectl config` including config validation, auth challenges, and discovery.
+`kubectl config` including config validations, auth challenges, and discoveries.
 
 Short term the subcommand should recognize and attempt to help:
 
 * New users with an empty configuration trying to connect to a server.
-* Users with no credentials, by prompt for any required information.
+* Users with no credentials, by prompting for any required information.
 * Fully configured users who want to validate credentials.
 * Users trying to switch servers.
 * Users trying to reauthenticate as the same user because credentials have expired.
@@ -25,9 +25,9 @@ sysadmin configured the Kubernetes cluster.
 
 The "login" subcommand helps users move towards a fully functional kubeconfig by
 evaluating the current state of the kubeconfig and trying to prompt the user for
-and validate the necessary information to login to the kubernetes cluster.
+and validating the necessary information to login to the kubernetes cluster.
 
-This is inspired by a similar tools such as:
+This is inspired by  similar tools such as:
 
  * [os login](https://docs.openshift.org/latest/cli_reference/get_started_cli.html#basic-setup-and-login)
  * [gcloud auth login](https://cloud.google.com/sdk/gcloud/reference/auth/login)

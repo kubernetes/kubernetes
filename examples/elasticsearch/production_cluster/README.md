@@ -1,7 +1,7 @@
 # Elasticsearch for Kubernetes
 
 Kubernetes makes it trivial for anyone to easily build and scale [Elasticsearch](http://www.elasticsearch.org/) clusters. Here, you'll find how to do so.
-Current Elasticsearch version is `1.7.1`.
+Current Elasticsearch version is `5.1`.
 
 Before we start, one needs to know that Elasticsearch best-practices recommend to separate nodes in three roles:
 * `Master` nodes - intended for clustering management only, no data, no HTTP API
@@ -39,7 +39,7 @@ kubectl create -f examples/elasticsearch/production_cluster/es-data-rc.yaml
 
 Wait until `es-data` is provisioned.
 
-Now, I leave up to you how to validate the cluster, but a first step is to wait for containers to be in ```RUNNING``` state and check the Elasticsearch master logs:
+Now, I leave up to you how to validate the cluster, but the first step is to wait for containers to be in ```RUNNING``` state and check the Elasticsearch master logs:
 
 ```
 $ kubectl get pods
@@ -73,7 +73,7 @@ As you can assert, the cluster is up and running. Easy, wasn't it?
 
 ## Scale
 
-Scaling each type of node to handle your cluster is as easy as:
+Scaling each type of nodes to handle your cluster is as easy as:
 
 ```
 kubectl scale --replicas=3 rc es-master
@@ -81,7 +81,7 @@ kubectl scale --replicas=2 rc es-client
 kubectl scale --replicas=2 rc es-data
 ```
 
-Did it work?
+Does it work?
 
 ```
 $ kubectl get pods
@@ -156,7 +156,7 @@ You should see something similar to the following:
 }
 ```
 
-Or if you want to check cluster information:
+Or if you want to check the cluster information:
 
 
 ```
