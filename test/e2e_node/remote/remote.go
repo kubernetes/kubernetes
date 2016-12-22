@@ -212,9 +212,10 @@ func RunRemote(archive string, host string, cleanup bool, junitFilePrefix string
 
 	// Extract the archive
 	cmd = getSshCommand(" && ", fmt.Sprintf("cd %s", tmp), fmt.Sprintf("tar -xzvf ./%s", archiveName))
-	glog.Infof("Extracting tar on %s", host)
-	output, err := RunSshCommand("ssh", GetHostnameOrIp(host), "--", "sh", "-c", cmd)
-	if err != nil {
+	glog.V(2).Infof("Extracting tar on %q", host)
+	// Do not use sudo here, because `sudo tar -x` will recover the file ownership inside the tar ball, but
+	// we want the extracted files to be owned by the current user.
+	if output, err := SSHNoSudo(host, "sh", "-c", cmd); err != nil {
 		// Exit failure with the error
 		return "", false, err
 	}
