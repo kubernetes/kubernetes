@@ -15,6 +15,7 @@ go_library(
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/service:go_default_library",
+        "//pkg/client/record:go_default_library",
         "//pkg/proxy:go_default_library",
         "//pkg/proxy/healthcheck:go_default_library",
         "//pkg/types:go_default_library",
