@@ -21,6 +21,7 @@ go_library(
         "//pkg/genericapiserver:go_default_library",
         "//pkg/genericapiserver/authorizer:go_default_library",
         "//pkg/genericapiserver/options:go_default_library",
+        "//pkg/kubeapiserver/options:go_default_library",
         "//pkg/registry/generic:go_default_library",
         "//pkg/runtime/schema:go_default_library",
         "//pkg/storage/storagebackend:go_default_library",
