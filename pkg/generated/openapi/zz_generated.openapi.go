@@ -8010,11 +8010,6 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
 				Properties: map[string]spec.Schema{
-					"TypeMeta": {
-						SchemaProps: spec.SchemaProps{
-							Ref: spec.MustCreateRef("#/definitions/v1.TypeMeta"),
-						},
-					},
 					"bindAddress": {
 						SchemaProps: spec.SchemaProps{
 							Description: "bindAddress is the IP address for the proxy server to serve on (set to 0.0.0.0 for all interfaces)",
@@ -8158,21 +8153,16 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 						},
 					},
 				},
-				Required: []string{"TypeMeta", "bindAddress", "clusterCIDR", "healthzBindAddress", "healthzPort", "hostnameOverride", "iptablesMasqueradeBit", "iptablesSyncPeriodSeconds", "iptablesMinSyncPeriodSeconds", "kubeconfigPath", "masqueradeAll", "master", "oomScoreAdj", "mode", "portRange", "resourceContainer", "udpTimeoutMilliseconds", "conntrackMax", "conntrackMaxPerCore", "conntrackMin", "conntrackTCPEstablishedTimeout", "conntrackTCPCloseWaitTimeout"},
+				Required: []string{"bindAddress", "clusterCIDR", "healthzBindAddress", "healthzPort", "hostnameOverride", "iptablesMasqueradeBit", "iptablesSyncPeriodSeconds", "iptablesMinSyncPeriodSeconds", "kubeconfigPath", "masqueradeAll", "master", "oomScoreAdj", "mode", "portRange", "resourceContainer", "udpTimeoutMilliseconds", "conntrackMax", "conntrackMaxPerCore", "conntrackMin", "conntrackTCPEstablishedTimeout", "conntrackTCPCloseWaitTimeout"},
 			},
 		},
 		Dependencies: []string{
-			"v1.Duration", "v1.TypeMeta"},
+			"v1.Duration"},
 	},
 	"v1alpha1.KubeSchedulerConfiguration": {
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
 				Properties: map[string]spec.Schema{
-					"TypeMeta": {
-						SchemaProps: spec.SchemaProps{
-							Ref: spec.MustCreateRef("#/definitions/v1.TypeMeta"),
-						},
-					},
 					"port": {
 						SchemaProps: spec.SchemaProps{
 							Description: "port is the port that the scheduler's http service runs on.",
@@ -8264,11 +8254,11 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 						},
 					},
 				},
-				Required: []string{"TypeMeta", "port", "address", "algorithmProvider", "policyConfigFile", "enableProfiling", "enableContentionProfiling", "contentType", "kubeAPIQPS", "kubeAPIBurst", "schedulerName", "hardPodAffinitySymmetricWeight", "failureDomains", "leaderElection"},
+				Required: []string{"port", "address", "algorithmProvider", "policyConfigFile", "enableProfiling", "enableContentionProfiling", "contentType", "kubeAPIQPS", "kubeAPIBurst", "schedulerName", "hardPodAffinitySymmetricWeight", "failureDomains", "leaderElection"},
 			},
 		},
 		Dependencies: []string{
-			"v1.TypeMeta", "v1alpha1.LeaderElectionConfiguration"},
+			"v1alpha1.LeaderElectionConfiguration"},
 	},
 	"v1alpha1.KubeletAnonymousAuthentication": {
 		Schema: spec.Schema{
@@ -8344,11 +8334,6 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
 				Properties: map[string]spec.Schema{
-					"TypeMeta": {
-						SchemaProps: spec.SchemaProps{
-							Ref: spec.MustCreateRef("#/definitions/v1.TypeMeta"),
-						},
-					},
 					"podManifestPath": {
 						SchemaProps: spec.SchemaProps{
 							Description: "podManifestPath is the path to the directory containing pod manifests to run, or the path to a single manifest file",
@@ -9181,7 +9166,7 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 							Format:      "",
 						},
 					},
-					"ExperimentalCheckNodeCapabilitiesBeforeMount": {
+					"experimentalCheckNodeCapabilitiesBeforeMount": {
 						SchemaProps: spec.SchemaProps{
 							Description: "This flag, if set, enables a check prior to mount operations to verify that the required components (binaries, etc.) to mount the volume are available on the underlying node. If the check is enabled and fails the mount operation fails.",
 							Type:        []string{"boolean"},
@@ -9189,11 +9174,11 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 						},
 					},
 				},
-				Required: []string{"TypeMeta", "podManifestPath", "syncFrequency", "fileCheckFrequency", "httpCheckFrequency", "manifestURL", "manifestURLHeader", "enableServer", "address", "port", "readOnlyPort", "tlsCertFile", "tlsPrivateKeyFile", "certDirectory", "authentication", "authorization", "hostnameOverride", "podInfraContainerImage", "dockerEndpoint", "rootDirectory", "seccompProfileRoot", "allowPrivileged", "hostNetworkSources", "hostPIDSources", "hostIPCSources", "registryPullQPS", "registryBurst", "eventRecordQPS", "eventBurst", "enableDebuggingHandlers", "minimumGCAge", "maxPerPodContainerCount", "maxContainerCount", "cAdvisorPort", "healthzPort", "healthzBindAddress", "oomScoreAdj", "registerNode", "clusterDomain", "masterServiceNamespace", "clusterDNS", "streamingConnectionIdleTimeout", "nodeStatusUpdateFrequency", "imageMinimumGCAge", "imageGCHighThresholdPercent", "imageGCLowThresholdPercent", "lowDiskSpaceThresholdMB", "volumeStatsAggPeriod", "networkPluginName", "networkPluginDir", "cniConfDir", "cniBinDir", "networkPluginMTU", "volumePluginDir", "cloudProvider", "cloudConfigFile", "kubeletCgroups", "runtimeCgroups", "systemCgroups", "cgroupRoot", "containerRuntime", "remoteRuntimeEndpoint", "remoteImageEndpoint", "runtimeRequestTimeout", "rktPath", "rktAPIEndpoint", "rktStage1Image", "lockFilePath", "exitOnLockContention", "hairpinMode", "babysitDaemons", "maxPods", "nvidiaGPUs", "dockerExecHandlerName", "podCIDR", "resolvConf", "cpuCFSQuota", "containerized", "maxOpenFiles", "reconcileCIDR", "registerSchedulable", "registerWithTaints", "contentType", "kubeAPIQPS", "kubeAPIBurst", "serializeImagePulls", "outOfDiskTransitionFrequency", "nodeIP", "nodeLabels", "nonMasqueradeCIDR", "enableCustomMetrics", "evictionHard", "evictionSoft", "evictionSoftGracePeriod", "evictionPressureTransitionPeriod", "evictionMaxPodGracePeriod", "evictionMinimumReclaim", "experimentalKernelMemcgNotification", "podsPerCore", "enableControllerAttachDetach", "systemReserved", "kubeReserved", "protectKernelDefaults", "makeIPTablesUtilChains", "iptablesMasqueradeBit", "iptablesDropBit"},
+				Required: []string{"podManifestPath", "syncFrequency", "fileCheckFrequency", "httpCheckFrequency", "manifestURL", "manifestURLHeader", "enableServer", "address", "port", "readOnlyPort", "tlsCertFile", "tlsPrivateKeyFile", "certDirectory", "authentication", "authorization", "hostnameOverride", "podInfraContainerImage", "dockerEndpoint", "rootDirectory", "seccompProfileRoot", "allowPrivileged", "hostNetworkSources", "hostPIDSources", "hostIPCSources", "registryPullQPS", "registryBurst", "eventRecordQPS", "eventBurst", "enableDebuggingHandlers", "minimumGCAge", "maxPerPodContainerCount", "maxContainerCount", "cAdvisorPort", "healthzPort", "healthzBindAddress", "oomScoreAdj", "registerNode", "clusterDomain", "masterServiceNamespace", "clusterDNS", "streamingConnectionIdleTimeout", "nodeStatusUpdateFrequency", "imageMinimumGCAge", "imageGCHighThresholdPercent", "imageGCLowThresholdPercent", "lowDiskSpaceThresholdMB", "volumeStatsAggPeriod", "networkPluginName", "networkPluginDir", "cniConfDir", "cniBinDir", "networkPluginMTU", "volumePluginDir", "cloudProvider", "cloudConfigFile", "kubeletCgroups", "runtimeCgroups", "systemCgroups", "cgroupRoot", "containerRuntime", "remoteRuntimeEndpoint", "remoteImageEndpoint", "runtimeRequestTimeout", "rktPath", "rktAPIEndpoint", "rktStage1Image", "lockFilePath", "exitOnLockContention", "hairpinMode", "babysitDaemons", "maxPods", "nvidiaGPUs", "dockerExecHandlerName", "podCIDR", "resolvConf", "cpuCFSQuota", "containerized", "maxOpenFiles", "reconcileCIDR", "registerSchedulable", "registerWithTaints", "contentType", "kubeAPIQPS", "kubeAPIBurst", "serializeImagePulls", "outOfDiskTransitionFrequency", "nodeIP", "nodeLabels", "nonMasqueradeCIDR", "enableCustomMetrics", "evictionHard", "evictionSoft", "evictionSoftGracePeriod", "evictionPressureTransitionPeriod", "evictionMaxPodGracePeriod", "evictionMinimumReclaim", "experimentalKernelMemcgNotification", "podsPerCore", "enableControllerAttachDetach", "systemReserved", "kubeReserved", "protectKernelDefaults", "makeIPTablesUtilChains", "iptablesMasqueradeBit", "iptablesDropBit"},
 			},
 		},
 		Dependencies: []string{
-			"v1.Duration", "v1.Taint", "v1.TypeMeta", "v1alpha1.KubeletAuthentication", "v1alpha1.KubeletAuthorization"},
+			"v1.Duration", "v1.Taint", "v1alpha1.KubeletAuthentication", "v1alpha1.KubeletAuthorization"},
 	},
 	"v1alpha1.KubeletWebhookAuthentication": {
 		Schema: spec.Schema{
