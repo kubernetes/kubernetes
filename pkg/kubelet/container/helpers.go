@@ -204,7 +204,7 @@ func ConvertPodStatusToRunningPod(runtimeName string, podStatus *PodStatus) Pod 
 	return runningPod
 }
 
-// sandboxToContainerState converts runtimeApi.PodSandboxState to
+// SandboxToContainerState converts runtimeApi.PodSandboxState to
 // kubecontainer.ContainerState.
 // This is only needed because we need to return sandboxes as if they were
 // kubecontainer.Containers to avoid substantial changes to PLEG.
