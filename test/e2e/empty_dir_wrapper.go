@@ -52,7 +52,7 @@ const (
 var _ = framework.KubeDescribe("EmptyDir wrapper volumes", func() {
 	f := framework.NewDefaultFramework("emptydir-wrapper")
 
-	It("should not conflict", func() {
+	It("should not conflict [Volume]", func() {
 		name := "emptydir-wrapper-test-" + string(uuid.NewUUID())
 		volumeName := "secret-volume"
 		volumeMountPath := "/etc/secret-volume"
@@ -151,7 +151,7 @@ var _ = framework.KubeDescribe("EmptyDir wrapper volumes", func() {
 	// but these cases are harder because tmpfs-based emptyDir
 	// appears to be less prone to the race problem.
 
-	It("should not cause race condition when used for configmaps [Serial] [Slow]", func() {
+	It("should not cause race condition when used for configmaps [Serial] [Slow] [Volume]", func() {
 		configMapNames := createConfigmapsForRace(f)
 		defer deleteConfigMaps(f, configMapNames)
 		volumes, volumeMounts := makeConfigMapVolumes(configMapNames)
@@ -160,7 +160,7 @@ var _ = framework.KubeDescribe("EmptyDir wrapper volumes", func() {
 		}
 	})
 
-	It("should not cause race condition when used for git_repo [Serial] [Slow]", func() {
+	It("should not cause race condition when used for git_repo [Serial] [Slow] [Volume]", func() {
 		gitURL, gitRepo, cleanup := createGitServer(f)
 		defer cleanup()
 		volumes, volumeMounts := makeGitRepoVolumes(gitURL, gitRepo)
