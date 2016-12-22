@@ -21,6 +21,7 @@ import (
 	"time"
 
 	genericoptions "k8s.io/kubernetes/pkg/genericapiserver/options"
+	kubeoptions "k8s.io/kubernetes/pkg/kubeapiserver/options"
 
 	"github.com/spf13/pflag"
 )
@@ -31,8 +32,8 @@ type ServerRunOptions struct {
 	Etcd                    *genericoptions.EtcdOptions
 	SecureServing           *genericoptions.SecureServingOptions
 	InsecureServing         *genericoptions.ServingOptions
-	Authentication          *genericoptions.BuiltInAuthenticationOptions
-	Authorization           *genericoptions.BuiltInAuthorizationOptions
+	Authentication          *kubeoptions.BuiltInAuthenticationOptions
+	Authorization           *kubeoptions.BuiltInAuthorizationOptions
 
 	EventTTL time.Duration
 }
@@ -44,8 +45,8 @@ func NewServerRunOptions() *ServerRunOptions {
 		Etcd:            genericoptions.NewEtcdOptions(),
 		SecureServing:   genericoptions.NewSecureServingOptions(),
 		InsecureServing: genericoptions.NewInsecureServingOptions(),
-		Authentication:  genericoptions.NewBuiltInAuthenticationOptions().WithAll(),
-		Authorization:   genericoptions.NewBuiltInAuthorizationOptions(),
+		Authentication:  kubeoptions.NewBuiltInAuthenticationOptions().WithAll(),
+		Authorization:   kubeoptions.NewBuiltInAuthorizationOptions(),
 
 		EventTTL: 1 * time.Hour,
 	}
