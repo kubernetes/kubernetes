@@ -167,6 +167,43 @@ func TestRangeSize(t *testing.T) {
 	}
 }
 
+func TestForEach(t *testing.T) {
+	_, cidr, err := net.ParseCIDR("192.168.1.0/24")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	testCases := []sets.String{
+		sets.NewString(),
+		sets.NewString("192.168.1.1"),
+		sets.NewString("192.168.1.1", "192.168.1.254"),
+		sets.NewString("192.168.1.1", "192.168.1.128", "192.168.1.254"),
+	}
+
+	for i, tc := range testCases {
+		r := NewCIDRRange(cidr)
+		for ips := range tc {
+			ip := net.ParseIP(ips)
+			if err := r.Allocate(ip); err != nil {
+				t.Errorf("[%d] error allocating IP %v: %v", i, ip, err)
+			}
+			if !r.Has(ip) {
+				t.Errorf("[%d] expected IP %v allocated", i, ip)
+			}
+		}
+		calls := sets.NewString()
+		r.ForEach(func(ip net.IP) {
+			calls.Insert(ip.String())
+		})
+		if len(calls) != len(tc) {
+			t.Errorf("[%d] expected %d calls, got %d", i, len(tc), len(calls))
+		}
+		if !calls.Equal(tc) {
+			t.Errorf("[%d] expected calls to equal testcase: %v vs %v", i, calls.List(), tc.List())
+		}
+	}
+}
+
 func TestSnapshot(t *testing.T) {
 	_, cidr, err := net.ParseCIDR("192.168.1.0/24")
 	if err != nil {

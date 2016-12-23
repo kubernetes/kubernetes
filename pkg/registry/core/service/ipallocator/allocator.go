@@ -32,6 +32,7 @@ type Interface interface {
 	Allocate(net.IP) error
 	AllocateNext() (net.IP, error)
 	Release(net.IP) error
+	ForEach(func(net.IP))
 }
 
 var (
@@ -144,6 +145,14 @@ func (r *Range) Release(ip net.IP) error {
 	}
 
 	return r.alloc.Release(offset)
+}
+
+// ForEach calls the provided function for each allocated IP.
+func (r *Range) ForEach(fn func(net.IP)) {
+	r.alloc.ForEach(func(offset int) {
+		ip, _ := GetIndexedIP(r.net, offset+1) // +1 because Range doesn't store IP 0
+		fn(ip)
+	})
 }
 
 // Has returns true if the provided IP is already allocated and a call
