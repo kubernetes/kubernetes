@@ -51,12 +51,12 @@ type InClusterConfig interface {
 
 // NewNonInteractiveDeferredLoadingClientConfig creates a ConfigClientClientConfig using the passed context name
 func NewNonInteractiveDeferredLoadingClientConfig(loader ClientConfigLoader, overrides *ConfigOverrides) ClientConfig {
-	return &DeferredLoadingClientConfig{loader: loader, overrides: overrides, icc: inClusterClientConfig{}}
+	return &DeferredLoadingClientConfig{loader: loader, overrides: overrides, icc: &inClusterClientConfig{overrides: overrides}}
 }
 
 // NewInteractiveDeferredLoadingClientConfig creates a ConfigClientClientConfig using the passed context name and the fallback auth reader
 func NewInteractiveDeferredLoadingClientConfig(loader ClientConfigLoader, overrides *ConfigOverrides, fallbackReader io.Reader) ClientConfig {
-	return &DeferredLoadingClientConfig{loader: loader, overrides: overrides, icc: inClusterClientConfig{}, fallbackReader: fallbackReader}
+	return &DeferredLoadingClientConfig{loader: loader, overrides: overrides, icc: &inClusterClientConfig{overrides: overrides}, fallbackReader: fallbackReader}
 }
 
 func (config *DeferredLoadingClientConfig) createClientConfig() (ClientConfig, error) {
