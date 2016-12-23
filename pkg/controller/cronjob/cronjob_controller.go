@@ -151,7 +151,7 @@ func SyncOne(sj batch.CronJob, js []batch.Job, now time.Time, jc jobControlInter
 	}
 
 	// Remove any job reference from the active list if the corresponding job does not exist any more.
-	// Otherwise, the cronjob will may stuck in active mode forever even though there is no matching
+	// Otherwise, the cronjob may be stuck in active mode forever even though there is no matching
 	// job running.
 
 	childrenJobs := make(map[types.UID]bool)
