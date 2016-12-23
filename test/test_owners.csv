@@ -179,6 +179,8 @@ Federation secrets Secret objects should be created and deleted successfully,pmo
 Federation secrets Secret objects should be deleted from underlying clusters when OrphanDependents is false,nikhiljindal,0
 Federation secrets Secret objects should not be deleted from underlying clusters when OrphanDependents is nil,nikhiljindal,0
 Federation secrets Secret objects should not be deleted from underlying clusters when OrphanDependents is true,nikhiljindal,0
+Firewall rule should create valid firewall rules for LoadBalancer type service,brendandburns,0
+Firewall rule should have correct firewall rules for e2e cluster,brendandburns,0
 GCP Volumes GlusterFS should be mountable,nikhiljindal,0
 GCP Volumes NFSv4 should be mountable for NFSv4,nikhiljindal,0
 GKE local SSD should write and read from node local SSD,fabioy,0

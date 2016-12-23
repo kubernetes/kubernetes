@@ -12056,3 +12056,56 @@ go_library(
         "//pkg/api/v1:go_default_library",
     ],
 )
+
+go_library(
+    name = "golang.org/x/text/encoding",
+    srcs = ["golang.org/x/text/encoding/encoding.go"],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:golang.org/x/text/encoding/internal/identifier",
+        "//vendor:golang.org/x/text/transform",
+    ],
+)
+
+go_library(
+    name = "golang.org/x/text/encoding/internal",
+    srcs = ["golang.org/x/text/encoding/internal/internal.go"],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:golang.org/x/text/encoding",
+        "//vendor:golang.org/x/text/encoding/internal/identifier",
+        "//vendor:golang.org/x/text/transform",
+    ],
+)
+
+go_library(
+    name = "golang.org/x/text/encoding/internal/identifier",
+    srcs = [
+        "golang.org/x/text/encoding/internal/identifier/identifier.go",
+        "golang.org/x/text/encoding/internal/identifier/mib.go",
+    ],
+    tags = ["automanaged"],
+)
+
+go_library(
+    name = "golang.org/x/text/encoding/unicode",
+    srcs = [
+        "golang.org/x/text/encoding/unicode/override.go",
+        "golang.org/x/text/encoding/unicode/unicode.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:golang.org/x/text/encoding",
+        "//vendor:golang.org/x/text/encoding/internal",
+        "//vendor:golang.org/x/text/encoding/internal/identifier",
+        "//vendor:golang.org/x/text/internal/utf8internal",
+        "//vendor:golang.org/x/text/runes",
+        "//vendor:golang.org/x/text/transform",
+    ],
+)
+
+go_library(
+    name = "golang.org/x/text/internal/utf8internal",
+    srcs = ["golang.org/x/text/internal/utf8internal/utf8internal.go"],
+    tags = ["automanaged"],
+)
