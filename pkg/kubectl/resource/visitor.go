@@ -26,6 +26,9 @@ import (
 	"path/filepath"
 	"time"
 
+	"golang.org/x/text/encoding/unicode"
+	"golang.org/x/text/transform"
+
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/meta"
@@ -489,7 +492,11 @@ func (v *FileVisitor) Visit(fn VisitorFunc) error {
 		}
 	}
 	defer f.Close()
-	v.StreamVisitor.Reader = f
+
+	// TODO: Consider adding a flag to force to UTF16, apparently some
+	// Windows tools don't write the BOM
+	utf16bom := unicode.BOMOverride(unicode.UTF8.NewDecoder())
+	v.StreamVisitor.Reader = transform.NewReader(f, utf16bom)
 
 	return v.StreamVisitor.Visit(fn)
 }
