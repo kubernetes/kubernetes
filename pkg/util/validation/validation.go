@@ -24,10 +24,12 @@ import (
 	"strings"
 )
 
-const qnameCharFmt string = "[A-Za-z0-9]"
-const qnameExtCharFmt string = "[-A-Za-z0-9_.]"
-const qualifiedNameFmt string = "(" + qnameCharFmt + qnameExtCharFmt + "*)?" + qnameCharFmt
-const qualifiedNameMaxLength int = 63
+const (
+	qnameCharFmt           string = "[A-Za-z0-9]"
+	qnameExtCharFmt        string = "[-A-Za-z0-9_.]"
+	qualifiedNameFmt       string = "(" + qnameCharFmt + qnameExtCharFmt + "*)?" + qnameCharFmt
+	qualifiedNameMaxLength int    = 63
+)
 
 var qualifiedNameRegexp = regexp.MustCompile("^" + qualifiedNameFmt + "$")
 
@@ -66,8 +68,10 @@ func IsQualifiedName(value string) []string {
 	return errs
 }
 
-const labelValueFmt string = "(" + qualifiedNameFmt + ")?"
-const LabelValueMaxLength int = 63
+const (
+	labelValueFmt       string = "(" + qualifiedNameFmt + ")?"
+	LabelValueMaxLength int    = 63
+)
 
 var labelValueRegexp = regexp.MustCompile("^" + labelValueFmt + "$")
 
@@ -85,8 +89,10 @@ func IsValidLabelValue(value string) []string {
 	return errs
 }
 
-const dns1123LabelFmt string = "[a-z0-9]([-a-z0-9]*[a-z0-9])?"
-const DNS1123LabelMaxLength int = 63
+const (
+	dns1123LabelFmt       string = "[a-z0-9]([-a-z0-9]*[a-z0-9])?"
+	DNS1123LabelMaxLength int    = 63
+)
 
 var dns1123LabelRegexp = regexp.MustCompile("^" + dns1123LabelFmt + "$")
 
@@ -103,8 +109,10 @@ func IsDNS1123Label(value string) []string {
 	return errs
 }
 
-const dns1123SubdomainFmt string = dns1123LabelFmt + "(\\." + dns1123LabelFmt + ")*"
-const DNS1123SubdomainMaxLength int = 253
+const (
+	dns1123SubdomainFmt       string = dns1123LabelFmt + "(\\." + dns1123LabelFmt + ")*"
+	DNS1123SubdomainMaxLength int    = 253
+)
 
 var dns1123SubdomainRegexp = regexp.MustCompile("^" + dns1123SubdomainFmt + "$")
 
@@ -121,8 +129,10 @@ func IsDNS1123Subdomain(value string) []string {
 	return errs
 }
 
-const dns1035LabelFmt string = "[a-z]([-a-z0-9]*[a-z0-9])?"
-const DNS1035LabelMaxLength int = 63
+const (
+	dns1035LabelFmt       string = "[a-z]([-a-z0-9]*[a-z0-9])?"
+	DNS1035LabelMaxLength int    = 63
+)
 
 var dns1035LabelRegexp = regexp.MustCompile("^" + dns1035LabelFmt + "$")
 
