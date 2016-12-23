@@ -17,25 +17,24 @@ limitations under the License.
 package dns
 
 import (
-	"encoding/json"
 	"fmt"
 	"net"
 	"strings"
 	"sync"
 	"time"
 
-	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/api/v1/endpoints"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
-	kcache "k8s.io/kubernetes/pkg/client/cache"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/pkg/api/v1"
+	metav1 "k8s.io/client-go/pkg/apis/meta/v1"
+	"k8s.io/client-go/pkg/runtime"
+	"k8s.io/client-go/pkg/watch"
+	kcache "k8s.io/client-go/tools/cache"
+
 	"k8s.io/kubernetes/pkg/dns/config"
 	"k8s.io/kubernetes/pkg/dns/treecache"
 	"k8s.io/kubernetes/pkg/dns/util"
-	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/validation"
 	"k8s.io/kubernetes/pkg/util/wait"
-	"k8s.io/kubernetes/pkg/watch"
 
 	etcd "github.com/coreos/etcd/client"
 	"github.com/golang/glog"
@@ -392,11 +391,6 @@ func (kd *KubeDNS) newPortalService(service *v1.Service) {
 }
 
 func (kd *KubeDNS) generateRecordsForHeadlessService(e *v1.Endpoints, svc *v1.Service) error {
-	// TODO: remove this after v1.4 is released and the old annotations are EOL
-	podHostnames, err := getPodHostnamesFromAnnotation(e.Annotations)
-	if err != nil {
-		return err
-	}
 	subCache := treecache.NewTreeCache()
 	glog.V(4).Infof("Endpoints Annotations: %v", e.Annotations)
 	for idx := range e.Subsets {
@@ -404,7 +398,7 @@ func (kd *KubeDNS) generateRecordsForHeadlessService(e *v1.Endpoints, svc *v1.Se
 			address := &e.Subsets[idx].Addresses[subIdx]
 			endpointIP := address.IP
 			recordValue, endpointName := util.GetSkyMsg(endpointIP, 0)
-			if hostLabel, exists := getHostname(address, podHostnames); exists {
+			if hostLabel, exists := getHostname(address); exists {
 				endpointName = hostLabel
 			}
 			subCache.SetEntry(endpointName, recordValue, kd.fqdn(svc, endpointName))
@@ -427,28 +421,11 @@ func (kd *KubeDNS) generateRecordsForHeadlessService(e *v1.Endpoints, svc *v1.Se
 	return nil
 }
 
-func getHostname(address *v1.EndpointAddress, podHostnames map[string]endpoints.HostRecord) (string, bool) {
+func getHostname(address *v1.EndpointAddress) (string, bool) {
 	if len(address.Hostname) > 0 {
 		return address.Hostname, true
 	}
-	if hostRecord, exists := podHostnames[address.IP]; exists && len(validation.IsDNS1123Label(hostRecord.HostName)) == 0 {
-		return hostRecord.HostName, true
-	}
 	return "", false
-}
-
-func getPodHostnamesFromAnnotation(annotations map[string]string) (map[string]endpoints.HostRecord, error) {
-	hostnames := map[string]endpoints.HostRecord{}
-
-	if annotations != nil {
-		if serializedHostnames, exists := annotations[endpoints.PodHostnamesAnnotation]; exists && len(serializedHostnames) > 0 {
-			err := json.Unmarshal([]byte(serializedHostnames), &hostnames)
-			if err != nil {
-				return nil, err
-			}
-		}
-	}
-	return hostnames, nil
 }
 
 func (kd *KubeDNS) generateSRVRecordValue(svc *v1.Service, portNumber int, labels ...string) *skymsg.Service {

@@ -17,7 +17,6 @@ limitations under the License.
 package dns
 
 import (
-	"encoding/json"
 	"fmt"
 	"net"
 	"reflect"
@@ -32,11 +31,12 @@ import (
 	skyserver "github.com/skynetservices/skydns/server"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"k8s.io/kubernetes/pkg/api/v1"
-	endpointsapi "k8s.io/kubernetes/pkg/api/v1/endpoints"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/client/cache"
-	fake "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
+
+	"k8s.io/client-go/kubernetes/fake"
+	"k8s.io/client-go/pkg/api/v1"
+	metav1 "k8s.io/client-go/pkg/apis/meta/v1"
+	"k8s.io/client-go/tools/cache"
+
 	"k8s.io/kubernetes/pkg/dns/config"
 	"k8s.io/kubernetes/pkg/dns/treecache"
 	"k8s.io/kubernetes/pkg/dns/util"
@@ -207,21 +207,9 @@ func TestSkyPodHostnameSRVLookup(t *testing.T) {
 
 	service := newHeadlessService()
 	endpointIPs := []string{"10.0.0.1", "10.0.0.2"}
-	endpoints := newEndpoints(service, newSubsetWithOnePort("", 80, endpointIPs...))
-
-	// The format of thes annotations is:
-	// endpoints.beta.kubernetes.io/hostnames-map: '{"ep-ip":{"HostName":"pod request hostname"}}'
-	epRecords := map[string]endpointsapi.HostRecord{}
-	for i, ep := range endpointIPs {
-		epRecords[ep] = endpointsapi.HostRecord{HostName: fmt.Sprintf("ep-%d", i)}
-	}
-	b, err := json.Marshal(epRecords)
-	if err != nil {
-		t.Fatalf("%v", err)
-	}
-	endpoints.Annotations = map[string]string{
-		endpointsapi.PodHostnamesAnnotation: string(b),
-	}
+	endpoints := newEndpoints(
+		service,
+		newSubsetWithOnePortWithHostname("", 80, true, endpointIPs...))
 	assert.NoError(t, kd.endpointsStore.Add(endpoints))
 	kd.newService(service)
 	name := strings.Join([]string{testService, testNamespace, "svc", testDomain}, ".")
@@ -676,10 +664,18 @@ func newEndpoints(service *v1.Service, subsets ...v1.EndpointSubset) *v1.Endpoin
 }
 
 func newSubsetWithOnePort(portName string, port int32, ips ...string) v1.EndpointSubset {
+	return newSubsetWithOnePortWithHostname(portName, port, false, ips...)
+}
+
+func newSubsetWithOnePortWithHostname(portName string, port int32, addHostname bool, ips ...string) v1.EndpointSubset {
 	subset := newSubset()
 	subset.Ports = append(subset.Ports, v1.EndpointPort{Port: port, Name: portName, Protocol: "TCP"})
-	for _, ip := range ips {
-		subset.Addresses = append(subset.Addresses, v1.EndpointAddress{IP: ip})
+	for i, ip := range ips {
+		var hostname string
+		if addHostname {
+			hostname = fmt.Sprintf("ep-%d", i)
+		}
+		subset.Addresses = append(subset.Addresses, v1.EndpointAddress{IP: ip, Hostname: hostname})
 	}
 	return subset
 }
