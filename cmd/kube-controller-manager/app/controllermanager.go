@@ -239,6 +239,10 @@ func newControllerInitializers() map[string]InitFunc {
 	controllers["statefuleset"] = startStatefulSetController
 	controllers["cronjob"] = startCronJobController
 	controllers["certificatesigningrequests"] = startCSRController
+	controllers["role"] = startRoleController
+	controllers["rolebinding"] = startRoleBindingController
+	controllers["clusterrole"] = startClusterRoleController
+	controllers["clusterrolebinding"] = startClusterRoleBindingController
 
 	return controllers
 }

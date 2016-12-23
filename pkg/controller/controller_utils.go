@@ -31,6 +31,7 @@ import (
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/client/cache"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -603,6 +604,82 @@ func (f *FakePodControl) Clear() {
 	f.Templates = []v1.PodTemplateSpec{}
 	f.ControllerRefs = []metav1.OwnerReference{}
 	f.Patches = [][]byte{}
+}
+
+// RoleBindingControlInterface is an interface that knows how to add or delete
+// RoleBindings, as well as increment or decrement them. It is used
+// by the Role controller to ease testing of actions that it takes.
+type RoleBindingControlInterface interface {
+	PatchRoleBinding(namespace, name string, data []byte) error
+}
+
+// RealRoleBindingControl is the default implementation of RoleControllerInterface.
+type RealRoleBindingControl struct {
+	KubeClient internalclientset.Interface
+	Recorder   record.EventRecorder
+}
+
+var _ RoleBindingControlInterface = &RealRoleBindingControl{}
+
+func (r RealRoleBindingControl) PatchRoleBinding(namespace, name string, data []byte) error {
+	_, err := r.KubeClient.Rbac().RoleBindings(namespace).Patch(name, api.StrategicMergePatchType, data)
+	return err
+}
+
+type FakeRoleBindingControl struct {
+	sync.Mutex
+	Patches [][]byte
+	Err     error
+}
+
+var _ RoleBindingControlInterface = &FakeRoleBindingControl{}
+
+func (f *FakeRoleBindingControl) PatchRoleBinding(namespace, name string, data []byte) error {
+	f.Lock()
+	defer f.Unlock()
+	f.Patches = append(f.Patches, data)
+	if f.Err != nil {
+		return f.Err
+	}
+	return nil
+}
+
+// ClusterRoleBindingControlInterface is an interface that knows how to add or delete
+// Roles, as well as increment or decrement them. It is used
+// by the ClusterRoleBinding controller to ease testing of actions that it takes.
+type ClusterRoleBindingControlInterface interface {
+	PatchClusterRoleBinding(name string, data []byte) error
+}
+
+// RealClusterRoleBindingControl is the default implementation of ClusterRoleBindingControllerInterface.
+type RealClusterRoleBindingControl struct {
+	KubeClient internalclientset.Interface
+	Recorder   record.EventRecorder
+}
+
+var _ ClusterRoleBindingControlInterface = &RealClusterRoleBindingControl{}
+
+func (r RealClusterRoleBindingControl) PatchClusterRoleBinding(name string, data []byte) error {
+	_, err := r.KubeClient.Rbac().ClusterRoleBindings().Patch(name, api.StrategicMergePatchType, data)
+	return err
+}
+
+type FakeClusterRoleBindingControl struct {
+	sync.Mutex
+	Patches [][]byte
+	Err     error
+}
+
+var _ ClusterRoleBindingControlInterface = &FakeClusterRoleBindingControl{}
+
+func (f *FakeClusterRoleBindingControl) PatchClusterRoleBinding(name string, data []byte) error {
+	f.Lock()
+	defer f.Unlock()
+	f.Patches = append(f.Patches, data)
+	if f.Err != nil {
+		return f.Err
+	}
+	return nil
 }
 
 // ByLogging allows custom sorting of pods so the best one can be picked for getting its logs.
