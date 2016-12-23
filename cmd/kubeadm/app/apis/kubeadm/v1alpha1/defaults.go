@@ -52,4 +52,8 @@ func SetDefaults_MasterConfiguration(obj *MasterConfiguration) {
 	if obj.Networking.DNSDomain == "" {
 		obj.Networking.DNSDomain = DefaultServiceDNSDomain
 	}
+
+	if obj.Discovery.Token == nil && obj.Discovery.File == nil && obj.Discovery.HTTPS == nil {
+		obj.Discovery.Token = &TokenDiscovery{}
+	}
 }
