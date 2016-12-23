@@ -32,7 +32,7 @@ import (
 
 // StorageFactory is the interface to locate the storage for a given GroupResource
 type StorageFactory interface {
-	// New finds the storage destination for the given group and resource. It will
+	// NewConfig finds the storage destination for the given group and resource. It will
 	// return an error if the group has no storage destination configured.
 	NewConfig(groupResource unversioned.GroupResource) (*storagebackend.Config, error)
 
@@ -164,7 +164,7 @@ func (s *DefaultStorageFactory) getStorageGroupResource(groupResource unversione
 	return groupResource
 }
 
-// New finds the storage destination for the given group and resource. It will
+// NewConfig finds the storage destination for the given group and resource. It will
 // return an error if the group has no storage destination configured.
 func (s *DefaultStorageFactory) NewConfig(groupResource unversioned.GroupResource) (*storagebackend.Config, error) {
 	chosenStorageResource := s.getStorageGroupResource(groupResource)
@@ -229,7 +229,7 @@ func (s *DefaultStorageFactory) NewConfig(groupResource unversioned.GroupResourc
 	return &config, nil
 }
 
-// Get all backends for all registered storage destinations.
+// Backends gets all backends for all registered storage destinations.
 // Used for getting all instances for health validations.
 func (s *DefaultStorageFactory) Backends() []string {
 	backends := sets.NewString(s.StorageConfig.ServerList...)
