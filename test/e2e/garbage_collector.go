@@ -21,8 +21,10 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api/v1"
+	v1beta1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/metrics"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -40,6 +42,40 @@ func getNonOrphanOptions() *v1.DeleteOptions {
 	return &v1.DeleteOptions{OrphanDependents: &falseVar}
 }
 
+var zero = int64(0)
+var deploymentLabels = map[string]string{"app": "gc-test"}
+var podTemplateSpec = v1.PodTemplateSpec{
+	ObjectMeta: v1.ObjectMeta{
+		Labels: deploymentLabels,
+	},
+	Spec: v1.PodSpec{
+		TerminationGracePeriodSeconds: &zero,
+		Containers: []v1.Container{
+			{
+				Name:  "nginx",
+				Image: "gcr.io/google_containers/nginx:1.7.9",
+			},
+		},
+	},
+}
+
+func newOwnerDeployment(f *framework.Framework, deploymentName string) *v1beta1.Deployment {
+	replicas := int32(2)
+	return &v1beta1.Deployment{
+		ObjectMeta: v1.ObjectMeta{
+			Name: deploymentName,
+		},
+		Spec: v1beta1.DeploymentSpec{
+			Replicas: &replicas,
+			Selector: &metav1.LabelSelector{MatchLabels: deploymentLabels},
+			Strategy: v1beta1.DeploymentStrategy{
+				Type: v1beta1.RollingUpdateDeploymentStrategyType,
+			},
+			Template: podTemplateSpec,
+		},
+	}
+}
+
 func newOwnerRC(f *framework.Framework, name string) *v1.ReplicationController {
 	var replicas int32
 	replicas = 2
@@ -55,21 +91,38 @@ func newOwnerRC(f *framework.Framework, name string) *v1.ReplicationController {
 		Spec: v1.ReplicationControllerSpec{
 			Replicas: &replicas,
 			Selector: map[string]string{"app": "gc-test"},
-			Template: &v1.PodTemplateSpec{
-				ObjectMeta: v1.ObjectMeta{
-					Labels: map[string]string{"app": "gc-test"},
-				},
-				Spec: v1.PodSpec{
-					Containers: []v1.Container{
-						{
-							Name:  "nginx",
-							Image: "gcr.io/google_containers/nginx:1.7.9",
-						},
-					},
-				},
-			},
+			Template: &podTemplateSpec,
 		},
 	}
+}
+
+// verifyRemainingDeploymentsAndReplicaSets verifies if the number of the remaining deployment
+// and rs are deploymentNum and rsNum. It returns error if the
+// communication with the API server fails.
+func verifyRemainingDeploymentsAndReplicaSets(
+	f *framework.Framework,
+	clientSet clientset.Interface,
+	deployment *v1beta1.Deployment,
+	deploymentNum, rsNum int,
+) (bool, error) {
+	var ret = true
+	rs, err := clientSet.Extensions().ReplicaSets(f.Namespace.Name).List(v1.ListOptions{})
+	if err != nil {
+		return false, fmt.Errorf("Failed to list rs: %v", err)
+	}
+	if len(rs.Items) != rsNum {
+		ret = false
+		By(fmt.Sprintf("expected %d rs, got %d rs", rsNum, len(rs.Items)))
+	}
+	deployments, err := clientSet.Extensions().Deployments(f.Namespace.Name).List(v1.ListOptions{})
+	if err != nil {
+		return false, fmt.Errorf("Failed to list deployments: %v", err)
+	}
+	if len(deployments.Items) != deploymentNum {
+		ret = false
+		By(fmt.Sprintf("expected %d Deploymentss, got %d Deployments", deploymentNum, len(deployments.Items)))
+	}
+	return ret, nil
 }
 
 // verifyRemainingObjects verifies if the number of the remaining replication
@@ -116,7 +169,7 @@ func gatherMetrics(f *framework.Framework) {
 
 var _ = framework.KubeDescribe("Garbage collector", func() {
 	f := framework.NewDefaultFramework("gc")
-	It("[Feature:GarbageCollector] should delete pods created by rc when not orphaning", func() {
+	It("should delete pods created by rc when not orphaning", func() {
 		clientSet := f.ClientSet
 		rcClient := clientSet.Core().ReplicationControllers(f.Namespace.Name)
 		podClient := clientSet.Core().Pods(f.Namespace.Name)
@@ -167,7 +220,7 @@ var _ = framework.KubeDescribe("Garbage collector", func() {
 		gatherMetrics(f)
 	})
 
-	It("[Feature:GarbageCollector] should orphan pods created by rc if delete options say so", func() {
+	It("should orphan pods created by rc if delete options say so", func() {
 		clientSet := f.ClientSet
 		rcClient := clientSet.Core().ReplicationControllers(f.Namespace.Name)
 		podClient := clientSet.Core().Pods(f.Namespace.Name)
@@ -229,7 +282,7 @@ var _ = framework.KubeDescribe("Garbage collector", func() {
 		gatherMetrics(f)
 	})
 
-	It("[Feature:GarbageCollector] should orphan pods created by rc if deleteOptions.OrphanDependents is nil", func() {
+	It("should orphan pods created by rc if deleteOptions.OrphanDependents is nil", func() {
 		clientSet := f.ClientSet
 		rcClient := clientSet.Core().ReplicationControllers(f.Namespace.Name)
 		podClient := clientSet.Core().Pods(f.Namespace.Name)
@@ -275,4 +328,117 @@ var _ = framework.KubeDescribe("Garbage collector", func() {
 		}
 		gatherMetrics(f)
 	})
+
+	It("should delete RS created by deployment when not orphaning", func() {
+		clientSet := f.ClientSet
+		deployClient := clientSet.Extensions().Deployments(f.Namespace.Name)
+		rsClient := clientSet.Extensions().ReplicaSets(f.Namespace.Name)
+		deploymentName := "simpletest.deployment"
+		deployment := newOwnerDeployment(f, deploymentName)
+		By("create the deployment")
+		createdDeployment, err := deployClient.Create(deployment)
+		if err != nil {
+			framework.Failf("Failed to create deployment: %v", err)
+		}
+		// wait for deployment to create some rs
+		By("Wait for the Deployment to create new ReplicaSet")
+		err = wait.PollImmediate(500*time.Millisecond, 1*time.Minute, func() (bool, error) {
+			rsList, err := rsClient.List(v1.ListOptions{})
+			if err != nil {
+				return false, fmt.Errorf("Failed to list rs: %v", err)
+			}
+			return len(rsList.Items) > 0, nil
+
+		})
+		if err == wait.ErrWaitTimeout {
+			err = fmt.Errorf("Failed to wait for the Deployment to create some ReplicaSet: %v", err)
+		}
+
+		By("delete the deployment")
+		deleteOptions := getNonOrphanOptions()
+		deleteOptions.Preconditions = v1.NewUIDPreconditions(string(createdDeployment.UID))
+		if err := deployClient.Delete(deployment.ObjectMeta.Name, deleteOptions); err != nil {
+			framework.Failf("failed to delete the deployment: %v", err)
+		}
+		By("wait for all rs to be garbage collected")
+		err = wait.PollImmediate(500*time.Millisecond, 1*time.Minute, func() (bool, error) {
+			return verifyRemainingDeploymentsAndReplicaSets(f, clientSet, deployment, 0, 0)
+		})
+		if err == wait.ErrWaitTimeout {
+			err = fmt.Errorf("Failed to wait for all rs to be garbage collected: %v", err)
+			remainingRSs, err := rsClient.List(v1.ListOptions{})
+			if err != nil {
+				framework.Failf("failed to list RSs post mortem: %v", err)
+			} else {
+				framework.Failf("remaining rs are: %#v", remainingRSs)
+			}
+
+		}
+
+		gatherMetrics(f)
+	})
+
+	It("should orphan RS created by deployment when deleteOptions.OrphanDependents is true", func() {
+		clientSet := f.ClientSet
+		deployClient := clientSet.Extensions().Deployments(f.Namespace.Name)
+		rsClient := clientSet.Extensions().ReplicaSets(f.Namespace.Name)
+		deploymentName := "simpletest.deployment"
+		deployment := newOwnerDeployment(f, deploymentName)
+		By("create the deployment")
+		createdDeployment, err := deployClient.Create(deployment)
+		if err != nil {
+			framework.Failf("Failed to create deployment: %v", err)
+		}
+		// wait for deployment to create some rs
+		By("Wait for the Deployment to create new ReplicaSet")
+		err = wait.PollImmediate(500*time.Millisecond, 1*time.Minute, func() (bool, error) {
+			rsList, err := rsClient.List(v1.ListOptions{})
+			if err != nil {
+				return false, fmt.Errorf("Failed to list rs: %v", err)
+			}
+			return len(rsList.Items) > 0, nil
+
+		})
+		if err == wait.ErrWaitTimeout {
+			err = fmt.Errorf("Failed to wait for the Deployment to create some ReplicaSet: %v", err)
+		}
+
+		By("delete the deployment")
+		deleteOptions := getOrphanOptions()
+		deleteOptions.Preconditions = v1.NewUIDPreconditions(string(createdDeployment.UID))
+		if err := deployClient.Delete(deployment.ObjectMeta.Name, deleteOptions); err != nil {
+			framework.Failf("failed to delete the deployment: %v", err)
+		}
+		By("wait for 2 Minute to see if the garbage collector mistakenly deletes the rs")
+		err = wait.PollImmediate(5*time.Second, 2*time.Minute, func() (bool, error) {
+			return verifyRemainingDeploymentsAndReplicaSets(f, clientSet, deployment, 0, 1)
+		})
+		if err != nil {
+			err = fmt.Errorf("Failed to wait to see if the garbage collecter mistakenly deletes the rs: %v", err)
+			remainingRSs, err := rsClient.List(v1.ListOptions{})
+			if err != nil {
+				framework.Failf("failed to list RSs post mortem: %v", err)
+			} else {
+				framework.Failf("remaining rs post mortem: %#v", remainingRSs)
+			}
+			remainingDSs, err := deployClient.List(v1.ListOptions{})
+			if err != nil {
+				framework.Failf("failed to list Deployments post mortem: %v", err)
+			} else {
+				framework.Failf("remaining deployment's post mortem: %#v", remainingDSs)
+			}
+		}
+		rs, err := clientSet.Extensions().ReplicaSets(f.Namespace.Name).List(v1.ListOptions{})
+		if err != nil {
+			framework.Failf("Failed to list ReplicaSet %v", err)
+		}
+		for _, replicaSet := range rs.Items {
+			if controller.GetControllerOf(replicaSet.ObjectMeta) != nil {
+				framework.Failf("Found ReplicaSet with non nil ownerRef %v", replicaSet)
+			}
+		}
+
+		gatherMetrics(f)
+	})
+
 })

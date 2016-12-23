@@ -28,6 +28,7 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/v1"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
@@ -39,6 +40,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller/deployment/util"
 	"k8s.io/kubernetes/pkg/controller/informers"
 	"k8s.io/kubernetes/pkg/labels"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/util/metrics"
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
@@ -58,9 +60,14 @@ const (
 	MaxRetries = 5
 )
 
+func getDeploymentKind() schema.GroupVersionKind {
+	return extensions.SchemeGroupVersion.WithKind("Deployment")
+}
+
 // DeploymentController is responsible for synchronizing Deployment objects stored
 // in the system with actual running replica sets and pods.
 type DeploymentController struct {
+	rsControl     controller.RSControlInterface
 	client        clientset.Interface
 	eventRecorder record.EventRecorder
 
@@ -105,6 +112,10 @@ func NewDeploymentController(dInformer informers.DeploymentInformer, rsInformer 
 		eventRecorder: eventBroadcaster.NewRecorder(v1.EventSource{Component: "deployment-controller"}),
 		queue:         workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "deployment"),
 		progressQueue: workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "progress-check"),
+	}
+	dc.rsControl = controller.RealRSControl{
+		KubeClient: client,
+		Recorder:   dc.eventRecorder,
 	}
 
 	dInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
@@ -428,6 +439,48 @@ func (dc *DeploymentController) handleErr(err error, key interface{}) {
 	dc.queue.Forget(key)
 }
 
+// classifyReplicaSets uses NewReplicaSetControllerRefManager to classify ReplicaSets
+// and adopts them if their labels match the Deployment but are missing the reference.
+// It also removes the controllerRef for ReplicaSets, whose labels no longer matches
+// the deployment.
+func (dc *DeploymentController) classifyReplicaSets(deployment *extensions.Deployment) error {
+	rsList, err := dc.rsLister.ReplicaSets(deployment.Namespace).List(labels.Everything())
+	if err != nil {
+		return err
+	}
+
+	deploymentSelector, err := metav1.LabelSelectorAsSelector(deployment.Spec.Selector)
+	if err != nil {
+		return fmt.Errorf("deployment %s/%s has invalid label selector: %v", deployment.Namespace, deployment.Name, err)
+	}
+	cm := controller.NewReplicaSetControllerRefManager(dc.rsControl, deployment.ObjectMeta, deploymentSelector, getDeploymentKind())
+	matchesAndControlled, matchesNeedsController, controlledDoesNotMatch := cm.Classify(rsList)
+	// Adopt replica sets only if this deployment is not going to be deleted.
+	if deployment.DeletionTimestamp == nil {
+		for _, replicaSet := range matchesNeedsController {
+			err := cm.AdoptReplicaSet(replicaSet)
+			// continue to next RS if adoption fails.
+			if err != nil {
+				// If the RS no longer exists, don't even log the error.
+				if !errors.IsNotFound(err) {
+					utilruntime.HandleError(err)
+				}
+			} else {
+				matchesAndControlled = append(matchesAndControlled, replicaSet)
+			}
+		}
+	}
+	// remove the controllerRef for the RS that no longer have matching labels
+	var errlist []error
+	for _, replicaSet := range controlledDoesNotMatch {
+		err := cm.ReleaseReplicaSet(replicaSet)
+		if err != nil {
+			errlist = append(errlist, err)
+		}
+	}
+	return utilerrors.NewAggregate(errlist)
+}
+
 // syncDeployment will sync the deployment with the given key.
 // This function is not meant to be invoked concurrently with the same key.
 func (dc *DeploymentController) syncDeployment(key string) error {
@@ -484,6 +537,11 @@ func (dc *DeploymentController) syncDeployment(key string) error {
 
 	if d.DeletionTimestamp != nil {
 		return dc.syncStatusOnly(d)
+	}
+
+	err = dc.classifyReplicaSets(deployment)
+	if err != nil {
+		return err
 	}
 
 	// Update deployment conditions with an Unknown condition when pausing/resuming
