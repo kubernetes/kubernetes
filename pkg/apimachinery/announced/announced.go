@@ -43,7 +43,7 @@ var (
 //
 // (Right now APIRegistrationManager has separate 'registration' and 'enabled'
 // concepts-- APIGroupFactory is going to take over the former function;
-// they will overlap untill the refactoring is finished.)
+// they will overlap until the refactoring is finished.)
 //
 // The key is the group name. After initialization, this should be treated as
 // read-only. It is implemented as a map from group name to group factory, and

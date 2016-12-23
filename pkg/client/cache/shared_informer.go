@@ -130,7 +130,7 @@ type sharedIndexInformer struct {
 }
 
 // dummyController hides the fact that a SharedInformer is different from a dedicated one
-// where a caller can `Run`.  The run method is disonnected in this case, because higher
+// where a caller can `Run`.  The run method is disconnected in this case, because higher
 // level logic will decide when to start the SharedInformer and related controller.
 // Because returning information back is always asynchronous, the legacy callers shouldn't
 // notice any change in behavior.

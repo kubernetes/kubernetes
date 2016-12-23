@@ -382,7 +382,7 @@ func (adc *attachDetachController) processPodVolumes(
 	return
 }
 
-// createVolumeSpec creates and returns a mutatable volume.Spec object for the
+// createVolumeSpec creates and returns a mutable volume.Spec object for the
 // specified volume. It dereference any PVC to get PV objects, if needed.
 func (adc *attachDetachController) createVolumeSpec(
 	podVolume v1.Volume, podNamespace string) (*volume.Spec, error) {

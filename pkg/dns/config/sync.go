@@ -176,7 +176,7 @@ func (sync *kubeSync) processUpdate(cm *v1.ConfigMap) (config *Config, changed b
 	}
 
 	if err = config.Validate(); err != nil {
-		glog.Errorf("Invalid onfiguration: %v (value was %+v), ignoring update",
+		glog.Errorf("Invalid configuration: %v (value was %+v), ignoring update",
 			err, config)
 		config = nil
 		return

@@ -585,7 +585,7 @@ func (dc *DisruptionController) getExpectedPodCount(pdb *policy.PodDisruptionBud
 func countHealthyPods(pods []*v1.Pod, disruptedPods map[string]metav1.Time, currentTime time.Time) (currentHealthy int32) {
 Pod:
 	for _, pod := range pods {
-		// Pod is beeing deleted.
+		// Pod is being deleted.
 		if pod.DeletionTimestamp != nil {
 			continue
 		}

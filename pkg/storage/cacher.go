@@ -59,7 +59,7 @@ type CacherConfig struct {
 	Type           interface{}
 	ResourcePrefix string
 
-	// KeyFunc is used to get a key in the underyling storage for a given object.
+	// KeyFunc is used to get a key in the underlying storage for a given object.
 	KeyFunc func(runtime.Object) (string, error)
 
 	// GetAttrsFunc is used to get object labels and fields.
@@ -638,7 +638,7 @@ func forgetWatcher(c *Cacher, index int, triggerValue string, triggerSupported b
 			defer c.Unlock()
 		}
 		// It's possible that the watcher is already not in the structure (e.g. in case of
-		// simulaneous Stop() and terminateAllWatchers(), but it doesn't break anything.
+		// simultaneous Stop() and terminateAllWatchers(), but it doesn't break anything.
 		c.watchers.deleteWatcher(index, triggerValue, triggerSupported)
 	}
 }

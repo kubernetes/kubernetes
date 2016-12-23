@@ -938,7 +938,7 @@ func WaitForObservedDeployment(getDeploymentFunc func() (*extensions.Deployment,
 
 // TODO: remove the duplicate
 // WaitForObservedInternalDeployment polls for deployment to be updated so that deployment.Status.ObservedGeneration >= desiredGeneration.
-// Returns error if polling timesout.
+// Returns error if polling timeout.
 func WaitForObservedDeploymentInternal(getDeploymentFunc func() (*internalextensions.Deployment, error), desiredGeneration int64, interval, timeout time.Duration) error {
 	return wait.Poll(interval, timeout, func() (bool, error) {
 		deployment, err := getDeploymentFunc()

@@ -363,7 +363,7 @@ func TestSetDefaulEndpointsProtocol(t *testing.T) {
 	}
 }
 
-func TestSetDefaulServiceTargetPort(t *testing.T) {
+func TestSetDefaultServiceTargetPort(t *testing.T) {
 	in := &versioned.Service{Spec: versioned.ServiceSpec{Ports: []versioned.ServicePort{{Port: 1234}}}}
 	obj := roundTrip(t, runtime.Object(in))
 	out := obj.(*versioned.Service)

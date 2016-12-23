@@ -64,7 +64,7 @@ type rangeAllocator struct {
 	// This increases a throughput of CIDR assignment by not blocking on long operations.
 	nodeCIDRUpdateChannel chan nodeAndCIDR
 	recorder              record.EventRecorder
-	// Keep a set of nodes that are currectly being processed to avoid races in CIDR allocation
+	// Keep a set of nodes that are correctly being processed to avoid races in CIDR allocation
 	sync.Mutex
 	nodesInProcessing sets.String
 }

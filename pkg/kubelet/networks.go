@@ -50,7 +50,7 @@ func (nh *networkHost) SupportsLegacyFeatures() bool {
 }
 
 // criNetworkHost implements the part of network.Host required by the
-// cri (NamespaceGetter). It leechs off networkHost for all other
+// cri (NamespaceGetter). It leeches off networkHost for all other
 // methods, because networkHost is slated for deletion.
 type criNetworkHost struct {
 	*networkHost

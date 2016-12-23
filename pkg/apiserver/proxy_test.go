@@ -127,7 +127,7 @@ func TestProxyRequestContentLengthAndTransferEncoding(t *testing.T) {
 				"Content-Encoding":  nil, // none set
 				"Transfer-Encoding": nil, // Transfer-Encoding gets removed
 			},
-			expectedBody: sampleData, // sample data is unchunked
+			expectedBody: sampleData, // sample data is unchecked
 		},
 
 		"chunked transfer-encoding + gzip content-encoding": {
@@ -142,7 +142,7 @@ func TestProxyRequestContentLengthAndTransferEncoding(t *testing.T) {
 				"Content-Encoding":  []string{"gzip"},
 				"Transfer-Encoding": nil, // gets removed
 			},
-			expectedBody: zip(sampleData), // sample data is unchunked, but content-encoding is preserved
+			expectedBody: zip(sampleData), // sample data is unchecked, but content-encoding is preserved
 		},
 
 		// "Transfer-Encoding: gzip" is not supported by go

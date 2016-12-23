@@ -57,7 +57,7 @@ func (s PodDisruptionBudgetV1Generator) Generate(params map[string]interface{}) 
 	if !isString {
 		return nil, fmt.Errorf("expected string, found %v", minAvailable)
 	}
-	selector, isString := params["selecor"].(string)
+	selector, isString := params["selector"].(string)
 	if !isString {
 		return nil, fmt.Errorf("expected string, found %v", selector)
 	}
@@ -96,7 +96,7 @@ func (s *PodDisruptionBudgetV1Generator) validate() error {
 		return fmt.Errorf("a selector must be specified")
 	}
 	if len(s.MinAvailable) == 0 {
-		return fmt.Errorf("the minimim number of available pods required must be specified")
+		return fmt.Errorf("the minimum number of available pods required must be specified")
 	}
 	return nil
 }
