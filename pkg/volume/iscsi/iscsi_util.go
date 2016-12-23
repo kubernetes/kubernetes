@@ -87,22 +87,29 @@ func getDevicePrefixRefCount(mounter mount.Interface, deviceNamePrefix string) (
 	return refCount, nil
 }
 
-// make a directory like /var/lib/kubelet/plugins/kubernetes.io/iscsi/portal-some_iqn-lun-lun_id
-func makePDNameInternal(host volume.VolumeHost, portal string, iqn string, lun string) string {
-	return path.Join(host.GetPluginDir(iscsiPluginName), portal+"-"+iqn+"-lun-"+lun)
+// make a directory like /var/lib/kubelet/plugins/kubernetes.io/iscsi/iface_name/portal-some_iqn-lun-lun_id
+func makePDNameInternal(host volume.VolumeHost, portal string, iqn string, lun string, iface string) string {
+	return path.Join(host.GetPluginDir(iscsiPluginName), iface, portal+"-"+iqn+"-lun-"+lun)
 }
 
 type ISCSIUtil struct{}
 
 func (util *ISCSIUtil) MakeGlobalPDName(iscsi iscsiDisk) string {
-	return makePDNameInternal(iscsi.plugin.host, iscsi.portal, iscsi.iqn, iscsi.lun)
+	return makePDNameInternal(iscsi.plugin.host, iscsi.portal, iscsi.iqn, iscsi.lun, iscsi.iface)
 }
 
 func (util *ISCSIUtil) AttachDisk(b iscsiDiskMounter) error {
 	var devicePath string
 	var iscsiTransport string
 
-	out, err := b.plugin.execCommand("iscsiadm", []string{"-m", "iface", "-I", b.iface, "-o", "show"})
+	// Rescan sessions to discover newly mapped LUNs. Do not specify the interface when rescanning
+	// to avoid establishing additional sessions to the same target.
+	out, err := b.plugin.execCommand("iscsiadm", []string{"-m", "node", "-p", b.portal, "-T", b.iqn, "-R"})
+	if err != nil {
+		glog.Errorf("iscsi: failed to rescan session with error: %s (%v)", string(out), err)
+	}
+
+	out, err = b.plugin.execCommand("iscsiadm", []string{"-m", "iface", "-I", b.iface, "-o", "show"})
 	if err != nil {
 		glog.Errorf("iscsi: could not read iface %s error: %s", b.iface, string(out))
 		return err
@@ -121,7 +128,7 @@ func (util *ISCSIUtil) AttachDisk(b iscsiDiskMounter) error {
 	exist := waitForPathToExist(devicePath, 1, iscsiTransport)
 	if exist == false {
 		// discover iscsi target
-		out, err := b.plugin.execCommand("iscsiadm", []string{"-m", "discovery", "-t", "sendtargets", "-p", b.portal, "-I", b.iface})
+		out, err = b.plugin.execCommand("iscsiadm", []string{"-m", "discovery", "-t", "sendtargets", "-p", b.portal, "-I", b.iface})
 		if err != nil {
 			glog.Errorf("iscsi: failed to sendtargets to portal %s error: %s", b.portal, string(out))
 			return err
@@ -182,14 +189,20 @@ func (util *ISCSIUtil) DetachDisk(c iscsiDiskUnmounter, mntPath string) error {
 		refCount, err := getDevicePrefixRefCount(c.mounter, prefix)
 
 		if err == nil && refCount == 0 {
-			// this portal/iqn are no longer referenced, log out
+			// this portal/iqn/iface are no longer referenced, log out
+			// extract iface from mount path
+			iface, err := extractIface(mntPath)
+			if err != nil {
+				return err
+			}
 			// extract portal and iqn from device path
 			portal, iqn, err := extractPortalAndIqn(device)
 			if err != nil {
 				return err
 			}
-			glog.Infof("iscsi: log out target %s iqn %s", portal, iqn)
-			out, err := c.plugin.execCommand("iscsiadm", []string{"-m", "node", "-p", portal, "-T", iqn, "--logout"})
+			glog.Infof("iscsi: log out target %s iqn %s iface %s", portal, iqn, iface)
+			// logout may fail as no session may exist for the portal/IQN on the specified interface
+			out, err := c.plugin.execCommand("iscsiadm", []string{"-m", "node", "-p", portal, "-T", iqn, "-I", iface, "--logout"})
 			if err != nil {
 				glog.Errorf("iscsi: failed to detach disk Error: %s", string(out))
 			}
@@ -221,13 +234,30 @@ func extractDeviceAndPrefix(mntPath string) (string, string, error) {
 		return "", "", fmt.Errorf("iscsi detach disk: malformatted mnt path: %s", mntPath)
 	}
 	device := mntPath[(ind + 1):]
-	// strip -lun- from device path
-	ind = strings.LastIndex(device, "-lun-")
+	// strip -lun- from mount path
+	ind = strings.LastIndex(mntPath, "-lun-")
 	if ind < 0 {
 		return "", "", fmt.Errorf("iscsi detach disk: malformatted mnt path: %s", mntPath)
 	}
-	prefix := device[:ind]
+	prefix := mntPath[:ind]
 	return device, prefix, nil
+}
+
+func extractIface(mntPath string) (string, error) {
+	ind := strings.LastIndex(mntPath, "/")
+	if ind < 0 {
+		return "", fmt.Errorf("iscsi detach disk: malformatted mnt path: %s", mntPath)
+	}
+
+	baseMntPath := mntPath[:ind]
+	ind = strings.LastIndex(baseMntPath, "/")
+	if ind < 0 {
+		return "", fmt.Errorf("iscsi detach disk: malformatted mnt path: %s", mntPath)
+	}
+
+	iface := baseMntPath[(ind + 1):]
+
+	return iface, nil
 }
 
 func extractPortalAndIqn(device string) (string, string, error) {
