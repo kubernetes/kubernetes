@@ -147,12 +147,12 @@ func NewProxier(loadBalancer LoadBalancer, listenIP net.IP, iptables iptables.In
 
 	hostIP, err := utilnet.ChooseHostInterface()
 	if err != nil {
-		return nil, fmt.Errorf("failed to select a host interface: %v", err)
+		return nil, fmt.Errorf("Failed to select a host interface: %v", err)
 	}
 
 	err = setRLimit(64 * 1000)
 	if err != nil {
-		return nil, fmt.Errorf("failed to set open file handler limit: %v", err)
+		return nil, fmt.Errorf("Failed to set open file handler limit: %v", err)
 	}
 
 	proxyPorts := newPortAllocator(pr)
@@ -168,12 +168,12 @@ func createProxier(loadBalancer LoadBalancer, listenIP net.IP, iptables iptables
 	}
 	// Set up the iptables foundations we need.
 	if err := iptablesInit(iptables); err != nil {
-		return nil, fmt.Errorf("failed to initialize iptables: %v", err)
+		return nil, fmt.Errorf("Failed to initialize iptables: %v", err)
 	}
 	// Flush old iptables rules (since the bound ports will be invalid after a restart).
 	// When OnUpdate() is first called, the rules will be recreated.
 	if err := iptablesFlush(iptables); err != nil {
-		return nil, fmt.Errorf("failed to flush iptables: %v", err)
+		return nil, fmt.Errorf("Failed to flush iptables: %v", err)
 	}
 	return &Proxier{
 		loadBalancer: loadBalancer,
@@ -411,7 +411,7 @@ func (proxier *Proxier) OnServiceUpdate(services []api.Service) {
 
 			proxyPort, err := proxier.proxyPorts.AllocateNext()
 			if err != nil {
-				glog.Errorf("failed to allocate proxy port for service %q: %v", serviceName, err)
+				glog.Errorf("Failed to allocate proxy port for service %q: %v", serviceName, err)
 				continue
 			}
 
