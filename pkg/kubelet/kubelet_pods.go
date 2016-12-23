@@ -82,16 +82,13 @@ func (kl *Kubelet) getActivePods() []*v1.Pod {
 }
 
 // makeDevices determines the devices for the given container.
-// Experimental. For now, we hardcode /dev/nvidia0 no matter what the user asks for
-// (we only support one device per node).
-// TODO: add support for more than 1 GPU after #28216.
 func (kl *Kubelet) makeDevices(container *v1.Container) []kubecontainer.DeviceInfo {
 	nvidiaGPULimit := container.Resources.Limits.NvidiaGPU()
 
 	if nvidiaGPULimit.Value() != 0 {
 		if nvidiaGPUPaths, err := kl.nvidiaGPUManager.AllocateGPUs(int(nvidiaGPULimit.Value())); err == nil {
-			devices := []kubecontainer.DeviceInfo{{PathOnHost: nvidiagpu.NvidiaDeviceCtl, PathInContainer: nvidiagpu.NvidiaDeviceCtl, Permissions: "mrw"},
-				{PathOnHost: nvidiagpu.NvidiaDeviceUVM, PathInContainer: nvidiagpu.NvidiaDeviceUVM, Permissions: "mrw"}}
+			devices := []kubecontainer.DeviceInfo{{PathOnHost: nvidiagpu.NvidiaCtlDevice, PathInContainer: nvidiagpu.NvidiaCtlDevice, Permissions: "mrw"},
+				{PathOnHost: nvidiagpu.NvidiaUVMDevice, PathInContainer: nvidiagpu.NvidiaUVMDevice, Permissions: "mrw"}}
 
 			for i, path := range nvidiaGPUPaths {
 				devices = append(devices, kubecontainer.DeviceInfo{PathOnHost: path, PathInContainer: "/dev/nvidia" + strconv.Itoa(i), Permissions: "mrw"})

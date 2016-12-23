@@ -34,8 +34,8 @@ import (
 const (
 	// All NVIDIA GPUs cards should be mounted with nvidiactl and nvidia-uvm
 	// If the driver installed correctly, the 2 devices must be there.
-	NvidiaDeviceCtl string = "/dev/nvidiactl"
-	NvidiaDeviceUVM string = "/dev/nvidia-uvm"
+	NvidiaCtlDevice string = "/dev/nvidiactl"
+	NvidiaUVMDevice string = "/dev/nvidia-uvm"
 )
 
 // Manage GPU devices.
@@ -54,8 +54,7 @@ type NvidiaGPUManager struct {
 // family name. Need to support NVML in the future. But we do not need NVML until
 // we want more features, features like schedule containers according to GPU family
 // name.
-func (ngm *NvidiaGPUManager) discovery() error {
-	var err error
+func (ngm *NvidiaGPUManager) discovery() (err error) {
 	if ngm.gpuPaths == nil {
 		err = filepath.Walk("/dev", func(path string, f os.FileInfo, err error) error {
 			reg := regexp.MustCompile(`^nvidia[0-9]*$`)
@@ -66,9 +65,13 @@ func (ngm *NvidiaGPUManager) discovery() error {
 
 			return nil
 		})
+
+		if err != nil {
+			return err
+		}
 	}
 
-	return err
+	return nil
 }
 
 func Valid(path string) bool {
@@ -78,13 +81,13 @@ func Valid(path string) bool {
 	return check != nil && check[0] != ""
 }
 
-// Initial the GPU devices, so far only need to discover the GPU paths.
+// Initialize the GPU devices, so far only needed to discover the GPU paths.
 func (ngm *NvidiaGPUManager) Init(dc dockertools.DockerInterface) error {
-	if _, err := os.Stat(NvidiaDeviceCtl); err != nil {
+	if _, err := os.Stat(NvidiaCtlDevice); err != nil {
 		return err
 	}
 
-	if _, err := os.Stat(NvidiaDeviceUVM); err != nil {
+	if _, err := os.Stat(NvidiaUVMDevice); err != nil {
 		return err
 	}
 
@@ -166,12 +169,12 @@ func (ngm *NvidiaGPUManager) AllocateGPUs(num int) (paths []string, err error) {
 		}
 	}
 
-	err = fmt.Errorf("Do not have sufficient GPUs!")
+	err = fmt.Errorf("Not enough GPUs!")
 
 	return
 }
 
-// Return GPUs' path which are not mapping to containers.
+// Return the count of GPUs which are free.
 func (ngm *NvidiaGPUManager) AvailableGPUs() (num int) {
 	ngm.gpuMutex.Lock()
 	defer ngm.gpuMutex.Unlock()
