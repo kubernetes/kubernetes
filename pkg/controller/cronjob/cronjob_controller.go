@@ -42,6 +42,7 @@ import (
 	v1core "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/core/v1"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/types"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/util/metrics"
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
@@ -148,6 +149,23 @@ func SyncOne(sj batch.CronJob, js []batch.Job, now time.Time, jc jobControlInter
 			recorder.Eventf(&sj, v1.EventTypeNormal, "SawCompletedJob", "Saw completed job: %v", j.Name)
 		}
 	}
+
+	// Remove any job reference from the active list if the corresponding job does not exist any more.
+	// Otherwise, the cronjob will may stuck in active mode forever even though there is no matching
+	// job running.
+
+	childrenJobs := make(map[types.UID]bool)
+	for _, childJob := range js {
+		childrenJobs[childJob.ObjectMeta.UID] = true
+	}
+	for _, j := range sj.Status.Active {
+		found := childrenJobs[j.UID]
+		if !found {
+			recorder.Eventf(&sj, v1.EventTypeNormal, "MissingJob", "Active job went missing: %v", j.Name)
+			deleteFromActiveList(&sj, j.UID)
+		}
+	}
+
 	updatedSJ, err := sjc.UpdateStatus(&sj)
 	if err != nil {
 		glog.Errorf("Unable to update status for %s (rv = %s): %v", nameForLog, sj.ResourceVersion, err)
