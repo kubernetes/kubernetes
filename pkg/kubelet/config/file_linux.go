@@ -22,6 +22,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/golang/glog"
 	"golang.org/x/exp/inotify"
@@ -103,6 +104,10 @@ func (s *sourceFile) processEvent(e *inotify.Event) error {
 
 	switch eventType {
 	case podAdd, podModify:
+		// Ignore file start with dots
+		if strings.HasPrefix(e.Name, ".") {
+			break
+		}
 		if pod, err := s.extractFromFile(e.Name); err != nil {
 			glog.Errorf("can't process config file %q: %v", e.Name, err)
 		} else {
