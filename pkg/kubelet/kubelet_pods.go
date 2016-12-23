@@ -572,7 +572,9 @@ func (kl *Kubelet) killPod(pod *v1.Pod, runningPod *kubecontainer.Pod, status *k
 	// and defer the responsibilty of destroying the pod's cgroup to the
 	// cleanup method and the housekeeping loop.
 	if reduceCpuLimts {
-		pcm.ReduceCPULimits(podCgroup)
+		if err := pcm.ReduceCPULimits(podCgroup); err != nil {
+			glog.Warningf("Reduces the CPU values to the minimum amount of shares error : %v", err)
+		}
 	}
 	return nil
 }
