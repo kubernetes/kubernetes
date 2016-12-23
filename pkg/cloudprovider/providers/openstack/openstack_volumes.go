@@ -27,7 +27,7 @@ import (
 
 	"github.com/rackspace/gophercloud"
 	"github.com/rackspace/gophercloud/openstack"
-	"github.com/rackspace/gophercloud/openstack/blockstorage/v1/volumes"
+	"github.com/rackspace/gophercloud/openstack/blockstorage/v2/volumes"
 	"github.com/rackspace/gophercloud/openstack/compute/v2/extensions/volumeattach"
 	"github.com/rackspace/gophercloud/pagination"
 
@@ -102,7 +102,7 @@ func (os *OpenStack) DetachDisk(instanceID string, partialDiskId string) error {
 
 // Takes a partial/full disk id or diskname
 func (os *OpenStack) getVolume(diskName string) (volumes.Volume, error) {
-	sClient, err := openstack.NewBlockStorageV1(os.provider, gophercloud.EndpointOpts{
+	sClient, err := openstack.NewBlockStorageV2(os.provider, gophercloud.EndpointOpts{
 		Region: os.region,
 	})
 
@@ -140,7 +140,7 @@ func (os *OpenStack) getVolume(diskName string) (volumes.Volume, error) {
 // Create a volume of given size (in GiB)
 func (os *OpenStack) CreateVolume(name string, size int, vtype, availability string, tags *map[string]string) (volumeName string, err error) {
 
-	sClient, err := openstack.NewBlockStorageV1(os.provider, gophercloud.EndpointOpts{
+	sClient, err := openstack.NewBlockStorageV2(os.provider, gophercloud.EndpointOpts{
 		Region: os.region,
 	})
 
@@ -153,7 +153,7 @@ func (os *OpenStack) CreateVolume(name string, size int, vtype, availability str
 		Name:         name,
 		Size:         size,
 		VolumeType:   vtype,
-		Availability: availability,
+		AvailabilityZone: availability,
 	}
 	if tags != nil {
 		opts.Metadata = *tags
@@ -202,7 +202,7 @@ func (os *OpenStack) DeleteVolume(volumeName string) error {
 		return volume.NewDeletedVolumeInUseError(msg)
 	}
 
-	sClient, err := openstack.NewBlockStorageV1(os.provider, gophercloud.EndpointOpts{
+	sClient, err := openstack.NewBlockStorageV2(os.provider, gophercloud.EndpointOpts{
 		Region: os.region,
 	})
 
