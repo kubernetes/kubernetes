@@ -650,13 +650,13 @@ func (kl *Kubelet) killPod(pod *v1.Pod, runningPod *kubecontainer.Pod, status *k
 	// cache the pod cgroup Name for reducing the cpu resource limits of the pod cgroup once the pod is killed
 	pcm := kl.containerManager.NewPodContainerManager()
 	var podCgroup cm.CgroupName
-	reduceCpuLimts := true
+	reduceCpuLimits := true
 	if pod != nil {
 		podCgroup, _ = pcm.GetPodContainerName(pod)
 	} else {
 		// If the pod is nil then cgroup limit must have already
 		// been decreased earlier
-		reduceCpuLimts = false
+		reduceCpuLimits = false
 	}
 
 	// Call the container runtime KillPod method which stops all running containers of the pod
@@ -671,8 +671,10 @@ func (kl *Kubelet) killPod(pod *v1.Pod, runningPod *kubecontainer.Pod, status *k
 	// Hence we only reduce the cpu resource limits of the pod's cgroup
 	// and defer the responsibilty of destroying the pod's cgroup to the
 	// cleanup method and the housekeeping loop.
-	if reduceCpuLimts {
-		pcm.ReduceCPULimits(podCgroup)
+	if reduceCpuLimits {
+		if err := pcm.ReduceCPULimits(podCgroup); err != nil {
+			glog.Warningf("Failed to reduce the CPU values to the minimum amount of shares: %v", err)
+		}
 	}
 	return nil
 }
