@@ -309,31 +309,65 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 
 	glog.Infof("eviction manager: pods ranked for eviction: %s", format.Pods(activePods))
 
-	// we kill at most a single pod during each eviction interval
+	// grace period for eviction
+	gracePeriodOverride := int64(0)
+	if softEviction {
+		gracePeriodOverride = m.config.MaxPodGracePeriodSeconds
+	}
+
+	// stautus reported for eviction
+	status := v1.PodStatus{
+		Phase:   v1.PodFailed,
+		Message: fmt.Sprintf(message, resourceToReclaim),
+		Reason:  reason,
+	}
+
+	// Try to evict non-critical pods first
+	var activeNonCriticalPods []*v1.Pod
+	var criticalPods []*v1.Pod
 	for i := range activePods {
-		pod := activePods[i]
-		status := v1.PodStatus{
-			Phase:   v1.PodFailed,
-			Message: fmt.Sprintf(message, resourceToReclaim),
-			Reason:  reason,
+		if kubepod.IsCriticalPod(activePods[i]) {
+			criticalPods = append(criticalPods, activePods[i])
+		} else {
+			activeNonCriticalPods = append(activeNonCriticalPods, activePods[i])
 		}
-		// record that we are evicting the pod
-		m.recorder.Eventf(pod, v1.EventTypeWarning, reason, fmt.Sprintf(message, resourceToReclaim))
-		gracePeriodOverride := int64(0)
-		if softEviction {
-			gracePeriodOverride = m.config.MaxPodGracePeriodSeconds
-		}
-		// this is a blocking call and should only return when the pod and its containers are killed.
-		err := m.killPodFunc(pod, status, &gracePeriodOverride)
-		if err != nil {
+	}
+	glog.V(4).Infof("eviction manager: %d/%d active pods eligible for eviction are marked critical", len(criticalPods), len(activePods))
+
+	// we kill at most a single pod during each eviction interval
+	if err := m.evictPod(activeNonCriticalPods, status, gracePeriodOverride); err == nil {
+		// success, so we return until the next housekeeping interval
+		return
+	} else {
+		glog.Infof("eviction manager: failed non-critical eviction, will try to evict a critical pod: %v", err)
+	}
+	if err := m.evictPod(criticalPods, status, gracePeriodOverride); err == nil {
+		return
+	} else {
+		glog.Infof("eviction manager: failed to evict a critical pod: %v", err)
+	}
+	glog.Infof("eviction manager: unable to evict any pods from the node")
+}
+
+// evictPod picks a single pod from the given list and kills it. Errors
+// are only passed on to the caller if no evictions are possible. Upon
+// picking a pod for eviction this function only returns when all its
+// containers are killed, or an error is encountered.
+func (m *managerImpl) evictPod(podsToEvict []*v1.Pod, status v1.PodStatus, grace int64) (err error) {
+	if len(podsToEvict) == 0 {
+		return fmt.Errorf("No pods are eligible for eviction")
+	}
+	for _, pod := range podsToEvict {
+		if err = m.killPodFunc(pod, status, &grace); err != nil {
 			glog.Infof("eviction manager: pod %s failed to evict %v", format.Pod(pod), err)
 			continue
 		}
-		// success, so we return until the next housekeeping interval
+		m.recorder.Eventf(pod, v1.EventTypeWarning, reason, status.Message)
 		glog.Infof("eviction manager: pod %s evicted successfully", format.Pod(pod))
-		return
+		return nil
 	}
-	glog.Infof("eviction manager: unable to evict any pods from the node")
+	// return the last error as a clue
+	return err
 }
 
 // reclaimNodeLevelResources attempts to reclaim node level resources.  returns true if thresholds were satisfied and no pod eviction is required.

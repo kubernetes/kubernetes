@@ -155,6 +155,8 @@ func TestMemoryPressure(t *testing.T) {
 		{name: "burstable-high", requests: newResourceList("100m", "100Mi"), limits: newResourceList("200m", "1Gi"), memoryWorkingSet: "800Mi"},
 		{name: "best-effort-low", requests: newResourceList("", ""), limits: newResourceList("", ""), memoryWorkingSet: "300Mi"},
 		{name: "best-effort-high", requests: newResourceList("", ""), limits: newResourceList("", ""), memoryWorkingSet: "500Mi"},
+		{name: "critical-best-effort-high", requests: newResourceList("", ""), limits: newResourceList("", ""), memoryWorkingSet: "900Mi"},
+		{name: "critical-best-effort-low", requests: newResourceList("", ""), limits: newResourceList("", ""), memoryWorkingSet: "100Mi"},
 	}
 	pods := []*v1.Pod{}
 	podStats := map[*v1.Pod]statsapi.PodStats{}
@@ -163,9 +165,20 @@ func TestMemoryPressure(t *testing.T) {
 		pods = append(pods, pod)
 		podStats[pod] = podStat
 	}
+	// mark both critical pod, in the absence of this annotation, the
+	// "critical-best-effort-high" pod will get evicted first
+	pods[6].ObjectMeta.Annotations = map[string]string{kubetypes.CriticalPodAnnotationKey: ""}
+	pods[7].ObjectMeta.Annotations = map[string]string{kubetypes.CriticalPodAnnotationKey: ""}
+
 	podToEvict := pods[5]
+	criticalHigh := pods[6]
+	criticalLow := pods[7]
+
 	activePodsFunc := func() []*v1.Pod {
 		return pods
+	}
+	criticalPodsFunc := func() []*v1.Pod {
+		return []*v1.Pod{criticalLow, criticalHigh}
 	}
 
 	fakeClock := clock.NewFakeClock(time.Now())
@@ -355,6 +368,24 @@ func TestMemoryPressure(t *testing.T) {
 			t.Errorf("Admit pod: %v, expected: %v, actual: %v", pod, expected[i], result.Admit)
 		}
 	}
+
+	// drain all but critical pod, induce memory pressure and check that it gets evicted
+	fakeClock.Step(1 * time.Minute)
+	summaryProvider.result = summaryStatsMaker("500Mi", podStats)
+	podKiller.pod = nil
+	manager.synchronize(diskInfoProvider, criticalPodsFunc)
+
+	// we should have memory pressure
+	if !manager.IsUnderMemoryPressure() {
+		t.Errorf("Manager should report memory pressure")
+	}
+
+	// check that out of the remaining critical pods, we evicted the one with
+	// higher memory usage
+	if podKiller.pod != criticalHigh {
+		t.Errorf("Manager chose to kill pod: %v, but should have chosen %v", podKiller.pod.Name, criticalHigh.Name)
+	}
+
 }
 
 // parseQuantity parses the specified value (if provided) otherwise returns 0 value
@@ -375,6 +406,8 @@ func TestDiskPressureNodeFs(t *testing.T) {
 		{name: "burstable-high", requests: newResourceList("100m", "100Mi"), limits: newResourceList("200m", "1Gi"), rootFsUsed: "800Mi"},
 		{name: "best-effort-low", requests: newResourceList("", ""), limits: newResourceList("", ""), perLocalVolumeUsed: "300Mi"},
 		{name: "best-effort-high", requests: newResourceList("", ""), limits: newResourceList("", ""), rootFsUsed: "500Mi"},
+		{name: "critical-best-effort-high", requests: newResourceList("", ""), limits: newResourceList("", ""), rootFsUsed: "600Mi"},
+		{name: "critical-best-effort-low", requests: newResourceList("", ""), limits: newResourceList("", ""), rootFsUsed: "100Mi"},
 	}
 	pods := []*v1.Pod{}
 	podStats := map[*v1.Pod]statsapi.PodStats{}
@@ -383,9 +416,21 @@ func TestDiskPressureNodeFs(t *testing.T) {
 		pods = append(pods, pod)
 		podStats[pod] = podStat
 	}
+
+	// mark both critical pod, in the absence of this annotation, the
+	// "critical-best-effort-high" pod will get evicted first
+	pods[6].ObjectMeta.Annotations = map[string]string{kubetypes.CriticalPodAnnotationKey: ""}
+	pods[7].ObjectMeta.Annotations = map[string]string{kubetypes.CriticalPodAnnotationKey: ""}
+
 	podToEvict := pods[5]
+	criticalHigh := pods[6]
+	criticalLow := pods[7]
+
 	activePodsFunc := func() []*v1.Pod {
 		return pods
+	}
+	criticalPodsFunc := func() []*v1.Pod {
+		return []*v1.Pod{criticalLow, criticalHigh}
 	}
 
 	fakeClock := clock.NewFakeClock(time.Now())
@@ -558,6 +603,23 @@ func TestDiskPressureNodeFs(t *testing.T) {
 	// try to admit our pod (should succeed)
 	if result := manager.Admit(&lifecycle.PodAdmitAttributes{Pod: podToAdmit}); !result.Admit {
 		t.Errorf("Admit pod: %v, expected: %v, actual: %v", podToAdmit, true, result.Admit)
+	}
+
+	// drain all but critical pod, induce disk pressure and check that it gets evicted
+	fakeClock.Step(1 * time.Minute)
+	summaryProvider.result = summaryStatsMaker("500Mi", "200Gi", podStats)
+	podKiller.pod = nil
+	manager.synchronize(diskInfoProvider, criticalPodsFunc)
+
+	// we should have memory pressure
+	if !manager.IsUnderDiskPressure() {
+		t.Errorf("Manager should report disk pressure")
+	}
+
+	// check that out of the remaining critical pods, we evicted the one with
+	// higher memory usage
+	if podKiller.pod != criticalHigh {
+		t.Errorf("Manager chose to kill pod: %v, but should have chosen %v", podKiller.pod.Name, criticalHigh.Name)
 	}
 }
 
