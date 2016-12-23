@@ -243,6 +243,7 @@ func DeepCopy_v1beta1_DaemonSetStatus(in interface{}, out interface{}, c *conver
 		out.NumberMisscheduled = in.NumberMisscheduled
 		out.DesiredNumberScheduled = in.DesiredNumberScheduled
 		out.NumberReady = in.NumberReady
+		out.ObservedGeneration = in.ObservedGeneration
 		return nil
 	}
 }
