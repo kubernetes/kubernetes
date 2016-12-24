@@ -383,6 +383,8 @@ items:
     - /api/*
     - /apis
     - /apis/*
+    - /swaggerapi
+    - /swaggerapi/*
     - /version
     verbs:
     - get
