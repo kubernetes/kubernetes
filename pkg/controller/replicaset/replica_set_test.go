@@ -1216,7 +1216,7 @@ func TestPatchPodFails(t *testing.T) {
 	// control of the pods and create new ones.
 	fakePodControl.Err = fmt.Errorf("Fake Error")
 	err := manager.syncReplicaSet(getKey(rs, t))
-	if err == nil || err.Error() != "Fake Error" {
+	if err == nil || err.Error() != "[Fake Error, Fake Error]" {
 		t.Errorf("expected Fake Error, got %+v", err)
 	}
 	// 2 patches to take control of pod1 and pod2 (both fail), 2 creates.

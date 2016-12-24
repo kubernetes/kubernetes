@@ -96,9 +96,9 @@ func newOwnerRC(f *framework.Framework, name string) *v1.ReplicationController {
 	}
 }
 
-// verifyRemainingDeploymentsAndReplicaSets verifies if the number of the remaining deployment
-// and rs are deploymentNum and rsNum. It returns error if the
-// communication with the API server fails.
+// verifyRemainingDeploymentsAndReplicaSets verifies if the number
+// of the remaining deployment and rs are deploymentNum and rsNum.
+// It returns error if the communication with the API server fails.
 func verifyRemainingDeploymentsAndReplicaSets(
 	f *framework.Framework,
 	clientSet clientset.Interface,
