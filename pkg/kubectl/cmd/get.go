@@ -31,6 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/runtime"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
+	"k8s.io/kubernetes/pkg/util/i18n"
 	"k8s.io/kubernetes/pkg/util/interrupt"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/watch"
@@ -213,7 +214,7 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 			return err
 		}
 		if len(infos) != 1 {
-			return fmt.Errorf("watch is only supported on individual resources and resource collections - %d resources were found", len(infos))
+			return i18n.Errorf("watch is only supported on individual resources and resource collections - %d resources were found", len(infos))
 		}
 		info := infos[0]
 		mapping := info.ResourceMapping()

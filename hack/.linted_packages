@@ -257,6 +257,7 @@ pkg/util/flushwriter
 pkg/util/goroutinemap
 pkg/util/hash
 pkg/util/homedir
+pkg/util/i18n
 pkg/util/interrupt
 pkg/util/io
 pkg/util/json
