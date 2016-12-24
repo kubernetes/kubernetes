@@ -23,6 +23,8 @@ import (
 	"net/url"
 	"os"
 	"reflect"
+	"runtime"
+	"strings"
 	"testing"
 
 	"k8s.io/kubernetes/pkg/util/sets"
@@ -52,14 +54,17 @@ func TestCloneTLSConfig(t *testing.T) {
 		// These fields are not copied
 		"SessionTicketsDisabled",
 		"SessionTicketKey",
-		"DynamicRecordSizingDisabled",
-		"Renegotiation",
 
 		// These fields are unexported
 		"serverInitOnce",
 		"mutex",
 		"sessionTicketKeys",
 	)
+
+	// See #33936.
+	if strings.HasPrefix(runtime.Version(), "go1.7") {
+		expected.Insert("DynamicRecordSizingDisabled", "Renegotiation")
+	}
 
 	fields := sets.NewString()
 	structType := reflect.TypeOf(tls.Config{})
