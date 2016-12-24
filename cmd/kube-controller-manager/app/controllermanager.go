@@ -110,6 +110,7 @@ controller, and serviceaccounts controller.`,
 	return cmd
 }
 
+// get the synchronization Period
 func ResyncPeriod(s *options.CMServer) func() time.Duration {
 	return func() time.Duration {
 		factor := rand.Float64() + 1
