@@ -102,6 +102,7 @@ go_library(
         "//pkg/util/errors:go_default_library",
         "//pkg/util/exec:go_default_library",
         "//pkg/util/flag:go_default_library",
+        "//pkg/util/i18n:go_default_library",
         "//pkg/util/interrupt:go_default_library",
         "//pkg/util/intstr:go_default_library",
         "//pkg/util/sets:go_default_library",

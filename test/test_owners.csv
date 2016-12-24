@@ -63,7 +63,7 @@ Density create a batch of pods latency/resource should be within limit when crea
 Density create a batch of pods with higher API QPS latency/resource should be within limit when create * pods with * interval (QPS *),jlowdermilk,1
 Density create a sequence of pods latency/resource should be within limit when create * pods with * background pods,wojtek-t,1
 Density should allow running maximum capacity pods on nodes,smarterclayton,1
-Density should allow starting * pods per node using * with * secrets,derekwaynecarr,0
+Density should allow starting * pods per node using * with * secrets,brendandburns,0
 Deployment RecreateDeployment should delete old pods and create new ones,pwittrock,0
 Deployment RollingUpdateDeployment should delete old pods and create new ones,pwittrock,0
 Deployment deployment reaping should cascade to its replica sets and pods,wojtek-t,1
@@ -278,7 +278,7 @@ KubeletManagedEtcHosts should test kubelet managed /etc/hosts file,Random-Liu,1
 Kubernetes Dashboard should check that the kubernetes-dashboard instance is alive,wonderfly,0
 LimitRange should create a LimitRange with defaults and ensure pod has those defaults applied.,cjcullen,1
 Liveness liveness pods should be automatically restarted,derekwaynecarr,0
-Load capacity should be able to handle * pods per node * with * secrets,derekwaynecarr,0
+Load capacity should be able to handle * pods per node * with * secrets,brendandburns,0
 Loadbalancing: L7 GCE shoud create ingress with given static-ip,derekwaynecarr,0
 Loadbalancing: L7 GCE should conform to Ingress spec,derekwaynecarr,0
 Loadbalancing: L7 Nginx should conform to Ingress spec,ncdc,1
@@ -306,7 +306,7 @@ Network Partition Pods should return to running and ready state after network pa
 Network Partition should come back up if node goes down,foxish,0
 Network Partition should create new pods when node is partitioned,foxish,0
 Network Partition should eagerly create replacement pod during network partition when termination grace is non-zero,foxish,0
-Network Partition should not reschedule stateful pods if there is a network partition,foxish,0
+Network Partition should not reschedule stateful pods if there is a network partition,brendandburns,0
 Network should set TCP CLOSE_WAIT timeout,bowei,0
 Networking Granular Checks: Pods should function for intra-pod communication: http,stts,0
 Networking Granular Checks: Pods should function for intra-pod communication: udp,freehan,0
@@ -471,13 +471,14 @@ SimpleMount should be able to mount an emptydir on a container,rrati,0
 "Spark should start spark master, driver and workers",jszczepkowski,1
 "Staging client repo client should create pods, delete pods, watch pods",jbeda,1
 StatefulSet Basic StatefulSet functionality Scaling down before scale up is finished should wait until current pod will be running and ready before it will be removed,derekwaynecarr,0
-StatefulSet Basic StatefulSet functionality Scaling should happen in predictable order and halt if any stateful pod is unhealthy,derekwaynecarr,0
-StatefulSet Basic StatefulSet functionality Should recreate evicted statefulset,rrati,0
+StatefulSet Basic StatefulSet functionality Scaling should happen in predictable order and halt if any stateful pod is unhealthy,brendandburns,0
+StatefulSet Basic StatefulSet functionality Should recreate evicted statefulset,brendandburns,0
 StatefulSet Basic StatefulSet functionality should allow template updates,derekwaynecarr,0
 StatefulSet Basic StatefulSet functionality should handle healthy stateful pod restarts during scale,kevin-wangzefeng,1
 StatefulSet Basic StatefulSet functionality Scaling should happen in predictable order and halt if any pet is unhealthy,rkouj,0
 StatefulSet Basic StatefulSet functionality should allow template updates,rkouj,0
 StatefulSet Basic StatefulSet functionality should handle healthy pet restarts during scale,girishkalele,1
+StatefulSet Basic StatefulSet functionality should handle healthy stateful pod restarts during scale,brendandburns,0
 StatefulSet Basic StatefulSet functionality should provide basic identity,bprashanth,1
 StatefulSet Deploy clustered applications should creating a working CockroachDB cluster,rkouj,0
 StatefulSet Deploy clustered applications should creating a working mysql cluster,yujuhong,1
@@ -511,7 +512,7 @@ k8s.io/kubernetes/cmd/kube-apiserver/app/options,nikhiljindal,0
 k8s.io/kubernetes/cmd/kube-discovery/app,pmorie,1
 k8s.io/kubernetes/cmd/kube-proxy/app,luxas,1
 k8s.io/kubernetes/cmd/kubeadm/app/cmd,caesarxuchao,1
-k8s.io/kubernetes/cmd/kubeadm/app/discovery,rrati,0
+k8s.io/kubernetes/cmd/kubeadm/app/discovery,brendandburns,0
 k8s.io/kubernetes/cmd/kubeadm/app/images,davidopp,1
 k8s.io/kubernetes/cmd/kubeadm/app/master,apprenda,0
 k8s.io/kubernetes/cmd/kubeadm/app/node,apprenda,0
@@ -519,7 +520,7 @@ k8s.io/kubernetes/cmd/kubeadm/app/preflight,apprenda,0
 k8s.io/kubernetes/cmd/kubeadm/app/util,krousey,1
 k8s.io/kubernetes/cmd/kubeadm/test,pipejakob,0
 k8s.io/kubernetes/cmd/kubelet/app,derekwaynecarr,0
-k8s.io/kubernetes/cmd/kubernetes-discovery/pkg/apiserver,deads2k,0
+k8s.io/kubernetes/cmd/kubernetes-discovery/pkg/apiserver,brendandburns,0
 k8s.io/kubernetes/cmd/libs/go2idl/client-gen/types,caesarxuchao,0
 k8s.io/kubernetes/cmd/libs/go2idl/go-to-protobuf/protobuf,smarterclayton,0
 k8s.io/kubernetes/cmd/libs/go2idl/openapi-gen/generators,davidopp,1
@@ -530,7 +531,7 @@ k8s.io/kubernetes/federation/apis/federation/validation,nikhiljindal,0
 k8s.io/kubernetes/federation/cmd/federation-controller-manager/app,kzwang,0
 k8s.io/kubernetes/federation/pkg/dnsprovider,sttts,1
 k8s.io/kubernetes/federation/pkg/dnsprovider/providers/aws/route53,cjcullen,1
-k8s.io/kubernetes/federation/pkg/dnsprovider/providers/coredns,quinton-hoole,0
+k8s.io/kubernetes/federation/pkg/dnsprovider/providers/coredns,brendandburns,0
 k8s.io/kubernetes/federation/pkg/dnsprovider/providers/google/clouddns,jsafrane,1
 k8s.io/kubernetes/federation/pkg/federation-controller/cluster,nikhiljindal,0
 k8s.io/kubernetes/federation/pkg/federation-controller/configmap,mwielgus,0
@@ -662,7 +663,7 @@ k8s.io/kubernetes/pkg/conversion,ixdy,1
 k8s.io/kubernetes/pkg/conversion/queryparams,caesarxuchao,1
 k8s.io/kubernetes/pkg/credentialprovider,justinsb,1
 k8s.io/kubernetes/pkg/credentialprovider/aws,zmerlynn,1
-k8s.io/kubernetes/pkg/credentialprovider/azure,brendandburns,1
+k8s.io/kubernetes/pkg/credentialprovider/azure,brendandburns,0
 k8s.io/kubernetes/pkg/credentialprovider/gcp,mml,1
 k8s.io/kubernetes/pkg/dns,rrati,0
 k8s.io/kubernetes/pkg/dns/config,derekwaynecarr,0
@@ -857,6 +858,7 @@ k8s.io/kubernetes/pkg/util/goroutinemap,saad-ali,0
 k8s.io/kubernetes/pkg/util/hash,timothysc,1
 k8s.io/kubernetes/pkg/util/httpstream,apelisse,1
 k8s.io/kubernetes/pkg/util/httpstream/spdy,zmerlynn,1
+k8s.io/kubernetes/pkg/util/i18n,brendandburns,0
 k8s.io/kubernetes/pkg/util/integer,childsb,1
 k8s.io/kubernetes/pkg/util/intstr,brendandburns,1
 k8s.io/kubernetes/pkg/util/io,mtaufen,1
@@ -970,7 +972,7 @@ k8s.io/kubernetes/test/integration/auth,jbeda,1
 k8s.io/kubernetes/test/integration/client,Q-Lee,1
 k8s.io/kubernetes/test/integration/configmap,Q-Lee,1
 k8s.io/kubernetes/test/integration/discoverysummarizer,fabioy,1
-k8s.io/kubernetes/test/integration/evictions,wojtek-t,1
+k8s.io/kubernetes/test/integration/evictions,brendandburns,0
 k8s.io/kubernetes/test/integration/examples,maisem,1
 k8s.io/kubernetes/test/integration/federation,rrati,0
 k8s.io/kubernetes/test/integration/garbagecollector,jlowdermilk,1
