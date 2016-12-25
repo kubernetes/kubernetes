@@ -105,6 +105,18 @@ func OutputVersion(cmd *cobra.Command, defaultVersion *schema.GroupVersion) (sch
 	return schema.ParseGroupVersion(outputVersionString)
 }
 
+func OutputVersionTwo(outputVersionString string, defaultVersion *schema.GroupVersion) (schema.GroupVersion, error) {
+	if len(outputVersionString) == 0 {
+		if defaultVersion == nil {
+			return schema.GroupVersion{}, nil
+		}
+
+		return *defaultVersion, nil
+	}
+
+	return schema.ParseGroupVersion(outputVersionString)
+}
+
 // PrinterForCommand returns the default printer for this command.
 // Requires that printer flags have been added to cmd (see AddPrinterFlags).
 func PrinterForCommand(cmd *cobra.Command) (kubectl.ResourcePrinter, bool, error) {
