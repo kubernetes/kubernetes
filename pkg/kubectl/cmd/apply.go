@@ -42,6 +42,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
+	"k8s.io/kubernetes/pkg/util/i18n"
 )
 
 type ApplyOptions struct {
@@ -96,7 +97,7 @@ func NewCmdApply(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:     "apply -f FILENAME",
-		Short:   "Apply a configuration to a resource by filename or stdin",
+		Short:   i18n.T("Apply a configuration to a resource by filename or stdin"),
 		Long:    apply_long,
 		Example: apply_example,
 		Run: func(cmd *cobra.Command, args []string) {
