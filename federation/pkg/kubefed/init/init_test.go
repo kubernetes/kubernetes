@@ -168,7 +168,7 @@ func TestInitFederation(t *testing.T) {
 				want = fmt.Sprintf("Federation control plane runs (dry run)\n")
 			}
 
-			if got := buf.String(); got != want {
+			if got := buf.String(); !strings.Contains(got, want) {
 				t.Errorf("[%d] unexpected output: got: %s, want: %s", i, got, want)
 				if cmdErrMsg != "" {
 					t.Errorf("[%d] unexpected error message: %s", i, cmdErrMsg)
@@ -693,6 +693,38 @@ func fakeInitHostFactory(federationName, namespaceName, ip, dnsZoneName, image, 
 		},
 	}
 
+	podList := v1.PodList{}
+	apiServerPod := v1.Pod{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Pod",
+			APIVersion: testapi.Extensions.GroupVersion().String(),
+		},
+		ObjectMeta: v1.ObjectMeta{
+			Name:      svcName,
+			Namespace: namespaceName,
+		},
+		Status: v1.PodStatus{
+			Phase: "Running",
+		},
+	}
+
+	ctrlMgrPod := v1.Pod{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Pod",
+			APIVersion: testapi.Extensions.GroupVersion().String(),
+		},
+		ObjectMeta: v1.ObjectMeta{
+			Name:      cmName,
+			Namespace: namespaceName,
+		},
+		Status: v1.PodStatus{
+			Phase: "Running",
+		},
+	}
+
+	podList.Items = append(podList.Items, apiServerPod)
+	podList.Items = append(podList.Items, ctrlMgrPod)
+
 	f, tf, codec, _ := cmdtesting.NewAPIFactory()
 	extCodec := testapi.Extensions.Codec()
 	ns := dynamic.ContentConfig().NegotiatedSerializer
@@ -794,7 +826,11 @@ func fakeInitHostFactory(federationName, namespaceName, ip, dnsZoneName, image, 
 					return nil, fmt.Errorf("Unexpected deployment object\n\tDiff: %s", diff.ObjectGoPrintDiff(got, want))
 				}
 				return &http.Response{StatusCode: http.StatusCreated, Header: kubefedtesting.DefaultHeader(), Body: kubefedtesting.ObjBody(extCodec, &want)}, nil
+			case p == "/api/v1/namespaces/federation-system/pods" && m == http.MethodGet:
+				return &http.Response{StatusCode: http.StatusOK, Header: kubefedtesting.DefaultHeader(), Body: kubefedtesting.ObjBody(codec, &podList)}, nil
+
 			default:
+				fmt.Println("Unknon api called %v\n", p)
 				return nil, fmt.Errorf("unexpected request: %#v\n%#v", req.URL, req)
 			}
 		}),
