@@ -140,16 +140,29 @@ func (g *genericScheduler) selectHost(priorityList schedulerapi.HostPriorityList
 		return "", fmt.Errorf("empty priorityList")
 	}
 
-	sort.Sort(sort.Reverse(priorityList))
-	maxScore := priorityList[0].Score
-	firstAfterMaxScore := sort.Search(len(priorityList), func(i int) bool { return priorityList[i].Score < maxScore })
+	// extract nodes with highest score
+	// TODO(harry) should we refactor PrioritizeNodes into return nodes with max score only?
+	maxHostList := make(schedulerapi.HostPriorityList, 0)
+	maxPriorityScore := -1
+	for _, node := range priorityList {
+		if node.Score > maxPriorityScore {
+			maxPriorityScore = node.Score
+			// reset the maxHostList
+			maxHostList = schedulerapi.HostPriorityList{node}
+		} else if node.Score == maxPriorityScore {
+			maxHostList = append(maxHostList, node)
+		}
+	}
+
+	// sort the hosts with highest score by name (because they have the same score)
+	sort.Sort(maxHostList)
 
 	g.lastNodeIndexLock.Lock()
-	ix := int(g.lastNodeIndex % uint64(firstAfterMaxScore))
+	ix := int(g.lastNodeIndex % uint64(len(maxHostList)))
 	g.lastNodeIndex++
 	g.lastNodeIndexLock.Unlock()
 
-	return priorityList[ix].Host, nil
+	return maxHostList[ix].Host, nil
 }
 
 // Filters the nodes to find the ones that fit based on the given predicate functions
