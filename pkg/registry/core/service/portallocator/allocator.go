@@ -78,9 +78,27 @@ func NewPortAllocator(pr net.PortRange) *PortAllocator {
 	})
 }
 
+// NewFromSnapshot allocates a PortAllocator and initializes it from a snapshot.
+func NewFromSnapshot(snap *api.RangeAllocation) (*PortAllocator, error) {
+	pr, err := net.ParsePortRange(snap.Range)
+	if err != nil {
+		return nil, err
+	}
+	r := NewPortAllocator(*pr)
+	if err := r.Restore(*pr, snap.Data); err != nil {
+		return nil, err
+	}
+	return r, nil
+}
+
 // Free returns the count of port left in the range.
 func (r *PortAllocator) Free() int {
 	return r.alloc.Free()
+}
+
+// Used returns the count of ports used in the range.
+func (r *PortAllocator) Used() int {
+	return r.portRange.Size - r.alloc.Free()
 }
 
 // Allocate attempts to reserve the provided port. ErrNotInRange or
