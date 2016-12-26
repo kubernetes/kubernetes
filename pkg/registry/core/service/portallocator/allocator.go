@@ -33,6 +33,7 @@ type Interface interface {
 	Allocate(int) error
 	AllocateNext() (int, error)
 	Release(int) error
+	ForEach(func(int))
 }
 
 var (
@@ -115,6 +116,13 @@ func (r *PortAllocator) AllocateNext() (int, error) {
 		return 0, ErrFull
 	}
 	return r.portRange.Base + offset, nil
+}
+
+// ForEach calls the provided function for each allocated port.
+func (r *PortAllocator) ForEach(fn func(int)) {
+	r.alloc.ForEach(func(offset int) {
+		fn(r.portRange.Base + offset)
+	})
 }
 
 // Release releases the port back to the pool. Releasing an
