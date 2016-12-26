@@ -31,10 +31,16 @@ sleep 60
 
 max_seconds=10
 
+if [[ $(curl -V | awk '{print $2}' | head -1) > 7.34.0 ]]; then
+  TLS_OPTS="--insecure --tlsv1.2"
+else
+  TLS_OPTS="--insecure"
+fi
+
 while true; do
-  if ! curl --insecure -m ${max_seconds} -f -s https://127.0.0.1:{{kubelet_port}}/healthz > /dev/null; then
+  if ! curl $TLS_OPTS -m ${max_seconds} -f -s https://127.0.0.1:{{kubelet_port}}/healthz > /dev/null; then
     echo "kubelet failed!"
-    curl --insecure https://127.0.0.1:{{kubelet_port}}/healthz
+    curl $TLS_OPTS https://127.0.0.1:{{kubelet_port}}/healthz
     exit 2
   fi
   sleep 10

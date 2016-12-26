@@ -42,10 +42,15 @@ function kubelet_monitoring {
   # TODO(andyzheng0831): replace it with a more reliable method if possible.
   sleep 120
   local -r max_seconds=10
+  if [[ $(curl -V | awk '{print $2}' | head -1) > 7.34.0 ]]; then
+    TLS_OPTS="--insecure --tlsv1.2"
+  else
+    TLS_OPTS="--insecure"
+  fi
   while [ 1 ]; do
-    if ! curl --insecure -m "${max_seconds}" -f -s https://127.0.0.1:${KUBELET_PORT:-10250}/healthz > /dev/null; then
+    if ! curl $TLS_OPTS -m "${max_seconds}" -f -s https://127.0.0.1:${KUBELET_PORT:-10250}/healthz > /dev/null; then
       echo "Kubelet is unhealthy!"
-      curl --insecure https://127.0.0.1:${KUBELET_PORT:-10250}/healthz
+      curl $TLS_OPTS https://127.0.0.1:${KUBELET_PORT:-10250}/healthz
       pkill kubelet
       # Wait for a while, as we don't want to kill it again before it is really up.
       sleep 60
