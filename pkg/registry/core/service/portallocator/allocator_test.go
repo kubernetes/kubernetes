@@ -35,6 +35,9 @@ func TestAllocate(t *testing.T) {
 	if f := r.Free(); f != 201 {
 		t.Errorf("unexpected free %d", f)
 	}
+	if f := r.Used(); f != 0 {
+		t.Errorf("unexpected used %d", f)
+	}
 	found := sets.NewString()
 	count := 0
 	for r.Free() > 0 {
@@ -61,6 +64,9 @@ func TestAllocate(t *testing.T) {
 	}
 	if f := r.Free(); f != 1 {
 		t.Errorf("unexpected free %d", f)
+	}
+	if f := r.Used(); f != 200 {
+		t.Errorf("unexpected used %d", f)
 	}
 	p, err := r.AllocateNext()
 	if err != nil {
@@ -95,11 +101,17 @@ func TestAllocate(t *testing.T) {
 	if f := r.Free(); f != 1 {
 		t.Errorf("unexpected free %d", f)
 	}
+	if f := r.Used(); f != 200 {
+		t.Errorf("unexpected used %d", f)
+	}
 	if err := r.Allocate(released); err != nil {
 		t.Fatal(err)
 	}
 	if f := r.Free(); f != 0 {
 		t.Errorf("unexpected free %d", f)
+	}
+	if f := r.Used(); f != 201 {
+		t.Errorf("unexpected used %d", f)
 	}
 }
 
@@ -191,5 +203,44 @@ func TestSnapshot(t *testing.T) {
 	}
 	if other.Free() != r.Free() {
 		t.Errorf("counts do not match: %d", other.Free())
+	}
+}
+
+func TestNewFromSnapshot(t *testing.T) {
+	pr, err := net.ParsePortRange("200-300")
+	if err != nil {
+		t.Fatal(err)
+	}
+	r := NewPortAllocator(*pr)
+	allocated := []int{}
+	for i := 0; i < 50; i++ {
+		p, err := r.AllocateNext()
+		if err != nil {
+			t.Fatal(err)
+		}
+		allocated = append(allocated, p)
+	}
+
+	snapshot := api.RangeAllocation{}
+	if err = r.Snapshot(&snapshot); err != nil {
+		t.Fatal(err)
+	}
+
+	r, err = NewFromSnapshot(&snapshot)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if x := r.Free(); x != 51 {
+		t.Fatalf("expected 51 free ports, got %d", x)
+	}
+	if x := r.Used(); x != 50 {
+		t.Fatalf("expected 50 used port, got %d", x)
+	}
+
+	for _, p := range allocated {
+		if !r.Has(p) {
+			t.Fatalf("expected port to be allocated, but it was not")
+		}
 	}
 }
