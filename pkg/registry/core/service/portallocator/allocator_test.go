@@ -103,6 +103,44 @@ func TestAllocate(t *testing.T) {
 	}
 }
 
+func TestForEach(t *testing.T) {
+	pr, err := net.ParsePortRange("10000-10200")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	testCases := []sets.Int{
+		sets.NewInt(),
+		sets.NewInt(10000),
+		sets.NewInt(10000, 10200),
+		sets.NewInt(10000, 10099, 10200),
+	}
+
+	for i, tc := range testCases {
+		r := NewPortAllocator(*pr)
+
+		for port := range tc {
+			if err := r.Allocate(port); err != nil {
+				t.Errorf("[%d] error allocating port %v: %v", i, port, err)
+			}
+			if !r.Has(port) {
+				t.Errorf("[%d] expected port %v allocated", i, port)
+			}
+		}
+
+		calls := sets.NewInt()
+		r.ForEach(func(port int) {
+			calls.Insert(port)
+		})
+		if len(calls) != len(tc) {
+			t.Errorf("[%d] expected %d calls, got %d", i, len(tc), len(calls))
+		}
+		if !calls.Equal(tc) {
+			t.Errorf("[%d] expected calls to equal testcase: %v vs %v", i, calls.List(), tc.List())
+		}
+	}
+}
+
 func TestSnapshot(t *testing.T) {
 	pr, err := net.ParsePortRange("10000-10200")
 	if err != nil {
