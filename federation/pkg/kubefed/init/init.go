@@ -230,6 +230,23 @@ func initFederation(cmdOut io.Writer, config util.AdminConfig, cmd *cobra.Comman
 	}
 
 	if !dryRun {
+		fmt.Fprintf(cmdOut, "Waiting for control plane to come up")
+		for !podRunning(hostClientset, serverName, initFlags.FederationSystemNamespace) {
+			_, err := fmt.Fprintf(cmdOut, ".")
+			if err != nil {
+				return err
+			}
+			//wait indefinite if the pod doesn't show up with correct status
+			time.Sleep(2 * time.Second)
+		}
+		for !podRunning(hostClientset, cmName, initFlags.FederationSystemNamespace) {
+			_, err := fmt.Fprintf(cmdOut, ".")
+			if err != nil {
+				return err
+			}
+			//wait indefinite if the pod doesn't show up with correct status
+			time.Sleep(2 * time.Second)
+		}
 		return printSuccess(cmdOut, ips, hostnames)
 	}
 	_, err = fmt.Fprintf(cmdOut, "Federation control plane runs (dry run)\n")
@@ -574,6 +591,21 @@ func createControllerManager(clientset *client.Clientset, namespace, name, svcNa
 		return dep, nil
 	}
 	return clientset.Extensions().Deployments(namespace).Create(dep)
+}
+
+func podRunning(clientset *client.Clientset, name, nameSpace string) bool {
+	podList, err := clientset.Core().Pods(nameSpace).List(api.ListOptions{})
+	if err != nil {
+		//Problem in getting pods at this time
+		return false
+	}
+
+	for _, pod := range podList.Items {
+		if strings.Contains(pod.Name, name) && pod.Status.Phase == "Running" {
+			return true
+		}
+	}
+	return false
 }
 
 func printSuccess(cmdOut io.Writer, ips, hostnames []string) error {
