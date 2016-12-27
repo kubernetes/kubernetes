@@ -217,8 +217,9 @@ func NewMaxPDVolumeCountPredicate(filter VolumeFilter, maxVolumes int, pvInfo Pe
 }
 
 func (c *MaxPDVolumeCountChecker) filterVolumes(volumes []v1.Volume, namespace string, filteredVolumes map[string]bool) error {
-	for _, vol := range volumes {
-		if id, ok := c.filter.FilterVolume(&vol); ok {
+	for i := range volumes {
+		vol := &volumes[i]
+		if id, ok := c.filter.FilterVolume(vol); ok {
 			filteredVolumes[id] = true
 		} else if vol.PersistentVolumeClaim != nil {
 			pvcName := vol.PersistentVolumeClaim.ClaimName
