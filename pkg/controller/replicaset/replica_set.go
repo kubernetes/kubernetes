@@ -598,6 +598,7 @@ func (rsc *ReplicaSetController) syncReplicaSet(key string) error {
 		}
 		cm := controller.NewPodControllerRefManager(rsc.podControl, rs.ObjectMeta, selector, getRSKind())
 		matchesAndControlled, matchesNeedsController, controlledDoesNotMatch := cm.Classify(pods)
+		var errlist []error
 		// Adopt pods only if this replica set is not going to be deleted.
 		if rs.DeletionTimestamp == nil {
 			for _, pod := range matchesNeedsController {
@@ -606,7 +607,7 @@ func (rsc *ReplicaSetController) syncReplicaSet(key string) error {
 				if err != nil {
 					// If the pod no longer exists, don't even log the error.
 					if !errors.IsNotFound(err) {
-						utilruntime.HandleError(err)
+						errlist = append(errlist, err)
 					}
 				} else {
 					matchesAndControlled = append(matchesAndControlled, pod)
@@ -615,7 +616,6 @@ func (rsc *ReplicaSetController) syncReplicaSet(key string) error {
 		}
 		filteredPods = matchesAndControlled
 		// remove the controllerRef for the pods that no longer have matching labels
-		var errlist []error
 		for _, pod := range controlledDoesNotMatch {
 			err := cm.ReleasePod(pod)
 			if err != nil {
