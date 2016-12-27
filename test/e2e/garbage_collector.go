@@ -433,7 +433,7 @@ var _ = framework.KubeDescribe("Garbage collector", func() {
 			framework.Failf("Failed to list ReplicaSet %v", err)
 		}
 		for _, replicaSet := range rs.Items {
-			if controller.GetControllerOf(replicaSet.ObjectMeta) != nil {
+			if controller.GetControllerOf(&replicaSet.ObjectMeta) != nil {
 				framework.Failf("Found ReplicaSet with non nil ownerRef %v", replicaSet)
 			}
 		}
