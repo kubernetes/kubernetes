@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,13 +18,13 @@ package controller
 
 import (
 	"fmt"
-	"net"
 	"strings"
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
-	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
+	"k8s.io/kubernetes/pkg/registry/core/service/portallocator"
+	"k8s.io/kubernetes/pkg/util/net"
 )
 
 type mockRangeRegistry struct {
@@ -50,33 +50,33 @@ func (r *mockRangeRegistry) CreateOrUpdate(alloc *api.RangeAllocation) error {
 
 func TestRepair(t *testing.T) {
 	fakeClient := fake.NewSimpleClientset()
-	ipregistry := &mockRangeRegistry{
-		item: &api.RangeAllocation{Range: "192.168.1.0/24"},
+	registry := &mockRangeRegistry{
+		item: &api.RangeAllocation{Range: "100-200"},
 	}
-	_, cidr, _ := net.ParseCIDR(ipregistry.item.Range)
-	r := NewRepair(0, fakeClient.Core(), cidr, ipregistry)
+	pr, _ := net.ParsePortRange(registry.item.Range)
+	r := NewRepair(0, fakeClient.Core(), *pr, registry)
 
 	if err := r.RunOnce(); err != nil {
 		t.Fatal(err)
 	}
-	if !ipregistry.updateCalled || ipregistry.updated == nil || ipregistry.updated.Range != cidr.String() || ipregistry.updated != ipregistry.item {
-		t.Errorf("unexpected ipregistry: %#v", ipregistry)
+	if !registry.updateCalled || registry.updated == nil || registry.updated.Range != pr.String() || registry.updated != registry.item {
+		t.Errorf("unexpected registry: %#v", registry)
 	}
 
-	ipregistry = &mockRangeRegistry{
-		item:      &api.RangeAllocation{Range: "192.168.1.0/24"},
+	registry = &mockRangeRegistry{
+		item:      &api.RangeAllocation{Range: "100-200"},
 		updateErr: fmt.Errorf("test error"),
 	}
-	r = NewRepair(0, fakeClient.Core(), cidr, ipregistry)
+	r = NewRepair(0, fakeClient.Core(), *pr, registry)
 	if err := r.RunOnce(); !strings.Contains(err.Error(), ": test error") {
 		t.Fatal(err)
 	}
 }
 
 func TestRepairLeak(t *testing.T) {
-	_, cidr, _ := net.ParseCIDR("192.168.1.0/24")
-	previous := ipallocator.NewCIDRRange(cidr)
-	previous.Allocate(net.ParseIP("192.168.1.10"))
+	pr, _ := net.ParsePortRange("100-200")
+	previous := portallocator.NewPortAllocator(*pr)
+	previous.Allocate(111)
 
 	var dst api.RangeAllocation
 	err := previous.Snapshot(&dst)
@@ -85,7 +85,7 @@ func TestRepairLeak(t *testing.T) {
 	}
 
 	fakeClient := fake.NewSimpleClientset()
-	ipregistry := &mockRangeRegistry{
+	registry := &mockRangeRegistry{
 		item: &api.RangeAllocation{
 			ObjectMeta: api.ObjectMeta{
 				ResourceVersion: "1",
@@ -95,36 +95,36 @@ func TestRepairLeak(t *testing.T) {
 		},
 	}
 
-	r := NewRepair(0, fakeClient.Core(), cidr, ipregistry)
+	r := NewRepair(0, fakeClient.Core(), *pr, registry)
 	// Run through the "leak detection holdoff" loops.
 	for i := 0; i < (numRepairsBeforeLeakCleanup - 1); i++ {
 		if err := r.RunOnce(); err != nil {
 			t.Fatal(err)
 		}
-		after, err := ipallocator.NewFromSnapshot(ipregistry.updated)
+		after, err := portallocator.NewFromSnapshot(registry.updated)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if !after.Has(net.ParseIP("192.168.1.10")) {
-			t.Errorf("expected ipallocator to still have leaked IP")
+		if !after.Has(111) {
+			t.Errorf("expected portallocator to still have leaked port")
 		}
 	}
 	// Run one more time to actually remove the leak.
 	if err := r.RunOnce(); err != nil {
 		t.Fatal(err)
 	}
-	after, err := ipallocator.NewFromSnapshot(ipregistry.updated)
+	after, err := portallocator.NewFromSnapshot(registry.updated)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if after.Has(net.ParseIP("192.168.1.10")) {
-		t.Errorf("expected ipallocator to not have leaked IP")
+	if after.Has(111) {
+		t.Errorf("expected portallocator to not have leaked port")
 	}
 }
 
 func TestRepairWithExisting(t *testing.T) {
-	_, cidr, _ := net.ParseCIDR("192.168.1.0/24")
-	previous := ipallocator.NewCIDRRange(cidr)
+	pr, _ := net.ParsePortRange("100-200")
+	previous := portallocator.NewPortAllocator(*pr)
 
 	var dst api.RangeAllocation
 	err := previous.Snapshot(&dst)
@@ -135,31 +135,37 @@ func TestRepairWithExisting(t *testing.T) {
 	fakeClient := fake.NewSimpleClientset(
 		&api.Service{
 			ObjectMeta: api.ObjectMeta{Namespace: "one", Name: "one"},
-			Spec:       api.ServiceSpec{ClusterIP: "192.168.1.1"},
+			Spec: api.ServiceSpec{
+				Ports: []api.ServicePort{{NodePort: 111}},
+			},
 		},
 		&api.Service{
 			ObjectMeta: api.ObjectMeta{Namespace: "two", Name: "two"},
-			Spec:       api.ServiceSpec{ClusterIP: "192.168.1.100"},
+			Spec: api.ServiceSpec{
+				Ports: []api.ServicePort{{NodePort: 122}, {NodePort: 133}},
+			},
 		},
-		&api.Service{ // outside CIDR, will be dropped
+		&api.Service{ // outside range, will be dropped
 			ObjectMeta: api.ObjectMeta{Namespace: "three", Name: "three"},
-			Spec:       api.ServiceSpec{ClusterIP: "192.168.0.1"},
+			Spec: api.ServiceSpec{
+				Ports: []api.ServicePort{{NodePort: 201}},
+			},
 		},
 		&api.Service{ // empty, ignored
 			ObjectMeta: api.ObjectMeta{Namespace: "four", Name: "four"},
-			Spec:       api.ServiceSpec{ClusterIP: ""},
+			Spec: api.ServiceSpec{
+				Ports: []api.ServicePort{{}},
+			},
 		},
 		&api.Service{ // duplicate, dropped
 			ObjectMeta: api.ObjectMeta{Namespace: "five", Name: "five"},
-			Spec:       api.ServiceSpec{ClusterIP: "192.168.1.1"},
-		},
-		&api.Service{ // headless
-			ObjectMeta: api.ObjectMeta{Namespace: "six", Name: "six"},
-			Spec:       api.ServiceSpec{ClusterIP: "None"},
+			Spec: api.ServiceSpec{
+				Ports: []api.ServicePort{{NodePort: 111}},
+			},
 		},
 	)
 
-	ipregistry := &mockRangeRegistry{
+	registry := &mockRangeRegistry{
 		item: &api.RangeAllocation{
 			ObjectMeta: api.ObjectMeta{
 				ResourceVersion: "1",
@@ -168,18 +174,18 @@ func TestRepairWithExisting(t *testing.T) {
 			Data:  dst.Data,
 		},
 	}
-	r := NewRepair(0, fakeClient.Core(), cidr, ipregistry)
+	r := NewRepair(0, fakeClient.Core(), *pr, registry)
 	if err := r.RunOnce(); err != nil {
 		t.Fatal(err)
 	}
-	after, err := ipallocator.NewFromSnapshot(ipregistry.updated)
+	after, err := portallocator.NewFromSnapshot(registry.updated)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !after.Has(net.ParseIP("192.168.1.1")) || !after.Has(net.ParseIP("192.168.1.100")) {
-		t.Errorf("unexpected ipallocator state: %#v", after)
+	if !after.Has(111) || !after.Has(122) || !after.Has(133) {
+		t.Errorf("unexpected portallocator state: %#v", after)
 	}
-	if free := after.Free(); free != 252 {
-		t.Errorf("unexpected ipallocator state: %d free", free)
+	if free := after.Free(); free != 98 {
+		t.Errorf("unexpected portallocator state: %d free", free)
 	}
 }
