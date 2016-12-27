@@ -14,74 +14,154 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package service
+package dns
 
 import (
-	"sync"
 	"testing"
 
 	"fmt"
 	"reflect"
 	"sort"
 
-	"k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	"k8s.io/kubernetes/federation/pkg/dnsprovider/providers/google/clouddns" // Only for unit testing purposes.
-	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/util/sets"
+	sc "k8s.io/kubernetes/federation/pkg/federation-controller/service"
+	apiv1 "k8s.io/kubernetes/pkg/api/v1"
 )
 
 func TestServiceController_ensureDnsRecords(t *testing.T) {
 	tests := []struct {
-		name          string
-		service       v1.Service
-		expected      []string
-		serviceStatus v1.LoadBalancerStatus
+		name     string
+		service  apiv1.Service
+		exist    bool
+		expected []string
 	}{
 		{
-			name: "withip",
-			service: v1.Service{
-				ObjectMeta: v1.ObjectMeta{
-					Name:      "servicename",
-					Namespace: "servicenamespace",
+			name: "ServiceWithSingleIpEndpoint",
+			service: apiv1.Service{
+				ObjectMeta: apiv1.ObjectMeta{
+					Name:      "nginx",
+					Namespace: "ns",
+					Annotations: sc.NewEndpointAnnotation(sc.NewEpMap().
+						AddEndpoint("fooregion", "foozone", "c1", []string{"198.51.100.1"}, true).
+						GetJSONMarshalledBytes()),
 				},
 			},
-			serviceStatus: buildServiceStatus([][]string{{"198.51.100.1", ""}}),
+			exist: true,
 			expected: []string{
-				"example.com:servicename.servicenamespace.myfederation.svc.federation.example.com:A:180:[198.51.100.1]",
-				"example.com:servicename.servicenamespace.myfederation.svc.fooregion.federation.example.com:A:180:[198.51.100.1]",
-				"example.com:servicename.servicenamespace.myfederation.svc.foozone.fooregion.federation.example.com:A:180:[198.51.100.1]",
+				"example.com:nginx.ns.myfed.svc.fed.example.com:A:180:[198.51.100.1]",
+				"example.com:nginx.ns.myfed.svc.fooregion.fed.example.com:A:180:[198.51.100.1]",
+				"example.com:nginx.ns.myfed.svc.foozone.fooregion.fed.example.com:A:180:[198.51.100.1]",
 			},
 		},
-		/*
-			TODO: getResolvedEndpoints preforms DNS lookup.
-			Mock and maybe look at error handling when some endpoints resolve, but also caching?
-			{
-				name: "withname",
-				service: v1.Service{
-					ObjectMeta: v1.ObjectMeta{
-						Name: "servicename",
-						Namespace: "servicenamespace",
-					},
-				},
-				serviceStatus: buildServiceStatus([][]string{{"", "randomstring.amazonelb.example.com"}}),
-				expected: []string{
-					"example.com:servicename.servicenamespace.myfederation.svc.federation.example.com:A:180:[198.51.100.1]",
-					"example.com:servicename.servicenamespace.myfederation.svc.fooregion.federation.example.com:A:180:[198.51.100.1]",
-					"example.com:servicename.servicenamespace.myfederation.svc.foozone.fooregion.federation.example.com:A:180:[198.51.100.1]",
-				},
-			},
-		*/
 		{
-			name: "noendpoints",
-			service: v1.Service{
-				ObjectMeta: v1.ObjectMeta{
-					Name:      "servicename",
-					Namespace: "servicenamespace",
+			name: "ServiceWithMultipleIpEndpoints",
+			service: apiv1.Service{
+				ObjectMeta: apiv1.ObjectMeta{
+					Name:      "nginx",
+					Namespace: "ns",
+					Annotations: sc.NewEndpointAnnotation(sc.NewEpMap().
+						AddEndpoint("fooregion", "foozone", "c1", []string{"198.51.100.1"}, true).
+						AddEndpoint("barregion", "barzone", "c2", []string{"198.51.200.1"}, true).
+						GetJSONMarshalledBytes()),
 				},
 			},
+			exist: true,
 			expected: []string{
-				"example.com:servicename.servicenamespace.myfederation.svc.fooregion.federation.example.com:CNAME:180:[servicename.servicenamespace.myfederation.svc.federation.example.com]",
-				"example.com:servicename.servicenamespace.myfederation.svc.foozone.fooregion.federation.example.com:CNAME:180:[servicename.servicenamespace.myfederation.svc.fooregion.federation.example.com]",
+				"example.com:nginx.ns.myfed.svc.fed.example.com:A:180:[198.51.100.1 198.51.200.1]",
+				"example.com:nginx.ns.myfed.svc.fooregion.fed.example.com:A:180:[198.51.100.1]",
+				"example.com:nginx.ns.myfed.svc.foozone.fooregion.fed.example.com:A:180:[198.51.100.1]",
+				"example.com:nginx.ns.myfed.svc.barregion.fed.example.com:A:180:[198.51.200.1]",
+				"example.com:nginx.ns.myfed.svc.barzone.barregion.fed.example.com:A:180:[198.51.200.1]",
+			},
+		},
+		{
+			name: "ServiceWithNoEndpoints",
+			service: apiv1.Service{
+				ObjectMeta: apiv1.ObjectMeta{
+					Name:      "nginx",
+					Namespace: "ns",
+				},
+			},
+			exist:    true,
+			expected: []string{},
+		},
+		{
+			name: "ServiceWithEndpointAndServiceDeleted",
+			service: apiv1.Service{
+				ObjectMeta: apiv1.ObjectMeta{
+					Name:      "nginx",
+					Namespace: "ns",
+					Annotations: sc.NewEndpointAnnotation(sc.NewEpMap().
+						AddEndpoint("fooregion", "foozone", "c1", []string{"198.51.100.1"}, true).
+						GetJSONMarshalledBytes()),
+				},
+			},
+			exist:    false,
+			expected: []string{},
+		},
+		{
+			name: "ServiceWithMultipleIpEndpointsAndOneEndpointGettingRemoved",
+			service: apiv1.Service{
+				ObjectMeta: apiv1.ObjectMeta{
+					Name:      "nginx",
+					Namespace: "ns",
+					Annotations: sc.NewEndpointAnnotation(sc.NewEpMap().
+						AddEndpoint("fooregion", "foozone", "c1", []string{"198.51.100.1"}, true).
+						AddEndpoint("barregion", "barzone", "c2", []string{"198.51.200.1"}, true).
+						RemoveEndpoint("barregion", "barzone", "c2", "198.51.200.1").
+						GetJSONMarshalledBytes()),
+				},
+			},
+			exist: true,
+			expected: []string{
+				"example.com:nginx.ns.myfed.svc.fed.example.com:A:180:[198.51.100.1]",
+				"example.com:nginx.ns.myfed.svc.fooregion.fed.example.com:A:180:[198.51.100.1]",
+				"example.com:nginx.ns.myfed.svc.foozone.fooregion.fed.example.com:A:180:[198.51.100.1]",
+				"example.com:nginx.ns.myfed.svc.barregion.fed.example.com:CNAME:180:[nginx.ns.myfed.svc.fed.example.com]",
+				"example.com:nginx.ns.myfed.svc.barzone.barregion.fed.example.com:CNAME:180:[nginx.ns.myfed.svc.barregion.fed.example.com]",
+			},
+		},
+		{
+			name: "ServiceWithMultipleIpEndpointsAndOneEndpointIsUnhealthy",
+			service: apiv1.Service{
+				ObjectMeta: apiv1.ObjectMeta{
+					Name:      "nginx",
+					Namespace: "ns",
+					Annotations: sc.NewEndpointAnnotation(sc.NewEpMap().
+						AddEndpoint("fooregion", "foozone", "c1", []string{"198.51.100.1"}, true).
+						AddEndpoint("barregion", "barzone", "c2", []string{"198.51.200.1"}, false).
+						GetJSONMarshalledBytes()),
+				},
+			},
+			exist: true,
+			expected: []string{
+				"example.com:nginx.ns.myfed.svc.fed.example.com:A:180:[198.51.100.1]",
+				"example.com:nginx.ns.myfed.svc.fooregion.fed.example.com:A:180:[198.51.100.1]",
+				"example.com:nginx.ns.myfed.svc.foozone.fooregion.fed.example.com:A:180:[198.51.100.1]",
+				"example.com:nginx.ns.myfed.svc.barregion.fed.example.com:CNAME:180:[nginx.ns.myfed.svc.fed.example.com]",
+				"example.com:nginx.ns.myfed.svc.barzone.barregion.fed.example.com:CNAME:180:[nginx.ns.myfed.svc.barregion.fed.example.com]",
+			},
+		},
+		{
+			name: "ServiceWithMultipleIpEndpointsAndAllEndpointGettingRemoved",
+			service: apiv1.Service{
+				ObjectMeta: apiv1.ObjectMeta{
+					Name:      "nginx",
+					Namespace: "ns",
+					Annotations: sc.NewEndpointAnnotation(sc.NewEpMap().
+						AddEndpoint("fooregion", "foozone", "c1", []string{"198.51.100.1"}, true).
+						AddEndpoint("barregion", "barzone", "c2", []string{"198.51.200.1"}, true).
+						RemoveEndpoint("fooregion", "foozone", "c1", "198.51.100.1").
+						RemoveEndpoint("barregion", "barzone", "c2", "198.51.200.1").
+						GetJSONMarshalledBytes()),
+				},
+			},
+			exist: true,
+			expected: []string{
+				"example.com:nginx.ns.myfed.svc.fooregion.fed.example.com:CNAME:180:[nginx.ns.myfed.svc.fed.example.com]",
+				"example.com:nginx.ns.myfed.svc.foozone.fooregion.fed.example.com:CNAME:180:[nginx.ns.myfed.svc.fooregion.fed.example.com]",
+				"example.com:nginx.ns.myfed.svc.barregion.fed.example.com:CNAME:180:[nginx.ns.myfed.svc.fed.example.com]",
+				"example.com:nginx.ns.myfed.svc.barzone.barregion.fed.example.com:CNAME:180:[nginx.ns.myfed.svc.barregion.fed.example.com]",
 			},
 		},
 	}
@@ -91,42 +171,20 @@ func TestServiceController_ensureDnsRecords(t *testing.T) {
 		if !ok {
 			t.Error("Unable to fetch zones")
 		}
-		serviceController := ServiceController{
+		dc := DNSController{
 			dns:              fakedns,
 			dnsZones:         fakednsZones,
-			serviceDnsSuffix: "federation.example.com",
+			serviceDNSSuffix: "fed.example.com",
 			zoneName:         "example.com",
-			federationName:   "myfederation",
-			serviceCache:     &serviceCache{fedServiceMap: make(map[string]*cachedService)},
-			clusterCache: &clusterClientCache{
-				rwlock:    sync.Mutex{},
-				clientMap: make(map[string]*clusterCache),
-			},
-			knownClusterSet: make(sets.String),
+			federationName:   "myfed",
 		}
 
-		clusterName := "testcluster"
-
-		serviceController.clusterCache.clientMap[clusterName] = &clusterCache{
-			cluster: &v1beta1.Cluster{
-				Status: v1beta1.ClusterStatus{
-					Zones:  []string{"foozone"},
-					Region: "fooregion",
-				},
-			},
+		dnsZone, err := getDNSZone(dc.zoneName, dc.zoneID, dc.dnsZones)
+		if err != nil {
+			t.Errorf("Test failed for %s, Get DNS Zone failed: %v", test.name, err)
 		}
 
-		cachedService := &cachedService{
-			lastState:        &test.service,
-			endpointMap:      make(map[string]int),
-			serviceStatusMap: make(map[string]v1.LoadBalancerStatus),
-		}
-		cachedService.endpointMap[clusterName] = 1
-		if !reflect.DeepEqual(&test.serviceStatus, &v1.LoadBalancerStatus{}) {
-			cachedService.serviceStatusMap[clusterName] = test.serviceStatus
-		}
-
-		err := serviceController.ensureDnsRecords(clusterName, cachedService)
+		err = dc.ensureDNSRrsets(dnsZone, &test.service, test.exist)
 		if err != nil {
 			t.Errorf("Test failed for %s, unexpected error %v", test.name, err)
 		}
@@ -137,7 +195,7 @@ func TestServiceController_ensureDnsRecords(t *testing.T) {
 		}
 
 		// Dump every record to a testable-by-string-comparison form
-		var records []string
+		records := []string{}
 		for _, z := range zones {
 			zoneName := z.Name()
 
@@ -155,7 +213,8 @@ func TestServiceController_ensureDnsRecords(t *testing.T) {
 
 				// Put in consistent (testable-by-string-comparison) order
 				sort.Strings(rrdatas)
-				records = append(records, fmt.Sprintf("%s:%s:%s:%d:%s", zoneName, rr.Name(), rr.Type(), rr.Ttl(), rrdatas))
+				records = append(records, fmt.Sprintf("%s:%s:%s:%d:%s",
+					zoneName, rr.Name(), rr.Type(), rr.Ttl(), rrdatas))
 			}
 		}
 
@@ -166,6 +225,5 @@ func TestServiceController_ensureDnsRecords(t *testing.T) {
 		if !reflect.DeepEqual(records, test.expected) {
 			t.Errorf("Test %q failed.  Actual=%v, Expected=%v", test.name, records, test.expected)
 		}
-
 	}
 }
