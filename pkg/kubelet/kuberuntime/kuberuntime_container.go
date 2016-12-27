@@ -793,7 +793,6 @@ func (m *kubeGenericRuntimeManager) runContainer(sandboxID, sandboxIP string, sa
 	}
 
 	// Step 3: create the container.
-
 	containerConfig, err := m.generateContainerConfig(container, pod, attempt, sandboxIP)
 	if err != nil {
 		m.recorder.Eventf(ref, v1.EventTypeWarning, events.FailedToCreateContainer, "Failed to create container with error: %v", err)
@@ -818,6 +817,18 @@ func (m *kubeGenericRuntimeManager) runContainer(sandboxID, sandboxIP string, sa
 		return kubecontainer.ErrRunContainer, fmt.Sprintf("Start Container Failed, %v", err)
 	}
 	m.recorder.Eventf(ref, v1.EventTypeNormal, events.StartedContainer, "Started container with id %v", containerID)
+
+	// Symlink container logs to the legacy container log location for cluster logging
+	// support.
+	// TODO(random-liu): Remove this after cluster logging supports CRI container log path.
+	containerMeta := containerConfig.GetMetadata()
+	sandboxMeta := sandboxConfig.GetMetadata()
+	legacySymlink := legacyLogSymlink(containerID, containerMeta.GetName(), sandboxMeta.GetName(), sandboxMeta.GetNamespace())
+	containerLog := filepath.Join(sandboxConfig.GetLogDirectory(), containerConfig.GetLogPath())
+	if err := m.osInterface.Symlink(containerLog, legacySymlink); err != nil {
+		glog.Errorf("Failed to create legacy symbolic link %q to container %q log %q: %v",
+			legacySymlink, containerID, containerLog, err)
+	}
 
 	// Step 5: execute the post start hook.
 	if container.Lifecycle != nil && container.Lifecycle.PostStart != nil {

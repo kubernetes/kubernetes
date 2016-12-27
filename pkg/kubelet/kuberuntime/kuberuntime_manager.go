@@ -783,24 +783,6 @@ func (m *kubeGenericRuntimeManager) killPodWithSyncResult(pod *v1.Pod, runningPo
 	return
 }
 
-// isHostNetwork checks whether the pod is running in host-network mode.
-func (m *kubeGenericRuntimeManager) isHostNetwork(podSandBoxID string, pod *v1.Pod) (bool, error) {
-	if pod != nil {
-		return kubecontainer.IsHostNetworkPod(pod), nil
-	}
-
-	podStatus, err := m.runtimeService.PodSandboxStatus(podSandBoxID)
-	if err != nil {
-		return false, err
-	}
-
-	if nsOpts := podStatus.GetLinux().GetNamespaces().GetOptions(); nsOpts != nil {
-		return nsOpts.HostNetwork, nil
-	}
-
-	return false, nil
-}
-
 // GetPodStatus retrieves the status of the pod, including the
 // information of all containers in the pod that are visble in Runtime.
 func (m *kubeGenericRuntimeManager) GetPodStatus(uid kubetypes.UID, name, namespace string) (*kubecontainer.PodStatus, error) {
