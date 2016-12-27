@@ -154,7 +154,7 @@ func StartControllers(s *options.CMServer, restClientCfg *restclient.Config) err
 	ccClientset := federationclientset.NewForConfigOrDie(restclient.AddUserAgent(restClientCfg, "cluster-controller"))
 	glog.Infof("Running cluster controller")
 	go clustercontroller.NewclusterController(ccClientset, s.ClusterMonitorPeriod.Duration).Run()
-	dns, err := dnsprovider.InitDnsProvider(s.DnsProvider, s.DnsConfigFile)
+	_, err := dnsprovider.InitDnsProvider(s.DnsProvider, s.DnsConfigFile)
 	if err != nil {
 		glog.Fatalf("Cloud provider could not be initialized: %v", err)
 	}
@@ -200,13 +200,10 @@ func StartControllers(s *options.CMServer, restClientCfg *restclient.Config) err
 		ingressController.Run(wait.NeverStop)
 	}
 
-	glog.Infof("Loading client config for service controller %q", servicecontroller.UserAgentName)
-	scClientset := federationclientset.NewForConfigOrDie(restclient.AddUserAgent(restClientCfg, servicecontroller.UserAgentName))
-	servicecontroller := servicecontroller.New(scClientset, dns, s.FederationName, s.ServiceDnsSuffix, s.ZoneName, s.ZoneID)
+	servicecontrollerClientset := federationclientset.NewForConfigOrDie(restclient.AddUserAgent(restClientCfg, "service-controller"))
+	serviceController := servicecontroller.NewServiceController(servicecontrollerClientset)
 	glog.Infof("Running service controller")
-	if err := servicecontroller.Run(s.ConcurrentServiceSyncs, wait.NeverStop); err != nil {
-		glog.Errorf("Failed to start service controller: %v", err)
-	}
+	serviceController.Run(s.ConcurrentServiceSyncs, wait.NeverStop)
 
 	select {}
 }
