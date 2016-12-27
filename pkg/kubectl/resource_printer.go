@@ -2075,13 +2075,29 @@ func printDeployment(deployment *extensions.Deployment, w io.Writer, options Pri
 	updatedReplicas := deployment.Status.UpdatedReplicas
 	availableReplicas := deployment.Status.AvailableReplicas
 	age := translateTimestamp(deployment.CreationTimestamp)
+	containers := deployment.Spec.Template.Spec.Containers
+	selector, err := metav1.LabelSelectorAsSelector(deployment.Spec.Selector)
+	if err != nil {
+		// this shouldn't happen if LabelSelector passed validation
+		return err
+	}
+
 	if _, err := fmt.Fprintf(w, "%s\t%d\t%d\t%d\t%d\t%s", name, desiredReplicas, currentReplicas, updatedReplicas, availableReplicas, age); err != nil {
 		return err
 	}
+	if options.Wide {
+		if err := layoutContainers(containers, w); err != nil {
+			return err
+		}
+		if _, err := fmt.Fprintf(w, "\t%s", selector.String()); err != nil {
+			return err
+		}
+	}
+
 	if _, err := fmt.Fprint(w, AppendLabels(deployment.Labels, options.ColumnLabels)); err != nil {
 		return err
 	}
-	_, err := fmt.Fprint(w, AppendAllLabels(options.ShowLabels, deployment.Labels))
+	_, err = fmt.Fprint(w, AppendAllLabels(options.ShowLabels, deployment.Labels))
 	return err
 }
 
@@ -2350,6 +2366,9 @@ func formatWideHeaders(wide bool, t reflect.Type) []string {
 			return []string{"SELECTOR"}
 		}
 		if t.String() == "*extensions.DaemonSet" || t.String() == "*extensions.DaemonSetList" {
+			return []string{"CONTAINER(S)", "IMAGE(S)", "SELECTOR"}
+		}
+		if t.String() == "*extensions.Deployment" || t.String() == "*extensions.DeploymentList" {
 			return []string{"CONTAINER(S)", "IMAGE(S)", "SELECTOR"}
 		}
 		if t.String() == "*extensions.ReplicaSet" || t.String() == "*extensions.ReplicaSetList" {
