@@ -19,7 +19,6 @@ package e2e
 import (
 	"crypto/tls"
 	"fmt"
-	"net"
 	"net/http"
 	"os"
 	"reflect"
@@ -35,6 +34,7 @@ import (
 	kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	gceprovider "k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
 	"k8s.io/kubernetes/pkg/util/intstr"
+	utilnet "k8s.io/kubernetes/pkg/util/net"
 	"k8s.io/kubernetes/pkg/util/net/sets"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -61,6 +61,9 @@ const (
 	FederatedIngressGCLBSrcRange = "130.211.0.0/22"
 
 	// TLS Certificate and Key for the ingress resource
+	// Generated using:
+	// $ openssl req -nodes -x509 -newkey rsa:2048 -keyout fedingtestkey.pem -out fedingtestcrt.pem -days 2485
+	// 2485 days is an arbitrary large number chosen below int32 seconds.
 	FederatedIngressTLSCrt = `-----BEGIN CERTIFICATE-----
 MIIDaTCCAlGgAwIBAgIJANwsCbwxm9pyMA0GCSqGSIb3DQEBCwUAMEoxCzAJBgNV
 BAYTAlVTMRMwEQYDVQQIDApTb21lLVN0YXRlMQswCQYDVQQKDAJOQTEZMBcGA1UE
@@ -518,24 +521,12 @@ func (j *federationTestJig) waitForFederatedIngress() {
 
 	client := &http.Client{
 		// This is mostly `http.DefaultTransport` except for the
-		// `TLSClientConfig`. `http.DefaultTransport` cannot be
-		// shallow copied due to the unexported `sync.Mutex` in
-		// the struct.
-		Transport: &http.Transport{
-			Proxy: http.ProxyFromEnvironment,
-			DialContext: (&net.Dialer{
-				Timeout:   30 * time.Second,
-				KeepAlive: 30 * time.Second,
-				DualStack: true,
-			}).DialContext,
-			MaxIdleConns:          100,
-			IdleConnTimeout:       90 * time.Second,
-			TLSHandshakeTimeout:   10 * time.Second,
-			ExpectContinueTimeout: 1 * time.Second,
+		// `TLSClientConfig`.
+		Transport: utilnet.SetTransportDefaults(&http.Transport{
 			TLSClientConfig: &tls.Config{
 				InsecureSkipVerify: true,
 			},
-		},
+		}),
 		Timeout: reqTimeout,
 	}
 
@@ -626,7 +617,8 @@ func getFederatedIngressAddress(client *fedclientset.Clientset, ns, name string)
 	return addresses, nil
 }
 
-// getNodeNames returns the names of nodes in a cluster.
+// getZoneNodesMap returns a map of zone names to list of nodes in that
+// zone in a cluster.
 func getZoneNodesMap(clientset *kubeclientset.Clientset) (map[string][]string, error) {
 	zoneNodes := make(map[string][]string)
 	nodes, err := clientset.Core().Nodes().List(v1.ListOptions{})
@@ -658,7 +650,7 @@ func getZoneNodesMap(clientset *kubeclientset.Clientset) (map[string][]string, e
 	return zoneNodes, nil
 }
 
-func updateMap(merged, src map[string][]string) {
+func mergeMap(merged, src map[string][]string) {
 	for zone, nodes := range src {
 		mNodes, ok := merged[zone]
 		if !ok {
@@ -683,7 +675,7 @@ func createFederatedIngressFirewallRules(ns, ingressName string, clusters map[st
 			return nil, err
 		}
 		framework.Logf("nodes to zones map for cluster %q: %#v", clusterName, mergedZoneNodes)
-		updateMap(mergedZoneNodes, zoneNodes)
+		mergeMap(mergedZoneNodes, zoneNodes)
 	}
 	framework.Logf("merged nodes to zones map: %#v", mergedZoneNodes)
 

@@ -85,6 +85,9 @@ func setupProviderConfig() error {
 
 		// TODO(madhusudancs): Remove this once
 		// https://github.com/kubernetes/kubernetes/issues/37306 is fixed.
+		// Populates `framework.TestContext.CloudConfig.FederationProviders`
+		// that holds a map of cloud provider zone names to provider
+		// instances.
 		if fzones := framework.TestContext.CloudConfig.FederationZones; fzones != "" {
 			framework.TestContext.CloudConfig.FederationProviders = make(map[string]cloudprovider.Interface)
 			for _, zone := range strings.Fields(fzones) {
