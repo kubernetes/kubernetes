@@ -251,28 +251,7 @@ func (a *syncAction) killSandboxes(m *kubeGenericRuntimeManager) ([]*kubecontain
 			defer utilruntime.HandleCrash()
 			defer wg.Done()
 
-			pod := a.sandboxContext.pod
-
 			result := kubecontainer.NewSyncResult(kubecontainer.KillPodSandbox, info.name)
-
-			// 1. Teardown the network.
-			isHostNetwork, err := m.isHostNetwork(info.id, pod)
-			if err != nil {
-				message := fmt.Sprintf("Failed to verify if the pod is host network or not, %v", err)
-				result.Fail(kubecontainer.ErrKillPodSandbox, message)
-				syncResultCh <- result
-				return
-			}
-			if !isHostNetwork {
-				teardownNetworkResult := kubecontainer.NewSyncResult(kubecontainer.TeardownNetwork, info.id)
-				if err := m.teardownPodNetwork(pod, info.id); err != nil {
-					teardownNetworkResult.Fail(kubecontainer.ErrTeardownNetwork, err.Error())
-				}
-				syncResultCh <- teardownNetworkResult
-			}
-
-			// 2. Kill the sandbox.
-			// For killings that happen inside sync pod, there's no gracePeriodOverride.
 			if err := m.killPodSandbox(info.id, info.name, info.reason); err != nil {
 				result.Fail(kubecontainer.ErrKillPodSandbox, err.Error())
 			}
@@ -317,28 +296,11 @@ func (a *syncAction) startSandbox(m *kubeGenericRuntimeManager) ([]*kubecontaine
 		return syncResult, err
 	}
 
-	// 2. Setup network
-	netResult := kubecontainer.NewSyncResult(kubecontainer.SetupNetwork, sandboxID)
-	syncResult = append(syncResult, netResult)
-	if err := m.setupPodNetwork(pod, sandboxID); err != nil {
-		netResult.Fail(kubecontainer.ErrCreatePodSandbox, fmt.Sprintf("setupPodNetwork for pod %q failed: %v", format.Pod(pod), err))
-
-		// Clean up the pod.
-		killResult := kubecontainer.NewSyncResult(kubecontainer.KillPodSandbox, pod.Name)
-		syncResult = append(syncResult, killResult)
-
-		if err := m.killPodSandbox(sandboxID, pod.Name, "cleanup the pod after setupPodNetwork failed"); err != nil {
-			killResult.Fail(kubecontainer.ErrKillPodSandbox, err.Error())
-		}
-		return syncResult, err
-	}
-
-	// 3. Update the sandbox status.
+	// 2. Update the sandbox status.
 	a.sandboxContext.sandboxStatus, err = m.getSandboxStatus(sandboxID)
 	if err != nil {
 		createResult.Fail(kubecontainer.ErrCreatePodSandbox, err.Error())
-		// TODO(yifan): Maybe tear down the network and kill the pod here,
-		// But leave it for the next iteration for now to be less aggressive.
+		// TODO(yifan): Maybe also kill the sandbox here.
 		return syncResult, err
 	}
 
