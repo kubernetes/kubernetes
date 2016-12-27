@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2014 The Kubernetes Authors.
+# Copyright 2016 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,6 +14,4 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../../..
-source ${KUBE_ROOT}/cluster/gce/util.sh
-source ${KUBE_ROOT}/cluster/kubemark/gce/config-default.sh
+CLOUD_PROVIDER="${CLOUD_PROVIDER:-gce}"

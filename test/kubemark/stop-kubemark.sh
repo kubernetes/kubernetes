@@ -14,54 +14,27 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Script that destroys Kubemark clusters and deletes all GCE resources created for Master
+# Script that destroys Kubemark clusters and deletes all master resources.
+
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
 
-# TODO(shyamjvs): This variable should be read from a cloud_provider_config.sh file.
-CLOUD_PROVIDER="${CLOUD_PROVIDER:-gce}"
+source "${KUBE_ROOT}/test/kubemark/skeleton/util.sh"
+source "${KUBE_ROOT}/test/kubemark/cloud-provider-config.sh"
+source "${KUBE_ROOT}/test/kubemark/${CLOUD_PROVIDER}/util.sh"
+source "${KUBE_ROOT}/cluster/kubemark/${CLOUD_PROVIDER}/config-default.sh"
 
-source "${KUBE_ROOT}/test/kubemark/${CLOUD_PROVIDER}/common.sh"
+KUBECTL="${KUBE_ROOT}/cluster/kubectl.sh"
+RESOURCE_DIRECTORY="${KUBE_ROOT}/test/kubemark/resources"
 
-"${KUBECTL}" delete -f "${RESOURCE_DIRECTORY}/hollow-kubelet.json" &> /dev/null || true
+"${KUBECTL}" delete -f "${RESOURCE_DIRECTORY}/hollow-node.json" &> /dev/null || true
 "${KUBECTL}" delete -f "${RESOURCE_DIRECTORY}/addons" &> /dev/null || true
 "${KUBECTL}" delete -f "${RESOURCE_DIRECTORY}/kubemark-ns.json" &> /dev/null || true
 
-rm -rf "${RESOURCE_DIRECTORY}/addons" "${RESOURCE_DIRECTORY}/kubeconfig.kubemark" &> /dev/null || true
-rm "${RESOURCE_DIRECTORY}/ca.crt" \
-	"${RESOURCE_DIRECTORY}/kubecfg.crt" \
-	"${RESOURCE_DIRECTORY}/kubecfg.key" \
+rm -rf "${RESOURCE_DIRECTORY}/addons" \
+	"${RESOURCE_DIRECTORY}/kubeconfig.kubemark" \
 	"${RESOURCE_DIRECTORY}/hollow-node.json" \
+	"${RESOURCE_DIRECTORY}/kubeconfig_secret.json" \
+	"${RESOURCE_DIRECTORY}/node_config_map.json" \
 	"${RESOURCE_DIRECTORY}/kubemark-master-env.sh"  &> /dev/null || true
 
-##################################################################################
-##################################################################################
-# TODO(shyamjvs): All this part should move out into cloud_provider specific code.
-GCLOUD_COMMON_ARGS="--project ${PROJECT} --zone ${ZONE} --quiet"
-
-gcloud compute instances delete "${MASTER_NAME}" \
-    ${GCLOUD_COMMON_ARGS} || true
-
-gcloud compute disks delete "${MASTER_NAME}-pd" \
-    ${GCLOUD_COMMON_ARGS} || true
-
-gcloud compute disks delete "${MASTER_NAME}-event-pd" \
-    ${GCLOUD_COMMON_ARGS} &> /dev/null || true
-
-gcloud compute addresses delete "${MASTER_NAME}-ip" \
-    --project "${PROJECT}" \
-    --region "${REGION}" \
-    --quiet || true
-
-gcloud compute firewall-rules delete "${INSTANCE_PREFIX}-kubemark-master-https" \
-	--project "${PROJECT}" \
-	--quiet || true
-
-if [ "${SEPARATE_EVENT_MACHINE:-false}" == "true" ]; then
-	gcloud compute instances delete "${EVENT_STORE_NAME}" \
-    	${GCLOUD_COMMON_ARGS} || true
-
-	gcloud compute disks delete "${EVENT_STORE_NAME}-pd" \
-    	${GCLOUD_COMMON_ARGS} || true
-fi
-##################################################################################
-##################################################################################
+delete-master-instance-and-resources

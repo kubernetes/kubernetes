@@ -14,18 +14,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# TODO(shyamjvs): This variable should be read from a cloud_provider_config.sh file.
-export CLOUD_PROVIDER="${CLOUD_PROVIDER:-gce}"
-export KUBERNETES_PROVIDER="kubemark/${CLOUD_PROVIDER}"
-export KUBE_CONFIG_FILE="config-default.sh"
-
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
+
+source "${KUBE_ROOT}/test/kubemark/cloud-provider-config.sh"
+source "${KUBE_ROOT}/test/kubemark/${CLOUD_PROVIDER}/util.sh"
+source "${KUBE_ROOT}/cluster/kubemark/${CLOUD_PROVIDER}/config-default.sh"
+
+export KUBERNETES_PROVIDER="kubemark"
+export KUBE_CONFIG_FILE="config-default.sh"
 
 # We need an absolute path to KUBE_ROOT
 ABSOLUTE_ROOT=$(readlink -f ${KUBE_ROOT})
-
-source "${KUBE_ROOT}/cluster/kubemark/${CLOUD_PROVIDER}/util.sh"
-source "${KUBE_ROOT}/cluster/kubemark/${CLOUD_PROVIDER}/config-default.sh"
 
 echo "Kubemark master name: ${MASTER_NAME}"
 
