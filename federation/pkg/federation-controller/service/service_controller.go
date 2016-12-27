@@ -69,6 +69,8 @@ type ServiceController struct {
 
 	// Contains services present in members of federation.
 	serviceFederatedInformer util.FederatedInformer
+	// Contains endpoints present in members of federation.
+	endpointFederatedInformer util.FederatedInformer
 	// For updating members of federation.
 	federatedServiceUpdater util.FederatedUpdater
 	// Definitions of services that should be federated.
@@ -171,6 +173,34 @@ func NewServiceController(client fedclientset.Interface) *ServiceController {
 				sc.clusterDeliverer.DeliverAfter(allServicesKey, nil, 0)
 			},
 		},
+	)
+
+	// Federated informer on endpoints in members of federation to know backing healthy endpoints
+	sc.endpointFederatedInformer = util.NewFederatedInformer(
+		client,
+		func(cluster *fedv1.Cluster, targetClient kubeclientset.Interface) (
+			cache.Store, cache.ControllerInterface) {
+			return cache.NewInformer(
+				&cache.ListWatch{
+					ListFunc: func(options apiv1.ListOptions) (runtime.Object, error) {
+						return targetClient.Core().Endpoints(apiv1.NamespaceAll).List(options)
+					},
+					WatchFunc: func(options apiv1.ListOptions) (watch.Interface, error) {
+						return targetClient.Core().Endpoints(apiv1.NamespaceAll).Watch(options)
+					},
+				},
+				&apiv1.Endpoints{},
+				time.Minute*10, // rechecks all endpoints on interval
+				util.NewTriggerOnMetaAndFieldChanges(
+					"Subsets",
+					func(obj runtime.Object) {
+						glog.V(5).Infof("Delivering endpoint notification from federated "+
+							"cluster %s :%v", cluster.Name, obj)
+						sc.deliverEndpointObj(obj, sc.reviewDelay, false)
+					},
+				))
+		},
+		&util.ClusterLifecycleHandlerFuncs{},
 	)
 
 	// Federated updater along with Create/Update/Delete operations.
@@ -276,9 +306,11 @@ func (sc *ServiceController) Run(workers int, stopChan <-chan struct{}) {
 
 	go sc.serviceInformerController.Run(stopChan)
 	sc.serviceFederatedInformer.Start()
+	sc.endpointFederatedInformer.Start()
 	go func() {
 		<-stopChan
 		sc.serviceFederatedInformer.Stop()
+		sc.endpointFederatedInformer.Stop()
 		sc.objectDeliverer.Stop()
 		sc.clusterDeliverer.Stop()
 		sc.serviceWorkQueue.ShutDown()
@@ -287,6 +319,11 @@ func (sc *ServiceController) Run(workers int, stopChan <-chan struct{}) {
 
 func (sc *ServiceController) deliverServiceObj(obj interface{}, delay time.Duration, failed bool) {
 	object := obj.(*apiv1.Service)
+	sc.deliverObject(types.NamespacedName{Namespace: object.Namespace, Name: object.Name}, delay, failed)
+}
+
+func (sc *ServiceController) deliverEndpointObj(obj interface{}, delay time.Duration, failed bool) {
+	object := obj.(*apiv1.Endpoints)
 	sc.deliverObject(types.NamespacedName{Namespace: object.Namespace, Name: object.Name}, delay, failed)
 }
 
@@ -357,6 +394,19 @@ func (sc *ServiceController) isSynced() bool {
 		return false
 	}
 	if !sc.serviceFederatedInformer.GetTargetStore().ClustersSynced(serviceClusters) {
+		return false
+	}
+
+	if !sc.endpointFederatedInformer.ClustersSynced() {
+		glog.V(2).Infof("Cluster list not synced")
+		return false
+	}
+	endpointClusters, err := sc.endpointFederatedInformer.GetReadyClusters()
+	if err != nil {
+		glog.Errorf("Failed to get ready clusters: %v", err)
+		return false
+	}
+	if !sc.endpointFederatedInformer.GetTargetStore().ClustersSynced(endpointClusters) {
 		return false
 	}
 
@@ -444,6 +494,13 @@ func (sc *ServiceController) reconcileService(serviceKey types.NamespacedName) (
 			glog.Errorf("Failed to get %s service from %s: %v", key, cluster.Name, err)
 			return statusError, err
 		}
+		// Get Endpoints object corresponding to service from cluster informer store
+		clusterEndpointsObj, endpointsFound, err :=
+			sc.endpointFederatedInformer.GetTargetStore().GetByKey(cluster.Name, key)
+		if err != nil {
+			glog.Errorf("Failed to get %s endpoint from %s: %v", key, cluster.Name, err)
+			return statusError, err
+		}
 		if !serviceFound {
 			sc.eventRecorder.Eventf(fedService, api.EventTypeNormal, "CreateInCluster",
 				"Creating service in cluster %s", cluster.Name)
@@ -522,7 +579,17 @@ func (sc *ServiceController) reconcileService(serviceKey types.NamespacedName) (
 						getClusterServiceIngresses(newServiceIngress,
 							region, zone, cluster.Name)
 					clusterIngress.Endpoints = append(clusterIngress.Endpoints, address)
-					clusterIngress.Healthy = true
+					clusterIngress.Healthy = false
+					// if endpoints not found, load balancer ingress is treated as unhealthy
+					if endpointsFound {
+						clusterEndpoints := clusterEndpointsObj.(*apiv1.Endpoints)
+						for _, subset := range clusterEndpoints.Subsets {
+							if len(subset.Addresses) > 0 {
+								clusterIngress.Healthy = true
+								break
+							}
+						}
+					}
 					newServiceIngress.Endpoints[region][zone][cluster.Name] = clusterIngress
 				}
 			}
