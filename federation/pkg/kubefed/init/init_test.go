@@ -168,7 +168,7 @@ func TestInitFederation(t *testing.T) {
 				want = fmt.Sprintf("Federation control plane runs (dry run)\n")
 			}
 
-			if got := buf.String(); !strings.Contains(got, want) {
+			if got := buf.String(); got != want {
 				t.Errorf("[%d] unexpected output: got: %s, want: %s", i, got, want)
 				if cmdErrMsg != "" {
 					t.Errorf("[%d] unexpected error message: %s", i, cmdErrMsg)
@@ -708,7 +708,7 @@ func fakeInitHostFactory(federationName, namespaceName, ip, dnsZoneName, image, 
 		},
 	}
 
-	ctrlMgrPod := v1.Pod{
+	cmPod := v1.Pod{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Pod",
 			APIVersion: testapi.Extensions.GroupVersion().String(),
@@ -723,7 +723,7 @@ func fakeInitHostFactory(federationName, namespaceName, ip, dnsZoneName, image, 
 	}
 
 	podList.Items = append(podList.Items, apiServerPod)
-	podList.Items = append(podList.Items, ctrlMgrPod)
+	podList.Items = append(podList.Items, cmPod)
 
 	f, tf, codec, _ := cmdtesting.NewAPIFactory()
 	extCodec := testapi.Extensions.Codec()
@@ -733,6 +733,8 @@ func fakeInitHostFactory(federationName, namespaceName, ip, dnsZoneName, image, 
 		NegotiatedSerializer: ns,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
+			case p == "/healthz":
+				return &http.Response{StatusCode: http.StatusOK, Header: kubefedtesting.DefaultHeader(), Body: ioutil.NopCloser(bytes.NewReader([]byte("ok")))}, nil
 			case p == "/api/v1/namespaces" && m == http.MethodPost:
 				body, err := ioutil.ReadAll(req.Body)
 				if err != nil {
@@ -828,9 +830,7 @@ func fakeInitHostFactory(federationName, namespaceName, ip, dnsZoneName, image, 
 				return &http.Response{StatusCode: http.StatusCreated, Header: kubefedtesting.DefaultHeader(), Body: kubefedtesting.ObjBody(extCodec, &want)}, nil
 			case p == "/api/v1/namespaces/federation-system/pods" && m == http.MethodGet:
 				return &http.Response{StatusCode: http.StatusOK, Header: kubefedtesting.DefaultHeader(), Body: kubefedtesting.ObjBody(codec, &podList)}, nil
-
 			default:
-				fmt.Println("Unknon api called %v\n", p)
 				return nil, fmt.Errorf("unexpected request: %#v\n%#v", req.URL, req)
 			}
 		}),
