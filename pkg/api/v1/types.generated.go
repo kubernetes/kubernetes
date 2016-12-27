@@ -32,7 +32,7 @@ import (
 	pkg5_intstr "k8s.io/kubernetes/pkg/util/intstr"
 	"reflect"
 	"runtime"
-	pkg4_inf "speter.net/go/exp/math/dec/inf"
+	pkg4_inf "gopkg.in/inf.v0"
 	time "time"
 )
 

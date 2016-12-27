@@ -21,13 +21,13 @@ package v1beta1
 import (
 	time "time"
 
+	inf "gopkg.in/inf.v0"
 	api "k8s.io/kubernetes/pkg/api"
 	resource "k8s.io/kubernetes/pkg/api/resource"
 	unversioned "k8s.io/kubernetes/pkg/api/unversioned"
 	v1 "k8s.io/kubernetes/pkg/api/v1"
 	conversion "k8s.io/kubernetes/pkg/conversion"
 	intstr "k8s.io/kubernetes/pkg/util/intstr"
-	inf "speter.net/go/exp/math/dec/inf"
 )
 
 func deepCopy_resource_Quantity(in resource.Quantity, out *resource.Quantity, c *conversion.Cloner) error {

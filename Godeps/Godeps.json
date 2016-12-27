@@ -1,6 +1,7 @@
 {
 	"ImportPath": "k8s.io/kubernetes",
 	"GoVersion": "go1.5",
+	"GodepVersion": "v62",
 	"Packages": [
 		"./..."
 	],
@@ -1042,6 +1043,11 @@
 			"Rev": "933601d8cd6418a8a891bd9075a7161b0a67badb"
 		},
 		{
+			"ImportPath": "gopkg.in/inf.v0",
+			"Comment": "v0.9.0",
+			"Rev": "3887ee99ecf07df5b447e9b00d9c0b2adaa9f3e4"
+		},
+		{
 			"ImportPath": "gopkg.in/natefinch/lumberjack.v2",
 			"Comment": "v1.0-16-g20b71e5",
 			"Rev": "20b71e5b60d756d3d2f80def009790325acc2b23"
@@ -1054,10 +1060,6 @@
 			"ImportPath": "k8s.io/heapster/api/v1/types",
 			"Comment": "v0.19.1-44-g0991ac5",
 			"Rev": "0991ac528ea24aae194e45d6dcf01896cb42cbea"
-		},
-		{
-			"ImportPath": "speter.net/go/exp/math/dec/inf",
-			"Rev": "42ca6cd68aa922bc3f32f1e056e61b65945d9ad7"
 		}
 	]
 }

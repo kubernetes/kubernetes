@@ -352,7 +352,7 @@ k8s.io/heapster/master/NOTICE
 k8s.io/heapster/master/NOTICE.txt
 k8s.io/heapster/master/README
 k8s.io/heapster/master/README.md
-speter.net/go/master/NOTICE
-speter.net/go/master/NOTICE.txt
-speter.net/go/master/README
-speter.net/go/master/README.md
+gopkg.in/inf.v0/master/NOTICE
+gopkg.in/inf.v0/master/NOTICE.txt
+gopkg.in/inf.v0/master/README
+gopkg.in/inf.v0/master/README.md
