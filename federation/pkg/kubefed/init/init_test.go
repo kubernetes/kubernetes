@@ -733,6 +733,8 @@ func fakeInitHostFactory(federationName, namespaceName, ip, dnsZoneName, image, 
 		NegotiatedSerializer: ns,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
+			case p == "/healthz":
+				return &http.Response{StatusCode: http.StatusOK, Header: kubefedtesting.DefaultHeader(), Body: ioutil.NopCloser(bytes.NewReader([]byte("ok")))}, nil
 			case p == "/api/v1/namespaces" && m == http.MethodPost:
 				body, err := ioutil.ReadAll(req.Body)
 				if err != nil {
@@ -828,9 +830,7 @@ func fakeInitHostFactory(federationName, namespaceName, ip, dnsZoneName, image, 
 				return &http.Response{StatusCode: http.StatusCreated, Header: kubefedtesting.DefaultHeader(), Body: kubefedtesting.ObjBody(extCodec, &want)}, nil
 			case p == "/api/v1/namespaces/federation-system/pods" && m == http.MethodGet:
 				return &http.Response{StatusCode: http.StatusOK, Header: kubefedtesting.DefaultHeader(), Body: kubefedtesting.ObjBody(codec, &podList)}, nil
-
 			default:
-				fmt.Println("Unknon api called %v\n", p)
 				return nil, fmt.Errorf("unexpected request: %#v\n%#v", req.URL, req)
 			}
 		}),
