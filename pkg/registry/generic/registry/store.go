@@ -402,8 +402,8 @@ func (e *Store) Update(ctx api.Context, name string, objInfo rest.UpdatedObjectI
 		if err := rest.BeforeUpdate(e.UpdateStrategy, ctx, obj, existing); err != nil {
 			return nil, nil, err
 		}
-		delete := e.shouldDelete(ctx, key, obj, existing)
-		if delete {
+		shouldDelete := e.shouldDelete(ctx, key, obj, existing)
+		if shouldDelete {
 			deleteObj = obj
 			return nil, nil, errEmptiedFinalizers
 		}
