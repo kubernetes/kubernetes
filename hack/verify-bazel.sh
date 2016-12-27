@@ -20,12 +20,9 @@ set -o pipefail
 export KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
-# Remove generated files prior to running kazel.
-# TODO(spxtr): Remove this line once Bazel is the only way to build.
-rm -f "${KUBE_ROOT}/pkg/generated/openapi/zz_generated.openapi.go"
-
 kube::util::go_install_from_commit github.com/kubernetes/repo-infra/kazel d651a70c51ec9a450135ff08ea045d857a6be014
 
+make generated_files
 if ! kazel -validate -print-diff -root="$(kube::realpath ${KUBE_ROOT})" ; then
   echo
   echo "Run ./hack/update-bazel.sh"
