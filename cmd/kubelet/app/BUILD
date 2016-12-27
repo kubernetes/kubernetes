@@ -56,7 +56,6 @@ go_library(
         "//pkg/kubelet/dockertools:go_default_library",
         "//pkg/kubelet/network:go_default_library",
         "//pkg/kubelet/network/cni:go_default_library",
-        "//pkg/kubelet/network/exec:go_default_library",
         "//pkg/kubelet/network/kubenet:go_default_library",
         "//pkg/kubelet/server:go_default_library",
         "//pkg/kubelet/types:go_default_library",
