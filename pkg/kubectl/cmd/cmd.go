@@ -191,6 +191,7 @@ __custom_func() {
     * persistentvolumeclaims (aka 'pvc')
     * persistentvolumes (aka 'pv')
     * pods (aka 'po')
+    * poddisruptionbudgets (aka 'pdb')
     * podsecuritypolicies (aka 'psp')
     * podtemplates
     * replicasets (aka 'rs')
