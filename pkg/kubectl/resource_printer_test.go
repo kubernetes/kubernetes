@@ -1443,6 +1443,7 @@ func TestPrintDeployment(t *testing.T) {
 	tests := []struct {
 		deployment extensions.Deployment
 		expect     string
+		wideExpect string
 	}{
 		{
 			extensions.Deployment{
@@ -1453,8 +1454,20 @@ func TestPrintDeployment(t *testing.T) {
 				Spec: extensions.DeploymentSpec{
 					Replicas: 5,
 					Template: api.PodTemplateSpec{
-						Spec: api.PodSpec{Containers: make([]api.Container, 2)},
+						Spec: api.PodSpec{
+							Containers: []api.Container{
+								{
+									Name:  "fake-container1",
+									Image: "fake-image1",
+								},
+								{
+									Name:  "fake-container2",
+									Image: "fake-image2",
+								},
+							},
+						},
 					},
+					Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
 				},
 				Status: extensions.DeploymentStatus{
 					Replicas:            10,
@@ -1464,6 +1477,7 @@ func TestPrintDeployment(t *testing.T) {
 				},
 			},
 			"test1\t5\t10\t2\t1\t0s\n",
+			"test1\t5\t10\t2\t1\t0s\tfake-container1,fake-container2\tfake-image1,fake-image2\tfoo=bar\n",
 		},
 	}
 
@@ -1472,6 +1486,12 @@ func TestPrintDeployment(t *testing.T) {
 		printDeployment(&test.deployment, buf, PrintOptions{false, false, false, false, true, false, false, "", []string{}})
 		if buf.String() != test.expect {
 			t.Fatalf("Expected: %s, got: %s", test.expect, buf.String())
+		}
+		buf.Reset()
+		// print deployment with '-o wide' option
+		printDeployment(&test.deployment, buf, PrintOptions{false, false, false, true, true, false, false, "", []string{}})
+		if buf.String() != test.wideExpect {
+			t.Fatalf("Expected: %s, got: %s", test.wideExpect, buf.String())
 		}
 		buf.Reset()
 	}
