@@ -372,7 +372,7 @@ func (dc *DeploymentController) getDeploymentForPod(pod *v1.Pod) *extensions.Dep
 	var rs *extensions.ReplicaSet
 	var err error
 	// Look at the owner reference
-	controllerRef := controller.GetControllerOf(pod.ObjectMeta)
+	controllerRef := controller.GetControllerOf(&pod.ObjectMeta)
 	if controllerRef != nil {
 		// Not a pod owned by a replica set.
 		if controllerRef.Kind != extensions.SchemeGroupVersion.WithKind("ReplicaSet").Kind {
