@@ -22,6 +22,7 @@ import (
 	proxyapp "k8s.io/kubernetes/cmd/kube-proxy/app"
 	"k8s.io/kubernetes/cmd/kube-proxy/app/options"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/record"
 	proxyconfig "k8s.io/kubernetes/pkg/proxy/config"
@@ -62,7 +63,7 @@ func NewHollowProxyOrDie(
 	config := options.NewProxyConfig()
 	config.OOMScoreAdj = util.Int32Ptr(0)
 	config.ResourceContainer = ""
-	config.NodeRef = &api.ObjectReference{
+	config.NodeRef = &v1.ObjectReference{
 		Kind:      "Node",
 		Name:      nodeName,
 		UID:       types.UID(nodeName),

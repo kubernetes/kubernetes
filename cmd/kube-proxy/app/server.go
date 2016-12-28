@@ -304,7 +304,7 @@ func NewProxyServerDefault(config *options.ProxyServerConfig) (*ProxyServer, err
 		endpointsConfig.Channel("api"),
 	)
 
-	config.NodeRef = &api.ObjectReference{
+	config.NodeRef = &v1.ObjectReference{
 		Kind:      "Node",
 		Name:      hostname,
 		UID:       types.UID(hostname),
