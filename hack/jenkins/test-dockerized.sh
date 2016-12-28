@@ -55,7 +55,6 @@ make generated_files
 go install ./cmd/...
 ./hack/install-etcd.sh
 
-make test WHAT="cmd/kubeadm/test cmd/libs/go2idl/openapi-gen/generators"
 make test-cmd
 make test-integration
 ./hack/test-update-storage-objects.sh
