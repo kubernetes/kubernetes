@@ -339,7 +339,7 @@ func (kl *Kubelet) tryUpdateNodeStatus(tryNumber int) error {
 	// from here are the majority of load on apiserver and etcd.
 	// To reduce the load on etcd, we are serving GET operations from
 	// apiserver cache (the data might be slightly delayed but it doesn't
-	// seem to cause more confilict - the delays are pretty small).
+	// seem to cause more conflict - the delays are pretty small).
 	// If it result in a conflict, all retries are served directly from etcd.
 	opts := metav1.GetOptions{}
 	if tryNumber == 0 {
@@ -376,11 +376,11 @@ func (kl *Kubelet) tryUpdateNodeStatus(tryNumber int) error {
 
 // recordNodeStatusEvent records an event of the given type with the given
 // message for the node.
-func (kl *Kubelet) recordNodeStatusEvent(eventtype, event string) {
+func (kl *Kubelet) recordNodeStatusEvent(eventType, event string) {
 	glog.V(2).Infof("Recording %s event message for node %s", event, kl.nodeName)
 	// TODO: This requires a transaction, either both node status is updated
 	// and event is recorded or neither should happen, see issue #6055.
-	kl.recorder.Eventf(kl.nodeRef, eventtype, event, "Node %s status is now: %s", kl.nodeName, event)
+	kl.recorder.Eventf(kl.nodeRef, eventType, event, "Node %s status is now: %s", kl.nodeName, event)
 }
 
 // Set IP and hostname addresses for the node.
@@ -765,7 +765,7 @@ func (kl *Kubelet) setNodeDiskPressureCondition(node *v1.Node) {
 	// Update the heartbeat time
 	condition.LastHeartbeatTime = currentTime
 
-	// Note: The conditions below take care of the case when a new NodeDiskressure condition is
+	// Note: The conditions below take care of the case when a new NodeDiskPressure condition is
 	// created and as well as the case when the condition already exists. When a new condition
 	// is created its status is set to v1.ConditionUnknown which matches either
 	// condition.Status != v1.ConditionTrue or
@@ -794,7 +794,7 @@ func (kl *Kubelet) setNodeDiskPressureCondition(node *v1.Node) {
 	}
 }
 
-// Set OODcondition for the node.
+// Set OODCondition for the node.
 func (kl *Kubelet) setNodeOODCondition(node *v1.Node) {
 	currentTime := metav1.NewTime(kl.clock.Now())
 	var nodeOODCondition *v1.NodeCondition
@@ -914,14 +914,6 @@ func (kl *Kubelet) defaultNodeStatusFuncs() []func(*v1.Node) error {
 		withoutError(kl.setNodeReadyCondition),
 		withoutError(kl.setNodeVolumesInUseStatus),
 		withoutError(kl.recordNodeSchedulableEvent),
-	}
-}
-
-// SetNodeStatus returns a functional Option that adds the given node status
-// update handler to the Kubelet
-func SetNodeStatus(f func(*v1.Node) error) Option {
-	return func(k *Kubelet) {
-		k.setNodeStatusFuncs = append(k.setNodeStatusFuncs, f)
 	}
 }
 
