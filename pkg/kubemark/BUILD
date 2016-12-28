@@ -19,6 +19,7 @@ go_library(
         "//cmd/kube-proxy/app/options:go_default_library",
         "//cmd/kubelet/app:go_default_library",
         "//pkg/api:go_default_library",
+        "//pkg/api/v1:go_default_library",
         "//pkg/apis/componentconfig:go_default_library",
         "//pkg/apis/componentconfig/v1alpha1:go_default_library",
         "//pkg/client/clientset_generated/clientset:go_default_library",
