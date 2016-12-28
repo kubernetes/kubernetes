@@ -17,11 +17,20 @@ limitations under the License.
 package system
 
 import (
-	"regexp"
+	"strings"
 )
 
 // TODO: find a better way of figuring out if given node is a registered master.
 func IsMasterNode(nodeName string) bool {
-	r := regexp.MustCompile("master(-...)?$")
-	return r.MatchString(nodeName)
+	// We are trying to capture "master(-...)?$" regexp.
+	// However, using regexp.MatchString() results even in more than 35%
+	// of all space allocations in ControllerManager spent in this function.
+	// That's why we are trying to be a bit smarter.
+	if strings.HasSuffix(nodeName, "master") {
+		return true
+	}
+	if len(nodeName) >= 10 {
+		return strings.HasSuffix(nodeName[:len(nodeName)-3], "master-")
+	}
+	return false
 }
