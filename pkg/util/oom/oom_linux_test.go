@@ -19,10 +19,10 @@ limitations under the License.
 package oom
 
 import (
+	"math/rand"
 	"os"
 	"path"
 	"strconv"
-	"math/rand"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -116,8 +116,8 @@ func TestApplyOOMScoreAdjPidNotExist(t *testing.T) {
 		if searchErr != nil && os.IsNotExist(searchErr) {
 			break
 		}
-		
-		tryTimes ++
+
+		tryTimes++
 		if tryTimes > upperLimit {
 			break
 		}
