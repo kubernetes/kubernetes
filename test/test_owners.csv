@@ -179,14 +179,16 @@ Federation secrets Secret objects should be created and deleted successfully,pmo
 Federation secrets Secret objects should be deleted from underlying clusters when OrphanDependents is false,nikhiljindal,0
 Federation secrets Secret objects should not be deleted from underlying clusters when OrphanDependents is nil,nikhiljindal,0
 Federation secrets Secret objects should not be deleted from underlying clusters when OrphanDependents is true,nikhiljindal,0
-Firewall rule should create valid firewall rules for LoadBalancer type service,brendandburns,0
-Firewall rule should have correct firewall rules for e2e cluster,brendandburns,0
+Firewall rule should create valid firewall rules for LoadBalancer type service,rkouj,0
+Firewall rule should have correct firewall rules for e2e cluster,rkouj,0
 GCP Volumes GlusterFS should be mountable,nikhiljindal,0
 GCP Volumes NFSv4 should be mountable for NFSv4,nikhiljindal,0
 GKE local SSD should write and read from node local SSD,fabioy,0
 GKE node pools should create a cluster with multiple node pools,fabioy,1
 Garbage Collection Test: * Should eventually garbage collect containers when we exceed the number of dead containers per container,Random-Liu,0
+Garbage collector should delete RS created by deployment when not orphaning,rkouj,0
 Garbage collector should delete pods created by rc when not orphaning,justinsb,1
+Garbage collector should orphan RS created by deployment when deleteOptions.OrphanDependents is true,rkouj,0
 Garbage collector should orphan pods created by rc if delete options say so,fabioy,1
 Garbage collector should orphan pods created by rc if deleteOptions.OrphanDependents is nil,zmerlynn,1
 "Generated release_1_5 clientset should create pods, delete pods, watch pods",rrati,0
@@ -247,6 +249,7 @@ Kubectl client Kubectl taint should update the taint on a node,pwittrock,0
 Kubectl client Kubectl version should check is all data is printed,janetkuo,0
 Kubectl client Proxy server should support --unix-socket=/path,zmerlynn,1
 Kubectl client Proxy server should support proxy with --port 0,ncdc,1
+Kubectl client Simple pod should handle in-cluster config,rkouj,0
 Kubectl client Simple pod should return command exit codes,yifan-gu,1
 Kubectl client Simple pod should support exec,ncdc,0
 Kubectl client Simple pod should support exec through an HTTP proxy,ncdc,0
@@ -264,9 +267,7 @@ Kubelet Container Manager Validate OOM score adjustments once the node is setup 
 Kubelet Container Manager Validate OOM score adjustments once the node is setup docker daemon's oom-score-adj should be -999,thockin,1
 Kubelet Container Manager Validate OOM score adjustments once the node is setup guaranteed container's oom-score-adj should be -998,kargakis,1
 Kubelet Container Manager Validate OOM score adjustments once the node is setup pod infra containers oom-score-adj should be -998 and best effort container's should be 1000,timothysc,1
-Kubelet Eviction Manager hard eviction test pod using the most disk space gets evicted when the node disk usage is above the eviction hard threshold should evict the pod using the most disk space,rrati,0
-Kubelet Volume Manager Volume Manager On terminatation of pod with memory backed volume should remove the volume from the node,derekwaynecarr,0
-Kubelet Eviction Manager hard eviction test pod using the most disk space gets evicted when the node disk usage is above the eviction hard threshold should evict the pod using the most disk space,karlkfi,1
+Kubelet Eviction Manager hard eviction test pod using the most disk space gets evicted when the node disk usage is above the eviction hard threshold should evict the pod using the most disk space,rkouj,0
 Kubelet Volume Manager Volume Manager On terminatation of pod with memory backed volume should remove the volume from the node,rkouj,0
 Kubelet experimental resource usage tracking resource tracking for * pods per node,yujuhong,0
 Kubelet regular resource usage tracking resource tracking for * pods per node,yujuhong,0
@@ -344,11 +345,10 @@ PersistentVolumes PersistentVolumes:NFS with multiple PVs and PVCs all in same n
 PersistentVolumes PersistentVolumes:NFS with multiple PVs and PVCs all in same ns should create 3 PVs and 3 PVCs: test write access,copejon,0
 PersistentVolumes PersistentVolumes:NFS with multiple PVs and PVCs all in same ns should create 4 PVs and 2 PVCs: test write access,copejon,0
 Pet Store should scale to persist a nominal number ( * ) of transactions in * seconds,xiang90,1
-"Pod Disks Should schedule a pod w/ a RW PD, gracefully remove it, then schedule it on another host",alex-mohr,1
-"Pod Disks Should schedule a pod w/ a readonly PD on two hosts, then remove both gracefully.",rrati,0
 "Pod Disks Should schedule a pod w/ a RW PD, gracefully remove it, then schedule it on another host",saad-ali,0
 "Pod Disks Should schedule a pod w/ a readonly PD on two hosts, then remove both gracefully.",saad-ali,0
 Pod Disks should be able to detach from a node which was deleted,rkouj,0
+Pod Disks should be able to detach from a node whose api object was deleted,rkouj,0
 "Pod Disks should schedule a pod w/ a RW PD shared between multiple containers, write to PD, delete pod, verify contents, and repeat in rapid succession",saad-ali,0
 "Pod Disks should schedule a pod w/ a RW PD, ungracefully remove it, then schedule it on another host",mml,1
 "Pod Disks should schedule a pod w/ a readonly PD on two hosts, then remove both ungracefully.",saad-ali,1
@@ -471,14 +471,10 @@ SimpleMount should be able to mount an emptydir on a container,rrati,0
 "Spark should start spark master, driver and workers",jszczepkowski,1
 "Staging client repo client should create pods, delete pods, watch pods",jbeda,1
 StatefulSet Basic StatefulSet functionality Scaling down before scale up is finished should wait until current pod will be running and ready before it will be removed,derekwaynecarr,0
-StatefulSet Basic StatefulSet functionality Scaling should happen in predictable order and halt if any stateful pod is unhealthy,brendandburns,0
-StatefulSet Basic StatefulSet functionality Should recreate evicted statefulset,brendandburns,0
-StatefulSet Basic StatefulSet functionality should allow template updates,derekwaynecarr,0
-StatefulSet Basic StatefulSet functionality should handle healthy stateful pod restarts during scale,kevin-wangzefeng,1
-StatefulSet Basic StatefulSet functionality Scaling should happen in predictable order and halt if any pet is unhealthy,rkouj,0
+StatefulSet Basic StatefulSet functionality Scaling should happen in predictable order and halt if any stateful pod is unhealthy,derekwaynecarr,0
+StatefulSet Basic StatefulSet functionality Should recreate evicted statefulset,rrati,0
 StatefulSet Basic StatefulSet functionality should allow template updates,rkouj,0
-StatefulSet Basic StatefulSet functionality should handle healthy pet restarts during scale,girishkalele,1
-StatefulSet Basic StatefulSet functionality should handle healthy stateful pod restarts during scale,brendandburns,0
+StatefulSet Basic StatefulSet functionality should handle healthy stateful pod restarts during scale,kevin-wangzefeng,1
 StatefulSet Basic StatefulSet functionality should provide basic identity,bprashanth,1
 StatefulSet Deploy clustered applications should creating a working CockroachDB cluster,rkouj,0
 StatefulSet Deploy clustered applications should creating a working mysql cluster,yujuhong,1
@@ -502,6 +498,7 @@ Variable Expansion should allow substituting values in a container's command,mml
 Volumes Ceph RBD should be mountable,fabioy,1
 Volumes CephFS should be mountable,Q-Lee,1
 Volumes Cinder should be mountable,cjcullen,1
+Volumes ConfigMap should be mountable,rkouj,0
 Volumes GlusterFS should be mountable,eparis,1
 Volumes NFS should be mountable,rrati,0
 Volumes PD should be mountable,caesarxuchao,1
@@ -561,15 +558,8 @@ k8s.io/kubernetes/pkg/api/meta,fabioy,1
 k8s.io/kubernetes/pkg/api/resource,smarterclayton,1
 k8s.io/kubernetes/pkg/api/service,spxtr,1
 k8s.io/kubernetes/pkg/api/testapi,caesarxuchao,1
-k8s.io/kubernetes/pkg/api/util,rrati,0
-k8s.io/kubernetes/pkg/api/v1,rrati,0
-k8s.io/kubernetes/pkg/api/v1/endpoints,madhusudancs,0
-k8s.io/kubernetes/pkg/api/v1/pod,madhusudancs,0
-k8s.io/kubernetes/pkg/api/v1/service,madhusudancs,0
-k8s.io/kubernetes/pkg/api/unversioned,kevin-wangzefeng,1
-k8s.io/kubernetes/pkg/api/unversioned/validation,brendandburns,1
-k8s.io/kubernetes/pkg/api/util,ghodss,1
-k8s.io/kubernetes/pkg/api/v1,vulpecula,1
+k8s.io/kubernetes/pkg/api/util,rkouj,0
+k8s.io/kubernetes/pkg/api/v1,rkouj,0
 k8s.io/kubernetes/pkg/api/v1/endpoints,rkouj,0
 k8s.io/kubernetes/pkg/api/v1/pod,rkouj,0
 k8s.io/kubernetes/pkg/api/v1/service,rkouj,0
@@ -599,6 +589,9 @@ k8s.io/kubernetes/pkg/apis/rbac/validation,erictune,0
 k8s.io/kubernetes/pkg/apis/storage/validation,caesarxuchao,1
 k8s.io/kubernetes/pkg/apiserver,nikhiljindal,0
 k8s.io/kubernetes/pkg/apiserver/filters,dchen1107,1
+k8s.io/kubernetes/pkg/apiserver/handlers,rkouj,0
+k8s.io/kubernetes/pkg/apiserver/handlers/errors,rkouj,0
+k8s.io/kubernetes/pkg/apiserver/handlers/negotiation,rkouj,0
 k8s.io/kubernetes/pkg/apiserver/request,lavalamp,1
 k8s.io/kubernetes/pkg/auth/authenticator/bearertoken,liggitt,0
 k8s.io/kubernetes/pkg/auth/authorizer/abac,liggitt,0
@@ -634,6 +627,7 @@ k8s.io/kubernetes/pkg/cloudprovider/providers/photon,luomiao,0
 k8s.io/kubernetes/pkg/cloudprovider/providers/rackspace,caesarxuchao,1
 k8s.io/kubernetes/pkg/cloudprovider/providers/vsphere,apelisse,1
 k8s.io/kubernetes/pkg/controller,mikedanese,1
+k8s.io/kubernetes/pkg/controller/cloud,rkouj,0
 k8s.io/kubernetes/pkg/controller/cronjob,soltysh,1
 k8s.io/kubernetes/pkg/controller/daemon,Q-Lee,1
 k8s.io/kubernetes/pkg/controller/deployment,asalkeld,0
@@ -665,10 +659,7 @@ k8s.io/kubernetes/pkg/credentialprovider,justinsb,1
 k8s.io/kubernetes/pkg/credentialprovider/aws,zmerlynn,1
 k8s.io/kubernetes/pkg/credentialprovider/azure,brendandburns,0
 k8s.io/kubernetes/pkg/credentialprovider/gcp,mml,1
-k8s.io/kubernetes/pkg/dns,rrati,0
-k8s.io/kubernetes/pkg/dns/config,derekwaynecarr,0
-k8s.io/kubernetes/pkg/dns/federation,derekwaynecarr,0
-k8s.io/kubernetes/pkg/dns,jdef,1
+k8s.io/kubernetes/pkg/dns,rkouj,0
 k8s.io/kubernetes/pkg/dns/config,rkouj,0
 k8s.io/kubernetes/pkg/dns/federation,rkouj,0
 k8s.io/kubernetes/pkg/dns/treecache,bowei,0
@@ -681,6 +672,7 @@ k8s.io/kubernetes/pkg/genericapiserver/mux,spxtr,1
 k8s.io/kubernetes/pkg/genericapiserver/openapi,davidopp,1
 k8s.io/kubernetes/pkg/healthz,thockin,1
 k8s.io/kubernetes/pkg/httplog,mtaufen,1
+k8s.io/kubernetes/pkg/kubeapiserver/authorizer,rkouj,0
 k8s.io/kubernetes/pkg/kubectl,madhusudancs,1
 k8s.io/kubernetes/pkg/kubectl/cmd,rmmh,1
 k8s.io/kubernetes/pkg/kubectl/cmd/config,asalkeld,0
@@ -786,6 +778,7 @@ k8s.io/kubernetes/pkg/registry/core/service/ipallocator,eparis,1
 k8s.io/kubernetes/pkg/registry/core/service/ipallocator/controller,mtaufen,1
 k8s.io/kubernetes/pkg/registry/core/service/ipallocator/etcd,kargakis,1
 k8s.io/kubernetes/pkg/registry/core/service/portallocator,rrati,0
+k8s.io/kubernetes/pkg/registry/core/service/portallocator/controller,rkouj,0
 k8s.io/kubernetes/pkg/registry/core/serviceaccount,caesarxuchao,1
 k8s.io/kubernetes/pkg/registry/core/serviceaccount/etcd,bprashanth,1
 k8s.io/kubernetes/pkg/registry/extensions/controller/etcd,mwielgus,1
@@ -812,7 +805,6 @@ k8s.io/kubernetes/pkg/registry/policy/poddisruptionbudget/etcd,xiang90,1
 k8s.io/kubernetes/pkg/registry/storage/storageclass,brendandburns,1
 k8s.io/kubernetes/pkg/registry/storage/storageclass/etcd,eparis,1
 k8s.io/kubernetes/pkg/runtime,wojtek-t,0
-k8s.io/kubernetes/pkg/runtime/schema,madhusudancs,0
 k8s.io/kubernetes/pkg/runtime/schema,rkouj,0
 k8s.io/kubernetes/pkg/runtime/serializer,wojtek-t,0
 k8s.io/kubernetes/pkg/runtime/serializer/json,wojtek-t,0
@@ -918,6 +910,7 @@ k8s.io/kubernetes/pkg/volume/rbd,piosz,1
 k8s.io/kubernetes/pkg/volume/secret,rmmh,1
 k8s.io/kubernetes/pkg/volume/util,saad-ali,0
 k8s.io/kubernetes/pkg/volume/util/nestedpendingoperations,freehan,1
+k8s.io/kubernetes/pkg/volume/util/operationexecutor,rkouj,0
 k8s.io/kubernetes/pkg/volume/vsphere_volume,deads2k,1
 k8s.io/kubernetes/pkg/watch,mwielgus,1
 k8s.io/kubernetes/pkg/watch/versioned,childsb,1
