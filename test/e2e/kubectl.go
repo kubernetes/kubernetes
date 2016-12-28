@@ -583,7 +583,6 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 			_, err := framework.RunHostCmd(ns, simplePodName, "/kubectl get pods --token=invalid --v=7 2>&1")
 			framework.Logf("got err %v", err)
 			Expect(err).To(HaveOccurred())
-			Expect(err).To(ContainSubstring("User \"system:anonymous\" cannot list pods in the namespace"))
 			Expect(err).To(ContainSubstring("Using in-cluster namespace"))
 			Expect(err).To(ContainSubstring("Using in-cluster configuration"))
 			Expect(err).To(ContainSubstring("Authorization: Bearer invalid"))
