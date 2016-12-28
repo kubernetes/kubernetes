@@ -119,6 +119,22 @@ type ActualStateOfWorld interface {
 	// actual state of the world.
 	GetMountedVolumes() []MountedVolume
 
+	// GetMountedMetricsProviderWrappers generates and returns a map containing the
+	// metrics providers of all volumes in the actual world.
+	// The key in the map is the path to which the volume should be mounted for the
+	// pod.
+	GetMountedMetricsProviderWrappers() map[string]MetricsProviderWrapper
+
+	// GetMountedVolumeNamesForPod returns a list of volume names. The volumes are
+	// successfully attached and mounted for the specified pod based on the
+	// current actual state of the world.
+	GetMountedVolumeNamesForPod(podName volumetypes.UniquePodName) []v1.UniqueVolumeName
+
+	// GetMountedVolumeNames returns a list of volume names. The volumes are
+	// successfully attached and mounted for based on the current actual
+	// state of the world.
+	GetMountedVolumeNames() []v1.UniqueVolumeName
+
 	// GetMountedVolumesForPod generates and returns a list of volumes that are
 	// successfully attached and mounted for the specified pod based on the
 	// current actual state of the world.
@@ -156,6 +172,15 @@ type AttachedVolume struct {
 	// device at a global mount point. This global mount point must unmounted
 	// prior to detach.
 	GloballyMounted bool
+}
+
+// MetricsProviderWrapper represents a metrics provider for volume that is going
+// to be measured.
+type MetricsProviderWrapper struct {
+	Provider            volume.MetricsProvider
+	VolumeName          v1.UniqueVolumeName
+	OuterVolumeSpecName string
+	PluginName          string
 }
 
 // NewActualStateOfWorld returns a new instance of ActualStateOfWorld.
@@ -529,6 +554,85 @@ func (asw *actualStateOfWorld) VolumeExists(
 
 	_, volumeExists := asw.attachedVolumes[volumeName]
 	return volumeExists
+}
+
+func (asw *actualStateOfWorld) GetMountedMetricsProviderWrappers() map[string]MetricsProviderWrapper {
+	asw.RLock()
+	defer asw.RUnlock()
+	metricsProviderWrappers := make(map[string]MetricsProviderWrapper)
+	for _, volumeObj := range asw.attachedVolumes {
+		volumePlugin, err := asw.volumePluginMgr.FindPluginBySpec(volumeObj.spec)
+		if err != nil || volumePlugin == nil {
+			continue
+		}
+		for _, podObj := range volumeObj.mountedPods {
+			// mounter may not be updated
+			if podObj.mounter == nil {
+				continue
+			}
+			// path of volume mounted to pod may be change when it run 'du'.
+			if podObj.remountRequired {
+				continue
+			}
+			path := podObj.mounter.GetPath()
+			pluginName := volumePlugin.GetPluginName()
+			//TODO: Use Constant as case values.
+			switch pluginName {
+			case "kubernetes.io/nfs", "kubernetes.io/empty-dir":
+				metricsProviderWrappers[path] = MetricsProviderWrapper{
+					Provider:            volume.NewMetricsDu(path),
+					VolumeName:          volumeObj.volumeName,
+					OuterVolumeSpecName: podObj.outerVolumeSpecName,
+					PluginName:          pluginName}
+
+			case "kubernetes.io/aws-ebs", "kubernetes.io/azure-file", "kubernetes.io/gce-pd":
+				metricsProviderWrappers[path] = MetricsProviderWrapper{
+					Provider:            volume.NewMetricsStatFS(path),
+					VolumeName:          volumeObj.volumeName,
+					OuterVolumeSpecName: podObj.outerVolumeSpecName,
+					PluginName:          pluginName}
+
+			case "kubernetes.io/secret":
+				metricsProviderWrappers[path] = MetricsProviderWrapper{
+					Provider:            volume.NewCachedMetrics(volume.NewMetricsDu(path)),
+					VolumeName:          volumeObj.volumeName,
+					OuterVolumeSpecName: podObj.outerVolumeSpecName,
+					PluginName:          pluginName}
+			//TODO: Provide other volume plugins
+			default:
+
+			}
+		}
+	}
+
+	return metricsProviderWrappers
+}
+
+func (asw *actualStateOfWorld) GetMountedVolumeNamesForPod(podName volumetypes.UniquePodName) []v1.UniqueVolumeName {
+	asw.RLock()
+	defer asw.RUnlock()
+	mountedVolumeNames := make([]v1.UniqueVolumeName, 0 /* len */, len(asw.attachedVolumes) /* cap */)
+	for _, volumeObj := range asw.attachedVolumes {
+		for mountedPodName := range volumeObj.mountedPods {
+			if mountedPodName == podName {
+				mountedVolumeNames = append(mountedVolumeNames, volumeObj.volumeName)
+			}
+		}
+	}
+
+	return mountedVolumeNames
+}
+
+func (asw *actualStateOfWorld) GetMountedVolumeNames() []v1.UniqueVolumeName {
+	asw.RLock()
+	defer asw.RUnlock()
+	mountedVolumeNames := make([]v1.UniqueVolumeName, 0 /* len */, len(asw.attachedVolumes) /* cap */)
+	for _, volumeObj := range asw.attachedVolumes {
+		mountedVolumeNames = append(mountedVolumeNames, volumeObj.volumeName)
+	}
+
+	return mountedVolumeNames
+
 }
 
 func (asw *actualStateOfWorld) GetMountedVolumes() []MountedVolume {

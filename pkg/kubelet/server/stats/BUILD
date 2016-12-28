@@ -28,7 +28,6 @@ go_library(
         "//pkg/kubelet/leaky:go_default_library",
         "//pkg/kubelet/network:go_default_library",
         "//pkg/kubelet/types:go_default_library",
-        "//pkg/kubelet/util/format:go_default_library",
         "//pkg/types:go_default_library",
         "//pkg/util/wait:go_default_library",
         "//pkg/volume:go_default_library",

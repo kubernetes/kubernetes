@@ -13,6 +13,7 @@ go_library(
     srcs = [
         "actual_state_of_world.go",
         "desired_state_of_world.go",
+        "volume_metric_of_world.go",
     ],
     tags = ["automanaged"],
     deps = [

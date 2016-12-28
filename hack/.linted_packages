@@ -198,6 +198,7 @@ pkg/kubelet/volume/reconciler
 pkg/kubelet/volumemanager
 pkg/kubelet/volumemanager/cache
 pkg/kubelet/volumemanager/populator
+pkg/kubelet/volumemanager/provider
 pkg/kubelet/volumemanager/reconciler
 pkg/proxy/config
 pkg/proxy/healthcheck

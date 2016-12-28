@@ -49,6 +49,15 @@ func (kl *Kubelet) ListVolumesForPod(podUID types.UID) (map[string]volume.Volume
 	return volumesToReturn, len(volumesToReturn) > 0
 }
 
+// GetVolumesMetricsForPod returns a map of the mounted volumes metrics for the
+// given pod.
+// The key in the map is the OuterVolumeSpecName (i.e. pod.Spec.Volumes[x].Name)
+func (kl *Kubelet) GetVolumesMetricsForPod(podUID types.UID) (map[string]*volume.Metrics, bool) {
+	metricsToReturn := kl.volumeManager.GetMountedVolumesMetricsForPod(volumetypes.UniquePodName(podUID))
+
+	return metricsToReturn, len(metricsToReturn) > 0
+}
+
 // podVolumesExist checks with the volume manager and returns true any of the
 // pods for the specified volume are mounted.
 func (kl *Kubelet) podVolumesExist(podUID types.UID) bool {

@@ -32,6 +32,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager/cache"
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager/populator"
+	"k8s.io/kubernetes/pkg/kubelet/volumemanager/provider"
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager/reconciler"
 	k8stypes "k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/mount"
@@ -87,6 +88,18 @@ const (
 	// reconcilerStartGracePeriod is the maximum amount of time volume manager
 	// can wait to start reconciler
 	reconcilerStartGracePeriod time.Duration = 60 * time.Second
+
+	// volumeMetricsCachePeriod is the amount of time the volume metrics is
+	// effective in cache
+	volumeMetricsCachePeriod time.Duration = 1 * time.Minute
+
+	// volumeMetricsCacheHouseKeepLoopSleepPeriod is the amount of time that
+	// housekeep dirty volume metrics between successive executions
+	volumeMetricsCacheHousekeepingLoopSleepPeriod time.Duration = 10 * time.Minute
+
+	// volumeMetricsProviderLoopSleepPeriod is the amount of time the metrics
+	// provider loop waits between successive executions
+	volumeMetricsProviderLoopSleepPeriod time.Duration = 30 * time.Second
 )
 
 // VolumeManager runs a set of asynchronous loops that figure out which volumes
@@ -109,6 +122,13 @@ type VolumeManager interface {
 	// pod.Spec.Volumes[x].Name). It returns an empty VolumeMap if pod has no
 	// volumes.
 	GetMountedVolumesForPod(podName types.UniquePodName) container.VolumeMap
+
+	// GetMountedVolumesMetricsForPod returns a map containing the metrics of
+	// all volumes referenced by the specified pod that are successfully attached
+	// and mounted. The key in the map is the OuterVolumeSpecName (i.e.
+	// pod.Spec.Volumes[x].Name). It returns an empty map if pod has no
+	// volumes.
+	GetMountedVolumesMetricsForPod(podName types.UniquePodName) map[string]*volume.Metrics
 
 	// GetExtraSupplementalGroupsForPod returns a list of the extra
 	// supplemental groups for the Pod. These extra supplemental groups come
@@ -160,10 +180,11 @@ func NewVolumeManager(
 	checkNodeCapabilitiesBeforeMount bool) (VolumeManager, error) {
 
 	vm := &volumeManager{
-		kubeClient:          kubeClient,
-		volumePluginMgr:     volumePluginMgr,
-		desiredStateOfWorld: cache.NewDesiredStateOfWorld(volumePluginMgr),
-		actualStateOfWorld:  cache.NewActualStateOfWorld(nodeName, volumePluginMgr),
+		kubeClient:            kubeClient,
+		volumePluginMgr:       volumePluginMgr,
+		desiredStateOfWorld:   cache.NewDesiredStateOfWorld(volumePluginMgr),
+		actualStateOfWorld:    cache.NewActualStateOfWorld(nodeName, volumePluginMgr),
+		volumesMetricsOfWorld: cache.NewVolumeMetricsOfWorld(),
 		operationExecutor: operationexecutor.NewOperationExecutor(
 			kubeClient,
 			volumePluginMgr,
@@ -191,6 +212,12 @@ func NewVolumeManager(
 		podManager,
 		vm.desiredStateOfWorld,
 		kubeContainerRuntime)
+	vm.metricsProvider = provider.NewVolumesMetricsOfWorldProvider(
+		volumeMetricsCachePeriod,
+		volumeMetricsProviderLoopSleepPeriod,
+		volumeMetricsCacheHousekeepingLoopSleepPeriod,
+		vm.actualStateOfWorld,
+		vm.volumesMetricsOfWorld)
 
 	return vm, nil
 }
@@ -219,6 +246,11 @@ type volumeManager struct {
 	// detach, mount, and unmount actions triggered by the reconciler.
 	actualStateOfWorld cache.ActualStateOfWorld
 
+	// volumesMetricsOfWorld is a data structure containing the mounted volumes
+	// metrics of the world according to the manager.
+	// The data structure is updated when it is expired.
+	volumesMetricsOfWorld cache.VolumesMetricsOfWorld
+
 	// operationExecutor is used to start asynchronous attach, detach, mount,
 	// and unmount operations.
 	operationExecutor operationexecutor.OperationExecutor
@@ -231,6 +263,10 @@ type volumeManager struct {
 	// desiredStateOfWorldPopulator runs an asynchronous periodic loop to
 	// populate the desiredStateOfWorld using the kubelet PodManager.
 	desiredStateOfWorldPopulator populator.DesiredStateOfWorldPopulator
+
+	// metricsProvider runs an asynchronous periodic loop to
+	// update the volumesMetricsOfWorld.
+	metricsProvider provider.VolumesMetricsOfWorldProvider
 }
 
 func (vm *volumeManager) Run(sourcesReady config.SourcesReady, stopCh <-chan struct{}) {
@@ -241,6 +277,9 @@ func (vm *volumeManager) Run(sourcesReady config.SourcesReady, stopCh <-chan str
 
 	glog.Infof("Starting Kubelet Volume Manager")
 	go vm.reconciler.Run(sourcesReady, stopCh)
+
+	glog.V(2).Infof("The provider starts to update volume metrics in cache")
+	go vm.metricsProvider.Run(stopCh)
 
 	<-stopCh
 	glog.Infof("Shutting down Kubelet Volume Manager")
@@ -253,6 +292,17 @@ func (vm *volumeManager) GetMountedVolumesForPod(
 		podVolumes[mountedVolume.OuterVolumeSpecName] = container.VolumeInfo{Mounter: mountedVolume.Mounter}
 	}
 	return podVolumes
+}
+
+func (vm *volumeManager) GetMountedVolumesMetricsForPod(podName types.UniquePodName) map[string]*volume.Metrics {
+	metrics := make(map[string]*volume.Metrics)
+	for _, volumeName := range vm.actualStateOfWorld.GetMountedVolumeNamesForPod(podName) {
+		metric, outerVolumeSpecName := vm.volumesMetricsOfWorld.GetVolumeMetrics(volumeName)
+		if outerVolumeSpecName != "" {
+			metrics[outerVolumeSpecName] = metric
+		}
+	}
+	return metrics
 }
 
 func (vm *volumeManager) GetExtraSupplementalGroupsForPod(pod *v1.Pod) []int64 {

@@ -22,6 +22,7 @@ go_library(
         "//pkg/kubelet/util/format:go_default_library",
         "//pkg/kubelet/volumemanager/cache:go_default_library",
         "//pkg/kubelet/volumemanager/populator:go_default_library",
+        "//pkg/kubelet/volumemanager/provider:go_default_library",
         "//pkg/kubelet/volumemanager/reconciler:go_default_library",
         "//pkg/types:go_default_library",
         "//pkg/util/mount:go_default_library",

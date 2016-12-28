@@ -181,6 +181,10 @@ func (fk *fakeKubelet) ListVolumesForPod(podUID types.UID) (map[string]volume.Vo
 	return map[string]volume.Volume{}, true
 }
 
+func (fk *fakeKubelet) GetVolumesMetricsForPod(podUID types.UID) (map[string]*volume.Metrics, bool) {
+	return map[string]*volume.Metrics{}, true
+}
+
 type fakeAuth struct {
 	authenticateFunc func(*http.Request) (user.Info, bool, error)
 	attributesFunc   func(user.Info, *http.Request) authorizer.Attributes
