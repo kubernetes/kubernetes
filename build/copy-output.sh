@@ -1,5 +1,6 @@
-#!/usr/bin/env bash
-# Copyright 2016 The Kubernetes Authors.
+#!/bin/bash
+
+# Copyright 2014 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,17 +14,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# Copies any built binaries (and other generated files) out of the Docker build contianer.
 set -o errexit
 set -o nounset
 set -o pipefail
 
-export KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
-source "${KUBE_ROOT}/hack/lib/init.sh"
+KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
+source "${KUBE_ROOT}/build/common.sh"
 
-go get -u github.com/mikedanese/gazel
-if [[ $("${GOPATH}/bin/gazel" -dry-run -root="$(kube::realpath ${KUBE_ROOT})" 2>&1 | tee /dev/stderr | wc -l | tr -d '[:space:]') != 0 ]]; then
-  echo
-  echo "BUILD files are not up to date"
-  echo "Run ./hack/update-bazel.sh"
-  exit 1
-fi
+kube::build::verify_prereqs
+kube::build::copy_output

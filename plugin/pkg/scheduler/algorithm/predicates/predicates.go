@@ -909,11 +909,13 @@ func (c *PodAffinityChecker) InterPodAffinityMatches(pod *api.Pod, meta interfac
 // TODO: Do we really need any pod matching, or all pods matching? I think the latter.
 func (c *PodAffinityChecker) anyPodMatchesPodAffinityTerm(pod *api.Pod, allPods []*api.Pod, node *api.Node, term *api.PodAffinityTerm) (bool, bool, error) {
 	matchingPodExists := false
+	namespaces := priorityutil.GetNamespacesFromPodAffinityTerm(pod, term)
+	selector, err := unversioned.LabelSelectorAsSelector(term.LabelSelector)
+	if err != nil {
+		return false, false, err
+	}
 	for _, existingPod := range allPods {
-		match, err := priorityutil.PodMatchesTermsNamespaceAndSelector(existingPod, pod, term)
-		if err != nil {
-			return false, matchingPodExists, err
-		}
+		match := priorityutil.PodMatchesTermsNamespaceAndSelector(existingPod, namespaces, selector)
 		if match {
 			matchingPodExists = true
 			existingPodNode, err := c.info.GetNodeInfo(existingPod.Spec.NodeName)
@@ -994,11 +996,13 @@ func getMatchingAntiAffinityTerms(pod *api.Pod, nodeInfoMap map[string]*schedule
 				continue
 			}
 			for _, term := range getPodAntiAffinityTerms(affinity.PodAntiAffinity) {
-				match, err := priorityutil.PodMatchesTermsNamespaceAndSelector(pod, existingPod, &term)
+				namespaces := priorityutil.GetNamespacesFromPodAffinityTerm(pod, &term)
+				selector, err := unversioned.LabelSelectorAsSelector(term.LabelSelector)
 				if err != nil {
 					catchError(err)
 					return
 				}
+				match := priorityutil.PodMatchesTermsNamespaceAndSelector(pod, namespaces, selector)
 				if match {
 					nodeResult = append(nodeResult, matchingPodAntiAffinityTerm{term: &term, node: node})
 				}
@@ -1025,10 +1029,12 @@ func (c *PodAffinityChecker) getMatchingAntiAffinityTerms(pod *api.Pod, allPods 
 				return nil, err
 			}
 			for _, term := range getPodAntiAffinityTerms(affinity.PodAntiAffinity) {
-				match, err := priorityutil.PodMatchesTermsNamespaceAndSelector(pod, existingPod, &term)
+				namespaces := priorityutil.GetNamespacesFromPodAffinityTerm(existingPod, &term)
+				selector, err := unversioned.LabelSelectorAsSelector(term.LabelSelector)
 				if err != nil {
 					return nil, err
 				}
+				match := priorityutil.PodMatchesTermsNamespaceAndSelector(pod, namespaces, selector)
 				if match {
 					result = append(result, matchingPodAntiAffinityTerm{term: &term, node: existingPodNode})
 				}
@@ -1090,8 +1096,15 @@ func (c *PodAffinityChecker) satisfiesPodsAffinityAntiAffinity(pod *api.Pod, nod
 			// If the requirement matches a pod's own labels are namespace, and there are
 			// no other such pods, then disregard the requirement. This is necessary to
 			// not block forever because the first pod of the collection can't be scheduled.
-			match, err := priorityutil.PodMatchesTermsNamespaceAndSelector(pod, pod, &term)
-			if err != nil || !match || matchingPodExists {
+			namespaces := priorityutil.GetNamespacesFromPodAffinityTerm(pod, &term)
+			selector, err := unversioned.LabelSelectorAsSelector(term.LabelSelector)
+			if err != nil {
+				glog.V(10).Infof("Cannot parse selector on term %v for pod %v. Details %v",
+					term, podName(pod), err)
+				return false
+			}
+			match := priorityutil.PodMatchesTermsNamespaceAndSelector(pod, namespaces, selector)
+			if !match || matchingPodExists {
 				glog.V(10).Infof("Cannot schedule pod %+v onto node %v,because of PodAffinityTerm %v, err: %v",
 					podName(pod), node.Name, term, err)
 				return false

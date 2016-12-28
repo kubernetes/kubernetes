@@ -271,7 +271,7 @@ Next, specify the docker repository where your ci images will be pushed.
 * Push the federation container images
 
   ```sh
-  $ build-tools/push-federation-images.sh
+  $ build/push-federation-images.sh
   ```
 
 #### Deploy federation control plane

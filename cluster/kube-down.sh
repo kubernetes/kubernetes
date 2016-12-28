@@ -31,6 +31,7 @@ source "${KUBE_ROOT}/cluster/kube-util.sh"
 echo "Bringing down cluster using provider: $KUBERNETES_PROVIDER"
 
 verify-prereqs
+verify-kube-binaries
 kube-down
 
 echo "Done"

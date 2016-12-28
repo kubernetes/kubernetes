@@ -553,25 +553,29 @@ func testRolloverDeployment(f *framework.Framework) {
 	deploymentReplicas := int32(4)
 	deploymentImage := "gcr.io/google_samples/gb-redisslave:nonexistent"
 	deploymentStrategyType := extensions.RollingUpdateDeploymentStrategyType
-	framework.Logf("Creating deployment %s", deploymentName)
+	framework.Logf("Creating deployment %q", deploymentName)
 	newDeployment := newDeployment(deploymentName, deploymentReplicas, deploymentPodLabels, deploymentImageName, deploymentImage, deploymentStrategyType, nil)
 	newDeployment.Spec.Strategy.RollingUpdate = &extensions.RollingUpdateDeployment{
 		MaxUnavailable: intstr.FromInt(1),
 		MaxSurge:       intstr.FromInt(1),
 	}
+	newDeployment.Spec.MinReadySeconds = int32(10)
 	_, err = c.Extensions().Deployments(ns).Create(newDeployment)
 	Expect(err).NotTo(HaveOccurred())
 
 	// Verify that the pods were scaled up and down as expected.
 	deployment, err := c.Extensions().Deployments(ns).Get(deploymentName)
 	Expect(err).NotTo(HaveOccurred())
+	framework.Logf("Make sure deployment %q performs scaling operations", deploymentName)
 	// Make sure the deployment starts to scale up and down replica sets by checking if its updated replicas >= 1
 	err = framework.WaitForDeploymentUpdatedReplicasLTE(c, ns, deploymentName, 1, deployment.Generation)
 	// Check if it's updated to revision 1 correctly
+	framework.Logf("Check revision of new replica set for deployment %q", deploymentName)
 	_, newRS := checkDeploymentRevision(c, ns, deploymentName, "1", deploymentImageName, deploymentImage)
 
 	// Before the deployment finishes, update the deployment to rollover the above 2 ReplicaSets and bring up redis pods.
 	Expect(newRS.Spec.Replicas).Should(BeNumerically("<", deploymentReplicas))
+	framework.Logf("Make sure deployment %q with new image", deploymentName)
 	updatedDeploymentImageName, updatedDeploymentImage := redisImageName, redisImage
 	deployment, err = framework.UpdateDeploymentWithRetries(c, ns, newDeployment.Name, func(update *extensions.Deployment) {
 		update.Spec.Template.Spec.Containers[0].Name = updatedDeploymentImageName
@@ -580,13 +584,16 @@ func testRolloverDeployment(f *framework.Framework) {
 	Expect(err).NotTo(HaveOccurred())
 
 	// Use observedGeneration to determine if the controller noticed the pod template update.
+	framework.Logf("Wait deployment %q to be observed by the deployment controller", deploymentName)
 	err = framework.WaitForObservedDeployment(c, ns, deploymentName, deployment.Generation)
 	Expect(err).NotTo(HaveOccurred())
 
 	// Wait for it to be updated to revision 2
+	framework.Logf("Wait for revision update of deployment %q to 2", deploymentName)
 	err = framework.WaitForDeploymentRevisionAndImage(c, ns, deploymentName, "2", updatedDeploymentImage)
 	Expect(err).NotTo(HaveOccurred())
 
+	framework.Logf("Make sure deployment %q is complete", deploymentName)
 	err = framework.WaitForDeploymentStatus(c, deployment)
 	Expect(err).NotTo(HaveOccurred())
 }

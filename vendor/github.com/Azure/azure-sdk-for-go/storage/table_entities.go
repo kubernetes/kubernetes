@@ -10,6 +10,8 @@ import (
 	"reflect"
 )
 
+// Annotating as secure for gas scanning
+/* #nosec */
 const (
 	partitionKeyNode                    = "PartitionKey"
 	rowKeyNode                          = "RowKey"
@@ -97,6 +99,10 @@ func (c *TableServiceClient) QueryTableEntities(tableName AzureTable, previousCo
 	headers["Content-Length"] = "0"
 
 	resp, err := c.client.execTable("GET", uri, headers, nil)
+
+	if err != nil {
+		return nil, nil, err
+	}
 
 	contToken := extractContinuationTokenFromHeaders(resp.headers)
 

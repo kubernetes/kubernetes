@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/ioutil"
+	"mime/multipart"
 	"net/http"
 	"net/url"
 	"strings"
@@ -191,6 +193,64 @@ func WithFormData(v url.Values) PrepareDecorator {
 				s := v.Encode()
 				r.ContentLength = int64(len(s))
 				r.Body = ioutil.NopCloser(strings.NewReader(s))
+			}
+			return r, err
+		})
+	}
+}
+
+// WithMultiPartFormData returns a PrepareDecoratore that "URL encodes" (e.g., bar=baz&foo=quux) form parameters
+// into the http.Request body.
+func WithMultiPartFormData(formDataParameters map[string]interface{}) PrepareDecorator {
+	return func(p Preparer) Preparer {
+		return PreparerFunc(func(r *http.Request) (*http.Request, error) {
+			r, err := p.Prepare(r)
+			if err == nil {
+				var body bytes.Buffer
+				writer := multipart.NewWriter(&body)
+				for key, value := range formDataParameters {
+					if rc, ok := value.(io.ReadCloser); ok {
+						var fd io.Writer
+						if fd, err = writer.CreateFormFile(key, key); err != nil {
+							return r, err
+						}
+						if _, err = io.Copy(fd, rc); err != nil {
+							return r, err
+						}
+					} else {
+						if err = writer.WriteField(key, ensureValueString(value)); err != nil {
+							return r, err
+						}
+					}
+				}
+				if err = writer.Close(); err != nil {
+					return r, err
+				}
+				if r.Header == nil {
+					r.Header = make(http.Header)
+				}
+				r.Header.Set(http.CanonicalHeaderKey(headerContentType), writer.FormDataContentType())
+				r.Body = ioutil.NopCloser(bytes.NewReader(body.Bytes()))
+				r.ContentLength = int64(body.Len())
+				return r, err
+			}
+			return r, err
+		})
+	}
+}
+
+// WithFile returns a PrepareDecorator that sends file in request body.
+func WithFile(f io.ReadCloser) PrepareDecorator {
+	return func(p Preparer) Preparer {
+		return PreparerFunc(func(r *http.Request) (*http.Request, error) {
+			r, err := p.Prepare(r)
+			if err == nil {
+				b, err := ioutil.ReadAll(f)
+				if err != nil {
+					return r, err
+				}
+				r.Body = ioutil.NopCloser(bytes.NewReader(b))
+				r.ContentLength = int64(len(b))
 			}
 			return r, err
 		})

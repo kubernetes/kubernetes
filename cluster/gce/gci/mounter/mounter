@@ -31,7 +31,7 @@ function gc {
     # Rkt pods end up creating new copies of mounts on the host. Hence it is ideal to clean them up right away.
     attempt=0
     until [ $attempt -ge 5 ]; do
-	${RKT_BINARY} gc --grace-period=0s &> /dev/null && break
+	${RKT_BINARY} gc --grace-period=0s &> /dev/null
 	attempt=$[$attempt+1]
 	sleep 1
     done

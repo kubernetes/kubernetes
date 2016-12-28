@@ -115,8 +115,13 @@ func WithAudit(handler http.Handler, attributeGetter RequestAttributeGetter, out
 		}
 		id := uuid.NewRandom().String()
 
+		username := "<none>"
+		if attribs.GetUser() != nil {
+			username = attribs.GetUser().GetName()
+		}
+
 		line := fmt.Sprintf("%s AUDIT: id=%q ip=%q method=%q user=%q as=%q asgroups=%q namespace=%q uri=%q\n",
-			time.Now().Format(time.RFC3339Nano), id, utilnet.GetClientIP(req), req.Method, attribs.GetUser().GetName(), asuser, asgroups, namespace, req.URL)
+			time.Now().Format(time.RFC3339Nano), id, utilnet.GetClientIP(req), req.Method, username, asuser, asgroups, namespace, req.URL)
 		if _, err := fmt.Fprint(out, line); err != nil {
 			glog.Errorf("Unable to write audit log: %s, the error is: %v", line, err)
 		}

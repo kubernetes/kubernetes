@@ -8,13 +8,13 @@ can be found [here](https://www.bazel.io/versions/master/docs/install.html).
 To build docker images for the components, run:
 
 ```
-$ bazel build //build-tools/...
+$ bazel build //build/...
 ```
 
 To run many of the unit tests, run:
 
 ```
-$ bazel test //cmd/... //build-tools/... //pkg/... //federation/... //plugin/...
+$ bazel test //cmd/... //build/... //pkg/... //federation/... //plugin/...
 ```
 
 To update automanaged build files, run:

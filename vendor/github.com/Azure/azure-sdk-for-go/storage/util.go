@@ -77,7 +77,7 @@ func headersFromStruct(v interface{}) map[string]string {
 	for i := 0; i < value.NumField(); i++ {
 		key := value.Type().Field(i).Tag.Get("header")
 		val := value.Field(i).String()
-		if val != "" {
+		if key != "" && val != "" {
 			headers[key] = val
 		}
 	}

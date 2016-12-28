@@ -358,6 +358,7 @@ func DeepCopy_componentconfig_KubeletConfiguration(in interface{}, out interface
 		out.EvictionPressureTransitionPeriod = in.EvictionPressureTransitionPeriod
 		out.EvictionMaxPodGracePeriod = in.EvictionMaxPodGracePeriod
 		out.EvictionMinimumReclaim = in.EvictionMinimumReclaim
+		out.ExperimentalKernelMemcgNotification = in.ExperimentalKernelMemcgNotification
 		out.PodsPerCore = in.PodsPerCore
 		out.EnableControllerAttachDetach = in.EnableControllerAttachDetach
 		if in.SystemReserved != nil {

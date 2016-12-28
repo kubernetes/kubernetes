@@ -210,6 +210,34 @@ var _ = framework.KubeDescribe("Cluster size autoscaling [Slow]", func() {
 		ExpectNoError(err)
 		newNodesSet := sets.NewString(newNodes...)
 		newNodesSet.Delete(nodes...)
+		if len(newNodesSet) > 1 {
+			By(fmt.Sprintf("Spotted following new nodes in %s: %v", minMig, newNodesSet))
+			glog.Infof("Usually only 1 new node is expected, investigating")
+			glog.Infof("Kubectl:%s\n", framework.RunKubectlOrDie("get", "nodes", "-o", "json"))
+			if output, err := exec.Command("gcloud", "compute", "instances", "list",
+				"--project="+framework.TestContext.CloudConfig.ProjectID,
+				"--zone="+framework.TestContext.CloudConfig.Zone).Output(); err == nil {
+				glog.Infof("Gcloud compute instances list: %s", output)
+			} else {
+				glog.Errorf("Failed to get instances list: %v", err)
+			}
+
+			for newNode := range newNodesSet {
+				if output, err := exec.Command("gcloud", "compute", "instances", "describe",
+					newNode,
+					"--project="+framework.TestContext.CloudConfig.ProjectID,
+					"--zone="+framework.TestContext.CloudConfig.Zone).Output(); err == nil {
+					glog.Infof("Gcloud compute instances describe: %s", output)
+				} else {
+					glog.Errorf("Failed to get instances describe: %v", err)
+				}
+			}
+
+			// TODO: possibly remove broken node from newNodesSet to prevent removeLabel from crashing.
+			// However at this moment we DO WANT it to crash so that we don't check all test runs for the
+			// rare behavior, but only the broken ones.
+		}
+
 		defer removeLabels(newNodesSet)
 		By(fmt.Sprintf("Setting labels for new nodes: %v", newNodesSet.List()))
 		updateNodeLabels(c, newNodesSet, labels, nil)

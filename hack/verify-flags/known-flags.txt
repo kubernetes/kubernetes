@@ -41,6 +41,7 @@ authorization-rbac-super-user
 authorization-webhook-cache-authorized-ttl
 authorization-webhook-cache-unauthorized-ttl
 authorization-webhook-config-file
+azure-container-registry-config
 babysit-daemons
 basic-auth-file
 bench-pods
@@ -200,6 +201,7 @@ experimental-nvidia-gpus
 experimental-prefix
 experimental-cri
 experimental-check-node-capabilities-before-mount
+experimental-kernel-memcg-notification
 external-etcd-cafile
 external-etcd-certfile
 external-etcd-endpoints

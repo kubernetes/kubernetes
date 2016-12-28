@@ -21,12 +21,13 @@ package network
 import (
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/azure"
+	"github.com/Azure/go-autorest/autorest/validation"
 	"net/http"
 )
 
 // SecurityRulesClient is the the Microsoft Azure Network management API
 // provides a RESTful set of web services that interact with Microsoft Azure
-// Networks service to manage your network resrources. The API has entities
+// Networks service to manage your network resources. The API has entities
 // that capture the relationship between an end user and the Microsoft Azure
 // Networks service.
 type SecurityRulesClient struct {
@@ -45,18 +46,26 @@ func NewSecurityRulesClientWithBaseURI(baseURI string, subscriptionID string) Se
 	return SecurityRulesClient{NewWithBaseURI(baseURI, subscriptionID)}
 }
 
-// CreateOrUpdate the Put network security rule operation creates/updates a
-// security rule in the specified network security group This method may poll
-// for completion. Polling can be canceled by passing the cancel channel
-// argument. The channel will be used to cancel polling and any outstanding
-// HTTP requests.
+// CreateOrUpdate creates or updates a security rule in the specified network
+// security group. This method may poll for completion. Polling can be
+// canceled by passing the cancel channel argument. The channel will be used
+// to cancel polling and any outstanding HTTP requests.
 //
 // resourceGroupName is the name of the resource group.
 // networkSecurityGroupName is the name of the network security group.
 // securityRuleName is the name of the security rule. securityRuleParameters
-// is parameters supplied to the create/update network security rule
-// operation
+// is parameters supplied to the create or update network security rule
+// operation.
 func (client SecurityRulesClient) CreateOrUpdate(resourceGroupName string, networkSecurityGroupName string, securityRuleName string, securityRuleParameters SecurityRule, cancel <-chan struct{}) (result autorest.Response, err error) {
+	if err := validation.Validate([]validation.Validation{
+		{TargetValue: securityRuleParameters,
+			Constraints: []validation.Constraint{{Target: "securityRuleParameters.SecurityRulePropertiesFormat", Name: validation.Null, Rule: false,
+				Chain: []validation.Constraint{{Target: "securityRuleParameters.SecurityRulePropertiesFormat.SourceAddressPrefix", Name: validation.Null, Rule: true, Chain: nil},
+					{Target: "securityRuleParameters.SecurityRulePropertiesFormat.DestinationAddressPrefix", Name: validation.Null, Rule: true, Chain: nil},
+				}}}}}); err != nil {
+		return result, validation.NewErrorWithValidationError(err, "network.SecurityRulesClient", "CreateOrUpdate")
+	}
+
 	req, err := client.CreateOrUpdatePreparer(resourceGroupName, networkSecurityGroupName, securityRuleName, securityRuleParameters, cancel)
 	if err != nil {
 		return result, autorest.NewErrorWithError(err, "network.SecurityRulesClient", "CreateOrUpdate", nil, "Failure preparing request")
@@ -119,10 +128,10 @@ func (client SecurityRulesClient) CreateOrUpdateResponder(resp *http.Response) (
 	return
 }
 
-// Delete the delete network security rule operation deletes the specified
-// network security rule. This method may poll for completion. Polling can be
-// canceled by passing the cancel channel argument. The channel will be used
-// to cancel polling and any outstanding HTTP requests.
+// Delete deletes the specified network security rule. This method may poll
+// for completion. Polling can be canceled by passing the cancel channel
+// argument. The channel will be used to cancel polling and any outstanding
+// HTTP requests.
 //
 // resourceGroupName is the name of the resource group.
 // networkSecurityGroupName is the name of the network security group.
@@ -188,8 +197,7 @@ func (client SecurityRulesClient) DeleteResponder(resp *http.Response) (result a
 	return
 }
 
-// Get the Get NetworkSecurityRule operation retreives information about the
-// specified network security rule.
+// Get get the specified network security rule.
 //
 // resourceGroupName is the name of the resource group.
 // networkSecurityGroupName is the name of the network security group.
@@ -254,8 +262,7 @@ func (client SecurityRulesClient) GetResponder(resp *http.Response) (result Secu
 	return
 }
 
-// List the List network security rule operation retrieves all the security
-// rules in a network security group.
+// List gets all security rules in a network security group.
 //
 // resourceGroupName is the name of the resource group.
 // networkSecurityGroupName is the name of the network security group.
@@ -322,7 +329,7 @@ func (client SecurityRulesClient) ListResponder(resp *http.Response) (result Sec
 func (client SecurityRulesClient) ListNextResults(lastResults SecurityRuleListResult) (result SecurityRuleListResult, err error) {
 	req, err := lastResults.SecurityRuleListResultPreparer()
 	if err != nil {
-		return result, autorest.NewErrorWithError(err, "network.SecurityRulesClient", "List", nil, "Failure preparing next results request request")
+		return result, autorest.NewErrorWithError(err, "network.SecurityRulesClient", "List", nil, "Failure preparing next results request")
 	}
 	if req == nil {
 		return
@@ -331,12 +338,12 @@ func (client SecurityRulesClient) ListNextResults(lastResults SecurityRuleListRe
 	resp, err := client.ListSender(req)
 	if err != nil {
 		result.Response = autorest.Response{Response: resp}
-		return result, autorest.NewErrorWithError(err, "network.SecurityRulesClient", "List", resp, "Failure sending next results request request")
+		return result, autorest.NewErrorWithError(err, "network.SecurityRulesClient", "List", resp, "Failure sending next results request")
 	}
 
 	result, err = client.ListResponder(resp)
 	if err != nil {
-		err = autorest.NewErrorWithError(err, "network.SecurityRulesClient", "List", resp, "Failure responding to next results request request")
+		err = autorest.NewErrorWithError(err, "network.SecurityRulesClient", "List", resp, "Failure responding to next results request")
 	}
 
 	return

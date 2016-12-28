@@ -24,7 +24,7 @@ KUBE_ROOT=$(readlink -m $(dirname "${BASH_SOURCE}")/../../)
 
 tagfile="${KUBE_ROOT}/federation/manifests/federated-image.tag"
 if [[ ! -f "$tagfile" ]]; then
-    echo "FATAL: tagfile ${tagfile} does not exist. Make sure that you have run build-tools/push-federation-images.sh"
+    echo "FATAL: tagfile ${tagfile} does not exist. Make sure that you have run build/push-federation-images.sh"
     exit 1
 fi
 export FEDERATION_IMAGE_TAG="$(cat "${KUBE_ROOT}/federation/manifests/federated-image.tag")"

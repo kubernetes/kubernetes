@@ -69,6 +69,7 @@ if [[ "${REGISTER_MASTER_KUBELET:-}" == "true" ]]; then
   fi
   EXPECTED_NUM_NODES=$((EXPECTED_NUM_NODES+NUM_MASTERS))
 fi
+
 REQUIRED_NUM_NODES=$((EXPECTED_NUM_NODES - ALLOWED_NOTREADY_NODES))
 # Make several attempts to deal with slow cluster birth.
 return_value=0

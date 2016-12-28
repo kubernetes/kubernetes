@@ -3548,16 +3548,10 @@ func IssueSSHCommandWithResult(cmd, provider string, node *api.Node) (*SSHResult
 }
 
 func IssueSSHCommand(cmd, provider string, node *api.Node) error {
-	result, err := IssueSSHCommandWithResult(cmd, provider, node)
-	if result != nil {
-		LogSSHResult(*result)
+	_, err := IssueSSHCommandWithResult(cmd, provider, node)
+	if err != nil {
+		return err
 	}
-
-	if result.Code != 0 || err != nil {
-		return fmt.Errorf("failed running %q: %v (exit code %d)",
-			cmd, err, result.Code)
-	}
-
 	return nil
 }
 

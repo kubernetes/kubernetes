@@ -84,6 +84,17 @@ const (
 	maxImgSize int64 = 1000 * 1024 * 1024
 )
 
+// fakeImageGCManager is a fake image gc manager for testing. It will return image
+// list from fake runtime directly instead of caching it.
+type fakeImageGCManager struct {
+	fakeImageService kubecontainer.ImageService
+	images.ImageGCManager
+}
+
+func (f *fakeImageGCManager) GetImageList() ([]kubecontainer.Image, error) {
+	return f.fakeImageService.ListImages()
+}
+
 type TestKubelet struct {
 	kubelet          *Kubelet
 	fakeRuntime      *containertest.FakeRuntime
@@ -188,7 +199,12 @@ func newTestKubeletWithImageList(
 		HighThresholdPercent: 90,
 		LowThresholdPercent:  80,
 	}
-	kubelet.imageManager, err = images.NewImageGCManager(fakeRuntime, mockCadvisor, fakeRecorder, fakeNodeRef, fakeImageGCPolicy)
+	imageGCManager, err := images.NewImageGCManager(fakeRuntime, mockCadvisor, fakeRecorder, fakeNodeRef, fakeImageGCPolicy)
+	assert.NoError(t, err)
+	kubelet.imageManager = &fakeImageGCManager{
+		fakeImageService: fakeRuntime,
+		ImageGCManager:   imageGCManager,
+	}
 	fakeClock := clock.NewFakeClock(time.Now())
 	kubelet.backOff = flowcontrol.NewBackOff(time.Second, time.Minute)
 	kubelet.backOff.Clock = fakeClock

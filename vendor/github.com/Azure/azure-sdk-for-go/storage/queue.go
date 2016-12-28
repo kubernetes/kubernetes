@@ -82,6 +82,24 @@ func (p PeekMessagesParameters) getParameters() url.Values {
 	return out
 }
 
+// UpdateMessageParameters is the set of options can be specified for Update Messsage
+// operation. A zero struct does not use any preferences for the request.
+type UpdateMessageParameters struct {
+	PopReceipt        string
+	VisibilityTimeout int
+}
+
+func (p UpdateMessageParameters) getParameters() url.Values {
+	out := url.Values{}
+	if p.PopReceipt != "" {
+		out.Set("popreceipt", p.PopReceipt)
+	}
+	if p.VisibilityTimeout != 0 {
+		out.Set("visibilitytimeout", strconv.Itoa(p.VisibilityTimeout))
+	}
+	return out
+}
+
 // GetMessagesResponse represents a response returned from Get Messages
 // operation.
 type GetMessagesResponse struct {
@@ -298,6 +316,26 @@ func (c QueueServiceClient) DeleteMessage(queue, messageID, popReceipt string) e
 	uri := c.client.getEndpoint(queueServiceName, pathForMessage(queue, messageID), url.Values{
 		"popreceipt": {popReceipt}})
 	resp, err := c.client.exec("DELETE", uri, c.client.getStandardHeaders(), nil)
+	if err != nil {
+		return err
+	}
+	defer resp.body.Close()
+	return checkRespCode(resp.statusCode, []int{http.StatusNoContent})
+}
+
+// UpdateMessage operation deletes the specified message.
+//
+// See https://msdn.microsoft.com/en-us/library/azure/hh452234.aspx
+func (c QueueServiceClient) UpdateMessage(queue string, messageID string, message string, params UpdateMessageParameters) error {
+	uri := c.client.getEndpoint(queueServiceName, pathForMessage(queue, messageID), params.getParameters())
+	req := putMessageRequest{MessageText: message}
+	body, nn, err := xmlMarshal(req)
+	if err != nil {
+		return err
+	}
+	headers := c.client.getStandardHeaders()
+	headers["Content-Length"] = fmt.Sprintf("%d", nn)
+	resp, err := c.client.exec("PUT", uri, headers, body)
 	if err != nil {
 		return err
 	}

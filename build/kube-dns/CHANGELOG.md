@@ -23,4 +23,4 @@
 - First Changelog entry
 
 
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/build-tools/kube-dns/CHANGELOG.md?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/build/kube-dns/CHANGELOG.md?pixel)]()

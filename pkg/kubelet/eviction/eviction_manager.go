@@ -204,7 +204,8 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 	}
 
 	// attempt to create a threshold notifier to improve eviction response time
-	if !m.notifiersInitialized {
+	if m.config.KernelMemcgNotification && !m.notifiersInitialized {
+		glog.Infof("eviction manager attempting to integrate with kernel memcg notification api")
 		m.notifiersInitialized = true
 		// start soft memory notification
 		err = startMemoryThresholdNotifier(m.config.Thresholds, observations, false, func(desc string) {

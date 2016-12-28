@@ -39,11 +39,11 @@ func (az *Cloud) ListRoutes(clusterName string) (routes []*cloudprovider.Route, 
 	}
 
 	var kubeRoutes []*cloudprovider.Route
-	if routeTable.Properties.Routes != nil {
-		kubeRoutes = make([]*cloudprovider.Route, len(*routeTable.Properties.Routes))
-		for i, route := range *routeTable.Properties.Routes {
+	if routeTable.Routes != nil {
+		kubeRoutes = make([]*cloudprovider.Route, len(*routeTable.Routes))
+		for i, route := range *routeTable.Routes {
 			instance := mapRouteNameToNodeName(*route.Name)
-			cidr := *route.Properties.AddressPrefix
+			cidr := *route.AddressPrefix
 			glog.V(10).Infof("list: * instance=%q, cidr=%q", instance, cidr)
 
 			kubeRoutes[i] = &cloudprovider.Route{
@@ -70,9 +70,9 @@ func (az *Cloud) CreateRoute(clusterName string, nameHint string, kubeRoute *clo
 	}
 	if !existsRouteTable {
 		routeTable = network.RouteTable{
-			Name:       to.StringPtr(az.RouteTableName),
-			Location:   to.StringPtr(az.Location),
-			Properties: &network.RouteTablePropertiesFormat{},
+			Name:                       to.StringPtr(az.RouteTableName),
+			Location:                   to.StringPtr(az.Location),
+			RouteTablePropertiesFormat: &network.RouteTablePropertiesFormat{},
 		}
 
 		glog.V(3).Infof("create: creating routetable. routeTableName=%q", az.RouteTableName)
@@ -93,12 +93,12 @@ func (az *Cloud) CreateRoute(clusterName string, nameHint string, kubeRoute *clo
 		// 404 is fatal here
 		return err
 	}
-	if subnet.Properties.RouteTable != nil {
-		if *subnet.Properties.RouteTable.ID != *routeTable.ID {
-			return fmt.Errorf("The subnet has a route table, but it was unrecognized. Refusing to modify it. active_routetable=%q expected_routetable=%q", *subnet.Properties.RouteTable.ID, *routeTable.ID)
+	if subnet.RouteTable != nil {
+		if *subnet.RouteTable.ID != *routeTable.ID {
+			return fmt.Errorf("The subnet has a route table, but it was unrecognized. Refusing to modify it. active_routetable=%q expected_routetable=%q", *subnet.RouteTable.ID, *routeTable.ID)
 		}
 	} else {
-		subnet.Properties.RouteTable = &network.RouteTable{
+		subnet.RouteTable = &network.RouteTable{
 			ID: routeTable.ID,
 		}
 		glog.V(3).Info("create: updating subnet")
@@ -116,7 +116,7 @@ func (az *Cloud) CreateRoute(clusterName string, nameHint string, kubeRoute *clo
 	routeName := mapNodeNameToRouteName(kubeRoute.TargetNode)
 	route := network.Route{
 		Name: to.StringPtr(routeName),
-		Properties: &network.RoutePropertiesFormat{
+		RoutePropertiesFormat: &network.RoutePropertiesFormat{
 			AddressPrefix:    to.StringPtr(kubeRoute.DestinationCIDR),
 			NextHopType:      network.RouteNextHopTypeVirtualAppliance,
 			NextHopIPAddress: to.StringPtr(targetIP),

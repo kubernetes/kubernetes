@@ -3638,7 +3638,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/v1.Pod"
+        "type": "string"
        }
       },
       "401": {

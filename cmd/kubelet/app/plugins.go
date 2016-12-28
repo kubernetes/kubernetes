@@ -20,6 +20,7 @@ package app
 import (
 	// Credential providers
 	_ "k8s.io/kubernetes/pkg/credentialprovider/aws"
+	_ "k8s.io/kubernetes/pkg/credentialprovider/azure"
 	_ "k8s.io/kubernetes/pkg/credentialprovider/gcp"
 	// Network plugins
 	"k8s.io/kubernetes/pkg/kubelet/network"

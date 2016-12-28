@@ -21,6 +21,7 @@ package compute
 import (
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/azure"
+	"github.com/Azure/go-autorest/autorest/validation"
 	"net/http"
 )
 
@@ -41,10 +42,18 @@ func NewUsageOperationsClientWithBaseURI(baseURI string, subscriptionID string) 
 	return UsageOperationsClient{NewWithBaseURI(baseURI, subscriptionID)}
 }
 
-// List lists compute usages for a subscription.
+// List gets, for the specified location, the current compute resource usage
+// information as well as the limits for compute resources under the
+// subscription.
 //
-// location is the location upon which resource usage is queried.
+// location is the location for which resource usage is queried.
 func (client UsageOperationsClient) List(location string) (result ListUsagesResult, err error) {
+	if err := validation.Validate([]validation.Validation{
+		{TargetValue: location,
+			Constraints: []validation.Constraint{{Target: "location", Name: validation.Pattern, Rule: `^[-\w\._]+$`, Chain: nil}}}}); err != nil {
+		return result, validation.NewErrorWithValidationError(err, "compute.UsageOperationsClient", "List")
+	}
+
 	req, err := client.ListPreparer(location)
 	if err != nil {
 		return result, autorest.NewErrorWithError(err, "compute.UsageOperationsClient", "List", nil, "Failure preparing request")
@@ -106,7 +115,7 @@ func (client UsageOperationsClient) ListResponder(resp *http.Response) (result L
 func (client UsageOperationsClient) ListNextResults(lastResults ListUsagesResult) (result ListUsagesResult, err error) {
 	req, err := lastResults.ListUsagesResultPreparer()
 	if err != nil {
-		return result, autorest.NewErrorWithError(err, "compute.UsageOperationsClient", "List", nil, "Failure preparing next results request request")
+		return result, autorest.NewErrorWithError(err, "compute.UsageOperationsClient", "List", nil, "Failure preparing next results request")
 	}
 	if req == nil {
 		return
@@ -115,12 +124,12 @@ func (client UsageOperationsClient) ListNextResults(lastResults ListUsagesResult
 	resp, err := client.ListSender(req)
 	if err != nil {
 		result.Response = autorest.Response{Response: resp}
-		return result, autorest.NewErrorWithError(err, "compute.UsageOperationsClient", "List", resp, "Failure sending next results request request")
+		return result, autorest.NewErrorWithError(err, "compute.UsageOperationsClient", "List", resp, "Failure sending next results request")
 	}
 
 	result, err = client.ListResponder(resp)
 	if err != nil {
-		err = autorest.NewErrorWithError(err, "compute.UsageOperationsClient", "List", resp, "Failure responding to next results request request")
+		err = autorest.NewErrorWithError(err, "compute.UsageOperationsClient", "List", resp, "Failure responding to next results request")
 	}
 
 	return

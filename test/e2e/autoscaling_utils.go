@@ -298,9 +298,9 @@ func (rc *ResourceConsumer) EnsureDesiredReplicas(desiredReplicas int, timeout t
 
 func (rc *ResourceConsumer) CleanUp() {
 	By(fmt.Sprintf("Removing consuming RC %s", rc.name))
-	rc.stopCPU <- 0
-	rc.stopMem <- 0
-	rc.stopCustomMetric <- 0
+	close(rc.stopCPU)
+	close(rc.stopMem)
+	close(rc.stopCustomMetric)
 	// Wait some time to ensure all child goroutines are finished.
 	time.Sleep(10 * time.Second)
 	framework.ExpectNoError(framework.DeleteRCAndPods(rc.framework.ClientSet, rc.framework.Namespace.Name, rc.name))
@@ -394,7 +394,7 @@ func runServiceAndWorkloadForResourceConsumer(c clientset.Interface, ns, name, k
 	}
 	framework.ExpectNoError(framework.RunRC(controllerRcConfig))
 
-	// Make sure endpoints are propagated.
-	// TODO(piosz): replace sleep with endpoints watch.
-	time.Sleep(10 * time.Second)
+	// Wait for endpoints to propagate for the controller service.
+	framework.ExpectNoError(framework.WaitForServiceEndpointsNum(
+		c, ns, controllerName, 1, startServiceInterval, startServiceTimeout))
 }

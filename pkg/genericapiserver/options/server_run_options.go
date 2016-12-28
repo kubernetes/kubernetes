@@ -129,7 +129,7 @@ type ServerRunOptions struct {
 func NewServerRunOptions() *ServerRunOptions {
 	return &ServerRunOptions{
 		AdmissionControl:                         "AlwaysAdmit",
-		AnonymousAuth:                            true,
+		AnonymousAuth:                            false,
 		AuthorizationMode:                        "AlwaysAllow",
 		AuthorizationWebhookCacheAuthorizedTTL:   5 * time.Minute,
 		AuthorizationWebhookCacheUnauthorizedTTL: 30 * time.Second,
@@ -293,7 +293,7 @@ func (s *ServerRunOptions) AddUniversalFlags(fs *pflag.FlagSet) {
 	fs.BoolVar(&s.AnonymousAuth, "anonymous-auth", s.AnonymousAuth, ""+
 		"Enables anonymous requests to the secure port of the API server. "+
 		"Requests that are not rejected by another authentication method are treated as anonymous requests. "+
-		"Anonymous requests have a username of system:anonymous, and a group name of system:unauthenticated.")
+		"Anonymous requests have a username of system:anonymous, and a group name of system:unauthenticated. ")
 
 	fs.StringVar(&s.BasicAuthFile, "basic-auth-file", s.BasicAuthFile, ""+
 		"If set, the file that will be used to admit requests to the secure port of the API server "+

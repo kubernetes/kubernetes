@@ -26,8 +26,8 @@ import (
 
 // ExpressRouteCircuitAuthorizationsClient is the the Microsoft Azure Network
 // management API provides a RESTful set of web services that interact with
-// Microsoft Azure Networks service to manage your network resrources. The
-// API has entities that capture the relationship between an end user and the
+// Microsoft Azure Networks service to manage your network resources. The API
+// has entities that capture the relationship between an end user and the
 // Microsoft Azure Networks service.
 type ExpressRouteCircuitAuthorizationsClient struct {
 	ManagementClient
@@ -45,16 +45,15 @@ func NewExpressRouteCircuitAuthorizationsClientWithBaseURI(baseURI string, subsc
 	return ExpressRouteCircuitAuthorizationsClient{NewWithBaseURI(baseURI, subscriptionID)}
 }
 
-// CreateOrUpdate the Put Authorization operation creates/updates an
-// authorization in thespecified ExpressRouteCircuits This method may poll
-// for completion. Polling can be canceled by passing the cancel channel
-// argument. The channel will be used to cancel polling and any outstanding
-// HTTP requests.
+// CreateOrUpdate creates or updates an authorization in the specified express
+// route circuit. This method may poll for completion. Polling can be
+// canceled by passing the cancel channel argument. The channel will be used
+// to cancel polling and any outstanding HTTP requests.
 //
 // resourceGroupName is the name of the resource group. circuitName is the
 // name of the express route circuit. authorizationName is the name of the
 // authorization. authorizationParameters is parameters supplied to the
-// create/update ExpressRouteCircuitAuthorization operation
+// create or update express route circuit authorization operation.
 func (client ExpressRouteCircuitAuthorizationsClient) CreateOrUpdate(resourceGroupName string, circuitName string, authorizationName string, authorizationParameters ExpressRouteCircuitAuthorization, cancel <-chan struct{}) (result autorest.Response, err error) {
 	req, err := client.CreateOrUpdatePreparer(resourceGroupName, circuitName, authorizationName, authorizationParameters, cancel)
 	if err != nil {
@@ -118,11 +117,10 @@ func (client ExpressRouteCircuitAuthorizationsClient) CreateOrUpdateResponder(re
 	return
 }
 
-// Delete the delete authorization operation deletes the specified
-// authorization from the specified ExpressRouteCircuit. This method may poll
-// for completion. Polling can be canceled by passing the cancel channel
-// argument. The channel will be used to cancel polling and any outstanding
-// HTTP requests.
+// Delete deletes the specified authorization from the specified express route
+// circuit. This method may poll for completion. Polling can be canceled by
+// passing the cancel channel argument. The channel will be used to cancel
+// polling and any outstanding HTTP requests.
 //
 // resourceGroupName is the name of the resource group. circuitName is the
 // name of the express route circuit. authorizationName is the name of the
@@ -188,8 +186,8 @@ func (client ExpressRouteCircuitAuthorizationsClient) DeleteResponder(resp *http
 	return
 }
 
-// Get the GET authorization operation retrieves the specified authorization
-// from the specified ExpressRouteCircuit.
+// Get gets the specified authorization from the specified express route
+// circuit.
 //
 // resourceGroupName is the name of the resource group. circuitName is the
 // name of the express route circuit. authorizationName is the name of the
@@ -254,11 +252,10 @@ func (client ExpressRouteCircuitAuthorizationsClient) GetResponder(resp *http.Re
 	return
 }
 
-// List the List authorization operation retrieves all the authorizations in
-// an ExpressRouteCircuit.
+// List gets all authorizations in an express route circuit.
 //
 // resourceGroupName is the name of the resource group. circuitName is the
-// name of the curcuit.
+// name of the circuit.
 func (client ExpressRouteCircuitAuthorizationsClient) List(resourceGroupName string, circuitName string) (result AuthorizationListResult, err error) {
 	req, err := client.ListPreparer(resourceGroupName, circuitName)
 	if err != nil {
@@ -322,7 +319,7 @@ func (client ExpressRouteCircuitAuthorizationsClient) ListResponder(resp *http.R
 func (client ExpressRouteCircuitAuthorizationsClient) ListNextResults(lastResults AuthorizationListResult) (result AuthorizationListResult, err error) {
 	req, err := lastResults.AuthorizationListResultPreparer()
 	if err != nil {
-		return result, autorest.NewErrorWithError(err, "network.ExpressRouteCircuitAuthorizationsClient", "List", nil, "Failure preparing next results request request")
+		return result, autorest.NewErrorWithError(err, "network.ExpressRouteCircuitAuthorizationsClient", "List", nil, "Failure preparing next results request")
 	}
 	if req == nil {
 		return
@@ -331,12 +328,12 @@ func (client ExpressRouteCircuitAuthorizationsClient) ListNextResults(lastResult
 	resp, err := client.ListSender(req)
 	if err != nil {
 		result.Response = autorest.Response{Response: resp}
-		return result, autorest.NewErrorWithError(err, "network.ExpressRouteCircuitAuthorizationsClient", "List", resp, "Failure sending next results request request")
+		return result, autorest.NewErrorWithError(err, "network.ExpressRouteCircuitAuthorizationsClient", "List", resp, "Failure sending next results request")
 	}
 
 	result, err = client.ListResponder(resp)
 	if err != nil {
-		err = autorest.NewErrorWithError(err, "network.ExpressRouteCircuitAuthorizationsClient", "List", resp, "Failure responding to next results request request")
+		err = autorest.NewErrorWithError(err, "network.ExpressRouteCircuitAuthorizationsClient", "List", resp, "Failure responding to next results request")
 	}
 
 	return

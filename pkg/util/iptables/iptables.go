@@ -374,6 +374,12 @@ func (runner *runner) checkRule(table Table, chain Chain, args ...string) (bool,
 	}
 }
 
+var hexnumRE = regexp.MustCompile("0x0+([0-9])")
+
+func trimhex(s string) string {
+	return hexnumRE.ReplaceAllString(s, "0x$1")
+}
+
 // Executes the rule check without using the "-C" flag, instead parsing iptables-save.
 // Present for compatibility with <1.4.11 versions of iptables.  This is full
 // of hack and half-measures.  We should nix this ASAP.
@@ -392,6 +398,7 @@ func (runner *runner) checkRuleWithoutCheck(table Table, chain Chain, args ...st
 	var argsCopy []string
 	for i := range args {
 		tmpField := strings.Trim(args[i], "\"")
+		tmpField = trimhex(tmpField)
 		argsCopy = append(argsCopy, strings.Fields(tmpField)...)
 	}
 	argset := sets.NewString(argsCopy...)
@@ -409,6 +416,7 @@ func (runner *runner) checkRuleWithoutCheck(table Table, chain Chain, args ...st
 		// Just remove all quotes.
 		for i := range fields {
 			fields[i] = strings.Trim(fields[i], "\"")
+			fields[i] = trimhex(fields[i])
 		}
 
 		// TODO: This misses reorderings e.g. "-x foo ! -y bar" will match "! -x foo -y bar"
