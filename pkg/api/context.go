@@ -66,7 +66,7 @@ const (
 
 // NewContext instantiates a base context object for request flows.
 func NewContext() Context {
-	return context.TODO()
+	return context.Background()
 }
 
 // NewDefaultContext instantiates a base context object for request flows in the default namespace
