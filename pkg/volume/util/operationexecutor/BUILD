@@ -41,6 +41,7 @@ go_test(
         "//pkg/api/v1:go_default_library",
         "//pkg/types:go_default_library",
         "//pkg/util/mount:go_default_library",
-        "//vendor:k8s.io/client-go/_vendor/github.com/pborman/uuid",
+        "//pkg/util/uuid:go_default_library",
+        "//pkg/volume/util/types:go_default_library",
     ],
 )
