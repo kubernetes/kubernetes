@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"time"
 
+	apierrors "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/v1"
 	legacyv1 "k8s.io/kubernetes/pkg/api/v1"
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
@@ -187,6 +188,13 @@ var _ = framework.KubeDescribe("PreStop", func() {
 				},
 			},
 		})
+		if apierrors.IsForbidden(err) {
+			// The user is not allowed to create ClusterRoleBindings. This
+			// probably means that RBAC is not being used. If RBAC is being
+			// used, this test will probably fail later.
+			framework.Logf("Attempt to create ClusterRoleBinding was forbidden: %v.", err)
+			return
+		}
 		framework.ExpectNoError(err)
 
 		err = framework.WaitForAuthorizationUpdate(f.ClientSet.Authorization(),
