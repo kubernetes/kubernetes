@@ -696,6 +696,7 @@ type cacheWatcher struct {
 	input   chan watchCacheEvent
 	result  chan watch.Event
 	filter  filterObjectFunc
+	done    chan struct{}
 	stopped bool
 	forget  func(bool)
 }
@@ -704,6 +705,7 @@ func newCacheWatcher(resourceVersion uint64, chanSize int, initEvents []watchCac
 	watcher := &cacheWatcher{
 		input:   make(chan watchCacheEvent, chanSize),
 		result:  make(chan watch.Event, chanSize),
+		done:    make(chan struct{}),
 		filter:  filter,
 		stopped: false,
 		forget:  forget,
@@ -728,6 +730,7 @@ func (c *cacheWatcher) stop() {
 	defer c.Unlock()
 	if !c.stopped {
 		c.stopped = true
+		close(c.done)
 		close(c.input)
 	}
 }
@@ -793,13 +796,37 @@ func (c *cacheWatcher) sendWatchCacheEvent(event *watchCacheEvent) {
 		glog.Errorf("unexpected copy error: %v", err)
 		return
 	}
+	var watchEvent watch.Event
 	switch {
 	case curObjPasses && !oldObjPasses:
-		c.result <- watch.Event{Type: watch.Added, Object: object}
+		watchEvent = watch.Event{Type: watch.Added, Object: object}
 	case curObjPasses && oldObjPasses:
-		c.result <- watch.Event{Type: watch.Modified, Object: object}
+		watchEvent = watch.Event{Type: watch.Modified, Object: object}
 	case !curObjPasses && oldObjPasses:
-		c.result <- watch.Event{Type: watch.Deleted, Object: object}
+		watchEvent = watch.Event{Type: watch.Deleted, Object: object}
+	}
+
+	// We need to ensure that if we put event X to the c.result, all
+	// previous events were already put into it before, no matter whether
+	// c.done is close or not.
+	// Thus we cannot simply select from c.done and c.result and this
+	// would give us non-determinism.
+	// At the same time, we don't want to block infinitely on putting
+	// to c.result, when c.done is already closed.
+
+	// This ensures that with c.done already close, we at most once go
+	// into the next select after this. With that, no matter which
+	// statement we choose there, we will deliver only consecutive
+	// events.
+	select {
+	case <-c.done:
+		return
+	default:
+	}
+
+	select {
+	case c.result <- watchEvent:
+	case <-c.done:
 	}
 }
 

@@ -434,3 +434,44 @@ func TestStartingResourceVersion(t *testing.T) {
 		t.Errorf("timed out waiting for event")
 	}
 }
+
+func TestRandomWatchDeliver(t *testing.T) {
+	server, etcdStorage := newEtcdTestStorage(t, testapi.Default.Codec(), etcdtest.PathPrefix())
+	defer server.Terminate(t)
+	cacher := newTestCacher(etcdStorage, 10)
+	defer cacher.Stop()
+
+	fooCreated := updatePod(t, etcdStorage, makeTestPod("foo"), nil)
+	rv, err := storage.ParseWatchResourceVersion(fooCreated.ResourceVersion)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	startVersion := strconv.Itoa(int(rv))
+
+	watcher, err := cacher.WatchList(context.TODO(), "pods/ns", startVersion, storage.Everything)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	// Now we can create exactly 21 events that should be delivered
+	// to the watcher, before it will completely block cacher and as
+	// a result will be dropped.
+	for i := 0; i < 21; i++ {
+		updatePod(t, etcdStorage, makeTestPod(fmt.Sprintf("foo-%d", i)), nil)
+	}
+
+	// Now stop the watcher and check if the consecutive events are being delivered.
+	watcher.Stop()
+
+	watched := 0
+	for {
+		event, ok := <-watcher.ResultChan()
+		if !ok {
+			break
+		}
+		if a, e := event.Object.(*api.Pod).Name, fmt.Sprintf("foo-%d", watched); e != a {
+			t.Errorf("Unexpected object watched: %s, expected %s", a, e)
+		}
+		watched++
+	}
+}
