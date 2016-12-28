@@ -34,6 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/apis/policy"
+	"k8s.io/kubernetes/pkg/apis/storage"
 	kubectltesting "k8s.io/kubernetes/pkg/kubectl/testing"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/runtime/schema"
@@ -1128,6 +1129,12 @@ func TestPrintHumanReadableWithNamespace(t *testing.T) {
 				Conditions: []api.ComponentCondition{
 					{Type: api.ComponentHealthy, Status: api.ConditionTrue, Message: "ok", Error: ""},
 				},
+			},
+			isNamespaced: false,
+		},
+		{
+			obj: &storage.StorageClass{
+				ObjectMeta: api.ObjectMeta{Name: name},
 			},
 			isNamespaced: false,
 		},
