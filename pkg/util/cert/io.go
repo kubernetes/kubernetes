@@ -117,3 +117,20 @@ func CertsFromFile(file string) ([]*x509.Certificate, error) {
 	}
 	return certs, nil
 }
+
+// PrivateKeyFromFile returns the private key in rsa.PrivateKey or ecdsa.PrivateKey format from a given PEM-encoded file.
+// Returns an error if the file could not be read or if the private key could not be parsed.
+func PrivateKeyFromFile(file string) (interface{}, error) {
+	if len(file) == 0 {
+		return nil, errors.New("error reading a private key from an empty filename")
+	}
+	pemBlock, err := ioutil.ReadFile(file)
+	if err != nil {
+		return nil, err
+	}
+	key, err := ParsePrivateKeyPEM(pemBlock)
+	if err != nil {
+		return nil, fmt.Errorf("error reading %s: %v", file, err)
+	}
+	return key, nil
+}
