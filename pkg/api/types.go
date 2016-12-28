@@ -1933,7 +1933,7 @@ type PodStatus struct {
 	// +optional
 	StartTime *metav1.Time
 	// +optional
-	QOSClass PodQOSClass `json:"qosClass,omitempty"`
+	QOSClass PodQOSClass
 
 	// The list has one entry per init container in the manifest. The most recent successful
 	// init container will have ready = true, the most recently started container will have
