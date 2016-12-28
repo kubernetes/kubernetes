@@ -36,9 +36,9 @@ import (
 
 const apiCallRetryInterval = 500 * time.Millisecond
 
-func CreateClientAndWaitForAPI(adminConfig *clientcmdapi.Config) (*clientset.Clientset, error) {
+func createAPIClient(adminKubeconfig *clientcmdapi.Config) (*clientset.Clientset, error) {
 	adminClientConfig, err := clientcmd.NewDefaultClientConfig(
-		*adminConfig,
+		*adminKubeconfig,
 		&clientcmd.ConfigOverrides{},
 	).ClientConfig()
 	if err != nil {
@@ -49,7 +49,22 @@ func CreateClientAndWaitForAPI(adminConfig *clientcmdapi.Config) (*clientset.Cli
 	if err != nil {
 		return nil, fmt.Errorf("failed to create API client [%v]", err)
 	}
+	return client, nil
+}
 
+func CreateClientFromFile(path string) (*clientset.Clientset, error) {
+	adminKubeconfig, err := clientcmd.LoadFromFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load admin kubeconfig [%v]", err)
+	}
+	return createAPIClient(adminKubeconfig)
+}
+
+func CreateClientAndWaitForAPI(adminConfig *clientcmdapi.Config) (*clientset.Clientset, error) {
+	client, err := createAPIClient(adminConfig)
+	if err != nil {
+		return nil, err
+	}
 	fmt.Println("[apiclient] Created API client, waiting for the control plane to become ready")
 
 	start := time.Now()

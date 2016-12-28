@@ -22,12 +22,14 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"os"
 	"reflect"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 
@@ -1117,6 +1119,35 @@ func TestCheckRetryClosesBody(t *testing.T) {
 	}
 	if !reflect.DeepEqual(backoffMgr.sleeps, expectedSleeps) {
 		t.Errorf("unexpected sleeps, expected: %v, got: %v", expectedSleeps, backoffMgr.sleeps)
+	}
+}
+
+func TestConnectionResetByPeerIsRetried(t *testing.T) {
+	count := 0
+	backoff := &testBackoffManager{}
+	req := &Request{
+		verb: "GET",
+		client: clientFunc(func(req *http.Request) (*http.Response, error) {
+			count++
+			if count >= 3 {
+				return &http.Response{
+					StatusCode: 200,
+					Body:       ioutil.NopCloser(bytes.NewReader([]byte{})),
+				}, nil
+			}
+			return nil, &net.OpError{Err: syscall.ECONNRESET}
+		}),
+		backoffMgr: backoff,
+	}
+	// We expect two retries of "connection reset by peer" and the success.
+	_, err := req.Do().Raw()
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+	// We have a sleep before each retry (including the initial one) and for
+	// every "retry-after" call - thus 5 together.
+	if len(backoff.sleeps) != 5 {
+		t.Errorf("Expected 5 retries, got: %d", len(backoff.sleeps))
 	}
 }
 

@@ -27,7 +27,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
-	"k8s.io/kubernetes/pkg/apiserver/request"
+	apiserverrequest "k8s.io/kubernetes/pkg/apiserver/request"
 )
 
 const globalTimeout = time.Minute
@@ -46,7 +46,7 @@ func WithTimeoutForNonLongRunningRequests(handler http.Handler, requestContextMa
 			return time.After(globalTimeout), ""
 		}
 
-		requestInfo, ok := request.RequestInfoFrom(ctx)
+		requestInfo, ok := apiserverrequest.RequestInfoFrom(ctx)
 		if !ok {
 			return time.After(globalTimeout), ""
 		}

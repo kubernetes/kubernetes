@@ -461,7 +461,7 @@ func (r *volumeReactor) getChangeCount() int {
 // waitForIdle waits until all tests, controllers and other goroutines do their
 // job and no new actions are registered for 10 milliseconds.
 func (r *volumeReactor) waitForIdle() {
-	r.ctrl.runningOperations.Wait()
+	r.ctrl.runningOperations.WaitForCompletion()
 	// Check every 10ms if the controller does something and stop if it's
 	// idle.
 	oldChanges := -1
@@ -489,7 +489,7 @@ func (r *volumeReactor) waitTest(test controllerTest) error {
 	}
 	err := wait.ExponentialBackoff(backoff, func() (done bool, err error) {
 		// Finish all operations that are in progress
-		r.ctrl.runningOperations.Wait()
+		r.ctrl.runningOperations.WaitForCompletion()
 
 		// Return 'true' if the reactor reached the expected state
 		err1 := r.checkClaims(test.expectedClaims)
@@ -1038,6 +1038,8 @@ func runMultisyncTests(t *testing.T, tests []controllerTest, storageClasses []*s
 					break
 				}
 			}
+			// waiting here cools down exponential backoff
+			time.Sleep(600 * time.Millisecond)
 
 			// There were some changes, process them
 			switch obj.(type) {

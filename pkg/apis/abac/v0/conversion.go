@@ -18,6 +18,7 @@ package v0
 
 import (
 	api "k8s.io/kubernetes/pkg/apis/abac"
+	"k8s.io/kubernetes/pkg/auth/user"
 	"k8s.io/kubernetes/pkg/conversion"
 	"k8s.io/kubernetes/pkg/runtime"
 )
@@ -32,9 +33,14 @@ func addConversionFuncs(scheme *runtime.Scheme) error {
 			out.Spec.Resource = in.Resource
 			out.Spec.Readonly = in.Readonly
 
-			// In v0, unspecified user and group matches all subjects
+			// In v0, unspecified user and group matches all authenticated subjects
 			if len(in.User) == 0 && len(in.Group) == 0 {
-				out.Spec.User = "*"
+				out.Spec.Group = user.AllAuthenticated
+			}
+			// In v0, user or group of * matches all authenticated subjects
+			if in.User == "*" || in.Group == "*" {
+				out.Spec.Group = user.AllAuthenticated
+				out.Spec.User = ""
 			}
 
 			// In v0, leaving namespace empty matches all namespaces

@@ -92,7 +92,7 @@ var KubeconfigGetterForCluster = func(c *federation_v1beta1.Cluster) clientcmd.K
 	}
 }
 
-// KubeconfigGettterForSecret is used to get the kubeconfig from the given secret.
+// KubeconfigGetterForSecret is used to get the kubeconfig from the given secret.
 var KubeconfigGetterForSecret = func(secretName string) clientcmd.KubeconfigGetter {
 	return func() (*clientcmdapi.Config, error) {
 		var data []byte
@@ -137,7 +137,7 @@ var KubeconfigGetterForSecret = func(secretName string) clientcmd.KubeconfigGett
 	}
 }
 
-// Retruns Clientset for the given cluster.
+// Returns Clientset for the given cluster.
 func GetClientsetForCluster(cluster *federation_v1beta1.Cluster) (*fedclientset.Clientset, error) {
 	clusterConfig, err := BuildClusterConfig(cluster)
 	if err != nil && clusterConfig != nil {

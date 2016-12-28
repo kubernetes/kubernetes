@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/apis/extensions/validation"
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
@@ -43,6 +44,12 @@ type deploymentStrategy struct {
 // Strategy is the default logic that applies when creating and updating Deployment
 // objects via the REST API.
 var Strategy = deploymentStrategy{api.Scheme, api.SimpleNameGenerator}
+
+// DefaultGarbageCollectionPolicy returns Orphan because that's the default
+// behavior before the server-side garbage collection is implemented.
+func (deploymentStrategy) DefaultGarbageCollectionPolicy() rest.GarbageCollectionPolicy {
+	return rest.OrphanDependents
+}
 
 // NamespaceScoped is true for deployment.
 func (deploymentStrategy) NamespaceScoped() bool {

@@ -38,7 +38,7 @@ func TestCacheWatcherCleanupNotBlockedByResult(t *testing.T) {
 		defer lock.Unlock()
 		count++
 	}
-	initEvents := []watchCacheEvent{
+	initEvents := []*watchCacheEvent{
 		{Object: &api.Pod{}},
 		{Object: &api.Pod{}},
 	}

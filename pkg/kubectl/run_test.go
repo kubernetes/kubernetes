@@ -821,6 +821,104 @@ func TestGenerateJob(t *testing.T) {
 	}
 }
 
+func TestGenerateCronJob(t *testing.T) {
+	tests := []struct {
+		params    map[string]interface{}
+		expected  *batch.CronJob
+		expectErr bool
+	}{
+		{
+			params: map[string]interface{}{
+				"labels":           "foo=bar,baz=blah",
+				"name":             "foo",
+				"image":            "someimage",
+				"port":             "80",
+				"hostport":         "80",
+				"stdin":            "true",
+				"leave-stdin-open": "true",
+				"command":          "true",
+				"args":             []string{"bar", "baz", "blah"},
+				"env":              []string{"a=b", "c=d"},
+				"requests":         "cpu=100m,memory=100Mi",
+				"limits":           "cpu=400m,memory=200Mi",
+				"restart":          "OnFailure",
+				"schedule":         "0/5 * * * ?",
+			},
+			expected: &batch.CronJob{
+				ObjectMeta: api.ObjectMeta{
+					Name:   "foo",
+					Labels: map[string]string{"foo": "bar", "baz": "blah"},
+				},
+				Spec: batch.CronJobSpec{
+					Schedule:          "0/5 * * * ?",
+					ConcurrencyPolicy: batch.AllowConcurrent,
+					JobTemplate: batch.JobTemplateSpec{
+						Spec: batch.JobSpec{
+							Template: api.PodTemplateSpec{
+								ObjectMeta: api.ObjectMeta{
+									Labels: map[string]string{"foo": "bar", "baz": "blah"},
+								},
+								Spec: api.PodSpec{
+									RestartPolicy: api.RestartPolicyOnFailure,
+									Containers: []api.Container{
+										{
+											Name:      "foo",
+											Image:     "someimage",
+											Stdin:     true,
+											StdinOnce: false,
+											Ports: []api.ContainerPort{
+												{
+													ContainerPort: 80,
+													HostPort:      80,
+												},
+											},
+											Command: []string{"bar", "baz", "blah"},
+											Env: []api.EnvVar{
+												{
+													Name:  "a",
+													Value: "b",
+												},
+												{
+													Name:  "c",
+													Value: "d",
+												},
+											},
+											Resources: api.ResourceRequirements{
+												Requests: api.ResourceList{
+													api.ResourceCPU:    resource.MustParse("100m"),
+													api.ResourceMemory: resource.MustParse("100Mi"),
+												},
+												Limits: api.ResourceList{
+													api.ResourceCPU:    resource.MustParse("400m"),
+													api.ResourceMemory: resource.MustParse("200Mi"),
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	generator := CronJobV2Alpha1{}
+	for _, test := range tests {
+		obj, err := generator.Generate(test.params)
+		if !test.expectErr && err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+		if test.expectErr && err != nil {
+			continue
+		}
+		if !reflect.DeepEqual(obj.(*batch.CronJob), test.expected) {
+			t.Errorf("\nexpected:\n%#v\nsaw:\n%#v", test.expected, obj.(*batch.CronJob))
+		}
+	}
+}
+
 func TestParseEnv(t *testing.T) {
 	tests := []struct {
 		envArray  []string

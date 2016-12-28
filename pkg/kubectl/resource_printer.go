@@ -657,7 +657,7 @@ func formatEndpoints(endpoints *api.Endpoints, ports sets.String) string {
 	return ret
 }
 
-func shortHumanDuration(d time.Duration) string {
+func ShortHumanDuration(d time.Duration) string {
 	// Allow deviation no more than 2 seconds(excluded) to tolerate machine time
 	// inconsistence, it can be considered as almost now.
 	if seconds := int(d.Seconds()); seconds < -1 {
@@ -682,7 +682,7 @@ func translateTimestamp(timestamp metav1.Time) string {
 	if timestamp.IsZero() {
 		return "<unknown>"
 	}
-	return shortHumanDuration(time.Now().Sub(timestamp.Time))
+	return ShortHumanDuration(time.Now().Sub(timestamp.Time))
 }
 
 func printPodBase(pod *api.Pod, w io.Writer, options PrintOptions) error {
@@ -2075,13 +2075,29 @@ func printDeployment(deployment *extensions.Deployment, w io.Writer, options Pri
 	updatedReplicas := deployment.Status.UpdatedReplicas
 	availableReplicas := deployment.Status.AvailableReplicas
 	age := translateTimestamp(deployment.CreationTimestamp)
+	containers := deployment.Spec.Template.Spec.Containers
+	selector, err := metav1.LabelSelectorAsSelector(deployment.Spec.Selector)
+	if err != nil {
+		// this shouldn't happen if LabelSelector passed validation
+		return err
+	}
+
 	if _, err := fmt.Fprintf(w, "%s\t%d\t%d\t%d\t%d\t%s", name, desiredReplicas, currentReplicas, updatedReplicas, availableReplicas, age); err != nil {
 		return err
 	}
+	if options.Wide {
+		if err := layoutContainers(containers, w); err != nil {
+			return err
+		}
+		if _, err := fmt.Fprintf(w, "\t%s", selector.String()); err != nil {
+			return err
+		}
+	}
+
 	if _, err := fmt.Fprint(w, AppendLabels(deployment.Labels, options.ColumnLabels)); err != nil {
 		return err
 	}
-	_, err := fmt.Fprint(w, AppendAllLabels(options.ShowLabels, deployment.Labels))
+	_, err = fmt.Fprint(w, AppendAllLabels(options.ShowLabels, deployment.Labels))
 	return err
 }
 
@@ -2352,6 +2368,9 @@ func formatWideHeaders(wide bool, t reflect.Type) []string {
 		if t.String() == "*extensions.DaemonSet" || t.String() == "*extensions.DaemonSetList" {
 			return []string{"CONTAINER(S)", "IMAGE(S)", "SELECTOR"}
 		}
+		if t.String() == "*extensions.Deployment" || t.String() == "*extensions.DeploymentList" {
+			return []string{"CONTAINER(S)", "IMAGE(S)", "SELECTOR"}
+		}
 		if t.String() == "*extensions.ReplicaSet" || t.String() == "*extensions.ReplicaSetList" {
 			return []string{"CONTAINER(S)", "IMAGE(S)", "SELECTOR"}
 		}
@@ -2394,14 +2413,7 @@ func (h *HumanReadablePrinter) PrintObj(obj runtime.Object, output io.Writer) er
 
 	// check if the object is unstructured.  If so, let's attempt to convert it to a type we can understand before
 	// trying to print, since the printers are keyed by type.  This is extremely expensive.
-	switch obj.(type) {
-	case runtime.Unstructured, *runtime.Unknown:
-		if objBytes, err := runtime.Encode(api.Codecs.LegacyCodec(), obj); err == nil {
-			if decodedObj, err := runtime.Decode(api.Codecs.UniversalDecoder(), objBytes); err == nil {
-				obj = decodedObj
-			}
-		}
-	}
+	obj, _ = DecodeUnknownObject(obj)
 
 	t := reflect.TypeOf(obj)
 	if handler := h.handlerMap[t]; handler != nil {

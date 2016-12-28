@@ -135,7 +135,7 @@ func (f *ring1Factory) ClientForMapping(mapping *meta.RESTMapping) (resource.RES
 }
 
 func (f *ring1Factory) UnstructuredClientForMapping(mapping *meta.RESTMapping) (resource.RESTClient, error) {
-	cfg, err := f.clientAccessFactory.ClientConfig()
+	cfg, err := f.clientAccessFactory.BareClientConfig()
 	if err != nil {
 		return nil, err
 	}

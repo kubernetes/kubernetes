@@ -29,12 +29,12 @@ import (
 	"github.com/spf13/pflag"
 
 	"k8s.io/kubernetes/cmd/kube-dns/app/options"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
-	"k8s.io/kubernetes/pkg/client/restclient"
-	kclientcmd "k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
-	kdns "k8s.io/kubernetes/pkg/dns"
+	"k8s.io/kubernetes/pkg/dns"
 	dnsconfig "k8s.io/kubernetes/pkg/dns/config"
-	"k8s.io/kubernetes/pkg/runtime/schema"
+
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/clientcmd"
 )
 
 type KubeDNSServer struct {
@@ -43,7 +43,7 @@ type KubeDNSServer struct {
 	healthzPort    int
 	dnsBindAddress string
 	dnsPort        int
-	kd             *kdns.KubeDNS
+	kd             *dns.KubeDNS
 }
 
 func NewKubeDNSServerDefault(config *options.KubeDNSConfig) *KubeDNSServer {
@@ -69,41 +69,28 @@ func NewKubeDNSServerDefault(config *options.KubeDNSConfig) *KubeDNSServer {
 		healthzPort:    config.HealthzPort,
 		dnsBindAddress: config.DNSBindAddress,
 		dnsPort:        config.DNSPort,
-		kd:             kdns.NewKubeDNS(kubeClient, config.ClusterDomain, config.InitialSyncTimeout, configSync),
+		kd:             dns.NewKubeDNS(kubeClient, config.ClusterDomain, config.InitialSyncTimeout, configSync),
 	}
 }
 
-// TODO: evaluate using pkg/client/clientcmd
-func newKubeClient(dnsConfig *options.KubeDNSConfig) (clientset.Interface, error) {
-	var (
-		config *restclient.Config
-		err    error
-	)
+func newKubeClient(dnsConfig *options.KubeDNSConfig) (kubernetes.Interface, error) {
+	var config *rest.Config
+	var err error
 
-	if dnsConfig.KubeMasterURL != "" && dnsConfig.KubeConfigFile == "" {
-		// Only --kube-master-url was provided.
-		config = &restclient.Config{
-			Host:          dnsConfig.KubeMasterURL,
-			ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Version: "v1"}},
+	if dnsConfig.KubeConfigFile == "" {
+		config, err = rest.InClusterConfig()
+		if err != nil {
+			return nil, err
 		}
 	} else {
-		// We either have:
-		//  1) --kube-master-url and --kubecfg-file
-		//  2) just --kubecfg-file
-		//  3) neither flag
-		// In any case, the logic is the same.  If (3), this will automatically
-		// fall back on the service account token.
-		overrides := &kclientcmd.ConfigOverrides{}
-		overrides.ClusterInfo.Server = dnsConfig.KubeMasterURL                                // might be "", but that is OK
-		rules := &kclientcmd.ClientConfigLoadingRules{ExplicitPath: dnsConfig.KubeConfigFile} // might be "", but that is OK
-		if config, err = kclientcmd.NewNonInteractiveDeferredLoadingClientConfig(rules, overrides).ClientConfig(); err != nil {
+		config, err = clientcmd.BuildConfigFromFlags(
+			dnsConfig.KubeMasterURL, dnsConfig.KubeConfigFile)
+		if err != nil {
 			return nil, err
 		}
 	}
 
-	glog.V(0).Infof("Using %v for kubernetes master, kubernetes API: %v",
-		config.Host, config.GroupVersion)
-	return clientset.NewForConfig(config)
+	return kubernetes.NewForConfig(config)
 }
 
 func (server *KubeDNSServer) Run() {

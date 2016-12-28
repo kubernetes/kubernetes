@@ -164,11 +164,12 @@ func NewVolumeManager(
 		volumePluginMgr:     volumePluginMgr,
 		desiredStateOfWorld: cache.NewDesiredStateOfWorld(volumePluginMgr),
 		actualStateOfWorld:  cache.NewActualStateOfWorld(nodeName, volumePluginMgr),
-		operationExecutor: operationexecutor.NewOperationExecutor(
+		operationExecutor: operationexecutor.NewOperationExecutor(operationexecutor.NewOperationGenerator(
 			kubeClient,
 			volumePluginMgr,
 			recorder,
 			checkNodeCapabilitiesBeforeMount),
+		),
 	}
 
 	vm.reconciler = reconciler.NewReconciler(
@@ -357,8 +358,8 @@ func (vm *volumeManager) WaitForAttachAndMount(pod *v1.Pod) error {
 
 		return fmt.Errorf(
 			"timeout expired waiting for volumes to attach/mount for pod %q/%q. list of unattached/unmounted volumes=%v",
-			pod.Name,
 			pod.Namespace,
+			pod.Name,
 			unmountedVolumes)
 	}
 

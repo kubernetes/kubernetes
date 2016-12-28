@@ -36012,7 +36012,7 @@
     ],
     "properties": {
      "observedGeneration": {
-      "description": "most recent generation observed by this autoscaler.",
+      "description": "most recent generation observed by this StatefulSet.",
       "type": "integer",
       "format": "int64"
      },

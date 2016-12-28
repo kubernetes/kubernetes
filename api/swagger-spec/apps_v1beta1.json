@@ -2891,7 +2891,7 @@
      "observedGeneration": {
       "type": "integer",
       "format": "int64",
-      "description": "most recent generation observed by this autoscaler."
+      "description": "most recent generation observed by this StatefulSet."
      },
      "replicas": {
       "type": "integer",

@@ -19,14 +19,16 @@ package main
 import (
 	"github.com/golang/glog"
 	"github.com/spf13/pflag"
+
 	"k8s.io/kubernetes/cmd/kube-dns/app"
 	"k8s.io/kubernetes/cmd/kube-dns/app/options"
-	_ "k8s.io/kubernetes/pkg/client/metrics/prometheus" // for client metric registration
 	"k8s.io/kubernetes/pkg/util/flag"
 	"k8s.io/kubernetes/pkg/util/logs"
 	"k8s.io/kubernetes/pkg/version"
-	_ "k8s.io/kubernetes/pkg/version/prometheus" // for version metric registration
 	"k8s.io/kubernetes/pkg/version/verflag"
+
+	_ "k8s.io/kubernetes/pkg/client/metrics/prometheus" // for client metric registration
+	_ "k8s.io/kubernetes/pkg/version/prometheus"        // for version metric registration
 )
 
 func main() {

@@ -17,6 +17,24 @@ spec:
       - name: kubernetes-discovery
         image: kubernetes-discovery:latest
         imagePullPolicy: Never
+        livenessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /version
+            port: 443
+            scheme: HTTPS
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 1
+        readinessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /version
+            port: 443
+            scheme: HTTPS
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 1
         args:
         - "--proxy-client-cert-file=/var/run/auth-proxy-client/tls.crt"
         - "--proxy-client-key-file=/var/run/auth-proxy-client/tls.key"

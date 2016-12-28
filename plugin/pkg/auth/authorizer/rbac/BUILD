@@ -21,6 +21,7 @@ go_library(
         "//pkg/auth/authorizer:go_default_library",
         "//pkg/auth/user:go_default_library",
         "//pkg/util/errors:go_default_library",
+        "//vendor:github.com/golang/glog",
     ],
 )
 

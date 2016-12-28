@@ -36,6 +36,17 @@ import (
 	"k8s.io/kubernetes/pkg/util/validation/field"
 )
 
+const (
+	dnsLabelErrMsg          = "a valid DNS (RFC 1123) label must consist of"
+	dnsSubdomainLabelErrMsg = "a valid DNS (RFC 1123) subdomain"
+	labelErrMsg             = "a valid label must be an empty string or consist of"
+	lowerCaseLabelErrMsg    = "a valid label must consist of"
+	maxLengthErrMsg         = "must be no more than"
+	namePartErrMsg          = "name part must consist of"
+	nameErrMsg              = "a qualified name must consist of"
+	idErrMsg                = "a valid C identifier must"
+)
+
 func expectPrefix(t *testing.T, prefix string, errs field.ErrorList) {
 	for i := range errs {
 		if f, p := errs[i].Field, prefix; !strings.HasPrefix(f, p) {
@@ -458,10 +469,10 @@ func TestValidateAnnotations(t *testing.T) {
 		annotations map[string]string
 		expect      string
 	}{
-		{map[string]string{"nospecialchars^=@": "bar"}, "must match the regex"},
-		{map[string]string{"cantendwithadash-": "bar"}, "must match the regex"},
-		{map[string]string{"only/one/slash": "bar"}, "must match the regex"},
-		{map[string]string{strings.Repeat("a", 254): "bar"}, "must be no more than"},
+		{map[string]string{"nospecialchars^=@": "bar"}, namePartErrMsg},
+		{map[string]string{"cantendwithadash-": "bar"}, namePartErrMsg},
+		{map[string]string{"only/one/slash": "bar"}, nameErrMsg},
+		{map[string]string{strings.Repeat("a", 254): "bar"}, maxLengthErrMsg},
 	}
 	for i := range nameErrorCases {
 		errs := ValidateAnnotations(nameErrorCases[i].annotations, field.NewPath("field"))
@@ -1152,7 +1163,7 @@ func TestValidateVolumes(t *testing.T) {
 			},
 			errtype:   field.ErrorTypeInvalid,
 			errfield:  "name",
-			errdetail: "must match the regex",
+			errdetail: dnsLabelErrMsg,
 		},
 		// More than one source field specified.
 		{
@@ -2530,7 +2541,7 @@ func TestValidateEnv(t *testing.T) {
 		{
 			name:          "name not a C identifier",
 			envs:          []api.EnvVar{{Name: "a.b.c"}},
-			expectedError: `[0].name: Invalid value: "a.b.c": must match the regex`,
+			expectedError: `[0].name: Invalid value: "a.b.c": ` + idErrMsg,
 		},
 		{
 			name: "value and valueFrom specified",
@@ -7288,11 +7299,11 @@ func TestValidateLimitRange(t *testing.T) {
 		},
 		"invalid-name": {
 			api.LimitRange{ObjectMeta: api.ObjectMeta{Name: "^Invalid", Namespace: "foo"}, Spec: api.LimitRangeSpec{}},
-			"must match the regex",
+			dnsSubdomainLabelErrMsg,
 		},
 		"invalid-namespace": {
 			api.LimitRange{ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: "^Invalid"}, Spec: api.LimitRangeSpec{}},
-			"must match the regex",
+			dnsLabelErrMsg,
 		},
 		"duplicate-limit-type": {
 			api.LimitRange{ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: api.LimitRangeSpec{
@@ -7634,11 +7645,11 @@ func TestValidateResourceQuota(t *testing.T) {
 		},
 		"invalid Name": {
 			api.ResourceQuota{ObjectMeta: api.ObjectMeta{Name: "^Invalid", Namespace: "foo"}, Spec: spec},
-			"must match the regex",
+			dnsSubdomainLabelErrMsg,
 		},
 		"invalid Namespace": {
 			api.ResourceQuota{ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: "^Invalid"}, Spec: spec},
-			"must match the regex",
+			dnsLabelErrMsg,
 		},
 		"negative-limits": {
 			api.ResourceQuota{ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: negativeSpec},
@@ -8232,12 +8243,12 @@ func TestValidateEndpoints(t *testing.T) {
 		"invalid namespace": {
 			endpoints:   api.Endpoints{ObjectMeta: api.ObjectMeta{Name: "mysvc", Namespace: "no@#invalid.;chars\"allowed"}},
 			errorType:   "FieldValueInvalid",
-			errorDetail: "must match the regex",
+			errorDetail: dnsLabelErrMsg,
 		},
 		"invalid name": {
 			endpoints:   api.Endpoints{ObjectMeta: api.ObjectMeta{Name: "-_Invliad^&Characters", Namespace: "namespace"}},
 			errorType:   "FieldValueInvalid",
-			errorDetail: "must match the regex",
+			errorDetail: dnsSubdomainLabelErrMsg,
 		},
 		"empty addresses": {
 			endpoints: api.Endpoints{

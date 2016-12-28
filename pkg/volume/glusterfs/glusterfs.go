@@ -129,7 +129,11 @@ func (plugin *glusterfsPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, _ volu
 	ep_name := source.EndpointsName
 	// PVC/POD is in same ns.
 	ns := pod.Namespace
-	ep, err := plugin.host.GetKubeClient().Core().Endpoints(ns).Get(ep_name, metav1.GetOptions{})
+	kubeClient := plugin.host.GetKubeClient()
+	if kubeClient == nil {
+		return nil, fmt.Errorf("glusterfs: failed to get kube client to initialize mounter")
+	}
+	ep, err := kubeClient.Core().Endpoints(ns).Get(ep_name, metav1.GetOptions{})
 	if err != nil {
 		glog.Errorf("glusterfs: failed to get endpoints %s[%v]", ep_name, err)
 		return nil, err
@@ -257,8 +261,7 @@ func (b *glusterfsMounter) SetUpAt(dir string, fsGroup *int64) error {
 	}
 
 	// Cleanup upon failure.
-	c := &glusterfsUnmounter{b.glusterfs}
-	c.cleanup(dir)
+	volutil.UnmountPath(dir, b.mounter)
 	return err
 }
 
@@ -278,32 +281,7 @@ func (c *glusterfsUnmounter) TearDown() error {
 }
 
 func (c *glusterfsUnmounter) TearDownAt(dir string) error {
-	return c.cleanup(dir)
-}
-
-func (c *glusterfsUnmounter) cleanup(dir string) error {
-	notMnt, err := c.mounter.IsLikelyNotMountPoint(dir)
-	if err != nil {
-		return fmt.Errorf("glusterfs: Error checking IsLikelyNotMountPoint: %v", err)
-	}
-	if notMnt {
-		return os.RemoveAll(dir)
-	}
-
-	if err := c.mounter.Unmount(dir); err != nil {
-		return fmt.Errorf("glusterfs: Unmounting failed: %v", err)
-	}
-	notMnt, mntErr := c.mounter.IsLikelyNotMountPoint(dir)
-	if mntErr != nil {
-		return fmt.Errorf("glusterfs: IsLikelyNotMountPoint check failed: %v", mntErr)
-	}
-	if notMnt {
-		if err := os.RemoveAll(dir); err != nil {
-			return fmt.Errorf("glusterfs: RemoveAll failed: %v", err)
-		}
-	}
-
-	return nil
+	return volutil.UnmountPath(dir, c.mounter)
 }
 
 func (b *glusterfsMounter) setUpAtInternal(dir string) error {
@@ -460,7 +438,11 @@ func (d *glusterfsVolumeDeleter) GetPath() string {
 // in a given storage class, and mark them in the table.
 //
 func (p *glusterfsPlugin) collectGids(className string, gidTable *MinMaxAllocator) error {
-	pvList, err := p.host.GetKubeClient().Core().PersistentVolumes().List(v1.ListOptions{LabelSelector: labels.Everything().String()})
+	kubeClient := p.host.GetKubeClient()
+	if kubeClient == nil {
+		return fmt.Errorf("glusterfs: failed to get kube client when collecting gids")
+	}
+	pvList, err := kubeClient.Core().PersistentVolumes().List(v1.ListOptions{LabelSelector: labels.Everything().String()})
 	if err != nil {
 		glog.Errorf("glusterfs: failed to get existing persistent volumes")
 		return err
@@ -787,7 +769,11 @@ func (p *glusterfsVolumeProvisioner) createEndpointService(namespace string, epS
 			Ports:     []v1.EndpointPort{{Port: 1, Protocol: "TCP"}},
 		}},
 	}
-	_, err = p.plugin.host.GetKubeClient().Core().Endpoints(namespace).Create(endpoint)
+	kubeClient := p.plugin.host.GetKubeClient()
+	if kubeClient == nil {
+		return nil, nil, fmt.Errorf("glusterfs: failed to get kube client when creating endpoint service")
+	}
+	_, err = kubeClient.Core().Endpoints(namespace).Create(endpoint)
 	if err != nil && errors.IsAlreadyExists(err) {
 		glog.V(1).Infof("glusterfs: endpoint [%s] already exist in namespace [%s]", endpoint, namespace)
 		err = nil
@@ -807,7 +793,7 @@ func (p *glusterfsVolumeProvisioner) createEndpointService(namespace string, epS
 		Spec: v1.ServiceSpec{
 			Ports: []v1.ServicePort{
 				{Protocol: "TCP", Port: 1}}}}
-	_, err = p.plugin.host.GetKubeClient().Core().Services(namespace).Create(service)
+	_, err = kubeClient.Core().Services(namespace).Create(service)
 	if err != nil && errors.IsAlreadyExists(err) {
 		glog.V(1).Infof("glusterfs: service [%s] already exist in namespace [%s]", service, namespace)
 		err = nil
@@ -820,7 +806,11 @@ func (p *glusterfsVolumeProvisioner) createEndpointService(namespace string, epS
 }
 
 func (d *glusterfsVolumeDeleter) deleteEndpointService(namespace string, epServiceName string) (err error) {
-	err = d.plugin.host.GetKubeClient().Core().Services(namespace).Delete(epServiceName, nil)
+	kubeClient := d.plugin.host.GetKubeClient()
+	if kubeClient == nil {
+		return fmt.Errorf("glusterfs: failed to get kube client when deleting endpoint service")
+	}
+	err = kubeClient.Core().Services(namespace).Delete(epServiceName, nil)
 	if err != nil {
 		glog.Errorf("glusterfs: error deleting service %s/%s: %v", namespace, epServiceName, err)
 		return fmt.Errorf("error deleting service %s/%s: %v", namespace, epServiceName, err)

@@ -145,7 +145,7 @@ func (cc *clusterClientCache) startClusterLW(cluster *v1beta1.Cluster, clusterNa
 				DeleteFunc: func(obj interface{}) {
 					service, _ := obj.(*v1.Service)
 					cc.enqueueService(obj, clusterName)
-					glog.V(2).Infof("Service %s/%s deletion found and enque to service store %s", service.Namespace, service.Name, clusterName)
+					glog.V(2).Infof("Service %s/%s deletion found and enqueue to service store %s", service.Namespace, service.Name, clusterName)
 				},
 			},
 			cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},

@@ -86,7 +86,7 @@ func TestConfigDirCleaner(t *testing.T) {
 				"manifests",
 			},
 		},
-		"preserve cloud-config.json": {
+		"preserve cloud-config": {
 			setupDirs: []string{
 				"manifests",
 				"pki",
@@ -97,12 +97,12 @@ func TestConfigDirCleaner(t *testing.T) {
 				"pki/ca.pem",
 				"admin.conf",
 				"kubelet.conf",
-				"cloud-config.json",
+				"cloud-config",
 			},
 			verifyExists: []string{
 				"manifests",
 				"pki",
-				"cloud-config.json",
+				"cloud-config",
 			},
 		},
 		"preserve hidden files and directories": {
@@ -117,13 +117,13 @@ func TestConfigDirCleaner(t *testing.T) {
 				"pki/ca.pem",
 				"admin.conf",
 				"kubelet.conf",
-				".cloud-config.json",
+				".cloud-config",
 				".mydir/.myfile",
 			},
 			verifyExists: []string{
 				"manifests",
 				"pki",
-				".cloud-config.json",
+				".cloud-config",
 				".mydir",
 				".mydir/.myfile",
 			},

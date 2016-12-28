@@ -24,7 +24,7 @@ import (
 	deputils "k8s.io/kubernetes/pkg/controller/deployment/util"
 )
 
-// Checks if cluster-independent, user provided data in two given Deployment are eqaul.
+// Checks if cluster-independent, user provided data in two given Deployment are equal.
 // This function assumes that revisions are not kept in sync across the clusters.
 func DeploymentEquivalent(a, b *extensions_v1.Deployment) bool {
 	if a.Name != b.Name {

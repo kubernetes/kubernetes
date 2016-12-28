@@ -48,7 +48,7 @@ Join a Special Interest Group ([SIG](https://github.com/kubernetes/community))
 
 ## Contribute
 
-If you're interested in being a contributor and want to get involved in developing Kubernetes, get started with with this reading:
+If you're interested in being a contributor and want to get involved in developing Kubernetes, get started with this reading:
 
 *  The community [expectations](https://github.com/kubernetes/community/blob/master/contributors/devel/community-expectations.md)
 *  The [contributor guidelines](CONTRIBUTING.md)

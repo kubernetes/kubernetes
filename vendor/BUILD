@@ -803,6 +803,64 @@ go_library(
 )
 
 go_library(
+    name = "github.com/chai2010/gettext-go/gettext",
+    srcs = [
+        "github.com/chai2010/gettext-go/gettext/caller.go",
+        "github.com/chai2010/gettext-go/gettext/doc.go",
+        "github.com/chai2010/gettext-go/gettext/domain.go",
+        "github.com/chai2010/gettext-go/gettext/domain_helper.go",
+        "github.com/chai2010/gettext-go/gettext/fs.go",
+        "github.com/chai2010/gettext-go/gettext/gettext.go",
+        "github.com/chai2010/gettext-go/gettext/local.go",
+        "github.com/chai2010/gettext-go/gettext/tr.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/chai2010/gettext-go/gettext/mo",
+        "//vendor:github.com/chai2010/gettext-go/gettext/plural",
+        "//vendor:github.com/chai2010/gettext-go/gettext/po",
+    ],
+)
+
+go_library(
+    name = "github.com/chai2010/gettext-go/gettext/mo",
+    srcs = [
+        "github.com/chai2010/gettext-go/gettext/mo/doc.go",
+        "github.com/chai2010/gettext-go/gettext/mo/encoder.go",
+        "github.com/chai2010/gettext-go/gettext/mo/file.go",
+        "github.com/chai2010/gettext-go/gettext/mo/header.go",
+        "github.com/chai2010/gettext-go/gettext/mo/message.go",
+        "github.com/chai2010/gettext-go/gettext/mo/util.go",
+    ],
+    tags = ["automanaged"],
+)
+
+go_library(
+    name = "github.com/chai2010/gettext-go/gettext/plural",
+    srcs = [
+        "github.com/chai2010/gettext-go/gettext/plural/doc.go",
+        "github.com/chai2010/gettext-go/gettext/plural/formula.go",
+        "github.com/chai2010/gettext-go/gettext/plural/table.go",
+    ],
+    tags = ["automanaged"],
+)
+
+go_library(
+    name = "github.com/chai2010/gettext-go/gettext/po",
+    srcs = [
+        "github.com/chai2010/gettext-go/gettext/po/comment.go",
+        "github.com/chai2010/gettext-go/gettext/po/doc.go",
+        "github.com/chai2010/gettext-go/gettext/po/file.go",
+        "github.com/chai2010/gettext-go/gettext/po/header.go",
+        "github.com/chai2010/gettext-go/gettext/po/line_reader.go",
+        "github.com/chai2010/gettext-go/gettext/po/message.go",
+        "github.com/chai2010/gettext-go/gettext/po/re.go",
+        "github.com/chai2010/gettext-go/gettext/po/util.go",
+    ],
+    tags = ["automanaged"],
+)
+
+go_library(
     name = "github.com/cloudflare/cfssl/auth",
     srcs = ["github.com/cloudflare/cfssl/auth/auth.go"],
     tags = ["automanaged"],
@@ -12055,4 +12113,57 @@ go_library(
         "//pkg/api/unversioned:go_default_library",
         "//pkg/api/v1:go_default_library",
     ],
+)
+
+go_library(
+    name = "golang.org/x/text/encoding",
+    srcs = ["golang.org/x/text/encoding/encoding.go"],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:golang.org/x/text/encoding/internal/identifier",
+        "//vendor:golang.org/x/text/transform",
+    ],
+)
+
+go_library(
+    name = "golang.org/x/text/encoding/internal",
+    srcs = ["golang.org/x/text/encoding/internal/internal.go"],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:golang.org/x/text/encoding",
+        "//vendor:golang.org/x/text/encoding/internal/identifier",
+        "//vendor:golang.org/x/text/transform",
+    ],
+)
+
+go_library(
+    name = "golang.org/x/text/encoding/internal/identifier",
+    srcs = [
+        "golang.org/x/text/encoding/internal/identifier/identifier.go",
+        "golang.org/x/text/encoding/internal/identifier/mib.go",
+    ],
+    tags = ["automanaged"],
+)
+
+go_library(
+    name = "golang.org/x/text/encoding/unicode",
+    srcs = [
+        "golang.org/x/text/encoding/unicode/override.go",
+        "golang.org/x/text/encoding/unicode/unicode.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:golang.org/x/text/encoding",
+        "//vendor:golang.org/x/text/encoding/internal",
+        "//vendor:golang.org/x/text/encoding/internal/identifier",
+        "//vendor:golang.org/x/text/internal/utf8internal",
+        "//vendor:golang.org/x/text/runes",
+        "//vendor:golang.org/x/text/transform",
+    ],
+)
+
+go_library(
+    name = "golang.org/x/text/internal/utf8internal",
+    srcs = ["golang.org/x/text/internal/utf8internal/utf8internal.go"],
+    tags = ["automanaged"],
 )

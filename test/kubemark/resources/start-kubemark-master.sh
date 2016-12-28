@@ -21,6 +21,24 @@
 KUBE_ROOT="/home/kubernetes"
 KUBE_BINDIR="${KUBE_ROOT}/kubernetes/server/bin"
 
+function config-ip-firewall {
+  echo "Configuring IP firewall rules"
+  # The GCI image has host firewall which drop most inbound/forwarded packets.
+  # We need to add rules to accept all TCP/UDP/ICMP packets.
+  if iptables -L INPUT | grep "Chain INPUT (policy DROP)" > /dev/null; then
+    echo "Add rules to accept all inbound TCP/UDP/ICMP packets"
+    iptables -A INPUT -w -p TCP -j ACCEPT
+    iptables -A INPUT -w -p UDP -j ACCEPT
+    iptables -A INPUT -w -p ICMP -j ACCEPT
+  fi
+  if iptables -L FORWARD | grep "Chain FORWARD (policy DROP)" > /dev/null; then
+    echo "Add rules to accept all forwarded TCP/UDP/ICMP packets"
+    iptables -A FORWARD -w -p TCP -j ACCEPT
+    iptables -A FORWARD -w -p UDP -j ACCEPT
+    iptables -A FORWARD -w -p ICMP -j ACCEPT
+  fi
+}
+
 function create-dirs {
 	echo "Creating required directories"
 	mkdir -p /var/lib/kubelet
@@ -102,8 +120,8 @@ function mount-pd() {
 		return
 	fi
 
-	echo "Mounting PD '${pd_path}' at '${mount_point}'"
 	local -r pd_path="/dev/disk/by-id/${pd_name}"
+	echo "Mounting PD '${pd_path}' at '${mount_point}'"
 	# Format and mount the disk, create directories on it for all of the master's
 	# persistent data, and link them to where they're used.
 	mkdir -p "${mount_point}"
@@ -123,8 +141,7 @@ function assemble-docker-flags {
 	# TODO(shyamjvs): Incorporate network plugin options, etc later.
 	echo "DOCKER_OPTS=\"${docker_opts}\"" > /etc/default/docker
 	echo "DOCKER_NOFILE=65536" >> /etc/default/docker  # For setting ulimit -n
-	service docker restart
-	# TODO(shyamjvs): Make docker run through systemd/supervisord.
+	systemctl restart docker
 }
 
 # A helper function for loading a docker image. It keeps trying up to 5 times.
@@ -176,39 +193,43 @@ function compute-kubelet-params {
 	echo "${params}"
 }
 
-# Creates the supervisord config file for kubelet from the exec_command ($1).
+# Creates the systemd config file for kubelet.service.
 function create-kubelet-conf() {
-	local -r name="kubelet"
-	local exec_command="$1 "
-	exec_command+=$(compute-kubelet-params)
+	local -r kubelet_bin="$1"
+	local -r kubelet_env_file="/etc/default/kubelet"
+	local -r flags=$(compute-kubelet-params)
+	echo "KUBELET_OPTS=\"${flags}\"" > "${kubelet_env_file}"
 
-	cat >>"/etc/supervisor/conf.d/${name}.conf" <<EOF
-[program:${name}]
-command=${exec_command}
-stderr_logfile=/var/log/${name}.log
-stdout_logfile=/var/log/${name}.log
-autorestart=true
-startretries=1000000
+	# Write the systemd service file for kubelet.
+	cat <<EOF >/etc/systemd/system/kubelet.service
+[Unit]
+Description=Kubermark kubelet
+Requires=network-online.target
+After=network-online.target
+
+[Service]
+Restart=always
+RestartSec=10
+EnvironmentFile=${kubelet_env_file}
+ExecStart=${kubelet_bin} \$KUBELET_OPTS
+
+[Install]
+WantedBy=multi-user.target
 EOF
 }
 
-# This function assembles the kubelet supervisord config file and starts it using
-# supervisorctl, on the kubemark master.
+# This function assembles the kubelet systemd service file and starts it using
+# systemctl, on the kubemark master.
 function start-kubelet {
-	# Kill any pre-existing kubelet process(es).
-	pkill kubelet
-	# Replace the builtin kubelet (if any) with the correct binary.
-	local -r builtin_kubelet="$(which kubelet)"
-	if [[ -n "${builtin_kubelet}" ]]; then
-		cp "${KUBE_BINDIR}/kubelet" "$(dirname "$builtin_kubelet")"
-	fi
+	# Create systemd config.
+	local -r kubelet_bin="/usr/bin/kubelet"
+	create-kubelet-conf "${kubelet_bin}"
 
-	# Create supervisord config for kubelet.
-	create-kubelet-conf "${KUBE_BINDIR}/kubelet"
+	# Flush iptables nat table
+  	iptables -t nat -F || true
 
-	# Update supervisord to make it run kubelet.
-	supervisorctl reread
-	supervisorctl update
+	# Start the kubelet service.
+	systemctl start kubelet.service
 }
 
 # Create the log file and set its properties.
@@ -248,12 +269,12 @@ function compute-kube-apiserver-params {
 	params+=" --insecure-bind-address=0.0.0.0"
 	params+=" --etcd-servers=http://127.0.0.1:2379"
 	params+=" --etcd-servers-overrides=/events#${EVENT_STORE_URL}"
-	params+=" --tls-cert-file=/srv/kubernetes/server.cert"
-	params+=" --tls-private-key-file=/srv/kubernetes/server.key"
-	params+=" --client-ca-file=/srv/kubernetes/ca.crt"
-	params+=" --token-auth-file=/srv/kubernetes/known_tokens.csv"
+	params+=" --tls-cert-file=/etc/srv/kubernetes/server.cert"
+	params+=" --tls-private-key-file=/etc/srv/kubernetes/server.key"
+	params+=" --client-ca-file=/etc/srv/kubernetes/ca.crt"
+	params+=" --token-auth-file=/etc/srv/kubernetes/known_tokens.csv"
 	params+=" --secure-port=443"
-	params+=" --basic-auth-file=/srv/kubernetes/basic_auth.csv"
+	params+=" --basic-auth-file=/etc/srv/kubernetes/basic_auth.csv"
 	params+=" --target-ram-mb=$((${NUM_NODES} * 60))"
 	params+=" --storage-backend=${STORAGE_BACKEND}"
 	params+=" --service-cluster-ip-range=${SERVICE_CLUSTER_IP_RANGE}"
@@ -265,8 +286,8 @@ function compute-kube-apiserver-params {
 function compute-kube-controller-manager-params {
 	local params="${CONTROLLER_MANAGER_TEST_ARGS:-}"
 	params+=" --master=127.0.0.1:8080"
-	params+=" --service-account-private-key-file=/srv/kubernetes/server.key"
-	params+=" --root-ca-file=/srv/kubernetes/ca.crt"
+	params+=" --service-account-private-key-file=/etc/srv/kubernetes/server.key"
+	params+=" --root-ca-file=/etc/srv/kubernetes/ca.crt"
 	params+=" --allocate-node-cidrs=${ALLOCATE_NODE_CIDRS}"
 	params+=" --cluster-cidr=${CLUSTER_IP_RANGE}"
 	params+=" --service-cluster-ip-range=${SERVICE_CLUSTER_IP_RANGE}"
@@ -326,7 +347,8 @@ cd "${KUBE_ROOT}"
 tar xzf kubernetes-server-linux-amd64.tar.gz
 source "${KUBE_ROOT}/kubemark-master-env.sh"
 
-# Setup required directory structure and etcd variables.
+# Setup IP firewall rules, required directory structure and etcd variables.
+config-ip-firewall
 create-dirs
 setup-kubelet-dir
 delete-default-etcd-configs

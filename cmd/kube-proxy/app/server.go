@@ -219,7 +219,19 @@ func NewProxyServerDefault(config *options.ProxyServerConfig) (*ProxyServer, err
 			// IPTablesMasqueradeBit must be specified or defaulted.
 			return nil, fmt.Errorf("Unable to read IPTablesMasqueradeBit from config")
 		}
-		proxierIPTables, err := iptables.NewProxier(iptInterface, utilsysctl.New(), execer, config.IPTablesSyncPeriod.Duration, config.IPTablesMinSyncPeriod.Duration, config.MasqueradeAll, int(*config.IPTablesMasqueradeBit), config.ClusterCIDR, hostname, getNodeIP(client, hostname))
+		proxierIPTables, err := iptables.NewProxier(
+			iptInterface,
+			utilsysctl.New(),
+			execer,
+			config.IPTablesSyncPeriod.Duration,
+			config.IPTablesMinSyncPeriod.Duration,
+			config.MasqueradeAll,
+			int(*config.IPTablesMasqueradeBit),
+			config.ClusterCIDR,
+			hostname,
+			getNodeIP(client, hostname),
+			recorder,
+		)
 		if err != nil {
 			glog.Fatalf("Unable to create proxier: %v", err)
 		}
@@ -292,7 +304,7 @@ func NewProxyServerDefault(config *options.ProxyServerConfig) (*ProxyServer, err
 		endpointsConfig.Channel("api"),
 	)
 
-	config.NodeRef = &api.ObjectReference{
+	config.NodeRef = &v1.ObjectReference{
 		Kind:      "Node",
 		Name:      hostname,
 		UID:       types.UID(hostname),

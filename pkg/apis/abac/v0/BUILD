@@ -19,6 +19,7 @@ go_library(
     deps = [
         "//pkg/apis/abac:go_default_library",
         "//pkg/apis/meta/v1:go_default_library",
+        "//pkg/auth/user:go_default_library",
         "//pkg/conversion:go_default_library",
         "//pkg/runtime:go_default_library",
         "//pkg/runtime/schema:go_default_library",
@@ -32,5 +33,6 @@ go_test(
     deps = [
         "//pkg/apis/abac:go_default_library",
         "//pkg/apis/abac/v0:go_default_library",
+        "//pkg/auth/user:go_default_library",
     ],
 )

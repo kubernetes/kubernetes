@@ -97,6 +97,7 @@ kube::build::get_docker_wrapped_binaries() {
           kube-apiserver,busybox
           kube-controller-manager,busybox
           kube-scheduler,busybox
+          kubernetes-discovery,busybox
           kube-proxy,gcr.io/google_containers/debian-iptables-amd64:v4
         );;
     "arm")
@@ -104,6 +105,7 @@ kube::build::get_docker_wrapped_binaries() {
           kube-apiserver,armel/busybox
           kube-controller-manager,armel/busybox
           kube-scheduler,armel/busybox
+          kubernetes-discovery,armel/busybox
           kube-proxy,gcr.io/google_containers/debian-iptables-arm:v4
         );;
     "arm64")
@@ -111,6 +113,7 @@ kube::build::get_docker_wrapped_binaries() {
           kube-apiserver,aarch64/busybox
           kube-controller-manager,aarch64/busybox
           kube-scheduler,aarch64/busybox
+          kubernetes-discovery,aarch64/busybox
           kube-proxy,gcr.io/google_containers/debian-iptables-arm64:v4
         );;
     "ppc64le")
@@ -118,6 +121,7 @@ kube::build::get_docker_wrapped_binaries() {
           kube-apiserver,ppc64le/busybox
           kube-controller-manager,ppc64le/busybox
           kube-scheduler,ppc64le/busybox
+          kubernetes-discovery,ppc64le/busybox
           kube-proxy,gcr.io/google_containers/debian-iptables-ppc64le:v4
         );;
     "s390x")
@@ -125,6 +129,7 @@ kube::build::get_docker_wrapped_binaries() {
           kube-apiserver,s390x/busybox
           kube-controller-manager,s390x/busybox
           kube-scheduler,s390x/busybox
+          kubernetes-discovery,s390x/busybox
           kube-proxy,gcr.io/google_containers/debian-iptables-s390x:v4
         );;		
   esac

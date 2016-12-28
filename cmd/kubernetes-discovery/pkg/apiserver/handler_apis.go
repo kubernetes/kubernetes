@@ -23,7 +23,8 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	apierrors "k8s.io/kubernetes/pkg/api/errors"
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/apiserver"
+	"k8s.io/kubernetes/pkg/apiserver/handlers/responsewriters"
+	v1listers "k8s.io/kubernetes/pkg/client/listers/core/v1"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 
@@ -34,10 +35,12 @@ import (
 )
 
 // WithAPIs adds the handling for /apis and /apis/<group: -apiregistration.k8s.io>.
-func WithAPIs(handler http.Handler, informer informers.APIServiceInformer) http.Handler {
+func WithAPIs(handler http.Handler, informer informers.APIServiceInformer, serviceLister v1listers.ServiceLister, endpointsLister v1listers.EndpointsLister) http.Handler {
 	apisHandler := &apisHandler{
-		lister:   informer.Lister(),
-		delegate: handler,
+		lister:          informer.Lister(),
+		delegate:        handler,
+		serviceLister:   serviceLister,
+		endpointsLister: endpointsLister,
 	}
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		apisHandler.ServeHTTP(w, req)
@@ -48,6 +51,9 @@ func WithAPIs(handler http.Handler, informer informers.APIServiceInformer) http.
 // This is registered as a filter so that it never collides with any explictly registered endpoints
 type apisHandler struct {
 	lister listers.APIServiceLister
+
+	serviceLister   v1listers.ServiceLister
+	endpointsLister v1listers.EndpointsLister
 
 	delegate http.Handler
 }
@@ -95,7 +101,10 @@ func (r *apisHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		if len(apiGroupServers[0].Spec.Group) == 0 {
 			continue
 		}
-		discoveryGroupList.Groups = append(discoveryGroupList.Groups, *newDiscoveryAPIGroup(apiGroupServers))
+		discoveryGroup := convertToDiscoveryAPIGroup(apiGroupServers, r.serviceLister, r.endpointsLister)
+		if discoveryGroup != nil {
+			discoveryGroupList.Groups = append(discoveryGroupList.Groups, *discoveryGroup)
+		}
 	}
 
 	json, err := runtime.Encode(api.Codecs.LegacyCodec(), discoveryGroupList)
@@ -108,18 +117,46 @@ func (r *apisHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	}
 }
 
-func newDiscoveryAPIGroup(apiServices []*apiregistrationapi.APIService) *metav1.APIGroup {
+// convertToDiscoveryAPIGroup takes apiservices in a single group and returns a discovery compatible object.
+// if none of the services are available, it will return nil.
+func convertToDiscoveryAPIGroup(apiServices []*apiregistrationapi.APIService, serviceLister v1listers.ServiceLister, endpointsLister v1listers.EndpointsLister) *metav1.APIGroup {
 	apiServicesByGroup := apiregistrationapi.SortedByGroup(apiServices)[0]
 
-	discoveryGroup := &metav1.APIGroup{
-		Name: apiServicesByGroup[0].Spec.Group,
-		PreferredVersion: metav1.GroupVersionForDiscovery{
-			GroupVersion: apiServicesByGroup[0].Spec.Group + "/" + apiServicesByGroup[0].Spec.Version,
-			Version:      apiServicesByGroup[0].Spec.Version,
-		},
-	}
+	var discoveryGroup *metav1.APIGroup
 
 	for _, apiService := range apiServicesByGroup {
+		// skip any API services without actual services
+		if _, err := serviceLister.Services(apiService.Spec.Service.Namespace).Get(apiService.Spec.Service.Name); err != nil {
+			continue
+		}
+
+		hasActiveEndpoints := false
+		endpoints, err := endpointsLister.Endpoints(apiService.Spec.Service.Namespace).Get(apiService.Spec.Service.Name)
+		// skip any API services without endpoints
+		if err != nil {
+			continue
+		}
+		for _, subset := range endpoints.Subsets {
+			if len(subset.Addresses) > 0 {
+				hasActiveEndpoints = true
+				break
+			}
+		}
+		if !hasActiveEndpoints {
+			continue
+		}
+
+		// the first APIService which is valid becomes the default
+		if discoveryGroup == nil {
+			discoveryGroup = &metav1.APIGroup{
+				Name: apiService.Spec.Group,
+				PreferredVersion: metav1.GroupVersionForDiscovery{
+					GroupVersion: apiService.Spec.Group + "/" + apiService.Spec.Version,
+					Version:      apiService.Spec.Version,
+				},
+			}
+		}
+
 		discoveryGroup.Versions = append(discoveryGroup.Versions,
 			metav1.GroupVersionForDiscovery{
 				GroupVersion: apiService.Spec.Group + "/" + apiService.Spec.Version,
@@ -136,6 +173,9 @@ type apiGroupHandler struct {
 	groupName string
 
 	lister listers.APIServiceLister
+
+	serviceLister   v1listers.ServiceLister
+	endpointsLister v1listers.EndpointsLister
 }
 
 func (r *apiGroupHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
@@ -147,7 +187,7 @@ func (r *apiGroupHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 	apiServices, err := r.lister.List(labels.Everything())
 	if statusErr, ok := err.(*apierrors.StatusError); ok && err != nil {
-		apiserver.WriteRawJSON(int(statusErr.Status().Code), statusErr.Status(), w)
+		responsewriters.WriteRawJSON(int(statusErr.Status().Code), statusErr.Status(), w)
 		return
 	}
 	if err != nil {
@@ -167,7 +207,12 @@ func (r *apiGroupHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	json, err := runtime.Encode(api.Codecs.LegacyCodec(), newDiscoveryAPIGroup(apiServicesForGroup))
+	discoveryGroup := convertToDiscoveryAPIGroup(apiServicesForGroup, r.serviceLister, r.endpointsLister)
+	if discoveryGroup == nil {
+		http.Error(w, "", http.StatusNotFound)
+		return
+	}
+	json, err := runtime.Encode(api.Codecs.LegacyCodec(), discoveryGroup)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

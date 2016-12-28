@@ -24,7 +24,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	apierrors "k8s.io/kubernetes/pkg/api/errors"
-	"k8s.io/kubernetes/pkg/apiserver/request"
+	apiserverrequest "k8s.io/kubernetes/pkg/apiserver/request"
 	"k8s.io/kubernetes/pkg/httplog"
 	"k8s.io/kubernetes/pkg/util/runtime"
 )
@@ -39,12 +39,12 @@ func WithPanicRecovery(handler http.Handler, requestContextMapper api.RequestCon
 
 		logger := httplog.NewLogged(req, &w)
 
-		var requestInfo *request.RequestInfo
+		var requestInfo *apiserverrequest.RequestInfo
 		ctx, ok := requestContextMapper.Get(req)
 		if !ok {
 			glog.Errorf("no context found for request, handler chain must be wrong")
 		} else {
-			requestInfo, ok = request.RequestInfoFrom(ctx)
+			requestInfo, ok = apiserverrequest.RequestInfoFrom(ctx)
 			if !ok {
 				glog.Errorf("no RequestInfo found in context, handler chain must be wrong")
 			}

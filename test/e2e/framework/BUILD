@@ -10,6 +10,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = [
+        "authorizer_util.go",
         "cleanup.go",
         "exec_util.go",
         "federation_util.go",
@@ -38,6 +39,7 @@ go_library(
         "//pkg/api/validation:go_default_library",
         "//pkg/apimachinery/registered:go_default_library",
         "//pkg/apis/apps/v1beta1:go_default_library",
+        "//pkg/apis/authorization/v1beta1:go_default_library",
         "//pkg/apis/batch:go_default_library",
         "//pkg/apis/batch/v1:go_default_library",
         "//pkg/apis/componentconfig:go_default_library",
@@ -46,6 +48,7 @@ go_library(
         "//pkg/apis/meta/v1:go_default_library",
         "//pkg/apis/meta/v1/unstructured:go_default_library",
         "//pkg/client/clientset_generated/clientset:go_default_library",
+        "//pkg/client/clientset_generated/clientset/typed/authorization/v1beta1:go_default_library",
         "//pkg/client/clientset_generated/clientset/typed/core/v1:go_default_library",
         "//pkg/client/clientset_generated/internalclientset:go_default_library",
         "//pkg/client/conditions:go_default_library",

@@ -24,10 +24,64 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/testing/core"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
 )
+
+func TestListVolumesForPod(t *testing.T) {
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	kubelet := testKubelet.kubelet
+
+	pod := podWithUidNameNsSpec("12345678", "foo", "test", v1.PodSpec{
+		Volumes: []v1.Volume{
+			{
+				Name: "vol1",
+				VolumeSource: v1.VolumeSource{
+					GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{
+						PDName: "fake-device1",
+					},
+				},
+			},
+			{
+				Name: "vol2",
+				VolumeSource: v1.VolumeSource{
+					GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{
+						PDName: "fake-device2",
+					},
+				},
+			},
+		},
+	})
+
+	stopCh := runVolumeManager(kubelet)
+	defer func() {
+		close(stopCh)
+	}()
+
+	kubelet.podManager.SetPods([]*v1.Pod{pod})
+	err := kubelet.volumeManager.WaitForAttachAndMount(pod)
+	assert.NoError(t, err)
+
+	podName := volumehelper.GetUniquePodName(pod)
+
+	volumesToReturn, volumeExsit := kubelet.ListVolumesForPod(types.UID(podName))
+	if !volumeExsit {
+		t.Errorf("Expected to find volumes for pod %q, but ListVolumesForPod find no volume", podName)
+	}
+
+	outerVolumeSpecName1 := "vol1"
+	if volumesToReturn[outerVolumeSpecName1] == nil {
+		t.Errorf("Value of map volumesToReturn is not expected to be nil, which key is : %s", outerVolumeSpecName1)
+	}
+
+	outerVolumeSpecName2 := "vol2"
+	if volumesToReturn[outerVolumeSpecName2] == nil {
+		t.Errorf("Value of map volumesToReturn is not expected to be nil, which key is : %s", outerVolumeSpecName2)
+	}
+
+}
 
 func TestPodVolumesExist(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)

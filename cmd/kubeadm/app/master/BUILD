@@ -60,6 +60,7 @@ go_test(
     tags = ["automanaged"],
     deps = [
         "//cmd/kubeadm/app/apis/kubeadm:go_default_library",
+        "//cmd/kubeadm/app/util:go_default_library",
         "//pkg/api/v1:go_default_library",
         "//pkg/util/cert:go_default_library",
         "//pkg/util/intstr:go_default_library",

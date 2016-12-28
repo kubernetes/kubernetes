@@ -149,9 +149,11 @@ func (ds *dockerService) CreateContainer(podSandboxID string, config *runtimeapi
 	// Apply cgroupsParent derived from the sandbox config.
 	if lc := sandboxConfig.GetLinux(); lc != nil {
 		// Apply Cgroup options.
-		// TODO: Check if this works with per-pod cgroups.
-		// TODO: we need to pass the cgroup in syntax expected by cgroup driver but shim does not use docker info yet...
-		hc.CgroupParent = lc.GetCgroupParent()
+		cgroupParent, err := ds.GenerateExpectedCgroupParent(lc.GetCgroupParent())
+		if err != nil {
+			return "", fmt.Errorf("failed to generate cgroup parent in expected syntax for container %q: %v", config.Metadata.GetName(), err)
+		}
+		hc.CgroupParent = cgroupParent
 	}
 
 	// Set devices for container.

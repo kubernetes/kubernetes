@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	"k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
@@ -44,7 +45,7 @@ type ProxyServerConfig struct {
 	KubeAPIBurst      int32
 	ConfigSyncPeriod  time.Duration
 	CleanupAndExit    bool
-	NodeRef           *api.ObjectReference
+	NodeRef           *v1.ObjectReference
 	Master            string
 	Kubeconfig        string
 }

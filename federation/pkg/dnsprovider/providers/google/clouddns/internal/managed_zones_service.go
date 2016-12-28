@@ -24,7 +24,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/uuid"
 )
 
-// Compile time check for interface adeherence
+// Compile time check for interface adherence
 var _ interfaces.ManagedZonesService = &ManagedZonesService{}
 
 type ManagedZonesService struct{ impl *dns.ManagedZonesService }

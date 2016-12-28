@@ -31,6 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/runtime"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
+	"k8s.io/kubernetes/pkg/util/i18n"
 	"k8s.io/kubernetes/pkg/util/interrupt"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/watch"
@@ -213,7 +214,7 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 			return err
 		}
 		if len(infos) != 1 {
-			return fmt.Errorf("watch is only supported on individual resources and resource collections - %d resources were found", len(infos))
+			return i18n.Errorf("watch is only supported on individual resources and resource collections - %d resources were found", len(infos))
 		}
 		info := infos[0]
 		mapping := info.ResourceMapping()
@@ -458,8 +459,11 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 			lastMapping = mapping
 		}
 
+		// try to convert before apply filter func
+		decodedObj, _ := kubectl.DecodeUnknownObject(original)
+
 		// filter objects if filter has been defined for current object
-		if isFiltered, err := filterFuncs.Filter(original, filterOpts); isFiltered {
+		if isFiltered, err := filterFuncs.Filter(decodedObj, filterOpts); isFiltered {
 			if err == nil {
 				filteredResourceCount++
 				continue
@@ -489,7 +493,7 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 				resourcePrinter.EnsurePrintWithKind(resourceName)
 			}
 
-			if err := printer.PrintObj(original, w); err != nil {
+			if err := printer.PrintObj(decodedObj, w); err != nil {
 				if !errs.Has(err.Error()) {
 					errs.Insert(err.Error())
 					allErrs = append(allErrs, err)
@@ -497,7 +501,7 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 			}
 			continue
 		}
-		if err := printer.PrintObj(original, w); err != nil {
+		if err := printer.PrintObj(decodedObj, w); err != nil {
 			if !errs.Has(err.Error()) {
 				errs.Insert(err.Error())
 				allErrs = append(allErrs, err)

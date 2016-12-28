@@ -145,16 +145,16 @@ done
 password=$(python -c 'import string,random; print("".join(random.SystemRandom().choice(string.ascii_letters + string.digits) for _ in range(16)))')
 
 gcloud compute ssh --zone="${ZONE}" --project="${PROJECT}" "${MASTER_NAME}" \
-  --command="sudo mkdir /home/kubernetes -p && sudo mkdir /srv/kubernetes -p && \
-    sudo bash -c \"echo ${MASTER_CERT_BASE64} | base64 --decode > /srv/kubernetes/server.cert\" && \
-    sudo bash -c \"echo ${MASTER_KEY_BASE64} | base64 --decode > /srv/kubernetes/server.key\" && \
-    sudo bash -c \"echo ${CA_CERT_BASE64} | base64 --decode > /srv/kubernetes/ca.crt\" && \
-    sudo bash -c \"echo ${KUBECFG_CERT_BASE64} | base64 --decode > /srv/kubernetes/kubecfg.crt\" && \
-    sudo bash -c \"echo ${KUBECFG_KEY_BASE64} | base64 --decode > /srv/kubernetes/kubecfg.key\" && \
-    sudo bash -c \"echo \"${KUBE_BEARER_TOKEN},admin,admin\" > /srv/kubernetes/known_tokens.csv\" && \
-    sudo bash -c \"echo \"${KUBELET_TOKEN},kubelet,kubelet\" >> /srv/kubernetes/known_tokens.csv\" && \
-    sudo bash -c \"echo \"${KUBE_PROXY_TOKEN},kube_proxy,kube_proxy\" >> /srv/kubernetes/known_tokens.csv\" && \
-    sudo bash -c \"echo ${password},admin,admin > /srv/kubernetes/basic_auth.csv\""
+  --command="sudo mkdir /home/kubernetes -p && sudo mkdir /etc/srv/kubernetes -p && \
+    sudo bash -c \"echo ${MASTER_CERT_BASE64} | base64 --decode > /etc/srv/kubernetes/server.cert\" && \
+    sudo bash -c \"echo ${MASTER_KEY_BASE64} | base64 --decode > /etc/srv/kubernetes/server.key\" && \
+    sudo bash -c \"echo ${CA_CERT_BASE64} | base64 --decode > /etc/srv/kubernetes/ca.crt\" && \
+    sudo bash -c \"echo ${KUBECFG_CERT_BASE64} | base64 --decode > /etc/srv/kubernetes/kubecfg.crt\" && \
+    sudo bash -c \"echo ${KUBECFG_KEY_BASE64} | base64 --decode > /etc/srv/kubernetes/kubecfg.key\" && \
+    sudo bash -c \"echo \"${KUBE_BEARER_TOKEN},admin,admin\" > /etc/srv/kubernetes/known_tokens.csv\" && \
+    sudo bash -c \"echo \"${KUBELET_TOKEN},kubelet,kubelet\" >> /etc/srv/kubernetes/known_tokens.csv\" && \
+    sudo bash -c \"echo \"${KUBE_PROXY_TOKEN},kube_proxy,kube_proxy\" >> /etc/srv/kubernetes/known_tokens.csv\" && \
+    sudo bash -c \"echo ${password},admin,admin > /etc/srv/kubernetes/basic_auth.csv\""
 
 
 gcloud compute copy-files --zone="${ZONE}" --project="${PROJECT}" \
@@ -167,12 +167,12 @@ gcloud compute copy-files --zone="${ZONE}" --project="${PROJECT}" \
   "${RESOURCE_DIRECTORY}/manifests/kube-apiserver.yaml" \
   "${RESOURCE_DIRECTORY}/manifests/kube-scheduler.yaml" \
   "${RESOURCE_DIRECTORY}/manifests/kube-controller-manager.yaml" \
-  "root@${MASTER_NAME}":/home/kubernetes/
+  "kubernetes@${MASTER_NAME}":/home/kubernetes/
 
 gcloud compute ssh "${MASTER_NAME}" --zone="${ZONE}" --project="${PROJECT}" \
   --command="sudo chmod a+x /home/kubernetes/configure-kubectl.sh && \
     sudo chmod a+x /home/kubernetes/start-kubemark-master.sh && \
-    sudo /home/kubernetes/start-kubemark-master.sh"
+    sudo bash /home/kubernetes/start-kubemark-master.sh"
 
 # create kubeconfig for Kubelet:
 KUBECONFIG_CONTENTS=$(echo "apiVersion: v1
@@ -264,6 +264,7 @@ sed -i'' -e "s/{{EVENTER_MEM}}/${eventer_mem}/g" "${RESOURCE_DIRECTORY}/addons/h
 "${KUBECTL}" create -f "${KUBECONFIG_SECRET}" --namespace="kubemark"
 "${KUBECTL}" create -f "${NODE_CONFIGMAP}" --namespace="kubemark"
 "${KUBECTL}" create -f "${RESOURCE_DIRECTORY}/addons" --namespace="kubemark"
+"${KUBECTL}" create configmap node-problem-detector-config --from-file="${RESOURCE_DIRECTORY}/kernel-monitor.json" --namespace="kubemark"
 "${KUBECTL}" create -f "${RESOURCE_DIRECTORY}/hollow-node.json" --namespace="kubemark"
 
 rm "${KUBECONFIG_SECRET}"

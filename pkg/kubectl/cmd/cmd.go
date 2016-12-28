@@ -27,6 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/util/flag"
+	"k8s.io/kubernetes/pkg/util/i18n"
 
 	"github.com/golang/glog"
 	"github.com/spf13/cobra"
@@ -190,6 +191,7 @@ __custom_func() {
     * persistentvolumeclaims (aka 'pvc')
     * persistentvolumes (aka 'pv')
     * pods (aka 'po')
+    * poddisruptionbudgets (aka 'pdb')
     * podsecuritypolicies (aka 'psp')
     * podtemplates
     * replicasets (aka 'rs')
@@ -222,6 +224,13 @@ func NewKubectlCommand(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cob
 
 	f.BindFlags(cmds.PersistentFlags())
 	f.BindExternalFlags(cmds.PersistentFlags())
+
+	// Sending in 'nil' for the getLanguageFn() results in using
+	// the LANG environment variable.
+	//
+	// TODO: Consider adding a flag or file preference for setting
+	// the language, instead of just loading from the LANG env. variable.
+	i18n.LoadTranslations("kubectl", nil)
 
 	// From this point and forward we get warnings on flags that contain "_" separators
 	cmds.SetGlobalNormalizationFunc(flag.WarnWordSepNormalizeFunc)

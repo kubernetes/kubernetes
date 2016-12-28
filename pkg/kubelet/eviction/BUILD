@@ -31,6 +31,7 @@ go_library(
         "//pkg/kubelet/pod:go_default_library",
         "//pkg/kubelet/qos:go_default_library",
         "//pkg/kubelet/server/stats:go_default_library",
+        "//pkg/kubelet/types:go_default_library",
         "//pkg/kubelet/util/format:go_default_library",
         "//pkg/quota/evaluator/core:go_default_library",
         "//pkg/util/clock:go_default_library",

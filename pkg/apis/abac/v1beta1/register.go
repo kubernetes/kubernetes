@@ -33,10 +33,14 @@ func init() {
 		// Programmer error.
 		panic(err)
 	}
+	if err := addConversionFuncs(api.Scheme); err != nil {
+		// Programmer error.
+		panic(err)
+	}
 }
 
 var (
-	SchemeBuilder = runtime.NewSchemeBuilder(addKnownTypes)
+	SchemeBuilder = runtime.NewSchemeBuilder(addKnownTypes, addConversionFuncs)
 	AddToScheme   = SchemeBuilder.AddToScheme
 )
 

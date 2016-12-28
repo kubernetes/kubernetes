@@ -21,7 +21,7 @@ import (
 
 	"github.com/emicklei/go-restful"
 
-	"k8s.io/kubernetes/pkg/apiserver"
+	"k8s.io/kubernetes/pkg/apiserver/handlers/responsewriters"
 	"k8s.io/kubernetes/pkg/genericapiserver/mux"
 	"k8s.io/kubernetes/pkg/version"
 )
@@ -54,5 +54,5 @@ func (v Version) Install(c *mux.APIContainer) {
 
 // handleVersion writes the server's version information.
 func (v Version) handleVersion(req *restful.Request, resp *restful.Response) {
-	apiserver.WriteRawJSON(http.StatusOK, *v.Version, resp.ResponseWriter)
+	responsewriters.WriteRawJSON(http.StatusOK, *v.Version, resp.ResponseWriter)
 }

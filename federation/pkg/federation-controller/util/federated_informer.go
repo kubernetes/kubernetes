@@ -79,7 +79,7 @@ type FederationView interface {
 	// GetUnreadyClusters returns a list of all clusters that are not ready yet.
 	GetUnreadyClusters() ([]*federationapi.Cluster, error)
 
-	// GetReadyClusers returns all clusters for which the sub-informers are run.
+	// GetReadyClusters returns all clusters for which the sub-informers are run.
 	GetReadyClusters() ([]*federationapi.Cluster, error)
 
 	// GetReadyCluster returns the cluster with the given name, if found.
@@ -337,7 +337,7 @@ func (f *federatedInformerImpl) GetUnreadyClusters() ([]*federationapi.Cluster, 
 	return result, nil
 }
 
-// GetReadyClusers returns all clusters for which the sub-informers are run.
+// GetReadyClusters returns all clusters for which the sub-informers are run.
 func (f *federatedInformerImpl) GetReadyClusters() ([]*federationapi.Cluster, error) {
 	f.Lock()
 	defer f.Unlock()

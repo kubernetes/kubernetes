@@ -33,6 +33,7 @@ go_library(
         "//pkg/controller/deployment/util:go_default_library",
         "//pkg/controller/informers:go_default_library",
         "//pkg/labels:go_default_library",
+        "//pkg/runtime/schema:go_default_library",
         "//pkg/util/errors:go_default_library",
         "//pkg/util/integer:go_default_library",
         "//pkg/util/labels:go_default_library",

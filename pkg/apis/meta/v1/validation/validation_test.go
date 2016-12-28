@@ -47,14 +47,19 @@ func TestValidateLabels(t *testing.T) {
 		}
 	}
 
+	namePartErrMsg := "name part must consist of"
+	nameErrMsg := "a qualified name must consist of"
+	labelErrMsg := "a valid label must be an empty string or consist of"
+	maxLengthErrMsg := "must be no more than"
+
 	labelNameErrorCases := []struct {
 		labels map[string]string
 		expect string
 	}{
-		{map[string]string{"nospecialchars^=@": "bar"}, "must match the regex"},
-		{map[string]string{"cantendwithadash-": "bar"}, "must match the regex"},
-		{map[string]string{"only/one/slash": "bar"}, "must match the regex"},
-		{map[string]string{strings.Repeat("a", 254): "bar"}, "must be no more than"},
+		{map[string]string{"nospecialchars^=@": "bar"}, namePartErrMsg},
+		{map[string]string{"cantendwithadash-": "bar"}, namePartErrMsg},
+		{map[string]string{"only/one/slash": "bar"}, nameErrMsg},
+		{map[string]string{strings.Repeat("a", 254): "bar"}, maxLengthErrMsg},
 	}
 	for i := range labelNameErrorCases {
 		errs := ValidateLabels(labelNameErrorCases[i].labels, field.NewPath("field"))
@@ -71,10 +76,10 @@ func TestValidateLabels(t *testing.T) {
 		labels map[string]string
 		expect string
 	}{
-		{map[string]string{"toolongvalue": strings.Repeat("a", 64)}, "must be no more than"},
-		{map[string]string{"backslashesinvalue": "some\\bad\\value"}, "must match the regex"},
-		{map[string]string{"nocommasallowed": "bad,value"}, "must match the regex"},
-		{map[string]string{"strangecharsinvalue": "?#$notsogood"}, "must match the regex"},
+		{map[string]string{"toolongvalue": strings.Repeat("a", 64)}, maxLengthErrMsg},
+		{map[string]string{"backslashesinvalue": "some\\bad\\value"}, labelErrMsg},
+		{map[string]string{"nocommasallowed": "bad,value"}, labelErrMsg},
+		{map[string]string{"strangecharsinvalue": "?#$notsogood"}, labelErrMsg},
 	}
 	for i := range labelValueErrorCases {
 		errs := ValidateLabels(labelValueErrorCases[i].labels, field.NewPath("field"))

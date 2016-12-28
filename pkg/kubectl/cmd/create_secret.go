@@ -83,7 +83,7 @@ func NewCmdCreateSecretGeneric(f cmdutil.Factory, cmdOut io.Writer) *cobra.Comma
 	cmdutil.AddPrinterFlags(cmd)
 	cmdutil.AddGeneratorFlags(cmd, cmdutil.SecretV1GeneratorName)
 	cmd.Flags().StringSlice("from-file", []string{}, "Key files can be specified using their file path, in which case a default name will be given to them, or optionally with a name and file path, in which case the given name will be used.  Specifying a directory will iterate each named file in the directory that is a valid secret key.")
-	cmd.Flags().StringSlice("from-literal", []string{}, "Specify a key and literal value to insert in secret (i.e. mykey=somevalue)")
+	cmd.Flags().StringArray("from-literal", []string{}, "Specify a key and literal value to insert in secret (i.e. mykey=somevalue)")
 	cmd.Flags().String("type", "", "The type of secret to create")
 	return cmd
 }
@@ -101,7 +101,7 @@ func CreateSecretGeneric(f cmdutil.Factory, cmdOut io.Writer, cmd *cobra.Command
 			Name:           name,
 			Type:           cmdutil.GetFlagString(cmd, "type"),
 			FileSources:    cmdutil.GetFlagStringSlice(cmd, "from-file"),
-			LiteralSources: cmdutil.GetFlagStringSlice(cmd, "from-literal"),
+			LiteralSources: cmdutil.GetFlagStringArray(cmd, "from-literal"),
 		}
 	default:
 		return cmdutil.UsageError(cmd, fmt.Sprintf("Generator: %s not supported.", generatorName))

@@ -60,8 +60,8 @@ spec:
             memory: 70Mi
         livenessProbe:
           httpGet:
-            path: /healthz-kubedns
-            port: 8080
+            path: /healthcheck/kubedns
+            port: 10054
             scheme: HTTP
           initialDelaySeconds: 60
           timeoutSeconds: 5
@@ -98,8 +98,8 @@ spec:
         image: gcr.io/google_containers/kube-dnsmasq-amd64:1.4
         livenessProbe:
           httpGet:
-            path: /healthz-dnsmasq
-            port: 8080
+            path: /healthcheck/dnsmasq
+            port: 10054
             scheme: HTTP
           initialDelaySeconds: 60
           timeoutSeconds: 5
@@ -122,8 +122,8 @@ spec:
           requests:
             cpu: 150m
             memory: 10Mi
-      - name: dnsmasq-metrics
-        image: gcr.io/google_containers/dnsmasq-metrics-amd64:1.0
+      - name: sidecar
+        image: gcr.io/google_containers/k8s-dns-sidecar-amd64:1.10.0
         livenessProbe:
           httpGet:
             path: /metrics
@@ -136,33 +136,14 @@ spec:
         args:
         - --v=2
         - --logtostderr
+        - --probe=kubedns,127.0.0.1:10053,kubernetes.default.svc.$DNS_DOMAIN,5,A
+        - --probe=dnsmasq,127.0.0.1:53,kubernetes.default.svc.$DNS_DOMAIN,5,A
         ports:
         - containerPort: 10054
           name: metrics
           protocol: TCP
         resources:
           requests:
-            memory: 10Mi
-      - name: healthz
-        image: gcr.io/google_containers/exechealthz-amd64:1.2
-        resources:
-          limits:
-            memory: 50Mi
-          requests:
+            memory: 20Mi
             cpu: 10m
-            # Note that this container shouldn't really need 50Mi of memory. The
-            # limits are set higher than expected pending investigation on #29688.
-            # The extra memory was stolen from the kubedns container to keep the
-            # net memory requested by the pod constant.
-            memory: 50Mi
-        args:
-        - --cmd=nslookup kubernetes.default.svc.$DNS_DOMAIN 127.0.0.1 >/dev/null
-        - --url=/healthz-dnsmasq
-        - --cmd=nslookup kubernetes.default.svc.$DNS_DOMAIN 127.0.0.1:10053 >/dev/null
-        - --url=/healthz-kubedns
-        - --port=8080
-        - --quiet
-        ports:
-        - containerPort: 8080
-          protocol: TCP
       dnsPolicy: Default  # Don't use cluster DNS.

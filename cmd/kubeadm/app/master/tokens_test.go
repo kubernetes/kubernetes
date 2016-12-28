@@ -20,6 +20,7 @@ import (
 	"testing"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 )
 
 func TestValidTokenPopulatesSecrets(t *testing.T) {
@@ -31,30 +32,30 @@ func TestValidTokenPopulatesSecrets(t *testing.T) {
 			Secret: expectedSecret,
 		}
 
-		err := generateTokenIfNeeded(s)
+		err := kubeadmutil.GenerateTokenIfNeeded(s)
 		if err != nil {
-			t.Errorf("generateTokenIfNeeded gave an error for a valid token: %v", err)
+			t.Errorf("GenerateTokenIfNeeded gave an error for a valid token: %v", err)
 		}
 		if s.ID != expectedID {
-			t.Errorf("generateTokenIfNeeded did not populate the TokenID correctly; expected [%s] but got [%s]", expectedID, s.ID)
+			t.Errorf("GenerateTokenIfNeeded did not populate the TokenID correctly; expected [%s] but got [%s]", expectedID, s.ID)
 		}
 		if s.Secret != expectedSecret {
-			t.Errorf("generateTokenIfNeeded did not populate the Token correctly; expected %v but got %v", expectedSecret, s.Secret)
+			t.Errorf("GenerateTokenIfNeeded did not populate the Token correctly; expected %v but got %v", expectedSecret, s.Secret)
 		}
 	})
 
 	t.Run("not provided", func(t *testing.T) {
 		s := &kubeadmapi.TokenDiscovery{}
 
-		err := generateTokenIfNeeded(s)
+		err := kubeadmutil.GenerateTokenIfNeeded(s)
 		if err != nil {
-			t.Errorf("generateTokenIfNeeded gave an error for a valid token: %v", err)
+			t.Errorf("GenerateTokenIfNeeded gave an error for a valid token: %v", err)
 		}
 		if s.ID == "" {
-			t.Errorf("generateTokenIfNeeded did not populate the TokenID correctly; expected ID to be non-empty")
+			t.Errorf("GenerateTokenIfNeeded did not populate the TokenID correctly; expected ID to be non-empty")
 		}
 		if s.Secret == "" {
-			t.Errorf("generateTokenIfNeeded did not populate the Token correctly; expected Secret to be non-empty")
+			t.Errorf("GenerateTokenIfNeeded did not populate the Token correctly; expected Secret to be non-empty")
 		}
 	})
 }

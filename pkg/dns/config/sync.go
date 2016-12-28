@@ -17,15 +17,16 @@ limitations under the License.
 package config
 
 import (
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/pkg/api/v1"
+	metav1 "k8s.io/client-go/pkg/apis/meta/v1"
+	"k8s.io/client-go/pkg/fields"
+	"k8s.io/client-go/pkg/runtime"
 	"k8s.io/client-go/pkg/util/wait"
-	"k8s.io/kubernetes/pkg/api/v1"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/client/cache"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	"k8s.io/client-go/pkg/watch"
+	"k8s.io/client-go/tools/cache"
+
 	fed "k8s.io/kubernetes/pkg/dns/federation"
-	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/watch"
 
 	"time"
 
@@ -47,7 +48,7 @@ type Sync interface {
 }
 
 // NewSync for ConfigMap from namespace `ns` and `name`.
-func NewSync(client clientset.Interface, ns string, name string) Sync {
+func NewSync(client kubernetes.Interface, ns string, name string) Sync {
 	sync := &kubeSync{
 		ns:      ns,
 		name:    name,
@@ -87,7 +88,7 @@ type kubeSync struct {
 	ns   string
 	name string
 
-	client     clientset.Interface
+	client     kubernetes.Interface
 	store      cache.Store
 	controller *cache.Controller
 

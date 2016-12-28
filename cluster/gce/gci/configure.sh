@@ -202,7 +202,6 @@ function install-kube-binary-config {
   rm -f "${KUBE_HOME}/${manifests_tar}.sha1"
 }
 
-
 ######### Main Function ##########
 echo "Start to install kubernetes files"
 set-broken-motd
@@ -211,3 +210,4 @@ download-kube-env
 source "${KUBE_HOME}/kube-env"
 install-kube-binary-config
 echo "Done for installing kubernetes files"
+

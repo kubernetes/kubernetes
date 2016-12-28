@@ -25,7 +25,6 @@ go_library(
         "//pkg/apis/storage/v1beta1/util:go_default_library",
         "//pkg/client/clientset_generated/clientset:go_default_library",
         "//pkg/labels:go_default_library",
-        "//pkg/registry/core/service/allocator:go_default_library",
         "//pkg/types:go_default_library",
         "//pkg/util/exec:go_default_library",
         "//pkg/util/mount:go_default_library",

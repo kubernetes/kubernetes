@@ -27,6 +27,8 @@ import (
 	"k8s.io/kubernetes/cmd/kubernetes-discovery/pkg/apiserver"
 	"k8s.io/kubernetes/cmd/kubernetes-discovery/pkg/legacy"
 	"k8s.io/kubernetes/pkg/api"
+	kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/genericapiserver"
 	"k8s.io/kubernetes/pkg/genericapiserver/filters"
 	genericoptions "k8s.io/kubernetes/pkg/genericapiserver/options"
@@ -135,9 +137,19 @@ func (o DiscoveryServerOptions) RunDiscoveryServer() error {
 		return err
 	}
 
+	kubeconfig, err := restclient.InClusterConfig()
+	if err != nil {
+		return err
+	}
+	coreAPIServerClient, err := kubeclientset.NewForConfig(kubeconfig)
+	if err != nil {
+		return err
+	}
+
 	config := apiserver.Config{
-		GenericConfig:     genericAPIServerConfig,
-		RESTOptionsGetter: &restOptionsFactory{storageConfig: &o.Etcd.StorageConfig},
+		GenericConfig:       genericAPIServerConfig,
+		RESTOptionsGetter:   &restOptionsFactory{storageConfig: &o.Etcd.StorageConfig},
+		CoreAPIServerClient: coreAPIServerClient,
 	}
 
 	config.ProxyClientCert, err = ioutil.ReadFile(o.ProxyClientCertFile)

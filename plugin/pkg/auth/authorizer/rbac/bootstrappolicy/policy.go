@@ -231,6 +231,14 @@ func ClusterRoles() []rbac.ClusterRole {
 			},
 		},
 		{
+			// a role to use for the API registry, summarization, and proxy handling
+			ObjectMeta: api.ObjectMeta{Name: "system:kubernetes-discovery"},
+			Rules: []rbac.PolicyRule{
+				// it needs to see all services so that it knows whether the ones it points to exist or not
+				rbac.NewRule(Read...).Groups(legacyGroup).Resources("services", "endpoints").RuleOrDie(),
+			},
+		},
+		{
 			// a role to use for bootstrapping the kube-controller-manager so it can create the shared informers
 			// service accounts, and secrets that we need to create separate identities for other controllers
 			ObjectMeta: api.ObjectMeta{Name: "system:kube-controller-manager"},

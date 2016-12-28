@@ -51,7 +51,7 @@ func RegisterDnsProvider(name string, cloud Factory) {
 // the name is not known.  The error return is only used if the named provider
 // was known but failed to initialize. The config parameter specifies the
 // io.Reader handler of the configuration file for the DNS provider, or nil
-// for no configuation.
+// for no configuration.
 func GetDnsProvider(name string, config io.Reader) (Interface, error) {
 	providersMutex.Lock()
 	defer providersMutex.Unlock()

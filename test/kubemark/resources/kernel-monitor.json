@@ -1,0 +1,9 @@
+{
+	"logPath": "/log/faillog",
+	"lookback": "10m",
+	"startPattern": "Initializing cgroup subsys cpuset",
+	"bufferSize": 10,
+	"source": "kernel-monitor",
+	"conditions": [],
+	"rules": []
+}

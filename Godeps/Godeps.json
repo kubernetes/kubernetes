@@ -288,6 +288,22 @@
 			"Rev": "dfb21201d9270c1082d5fb0f07f500311ff72f18"
 		},
 		{
+			"ImportPath": "github.com/chai2010/gettext-go/gettext",
+			"Rev": "c6fed771bfd517099caf0f7a961671fa8ed08723"
+		},
+		{
+			"ImportPath": "github.com/chai2010/gettext-go/gettext/mo",
+			"Rev": "c6fed771bfd517099caf0f7a961671fa8ed08723"
+		},
+		{
+			"ImportPath": "github.com/chai2010/gettext-go/gettext/plural",
+			"Rev": "c6fed771bfd517099caf0f7a961671fa8ed08723"
+		},
+		{
+			"ImportPath": "github.com/chai2010/gettext-go/gettext/po",
+			"Rev": "c6fed771bfd517099caf0f7a961671fa8ed08723"
+		},
+		{
 			"ImportPath": "github.com/cloudflare/cfssl/auth",
 			"Comment": "1.2.0",
 			"Rev": "db0d0650b6496bfe8061ec56a92edd32d8e75c30"
@@ -2449,7 +2465,27 @@
 			"Rev": "2910a502d2bf9e43193af9d68ca516529614eed3"
 		},
 		{
+			"ImportPath": "golang.org/x/text/encoding",
+			"Rev": "2910a502d2bf9e43193af9d68ca516529614eed3"
+		},
+		{
+			"ImportPath": "golang.org/x/text/encoding/internal",
+			"Rev": "2910a502d2bf9e43193af9d68ca516529614eed3"
+		},
+		{
+			"ImportPath": "golang.org/x/text/encoding/internal/identifier",
+			"Rev": "2910a502d2bf9e43193af9d68ca516529614eed3"
+		},
+		{
+			"ImportPath": "golang.org/x/text/encoding/unicode",
+			"Rev": "2910a502d2bf9e43193af9d68ca516529614eed3"
+		},
+		{
 			"ImportPath": "golang.org/x/text/internal/tag",
+			"Rev": "2910a502d2bf9e43193af9d68ca516529614eed3"
+		},
+		{
+			"ImportPath": "golang.org/x/text/internal/utf8internal",
 			"Rev": "2910a502d2bf9e43193af9d68ca516529614eed3"
 		},
 		{

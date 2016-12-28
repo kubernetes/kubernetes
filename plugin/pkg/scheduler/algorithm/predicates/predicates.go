@@ -217,8 +217,9 @@ func NewMaxPDVolumeCountPredicate(filter VolumeFilter, maxVolumes int, pvInfo Pe
 }
 
 func (c *MaxPDVolumeCountChecker) filterVolumes(volumes []v1.Volume, namespace string, filteredVolumes map[string]bool) error {
-	for _, vol := range volumes {
-		if id, ok := c.filter.FilterVolume(&vol); ok {
+	for i := range volumes {
+		vol := &volumes[i]
+		if id, ok := c.filter.FilterVolume(vol); ok {
 			filteredVolumes[id] = true
 		} else if vol.PersistentVolumeClaim != nil {
 			pvcName := vol.PersistentVolumeClaim.ClaimName
@@ -1116,6 +1117,11 @@ func (c *PodAffinityChecker) satisfiesPodsAffinityAntiAffinity(pod *v1.Pod, node
 			// If the requirement matches a pod's own labels are namespace, and there are
 			// no other such pods, then disregard the requirement. This is necessary to
 			// not block forever because the first pod of the collection can't be scheduled.
+			if matchingPodExists {
+				glog.V(10).Infof("Cannot schedule pod %+v onto node %v,because of PodAffinityTerm %v, err: %v",
+					podName(pod), node.Name, term, err)
+				return false
+			}
 			namespaces := priorityutil.GetNamespacesFromPodAffinityTerm(pod, &term)
 			selector, err := metav1.LabelSelectorAsSelector(term.LabelSelector)
 			if err != nil {
@@ -1124,7 +1130,7 @@ func (c *PodAffinityChecker) satisfiesPodsAffinityAntiAffinity(pod *v1.Pod, node
 				return false
 			}
 			match := priorityutil.PodMatchesTermsNamespaceAndSelector(pod, namespaces, selector)
-			if !match || matchingPodExists {
+			if !match {
 				glog.V(10).Infof("Cannot schedule pod %+v onto node %v,because of PodAffinityTerm %v, err: %v",
 					podName(pod), node.Name, term, err)
 				return false

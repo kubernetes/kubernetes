@@ -32,12 +32,10 @@ import (
 	"k8s.io/kubernetes/federation/cmd/federation-apiserver/app/options"
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/apiserver/authenticator"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/controller/informers"
 	"k8s.io/kubernetes/pkg/generated/openapi"
 	"k8s.io/kubernetes/pkg/genericapiserver"
-	"k8s.io/kubernetes/pkg/genericapiserver/authorizer"
 	"k8s.io/kubernetes/pkg/genericapiserver/filters"
 	"k8s.io/kubernetes/pkg/registry/cachesize"
 	"k8s.io/kubernetes/pkg/registry/generic"
@@ -92,7 +90,7 @@ func Run(s *options.ServerRunOptions) error {
 	if _, err := genericConfig.ApplySecureServingOptions(s.SecureServing); err != nil {
 		return fmt.Errorf("failed to configure https: %s", err)
 	}
-	if _, err := genericConfig.ApplyAuthenticationOptions(s.Authentication); err != nil {
+	if err := s.Authentication.Apply(genericConfig); err != nil {
 		return fmt.Errorf("failed to configure authentication: %s", err)
 	}
 
@@ -135,7 +133,7 @@ func Run(s *options.ServerRunOptions) error {
 		storageFactory.SetEtcdLocation(groupResource, servers)
 	}
 
-	apiAuthenticator, securityDefinitions, err := authenticator.New(s.Authentication.ToAuthenticationConfig())
+	apiAuthenticator, securityDefinitions, err := s.Authentication.ToAuthenticationConfig().New()
 	if err != nil {
 		return fmt.Errorf("invalid Authentication Config: %v", err)
 	}
@@ -151,8 +149,8 @@ func Run(s *options.ServerRunOptions) error {
 	}
 	sharedInformers := informers.NewSharedInformerFactory(nil, client, 10*time.Minute)
 
-	authorizerconfig := s.Authorization.ToAuthorizationConfig(sharedInformers)
-	apiAuthorizer, err := authorizer.NewAuthorizerFromAuthorizationConfig(authorizerconfig)
+	authorizationConfig := s.Authorization.ToAuthorizationConfig(sharedInformers)
+	apiAuthorizer, err := authorizationConfig.New()
 	if err != nil {
 		return fmt.Errorf("invalid Authorization Config: %v", err)
 	}
@@ -207,6 +205,7 @@ func Run(s *options.ServerRunOptions) error {
 	installFederationAPIs(m, restOptionsFactory)
 	installCoreAPIs(s, m, restOptionsFactory)
 	installExtensionsAPIs(m, restOptionsFactory)
+	installBatchAPIs(m, restOptionsFactory)
 
 	sharedInformers.Start(wait.NeverStop)
 	m.PrepareRun().Run(wait.NeverStop)

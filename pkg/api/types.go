@@ -1933,7 +1933,7 @@ type PodStatus struct {
 	// +optional
 	StartTime *metav1.Time
 	// +optional
-	QOSClass PodQOSClass `json:"qosClass,omitempty"`
+	QOSClass PodQOSClass
 
 	// The list has one entry per init container in the manifest. The most recent successful
 	// init container will have ready = true, the most recently started container will have
@@ -3248,6 +3248,9 @@ const (
 	// - Secret.Annotations["kubernetes.io/service-account.uid"] - the UID of the ServiceAccount the token identifies
 	// - Secret.Data["token"] - a token that identifies the service account to the API
 	SecretTypeServiceAccountToken SecretType = "kubernetes.io/service-account-token"
+
+	// SecretTypeBootstrapToken is the key for tokens used by kubeadm to validate cluster info during discovery.
+	SecretTypeBootstrapToken = "bootstrap.kubernetes.io/token"
 
 	// ServiceAccountNameKey is the key of the required annotation for SecretTypeServiceAccountToken secrets
 	ServiceAccountNameKey = "kubernetes.io/service-account.name"

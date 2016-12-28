@@ -17,7 +17,7 @@ limitations under the License.
 package config
 
 import (
-	types "k8s.io/kubernetes/pkg/apis/meta/v1"
+	types "k8s.io/client-go/pkg/apis/meta/v1"
 	fed "k8s.io/kubernetes/pkg/dns/federation"
 )
 

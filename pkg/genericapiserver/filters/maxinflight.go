@@ -22,7 +22,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
-	"k8s.io/kubernetes/pkg/apiserver/request"
+	apiserverrequest "k8s.io/kubernetes/pkg/apiserver/request"
 	"k8s.io/kubernetes/pkg/httplog"
 	"k8s.io/kubernetes/pkg/util/sets"
 
@@ -67,7 +67,7 @@ func WithMaxInFlightLimit(
 			handleError(w, r, fmt.Errorf("no context found for request, handler chain must be wrong"))
 			return
 		}
-		requestInfo, ok := request.RequestInfoFrom(ctx)
+		requestInfo, ok := apiserverrequest.RequestInfoFrom(ctx)
 		if !ok {
 			handleError(w, r, fmt.Errorf("no RequestInfo found in context, handler chain must be wrong"))
 			return

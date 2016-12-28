@@ -23,7 +23,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/record"
 )
 
-// Implemnts k8s.io/kubernetes/pkg/client/record.EventSink.
+// Implements k8s.io/kubernetes/pkg/client/record.EventSink.
 type FederatedEventSink struct {
 	clientset fedclientset.Interface
 }

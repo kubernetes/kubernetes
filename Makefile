@@ -467,3 +467,11 @@ else
 help:
 	hack/make-rules/make-help.sh
 endif
+
+# Non-dockerized bazel rules.
+.PHONY: bazel-build bazel-test
+bazel-build:
+	bazel build //cmd/... //pkg/... //federation/... //plugin/... //build/... //examples/... //test/... //third_party/...
+
+bazel-test:
+	bazel test  --test_output=errors //cmd/... //pkg/... //federation/... //plugin/... //build/... //third_party/...

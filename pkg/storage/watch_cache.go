@@ -35,9 +35,11 @@ import (
 )
 
 const (
-	// MaximumListWait determines how long we're willing to wait for a
-	// list if a client specified a resource version in the future.
-	MaximumListWait = 60 * time.Second
+	// blockTimeout determines how long we're willing to block the request
+	// to wait for a given resource version to be propagated to cache,
+	// before terminating request and returning Timeout error with retry
+	// after suggestion.
+	blockTimeout = 3 * time.Second
 )
 
 // watchCacheEvent is a single "watch event" that is send to users of
@@ -78,7 +80,7 @@ func storeElementKey(obj interface{}) (string, error) {
 // itself.
 type watchCacheElement struct {
 	resourceVersion uint64
-	watchCacheEvent watchCacheEvent
+	watchCacheEvent *watchCacheEvent
 }
 
 // watchCache implements a Store interface.
@@ -125,7 +127,7 @@ type watchCache struct {
 
 	// This handler is run at the end of every Add/Update/Delete method
 	// and additionally gets the previous value of the object.
-	onEvent func(watchCacheEvent)
+	onEvent func(*watchCacheEvent)
 
 	// for testing timeouts.
 	clock clock.Clock
@@ -206,7 +208,8 @@ func parseResourceVersion(resourceVersion string) (uint64, error) {
 	if resourceVersion == "" {
 		return 0, nil
 	}
-	return strconv.ParseUint(resourceVersion, 10, 64)
+	// Use bitsize being the size of int on the machine.
+	return strconv.ParseUint(resourceVersion, 10, 0)
 }
 
 func (w *watchCache) processEvent(event watch.Event, resourceVersion uint64, updateFunc func(*storeElement) error) error {
@@ -240,7 +243,7 @@ func (w *watchCache) processEvent(event watch.Event, resourceVersion uint64, upd
 			return err
 		}
 	}
-	watchCacheEvent := watchCacheEvent{
+	watchCacheEvent := &watchCacheEvent{
 		Type:            event.Type,
 		Object:          event.Object,
 		ObjLabels:       objLabels,
@@ -254,7 +257,7 @@ func (w *watchCache) processEvent(event watch.Event, resourceVersion uint64, upd
 	if w.onEvent != nil {
 		w.onEvent(watchCacheEvent)
 	}
-	w.updateCache(resourceVersion, &watchCacheEvent)
+	w.updateCache(resourceVersion, watchCacheEvent)
 	w.resourceVersion = resourceVersion
 	w.cond.Broadcast()
 	return updateFunc(elem)
@@ -266,7 +269,7 @@ func (w *watchCache) updateCache(resourceVersion uint64, event *watchCacheEvent)
 		// Cache is full - remove the oldest element.
 		w.startIndex++
 	}
-	w.cache[w.endIndex%w.capacity] = watchCacheElement{resourceVersion, *event}
+	w.cache[w.endIndex%w.capacity] = watchCacheElement{resourceVersion, event}
 	w.endIndex++
 }
 
@@ -288,7 +291,7 @@ func (w *watchCache) waitUntilFreshAndBlock(resourceVersion uint64, trace *util.
 		// it will wake up the loop below sometime after the broadcast,
 		// we don't need to worry about waking it up before the time
 		// has expired accidentally.
-		<-w.clock.After(MaximumListWait)
+		<-w.clock.After(blockTimeout)
 		w.cond.Broadcast()
 	}()
 
@@ -297,8 +300,9 @@ func (w *watchCache) waitUntilFreshAndBlock(resourceVersion uint64, trace *util.
 		trace.Step("watchCache locked acquired")
 	}
 	for w.resourceVersion < resourceVersion {
-		if w.clock.Since(startTime) >= MaximumListWait {
-			return fmt.Errorf("time limit exceeded while waiting for resource version %v (current value: %v)", resourceVersion, w.resourceVersion)
+		if w.clock.Since(startTime) >= blockTimeout {
+			// Timeout with retry after 1 second.
+			return errors.NewTimeoutError(fmt.Sprintf("Too large resource version: %v, current: %v", resourceVersion, w.resourceVersion), 1)
 		}
 		w.cond.Wait()
 	}
@@ -395,13 +399,13 @@ func (w *watchCache) SetOnReplace(onReplace func()) {
 	w.onReplace = onReplace
 }
 
-func (w *watchCache) SetOnEvent(onEvent func(watchCacheEvent)) {
+func (w *watchCache) SetOnEvent(onEvent func(*watchCacheEvent)) {
 	w.Lock()
 	defer w.Unlock()
 	w.onEvent = onEvent
 }
 
-func (w *watchCache) GetAllEventsSinceThreadUnsafe(resourceVersion uint64) ([]watchCacheEvent, error) {
+func (w *watchCache) GetAllEventsSinceThreadUnsafe(resourceVersion uint64) ([]*watchCacheEvent, error) {
 	size := w.endIndex - w.startIndex
 	oldest := w.resourceVersion
 	if size > 0 {
@@ -415,7 +419,7 @@ func (w *watchCache) GetAllEventsSinceThreadUnsafe(resourceVersion uint64) ([]wa
 		//
 		// TODO: In v2 api, we should stop returning the current state - #13969.
 		allItems := w.store.List()
-		result := make([]watchCacheEvent, len(allItems))
+		result := make([]*watchCacheEvent, len(allItems))
 		for i, item := range allItems {
 			elem, ok := item.(*storeElement)
 			if !ok {
@@ -425,7 +429,7 @@ func (w *watchCache) GetAllEventsSinceThreadUnsafe(resourceVersion uint64) ([]wa
 			if err != nil {
 				return nil, err
 			}
-			result[i] = watchCacheEvent{
+			result[i] = &watchCacheEvent{
 				Type:            watch.Added,
 				Object:          elem.Object,
 				ObjLabels:       objLabels,
@@ -445,14 +449,14 @@ func (w *watchCache) GetAllEventsSinceThreadUnsafe(resourceVersion uint64) ([]wa
 		return w.cache[(w.startIndex+i)%w.capacity].resourceVersion > resourceVersion
 	}
 	first := sort.Search(size, f)
-	result := make([]watchCacheEvent, size-first)
+	result := make([]*watchCacheEvent, size-first)
 	for i := 0; i < size-first; i++ {
 		result[i] = w.cache[(w.startIndex+first+i)%w.capacity].watchCacheEvent
 	}
 	return result, nil
 }
 
-func (w *watchCache) GetAllEventsSince(resourceVersion uint64) ([]watchCacheEvent, error) {
+func (w *watchCache) GetAllEventsSince(resourceVersion uint64) ([]*watchCacheEvent, error) {
 	w.RLock()
 	defer w.RUnlock()
 	return w.GetAllEventsSinceThreadUnsafe(resourceVersion)

@@ -194,7 +194,7 @@ func (s *Serializer) RecognizesData(peek io.Reader) (ok, unknown bool, err error
 		// we could potentially look for '---'
 		return false, true, nil
 	}
-	_, ok = utilyaml.GuessJSONStream(peek, 2048)
+	_, _, ok = utilyaml.GuessJSONStream(peek, 2048)
 	return ok, false, nil
 }
 

@@ -550,6 +550,7 @@ func FuzzerFor(t *testing.T, version schema.GroupVersion, src rand.Source) *fuzz
 			obj.API.Port = 20
 			obj.Networking.ServiceSubnet = "foo"
 			obj.Networking.DNSDomain = "foo"
+			obj.Discovery.Token = &kubeadm.TokenDiscovery{}
 		},
 		func(s *policy.PodDisruptionBudgetStatus, c fuzz.Continue) {
 			c.FuzzNoCustom(s) // fuzz self without calling this function again

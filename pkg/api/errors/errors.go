@@ -404,6 +404,12 @@ func IsForbidden(err error) bool {
 	return reasonForError(err) == metav1.StatusReasonForbidden
 }
 
+// IsTimeout determines if err is an error which indicates that request times out due to long
+// processing.
+func IsTimeout(err error) bool {
+	return reasonForError(err) == metav1.StatusReasonTimeout
+}
+
 // IsServerTimeout determines if err is an error which indicates that the request needs to be retried
 // by the client.
 func IsServerTimeout(err error) bool {

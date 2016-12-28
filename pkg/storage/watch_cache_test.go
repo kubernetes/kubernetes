@@ -302,7 +302,7 @@ func TestWaitUntilFreshAndListTimeout(t *testing.T) {
 		for !fc.HasWaiters() {
 			time.Sleep(time.Millisecond)
 		}
-		fc.Step(MaximumListWait)
+		fc.Step(blockTimeout)
 
 		// Add an object to make sure the test would
 		// eventually fail instead of just waiting

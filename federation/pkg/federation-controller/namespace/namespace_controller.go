@@ -95,7 +95,7 @@ func NewNamespaceController(client federationclientset.Interface) *NamespaceCont
 		eventRecorder:         recorder,
 	}
 
-	// Build delivereres for triggering reconciliations.
+	// Build deliverers for triggering reconciliations.
 	nc.namespaceDeliverer = util.NewDelayingDeliverer()
 	nc.clusterDeliverer = util.NewDelayingDeliverer()
 
@@ -129,7 +129,7 @@ func NewNamespaceController(client federationclientset.Interface) *NamespaceCont
 				&apiv1.Namespace{},
 				controller.NoResyncPeriodFunc(),
 				// Trigger reconciliation whenever something in federated cluster is changed. In most cases it
-				// would be just confirmation that some namespace opration succeeded.
+				// would be just confirmation that some namespace operation succeeded.
 				util.NewTriggerOnMetaAndSpecChanges(
 					func(obj runtime.Object) { nc.deliverNamespaceObj(obj, nc.namespaceReviewDelay, false) },
 				))
@@ -142,7 +142,7 @@ func NewNamespaceController(client federationclientset.Interface) *NamespaceCont
 		},
 	)
 
-	// Federated updeater along with Create/Update/Delete operations.
+	// Federated updater along with Create/Update/Delete operations.
 	nc.federatedUpdater = util.NewFederatedUpdater(nc.namespaceFederatedInformer,
 		func(client kubeclientset.Interface, obj runtime.Object) error {
 			namespace := obj.(*apiv1.Namespace)
@@ -435,7 +435,7 @@ func (nc *NamespaceController) reconcileNamespace(namespace string) {
 		return
 	}
 
-	// Evertyhing is in order but lets be double sure
+	// Everything is in order but lets be double sure
 	nc.deliverNamespace(namespace, nc.namespaceReviewDelay, false)
 }
 
@@ -489,7 +489,7 @@ func (nc *NamespaceController) delete(namespace *apiv1.Namespace) error {
 // Ensures that all resources in this namespace are deleted and then removes the kubernetes finalizer.
 func (nc *NamespaceController) removeKubernetesFinalizer(namespace *apiv1.Namespace) (*apiv1.Namespace, error) {
 	// Right now there are just 7 types of objects: Deployments, DaemonSets, ReplicaSet, Secret, Ingress, Events and Service.
-	// Temporarly these items are simply deleted one by one to squeeze this code into 1.4.
+	// Temporarily these items are simply deleted one by one to squeeze this code into 1.4.
 	// TODO: Make it generic (like in the regular namespace controller) and parallel.
 	err := nc.federatedApiClient.Core().Services(namespace.Name).DeleteCollection(&apiv1.DeleteOptions{}, apiv1.ListOptions{})
 	if err != nil {

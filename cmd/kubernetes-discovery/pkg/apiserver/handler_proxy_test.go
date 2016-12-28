@@ -26,7 +26,7 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/apiserver/request"
+	apiserverrequest "k8s.io/kubernetes/pkg/apiserver/request"
 	"k8s.io/kubernetes/pkg/auth/user"
 	"k8s.io/kubernetes/pkg/util/sets"
 
@@ -62,13 +62,13 @@ func (m *fakeRequestContextMapper) Get(req *http.Request) (api.Context, bool) {
 		ctx = api.WithUser(ctx, m.user)
 	}
 
-	resolver := &request.RequestInfoFactory{
+	resolver := &apiserverrequest.RequestInfoFactory{
 		APIPrefixes:          sets.NewString("api", "apis"),
 		GrouplessAPIPrefixes: sets.NewString("api"),
 	}
 	info, err := resolver.NewRequestInfo(req)
 	if err == nil {
-		ctx = request.WithRequestInfo(ctx, info)
+		ctx = apiserverrequest.WithRequestInfo(ctx, info)
 	}
 
 	return ctx, true

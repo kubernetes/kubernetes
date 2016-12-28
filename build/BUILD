@@ -6,6 +6,7 @@ server_binaries = {
     "kube-apiserver": "//cmd/kube-apiserver",
     "kube-controller-manager": "//cmd/kube-controller-manager",
     "kube-scheduler": "//plugin/cmd/kube-scheduler",
+    "kubernetes-discovery": "//cmd/kubernetes-discovery",
 }
 
 docker_build(

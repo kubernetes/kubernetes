@@ -64,6 +64,6 @@ func internalError(w http.ResponseWriter, req *http.Request, err error) {
 	w.Header().Set("Content-Type", "text/plain")
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.WriteHeader(http.StatusInternalServerError)
-	fmt.Fprintf(w, "Internal Server Error: %#v", req.RequestURI)
+	fmt.Fprintf(w, "Internal Server Error: %#v: %v", req.RequestURI, err)
 	runtime.HandleError(err)
 }

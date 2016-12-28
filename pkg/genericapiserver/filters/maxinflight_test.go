@@ -27,7 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	apiserverfilters "k8s.io/kubernetes/pkg/apiserver/filters"
-	"k8s.io/kubernetes/pkg/apiserver/request"
+	apiserverrequest "k8s.io/kubernetes/pkg/apiserver/request"
 	"k8s.io/kubernetes/pkg/util/sets"
 )
 
@@ -36,7 +36,7 @@ func createMaxInflightServer(callsWg, blockWg *sync.WaitGroup, disableCallsWg *b
 	longRunningRequestCheck := BasicLongRunningRequestCheck(sets.NewString("watch"), sets.NewString("proxy"))
 
 	requestContextMapper := api.NewRequestContextMapper()
-	requestInfoFactory := &request.RequestInfoFactory{APIPrefixes: sets.NewString("apis", "api"), GrouplessAPIPrefixes: sets.NewString("api")}
+	requestInfoFactory := &apiserverrequest.RequestInfoFactory{APIPrefixes: sets.NewString("apis", "api"), GrouplessAPIPrefixes: sets.NewString("api")}
 	handler := WithMaxInFlightLimit(
 		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			// A short, accounted request that does not wait for block WaitGroup.

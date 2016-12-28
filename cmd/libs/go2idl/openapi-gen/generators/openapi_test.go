@@ -70,11 +70,6 @@ func TestSimple(t *testing.T) {
 	err, assert, buffer := testOpenAPITypeWritter(t, `
 package foo
 
-import (
-	"time"
-	"k8s.io/kubernetes/pkg/util/intstr"
-)
-
 // Blah is a test.
 // +k8s:openapi=true
 type Blah struct {
@@ -110,12 +105,8 @@ type Blah struct {
 	Float64 float64
 	// A simple float32
 	Float32 float32
-	// A simple time
-	Time time.Time
 	// a base64 encoded characters
 	ByteArray []byte
-	// an int or string type
-	IntOrString intstr.IntOrString
 }
 		`)
 	if err != nil {
@@ -224,13 +215,6 @@ Type: []string{"number"},
 Format: "float",
 },
 },
-"Time": {
-SchemaProps: spec.SchemaProps{
-Description: "A simple time",
-Type: []string{"string"},
-Format: "date-time",
-},
-},
 "ByteArray": {
 SchemaProps: spec.SchemaProps{
 Description: "a base64 encoded characters",
@@ -238,18 +222,12 @@ Type: []string{"string"},
 Format: "byte",
 },
 },
-"IntOrString": {
-SchemaProps: spec.SchemaProps{
-Description: "an int or string type",
-Ref: spec.MustCreateRef("#/definitions/intstr.IntOrString"),
 },
-},
-},
-Required: []string{"String","Int64","Int32","Int16","Int8","Uint","Uint64","Uint32","Uint16","Uint8","Byte","Bool","Float64","Float32","Time","ByteArray","IntOrString"},
+Required: []string{"String","Int64","Int32","Int16","Int8","Uint","Uint64","Uint32","Uint16","Uint8","Byte","Bool","Float64","Float32","ByteArray"},
 },
 },
 Dependencies: []string{
-"intstr.IntOrString",},
+},
 },
 `, buffer.String())
 }

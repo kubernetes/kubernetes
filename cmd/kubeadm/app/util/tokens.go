@@ -23,14 +23,23 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiext "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
+	"k8s.io/kubernetes/pkg/api"
+	apierrors "k8s.io/kubernetes/pkg/api/errors"
+	v1 "k8s.io/kubernetes/pkg/api/v1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 )
 
 const (
-	TokenIDBytes = 3
-	TokenBytes   = 8
+	TokenIDBytes               = 3
+	TokenBytes                 = 8
+	BootstrapTokenSecretPrefix = "bootstrap-token-"
+	DefaultTokenDuration       = time.Duration(8) * time.Hour
+	tokenCreateRetries         = 5
 )
 
 func RandBytes(length int) (string, error) {
@@ -62,6 +71,21 @@ var (
 	tokenRegexpString = "^([a-zA-Z0-9]{6})\\.([a-zA-Z0-9]{16})$"
 	tokenRegexp       = regexp.MustCompile(tokenRegexpString)
 )
+
+func GenerateTokenIfNeeded(d *kubeadmapi.TokenDiscovery) error {
+	ok, err := IsTokenValid(d)
+	if err != nil {
+		return err
+	}
+	if ok {
+		return nil
+	}
+	if err := GenerateToken(d); err != nil {
+		return err
+	}
+
+	return nil
+}
 
 func ParseToken(s string) (string, string, error) {
 	split := tokenRegexp.FindStringSubmatch(s)
@@ -98,4 +122,64 @@ func DiscoveryPort(d *kubeadmapi.TokenDiscovery) int32 {
 		return int32(i)
 	}
 	return kubeadmapiext.DefaultDiscoveryBindPort
+}
+
+// UpdateOrCreateToken attempts to update a token with the given ID, or create if it does
+// not already exist.
+func UpdateOrCreateToken(client *clientset.Clientset, d *kubeadmapi.TokenDiscovery, tokenDuration time.Duration) error {
+	secretName := fmt.Sprintf("%s%s", BootstrapTokenSecretPrefix, d.ID)
+
+	var lastErr error
+	for i := 0; i < tokenCreateRetries; i++ {
+		secret, err := client.Secrets(api.NamespaceSystem).Get(secretName, metav1.GetOptions{})
+		if err == nil {
+			// Secret with this ID already exists, update it:
+			secret.Data = encodeTokenSecretData(d, tokenDuration)
+			if _, err := client.Secrets(api.NamespaceSystem).Update(secret); err == nil {
+				return nil
+			} else {
+				lastErr = err
+			}
+			continue
+		}
+
+		// Secret does not already exist:
+		if apierrors.IsNotFound(err) {
+			secret = &v1.Secret{
+				ObjectMeta: v1.ObjectMeta{
+					Name: secretName,
+				},
+				Type: api.SecretTypeBootstrapToken,
+				Data: encodeTokenSecretData(d, tokenDuration),
+			}
+			if _, err := client.Secrets(api.NamespaceSystem).Create(secret); err == nil {
+				return nil
+			} else {
+				lastErr = err
+			}
+
+			continue
+		}
+
+	}
+	return fmt.Errorf("<util/tokens> unable to create bootstrap token after %d attempts [%v]", tokenCreateRetries, lastErr)
+}
+
+func encodeTokenSecretData(d *kubeadmapi.TokenDiscovery, duration time.Duration) map[string][]byte {
+	var (
+		data = map[string][]byte{}
+	)
+
+	data["token-id"] = []byte(d.ID)
+	data["token-secret"] = []byte(d.Secret)
+
+	data["usage-bootstrap-signing"] = []byte("true")
+
+	if duration > 0 {
+		t := time.Now()
+		t = t.Add(duration)
+		data["expiration"] = []byte(t.Format(time.RFC3339))
+	}
+
+	return data
 }

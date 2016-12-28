@@ -29,6 +29,7 @@ import (
 
 var sshOptions = flag.String("ssh-options", "", "Commandline options passed to ssh.")
 var sshEnv = flag.String("ssh-env", "", "Use predefined ssh options for environment.  Options: gce")
+var sshUser = flag.String("ssh-user", "", "Use predefined user for ssh.")
 
 var sshOptionsMap map[string]string
 
@@ -53,13 +54,18 @@ func AddHostnameIp(hostname, ip string) {
 	hostnameIpOverrides.m[hostname] = ip
 }
 
+// GetHostnameOrIp converts hostname into ip and apply user if necessary.
 func GetHostnameOrIp(hostname string) string {
 	hostnameIpOverrides.RLock()
 	defer hostnameIpOverrides.RUnlock()
+	host := hostname
 	if ip, found := hostnameIpOverrides.m[hostname]; found {
-		return ip
+		host = ip
 	}
-	return hostname
+	if *sshUser != "" {
+		host = fmt.Sprintf("%s@%s", *sshUser, host)
+	}
+	return host
 }
 
 // getSSHCommand handles proper quoting so that multiple commands are executed in the same shell over ssh

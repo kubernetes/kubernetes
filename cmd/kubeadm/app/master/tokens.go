@@ -31,22 +31,6 @@ import (
 	"k8s.io/kubernetes/pkg/util/uuid"
 )
 
-func generateTokenIfNeeded(d *kubeadmapi.TokenDiscovery) error {
-	ok, err := kubeadmutil.IsTokenValid(d)
-	if err != nil {
-		return err
-	}
-	if ok {
-		fmt.Println("[tokens] Accepted provided token")
-		return nil
-	}
-	if err := kubeadmutil.GenerateToken(d); err != nil {
-		return err
-	}
-	fmt.Printf("[tokens] Generated token: %q\n", kubeadmutil.BearerToken(d))
-	return nil
-}
-
 func PrepareTokenDiscovery(d *kubeadmapi.TokenDiscovery) error {
 	if len(d.Addresses) == 0 {
 		ip, err := netutil.ChooseHostInterface()
@@ -55,7 +39,7 @@ func PrepareTokenDiscovery(d *kubeadmapi.TokenDiscovery) error {
 		}
 		d.Addresses = []string{ip.String() + ":" + strconv.Itoa(kubeadmapiext.DefaultDiscoveryBindPort)}
 	}
-	if err := generateTokenIfNeeded(d); err != nil {
+	if err := kubeadmutil.GenerateTokenIfNeeded(d); err != nil {
 		return fmt.Errorf("failed to generate token(s) [%v]", err)
 	}
 	return nil
