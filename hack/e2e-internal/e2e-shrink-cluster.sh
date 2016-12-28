@@ -22,7 +22,12 @@ fi
 if [[ ! -z "${2:-}" ]]; then
   export MULTIZONE="${2}"
 fi
-export KUBE_DELETE_NODES=false
+if [[ ! -z "${3:-}" ]]; then
+  export KUBE_DELETE_NODES="${3}"
+fi
+if [[ ! -z "${4:-}" ]]; then
+  export KUBE_USE_EXISTING_MASTER="${4}"
+fi
 
 source "${KUBE_ROOT}/hack/e2e-internal/e2e-down.sh"
 
