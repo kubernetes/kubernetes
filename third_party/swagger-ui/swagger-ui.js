@@ -10,19 +10,19 @@ $(function() {
 	// http://www.seodenver.com/simple-vertical-align-plugin-for-jquery/
 	$.fn.vAlign = function() {
 		return this.each(function(i){
-		var ah = $(this).height();
-		var ph = $(this).parent().height();
-		var mh = (ph - ah) / 2;
-		$(this).css('margin-top', mh);
+			var ah = $(this).height();
+			var ph = $(this).parent().height();
+			var mh = (ph - ah) / 2;
+			$(this).css('margin-top', mh);
 		});
 	};
 
 	$.fn.stretchFormtasticInputWidthToParent = function() {
 		return this.each(function(i){
-		var p_width = $(this).closest("form").innerWidth();
-		var p_padding = parseInt($(this).closest("form").css('padding-left') ,10) + parseInt($(this).closest("form").css('padding-right'), 10);
-		var this_padding = parseInt($(this).css('padding-left'), 10) + parseInt($(this).css('padding-right'), 10);
-		$(this).css('width', p_width - p_padding - this_padding);
+			var p_width = $(this).closest("form").innerWidth();
+			var p_padding = parseInt($(this).closest("form").css('padding-left') ,10) + parseInt($(this).closest("form").css('padding-right'), 10);
+			var this_padding = parseInt($(this).css('padding-left'), 10) + parseInt($(this).css('padding-right'), 10);
+			$(this).css('width', p_width - p_padding - this_padding);
 		});
 	};
 
@@ -106,8 +106,8 @@ var Docs = {
 				// Refer to the endpoint DOM element, e.g. #words_get_search
 
         // Expand Resource
-        Docs.expandEndpointListForResource(fragments[0]);
-        $("#"+dom_id).slideto({highlight: false});
+        		Docs.expandEndpointListForResource(fragments[0]);
+        		$("#"+dom_id).slideto({highlight: false});
 
         // Expand operation
 				var li_dom_id = fragments.join('_');
