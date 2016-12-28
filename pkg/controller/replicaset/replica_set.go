@@ -176,8 +176,8 @@ func (rsc *ReplicaSetController) Run(workers int, stopCh <-chan struct{}) {
 
 // getPodReplicaSet returns the replica set managing the given pod.
 // TODO: Surface that we are ignoring multiple replica sets for a single pod.
-// TODO: use ownerReference.Controller to determine if the rs controls the pod.
 func (rsc *ReplicaSetController) getPodReplicaSet(pod *v1.Pod) *extensions.ReplicaSet {
+	controllerRef := controller.GetControllerOf(pod.ObjectMeta)
 	// look up in the cache, if cached and the cache is valid, just return cached value
 	if obj, cached := rsc.lookupCache.GetMatchingObject(pod); cached {
 		rs, ok := obj.(*extensions.ReplicaSet)
@@ -186,7 +186,13 @@ func (rsc *ReplicaSetController) getPodReplicaSet(pod *v1.Pod) *extensions.Repli
 			utilruntime.HandleError(fmt.Errorf("lookup cache does not return a ReplicaSet object"))
 			return nil
 		}
-		if cached && rsc.isCacheValid(pod, rs) {
+		// For the case when we have several active controllers with the same labels in the system,
+		// the cache will return the oldest controller for all pods with the same label and namespace
+		// So we need to check here that the oldest one actually controls the pod,
+		// or the pod doesn't have controller set
+		isValidController := (controllerRef == nil || controllerRef.UID == rs.ObjectMeta.UID)
+		if isValidController && rsc.isCacheValid(pod, rs) {
+			glog.V(4).Infof("Return for pod %s controller from cache: %+v", pod.Name, *rs)
 			return rs
 		}
 	}
@@ -210,7 +216,19 @@ func (rsc *ReplicaSetController) getPodReplicaSet(pod *v1.Pod) *extensions.Repli
 		sort.Sort(controller.ReplicaSetsByCreationTimestamp(rss))
 	}
 
+	// check ownerReference.Controller and UID to determine if the rc controls the pod
+	// in case of multiple controllers match the pod's label
+	if controllerRef != nil {
+		for _, rs := range rss {
+			if controllerRef.UID == rs.ObjectMeta.UID {
+				glog.V(4).Infof("Return for pod %s/%s controller: %+v", pod.Namespace, pod.Name, rs)
+				return rs
+			}
+		}
+	}
+
 	// update lookup cache
+	glog.V(4).Infof("Return for pod %s/%s controller: %+v", pod.Namespace, pod.Name, *rss[0])
 	rsc.lookupCache.Update(pod, rss[0])
 
 	return rss[0]

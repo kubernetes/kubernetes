@@ -956,11 +956,28 @@ func TestOverlappingRCs(t *testing.T) {
 			manager.rcStore.Indexer.Add(shuffledControllers[j])
 		}
 		// Add a pod and make sure only the oldest rc is synced
-		pods := newPodList(nil, 1, v1.PodPending, controllers[0], "pod")
+		pods := newPodList(nil, 1, v1.PodPending, controllers[0], "pod1")
 		rcKey := getKey(controllers[0], t)
 
 		manager.addPod(&pods.Items[0])
 		queueRC, _ := manager.queue.Get()
+		manager.queue.Done(queueRC)
+		if queueRC != rcKey {
+			t.Fatalf("Expected to find key %v in queue, found %v", rcKey, queueRC)
+		}
+
+		// Now let's add pod for another controller to check correct handling of
+		// having multiple active controllers with the same selector in the system
+		// each having different pods under control. Example:
+		// 1. RC1 was created with set replicas to 1 => pod1 is created with set OwnerRef to RC1
+		// 2. RC2 was created with set replicas to 1 => pod2 is created with set OwnerRef to RC2
+		// In this case we expect to have in queue key for RC2 on adding event for pod2
+		pods = newPodList(nil, 1, v1.PodPending, controllers[1], "pod2")
+		rcKey = getKey(controllers[1], t)
+
+		manager.addPod(&pods.Items[0])
+		queueRC, _ = manager.queue.Get()
+		manager.queue.Done(queueRC)
 		if queueRC != rcKey {
 			t.Fatalf("Expected to find key %v in queue, found %v", rcKey, queueRC)
 		}

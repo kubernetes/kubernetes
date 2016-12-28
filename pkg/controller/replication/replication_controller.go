@@ -234,8 +234,8 @@ func (rm *ReplicationManager) Run(workers int, stopCh <-chan struct{}) {
 
 // getPodController returns the controller managing the given pod.
 // TODO: Surface that we are ignoring multiple controllers for a single pod.
-// TODO: use ownerReference.Controller to determine if the rc controls the pod.
 func (rm *ReplicationManager) getPodController(pod *v1.Pod) *v1.ReplicationController {
+	controllerRef := controller.GetControllerOf(pod.ObjectMeta)
 	// look up in the cache, if cached and the cache is valid, just return cached value
 	if obj, cached := rm.lookupCache.GetMatchingObject(pod); cached {
 		controller, ok := obj.(*v1.ReplicationController)
@@ -244,7 +244,13 @@ func (rm *ReplicationManager) getPodController(pod *v1.Pod) *v1.ReplicationContr
 			glog.Errorf("lookup cache does not return a ReplicationController object")
 			return nil
 		}
-		if cached && rm.isCacheValid(pod, controller) {
+		// For the case when we have several active controllers with the same labels in the system,
+		// the cache will return the oldest controller for all pods with the same label and namespace
+		// So we need to check here that the oldest one actually controls the pod,
+		// or the pod doesn't have controller set
+		isValidController := (controllerRef == nil || controllerRef.UID == controller.ObjectMeta.UID)
+		if isValidController && rm.isCacheValid(pod, controller) {
+			glog.V(4).Infof("Return for pod %s controller from cache: %+v", pod.Name, *controller)
 			return controller
 		}
 	}
@@ -268,8 +274,20 @@ func (rm *ReplicationManager) getPodController(pod *v1.Pod) *v1.ReplicationContr
 		sort.Sort(OverlappingControllers(controllers))
 	}
 
+	// check ownerReference.Controller and UID to determine if the rc controls the pod
+	// in case of multiple controllers match the pod's label
+	if controllerRef != nil {
+		for _, rc := range controllers {
+			if controllerRef.UID == rc.ObjectMeta.UID {
+				glog.V(4).Infof("Return for pod %s/%s controller: %+v", pod.Namespace, pod.Name, rc)
+				return rc
+			}
+		}
+	}
+
 	// update lookup cache
 	rm.lookupCache.Update(pod, controllers[0])
+	glog.V(4).Infof("Return for pod %s/%s controller: %+v", pod.Namespace, pod.Name, *controllers[0])
 
 	return controllers[0]
 }
