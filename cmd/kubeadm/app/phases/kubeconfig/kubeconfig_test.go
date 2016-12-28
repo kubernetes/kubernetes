@@ -14,10 +14,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package util
+package kubeconfig
 
 import (
 	"bytes"
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/x509"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -32,8 +35,8 @@ const (
 	configOut1 = `apiVersion: v1
 clusters:
 - cluster:
-    server: ""
-  name: ""
+    server: "localhost:8080"
+  name: kubernetes
 contexts: []
 current-context: ""
 kind: Config
@@ -54,44 +57,19 @@ users: []
 )
 
 type configClient struct {
-	c  string
-	s  string
-	ca []byte
+	clusterName string
+	userName    string
+	serverURL   string
+	caCert      []byte
 }
 
 type configClientWithCerts struct {
-	c           *clientcmdapi.Config
-	clusterName string
-	userName    string
-	clientKey   []byte
-	clientCert  []byte
+	clientKey  []byte
+	clientCert []byte
 }
 
 type configClientWithToken struct {
-	c           *clientcmdapi.Config
-	clusterName string
-	userName    string
-	token       string
-}
-
-func TestCreateBasicClientConfig(t *testing.T) {
-	var createBasicTest = []struct {
-		cc       configClient
-		expected string
-	}{
-		{configClient{}, ""},
-		{configClient{c: "kubernetes"}, ""},
-	}
-	for _, rt := range createBasicTest {
-		c := CreateBasicClientConfig(rt.cc.c, rt.cc.s, rt.cc.ca)
-		if c.Kind != rt.expected {
-			t.Errorf(
-				"failed CreateBasicClientConfig:\n\texpected: %s\n\t  actual: %s",
-				c.Kind,
-				rt.expected,
-			)
-		}
-	}
+	token string
 }
 
 func TestMakeClientConfigWithCerts(t *testing.T) {
@@ -104,12 +82,11 @@ func TestMakeClientConfigWithCerts(t *testing.T) {
 		{configClient{c: "kubernetes"}, configClientWithCerts{}, ""},
 	}
 	for _, rt := range createBasicTest {
-		c := CreateBasicClientConfig(rt.cc.c, rt.cc.s, rt.cc.ca)
-		rt.ccWithCerts.c = c
 		cwc := MakeClientConfigWithCerts(
-			rt.ccWithCerts.c,
-			rt.ccWithCerts.clusterName,
-			rt.ccWithCerts.userName,
+			rt.cc.serverURL,
+			rt.cc.clusterName,
+			rt.cc.userName,
+			rt.cc.caCert,
 			rt.ccWithCerts.clientKey,
 			rt.ccWithCerts.clientCert,
 		)
@@ -130,15 +107,14 @@ func TestMakeClientConfigWithToken(t *testing.T) {
 		expected    string
 	}{
 		{configClient{}, configClientWithToken{}, ""},
-		{configClient{c: "kubernetes"}, configClientWithToken{}, ""},
+		{configClient{clusterName: "kubernetes"}, configClientWithToken{}, ""},
 	}
 	for _, rt := range createBasicTest {
-		c := CreateBasicClientConfig(rt.cc.c, rt.cc.s, rt.cc.ca)
-		rt.ccWithToken.c = c
 		cwc := MakeClientConfigWithToken(
-			rt.ccWithToken.c,
-			rt.ccWithToken.clusterName,
-			rt.ccWithToken.userName,
+			rt.cc.serverURL,
+			rt.cc.clusterName,
+			rt.cc.userName,
+			rt.cc.caCert,
 			rt.ccWithToken.token,
 		)
 		if cwc.Kind != rt.expected {
@@ -162,22 +138,26 @@ func TestWriteKubeconfigIfNotExists(t *testing.T) {
 	oldEnv := kubeadmapi.GlobalEnvParams
 	kubeadmapi.GlobalEnvParams = kubeadmapi.SetEnvParams()
 	kubeadmapi.GlobalEnvParams.KubernetesDir = fmt.Sprintf("%s/etc/kubernetes", tmpdir)
-	kubeadmapi.GlobalEnvParams.HostPKIPath = fmt.Sprintf("%s/etc/kubernetes/pki", tmpdir)
-	kubeadmapi.GlobalEnvParams.HostEtcdPath = fmt.Sprintf("%s/var/lib/etcd", tmpdir)
-	kubeadmapi.GlobalEnvParams.DiscoveryImage = fmt.Sprintf("%s/var/lib/etcd", tmpdir)
 	defer func() { kubeadmapi.GlobalEnvParams = oldEnv }()
 
 	var writeConfig = []struct {
-		name     string
-		cc       configClient
-		expected error
-		file     []byte
+		name        string
+		cc          configClient
+		ccWithToken configClientWithToken
+		expected    error
+		file        []byte
 	}{
-		{"test1", configClient{}, nil, []byte(configOut1)},
-		{"test2", configClient{c: "kubernetes"}, nil, []byte(configOut2)},
+		{"test1", configClientWithToken{clusterName: "k8s", userName: "user1", token: "abc"}, nil, []byte(configOut1)},
+		{"test2", configClientWithToken{clusterName: "kubernetes", userName: "user2", serverURL: "localhost:8080", token: "cba"}, nil, []byte(configOut2)},
 	}
 	for _, rt := range writeConfig {
-		c := CreateBasicClientConfig(rt.cc.c, rt.cc.s, rt.cc.ca)
+		c := MakeClientConfigWithToken(
+			rt.cc.serverURL,
+			rt.cc.clusterName,
+			rt.cc.userName,
+			rt.cc.caCert,
+			rt.ccWithToken.token,
+		)
 		err := WriteKubeconfigIfNotExists(rt.name, c)
 		if err != rt.expected {
 			t.Errorf(
@@ -193,6 +173,51 @@ func TestWriteKubeconfigIfNotExists(t *testing.T) {
 				"failed WriteKubeconfigIfNotExists config write:\n\texpected: %s\n\t  actual: %s",
 				newFile,
 				rt.file,
+			)
+		}
+	}
+}
+
+// TODO: Update this test
+func TestCreateCertsAndConfigForClients(t *testing.T) {
+	var tests = []struct {
+		a         kubeadmapi.API
+		cn        []string
+		caKeySize int
+		expected  bool
+	}{
+		{
+			a:         kubeadmapi.API{AdvertiseAddresses: []string{"foo"}},
+			cn:        []string{"localhost"},
+			caKeySize: 128,
+			expected:  false,
+		},
+		{
+			a:         kubeadmapi.API{AdvertiseAddresses: []string{"foo"}},
+			cn:        []string{},
+			caKeySize: 128,
+			expected:  true,
+		},
+		{
+			a:         kubeadmapi.API{AdvertiseAddresses: []string{"foo"}},
+			cn:        []string{"localhost"},
+			caKeySize: 2048,
+			expected:  true,
+		},
+	}
+
+	for _, rt := range tests {
+		caKey, err := rsa.GenerateKey(rand.Reader, rt.caKeySize)
+		if err != nil {
+			t.Fatalf("Couldn't create rsa Private Key")
+		}
+		caCert := &x509.Certificate{}
+		_, actual := CreateCertsAndConfigForClients(rt.a, rt.cn, caKey, caCert)
+		if (actual == nil) != rt.expected {
+			t.Errorf(
+				"failed CreateCertsAndConfigForClients:\n\texpected: %t\n\t  actual: %t",
+				rt.expected,
+				(actual == nil),
 			)
 		}
 	}
