@@ -21,6 +21,7 @@ import (
 	"path/filepath"
 	"time"
 
+	apierrors "k8s.io/kubernetes/pkg/api/errors"
 	legacyv1 "k8s.io/kubernetes/pkg/api/v1"
 	rbacv1alpha1 "k8s.io/kubernetes/pkg/apis/rbac/v1alpha1"
 	"k8s.io/kubernetes/pkg/runtime/schema"
@@ -94,6 +95,13 @@ var _ = framework.KubeDescribe("Loadbalancing: L7", func() {
 				},
 			},
 		})
+		if apierrors.IsForbidden(err) {
+			// The user is not allowed to create ClusterRoleBindings. This
+			// probably means that RBAC is not being used. If RBAC is being
+			// used, this test will probably fail later.
+			framework.Logf("Attempt to create ClusterRoleBinding was forbidden: %v.", err)
+			return
+		}
 		framework.ExpectNoError(err)
 
 		err = framework.WaitForAuthorizationUpdate(jig.client.Authorization(),
