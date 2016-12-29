@@ -42,7 +42,7 @@ go_test(
         "chain_test.go",
         "init_test.go",
     ],
-    library = "go_default_library",
+    library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
         "//pkg/auth/authorizer:go_default_library",

@@ -37,7 +37,7 @@ go_test(
         "quantity_test.go",
         "scale_int_test.go",
     ],
-    library = "go_default_library",
+    library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
         "//vendor:github.com/google/gofuzz",

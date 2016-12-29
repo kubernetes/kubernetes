@@ -42,7 +42,7 @@ go_test(
         "admission_test.go",
         "hawkular_test.go",
     ],
-    library = "go_default_library",
+    library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
         "//pkg/admission:go_default_library",

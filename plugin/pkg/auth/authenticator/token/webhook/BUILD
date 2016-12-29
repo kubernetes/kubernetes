@@ -30,7 +30,7 @@ go_test(
         "certs_test.go",
         "webhook_test.go",
     ],
-    library = "go_default_library",
+    library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
         "//pkg/apis/authentication/v1beta1:go_default_library",

@@ -56,7 +56,7 @@ go_test(
         "pki_test.go",
         "tokens_test.go",
     ],
-    library = "go_default_library",
+    library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
         "//cmd/kubeadm/app/apis/kubeadm:go_default_library",

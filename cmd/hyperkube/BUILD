@@ -5,10 +5,29 @@ licenses(["notice"])
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_binary",
+    "go_library",
+    "go_test",
 )
 
 go_binary(
     name = "hyperkube",
+    library = ":go_default_library",
+    tags = ["automanaged"],
+)
+
+go_test(
+    name = "go_default_test",
+    srcs = ["hyperkube_test.go"],
+    library = ":go_default_library",
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/spf13/cobra",
+        "//vendor:github.com/stretchr/testify/assert",
+    ],
+)
+
+go_library(
+    name = "go_default_library",
     srcs = [
         "federation-apiserver.go",
         "federation-controller-manager.go",

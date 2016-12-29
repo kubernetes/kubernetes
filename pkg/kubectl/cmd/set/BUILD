@@ -44,7 +44,7 @@ go_test(
     data = [
         "//examples:config",
     ],
-    library = "go_default_library",
+    library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",

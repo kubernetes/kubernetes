@@ -38,7 +38,7 @@ go_test(
         "response_checker_test.go",
         "streamer_test.go",
     ],
-    library = "go_default_library",
+    library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",

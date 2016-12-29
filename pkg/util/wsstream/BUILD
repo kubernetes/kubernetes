@@ -29,7 +29,7 @@ go_test(
         "conn_test.go",
         "stream_test.go",
     ],
-    library = "go_default_library",
+    library = ":go_default_library",
     tags = ["automanaged"],
     deps = ["//vendor:golang.org/x/net/websocket"],
 )

@@ -33,7 +33,7 @@ go_test(
         "jwt_test.go",
         "metadata_test.go",
     ],
-    library = "go_default_library",
+    library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
         "//pkg/credentialprovider:go_default_library",

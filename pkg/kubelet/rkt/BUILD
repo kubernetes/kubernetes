@@ -67,7 +67,7 @@ go_test(
         "fake_rkt_interface_test.go",
         "rkt_test.go",
     ],
-    library = "go_default_library",
+    library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
         "//pkg/api/resource:go_default_library",

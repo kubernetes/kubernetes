@@ -53,7 +53,7 @@ go_test(
         "get_contexts_test.go",
         "navigation_step_parser_test.go",
     ],
-    library = "go_default_library",
+    library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
