@@ -14,6 +14,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# A library of helper functions and constants for the CoreOS distro
+# A library of helper functions and constants for the Container Linux distro.
 
 # This file intentionally left blank
