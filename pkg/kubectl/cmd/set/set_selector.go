@@ -29,6 +29,7 @@ import (
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/util/validation"
 )
 
 // SelectorOptions is the start of the data required to perform the operation.  As new fields are added, add them here instead of
@@ -77,7 +78,7 @@ func NewCmdSelector(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "selector (-f FILENAME | TYPE NAME) EXPRESSIONS [--resource-version=version]",
 		Short:   "Set the selector on a resource",
-		Long:    fmt.Sprintf(selectorLong),
+		Long:    fmt.Sprintf(selectorLong, validation.LabelValueMaxLength),
 		Example: selectorExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(options.Complete(f, cmd, args, out))
@@ -135,6 +136,9 @@ func (o *SelectorOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args [
 func (o *SelectorOptions) Validate() error {
 	if len(o.resources) < 1 && cmdutil.IsFilenameEmpty(o.fileOptions.Filenames) {
 		return fmt.Errorf("one or more resources must be specified as <resource> <name> or <resource>/<name>")
+	}
+	if o.selector == nil {
+		return fmt.Errorf("one selector is required")
 	}
 	return nil
 }
@@ -213,9 +217,10 @@ func updateSelectorForObject(obj runtime.Object, selector metav1.LabelSelector) 
 
 // getResourcesAndSelector retrieves resources and the selector expression from the given args (assuming selectors the last arg)
 func getResourcesAndSelector(args []string) (resources []string, selector *metav1.LabelSelector, err error) {
-	if len(args) > 1 {
-		resources = args[:len(args)-1]
+	if len(args) == 0 {
+		return []string{}, nil, nil
 	}
+	resources = args[:len(args)-1]
 	selector, err = metav1.ParseToLabelSelector(args[len(args)-1])
 	return resources, selector, err
 }
