@@ -283,6 +283,13 @@ func TestGetResourcesAndSelector(t *testing.T) {
 				MatchExpressions: []metav1.LabelSelectorRequirement{},
 			},
 		},
+		{
+			name:          "no resource and selector",
+			args:          args{args: []string{}},
+			wantResources: []string{},
+			wantErr:       false,
+			wantSelector:  nil,
+		},
 	}
 	for _, tt := range tests {
 		gotResources, gotSelector, err := getResourcesAndSelector(tt.args.args)
