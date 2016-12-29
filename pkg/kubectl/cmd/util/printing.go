@@ -52,7 +52,7 @@ func AddOutputFlags(cmd *cobra.Command) {
 
 // AddNoHeadersFlags adds no-headers flags to a command.
 func AddNoHeadersFlags(cmd *cobra.Command) {
-	cmd.Flags().Bool("no-headers", false, "When using the default or custom-column output format, don't print headers.")
+	cmd.Flags().Bool("no-headers", false, "When using the default or custom-column output format, don't print headers (default print headers).")
 }
 
 // PrintSuccess prints message after finishing mutating operations
