@@ -72,8 +72,8 @@ func GetContainerOOMScoreAdjust(pod *v1.Pod, container *v1.Container, memoryCapa
 		return (1000 + guaranteedOOMScoreAdj)
 	}
 	// Give burstable pods a higher chance of survival over besteffort pods.
-	if int(oomScoreAdjust) == besteffortOOMScoreAdj {
-		return int(oomScoreAdjust - 1)
+	if int(oomScoreAdjust) >= besteffortOOMScoreAdj {
+		return int(besteffortOOMScoreAdj - 1)
 	}
 	return int(oomScoreAdjust)
 }
