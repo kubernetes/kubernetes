@@ -18,6 +18,7 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//cmd/kubeadm/app/apis/kubeadm:go_default_library",
+        "//cmd/kubeadm/app/phases/kubeconfig:go_default_library",
         "//cmd/kubeadm/app/util:go_default_library",
         "//pkg/api/v1:go_default_library",
         "//pkg/apis/certificates:go_default_library",

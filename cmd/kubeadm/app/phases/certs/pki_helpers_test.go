@@ -14,19 +14,16 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package master
+package certs
 
 import (
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
-	"fmt"
 	"io/ioutil"
 	"os"
 	"testing"
 
-	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	certutil "k8s.io/kubernetes/pkg/util/cert"
 )
 
@@ -53,38 +50,16 @@ func TestNewCertificateAuthority(t *testing.T) {
 
 func TestNewServerKeyAndCert(t *testing.T) {
 	var tests = []struct {
-		cfg       *kubeadmapi.MasterConfiguration
 		caKeySize int
 		expected  bool
 	}{
 		{
-			// given CIDR too small
-			cfg: &kubeadmapi.MasterConfiguration{
-				Networking: kubeadm.Networking{ServiceSubnet: "10.0.0.1/1"},
-			},
-			caKeySize: 2048,
-			expected:  false,
-		},
-		{
-			// bad CIDR
-			cfg: &kubeadmapi.MasterConfiguration{
-				Networking: kubeadm.Networking{ServiceSubnet: "foo"},
-			},
-			caKeySize: 2048,
-			expected:  false,
-		},
-		{
 			// RSA key too small
-			cfg: &kubeadmapi.MasterConfiguration{
-				Networking: kubeadm.Networking{ServiceSubnet: "10.0.0.1/24"},
-			},
 			caKeySize: 128,
 			expected:  false,
 		},
 		{
-			cfg: &kubeadmapi.MasterConfiguration{
-				Networking: kubeadm.Networking{ServiceSubnet: "10.0.0.1/24"},
-			},
+			// Should succeed
 			caKeySize: 2048,
 			expected:  true,
 		},
@@ -97,7 +72,7 @@ func TestNewServerKeyAndCert(t *testing.T) {
 		}
 		caCert := &x509.Certificate{}
 		altNames := certutil.AltNames{}
-		_, _, actual := newServerKeyAndCert(rt.cfg, caCert, caKey, altNames)
+		_, _, actual := newServerKeyAndCert(caCert, caKey, altNames)
 		if (actual == nil) != rt.expected {
 			t.Errorf(
 				"failed newServerKeyAndCert:\n\texpected: %t\n\t  actual: %t",
@@ -130,10 +105,10 @@ func TestNewClientKeyAndCert(t *testing.T) {
 			t.Fatalf("Couldn't create rsa Private Key")
 		}
 		caCert := &x509.Certificate{}
-		_, _, actual := newClientKeyAndCert(caCert, caKey)
+		_, _, actual := NewClientKeyAndCert(caCert, caKey)
 		if (actual == nil) != rt.expected {
 			t.Errorf(
-				"failed newClientKeyAndCert:\n\texpected: %t\n\t  actual: %t",
+				"failed NewClientKeyAndCert:\n\texpected: %t\n\t  actual: %t",
 				rt.expected,
 				(actual == nil),
 			)
@@ -191,68 +166,6 @@ func TestPathsKeysCerts(t *testing.T) {
 					all[i],
 				)
 			}
-		}
-	}
-}
-
-func TestNewServiceAccountKey(t *testing.T) {
-	r, err := newServiceAccountKey()
-	if r == nil {
-		t.Errorf(
-			"failed newServiceAccountKey, rsa key == nil",
-		)
-	}
-	if err != nil {
-		t.Errorf(
-			"failed newServiceAccountKey with an error: %v",
-			err,
-		)
-	}
-}
-
-func TestCreatePKIAssets(t *testing.T) {
-	tmpdir, err := ioutil.TempDir("", "")
-	if err != nil {
-		t.Fatalf("Couldn't create tmpdir")
-	}
-	defer os.Remove(tmpdir)
-
-	// set up tmp GlobalEnvParams values for testing
-	oldEnv := kubeadmapi.GlobalEnvParams
-	kubeadmapi.GlobalEnvParams.HostPKIPath = fmt.Sprintf("%s/etc/kubernetes/pki", tmpdir)
-	defer func() { kubeadmapi.GlobalEnvParams = oldEnv }()
-
-	var tests = []struct {
-		cfg      *kubeadmapi.MasterConfiguration
-		expected bool
-	}{
-		{
-			cfg:      &kubeadmapi.MasterConfiguration{},
-			expected: false,
-		},
-		{
-			cfg: &kubeadmapi.MasterConfiguration{
-				API:        kubeadm.API{AdvertiseAddresses: []string{"10.0.0.1"}},
-				Networking: kubeadm.Networking{ServiceSubnet: "10.0.0.1/1"},
-			},
-			expected: false,
-		},
-		{
-			cfg: &kubeadmapi.MasterConfiguration{
-				API:        kubeadm.API{AdvertiseAddresses: []string{"10.0.0.1"}},
-				Networking: kubeadm.Networking{ServiceSubnet: "10.0.0.1/24"},
-			},
-			expected: true,
-		},
-	}
-	for _, rt := range tests {
-		_, _, actual := CreatePKIAssets(rt.cfg)
-		if (actual == nil) != rt.expected {
-			t.Errorf(
-				"failed CreatePKIAssets with an error:\n\texpected: %t\n\t  actual: %t",
-				rt.expected,
-				(actual == nil),
-			)
 		}
 	}
 }
