@@ -55,7 +55,7 @@ go_test(
         "selector_spreading_test.go",
         "taint_toleration_test.go",
     ],
-    library = "go_default_library",
+    library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
         "//pkg/api/resource:go_default_library",

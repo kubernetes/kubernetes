@@ -227,7 +227,7 @@ go_library(
         "e2e_test.go",
         "metrics_grabber_test.go",
     ],
-    library = "go_default_library",
+    library = ":go_default_library",
     tags = ["automanaged"],
     visibility = ["//visibility:private"],
     deps = [

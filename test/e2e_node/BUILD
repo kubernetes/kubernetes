@@ -70,7 +70,7 @@ go_test(
         "summary_test.go",
         "volume_manager_test.go",
     ],
-    library = "go_default_library",
+    library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
         "//pkg/api/errors:go_default_library",

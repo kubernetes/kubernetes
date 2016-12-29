@@ -53,7 +53,7 @@ go_test(
         "container_manager_linux_test.go",
         "helpers_linux_test.go",
     ],
-    library = "go_default_library",
+    library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
         "//pkg/api/resource:go_default_library",

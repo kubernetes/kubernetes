@@ -48,7 +48,7 @@ go_test(
         "strategy_test.go",
         "util_test.go",
     ],
-    library = "go_default_library",
+    library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",

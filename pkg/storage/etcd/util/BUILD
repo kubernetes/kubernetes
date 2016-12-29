@@ -21,7 +21,7 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = ["etcd_util_test.go"],
-    library = "go_default_library",
+    library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
         "//vendor:github.com/coreos/etcd/client",

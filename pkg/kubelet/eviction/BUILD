@@ -17,7 +17,7 @@ go_library(
         "helpers.go",
         "types.go",
     ],
-    library = "cgo_codegen",
+    library = ":cgo_codegen",
     tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
@@ -47,7 +47,7 @@ go_test(
         "eviction_manager_test.go",
         "helpers_test.go",
     ],
-    library = "go_default_library",
+    library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",

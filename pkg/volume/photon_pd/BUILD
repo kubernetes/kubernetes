@@ -37,7 +37,7 @@ go_test(
         "attacher_test.go",
         "photon_pd_test.go",
     ],
-    library = "go_default_library",
+    library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
         "//pkg/api/v1:go_default_library",

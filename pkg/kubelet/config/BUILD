@@ -57,7 +57,7 @@ go_test(
         "file_linux_test.go",
         "http_test.go",
     ],
-    library = "go_default_library",
+    library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",

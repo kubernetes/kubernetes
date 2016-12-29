@@ -39,7 +39,7 @@ go_test(
         "flocker_util_test.go",
         "flocker_volume_test.go",
     ],
-    library = "go_default_library",
+    library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
         "//pkg/api/v1:go_default_library",

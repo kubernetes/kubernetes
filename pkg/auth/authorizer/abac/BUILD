@@ -36,7 +36,7 @@ go_test(
     data = [
         ":example_policy",
     ],
-    library = "go_default_library",
+    library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
         "//pkg/apis/abac:go_default_library",

@@ -47,7 +47,7 @@ go_test(
         "proxy_test.go",
         "watch_test.go",
     ],
-    library = "go_default_library",
+    library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
         "//pkg/admission:go_default_library",

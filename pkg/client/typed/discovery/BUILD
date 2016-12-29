@@ -41,7 +41,7 @@ go_test(
         "discovery_client_test.go",
         "restmapper_test.go",
     ],
-    library = "go_default_library",
+    library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
         "//pkg/api/errors:go_default_library",
