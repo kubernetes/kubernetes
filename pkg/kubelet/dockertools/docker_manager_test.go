@@ -2227,8 +2227,7 @@ func TestGetPodStatusFromNetworkPlugin(t *testing.T) {
 		containerID        string
 		infraContainerID   string
 		networkStatusError error
-		expectRunning      bool
-		expectUnknown      bool
+		expectedState      kubecontainer.ContainerState
 	}{
 		{
 			pod: &v1.Pod{
@@ -2245,8 +2244,7 @@ func TestGetPodStatusFromNetworkPlugin(t *testing.T) {
 			containerID:        "123",
 			infraContainerID:   "9876",
 			networkStatusError: nil,
-			expectRunning:      true,
-			expectUnknown:      false,
+			expectedState:      kubecontainer.ContainerStateRunning,
 		},
 		{
 			pod: &v1.Pod{
@@ -2263,8 +2261,7 @@ func TestGetPodStatusFromNetworkPlugin(t *testing.T) {
 			containerID:        "123",
 			infraContainerID:   "9876",
 			networkStatusError: fmt.Errorf("CNI plugin error"),
-			expectRunning:      false,
-			expectUnknown:      true,
+			expectedState:      kubecontainer.ContainerStateExited,
 		},
 	}
 	for _, test := range cases {
@@ -2302,16 +2299,8 @@ func TestGetPodStatusFromNetworkPlugin(t *testing.T) {
 		}
 
 		expectedStatesCount := 0
-		var expectedState kubecontainer.ContainerState
-		if test.expectRunning {
-			expectedState = kubecontainer.ContainerStateRunning
-		} else if test.expectUnknown {
-			expectedState = kubecontainer.ContainerStateUnknown
-		} else {
-			t.Errorf("Some state has to be expected")
-		}
 		for _, containerStatus := range podStatus.ContainerStatuses {
-			if containerStatus.State == expectedState {
+			if containerStatus.State == test.expectedState {
 				expectedStatesCount++
 			}
 		}

@@ -448,8 +448,9 @@ func (dm *DockerManager) inspectContainer(id string, podName, podNamespace strin
 			ip, err = dm.determineContainerIP(podNamespace, podName, iResult)
 			// Kubelet doesn't handle the network error scenario
 			if err != nil {
-				status.State = kubecontainer.ContainerStateUnknown
-				status.Message = fmt.Sprintf("Network error: %#v", err)
+				status.State = kubecontainer.ContainerStateExited
+				status.Message = iResult.State.Error
+				status.Reason = "Error"
 			}
 		}
 		return &status, ip, nil
@@ -1973,7 +1974,7 @@ func (dm *DockerManager) computePodContainerChanges(pod *v1.Pod, podStatus *kube
 			case containerStatus.State == kubecontainer.ContainerStateExited:
 				initContainersToKeep[kubecontainer.DockerID(containerStatus.ID.ID)] = i
 				// TODO: should we abstract the "did the init container fail" check?
-				if containerStatus.ExitCode != 0 {
+				if containerStatus.ExitCode != 0 || containerStatus.Reason == "Error" {
 					initFailed = true
 					break Containers
 				}
