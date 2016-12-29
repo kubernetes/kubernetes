@@ -1,0 +1,16 @@
+# This is the role binding for the node-problem-detector
+# which is used to get and patch the node health status.
+apiVersion: rbac.authorization.k8s.io/v1alpha1
+kind: ClusterRoleBinding
+metadata:
+  name: node-problem-detector-binding
+  labels:
+    kubernetes.io/cluster-service: "true"
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: cluster-admin
+subjects:
+- apiVersion: rbac/v1alpha1
+  kind: User
+  name: system:node-problem-detector
