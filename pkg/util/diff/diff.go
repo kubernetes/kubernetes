@@ -91,8 +91,8 @@ func ObjectReflectDiff(a, b interface{}) string {
 	for _, d := range diffs {
 		out = append(out,
 			fmt.Sprintf("%s:", d.path),
-			limit(fmt.Sprintf("  a: %#v", d.a), 80),
-			limit(fmt.Sprintf("  b: %#v", d.b), 80),
+			limit(fmt.Sprintf("  a: %#v", d.a), 200),
+			limit(fmt.Sprintf("  b: %#v", d.b), 200),
 		)
 	}
 	return strings.Join(out, "\n")
