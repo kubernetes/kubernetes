@@ -84,6 +84,7 @@ go_test(
     srcs = [
         "container_gc_test.go",
         "convert_test.go",
+        "docker_manager_linux_test.go",
         "docker_manager_test.go",
         "docker_test.go",
         "images_test.go",
