@@ -3829,6 +3829,80 @@ func LaunchHostExecPod(client clientset.Interface, ns, name string) *v1.Pod {
 	return pod
 }
 
+// newExecPodSpec returns the pod spec of exec pod
+func newExecPodSpec(ns, generateName string) *v1.Pod {
+	immediate := int64(0)
+	pod := &v1.Pod{
+		ObjectMeta: v1.ObjectMeta{
+			GenerateName: generateName,
+			Namespace:    ns,
+		},
+		Spec: v1.PodSpec{
+			TerminationGracePeriodSeconds: &immediate,
+			Containers: []v1.Container{
+				{
+					Name:    "exec",
+					Image:   "gcr.io/google_containers/busybox:1.24",
+					Command: []string{"sh", "-c", "while true; do sleep 5; done"},
+				},
+			},
+		},
+	}
+	return pod
+}
+
+// CreateExecPodOrFail creates a simple busybox pod in a sleep loop used as a
+// vessel for kubectl exec commands.
+// Returns the name of the created pod.
+func CreateExecPodOrFail(client clientset.Interface, ns, generateName string, tweak func(*v1.Pod)) string {
+	Logf("Creating new exec pod")
+	execPod := newExecPodSpec(ns, generateName)
+	if tweak != nil {
+		tweak(execPod)
+	}
+	created, err := client.Core().Pods(ns).Create(execPod)
+	Expect(err).NotTo(HaveOccurred())
+	err = wait.PollImmediate(Poll, 5*time.Minute, func() (bool, error) {
+		retrievedPod, err := client.Core().Pods(execPod.Namespace).Get(created.Name, metav1.GetOptions{})
+		if err != nil {
+			return false, nil
+		}
+		return retrievedPod.Status.Phase == v1.PodRunning, nil
+	})
+	Expect(err).NotTo(HaveOccurred())
+	return created.Name
+}
+
+func CreatePodOrFail(c clientset.Interface, ns, name string, labels map[string]string, containerPorts []v1.ContainerPort) {
+	By(fmt.Sprintf("Creating pod %s in namespace %s", name, ns))
+	pod := &v1.Pod{
+		ObjectMeta: v1.ObjectMeta{
+			Name:   name,
+			Labels: labels,
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:  "pause",
+					Image: GetPauseImageName(c),
+					Ports: containerPorts,
+					// Add a dummy environment variable to work around a docker issue.
+					// https://github.com/docker/docker/issues/14203
+					Env: []v1.EnvVar{{Name: "FOO", Value: " "}},
+				},
+			},
+		},
+	}
+	_, err := c.Core().Pods(ns).Create(pod)
+	Expect(err).NotTo(HaveOccurred())
+}
+
+func DeletePodOrFail(c clientset.Interface, ns, name string) {
+	By(fmt.Sprintf("Deleting pod %s in namespace %s", name, ns))
+	err := c.Core().Pods(ns).Delete(name, nil)
+	Expect(err).NotTo(HaveOccurred())
+}
+
 // GetSigner returns an ssh.Signer for the provider ("gce", etc.) that can be
 // used to SSH to their nodes.
 func GetSigner(provider string) (ssh.Signer, error) {
@@ -5158,4 +5232,52 @@ func GetNodeExternalIP(node *v1.Node) string {
 		Failf("Couldn't get the external IP of host %s with addresses %v", node.Name, node.Status.Addresses)
 	}
 	return host
+}
+
+// RcByNamePort returns a ReplicationController with specified name and port
+func RcByNamePort(name string, replicas int32, image string, port int, protocol v1.Protocol,
+	labels map[string]string, gracePeriod *int64) *v1.ReplicationController {
+
+	return RcByNameContainer(name, replicas, image, labels, v1.Container{
+		Name:  name,
+		Image: image,
+		Ports: []v1.ContainerPort{{ContainerPort: int32(port), Protocol: protocol}},
+	}, gracePeriod)
+}
+
+// RcByNameContainer returns a ReplicationControoler with specified name and container
+func RcByNameContainer(name string, replicas int32, image string, labels map[string]string, c v1.Container,
+	gracePeriod *int64) *v1.ReplicationController {
+
+	zeroGracePeriod := int64(0)
+
+	// Add "name": name to the labels, overwriting if it exists.
+	labels["name"] = name
+	if gracePeriod == nil {
+		gracePeriod = &zeroGracePeriod
+	}
+	return &v1.ReplicationController{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "ReplicationController",
+			APIVersion: registered.GroupOrDie(v1.GroupName).GroupVersion.String(),
+		},
+		ObjectMeta: v1.ObjectMeta{
+			Name: name,
+		},
+		Spec: v1.ReplicationControllerSpec{
+			Replicas: func(i int32) *int32 { return &i }(replicas),
+			Selector: map[string]string{
+				"name": name,
+			},
+			Template: &v1.PodTemplateSpec{
+				ObjectMeta: v1.ObjectMeta{
+					Labels: labels,
+				},
+				Spec: v1.PodSpec{
+					Containers:                    []v1.Container{c},
+					TerminationGracePeriodSeconds: gracePeriod,
+				},
+			},
+		},
+	}
 }
