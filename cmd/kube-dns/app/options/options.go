@@ -139,8 +139,8 @@ func (s *KubeDNSConfig) AddFlags(fs *pflag.FlagSet) {
 
 	fs.StringVar(&s.KubeConfigFile, "kubecfg-file", s.KubeConfigFile,
 		"Location of kubecfg file for access to kubernetes master service;"+
-			" --kube-master-url overrides the URL part of this; if neither this nor"+
-			" --kube-master-url are provided, defaults to service account tokens")
+			" --kube-master-url overrides the URL part of this; if this is not"+
+			" provided, defaults to service account tokens")
 	fs.Var(kubeMasterURLVar{&s.KubeMasterURL}, "kube-master-url",
 		"URL to reach kubernetes master. Env variables in this flag will be expanded.")
 
