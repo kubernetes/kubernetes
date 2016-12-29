@@ -51,35 +51,6 @@ EOF
 
 writeEnvironmentFile
 
-MAKE_DIR="${KUBE_ROOT}/cluster/images/kubemark"
-
-KUBEMARK_BIN="$(kube::util::find-binary-for-platform kubemark linux/amd64)"
-if [[ -z "${KUBEMARK_BIN}" ]]; then
-  echo 'Cannot find cmd/kubemark binary'
-  exit 1
-fi
-
-echo "Copying kubemark to ${MAKE_DIR}"
-cp "${KUBEMARK_BIN}" "${MAKE_DIR}"
-
-CURR_DIR=`pwd`
-cd "${MAKE_DIR}"
-RETRIES=3
-for attempt in $(seq 1 ${RETRIES}); do
-  if ! make; then
-    if [[ $((attempt)) -eq "${RETRIES}" ]]; then
-      echo "${color_red}Make failed. Exiting.${color_norm}"
-      exit 1
-    fi
-    echo -e "${color_yellow}Make attempt $(($attempt)) failed. Retrying.${color_norm}" >& 2
-    sleep $(($attempt * 5))
-  else
-    break
-  fi
-done
-rm kubemark
-cd $CURR_DIR
-
 GCLOUD_COMMON_ARGS="--project ${PROJECT} --zone ${ZONE}"
 
 run-gcloud-compute-with-retries disks create "${MASTER_NAME}-pd" \
@@ -134,10 +105,7 @@ create-certs ${MASTER_IP}
 KUBELET_TOKEN=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)
 KUBE_PROXY_TOKEN=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)
 HEAPSTER_TOKEN=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)
-
-echo "${CA_CERT_BASE64}" | base64 --decode > "${RESOURCE_DIRECTORY}/ca.crt"
-echo "${KUBECFG_CERT_BASE64}" | base64 --decode > "${RESOURCE_DIRECTORY}/kubecfg.crt"
-echo "${KUBECFG_KEY_BASE64}" | base64 --decode > "${RESOURCE_DIRECTORY}/kubecfg.key"
+NODE_PROBLEM_DETECTOR_TOKEN=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)
 
 until gcloud compute ssh --zone="${ZONE}" --project="${PROJECT}" "${MASTER_NAME}" --command="ls" &> /dev/null; do
   sleep 1
@@ -156,6 +124,7 @@ run-gcloud-compute-with-retries ssh --zone="${ZONE}" --project="${PROJECT}" "${M
     sudo bash -c \"echo \"${KUBELET_TOKEN},system:node:node-name,uid:kubelet,system:nodes\" >> /etc/srv/kubernetes/known_tokens.csv\" && \
     sudo bash -c \"echo \"${KUBE_PROXY_TOKEN},system:kube-proxy,uid:kube_proxy\" >> /etc/srv/kubernetes/known_tokens.csv\" && \
     sudo bash -c \"echo \"${HEAPSTER_TOKEN},system:heapster,uid:heapster\" >> /etc/srv/kubernetes/known_tokens.csv\" && \
+    sudo bash -c \"echo \"${NODE_PROBLEM_DETECTOR_TOKEN},system:node-problem-detector,uid:system:node-problem-detector\" >> /etc/srv/kubernetes/known_tokens.csv\" && \
     sudo bash -c \"echo ${password},admin,admin > /etc/srv/kubernetes/basic_auth.csv\""
 
 run-gcloud-compute-with-retries copy-files --zone="${ZONE}" --project="${PROJECT}" \
@@ -177,6 +146,34 @@ gcloud compute ssh "${MASTER_NAME}" --zone="${ZONE}" --project="${PROJECT}" \
     sudo chmod a+x /home/kubernetes/start-kubemark-master.sh && \
     sudo bash /home/kubernetes/start-kubemark-master.sh"
 
+# Setup the docker image for kubemark hollow-node.
+MAKE_DIR="${KUBE_ROOT}/cluster/images/kubemark"
+KUBEMARK_BIN="$(kube::util::find-binary-for-platform kubemark linux/amd64)"
+if [[ -z "${KUBEMARK_BIN}" ]]; then
+  echo 'Cannot find cmd/kubemark binary'
+  exit 1
+fi
+
+echo "Copying kubemark to ${MAKE_DIR}"
+cp "${KUBEMARK_BIN}" "${MAKE_DIR}"
+CURR_DIR=`pwd`
+cd "${MAKE_DIR}"
+RETRIES=3
+for attempt in $(seq 1 ${RETRIES}); do
+  if ! make; then
+    if [[ $((attempt)) -eq "${RETRIES}" ]]; then
+      echo "${color_red}Make failed. Exiting.${color_norm}"
+      exit 1
+    fi
+    echo -e "${color_yellow}Make attempt $(($attempt)) failed. Retrying.${color_norm}" >& 2
+    sleep $(($attempt * 5))
+  else
+    break
+  fi
+done
+rm kubemark
+cd $CURR_DIR
+
 # Create kubeconfig for Kubelet.
 KUBELET_KUBECONFIG_CONTENTS=$(echo "apiVersion: v1
 kind: Config
@@ -195,7 +192,7 @@ contexts:
     cluster: kubemark
     user: kubelet
   name: kubemark-context
-current-context: kubemark-context" | base64 | tr -d "\n\r")
+current-context: kubemark-context")
 
 # Create kubeconfig for Kubeproxy.
 KUBEPROXY_KUBECONFIG_CONTENTS=$(echo "apiVersion: v1
@@ -214,7 +211,7 @@ contexts:
     cluster: kubemark
     user: kube-proxy
   name: kubemark-context
-current-context: kubemark-context" | base64 | tr -d "\n\r")
+current-context: kubemark-context")
 
 # Create kubeconfig for Heapster.
 HEAPSTER_KUBECONFIG_CONTENTS=$(echo "apiVersion: v1
@@ -233,39 +230,28 @@ contexts:
     cluster: kubemark
     user: heapster
   name: kubemark-context
-current-context: kubemark-context" | base64 | tr -d "\n\r")
+current-context: kubemark-context")
 
-KUBECONFIG_SECRET="${RESOURCE_DIRECTORY}/kubeconfig_secret.json"
-cat > "${KUBECONFIG_SECRET}" << EOF
-{
-  "apiVersion": "v1",
-  "kind": "Secret",
-  "metadata": {
-    "name": "kubeconfig"
-  },
-  "type": "Opaque",
-  "data": {
-    "kubelet.kubeconfig": "${KUBELET_KUBECONFIG_CONTENTS}",
-    "kubeproxy.kubeconfig": "${KUBEPROXY_KUBECONFIG_CONTENTS}",
-    "heapster.kubeconfig": "${HEAPSTER_KUBECONFIG_CONTENTS}"
-  }
-}
-EOF
+# Create kubeconfig for NodeProblemDetector.
+NPD_KUBECONFIG_CONTENTS=$(echo "apiVersion: v1
+kind: Config
+users:
+- name: node-problem-detector
+  user:
+    token: ${NODE_PROBLEM_DETECTOR_TOKEN}
+clusters:
+- name: kubemark
+  cluster:
+    insecure-skip-tls-verify: true
+    server: https://${MASTER_IP}
+contexts:
+- context:
+    cluster: kubemark
+    user: node-problem-detector
+  name: kubemark-npd-context
+current-context: kubemark-npd-context")
 
-NODE_CONFIGMAP="${RESOURCE_DIRECTORY}/node_config_map.json"
-cat > "${NODE_CONFIGMAP}" << EOF
-{
-  "apiVersion": "v1",
-  "kind": "ConfigMap",
-  "metadata": {
-    "name": "node-configmap"
-  },
-  "data": {
-    "content.type": "${TEST_CLUSTER_API_CONTENT_TYPE}"
-  }
-}
-EOF
-
+# Create kubeconfig for local kubectl.
 LOCAL_KUBECONFIG="${RESOURCE_DIRECTORY}/kubeconfig.kubemark"
 cat > "${LOCAL_KUBECONFIG}" << EOF
 apiVersion: v1
@@ -292,6 +278,7 @@ EOF
 
 sed "s/{{numreplicas}}/${NUM_NODES:-10}/g" "${RESOURCE_DIRECTORY}/hollow-node_template.json" > "${RESOURCE_DIRECTORY}/hollow-node.json"
 sed -i'' -e "s/{{project}}/${PROJECT}/g" "${RESOURCE_DIRECTORY}/hollow-node.json"
+sed -i'' -e "s/{{master_ip}}/${MASTER_IP}/g" "${RESOURCE_DIRECTORY}/hollow-node.json"
 
 mkdir "${RESOURCE_DIRECTORY}/addons" || true
 
@@ -303,15 +290,22 @@ eventer_mem_per_node=500
 eventer_mem=$((200 * 1024 + ${eventer_mem_per_node}*${NUM_NODES:-10}))
 sed -i'' -e "s/{{EVENTER_MEM}}/${eventer_mem}/g" "${RESOURCE_DIRECTORY}/addons/heapster.json"
 
+# Create kubemark namespace.
 "${KUBECTL}" create -f "${RESOURCE_DIRECTORY}/kubemark-ns.json"
-"${KUBECTL}" create -f "${KUBECONFIG_SECRET}" --namespace="kubemark"
-"${KUBECTL}" create -f "${NODE_CONFIGMAP}" --namespace="kubemark"
+# Create configmap for configuring hollow- kubelet, proxy and npd.
+"${KUBECTL}" create configmap "node-configmap" --namespace="kubemark" \
+  --from-literal=content.type="${TEST_CLUSTER_API_CONTENT_TYPE}" \
+  --from-file=kernel.monitor="${RESOURCE_DIRECTORY}/kernel-monitor.json"
+# Create secret for passing kubeconfigs to kubelet, kubeproxy and npd.
+"${KUBECTL}" create secret generic "kubeconfig" --type=Opaque --namespace="kubemark" \
+  --from-literal=kubelet.kubeconfig="${KUBELET_KUBECONFIG_CONTENTS}" \
+  --from-literal=kubeproxy.kubeconfig="${KUBEPROXY_KUBECONFIG_CONTENTS}" \
+  --from-literal=heapster.kubeconfig="${HEAPSTER_KUBECONFIG_CONTENTS}" \
+  --from-literal=npd.kubeconfig="${NPD_KUBECONFIG_CONTENTS}"
+# Create addon pods.
 "${KUBECTL}" create -f "${RESOURCE_DIRECTORY}/addons" --namespace="kubemark"
-"${KUBECTL}" create configmap node-problem-detector-config --from-file="${RESOURCE_DIRECTORY}/kernel-monitor.json" --namespace="kubemark"
+# Create the replication controller for hollow-nodes.
 "${KUBECTL}" create -f "${RESOURCE_DIRECTORY}/hollow-node.json" --namespace="kubemark"
-
-rm "${KUBECONFIG_SECRET}"
-rm "${NODE_CONFIGMAP}"
 
 echo "Waiting for all HollowNodes to become Running..."
 start=$(date +%s)
