@@ -28,7 +28,7 @@ go_test(
     name = "go_default_test",
     srcs = ["x509_test.go"],
     data = glob(["testdata/*"]),
-    library = "go_default_library",
+    library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
         "//pkg/auth/authenticator:go_default_library",

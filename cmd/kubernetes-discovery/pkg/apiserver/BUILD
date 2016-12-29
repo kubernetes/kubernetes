@@ -61,7 +61,7 @@ go_test(
         "handler_apis_test.go",
         "handler_proxy_test.go",
     ],
-    library = "go_default_library",
+    library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
         "//cmd/kubernetes-discovery/pkg/apis/apiregistration:go_default_library",

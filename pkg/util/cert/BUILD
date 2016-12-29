@@ -29,7 +29,6 @@ go_test(
     data = [
         "testdata/dontUseThisKey.pem",
     ],
-    library = "go_default_library",
+    library = ":go_default_library",
     tags = ["automanaged"],
-    deps = [],
 )

@@ -51,7 +51,7 @@ go_test(
         "reset_test.go",
         "token_test.go",
     ],
-    library = "go_default_library",
+    library = ":go_default_library",
     tags = ["automanaged"],
     deps = ["//cmd/kubeadm/app/preflight:go_default_library"],
 )

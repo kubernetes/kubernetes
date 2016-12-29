@@ -145,7 +145,7 @@ go_test(
         "reason_cache_test.go",
         "runonce_test.go",
     ],
-    library = "go_default_library",
+    library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",

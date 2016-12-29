@@ -43,7 +43,7 @@ go_test(
         "priority_test.go",
         "restmapper_test.go",
     ],
-    library = "go_default_library",
+    library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
         "//pkg/runtime:go_default_library",

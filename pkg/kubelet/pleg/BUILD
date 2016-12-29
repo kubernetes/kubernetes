@@ -30,7 +30,7 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = ["generic_test.go"],
-    library = "go_default_library",
+    library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
         "//pkg/kubelet/container:go_default_library",

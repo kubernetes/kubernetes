@@ -39,7 +39,7 @@ go_test(
         "event_test.go",
         "events_cache_test.go",
     ],
-    library = "go_default_library",
+    library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
         "//pkg/api/errors:go_default_library",

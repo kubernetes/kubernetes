@@ -53,7 +53,7 @@ go_test(
         "pet_set_test.go",
         "pet_test.go",
     ],
-    library = "go_default_library",
+    library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
         "//pkg/api/testapi:go_default_library",

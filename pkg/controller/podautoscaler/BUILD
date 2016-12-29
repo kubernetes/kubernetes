@@ -43,7 +43,7 @@ go_test(
         "horizontal_test.go",
         "replica_calculator_test.go",
     ],
-    library = "go_default_library",
+    library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
         "//pkg/api/resource:go_default_library",

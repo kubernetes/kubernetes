@@ -110,7 +110,7 @@ go_test(
         "bootstrap_test.go",
         "server_test.go",
     ],
-    library = "go_default_library",
+    library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
         "//pkg/client/restclient:go_default_library",

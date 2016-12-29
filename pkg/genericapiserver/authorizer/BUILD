@@ -28,7 +28,7 @@ go_test(
     data = [
         "//pkg/auth/authorizer/abac:example_policy",
     ],
-    library = "go_default_library",
+    library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
         "//pkg/auth/authorizer:go_default_library",

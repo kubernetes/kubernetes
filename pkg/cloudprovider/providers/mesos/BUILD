@@ -39,7 +39,7 @@ go_test(
         "config_test.go",
         "mesos_test.go",
     ],
-    library = "go_default_library",
+    library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
         "//pkg/cloudprovider:go_default_library",

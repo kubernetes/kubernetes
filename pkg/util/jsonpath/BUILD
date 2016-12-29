@@ -26,7 +26,6 @@ go_test(
         "jsonpath_test.go",
         "parser_test.go",
     ],
-    library = "go_default_library",
+    library = ":go_default_library",
     tags = ["automanaged"],
-    deps = [],
 )

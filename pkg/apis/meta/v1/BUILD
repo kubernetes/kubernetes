@@ -50,7 +50,7 @@ go_test(
         "time_test.go",
         "types_test.go",
     ],
-    library = "go_default_library",
+    library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
         "//pkg/labels:go_default_library",

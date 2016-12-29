@@ -38,7 +38,7 @@ go_test(
         "certs_test.go",
         "config_test.go",
     ],
-    library = "go_default_library",
+    library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
         "//pkg/admission:go_default_library",

@@ -40,7 +40,7 @@ go_test(
         "csr_test.go",
         "discovery_test.go",
     ],
-    library = "go_default_library",
+    library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
         "//cmd/kubeadm/app/apis/kubeadm:go_default_library",
