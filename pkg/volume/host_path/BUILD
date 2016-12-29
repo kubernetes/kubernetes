@@ -27,7 +27,7 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = ["host_path_test.go"],
-    library = "go_default_library",
+    library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
         "//pkg/api/resource:go_default_library",

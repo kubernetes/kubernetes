@@ -55,7 +55,7 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = ["storage_core_test.go"],
-    library = "go_default_library",
+    library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
         "//pkg/runtime/schema:go_default_library",

@@ -37,7 +37,7 @@ go_test(
         "kernel_validator_test.go",
         "os_validator_test.go",
     ],
-    library = "go_default_library",
+    library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
         "//vendor:github.com/docker/engine-api/types",

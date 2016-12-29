@@ -33,7 +33,7 @@ go_test(
         "nonroot_test.go",
         "runasany_test.go",
     ],
-    library = "go_default_library",
+    library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",

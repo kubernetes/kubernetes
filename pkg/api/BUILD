@@ -61,7 +61,7 @@ go_test(
         "ref_test.go",
         "resource_helpers_test.go",
     ],
-    library = "go_default_library",
+    library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
         "//pkg/api/resource:go_default_library",

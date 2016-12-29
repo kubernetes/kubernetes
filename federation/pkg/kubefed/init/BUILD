@@ -36,7 +36,7 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = ["init_test.go"],
-    library = "go_default_library",
+    library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
         "//federation/pkg/kubefed/testing:go_default_library",

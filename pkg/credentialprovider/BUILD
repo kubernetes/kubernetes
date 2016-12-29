@@ -33,7 +33,6 @@ go_test(
         "keyring_test.go",
         "provider_test.go",
     ],
-    library = "go_default_library",
+    library = ":go_default_library",
     tags = ["automanaged"],
-    deps = [],
 )

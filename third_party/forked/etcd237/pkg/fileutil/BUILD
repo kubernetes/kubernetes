@@ -16,9 +16,8 @@ go_test(
         "preallocate_test.go",
         "purge_test.go",
     ],
-    library = "go_default_library",
+    library = ":go_default_library",
     tags = ["automanaged"],
-    deps = [],
 )
 
 go_library(

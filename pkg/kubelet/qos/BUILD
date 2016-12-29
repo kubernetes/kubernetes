@@ -32,7 +32,7 @@ go_test(
         "policy_test.go",
         "qos_test.go",
     ],
-    library = "go_default_library",
+    library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
         "//pkg/api/resource:go_default_library",

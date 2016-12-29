@@ -94,7 +94,7 @@ go_test(
         "fixtures/seccomp/sub/subtest",
         "fixtures/seccomp/test",
     ],
-    library = "go_default_library",
+    library = ":go_default_library",
     tags = [
         "automanaged",
     ],

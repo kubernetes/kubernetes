@@ -34,7 +34,7 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = ["configmap_controller_test.go"],
-    library = "go_default_library",
+    library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
         "//federation/apis/federation/v1beta1:go_default_library",

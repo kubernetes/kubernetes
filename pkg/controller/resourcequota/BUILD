@@ -43,7 +43,7 @@ go_test(
         "replenishment_controller_test.go",
         "resource_quota_controller_test.go",
     ],
-    library = "go_default_library",
+    library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
