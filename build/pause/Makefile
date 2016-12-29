@@ -69,7 +69,7 @@ build: bin/$(BIN)-$(ARCH)
 
 bin/$(BIN)-$(ARCH): $(SRCS)
 	mkdir -p bin
-	docker run -u $$(id -u):$$(id -g) -v $$(pwd):/build \
+	docker run --rm -u $$(id -u):$$(id -g) -v $$(pwd):/build \
 		$(KUBE_CROSS_IMAGE):$(KUBE_CROSS_VERSION) \
 		/bin/bash -c "\
 			cd /build && \
