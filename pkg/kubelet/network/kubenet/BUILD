@@ -31,7 +31,6 @@ go_library(
         "//vendor:github.com/containernetworking/cni/pkg/types",
         "//vendor:github.com/golang/glog",
         "//vendor:github.com/vishvananda/netlink",
-        "//vendor:github.com/vishvananda/netlink/nl",
     ],
 )
 
