@@ -4322,15 +4322,6 @@ go_binary(
 )
 
 go_library(
-    name = "github.com/juju/ratelimit",
-    srcs = [
-        "github.com/juju/ratelimit/ratelimit.go",
-        "github.com/juju/ratelimit/reader.go",
-    ],
-    tags = ["automanaged"],
-)
-
-go_library(
     name = "github.com/kardianos/osext",
     srcs = [
         "github.com/kardianos/osext/osext.go",
