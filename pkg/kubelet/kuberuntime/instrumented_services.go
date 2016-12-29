@@ -239,13 +239,13 @@ func (in instrumentedImageManagerService) ImageStatus(image *runtimeapi.ImageSpe
 	return out, err
 }
 
-func (in instrumentedImageManagerService) PullImage(image *runtimeapi.ImageSpec, auth *runtimeapi.AuthConfig) error {
+func (in instrumentedImageManagerService) PullImage(image *runtimeapi.ImageSpec, auth *runtimeapi.AuthConfig) (string, error) {
 	const operation = "pull_image"
 	defer recordOperation(operation, time.Now())
 
-	err := in.service.PullImage(image, auth)
+	imageRef, err := in.service.PullImage(image, auth)
 	recordError(operation, err)
-	return err
+	return imageRef, err
 }
 
 func (in instrumentedImageManagerService) RemoveImage(image *runtimeapi.ImageSpec) error {

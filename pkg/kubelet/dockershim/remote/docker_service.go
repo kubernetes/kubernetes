@@ -200,11 +200,11 @@ func (d *dockerService) ImageStatus(ctx context.Context, r *runtimeapi.ImageStat
 }
 
 func (d *dockerService) PullImage(ctx context.Context, r *runtimeapi.PullImageRequest) (*runtimeapi.PullImageResponse, error) {
-	err := d.imageService.PullImage(r.GetImage(), r.GetAuth())
+	image, err := d.imageService.PullImage(r.GetImage(), r.GetAuth())
 	if err != nil {
 		return nil, err
 	}
-	return &runtimeapi.PullImageResponse{}, nil
+	return &runtimeapi.PullImageResponse{ImageRef: &image}, nil
 }
 
 func (d *dockerService) RemoveImage(ctx context.Context, r *runtimeapi.RemoveImageRequest) (*runtimeapi.RemoveImageResponse, error) {
