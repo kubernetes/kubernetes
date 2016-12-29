@@ -146,10 +146,10 @@ type IndirectStreamingRuntime interface {
 
 type ImageService interface {
 	// PullImage pulls an image from the network to local storage using the supplied
-	// secrets if necessary.
-	PullImage(image ImageSpec, pullSecrets []v1.Secret) error
+	// secrets if necessary. It returns a reference (digest or ID) to the pulled image.
+	PullImage(image ImageSpec, pullSecrets []v1.Secret) (string, error)
 	// IsImagePresent checks whether the container image is already in the local storage.
-	IsImagePresent(image ImageSpec) (bool, error)
+	IsImagePresent(image ImageSpec) (string, error)
 	// Gets all images currently on the machine.
 	ListImages() ([]Image, error)
 	// Removes the specified image.
