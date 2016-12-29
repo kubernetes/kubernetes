@@ -782,8 +782,9 @@ func (r *Runtime) newAppcRuntimeApp(pod *v1.Pod, podIP string, c v1.Container, r
 	if requiresPrivileged && !securitycontext.HasPrivilegedRequest(&c) {
 		return fmt.Errorf("cannot make %q: running a custom stage1 requires a privileged security context", format.Pod(pod))
 	}
-	if err, _ := r.imagePuller.EnsureImageExists(pod, &c, pullSecrets); err != nil {
-		return nil
+	imageRef, _, err := r.imagePuller.EnsureImageExists(pod, &c, pullSecrets)
+	if err != nil {
+		return err
 	}
 	imgManifest, err := r.getImageManifest(c.Image)
 	if err != nil {
@@ -794,11 +795,7 @@ func (r *Runtime) newAppcRuntimeApp(pod *v1.Pod, podIP string, c v1.Container, r
 		imgManifest.App = new(appctypes.App)
 	}
 
-	imageID, err := r.getImageID(c.Image)
-	if err != nil {
-		return err
-	}
-	hash, err := appctypes.NewHash(imageID)
+	hash, err := appctypes.NewHash(imageRef)
 	if err != nil {
 		return err
 	}
