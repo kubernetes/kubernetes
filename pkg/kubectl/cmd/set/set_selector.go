@@ -29,6 +29,7 @@ import (
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/runtime"
+	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 )
 
 // SelectorOptions is the start of the data required to perform the operation.  As new fields are added, add them here instead of
@@ -133,10 +134,14 @@ func (o *SelectorOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args [
 
 // Validate basic inputs
 func (o *SelectorOptions) Validate() error {
+	errors := []error{}
 	if len(o.resources) < 1 && cmdutil.IsFilenameEmpty(o.fileOptions.Filenames) {
-		return fmt.Errorf("one or more resources must be specified as <resource> <name> or <resource>/<name>")
+		errors = append(errors, fmt.Errorf("one or more resources must be specified as <resource> <name> or <resource>/<name>"))
 	}
-	return nil
+	if o.selector == nil {
+		errors = append(errors, fmt.Errorf("one selector is required"))
+	}
+	return utilerrors.NewAggregate(errors)
 }
 
 // RunSelector executes the command.
@@ -213,6 +218,9 @@ func updateSelectorForObject(obj runtime.Object, selector metav1.LabelSelector) 
 
 // getResourcesAndSelector retrieves resources and the selector expression from the given args (assuming selectors the last arg)
 func getResourcesAndSelector(args []string) (resources []string, selector *metav1.LabelSelector, err error) {
+	if len(args) == 0 {
+		return []string{}, nil, nil
+	}
 	if len(args) > 1 {
 		resources = args[:len(args)-1]
 	}
