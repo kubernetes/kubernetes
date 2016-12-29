@@ -181,7 +181,7 @@ func createComformanceTests(jig *testJig, ns string) []conformanceTests {
 				})
 				By("Checking that " + pathToFail + " is not exposed by polling for failure")
 				route := fmt.Sprintf("http://%v%v", jig.address, pathToFail)
-				framework.ExpectNoError(pollURL(route, updateURLMapHost, lbCleanupTimeout, jig.pollInterval, &http.Client{Timeout: reqTimeout}, true))
+				framework.ExpectNoError(pollURL(route, updateURLMapHost, framework.LoadBalancerCleanupTimeout, jig.pollInterval, &http.Client{Timeout: reqTimeout}, true))
 			},
 			fmt.Sprintf("Waiting for path updates to reflect in L7"),
 		},
@@ -335,7 +335,7 @@ func describeIng(ns string) {
 }
 
 func cleanupGCE(gceController *GCEIngressController) {
-	pollErr := wait.Poll(5*time.Second, lbCleanupTimeout, func() (bool, error) {
+	pollErr := wait.Poll(5*time.Second, framework.LoadBalancerCleanupTimeout, func() (bool, error) {
 		if err := gceController.Cleanup(false); err != nil {
 			framework.Logf("Still waiting for glbc to cleanup:\n%v", err)
 			return false, nil
@@ -347,7 +347,7 @@ func cleanupGCE(gceController *GCEIngressController) {
 	// controller. Delete this IP only after the controller has had a chance
 	// to cleanup or it might interfere with the controller, causing it to
 	// throw out confusing events.
-	if ipErr := wait.Poll(5*time.Second, lbCleanupTimeout, func() (bool, error) {
+	if ipErr := wait.Poll(5*time.Second, framework.LoadBalancerCleanupTimeout, func() (bool, error) {
 		if err := gceController.deleteStaticIPs(); err != nil {
 			framework.Logf("Failed to delete static-ip: %v\n", err)
 			return false, nil
@@ -864,9 +864,9 @@ func (j *testJig) deleteIngress() {
 // Ingress.
 func (j *testJig) waitForIngress(waitForNodePort bool) {
 	// Wait for the loadbalancer IP.
-	address, err := framework.WaitForIngressAddress(j.client, j.ing.Namespace, j.ing.Name, lbPollTimeout)
+	address, err := framework.WaitForIngressAddress(j.client, j.ing.Namespace, j.ing.Name, framework.LoadBalancerPollTimeout)
 	if err != nil {
-		framework.Failf("Ingress failed to acquire an IP address within %v", lbPollTimeout)
+		framework.Failf("Ingress failed to acquire an IP address within %v", framework.LoadBalancerPollTimeout)
 	}
 	j.address = address
 	framework.Logf("Found address %v for ingress %v", j.address, j.ing.Name)
@@ -889,7 +889,7 @@ func (j *testJig) waitForIngress(waitForNodePort bool) {
 			}
 			route := fmt.Sprintf("%v://%v%v", proto, address, p.Path)
 			framework.Logf("Testing route %v host %v with simple GET", route, rules.Host)
-			framework.ExpectNoError(pollURL(route, rules.Host, lbPollTimeout, j.pollInterval, timeoutClient, false))
+			framework.ExpectNoError(pollURL(route, rules.Host, framework.LoadBalancerPollTimeout, j.pollInterval, timeoutClient, false))
 		}
 	}
 }
@@ -1011,7 +1011,7 @@ type GCEIngressController struct {
 }
 
 func newTestJig(c clientset.Interface) *testJig {
-	return &testJig{client: c, rootCAs: map[string][]byte{}, pollInterval: lbPollInterval}
+	return &testJig{client: c, rootCAs: map[string][]byte{}, pollInterval: framework.LoadBalancerPollInterval}
 }
 
 // NginxIngressController manages implementation details of Ingress on Nginx.

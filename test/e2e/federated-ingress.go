@@ -408,9 +408,9 @@ func updateIngressOrFail(clientset *fedclientset.Clientset, namespace string) (n
 
 func (j *federationTestJig) waitForFederatedIngress() {
 	// Wait for the loadbalancer IP.
-	address, err := waitForFederatedIngressAddress(j.client, j.ing.Namespace, j.ing.Name, lbPollTimeout)
+	address, err := waitForFederatedIngressAddress(j.client, j.ing.Namespace, j.ing.Name, framework.LoadBalancerPollTimeout)
 	if err != nil {
-		framework.Failf("Ingress failed to acquire an IP address within %v", lbPollTimeout)
+		framework.Failf("Ingress failed to acquire an IP address within %v", framework.LoadBalancerPollTimeout)
 	}
 	j.address = address
 	framework.Logf("Found address %v for ingress %v", j.address, j.ing.Name)
@@ -422,7 +422,7 @@ func (j *federationTestJig) waitForFederatedIngress() {
 		for _, p := range rules.IngressRuleValue.HTTP.Paths {
 			route := fmt.Sprintf("%v://%v%v", proto, address, p.Path)
 			framework.Logf("Testing route %v host %v with simple GET", route, rules.Host)
-			framework.ExpectNoError(pollURL(route, rules.Host, lbPollTimeout, lbPollInterval, timeoutClient, false))
+			framework.ExpectNoError(pollURL(route, rules.Host, framework.LoadBalancerPollTimeout, framework.LoadBalancerPollInterval, timeoutClient, false))
 		}
 	}
 }
