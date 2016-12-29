@@ -421,9 +421,8 @@ message ListPodSandboxResponse {
 }
 
 // ImageSpec is an internal representation of an image.  Currently, it wraps the
-// value of a Container's Image field (e.g. imageName, imageName:tag, or
-// imageName:digest), but in the future it will include more detailed
-// information about the different image types.
+// value of a Container's Image field (e.g. imageID or imageDigest), but in the
+// future it will include more detailed information about the different image types.
 message ImageSpec {
     optional string image = 1;
 }
@@ -878,7 +877,11 @@ message PullImageRequest {
     optional PodSandboxConfig sandbox_config = 3;
 }
 
-message PullImageResponse {}
+message PullImageResponse {
+    // Reference to the image in use. For most runtimes, this should be an
+    // image ID or digest.
+    optional string image_ref = 1;
+}
 
 message RemoveImageRequest {
     // Spec of the image to remove.
