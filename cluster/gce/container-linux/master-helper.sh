@@ -14,8 +14,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# A library of helper functions and constant for coreos os distro
-source "${KUBE_ROOT}/cluster/gce/coreos/helper.sh"
+# A library of helper functions and constant for the Container Linux distro.
+source "${KUBE_ROOT}/cluster/gce/container-linux/helper.sh"
 
 # create-master-instance creates the master instance. If called with
 # an argument, the argument is used as the name to a reserved IP
@@ -85,7 +85,7 @@ function create-master-instance-internal() {
     --scopes "storage-ro,compute-rw,monitoring,logging-write" \
     --can-ip-forward \
     --metadata-from-file \
-      "kube-env=${KUBE_TEMP}/master-kube-env.yaml,user-data=${KUBE_ROOT}/cluster/gce/coreos/master.yaml,configure-sh=${KUBE_ROOT}/cluster/gce/coreos/configure.sh,cluster-name=${KUBE_TEMP}/cluster-name.txt" \
+      "kube-env=${KUBE_TEMP}/master-kube-env.yaml,user-data=${KUBE_ROOT}/cluster/gce/container-linux/master.yaml,configure-sh=${KUBE_ROOT}/cluster/gce/container-linux/configure.sh,cluster-name=${KUBE_TEMP}/cluster-name.txt" \
     --disk "name=${master_name}-pd,device-name=master-pd,mode=rw,boot=no,auto-delete=no" \
     --boot-disk-size "${MASTER_ROOT_DISK_SIZE:-30}" \
     ${preemptible_master}

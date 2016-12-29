@@ -1268,5 +1268,4 @@ else
     start-image-puller
   fi
 fi
-start-fluentd
 echo "Done for the configuration for kubernetes"

@@ -147,7 +147,7 @@ function install-kube-binary-config {
     find "${dst_dir}" -name \*.manifest -or -name \*.json | \
       xargs sed -ri "s@(image\":\s+\")gcr.io/google_containers@\1${kube_addon_registry}@"
   fi
-  cp "${dst_dir}/kubernetes/gci-trusty/coreos-configure-helper.sh" "${KUBE_HOME}/bin/configure-helper.sh"
+  cp "${dst_dir}/kubernetes/gci-trusty/container-linux-configure-helper.sh" "${KUBE_HOME}/bin/configure-helper.sh"
   chmod -R 755 "${kube_bin}"
 
   # Clean up.
@@ -167,7 +167,7 @@ source "${KUBE_HOME}/kube-env"
 install-kube-binary-config
 echo "Done for installing kubernetes files"
 
-# On CoreOS, the hosts is in /usr/share/baselayout/hosts
+# On Container Linux, the hosts is in /usr/share/baselayout/hosts
 # So we need to manually populdate the hosts file here on gce.
 echo "127.0.0.1 localhost" >> /etc/hosts
 echo "::1 localhost" >> /etc/hosts

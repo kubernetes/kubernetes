@@ -40,6 +40,13 @@ KUBE_DELETE_NETWORK=${KUBE_DELETE_NETWORK:-true}
 
 MASTER_OS_DISTRIBUTION=${KUBE_MASTER_OS_DISTRIBUTION:-${KUBE_OS_DISTRIBUTION:-gci}}
 NODE_OS_DISTRIBUTION=${KUBE_NODE_OS_DISTRIBUTION:-${KUBE_OS_DISTRIBUTION:-debian}}
+if [[ "${MASTER_OS_DISTRIBUTION}" == "coreos" ]]; then
+    MASTER_OS_DISTRIBUTION="container-linux"
+fi
+if [[ "${NODE_OS_DISTRIBUTION}" == "coreos" ]]; then
+    NODE_OS_DISTRIBUTION="container-linux"
+fi
+
 # By default a cluster will be started with the master on GCI and nodes on
 # containervm. If you are updating the containervm version, update this
 # variable. Also please update corresponding image for node e2e at:
