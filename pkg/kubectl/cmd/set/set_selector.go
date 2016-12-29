@@ -213,6 +213,9 @@ func updateSelectorForObject(obj runtime.Object, selector metav1.LabelSelector) 
 
 // getResourcesAndSelector retrieves resources and the selector expression from the given args (assuming selectors the last arg)
 func getResourcesAndSelector(args []string) (resources []string, selector *metav1.LabelSelector, err error) {
+	if len(args) == 0 {
+		return resources, nil, fmt.Errorf("missing parameters")
+	}
 	if len(args) > 1 {
 		resources = args[:len(args)-1]
 	}
