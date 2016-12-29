@@ -112,8 +112,8 @@ func newFakeImageManager() images.ImageManager {
 	return &fakeImageManager{}
 }
 
-func (m *fakeImageManager) EnsureImageExists(pod *v1.Pod, container *v1.Container, pullSecrets []v1.Secret) (error, string) {
-	return nil, ""
+func (m *fakeImageManager) EnsureImageExists(pod *v1.Pod, container *v1.Container, pullSecrets []v1.Secret) (string, string, error) {
+	return container.Image, "", nil
 }
 
 func createTestDockerManager(fakeHTTPClient *fakeHTTP, fakeDocker *FakeDockerClient) (*DockerManager, *FakeDockerClient) {
@@ -647,9 +647,9 @@ func TestSyncPodCreatesNetAndContainerPullsImage(t *testing.T) {
 
 	verifyCalls(t, fakeDocker, []string{
 		// Create pod infra container.
-		"create", "start", "inspect_container", "inspect_container",
+		"inspect_image", "create", "start", "inspect_container", "inspect_container",
 		// Create container.
-		"create", "start", "inspect_container",
+		"inspect_image", "create", "start", "inspect_container",
 	})
 
 	fakeDocker.Lock()
