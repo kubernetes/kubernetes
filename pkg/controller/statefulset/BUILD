@@ -30,7 +30,6 @@ go_library(
         "//pkg/client/record:go_default_library",
         "//pkg/controller:go_default_library",
         "//vendor:github.com/golang/glog",
-        "//vendor:gopkg.in/inf.v0",
         "//vendor:k8s.io/apimachinery/pkg/api/errors",
         "//vendor:k8s.io/apimachinery/pkg/api/resource",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
