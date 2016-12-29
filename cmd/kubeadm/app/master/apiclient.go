@@ -254,18 +254,21 @@ func NativeArchitectureNodeAffinity() v1.NodeSelectorRequirement {
 
 func createDummyDeployment(client *clientset.Clientset) {
 	fmt.Println("[apiclient] Creating a test deployment")
-	dummyDeployment := NewDeployment("dummy", 1, v1.PodSpec{
-		HostNetwork:     true,
-		SecurityContext: &v1.PodSecurityContext{},
-		Containers: []v1.Container{{
-			Name:  "dummy",
-			Image: images.GetAddonImage("pause"),
-		}},
-	})
+	dummyPod := v1.Pod{
+		ObjectMeta: v1.ObjectMeta{Name: "dummy"},
+		Spec: v1.PodSpec{
+			HostNetwork:     true,
+			SecurityContext: &v1.PodSecurityContext{},
+			Containers: []v1.Container{{
+				Name:  "dummy",
+				Image: images.GetAddonImage("pause"),
+			}},
+		},
+	}
 
 	wait.PollInfinite(apiCallRetryInterval, func() (bool, error) {
 		// TODO: we should check the error, as some cases may be fatal
-		if _, err := client.Extensions().Deployments(api.NamespaceSystem).Create(dummyDeployment); err != nil {
+		if _, err := client.Core().Pods(api.NamespaceSystem).Create(&dummyPod); err != nil {
 			fmt.Printf("[apiclient] Failed to create test deployment [%v] (will retry)\n", err)
 			return false, nil
 		}
@@ -273,21 +276,19 @@ func createDummyDeployment(client *clientset.Clientset) {
 	})
 
 	wait.PollInfinite(apiCallRetryInterval, func() (bool, error) {
-		d, err := client.Extensions().Deployments(api.NamespaceSystem).Get("dummy", metav1.GetOptions{})
+		d, err := client.Core().Pods(api.NamespaceSystem).Get("dummy", metav1.GetOptions{})
 		if err != nil {
 			fmt.Printf("[apiclient] Failed to get test deployment [%v] (will retry)\n", err)
 			return false, nil
 		}
-		if d.Status.AvailableReplicas < 1 {
-			return false, nil
-		}
-		return true, nil
+		// Wait until it's running
+		return d.Status.Phase == v1.PodRunning, nil
 	})
 
 	fmt.Println("[apiclient] Test deployment succeeded")
 
 	// TODO: In the future, make sure the ReplicaSet and Pod are garbage collected
-	if err := client.Extensions().Deployments(api.NamespaceSystem).Delete("dummy", &v1.DeleteOptions{}); err != nil {
+	if err := client.Core().Pods(api.NamespaceSystem).Delete("dummy", &v1.DeleteOptions{}); err != nil {
 		fmt.Printf("[apiclient] Failed to delete test deployment [%v] (will ignore)\n", err)
 	}
 }
