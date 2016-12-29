@@ -592,18 +592,18 @@ func (f *FakeDockerPuller) Pull(image string, secrets []v1.Secret) (err error) {
 	return err
 }
 
-func (f *FakeDockerPuller) IsImagePresent(name string) (bool, error) {
+func (f *FakeDockerPuller) IsImagePresent(name string) (string, error) {
 	f.Lock()
 	defer f.Unlock()
 	if f.HasImages == nil {
-		return true, nil
+		return name, nil
 	}
 	for _, s := range f.HasImages {
 		if s == name {
-			return true, nil
+			return s, nil
 		}
 	}
-	return false, nil
+	return "", nil
 }
 func (f *FakeDockerClient) ImageHistory(id string) ([]dockertypes.ImageHistory, error) {
 	f.Lock()
