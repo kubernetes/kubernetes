@@ -34,8 +34,6 @@
 #   * export KUBERNETES_PROVIDER=azure-legacy; wget -q -O - https://get.k8s.io | bash
 #  Vagrant (local virtual machines)
 #   * export KUBERNETES_PROVIDER=vagrant; wget -q -O - https://get.k8s.io | bash
-#  VMWare VSphere
-#   * export KUBERNETES_PROVIDER=vsphere; wget -q -O - https://get.k8s.io | bash
 #  VMWare Photon Controller
 #   * export KUBERNETES_PROVIDER=photon-controller; wget -q -O - https://get.k8s.io | bash
 #  Rackspace
