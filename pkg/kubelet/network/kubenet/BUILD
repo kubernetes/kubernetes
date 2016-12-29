@@ -10,7 +10,10 @@ load(
 
 go_library(
     name = "go_default_library",
-    srcs = ["kubenet_linux.go"],
+    srcs = [
+        "kubenet.go",
+        "kubenet_linux.go",
+    ],
     tags = ["automanaged"],
     deps = [
         "//pkg/api/v1:go_default_library",
