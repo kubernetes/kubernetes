@@ -478,6 +478,7 @@ func (f *FakeDockerClient) PullImage(image string, auth dockertypes.AuthConfig, 
 	err := f.popError("pull")
 	if err == nil {
 		authJson, _ := json.Marshal(auth)
+		f.Image = &dockertypes.ImageInspect{ID: image}
 		f.pulled = append(f.pulled, fmt.Sprintf("%s using %s", image, string(authJson)))
 	}
 	return err
