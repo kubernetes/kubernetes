@@ -24,7 +24,6 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api/v1"
-	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
 )
 
@@ -62,32 +61,29 @@ func TestOpenPodHostports(t *testing.T) {
 	}
 
 	tests := []struct {
-		pod     *v1.Pod
-		ip      string
+		mapping *PodPortMapping
 		matches []*ruleMatch
 	}{
 		// New pod that we are going to add
 		{
-			&v1.Pod{
-				ObjectMeta: v1.ObjectMeta{
-					Name:      "test-pod",
-					Namespace: v1.NamespaceDefault,
-				},
-				Spec: v1.PodSpec{
-					Containers: []v1.Container{{
-						Ports: []v1.ContainerPort{{
-							HostPort:      4567,
-							ContainerPort: 80,
-							Protocol:      v1.ProtocolTCP,
-						}, {
-							HostPort:      5678,
-							ContainerPort: 81,
-							Protocol:      v1.ProtocolUDP,
-						}},
-					}},
+			&PodPortMapping{
+				Name:         "test-pod",
+				Namespace:    v1.NamespaceDefault,
+				IP:           net.ParseIP("10.1.1.2"),
+				HostNetwork:  false,
+				PortMappings: []*PortMapping{
+					{
+						HostPort:      4567,
+						ContainerPort: 80,
+						Protocol:      v1.ProtocolTCP,
+					},
+					{
+						HostPort:      5678,
+						ContainerPort: 81,
+						Protocol:      v1.ProtocolUDP,
+					},
 				},
 			},
-			"10.1.1.2",
 			[]*ruleMatch{
 				{
 					-1,
@@ -123,22 +119,19 @@ func TestOpenPodHostports(t *testing.T) {
 		},
 		// Already running pod
 		{
-			&v1.Pod{
-				ObjectMeta: v1.ObjectMeta{
-					Name:      "another-test-pod",
-					Namespace: v1.NamespaceDefault,
-				},
-				Spec: v1.PodSpec{
-					Containers: []v1.Container{{
-						Ports: []v1.ContainerPort{{
-							HostPort:      123,
-							ContainerPort: 654,
-							Protocol:      v1.ProtocolTCP,
-						}},
-					}},
+			&PodPortMapping{
+				Name:         "another-test-pod",
+				Namespace:    v1.NamespaceDefault,
+				IP:           net.ParseIP("10.1.1.5"),
+				HostNetwork:  false,
+				PortMappings: []*PortMapping{
+					{
+						HostPort:      123,
+						ContainerPort: 654,
+						Protocol:      v1.ProtocolTCP,
+					},
 				},
 			},
-			"10.1.1.5",
 			[]*ruleMatch{
 				{
 					-1,
@@ -159,20 +152,18 @@ func TestOpenPodHostports(t *testing.T) {
 		},
 	}
 
-	activePods := make([]*ActivePod, 0)
+	activePodPortMapping := make([]*PodPortMapping, 0)
 
 	// Fill in any match rules missing chain names
 	for _, test := range tests {
 		for _, match := range test.matches {
 			if match.hostport >= 0 {
 				found := false
-				for _, c := range test.pod.Spec.Containers {
-					for _, cp := range c.Ports {
-						if int(cp.HostPort) == match.hostport {
-							match.chain = string(hostportChainName(cp, kubecontainer.GetPodFullName(test.pod)))
-							found = true
-							break
-						}
+				for _, pm := range test.mapping.PortMappings {
+					if int(pm.HostPort) == match.hostport {
+						match.chain = string(hostportChainName(pm, getPodFullName(test.mapping)))
+						found = true
+						break
 					}
 				}
 				if !found {
@@ -180,24 +171,23 @@ func TestOpenPodHostports(t *testing.T) {
 				}
 			}
 		}
-		activePods = append(activePods, &ActivePod{
-			Pod: test.pod,
-			IP:  net.ParseIP(test.ip),
-		})
+		activePodPortMapping = append(activePodPortMapping, test.mapping)
+
 	}
 
 	// Already running pod's host port
 	hp := hostport{
-		tests[1].pod.Spec.Containers[0].Ports[0].HostPort,
-		strings.ToLower(string(tests[1].pod.Spec.Containers[0].Ports[0].Protocol)),
+		tests[1].mapping.PortMappings[0].HostPort,
+		strings.ToLower(string(tests[1].mapping.PortMappings[0].Protocol)),
 	}
 	h.hostPortMap[hp] = &fakeSocket{
-		tests[1].pod.Spec.Containers[0].Ports[0].HostPort,
-		strings.ToLower(string(tests[1].pod.Spec.Containers[0].Ports[0].Protocol)),
+		tests[1].mapping.PortMappings[0].HostPort,
+		strings.ToLower(string(tests[1].mapping.PortMappings[0].Protocol)),
 		false,
 	}
 
-	err := h.OpenPodHostportsAndSync(&ActivePod{Pod: tests[0].pod, IP: net.ParseIP(tests[0].ip)}, "br0", activePods)
+
+	err := h.OpenPodHostportsAndSync(tests[0].mapping, "br0", activePodPortMapping)
 	if err != nil {
 		t.Fatalf("Failed to OpenPodHostportsAndSync: %v", err)
 	}
