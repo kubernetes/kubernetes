@@ -84,7 +84,7 @@ func NewManager(
 	imageGC ImageGC,
 	recorder record.EventRecorder,
 	nodeRef *v1.ObjectReference,
-	clock clock.Clock) (Manager, lifecycle.PodAdmitHandler, error) {
+	clock clock.Clock) (Manager, lifecycle.PodAdmitHandler) {
 	manager := &managerImpl{
 		clock:           clock,
 		killPodFunc:     killPodFunc,
@@ -96,7 +96,7 @@ func NewManager(
 		nodeConditionsLastObservedAt: nodeConditionsObservedAt{},
 		thresholdsFirstObservedAt:    thresholdsObservedAt{},
 	}
-	return manager, manager, nil
+	return manager, manager
 }
 
 // Admit rejects a pod if its not safe to admit for node stability.
