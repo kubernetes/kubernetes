@@ -94,7 +94,7 @@ type ImageManagerService interface {
 	// ImageStatus returns the status of the image.
 	ImageStatus(image *runtimeapi.ImageSpec) (*runtimeapi.Image, error)
 	// PullImage pulls an image with the authentication config.
-	PullImage(image *runtimeapi.ImageSpec, auth *runtimeapi.AuthConfig) error
+	PullImage(image *runtimeapi.ImageSpec, auth *runtimeapi.AuthConfig) (string, error)
 	// RemoveImage removes the image.
 	RemoveImage(image *runtimeapi.ImageSpec) error
 }
