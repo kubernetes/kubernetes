@@ -19,8 +19,17 @@ KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
 if [[ ! -z "${1:-}" ]]; then
   export KUBE_GCE_ZONE="${1}"
 fi
-export KUBE_REPLICATE_EXISTING_MASTER=true
-export MULTIZONE=true
+if [[ ! -z "${2:-}" ]]; then
+  export MULTIZONE="${2}"
+fi
+if [[ ! -z "${3:-}" ]]; then
+  export KUBE_REPLICATE_EXISTING_MASTER="${3}"
+fi
+if [[ ! -z "${4:-}" ]]; then
+  export KUBE_USE_EXISTING_MASTER="${4}"
+fi
+if [[ -z "${NUM_NODES:-}" ]]; then
+  export NUM_NODES=3
+fi
 
 source "${KUBE_ROOT}/hack/e2e-internal/e2e-up.sh"
-
