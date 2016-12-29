@@ -312,7 +312,7 @@ func getAPIServerCommand(cfg *kubeadmapi.MasterConfiguration) []string {
 			command = append(command, "--kubelet-preferred-address-types=InternalIP,ExternalIP,Hostname")
 		}
 
-		// This is a critical "bugfix". Any version above this is vulnarable unless a RBAC/ABAC-authorizer is provided (which kubeadm doesn't for the time being)
+		// This is a critical "bugfix". Any version above this is vulnerable unless a RBAC/ABAC-authorizer is provided (which kubeadm doesn't for the time being)
 		if err == nil && k8sVersion.GTE(anonAuthDisableAPIServerMinVersion) {
 			command = append(command, "--anonymous-auth=false")
 		}
