@@ -558,7 +558,7 @@ function start-kube-proxy {
     sed -i -e "s@{{cluster_cidr}}@--cluster-cidr=${CLUSTER_IP_RANGE}@g" ${src_file}
   fi
   if [[ "${CONTAINER_RUNTIME:-}" == "rkt" ]]; then
-    # Work arounds for https://github.com/coreos/rkt/issues/3245 and https://github.com/coreos/rkt/issues/3264
+    # Work arounds for https://github.com/container-linux/rkt/issues/3245 and https://github.com/coreos/rkt/issues/3264
     # This is an incredibly hacky workaround. It's fragile too. If the kube-proxy command changes too much, this breaks
     # TODO, this could be done much better in many other places, such as an
     # init script within the container, or even within kube-proxy's code.
@@ -1152,7 +1152,7 @@ function setup-rkt {
     local rkt_tmpdir=$(mktemp -d "${KUBE_HOME}/rkt_download.XXXXX")
     curl --retry 5 --retry-delay 3 --fail --silent --show-error \
       --location --create-dirs --output "${rkt_tar}" \
-      https://github.com/coreos/rkt/releases/download/v${RKT_VERSION}/rkt-v${RKT_VERSION}.tar.gz
+      https://github.com/container-linux/rkt/releases/download/v${RKT_VERSION}/rkt-v${RKT_VERSION}.tar.gz
     tar --strip-components=1 -xf "${rkt_tar}" -C "${rkt_tmpdir}" --overwrite
     mv "${rkt_tmpdir}/rkt" "${rkt_bin}"
     if [[ ! -x "${rkt_bin}" ]]; then
