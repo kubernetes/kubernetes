@@ -607,11 +607,11 @@ func patchResource(
 			if err != nil {
 				return nil, err
 			}
-			currentPatch, err := strategicpatch.CreateStrategicMergePatch(originalObjJS, currentObjectJS, versionedObj)
+			currentPatch, err := strategicpatch.CreateTwoWayMergePatch(originalObjJS, currentObjectJS, versionedObj)
 			if err != nil {
 				return nil, err
 			}
-			originalPatch, err := strategicpatch.CreateStrategicMergePatch(originalObjJS, originalPatchedObjJS, versionedObj)
+			originalPatch, err := strategicpatch.CreateTwoWayMergePatch(originalObjJS, originalPatchedObjJS, versionedObj)
 			if err != nil {
 				return nil, err
 			}
@@ -1090,7 +1090,7 @@ func getPatchedJS(patchType types.PatchType, originalJS, patchJS []byte, obj run
 	case types.MergePatchType:
 		return jsonpatch.MergePatch(originalJS, patchJS)
 	case types.StrategicMergePatchType:
-		return strategicpatch.StrategicMergePatchData(originalJS, patchJS, obj)
+		return strategicpatch.StrategicMergePatch(originalJS, patchJS, obj)
 	default:
 		// only here as a safety net - go-restful filters content-type
 		return nil, fmt.Errorf("unknown Content-Type header for patch: %v", patchType)
