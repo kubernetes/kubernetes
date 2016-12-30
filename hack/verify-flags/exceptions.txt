@@ -12,9 +12,9 @@ cluster/gce/configure-vm.sh:  cloud_config: ${CLOUD_CONFIG}
 cluster/gce/configure-vm.sh:  env-to-grains "feature_gates"
 cluster/gce/configure-vm.sh:  env-to-grains "runtime_config"
 cluster/gce/configure-vm.sh:  kubelet_api_servers: '${KUBELET_APISERVER}'
-cluster/gce/coreos/configure-helper.sh:  local api_servers="--master=https://${KUBERNETES_MASTER_NAME}"
-cluster/gce/coreos/configure-helper.sh:  sed -i -e "s@{{ *storage_backend *}}@${STORAGE_BACKEND:-}@g" "${temp_file}"
-cluster/gce/coreos/configure-helper.sh:  sed -i -e "s@{{pillar\['allow_privileged'\]}}@true@g" "${src_file}"
+cluster/gce/container-linux/configure-helper.sh:  local api_servers="--master=https://${KUBERNETES_MASTER_NAME}"
+cluster/gce/container-linux/configure-helper.sh:  sed -i -e "s@{{ *storage_backend *}}@${STORAGE_BACKEND:-}@g" "${temp_file}"
+cluster/gce/container-linux/configure-helper.sh:  sed -i -e "s@{{pillar\['allow_privileged'\]}}@true@g" "${src_file}"
 cluster/gce/gci/configure-helper.sh:  local api_servers="--master=https://${KUBERNETES_MASTER_NAME}"
 cluster/gce/gci/configure-helper.sh:  sed -i -e "s@{{ *storage_backend *}}@${STORAGE_BACKEND:-}@g" "${temp_file}"
 cluster/gce/gci/configure-helper.sh:  sed -i -e "s@{{pillar\['allow_privileged'\]}}@true@g" "${src_file}"
@@ -67,8 +67,6 @@ cluster/ubuntu/util.sh:  local node_ip=${1}
 cluster/vagrant/provision-utils.sh:  api_servers: '$(echo "$MASTER_IP" | sed -e "s/'/''/g")'
 cluster/vagrant/provision-utils.sh:  node_ip: '$(echo "$MASTER_IP" | sed -e "s/'/''/g")'
 cluster/vagrant/provision-utils.sh:  runtime_config: '$(echo "$RUNTIME_CONFIG" | sed -e "s/'/''/g")'
-cluster/vsphere/templates/salt-master.sh:  cloud_config: $CLOUD_CONFIG
-cluster/vsphere/templates/salt-minion.sh:  cloud_config: $CLOUD_CONFIG
 examples/cluster-dns/images/frontend/client.py:  service_address = socket.gethostbyname(hostname)
 examples/storage/cassandra/image/files/run.sh:  cluster_name \
 examples/storage/vitess/env.sh:    node_ip=$(get_node_ip)
