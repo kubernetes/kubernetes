@@ -62,7 +62,7 @@ const (
 	// resolvable during initialization. In this situation we create a headless
 	// service just for the StatefulSet, and clients shouldn't be using this Service
 	// for anything so unready endpoints don't matter.
-	TolerateUnreadyEndpointsAnnotation = "service.alpha.kubernetes.io/tolerate-unready-endpoints"
+	TolerateUnreadyEndpointsAnnotation = "service.beta.kubernetes.io/tolerate-unready-endpoints"
 )
 
 var (
