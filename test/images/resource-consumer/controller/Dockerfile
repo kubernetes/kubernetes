@@ -13,7 +13,6 @@
 # limitations under the License.
 
 FROM busybox
-MAINTAINER Jerzy Szczepkowski <jsz@google.com>
 ADD controller /controller
 EXPOSE 8080
 ENTRYPOINT ["/controller"]

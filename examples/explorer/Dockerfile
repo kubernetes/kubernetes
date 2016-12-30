@@ -13,7 +13,6 @@
 # limitations under the License.
 
 FROM scratch
-MAINTAINER Daniel Smith <dbsmith@google.com>
 ADD explorer explorer
 ADD README.md README.md
 EXPOSE 8080
