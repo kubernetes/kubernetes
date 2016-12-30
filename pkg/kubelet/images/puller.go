@@ -24,13 +24,13 @@ import (
 	"k8s.io/kubernetes/pkg/util/wait"
 )
 
-type imageRefWithError struct {
+type pullResult struct {
 	imageRef string
 	err      error
 }
 
 type imagePuller interface {
-	pullImage(kubecontainer.ImageSpec, []v1.Secret, chan<- imageRefWithError)
+	pullImage(kubecontainer.ImageSpec, []v1.Secret, chan<- pullResult)
 }
 
 var _, _ imagePuller = &parallelImagePuller{}, &serialImagePuller{}
@@ -43,10 +43,10 @@ func newParallelImagePuller(imageService kubecontainer.ImageService) imagePuller
 	return &parallelImagePuller{imageService}
 }
 
-func (pip *parallelImagePuller) pullImage(spec kubecontainer.ImageSpec, pullSecrets []v1.Secret, pullChan chan<- imageRefWithError) {
+func (pip *parallelImagePuller) pullImage(spec kubecontainer.ImageSpec, pullSecrets []v1.Secret, pullChan chan<- pullResult) {
 	go func() {
 		imageRef, err := pip.imageService.PullImage(spec, pullSecrets)
-		pullChan <- imageRefWithError{
+		pullChan <- pullResult{
 			imageRef: imageRef,
 			err:      err,
 		}
@@ -70,10 +70,10 @@ func newSerialImagePuller(imageService kubecontainer.ImageService) imagePuller {
 type imagePullRequest struct {
 	spec        kubecontainer.ImageSpec
 	pullSecrets []v1.Secret
-	pullChan    chan<- imageRefWithError
+	pullChan    chan<- pullResult
 }
 
-func (sip *serialImagePuller) pullImage(spec kubecontainer.ImageSpec, pullSecrets []v1.Secret, pullChan chan<- imageRefWithError) {
+func (sip *serialImagePuller) pullImage(spec kubecontainer.ImageSpec, pullSecrets []v1.Secret, pullChan chan<- pullResult) {
 	sip.pullRequests <- &imagePullRequest{
 		spec:        spec,
 		pullSecrets: pullSecrets,
@@ -84,7 +84,7 @@ func (sip *serialImagePuller) pullImage(spec kubecontainer.ImageSpec, pullSecret
 func (sip *serialImagePuller) processImagePullRequests() {
 	for pullRequest := range sip.pullRequests {
 		imageRef, err := sip.imageService.PullImage(pullRequest.spec, pullRequest.pullSecrets)
-		pullRequest.pullChan <- imageRefWithError{
+		pullRequest.pullChan <- pullResult{
 			imageRef: imageRef,
 			err:      err,
 		}

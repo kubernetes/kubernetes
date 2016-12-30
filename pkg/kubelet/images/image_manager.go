@@ -81,7 +81,7 @@ func (m *imageManager) logIt(ref *v1.ObjectReference, eventtype, event, prefix, 
 	}
 }
 
-// EnsureImageExists pulls the image for the specified pod and container, and returnsIt returns
+// EnsureImageExists pulls the image for the specified pod and container, and returns
 // (imageRef, error message, error).
 func (m *imageManager) EnsureImageExists(pod *v1.Pod, container *v1.Container, pullSecrets []v1.Secret) (string, string, error) {
 	logPrefix := fmt.Sprintf("%s/%s", pod.Name, container.Image)
@@ -106,8 +106,9 @@ func (m *imageManager) EnsureImageExists(pod *v1.Pod, container *v1.Container, p
 		return "", msg, ErrImageInspect
 	}
 
-	if !shouldPullImage(container, imageRef != "") {
-		if imageRef != "" {
+	present := imageRef != ""
+	if !shouldPullImage(container, present) {
+		if present {
 			msg := fmt.Sprintf("Container image %q already present on machine", container.Image)
 			m.logIt(ref, v1.EventTypeNormal, events.PulledImage, logPrefix, msg, glog.Info)
 			return imageRef, "", nil
@@ -125,7 +126,7 @@ func (m *imageManager) EnsureImageExists(pod *v1.Pod, container *v1.Container, p
 		return "", msg, ErrImagePullBackOff
 	}
 	m.logIt(ref, v1.EventTypeNormal, events.PullingImage, logPrefix, fmt.Sprintf("pulling image %q", container.Image), glog.Info)
-	pullChan := make(chan imageRefWithError)
+	pullChan := make(chan pullResult)
 	m.puller.pullImage(spec, pullSecrets, pullChan)
 	imageRefWithErr := <-pullChan
 	if imageRefWithErr.err != nil {

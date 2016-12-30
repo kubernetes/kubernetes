@@ -430,10 +430,14 @@ func (dm *DockerManager) inspectContainer(id string, podName, podNamespace strin
 		}
 	}
 
+	imageName := iResult.Config.Image
+	if len(imgInspectResult.RepoTags) > 0 {
+		imageName = imgInspectResult.RepoTags[0]
+	}
 	status := kubecontainer.ContainerStatus{
 		Name:         containerName,
 		RestartCount: containerInfo.RestartCount,
-		Image:        iResult.Config.Image,
+		Image:        imageName,
 		ImageID:      imageID,
 		ID:           kubecontainer.DockerID(id).ContainerID(),
 		ExitCode:     iResult.State.ExitCode,
