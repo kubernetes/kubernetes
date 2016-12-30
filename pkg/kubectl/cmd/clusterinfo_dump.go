@@ -43,7 +43,7 @@ func NewCmdClusterInfoDump(f cmdutil.Factory, cmdOut io.Writer) *cobra.Command {
 	}
 	cmd.Flags().String("output-directory", "", "Where to output the files.  If empty or '-' uses stdout, otherwise creates a directory hierarchy in that directory")
 	cmd.Flags().StringSlice("namespaces", []string{}, "A comma separated list of namespaces to dump.")
-	cmd.Flags().Bool("all-namespaces", false, "If true, dump all namespaces.  If true, --namespaces is ignored.")
+	cmd.Flags().BoolP("all-namespaces", "A", false, "If true, dump all namespaces.  If true, --namespaces is ignored.")
 	return cmd
 }
 
