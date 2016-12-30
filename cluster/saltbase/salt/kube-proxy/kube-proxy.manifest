@@ -53,14 +53,14 @@ spec:
   hostNetwork: true
   containers:
   - name: kube-proxy
-    image: {{pillar['kube_docker_registry']}}/kube-proxy:{{pillar['kube-proxy_docker_tag']}}
+    image: {{pillar['kube_docker_registry']}}/hyperkube-amd64:{{pillar['hyperkube_docker_tag']}}
     resources:
       requests:
         cpu: {{ cpurequest }}
     command:
     - /bin/sh
     - -c
-    - kube-proxy {{api_servers_with_port}} {{kubeconfig}} {{cluster_cidr}} --resource-container="" {{params}} 1>>/var/log/kube-proxy.log 2>&1
+    - /proxy {{api_servers_with_port}} {{kubeconfig}} {{cluster_cidr}} --resource-container="" {{params}} 1>>/var/log/kube-proxy.log 2>&1
     securityContext:
       privileged: true
     volumeMounts:

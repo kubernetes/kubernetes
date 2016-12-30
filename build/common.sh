@@ -91,6 +91,11 @@ readonly KUBE_CONTAINER_RSYNC_PORT=8730
 #
 # $1 - server architecture
 kube::build::get_docker_wrapped_binaries() {
+
+  if [[ "${KUBE_RELEASE_HYPERKUBE_ONLY}" =~ ^[yY]$ ]]; then
+    return
+  fi
+
   case $1 in
     "amd64")
         local targets=(

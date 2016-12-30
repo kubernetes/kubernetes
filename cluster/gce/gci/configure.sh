@@ -135,12 +135,8 @@ function install-kube-binary-config {
   dst_dir="${KUBE_HOME}/kube-docker-files"
   mkdir -p "${dst_dir}"
   cp "${src_dir}/"*.docker_tag "${dst_dir}"
-  if [[ "${KUBERNETES_MASTER:-}" == "false" ]]; then
-    cp "${src_dir}/kube-proxy.tar" "${dst_dir}"
-  else
-    cp "${src_dir}/kube-apiserver.tar" "${dst_dir}"
-    cp "${src_dir}/kube-controller-manager.tar" "${dst_dir}"
-    cp "${src_dir}/kube-scheduler.tar" "${dst_dir}"
+  cp "${src_dir}/hyperkube.tar" "${dst_dir}"
+  if [[ "${KUBERNETES_MASTER:-}" == "true" ]]; then
     cp -r "${KUBE_HOME}/kubernetes/addons" "${dst_dir}"
   fi
   local -r kube_bin="${KUBE_HOME}/bin"
