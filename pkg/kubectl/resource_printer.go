@@ -2196,6 +2196,10 @@ func printConfigMapList(list *api.ConfigMapList, w io.Writer, options PrintOptio
 func printPodSecurityPolicy(item *extensions.PodSecurityPolicy, w io.Writer, options PrintOptions) error {
 	name := formatResourceName(options.Kind, item.Name, options.WithKind)
 
+	if options.WithNamespace {
+		return fmt.Errorf("podSecurityPolicy is not namespaced")
+	}
+
 	_, err := fmt.Fprintf(w, "%s\t%t\t%v\t%s\t%s\t%s\t%s\t%t\t%v\n", name, item.Spec.Privileged,
 		item.Spec.AllowedCapabilities, item.Spec.SELinux.Rule,
 		item.Spec.RunAsUser.Rule, item.Spec.FSGroup.Rule, item.Spec.SupplementalGroups.Rule, item.Spec.ReadOnlyRootFilesystem, item.Spec.Volumes)
