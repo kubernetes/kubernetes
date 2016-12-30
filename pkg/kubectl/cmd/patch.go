@@ -261,7 +261,7 @@ func getPatchedJSON(patchType types.PatchType, originalJS, patchJS []byte, obj r
 		return jsonpatch.MergePatch(originalJS, patchJS)
 
 	case types.StrategicMergePatchType:
-		return strategicpatch.StrategicMergePatchData(originalJS, patchJS, obj)
+		return strategicpatch.StrategicMergePatch(originalJS, patchJS, obj)
 
 	default:
 		// only here as a safety net - go-restful filters content-type
