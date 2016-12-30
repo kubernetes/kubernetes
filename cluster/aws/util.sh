@@ -1489,6 +1489,21 @@ function kube-down {
     echo "has a name other than '${CLUSTER_ID}'." >&2
   fi
 
+  if [[ -z "${DHCP_OPTION_SET_ID:-}" ]]; then
+    dhcp_option_ids=$($AWS_CMD describe-dhcp-options \
+                               --output text \
+                               --filters Name=tag:Name,Values=kubernetes-dhcp-option-set \
+                                         Name=tag:KubernetesCluster,Values=${CLUSTER_ID} \
+                               --query DhcpOptions[].DhcpOptionsId \
+                      | tr "\t" "\n")
+    for dhcp_option_id in ${dhcp_option_ids}; do
+      echo "Deleting DHCP option set: ${dhcp_option_id}"
+      $AWS_CMD delete-dhcp-options --dhcp-options-id $dhcp_option_id > $LOG
+    done
+  else
+    echo "Skipping deletion of pre-existing DHCP option set: ${DHCP_OPTION_SET_ID}"
+  fi
+
   echo "Deleting IAM Instance profiles"
   delete-iam-profiles
 }
