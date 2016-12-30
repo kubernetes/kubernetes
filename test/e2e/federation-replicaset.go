@@ -243,11 +243,7 @@ func verifyCascadingDeletionForReplicaSet(clientset *fedclientset.Clientset, clu
 }
 
 func generageFedRsPrefsWithWeight(clusters map[string]*cluster) (pref *federation.FederatedReplicaSetPreferences, replicas int32, expect map[string]int32) {
-	clusterNames := make([]string, 0, len(clusters))
-	for clusterName := range clusters {
-		clusterNames = append(clusterNames, clusterName)
-	}
-
+	clusterNames := extraceClusterNames(clusters)
 	pref = &federation.FederatedReplicaSetPreferences{
 		Clusters: map[string]federation.ClusterReplicaSetPreferences{},
 	}
@@ -262,16 +258,11 @@ func generageFedRsPrefsWithWeight(clusters map[string]*cluster) (pref *federatio
 			expect[clusterName] = int32(i)
 		}
 	}
-
 	return
 }
 
 func generageFedRsPrefsWithMin(clusters map[string]*cluster) (pref *federation.FederatedReplicaSetPreferences, replicas int32, expect map[string]int32) {
-	clusterNames := make([]string, 0, len(clusters))
-	for clusterName := range clusters {
-		clusterNames = append(clusterNames, clusterName)
-	}
-
+	clusterNames := extraceClusterNames(clusters)
 	pref = &federation.FederatedReplicaSetPreferences{
 		Clusters: map[string]federation.ClusterReplicaSetPreferences{
 			clusterNames[0]: {Weight: 100},
@@ -296,11 +287,7 @@ func generageFedRsPrefsWithMin(clusters map[string]*cluster) (pref *federation.F
 }
 
 func generageFedRsPrefsWithMax(clusters map[string]*cluster) (pref *federation.FederatedReplicaSetPreferences, replicas int32, expect map[string]int32) {
-	clusterNames := make([]string, 0, len(clusters))
-	for clusterName := range clusters {
-		clusterNames = append(clusterNames, clusterName)
-	}
-
+	clusterNames := extraceClusterNames(clusters)
 	pref = &federation.FederatedReplicaSetPreferences{
 		Clusters: map[string]federation.ClusterReplicaSetPreferences{
 			clusterNames[0]: {Weight: 1},
@@ -331,11 +318,7 @@ func updateFedRePrefsRebalance(pref *federation.FederatedReplicaSetPreferences, 
 }
 
 func generageFedRsPrefsForRebalancing(clusters map[string]*cluster) (pref1, pref2 *federation.FederatedReplicaSetPreferences, replicas int32, expect1, expect2 map[string]int32) {
-	clusterNames := make([]string, 0, len(clusters))
-	for clusterName := range clusters {
-		clusterNames = append(clusterNames, clusterName)
-	}
-
+	clusterNames := extraceClusterNames(clusters)
 	replicas = 3
 
 	pref1 = &federation.FederatedReplicaSetPreferences{
@@ -496,4 +479,12 @@ func newReplicaSet(namespace string, name string, replicas int32, pref *federati
 		rs.Annotations[fedreplicsetcontroller.FedReplicaSetPreferencesAnnotation] = prefString
 	}
 	return &rs
+}
+
+func extraceClusterNames(clusters map[string]*cluster) []string {
+	clusterNames := make([]string, 0, len(clusters))
+	for clusterName := range clusters {
+		clusterNames = append(clusterNames, clusterName)
+	}
+	return clusterNames
 }
