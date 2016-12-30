@@ -13,6 +13,5 @@
 # limitations under the License.
 
 FROM BASEIMAGE
-MAINTAINER Tim Hockin <thockin@google.com>
 ADD kube-dns /
 ENTRYPOINT ["/kube-dns"]

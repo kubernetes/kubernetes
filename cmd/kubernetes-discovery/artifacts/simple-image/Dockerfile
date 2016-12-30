@@ -13,6 +13,5 @@
 # limitations under the License.
 
 FROM fedora
-MAINTAINER David Eads <deads@redhat.com>
 ADD kubernetes-discovery /
 ENTRYPOINT ["/kubernetes-discovery"]
