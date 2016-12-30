@@ -30,7 +30,7 @@ How the request and limit are enforced depends on whether the resource is [compr
 
 - For now, we are only supporting CPU.
 - Pods are guaranteed to get the amount of CPU they request, they may or may not get additional CPU time (depending on the other jobs running). This isn't fully guaranteed today because cpu isolation is at the container level. Pod level cgroups will be introduced soon to achieve this goal.
-- Excess CPU resources will be distributed based on the amount of CPU requested. For example, suppose container A requests for 600 milli CPUs, and container B requests for 300 milli CPUs. Suppose that both containers are trying to use as much CPU as they can. Then the extra 10 milli CPUs will be distributed to A and B in a 2:1 ratio (implementation discussed in later sections).
+- Excess CPU resources will be distributed based on the amount of CPU requested. For example, suppose container A requests for 600 milli CPUs, and container B requests for 300 milli CPUs. Suppose that both containers are trying to use as much CPU as they can. Then the extra 100 milli CPUs will be distributed to A and B in a 2:1 ratio (implementation discussed in later sections).
 - Pods will be throttled if they exceed their limit. If limit is unspecified, then the pods can use excess CPU when available.
 
 ### Incompressible Resource Guarantees
