@@ -38,11 +38,6 @@ import (
 	"github.com/golang/glog"
 )
 
-const (
-	// Number of Nodes that needs to be in the cluster for it to be treated as "large"
-	LargeClusterThreshold = 20
-)
-
 // deletePods will delete all pods from master running on given node, and return true
 // if any pods were deleted, or were found pending deletion.
 func deletePods(kubeClient clientset.Interface, recorder record.EventRecorder, nodeName, nodeUID string, daemonStore cache.StoreToDaemonSetLister) (bool, error) {
