@@ -42,6 +42,9 @@ import (
 )
 
 func TestMerge(t *testing.T) {
+	expectedAfterMerge0 := apitesting.DeepEqualSafePodSpec()
+	expectedAfterMerge0.PredicateResults = nil
+
 	grace := int64(30)
 	tests := []struct {
 		obj       runtime.Object
@@ -62,7 +65,7 @@ func TestMerge(t *testing.T) {
 				ObjectMeta: api.ObjectMeta{
 					Name: "foo",
 				},
-				Spec: apitesting.DeepEqualSafePodSpec(),
+				Spec: expectedAfterMerge0,
 			},
 		},
 		/* TODO: uncomment this test once Merge is updated to use
