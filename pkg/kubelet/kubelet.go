@@ -1206,9 +1206,7 @@ func (kl *Kubelet) initializeRuntimeDependentModules() {
 		glog.Fatalf("Failed to start cAdvisor %v", err)
 	}
 	// eviction manager must start after cadvisor because it needs to know if the container runtime has a dedicated imagefs
-	if err := kl.evictionManager.Start(kl, kl.getActivePods, evictionMonitoringPeriod); err != nil {
-		kl.runtimeState.setInternalError(fmt.Errorf("failed to start eviction manager %v", err))
-	}
+	kl.evictionManager.Start(kl, kl.getActivePods, evictionMonitoringPeriod)
 }
 
 // Run starts the kubelet reacting to config updates
