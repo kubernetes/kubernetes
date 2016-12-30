@@ -149,6 +149,7 @@ kube::util::ensure-temp-dir
 
 BINS=(
 	cmd/kubectl
+	cmd/kube-validate
 	cmd/kube-apiserver
 	cmd/kube-controller-manager
 )
