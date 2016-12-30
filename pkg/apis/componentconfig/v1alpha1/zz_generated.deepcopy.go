@@ -351,13 +351,6 @@ func DeepCopy_v1alpha1_KubeletConfiguration(in interface{}, out interface{}, c *
 			out.Containerized = nil
 		}
 		out.MaxOpenFiles = in.MaxOpenFiles
-		if in.ReconcileCIDR != nil {
-			in, out := &in.ReconcileCIDR, &out.ReconcileCIDR
-			*out = new(bool)
-			**out = **in
-		} else {
-			out.ReconcileCIDR = nil
-		}
 		if in.RegisterSchedulable != nil {
 			in, out := &in.RegisterSchedulable, &out.RegisterSchedulable
 			*out = new(bool)
