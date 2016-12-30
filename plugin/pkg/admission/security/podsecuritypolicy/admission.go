@@ -109,7 +109,7 @@ func NewPlugin(kclient clientset.Interface, strategyFactory psp.StrategyFactory,
 	)
 
 	return &podSecurityPolicyPlugin{
-		Handler:          admission.NewHandler(admission.Create, admission.Update),
+		Handler:          admission.NewHandler(admission.Create, admission.Update, admission.Delete),
 		client:           kclient,
 		strategyFactory:  strategyFactory,
 		pspMatcher:       pspMatcher,
@@ -150,10 +150,20 @@ func (c *podSecurityPolicyPlugin) Admit(a admission.Attributes) error {
 		return nil
 	}
 
-	pod, ok := a.GetObject().(*api.Pod)
-	// if we can't convert then we don't handle this object so just return
-	if !ok {
-		return nil
+	var pod *api.Pod
+	if a.GetOperation() == admission.Delete {
+		var err error
+		pod, err = c.client.Core().Pods(a.GetNamespace()).Get(a.GetName())
+		if err != nil {
+			return nil
+		}
+	} else {
+		var ok bool
+		pod, ok = a.GetObject().(*api.Pod)
+		// if we can't convert then we don't handle this object so just return
+		if !ok {
+			return nil
+		}
 	}
 
 	// get all constraints that are usable by the user
