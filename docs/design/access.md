@@ -55,14 +55,14 @@ K8s User assets:
   - External User assets of each K8s User.
   - things private to the K8s app, like:
     - credentials for accessing other services (docker private repos, storage
-services, facebook, etc)
+services, facebook, etc.)
     - SSL certificates for web servers
     - proprietary data and code
 
 K8s Cluster assets:
   - Assets of each K8s User.
   - Machine Certificates or secrets.
-  - The value of K8s cluster computing resources (cpu, memory, etc).
+  - The value of K8s cluster computing resources (cpu, memory, etc.).
 
 This document is primarily about protecting K8s User assets and K8s cluster
 assets from other K8s Users and K8s Project and Cluster Admins.
@@ -104,7 +104,7 @@ needed for hard limits (Users given limited slice of data) and soft limits
 
 K8s ecosystem services:
  - There may be companies that want to offer their existing services (Build, CI,
-A/B-test, release automation, etc) for use with K8s. There should be some story
+A/B-test, release automation, etc.) for use with K8s. There should be some story
 for this case.
 
 Pods configs should be largely portable between Org-run and hosted
@@ -309,7 +309,7 @@ Authorization policy is set by creating a set of Policy objects.
 The API Server will be the Enforcement Point for Policy. For each API call that
 it receives, it will construct the Attributes needed to evaluate the policy
 (what user is making the call, what resource they are accessing, what they are
-trying to do that resource, etc) and pass those attributes to a Decision Point.
+trying to do that resource, etc.) and pass those attributes to a Decision Point.
 The Decision Point code evaluates the Attributes against all the Policies and
 allows or denies the API call. The system will be modular enough that the
 Decision Point code can either be linked into the APIserver binary, or be
