@@ -64,6 +64,10 @@ const (
 	// avoid a hot loop, we'll wait this long between checks.
 	PodStoreSyncedPollPeriod = 100 * time.Millisecond
 
+	// We must avoid counting pods until the pod store has synced. If it hasn't synced, to
+	// avoid a hot loop, we'll wait this long between checks.
+	rcStoreSyncedPollPeriod = 100 * time.Millisecond
+
 	// The number of times we retry updating a replication controller's status.
 	statusUpdateRetries = 1
 )
@@ -107,6 +111,9 @@ type ReplicationManager struct {
 	// podStoreSynced returns true if the pod store has been synced at least once.
 	// Added as a member to the struct to allow injection for testing.
 	podStoreSynced func() bool
+	// rcStoreSynced returns true if the rc store has been synced at least once.
+	// Added as a member to the struct to allow injection for testing.
+	rcStoreSynced func() bool
 
 	lookupCache *controller.MatchingCache
 
@@ -182,6 +189,7 @@ func newReplicationManager(eventRecorder record.EventRecorder, podInformer cache
 
 	rm.syncHandler = rm.syncReplicationController
 	rm.podStoreSynced = rm.podController.HasSynced
+	rm.rcStoreSynced = rm.rcController.HasSynced
 	rm.lookupCache = controller.NewMatchingCache(lookupCacheSize)
 	return rm
 }
@@ -218,7 +226,16 @@ func (rm *ReplicationManager) Run(workers int, stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 	glog.Infof("Starting RC Manager")
 	go rm.rcController.Run(stopCh)
-	go rm.podController.Run(stopCh)
+	go func() {
+		for {
+			if rm.rcStoreSynced() {
+				break
+			}
+			// Sleep so we give the rc reflector goroutine a chance to run.
+			time.Sleep(rcStoreSyncedPollPeriod)
+		}
+		rm.podController.Run(stopCh)
+	}()
 	for i := 0; i < workers; i++ {
 		go wait.Until(rm.worker, time.Second, stopCh)
 	}
