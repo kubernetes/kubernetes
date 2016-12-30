@@ -200,8 +200,8 @@ func init() {
 		externalGroupVersion := schema.GroupVersion{Group: apps.GroupName, Version: api.Registry.GroupOrDie(apps.GroupName).GroupVersion.Version}
 		Groups[apps.GroupName] = TestGroup{
 			externalGroupVersion: externalGroupVersion,
-			internalGroupVersion: extensions.SchemeGroupVersion,
-			internalTypes:        api.Scheme.KnownTypes(extensions.SchemeGroupVersion),
+			internalGroupVersion: apps.SchemeGroupVersion,
+			internalTypes:        api.Scheme.KnownTypes(apps.SchemeGroupVersion),
 			externalTypes:        api.Scheme.KnownTypes(externalGroupVersion),
 		}
 	}
