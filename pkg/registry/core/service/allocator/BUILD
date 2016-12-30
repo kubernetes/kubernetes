@@ -28,5 +28,5 @@ go_test(
     ],
     library = "go_default_library",
     tags = ["automanaged"],
-    deps = [],
+    deps = ["//vendor:k8s.io/client-go/pkg/util/sets"],
 )

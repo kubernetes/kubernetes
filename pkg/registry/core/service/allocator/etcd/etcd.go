@@ -144,6 +144,12 @@ func (e *Etcd) Release(item int) error {
 	})
 }
 
+func (e *Etcd) ForEach(fn func(int)) {
+	e.lock.Lock()
+	defer e.lock.Unlock()
+	e.alloc.ForEach(fn)
+}
+
 // tryUpdate performs a read-update to persist the latest snapshot state of allocation.
 func (e *Etcd) tryUpdate(fn func() error) error {
 	err := e.storage.GuaranteedUpdate(context.TODO(), e.baseKey, &api.RangeAllocation{}, true, nil,
