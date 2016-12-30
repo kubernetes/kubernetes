@@ -364,9 +364,6 @@ func autoConvert_v1alpha1_KubeletConfiguration_To_componentconfig_KubeletConfigu
 		return err
 	}
 	out.MaxOpenFiles = in.MaxOpenFiles
-	if err := api.Convert_Pointer_bool_To_bool(&in.ReconcileCIDR, &out.ReconcileCIDR, s); err != nil {
-		return err
-	}
 	if err := api.Convert_Pointer_bool_To_bool(&in.RegisterSchedulable, &out.RegisterSchedulable, s); err != nil {
 		return err
 	}
@@ -538,9 +535,6 @@ func autoConvert_componentconfig_KubeletConfiguration_To_v1alpha1_KubeletConfigu
 		return err
 	}
 	out.MaxOpenFiles = in.MaxOpenFiles
-	if err := api.Convert_bool_To_Pointer_bool(&in.ReconcileCIDR, &out.ReconcileCIDR, s); err != nil {
-		return err
-	}
 	if err := api.Convert_bool_To_Pointer_bool(&in.RegisterSchedulable, &out.RegisterSchedulable, s); err != nil {
 		return err
 	}
