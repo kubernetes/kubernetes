@@ -1330,12 +1330,12 @@ func TestDoRequestNewWayFile(t *testing.T) {
 	testServer := httptest.NewServer(&fakeHandler)
 	defer testServer.Close()
 	c := testRESTClient(t, testServer)
-	wasCreated := true
+	var statusCode int
 	obj, err := c.Verb("POST").
 		Prefix("foo/bar", "baz").
 		Timeout(time.Second).
 		Body(file.Name()).
-		Do().WasCreated(&wasCreated).Get()
+		Do().StatusCode(&statusCode).Get()
 	if err != nil {
 		t.Errorf("Unexpected error: %v %#v", err, err)
 		return
@@ -1345,59 +1345,13 @@ func TestDoRequestNewWayFile(t *testing.T) {
 	} else if !api.Semantic.DeepDerivative(expectedObj, obj) {
 		t.Errorf("Expected: %#v, got %#v", expectedObj, obj)
 	}
-	if wasCreated {
+	if statusCode == 202 {
 		t.Errorf("expected object was created")
 	}
 	tmpStr := string(reqBodyExpected)
 	requestURL := testapi.Default.ResourcePathWithPrefix("foo/bar/baz", "", "", "")
 	requestURL += "?timeout=1s"
 	fakeHandler.ValidateRequest(t, requestURL, "POST", &tmpStr)
-}
-
-func TestWasCreated(t *testing.T) {
-	reqObj := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
-	reqBodyExpected, err := runtime.Encode(testapi.Default.Codec(), reqObj)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-
-	expectedObj := &api.Service{Spec: api.ServiceSpec{Ports: []api.ServicePort{{
-		Protocol:   "TCP",
-		Port:       12345,
-		TargetPort: intstr.FromInt(12345),
-	}}}}
-	expectedBody, _ := runtime.Encode(testapi.Default.Codec(), expectedObj)
-	fakeHandler := utiltesting.FakeHandler{
-		StatusCode:   201,
-		ResponseBody: string(expectedBody),
-		T:            t,
-	}
-	testServer := httptest.NewServer(&fakeHandler)
-	defer testServer.Close()
-	c := testRESTClient(t, testServer)
-	wasCreated := false
-	obj, err := c.Verb("PUT").
-		Prefix("foo/bar", "baz").
-		Timeout(time.Second).
-		Body(reqBodyExpected).
-		Do().WasCreated(&wasCreated).Get()
-	if err != nil {
-		t.Errorf("Unexpected error: %v %#v", err, err)
-		return
-	}
-	if obj == nil {
-		t.Error("nil obj")
-	} else if !api.Semantic.DeepDerivative(expectedObj, obj) {
-		t.Errorf("Expected: %#v, got %#v", expectedObj, obj)
-	}
-	if !wasCreated {
-		t.Errorf("Expected object was created")
-	}
-
-	tmpStr := string(reqBodyExpected)
-	requestURL := testapi.Default.ResourcePathWithPrefix("foo/bar/baz", "", "", "")
-	requestURL += "?timeout=1s"
-	fakeHandler.ValidateRequest(t, requestURL, "PUT", &tmpStr)
 }
 
 func TestVerbs(t *testing.T) {

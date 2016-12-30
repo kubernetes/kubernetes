@@ -1148,13 +1148,6 @@ func (r Result) Into(obj runtime.Object) error {
 	return nil
 }
 
-// WasCreated updates the provided bool pointer to whether the server returned
-// 201 created or a different response.
-func (r Result) WasCreated(wasCreated *bool) Result {
-	*wasCreated = r.statusCode == http.StatusCreated
-	return r
-}
-
 // Error returns the error executing the request, nil if no error occurred.
 // If the returned object is of type Status and has Status != StatusSuccess, the
 // additional information in Status will be used to enrich the error.
