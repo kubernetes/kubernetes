@@ -992,9 +992,10 @@ func (dm *DockerManager) PullImage(image kubecontainer.ImageSpec, secrets []v1.S
 	return GetImageRef(dm.client, image.Image)
 }
 
-// IsImagePresent checks whether the container image is already in the local storage.
-func (dm *DockerManager) IsImagePresent(image kubecontainer.ImageSpec) (string, error) {
-	return dm.dockerPuller.IsImagePresent(image.Image)
+// GetImageRef gets the reference (digest or ID) of the image which has already been in
+// the local storage. It returns ("", nil) if the image isn't in the local storage.
+func (dm *DockerManager) GetImageRef(image kubecontainer.ImageSpec) (string, error) {
+	return dm.dockerPuller.GetImageRef(image.Image)
 }
 
 // Removes the specified image.

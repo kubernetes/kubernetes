@@ -56,13 +56,13 @@ func TestListImages(t *testing.T) {
 	assert.Equal(t, expected.List(), actual.List())
 }
 
-func TestIsImagePresent(t *testing.T) {
+func TestGetImageRef(t *testing.T) {
 	_, fakeImageService, fakeManager, err := createTestRuntimeManager()
 	assert.NoError(t, err)
 
 	image := "busybox"
 	fakeImageService.SetFakeImages([]string{image})
-	imageRef, err := fakeManager.IsImagePresent(kubecontainer.ImageSpec{Image: image})
+	imageRef, err := fakeManager.GetImageRef(kubecontainer.ImageSpec{Image: image})
 	assert.NoError(t, err)
 	assert.Equal(t, image, imageRef)
 }

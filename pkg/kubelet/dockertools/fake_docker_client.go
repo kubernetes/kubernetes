@@ -596,7 +596,7 @@ func (f *FakeDockerPuller) Pull(image string, secrets []v1.Secret) (err error) {
 	return err
 }
 
-func (f *FakeDockerPuller) IsImagePresent(name string) (string, error) {
+func (f *FakeDockerPuller) GetImageRef(name string) (string, error) {
 	f.Lock()
 	defer f.Unlock()
 	if f.HasImages == nil {

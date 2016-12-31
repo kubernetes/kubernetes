@@ -87,7 +87,7 @@ func (r *Runtime) PullImage(image kubecontainer.ImageSpec, pullSecrets []v1.Secr
 	return r.getImageID(img)
 }
 
-func (r *Runtime) IsImagePresent(image kubecontainer.ImageSpec) (string, error) {
+func (r *Runtime) GetImageRef(image kubecontainer.ImageSpec) (string, error) {
 	images, err := r.listImages(image.Image, false)
 	if err != nil {
 		return "", err

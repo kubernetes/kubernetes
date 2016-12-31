@@ -99,7 +99,7 @@ func (m *imageManager) EnsureImageExists(pod *v1.Pod, container *v1.Container, p
 	}
 
 	spec := kubecontainer.ImageSpec{Image: image}
-	imageRef, err := m.imageService.IsImagePresent(spec)
+	imageRef, err := m.imageService.GetImageRef(spec)
 	if err != nil {
 		msg := fmt.Sprintf("Failed to inspect image %q: %v", container.Image, err)
 		m.logIt(ref, v1.EventTypeWarning, events.FailedToInspectImage, logPrefix, msg, glog.Warning)
@@ -128,20 +128,20 @@ func (m *imageManager) EnsureImageExists(pod *v1.Pod, container *v1.Container, p
 	m.logIt(ref, v1.EventTypeNormal, events.PullingImage, logPrefix, fmt.Sprintf("pulling image %q", container.Image), glog.Info)
 	pullChan := make(chan pullResult)
 	m.puller.pullImage(spec, pullSecrets, pullChan)
-	imageRefWithErr := <-pullChan
-	if imageRefWithErr.err != nil {
-		m.logIt(ref, v1.EventTypeWarning, events.FailedToPullImage, logPrefix, fmt.Sprintf("Failed to pull image %q: %v", container.Image, imageRefWithErr.err), glog.Warning)
+	imagePullResult := <-pullChan
+	if imagePullResult.err != nil {
+		m.logIt(ref, v1.EventTypeWarning, events.FailedToPullImage, logPrefix, fmt.Sprintf("Failed to pull image %q: %v", container.Image, imagePullResult.err), glog.Warning)
 		m.backOff.Next(backOffKey, m.backOff.Clock.Now())
-		if imageRefWithErr.err == RegistryUnavailable {
+		if imagePullResult.err == RegistryUnavailable {
 			msg := fmt.Sprintf("image pull failed for %s because the registry is unavailable.", container.Image)
-			return "", msg, imageRefWithErr.err
+			return "", msg, imagePullResult.err
 		}
 
-		return "", imageRefWithErr.err.Error(), ErrImagePull
+		return "", imagePullResult.err.Error(), ErrImagePull
 	}
 	m.logIt(ref, v1.EventTypeNormal, events.PulledImage, logPrefix, fmt.Sprintf("Successfully pulled image %q", container.Image), glog.Info)
 	m.backOff.GC()
-	return imageRefWithErr.imageRef, "", nil
+	return imagePullResult.imageRef, "", nil
 }
 
 // applyDefaultImageTag parses a docker image string, if it doesn't contain any tag or digest,
