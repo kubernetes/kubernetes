@@ -28,16 +28,16 @@ import (
 
 // PullImage pulls an image from the network to local storage using the supplied
 // secrets if necessary.
-func (m *kubeGenericRuntimeManager) PullImage(image kubecontainer.ImageSpec, pullSecrets []v1.Secret) error {
+func (m *kubeGenericRuntimeManager) PullImage(image kubecontainer.ImageSpec, pullSecrets []v1.Secret) (string, error) {
 	img := image.Image
 	repoToPull, _, _, err := parsers.ParseImageName(img)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	keyring, err := credentialprovider.MakeDockerKeyring(pullSecrets, m.keyring)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	imgSpec := &runtimeapi.ImageSpec{Image: &img}
@@ -45,13 +45,13 @@ func (m *kubeGenericRuntimeManager) PullImage(image kubecontainer.ImageSpec, pul
 	if !withCredentials {
 		glog.V(3).Infof("Pulling image %q without credentials", img)
 
-		err = m.imageService.PullImage(imgSpec, nil)
+		imageRef, err := m.imageService.PullImage(imgSpec, nil)
 		if err != nil {
 			glog.Errorf("Pull image %q failed: %v", img, err)
-			return err
+			return "", err
 		}
 
-		return nil
+		return imageRef, nil
 	}
 
 	var pullErrs []error
@@ -66,26 +66,35 @@ func (m *kubeGenericRuntimeManager) PullImage(image kubecontainer.ImageSpec, pul
 			RegistryToken: &authConfig.RegistryToken,
 		}
 
-		err = m.imageService.PullImage(imgSpec, auth)
+		imageRef, err := m.imageService.PullImage(imgSpec, auth)
 		// If there was no error, return success
 		if err == nil {
-			return nil
+			return imageRef, nil
 		}
 
 		pullErrs = append(pullErrs, err)
 	}
 
-	return utilerrors.NewAggregate(pullErrs)
+	return "", utilerrors.NewAggregate(pullErrs)
 }
 
-// IsImagePresent checks whether the container image is already in the local storage.
-func (m *kubeGenericRuntimeManager) IsImagePresent(image kubecontainer.ImageSpec) (bool, error) {
+// GetImageRef gets the reference (digest or ID) of the image which has already been in
+// the local storage. It returns ("", nil) if the image isn't in the local storage.
+func (m *kubeGenericRuntimeManager) GetImageRef(image kubecontainer.ImageSpec) (string, error) {
 	status, err := m.imageService.ImageStatus(&runtimeapi.ImageSpec{Image: &image.Image})
 	if err != nil {
 		glog.Errorf("ImageStatus for image %q failed: %v", image, err)
-		return false, err
+		return "", err
 	}
-	return status != nil, nil
+	if status == nil {
+		return "", nil
+	}
+
+	imageRef := status.GetId()
+	if len(status.RepoDigests) > 0 {
+		imageRef = status.RepoDigests[0]
+	}
+	return imageRef, nil
 }
 
 // ListImages gets all images currently on the machine.

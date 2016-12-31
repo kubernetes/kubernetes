@@ -348,25 +348,25 @@ func (f *FakeRuntime) GetContainerLogs(pod *v1.Pod, containerID ContainerID, log
 	return f.Err
 }
 
-func (f *FakeRuntime) PullImage(image ImageSpec, pullSecrets []v1.Secret) error {
+func (f *FakeRuntime) PullImage(image ImageSpec, pullSecrets []v1.Secret) (string, error) {
 	f.Lock()
 	defer f.Unlock()
 
 	f.CalledFunctions = append(f.CalledFunctions, "PullImage")
-	return f.Err
+	return image.Image, f.Err
 }
 
-func (f *FakeRuntime) IsImagePresent(image ImageSpec) (bool, error) {
+func (f *FakeRuntime) GetImageRef(image ImageSpec) (string, error) {
 	f.Lock()
 	defer f.Unlock()
 
-	f.CalledFunctions = append(f.CalledFunctions, "IsImagePresent")
+	f.CalledFunctions = append(f.CalledFunctions, "GetImageRef")
 	for _, i := range f.ImageList {
 		if i.ID == image.Image {
-			return true, nil
+			return i.ID, nil
 		}
 	}
-	return false, f.InspectErr
+	return "", f.InspectErr
 }
 
 func (f *FakeRuntime) ListImages() ([]Image, error) {

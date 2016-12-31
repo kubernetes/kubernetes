@@ -91,7 +91,7 @@ func (r *FakeImageService) ImageStatus(image *runtimeapi.ImageSpec) (*runtimeapi
 	return r.Images[image.GetImage()], nil
 }
 
-func (r *FakeImageService) PullImage(image *runtimeapi.ImageSpec, auth *runtimeapi.AuthConfig) error {
+func (r *FakeImageService) PullImage(image *runtimeapi.ImageSpec, auth *runtimeapi.AuthConfig) (string, error) {
 	r.Lock()
 	defer r.Unlock()
 
@@ -104,7 +104,7 @@ func (r *FakeImageService) PullImage(image *runtimeapi.ImageSpec, auth *runtimea
 		r.Images[imageID] = r.makeFakeImage(image.GetImage())
 	}
 
-	return nil
+	return imageID, nil
 }
 
 func (r *FakeImageService) RemoveImage(image *runtimeapi.ImageSpec) error {
