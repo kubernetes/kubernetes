@@ -81,6 +81,16 @@ func unjoinFederation(f cmdutil.Factory, cmdOut, cmdErr io.Writer, config util.A
 		return nil
 	}
 
+	//we need to ensure deleting the config map created in the deregistered cluster
+	//this configmap was created when the cluster joined this federation to aid
+	//the kube-dns of that cluser to aid service discovery
+	unjoinClusterFactory := config.HostFactory(unjoinFlags.Name, unjoinFlags.Kubeconfig)
+	err = deleteConfigMap(unjoinClusterFactory)
+	if err != nil {
+		fmt.Fprintf(cmdErr, "WARNING: Encountered error in deleting kube-dns configmap\n")
+		//we anyways continue to try and delete the secret further
+	}
+
 	// We want a separate client factory to communicate with the
 	// federation host cluster. See join_federation.go for details.
 	hostFactory := config.HostFactory(unjoinFlags.Host, unjoinFlags.Kubeconfig)
@@ -97,7 +107,6 @@ func unjoinFederation(f cmdutil.Factory, cmdOut, cmdErr io.Writer, config util.A
 // popCluster fetches the cluster object with the given name, deletes
 // it and returns the deleted cluster object.
 func popCluster(f cmdutil.Factory, name string) (*federationapi.Cluster, error) {
-	// Boilerplate to create the secret in the host cluster.
 	mapper, typer := f.Object()
 	gvks, _, err := typer.ObjectKinds(&federationapi.Cluster{})
 	if err != nil {
@@ -130,6 +139,14 @@ func popCluster(f cmdutil.Factory, name string) (*federationapi.Cluster, error) 
 	// Remove the cluster resource in the federation API server by
 	// calling rh.Delete()
 	return cluster, rh.Delete("", name)
+}
+
+func deleteConfigMap(unjoinClusterFactory cmdutil.Factory) error {
+	clientset, err := unjoinClusterFactory.ClientSet()
+	if err != nil {
+		return err
+	}
+	return clientset.Core().ConfigMaps("kube-system").Delete("kube-dns", &api.DeleteOptions{})
 }
 
 // deleteSecret deletes the secret with the given name from the host
