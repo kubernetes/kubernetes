@@ -63,8 +63,8 @@ func (ds *dockerService) ImageStatus(image *runtimeapi.ImageSpec) (*runtimeapi.I
 }
 
 // PullImage pulls an image with authentication config.
-func (ds *dockerService) PullImage(image *runtimeapi.ImageSpec, auth *runtimeapi.AuthConfig) error {
-	return ds.client.PullImage(image.GetImage(),
+func (ds *dockerService) PullImage(image *runtimeapi.ImageSpec, auth *runtimeapi.AuthConfig) (string, error) {
+	err := ds.client.PullImage(image.GetImage(),
 		dockertypes.AuthConfig{
 			Username:      auth.GetUsername(),
 			Password:      auth.GetPassword(),
@@ -74,6 +74,11 @@ func (ds *dockerService) PullImage(image *runtimeapi.ImageSpec, auth *runtimeapi
 		},
 		dockertypes.ImagePullOptions{},
 	)
+	if err != nil {
+		return "", err
+	}
+
+	return dockertools.GetImageRef(ds.client, image.GetImage())
 }
 
 // RemoveImage removes the image.

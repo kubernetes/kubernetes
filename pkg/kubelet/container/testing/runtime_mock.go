@@ -105,14 +105,14 @@ func (r *Mock) GetContainerLogs(pod *v1.Pod, containerID ContainerID, logOptions
 	return args.Error(0)
 }
 
-func (r *Mock) PullImage(image ImageSpec, pullSecrets []v1.Secret) error {
+func (r *Mock) PullImage(image ImageSpec, pullSecrets []v1.Secret) (string, error) {
 	args := r.Called(image, pullSecrets)
-	return args.Error(0)
+	return image.Image, args.Error(0)
 }
 
-func (r *Mock) IsImagePresent(image ImageSpec) (bool, error) {
+func (r *Mock) GetImageRef(image ImageSpec) (string, error) {
 	args := r.Called(image)
-	return args.Get(0).(bool), args.Error(1)
+	return args.Get(0).(string), args.Error(1)
 }
 
 func (r *Mock) ListImages() ([]Image, error) {
