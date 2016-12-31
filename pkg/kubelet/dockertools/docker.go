@@ -94,7 +94,7 @@ func SetContainerNamePrefix(prefix string) {
 // DockerPuller is an abstract interface for testability.  It abstracts image pull operations.
 type DockerPuller interface {
 	Pull(image string, secrets []v1.Secret) error
-	IsImagePresent(image string) (string, error)
+	GetImageRef(image string) (string, error)
 }
 
 // dockerPuller is the default implementation of DockerPuller.
@@ -241,7 +241,7 @@ func (p dockerPuller) Pull(image string, secrets []v1.Secret) error {
 		err := p.client.PullImage(image, dockertypes.AuthConfig{}, opts)
 		if err == nil {
 			// Sometimes PullImage failed with no error returned.
-			imageRef, ierr := p.IsImagePresent(image)
+			imageRef, ierr := p.GetImageRef(image)
 			if ierr != nil {
 				glog.Warningf("Failed to inspect image %s: %v", image, ierr)
 			}
@@ -277,7 +277,7 @@ func (p dockerPuller) Pull(image string, secrets []v1.Secret) error {
 	return utilerrors.NewAggregate(pullErrs)
 }
 
-func (p dockerPuller) IsImagePresent(image string) (string, error) {
+func (p dockerPuller) GetImageRef(image string) (string, error) {
 	resp, err := p.client.InspectImageByRef(image)
 	if err == nil {
 		if resp == nil {

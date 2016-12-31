@@ -356,11 +356,11 @@ func (f *FakeRuntime) PullImage(image ImageSpec, pullSecrets []v1.Secret) (strin
 	return image.Image, f.Err
 }
 
-func (f *FakeRuntime) IsImagePresent(image ImageSpec) (string, error) {
+func (f *FakeRuntime) GetImageRef(image ImageSpec) (string, error) {
 	f.Lock()
 	defer f.Unlock()
 
-	f.CalledFunctions = append(f.CalledFunctions, "IsImagePresent")
+	f.CalledFunctions = append(f.CalledFunctions, "GetImageRef")
 	for _, i := range f.ImageList {
 		if i.ID == image.Image {
 			return i.ID, nil

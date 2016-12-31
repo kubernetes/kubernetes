@@ -78,8 +78,9 @@ func (m *kubeGenericRuntimeManager) PullImage(image kubecontainer.ImageSpec, pul
 	return "", utilerrors.NewAggregate(pullErrs)
 }
 
-// IsImagePresent checks whether the container image is already in the local storage.
-func (m *kubeGenericRuntimeManager) IsImagePresent(image kubecontainer.ImageSpec) (string, error) {
+// GetImageRef gets the reference (digest or ID) of the image which has already been in
+// the local storage. It returns ("", nil) if the image isn't in the local storage.
+func (m *kubeGenericRuntimeManager) GetImageRef(image kubecontainer.ImageSpec) (string, error) {
 	status, err := m.imageService.ImageStatus(&runtimeapi.ImageSpec{Image: &image.Image})
 	if err != nil {
 		glog.Errorf("ImageStatus for image %q failed: %v", image, err)

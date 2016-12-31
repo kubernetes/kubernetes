@@ -705,12 +705,12 @@ func (f *imageTrackingDockerClient) InspectImageByRef(name string) (image *docke
 	return
 }
 
-func TestIsImagePresent(t *testing.T) {
+func TestGetImageRef(t *testing.T) {
 	cl := &imageTrackingDockerClient{NewFakeDockerClient(), ""}
 	puller := &dockerPuller{
 		client: cl,
 	}
-	_, _ = puller.IsImagePresent("abc:123")
+	_, _ = puller.GetImageRef("abc:123")
 	if cl.imageName != "abc:123" {
 		t.Errorf("expected inspection of image abc:123, instead inspected image %v", cl.imageName)
 	}
