@@ -195,7 +195,11 @@ func foundInitContainerSpec(pod *v1.Pod, status *kubecontainer.ContainerStatus) 
 
 // containerChanged returns true if the container's spec has changed.
 func containerChanged(container *v1.Container, status *kubecontainer.ContainerStatus) bool {
-	return kubecontainer.HashContainer(container) != status.Hash
+	currentHash := status.Hash
+	expectedHash := kubecontainer.HashContainer(container)
+
+	glog.V(6).Infof("container %q's current hash: %v, expected hash: %v", container.Name, currentHash, expectedHash)
+	return currentHash != expectedHash
 }
 
 // initContainersChanged returns true if any init container's spec has been changed.
@@ -226,7 +230,7 @@ func findContainerSpecByName(name string, pod *v1.Pod) *v1.Container {
 
 // isInBackOff returns true and the backoff time if the container is still in back-off.
 func isInBackOff(pod *v1.Pod, container *v1.Container, finishedAt time.Time, backoff *flowcontrol.Backoff) (bool, time.Duration) {
-	glog.V(4).Infof("Checking backoff for container %q in pod %q", container.Name, format.Pod(pod))
+	glog.V(4).Infof("Checking backoff for container %q in pod %q, last finish time: %v", container.Name, format.Pod(pod), finishedAt)
 	// Use the finished time of the latest exited container as the start point to calculate whether to do back-off.
 	var backoffTime time.Duration
 	// backoff requires a unique key to identify the container.
