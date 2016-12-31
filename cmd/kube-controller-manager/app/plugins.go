@@ -25,7 +25,7 @@ import (
 
 	// Cloud providers
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
-	_ "k8s.io/kubernetes/pkg/cloudprovider/providers"
+	//_ "k8s.io/kubernetes/pkg/cloudprovider/providers"
 
 	// Volume plugins
 	"github.com/golang/glog"
