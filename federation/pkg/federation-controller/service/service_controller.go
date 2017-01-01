@@ -165,11 +165,11 @@ func NewServiceController(client fedclientset.Interface) *ServiceController {
 		},
 		&util.ClusterLifecycleHandlerFuncs{
 			ClusterAvailable: func(cluster *fedv1.Cluster) {
-				// When new cluster becomes available process all the services again.
+				// When new cluster becomes available, process all the services again.
 				sc.clusterDeliverer.DeliverAfter(allServicesKey, nil, sc.clusterAvailableDelay)
 			},
 			ClusterUnavailable: func(cluster *fedv1.Cluster, _ []interface{}) {
-				// When cluster becomes unavailable process all the services again.
+				// When cluster is unregistered, process all the services again.
 				sc.clusterDeliverer.DeliverAfter(allServicesKey, nil, 0)
 			},
 		},
@@ -477,10 +477,10 @@ func (sc *ServiceController) reconcileService(serviceKey types.NamespacedName) (
 	}
 	fedService = updatedServiceObj.(*apiv1.Service)
 
-	// Sync the service in all underlying clusters.
+	// Sync the service in all underlying ready clusters.
 	clusters, err := sc.serviceFederatedInformer.GetReadyClusters()
 	if err != nil {
-		glog.Errorf("Failed to get cluster list: %v", err)
+		glog.Errorf("Failed to get ready cluster list: %v", err)
 		return statusError, err
 	}
 
@@ -576,7 +576,7 @@ func (sc *ServiceController) reconcileService(serviceKey types.NamespacedName) (
 					zone := cluster.Status.Zones[0]
 
 					clusterIngress :=
-						getClusterServiceIngresses(newServiceIngress,
+						getOrCreateClusterServiceIngresses(newServiceIngress,
 							region, zone, cluster.Name)
 					clusterIngress.Endpoints = append(clusterIngress.Endpoints, address)
 					clusterIngress.Healthy = false
@@ -612,6 +612,23 @@ func (sc *ServiceController) reconcileService(serviceKey types.NamespacedName) (
 		if err != nil {
 			glog.Errorf("Failed to parse endpoint annotations for service %s: %v", key, err)
 			return statusError, err
+		}
+
+		// Copy ingresses of unreachable clusters for comparison and do not delete those ingresses
+		unreadyClusters, err := sc.serviceFederatedInformer.GetUnreadyClusters()
+		if err != nil {
+			glog.Errorf("Failed to get unready cluster list: %v", err)
+			return statusError, err
+		}
+
+		for _, cluster := range unreadyClusters {
+			region := cluster.Status.Region
+			zone := cluster.Status.Zones[0]
+			clusterIngress := getClusterServiceIngresses(existingServiceIngress, region, zone, cluster.Name)
+			if clusterIngress != nil {
+				getOrCreateClusterServiceIngresses(newServiceIngress, region, zone, cluster.Name)
+				newServiceIngress.Endpoints[region][zone][cluster.Name] = clusterIngress
+			}
 		}
 
 		// Update federated service status and/or endpoints annotations if changed
@@ -730,6 +747,17 @@ func (slice ingress) Swap(i, j int) {
 
 // getClusterServiceIngresses returns cluster service ingresses for given region, zone and cluster name
 func getClusterServiceIngresses(ingress *fed.FederatedServiceIngress,
+	region, zone, cluster string) *fed.ClusterServiceIngress {
+	if ingress.Endpoints != nil && ingress.Endpoints[region] != nil && ingress.Endpoints[region][zone] != nil &&
+		ingress.Endpoints[region][zone][cluster] != nil {
+		return ingress.Endpoints[region][zone][cluster]
+	}
+	return nil
+}
+
+// getOrCreateClusterServiceIngresses returns cluster service ingresses for given region, zone and cluster name if
+// exist otherwise creates one and returns
+func getOrCreateClusterServiceIngresses(ingress *fed.FederatedServiceIngress,
 	region, zone, cluster string) *fed.ClusterServiceIngress {
 	if ingress.Endpoints == nil {
 		ingress.Endpoints = make(map[string]map[string]map[string]*fed.ClusterServiceIngress)
