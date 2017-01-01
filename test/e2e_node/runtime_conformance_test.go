@@ -132,7 +132,7 @@ while true; do sleep 1; done
 				name := "termination-message-container"
 				terminationMessage := "DONE"
 				terminationMessagePath := "/dev/termination-log"
-				priv := true
+				rootUser := int64(0)
 				c := ConformanceContainer{
 					PodClient: f.PodClient(),
 					Container: v1.Container{
@@ -142,7 +142,7 @@ while true; do sleep 1; done
 						Args:    []string{fmt.Sprintf("/bin/echo -n %s > %s", terminationMessage, terminationMessagePath)},
 						TerminationMessagePath: terminationMessagePath,
 						SecurityContext: &v1.SecurityContext{
-							Privileged: &priv,
+							RunAsUser: &rootUser,
 						},
 					},
 					RestartPolicy: v1.RestartPolicyNever,
@@ -164,6 +164,123 @@ while true; do sleep 1; done
 
 				By("the termination message should be set")
 				Expect(status.State.Terminated.Message).Should(Equal(terminationMessage))
+
+				By("delete the container")
+				Expect(c.Delete()).To(Succeed())
+			})
+
+			It("should report termination message if TerminationMessagePath is set as non-root user [Conformance]", func() {
+				name := "termination-message-container"
+				terminationMessage := "DONE"
+				terminationMessagePath := "/dev/termination-log"
+				nonRootUser := int64(10000)
+				c := ConformanceContainer{
+					PodClient: f.PodClient(),
+					Container: v1.Container{
+						Image:   "gcr.io/google_containers/busybox:1.24",
+						Name:    name,
+						Command: []string{"/bin/sh", "-c"},
+						Args:    []string{fmt.Sprintf("/bin/echo -n %s > %s", terminationMessage, terminationMessagePath)},
+						TerminationMessagePath: terminationMessagePath,
+						SecurityContext: &v1.SecurityContext{
+							RunAsUser: &nonRootUser,
+						},
+					},
+					RestartPolicy: v1.RestartPolicyNever,
+				}
+
+				By("create the container")
+				c.Create()
+				defer c.Delete()
+
+				By("wait for the container to succeed")
+				Eventually(c.GetPhase, retryTimeout, pollInterval).Should(Equal(v1.PodSucceeded))
+
+				By("get the container status")
+				status, err := c.GetStatus()
+				Expect(err).NotTo(HaveOccurred())
+
+				By("the container should be terminated")
+				Expect(GetContainerState(status.State)).To(Equal(ContainerStateTerminated))
+
+				By("the termination message should be set")
+				Expect(status.State.Terminated.Message).Should(Equal(terminationMessage))
+
+				By("delete the container")
+				Expect(c.Delete()).To(Succeed())
+			})
+
+			It("should fallback to log output if TerminationMessagePolicy is set [Conformance]", func() {
+				name := "termination-message-container"
+				terminationMessage := "DONE"
+				terminationMessagePath := "/dev/termination-log"
+				c := ConformanceContainer{
+					PodClient: f.PodClient(),
+					Container: v1.Container{
+						Image:   "gcr.io/google_containers/busybox:1.24",
+						Name:    name,
+						Command: []string{"/bin/sh", "-c"},
+						Args:    []string{fmt.Sprintf("/bin/echo -n %s; /bin/false", terminationMessage)},
+						TerminationMessagePath:   terminationMessagePath,
+						TerminationMessagePolicy: v1.FallbackToLogsOnErrorTerminationMessage,
+					},
+					RestartPolicy: v1.RestartPolicyNever,
+				}
+
+				By("create the container")
+				c.Create()
+				defer c.Delete()
+
+				By("wait for the container to fail")
+				Eventually(c.GetPhase, retryTimeout, pollInterval).Should(Equal(v1.PodFailed))
+
+				By("get the container status")
+				status, err := c.GetStatus()
+				Expect(err).NotTo(HaveOccurred())
+
+				By("the container should be terminated")
+				Expect(GetContainerState(status.State)).To(Equal(ContainerStateTerminated))
+
+				By("the termination message should be set from the logs with a newline")
+				Expect(status.State.Terminated.Message).Should(Equal(terminationMessage + "\n"))
+
+				By("delete the container")
+				Expect(c.Delete()).To(Succeed())
+			})
+
+			It("should not fallback to log output if the pod succeeds and TerminationMessagePolicy is set [Conformance]", func() {
+				name := "termination-message-container"
+				terminationMessage := "DONE"
+				terminationMessagePath := "/dev/termination-log"
+				c := ConformanceContainer{
+					PodClient: f.PodClient(),
+					Container: v1.Container{
+						Image:   "gcr.io/google_containers/busybox:1.24",
+						Name:    name,
+						Command: []string{"/bin/sh", "-c"},
+						Args:    []string{fmt.Sprintf("/bin/echo %s; /bin/true", terminationMessage)},
+						TerminationMessagePath:   terminationMessagePath,
+						TerminationMessagePolicy: v1.FallbackToLogsOnErrorTerminationMessage,
+					},
+					RestartPolicy: v1.RestartPolicyNever,
+				}
+
+				By("create the container")
+				c.Create()
+				defer c.Delete()
+
+				By("wait for the container to succeed")
+				Eventually(c.GetPhase, retryTimeout, pollInterval).Should(Equal(v1.PodSucceeded))
+
+				By("get the container status")
+				status, err := c.GetStatus()
+				Expect(err).NotTo(HaveOccurred())
+
+				By("the container should be terminated")
+				Expect(GetContainerState(status.State)).To(Equal(ContainerStateTerminated))
+
+				By("the termination message should be set empty")
+				Expect(status.State.Terminated.Message).Should(Equal(""))
 
 				By("delete the container")
 				Expect(c.Delete()).To(Succeed())
