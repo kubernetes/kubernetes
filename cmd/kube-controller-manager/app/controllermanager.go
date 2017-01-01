@@ -283,6 +283,9 @@ func getAvailableResources(clientBuilder controller.ControllerClientBuilder) (ma
 	return allResources, nil
 }
 
+// StartControllers is start controller (replication controller,node controller,resourceQuota controller,
+// namespace controller,serviceAccount controller,token controller,server controller,
+// endpoint controller) in Controller manager
 func StartControllers(controllers map[string]InitFunc, s *options.CMServer, rootClientBuilder, clientBuilder controller.ControllerClientBuilder, stop <-chan struct{}) error {
 	sharedInformers := informers.NewSharedInformerFactory(rootClientBuilder.ClientOrDie("shared-informers"), nil, ResyncPeriod(s)())
 
