@@ -803,64 +803,6 @@ go_library(
 )
 
 go_library(
-    name = "github.com/chai2010/gettext-go/gettext",
-    srcs = [
-        "github.com/chai2010/gettext-go/gettext/caller.go",
-        "github.com/chai2010/gettext-go/gettext/doc.go",
-        "github.com/chai2010/gettext-go/gettext/domain.go",
-        "github.com/chai2010/gettext-go/gettext/domain_helper.go",
-        "github.com/chai2010/gettext-go/gettext/fs.go",
-        "github.com/chai2010/gettext-go/gettext/gettext.go",
-        "github.com/chai2010/gettext-go/gettext/local.go",
-        "github.com/chai2010/gettext-go/gettext/tr.go",
-    ],
-    tags = ["automanaged"],
-    deps = [
-        "//vendor:github.com/chai2010/gettext-go/gettext/mo",
-        "//vendor:github.com/chai2010/gettext-go/gettext/plural",
-        "//vendor:github.com/chai2010/gettext-go/gettext/po",
-    ],
-)
-
-go_library(
-    name = "github.com/chai2010/gettext-go/gettext/mo",
-    srcs = [
-        "github.com/chai2010/gettext-go/gettext/mo/doc.go",
-        "github.com/chai2010/gettext-go/gettext/mo/encoder.go",
-        "github.com/chai2010/gettext-go/gettext/mo/file.go",
-        "github.com/chai2010/gettext-go/gettext/mo/header.go",
-        "github.com/chai2010/gettext-go/gettext/mo/message.go",
-        "github.com/chai2010/gettext-go/gettext/mo/util.go",
-    ],
-    tags = ["automanaged"],
-)
-
-go_library(
-    name = "github.com/chai2010/gettext-go/gettext/plural",
-    srcs = [
-        "github.com/chai2010/gettext-go/gettext/plural/doc.go",
-        "github.com/chai2010/gettext-go/gettext/plural/formula.go",
-        "github.com/chai2010/gettext-go/gettext/plural/table.go",
-    ],
-    tags = ["automanaged"],
-)
-
-go_library(
-    name = "github.com/chai2010/gettext-go/gettext/po",
-    srcs = [
-        "github.com/chai2010/gettext-go/gettext/po/comment.go",
-        "github.com/chai2010/gettext-go/gettext/po/doc.go",
-        "github.com/chai2010/gettext-go/gettext/po/file.go",
-        "github.com/chai2010/gettext-go/gettext/po/header.go",
-        "github.com/chai2010/gettext-go/gettext/po/line_reader.go",
-        "github.com/chai2010/gettext-go/gettext/po/message.go",
-        "github.com/chai2010/gettext-go/gettext/po/re.go",
-        "github.com/chai2010/gettext-go/gettext/po/util.go",
-    ],
-    tags = ["automanaged"],
-)
-
-go_library(
     name = "github.com/cloudflare/cfssl/auth",
     srcs = ["github.com/cloudflare/cfssl/auth/auth.go"],
     tags = ["automanaged"],
@@ -4317,17 +4259,6 @@ go_binary(
 )
 
 go_library(
-    name = "github.com/jteeuwen/go-bindata/go-bindata",
-    srcs = [
-        "github.com/jteeuwen/go-bindata/go-bindata/AppendSliceValue.go",
-        "github.com/jteeuwen/go-bindata/go-bindata/main.go",
-        "github.com/jteeuwen/go-bindata/go-bindata/version.go",
-    ],
-    tags = ["automanaged"],
-    deps = ["//vendor:github.com/jteeuwen/go-bindata"],
-)
-
-go_library(
     name = "github.com/juju/ratelimit",
     srcs = [
         "github.com/juju/ratelimit/ratelimit.go",
@@ -4631,37 +4562,6 @@ go_binary(
     name = "github.com/onsi/ginkgo/ginkgo_bin",
     library = ":github.com/onsi/ginkgo/ginkgo",
     tags = ["automanaged"],
-)
-
-go_library(
-    name = "github.com/onsi/ginkgo/ginkgo",
-    srcs = [
-        "github.com/onsi/ginkgo/ginkgo/bootstrap_command.go",
-        "github.com/onsi/ginkgo/ginkgo/build_command.go",
-        "github.com/onsi/ginkgo/ginkgo/convert_command.go",
-        "github.com/onsi/ginkgo/ginkgo/generate_command.go",
-        "github.com/onsi/ginkgo/ginkgo/help_command.go",
-        "github.com/onsi/ginkgo/ginkgo/main.go",
-        "github.com/onsi/ginkgo/ginkgo/nodot_command.go",
-        "github.com/onsi/ginkgo/ginkgo/notifications.go",
-        "github.com/onsi/ginkgo/ginkgo/run_command.go",
-        "github.com/onsi/ginkgo/ginkgo/run_watch_and_build_command_flags.go",
-        "github.com/onsi/ginkgo/ginkgo/suite_runner.go",
-        "github.com/onsi/ginkgo/ginkgo/unfocus_command.go",
-        "github.com/onsi/ginkgo/ginkgo/version_command.go",
-        "github.com/onsi/ginkgo/ginkgo/watch_command.go",
-    ],
-    tags = ["automanaged"],
-    deps = [
-        "//vendor:github.com/onsi/ginkgo/config",
-        "//vendor:github.com/onsi/ginkgo/ginkgo/convert",
-        "//vendor:github.com/onsi/ginkgo/ginkgo/interrupthandler",
-        "//vendor:github.com/onsi/ginkgo/ginkgo/nodot",
-        "//vendor:github.com/onsi/ginkgo/ginkgo/testrunner",
-        "//vendor:github.com/onsi/ginkgo/ginkgo/testsuite",
-        "//vendor:github.com/onsi/ginkgo/ginkgo/watch",
-        "//vendor:github.com/onsi/ginkgo/types",
-    ],
 )
 
 go_library(
@@ -6473,15 +6373,6 @@ go_binary(
 )
 
 go_library(
-    name = "github.com/ugorji/go/codec/codecgen",
-    srcs = [
-        "github.com/ugorji/go/codec/codecgen/gen.go",
-        "github.com/ugorji/go/codec/codecgen/z.go",
-    ],
-    tags = ["automanaged"],
-)
-
-go_library(
     name = "github.com/vishvananda/netlink",
     srcs = [
         "github.com/vishvananda/netlink/addr.go",
@@ -7285,61 +7176,8 @@ go_library(
 )
 
 go_library(
-    name = "golang.org/x/text/encoding",
-    srcs = ["golang.org/x/text/encoding/encoding.go"],
-    tags = ["automanaged"],
-    deps = [
-        "//vendor:golang.org/x/text/encoding/internal/identifier",
-        "//vendor:golang.org/x/text/transform",
-    ],
-)
-
-go_library(
-    name = "golang.org/x/text/encoding/internal",
-    srcs = ["golang.org/x/text/encoding/internal/internal.go"],
-    tags = ["automanaged"],
-    deps = [
-        "//vendor:golang.org/x/text/encoding",
-        "//vendor:golang.org/x/text/encoding/internal/identifier",
-        "//vendor:golang.org/x/text/transform",
-    ],
-)
-
-go_library(
-    name = "golang.org/x/text/encoding/internal/identifier",
-    srcs = [
-        "golang.org/x/text/encoding/internal/identifier/identifier.go",
-        "golang.org/x/text/encoding/internal/identifier/mib.go",
-    ],
-    tags = ["automanaged"],
-)
-
-go_library(
-    name = "golang.org/x/text/encoding/unicode",
-    srcs = [
-        "golang.org/x/text/encoding/unicode/override.go",
-        "golang.org/x/text/encoding/unicode/unicode.go",
-    ],
-    tags = ["automanaged"],
-    deps = [
-        "//vendor:golang.org/x/text/encoding",
-        "//vendor:golang.org/x/text/encoding/internal",
-        "//vendor:golang.org/x/text/encoding/internal/identifier",
-        "//vendor:golang.org/x/text/internal/utf8internal",
-        "//vendor:golang.org/x/text/runes",
-        "//vendor:golang.org/x/text/transform",
-    ],
-)
-
-go_library(
     name = "golang.org/x/text/internal/tag",
     srcs = ["golang.org/x/text/internal/tag/tag.go"],
-    tags = ["automanaged"],
-)
-
-go_library(
-    name = "golang.org/x/text/internal/utf8internal",
-    srcs = ["golang.org/x/text/internal/utf8internal/utf8internal.go"],
     tags = ["automanaged"],
 )
 
@@ -12188,6 +12026,159 @@ go_library(
     ],
 )
 
+go_test(
+    name = "k8s.io/client-go/pkg/util/workqueue_test",
+    srcs = [
+        "k8s.io/client-go/pkg/util/workqueue/default_rate_limiters_test.go",
+        "k8s.io/client-go/pkg/util/workqueue/delaying_queue_test.go",
+        "k8s.io/client-go/pkg/util/workqueue/rate_limitting_queue_test.go",
+        "k8s.io/client-go/pkg/util/workqueue/timed_queue_test.go",
+    ],
+    library = ":k8s.io/client-go/pkg/util/workqueue",
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:k8s.io/client-go/pkg/api/v1",
+        "//vendor:k8s.io/client-go/pkg/util/clock",
+        "//vendor:k8s.io/client-go/pkg/util/wait",
+    ],
+)
+
+go_library(
+    name = "k8s.io/client-go/pkg/util/workqueue",
+    srcs = [
+        "k8s.io/client-go/pkg/util/workqueue/default_rate_limiters.go",
+        "k8s.io/client-go/pkg/util/workqueue/delaying_queue.go",
+        "k8s.io/client-go/pkg/util/workqueue/doc.go",
+        "k8s.io/client-go/pkg/util/workqueue/metrics.go",
+        "k8s.io/client-go/pkg/util/workqueue/parallelizer.go",
+        "k8s.io/client-go/pkg/util/workqueue/queue.go",
+        "k8s.io/client-go/pkg/util/workqueue/rate_limitting_queue.go",
+        "k8s.io/client-go/pkg/util/workqueue/timed_queue.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/juju/ratelimit",
+        "//vendor:k8s.io/client-go/pkg/util/clock",
+        "//vendor:k8s.io/client-go/pkg/util/runtime",
+    ],
+)
+
+go_test(
+    name = "k8s.io/client-go/pkg/util/workqueue_xtest",
+    srcs = ["k8s.io/client-go/pkg/util/workqueue/queue_test.go"],
+    tags = ["automanaged"],
+    deps = ["//vendor:k8s.io/client-go/pkg/util/workqueue"],
+)
+
+go_library(
+    name = "github.com/chai2010/gettext-go/gettext",
+    srcs = [
+        "github.com/chai2010/gettext-go/gettext/caller.go",
+        "github.com/chai2010/gettext-go/gettext/doc.go",
+        "github.com/chai2010/gettext-go/gettext/domain.go",
+        "github.com/chai2010/gettext-go/gettext/domain_helper.go",
+        "github.com/chai2010/gettext-go/gettext/fs.go",
+        "github.com/chai2010/gettext-go/gettext/gettext.go",
+        "github.com/chai2010/gettext-go/gettext/local.go",
+        "github.com/chai2010/gettext-go/gettext/tr.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/chai2010/gettext-go/gettext/mo",
+        "//vendor:github.com/chai2010/gettext-go/gettext/plural",
+        "//vendor:github.com/chai2010/gettext-go/gettext/po",
+    ],
+)
+
+go_library(
+    name = "github.com/chai2010/gettext-go/gettext/mo",
+    srcs = [
+        "github.com/chai2010/gettext-go/gettext/mo/doc.go",
+        "github.com/chai2010/gettext-go/gettext/mo/encoder.go",
+        "github.com/chai2010/gettext-go/gettext/mo/file.go",
+        "github.com/chai2010/gettext-go/gettext/mo/header.go",
+        "github.com/chai2010/gettext-go/gettext/mo/message.go",
+        "github.com/chai2010/gettext-go/gettext/mo/util.go",
+    ],
+    tags = ["automanaged"],
+)
+
+go_library(
+    name = "github.com/chai2010/gettext-go/gettext/plural",
+    srcs = [
+        "github.com/chai2010/gettext-go/gettext/plural/doc.go",
+        "github.com/chai2010/gettext-go/gettext/plural/formula.go",
+        "github.com/chai2010/gettext-go/gettext/plural/table.go",
+    ],
+    tags = ["automanaged"],
+)
+
+go_library(
+    name = "github.com/chai2010/gettext-go/gettext/po",
+    srcs = [
+        "github.com/chai2010/gettext-go/gettext/po/comment.go",
+        "github.com/chai2010/gettext-go/gettext/po/doc.go",
+        "github.com/chai2010/gettext-go/gettext/po/file.go",
+        "github.com/chai2010/gettext-go/gettext/po/header.go",
+        "github.com/chai2010/gettext-go/gettext/po/line_reader.go",
+        "github.com/chai2010/gettext-go/gettext/po/message.go",
+        "github.com/chai2010/gettext-go/gettext/po/re.go",
+        "github.com/chai2010/gettext-go/gettext/po/util.go",
+    ],
+    tags = ["automanaged"],
+)
+
+go_library(
+    name = "github.com/jteeuwen/go-bindata/go-bindata",
+    srcs = [
+        "github.com/jteeuwen/go-bindata/go-bindata/AppendSliceValue.go",
+        "github.com/jteeuwen/go-bindata/go-bindata/main.go",
+        "github.com/jteeuwen/go-bindata/go-bindata/version.go",
+    ],
+    tags = ["automanaged"],
+    deps = ["//vendor:github.com/jteeuwen/go-bindata"],
+)
+
+go_library(
+    name = "github.com/onsi/ginkgo/ginkgo",
+    srcs = [
+        "github.com/onsi/ginkgo/ginkgo/bootstrap_command.go",
+        "github.com/onsi/ginkgo/ginkgo/build_command.go",
+        "github.com/onsi/ginkgo/ginkgo/convert_command.go",
+        "github.com/onsi/ginkgo/ginkgo/generate_command.go",
+        "github.com/onsi/ginkgo/ginkgo/help_command.go",
+        "github.com/onsi/ginkgo/ginkgo/main.go",
+        "github.com/onsi/ginkgo/ginkgo/nodot_command.go",
+        "github.com/onsi/ginkgo/ginkgo/notifications.go",
+        "github.com/onsi/ginkgo/ginkgo/run_command.go",
+        "github.com/onsi/ginkgo/ginkgo/run_watch_and_build_command_flags.go",
+        "github.com/onsi/ginkgo/ginkgo/suite_runner.go",
+        "github.com/onsi/ginkgo/ginkgo/unfocus_command.go",
+        "github.com/onsi/ginkgo/ginkgo/version_command.go",
+        "github.com/onsi/ginkgo/ginkgo/watch_command.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/onsi/ginkgo/config",
+        "//vendor:github.com/onsi/ginkgo/ginkgo/convert",
+        "//vendor:github.com/onsi/ginkgo/ginkgo/interrupthandler",
+        "//vendor:github.com/onsi/ginkgo/ginkgo/nodot",
+        "//vendor:github.com/onsi/ginkgo/ginkgo/testrunner",
+        "//vendor:github.com/onsi/ginkgo/ginkgo/testsuite",
+        "//vendor:github.com/onsi/ginkgo/ginkgo/watch",
+        "//vendor:github.com/onsi/ginkgo/types",
+    ],
+)
+
+go_library(
+    name = "github.com/ugorji/go/codec/codecgen",
+    srcs = [
+        "github.com/ugorji/go/codec/codecgen/gen.go",
+        "github.com/ugorji/go/codec/codecgen/z.go",
+    ],
+    tags = ["automanaged"],
+)
+
 go_library(
     name = "golang.org/x/crypto/ed25519",
     srcs = ["golang.org/x/crypto/ed25519/ed25519.go"],
@@ -12201,5 +12192,58 @@ go_library(
         "golang.org/x/crypto/ed25519/internal/edwards25519/const.go",
         "golang.org/x/crypto/ed25519/internal/edwards25519/edwards25519.go",
     ],
+    tags = ["automanaged"],
+)
+
+go_library(
+    name = "golang.org/x/text/encoding",
+    srcs = ["golang.org/x/text/encoding/encoding.go"],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:golang.org/x/text/encoding/internal/identifier",
+        "//vendor:golang.org/x/text/transform",
+    ],
+)
+
+go_library(
+    name = "golang.org/x/text/encoding/internal",
+    srcs = ["golang.org/x/text/encoding/internal/internal.go"],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:golang.org/x/text/encoding",
+        "//vendor:golang.org/x/text/encoding/internal/identifier",
+        "//vendor:golang.org/x/text/transform",
+    ],
+)
+
+go_library(
+    name = "golang.org/x/text/encoding/internal/identifier",
+    srcs = [
+        "golang.org/x/text/encoding/internal/identifier/identifier.go",
+        "golang.org/x/text/encoding/internal/identifier/mib.go",
+    ],
+    tags = ["automanaged"],
+)
+
+go_library(
+    name = "golang.org/x/text/encoding/unicode",
+    srcs = [
+        "golang.org/x/text/encoding/unicode/override.go",
+        "golang.org/x/text/encoding/unicode/unicode.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:golang.org/x/text/encoding",
+        "//vendor:golang.org/x/text/encoding/internal",
+        "//vendor:golang.org/x/text/encoding/internal/identifier",
+        "//vendor:golang.org/x/text/internal/utf8internal",
+        "//vendor:golang.org/x/text/runes",
+        "//vendor:golang.org/x/text/transform",
+    ],
+)
+
+go_library(
+    name = "golang.org/x/text/internal/utf8internal",
+    srcs = ["golang.org/x/text/internal/utf8internal/utf8internal.go"],
     tags = ["automanaged"],
 )
