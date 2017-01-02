@@ -21,6 +21,7 @@ go_library(
         "//pkg/genericapiserver:go_default_library",
         "//pkg/genericapiserver/api:go_default_library",
         "//pkg/genericapiserver/api/handlers:go_default_library",
+        "//pkg/genericapiserver/api/request:go_default_library",
         "//pkg/registry/extensions/rest:go_default_library",
         "//pkg/registry/extensions/thirdpartyresourcedata:go_default_library",
         "//pkg/registry/extensions/thirdpartyresourcedata/etcd:go_default_library",
