@@ -8947,6 +8947,11 @@
       "format": "int32",
       "description": "Total number of non-terminated pods targeted by this deployment that have the desired template spec."
      },
+     "readyReplicas": {
+      "type": "integer",
+      "format": "int32",
+      "description": "Total number of ready pods targeted by this deployment."
+     },
      "availableReplicas": {
       "type": "integer",
       "format": "int32",
