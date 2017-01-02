@@ -55,8 +55,8 @@ func startEndpointController(ctx ControllerContext) (bool, error) {
 func startReplicationController(ctx ControllerContext) (bool, error) {
 	go replicationcontroller.NewReplicationManager(
 		ctx.InformerFactory.Pods().Informer(),
+		ctx.InformerFactory.ReplicationControllers().Informer(),
 		ctx.ClientBuilder.ClientOrDie("replication-controller"),
-		ResyncPeriod(&ctx.Options),
 		replicationcontroller.BurstReplicas,
 		int(ctx.Options.LookupCacheSizeForRC),
 		ctx.Options.EnableGarbageCollector,
