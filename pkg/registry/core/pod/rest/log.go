@@ -26,7 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/registry/core/pod"
 	genericregistry "k8s.io/kubernetes/pkg/registry/generic/registry"
-	genericrest "k8s.io/kubernetes/pkg/registry/generic/rest"
+	genericapi "k8s.io/kubernetes/pkg/registry/generic/rest"
 	"k8s.io/kubernetes/pkg/runtime"
 )
 
@@ -73,12 +73,12 @@ func (r *LogREST) Get(ctx api.Context, name string, opts runtime.Object) (runtim
 	if err != nil {
 		return nil, err
 	}
-	return &genericrest.LocationStreamer{
+	return &genericapi.LocationStreamer{
 		Location:        location,
 		Transport:       transport,
 		ContentType:     "text/plain",
 		Flush:           logOpts.Follow,
-		ResponseChecker: genericrest.NewGenericHttpResponseChecker(api.Resource("pods/log"), name),
+		ResponseChecker: genericapi.NewGenericHttpResponseChecker(api.Resource("pods/log"), name),
 	}, nil
 }
 

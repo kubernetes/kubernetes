@@ -22,10 +22,10 @@ import (
 	"sync"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/apiserver/handlers/responsewriters"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/transport"
-	genericrest "k8s.io/kubernetes/pkg/registry/generic/rest"
+	"k8s.io/kubernetes/pkg/genericapiserver/api/handlers/responsewriters"
+	genericapi "k8s.io/kubernetes/pkg/registry/generic/rest"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/httpstream/spdy"
 
@@ -113,7 +113,7 @@ func (r *proxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		transport.SetAuthProxyHeaders(newReq, user.GetName(), user.GetGroups(), user.GetExtra())
 	}
 
-	handler := genericrest.NewUpgradeAwareProxyHandler(location, proxyRoundTripper, true, upgrade, &responder{w: w})
+	handler := genericapi.NewUpgradeAwareProxyHandler(location, proxyRoundTripper, true, upgrade, &responder{w: w})
 	handler.ServeHTTP(w, newReq)
 }
 
