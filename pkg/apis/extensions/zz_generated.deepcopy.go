@@ -359,6 +359,7 @@ func DeepCopy_extensions_DeploymentStatus(in interface{}, out interface{}, c *co
 		out.ObservedGeneration = in.ObservedGeneration
 		out.Replicas = in.Replicas
 		out.UpdatedReplicas = in.UpdatedReplicas
+		out.ReadyReplicas = in.ReadyReplicas
 		out.AvailableReplicas = in.AvailableReplicas
 		out.UnavailableReplicas = in.UnavailableReplicas
 		if in.Conditions != nil {
