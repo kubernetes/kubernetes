@@ -146,16 +146,15 @@ password=$(python -c 'import string,random; print("".join(random.SystemRandom().
 
 gcloud compute ssh --zone="${ZONE}" --project="${PROJECT}" "${MASTER_NAME}" \
   --command="sudo mkdir /home/kubernetes -p && sudo mkdir /etc/srv/kubernetes -p && \
+    sudo bash -c \"echo ${CA_CERT_BASE64} | base64 --decode > /etc/srv/kubernetes/ca.crt\" && \
     sudo bash -c \"echo ${MASTER_CERT_BASE64} | base64 --decode > /etc/srv/kubernetes/server.cert\" && \
     sudo bash -c \"echo ${MASTER_KEY_BASE64} | base64 --decode > /etc/srv/kubernetes/server.key\" && \
-    sudo bash -c \"echo ${CA_CERT_BASE64} | base64 --decode > /etc/srv/kubernetes/ca.crt\" && \
     sudo bash -c \"echo ${KUBECFG_CERT_BASE64} | base64 --decode > /etc/srv/kubernetes/kubecfg.crt\" && \
     sudo bash -c \"echo ${KUBECFG_KEY_BASE64} | base64 --decode > /etc/srv/kubernetes/kubecfg.key\" && \
     sudo bash -c \"echo \"${KUBE_BEARER_TOKEN},admin,admin\" > /etc/srv/kubernetes/known_tokens.csv\" && \
-    sudo bash -c \"echo \"${KUBELET_TOKEN},kubelet,kubelet\" >> /etc/srv/kubernetes/known_tokens.csv\" && \
-    sudo bash -c \"echo \"${KUBE_PROXY_TOKEN},kube_proxy,kube_proxy\" >> /etc/srv/kubernetes/known_tokens.csv\" && \
+    sudo bash -c \"echo \"${KUBELET_TOKEN},system:node:node-name,uid:kubelet,system:nodes\" >> /etc/srv/kubernetes/known_tokens.csv\" && \
+    sudo bash -c \"echo \"${KUBE_PROXY_TOKEN},system:kube-proxy,uid:kube_proxy\" >> /etc/srv/kubernetes/known_tokens.csv\" && \
     sudo bash -c \"echo ${password},admin,admin > /etc/srv/kubernetes/basic_auth.csv\""
-
 
 gcloud compute copy-files --zone="${ZONE}" --project="${PROJECT}" \
   "${SERVER_BINARY_TAR}" \
@@ -167,6 +166,8 @@ gcloud compute copy-files --zone="${ZONE}" --project="${PROJECT}" \
   "${RESOURCE_DIRECTORY}/manifests/kube-apiserver.yaml" \
   "${RESOURCE_DIRECTORY}/manifests/kube-scheduler.yaml" \
   "${RESOURCE_DIRECTORY}/manifests/kube-controller-manager.yaml" \
+  "${RESOURCE_DIRECTORY}/manifests/kube-addon-manager.yaml" \
+  "${RESOURCE_DIRECTORY}/manifests/addons/kubemark-rbac-bindings" \
   "kubernetes@${MASTER_NAME}":/home/kubernetes/
 
 gcloud compute ssh "${MASTER_NAME}" --zone="${ZONE}" --project="${PROJECT}" \
@@ -228,7 +229,7 @@ cat > "${LOCAL_KUBECONFIG}" << EOF
 apiVersion: v1
 kind: Config
 users:
-- name: admin
+- name: kubecfg
   user:
     client-certificate-data: "${KUBECFG_CERT_BASE64}"
     client-key-data: "${KUBECFG_KEY_BASE64}"
@@ -242,7 +243,7 @@ clusters:
 contexts:
 - context:
     cluster: kubemark
-    user: admin
+    user: kubecfg
   name: kubemark-context
 current-context: kubemark-context
 EOF
@@ -272,7 +273,7 @@ rm "${NODE_CONFIGMAP}"
 
 echo "Waiting for all HollowNodes to become Running..."
 start=$(date +%s)
-nodes=$("${KUBECTL}" --kubeconfig="${LOCAL_KUBECONFIG}" get node) || true
+nodes=$("${KUBECTL}" --kubeconfig="${LOCAL_KUBECONFIG}" get node 2> /dev/null) || true
 ready=$(($(echo "${nodes}" | grep -v "NotReady" | wc -l) - 1))
 
 until [[ "${ready}" -ge "${NUM_NODES}" ]]; do
@@ -297,7 +298,7 @@ until [[ "${ready}" -ge "${NUM_NODES}" ]]; do
     echo $(echo "${pods}" | grep -v "Running")
     exit 1
   fi
-  nodes=$("${KUBECTL}" --kubeconfig="${LOCAL_KUBECONFIG}" get node) || true
+  nodes=$("${KUBECTL}" --kubeconfig="${LOCAL_KUBECONFIG}" get node 2> /dev/null) || true
   ready=$(($(echo "${nodes}" | grep -v "NotReady" | wc -l) - 1))
 done
 echo ""
