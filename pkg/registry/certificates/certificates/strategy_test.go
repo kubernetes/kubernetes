@@ -23,26 +23,27 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	certapi "k8s.io/kubernetes/pkg/apis/certificates"
 	"k8s.io/kubernetes/pkg/auth/user"
+	genericapirequest "k8s.io/kubernetes/pkg/genericapiserver/api/request"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/diff"
 )
 
 func TestStrategyCreate(t *testing.T) {
 	tests := map[string]struct {
-		ctx         api.Context
+		ctx         genericapirequest.Context
 		obj         runtime.Object
 		expectedObj runtime.Object
 	}{
 		"no user in context, no user in obj": {
-			ctx: api.NewContext(),
+			ctx: genericapirequest.NewContext(),
 			obj: &certapi.CertificateSigningRequest{},
 			expectedObj: &certapi.CertificateSigningRequest{
 				Status: certapi.CertificateSigningRequestStatus{Conditions: []certapi.CertificateSigningRequestCondition{}},
 			},
 		},
 		"user in context, no user in obj": {
-			ctx: api.WithUser(
-				api.NewContext(),
+			ctx: genericapirequest.WithUser(
+				genericapirequest.NewContext(),
 				&user.DefaultInfo{
 					Name:   "bob",
 					UID:    "123",
@@ -61,7 +62,7 @@ func TestStrategyCreate(t *testing.T) {
 			},
 		},
 		"no user in context, user in obj": {
-			ctx: api.NewContext(),
+			ctx: genericapirequest.NewContext(),
 			obj: &certapi.CertificateSigningRequest{
 				Spec: certapi.CertificateSigningRequestSpec{
 					Username: "bob",
@@ -74,8 +75,8 @@ func TestStrategyCreate(t *testing.T) {
 			},
 		},
 		"user in context, user in obj": {
-			ctx: api.WithUser(
-				api.NewContext(),
+			ctx: genericapirequest.WithUser(
+				genericapirequest.NewContext(),
 				&user.DefaultInfo{
 					Name: "alice",
 					UID:  "234",
@@ -98,7 +99,7 @@ func TestStrategyCreate(t *testing.T) {
 			},
 		},
 		"pre-approved status": {
-			ctx: api.NewContext(),
+			ctx: genericapirequest.NewContext(),
 			obj: &certapi.CertificateSigningRequest{
 				Status: certapi.CertificateSigningRequestStatus{
 					Conditions: []certapi.CertificateSigningRequestCondition{

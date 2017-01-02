@@ -14,20 +14,21 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package api_test
+package request_test
 
 import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/auth/user"
+	genericapirequest "k8s.io/kubernetes/pkg/genericapiserver/api/request"
 	"k8s.io/kubernetes/pkg/types"
 )
 
 // TestNamespaceContext validates that a namespace can be get/set on a context object
 func TestNamespaceContext(t *testing.T) {
-	ctx := api.NewDefaultContext()
-	result, ok := api.NamespaceFrom(ctx)
+	ctx := genericapirequest.NewDefaultContext()
+	result, ok := genericapirequest.NamespaceFrom(ctx)
 	if !ok {
 		t.Fatalf("Error getting namespace")
 	}
@@ -35,8 +36,8 @@ func TestNamespaceContext(t *testing.T) {
 		t.Fatalf("Expected: %s, Actual: %s", api.NamespaceDefault, result)
 	}
 
-	ctx = api.NewContext()
-	result, ok = api.NamespaceFrom(ctx)
+	ctx = genericapirequest.NewContext()
+	result, ok = genericapirequest.NamespaceFrom(ctx)
 	if ok {
 		t.Fatalf("Should not be ok because there is no namespace on the context")
 	}
@@ -44,8 +45,8 @@ func TestNamespaceContext(t *testing.T) {
 
 // TestValidNamespace validates that namespace rules are enforced on a resource prior to create or update
 func TestValidNamespace(t *testing.T) {
-	ctx := api.NewDefaultContext()
-	namespace, _ := api.NamespaceFrom(ctx)
+	ctx := genericapirequest.NewDefaultContext()
+	namespace, _ := genericapirequest.NamespaceFrom(ctx)
 	resource := api.ReplicationController{}
 	if !api.ValidNamespace(ctx, &resource.ObjectMeta) {
 		t.Fatalf("expected success")
@@ -57,13 +58,13 @@ func TestValidNamespace(t *testing.T) {
 	if api.ValidNamespace(ctx, &resource.ObjectMeta) {
 		t.Fatalf("Expected error that resource and context errors do not match because resource has different namespace")
 	}
-	ctx = api.NewContext()
+	ctx = genericapirequest.NewContext()
 	if api.ValidNamespace(ctx, &resource.ObjectMeta) {
 		t.Fatalf("Expected error that resource and context errors do not match since context has no namespace")
 	}
 
-	ctx = api.NewContext()
-	ns := api.NamespaceValue(ctx)
+	ctx = genericapirequest.NewContext()
+	ns := genericapirequest.NamespaceValue(ctx)
 	if ns != "" {
 		t.Fatalf("Expected the empty string")
 	}
@@ -71,12 +72,12 @@ func TestValidNamespace(t *testing.T) {
 
 //TestUserContext validates that a userinfo can be get/set on a context object
 func TestUserContext(t *testing.T) {
-	ctx := api.NewContext()
-	_, ok := api.UserFrom(ctx)
+	ctx := genericapirequest.NewContext()
+	_, ok := genericapirequest.UserFrom(ctx)
 	if ok {
 		t.Fatalf("Should not be ok because there is no user.Info on the context")
 	}
-	ctx = api.WithUser(
+	ctx = genericapirequest.WithUser(
 		ctx,
 		&user.DefaultInfo{
 			Name:   "bob",
@@ -86,7 +87,7 @@ func TestUserContext(t *testing.T) {
 		},
 	)
 
-	result, ok := api.UserFrom(ctx)
+	result, ok := genericapirequest.UserFrom(ctx)
 	if !ok {
 		t.Fatalf("Error getting user info")
 	}
@@ -122,16 +123,16 @@ func TestUserContext(t *testing.T) {
 
 //TestUIDContext validates that a UID can be get/set on a context object
 func TestUIDContext(t *testing.T) {
-	ctx := api.NewContext()
-	_, ok := api.UIDFrom(ctx)
+	ctx := genericapirequest.NewContext()
+	_, ok := genericapirequest.UIDFrom(ctx)
 	if ok {
 		t.Fatalf("Should not be ok because there is no UID on the context")
 	}
-	ctx = api.WithUID(
+	ctx = genericapirequest.WithUID(
 		ctx,
 		types.UID("testUID"),
 	)
-	_, ok = api.UIDFrom(ctx)
+	_, ok = genericapirequest.UIDFrom(ctx)
 	if !ok {
 		t.Fatalf("Error getting UID")
 	}
@@ -139,17 +140,17 @@ func TestUIDContext(t *testing.T) {
 
 //TestUserAgentContext validates that a useragent can be get/set on a context object
 func TestUserAgentContext(t *testing.T) {
-	ctx := api.NewContext()
-	_, ok := api.UserAgentFrom(ctx)
+	ctx := genericapirequest.NewContext()
+	_, ok := genericapirequest.UserAgentFrom(ctx)
 	if ok {
 		t.Fatalf("Should not be ok because there is no UserAgent on the context")
 	}
 
-	ctx = api.WithUserAgent(
+	ctx = genericapirequest.WithUserAgent(
 		ctx,
 		"TestUserAgent",
 	)
-	result, ok := api.UserAgentFrom(ctx)
+	result, ok := genericapirequest.UserAgentFrom(ctx)
 	if !ok {
 		t.Fatalf("Error getting UserAgent")
 	}

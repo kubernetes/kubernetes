@@ -28,6 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/apis/extensions/validation"
 	"k8s.io/kubernetes/pkg/fields"
+	genericapirequest "k8s.io/kubernetes/pkg/genericapiserver/api/request"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/generic"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -56,7 +57,7 @@ func (rsStrategy) NamespaceScoped() bool {
 }
 
 // PrepareForCreate clears the status of a ReplicaSet before creation.
-func (rsStrategy) PrepareForCreate(ctx api.Context, obj runtime.Object) {
+func (rsStrategy) PrepareForCreate(ctx genericapirequest.Context, obj runtime.Object) {
 	rs := obj.(*extensions.ReplicaSet)
 	rs.Status = extensions.ReplicaSetStatus{}
 
@@ -64,7 +65,7 @@ func (rsStrategy) PrepareForCreate(ctx api.Context, obj runtime.Object) {
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
-func (rsStrategy) PrepareForUpdate(ctx api.Context, obj, old runtime.Object) {
+func (rsStrategy) PrepareForUpdate(ctx genericapirequest.Context, obj, old runtime.Object) {
 	newRS := obj.(*extensions.ReplicaSet)
 	oldRS := old.(*extensions.ReplicaSet)
 	// update is not allowed to set status
@@ -84,7 +85,7 @@ func (rsStrategy) PrepareForUpdate(ctx api.Context, obj, old runtime.Object) {
 }
 
 // Validate validates a new ReplicaSet.
-func (rsStrategy) Validate(ctx api.Context, obj runtime.Object) field.ErrorList {
+func (rsStrategy) Validate(ctx genericapirequest.Context, obj runtime.Object) field.ErrorList {
 	rs := obj.(*extensions.ReplicaSet)
 	return validation.ValidateReplicaSet(rs)
 }
@@ -100,7 +101,7 @@ func (rsStrategy) AllowCreateOnUpdate() bool {
 }
 
 // ValidateUpdate is the default update validation for an end user.
-func (rsStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) field.ErrorList {
+func (rsStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
 	validationErrorList := validation.ValidateReplicaSet(obj.(*extensions.ReplicaSet))
 	updateErrorList := validation.ValidateReplicaSetUpdate(obj.(*extensions.ReplicaSet), old.(*extensions.ReplicaSet))
 	return append(validationErrorList, updateErrorList...)
@@ -145,13 +146,13 @@ type rsStatusStrategy struct {
 
 var StatusStrategy = rsStatusStrategy{Strategy}
 
-func (rsStatusStrategy) PrepareForUpdate(ctx api.Context, obj, old runtime.Object) {
+func (rsStatusStrategy) PrepareForUpdate(ctx genericapirequest.Context, obj, old runtime.Object) {
 	newRS := obj.(*extensions.ReplicaSet)
 	oldRS := old.(*extensions.ReplicaSet)
 	// update is not allowed to set spec
 	newRS.Spec = oldRS.Spec
 }
 
-func (rsStatusStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) field.ErrorList {
+func (rsStatusStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
 	return validation.ValidateReplicaSetStatusUpdate(obj.(*extensions.ReplicaSet), old.(*extensions.ReplicaSet))
 }

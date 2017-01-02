@@ -49,7 +49,7 @@ type ProxyHandler struct {
 	Prefix     string
 	Storage    map[string]rest.Storage
 	Serializer runtime.NegotiatedSerializer
-	Mapper     api.RequestContextMapper
+	Mapper     request.RequestContextMapper
 }
 
 func (r *ProxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
@@ -87,7 +87,7 @@ func (r *ProxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	verb = requestInfo.Verb
 	namespace, resource, parts := requestInfo.Namespace, requestInfo.Resource, requestInfo.Parts
 
-	ctx = api.WithNamespace(ctx, namespace)
+	ctx = request.WithNamespace(ctx, namespace)
 	if len(parts) < 2 {
 		responsewriters.NotFound(w, req)
 		httpCode = http.StatusNotFound

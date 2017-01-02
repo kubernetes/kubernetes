@@ -24,6 +24,7 @@ import (
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/apis/policy"
 	"k8s.io/kubernetes/pkg/fields"
+	genericapirequest "k8s.io/kubernetes/pkg/genericapiserver/api/request"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/generic"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
@@ -40,7 +41,7 @@ func newStorage(t *testing.T) (*REST, *StatusREST, *etcdtesting.EtcdTestServer) 
 
 // createPodDisruptionBudget is a helper function that returns a PodDisruptionBudget with the updated resource version.
 func createPodDisruptionBudget(storage *REST, pdb policy.PodDisruptionBudget, t *testing.T) (policy.PodDisruptionBudget, error) {
-	ctx := api.WithNamespace(api.NewContext(), pdb.Namespace)
+	ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), pdb.Namespace)
 	obj, err := storage.Create(ctx, &pdb)
 	if err != nil {
 		t.Errorf("Failed to create PodDisruptionBudget, %v", err)
@@ -84,7 +85,7 @@ func TestStatusUpdate(t *testing.T) {
 	storage, statusStorage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	ctx := api.WithNamespace(api.NewContext(), api.NamespaceDefault)
+	ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), api.NamespaceDefault)
 	key := "/poddisruptionbudgets/" + api.NamespaceDefault + "/foo"
 	validPodDisruptionBudget := validNewPodDisruptionBudget()
 	if err := storage.Storage.Create(ctx, key, validPodDisruptionBudget, nil, 0); err != nil {

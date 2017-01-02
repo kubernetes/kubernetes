@@ -21,17 +21,18 @@ import (
 	"k8s.io/kubernetes/pkg/api/rest"
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/apis/rbac"
+	genericapirequest "k8s.io/kubernetes/pkg/genericapiserver/api/request"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
 // Registry is an interface for things that know how to store ClusterRoles.
 type Registry interface {
-	ListClusterRoles(ctx api.Context, options *api.ListOptions) (*rbac.ClusterRoleList, error)
-	CreateClusterRole(ctx api.Context, clusterRole *rbac.ClusterRole) error
-	UpdateClusterRole(ctx api.Context, clusterRole *rbac.ClusterRole) error
-	GetClusterRole(ctx api.Context, name string, options *metav1.GetOptions) (*rbac.ClusterRole, error)
-	DeleteClusterRole(ctx api.Context, name string) error
-	WatchClusterRoles(ctx api.Context, options *api.ListOptions) (watch.Interface, error)
+	ListClusterRoles(ctx genericapirequest.Context, options *api.ListOptions) (*rbac.ClusterRoleList, error)
+	CreateClusterRole(ctx genericapirequest.Context, clusterRole *rbac.ClusterRole) error
+	UpdateClusterRole(ctx genericapirequest.Context, clusterRole *rbac.ClusterRole) error
+	GetClusterRole(ctx genericapirequest.Context, name string, options *metav1.GetOptions) (*rbac.ClusterRole, error)
+	DeleteClusterRole(ctx genericapirequest.Context, name string) error
+	WatchClusterRoles(ctx genericapirequest.Context, options *api.ListOptions) (watch.Interface, error)
 }
 
 // storage puts strong typing around storage calls
@@ -45,7 +46,7 @@ func NewRegistry(s rest.StandardStorage) Registry {
 	return &storage{s}
 }
 
-func (s *storage) ListClusterRoles(ctx api.Context, options *api.ListOptions) (*rbac.ClusterRoleList, error) {
+func (s *storage) ListClusterRoles(ctx genericapirequest.Context, options *api.ListOptions) (*rbac.ClusterRoleList, error) {
 	obj, err := s.List(ctx, options)
 	if err != nil {
 		return nil, err
@@ -54,21 +55,21 @@ func (s *storage) ListClusterRoles(ctx api.Context, options *api.ListOptions) (*
 	return obj.(*rbac.ClusterRoleList), nil
 }
 
-func (s *storage) CreateClusterRole(ctx api.Context, clusterRole *rbac.ClusterRole) error {
+func (s *storage) CreateClusterRole(ctx genericapirequest.Context, clusterRole *rbac.ClusterRole) error {
 	_, err := s.Create(ctx, clusterRole)
 	return err
 }
 
-func (s *storage) UpdateClusterRole(ctx api.Context, clusterRole *rbac.ClusterRole) error {
+func (s *storage) UpdateClusterRole(ctx genericapirequest.Context, clusterRole *rbac.ClusterRole) error {
 	_, _, err := s.Update(ctx, clusterRole.Name, rest.DefaultUpdatedObjectInfo(clusterRole, api.Scheme))
 	return err
 }
 
-func (s *storage) WatchClusterRoles(ctx api.Context, options *api.ListOptions) (watch.Interface, error) {
+func (s *storage) WatchClusterRoles(ctx genericapirequest.Context, options *api.ListOptions) (watch.Interface, error) {
 	return s.Watch(ctx, options)
 }
 
-func (s *storage) GetClusterRole(ctx api.Context, name string, options *metav1.GetOptions) (*rbac.ClusterRole, error) {
+func (s *storage) GetClusterRole(ctx genericapirequest.Context, name string, options *metav1.GetOptions) (*rbac.ClusterRole, error) {
 	obj, err := s.Get(ctx, name, options)
 	if err != nil {
 		return nil, err
@@ -76,7 +77,7 @@ func (s *storage) GetClusterRole(ctx api.Context, name string, options *metav1.G
 	return obj.(*rbac.ClusterRole), nil
 }
 
-func (s *storage) DeleteClusterRole(ctx api.Context, name string) error {
+func (s *storage) DeleteClusterRole(ctx genericapirequest.Context, name string) error {
 	_, err := s.Delete(ctx, name, nil)
 	return err
 }
@@ -87,5 +88,5 @@ type AuthorizerAdapter struct {
 }
 
 func (a AuthorizerAdapter) GetClusterRole(name string) (*rbac.ClusterRole, error) {
-	return a.Registry.GetClusterRole(api.NewContext(), name, &metav1.GetOptions{})
+	return a.Registry.GetClusterRole(genericapirequest.NewContext(), name, &metav1.GetOptions{})
 }

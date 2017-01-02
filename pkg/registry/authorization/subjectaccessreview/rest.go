@@ -19,11 +19,11 @@ package subjectaccessreview
 import (
 	"fmt"
 
-	kapi "k8s.io/kubernetes/pkg/api"
 	kapierrors "k8s.io/kubernetes/pkg/api/errors"
 	authorizationapi "k8s.io/kubernetes/pkg/apis/authorization"
 	authorizationvalidation "k8s.io/kubernetes/pkg/apis/authorization/validation"
 	"k8s.io/kubernetes/pkg/auth/authorizer"
+	genericapirequest "k8s.io/kubernetes/pkg/genericapiserver/api/request"
 	authorizationutil "k8s.io/kubernetes/pkg/registry/authorization/util"
 	"k8s.io/kubernetes/pkg/runtime"
 )
@@ -40,7 +40,7 @@ func (r *REST) New() runtime.Object {
 	return &authorizationapi.SubjectAccessReview{}
 }
 
-func (r *REST) Create(ctx kapi.Context, obj runtime.Object) (runtime.Object, error) {
+func (r *REST) Create(ctx genericapirequest.Context, obj runtime.Object) (runtime.Object, error) {
 	subjectAccessReview, ok := obj.(*authorizationapi.SubjectAccessReview)
 	if !ok {
 		return nil, kapierrors.NewBadRequest(fmt.Sprintf("not a SubjectAccessReview: %#v", obj))

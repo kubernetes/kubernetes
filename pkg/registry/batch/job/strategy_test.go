@@ -25,6 +25,7 @@ import (
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
+	genericapirequest "k8s.io/kubernetes/pkg/genericapiserver/api/request"
 	"k8s.io/kubernetes/pkg/types"
 )
 
@@ -35,7 +36,7 @@ func newBool(a bool) *bool {
 }
 
 func TestJobStrategy(t *testing.T) {
-	ctx := api.NewDefaultContext()
+	ctx := genericapirequest.NewDefaultContext()
 	if !Strategy.NamespaceScoped() {
 		t.Errorf("Job must be namespace scoped")
 	}
@@ -102,7 +103,7 @@ func TestJobStrategy(t *testing.T) {
 }
 
 func TestJobStrategyWithGeneration(t *testing.T) {
-	ctx := api.NewDefaultContext()
+	ctx := genericapirequest.NewDefaultContext()
 
 	theUID := types.UID("1a2b3c4d5e6f7g8h9i0k")
 
@@ -152,7 +153,7 @@ func TestJobStrategyWithGeneration(t *testing.T) {
 }
 
 func TestJobStatusStrategy(t *testing.T) {
-	ctx := api.NewDefaultContext()
+	ctx := genericapirequest.NewDefaultContext()
 	if !StatusStrategy.NamespaceScoped() {
 		t.Errorf("Job must be namespace scoped")
 	}

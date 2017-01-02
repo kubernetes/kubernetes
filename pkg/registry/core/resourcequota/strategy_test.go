@@ -23,6 +23,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/resource"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
+	genericapirequest "k8s.io/kubernetes/pkg/genericapiserver/api/request"
 )
 
 func TestResourceQuotaStrategy(t *testing.T) {
@@ -53,7 +54,7 @@ func TestResourceQuotaStrategy(t *testing.T) {
 			},
 		},
 	}
-	Strategy.PrepareForCreate(api.NewContext(), resourceQuota)
+	Strategy.PrepareForCreate(genericapirequest.NewContext(), resourceQuota)
 	if resourceQuota.Status.Used != nil {
 		t.Errorf("ResourceQuota does not allow setting status on create")
 	}

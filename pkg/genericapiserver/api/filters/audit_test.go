@@ -28,7 +28,6 @@ import (
 	"strings"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/auth/user"
 	"k8s.io/kubernetes/pkg/genericapiserver/api/request"
 )
@@ -105,10 +104,10 @@ type fakeRequestContextMapper struct {
 	user *user.DefaultInfo
 }
 
-func (m *fakeRequestContextMapper) Get(req *http.Request) (api.Context, bool) {
-	ctx := api.NewContext()
+func (m *fakeRequestContextMapper) Get(req *http.Request) (request.Context, bool) {
+	ctx := request.NewContext()
 	if m.user != nil {
-		ctx = api.WithUser(ctx, m.user)
+		ctx = request.WithUser(ctx, m.user)
 	}
 
 	resolver := newTestRequestInfoResolver()
@@ -120,7 +119,7 @@ func (m *fakeRequestContextMapper) Get(req *http.Request) (api.Context, bool) {
 	return ctx, true
 }
 
-func (*fakeRequestContextMapper) Update(req *http.Request, context api.Context) error {
+func (*fakeRequestContextMapper) Update(req *http.Request, context request.Context) error {
 	return nil
 }
 

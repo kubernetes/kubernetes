@@ -21,6 +21,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api/resource"
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
+	genericapirequest "k8s.io/kubernetes/pkg/genericapiserver/api/request"
 )
 
 // Returns string version of ResourceName.
@@ -226,4 +227,14 @@ func PodRequestsAndLimits(pod *Pod) (reqs map[ResourceName]resource.Quantity, li
 		}
 	}
 	return
+}
+
+// ValidNamespace returns false if the namespace on the context differs from the resource.  If the resource has no namespace, it is set to the value in the context.
+// TODO(sttts): move into pkg/genericapiserver/api
+func ValidNamespace(ctx genericapirequest.Context, resource *ObjectMeta) bool {
+	ns, ok := genericapirequest.NamespaceFrom(ctx)
+	if len(resource.Namespace) == 0 {
+		resource.Namespace = ns
+	}
+	return ns == resource.Namespace && ok
 }

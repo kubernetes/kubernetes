@@ -24,17 +24,18 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/rest"
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
+	genericapirequest "k8s.io/kubernetes/pkg/genericapiserver/api/request"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
 // Registry is an interface for things that know how to store ReplicationControllers.
 type Registry interface {
-	ListControllers(ctx api.Context, options *api.ListOptions) (*api.ReplicationControllerList, error)
-	WatchControllers(ctx api.Context, options *api.ListOptions) (watch.Interface, error)
-	GetController(ctx api.Context, controllerID string, options *metav1.GetOptions) (*api.ReplicationController, error)
-	CreateController(ctx api.Context, controller *api.ReplicationController) (*api.ReplicationController, error)
-	UpdateController(ctx api.Context, controller *api.ReplicationController) (*api.ReplicationController, error)
-	DeleteController(ctx api.Context, controllerID string) error
+	ListControllers(ctx genericapirequest.Context, options *api.ListOptions) (*api.ReplicationControllerList, error)
+	WatchControllers(ctx genericapirequest.Context, options *api.ListOptions) (watch.Interface, error)
+	GetController(ctx genericapirequest.Context, controllerID string, options *metav1.GetOptions) (*api.ReplicationController, error)
+	CreateController(ctx genericapirequest.Context, controller *api.ReplicationController) (*api.ReplicationController, error)
+	UpdateController(ctx genericapirequest.Context, controller *api.ReplicationController) (*api.ReplicationController, error)
+	DeleteController(ctx genericapirequest.Context, controllerID string) error
 }
 
 // storage puts strong typing around storage calls
@@ -48,7 +49,7 @@ func NewRegistry(s rest.StandardStorage) Registry {
 	return &storage{s}
 }
 
-func (s *storage) ListControllers(ctx api.Context, options *api.ListOptions) (*api.ReplicationControllerList, error) {
+func (s *storage) ListControllers(ctx genericapirequest.Context, options *api.ListOptions) (*api.ReplicationControllerList, error) {
 	if options != nil && options.FieldSelector != nil && !options.FieldSelector.Empty() {
 		return nil, fmt.Errorf("field selector not supported yet")
 	}
@@ -59,11 +60,11 @@ func (s *storage) ListControllers(ctx api.Context, options *api.ListOptions) (*a
 	return obj.(*api.ReplicationControllerList), err
 }
 
-func (s *storage) WatchControllers(ctx api.Context, options *api.ListOptions) (watch.Interface, error) {
+func (s *storage) WatchControllers(ctx genericapirequest.Context, options *api.ListOptions) (watch.Interface, error) {
 	return s.Watch(ctx, options)
 }
 
-func (s *storage) GetController(ctx api.Context, controllerID string, options *metav1.GetOptions) (*api.ReplicationController, error) {
+func (s *storage) GetController(ctx genericapirequest.Context, controllerID string, options *metav1.GetOptions) (*api.ReplicationController, error) {
 	obj, err := s.Get(ctx, controllerID, options)
 	if err != nil {
 		return nil, err
@@ -71,7 +72,7 @@ func (s *storage) GetController(ctx api.Context, controllerID string, options *m
 	return obj.(*api.ReplicationController), nil
 }
 
-func (s *storage) CreateController(ctx api.Context, controller *api.ReplicationController) (*api.ReplicationController, error) {
+func (s *storage) CreateController(ctx genericapirequest.Context, controller *api.ReplicationController) (*api.ReplicationController, error) {
 	obj, err := s.Create(ctx, controller)
 	if err != nil {
 		return nil, err
@@ -79,7 +80,7 @@ func (s *storage) CreateController(ctx api.Context, controller *api.ReplicationC
 	return obj.(*api.ReplicationController), nil
 }
 
-func (s *storage) UpdateController(ctx api.Context, controller *api.ReplicationController) (*api.ReplicationController, error) {
+func (s *storage) UpdateController(ctx genericapirequest.Context, controller *api.ReplicationController) (*api.ReplicationController, error) {
 	obj, _, err := s.Update(ctx, controller.Name, rest.DefaultUpdatedObjectInfo(controller, api.Scheme))
 	if err != nil {
 		return nil, err
@@ -87,7 +88,7 @@ func (s *storage) UpdateController(ctx api.Context, controller *api.ReplicationC
 	return obj.(*api.ReplicationController), nil
 }
 
-func (s *storage) DeleteController(ctx api.Context, controllerID string) error {
+func (s *storage) DeleteController(ctx genericapirequest.Context, controllerID string) error {
 	_, err := s.Delete(ctx, controllerID, nil)
 	return err
 }

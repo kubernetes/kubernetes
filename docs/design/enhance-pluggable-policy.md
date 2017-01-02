@@ -89,7 +89,7 @@ type Authorizer interface {
   // reason is an optional return value that can describe why a policy decision
   //   was made.  Reasons are useful during debugging when trying to figure out
   //   why a user or group has access to perform a particular action.
-  Authorize(ctx api.Context, a Attributes) (allowed bool, reason string, evaluationError error)
+  Authorize(ctx genericapirequest.Context, a Attributes) (allowed bool, reason string, evaluationError error)
 }
 
 // AuthorizerIntrospection is an optional interface that provides the ability to
@@ -103,7 +103,7 @@ type AuthorizerIntrospection interface {
   // Attributes to determine which users and groups are allowed to perform the
   // described action in the namespace. This API enables the ResourceBasedReview
   // requests below
-  GetAllowedSubjects(ctx api.Context, a Attributes) (users util.StringSet, groups util.StringSet, evaluationError error)
+  GetAllowedSubjects(ctx genericapirequest.Context, a Attributes) (users util.StringSet, groups util.StringSet, evaluationError error)
 }
 ```
 
