@@ -47,18 +47,9 @@ import (
 )
 
 const (
-	// We'll attempt to recompute the required replicas of all ReplicaSets
-	// that have fulfilled their expectations at least this often. This recomputation
-	// happens based on contents in local pod storage.
-	FullControllerResyncPeriod = 30 * time.Second
-
 	// Realistic value of the burstReplica field for the replica set manager based off
 	// performance requirements for kubernetes 1.0.
 	BurstReplicas = 500
-
-	// We must avoid counting pods until the pod store has synced. If it hasn't synced, to
-	// avoid a hot loop, we'll wait this long between checks.
-	PodStoreSyncedPollPeriod = 100 * time.Millisecond
 
 	// The number of times we retry updating a ReplicaSet's status.
 	statusUpdateRetries = 1
@@ -568,13 +559,13 @@ func (rsc *ReplicaSetController) syncReplicaSet(key string) error {
 	}()
 
 	obj, exists, err := rsc.rsLister.Indexer.GetByKey(key)
+	if err != nil {
+		return err
+	}
 	if !exists {
 		glog.V(4).Infof("ReplicaSet has been deleted %v", key)
 		rsc.expectations.DeleteExpectations(key)
 		return nil
-	}
-	if err != nil {
-		return err
 	}
 	rs := *obj.(*extensions.ReplicaSet)
 
