@@ -383,6 +383,16 @@ func cleanupServiceShardLoadBalancer(clusterName string, service *v1.Service, ti
 	return err
 }
 
+func deleteServiceShard(c *cluster, namespace, service string) error {
+	err := c.Clientset.Services(namespace).Delete(service, &v1.DeleteOptions{})
+	if err != nil && !errors.IsNotFound(err) {
+		framework.Logf("Failed to delete service %q in namespace %q, in cluster %q", service, namespace, c.name)
+		return err
+	}
+	By(fmt.Sprintf("Service %q in namespace %q in cluster %q deleted", service, namespace, c.name))
+	return nil
+}
+
 func podExitCodeDetector(f *framework.Framework, name, namespace string, code int32) func() error {
 	// If we ever get any container logs, stash them here.
 	logs := ""

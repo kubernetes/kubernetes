@@ -141,6 +141,29 @@ var _ = framework.KubeDescribe("[Feature:Federation]", func() {
 				verifyCascadingDeletionForService(f.FederationClientset_1_5, clusters, nil, nsName)
 				By(fmt.Sprintf("Verified that services were not deleted from underlying clusters"))
 			})
+
+			It("recreates deleted services in underlying clusters", func() {
+				framework.SkipUnlessFederated(f.ClientSet)
+
+				nsName = f.FederationNamespace.Name
+				By(fmt.Sprintf("Create a federation service"))
+				service = createServiceOrFail(f.FederationClientset_1_5, nsName, FederatedServiceName)
+				defer func() { // Cleanup
+					By(fmt.Sprintf("Deleting service %q in namespace %q", service.Name, nsName))
+					err := f.FederationClientset_1_5.Services(nsName).Delete(service.Name, &v1.DeleteOptions{})
+					framework.ExpectNoError(err, "Error deleting service %q in namespace %q", service.Name, nsName)
+				}()
+				By(fmt.Sprintf("Waiting for service shard to be created"))
+				waitForServiceShardsOrFail(nsName, service, clusters)
+
+				By(fmt.Sprintf("Deleting a service shard in one underlying cluster"))
+				err := deleteServiceShard(clusters[primaryClusterName], nsName, FederatedServiceName)
+				framework.ExpectNoError(err, fmt.Sprintf("Error in deleting service shard %q in cluster %q",
+					FederatedServiceName, primaryClusterName))
+
+				By(fmt.Sprintf("Waiting for service shard to be recreated"))
+				waitForServiceShardsOrFail(nsName, service, clusters)
+			})
 		})
 
 		var _ = Describe("DNS", func() {
