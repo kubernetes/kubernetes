@@ -563,3 +563,15 @@ func NewPersistentVolumeRecyclerPodTemplate() *v1.Pod {
 	}
 	return pod
 }
+
+// Check validity of recycle pod template
+// List of checks:
+// - at least one volume is defined in the recycle pod template
+// If successful, returns nil
+// if unsuccessful, returns an error.
+func ValidateRecyclerPodTemplate(pod *v1.Pod) error {
+	if len(pod.Spec.Volumes) < 1 {
+		return fmt.Errorf("does not contain any volume(s)")
+	}
+	return nil
+}
