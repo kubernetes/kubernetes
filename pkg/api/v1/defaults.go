@@ -112,7 +112,6 @@ func SetDefaults_Container(obj *Container) {
 		_, tag, _, _ := parsers.ParseImageName(obj.Image)
 
 		// Check image tag
-
 		if tag == "latest" {
 			obj.ImagePullPolicy = PullAlways
 		} else {
