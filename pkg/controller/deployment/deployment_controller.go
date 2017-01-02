@@ -583,6 +583,9 @@ func (dc *DeploymentController) syncDeployment(key string) error {
 		return dc.rolloutRecreate(d)
 	case extensions.RollingUpdateDeploymentStrategyType:
 		return dc.rolloutRolling(d)
+	case extensions.NoopDeploymentStrategyType:
+		// Do nothing; an external controller should take control of this Deployment.
+		return dc.syncStatusOnly(d)
 	}
 	return fmt.Errorf("unexpected deployment strategy type: %s", d.Spec.Strategy.Type)
 }

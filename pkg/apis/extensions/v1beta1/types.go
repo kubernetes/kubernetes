@@ -351,6 +351,11 @@ const (
 
 	// Replace the old RCs by new one using rolling update i.e gradually scale down the old RCs and scale up the new one.
 	RollingUpdateDeploymentStrategyType DeploymentStrategyType = "RollingUpdate"
+
+	// The Deployment controller is not going to orchestrate ReplicaSets for
+	// Deployments that use this strategy. Useful for delegating orchestration of
+	// certain Deployments to external controllers.
+	NoopDeploymentStrategyType DeploymentStrategyType = "Noop"
 )
 
 // Spec to control the desired behavior of rolling update.

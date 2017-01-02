@@ -237,6 +237,19 @@ func TestSyncDeploymentDontDoAnythingDuringDeletion(t *testing.T) {
 	f.run(getKey(d, t))
 }
 
+func TestSyncNoopDeployment(t *testing.T) {
+	f := newFixture(t)
+
+	d := newDeployment("foo", 1, nil, nil, nil, map[string]string{"foo": "bar"})
+	d.Spec.Strategy.Type = extensions.NoopDeploymentStrategyType
+	d.Spec.Strategy.RollingUpdate = nil
+	f.dLister = append(f.dLister, d)
+	f.objects = append(f.objects, d)
+
+	f.expectUpdateDeploymentStatusAction(d)
+	f.run(getKey(d, t))
+}
+
 // issue: https://github.com/kubernetes/kubernetes/issues/23218
 func TestDeploymentController_dontSyncDeploymentsWithEmptyPodSelector(t *testing.T) {
 	fake := &fake.Clientset{}
