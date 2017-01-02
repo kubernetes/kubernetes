@@ -241,6 +241,52 @@ function prepare-log-file {
 	chown root:root $1
 }
 
+# A helper function for removing salt configuration and comments from a file.
+# This is mainly for preparing a manifest file.
+#
+# $1: Full path of the file to manipulate
+function remove-salt-config-comments {
+	# Remove salt configuration.
+	sed -i "/^[ |\t]*{[#|%]/d" $1
+	# Remove comments.
+	sed -i "/^[ |\t]*#/d" $1
+}
+
+# Prepare the abac policy file from the salt template.
+function setup-abac-authz-policy-file {
+	local -r abac_policy_json="/home/kubernetes/abac-authz-policy.jsonl"
+	remove-salt-config-comments "${abac_policy_json}"
+	sed -i -e "s/{{kube_user}}/admin/g" "${abac_policy_json}"
+	cp "${abac_policy_json}" /etc/srv/kubernetes/
+}
+
+# Create kubeconfig for controller-manager's service account authentication.
+function create-kubecontrollermanager-kubeconfig {
+	echo "Creating kube-controller-manager kubeconfig file"
+	KUBE_CONTROLLER_MANAGER_TOKEN=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)
+	echo "${KUBE_CONTROLLER_MANAGER_TOKEN},system:kube-controller-manager,uid:system:kube-controller-manager" >> /etc/srv/kubernetes/known_tokens.csv
+	mkdir -p /etc/srv/kubernetes/kube-controller-manager
+	cat <<EOF >/etc/srv/kubernetes/kube-controller-manager/kubeconfig
+apiVersion: v1
+kind: Config
+users:
+- name: kube-controller-manager
+  user:
+    token: ${KUBE_CONTROLLER_MANAGER_TOKEN}
+clusters:
+- name: local
+  cluster:
+    insecure-skip-tls-verify: true
+    server: https://localhost:443
+contexts:
+- context:
+    cluster: local
+    user: kube-controller-manager
+  name: service-account-context
+current-context: service-account-context
+EOF
+}
+
 # Computes command line arguments to be passed to etcd.
 function compute-etcd-params {
 	local params="${ETCD_TEST_ARGS:-}"
@@ -279,13 +325,16 @@ function compute-kube-apiserver-params {
 	params+=" --storage-backend=${STORAGE_BACKEND}"
 	params+=" --service-cluster-ip-range=${SERVICE_CLUSTER_IP_RANGE}"
 	params+=" --admission-control=${CUSTOM_ADMISSION_PLUGINS}"
+	params+=" --authorization-policy-file=/etc/srv/kubernetes/abac-authz-policy.jsonl"
+	params+=" --authorization-mode=RBAC,ABAC"
 	echo "${params}"
 }
 
 # Computes command line arguments to be passed to controller-manager.
 function compute-kube-controller-manager-params {
 	local params="${CONTROLLER_MANAGER_TEST_ARGS:-}"
-	params+=" --master=127.0.0.1:8080"
+	params+=" --use-service-account-credentials"
+	params+=" --kubeconfig=/etc/srv/kubernetes/kube-controller-manager/kubeconfig"
 	params+=" --service-account-private-key-file=/etc/srv/kubernetes/server.key"
 	params+=" --root-ca-file=/etc/srv/kubernetes/ca.crt"
 	params+=" --allocate-node-cidrs=${ALLOCATE_NODE_CIDRS}"
@@ -347,12 +396,14 @@ cd "${KUBE_ROOT}"
 tar xzf kubernetes-server-linux-amd64.tar.gz
 source "${KUBE_ROOT}/kubemark-master-env.sh"
 
-# Setup IP firewall rules, required directory structure and etcd variables.
+# Setup IP firewall rules, required directory structure and other configs.
 config-ip-firewall
 create-dirs
 setup-kubelet-dir
 delete-default-etcd-configs
 compute-etcd-variables
+setup-abac-authz-policy-file
+create-kubecontrollermanager-kubeconfig
 
 # Mount master PD for etcd and create symbolic links to it.
 {

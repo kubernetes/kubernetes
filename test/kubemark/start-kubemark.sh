@@ -152,10 +152,9 @@ gcloud compute ssh --zone="${ZONE}" --project="${PROJECT}" "${MASTER_NAME}" \
     sudo bash -c \"echo ${KUBECFG_CERT_BASE64} | base64 --decode > /etc/srv/kubernetes/kubecfg.crt\" && \
     sudo bash -c \"echo ${KUBECFG_KEY_BASE64} | base64 --decode > /etc/srv/kubernetes/kubecfg.key\" && \
     sudo bash -c \"echo \"${KUBE_BEARER_TOKEN},admin,admin\" > /etc/srv/kubernetes/known_tokens.csv\" && \
-    sudo bash -c \"echo \"${KUBELET_TOKEN},kubelet,kubelet\" >> /etc/srv/kubernetes/known_tokens.csv\" && \
-    sudo bash -c \"echo \"${KUBE_PROXY_TOKEN},kube_proxy,kube_proxy\" >> /etc/srv/kubernetes/known_tokens.csv\" && \
+    sudo bash -c \"echo \"${KUBELET_TOKEN},system:node:node-name,uid:kubelet,system:nodes\" >> /etc/srv/kubernetes/known_tokens.csv\" && \
+    sudo bash -c \"echo \"${KUBE_PROXY_TOKEN},system:kube-proxy,uid:kube_proxy\" >> /etc/srv/kubernetes/known_tokens.csv\" && \
     sudo bash -c \"echo ${password},admin,admin > /etc/srv/kubernetes/basic_auth.csv\""
-
 
 gcloud compute copy-files --zone="${ZONE}" --project="${PROJECT}" \
   "${SERVER_BINARY_TAR}" \
@@ -167,6 +166,7 @@ gcloud compute copy-files --zone="${ZONE}" --project="${PROJECT}" \
   "${RESOURCE_DIRECTORY}/manifests/kube-apiserver.yaml" \
   "${RESOURCE_DIRECTORY}/manifests/kube-scheduler.yaml" \
   "${RESOURCE_DIRECTORY}/manifests/kube-controller-manager.yaml" \
+  "${KUBE_ROOT}/cluster/saltbase/salt/kube-apiserver/abac-authz-policy.jsonl" \
   "kubernetes@${MASTER_NAME}":/home/kubernetes/
 
 gcloud compute ssh "${MASTER_NAME}" --zone="${ZONE}" --project="${PROJECT}" \
