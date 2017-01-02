@@ -176,7 +176,7 @@ func TestControllerSync(t *testing.T) {
 
 		// Start the controller
 		stopCh := make(chan struct{})
-		ctrl.Run(stopCh)
+		go ctrl.Run(stopCh)
 
 		// Wait for the controller to pass initial sync and fill its caches.
 		for !ctrl.volumeController.HasSynced() ||
