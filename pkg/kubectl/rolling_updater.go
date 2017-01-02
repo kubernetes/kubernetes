@@ -425,6 +425,10 @@ func (r *RollingUpdater) readyPods(oldRc, newRc *api.ReplicationController, minR
 			if err := v1.Convert_api_Pod_To_v1_Pod(&pod, v1Pod, nil); err != nil {
 				return 0, 0, err
 			}
+			// Do not count deleted pods as ready
+			if v1Pod.DeletionTimestamp != nil {
+				continue
+			}
 			if !deploymentutil.IsPodAvailable(v1Pod, minReadySeconds, r.nowFn().Time) {
 				continue
 			}
