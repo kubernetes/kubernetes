@@ -25,22 +25,6 @@ boiler="${boilerDir}/boilerplate.py"
 
 files_need_boilerplate=($(${boiler} "$@"))
 
-# Run boilerplate.py unit tests
-unitTestOut="$(mktemp)"
-trap cleanup EXIT
-cleanup() {
-	rm "${unitTestOut}"
-}
-
-pushd "${boilerDir}" >/dev/null
-if ! python -m unittest boilerplate_test 2>"${unitTestOut}"; then
-	echo "boilerplate_test.py failed"
-	echo
-	cat "${unitTestOut}"
-	exit 1
-fi
-popd >/dev/null
-
 # Run boilerplate check
 if [[ ${#files_need_boilerplate[@]} -gt 0 ]]; then
   for file in "${files_need_boilerplate[@]}"; do
