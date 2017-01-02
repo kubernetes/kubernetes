@@ -19,7 +19,7 @@ go_library(
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/errors:go_default_library",
-        "//pkg/apiserver/handlers/responsewriters:go_default_library",
+        "//pkg/genericapiserver/api/handlers/responsewriters:go_default_library",
         "//pkg/runtime:go_default_library",
         "//pkg/runtime/schema:go_default_library",
         "//vendor:github.com/emicklei/go-restful",
