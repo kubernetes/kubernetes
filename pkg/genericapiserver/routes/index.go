@@ -21,7 +21,7 @@ import (
 	"sort"
 
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/apiserver/handlers/responsewriters"
+	"k8s.io/kubernetes/pkg/genericapiserver/api/handlers/responsewriters"
 	"k8s.io/kubernetes/pkg/genericapiserver/mux"
 )
 
