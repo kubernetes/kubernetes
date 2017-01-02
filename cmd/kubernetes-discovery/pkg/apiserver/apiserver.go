@@ -23,12 +23,12 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/rest"
-	apiserverfilters "k8s.io/kubernetes/pkg/apiserver/filters"
 	authhandlers "k8s.io/kubernetes/pkg/auth/handlers"
 	kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	kubeinformers "k8s.io/kubernetes/pkg/client/informers/informers_generated"
 	v1listers "k8s.io/kubernetes/pkg/client/listers/core/v1"
 	"k8s.io/kubernetes/pkg/genericapiserver"
+	genericapifilters "k8s.io/kubernetes/pkg/genericapiserver/api/filters"
 	genericfilters "k8s.io/kubernetes/pkg/genericapiserver/filters"
 	"k8s.io/kubernetes/pkg/registry/generic"
 	"k8s.io/kubernetes/pkg/util/wait"
@@ -181,23 +181,23 @@ func (h *handlerChainConfig) handlerChain(apiHandler http.Handler, c *genericapi
 	// add this as a filter so that we never collide with "already registered" failures on `/apis`
 	handler := WithAPIs(apiHandler, h.informers.Apiregistration().InternalVersion().APIServices(), h.serviceLister, h.endpointsLister)
 
-	handler = apiserverfilters.WithAuthorization(handler, c.RequestContextMapper, c.Authorizer)
+	handler = genericapifilters.WithAuthorization(handler, c.RequestContextMapper, c.Authorizer)
 
 	// this mux is NOT protected by authorization, but DOES have authentication information
 	// this is so that everyone can hit the proxy and we can properly identify the user.  The backing
 	// API server will deal with authorization
 	handler = WithProxyMux(handler, h.proxyMux)
 
-	handler = apiserverfilters.WithImpersonation(handler, c.RequestContextMapper, c.Authorizer)
+	handler = genericapifilters.WithImpersonation(handler, c.RequestContextMapper, c.Authorizer)
 	// audit to stdout to help with debugging as we get this started
-	handler = apiserverfilters.WithAudit(handler, c.RequestContextMapper, os.Stdout)
+	handler = genericapifilters.WithAudit(handler, c.RequestContextMapper, os.Stdout)
 	handler = authhandlers.WithAuthentication(handler, c.RequestContextMapper, c.Authenticator, authhandlers.Unauthorized(c.SupportsBasicAuth))
 
 	handler = genericfilters.WithCORS(handler, c.CorsAllowedOriginList, nil, nil, nil, "true")
 	handler = genericfilters.WithPanicRecovery(handler, c.RequestContextMapper)
 	handler = genericfilters.WithTimeoutForNonLongRunningRequests(handler, c.RequestContextMapper, c.LongRunningFunc)
 	handler = genericfilters.WithMaxInFlightLimit(handler, c.MaxRequestsInFlight, c.MaxMutatingRequestsInFlight, c.RequestContextMapper, c.LongRunningFunc)
-	handler = apiserverfilters.WithRequestInfo(handler, genericapiserver.NewRequestInfoResolver(c), c.RequestContextMapper)
+	handler = genericapifilters.WithRequestInfo(handler, genericapiserver.NewRequestInfoResolver(c), c.RequestContextMapper)
 	handler = api.WithRequestContext(handler, c.RequestContextMapper)
 
 	return handler, nil
