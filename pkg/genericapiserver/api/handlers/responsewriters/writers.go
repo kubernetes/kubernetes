@@ -24,7 +24,6 @@ import (
 	"strconv"
 
 	"k8s.io/kubernetes/pkg/api/rest"
-	handlererrors "k8s.io/kubernetes/pkg/genericapiserver/api/handlers/errors"
 	"k8s.io/kubernetes/pkg/genericapiserver/api/handlers/negotiation"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/runtime/schema"
@@ -81,7 +80,7 @@ func WriteObject(statusCode int, gv schema.GroupVersion, s runtime.NegotiatedSer
 func WriteObjectNegotiated(s runtime.NegotiatedSerializer, gv schema.GroupVersion, w http.ResponseWriter, req *http.Request, statusCode int, object runtime.Object) {
 	serializer, err := negotiation.NegotiateOutputSerializer(req, s)
 	if err != nil {
-		status := handlererrors.ErrToAPIStatus(err)
+		status := apiStatus(err)
 		WriteRawJSON(int(status.Code), status, w)
 		return
 	}
@@ -97,7 +96,7 @@ func WriteObjectNegotiated(s runtime.NegotiatedSerializer, gv schema.GroupVersio
 
 // ErrorNegotiated renders an error to the response. Returns the HTTP status code of the error.
 func ErrorNegotiated(err error, s runtime.NegotiatedSerializer, gv schema.GroupVersion, w http.ResponseWriter, req *http.Request) int {
-	status := handlererrors.ErrToAPIStatus(err)
+	status := apiStatus(err)
 	code := int(status.Code)
 	// when writing an error, check to see if the status indicates a retry after period
 	if status.Details != nil && status.Details.RetryAfterSeconds > 0 {
@@ -112,7 +111,7 @@ func ErrorNegotiated(err error, s runtime.NegotiatedSerializer, gv schema.GroupV
 // Returns the HTTP status code of the error.
 func errorJSONFatal(err error, codec runtime.Encoder, w http.ResponseWriter) int {
 	utilruntime.HandleError(fmt.Errorf("apiserver was unable to write a JSON response: %v", err))
-	status := handlererrors.ErrToAPIStatus(err)
+	status := apiStatus(err)
 	code := int(status.Code)
 	output, err := runtime.Encode(codec, status)
 	if err != nil {
