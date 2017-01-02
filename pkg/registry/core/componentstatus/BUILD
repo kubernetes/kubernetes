@@ -19,6 +19,7 @@ go_library(
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/apis/meta/v1:go_default_library",
+        "//pkg/genericapiserver/api/request:go_default_library",
         "//pkg/probe:go_default_library",
         "//pkg/probe/http:go_default_library",
         "//pkg/runtime:go_default_library",
@@ -37,6 +38,7 @@ go_test(
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/apis/meta/v1:go_default_library",
+        "//pkg/genericapiserver/api/request:go_default_library",
         "//pkg/probe:go_default_library",
         "//pkg/util/diff:go_default_library",
     ],
