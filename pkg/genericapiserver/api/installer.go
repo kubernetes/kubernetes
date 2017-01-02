@@ -37,6 +37,7 @@ import (
 	"k8s.io/kubernetes/pkg/genericapiserver/api/handlers"
 	"k8s.io/kubernetes/pkg/genericapiserver/api/handlers/negotiation"
 	"k8s.io/kubernetes/pkg/genericapiserver/api/metrics"
+	"k8s.io/kubernetes/pkg/genericapiserver/api/request"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/runtime/schema"
 	utilstrings "k8s.io/kubernetes/pkg/util/strings"
@@ -341,14 +342,14 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	}
 
 	var ctxFn handlers.ContextFunc
-	ctxFn = func(req *restful.Request) api.Context {
+	ctxFn = func(req *restful.Request) request.Context {
 		if context == nil {
-			return api.WithUserAgent(api.NewContext(), req.HeaderParameter("User-Agent"))
+			return request.WithUserAgent(request.NewContext(), req.HeaderParameter("User-Agent"))
 		}
 		if ctx, ok := context.Get(req.Request); ok {
-			return api.WithUserAgent(ctx, req.HeaderParameter("User-Agent"))
+			return request.WithUserAgent(ctx, req.HeaderParameter("User-Agent"))
 		}
-		return api.WithUserAgent(api.NewContext(), req.HeaderParameter("User-Agent"))
+		return request.WithUserAgent(request.NewContext(), req.HeaderParameter("User-Agent"))
 	}
 
 	allowWatchList := isWatcher && isLister // watching on lists is allowed only for kinds that support both watch and list.

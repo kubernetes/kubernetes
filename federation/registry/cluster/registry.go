@@ -21,17 +21,18 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/rest"
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
+	genericapirequest "k8s.io/kubernetes/pkg/genericapiserver/api/request"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
 // Registry is an interface implemented by things that know how to store Cluster objects.
 type Registry interface {
-	ListClusters(ctx api.Context, options *api.ListOptions) (*federation.ClusterList, error)
-	WatchCluster(ctx api.Context, options *api.ListOptions) (watch.Interface, error)
-	GetCluster(ctx api.Context, name string, options *metav1.GetOptions) (*federation.Cluster, error)
-	CreateCluster(ctx api.Context, cluster *federation.Cluster) error
-	UpdateCluster(ctx api.Context, cluster *federation.Cluster) error
-	DeleteCluster(ctx api.Context, name string) error
+	ListClusters(ctx genericapirequest.Context, options *api.ListOptions) (*federation.ClusterList, error)
+	WatchCluster(ctx genericapirequest.Context, options *api.ListOptions) (watch.Interface, error)
+	GetCluster(ctx genericapirequest.Context, name string, options *metav1.GetOptions) (*federation.Cluster, error)
+	CreateCluster(ctx genericapirequest.Context, cluster *federation.Cluster) error
+	UpdateCluster(ctx genericapirequest.Context, cluster *federation.Cluster) error
+	DeleteCluster(ctx genericapirequest.Context, name string) error
 }
 
 // storage puts strong typing around storage calls
@@ -45,7 +46,7 @@ func NewRegistry(s rest.StandardStorage) Registry {
 	return &storage{s}
 }
 
-func (s *storage) ListClusters(ctx api.Context, options *api.ListOptions) (*federation.ClusterList, error) {
+func (s *storage) ListClusters(ctx genericapirequest.Context, options *api.ListOptions) (*federation.ClusterList, error) {
 	obj, err := s.List(ctx, options)
 	if err != nil {
 		return nil, err
@@ -53,11 +54,11 @@ func (s *storage) ListClusters(ctx api.Context, options *api.ListOptions) (*fede
 	return obj.(*federation.ClusterList), nil
 }
 
-func (s *storage) WatchCluster(ctx api.Context, options *api.ListOptions) (watch.Interface, error) {
+func (s *storage) WatchCluster(ctx genericapirequest.Context, options *api.ListOptions) (watch.Interface, error) {
 	return s.Watch(ctx, options)
 }
 
-func (s *storage) GetCluster(ctx api.Context, name string, options *metav1.GetOptions) (*federation.Cluster, error) {
+func (s *storage) GetCluster(ctx genericapirequest.Context, name string, options *metav1.GetOptions) (*federation.Cluster, error) {
 	obj, err := s.Get(ctx, name, options)
 	if err != nil {
 		return nil, err
@@ -65,17 +66,17 @@ func (s *storage) GetCluster(ctx api.Context, name string, options *metav1.GetOp
 	return obj.(*federation.Cluster), nil
 }
 
-func (s *storage) CreateCluster(ctx api.Context, cluster *federation.Cluster) error {
+func (s *storage) CreateCluster(ctx genericapirequest.Context, cluster *federation.Cluster) error {
 	_, err := s.Create(ctx, cluster)
 	return err
 }
 
-func (s *storage) UpdateCluster(ctx api.Context, cluster *federation.Cluster) error {
+func (s *storage) UpdateCluster(ctx genericapirequest.Context, cluster *federation.Cluster) error {
 	_, _, err := s.Update(ctx, cluster.Name, rest.DefaultUpdatedObjectInfo(cluster, api.Scheme))
 	return err
 }
 
-func (s *storage) DeleteCluster(ctx api.Context, name string) error {
+func (s *storage) DeleteCluster(ctx genericapirequest.Context, name string) error {
 	_, err := s.Delete(ctx, name, nil)
 	return err
 }

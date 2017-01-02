@@ -36,6 +36,7 @@ import (
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/genericapiserver/api/handlers/negotiation"
 	"k8s.io/kubernetes/pkg/genericapiserver/api/handlers/responsewriters"
+	"k8s.io/kubernetes/pkg/genericapiserver/api/request"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/util"
@@ -48,7 +49,7 @@ import (
 )
 
 // ContextFunc returns a Context given a request - a context must be returned
-type ContextFunc func(req *restful.Request) api.Context
+type ContextFunc func(req *restful.Request) request.Context
 
 // ScopeNamer handles accessing names from requests and objects
 type ScopeNamer interface {
@@ -94,7 +95,7 @@ func (scope *RequestScope) err(err error, w http.ResponseWriter, req *http.Reque
 
 // getterFunc performs a get request with the given context and object name. The request
 // may be used to deserialize an options object to pass to the getter.
-type getterFunc func(ctx api.Context, name string, req *restful.Request) (runtime.Object, error)
+type getterFunc func(ctx request.Context, name string, req *restful.Request) (runtime.Object, error)
 
 // maxRetryWhenPatchConflicts is the maximum number of conflicts retry during a patch operation before returning failure
 const maxRetryWhenPatchConflicts = 5
@@ -110,7 +111,7 @@ func getResourceHandler(scope RequestScope, getter getterFunc) restful.RouteFunc
 			return
 		}
 		ctx := scope.ContextFunc(req)
-		ctx = api.WithNamespace(ctx, namespace)
+		ctx = request.WithNamespace(ctx, namespace)
 
 		result, err := getter(ctx, name, req)
 		if err != nil {
@@ -128,7 +129,7 @@ func getResourceHandler(scope RequestScope, getter getterFunc) restful.RouteFunc
 // GetResource returns a function that handles retrieving a single resource from a rest.Storage object.
 func GetResource(r rest.Getter, e rest.Exporter, scope RequestScope) restful.RouteFunction {
 	return getResourceHandler(scope,
-		func(ctx api.Context, name string, req *restful.Request) (runtime.Object, error) {
+		func(ctx request.Context, name string, req *restful.Request) (runtime.Object, error) {
 			// For performance tracking purposes.
 			trace := util.NewTrace("Get " + req.Request.URL.Path)
 			defer trace.LogIfLong(500 * time.Millisecond)
@@ -158,7 +159,7 @@ func GetResource(r rest.Getter, e rest.Exporter, scope RequestScope) restful.Rou
 // GetResourceWithOptions returns a function that handles retrieving a single resource from a rest.Storage object.
 func GetResourceWithOptions(r rest.GetterWithOptions, scope RequestScope) restful.RouteFunction {
 	return getResourceHandler(scope,
-		func(ctx api.Context, name string, req *restful.Request) (runtime.Object, error) {
+		func(ctx request.Context, name string, req *restful.Request) (runtime.Object, error) {
 			opts, subpath, subpathKey := r.NewGetOptions()
 			if err := getRequestOptions(req, scope, opts, subpath, subpathKey); err != nil {
 				return nil, err
@@ -194,7 +195,7 @@ func ConnectResource(connecter rest.Connecter, scope RequestScope, admit admissi
 			return
 		}
 		ctx := scope.ContextFunc(req)
-		ctx = api.WithNamespace(ctx, namespace)
+		ctx = request.WithNamespace(ctx, namespace)
 		opts, subpath, subpathKey := connecter.NewConnectOptions()
 		if err := getRequestOptions(req, scope, opts, subpath, subpathKey); err != nil {
 			scope.err(err, res.ResponseWriter, req.Request)
@@ -206,7 +207,7 @@ func ConnectResource(connecter rest.Connecter, scope RequestScope, admit admissi
 				Options:      opts,
 				ResourcePath: restPath,
 			}
-			userInfo, _ := api.UserFrom(ctx)
+			userInfo, _ := request.UserFrom(ctx)
 
 			err = admit.Admit(admission.NewAttributesRecord(connectRequest, nil, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Connect, userInfo))
 			if err != nil {
@@ -261,7 +262,7 @@ func ListResource(r rest.Lister, rw rest.Watcher, scope RequestScope, forceWatch
 		}
 
 		ctx := scope.ContextFunc(req)
-		ctx = api.WithNamespace(ctx, namespace)
+		ctx = request.WithNamespace(ctx, namespace)
 
 		opts := api.ListOptions{}
 		if err := scope.ParameterCodec.DecodeParameters(req.Request.URL.Query(), scope.Kind.GroupVersion(), &opts); err != nil {
@@ -364,7 +365,7 @@ func createHandler(r rest.NamedCreater, scope RequestScope, typer runtime.Object
 		}
 
 		ctx := scope.ContextFunc(req)
-		ctx = api.WithNamespace(ctx, namespace)
+		ctx = request.WithNamespace(ctx, namespace)
 
 		gv := scope.Kind.GroupVersion()
 		s, err := negotiation.NegotiateInputSerializer(req.Request, scope.Serializer)
@@ -397,7 +398,7 @@ func createHandler(r rest.NamedCreater, scope RequestScope, typer runtime.Object
 		trace.Step("Conversion done")
 
 		if admit != nil && admit.Handles(admission.Create) {
-			userInfo, _ := api.UserFrom(ctx)
+			userInfo, _ := request.UserFrom(ctx)
 
 			err = admit.Admit(admission.NewAttributesRecord(obj, nil, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Create, userInfo))
 			if err != nil {
@@ -444,7 +445,7 @@ type namedCreaterAdapter struct {
 	rest.Creater
 }
 
-func (c *namedCreaterAdapter) Create(ctx api.Context, name string, obj runtime.Object) (runtime.Object, error) {
+func (c *namedCreaterAdapter) Create(ctx request.Context, name string, obj runtime.Object) (runtime.Object, error) {
 	return c.Creater.Create(ctx, obj)
 }
 
@@ -466,7 +467,7 @@ func PatchResource(r rest.Patcher, scope RequestScope, typer runtime.ObjectTyper
 		}
 
 		ctx := scope.ContextFunc(req)
-		ctx = api.WithNamespace(ctx, namespace)
+		ctx = request.WithNamespace(ctx, namespace)
 
 		versionedObj, err := converter.ConvertToVersion(r.New(), scope.Kind.GroupVersion())
 		if err != nil {
@@ -501,7 +502,7 @@ func PatchResource(r rest.Patcher, scope RequestScope, typer runtime.ObjectTyper
 
 		updateAdmit := func(updatedObject runtime.Object, currentObject runtime.Object) error {
 			if admit != nil && admit.Handles(admission.Update) {
-				userInfo, _ := api.UserFrom(ctx)
+				userInfo, _ := request.UserFrom(ctx)
 				return admit.Admit(admission.NewAttributesRecord(updatedObject, currentObject, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Update, userInfo))
 			}
 
@@ -528,7 +529,7 @@ type updateAdmissionFunc func(updatedObject runtime.Object, currentObject runtim
 
 // patchResource divides PatchResource for easier unit testing
 func patchResource(
-	ctx api.Context,
+	ctx request.Context,
 	admit updateAdmissionFunc,
 	timeout time.Duration,
 	versionedObj runtime.Object,
@@ -542,7 +543,7 @@ func patchResource(
 	codec runtime.Codec,
 ) (runtime.Object, error) {
 
-	namespace := api.NamespaceValue(ctx)
+	namespace := request.NamespaceValue(ctx)
 
 	var (
 		originalObjJS        []byte
@@ -552,7 +553,7 @@ func patchResource(
 
 	// applyPatch is called every time GuaranteedUpdate asks for the updated object,
 	// and is given the currently persisted object as input.
-	applyPatch := func(_ api.Context, _, currentObject runtime.Object) (runtime.Object, error) {
+	applyPatch := func(_ request.Context, _, currentObject runtime.Object) (runtime.Object, error) {
 		// Make sure we actually have a persisted currentObject
 		if hasUID, err := hasUID(currentObject); err != nil {
 			return nil, err
@@ -643,7 +644,7 @@ func patchResource(
 
 	// applyAdmission is called every time GuaranteedUpdate asks for the updated object,
 	// and is given the currently persisted object and the patched object as input.
-	applyAdmission := func(ctx api.Context, patchedObject runtime.Object, currentObject runtime.Object) (runtime.Object, error) {
+	applyAdmission := func(ctx request.Context, patchedObject runtime.Object, currentObject runtime.Object) (runtime.Object, error) {
 		return patchedObject, admit(patchedObject, currentObject)
 	}
 
@@ -677,7 +678,7 @@ func UpdateResource(r rest.Updater, scope RequestScope, typer runtime.ObjectType
 			return
 		}
 		ctx := scope.ContextFunc(req)
-		ctx = api.WithNamespace(ctx, namespace)
+		ctx = request.WithNamespace(ctx, namespace)
 
 		body, err := readBody(req.Request)
 		if err != nil {
@@ -713,8 +714,8 @@ func UpdateResource(r rest.Updater, scope RequestScope, typer runtime.ObjectType
 
 		var transformers []rest.TransformFunc
 		if admit != nil && admit.Handles(admission.Update) {
-			transformers = append(transformers, func(ctx api.Context, newObj, oldObj runtime.Object) (runtime.Object, error) {
-				userInfo, _ := api.UserFrom(ctx)
+			transformers = append(transformers, func(ctx request.Context, newObj, oldObj runtime.Object) (runtime.Object, error) {
+				userInfo, _ := request.UserFrom(ctx)
 				return newObj, admit.Admit(admission.NewAttributesRecord(newObj, oldObj, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Update, userInfo))
 			})
 		}
@@ -764,7 +765,7 @@ func DeleteResource(r rest.GracefulDeleter, allowsOptions bool, scope RequestSco
 			return
 		}
 		ctx := scope.ContextFunc(req)
-		ctx = api.WithNamespace(ctx, namespace)
+		ctx = request.WithNamespace(ctx, namespace)
 
 		options := &api.DeleteOptions{}
 		if allowsOptions {
@@ -800,7 +801,7 @@ func DeleteResource(r rest.GracefulDeleter, allowsOptions bool, scope RequestSco
 		}
 
 		if admit != nil && admit.Handles(admission.Delete) {
-			userInfo, _ := api.UserFrom(ctx)
+			userInfo, _ := request.UserFrom(ctx)
 
 			err = admit.Admit(admission.NewAttributesRecord(nil, nil, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Delete, userInfo))
 			if err != nil {
@@ -858,10 +859,10 @@ func DeleteCollection(r rest.CollectionDeleter, checkBody bool, scope RequestSco
 		}
 
 		ctx := scope.ContextFunc(req)
-		ctx = api.WithNamespace(ctx, namespace)
+		ctx = request.WithNamespace(ctx, namespace)
 
 		if admit != nil && admit.Handles(admission.Delete) {
-			userInfo, _ := api.UserFrom(ctx)
+			userInfo, _ := request.UserFrom(ctx)
 
 			err = admit.Admit(admission.NewAttributesRecord(nil, nil, scope.Kind, namespace, "", scope.Resource, scope.Subresource, admission.Delete, userInfo))
 			if err != nil {

@@ -20,17 +20,18 @@ import (
 	"k8s.io/kubernetes/pkg/api/meta"
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/conversion"
+	genericapirequest "k8s.io/kubernetes/pkg/genericapiserver/api/request"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/uuid"
 )
 
 // FillObjectMetaSystemFields populates fields that are managed by the system on ObjectMeta.
-func FillObjectMetaSystemFields(ctx Context, meta *ObjectMeta) {
+func FillObjectMetaSystemFields(ctx genericapirequest.Context, meta *ObjectMeta) {
 	meta.CreationTimestamp = metav1.Now()
 	// allows admission controllers to assign a UID earlier in the request processing
 	// to support tracking resources pending creation.
-	uid, found := UIDFrom(ctx)
+	uid, found := genericapirequest.UIDFrom(ctx)
 	if !found {
 		uid = uuid.NewUUID()
 	}

@@ -27,6 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/policy"
 	policyclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/policy/internalversion"
 	"k8s.io/kubernetes/pkg/client/retry"
+	genericapirequest "k8s.io/kubernetes/pkg/genericapiserver/api/request"
 	"k8s.io/kubernetes/pkg/labels"
 	genericregistry "k8s.io/kubernetes/pkg/registry/generic/registry"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -70,7 +71,7 @@ func (r *EvictionREST) New() runtime.Object {
 }
 
 // Create attempts to create a new eviction.  That is, it tries to evict a pod.
-func (r *EvictionREST) Create(ctx api.Context, obj runtime.Object) (runtime.Object, error) {
+func (r *EvictionREST) Create(ctx genericapirequest.Context, obj runtime.Object) (runtime.Object, error) {
 	eviction := obj.(*policy.Eviction)
 
 	obj, err := r.store.Get(ctx, eviction.Name, &metav1.GetOptions{})
@@ -175,7 +176,7 @@ func (r *EvictionREST) checkAndDecrement(namespace string, podName string, pdb p
 }
 
 // getPodDisruptionBudgets returns any PDBs that match the pod or err if there's an error.
-func (r *EvictionREST) getPodDisruptionBudgets(ctx api.Context, pod *api.Pod) ([]policy.PodDisruptionBudget, error) {
+func (r *EvictionREST) getPodDisruptionBudgets(ctx genericapirequest.Context, pod *api.Pod) ([]policy.PodDisruptionBudget, error) {
 	if len(pod.Labels) == 0 {
 		return nil, nil
 	}

@@ -24,6 +24,7 @@ go_library(
         "//pkg/apis/meta/v1:go_default_library",
         "//pkg/controller/deployment/util:go_default_library",
         "//pkg/fields:go_default_library",
+        "//pkg/genericapiserver/api/request:go_default_library",
         "//pkg/labels:go_default_library",
         "//pkg/registry/generic:go_default_library",
         "//pkg/runtime:go_default_library",
@@ -42,6 +43,7 @@ go_test(
         "//pkg/api/testapi:go_default_library",
         "//pkg/api/testing:go_default_library",
         "//pkg/apis/extensions:go_default_library",
+        "//pkg/genericapiserver/api/request:go_default_library",
         "//pkg/runtime:go_default_library",
     ],
 )

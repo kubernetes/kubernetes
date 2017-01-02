@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package api
+package request
 
 import (
 	stderrs "errors"
@@ -62,6 +62,8 @@ const (
 
 	// userAgentKey is the context key for the request user agent.
 	userAgentKey
+
+	namespaceDefault = "default" // TODO(sttts): solve import cycle when using api.NamespaceDefault
 )
 
 // NewContext instantiates a base context object for request flows.
@@ -71,7 +73,7 @@ func NewContext() Context {
 
 // NewDefaultContext instantiates a base context object for request flows in the default namespace
 func NewDefaultContext() Context {
-	return WithNamespace(NewContext(), NamespaceDefault)
+	return WithNamespace(NewContext(), namespaceDefault)
 }
 
 // WithValue returns a copy of parent in which the value associated with key is val.
@@ -100,20 +102,11 @@ func NamespaceValue(ctx Context) string {
 	return namespace
 }
 
-// ValidNamespace returns false if the namespace on the context differs from the resource.  If the resource has no namespace, it is set to the value in the context.
-func ValidNamespace(ctx Context, resource *ObjectMeta) bool {
-	ns, ok := NamespaceFrom(ctx)
-	if len(resource.Namespace) == 0 {
-		resource.Namespace = ns
-	}
-	return ns == resource.Namespace && ok
-}
-
 // WithNamespaceDefaultIfNone returns a context whose namespace is the default if and only if the parent context has no namespace value
 func WithNamespaceDefaultIfNone(parent Context) Context {
 	namespace, ok := NamespaceFrom(parent)
 	if !ok || len(namespace) == 0 {
-		return WithNamespace(parent, NamespaceDefault)
+		return WithNamespace(parent, namespaceDefault)
 	}
 	return parent
 }

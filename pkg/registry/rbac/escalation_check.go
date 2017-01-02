@@ -17,12 +17,12 @@ limitations under the License.
 package rbac
 
 import (
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/auth/user"
+	genericapirequest "k8s.io/kubernetes/pkg/genericapiserver/api/request"
 )
 
-func EscalationAllowed(ctx api.Context) bool {
-	u, ok := api.UserFrom(ctx)
+func EscalationAllowed(ctx genericapirequest.Context) bool {
+	u, ok := genericapirequest.UserFrom(ctx)
 	if !ok {
 		// the only way to be without a user is to either have no authenticators by explicitly saying that's your preference
 		// or to be connecting via the insecure port, in which case this logically doesn't apply

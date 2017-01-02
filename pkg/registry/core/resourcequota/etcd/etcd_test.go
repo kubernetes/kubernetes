@@ -24,6 +24,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/rest"
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/fields"
+	genericapirequest "k8s.io/kubernetes/pkg/genericapiserver/api/request"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/generic"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
@@ -83,9 +84,9 @@ func TestCreateSetsFields(t *testing.T) {
 	storage, _, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	ctx := api.NewDefaultContext()
+	ctx := genericapirequest.NewDefaultContext()
 	resourcequota := validNewResourceQuota()
-	_, err := storage.Create(api.NewDefaultContext(), resourcequota)
+	_, err := storage.Create(genericapirequest.NewDefaultContext(), resourcequota)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -155,7 +156,7 @@ func TestUpdateStatus(t *testing.T) {
 	storage, status, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	ctx := api.NewDefaultContext()
+	ctx := genericapirequest.NewDefaultContext()
 
 	key, _ := storage.KeyFunc(ctx, "foo")
 	resourcequotaStart := validNewResourceQuota()

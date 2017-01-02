@@ -23,6 +23,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
+	genericapirequest "k8s.io/kubernetes/pkg/genericapiserver/api/request"
 	"k8s.io/kubernetes/pkg/runtime"
 )
 
@@ -83,7 +84,7 @@ func TestExportSecret(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		err := Strategy.Export(api.NewContext(), test.objIn, test.exact)
+		err := Strategy.Export(genericapirequest.NewContext(), test.objIn, test.exact)
 		if err != nil {
 			if !test.expectErr {
 				t.Errorf("unexpected error: %v", err)

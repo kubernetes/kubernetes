@@ -22,6 +22,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/fields"
+	genericapirequest "k8s.io/kubernetes/pkg/genericapiserver/api/request"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/generic"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -45,7 +46,7 @@ func (namespaceStrategy) NamespaceScoped() bool {
 }
 
 // PrepareForCreate clears fields that are not allowed to be set by end users on creation.
-func (namespaceStrategy) PrepareForCreate(ctx api.Context, obj runtime.Object) {
+func (namespaceStrategy) PrepareForCreate(ctx genericapirequest.Context, obj runtime.Object) {
 	// on create, status is active
 	namespace := obj.(*api.Namespace)
 	namespace.Status = api.NamespaceStatus{
@@ -70,7 +71,7 @@ func (namespaceStrategy) PrepareForCreate(ctx api.Context, obj runtime.Object) {
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
-func (namespaceStrategy) PrepareForUpdate(ctx api.Context, obj, old runtime.Object) {
+func (namespaceStrategy) PrepareForUpdate(ctx genericapirequest.Context, obj, old runtime.Object) {
 	newNamespace := obj.(*api.Namespace)
 	oldNamespace := old.(*api.Namespace)
 	newNamespace.Spec.Finalizers = oldNamespace.Spec.Finalizers
@@ -78,7 +79,7 @@ func (namespaceStrategy) PrepareForUpdate(ctx api.Context, obj, old runtime.Obje
 }
 
 // Validate validates a new namespace.
-func (namespaceStrategy) Validate(ctx api.Context, obj runtime.Object) field.ErrorList {
+func (namespaceStrategy) Validate(ctx genericapirequest.Context, obj runtime.Object) field.ErrorList {
 	namespace := obj.(*api.Namespace)
 	return validation.ValidateNamespace(namespace)
 }
@@ -93,7 +94,7 @@ func (namespaceStrategy) AllowCreateOnUpdate() bool {
 }
 
 // ValidateUpdate is the default update validation for an end user.
-func (namespaceStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) field.ErrorList {
+func (namespaceStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
 	errorList := validation.ValidateNamespace(obj.(*api.Namespace))
 	return append(errorList, validation.ValidateNamespaceUpdate(obj.(*api.Namespace), old.(*api.Namespace))...)
 }
@@ -108,13 +109,13 @@ type namespaceStatusStrategy struct {
 
 var StatusStrategy = namespaceStatusStrategy{Strategy}
 
-func (namespaceStatusStrategy) PrepareForUpdate(ctx api.Context, obj, old runtime.Object) {
+func (namespaceStatusStrategy) PrepareForUpdate(ctx genericapirequest.Context, obj, old runtime.Object) {
 	newNamespace := obj.(*api.Namespace)
 	oldNamespace := old.(*api.Namespace)
 	newNamespace.Spec = oldNamespace.Spec
 }
 
-func (namespaceStatusStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) field.ErrorList {
+func (namespaceStatusStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
 	return validation.ValidateNamespaceStatusUpdate(obj.(*api.Namespace), old.(*api.Namespace))
 }
 
@@ -124,12 +125,12 @@ type namespaceFinalizeStrategy struct {
 
 var FinalizeStrategy = namespaceFinalizeStrategy{Strategy}
 
-func (namespaceFinalizeStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) field.ErrorList {
+func (namespaceFinalizeStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
 	return validation.ValidateNamespaceFinalizeUpdate(obj.(*api.Namespace), old.(*api.Namespace))
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
-func (namespaceFinalizeStrategy) PrepareForUpdate(ctx api.Context, obj, old runtime.Object) {
+func (namespaceFinalizeStrategy) PrepareForUpdate(ctx genericapirequest.Context, obj, old runtime.Object) {
 	newNamespace := obj.(*api.Namespace)
 	oldNamespace := old.(*api.Namespace)
 	newNamespace.Status = oldNamespace.Status

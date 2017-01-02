@@ -26,6 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/fields"
+	genericapirequest "k8s.io/kubernetes/pkg/genericapiserver/api/request"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 )
@@ -136,7 +137,7 @@ func TestCheckGracefulDelete(t *testing.T) {
 	}
 	for _, tc := range tcs {
 		out := &api.DeleteOptions{GracePeriodSeconds: &defaultGracePeriod}
-		Strategy.CheckGracefulDelete(api.NewContext(), tc.in, out)
+		Strategy.CheckGracefulDelete(genericapirequest.NewContext(), tc.in, out)
 		if out.GracePeriodSeconds == nil {
 			t.Errorf("out grace period was nil but supposed to be %v", tc.gracePeriod)
 		}
@@ -150,12 +151,12 @@ type mockPodGetter struct {
 	pod *api.Pod
 }
 
-func (g mockPodGetter) Get(api.Context, string, *metav1.GetOptions) (runtime.Object, error) {
+func (g mockPodGetter) Get(genericapirequest.Context, string, *metav1.GetOptions) (runtime.Object, error) {
 	return g.pod, nil
 }
 
 func TestCheckLogLocation(t *testing.T) {
-	ctx := api.NewDefaultContext()
+	ctx := genericapirequest.NewDefaultContext()
 	tcs := []struct {
 		in          *api.Pod
 		opts        *api.PodLogOptions

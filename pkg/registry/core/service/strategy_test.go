@@ -25,6 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/rest"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
+	genericapirequest "k8s.io/kubernetes/pkg/genericapiserver/api/request"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/intstr"
 )
@@ -92,7 +93,7 @@ func TestExportService(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		err := Strategy.Export(api.NewContext(), test.objIn, test.exact)
+		err := Strategy.Export(genericapirequest.NewContext(), test.objIn, test.exact)
 		if err != nil {
 			if !test.expectErr {
 				t.Errorf("unexpected error: %v", err)
@@ -200,7 +201,7 @@ func TestBeforeUpdate(t *testing.T) {
 		oldSvc := makeValidService()
 		newSvc := makeValidService()
 		tc.tweakSvc(&oldSvc, &newSvc)
-		ctx := api.NewDefaultContext()
+		ctx := genericapirequest.NewDefaultContext()
 		err := rest.BeforeUpdate(Strategy, ctx, runtime.Object(&oldSvc), runtime.Object(&newSvc))
 		if tc.expectErr && err == nil {
 			t.Errorf("unexpected non-error for %q", tc.name)
@@ -221,7 +222,7 @@ func TestSelectableFieldLabelConversions(t *testing.T) {
 }
 
 func TestServiceStatusStrategy(t *testing.T) {
-	ctx := api.NewDefaultContext()
+	ctx := genericapirequest.NewDefaultContext()
 	if !StatusStrategy.NamespaceScoped() {
 		t.Errorf("Service must be namespace scoped")
 	}

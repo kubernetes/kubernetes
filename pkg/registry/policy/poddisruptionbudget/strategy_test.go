@@ -22,11 +22,12 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/apis/policy"
+	genericapirequest "k8s.io/kubernetes/pkg/genericapiserver/api/request"
 	"k8s.io/kubernetes/pkg/util/intstr"
 )
 
 func TestPodDisruptionBudgetStrategy(t *testing.T) {
-	ctx := api.NewDefaultContext()
+	ctx := genericapirequest.NewDefaultContext()
 	if !Strategy.NamespaceScoped() {
 		t.Errorf("PodDisruptionBudget must be namespace scoped")
 	}
@@ -86,7 +87,7 @@ func TestPodDisruptionBudgetStrategy(t *testing.T) {
 }
 
 func TestPodDisruptionBudgetStatusStrategy(t *testing.T) {
-	ctx := api.NewDefaultContext()
+	ctx := genericapirequest.NewDefaultContext()
 	if !StatusStrategy.NamespaceScoped() {
 		t.Errorf("PodDisruptionBudgetStatus must be namespace scoped")
 	}

@@ -38,6 +38,7 @@ import (
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	genericapi "k8s.io/kubernetes/pkg/genericapiserver/api"
+	apirequest "k8s.io/kubernetes/pkg/genericapiserver/api/request"
 	genericmux "k8s.io/kubernetes/pkg/genericapiserver/mux"
 	openapicommon "k8s.io/kubernetes/pkg/genericapiserver/openapi/common"
 	"k8s.io/kubernetes/pkg/genericapiserver/routes"
@@ -95,7 +96,7 @@ type GenericAPIServer struct {
 	admissionControl admission.Interface
 
 	// requestContextMapper provides a way to get the context for a request.  It may be nil.
-	requestContextMapper api.RequestContextMapper
+	requestContextMapper apirequest.RequestContextMapper
 
 	// The registered APIs
 	HandlerContainer *genericmux.APIContainer
@@ -152,7 +153,7 @@ func init() {
 
 // RequestContextMapper is exposed so that third party resource storage can be build in a different location.
 // TODO refactor third party resource storage
-func (s *GenericAPIServer) RequestContextMapper() api.RequestContextMapper {
+func (s *GenericAPIServer) RequestContextMapper() apirequest.RequestContextMapper {
 	return s.requestContextMapper
 }
 

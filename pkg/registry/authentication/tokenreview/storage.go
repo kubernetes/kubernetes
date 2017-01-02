@@ -20,10 +20,10 @@ import (
 	"fmt"
 	"net/http"
 
-	"k8s.io/kubernetes/pkg/api"
 	apierrors "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/apis/authentication"
 	"k8s.io/kubernetes/pkg/auth/authenticator"
+	genericapirequest "k8s.io/kubernetes/pkg/genericapiserver/api/request"
 	"k8s.io/kubernetes/pkg/runtime"
 )
 
@@ -39,12 +39,12 @@ func (r *REST) New() runtime.Object {
 	return &authentication.TokenReview{}
 }
 
-func (r *REST) Create(ctx api.Context, obj runtime.Object) (runtime.Object, error) {
+func (r *REST) Create(ctx genericapirequest.Context, obj runtime.Object) (runtime.Object, error) {
 	tokenReview, ok := obj.(*authentication.TokenReview)
 	if !ok {
 		return nil, apierrors.NewBadRequest(fmt.Sprintf("not a TokenReview: %#v", obj))
 	}
-	namespace := api.NamespaceValue(ctx)
+	namespace := genericapirequest.NamespaceValue(ctx)
 	if len(namespace) != 0 {
 		return nil, apierrors.NewBadRequest(fmt.Sprintf("namespace is not allowed on this type: %v", namespace))
 	}

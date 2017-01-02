@@ -11,7 +11,6 @@ load(
 go_library(
     name = "go_default_library",
     srcs = [
-        "context.go",
         "conversion.go",
         "defaults.go",
         "doc.go",
@@ -22,7 +21,6 @@ go_library(
         "meta.go",
         "ref.go",
         "register.go",
-        "requestcontext.go",
         "resource_helpers.go",
         "types.go",
         "zz_generated.deepcopy.go",
@@ -32,9 +30,9 @@ go_library(
         "//pkg/api/meta:go_default_library",
         "//pkg/api/resource:go_default_library",
         "//pkg/apis/meta/v1:go_default_library",
-        "//pkg/auth/user:go_default_library",
         "//pkg/conversion:go_default_library",
         "//pkg/fields:go_default_library",
+        "//pkg/genericapiserver/api/request:go_default_library",
         "//pkg/labels:go_default_library",
         "//pkg/runtime:go_default_library",
         "//pkg/runtime/schema:go_default_library",
@@ -48,8 +46,6 @@ go_library(
         "//pkg/util/uuid:go_default_library",
         "//pkg/util/validation/field:go_default_library",
         "//vendor:github.com/davecgh/go-spew/spew",
-        "//vendor:github.com/golang/glog",
-        "//vendor:golang.org/x/net/context",
     ],
 )
 
@@ -75,7 +71,6 @@ go_test(
 go_test(
     name = "go_default_xtest",
     srcs = [
-        "context_test.go",
         "conversion_test.go",
         "copy_test.go",
         "deep_copy_test.go",
@@ -96,8 +91,8 @@ go_test(
         "//pkg/apis/extensions:go_default_library",
         "//pkg/apis/extensions/v1beta1:go_default_library",
         "//pkg/apis/meta/v1:go_default_library",
-        "//pkg/auth/user:go_default_library",
         "//pkg/conversion:go_default_library",
+        "//pkg/genericapiserver/api/request:go_default_library",
         "//pkg/runtime:go_default_library",
         "//pkg/runtime/schema:go_default_library",
         "//pkg/runtime/serializer/protobuf:go_default_library",
