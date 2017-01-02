@@ -23,10 +23,11 @@ import (
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
+	genericapirequest "k8s.io/kubernetes/pkg/genericapiserver/api/request"
 )
 
 func TestNamespaceStrategy(t *testing.T) {
-	ctx := api.NewDefaultContext()
+	ctx := genericapirequest.NewDefaultContext()
 	if Strategy.NamespaceScoped() {
 		t.Errorf("Namespaces should not be namespace scoped")
 	}
@@ -66,7 +67,7 @@ func TestNamespaceStrategy(t *testing.T) {
 }
 
 func TestNamespaceStatusStrategy(t *testing.T) {
-	ctx := api.NewDefaultContext()
+	ctx := genericapirequest.NewDefaultContext()
 	if StatusStrategy.NamespaceScoped() {
 		t.Errorf("Namespaces should not be namespace scoped")
 	}
@@ -100,7 +101,7 @@ func TestNamespaceStatusStrategy(t *testing.T) {
 }
 
 func TestNamespaceFinalizeStrategy(t *testing.T) {
-	ctx := api.NewDefaultContext()
+	ctx := genericapirequest.NewDefaultContext()
 	if FinalizeStrategy.NamespaceScoped() {
 		t.Errorf("Namespaces should not be namespace scoped")
 	}

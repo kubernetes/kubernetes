@@ -24,12 +24,12 @@ import (
 	"github.com/emicklei/go-restful"
 
 	"k8s.io/kubernetes/pkg/admission"
-	"k8s.io/kubernetes/pkg/api"
 	apierrors "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/rest"
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/genericapiserver/api/handlers"
+	"k8s.io/kubernetes/pkg/genericapiserver/api/request"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/runtime/schema"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
@@ -68,7 +68,7 @@ type APIGroupVersion struct {
 	Linker    runtime.SelfLinker
 
 	Admit   admission.Interface
-	Context api.RequestContextMapper
+	Context request.RequestContextMapper
 
 	MinRequestTimeout time.Duration
 

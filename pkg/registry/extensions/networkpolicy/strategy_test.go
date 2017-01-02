@@ -22,10 +22,11 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
+	genericapirequest "k8s.io/kubernetes/pkg/genericapiserver/api/request"
 )
 
 func TestNetworkPolicyStrategy(t *testing.T) {
-	ctx := api.NewDefaultContext()
+	ctx := genericapirequest.NewDefaultContext()
 	if !Strategy.NamespaceScoped() {
 		t.Errorf("NetworkPolicy must be namespace scoped")
 	}

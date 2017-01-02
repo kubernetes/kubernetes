@@ -31,6 +31,7 @@ import (
 	apiservice "k8s.io/kubernetes/pkg/api/service"
 	"k8s.io/kubernetes/pkg/api/validation"
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
+	genericapirequest "k8s.io/kubernetes/pkg/genericapiserver/api/request"
 	"k8s.io/kubernetes/pkg/registry/core/endpoint"
 	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
 	"k8s.io/kubernetes/pkg/registry/core/service/portallocator"
@@ -73,7 +74,7 @@ func NewStorage(registry Registry, endpoints endpoint.Registry, serviceIPs ipall
 	}
 }
 
-func (rs *REST) Create(ctx api.Context, obj runtime.Object) (runtime.Object, error) {
+func (rs *REST) Create(ctx genericapirequest.Context, obj runtime.Object) (runtime.Object, error) {
 	service := obj.(*api.Service)
 
 	if err := rest.BeforeCreate(Strategy, ctx, obj); err != nil {
@@ -205,7 +206,7 @@ func (rs *REST) Create(ctx api.Context, obj runtime.Object) (runtime.Object, err
 	return out, err
 }
 
-func (rs *REST) Delete(ctx api.Context, id string) (runtime.Object, error) {
+func (rs *REST) Delete(ctx genericapirequest.Context, id string) (runtime.Object, error) {
 	service, err := rs.registry.GetService(ctx, id, &metav1.GetOptions{})
 	if err != nil {
 		return nil, err
@@ -248,23 +249,23 @@ func (rs *REST) Delete(ctx api.Context, id string) (runtime.Object, error) {
 	return &metav1.Status{Status: metav1.StatusSuccess}, nil
 }
 
-func (rs *REST) Get(ctx api.Context, id string, options *metav1.GetOptions) (runtime.Object, error) {
+func (rs *REST) Get(ctx genericapirequest.Context, id string, options *metav1.GetOptions) (runtime.Object, error) {
 	return rs.registry.GetService(ctx, id, options)
 }
 
-func (rs *REST) List(ctx api.Context, options *api.ListOptions) (runtime.Object, error) {
+func (rs *REST) List(ctx genericapirequest.Context, options *api.ListOptions) (runtime.Object, error) {
 	return rs.registry.ListServices(ctx, options)
 }
 
 // Watch returns Services events via a watch.Interface.
 // It implements rest.Watcher.
-func (rs *REST) Watch(ctx api.Context, options *api.ListOptions) (watch.Interface, error) {
+func (rs *REST) Watch(ctx genericapirequest.Context, options *api.ListOptions) (watch.Interface, error) {
 	return rs.registry.WatchServices(ctx, options)
 }
 
 // Export returns Service stripped of cluster-specific information.
 // It implements rest.Exporter.
-func (rs *REST) Export(ctx api.Context, name string, opts metav1.ExportOptions) (runtime.Object, error) {
+func (rs *REST) Export(ctx genericapirequest.Context, name string, opts metav1.ExportOptions) (runtime.Object, error) {
 	return rs.registry.ExportService(ctx, name, opts)
 }
 
@@ -368,7 +369,7 @@ func (rs *REST) healthCheckNodePortUpdate(oldService, service *api.Service) (boo
 	return true, nil
 }
 
-func (rs *REST) Update(ctx api.Context, name string, objInfo rest.UpdatedObjectInfo) (runtime.Object, bool, error) {
+func (rs *REST) Update(ctx genericapirequest.Context, name string, objInfo rest.UpdatedObjectInfo) (runtime.Object, bool, error) {
 	oldService, err := rs.registry.GetService(ctx, name, &metav1.GetOptions{})
 	if err != nil {
 		return nil, false, err
@@ -467,7 +468,7 @@ func (rs *REST) Update(ctx api.Context, name string, objInfo rest.UpdatedObjectI
 var _ = rest.Redirector(&REST{})
 
 // ResourceLocation returns a URL to which one can send traffic for the specified service.
-func (rs *REST) ResourceLocation(ctx api.Context, id string) (*url.URL, http.RoundTripper, error) {
+func (rs *REST) ResourceLocation(ctx genericapirequest.Context, id string) (*url.URL, http.RoundTripper, error) {
 	// Allow ID as "svcname", "svcname:port", or "scheme:svcname:port".
 	svcScheme, svcName, portStr, valid := utilnet.SplitSchemeNamePort(id)
 	if !valid {

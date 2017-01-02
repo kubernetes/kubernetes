@@ -21,17 +21,18 @@ import (
 	"k8s.io/kubernetes/pkg/api/rest"
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/apis/rbac"
+	genericapirequest "k8s.io/kubernetes/pkg/genericapiserver/api/request"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
 // Registry is an interface for things that know how to store Roles.
 type Registry interface {
-	ListRoles(ctx api.Context, options *api.ListOptions) (*rbac.RoleList, error)
-	CreateRole(ctx api.Context, role *rbac.Role) error
-	UpdateRole(ctx api.Context, role *rbac.Role) error
-	GetRole(ctx api.Context, name string, options *metav1.GetOptions) (*rbac.Role, error)
-	DeleteRole(ctx api.Context, name string) error
-	WatchRoles(ctx api.Context, options *api.ListOptions) (watch.Interface, error)
+	ListRoles(ctx genericapirequest.Context, options *api.ListOptions) (*rbac.RoleList, error)
+	CreateRole(ctx genericapirequest.Context, role *rbac.Role) error
+	UpdateRole(ctx genericapirequest.Context, role *rbac.Role) error
+	GetRole(ctx genericapirequest.Context, name string, options *metav1.GetOptions) (*rbac.Role, error)
+	DeleteRole(ctx genericapirequest.Context, name string) error
+	WatchRoles(ctx genericapirequest.Context, options *api.ListOptions) (watch.Interface, error)
 }
 
 // storage puts strong typing around storage calls
@@ -45,7 +46,7 @@ func NewRegistry(s rest.StandardStorage) Registry {
 	return &storage{s}
 }
 
-func (s *storage) ListRoles(ctx api.Context, options *api.ListOptions) (*rbac.RoleList, error) {
+func (s *storage) ListRoles(ctx genericapirequest.Context, options *api.ListOptions) (*rbac.RoleList, error) {
 	obj, err := s.List(ctx, options)
 	if err != nil {
 		return nil, err
@@ -54,21 +55,21 @@ func (s *storage) ListRoles(ctx api.Context, options *api.ListOptions) (*rbac.Ro
 	return obj.(*rbac.RoleList), nil
 }
 
-func (s *storage) CreateRole(ctx api.Context, role *rbac.Role) error {
+func (s *storage) CreateRole(ctx genericapirequest.Context, role *rbac.Role) error {
 	_, err := s.Create(ctx, role)
 	return err
 }
 
-func (s *storage) UpdateRole(ctx api.Context, role *rbac.Role) error {
+func (s *storage) UpdateRole(ctx genericapirequest.Context, role *rbac.Role) error {
 	_, _, err := s.Update(ctx, role.Name, rest.DefaultUpdatedObjectInfo(role, api.Scheme))
 	return err
 }
 
-func (s *storage) WatchRoles(ctx api.Context, options *api.ListOptions) (watch.Interface, error) {
+func (s *storage) WatchRoles(ctx genericapirequest.Context, options *api.ListOptions) (watch.Interface, error) {
 	return s.Watch(ctx, options)
 }
 
-func (s *storage) GetRole(ctx api.Context, name string, options *metav1.GetOptions) (*rbac.Role, error) {
+func (s *storage) GetRole(ctx genericapirequest.Context, name string, options *metav1.GetOptions) (*rbac.Role, error) {
 	obj, err := s.Get(ctx, name, options)
 	if err != nil {
 		return nil, err
@@ -76,7 +77,7 @@ func (s *storage) GetRole(ctx api.Context, name string, options *metav1.GetOptio
 	return obj.(*rbac.Role), nil
 }
 
-func (s *storage) DeleteRole(ctx api.Context, name string) error {
+func (s *storage) DeleteRole(ctx genericapirequest.Context, name string) error {
 	_, err := s.Delete(ctx, name, nil)
 	return err
 }
@@ -87,5 +88,5 @@ type AuthorizerAdapter struct {
 }
 
 func (a AuthorizerAdapter) GetRole(namespace, name string) (*rbac.Role, error) {
-	return a.Registry.GetRole(api.WithNamespace(api.NewContext(), namespace), name, &metav1.GetOptions{})
+	return a.Registry.GetRole(genericapirequest.WithNamespace(genericapirequest.NewContext(), namespace), name, &metav1.GetOptions{})
 }

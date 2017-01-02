@@ -20,17 +20,18 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/rest"
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
+	genericapirequest "k8s.io/kubernetes/pkg/genericapiserver/api/request"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
 // Registry is an interface implemented by things that know how to store Secret objects.
 type Registry interface {
-	ListSecrets(ctx api.Context, options *api.ListOptions) (*api.SecretList, error)
-	WatchSecrets(ctx api.Context, options *api.ListOptions) (watch.Interface, error)
-	GetSecret(ctx api.Context, name string, options *metav1.GetOptions) (*api.Secret, error)
-	CreateSecret(ctx api.Context, Secret *api.Secret) (*api.Secret, error)
-	UpdateSecret(ctx api.Context, Secret *api.Secret) (*api.Secret, error)
-	DeleteSecret(ctx api.Context, name string) error
+	ListSecrets(ctx genericapirequest.Context, options *api.ListOptions) (*api.SecretList, error)
+	WatchSecrets(ctx genericapirequest.Context, options *api.ListOptions) (watch.Interface, error)
+	GetSecret(ctx genericapirequest.Context, name string, options *metav1.GetOptions) (*api.Secret, error)
+	CreateSecret(ctx genericapirequest.Context, Secret *api.Secret) (*api.Secret, error)
+	UpdateSecret(ctx genericapirequest.Context, Secret *api.Secret) (*api.Secret, error)
+	DeleteSecret(ctx genericapirequest.Context, name string) error
 }
 
 // storage puts strong typing around storage calls
@@ -44,7 +45,7 @@ func NewRegistry(s rest.StandardStorage) Registry {
 	return &storage{s}
 }
 
-func (s *storage) ListSecrets(ctx api.Context, options *api.ListOptions) (*api.SecretList, error) {
+func (s *storage) ListSecrets(ctx genericapirequest.Context, options *api.ListOptions) (*api.SecretList, error) {
 	obj, err := s.List(ctx, options)
 	if err != nil {
 		return nil, err
@@ -52,11 +53,11 @@ func (s *storage) ListSecrets(ctx api.Context, options *api.ListOptions) (*api.S
 	return obj.(*api.SecretList), nil
 }
 
-func (s *storage) WatchSecrets(ctx api.Context, options *api.ListOptions) (watch.Interface, error) {
+func (s *storage) WatchSecrets(ctx genericapirequest.Context, options *api.ListOptions) (watch.Interface, error) {
 	return s.Watch(ctx, options)
 }
 
-func (s *storage) GetSecret(ctx api.Context, name string, options *metav1.GetOptions) (*api.Secret, error) {
+func (s *storage) GetSecret(ctx genericapirequest.Context, name string, options *metav1.GetOptions) (*api.Secret, error) {
 	obj, err := s.Get(ctx, name, options)
 	if err != nil {
 		return nil, err
@@ -64,17 +65,17 @@ func (s *storage) GetSecret(ctx api.Context, name string, options *metav1.GetOpt
 	return obj.(*api.Secret), nil
 }
 
-func (s *storage) CreateSecret(ctx api.Context, secret *api.Secret) (*api.Secret, error) {
+func (s *storage) CreateSecret(ctx genericapirequest.Context, secret *api.Secret) (*api.Secret, error) {
 	obj, err := s.Create(ctx, secret)
 	return obj.(*api.Secret), err
 }
 
-func (s *storage) UpdateSecret(ctx api.Context, secret *api.Secret) (*api.Secret, error) {
+func (s *storage) UpdateSecret(ctx genericapirequest.Context, secret *api.Secret) (*api.Secret, error) {
 	obj, _, err := s.Update(ctx, secret.Name, rest.DefaultUpdatedObjectInfo(secret, api.Scheme))
 	return obj.(*api.Secret), err
 }
 
-func (s *storage) DeleteSecret(ctx api.Context, name string) error {
+func (s *storage) DeleteSecret(ctx genericapirequest.Context, name string) error {
 	_, err := s.Delete(ctx, name, nil)
 	return err
 }

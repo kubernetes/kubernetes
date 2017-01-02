@@ -23,14 +23,14 @@ import (
 	"reflect"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/auth/authorizer"
 	"k8s.io/kubernetes/pkg/genericapiserver/api/handlers/responsewriters"
+	"k8s.io/kubernetes/pkg/genericapiserver/api/request"
 )
 
 func TestGetAuthorizerAttributes(t *testing.T) {
-	mapper := api.NewRequestContextMapper()
+	mapper := request.NewRequestContextMapper()
 
 	testcases := map[string]struct {
 		Verb               string
@@ -117,7 +117,7 @@ func TestGetAuthorizerAttributes(t *testing.T) {
 			attribs, err = GetAuthorizerAttributes(ctx)
 		})
 		handler = WithRequestInfo(handler, newTestRequestInfoResolver(), mapper)
-		handler = api.WithRequestContext(handler, mapper)
+		handler = request.WithRequestContext(handler, mapper)
 		handler.ServeHTTP(httptest.NewRecorder(), req)
 
 		if err != nil {

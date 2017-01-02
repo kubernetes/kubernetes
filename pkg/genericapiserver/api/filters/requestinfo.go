@@ -21,13 +21,12 @@ import (
 	"fmt"
 	"net/http"
 
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/genericapiserver/api/handlers/responsewriters"
 	"k8s.io/kubernetes/pkg/genericapiserver/api/request"
 )
 
 // WithRequestInfo attaches a RequestInfo to the context.
-func WithRequestInfo(handler http.Handler, resolver *request.RequestInfoFactory, requestContextMapper api.RequestContextMapper) http.Handler {
+func WithRequestInfo(handler http.Handler, resolver *request.RequestInfoFactory, requestContextMapper request.RequestContextMapper) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		ctx, ok := requestContextMapper.Get(req)
 		if !ok {

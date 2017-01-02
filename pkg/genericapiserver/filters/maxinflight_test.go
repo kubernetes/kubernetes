@@ -24,7 +24,6 @@ import (
 	"sync"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	apifilters "k8s.io/kubernetes/pkg/genericapiserver/api/filters"
 	apirequest "k8s.io/kubernetes/pkg/genericapiserver/api/request"
@@ -35,7 +34,7 @@ func createMaxInflightServer(callsWg, blockWg *sync.WaitGroup, disableCallsWg *b
 
 	longRunningRequestCheck := BasicLongRunningRequestCheck(sets.NewString("watch"), sets.NewString("proxy"))
 
-	requestContextMapper := api.NewRequestContextMapper()
+	requestContextMapper := apirequest.NewRequestContextMapper()
 	requestInfoFactory := &apirequest.RequestInfoFactory{APIPrefixes: sets.NewString("apis", "api"), GrouplessAPIPrefixes: sets.NewString("api")}
 	handler := WithMaxInFlightLimit(
 		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -57,7 +56,7 @@ func createMaxInflightServer(callsWg, blockWg *sync.WaitGroup, disableCallsWg *b
 		longRunningRequestCheck,
 	)
 	handler = apifilters.WithRequestInfo(handler, requestInfoFactory, requestContextMapper)
-	handler = api.WithRequestContext(handler, requestContextMapper)
+	handler = apirequest.WithRequestContext(handler, requestContextMapper)
 
 	return httptest.NewServer(handler)
 }

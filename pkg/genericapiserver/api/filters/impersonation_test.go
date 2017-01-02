@@ -24,10 +24,10 @@ import (
 	"sync"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/api"
 	authenticationapi "k8s.io/kubernetes/pkg/apis/authentication"
 	"k8s.io/kubernetes/pkg/auth/authorizer"
 	"k8s.io/kubernetes/pkg/auth/user"
+	"k8s.io/kubernetes/pkg/genericapiserver/api/request"
 )
 
 type impersonateAuthorizer struct{}
@@ -264,14 +264,14 @@ func TestImpersonationFilter(t *testing.T) {
 		},
 	}
 
-	requestContextMapper := api.NewRequestContextMapper()
-	var ctx api.Context
+	requestContextMapper := request.NewRequestContextMapper()
+	var ctx request.Context
 	var actualUser user.Info
 	var lock sync.Mutex
 
 	doNothingHandler := http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		currentCtx, _ := requestContextMapper.Get(req)
-		user, exists := api.UserFrom(currentCtx)
+		user, exists := request.UserFrom(currentCtx)
 		if !exists {
 			actualUser = nil
 			return
@@ -291,7 +291,7 @@ func TestImpersonationFilter(t *testing.T) {
 			requestContextMapper.Update(req, ctx)
 			currentCtx, _ := requestContextMapper.Get(req)
 
-			user, exists := api.UserFrom(currentCtx)
+			user, exists := request.UserFrom(currentCtx)
 			if !exists {
 				actualUser = nil
 				return
@@ -302,7 +302,7 @@ func TestImpersonationFilter(t *testing.T) {
 			delegate.ServeHTTP(w, req)
 		})
 	}(WithImpersonation(doNothingHandler, requestContextMapper, impersonateAuthorizer{}))
-	handler = api.WithRequestContext(handler, requestContextMapper)
+	handler = request.WithRequestContext(handler, requestContextMapper)
 
 	server := httptest.NewServer(handler)
 	defer server.Close()
@@ -311,7 +311,7 @@ func TestImpersonationFilter(t *testing.T) {
 		func() {
 			lock.Lock()
 			defer lock.Unlock()
-			ctx = api.WithUser(api.NewContext(), tc.user)
+			ctx = request.WithUser(request.NewContext(), tc.user)
 		}()
 
 		req, err := http.NewRequest("GET", server.URL, nil)

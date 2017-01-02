@@ -25,7 +25,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/v1"
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
@@ -33,6 +32,7 @@ import (
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/controller/informers"
 	"k8s.io/kubernetes/pkg/fields"
+	genericapirequest "k8s.io/kubernetes/pkg/genericapiserver/api/request"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/sets"
@@ -648,8 +648,8 @@ type binder struct {
 // Bind just does a POST binding RPC.
 func (b *binder) Bind(binding *v1.Binding) error {
 	glog.V(3).Infof("Attempting to bind %v to %v", binding.Name, binding.Target.Name)
-	ctx := api.WithNamespace(api.NewContext(), binding.Namespace)
-	return b.Client.Core().RESTClient().Post().Namespace(api.NamespaceValue(ctx)).Resource("bindings").Body(binding).Do().Error()
+	ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), binding.Namespace)
+	return b.Client.Core().RESTClient().Post().Namespace(genericapirequest.NamespaceValue(ctx)).Resource("bindings").Body(binding).Do().Error()
 	// TODO: use Pods interface for binding once clusters are upgraded
 	// return b.Pods(binding.Namespace).Bind(binding)
 }
