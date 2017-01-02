@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package errors
+package responsewriters
 
 import (
 	stderrs "errors"
@@ -28,7 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/runtime/schema"
 )
 
-func TestErrorsToAPIStatus(t *testing.T) {
+func TestAPIStatus(t *testing.T) {
 	cases := map[error]metav1.Status{
 		errors.NewNotFound(schema.GroupResource{Group: "legacy.kubernetes.io", Resource: "foos"}, "bar"): {
 			Status:  metav1.StatusFailure,
@@ -65,7 +65,7 @@ func TestErrorsToAPIStatus(t *testing.T) {
 		},
 	}
 	for k, v := range cases {
-		actual := ErrToAPIStatus(k)
+		actual := apiStatus(k)
 		if !reflect.DeepEqual(actual, &v) {
 			t.Errorf("%s: Expected %#v, Got %#v", k, v, actual)
 		}

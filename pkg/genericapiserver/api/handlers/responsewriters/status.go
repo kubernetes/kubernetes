@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package errors
+package responsewriters
 
 import (
 	"fmt"
@@ -30,8 +30,8 @@ type statusError interface {
 	Status() metav1.Status
 }
 
-// ErrToAPIStatus converts an error to an metav1.Status object.
-func ErrToAPIStatus(err error) *metav1.Status {
+// apiStatus converts an error to an metav1.Status object.
+func apiStatus(err error) *metav1.Status {
 	switch t := err.(type) {
 	case statusError:
 		status := t.Status()
@@ -67,23 +67,4 @@ func ErrToAPIStatus(err error) *metav1.Status {
 			Message: err.Error(),
 		}
 	}
-}
-
-// errAPIPrefixNotFound indicates that a RequestInfo resolution failed because the request isn't under
-// any known API prefixes
-type errAPIPrefixNotFound struct {
-	SpecifiedPrefix string
-}
-
-func (e *errAPIPrefixNotFound) Error() string {
-	return fmt.Sprintf("no valid API prefix found matching %v", e.SpecifiedPrefix)
-}
-
-func IsAPIPrefixNotFound(err error) bool {
-	if err == nil {
-		return false
-	}
-
-	_, ok := err.(*errAPIPrefixNotFound)
-	return ok
 }
