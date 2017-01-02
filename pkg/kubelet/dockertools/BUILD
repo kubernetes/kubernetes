@@ -63,6 +63,7 @@ go_library(
         "//pkg/util/strings:go_default_library",
         "//pkg/util/term:go_default_library",
         "//pkg/util/version:go_default_library",
+        "//vendor:github.com/armon/circbuf",
         "//vendor:github.com/docker/distribution/digest",
         "//vendor:github.com/docker/distribution/reference",
         "//vendor:github.com/docker/docker/pkg/jsonmessage",

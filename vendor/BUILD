@@ -12247,3 +12247,9 @@ go_library(
     srcs = ["golang.org/x/text/internal/utf8internal/utf8internal.go"],
     tags = ["automanaged"],
 )
+
+go_library(
+    name = "github.com/armon/circbuf",
+    srcs = ["github.com/armon/circbuf/circbuf.go"],
+    tags = ["automanaged"],
+)

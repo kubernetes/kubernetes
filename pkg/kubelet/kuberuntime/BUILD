@@ -54,6 +54,7 @@ go_library(
         "//pkg/util/selinux:go_default_library",
         "//pkg/util/sets:go_default_library",
         "//pkg/util/version:go_default_library",
+        "//vendor:github.com/armon/circbuf",
         "//vendor:github.com/docker/docker/pkg/jsonlog",
         "//vendor:github.com/fsnotify/fsnotify",
         "//vendor:github.com/golang/glog",
