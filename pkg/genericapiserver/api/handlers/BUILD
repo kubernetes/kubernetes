@@ -10,7 +10,7 @@ load(
 
 go_test(
     name = "go_default_test",
-    srcs = ["resthandler_test.go"],
+    srcs = ["rest_test.go"],
     library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
@@ -36,7 +36,7 @@ go_library(
         "discovery.go",
         "doc.go",
         "proxy.go",
-        "resthandler.go",
+        "rest.go",
         "watch.go",
     ],
     tags = ["automanaged"],
@@ -47,11 +47,11 @@ go_library(
         "//pkg/api/meta:go_default_library",
         "//pkg/api/rest:go_default_library",
         "//pkg/apis/meta/v1:go_default_library",
-        "//pkg/apiserver/handlers/negotiation:go_default_library",
-        "//pkg/apiserver/handlers/responsewriters:go_default_library",
-        "//pkg/apiserver/metrics:go_default_library",
-        "//pkg/apiserver/request:go_default_library",
         "//pkg/fields:go_default_library",
+        "//pkg/genericapiserver/api/handlers/negotiation:go_default_library",
+        "//pkg/genericapiserver/api/handlers/responsewriters:go_default_library",
+        "//pkg/genericapiserver/api/metrics:go_default_library",
+        "//pkg/genericapiserver/api/request:go_default_library",
         "//pkg/httplog:go_default_library",
         "//pkg/runtime:go_default_library",
         "//pkg/runtime/schema:go_default_library",
