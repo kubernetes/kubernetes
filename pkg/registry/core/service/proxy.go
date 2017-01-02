@@ -25,6 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/capabilities"
+	genericapirequest "k8s.io/kubernetes/pkg/genericapiserver/api/request"
 	genericrest "k8s.io/kubernetes/pkg/registry/generic/rest"
 	"k8s.io/kubernetes/pkg/runtime"
 )
@@ -56,7 +57,7 @@ func (r *ProxyREST) NewConnectOptions() (runtime.Object, bool, string) {
 }
 
 // Connect returns a handler for the service proxy
-func (r *ProxyREST) Connect(ctx api.Context, id string, opts runtime.Object, responder rest.Responder) (http.Handler, error) {
+func (r *ProxyREST) Connect(ctx genericapirequest.Context, id string, opts runtime.Object, responder rest.Responder) (http.Handler, error) {
 	proxyOpts, ok := opts.(*api.ServiceProxyOptions)
 	if !ok {
 		return nil, fmt.Errorf("Invalid options object: %#v", opts)

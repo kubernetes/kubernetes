@@ -23,6 +23,7 @@ import (
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
+	genericapirequest "k8s.io/kubernetes/pkg/genericapiserver/api/request"
 )
 
 func newBool(a bool) *bool {
@@ -32,7 +33,7 @@ func newBool(a bool) *bool {
 }
 
 func TestCronJobStrategy(t *testing.T) {
-	ctx := api.NewDefaultContext()
+	ctx := genericapirequest.NewDefaultContext()
 	if !Strategy.NamespaceScoped() {
 		t.Errorf("CronJob must be namespace scoped")
 	}
@@ -94,7 +95,7 @@ func TestCronJobStrategy(t *testing.T) {
 }
 
 func TestCronJobStatusStrategy(t *testing.T) {
-	ctx := api.NewDefaultContext()
+	ctx := genericapirequest.NewDefaultContext()
 	if !StatusStrategy.NamespaceScoped() {
 		t.Errorf("CronJob must be namespace scoped")
 	}

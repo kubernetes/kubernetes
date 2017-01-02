@@ -23,6 +23,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
+	genericapirequest "k8s.io/kubernetes/pkg/genericapiserver/api/request"
 	"k8s.io/kubernetes/pkg/registry/generic"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
 	"k8s.io/kubernetes/pkg/storage"
@@ -90,7 +91,7 @@ func TestGet(t *testing.T) {
 	storage, _, si, destroyFunc := newStorage(t)
 	defer destroyFunc()
 
-	ctx := api.WithNamespace(api.NewContext(), "test")
+	ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), "test")
 	key := "/controllers/test/foo"
 	if err := si.Create(ctx, key, &validController, nil, 0); err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -109,7 +110,7 @@ func TestUpdate(t *testing.T) {
 	storage, _, si, destroyFunc := newStorage(t)
 	defer destroyFunc()
 
-	ctx := api.WithNamespace(api.NewContext(), "test")
+	ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), "test")
 	key := "/controllers/test/foo"
 	if err := si.Create(ctx, key, &validController, nil, 0); err != nil {
 		t.Fatalf("unexpected error: %v", err)

@@ -179,6 +179,7 @@ pkg/credentialprovider/aws
 pkg/genericapiserver/api/audit
 pkg/genericapiserver/api/handlers/responsewriters
 pkg/genericapiserver/api/openapi
+pkg/genericapiserver/api/request
 pkg/genericapiserver/filters
 pkg/genericapiserver/mux
 pkg/genericapiserver/routes

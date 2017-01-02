@@ -26,6 +26,7 @@ import (
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/fields"
+	genericapirequest "k8s.io/kubernetes/pkg/genericapiserver/api/request"
 	"k8s.io/kubernetes/pkg/labels"
 )
 
@@ -70,7 +71,7 @@ func invalidNewCluster() *federation.Cluster {
 }
 
 func TestClusterStrategy(t *testing.T) {
-	ctx := api.NewDefaultContext()
+	ctx := genericapirequest.NewDefaultContext()
 	if Strategy.NamespaceScoped() {
 		t.Errorf("Cluster should not be namespace scoped")
 	}
@@ -104,7 +105,7 @@ func TestClusterStrategy(t *testing.T) {
 }
 
 func TestClusterStatusStrategy(t *testing.T) {
-	ctx := api.NewDefaultContext()
+	ctx := genericapirequest.NewDefaultContext()
 	if StatusStrategy.NamespaceScoped() {
 		t.Errorf("Cluster should not be namespace scoped")
 	}

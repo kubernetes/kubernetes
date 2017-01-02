@@ -17,9 +17,9 @@ limitations under the License.
 package etcd
 
 import (
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/apis/certificates"
+	genericapirequest "k8s.io/kubernetes/pkg/genericapiserver/api/request"
 	csrregistry "k8s.io/kubernetes/pkg/registry/certificates/certificates"
 	"k8s.io/kubernetes/pkg/registry/generic"
 	genericregistry "k8s.io/kubernetes/pkg/registry/generic/registry"
@@ -73,7 +73,7 @@ func (r *StatusREST) New() runtime.Object {
 }
 
 // Update alters the status subset of an object.
-func (r *StatusREST) Update(ctx api.Context, name string, objInfo rest.UpdatedObjectInfo) (runtime.Object, bool, error) {
+func (r *StatusREST) Update(ctx genericapirequest.Context, name string, objInfo rest.UpdatedObjectInfo) (runtime.Object, bool, error) {
 	return r.store.Update(ctx, name, objInfo)
 }
 
@@ -87,6 +87,6 @@ func (r *ApprovalREST) New() runtime.Object {
 }
 
 // Update alters the approval subset of an object.
-func (r *ApprovalREST) Update(ctx api.Context, name string, objInfo rest.UpdatedObjectInfo) (runtime.Object, bool, error) {
+func (r *ApprovalREST) Update(ctx genericapirequest.Context, name string, objInfo rest.UpdatedObjectInfo) (runtime.Object, bool, error) {
 	return r.store.Update(ctx, name, objInfo)
 }

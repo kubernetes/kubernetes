@@ -23,6 +23,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/batch/validation"
 	"k8s.io/kubernetes/pkg/fields"
+	genericapirequest "k8s.io/kubernetes/pkg/genericapiserver/api/request"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/generic"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -45,20 +46,20 @@ func (scheduledJobStrategy) NamespaceScoped() bool {
 }
 
 // PrepareForCreate clears the status of a scheduled job before creation.
-func (scheduledJobStrategy) PrepareForCreate(ctx api.Context, obj runtime.Object) {
+func (scheduledJobStrategy) PrepareForCreate(ctx genericapirequest.Context, obj runtime.Object) {
 	scheduledJob := obj.(*batch.CronJob)
 	scheduledJob.Status = batch.CronJobStatus{}
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
-func (scheduledJobStrategy) PrepareForUpdate(ctx api.Context, obj, old runtime.Object) {
+func (scheduledJobStrategy) PrepareForUpdate(ctx genericapirequest.Context, obj, old runtime.Object) {
 	newCronJob := obj.(*batch.CronJob)
 	oldCronJob := old.(*batch.CronJob)
 	newCronJob.Status = oldCronJob.Status
 }
 
 // Validate validates a new scheduled job.
-func (scheduledJobStrategy) Validate(ctx api.Context, obj runtime.Object) field.ErrorList {
+func (scheduledJobStrategy) Validate(ctx genericapirequest.Context, obj runtime.Object) field.ErrorList {
 	scheduledJob := obj.(*batch.CronJob)
 	return validation.ValidateCronJob(scheduledJob)
 }
@@ -77,7 +78,7 @@ func (scheduledJobStrategy) AllowCreateOnUpdate() bool {
 }
 
 // ValidateUpdate is the default update validation for an end user.
-func (scheduledJobStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) field.ErrorList {
+func (scheduledJobStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
 	return validation.ValidateCronJob(obj.(*batch.CronJob))
 }
 
@@ -87,13 +88,13 @@ type scheduledJobStatusStrategy struct {
 
 var StatusStrategy = scheduledJobStatusStrategy{Strategy}
 
-func (scheduledJobStatusStrategy) PrepareForUpdate(ctx api.Context, obj, old runtime.Object) {
+func (scheduledJobStatusStrategy) PrepareForUpdate(ctx genericapirequest.Context, obj, old runtime.Object) {
 	newJob := obj.(*batch.CronJob)
 	oldJob := old.(*batch.CronJob)
 	newJob.Spec = oldJob.Spec
 }
 
-func (scheduledJobStatusStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) field.ErrorList {
+func (scheduledJobStatusStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
 	return field.ErrorList{}
 }
 

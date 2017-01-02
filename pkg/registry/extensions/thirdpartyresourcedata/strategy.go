@@ -24,6 +24,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/apis/extensions/validation"
 	"k8s.io/kubernetes/pkg/fields"
+	genericapirequest "k8s.io/kubernetes/pkg/genericapiserver/api/request"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 	apistorage "k8s.io/kubernetes/pkg/storage"
@@ -48,10 +49,10 @@ func (strategy) NamespaceScoped() bool {
 	return true
 }
 
-func (strategy) PrepareForCreate(ctx api.Context, obj runtime.Object) {
+func (strategy) PrepareForCreate(ctx genericapirequest.Context, obj runtime.Object) {
 }
 
-func (strategy) Validate(ctx api.Context, obj runtime.Object) field.ErrorList {
+func (strategy) Validate(ctx genericapirequest.Context, obj runtime.Object) field.ErrorList {
 	return validation.ValidateThirdPartyResourceData(obj.(*extensions.ThirdPartyResourceData))
 }
 
@@ -63,10 +64,10 @@ func (strategy) AllowCreateOnUpdate() bool {
 	return false
 }
 
-func (strategy) PrepareForUpdate(ctx api.Context, obj, old runtime.Object) {
+func (strategy) PrepareForUpdate(ctx genericapirequest.Context, obj, old runtime.Object) {
 }
 
-func (strategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) field.ErrorList {
+func (strategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
 	return validation.ValidateThirdPartyResourceDataUpdate(obj.(*extensions.ThirdPartyResourceData), old.(*extensions.ThirdPartyResourceData))
 }
 

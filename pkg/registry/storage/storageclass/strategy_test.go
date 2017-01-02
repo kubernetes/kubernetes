@@ -21,10 +21,11 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/storage"
+	genericapirequest "k8s.io/kubernetes/pkg/genericapiserver/api/request"
 )
 
 func TestStorageClassStrategy(t *testing.T) {
-	ctx := api.NewDefaultContext()
+	ctx := genericapirequest.NewDefaultContext()
 	if Strategy.NamespaceScoped() {
 		t.Errorf("StorageClass must not be namespace scoped")
 	}

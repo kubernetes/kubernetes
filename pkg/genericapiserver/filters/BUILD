@@ -41,7 +41,6 @@ go_test(
     library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
-        "//pkg/api:go_default_library",
         "//pkg/api/errors:go_default_library",
         "//pkg/genericapiserver/api/filters:go_default_library",
         "//pkg/genericapiserver/api/request:go_default_library",

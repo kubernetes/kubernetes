@@ -29,12 +29,13 @@ import (
 	"k8s.io/kubernetes/pkg/auth/authorizer"
 	"k8s.io/kubernetes/pkg/auth/user"
 	"k8s.io/kubernetes/pkg/genericapiserver/api/handlers/responsewriters"
+	"k8s.io/kubernetes/pkg/genericapiserver/api/request"
 	"k8s.io/kubernetes/pkg/httplog"
 	"k8s.io/kubernetes/pkg/serviceaccount"
 )
 
 // WithImpersonation is a filter that will inspect and check requests that attempt to change the user.Info for their requests
-func WithImpersonation(handler http.Handler, requestContextMapper api.RequestContextMapper, a authorizer.Authorizer) http.Handler {
+func WithImpersonation(handler http.Handler, requestContextMapper request.RequestContextMapper, a authorizer.Authorizer) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		impersonationRequests, err := buildImpersonationRequests(req.Header)
 		if err != nil {
@@ -52,7 +53,7 @@ func WithImpersonation(handler http.Handler, requestContextMapper api.RequestCon
 			responsewriters.InternalError(w, req, errors.New("no context found for request"))
 			return
 		}
-		requestor, exists := api.UserFrom(ctx)
+		requestor, exists := request.UserFrom(ctx)
 		if !exists {
 			responsewriters.InternalError(w, req, errors.New("no user found for request"))
 			return
@@ -120,9 +121,9 @@ func WithImpersonation(handler http.Handler, requestContextMapper api.RequestCon
 			Groups: groups,
 			Extra:  userExtra,
 		}
-		requestContextMapper.Update(req, api.WithUser(ctx, newUser))
+		requestContextMapper.Update(req, request.WithUser(ctx, newUser))
 
-		oldUser, _ := api.UserFrom(ctx)
+		oldUser, _ := request.UserFrom(ctx)
 		httplog.LogOf(req, w).Addf("%v is acting as %v", oldUser, newUser)
 
 		// clear all the impersonation headers from the request
