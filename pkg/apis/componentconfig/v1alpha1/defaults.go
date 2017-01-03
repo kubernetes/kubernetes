@@ -351,9 +351,6 @@ func SetDefaults_KubeletConfiguration(obj *KubeletConfiguration) {
 	if obj.SyncFrequency == zeroDuration {
 		obj.SyncFrequency = metav1.Duration{Duration: 1 * time.Minute}
 	}
-	if obj.ReconcileCIDR == nil {
-		obj.ReconcileCIDR = boolVar(true)
-	}
 	if obj.ContentType == "" {
 		obj.ContentType = "application/vnd.kubernetes.protobuf"
 	}
