@@ -40,8 +40,9 @@ const tagOptional = "optional"
 
 // Known values for the tag.
 const (
-	tagValueTrue  = "true"
-	tagValueFalse = "false"
+	tagValueTrue       = "true"
+	tagValueFalse      = "false"
+	tagValueLegacyName = "legacy-name"
 )
 
 func hasOpenAPITagValue(comments []string, value string) bool {
@@ -349,62 +350,89 @@ func hasOpenAPIDefinitionMethod(t *types.Type) bool {
 	return false
 }
 
+// typeLegacyName returns short package name (e.g. the name x appears in package x definition) dot type name.
+// This naming style is not sufficiently unique and is deprecated - existing types may request it by adding
+// a type comment '+k8s:openapi-gen=legacy-name'
+func typeLegacyName(t *types.Type) string {
+	return filepath.Base(t.Name.Package) + "." + t.Name.Name
+}
+
 func (g openAPITypeWriter) generate(t *types.Type) error {
 	// Only generate for struct type and ignore the rest
 	switch t.Kind {
 	case types.Struct:
-		args := argsFromType(t)
 		g.Do("\"$.|openapi$\": ", t)
-		if hasOpenAPIDefinitionMethod(t) {
-			g.Do("$.type|raw${}.OpenAPIDefinition(),", args)
-			return nil
+		if err := g.generateStructInitializer(t, ""); err != nil {
+			return err
 		}
-		g.Do("{\nSchema: spec.Schema{\nSchemaProps: spec.SchemaProps{\n", nil)
-		g.generateDescription(t.CommentLines)
-		g.Do("Properties: map[string]$.SpecSchemaType|raw${\n", args)
-		required := []string{}
-		for _, m := range t.Members {
-			if hasOpenAPITagValue(m.CommentLines, tagValueFalse) {
-				continue
-			}
-			name := getReferableName(&m)
-			if name == "" {
-				continue
-			}
-			if !hasOptionalTag(&m) {
-				required = append(required, name)
-			}
-			if err := g.generateProperty(&m); err != nil {
+		g.Do(",\n", nil)
+
+		// for backwards compatibility, register certain types under their old names
+		if hasOpenAPITagValue(t.CommentLines, tagValueLegacyName) {
+			g.Do("\"$.$\": ", typeLegacyName(t))
+			if err := g.generateStructInitializer(t, g.context.Namers["openapi"].Name(t)); err != nil {
 				return err
 			}
+			g.Do(",\n", nil)
 		}
-		g.Do("},\n", nil)
-		if len(required) > 0 {
-			g.Do("Required: []string{\"$.$\"},\n", strings.Join(required, "\",\""))
-		}
-		g.Do("},\n", nil)
-		g.Do("VendorExtensible: spec.VendorExtensible{\nExtensions: spec.Extensions{\n", nil)
-		g.Do("\"io.k8s.kubernetes.openapi.type.golang\": \"$.$\",\n", t.Name)
-		g.Do("},\n},\n", nil)
-		g.Do("},\n", nil)
-		g.Do("Dependencies: []string{\n", args)
-		// Map order is undefined, sort them or we may get a different file generated each time.
-		keys := []string{}
-		for k := range g.refTypes {
-			keys = append(keys, k)
-		}
-		sort.Strings(keys)
-		for _, k := range keys {
-			v := g.refTypes[k]
-			if t, _ := common.GetOpenAPITypeFormat(v.String()); t != "" {
-				// This is a known type, we do not need a reference to it
-				// Will eliminate special case of time.Time
-				continue
-			}
-			g.Do("\"$.$\",", k)
-		}
-		g.Do("},\n},\n", nil)
 	}
+	return nil
+}
+
+func (g openAPITypeWriter) generateStructInitializer(t *types.Type, deprecatedBy string) error {
+	args := argsFromType(t)
+	if hasOpenAPIDefinitionMethod(t) {
+		g.Do("$.type|raw${}.OpenAPIDefinition()", args)
+		return nil
+	}
+	g.Do("{\nSchema: spec.Schema{\nSchemaProps: spec.SchemaProps{\n", nil)
+	g.generateDescription(t.CommentLines)
+	g.Do("Properties: map[string]$.SpecSchemaType|raw${\n", args)
+	required := []string{}
+	for _, m := range t.Members {
+		if hasOpenAPITagValue(m.CommentLines, tagValueFalse) {
+			continue
+		}
+		name := getReferableName(&m)
+		if name == "" {
+			continue
+		}
+		if !hasOptionalTag(&m) {
+			required = append(required, name)
+		}
+		if err := g.generateProperty(&m); err != nil {
+			return err
+		}
+	}
+	g.Do("},\n", nil)
+	if len(required) > 0 {
+		g.Do("Required: []string{\"$.$\"},\n", strings.Join(required, "\",\""))
+	}
+	g.Do("},\n", nil)
+	g.Do("VendorExtensible: spec.VendorExtensible{\nExtensions: spec.Extensions{\n", nil)
+	g.Do("\"io.k8s.kubernetes.openapi.type.golang\": \"$.$\",\n", t.Name)
+	if len(deprecatedBy) > 0 {
+		g.Do("\"io.k8s.kubernetes.openapi.type.deprecated.use\": \"$.$\",\n", deprecatedBy)
+	}
+	g.Do("},\n},\n", nil)
+	g.Do("},\n", nil)
+	g.Do("Dependencies: []string{\n", args)
+	// Map order is undefined, sort them or we may get a different file generated each time.
+	keys := []string{}
+	for k := range g.refTypes {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	for _, k := range keys {
+		v := g.refTypes[k]
+		if t, _ := common.GetOpenAPITypeFormat(v.String()); t != "" {
+			// This is a known type, we do not need a reference to it
+			// Will eliminate special case of time.Time
+			continue
+		}
+		g.Do("\"$.$\",", k)
+	}
+	g.Do("},\n}", nil)
 	return nil
 }
 
