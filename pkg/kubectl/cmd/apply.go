@@ -224,39 +224,6 @@ func RunApply(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer, opti
 			return cmdutil.AddSourceToErr(fmt.Sprintf("retrieving modified configuration from:\n%v\nfor:", info), info.Source, err)
 		}
 
-		if err := info.Get(); err != nil {
-			if !errors.IsNotFound(err) {
-				return cmdutil.AddSourceToErr(fmt.Sprintf("retrieving current configuration of:\n%v\nfrom server for:", info), info.Source, err)
-			}
-			// Create the resource if it doesn't exist
-			// First, update the annotation used by kubectl apply
-			if err := kubectl.CreateApplyAnnotation(info, encoder); err != nil {
-				return cmdutil.AddSourceToErr("creating", info.Source, err)
-			}
-
-			if cmdutil.ShouldRecord(cmd, info) {
-				if err := cmdutil.RecordChangeCause(info.Object, f.Command()); err != nil {
-					return cmdutil.AddSourceToErr("creating", info.Source, err)
-				}
-			}
-
-			if !dryRun {
-				// Then create the resource and skip the three-way merge
-				if err := createAndRefresh(info); err != nil {
-					return cmdutil.AddSourceToErr("creating", info.Source, err)
-				}
-				if uid, err := info.Mapping.UID(info.Object); err != nil {
-					return err
-				} else {
-					visitedUids.Insert(string(uid))
-				}
-			}
-
-			count++
-			cmdutil.PrintSuccess(mapper, shortOutput, out, info.Mapping.Resource, info.Name, dryRun, "created")
-			return nil
-		}
-
 		if !dryRun {
 			annotationMap, err := info.Mapping.MetadataAccessor.Annotations(info.Object)
 			if err != nil {
@@ -281,7 +248,12 @@ func RunApply(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer, opti
 				gracePeriod:   options.GracePeriod,
 			}
 
-			patchBytes, err := patcher.patch(info.Object, modified, info.Source, info.Namespace, info.Name)
+			originalObj, ok := info.VersionedObject.(runtime.Object)
+			if !ok {
+				return fmt.Errorf("unable to cast %T to runtime.Object", info.VersionedObject)
+			}
+
+			patchBytes, err := patcher.patch(originalObj, modified, info.Source, info.Namespace, info.Name)
 			if err != nil {
 				return cmdutil.AddSourceToErr(fmt.Sprintf("applying patch:\n%s\nto:\n%v\nfor:", patchBytes, info), info.Source, err)
 			}
