@@ -29,7 +29,6 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	proberesults "k8s.io/kubernetes/pkg/kubelet/prober/results"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
-	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/flowcontrol"
 )
 
