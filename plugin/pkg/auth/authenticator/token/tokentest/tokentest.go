@@ -16,7 +16,7 @@ limitations under the License.
 
 package tokentest
 
-import "k8s.io/kubernetes/pkg/auth/user"
+import "k8s.io/genericapiserver/pkg/authentication/user"
 
 type TokenAuthenticator struct {
 	Tokens map[string]*user.DefaultInfo

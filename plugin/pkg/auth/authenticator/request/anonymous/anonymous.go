@@ -19,8 +19,8 @@ package anonymous
 import (
 	"net/http"
 
+	"k8s.io/genericapiserver/pkg/authentication/user"
 	"k8s.io/kubernetes/pkg/auth/authenticator"
-	"k8s.io/kubernetes/pkg/auth/user"
 )
 
 const (

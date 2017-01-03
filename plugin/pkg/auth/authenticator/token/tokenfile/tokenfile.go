@@ -24,7 +24,7 @@ import (
 	"strings"
 
 	"github.com/golang/glog"
-	"k8s.io/kubernetes/pkg/auth/user"
+	"k8s.io/genericapiserver/pkg/authentication/user"
 )
 
 type TokenAuthenticator struct {

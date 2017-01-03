@@ -19,7 +19,6 @@ go_library(
         "//pkg/api/v1:go_default_library",
         "//pkg/apis/extensions:go_default_library",
         "//pkg/auth/authorizer:go_default_library",
-        "//pkg/auth/user:go_default_library",
         "//pkg/client/cache:go_default_library",
         "//pkg/client/clientset_generated/internalclientset:go_default_library",
         "//pkg/runtime:go_default_library",
@@ -31,6 +30,7 @@ go_library(
         "//pkg/util/validation/field:go_default_library",
         "//pkg/watch:go_default_library",
         "//vendor:github.com/golang/glog",
+        "//vendor:k8s.io/genericapiserver/pkg/authentication/user",
     ],
 )
 
@@ -44,7 +44,6 @@ go_test(
         "//pkg/api:go_default_library",
         "//pkg/apis/extensions:go_default_library",
         "//pkg/auth/authorizer:go_default_library",
-        "//pkg/auth/user:go_default_library",
         "//pkg/client/cache:go_default_library",
         "//pkg/client/clientset_generated/internalclientset:go_default_library",
         "//pkg/client/clientset_generated/internalclientset/fake:go_default_library",
@@ -55,5 +54,6 @@ go_test(
         "//pkg/util/diff:go_default_library",
         "//pkg/util/sets:go_default_library",
         "//vendor:github.com/stretchr/testify/assert",
+        "//vendor:k8s.io/genericapiserver/pkg/authentication/user",
     ],
 )
