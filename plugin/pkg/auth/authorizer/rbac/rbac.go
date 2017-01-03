@@ -22,6 +22,7 @@ import (
 	"github.com/golang/glog"
 
 	"k8s.io/kubernetes/pkg/apis/rbac"
+	rbacadapters "k8s.io/kubernetes/pkg/apis/rbac/adapters"
 	"k8s.io/kubernetes/pkg/apis/rbac/validation"
 	"k8s.io/kubernetes/pkg/auth/authorizer"
 	"k8s.io/kubernetes/pkg/auth/user"
@@ -32,7 +33,7 @@ type RequestToRuleMapper interface {
 	// Any rule returned is still valid, since rules are deny by default.  If you can pass with the rules
 	// supplied, you do not have to fail the request.  If you cannot, you should indicate the error along
 	// with your denial.
-	RulesFor(subject user.Info, namespace string) ([]rbac.PolicyRule, error)
+	RulesFor(subject user.Info, namespace string) ([]rbacadapters.PolicyRule, error)
 }
 
 type RBACAuthorizer struct {
@@ -60,7 +61,7 @@ func New(roles validation.RoleGetter, roleBindings validation.RoleBindingLister,
 	return authorizer
 }
 
-func RulesAllow(requestAttributes authorizer.Attributes, rules ...rbac.PolicyRule) bool {
+func RulesAllow(requestAttributes authorizer.Attributes, rules ...rbacadapters.PolicyRule) bool {
 	for _, rule := range rules {
 		if RuleAllows(requestAttributes, rule) {
 			return true
@@ -70,19 +71,19 @@ func RulesAllow(requestAttributes authorizer.Attributes, rules ...rbac.PolicyRul
 	return false
 }
 
-func RuleAllows(requestAttributes authorizer.Attributes, rule rbac.PolicyRule) bool {
+func RuleAllows(requestAttributes authorizer.Attributes, rule rbacadapters.PolicyRule) bool {
 	if requestAttributes.IsResourceRequest() {
 		resource := requestAttributes.GetResource()
 		if len(requestAttributes.GetSubresource()) > 0 {
 			resource = requestAttributes.GetResource() + "/" + requestAttributes.GetSubresource()
 		}
 
-		return rbac.VerbMatches(rule, requestAttributes.GetVerb()) &&
-			rbac.APIGroupMatches(rule, requestAttributes.GetAPIGroup()) &&
-			rbac.ResourceMatches(rule, resource) &&
-			rbac.ResourceNameMatches(rule, requestAttributes.GetName())
+		return rbacadapters.VerbMatches(rule, requestAttributes.GetVerb()) &&
+			rbacadapters.APIGroupMatches(rule, requestAttributes.GetAPIGroup()) &&
+			rbacadapters.ResourceMatches(rule, resource) &&
+			rbacadapters.ResourceNameMatches(rule, requestAttributes.GetName())
 	}
 
-	return rbac.VerbMatches(rule, requestAttributes.GetVerb()) &&
-		rbac.NonResourceURLMatches(rule, requestAttributes.GetPath())
+	return rbacadapters.VerbMatches(rule, requestAttributes.GetVerb()) &&
+		rbacadapters.NonResourceURLMatches(rule, requestAttributes.GetPath())
 }

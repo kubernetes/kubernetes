@@ -19,6 +19,7 @@ package rbac
 
 import (
 	"k8s.io/kubernetes/pkg/apis/rbac"
+	rbacadapters "k8s.io/kubernetes/pkg/apis/rbac/adapters"
 	"k8s.io/kubernetes/pkg/apis/rbac/validation"
 	"k8s.io/kubernetes/pkg/auth/authorizer"
 	"k8s.io/kubernetes/pkg/auth/user"
@@ -28,7 +29,7 @@ import (
 type RoleToRuleMapper interface {
 	// GetRoleReferenceRules attempts to resolve the role reference of a RoleBinding or ClusterRoleBinding.  The passed namespace should be the namespace
 	// of the role binding, the empty string if a cluster role binding.
-	GetRoleReferenceRules(roleRef rbac.RoleRef, namespace string) ([]rbac.PolicyRule, error)
+	GetRoleReferenceRules(roleRef rbac.RoleRef, namespace string) (rbacadapters.PolicyRules, error)
 }
 
 type SubjectAccessEvaluator struct {
@@ -53,10 +54,10 @@ func NewSubjectAccessEvaluator(roles validation.RoleGetter, roleBindings validat
 
 // AllowedSubjects returns the subjects that can perform an action and any errors encountered while computing the list.
 // It is possible to have both subjects and errors returned if some rolebindings couldn't be resolved, but others could be.
-func (r *SubjectAccessEvaluator) AllowedSubjects(requestAttributes authorizer.Attributes) ([]rbac.Subject, error) {
-	subjects := []rbac.Subject{{Kind: rbac.GroupKind, Name: user.SystemPrivilegedGroup}}
+func (r *SubjectAccessEvaluator) AllowedSubjects(requestAttributes authorizer.Attributes) ([]rbacadapters.Subject, error) {
+	subjects := []rbacadapters.Subject{rbacadapters.ToSubject(&rbac.Subject{Kind: rbac.GroupKind, Name: user.SystemPrivilegedGroup})}
 	if len(r.superUser) > 0 {
-		subjects = append(subjects, rbac.Subject{Kind: rbac.UserKind, APIVersion: "v1alpha1", Name: r.superUser})
+		subjects = append(subjects, rbacadapters.ToSubject(&rbac.Subject{Kind: rbac.UserKind, APIVersion: "v1alpha1", Name: r.superUser}))
 	}
 	errorlist := []error{}
 
