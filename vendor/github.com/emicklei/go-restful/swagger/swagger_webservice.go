@@ -226,6 +226,9 @@ func (sws SwaggerService) composeDeclaration(ws *restful.WebService, pathPrefix 
 	pathToRoutes := newOrderedRouteMap()
 	for _, other := range ws.Routes() {
 		if strings.HasPrefix(other.Path, pathPrefix) {
+			if len(pathPrefix) > 1 && len(other.Path) > len(pathPrefix) && other.Path[len(pathPrefix)] != '/' {
+				continue
+			}
 			pathToRoutes.Add(other.Path, other)
 		}
 	}

@@ -1,7 +1,12 @@
 go-restful
 ==========
 
+[![Build Status](https://drone.io/github.com/emicklei/go-restful/status.png)](https://drone.io/github.com/emicklei/go-restful/latest)
+
 package for building REST-style Web Services using Google Go
+
+- [Documentation on godoc.org](http://godoc.org/github.com/emicklei/go-restful)
+- [Code examples](https://github.com/emicklei/go-restful/tree/master/examples)
 
 REST asks developers to use HTTP methods explicitly and in a way that's consistent with the protocol definition. This basic REST design principle establishes a one-to-one mapping between create, read, update, and delete (CRUD) operations and HTTP methods. According to this mapping:
 
@@ -40,8 +45,8 @@ func (u UserResource) findUser(request *restful.Request, response *restful.Respo
 
 - Routes for request &#8594; function mapping with path parameter (e.g. {id}) support
 - Configurable router:
-	- Routing algorithm after [JSR311](http://jsr311.java.net/nonav/releases/1.1/spec/spec.html) that is implemented using (but does **not** accept) regular expressions (See RouterJSR311 which is used by default)
-	- Fast routing algorithm that allows static elements, regular expressions and dynamic parameters in the URL path (e.g. /meetings/{id} or /static/{subpath:*}, See CurlyRouter)
+	- (default) Fast routing algorithm that allows static elements, regular expressions and dynamic parameters in the URL path (e.g. /meetings/{id} or /static/{subpath:*}
+	- Routing algorithm after [JSR311](http://jsr311.java.net/nonav/releases/1.1/spec/spec.html) that is implemented using (but does **not** accept) regular expressions
 - Request API for reading structs from JSON/XML and accesing parameters (path,query,header)
 - Response API for writing structs to JSON/XML and setting headers
 - Filters for intercepting the request &#8594; response flow on Service or Route level
@@ -59,16 +64,11 @@ func (u UserResource) findUser(request *restful.Request, response *restful.Respo
 	
 ### Resources
 
-- [Documentation on godoc.org](http://godoc.org/github.com/emicklei/go-restful)
-- [Code examples](https://github.com/emicklei/go-restful/tree/master/examples)
 - [Example posted on blog](http://ernestmicklei.com/2012/11/go-restful-first-working-example/)
 - [Design explained on blog](http://ernestmicklei.com/2012/11/go-restful-api-design/)
 - [sourcegraph](https://sourcegraph.com/github.com/emicklei/go-restful)
-- [gopkg.in](https://gopkg.in/emicklei/go-restful.v1)
 - [showcase: Mora - MongoDB REST Api server](https://github.com/emicklei/mora)
 
-[![Build Status](https://drone.io/github.com/emicklei/go-restful/status.png)](https://drone.io/github.com/emicklei/go-restful/latest)
-
-(c) 2012 - 2015, http://ernestmicklei.com. MIT License
+(c) 2012 - 2016, http://ernestmicklei.com. MIT License
 
 Type ```git shortlog -s``` for a full list of contributors.
