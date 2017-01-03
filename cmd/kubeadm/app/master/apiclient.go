@@ -60,8 +60,8 @@ func CreateClientFromFile(path string) (*clientset.Clientset, error) {
 	return createAPIClient(adminKubeconfig)
 }
 
-func CreateClientAndWaitForAPI(adminConfig *clientcmdapi.Config) (*clientset.Clientset, error) {
-	client, err := createAPIClient(adminConfig)
+func CreateClientAndWaitForAPI(file string) (*clientset.Clientset, error) {
+	client, err := CreateClientFromFile(file)
 	if err != nil {
 		return nil, err
 	}

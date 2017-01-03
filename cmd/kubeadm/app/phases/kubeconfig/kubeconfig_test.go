@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package util
+package kubeconfig
 
 import (
 	"bytes"
@@ -25,7 +25,6 @@ import (
 	"testing"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
 )
 
 const (
@@ -33,65 +32,54 @@ const (
 clusters:
 - cluster:
     server: ""
-  name: ""
-contexts: []
-current-context: ""
+  name: k8s
+contexts:
+- context:
+    cluster: k8s
+    user: user1
+  name: user1@k8s
+current-context: user1@k8s
 kind: Config
 preferences: {}
-users: []
+users:
+- name: user1
+  user:
+    token: abc
 `
 	configOut2 = `apiVersion: v1
 clusters:
 - cluster:
-    server: ""
+    server: localhost:8080
   name: kubernetes
-contexts: []
-current-context: ""
+contexts:
+- context:
+    cluster: kubernetes
+    user: user2
+  name: user2@kubernetes
+current-context: user2@kubernetes
 kind: Config
 preferences: {}
-users: []
+users:
+- name: user2
+  user:
+    token: cba
 `
 )
 
 type configClient struct {
-	c  string
-	s  string
-	ca []byte
+	clusterName string
+	userName    string
+	serverURL   string
+	caCert      []byte
 }
 
 type configClientWithCerts struct {
-	c           *clientcmdapi.Config
-	clusterName string
-	userName    string
-	clientKey   []byte
-	clientCert  []byte
+	clientKey  []byte
+	clientCert []byte
 }
 
 type configClientWithToken struct {
-	c           *clientcmdapi.Config
-	clusterName string
-	userName    string
-	token       string
-}
-
-func TestCreateBasicClientConfig(t *testing.T) {
-	var createBasicTest = []struct {
-		cc       configClient
-		expected string
-	}{
-		{configClient{}, ""},
-		{configClient{c: "kubernetes"}, ""},
-	}
-	for _, rt := range createBasicTest {
-		c := CreateBasicClientConfig(rt.cc.c, rt.cc.s, rt.cc.ca)
-		if c.Kind != rt.expected {
-			t.Errorf(
-				"failed CreateBasicClientConfig:\n\texpected: %s\n\t  actual: %s",
-				c.Kind,
-				rt.expected,
-			)
-		}
-	}
+	token string
 }
 
 func TestMakeClientConfigWithCerts(t *testing.T) {
@@ -101,23 +89,22 @@ func TestMakeClientConfigWithCerts(t *testing.T) {
 		expected    string
 	}{
 		{configClient{}, configClientWithCerts{}, ""},
-		{configClient{c: "kubernetes"}, configClientWithCerts{}, ""},
+		{configClient{clusterName: "kubernetes"}, configClientWithCerts{}, ""},
 	}
 	for _, rt := range createBasicTest {
-		c := CreateBasicClientConfig(rt.cc.c, rt.cc.s, rt.cc.ca)
-		rt.ccWithCerts.c = c
 		cwc := MakeClientConfigWithCerts(
-			rt.ccWithCerts.c,
-			rt.ccWithCerts.clusterName,
-			rt.ccWithCerts.userName,
+			rt.cc.serverURL,
+			rt.cc.clusterName,
+			rt.cc.userName,
+			rt.cc.caCert,
 			rt.ccWithCerts.clientKey,
 			rt.ccWithCerts.clientCert,
 		)
 		if cwc.Kind != rt.expected {
 			t.Errorf(
 				"failed MakeClientConfigWithCerts:\n\texpected: %s\n\t  actual: %s",
-				c.Kind,
 				rt.expected,
+				cwc.Kind,
 			)
 		}
 	}
@@ -130,28 +117,27 @@ func TestMakeClientConfigWithToken(t *testing.T) {
 		expected    string
 	}{
 		{configClient{}, configClientWithToken{}, ""},
-		{configClient{c: "kubernetes"}, configClientWithToken{}, ""},
+		{configClient{clusterName: "kubernetes"}, configClientWithToken{}, ""},
 	}
 	for _, rt := range createBasicTest {
-		c := CreateBasicClientConfig(rt.cc.c, rt.cc.s, rt.cc.ca)
-		rt.ccWithToken.c = c
 		cwc := MakeClientConfigWithToken(
-			rt.ccWithToken.c,
-			rt.ccWithToken.clusterName,
-			rt.ccWithToken.userName,
+			rt.cc.serverURL,
+			rt.cc.clusterName,
+			rt.cc.userName,
+			rt.cc.caCert,
 			rt.ccWithToken.token,
 		)
 		if cwc.Kind != rt.expected {
 			t.Errorf(
 				"failed MakeClientConfigWithCerts:\n\texpected: %s\n\t  actual: %s",
-				c.Kind,
 				rt.expected,
+				cwc.Kind,
 			)
 		}
 	}
 }
 
-func TestWriteKubeconfigIfNotExists(t *testing.T) {
+func TestWriteKubeconfigToDisk(t *testing.T) {
 	tmpdir, err := ioutil.TempDir("", "")
 	if err != nil {
 		t.Fatalf("Couldn't create tmpdir")
@@ -162,37 +148,41 @@ func TestWriteKubeconfigIfNotExists(t *testing.T) {
 	oldEnv := kubeadmapi.GlobalEnvParams
 	kubeadmapi.GlobalEnvParams = kubeadmapi.SetEnvParams()
 	kubeadmapi.GlobalEnvParams.KubernetesDir = fmt.Sprintf("%s/etc/kubernetes", tmpdir)
-	kubeadmapi.GlobalEnvParams.HostPKIPath = fmt.Sprintf("%s/etc/kubernetes/pki", tmpdir)
-	kubeadmapi.GlobalEnvParams.HostEtcdPath = fmt.Sprintf("%s/var/lib/etcd", tmpdir)
-	kubeadmapi.GlobalEnvParams.DiscoveryImage = fmt.Sprintf("%s/var/lib/etcd", tmpdir)
 	defer func() { kubeadmapi.GlobalEnvParams = oldEnv }()
 
 	var writeConfig = []struct {
-		name     string
-		cc       configClient
-		expected error
-		file     []byte
+		name        string
+		cc          configClient
+		ccWithToken configClientWithToken
+		expected    error
+		file        []byte
 	}{
-		{"test1", configClient{}, nil, []byte(configOut1)},
-		{"test2", configClient{c: "kubernetes"}, nil, []byte(configOut2)},
+		{"test1", configClient{clusterName: "k8s", userName: "user1"}, configClientWithToken{token: "abc"}, nil, []byte(configOut1)},
+		{"test2", configClient{clusterName: "kubernetes", userName: "user2", serverURL: "localhost:8080"}, configClientWithToken{token: "cba"}, nil, []byte(configOut2)},
 	}
 	for _, rt := range writeConfig {
-		c := CreateBasicClientConfig(rt.cc.c, rt.cc.s, rt.cc.ca)
-		err := WriteKubeconfigIfNotExists(rt.name, c)
+		c := MakeClientConfigWithToken(
+			rt.cc.serverURL,
+			rt.cc.clusterName,
+			rt.cc.userName,
+			rt.cc.caCert,
+			rt.ccWithToken.token,
+		)
+		configPath := filepath.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, fmt.Sprintf("%s.conf", rt.name))
+		err := WriteKubeconfigToDisk(configPath, c)
 		if err != rt.expected {
 			t.Errorf(
-				"failed WriteKubeconfigIfNotExists with an error:\n\texpected: %s\n\t  actual: %s",
-				err,
+				"failed WriteKubeconfigToDisk with an error:\n\texpected: %s\n\t  actual: %s",
 				rt.expected,
+				err,
 			)
 		}
-		configPath := filepath.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, fmt.Sprintf("%s.conf", rt.name))
 		newFile, err := ioutil.ReadFile(configPath)
 		if !bytes.Equal(newFile, rt.file) {
 			t.Errorf(
-				"failed WriteKubeconfigIfNotExists config write:\n\texpected: %s\n\t  actual: %s",
-				newFile,
+				"failed WriteKubeconfigToDisk config write:\n\texpected: %s\n\t  actual: %s",
 				rt.file,
+				newFile,
 			)
 		}
 	}

@@ -36,7 +36,7 @@ import (
 	"strings"
 	"time"
 
-	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
+	kubeadmkubeconfigphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubeconfig"
 	"k8s.io/kubernetes/federation/pkg/kubefed/util"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
@@ -360,16 +360,11 @@ func createAPIServerCredentialsSecret(clientset *client.Clientset, namespace, cr
 }
 
 func createControllerManagerKubeconfigSecret(clientset *client.Clientset, namespace, name, svcName, kubeconfigName string, entKeyPairs *entityKeyPairs, dryRun bool) (*api.Secret, error) {
-	basicClientConfig := kubeadmutil.CreateBasicClientConfig(
-		name,
+	config := kubeadmkubeconfigphase.MakeClientConfigWithCerts(
 		fmt.Sprintf("https://%s", svcName),
-		certutil.EncodeCertPEM(entKeyPairs.ca.Cert),
-	)
-
-	config := kubeadmutil.MakeClientConfigWithCerts(
-		basicClientConfig,
 		name,
 		"federation-controller-manager",
+		certutil.EncodeCertPEM(entKeyPairs.ca.Cert),
 		certutil.EncodePrivateKeyPEM(entKeyPairs.controllerManager.Key),
 		certutil.EncodeCertPEM(entKeyPairs.controllerManager.Cert),
 	)
