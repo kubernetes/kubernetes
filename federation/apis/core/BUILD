@@ -25,3 +25,20 @@ go_library(
         "//pkg/runtime/serializer:go_default_library",
     ],
 )
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [
+        ":package-srcs",
+        "//federation/apis/core/install:all-srcs",
+        "//federation/apis/core/v1:all-srcs",
+    ],
+    tags = ["automanaged"],
+)

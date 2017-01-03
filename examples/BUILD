@@ -56,3 +56,24 @@ go_test(
         "//vendor:github.com/golang/glog",
     ],
 )
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [
+        ":package-srcs",
+        "//examples/apiserver:all-srcs",
+        "//examples/explorer:all-srcs",
+        "//examples/guestbook-go:all-srcs",
+        "//examples/https-nginx:all-srcs",
+        "//examples/k8petstore/web-server/src:all-srcs",
+        "//examples/sharing-clusters:all-srcs",
+    ],
+    tags = ["automanaged"],
+)

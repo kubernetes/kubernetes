@@ -58,3 +58,20 @@ go_test(
         "//vendor:github.com/ugorji/go/codec",
     ],
 )
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [
+        ":package-srcs",
+        "//pkg/apis/meta/v1/unstructured:all-srcs",
+        "//pkg/apis/meta/v1/validation:all-srcs",
+    ],
+    tags = ["automanaged"],
+)

@@ -13,3 +13,20 @@ go_library(
     tags = ["automanaged"],
     deps = ["//vendor:k8s.io/apiserver/pkg/authentication/user"],
 )
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [
+        ":package-srcs",
+        "//pkg/auth/authorizer/abac:all-srcs",
+        "//pkg/auth/authorizer/union:all-srcs",
+    ],
+    tags = ["automanaged"],
+)

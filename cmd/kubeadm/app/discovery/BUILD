@@ -35,3 +35,21 @@ go_test(
         "//vendor:github.com/davecgh/go-spew/spew",
     ],
 )
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [
+        ":package-srcs",
+        "//cmd/kubeadm/app/discovery/file:all-srcs",
+        "//cmd/kubeadm/app/discovery/https:all-srcs",
+        "//cmd/kubeadm/app/discovery/token:all-srcs",
+    ],
+    tags = ["automanaged"],
+)

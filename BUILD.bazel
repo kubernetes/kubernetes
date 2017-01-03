@@ -13,3 +13,31 @@ gcs_upload(
         "//build/debs",
     ],
 )
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"], exclude=["bazel-*/**", ".git/**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [
+        ":package-srcs",
+        "//api:all-srcs",
+        "//build:all-srcs",
+        "//cluster:all-srcs",
+        "//cmd:all-srcs",
+        "//docs:all-srcs",
+        "//examples:all-srcs",
+        "//federation:all-srcs",
+        "//hack:all-srcs",
+        "//pkg:all-srcs",
+        "//plugin:all-srcs",
+        "//test:all-srcs",
+        "//third_party:all-srcs",
+        "//vendor:all-srcs",
+    ],
+    tags = ["automanaged"],
+)

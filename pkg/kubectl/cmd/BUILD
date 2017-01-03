@@ -209,3 +209,24 @@ go_test(
         "//vendor:k8s.io/heapster/metrics/apis/metrics/v1alpha1",
     ],
 )
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [
+        ":package-srcs",
+        "//pkg/kubectl/cmd/config:all-srcs",
+        "//pkg/kubectl/cmd/rollout:all-srcs",
+        "//pkg/kubectl/cmd/set:all-srcs",
+        "//pkg/kubectl/cmd/templates:all-srcs",
+        "//pkg/kubectl/cmd/testing:all-srcs",
+        "//pkg/kubectl/cmd/util:all-srcs",
+    ],
+    tags = ["automanaged"],
+)

@@ -28,3 +28,19 @@ go_test(
     tags = ["automanaged"],
     deps = ["//vendor:k8s.io/client-go/pkg/util/sets"],
 )
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [
+        ":package-srcs",
+        "//pkg/registry/core/service/allocator/etcd:all-srcs",
+    ],
+    tags = ["automanaged"],
+)

@@ -133,3 +133,20 @@ go_test(
         "//vendor:github.com/stretchr/testify/assert",
     ],
 )
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [
+        ":package-srcs",
+        "//pkg/master/ports:all-srcs",
+        "//pkg/master/thirdparty:all-srcs",
+    ],
+    tags = ["automanaged"],
+)

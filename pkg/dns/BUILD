@@ -56,3 +56,22 @@ go_test(
         "//vendor:k8s.io/client-go/tools/cache",
     ],
 )
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [
+        ":package-srcs",
+        "//pkg/dns/config:all-srcs",
+        "//pkg/dns/federation:all-srcs",
+        "//pkg/dns/treecache:all-srcs",
+        "//pkg/dns/util:all-srcs",
+    ],
+    tags = ["automanaged"],
+)
