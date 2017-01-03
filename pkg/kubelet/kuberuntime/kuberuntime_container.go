@@ -31,6 +31,7 @@ import (
 	"github.com/golang/glog"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubetypes "k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/api/v1"
@@ -40,10 +41,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/qos"
 	"k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
-	kubetypes "k8s.io/kubernetes/pkg/types"
-	"k8s.io/kubernetes/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/util/flowcontrol"
-	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/selinux"
 )
 
@@ -785,13 +783,13 @@ func (m *kubeGenericRuntimeManager) runContainer(sandboxID, sandboxIP string, sa
 	}
 
 	// Step 2: pull the image.
-	err, msg = m.imagePuller.EnsureImageExists(pod, container, pullSecrets)
+	imgRef, msg, err := m.imagePuller.EnsureImageExists(pod, container, pullSecrets)
 	if err != nil {
 		return err, msg
 	}
 
 	// Step 3: create the container.
-	containerConfig, err := m.generateContainerConfig(container, pod, attempt, sandboxIP)
+	containerConfig, err := m.generateContainerConfig(container, pod, attempt, sandboxIP, imgRef)
 	if err != nil {
 		m.recorder.Eventf(ref, v1.EventTypeWarning, events.FailedToCreateContainer, "Failed to create container with error: %v", err)
 		return kubecontainer.ErrRunContainer, fmt.Sprintf("Generate Container Config Failed, %v", err)
