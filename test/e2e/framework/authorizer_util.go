@@ -17,11 +17,15 @@ limitations under the License.
 package framework
 
 import (
+	"fmt"
 	"time"
 
 	apierrors "k8s.io/kubernetes/pkg/api/errors"
+	legacyv1 "k8s.io/kubernetes/pkg/api/v1"
 	authorizationv1beta1 "k8s.io/kubernetes/pkg/apis/authorization/v1beta1"
+	rbacv1alpha1 "k8s.io/kubernetes/pkg/apis/rbac/v1alpha1"
 	v1beta1authorization "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/authorization/v1beta1"
+	v1alpha1rbac "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/rbac/v1alpha1"
 	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/util/wait"
 )
@@ -50,6 +54,7 @@ func WaitForAuthorizationUpdate(c v1beta1authorization.SubjectAccessReviewsGette
 		// GKE doesn't enable the SAR endpoint.  Without this endpoint, we cannot determine if the policy engine
 		// has adjusted as expected.  In this case, simply wait one second and hope it's up to date
 		if apierrors.IsNotFound(err) {
+			fmt.Printf("SubjectAccessReview endpoint is missing\n")
 			time.Sleep(1 * time.Second)
 			return true, nil
 		}
@@ -62,4 +67,46 @@ func WaitForAuthorizationUpdate(c v1beta1authorization.SubjectAccessReviewsGette
 		return true, nil
 	})
 	return err
+}
+
+// BindClusterRole binds the cluster role at the cluster scope
+func BindClusterRole(c v1alpha1rbac.ClusterRoleBindingsGetter, clusterRole, ns string, subjects ...rbacv1alpha1.Subject) {
+	// Since the namespace names are unique, we can leave this lying around so we don't have to race any caches
+	_, err := c.ClusterRoleBindings().Create(&rbacv1alpha1.ClusterRoleBinding{
+		ObjectMeta: legacyv1.ObjectMeta{
+			Name: ns + "--" + clusterRole,
+		},
+		RoleRef: rbacv1alpha1.RoleRef{
+			APIGroup: "rbac.authorization.k8s.io",
+			Kind:     "ClusterRole",
+			Name:     clusterRole,
+		},
+		Subjects: subjects,
+	})
+
+	// if we failed, don't fail the entire test because it may still work. RBAC may simply be disabled.
+	if err != nil {
+		fmt.Printf("Error binding clusterrole/%s for %q for %v\n", clusterRole, ns, subjects)
+	}
+}
+
+// BindClusterRoleInNamespace binds the cluster role at the namespace scope
+func BindClusterRoleInNamespace(c v1alpha1rbac.RoleBindingsGetter, clusterRole, ns string, subjects ...rbacv1alpha1.Subject) {
+	// Since the namespace names are unique, we can leave this lying around so we don't have to race any caches
+	_, err := c.RoleBindings(ns).Create(&rbacv1alpha1.RoleBinding{
+		ObjectMeta: legacyv1.ObjectMeta{
+			Name: ns + "--" + clusterRole,
+		},
+		RoleRef: rbacv1alpha1.RoleRef{
+			APIGroup: "rbac.authorization.k8s.io",
+			Kind:     "ClusterRole",
+			Name:     clusterRole,
+		},
+		Subjects: subjects,
+	})
+
+	// if we failed, don't fail the entire test because it may still work. RBAC may simply be disabled.
+	if err != nil {
+		fmt.Printf("Error binding clusterrole/%s into %q for %v\n", clusterRole, ns, subjects)
+	}
 }
