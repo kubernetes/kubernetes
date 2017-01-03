@@ -22,6 +22,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/apis/rbac"
 	"k8s.io/kubernetes/pkg/apis/rbac/validation"
+	"k8s.io/kubernetes/pkg/auth/authorizer"
 	genericapirequest "k8s.io/kubernetes/pkg/genericapiserver/api/request"
 	rbacregistry "k8s.io/kubernetes/pkg/registry/rbac"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -32,11 +33,13 @@ var groupResource = rbac.Resource("clusterrolebindings")
 type Storage struct {
 	rest.StandardStorage
 
+	authorizer authorizer.Authorizer
+
 	ruleResolver validation.AuthorizationRuleResolver
 }
 
-func NewStorage(s rest.StandardStorage, ruleResolver validation.AuthorizationRuleResolver) *Storage {
-	return &Storage{s, ruleResolver}
+func NewStorage(s rest.StandardStorage, authorizer authorizer.Authorizer, ruleResolver validation.AuthorizationRuleResolver) *Storage {
+	return &Storage{s, authorizer, ruleResolver}
 }
 
 func (s *Storage) Create(ctx genericapirequest.Context, obj runtime.Object) (runtime.Object, error) {
@@ -63,6 +66,12 @@ func (s *Storage) Update(ctx genericapirequest.Context, name string, obj rest.Up
 	nonEscalatingInfo := rest.WrapUpdatedObjectInfo(obj, func(ctx genericapirequest.Context, obj runtime.Object, oldObj runtime.Object) (runtime.Object, error) {
 		clusterRoleBinding := obj.(*rbac.ClusterRoleBinding)
 
+		// if we're explicitly authorized to bind this clusterrole, return
+		if canBind, _, _ := rbacregistry.AuthorizeBinding(ctx, clusterRoleBinding.RoleRef, clusterRoleBinding.Namespace, s.authorizer); canBind {
+			return obj, nil
+		}
+
+		// Otherwise, see if we already have all the permissions contained in the referenced clusterrole
 		rules, err := s.ruleResolver.GetRoleReferenceRules(clusterRoleBinding.RoleRef, clusterRoleBinding.Namespace)
 		if err != nil {
 			return nil, err

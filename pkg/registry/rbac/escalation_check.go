@@ -17,6 +17,9 @@ limitations under the License.
 package rbac
 
 import (
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/apis/rbac"
+	"k8s.io/kubernetes/pkg/auth/authorizer"
 	"k8s.io/kubernetes/pkg/auth/user"
 	genericapirequest "k8s.io/kubernetes/pkg/genericapiserver/api/request"
 )
@@ -38,4 +41,38 @@ func EscalationAllowed(ctx genericapirequest.Context) bool {
 	}
 
 	return false
+}
+
+func AuthorizeBinding(ctx genericapirequest.Context, roleRef rbac.RoleRef, bindingNamespace string, a authorizer.Authorizer) (bool, string, error) {
+	if a == nil {
+		return false, "", nil
+	}
+
+	user, ok := genericapirequest.UserFrom(ctx)
+	if !ok {
+		return false, "", nil
+	}
+
+	attrs := authorizer.AttributesRecord{
+		User:            user,
+		Verb:            "bind",
+		ResourceRequest: true,
+	}
+
+	switch roleRef.Kind {
+	case "ClusterRole":
+		attrs.Namespace = api.NamespaceNone
+		attrs.APIGroup = roleRef.APIGroup
+		attrs.Resource = "clusterroles"
+		attrs.Name = roleRef.Name
+	case "Role":
+		attrs.Namespace = bindingNamespace
+		attrs.APIGroup = roleRef.APIGroup
+		attrs.Resource = "roles"
+		attrs.Name = roleRef.Name
+	default:
+		return false, "", nil
+	}
+
+	return a.Authorize(attrs)
 }

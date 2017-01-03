@@ -22,6 +22,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/apis/rbac"
 	"k8s.io/kubernetes/pkg/apis/rbac/validation"
+	"k8s.io/kubernetes/pkg/auth/authorizer"
 	genericapirequest "k8s.io/kubernetes/pkg/genericapiserver/api/request"
 	rbacregistry "k8s.io/kubernetes/pkg/registry/rbac"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -32,11 +33,13 @@ var groupResource = rbac.Resource("rolebindings")
 type Storage struct {
 	rest.StandardStorage
 
+	authorizer authorizer.Authorizer
+
 	ruleResolver validation.AuthorizationRuleResolver
 }
 
-func NewStorage(s rest.StandardStorage, ruleResolver validation.AuthorizationRuleResolver) *Storage {
-	return &Storage{s, ruleResolver}
+func NewStorage(s rest.StandardStorage, authorizer authorizer.Authorizer, ruleResolver validation.AuthorizationRuleResolver) *Storage {
+	return &Storage{s, authorizer, ruleResolver}
 }
 
 func (s *Storage) Create(ctx genericapirequest.Context, obj runtime.Object) (runtime.Object, error) {
@@ -63,6 +66,12 @@ func (s *Storage) Update(ctx genericapirequest.Context, name string, obj rest.Up
 	nonEscalatingInfo := rest.WrapUpdatedObjectInfo(obj, func(ctx genericapirequest.Context, obj runtime.Object, oldObj runtime.Object) (runtime.Object, error) {
 		roleBinding := obj.(*rbac.RoleBinding)
 
+		// if we're explicitly authorized to bind this role, return
+		if canBind, _, _ := rbacregistry.AuthorizeBinding(ctx, roleBinding.RoleRef, roleBinding.Namespace, s.authorizer); canBind {
+			return obj, nil
+		}
+
+		// Otherwise, see if we already have all the permissions contained in the referenced role
 		rules, err := s.ruleResolver.GetRoleReferenceRules(roleBinding.RoleRef, roleBinding.Namespace)
 		if err != nil {
 			return nil, err
