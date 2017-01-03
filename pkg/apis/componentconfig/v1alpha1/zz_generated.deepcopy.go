@@ -219,6 +219,11 @@ func DeepCopy_v1alpha1_KubeletConfiguration(in interface{}, out interface{}, c *
 			*out = new(bool)
 			**out = **in
 		}
+		if in.ClusterDNS != nil {
+			in, out := &in.ClusterDNS, &out.ClusterDNS
+			*out = make([]string, len(*in))
+			copy(*out, *in)
+		}
 		if in.ImageGCHighThresholdPercent != nil {
 			in, out := &in.ImageGCHighThresholdPercent, &out.ImageGCHighThresholdPercent
 			*out = new(int32)
