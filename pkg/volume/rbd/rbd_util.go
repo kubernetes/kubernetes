@@ -84,6 +84,9 @@ func waitForPath(pool, image string, maxRetries int) (string, bool) {
 		if found {
 			return devicePath, true
 		}
+		if i == maxRetries-1 {
+			break
+		}
 		time.Sleep(time.Second)
 	}
 	return "", false
