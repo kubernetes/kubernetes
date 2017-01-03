@@ -23,3 +23,20 @@ go_library(
         "//vendor:github.com/golang/glog",
     ],
 )
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [
+        ":package-srcs",
+        "//cmd/kubernetes-discovery/pkg/client/clientset_generated/clientset/fake:all-srcs",
+        "//cmd/kubernetes-discovery/pkg/client/clientset_generated/clientset/typed/apiregistration/v1alpha1:all-srcs",
+    ],
+    tags = ["automanaged"],
+)

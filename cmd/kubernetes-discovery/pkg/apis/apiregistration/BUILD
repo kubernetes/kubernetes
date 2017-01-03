@@ -26,3 +26,21 @@ go_library(
         "//pkg/watch/versioned:go_default_library",
     ],
 )
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [
+        ":package-srcs",
+        "//cmd/kubernetes-discovery/pkg/apis/apiregistration/install:all-srcs",
+        "//cmd/kubernetes-discovery/pkg/apis/apiregistration/v1alpha1:all-srcs",
+        "//cmd/kubernetes-discovery/pkg/apis/apiregistration/validation:all-srcs",
+    ],
+    tags = ["automanaged"],
+)

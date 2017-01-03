@@ -22,3 +22,21 @@ go_library(
         "//pkg/runtime/schema:go_default_library",
     ],
 )
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [
+        ":package-srcs",
+        "//plugin/pkg/scheduler/api/latest:all-srcs",
+        "//plugin/pkg/scheduler/api/v1:all-srcs",
+        "//plugin/pkg/scheduler/api/validation:all-srcs",
+    ],
+    tags = ["automanaged"],
+)

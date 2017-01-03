@@ -50,3 +50,23 @@ go_test(
         "//pkg/runtime/schema:go_default_library",
     ],
 )
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [
+        ":package-srcs",
+        "//pkg/client/unversioned/auth:all-srcs",
+        "//pkg/client/unversioned/clientcmd:all-srcs",
+        "//pkg/client/unversioned/portforward:all-srcs",
+        "//pkg/client/unversioned/remotecommand:all-srcs",
+        "//pkg/client/unversioned/testclient/simple:all-srcs",
+    ],
+    tags = ["automanaged"],
+)

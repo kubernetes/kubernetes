@@ -28,3 +28,20 @@ go_test(
         "//pkg/util/sets:go_default_library",
     ],
 )
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [
+        ":package-srcs",
+        "//pkg/registry/core/service/ipallocator/controller:all-srcs",
+        "//pkg/registry/core/service/ipallocator/etcd:all-srcs",
+    ],
+    tags = ["automanaged"],
+)

@@ -17,3 +17,20 @@ go_library(
         "//cmd/kubernetes-discovery/pkg/client/informers/internalinterfaces:go_default_library",
     ],
 )
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [
+        ":package-srcs",
+        "//cmd/kubernetes-discovery/pkg/client/informers/apiregistration/internalversion:all-srcs",
+        "//cmd/kubernetes-discovery/pkg/client/informers/apiregistration/v1alpha1:all-srcs",
+    ],
+    tags = ["automanaged"],
+)

@@ -23,3 +23,20 @@ go_library(
         "//test/images/net/nat:go_default_library",
     ],
 )
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [
+        ":package-srcs",
+        "//test/images/net/common:all-srcs",
+        "//test/images/net/nat:all-srcs",
+    ],
+    tags = ["automanaged"],
+)

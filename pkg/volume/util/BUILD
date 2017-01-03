@@ -45,3 +45,22 @@ go_test(
         "//pkg/util/testing:go_default_library",
     ],
 )
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [
+        ":package-srcs",
+        "//pkg/volume/util/nestedpendingoperations:all-srcs",
+        "//pkg/volume/util/operationexecutor:all-srcs",
+        "//pkg/volume/util/types:all-srcs",
+        "//pkg/volume/util/volumehelper:all-srcs",
+    ],
+    tags = ["automanaged"],
+)

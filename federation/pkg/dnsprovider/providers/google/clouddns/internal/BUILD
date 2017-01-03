@@ -36,3 +36,20 @@ go_library(
         "//vendor:google.golang.org/api/googleapi",
     ],
 )
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [
+        ":package-srcs",
+        "//federation/pkg/dnsprovider/providers/google/clouddns/internal/interfaces:all-srcs",
+        "//federation/pkg/dnsprovider/providers/google/clouddns/internal/stubs:all-srcs",
+    ],
+    tags = ["automanaged"],
+)

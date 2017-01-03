@@ -30,3 +30,19 @@ go_library(
         "//vendor:k8s.io/apiserver/pkg/healthz",
     ],
 )
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [
+        ":package-srcs",
+        "//cmd/kube-proxy/app:all-srcs",
+    ],
+    tags = ["automanaged"],
+)

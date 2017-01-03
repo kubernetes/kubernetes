@@ -42,3 +42,24 @@ go_test(
         "//vendor:github.com/spf13/pflag",
     ],
 )
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [
+        ":package-srcs",
+        "//pkg/runtime/serializer/json:all-srcs",
+        "//pkg/runtime/serializer/protobuf:all-srcs",
+        "//pkg/runtime/serializer/recognizer:all-srcs",
+        "//pkg/runtime/serializer/streaming:all-srcs",
+        "//pkg/runtime/serializer/versioning:all-srcs",
+        "//pkg/runtime/serializer/yaml:all-srcs",
+    ],
+    tags = ["automanaged"],
+)

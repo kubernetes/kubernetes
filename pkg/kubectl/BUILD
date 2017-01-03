@@ -186,3 +186,22 @@ go_test(
         "//vendor:github.com/spf13/cobra",
     ],
 )
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [
+        ":package-srcs",
+        "//pkg/kubectl/cmd:all-srcs",
+        "//pkg/kubectl/metricsutil:all-srcs",
+        "//pkg/kubectl/resource:all-srcs",
+        "//pkg/kubectl/testing:all-srcs",
+    ],
+    tags = ["automanaged"],
+)

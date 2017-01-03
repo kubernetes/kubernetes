@@ -29,3 +29,19 @@ go_library(
         "//vendor:github.com/spf13/pflag",
     ],
 )
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [
+        ":package-srcs",
+        "//cmd/kube-apiserver/app:all-srcs",
+    ],
+    tags = ["automanaged"],
+)
