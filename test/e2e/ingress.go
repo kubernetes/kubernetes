@@ -21,8 +21,6 @@ import (
 	"path/filepath"
 	"time"
 
-	apierrors "k8s.io/kubernetes/pkg/api/errors"
-	legacyv1 "k8s.io/kubernetes/pkg/api/v1"
 	rbacv1alpha1 "k8s.io/kubernetes/pkg/apis/rbac/v1alpha1"
 	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/serviceaccount"
@@ -78,33 +76,10 @@ var _ = framework.KubeDescribe("Loadbalancing: L7", func() {
 
 		// this test wants powerful permissions.  Since the namespace names are unique, we can leave this
 		// lying around so we don't have to race any caches
-		_, err := jig.client.Rbac().ClusterRoleBindings().Create(&rbacv1alpha1.ClusterRoleBinding{
-			ObjectMeta: legacyv1.ObjectMeta{
-				Name: f.Namespace.Name + "--cluster-admin",
-			},
-			RoleRef: rbacv1alpha1.RoleRef{
-				APIGroup: "rbac.authorization.k8s.io",
-				Kind:     "ClusterRole",
-				Name:     "cluster-admin",
-			},
-			Subjects: []rbacv1alpha1.Subject{
-				{
-					Kind:      rbacv1alpha1.ServiceAccountKind,
-					Namespace: f.Namespace.Name,
-					Name:      "default",
-				},
-			},
-		})
-		if apierrors.IsForbidden(err) {
-			// The user is not allowed to create ClusterRoleBindings. This
-			// probably means that RBAC is not being used. If RBAC is being
-			// used, this test will probably fail later.
-			framework.Logf("Attempt to create ClusterRoleBinding was forbidden: %v.", err)
-			return
-		}
-		framework.ExpectNoError(err)
+		framework.BindClusterRole(jig.client.Rbac(), "cluster-admin", f.Namespace.Name,
+			rbacv1alpha1.Subject{Kind: rbacv1alpha1.ServiceAccountKind, Namespace: f.Namespace.Name, Name: "default"})
 
-		err = framework.WaitForAuthorizationUpdate(jig.client.Authorization(),
+		err := framework.WaitForAuthorizationUpdate(jig.client.Authorization(),
 			serviceaccount.MakeUsername(f.Namespace.Name, "default"),
 			"", "create", schema.GroupResource{Resource: "pods"}, true)
 		framework.ExpectNoError(err)
