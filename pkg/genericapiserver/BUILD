@@ -106,6 +106,7 @@ go_test(
         "//pkg/apis/meta/v1:go_default_library",
         "//pkg/auth/authorizer:go_default_library",
         "//pkg/auth/user:go_default_library",
+        "//pkg/client/clientset_generated/clientset:go_default_library",
         "//pkg/generated/openapi:go_default_library",
         "//pkg/genericapiserver/api/request:go_default_library",
         "//pkg/genericapiserver/options:go_default_library",
