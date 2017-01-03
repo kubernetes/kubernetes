@@ -60,3 +60,19 @@ go_test(
         "//vendor:github.com/imdario/mergo",
     ],
 )
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [
+        ":package-srcs",
+        "//pkg/client/unversioned/clientcmd/api:all-srcs",
+    ],
+    tags = ["automanaged"],
+)

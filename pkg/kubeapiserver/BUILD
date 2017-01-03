@@ -12,3 +12,22 @@ go_library(
     srcs = ["doc.go"],
     tags = ["automanaged"],
 )
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [
+        ":package-srcs",
+        "//pkg/kubeapiserver/admission:all-srcs",
+        "//pkg/kubeapiserver/authenticator:all-srcs",
+        "//pkg/kubeapiserver/authorizer:all-srcs",
+        "//pkg/kubeapiserver/options:all-srcs",
+    ],
+    tags = ["automanaged"],
+)

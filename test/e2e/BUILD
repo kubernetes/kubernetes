@@ -240,3 +240,24 @@ go_library(
         "//vendor:github.com/onsi/gomega",
     ],
 )
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [
+        ":package-srcs",
+        "//test/e2e/chaosmonkey:all-srcs",
+        "//test/e2e/common:all-srcs",
+        "//test/e2e/framework:all-srcs",
+        "//test/e2e/generated:all-srcs",
+        "//test/e2e/perftype:all-srcs",
+        "//test/e2e/testing-manifests:all-srcs",
+    ],
+    tags = ["automanaged"],
+)

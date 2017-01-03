@@ -35,3 +35,19 @@ go_test(
         "//vendor:k8s.io/apiserver/pkg/authentication/user",
     ],
 )
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [
+        ":package-srcs",
+        "//plugin/pkg/auth/authenticator/token/oidc/testing:all-srcs",
+    ],
+    tags = ["automanaged"],
+)

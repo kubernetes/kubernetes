@@ -16,3 +16,23 @@ go_library(
         "//vendor:k8s.io/apiserver/pkg/authentication/user",
     ],
 )
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [
+        ":package-srcs",
+        "//pkg/registry/rbac/clusterrole:all-srcs",
+        "//pkg/registry/rbac/clusterrolebinding:all-srcs",
+        "//pkg/registry/rbac/rest:all-srcs",
+        "//pkg/registry/rbac/role:all-srcs",
+        "//pkg/registry/rbac/rolebinding:all-srcs",
+    ],
+    tags = ["automanaged"],
+)

@@ -76,3 +76,42 @@ go_test(
         "//pkg/volume/testing:go_default_library",
     ],
 )
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [
+        ":package-srcs",
+        "//pkg/volume/aws_ebs:all-srcs",
+        "//pkg/volume/azure_dd:all-srcs",
+        "//pkg/volume/azure_file:all-srcs",
+        "//pkg/volume/cephfs:all-srcs",
+        "//pkg/volume/cinder:all-srcs",
+        "//pkg/volume/configmap:all-srcs",
+        "//pkg/volume/downwardapi:all-srcs",
+        "//pkg/volume/empty_dir:all-srcs",
+        "//pkg/volume/fc:all-srcs",
+        "//pkg/volume/flexvolume:all-srcs",
+        "//pkg/volume/flocker:all-srcs",
+        "//pkg/volume/gce_pd:all-srcs",
+        "//pkg/volume/git_repo:all-srcs",
+        "//pkg/volume/glusterfs:all-srcs",
+        "//pkg/volume/host_path:all-srcs",
+        "//pkg/volume/iscsi:all-srcs",
+        "//pkg/volume/nfs:all-srcs",
+        "//pkg/volume/photon_pd:all-srcs",
+        "//pkg/volume/quobyte:all-srcs",
+        "//pkg/volume/rbd:all-srcs",
+        "//pkg/volume/secret:all-srcs",
+        "//pkg/volume/testing:all-srcs",
+        "//pkg/volume/util:all-srcs",
+        "//pkg/volume/vsphere_volume:all-srcs",
+    ],
+    tags = ["automanaged"],
+)

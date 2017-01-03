@@ -45,3 +45,19 @@ go_test(
         "//pkg/genericapiserver/api/request:go_default_library",
     ],
 )
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [
+        ":package-srcs",
+        "//pkg/registry/extensions/replicaset/etcd:all-srcs",
+    ],
+    tags = ["automanaged"],
+)

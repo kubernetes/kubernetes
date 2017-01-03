@@ -83,3 +83,22 @@ go_test(
         "//vendor:k8s.io/apiserver/pkg/authorization/authorizer",
     ],
 )
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [
+        ":package-srcs",
+        "//pkg/kubelet/server/portforward:all-srcs",
+        "//pkg/kubelet/server/remotecommand:all-srcs",
+        "//pkg/kubelet/server/stats:all-srcs",
+        "//pkg/kubelet/server/streaming:all-srcs",
+    ],
+    tags = ["automanaged"],
+)
