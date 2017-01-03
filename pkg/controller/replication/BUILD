@@ -55,6 +55,7 @@ go_test(
         "//pkg/client/restclient:go_default_library",
         "//pkg/client/testing/core:go_default_library",
         "//pkg/controller:go_default_library",
+        "//pkg/controller/informers:go_default_library",
         "//pkg/runtime:go_default_library",
         "//pkg/securitycontext:go_default_library",
         "//pkg/util/sets:go_default_library",
