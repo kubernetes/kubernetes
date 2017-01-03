@@ -94,8 +94,15 @@ func doRoundTrip(t *testing.T, group testapi.TestGroup, kind string) {
 		return
 	}
 
+	newUnstr := make(map[string]interface{})
+	err = unstructured.NewConverter().ToUnstructured(item, &newUnstr)
+	if err != nil {
+		t.Errorf("ToUnstructured failed: %v", err)
+		return
+	}
+
 	newObj := reflect.New(reflect.TypeOf(item).Elem()).Interface().(runtime.Object)
-	err = unstructured.NewConverter().FromUnstructured(unstr, newObj)
+	err = unstructured.NewConverter().FromUnstructured(newUnstr, newObj)
 	if err != nil {
 		t.Errorf("FromUnstructured failed: %v", err)
 		return
