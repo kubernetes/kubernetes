@@ -19,6 +19,7 @@ package kuberuntime
 import (
 	"fmt"
 	"sync"
+	"time"
 
 	"k8s.io/kubernetes/pkg/api/v1"
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
@@ -210,7 +211,10 @@ func (a *syncAction) killContainers(m *kubeGenericRuntimeManager) ([]*kubecontai
 
 			// For killings that happen inside sync pod, there's no gracePeriodOverride.
 			result := kubecontainer.NewSyncResult(kubecontainer.KillContainer, info.name)
-			if err := m.killContainer(a.sandboxContext.pod, info.id, info.name, info.reason, nil); err != nil {
+			err := m.killContainer(a.sandboxContext.pod, info.id, info.name, info.reason, nil)
+			if err == nil {
+				info.status.FinishedAt = time.Now() // Update the 'FinishedAt' field so we can do correct backoff on killed containers.
+			} else {
 				result.Fail(kubecontainer.ErrKillContainer, err.Error())
 			}
 			syncResultCh <- result
