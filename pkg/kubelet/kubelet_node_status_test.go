@@ -929,6 +929,13 @@ func TestRegisterWithApiServer(t *testing.T) {
 			Spec:       v1.NodeSpec{ExternalID: testKubeletHostname},
 		}, nil
 	})
+	// patch will be called because labels on existing node needs to be updated
+	kubeClient.AddReactor("patch", "nodes", func(action core.Action) (bool, runtime.Object, error) {
+		if action.GetSubresource() == "status" {
+			return true, nil, nil
+		}
+		return true, nil, fmt.Errorf("no reaction implemented for %s", action)
+	})
 	kubeClient.AddReactor("*", "*", func(action core.Action) (bool, runtime.Object, error) {
 		return true, nil, fmt.Errorf("no reaction implemented for %s", action)
 	})
@@ -995,20 +1002,44 @@ func TestTryRegisterWithApiServer(t *testing.T) {
 		return node
 	}
 
-	cases := []struct {
-		name            string
-		newNode         *v1.Node
-		existingNode    *v1.Node
-		createError     error
-		getError        error
-		patchError      error
-		deleteError     error
-		expectedResult  bool
-		expectedActions int
-		testSavedNode   bool
-		savedNodeIndex  int
-		savedNodeCMAD   bool
-	}{
+	newNodeWithLabels := func(cmad bool, externalID string, labels map[string]string) *v1.Node {
+		node := &v1.Node{
+			ObjectMeta: v1.ObjectMeta{},
+			Spec: v1.NodeSpec{
+				ExternalID: externalID,
+			},
+		}
+
+		if cmad {
+			node.Annotations = make(map[string]string)
+			node.Annotations[volumehelper.ControllerManagedAttachAnnotation] = "true"
+		}
+
+		node.SetLabels(labels)
+
+		return node
+	}
+
+	newLabels := map[string]string{"newKey": "newValue"}
+	oldLabels := map[string]string{"oldKey": "oldValue"}
+
+	type testCase struct {
+		name                string
+		newNode             *v1.Node
+		existingNode        *v1.Node
+		createError         error
+		getError            error
+		patchError          error
+		deleteError         error
+		expectedResult      bool
+		expectedActions     int
+		testSavedNode       bool
+		savedNodeIndex      int
+		savedNodeCMAD       bool
+		testSavedNodeLabels bool
+	}
+
+	cases := []testCase{
 		{
 			name:            "success case - new node",
 			newNode:         &v1.Node{},
@@ -1086,6 +1117,15 @@ func TestTryRegisterWithApiServer(t *testing.T) {
 			expectedResult:  false,
 			expectedActions: 3,
 		},
+		{
+			name:                "success case - existing node - label changed",
+			newNode:             newNodeWithLabels(false, "a", newLabels),
+			createError:         alreadyExists,
+			existingNode:        newNodeWithLabels(false, "a", oldLabels),
+			expectedResult:      true,
+			expectedActions:     3,
+			testSavedNodeLabels: true,
+		},
 	}
 
 	notImplemented := func(action core.Action) (bool, runtime.Object, error) {
@@ -1128,7 +1168,7 @@ func TestTryRegisterWithApiServer(t *testing.T) {
 			t.Errorf("%v: unexpected number of actions, expected %v, got %v", tc.name, e, a)
 		}
 
-		if tc.testSavedNode {
+		getSavedNodeForPatchAction := func(actions []core.Action, tc testCase, t *testing.T) (*v1.Node, error) {
 			var savedNode *v1.Node
 			var ok bool
 
@@ -1138,22 +1178,39 @@ func TestTryRegisterWithApiServer(t *testing.T) {
 				createAction := action.(core.CreateAction)
 				savedNode, ok = createAction.GetObject().(*v1.Node)
 				if !ok {
-					t.Errorf("%v: unexpected type; couldn't convert to *v1.Node: %+v", tc.name, createAction.GetObject())
-					continue
+					return nil, fmt.Errorf("%v: unexpected type; couldn't convert to *v1.Node: %+v", tc.name, createAction.GetObject())
 				}
 			} else if action.GetVerb() == "patch" {
 				patchAction := action.(core.PatchActionImpl)
 				var err error
 				savedNode, err = applyNodeStatusPatch(tc.existingNode, patchAction.GetPatch())
 				if err != nil {
-					t.Errorf("can't apply node status patch: %v", err)
-					continue
+					return nil, fmt.Errorf("can't apply node status patch: %v", err)
 				}
 			}
 
+			return savedNode, nil
+		}
+
+		if tc.testSavedNode {
+			savedNode, err := getSavedNodeForPatchAction(actions, tc, t)
+			if err != nil {
+				t.Error(err)
+			}
 			actualCMAD, _ := strconv.ParseBool(savedNode.Annotations[volumehelper.ControllerManagedAttachAnnotation])
 			if e, a := tc.savedNodeCMAD, actualCMAD; e != a {
 				t.Errorf("%v: unexpected attach-detach value on saved node; expected %v got %v", tc.name, e, a)
+			}
+		}
+
+		if tc.testSavedNodeLabels {
+			savedNode, err := getSavedNodeForPatchAction(actions, tc, t)
+			if err != nil {
+				t.Error(err)
+			}
+			actualLabels := savedNode.GetLabels()
+			if !reflect.DeepEqual(actualLabels, newLabels) {
+				t.Errorf("%v: unexpected labels on saved node; expected %v got %v", tc.name, newLabels, actualLabels)
 			}
 		}
 	}

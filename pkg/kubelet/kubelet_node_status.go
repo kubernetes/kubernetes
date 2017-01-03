@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"math"
 	"net"
+	"reflect"
 	goruntime "runtime"
 	"sort"
 	"strings"
@@ -125,12 +126,17 @@ func (kl *Kubelet) tryRegisterWithApiServer(node *v1.Node) bool {
 	}
 
 	if existingNode.Spec.ExternalID == node.Spec.ExternalID {
+		var requiresUpdate bool
 		glog.Infof("Node %s was previously registered", kl.nodeName)
 
 		// Edge case: the node was previously registered; reconcile
 		// the value of the controller-managed attach-detach
 		// annotation.
-		requiresUpdate := kl.reconcileCMADAnnotationWithExistingNode(node, existingNode)
+		if kl.reconcileCMADAnnotationWithExistingNode(node, existingNode) ||
+			kl.reconcileLablesWithExistingNode(node, existingNode) {
+			requiresUpdate = true
+		}
+
 		if requiresUpdate {
 			if _, err := nodeutil.PatchNodeStatus(kl.kubeClient, types.NodeName(kl.nodeName),
 				originalNode, existingNode); err != nil {
@@ -138,7 +144,6 @@ func (kl *Kubelet) tryRegisterWithApiServer(node *v1.Node) bool {
 				return false
 			}
 		}
-
 		return true
 	}
 
@@ -150,6 +155,22 @@ func (kl *Kubelet) tryRegisterWithApiServer(node *v1.Node) bool {
 		glog.Errorf("Unable to register node %q with API server: error deleting old node: %v", kl.nodeName, err)
 	} else {
 		glog.Info("Deleted old node object %q", kl.nodeName)
+	}
+
+	return false
+}
+
+// reconcileLablesWithExistingNode reconciles labels on a new node and the existing node, returning
+// whether the existing node must be updated.
+// Current reconcile strategy: always use labels on new node.
+func (kl *Kubelet) reconcileLablesWithExistingNode(node, existingNode *v1.Node) bool {
+	existingLabels := existingNode.GetLabels()
+	newLabels := node.GetLabels()
+
+	// always use newly provided labels to update the existing node
+	if !reflect.DeepEqual(existingLabels, newLabels) {
+		existingNode.SetLabels(newLabels)
+		return true
 	}
 
 	return false
