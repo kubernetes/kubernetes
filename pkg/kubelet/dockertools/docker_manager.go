@@ -739,17 +739,24 @@ func (dm *DockerManager) runContainer(
 		fs, err := os.Create(containerLogPath)
 		if err != nil {
 			// TODO: Clean up the previously created dir? return the error?
-			glog.Errorf("Error on creating termination-log file %q: %v", containerLogPath, err)
+			utilruntime.HandleError(fmt.Errorf("error creating termination-log file %q: %v", containerLogPath, err))
 		} else {
 			fs.Close() // Close immediately; we're just doing a `touch` here
-			b := fmt.Sprintf("%s:%s", containerLogPath, container.TerminationMessagePath)
+
+			// Chmod is needed because ioutil.WriteFile() ends up calling
+			// open(2) to create the file, so the final mode used is "mode &
+			// ~umask". But we want to make sure the specified mode is used
+			// in the file no matter what the umask is.
+			if err := os.Chmod(containerLogPath, 0666); err != nil {
+				utilruntime.HandleError(fmt.Errorf("unable to set termination-log file permissions %q: %v", containerLogPath, err))
+			}
 
 			// Have docker relabel the termination log path if SELinux is
 			// enabled.
+			b := fmt.Sprintf("%s:%s", containerLogPath, container.TerminationMessagePath)
 			if selinux.SELinuxEnabled() {
 				b += ":Z"
 			}
-
 			binds = append(binds, b)
 		}
 	}

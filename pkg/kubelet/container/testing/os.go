@@ -83,6 +83,11 @@ func (FakeOS) Create(path string) (*os.File, error) {
 	return nil, nil
 }
 
+// Chmod is a fake call that returns nil.
+func (FakeOS) Chmod(path string, perm os.FileMode) error {
+	return nil
+}
+
 // Hostname is a fake call that returns nil.
 func (f *FakeOS) Hostname() (name string, err error) {
 	return f.HostName, nil
