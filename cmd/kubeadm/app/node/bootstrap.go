@@ -23,6 +23,7 @@ import (
 	"time"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	kubeconfigphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubeconfig"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/certificates"
@@ -109,13 +110,15 @@ func EstablishMasterConnection(c *kubeadmapi.TokenDiscovery, clusterInfo *kubead
 
 // creates a set of clients for this endpoint
 func createClients(caCert []byte, endpoint, token string, nodeName types.NodeName) (*clientset.Clientset, error) {
-	bareClientConfig := kubeadmutil.CreateBasicClientConfig("kubernetes", endpoint, caCert)
-	bootstrapClientConfig, err := clientcmd.NewDefaultClientConfig(
-		*kubeadmutil.MakeClientConfigWithToken(
-			bareClientConfig, "kubernetes", fmt.Sprintf("kubelet-%s", nodeName), token,
-		),
-		&clientcmd.ConfigOverrides{},
-	).ClientConfig()
+	clientConfig := kubeconfigphase.MakeClientConfigWithToken(
+		endpoint,
+		"kubernetes",
+		fmt.Sprintf("kubelet-%s", nodeName),
+		caCert,
+		token,
+	)
+
+	bootstrapClientConfig, err := clientcmd.NewDefaultClientConfig(*clientConfig, &clientcmd.ConfigOverrides{}).ClientConfig()
 	if err != nil {
 		return nil, fmt.Errorf("failed to create API client configuration [%v]", err)
 	}

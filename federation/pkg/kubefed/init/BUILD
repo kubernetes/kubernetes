@@ -13,7 +13,7 @@ go_library(
     srcs = ["init.go"],
     tags = ["automanaged"],
     deps = [
-        "//cmd/kubeadm/app/util:go_default_library",
+        "//cmd/kubeadm/app/phases/kubeconfig:go_default_library",
         "//federation/pkg/kubefed/util:go_default_library",
         "//pkg/api:go_default_library",
         "//pkg/api/resource:go_default_library",
