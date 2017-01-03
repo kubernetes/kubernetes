@@ -26,8 +26,8 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
-	apiserverrequest "k8s.io/kubernetes/pkg/apiserver/request"
 	"k8s.io/kubernetes/pkg/auth/user"
+	genericapirequest "k8s.io/kubernetes/pkg/genericapiserver/api/request"
 	"k8s.io/kubernetes/pkg/util/sets"
 
 	"k8s.io/kubernetes/cmd/kubernetes-discovery/pkg/apis/apiregistration"
@@ -62,13 +62,13 @@ func (m *fakeRequestContextMapper) Get(req *http.Request) (api.Context, bool) {
 		ctx = api.WithUser(ctx, m.user)
 	}
 
-	resolver := &apiserverrequest.RequestInfoFactory{
+	resolver := &genericapirequest.RequestInfoFactory{
 		APIPrefixes:          sets.NewString("api", "apis"),
 		GrouplessAPIPrefixes: sets.NewString("api"),
 	}
 	info, err := resolver.NewRequestInfo(req)
 	if err == nil {
-		ctx = apiserverrequest.WithRequestInfo(ctx, info)
+		ctx = genericapirequest.WithRequestInfo(ctx, info)
 	}
 
 	return ctx, true

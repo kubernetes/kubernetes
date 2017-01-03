@@ -20,7 +20,7 @@ import (
 	"io"
 	"net/http"
 
-	apiservermetrics "k8s.io/kubernetes/pkg/apiserver/metrics"
+	apimetrics "k8s.io/kubernetes/pkg/genericapiserver/api/metrics"
 	"k8s.io/kubernetes/pkg/genericapiserver/mux"
 	etcdmetrics "k8s.io/kubernetes/pkg/storage/etcd/metrics"
 
@@ -44,7 +44,7 @@ func (m MetricsWithReset) Install(c *mux.APIContainer) {
 	defaultMetricsHandler := prometheus.Handler().ServeHTTP
 	c.NonSwaggerRoutes.HandleFunc("/metrics", func(w http.ResponseWriter, req *http.Request) {
 		if req.Method == "DELETE" {
-			apiservermetrics.Reset()
+			apimetrics.Reset()
 			etcdmetrics.Reset()
 			io.WriteString(w, "metrics reset\n")
 			return
