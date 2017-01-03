@@ -180,7 +180,7 @@ while true; do sleep 1; done
 						Image:   "gcr.io/google_containers/busybox:1.24",
 						Name:    name,
 						Command: []string{"/bin/sh", "-c"},
-						Args:    []string{fmt.Sprintf("/bin/echo -n %s > %s", terminationMessage, terminationMessagePath)},
+						Args:    []string{fmt.Sprintf("/bin/ls -al /dev/termination-log; /bin/echo -n %s > %s", terminationMessage, terminationMessagePath)},
 						TerminationMessagePath: terminationMessagePath,
 						SecurityContext: &v1.SecurityContext{
 							RunAsUser: &nonRootUser,
@@ -191,7 +191,12 @@ while true; do sleep 1; done
 
 				By("create the container")
 				c.Create()
-				defer c.Delete()
+				defer func() {
+					if body, err := c.PodClient.GetLogs(c.podName, &v1.PodLogOptions{Container: name}).DoRaw(); err == nil {
+						framework.Logf("logs from container:\n%s", string(body))
+					}
+					c.Delete()
+				}()
 
 				By("wait for the container to succeed")
 				Eventually(c.GetPhase, retryTimeout, pollInterval).Should(Equal(v1.PodSucceeded))
