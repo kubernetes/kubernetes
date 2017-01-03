@@ -783,13 +783,13 @@ func (m *kubeGenericRuntimeManager) runContainer(sandboxID, sandboxIP string, sa
 	}
 
 	// Step 2: pull the image.
-	err, msg = m.imagePuller.EnsureImageExists(pod, container, pullSecrets)
+	imgRef, msg, err := m.imagePuller.EnsureImageExists(pod, container, pullSecrets)
 	if err != nil {
 		return err, msg
 	}
 
 	// Step 3: create the container.
-	containerConfig, err := m.generateContainerConfig(container, pod, attempt, sandboxIP)
+	containerConfig, err := m.generateContainerConfig(container, pod, attempt, sandboxIP, imgRef)
 	if err != nil {
 		m.recorder.Eventf(ref, v1.EventTypeWarning, events.FailedToCreateContainer, "Failed to create container with error: %v", err)
 		return kubecontainer.ErrRunContainer, fmt.Sprintf("Generate Container Config Failed, %v", err)
