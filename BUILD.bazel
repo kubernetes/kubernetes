@@ -4,6 +4,7 @@ licenses(["notice"])
 
 load("@io_bazel_rules_go//go:def.bzl", "go_prefix")
 load("@io_kubernetes_build//defs:build.bzl", "gcs_upload")
+load("@bazel_tools//tools/build_defs/pkg:pkg.bzl", "pkg_tar")
 
 go_prefix("k8s.io/kubernetes")
 
@@ -49,4 +50,14 @@ filegroup(
         "//vendor:all-srcs",
     ],
     tags = ["automanaged"],
+)
+
+pkg_tar(
+    name = "kubernetes-src",
+    extension = "tar.gz",
+    files = [
+        ":all-srcs",
+    ],
+    package_dir = "kubernetes",
+    strip_prefix = "//",
 )
