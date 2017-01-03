@@ -108,7 +108,7 @@
         "allowMultiple": false
        },
        {
-        "type": "v1beta1.PodDisruptionBudget",
+        "type": "policy.v1beta1.PodDisruptionBudget",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -390,7 +390,7 @@
         "allowMultiple": false
        },
        {
-        "type": "v1beta1.PodDisruptionBudget",
+        "type": "policy.v1beta1.PodDisruptionBudget",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -445,7 +445,7 @@
         "allowMultiple": false
        },
        {
-        "type": "v1.Patch",
+        "type": "io.k8s.meta.v1.Patch",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -879,7 +879,7 @@
         "allowMultiple": false
        },
        {
-        "type": "v1beta1.PodDisruptionBudget",
+        "type": "policy.v1beta1.PodDisruptionBudget",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -934,7 +934,7 @@
         "allowMultiple": false
        },
        {
-        "type": "v1.Patch",
+        "type": "io.k8s.meta.v1.Patch",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -1005,7 +1005,7 @@
   "models": {
    "v1beta1.PodDisruptionBudgetList": {
     "id": "v1beta1.PodDisruptionBudgetList",
-    "description": "PodDisruptionBudgetList is a collection of PodDisruptionBudgets.",
+    "description": "PodDisruptionBudgetList is a collection of PodDisruptionBudgets.\n\nDEPRECATED: Use 'policy.v1beta1.PodDisruptionBudgetList' instead.",
     "required": [
      "items"
     ],
@@ -1031,7 +1031,7 @@
    },
    "v1.ListMeta": {
     "id": "v1.ListMeta",
-    "description": "ListMeta describes metadata that synthetic resources must have, including lists and various status objects. A resource may have only one of {ObjectMeta, ListMeta}.",
+    "description": "ListMeta describes metadata that synthetic resources must have, including lists and various status objects. A resource may have only one of {ObjectMeta, ListMeta}.\n\nDEPRECATED: Use 'io.k8s.meta.v1.ListMeta' instead.",
     "properties": {
      "selfLink": {
       "type": "string",
@@ -1045,7 +1045,7 @@
    },
    "v1beta1.PodDisruptionBudget": {
     "id": "v1beta1.PodDisruptionBudget",
-    "description": "PodDisruptionBudget is an object to define the max disruption that can be caused to a collection of pods",
+    "description": "PodDisruptionBudget is an object to define the max disruption that can be caused to a collection of pods\n\nDEPRECATED: Use 'policy.v1beta1.PodDisruptionBudget' instead.",
     "properties": {
      "kind": {
       "type": "string",
@@ -1144,7 +1144,7 @@
    },
    "v1.OwnerReference": {
     "id": "v1.OwnerReference",
-    "description": "OwnerReference contains enough information to let you identify an owning object. Currently, an owning object must be in the same namespace, so there is no namespace field.",
+    "description": "OwnerReference contains enough information to let you identify an owning object. Currently, an owning object must be in the same namespace, so there is no namespace field.\n\nDEPRECATED: Use 'io.k8s.meta.v1.OwnerReference' instead.",
     "required": [
      "apiVersion",
      "kind",
@@ -1176,7 +1176,7 @@
    },
    "v1beta1.PodDisruptionBudgetSpec": {
     "id": "v1beta1.PodDisruptionBudgetSpec",
-    "description": "PodDisruptionBudgetSpec is a description of a PodDisruptionBudget.",
+    "description": "PodDisruptionBudgetSpec is a description of a PodDisruptionBudget.\n\nDEPRECATED: Use 'policy.v1beta1.PodDisruptionBudgetSpec' instead.",
     "properties": {
      "minAvailable": {
       "type": "string",
@@ -1190,7 +1190,7 @@
    },
    "v1.LabelSelector": {
     "id": "v1.LabelSelector",
-    "description": "A label selector is a label query over a set of resources. The result of matchLabels and matchExpressions are ANDed. An empty label selector matches all objects. A null label selector matches no objects.",
+    "description": "A label selector is a label query over a set of resources. The result of matchLabels and matchExpressions are ANDed. An empty label selector matches all objects. A null label selector matches no objects.\n\nDEPRECATED: Use 'io.k8s.meta.v1.LabelSelector' instead.",
     "properties": {
      "matchLabels": {
       "type": "object",
@@ -1207,7 +1207,7 @@
    },
    "v1.LabelSelectorRequirement": {
     "id": "v1.LabelSelectorRequirement",
-    "description": "A label selector requirement is a selector that contains values, a key, and an operator that relates the key and values.",
+    "description": "A label selector requirement is a selector that contains values, a key, and an operator that relates the key and values.\n\nDEPRECATED: Use 'io.k8s.meta.v1.LabelSelectorRequirement' instead.",
     "required": [
      "key",
      "operator"
@@ -1232,7 +1232,7 @@
    },
    "v1beta1.PodDisruptionBudgetStatus": {
     "id": "v1beta1.PodDisruptionBudgetStatus",
-    "description": "PodDisruptionBudgetStatus represents information about the status of a PodDisruptionBudget. Status may trail the actual state of a system.",
+    "description": "PodDisruptionBudgetStatus represents information about the status of a PodDisruptionBudget. Status may trail the actual state of a system.\n\nDEPRECATED: Use 'policy.v1beta1.PodDisruptionBudgetStatus' instead.",
     "required": [
      "disruptedPods",
      "disruptionsAllowed",
@@ -1274,7 +1274,7 @@
    },
    "v1.Status": {
     "id": "v1.Status",
-    "description": "Status is a return value for calls that don't return other objects.",
+    "description": "Status is a return value for calls that don't return other objects.\n\nDEPRECATED: Use 'io.k8s.meta.v1.Status' instead.",
     "properties": {
      "kind": {
       "type": "string",
@@ -1313,7 +1313,7 @@
    },
    "v1.StatusDetails": {
     "id": "v1.StatusDetails",
-    "description": "StatusDetails is a set of additional properties that MAY be set by the server to provide additional information about a response. The Reason field of a Status object defines what attributes will be set. Clients must ignore fields that do not match the defined type of each attribute, and should assume that any attribute may be empty, invalid, or under defined.",
+    "description": "StatusDetails is a set of additional properties that MAY be set by the server to provide additional information about a response. The Reason field of a Status object defines what attributes will be set. Clients must ignore fields that do not match the defined type of each attribute, and should assume that any attribute may be empty, invalid, or under defined.\n\nDEPRECATED: Use 'io.k8s.meta.v1.StatusDetails' instead.",
     "properties": {
      "name": {
       "type": "string",
@@ -1343,7 +1343,7 @@
    },
    "v1.StatusCause": {
     "id": "v1.StatusCause",
-    "description": "StatusCause provides more information about an api.Status failure, including cases when multiple errors are encountered.",
+    "description": "StatusCause provides more information about an api.Status failure, including cases when multiple errors are encountered.\n\nDEPRECATED: Use 'io.k8s.meta.v1.StatusCause' instead.",
     "properties": {
      "reason": {
       "type": "string",
@@ -1361,6 +1361,7 @@
    },
    "versioned.Event": {
     "id": "versioned.Event",
+    "description": "\n\nDEPRECATED: Use 'io.k8s.kubernetes.pkg.watch.versioned.Event' instead.",
     "required": [
      "type",
      "object"
@@ -1376,7 +1377,7 @@
    },
    "v1.Patch": {
     "id": "v1.Patch",
-    "description": "Patch is provided to give a concrete name and type to the Kubernetes PATCH request body.",
+    "description": "Patch is provided to give a concrete name and type to the Kubernetes PATCH request body.\n\nDEPRECATED: Use 'io.k8s.meta.v1.Patch' instead.",
     "properties": {}
    },
    "v1.DeleteOptions": {
@@ -1411,18 +1412,18 @@
     "description": "Preconditions must be fulfilled before an operation (update, delete, etc.) is carried out.",
     "properties": {
      "uid": {
-      "$ref": "types.UID",
+      "$ref": "io.k8s.kubernetes.pkg.types.UID",
       "description": "Specifies the target UID."
      }
     }
    },
-   "types.UID": {
-    "id": "types.UID",
+   "io.k8s.kubernetes.pkg.types.UID": {
+    "id": "io.k8s.kubernetes.pkg.types.UID",
     "properties": {}
    },
    "v1.APIResourceList": {
     "id": "v1.APIResourceList",
-    "description": "APIResourceList is a list of APIResource, it is used to expose the name of the resources supported in a specific group and version, and if the resource is namespaced.",
+    "description": "APIResourceList is a list of APIResource, it is used to expose the name of the resources supported in a specific group and version, and if the resource is namespaced.\n\nDEPRECATED: Use 'io.k8s.meta.v1.APIResourceList' instead.",
     "required": [
      "groupVersion",
      "resources"
@@ -1451,6 +1452,368 @@
    },
    "v1.APIResource": {
     "id": "v1.APIResource",
+    "description": "APIResource specifies the name of a resource and whether it is namespaced.\n\nDEPRECATED: Use 'io.k8s.meta.v1.APIResource' instead.",
+    "required": [
+     "name",
+     "namespaced",
+     "kind",
+     "verbs"
+    ],
+    "properties": {
+     "name": {
+      "type": "string",
+      "description": "name is the name of the resource."
+     },
+     "namespaced": {
+      "type": "boolean",
+      "description": "namespaced indicates if a resource is namespaced or not."
+     },
+     "kind": {
+      "type": "string",
+      "description": "kind is the kind for the resource (e.g. 'Foo' is the kind for a resource 'foo')"
+     },
+     "verbs": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      },
+      "description": "verbs is a list of supported kube verbs (this includes get, list, watch, create, update, patch, delete, deletecollection, and proxy)"
+     }
+    }
+   },
+   "policy.v1beta1.PodDisruptionBudgetList": {
+    "id": "policy.v1beta1.PodDisruptionBudgetList",
+    "description": "PodDisruptionBudgetList is a collection of PodDisruptionBudgets.",
+    "required": [
+     "items"
+    ],
+    "properties": {
+     "kind": {
+      "type": "string",
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+     },
+     "apiVersion": {
+      "type": "string",
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+     },
+     "metadata": {
+      "$ref": "v1.ListMeta"
+     },
+     "items": {
+      "type": "array",
+      "items": {
+       "$ref": "v1beta1.PodDisruptionBudget"
+      }
+     }
+    }
+   },
+   "io.k8s.meta.v1.ListMeta": {
+    "id": "io.k8s.meta.v1.ListMeta",
+    "description": "ListMeta describes metadata that synthetic resources must have, including lists and various status objects. A resource may have only one of {ObjectMeta, ListMeta}.",
+    "properties": {
+     "selfLink": {
+      "type": "string",
+      "description": "SelfLink is a URL representing this object. Populated by the system. Read-only."
+     },
+     "resourceVersion": {
+      "type": "string",
+      "description": "String that identifies the server's internal version of this object that can be used by clients to determine when objects have changed. Value must be treated as opaque by clients and passed unmodified back to the server. Populated by the system. Read-only. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#concurrency-control-and-consistency"
+     }
+    }
+   },
+   "policy.v1beta1.PodDisruptionBudget": {
+    "id": "policy.v1beta1.PodDisruptionBudget",
+    "description": "PodDisruptionBudget is an object to define the max disruption that can be caused to a collection of pods",
+    "properties": {
+     "kind": {
+      "type": "string",
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+     },
+     "apiVersion": {
+      "type": "string",
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+     },
+     "metadata": {
+      "$ref": "v1.ObjectMeta"
+     },
+     "spec": {
+      "$ref": "v1beta1.PodDisruptionBudgetSpec",
+      "description": "Specification of the desired behavior of the PodDisruptionBudget."
+     },
+     "status": {
+      "$ref": "v1beta1.PodDisruptionBudgetStatus",
+      "description": "Most recently observed status of the PodDisruptionBudget."
+     }
+    }
+   },
+   "io.k8s.meta.v1.OwnerReference": {
+    "id": "io.k8s.meta.v1.OwnerReference",
+    "description": "OwnerReference contains enough information to let you identify an owning object. Currently, an owning object must be in the same namespace, so there is no namespace field.",
+    "required": [
+     "apiVersion",
+     "kind",
+     "name",
+     "uid"
+    ],
+    "properties": {
+     "apiVersion": {
+      "type": "string",
+      "description": "API version of the referent."
+     },
+     "kind": {
+      "type": "string",
+      "description": "Kind of the referent. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+     },
+     "name": {
+      "type": "string",
+      "description": "Name of the referent. More info: http://kubernetes.io/docs/user-guide/identifiers#names"
+     },
+     "uid": {
+      "type": "string",
+      "description": "UID of the referent. More info: http://kubernetes.io/docs/user-guide/identifiers#uids"
+     },
+     "controller": {
+      "type": "boolean",
+      "description": "If true, this reference points to the managing controller."
+     }
+    }
+   },
+   "policy.v1beta1.PodDisruptionBudgetSpec": {
+    "id": "policy.v1beta1.PodDisruptionBudgetSpec",
+    "description": "PodDisruptionBudgetSpec is a description of a PodDisruptionBudget.",
+    "properties": {
+     "minAvailable": {
+      "type": "string",
+      "description": "An eviction is allowed if at least \"minAvailable\" pods selected by \"selector\" will still be available after the eviction, i.e. even in the absence of the evicted pod.  So for example you can prevent all voluntary evictions by specifying \"100%\"."
+     },
+     "selector": {
+      "$ref": "v1.LabelSelector",
+      "description": "Label query over pods whose evictions are managed by the disruption budget."
+     }
+    }
+   },
+   "io.k8s.meta.v1.LabelSelector": {
+    "id": "io.k8s.meta.v1.LabelSelector",
+    "description": "A label selector is a label query over a set of resources. The result of matchLabels and matchExpressions are ANDed. An empty label selector matches all objects. A null label selector matches no objects.",
+    "properties": {
+     "matchLabels": {
+      "type": "object",
+      "description": "matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels map is equivalent to an element of matchExpressions, whose key field is \"key\", the operator is \"In\", and the values array contains only \"value\". The requirements are ANDed."
+     },
+     "matchExpressions": {
+      "type": "array",
+      "items": {
+       "$ref": "v1.LabelSelectorRequirement"
+      },
+      "description": "matchExpressions is a list of label selector requirements. The requirements are ANDed."
+     }
+    }
+   },
+   "io.k8s.meta.v1.LabelSelectorRequirement": {
+    "id": "io.k8s.meta.v1.LabelSelectorRequirement",
+    "description": "A label selector requirement is a selector that contains values, a key, and an operator that relates the key and values.",
+    "required": [
+     "key",
+     "operator"
+    ],
+    "properties": {
+     "key": {
+      "type": "string",
+      "description": "key is the label key that the selector applies to."
+     },
+     "operator": {
+      "type": "string",
+      "description": "operator represents a key's relationship to a set of values. Valid operators ard In, NotIn, Exists and DoesNotExist."
+     },
+     "values": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      },
+      "description": "values is an array of string values. If the operator is In or NotIn, the values array must be non-empty. If the operator is Exists or DoesNotExist, the values array must be empty. This array is replaced during a strategic merge patch."
+     }
+    }
+   },
+   "policy.v1beta1.PodDisruptionBudgetStatus": {
+    "id": "policy.v1beta1.PodDisruptionBudgetStatus",
+    "description": "PodDisruptionBudgetStatus represents information about the status of a PodDisruptionBudget. Status may trail the actual state of a system.",
+    "required": [
+     "disruptedPods",
+     "disruptionsAllowed",
+     "currentHealthy",
+     "desiredHealthy",
+     "expectedPods"
+    ],
+    "properties": {
+     "observedGeneration": {
+      "type": "integer",
+      "format": "int64",
+      "description": "Most recent generation observed when updating this PDB status. PodDisruptionsAllowed and other status informatio is valid only if observedGeneration equals to PDB's object generation."
+     },
+     "disruptedPods": {
+      "type": "object",
+      "description": "DisruptedPods contains information about pods whose eviction was processed by the API server eviction subresource handler but has not yet been observed by the PodDisruptionBudget controller. A pod will be in this map from the time when the API server processed the eviction request to the time when the pod is seen by PDB controller as having been marked for deletion (or after a timeout). The key in the map is the name of the pod and the value is the time when the API server processed the eviction request. If the deletion didn't occur and a pod is still there it will be removed from the list automatically by PodDisruptionBudget controller after some time. If everything goes smooth this map should be empty for the most of the time. Large number of entries in the map may indicate problems with pod deletions."
+     },
+     "disruptionsAllowed": {
+      "type": "integer",
+      "format": "int32",
+      "description": "Number of pod disruptions that are currently allowed."
+     },
+     "currentHealthy": {
+      "type": "integer",
+      "format": "int32",
+      "description": "current number of healthy pods"
+     },
+     "desiredHealthy": {
+      "type": "integer",
+      "format": "int32",
+      "description": "minimum desired number of healthy pods"
+     },
+     "expectedPods": {
+      "type": "integer",
+      "format": "int32",
+      "description": "total number of pods counted by this disruption budget"
+     }
+    }
+   },
+   "io.k8s.meta.v1.Status": {
+    "id": "io.k8s.meta.v1.Status",
+    "description": "Status is a return value for calls that don't return other objects.",
+    "properties": {
+     "kind": {
+      "type": "string",
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+     },
+     "apiVersion": {
+      "type": "string",
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+     },
+     "metadata": {
+      "$ref": "v1.ListMeta",
+      "description": "Standard list metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+     },
+     "status": {
+      "type": "string",
+      "description": "Status of the operation. One of: \"Success\" or \"Failure\". More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status"
+     },
+     "message": {
+      "type": "string",
+      "description": "A human-readable description of the status of this operation."
+     },
+     "reason": {
+      "type": "string",
+      "description": "A machine-readable description of why this operation is in the \"Failure\" status. If this value is empty there is no information available. A Reason clarifies an HTTP status code but does not override it."
+     },
+     "details": {
+      "$ref": "v1.StatusDetails",
+      "description": "Extended data associated with the reason.  Each reason may define its own extended details. This field is optional and the data returned is not guaranteed to conform to any schema except that defined by the reason type."
+     },
+     "code": {
+      "type": "integer",
+      "format": "int32",
+      "description": "Suggested HTTP return code for this status, 0 if not set."
+     }
+    }
+   },
+   "io.k8s.meta.v1.StatusDetails": {
+    "id": "io.k8s.meta.v1.StatusDetails",
+    "description": "StatusDetails is a set of additional properties that MAY be set by the server to provide additional information about a response. The Reason field of a Status object defines what attributes will be set. Clients must ignore fields that do not match the defined type of each attribute, and should assume that any attribute may be empty, invalid, or under defined.",
+    "properties": {
+     "name": {
+      "type": "string",
+      "description": "The name attribute of the resource associated with the status StatusReason (when there is a single name which can be described)."
+     },
+     "group": {
+      "type": "string",
+      "description": "The group attribute of the resource associated with the status StatusReason."
+     },
+     "kind": {
+      "type": "string",
+      "description": "The kind attribute of the resource associated with the status StatusReason. On some operations may differ from the requested resource Kind. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+     },
+     "causes": {
+      "type": "array",
+      "items": {
+       "$ref": "v1.StatusCause"
+      },
+      "description": "The Causes array includes more details associated with the StatusReason failure. Not all StatusReasons may provide detailed causes."
+     },
+     "retryAfterSeconds": {
+      "type": "integer",
+      "format": "int32",
+      "description": "If specified, the time in seconds before the operation should be retried."
+     }
+    }
+   },
+   "io.k8s.meta.v1.StatusCause": {
+    "id": "io.k8s.meta.v1.StatusCause",
+    "description": "StatusCause provides more information about an api.Status failure, including cases when multiple errors are encountered.",
+    "properties": {
+     "reason": {
+      "type": "string",
+      "description": "A machine-readable description of the cause of the error. If this value is empty there is no information available."
+     },
+     "message": {
+      "type": "string",
+      "description": "A human-readable description of the cause of the error.  This field may be presented as-is to a reader."
+     },
+     "field": {
+      "type": "string",
+      "description": "The field of the resource that has caused this error, as named by its JSON serialization. May include dot and postfix notation for nested attributes. Arrays are zero-indexed.  Fields may appear more than once in an array of causes due to fields having multiple errors. Optional.\n\nExamples:\n  \"name\" - the field \"name\" on the current resource\n  \"items[0].name\" - the field \"name\" on the first array entry in \"items\""
+     }
+    }
+   },
+   "io.k8s.kubernetes.pkg.watch.versioned.Event": {
+    "id": "io.k8s.kubernetes.pkg.watch.versioned.Event",
+    "required": [
+     "type",
+     "object"
+    ],
+    "properties": {
+     "type": {
+      "type": "string"
+     },
+     "object": {
+      "type": "string"
+     }
+    }
+   },
+   "io.k8s.meta.v1.Patch": {
+    "id": "io.k8s.meta.v1.Patch",
+    "description": "Patch is provided to give a concrete name and type to the Kubernetes PATCH request body.",
+    "properties": {}
+   },
+   "io.k8s.meta.v1.APIResourceList": {
+    "id": "io.k8s.meta.v1.APIResourceList",
+    "description": "APIResourceList is a list of APIResource, it is used to expose the name of the resources supported in a specific group and version, and if the resource is namespaced.",
+    "required": [
+     "groupVersion",
+     "resources"
+    ],
+    "properties": {
+     "kind": {
+      "type": "string",
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+     },
+     "apiVersion": {
+      "type": "string",
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+     },
+     "groupVersion": {
+      "type": "string",
+      "description": "groupVersion is the group and version this APIResourceList is for."
+     },
+     "resources": {
+      "type": "array",
+      "items": {
+       "$ref": "v1.APIResource"
+      },
+      "description": "resources contains the name of the resources and if they are namespaced."
+     }
+    }
+   },
+   "io.k8s.meta.v1.APIResource": {
+    "id": "io.k8s.meta.v1.APIResource",
     "description": "APIResource specifies the name of a resource and whether it is namespaced.",
     "required": [
      "name",

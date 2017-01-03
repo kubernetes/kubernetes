@@ -27,7 +27,7 @@
         "allowMultiple": false
        },
        {
-        "type": "v1beta1.LocalSubjectAccessReview",
+        "type": "io.k8s.authorization.v1beta1.LocalSubjectAccessReview",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -80,7 +80,7 @@
         "allowMultiple": false
        },
        {
-        "type": "v1beta1.SelfSubjectAccessReview",
+        "type": "io.k8s.authorization.v1beta1.SelfSubjectAccessReview",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -125,7 +125,7 @@
         "allowMultiple": false
        },
        {
-        "type": "v1beta1.SubjectAccessReview",
+        "type": "io.k8s.authorization.v1beta1.SubjectAccessReview",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -178,7 +178,7 @@
   "models": {
    "v1beta1.LocalSubjectAccessReview": {
     "id": "v1beta1.LocalSubjectAccessReview",
-    "description": "LocalSubjectAccessReview checks whether or not a user or group can perform an action in a given namespace. Having a namespace scoped resource makes it much easier to grant namespace scoped policy that includes permissions checking.",
+    "description": "LocalSubjectAccessReview checks whether or not a user or group can perform an action in a given namespace. Having a namespace scoped resource makes it much easier to grant namespace scoped policy that includes permissions checking.\n\nDEPRECATED: Use 'io.k8s.authorization.v1beta1.LocalSubjectAccessReview' instead.",
     "required": [
      "spec"
     ],
@@ -280,7 +280,7 @@
    },
    "v1.OwnerReference": {
     "id": "v1.OwnerReference",
-    "description": "OwnerReference contains enough information to let you identify an owning object. Currently, an owning object must be in the same namespace, so there is no namespace field.",
+    "description": "OwnerReference contains enough information to let you identify an owning object. Currently, an owning object must be in the same namespace, so there is no namespace field.\n\nDEPRECATED: Use 'io.k8s.meta.v1.OwnerReference' instead.",
     "required": [
      "apiVersion",
      "kind",
@@ -312,7 +312,7 @@
    },
    "v1beta1.SubjectAccessReviewSpec": {
     "id": "v1beta1.SubjectAccessReviewSpec",
-    "description": "SubjectAccessReviewSpec is a description of the access request.  Exactly one of ResourceAuthorizationAttributes and NonResourceAuthorizationAttributes must be set",
+    "description": "SubjectAccessReviewSpec is a description of the access request.  Exactly one of ResourceAuthorizationAttributes and NonResourceAuthorizationAttributes must be set\n\nDEPRECATED: Use 'io.k8s.authorization.v1beta1.SubjectAccessReviewSpec' instead.",
     "properties": {
      "resourceAttributes": {
       "$ref": "v1beta1.ResourceAttributes",
@@ -341,7 +341,7 @@
    },
    "v1beta1.ResourceAttributes": {
     "id": "v1beta1.ResourceAttributes",
-    "description": "ResourceAttributes includes the authorization attributes available for resource requests to the Authorizer interface",
+    "description": "ResourceAttributes includes the authorization attributes available for resource requests to the Authorizer interface\n\nDEPRECATED: Use 'io.k8s.authorization.v1beta1.ResourceAttributes' instead.",
     "properties": {
      "namespace": {
       "type": "string",
@@ -375,7 +375,7 @@
    },
    "v1beta1.NonResourceAttributes": {
     "id": "v1beta1.NonResourceAttributes",
-    "description": "NonResourceAttributes includes the authorization attributes available for non-resource requests to the Authorizer interface",
+    "description": "NonResourceAttributes includes the authorization attributes available for non-resource requests to the Authorizer interface\n\nDEPRECATED: Use 'io.k8s.authorization.v1beta1.NonResourceAttributes' instead.",
     "properties": {
      "path": {
       "type": "string",
@@ -389,7 +389,7 @@
    },
    "v1beta1.SubjectAccessReviewStatus": {
     "id": "v1beta1.SubjectAccessReviewStatus",
-    "description": "SubjectAccessReviewStatus",
+    "description": "SubjectAccessReviewStatus\n\nDEPRECATED: Use 'io.k8s.authorization.v1beta1.SubjectAccessReviewStatus' instead.",
     "required": [
      "allowed"
     ],
@@ -410,7 +410,7 @@
    },
    "v1beta1.SelfSubjectAccessReview": {
     "id": "v1beta1.SelfSubjectAccessReview",
-    "description": "SelfSubjectAccessReview checks whether or the current user can perform an action.  Not filling in a spec.namespace means \"in all namespaces\".  Self is a special case, because users should always be able to check whether they can perform an action",
+    "description": "SelfSubjectAccessReview checks whether or the current user can perform an action.  Not filling in a spec.namespace means \"in all namespaces\".  Self is a special case, because users should always be able to check whether they can perform an action\n\nDEPRECATED: Use 'io.k8s.authorization.v1beta1.SelfSubjectAccessReview' instead.",
     "required": [
      "spec"
     ],
@@ -438,7 +438,7 @@
    },
    "v1beta1.SelfSubjectAccessReviewSpec": {
     "id": "v1beta1.SelfSubjectAccessReviewSpec",
-    "description": "SelfSubjectAccessReviewSpec is a description of the access request.  Exactly one of ResourceAuthorizationAttributes and NonResourceAuthorizationAttributes must be set",
+    "description": "SelfSubjectAccessReviewSpec is a description of the access request.  Exactly one of ResourceAuthorizationAttributes and NonResourceAuthorizationAttributes must be set\n\nDEPRECATED: Use 'io.k8s.authorization.v1beta1.SelfSubjectAccessReviewSpec' instead.",
     "properties": {
      "resourceAttributes": {
       "$ref": "v1beta1.ResourceAttributes",
@@ -452,7 +452,7 @@
    },
    "v1beta1.SubjectAccessReview": {
     "id": "v1beta1.SubjectAccessReview",
-    "description": "SubjectAccessReview checks whether or not a user or group can perform an action.",
+    "description": "SubjectAccessReview checks whether or not a user or group can perform an action.\n\nDEPRECATED: Use 'io.k8s.authorization.v1beta1.SubjectAccessReview' instead.",
     "required": [
      "spec"
     ],
@@ -480,7 +480,7 @@
    },
    "v1.APIResourceList": {
     "id": "v1.APIResourceList",
-    "description": "APIResourceList is a list of APIResource, it is used to expose the name of the resources supported in a specific group and version, and if the resource is namespaced.",
+    "description": "APIResourceList is a list of APIResource, it is used to expose the name of the resources supported in a specific group and version, and if the resource is namespaced.\n\nDEPRECATED: Use 'io.k8s.meta.v1.APIResourceList' instead.",
     "required": [
      "groupVersion",
      "resources"
@@ -509,6 +509,294 @@
    },
    "v1.APIResource": {
     "id": "v1.APIResource",
+    "description": "APIResource specifies the name of a resource and whether it is namespaced.\n\nDEPRECATED: Use 'io.k8s.meta.v1.APIResource' instead.",
+    "required": [
+     "name",
+     "namespaced",
+     "kind",
+     "verbs"
+    ],
+    "properties": {
+     "name": {
+      "type": "string",
+      "description": "name is the name of the resource."
+     },
+     "namespaced": {
+      "type": "boolean",
+      "description": "namespaced indicates if a resource is namespaced or not."
+     },
+     "kind": {
+      "type": "string",
+      "description": "kind is the kind for the resource (e.g. 'Foo' is the kind for a resource 'foo')"
+     },
+     "verbs": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      },
+      "description": "verbs is a list of supported kube verbs (this includes get, list, watch, create, update, patch, delete, deletecollection, and proxy)"
+     }
+    }
+   },
+   "io.k8s.authorization.v1beta1.LocalSubjectAccessReview": {
+    "id": "io.k8s.authorization.v1beta1.LocalSubjectAccessReview",
+    "description": "LocalSubjectAccessReview checks whether or not a user or group can perform an action in a given namespace. Having a namespace scoped resource makes it much easier to grant namespace scoped policy that includes permissions checking.",
+    "required": [
+     "spec"
+    ],
+    "properties": {
+     "kind": {
+      "type": "string",
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+     },
+     "apiVersion": {
+      "type": "string",
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+     },
+     "metadata": {
+      "$ref": "v1.ObjectMeta"
+     },
+     "spec": {
+      "$ref": "v1beta1.SubjectAccessReviewSpec",
+      "description": "Spec holds information about the request being evaluated.  spec.namespace must be equal to the namespace you made the request against.  If empty, it is defaulted."
+     },
+     "status": {
+      "$ref": "v1beta1.SubjectAccessReviewStatus",
+      "description": "Status is filled in by the server and indicates whether the request is allowed or not"
+     }
+    }
+   },
+   "io.k8s.meta.v1.OwnerReference": {
+    "id": "io.k8s.meta.v1.OwnerReference",
+    "description": "OwnerReference contains enough information to let you identify an owning object. Currently, an owning object must be in the same namespace, so there is no namespace field.",
+    "required": [
+     "apiVersion",
+     "kind",
+     "name",
+     "uid"
+    ],
+    "properties": {
+     "apiVersion": {
+      "type": "string",
+      "description": "API version of the referent."
+     },
+     "kind": {
+      "type": "string",
+      "description": "Kind of the referent. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+     },
+     "name": {
+      "type": "string",
+      "description": "Name of the referent. More info: http://kubernetes.io/docs/user-guide/identifiers#names"
+     },
+     "uid": {
+      "type": "string",
+      "description": "UID of the referent. More info: http://kubernetes.io/docs/user-guide/identifiers#uids"
+     },
+     "controller": {
+      "type": "boolean",
+      "description": "If true, this reference points to the managing controller."
+     }
+    }
+   },
+   "io.k8s.authorization.v1beta1.SubjectAccessReviewSpec": {
+    "id": "io.k8s.authorization.v1beta1.SubjectAccessReviewSpec",
+    "description": "SubjectAccessReviewSpec is a description of the access request.  Exactly one of ResourceAuthorizationAttributes and NonResourceAuthorizationAttributes must be set",
+    "properties": {
+     "resourceAttributes": {
+      "$ref": "v1beta1.ResourceAttributes",
+      "description": "ResourceAuthorizationAttributes describes information for a resource access request"
+     },
+     "nonResourceAttributes": {
+      "$ref": "v1beta1.NonResourceAttributes",
+      "description": "NonResourceAttributes describes information for a non-resource access request"
+     },
+     "user": {
+      "type": "string",
+      "description": "User is the user you're testing for. If you specify \"User\" but not \"Group\", then is it interpreted as \"What if User were not a member of any groups"
+     },
+     "group": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      },
+      "description": "Groups is the groups you're testing for."
+     },
+     "extra": {
+      "type": "object",
+      "description": "Extra corresponds to the user.Info.GetExtra() method from the authenticator.  Since that is input to the authorizer it needs a reflection here."
+     }
+    }
+   },
+   "io.k8s.authorization.v1beta1.ResourceAttributes": {
+    "id": "io.k8s.authorization.v1beta1.ResourceAttributes",
+    "description": "ResourceAttributes includes the authorization attributes available for resource requests to the Authorizer interface",
+    "properties": {
+     "namespace": {
+      "type": "string",
+      "description": "Namespace is the namespace of the action being requested.  Currently, there is no distinction between no namespace and all namespaces \"\" (empty) is defaulted for LocalSubjectAccessReviews \"\" (empty) is empty for cluster-scoped resources \"\" (empty) means \"all\" for namespace scoped resources from a SubjectAccessReview or SelfSubjectAccessReview"
+     },
+     "verb": {
+      "type": "string",
+      "description": "Verb is a kubernetes resource API verb, like: get, list, watch, create, update, delete, proxy.  \"*\" means all."
+     },
+     "group": {
+      "type": "string",
+      "description": "Group is the API Group of the Resource.  \"*\" means all."
+     },
+     "version": {
+      "type": "string",
+      "description": "Version is the API Version of the Resource.  \"*\" means all."
+     },
+     "resource": {
+      "type": "string",
+      "description": "Resource is one of the existing resource types.  \"*\" means all."
+     },
+     "subresource": {
+      "type": "string",
+      "description": "Subresource is one of the existing resource types.  \"\" means none."
+     },
+     "name": {
+      "type": "string",
+      "description": "Name is the name of the resource being requested for a \"get\" or deleted for a \"delete\". \"\" (empty) means all."
+     }
+    }
+   },
+   "io.k8s.authorization.v1beta1.NonResourceAttributes": {
+    "id": "io.k8s.authorization.v1beta1.NonResourceAttributes",
+    "description": "NonResourceAttributes includes the authorization attributes available for non-resource requests to the Authorizer interface",
+    "properties": {
+     "path": {
+      "type": "string",
+      "description": "Path is the URL path of the request"
+     },
+     "verb": {
+      "type": "string",
+      "description": "Verb is the standard HTTP verb"
+     }
+    }
+   },
+   "io.k8s.authorization.v1beta1.SubjectAccessReviewStatus": {
+    "id": "io.k8s.authorization.v1beta1.SubjectAccessReviewStatus",
+    "description": "SubjectAccessReviewStatus",
+    "required": [
+     "allowed"
+    ],
+    "properties": {
+     "allowed": {
+      "type": "boolean",
+      "description": "Allowed is required.  True if the action would be allowed, false otherwise."
+     },
+     "reason": {
+      "type": "string",
+      "description": "Reason is optional.  It indicates why a request was allowed or denied."
+     },
+     "evaluationError": {
+      "type": "string",
+      "description": "EvaluationError is an indication that some error occurred during the authorization check. It is entirely possible to get an error and be able to continue determine authorization status in spite of it. For instance, RBAC can be missing a role, but enough roles are still present and bound to reason about the request."
+     }
+    }
+   },
+   "io.k8s.authorization.v1beta1.SelfSubjectAccessReview": {
+    "id": "io.k8s.authorization.v1beta1.SelfSubjectAccessReview",
+    "description": "SelfSubjectAccessReview checks whether or the current user can perform an action.  Not filling in a spec.namespace means \"in all namespaces\".  Self is a special case, because users should always be able to check whether they can perform an action",
+    "required": [
+     "spec"
+    ],
+    "properties": {
+     "kind": {
+      "type": "string",
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+     },
+     "apiVersion": {
+      "type": "string",
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+     },
+     "metadata": {
+      "$ref": "v1.ObjectMeta"
+     },
+     "spec": {
+      "$ref": "v1beta1.SelfSubjectAccessReviewSpec",
+      "description": "Spec holds information about the request being evaluated.  user and groups must be empty"
+     },
+     "status": {
+      "$ref": "v1beta1.SubjectAccessReviewStatus",
+      "description": "Status is filled in by the server and indicates whether the request is allowed or not"
+     }
+    }
+   },
+   "io.k8s.authorization.v1beta1.SelfSubjectAccessReviewSpec": {
+    "id": "io.k8s.authorization.v1beta1.SelfSubjectAccessReviewSpec",
+    "description": "SelfSubjectAccessReviewSpec is a description of the access request.  Exactly one of ResourceAuthorizationAttributes and NonResourceAuthorizationAttributes must be set",
+    "properties": {
+     "resourceAttributes": {
+      "$ref": "v1beta1.ResourceAttributes",
+      "description": "ResourceAuthorizationAttributes describes information for a resource access request"
+     },
+     "nonResourceAttributes": {
+      "$ref": "v1beta1.NonResourceAttributes",
+      "description": "NonResourceAttributes describes information for a non-resource access request"
+     }
+    }
+   },
+   "io.k8s.authorization.v1beta1.SubjectAccessReview": {
+    "id": "io.k8s.authorization.v1beta1.SubjectAccessReview",
+    "description": "SubjectAccessReview checks whether or not a user or group can perform an action.",
+    "required": [
+     "spec"
+    ],
+    "properties": {
+     "kind": {
+      "type": "string",
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+     },
+     "apiVersion": {
+      "type": "string",
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+     },
+     "metadata": {
+      "$ref": "v1.ObjectMeta"
+     },
+     "spec": {
+      "$ref": "v1beta1.SubjectAccessReviewSpec",
+      "description": "Spec holds information about the request being evaluated"
+     },
+     "status": {
+      "$ref": "v1beta1.SubjectAccessReviewStatus",
+      "description": "Status is filled in by the server and indicates whether the request is allowed or not"
+     }
+    }
+   },
+   "io.k8s.meta.v1.APIResourceList": {
+    "id": "io.k8s.meta.v1.APIResourceList",
+    "description": "APIResourceList is a list of APIResource, it is used to expose the name of the resources supported in a specific group and version, and if the resource is namespaced.",
+    "required": [
+     "groupVersion",
+     "resources"
+    ],
+    "properties": {
+     "kind": {
+      "type": "string",
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+     },
+     "apiVersion": {
+      "type": "string",
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+     },
+     "groupVersion": {
+      "type": "string",
+      "description": "groupVersion is the group and version this APIResourceList is for."
+     },
+     "resources": {
+      "type": "array",
+      "items": {
+       "$ref": "v1.APIResource"
+      },
+      "description": "resources contains the name of the resources and if they are namespaced."
+     }
+    }
+   },
+   "io.k8s.meta.v1.APIResource": {
+    "id": "io.k8s.meta.v1.APIResource",
     "description": "APIResource specifies the name of a resource and whether it is namespaced.",
     "required": [
      "name",

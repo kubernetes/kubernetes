@@ -108,7 +108,7 @@
         "allowMultiple": false
        },
        {
-        "type": "v1beta1.StatefulSet",
+        "type": "apps.v1beta1.StatefulSet",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -390,7 +390,7 @@
         "allowMultiple": false
        },
        {
-        "type": "v1beta1.StatefulSet",
+        "type": "apps.v1beta1.StatefulSet",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -445,7 +445,7 @@
         "allowMultiple": false
        },
        {
-        "type": "v1.Patch",
+        "type": "io.k8s.meta.v1.Patch",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -879,7 +879,7 @@
         "allowMultiple": false
        },
        {
-        "type": "v1beta1.StatefulSet",
+        "type": "apps.v1beta1.StatefulSet",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -934,7 +934,7 @@
         "allowMultiple": false
        },
        {
-        "type": "v1.Patch",
+        "type": "io.k8s.meta.v1.Patch",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -1005,7 +1005,7 @@
   "models": {
    "v1beta1.StatefulSetList": {
     "id": "v1beta1.StatefulSetList",
-    "description": "StatefulSetList is a collection of StatefulSets.",
+    "description": "StatefulSetList is a collection of StatefulSets.\n\nDEPRECATED: Use 'apps.v1beta1.StatefulSetList' instead.",
     "required": [
      "items"
     ],
@@ -1031,7 +1031,7 @@
    },
    "v1.ListMeta": {
     "id": "v1.ListMeta",
-    "description": "ListMeta describes metadata that synthetic resources must have, including lists and various status objects. A resource may have only one of {ObjectMeta, ListMeta}.",
+    "description": "ListMeta describes metadata that synthetic resources must have, including lists and various status objects. A resource may have only one of {ObjectMeta, ListMeta}.\n\nDEPRECATED: Use 'io.k8s.meta.v1.ListMeta' instead.",
     "properties": {
      "selfLink": {
       "type": "string",
@@ -1045,7 +1045,7 @@
    },
    "v1beta1.StatefulSet": {
     "id": "v1beta1.StatefulSet",
-    "description": "StatefulSet represents a set of pods with consistent identities. Identities are defined as:\n - Network: A single stable DNS and hostname.\n - Storage: As many VolumeClaims as requested.\nThe StatefulSet guarantees that a given network identity will always map to the same storage identity.",
+    "description": "StatefulSet represents a set of pods with consistent identities. Identities are defined as:\n - Network: A single stable DNS and hostname.\n - Storage: As many VolumeClaims as requested.\nThe StatefulSet guarantees that a given network identity will always map to the same storage identity.\n\nDEPRECATED: Use 'apps.v1beta1.StatefulSet' instead.",
     "properties": {
      "kind": {
       "type": "string",
@@ -1144,7 +1144,7 @@
    },
    "v1.OwnerReference": {
     "id": "v1.OwnerReference",
-    "description": "OwnerReference contains enough information to let you identify an owning object. Currently, an owning object must be in the same namespace, so there is no namespace field.",
+    "description": "OwnerReference contains enough information to let you identify an owning object. Currently, an owning object must be in the same namespace, so there is no namespace field.\n\nDEPRECATED: Use 'io.k8s.meta.v1.OwnerReference' instead.",
     "required": [
      "apiVersion",
      "kind",
@@ -1176,7 +1176,7 @@
    },
    "v1beta1.StatefulSetSpec": {
     "id": "v1beta1.StatefulSetSpec",
-    "description": "A StatefulSetSpec is the specification of a StatefulSet.",
+    "description": "A StatefulSetSpec is the specification of a StatefulSet.\n\nDEPRECATED: Use 'apps.v1beta1.StatefulSetSpec' instead.",
     "required": [
      "template",
      "serviceName"
@@ -1210,7 +1210,7 @@
    },
    "v1.LabelSelector": {
     "id": "v1.LabelSelector",
-    "description": "A label selector is a label query over a set of resources. The result of matchLabels and matchExpressions are ANDed. An empty label selector matches all objects. A null label selector matches no objects.",
+    "description": "A label selector is a label query over a set of resources. The result of matchLabels and matchExpressions are ANDed. An empty label selector matches all objects. A null label selector matches no objects.\n\nDEPRECATED: Use 'io.k8s.meta.v1.LabelSelector' instead.",
     "properties": {
      "matchLabels": {
       "type": "object",
@@ -1227,7 +1227,7 @@
    },
    "v1.LabelSelectorRequirement": {
     "id": "v1.LabelSelectorRequirement",
-    "description": "A label selector requirement is a selector that contains values, a key, and an operator that relates the key and values.",
+    "description": "A label selector requirement is a selector that contains values, a key, and an operator that relates the key and values.\n\nDEPRECATED: Use 'io.k8s.meta.v1.LabelSelectorRequirement' instead.",
     "required": [
      "key",
      "operator"
@@ -2074,7 +2074,7 @@
       "description": "The URI the data disk in the blob storage"
      },
      "cachingMode": {
-      "$ref": "v1.AzureDataDiskCachingMode",
+      "$ref": "io.k8s.kubernetes.pkg.api.v1.AzureDataDiskCachingMode",
       "description": "Host Caching mode: None, Read Only, Read Write."
      },
      "fsType": {
@@ -2087,8 +2087,8 @@
      }
     }
    },
-   "v1.AzureDataDiskCachingMode": {
-    "id": "v1.AzureDataDiskCachingMode",
+   "io.k8s.kubernetes.pkg.api.v1.AzureDataDiskCachingMode": {
+    "id": "io.k8s.kubernetes.pkg.api.v1.AzureDataDiskCachingMode",
     "properties": {}
    },
    "v1.PhotonPersistentDiskVolumeSource": {
@@ -2572,21 +2572,21 @@
      "add": {
       "type": "array",
       "items": {
-       "$ref": "v1.Capability"
+       "$ref": "io.k8s.kubernetes.pkg.api.v1.Capability"
       },
       "description": "Added capabilities"
      },
      "drop": {
       "type": "array",
       "items": {
-       "$ref": "v1.Capability"
+       "$ref": "io.k8s.kubernetes.pkg.api.v1.Capability"
       },
       "description": "Removed capabilities"
      }
     }
    },
-   "v1.Capability": {
-    "id": "v1.Capability",
+   "io.k8s.kubernetes.pkg.api.v1.Capability": {
+    "id": "io.k8s.kubernetes.pkg.api.v1.Capability",
     "properties": {}
    },
    "v1.SELinuxOptions": {
@@ -2869,7 +2869,7 @@
      "accessModes": {
       "type": "array",
       "items": {
-       "$ref": "v1.PersistentVolumeAccessMode"
+       "$ref": "io.k8s.kubernetes.pkg.api.v1.PersistentVolumeAccessMode"
       },
       "description": "AccessModes contains the desired access modes the volume should have. More info: http://kubernetes.io/docs/user-guide/persistent-volumes#access-modes-1"
      },
@@ -2887,8 +2887,8 @@
      }
     }
    },
-   "v1.PersistentVolumeAccessMode": {
-    "id": "v1.PersistentVolumeAccessMode",
+   "io.k8s.kubernetes.pkg.api.v1.PersistentVolumeAccessMode": {
+    "id": "io.k8s.kubernetes.pkg.api.v1.PersistentVolumeAccessMode",
     "properties": {}
    },
    "v1.PersistentVolumeClaimStatus": {
@@ -2902,7 +2902,7 @@
      "accessModes": {
       "type": "array",
       "items": {
-       "$ref": "v1.PersistentVolumeAccessMode"
+       "$ref": "io.k8s.kubernetes.pkg.api.v1.PersistentVolumeAccessMode"
       },
       "description": "AccessModes contains the actual access modes the volume backing the PVC has. More info: http://kubernetes.io/docs/user-guide/persistent-volumes#access-modes-1"
      },
@@ -2914,7 +2914,7 @@
    },
    "v1beta1.StatefulSetStatus": {
     "id": "v1beta1.StatefulSetStatus",
-    "description": "StatefulSetStatus represents the current state of a StatefulSet.",
+    "description": "StatefulSetStatus represents the current state of a StatefulSet.\n\nDEPRECATED: Use 'apps.v1beta1.StatefulSetStatus' instead.",
     "required": [
      "replicas"
     ],
@@ -2933,7 +2933,7 @@
    },
    "v1.Status": {
     "id": "v1.Status",
-    "description": "Status is a return value for calls that don't return other objects.",
+    "description": "Status is a return value for calls that don't return other objects.\n\nDEPRECATED: Use 'io.k8s.meta.v1.Status' instead.",
     "properties": {
      "kind": {
       "type": "string",
@@ -2972,7 +2972,7 @@
    },
    "v1.StatusDetails": {
     "id": "v1.StatusDetails",
-    "description": "StatusDetails is a set of additional properties that MAY be set by the server to provide additional information about a response. The Reason field of a Status object defines what attributes will be set. Clients must ignore fields that do not match the defined type of each attribute, and should assume that any attribute may be empty, invalid, or under defined.",
+    "description": "StatusDetails is a set of additional properties that MAY be set by the server to provide additional information about a response. The Reason field of a Status object defines what attributes will be set. Clients must ignore fields that do not match the defined type of each attribute, and should assume that any attribute may be empty, invalid, or under defined.\n\nDEPRECATED: Use 'io.k8s.meta.v1.StatusDetails' instead.",
     "properties": {
      "name": {
       "type": "string",
@@ -3002,7 +3002,7 @@
    },
    "v1.StatusCause": {
     "id": "v1.StatusCause",
-    "description": "StatusCause provides more information about an api.Status failure, including cases when multiple errors are encountered.",
+    "description": "StatusCause provides more information about an api.Status failure, including cases when multiple errors are encountered.\n\nDEPRECATED: Use 'io.k8s.meta.v1.StatusCause' instead.",
     "properties": {
      "reason": {
       "type": "string",
@@ -3020,6 +3020,7 @@
    },
    "versioned.Event": {
     "id": "versioned.Event",
+    "description": "\n\nDEPRECATED: Use 'io.k8s.kubernetes.pkg.watch.versioned.Event' instead.",
     "required": [
      "type",
      "object"
@@ -3035,7 +3036,7 @@
    },
    "v1.Patch": {
     "id": "v1.Patch",
-    "description": "Patch is provided to give a concrete name and type to the Kubernetes PATCH request body.",
+    "description": "Patch is provided to give a concrete name and type to the Kubernetes PATCH request body.\n\nDEPRECATED: Use 'io.k8s.meta.v1.Patch' instead.",
     "properties": {}
    },
    "v1.DeleteOptions": {
@@ -3070,18 +3071,18 @@
     "description": "Preconditions must be fulfilled before an operation (update, delete, etc.) is carried out.",
     "properties": {
      "uid": {
-      "$ref": "types.UID",
+      "$ref": "io.k8s.kubernetes.pkg.types.UID",
       "description": "Specifies the target UID."
      }
     }
    },
-   "types.UID": {
-    "id": "types.UID",
+   "io.k8s.kubernetes.pkg.types.UID": {
+    "id": "io.k8s.kubernetes.pkg.types.UID",
     "properties": {}
    },
    "v1.APIResourceList": {
     "id": "v1.APIResourceList",
-    "description": "APIResourceList is a list of APIResource, it is used to expose the name of the resources supported in a specific group and version, and if the resource is namespaced.",
+    "description": "APIResourceList is a list of APIResource, it is used to expose the name of the resources supported in a specific group and version, and if the resource is namespaced.\n\nDEPRECATED: Use 'io.k8s.meta.v1.APIResourceList' instead.",
     "required": [
      "groupVersion",
      "resources"
@@ -3110,6 +3111,365 @@
    },
    "v1.APIResource": {
     "id": "v1.APIResource",
+    "description": "APIResource specifies the name of a resource and whether it is namespaced.\n\nDEPRECATED: Use 'io.k8s.meta.v1.APIResource' instead.",
+    "required": [
+     "name",
+     "namespaced",
+     "kind",
+     "verbs"
+    ],
+    "properties": {
+     "name": {
+      "type": "string",
+      "description": "name is the name of the resource."
+     },
+     "namespaced": {
+      "type": "boolean",
+      "description": "namespaced indicates if a resource is namespaced or not."
+     },
+     "kind": {
+      "type": "string",
+      "description": "kind is the kind for the resource (e.g. 'Foo' is the kind for a resource 'foo')"
+     },
+     "verbs": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      },
+      "description": "verbs is a list of supported kube verbs (this includes get, list, watch, create, update, patch, delete, deletecollection, and proxy)"
+     }
+    }
+   },
+   "apps.v1beta1.StatefulSetList": {
+    "id": "apps.v1beta1.StatefulSetList",
+    "description": "StatefulSetList is a collection of StatefulSets.",
+    "required": [
+     "items"
+    ],
+    "properties": {
+     "kind": {
+      "type": "string",
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+     },
+     "apiVersion": {
+      "type": "string",
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+     },
+     "metadata": {
+      "$ref": "v1.ListMeta"
+     },
+     "items": {
+      "type": "array",
+      "items": {
+       "$ref": "v1beta1.StatefulSet"
+      }
+     }
+    }
+   },
+   "io.k8s.meta.v1.ListMeta": {
+    "id": "io.k8s.meta.v1.ListMeta",
+    "description": "ListMeta describes metadata that synthetic resources must have, including lists and various status objects. A resource may have only one of {ObjectMeta, ListMeta}.",
+    "properties": {
+     "selfLink": {
+      "type": "string",
+      "description": "SelfLink is a URL representing this object. Populated by the system. Read-only."
+     },
+     "resourceVersion": {
+      "type": "string",
+      "description": "String that identifies the server's internal version of this object that can be used by clients to determine when objects have changed. Value must be treated as opaque by clients and passed unmodified back to the server. Populated by the system. Read-only. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#concurrency-control-and-consistency"
+     }
+    }
+   },
+   "apps.v1beta1.StatefulSet": {
+    "id": "apps.v1beta1.StatefulSet",
+    "description": "StatefulSet represents a set of pods with consistent identities. Identities are defined as:\n - Network: A single stable DNS and hostname.\n - Storage: As many VolumeClaims as requested.\nThe StatefulSet guarantees that a given network identity will always map to the same storage identity.",
+    "properties": {
+     "kind": {
+      "type": "string",
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+     },
+     "apiVersion": {
+      "type": "string",
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+     },
+     "metadata": {
+      "$ref": "v1.ObjectMeta"
+     },
+     "spec": {
+      "$ref": "v1beta1.StatefulSetSpec",
+      "description": "Spec defines the desired identities of pods in this set."
+     },
+     "status": {
+      "$ref": "v1beta1.StatefulSetStatus",
+      "description": "Status is the current status of Pods in this StatefulSet. This data may be out of date by some window of time."
+     }
+    }
+   },
+   "io.k8s.meta.v1.OwnerReference": {
+    "id": "io.k8s.meta.v1.OwnerReference",
+    "description": "OwnerReference contains enough information to let you identify an owning object. Currently, an owning object must be in the same namespace, so there is no namespace field.",
+    "required": [
+     "apiVersion",
+     "kind",
+     "name",
+     "uid"
+    ],
+    "properties": {
+     "apiVersion": {
+      "type": "string",
+      "description": "API version of the referent."
+     },
+     "kind": {
+      "type": "string",
+      "description": "Kind of the referent. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+     },
+     "name": {
+      "type": "string",
+      "description": "Name of the referent. More info: http://kubernetes.io/docs/user-guide/identifiers#names"
+     },
+     "uid": {
+      "type": "string",
+      "description": "UID of the referent. More info: http://kubernetes.io/docs/user-guide/identifiers#uids"
+     },
+     "controller": {
+      "type": "boolean",
+      "description": "If true, this reference points to the managing controller."
+     }
+    }
+   },
+   "apps.v1beta1.StatefulSetSpec": {
+    "id": "apps.v1beta1.StatefulSetSpec",
+    "description": "A StatefulSetSpec is the specification of a StatefulSet.",
+    "required": [
+     "template",
+     "serviceName"
+    ],
+    "properties": {
+     "replicas": {
+      "type": "integer",
+      "format": "int32",
+      "description": "Replicas is the desired number of replicas of the given Template. These are replicas in the sense that they are instantiations of the same Template, but individual replicas also have a consistent identity. If unspecified, defaults to 1."
+     },
+     "selector": {
+      "$ref": "v1.LabelSelector",
+      "description": "Selector is a label query over pods that should match the replica count. If empty, defaulted to labels on the pod template. More info: http://kubernetes.io/docs/user-guide/labels#label-selectors"
+     },
+     "template": {
+      "$ref": "v1.PodTemplateSpec",
+      "description": "Template is the object that describes the pod that will be created if insufficient replicas are detected. Each pod stamped out by the StatefulSet will fulfill this Template, but have a unique identity from the rest of the StatefulSet."
+     },
+     "volumeClaimTemplates": {
+      "type": "array",
+      "items": {
+       "$ref": "v1.PersistentVolumeClaim"
+      },
+      "description": "VolumeClaimTemplates is a list of claims that pods are allowed to reference. The StatefulSet controller is responsible for mapping network identities to claims in a way that maintains the identity of a pod. Every claim in this list must have at least one matching (by name) volumeMount in one container in the template. A claim in this list takes precedence over any volumes in the template, with the same name."
+     },
+     "serviceName": {
+      "type": "string",
+      "description": "ServiceName is the name of the service that governs this StatefulSet. This service must exist before the StatefulSet, and is responsible for the network identity of the set. Pods get DNS/hostnames that follow the pattern: pod-specific-string.serviceName.default.svc.cluster.local where \"pod-specific-string\" is managed by the StatefulSet controller."
+     }
+    }
+   },
+   "io.k8s.meta.v1.LabelSelector": {
+    "id": "io.k8s.meta.v1.LabelSelector",
+    "description": "A label selector is a label query over a set of resources. The result of matchLabels and matchExpressions are ANDed. An empty label selector matches all objects. A null label selector matches no objects.",
+    "properties": {
+     "matchLabels": {
+      "type": "object",
+      "description": "matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels map is equivalent to an element of matchExpressions, whose key field is \"key\", the operator is \"In\", and the values array contains only \"value\". The requirements are ANDed."
+     },
+     "matchExpressions": {
+      "type": "array",
+      "items": {
+       "$ref": "v1.LabelSelectorRequirement"
+      },
+      "description": "matchExpressions is a list of label selector requirements. The requirements are ANDed."
+     }
+    }
+   },
+   "io.k8s.meta.v1.LabelSelectorRequirement": {
+    "id": "io.k8s.meta.v1.LabelSelectorRequirement",
+    "description": "A label selector requirement is a selector that contains values, a key, and an operator that relates the key and values.",
+    "required": [
+     "key",
+     "operator"
+    ],
+    "properties": {
+     "key": {
+      "type": "string",
+      "description": "key is the label key that the selector applies to."
+     },
+     "operator": {
+      "type": "string",
+      "description": "operator represents a key's relationship to a set of values. Valid operators ard In, NotIn, Exists and DoesNotExist."
+     },
+     "values": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      },
+      "description": "values is an array of string values. If the operator is In or NotIn, the values array must be non-empty. If the operator is Exists or DoesNotExist, the values array must be empty. This array is replaced during a strategic merge patch."
+     }
+    }
+   },
+   "apps.v1beta1.StatefulSetStatus": {
+    "id": "apps.v1beta1.StatefulSetStatus",
+    "description": "StatefulSetStatus represents the current state of a StatefulSet.",
+    "required": [
+     "replicas"
+    ],
+    "properties": {
+     "observedGeneration": {
+      "type": "integer",
+      "format": "int64",
+      "description": "most recent generation observed by this StatefulSet."
+     },
+     "replicas": {
+      "type": "integer",
+      "format": "int32",
+      "description": "Replicas is the number of actual replicas."
+     }
+    }
+   },
+   "io.k8s.meta.v1.Status": {
+    "id": "io.k8s.meta.v1.Status",
+    "description": "Status is a return value for calls that don't return other objects.",
+    "properties": {
+     "kind": {
+      "type": "string",
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+     },
+     "apiVersion": {
+      "type": "string",
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+     },
+     "metadata": {
+      "$ref": "v1.ListMeta",
+      "description": "Standard list metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+     },
+     "status": {
+      "type": "string",
+      "description": "Status of the operation. One of: \"Success\" or \"Failure\". More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status"
+     },
+     "message": {
+      "type": "string",
+      "description": "A human-readable description of the status of this operation."
+     },
+     "reason": {
+      "type": "string",
+      "description": "A machine-readable description of why this operation is in the \"Failure\" status. If this value is empty there is no information available. A Reason clarifies an HTTP status code but does not override it."
+     },
+     "details": {
+      "$ref": "v1.StatusDetails",
+      "description": "Extended data associated with the reason.  Each reason may define its own extended details. This field is optional and the data returned is not guaranteed to conform to any schema except that defined by the reason type."
+     },
+     "code": {
+      "type": "integer",
+      "format": "int32",
+      "description": "Suggested HTTP return code for this status, 0 if not set."
+     }
+    }
+   },
+   "io.k8s.meta.v1.StatusDetails": {
+    "id": "io.k8s.meta.v1.StatusDetails",
+    "description": "StatusDetails is a set of additional properties that MAY be set by the server to provide additional information about a response. The Reason field of a Status object defines what attributes will be set. Clients must ignore fields that do not match the defined type of each attribute, and should assume that any attribute may be empty, invalid, or under defined.",
+    "properties": {
+     "name": {
+      "type": "string",
+      "description": "The name attribute of the resource associated with the status StatusReason (when there is a single name which can be described)."
+     },
+     "group": {
+      "type": "string",
+      "description": "The group attribute of the resource associated with the status StatusReason."
+     },
+     "kind": {
+      "type": "string",
+      "description": "The kind attribute of the resource associated with the status StatusReason. On some operations may differ from the requested resource Kind. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+     },
+     "causes": {
+      "type": "array",
+      "items": {
+       "$ref": "v1.StatusCause"
+      },
+      "description": "The Causes array includes more details associated with the StatusReason failure. Not all StatusReasons may provide detailed causes."
+     },
+     "retryAfterSeconds": {
+      "type": "integer",
+      "format": "int32",
+      "description": "If specified, the time in seconds before the operation should be retried."
+     }
+    }
+   },
+   "io.k8s.meta.v1.StatusCause": {
+    "id": "io.k8s.meta.v1.StatusCause",
+    "description": "StatusCause provides more information about an api.Status failure, including cases when multiple errors are encountered.",
+    "properties": {
+     "reason": {
+      "type": "string",
+      "description": "A machine-readable description of the cause of the error. If this value is empty there is no information available."
+     },
+     "message": {
+      "type": "string",
+      "description": "A human-readable description of the cause of the error.  This field may be presented as-is to a reader."
+     },
+     "field": {
+      "type": "string",
+      "description": "The field of the resource that has caused this error, as named by its JSON serialization. May include dot and postfix notation for nested attributes. Arrays are zero-indexed.  Fields may appear more than once in an array of causes due to fields having multiple errors. Optional.\n\nExamples:\n  \"name\" - the field \"name\" on the current resource\n  \"items[0].name\" - the field \"name\" on the first array entry in \"items\""
+     }
+    }
+   },
+   "io.k8s.kubernetes.pkg.watch.versioned.Event": {
+    "id": "io.k8s.kubernetes.pkg.watch.versioned.Event",
+    "required": [
+     "type",
+     "object"
+    ],
+    "properties": {
+     "type": {
+      "type": "string"
+     },
+     "object": {
+      "type": "string"
+     }
+    }
+   },
+   "io.k8s.meta.v1.Patch": {
+    "id": "io.k8s.meta.v1.Patch",
+    "description": "Patch is provided to give a concrete name and type to the Kubernetes PATCH request body.",
+    "properties": {}
+   },
+   "io.k8s.meta.v1.APIResourceList": {
+    "id": "io.k8s.meta.v1.APIResourceList",
+    "description": "APIResourceList is a list of APIResource, it is used to expose the name of the resources supported in a specific group and version, and if the resource is namespaced.",
+    "required": [
+     "groupVersion",
+     "resources"
+    ],
+    "properties": {
+     "kind": {
+      "type": "string",
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+     },
+     "apiVersion": {
+      "type": "string",
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+     },
+     "groupVersion": {
+      "type": "string",
+      "description": "groupVersion is the group and version this APIResourceList is for."
+     },
+     "resources": {
+      "type": "array",
+      "items": {
+       "$ref": "v1.APIResource"
+      },
+      "description": "resources contains the name of the resources and if they are namespaced."
+     }
+    }
+   },
+   "io.k8s.meta.v1.APIResource": {
+    "id": "io.k8s.meta.v1.APIResource",
     "description": "APIResource specifies the name of a resource and whether it is namespaced.",
     "required": [
      "name",

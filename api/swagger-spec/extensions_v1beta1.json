@@ -108,7 +108,7 @@
         "allowMultiple": false
        },
        {
-        "type": "v1beta1.DaemonSet",
+        "type": "extensions.v1beta1.DaemonSet",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -390,7 +390,7 @@
         "allowMultiple": false
        },
        {
-        "type": "v1beta1.DaemonSet",
+        "type": "extensions.v1beta1.DaemonSet",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -445,7 +445,7 @@
         "allowMultiple": false
        },
        {
-        "type": "v1.Patch",
+        "type": "io.k8s.meta.v1.Patch",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -879,7 +879,7 @@
         "allowMultiple": false
        },
        {
-        "type": "v1beta1.DaemonSet",
+        "type": "extensions.v1beta1.DaemonSet",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -934,7 +934,7 @@
         "allowMultiple": false
        },
        {
-        "type": "v1.Patch",
+        "type": "io.k8s.meta.v1.Patch",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -1078,7 +1078,7 @@
         "allowMultiple": false
        },
        {
-        "type": "v1beta1.Deployment",
+        "type": "extensions.v1beta1.Deployment",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -1360,7 +1360,7 @@
         "allowMultiple": false
        },
        {
-        "type": "v1beta1.Deployment",
+        "type": "extensions.v1beta1.Deployment",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -1415,7 +1415,7 @@
         "allowMultiple": false
        },
        {
-        "type": "v1.Patch",
+        "type": "io.k8s.meta.v1.Patch",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -1802,7 +1802,7 @@
         "allowMultiple": false
        },
        {
-        "type": "v1beta1.DeploymentRollback",
+        "type": "extensions.v1beta1.DeploymentRollback",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -1910,7 +1910,7 @@
         "allowMultiple": false
        },
        {
-        "type": "v1beta1.Scale",
+        "type": "extensions.v1beta1.Scale",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -1965,7 +1965,7 @@
         "allowMultiple": false
        },
        {
-        "type": "v1.Patch",
+        "type": "io.k8s.meta.v1.Patch",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -2075,7 +2075,7 @@
         "allowMultiple": false
        },
        {
-        "type": "v1beta1.Deployment",
+        "type": "extensions.v1beta1.Deployment",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -2130,7 +2130,7 @@
         "allowMultiple": false
        },
        {
-        "type": "v1.Patch",
+        "type": "io.k8s.meta.v1.Patch",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -2274,7 +2274,7 @@
         "allowMultiple": false
        },
        {
-        "type": "v1beta1.HorizontalPodAutoscaler",
+        "type": "extensions.v1beta1.HorizontalPodAutoscaler",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -2556,7 +2556,7 @@
         "allowMultiple": false
        },
        {
-        "type": "v1beta1.HorizontalPodAutoscaler",
+        "type": "extensions.v1beta1.HorizontalPodAutoscaler",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -2611,7 +2611,7 @@
         "allowMultiple": false
        },
        {
-        "type": "v1.Patch",
+        "type": "io.k8s.meta.v1.Patch",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -3045,7 +3045,7 @@
         "allowMultiple": false
        },
        {
-        "type": "v1beta1.HorizontalPodAutoscaler",
+        "type": "extensions.v1beta1.HorizontalPodAutoscaler",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -3100,7 +3100,7 @@
         "allowMultiple": false
        },
        {
-        "type": "v1.Patch",
+        "type": "io.k8s.meta.v1.Patch",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -3244,7 +3244,7 @@
         "allowMultiple": false
        },
        {
-        "type": "v1beta1.Ingress",
+        "type": "extensions.v1beta1.Ingress",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -3526,7 +3526,7 @@
         "allowMultiple": false
        },
        {
-        "type": "v1beta1.Ingress",
+        "type": "extensions.v1beta1.Ingress",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -3581,7 +3581,7 @@
         "allowMultiple": false
        },
        {
-        "type": "v1.Patch",
+        "type": "io.k8s.meta.v1.Patch",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -4015,7 +4015,7 @@
         "allowMultiple": false
        },
        {
-        "type": "v1beta1.Ingress",
+        "type": "extensions.v1beta1.Ingress",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -4070,7 +4070,7 @@
         "allowMultiple": false
        },
        {
-        "type": "v1.Patch",
+        "type": "io.k8s.meta.v1.Patch",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -4214,7 +4214,7 @@
         "allowMultiple": false
        },
        {
-        "type": "v1beta1.NetworkPolicy",
+        "type": "extensions.v1beta1.NetworkPolicy",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -4496,7 +4496,7 @@
         "allowMultiple": false
        },
        {
-        "type": "v1beta1.NetworkPolicy",
+        "type": "extensions.v1beta1.NetworkPolicy",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -4551,7 +4551,7 @@
         "allowMultiple": false
        },
        {
-        "type": "v1.Patch",
+        "type": "io.k8s.meta.v1.Patch",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -5019,7 +5019,7 @@
         "allowMultiple": false
        },
        {
-        "type": "v1beta1.ReplicaSet",
+        "type": "extensions.v1beta1.ReplicaSet",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -5301,7 +5301,7 @@
         "allowMultiple": false
        },
        {
-        "type": "v1beta1.ReplicaSet",
+        "type": "extensions.v1beta1.ReplicaSet",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -5356,7 +5356,7 @@
         "allowMultiple": false
        },
        {
-        "type": "v1.Patch",
+        "type": "io.k8s.meta.v1.Patch",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -5790,7 +5790,7 @@
         "allowMultiple": false
        },
        {
-        "type": "v1beta1.Scale",
+        "type": "extensions.v1beta1.Scale",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -5845,7 +5845,7 @@
         "allowMultiple": false
        },
        {
-        "type": "v1.Patch",
+        "type": "io.k8s.meta.v1.Patch",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -5955,7 +5955,7 @@
         "allowMultiple": false
        },
        {
-        "type": "v1beta1.ReplicaSet",
+        "type": "extensions.v1beta1.ReplicaSet",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -6010,7 +6010,7 @@
         "allowMultiple": false
        },
        {
-        "type": "v1.Patch",
+        "type": "io.k8s.meta.v1.Patch",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -6120,7 +6120,7 @@
         "allowMultiple": false
        },
        {
-        "type": "v1beta1.Scale",
+        "type": "extensions.v1beta1.Scale",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -6175,7 +6175,7 @@
         "allowMultiple": false
        },
        {
-        "type": "v1.Patch",
+        "type": "io.k8s.meta.v1.Patch",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -6311,7 +6311,7 @@
         "allowMultiple": false
        },
        {
-        "type": "v1beta1.ThirdPartyResource",
+        "type": "extensions.v1beta1.ThirdPartyResource",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -6561,7 +6561,7 @@
         "allowMultiple": false
        },
        {
-        "type": "v1beta1.ThirdPartyResource",
+        "type": "extensions.v1beta1.ThirdPartyResource",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -6608,7 +6608,7 @@
         "allowMultiple": false
        },
        {
-        "type": "v1.Patch",
+        "type": "io.k8s.meta.v1.Patch",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -6821,7 +6821,7 @@
   "models": {
    "v1beta1.DaemonSetList": {
     "id": "v1beta1.DaemonSetList",
-    "description": "DaemonSetList is a collection of daemon sets.",
+    "description": "DaemonSetList is a collection of daemon sets.\n\nDEPRECATED: Use 'extensions.v1beta1.DaemonSetList' instead.",
     "required": [
      "items"
     ],
@@ -6849,7 +6849,7 @@
    },
    "v1.ListMeta": {
     "id": "v1.ListMeta",
-    "description": "ListMeta describes metadata that synthetic resources must have, including lists and various status objects. A resource may have only one of {ObjectMeta, ListMeta}.",
+    "description": "ListMeta describes metadata that synthetic resources must have, including lists and various status objects. A resource may have only one of {ObjectMeta, ListMeta}.\n\nDEPRECATED: Use 'io.k8s.meta.v1.ListMeta' instead.",
     "properties": {
      "selfLink": {
       "type": "string",
@@ -6863,7 +6863,7 @@
    },
    "v1beta1.DaemonSet": {
     "id": "v1beta1.DaemonSet",
-    "description": "DaemonSet represents the configuration of a daemon set.",
+    "description": "DaemonSet represents the configuration of a daemon set.\n\nDEPRECATED: Use 'extensions.v1beta1.DaemonSet' instead.",
     "properties": {
      "kind": {
       "type": "string",
@@ -6963,7 +6963,7 @@
    },
    "v1.OwnerReference": {
     "id": "v1.OwnerReference",
-    "description": "OwnerReference contains enough information to let you identify an owning object. Currently, an owning object must be in the same namespace, so there is no namespace field.",
+    "description": "OwnerReference contains enough information to let you identify an owning object. Currently, an owning object must be in the same namespace, so there is no namespace field.\n\nDEPRECATED: Use 'io.k8s.meta.v1.OwnerReference' instead.",
     "required": [
      "apiVersion",
      "kind",
@@ -6995,7 +6995,7 @@
    },
    "v1beta1.DaemonSetSpec": {
     "id": "v1beta1.DaemonSetSpec",
-    "description": "DaemonSetSpec is the specification of a daemon set.",
+    "description": "DaemonSetSpec is the specification of a daemon set.\n\nDEPRECATED: Use 'extensions.v1beta1.DaemonSetSpec' instead.",
     "required": [
      "template"
     ],
@@ -7012,7 +7012,7 @@
    },
    "v1.LabelSelector": {
     "id": "v1.LabelSelector",
-    "description": "A label selector is a label query over a set of resources. The result of matchLabels and matchExpressions are ANDed. An empty label selector matches all objects. A null label selector matches no objects.",
+    "description": "A label selector is a label query over a set of resources. The result of matchLabels and matchExpressions are ANDed. An empty label selector matches all objects. A null label selector matches no objects.\n\nDEPRECATED: Use 'io.k8s.meta.v1.LabelSelector' instead.",
     "properties": {
      "matchLabels": {
       "type": "object",
@@ -7029,7 +7029,7 @@
    },
    "v1.LabelSelectorRequirement": {
     "id": "v1.LabelSelectorRequirement",
-    "description": "A label selector requirement is a selector that contains values, a key, and an operator that relates the key and values.",
+    "description": "A label selector requirement is a selector that contains values, a key, and an operator that relates the key and values.\n\nDEPRECATED: Use 'io.k8s.meta.v1.LabelSelectorRequirement' instead.",
     "required": [
      "key",
      "operator"
@@ -7876,7 +7876,7 @@
       "description": "The URI the data disk in the blob storage"
      },
      "cachingMode": {
-      "$ref": "v1.AzureDataDiskCachingMode",
+      "$ref": "io.k8s.kubernetes.pkg.api.v1.AzureDataDiskCachingMode",
       "description": "Host Caching mode: None, Read Only, Read Write."
      },
      "fsType": {
@@ -7889,8 +7889,8 @@
      }
     }
    },
-   "v1.AzureDataDiskCachingMode": {
-    "id": "v1.AzureDataDiskCachingMode",
+   "io.k8s.kubernetes.pkg.api.v1.AzureDataDiskCachingMode": {
+    "id": "io.k8s.kubernetes.pkg.api.v1.AzureDataDiskCachingMode",
     "properties": {}
    },
    "v1.PhotonPersistentDiskVolumeSource": {
@@ -8374,21 +8374,21 @@
      "add": {
       "type": "array",
       "items": {
-       "$ref": "v1.Capability"
+       "$ref": "io.k8s.kubernetes.pkg.api.v1.Capability"
       },
       "description": "Added capabilities"
      },
      "drop": {
       "type": "array",
       "items": {
-       "$ref": "v1.Capability"
+       "$ref": "io.k8s.kubernetes.pkg.api.v1.Capability"
       },
       "description": "Removed capabilities"
      }
     }
    },
-   "v1.Capability": {
-    "id": "v1.Capability",
+   "io.k8s.kubernetes.pkg.api.v1.Capability": {
+    "id": "io.k8s.kubernetes.pkg.api.v1.Capability",
     "properties": {}
    },
    "v1.SELinuxOptions": {
@@ -8640,7 +8640,7 @@
    },
    "v1beta1.DaemonSetStatus": {
     "id": "v1beta1.DaemonSetStatus",
-    "description": "DaemonSetStatus represents the current status of a daemon set.",
+    "description": "DaemonSetStatus represents the current status of a daemon set.\n\nDEPRECATED: Use 'extensions.v1beta1.DaemonSetStatus' instead.",
     "required": [
      "currentNumberScheduled",
      "numberMisscheduled",
@@ -8677,7 +8677,7 @@
    },
    "v1.Status": {
     "id": "v1.Status",
-    "description": "Status is a return value for calls that don't return other objects.",
+    "description": "Status is a return value for calls that don't return other objects.\n\nDEPRECATED: Use 'io.k8s.meta.v1.Status' instead.",
     "properties": {
      "kind": {
       "type": "string",
@@ -8716,7 +8716,7 @@
    },
    "v1.StatusDetails": {
     "id": "v1.StatusDetails",
-    "description": "StatusDetails is a set of additional properties that MAY be set by the server to provide additional information about a response. The Reason field of a Status object defines what attributes will be set. Clients must ignore fields that do not match the defined type of each attribute, and should assume that any attribute may be empty, invalid, or under defined.",
+    "description": "StatusDetails is a set of additional properties that MAY be set by the server to provide additional information about a response. The Reason field of a Status object defines what attributes will be set. Clients must ignore fields that do not match the defined type of each attribute, and should assume that any attribute may be empty, invalid, or under defined.\n\nDEPRECATED: Use 'io.k8s.meta.v1.StatusDetails' instead.",
     "properties": {
      "name": {
       "type": "string",
@@ -8746,7 +8746,7 @@
    },
    "v1.StatusCause": {
     "id": "v1.StatusCause",
-    "description": "StatusCause provides more information about an api.Status failure, including cases when multiple errors are encountered.",
+    "description": "StatusCause provides more information about an api.Status failure, including cases when multiple errors are encountered.\n\nDEPRECATED: Use 'io.k8s.meta.v1.StatusCause' instead.",
     "properties": {
      "reason": {
       "type": "string",
@@ -8764,6 +8764,7 @@
    },
    "versioned.Event": {
     "id": "versioned.Event",
+    "description": "\n\nDEPRECATED: Use 'io.k8s.kubernetes.pkg.watch.versioned.Event' instead.",
     "required": [
      "type",
      "object"
@@ -8779,7 +8780,7 @@
    },
    "v1.Patch": {
     "id": "v1.Patch",
-    "description": "Patch is provided to give a concrete name and type to the Kubernetes PATCH request body.",
+    "description": "Patch is provided to give a concrete name and type to the Kubernetes PATCH request body.\n\nDEPRECATED: Use 'io.k8s.meta.v1.Patch' instead.",
     "properties": {}
    },
    "v1.DeleteOptions": {
@@ -8814,18 +8815,18 @@
     "description": "Preconditions must be fulfilled before an operation (update, delete, etc.) is carried out.",
     "properties": {
      "uid": {
-      "$ref": "types.UID",
+      "$ref": "io.k8s.kubernetes.pkg.types.UID",
       "description": "Specifies the target UID."
      }
     }
    },
-   "types.UID": {
-    "id": "types.UID",
+   "io.k8s.kubernetes.pkg.types.UID": {
+    "id": "io.k8s.kubernetes.pkg.types.UID",
     "properties": {}
    },
    "v1beta1.DeploymentList": {
     "id": "v1beta1.DeploymentList",
-    "description": "DeploymentList is a list of Deployments.",
+    "description": "DeploymentList is a list of Deployments.\n\nDEPRECATED: Use 'extensions.v1beta1.DeploymentList' instead.",
     "required": [
      "items"
     ],
@@ -8853,7 +8854,7 @@
    },
    "v1beta1.Deployment": {
     "id": "v1beta1.Deployment",
-    "description": "Deployment enables declarative updates for Pods and ReplicaSets.",
+    "description": "Deployment enables declarative updates for Pods and ReplicaSets.\n\nDEPRECATED: Use 'extensions.v1beta1.Deployment' instead.",
     "properties": {
      "kind": {
       "type": "string",
@@ -8879,7 +8880,7 @@
    },
    "v1beta1.DeploymentSpec": {
     "id": "v1beta1.DeploymentSpec",
-    "description": "DeploymentSpec is the specification of the desired behavior of the Deployment.",
+    "description": "DeploymentSpec is the specification of the desired behavior of the Deployment.\n\nDEPRECATED: Use 'extensions.v1beta1.DeploymentSpec' instead.",
     "required": [
      "template"
     ],
@@ -8928,7 +8929,7 @@
    },
    "v1beta1.DeploymentStrategy": {
     "id": "v1beta1.DeploymentStrategy",
-    "description": "DeploymentStrategy describes how to replace existing pods with new ones.",
+    "description": "DeploymentStrategy describes how to replace existing pods with new ones.\n\nDEPRECATED: Use 'extensions.v1beta1.DeploymentStrategy' instead.",
     "properties": {
      "type": {
       "type": "string",
@@ -8942,7 +8943,7 @@
    },
    "v1beta1.RollingUpdateDeployment": {
     "id": "v1beta1.RollingUpdateDeployment",
-    "description": "Spec to control the desired behavior of rolling update.",
+    "description": "Spec to control the desired behavior of rolling update.\n\nDEPRECATED: Use 'extensions.v1beta1.RollingUpdateDeployment' instead.",
     "properties": {
      "maxUnavailable": {
       "type": "string",
@@ -8956,6 +8957,7 @@
    },
    "v1beta1.RollbackConfig": {
     "id": "v1beta1.RollbackConfig",
+    "description": "\n\nDEPRECATED: Use 'extensions.v1beta1.RollbackConfig' instead.",
     "properties": {
      "revision": {
       "type": "integer",
@@ -8966,7 +8968,7 @@
    },
    "v1beta1.DeploymentStatus": {
     "id": "v1beta1.DeploymentStatus",
-    "description": "DeploymentStatus is the most recently observed status of the Deployment.",
+    "description": "DeploymentStatus is the most recently observed status of the Deployment.\n\nDEPRECATED: Use 'extensions.v1beta1.DeploymentStatus' instead.",
     "properties": {
      "observedGeneration": {
       "type": "integer",
@@ -9009,7 +9011,7 @@
    },
    "v1beta1.DeploymentCondition": {
     "id": "v1beta1.DeploymentCondition",
-    "description": "DeploymentCondition describes the state of a deployment at a certain point.",
+    "description": "DeploymentCondition describes the state of a deployment at a certain point.\n\nDEPRECATED: Use 'extensions.v1beta1.DeploymentCondition' instead.",
     "required": [
      "type",
      "status"
@@ -9043,7 +9045,7 @@
    },
    "v1beta1.DeploymentRollback": {
     "id": "v1beta1.DeploymentRollback",
-    "description": "DeploymentRollback stores the information required to rollback a deployment.",
+    "description": "DeploymentRollback stores the information required to rollback a deployment.\n\nDEPRECATED: Use 'extensions.v1beta1.DeploymentRollback' instead.",
     "required": [
      "name",
      "rollbackTo"
@@ -9073,7 +9075,7 @@
    },
    "v1beta1.Scale": {
     "id": "v1beta1.Scale",
-    "description": "represents a scaling request for a resource.",
+    "description": "represents a scaling request for a resource.\n\nDEPRECATED: Use 'extensions.v1beta1.Scale' instead.",
     "properties": {
      "kind": {
       "type": "string",
@@ -9099,7 +9101,7 @@
    },
    "v1beta1.ScaleSpec": {
     "id": "v1beta1.ScaleSpec",
-    "description": "describes the attributes of a scale subresource",
+    "description": "describes the attributes of a scale subresource\n\nDEPRECATED: Use 'extensions.v1beta1.ScaleSpec' instead.",
     "properties": {
      "replicas": {
       "type": "integer",
@@ -9110,7 +9112,7 @@
    },
    "v1beta1.ScaleStatus": {
     "id": "v1beta1.ScaleStatus",
-    "description": "represents the current status of a scale subresource.",
+    "description": "represents the current status of a scale subresource.\n\nDEPRECATED: Use 'extensions.v1beta1.ScaleStatus' instead.",
     "required": [
      "replicas"
     ],
@@ -9132,7 +9134,7 @@
    },
    "v1beta1.HorizontalPodAutoscalerList": {
     "id": "v1beta1.HorizontalPodAutoscalerList",
-    "description": "list of horizontal pod autoscaler objects.",
+    "description": "list of horizontal pod autoscaler objects.\n\nDEPRECATED: Use 'extensions.v1beta1.HorizontalPodAutoscalerList' instead.",
     "required": [
      "items"
     ],
@@ -9160,7 +9162,7 @@
    },
    "v1beta1.HorizontalPodAutoscaler": {
     "id": "v1beta1.HorizontalPodAutoscaler",
-    "description": "configuration of a horizontal pod autoscaler.",
+    "description": "configuration of a horizontal pod autoscaler.\n\nDEPRECATED: Use 'extensions.v1beta1.HorizontalPodAutoscaler' instead.",
     "properties": {
      "kind": {
       "type": "string",
@@ -9186,7 +9188,7 @@
    },
    "v1beta1.HorizontalPodAutoscalerSpec": {
     "id": "v1beta1.HorizontalPodAutoscalerSpec",
-    "description": "specification of a horizontal pod autoscaler.",
+    "description": "specification of a horizontal pod autoscaler.\n\nDEPRECATED: Use 'extensions.v1beta1.HorizontalPodAutoscalerSpec' instead.",
     "required": [
      "scaleRef",
      "maxReplicas"
@@ -9214,7 +9216,7 @@
    },
    "v1beta1.SubresourceReference": {
     "id": "v1beta1.SubresourceReference",
-    "description": "SubresourceReference contains enough information to let you inspect or modify the referred subresource.",
+    "description": "SubresourceReference contains enough information to let you inspect or modify the referred subresource.\n\nDEPRECATED: Use 'extensions.v1beta1.SubresourceReference' instead.",
     "properties": {
      "kind": {
       "type": "string",
@@ -9236,6 +9238,7 @@
    },
    "v1beta1.CPUTargetUtilization": {
     "id": "v1beta1.CPUTargetUtilization",
+    "description": "\n\nDEPRECATED: Use 'extensions.v1beta1.CPUTargetUtilization' instead.",
     "required": [
      "targetPercentage"
     ],
@@ -9249,7 +9252,7 @@
    },
    "v1beta1.HorizontalPodAutoscalerStatus": {
     "id": "v1beta1.HorizontalPodAutoscalerStatus",
-    "description": "current status of a horizontal pod autoscaler",
+    "description": "current status of a horizontal pod autoscaler\n\nDEPRECATED: Use 'extensions.v1beta1.HorizontalPodAutoscalerStatus' instead.",
     "required": [
      "currentReplicas",
      "desiredReplicas"
@@ -9283,7 +9286,7 @@
    },
    "v1beta1.IngressList": {
     "id": "v1beta1.IngressList",
-    "description": "IngressList is a collection of Ingress.",
+    "description": "IngressList is a collection of Ingress.\n\nDEPRECATED: Use 'extensions.v1beta1.IngressList' instead.",
     "required": [
      "items"
     ],
@@ -9311,7 +9314,7 @@
    },
    "v1beta1.Ingress": {
     "id": "v1beta1.Ingress",
-    "description": "Ingress is a collection of rules that allow inbound connections to reach the endpoints defined by a backend. An Ingress can be configured to give services externally-reachable urls, load balance traffic, terminate SSL, offer name based virtual hosting etc.",
+    "description": "Ingress is a collection of rules that allow inbound connections to reach the endpoints defined by a backend. An Ingress can be configured to give services externally-reachable urls, load balance traffic, terminate SSL, offer name based virtual hosting etc.\n\nDEPRECATED: Use 'extensions.v1beta1.Ingress' instead.",
     "properties": {
      "kind": {
       "type": "string",
@@ -9337,7 +9340,7 @@
    },
    "v1beta1.IngressSpec": {
     "id": "v1beta1.IngressSpec",
-    "description": "IngressSpec describes the Ingress the user wishes to exist.",
+    "description": "IngressSpec describes the Ingress the user wishes to exist.\n\nDEPRECATED: Use 'extensions.v1beta1.IngressSpec' instead.",
     "properties": {
      "backend": {
       "$ref": "v1beta1.IngressBackend",
@@ -9361,7 +9364,7 @@
    },
    "v1beta1.IngressBackend": {
     "id": "v1beta1.IngressBackend",
-    "description": "IngressBackend describes all endpoints for a given service and port.",
+    "description": "IngressBackend describes all endpoints for a given service and port.\n\nDEPRECATED: Use 'extensions.v1beta1.IngressBackend' instead.",
     "required": [
      "serviceName",
      "servicePort"
@@ -9379,7 +9382,7 @@
    },
    "v1beta1.IngressTLS": {
     "id": "v1beta1.IngressTLS",
-    "description": "IngressTLS describes the transport layer security associated with an Ingress.",
+    "description": "IngressTLS describes the transport layer security associated with an Ingress.\n\nDEPRECATED: Use 'extensions.v1beta1.IngressTLS' instead.",
     "properties": {
      "hosts": {
       "type": "array",
@@ -9396,7 +9399,7 @@
    },
    "v1beta1.IngressRule": {
     "id": "v1beta1.IngressRule",
-    "description": "IngressRule represents the rules mapping the paths under a specified host to the related backend services. Incoming requests are first evaluated for a host match, then routed to the backend associated with the matching IngressRuleValue.",
+    "description": "IngressRule represents the rules mapping the paths under a specified host to the related backend services. Incoming requests are first evaluated for a host match, then routed to the backend associated with the matching IngressRuleValue.\n\nDEPRECATED: Use 'extensions.v1beta1.IngressRule' instead.",
     "properties": {
      "host": {
       "type": "string",
@@ -9409,7 +9412,7 @@
    },
    "v1beta1.HTTPIngressRuleValue": {
     "id": "v1beta1.HTTPIngressRuleValue",
-    "description": "HTTPIngressRuleValue is a list of http selectors pointing to backends. In the example: http://\u003chost\u003e/\u003cpath\u003e?\u003csearchpart\u003e -\u003e backend where where parts of the url correspond to RFC 3986, this resource will be used to match against everything after the last '/' and before the first '?' or '#'.",
+    "description": "HTTPIngressRuleValue is a list of http selectors pointing to backends. In the example: http://\u003chost\u003e/\u003cpath\u003e?\u003csearchpart\u003e -\u003e backend where where parts of the url correspond to RFC 3986, this resource will be used to match against everything after the last '/' and before the first '?' or '#'.\n\nDEPRECATED: Use 'extensions.v1beta1.HTTPIngressRuleValue' instead.",
     "required": [
      "paths"
     ],
@@ -9425,7 +9428,7 @@
    },
    "v1beta1.HTTPIngressPath": {
     "id": "v1beta1.HTTPIngressPath",
-    "description": "HTTPIngressPath associates a path regex with a backend. Incoming urls matching the path are forwarded to the backend.",
+    "description": "HTTPIngressPath associates a path regex with a backend. Incoming urls matching the path are forwarded to the backend.\n\nDEPRECATED: Use 'extensions.v1beta1.HTTPIngressPath' instead.",
     "required": [
      "backend"
     ],
@@ -9442,7 +9445,7 @@
    },
    "v1beta1.IngressStatus": {
     "id": "v1beta1.IngressStatus",
-    "description": "IngressStatus describe the current state of the Ingress.",
+    "description": "IngressStatus describe the current state of the Ingress.\n\nDEPRECATED: Use 'extensions.v1beta1.IngressStatus' instead.",
     "properties": {
      "loadBalancer": {
       "$ref": "v1.LoadBalancerStatus",
@@ -9479,7 +9482,7 @@
    },
    "v1beta1.NetworkPolicyList": {
     "id": "v1beta1.NetworkPolicyList",
-    "description": "Network Policy List is a list of NetworkPolicy objects.",
+    "description": "Network Policy List is a list of NetworkPolicy objects.\n\nDEPRECATED: Use 'extensions.v1beta1.NetworkPolicyList' instead.",
     "required": [
      "items"
     ],
@@ -9507,6 +9510,7 @@
    },
    "v1beta1.NetworkPolicy": {
     "id": "v1beta1.NetworkPolicy",
+    "description": "\n\nDEPRECATED: Use 'extensions.v1beta1.NetworkPolicy' instead.",
     "properties": {
      "kind": {
       "type": "string",
@@ -9528,6 +9532,7 @@
    },
    "v1beta1.NetworkPolicySpec": {
     "id": "v1beta1.NetworkPolicySpec",
+    "description": "\n\nDEPRECATED: Use 'extensions.v1beta1.NetworkPolicySpec' instead.",
     "required": [
      "podSelector"
     ],
@@ -9547,7 +9552,7 @@
    },
    "v1beta1.NetworkPolicyIngressRule": {
     "id": "v1beta1.NetworkPolicyIngressRule",
-    "description": "This NetworkPolicyIngressRule matches traffic if and only if the traffic matches both ports AND from.",
+    "description": "This NetworkPolicyIngressRule matches traffic if and only if the traffic matches both ports AND from.\n\nDEPRECATED: Use 'extensions.v1beta1.NetworkPolicyIngressRule' instead.",
     "properties": {
      "ports": {
       "type": "array",
@@ -9567,9 +9572,10 @@
    },
    "v1beta1.NetworkPolicyPort": {
     "id": "v1beta1.NetworkPolicyPort",
+    "description": "\n\nDEPRECATED: Use 'extensions.v1beta1.NetworkPolicyPort' instead.",
     "properties": {
      "protocol": {
-      "$ref": "v1.Protocol",
+      "$ref": "io.k8s.kubernetes.pkg.api.v1.Protocol",
       "description": "Optional.  The protocol (TCP or UDP) which traffic must match. If not specified, this field defaults to TCP."
      },
      "port": {
@@ -9578,12 +9584,13 @@
      }
     }
    },
-   "v1.Protocol": {
-    "id": "v1.Protocol",
+   "io.k8s.kubernetes.pkg.api.v1.Protocol": {
+    "id": "io.k8s.kubernetes.pkg.api.v1.Protocol",
     "properties": {}
    },
    "v1beta1.NetworkPolicyPeer": {
     "id": "v1beta1.NetworkPolicyPeer",
+    "description": "\n\nDEPRECATED: Use 'extensions.v1beta1.NetworkPolicyPeer' instead.",
     "properties": {
      "podSelector": {
       "$ref": "v1.LabelSelector",
@@ -9597,7 +9604,7 @@
    },
    "v1beta1.ReplicaSetList": {
     "id": "v1beta1.ReplicaSetList",
-    "description": "ReplicaSetList is a collection of ReplicaSets.",
+    "description": "ReplicaSetList is a collection of ReplicaSets.\n\nDEPRECATED: Use 'extensions.v1beta1.ReplicaSetList' instead.",
     "required": [
      "items"
     ],
@@ -9625,7 +9632,7 @@
    },
    "v1beta1.ReplicaSet": {
     "id": "v1beta1.ReplicaSet",
-    "description": "ReplicaSet represents the configuration of a ReplicaSet.",
+    "description": "ReplicaSet represents the configuration of a ReplicaSet.\n\nDEPRECATED: Use 'extensions.v1beta1.ReplicaSet' instead.",
     "properties": {
      "kind": {
       "type": "string",
@@ -9651,7 +9658,7 @@
    },
    "v1beta1.ReplicaSetSpec": {
     "id": "v1beta1.ReplicaSetSpec",
-    "description": "ReplicaSetSpec is the specification of a ReplicaSet.",
+    "description": "ReplicaSetSpec is the specification of a ReplicaSet.\n\nDEPRECATED: Use 'extensions.v1beta1.ReplicaSetSpec' instead.",
     "properties": {
      "replicas": {
       "type": "integer",
@@ -9675,7 +9682,7 @@
    },
    "v1beta1.ReplicaSetStatus": {
     "id": "v1beta1.ReplicaSetStatus",
-    "description": "ReplicaSetStatus represents the current status of a ReplicaSet.",
+    "description": "ReplicaSetStatus represents the current status of a ReplicaSet.\n\nDEPRECATED: Use 'extensions.v1beta1.ReplicaSetStatus' instead.",
     "required": [
      "replicas"
     ],
@@ -9716,7 +9723,7 @@
    },
    "v1beta1.ReplicaSetCondition": {
     "id": "v1beta1.ReplicaSetCondition",
-    "description": "ReplicaSetCondition describes the state of a replica set at a certain point.",
+    "description": "ReplicaSetCondition describes the state of a replica set at a certain point.\n\nDEPRECATED: Use 'extensions.v1beta1.ReplicaSetCondition' instead.",
     "required": [
      "type",
      "status"
@@ -9746,7 +9753,7 @@
    },
    "v1beta1.ThirdPartyResourceList": {
     "id": "v1beta1.ThirdPartyResourceList",
-    "description": "ThirdPartyResourceList is a list of ThirdPartyResources.",
+    "description": "ThirdPartyResourceList is a list of ThirdPartyResources.\n\nDEPRECATED: Use 'extensions.v1beta1.ThirdPartyResourceList' instead.",
     "required": [
      "items"
     ],
@@ -9774,7 +9781,7 @@
    },
    "v1beta1.ThirdPartyResource": {
     "id": "v1beta1.ThirdPartyResource",
-    "description": "A ThirdPartyResource is a generic representation of a resource, it is used by add-ons and plugins to add new resource types to the API.  It consists of one or more Versions of the api.",
+    "description": "A ThirdPartyResource is a generic representation of a resource, it is used by add-ons and plugins to add new resource types to the API.  It consists of one or more Versions of the api.\n\nDEPRECATED: Use 'extensions.v1beta1.ThirdPartyResource' instead.",
     "properties": {
      "kind": {
       "type": "string",
@@ -9803,7 +9810,7 @@
    },
    "v1beta1.APIVersion": {
     "id": "v1beta1.APIVersion",
-    "description": "An APIVersion represents a single concrete version of an object model.",
+    "description": "An APIVersion represents a single concrete version of an object model.\n\nDEPRECATED: Use 'extensions.v1beta1.APIVersion' instead.",
     "properties": {
      "name": {
       "type": "string",
@@ -9813,7 +9820,7 @@
    },
    "v1.APIResourceList": {
     "id": "v1.APIResourceList",
-    "description": "APIResourceList is a list of APIResource, it is used to expose the name of the resources supported in a specific group and version, and if the resource is namespaced.",
+    "description": "APIResourceList is a list of APIResource, it is used to expose the name of the resources supported in a specific group and version, and if the resource is namespaced.\n\nDEPRECATED: Use 'io.k8s.meta.v1.APIResourceList' instead.",
     "required": [
      "groupVersion",
      "resources"
@@ -9842,6 +9849,1326 @@
    },
    "v1.APIResource": {
     "id": "v1.APIResource",
+    "description": "APIResource specifies the name of a resource and whether it is namespaced.\n\nDEPRECATED: Use 'io.k8s.meta.v1.APIResource' instead.",
+    "required": [
+     "name",
+     "namespaced",
+     "kind",
+     "verbs"
+    ],
+    "properties": {
+     "name": {
+      "type": "string",
+      "description": "name is the name of the resource."
+     },
+     "namespaced": {
+      "type": "boolean",
+      "description": "namespaced indicates if a resource is namespaced or not."
+     },
+     "kind": {
+      "type": "string",
+      "description": "kind is the kind for the resource (e.g. 'Foo' is the kind for a resource 'foo')"
+     },
+     "verbs": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      },
+      "description": "verbs is a list of supported kube verbs (this includes get, list, watch, create, update, patch, delete, deletecollection, and proxy)"
+     }
+    }
+   },
+   "extensions.v1beta1.DaemonSetList": {
+    "id": "extensions.v1beta1.DaemonSetList",
+    "description": "DaemonSetList is a collection of daemon sets.",
+    "required": [
+     "items"
+    ],
+    "properties": {
+     "kind": {
+      "type": "string",
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+     },
+     "apiVersion": {
+      "type": "string",
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+     },
+     "metadata": {
+      "$ref": "v1.ListMeta",
+      "description": "Standard list metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata"
+     },
+     "items": {
+      "type": "array",
+      "items": {
+       "$ref": "v1beta1.DaemonSet"
+      },
+      "description": "Items is a list of daemon sets."
+     }
+    }
+   },
+   "io.k8s.meta.v1.ListMeta": {
+    "id": "io.k8s.meta.v1.ListMeta",
+    "description": "ListMeta describes metadata that synthetic resources must have, including lists and various status objects. A resource may have only one of {ObjectMeta, ListMeta}.",
+    "properties": {
+     "selfLink": {
+      "type": "string",
+      "description": "SelfLink is a URL representing this object. Populated by the system. Read-only."
+     },
+     "resourceVersion": {
+      "type": "string",
+      "description": "String that identifies the server's internal version of this object that can be used by clients to determine when objects have changed. Value must be treated as opaque by clients and passed unmodified back to the server. Populated by the system. Read-only. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#concurrency-control-and-consistency"
+     }
+    }
+   },
+   "extensions.v1beta1.DaemonSet": {
+    "id": "extensions.v1beta1.DaemonSet",
+    "description": "DaemonSet represents the configuration of a daemon set.",
+    "properties": {
+     "kind": {
+      "type": "string",
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+     },
+     "apiVersion": {
+      "type": "string",
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+     },
+     "metadata": {
+      "$ref": "v1.ObjectMeta",
+      "description": "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata"
+     },
+     "spec": {
+      "$ref": "v1beta1.DaemonSetSpec",
+      "description": "Spec defines the desired behavior of this daemon set. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status"
+     },
+     "status": {
+      "$ref": "v1beta1.DaemonSetStatus",
+      "description": "Status is the current status of this daemon set. This data may be out of date by some window of time. Populated by the system. Read-only. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status"
+     }
+    }
+   },
+   "io.k8s.meta.v1.OwnerReference": {
+    "id": "io.k8s.meta.v1.OwnerReference",
+    "description": "OwnerReference contains enough information to let you identify an owning object. Currently, an owning object must be in the same namespace, so there is no namespace field.",
+    "required": [
+     "apiVersion",
+     "kind",
+     "name",
+     "uid"
+    ],
+    "properties": {
+     "apiVersion": {
+      "type": "string",
+      "description": "API version of the referent."
+     },
+     "kind": {
+      "type": "string",
+      "description": "Kind of the referent. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+     },
+     "name": {
+      "type": "string",
+      "description": "Name of the referent. More info: http://kubernetes.io/docs/user-guide/identifiers#names"
+     },
+     "uid": {
+      "type": "string",
+      "description": "UID of the referent. More info: http://kubernetes.io/docs/user-guide/identifiers#uids"
+     },
+     "controller": {
+      "type": "boolean",
+      "description": "If true, this reference points to the managing controller."
+     }
+    }
+   },
+   "extensions.v1beta1.DaemonSetSpec": {
+    "id": "extensions.v1beta1.DaemonSetSpec",
+    "description": "DaemonSetSpec is the specification of a daemon set.",
+    "required": [
+     "template"
+    ],
+    "properties": {
+     "selector": {
+      "$ref": "v1.LabelSelector",
+      "description": "Selector is a label query over pods that are managed by the daemon set. Must match in order to be controlled. If empty, defaulted to labels on Pod template. More info: http://kubernetes.io/docs/user-guide/labels#label-selectors"
+     },
+     "template": {
+      "$ref": "v1.PodTemplateSpec",
+      "description": "Template is the object that describes the pod that will be created. The DaemonSet will create exactly one copy of this pod on every node that matches the template's node selector (or on every node if no node selector is specified). More info: http://kubernetes.io/docs/user-guide/replication-controller#pod-template"
+     }
+    }
+   },
+   "io.k8s.meta.v1.LabelSelector": {
+    "id": "io.k8s.meta.v1.LabelSelector",
+    "description": "A label selector is a label query over a set of resources. The result of matchLabels and matchExpressions are ANDed. An empty label selector matches all objects. A null label selector matches no objects.",
+    "properties": {
+     "matchLabels": {
+      "type": "object",
+      "description": "matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels map is equivalent to an element of matchExpressions, whose key field is \"key\", the operator is \"In\", and the values array contains only \"value\". The requirements are ANDed."
+     },
+     "matchExpressions": {
+      "type": "array",
+      "items": {
+       "$ref": "v1.LabelSelectorRequirement"
+      },
+      "description": "matchExpressions is a list of label selector requirements. The requirements are ANDed."
+     }
+    }
+   },
+   "io.k8s.meta.v1.LabelSelectorRequirement": {
+    "id": "io.k8s.meta.v1.LabelSelectorRequirement",
+    "description": "A label selector requirement is a selector that contains values, a key, and an operator that relates the key and values.",
+    "required": [
+     "key",
+     "operator"
+    ],
+    "properties": {
+     "key": {
+      "type": "string",
+      "description": "key is the label key that the selector applies to."
+     },
+     "operator": {
+      "type": "string",
+      "description": "operator represents a key's relationship to a set of values. Valid operators ard In, NotIn, Exists and DoesNotExist."
+     },
+     "values": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      },
+      "description": "values is an array of string values. If the operator is In or NotIn, the values array must be non-empty. If the operator is Exists or DoesNotExist, the values array must be empty. This array is replaced during a strategic merge patch."
+     }
+    }
+   },
+   "extensions.v1beta1.DaemonSetStatus": {
+    "id": "extensions.v1beta1.DaemonSetStatus",
+    "description": "DaemonSetStatus represents the current status of a daemon set.",
+    "required": [
+     "currentNumberScheduled",
+     "numberMisscheduled",
+     "desiredNumberScheduled",
+     "numberReady"
+    ],
+    "properties": {
+     "currentNumberScheduled": {
+      "type": "integer",
+      "format": "int32",
+      "description": "CurrentNumberScheduled is the number of nodes that are running at least 1 daemon pod and are supposed to run the daemon pod. More info: http://releases.k8s.io/HEAD/docs/admin/daemons.md"
+     },
+     "numberMisscheduled": {
+      "type": "integer",
+      "format": "int32",
+      "description": "NumberMisscheduled is the number of nodes that are running the daemon pod, but are not supposed to run the daemon pod. More info: http://releases.k8s.io/HEAD/docs/admin/daemons.md"
+     },
+     "desiredNumberScheduled": {
+      "type": "integer",
+      "format": "int32",
+      "description": "DesiredNumberScheduled is the total number of nodes that should be running the daemon pod (including nodes correctly running the daemon pod). More info: http://releases.k8s.io/HEAD/docs/admin/daemons.md"
+     },
+     "numberReady": {
+      "type": "integer",
+      "format": "int32",
+      "description": "NumberReady is the number of nodes that should be running the daemon pod and have one or more of the daemon pod running and ready."
+     },
+     "observedGeneration": {
+      "type": "integer",
+      "format": "int64",
+      "description": "ObservedGeneration is the most recent generation observed by the daemon set controller."
+     }
+    }
+   },
+   "io.k8s.meta.v1.Status": {
+    "id": "io.k8s.meta.v1.Status",
+    "description": "Status is a return value for calls that don't return other objects.",
+    "properties": {
+     "kind": {
+      "type": "string",
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+     },
+     "apiVersion": {
+      "type": "string",
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+     },
+     "metadata": {
+      "$ref": "v1.ListMeta",
+      "description": "Standard list metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+     },
+     "status": {
+      "type": "string",
+      "description": "Status of the operation. One of: \"Success\" or \"Failure\". More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status"
+     },
+     "message": {
+      "type": "string",
+      "description": "A human-readable description of the status of this operation."
+     },
+     "reason": {
+      "type": "string",
+      "description": "A machine-readable description of why this operation is in the \"Failure\" status. If this value is empty there is no information available. A Reason clarifies an HTTP status code but does not override it."
+     },
+     "details": {
+      "$ref": "v1.StatusDetails",
+      "description": "Extended data associated with the reason.  Each reason may define its own extended details. This field is optional and the data returned is not guaranteed to conform to any schema except that defined by the reason type."
+     },
+     "code": {
+      "type": "integer",
+      "format": "int32",
+      "description": "Suggested HTTP return code for this status, 0 if not set."
+     }
+    }
+   },
+   "io.k8s.meta.v1.StatusDetails": {
+    "id": "io.k8s.meta.v1.StatusDetails",
+    "description": "StatusDetails is a set of additional properties that MAY be set by the server to provide additional information about a response. The Reason field of a Status object defines what attributes will be set. Clients must ignore fields that do not match the defined type of each attribute, and should assume that any attribute may be empty, invalid, or under defined.",
+    "properties": {
+     "name": {
+      "type": "string",
+      "description": "The name attribute of the resource associated with the status StatusReason (when there is a single name which can be described)."
+     },
+     "group": {
+      "type": "string",
+      "description": "The group attribute of the resource associated with the status StatusReason."
+     },
+     "kind": {
+      "type": "string",
+      "description": "The kind attribute of the resource associated with the status StatusReason. On some operations may differ from the requested resource Kind. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+     },
+     "causes": {
+      "type": "array",
+      "items": {
+       "$ref": "v1.StatusCause"
+      },
+      "description": "The Causes array includes more details associated with the StatusReason failure. Not all StatusReasons may provide detailed causes."
+     },
+     "retryAfterSeconds": {
+      "type": "integer",
+      "format": "int32",
+      "description": "If specified, the time in seconds before the operation should be retried."
+     }
+    }
+   },
+   "io.k8s.meta.v1.StatusCause": {
+    "id": "io.k8s.meta.v1.StatusCause",
+    "description": "StatusCause provides more information about an api.Status failure, including cases when multiple errors are encountered.",
+    "properties": {
+     "reason": {
+      "type": "string",
+      "description": "A machine-readable description of the cause of the error. If this value is empty there is no information available."
+     },
+     "message": {
+      "type": "string",
+      "description": "A human-readable description of the cause of the error.  This field may be presented as-is to a reader."
+     },
+     "field": {
+      "type": "string",
+      "description": "The field of the resource that has caused this error, as named by its JSON serialization. May include dot and postfix notation for nested attributes. Arrays are zero-indexed.  Fields may appear more than once in an array of causes due to fields having multiple errors. Optional.\n\nExamples:\n  \"name\" - the field \"name\" on the current resource\n  \"items[0].name\" - the field \"name\" on the first array entry in \"items\""
+     }
+    }
+   },
+   "io.k8s.kubernetes.pkg.watch.versioned.Event": {
+    "id": "io.k8s.kubernetes.pkg.watch.versioned.Event",
+    "required": [
+     "type",
+     "object"
+    ],
+    "properties": {
+     "type": {
+      "type": "string"
+     },
+     "object": {
+      "type": "string"
+     }
+    }
+   },
+   "io.k8s.meta.v1.Patch": {
+    "id": "io.k8s.meta.v1.Patch",
+    "description": "Patch is provided to give a concrete name and type to the Kubernetes PATCH request body.",
+    "properties": {}
+   },
+   "extensions.v1beta1.DeploymentList": {
+    "id": "extensions.v1beta1.DeploymentList",
+    "description": "DeploymentList is a list of Deployments.",
+    "required": [
+     "items"
+    ],
+    "properties": {
+     "kind": {
+      "type": "string",
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+     },
+     "apiVersion": {
+      "type": "string",
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+     },
+     "metadata": {
+      "$ref": "v1.ListMeta",
+      "description": "Standard list metadata."
+     },
+     "items": {
+      "type": "array",
+      "items": {
+       "$ref": "v1beta1.Deployment"
+      },
+      "description": "Items is the list of Deployments."
+     }
+    }
+   },
+   "extensions.v1beta1.Deployment": {
+    "id": "extensions.v1beta1.Deployment",
+    "description": "Deployment enables declarative updates for Pods and ReplicaSets.",
+    "properties": {
+     "kind": {
+      "type": "string",
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+     },
+     "apiVersion": {
+      "type": "string",
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+     },
+     "metadata": {
+      "$ref": "v1.ObjectMeta",
+      "description": "Standard object metadata."
+     },
+     "spec": {
+      "$ref": "v1beta1.DeploymentSpec",
+      "description": "Specification of the desired behavior of the Deployment."
+     },
+     "status": {
+      "$ref": "v1beta1.DeploymentStatus",
+      "description": "Most recently observed status of the Deployment."
+     }
+    }
+   },
+   "extensions.v1beta1.DeploymentSpec": {
+    "id": "extensions.v1beta1.DeploymentSpec",
+    "description": "DeploymentSpec is the specification of the desired behavior of the Deployment.",
+    "required": [
+     "template"
+    ],
+    "properties": {
+     "replicas": {
+      "type": "integer",
+      "format": "int32",
+      "description": "Number of desired pods. This is a pointer to distinguish between explicit zero and not specified. Defaults to 1."
+     },
+     "selector": {
+      "$ref": "v1.LabelSelector",
+      "description": "Label selector for pods. Existing ReplicaSets whose pods are selected by this will be the ones affected by this deployment."
+     },
+     "template": {
+      "$ref": "v1.PodTemplateSpec",
+      "description": "Template describes the pods that will be created."
+     },
+     "strategy": {
+      "$ref": "v1beta1.DeploymentStrategy",
+      "description": "The deployment strategy to use to replace existing pods with new ones."
+     },
+     "minReadySeconds": {
+      "type": "integer",
+      "format": "int32",
+      "description": "Minimum number of seconds for which a newly created pod should be ready without any of its container crashing, for it to be considered available. Defaults to 0 (pod will be considered available as soon as it is ready)"
+     },
+     "revisionHistoryLimit": {
+      "type": "integer",
+      "format": "int32",
+      "description": "The number of old ReplicaSets to retain to allow rollback. This is a pointer to distinguish between explicit zero and not specified."
+     },
+     "paused": {
+      "type": "boolean",
+      "description": "Indicates that the deployment is paused and will not be processed by the deployment controller."
+     },
+     "rollbackTo": {
+      "$ref": "v1beta1.RollbackConfig",
+      "description": "The config this deployment is rolling back to. Will be cleared after rollback is done."
+     },
+     "progressDeadlineSeconds": {
+      "type": "integer",
+      "format": "int32",
+      "description": "The maximum time in seconds for a deployment to make progress before it is considered to be failed. The deployment controller will continue to process failed deployments and a condition with a ProgressDeadlineExceeded reason will be surfaced in the deployment status. Once autoRollback is implemented, the deployment controller will automatically rollback failed deployments. Note that progress will not be estimated during the time a deployment is paused. This is not set by default."
+     }
+    }
+   },
+   "extensions.v1beta1.DeploymentStrategy": {
+    "id": "extensions.v1beta1.DeploymentStrategy",
+    "description": "DeploymentStrategy describes how to replace existing pods with new ones.",
+    "properties": {
+     "type": {
+      "type": "string",
+      "description": "Type of deployment. Can be \"Recreate\" or \"RollingUpdate\". Default is RollingUpdate."
+     },
+     "rollingUpdate": {
+      "$ref": "v1beta1.RollingUpdateDeployment",
+      "description": "Rolling update config params. Present only if DeploymentStrategyType = RollingUpdate."
+     }
+    }
+   },
+   "extensions.v1beta1.RollingUpdateDeployment": {
+    "id": "extensions.v1beta1.RollingUpdateDeployment",
+    "description": "Spec to control the desired behavior of rolling update.",
+    "properties": {
+     "maxUnavailable": {
+      "type": "string",
+      "description": "The maximum number of pods that can be unavailable during the update. Value can be an absolute number (ex: 5) or a percentage of desired pods (ex: 10%). Absolute number is calculated from percentage by rounding down. This can not be 0 if MaxSurge is 0. By default, a fixed value of 1 is used. Example: when this is set to 30%, the old RC can be scaled down to 70% of desired pods immediately when the rolling update starts. Once new pods are ready, old RC can be scaled down further, followed by scaling up the new RC, ensuring that the total number of pods available at all times during the update is at least 70% of desired pods."
+     },
+     "maxSurge": {
+      "type": "string",
+      "description": "The maximum number of pods that can be scheduled above the desired number of pods. Value can be an absolute number (ex: 5) or a percentage of desired pods (ex: 10%). This can not be 0 if MaxUnavailable is 0. Absolute number is calculated from percentage by rounding up. By default, a value of 1 is used. Example: when this is set to 30%, the new RC can be scaled up immediately when the rolling update starts, such that the total number of old and new pods do not exceed 130% of desired pods. Once old pods have been killed, new RC can be scaled up further, ensuring that total number of pods running at any time during the update is atmost 130% of desired pods."
+     }
+    }
+   },
+   "extensions.v1beta1.RollbackConfig": {
+    "id": "extensions.v1beta1.RollbackConfig",
+    "properties": {
+     "revision": {
+      "type": "integer",
+      "format": "int64",
+      "description": "The revision to rollback to. If set to 0, rollbck to the last revision."
+     }
+    }
+   },
+   "extensions.v1beta1.DeploymentStatus": {
+    "id": "extensions.v1beta1.DeploymentStatus",
+    "description": "DeploymentStatus is the most recently observed status of the Deployment.",
+    "properties": {
+     "observedGeneration": {
+      "type": "integer",
+      "format": "int64",
+      "description": "The generation observed by the deployment controller."
+     },
+     "replicas": {
+      "type": "integer",
+      "format": "int32",
+      "description": "Total number of non-terminated pods targeted by this deployment (their labels match the selector)."
+     },
+     "updatedReplicas": {
+      "type": "integer",
+      "format": "int32",
+      "description": "Total number of non-terminated pods targeted by this deployment that have the desired template spec."
+     },
+     "readyReplicas": {
+      "type": "integer",
+      "format": "int32",
+      "description": "Total number of ready pods targeted by this deployment."
+     },
+     "availableReplicas": {
+      "type": "integer",
+      "format": "int32",
+      "description": "Total number of available pods (ready for at least minReadySeconds) targeted by this deployment."
+     },
+     "unavailableReplicas": {
+      "type": "integer",
+      "format": "int32",
+      "description": "Total number of unavailable pods targeted by this deployment."
+     },
+     "conditions": {
+      "type": "array",
+      "items": {
+       "$ref": "v1beta1.DeploymentCondition"
+      },
+      "description": "Represents the latest available observations of a deployment's current state."
+     }
+    }
+   },
+   "extensions.v1beta1.DeploymentCondition": {
+    "id": "extensions.v1beta1.DeploymentCondition",
+    "description": "DeploymentCondition describes the state of a deployment at a certain point.",
+    "required": [
+     "type",
+     "status"
+    ],
+    "properties": {
+     "type": {
+      "type": "string",
+      "description": "Type of deployment condition."
+     },
+     "status": {
+      "type": "string",
+      "description": "Status of the condition, one of True, False, Unknown."
+     },
+     "lastUpdateTime": {
+      "type": "string",
+      "description": "The last time this condition was updated."
+     },
+     "lastTransitionTime": {
+      "type": "string",
+      "description": "Last time the condition transitioned from one status to another."
+     },
+     "reason": {
+      "type": "string",
+      "description": "The reason for the condition's last transition."
+     },
+     "message": {
+      "type": "string",
+      "description": "A human readable message indicating details about the transition."
+     }
+    }
+   },
+   "extensions.v1beta1.DeploymentRollback": {
+    "id": "extensions.v1beta1.DeploymentRollback",
+    "description": "DeploymentRollback stores the information required to rollback a deployment.",
+    "required": [
+     "name",
+     "rollbackTo"
+    ],
+    "properties": {
+     "kind": {
+      "type": "string",
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+     },
+     "apiVersion": {
+      "type": "string",
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+     },
+     "name": {
+      "type": "string",
+      "description": "Required: This must match the Name of a deployment."
+     },
+     "updatedAnnotations": {
+      "type": "object",
+      "description": "The annotations to be updated to a deployment"
+     },
+     "rollbackTo": {
+      "$ref": "v1beta1.RollbackConfig",
+      "description": "The config of this deployment rollback."
+     }
+    }
+   },
+   "extensions.v1beta1.Scale": {
+    "id": "extensions.v1beta1.Scale",
+    "description": "represents a scaling request for a resource.",
+    "properties": {
+     "kind": {
+      "type": "string",
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+     },
+     "apiVersion": {
+      "type": "string",
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+     },
+     "metadata": {
+      "$ref": "v1.ObjectMeta",
+      "description": "Standard object metadata; More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata."
+     },
+     "spec": {
+      "$ref": "v1beta1.ScaleSpec",
+      "description": "defines the behavior of the scale. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status."
+     },
+     "status": {
+      "$ref": "v1beta1.ScaleStatus",
+      "description": "current status of the scale. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status. Read-only."
+     }
+    }
+   },
+   "extensions.v1beta1.ScaleSpec": {
+    "id": "extensions.v1beta1.ScaleSpec",
+    "description": "describes the attributes of a scale subresource",
+    "properties": {
+     "replicas": {
+      "type": "integer",
+      "format": "int32",
+      "description": "desired number of instances for the scaled object."
+     }
+    }
+   },
+   "extensions.v1beta1.ScaleStatus": {
+    "id": "extensions.v1beta1.ScaleStatus",
+    "description": "represents the current status of a scale subresource.",
+    "required": [
+     "replicas"
+    ],
+    "properties": {
+     "replicas": {
+      "type": "integer",
+      "format": "int32",
+      "description": "actual number of observed instances of the scaled object."
+     },
+     "selector": {
+      "type": "object",
+      "description": "label query over pods that should match the replicas count. More info: http://kubernetes.io/docs/user-guide/labels#label-selectors"
+     },
+     "targetSelector": {
+      "type": "string",
+      "description": "label selector for pods that should match the replicas count. This is a serializated version of both map-based and more expressive set-based selectors. This is done to avoid introspection in the clients. The string will be in the same format as the query-param syntax. If the target type only supports map-based selectors, both this field and map-based selector field are populated. More info: http://kubernetes.io/docs/user-guide/labels#label-selectors"
+     }
+    }
+   },
+   "extensions.v1beta1.HorizontalPodAutoscalerList": {
+    "id": "extensions.v1beta1.HorizontalPodAutoscalerList",
+    "description": "list of horizontal pod autoscaler objects.",
+    "required": [
+     "items"
+    ],
+    "properties": {
+     "kind": {
+      "type": "string",
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+     },
+     "apiVersion": {
+      "type": "string",
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+     },
+     "metadata": {
+      "$ref": "v1.ListMeta",
+      "description": "Standard list metadata."
+     },
+     "items": {
+      "type": "array",
+      "items": {
+       "$ref": "v1beta1.HorizontalPodAutoscaler"
+      },
+      "description": "list of horizontal pod autoscaler objects."
+     }
+    }
+   },
+   "extensions.v1beta1.HorizontalPodAutoscaler": {
+    "id": "extensions.v1beta1.HorizontalPodAutoscaler",
+    "description": "configuration of a horizontal pod autoscaler.",
+    "properties": {
+     "kind": {
+      "type": "string",
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+     },
+     "apiVersion": {
+      "type": "string",
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+     },
+     "metadata": {
+      "$ref": "v1.ObjectMeta",
+      "description": "Standard object metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata"
+     },
+     "spec": {
+      "$ref": "v1beta1.HorizontalPodAutoscalerSpec",
+      "description": "behaviour of autoscaler. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status."
+     },
+     "status": {
+      "$ref": "v1beta1.HorizontalPodAutoscalerStatus",
+      "description": "current information about the autoscaler."
+     }
+    }
+   },
+   "extensions.v1beta1.HorizontalPodAutoscalerSpec": {
+    "id": "extensions.v1beta1.HorizontalPodAutoscalerSpec",
+    "description": "specification of a horizontal pod autoscaler.",
+    "required": [
+     "scaleRef",
+     "maxReplicas"
+    ],
+    "properties": {
+     "scaleRef": {
+      "$ref": "v1beta1.SubresourceReference",
+      "description": "reference to Scale subresource; horizontal pod autoscaler will learn the current resource consumption from its status, and will set the desired number of pods by modifying its spec."
+     },
+     "minReplicas": {
+      "type": "integer",
+      "format": "int32",
+      "description": "lower limit for the number of pods that can be set by the autoscaler, default 1."
+     },
+     "maxReplicas": {
+      "type": "integer",
+      "format": "int32",
+      "description": "upper limit for the number of pods that can be set by the autoscaler; cannot be smaller than MinReplicas."
+     },
+     "cpuUtilization": {
+      "$ref": "v1beta1.CPUTargetUtilization",
+      "description": "target average CPU utilization (represented as a percentage of requested CPU) over all the pods; if not specified it defaults to the target CPU utilization at 80% of the requested resources."
+     }
+    }
+   },
+   "extensions.v1beta1.SubresourceReference": {
+    "id": "extensions.v1beta1.SubresourceReference",
+    "description": "SubresourceReference contains enough information to let you inspect or modify the referred subresource.",
+    "properties": {
+     "kind": {
+      "type": "string",
+      "description": "Kind of the referent; More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+     },
+     "name": {
+      "type": "string",
+      "description": "Name of the referent; More info: http://kubernetes.io/docs/user-guide/identifiers#names"
+     },
+     "apiVersion": {
+      "type": "string",
+      "description": "API version of the referent"
+     },
+     "subresource": {
+      "type": "string",
+      "description": "Subresource name of the referent"
+     }
+    }
+   },
+   "extensions.v1beta1.CPUTargetUtilization": {
+    "id": "extensions.v1beta1.CPUTargetUtilization",
+    "required": [
+     "targetPercentage"
+    ],
+    "properties": {
+     "targetPercentage": {
+      "type": "integer",
+      "format": "int32",
+      "description": "fraction of the requested CPU that should be utilized/used, e.g. 70 means that 70% of the requested CPU should be in use."
+     }
+    }
+   },
+   "extensions.v1beta1.HorizontalPodAutoscalerStatus": {
+    "id": "extensions.v1beta1.HorizontalPodAutoscalerStatus",
+    "description": "current status of a horizontal pod autoscaler",
+    "required": [
+     "currentReplicas",
+     "desiredReplicas"
+    ],
+    "properties": {
+     "observedGeneration": {
+      "type": "integer",
+      "format": "int64",
+      "description": "most recent generation observed by this autoscaler."
+     },
+     "lastScaleTime": {
+      "type": "string",
+      "description": "last time the HorizontalPodAutoscaler scaled the number of pods; used by the autoscaler to control how often the number of pods is changed."
+     },
+     "currentReplicas": {
+      "type": "integer",
+      "format": "int32",
+      "description": "current number of replicas of pods managed by this autoscaler."
+     },
+     "desiredReplicas": {
+      "type": "integer",
+      "format": "int32",
+      "description": "desired number of replicas of pods managed by this autoscaler."
+     },
+     "currentCPUUtilizationPercentage": {
+      "type": "integer",
+      "format": "int32",
+      "description": "current average CPU utilization over all pods, represented as a percentage of requested CPU, e.g. 70 means that an average pod is using now 70% of its requested CPU."
+     }
+    }
+   },
+   "extensions.v1beta1.IngressList": {
+    "id": "extensions.v1beta1.IngressList",
+    "description": "IngressList is a collection of Ingress.",
+    "required": [
+     "items"
+    ],
+    "properties": {
+     "kind": {
+      "type": "string",
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+     },
+     "apiVersion": {
+      "type": "string",
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+     },
+     "metadata": {
+      "$ref": "v1.ListMeta",
+      "description": "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata"
+     },
+     "items": {
+      "type": "array",
+      "items": {
+       "$ref": "v1beta1.Ingress"
+      },
+      "description": "Items is the list of Ingress."
+     }
+    }
+   },
+   "extensions.v1beta1.Ingress": {
+    "id": "extensions.v1beta1.Ingress",
+    "description": "Ingress is a collection of rules that allow inbound connections to reach the endpoints defined by a backend. An Ingress can be configured to give services externally-reachable urls, load balance traffic, terminate SSL, offer name based virtual hosting etc.",
+    "properties": {
+     "kind": {
+      "type": "string",
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+     },
+     "apiVersion": {
+      "type": "string",
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+     },
+     "metadata": {
+      "$ref": "v1.ObjectMeta",
+      "description": "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata"
+     },
+     "spec": {
+      "$ref": "v1beta1.IngressSpec",
+      "description": "Spec is the desired state of the Ingress. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status"
+     },
+     "status": {
+      "$ref": "v1beta1.IngressStatus",
+      "description": "Status is the current state of the Ingress. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status"
+     }
+    }
+   },
+   "extensions.v1beta1.IngressSpec": {
+    "id": "extensions.v1beta1.IngressSpec",
+    "description": "IngressSpec describes the Ingress the user wishes to exist.",
+    "properties": {
+     "backend": {
+      "$ref": "v1beta1.IngressBackend",
+      "description": "A default backend capable of servicing requests that don't match any rule. At least one of 'backend' or 'rules' must be specified. This field is optional to allow the loadbalancer controller or defaulting logic to specify a global default."
+     },
+     "tls": {
+      "type": "array",
+      "items": {
+       "$ref": "v1beta1.IngressTLS"
+      },
+      "description": "TLS configuration. Currently the Ingress only supports a single TLS port, 443. If multiple members of this list specify different hosts, they will be multiplexed on the same port according to the hostname specified through the SNI TLS extension, if the ingress controller fulfilling the ingress supports SNI."
+     },
+     "rules": {
+      "type": "array",
+      "items": {
+       "$ref": "v1beta1.IngressRule"
+      },
+      "description": "A list of host rules used to configure the Ingress. If unspecified, or no rule matches, all traffic is sent to the default backend."
+     }
+    }
+   },
+   "extensions.v1beta1.IngressBackend": {
+    "id": "extensions.v1beta1.IngressBackend",
+    "description": "IngressBackend describes all endpoints for a given service and port.",
+    "required": [
+     "serviceName",
+     "servicePort"
+    ],
+    "properties": {
+     "serviceName": {
+      "type": "string",
+      "description": "Specifies the name of the referenced service."
+     },
+     "servicePort": {
+      "type": "string",
+      "description": "Specifies the port of the referenced service."
+     }
+    }
+   },
+   "extensions.v1beta1.IngressTLS": {
+    "id": "extensions.v1beta1.IngressTLS",
+    "description": "IngressTLS describes the transport layer security associated with an Ingress.",
+    "properties": {
+     "hosts": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      },
+      "description": "Hosts are a list of hosts included in the TLS certificate. The values in this list must match the name/s used in the tlsSecret. Defaults to the wildcard host setting for the loadbalancer controller fulfilling this Ingress, if left unspecified."
+     },
+     "secretName": {
+      "type": "string",
+      "description": "SecretName is the name of the secret used to terminate SSL traffic on 443. Field is left optional to allow SSL routing based on SNI hostname alone. If the SNI host in a listener conflicts with the \"Host\" header field used by an IngressRule, the SNI host is used for termination and value of the Host header is used for routing."
+     }
+    }
+   },
+   "extensions.v1beta1.IngressRule": {
+    "id": "extensions.v1beta1.IngressRule",
+    "description": "IngressRule represents the rules mapping the paths under a specified host to the related backend services. Incoming requests are first evaluated for a host match, then routed to the backend associated with the matching IngressRuleValue.",
+    "properties": {
+     "host": {
+      "type": "string",
+      "description": "Host is the fully qualified domain name of a network host, as defined by RFC 3986. Note the following deviations from the \"host\" part of the URI as defined in the RFC: 1. IPs are not allowed. Currently an IngressRuleValue can only apply to the\n\t  IP in the Spec of the parent Ingress.\n2. The `:` delimiter is not respected because ports are not allowed.\n\t  Currently the port of an Ingress is implicitly :80 for http and\n\t  :443 for https.\nBoth these may change in the future. Incoming requests are matched against the host before the IngressRuleValue. If the host is unspecified, the Ingress routes all traffic based on the specified IngressRuleValue."
+     },
+     "http": {
+      "$ref": "v1beta1.HTTPIngressRuleValue"
+     }
+    }
+   },
+   "extensions.v1beta1.HTTPIngressRuleValue": {
+    "id": "extensions.v1beta1.HTTPIngressRuleValue",
+    "description": "HTTPIngressRuleValue is a list of http selectors pointing to backends. In the example: http://\u003chost\u003e/\u003cpath\u003e?\u003csearchpart\u003e -\u003e backend where where parts of the url correspond to RFC 3986, this resource will be used to match against everything after the last '/' and before the first '?' or '#'.",
+    "required": [
+     "paths"
+    ],
+    "properties": {
+     "paths": {
+      "type": "array",
+      "items": {
+       "$ref": "v1beta1.HTTPIngressPath"
+      },
+      "description": "A collection of paths that map requests to backends."
+     }
+    }
+   },
+   "extensions.v1beta1.HTTPIngressPath": {
+    "id": "extensions.v1beta1.HTTPIngressPath",
+    "description": "HTTPIngressPath associates a path regex with a backend. Incoming urls matching the path are forwarded to the backend.",
+    "required": [
+     "backend"
+    ],
+    "properties": {
+     "path": {
+      "type": "string",
+      "description": "Path is an extended POSIX regex as defined by IEEE Std 1003.1, (i.e this follows the egrep/unix syntax, not the perl syntax) matched against the path of an incoming request. Currently it can contain characters disallowed from the conventional \"path\" part of a URL as defined by RFC 3986. Paths must begin with a '/'. If unspecified, the path defaults to a catch all sending traffic to the backend."
+     },
+     "backend": {
+      "$ref": "v1beta1.IngressBackend",
+      "description": "Backend defines the referenced service endpoint to which the traffic will be forwarded to."
+     }
+    }
+   },
+   "extensions.v1beta1.IngressStatus": {
+    "id": "extensions.v1beta1.IngressStatus",
+    "description": "IngressStatus describe the current state of the Ingress.",
+    "properties": {
+     "loadBalancer": {
+      "$ref": "v1.LoadBalancerStatus",
+      "description": "LoadBalancer contains the current status of the load-balancer."
+     }
+    }
+   },
+   "extensions.v1beta1.NetworkPolicyList": {
+    "id": "extensions.v1beta1.NetworkPolicyList",
+    "description": "Network Policy List is a list of NetworkPolicy objects.",
+    "required": [
+     "items"
+    ],
+    "properties": {
+     "kind": {
+      "type": "string",
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+     },
+     "apiVersion": {
+      "type": "string",
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+     },
+     "metadata": {
+      "$ref": "v1.ListMeta",
+      "description": "Standard list metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata"
+     },
+     "items": {
+      "type": "array",
+      "items": {
+       "$ref": "v1beta1.NetworkPolicy"
+      },
+      "description": "Items is a list of schema objects."
+     }
+    }
+   },
+   "extensions.v1beta1.NetworkPolicy": {
+    "id": "extensions.v1beta1.NetworkPolicy",
+    "properties": {
+     "kind": {
+      "type": "string",
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+     },
+     "apiVersion": {
+      "type": "string",
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+     },
+     "metadata": {
+      "$ref": "v1.ObjectMeta",
+      "description": "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata"
+     },
+     "spec": {
+      "$ref": "v1beta1.NetworkPolicySpec",
+      "description": "Specification of the desired behavior for this NetworkPolicy."
+     }
+    }
+   },
+   "extensions.v1beta1.NetworkPolicySpec": {
+    "id": "extensions.v1beta1.NetworkPolicySpec",
+    "required": [
+     "podSelector"
+    ],
+    "properties": {
+     "podSelector": {
+      "$ref": "v1.LabelSelector",
+      "description": "Selects the pods to which this NetworkPolicy object applies.  The array of ingress rules is applied to any pods selected by this field. Multiple network policies can select the same set of pods.  In this case, the ingress rules for each are combined additively. This field is NOT optional and follows standard label selector semantics. An empty podSelector matches all pods in this namespace."
+     },
+     "ingress": {
+      "type": "array",
+      "items": {
+       "$ref": "v1beta1.NetworkPolicyIngressRule"
+      },
+      "description": "List of ingress rules to be applied to the selected pods. Traffic is allowed to a pod if namespace.networkPolicy.ingress.isolation is undefined and cluster policy allows it, OR if the traffic source is the pod's local node, OR if the traffic matches at least one ingress rule across all of the NetworkPolicy objects whose podSelector matches the pod. If this field is empty then this NetworkPolicy does not affect ingress isolation. If this field is present and contains at least one rule, this policy allows any traffic which matches at least one of the ingress rules in this list."
+     }
+    }
+   },
+   "extensions.v1beta1.NetworkPolicyIngressRule": {
+    "id": "extensions.v1beta1.NetworkPolicyIngressRule",
+    "description": "This NetworkPolicyIngressRule matches traffic if and only if the traffic matches both ports AND from.",
+    "properties": {
+     "ports": {
+      "type": "array",
+      "items": {
+       "$ref": "v1beta1.NetworkPolicyPort"
+      },
+      "description": "List of ports which should be made accessible on the pods selected for this rule. Each item in this list is combined using a logical OR. If this field is not provided, this rule matches all ports (traffic not restricted by port). If this field is empty, this rule matches no ports (no traffic matches). If this field is present and contains at least one item, then this rule allows traffic only if the traffic matches at least one port in the list."
+     },
+     "from": {
+      "type": "array",
+      "items": {
+       "$ref": "v1beta1.NetworkPolicyPeer"
+      },
+      "description": "List of sources which should be able to access the pods selected for this rule. Items in this list are combined using a logical OR operation. If this field is not provided, this rule matches all sources (traffic not restricted by source). If this field is empty, this rule matches no sources (no traffic matches). If this field is present and contains at least on item, this rule allows traffic only if the traffic matches at least one item in the from list."
+     }
+    }
+   },
+   "extensions.v1beta1.NetworkPolicyPort": {
+    "id": "extensions.v1beta1.NetworkPolicyPort",
+    "properties": {
+     "protocol": {
+      "$ref": "io.k8s.kubernetes.pkg.api.v1.Protocol",
+      "description": "Optional.  The protocol (TCP or UDP) which traffic must match. If not specified, this field defaults to TCP."
+     },
+     "port": {
+      "type": "string",
+      "description": "If specified, the port on the given protocol.  This can either be a numerical or named port on a pod.  If this field is not provided, this matches all port names and numbers. If present, only traffic on the specified protocol AND port will be matched."
+     }
+    }
+   },
+   "extensions.v1beta1.NetworkPolicyPeer": {
+    "id": "extensions.v1beta1.NetworkPolicyPeer",
+    "properties": {
+     "podSelector": {
+      "$ref": "v1.LabelSelector",
+      "description": "This is a label selector which selects Pods in this namespace. This field follows standard label selector semantics. If not provided, this selector selects no pods. If present but empty, this selector selects all pods in this namespace."
+     },
+     "namespaceSelector": {
+      "$ref": "v1.LabelSelector",
+      "description": "Selects Namespaces using cluster scoped-labels.  This matches all pods in all namespaces selected by this label selector. This field follows standard label selector semantics. If omitted, this selector selects no namespaces. If present but empty, this selector selects all namespaces."
+     }
+    }
+   },
+   "extensions.v1beta1.ReplicaSetList": {
+    "id": "extensions.v1beta1.ReplicaSetList",
+    "description": "ReplicaSetList is a collection of ReplicaSets.",
+    "required": [
+     "items"
+    ],
+    "properties": {
+     "kind": {
+      "type": "string",
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+     },
+     "apiVersion": {
+      "type": "string",
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+     },
+     "metadata": {
+      "$ref": "v1.ListMeta",
+      "description": "Standard list metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+     },
+     "items": {
+      "type": "array",
+      "items": {
+       "$ref": "v1beta1.ReplicaSet"
+      },
+      "description": "List of ReplicaSets. More info: http://kubernetes.io/docs/user-guide/replication-controller"
+     }
+    }
+   },
+   "extensions.v1beta1.ReplicaSet": {
+    "id": "extensions.v1beta1.ReplicaSet",
+    "description": "ReplicaSet represents the configuration of a ReplicaSet.",
+    "properties": {
+     "kind": {
+      "type": "string",
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+     },
+     "apiVersion": {
+      "type": "string",
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+     },
+     "metadata": {
+      "$ref": "v1.ObjectMeta",
+      "description": "If the Labels of a ReplicaSet are empty, they are defaulted to be the same as the Pod(s) that the ReplicaSet manages. Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata"
+     },
+     "spec": {
+      "$ref": "v1beta1.ReplicaSetSpec",
+      "description": "Spec defines the specification of the desired behavior of the ReplicaSet. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status"
+     },
+     "status": {
+      "$ref": "v1beta1.ReplicaSetStatus",
+      "description": "Status is the most recently observed status of the ReplicaSet. This data may be out of date by some window of time. Populated by the system. Read-only. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status"
+     }
+    }
+   },
+   "extensions.v1beta1.ReplicaSetSpec": {
+    "id": "extensions.v1beta1.ReplicaSetSpec",
+    "description": "ReplicaSetSpec is the specification of a ReplicaSet.",
+    "properties": {
+     "replicas": {
+      "type": "integer",
+      "format": "int32",
+      "description": "Replicas is the number of desired replicas. This is a pointer to distinguish between explicit zero and unspecified. Defaults to 1. More info: http://kubernetes.io/docs/user-guide/replication-controller#what-is-a-replication-controller"
+     },
+     "minReadySeconds": {
+      "type": "integer",
+      "format": "int32",
+      "description": "Minimum number of seconds for which a newly created pod should be ready without any of its container crashing, for it to be considered available. Defaults to 0 (pod will be considered available as soon as it is ready)"
+     },
+     "selector": {
+      "$ref": "v1.LabelSelector",
+      "description": "Selector is a label query over pods that should match the replica count. If the selector is empty, it is defaulted to the labels present on the pod template. Label keys and values that must match in order to be controlled by this replica set. More info: http://kubernetes.io/docs/user-guide/labels#label-selectors"
+     },
+     "template": {
+      "$ref": "v1.PodTemplateSpec",
+      "description": "Template is the object that describes the pod that will be created if insufficient replicas are detected. More info: http://kubernetes.io/docs/user-guide/replication-controller#pod-template"
+     }
+    }
+   },
+   "extensions.v1beta1.ReplicaSetStatus": {
+    "id": "extensions.v1beta1.ReplicaSetStatus",
+    "description": "ReplicaSetStatus represents the current status of a ReplicaSet.",
+    "required": [
+     "replicas"
+    ],
+    "properties": {
+     "replicas": {
+      "type": "integer",
+      "format": "int32",
+      "description": "Replicas is the most recently oberved number of replicas. More info: http://kubernetes.io/docs/user-guide/replication-controller#what-is-a-replication-controller"
+     },
+     "fullyLabeledReplicas": {
+      "type": "integer",
+      "format": "int32",
+      "description": "The number of pods that have labels matching the labels of the pod template of the replicaset."
+     },
+     "readyReplicas": {
+      "type": "integer",
+      "format": "int32",
+      "description": "The number of ready replicas for this replica set."
+     },
+     "availableReplicas": {
+      "type": "integer",
+      "format": "int32",
+      "description": "The number of available replicas (ready for at least minReadySeconds) for this replica set."
+     },
+     "observedGeneration": {
+      "type": "integer",
+      "format": "int64",
+      "description": "ObservedGeneration reflects the generation of the most recently observed ReplicaSet."
+     },
+     "conditions": {
+      "type": "array",
+      "items": {
+       "$ref": "v1beta1.ReplicaSetCondition"
+      },
+      "description": "Represents the latest available observations of a replica set's current state."
+     }
+    }
+   },
+   "extensions.v1beta1.ReplicaSetCondition": {
+    "id": "extensions.v1beta1.ReplicaSetCondition",
+    "description": "ReplicaSetCondition describes the state of a replica set at a certain point.",
+    "required": [
+     "type",
+     "status"
+    ],
+    "properties": {
+     "type": {
+      "type": "string",
+      "description": "Type of replica set condition."
+     },
+     "status": {
+      "type": "string",
+      "description": "Status of the condition, one of True, False, Unknown."
+     },
+     "lastTransitionTime": {
+      "type": "string",
+      "description": "The last time the condition transitioned from one status to another."
+     },
+     "reason": {
+      "type": "string",
+      "description": "The reason for the condition's last transition."
+     },
+     "message": {
+      "type": "string",
+      "description": "A human readable message indicating details about the transition."
+     }
+    }
+   },
+   "extensions.v1beta1.ThirdPartyResourceList": {
+    "id": "extensions.v1beta1.ThirdPartyResourceList",
+    "description": "ThirdPartyResourceList is a list of ThirdPartyResources.",
+    "required": [
+     "items"
+    ],
+    "properties": {
+     "kind": {
+      "type": "string",
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+     },
+     "apiVersion": {
+      "type": "string",
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+     },
+     "metadata": {
+      "$ref": "v1.ListMeta",
+      "description": "Standard list metadata."
+     },
+     "items": {
+      "type": "array",
+      "items": {
+       "$ref": "v1beta1.ThirdPartyResource"
+      },
+      "description": "Items is the list of ThirdPartyResources."
+     }
+    }
+   },
+   "extensions.v1beta1.ThirdPartyResource": {
+    "id": "extensions.v1beta1.ThirdPartyResource",
+    "description": "A ThirdPartyResource is a generic representation of a resource, it is used by add-ons and plugins to add new resource types to the API.  It consists of one or more Versions of the api.",
+    "properties": {
+     "kind": {
+      "type": "string",
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+     },
+     "apiVersion": {
+      "type": "string",
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+     },
+     "metadata": {
+      "$ref": "v1.ObjectMeta",
+      "description": "Standard object metadata"
+     },
+     "description": {
+      "type": "string",
+      "description": "Description is the description of this object."
+     },
+     "versions": {
+      "type": "array",
+      "items": {
+       "$ref": "v1beta1.APIVersion"
+      },
+      "description": "Versions are versions for this third party object"
+     }
+    }
+   },
+   "extensions.v1beta1.APIVersion": {
+    "id": "extensions.v1beta1.APIVersion",
+    "description": "An APIVersion represents a single concrete version of an object model.",
+    "properties": {
+     "name": {
+      "type": "string",
+      "description": "Name of this version (e.g. 'v1')."
+     }
+    }
+   },
+   "io.k8s.meta.v1.APIResourceList": {
+    "id": "io.k8s.meta.v1.APIResourceList",
+    "description": "APIResourceList is a list of APIResource, it is used to expose the name of the resources supported in a specific group and version, and if the resource is namespaced.",
+    "required": [
+     "groupVersion",
+     "resources"
+    ],
+    "properties": {
+     "kind": {
+      "type": "string",
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+     },
+     "apiVersion": {
+      "type": "string",
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+     },
+     "groupVersion": {
+      "type": "string",
+      "description": "groupVersion is the group and version this APIResourceList is for."
+     },
+     "resources": {
+      "type": "array",
+      "items": {
+       "$ref": "v1.APIResource"
+      },
+      "description": "resources contains the name of the resources and if they are namespaced."
+     }
+    }
+   },
+   "io.k8s.meta.v1.APIResource": {
+    "id": "io.k8s.meta.v1.APIResource",
     "description": "APIResource specifies the name of a resource and whether it is namespaced.",
     "required": [
      "name",

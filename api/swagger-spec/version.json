@@ -31,6 +31,50 @@
   "models": {
    "version.Info": {
     "id": "version.Info",
+    "description": "\n\nDEPRECATED: Use 'io.k8s.kubernetes.pkg.version.Info' instead.",
+    "required": [
+     "major",
+     "minor",
+     "gitVersion",
+     "gitCommit",
+     "gitTreeState",
+     "buildDate",
+     "goVersion",
+     "compiler",
+     "platform"
+    ],
+    "properties": {
+     "major": {
+      "type": "string"
+     },
+     "minor": {
+      "type": "string"
+     },
+     "gitVersion": {
+      "type": "string"
+     },
+     "gitCommit": {
+      "type": "string"
+     },
+     "gitTreeState": {
+      "type": "string"
+     },
+     "buildDate": {
+      "type": "string"
+     },
+     "goVersion": {
+      "type": "string"
+     },
+     "compiler": {
+      "type": "string"
+     },
+     "platform": {
+      "type": "string"
+     }
+    }
+   },
+   "io.k8s.kubernetes.pkg.version.Info": {
+    "id": "io.k8s.kubernetes.pkg.version.Info",
     "required": [
      "major",
      "minor",
