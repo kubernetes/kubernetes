@@ -353,8 +353,14 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.KubeletDeps) (err error) {
 				if err != nil {
 					return err
 				}
+			} else {
+				glog.Warningf("failed to init kubelet configure sync : %v", err)
 			}
+		} else if cfgzErr != nil {
+			glog.Warningf("failed to init configz : %v", cfgzErr)
 		}
+	} else if cfgzErr != nil {
+		glog.Warningf("failed to init configz : %v", cfgzErr)
 	}
 
 	if kubeDeps == nil {
