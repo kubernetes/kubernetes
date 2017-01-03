@@ -508,6 +508,7 @@ k8s.io/kubernetes/cmd/hyperkube,jbeda,0
 k8s.io/kubernetes/cmd/kube-apiserver/app/options,nikhiljindal,0
 k8s.io/kubernetes/cmd/kube-discovery/app,pmorie,1
 k8s.io/kubernetes/cmd/kube-proxy/app,luxas,1
+k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm,apprenda,0
 k8s.io/kubernetes/cmd/kubeadm/app/cmd,caesarxuchao,1
 k8s.io/kubernetes/cmd/kubeadm/app/discovery,brendandburns,0
 k8s.io/kubernetes/cmd/kubeadm/app/images,davidopp,1
