@@ -24,6 +24,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/pprof"
+	"os"
 	"strconv"
 
 	federationclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset"
@@ -39,6 +40,9 @@ import (
 	secretcontroller "k8s.io/kubernetes/federation/pkg/federation-controller/secret"
 	servicecontroller "k8s.io/kubernetes/federation/pkg/federation-controller/service"
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util"
+        "k8s.io/kubernetes/pkg/api/v1"
+        "k8s.io/kubernetes/federation/client/leaderelection"
+        "k8s.io/kubernetes/federation/client/leaderelection/resourcelock"
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
@@ -123,6 +127,17 @@ func Run(s *options.CMServer) error {
 	restClientCfg.QPS = s.APIServerQPS
 	restClientCfg.Burst = s.APIServerBurst
 
+        kubeconfig, err := clientcmd.BuildConfigFromFlags(s.Master, s.Kubeconfig)
+        if err != nil {
+                return err
+        }
+ 
+        kubeconfig.ContentConfig.ContentType = s.ContentType
+        // Override kubeconfig qps/burst settings from flags
+        kubeconfig.QPS = s.APIServerQPS
+        kubeconfig.Burst = s.APIServerBurst
+        leaderElectionClient := federationclientset.NewForConfigOrDie(restclient.AddUserAgent(kubeconfig, "leader-election"))
+
 	go func() {
 		mux := http.NewServeMux()
 		healthz.InstallHandler(mux)
@@ -140,12 +155,45 @@ func Run(s *options.CMServer) error {
 		glog.Fatal(server.ListenAndServe())
 	}()
 
-	run := func() {
+        run := func(stop <-chan struct{}) {
 		err := StartControllers(s, restClientCfg)
 		glog.Fatalf("error running controllers: %v", err)
 		panic("unreachable")
 	}
-	run()
+
+        if !s.LeaderElection.LeaderElect {
+                run(nil)
+                panic("unreachable")
+        }
+ 
+        id, err := os.Hostname()
+        if err != nil {
+                return err
+        }
+ 
+        rl := resourcelock.SecretsLock{
+                SecretsMeta: v1.ObjectMeta{
+                        Namespace: "federation",
+                        Name:      DeprecatedKubeconfigSecretName,
+                },
+                Client: leaderElectionClient,
+                LockConfig: resourcelock.ResourceLockConfig{
+                        Identity:      id,
+                },
+        }
+        leaderelection.RunOrDie(leaderelection.LeaderElectionConfig{
+                Lock:          &rl,
+                LeaseDuration: s.LeaderElection.LeaseDuration.Duration,
+                RenewDeadline: s.LeaderElection.RenewDeadline.Duration,
+                RetryPeriod:   s.LeaderElection.RetryPeriod.Duration,
+                Callbacks: leaderelection.LeaderCallbacks{
+                        OnStartedLeading: run,
+                        OnStoppedLeading: func() {
+                                glog.Fatalf("leaderelection lost")
+                        },
+                },
+        })
+ 
 	panic("unreachable")
 }
 
