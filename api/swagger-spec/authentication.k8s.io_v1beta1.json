@@ -27,7 +27,7 @@
         "allowMultiple": false
        },
        {
-        "type": "v1beta1.TokenReview",
+        "type": "io.k8s.authentication.v1beta1.TokenReview",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -78,8 +78,8 @@
    }
   ],
   "models": {
-   "v1beta1.TokenReview": {
-    "id": "v1beta1.TokenReview",
+   "io.k8s.authentication.v1beta1.TokenReview": {
+    "id": "io.k8s.authentication.v1beta1.TokenReview",
     "description": "TokenReview attempts to authenticate a token to a known user. Note: TokenReview requests may be cached by the webhook token authenticator plugin in the kube-apiserver.",
     "required": [
      "spec"
@@ -97,11 +97,11 @@
       "$ref": "v1.ObjectMeta"
      },
      "spec": {
-      "$ref": "v1beta1.TokenReviewSpec",
+      "$ref": "io.k8s.authentication.v1beta1.TokenReviewSpec",
       "description": "Spec holds information about the request being evaluated"
      },
      "status": {
-      "$ref": "v1beta1.TokenReviewStatus",
+      "$ref": "io.k8s.authentication.v1beta1.TokenReviewStatus",
       "description": "Status is filled in by the server and indicates whether the request can be authenticated."
      }
     }
@@ -163,7 +163,7 @@
      "ownerReferences": {
       "type": "array",
       "items": {
-       "$ref": "v1.OwnerReference"
+       "$ref": "io.k8s.meta.v1.OwnerReference"
       },
       "description": "List of objects depended by this object. If ALL objects in the list have been deleted, this object will be garbage collected. If this object is managed by a controller, then an entry in this list will point to this controller, with the controller field set to true. There cannot be more than one managing controller."
      },
@@ -180,8 +180,8 @@
      }
     }
    },
-   "v1.OwnerReference": {
-    "id": "v1.OwnerReference",
+   "io.k8s.meta.v1.OwnerReference": {
+    "id": "io.k8s.meta.v1.OwnerReference",
     "description": "OwnerReference contains enough information to let you identify an owning object. Currently, an owning object must be in the same namespace, so there is no namespace field.",
     "required": [
      "apiVersion",
@@ -212,8 +212,8 @@
      }
     }
    },
-   "v1beta1.TokenReviewSpec": {
-    "id": "v1beta1.TokenReviewSpec",
+   "io.k8s.authentication.v1beta1.TokenReviewSpec": {
+    "id": "io.k8s.authentication.v1beta1.TokenReviewSpec",
     "description": "TokenReviewSpec is a description of the token authentication request.",
     "properties": {
      "token": {
@@ -222,8 +222,8 @@
      }
     }
    },
-   "v1beta1.TokenReviewStatus": {
-    "id": "v1beta1.TokenReviewStatus",
+   "io.k8s.authentication.v1beta1.TokenReviewStatus": {
+    "id": "io.k8s.authentication.v1beta1.TokenReviewStatus",
     "description": "TokenReviewStatus is the result of the token authentication request.",
     "properties": {
      "authenticated": {
@@ -231,7 +231,7 @@
       "description": "Authenticated indicates that the token was associated with a known user."
      },
      "user": {
-      "$ref": "v1beta1.UserInfo",
+      "$ref": "io.k8s.authentication.v1beta1.UserInfo",
       "description": "User is the UserInfo associated with the provided token."
      },
      "error": {
@@ -240,8 +240,8 @@
      }
     }
    },
-   "v1beta1.UserInfo": {
-    "id": "v1beta1.UserInfo",
+   "io.k8s.authentication.v1beta1.UserInfo": {
+    "id": "io.k8s.authentication.v1beta1.UserInfo",
     "description": "UserInfo holds the information about the user needed to implement the user.Info interface.",
     "properties": {
      "username": {
@@ -265,8 +265,8 @@
      }
     }
    },
-   "v1.APIResourceList": {
-    "id": "v1.APIResourceList",
+   "io.k8s.meta.v1.APIResourceList": {
+    "id": "io.k8s.meta.v1.APIResourceList",
     "description": "APIResourceList is a list of APIResource, it is used to expose the name of the resources supported in a specific group and version, and if the resource is namespaced.",
     "required": [
      "groupVersion",
@@ -288,14 +288,14 @@
      "resources": {
       "type": "array",
       "items": {
-       "$ref": "v1.APIResource"
+       "$ref": "io.k8s.meta.v1.APIResource"
       },
       "description": "resources contains the name of the resources and if they are namespaced."
      }
     }
    },
-   "v1.APIResource": {
-    "id": "v1.APIResource",
+   "io.k8s.meta.v1.APIResource": {
+    "id": "io.k8s.meta.v1.APIResource",
     "description": "APIResource specifies the name of a resource and whether it is namespaced.",
     "required": [
      "name",

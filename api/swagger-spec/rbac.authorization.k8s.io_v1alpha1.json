@@ -100,7 +100,7 @@
         "allowMultiple": false
        },
        {
-        "type": "v1alpha1.ClusterRoleBinding",
+        "type": "io.k8s.authorization.rbac.v1alpha1.ClusterRoleBinding",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -334,7 +334,7 @@
         "allowMultiple": false
        },
        {
-        "type": "v1alpha1.ClusterRoleBinding",
+        "type": "io.k8s.authorization.rbac.v1alpha1.ClusterRoleBinding",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -381,7 +381,7 @@
         "allowMultiple": false
        },
        {
-        "type": "v1.Patch",
+        "type": "io.k8s.meta.v1.Patch",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -659,7 +659,7 @@
         "allowMultiple": false
        },
        {
-        "type": "v1alpha1.ClusterRole",
+        "type": "io.k8s.authorization.rbac.v1alpha1.ClusterRole",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -893,7 +893,7 @@
         "allowMultiple": false
        },
        {
-        "type": "v1alpha1.ClusterRole",
+        "type": "io.k8s.authorization.rbac.v1alpha1.ClusterRole",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -940,7 +940,7 @@
         "allowMultiple": false
        },
        {
-        "type": "v1.Patch",
+        "type": "io.k8s.meta.v1.Patch",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -1226,7 +1226,7 @@
         "allowMultiple": false
        },
        {
-        "type": "v1alpha1.RoleBinding",
+        "type": "io.k8s.authorization.rbac.v1alpha1.RoleBinding",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -1492,7 +1492,7 @@
         "allowMultiple": false
        },
        {
-        "type": "v1alpha1.RoleBinding",
+        "type": "io.k8s.authorization.rbac.v1alpha1.RoleBinding",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -1547,7 +1547,7 @@
         "allowMultiple": false
        },
        {
-        "type": "v1.Patch",
+        "type": "io.k8s.meta.v1.Patch",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -2015,7 +2015,7 @@
         "allowMultiple": false
        },
        {
-        "type": "v1alpha1.Role",
+        "type": "io.k8s.authorization.rbac.v1alpha1.Role",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -2281,7 +2281,7 @@
         "allowMultiple": false
        },
        {
-        "type": "v1alpha1.Role",
+        "type": "io.k8s.authorization.rbac.v1alpha1.Role",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -2336,7 +2336,7 @@
         "allowMultiple": false
        },
        {
-        "type": "v1.Patch",
+        "type": "io.k8s.meta.v1.Patch",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -2729,8 +2729,8 @@
    }
   ],
   "models": {
-   "v1alpha1.ClusterRoleBindingList": {
-    "id": "v1alpha1.ClusterRoleBindingList",
+   "io.k8s.authorization.rbac.v1alpha1.ClusterRoleBindingList": {
+    "id": "io.k8s.authorization.rbac.v1alpha1.ClusterRoleBindingList",
     "description": "ClusterRoleBindingList is a collection of ClusterRoleBindings",
     "required": [
      "items"
@@ -2745,20 +2745,20 @@
       "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
      },
      "metadata": {
-      "$ref": "v1.ListMeta",
+      "$ref": "io.k8s.meta.v1.ListMeta",
       "description": "Standard object's metadata."
      },
      "items": {
       "type": "array",
       "items": {
-       "$ref": "v1alpha1.ClusterRoleBinding"
+       "$ref": "io.k8s.authorization.rbac.v1alpha1.ClusterRoleBinding"
       },
       "description": "Items is a list of ClusterRoleBindings"
      }
     }
    },
-   "v1.ListMeta": {
-    "id": "v1.ListMeta",
+   "io.k8s.meta.v1.ListMeta": {
+    "id": "io.k8s.meta.v1.ListMeta",
     "description": "ListMeta describes metadata that synthetic resources must have, including lists and various status objects. A resource may have only one of {ObjectMeta, ListMeta}.",
     "properties": {
      "selfLink": {
@@ -2771,8 +2771,8 @@
      }
     }
    },
-   "v1alpha1.ClusterRoleBinding": {
-    "id": "v1alpha1.ClusterRoleBinding",
+   "io.k8s.authorization.rbac.v1alpha1.ClusterRoleBinding": {
+    "id": "io.k8s.authorization.rbac.v1alpha1.ClusterRoleBinding",
     "description": "ClusterRoleBinding references a ClusterRole, but not contain it.  It can reference a ClusterRole in the global namespace, and adds who information via Subject.",
     "required": [
      "subjects",
@@ -2794,12 +2794,12 @@
      "subjects": {
       "type": "array",
       "items": {
-       "$ref": "v1alpha1.Subject"
+       "$ref": "io.k8s.authorization.rbac.v1alpha1.Subject"
       },
       "description": "Subjects holds references to the objects the role applies to."
      },
      "roleRef": {
-      "$ref": "v1alpha1.RoleRef",
+      "$ref": "io.k8s.authorization.rbac.v1alpha1.RoleRef",
       "description": "RoleRef can only reference a ClusterRole in the global namespace. If the RoleRef cannot be resolved, the Authorizer must return an error."
      }
     }
@@ -2861,7 +2861,7 @@
      "ownerReferences": {
       "type": "array",
       "items": {
-       "$ref": "v1.OwnerReference"
+       "$ref": "io.k8s.meta.v1.OwnerReference"
       },
       "description": "List of objects depended by this object. If ALL objects in the list have been deleted, this object will be garbage collected. If this object is managed by a controller, then an entry in this list will point to this controller, with the controller field set to true. There cannot be more than one managing controller."
      },
@@ -2878,8 +2878,8 @@
      }
     }
    },
-   "v1.OwnerReference": {
-    "id": "v1.OwnerReference",
+   "io.k8s.meta.v1.OwnerReference": {
+    "id": "io.k8s.meta.v1.OwnerReference",
     "description": "OwnerReference contains enough information to let you identify an owning object. Currently, an owning object must be in the same namespace, so there is no namespace field.",
     "required": [
      "apiVersion",
@@ -2910,8 +2910,8 @@
      }
     }
    },
-   "v1alpha1.Subject": {
-    "id": "v1alpha1.Subject",
+   "io.k8s.authorization.rbac.v1alpha1.Subject": {
+    "id": "io.k8s.authorization.rbac.v1alpha1.Subject",
     "description": "Subject contains a reference to the object or user identities a role binding applies to.  This can either hold a direct API object reference, or a value for non-objects such as user and group names.",
     "required": [
      "kind",
@@ -2936,8 +2936,8 @@
      }
     }
    },
-   "v1alpha1.RoleRef": {
-    "id": "v1alpha1.RoleRef",
+   "io.k8s.authorization.rbac.v1alpha1.RoleRef": {
+    "id": "io.k8s.authorization.rbac.v1alpha1.RoleRef",
     "description": "RoleRef contains information that points to the role being used",
     "required": [
      "apiGroup",
@@ -2959,8 +2959,8 @@
      }
     }
    },
-   "v1.Status": {
-    "id": "v1.Status",
+   "io.k8s.meta.v1.Status": {
+    "id": "io.k8s.meta.v1.Status",
     "description": "Status is a return value for calls that don't return other objects.",
     "properties": {
      "kind": {
@@ -2972,7 +2972,7 @@
       "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
      },
      "metadata": {
-      "$ref": "v1.ListMeta",
+      "$ref": "io.k8s.meta.v1.ListMeta",
       "description": "Standard list metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
      },
      "status": {
@@ -2988,7 +2988,7 @@
       "description": "A machine-readable description of why this operation is in the \"Failure\" status. If this value is empty there is no information available. A Reason clarifies an HTTP status code but does not override it."
      },
      "details": {
-      "$ref": "v1.StatusDetails",
+      "$ref": "io.k8s.meta.v1.StatusDetails",
       "description": "Extended data associated with the reason.  Each reason may define its own extended details. This field is optional and the data returned is not guaranteed to conform to any schema except that defined by the reason type."
      },
      "code": {
@@ -2998,8 +2998,8 @@
      }
     }
    },
-   "v1.StatusDetails": {
-    "id": "v1.StatusDetails",
+   "io.k8s.meta.v1.StatusDetails": {
+    "id": "io.k8s.meta.v1.StatusDetails",
     "description": "StatusDetails is a set of additional properties that MAY be set by the server to provide additional information about a response. The Reason field of a Status object defines what attributes will be set. Clients must ignore fields that do not match the defined type of each attribute, and should assume that any attribute may be empty, invalid, or under defined.",
     "properties": {
      "name": {
@@ -3017,7 +3017,7 @@
      "causes": {
       "type": "array",
       "items": {
-       "$ref": "v1.StatusCause"
+       "$ref": "io.k8s.meta.v1.StatusCause"
       },
       "description": "The Causes array includes more details associated with the StatusReason failure. Not all StatusReasons may provide detailed causes."
      },
@@ -3028,8 +3028,8 @@
      }
     }
    },
-   "v1.StatusCause": {
-    "id": "v1.StatusCause",
+   "io.k8s.meta.v1.StatusCause": {
+    "id": "io.k8s.meta.v1.StatusCause",
     "description": "StatusCause provides more information about an api.Status failure, including cases when multiple errors are encountered.",
     "properties": {
      "reason": {
@@ -3046,8 +3046,8 @@
      }
     }
    },
-   "versioned.Event": {
-    "id": "versioned.Event",
+   "io.k8s.kubernetes.pkg.watch.versioned.Event": {
+    "id": "io.k8s.kubernetes.pkg.watch.versioned.Event",
     "required": [
      "type",
      "object"
@@ -3061,8 +3061,8 @@
      }
     }
    },
-   "v1.Patch": {
-    "id": "v1.Patch",
+   "io.k8s.meta.v1.Patch": {
+    "id": "io.k8s.meta.v1.Patch",
     "description": "Patch is provided to give a concrete name and type to the Kubernetes PATCH request body.",
     "properties": {}
    },
@@ -3098,17 +3098,17 @@
     "description": "Preconditions must be fulfilled before an operation (update, delete, etc.) is carried out.",
     "properties": {
      "uid": {
-      "$ref": "types.UID",
+      "$ref": "io.k8s.kubernetes.pkg.types.UID",
       "description": "Specifies the target UID."
      }
     }
    },
-   "types.UID": {
-    "id": "types.UID",
+   "io.k8s.kubernetes.pkg.types.UID": {
+    "id": "io.k8s.kubernetes.pkg.types.UID",
     "properties": {}
    },
-   "v1alpha1.ClusterRoleList": {
-    "id": "v1alpha1.ClusterRoleList",
+   "io.k8s.authorization.rbac.v1alpha1.ClusterRoleList": {
+    "id": "io.k8s.authorization.rbac.v1alpha1.ClusterRoleList",
     "description": "ClusterRoleList is a collection of ClusterRoles",
     "required": [
      "items"
@@ -3123,20 +3123,20 @@
       "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
      },
      "metadata": {
-      "$ref": "v1.ListMeta",
+      "$ref": "io.k8s.meta.v1.ListMeta",
       "description": "Standard object's metadata."
      },
      "items": {
       "type": "array",
       "items": {
-       "$ref": "v1alpha1.ClusterRole"
+       "$ref": "io.k8s.authorization.rbac.v1alpha1.ClusterRole"
       },
       "description": "Items is a list of ClusterRoles"
      }
     }
    },
-   "v1alpha1.ClusterRole": {
-    "id": "v1alpha1.ClusterRole",
+   "io.k8s.authorization.rbac.v1alpha1.ClusterRole": {
+    "id": "io.k8s.authorization.rbac.v1alpha1.ClusterRole",
     "description": "ClusterRole is a cluster level, logical grouping of PolicyRules that can be referenced as a unit by a RoleBinding or ClusterRoleBinding.",
     "required": [
      "rules"
@@ -3157,14 +3157,14 @@
      "rules": {
       "type": "array",
       "items": {
-       "$ref": "v1alpha1.PolicyRule"
+       "$ref": "io.k8s.authorization.rbac.v1alpha1.PolicyRule"
       },
       "description": "Rules holds all the PolicyRules for this ClusterRole"
      }
     }
    },
-   "v1alpha1.PolicyRule": {
-    "id": "v1alpha1.PolicyRule",
+   "io.k8s.authorization.rbac.v1alpha1.PolicyRule": {
+    "id": "io.k8s.authorization.rbac.v1alpha1.PolicyRule",
     "description": "PolicyRule holds information that describes a policy rule, but does not contain information about who the rule applies to or which namespace the rule applies to.",
     "required": [
      "verbs"
@@ -3211,8 +3211,8 @@
      }
     }
    },
-   "v1alpha1.RoleBindingList": {
-    "id": "v1alpha1.RoleBindingList",
+   "io.k8s.authorization.rbac.v1alpha1.RoleBindingList": {
+    "id": "io.k8s.authorization.rbac.v1alpha1.RoleBindingList",
     "description": "RoleBindingList is a collection of RoleBindings",
     "required": [
      "items"
@@ -3227,20 +3227,20 @@
       "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
      },
      "metadata": {
-      "$ref": "v1.ListMeta",
+      "$ref": "io.k8s.meta.v1.ListMeta",
       "description": "Standard object's metadata."
      },
      "items": {
       "type": "array",
       "items": {
-       "$ref": "v1alpha1.RoleBinding"
+       "$ref": "io.k8s.authorization.rbac.v1alpha1.RoleBinding"
       },
       "description": "Items is a list of RoleBindings"
      }
     }
    },
-   "v1alpha1.RoleBinding": {
-    "id": "v1alpha1.RoleBinding",
+   "io.k8s.authorization.rbac.v1alpha1.RoleBinding": {
+    "id": "io.k8s.authorization.rbac.v1alpha1.RoleBinding",
     "description": "RoleBinding references a role, but does not contain it.  It can reference a Role in the same namespace or a ClusterRole in the global namespace. It adds who information via Subjects and namespace information by which namespace it exists in.  RoleBindings in a given namespace only have effect in that namespace.",
     "required": [
      "subjects",
@@ -3262,18 +3262,18 @@
      "subjects": {
       "type": "array",
       "items": {
-       "$ref": "v1alpha1.Subject"
+       "$ref": "io.k8s.authorization.rbac.v1alpha1.Subject"
       },
       "description": "Subjects holds references to the objects the role applies to."
      },
      "roleRef": {
-      "$ref": "v1alpha1.RoleRef",
+      "$ref": "io.k8s.authorization.rbac.v1alpha1.RoleRef",
       "description": "RoleRef can reference a Role in the current namespace or a ClusterRole in the global namespace. If the RoleRef cannot be resolved, the Authorizer must return an error."
      }
     }
    },
-   "v1alpha1.RoleList": {
-    "id": "v1alpha1.RoleList",
+   "io.k8s.authorization.rbac.v1alpha1.RoleList": {
+    "id": "io.k8s.authorization.rbac.v1alpha1.RoleList",
     "description": "RoleList is a collection of Roles",
     "required": [
      "items"
@@ -3288,20 +3288,20 @@
       "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
      },
      "metadata": {
-      "$ref": "v1.ListMeta",
+      "$ref": "io.k8s.meta.v1.ListMeta",
       "description": "Standard object's metadata."
      },
      "items": {
       "type": "array",
       "items": {
-       "$ref": "v1alpha1.Role"
+       "$ref": "io.k8s.authorization.rbac.v1alpha1.Role"
       },
       "description": "Items is a list of Roles"
      }
     }
    },
-   "v1alpha1.Role": {
-    "id": "v1alpha1.Role",
+   "io.k8s.authorization.rbac.v1alpha1.Role": {
+    "id": "io.k8s.authorization.rbac.v1alpha1.Role",
     "description": "Role is a namespaced, logical grouping of PolicyRules that can be referenced as a unit by a RoleBinding.",
     "required": [
      "rules"
@@ -3322,14 +3322,14 @@
      "rules": {
       "type": "array",
       "items": {
-       "$ref": "v1alpha1.PolicyRule"
+       "$ref": "io.k8s.authorization.rbac.v1alpha1.PolicyRule"
       },
       "description": "Rules holds all the PolicyRules for this Role"
      }
     }
    },
-   "v1.APIResourceList": {
-    "id": "v1.APIResourceList",
+   "io.k8s.meta.v1.APIResourceList": {
+    "id": "io.k8s.meta.v1.APIResourceList",
     "description": "APIResourceList is a list of APIResource, it is used to expose the name of the resources supported in a specific group and version, and if the resource is namespaced.",
     "required": [
      "groupVersion",
@@ -3351,14 +3351,14 @@
      "resources": {
       "type": "array",
       "items": {
-       "$ref": "v1.APIResource"
+       "$ref": "io.k8s.meta.v1.APIResource"
       },
       "description": "resources contains the name of the resources and if they are namespaced."
      }
     }
    },
-   "v1.APIResource": {
-    "id": "v1.APIResource",
+   "io.k8s.meta.v1.APIResource": {
+    "id": "io.k8s.meta.v1.APIResource",
     "description": "APIResource specifies the name of a resource and whether it is namespaced.",
     "required": [
      "name",

@@ -108,7 +108,7 @@
         "allowMultiple": false
        },
        {
-        "type": "v1beta1.DaemonSet",
+        "type": "extensions.v1beta1.DaemonSet",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -390,7 +390,7 @@
         "allowMultiple": false
        },
        {
-        "type": "v1beta1.DaemonSet",
+        "type": "extensions.v1beta1.DaemonSet",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -445,7 +445,7 @@
         "allowMultiple": false
        },
        {
-        "type": "v1.Patch",
+        "type": "io.k8s.meta.v1.Patch",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -879,7 +879,7 @@
         "allowMultiple": false
        },
        {
-        "type": "v1beta1.DaemonSet",
+        "type": "extensions.v1beta1.DaemonSet",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -934,7 +934,7 @@
         "allowMultiple": false
        },
        {
-        "type": "v1.Patch",
+        "type": "io.k8s.meta.v1.Patch",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -1078,7 +1078,7 @@
         "allowMultiple": false
        },
        {
-        "type": "v1beta1.Deployment",
+        "type": "extensions.v1beta1.Deployment",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -1360,7 +1360,7 @@
         "allowMultiple": false
        },
        {
-        "type": "v1beta1.Deployment",
+        "type": "extensions.v1beta1.Deployment",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -1415,7 +1415,7 @@
         "allowMultiple": false
        },
        {
-        "type": "v1.Patch",
+        "type": "io.k8s.meta.v1.Patch",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -1802,7 +1802,7 @@
         "allowMultiple": false
        },
        {
-        "type": "v1beta1.DeploymentRollback",
+        "type": "extensions.v1beta1.DeploymentRollback",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -1910,7 +1910,7 @@
         "allowMultiple": false
        },
        {
-        "type": "v1beta1.Scale",
+        "type": "extensions.v1beta1.Scale",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -1965,7 +1965,7 @@
         "allowMultiple": false
        },
        {
-        "type": "v1.Patch",
+        "type": "io.k8s.meta.v1.Patch",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -2075,7 +2075,7 @@
         "allowMultiple": false
        },
        {
-        "type": "v1beta1.Deployment",
+        "type": "extensions.v1beta1.Deployment",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -2130,7 +2130,7 @@
         "allowMultiple": false
        },
        {
-        "type": "v1.Patch",
+        "type": "io.k8s.meta.v1.Patch",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -2274,7 +2274,7 @@
         "allowMultiple": false
        },
        {
-        "type": "v1beta1.Ingress",
+        "type": "extensions.v1beta1.Ingress",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -2556,7 +2556,7 @@
         "allowMultiple": false
        },
        {
-        "type": "v1beta1.Ingress",
+        "type": "extensions.v1beta1.Ingress",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -2611,7 +2611,7 @@
         "allowMultiple": false
        },
        {
-        "type": "v1.Patch",
+        "type": "io.k8s.meta.v1.Patch",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -3045,7 +3045,7 @@
         "allowMultiple": false
        },
        {
-        "type": "v1beta1.Ingress",
+        "type": "extensions.v1beta1.Ingress",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -3100,7 +3100,7 @@
         "allowMultiple": false
        },
        {
-        "type": "v1.Patch",
+        "type": "io.k8s.meta.v1.Patch",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -3244,7 +3244,7 @@
         "allowMultiple": false
        },
        {
-        "type": "v1beta1.ReplicaSet",
+        "type": "extensions.v1beta1.ReplicaSet",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -3526,7 +3526,7 @@
         "allowMultiple": false
        },
        {
-        "type": "v1beta1.ReplicaSet",
+        "type": "extensions.v1beta1.ReplicaSet",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -3581,7 +3581,7 @@
         "allowMultiple": false
        },
        {
-        "type": "v1.Patch",
+        "type": "io.k8s.meta.v1.Patch",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -4015,7 +4015,7 @@
         "allowMultiple": false
        },
        {
-        "type": "v1beta1.Scale",
+        "type": "extensions.v1beta1.Scale",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -4070,7 +4070,7 @@
         "allowMultiple": false
        },
        {
-        "type": "v1.Patch",
+        "type": "io.k8s.meta.v1.Patch",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -4180,7 +4180,7 @@
         "allowMultiple": false
        },
        {
-        "type": "v1beta1.ReplicaSet",
+        "type": "extensions.v1beta1.ReplicaSet",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -4235,7 +4235,7 @@
         "allowMultiple": false
        },
        {
-        "type": "v1.Patch",
+        "type": "io.k8s.meta.v1.Patch",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -4304,8 +4304,8 @@
    }
   ],
   "models": {
-   "v1beta1.DaemonSetList": {
-    "id": "v1beta1.DaemonSetList",
+   "extensions.v1beta1.DaemonSetList": {
+    "id": "extensions.v1beta1.DaemonSetList",
     "description": "DaemonSetList is a collection of daemon sets.",
     "required": [
      "items"
@@ -4320,20 +4320,20 @@
       "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
      },
      "metadata": {
-      "$ref": "v1.ListMeta",
+      "$ref": "io.k8s.meta.v1.ListMeta",
       "description": "Standard list metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata"
      },
      "items": {
       "type": "array",
       "items": {
-       "$ref": "v1beta1.DaemonSet"
+       "$ref": "extensions.v1beta1.DaemonSet"
       },
       "description": "Items is a list of daemon sets."
      }
     }
    },
-   "v1.ListMeta": {
-    "id": "v1.ListMeta",
+   "io.k8s.meta.v1.ListMeta": {
+    "id": "io.k8s.meta.v1.ListMeta",
     "description": "ListMeta describes metadata that synthetic resources must have, including lists and various status objects. A resource may have only one of {ObjectMeta, ListMeta}.",
     "properties": {
      "selfLink": {
@@ -4346,8 +4346,8 @@
      }
     }
    },
-   "v1beta1.DaemonSet": {
-    "id": "v1beta1.DaemonSet",
+   "extensions.v1beta1.DaemonSet": {
+    "id": "extensions.v1beta1.DaemonSet",
     "description": "DaemonSet represents the configuration of a daemon set.",
     "properties": {
      "kind": {
@@ -4363,11 +4363,11 @@
       "description": "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata"
      },
      "spec": {
-      "$ref": "v1beta1.DaemonSetSpec",
+      "$ref": "extensions.v1beta1.DaemonSetSpec",
       "description": "Spec defines the desired behavior of this daemon set. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status"
      },
      "status": {
-      "$ref": "v1beta1.DaemonSetStatus",
+      "$ref": "extensions.v1beta1.DaemonSetStatus",
       "description": "Status is the current status of this daemon set. This data may be out of date by some window of time. Populated by the system. Read-only. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status"
      }
     }
@@ -4429,7 +4429,7 @@
      "ownerReferences": {
       "type": "array",
       "items": {
-       "$ref": "v1.OwnerReference"
+       "$ref": "io.k8s.meta.v1.OwnerReference"
       },
       "description": "List of objects depended by this object. If ALL objects in the list have been deleted, this object will be garbage collected. If this object is managed by a controller, then an entry in this list will point to this controller, with the controller field set to true. There cannot be more than one managing controller."
      },
@@ -4446,8 +4446,8 @@
      }
     }
    },
-   "v1.OwnerReference": {
-    "id": "v1.OwnerReference",
+   "io.k8s.meta.v1.OwnerReference": {
+    "id": "io.k8s.meta.v1.OwnerReference",
     "description": "OwnerReference contains enough information to let you identify an owning object. Currently, an owning object must be in the same namespace, so there is no namespace field.",
     "required": [
      "apiVersion",
@@ -4478,15 +4478,15 @@
      }
     }
    },
-   "v1beta1.DaemonSetSpec": {
-    "id": "v1beta1.DaemonSetSpec",
+   "extensions.v1beta1.DaemonSetSpec": {
+    "id": "extensions.v1beta1.DaemonSetSpec",
     "description": "DaemonSetSpec is the specification of a daemon set.",
     "required": [
      "template"
     ],
     "properties": {
      "selector": {
-      "$ref": "v1.LabelSelector",
+      "$ref": "io.k8s.meta.v1.LabelSelector",
       "description": "Selector is a label query over pods that are managed by the daemon set. Must match in order to be controlled. If empty, defaulted to labels on Pod template. More info: http://kubernetes.io/docs/user-guide/labels#label-selectors"
      },
      "template": {
@@ -4495,8 +4495,8 @@
      }
     }
    },
-   "v1.LabelSelector": {
-    "id": "v1.LabelSelector",
+   "io.k8s.meta.v1.LabelSelector": {
+    "id": "io.k8s.meta.v1.LabelSelector",
     "description": "A label selector is a label query over a set of resources. The result of matchLabels and matchExpressions are ANDed. An empty label selector matches all objects. A null label selector matches no objects.",
     "properties": {
      "matchLabels": {
@@ -4506,14 +4506,14 @@
      "matchExpressions": {
       "type": "array",
       "items": {
-       "$ref": "v1.LabelSelectorRequirement"
+       "$ref": "io.k8s.meta.v1.LabelSelectorRequirement"
       },
       "description": "matchExpressions is a list of label selector requirements. The requirements are ANDed."
      }
     }
    },
-   "v1.LabelSelectorRequirement": {
-    "id": "v1.LabelSelectorRequirement",
+   "io.k8s.meta.v1.LabelSelectorRequirement": {
+    "id": "io.k8s.meta.v1.LabelSelectorRequirement",
     "description": "A label selector requirement is a selector that contains values, a key, and an operator that relates the key and values.",
     "required": [
      "key",
@@ -5361,7 +5361,7 @@
       "description": "The URI the data disk in the blob storage"
      },
      "cachingMode": {
-      "$ref": "v1.AzureDataDiskCachingMode",
+      "$ref": "io.k8s.kubernetes.pkg.api.v1.AzureDataDiskCachingMode",
       "description": "Host Caching mode: None, Read Only, Read Write."
      },
      "fsType": {
@@ -5374,8 +5374,8 @@
      }
     }
    },
-   "v1.AzureDataDiskCachingMode": {
-    "id": "v1.AzureDataDiskCachingMode",
+   "io.k8s.kubernetes.pkg.api.v1.AzureDataDiskCachingMode": {
+    "id": "io.k8s.kubernetes.pkg.api.v1.AzureDataDiskCachingMode",
     "properties": {}
    },
    "v1.PhotonPersistentDiskVolumeSource": {
@@ -5828,21 +5828,21 @@
      "add": {
       "type": "array",
       "items": {
-       "$ref": "v1.Capability"
+       "$ref": "io.k8s.kubernetes.pkg.api.v1.Capability"
       },
       "description": "Added capabilities"
      },
      "drop": {
       "type": "array",
       "items": {
-       "$ref": "v1.Capability"
+       "$ref": "io.k8s.kubernetes.pkg.api.v1.Capability"
       },
       "description": "Removed capabilities"
      }
     }
    },
-   "v1.Capability": {
-    "id": "v1.Capability",
+   "io.k8s.kubernetes.pkg.api.v1.Capability": {
+    "id": "io.k8s.kubernetes.pkg.api.v1.Capability",
     "properties": {}
    },
    "v1.SELinuxOptions": {
@@ -6037,7 +6037,7 @@
     ],
     "properties": {
      "labelSelector": {
-      "$ref": "v1.LabelSelector",
+      "$ref": "io.k8s.meta.v1.LabelSelector",
       "description": "A label query over a set of resources, in this case pods."
      },
      "namespaces": {
@@ -6092,8 +6092,8 @@
      }
     }
    },
-   "v1beta1.DaemonSetStatus": {
-    "id": "v1beta1.DaemonSetStatus",
+   "extensions.v1beta1.DaemonSetStatus": {
+    "id": "extensions.v1beta1.DaemonSetStatus",
     "description": "DaemonSetStatus represents the current status of a daemon set.",
     "required": [
      "currentNumberScheduled",
@@ -6121,11 +6121,16 @@
       "type": "integer",
       "format": "int32",
       "description": "NumberReady is the number of nodes that should be running the daemon pod and have one or more of the daemon pod running and ready."
+     },
+     "observedGeneration": {
+      "type": "integer",
+      "format": "int64",
+      "description": "ObservedGeneration is the most recent generation observed by the daemon set controller."
      }
     }
    },
-   "v1.Status": {
-    "id": "v1.Status",
+   "io.k8s.meta.v1.Status": {
+    "id": "io.k8s.meta.v1.Status",
     "description": "Status is a return value for calls that don't return other objects.",
     "properties": {
      "kind": {
@@ -6137,7 +6142,7 @@
       "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
      },
      "metadata": {
-      "$ref": "v1.ListMeta",
+      "$ref": "io.k8s.meta.v1.ListMeta",
       "description": "Standard list metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
      },
      "status": {
@@ -6153,7 +6158,7 @@
       "description": "A machine-readable description of why this operation is in the \"Failure\" status. If this value is empty there is no information available. A Reason clarifies an HTTP status code but does not override it."
      },
      "details": {
-      "$ref": "v1.StatusDetails",
+      "$ref": "io.k8s.meta.v1.StatusDetails",
       "description": "Extended data associated with the reason.  Each reason may define its own extended details. This field is optional and the data returned is not guaranteed to conform to any schema except that defined by the reason type."
      },
      "code": {
@@ -6163,8 +6168,8 @@
      }
     }
    },
-   "v1.StatusDetails": {
-    "id": "v1.StatusDetails",
+   "io.k8s.meta.v1.StatusDetails": {
+    "id": "io.k8s.meta.v1.StatusDetails",
     "description": "StatusDetails is a set of additional properties that MAY be set by the server to provide additional information about a response. The Reason field of a Status object defines what attributes will be set. Clients must ignore fields that do not match the defined type of each attribute, and should assume that any attribute may be empty, invalid, or under defined.",
     "properties": {
      "name": {
@@ -6182,7 +6187,7 @@
      "causes": {
       "type": "array",
       "items": {
-       "$ref": "v1.StatusCause"
+       "$ref": "io.k8s.meta.v1.StatusCause"
       },
       "description": "The Causes array includes more details associated with the StatusReason failure. Not all StatusReasons may provide detailed causes."
      },
@@ -6193,8 +6198,8 @@
      }
     }
    },
-   "v1.StatusCause": {
-    "id": "v1.StatusCause",
+   "io.k8s.meta.v1.StatusCause": {
+    "id": "io.k8s.meta.v1.StatusCause",
     "description": "StatusCause provides more information about an api.Status failure, including cases when multiple errors are encountered.",
     "properties": {
      "reason": {
@@ -6211,8 +6216,8 @@
      }
     }
    },
-   "versioned.Event": {
-    "id": "versioned.Event",
+   "io.k8s.kubernetes.pkg.watch.versioned.Event": {
+    "id": "io.k8s.kubernetes.pkg.watch.versioned.Event",
     "required": [
      "type",
      "object"
@@ -6226,8 +6231,8 @@
      }
     }
    },
-   "v1.Patch": {
-    "id": "v1.Patch",
+   "io.k8s.meta.v1.Patch": {
+    "id": "io.k8s.meta.v1.Patch",
     "description": "Patch is provided to give a concrete name and type to the Kubernetes PATCH request body.",
     "properties": {}
    },
@@ -6263,17 +6268,17 @@
     "description": "Preconditions must be fulfilled before an operation (update, delete, etc.) is carried out.",
     "properties": {
      "uid": {
-      "$ref": "types.UID",
+      "$ref": "io.k8s.kubernetes.pkg.types.UID",
       "description": "Specifies the target UID."
      }
     }
    },
-   "types.UID": {
-    "id": "types.UID",
+   "io.k8s.kubernetes.pkg.types.UID": {
+    "id": "io.k8s.kubernetes.pkg.types.UID",
     "properties": {}
    },
-   "v1beta1.DeploymentList": {
-    "id": "v1beta1.DeploymentList",
+   "extensions.v1beta1.DeploymentList": {
+    "id": "extensions.v1beta1.DeploymentList",
     "description": "DeploymentList is a list of Deployments.",
     "required": [
      "items"
@@ -6288,20 +6293,20 @@
       "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
      },
      "metadata": {
-      "$ref": "v1.ListMeta",
+      "$ref": "io.k8s.meta.v1.ListMeta",
       "description": "Standard list metadata."
      },
      "items": {
       "type": "array",
       "items": {
-       "$ref": "v1beta1.Deployment"
+       "$ref": "extensions.v1beta1.Deployment"
       },
       "description": "Items is the list of Deployments."
      }
     }
    },
-   "v1beta1.Deployment": {
-    "id": "v1beta1.Deployment",
+   "extensions.v1beta1.Deployment": {
+    "id": "extensions.v1beta1.Deployment",
     "description": "Deployment enables declarative updates for Pods and ReplicaSets.",
     "properties": {
      "kind": {
@@ -6317,17 +6322,17 @@
       "description": "Standard object metadata."
      },
      "spec": {
-      "$ref": "v1beta1.DeploymentSpec",
+      "$ref": "extensions.v1beta1.DeploymentSpec",
       "description": "Specification of the desired behavior of the Deployment."
      },
      "status": {
-      "$ref": "v1beta1.DeploymentStatus",
+      "$ref": "extensions.v1beta1.DeploymentStatus",
       "description": "Most recently observed status of the Deployment."
      }
     }
    },
-   "v1beta1.DeploymentSpec": {
-    "id": "v1beta1.DeploymentSpec",
+   "extensions.v1beta1.DeploymentSpec": {
+    "id": "extensions.v1beta1.DeploymentSpec",
     "description": "DeploymentSpec is the specification of the desired behavior of the Deployment.",
     "required": [
      "template"
@@ -6339,7 +6344,7 @@
       "description": "Number of desired pods. This is a pointer to distinguish between explicit zero and not specified. Defaults to 1."
      },
      "selector": {
-      "$ref": "v1.LabelSelector",
+      "$ref": "io.k8s.meta.v1.LabelSelector",
       "description": "Label selector for pods. Existing ReplicaSets whose pods are selected by this will be the ones affected by this deployment."
      },
      "template": {
@@ -6347,7 +6352,7 @@
       "description": "Template describes the pods that will be created."
      },
      "strategy": {
-      "$ref": "v1beta1.DeploymentStrategy",
+      "$ref": "extensions.v1beta1.DeploymentStrategy",
       "description": "The deployment strategy to use to replace existing pods with new ones."
      },
      "minReadySeconds": {
@@ -6365,7 +6370,7 @@
       "description": "Indicates that the deployment is paused and will not be processed by the deployment controller."
      },
      "rollbackTo": {
-      "$ref": "v1beta1.RollbackConfig",
+      "$ref": "extensions.v1beta1.RollbackConfig",
       "description": "The config this deployment is rolling back to. Will be cleared after rollback is done."
      },
      "progressDeadlineSeconds": {
@@ -6375,8 +6380,8 @@
      }
     }
    },
-   "v1beta1.DeploymentStrategy": {
-    "id": "v1beta1.DeploymentStrategy",
+   "extensions.v1beta1.DeploymentStrategy": {
+    "id": "extensions.v1beta1.DeploymentStrategy",
     "description": "DeploymentStrategy describes how to replace existing pods with new ones.",
     "properties": {
      "type": {
@@ -6384,13 +6389,13 @@
       "description": "Type of deployment. Can be \"Recreate\" or \"RollingUpdate\". Default is RollingUpdate."
      },
      "rollingUpdate": {
-      "$ref": "v1beta1.RollingUpdateDeployment",
+      "$ref": "extensions.v1beta1.RollingUpdateDeployment",
       "description": "Rolling update config params. Present only if DeploymentStrategyType = RollingUpdate."
      }
     }
    },
-   "v1beta1.RollingUpdateDeployment": {
-    "id": "v1beta1.RollingUpdateDeployment",
+   "extensions.v1beta1.RollingUpdateDeployment": {
+    "id": "extensions.v1beta1.RollingUpdateDeployment",
     "description": "Spec to control the desired behavior of rolling update.",
     "properties": {
      "maxUnavailable": {
@@ -6403,8 +6408,8 @@
      }
     }
    },
-   "v1beta1.RollbackConfig": {
-    "id": "v1beta1.RollbackConfig",
+   "extensions.v1beta1.RollbackConfig": {
+    "id": "extensions.v1beta1.RollbackConfig",
     "properties": {
      "revision": {
       "type": "integer",
@@ -6413,8 +6418,8 @@
      }
     }
    },
-   "v1beta1.DeploymentStatus": {
-    "id": "v1beta1.DeploymentStatus",
+   "extensions.v1beta1.DeploymentStatus": {
+    "id": "extensions.v1beta1.DeploymentStatus",
     "description": "DeploymentStatus is the most recently observed status of the Deployment.",
     "properties": {
      "observedGeneration": {
@@ -6432,6 +6437,11 @@
       "format": "int32",
       "description": "Total number of non-terminated pods targeted by this deployment that have the desired template spec."
      },
+     "readyReplicas": {
+      "type": "integer",
+      "format": "int32",
+      "description": "Total number of ready pods targeted by this deployment."
+     },
      "availableReplicas": {
       "type": "integer",
       "format": "int32",
@@ -6445,14 +6455,14 @@
      "conditions": {
       "type": "array",
       "items": {
-       "$ref": "v1beta1.DeploymentCondition"
+       "$ref": "extensions.v1beta1.DeploymentCondition"
       },
       "description": "Represents the latest available observations of a deployment's current state."
      }
     }
    },
-   "v1beta1.DeploymentCondition": {
-    "id": "v1beta1.DeploymentCondition",
+   "extensions.v1beta1.DeploymentCondition": {
+    "id": "extensions.v1beta1.DeploymentCondition",
     "description": "DeploymentCondition describes the state of a deployment at a certain point.",
     "required": [
      "type",
@@ -6485,8 +6495,8 @@
      }
     }
    },
-   "v1beta1.DeploymentRollback": {
-    "id": "v1beta1.DeploymentRollback",
+   "extensions.v1beta1.DeploymentRollback": {
+    "id": "extensions.v1beta1.DeploymentRollback",
     "description": "DeploymentRollback stores the information required to rollback a deployment.",
     "required": [
      "name",
@@ -6510,13 +6520,13 @@
       "description": "The annotations to be updated to a deployment"
      },
      "rollbackTo": {
-      "$ref": "v1beta1.RollbackConfig",
+      "$ref": "extensions.v1beta1.RollbackConfig",
       "description": "The config of this deployment rollback."
      }
     }
    },
-   "v1beta1.Scale": {
-    "id": "v1beta1.Scale",
+   "extensions.v1beta1.Scale": {
+    "id": "extensions.v1beta1.Scale",
     "description": "represents a scaling request for a resource.",
     "properties": {
      "kind": {
@@ -6532,17 +6542,17 @@
       "description": "Standard object metadata; More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata."
      },
      "spec": {
-      "$ref": "v1beta1.ScaleSpec",
+      "$ref": "extensions.v1beta1.ScaleSpec",
       "description": "defines the behavior of the scale. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status."
      },
      "status": {
-      "$ref": "v1beta1.ScaleStatus",
+      "$ref": "extensions.v1beta1.ScaleStatus",
       "description": "current status of the scale. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status. Read-only."
      }
     }
    },
-   "v1beta1.ScaleSpec": {
-    "id": "v1beta1.ScaleSpec",
+   "extensions.v1beta1.ScaleSpec": {
+    "id": "extensions.v1beta1.ScaleSpec",
     "description": "describes the attributes of a scale subresource",
     "properties": {
      "replicas": {
@@ -6552,8 +6562,8 @@
      }
     }
    },
-   "v1beta1.ScaleStatus": {
-    "id": "v1beta1.ScaleStatus",
+   "extensions.v1beta1.ScaleStatus": {
+    "id": "extensions.v1beta1.ScaleStatus",
     "description": "represents the current status of a scale subresource.",
     "required": [
      "replicas"
@@ -6574,8 +6584,8 @@
      }
     }
    },
-   "v1beta1.IngressList": {
-    "id": "v1beta1.IngressList",
+   "extensions.v1beta1.IngressList": {
+    "id": "extensions.v1beta1.IngressList",
     "description": "IngressList is a collection of Ingress.",
     "required": [
      "items"
@@ -6590,20 +6600,20 @@
       "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
      },
      "metadata": {
-      "$ref": "v1.ListMeta",
+      "$ref": "io.k8s.meta.v1.ListMeta",
       "description": "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata"
      },
      "items": {
       "type": "array",
       "items": {
-       "$ref": "v1beta1.Ingress"
+       "$ref": "extensions.v1beta1.Ingress"
       },
       "description": "Items is the list of Ingress."
      }
     }
    },
-   "v1beta1.Ingress": {
-    "id": "v1beta1.Ingress",
+   "extensions.v1beta1.Ingress": {
+    "id": "extensions.v1beta1.Ingress",
     "description": "Ingress is a collection of rules that allow inbound connections to reach the endpoints defined by a backend. An Ingress can be configured to give services externally-reachable urls, load balance traffic, terminate SSL, offer name based virtual hosting etc.",
     "properties": {
      "kind": {
@@ -6619,41 +6629,41 @@
       "description": "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata"
      },
      "spec": {
-      "$ref": "v1beta1.IngressSpec",
+      "$ref": "extensions.v1beta1.IngressSpec",
       "description": "Spec is the desired state of the Ingress. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status"
      },
      "status": {
-      "$ref": "v1beta1.IngressStatus",
+      "$ref": "extensions.v1beta1.IngressStatus",
       "description": "Status is the current state of the Ingress. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status"
      }
     }
    },
-   "v1beta1.IngressSpec": {
-    "id": "v1beta1.IngressSpec",
+   "extensions.v1beta1.IngressSpec": {
+    "id": "extensions.v1beta1.IngressSpec",
     "description": "IngressSpec describes the Ingress the user wishes to exist.",
     "properties": {
      "backend": {
-      "$ref": "v1beta1.IngressBackend",
+      "$ref": "extensions.v1beta1.IngressBackend",
       "description": "A default backend capable of servicing requests that don't match any rule. At least one of 'backend' or 'rules' must be specified. This field is optional to allow the loadbalancer controller or defaulting logic to specify a global default."
      },
      "tls": {
       "type": "array",
       "items": {
-       "$ref": "v1beta1.IngressTLS"
+       "$ref": "extensions.v1beta1.IngressTLS"
       },
       "description": "TLS configuration. Currently the Ingress only supports a single TLS port, 443. If multiple members of this list specify different hosts, they will be multiplexed on the same port according to the hostname specified through the SNI TLS extension, if the ingress controller fulfilling the ingress supports SNI."
      },
      "rules": {
       "type": "array",
       "items": {
-       "$ref": "v1beta1.IngressRule"
+       "$ref": "extensions.v1beta1.IngressRule"
       },
       "description": "A list of host rules used to configure the Ingress. If unspecified, or no rule matches, all traffic is sent to the default backend."
      }
     }
    },
-   "v1beta1.IngressBackend": {
-    "id": "v1beta1.IngressBackend",
+   "extensions.v1beta1.IngressBackend": {
+    "id": "extensions.v1beta1.IngressBackend",
     "description": "IngressBackend describes all endpoints for a given service and port.",
     "required": [
      "serviceName",
@@ -6670,8 +6680,8 @@
      }
     }
    },
-   "v1beta1.IngressTLS": {
-    "id": "v1beta1.IngressTLS",
+   "extensions.v1beta1.IngressTLS": {
+    "id": "extensions.v1beta1.IngressTLS",
     "description": "IngressTLS describes the transport layer security associated with an Ingress.",
     "properties": {
      "hosts": {
@@ -6687,8 +6697,8 @@
      }
     }
    },
-   "v1beta1.IngressRule": {
-    "id": "v1beta1.IngressRule",
+   "extensions.v1beta1.IngressRule": {
+    "id": "extensions.v1beta1.IngressRule",
     "description": "IngressRule represents the rules mapping the paths under a specified host to the related backend services. Incoming requests are first evaluated for a host match, then routed to the backend associated with the matching IngressRuleValue.",
     "properties": {
      "host": {
@@ -6696,12 +6706,12 @@
       "description": "Host is the fully qualified domain name of a network host, as defined by RFC 3986. Note the following deviations from the \"host\" part of the URI as defined in the RFC: 1. IPs are not allowed. Currently an IngressRuleValue can only apply to the\n\t  IP in the Spec of the parent Ingress.\n2. The `:` delimiter is not respected because ports are not allowed.\n\t  Currently the port of an Ingress is implicitly :80 for http and\n\t  :443 for https.\nBoth these may change in the future. Incoming requests are matched against the host before the IngressRuleValue. If the host is unspecified, the Ingress routes all traffic based on the specified IngressRuleValue."
      },
      "http": {
-      "$ref": "v1beta1.HTTPIngressRuleValue"
+      "$ref": "extensions.v1beta1.HTTPIngressRuleValue"
      }
     }
    },
-   "v1beta1.HTTPIngressRuleValue": {
-    "id": "v1beta1.HTTPIngressRuleValue",
+   "extensions.v1beta1.HTTPIngressRuleValue": {
+    "id": "extensions.v1beta1.HTTPIngressRuleValue",
     "description": "HTTPIngressRuleValue is a list of http selectors pointing to backends. In the example: http://\u003chost\u003e/\u003cpath\u003e?\u003csearchpart\u003e -\u003e backend where where parts of the url correspond to RFC 3986, this resource will be used to match against everything after the last '/' and before the first '?' or '#'.",
     "required": [
      "paths"
@@ -6710,14 +6720,14 @@
      "paths": {
       "type": "array",
       "items": {
-       "$ref": "v1beta1.HTTPIngressPath"
+       "$ref": "extensions.v1beta1.HTTPIngressPath"
       },
       "description": "A collection of paths that map requests to backends."
      }
     }
    },
-   "v1beta1.HTTPIngressPath": {
-    "id": "v1beta1.HTTPIngressPath",
+   "extensions.v1beta1.HTTPIngressPath": {
+    "id": "extensions.v1beta1.HTTPIngressPath",
     "description": "HTTPIngressPath associates a path regex with a backend. Incoming urls matching the path are forwarded to the backend.",
     "required": [
      "backend"
@@ -6728,13 +6738,13 @@
       "description": "Path is an extended POSIX regex as defined by IEEE Std 1003.1, (i.e this follows the egrep/unix syntax, not the perl syntax) matched against the path of an incoming request. Currently it can contain characters disallowed from the conventional \"path\" part of a URL as defined by RFC 3986. Paths must begin with a '/'. If unspecified, the path defaults to a catch all sending traffic to the backend."
      },
      "backend": {
-      "$ref": "v1beta1.IngressBackend",
+      "$ref": "extensions.v1beta1.IngressBackend",
       "description": "Backend defines the referenced service endpoint to which the traffic will be forwarded to."
      }
     }
    },
-   "v1beta1.IngressStatus": {
-    "id": "v1beta1.IngressStatus",
+   "extensions.v1beta1.IngressStatus": {
+    "id": "extensions.v1beta1.IngressStatus",
     "description": "IngressStatus describe the current state of the Ingress.",
     "properties": {
      "loadBalancer": {
@@ -6770,8 +6780,8 @@
      }
     }
    },
-   "v1beta1.ReplicaSetList": {
-    "id": "v1beta1.ReplicaSetList",
+   "extensions.v1beta1.ReplicaSetList": {
+    "id": "extensions.v1beta1.ReplicaSetList",
     "description": "ReplicaSetList is a collection of ReplicaSets.",
     "required": [
      "items"
@@ -6786,20 +6796,20 @@
       "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
      },
      "metadata": {
-      "$ref": "v1.ListMeta",
+      "$ref": "io.k8s.meta.v1.ListMeta",
       "description": "Standard list metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
      },
      "items": {
       "type": "array",
       "items": {
-       "$ref": "v1beta1.ReplicaSet"
+       "$ref": "extensions.v1beta1.ReplicaSet"
       },
       "description": "List of ReplicaSets. More info: http://kubernetes.io/docs/user-guide/replication-controller"
      }
     }
    },
-   "v1beta1.ReplicaSet": {
-    "id": "v1beta1.ReplicaSet",
+   "extensions.v1beta1.ReplicaSet": {
+    "id": "extensions.v1beta1.ReplicaSet",
     "description": "ReplicaSet represents the configuration of a ReplicaSet.",
     "properties": {
      "kind": {
@@ -6815,17 +6825,17 @@
       "description": "If the Labels of a ReplicaSet are empty, they are defaulted to be the same as the Pod(s) that the ReplicaSet manages. Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata"
      },
      "spec": {
-      "$ref": "v1beta1.ReplicaSetSpec",
+      "$ref": "extensions.v1beta1.ReplicaSetSpec",
       "description": "Spec defines the specification of the desired behavior of the ReplicaSet. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status"
      },
      "status": {
-      "$ref": "v1beta1.ReplicaSetStatus",
+      "$ref": "extensions.v1beta1.ReplicaSetStatus",
       "description": "Status is the most recently observed status of the ReplicaSet. This data may be out of date by some window of time. Populated by the system. Read-only. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status"
      }
     }
    },
-   "v1beta1.ReplicaSetSpec": {
-    "id": "v1beta1.ReplicaSetSpec",
+   "extensions.v1beta1.ReplicaSetSpec": {
+    "id": "extensions.v1beta1.ReplicaSetSpec",
     "description": "ReplicaSetSpec is the specification of a ReplicaSet.",
     "properties": {
      "replicas": {
@@ -6839,7 +6849,7 @@
       "description": "Minimum number of seconds for which a newly created pod should be ready without any of its container crashing, for it to be considered available. Defaults to 0 (pod will be considered available as soon as it is ready)"
      },
      "selector": {
-      "$ref": "v1.LabelSelector",
+      "$ref": "io.k8s.meta.v1.LabelSelector",
       "description": "Selector is a label query over pods that should match the replica count. If the selector is empty, it is defaulted to the labels present on the pod template. Label keys and values that must match in order to be controlled by this replica set. More info: http://kubernetes.io/docs/user-guide/labels#label-selectors"
      },
      "template": {
@@ -6848,8 +6858,8 @@
      }
     }
    },
-   "v1beta1.ReplicaSetStatus": {
-    "id": "v1beta1.ReplicaSetStatus",
+   "extensions.v1beta1.ReplicaSetStatus": {
+    "id": "extensions.v1beta1.ReplicaSetStatus",
     "description": "ReplicaSetStatus represents the current status of a ReplicaSet.",
     "required": [
      "replicas"
@@ -6883,14 +6893,14 @@
      "conditions": {
       "type": "array",
       "items": {
-       "$ref": "v1beta1.ReplicaSetCondition"
+       "$ref": "extensions.v1beta1.ReplicaSetCondition"
       },
       "description": "Represents the latest available observations of a replica set's current state."
      }
     }
    },
-   "v1beta1.ReplicaSetCondition": {
-    "id": "v1beta1.ReplicaSetCondition",
+   "extensions.v1beta1.ReplicaSetCondition": {
+    "id": "extensions.v1beta1.ReplicaSetCondition",
     "description": "ReplicaSetCondition describes the state of a replica set at a certain point.",
     "required": [
      "type",
@@ -6919,8 +6929,8 @@
      }
     }
    },
-   "v1.APIResourceList": {
-    "id": "v1.APIResourceList",
+   "io.k8s.meta.v1.APIResourceList": {
+    "id": "io.k8s.meta.v1.APIResourceList",
     "description": "APIResourceList is a list of APIResource, it is used to expose the name of the resources supported in a specific group and version, and if the resource is namespaced.",
     "required": [
      "groupVersion",
@@ -6942,14 +6952,14 @@
      "resources": {
       "type": "array",
       "items": {
-       "$ref": "v1.APIResource"
+       "$ref": "io.k8s.meta.v1.APIResource"
       },
       "description": "resources contains the name of the resources and if they are namespaced."
      }
     }
    },
-   "v1.APIResource": {
-    "id": "v1.APIResource",
+   "io.k8s.meta.v1.APIResource": {
+    "id": "io.k8s.meta.v1.APIResource",
     "description": "APIResource specifies the name of a resource and whether it is namespaced.",
     "required": [
      "name",

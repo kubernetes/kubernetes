@@ -29,8 +29,8 @@
    }
   ],
   "models": {
-   "version.Info": {
-    "id": "version.Info",
+   "io.k8s.kubernetes.pkg.version.Info": {
+    "id": "io.k8s.kubernetes.pkg.version.Info",
     "required": [
      "major",
      "minor",

@@ -33,8 +33,8 @@
    }
   ],
   "models": {
-   "v1.APIResourceList": {
-    "id": "v1.APIResourceList",
+   "io.k8s.meta.v1.APIResourceList": {
+    "id": "io.k8s.meta.v1.APIResourceList",
     "description": "APIResourceList is a list of APIResource, it is used to expose the name of the resources supported in a specific group and version, and if the resource is namespaced.",
     "required": [
      "groupVersion",
@@ -56,14 +56,14 @@
      "resources": {
       "type": "array",
       "items": {
-       "$ref": "v1.APIResource"
+       "$ref": "io.k8s.meta.v1.APIResource"
       },
       "description": "resources contains the name of the resources and if they are namespaced."
      }
     }
    },
-   "v1.APIResource": {
-    "id": "v1.APIResource",
+   "io.k8s.meta.v1.APIResource": {
+    "id": "io.k8s.meta.v1.APIResource",
     "description": "APIResource specifies the name of a resource and whether it is namespaced.",
     "required": [
      "name",

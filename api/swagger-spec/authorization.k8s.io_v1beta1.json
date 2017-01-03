@@ -27,7 +27,7 @@
         "allowMultiple": false
        },
        {
-        "type": "v1beta1.LocalSubjectAccessReview",
+        "type": "io.k8s.authorization.v1beta1.LocalSubjectAccessReview",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -80,7 +80,7 @@
         "allowMultiple": false
        },
        {
-        "type": "v1beta1.SelfSubjectAccessReview",
+        "type": "io.k8s.authorization.v1beta1.SelfSubjectAccessReview",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -125,7 +125,7 @@
         "allowMultiple": false
        },
        {
-        "type": "v1beta1.SubjectAccessReview",
+        "type": "io.k8s.authorization.v1beta1.SubjectAccessReview",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -176,8 +176,8 @@
    }
   ],
   "models": {
-   "v1beta1.LocalSubjectAccessReview": {
-    "id": "v1beta1.LocalSubjectAccessReview",
+   "io.k8s.authorization.v1beta1.LocalSubjectAccessReview": {
+    "id": "io.k8s.authorization.v1beta1.LocalSubjectAccessReview",
     "description": "LocalSubjectAccessReview checks whether or not a user or group can perform an action in a given namespace. Having a namespace scoped resource makes it much easier to grant namespace scoped policy that includes permissions checking.",
     "required": [
      "spec"
@@ -195,11 +195,11 @@
       "$ref": "v1.ObjectMeta"
      },
      "spec": {
-      "$ref": "v1beta1.SubjectAccessReviewSpec",
+      "$ref": "io.k8s.authorization.v1beta1.SubjectAccessReviewSpec",
       "description": "Spec holds information about the request being evaluated.  spec.namespace must be equal to the namespace you made the request against.  If empty, it is defaulted."
      },
      "status": {
-      "$ref": "v1beta1.SubjectAccessReviewStatus",
+      "$ref": "io.k8s.authorization.v1beta1.SubjectAccessReviewStatus",
       "description": "Status is filled in by the server and indicates whether the request is allowed or not"
      }
     }
@@ -261,7 +261,7 @@
      "ownerReferences": {
       "type": "array",
       "items": {
-       "$ref": "v1.OwnerReference"
+       "$ref": "io.k8s.meta.v1.OwnerReference"
       },
       "description": "List of objects depended by this object. If ALL objects in the list have been deleted, this object will be garbage collected. If this object is managed by a controller, then an entry in this list will point to this controller, with the controller field set to true. There cannot be more than one managing controller."
      },
@@ -278,8 +278,8 @@
      }
     }
    },
-   "v1.OwnerReference": {
-    "id": "v1.OwnerReference",
+   "io.k8s.meta.v1.OwnerReference": {
+    "id": "io.k8s.meta.v1.OwnerReference",
     "description": "OwnerReference contains enough information to let you identify an owning object. Currently, an owning object must be in the same namespace, so there is no namespace field.",
     "required": [
      "apiVersion",
@@ -310,16 +310,16 @@
      }
     }
    },
-   "v1beta1.SubjectAccessReviewSpec": {
-    "id": "v1beta1.SubjectAccessReviewSpec",
+   "io.k8s.authorization.v1beta1.SubjectAccessReviewSpec": {
+    "id": "io.k8s.authorization.v1beta1.SubjectAccessReviewSpec",
     "description": "SubjectAccessReviewSpec is a description of the access request.  Exactly one of ResourceAuthorizationAttributes and NonResourceAuthorizationAttributes must be set",
     "properties": {
      "resourceAttributes": {
-      "$ref": "v1beta1.ResourceAttributes",
+      "$ref": "io.k8s.authorization.v1beta1.ResourceAttributes",
       "description": "ResourceAuthorizationAttributes describes information for a resource access request"
      },
      "nonResourceAttributes": {
-      "$ref": "v1beta1.NonResourceAttributes",
+      "$ref": "io.k8s.authorization.v1beta1.NonResourceAttributes",
       "description": "NonResourceAttributes describes information for a non-resource access request"
      },
      "user": {
@@ -339,8 +339,8 @@
      }
     }
    },
-   "v1beta1.ResourceAttributes": {
-    "id": "v1beta1.ResourceAttributes",
+   "io.k8s.authorization.v1beta1.ResourceAttributes": {
+    "id": "io.k8s.authorization.v1beta1.ResourceAttributes",
     "description": "ResourceAttributes includes the authorization attributes available for resource requests to the Authorizer interface",
     "properties": {
      "namespace": {
@@ -373,8 +373,8 @@
      }
     }
    },
-   "v1beta1.NonResourceAttributes": {
-    "id": "v1beta1.NonResourceAttributes",
+   "io.k8s.authorization.v1beta1.NonResourceAttributes": {
+    "id": "io.k8s.authorization.v1beta1.NonResourceAttributes",
     "description": "NonResourceAttributes includes the authorization attributes available for non-resource requests to the Authorizer interface",
     "properties": {
      "path": {
@@ -387,8 +387,8 @@
      }
     }
    },
-   "v1beta1.SubjectAccessReviewStatus": {
-    "id": "v1beta1.SubjectAccessReviewStatus",
+   "io.k8s.authorization.v1beta1.SubjectAccessReviewStatus": {
+    "id": "io.k8s.authorization.v1beta1.SubjectAccessReviewStatus",
     "description": "SubjectAccessReviewStatus",
     "required": [
      "allowed"
@@ -408,8 +408,8 @@
      }
     }
    },
-   "v1beta1.SelfSubjectAccessReview": {
-    "id": "v1beta1.SelfSubjectAccessReview",
+   "io.k8s.authorization.v1beta1.SelfSubjectAccessReview": {
+    "id": "io.k8s.authorization.v1beta1.SelfSubjectAccessReview",
     "description": "SelfSubjectAccessReview checks whether or the current user can perform an action.  Not filling in a spec.namespace means \"in all namespaces\".  Self is a special case, because users should always be able to check whether they can perform an action",
     "required": [
      "spec"
@@ -427,31 +427,31 @@
       "$ref": "v1.ObjectMeta"
      },
      "spec": {
-      "$ref": "v1beta1.SelfSubjectAccessReviewSpec",
+      "$ref": "io.k8s.authorization.v1beta1.SelfSubjectAccessReviewSpec",
       "description": "Spec holds information about the request being evaluated.  user and groups must be empty"
      },
      "status": {
-      "$ref": "v1beta1.SubjectAccessReviewStatus",
+      "$ref": "io.k8s.authorization.v1beta1.SubjectAccessReviewStatus",
       "description": "Status is filled in by the server and indicates whether the request is allowed or not"
      }
     }
    },
-   "v1beta1.SelfSubjectAccessReviewSpec": {
-    "id": "v1beta1.SelfSubjectAccessReviewSpec",
+   "io.k8s.authorization.v1beta1.SelfSubjectAccessReviewSpec": {
+    "id": "io.k8s.authorization.v1beta1.SelfSubjectAccessReviewSpec",
     "description": "SelfSubjectAccessReviewSpec is a description of the access request.  Exactly one of ResourceAuthorizationAttributes and NonResourceAuthorizationAttributes must be set",
     "properties": {
      "resourceAttributes": {
-      "$ref": "v1beta1.ResourceAttributes",
+      "$ref": "io.k8s.authorization.v1beta1.ResourceAttributes",
       "description": "ResourceAuthorizationAttributes describes information for a resource access request"
      },
      "nonResourceAttributes": {
-      "$ref": "v1beta1.NonResourceAttributes",
+      "$ref": "io.k8s.authorization.v1beta1.NonResourceAttributes",
       "description": "NonResourceAttributes describes information for a non-resource access request"
      }
     }
    },
-   "v1beta1.SubjectAccessReview": {
-    "id": "v1beta1.SubjectAccessReview",
+   "io.k8s.authorization.v1beta1.SubjectAccessReview": {
+    "id": "io.k8s.authorization.v1beta1.SubjectAccessReview",
     "description": "SubjectAccessReview checks whether or not a user or group can perform an action.",
     "required": [
      "spec"
@@ -469,17 +469,17 @@
       "$ref": "v1.ObjectMeta"
      },
      "spec": {
-      "$ref": "v1beta1.SubjectAccessReviewSpec",
+      "$ref": "io.k8s.authorization.v1beta1.SubjectAccessReviewSpec",
       "description": "Spec holds information about the request being evaluated"
      },
      "status": {
-      "$ref": "v1beta1.SubjectAccessReviewStatus",
+      "$ref": "io.k8s.authorization.v1beta1.SubjectAccessReviewStatus",
       "description": "Status is filled in by the server and indicates whether the request is allowed or not"
      }
     }
    },
-   "v1.APIResourceList": {
-    "id": "v1.APIResourceList",
+   "io.k8s.meta.v1.APIResourceList": {
+    "id": "io.k8s.meta.v1.APIResourceList",
     "description": "APIResourceList is a list of APIResource, it is used to expose the name of the resources supported in a specific group and version, and if the resource is namespaced.",
     "required": [
      "groupVersion",
@@ -501,14 +501,14 @@
      "resources": {
       "type": "array",
       "items": {
-       "$ref": "v1.APIResource"
+       "$ref": "io.k8s.meta.v1.APIResource"
       },
       "description": "resources contains the name of the resources and if they are namespaced."
      }
     }
    },
-   "v1.APIResource": {
-    "id": "v1.APIResource",
+   "io.k8s.meta.v1.APIResource": {
+    "id": "io.k8s.meta.v1.APIResource",
     "description": "APIResource specifies the name of a resource and whether it is namespaced.",
     "required": [
      "name",
