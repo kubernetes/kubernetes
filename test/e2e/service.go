@@ -1040,7 +1040,7 @@ var _ = framework.KubeDescribe("Services", func() {
 	})
 
 	It("should create endpoints for unready pods", func() {
-		serviceName := "never-ready"
+		serviceName := "tolerate-unready"
 		ns := f.Namespace.Name
 
 		t := NewServerTest(cs, ns, serviceName)
@@ -1052,12 +1052,31 @@ var _ = framework.KubeDescribe("Services", func() {
 			}
 		}()
 
-		service := t.BuildServiceSpec()
-		service.Annotations = map[string]string{endpoint.TolerateUnreadyEndpointsAnnotation: "true"}
+		t.name = "slow-terminating-unready-pod"
+		t.image = "gcr.io/google_containers/netexec:1.7"
+		port := 80
+		terminateSeconds := int64(600)
+
+		service := &api.Service{
+			ObjectMeta: api.ObjectMeta{
+				Name:        t.ServiceName,
+				Namespace:   t.Namespace,
+				Annotations: map[string]string{endpoint.TolerateUnreadyEndpointsAnnotation: "true"},
+			},
+			Spec: api.ServiceSpec{
+				Selector: t.Labels,
+				Ports: []api.ServicePort{{
+					Name:       "http",
+					Port:       int32(port),
+					TargetPort: intstr.FromInt(port),
+				}},
+			},
+		}
 		rcSpec := rcByNameContainer(t.name, 1, t.image, t.Labels, api.Container{
+			Args:  []string{fmt.Sprintf("--http-port=%d", port)},
 			Name:  t.name,
 			Image: t.image,
-			Ports: []api.ContainerPort{{ContainerPort: int32(80), Protocol: api.ProtocolTCP}},
+			Ports: []api.ContainerPort{{ContainerPort: int32(port), Protocol: api.ProtocolTCP}},
 			ReadinessProbe: &api.Probe{
 				Handler: api.Handler{
 					Exec: &api.ExecAction{
@@ -1065,9 +1084,17 @@ var _ = framework.KubeDescribe("Services", func() {
 					},
 				},
 			},
+			Lifecycle: &api.Lifecycle{
+				PreStop: &api.Handler{
+					Exec: &api.ExecAction{
+						Command: []string{"/bin/sleep", fmt.Sprintf("%d", terminateSeconds)},
+					},
+				},
+			},
 		}, nil)
+		rcSpec.Spec.Template.Spec.TerminationGracePeriodSeconds = &terminateSeconds
 
-		By(fmt.Sprintf("createing RC %v with selectors %v", rcSpec.Name, rcSpec.Spec.Selector))
+		By(fmt.Sprintf("creating RC %v with selectors %v", rcSpec.Name, rcSpec.Spec.Selector))
 		_, err := t.createRC(rcSpec)
 		ExpectNoError(err)
 
@@ -1079,10 +1106,10 @@ var _ = framework.KubeDescribe("Services", func() {
 		ExpectNoError(framework.VerifyPods(t.Client, t.Namespace, t.name, false, 1))
 
 		svcName := fmt.Sprintf("%v.%v", serviceName, f.Namespace.Name)
-		By("waiting for endpoints of Service with DNS name " + svcName)
+		By("Waiting for endpoints of Service with DNS name " + svcName)
 
 		execPodName := createExecPodOrFail(f.ClientSet, f.Namespace.Name, "execpod-")
-		cmd := fmt.Sprintf("wget -qO- %v", svcName)
+		cmd := fmt.Sprintf("wget -qO- http://%s:%d/", svcName, port)
 		var stdout string
 		if pollErr := wait.PollImmediate(framework.Poll, kubeProxyLagTimeout, func() (bool, error) {
 			var err error
@@ -1094,6 +1121,66 @@ var _ = framework.KubeDescribe("Services", func() {
 			return true, nil
 		}); pollErr != nil {
 			framework.Failf("expected un-ready endpoint for Service %v within %v, stdout: %v", t.name, kubeProxyLagTimeout, stdout)
+		}
+
+		By("Scaling down replication controler to zero")
+		framework.ScaleRC(f.ClientSet, t.Namespace, rcSpec.Name, 0, false)
+
+		By("Update service to not tolerate unready services")
+		_, err = updateService(f.ClientSet, t.Namespace, t.ServiceName, func(s *api.Service) {
+			s.ObjectMeta.Annotations[endpoint.TolerateUnreadyEndpointsAnnotation] = "false"
+		})
+		framework.ExpectNoError(err)
+
+		By("Check if pod is unreachable")
+		cmd = fmt.Sprintf("wget -qO- -T 2 http://%s:%d/; test \"$?\" -eq \"1\"", svcName, port)
+		if pollErr := wait.PollImmediate(framework.Poll, kubeProxyLagTimeout, func() (bool, error) {
+			var err error
+			stdout, err = framework.RunHostCmd(f.Namespace.Name, execPodName, cmd)
+			if err != nil {
+				framework.Logf("expected un-ready endpoint for Service %v, stdout: %v, err %v", t.name, stdout, err)
+				return false, nil
+			}
+			return true, nil
+		}); pollErr != nil {
+			framework.Failf("expected un-ready endpoint for Service %v within %v, stdout: %v", t.name, kubeProxyLagTimeout, stdout)
+		}
+
+		By("Update service to tolerate unready services again")
+		_, err = updateService(f.ClientSet, t.Namespace, t.ServiceName, func(s *api.Service) {
+			s.ObjectMeta.Annotations[endpoint.TolerateUnreadyEndpointsAnnotation] = "true"
+		})
+		framework.ExpectNoError(err)
+
+		By("Check if terminating pod is available through service")
+		cmd = fmt.Sprintf("wget -qO- http://%s:%d/", svcName, port)
+		if pollErr := wait.PollImmediate(framework.Poll, kubeProxyLagTimeout, func() (bool, error) {
+			var err error
+			stdout, err = framework.RunHostCmd(f.Namespace.Name, execPodName, cmd)
+			if err != nil {
+				framework.Logf("expected un-ready endpoint for Service %v, stdout: %v, err %v", t.name, stdout, err)
+				return false, nil
+			}
+			return true, nil
+		}); pollErr != nil {
+			framework.Failf("expected un-ready endpoint for Service %v within %v, stdout: %v", t.name, kubeProxyLagTimeout, stdout)
+		}
+
+		By("Remove pods immediately")
+		label := labels.SelectorFromSet(labels.Set(t.Labels))
+		options := api.ListOptions{LabelSelector: label}
+		podClient := t.Client.Core().Pods(f.Namespace.Name)
+		pods, err := podClient.List(options)
+		if err != nil {
+			framework.Logf("warning: error retrieving pods: %s", err)
+		} else {
+			for _, pod := range pods.Items {
+				var gracePeriodSeconds int64 = 0
+				err := podClient.Delete(pod.Name, &api.DeleteOptions{GracePeriodSeconds: &gracePeriodSeconds})
+				if err != nil {
+					framework.Logf("warning: error force deleting pod '%s': %s", pod.Name, err)
+				}
+			}
 		}
 	})
 
