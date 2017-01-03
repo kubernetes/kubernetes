@@ -23,7 +23,7 @@ import (
 
 	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
-
+	"github.com/spf13/pflag"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiext "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
@@ -49,6 +49,8 @@ var (
 
 		kubeadm join --discovery %s
 		`)
+	// advancedHelpOnlyFlags records all flags that will only be displayed in advanced help.
+	advancedHelpOnlyFlags = []string{"external-etcd-endpoints", "external-etcd-cafile", "external-etcd-certfile", "external-etcd-keyfile"}
 )
 
 // NewCmdInit returns "kubeadm init" command.
@@ -60,10 +62,18 @@ func NewCmdInit(out io.Writer) *cobra.Command {
 
 	var cfgPath string
 	var skipPreFlight bool
+	// advancedHelp indicates whether user call kubeadm init command with --advanced-help flag or not.
+	var advancedHelp = false
+	var deprecatedFlagWarningSuffix = ", Warning: this flag is deprecated and will be removed when componentconfig exists"
 	cmd := &cobra.Command{
 		Use:   "init",
 		Short: "Run this in order to set up the Kubernetes master",
 		Run: func(cmd *cobra.Command, args []string) {
+			if advancedHelp {
+				markAdvancedHelpOnlyFlagsDisplayed(cmd.Flags())
+				cmd.Help()
+				return
+			}
 			i, err := NewInit(cfgPath, &cfg, skipPreFlight)
 			kubeadmutil.CheckErr(err)
 			kubeadmutil.CheckErr(i.Validate())
@@ -103,30 +113,33 @@ func NewCmdInit(out io.Writer) *cobra.Command {
 
 	cmd.PersistentFlags().StringVar(&cfgPath, "config", cfgPath, "Path to kubeadm config file")
 
-	// TODO (phase1+) @errordeveloper make the flags below not show up in --help but rather on --advanced-help
 	cmd.PersistentFlags().StringSliceVar(
 		&cfg.Etcd.Endpoints, "external-etcd-endpoints", cfg.Etcd.Endpoints,
-		"etcd endpoints to use, in case you have an external cluster",
+		"etcd endpoints to use, in case you have an external cluster"+
+			deprecatedFlagWarningSuffix,
 	)
-	cmd.PersistentFlags().MarkDeprecated("external-etcd-endpoints", "this flag will be removed when componentconfig exists")
+	cmd.PersistentFlags().MarkHidden("external-etcd-endpoints")
 
 	cmd.PersistentFlags().StringVar(
 		&cfg.Etcd.CAFile, "external-etcd-cafile", cfg.Etcd.CAFile,
-		"etcd certificate authority certificate file. Note: The path must be in /etc/ssl/certs",
+		"etcd certificate authority certificate file. Note: The path must be in /etc/ssl/certs"+
+			deprecatedFlagWarningSuffix,
 	)
-	cmd.PersistentFlags().MarkDeprecated("external-etcd-cafile", "this flag will be removed when componentconfig exists")
+	cmd.PersistentFlags().MarkHidden("external-etcd-cafile")
 
 	cmd.PersistentFlags().StringVar(
 		&cfg.Etcd.CertFile, "external-etcd-certfile", cfg.Etcd.CertFile,
-		"etcd client certificate file. Note: The path must be in /etc/ssl/certs",
+		"etcd client certificate file. Note: The path must be in /etc/ssl/certs"+
+			deprecatedFlagWarningSuffix,
 	)
-	cmd.PersistentFlags().MarkDeprecated("external-etcd-certfile", "this flag will be removed when componentconfig exists")
+	cmd.PersistentFlags().MarkHidden("external-etcd-certfile")
 
 	cmd.PersistentFlags().StringVar(
 		&cfg.Etcd.KeyFile, "external-etcd-keyfile", cfg.Etcd.KeyFile,
-		"etcd client key file. Note: The path must be in /etc/ssl/certs",
+		"etcd client key file. Note: The path must be in /etc/ssl/certs"+
+			deprecatedFlagWarningSuffix,
 	)
-	cmd.PersistentFlags().MarkDeprecated("external-etcd-keyfile", "this flag will be removed when componentconfig exists")
+	cmd.PersistentFlags().MarkHidden("external-etcd-keyfile")
 
 	cmd.PersistentFlags().BoolVar(
 		&skipPreFlight, "skip-preflight-checks", skipPreFlight,
@@ -137,8 +150,28 @@ func NewCmdInit(out io.Writer) *cobra.Command {
 		discovery.NewDiscoveryValue(&cfg.Discovery), "discovery",
 		"The discovery method kubeadm will use for connecting nodes to the master",
 	)
+	cmd.PersistentFlags().BoolVar(
+		&advancedHelp, "advanced-help", advancedHelp,
+		"more flags will be displayed in advanced help informations")
 
 	return cmd
+}
+
+// markDisplayed sets a flag to be displayed in your program.this function is the opposite of pflag.FlagSet#MarkHidden().
+func markDisplayed(f *pflag.FlagSet, name string) error {
+	flag := f.Lookup(name)
+	if flag == nil {
+		return fmt.Errorf("flag %q does not exist", name)
+	}
+	flag.Hidden = false
+	return nil
+}
+
+// markAdvancedHelpOnlyFlagsDisplayed set all advanced-help-only flags to be displayed.
+func markAdvancedHelpOnlyFlagsDisplayed(fs *pflag.FlagSet) {
+	for _, flag := range advancedHelpOnlyFlags {
+		markDisplayed(fs, flag)
+	}
 }
 
 type Init struct {
