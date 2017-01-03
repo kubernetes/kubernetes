@@ -132,13 +132,13 @@ func ValidateJobStatus(status *batch.JobStatus, fldPath *field.Path) field.Error
 }
 
 func ValidateJobUpdate(job, oldJob *batch.Job) field.ErrorList {
-	allErrs := apivalidation.ValidateObjectMetaUpdate(&oldJob.ObjectMeta, &job.ObjectMeta, field.NewPath("metadata"))
+	allErrs := apivalidation.ValidateObjectMetaUpdate(&job.ObjectMeta, &oldJob.ObjectMeta, field.NewPath("metadata"))
 	allErrs = append(allErrs, ValidateJobSpecUpdate(job.Spec, oldJob.Spec, field.NewPath("spec"))...)
 	return allErrs
 }
 
 func ValidateJobUpdateStatus(job, oldJob *batch.Job) field.ErrorList {
-	allErrs := apivalidation.ValidateObjectMetaUpdate(&oldJob.ObjectMeta, &job.ObjectMeta, field.NewPath("metadata"))
+	allErrs := apivalidation.ValidateObjectMetaUpdate(&job.ObjectMeta, &oldJob.ObjectMeta, field.NewPath("metadata"))
 	allErrs = append(allErrs, ValidateJobStatusUpdate(job.Status, oldJob.Status)...)
 	return allErrs
 }
