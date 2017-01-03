@@ -75,6 +75,10 @@ func NewCmdInit(out io.Writer) *cobra.Command {
 		&cfg.API.AdvertiseAddresses, "api-advertise-addresses", cfg.API.AdvertiseAddresses,
 		"The IP addresses to advertise, in case autodetection fails",
 	)
+	cmd.PersistentFlags().Int32Var(
+		&cfg.API.Port, "api-port", cfg.API.Port,
+		"Port for API to bind to",
+	)
 	cmd.PersistentFlags().StringSliceVar(
 		&cfg.API.ExternalDNSNames, "api-external-dns-names", cfg.API.ExternalDNSNames,
 		"The DNS names to advertise, in case you have configured them yourself",
