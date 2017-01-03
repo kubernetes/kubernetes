@@ -786,7 +786,6 @@ function start-kube-apiserver {
   local params="${API_SERVER_TEST_LOG_LEVEL:-"--v=2"} ${APISERVER_TEST_ARGS:-} ${CLOUD_CONFIG_OPT}"
   params+=" --address=127.0.0.1"
   params+=" --allow-privileged=true"
-  params+=" --authorization-policy-file=/etc/srv/kubernetes/abac-authz-policy.jsonl"
   params+=" --cloud-provider=gce"
   params+=" --client-ca-file=/etc/srv/kubernetes/ca.crt"
   params+=" --etcd-servers=http://127.0.0.1:2379"
@@ -864,7 +863,7 @@ function start-kube-apiserver {
     webhook_authn_config_volume="{\"name\": \"webhookauthnconfigmount\",\"hostPath\": {\"path\": \"/etc/gcp_authn.config\"}},"
   fi
 
-  params+=" --authorization-mode=RBAC,ABAC"
+  params+=" --authorization-mode=RBAC"
   local webhook_config_mount=""
   local webhook_config_volume=""
   if [[ -n "${GCP_AUTHZ_URL:-}" ]]; then
@@ -873,17 +872,6 @@ function start-kube-apiserver {
     webhook_config_volume="{\"name\": \"webhookconfigmount\",\"hostPath\": {\"path\": \"/etc/gcp_authz.config\"}},"
   fi
   local -r src_dir="${KUBE_HOME}/kube-manifests/kubernetes/gci-trusty"
-
-  if [[ -n "${KUBE_USER:-}" || ! -e /etc/srv/kubernetes/abac-authz-policy.jsonl ]]; then
-    local -r abac_policy_json="${src_dir}/abac-authz-policy.jsonl"
-    remove-salt-config-comments "${abac_policy_json}"
-    if [[ -n "${KUBE_USER:-}" ]]; then
-      sed -i -e "s/{{kube_user}}/${KUBE_USER}/g" "${abac_policy_json}"
-    else
-      sed -i -e "/{{kube_user}}/d" "${abac_policy_json}"
-    fi
-    cp "${abac_policy_json}" /etc/srv/kubernetes/
-  fi
 
   src_file="${src_dir}/kube-apiserver.manifest"
   remove-salt-config-comments "${src_file}"
