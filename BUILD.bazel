@@ -16,8 +16,17 @@ gcs_upload(
 
 filegroup(
     name = "package-srcs",
-    srcs = glob(["**"], exclude=["bazel-*/**", ".git/**"]),
-    tags = ["automanaged"],
+    srcs = glob(
+        ["**"],
+        exclude = [
+            "bazel-*/**",
+            "_*/**",
+            ".config/**",
+            ".git/**",
+            ".gsutil/**",
+            ".make/**",
+        ],
+    ),
     visibility = ["//visibility:private"],
 )
 
