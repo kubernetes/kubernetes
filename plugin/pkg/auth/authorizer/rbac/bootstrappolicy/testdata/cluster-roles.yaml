@@ -445,6 +445,7 @@ items:
     - persistentvolumeclaims
     - persistentvolumes
     - pods
+    - replicationcontrollers
     - secrets
     - serviceaccounts
     verbs:
