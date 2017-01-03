@@ -74,6 +74,7 @@ func main() {
 		"k8s.io/kubernetes/pkg/...",
 		"k8s.io/kubernetes/cmd/...",
 		"k8s.io/kubernetes/plugin/...",
+		"k8s.io/genericapiserver/pkg/...",
 	}
 	arguments.GoHeaderFilePath = filepath.Join(args.DefaultSourceTree(), "k8s.io/kubernetes/hack/boilerplate/boilerplate.go.txt")
 	// arguments.VerifyOnly = true

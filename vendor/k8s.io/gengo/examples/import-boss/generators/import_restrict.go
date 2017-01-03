@@ -192,8 +192,16 @@ func (importRuleFile) VerifyFile(f *generator.File, path string) error {
 	}
 
 	if rules == nil {
-		// No restrictions on this directory.
-		return nil
+		// No restrictions on this directory, double check under vendor.  Make an assumption about running in kube
+		vendorPath := strings.Replace(path, "/go/src/k8s.io/", "/go/src/k8s.io/kubernetes/vendor/k8s.io/", -1)
+		rules, actualPath, err = recursiveRead(vendorPath)
+		if err != nil {
+			return fmt.Errorf("error finding rules file: %v", err)
+		}
+
+		if rules == nil {
+			return nil
+		}
 	}
 
 	for _, r := range rules.Rules {
