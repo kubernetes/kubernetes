@@ -17,6 +17,3 @@ subjects:
 - apiVersion: rbac/v1alpha1
   kind: User
   name: kubecfg
-- apiVersion: rbac/v1alpha1
-  kind: User
-  name: kubekins@kubernetes-jenkins.iam.gserviceaccount.com
