@@ -491,8 +491,9 @@ func (a *syncAction) computeSyncActionKillingPhase(statuses *statusGroup, manage
 	}
 	// (a) Check init containers.
 	initContainersInSpec := make(map[string]*record)
-	for _, c := range pod.Spec.InitContainers {
-		initContainersInSpec[c.Name] = &record{&c, false}
+	for i := range pod.Spec.InitContainers {
+		c := &pod.Spec.InitContainers[i]
+		initContainersInSpec[c.Name] = &record{c, false}
 	}
 	for _, s := range initContainerStatuses {
 		if !isContainerActive(s) {
@@ -513,8 +514,9 @@ func (a *syncAction) computeSyncActionKillingPhase(statuses *statusGroup, manage
 
 	// (b) Check app containers.
 	appContainersInSpec := make(map[string]*record)
-	for _, c := range pod.Spec.Containers {
-		appContainersInSpec[c.Name] = &record{&c, false}
+	for i := range pod.Spec.Containers {
+		c := &pod.Spec.Containers[i]
+		appContainersInSpec[c.Name] = &record{c, false}
 	}
 	for _, s := range appContainerStatuses {
 		if !isContainerActive(s) {
