@@ -46,11 +46,14 @@ import (
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/v1"
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
+	rbacv1alpha1 "k8s.io/kubernetes/pkg/apis/rbac/v1alpha1"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/labels"
 	genericregistry "k8s.io/kubernetes/pkg/registry/generic/registry"
+	"k8s.io/kubernetes/pkg/runtime/schema"
+	"k8s.io/kubernetes/pkg/serviceaccount"
 	uexec "k8s.io/kubernetes/pkg/util/exec"
 	utilnet "k8s.io/kubernetes/pkg/util/net"
 	"k8s.io/kubernetes/pkg/util/uuid"
@@ -566,6 +569,15 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 		})
 
 		It("should handle in-cluster config", func() {
+			By("adding rbac permissions")
+			framework.BindClusterRoleInNamespace(f.ClientSet.Rbac(), "view", f.Namespace.Name,
+				rbacv1alpha1.Subject{Kind: rbacv1alpha1.ServiceAccountKind, Namespace: f.Namespace.Name, Name: "default"})
+
+			err := framework.WaitForAuthorizationUpdate(f.ClientSet.Authorization(),
+				serviceaccount.MakeUsername(f.Namespace.Name, "default"),
+				f.Namespace.Name, "list", schema.GroupResource{Resource: "pods"}, true)
+			framework.ExpectNoError(err)
+
 			By("overriding icc with values provided by flags")
 			kubectlPath := framework.TestContext.KubectlPath
 
@@ -580,7 +592,7 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 			}
 
 			By("trying to use kubectl with invalid token")
-			_, err := framework.RunHostCmd(ns, simplePodName, "/kubectl get pods --token=invalid --v=7 2>&1")
+			_, err = framework.RunHostCmd(ns, simplePodName, "/kubectl get pods --token=invalid --v=7 2>&1")
 			framework.Logf("got err %v", err)
 			Expect(err).To(HaveOccurred())
 			Expect(err).To(ContainSubstring("Using in-cluster namespace"))
@@ -597,13 +609,14 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 			Expect(err).To(ContainSubstring("GET http://invalid/api"))
 
 			By("trying to use kubectl with invalid namespace")
-			output, _ := framework.RunHostCmd(ns, simplePodName, "/kubectl get pods --namespace=invalid --v=6 2>&1")
-			Expect(output).To(ContainSubstring("No resources found"))
+			output, err := framework.RunHostCmd(ns, simplePodName, "/kubectl get pods --namespace=invalid --v=6 2>&1")
 			Expect(output).ToNot(ContainSubstring("Using in-cluster namespace"))
 			Expect(output).To(ContainSubstring("Using in-cluster configuration"))
 			if matched, _ := regexp.MatchString(fmt.Sprintf("GET http[s]?://%s:%s/api/v1/namespaces/invalid/pods", inClusterHost, inClusterPort), output); !matched {
 				framework.Failf("Unexpected kubectl exec output: ", output)
 			}
+			// we expect to get a forbidden since we don't have rights to the invalid namespace
+			Expect(err).To(ContainSubstring("Response Status: 403 Forbidden"))
 
 		})
 	})
