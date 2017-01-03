@@ -158,3 +158,67 @@ func TestUserAgentContext(t *testing.T) {
 		t.Fatalf("Get user agent error, Expected: %s, Actual: %s", expectedResult, result)
 	}
 }
+
+//TestUserContext validates that a userinfo can be get/set on a context object
+func TestUserContext(t *testing.T) {
+	ctx := api.NewContext()
+	_,ok := api.UserFrom(ctx)
+	if ok {
+		t.Errorf("Should not be ok because there is no user.Info on the context")
+	}
+	ctx = api.WithUser(
+		ctx,
+		&user.DefaultInfo{
+			Name:   "bob",
+			UID:    "123",
+			Groups: []string{"group1"},
+			Extra:  map[string][]string{"foo": {"bar"}},
+		},
+	)
+
+	result,ok := api.UserFrom(ctx)
+	if !ok {
+		t.Errorf("Error getting user info")
+	}
+	if result.GetName() !="bob" {
+		t.Errorf("Expected: bob, Actual: %v", result.GetName())
+	}
+}
+
+//TestUIDContext validates that a UID can be get/set on a context object
+func TestUIDContext(t *testing.T) {
+	ctx := api.NewContext()
+	_,ok := api.UIDFrom(ctx)
+	if ok {
+		t.Errorf("Should not be ok because there is no UID on the context")
+	}
+	ctx = api.WithUID(
+		ctx,
+		types.UID{"testUID"},
+	)
+	_,ok = api.UIDFrom(ctx)
+	if !ok {
+		t.Errorf("Error getting UID")
+	}
+}
+
+//TestUserAgentContext validates that a useragent can be get/set on a context object
+func TestUserAgentContext(t *testing.T) {
+	ctx := api.NewContext()
+	_,ok := api.UserAgentFrom(ctx)
+	if ok {
+		t.Errorf("Should not be ok because there is no UserAgent on the context")
+	}
+
+	ctx = api.WithUserAgent(
+		ctx,
+		"TestUserAgent",
+	)
+	result,ok:= api.UserAgentFrom(ctx)
+	if !ok {
+		t.Errorf("Error getting UserAgent")
+	}
+	if result != "TestUserAgent" {
+		t.Errorf("Expected: TestUserAgent, Actual: %v", result)
+	}
+}
