@@ -62,6 +62,9 @@ const (
 
 	// userAgentKey is the context key for the request user agent.
 	userAgentKey
+
+	// kubernetesUserAgentKey is the context key for the customized kubernetes user agent.
+	kubernetesUserAgentKey
 )
 
 // NewContext instantiates a base context object for request flows.
@@ -149,4 +152,15 @@ func WithUserAgent(parent Context, userAgent string) Context {
 func UserAgentFrom(ctx Context) (string, bool) {
 	userAgent, ok := ctx.Value(userAgentKey).(string)
 	return userAgent, ok
+}
+
+// WithClientVersion returns a copy of parent in which the user value is set
+func WithKubernetesUserAgent(parent Context, kubernetesUserAgent string) Context {
+	return WithValue(parent, kubernetesUserAgentKey, kubernetesUserAgent)
+}
+
+// KubernetesUserAgentFrom returns the value of the kubernetesUserAgent key on the ctx
+func KubernetesUserAgentFrom(ctx Context) (string, bool) {
+	kubernetesUserAgent, ok := ctx.Value(kubernetesUserAgentKey).(string)
+	return kubernetesUserAgent, ok
 }
