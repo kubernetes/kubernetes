@@ -85,7 +85,7 @@ var accessor = meta.NewAccessor()
 var selfLinker runtime.SelfLinker = accessor
 var mapper, namespaceMapper meta.RESTMapper // The mappers with namespace and with legacy namespace scopes.
 var admissionControl admission.Interface
-var requestContextMapper api.RequestContextMapper
+var requestContextMapper request.RequestContextMapper
 
 func interfacesFor(version schema.GroupVersion) (*meta.VersionInterfaces, error) {
 	switch version {
@@ -209,7 +209,7 @@ func init() {
 	mapper = nsMapper
 	namespaceMapper = nsMapper
 	admissionControl = admit.NewAlwaysAdmit()
-	requestContextMapper = api.NewRequestContextMapper()
+	requestContextMapper = request.NewRequestContextMapper()
 
 	api.Scheme.AddFieldLabelConversionFunc(grouplessGroupVersion.String(), "Simple",
 		func(label, value string) (string, string, error) {
@@ -380,7 +380,7 @@ type SimpleRESTStorage struct {
 	injectedFunction func(obj runtime.Object) (returnObj runtime.Object, err error)
 }
 
-func (storage *SimpleRESTStorage) Export(ctx api.Context, name string, opts metav1.ExportOptions) (runtime.Object, error) {
+func (storage *SimpleRESTStorage) Export(ctx request.Context, name string, opts metav1.ExportOptions) (runtime.Object, error) {
 	obj, err := storage.Get(ctx, name, &metav1.GetOptions{})
 	if err != nil {
 		return nil, err
@@ -395,7 +395,7 @@ func (storage *SimpleRESTStorage) Export(ctx api.Context, name string, opts meta
 	return obj, storage.errors["export"]
 }
 
-func (storage *SimpleRESTStorage) List(ctx api.Context, options *api.ListOptions) (runtime.Object, error) {
+func (storage *SimpleRESTStorage) List(ctx request.Context, options *api.ListOptions) (runtime.Object, error) {
 	storage.checkContext(ctx)
 	result := &genericapitesting.SimpleList{
 		Items: storage.list,
@@ -442,7 +442,7 @@ func (h *OutputConnect) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	w.Write([]byte(h.response))
 }
 
-func (storage *SimpleRESTStorage) Get(ctx api.Context, id string, options *metav1.GetOptions) (runtime.Object, error) {
+func (storage *SimpleRESTStorage) Get(ctx request.Context, id string, options *metav1.GetOptions) (runtime.Object, error) {
 	storage.checkContext(ctx)
 	if id == "binary" {
 		return storage.stream, storage.errors["get"]
@@ -454,11 +454,11 @@ func (storage *SimpleRESTStorage) Get(ctx api.Context, id string, options *metav
 	return copied, storage.errors["get"]
 }
 
-func (storage *SimpleRESTStorage) checkContext(ctx api.Context) {
-	storage.actualNamespace, storage.namespacePresent = api.NamespaceFrom(ctx)
+func (storage *SimpleRESTStorage) checkContext(ctx request.Context) {
+	storage.actualNamespace, storage.namespacePresent = request.NamespaceFrom(ctx)
 }
 
-func (storage *SimpleRESTStorage) Delete(ctx api.Context, id string, options *api.DeleteOptions) (runtime.Object, error) {
+func (storage *SimpleRESTStorage) Delete(ctx request.Context, id string, options *api.DeleteOptions) (runtime.Object, error) {
 	storage.checkContext(ctx)
 	storage.deleted = id
 	storage.deleteOptions = options
@@ -481,7 +481,7 @@ func (storage *SimpleRESTStorage) NewList() runtime.Object {
 	return &genericapitesting.SimpleList{}
 }
 
-func (storage *SimpleRESTStorage) Create(ctx api.Context, obj runtime.Object) (runtime.Object, error) {
+func (storage *SimpleRESTStorage) Create(ctx request.Context, obj runtime.Object) (runtime.Object, error) {
 	storage.checkContext(ctx)
 	storage.created = obj.(*genericapitesting.Simple)
 	if err := storage.errors["create"]; err != nil {
@@ -494,7 +494,7 @@ func (storage *SimpleRESTStorage) Create(ctx api.Context, obj runtime.Object) (r
 	return obj, err
 }
 
-func (storage *SimpleRESTStorage) Update(ctx api.Context, name string, objInfo rest.UpdatedObjectInfo) (runtime.Object, bool, error) {
+func (storage *SimpleRESTStorage) Update(ctx request.Context, name string, objInfo rest.UpdatedObjectInfo) (runtime.Object, bool, error) {
 	storage.checkContext(ctx)
 	obj, err := objInfo.UpdatedObject(ctx, &storage.item)
 	if err != nil {
@@ -511,7 +511,7 @@ func (storage *SimpleRESTStorage) Update(ctx api.Context, name string, objInfo r
 }
 
 // Implement ResourceWatcher.
-func (storage *SimpleRESTStorage) Watch(ctx api.Context, options *api.ListOptions) (watch.Interface, error) {
+func (storage *SimpleRESTStorage) Watch(ctx request.Context, options *api.ListOptions) (watch.Interface, error) {
 	storage.lock.Lock()
 	defer storage.lock.Unlock()
 	storage.checkContext(ctx)
@@ -527,7 +527,7 @@ func (storage *SimpleRESTStorage) Watch(ctx api.Context, options *api.ListOption
 	if options != nil {
 		storage.requestedResourceVersion = options.ResourceVersion
 	}
-	storage.requestedResourceNamespace = api.NamespaceValue(ctx)
+	storage.requestedResourceNamespace = request.NamespaceValue(ctx)
 	if err := storage.errors["watch"]; err != nil {
 		return nil, err
 	}
@@ -545,10 +545,10 @@ func (storage *SimpleRESTStorage) Watcher() *watch.FakeWatcher {
 var _ = rest.Redirector(&SimpleRESTStorage{})
 
 // Implement Redirector.
-func (storage *SimpleRESTStorage) ResourceLocation(ctx api.Context, id string) (*url.URL, http.RoundTripper, error) {
+func (storage *SimpleRESTStorage) ResourceLocation(ctx request.Context, id string) (*url.URL, http.RoundTripper, error) {
 	storage.checkContext(ctx)
 	// validate that the namespace context on the request matches the expected input
-	storage.requestedResourceNamespace = api.NamespaceValue(ctx)
+	storage.requestedResourceNamespace = request.NamespaceValue(ctx)
 	if storage.expectedResourceNamespace != storage.requestedResourceNamespace {
 		return nil, nil, fmt.Errorf("Expected request namespace %s, but got namespace %s", storage.expectedResourceNamespace, storage.requestedResourceNamespace)
 	}
@@ -580,7 +580,7 @@ func (s *ConnecterRESTStorage) New() runtime.Object {
 	return &genericapitesting.Simple{}
 }
 
-func (s *ConnecterRESTStorage) Connect(ctx api.Context, id string, options runtime.Object, responder rest.Responder) (http.Handler, error) {
+func (s *ConnecterRESTStorage) Connect(ctx request.Context, id string, options runtime.Object, responder rest.Responder) (http.Handler, error) {
 	s.receivedConnectOptions = options
 	s.receivedID = id
 	s.receivedResponder = responder
@@ -605,7 +605,7 @@ type LegacyRESTStorage struct {
 	*SimpleRESTStorage
 }
 
-func (storage LegacyRESTStorage) Delete(ctx api.Context, id string) (runtime.Object, error) {
+func (storage LegacyRESTStorage) Delete(ctx request.Context, id string) (runtime.Object, error) {
 	return storage.SimpleRESTStorage.Delete(ctx, id, nil)
 }
 
@@ -630,7 +630,7 @@ type GetWithOptionsRESTStorage struct {
 	takesPath       string
 }
 
-func (r *GetWithOptionsRESTStorage) Get(ctx api.Context, name string, options runtime.Object) (runtime.Object, error) {
+func (r *GetWithOptionsRESTStorage) Get(ctx request.Context, name string, options runtime.Object) (runtime.Object, error) {
 	if _, ok := options.(*genericapitesting.SimpleGetOptions); !ok {
 		return nil, fmt.Errorf("Unexpected options object: %#v", options)
 	}
@@ -652,7 +652,7 @@ type NamedCreaterRESTStorage struct {
 	createdName string
 }
 
-func (storage *NamedCreaterRESTStorage) Create(ctx api.Context, name string, obj runtime.Object) (runtime.Object, error) {
+func (storage *NamedCreaterRESTStorage) Create(ctx request.Context, name string, obj runtime.Object) (runtime.Object, error) {
 	storage.checkContext(ctx)
 	storage.created = obj.(*genericapitesting.Simple)
 	storage.createdName = name
@@ -679,7 +679,7 @@ func (storage *SimpleTypedStorage) New() runtime.Object {
 	return storage.baseType
 }
 
-func (storage *SimpleTypedStorage) Get(ctx api.Context, id string, options *metav1.GetOptions) (runtime.Object, error) {
+func (storage *SimpleTypedStorage) Get(ctx request.Context, id string, options *metav1.GetOptions) (runtime.Object, error) {
 	storage.checkContext(ctx)
 	copied, err := api.Scheme.Copy(storage.item)
 	if err != nil {
@@ -688,8 +688,8 @@ func (storage *SimpleTypedStorage) Get(ctx api.Context, id string, options *meta
 	return copied, storage.errors["get"]
 }
 
-func (storage *SimpleTypedStorage) checkContext(ctx api.Context) {
-	storage.actualNamespace, storage.namespacePresent = api.NamespaceFrom(ctx)
+func (storage *SimpleTypedStorage) checkContext(ctx request.Context) {
+	storage.actualNamespace, storage.namespacePresent = request.NamespaceFrom(ctx)
 }
 
 func extractBody(response *http.Response, object runtime.Object) (string, error) {
@@ -3255,7 +3255,7 @@ func (storage *SimpleXGSubresourceRESTStorage) New() runtime.Object {
 	return &SimpleXGSubresource{}
 }
 
-func (storage *SimpleXGSubresourceRESTStorage) Get(ctx api.Context, id string, options *metav1.GetOptions) (runtime.Object, error) {
+func (storage *SimpleXGSubresourceRESTStorage) Get(ctx request.Context, id string, options *metav1.GetOptions) (runtime.Object, error) {
 	copied, err := api.Scheme.Copy(&storage.item)
 	if err != nil {
 		panic(err)
@@ -3400,7 +3400,7 @@ func BenchmarkUpdateProtobuf(b *testing.B) {
 
 func newTestServer(handler http.Handler) *httptest.Server {
 	handler = genericapifilters.WithRequestInfo(handler, newTestRequestInfoResolver(), requestContextMapper)
-	handler = api.WithRequestContext(handler, requestContextMapper)
+	handler = request.WithRequestContext(handler, requestContextMapper)
 	return httptest.NewServer(handler)
 }
 

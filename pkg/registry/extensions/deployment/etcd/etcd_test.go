@@ -27,6 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/fields"
+	genericapirequest "k8s.io/kubernetes/pkg/genericapiserver/api/request"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/generic"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
@@ -197,7 +198,7 @@ func TestScaleGet(t *testing.T) {
 	defer server.Terminate(t)
 	defer storage.Deployment.Store.DestroyFunc()
 	var deployment extensions.Deployment
-	ctx := api.WithNamespace(api.NewContext(), namespace)
+	ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), namespace)
 	key := "/deployments/" + namespace + "/" + name
 	if err := storage.Deployment.Storage.Create(ctx, key, &validDeployment, &deployment, 0); err != nil {
 		t.Fatalf("error setting new deployment (key: %s) %v: %v", key, validDeployment, err)
@@ -234,7 +235,7 @@ func TestScaleUpdate(t *testing.T) {
 	defer server.Terminate(t)
 	defer storage.Deployment.Store.DestroyFunc()
 	var deployment extensions.Deployment
-	ctx := api.WithNamespace(api.NewContext(), namespace)
+	ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), namespace)
 	key := "/deployments/" + namespace + "/" + name
 	if err := storage.Deployment.Storage.Create(ctx, key, &validDeployment, &deployment, 0); err != nil {
 		t.Fatalf("error setting new deployment (key: %s) %v: %v", key, validDeployment, err)
@@ -271,7 +272,7 @@ func TestStatusUpdate(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Deployment.Store.DestroyFunc()
-	ctx := api.WithNamespace(api.NewContext(), namespace)
+	ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), namespace)
 	key := "/deployments/" + namespace + "/" + name
 	if err := storage.Deployment.Storage.Create(ctx, key, &validDeployment, nil, 0); err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -304,7 +305,7 @@ func TestStatusUpdate(t *testing.T) {
 }
 
 func TestEtcdCreateDeploymentRollback(t *testing.T) {
-	ctx := api.WithNamespace(api.NewContext(), namespace)
+	ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), namespace)
 
 	testCases := map[string]struct {
 		rollback extensions.DeploymentRollback
@@ -363,7 +364,7 @@ func TestEtcdCreateDeploymentRollbackNoDeployment(t *testing.T) {
 	defer server.Terminate(t)
 	defer storage.Deployment.Store.DestroyFunc()
 	rollbackStorage := storage.Rollback
-	ctx := api.WithNamespace(api.NewContext(), namespace)
+	ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), namespace)
 
 	_, err := rollbackStorage.Create(ctx, &extensions.DeploymentRollback{
 		Name:               name,

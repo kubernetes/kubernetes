@@ -20,17 +20,18 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/rest"
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
+	genericapirequest "k8s.io/kubernetes/pkg/genericapiserver/api/request"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
 // Registry is an interface for things that know how to store ConfigMaps.
 type Registry interface {
-	ListConfigMaps(ctx api.Context, options *api.ListOptions) (*api.ConfigMapList, error)
-	WatchConfigMaps(ctx api.Context, options *api.ListOptions) (watch.Interface, error)
-	GetConfigMap(ctx api.Context, name string, options *metav1.GetOptions) (*api.ConfigMap, error)
-	CreateConfigMap(ctx api.Context, cfg *api.ConfigMap) (*api.ConfigMap, error)
-	UpdateConfigMap(ctx api.Context, cfg *api.ConfigMap) (*api.ConfigMap, error)
-	DeleteConfigMap(ctx api.Context, name string) error
+	ListConfigMaps(ctx genericapirequest.Context, options *api.ListOptions) (*api.ConfigMapList, error)
+	WatchConfigMaps(ctx genericapirequest.Context, options *api.ListOptions) (watch.Interface, error)
+	GetConfigMap(ctx genericapirequest.Context, name string, options *metav1.GetOptions) (*api.ConfigMap, error)
+	CreateConfigMap(ctx genericapirequest.Context, cfg *api.ConfigMap) (*api.ConfigMap, error)
+	UpdateConfigMap(ctx genericapirequest.Context, cfg *api.ConfigMap) (*api.ConfigMap, error)
+	DeleteConfigMap(ctx genericapirequest.Context, name string) error
 }
 
 // storage puts strong typing around storage calls
@@ -44,7 +45,7 @@ func NewRegistry(s rest.StandardStorage) Registry {
 	return &storage{s}
 }
 
-func (s *storage) ListConfigMaps(ctx api.Context, options *api.ListOptions) (*api.ConfigMapList, error) {
+func (s *storage) ListConfigMaps(ctx genericapirequest.Context, options *api.ListOptions) (*api.ConfigMapList, error) {
 	obj, err := s.List(ctx, options)
 	if err != nil {
 		return nil, err
@@ -53,11 +54,11 @@ func (s *storage) ListConfigMaps(ctx api.Context, options *api.ListOptions) (*ap
 	return obj.(*api.ConfigMapList), err
 }
 
-func (s *storage) WatchConfigMaps(ctx api.Context, options *api.ListOptions) (watch.Interface, error) {
+func (s *storage) WatchConfigMaps(ctx genericapirequest.Context, options *api.ListOptions) (watch.Interface, error) {
 	return s.Watch(ctx, options)
 }
 
-func (s *storage) GetConfigMap(ctx api.Context, name string, options *metav1.GetOptions) (*api.ConfigMap, error) {
+func (s *storage) GetConfigMap(ctx genericapirequest.Context, name string, options *metav1.GetOptions) (*api.ConfigMap, error) {
 	obj, err := s.Get(ctx, name, options)
 	if err != nil {
 		return nil, err
@@ -66,7 +67,7 @@ func (s *storage) GetConfigMap(ctx api.Context, name string, options *metav1.Get
 	return obj.(*api.ConfigMap), nil
 }
 
-func (s *storage) CreateConfigMap(ctx api.Context, cfg *api.ConfigMap) (*api.ConfigMap, error) {
+func (s *storage) CreateConfigMap(ctx genericapirequest.Context, cfg *api.ConfigMap) (*api.ConfigMap, error) {
 	obj, err := s.Create(ctx, cfg)
 	if err != nil {
 		return nil, err
@@ -75,7 +76,7 @@ func (s *storage) CreateConfigMap(ctx api.Context, cfg *api.ConfigMap) (*api.Con
 	return obj.(*api.ConfigMap), nil
 }
 
-func (s *storage) UpdateConfigMap(ctx api.Context, cfg *api.ConfigMap) (*api.ConfigMap, error) {
+func (s *storage) UpdateConfigMap(ctx genericapirequest.Context, cfg *api.ConfigMap) (*api.ConfigMap, error) {
 	obj, _, err := s.Update(ctx, cfg.Name, rest.DefaultUpdatedObjectInfo(cfg, api.Scheme))
 	if err != nil {
 		return nil, err
@@ -84,7 +85,7 @@ func (s *storage) UpdateConfigMap(ctx api.Context, cfg *api.ConfigMap) (*api.Con
 	return obj.(*api.ConfigMap), nil
 }
 
-func (s *storage) DeleteConfigMap(ctx api.Context, name string) error {
+func (s *storage) DeleteConfigMap(ctx genericapirequest.Context, name string) error {
 	_, err := s.Delete(ctx, name, nil)
 
 	return err

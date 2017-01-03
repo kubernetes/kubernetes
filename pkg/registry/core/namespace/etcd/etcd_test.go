@@ -22,6 +22,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/fields"
+	genericapirequest "k8s.io/kubernetes/pkg/genericapiserver/api/request"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/generic"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
@@ -65,7 +66,7 @@ func TestCreateSetsFields(t *testing.T) {
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
 	namespace := validNewNamespace()
-	ctx := api.NewContext()
+	ctx := genericapirequest.NewContext()
 	_, err := storage.Create(ctx, namespace)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -141,7 +142,7 @@ func TestDeleteNamespaceWithIncompleteFinalizers(t *testing.T) {
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
 	key := "namespaces/foo"
-	ctx := api.NewContext()
+	ctx := genericapirequest.NewContext()
 	now := metav1.Now()
 	namespace := &api.Namespace{
 		ObjectMeta: api.ObjectMeta{
@@ -166,7 +167,7 @@ func TestDeleteNamespaceWithCompleteFinalizers(t *testing.T) {
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
 	key := "namespaces/foo"
-	ctx := api.NewContext()
+	ctx := genericapirequest.NewContext()
 	now := metav1.Now()
 	namespace := &api.Namespace{
 		ObjectMeta: api.ObjectMeta{

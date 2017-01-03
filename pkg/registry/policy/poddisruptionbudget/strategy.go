@@ -24,6 +24,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/policy"
 	"k8s.io/kubernetes/pkg/apis/policy/validation"
 	"k8s.io/kubernetes/pkg/fields"
+	genericapirequest "k8s.io/kubernetes/pkg/genericapiserver/api/request"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/generic"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -46,7 +47,7 @@ func (podDisruptionBudgetStrategy) NamespaceScoped() bool {
 }
 
 // PrepareForCreate clears the status of an PodDisruptionBudget before creation.
-func (podDisruptionBudgetStrategy) PrepareForCreate(ctx api.Context, obj runtime.Object) {
+func (podDisruptionBudgetStrategy) PrepareForCreate(ctx genericapirequest.Context, obj runtime.Object) {
 	podDisruptionBudget := obj.(*policy.PodDisruptionBudget)
 	// create cannot set status
 	podDisruptionBudget.Status = policy.PodDisruptionBudgetStatus{}
@@ -55,7 +56,7 @@ func (podDisruptionBudgetStrategy) PrepareForCreate(ctx api.Context, obj runtime
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
-func (podDisruptionBudgetStrategy) PrepareForUpdate(ctx api.Context, obj, old runtime.Object) {
+func (podDisruptionBudgetStrategy) PrepareForUpdate(ctx genericapirequest.Context, obj, old runtime.Object) {
 	newPodDisruptionBudget := obj.(*policy.PodDisruptionBudget)
 	oldPodDisruptionBudget := old.(*policy.PodDisruptionBudget)
 	// Update is not allowed to set status
@@ -70,7 +71,7 @@ func (podDisruptionBudgetStrategy) PrepareForUpdate(ctx api.Context, obj, old ru
 }
 
 // Validate validates a new PodDisruptionBudget.
-func (podDisruptionBudgetStrategy) Validate(ctx api.Context, obj runtime.Object) field.ErrorList {
+func (podDisruptionBudgetStrategy) Validate(ctx genericapirequest.Context, obj runtime.Object) field.ErrorList {
 	podDisruptionBudget := obj.(*policy.PodDisruptionBudget)
 	return validation.ValidatePodDisruptionBudget(podDisruptionBudget)
 }
@@ -85,7 +86,7 @@ func (podDisruptionBudgetStrategy) AllowCreateOnUpdate() bool {
 }
 
 // ValidateUpdate is the default update validation for an end user.
-func (podDisruptionBudgetStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) field.ErrorList {
+func (podDisruptionBudgetStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
 	validationErrorList := validation.ValidatePodDisruptionBudget(obj.(*policy.PodDisruptionBudget))
 	updateErrorList := validation.ValidatePodDisruptionBudgetUpdate(obj.(*policy.PodDisruptionBudget), old.(*policy.PodDisruptionBudget))
 	return append(validationErrorList, updateErrorList...)
@@ -128,7 +129,7 @@ type podDisruptionBudgetStatusStrategy struct {
 var StatusStrategy = podDisruptionBudgetStatusStrategy{Strategy}
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update of status
-func (podDisruptionBudgetStatusStrategy) PrepareForUpdate(ctx api.Context, obj, old runtime.Object) {
+func (podDisruptionBudgetStatusStrategy) PrepareForUpdate(ctx genericapirequest.Context, obj, old runtime.Object) {
 	newPodDisruptionBudget := obj.(*policy.PodDisruptionBudget)
 	oldPodDisruptionBudget := old.(*policy.PodDisruptionBudget)
 	// status changes are not allowed to update spec
@@ -136,7 +137,7 @@ func (podDisruptionBudgetStatusStrategy) PrepareForUpdate(ctx api.Context, obj, 
 }
 
 // ValidateUpdate is the default update validation for an end user updating status
-func (podDisruptionBudgetStatusStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) field.ErrorList {
+func (podDisruptionBudgetStatusStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
 	// TODO: Validate status updates.
 	return field.ErrorList{}
 	// return validation.ValidatePodDisruptionBudgetStatusUpdate(obj.(*policy.PodDisruptionBudget), old.(*policy.PodDisruptionBudget))

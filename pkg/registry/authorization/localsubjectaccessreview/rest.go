@@ -19,11 +19,11 @@ package localsubjectaccessreview
 import (
 	"fmt"
 
-	kapi "k8s.io/kubernetes/pkg/api"
 	kapierrors "k8s.io/kubernetes/pkg/api/errors"
 	authorizationapi "k8s.io/kubernetes/pkg/apis/authorization"
 	authorizationvalidation "k8s.io/kubernetes/pkg/apis/authorization/validation"
 	"k8s.io/kubernetes/pkg/auth/authorizer"
+	genericapirequest "k8s.io/kubernetes/pkg/genericapiserver/api/request"
 	authorizationutil "k8s.io/kubernetes/pkg/registry/authorization/util"
 	"k8s.io/kubernetes/pkg/runtime"
 )
@@ -40,7 +40,7 @@ func (r *REST) New() runtime.Object {
 	return &authorizationapi.LocalSubjectAccessReview{}
 }
 
-func (r *REST) Create(ctx kapi.Context, obj runtime.Object) (runtime.Object, error) {
+func (r *REST) Create(ctx genericapirequest.Context, obj runtime.Object) (runtime.Object, error) {
 	localSubjectAccessReview, ok := obj.(*authorizationapi.LocalSubjectAccessReview)
 	if !ok {
 		return nil, kapierrors.NewBadRequest(fmt.Sprintf("not a LocaLocalSubjectAccessReview: %#v", obj))
@@ -48,7 +48,7 @@ func (r *REST) Create(ctx kapi.Context, obj runtime.Object) (runtime.Object, err
 	if errs := authorizationvalidation.ValidateLocalSubjectAccessReview(localSubjectAccessReview); len(errs) > 0 {
 		return nil, kapierrors.NewInvalid(authorizationapi.Kind(localSubjectAccessReview.Kind), "", errs)
 	}
-	namespace := kapi.NamespaceValue(ctx)
+	namespace := genericapirequest.NamespaceValue(ctx)
 	if len(namespace) == 0 {
 		return nil, kapierrors.NewBadRequest(fmt.Sprintf("namespace is required on this type: %v", namespace))
 	}

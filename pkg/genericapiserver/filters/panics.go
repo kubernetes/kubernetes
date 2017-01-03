@@ -22,7 +22,6 @@ import (
 
 	"github.com/golang/glog"
 
-	"k8s.io/kubernetes/pkg/api"
 	apierrors "k8s.io/kubernetes/pkg/api/errors"
 	apirequest "k8s.io/kubernetes/pkg/genericapiserver/api/request"
 	"k8s.io/kubernetes/pkg/httplog"
@@ -30,7 +29,7 @@ import (
 )
 
 // WithPanicRecovery wraps an http Handler to recover and log panics.
-func WithPanicRecovery(handler http.Handler, requestContextMapper api.RequestContextMapper) http.Handler {
+func WithPanicRecovery(handler http.Handler, requestContextMapper apirequest.RequestContextMapper) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		defer runtime.HandleCrash(func(err interface{}) {
 			http.Error(w, "This request caused apisever to panic. Look in log for details.", http.StatusInternalServerError)

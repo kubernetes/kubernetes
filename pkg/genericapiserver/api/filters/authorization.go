@@ -22,14 +22,13 @@ import (
 
 	"github.com/golang/glog"
 
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/auth/authorizer"
 	"k8s.io/kubernetes/pkg/genericapiserver/api/handlers/responsewriters"
 	"k8s.io/kubernetes/pkg/genericapiserver/api/request"
 )
 
 // WithAuthorizationCheck passes all authorized requests on to handler, and returns a forbidden error otherwise.
-func WithAuthorization(handler http.Handler, requestContextMapper api.RequestContextMapper, a authorizer.Authorizer) http.Handler {
+func WithAuthorization(handler http.Handler, requestContextMapper request.RequestContextMapper, a authorizer.Authorizer) http.Handler {
 	if a == nil {
 		glog.Warningf("Authorization is disabled")
 		return handler
@@ -61,10 +60,10 @@ func WithAuthorization(handler http.Handler, requestContextMapper api.RequestCon
 	})
 }
 
-func GetAuthorizerAttributes(ctx api.Context) (authorizer.Attributes, error) {
+func GetAuthorizerAttributes(ctx request.Context) (authorizer.Attributes, error) {
 	attribs := authorizer.AttributesRecord{}
 
-	user, ok := api.UserFrom(ctx)
+	user, ok := request.UserFrom(ctx)
 	if ok {
 		attribs.User = user
 	}

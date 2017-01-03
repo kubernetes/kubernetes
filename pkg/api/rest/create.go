@@ -21,6 +21,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/validation"
 	path "k8s.io/kubernetes/pkg/api/validation/path"
+	genericapirequest "k8s.io/kubernetes/pkg/genericapiserver/api/request"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/util/validation/field"
@@ -41,10 +42,10 @@ type RESTCreateStrategy interface {
 	// the object.  For example: remove fields that are not to be persisted,
 	// sort order-insensitive list fields, etc.  This should not remove fields
 	// whose presence would be considered a validation error.
-	PrepareForCreate(ctx api.Context, obj runtime.Object)
+	PrepareForCreate(ctx genericapirequest.Context, obj runtime.Object)
 	// Validate is invoked after default fields in the object have been filled in before
 	// the object is persisted.  This method should not mutate the object.
-	Validate(ctx api.Context, obj runtime.Object) field.ErrorList
+	Validate(ctx genericapirequest.Context, obj runtime.Object) field.ErrorList
 	// Canonicalize is invoked after validation has succeeded but before the
 	// object has been persisted.  This method may mutate the object.
 	Canonicalize(obj runtime.Object)
@@ -53,7 +54,7 @@ type RESTCreateStrategy interface {
 // BeforeCreate ensures that common operations for all resources are performed on creation. It only returns
 // errors that can be converted to api.Status. It invokes PrepareForCreate, then GenerateName, then Validate.
 // It returns nil if the object should be created.
-func BeforeCreate(strategy RESTCreateStrategy, ctx api.Context, obj runtime.Object) error {
+func BeforeCreate(strategy RESTCreateStrategy, ctx genericapirequest.Context, obj runtime.Object) error {
 	objectMeta, kind, kerr := objectMetaAndKind(strategy, obj)
 	if kerr != nil {
 		return kerr

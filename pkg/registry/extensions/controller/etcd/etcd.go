@@ -22,15 +22,14 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/rest"
+	"k8s.io/kubernetes/pkg/apis/extensions"
+	extvalidation "k8s.io/kubernetes/pkg/apis/extensions/validation"
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
+	genericapirequest "k8s.io/kubernetes/pkg/genericapiserver/api/request"
 	"k8s.io/kubernetes/pkg/registry/core/controller"
 	"k8s.io/kubernetes/pkg/registry/core/controller/etcd"
 	"k8s.io/kubernetes/pkg/registry/generic"
 	"k8s.io/kubernetes/pkg/runtime"
-
-	"k8s.io/kubernetes/pkg/apis/extensions"
-
-	extvalidation "k8s.io/kubernetes/pkg/apis/extensions/validation"
 )
 
 // Container includes dummy storage for RC pods and experimental storage for Scale.
@@ -62,7 +61,7 @@ func (r *ScaleREST) New() runtime.Object {
 	return &extensions.Scale{}
 }
 
-func (r *ScaleREST) Get(ctx api.Context, name string, options *metav1.GetOptions) (runtime.Object, error) {
+func (r *ScaleREST) Get(ctx genericapirequest.Context, name string, options *metav1.GetOptions) (runtime.Object, error) {
 	rc, err := (*r.registry).GetController(ctx, name, options)
 	if err != nil {
 		return nil, errors.NewNotFound(extensions.Resource("replicationcontrollers/scale"), name)
@@ -70,7 +69,7 @@ func (r *ScaleREST) Get(ctx api.Context, name string, options *metav1.GetOptions
 	return scaleFromRC(rc), nil
 }
 
-func (r *ScaleREST) Update(ctx api.Context, name string, objInfo rest.UpdatedObjectInfo) (runtime.Object, bool, error) {
+func (r *ScaleREST) Update(ctx genericapirequest.Context, name string, objInfo rest.UpdatedObjectInfo) (runtime.Object, bool, error) {
 	rc, err := (*r.registry).GetController(ctx, name, &metav1.GetOptions{})
 	if err != nil {
 		return nil, false, errors.NewNotFound(extensions.Resource("replicationcontrollers/scale"), name)

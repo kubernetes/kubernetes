@@ -28,6 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/fields"
+	genericapirequest "k8s.io/kubernetes/pkg/genericapiserver/api/request"
 	"k8s.io/kubernetes/pkg/labels"
 	genericregistry "k8s.io/kubernetes/pkg/registry/generic/registry"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -175,7 +176,7 @@ func getCodec(obj runtime.Object) (runtime.Codec, error) {
 
 // Helper functions
 
-func (t *Tester) getObject(ctx api.Context, obj runtime.Object) (runtime.Object, error) {
+func (t *Tester) getObject(ctx genericapirequest.Context, obj runtime.Object) (runtime.Object, error) {
 	accessor, err := meta.Accessor(obj)
 	if err != nil {
 		return nil, err
@@ -188,7 +189,7 @@ func (t *Tester) getObject(ctx api.Context, obj runtime.Object) (runtime.Object,
 	return result, nil
 }
 
-func (t *Tester) createObject(ctx api.Context, obj runtime.Object) error {
+func (t *Tester) createObject(ctx genericapirequest.Context, obj runtime.Object) error {
 	accessor, err := meta.Accessor(obj)
 	if err != nil {
 		return err

@@ -41,6 +41,7 @@ go_library(
         "//pkg/genericapiserver:go_default_library",
         "//pkg/genericapiserver/api/filters:go_default_library",
         "//pkg/genericapiserver/api/handlers/responsewriters:go_default_library",
+        "//pkg/genericapiserver/api/request:go_default_library",
         "//pkg/genericapiserver/filters:go_default_library",
         "//pkg/labels:go_default_library",
         "//pkg/registry/generic:go_default_library",

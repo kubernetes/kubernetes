@@ -21,7 +21,6 @@ import (
 	"os"
 	"time"
 
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/rest"
 	authhandlers "k8s.io/kubernetes/pkg/auth/handlers"
 	kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
@@ -29,6 +28,7 @@ import (
 	v1listers "k8s.io/kubernetes/pkg/client/listers/core/v1"
 	"k8s.io/kubernetes/pkg/genericapiserver"
 	genericapifilters "k8s.io/kubernetes/pkg/genericapiserver/api/filters"
+	genericapirequest "k8s.io/kubernetes/pkg/genericapiserver/api/request"
 	genericfilters "k8s.io/kubernetes/pkg/genericapiserver/filters"
 	"k8s.io/kubernetes/pkg/registry/generic"
 	"k8s.io/kubernetes/pkg/util/wait"
@@ -63,7 +63,7 @@ type Config struct {
 type APIDiscoveryServer struct {
 	GenericAPIServer *genericapiserver.GenericAPIServer
 
-	contextMapper api.RequestContextMapper
+	contextMapper genericapirequest.RequestContextMapper
 
 	// proxyClientCert/Key are the client cert used to identify this proxy. Backing APIServices use
 	// this to confirm the proxy's identity
@@ -198,7 +198,7 @@ func (h *handlerChainConfig) handlerChain(apiHandler http.Handler, c *genericapi
 	handler = genericfilters.WithTimeoutForNonLongRunningRequests(handler, c.RequestContextMapper, c.LongRunningFunc)
 	handler = genericfilters.WithMaxInFlightLimit(handler, c.MaxRequestsInFlight, c.MaxMutatingRequestsInFlight, c.RequestContextMapper, c.LongRunningFunc)
 	handler = genericapifilters.WithRequestInfo(handler, genericapiserver.NewRequestInfoResolver(c), c.RequestContextMapper)
-	handler = api.WithRequestContext(handler, c.RequestContextMapper)
+	handler = genericapirequest.WithRequestContext(handler, c.RequestContextMapper)
 
 	return handler, nil
 }

@@ -32,6 +32,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/v1"
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
+	"k8s.io/kubernetes/pkg/genericapiserver/api/request"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/types"
@@ -83,7 +84,7 @@ func (p *testPatcher) New() runtime.Object {
 	return &api.Pod{}
 }
 
-func (p *testPatcher) Update(ctx api.Context, name string, objInfo rest.UpdatedObjectInfo) (runtime.Object, bool, error) {
+func (p *testPatcher) Update(ctx request.Context, name string, objInfo rest.UpdatedObjectInfo) (runtime.Object, bool, error) {
 	currentPod := p.startingPod
 	if p.numUpdates > 0 {
 		currentPod = p.updatePod
@@ -102,7 +103,7 @@ func (p *testPatcher) Update(ctx api.Context, name string, objInfo rest.UpdatedO
 	return inPod, false, nil
 }
 
-func (p *testPatcher) Get(ctx api.Context, name string, options *metav1.GetOptions) (runtime.Object, error) {
+func (p *testPatcher) Get(ctx request.Context, name string, options *metav1.GetOptions) (runtime.Object, error) {
 	p.t.Fatal("Unexpected call to testPatcher.Get")
 	return nil, errors.New("Unexpected call to testPatcher.Get")
 }
@@ -182,8 +183,8 @@ func (tc *patchTestCase) Run(t *testing.T) {
 	testPatcher.startingPod = tc.startingPod
 	testPatcher.updatePod = tc.updatePod
 
-	ctx := api.NewDefaultContext()
-	ctx = api.WithNamespace(ctx, namespace)
+	ctx := request.NewDefaultContext()
+	ctx = request.WithNamespace(ctx, namespace)
 
 	namer := &testNamer{namespace, name}
 	copier := runtime.ObjectCopier(api.Scheme)

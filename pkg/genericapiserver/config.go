@@ -126,7 +126,7 @@ type Config struct {
 	LegacyAPIGroupPrefixes sets.String
 	// RequestContextMapper maps requests to contexts. Exported so downstream consumers can provider their own mappers
 	// TODO confirm that anyone downstream actually uses this and doesn't just need an accessor
-	RequestContextMapper api.RequestContextMapper
+	RequestContextMapper apirequest.RequestContextMapper
 	// Serializer is required and provides the interface for serializing and converting objects to and from the wire
 	// The default (api.Codecs) usually works fine.
 	Serializer runtime.NegotiatedSerializer
@@ -195,7 +195,7 @@ func NewConfig() *Config {
 	config := &Config{
 		Serializer:             api.Codecs,
 		ReadWritePort:          6443,
-		RequestContextMapper:   api.NewRequestContextMapper(),
+		RequestContextMapper:   apirequest.NewRequestContextMapper(),
 		BuildHandlerChainsFunc: DefaultBuildHandlerChain,
 		LegacyAPIGroupPrefixes: sets.NewString(DefaultLegacyAPIPrefix),
 		HealthzChecks:          []healthz.HealthzChecker{healthz.PingHealthz},
@@ -563,7 +563,7 @@ func DefaultBuildHandlerChain(apiHandler http.Handler, c *Config) (secure, insec
 		handler = genericfilters.WithTimeoutForNonLongRunningRequests(handler, c.RequestContextMapper, c.LongRunningFunc)
 		handler = genericfilters.WithMaxInFlightLimit(handler, c.MaxRequestsInFlight, c.MaxMutatingRequestsInFlight, c.RequestContextMapper, c.LongRunningFunc)
 		handler = genericapifilters.WithRequestInfo(handler, NewRequestInfoResolver(c), c.RequestContextMapper)
-		handler = api.WithRequestContext(handler, c.RequestContextMapper)
+		handler = apirequest.WithRequestContext(handler, c.RequestContextMapper)
 		return handler
 	}
 	audit := func(handler http.Handler) http.Handler {

@@ -26,6 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
+	genericapirequest "k8s.io/kubernetes/pkg/genericapiserver/api/request"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/util/uuid"
@@ -35,7 +36,7 @@ var _ meta.Object = &api.ObjectMeta{}
 
 // TestFillObjectMetaSystemFields validates that system populated fields are set on an object
 func TestFillObjectMetaSystemFields(t *testing.T) {
-	ctx := api.NewDefaultContext()
+	ctx := genericapirequest.NewDefaultContext()
 	resource := api.ObjectMeta{}
 	api.FillObjectMetaSystemFields(ctx, &resource)
 	if resource.CreationTimestamp.Time.IsZero() {
@@ -45,7 +46,7 @@ func TestFillObjectMetaSystemFields(t *testing.T) {
 	}
 	// verify we can inject a UID
 	uid := uuid.NewUUID()
-	ctx = api.WithUID(ctx, uid)
+	ctx = genericapirequest.WithUID(ctx, uid)
 	resource = api.ObjectMeta{}
 	api.FillObjectMetaSystemFields(ctx, &resource)
 	if resource.UID != uid {
@@ -55,7 +56,7 @@ func TestFillObjectMetaSystemFields(t *testing.T) {
 
 // TestHasObjectMetaSystemFieldValues validates that true is returned if and only if all fields are populated
 func TestHasObjectMetaSystemFieldValues(t *testing.T) {
-	ctx := api.NewDefaultContext()
+	ctx := genericapirequest.NewDefaultContext()
 	resource := api.ObjectMeta{}
 	if api.HasObjectMetaSystemFieldValues(&resource) {
 		t.Errorf("the resource does not have all fields yet populated, but incorrectly reports it does")
