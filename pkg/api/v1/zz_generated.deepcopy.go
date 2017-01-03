@@ -153,6 +153,7 @@ func RegisterDeepCopies(scheme *runtime.Scheme) error {
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_PodTemplateList, InType: reflect.TypeOf(&PodTemplateList{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_PodTemplateSpec, InType: reflect.TypeOf(&PodTemplateSpec{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_Preconditions, InType: reflect.TypeOf(&Preconditions{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_PredicateResult, InType: reflect.TypeOf(&PredicateResult{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_PreferAvoidPodsEntry, InType: reflect.TypeOf(&PreferAvoidPodsEntry{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_PreferredSchedulingTerm, InType: reflect.TypeOf(&PreferredSchedulingTerm{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_Probe, InType: reflect.TypeOf(&Probe{})},
@@ -2707,6 +2708,15 @@ func DeepCopy_v1_PodSpec(in interface{}, out interface{}, c *conversion.Cloner) 
 		} else {
 			out.Affinity = nil
 		}
+		if in.PredicateResults != nil {
+			in, out := &in.PredicateResults, &out.PredicateResults
+			*out = make([]PredicateResult, len(*in))
+			for i := range *in {
+				(*out)[i] = (*in)[i]
+			}
+		} else {
+			out.PredicateResults = nil
+		}
 		return nil
 	}
 }
@@ -2841,6 +2851,16 @@ func DeepCopy_v1_Preconditions(in interface{}, out interface{}, c *conversion.Cl
 		} else {
 			out.UID = nil
 		}
+		return nil
+	}
+}
+
+func DeepCopy_v1_PredicateResult(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*PredicateResult)
+		out := out.(*PredicateResult)
+		out.Description = in.Description
+		out.Count = in.Count
 		return nil
 	}
 }

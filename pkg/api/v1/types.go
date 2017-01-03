@@ -2030,8 +2030,8 @@ const (
 
 // PredicateResult is metadata that aggregates at the pod level.
 type PredicateResult struct {
-	Description string
-	Count       int32
+	Description string `json:"description,omitempty" protobuf:"bytes,1,opt,name=description"`
+	Count       int32 `json:"count,omitempty" protobuf:"bytes,2,opt,name=count"`
 }
 
 // PodSpec is a description of a pod.
