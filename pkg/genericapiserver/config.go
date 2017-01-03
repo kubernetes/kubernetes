@@ -252,7 +252,33 @@ func DefaultSwaggerConfig(definitions *openapicommon.OpenAPIDefinitions) *swagge
 		},
 	}
 	if definitions != nil {
-		fn := (&openapicommon.Config{Definitions: definitions}).TypeNameFunction()
+		openapiConfig := &openapicommon.Config{Definitions: definitions}
+
+		// any deprecated model should be included so that old clients looking up models
+		// by their old names can still find them.
+		config.PostBuildHandler = func(list *swagger.ApiDeclarationList) {
+			deprecatedTypes := openapiConfig.DeprecatedDefinitions()
+			for i, decl := range list.List {
+				var newDefinitions []swagger.NamedModel
+				for j, model := range decl.Models.List {
+					if by, ok := deprecatedTypes[model.Name]; ok {
+						// create a copy at the new name
+						copied := model
+						copied.Name = by
+						copied.Model.Id = by
+						newDefinitions = append(newDefinitions, copied)
+
+						// update the description to indicate this model should no longer be used
+						list.List[i].Models.List[j].Model.Description += fmt.Sprintf("\n\nDEPRECATED: Use '%s' instead.", by)
+					}
+				}
+				list.List[i].Models.List = append(list.List[i].Models.List, newDefinitions...)
+			}
+		}
+
+		// register a name function for Swagger that prefers the longer form names defined
+		// for OpenAPI
+		fn := openapiConfig.LegacyTypeNameFunction()
 		config.ModelTypeNameHandler = func(t reflect.Type) (string, bool) {
 			isPtr := t.Kind() == reflect.Ptr
 			if isPtr {

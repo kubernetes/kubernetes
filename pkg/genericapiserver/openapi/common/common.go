@@ -145,15 +145,61 @@ func GetOpenAPITypeFormat(typeName string) (string, string) {
 	return mapped[0], mapped[1]
 }
 
-// golangTypeNameOpenAPIVendorExtension is an OpenAPI vendor extension that identifies the Golang
-// type name of a given OpenAPI struct.
-const golangTypeNameOpenAPIVendorExtension = "io.k8s.kubernetes.openapi.type.golang"
+const (
+	// golangTypeNameOpenAPIVendorExtension is an OpenAPI vendor extension that identifies the Golang
+	// type name of a given OpenAPI struct.
+	golangTypeNameOpenAPIVendorExtension = "io.k8s.kubernetes.openapi.type.golang"
+	// deprecatedUseOpenAPIVendorExtension is an OpenAPI vendor extension that identifies this model
+	// type is deprecated and the value of the extension indicatse the model name that should be used
+	// instead.
+	deprecatedUseOpenAPIVendorExtension = "io.k8s.kubernetes.openapi.type.deprecated.use"
+)
 
 // TypeNameFunction returns a function that can map a given Go type to an OpenAPI name.
 func (c *Config) TypeNameFunction() func(t reflect.Type) string {
 	typesToDefinitions := make(typeMapper)
 	if c != nil && c.Definitions != nil {
+		// insert deprecated types first
 		for name, definition := range *c.Definitions {
+			if _, ok := definition.Schema.VendorExtensible.Extensions.GetString(deprecatedUseOpenAPIVendorExtension); !ok {
+				continue
+			}
+			if t, ok := definition.Schema.VendorExtensible.Extensions.GetString(golangTypeNameOpenAPIVendorExtension); ok {
+				typesToDefinitions[t] = name
+			}
+		}
+		// for all non-deprecated types, insert
+		for name, definition := range *c.Definitions {
+			if _, ok := definition.Schema.VendorExtensible.Extensions.GetString(deprecatedUseOpenAPIVendorExtension); ok {
+				continue
+			}
+			if t, ok := definition.Schema.VendorExtensible.Extensions.GetString(golangTypeNameOpenAPIVendorExtension); ok {
+				typesToDefinitions[t] = name
+			}
+		}
+	}
+	return typesToDefinitions.Name
+}
+
+// LegacyTypeNameFunction returns a function that can map a given Go type to an OpenAPI name, and prefers the
+// legacy version of a name (deprecated ones) over future names.
+func (c *Config) LegacyTypeNameFunction() func(t reflect.Type) string {
+	typesToDefinitions := make(typeMapper)
+	if c != nil && c.Definitions != nil {
+		// for all non-deprecated types, insert
+		for name, definition := range *c.Definitions {
+			if _, ok := definition.Schema.VendorExtensible.Extensions.GetString(deprecatedUseOpenAPIVendorExtension); ok {
+				continue
+			}
+			if t, ok := definition.Schema.VendorExtensible.Extensions.GetString(golangTypeNameOpenAPIVendorExtension); ok {
+				typesToDefinitions[t] = name
+			}
+		}
+		// allow types marked as deprecated to override non-deprecated names
+		for name, definition := range *c.Definitions {
+			if _, ok := definition.Schema.VendorExtensible.Extensions.GetString(deprecatedUseOpenAPIVendorExtension); !ok {
+				continue
+			}
 			if t, ok := definition.Schema.VendorExtensible.Extensions.GetString(golangTypeNameOpenAPIVendorExtension); ok {
 				typesToDefinitions[t] = name
 			}
@@ -166,6 +212,22 @@ func (c *Config) TypeNameFunction() func(t reflect.Type) string {
 func (c *Config) ObjectTypeNameFunction() func(obj interface{}) string {
 	fn := c.TypeNameFunction()
 	return func(obj interface{}) string { return fn(reflect.TypeOf(obj)) }
+}
+
+// DeprecatedDefinitions returns a map of names that are deprecated to their replacement type name.
+func (c *Config) DeprecatedDefinitions() map[string]string {
+	if c == nil || c.Definitions == nil {
+		return nil
+	}
+	deprecated := make(map[string]string)
+	for name, definition := range *c.Definitions {
+		instead, ok := definition.Schema.VendorExtensible.Extensions.GetString(deprecatedUseOpenAPIVendorExtension)
+		if !ok {
+			continue
+		}
+		deprecated[name] = instead
+	}
+	return deprecated
 }
 
 // typeMapper is a map of Go types names to OpenAPI definition names.

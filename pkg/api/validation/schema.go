@@ -424,17 +424,8 @@ func (s *SwaggerSchema) validateField(value interface{}, fieldName, fieldType st
 	if reflect.TypeOf(value) == nil {
 		return append(allErrs, fmt.Errorf("unexpected nil value for field %v", fieldName))
 	}
-	// TODO: caesarxuchao: because we have multiple group/versions and objects
-	// may reference objects in other group, the commented out way of checking
-	// if a filedType is a type defined by us is outdated. We use a hacky way
-	// for now.
-	// TODO: the type name in the swagger spec is something like "v1.Binding",
-	// and the "v1" is generated from the package name, not the groupVersion of
-	// the type. We need to fix go-restful to embed the group name in the type
-	// name, otherwise we couldn't handle identically named types in different
-	// groups correctly.
+	// the versionRegexp is unnecessary, but preserved here in case clients outside of Kube were depending on it.
 	if _, ok := s.api.Models.At(fieldType); ok || versionRegexp.MatchString(fieldType) {
-		// if strings.HasPrefix(fieldType, apiVersion) {
 		return s.ValidateObject(value, fieldName, fieldType)
 	}
 	switch fieldType {
