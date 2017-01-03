@@ -138,6 +138,10 @@ message DaemonSetStatus {
   // NumberReady is the number of nodes that should be running the daemon pod and have one
   // or more of the daemon pod running and ready.
   optional int32 numberReady = 4;
+
+  // ObservedGeneration is the most recent generation observed by the daemon set controller.
+  // +optional
+  optional int64 observedGeneration = 5;
 }
 
 // Deployment enables declarative updates for Pods and ReplicaSets.
