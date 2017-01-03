@@ -21,7 +21,6 @@ import (
 	"net/http"
 	"strings"
 
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/util/sets"
 )
 
@@ -177,7 +176,7 @@ func (r *RequestInfoFactory) NewRequestInfo(req *http.Request) (*RequestInfo, er
 			}
 		}
 	} else {
-		requestInfo.Namespace = api.NamespaceNone
+		requestInfo.Namespace = "" // TODO(sttts): solve import cycle when using api.NamespaceNone
 	}
 
 	// parsing successful, so we now know the proper value for .Parts
@@ -222,12 +221,12 @@ type requestInfoKeyType int
 const requestInfoKey requestInfoKeyType = iota
 
 // WithRequestInfo returns a copy of parent in which the request info value is set
-func WithRequestInfo(parent api.Context, info *RequestInfo) api.Context {
-	return api.WithValue(parent, requestInfoKey, info)
+func WithRequestInfo(parent Context, info *RequestInfo) Context {
+	return WithValue(parent, requestInfoKey, info)
 }
 
 // RequestInfoFrom returns the value of the RequestInfo key on the ctx
-func RequestInfoFrom(ctx api.Context) (*RequestInfo, bool) {
+func RequestInfoFrom(ctx Context) (*RequestInfo, bool) {
 	info, ok := ctx.Value(requestInfoKey).(*RequestInfo)
 	return info, ok
 }

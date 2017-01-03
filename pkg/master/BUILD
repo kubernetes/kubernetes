@@ -117,6 +117,7 @@ go_test(
         "//pkg/client/testing/core:go_default_library",
         "//pkg/generated/openapi:go_default_library",
         "//pkg/genericapiserver:go_default_library",
+        "//pkg/genericapiserver/api/request:go_default_library",
         "//pkg/kubelet/client:go_default_library",
         "//pkg/runtime:go_default_library",
         "//pkg/runtime/schema:go_default_library",

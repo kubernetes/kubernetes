@@ -27,6 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/rest"
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/fields"
+	genericapirequest "k8s.io/kubernetes/pkg/genericapiserver/api/request"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/generic"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
@@ -166,7 +167,7 @@ func newFailDeleteStorage(t *testing.T, called *bool) (*REST, *etcdtesting.EtcdT
 
 func TestIgnoreDeleteNotFound(t *testing.T) {
 	pod := validNewPod()
-	testContext := api.WithNamespace(api.NewContext(), api.NamespaceDefault)
+	testContext := genericapirequest.WithNamespace(genericapirequest.NewContext(), api.NamespaceDefault)
 	called := false
 	registry, server := newFailDeleteStorage(t, &called)
 	defer server.Terminate(t)
@@ -216,11 +217,11 @@ func TestCreateSetsFields(t *testing.T) {
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
 	pod := validNewPod()
-	_, err := storage.Create(api.NewDefaultContext(), pod)
+	_, err := storage.Create(genericapirequest.NewDefaultContext(), pod)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	ctx := api.NewDefaultContext()
+	ctx := genericapirequest.NewDefaultContext()
 	object, err := storage.Get(ctx, "foo", &metav1.GetOptions{})
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -326,7 +327,7 @@ func TestResourceLocation(t *testing.T) {
 		},
 	}
 
-	ctx := api.NewDefaultContext()
+	ctx := genericapirequest.NewDefaultContext()
 	for _, tc := range testCases {
 		storage, _, _, server := newStorage(t)
 		key, _ := storage.KeyFunc(ctx, tc.pod.Name)
@@ -335,7 +336,7 @@ func TestResourceLocation(t *testing.T) {
 		}
 
 		redirector := rest.Redirector(storage)
-		location, _, err := redirector.ResourceLocation(api.NewDefaultContext(), tc.query)
+		location, _, err := redirector.ResourceLocation(genericapirequest.NewDefaultContext(), tc.query)
 		if err != nil {
 			t.Errorf("Unexpected error: %v", err)
 		}
@@ -397,7 +398,7 @@ func TestEtcdCreate(t *testing.T) {
 	storage, bindingStorage, _, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	ctx := api.NewDefaultContext()
+	ctx := genericapirequest.NewDefaultContext()
 	_, err := storage.Create(ctx, validNewPod())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -424,7 +425,7 @@ func TestEtcdCreateBindingNoPod(t *testing.T) {
 	storage, bindingStorage, _, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	ctx := api.NewDefaultContext()
+	ctx := genericapirequest.NewDefaultContext()
 
 	// Assume that a pod has undergone the following:
 	// - Create (apiserver)
@@ -456,7 +457,7 @@ func TestEtcdCreateFailsWithoutNamespace(t *testing.T) {
 	defer storage.Store.DestroyFunc()
 	pod := validNewPod()
 	pod.Namespace = ""
-	_, err := storage.Create(api.NewContext(), pod)
+	_, err := storage.Create(genericapirequest.NewContext(), pod)
 	// Accept "namespace" or "Namespace".
 	if err == nil || !strings.Contains(err.Error(), "amespace") {
 		t.Fatalf("expected error that namespace was missing from context, got: %v", err)
@@ -467,7 +468,7 @@ func TestEtcdCreateWithContainersNotFound(t *testing.T) {
 	storage, bindingStorage, _, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	ctx := api.NewDefaultContext()
+	ctx := genericapirequest.NewDefaultContext()
 	_, err := storage.Create(ctx, validNewPod())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -501,7 +502,7 @@ func TestEtcdCreateWithConflict(t *testing.T) {
 	storage, bindingStorage, _, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	ctx := api.NewDefaultContext()
+	ctx := genericapirequest.NewDefaultContext()
 
 	_, err := storage.Create(ctx, validNewPod())
 	if err != nil {
@@ -532,7 +533,7 @@ func TestEtcdCreateWithExistingContainers(t *testing.T) {
 	storage, bindingStorage, _, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	ctx := api.NewDefaultContext()
+	ctx := genericapirequest.NewDefaultContext()
 	_, err := storage.Create(ctx, validNewPod())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -554,7 +555,7 @@ func TestEtcdCreateWithExistingContainers(t *testing.T) {
 }
 
 func TestEtcdCreateBinding(t *testing.T) {
-	ctx := api.NewDefaultContext()
+	ctx := genericapirequest.NewDefaultContext()
 
 	testCases := map[string]struct {
 		binding api.Binding
@@ -615,7 +616,7 @@ func TestEtcdUpdateNotScheduled(t *testing.T) {
 	storage, _, _, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	ctx := api.NewDefaultContext()
+	ctx := genericapirequest.NewDefaultContext()
 
 	if _, err := storage.Create(ctx, validNewPod()); err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -641,7 +642,7 @@ func TestEtcdUpdateScheduled(t *testing.T) {
 	storage, _, _, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	ctx := api.NewDefaultContext()
+	ctx := genericapirequest.NewDefaultContext()
 
 	key, _ := storage.KeyFunc(ctx, "foo")
 	err := storage.Storage.Create(ctx, key, &api.Pod{
@@ -712,7 +713,7 @@ func TestEtcdUpdateStatus(t *testing.T) {
 	storage, _, statusStorage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	ctx := api.NewDefaultContext()
+	ctx := genericapirequest.NewDefaultContext()
 
 	key, _ := storage.KeyFunc(ctx, "foo")
 	podStart := api.Pod{

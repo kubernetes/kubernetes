@@ -22,18 +22,19 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/rest"
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
+	genericapirequest "k8s.io/kubernetes/pkg/genericapiserver/api/request"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
 // Registry is an interface for things that know how to store services.
 type Registry interface {
-	ListServices(ctx api.Context, options *api.ListOptions) (*api.ServiceList, error)
-	CreateService(ctx api.Context, svc *api.Service) (*api.Service, error)
-	GetService(ctx api.Context, name string, options *metav1.GetOptions) (*api.Service, error)
-	DeleteService(ctx api.Context, name string) error
-	UpdateService(ctx api.Context, svc *api.Service) (*api.Service, error)
-	WatchServices(ctx api.Context, options *api.ListOptions) (watch.Interface, error)
-	ExportService(ctx api.Context, name string, options metav1.ExportOptions) (*api.Service, error)
+	ListServices(ctx genericapirequest.Context, options *api.ListOptions) (*api.ServiceList, error)
+	CreateService(ctx genericapirequest.Context, svc *api.Service) (*api.Service, error)
+	GetService(ctx genericapirequest.Context, name string, options *metav1.GetOptions) (*api.Service, error)
+	DeleteService(ctx genericapirequest.Context, name string) error
+	UpdateService(ctx genericapirequest.Context, svc *api.Service) (*api.Service, error)
+	WatchServices(ctx genericapirequest.Context, options *api.ListOptions) (watch.Interface, error)
+	ExportService(ctx genericapirequest.Context, name string, options metav1.ExportOptions) (*api.Service, error)
 }
 
 // storage puts strong typing around storage calls
@@ -47,7 +48,7 @@ func NewRegistry(s rest.StandardStorage) Registry {
 	return &storage{s}
 }
 
-func (s *storage) ListServices(ctx api.Context, options *api.ListOptions) (*api.ServiceList, error) {
+func (s *storage) ListServices(ctx genericapirequest.Context, options *api.ListOptions) (*api.ServiceList, error) {
 	obj, err := s.List(ctx, options)
 	if err != nil {
 		return nil, err
@@ -55,7 +56,7 @@ func (s *storage) ListServices(ctx api.Context, options *api.ListOptions) (*api.
 	return obj.(*api.ServiceList), nil
 }
 
-func (s *storage) CreateService(ctx api.Context, svc *api.Service) (*api.Service, error) {
+func (s *storage) CreateService(ctx genericapirequest.Context, svc *api.Service) (*api.Service, error) {
 	obj, err := s.Create(ctx, svc)
 	if err != nil {
 		return nil, err
@@ -63,7 +64,7 @@ func (s *storage) CreateService(ctx api.Context, svc *api.Service) (*api.Service
 	return obj.(*api.Service), nil
 }
 
-func (s *storage) GetService(ctx api.Context, name string, options *metav1.GetOptions) (*api.Service, error) {
+func (s *storage) GetService(ctx genericapirequest.Context, name string, options *metav1.GetOptions) (*api.Service, error) {
 	obj, err := s.Get(ctx, name, options)
 	if err != nil {
 		return nil, err
@@ -71,12 +72,12 @@ func (s *storage) GetService(ctx api.Context, name string, options *metav1.GetOp
 	return obj.(*api.Service), nil
 }
 
-func (s *storage) DeleteService(ctx api.Context, name string) error {
+func (s *storage) DeleteService(ctx genericapirequest.Context, name string) error {
 	_, err := s.Delete(ctx, name, nil)
 	return err
 }
 
-func (s *storage) UpdateService(ctx api.Context, svc *api.Service) (*api.Service, error) {
+func (s *storage) UpdateService(ctx genericapirequest.Context, svc *api.Service) (*api.Service, error) {
 	obj, _, err := s.Update(ctx, svc.Name, rest.DefaultUpdatedObjectInfo(svc, api.Scheme))
 	if err != nil {
 		return nil, err
@@ -84,13 +85,13 @@ func (s *storage) UpdateService(ctx api.Context, svc *api.Service) (*api.Service
 	return obj.(*api.Service), nil
 }
 
-func (s *storage) WatchServices(ctx api.Context, options *api.ListOptions) (watch.Interface, error) {
+func (s *storage) WatchServices(ctx genericapirequest.Context, options *api.ListOptions) (watch.Interface, error) {
 	return s.Watch(ctx, options)
 }
 
 // If StandardStorage implements rest.Exporter, returns exported service.
 // Otherwise export is not supported.
-func (s *storage) ExportService(ctx api.Context, name string, options metav1.ExportOptions) (*api.Service, error) {
+func (s *storage) ExportService(ctx genericapirequest.Context, name string, options metav1.ExportOptions) (*api.Service, error) {
 	exporter, isExporter := s.StandardStorage.(rest.Exporter)
 	if !isExporter {
 		return nil, fmt.Errorf("export is not supported")

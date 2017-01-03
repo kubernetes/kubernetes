@@ -32,6 +32,7 @@ import (
 	"k8s.io/kubernetes/pkg/genericapiserver"
 	genericapi "k8s.io/kubernetes/pkg/genericapiserver/api"
 	genericapihandlers "k8s.io/kubernetes/pkg/genericapiserver/api/handlers"
+	genericapirequest "k8s.io/kubernetes/pkg/genericapiserver/api/request"
 	extensionsrest "k8s.io/kubernetes/pkg/registry/extensions/rest"
 	"k8s.io/kubernetes/pkg/registry/extensions/thirdpartyresourcedata"
 	thirdpartyresourcedataetcd "k8s.io/kubernetes/pkg/registry/extensions/thirdpartyresourcedata/etcd"
@@ -163,7 +164,7 @@ func (m *ThirdPartyResourceServer) RemoveThirdPartyResource(path string) error {
 }
 
 func (m *ThirdPartyResourceServer) removeAllThirdPartyResources(registry *thirdpartyresourcedataetcd.REST) error {
-	ctx := api.NewDefaultContext()
+	ctx := genericapirequest.NewDefaultContext()
 	existingData, err := registry.List(ctx, nil)
 	if err != nil {
 		return err

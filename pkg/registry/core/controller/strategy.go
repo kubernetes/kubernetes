@@ -27,6 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/fields"
+	genericapirequest "k8s.io/kubernetes/pkg/genericapiserver/api/request"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/generic"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -55,7 +56,7 @@ func (rcStrategy) NamespaceScoped() bool {
 }
 
 // PrepareForCreate clears the status of a replication controller before creation.
-func (rcStrategy) PrepareForCreate(ctx api.Context, obj runtime.Object) {
+func (rcStrategy) PrepareForCreate(ctx genericapirequest.Context, obj runtime.Object) {
 	controller := obj.(*api.ReplicationController)
 	controller.Status = api.ReplicationControllerStatus{}
 
@@ -63,7 +64,7 @@ func (rcStrategy) PrepareForCreate(ctx api.Context, obj runtime.Object) {
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
-func (rcStrategy) PrepareForUpdate(ctx api.Context, obj, old runtime.Object) {
+func (rcStrategy) PrepareForUpdate(ctx genericapirequest.Context, obj, old runtime.Object) {
 	newController := obj.(*api.ReplicationController)
 	oldController := old.(*api.ReplicationController)
 	// update is not allowed to set status
@@ -83,7 +84,7 @@ func (rcStrategy) PrepareForUpdate(ctx api.Context, obj, old runtime.Object) {
 }
 
 // Validate validates a new replication controller.
-func (rcStrategy) Validate(ctx api.Context, obj runtime.Object) field.ErrorList {
+func (rcStrategy) Validate(ctx genericapirequest.Context, obj runtime.Object) field.ErrorList {
 	controller := obj.(*api.ReplicationController)
 	return validation.ValidateReplicationController(controller)
 }
@@ -99,7 +100,7 @@ func (rcStrategy) AllowCreateOnUpdate() bool {
 }
 
 // ValidateUpdate is the default update validation for an end user.
-func (rcStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) field.ErrorList {
+func (rcStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
 	validationErrorList := validation.ValidateReplicationController(obj.(*api.ReplicationController))
 	updateErrorList := validation.ValidateReplicationControllerUpdate(obj.(*api.ReplicationController), old.(*api.ReplicationController))
 	return append(validationErrorList, updateErrorList...)
@@ -144,13 +145,13 @@ type rcStatusStrategy struct {
 
 var StatusStrategy = rcStatusStrategy{Strategy}
 
-func (rcStatusStrategy) PrepareForUpdate(ctx api.Context, obj, old runtime.Object) {
+func (rcStatusStrategy) PrepareForUpdate(ctx genericapirequest.Context, obj, old runtime.Object) {
 	newRc := obj.(*api.ReplicationController)
 	oldRc := old.(*api.ReplicationController)
 	// update is not allowed to set spec
 	newRc.Spec = oldRc.Spec
 }
 
-func (rcStatusStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) field.ErrorList {
+func (rcStatusStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
 	return validation.ValidateReplicationControllerStatusUpdate(obj.(*api.ReplicationController), old.(*api.ReplicationController))
 }

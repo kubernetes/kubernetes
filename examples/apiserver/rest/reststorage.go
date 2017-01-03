@@ -22,6 +22,7 @@ import (
 	"k8s.io/kubernetes/cmd/libs/go2idl/client-gen/test_apis/testgroup"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/fields"
+	genericapirequest "k8s.io/kubernetes/pkg/genericapiserver/api/request"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/generic"
 	genericregistry "k8s.io/kubernetes/pkg/registry/generic/registry"
@@ -63,10 +64,12 @@ type fakeStrategy struct {
 	api.NameGenerator
 }
 
-func (*fakeStrategy) NamespaceScoped() bool                                        { return false }
-func (*fakeStrategy) PrepareForCreate(ctx api.Context, obj runtime.Object)         {}
-func (*fakeStrategy) Validate(ctx api.Context, obj runtime.Object) field.ErrorList { return nil }
-func (*fakeStrategy) Canonicalize(obj runtime.Object)                              {}
+func (*fakeStrategy) NamespaceScoped() bool                                              { return false }
+func (*fakeStrategy) PrepareForCreate(ctx genericapirequest.Context, obj runtime.Object) {}
+func (*fakeStrategy) Validate(ctx genericapirequest.Context, obj runtime.Object) field.ErrorList {
+	return nil
+}
+func (*fakeStrategy) Canonicalize(obj runtime.Object) {}
 
 var strategy = &fakeStrategy{api.Scheme, api.SimpleNameGenerator}
 

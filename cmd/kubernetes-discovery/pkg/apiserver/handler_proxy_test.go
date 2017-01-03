@@ -56,10 +56,10 @@ type fakeRequestContextMapper struct {
 	user user.Info
 }
 
-func (m *fakeRequestContextMapper) Get(req *http.Request) (api.Context, bool) {
-	ctx := api.NewContext()
+func (m *fakeRequestContextMapper) Get(req *http.Request) (genericapirequest.Context, bool) {
+	ctx := genericapirequest.NewContext()
 	if m.user != nil {
-		ctx = api.WithUser(ctx, m.user)
+		ctx = genericapirequest.WithUser(ctx, m.user)
 	}
 
 	resolver := &genericapirequest.RequestInfoFactory{
@@ -74,7 +74,7 @@ func (m *fakeRequestContextMapper) Get(req *http.Request) (api.Context, bool) {
 	return ctx, true
 }
 
-func (*fakeRequestContextMapper) Update(req *http.Request, context api.Context) error {
+func (*fakeRequestContextMapper) Update(req *http.Request, context genericapirequest.Context) error {
 	return nil
 }
 

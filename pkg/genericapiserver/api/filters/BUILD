@@ -44,7 +44,6 @@ go_test(
     library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
-        "//pkg/api:go_default_library",
         "//pkg/apis/authentication:go_default_library",
         "//pkg/apis/batch:go_default_library",
         "//pkg/auth/authorizer:go_default_library",

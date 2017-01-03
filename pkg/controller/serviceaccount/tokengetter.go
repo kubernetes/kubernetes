@@ -17,10 +17,10 @@ limitations under the License.
 package serviceaccount
 
 import (
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	genericapirequest "k8s.io/kubernetes/pkg/genericapiserver/api/request"
 	"k8s.io/kubernetes/pkg/registry/core/secret"
 	secretetcd "k8s.io/kubernetes/pkg/registry/core/secret/etcd"
 	serviceaccountregistry "k8s.io/kubernetes/pkg/registry/core/serviceaccount"
@@ -61,7 +61,7 @@ func NewGetterFromRegistries(serviceAccounts serviceaccountregistry.Registry, se
 	return &registryGetter{serviceAccounts, secrets}
 }
 func (r *registryGetter) GetServiceAccount(namespace, name string) (*v1.ServiceAccount, error) {
-	ctx := api.WithNamespace(api.NewContext(), namespace)
+	ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), namespace)
 	internalServiceAccount, err := r.serviceAccounts.GetServiceAccount(ctx, name, &metav1.GetOptions{})
 	if err != nil {
 		return nil, err
@@ -72,7 +72,7 @@ func (r *registryGetter) GetServiceAccount(namespace, name string) (*v1.ServiceA
 
 }
 func (r *registryGetter) GetSecret(namespace, name string) (*v1.Secret, error) {
-	ctx := api.WithNamespace(api.NewContext(), namespace)
+	ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), namespace)
 	internalSecret, err := r.secrets.GetSecret(ctx, name, &metav1.GetOptions{})
 	if err != nil {
 		return nil, err

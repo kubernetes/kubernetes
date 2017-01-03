@@ -18,11 +18,11 @@ limitations under the License.
 package policybased
 
 import (
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/apis/rbac"
 	"k8s.io/kubernetes/pkg/apis/rbac/validation"
+	genericapirequest "k8s.io/kubernetes/pkg/genericapiserver/api/request"
 	rbacregistry "k8s.io/kubernetes/pkg/registry/rbac"
 	"k8s.io/kubernetes/pkg/runtime"
 )
@@ -39,7 +39,7 @@ func NewStorage(s rest.StandardStorage, ruleResolver validation.AuthorizationRul
 	return &Storage{s, ruleResolver}
 }
 
-func (s *Storage) Create(ctx api.Context, obj runtime.Object) (runtime.Object, error) {
+func (s *Storage) Create(ctx genericapirequest.Context, obj runtime.Object) (runtime.Object, error) {
 	if rbacregistry.EscalationAllowed(ctx) {
 		return s.StandardStorage.Create(ctx, obj)
 	}
@@ -55,12 +55,12 @@ func (s *Storage) Create(ctx api.Context, obj runtime.Object) (runtime.Object, e
 	return s.StandardStorage.Create(ctx, obj)
 }
 
-func (s *Storage) Update(ctx api.Context, name string, obj rest.UpdatedObjectInfo) (runtime.Object, bool, error) {
+func (s *Storage) Update(ctx genericapirequest.Context, name string, obj rest.UpdatedObjectInfo) (runtime.Object, bool, error) {
 	if rbacregistry.EscalationAllowed(ctx) {
 		return s.StandardStorage.Update(ctx, name, obj)
 	}
 
-	nonEscalatingInfo := rest.WrapUpdatedObjectInfo(obj, func(ctx api.Context, obj runtime.Object, oldObj runtime.Object) (runtime.Object, error) {
+	nonEscalatingInfo := rest.WrapUpdatedObjectInfo(obj, func(ctx genericapirequest.Context, obj runtime.Object, oldObj runtime.Object) (runtime.Object, error) {
 		roleBinding := obj.(*rbac.RoleBinding)
 
 		rules, err := s.ruleResolver.GetRoleReferenceRules(roleBinding.RoleRef, roleBinding.Namespace)

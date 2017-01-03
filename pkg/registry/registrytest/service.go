@@ -21,6 +21,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
+	genericapirequest "k8s.io/kubernetes/pkg/genericapiserver/api/request"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
@@ -46,11 +47,11 @@ func (r *ServiceRegistry) SetError(err error) {
 	r.Err = err
 }
 
-func (r *ServiceRegistry) ListServices(ctx api.Context, options *api.ListOptions) (*api.ServiceList, error) {
+func (r *ServiceRegistry) ListServices(ctx genericapirequest.Context, options *api.ListOptions) (*api.ServiceList, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	ns, _ := api.NamespaceFrom(ctx)
+	ns, _ := genericapirequest.NamespaceFrom(ctx)
 
 	// Copy metadata from internal list into result
 	res := new(api.ServiceList)
@@ -70,7 +71,7 @@ func (r *ServiceRegistry) ListServices(ctx api.Context, options *api.ListOptions
 	return res, r.Err
 }
 
-func (r *ServiceRegistry) CreateService(ctx api.Context, svc *api.Service) (*api.Service, error) {
+func (r *ServiceRegistry) CreateService(ctx genericapirequest.Context, svc *api.Service) (*api.Service, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -85,7 +86,7 @@ func (r *ServiceRegistry) CreateService(ctx api.Context, svc *api.Service) (*api
 	return svc, r.Err
 }
 
-func (r *ServiceRegistry) GetService(ctx api.Context, id string, options *metav1.GetOptions) (*api.Service, error) {
+func (r *ServiceRegistry) GetService(ctx genericapirequest.Context, id string, options *metav1.GetOptions) (*api.Service, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -93,7 +94,7 @@ func (r *ServiceRegistry) GetService(ctx api.Context, id string, options *metav1
 	return r.Service, r.Err
 }
 
-func (r *ServiceRegistry) DeleteService(ctx api.Context, id string) error {
+func (r *ServiceRegistry) DeleteService(ctx genericapirequest.Context, id string) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -102,7 +103,7 @@ func (r *ServiceRegistry) DeleteService(ctx api.Context, id string) error {
 	return r.Err
 }
 
-func (r *ServiceRegistry) UpdateService(ctx api.Context, svc *api.Service) (*api.Service, error) {
+func (r *ServiceRegistry) UpdateService(ctx genericapirequest.Context, svc *api.Service) (*api.Service, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -112,14 +113,14 @@ func (r *ServiceRegistry) UpdateService(ctx api.Context, svc *api.Service) (*api
 	return svc, r.Err
 }
 
-func (r *ServiceRegistry) WatchServices(ctx api.Context, options *api.ListOptions) (watch.Interface, error) {
+func (r *ServiceRegistry) WatchServices(ctx genericapirequest.Context, options *api.ListOptions) (watch.Interface, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
 	return nil, r.Err
 }
 
-func (r *ServiceRegistry) ExportService(ctx api.Context, name string, options metav1.ExportOptions) (*api.Service, error) {
+func (r *ServiceRegistry) ExportService(ctx genericapirequest.Context, name string, options metav1.ExportOptions) (*api.Service, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 

@@ -22,21 +22,21 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/auth/authenticator"
 	"k8s.io/kubernetes/pkg/auth/user"
+	genericapirequest "k8s.io/kubernetes/pkg/genericapiserver/api/request"
 )
 
 func TestAuthenticateRequest(t *testing.T) {
 	success := make(chan struct{})
-	contextMapper := api.NewRequestContextMapper()
+	contextMapper := genericapirequest.NewRequestContextMapper()
 	auth := WithAuthentication(
 		http.HandlerFunc(func(_ http.ResponseWriter, req *http.Request) {
 			ctx, ok := contextMapper.Get(req)
 			if ctx == nil || !ok {
 				t.Errorf("no context stored on contextMapper: %#v", contextMapper)
 			}
-			user, ok := api.UserFrom(ctx)
+			user, ok := genericapirequest.UserFrom(ctx)
 			if user == nil || !ok {
 				t.Errorf("no user stored in context: %#v", ctx)
 			}
@@ -60,7 +60,7 @@ func TestAuthenticateRequest(t *testing.T) {
 	auth.ServeHTTP(httptest.NewRecorder(), &http.Request{Header: map[string][]string{"Authorization": {"Something"}}})
 
 	<-success
-	empty, err := api.IsEmpty(contextMapper)
+	empty, err := genericapirequest.IsEmpty(contextMapper)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -71,7 +71,7 @@ func TestAuthenticateRequest(t *testing.T) {
 
 func TestAuthenticateRequestFailed(t *testing.T) {
 	failed := make(chan struct{})
-	contextMapper := api.NewRequestContextMapper()
+	contextMapper := genericapirequest.NewRequestContextMapper()
 	auth := WithAuthentication(
 		http.HandlerFunc(func(_ http.ResponseWriter, req *http.Request) {
 			t.Errorf("unexpected call to handler")
@@ -88,7 +88,7 @@ func TestAuthenticateRequestFailed(t *testing.T) {
 	auth.ServeHTTP(httptest.NewRecorder(), &http.Request{})
 
 	<-failed
-	empty, err := api.IsEmpty(contextMapper)
+	empty, err := genericapirequest.IsEmpty(contextMapper)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -99,7 +99,7 @@ func TestAuthenticateRequestFailed(t *testing.T) {
 
 func TestAuthenticateRequestError(t *testing.T) {
 	failed := make(chan struct{})
-	contextMapper := api.NewRequestContextMapper()
+	contextMapper := genericapirequest.NewRequestContextMapper()
 	auth := WithAuthentication(
 		http.HandlerFunc(func(_ http.ResponseWriter, req *http.Request) {
 			t.Errorf("unexpected call to handler")
@@ -116,7 +116,7 @@ func TestAuthenticateRequestError(t *testing.T) {
 	auth.ServeHTTP(httptest.NewRecorder(), &http.Request{})
 
 	<-failed
-	empty, err := api.IsEmpty(contextMapper)
+	empty, err := genericapirequest.IsEmpty(contextMapper)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

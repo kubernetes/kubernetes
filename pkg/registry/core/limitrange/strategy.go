@@ -22,6 +22,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/fields"
+	genericapirequest "k8s.io/kubernetes/pkg/genericapiserver/api/request"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage"
@@ -42,17 +43,17 @@ func (limitrangeStrategy) NamespaceScoped() bool {
 	return true
 }
 
-func (limitrangeStrategy) PrepareForCreate(ctx api.Context, obj runtime.Object) {
+func (limitrangeStrategy) PrepareForCreate(ctx genericapirequest.Context, obj runtime.Object) {
 	limitRange := obj.(*api.LimitRange)
 	if len(limitRange.Name) == 0 {
 		limitRange.Name = string(uuid.NewUUID())
 	}
 }
 
-func (limitrangeStrategy) PrepareForUpdate(ctx api.Context, obj, old runtime.Object) {
+func (limitrangeStrategy) PrepareForUpdate(ctx genericapirequest.Context, obj, old runtime.Object) {
 }
 
-func (limitrangeStrategy) Validate(ctx api.Context, obj runtime.Object) field.ErrorList {
+func (limitrangeStrategy) Validate(ctx genericapirequest.Context, obj runtime.Object) field.ErrorList {
 	limitRange := obj.(*api.LimitRange)
 	return validation.ValidateLimitRange(limitRange)
 }
@@ -65,7 +66,7 @@ func (limitrangeStrategy) AllowCreateOnUpdate() bool {
 	return true
 }
 
-func (limitrangeStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) field.ErrorList {
+func (limitrangeStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
 	limitRange := obj.(*api.LimitRange)
 	return validation.ValidateLimitRange(limitRange)
 }
@@ -78,7 +79,7 @@ func LimitRangeToSelectableFields(limitRange *api.LimitRange) fields.Set {
 	return nil
 }
 
-func (limitrangeStrategy) Export(api.Context, runtime.Object, bool) error {
+func (limitrangeStrategy) Export(genericapirequest.Context, runtime.Object, bool) error {
 	// Copied from OpenShift exporter
 	// TODO: this needs to be fixed
 	//  limitrange.Strategy.PrepareForCreate(ctx, obj)
