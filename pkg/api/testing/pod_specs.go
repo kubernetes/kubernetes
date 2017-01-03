@@ -31,7 +31,6 @@ func DeepEqualSafePodSpec() api.PodSpec {
 		// Non nil data needed for some unit tests...
 		SecurityContext:  &api.PodSecurityContext{},
 		Affinity:         &api.Affinity{},
-		PredicateResults: []api.PredicateResult{},
 	}
 }
 
