@@ -29,7 +29,9 @@ import (
 )
 
 var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
-	"io.k8s.kubernetes.pkg.util.intstr.IntOrString": intstr.IntOrString{}.OpenAPIDefinition(), "io.k8s.kubernetes.pkg.api.resource.Quantity": resource.Quantity{}.OpenAPIDefinition(), "io.k8s.kubernetes.pkg.api.resource.int64Amount": {
+	"io.k8s.kubernetes.pkg.util.intstr.IntOrString": intstr.IntOrString{}.OpenAPIDefinition(),
+	"io.k8s.kubernetes.pkg.api.resource.Quantity":   resource.Quantity{}.OpenAPIDefinition(),
+	"io.k8s.kubernetes.pkg.api.resource.int64Amount": {
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
 				Description: "int64Amount represents a fixed precision numerator and arbitrary scale exponent. It is faster than operations on inf.Dec for values that can be represented as int64.",
@@ -8239,7 +8241,8 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 		},
 		Dependencies: []string{},
 	},
-	"io.k8s.meta.v1.Time": v1.Time{}.OpenAPIDefinition(), "io.k8s.meta.v1.Timestamp": {
+	"io.k8s.meta.v1.Time": v1.Time{}.OpenAPIDefinition(),
+	"io.k8s.meta.v1.Timestamp": {
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
 				Description: "Timestamp is a struct that is equivalent to Time, but intended for protobuf marshalling/unmarshalling. It is generated into a serialization that matches Time. Do not use in Go structs.",
@@ -11207,6 +11210,41 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 		Dependencies: []string{
 			"extensions.v1beta1.DaemonSetSpec", "extensions.v1beta1.DaemonSetStatus", "v1.ObjectMeta"},
 	},
+	"v1beta1.DaemonSet": {
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "DaemonSet represents the configuration of a daemon set.",
+				Properties: map[string]spec.Schema{
+					"metadata": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
+							Ref:         spec.MustCreateRef("#/definitions/v1.ObjectMeta"),
+						},
+					},
+					"spec": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Spec defines the desired behavior of this daemon set. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status",
+							Ref:         spec.MustCreateRef("#/definitions/extensions.v1beta1.DaemonSetSpec"),
+						},
+					},
+					"status": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Status is the current status of this daemon set. This data may be out of date by some window of time. Populated by the system. Read-only. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status",
+							Ref:         spec.MustCreateRef("#/definitions/extensions.v1beta1.DaemonSetStatus"),
+						},
+					},
+				},
+			},
+			VendorExtensible: spec.VendorExtensible{
+				Extensions: spec.Extensions{
+					"io.k8s.kubernetes.openapi.type.golang":         "k8s.io/kubernetes/pkg/apis/extensions/v1beta1.DaemonSet",
+					"io.k8s.kubernetes.openapi.type.deprecated.use": "extensions.v1beta1.DaemonSet",
+				},
+			},
+		},
+		Dependencies: []string{
+			"extensions.v1beta1.DaemonSetSpec", "extensions.v1beta1.DaemonSetStatus", "v1.ObjectMeta"},
+	},
 	"extensions.v1beta1.DaemonSetList": {
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -11237,6 +11275,43 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 			VendorExtensible: spec.VendorExtensible{
 				Extensions: spec.Extensions{
 					"io.k8s.kubernetes.openapi.type.golang": "k8s.io/kubernetes/pkg/apis/extensions/v1beta1.DaemonSetList",
+				},
+			},
+		},
+		Dependencies: []string{
+			"extensions.v1beta1.DaemonSet", "io.k8s.meta.v1.ListMeta"},
+	},
+	"v1beta1.DaemonSetList": {
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "DaemonSetList is a collection of daemon sets.",
+				Properties: map[string]spec.Schema{
+					"metadata": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Standard list metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
+							Ref:         spec.MustCreateRef("#/definitions/io.k8s.meta.v1.ListMeta"),
+						},
+					},
+					"items": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Items is a list of daemon sets.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: spec.MustCreateRef("#/definitions/extensions.v1beta1.DaemonSet"),
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"items"},
+			},
+			VendorExtensible: spec.VendorExtensible{
+				Extensions: spec.Extensions{
+					"io.k8s.kubernetes.openapi.type.golang":         "k8s.io/kubernetes/pkg/apis/extensions/v1beta1.DaemonSetList",
+					"io.k8s.kubernetes.openapi.type.deprecated.use": "extensions.v1beta1.DaemonSetList",
 				},
 			},
 		},
@@ -11357,6 +11432,41 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 		Dependencies: []string{
 			"extensions.v1beta1.DeploymentSpec", "extensions.v1beta1.DeploymentStatus", "v1.ObjectMeta"},
 	},
+	"v1beta1.Deployment": {
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "Deployment enables declarative updates for Pods and ReplicaSets.",
+				Properties: map[string]spec.Schema{
+					"metadata": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Standard object metadata.",
+							Ref:         spec.MustCreateRef("#/definitions/v1.ObjectMeta"),
+						},
+					},
+					"spec": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Specification of the desired behavior of the Deployment.",
+							Ref:         spec.MustCreateRef("#/definitions/extensions.v1beta1.DeploymentSpec"),
+						},
+					},
+					"status": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Most recently observed status of the Deployment.",
+							Ref:         spec.MustCreateRef("#/definitions/extensions.v1beta1.DeploymentStatus"),
+						},
+					},
+				},
+			},
+			VendorExtensible: spec.VendorExtensible{
+				Extensions: spec.Extensions{
+					"io.k8s.kubernetes.openapi.type.golang":         "k8s.io/kubernetes/pkg/apis/extensions/v1beta1.Deployment",
+					"io.k8s.kubernetes.openapi.type.deprecated.use": "extensions.v1beta1.Deployment",
+				},
+			},
+		},
+		Dependencies: []string{
+			"extensions.v1beta1.DeploymentSpec", "extensions.v1beta1.DeploymentStatus", "v1.ObjectMeta"},
+	},
 	"extensions.v1beta1.DeploymentCondition": {
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -11450,6 +11560,43 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 		Dependencies: []string{
 			"extensions.v1beta1.Deployment", "io.k8s.meta.v1.ListMeta"},
 	},
+	"v1beta1.DeploymentList": {
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "DeploymentList is a list of Deployments.",
+				Properties: map[string]spec.Schema{
+					"metadata": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Standard list metadata.",
+							Ref:         spec.MustCreateRef("#/definitions/io.k8s.meta.v1.ListMeta"),
+						},
+					},
+					"items": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Items is the list of Deployments.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: spec.MustCreateRef("#/definitions/extensions.v1beta1.Deployment"),
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"items"},
+			},
+			VendorExtensible: spec.VendorExtensible{
+				Extensions: spec.Extensions{
+					"io.k8s.kubernetes.openapi.type.golang":         "k8s.io/kubernetes/pkg/apis/extensions/v1beta1.DeploymentList",
+					"io.k8s.kubernetes.openapi.type.deprecated.use": "extensions.v1beta1.DeploymentList",
+				},
+			},
+		},
+		Dependencies: []string{
+			"extensions.v1beta1.Deployment", "io.k8s.meta.v1.ListMeta"},
+	},
 	"extensions.v1beta1.DeploymentRollback": {
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -11488,6 +11635,51 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 			VendorExtensible: spec.VendorExtensible{
 				Extensions: spec.Extensions{
 					"io.k8s.kubernetes.openapi.type.golang": "k8s.io/kubernetes/pkg/apis/extensions/v1beta1.DeploymentRollback",
+				},
+			},
+		},
+		Dependencies: []string{
+			"extensions.v1beta1.RollbackConfig"},
+	},
+	"v1beta1.DeploymentRollback": {
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "DeploymentRollback stores the information required to rollback a deployment.",
+				Properties: map[string]spec.Schema{
+					"name": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Required: This must match the Name of a deployment.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"updatedAnnotations": {
+						SchemaProps: spec.SchemaProps{
+							Description: "The annotations to be updated to a deployment",
+							Type:        []string{"object"},
+							AdditionalProperties: &spec.SchemaOrBool{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Type:   []string{"string"},
+										Format: "",
+									},
+								},
+							},
+						},
+					},
+					"rollbackTo": {
+						SchemaProps: spec.SchemaProps{
+							Description: "The config of this deployment rollback.",
+							Ref:         spec.MustCreateRef("#/definitions/extensions.v1beta1.RollbackConfig"),
+						},
+					},
+				},
+				Required: []string{"name", "rollbackTo"},
+			},
+			VendorExtensible: spec.VendorExtensible{
+				Extensions: spec.Extensions{
+					"io.k8s.kubernetes.openapi.type.golang":         "k8s.io/kubernetes/pkg/apis/extensions/v1beta1.DeploymentRollback",
+					"io.k8s.kubernetes.openapi.type.deprecated.use": "extensions.v1beta1.DeploymentRollback",
 				},
 			},
 		},
@@ -11828,6 +12020,41 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 		Dependencies: []string{
 			"extensions.v1beta1.HorizontalPodAutoscalerSpec", "extensions.v1beta1.HorizontalPodAutoscalerStatus", "v1.ObjectMeta"},
 	},
+	"v1beta1.HorizontalPodAutoscaler": {
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "configuration of a horizontal pod autoscaler.",
+				Properties: map[string]spec.Schema{
+					"metadata": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Standard object metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
+							Ref:         spec.MustCreateRef("#/definitions/v1.ObjectMeta"),
+						},
+					},
+					"spec": {
+						SchemaProps: spec.SchemaProps{
+							Description: "behaviour of autoscaler. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status.",
+							Ref:         spec.MustCreateRef("#/definitions/extensions.v1beta1.HorizontalPodAutoscalerSpec"),
+						},
+					},
+					"status": {
+						SchemaProps: spec.SchemaProps{
+							Description: "current information about the autoscaler.",
+							Ref:         spec.MustCreateRef("#/definitions/extensions.v1beta1.HorizontalPodAutoscalerStatus"),
+						},
+					},
+				},
+			},
+			VendorExtensible: spec.VendorExtensible{
+				Extensions: spec.Extensions{
+					"io.k8s.kubernetes.openapi.type.golang":         "k8s.io/kubernetes/pkg/apis/extensions/v1beta1.HorizontalPodAutoscaler",
+					"io.k8s.kubernetes.openapi.type.deprecated.use": "extensions.v1beta1.HorizontalPodAutoscaler",
+				},
+			},
+		},
+		Dependencies: []string{
+			"extensions.v1beta1.HorizontalPodAutoscalerSpec", "extensions.v1beta1.HorizontalPodAutoscalerStatus", "v1.ObjectMeta"},
+	},
 	"extensions.v1beta1.HorizontalPodAutoscalerList": {
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -11858,6 +12085,43 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 			VendorExtensible: spec.VendorExtensible{
 				Extensions: spec.Extensions{
 					"io.k8s.kubernetes.openapi.type.golang": "k8s.io/kubernetes/pkg/apis/extensions/v1beta1.HorizontalPodAutoscalerList",
+				},
+			},
+		},
+		Dependencies: []string{
+			"extensions.v1beta1.HorizontalPodAutoscaler", "io.k8s.meta.v1.ListMeta"},
+	},
+	"v1beta1.HorizontalPodAutoscalerList": {
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "list of horizontal pod autoscaler objects.",
+				Properties: map[string]spec.Schema{
+					"metadata": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Standard list metadata.",
+							Ref:         spec.MustCreateRef("#/definitions/io.k8s.meta.v1.ListMeta"),
+						},
+					},
+					"items": {
+						SchemaProps: spec.SchemaProps{
+							Description: "list of horizontal pod autoscaler objects.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: spec.MustCreateRef("#/definitions/extensions.v1beta1.HorizontalPodAutoscaler"),
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"items"},
+			},
+			VendorExtensible: spec.VendorExtensible{
+				Extensions: spec.Extensions{
+					"io.k8s.kubernetes.openapi.type.golang":         "k8s.io/kubernetes/pkg/apis/extensions/v1beta1.HorizontalPodAutoscalerList",
+					"io.k8s.kubernetes.openapi.type.deprecated.use": "extensions.v1beta1.HorizontalPodAutoscalerList",
 				},
 			},
 		},
@@ -12052,6 +12316,41 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 		Dependencies: []string{
 			"extensions.v1beta1.IngressSpec", "extensions.v1beta1.IngressStatus", "v1.ObjectMeta"},
 	},
+	"v1beta1.Ingress": {
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "Ingress is a collection of rules that allow inbound connections to reach the endpoints defined by a backend. An Ingress can be configured to give services externally-reachable urls, load balance traffic, terminate SSL, offer name based virtual hosting etc.",
+				Properties: map[string]spec.Schema{
+					"metadata": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
+							Ref:         spec.MustCreateRef("#/definitions/v1.ObjectMeta"),
+						},
+					},
+					"spec": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Spec is the desired state of the Ingress. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status",
+							Ref:         spec.MustCreateRef("#/definitions/extensions.v1beta1.IngressSpec"),
+						},
+					},
+					"status": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Status is the current state of the Ingress. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status",
+							Ref:         spec.MustCreateRef("#/definitions/extensions.v1beta1.IngressStatus"),
+						},
+					},
+				},
+			},
+			VendorExtensible: spec.VendorExtensible{
+				Extensions: spec.Extensions{
+					"io.k8s.kubernetes.openapi.type.golang":         "k8s.io/kubernetes/pkg/apis/extensions/v1beta1.Ingress",
+					"io.k8s.kubernetes.openapi.type.deprecated.use": "extensions.v1beta1.Ingress",
+				},
+			},
+		},
+		Dependencies: []string{
+			"extensions.v1beta1.IngressSpec", "extensions.v1beta1.IngressStatus", "v1.ObjectMeta"},
+	},
 	"extensions.v1beta1.IngressBackend": {
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -12112,6 +12411,43 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 			VendorExtensible: spec.VendorExtensible{
 				Extensions: spec.Extensions{
 					"io.k8s.kubernetes.openapi.type.golang": "k8s.io/kubernetes/pkg/apis/extensions/v1beta1.IngressList",
+				},
+			},
+		},
+		Dependencies: []string{
+			"extensions.v1beta1.Ingress", "io.k8s.meta.v1.ListMeta"},
+	},
+	"v1beta1.IngressList": {
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "IngressList is a collection of Ingress.",
+				Properties: map[string]spec.Schema{
+					"metadata": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
+							Ref:         spec.MustCreateRef("#/definitions/io.k8s.meta.v1.ListMeta"),
+						},
+					},
+					"items": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Items is the list of Ingress.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: spec.MustCreateRef("#/definitions/extensions.v1beta1.Ingress"),
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"items"},
+			},
+			VendorExtensible: spec.VendorExtensible{
+				Extensions: spec.Extensions{
+					"io.k8s.kubernetes.openapi.type.golang":         "k8s.io/kubernetes/pkg/apis/extensions/v1beta1.IngressList",
+					"io.k8s.kubernetes.openapi.type.deprecated.use": "extensions.v1beta1.IngressList",
 				},
 			},
 		},
@@ -12328,6 +12664,34 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 		Dependencies: []string{
 			"extensions.v1beta1.NetworkPolicySpec", "v1.ObjectMeta"},
 	},
+	"v1beta1.NetworkPolicy": {
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Properties: map[string]spec.Schema{
+					"metadata": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
+							Ref:         spec.MustCreateRef("#/definitions/v1.ObjectMeta"),
+						},
+					},
+					"spec": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Specification of the desired behavior for this NetworkPolicy.",
+							Ref:         spec.MustCreateRef("#/definitions/extensions.v1beta1.NetworkPolicySpec"),
+						},
+					},
+				},
+			},
+			VendorExtensible: spec.VendorExtensible{
+				Extensions: spec.Extensions{
+					"io.k8s.kubernetes.openapi.type.golang":         "k8s.io/kubernetes/pkg/apis/extensions/v1beta1.NetworkPolicy",
+					"io.k8s.kubernetes.openapi.type.deprecated.use": "extensions.v1beta1.NetworkPolicy",
+				},
+			},
+		},
+		Dependencies: []string{
+			"extensions.v1beta1.NetworkPolicySpec", "v1.ObjectMeta"},
+	},
 	"extensions.v1beta1.NetworkPolicyIngressRule": {
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -12400,6 +12764,43 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 			VendorExtensible: spec.VendorExtensible{
 				Extensions: spec.Extensions{
 					"io.k8s.kubernetes.openapi.type.golang": "k8s.io/kubernetes/pkg/apis/extensions/v1beta1.NetworkPolicyList",
+				},
+			},
+		},
+		Dependencies: []string{
+			"extensions.v1beta1.NetworkPolicy", "io.k8s.meta.v1.ListMeta"},
+	},
+	"v1beta1.NetworkPolicyList": {
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "Network Policy List is a list of NetworkPolicy objects.",
+				Properties: map[string]spec.Schema{
+					"metadata": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Standard list metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
+							Ref:         spec.MustCreateRef("#/definitions/io.k8s.meta.v1.ListMeta"),
+						},
+					},
+					"items": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Items is a list of schema objects.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: spec.MustCreateRef("#/definitions/extensions.v1beta1.NetworkPolicy"),
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"items"},
+			},
+			VendorExtensible: spec.VendorExtensible{
+				Extensions: spec.Extensions{
+					"io.k8s.kubernetes.openapi.type.golang":         "k8s.io/kubernetes/pkg/apis/extensions/v1beta1.NetworkPolicyList",
+					"io.k8s.kubernetes.openapi.type.deprecated.use": "extensions.v1beta1.NetworkPolicyList",
 				},
 			},
 		},
@@ -12713,6 +13114,35 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 		Dependencies: []string{
 			"extensions.v1beta1.PodSecurityPolicySpec", "v1.ObjectMeta"},
 	},
+	"v1beta1.PodSecurityPolicy": {
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "Pod Security Policy governs the ability to make requests that affect the Security Context that will be applied to a pod and container.",
+				Properties: map[string]spec.Schema{
+					"metadata": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
+							Ref:         spec.MustCreateRef("#/definitions/v1.ObjectMeta"),
+						},
+					},
+					"spec": {
+						SchemaProps: spec.SchemaProps{
+							Description: "spec defines the policy enforced.",
+							Ref:         spec.MustCreateRef("#/definitions/extensions.v1beta1.PodSecurityPolicySpec"),
+						},
+					},
+				},
+			},
+			VendorExtensible: spec.VendorExtensible{
+				Extensions: spec.Extensions{
+					"io.k8s.kubernetes.openapi.type.golang":         "k8s.io/kubernetes/pkg/apis/extensions/v1beta1.PodSecurityPolicy",
+					"io.k8s.kubernetes.openapi.type.deprecated.use": "extensions.v1beta1.PodSecurityPolicy",
+				},
+			},
+		},
+		Dependencies: []string{
+			"extensions.v1beta1.PodSecurityPolicySpec", "v1.ObjectMeta"},
+	},
 	"extensions.v1beta1.PodSecurityPolicyList": {
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -12743,6 +13173,43 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 			VendorExtensible: spec.VendorExtensible{
 				Extensions: spec.Extensions{
 					"io.k8s.kubernetes.openapi.type.golang": "k8s.io/kubernetes/pkg/apis/extensions/v1beta1.PodSecurityPolicyList",
+				},
+			},
+		},
+		Dependencies: []string{
+			"extensions.v1beta1.PodSecurityPolicy", "io.k8s.meta.v1.ListMeta"},
+	},
+	"v1beta1.PodSecurityPolicyList": {
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "Pod Security Policy List is a list of PodSecurityPolicy objects.",
+				Properties: map[string]spec.Schema{
+					"metadata": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Standard list metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
+							Ref:         spec.MustCreateRef("#/definitions/io.k8s.meta.v1.ListMeta"),
+						},
+					},
+					"items": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Items is a list of schema objects.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: spec.MustCreateRef("#/definitions/extensions.v1beta1.PodSecurityPolicy"),
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"items"},
+			},
+			VendorExtensible: spec.VendorExtensible{
+				Extensions: spec.Extensions{
+					"io.k8s.kubernetes.openapi.type.golang":         "k8s.io/kubernetes/pkg/apis/extensions/v1beta1.PodSecurityPolicyList",
+					"io.k8s.kubernetes.openapi.type.deprecated.use": "extensions.v1beta1.PodSecurityPolicyList",
 				},
 			},
 		},
@@ -13015,6 +13482,41 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 		Dependencies: []string{
 			"extensions.v1beta1.ReplicaSetSpec", "extensions.v1beta1.ReplicaSetStatus", "v1.ObjectMeta"},
 	},
+	"v1beta1.ReplicaSet": {
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "ReplicaSet represents the configuration of a ReplicaSet.",
+				Properties: map[string]spec.Schema{
+					"metadata": {
+						SchemaProps: spec.SchemaProps{
+							Description: "If the Labels of a ReplicaSet are empty, they are defaulted to be the same as the Pod(s) that the ReplicaSet manages. Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
+							Ref:         spec.MustCreateRef("#/definitions/v1.ObjectMeta"),
+						},
+					},
+					"spec": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Spec defines the specification of the desired behavior of the ReplicaSet. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status",
+							Ref:         spec.MustCreateRef("#/definitions/extensions.v1beta1.ReplicaSetSpec"),
+						},
+					},
+					"status": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Status is the most recently observed status of the ReplicaSet. This data may be out of date by some window of time. Populated by the system. Read-only. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status",
+							Ref:         spec.MustCreateRef("#/definitions/extensions.v1beta1.ReplicaSetStatus"),
+						},
+					},
+				},
+			},
+			VendorExtensible: spec.VendorExtensible{
+				Extensions: spec.Extensions{
+					"io.k8s.kubernetes.openapi.type.golang":         "k8s.io/kubernetes/pkg/apis/extensions/v1beta1.ReplicaSet",
+					"io.k8s.kubernetes.openapi.type.deprecated.use": "extensions.v1beta1.ReplicaSet",
+				},
+			},
+		},
+		Dependencies: []string{
+			"extensions.v1beta1.ReplicaSetSpec", "extensions.v1beta1.ReplicaSetStatus", "v1.ObjectMeta"},
+	},
 	"extensions.v1beta1.ReplicaSetCondition": {
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -13096,6 +13598,43 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 			VendorExtensible: spec.VendorExtensible{
 				Extensions: spec.Extensions{
 					"io.k8s.kubernetes.openapi.type.golang": "k8s.io/kubernetes/pkg/apis/extensions/v1beta1.ReplicaSetList",
+				},
+			},
+		},
+		Dependencies: []string{
+			"extensions.v1beta1.ReplicaSet", "io.k8s.meta.v1.ListMeta"},
+	},
+	"v1beta1.ReplicaSetList": {
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "ReplicaSetList is a collection of ReplicaSets.",
+				Properties: map[string]spec.Schema{
+					"metadata": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Standard list metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
+							Ref:         spec.MustCreateRef("#/definitions/io.k8s.meta.v1.ListMeta"),
+						},
+					},
+					"items": {
+						SchemaProps: spec.SchemaProps{
+							Description: "List of ReplicaSets. More info: http://kubernetes.io/docs/user-guide/replication-controller",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: spec.MustCreateRef("#/definitions/extensions.v1beta1.ReplicaSet"),
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"items"},
+			},
+			VendorExtensible: spec.VendorExtensible{
+				Extensions: spec.Extensions{
+					"io.k8s.kubernetes.openapi.type.golang":         "k8s.io/kubernetes/pkg/apis/extensions/v1beta1.ReplicaSetList",
+					"io.k8s.kubernetes.openapi.type.deprecated.use": "extensions.v1beta1.ReplicaSetList",
 				},
 			},
 		},
@@ -13431,6 +13970,41 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 			VendorExtensible: spec.VendorExtensible{
 				Extensions: spec.Extensions{
 					"io.k8s.kubernetes.openapi.type.golang": "k8s.io/kubernetes/pkg/apis/extensions/v1beta1.Scale",
+				},
+			},
+		},
+		Dependencies: []string{
+			"extensions.v1beta1.ScaleSpec", "extensions.v1beta1.ScaleStatus", "v1.ObjectMeta"},
+	},
+	"v1beta1.Scale": {
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "represents a scaling request for a resource.",
+				Properties: map[string]spec.Schema{
+					"metadata": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Standard object metadata; More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata.",
+							Ref:         spec.MustCreateRef("#/definitions/v1.ObjectMeta"),
+						},
+					},
+					"spec": {
+						SchemaProps: spec.SchemaProps{
+							Description: "defines the behavior of the scale. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status.",
+							Ref:         spec.MustCreateRef("#/definitions/extensions.v1beta1.ScaleSpec"),
+						},
+					},
+					"status": {
+						SchemaProps: spec.SchemaProps{
+							Description: "current status of the scale. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status. Read-only.",
+							Ref:         spec.MustCreateRef("#/definitions/extensions.v1beta1.ScaleStatus"),
+						},
+					},
+				},
+			},
+			VendorExtensible: spec.VendorExtensible{
+				Extensions: spec.Extensions{
+					"io.k8s.kubernetes.openapi.type.golang":         "k8s.io/kubernetes/pkg/apis/extensions/v1beta1.Scale",
+					"io.k8s.kubernetes.openapi.type.deprecated.use": "extensions.v1beta1.Scale",
 				},
 			},
 		},
@@ -14090,6 +14664,49 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 		Dependencies: []string{
 			"extensions.v1beta1.APIVersion", "v1.ObjectMeta"},
 	},
+	"v1beta1.ThirdPartyResource": {
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "A ThirdPartyResource is a generic representation of a resource, it is used by add-ons and plugins to add new resource types to the API.  It consists of one or more Versions of the api.",
+				Properties: map[string]spec.Schema{
+					"metadata": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Standard object metadata",
+							Ref:         spec.MustCreateRef("#/definitions/v1.ObjectMeta"),
+						},
+					},
+					"description": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Description is the description of this object.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"versions": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Versions are versions for this third party object",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: spec.MustCreateRef("#/definitions/extensions.v1beta1.APIVersion"),
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			VendorExtensible: spec.VendorExtensible{
+				Extensions: spec.Extensions{
+					"io.k8s.kubernetes.openapi.type.golang":         "k8s.io/kubernetes/pkg/apis/extensions/v1beta1.ThirdPartyResource",
+					"io.k8s.kubernetes.openapi.type.deprecated.use": "extensions.v1beta1.ThirdPartyResource",
+				},
+			},
+		},
+		Dependencies: []string{
+			"extensions.v1beta1.APIVersion", "v1.ObjectMeta"},
+	},
 	"extensions.v1beta1.ThirdPartyResourceData": {
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -14113,6 +14730,36 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 			VendorExtensible: spec.VendorExtensible{
 				Extensions: spec.Extensions{
 					"io.k8s.kubernetes.openapi.type.golang": "k8s.io/kubernetes/pkg/apis/extensions/v1beta1.ThirdPartyResourceData",
+				},
+			},
+		},
+		Dependencies: []string{
+			"v1.ObjectMeta"},
+	},
+	"v1beta1.ThirdPartyResourceData": {
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "An internal object, used for versioned storage in etcd.  Not exposed to the end user.",
+				Properties: map[string]spec.Schema{
+					"metadata": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Standard object metadata.",
+							Ref:         spec.MustCreateRef("#/definitions/v1.ObjectMeta"),
+						},
+					},
+					"data": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Data is the raw JSON data for this data.",
+							Type:        []string{"string"},
+							Format:      "byte",
+						},
+					},
+				},
+			},
+			VendorExtensible: spec.VendorExtensible{
+				Extensions: spec.Extensions{
+					"io.k8s.kubernetes.openapi.type.golang":         "k8s.io/kubernetes/pkg/apis/extensions/v1beta1.ThirdPartyResourceData",
+					"io.k8s.kubernetes.openapi.type.deprecated.use": "extensions.v1beta1.ThirdPartyResourceData",
 				},
 			},
 		},
@@ -14155,6 +14802,43 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 		Dependencies: []string{
 			"extensions.v1beta1.ThirdPartyResourceData", "io.k8s.meta.v1.ListMeta"},
 	},
+	"v1beta1.ThirdPartyResourceDataList": {
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "ThirdPartyResrouceDataList is a list of ThirdPartyResourceData.",
+				Properties: map[string]spec.Schema{
+					"metadata": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Standard list metadata More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
+							Ref:         spec.MustCreateRef("#/definitions/io.k8s.meta.v1.ListMeta"),
+						},
+					},
+					"items": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Items is the list of ThirdpartyResourceData.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: spec.MustCreateRef("#/definitions/extensions.v1beta1.ThirdPartyResourceData"),
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"items"},
+			},
+			VendorExtensible: spec.VendorExtensible{
+				Extensions: spec.Extensions{
+					"io.k8s.kubernetes.openapi.type.golang":         "k8s.io/kubernetes/pkg/apis/extensions/v1beta1.ThirdPartyResourceDataList",
+					"io.k8s.kubernetes.openapi.type.deprecated.use": "extensions.v1beta1.ThirdPartyResourceDataList",
+				},
+			},
+		},
+		Dependencies: []string{
+			"extensions.v1beta1.ThirdPartyResourceData", "io.k8s.meta.v1.ListMeta"},
+	},
 	"extensions.v1beta1.ThirdPartyResourceList": {
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -14185,6 +14869,43 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 			VendorExtensible: spec.VendorExtensible{
 				Extensions: spec.Extensions{
 					"io.k8s.kubernetes.openapi.type.golang": "k8s.io/kubernetes/pkg/apis/extensions/v1beta1.ThirdPartyResourceList",
+				},
+			},
+		},
+		Dependencies: []string{
+			"extensions.v1beta1.ThirdPartyResource", "io.k8s.meta.v1.ListMeta"},
+	},
+	"v1beta1.ThirdPartyResourceList": {
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "ThirdPartyResourceList is a list of ThirdPartyResources.",
+				Properties: map[string]spec.Schema{
+					"metadata": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Standard list metadata.",
+							Ref:         spec.MustCreateRef("#/definitions/io.k8s.meta.v1.ListMeta"),
+						},
+					},
+					"items": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Items is the list of ThirdPartyResources.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: spec.MustCreateRef("#/definitions/extensions.v1beta1.ThirdPartyResource"),
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"items"},
+			},
+			VendorExtensible: spec.VendorExtensible{
+				Extensions: spec.Extensions{
+					"io.k8s.kubernetes.openapi.type.golang":         "k8s.io/kubernetes/pkg/apis/extensions/v1beta1.ThirdPartyResourceList",
+					"io.k8s.kubernetes.openapi.type.deprecated.use": "extensions.v1beta1.ThirdPartyResourceList",
 				},
 			},
 		},
