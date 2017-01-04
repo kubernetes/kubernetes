@@ -27,7 +27,7 @@ import (
 
 // ensures the hard PodAntiAffinity is denied if it defines TopologyKey other than kubernetes.io/hostname.
 func TestInterPodAffinityAdmission(t *testing.T) {
-	handler := NewInterPodAntiAffinity(nil)
+	handler := NewInterPodAntiAffinity()
 	pod := api.Pod{
 		Spec: api.PodSpec{},
 	}
@@ -226,7 +226,7 @@ func TestInterPodAffinityAdmission(t *testing.T) {
 	}
 }
 func TestHandles(t *testing.T) {
-	handler := NewInterPodAntiAffinity(nil)
+	handler := NewInterPodAntiAffinity()
 	tests := map[admission.Operation]bool{
 		admission.Update:  true,
 		admission.Create:  true,

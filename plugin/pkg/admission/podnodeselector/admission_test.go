@@ -25,6 +25,7 @@ import (
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
 	"k8s.io/kubernetes/pkg/controller/informers"
+	kubeadmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util/wait"
 )
@@ -169,7 +170,7 @@ func TestHandles(t *testing.T) {
 		admission.Connect: false,
 		admission.Delete:  false,
 	} {
-		nodeEnvionment := NewPodNodeSelector(nil, nil)
+		nodeEnvionment := NewPodNodeSelector(nil)
 		if e, a := shouldHandle, nodeEnvionment.Handles(op); e != a {
 			t.Errorf("%v: shouldHandle=%t, handles=%t", op, e, a)
 		}
@@ -179,10 +180,9 @@ func TestHandles(t *testing.T) {
 // newHandlerForTest returns the admission controller configured for testing.
 func newHandlerForTest(c clientset.Interface) (*podNodeSelector, informers.SharedInformerFactory, error) {
 	f := informers.NewSharedInformerFactory(nil, c, 5*time.Minute)
-	handler := NewPodNodeSelector(c, nil)
-	plugins := []admission.Interface{handler}
-	pluginInitializer := admission.NewPluginInitializer(f, nil)
-	pluginInitializer.Initialize(plugins)
-	err := admission.Validate(plugins)
+	handler := NewPodNodeSelector(nil)
+	pluginInitializer := kubeadmission.NewPluginInitializer(c, f, nil)
+	pluginInitializer.Initialize(handler)
+	err := admission.Validate(handler)
 	return handler, f, err
 }

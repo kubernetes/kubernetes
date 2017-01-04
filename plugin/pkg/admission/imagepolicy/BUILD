@@ -21,7 +21,6 @@ go_library(
         "//pkg/api:go_default_library",
         "//pkg/api/errors:go_default_library",
         "//pkg/apis/imagepolicy/v1alpha1:go_default_library",
-        "//pkg/client/clientset_generated/internalclientset:go_default_library",
         "//pkg/client/restclient:go_default_library",
         "//pkg/runtime/schema:go_default_library",
         "//pkg/util/cache:go_default_library",
@@ -46,7 +45,6 @@ go_test(
         "//pkg/apis/imagepolicy/install:go_default_library",
         "//pkg/apis/imagepolicy/v1alpha1:go_default_library",
         "//pkg/auth/user:go_default_library",
-        "//pkg/client/clientset_generated/internalclientset/fake:go_default_library",
         "//pkg/client/unversioned/clientcmd/api/v1:go_default_library",
     ],
 )
