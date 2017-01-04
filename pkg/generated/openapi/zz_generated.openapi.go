@@ -2686,6 +2686,30 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 		},
 		Dependencies: []string{},
 	},
+	"v1.InternalEvent": {
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "InternalEvent makes watch.Event versioned",
+				Properties: map[string]spec.Schema{
+					"Type": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"string"},
+							Format: "",
+						},
+					},
+					"Object": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Object is:\n * If Type is Added or Modified: the new state of the object.\n * If Type is Deleted: the state of the object immediately before deletion.\n * If Type is Error: *api.Status is recommended; other types may make sense\n   depending on context.",
+							Ref:         spec.MustCreateRef("#/definitions/runtime.Object"),
+						},
+					},
+				},
+				Required: []string{"Type", "Object"},
+			},
+		},
+		Dependencies: []string{
+			"runtime.Object"},
+	},
 	"v1.Job": {
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -13174,29 +13198,5 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 			},
 		},
 		Dependencies: []string{},
-	},
-	"versioned.Event": {
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "Event represents a single event to a watched resource.",
-				Properties: map[string]spec.Schema{
-					"type": {
-						SchemaProps: spec.SchemaProps{
-							Type:   []string{"string"},
-							Format: "",
-						},
-					},
-					"object": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Object is:\n * If Type is Added or Modified: the new state of the object.\n * If Type is Deleted: the state of the object immediately before deletion.\n * If Type is Error: *api.Status is recommended; other types may make sense\n   depending on context.",
-							Ref:         spec.MustCreateRef("#/definitions/runtime.RawExtension"),
-						},
-					},
-				},
-				Required: []string{"type", "object"},
-			},
-		},
-		Dependencies: []string{
-			"runtime.RawExtension"},
 	},
 }

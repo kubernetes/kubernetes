@@ -203,7 +203,6 @@ go_test(
         "//pkg/util/term:go_default_library",
         "//pkg/util/wait:go_default_library",
         "//pkg/watch:go_default_library",
-        "//pkg/watch/versioned:go_default_library",
         "//vendor:github.com/spf13/cobra",
         "//vendor:github.com/stretchr/testify/assert",
         "//vendor:k8s.io/heapster/metrics/apis/metrics/v1alpha1",

@@ -22,6 +22,7 @@ package v1
 
 import (
 	conversion "k8s.io/kubernetes/pkg/conversion"
+	runtime "k8s.io/kubernetes/pkg/runtime"
 	time "time"
 )
 
@@ -147,6 +148,18 @@ func DeepCopy_v1_Duration(in interface{}, out interface{}, c *conversion.Cloner)
 	}
 }
 
+func DeepCopy_v1_Event(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*Event)
+		out := out.(*Event)
+		out.Type = in.Type
+		if err := runtime.DeepCopy_runtime_RawExtension(&in.Object, &out.Object, c); err != nil {
+			return err
+		}
+		return nil
+	}
+}
+
 func DeepCopy_v1_ExportOptions(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*ExportOptions)
@@ -226,6 +239,22 @@ func DeepCopy_v1_GroupVersionResource(in interface{}, out interface{}, c *conver
 		out.Group = in.Group
 		out.Version = in.Version
 		out.Resource = in.Resource
+		return nil
+	}
+}
+
+func DeepCopy_v1_InternalEvent(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*InternalEvent)
+		out := out.(*InternalEvent)
+		out.Type = in.Type
+		if in.Object == nil {
+			out.Object = nil
+		} else if newVal, err := c.DeepCopy(&in.Object); err != nil {
+			return err
+		} else {
+			out.Object = *newVal.(*runtime.Object)
+		}
 		return nil
 	}
 }

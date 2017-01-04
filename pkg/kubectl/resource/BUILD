@@ -73,7 +73,6 @@ go_test(
         "//pkg/util/errors:go_default_library",
         "//pkg/util/testing:go_default_library",
         "//pkg/watch:go_default_library",
-        "//pkg/watch/versioned:go_default_library",
         "//vendor:github.com/ghodss/yaml",
         "//vendor:github.com/stretchr/testify/assert",
     ],
