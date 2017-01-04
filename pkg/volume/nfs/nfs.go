@@ -137,6 +137,10 @@ func (plugin *nfsPlugin) NewRecycler(pvName string, spec *volume.Spec, eventReco
 	return newRecycler(pvName, spec, eventRecorder, plugin.host, plugin.config)
 }
 
+func (plugin *nfsPlugin) ConstructVolumeSpecFromName(volumeName string) (*volume.Spec, error) {
+	return plugin.ConstructVolumeSpec(volumeName, "")
+}
+
 func (plugin *nfsPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volume.Spec, error) {
 	nfsVolume := &v1.Volume{
 		Name: volumeName,

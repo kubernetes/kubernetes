@@ -150,6 +150,10 @@ func (plugin *iscsiPlugin) execCommand(command string, args []string) ([]byte, e
 	return cmd.CombinedOutput()
 }
 
+func (plugin *iscsiPlugin) ConstructVolumeSpecFromName(volumeName string) (*volume.Spec, error) {
+	return plugin.ConstructVolumeSpec(volumeName, "")
+}
+
 func (plugin *iscsiPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volume.Spec, error) {
 	iscsiVolume := &v1.Volume{
 		Name: volumeName,

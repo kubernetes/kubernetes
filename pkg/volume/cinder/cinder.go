@@ -205,6 +205,19 @@ func (plugin *cinderPlugin) getCloudProvider() (CinderProvider, error) {
 	}
 }
 
+func (plugin *cinderPlugin) ConstructVolumeSpecFromName(volumeName string) (*volume.Spec, error) {
+	// The volumeName and VolumeID are identical: see the GetVolumeName method
+	cinderVolume := &v1.Volume{
+		Name: volumeName,
+		VolumeSource: v1.VolumeSource{
+			Cinder: &v1.CinderVolumeSource{
+				VolumeID: volumeName,
+			},
+		},
+	}
+	return volume.NewSpecFromVolume(cinderVolume), nil
+}
+
 func (plugin *cinderPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volume.Spec, error) {
 	mounter := plugin.host.GetMounter()
 	pluginDir := plugin.host.GetPluginDir(plugin.GetPluginName())

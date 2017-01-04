@@ -126,6 +126,10 @@ func (plugin *azureFilePlugin) newUnmounterInternal(volName string, podUID types
 	}}, nil
 }
 
+func (plugin *azureFilePlugin) ConstructVolumeSpecFromName(volName string) (*volume.Spec, error) {
+	return plugin.ConstructVolumeSpec(volName, "")
+}
+
 func (plugin *azureFilePlugin) ConstructVolumeSpec(volName, mountPath string) (*volume.Spec, error) {
 	azureVolume := &v1.Volume{
 		Name: volName,

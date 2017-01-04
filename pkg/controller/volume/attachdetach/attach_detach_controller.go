@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
@@ -230,11 +231,75 @@ func (adc *attachDetachController) Run(stopCh <-chan struct{}) {
 	// 	return
 	// }
 
+	err := adc.populateActualStateOfWorld()
+	if err != nil {
+		glog.Errorf("error populating the actual state of world: %v", err)
+	}
+	err = adc.populateDesiredStateOfWorld()
+	if err != nil {
+		glog.Errorf("error populating the desired state of world: %v", err)
+	}
 	go adc.reconciler.Run(stopCh)
 	go adc.desiredStateOfWorldPopulator.Run(stopCh)
 
 	<-stopCh
 	glog.Infof("Shutting down Attach Detach Controller")
+}
+
+func (adc *attachDetachController) populateActualStateOfWorld() error {
+	glog.V(5).Infof("Populating ActualStateOfworld")
+	nodes, err := adc.kubeClient.Core().Nodes().List(metav1.ListOptions{})
+	if err != nil {
+		return err
+	}
+
+	for i := range nodes.Items {
+		nodeName := types.NodeName(nodes.Items[i].Name)
+		for _, attachedVolume := range nodes.Items[i].Status.VolumesAttached {
+			uniqueName := string(attachedVolume.Name)
+			pluginName, volumeName := volumehelper.SplitUniqueName(uniqueName)
+			plug, err := adc.volumePluginMgr.FindPluginByName(pluginName)
+			if err != nil {
+				glog.Errorf("could not find plugin named %s for volume %s: %v", pluginName, volumeName, err)
+				continue
+			}
+			volumeSpec, err := plug.ConstructVolumeSpecFromName(volumeName)
+			if err != nil {
+				glog.Errorf("could not construct volume spec in plugin %s for volume %s: %v", pluginName, volumeName, err)
+				continue
+			}
+			_, err = adc.actualStateOfWorld.AddVolumeNode(volumeSpec, nodeName, attachedVolume.DevicePath)
+			if err != nil {
+				glog.Errorf("error adding node to ActualStateOfWorld: %v", err)
+				continue
+			}
+			adc.processVolumesInUse(nodeName, nodes.Items[i].Status.VolumesInUse, true)
+		}
+	}
+	return nil
+}
+
+func (adc *attachDetachController) populateDesiredStateOfWorld() error {
+	glog.V(5).Infof("Populating DesiredStateOfworld")
+
+	nodes, err := adc.kubeClient.Core().Nodes().List(metav1.ListOptions{})
+	if err != nil {
+		return err
+	}
+	for i := range nodes.Items {
+		nodeName := types.NodeName(nodes.Items[i].Name)
+		adc.desiredStateOfWorld.AddNode(nodeName)
+	}
+
+	pods, err := adc.kubeClient.Core().Pods(v1.NamespaceAll).List(metav1.ListOptions{})
+	if err != nil {
+		return err
+	}
+	for _, pod := range pods.Items {
+		adc.podAdd(&pod)
+	}
+
+	return nil
 }
 
 func (adc *attachDetachController) podAdd(obj interface{}) {
@@ -298,7 +363,7 @@ func (adc *attachDetachController) nodeUpdate(oldObj, newObj interface{}) {
 		// detach controller. Add it to desired state of world.
 		adc.desiredStateOfWorld.AddNode(nodeName)
 	}
-	adc.processVolumesInUse(nodeName, node.Status.VolumesInUse)
+	adc.processVolumesInUse(nodeName, node.Status.VolumesInUse, false)
 }
 
 func (adc *attachDetachController) nodeDelete(obj interface{}) {
@@ -312,7 +377,7 @@ func (adc *attachDetachController) nodeDelete(obj interface{}) {
 		glog.V(10).Infof("%v", err)
 	}
 
-	adc.processVolumesInUse(nodeName, node.Status.VolumesInUse)
+	adc.processVolumesInUse(nodeName, node.Status.VolumesInUse, false)
 }
 
 // processPodVolumes processes the volumes in the given pod and adds them to the
@@ -539,7 +604,7 @@ func (adc *attachDetachController) getPVSpecFromCache(name string, pvcReadOnly b
 // corresponding volume in the actual state of the world to indicate that it is
 // mounted.
 func (adc *attachDetachController) processVolumesInUse(
-	nodeName types.NodeName, volumesInUse []v1.UniqueVolumeName) {
+	nodeName types.NodeName, volumesInUse []v1.UniqueVolumeName, forceUnmount bool) {
 	glog.V(4).Infof("processVolumesInUse for node %q", nodeName)
 	for _, attachedVolume := range adc.actualStateOfWorld.GetAttachedVolumesForNode(nodeName) {
 		mounted := false
@@ -550,7 +615,7 @@ func (adc *attachDetachController) processVolumesInUse(
 			}
 		}
 		err := adc.actualStateOfWorld.SetVolumeMountedByNode(
-			attachedVolume.VolumeName, nodeName, mounted)
+			attachedVolume.VolumeName, nodeName, mounted, forceUnmount)
 		if err != nil {
 			glog.Warningf(
 				"SetVolumeMountedByNode(%q, %q, %q) returned an error: %v",

@@ -185,6 +185,10 @@ func (plugin *glusterfsPlugin) execCommand(command string, args []string) ([]byt
 	return cmd.CombinedOutput()
 }
 
+func (plugin *glusterfsPlugin) ConstructVolumeSpecFromName(volumeName string) (*volume.Spec, error) {
+	return plugin.ConstructVolumeSpec(volumeName, "")
+}
+
 func (plugin *glusterfsPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volume.Spec, error) {
 	glusterfsVolume := &v1.Volume{
 		Name: volumeName,

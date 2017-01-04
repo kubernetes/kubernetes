@@ -172,6 +172,10 @@ func (p *flockerPlugin) newUnmounterInternal(volName string, podUID types.UID, m
 	}}, nil
 }
 
+func (p *flockerPlugin) ConstructVolumeSpecFromName(volumeName string) (*volume.Spec, error) {
+	return p.ConstructVolumeSpec(volumeName, "")
+}
+
 func (p *flockerPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volume.Spec, error) {
 	flockerVolume := &v1.Volume{
 		Name: volumeName,

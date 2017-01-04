@@ -20,6 +20,7 @@ package volumehelper
 
 import (
 	"fmt"
+	"strings"
 
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/volume"
@@ -86,4 +87,12 @@ func GetUniqueVolumeNameFromSpec(
 			volumePlugin.GetPluginName(),
 			volumeName),
 		nil
+}
+
+// SplitUniqueName takes the volume unique name and splits it into the plugin
+// name and volume name.
+func SplitUniqueName(uniqueName string) (string, string) {
+	components := strings.SplitN(uniqueName, "/", 3)
+	pluginName := fmt.Sprintf("%s/%s", components[0], components[1])
+	return pluginName, components[2]
 }
