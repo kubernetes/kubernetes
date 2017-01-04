@@ -38,7 +38,12 @@ func Forbidden(attributes authorizer.Attributes, w http.ResponseWriter, req *htt
 	w.Header().Set("Content-Type", "text/plain")
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.WriteHeader(http.StatusForbidden)
-	fmt.Fprintf(w, "%s: %q", msg, reason)
+
+	if len(reason) == 0 {
+		fmt.Fprintf(w, "%s", msg)
+	} else {
+		fmt.Fprintf(w, "%s: %q", msg, reason)
+	}
 }
 
 func forbiddenMessage(attributes authorizer.Attributes) string {
