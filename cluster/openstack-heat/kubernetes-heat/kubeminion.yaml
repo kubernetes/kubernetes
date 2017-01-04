@@ -61,9 +61,9 @@ parameters:
     description: OpenStack Region Name
     default: false
 
-  os_tenant_id:
+  os_tenant_name:
     type: string
-    description: OpenStack Tenant ID
+    description: OpenStack Tenant Name
     default: false
 
   enable_proxy:
@@ -216,7 +216,7 @@ resources:
             "$OS_USERNAME": {get_param: os_username}
             "$OS_PASSWORD": {get_param: os_password}
             "$OS_REGION_NAME": {get_param: os_region_name}
-            "$OS_TENANT_ID": {get_param: os_tenant_id}
+            "$OS_TENANT_NAME": {get_param: os_tenant_name}
             "$role": "kubernetes-pool"
             "$cluster_cidr": {get_param: cluster_cidr}
 
