@@ -23,7 +23,7 @@ import (
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/api/validation"
+	"k8s.io/kubernetes/pkg/api/validation/genericvalidation"
 )
 
 const (
@@ -53,10 +53,10 @@ func SplitUsername(username string) (string, string, error) {
 		return "", "", invalidUsernameErr
 	}
 	namespace, name := parts[0], parts[1]
-	if len(validation.ValidateNamespaceName(namespace, false)) != 0 {
+	if len(genericvalidation.ValidateNamespaceName(namespace, false)) != 0 {
 		return "", "", invalidUsernameErr
 	}
-	if len(validation.ValidateServiceAccountName(name, false)) != 0 {
+	if len(genericvalidation.ValidateServiceAccountName(name, false)) != 0 {
 		return "", "", invalidUsernameErr
 	}
 	return namespace, name, nil

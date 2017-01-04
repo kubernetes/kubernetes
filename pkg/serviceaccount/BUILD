@@ -18,7 +18,7 @@ go_library(
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/v1:go_default_library",
-        "//pkg/api/validation:go_default_library",
+        "//pkg/api/validation/genericvalidation:go_default_library",
         "//pkg/auth/authenticator:go_default_library",
         "//vendor:github.com/dgrijalva/jwt-go",
         "//vendor:github.com/golang/glog",
