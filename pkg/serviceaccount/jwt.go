@@ -26,9 +26,9 @@ import (
 	"fmt"
 	"io/ioutil"
 
+	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/auth/authenticator"
 
 	jwt "github.com/dgrijalva/jwt-go"
 	"github.com/golang/glog"

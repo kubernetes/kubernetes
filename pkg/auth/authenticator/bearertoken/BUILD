@@ -13,7 +13,7 @@ go_library(
     srcs = ["bearertoken.go"],
     tags = ["automanaged"],
     deps = [
-        "//pkg/auth/authenticator:go_default_library",
+        "//vendor:k8s.io/apiserver/pkg/authentication/authenticator",
         "//vendor:k8s.io/apiserver/pkg/authentication/user",
     ],
 )
@@ -24,7 +24,7 @@ go_test(
     library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
-        "//pkg/auth/authenticator:go_default_library",
+        "//vendor:k8s.io/apiserver/pkg/authentication/authenticator",
         "//vendor:k8s.io/apiserver/pkg/authentication/user",
     ],
 )

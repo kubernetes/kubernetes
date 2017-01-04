@@ -21,8 +21,8 @@ go_library(
     srcs = ["requestheader.go"],
     tags = ["automanaged"],
     deps = [
-        "//pkg/auth/authenticator:go_default_library",
         "//plugin/pkg/auth/authenticator/request/x509:go_default_library",
+        "//vendor:k8s.io/apiserver/pkg/authentication/authenticator",
         "//vendor:k8s.io/apiserver/pkg/authentication/user",
         "//vendor:k8s.io/client-go/pkg/util/cert",
         "//vendor:k8s.io/client-go/pkg/util/sets",

@@ -15,11 +15,11 @@ go_library(
     deps = [
         "//pkg/apis/authentication/install:go_default_library",
         "//pkg/apis/authentication/v1beta1:go_default_library",
-        "//pkg/auth/authenticator:go_default_library",
         "//pkg/client/clientset_generated/clientset/typed/authentication/v1beta1:go_default_library",
         "//pkg/runtime/schema:go_default_library",
         "//pkg/util/cache:go_default_library",
         "//plugin/pkg/webhook:go_default_library",
+        "//vendor:k8s.io/apiserver/pkg/authentication/authenticator",
         "//vendor:k8s.io/apiserver/pkg/authentication/user",
     ],
 )

@@ -20,10 +20,10 @@ package webhook
 import (
 	"time"
 
+	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/user"
 	_ "k8s.io/kubernetes/pkg/apis/authentication/install"
 	authentication "k8s.io/kubernetes/pkg/apis/authentication/v1beta1"
-	"k8s.io/kubernetes/pkg/auth/authenticator"
 	authenticationclient "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/authentication/v1beta1"
 	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/util/cache"

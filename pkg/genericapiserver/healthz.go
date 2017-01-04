@@ -19,7 +19,7 @@ package genericapiserver
 import (
 	"fmt"
 
-	"k8s.io/kubernetes/pkg/healthz"
+	"k8s.io/apiserver/pkg/healthz"
 )
 
 // AddHealthzCheck allows you to add a HealthzCheck.

@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"net/http"
 
-	"k8s.io/kubernetes/pkg/auth/authorizer"
+	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/kubernetes/pkg/util/runtime"
 )
 

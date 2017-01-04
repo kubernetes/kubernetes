@@ -25,8 +25,8 @@ import (
 	"testing"
 
 	"k8s.io/apiserver/pkg/authentication/user"
+	"k8s.io/apiserver/pkg/authorization/authorizer"
 	authenticationapi "k8s.io/kubernetes/pkg/apis/authentication"
-	"k8s.io/kubernetes/pkg/auth/authorizer"
 	"k8s.io/kubernetes/pkg/genericapiserver/api/request"
 )
 

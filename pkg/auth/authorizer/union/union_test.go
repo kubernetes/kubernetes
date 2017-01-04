@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/auth/authorizer"
+	"k8s.io/apiserver/pkg/authorization/authorizer"
 )
 
 type mockAuthzHandler struct {
