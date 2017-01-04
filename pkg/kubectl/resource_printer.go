@@ -352,6 +352,7 @@ func (p *YAMLPrinter) HandledResources() []string {
 
 type handlerEntry struct {
 	columns   []string
+	wideColumns []string
 	printFunc reflect.Value
 	args      []reflect.Value
 }
@@ -414,7 +415,7 @@ func (h *HumanReadablePrinter) EnsurePrintWithKind(kind string) {
 
 // Handler adds a print handler with a given set of columns to HumanReadablePrinter instance.
 // See validatePrintHandlerFunc for required method signature.
-func (h *HumanReadablePrinter) Handler(columns []string, printFunc interface{}) error {
+func (h *HumanReadablePrinter) Handler(columns []string, wideColumns []string, printFunc interface{}) error {
 	printFuncValue := reflect.ValueOf(printFunc)
 	if err := h.validatePrintHandlerFunc(printFuncValue); err != nil {
 		glog.Errorf("Unable to add print handler: %v", err)
@@ -424,6 +425,7 @@ func (h *HumanReadablePrinter) Handler(columns []string, printFunc interface{}) 
 	objType := printFuncValue.Type().In(0)
 	h.handlerMap[objType] = &handlerEntry{
 		columns:   columns,
+		wideColumns: wideColumns,
 		printFunc: printFuncValue,
 	}
 	return nil
@@ -515,6 +517,19 @@ var (
 	clusterColumns                   = []string{"NAME", "STATUS", "AGE"}
 	networkPolicyColumns             = []string{"NAME", "POD-SELECTOR", "AGE"}
 	certificateSigningRequestColumns = []string{"NAME", "AGE", "REQUESTOR", "CONDITION"}
+
+	//this is columns for -o wide
+	podWideColumns 		            = []string{"IP", "NODE"}
+	replicationControllerWideColumns    = []string{"CONTAINER(S)", "IMAGE(S)", "SELECTOR"}
+	batchJobWideColumns                 = []string{"CONTAINER(S)", "IMAGE(S)", "SELECTOR"}
+	serviceWideColumns		    = []string{"SELECTOR"}
+	daemonSetWideColumns 		    = []string{"CONTAINER(S)", "IMAGE(S)", "SELECTOR"}
+	deploymentWideColumns		    = []string{"CONTAINER(S)", "IMAGE(S)", "SELECTOR"}
+	replicaSetWideColumns		    = []string{"CONTAINER(S)", "IMAGE(S)", "SELECTOR"}
+	nodeWideColumns                     = []string{"EXTERNAL-IP"}
+	roleBindingWideColumns		    = []string{"ROLE", "USERS", "GROUPS", "SERVICEACCOUNTS"}
+	clusterRoleBindingWideColumns       = []string{"ROLE", "USERS", "GROUPS", "SERVICEACCOUNTS"}
+
 )
 
 func (h *HumanReadablePrinter) printPod(pod *api.Pod, w io.Writer, options PrintOptions) error {
@@ -536,79 +551,79 @@ func (h *HumanReadablePrinter) printPodList(podList *api.PodList, w io.Writer, o
 
 // addDefaultHandlers adds print handlers for default Kubernetes types.
 func (h *HumanReadablePrinter) addDefaultHandlers() {
-	h.Handler(podColumns, h.printPodList)
-	h.Handler(podColumns, h.printPod)
-	h.Handler(podTemplateColumns, printPodTemplate)
-	h.Handler(podTemplateColumns, printPodTemplateList)
-	h.Handler(podDisruptionBudgetColumns, printPodDisruptionBudget)
-	h.Handler(podDisruptionBudgetColumns, printPodDisruptionBudgetList)
-	h.Handler(replicationControllerColumns, printReplicationController)
-	h.Handler(replicationControllerColumns, printReplicationControllerList)
-	h.Handler(replicaSetColumns, printReplicaSet)
-	h.Handler(replicaSetColumns, printReplicaSetList)
-	h.Handler(daemonSetColumns, printDaemonSet)
-	h.Handler(daemonSetColumns, printDaemonSetList)
-	h.Handler(jobColumns, printJob)
-	h.Handler(jobColumns, printJobList)
-	h.Handler(cronJobColumns, printCronJob)
-	h.Handler(cronJobColumns, printCronJobList)
-	h.Handler(serviceColumns, printService)
-	h.Handler(serviceColumns, printServiceList)
-	h.Handler(ingressColumns, printIngress)
-	h.Handler(ingressColumns, printIngressList)
-	h.Handler(statefulSetColumns, printStatefulSet)
-	h.Handler(statefulSetColumns, printStatefulSetList)
-	h.Handler(endpointColumns, printEndpoints)
-	h.Handler(endpointColumns, printEndpointsList)
-	h.Handler(nodeColumns, printNode)
-	h.Handler(nodeColumns, printNodeList)
-	h.Handler(eventColumns, printEvent)
-	h.Handler(eventColumns, printEventList)
-	h.Handler(limitRangeColumns, printLimitRange)
-	h.Handler(limitRangeColumns, printLimitRangeList)
-	h.Handler(resourceQuotaColumns, printResourceQuota)
-	h.Handler(resourceQuotaColumns, printResourceQuotaList)
-	h.Handler(namespaceColumns, printNamespace)
-	h.Handler(namespaceColumns, printNamespaceList)
-	h.Handler(secretColumns, printSecret)
-	h.Handler(secretColumns, printSecretList)
-	h.Handler(serviceAccountColumns, printServiceAccount)
-	h.Handler(serviceAccountColumns, printServiceAccountList)
-	h.Handler(persistentVolumeClaimColumns, printPersistentVolumeClaim)
-	h.Handler(persistentVolumeClaimColumns, printPersistentVolumeClaimList)
-	h.Handler(persistentVolumeColumns, printPersistentVolume)
-	h.Handler(persistentVolumeColumns, printPersistentVolumeList)
-	h.Handler(componentStatusColumns, printComponentStatus)
-	h.Handler(componentStatusColumns, printComponentStatusList)
-	h.Handler(thirdPartyResourceColumns, printThirdPartyResource)
-	h.Handler(thirdPartyResourceColumns, printThirdPartyResourceList)
-	h.Handler(deploymentColumns, printDeployment)
-	h.Handler(deploymentColumns, printDeploymentList)
-	h.Handler(horizontalPodAutoscalerColumns, printHorizontalPodAutoscaler)
-	h.Handler(horizontalPodAutoscalerColumns, printHorizontalPodAutoscalerList)
-	h.Handler(configMapColumns, printConfigMap)
-	h.Handler(configMapColumns, printConfigMapList)
-	h.Handler(podSecurityPolicyColumns, printPodSecurityPolicy)
-	h.Handler(podSecurityPolicyColumns, printPodSecurityPolicyList)
-	h.Handler(thirdPartyResourceDataColumns, printThirdPartyResourceData)
-	h.Handler(thirdPartyResourceDataColumns, printThirdPartyResourceDataList)
-	h.Handler(clusterColumns, printCluster)
-	h.Handler(clusterColumns, printClusterList)
-	h.Handler(networkPolicyColumns, printNetworkPolicy)
-	h.Handler(networkPolicyColumns, printNetworkPolicyList)
-	h.Handler(roleColumns, printRole)
-	h.Handler(roleColumns, printRoleList)
-	h.Handler(roleBindingColumns, printRoleBinding)
-	h.Handler(roleBindingColumns, printRoleBindingList)
-	h.Handler(clusterRoleColumns, printClusterRole)
-	h.Handler(clusterRoleColumns, printClusterRoleList)
-	h.Handler(clusterRoleBindingColumns, printClusterRoleBinding)
-	h.Handler(clusterRoleBindingColumns, printClusterRoleBindingList)
-	h.Handler(certificateSigningRequestColumns, printCertificateSigningRequest)
-	h.Handler(certificateSigningRequestColumns, printCertificateSigningRequestList)
-	h.Handler(storageClassColumns, printStorageClass)
-	h.Handler(storageClassColumns, printStorageClassList)
-	h.Handler(statusColumns, printStatus)
+	h.Handler(podColumns, podWideColumns, h.printPodList)
+	h.Handler(podColumns, podWideColumns, h.printPod)
+	h.Handler(podTemplateColumns, nil, printPodTemplate)
+	h.Handler(podTemplateColumns, nil, printPodTemplateList)
+	h.Handler(podDisruptionBudgetColumns, nil, printPodDisruptionBudget)
+	h.Handler(podDisruptionBudgetColumns, nil, printPodDisruptionBudgetList)
+	h.Handler(replicationControllerColumns, replicationControllerWideColumns, printReplicationController)
+	h.Handler(replicationControllerColumns, replicationControllerWideColumns, printReplicationControllerList)
+	h.Handler(replicaSetColumns, replicaSetWideColumns, printReplicaSet)
+	h.Handler(replicaSetColumns, replicaSetWideColumns, printReplicaSetList)
+	h.Handler(daemonSetColumns, daemonSetWideColumns, printDaemonSet)
+	h.Handler(daemonSetColumns, daemonSetWideColumns, printDaemonSetList)
+	h.Handler(jobColumns, batchJobWideColumns, printJob)
+	h.Handler(jobColumns, batchJobWideColumns, printJobList)
+	h.Handler(cronJobColumns, batchJobWideColumns, printCronJob)
+	h.Handler(cronJobColumns, batchJobWideColumns, printCronJobList)
+	h.Handler(serviceColumns, serviceWideColumns, printService)
+	h.Handler(serviceColumns, serviceWideColumns, printServiceList)
+	h.Handler(ingressColumns, nil, printIngress)
+	h.Handler(ingressColumns, nil, printIngressList)
+	h.Handler(statefulSetColumns, nil, printStatefulSet)
+	h.Handler(statefulSetColumns, nil, printStatefulSetList)
+	h.Handler(endpointColumns, nil, printEndpoints)
+	h.Handler(endpointColumns, nil, printEndpointsList)
+	h.Handler(nodeColumns, nodeWideColumns, printNode)
+	h.Handler(nodeColumns, nodeWideColumns, printNodeList)
+	h.Handler(eventColumns, nil, printEvent)
+	h.Handler(eventColumns, nil, printEventList)
+	h.Handler(limitRangeColumns, nil, printLimitRange)
+	h.Handler(limitRangeColumns, nil, printLimitRangeList)
+	h.Handler(resourceQuotaColumns, nil, printResourceQuota)
+	h.Handler(resourceQuotaColumns, nil, printResourceQuotaList)
+	h.Handler(namespaceColumns, nil, printNamespace)
+	h.Handler(namespaceColumns, nil, printNamespaceList)
+	h.Handler(secretColumns, nil, printSecret)
+	h.Handler(secretColumns, nil, printSecretList)
+	h.Handler(serviceAccountColumns, nil, printServiceAccount)
+	h.Handler(serviceAccountColumns, nil, printServiceAccountList)
+	h.Handler(persistentVolumeClaimColumns, nil, printPersistentVolumeClaim)
+	h.Handler(persistentVolumeClaimColumns, nil, printPersistentVolumeClaimList)
+	h.Handler(persistentVolumeColumns, nil, printPersistentVolume)
+	h.Handler(persistentVolumeColumns, nil, printPersistentVolumeList)
+	h.Handler(componentStatusColumns, nil, printComponentStatus)
+	h.Handler(componentStatusColumns, nil, printComponentStatusList)
+	h.Handler(thirdPartyResourceColumns, nil, printThirdPartyResource)
+	h.Handler(thirdPartyResourceColumns, nil, printThirdPartyResourceList)
+	h.Handler(deploymentColumns, deploymentWideColumns, printDeployment)
+	h.Handler(deploymentColumns, deploymentWideColumns, printDeploymentList)
+	h.Handler(horizontalPodAutoscalerColumns, nil, printHorizontalPodAutoscaler)
+	h.Handler(horizontalPodAutoscalerColumns, nil, printHorizontalPodAutoscalerList)
+	h.Handler(configMapColumns, nil, printConfigMap)
+	h.Handler(configMapColumns, nil, printConfigMapList)
+	h.Handler(podSecurityPolicyColumns, nil, printPodSecurityPolicy)
+	h.Handler(podSecurityPolicyColumns, nil, printPodSecurityPolicyList)
+	h.Handler(thirdPartyResourceDataColumns, nil, printThirdPartyResourceData)
+	h.Handler(thirdPartyResourceDataColumns, nil, printThirdPartyResourceDataList)
+	h.Handler(clusterColumns, nil, printCluster)
+	h.Handler(clusterColumns, nil, printClusterList)
+	h.Handler(networkPolicyColumns, nil, printNetworkPolicy)
+	h.Handler(networkPolicyColumns, nil, printNetworkPolicyList)
+	h.Handler(roleColumns, nil, printRole)
+	h.Handler(roleColumns, nil, printRoleList)
+	h.Handler(roleBindingColumns, roleBindingWideColumns, printRoleBinding)
+	h.Handler(roleBindingColumns, roleBindingWideColumns, printRoleBindingList)
+	h.Handler(clusterRoleColumns, nil, printClusterRole)
+	h.Handler(clusterRoleColumns, nil, printClusterRoleList)
+	h.Handler(clusterRoleBindingColumns, clusterRoleBindingWideColumns, printClusterRoleBinding)
+	h.Handler(clusterRoleBindingColumns, clusterRoleBindingWideColumns, printClusterRoleBindingList)
+	h.Handler(certificateSigningRequestColumns, nil, printCertificateSigningRequest)
+	h.Handler(certificateSigningRequestColumns, nil, printCertificateSigningRequestList)
+	h.Handler(storageClassColumns, nil, printStorageClass)
+	h.Handler(storageClassColumns, nil, printStorageClassList)
+	h.Handler(statusColumns, nil, printStatus)
 }
 
 func (h *HumanReadablePrinter) unknown(data []byte, w io.Writer) error {
@@ -2351,38 +2366,9 @@ func formatLabelHeaders(columnLabels []string) []string {
 }
 
 // headers for -o wide
-func formatWideHeaders(wide bool, t reflect.Type) []string {
+func formatWideHeaders(wide bool, wideColumns []string) []string {
 	if wide {
-		if t.String() == "*api.Pod" || t.String() == "*api.PodList" {
-			return []string{"IP", "NODE"}
-		}
-		if t.String() == "*api.ReplicationController" || t.String() == "*api.ReplicationControllerList" {
-			return []string{"CONTAINER(S)", "IMAGE(S)", "SELECTOR"}
-		}
-		if t.String() == "*batch.Job" || t.String() == "*batch.JobList" {
-			return []string{"CONTAINER(S)", "IMAGE(S)", "SELECTOR"}
-		}
-		if t.String() == "*api.Service" || t.String() == "*api.ServiceList" {
-			return []string{"SELECTOR"}
-		}
-		if t.String() == "*extensions.DaemonSet" || t.String() == "*extensions.DaemonSetList" {
-			return []string{"CONTAINER(S)", "IMAGE(S)", "SELECTOR"}
-		}
-		if t.String() == "*extensions.Deployment" || t.String() == "*extensions.DeploymentList" {
-			return []string{"CONTAINER(S)", "IMAGE(S)", "SELECTOR"}
-		}
-		if t.String() == "*extensions.ReplicaSet" || t.String() == "*extensions.ReplicaSetList" {
-			return []string{"CONTAINER(S)", "IMAGE(S)", "SELECTOR"}
-		}
-		if t.String() == "*api.Node" || t.String() == "*api.NodeList" {
-			return []string{"EXTERNAL-IP"}
-		}
-		if t.String() == "*rbac.RoleBinding" || t.String() == "*rbac.RoleBindingList" {
-			return []string{"ROLE", "USERS", "GROUPS", "SERVICEACCOUNTS"}
-		}
-		if t.String() == "*rbac.ClusterRoleBinding" || t.String() == "*rbac.ClusterRoleBindingList" {
-			return []string{"ROLE", "USERS", "GROUPS", "SERVICEACCOUNTS"}
-		}
+		return wideColumns
 	}
 	return nil
 }
@@ -2418,7 +2404,7 @@ func (h *HumanReadablePrinter) PrintObj(obj runtime.Object, output io.Writer) er
 	t := reflect.TypeOf(obj)
 	if handler := h.handlerMap[t]; handler != nil {
 		if !h.options.NoHeaders && t != h.lastType {
-			headers := append(handler.columns, formatWideHeaders(h.options.Wide, t)...)
+			headers := append(handler.columns, formatWideHeaders(h.options.Wide, handler.wideColumns)...)
 			headers = append(headers, formatLabelHeaders(h.options.ColumnLabels)...)
 			// LABELS is always the last column.
 			headers = append(headers, formatShowLabelsHeader(h.options.ShowLabels, t)...)
