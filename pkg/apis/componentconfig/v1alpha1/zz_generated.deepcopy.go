@@ -170,7 +170,13 @@ func DeepCopy_v1alpha1_KubeletConfiguration(in interface{}, out interface{}, c *
 		out.FileCheckFrequency = in.FileCheckFrequency
 		out.HTTPCheckFrequency = in.HTTPCheckFrequency
 		out.ManifestURL = in.ManifestURL
-		out.ManifestURLHeader = in.ManifestURLHeader
+		if in.ManifestURLHeader != nil {
+			in, out := &in.ManifestURLHeader, &out.ManifestURLHeader
+			*out = make([]string, len(*in))
+			copy(*out, *in)
+		} else {
+			out.ManifestURLHeader = nil
+		}
 		if in.EnableServer != nil {
 			in, out := &in.EnableServer, &out.EnableServer
 			*out = new(bool)

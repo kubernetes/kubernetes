@@ -255,7 +255,7 @@ func autoConvert_v1alpha1_KubeletConfiguration_To_componentconfig_KubeletConfigu
 	out.FileCheckFrequency = in.FileCheckFrequency
 	out.HTTPCheckFrequency = in.HTTPCheckFrequency
 	out.ManifestURL = in.ManifestURL
-	out.ManifestURLHeader = in.ManifestURLHeader
+	out.ManifestURLHeader = *(*[]string)(unsafe.Pointer(&in.ManifestURLHeader))
 	if err := api.Convert_Pointer_bool_To_bool(&in.EnableServer, &out.EnableServer, s); err != nil {
 		return err
 	}
@@ -426,7 +426,7 @@ func autoConvert_componentconfig_KubeletConfiguration_To_v1alpha1_KubeletConfigu
 	out.FileCheckFrequency = in.FileCheckFrequency
 	out.HTTPCheckFrequency = in.HTTPCheckFrequency
 	out.ManifestURL = in.ManifestURL
-	out.ManifestURLHeader = in.ManifestURLHeader
+	out.ManifestURLHeader = *(*[]string)(unsafe.Pointer(&in.ManifestURLHeader))
 	if err := api.Convert_bool_To_Pointer_bool(&in.EnableServer, &out.EnableServer, s); err != nil {
 		return err
 	}
