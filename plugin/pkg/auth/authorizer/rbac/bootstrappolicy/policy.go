@@ -82,7 +82,7 @@ func ClusterRoles() []rbac.ClusterRole {
 			// a role which provides just enough power to discovery API versions for negotiation
 			ObjectMeta: api.ObjectMeta{Name: "system:discovery"},
 			Rules: []rbac.PolicyRule{
-				rbac.NewRule("get").URLs("/version", "/api", "/api/*", "/apis", "/apis/*").RuleOrDie(),
+				rbac.NewRule("get").URLs("/version", "/swaggerapi", "/swaggerapi/*", "/api", "/api/*", "/apis", "/apis/*").RuleOrDie(),
 			},
 		},
 		{
