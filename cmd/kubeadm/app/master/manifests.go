@@ -386,7 +386,9 @@ func getSchedulerCommand(cfg *kubeadmapi.MasterConfiguration) []string {
 }
 
 func getProxyCommand(cfg *kubeadmapi.MasterConfiguration) []string {
-	return getComponentBaseCommand(proxy)
+	return append(getComponentBaseCommand(proxy),
+		"--cluster-cidr="+cfg.Networking.PodSubnet,
+	)
 }
 
 func getProxyEnvVars() []api.EnvVar {
