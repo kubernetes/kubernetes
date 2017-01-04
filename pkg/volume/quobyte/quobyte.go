@@ -137,6 +137,10 @@ func getVolumeSource(spec *volume.Spec) (*v1.QuobyteVolumeSource, bool, error) {
 	return nil, false, fmt.Errorf("Spec does not reference a Quobyte volume type")
 }
 
+func (plugin *quobytePlugin) ConstructVolumeSpecFromName(volumeName string) (*volume.Spec, error) {
+	return plugin.ConstructVolumeSpec(volumeName, "")
+}
+
 func (plugin *quobytePlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volume.Spec, error) {
 	quobyteVolume := &v1.Volume{
 		Name: volumeName,

@@ -105,6 +105,12 @@ type VolumePlugin interface {
 	// information from input. This function is used by volume manager to reconstruct
 	// volume spec by reading the volume directories from disk
 	ConstructVolumeSpec(volumeName, mountPath string) (*Spec, error)
+
+	// ConstructVolumeSpecFromName constructs a volume spec based on the given volume
+	// name only. The spec may have incomplete information due to limited
+	// information from input. This function is used by volume manager to reconstruct
+	// volume spec by reading the volume directories from disk
+	ConstructVolumeSpecFromName(volumeName string) (*Spec, error)
 }
 
 // PersistentVolumePlugin is an extended interface of VolumePlugin and is used

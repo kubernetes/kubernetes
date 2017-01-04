@@ -128,6 +128,10 @@ func (plugin *emptyDirPlugin) newUnmounterInternal(volName string, podUID types.
 	return ed, nil
 }
 
+func (plugin *emptyDirPlugin) ConstructVolumeSpecFromName(volName string) (*volume.Spec, error) {
+	return plugin.ConstructVolumeSpec(volName, "")
+}
+
 func (plugin *emptyDirPlugin) ConstructVolumeSpec(volName, mountPath string) (*volume.Spec, error) {
 	emptyDirVolume := &v1.Volume{
 		Name: volName,
