@@ -267,7 +267,9 @@ func runEdit(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args 
 			if err != nil {
 				// syntax error
 				containsError = true
-				results.header.reasons = append(results.header.reasons, editReason{head: fmt.Sprintf("The edited file had a syntax error: %v", err)})
+				reason := fmt.Sprintf("The edited file had a syntax error: %v", err)
+				results.header.reasons = append(results.header.reasons, editReason{head: reason})
+				fmt.Fprintln(errOut, reason)
 				continue
 			}
 			// not a syntax error as it turns out...
