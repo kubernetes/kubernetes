@@ -101,7 +101,6 @@ func NewServer(config Config, runtime Runtime) (Server, error) {
 		runtime: &criAdapter{runtime},
 		cache:   newRequestCache(),
 	}
-	s.cache.startGC()
 
 	if s.config.BaseURL == nil {
 		s.config.BaseURL = &url.URL{
@@ -178,6 +177,9 @@ func (s *server) GetPortForward(req *runtimeapi.PortForwardRequest) (*runtimeapi
 	}
 	token, err := s.cache.Insert(req)
 	if err != nil {
+		if err == errCacheFull {
+			return nil, grpc.Errorf(codes.Unavailable, err.Error())
+		}
 		return nil, err
 	}
 	return &runtimeapi.PortForwardResponse{

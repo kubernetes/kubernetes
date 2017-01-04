@@ -24,7 +24,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"k8s.io/client-go/pkg/util/clock"
-	"k8s.io/client-go/pkg/util/wait"
 )
 
 func TestInsert(t *testing.T) {
@@ -64,13 +63,11 @@ func TestInsert(t *testing.T) {
 	assertCacheSize(t, c, CacheMaxSize)
 
 	// Insert again (should evict)
-	tok, err = c.Insert(nextRequest())
-	require.NoError(t, err)
-	assert.Len(t, tok, TokenLen)
+	_, err = c.Insert(nextRequest())
+	assert.Equal(t, errCacheFull, err, "should not accept new requests when full")
 	assertCacheSize(t, c, CacheMaxSize)
-	assert.NotContains(t, c.tokens, oldestTok, "oldest request should be evicted")
 	_, ok = c.Consume(oldestTok)
-	assert.False(t, ok, "oldest request should be evicted")
+	assert.True(t, ok, "oldest request should be valid")
 }
 
 func TestConsume(t *testing.T) {
@@ -152,24 +149,25 @@ func TestGC(t *testing.T) {
 	c.gc()
 	assertCacheSize(t, c, 0)
 
-	// expired: tok1, tok2
-	// non-expired: tok3, tok4
 	tok1, err := c.Insert(nextRequest())
 	require.NoError(t, err)
+	assertCacheSize(t, c, 1)
 	clock.Step(10 * time.Second)
 	tok2, err := c.Insert(nextRequest())
 	require.NoError(t, err)
+	assertCacheSize(t, c, 2)
+
+	// expired: tok1, tok2
+	// non-expired: tok3, tok4
 	clock.Step(2 * CacheTTL)
 	tok3, err := c.Insert(nextRequest())
 	require.NoError(t, err)
+	assertCacheSize(t, c, 1)
 	clock.Step(10 * time.Second)
 	tok4, err := c.Insert(nextRequest())
 	require.NoError(t, err)
-	assertCacheSize(t, c, 4)
-
-	c.gc()
-
 	assertCacheSize(t, c, 2)
+
 	_, ok := c.Consume(tok1)
 	assert.False(t, ok)
 	_, ok = c.Consume(tok2)
@@ -185,29 +183,12 @@ func TestGC(t *testing.T) {
 		require.NoError(t, err)
 	}
 	assertCacheSize(t, c, CacheMaxSize)
-	c.gc()
-	assertCacheSize(t, c, CacheMaxSize)
 
 	// When everything is expired
 	clock.Step(2 * CacheTTL)
-	c.gc()
-	assertCacheSize(t, c, 0)
-}
-
-func TestGCLoop(t *testing.T) {
-	c, clock := newTestCache()
-	c.startGC()
-
-	_, err := c.Insert(nextRequest())
+	_, err = c.Insert(nextRequest())
 	require.NoError(t, err)
 	assertCacheSize(t, c, 1)
-
-	clock.Step(2 * CacheTTL)
-
-	wait.PollImmediate(2*time.Second, wait.ForeverTestTimeout, func() (bool, error) {
-		return len(c.tokens) == 0, nil
-	})
-	assertCacheSize(t, c, 0)
 }
 
 func newTestCache() (*requestCache, *clock.FakeClock) {
