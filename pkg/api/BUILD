@@ -102,7 +102,6 @@ go_test(
         "//pkg/util/sets:go_default_library",
         "//pkg/util/uuid:go_default_library",
         "//pkg/watch:go_default_library",
-        "//pkg/watch/versioned:go_default_library",
         "//vendor:github.com/davecgh/go-spew/spew",
         "//vendor:github.com/gogo/protobuf/proto",
         "//vendor:github.com/golang/protobuf/proto",

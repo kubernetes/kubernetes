@@ -22,6 +22,7 @@ package v1
 
 import (
 	conversion "k8s.io/kubernetes/pkg/conversion"
+	runtime "k8s.io/kubernetes/pkg/runtime"
 	reflect "reflect"
 )
 
@@ -34,6 +35,7 @@ func GetGeneratedDeepCopyFuncs() []conversion.GeneratedDeepCopyFunc {
 		{Fn: DeepCopy_v1_APIResourceList, InType: reflect.TypeOf(&APIResourceList{})},
 		{Fn: DeepCopy_v1_APIVersions, InType: reflect.TypeOf(&APIVersions{})},
 		{Fn: DeepCopy_v1_Duration, InType: reflect.TypeOf(&Duration{})},
+		{Fn: DeepCopy_v1_Event, InType: reflect.TypeOf(&Event{})},
 		{Fn: DeepCopy_v1_ExportOptions, InType: reflect.TypeOf(&ExportOptions{})},
 		{Fn: DeepCopy_v1_GetOptions, InType: reflect.TypeOf(&GetOptions{})},
 		{Fn: DeepCopy_v1_GroupKind, InType: reflect.TypeOf(&GroupKind{})},
@@ -42,6 +44,7 @@ func GetGeneratedDeepCopyFuncs() []conversion.GeneratedDeepCopyFunc {
 		{Fn: DeepCopy_v1_GroupVersionForDiscovery, InType: reflect.TypeOf(&GroupVersionForDiscovery{})},
 		{Fn: DeepCopy_v1_GroupVersionKind, InType: reflect.TypeOf(&GroupVersionKind{})},
 		{Fn: DeepCopy_v1_GroupVersionResource, InType: reflect.TypeOf(&GroupVersionResource{})},
+		{Fn: DeepCopy_v1_InternalEvent, InType: reflect.TypeOf(&InternalEvent{})},
 		{Fn: DeepCopy_v1_LabelSelector, InType: reflect.TypeOf(&LabelSelector{})},
 		{Fn: DeepCopy_v1_LabelSelectorRequirement, InType: reflect.TypeOf(&LabelSelectorRequirement{})},
 		{Fn: DeepCopy_v1_ListMeta, InType: reflect.TypeOf(&ListMeta{})},
@@ -161,6 +164,18 @@ func DeepCopy_v1_Duration(in interface{}, out interface{}, c *conversion.Cloner)
 	}
 }
 
+func DeepCopy_v1_Event(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*Event)
+		out := out.(*Event)
+		*out = *in
+		if err := runtime.DeepCopy_runtime_RawExtension(&in.Object, &out.Object, c); err != nil {
+			return err
+		}
+		return nil
+	}
+}
+
 func DeepCopy_v1_ExportOptions(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*ExportOptions)
@@ -229,6 +244,23 @@ func DeepCopy_v1_GroupVersionResource(in interface{}, out interface{}, c *conver
 		in := in.(*GroupVersionResource)
 		out := out.(*GroupVersionResource)
 		*out = *in
+		return nil
+	}
+}
+
+func DeepCopy_v1_InternalEvent(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*InternalEvent)
+		out := out.(*InternalEvent)
+		*out = *in
+		// in.Object is kind 'Interface'
+		if in.Object != nil {
+			if newVal, err := c.DeepCopy(&in.Object); err != nil {
+				return err
+			} else {
+				out.Object = *newVal.(*runtime.Object)
+			}
+		}
 		return nil
 	}
 }

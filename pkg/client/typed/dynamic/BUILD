@@ -50,7 +50,6 @@ go_test(
         "//pkg/runtime/schema:go_default_library",
         "//pkg/runtime/serializer/streaming:go_default_library",
         "//pkg/watch:go_default_library",
-        "//pkg/watch/versioned:go_default_library",
     ],
 )
 
