@@ -47,7 +47,7 @@ computer.
 
 ## Cassandra Docker
 
-The pods use the [```gcr.io/google-samples/cassandra:v11```](image/Dockerfile)
+The pods use the [```gcr.io/google-samples/cassandra:v12```](image/Dockerfile)
 image from Google's [container registry](https://cloud.google.com/container-registry/docs/).
 The docker is based on `debian:jessie` and includes OpenJDK 8. This image
 includes a standard Cassandra installation from the Apache Debian repo.  Through the use of environment variables you are able to change values that are inserted into the `cassandra.yaml`.
@@ -193,7 +193,7 @@ spec:
     spec:
       containers:
       - name: cassandra
-        image: gcr.io/google-samples/cassandra:v11
+        image: gcr.io/google-samples/cassandra:v12
         imagePullPolicy: Always
         ports:
         - containerPort: 7000
@@ -230,6 +230,9 @@ spec:
             value: "Rack1-K8Demo"
           - name: CASSANDRA_AUTO_BOOTSTRAP
             value: "false"
+            # If you need container healthcheck output
+            #- name: DEBUG
+            #  value: 1
           - name: POD_IP
             valueFrom:
               fieldRef:
@@ -458,6 +461,9 @@ spec:
               value: 100M
             - name: CASSANDRA_SEED_PROVIDER
               value: "io.k8s.cassandra.KubernetesSeedProvider"
+              # If you need container healthcheck output
+              #- name: DEBUG
+              #  value: 1
             - name: POD_NAMESPACE
               valueFrom:
                 fieldRef:
@@ -466,7 +472,7 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: status.podIP
-          image: gcr.io/google-samples/cassandra:v11
+          image: gcr.io/google-samples/cassandra:v12
           name: cassandra
           ports:
             - containerPort: 7000
@@ -515,7 +521,7 @@ You can list the new controller:
 
 $ kubectl get rc -o wide
 NAME        DESIRED   CURRENT   AGE       CONTAINER(S)   IMAGE(S)                             SELECTOR
-cassandra   2         2         11s       cassandra      gcr.io/google-samples/cassandra:v11   app=cassandra
+cassandra   2         2         11s       cassandra      gcr.io/google-samples/cassandra:v12   app=cassandra
 
 ```
 
@@ -684,6 +690,9 @@ spec:
               value: 100M
             - name: CASSANDRA_SEED_PROVIDER
               value: "io.k8s.cassandra.KubernetesSeedProvider"
+              # If you need container healthcheck output
+              #- name: DEBUG
+              #  value: 1
             - name: POD_NAMESPACE
               valueFrom:
                 fieldRef:
@@ -692,7 +701,7 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: status.podIP
-          image: gcr.io/google-samples/cassandra:v11
+          image: gcr.io/google-samples/cassandra:v12
           name: cassandra
           ports:
             - containerPort: 7000

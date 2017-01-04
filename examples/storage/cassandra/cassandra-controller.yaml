@@ -30,6 +30,9 @@ spec:
               value: 100M
             - name: CASSANDRA_SEED_PROVIDER
               value: "io.k8s.cassandra.KubernetesSeedProvider"
+              # If you need container healthcheck output
+              #- name: DEBUG
+              #  value: 1
             - name: POD_NAMESPACE
               valueFrom:
                 fieldRef:
@@ -38,7 +41,7 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: status.podIP
-          image: gcr.io/google-samples/cassandra:v11
+          image: gcr.io/google-samples/cassandra:v12
           name: cassandra
           ports:
             - containerPort: 7000

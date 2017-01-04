@@ -12,7 +12,7 @@ spec:
     spec:
       containers:
       - name: cassandra
-        image: gcr.io/google-samples/cassandra:v11
+        image: gcr.io/google-samples/cassandra:v12
         imagePullPolicy: Always
         ports:
         - containerPort: 7000
@@ -49,6 +49,9 @@ spec:
             value: "Rack1-K8Demo"
           - name: CASSANDRA_AUTO_BOOTSTRAP
             value: "false"
+            # If you need container healthcheck output
+            #- name: DEBUG
+            #  value: 1
           - name: POD_IP
             valueFrom:
               fieldRef:
