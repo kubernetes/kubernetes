@@ -269,6 +269,7 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 		masterServiceNs string                 // the namespace to read master service info from
 		nilLister       bool                   // whether the lister should be nil
 		configMap       *v1.ConfigMap          // an optional ConfigMap to pull from
+		secret          *v1.Secret             // an optional Secret to pull from
 		expectedEnvs    []kubecontainer.EnvVar // a set of expected environment vars
 		expectedError   bool                   // does the test fail
 	}{
@@ -733,6 +734,132 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 			},
 			expectedError: true,
 		},
+		{
+			name: "secret",
+			ns:   "test1",
+			container: &v1.Container{
+				EnvFrom: []v1.EnvFromSource{
+					{
+						SecretRef: &v1.SecretEnvSource{LocalObjectReference: v1.LocalObjectReference{Name: "test-secret"}},
+					},
+					{
+						Prefix:    "p_",
+						SecretRef: &v1.SecretEnvSource{LocalObjectReference: v1.LocalObjectReference{Name: "test-secret"}},
+					},
+				},
+				Env: []v1.EnvVar{
+					{
+						Name:  "TEST_LITERAL",
+						Value: "test-test-test",
+					},
+					{
+						Name:  "EXPANSION_TEST",
+						Value: "$(REPLACE_ME)",
+					},
+					{
+						Name:  "DUPE_TEST",
+						Value: "ENV_VAR",
+					},
+				},
+			},
+			masterServiceNs: "nothing",
+			nilLister:       false,
+			secret: &v1.Secret{
+				ObjectMeta: v1.ObjectMeta{
+					Namespace: "test1",
+					Name:      "test-secret",
+				},
+				Data: map[string][]byte{
+					"REPLACE_ME": []byte("FROM_SECRET"),
+					"DUPE_TEST":  []byte("SECRET"),
+				},
+			},
+			expectedEnvs: []kubecontainer.EnvVar{
+				{
+					Name:  "TEST_LITERAL",
+					Value: "test-test-test",
+				},
+				{
+					Name:  "TEST_SERVICE_HOST",
+					Value: "1.2.3.3",
+				},
+				{
+					Name:  "TEST_SERVICE_PORT",
+					Value: "8083",
+				},
+				{
+					Name:  "TEST_PORT",
+					Value: "tcp://1.2.3.3:8083",
+				},
+				{
+					Name:  "TEST_PORT_8083_TCP",
+					Value: "tcp://1.2.3.3:8083",
+				},
+				{
+					Name:  "TEST_PORT_8083_TCP_PROTO",
+					Value: "tcp",
+				},
+				{
+					Name:  "TEST_PORT_8083_TCP_PORT",
+					Value: "8083",
+				},
+				{
+					Name:  "TEST_PORT_8083_TCP_ADDR",
+					Value: "1.2.3.3",
+				},
+				{
+					Name:  "REPLACE_ME",
+					Value: "FROM_SECRET",
+				},
+				{
+					Name:  "EXPANSION_TEST",
+					Value: "FROM_SECRET",
+				},
+				{
+					Name:  "DUPE_TEST",
+					Value: "ENV_VAR",
+				},
+				{
+					Name:  "p_REPLACE_ME",
+					Value: "FROM_SECRET",
+				},
+				{
+					Name:  "p_DUPE_TEST",
+					Value: "SECRET",
+				},
+			},
+		},
+		{
+			name: "secret_missing",
+			ns:   "test1",
+			container: &v1.Container{
+				EnvFrom: []v1.EnvFromSource{
+					{SecretRef: &v1.SecretEnvSource{LocalObjectReference: v1.LocalObjectReference{Name: "test-secret"}}},
+				},
+			},
+			masterServiceNs: "nothing",
+			expectedError:   true,
+		},
+		{
+			name: "secret_invalid_keys",
+			ns:   "test1",
+			container: &v1.Container{
+				EnvFrom: []v1.EnvFromSource{
+					{SecretRef: &v1.SecretEnvSource{LocalObjectReference: v1.LocalObjectReference{Name: "test-secret"}}},
+				},
+			},
+			masterServiceNs: "nothing",
+			secret: &v1.Secret{
+				ObjectMeta: v1.ObjectMeta{
+					Namespace: "test1",
+					Name:      "test-secret",
+				},
+				Data: map[string][]byte{
+					"-1234": []byte("abc"),
+				},
+			},
+			expectedError: true,
+		},
 	}
 
 	for _, tc := range testCases {
@@ -751,6 +878,14 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 				err = errors.New("no configmap defined")
 			}
 			return true, tc.configMap, err
+		})
+
+		testKubelet.fakeKubeClient.AddReactor("get", "secrets", func(action core.Action) (bool, runtime.Object, error) {
+			var err error
+			if tc.secret == nil {
+				err = errors.New("no secret defined")
+			}
+			return true, tc.secret, err
 		})
 
 		testPod := &v1.Pod{
