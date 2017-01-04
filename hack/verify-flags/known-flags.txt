@@ -635,3 +635,13 @@ garbage-collector-enabled
 viper-config
 log-lines-total
 run-duration
+apiserver-address
+apiserver-insecure-address
+apiserver-insecure-port
+apiserver-port
+dns-domain
+dns-ip
+enable-dns
+extra-config
+generate-certs
+localkube-directory

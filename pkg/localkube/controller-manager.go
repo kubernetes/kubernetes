@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,7 +17,7 @@ limitations under the License.
 package localkube
 
 import (
-	controllerManager "k8s.io/kubernetes/cmd/kube-controller-manager/app"
+	controllermanager "k8s.io/kubernetes/cmd/kube-controller-manager/app"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/app/options"
 )
 
@@ -44,6 +44,6 @@ func StartControllerManagerServer(lk LocalkubeServer) func() error {
 	lk.SetExtraConfigForComponent("controller-manager", &config)
 
 	return func() error {
-		return controllerManager.Run(config)
+		return controllermanager.Run(config)
 	}
 }
