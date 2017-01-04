@@ -36,7 +36,7 @@ go_test(
         "rate_limitting_queue_test.go",
         "timed_queue_test.go",
     ],
-    library = "go_default_library",
+    library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
         "//pkg/api/v1:go_default_library",

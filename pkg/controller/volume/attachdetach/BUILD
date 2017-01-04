@@ -38,7 +38,7 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = ["attach_detach_controller_test.go"],
-    library = "go_default_library",
+    library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
         "//pkg/controller/informers:go_default_library",

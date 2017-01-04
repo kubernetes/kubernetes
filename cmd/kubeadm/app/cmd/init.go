@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"path"
 
 	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
@@ -30,6 +31,10 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/flags"
 	"k8s.io/kubernetes/cmd/kubeadm/app/discovery"
 	kubemaster "k8s.io/kubernetes/cmd/kubeadm/app/master"
+
+	certphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
+	kubeconfigphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubeconfig"
+
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/pkg/api"
@@ -75,6 +80,10 @@ func NewCmdInit(out io.Writer) *cobra.Command {
 		&cfg.API.AdvertiseAddresses, "api-advertise-addresses", cfg.API.AdvertiseAddresses,
 		"The IP addresses to advertise, in case autodetection fails",
 	)
+	cmd.PersistentFlags().Int32Var(
+		&cfg.API.Port, "api-port", cfg.API.Port,
+		"Port for API to bind to",
+	)
 	cmd.PersistentFlags().StringSliceVar(
 		&cfg.API.ExternalDNSNames, "api-external-dns-names", cfg.API.ExternalDNSNames,
 		"The DNS names to advertise, in case you have configured them yourself",
@@ -102,31 +111,6 @@ func NewCmdInit(out io.Writer) *cobra.Command {
 	)
 
 	cmd.PersistentFlags().StringVar(&cfgPath, "config", cfgPath, "Path to kubeadm config file")
-
-	// TODO (phase1+) @errordeveloper make the flags below not show up in --help but rather on --advanced-help
-	cmd.PersistentFlags().StringSliceVar(
-		&cfg.Etcd.Endpoints, "external-etcd-endpoints", cfg.Etcd.Endpoints,
-		"etcd endpoints to use, in case you have an external cluster",
-	)
-	cmd.PersistentFlags().MarkDeprecated("external-etcd-endpoints", "this flag will be removed when componentconfig exists")
-
-	cmd.PersistentFlags().StringVar(
-		&cfg.Etcd.CAFile, "external-etcd-cafile", cfg.Etcd.CAFile,
-		"etcd certificate authority certificate file. Note: The path must be in /etc/ssl/certs",
-	)
-	cmd.PersistentFlags().MarkDeprecated("external-etcd-cafile", "this flag will be removed when componentconfig exists")
-
-	cmd.PersistentFlags().StringVar(
-		&cfg.Etcd.CertFile, "external-etcd-certfile", cfg.Etcd.CertFile,
-		"etcd client certificate file. Note: The path must be in /etc/ssl/certs",
-	)
-	cmd.PersistentFlags().MarkDeprecated("external-etcd-certfile", "this flag will be removed when componentconfig exists")
-
-	cmd.PersistentFlags().StringVar(
-		&cfg.Etcd.KeyFile, "external-etcd-keyfile", cfg.Etcd.KeyFile,
-		"etcd client key file. Note: The path must be in /etc/ssl/certs",
-	)
-	cmd.PersistentFlags().MarkDeprecated("external-etcd-keyfile", "this flag will be removed when componentconfig exists")
 
 	cmd.PersistentFlags().BoolVar(
 		&skipPreFlight, "skip-preflight-checks", skipPreFlight,
@@ -215,6 +199,13 @@ func (i *Init) Validate() error {
 // Run executes master node provisioning, including certificates, needed static pod manifests, etc.
 func (i *Init) Run(out io.Writer) error {
 
+	// PHASE 1: Generate certificates
+	caCert, err := certphase.CreatePKIAssets(i.cfg, kubeadmapi.GlobalEnvParams.HostPKIPath)
+	if err != nil {
+		return err
+	}
+
+	// Exception:
 	if i.cfg.Discovery.Token != nil {
 		if err := kubemaster.PrepareTokenDiscovery(i.cfg.Discovery.Token); err != nil {
 			return err
@@ -224,36 +215,23 @@ func (i *Init) Run(out io.Writer) error {
 		}
 	}
 
+	// PHASE 2: Generate kubeconfig files for the admin and the kubelet
+
+	// TODO this is not great, but there is only one address we can use here
+	// so we'll pick the first one, there is much of chance to have an empty
+	// slice by the time this gets called
+	masterEndpoint := fmt.Sprintf("https://%s:%d", i.cfg.API.AdvertiseAddresses[0], i.cfg.API.Port)
+	err = kubeconfigphase.CreateAdminAndKubeletKubeConfig(masterEndpoint, kubeadmapi.GlobalEnvParams.HostPKIPath, kubeadmapi.GlobalEnvParams.KubernetesDir)
+	if err != nil {
+		return err
+	}
+
+	// Phase 3: Bootstrap the control plane
 	if err := kubemaster.WriteStaticPodManifests(i.cfg); err != nil {
 		return err
 	}
 
-	caKey, caCert, err := kubemaster.CreatePKIAssets(i.cfg)
-	if err != nil {
-		return err
-	}
-
-	kubeconfigs, err := kubemaster.CreateCertsAndConfigForClients(i.cfg.API, []string{"kubelet", "admin"}, caKey, caCert)
-	if err != nil {
-		return err
-	}
-
-	// kubeadm is responsible for writing the following kubeconfig file, which
-	// kubelet should be waiting for. Help user avoid foot-shooting by refusing to
-	// write a file that has already been written (the kubelet will be up and
-	// running in that case - they'd need to stop the kubelet, remove the file, and
-	// start it again in that case).
-	// TODO(phase1+) this is no longer the right place to guard against foo-shooting,
-	// we need to decide how to handle existing files (it may be handy to support
-	// importing existing files, may be we could even make our command idempotant,
-	// or at least allow for external PKI and stuff)
-	for name, kubeconfig := range kubeconfigs {
-		if err := kubeadmutil.WriteKubeconfigIfNotExists(name, kubeconfig); err != nil {
-			return err
-		}
-	}
-
-	client, err := kubemaster.CreateClientAndWaitForAPI(kubeconfigs["admin"])
+	client, err := kubemaster.CreateClientAndWaitForAPI(path.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, kubeconfigphase.AdminKubeConfigFileName))
 	if err != nil {
 		return err
 	}

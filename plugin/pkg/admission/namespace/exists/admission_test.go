@@ -28,6 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
 	"k8s.io/kubernetes/pkg/client/testing/core"
 	"k8s.io/kubernetes/pkg/controller/informers"
+	kubeadmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/wait"
 )
@@ -35,11 +36,10 @@ import (
 // newHandlerForTest returns the admission controller configured for testing.
 func newHandlerForTest(c clientset.Interface) (admission.Interface, informers.SharedInformerFactory, error) {
 	f := informers.NewSharedInformerFactory(nil, c, 5*time.Minute)
-	handler := NewExists(c)
-	plugins := []admission.Interface{handler}
-	pluginInitializer := admission.NewPluginInitializer(f, nil)
-	pluginInitializer.Initialize(plugins)
-	err := admission.Validate(plugins)
+	handler := NewExists()
+	pluginInitializer := kubeadmission.NewPluginInitializer(c, f, nil)
+	pluginInitializer.Initialize(handler)
+	err := admission.Validate(handler)
 	return handler, f, err
 }
 

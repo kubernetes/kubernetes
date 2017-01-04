@@ -29,7 +29,7 @@ go_test(
     data = [
         "example_proc_cgroup",
     ],
-    library = "go_default_library",
+    library = ":go_default_library",
     tags = [
         "automanaged",
     ],

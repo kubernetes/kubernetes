@@ -19,7 +19,10 @@ go_test(
     srcs = ["token_test.go"],
     args = ["--kubeadm-path=../kubeadm"],
     data = ["//cmd/kubeadm"],
-    library = "go_default_library",
-    tags = ["automanaged"],
-    deps = [],
+    library = ":go_default_library",
+    tags = [
+        "automanaged",
+        "integration",
+        "skip",
+    ],
 )

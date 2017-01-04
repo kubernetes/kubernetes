@@ -27,7 +27,7 @@ go_test(
         "pod_update_test.go",
         "types_test.go",
     ],
-    library = "go_default_library",
+    library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
         "//pkg/api/v1:go_default_library",

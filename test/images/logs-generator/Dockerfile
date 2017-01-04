@@ -14,7 +14,6 @@
 
 FROM gcr.io/google_containers/ubuntu-slim:0.4
 
-MAINTAINER Mik Vyatskov <vmik@google.com>
 
 COPY logs-generator /
 

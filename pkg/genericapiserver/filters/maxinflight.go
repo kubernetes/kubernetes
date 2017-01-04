@@ -20,9 +20,9 @@ import (
 	"fmt"
 	"net/http"
 
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
-	apiserverrequest "k8s.io/kubernetes/pkg/apiserver/request"
+	apirequest "k8s.io/kubernetes/pkg/genericapiserver/api/request"
+	genericapirequest "k8s.io/kubernetes/pkg/genericapiserver/api/request"
 	"k8s.io/kubernetes/pkg/httplog"
 	"k8s.io/kubernetes/pkg/util/sets"
 
@@ -46,7 +46,7 @@ func WithMaxInFlightLimit(
 	handler http.Handler,
 	nonMutatingLimit int,
 	mutatingLimit int,
-	requestContextMapper api.RequestContextMapper,
+	requestContextMapper genericapirequest.RequestContextMapper,
 	longRunningRequestCheck LongRunningRequestCheck,
 ) http.Handler {
 	if nonMutatingLimit == 0 && mutatingLimit == 0 {
@@ -67,7 +67,7 @@ func WithMaxInFlightLimit(
 			handleError(w, r, fmt.Errorf("no context found for request, handler chain must be wrong"))
 			return
 		}
-		requestInfo, ok := apiserverrequest.RequestInfoFrom(ctx)
+		requestInfo, ok := apirequest.RequestInfoFrom(ctx)
 		if !ok {
 			handleError(w, r, fmt.Errorf("no RequestInfo found in context, handler chain must be wrong"))
 			return

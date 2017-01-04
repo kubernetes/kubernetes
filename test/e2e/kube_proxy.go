@@ -47,7 +47,7 @@ var _ = framework.KubeDescribe("Network", func() {
 
 	It("should set TCP CLOSE_WAIT timeout", func() {
 		nodes := framework.GetReadySchedulableNodesOrDie(fr.ClientSet)
-		ips := collectAddresses(nodes, v1.NodeInternalIP)
+		ips := framework.CollectAddresses(nodes, v1.NodeInternalIP)
 
 		if len(nodes.Items) < 2 {
 			framework.Skipf(

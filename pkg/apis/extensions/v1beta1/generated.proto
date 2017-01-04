@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors.
+Copyright 2017 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -138,6 +138,10 @@ message DaemonSetStatus {
   // NumberReady is the number of nodes that should be running the daemon pod and have one
   // or more of the daemon pod running and ready.
   optional int32 numberReady = 4;
+
+  // ObservedGeneration is the most recent generation observed by the daemon set controller.
+  // +optional
+  optional int64 observedGeneration = 5;
 }
 
 // Deployment enables declarative updates for Pods and ReplicaSets.
@@ -261,6 +265,10 @@ message DeploymentStatus {
   // Total number of non-terminated pods targeted by this deployment that have the desired template spec.
   // +optional
   optional int32 updatedReplicas = 3;
+
+  // Total number of ready pods targeted by this deployment.
+  // +optional
+  optional int32 readyReplicas = 7;
 
   // Total number of available pods (ready for at least minReadySeconds) targeted by this deployment.
   // +optional

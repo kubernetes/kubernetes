@@ -28,7 +28,7 @@ go_test(
         "template_test.go",
         "util_test.go",
     ],
-    library = "go_default_library",
+    library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
         "//pkg/util/diff:go_default_library",

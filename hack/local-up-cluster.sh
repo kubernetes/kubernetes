@@ -633,6 +633,13 @@ function start_kubedns {
     fi
 }
 
+function create_psp_policy {
+    echo "Create podsecuritypolicy policies for RBAC."
+    ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" create -f ${KUBE_ROOT}/examples/podsecuritypolicy/rbac/policies.yaml
+    ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" create -f ${KUBE_ROOT}/examples/podsecuritypolicy/rbac/roles.yaml
+    ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" create -f ${KUBE_ROOT}/examples/podsecuritypolicy/rbac/bindings.yaml
+}
+
 function print_success {
 if [[ "${START_MODE}" != "kubeletonly" ]]; then
   cat <<EOF
@@ -718,6 +725,10 @@ fi
 
 if [[ "${START_MODE}" != "nokubelet" ]]; then
   start_kubelet
+fi
+
+if [[ -n "${PSP_ADMISSION}" && "${ENABLE_RBAC}" = true ]]; then
+    create_psp_policy
 fi
 
 print_success

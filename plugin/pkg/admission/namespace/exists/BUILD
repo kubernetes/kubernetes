@@ -20,13 +20,14 @@ go_library(
         "//pkg/client/cache:go_default_library",
         "//pkg/client/clientset_generated/internalclientset:go_default_library",
         "//pkg/controller/informers:go_default_library",
+        "//pkg/kubeapiserver/admission:go_default_library",
     ],
 )
 
 go_test(
     name = "go_default_test",
     srcs = ["admission_test.go"],
-    library = "go_default_library",
+    library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
         "//pkg/admission:go_default_library",
@@ -36,6 +37,7 @@ go_test(
         "//pkg/client/clientset_generated/internalclientset/fake:go_default_library",
         "//pkg/client/testing/core:go_default_library",
         "//pkg/controller/informers:go_default_library",
+        "//pkg/kubeapiserver/admission:go_default_library",
         "//pkg/runtime:go_default_library",
         "//pkg/util/wait:go_default_library",
     ],

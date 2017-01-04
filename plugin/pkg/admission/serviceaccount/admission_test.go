@@ -33,7 +33,7 @@ func TestIgnoresNonCreate(t *testing.T) {
 	pod := &api.Pod{}
 	for _, op := range []admission.Operation{admission.Update, admission.Delete, admission.Connect} {
 		attrs := admission.NewAttributesRecord(pod, nil, api.Kind("Pod").WithVersion("version"), "myns", "myname", api.Resource("pods").WithVersion("version"), "", op, nil)
-		handler := admission.NewChainHandler(NewServiceAccount(nil))
+		handler := admission.NewChainHandler(NewServiceAccount())
 		err := handler.Admit(attrs)
 		if err != nil {
 			t.Errorf("Expected %s operation allowed, got err: %v", op, err)
@@ -44,7 +44,7 @@ func TestIgnoresNonCreate(t *testing.T) {
 func TestIgnoresNonPodResource(t *testing.T) {
 	pod := &api.Pod{}
 	attrs := admission.NewAttributesRecord(pod, nil, api.Kind("Pod").WithVersion("version"), "myns", "myname", api.Resource("CustomResource").WithVersion("version"), "", admission.Create, nil)
-	err := NewServiceAccount(nil).Admit(attrs)
+	err := NewServiceAccount().Admit(attrs)
 	if err != nil {
 		t.Errorf("Expected non-pod resource allowed, got err: %v", err)
 	}
@@ -52,7 +52,7 @@ func TestIgnoresNonPodResource(t *testing.T) {
 
 func TestIgnoresNilObject(t *testing.T) {
 	attrs := admission.NewAttributesRecord(nil, nil, api.Kind("Pod").WithVersion("version"), "myns", "myname", api.Resource("pods").WithVersion("version"), "", admission.Create, nil)
-	err := NewServiceAccount(nil).Admit(attrs)
+	err := NewServiceAccount().Admit(attrs)
 	if err != nil {
 		t.Errorf("Expected nil object allowed allowed, got err: %v", err)
 	}
@@ -61,7 +61,7 @@ func TestIgnoresNilObject(t *testing.T) {
 func TestIgnoresNonPodObject(t *testing.T) {
 	obj := &api.Namespace{}
 	attrs := admission.NewAttributesRecord(obj, nil, api.Kind("Pod").WithVersion("version"), "myns", "myname", api.Resource("pods").WithVersion("version"), "", admission.Create, nil)
-	err := NewServiceAccount(nil).Admit(attrs)
+	err := NewServiceAccount().Admit(attrs)
 	if err != nil {
 		t.Errorf("Expected non pod object allowed, got err: %v", err)
 	}
@@ -81,7 +81,7 @@ func TestIgnoresMirrorPod(t *testing.T) {
 		},
 	}
 	attrs := admission.NewAttributesRecord(pod, nil, api.Kind("Pod").WithVersion("version"), "myns", "myname", api.Resource("pods").WithVersion("version"), "", admission.Create, nil)
-	err := NewServiceAccount(nil).Admit(attrs)
+	err := NewServiceAccount().Admit(attrs)
 	if err != nil {
 		t.Errorf("Expected mirror pod without service account or secrets allowed, got err: %v", err)
 	}
@@ -99,7 +99,7 @@ func TestRejectsMirrorPodWithServiceAccount(t *testing.T) {
 		},
 	}
 	attrs := admission.NewAttributesRecord(pod, nil, api.Kind("Pod").WithVersion("version"), "myns", "myname", api.Resource("pods").WithVersion("version"), "", admission.Create, nil)
-	err := NewServiceAccount(nil).Admit(attrs)
+	err := NewServiceAccount().Admit(attrs)
 	if err == nil {
 		t.Errorf("Expected a mirror pod to be prevented from referencing a service account")
 	}
@@ -119,7 +119,7 @@ func TestRejectsMirrorPodWithSecretVolumes(t *testing.T) {
 		},
 	}
 	attrs := admission.NewAttributesRecord(pod, nil, api.Kind("Pod").WithVersion("version"), "myns", "myname", api.Resource("pods").WithVersion("version"), "", admission.Create, nil)
-	err := NewServiceAccount(nil).Admit(attrs)
+	err := NewServiceAccount().Admit(attrs)
 	if err == nil {
 		t.Errorf("Expected a mirror pod to be prevented from referencing a secret volume")
 	}
@@ -128,7 +128,8 @@ func TestRejectsMirrorPodWithSecretVolumes(t *testing.T) {
 func TestAssignsDefaultServiceAccountAndToleratesMissingAPIToken(t *testing.T) {
 	ns := "myns"
 
-	admit := NewServiceAccount(nil)
+	admit := NewServiceAccount()
+	admit.SetInternalClientSet(nil)
 	admit.MountServiceAccountToken = true
 	admit.RequireAPIToken = false
 
@@ -154,7 +155,8 @@ func TestAssignsDefaultServiceAccountAndToleratesMissingAPIToken(t *testing.T) {
 func TestAssignsDefaultServiceAccountAndRejectsMissingAPIToken(t *testing.T) {
 	ns := "myns"
 
-	admit := NewServiceAccount(nil)
+	admit := NewServiceAccount()
+	admit.SetInternalClientSet(nil)
 	admit.MountServiceAccountToken = true
 	admit.RequireAPIToken = true
 
@@ -185,7 +187,9 @@ func TestFetchesUncachedServiceAccount(t *testing.T) {
 		},
 	})
 
-	admit := NewServiceAccount(client)
+	admit := NewServiceAccount()
+	admit.SetInternalClientSet(nil)
+	admit.client = client
 	admit.RequireAPIToken = false
 
 	pod := &api.Pod{}
@@ -205,7 +209,8 @@ func TestDeniesInvalidServiceAccount(t *testing.T) {
 	// Build a test client that the admission plugin can use to look up the service account missing from its cache
 	client := fake.NewSimpleClientset()
 
-	admit := NewServiceAccount(client)
+	admit := NewServiceAccount()
+	admit.SetInternalClientSet(client)
 
 	pod := &api.Pod{}
 	attrs := admission.NewAttributesRecord(pod, nil, api.Kind("Pod").WithVersion("version"), ns, "myname", api.Resource("pods").WithVersion("version"), "", admission.Create, nil)
@@ -233,7 +238,8 @@ func TestAutomountsAPIToken(t *testing.T) {
 		MountPath: DefaultAPITokenMountPath,
 	}
 
-	admit := NewServiceAccount(nil)
+	admit := NewServiceAccount()
+	admit.SetInternalClientSet(nil)
 	admit.MountServiceAccountToken = true
 	admit.RequireAPIToken = true
 
@@ -332,7 +338,8 @@ func TestRespectsExistingMount(t *testing.T) {
 		MountPath: DefaultAPITokenMountPath,
 	}
 
-	admit := NewServiceAccount(nil)
+	admit := NewServiceAccount()
+	admit.SetInternalClientSet(nil)
 	admit.MountServiceAccountToken = true
 	admit.RequireAPIToken = true
 
@@ -428,7 +435,8 @@ func TestRespectsExistingMount(t *testing.T) {
 func TestAllowsReferencedSecret(t *testing.T) {
 	ns := "myns"
 
-	admit := NewServiceAccount(nil)
+	admit := NewServiceAccount()
+	admit.SetInternalClientSet(nil)
 	admit.LimitSecretReferences = true
 	admit.RequireAPIToken = false
 
@@ -507,7 +515,8 @@ func TestAllowsReferencedSecret(t *testing.T) {
 func TestRejectsUnreferencedSecretVolumes(t *testing.T) {
 	ns := "myns"
 
-	admit := NewServiceAccount(nil)
+	admit := NewServiceAccount()
+	admit.SetInternalClientSet(nil)
 	admit.LimitSecretReferences = true
 	admit.RequireAPIToken = false
 
@@ -583,7 +592,8 @@ func TestRejectsUnreferencedSecretVolumes(t *testing.T) {
 func TestAllowUnreferencedSecretVolumesForPermissiveSAs(t *testing.T) {
 	ns := "myns"
 
-	admit := NewServiceAccount(nil)
+	admit := NewServiceAccount()
+	admit.SetInternalClientSet(nil)
 	admit.LimitSecretReferences = false
 	admit.RequireAPIToken = false
 
@@ -613,7 +623,8 @@ func TestAllowUnreferencedSecretVolumesForPermissiveSAs(t *testing.T) {
 func TestAllowsReferencedImagePullSecrets(t *testing.T) {
 	ns := "myns"
 
-	admit := NewServiceAccount(nil)
+	admit := NewServiceAccount()
+	admit.SetInternalClientSet(nil)
 	admit.LimitSecretReferences = true
 	admit.RequireAPIToken = false
 
@@ -643,7 +654,8 @@ func TestAllowsReferencedImagePullSecrets(t *testing.T) {
 func TestRejectsUnreferencedImagePullSecrets(t *testing.T) {
 	ns := "myns"
 
-	admit := NewServiceAccount(nil)
+	admit := NewServiceAccount()
+	admit.SetInternalClientSet(nil)
 	admit.LimitSecretReferences = true
 	admit.RequireAPIToken = false
 
@@ -670,7 +682,8 @@ func TestRejectsUnreferencedImagePullSecrets(t *testing.T) {
 func TestDoNotAddImagePullSecrets(t *testing.T) {
 	ns := "myns"
 
-	admit := NewServiceAccount(nil)
+	admit := NewServiceAccount()
+	admit.SetInternalClientSet(nil)
 	admit.LimitSecretReferences = true
 	admit.RequireAPIToken = false
 
@@ -705,7 +718,8 @@ func TestDoNotAddImagePullSecrets(t *testing.T) {
 func TestAddImagePullSecrets(t *testing.T) {
 	ns := "myns"
 
-	admit := NewServiceAccount(nil)
+	admit := NewServiceAccount()
+	admit.SetInternalClientSet(nil)
 	admit.LimitSecretReferences = true
 	admit.RequireAPIToken = false
 

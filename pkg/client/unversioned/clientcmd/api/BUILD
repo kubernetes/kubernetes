@@ -28,7 +28,7 @@ go_test(
         "helpers_test.go",
         "types_test.go",
     ],
-    library = "go_default_library",
+    library = ":go_default_library",
     tags = ["automanaged"],
     deps = ["//vendor:github.com/ghodss/yaml"],
 )

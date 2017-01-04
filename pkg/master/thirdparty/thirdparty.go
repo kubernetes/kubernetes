@@ -29,9 +29,10 @@ import (
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/apiserver"
-	apiserverhandlers "k8s.io/kubernetes/pkg/apiserver/handlers"
 	"k8s.io/kubernetes/pkg/genericapiserver"
+	genericapi "k8s.io/kubernetes/pkg/genericapiserver/api"
+	genericapihandlers "k8s.io/kubernetes/pkg/genericapiserver/api/handlers"
+	genericapirequest "k8s.io/kubernetes/pkg/genericapiserver/api/request"
 	extensionsrest "k8s.io/kubernetes/pkg/registry/extensions/rest"
 	"k8s.io/kubernetes/pkg/registry/extensions/thirdpartyresourcedata"
 	thirdpartyresourcedataetcd "k8s.io/kubernetes/pkg/registry/extensions/thirdpartyresourcedata/etcd"
@@ -42,7 +43,7 @@ import (
 )
 
 // dynamicLister is used to list resources for dynamic third party
-// apis. It implements the apiserver.APIResourceLister interface
+// apis. It implements the genericapihandlers.APIResourceLister interface
 type dynamicLister struct {
 	m    *ThirdPartyResourceServer
 	path string
@@ -52,7 +53,7 @@ func (d dynamicLister) ListAPIResources() []metav1.APIResource {
 	return d.m.getExistingThirdPartyResources(d.path)
 }
 
-var _ apiserverhandlers.APIResourceLister = &dynamicLister{}
+var _ genericapihandlers.APIResourceLister = &dynamicLister{}
 
 type ThirdPartyResourceServer struct {
 	genericAPIServer *genericapiserver.GenericAPIServer
@@ -163,7 +164,7 @@ func (m *ThirdPartyResourceServer) RemoveThirdPartyResource(path string) error {
 }
 
 func (m *ThirdPartyResourceServer) removeAllThirdPartyResources(registry *thirdpartyresourcedataetcd.REST) error {
-	ctx := api.NewDefaultContext()
+	ctx := genericapirequest.NewDefaultContext()
 	existingData, err := registry.List(ctx, nil)
 	if err != nil {
 		return err
@@ -280,13 +281,13 @@ func (m *ThirdPartyResourceServer) InstallThirdPartyResource(rsrc *extensions.Th
 	if err := thirdparty.InstallREST(m.genericAPIServer.HandlerContainer.Container); err != nil {
 		glog.Errorf("Unable to setup thirdparty api: %v", err)
 	}
-	m.genericAPIServer.HandlerContainer.Add(apiserver.NewGroupWebService(api.Codecs, path, apiGroup))
+	m.genericAPIServer.HandlerContainer.Add(genericapi.NewGroupWebService(api.Codecs, path, apiGroup))
 
 	m.addThirdPartyResourceStorage(path, plural.Resource, thirdparty.Storage[plural.Resource].(*thirdpartyresourcedataetcd.REST), apiGroup)
 	return nil
 }
 
-func (m *ThirdPartyResourceServer) thirdpartyapi(group, kind, version, pluralResource string) *apiserver.APIGroupVersion {
+func (m *ThirdPartyResourceServer) thirdpartyapi(group, kind, version, pluralResource string) *genericapi.APIGroupVersion {
 	resourceStorage := thirdpartyresourcedataetcd.NewREST(
 		generic.RESTOptions{
 			StorageConfig:           m.thirdPartyStorageConfig,
@@ -306,7 +307,7 @@ func (m *ThirdPartyResourceServer) thirdpartyapi(group, kind, version, pluralRes
 	externalVersion := schema.GroupVersion{Group: group, Version: version}
 
 	apiRoot := extensionsrest.MakeThirdPartyPath("")
-	return &apiserver.APIGroupVersion{
+	return &genericapi.APIGroupVersion{
 		Root:         apiRoot,
 		GroupVersion: externalVersion,
 

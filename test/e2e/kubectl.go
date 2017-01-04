@@ -46,11 +46,14 @@ import (
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/v1"
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
+	rbacv1alpha1 "k8s.io/kubernetes/pkg/apis/rbac/v1alpha1"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/labels"
 	genericregistry "k8s.io/kubernetes/pkg/registry/generic/registry"
+	"k8s.io/kubernetes/pkg/runtime/schema"
+	"k8s.io/kubernetes/pkg/serviceaccount"
 	uexec "k8s.io/kubernetes/pkg/util/exec"
 	utilnet "k8s.io/kubernetes/pkg/util/net"
 	"k8s.io/kubernetes/pkg/util/uuid"
@@ -566,6 +569,16 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 		})
 
 		It("should handle in-cluster config", func() {
+			By("adding rbac permissions")
+			// grant the view permission widely to allow inspection of the `invalid` namespace.
+			framework.BindClusterRole(f.ClientSet.Rbac(), "view", f.Namespace.Name,
+				rbacv1alpha1.Subject{Kind: rbacv1alpha1.ServiceAccountKind, Namespace: f.Namespace.Name, Name: "default"})
+
+			err := framework.WaitForAuthorizationUpdate(f.ClientSet.Authorization(),
+				serviceaccount.MakeUsername(f.Namespace.Name, "default"),
+				f.Namespace.Name, "list", schema.GroupResource{Resource: "pods"}, true)
+			framework.ExpectNoError(err)
+
 			By("overriding icc with values provided by flags")
 			kubectlPath := framework.TestContext.KubectlPath
 
@@ -580,7 +593,7 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 			}
 
 			By("trying to use kubectl with invalid token")
-			_, err := framework.RunHostCmd(ns, simplePodName, "/kubectl get pods --token=invalid --v=7 2>&1")
+			_, err = framework.RunHostCmd(ns, simplePodName, "/kubectl get pods --token=invalid --v=7 2>&1")
 			framework.Logf("got err %v", err)
 			Expect(err).To(HaveOccurred())
 			Expect(err).To(ContainSubstring("Using in-cluster namespace"))
@@ -604,7 +617,6 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 			if matched, _ := regexp.MatchString(fmt.Sprintf("GET http[s]?://%s:%s/api/v1/namespaces/invalid/pods", inClusterHost, inClusterPort), output); !matched {
 				framework.Failf("Unexpected kubectl exec output: ", output)
 			}
-
 		})
 	})
 
@@ -812,7 +824,7 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 						return false, err
 					}
 
-					uidToPort := getContainerPortsByPodUID(endpoints)
+					uidToPort := framework.GetContainerPortsByPodUID(endpoints)
 					if len(uidToPort) == 0 {
 						framework.Logf("No endpoint found, retrying")
 						return false, nil

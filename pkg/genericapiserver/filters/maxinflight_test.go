@@ -24,10 +24,9 @@ import (
 	"sync"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
-	apiserverfilters "k8s.io/kubernetes/pkg/apiserver/filters"
-	apiserverrequest "k8s.io/kubernetes/pkg/apiserver/request"
+	apifilters "k8s.io/kubernetes/pkg/genericapiserver/api/filters"
+	apirequest "k8s.io/kubernetes/pkg/genericapiserver/api/request"
 	"k8s.io/kubernetes/pkg/util/sets"
 )
 
@@ -35,8 +34,8 @@ func createMaxInflightServer(callsWg, blockWg *sync.WaitGroup, disableCallsWg *b
 
 	longRunningRequestCheck := BasicLongRunningRequestCheck(sets.NewString("watch"), sets.NewString("proxy"))
 
-	requestContextMapper := api.NewRequestContextMapper()
-	requestInfoFactory := &apiserverrequest.RequestInfoFactory{APIPrefixes: sets.NewString("apis", "api"), GrouplessAPIPrefixes: sets.NewString("api")}
+	requestContextMapper := apirequest.NewRequestContextMapper()
+	requestInfoFactory := &apirequest.RequestInfoFactory{APIPrefixes: sets.NewString("apis", "api"), GrouplessAPIPrefixes: sets.NewString("api")}
 	handler := WithMaxInFlightLimit(
 		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			// A short, accounted request that does not wait for block WaitGroup.
@@ -56,8 +55,8 @@ func createMaxInflightServer(callsWg, blockWg *sync.WaitGroup, disableCallsWg *b
 		requestContextMapper,
 		longRunningRequestCheck,
 	)
-	handler = apiserverfilters.WithRequestInfo(handler, requestInfoFactory, requestContextMapper)
-	handler = api.WithRequestContext(handler, requestContextMapper)
+	handler = apifilters.WithRequestInfo(handler, requestInfoFactory, requestContextMapper)
+	handler = apirequest.WithRequestContext(handler, requestContextMapper)
 
 	return httptest.NewServer(handler)
 }

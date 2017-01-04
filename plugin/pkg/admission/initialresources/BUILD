@@ -23,7 +23,6 @@ go_library(
         "//pkg/api:go_default_library",
         "//pkg/api/errors:go_default_library",
         "//pkg/api/resource:go_default_library",
-        "//pkg/client/clientset_generated/internalclientset:go_default_library",
         "//pkg/client/restclient:go_default_library",
         "//pkg/client/unversioned/clientcmd:go_default_library",
         "//vendor:cloud.google.com/go/compute/metadata",
@@ -42,7 +41,7 @@ go_test(
         "admission_test.go",
         "hawkular_test.go",
     ],
-    library = "go_default_library",
+    library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
         "//pkg/admission:go_default_library",

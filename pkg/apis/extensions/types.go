@@ -312,6 +312,10 @@ type DeploymentStatus struct {
 	// +optional
 	UpdatedReplicas int32
 
+	// Total number of ready pods targeted by this deployment.
+	// +optional
+	ReadyReplicas int32
+
 	// Total number of available pods (ready for at least minReadySeconds) targeted by this deployment.
 	// +optional
 	AvailableReplicas int32
@@ -474,6 +478,10 @@ type DaemonSetStatus struct {
 	// NumberReady is the number of nodes that should be running the daemon pod and have one
 	// or more of the daemon pod running and ready.
 	NumberReady int32
+
+	// ObservedGeneration is the most recent generation observed by the daemon set controller.
+	// +optional
+	ObservedGeneration int64
 }
 
 // +genclient=true

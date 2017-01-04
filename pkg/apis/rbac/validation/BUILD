@@ -17,12 +17,12 @@ go_library(
     ],
     tags = ["automanaged"],
     deps = [
-        "//pkg/api:go_default_library",
         "//pkg/api/errors:go_default_library",
         "//pkg/api/validation:go_default_library",
         "//pkg/api/validation/path:go_default_library",
         "//pkg/apis/rbac:go_default_library",
         "//pkg/auth/user:go_default_library",
+        "//pkg/genericapiserver/api/request:go_default_library",
         "//pkg/serviceaccount:go_default_library",
         "//pkg/util/errors:go_default_library",
         "//pkg/util/validation/field:go_default_library",
@@ -37,7 +37,7 @@ go_test(
         "rulevalidation_test.go",
         "validation_test.go",
     ],
-    library = "go_default_library",
+    library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",

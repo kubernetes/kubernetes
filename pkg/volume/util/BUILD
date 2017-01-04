@@ -38,7 +38,7 @@ go_test(
         "atomic_writer_test.go",
         "device_util_linux_test.go",
     ],
-    library = "go_default_library",
+    library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
         "//pkg/util/sets:go_default_library",

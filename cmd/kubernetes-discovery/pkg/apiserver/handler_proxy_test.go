@@ -26,8 +26,8 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
-	apiserverrequest "k8s.io/kubernetes/pkg/apiserver/request"
 	"k8s.io/kubernetes/pkg/auth/user"
+	genericapirequest "k8s.io/kubernetes/pkg/genericapiserver/api/request"
 	"k8s.io/kubernetes/pkg/util/sets"
 
 	"k8s.io/kubernetes/cmd/kubernetes-discovery/pkg/apis/apiregistration"
@@ -56,25 +56,25 @@ type fakeRequestContextMapper struct {
 	user user.Info
 }
 
-func (m *fakeRequestContextMapper) Get(req *http.Request) (api.Context, bool) {
-	ctx := api.NewContext()
+func (m *fakeRequestContextMapper) Get(req *http.Request) (genericapirequest.Context, bool) {
+	ctx := genericapirequest.NewContext()
 	if m.user != nil {
-		ctx = api.WithUser(ctx, m.user)
+		ctx = genericapirequest.WithUser(ctx, m.user)
 	}
 
-	resolver := &apiserverrequest.RequestInfoFactory{
+	resolver := &genericapirequest.RequestInfoFactory{
 		APIPrefixes:          sets.NewString("api", "apis"),
 		GrouplessAPIPrefixes: sets.NewString("api"),
 	}
 	info, err := resolver.NewRequestInfo(req)
 	if err == nil {
-		ctx = apiserverrequest.WithRequestInfo(ctx, info)
+		ctx = genericapirequest.WithRequestInfo(ctx, info)
 	}
 
 	return ctx, true
 }
 
-func (*fakeRequestContextMapper) Update(req *http.Request, context api.Context) error {
+func (*fakeRequestContextMapper) Update(req *http.Request, context genericapirequest.Context) error {
 	return nil
 }
 

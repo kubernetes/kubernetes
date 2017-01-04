@@ -53,7 +53,7 @@ go_test(
         "//examples:config",
         "//test/fixtures",
     ],
-    library = "go_default_library",
+    library = ":go_default_library",
     tags = [
         "automanaged",
     ],

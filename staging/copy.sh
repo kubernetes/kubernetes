@@ -77,6 +77,9 @@ mkcp "/pkg/client/unversioned/clientcmd" "/pkg/client/unversioned"
 mkcp "/pkg/client/unversioned/portforward" "/pkg/client/unversioned"
 
 mkcp "/plugin/pkg/client/auth" "/plugin/pkg/client"
+mkcp "/pkg/util/workqueue" "pkg/util"
+# remove this folder because it imports prometheus
+rm -rf "${CLIENT_REPO_TEMP}/pkg/util/workqueue/prometheus"
 # remove this test because it imports the internal clientset
 rm "${CLIENT_REPO_TEMP}"/pkg/client/unversioned/portforward/portforward_test.go
 

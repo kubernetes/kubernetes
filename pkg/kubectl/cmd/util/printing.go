@@ -23,6 +23,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/kubectl"
+	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/runtime/schema"
 
 	"github.com/spf13/cobra"
@@ -131,6 +132,24 @@ func PrinterForCommand(cmd *cobra.Command) (kubectl.ResourcePrinter, bool, error
 	}
 
 	return maybeWrapSortingPrinter(cmd, printer), generic, nil
+}
+
+// PrintResourceInfoForCommand receives a *cobra.Command and a *resource.Info and
+// attempts to print an info object based on the specified output format. If the
+// object passed is non-generic, it attempts to print the object using a HumanReadablePrinter.
+// Requires that printer flags have been added to cmd (see AddPrinterFlags).
+func PrintResourceInfoForCommand(cmd *cobra.Command, info *resource.Info, f Factory, out io.Writer) error {
+	printer, generic, err := PrinterForCommand(cmd)
+	if err != nil {
+		return err
+	}
+	if !generic || printer == nil {
+		printer, err = f.PrinterForMapping(cmd, nil, false)
+		if err != nil {
+			return err
+		}
+	}
+	return printer.PrintObj(info.Object, out)
 }
 
 func maybeWrapSortingPrinter(cmd *cobra.Command, printer kubectl.ResourcePrinter) kubectl.ResourcePrinter {

@@ -64,7 +64,7 @@ go_test(
         "testdata/v1/validPod.yaml",
         "//api/swagger-spec",
     ],
-    library = "go_default_library",
+    library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",

@@ -39,7 +39,7 @@ go_test(
         "generate_test.go",
         "status_manager_test.go",
     ],
-    library = "go_default_library",
+    library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",

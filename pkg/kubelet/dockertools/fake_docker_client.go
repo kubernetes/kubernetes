@@ -478,6 +478,10 @@ func (f *FakeDockerClient) PullImage(image string, auth dockertypes.AuthConfig, 
 	err := f.popError("pull")
 	if err == nil {
 		authJson, _ := json.Marshal(auth)
+		f.Image = &dockertypes.ImageInspect{
+			ID:       image,
+			RepoTags: []string{image},
+		}
 		f.pulled = append(f.pulled, fmt.Sprintf("%s using %s", image, string(authJson)))
 	}
 	return err
@@ -592,18 +596,18 @@ func (f *FakeDockerPuller) Pull(image string, secrets []v1.Secret) (err error) {
 	return err
 }
 
-func (f *FakeDockerPuller) IsImagePresent(name string) (bool, error) {
+func (f *FakeDockerPuller) GetImageRef(name string) (string, error) {
 	f.Lock()
 	defer f.Unlock()
 	if f.HasImages == nil {
-		return true, nil
+		return name, nil
 	}
 	for _, s := range f.HasImages {
 		if s == name {
-			return true, nil
+			return s, nil
 		}
 	}
-	return false, nil
+	return "", nil
 }
 func (f *FakeDockerClient) ImageHistory(id string) ([]dockertypes.ImageHistory, error) {
 	f.Lock()

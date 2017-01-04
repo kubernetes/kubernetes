@@ -25,6 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/fields"
+	genericapirequest "k8s.io/kubernetes/pkg/genericapiserver/api/request"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/generic"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
@@ -44,7 +45,7 @@ func newStorage(t *testing.T) (*ReplicaSetStorage, *etcdtesting.EtcdTestServer) 
 
 // createReplicaSet is a helper function that returns a ReplicaSet with the updated resource version.
 func createReplicaSet(storage *REST, rs extensions.ReplicaSet, t *testing.T) (extensions.ReplicaSet, error) {
-	ctx := api.WithNamespace(api.NewContext(), rs.Namespace)
+	ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), rs.Namespace)
 	obj, err := storage.Create(ctx, &rs)
 	if err != nil {
 		t.Errorf("Failed to create ReplicaSet, %v", err)
@@ -151,7 +152,7 @@ func TestGenerationNumber(t *testing.T) {
 	modifiedSno := *validNewReplicaSet()
 	modifiedSno.Generation = 100
 	modifiedSno.Status.ObservedGeneration = 10
-	ctx := api.NewDefaultContext()
+	ctx := genericapirequest.NewDefaultContext()
 	rs, err := createReplicaSet(storage.ReplicaSet, modifiedSno, t)
 	etcdRS, err := storage.ReplicaSet.Get(ctx, rs.Name, &metav1.GetOptions{})
 	if err != nil {
@@ -252,7 +253,7 @@ func TestScaleGet(t *testing.T) {
 	name := "foo"
 
 	var rs extensions.ReplicaSet
-	ctx := api.WithNamespace(api.NewContext(), api.NamespaceDefault)
+	ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), api.NamespaceDefault)
 	key := "/replicasets/" + api.NamespaceDefault + "/" + name
 	if err := storage.ReplicaSet.Storage.Create(ctx, key, &validReplicaSet, &rs, 0); err != nil {
 		t.Fatalf("error setting new replica set (key: %s) %v: %v", key, validReplicaSet, err)
@@ -292,7 +293,7 @@ func TestScaleUpdate(t *testing.T) {
 	name := "foo"
 
 	var rs extensions.ReplicaSet
-	ctx := api.WithNamespace(api.NewContext(), api.NamespaceDefault)
+	ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), api.NamespaceDefault)
 	key := "/replicasets/" + api.NamespaceDefault + "/" + name
 	if err := storage.ReplicaSet.Storage.Create(ctx, key, &validReplicaSet, &rs, 0); err != nil {
 		t.Fatalf("error setting new replica set (key: %s) %v: %v", key, validReplicaSet, err)
@@ -334,7 +335,7 @@ func TestStatusUpdate(t *testing.T) {
 	defer server.Terminate(t)
 	defer storage.ReplicaSet.Store.DestroyFunc()
 
-	ctx := api.WithNamespace(api.NewContext(), api.NamespaceDefault)
+	ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), api.NamespaceDefault)
 	key := "/replicasets/" + api.NamespaceDefault + "/foo"
 	if err := storage.ReplicaSet.Storage.Create(ctx, key, &validReplicaSet, nil, 0); err != nil {
 		t.Fatalf("unexpected error: %v", err)

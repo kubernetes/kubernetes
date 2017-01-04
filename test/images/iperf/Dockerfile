@@ -13,7 +13,6 @@
 # limitations under the License.
 
 FROM gcr.io/google_containers/ubuntu-slim:0.2
-MAINTAINER jay@apache.org
 RUN apt-get update && apt-get install -y --no-install-recommends iperf bash \
   && apt-get clean -y \
   && rm -rf /var/lib/apt/lists/* \

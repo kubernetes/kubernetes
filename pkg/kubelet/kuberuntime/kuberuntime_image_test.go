@@ -28,8 +28,9 @@ func TestPullImage(t *testing.T) {
 	_, _, fakeManager, err := createTestRuntimeManager()
 	assert.NoError(t, err)
 
-	err = fakeManager.PullImage(kubecontainer.ImageSpec{Image: "busybox"}, nil)
+	imageRef, err := fakeManager.PullImage(kubecontainer.ImageSpec{Image: "busybox"}, nil)
 	assert.NoError(t, err)
+	assert.Equal(t, "busybox", imageRef)
 
 	images, err := fakeManager.ListImages()
 	assert.NoError(t, err)
@@ -55,22 +56,22 @@ func TestListImages(t *testing.T) {
 	assert.Equal(t, expected.List(), actual.List())
 }
 
-func TestIsImagePresent(t *testing.T) {
+func TestGetImageRef(t *testing.T) {
 	_, fakeImageService, fakeManager, err := createTestRuntimeManager()
 	assert.NoError(t, err)
 
 	image := "busybox"
 	fakeImageService.SetFakeImages([]string{image})
-	present, err := fakeManager.IsImagePresent(kubecontainer.ImageSpec{Image: image})
+	imageRef, err := fakeManager.GetImageRef(kubecontainer.ImageSpec{Image: image})
 	assert.NoError(t, err)
-	assert.Equal(t, true, present)
+	assert.Equal(t, image, imageRef)
 }
 
 func TestRemoveImage(t *testing.T) {
 	_, fakeImageService, fakeManager, err := createTestRuntimeManager()
 	assert.NoError(t, err)
 
-	err = fakeManager.PullImage(kubecontainer.ImageSpec{Image: "busybox"}, nil)
+	_, err = fakeManager.PullImage(kubecontainer.ImageSpec{Image: "busybox"}, nil)
 	assert.NoError(t, err)
 	assert.Equal(t, 1, len(fakeImageService.Images))
 

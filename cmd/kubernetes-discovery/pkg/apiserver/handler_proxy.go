@@ -21,10 +21,10 @@ import (
 	"net/url"
 	"sync"
 
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/apiserver/handlers/responsewriters"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/transport"
+	"k8s.io/kubernetes/pkg/genericapiserver/api/handlers/responsewriters"
+	genericapirequest "k8s.io/kubernetes/pkg/genericapiserver/api/request"
 	genericrest "k8s.io/kubernetes/pkg/registry/generic/rest"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/httpstream/spdy"
@@ -35,7 +35,7 @@ import (
 // proxyHandler provides a http.Handler which will proxy traffic to locations
 // specified by items implementing Redirector.
 type proxyHandler struct {
-	contextMapper api.RequestContextMapper
+	contextMapper genericapirequest.RequestContextMapper
 
 	// proxyClientCert/Key are the client cert used to identify this proxy. Backing APIServices use
 	// this to confirm the proxy's identity
@@ -71,7 +71,7 @@ func (r *proxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		http.Error(w, "missing context", http.StatusInternalServerError)
 		return
 	}
-	user, ok := api.UserFrom(ctx)
+	user, ok := genericapirequest.UserFrom(ctx)
 	if !ok {
 		http.Error(w, "missing user", http.StatusInternalServerError)
 		return

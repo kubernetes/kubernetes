@@ -9,7 +9,7 @@
   {% if grains.cloud == 'azure-legacy' %}
     {% set cert_ip='_use_azure_dns_name_' %}
   {% endif %}
-  {% if grains.cloud == 'vsphere' or grains.cloud == 'photon-controller' %}
+  {% if grains.cloud == 'photon-controller' %}
     {% set cert_ip=grains.ip_interfaces.eth0[0] %}
   {% endif %}
 {% endif %}

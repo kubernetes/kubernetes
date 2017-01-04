@@ -22,15 +22,14 @@ import (
 
 	"github.com/golang/glog"
 
-	"k8s.io/kubernetes/pkg/api"
 	apierrors "k8s.io/kubernetes/pkg/api/errors"
-	apiserverrequest "k8s.io/kubernetes/pkg/apiserver/request"
+	apirequest "k8s.io/kubernetes/pkg/genericapiserver/api/request"
 	"k8s.io/kubernetes/pkg/httplog"
 	"k8s.io/kubernetes/pkg/util/runtime"
 )
 
 // WithPanicRecovery wraps an http Handler to recover and log panics.
-func WithPanicRecovery(handler http.Handler, requestContextMapper api.RequestContextMapper) http.Handler {
+func WithPanicRecovery(handler http.Handler, requestContextMapper apirequest.RequestContextMapper) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		defer runtime.HandleCrash(func(err interface{}) {
 			http.Error(w, "This request caused apisever to panic. Look in log for details.", http.StatusInternalServerError)
@@ -39,12 +38,12 @@ func WithPanicRecovery(handler http.Handler, requestContextMapper api.RequestCon
 
 		logger := httplog.NewLogged(req, &w)
 
-		var requestInfo *apiserverrequest.RequestInfo
+		var requestInfo *apirequest.RequestInfo
 		ctx, ok := requestContextMapper.Get(req)
 		if !ok {
 			glog.Errorf("no context found for request, handler chain must be wrong")
 		} else {
-			requestInfo, ok = apiserverrequest.RequestInfoFrom(ctx)
+			requestInfo, ok = apirequest.RequestInfoFrom(ctx)
 			if !ok {
 				glog.Errorf("no RequestInfo found in context, handler chain must be wrong")
 			}

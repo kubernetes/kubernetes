@@ -38,6 +38,7 @@ import (
 	"k8s.io/kubernetes/pkg/auth/authorizer"
 	"k8s.io/kubernetes/pkg/auth/user"
 	openapigen "k8s.io/kubernetes/pkg/generated/openapi"
+	genericapirequest "k8s.io/kubernetes/pkg/genericapiserver/api/request"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/runtime/schema"
 	etcdtesting "k8s.io/kubernetes/pkg/storage/etcd/testing"
@@ -55,7 +56,7 @@ func setUp(t *testing.T) (*etcdtesting.EtcdTestServer, Config, *assert.Assertion
 
 	config := NewConfig()
 	config.PublicAddress = net.ParseIP("192.168.10.4")
-	config.RequestContextMapper = api.NewRequestContextMapper()
+	config.RequestContextMapper = genericapirequest.NewRequestContextMapper()
 	config.LegacyAPIGroupPrefixes = sets.NewString("/api")
 
 	config.OpenAPIConfig = DefaultOpenAPIConfig(openapigen.OpenAPIDefinitions)
@@ -601,7 +602,7 @@ func (p *testGetterStorage) New() runtime.Object {
 	}
 }
 
-func (p *testGetterStorage) Get(ctx api.Context, name string, options *metav1.GetOptions) (runtime.Object, error) {
+func (p *testGetterStorage) Get(ctx genericapirequest.Context, name string, options *metav1.GetOptions) (runtime.Object, error) {
 	return nil, nil
 }
 

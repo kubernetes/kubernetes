@@ -144,7 +144,7 @@ go_test(
         "sorting_printer_test.go",
         "stop_test.go",
     ],
-    library = "go_default_library",
+    library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
         "//federation/apis/federation:go_default_library",

@@ -18,7 +18,6 @@ package cert
 
 import (
 	"crypto/x509"
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -104,9 +103,6 @@ func NewPool(filename string) (*x509.CertPool, error) {
 // CertsFromFile returns the x509.Certificates contained in the given PEM-encoded file.
 // Returns an error if the file could not be read, a certificate could not be parsed, or if the file does not contain any certificates
 func CertsFromFile(file string) ([]*x509.Certificate, error) {
-	if len(file) == 0 {
-		return nil, errors.New("error reading certificates from an empty filename")
-	}
 	pemBlock, err := ioutil.ReadFile(file)
 	if err != nil {
 		return nil, err
@@ -116,4 +112,18 @@ func CertsFromFile(file string) ([]*x509.Certificate, error) {
 		return nil, fmt.Errorf("error reading %s: %s", file, err)
 	}
 	return certs, nil
+}
+
+// PrivateKeyFromFile returns the private key in rsa.PrivateKey or ecdsa.PrivateKey format from a given PEM-encoded file.
+// Returns an error if the file could not be read or if the private key could not be parsed.
+func PrivateKeyFromFile(file string) (interface{}, error) {
+	pemBlock, err := ioutil.ReadFile(file)
+	if err != nil {
+		return nil, err
+	}
+	key, err := ParsePrivateKeyPEM(pemBlock)
+	if err != nil {
+		return nil, fmt.Errorf("error reading %s: %v", file, err)
+	}
+	return key, nil
 }

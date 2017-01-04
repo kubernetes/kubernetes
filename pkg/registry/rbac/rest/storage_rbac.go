@@ -19,6 +19,7 @@ package rest
 import (
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/golang/glog"
 
@@ -43,6 +44,7 @@ import (
 	rolebindingetcd "k8s.io/kubernetes/pkg/registry/rbac/rolebinding/etcd"
 	rolebindingpolicybased "k8s.io/kubernetes/pkg/registry/rbac/rolebinding/policybased"
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
+	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/plugin/pkg/auth/authorizer/rbac/bootstrappolicy"
 )
 
@@ -114,50 +116,54 @@ func (p RESTStorageProvider) PostStartHook() (string, genericapiserver.PostStart
 }
 
 func PostStartHook(hookContext genericapiserver.PostStartHookContext) error {
-	clientset, err := rbacclient.NewForConfig(hookContext.LoopbackClientConfig)
-	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("unable to initialize clusterroles: %v", err))
-		return nil
-	}
-
-	existingClusterRoles, err := clientset.ClusterRoles().List(api.ListOptions{})
-	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("unable to initialize clusterroles: %v", err))
-		return nil
-	}
-	// if clusterroles already exist, then assume we don't have work to do because we've already
-	// initialized or another API server has started this task
-	if len(existingClusterRoles.Items) > 0 {
-		return nil
-	}
-
-	for _, clusterRole := range append(bootstrappolicy.ClusterRoles(), bootstrappolicy.ControllerRoles()...) {
-		if _, err := clientset.ClusterRoles().Create(&clusterRole); err != nil {
-			// don't fail on failures, try to create as many as you can
+	// intializing roles is really important.  On some e2e runs, we've seen cases where etcd is down when the server
+	// starts, the roles don't initialize, and nothing works.
+	err := wait.Poll(1*time.Second, 30*time.Second, func() (done bool, err error) {
+		clientset, err := rbacclient.NewForConfig(hookContext.LoopbackClientConfig)
+		if err != nil {
 			utilruntime.HandleError(fmt.Errorf("unable to initialize clusterroles: %v", err))
-			continue
+			return false, nil
 		}
-		glog.Infof("Created clusterrole.%s/%s", rbac.GroupName, clusterRole.Name)
-	}
 
-	existingClusterRoleBindings, err := clientset.ClusterRoleBindings().List(api.ListOptions{})
-	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("unable to initialize clusterrolebindings: %v", err))
-		return nil
-	}
-	// if clusterrolebindings already exist, then assume we don't have work to do because we've already
-	// initialized or another API server has started this task
-	if len(existingClusterRoleBindings.Items) > 0 {
-		return nil
-	}
+		existingClusterRoles, err := clientset.ClusterRoles().List(api.ListOptions{})
+		if err != nil {
+			utilruntime.HandleError(fmt.Errorf("unable to initialize clusterroles: %v", err))
+			return false, nil
+		}
+		// only initialized on empty etcd
+		if len(existingClusterRoles.Items) == 0 {
+			for _, clusterRole := range append(bootstrappolicy.ClusterRoles(), bootstrappolicy.ControllerRoles()...) {
+				if _, err := clientset.ClusterRoles().Create(&clusterRole); err != nil {
+					// don't fail on failures, try to create as many as you can
+					utilruntime.HandleError(fmt.Errorf("unable to initialize clusterroles: %v", err))
+					continue
+				}
+				glog.Infof("Created clusterrole.%s/%s", rbac.GroupName, clusterRole.Name)
+			}
+		}
 
-	for _, clusterRoleBinding := range append(bootstrappolicy.ClusterRoleBindings(), bootstrappolicy.ControllerRoleBindings()...) {
-		if _, err := clientset.ClusterRoleBindings().Create(&clusterRoleBinding); err != nil {
-			// don't fail on failures, try to create as many as you can
+		existingClusterRoleBindings, err := clientset.ClusterRoleBindings().List(api.ListOptions{})
+		if err != nil {
 			utilruntime.HandleError(fmt.Errorf("unable to initialize clusterrolebindings: %v", err))
-			continue
+			return false, nil
 		}
-		glog.Infof("Created clusterrolebinding.%s/%s", rbac.GroupName, clusterRoleBinding.Name)
+		// only initialized on empty etcd
+		if len(existingClusterRoleBindings.Items) == 0 {
+			for _, clusterRoleBinding := range append(bootstrappolicy.ClusterRoleBindings(), bootstrappolicy.ControllerRoleBindings()...) {
+				if _, err := clientset.ClusterRoleBindings().Create(&clusterRoleBinding); err != nil {
+					// don't fail on failures, try to create as many as you can
+					utilruntime.HandleError(fmt.Errorf("unable to initialize clusterrolebindings: %v", err))
+					continue
+				}
+				glog.Infof("Created clusterrolebinding.%s/%s", rbac.GroupName, clusterRoleBinding.Name)
+			}
+		}
+
+		return true, nil
+	})
+	// if we're never able to make it through intialization, kill the API server
+	if err != nil {
+		return fmt.Errorf("unable to initialize roles: %v", err)
 	}
 
 	return nil

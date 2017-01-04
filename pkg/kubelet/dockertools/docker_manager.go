@@ -430,10 +430,14 @@ func (dm *DockerManager) inspectContainer(id string, podName, podNamespace strin
 		}
 	}
 
+	imageName := iResult.Config.Image
+	if len(imgInspectResult.RepoTags) > 0 {
+		imageName = imgInspectResult.RepoTags[0]
+	}
 	status := kubecontainer.ContainerStatus{
 		Name:         containerName,
 		RestartCount: containerInfo.RestartCount,
-		Image:        iResult.Config.Image,
+		Image:        imageName,
 		ImageID:      imageID,
 		ID:           kubecontainer.DockerID(id).ContainerID(),
 		ExitCode:     iResult.State.ExitCode,
@@ -590,6 +594,7 @@ func (dm *DockerManager) runContainer(
 	container *v1.Container,
 	opts *kubecontainer.RunContainerOptions,
 	ref *v1.ObjectReference,
+	imageRef string,
 	netMode string,
 	ipcMode string,
 	utsMode string,
@@ -765,7 +770,7 @@ func (dm *DockerManager) runContainer(
 		Name: containerName,
 		Config: &dockercontainer.Config{
 			Env:        makeEnvList(opts.Envs),
-			Image:      container.Image,
+			Image:      imageRef,
 			WorkingDir: container.WorkingDir,
 			Labels:     labels,
 			// Interactive containers:
@@ -958,14 +963,39 @@ func (dm *DockerManager) ListImages() ([]kubecontainer.Image, error) {
 	return images, nil
 }
 
-// PullImage pulls an image from network to local storage.
-func (dm *DockerManager) PullImage(image kubecontainer.ImageSpec, secrets []v1.Secret) error {
-	return dm.dockerPuller.Pull(image.Image, secrets)
+// GetImageRef returns the image digest if exists, or else returns the image ID.
+// It is exported for reusing in dockershim.
+func GetImageRef(client DockerInterface, image string) (string, error) {
+	img, err := client.InspectImageByRef(image)
+	if err != nil {
+		return "", err
+	}
+	if img == nil {
+		return "", fmt.Errorf("unable to inspect image %s", image)
+	}
+
+	// Returns the digest if it exist.
+	if len(img.RepoDigests) > 0 {
+		return img.RepoDigests[0], nil
+	}
+
+	return img.ID, nil
 }
 
-// IsImagePresent checks whether the container image is already in the local storage.
-func (dm *DockerManager) IsImagePresent(image kubecontainer.ImageSpec) (bool, error) {
-	return dm.dockerPuller.IsImagePresent(image.Image)
+// PullImage pulls an image from network to local storage.
+func (dm *DockerManager) PullImage(image kubecontainer.ImageSpec, secrets []v1.Secret) (string, error) {
+	err := dm.dockerPuller.Pull(image.Image, secrets)
+	if err != nil {
+		return "", err
+	}
+
+	return GetImageRef(dm.client, image.Image)
+}
+
+// GetImageRef gets the reference (digest or ID) of the image which has already been in
+// the local storage. It returns ("", nil) if the image isn't in the local storage.
+func (dm *DockerManager) GetImageRef(image kubecontainer.ImageSpec) (string, error) {
+	return dm.dockerPuller.GetImageRef(image.Image)
 }
 
 // Removes the specified image.
@@ -1683,7 +1713,7 @@ func (dm *DockerManager) applyOOMScoreAdj(pod *v1.Pod, container *v1.Container, 
 
 // Run a single container from a pod. Returns the docker container ID
 // If do not need to pass labels, just pass nil.
-func (dm *DockerManager) runContainerInPod(pod *v1.Pod, container *v1.Container, netMode, ipcMode, pidMode, podIP string, restartCount int) (kubecontainer.ContainerID, error) {
+func (dm *DockerManager) runContainerInPod(pod *v1.Pod, container *v1.Container, netMode, ipcMode, pidMode, podIP, imageRef string, restartCount int) (kubecontainer.ContainerID, error) {
 	start := time.Now()
 	defer func() {
 		metrics.ContainerManagerLatency.WithLabelValues("runContainerInPod").Observe(metrics.SinceInMicroseconds(start))
@@ -1708,7 +1738,7 @@ func (dm *DockerManager) runContainerInPod(pod *v1.Pod, container *v1.Container,
 
 	oomScoreAdj := dm.calculateOomScoreAdj(pod, container)
 
-	id, err := dm.runContainer(pod, container, opts, ref, netMode, ipcMode, utsMode, pidMode, restartCount, oomScoreAdj)
+	id, err := dm.runContainer(pod, container, opts, ref, imageRef, netMode, ipcMode, utsMode, pidMode, restartCount, oomScoreAdj)
 	if err != nil {
 		return kubecontainer.ContainerID{}, fmt.Errorf("runContainer: %v", err)
 	}
@@ -1888,12 +1918,13 @@ func (dm *DockerManager) createPodInfraContainer(pod *v1.Pod) (kubecontainer.Doc
 
 	// No pod secrets for the infra container.
 	// The message isn't needed for the Infra container
-	if err, msg := dm.imagePuller.EnsureImageExists(pod, container, nil); err != nil {
+	imageRef, msg, err := dm.imagePuller.EnsureImageExists(pod, container, nil)
+	if err != nil {
 		return "", err, msg
 	}
 
 	// Currently we don't care about restart count of infra container, just set it to 0.
-	id, err := dm.runContainerInPod(pod, container, netNamespace, getIPCMode(pod), getPidMode(pod), "", 0)
+	id, err := dm.runContainerInPod(pod, container, netNamespace, getIPCMode(pod), getPidMode(pod), "", imageRef, 0)
 	if err != nil {
 		return "", kubecontainer.ErrRunContainer, err.Error()
 	}
@@ -2305,7 +2336,7 @@ func (dm *DockerManager) SyncPod(pod *v1.Pod, _ v1.PodStatus, podStatus *kubecon
 // tryContainerStart attempts to pull and start the container, returning an error and a reason string if the start
 // was not successful.
 func (dm *DockerManager) tryContainerStart(container *v1.Container, pod *v1.Pod, podStatus *kubecontainer.PodStatus, pullSecrets []v1.Secret, namespaceMode, pidMode, podIP string) (err error, reason string) {
-	err, msg := dm.imagePuller.EnsureImageExists(pod, container, pullSecrets)
+	imageRef, msg, err := dm.imagePuller.EnsureImageExists(pod, container, pullSecrets)
 	if err != nil {
 		return err, msg
 	}
@@ -2331,7 +2362,7 @@ func (dm *DockerManager) tryContainerStart(container *v1.Container, pod *v1.Pod,
 		netMode = namespaceMode
 	}
 
-	_, err = dm.runContainerInPod(pod, container, netMode, namespaceMode, pidMode, podIP, restartCount)
+	_, err = dm.runContainerInPod(pod, container, netMode, namespaceMode, pidMode, podIP, imageRef, restartCount)
 	if err != nil {
 		// TODO(bburns) : Perhaps blacklist a container after N failures?
 		return kubecontainer.ErrRunContainer, err.Error()

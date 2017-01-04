@@ -99,7 +99,7 @@ func (h *UpgradeAwareProxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Re
 		loc.Path += "/"
 	}
 
-	// From pkg/apiserver/proxy.go#ServeHTTP:
+	// From pkg/genericapiserver/api/handlers/proxy.go#ServeHTTP:
 	// Redirect requests with an empty path to a location that ends with a '/'
 	// This is essentially a hack for http://issue.k8s.io/4958.
 	// Note: Keep this code after tryUpgrade to not break that flow.

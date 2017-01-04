@@ -464,7 +464,7 @@ var _ = framework.KubeDescribe("DNS", func() {
 
 		// Test changing the externalName field
 		By("changing the externalName to bar.example.com")
-		_, err = updateService(f.ClientSet, f.Namespace.Name, serviceName, func(s *v1.Service) {
+		_, err = framework.UpdateService(f.ClientSet, f.Namespace.Name, serviceName, func(s *v1.Service) {
 			s.Spec.ExternalName = "bar.example.com"
 		})
 		Expect(err).NotTo(HaveOccurred())
@@ -481,7 +481,7 @@ var _ = framework.KubeDescribe("DNS", func() {
 
 		// Test changing type from ExternalName to ClusterIP
 		By("changing the service to type=ClusterIP")
-		_, err = updateService(f.ClientSet, f.Namespace.Name, serviceName, func(s *v1.Service) {
+		_, err = framework.UpdateService(f.ClientSet, f.Namespace.Name, serviceName, func(s *v1.Service) {
 			s.Spec.Type = v1.ServiceTypeClusterIP
 			s.Spec.ClusterIP = "127.1.2.3"
 			s.Spec.Ports = []v1.ServicePort{

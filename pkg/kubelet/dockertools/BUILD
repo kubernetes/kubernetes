@@ -84,6 +84,7 @@ go_test(
     srcs = [
         "container_gc_test.go",
         "convert_test.go",
+        "docker_manager_linux_test.go",
         "docker_manager_test.go",
         "docker_test.go",
         "images_test.go",
@@ -93,7 +94,7 @@ go_test(
         "fixtures/seccomp/sub/subtest",
         "fixtures/seccomp/test",
     ],
-    library = "go_default_library",
+    library = ":go_default_library",
     tags = [
         "automanaged",
     ],

@@ -36,8 +36,9 @@ import (
 	"k8s.io/kubernetes/pkg/apimachinery"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/apiserver"
 	"k8s.io/kubernetes/pkg/client/restclient"
+	genericapi "k8s.io/kubernetes/pkg/genericapiserver/api"
+	apirequest "k8s.io/kubernetes/pkg/genericapiserver/api/request"
 	genericmux "k8s.io/kubernetes/pkg/genericapiserver/mux"
 	openapicommon "k8s.io/kubernetes/pkg/genericapiserver/openapi/common"
 	"k8s.io/kubernetes/pkg/genericapiserver/routes"
@@ -95,7 +96,7 @@ type GenericAPIServer struct {
 	admissionControl admission.Interface
 
 	// requestContextMapper provides a way to get the context for a request.  It may be nil.
-	requestContextMapper api.RequestContextMapper
+	requestContextMapper apirequest.RequestContextMapper
 
 	// The registered APIs
 	HandlerContainer *genericmux.APIContainer
@@ -152,7 +153,7 @@ func init() {
 
 // RequestContextMapper is exposed so that third party resource storage can be build in a different location.
 // TODO refactor third party resource storage
-func (s *GenericAPIServer) RequestContextMapper() api.RequestContextMapper {
+func (s *GenericAPIServer) RequestContextMapper() apirequest.RequestContextMapper {
 	return s.requestContextMapper
 }
 
@@ -241,7 +242,7 @@ func (s *GenericAPIServer) InstallLegacyAPIGroup(apiPrefix string, apiGroupInfo 
 	}
 	// Install the version handler.
 	// Add a handler at /<apiPrefix> to enumerate the supported api versions.
-	apiserver.AddApiWebService(s.Serializer, s.HandlerContainer.Container, apiPrefix, func(req *restful.Request) *metav1.APIVersions {
+	genericapi.AddApiWebService(s.Serializer, s.HandlerContainer.Container, apiPrefix, func(req *restful.Request) *metav1.APIVersions {
 		clientIP := utilnet.GetClientIP(req.Request)
 
 		apiVersionsForDiscovery := metav1.APIVersions{
@@ -293,7 +294,7 @@ func (s *GenericAPIServer) InstallAPIGroup(apiGroupInfo *APIGroupInfo) error {
 	}
 
 	s.AddAPIGroupForDiscovery(apiGroup)
-	s.HandlerContainer.Add(apiserver.NewGroupWebService(s.Serializer, APIGroupPrefix+"/"+apiGroup.Name, apiGroup))
+	s.HandlerContainer.Add(genericapi.NewGroupWebService(s.Serializer, APIGroupPrefix+"/"+apiGroup.Name, apiGroup))
 
 	return nil
 }
@@ -312,7 +313,7 @@ func (s *GenericAPIServer) RemoveAPIGroupForDiscovery(groupName string) {
 	delete(s.apiGroupsForDiscovery, groupName)
 }
 
-func (s *GenericAPIServer) getAPIGroupVersion(apiGroupInfo *APIGroupInfo, groupVersion schema.GroupVersion, apiPrefix string) (*apiserver.APIGroupVersion, error) {
+func (s *GenericAPIServer) getAPIGroupVersion(apiGroupInfo *APIGroupInfo, groupVersion schema.GroupVersion, apiPrefix string) (*genericapi.APIGroupVersion, error) {
 	storage := make(map[string]rest.Storage)
 	for k, v := range apiGroupInfo.VersionedResourcesStorageMap[groupVersion.Version] {
 		storage[strings.ToLower(k)] = v
@@ -323,8 +324,8 @@ func (s *GenericAPIServer) getAPIGroupVersion(apiGroupInfo *APIGroupInfo, groupV
 	return version, err
 }
 
-func (s *GenericAPIServer) newAPIGroupVersion(apiGroupInfo *APIGroupInfo, groupVersion schema.GroupVersion) (*apiserver.APIGroupVersion, error) {
-	return &apiserver.APIGroupVersion{
+func (s *GenericAPIServer) newAPIGroupVersion(apiGroupInfo *APIGroupInfo, groupVersion schema.GroupVersion) (*genericapi.APIGroupVersion, error) {
+	return &genericapi.APIGroupVersion{
 		GroupVersion: groupVersion,
 
 		ParameterCodec: apiGroupInfo.ParameterCodec,
@@ -346,7 +347,7 @@ func (s *GenericAPIServer) newAPIGroupVersion(apiGroupInfo *APIGroupInfo, groupV
 // DynamicApisDiscovery returns a webservice serving api group discovery.
 // Note: during the server runtime apiGroupsForDiscovery might change.
 func (s *GenericAPIServer) DynamicApisDiscovery() *restful.WebService {
-	return apiserver.NewApisWebService(s.Serializer, APIGroupPrefix, func(req *restful.Request) []metav1.APIGroup {
+	return genericapi.NewApisWebService(s.Serializer, APIGroupPrefix, func(req *restful.Request) []metav1.APIGroup {
 		s.apiGroupsForDiscoveryLock.RLock()
 		defer s.apiGroupsForDiscoveryLock.RUnlock()
 

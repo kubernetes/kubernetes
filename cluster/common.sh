@@ -439,10 +439,10 @@ function find-release-tars() {
     exit 1
   fi
 
-  # This tarball is used by GCI, Ubuntu Trusty, and CoreOS.
+  # This tarball is used by GCI, Ubuntu Trusty, and Container Linux.
   KUBE_MANIFESTS_TAR=
-  if [[ "${MASTER_OS_DISTRIBUTION:-}" == "trusty" || "${MASTER_OS_DISTRIBUTION:-}" == "gci" || "${MASTER_OS_DISTRIBUTION:-}" == "coreos" ]] || \
-     [[ "${NODE_OS_DISTRIBUTION:-}" == "trusty" || "${NODE_OS_DISTRIBUTION:-}" == "gci" || "${NODE_OS_DISTRIBUTION:-}" == "coreos" ]] ; then
+  if [[ "${MASTER_OS_DISTRIBUTION:-}" == "trusty" || "${MASTER_OS_DISTRIBUTION:-}" == "gci" || "${MASTER_OS_DISTRIBUTION:-}" == "container-linux" ]] || \
+     [[ "${NODE_OS_DISTRIBUTION:-}" == "trusty" || "${NODE_OS_DISTRIBUTION:-}" == "gci" || "${NODE_OS_DISTRIBUTION:-}" == "container-linux" ]] ; then
     KUBE_MANIFESTS_TAR="${KUBE_ROOT}/server/kubernetes-manifests.tar.gz"
     if [[ ! -f "${KUBE_MANIFESTS_TAR}" ]]; then
       KUBE_MANIFESTS_TAR="${KUBE_ROOT}/_output/release-tars/kubernetes-manifests.tar.gz"
@@ -573,9 +573,9 @@ function build-kube-env {
   local server_binary_tar_url=$SERVER_BINARY_TAR_URL
   local salt_tar_url=$SALT_TAR_URL
   local kube_manifests_tar_url="${KUBE_MANIFESTS_TAR_URL:-}"
-  if [[ "${master}" == "true" && "${MASTER_OS_DISTRIBUTION}" == "coreos" ]] || \
-     [[ "${master}" == "false" && "${NODE_OS_DISTRIBUTION}" == "coreos" ]] ; then
-    # TODO: Support fallback .tar.gz settings on CoreOS
+  if [[ "${master}" == "true" && "${MASTER_OS_DISTRIBUTION}" == "container-linux" ]] || \
+     [[ "${master}" == "false" && "${NODE_OS_DISTRIBUTION}" == "container-linux" ]] ; then
+    # TODO: Support fallback .tar.gz settings on Container Linux
     server_binary_tar_url=$(split_csv "${SERVER_BINARY_TAR_URL}")
     salt_tar_url=$(split_csv "${SALT_TAR_URL}")
     kube_manifests_tar_url=$(split_csv "${KUBE_MANIFESTS_TAR_URL}")
@@ -655,8 +655,8 @@ EOF
 TERMINATED_POD_GC_THRESHOLD: $(yaml-quote ${TERMINATED_POD_GC_THRESHOLD})
 EOF
   fi
-  if [[ "${master}" == "true" && ("${MASTER_OS_DISTRIBUTION}" == "trusty" || "${MASTER_OS_DISTRIBUTION}" == "gci" || "${MASTER_OS_DISTRIBUTION}" == "coreos") ]] || \
-     [[ "${master}" == "false" && ("${NODE_OS_DISTRIBUTION}" == "trusty" || "${NODE_OS_DISTRIBUTION}" == "gci" || "${NODE_OS_DISTRIBUTION}" == "coreos") ]] ; then
+  if [[ "${master}" == "true" && ("${MASTER_OS_DISTRIBUTION}" == "trusty" || "${MASTER_OS_DISTRIBUTION}" == "gci" || "${MASTER_OS_DISTRIBUTION}" == "container-linux") ]] || \
+     [[ "${master}" == "false" && ("${NODE_OS_DISTRIBUTION}" == "trusty" || "${NODE_OS_DISTRIBUTION}" == "gci" || "${NODE_OS_DISTRIBUTION}" == "container-linux") ]] ; then
     cat >>$file <<EOF
 KUBE_MANIFESTS_TAR_URL: $(yaml-quote ${kube_manifests_tar_url})
 KUBE_MANIFESTS_TAR_HASH: $(yaml-quote ${KUBE_MANIFESTS_TAR_HASH})
@@ -799,9 +799,9 @@ EOF
 EVICTION_HARD: $(yaml-quote ${EVICTION_HARD})
 EOF
     fi
-  if [[ "${master}" == "true" && "${MASTER_OS_DISTRIBUTION}" == "coreos" ]] || \
-     [[ "${master}" == "false" && "${NODE_OS_DISTRIBUTION}" == "coreos" ]]; then
-    # CoreOS-only env vars. TODO(yifan): Make them available on other distros.
+  if [[ "${master}" == "true" && "${MASTER_OS_DISTRIBUTION}" == "container-linux" ]] || \
+     [[ "${master}" == "false" && "${NODE_OS_DISTRIBUTION}" == "container-linux" ]]; then
+    # Container-Linux-only env vars. TODO(yifan): Make them available on other distros.
     cat >>$file <<EOF
 KUBERNETES_CONTAINER_RUNTIME: $(yaml-quote ${CONTAINER_RUNTIME:-rkt})
 RKT_VERSION: $(yaml-quote ${RKT_VERSION:-})
@@ -851,6 +851,38 @@ function sha1sum-file() {
     shasum -a1 "$1" | awk '{ print $1 }'
   fi
 }
+
+# Downloads cfssl into ${KUBE_TEMP}/cfssl directory
+#
+# Assumed vars:
+#   KUBE_TEMP: temporary directory
+#
+function download-cfssl {
+  mkdir -p "${KUBE_TEMP}/cfssl"
+  pushd "${KUBE_TEMP}/cfssl"
+
+  kernel=$(uname -s)
+  case "${kernel}" in
+    Linux)
+      curl -s -L -o cfssl https://pkg.cfssl.org/R1.2/cfssl_linux-amd64
+      curl -s -L -o cfssljson https://pkg.cfssl.org/R1.2/cfssljson_linux-amd64
+      ;;
+    Darwin)
+      curl -s -L -o cfssl https://pkg.cfssl.org/R1.2/cfssl_darwin-amd64
+      curl -s -L -o cfssljson https://pkg.cfssl.org/R1.2/cfssljson_darwin-amd64
+      ;;
+    *)
+      echo "Unknown, unsupported platform: ${kernel}." >&2
+      echo "Supported platforms: Linux, Darwin." >&2
+      exit 2
+  esac
+
+  chmod +x cfssl
+  chmod +x cfssljson
+
+  popd
+}
+
 
 # Create certificate pairs for the cluster.
 # $1: The public IP for the master.

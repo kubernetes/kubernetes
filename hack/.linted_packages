@@ -96,9 +96,6 @@ pkg/apis/policy/install
 pkg/apis/rbac/install
 pkg/apis/storage/install
 pkg/apis/storage/validation
-pkg/apiserver/audit
-pkg/apiserver/handlers/responsewriters
-pkg/apiserver/openapi
 pkg/auth/authenticator
 pkg/auth/authorizer/union
 pkg/client/conditions
@@ -179,6 +176,10 @@ pkg/controller/volume/reconciler
 pkg/controller/volume/statusupdater
 pkg/conversion/queryparams
 pkg/credentialprovider/aws
+pkg/genericapiserver/api/audit
+pkg/genericapiserver/api/handlers/responsewriters
+pkg/genericapiserver/api/openapi
+pkg/genericapiserver/api/request
 pkg/genericapiserver/filters
 pkg/genericapiserver/mux
 pkg/genericapiserver/routes

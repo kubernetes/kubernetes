@@ -84,7 +84,7 @@ func NewCmdCompletion(f cmdutil.Factory, out io.Writer) *cobra.Command {
 		Short: "Output shell completion code for the given shell (bash or zsh)",
 		Long:  completion_long,
 		Run: func(cmd *cobra.Command, args []string) {
-			err := RunCompletion(f, out, cmd, args)
+			err := RunCompletion(out, cmd, args)
 			cmdutil.CheckErr(err)
 		},
 		ValidArgs: shells,
@@ -93,7 +93,7 @@ func NewCmdCompletion(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func RunCompletion(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string) error {
+func RunCompletion(out io.Writer, cmd *cobra.Command, args []string) error {
 	if len(args) == 0 {
 		return cmdutil.UsageError(cmd, "Shell not specified.")
 	}

@@ -123,6 +123,13 @@ func (s ClusterRoleBindingGeneratorV1) StructuredGenerate() (runtime.Object, err
 			Name:       user,
 		})
 	}
+	for _, group := range s.Groups {
+		clusterRoleBinding.Subjects = append(clusterRoleBinding.Subjects, rbac.Subject{
+			Kind:       rbac.GroupKind,
+			APIVersion: "rbac/v1alpha1",
+			Name:       group,
+		})
+	}
 	for _, sa := range s.ServiceAccounts {
 		tokens := strings.Split(sa, ":")
 		if len(tokens) != 2 {
