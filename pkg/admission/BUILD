@@ -15,19 +15,14 @@ go_library(
         "chain.go",
         "errors.go",
         "handler.go",
-        "init.go",
         "interfaces.go",
         "plugins.go",
-        "types.go",
     ],
     tags = ["automanaged"],
     deps = [
         "//pkg/api/errors:go_default_library",
         "//pkg/api/meta:go_default_library",
-        "//pkg/auth/authorizer:go_default_library",
         "//pkg/auth/user:go_default_library",
-        "//pkg/client/clientset_generated/internalclientset:go_default_library",
-        "//pkg/controller/informers:go_default_library",
         "//pkg/runtime:go_default_library",
         "//pkg/runtime/schema:go_default_library",
         "//pkg/util/errors:go_default_library",
@@ -38,14 +33,8 @@ go_library(
 
 go_test(
     name = "go_default_test",
-    srcs = [
-        "chain_test.go",
-        "init_test.go",
-    ],
+    srcs = ["chain_test.go"],
     library = ":go_default_library",
     tags = ["automanaged"],
-    deps = [
-        "//pkg/auth/authorizer:go_default_library",
-        "//pkg/runtime/schema:go_default_library",
-    ],
+    deps = ["//pkg/runtime/schema:go_default_library"],
 )

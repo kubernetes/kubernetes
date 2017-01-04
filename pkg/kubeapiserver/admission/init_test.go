@@ -19,6 +19,7 @@ package admission
 import (
 	"testing"
 
+	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/auth/authorizer"
 )
 
@@ -40,19 +41,19 @@ type WantAuthorizerAdmission struct {
 func (self *WantAuthorizerAdmission) SetAuthorizer(a authorizer.Authorizer) {
 	self.auth = a
 }
-func (self *WantAuthorizerAdmission) Admit(a Attributes) error { return nil }
-func (self *WantAuthorizerAdmission) Handles(o Operation) bool { return false }
-func (self *WantAuthorizerAdmission) Validate() error          { return nil }
+func (self *WantAuthorizerAdmission) Admit(a admission.Attributes) error { return nil }
+func (self *WantAuthorizerAdmission) Handles(o admission.Operation) bool { return false }
+func (self *WantAuthorizerAdmission) Validate() error                    { return nil }
 
-var _ Interface = &WantAuthorizerAdmission{}
+var _ admission.Interface = &WantAuthorizerAdmission{}
 var _ WantsAuthorizer = &WantAuthorizerAdmission{}
 
 // TestWantsAuthorizer ensures that the authorizer is injected when the WantsAuthorizer
 // interface is implemented.
 func TestWantsAuthorizer(t *testing.T) {
-	initializer := NewPluginInitializer(nil, &TestAuthorizer{})
+	initializer := NewPluginInitializer(nil, nil, &TestAuthorizer{})
 	wantAuthorizerAdmission := &WantAuthorizerAdmission{}
-	initializer.Initialize([]Interface{wantAuthorizerAdmission})
+	initializer.Initialize(wantAuthorizerAdmission)
 	if wantAuthorizerAdmission.auth == nil {
 		t.Errorf("expected authorizer to be initialized but found nil")
 	}

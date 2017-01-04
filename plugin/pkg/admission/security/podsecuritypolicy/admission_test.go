@@ -30,8 +30,6 @@ import (
 	"k8s.io/kubernetes/pkg/auth/authorizer"
 	"k8s.io/kubernetes/pkg/auth/user"
 	"k8s.io/kubernetes/pkg/client/cache"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	clientsetfake "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
 	"k8s.io/kubernetes/pkg/security/apparmor"
 	kpsp "k8s.io/kubernetes/pkg/security/podsecuritypolicy"
 	"k8s.io/kubernetes/pkg/security/podsecuritypolicy/seccomp"
@@ -44,10 +42,9 @@ const defaultContainerName = "test-c"
 
 // NewTestAdmission provides an admission plugin with test implementations of internal structs.  It uses
 // an authorizer that always returns true.
-func NewTestAdmission(store cache.Store, kclient clientset.Interface) kadmission.Interface {
+func NewTestAdmission(store cache.Store) kadmission.Interface {
 	return &podSecurityPolicyPlugin{
 		Handler:         kadmission.NewHandler(kadmission.Create),
-		client:          kclient,
 		store:           store,
 		strategyFactory: kpsp.NewSimpleStrategyFactory(),
 		pspMatcher:      getMatchingPolicies,
@@ -1339,16 +1336,13 @@ func TestAdmitSysctls(t *testing.T) {
 }
 
 func testPSPAdmit(testCaseName string, psps []*extensions.PodSecurityPolicy, pod *kapi.Pod, shouldPass bool, expectedPSP string, t *testing.T) {
-	namespace := createNamespaceForTest()
-	serviceAccount := createSAForTest()
-	tc := clientsetfake.NewSimpleClientset(namespace, serviceAccount)
 	store := cache.NewStore(cache.MetaNamespaceKeyFunc)
 
 	for _, psp := range psps {
 		store.Add(psp)
 	}
 
-	plugin := NewTestAdmission(store, tc)
+	plugin := NewTestAdmission(store)
 
 	attrs := kadmission.NewAttributesRecord(pod, nil, kapi.Kind("Pod").WithVersion("version"), "namespace", "", kapi.Resource("pods").WithVersion("version"), "", kadmission.Create, &user.DefaultInfo{})
 	err := plugin.Admit(attrs)
@@ -1512,10 +1506,8 @@ func TestCreateProvidersFromConstraints(t *testing.T) {
 	for k, v := range testCases {
 		store := cache.NewStore(cache.MetaNamespaceKeyFunc)
 
-		tc := clientsetfake.NewSimpleClientset()
 		admit := &podSecurityPolicyPlugin{
 			Handler:         kadmission.NewHandler(kadmission.Create, kadmission.Update),
-			client:          tc,
 			store:           store,
 			strategyFactory: kpsp.NewSimpleStrategyFactory(),
 		}

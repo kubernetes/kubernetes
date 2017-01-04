@@ -23,18 +23,18 @@ import (
 	"strconv"
 	"time"
 
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	"k8s.io/kubernetes/pkg/runtime/schema"
-
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/v1"
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/client/cache"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/fields"
+	kubeapiserveradmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
 	kubelet "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/serviceaccount"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/watch"
@@ -55,9 +55,8 @@ const DefaultAPITokenMountPath = "/var/run/secrets/kubernetes.io/serviceaccount"
 const PluginName = "ServiceAccount"
 
 func init() {
-	admission.RegisterPlugin(PluginName, func(client clientset.Interface, config io.Reader) (admission.Interface, error) {
-		serviceAccountAdmission := NewServiceAccount(client)
-		serviceAccountAdmission.Run()
+	admission.RegisterPlugin(PluginName, func(config io.Reader) (admission.Interface, error) {
+		serviceAccountAdmission := NewServiceAccount()
 		return serviceAccountAdmission, nil
 	})
 }
@@ -74,7 +73,7 @@ type serviceAccount struct {
 	// MountServiceAccountToken creates Volume and VolumeMounts for the first referenced ServiceAccountToken for the pod's service account
 	MountServiceAccountToken bool
 
-	client clientset.Interface
+	client internalclientset.Interface
 
 	serviceAccounts cache.Indexer
 	secrets         cache.Indexer
@@ -84,14 +83,29 @@ type serviceAccount struct {
 	secretsReflector         *cache.Reflector
 }
 
+var _ = kubeapiserveradmission.WantsInternalClientSet(&serviceAccount{})
+
 // NewServiceAccount returns an admission.Interface implementation which limits admission of Pod CREATE requests based on the pod's ServiceAccount:
 // 1. If the pod does not specify a ServiceAccount, it sets the pod's ServiceAccount to "default"
 // 2. It ensures the ServiceAccount referenced by the pod exists
 // 3. If LimitSecretReferences is true, it rejects the pod if the pod references Secret objects which the pod's ServiceAccount does not reference
 // 4. If the pod does not contain any ImagePullSecrets, the ImagePullSecrets of the service account are added.
 // 5. If MountServiceAccountToken is true, it adds a VolumeMount with the pod's ServiceAccount's api token secret to containers
-func NewServiceAccount(cl clientset.Interface) *serviceAccount {
-	serviceAccountsIndexer, serviceAccountsReflector := cache.NewNamespaceKeyedIndexerAndReflector(
+func NewServiceAccount() *serviceAccount {
+	return &serviceAccount{
+		Handler: admission.NewHandler(admission.Create),
+		// TODO: enable this once we've swept secret usage to account for adding secret references to service accounts
+		LimitSecretReferences: false,
+		// Auto mount service account API token secrets
+		MountServiceAccountToken: true,
+		// Reject pod creation until a service account token is available
+		RequireAPIToken: true,
+	}
+}
+
+func (a *serviceAccount) SetInternalClientSet(cl internalclientset.Interface) {
+	a.client = cl
+	a.serviceAccounts, a.serviceAccountsReflector = cache.NewNamespaceKeyedIndexerAndReflector(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
 				internalOptions := api.ListOptions{}
@@ -109,7 +123,7 @@ func NewServiceAccount(cl clientset.Interface) *serviceAccount {
 	)
 
 	tokenSelector := fields.SelectorFromSet(map[string]string{api.SecretTypeField: string(api.SecretTypeServiceAccountToken)})
-	secretsIndexer, secretsReflector := cache.NewNamespaceKeyedIndexerAndReflector(
+	a.secrets, a.secretsReflector = cache.NewNamespaceKeyedIndexerAndReflector(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
 				internalOptions := api.ListOptions{}
@@ -128,21 +142,29 @@ func NewServiceAccount(cl clientset.Interface) *serviceAccount {
 		0,
 	)
 
-	return &serviceAccount{
-		Handler: admission.NewHandler(admission.Create),
-		// TODO: enable this once we've swept secret usage to account for adding secret references to service accounts
-		LimitSecretReferences: false,
-		// Auto mount service account API token secrets
-		MountServiceAccountToken: true,
-		// Reject pod creation until a service account token is available
-		RequireAPIToken: true,
-
-		client:                   cl,
-		serviceAccounts:          serviceAccountsIndexer,
-		serviceAccountsReflector: serviceAccountsReflector,
-		secrets:                  secretsIndexer,
-		secretsReflector:         secretsReflector,
+	if cl != nil {
+		a.Run()
 	}
+}
+
+// Validate ensures an authorizer is set.
+func (a *serviceAccount) Validate() error {
+	if a.client == nil {
+		return fmt.Errorf("missing client")
+	}
+	if a.secrets == nil {
+		return fmt.Errorf("missing secretsIndexer")
+	}
+	if a.secretsReflector == nil {
+		return fmt.Errorf("missing secretsReflector")
+	}
+	if a.serviceAccounts == nil {
+		return fmt.Errorf("missing serviceAccountsIndexer")
+	}
+	if a.serviceAccountsReflector == nil {
+		return fmt.Errorf("missing serviceAccountsReflector")
+	}
+	return nil
 }
 
 func (s *serviceAccount) Run() {
