@@ -1052,10 +1052,19 @@ func describeContainerEnvFrom(container api.Container, resolverFn EnvVarResolver
 	w.Write(LEVEL_2, "Environment Variables from:%s\n", none)
 
 	for _, e := range container.EnvFrom {
+		from := ""
+		name := ""
+		if e.ConfigMapRef != nil {
+			from = "ConfigMap"
+			name = e.ConfigMapRef.Name
+		} else if e.SecretRef != nil {
+			from = "Secret"
+			name = e.SecretRef.Name
+		}
 		if len(e.Prefix) == 0 {
-			w.Write(LEVEL_3, "%s\tConfigMap\n", e.ConfigMapRef.Name)
+			w.Write(LEVEL_3, "%s\t%s\n", name, from)
 		} else {
-			w.Write(LEVEL_3, "%s\tConfigMap with prefix '%s'\n", e.ConfigMapRef.Name, e.Prefix)
+			w.Write(LEVEL_3, "%s\t%s with prefix '%s'\n", name, from, e.Prefix)
 		}
 	}
 }
