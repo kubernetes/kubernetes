@@ -113,7 +113,7 @@ func WriteStaticPodManifests(cfg *kubeadmapi.MasterConfiguration) error {
 				"etcd",
 				"--listen-client-urls=http://127.0.0.1:2379",
 				"--advertise-client-urls=http://127.0.0.1:2379",
-				"--data-dir=/var/etcd/data",
+				"--data-dir=/var/lib/etcd",
 			},
 			VolumeMounts:  []api.VolumeMount{certsVolumeMount(), etcdVolumeMount(), k8sVolumeMount()},
 			Image:         images.GetCoreImage(images.KubeEtcdImage, cfg, kubeadmapi.GlobalEnvParams.EtcdImage),
@@ -161,7 +161,7 @@ func etcdVolume(cfg *kubeadmapi.MasterConfiguration) api.Volume {
 func etcdVolumeMount() api.VolumeMount {
 	return api.VolumeMount{
 		Name:      "etcd",
-		MountPath: "/var/etcd",
+		MountPath: "/var/lib/etcd",
 	}
 }
 
