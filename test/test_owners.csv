@@ -585,6 +585,7 @@ k8s.io/kubernetes/pkg/apis/meta/v1,sttts,0
 k8s.io/kubernetes/pkg/apis/meta/v1/unstructured,smarterclayton,0
 k8s.io/kubernetes/pkg/apis/meta/v1/validation,smarterclayton,0
 k8s.io/kubernetes/pkg/apis/policy/validation,deads2k,1
+k8s.io/kubernetes/pkg/apis/rbac/v1alpha1,liggitt,0
 k8s.io/kubernetes/pkg/apis/rbac/validation,erictune,0
 k8s.io/kubernetes/pkg/apis/storage/validation,caesarxuchao,1
 k8s.io/kubernetes/pkg/genericapiserver/api,nikhiljindal,0
