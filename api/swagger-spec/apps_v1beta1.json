@@ -13,7 +13,7 @@
     "description": "API at /apis/apps/v1beta1",
     "operations": [
      {
-      "type": "v1beta1.StatefulSetList",
+      "type": "apps.v1beta1.StatefulSetList",
       "method": "GET",
       "summary": "list or watch objects of kind StatefulSet",
       "nickname": "listNamespacedStatefulSet",
@@ -79,7 +79,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1beta1.StatefulSetList"
+        "responseModel": "apps.v1beta1.StatefulSetList"
        }
       ],
       "produces": [
@@ -94,7 +94,7 @@
       ]
      },
      {
-      "type": "v1beta1.StatefulSet",
+      "type": "apps.v1beta1.StatefulSet",
       "method": "POST",
       "summary": "create a StatefulSet",
       "nickname": "createNamespacedStatefulSet",
@@ -128,7 +128,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1beta1.StatefulSet"
+        "responseModel": "apps.v1beta1.StatefulSet"
        }
       ],
       "produces": [
@@ -141,7 +141,7 @@
       ]
      },
      {
-      "type": "v1.Status",
+      "type": "io.k8s.meta.v1.Status",
       "method": "DELETE",
       "summary": "delete collection of StatefulSet",
       "nickname": "deletecollectionNamespacedStatefulSet",
@@ -207,7 +207,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1.Status"
+        "responseModel": "io.k8s.meta.v1.Status"
        }
       ],
       "produces": [
@@ -226,7 +226,7 @@
     "description": "API at /apis/apps/v1beta1",
     "operations": [
      {
-      "type": "versioned.Event",
+      "type": "io.k8s.kubernetes.pkg.watch.versioned.Event",
       "method": "GET",
       "summary": "watch individual changes to a list of StatefulSet",
       "nickname": "watchNamespacedStatefulSetList",
@@ -292,7 +292,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "versioned.Event"
+        "responseModel": "io.k8s.kubernetes.pkg.watch.versioned.Event"
        }
       ],
       "produces": [
@@ -313,7 +313,7 @@
     "description": "API at /apis/apps/v1beta1",
     "operations": [
      {
-      "type": "v1beta1.StatefulSet",
+      "type": "apps.v1beta1.StatefulSet",
       "method": "GET",
       "summary": "read the specified StatefulSet",
       "nickname": "readNamespacedStatefulSet",
@@ -363,7 +363,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1beta1.StatefulSet"
+        "responseModel": "apps.v1beta1.StatefulSet"
        }
       ],
       "produces": [
@@ -376,7 +376,7 @@
       ]
      },
      {
-      "type": "v1beta1.StatefulSet",
+      "type": "apps.v1beta1.StatefulSet",
       "method": "PUT",
       "summary": "replace the specified StatefulSet",
       "nickname": "replaceNamespacedStatefulSet",
@@ -418,7 +418,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1beta1.StatefulSet"
+        "responseModel": "apps.v1beta1.StatefulSet"
        }
       ],
       "produces": [
@@ -431,7 +431,7 @@
       ]
      },
      {
-      "type": "v1beta1.StatefulSet",
+      "type": "apps.v1beta1.StatefulSet",
       "method": "PATCH",
       "summary": "partially update the specified StatefulSet",
       "nickname": "patchNamespacedStatefulSet",
@@ -473,7 +473,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1beta1.StatefulSet"
+        "responseModel": "apps.v1beta1.StatefulSet"
        }
       ],
       "produces": [
@@ -488,7 +488,7 @@
       ]
      },
      {
-      "type": "v1.Status",
+      "type": "io.k8s.meta.v1.Status",
       "method": "DELETE",
       "summary": "delete a StatefulSet",
       "nickname": "deleteNamespacedStatefulSet",
@@ -546,7 +546,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1.Status"
+        "responseModel": "io.k8s.meta.v1.Status"
        }
       ],
       "produces": [
@@ -565,7 +565,7 @@
     "description": "API at /apis/apps/v1beta1",
     "operations": [
      {
-      "type": "versioned.Event",
+      "type": "io.k8s.kubernetes.pkg.watch.versioned.Event",
       "method": "GET",
       "summary": "watch changes to an object of kind StatefulSet",
       "nickname": "watchNamespacedStatefulSet",
@@ -639,7 +639,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "versioned.Event"
+        "responseModel": "io.k8s.kubernetes.pkg.watch.versioned.Event"
        }
       ],
       "produces": [
@@ -660,7 +660,7 @@
     "description": "API at /apis/apps/v1beta1",
     "operations": [
      {
-      "type": "v1beta1.StatefulSetList",
+      "type": "apps.v1beta1.StatefulSetList",
       "method": "GET",
       "summary": "list or watch objects of kind StatefulSet",
       "nickname": "listStatefulSetForAllNamespaces",
@@ -718,7 +718,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1beta1.StatefulSetList"
+        "responseModel": "apps.v1beta1.StatefulSetList"
        }
       ],
       "produces": [
@@ -739,7 +739,7 @@
     "description": "API at /apis/apps/v1beta1",
     "operations": [
      {
-      "type": "versioned.Event",
+      "type": "io.k8s.kubernetes.pkg.watch.versioned.Event",
       "method": "GET",
       "summary": "watch individual changes to a list of StatefulSet",
       "nickname": "watchStatefulSetListForAllNamespaces",
@@ -797,7 +797,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "versioned.Event"
+        "responseModel": "io.k8s.kubernetes.pkg.watch.versioned.Event"
        }
       ],
       "produces": [
@@ -818,7 +818,7 @@
     "description": "API at /apis/apps/v1beta1",
     "operations": [
      {
-      "type": "v1beta1.StatefulSet",
+      "type": "apps.v1beta1.StatefulSet",
       "method": "GET",
       "summary": "read status of the specified StatefulSet",
       "nickname": "readNamespacedStatefulSetStatus",
@@ -852,7 +852,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1beta1.StatefulSet"
+        "responseModel": "apps.v1beta1.StatefulSet"
        }
       ],
       "produces": [
@@ -865,7 +865,7 @@
       ]
      },
      {
-      "type": "v1beta1.StatefulSet",
+      "type": "apps.v1beta1.StatefulSet",
       "method": "PUT",
       "summary": "replace status of the specified StatefulSet",
       "nickname": "replaceNamespacedStatefulSetStatus",
@@ -907,7 +907,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1beta1.StatefulSet"
+        "responseModel": "apps.v1beta1.StatefulSet"
        }
       ],
       "produces": [
@@ -920,7 +920,7 @@
       ]
      },
      {
-      "type": "v1beta1.StatefulSet",
+      "type": "apps.v1beta1.StatefulSet",
       "method": "PATCH",
       "summary": "partially update status of the specified StatefulSet",
       "nickname": "patchNamespacedStatefulSetStatus",
@@ -962,7 +962,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1beta1.StatefulSet"
+        "responseModel": "apps.v1beta1.StatefulSet"
        }
       ],
       "produces": [
@@ -983,7 +983,7 @@
     "description": "API at /apis/apps/v1beta1",
     "operations": [
      {
-      "type": "v1.APIResourceList",
+      "type": "io.k8s.meta.v1.APIResourceList",
       "method": "GET",
       "summary": "get available resources",
       "nickname": "getAPIResources",
@@ -3136,6 +3136,57 @@
        "type": "string"
       },
       "description": "verbs is a list of supported kube verbs (this includes get, list, watch, create, update, patch, delete, deletecollection, and proxy)"
+     }
+    }
+   },
+   "v1beta1.StatefulSetList": {
+    "id": "v1beta1.StatefulSetList",
+    "description": "StatefulSetList is a collection of StatefulSets.\n\nDEPRECATED: Use 'apps.v1beta1.StatefulSetList' instead.",
+    "required": [
+     "items"
+    ],
+    "properties": {
+     "kind": {
+      "type": "string",
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+     },
+     "apiVersion": {
+      "type": "string",
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+     },
+     "metadata": {
+      "$ref": "io.k8s.meta.v1.ListMeta"
+     },
+     "items": {
+      "type": "array",
+      "items": {
+       "$ref": "apps.v1beta1.StatefulSet"
+      }
+     }
+    }
+   },
+   "v1beta1.StatefulSet": {
+    "id": "v1beta1.StatefulSet",
+    "description": "StatefulSet represents a set of pods with consistent identities. Identities are defined as:\n - Network: A single stable DNS and hostname.\n - Storage: As many VolumeClaims as requested.\nThe StatefulSet guarantees that a given network identity will always map to the same storage identity.\n\nDEPRECATED: Use 'apps.v1beta1.StatefulSet' instead.",
+    "properties": {
+     "kind": {
+      "type": "string",
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+     },
+     "apiVersion": {
+      "type": "string",
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+     },
+     "metadata": {
+      "$ref": "v1.ObjectMeta"
+     },
+     "spec": {
+      "$ref": "apps.v1beta1.StatefulSetSpec",
+      "description": "Spec defines the desired identities of pods in this set."
+     },
+     "status": {
+      "$ref": "apps.v1beta1.StatefulSetStatus",
+      "description": "Status is the current status of Pods in this StatefulSet. This data may be out of date by some window of time."
      }
     }
    }

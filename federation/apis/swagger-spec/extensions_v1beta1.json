@@ -13,7 +13,7 @@
     "description": "API at /apis/extensions/v1beta1",
     "operations": [
      {
-      "type": "v1beta1.DaemonSetList",
+      "type": "extensions.v1beta1.DaemonSetList",
       "method": "GET",
       "summary": "list or watch objects of kind DaemonSet",
       "nickname": "listNamespacedDaemonSet",
@@ -79,7 +79,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1beta1.DaemonSetList"
+        "responseModel": "extensions.v1beta1.DaemonSetList"
        }
       ],
       "produces": [
@@ -94,7 +94,7 @@
       ]
      },
      {
-      "type": "v1beta1.DaemonSet",
+      "type": "extensions.v1beta1.DaemonSet",
       "method": "POST",
       "summary": "create a DaemonSet",
       "nickname": "createNamespacedDaemonSet",
@@ -128,7 +128,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1beta1.DaemonSet"
+        "responseModel": "extensions.v1beta1.DaemonSet"
        }
       ],
       "produces": [
@@ -141,7 +141,7 @@
       ]
      },
      {
-      "type": "v1.Status",
+      "type": "io.k8s.meta.v1.Status",
       "method": "DELETE",
       "summary": "delete collection of DaemonSet",
       "nickname": "deletecollectionNamespacedDaemonSet",
@@ -207,7 +207,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1.Status"
+        "responseModel": "io.k8s.meta.v1.Status"
        }
       ],
       "produces": [
@@ -226,7 +226,7 @@
     "description": "API at /apis/extensions/v1beta1",
     "operations": [
      {
-      "type": "versioned.Event",
+      "type": "io.k8s.kubernetes.pkg.watch.versioned.Event",
       "method": "GET",
       "summary": "watch individual changes to a list of DaemonSet",
       "nickname": "watchNamespacedDaemonSetList",
@@ -292,7 +292,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "versioned.Event"
+        "responseModel": "io.k8s.kubernetes.pkg.watch.versioned.Event"
        }
       ],
       "produces": [
@@ -313,7 +313,7 @@
     "description": "API at /apis/extensions/v1beta1",
     "operations": [
      {
-      "type": "v1beta1.DaemonSet",
+      "type": "extensions.v1beta1.DaemonSet",
       "method": "GET",
       "summary": "read the specified DaemonSet",
       "nickname": "readNamespacedDaemonSet",
@@ -363,7 +363,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1beta1.DaemonSet"
+        "responseModel": "extensions.v1beta1.DaemonSet"
        }
       ],
       "produces": [
@@ -376,7 +376,7 @@
       ]
      },
      {
-      "type": "v1beta1.DaemonSet",
+      "type": "extensions.v1beta1.DaemonSet",
       "method": "PUT",
       "summary": "replace the specified DaemonSet",
       "nickname": "replaceNamespacedDaemonSet",
@@ -418,7 +418,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1beta1.DaemonSet"
+        "responseModel": "extensions.v1beta1.DaemonSet"
        }
       ],
       "produces": [
@@ -431,7 +431,7 @@
       ]
      },
      {
-      "type": "v1beta1.DaemonSet",
+      "type": "extensions.v1beta1.DaemonSet",
       "method": "PATCH",
       "summary": "partially update the specified DaemonSet",
       "nickname": "patchNamespacedDaemonSet",
@@ -473,7 +473,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1beta1.DaemonSet"
+        "responseModel": "extensions.v1beta1.DaemonSet"
        }
       ],
       "produces": [
@@ -488,7 +488,7 @@
       ]
      },
      {
-      "type": "v1.Status",
+      "type": "io.k8s.meta.v1.Status",
       "method": "DELETE",
       "summary": "delete a DaemonSet",
       "nickname": "deleteNamespacedDaemonSet",
@@ -546,7 +546,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1.Status"
+        "responseModel": "io.k8s.meta.v1.Status"
        }
       ],
       "produces": [
@@ -565,7 +565,7 @@
     "description": "API at /apis/extensions/v1beta1",
     "operations": [
      {
-      "type": "versioned.Event",
+      "type": "io.k8s.kubernetes.pkg.watch.versioned.Event",
       "method": "GET",
       "summary": "watch changes to an object of kind DaemonSet",
       "nickname": "watchNamespacedDaemonSet",
@@ -639,7 +639,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "versioned.Event"
+        "responseModel": "io.k8s.kubernetes.pkg.watch.versioned.Event"
        }
       ],
       "produces": [
@@ -660,7 +660,7 @@
     "description": "API at /apis/extensions/v1beta1",
     "operations": [
      {
-      "type": "v1beta1.DaemonSetList",
+      "type": "extensions.v1beta1.DaemonSetList",
       "method": "GET",
       "summary": "list or watch objects of kind DaemonSet",
       "nickname": "listDaemonSetForAllNamespaces",
@@ -718,7 +718,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1beta1.DaemonSetList"
+        "responseModel": "extensions.v1beta1.DaemonSetList"
        }
       ],
       "produces": [
@@ -739,7 +739,7 @@
     "description": "API at /apis/extensions/v1beta1",
     "operations": [
      {
-      "type": "versioned.Event",
+      "type": "io.k8s.kubernetes.pkg.watch.versioned.Event",
       "method": "GET",
       "summary": "watch individual changes to a list of DaemonSet",
       "nickname": "watchDaemonSetListForAllNamespaces",
@@ -797,7 +797,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "versioned.Event"
+        "responseModel": "io.k8s.kubernetes.pkg.watch.versioned.Event"
        }
       ],
       "produces": [
@@ -818,7 +818,7 @@
     "description": "API at /apis/extensions/v1beta1",
     "operations": [
      {
-      "type": "v1beta1.DaemonSet",
+      "type": "extensions.v1beta1.DaemonSet",
       "method": "GET",
       "summary": "read status of the specified DaemonSet",
       "nickname": "readNamespacedDaemonSetStatus",
@@ -852,7 +852,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1beta1.DaemonSet"
+        "responseModel": "extensions.v1beta1.DaemonSet"
        }
       ],
       "produces": [
@@ -865,7 +865,7 @@
       ]
      },
      {
-      "type": "v1beta1.DaemonSet",
+      "type": "extensions.v1beta1.DaemonSet",
       "method": "PUT",
       "summary": "replace status of the specified DaemonSet",
       "nickname": "replaceNamespacedDaemonSetStatus",
@@ -907,7 +907,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1beta1.DaemonSet"
+        "responseModel": "extensions.v1beta1.DaemonSet"
        }
       ],
       "produces": [
@@ -920,7 +920,7 @@
       ]
      },
      {
-      "type": "v1beta1.DaemonSet",
+      "type": "extensions.v1beta1.DaemonSet",
       "method": "PATCH",
       "summary": "partially update status of the specified DaemonSet",
       "nickname": "patchNamespacedDaemonSetStatus",
@@ -962,7 +962,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1beta1.DaemonSet"
+        "responseModel": "extensions.v1beta1.DaemonSet"
        }
       ],
       "produces": [
@@ -983,7 +983,7 @@
     "description": "API at /apis/extensions/v1beta1",
     "operations": [
      {
-      "type": "v1beta1.DeploymentList",
+      "type": "extensions.v1beta1.DeploymentList",
       "method": "GET",
       "summary": "list or watch objects of kind Deployment",
       "nickname": "listNamespacedDeployment",
@@ -1049,7 +1049,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1beta1.DeploymentList"
+        "responseModel": "extensions.v1beta1.DeploymentList"
        }
       ],
       "produces": [
@@ -1064,7 +1064,7 @@
       ]
      },
      {
-      "type": "v1beta1.Deployment",
+      "type": "extensions.v1beta1.Deployment",
       "method": "POST",
       "summary": "create a Deployment",
       "nickname": "createNamespacedDeployment",
@@ -1098,7 +1098,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1beta1.Deployment"
+        "responseModel": "extensions.v1beta1.Deployment"
        }
       ],
       "produces": [
@@ -1111,7 +1111,7 @@
       ]
      },
      {
-      "type": "v1.Status",
+      "type": "io.k8s.meta.v1.Status",
       "method": "DELETE",
       "summary": "delete collection of Deployment",
       "nickname": "deletecollectionNamespacedDeployment",
@@ -1177,7 +1177,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1.Status"
+        "responseModel": "io.k8s.meta.v1.Status"
        }
       ],
       "produces": [
@@ -1196,7 +1196,7 @@
     "description": "API at /apis/extensions/v1beta1",
     "operations": [
      {
-      "type": "versioned.Event",
+      "type": "io.k8s.kubernetes.pkg.watch.versioned.Event",
       "method": "GET",
       "summary": "watch individual changes to a list of Deployment",
       "nickname": "watchNamespacedDeploymentList",
@@ -1262,7 +1262,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "versioned.Event"
+        "responseModel": "io.k8s.kubernetes.pkg.watch.versioned.Event"
        }
       ],
       "produces": [
@@ -1283,7 +1283,7 @@
     "description": "API at /apis/extensions/v1beta1",
     "operations": [
      {
-      "type": "v1beta1.Deployment",
+      "type": "extensions.v1beta1.Deployment",
       "method": "GET",
       "summary": "read the specified Deployment",
       "nickname": "readNamespacedDeployment",
@@ -1333,7 +1333,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1beta1.Deployment"
+        "responseModel": "extensions.v1beta1.Deployment"
        }
       ],
       "produces": [
@@ -1346,7 +1346,7 @@
       ]
      },
      {
-      "type": "v1beta1.Deployment",
+      "type": "extensions.v1beta1.Deployment",
       "method": "PUT",
       "summary": "replace the specified Deployment",
       "nickname": "replaceNamespacedDeployment",
@@ -1388,7 +1388,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1beta1.Deployment"
+        "responseModel": "extensions.v1beta1.Deployment"
        }
       ],
       "produces": [
@@ -1401,7 +1401,7 @@
       ]
      },
      {
-      "type": "v1beta1.Deployment",
+      "type": "extensions.v1beta1.Deployment",
       "method": "PATCH",
       "summary": "partially update the specified Deployment",
       "nickname": "patchNamespacedDeployment",
@@ -1443,7 +1443,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1beta1.Deployment"
+        "responseModel": "extensions.v1beta1.Deployment"
        }
       ],
       "produces": [
@@ -1458,7 +1458,7 @@
       ]
      },
      {
-      "type": "v1.Status",
+      "type": "io.k8s.meta.v1.Status",
       "method": "DELETE",
       "summary": "delete a Deployment",
       "nickname": "deleteNamespacedDeployment",
@@ -1516,7 +1516,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1.Status"
+        "responseModel": "io.k8s.meta.v1.Status"
        }
       ],
       "produces": [
@@ -1535,7 +1535,7 @@
     "description": "API at /apis/extensions/v1beta1",
     "operations": [
      {
-      "type": "versioned.Event",
+      "type": "io.k8s.kubernetes.pkg.watch.versioned.Event",
       "method": "GET",
       "summary": "watch changes to an object of kind Deployment",
       "nickname": "watchNamespacedDeployment",
@@ -1609,7 +1609,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "versioned.Event"
+        "responseModel": "io.k8s.kubernetes.pkg.watch.versioned.Event"
        }
       ],
       "produces": [
@@ -1630,7 +1630,7 @@
     "description": "API at /apis/extensions/v1beta1",
     "operations": [
      {
-      "type": "v1beta1.DeploymentList",
+      "type": "extensions.v1beta1.DeploymentList",
       "method": "GET",
       "summary": "list or watch objects of kind Deployment",
       "nickname": "listDeploymentForAllNamespaces",
@@ -1688,7 +1688,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1beta1.DeploymentList"
+        "responseModel": "extensions.v1beta1.DeploymentList"
        }
       ],
       "produces": [
@@ -1709,7 +1709,7 @@
     "description": "API at /apis/extensions/v1beta1",
     "operations": [
      {
-      "type": "versioned.Event",
+      "type": "io.k8s.kubernetes.pkg.watch.versioned.Event",
       "method": "GET",
       "summary": "watch individual changes to a list of Deployment",
       "nickname": "watchDeploymentListForAllNamespaces",
@@ -1767,7 +1767,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "versioned.Event"
+        "responseModel": "io.k8s.kubernetes.pkg.watch.versioned.Event"
        }
       ],
       "produces": [
@@ -1788,7 +1788,7 @@
     "description": "API at /apis/extensions/v1beta1",
     "operations": [
      {
-      "type": "v1beta1.DeploymentRollback",
+      "type": "extensions.v1beta1.DeploymentRollback",
       "method": "POST",
       "summary": "create rollback of a DeploymentRollback",
       "nickname": "createNamespacedDeploymentRollbackRollback",
@@ -1830,7 +1830,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1beta1.DeploymentRollback"
+        "responseModel": "extensions.v1beta1.DeploymentRollback"
        }
       ],
       "produces": [
@@ -1849,7 +1849,7 @@
     "description": "API at /apis/extensions/v1beta1",
     "operations": [
      {
-      "type": "v1beta1.Scale",
+      "type": "extensions.v1beta1.Scale",
       "method": "GET",
       "summary": "read scale of the specified Scale",
       "nickname": "readNamespacedScaleScale",
@@ -1883,7 +1883,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1beta1.Scale"
+        "responseModel": "extensions.v1beta1.Scale"
        }
       ],
       "produces": [
@@ -1896,7 +1896,7 @@
       ]
      },
      {
-      "type": "v1beta1.Scale",
+      "type": "extensions.v1beta1.Scale",
       "method": "PUT",
       "summary": "replace scale of the specified Scale",
       "nickname": "replaceNamespacedScaleScale",
@@ -1938,7 +1938,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1beta1.Scale"
+        "responseModel": "extensions.v1beta1.Scale"
        }
       ],
       "produces": [
@@ -1951,7 +1951,7 @@
       ]
      },
      {
-      "type": "v1beta1.Scale",
+      "type": "extensions.v1beta1.Scale",
       "method": "PATCH",
       "summary": "partially update scale of the specified Scale",
       "nickname": "patchNamespacedScaleScale",
@@ -1993,7 +1993,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1beta1.Scale"
+        "responseModel": "extensions.v1beta1.Scale"
        }
       ],
       "produces": [
@@ -2014,7 +2014,7 @@
     "description": "API at /apis/extensions/v1beta1",
     "operations": [
      {
-      "type": "v1beta1.Deployment",
+      "type": "extensions.v1beta1.Deployment",
       "method": "GET",
       "summary": "read status of the specified Deployment",
       "nickname": "readNamespacedDeploymentStatus",
@@ -2048,7 +2048,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1beta1.Deployment"
+        "responseModel": "extensions.v1beta1.Deployment"
        }
       ],
       "produces": [
@@ -2061,7 +2061,7 @@
       ]
      },
      {
-      "type": "v1beta1.Deployment",
+      "type": "extensions.v1beta1.Deployment",
       "method": "PUT",
       "summary": "replace status of the specified Deployment",
       "nickname": "replaceNamespacedDeploymentStatus",
@@ -2103,7 +2103,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1beta1.Deployment"
+        "responseModel": "extensions.v1beta1.Deployment"
        }
       ],
       "produces": [
@@ -2116,7 +2116,7 @@
       ]
      },
      {
-      "type": "v1beta1.Deployment",
+      "type": "extensions.v1beta1.Deployment",
       "method": "PATCH",
       "summary": "partially update status of the specified Deployment",
       "nickname": "patchNamespacedDeploymentStatus",
@@ -2158,7 +2158,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1beta1.Deployment"
+        "responseModel": "extensions.v1beta1.Deployment"
        }
       ],
       "produces": [
@@ -2179,7 +2179,7 @@
     "description": "API at /apis/extensions/v1beta1",
     "operations": [
      {
-      "type": "v1beta1.IngressList",
+      "type": "extensions.v1beta1.IngressList",
       "method": "GET",
       "summary": "list or watch objects of kind Ingress",
       "nickname": "listNamespacedIngress",
@@ -2245,7 +2245,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1beta1.IngressList"
+        "responseModel": "extensions.v1beta1.IngressList"
        }
       ],
       "produces": [
@@ -2260,7 +2260,7 @@
       ]
      },
      {
-      "type": "v1beta1.Ingress",
+      "type": "extensions.v1beta1.Ingress",
       "method": "POST",
       "summary": "create an Ingress",
       "nickname": "createNamespacedIngress",
@@ -2294,7 +2294,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1beta1.Ingress"
+        "responseModel": "extensions.v1beta1.Ingress"
        }
       ],
       "produces": [
@@ -2307,7 +2307,7 @@
       ]
      },
      {
-      "type": "v1.Status",
+      "type": "io.k8s.meta.v1.Status",
       "method": "DELETE",
       "summary": "delete collection of Ingress",
       "nickname": "deletecollectionNamespacedIngress",
@@ -2373,7 +2373,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1.Status"
+        "responseModel": "io.k8s.meta.v1.Status"
        }
       ],
       "produces": [
@@ -2392,7 +2392,7 @@
     "description": "API at /apis/extensions/v1beta1",
     "operations": [
      {
-      "type": "versioned.Event",
+      "type": "io.k8s.kubernetes.pkg.watch.versioned.Event",
       "method": "GET",
       "summary": "watch individual changes to a list of Ingress",
       "nickname": "watchNamespacedIngressList",
@@ -2458,7 +2458,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "versioned.Event"
+        "responseModel": "io.k8s.kubernetes.pkg.watch.versioned.Event"
        }
       ],
       "produces": [
@@ -2479,7 +2479,7 @@
     "description": "API at /apis/extensions/v1beta1",
     "operations": [
      {
-      "type": "v1beta1.Ingress",
+      "type": "extensions.v1beta1.Ingress",
       "method": "GET",
       "summary": "read the specified Ingress",
       "nickname": "readNamespacedIngress",
@@ -2529,7 +2529,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1beta1.Ingress"
+        "responseModel": "extensions.v1beta1.Ingress"
        }
       ],
       "produces": [
@@ -2542,7 +2542,7 @@
       ]
      },
      {
-      "type": "v1beta1.Ingress",
+      "type": "extensions.v1beta1.Ingress",
       "method": "PUT",
       "summary": "replace the specified Ingress",
       "nickname": "replaceNamespacedIngress",
@@ -2584,7 +2584,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1beta1.Ingress"
+        "responseModel": "extensions.v1beta1.Ingress"
        }
       ],
       "produces": [
@@ -2597,7 +2597,7 @@
       ]
      },
      {
-      "type": "v1beta1.Ingress",
+      "type": "extensions.v1beta1.Ingress",
       "method": "PATCH",
       "summary": "partially update the specified Ingress",
       "nickname": "patchNamespacedIngress",
@@ -2639,7 +2639,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1beta1.Ingress"
+        "responseModel": "extensions.v1beta1.Ingress"
        }
       ],
       "produces": [
@@ -2654,7 +2654,7 @@
       ]
      },
      {
-      "type": "v1.Status",
+      "type": "io.k8s.meta.v1.Status",
       "method": "DELETE",
       "summary": "delete an Ingress",
       "nickname": "deleteNamespacedIngress",
@@ -2712,7 +2712,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1.Status"
+        "responseModel": "io.k8s.meta.v1.Status"
        }
       ],
       "produces": [
@@ -2731,7 +2731,7 @@
     "description": "API at /apis/extensions/v1beta1",
     "operations": [
      {
-      "type": "versioned.Event",
+      "type": "io.k8s.kubernetes.pkg.watch.versioned.Event",
       "method": "GET",
       "summary": "watch changes to an object of kind Ingress",
       "nickname": "watchNamespacedIngress",
@@ -2805,7 +2805,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "versioned.Event"
+        "responseModel": "io.k8s.kubernetes.pkg.watch.versioned.Event"
        }
       ],
       "produces": [
@@ -2826,7 +2826,7 @@
     "description": "API at /apis/extensions/v1beta1",
     "operations": [
      {
-      "type": "v1beta1.IngressList",
+      "type": "extensions.v1beta1.IngressList",
       "method": "GET",
       "summary": "list or watch objects of kind Ingress",
       "nickname": "listIngressForAllNamespaces",
@@ -2884,7 +2884,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1beta1.IngressList"
+        "responseModel": "extensions.v1beta1.IngressList"
        }
       ],
       "produces": [
@@ -2905,7 +2905,7 @@
     "description": "API at /apis/extensions/v1beta1",
     "operations": [
      {
-      "type": "versioned.Event",
+      "type": "io.k8s.kubernetes.pkg.watch.versioned.Event",
       "method": "GET",
       "summary": "watch individual changes to a list of Ingress",
       "nickname": "watchIngressListForAllNamespaces",
@@ -2963,7 +2963,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "versioned.Event"
+        "responseModel": "io.k8s.kubernetes.pkg.watch.versioned.Event"
        }
       ],
       "produces": [
@@ -2984,7 +2984,7 @@
     "description": "API at /apis/extensions/v1beta1",
     "operations": [
      {
-      "type": "v1beta1.Ingress",
+      "type": "extensions.v1beta1.Ingress",
       "method": "GET",
       "summary": "read status of the specified Ingress",
       "nickname": "readNamespacedIngressStatus",
@@ -3018,7 +3018,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1beta1.Ingress"
+        "responseModel": "extensions.v1beta1.Ingress"
        }
       ],
       "produces": [
@@ -3031,7 +3031,7 @@
       ]
      },
      {
-      "type": "v1beta1.Ingress",
+      "type": "extensions.v1beta1.Ingress",
       "method": "PUT",
       "summary": "replace status of the specified Ingress",
       "nickname": "replaceNamespacedIngressStatus",
@@ -3073,7 +3073,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1beta1.Ingress"
+        "responseModel": "extensions.v1beta1.Ingress"
        }
       ],
       "produces": [
@@ -3086,7 +3086,7 @@
       ]
      },
      {
-      "type": "v1beta1.Ingress",
+      "type": "extensions.v1beta1.Ingress",
       "method": "PATCH",
       "summary": "partially update status of the specified Ingress",
       "nickname": "patchNamespacedIngressStatus",
@@ -3128,7 +3128,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1beta1.Ingress"
+        "responseModel": "extensions.v1beta1.Ingress"
        }
       ],
       "produces": [
@@ -3149,7 +3149,7 @@
     "description": "API at /apis/extensions/v1beta1",
     "operations": [
      {
-      "type": "v1beta1.ReplicaSetList",
+      "type": "extensions.v1beta1.ReplicaSetList",
       "method": "GET",
       "summary": "list or watch objects of kind ReplicaSet",
       "nickname": "listNamespacedReplicaSet",
@@ -3215,7 +3215,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1beta1.ReplicaSetList"
+        "responseModel": "extensions.v1beta1.ReplicaSetList"
        }
       ],
       "produces": [
@@ -3230,7 +3230,7 @@
       ]
      },
      {
-      "type": "v1beta1.ReplicaSet",
+      "type": "extensions.v1beta1.ReplicaSet",
       "method": "POST",
       "summary": "create a ReplicaSet",
       "nickname": "createNamespacedReplicaSet",
@@ -3264,7 +3264,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1beta1.ReplicaSet"
+        "responseModel": "extensions.v1beta1.ReplicaSet"
        }
       ],
       "produces": [
@@ -3277,7 +3277,7 @@
       ]
      },
      {
-      "type": "v1.Status",
+      "type": "io.k8s.meta.v1.Status",
       "method": "DELETE",
       "summary": "delete collection of ReplicaSet",
       "nickname": "deletecollectionNamespacedReplicaSet",
@@ -3343,7 +3343,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1.Status"
+        "responseModel": "io.k8s.meta.v1.Status"
        }
       ],
       "produces": [
@@ -3362,7 +3362,7 @@
     "description": "API at /apis/extensions/v1beta1",
     "operations": [
      {
-      "type": "versioned.Event",
+      "type": "io.k8s.kubernetes.pkg.watch.versioned.Event",
       "method": "GET",
       "summary": "watch individual changes to a list of ReplicaSet",
       "nickname": "watchNamespacedReplicaSetList",
@@ -3428,7 +3428,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "versioned.Event"
+        "responseModel": "io.k8s.kubernetes.pkg.watch.versioned.Event"
        }
       ],
       "produces": [
@@ -3449,7 +3449,7 @@
     "description": "API at /apis/extensions/v1beta1",
     "operations": [
      {
-      "type": "v1beta1.ReplicaSet",
+      "type": "extensions.v1beta1.ReplicaSet",
       "method": "GET",
       "summary": "read the specified ReplicaSet",
       "nickname": "readNamespacedReplicaSet",
@@ -3499,7 +3499,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1beta1.ReplicaSet"
+        "responseModel": "extensions.v1beta1.ReplicaSet"
        }
       ],
       "produces": [
@@ -3512,7 +3512,7 @@
       ]
      },
      {
-      "type": "v1beta1.ReplicaSet",
+      "type": "extensions.v1beta1.ReplicaSet",
       "method": "PUT",
       "summary": "replace the specified ReplicaSet",
       "nickname": "replaceNamespacedReplicaSet",
@@ -3554,7 +3554,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1beta1.ReplicaSet"
+        "responseModel": "extensions.v1beta1.ReplicaSet"
        }
       ],
       "produces": [
@@ -3567,7 +3567,7 @@
       ]
      },
      {
-      "type": "v1beta1.ReplicaSet",
+      "type": "extensions.v1beta1.ReplicaSet",
       "method": "PATCH",
       "summary": "partially update the specified ReplicaSet",
       "nickname": "patchNamespacedReplicaSet",
@@ -3609,7 +3609,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1beta1.ReplicaSet"
+        "responseModel": "extensions.v1beta1.ReplicaSet"
        }
       ],
       "produces": [
@@ -3624,7 +3624,7 @@
       ]
      },
      {
-      "type": "v1.Status",
+      "type": "io.k8s.meta.v1.Status",
       "method": "DELETE",
       "summary": "delete a ReplicaSet",
       "nickname": "deleteNamespacedReplicaSet",
@@ -3682,7 +3682,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1.Status"
+        "responseModel": "io.k8s.meta.v1.Status"
        }
       ],
       "produces": [
@@ -3701,7 +3701,7 @@
     "description": "API at /apis/extensions/v1beta1",
     "operations": [
      {
-      "type": "versioned.Event",
+      "type": "io.k8s.kubernetes.pkg.watch.versioned.Event",
       "method": "GET",
       "summary": "watch changes to an object of kind ReplicaSet",
       "nickname": "watchNamespacedReplicaSet",
@@ -3775,7 +3775,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "versioned.Event"
+        "responseModel": "io.k8s.kubernetes.pkg.watch.versioned.Event"
        }
       ],
       "produces": [
@@ -3796,7 +3796,7 @@
     "description": "API at /apis/extensions/v1beta1",
     "operations": [
      {
-      "type": "v1beta1.ReplicaSetList",
+      "type": "extensions.v1beta1.ReplicaSetList",
       "method": "GET",
       "summary": "list or watch objects of kind ReplicaSet",
       "nickname": "listReplicaSetForAllNamespaces",
@@ -3854,7 +3854,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1beta1.ReplicaSetList"
+        "responseModel": "extensions.v1beta1.ReplicaSetList"
        }
       ],
       "produces": [
@@ -3875,7 +3875,7 @@
     "description": "API at /apis/extensions/v1beta1",
     "operations": [
      {
-      "type": "versioned.Event",
+      "type": "io.k8s.kubernetes.pkg.watch.versioned.Event",
       "method": "GET",
       "summary": "watch individual changes to a list of ReplicaSet",
       "nickname": "watchReplicaSetListForAllNamespaces",
@@ -3933,7 +3933,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "versioned.Event"
+        "responseModel": "io.k8s.kubernetes.pkg.watch.versioned.Event"
        }
       ],
       "produces": [
@@ -3954,7 +3954,7 @@
     "description": "API at /apis/extensions/v1beta1",
     "operations": [
      {
-      "type": "v1beta1.Scale",
+      "type": "extensions.v1beta1.Scale",
       "method": "GET",
       "summary": "read scale of the specified Scale",
       "nickname": "readNamespacedScaleScale",
@@ -3988,7 +3988,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1beta1.Scale"
+        "responseModel": "extensions.v1beta1.Scale"
        }
       ],
       "produces": [
@@ -4001,7 +4001,7 @@
       ]
      },
      {
-      "type": "v1beta1.Scale",
+      "type": "extensions.v1beta1.Scale",
       "method": "PUT",
       "summary": "replace scale of the specified Scale",
       "nickname": "replaceNamespacedScaleScale",
@@ -4043,7 +4043,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1beta1.Scale"
+        "responseModel": "extensions.v1beta1.Scale"
        }
       ],
       "produces": [
@@ -4056,7 +4056,7 @@
       ]
      },
      {
-      "type": "v1beta1.Scale",
+      "type": "extensions.v1beta1.Scale",
       "method": "PATCH",
       "summary": "partially update scale of the specified Scale",
       "nickname": "patchNamespacedScaleScale",
@@ -4098,7 +4098,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1beta1.Scale"
+        "responseModel": "extensions.v1beta1.Scale"
        }
       ],
       "produces": [
@@ -4119,7 +4119,7 @@
     "description": "API at /apis/extensions/v1beta1",
     "operations": [
      {
-      "type": "v1beta1.ReplicaSet",
+      "type": "extensions.v1beta1.ReplicaSet",
       "method": "GET",
       "summary": "read status of the specified ReplicaSet",
       "nickname": "readNamespacedReplicaSetStatus",
@@ -4153,7 +4153,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1beta1.ReplicaSet"
+        "responseModel": "extensions.v1beta1.ReplicaSet"
        }
       ],
       "produces": [
@@ -4166,7 +4166,7 @@
       ]
      },
      {
-      "type": "v1beta1.ReplicaSet",
+      "type": "extensions.v1beta1.ReplicaSet",
       "method": "PUT",
       "summary": "replace status of the specified ReplicaSet",
       "nickname": "replaceNamespacedReplicaSetStatus",
@@ -4208,7 +4208,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1beta1.ReplicaSet"
+        "responseModel": "extensions.v1beta1.ReplicaSet"
        }
       ],
       "produces": [
@@ -4221,7 +4221,7 @@
       ]
      },
      {
-      "type": "v1beta1.ReplicaSet",
+      "type": "extensions.v1beta1.ReplicaSet",
       "method": "PATCH",
       "summary": "partially update status of the specified ReplicaSet",
       "nickname": "patchNamespacedReplicaSetStatus",
@@ -4263,7 +4263,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1beta1.ReplicaSet"
+        "responseModel": "extensions.v1beta1.ReplicaSet"
        }
       ],
       "produces": [
@@ -4284,7 +4284,7 @@
     "description": "API at /apis/extensions/v1beta1",
     "operations": [
      {
-      "type": "v1.APIResourceList",
+      "type": "io.k8s.meta.v1.APIResourceList",
       "method": "GET",
       "summary": "get available resources",
       "nickname": "getAPIResources",
@@ -5435,6 +5435,13 @@
       },
       "description": "List of ports to expose from the container. Exposing a port here gives the system additional information about the network connections a container uses, but is primarily informational. Not specifying a port here DOES NOT prevent that port from being exposed. Any port which is listening on the default \"0.0.0.0\" address inside a container will be accessible from the network. Cannot be updated."
      },
+     "envFrom": {
+      "type": "array",
+      "items": {
+       "$ref": "v1.EnvFromSource"
+      },
+      "description": "List of sources to populate environment variables in the container. The keys defined within a source must be a C_IDENTIFIER. An invalid key will prevent the container from starting. When a key exists in multiple sources, the value associated with the last source will take precedence. Values defined by an Env with a duplicate key will take precedence. Cannot be updated."
+     },
      "env": {
       "type": "array",
       "items": {
@@ -5519,6 +5526,30 @@
      "hostIP": {
       "type": "string",
       "description": "What host IP to bind the external port to."
+     }
+    }
+   },
+   "v1.EnvFromSource": {
+    "id": "v1.EnvFromSource",
+    "description": "EnvFromSource represents the source of a set of ConfigMaps",
+    "properties": {
+     "prefix": {
+      "type": "string",
+      "description": "An optional identifer to prepend to each key in the ConfigMap. Must be a C_IDENTIFIER."
+     },
+     "configMapRef": {
+      "$ref": "v1.ConfigMapEnvSource",
+      "description": "The ConfigMap to select from"
+     }
+    }
+   },
+   "v1.ConfigMapEnvSource": {
+    "id": "v1.ConfigMapEnvSource",
+    "description": "ConfigMapEnvSource selects a ConfigMap to populate the environment variables with.\n\nThe contents of the target ConfigMap's Data field will represent the key-value pairs as environment variables.",
+    "properties": {
+     "name": {
+      "type": "string",
+      "description": "Name of the referent. More info: http://kubernetes.io/docs/user-guide/identifiers#names"
      }
     }
    },
@@ -6986,6 +7017,278 @@
        "type": "string"
       },
       "description": "verbs is a list of supported kube verbs (this includes get, list, watch, create, update, patch, delete, deletecollection, and proxy)"
+     }
+    }
+   },
+   "v1beta1.DaemonSetList": {
+    "id": "v1beta1.DaemonSetList",
+    "description": "DaemonSetList is a collection of daemon sets.\n\nDEPRECATED: Use 'extensions.v1beta1.DaemonSetList' instead.",
+    "required": [
+     "items"
+    ],
+    "properties": {
+     "kind": {
+      "type": "string",
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+     },
+     "apiVersion": {
+      "type": "string",
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+     },
+     "metadata": {
+      "$ref": "io.k8s.meta.v1.ListMeta",
+      "description": "Standard list metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata"
+     },
+     "items": {
+      "type": "array",
+      "items": {
+       "$ref": "extensions.v1beta1.DaemonSet"
+      },
+      "description": "Items is a list of daemon sets."
+     }
+    }
+   },
+   "v1beta1.DaemonSet": {
+    "id": "v1beta1.DaemonSet",
+    "description": "DaemonSet represents the configuration of a daemon set.\n\nDEPRECATED: Use 'extensions.v1beta1.DaemonSet' instead.",
+    "properties": {
+     "kind": {
+      "type": "string",
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+     },
+     "apiVersion": {
+      "type": "string",
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+     },
+     "metadata": {
+      "$ref": "v1.ObjectMeta",
+      "description": "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata"
+     },
+     "spec": {
+      "$ref": "extensions.v1beta1.DaemonSetSpec",
+      "description": "Spec defines the desired behavior of this daemon set. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status"
+     },
+     "status": {
+      "$ref": "extensions.v1beta1.DaemonSetStatus",
+      "description": "Status is the current status of this daemon set. This data may be out of date by some window of time. Populated by the system. Read-only. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status"
+     }
+    }
+   },
+   "v1beta1.DeploymentList": {
+    "id": "v1beta1.DeploymentList",
+    "description": "DeploymentList is a list of Deployments.\n\nDEPRECATED: Use 'extensions.v1beta1.DeploymentList' instead.",
+    "required": [
+     "items"
+    ],
+    "properties": {
+     "kind": {
+      "type": "string",
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+     },
+     "apiVersion": {
+      "type": "string",
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+     },
+     "metadata": {
+      "$ref": "io.k8s.meta.v1.ListMeta",
+      "description": "Standard list metadata."
+     },
+     "items": {
+      "type": "array",
+      "items": {
+       "$ref": "extensions.v1beta1.Deployment"
+      },
+      "description": "Items is the list of Deployments."
+     }
+    }
+   },
+   "v1beta1.Deployment": {
+    "id": "v1beta1.Deployment",
+    "description": "Deployment enables declarative updates for Pods and ReplicaSets.\n\nDEPRECATED: Use 'extensions.v1beta1.Deployment' instead.",
+    "properties": {
+     "kind": {
+      "type": "string",
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+     },
+     "apiVersion": {
+      "type": "string",
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+     },
+     "metadata": {
+      "$ref": "v1.ObjectMeta",
+      "description": "Standard object metadata."
+     },
+     "spec": {
+      "$ref": "extensions.v1beta1.DeploymentSpec",
+      "description": "Specification of the desired behavior of the Deployment."
+     },
+     "status": {
+      "$ref": "extensions.v1beta1.DeploymentStatus",
+      "description": "Most recently observed status of the Deployment."
+     }
+    }
+   },
+   "v1beta1.DeploymentRollback": {
+    "id": "v1beta1.DeploymentRollback",
+    "description": "DeploymentRollback stores the information required to rollback a deployment.\n\nDEPRECATED: Use 'extensions.v1beta1.DeploymentRollback' instead.",
+    "required": [
+     "name",
+     "rollbackTo"
+    ],
+    "properties": {
+     "kind": {
+      "type": "string",
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+     },
+     "apiVersion": {
+      "type": "string",
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+     },
+     "name": {
+      "type": "string",
+      "description": "Required: This must match the Name of a deployment."
+     },
+     "updatedAnnotations": {
+      "type": "object",
+      "description": "The annotations to be updated to a deployment"
+     },
+     "rollbackTo": {
+      "$ref": "extensions.v1beta1.RollbackConfig",
+      "description": "The config of this deployment rollback."
+     }
+    }
+   },
+   "v1beta1.Scale": {
+    "id": "v1beta1.Scale",
+    "description": "represents a scaling request for a resource.\n\nDEPRECATED: Use 'extensions.v1beta1.Scale' instead.",
+    "properties": {
+     "kind": {
+      "type": "string",
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+     },
+     "apiVersion": {
+      "type": "string",
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+     },
+     "metadata": {
+      "$ref": "v1.ObjectMeta",
+      "description": "Standard object metadata; More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata."
+     },
+     "spec": {
+      "$ref": "extensions.v1beta1.ScaleSpec",
+      "description": "defines the behavior of the scale. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status."
+     },
+     "status": {
+      "$ref": "extensions.v1beta1.ScaleStatus",
+      "description": "current status of the scale. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status. Read-only."
+     }
+    }
+   },
+   "v1beta1.IngressList": {
+    "id": "v1beta1.IngressList",
+    "description": "IngressList is a collection of Ingress.\n\nDEPRECATED: Use 'extensions.v1beta1.IngressList' instead.",
+    "required": [
+     "items"
+    ],
+    "properties": {
+     "kind": {
+      "type": "string",
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+     },
+     "apiVersion": {
+      "type": "string",
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+     },
+     "metadata": {
+      "$ref": "io.k8s.meta.v1.ListMeta",
+      "description": "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata"
+     },
+     "items": {
+      "type": "array",
+      "items": {
+       "$ref": "extensions.v1beta1.Ingress"
+      },
+      "description": "Items is the list of Ingress."
+     }
+    }
+   },
+   "v1beta1.Ingress": {
+    "id": "v1beta1.Ingress",
+    "description": "Ingress is a collection of rules that allow inbound connections to reach the endpoints defined by a backend. An Ingress can be configured to give services externally-reachable urls, load balance traffic, terminate SSL, offer name based virtual hosting etc.\n\nDEPRECATED: Use 'extensions.v1beta1.Ingress' instead.",
+    "properties": {
+     "kind": {
+      "type": "string",
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+     },
+     "apiVersion": {
+      "type": "string",
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+     },
+     "metadata": {
+      "$ref": "v1.ObjectMeta",
+      "description": "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata"
+     },
+     "spec": {
+      "$ref": "extensions.v1beta1.IngressSpec",
+      "description": "Spec is the desired state of the Ingress. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status"
+     },
+     "status": {
+      "$ref": "extensions.v1beta1.IngressStatus",
+      "description": "Status is the current state of the Ingress. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status"
+     }
+    }
+   },
+   "v1beta1.ReplicaSetList": {
+    "id": "v1beta1.ReplicaSetList",
+    "description": "ReplicaSetList is a collection of ReplicaSets.\n\nDEPRECATED: Use 'extensions.v1beta1.ReplicaSetList' instead.",
+    "required": [
+     "items"
+    ],
+    "properties": {
+     "kind": {
+      "type": "string",
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+     },
+     "apiVersion": {
+      "type": "string",
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+     },
+     "metadata": {
+      "$ref": "io.k8s.meta.v1.ListMeta",
+      "description": "Standard list metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+     },
+     "items": {
+      "type": "array",
+      "items": {
+       "$ref": "extensions.v1beta1.ReplicaSet"
+      },
+      "description": "List of ReplicaSets. More info: http://kubernetes.io/docs/user-guide/replication-controller"
+     }
+    }
+   },
+   "v1beta1.ReplicaSet": {
+    "id": "v1beta1.ReplicaSet",
+    "description": "ReplicaSet represents the configuration of a ReplicaSet.\n\nDEPRECATED: Use 'extensions.v1beta1.ReplicaSet' instead.",
+    "properties": {
+     "kind": {
+      "type": "string",
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+     },
+     "apiVersion": {
+      "type": "string",
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+     },
+     "metadata": {
+      "$ref": "v1.ObjectMeta",
+      "description": "If the Labels of a ReplicaSet are empty, they are defaulted to be the same as the Pod(s) that the ReplicaSet manages. Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata"
+     },
+     "spec": {
+      "$ref": "extensions.v1beta1.ReplicaSetSpec",
+      "description": "Spec defines the specification of the desired behavior of the ReplicaSet. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status"
+     },
+     "status": {
+      "$ref": "extensions.v1beta1.ReplicaSetStatus",
+      "description": "Status is the most recently observed status of the ReplicaSet. This data may be out of date by some window of time. Populated by the system. Read-only. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status"
      }
     }
    }

@@ -13,7 +13,7 @@
     "description": "API at /apis/certificates.k8s.io/v1alpha1",
     "operations": [
      {
-      "type": "v1alpha1.CertificateSigningRequestList",
+      "type": "io.k8s.certificates.v1alpha1.CertificateSigningRequestList",
       "method": "GET",
       "summary": "list or watch objects of kind CertificateSigningRequest",
       "nickname": "listCertificateSigningRequest",
@@ -71,7 +71,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1alpha1.CertificateSigningRequestList"
+        "responseModel": "io.k8s.certificates.v1alpha1.CertificateSigningRequestList"
        }
       ],
       "produces": [
@@ -86,7 +86,7 @@
       ]
      },
      {
-      "type": "v1alpha1.CertificateSigningRequest",
+      "type": "io.k8s.certificates.v1alpha1.CertificateSigningRequest",
       "method": "POST",
       "summary": "create a CertificateSigningRequest",
       "nickname": "createCertificateSigningRequest",
@@ -112,7 +112,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1alpha1.CertificateSigningRequest"
+        "responseModel": "io.k8s.certificates.v1alpha1.CertificateSigningRequest"
        }
       ],
       "produces": [
@@ -125,7 +125,7 @@
       ]
      },
      {
-      "type": "v1.Status",
+      "type": "io.k8s.meta.v1.Status",
       "method": "DELETE",
       "summary": "delete collection of CertificateSigningRequest",
       "nickname": "deletecollectionCertificateSigningRequest",
@@ -183,7 +183,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1.Status"
+        "responseModel": "io.k8s.meta.v1.Status"
        }
       ],
       "produces": [
@@ -202,7 +202,7 @@
     "description": "API at /apis/certificates.k8s.io/v1alpha1",
     "operations": [
      {
-      "type": "versioned.Event",
+      "type": "io.k8s.kubernetes.pkg.watch.versioned.Event",
       "method": "GET",
       "summary": "watch individual changes to a list of CertificateSigningRequest",
       "nickname": "watchCertificateSigningRequestList",
@@ -260,7 +260,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "versioned.Event"
+        "responseModel": "io.k8s.kubernetes.pkg.watch.versioned.Event"
        }
       ],
       "produces": [
@@ -281,7 +281,7 @@
     "description": "API at /apis/certificates.k8s.io/v1alpha1",
     "operations": [
      {
-      "type": "v1alpha1.CertificateSigningRequest",
+      "type": "io.k8s.certificates.v1alpha1.CertificateSigningRequest",
       "method": "GET",
       "summary": "read the specified CertificateSigningRequest",
       "nickname": "readCertificateSigningRequest",
@@ -323,7 +323,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1alpha1.CertificateSigningRequest"
+        "responseModel": "io.k8s.certificates.v1alpha1.CertificateSigningRequest"
        }
       ],
       "produces": [
@@ -336,7 +336,7 @@
       ]
      },
      {
-      "type": "v1alpha1.CertificateSigningRequest",
+      "type": "io.k8s.certificates.v1alpha1.CertificateSigningRequest",
       "method": "PUT",
       "summary": "replace the specified CertificateSigningRequest",
       "nickname": "replaceCertificateSigningRequest",
@@ -370,7 +370,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1alpha1.CertificateSigningRequest"
+        "responseModel": "io.k8s.certificates.v1alpha1.CertificateSigningRequest"
        }
       ],
       "produces": [
@@ -383,7 +383,7 @@
       ]
      },
      {
-      "type": "v1alpha1.CertificateSigningRequest",
+      "type": "io.k8s.certificates.v1alpha1.CertificateSigningRequest",
       "method": "PATCH",
       "summary": "partially update the specified CertificateSigningRequest",
       "nickname": "patchCertificateSigningRequest",
@@ -417,7 +417,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1alpha1.CertificateSigningRequest"
+        "responseModel": "io.k8s.certificates.v1alpha1.CertificateSigningRequest"
        }
       ],
       "produces": [
@@ -432,7 +432,7 @@
       ]
      },
      {
-      "type": "v1.Status",
+      "type": "io.k8s.meta.v1.Status",
       "method": "DELETE",
       "summary": "delete a CertificateSigningRequest",
       "nickname": "deleteCertificateSigningRequest",
@@ -482,7 +482,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1.Status"
+        "responseModel": "io.k8s.meta.v1.Status"
        }
       ],
       "produces": [
@@ -501,7 +501,7 @@
     "description": "API at /apis/certificates.k8s.io/v1alpha1",
     "operations": [
      {
-      "type": "versioned.Event",
+      "type": "io.k8s.kubernetes.pkg.watch.versioned.Event",
       "method": "GET",
       "summary": "watch changes to an object of kind CertificateSigningRequest",
       "nickname": "watchCertificateSigningRequest",
@@ -567,7 +567,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "versioned.Event"
+        "responseModel": "io.k8s.kubernetes.pkg.watch.versioned.Event"
        }
       ],
       "produces": [
@@ -588,7 +588,7 @@
     "description": "API at /apis/certificates.k8s.io/v1alpha1",
     "operations": [
      {
-      "type": "v1alpha1.CertificateSigningRequest",
+      "type": "io.k8s.certificates.v1alpha1.CertificateSigningRequest",
       "method": "PUT",
       "summary": "replace approval of the specified CertificateSigningRequest",
       "nickname": "replaceCertificateSigningRequestApproval",
@@ -622,7 +622,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1alpha1.CertificateSigningRequest"
+        "responseModel": "io.k8s.certificates.v1alpha1.CertificateSigningRequest"
        }
       ],
       "produces": [
@@ -641,7 +641,7 @@
     "description": "API at /apis/certificates.k8s.io/v1alpha1",
     "operations": [
      {
-      "type": "v1alpha1.CertificateSigningRequest",
+      "type": "io.k8s.certificates.v1alpha1.CertificateSigningRequest",
       "method": "PUT",
       "summary": "replace status of the specified CertificateSigningRequest",
       "nickname": "replaceCertificateSigningRequestStatus",
@@ -675,7 +675,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1alpha1.CertificateSigningRequest"
+        "responseModel": "io.k8s.certificates.v1alpha1.CertificateSigningRequest"
        }
       ],
       "produces": [
@@ -694,7 +694,7 @@
     "description": "API at /apis/certificates.k8s.io/v1alpha1",
     "operations": [
      {
-      "type": "v1.APIResourceList",
+      "type": "io.k8s.meta.v1.APIResourceList",
       "method": "GET",
       "summary": "get available resources",
       "nickname": "getAPIResources",
@@ -1155,6 +1155,57 @@
        "type": "string"
       },
       "description": "verbs is a list of supported kube verbs (this includes get, list, watch, create, update, patch, delete, deletecollection, and proxy)"
+     }
+    }
+   },
+   "v1alpha1.CertificateSigningRequestList": {
+    "id": "v1alpha1.CertificateSigningRequestList",
+    "description": "\n\nDEPRECATED: Use 'io.k8s.certificates.v1alpha1.CertificateSigningRequestList' instead.",
+    "required": [
+     "items"
+    ],
+    "properties": {
+     "kind": {
+      "type": "string",
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+     },
+     "apiVersion": {
+      "type": "string",
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+     },
+     "metadata": {
+      "$ref": "io.k8s.meta.v1.ListMeta"
+     },
+     "items": {
+      "type": "array",
+      "items": {
+       "$ref": "io.k8s.certificates.v1alpha1.CertificateSigningRequest"
+      }
+     }
+    }
+   },
+   "v1alpha1.CertificateSigningRequest": {
+    "id": "v1alpha1.CertificateSigningRequest",
+    "description": "Describes a certificate signing request\n\nDEPRECATED: Use 'io.k8s.certificates.v1alpha1.CertificateSigningRequest' instead.",
+    "properties": {
+     "kind": {
+      "type": "string",
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+     },
+     "apiVersion": {
+      "type": "string",
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+     },
+     "metadata": {
+      "$ref": "v1.ObjectMeta"
+     },
+     "spec": {
+      "$ref": "io.k8s.certificates.v1alpha1.CertificateSigningRequestSpec",
+      "description": "The certificate request itself and any additional information."
+     },
+     "status": {
+      "$ref": "io.k8s.certificates.v1alpha1.CertificateSigningRequestStatus",
+      "description": "Derived information about the request."
      }
     }
    }

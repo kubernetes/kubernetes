@@ -13,7 +13,7 @@
     "description": "API at /apis/authorization.k8s.io/v1beta1",
     "operations": [
      {
-      "type": "v1beta1.LocalSubjectAccessReview",
+      "type": "io.k8s.authorization.v1beta1.LocalSubjectAccessReview",
       "method": "POST",
       "summary": "create a LocalSubjectAccessReview",
       "nickname": "createNamespacedLocalSubjectAccessReview",
@@ -47,7 +47,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1beta1.LocalSubjectAccessReview"
+        "responseModel": "io.k8s.authorization.v1beta1.LocalSubjectAccessReview"
        }
       ],
       "produces": [
@@ -66,7 +66,7 @@
     "description": "API at /apis/authorization.k8s.io/v1beta1",
     "operations": [
      {
-      "type": "v1beta1.SelfSubjectAccessReview",
+      "type": "io.k8s.authorization.v1beta1.SelfSubjectAccessReview",
       "method": "POST",
       "summary": "create a SelfSubjectAccessReview",
       "nickname": "createSelfSubjectAccessReview",
@@ -92,7 +92,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1beta1.SelfSubjectAccessReview"
+        "responseModel": "io.k8s.authorization.v1beta1.SelfSubjectAccessReview"
        }
       ],
       "produces": [
@@ -111,7 +111,7 @@
     "description": "API at /apis/authorization.k8s.io/v1beta1",
     "operations": [
      {
-      "type": "v1beta1.SubjectAccessReview",
+      "type": "io.k8s.authorization.v1beta1.SubjectAccessReview",
       "method": "POST",
       "summary": "create a SubjectAccessReview",
       "nickname": "createSubjectAccessReview",
@@ -137,7 +137,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1beta1.SubjectAccessReview"
+        "responseModel": "io.k8s.authorization.v1beta1.SubjectAccessReview"
        }
       ],
       "produces": [
@@ -156,7 +156,7 @@
     "description": "API at /apis/authorization.k8s.io/v1beta1",
     "operations": [
      {
-      "type": "v1.APIResourceList",
+      "type": "io.k8s.meta.v1.APIResourceList",
       "method": "GET",
       "summary": "get available resources",
       "nickname": "getAPIResources",
@@ -535,6 +535,90 @@
        "type": "string"
       },
       "description": "verbs is a list of supported kube verbs (this includes get, list, watch, create, update, patch, delete, deletecollection, and proxy)"
+     }
+    }
+   },
+   "v1beta1.LocalSubjectAccessReview": {
+    "id": "v1beta1.LocalSubjectAccessReview",
+    "description": "LocalSubjectAccessReview checks whether or not a user or group can perform an action in a given namespace. Having a namespace scoped resource makes it much easier to grant namespace scoped policy that includes permissions checking.\n\nDEPRECATED: Use 'io.k8s.authorization.v1beta1.LocalSubjectAccessReview' instead.",
+    "required": [
+     "spec"
+    ],
+    "properties": {
+     "kind": {
+      "type": "string",
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+     },
+     "apiVersion": {
+      "type": "string",
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+     },
+     "metadata": {
+      "$ref": "v1.ObjectMeta"
+     },
+     "spec": {
+      "$ref": "io.k8s.authorization.v1beta1.SubjectAccessReviewSpec",
+      "description": "Spec holds information about the request being evaluated.  spec.namespace must be equal to the namespace you made the request against.  If empty, it is defaulted."
+     },
+     "status": {
+      "$ref": "io.k8s.authorization.v1beta1.SubjectAccessReviewStatus",
+      "description": "Status is filled in by the server and indicates whether the request is allowed or not"
+     }
+    }
+   },
+   "v1beta1.SelfSubjectAccessReview": {
+    "id": "v1beta1.SelfSubjectAccessReview",
+    "description": "SelfSubjectAccessReview checks whether or the current user can perform an action.  Not filling in a spec.namespace means \"in all namespaces\".  Self is a special case, because users should always be able to check whether they can perform an action\n\nDEPRECATED: Use 'io.k8s.authorization.v1beta1.SelfSubjectAccessReview' instead.",
+    "required": [
+     "spec"
+    ],
+    "properties": {
+     "kind": {
+      "type": "string",
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+     },
+     "apiVersion": {
+      "type": "string",
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+     },
+     "metadata": {
+      "$ref": "v1.ObjectMeta"
+     },
+     "spec": {
+      "$ref": "io.k8s.authorization.v1beta1.SelfSubjectAccessReviewSpec",
+      "description": "Spec holds information about the request being evaluated.  user and groups must be empty"
+     },
+     "status": {
+      "$ref": "io.k8s.authorization.v1beta1.SubjectAccessReviewStatus",
+      "description": "Status is filled in by the server and indicates whether the request is allowed or not"
+     }
+    }
+   },
+   "v1beta1.SubjectAccessReview": {
+    "id": "v1beta1.SubjectAccessReview",
+    "description": "SubjectAccessReview checks whether or not a user or group can perform an action.\n\nDEPRECATED: Use 'io.k8s.authorization.v1beta1.SubjectAccessReview' instead.",
+    "required": [
+     "spec"
+    ],
+    "properties": {
+     "kind": {
+      "type": "string",
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+     },
+     "apiVersion": {
+      "type": "string",
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+     },
+     "metadata": {
+      "$ref": "v1.ObjectMeta"
+     },
+     "spec": {
+      "$ref": "io.k8s.authorization.v1beta1.SubjectAccessReviewSpec",
+      "description": "Spec holds information about the request being evaluated"
+     },
+     "status": {
+      "$ref": "io.k8s.authorization.v1beta1.SubjectAccessReviewStatus",
+      "description": "Status is filled in by the server and indicates whether the request is allowed or not"
      }
     }
    }

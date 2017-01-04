@@ -13,7 +13,7 @@
     "description": "git code version from which this is built",
     "operations": [
      {
-      "type": "version.Info",
+      "type": "io.k8s.kubernetes.pkg.version.Info",
       "method": "GET",
       "summary": "get the code version",
       "nickname": "getCodeVersion",

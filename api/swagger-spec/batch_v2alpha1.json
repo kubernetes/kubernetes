@@ -13,7 +13,7 @@
     "description": "API at /apis/batch/v2alpha1",
     "operations": [
      {
-      "type": "v1.APIResourceList",
+      "type": "io.k8s.meta.v1.APIResourceList",
       "method": "GET",
       "summary": "get available resources",
       "nickname": "getAPIResources",

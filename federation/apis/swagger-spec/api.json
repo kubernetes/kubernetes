@@ -13,7 +13,7 @@
     "description": "get available API versions",
     "operations": [
      {
-      "type": "v1.APIVersions",
+      "type": "io.k8s.meta.v1.APIVersions",
       "method": "GET",
       "summary": "get available API versions",
       "nickname": "getAPIVersions",

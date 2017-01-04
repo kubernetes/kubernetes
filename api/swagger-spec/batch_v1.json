@@ -13,7 +13,7 @@
     "description": "API at /apis/batch/v1",
     "operations": [
      {
-      "type": "v1.JobList",
+      "type": "batch.v1.JobList",
       "method": "GET",
       "summary": "list or watch objects of kind Job",
       "nickname": "listNamespacedJob",
@@ -79,7 +79,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1.JobList"
+        "responseModel": "batch.v1.JobList"
        }
       ],
       "produces": [
@@ -94,7 +94,7 @@
       ]
      },
      {
-      "type": "v1.Job",
+      "type": "batch.v1.Job",
       "method": "POST",
       "summary": "create a Job",
       "nickname": "createNamespacedJob",
@@ -128,7 +128,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1.Job"
+        "responseModel": "batch.v1.Job"
        }
       ],
       "produces": [
@@ -141,7 +141,7 @@
       ]
      },
      {
-      "type": "v1.Status",
+      "type": "io.k8s.meta.v1.Status",
       "method": "DELETE",
       "summary": "delete collection of Job",
       "nickname": "deletecollectionNamespacedJob",
@@ -207,7 +207,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1.Status"
+        "responseModel": "io.k8s.meta.v1.Status"
        }
       ],
       "produces": [
@@ -226,7 +226,7 @@
     "description": "API at /apis/batch/v1",
     "operations": [
      {
-      "type": "versioned.Event",
+      "type": "io.k8s.kubernetes.pkg.watch.versioned.Event",
       "method": "GET",
       "summary": "watch individual changes to a list of Job",
       "nickname": "watchNamespacedJobList",
@@ -292,7 +292,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "versioned.Event"
+        "responseModel": "io.k8s.kubernetes.pkg.watch.versioned.Event"
        }
       ],
       "produces": [
@@ -313,7 +313,7 @@
     "description": "API at /apis/batch/v1",
     "operations": [
      {
-      "type": "v1.Job",
+      "type": "batch.v1.Job",
       "method": "GET",
       "summary": "read the specified Job",
       "nickname": "readNamespacedJob",
@@ -363,7 +363,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1.Job"
+        "responseModel": "batch.v1.Job"
        }
       ],
       "produces": [
@@ -376,7 +376,7 @@
       ]
      },
      {
-      "type": "v1.Job",
+      "type": "batch.v1.Job",
       "method": "PUT",
       "summary": "replace the specified Job",
       "nickname": "replaceNamespacedJob",
@@ -418,7 +418,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1.Job"
+        "responseModel": "batch.v1.Job"
        }
       ],
       "produces": [
@@ -431,7 +431,7 @@
       ]
      },
      {
-      "type": "v1.Job",
+      "type": "batch.v1.Job",
       "method": "PATCH",
       "summary": "partially update the specified Job",
       "nickname": "patchNamespacedJob",
@@ -473,7 +473,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1.Job"
+        "responseModel": "batch.v1.Job"
        }
       ],
       "produces": [
@@ -488,7 +488,7 @@
       ]
      },
      {
-      "type": "v1.Status",
+      "type": "io.k8s.meta.v1.Status",
       "method": "DELETE",
       "summary": "delete a Job",
       "nickname": "deleteNamespacedJob",
@@ -546,7 +546,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1.Status"
+        "responseModel": "io.k8s.meta.v1.Status"
        }
       ],
       "produces": [
@@ -565,7 +565,7 @@
     "description": "API at /apis/batch/v1",
     "operations": [
      {
-      "type": "versioned.Event",
+      "type": "io.k8s.kubernetes.pkg.watch.versioned.Event",
       "method": "GET",
       "summary": "watch changes to an object of kind Job",
       "nickname": "watchNamespacedJob",
@@ -639,7 +639,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "versioned.Event"
+        "responseModel": "io.k8s.kubernetes.pkg.watch.versioned.Event"
        }
       ],
       "produces": [
@@ -660,7 +660,7 @@
     "description": "API at /apis/batch/v1",
     "operations": [
      {
-      "type": "v1.JobList",
+      "type": "batch.v1.JobList",
       "method": "GET",
       "summary": "list or watch objects of kind Job",
       "nickname": "listJobForAllNamespaces",
@@ -718,7 +718,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1.JobList"
+        "responseModel": "batch.v1.JobList"
        }
       ],
       "produces": [
@@ -739,7 +739,7 @@
     "description": "API at /apis/batch/v1",
     "operations": [
      {
-      "type": "versioned.Event",
+      "type": "io.k8s.kubernetes.pkg.watch.versioned.Event",
       "method": "GET",
       "summary": "watch individual changes to a list of Job",
       "nickname": "watchJobListForAllNamespaces",
@@ -797,7 +797,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "versioned.Event"
+        "responseModel": "io.k8s.kubernetes.pkg.watch.versioned.Event"
        }
       ],
       "produces": [
@@ -818,7 +818,7 @@
     "description": "API at /apis/batch/v1",
     "operations": [
      {
-      "type": "v1.Job",
+      "type": "batch.v1.Job",
       "method": "GET",
       "summary": "read status of the specified Job",
       "nickname": "readNamespacedJobStatus",
@@ -852,7 +852,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1.Job"
+        "responseModel": "batch.v1.Job"
        }
       ],
       "produces": [
@@ -865,7 +865,7 @@
       ]
      },
      {
-      "type": "v1.Job",
+      "type": "batch.v1.Job",
       "method": "PUT",
       "summary": "replace status of the specified Job",
       "nickname": "replaceNamespacedJobStatus",
@@ -907,7 +907,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1.Job"
+        "responseModel": "batch.v1.Job"
        }
       ],
       "produces": [
@@ -920,7 +920,7 @@
       ]
      },
      {
-      "type": "v1.Job",
+      "type": "batch.v1.Job",
       "method": "PATCH",
       "summary": "partially update status of the specified Job",
       "nickname": "patchNamespacedJobStatus",
@@ -962,7 +962,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1.Job"
+        "responseModel": "batch.v1.Job"
        }
       ],
       "produces": [
@@ -983,7 +983,7 @@
     "description": "API at /apis/batch/v1",
     "operations": [
      {
-      "type": "v1.APIResourceList",
+      "type": "io.k8s.meta.v1.APIResourceList",
       "method": "GET",
       "summary": "get available resources",
       "nickname": "getAPIResources",
@@ -3116,6 +3116,60 @@
        "type": "string"
       },
       "description": "verbs is a list of supported kube verbs (this includes get, list, watch, create, update, patch, delete, deletecollection, and proxy)"
+     }
+    }
+   },
+   "v1.JobList": {
+    "id": "v1.JobList",
+    "description": "JobList is a collection of jobs.\n\nDEPRECATED: Use 'batch.v1.JobList' instead.",
+    "required": [
+     "items"
+    ],
+    "properties": {
+     "kind": {
+      "type": "string",
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+     },
+     "apiVersion": {
+      "type": "string",
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+     },
+     "metadata": {
+      "$ref": "io.k8s.meta.v1.ListMeta",
+      "description": "Standard list metadata More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata"
+     },
+     "items": {
+      "type": "array",
+      "items": {
+       "$ref": "batch.v1.Job"
+      },
+      "description": "Items is the list of Job."
+     }
+    }
+   },
+   "v1.Job": {
+    "id": "v1.Job",
+    "description": "Job represents the configuration of a single job.\n\nDEPRECATED: Use 'batch.v1.Job' instead.",
+    "properties": {
+     "kind": {
+      "type": "string",
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+     },
+     "apiVersion": {
+      "type": "string",
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+     },
+     "metadata": {
+      "$ref": "v1.ObjectMeta",
+      "description": "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata"
+     },
+     "spec": {
+      "$ref": "batch.v1.JobSpec",
+      "description": "Spec is a structure defining the expected behavior of a job. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status"
+     },
+     "status": {
+      "$ref": "batch.v1.JobStatus",
+      "description": "Status is a structure describing current status of a job. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status"
      }
     }
    }

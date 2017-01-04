@@ -318,7 +318,7 @@
       ]
      },
      {
-      "type": "v1.Status",
+      "type": "io.k8s.meta.v1.Status",
       "method": "DELETE",
       "summary": "delete collection of ConfigMap",
       "nickname": "deletecollectionNamespacedConfigMap",
@@ -384,7 +384,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1.Status"
+        "responseModel": "io.k8s.meta.v1.Status"
        }
       ],
       "produces": [
@@ -403,7 +403,7 @@
     "description": "API at /api/v1",
     "operations": [
      {
-      "type": "versioned.Event",
+      "type": "io.k8s.kubernetes.pkg.watch.versioned.Event",
       "method": "GET",
       "summary": "watch individual changes to a list of ConfigMap",
       "nickname": "watchNamespacedConfigMapList",
@@ -469,7 +469,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "versioned.Event"
+        "responseModel": "io.k8s.kubernetes.pkg.watch.versioned.Event"
        }
       ],
       "produces": [
@@ -665,7 +665,7 @@
       ]
      },
      {
-      "type": "v1.Status",
+      "type": "io.k8s.meta.v1.Status",
       "method": "DELETE",
       "summary": "delete a ConfigMap",
       "nickname": "deleteNamespacedConfigMap",
@@ -723,7 +723,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1.Status"
+        "responseModel": "io.k8s.meta.v1.Status"
        }
       ],
       "produces": [
@@ -742,7 +742,7 @@
     "description": "API at /api/v1",
     "operations": [
      {
-      "type": "versioned.Event",
+      "type": "io.k8s.kubernetes.pkg.watch.versioned.Event",
       "method": "GET",
       "summary": "watch changes to an object of kind ConfigMap",
       "nickname": "watchNamespacedConfigMap",
@@ -816,7 +816,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "versioned.Event"
+        "responseModel": "io.k8s.kubernetes.pkg.watch.versioned.Event"
        }
       ],
       "produces": [
@@ -916,7 +916,7 @@
     "description": "API at /api/v1",
     "operations": [
      {
-      "type": "versioned.Event",
+      "type": "io.k8s.kubernetes.pkg.watch.versioned.Event",
       "method": "GET",
       "summary": "watch individual changes to a list of ConfigMap",
       "nickname": "watchConfigMapListForAllNamespaces",
@@ -974,7 +974,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "versioned.Event"
+        "responseModel": "io.k8s.kubernetes.pkg.watch.versioned.Event"
        }
       ],
       "produces": [
@@ -1123,7 +1123,7 @@
       ]
      },
      {
-      "type": "v1.Status",
+      "type": "io.k8s.meta.v1.Status",
       "method": "DELETE",
       "summary": "delete collection of Endpoints",
       "nickname": "deletecollectionNamespacedEndpoints",
@@ -1189,7 +1189,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1.Status"
+        "responseModel": "io.k8s.meta.v1.Status"
        }
       ],
       "produces": [
@@ -1208,7 +1208,7 @@
     "description": "API at /api/v1",
     "operations": [
      {
-      "type": "versioned.Event",
+      "type": "io.k8s.kubernetes.pkg.watch.versioned.Event",
       "method": "GET",
       "summary": "watch individual changes to a list of Endpoints",
       "nickname": "watchNamespacedEndpointsList",
@@ -1274,7 +1274,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "versioned.Event"
+        "responseModel": "io.k8s.kubernetes.pkg.watch.versioned.Event"
        }
       ],
       "produces": [
@@ -1470,7 +1470,7 @@
       ]
      },
      {
-      "type": "v1.Status",
+      "type": "io.k8s.meta.v1.Status",
       "method": "DELETE",
       "summary": "delete Endpoints",
       "nickname": "deleteNamespacedEndpoints",
@@ -1528,7 +1528,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1.Status"
+        "responseModel": "io.k8s.meta.v1.Status"
        }
       ],
       "produces": [
@@ -1547,7 +1547,7 @@
     "description": "API at /api/v1",
     "operations": [
      {
-      "type": "versioned.Event",
+      "type": "io.k8s.kubernetes.pkg.watch.versioned.Event",
       "method": "GET",
       "summary": "watch changes to an object of kind Endpoints",
       "nickname": "watchNamespacedEndpoints",
@@ -1621,7 +1621,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "versioned.Event"
+        "responseModel": "io.k8s.kubernetes.pkg.watch.versioned.Event"
        }
       ],
       "produces": [
@@ -1721,7 +1721,7 @@
     "description": "API at /api/v1",
     "operations": [
      {
-      "type": "versioned.Event",
+      "type": "io.k8s.kubernetes.pkg.watch.versioned.Event",
       "method": "GET",
       "summary": "watch individual changes to a list of Endpoints",
       "nickname": "watchEndpointsListForAllNamespaces",
@@ -1779,7 +1779,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "versioned.Event"
+        "responseModel": "io.k8s.kubernetes.pkg.watch.versioned.Event"
        }
       ],
       "produces": [
@@ -1928,7 +1928,7 @@
       ]
      },
      {
-      "type": "v1.Status",
+      "type": "io.k8s.meta.v1.Status",
       "method": "DELETE",
       "summary": "delete collection of Event",
       "nickname": "deletecollectionNamespacedEvent",
@@ -1994,7 +1994,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1.Status"
+        "responseModel": "io.k8s.meta.v1.Status"
        }
       ],
       "produces": [
@@ -2013,7 +2013,7 @@
     "description": "API at /api/v1",
     "operations": [
      {
-      "type": "versioned.Event",
+      "type": "io.k8s.kubernetes.pkg.watch.versioned.Event",
       "method": "GET",
       "summary": "watch individual changes to a list of Event",
       "nickname": "watchNamespacedEventList",
@@ -2079,7 +2079,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "versioned.Event"
+        "responseModel": "io.k8s.kubernetes.pkg.watch.versioned.Event"
        }
       ],
       "produces": [
@@ -2275,7 +2275,7 @@
       ]
      },
      {
-      "type": "v1.Status",
+      "type": "io.k8s.meta.v1.Status",
       "method": "DELETE",
       "summary": "delete an Event",
       "nickname": "deleteNamespacedEvent",
@@ -2333,7 +2333,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1.Status"
+        "responseModel": "io.k8s.meta.v1.Status"
        }
       ],
       "produces": [
@@ -2352,7 +2352,7 @@
     "description": "API at /api/v1",
     "operations": [
      {
-      "type": "versioned.Event",
+      "type": "io.k8s.kubernetes.pkg.watch.versioned.Event",
       "method": "GET",
       "summary": "watch changes to an object of kind Event",
       "nickname": "watchNamespacedEvent",
@@ -2426,7 +2426,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "versioned.Event"
+        "responseModel": "io.k8s.kubernetes.pkg.watch.versioned.Event"
        }
       ],
       "produces": [
@@ -2526,7 +2526,7 @@
     "description": "API at /api/v1",
     "operations": [
      {
-      "type": "versioned.Event",
+      "type": "io.k8s.kubernetes.pkg.watch.versioned.Event",
       "method": "GET",
       "summary": "watch individual changes to a list of Event",
       "nickname": "watchEventListForAllNamespaces",
@@ -2584,7 +2584,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "versioned.Event"
+        "responseModel": "io.k8s.kubernetes.pkg.watch.versioned.Event"
        }
       ],
       "produces": [
@@ -2733,7 +2733,7 @@
       ]
      },
      {
-      "type": "v1.Status",
+      "type": "io.k8s.meta.v1.Status",
       "method": "DELETE",
       "summary": "delete collection of LimitRange",
       "nickname": "deletecollectionNamespacedLimitRange",
@@ -2799,7 +2799,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1.Status"
+        "responseModel": "io.k8s.meta.v1.Status"
        }
       ],
       "produces": [
@@ -2818,7 +2818,7 @@
     "description": "API at /api/v1",
     "operations": [
      {
-      "type": "versioned.Event",
+      "type": "io.k8s.kubernetes.pkg.watch.versioned.Event",
       "method": "GET",
       "summary": "watch individual changes to a list of LimitRange",
       "nickname": "watchNamespacedLimitRangeList",
@@ -2884,7 +2884,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "versioned.Event"
+        "responseModel": "io.k8s.kubernetes.pkg.watch.versioned.Event"
        }
       ],
       "produces": [
@@ -3080,7 +3080,7 @@
       ]
      },
      {
-      "type": "v1.Status",
+      "type": "io.k8s.meta.v1.Status",
       "method": "DELETE",
       "summary": "delete a LimitRange",
       "nickname": "deleteNamespacedLimitRange",
@@ -3138,7 +3138,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1.Status"
+        "responseModel": "io.k8s.meta.v1.Status"
        }
       ],
       "produces": [
@@ -3157,7 +3157,7 @@
     "description": "API at /api/v1",
     "operations": [
      {
-      "type": "versioned.Event",
+      "type": "io.k8s.kubernetes.pkg.watch.versioned.Event",
       "method": "GET",
       "summary": "watch changes to an object of kind LimitRange",
       "nickname": "watchNamespacedLimitRange",
@@ -3231,7 +3231,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "versioned.Event"
+        "responseModel": "io.k8s.kubernetes.pkg.watch.versioned.Event"
        }
       ],
       "produces": [
@@ -3331,7 +3331,7 @@
     "description": "API at /api/v1",
     "operations": [
      {
-      "type": "versioned.Event",
+      "type": "io.k8s.kubernetes.pkg.watch.versioned.Event",
       "method": "GET",
       "summary": "watch individual changes to a list of LimitRange",
       "nickname": "watchLimitRangeListForAllNamespaces",
@@ -3389,7 +3389,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "versioned.Event"
+        "responseModel": "io.k8s.kubernetes.pkg.watch.versioned.Event"
        }
       ],
       "produces": [
@@ -3522,7 +3522,7 @@
       ]
      },
      {
-      "type": "v1.Status",
+      "type": "io.k8s.meta.v1.Status",
       "method": "DELETE",
       "summary": "delete collection of Namespace",
       "nickname": "deletecollectionNamespace",
@@ -3580,7 +3580,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1.Status"
+        "responseModel": "io.k8s.meta.v1.Status"
        }
       ],
       "produces": [
@@ -3599,7 +3599,7 @@
     "description": "API at /api/v1",
     "operations": [
      {
-      "type": "versioned.Event",
+      "type": "io.k8s.kubernetes.pkg.watch.versioned.Event",
       "method": "GET",
       "summary": "watch individual changes to a list of Namespace",
       "nickname": "watchNamespaceList",
@@ -3657,7 +3657,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "versioned.Event"
+        "responseModel": "io.k8s.kubernetes.pkg.watch.versioned.Event"
        }
       ],
       "produces": [
@@ -3829,7 +3829,7 @@
       ]
      },
      {
-      "type": "v1.Status",
+      "type": "io.k8s.meta.v1.Status",
       "method": "DELETE",
       "summary": "delete a Namespace",
       "nickname": "deleteNamespace",
@@ -3879,7 +3879,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1.Status"
+        "responseModel": "io.k8s.meta.v1.Status"
        }
       ],
       "produces": [
@@ -3898,7 +3898,7 @@
     "description": "API at /api/v1",
     "operations": [
      {
-      "type": "versioned.Event",
+      "type": "io.k8s.kubernetes.pkg.watch.versioned.Event",
       "method": "GET",
       "summary": "watch changes to an object of kind Namespace",
       "nickname": "watchNamespace",
@@ -3964,7 +3964,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "versioned.Event"
+        "responseModel": "io.k8s.kubernetes.pkg.watch.versioned.Event"
        }
       ],
       "produces": [
@@ -4291,7 +4291,7 @@
       ]
      },
      {
-      "type": "v1.Status",
+      "type": "io.k8s.meta.v1.Status",
       "method": "DELETE",
       "summary": "delete collection of Node",
       "nickname": "deletecollectionNode",
@@ -4349,7 +4349,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1.Status"
+        "responseModel": "io.k8s.meta.v1.Status"
        }
       ],
       "produces": [
@@ -4368,7 +4368,7 @@
     "description": "API at /api/v1",
     "operations": [
      {
-      "type": "versioned.Event",
+      "type": "io.k8s.kubernetes.pkg.watch.versioned.Event",
       "method": "GET",
       "summary": "watch individual changes to a list of Node",
       "nickname": "watchNodeList",
@@ -4426,7 +4426,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "versioned.Event"
+        "responseModel": "io.k8s.kubernetes.pkg.watch.versioned.Event"
        }
       ],
       "produces": [
@@ -4598,7 +4598,7 @@
       ]
      },
      {
-      "type": "v1.Status",
+      "type": "io.k8s.meta.v1.Status",
       "method": "DELETE",
       "summary": "delete a Node",
       "nickname": "deleteNode",
@@ -4648,7 +4648,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1.Status"
+        "responseModel": "io.k8s.meta.v1.Status"
        }
       ],
       "produces": [
@@ -4667,7 +4667,7 @@
     "description": "API at /api/v1",
     "operations": [
      {
-      "type": "versioned.Event",
+      "type": "io.k8s.kubernetes.pkg.watch.versioned.Event",
       "method": "GET",
       "summary": "watch changes to an object of kind Node",
       "nickname": "watchNode",
@@ -4733,7 +4733,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "versioned.Event"
+        "responseModel": "io.k8s.kubernetes.pkg.watch.versioned.Event"
        }
       ],
       "produces": [
@@ -5767,7 +5767,7 @@
       ]
      },
      {
-      "type": "v1.Status",
+      "type": "io.k8s.meta.v1.Status",
       "method": "DELETE",
       "summary": "delete collection of PersistentVolumeClaim",
       "nickname": "deletecollectionNamespacedPersistentVolumeClaim",
@@ -5833,7 +5833,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1.Status"
+        "responseModel": "io.k8s.meta.v1.Status"
        }
       ],
       "produces": [
@@ -5852,7 +5852,7 @@
     "description": "API at /api/v1",
     "operations": [
      {
-      "type": "versioned.Event",
+      "type": "io.k8s.kubernetes.pkg.watch.versioned.Event",
       "method": "GET",
       "summary": "watch individual changes to a list of PersistentVolumeClaim",
       "nickname": "watchNamespacedPersistentVolumeClaimList",
@@ -5918,7 +5918,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "versioned.Event"
+        "responseModel": "io.k8s.kubernetes.pkg.watch.versioned.Event"
        }
       ],
       "produces": [
@@ -6114,7 +6114,7 @@
       ]
      },
      {
-      "type": "v1.Status",
+      "type": "io.k8s.meta.v1.Status",
       "method": "DELETE",
       "summary": "delete a PersistentVolumeClaim",
       "nickname": "deleteNamespacedPersistentVolumeClaim",
@@ -6172,7 +6172,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1.Status"
+        "responseModel": "io.k8s.meta.v1.Status"
        }
       ],
       "produces": [
@@ -6191,7 +6191,7 @@
     "description": "API at /api/v1",
     "operations": [
      {
-      "type": "versioned.Event",
+      "type": "io.k8s.kubernetes.pkg.watch.versioned.Event",
       "method": "GET",
       "summary": "watch changes to an object of kind PersistentVolumeClaim",
       "nickname": "watchNamespacedPersistentVolumeClaim",
@@ -6265,7 +6265,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "versioned.Event"
+        "responseModel": "io.k8s.kubernetes.pkg.watch.versioned.Event"
        }
       ],
       "produces": [
@@ -6365,7 +6365,7 @@
     "description": "API at /api/v1",
     "operations": [
      {
-      "type": "versioned.Event",
+      "type": "io.k8s.kubernetes.pkg.watch.versioned.Event",
       "method": "GET",
       "summary": "watch individual changes to a list of PersistentVolumeClaim",
       "nickname": "watchPersistentVolumeClaimListForAllNamespaces",
@@ -6423,7 +6423,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "versioned.Event"
+        "responseModel": "io.k8s.kubernetes.pkg.watch.versioned.Event"
        }
       ],
       "produces": [
@@ -6721,7 +6721,7 @@
       ]
      },
      {
-      "type": "v1.Status",
+      "type": "io.k8s.meta.v1.Status",
       "method": "DELETE",
       "summary": "delete collection of PersistentVolume",
       "nickname": "deletecollectionPersistentVolume",
@@ -6779,7 +6779,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1.Status"
+        "responseModel": "io.k8s.meta.v1.Status"
        }
       ],
       "produces": [
@@ -6798,7 +6798,7 @@
     "description": "API at /api/v1",
     "operations": [
      {
-      "type": "versioned.Event",
+      "type": "io.k8s.kubernetes.pkg.watch.versioned.Event",
       "method": "GET",
       "summary": "watch individual changes to a list of PersistentVolume",
       "nickname": "watchPersistentVolumeList",
@@ -6856,7 +6856,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "versioned.Event"
+        "responseModel": "io.k8s.kubernetes.pkg.watch.versioned.Event"
        }
       ],
       "produces": [
@@ -7028,7 +7028,7 @@
       ]
      },
      {
-      "type": "v1.Status",
+      "type": "io.k8s.meta.v1.Status",
       "method": "DELETE",
       "summary": "delete a PersistentVolume",
       "nickname": "deletePersistentVolume",
@@ -7078,7 +7078,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1.Status"
+        "responseModel": "io.k8s.meta.v1.Status"
        }
       ],
       "produces": [
@@ -7097,7 +7097,7 @@
     "description": "API at /api/v1",
     "operations": [
      {
-      "type": "versioned.Event",
+      "type": "io.k8s.kubernetes.pkg.watch.versioned.Event",
       "method": "GET",
       "summary": "watch changes to an object of kind PersistentVolume",
       "nickname": "watchPersistentVolume",
@@ -7163,7 +7163,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "versioned.Event"
+        "responseModel": "io.k8s.kubernetes.pkg.watch.versioned.Event"
        }
       ],
       "produces": [
@@ -7453,7 +7453,7 @@
       ]
      },
      {
-      "type": "v1.Status",
+      "type": "io.k8s.meta.v1.Status",
       "method": "DELETE",
       "summary": "delete collection of Pod",
       "nickname": "deletecollectionNamespacedPod",
@@ -7519,7 +7519,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1.Status"
+        "responseModel": "io.k8s.meta.v1.Status"
        }
       ],
       "produces": [
@@ -7538,7 +7538,7 @@
     "description": "API at /api/v1",
     "operations": [
      {
-      "type": "versioned.Event",
+      "type": "io.k8s.kubernetes.pkg.watch.versioned.Event",
       "method": "GET",
       "summary": "watch individual changes to a list of Pod",
       "nickname": "watchNamespacedPodList",
@@ -7604,7 +7604,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "versioned.Event"
+        "responseModel": "io.k8s.kubernetes.pkg.watch.versioned.Event"
        }
       ],
       "produces": [
@@ -7800,7 +7800,7 @@
       ]
      },
      {
-      "type": "v1.Status",
+      "type": "io.k8s.meta.v1.Status",
       "method": "DELETE",
       "summary": "delete a Pod",
       "nickname": "deleteNamespacedPod",
@@ -7858,7 +7858,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1.Status"
+        "responseModel": "io.k8s.meta.v1.Status"
        }
       ],
       "produces": [
@@ -7877,7 +7877,7 @@
     "description": "API at /api/v1",
     "operations": [
      {
-      "type": "versioned.Event",
+      "type": "io.k8s.kubernetes.pkg.watch.versioned.Event",
       "method": "GET",
       "summary": "watch changes to an object of kind Pod",
       "nickname": "watchNamespacedPod",
@@ -7951,7 +7951,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "versioned.Event"
+        "responseModel": "io.k8s.kubernetes.pkg.watch.versioned.Event"
        }
       ],
       "produces": [
@@ -8471,7 +8471,7 @@
     "description": "API at /api/v1",
     "operations": [
      {
-      "type": "versioned.Event",
+      "type": "io.k8s.kubernetes.pkg.watch.versioned.Event",
       "method": "GET",
       "summary": "watch individual changes to a list of Pod",
       "nickname": "watchPodListForAllNamespaces",
@@ -8529,7 +8529,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "versioned.Event"
+        "responseModel": "io.k8s.kubernetes.pkg.watch.versioned.Event"
        }
       ],
       "produces": [
@@ -8757,7 +8757,7 @@
     "description": "API at /api/v1",
     "operations": [
      {
-      "type": "v1beta1.Eviction",
+      "type": "policy.v1beta1.Eviction",
       "method": "POST",
       "summary": "create eviction of an Eviction",
       "nickname": "createNamespacedEvictionEviction",
@@ -8799,7 +8799,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1beta1.Eviction"
+        "responseModel": "policy.v1beta1.Eviction"
        }
       ],
       "produces": [
@@ -9965,7 +9965,7 @@
       ]
      },
      {
-      "type": "v1.Status",
+      "type": "io.k8s.meta.v1.Status",
       "method": "DELETE",
       "summary": "delete collection of PodTemplate",
       "nickname": "deletecollectionNamespacedPodTemplate",
@@ -10031,7 +10031,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1.Status"
+        "responseModel": "io.k8s.meta.v1.Status"
        }
       ],
       "produces": [
@@ -10050,7 +10050,7 @@
     "description": "API at /api/v1",
     "operations": [
      {
-      "type": "versioned.Event",
+      "type": "io.k8s.kubernetes.pkg.watch.versioned.Event",
       "method": "GET",
       "summary": "watch individual changes to a list of PodTemplate",
       "nickname": "watchNamespacedPodTemplateList",
@@ -10116,7 +10116,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "versioned.Event"
+        "responseModel": "io.k8s.kubernetes.pkg.watch.versioned.Event"
        }
       ],
       "produces": [
@@ -10312,7 +10312,7 @@
       ]
      },
      {
-      "type": "v1.Status",
+      "type": "io.k8s.meta.v1.Status",
       "method": "DELETE",
       "summary": "delete a PodTemplate",
       "nickname": "deleteNamespacedPodTemplate",
@@ -10370,7 +10370,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1.Status"
+        "responseModel": "io.k8s.meta.v1.Status"
        }
       ],
       "produces": [
@@ -10389,7 +10389,7 @@
     "description": "API at /api/v1",
     "operations": [
      {
-      "type": "versioned.Event",
+      "type": "io.k8s.kubernetes.pkg.watch.versioned.Event",
       "method": "GET",
       "summary": "watch changes to an object of kind PodTemplate",
       "nickname": "watchNamespacedPodTemplate",
@@ -10463,7 +10463,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "versioned.Event"
+        "responseModel": "io.k8s.kubernetes.pkg.watch.versioned.Event"
        }
       ],
       "produces": [
@@ -10563,7 +10563,7 @@
     "description": "API at /api/v1",
     "operations": [
      {
-      "type": "versioned.Event",
+      "type": "io.k8s.kubernetes.pkg.watch.versioned.Event",
       "method": "GET",
       "summary": "watch individual changes to a list of PodTemplate",
       "nickname": "watchPodTemplateListForAllNamespaces",
@@ -10621,7 +10621,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "versioned.Event"
+        "responseModel": "io.k8s.kubernetes.pkg.watch.versioned.Event"
        }
       ],
       "produces": [
@@ -10770,7 +10770,7 @@
       ]
      },
      {
-      "type": "v1.Status",
+      "type": "io.k8s.meta.v1.Status",
       "method": "DELETE",
       "summary": "delete collection of ReplicationController",
       "nickname": "deletecollectionNamespacedReplicationController",
@@ -10836,7 +10836,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1.Status"
+        "responseModel": "io.k8s.meta.v1.Status"
        }
       ],
       "produces": [
@@ -10855,7 +10855,7 @@
     "description": "API at /api/v1",
     "operations": [
      {
-      "type": "versioned.Event",
+      "type": "io.k8s.kubernetes.pkg.watch.versioned.Event",
       "method": "GET",
       "summary": "watch individual changes to a list of ReplicationController",
       "nickname": "watchNamespacedReplicationControllerList",
@@ -10921,7 +10921,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "versioned.Event"
+        "responseModel": "io.k8s.kubernetes.pkg.watch.versioned.Event"
        }
       ],
       "produces": [
@@ -11117,7 +11117,7 @@
       ]
      },
      {
-      "type": "v1.Status",
+      "type": "io.k8s.meta.v1.Status",
       "method": "DELETE",
       "summary": "delete a ReplicationController",
       "nickname": "deleteNamespacedReplicationController",
@@ -11175,7 +11175,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1.Status"
+        "responseModel": "io.k8s.meta.v1.Status"
        }
       ],
       "produces": [
@@ -11194,7 +11194,7 @@
     "description": "API at /api/v1",
     "operations": [
      {
-      "type": "versioned.Event",
+      "type": "io.k8s.kubernetes.pkg.watch.versioned.Event",
       "method": "GET",
       "summary": "watch changes to an object of kind ReplicationController",
       "nickname": "watchNamespacedReplicationController",
@@ -11268,7 +11268,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "versioned.Event"
+        "responseModel": "io.k8s.kubernetes.pkg.watch.versioned.Event"
        }
       ],
       "produces": [
@@ -11368,7 +11368,7 @@
     "description": "API at /api/v1",
     "operations": [
      {
-      "type": "versioned.Event",
+      "type": "io.k8s.kubernetes.pkg.watch.versioned.Event",
       "method": "GET",
       "summary": "watch individual changes to a list of ReplicationController",
       "nickname": "watchReplicationControllerListForAllNamespaces",
@@ -11426,7 +11426,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "versioned.Event"
+        "responseModel": "io.k8s.kubernetes.pkg.watch.versioned.Event"
        }
       ],
       "produces": [
@@ -11447,7 +11447,7 @@
     "description": "API at /api/v1",
     "operations": [
      {
-      "type": "v1.Scale",
+      "type": "autoscaling.v1.Scale",
       "method": "GET",
       "summary": "read scale of the specified Scale",
       "nickname": "readNamespacedScaleScale",
@@ -11481,7 +11481,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1.Scale"
+        "responseModel": "autoscaling.v1.Scale"
        }
       ],
       "produces": [
@@ -11494,7 +11494,7 @@
       ]
      },
      {
-      "type": "v1.Scale",
+      "type": "autoscaling.v1.Scale",
       "method": "PUT",
       "summary": "replace scale of the specified Scale",
       "nickname": "replaceNamespacedScaleScale",
@@ -11536,7 +11536,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1.Scale"
+        "responseModel": "autoscaling.v1.Scale"
        }
       ],
       "produces": [
@@ -11549,7 +11549,7 @@
       ]
      },
      {
-      "type": "v1.Scale",
+      "type": "autoscaling.v1.Scale",
       "method": "PATCH",
       "summary": "partially update scale of the specified Scale",
       "nickname": "patchNamespacedScaleScale",
@@ -11591,7 +11591,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1.Scale"
+        "responseModel": "autoscaling.v1.Scale"
        }
       ],
       "produces": [
@@ -11905,7 +11905,7 @@
       ]
      },
      {
-      "type": "v1.Status",
+      "type": "io.k8s.meta.v1.Status",
       "method": "DELETE",
       "summary": "delete collection of ResourceQuota",
       "nickname": "deletecollectionNamespacedResourceQuota",
@@ -11971,7 +11971,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1.Status"
+        "responseModel": "io.k8s.meta.v1.Status"
        }
       ],
       "produces": [
@@ -11990,7 +11990,7 @@
     "description": "API at /api/v1",
     "operations": [
      {
-      "type": "versioned.Event",
+      "type": "io.k8s.kubernetes.pkg.watch.versioned.Event",
       "method": "GET",
       "summary": "watch individual changes to a list of ResourceQuota",
       "nickname": "watchNamespacedResourceQuotaList",
@@ -12056,7 +12056,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "versioned.Event"
+        "responseModel": "io.k8s.kubernetes.pkg.watch.versioned.Event"
        }
       ],
       "produces": [
@@ -12252,7 +12252,7 @@
       ]
      },
      {
-      "type": "v1.Status",
+      "type": "io.k8s.meta.v1.Status",
       "method": "DELETE",
       "summary": "delete a ResourceQuota",
       "nickname": "deleteNamespacedResourceQuota",
@@ -12310,7 +12310,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1.Status"
+        "responseModel": "io.k8s.meta.v1.Status"
        }
       ],
       "produces": [
@@ -12329,7 +12329,7 @@
     "description": "API at /api/v1",
     "operations": [
      {
-      "type": "versioned.Event",
+      "type": "io.k8s.kubernetes.pkg.watch.versioned.Event",
       "method": "GET",
       "summary": "watch changes to an object of kind ResourceQuota",
       "nickname": "watchNamespacedResourceQuota",
@@ -12403,7 +12403,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "versioned.Event"
+        "responseModel": "io.k8s.kubernetes.pkg.watch.versioned.Event"
        }
       ],
       "produces": [
@@ -12503,7 +12503,7 @@
     "description": "API at /api/v1",
     "operations": [
      {
-      "type": "versioned.Event",
+      "type": "io.k8s.kubernetes.pkg.watch.versioned.Event",
       "method": "GET",
       "summary": "watch individual changes to a list of ResourceQuota",
       "nickname": "watchResourceQuotaListForAllNamespaces",
@@ -12561,7 +12561,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "versioned.Event"
+        "responseModel": "io.k8s.kubernetes.pkg.watch.versioned.Event"
        }
       ],
       "produces": [
@@ -12875,7 +12875,7 @@
       ]
      },
      {
-      "type": "v1.Status",
+      "type": "io.k8s.meta.v1.Status",
       "method": "DELETE",
       "summary": "delete collection of Secret",
       "nickname": "deletecollectionNamespacedSecret",
@@ -12941,7 +12941,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1.Status"
+        "responseModel": "io.k8s.meta.v1.Status"
        }
       ],
       "produces": [
@@ -12960,7 +12960,7 @@
     "description": "API at /api/v1",
     "operations": [
      {
-      "type": "versioned.Event",
+      "type": "io.k8s.kubernetes.pkg.watch.versioned.Event",
       "method": "GET",
       "summary": "watch individual changes to a list of Secret",
       "nickname": "watchNamespacedSecretList",
@@ -13026,7 +13026,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "versioned.Event"
+        "responseModel": "io.k8s.kubernetes.pkg.watch.versioned.Event"
        }
       ],
       "produces": [
@@ -13222,7 +13222,7 @@
       ]
      },
      {
-      "type": "v1.Status",
+      "type": "io.k8s.meta.v1.Status",
       "method": "DELETE",
       "summary": "delete a Secret",
       "nickname": "deleteNamespacedSecret",
@@ -13280,7 +13280,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1.Status"
+        "responseModel": "io.k8s.meta.v1.Status"
        }
       ],
       "produces": [
@@ -13299,7 +13299,7 @@
     "description": "API at /api/v1",
     "operations": [
      {
-      "type": "versioned.Event",
+      "type": "io.k8s.kubernetes.pkg.watch.versioned.Event",
       "method": "GET",
       "summary": "watch changes to an object of kind Secret",
       "nickname": "watchNamespacedSecret",
@@ -13373,7 +13373,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "versioned.Event"
+        "responseModel": "io.k8s.kubernetes.pkg.watch.versioned.Event"
        }
       ],
       "produces": [
@@ -13473,7 +13473,7 @@
     "description": "API at /api/v1",
     "operations": [
      {
-      "type": "versioned.Event",
+      "type": "io.k8s.kubernetes.pkg.watch.versioned.Event",
       "method": "GET",
       "summary": "watch individual changes to a list of Secret",
       "nickname": "watchSecretListForAllNamespaces",
@@ -13531,7 +13531,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "versioned.Event"
+        "responseModel": "io.k8s.kubernetes.pkg.watch.versioned.Event"
        }
       ],
       "produces": [
@@ -13680,7 +13680,7 @@
       ]
      },
      {
-      "type": "v1.Status",
+      "type": "io.k8s.meta.v1.Status",
       "method": "DELETE",
       "summary": "delete collection of ServiceAccount",
       "nickname": "deletecollectionNamespacedServiceAccount",
@@ -13746,7 +13746,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1.Status"
+        "responseModel": "io.k8s.meta.v1.Status"
        }
       ],
       "produces": [
@@ -13765,7 +13765,7 @@
     "description": "API at /api/v1",
     "operations": [
      {
-      "type": "versioned.Event",
+      "type": "io.k8s.kubernetes.pkg.watch.versioned.Event",
       "method": "GET",
       "summary": "watch individual changes to a list of ServiceAccount",
       "nickname": "watchNamespacedServiceAccountList",
@@ -13831,7 +13831,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "versioned.Event"
+        "responseModel": "io.k8s.kubernetes.pkg.watch.versioned.Event"
        }
       ],
       "produces": [
@@ -14027,7 +14027,7 @@
       ]
      },
      {
-      "type": "v1.Status",
+      "type": "io.k8s.meta.v1.Status",
       "method": "DELETE",
       "summary": "delete a ServiceAccount",
       "nickname": "deleteNamespacedServiceAccount",
@@ -14085,7 +14085,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1.Status"
+        "responseModel": "io.k8s.meta.v1.Status"
        }
       ],
       "produces": [
@@ -14104,7 +14104,7 @@
     "description": "API at /api/v1",
     "operations": [
      {
-      "type": "versioned.Event",
+      "type": "io.k8s.kubernetes.pkg.watch.versioned.Event",
       "method": "GET",
       "summary": "watch changes to an object of kind ServiceAccount",
       "nickname": "watchNamespacedServiceAccount",
@@ -14178,7 +14178,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "versioned.Event"
+        "responseModel": "io.k8s.kubernetes.pkg.watch.versioned.Event"
        }
       ],
       "produces": [
@@ -14278,7 +14278,7 @@
     "description": "API at /api/v1",
     "operations": [
      {
-      "type": "versioned.Event",
+      "type": "io.k8s.kubernetes.pkg.watch.versioned.Event",
       "method": "GET",
       "summary": "watch individual changes to a list of ServiceAccount",
       "nickname": "watchServiceAccountListForAllNamespaces",
@@ -14336,7 +14336,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "versioned.Event"
+        "responseModel": "io.k8s.kubernetes.pkg.watch.versioned.Event"
        }
       ],
       "produces": [
@@ -14491,7 +14491,7 @@
     "description": "API at /api/v1",
     "operations": [
      {
-      "type": "versioned.Event",
+      "type": "io.k8s.kubernetes.pkg.watch.versioned.Event",
       "method": "GET",
       "summary": "watch individual changes to a list of Service",
       "nickname": "watchNamespacedServiceList",
@@ -14557,7 +14557,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "versioned.Event"
+        "responseModel": "io.k8s.kubernetes.pkg.watch.versioned.Event"
        }
       ],
       "produces": [
@@ -14753,7 +14753,7 @@
       ]
      },
      {
-      "type": "v1.Status",
+      "type": "io.k8s.meta.v1.Status",
       "method": "DELETE",
       "summary": "delete a Service",
       "nickname": "deleteNamespacedService",
@@ -14787,7 +14787,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1.Status"
+        "responseModel": "io.k8s.meta.v1.Status"
        }
       ],
       "produces": [
@@ -14806,7 +14806,7 @@
     "description": "API at /api/v1",
     "operations": [
      {
-      "type": "versioned.Event",
+      "type": "io.k8s.kubernetes.pkg.watch.versioned.Event",
       "method": "GET",
       "summary": "watch changes to an object of kind Service",
       "nickname": "watchNamespacedService",
@@ -14880,7 +14880,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "versioned.Event"
+        "responseModel": "io.k8s.kubernetes.pkg.watch.versioned.Event"
        }
       ],
       "produces": [
@@ -15400,7 +15400,7 @@
     "description": "API at /api/v1",
     "operations": [
      {
-      "type": "versioned.Event",
+      "type": "io.k8s.kubernetes.pkg.watch.versioned.Event",
       "method": "GET",
       "summary": "watch individual changes to a list of Service",
       "nickname": "watchServiceListForAllNamespaces",
@@ -15458,7 +15458,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "versioned.Event"
+        "responseModel": "io.k8s.kubernetes.pkg.watch.versioned.Event"
        }
       ],
       "produces": [
@@ -16160,7 +16160,7 @@
     "description": "API at /api/v1",
     "operations": [
      {
-      "type": "v1.APIResourceList",
+      "type": "io.k8s.meta.v1.APIResourceList",
       "method": "GET",
       "summary": "get available resources",
       "nickname": "getAPIResources",
@@ -20234,6 +20234,54 @@
        "type": "string"
       },
       "description": "verbs is a list of supported kube verbs (this includes get, list, watch, create, update, patch, delete, deletecollection, and proxy)"
+     }
+    }
+   },
+   "v1beta1.Eviction": {
+    "id": "v1beta1.Eviction",
+    "description": "Eviction evicts a pod from its node subject to certain policies and safety constraints. This is a subresource of Pod.  A request to cause such an eviction is created by POSTing to .../pods/\u003cpod name\u003e/evictions.\n\nDEPRECATED: Use 'policy.v1beta1.Eviction' instead.",
+    "properties": {
+     "kind": {
+      "type": "string",
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+     },
+     "apiVersion": {
+      "type": "string",
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+     },
+     "metadata": {
+      "$ref": "v1.ObjectMeta",
+      "description": "ObjectMeta describes the pod that is being evicted."
+     },
+     "deleteOptions": {
+      "$ref": "v1.DeleteOptions",
+      "description": "DeleteOptions may be provided"
+     }
+    }
+   },
+   "v1.Scale": {
+    "id": "v1.Scale",
+    "description": "Scale represents a scaling request for a resource.\n\nDEPRECATED: Use 'autoscaling.v1.Scale' instead.",
+    "properties": {
+     "kind": {
+      "type": "string",
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+     },
+     "apiVersion": {
+      "type": "string",
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+     },
+     "metadata": {
+      "$ref": "v1.ObjectMeta",
+      "description": "Standard object metadata; More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata."
+     },
+     "spec": {
+      "$ref": "autoscaling.v1.ScaleSpec",
+      "description": "defines the behavior of the scale. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status."
+     },
+     "status": {
+      "$ref": "autoscaling.v1.ScaleStatus",
+      "description": "current status of the scale. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status. Read-only."
      }
     }
    }

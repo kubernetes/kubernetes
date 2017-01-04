@@ -13,7 +13,7 @@
     "description": "API at /apis/policy/v1beta1",
     "operations": [
      {
-      "type": "v1beta1.PodDisruptionBudgetList",
+      "type": "policy.v1beta1.PodDisruptionBudgetList",
       "method": "GET",
       "summary": "list or watch objects of kind PodDisruptionBudget",
       "nickname": "listNamespacedPodDisruptionBudget",
@@ -79,7 +79,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1beta1.PodDisruptionBudgetList"
+        "responseModel": "policy.v1beta1.PodDisruptionBudgetList"
        }
       ],
       "produces": [
@@ -94,7 +94,7 @@
       ]
      },
      {
-      "type": "v1beta1.PodDisruptionBudget",
+      "type": "policy.v1beta1.PodDisruptionBudget",
       "method": "POST",
       "summary": "create a PodDisruptionBudget",
       "nickname": "createNamespacedPodDisruptionBudget",
@@ -128,7 +128,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1beta1.PodDisruptionBudget"
+        "responseModel": "policy.v1beta1.PodDisruptionBudget"
        }
       ],
       "produces": [
@@ -141,7 +141,7 @@
       ]
      },
      {
-      "type": "v1.Status",
+      "type": "io.k8s.meta.v1.Status",
       "method": "DELETE",
       "summary": "delete collection of PodDisruptionBudget",
       "nickname": "deletecollectionNamespacedPodDisruptionBudget",
@@ -207,7 +207,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1.Status"
+        "responseModel": "io.k8s.meta.v1.Status"
        }
       ],
       "produces": [
@@ -226,7 +226,7 @@
     "description": "API at /apis/policy/v1beta1",
     "operations": [
      {
-      "type": "versioned.Event",
+      "type": "io.k8s.kubernetes.pkg.watch.versioned.Event",
       "method": "GET",
       "summary": "watch individual changes to a list of PodDisruptionBudget",
       "nickname": "watchNamespacedPodDisruptionBudgetList",
@@ -292,7 +292,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "versioned.Event"
+        "responseModel": "io.k8s.kubernetes.pkg.watch.versioned.Event"
        }
       ],
       "produces": [
@@ -313,7 +313,7 @@
     "description": "API at /apis/policy/v1beta1",
     "operations": [
      {
-      "type": "v1beta1.PodDisruptionBudget",
+      "type": "policy.v1beta1.PodDisruptionBudget",
       "method": "GET",
       "summary": "read the specified PodDisruptionBudget",
       "nickname": "readNamespacedPodDisruptionBudget",
@@ -363,7 +363,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1beta1.PodDisruptionBudget"
+        "responseModel": "policy.v1beta1.PodDisruptionBudget"
        }
       ],
       "produces": [
@@ -376,7 +376,7 @@
       ]
      },
      {
-      "type": "v1beta1.PodDisruptionBudget",
+      "type": "policy.v1beta1.PodDisruptionBudget",
       "method": "PUT",
       "summary": "replace the specified PodDisruptionBudget",
       "nickname": "replaceNamespacedPodDisruptionBudget",
@@ -418,7 +418,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1beta1.PodDisruptionBudget"
+        "responseModel": "policy.v1beta1.PodDisruptionBudget"
        }
       ],
       "produces": [
@@ -431,7 +431,7 @@
       ]
      },
      {
-      "type": "v1beta1.PodDisruptionBudget",
+      "type": "policy.v1beta1.PodDisruptionBudget",
       "method": "PATCH",
       "summary": "partially update the specified PodDisruptionBudget",
       "nickname": "patchNamespacedPodDisruptionBudget",
@@ -473,7 +473,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1beta1.PodDisruptionBudget"
+        "responseModel": "policy.v1beta1.PodDisruptionBudget"
        }
       ],
       "produces": [
@@ -488,7 +488,7 @@
       ]
      },
      {
-      "type": "v1.Status",
+      "type": "io.k8s.meta.v1.Status",
       "method": "DELETE",
       "summary": "delete a PodDisruptionBudget",
       "nickname": "deleteNamespacedPodDisruptionBudget",
@@ -546,7 +546,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1.Status"
+        "responseModel": "io.k8s.meta.v1.Status"
        }
       ],
       "produces": [
@@ -565,7 +565,7 @@
     "description": "API at /apis/policy/v1beta1",
     "operations": [
      {
-      "type": "versioned.Event",
+      "type": "io.k8s.kubernetes.pkg.watch.versioned.Event",
       "method": "GET",
       "summary": "watch changes to an object of kind PodDisruptionBudget",
       "nickname": "watchNamespacedPodDisruptionBudget",
@@ -639,7 +639,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "versioned.Event"
+        "responseModel": "io.k8s.kubernetes.pkg.watch.versioned.Event"
        }
       ],
       "produces": [
@@ -660,7 +660,7 @@
     "description": "API at /apis/policy/v1beta1",
     "operations": [
      {
-      "type": "v1beta1.PodDisruptionBudgetList",
+      "type": "policy.v1beta1.PodDisruptionBudgetList",
       "method": "GET",
       "summary": "list or watch objects of kind PodDisruptionBudget",
       "nickname": "listPodDisruptionBudgetForAllNamespaces",
@@ -718,7 +718,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1beta1.PodDisruptionBudgetList"
+        "responseModel": "policy.v1beta1.PodDisruptionBudgetList"
        }
       ],
       "produces": [
@@ -739,7 +739,7 @@
     "description": "API at /apis/policy/v1beta1",
     "operations": [
      {
-      "type": "versioned.Event",
+      "type": "io.k8s.kubernetes.pkg.watch.versioned.Event",
       "method": "GET",
       "summary": "watch individual changes to a list of PodDisruptionBudget",
       "nickname": "watchPodDisruptionBudgetListForAllNamespaces",
@@ -797,7 +797,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "versioned.Event"
+        "responseModel": "io.k8s.kubernetes.pkg.watch.versioned.Event"
        }
       ],
       "produces": [
@@ -818,7 +818,7 @@
     "description": "API at /apis/policy/v1beta1",
     "operations": [
      {
-      "type": "v1beta1.PodDisruptionBudget",
+      "type": "policy.v1beta1.PodDisruptionBudget",
       "method": "GET",
       "summary": "read status of the specified PodDisruptionBudget",
       "nickname": "readNamespacedPodDisruptionBudgetStatus",
@@ -852,7 +852,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1beta1.PodDisruptionBudget"
+        "responseModel": "policy.v1beta1.PodDisruptionBudget"
        }
       ],
       "produces": [
@@ -865,7 +865,7 @@
       ]
      },
      {
-      "type": "v1beta1.PodDisruptionBudget",
+      "type": "policy.v1beta1.PodDisruptionBudget",
       "method": "PUT",
       "summary": "replace status of the specified PodDisruptionBudget",
       "nickname": "replaceNamespacedPodDisruptionBudgetStatus",
@@ -907,7 +907,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1beta1.PodDisruptionBudget"
+        "responseModel": "policy.v1beta1.PodDisruptionBudget"
        }
       ],
       "produces": [
@@ -920,7 +920,7 @@
       ]
      },
      {
-      "type": "v1beta1.PodDisruptionBudget",
+      "type": "policy.v1beta1.PodDisruptionBudget",
       "method": "PATCH",
       "summary": "partially update status of the specified PodDisruptionBudget",
       "nickname": "patchNamespacedPodDisruptionBudgetStatus",
@@ -962,7 +962,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1beta1.PodDisruptionBudget"
+        "responseModel": "policy.v1beta1.PodDisruptionBudget"
        }
       ],
       "produces": [
@@ -983,7 +983,7 @@
     "description": "API at /apis/policy/v1beta1",
     "operations": [
      {
-      "type": "v1.APIResourceList",
+      "type": "io.k8s.meta.v1.APIResourceList",
       "method": "GET",
       "summary": "get available resources",
       "nickname": "getAPIResources",
@@ -1477,6 +1477,57 @@
        "type": "string"
       },
       "description": "verbs is a list of supported kube verbs (this includes get, list, watch, create, update, patch, delete, deletecollection, and proxy)"
+     }
+    }
+   },
+   "v1beta1.PodDisruptionBudgetList": {
+    "id": "v1beta1.PodDisruptionBudgetList",
+    "description": "PodDisruptionBudgetList is a collection of PodDisruptionBudgets.\n\nDEPRECATED: Use 'policy.v1beta1.PodDisruptionBudgetList' instead.",
+    "required": [
+     "items"
+    ],
+    "properties": {
+     "kind": {
+      "type": "string",
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+     },
+     "apiVersion": {
+      "type": "string",
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+     },
+     "metadata": {
+      "$ref": "io.k8s.meta.v1.ListMeta"
+     },
+     "items": {
+      "type": "array",
+      "items": {
+       "$ref": "policy.v1beta1.PodDisruptionBudget"
+      }
+     }
+    }
+   },
+   "v1beta1.PodDisruptionBudget": {
+    "id": "v1beta1.PodDisruptionBudget",
+    "description": "PodDisruptionBudget is an object to define the max disruption that can be caused to a collection of pods\n\nDEPRECATED: Use 'policy.v1beta1.PodDisruptionBudget' instead.",
+    "properties": {
+     "kind": {
+      "type": "string",
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+     },
+     "apiVersion": {
+      "type": "string",
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+     },
+     "metadata": {
+      "$ref": "v1.ObjectMeta"
+     },
+     "spec": {
+      "$ref": "policy.v1beta1.PodDisruptionBudgetSpec",
+      "description": "Specification of the desired behavior of the PodDisruptionBudget."
+     },
+     "status": {
+      "$ref": "policy.v1beta1.PodDisruptionBudgetStatus",
+      "description": "Most recently observed status of the PodDisruptionBudget."
      }
     }
    }

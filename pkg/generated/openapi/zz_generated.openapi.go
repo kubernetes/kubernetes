@@ -618,36 +618,6 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 		Dependencies: []string{
 			"v1.ObjectMeta", "v1.ObjectReference"},
 	},
-	"v1.Binding": {
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "Binding ties one object to another. For example, a pod is bound to a node by a scheduler.",
-				Properties: map[string]spec.Schema{
-					"metadata": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
-							Ref:         spec.MustCreateRef("#/definitions/v1.ObjectMeta"),
-						},
-					},
-					"target": {
-						SchemaProps: spec.SchemaProps{
-							Description: "The target object that you want to bind to the standard object.",
-							Ref:         spec.MustCreateRef("#/definitions/v1.ObjectReference"),
-						},
-					},
-				},
-				Required: []string{"target"},
-			},
-			VendorExtensible: spec.VendorExtensible{
-				Extensions: spec.Extensions{
-					"io.k8s.kubernetes.openapi.type.golang":         "k8s.io/kubernetes/pkg/api/v1.Binding",
-					"io.k8s.kubernetes.openapi.type.deprecated.use": "v1.Binding",
-				},
-			},
-		},
-		Dependencies: []string{
-			"v1.ObjectMeta", "v1.ObjectReference"},
-	},
 	"v1.Capabilities": {
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -872,42 +842,6 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 		Dependencies: []string{
 			"v1.ComponentCondition", "v1.ObjectMeta"},
 	},
-	"v1.ComponentStatus": {
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "ComponentStatus (and ComponentStatusList) holds the cluster validation info.",
-				Properties: map[string]spec.Schema{
-					"metadata": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
-							Ref:         spec.MustCreateRef("#/definitions/v1.ObjectMeta"),
-						},
-					},
-					"conditions": {
-						SchemaProps: spec.SchemaProps{
-							Description: "List of component conditions observed",
-							Type:        []string{"array"},
-							Items: &spec.SchemaOrArray{
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Ref: spec.MustCreateRef("#/definitions/v1.ComponentCondition"),
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-			VendorExtensible: spec.VendorExtensible{
-				Extensions: spec.Extensions{
-					"io.k8s.kubernetes.openapi.type.golang":         "k8s.io/kubernetes/pkg/api/v1.ComponentStatus",
-					"io.k8s.kubernetes.openapi.type.deprecated.use": "v1.ComponentStatus",
-				},
-			},
-		},
-		Dependencies: []string{
-			"v1.ComponentCondition", "v1.ObjectMeta"},
-	},
 	"v1.ComponentStatusList": {
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -944,43 +878,6 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 		Dependencies: []string{
 			"io.k8s.meta.v1.ListMeta", "v1.ComponentStatus"},
 	},
-	"v1.ComponentStatusList": {
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "Status of all the conditions for the component as a list of ComponentStatus objects.",
-				Properties: map[string]spec.Schema{
-					"metadata": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Standard list metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
-							Ref:         spec.MustCreateRef("#/definitions/io.k8s.meta.v1.ListMeta"),
-						},
-					},
-					"items": {
-						SchemaProps: spec.SchemaProps{
-							Description: "List of ComponentStatus objects.",
-							Type:        []string{"array"},
-							Items: &spec.SchemaOrArray{
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Ref: spec.MustCreateRef("#/definitions/v1.ComponentStatus"),
-									},
-								},
-							},
-						},
-					},
-				},
-				Required: []string{"items"},
-			},
-			VendorExtensible: spec.VendorExtensible{
-				Extensions: spec.Extensions{
-					"io.k8s.kubernetes.openapi.type.golang":         "k8s.io/kubernetes/pkg/api/v1.ComponentStatusList",
-					"io.k8s.kubernetes.openapi.type.deprecated.use": "v1.ComponentStatusList",
-				},
-			},
-		},
-		Dependencies: []string{
-			"io.k8s.meta.v1.ListMeta", "v1.ComponentStatus"},
-	},
 	"v1.ConfigMap": {
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -1011,43 +908,6 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 			VendorExtensible: spec.VendorExtensible{
 				Extensions: spec.Extensions{
 					"io.k8s.kubernetes.openapi.type.golang": "k8s.io/kubernetes/pkg/api/v1.ConfigMap",
-				},
-			},
-		},
-		Dependencies: []string{
-			"v1.ObjectMeta"},
-	},
-	"v1.ConfigMap": {
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "ConfigMap holds configuration data for pods to consume.",
-				Properties: map[string]spec.Schema{
-					"metadata": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
-							Ref:         spec.MustCreateRef("#/definitions/v1.ObjectMeta"),
-						},
-					},
-					"data": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Data contains the configuration data. Each key must be a valid DNS_SUBDOMAIN with an optional leading dot.",
-							Type:        []string{"object"},
-							AdditionalProperties: &spec.SchemaOrBool{
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Type:   []string{"string"},
-										Format: "",
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-			VendorExtensible: spec.VendorExtensible{
-				Extensions: spec.Extensions{
-					"io.k8s.kubernetes.openapi.type.golang":         "k8s.io/kubernetes/pkg/api/v1.ConfigMap",
-					"io.k8s.kubernetes.openapi.type.deprecated.use": "v1.ConfigMap",
 				},
 			},
 		},
@@ -1121,43 +981,6 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 			VendorExtensible: spec.VendorExtensible{
 				Extensions: spec.Extensions{
 					"io.k8s.kubernetes.openapi.type.golang": "k8s.io/kubernetes/pkg/api/v1.ConfigMapList",
-				},
-			},
-		},
-		Dependencies: []string{
-			"io.k8s.meta.v1.ListMeta", "v1.ConfigMap"},
-	},
-	"v1.ConfigMapList": {
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "ConfigMapList is a resource containing a list of ConfigMap objects.",
-				Properties: map[string]spec.Schema{
-					"metadata": {
-						SchemaProps: spec.SchemaProps{
-							Description: "More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
-							Ref:         spec.MustCreateRef("#/definitions/io.k8s.meta.v1.ListMeta"),
-						},
-					},
-					"items": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Items is the list of ConfigMaps.",
-							Type:        []string{"array"},
-							Items: &spec.SchemaOrArray{
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Ref: spec.MustCreateRef("#/definitions/v1.ConfigMap"),
-									},
-								},
-							},
-						},
-					},
-				},
-				Required: []string{"items"},
-			},
-			VendorExtensible: spec.VendorExtensible{
-				Extensions: spec.Extensions{
-					"io.k8s.kubernetes.openapi.type.golang":         "k8s.io/kubernetes/pkg/api/v1.ConfigMapList",
-					"io.k8s.kubernetes.openapi.type.deprecated.use": "v1.ConfigMapList",
 				},
 			},
 		},
@@ -1787,43 +1610,6 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 		Dependencies: []string{
 			"v1.Preconditions"},
 	},
-	"v1.DeleteOptions": {
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "DeleteOptions may be provided when deleting an API object",
-				Properties: map[string]spec.Schema{
-					"gracePeriodSeconds": {
-						SchemaProps: spec.SchemaProps{
-							Description: "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",
-							Type:        []string{"integer"},
-							Format:      "int64",
-						},
-					},
-					"preconditions": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Must be fulfilled before a deletion is carried out. If not possible, a 409 Conflict status will be returned.",
-							Ref:         spec.MustCreateRef("#/definitions/v1.Preconditions"),
-						},
-					},
-					"orphanDependents": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Should the dependent objects be orphaned. If true/false, the \"orphan\" finalizer will be added to/removed from the object's finalizers list.",
-							Type:        []string{"boolean"},
-							Format:      "",
-						},
-					},
-				},
-			},
-			VendorExtensible: spec.VendorExtensible{
-				Extensions: spec.Extensions{
-					"io.k8s.kubernetes.openapi.type.golang":         "k8s.io/kubernetes/pkg/api/v1.DeleteOptions",
-					"io.k8s.kubernetes.openapi.type.deprecated.use": "v1.DeleteOptions",
-				},
-			},
-		},
-		Dependencies: []string{
-			"v1.Preconditions"},
-	},
 	"v1.DownwardAPIVolumeFile": {
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -2119,43 +1905,6 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 		Dependencies: []string{
 			"v1.EndpointSubset", "v1.ObjectMeta"},
 	},
-	"v1.Endpoints": {
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "Endpoints is a collection of endpoints that implement the actual service. Example:\n  Name: \"mysvc\",\n  Subsets: [\n    {\n      Addresses: [{\"ip\": \"10.10.1.1\"}, {\"ip\": \"10.10.2.2\"}],\n      Ports: [{\"name\": \"a\", \"port\": 8675}, {\"name\": \"b\", \"port\": 309}]\n    },\n    {\n      Addresses: [{\"ip\": \"10.10.3.3\"}],\n      Ports: [{\"name\": \"a\", \"port\": 93}, {\"name\": \"b\", \"port\": 76}]\n    },\n ]",
-				Properties: map[string]spec.Schema{
-					"metadata": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
-							Ref:         spec.MustCreateRef("#/definitions/v1.ObjectMeta"),
-						},
-					},
-					"subsets": {
-						SchemaProps: spec.SchemaProps{
-							Description: "The set of all endpoints is the union of all subsets. Addresses are placed into subsets according to the IPs they share. A single address with multiple ports, some of which are ready and some of which are not (because they come from different containers) will result in the address being displayed in different subsets for the different ports. No address will appear in both Addresses and NotReadyAddresses in the same subset. Sets of addresses and ports that comprise a service.",
-							Type:        []string{"array"},
-							Items: &spec.SchemaOrArray{
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Ref: spec.MustCreateRef("#/definitions/v1.EndpointSubset"),
-									},
-								},
-							},
-						},
-					},
-				},
-				Required: []string{"subsets"},
-			},
-			VendorExtensible: spec.VendorExtensible{
-				Extensions: spec.Extensions{
-					"io.k8s.kubernetes.openapi.type.golang":         "k8s.io/kubernetes/pkg/api/v1.Endpoints",
-					"io.k8s.kubernetes.openapi.type.deprecated.use": "v1.Endpoints",
-				},
-			},
-		},
-		Dependencies: []string{
-			"v1.EndpointSubset", "v1.ObjectMeta"},
-	},
 	"v1.EndpointsList": {
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -2186,43 +1935,6 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 			VendorExtensible: spec.VendorExtensible{
 				Extensions: spec.Extensions{
 					"io.k8s.kubernetes.openapi.type.golang": "k8s.io/kubernetes/pkg/api/v1.EndpointsList",
-				},
-			},
-		},
-		Dependencies: []string{
-			"io.k8s.meta.v1.ListMeta", "v1.Endpoints"},
-	},
-	"v1.EndpointsList": {
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "EndpointsList is a list of endpoints.",
-				Properties: map[string]spec.Schema{
-					"metadata": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Standard list metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
-							Ref:         spec.MustCreateRef("#/definitions/io.k8s.meta.v1.ListMeta"),
-						},
-					},
-					"items": {
-						SchemaProps: spec.SchemaProps{
-							Description: "List of endpoints.",
-							Type:        []string{"array"},
-							Items: &spec.SchemaOrArray{
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Ref: spec.MustCreateRef("#/definitions/v1.Endpoints"),
-									},
-								},
-							},
-						},
-					},
-				},
-				Required: []string{"items"},
-			},
-			VendorExtensible: spec.VendorExtensible{
-				Extensions: spec.Extensions{
-					"io.k8s.kubernetes.openapi.type.golang":         "k8s.io/kubernetes/pkg/api/v1.EndpointsList",
-					"io.k8s.kubernetes.openapi.type.deprecated.use": "v1.EndpointsList",
 				},
 			},
 		},
@@ -2410,82 +2122,6 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 		Dependencies: []string{
 			"io.k8s.meta.v1.Time", "v1.EventSource", "v1.ObjectMeta", "v1.ObjectReference"},
 	},
-	"v1.Event": {
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "Event is a report of an event somewhere in the cluster.",
-				Properties: map[string]spec.Schema{
-					"metadata": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
-							Ref:         spec.MustCreateRef("#/definitions/v1.ObjectMeta"),
-						},
-					},
-					"involvedObject": {
-						SchemaProps: spec.SchemaProps{
-							Description: "The object that this event is about.",
-							Ref:         spec.MustCreateRef("#/definitions/v1.ObjectReference"),
-						},
-					},
-					"reason": {
-						SchemaProps: spec.SchemaProps{
-							Description: "This should be a short, machine understandable string that gives the reason for the transition into the object's current status.",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-					"message": {
-						SchemaProps: spec.SchemaProps{
-							Description: "A human-readable description of the status of this operation.",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-					"source": {
-						SchemaProps: spec.SchemaProps{
-							Description: "The component reporting this event. Should be a short machine understandable string.",
-							Ref:         spec.MustCreateRef("#/definitions/v1.EventSource"),
-						},
-					},
-					"firstTimestamp": {
-						SchemaProps: spec.SchemaProps{
-							Description: "The time at which the event was first recorded. (Time of server receipt is in TypeMeta.)",
-							Ref:         spec.MustCreateRef("#/definitions/io.k8s.meta.v1.Time"),
-						},
-					},
-					"lastTimestamp": {
-						SchemaProps: spec.SchemaProps{
-							Description: "The time at which the most recent occurrence of this event was recorded.",
-							Ref:         spec.MustCreateRef("#/definitions/io.k8s.meta.v1.Time"),
-						},
-					},
-					"count": {
-						SchemaProps: spec.SchemaProps{
-							Description: "The number of times this event has occurred.",
-							Type:        []string{"integer"},
-							Format:      "int32",
-						},
-					},
-					"type": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Type of this event (Normal, Warning), new types could be added in the future",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-				},
-				Required: []string{"metadata", "involvedObject"},
-			},
-			VendorExtensible: spec.VendorExtensible{
-				Extensions: spec.Extensions{
-					"io.k8s.kubernetes.openapi.type.golang":         "k8s.io/kubernetes/pkg/api/v1.Event",
-					"io.k8s.kubernetes.openapi.type.deprecated.use": "v1.Event",
-				},
-			},
-		},
-		Dependencies: []string{
-			"io.k8s.meta.v1.Time", "v1.EventSource", "v1.ObjectMeta", "v1.ObjectReference"},
-	},
 	"v1.EventList": {
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -2516,43 +2152,6 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 			VendorExtensible: spec.VendorExtensible{
 				Extensions: spec.Extensions{
 					"io.k8s.kubernetes.openapi.type.golang": "k8s.io/kubernetes/pkg/api/v1.EventList",
-				},
-			},
-		},
-		Dependencies: []string{
-			"io.k8s.meta.v1.ListMeta", "v1.Event"},
-	},
-	"v1.EventList": {
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "EventList is a list of events.",
-				Properties: map[string]spec.Schema{
-					"metadata": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Standard list metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
-							Ref:         spec.MustCreateRef("#/definitions/io.k8s.meta.v1.ListMeta"),
-						},
-					},
-					"items": {
-						SchemaProps: spec.SchemaProps{
-							Description: "List of events",
-							Type:        []string{"array"},
-							Items: &spec.SchemaOrArray{
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Ref: spec.MustCreateRef("#/definitions/v1.Event"),
-									},
-								},
-							},
-						},
-					},
-				},
-				Required: []string{"items"},
-			},
-			VendorExtensible: spec.VendorExtensible{
-				Extensions: spec.Extensions{
-					"io.k8s.kubernetes.openapi.type.golang":         "k8s.io/kubernetes/pkg/api/v1.EventList",
-					"io.k8s.kubernetes.openapi.type.deprecated.use": "v1.EventList",
 				},
 			},
 		},
@@ -4044,35 +3643,6 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 		Dependencies: []string{
 			"v1.LimitRangeSpec", "v1.ObjectMeta"},
 	},
-	"v1.LimitRange": {
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "LimitRange sets resource usage limits for each kind of resource in a Namespace.",
-				Properties: map[string]spec.Schema{
-					"metadata": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
-							Ref:         spec.MustCreateRef("#/definitions/v1.ObjectMeta"),
-						},
-					},
-					"spec": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Spec defines the limits enforced. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status",
-							Ref:         spec.MustCreateRef("#/definitions/v1.LimitRangeSpec"),
-						},
-					},
-				},
-			},
-			VendorExtensible: spec.VendorExtensible{
-				Extensions: spec.Extensions{
-					"io.k8s.kubernetes.openapi.type.golang":         "k8s.io/kubernetes/pkg/api/v1.LimitRange",
-					"io.k8s.kubernetes.openapi.type.deprecated.use": "v1.LimitRange",
-				},
-			},
-		},
-		Dependencies: []string{
-			"v1.LimitRangeSpec", "v1.ObjectMeta"},
-	},
 	"v1.LimitRangeItem": {
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -4197,43 +3767,6 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 		Dependencies: []string{
 			"io.k8s.meta.v1.ListMeta", "v1.LimitRange"},
 	},
-	"v1.LimitRangeList": {
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "LimitRangeList is a list of LimitRange items.",
-				Properties: map[string]spec.Schema{
-					"metadata": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Standard list metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
-							Ref:         spec.MustCreateRef("#/definitions/io.k8s.meta.v1.ListMeta"),
-						},
-					},
-					"items": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Items is a list of LimitRange objects. More info: http://releases.k8s.io/HEAD/docs/design/admission_control_limit_range.md",
-							Type:        []string{"array"},
-							Items: &spec.SchemaOrArray{
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Ref: spec.MustCreateRef("#/definitions/v1.LimitRange"),
-									},
-								},
-							},
-						},
-					},
-				},
-				Required: []string{"items"},
-			},
-			VendorExtensible: spec.VendorExtensible{
-				Extensions: spec.Extensions{
-					"io.k8s.kubernetes.openapi.type.golang":         "k8s.io/kubernetes/pkg/api/v1.LimitRangeList",
-					"io.k8s.kubernetes.openapi.type.deprecated.use": "v1.LimitRangeList",
-				},
-			},
-		},
-		Dependencies: []string{
-			"io.k8s.meta.v1.ListMeta", "v1.LimitRange"},
-	},
 	"v1.LimitRangeSpec": {
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -4294,43 +3827,6 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 			VendorExtensible: spec.VendorExtensible{
 				Extensions: spec.Extensions{
 					"io.k8s.kubernetes.openapi.type.golang": "k8s.io/kubernetes/pkg/api/v1.List",
-				},
-			},
-		},
-		Dependencies: []string{
-			"io.k8s.kubernetes.pkg.runtime.RawExtension", "io.k8s.meta.v1.ListMeta"},
-	},
-	"v1.List": {
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "List holds a list of objects, which may not be known by the server.",
-				Properties: map[string]spec.Schema{
-					"metadata": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Standard list metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
-							Ref:         spec.MustCreateRef("#/definitions/io.k8s.meta.v1.ListMeta"),
-						},
-					},
-					"items": {
-						SchemaProps: spec.SchemaProps{
-							Description: "List of objects",
-							Type:        []string{"array"},
-							Items: &spec.SchemaOrArray{
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Ref: spec.MustCreateRef("#/definitions/io.k8s.kubernetes.pkg.runtime.RawExtension"),
-									},
-								},
-							},
-						},
-					},
-				},
-				Required: []string{"items"},
-			},
-			VendorExtensible: spec.VendorExtensible{
-				Extensions: spec.Extensions{
-					"io.k8s.kubernetes.openapi.type.golang":         "k8s.io/kubernetes/pkg/api/v1.List",
-					"io.k8s.kubernetes.openapi.type.deprecated.use": "v1.List",
 				},
 			},
 		},
@@ -4411,57 +3907,6 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 			VendorExtensible: spec.VendorExtensible{
 				Extensions: spec.Extensions{
 					"io.k8s.kubernetes.openapi.type.golang": "k8s.io/kubernetes/pkg/api/v1.ListOptions",
-				},
-			},
-		},
-		Dependencies: []string{},
-	},
-	"v1.ListOptions": {
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "ListOptions is the query options to a standard REST list call.",
-				Properties: map[string]spec.Schema{
-					"labelSelector": {
-						SchemaProps: spec.SchemaProps{
-							Description: "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-					"fieldSelector": {
-						SchemaProps: spec.SchemaProps{
-							Description: "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-					"watch": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
-							Type:        []string{"boolean"},
-							Format:      "",
-						},
-					},
-					"resourceVersion": {
-						SchemaProps: spec.SchemaProps{
-							Description: "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history. When specified for list: - if unset, then the result is returned from remote storage based on quorum-read flag; - if it's 0, then we simply return what we currently have in cache, no guarantee; - if set to non zero, then the result is at least as fresh as given rv.",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-					"timeoutSeconds": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Timeout for the list/watch call.",
-							Type:        []string{"integer"},
-							Format:      "int64",
-						},
-					},
-				},
-			},
-			VendorExtensible: spec.VendorExtensible{
-				Extensions: spec.Extensions{
-					"io.k8s.kubernetes.openapi.type.golang":         "k8s.io/kubernetes/pkg/api/v1.ListOptions",
-					"io.k8s.kubernetes.openapi.type.deprecated.use": "v1.ListOptions",
 				},
 			},
 		},
@@ -4618,41 +4063,6 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 		Dependencies: []string{
 			"v1.NamespaceSpec", "v1.NamespaceStatus", "v1.ObjectMeta"},
 	},
-	"v1.Namespace": {
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "Namespace provides a scope for Names. Use of multiple namespaces is optional.",
-				Properties: map[string]spec.Schema{
-					"metadata": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
-							Ref:         spec.MustCreateRef("#/definitions/v1.ObjectMeta"),
-						},
-					},
-					"spec": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Spec defines the behavior of the Namespace. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status",
-							Ref:         spec.MustCreateRef("#/definitions/v1.NamespaceSpec"),
-						},
-					},
-					"status": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Status describes the current status of a Namespace. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status",
-							Ref:         spec.MustCreateRef("#/definitions/v1.NamespaceStatus"),
-						},
-					},
-				},
-			},
-			VendorExtensible: spec.VendorExtensible{
-				Extensions: spec.Extensions{
-					"io.k8s.kubernetes.openapi.type.golang":         "k8s.io/kubernetes/pkg/api/v1.Namespace",
-					"io.k8s.kubernetes.openapi.type.deprecated.use": "v1.Namespace",
-				},
-			},
-		},
-		Dependencies: []string{
-			"v1.NamespaceSpec", "v1.NamespaceStatus", "v1.ObjectMeta"},
-	},
 	"v1.NamespaceList": {
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -4683,43 +4093,6 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 			VendorExtensible: spec.VendorExtensible{
 				Extensions: spec.Extensions{
 					"io.k8s.kubernetes.openapi.type.golang": "k8s.io/kubernetes/pkg/api/v1.NamespaceList",
-				},
-			},
-		},
-		Dependencies: []string{
-			"io.k8s.meta.v1.ListMeta", "v1.Namespace"},
-	},
-	"v1.NamespaceList": {
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "NamespaceList is a list of Namespaces.",
-				Properties: map[string]spec.Schema{
-					"metadata": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Standard list metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
-							Ref:         spec.MustCreateRef("#/definitions/io.k8s.meta.v1.ListMeta"),
-						},
-					},
-					"items": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Items is the list of Namespace objects in the list. More info: http://kubernetes.io/docs/user-guide/namespaces",
-							Type:        []string{"array"},
-							Items: &spec.SchemaOrArray{
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Ref: spec.MustCreateRef("#/definitions/v1.Namespace"),
-									},
-								},
-							},
-						},
-					},
-				},
-				Required: []string{"items"},
-			},
-			VendorExtensible: spec.VendorExtensible{
-				Extensions: spec.Extensions{
-					"io.k8s.kubernetes.openapi.type.golang":         "k8s.io/kubernetes/pkg/api/v1.NamespaceList",
-					"io.k8s.kubernetes.openapi.type.deprecated.use": "v1.NamespaceList",
 				},
 			},
 		},
@@ -4805,41 +4178,6 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 			VendorExtensible: spec.VendorExtensible{
 				Extensions: spec.Extensions{
 					"io.k8s.kubernetes.openapi.type.golang": "k8s.io/kubernetes/pkg/api/v1.Node",
-				},
-			},
-		},
-		Dependencies: []string{
-			"v1.NodeSpec", "v1.NodeStatus", "v1.ObjectMeta"},
-	},
-	"v1.Node": {
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "Node is a worker node in Kubernetes. Each node will have a unique identifier in the cache (i.e. in etcd).",
-				Properties: map[string]spec.Schema{
-					"metadata": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
-							Ref:         spec.MustCreateRef("#/definitions/v1.ObjectMeta"),
-						},
-					},
-					"spec": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Spec defines the behavior of a node. http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status",
-							Ref:         spec.MustCreateRef("#/definitions/v1.NodeSpec"),
-						},
-					},
-					"status": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Most recently observed status of the node. Populated by the system. Read-only. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status",
-							Ref:         spec.MustCreateRef("#/definitions/v1.NodeStatus"),
-						},
-					},
-				},
-			},
-			VendorExtensible: spec.VendorExtensible{
-				Extensions: spec.Extensions{
-					"io.k8s.kubernetes.openapi.type.golang":         "k8s.io/kubernetes/pkg/api/v1.Node",
-					"io.k8s.kubernetes.openapi.type.deprecated.use": "v1.Node",
 				},
 			},
 		},
@@ -5026,43 +4364,6 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 		Dependencies: []string{
 			"io.k8s.meta.v1.ListMeta", "v1.Node"},
 	},
-	"v1.NodeList": {
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "NodeList is the whole list of all Nodes which have been registered with master.",
-				Properties: map[string]spec.Schema{
-					"metadata": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Standard list metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
-							Ref:         spec.MustCreateRef("#/definitions/io.k8s.meta.v1.ListMeta"),
-						},
-					},
-					"items": {
-						SchemaProps: spec.SchemaProps{
-							Description: "List of nodes",
-							Type:        []string{"array"},
-							Items: &spec.SchemaOrArray{
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Ref: spec.MustCreateRef("#/definitions/v1.Node"),
-									},
-								},
-							},
-						},
-					},
-				},
-				Required: []string{"items"},
-			},
-			VendorExtensible: spec.VendorExtensible{
-				Extensions: spec.Extensions{
-					"io.k8s.kubernetes.openapi.type.golang":         "k8s.io/kubernetes/pkg/api/v1.NodeList",
-					"io.k8s.kubernetes.openapi.type.deprecated.use": "v1.NodeList",
-				},
-			},
-		},
-		Dependencies: []string{
-			"io.k8s.meta.v1.ListMeta", "v1.Node"},
-	},
 	"v1.NodeProxyOptions": {
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -5080,29 +4381,6 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 			VendorExtensible: spec.VendorExtensible{
 				Extensions: spec.Extensions{
 					"io.k8s.kubernetes.openapi.type.golang": "k8s.io/kubernetes/pkg/api/v1.NodeProxyOptions",
-				},
-			},
-		},
-		Dependencies: []string{},
-	},
-	"v1.NodeProxyOptions": {
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "NodeProxyOptions is the query options to a Node's proxy call.",
-				Properties: map[string]spec.Schema{
-					"path": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Path is the URL path to use for the current proxy request to node.",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-				},
-			},
-			VendorExtensible: spec.VendorExtensible{
-				Extensions: spec.Extensions{
-					"io.k8s.kubernetes.openapi.type.golang":         "k8s.io/kubernetes/pkg/api/v1.NodeProxyOptions",
-					"io.k8s.kubernetes.openapi.type.deprecated.use": "v1.NodeProxyOptions",
 				},
 			},
 		},
@@ -5837,41 +5115,6 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 		Dependencies: []string{
 			"v1.ObjectMeta", "v1.PersistentVolumeSpec", "v1.PersistentVolumeStatus"},
 	},
-	"v1.PersistentVolume": {
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "PersistentVolume (PV) is a storage resource provisioned by an administrator. It is analogous to a node. More info: http://kubernetes.io/docs/user-guide/persistent-volumes",
-				Properties: map[string]spec.Schema{
-					"metadata": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
-							Ref:         spec.MustCreateRef("#/definitions/v1.ObjectMeta"),
-						},
-					},
-					"spec": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Spec defines a specification of a persistent volume owned by the cluster. Provisioned by an administrator. More info: http://kubernetes.io/docs/user-guide/persistent-volumes#persistent-volumes",
-							Ref:         spec.MustCreateRef("#/definitions/v1.PersistentVolumeSpec"),
-						},
-					},
-					"status": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Status represents the current information/status for the persistent volume. Populated by the system. Read-only. More info: http://kubernetes.io/docs/user-guide/persistent-volumes#persistent-volumes",
-							Ref:         spec.MustCreateRef("#/definitions/v1.PersistentVolumeStatus"),
-						},
-					},
-				},
-			},
-			VendorExtensible: spec.VendorExtensible{
-				Extensions: spec.Extensions{
-					"io.k8s.kubernetes.openapi.type.golang":         "k8s.io/kubernetes/pkg/api/v1.PersistentVolume",
-					"io.k8s.kubernetes.openapi.type.deprecated.use": "v1.PersistentVolume",
-				},
-			},
-		},
-		Dependencies: []string{
-			"v1.ObjectMeta", "v1.PersistentVolumeSpec", "v1.PersistentVolumeStatus"},
-	},
 	"v1.PersistentVolumeClaim": {
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -5900,41 +5143,6 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 			VendorExtensible: spec.VendorExtensible{
 				Extensions: spec.Extensions{
 					"io.k8s.kubernetes.openapi.type.golang": "k8s.io/kubernetes/pkg/api/v1.PersistentVolumeClaim",
-				},
-			},
-		},
-		Dependencies: []string{
-			"v1.ObjectMeta", "v1.PersistentVolumeClaimSpec", "v1.PersistentVolumeClaimStatus"},
-	},
-	"v1.PersistentVolumeClaim": {
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "PersistentVolumeClaim is a user's request for and claim to a persistent volume",
-				Properties: map[string]spec.Schema{
-					"metadata": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
-							Ref:         spec.MustCreateRef("#/definitions/v1.ObjectMeta"),
-						},
-					},
-					"spec": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Spec defines the desired characteristics of a volume requested by a pod author. More info: http://kubernetes.io/docs/user-guide/persistent-volumes#persistentvolumeclaims",
-							Ref:         spec.MustCreateRef("#/definitions/v1.PersistentVolumeClaimSpec"),
-						},
-					},
-					"status": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Status represents the current information/status of a persistent volume claim. Read-only. More info: http://kubernetes.io/docs/user-guide/persistent-volumes#persistentvolumeclaims",
-							Ref:         spec.MustCreateRef("#/definitions/v1.PersistentVolumeClaimStatus"),
-						},
-					},
-				},
-			},
-			VendorExtensible: spec.VendorExtensible{
-				Extensions: spec.Extensions{
-					"io.k8s.kubernetes.openapi.type.golang":         "k8s.io/kubernetes/pkg/api/v1.PersistentVolumeClaim",
-					"io.k8s.kubernetes.openapi.type.deprecated.use": "v1.PersistentVolumeClaim",
 				},
 			},
 		},
@@ -5971,43 +5179,6 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 			VendorExtensible: spec.VendorExtensible{
 				Extensions: spec.Extensions{
 					"io.k8s.kubernetes.openapi.type.golang": "k8s.io/kubernetes/pkg/api/v1.PersistentVolumeClaimList",
-				},
-			},
-		},
-		Dependencies: []string{
-			"io.k8s.meta.v1.ListMeta", "v1.PersistentVolumeClaim"},
-	},
-	"v1.PersistentVolumeClaimList": {
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "PersistentVolumeClaimList is a list of PersistentVolumeClaim items.",
-				Properties: map[string]spec.Schema{
-					"metadata": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Standard list metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
-							Ref:         spec.MustCreateRef("#/definitions/io.k8s.meta.v1.ListMeta"),
-						},
-					},
-					"items": {
-						SchemaProps: spec.SchemaProps{
-							Description: "A list of persistent volume claims. More info: http://kubernetes.io/docs/user-guide/persistent-volumes#persistentvolumeclaims",
-							Type:        []string{"array"},
-							Items: &spec.SchemaOrArray{
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Ref: spec.MustCreateRef("#/definitions/v1.PersistentVolumeClaim"),
-									},
-								},
-							},
-						},
-					},
-				},
-				Required: []string{"items"},
-			},
-			VendorExtensible: spec.VendorExtensible{
-				Extensions: spec.Extensions{
-					"io.k8s.kubernetes.openapi.type.golang":         "k8s.io/kubernetes/pkg/api/v1.PersistentVolumeClaimList",
-					"io.k8s.kubernetes.openapi.type.deprecated.use": "v1.PersistentVolumeClaimList",
 				},
 			},
 		},
@@ -6173,43 +5344,6 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 			VendorExtensible: spec.VendorExtensible{
 				Extensions: spec.Extensions{
 					"io.k8s.kubernetes.openapi.type.golang": "k8s.io/kubernetes/pkg/api/v1.PersistentVolumeList",
-				},
-			},
-		},
-		Dependencies: []string{
-			"io.k8s.meta.v1.ListMeta", "v1.PersistentVolume"},
-	},
-	"v1.PersistentVolumeList": {
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "PersistentVolumeList is a list of PersistentVolume items.",
-				Properties: map[string]spec.Schema{
-					"metadata": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Standard list metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
-							Ref:         spec.MustCreateRef("#/definitions/io.k8s.meta.v1.ListMeta"),
-						},
-					},
-					"items": {
-						SchemaProps: spec.SchemaProps{
-							Description: "List of persistent volumes. More info: http://kubernetes.io/docs/user-guide/persistent-volumes",
-							Type:        []string{"array"},
-							Items: &spec.SchemaOrArray{
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Ref: spec.MustCreateRef("#/definitions/v1.PersistentVolume"),
-									},
-								},
-							},
-						},
-					},
-				},
-				Required: []string{"items"},
-			},
-			VendorExtensible: spec.VendorExtensible{
-				Extensions: spec.Extensions{
-					"io.k8s.kubernetes.openapi.type.golang":         "k8s.io/kubernetes/pkg/api/v1.PersistentVolumeList",
-					"io.k8s.kubernetes.openapi.type.deprecated.use": "v1.PersistentVolumeList",
 				},
 			},
 		},
@@ -6490,41 +5624,6 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 		Dependencies: []string{
 			"v1.ObjectMeta", "v1.PodSpec", "v1.PodStatus"},
 	},
-	"v1.Pod": {
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "Pod is a collection of containers that can run on a host. This resource is created by clients and scheduled onto hosts.",
-				Properties: map[string]spec.Schema{
-					"metadata": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
-							Ref:         spec.MustCreateRef("#/definitions/v1.ObjectMeta"),
-						},
-					},
-					"spec": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Specification of the desired behavior of the pod. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status",
-							Ref:         spec.MustCreateRef("#/definitions/v1.PodSpec"),
-						},
-					},
-					"status": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Most recently observed status of the pod. This data may not be up to date. Populated by the system. Read-only. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status",
-							Ref:         spec.MustCreateRef("#/definitions/v1.PodStatus"),
-						},
-					},
-				},
-			},
-			VendorExtensible: spec.VendorExtensible{
-				Extensions: spec.Extensions{
-					"io.k8s.kubernetes.openapi.type.golang":         "k8s.io/kubernetes/pkg/api/v1.Pod",
-					"io.k8s.kubernetes.openapi.type.deprecated.use": "v1.Pod",
-				},
-			},
-		},
-		Dependencies: []string{
-			"v1.ObjectMeta", "v1.PodSpec", "v1.PodStatus"},
-	},
 	"v1.PodAffinity": {
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -6703,57 +5802,6 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 		},
 		Dependencies: []string{},
 	},
-	"v1.PodAttachOptions": {
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "PodAttachOptions is the query options to a Pod's remote attach call.",
-				Properties: map[string]spec.Schema{
-					"stdin": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Stdin if true, redirects the standard input stream of the pod for this call. Defaults to false.",
-							Type:        []string{"boolean"},
-							Format:      "",
-						},
-					},
-					"stdout": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Stdout if true indicates that stdout is to be redirected for the attach call. Defaults to true.",
-							Type:        []string{"boolean"},
-							Format:      "",
-						},
-					},
-					"stderr": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Stderr if true indicates that stderr is to be redirected for the attach call. Defaults to true.",
-							Type:        []string{"boolean"},
-							Format:      "",
-						},
-					},
-					"tty": {
-						SchemaProps: spec.SchemaProps{
-							Description: "TTY if true indicates that a tty will be allocated for the attach call. This is passed through the container runtime so the tty is allocated on the worker node by the container runtime. Defaults to false.",
-							Type:        []string{"boolean"},
-							Format:      "",
-						},
-					},
-					"container": {
-						SchemaProps: spec.SchemaProps{
-							Description: "The container in which to execute the command. Defaults to only container if there is only one container in the pod.",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-				},
-			},
-			VendorExtensible: spec.VendorExtensible{
-				Extensions: spec.Extensions{
-					"io.k8s.kubernetes.openapi.type.golang":         "k8s.io/kubernetes/pkg/api/v1.PodAttachOptions",
-					"io.k8s.kubernetes.openapi.type.deprecated.use": "v1.PodAttachOptions",
-				},
-			},
-		},
-		Dependencies: []string{},
-	},
 	"v1.PodCondition": {
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -6876,72 +5924,6 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 		},
 		Dependencies: []string{},
 	},
-	"v1.PodExecOptions": {
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "PodExecOptions is the query options to a Pod's remote exec call.",
-				Properties: map[string]spec.Schema{
-					"stdin": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Redirect the standard input stream of the pod for this call. Defaults to false.",
-							Type:        []string{"boolean"},
-							Format:      "",
-						},
-					},
-					"stdout": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Redirect the standard output stream of the pod for this call. Defaults to true.",
-							Type:        []string{"boolean"},
-							Format:      "",
-						},
-					},
-					"stderr": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Redirect the standard error stream of the pod for this call. Defaults to true.",
-							Type:        []string{"boolean"},
-							Format:      "",
-						},
-					},
-					"tty": {
-						SchemaProps: spec.SchemaProps{
-							Description: "TTY if true indicates that a tty will be allocated for the exec call. Defaults to false.",
-							Type:        []string{"boolean"},
-							Format:      "",
-						},
-					},
-					"container": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Container in which to execute the command. Defaults to only container if there is only one container in the pod.",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-					"command": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Command is the remote command to execute. argv array. Not executed within a shell.",
-							Type:        []string{"array"},
-							Items: &spec.SchemaOrArray{
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Type:   []string{"string"},
-										Format: "",
-									},
-								},
-							},
-						},
-					},
-				},
-				Required: []string{"command"},
-			},
-			VendorExtensible: spec.VendorExtensible{
-				Extensions: spec.Extensions{
-					"io.k8s.kubernetes.openapi.type.golang":         "k8s.io/kubernetes/pkg/api/v1.PodExecOptions",
-					"io.k8s.kubernetes.openapi.type.deprecated.use": "v1.PodExecOptions",
-				},
-			},
-		},
-		Dependencies: []string{},
-	},
 	"v1.PodList": {
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -6972,43 +5954,6 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 			VendorExtensible: spec.VendorExtensible{
 				Extensions: spec.Extensions{
 					"io.k8s.kubernetes.openapi.type.golang": "k8s.io/kubernetes/pkg/api/v1.PodList",
-				},
-			},
-		},
-		Dependencies: []string{
-			"io.k8s.meta.v1.ListMeta", "v1.Pod"},
-	},
-	"v1.PodList": {
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "PodList is a list of Pods.",
-				Properties: map[string]spec.Schema{
-					"metadata": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Standard list metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
-							Ref:         spec.MustCreateRef("#/definitions/io.k8s.meta.v1.ListMeta"),
-						},
-					},
-					"items": {
-						SchemaProps: spec.SchemaProps{
-							Description: "List of pods. More info: http://kubernetes.io/docs/user-guide/pods",
-							Type:        []string{"array"},
-							Items: &spec.SchemaOrArray{
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Ref: spec.MustCreateRef("#/definitions/v1.Pod"),
-									},
-								},
-							},
-						},
-					},
-				},
-				Required: []string{"items"},
-			},
-			VendorExtensible: spec.VendorExtensible{
-				Extensions: spec.Extensions{
-					"io.k8s.kubernetes.openapi.type.golang":         "k8s.io/kubernetes/pkg/api/v1.PodList",
-					"io.k8s.kubernetes.openapi.type.deprecated.use": "v1.PodList",
 				},
 			},
 		},
@@ -7086,78 +6031,6 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 		Dependencies: []string{
 			"io.k8s.meta.v1.Time"},
 	},
-	"v1.PodLogOptions": {
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "PodLogOptions is the query options for a Pod's logs REST call.",
-				Properties: map[string]spec.Schema{
-					"container": {
-						SchemaProps: spec.SchemaProps{
-							Description: "The container for which to stream logs. Defaults to only container if there is one container in the pod.",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-					"follow": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Follow the log stream of the pod. Defaults to false.",
-							Type:        []string{"boolean"},
-							Format:      "",
-						},
-					},
-					"previous": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Return previous terminated container logs. Defaults to false.",
-							Type:        []string{"boolean"},
-							Format:      "",
-						},
-					},
-					"sinceSeconds": {
-						SchemaProps: spec.SchemaProps{
-							Description: "A relative time in seconds before the current time from which to show logs. If this value precedes the time a pod was started, only logs since the pod start will be returned. If this value is in the future, no logs will be returned. Only one of sinceSeconds or sinceTime may be specified.",
-							Type:        []string{"integer"},
-							Format:      "int64",
-						},
-					},
-					"sinceTime": {
-						SchemaProps: spec.SchemaProps{
-							Description: "An RFC3339 timestamp from which to show logs. If this value precedes the time a pod was started, only logs since the pod start will be returned. If this value is in the future, no logs will be returned. Only one of sinceSeconds or sinceTime may be specified.",
-							Ref:         spec.MustCreateRef("#/definitions/io.k8s.meta.v1.Time"),
-						},
-					},
-					"timestamps": {
-						SchemaProps: spec.SchemaProps{
-							Description: "If true, add an RFC3339 or RFC3339Nano timestamp at the beginning of every line of log output. Defaults to false.",
-							Type:        []string{"boolean"},
-							Format:      "",
-						},
-					},
-					"tailLines": {
-						SchemaProps: spec.SchemaProps{
-							Description: "If set, the number of lines from the end of the logs to show. If not specified, logs are shown from the creation of the container or sinceSeconds or sinceTime",
-							Type:        []string{"integer"},
-							Format:      "int64",
-						},
-					},
-					"limitBytes": {
-						SchemaProps: spec.SchemaProps{
-							Description: "If set, the number of bytes to read from the server before terminating the log output. This may not display a complete final line of logging, and may return slightly more or slightly less than the specified limit.",
-							Type:        []string{"integer"},
-							Format:      "int64",
-						},
-					},
-				},
-			},
-			VendorExtensible: spec.VendorExtensible{
-				Extensions: spec.Extensions{
-					"io.k8s.kubernetes.openapi.type.golang":         "k8s.io/kubernetes/pkg/api/v1.PodLogOptions",
-					"io.k8s.kubernetes.openapi.type.deprecated.use": "v1.PodLogOptions",
-				},
-			},
-		},
-		Dependencies: []string{
-			"io.k8s.meta.v1.Time"},
-	},
 	"v1.PodProxyOptions": {
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -7175,29 +6048,6 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 			VendorExtensible: spec.VendorExtensible{
 				Extensions: spec.Extensions{
 					"io.k8s.kubernetes.openapi.type.golang": "k8s.io/kubernetes/pkg/api/v1.PodProxyOptions",
-				},
-			},
-		},
-		Dependencies: []string{},
-	},
-	"v1.PodProxyOptions": {
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "PodProxyOptions is the query options to a Pod's proxy call.",
-				Properties: map[string]spec.Schema{
-					"path": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Path is the URL path to use for the current proxy request to pod.",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-				},
-			},
-			VendorExtensible: spec.VendorExtensible{
-				Extensions: spec.Extensions{
-					"io.k8s.kubernetes.openapi.type.golang":         "k8s.io/kubernetes/pkg/api/v1.PodProxyOptions",
-					"io.k8s.kubernetes.openapi.type.deprecated.use": "v1.PodProxyOptions",
 				},
 			},
 		},
@@ -7566,35 +6416,6 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 		Dependencies: []string{
 			"v1.ObjectMeta", "v1.PodStatus"},
 	},
-	"v1.PodStatusResult": {
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "PodStatusResult is a wrapper for PodStatus returned by kubelet that can be encode/decoded",
-				Properties: map[string]spec.Schema{
-					"metadata": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
-							Ref:         spec.MustCreateRef("#/definitions/v1.ObjectMeta"),
-						},
-					},
-					"status": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Most recently observed status of the pod. This data may not be up to date. Populated by the system. Read-only. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status",
-							Ref:         spec.MustCreateRef("#/definitions/v1.PodStatus"),
-						},
-					},
-				},
-			},
-			VendorExtensible: spec.VendorExtensible{
-				Extensions: spec.Extensions{
-					"io.k8s.kubernetes.openapi.type.golang":         "k8s.io/kubernetes/pkg/api/v1.PodStatusResult",
-					"io.k8s.kubernetes.openapi.type.deprecated.use": "v1.PodStatusResult",
-				},
-			},
-		},
-		Dependencies: []string{
-			"v1.ObjectMeta", "v1.PodStatus"},
-	},
 	"v1.PodTemplate": {
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -7617,35 +6438,6 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 			VendorExtensible: spec.VendorExtensible{
 				Extensions: spec.Extensions{
 					"io.k8s.kubernetes.openapi.type.golang": "k8s.io/kubernetes/pkg/api/v1.PodTemplate",
-				},
-			},
-		},
-		Dependencies: []string{
-			"v1.ObjectMeta", "v1.PodTemplateSpec"},
-	},
-	"v1.PodTemplate": {
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "PodTemplate describes a template for creating copies of a predefined pod.",
-				Properties: map[string]spec.Schema{
-					"metadata": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
-							Ref:         spec.MustCreateRef("#/definitions/v1.ObjectMeta"),
-						},
-					},
-					"template": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Template defines the pods that will be created from this pod template. http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status",
-							Ref:         spec.MustCreateRef("#/definitions/v1.PodTemplateSpec"),
-						},
-					},
-				},
-			},
-			VendorExtensible: spec.VendorExtensible{
-				Extensions: spec.Extensions{
-					"io.k8s.kubernetes.openapi.type.golang":         "k8s.io/kubernetes/pkg/api/v1.PodTemplate",
-					"io.k8s.kubernetes.openapi.type.deprecated.use": "v1.PodTemplate",
 				},
 			},
 		},
@@ -7682,43 +6474,6 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 			VendorExtensible: spec.VendorExtensible{
 				Extensions: spec.Extensions{
 					"io.k8s.kubernetes.openapi.type.golang": "k8s.io/kubernetes/pkg/api/v1.PodTemplateList",
-				},
-			},
-		},
-		Dependencies: []string{
-			"io.k8s.meta.v1.ListMeta", "v1.PodTemplate"},
-	},
-	"v1.PodTemplateList": {
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "PodTemplateList is a list of PodTemplates.",
-				Properties: map[string]spec.Schema{
-					"metadata": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Standard list metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
-							Ref:         spec.MustCreateRef("#/definitions/io.k8s.meta.v1.ListMeta"),
-						},
-					},
-					"items": {
-						SchemaProps: spec.SchemaProps{
-							Description: "List of pod templates",
-							Type:        []string{"array"},
-							Items: &spec.SchemaOrArray{
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Ref: spec.MustCreateRef("#/definitions/v1.PodTemplate"),
-									},
-								},
-							},
-						},
-					},
-				},
-				Required: []string{"items"},
-			},
-			VendorExtensible: spec.VendorExtensible{
-				Extensions: spec.Extensions{
-					"io.k8s.kubernetes.openapi.type.golang":         "k8s.io/kubernetes/pkg/api/v1.PodTemplateList",
-					"io.k8s.kubernetes.openapi.type.deprecated.use": "v1.PodTemplateList",
 				},
 			},
 		},
@@ -8065,44 +6820,6 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 		Dependencies: []string{
 			"v1.ObjectMeta"},
 	},
-	"v1.RangeAllocation": {
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "RangeAllocation is not a public type.",
-				Properties: map[string]spec.Schema{
-					"metadata": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
-							Ref:         spec.MustCreateRef("#/definitions/v1.ObjectMeta"),
-						},
-					},
-					"range": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Range is string that identifies the range represented by 'data'.",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-					"data": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Data is a bit array containing all allocated addresses in the previous segment.",
-							Type:        []string{"string"},
-							Format:      "byte",
-						},
-					},
-				},
-				Required: []string{"range", "data"},
-			},
-			VendorExtensible: spec.VendorExtensible{
-				Extensions: spec.Extensions{
-					"io.k8s.kubernetes.openapi.type.golang":         "k8s.io/kubernetes/pkg/api/v1.RangeAllocation",
-					"io.k8s.kubernetes.openapi.type.deprecated.use": "v1.RangeAllocation",
-				},
-			},
-		},
-		Dependencies: []string{
-			"v1.ObjectMeta"},
-	},
 	"v1.ReplicationController": {
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -8131,41 +6848,6 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 			VendorExtensible: spec.VendorExtensible{
 				Extensions: spec.Extensions{
 					"io.k8s.kubernetes.openapi.type.golang": "k8s.io/kubernetes/pkg/api/v1.ReplicationController",
-				},
-			},
-		},
-		Dependencies: []string{
-			"v1.ObjectMeta", "v1.ReplicationControllerSpec", "v1.ReplicationControllerStatus"},
-	},
-	"v1.ReplicationController": {
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "ReplicationController represents the configuration of a replication controller.",
-				Properties: map[string]spec.Schema{
-					"metadata": {
-						SchemaProps: spec.SchemaProps{
-							Description: "If the Labels of a ReplicationController are empty, they are defaulted to be the same as the Pod(s) that the replication controller manages. Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
-							Ref:         spec.MustCreateRef("#/definitions/v1.ObjectMeta"),
-						},
-					},
-					"spec": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Spec defines the specification of the desired behavior of the replication controller. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status",
-							Ref:         spec.MustCreateRef("#/definitions/v1.ReplicationControllerSpec"),
-						},
-					},
-					"status": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Status is the most recently observed status of the replication controller. This data may be out of date by some window of time. Populated by the system. Read-only. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status",
-							Ref:         spec.MustCreateRef("#/definitions/v1.ReplicationControllerStatus"),
-						},
-					},
-				},
-			},
-			VendorExtensible: spec.VendorExtensible{
-				Extensions: spec.Extensions{
-					"io.k8s.kubernetes.openapi.type.golang":         "k8s.io/kubernetes/pkg/api/v1.ReplicationController",
-					"io.k8s.kubernetes.openapi.type.deprecated.use": "v1.ReplicationController",
 				},
 			},
 		},
@@ -8253,43 +6935,6 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 			VendorExtensible: spec.VendorExtensible{
 				Extensions: spec.Extensions{
 					"io.k8s.kubernetes.openapi.type.golang": "k8s.io/kubernetes/pkg/api/v1.ReplicationControllerList",
-				},
-			},
-		},
-		Dependencies: []string{
-			"io.k8s.meta.v1.ListMeta", "v1.ReplicationController"},
-	},
-	"v1.ReplicationControllerList": {
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "ReplicationControllerList is a collection of replication controllers.",
-				Properties: map[string]spec.Schema{
-					"metadata": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Standard list metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
-							Ref:         spec.MustCreateRef("#/definitions/io.k8s.meta.v1.ListMeta"),
-						},
-					},
-					"items": {
-						SchemaProps: spec.SchemaProps{
-							Description: "List of replication controllers. More info: http://kubernetes.io/docs/user-guide/replication-controller",
-							Type:        []string{"array"},
-							Items: &spec.SchemaOrArray{
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Ref: spec.MustCreateRef("#/definitions/v1.ReplicationController"),
-									},
-								},
-							},
-						},
-					},
-				},
-				Required: []string{"items"},
-			},
-			VendorExtensible: spec.VendorExtensible{
-				Extensions: spec.Extensions{
-					"io.k8s.kubernetes.openapi.type.golang":         "k8s.io/kubernetes/pkg/api/v1.ReplicationControllerList",
-					"io.k8s.kubernetes.openapi.type.deprecated.use": "v1.ReplicationControllerList",
 				},
 			},
 		},
@@ -8482,41 +7127,6 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 		Dependencies: []string{
 			"v1.ObjectMeta", "v1.ResourceQuotaSpec", "v1.ResourceQuotaStatus"},
 	},
-	"v1.ResourceQuota": {
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "ResourceQuota sets aggregate quota restrictions enforced per namespace",
-				Properties: map[string]spec.Schema{
-					"metadata": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
-							Ref:         spec.MustCreateRef("#/definitions/v1.ObjectMeta"),
-						},
-					},
-					"spec": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Spec defines the desired quota. http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status",
-							Ref:         spec.MustCreateRef("#/definitions/v1.ResourceQuotaSpec"),
-						},
-					},
-					"status": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Status defines the actual enforced quota and its current usage. http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status",
-							Ref:         spec.MustCreateRef("#/definitions/v1.ResourceQuotaStatus"),
-						},
-					},
-				},
-			},
-			VendorExtensible: spec.VendorExtensible{
-				Extensions: spec.Extensions{
-					"io.k8s.kubernetes.openapi.type.golang":         "k8s.io/kubernetes/pkg/api/v1.ResourceQuota",
-					"io.k8s.kubernetes.openapi.type.deprecated.use": "v1.ResourceQuota",
-				},
-			},
-		},
-		Dependencies: []string{
-			"v1.ObjectMeta", "v1.ResourceQuotaSpec", "v1.ResourceQuotaStatus"},
-	},
 	"v1.ResourceQuotaList": {
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -8547,43 +7157,6 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 			VendorExtensible: spec.VendorExtensible{
 				Extensions: spec.Extensions{
 					"io.k8s.kubernetes.openapi.type.golang": "k8s.io/kubernetes/pkg/api/v1.ResourceQuotaList",
-				},
-			},
-		},
-		Dependencies: []string{
-			"io.k8s.meta.v1.ListMeta", "v1.ResourceQuota"},
-	},
-	"v1.ResourceQuotaList": {
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "ResourceQuotaList is a list of ResourceQuota items.",
-				Properties: map[string]spec.Schema{
-					"metadata": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Standard list metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
-							Ref:         spec.MustCreateRef("#/definitions/io.k8s.meta.v1.ListMeta"),
-						},
-					},
-					"items": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Items is a list of ResourceQuota objects. More info: http://releases.k8s.io/HEAD/docs/design/admission_control_resource_quota.md#admissioncontrol-plugin-resourcequota",
-							Type:        []string{"array"},
-							Items: &spec.SchemaOrArray{
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Ref: spec.MustCreateRef("#/definitions/v1.ResourceQuota"),
-									},
-								},
-							},
-						},
-					},
-				},
-				Required: []string{"items"},
-			},
-			VendorExtensible: spec.VendorExtensible{
-				Extensions: spec.Extensions{
-					"io.k8s.kubernetes.openapi.type.golang":         "k8s.io/kubernetes/pkg/api/v1.ResourceQuotaList",
-					"io.k8s.kubernetes.openapi.type.deprecated.use": "v1.ResourceQuotaList",
 				},
 			},
 		},
@@ -8968,64 +7541,6 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 		Dependencies: []string{
 			"v1.ObjectMeta"},
 	},
-	"v1.Secret": {
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "Secret holds secret data of a certain type. The total bytes of the values in the Data field must be less than MaxSecretSize bytes.",
-				Properties: map[string]spec.Schema{
-					"metadata": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
-							Ref:         spec.MustCreateRef("#/definitions/v1.ObjectMeta"),
-						},
-					},
-					"data": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Data contains the secret data. Each key must be a valid DNS_SUBDOMAIN or leading dot followed by valid DNS_SUBDOMAIN. The serialized form of the secret data is a base64 encoded string, representing the arbitrary (possibly non-string) data value here. Described in https://tools.ietf.org/html/rfc4648#section-4",
-							Type:        []string{"object"},
-							AdditionalProperties: &spec.SchemaOrBool{
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Type:   []string{"string"},
-										Format: "byte",
-									},
-								},
-							},
-						},
-					},
-					"stringData": {
-						SchemaProps: spec.SchemaProps{
-							Description: "stringData allows specifying non-binary secret data in string form. It is provided as a write-only convenience method. All keys and values are merged into the data field on write, overwriting any existing values. It is never output when reading from the API.",
-							Type:        []string{"object"},
-							AdditionalProperties: &spec.SchemaOrBool{
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Type:   []string{"string"},
-										Format: "",
-									},
-								},
-							},
-						},
-					},
-					"type": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Used to facilitate programmatic handling of secret data.",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-				},
-			},
-			VendorExtensible: spec.VendorExtensible{
-				Extensions: spec.Extensions{
-					"io.k8s.kubernetes.openapi.type.golang":         "k8s.io/kubernetes/pkg/api/v1.Secret",
-					"io.k8s.kubernetes.openapi.type.deprecated.use": "v1.Secret",
-				},
-			},
-		},
-		Dependencies: []string{
-			"v1.ObjectMeta"},
-	},
 	"v1.SecretKeySelector": {
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -9079,43 +7594,6 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 			VendorExtensible: spec.VendorExtensible{
 				Extensions: spec.Extensions{
 					"io.k8s.kubernetes.openapi.type.golang": "k8s.io/kubernetes/pkg/api/v1.SecretList",
-				},
-			},
-		},
-		Dependencies: []string{
-			"io.k8s.meta.v1.ListMeta", "v1.Secret"},
-	},
-	"v1.SecretList": {
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "SecretList is a list of Secret.",
-				Properties: map[string]spec.Schema{
-					"metadata": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Standard list metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
-							Ref:         spec.MustCreateRef("#/definitions/io.k8s.meta.v1.ListMeta"),
-						},
-					},
-					"items": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Items is a list of secret objects. More info: http://kubernetes.io/docs/user-guide/secrets",
-							Type:        []string{"array"},
-							Items: &spec.SchemaOrArray{
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Ref: spec.MustCreateRef("#/definitions/v1.Secret"),
-									},
-								},
-							},
-						},
-					},
-				},
-				Required: []string{"items"},
-			},
-			VendorExtensible: spec.VendorExtensible{
-				Extensions: spec.Extensions{
-					"io.k8s.kubernetes.openapi.type.golang":         "k8s.io/kubernetes/pkg/api/v1.SecretList",
-					"io.k8s.kubernetes.openapi.type.deprecated.use": "v1.SecretList",
 				},
 			},
 		},
@@ -9243,29 +7721,6 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 		Dependencies: []string{
 			"v1.ObjectReference"},
 	},
-	"v1.SerializedReference": {
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "SerializedReference is a reference to serialized object.",
-				Properties: map[string]spec.Schema{
-					"reference": {
-						SchemaProps: spec.SchemaProps{
-							Description: "The reference to an object in the system.",
-							Ref:         spec.MustCreateRef("#/definitions/v1.ObjectReference"),
-						},
-					},
-				},
-			},
-			VendorExtensible: spec.VendorExtensible{
-				Extensions: spec.Extensions{
-					"io.k8s.kubernetes.openapi.type.golang":         "k8s.io/kubernetes/pkg/api/v1.SerializedReference",
-					"io.k8s.kubernetes.openapi.type.deprecated.use": "v1.SerializedReference",
-				},
-			},
-		},
-		Dependencies: []string{
-			"v1.ObjectReference"},
-	},
 	"io.k8s.meta.v1.ServerAddressByClientCIDR": {
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -9330,41 +7785,6 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 		Dependencies: []string{
 			"v1.ObjectMeta", "v1.ServiceSpec", "v1.ServiceStatus"},
 	},
-	"v1.Service": {
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "Service is a named abstraction of software service (for example, mysql) consisting of local port (for example 3306) that the proxy listens on, and the selector that determines which pods will answer requests sent through the proxy.",
-				Properties: map[string]spec.Schema{
-					"metadata": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
-							Ref:         spec.MustCreateRef("#/definitions/v1.ObjectMeta"),
-						},
-					},
-					"spec": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Spec defines the behavior of a service. http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status",
-							Ref:         spec.MustCreateRef("#/definitions/v1.ServiceSpec"),
-						},
-					},
-					"status": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Most recently observed status of the service. Populated by the system. Read-only. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status",
-							Ref:         spec.MustCreateRef("#/definitions/v1.ServiceStatus"),
-						},
-					},
-				},
-			},
-			VendorExtensible: spec.VendorExtensible{
-				Extensions: spec.Extensions{
-					"io.k8s.kubernetes.openapi.type.golang":         "k8s.io/kubernetes/pkg/api/v1.Service",
-					"io.k8s.kubernetes.openapi.type.deprecated.use": "v1.Service",
-				},
-			},
-		},
-		Dependencies: []string{
-			"v1.ObjectMeta", "v1.ServiceSpec", "v1.ServiceStatus"},
-	},
 	"v1.ServiceAccount": {
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -9413,55 +7833,6 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 		Dependencies: []string{
 			"v1.LocalObjectReference", "v1.ObjectMeta", "v1.ObjectReference"},
 	},
-	"v1.ServiceAccount": {
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "ServiceAccount binds together: * a name, understood by users, and perhaps by peripheral systems, for an identity * a principal that can be authenticated and authorized * a set of secrets",
-				Properties: map[string]spec.Schema{
-					"metadata": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
-							Ref:         spec.MustCreateRef("#/definitions/v1.ObjectMeta"),
-						},
-					},
-					"secrets": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Secrets is the list of secrets allowed to be used by pods running using this ServiceAccount. More info: http://kubernetes.io/docs/user-guide/secrets",
-							Type:        []string{"array"},
-							Items: &spec.SchemaOrArray{
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Ref: spec.MustCreateRef("#/definitions/v1.ObjectReference"),
-									},
-								},
-							},
-						},
-					},
-					"imagePullSecrets": {
-						SchemaProps: spec.SchemaProps{
-							Description: "ImagePullSecrets is a list of references to secrets in the same namespace to use for pulling any images in pods that reference this ServiceAccount. ImagePullSecrets are distinct from Secrets because Secrets can be mounted in the pod, but ImagePullSecrets are only accessed by the kubelet. More info: http://kubernetes.io/docs/user-guide/secrets#manually-specifying-an-imagepullsecret",
-							Type:        []string{"array"},
-							Items: &spec.SchemaOrArray{
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Ref: spec.MustCreateRef("#/definitions/v1.LocalObjectReference"),
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-			VendorExtensible: spec.VendorExtensible{
-				Extensions: spec.Extensions{
-					"io.k8s.kubernetes.openapi.type.golang":         "k8s.io/kubernetes/pkg/api/v1.ServiceAccount",
-					"io.k8s.kubernetes.openapi.type.deprecated.use": "v1.ServiceAccount",
-				},
-			},
-		},
-		Dependencies: []string{
-			"v1.LocalObjectReference", "v1.ObjectMeta", "v1.ObjectReference"},
-	},
 	"v1.ServiceAccountList": {
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -9498,43 +7869,6 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 		Dependencies: []string{
 			"io.k8s.meta.v1.ListMeta", "v1.ServiceAccount"},
 	},
-	"v1.ServiceAccountList": {
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "ServiceAccountList is a list of ServiceAccount objects",
-				Properties: map[string]spec.Schema{
-					"metadata": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Standard list metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
-							Ref:         spec.MustCreateRef("#/definitions/io.k8s.meta.v1.ListMeta"),
-						},
-					},
-					"items": {
-						SchemaProps: spec.SchemaProps{
-							Description: "List of ServiceAccounts. More info: http://releases.k8s.io/HEAD/docs/design/service_accounts.md#service-accounts",
-							Type:        []string{"array"},
-							Items: &spec.SchemaOrArray{
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Ref: spec.MustCreateRef("#/definitions/v1.ServiceAccount"),
-									},
-								},
-							},
-						},
-					},
-				},
-				Required: []string{"items"},
-			},
-			VendorExtensible: spec.VendorExtensible{
-				Extensions: spec.Extensions{
-					"io.k8s.kubernetes.openapi.type.golang":         "k8s.io/kubernetes/pkg/api/v1.ServiceAccountList",
-					"io.k8s.kubernetes.openapi.type.deprecated.use": "v1.ServiceAccountList",
-				},
-			},
-		},
-		Dependencies: []string{
-			"io.k8s.meta.v1.ListMeta", "v1.ServiceAccount"},
-	},
 	"v1.ServiceList": {
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -9565,43 +7899,6 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 			VendorExtensible: spec.VendorExtensible{
 				Extensions: spec.Extensions{
 					"io.k8s.kubernetes.openapi.type.golang": "k8s.io/kubernetes/pkg/api/v1.ServiceList",
-				},
-			},
-		},
-		Dependencies: []string{
-			"io.k8s.meta.v1.ListMeta", "v1.Service"},
-	},
-	"v1.ServiceList": {
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "ServiceList holds a list of services.",
-				Properties: map[string]spec.Schema{
-					"metadata": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Standard list metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
-							Ref:         spec.MustCreateRef("#/definitions/io.k8s.meta.v1.ListMeta"),
-						},
-					},
-					"items": {
-						SchemaProps: spec.SchemaProps{
-							Description: "List of services",
-							Type:        []string{"array"},
-							Items: &spec.SchemaOrArray{
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Ref: spec.MustCreateRef("#/definitions/v1.Service"),
-									},
-								},
-							},
-						},
-					},
-				},
-				Required: []string{"items"},
-			},
-			VendorExtensible: spec.VendorExtensible{
-				Extensions: spec.Extensions{
-					"io.k8s.kubernetes.openapi.type.golang":         "k8s.io/kubernetes/pkg/api/v1.ServiceList",
-					"io.k8s.kubernetes.openapi.type.deprecated.use": "v1.ServiceList",
 				},
 			},
 		},
@@ -9676,29 +7973,6 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 			VendorExtensible: spec.VendorExtensible{
 				Extensions: spec.Extensions{
 					"io.k8s.kubernetes.openapi.type.golang": "k8s.io/kubernetes/pkg/api/v1.ServiceProxyOptions",
-				},
-			},
-		},
-		Dependencies: []string{},
-	},
-	"v1.ServiceProxyOptions": {
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "ServiceProxyOptions is the query options to a Service's proxy call.",
-				Properties: map[string]spec.Schema{
-					"path": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Path is the part of URLs that include service endpoints, suffixes, and parameters to use for the current proxy request to service. For example, the whole request URL is http://localhost/api/v1/namespaces/kube-system/services/elasticsearch-logging/_search?q=user:kimchy. Path is _search?q=user:kimchy.",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-				},
-			},
-			VendorExtensible: spec.VendorExtensible{
-				Extensions: spec.Extensions{
-					"io.k8s.kubernetes.openapi.type.golang":         "k8s.io/kubernetes/pkg/api/v1.ServiceProxyOptions",
-					"io.k8s.kubernetes.openapi.type.deprecated.use": "v1.ServiceProxyOptions",
 				},
 			},
 		},

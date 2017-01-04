@@ -13,7 +13,7 @@
     "description": "API at /apis/rbac.authorization.k8s.io/v1alpha1",
     "operations": [
      {
-      "type": "v1alpha1.ClusterRoleBindingList",
+      "type": "io.k8s.authorization.rbac.v1alpha1.ClusterRoleBindingList",
       "method": "GET",
       "summary": "list or watch objects of kind ClusterRoleBinding",
       "nickname": "listClusterRoleBinding",
@@ -71,7 +71,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1alpha1.ClusterRoleBindingList"
+        "responseModel": "io.k8s.authorization.rbac.v1alpha1.ClusterRoleBindingList"
        }
       ],
       "produces": [
@@ -86,7 +86,7 @@
       ]
      },
      {
-      "type": "v1alpha1.ClusterRoleBinding",
+      "type": "io.k8s.authorization.rbac.v1alpha1.ClusterRoleBinding",
       "method": "POST",
       "summary": "create a ClusterRoleBinding",
       "nickname": "createClusterRoleBinding",
@@ -112,7 +112,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1alpha1.ClusterRoleBinding"
+        "responseModel": "io.k8s.authorization.rbac.v1alpha1.ClusterRoleBinding"
        }
       ],
       "produces": [
@@ -125,7 +125,7 @@
       ]
      },
      {
-      "type": "v1.Status",
+      "type": "io.k8s.meta.v1.Status",
       "method": "DELETE",
       "summary": "delete collection of ClusterRoleBinding",
       "nickname": "deletecollectionClusterRoleBinding",
@@ -183,7 +183,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1.Status"
+        "responseModel": "io.k8s.meta.v1.Status"
        }
       ],
       "produces": [
@@ -202,7 +202,7 @@
     "description": "API at /apis/rbac.authorization.k8s.io/v1alpha1",
     "operations": [
      {
-      "type": "versioned.Event",
+      "type": "io.k8s.kubernetes.pkg.watch.versioned.Event",
       "method": "GET",
       "summary": "watch individual changes to a list of ClusterRoleBinding",
       "nickname": "watchClusterRoleBindingList",
@@ -260,7 +260,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "versioned.Event"
+        "responseModel": "io.k8s.kubernetes.pkg.watch.versioned.Event"
        }
       ],
       "produces": [
@@ -281,7 +281,7 @@
     "description": "API at /apis/rbac.authorization.k8s.io/v1alpha1",
     "operations": [
      {
-      "type": "v1alpha1.ClusterRoleBinding",
+      "type": "io.k8s.authorization.rbac.v1alpha1.ClusterRoleBinding",
       "method": "GET",
       "summary": "read the specified ClusterRoleBinding",
       "nickname": "readClusterRoleBinding",
@@ -307,7 +307,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1alpha1.ClusterRoleBinding"
+        "responseModel": "io.k8s.authorization.rbac.v1alpha1.ClusterRoleBinding"
        }
       ],
       "produces": [
@@ -320,7 +320,7 @@
       ]
      },
      {
-      "type": "v1alpha1.ClusterRoleBinding",
+      "type": "io.k8s.authorization.rbac.v1alpha1.ClusterRoleBinding",
       "method": "PUT",
       "summary": "replace the specified ClusterRoleBinding",
       "nickname": "replaceClusterRoleBinding",
@@ -354,7 +354,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1alpha1.ClusterRoleBinding"
+        "responseModel": "io.k8s.authorization.rbac.v1alpha1.ClusterRoleBinding"
        }
       ],
       "produces": [
@@ -367,7 +367,7 @@
       ]
      },
      {
-      "type": "v1alpha1.ClusterRoleBinding",
+      "type": "io.k8s.authorization.rbac.v1alpha1.ClusterRoleBinding",
       "method": "PATCH",
       "summary": "partially update the specified ClusterRoleBinding",
       "nickname": "patchClusterRoleBinding",
@@ -401,7 +401,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1alpha1.ClusterRoleBinding"
+        "responseModel": "io.k8s.authorization.rbac.v1alpha1.ClusterRoleBinding"
        }
       ],
       "produces": [
@@ -416,7 +416,7 @@
       ]
      },
      {
-      "type": "v1.Status",
+      "type": "io.k8s.meta.v1.Status",
       "method": "DELETE",
       "summary": "delete a ClusterRoleBinding",
       "nickname": "deleteClusterRoleBinding",
@@ -466,7 +466,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1.Status"
+        "responseModel": "io.k8s.meta.v1.Status"
        }
       ],
       "produces": [
@@ -485,7 +485,7 @@
     "description": "API at /apis/rbac.authorization.k8s.io/v1alpha1",
     "operations": [
      {
-      "type": "versioned.Event",
+      "type": "io.k8s.kubernetes.pkg.watch.versioned.Event",
       "method": "GET",
       "summary": "watch changes to an object of kind ClusterRoleBinding",
       "nickname": "watchClusterRoleBinding",
@@ -551,7 +551,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "versioned.Event"
+        "responseModel": "io.k8s.kubernetes.pkg.watch.versioned.Event"
        }
       ],
       "produces": [
@@ -572,7 +572,7 @@
     "description": "API at /apis/rbac.authorization.k8s.io/v1alpha1",
     "operations": [
      {
-      "type": "v1alpha1.ClusterRoleList",
+      "type": "io.k8s.authorization.rbac.v1alpha1.ClusterRoleList",
       "method": "GET",
       "summary": "list or watch objects of kind ClusterRole",
       "nickname": "listClusterRole",
@@ -630,7 +630,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1alpha1.ClusterRoleList"
+        "responseModel": "io.k8s.authorization.rbac.v1alpha1.ClusterRoleList"
        }
       ],
       "produces": [
@@ -645,7 +645,7 @@
       ]
      },
      {
-      "type": "v1alpha1.ClusterRole",
+      "type": "io.k8s.authorization.rbac.v1alpha1.ClusterRole",
       "method": "POST",
       "summary": "create a ClusterRole",
       "nickname": "createClusterRole",
@@ -671,7 +671,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1alpha1.ClusterRole"
+        "responseModel": "io.k8s.authorization.rbac.v1alpha1.ClusterRole"
        }
       ],
       "produces": [
@@ -684,7 +684,7 @@
       ]
      },
      {
-      "type": "v1.Status",
+      "type": "io.k8s.meta.v1.Status",
       "method": "DELETE",
       "summary": "delete collection of ClusterRole",
       "nickname": "deletecollectionClusterRole",
@@ -742,7 +742,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1.Status"
+        "responseModel": "io.k8s.meta.v1.Status"
        }
       ],
       "produces": [
@@ -761,7 +761,7 @@
     "description": "API at /apis/rbac.authorization.k8s.io/v1alpha1",
     "operations": [
      {
-      "type": "versioned.Event",
+      "type": "io.k8s.kubernetes.pkg.watch.versioned.Event",
       "method": "GET",
       "summary": "watch individual changes to a list of ClusterRole",
       "nickname": "watchClusterRoleList",
@@ -819,7 +819,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "versioned.Event"
+        "responseModel": "io.k8s.kubernetes.pkg.watch.versioned.Event"
        }
       ],
       "produces": [
@@ -840,7 +840,7 @@
     "description": "API at /apis/rbac.authorization.k8s.io/v1alpha1",
     "operations": [
      {
-      "type": "v1alpha1.ClusterRole",
+      "type": "io.k8s.authorization.rbac.v1alpha1.ClusterRole",
       "method": "GET",
       "summary": "read the specified ClusterRole",
       "nickname": "readClusterRole",
@@ -866,7 +866,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1alpha1.ClusterRole"
+        "responseModel": "io.k8s.authorization.rbac.v1alpha1.ClusterRole"
        }
       ],
       "produces": [
@@ -879,7 +879,7 @@
       ]
      },
      {
-      "type": "v1alpha1.ClusterRole",
+      "type": "io.k8s.authorization.rbac.v1alpha1.ClusterRole",
       "method": "PUT",
       "summary": "replace the specified ClusterRole",
       "nickname": "replaceClusterRole",
@@ -913,7 +913,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1alpha1.ClusterRole"
+        "responseModel": "io.k8s.authorization.rbac.v1alpha1.ClusterRole"
        }
       ],
       "produces": [
@@ -926,7 +926,7 @@
       ]
      },
      {
-      "type": "v1alpha1.ClusterRole",
+      "type": "io.k8s.authorization.rbac.v1alpha1.ClusterRole",
       "method": "PATCH",
       "summary": "partially update the specified ClusterRole",
       "nickname": "patchClusterRole",
@@ -960,7 +960,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1alpha1.ClusterRole"
+        "responseModel": "io.k8s.authorization.rbac.v1alpha1.ClusterRole"
        }
       ],
       "produces": [
@@ -975,7 +975,7 @@
       ]
      },
      {
-      "type": "v1.Status",
+      "type": "io.k8s.meta.v1.Status",
       "method": "DELETE",
       "summary": "delete a ClusterRole",
       "nickname": "deleteClusterRole",
@@ -1025,7 +1025,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1.Status"
+        "responseModel": "io.k8s.meta.v1.Status"
        }
       ],
       "produces": [
@@ -1044,7 +1044,7 @@
     "description": "API at /apis/rbac.authorization.k8s.io/v1alpha1",
     "operations": [
      {
-      "type": "versioned.Event",
+      "type": "io.k8s.kubernetes.pkg.watch.versioned.Event",
       "method": "GET",
       "summary": "watch changes to an object of kind ClusterRole",
       "nickname": "watchClusterRole",
@@ -1110,7 +1110,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "versioned.Event"
+        "responseModel": "io.k8s.kubernetes.pkg.watch.versioned.Event"
        }
       ],
       "produces": [
@@ -1131,7 +1131,7 @@
     "description": "API at /apis/rbac.authorization.k8s.io/v1alpha1",
     "operations": [
      {
-      "type": "v1alpha1.RoleBindingList",
+      "type": "io.k8s.authorization.rbac.v1alpha1.RoleBindingList",
       "method": "GET",
       "summary": "list or watch objects of kind RoleBinding",
       "nickname": "listNamespacedRoleBinding",
@@ -1197,7 +1197,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1alpha1.RoleBindingList"
+        "responseModel": "io.k8s.authorization.rbac.v1alpha1.RoleBindingList"
        }
       ],
       "produces": [
@@ -1212,7 +1212,7 @@
       ]
      },
      {
-      "type": "v1alpha1.RoleBinding",
+      "type": "io.k8s.authorization.rbac.v1alpha1.RoleBinding",
       "method": "POST",
       "summary": "create a RoleBinding",
       "nickname": "createNamespacedRoleBinding",
@@ -1246,7 +1246,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1alpha1.RoleBinding"
+        "responseModel": "io.k8s.authorization.rbac.v1alpha1.RoleBinding"
        }
       ],
       "produces": [
@@ -1259,7 +1259,7 @@
       ]
      },
      {
-      "type": "v1.Status",
+      "type": "io.k8s.meta.v1.Status",
       "method": "DELETE",
       "summary": "delete collection of RoleBinding",
       "nickname": "deletecollectionNamespacedRoleBinding",
@@ -1325,7 +1325,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1.Status"
+        "responseModel": "io.k8s.meta.v1.Status"
        }
       ],
       "produces": [
@@ -1344,7 +1344,7 @@
     "description": "API at /apis/rbac.authorization.k8s.io/v1alpha1",
     "operations": [
      {
-      "type": "versioned.Event",
+      "type": "io.k8s.kubernetes.pkg.watch.versioned.Event",
       "method": "GET",
       "summary": "watch individual changes to a list of RoleBinding",
       "nickname": "watchNamespacedRoleBindingList",
@@ -1410,7 +1410,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "versioned.Event"
+        "responseModel": "io.k8s.kubernetes.pkg.watch.versioned.Event"
        }
       ],
       "produces": [
@@ -1431,7 +1431,7 @@
     "description": "API at /apis/rbac.authorization.k8s.io/v1alpha1",
     "operations": [
      {
-      "type": "v1alpha1.RoleBinding",
+      "type": "io.k8s.authorization.rbac.v1alpha1.RoleBinding",
       "method": "GET",
       "summary": "read the specified RoleBinding",
       "nickname": "readNamespacedRoleBinding",
@@ -1465,7 +1465,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1alpha1.RoleBinding"
+        "responseModel": "io.k8s.authorization.rbac.v1alpha1.RoleBinding"
        }
       ],
       "produces": [
@@ -1478,7 +1478,7 @@
       ]
      },
      {
-      "type": "v1alpha1.RoleBinding",
+      "type": "io.k8s.authorization.rbac.v1alpha1.RoleBinding",
       "method": "PUT",
       "summary": "replace the specified RoleBinding",
       "nickname": "replaceNamespacedRoleBinding",
@@ -1520,7 +1520,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1alpha1.RoleBinding"
+        "responseModel": "io.k8s.authorization.rbac.v1alpha1.RoleBinding"
        }
       ],
       "produces": [
@@ -1533,7 +1533,7 @@
       ]
      },
      {
-      "type": "v1alpha1.RoleBinding",
+      "type": "io.k8s.authorization.rbac.v1alpha1.RoleBinding",
       "method": "PATCH",
       "summary": "partially update the specified RoleBinding",
       "nickname": "patchNamespacedRoleBinding",
@@ -1575,7 +1575,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1alpha1.RoleBinding"
+        "responseModel": "io.k8s.authorization.rbac.v1alpha1.RoleBinding"
        }
       ],
       "produces": [
@@ -1590,7 +1590,7 @@
       ]
      },
      {
-      "type": "v1.Status",
+      "type": "io.k8s.meta.v1.Status",
       "method": "DELETE",
       "summary": "delete a RoleBinding",
       "nickname": "deleteNamespacedRoleBinding",
@@ -1648,7 +1648,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1.Status"
+        "responseModel": "io.k8s.meta.v1.Status"
        }
       ],
       "produces": [
@@ -1667,7 +1667,7 @@
     "description": "API at /apis/rbac.authorization.k8s.io/v1alpha1",
     "operations": [
      {
-      "type": "versioned.Event",
+      "type": "io.k8s.kubernetes.pkg.watch.versioned.Event",
       "method": "GET",
       "summary": "watch changes to an object of kind RoleBinding",
       "nickname": "watchNamespacedRoleBinding",
@@ -1741,7 +1741,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "versioned.Event"
+        "responseModel": "io.k8s.kubernetes.pkg.watch.versioned.Event"
        }
       ],
       "produces": [
@@ -1762,7 +1762,7 @@
     "description": "API at /apis/rbac.authorization.k8s.io/v1alpha1",
     "operations": [
      {
-      "type": "v1alpha1.RoleBindingList",
+      "type": "io.k8s.authorization.rbac.v1alpha1.RoleBindingList",
       "method": "GET",
       "summary": "list or watch objects of kind RoleBinding",
       "nickname": "listRoleBindingForAllNamespaces",
@@ -1820,7 +1820,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1alpha1.RoleBindingList"
+        "responseModel": "io.k8s.authorization.rbac.v1alpha1.RoleBindingList"
        }
       ],
       "produces": [
@@ -1841,7 +1841,7 @@
     "description": "API at /apis/rbac.authorization.k8s.io/v1alpha1",
     "operations": [
      {
-      "type": "versioned.Event",
+      "type": "io.k8s.kubernetes.pkg.watch.versioned.Event",
       "method": "GET",
       "summary": "watch individual changes to a list of RoleBinding",
       "nickname": "watchRoleBindingListForAllNamespaces",
@@ -1899,7 +1899,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "versioned.Event"
+        "responseModel": "io.k8s.kubernetes.pkg.watch.versioned.Event"
        }
       ],
       "produces": [
@@ -1920,7 +1920,7 @@
     "description": "API at /apis/rbac.authorization.k8s.io/v1alpha1",
     "operations": [
      {
-      "type": "v1alpha1.RoleList",
+      "type": "io.k8s.authorization.rbac.v1alpha1.RoleList",
       "method": "GET",
       "summary": "list or watch objects of kind Role",
       "nickname": "listNamespacedRole",
@@ -1986,7 +1986,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1alpha1.RoleList"
+        "responseModel": "io.k8s.authorization.rbac.v1alpha1.RoleList"
        }
       ],
       "produces": [
@@ -2001,7 +2001,7 @@
       ]
      },
      {
-      "type": "v1alpha1.Role",
+      "type": "io.k8s.authorization.rbac.v1alpha1.Role",
       "method": "POST",
       "summary": "create a Role",
       "nickname": "createNamespacedRole",
@@ -2035,7 +2035,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1alpha1.Role"
+        "responseModel": "io.k8s.authorization.rbac.v1alpha1.Role"
        }
       ],
       "produces": [
@@ -2048,7 +2048,7 @@
       ]
      },
      {
-      "type": "v1.Status",
+      "type": "io.k8s.meta.v1.Status",
       "method": "DELETE",
       "summary": "delete collection of Role",
       "nickname": "deletecollectionNamespacedRole",
@@ -2114,7 +2114,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1.Status"
+        "responseModel": "io.k8s.meta.v1.Status"
        }
       ],
       "produces": [
@@ -2133,7 +2133,7 @@
     "description": "API at /apis/rbac.authorization.k8s.io/v1alpha1",
     "operations": [
      {
-      "type": "versioned.Event",
+      "type": "io.k8s.kubernetes.pkg.watch.versioned.Event",
       "method": "GET",
       "summary": "watch individual changes to a list of Role",
       "nickname": "watchNamespacedRoleList",
@@ -2199,7 +2199,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "versioned.Event"
+        "responseModel": "io.k8s.kubernetes.pkg.watch.versioned.Event"
        }
       ],
       "produces": [
@@ -2220,7 +2220,7 @@
     "description": "API at /apis/rbac.authorization.k8s.io/v1alpha1",
     "operations": [
      {
-      "type": "v1alpha1.Role",
+      "type": "io.k8s.authorization.rbac.v1alpha1.Role",
       "method": "GET",
       "summary": "read the specified Role",
       "nickname": "readNamespacedRole",
@@ -2254,7 +2254,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1alpha1.Role"
+        "responseModel": "io.k8s.authorization.rbac.v1alpha1.Role"
        }
       ],
       "produces": [
@@ -2267,7 +2267,7 @@
       ]
      },
      {
-      "type": "v1alpha1.Role",
+      "type": "io.k8s.authorization.rbac.v1alpha1.Role",
       "method": "PUT",
       "summary": "replace the specified Role",
       "nickname": "replaceNamespacedRole",
@@ -2309,7 +2309,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1alpha1.Role"
+        "responseModel": "io.k8s.authorization.rbac.v1alpha1.Role"
        }
       ],
       "produces": [
@@ -2322,7 +2322,7 @@
       ]
      },
      {
-      "type": "v1alpha1.Role",
+      "type": "io.k8s.authorization.rbac.v1alpha1.Role",
       "method": "PATCH",
       "summary": "partially update the specified Role",
       "nickname": "patchNamespacedRole",
@@ -2364,7 +2364,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1alpha1.Role"
+        "responseModel": "io.k8s.authorization.rbac.v1alpha1.Role"
        }
       ],
       "produces": [
@@ -2379,7 +2379,7 @@
       ]
      },
      {
-      "type": "v1.Status",
+      "type": "io.k8s.meta.v1.Status",
       "method": "DELETE",
       "summary": "delete a Role",
       "nickname": "deleteNamespacedRole",
@@ -2437,7 +2437,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1.Status"
+        "responseModel": "io.k8s.meta.v1.Status"
        }
       ],
       "produces": [
@@ -2456,7 +2456,7 @@
     "description": "API at /apis/rbac.authorization.k8s.io/v1alpha1",
     "operations": [
      {
-      "type": "versioned.Event",
+      "type": "io.k8s.kubernetes.pkg.watch.versioned.Event",
       "method": "GET",
       "summary": "watch changes to an object of kind Role",
       "nickname": "watchNamespacedRole",
@@ -2530,7 +2530,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "versioned.Event"
+        "responseModel": "io.k8s.kubernetes.pkg.watch.versioned.Event"
        }
       ],
       "produces": [
@@ -2551,7 +2551,7 @@
     "description": "API at /apis/rbac.authorization.k8s.io/v1alpha1",
     "operations": [
      {
-      "type": "v1alpha1.RoleList",
+      "type": "io.k8s.authorization.rbac.v1alpha1.RoleList",
       "method": "GET",
       "summary": "list or watch objects of kind Role",
       "nickname": "listRoleForAllNamespaces",
@@ -2609,7 +2609,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1alpha1.RoleList"
+        "responseModel": "io.k8s.authorization.rbac.v1alpha1.RoleList"
        }
       ],
       "produces": [
@@ -2630,7 +2630,7 @@
     "description": "API at /apis/rbac.authorization.k8s.io/v1alpha1",
     "operations": [
      {
-      "type": "versioned.Event",
+      "type": "io.k8s.kubernetes.pkg.watch.versioned.Event",
       "method": "GET",
       "summary": "watch individual changes to a list of Role",
       "nickname": "watchRoleListForAllNamespaces",
@@ -2688,7 +2688,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "versioned.Event"
+        "responseModel": "io.k8s.kubernetes.pkg.watch.versioned.Event"
        }
       ],
       "produces": [
@@ -2709,7 +2709,7 @@
     "description": "API at /apis/rbac.authorization.k8s.io/v1alpha1",
     "operations": [
      {
-      "type": "v1.APIResourceList",
+      "type": "io.k8s.meta.v1.APIResourceList",
       "method": "GET",
       "summary": "get available resources",
       "nickname": "getAPIResources",
@@ -3385,6 +3385,240 @@
        "type": "string"
       },
       "description": "verbs is a list of supported kube verbs (this includes get, list, watch, create, update, patch, delete, deletecollection, and proxy)"
+     }
+    }
+   },
+   "v1alpha1.ClusterRoleBindingList": {
+    "id": "v1alpha1.ClusterRoleBindingList",
+    "description": "ClusterRoleBindingList is a collection of ClusterRoleBindings\n\nDEPRECATED: Use 'io.k8s.authorization.rbac.v1alpha1.ClusterRoleBindingList' instead.",
+    "required": [
+     "items"
+    ],
+    "properties": {
+     "kind": {
+      "type": "string",
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+     },
+     "apiVersion": {
+      "type": "string",
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+     },
+     "metadata": {
+      "$ref": "io.k8s.meta.v1.ListMeta",
+      "description": "Standard object's metadata."
+     },
+     "items": {
+      "type": "array",
+      "items": {
+       "$ref": "io.k8s.authorization.rbac.v1alpha1.ClusterRoleBinding"
+      },
+      "description": "Items is a list of ClusterRoleBindings"
+     }
+    }
+   },
+   "v1alpha1.ClusterRoleBinding": {
+    "id": "v1alpha1.ClusterRoleBinding",
+    "description": "ClusterRoleBinding references a ClusterRole, but not contain it.  It can reference a ClusterRole in the global namespace, and adds who information via Subject.\n\nDEPRECATED: Use 'io.k8s.authorization.rbac.v1alpha1.ClusterRoleBinding' instead.",
+    "required": [
+     "subjects",
+     "roleRef"
+    ],
+    "properties": {
+     "kind": {
+      "type": "string",
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+     },
+     "apiVersion": {
+      "type": "string",
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+     },
+     "metadata": {
+      "$ref": "v1.ObjectMeta",
+      "description": "Standard object's metadata."
+     },
+     "subjects": {
+      "type": "array",
+      "items": {
+       "$ref": "io.k8s.authorization.rbac.v1alpha1.Subject"
+      },
+      "description": "Subjects holds references to the objects the role applies to."
+     },
+     "roleRef": {
+      "$ref": "io.k8s.authorization.rbac.v1alpha1.RoleRef",
+      "description": "RoleRef can only reference a ClusterRole in the global namespace. If the RoleRef cannot be resolved, the Authorizer must return an error."
+     }
+    }
+   },
+   "v1alpha1.ClusterRoleList": {
+    "id": "v1alpha1.ClusterRoleList",
+    "description": "ClusterRoleList is a collection of ClusterRoles\n\nDEPRECATED: Use 'io.k8s.authorization.rbac.v1alpha1.ClusterRoleList' instead.",
+    "required": [
+     "items"
+    ],
+    "properties": {
+     "kind": {
+      "type": "string",
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+     },
+     "apiVersion": {
+      "type": "string",
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+     },
+     "metadata": {
+      "$ref": "io.k8s.meta.v1.ListMeta",
+      "description": "Standard object's metadata."
+     },
+     "items": {
+      "type": "array",
+      "items": {
+       "$ref": "io.k8s.authorization.rbac.v1alpha1.ClusterRole"
+      },
+      "description": "Items is a list of ClusterRoles"
+     }
+    }
+   },
+   "v1alpha1.ClusterRole": {
+    "id": "v1alpha1.ClusterRole",
+    "description": "ClusterRole is a cluster level, logical grouping of PolicyRules that can be referenced as a unit by a RoleBinding or ClusterRoleBinding.\n\nDEPRECATED: Use 'io.k8s.authorization.rbac.v1alpha1.ClusterRole' instead.",
+    "required": [
+     "rules"
+    ],
+    "properties": {
+     "kind": {
+      "type": "string",
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+     },
+     "apiVersion": {
+      "type": "string",
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+     },
+     "metadata": {
+      "$ref": "v1.ObjectMeta",
+      "description": "Standard object's metadata."
+     },
+     "rules": {
+      "type": "array",
+      "items": {
+       "$ref": "io.k8s.authorization.rbac.v1alpha1.PolicyRule"
+      },
+      "description": "Rules holds all the PolicyRules for this ClusterRole"
+     }
+    }
+   },
+   "v1alpha1.RoleBindingList": {
+    "id": "v1alpha1.RoleBindingList",
+    "description": "RoleBindingList is a collection of RoleBindings\n\nDEPRECATED: Use 'io.k8s.authorization.rbac.v1alpha1.RoleBindingList' instead.",
+    "required": [
+     "items"
+    ],
+    "properties": {
+     "kind": {
+      "type": "string",
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+     },
+     "apiVersion": {
+      "type": "string",
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+     },
+     "metadata": {
+      "$ref": "io.k8s.meta.v1.ListMeta",
+      "description": "Standard object's metadata."
+     },
+     "items": {
+      "type": "array",
+      "items": {
+       "$ref": "io.k8s.authorization.rbac.v1alpha1.RoleBinding"
+      },
+      "description": "Items is a list of RoleBindings"
+     }
+    }
+   },
+   "v1alpha1.RoleBinding": {
+    "id": "v1alpha1.RoleBinding",
+    "description": "RoleBinding references a role, but does not contain it.  It can reference a Role in the same namespace or a ClusterRole in the global namespace. It adds who information via Subjects and namespace information by which namespace it exists in.  RoleBindings in a given namespace only have effect in that namespace.\n\nDEPRECATED: Use 'io.k8s.authorization.rbac.v1alpha1.RoleBinding' instead.",
+    "required": [
+     "subjects",
+     "roleRef"
+    ],
+    "properties": {
+     "kind": {
+      "type": "string",
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+     },
+     "apiVersion": {
+      "type": "string",
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+     },
+     "metadata": {
+      "$ref": "v1.ObjectMeta",
+      "description": "Standard object's metadata."
+     },
+     "subjects": {
+      "type": "array",
+      "items": {
+       "$ref": "io.k8s.authorization.rbac.v1alpha1.Subject"
+      },
+      "description": "Subjects holds references to the objects the role applies to."
+     },
+     "roleRef": {
+      "$ref": "io.k8s.authorization.rbac.v1alpha1.RoleRef",
+      "description": "RoleRef can reference a Role in the current namespace or a ClusterRole in the global namespace. If the RoleRef cannot be resolved, the Authorizer must return an error."
+     }
+    }
+   },
+   "v1alpha1.RoleList": {
+    "id": "v1alpha1.RoleList",
+    "description": "RoleList is a collection of Roles\n\nDEPRECATED: Use 'io.k8s.authorization.rbac.v1alpha1.RoleList' instead.",
+    "required": [
+     "items"
+    ],
+    "properties": {
+     "kind": {
+      "type": "string",
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+     },
+     "apiVersion": {
+      "type": "string",
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+     },
+     "metadata": {
+      "$ref": "io.k8s.meta.v1.ListMeta",
+      "description": "Standard object's metadata."
+     },
+     "items": {
+      "type": "array",
+      "items": {
+       "$ref": "io.k8s.authorization.rbac.v1alpha1.Role"
+      },
+      "description": "Items is a list of Roles"
+     }
+    }
+   },
+   "v1alpha1.Role": {
+    "id": "v1alpha1.Role",
+    "description": "Role is a namespaced, logical grouping of PolicyRules that can be referenced as a unit by a RoleBinding.\n\nDEPRECATED: Use 'io.k8s.authorization.rbac.v1alpha1.Role' instead.",
+    "required": [
+     "rules"
+    ],
+    "properties": {
+     "kind": {
+      "type": "string",
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+     },
+     "apiVersion": {
+      "type": "string",
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+     },
+     "metadata": {
+      "$ref": "v1.ObjectMeta",
+      "description": "Standard object's metadata."
+     },
+     "rules": {
+      "type": "array",
+      "items": {
+       "$ref": "io.k8s.authorization.rbac.v1alpha1.PolicyRule"
+      },
+      "description": "Rules holds all the PolicyRules for this Role"
      }
     }
    }

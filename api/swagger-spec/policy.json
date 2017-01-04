@@ -13,7 +13,7 @@
     "description": "get information of a group",
     "operations": [
      {
-      "type": "v1.APIGroup",
+      "type": "io.k8s.meta.v1.APIGroup",
       "method": "GET",
       "summary": "get information of a group",
       "nickname": "getAPIGroup",
