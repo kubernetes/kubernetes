@@ -21,9 +21,9 @@ import (
 
 	"github.com/spf13/pflag"
 
-	authenticationclient "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/authentication/v1beta1"
-	"k8s.io/kubernetes/pkg/client/restclient"
-	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
+	authenticationclient "k8s.io/client-go/kubernetes/typed/authentication/v1beta1"
+	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/kubernetes/pkg/genericapiserver/authenticator"
 )
 
@@ -145,7 +145,7 @@ func (s *DelegatingAuthenticationOptions) ToAuthenticationConfig() (authenticato
 }
 
 func (s *DelegatingAuthenticationOptions) newTokenAccessReview() (authenticationclient.TokenReviewInterface, error) {
-	var clientConfig *restclient.Config
+	var clientConfig *rest.Config
 	var err error
 	if len(s.RemoteKubeConfigFile) > 0 {
 		loadingRules := &clientcmd.ClientConfigLoadingRules{ExplicitPath: s.RemoteKubeConfigFile}
@@ -156,7 +156,7 @@ func (s *DelegatingAuthenticationOptions) newTokenAccessReview() (authentication
 	} else {
 		// without the remote kubeconfig file, try to use the in-cluster config.  Most addon API servers will
 		// use this path
-		clientConfig, err = restclient.InClusterConfig()
+		clientConfig, err = rest.InClusterConfig()
 	}
 	if err != nil {
 		return nil, err

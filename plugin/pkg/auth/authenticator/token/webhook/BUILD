@@ -8,22 +8,6 @@ load(
     "go_test",
 )
 
-go_library(
-    name = "go_default_library",
-    srcs = ["webhook.go"],
-    tags = ["automanaged"],
-    deps = [
-        "//pkg/apis/authentication/install:go_default_library",
-        "//pkg/apis/authentication/v1beta1:go_default_library",
-        "//pkg/auth/authenticator:go_default_library",
-        "//pkg/client/clientset_generated/clientset/typed/authentication/v1beta1:go_default_library",
-        "//pkg/runtime/schema:go_default_library",
-        "//pkg/util/cache:go_default_library",
-        "//plugin/pkg/webhook:go_default_library",
-        "//vendor:k8s.io/apiserver/pkg/authentication/user",
-    ],
-)
-
 go_test(
     name = "go_default_test",
     srcs = [
@@ -37,5 +21,21 @@ go_test(
         "//pkg/apis/meta/v1:go_default_library",
         "//pkg/client/unversioned/clientcmd/api/v1:go_default_library",
         "//vendor:k8s.io/apiserver/pkg/authentication/user",
+    ],
+)
+
+go_library(
+    name = "go_default_library",
+    srcs = ["webhook.go"],
+    tags = ["automanaged"],
+    deps = [
+        "//pkg/auth/authenticator:go_default_library",
+        "//pkg/util/cache:go_default_library",
+        "//plugin/pkg/webhook:go_default_library",
+        "//vendor:k8s.io/apiserver/pkg/authentication/user",
+        "//vendor:k8s.io/client-go/kubernetes/typed/authentication/v1beta1",
+        "//vendor:k8s.io/client-go/pkg/apis/authentication/install",
+        "//vendor:k8s.io/client-go/pkg/apis/authentication/v1beta1",
+        "//vendor:k8s.io/client-go/pkg/runtime/schema",
     ],
 )

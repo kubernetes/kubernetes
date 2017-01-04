@@ -30,6 +30,9 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+
+	clientgoclientset "k8s.io/client-go/kubernetes"
+
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
@@ -205,22 +208,23 @@ type KubeletDeps struct {
 	Options                 []Option
 
 	// Injected Dependencies
-	Auth              server.AuthInterface
-	CAdvisorInterface cadvisor.Interface
-	Cloud             cloudprovider.Interface
-	ContainerManager  cm.ContainerManager
-	DockerClient      dockertools.DockerInterface
-	EventClient       *clientset.Clientset
-	KubeClient        *clientset.Clientset
-	Mounter           mount.Interface
-	NetworkPlugins    []network.NetworkPlugin
-	OOMAdjuster       *oom.OOMAdjuster
-	OSInterface       kubecontainer.OSInterface
-	PodConfig         *config.PodConfig
-	Recorder          record.EventRecorder
-	Writer            kubeio.Writer
-	VolumePlugins     []volume.VolumePlugin
-	TLSOptions        *server.TLSOptions
+	Auth               server.AuthInterface
+	CAdvisorInterface  cadvisor.Interface
+	Cloud              cloudprovider.Interface
+	ContainerManager   cm.ContainerManager
+	DockerClient       dockertools.DockerInterface
+	EventClient        *clientset.Clientset
+	KubeClient         *clientset.Clientset
+	ExternalKubeClient clientgoclientset.Interface
+	Mounter            mount.Interface
+	NetworkPlugins     []network.NetworkPlugin
+	OOMAdjuster        *oom.OOMAdjuster
+	OSInterface        kubecontainer.OSInterface
+	PodConfig          *config.PodConfig
+	Recorder           record.EventRecorder
+	Writer             kubeio.Writer
+	VolumePlugins      []volume.VolumePlugin
+	TLSOptions         *server.TLSOptions
 }
 
 // makePodSourceConfig creates a config.PodConfig from the given

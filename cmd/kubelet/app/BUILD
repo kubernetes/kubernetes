@@ -13,6 +13,7 @@ go_library(
     srcs = [
         "auth.go",
         "bootstrap.go",
+        "clientgo.go",
         "plugins.go",
         "server.go",
         "server_linux.go",
@@ -30,8 +31,6 @@ go_library(
         "//pkg/capabilities:go_default_library",
         "//pkg/client/chaosclient:go_default_library",
         "//pkg/client/clientset_generated/clientset:go_default_library",
-        "//pkg/client/clientset_generated/clientset/typed/authentication/v1beta1:go_default_library",
-        "//pkg/client/clientset_generated/clientset/typed/authorization/v1beta1:go_default_library",
         "//pkg/client/clientset_generated/clientset/typed/certificates/v1alpha1:go_default_library",
         "//pkg/client/clientset_generated/clientset/typed/core/v1:go_default_library",
         "//pkg/client/record:go_default_library",
@@ -101,6 +100,13 @@ go_library(
         "//vendor:github.com/spf13/cobra",
         "//vendor:github.com/spf13/pflag",
         "//vendor:golang.org/x/exp/inotify",
+        "//vendor:k8s.io/client-go/kubernetes",
+        "//vendor:k8s.io/client-go/kubernetes/typed/authentication/v1beta1",
+        "//vendor:k8s.io/client-go/kubernetes/typed/authorization/v1beta1",
+        "//vendor:k8s.io/client-go/rest",
+        "//vendor:k8s.io/client-go/tools/auth",
+        "//vendor:k8s.io/client-go/tools/clientcmd",
+        "//vendor:k8s.io/client-go/tools/clientcmd/api",
     ],
 )
 
