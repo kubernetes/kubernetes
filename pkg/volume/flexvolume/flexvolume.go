@@ -180,6 +180,10 @@ func (plugin *flexVolumePlugin) newUnmounterInternal(volName string, podUID type
 	}, nil
 }
 
+func (plugin *flexVolumePlugin) ConstructVolumeSpecFromName(volumeName string) (*volume.Spec, error) {
+	return plugin.ConstructVolumeSpec(volumeName, "")
+}
+
 func (plugin *flexVolumePlugin) ConstructVolumeSpec(volumeName, sourceName string) (*volume.Spec, error) {
 	flexVolume := &v1.Volume{
 		Name: volumeName,

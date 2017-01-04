@@ -141,6 +141,10 @@ func (plugin *fcPlugin) execCommand(command string, args []string) ([]byte, erro
 	return cmd.CombinedOutput()
 }
 
+func (plugin *fcPlugin) ConstructVolumeSpecFromName(volumeName string) (*volume.Spec, error) {
+	return plugin.ConstructVolumeSpec(volumeName, "")
+}
+
 func (plugin *fcPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volume.Spec, error) {
 	fcVolume := &v1.Volume{
 		Name: volumeName,

@@ -209,11 +209,60 @@ func (adc *attachDetachController) Run(stopCh <-chan struct{}) {
 	defer runtime.HandleCrash()
 	glog.Infof("Starting Attach Detach Controller")
 
+	err := adc.populateActualStateOfWorld()
+	if err != nil {
+		glog.Errorf("error populating the actual state of world: %v", err)
+	}
+	err = adc.populateDesiredStateOfWorld()
+	if err != nil {
+		glog.Errorf("error populating the desired state of world: %v", err)
+	}
 	go adc.reconciler.Run(stopCh)
 	go adc.desiredStateOfWorldPopulator.Run(stopCh)
 
 	<-stopCh
 	glog.Infof("Shutting down Attach Detach Controller")
+}
+
+func (adc *attachDetachController) populateActualStateOfWorld() error {
+	glog.V(5).Infof("Populating ActualStateOfworld")
+	nodes, err := adc.kubeClient.Core().Nodes().List(v1.ListOptions{})
+	if err != nil {
+		return err
+	}
+
+	for i := range nodes.Items {
+		nodeName := types.NodeName(nodes.Items[i].Name)
+		for _, attachedVolume := range nodes.Items[i].Status.VolumesAttached {
+			uniqueName := string(attachedVolume.Name)
+			pluginName, volumeName := volumehelper.SplitUniqueName(uniqueName)
+			plug, err := adc.volumePluginMgr.FindPluginByName(pluginName)
+			if err != nil {
+				glog.Errorf("could not find plugin named %s for volume %s: %v", pluginName, volumeName, err)
+				continue
+			}
+			volumeSpec, err := plug.ConstructVolumeSpecFromName(volumeName)
+			if err != nil {
+				glog.Errorf("could not construct volume spec in plugin %s for volume %s: %v", pluginName, volumeName, err)
+				continue
+			}
+			adc.actualStateOfWorld.AddVolumeNode(volumeSpec, nodeName, attachedVolume.DevicePath)
+		}
+	}
+	return nil
+}
+
+func (adc *attachDetachController) populateDesiredStateOfWorld() error {
+	glog.V(5).Infof("Populating DesiredStateOfworld")
+	pods, err := adc.kubeClient.Core().Pods(v1.NamespaceAll).List(v1.ListOptions{})
+	if err != nil {
+		return err
+	}
+	for _, pod := range pods.Items {
+		adc.podAdd(pod)
+	}
+
+	return nil
 }
 
 func (adc *attachDetachController) podAdd(obj interface{}) {

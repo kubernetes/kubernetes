@@ -164,6 +164,10 @@ func (plugin *rbdPlugin) newUnmounterInternal(volName string, podUID types.UID, 
 	}, nil
 }
 
+func (plugin *rbdPlugin) ConstructVolumeSpecFromName(volumeName string) (*volume.Spec, error) {
+	return plugin.ConstructVolumeSpec(volumeName, "")
+}
+
 func (plugin *rbdPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volume.Spec, error) {
 	rbdVolume := &v1.Volume{
 		Name: volumeName,

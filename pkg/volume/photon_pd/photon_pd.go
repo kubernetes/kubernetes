@@ -120,6 +120,18 @@ func (plugin *photonPersistentDiskPlugin) newUnmounterInternal(volName string, p
 		}}, nil
 }
 
+func (plugin *photonPersistentDiskPlugin) ConstructVolumeSpecFromName(volumeSpecName string) (*volume.Spec, error) {
+	photonPersistentDisk := &v1.Volume{
+		Name: volumeSpecName,
+		VolumeSource: v1.VolumeSource{
+			PhotonPersistentDisk: &v1.PhotonPersistentDiskVolumeSource{
+				PdID: volumeSpecName,
+			},
+		},
+	}
+	return volume.NewSpecFromVolume(photonPersistentDisk), nil
+}
+
 func (plugin *photonPersistentDiskPlugin) ConstructVolumeSpec(volumeSpecName, mountPath string) (*volume.Spec, error) {
 	mounter := plugin.host.GetMounter()
 	pluginDir := plugin.host.GetPluginDir(plugin.GetPluginName())

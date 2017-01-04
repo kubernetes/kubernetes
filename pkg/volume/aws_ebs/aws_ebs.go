@@ -188,6 +188,18 @@ func getVolumeSource(
 	return nil, false, fmt.Errorf("Spec does not reference an AWS EBS volume type")
 }
 
+func (plugin *awsElasticBlockStorePlugin) ConstructVolumeSpecFromName(volName string) (*volume.Spec, error) {
+	awsVolume := &v1.Volume{
+		Name: volName,
+		VolumeSource: v1.VolumeSource{
+			AWSElasticBlockStore: &v1.AWSElasticBlockStoreVolumeSource{
+				VolumeID: volName,
+			},
+		},
+	}
+	return volume.NewSpecFromVolume(awsVolume), nil
+}
+
 func (plugin *awsElasticBlockStorePlugin) ConstructVolumeSpec(volName, mountPath string) (*volume.Spec, error) {
 	mounter := plugin.host.GetMounter()
 	pluginDir := plugin.host.GetPluginDir(plugin.GetPluginName())

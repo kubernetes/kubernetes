@@ -107,6 +107,10 @@ func (plugin *downwardAPIPlugin) NewUnmounter(volName string, podUID types.UID) 
 	}, nil
 }
 
+func (plugin *downwardAPIPlugin) ConstructVolumeSpecFromName(volumeName string) (*volume.Spec, error) {
+	return plugin.ConstructVolumeSpec(volumeName, "")
+}
+
 func (plugin *downwardAPIPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volume.Spec, error) {
 	downwardAPIVolume := &v1.Volume{
 		Name: volumeName,

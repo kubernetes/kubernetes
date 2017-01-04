@@ -121,6 +121,9 @@ func (plugin *hostPathPlugin) NewProvisioner(options volume.VolumeOptions) (volu
 	return newProvisioner(options, plugin.host, plugin)
 }
 
+func (plugin *hostPathPlugin) ConstructVolumeSpecFromName(volumeName string) (*volume.Spec, error) {
+	return plugin.ConstructVolumeSpec(volumeName, "")
+}
 func (plugin *hostPathPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volume.Spec, error) {
 	hostPathVolume := &v1.Volume{
 		Name: volumeName,

@@ -287,6 +287,10 @@ func (plugin *FakeVolumePlugin) GetAccessModes() []v1.PersistentVolumeAccessMode
 	return []v1.PersistentVolumeAccessMode{}
 }
 
+func (plugin *FakeVolumePlugin) ConstructVolumeSpecFromName(volumeName string) (*Spec, error) {
+	return nil, nil
+}
+
 func (plugin *FakeVolumePlugin) ConstructVolumeSpec(volumeName, mountPath string) (*Spec, error) {
 	return nil, nil
 }
