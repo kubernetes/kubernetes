@@ -57,6 +57,8 @@ Third Party Metric Provider integration will not be tackled in this proposal. Th
 
 Integration with CRI will not be covered in this proposal.  In future proposals, integrating with CRI may provide a better abstraction of information required by the core metrics pipeline to collect metrics.
 
+Methods for pushing these metrics to various kubernetes components will not be covered.  This proposal does not cover any future "metrics-server", but these metrics could easily be pushed to whatever components require them.
+
 ## Design
 
 This design covers only the internal Core Metrics Pipeline.
@@ -66,6 +68,18 @@ High level requirements for the design are as follows:
  - The kubelet collects the minimum possible number of metrics for full kubernetes functionality.
  - Code for collecting core metrics resides in the kubernetes codebase.
  - Metrics can be fetched "On Demand", giving the kubelet more up-to-date stats.
+
+Metrics requirements, based on kubernetes component needs, are as follows:
+ - Kubelet
+  - Node-level capacity and availability metrics for Disk and Memory
+  - Pod-level usage metrics for Disk and Memory
+ - Scheduler
+  - Node-level capacity and availability metrics for Disk, CPU, and Memory
+  - Pod-level usage metrics for Disk, CPU, and Memory
+  - Container-level usage metrics for Disk, CPU, and Memory
+ - Horizontal-Pod-AutoScalar (HPA)
+  - Node-level capacity and availability metrics for CPU and Memory
+  - Pod-level usage metrics for CPU and Memory
 
 More details on how I intend to achieve these high level goals can be found in the Implementation Plan.
 
@@ -79,37 +93,56 @@ This proposal purposefully omits many metrics that may eventually become core me
 
 An important difference between the current summary api and the proposed core metrics api is that per-pod stats in the core metrics api contain only usage data, and not capacity-related statistics.  This is more accurate since a pod's resource capacity is really defined by its "requests" and "limits", and it is a better reflection of how the kubelet uses the data.  The kubelet finds which resources are constrained using node-level capacity and availability data, and then chooses which pods to take action on based on the pod's usage of the constrained resource.  If neccessary, capacity for resources a pod consumes can still be correlated with node-level resources using this format of stats.
 
+
     // CoreStats is a top-level container for holding NodeStats and PodStats.  
     type CoreStats struct {  
-      // Overall node stats.  
-      Node NodeStats `json:"node"`  
-      // Per-pod stats.  
-      Pods []PodStats `json:"pods"`  
+      // Overall node resource stats.  
+      Node NodeResources `json:"node"`  
+      // Per-pod usage stats.  
+      Pods []PodUsage `json:"pods"`  
     }  
 
     // NodeStats holds node-level stats.  NodeStats contains capacity and availibility for Node Resources.  
-    type NodeStats struct {  
+    type NodeResources struct {  
+      // The filesystem device used by node k8s components.  
+      // +optional  
+      KubeletFsDevice string `json:"kubeletfs"`  
+      // The filesystem device used by node runtime components.  
+      // +optional  
+      RuntimeFsDevice string `json:"runtimefs"`  
+      // Stats pertaining to cpu resources.  
+      // +optional  
+      CPU *CpuResources `json:"cpu,omitempty"`  
       // Stats pertaining to memory (RAM) resources.  
       // +optional  
-      Memory *MemoryStats `json:"memory,omitempty"`  
-      // Stats pertaining to total usage of filesystem resources on the filesystem used by node k8s components.  
+      Memory *MemoryResources `json:"memory,omitempty"`  
+      // Stats pertaining to node filesystem resources.  
       // +optional  
-      KubeletFs *FsStats `json:"kubeletfs,omitempty"`  
-      // Stats pertaining to total usage of filesystem resources on the filesystem used by the runtime.  
-      // +optional  
-      RuntimeFs *FsStats `json:"runtimefs,omitempty"`  
+      Filesystems []DiskResources `json:"filesystems, omitempty" patchStrategy:"merge" patchMergeKey:"device"`  
     }  
 
-    // MemoryStats contains data about memory usage.  
-    type MemoryStats struct {  
+    // CpuResources containes data about cpu resource usage  
+    type CpuResources struct {  
+      // The number of cores in this machine.  
+      NumCores int `json:"numcores"`  
+      // The current Usage of CPU resources  
+      TotalUsage *CpuUsage `json:"cpuusage,omitempty"`  
+    }  
+
+    // MemoryResources contains data about memory resource usage.  
+    type MemoryResources struct {  
+      // The time at which these stats were updated.  
+      Time metav1.Time `json:"time"`  
       // The memory capacity, in bytes  
-      CapacityBytes *uint64  
+      CapacityBytes *uint64 `json:"capacitybytes,omitempty"`  
       // The available memory, in bytes  
-      AvailableBytes *uint64  
+      AvailableBytes *uint64 `json:"availablebytes,omitempty"`  
     }  
 
-    // FsStats contains data about filesystem usage.  
-    type FsStats struct {  
+    // DiskResources contains data about filesystem disk resources.  
+    type DiskResources struct {  
+      // The time at which these stats were updated.  
+      Time metav1.Time `json:"time"`  
       // The device that this filesystem is on  
       Device string `json:"device"`  
       // AvailableBytes represents the storage space available (bytes) for the filesystem.  
@@ -126,49 +159,90 @@ An important difference between the current summary api and the proposed core me
       Inodes *uint64 `json:"inodes,omitempty"`  
     }  
 
-    // PodStats holds pod-level unprocessed sample stats.  
-    type PodStats struct {  
+    // PodUsage holds pod-level unprocessed sample stats.  
+    type PodUsage struct {  
       // UID of the pod  
       PodUID string `json:"uid"`  
-      // Stats of containers in the measured pod.  
-      Containers []ContainerStats `json:"containers" patchStrategy:"merge" patchMergeKey:"name"`  
-      // Stats pertaining to volume usage of filesystem resources.  
-      // VolumeStats.UsedBytes is the number of bytes used by the Volume  
+      // Stats pertaining to pod total usage of cpu  
+      // This may include additional overhead not included in container usage statistics.  
       // +optional  
-      VolumeStats []DiskUsageStats `json:"volume,omitempty" patchStrategy:"merge" patchMergeKey:"name"`  
+      CPU *CpuUsage `json:"cpu,omitempty"`  
+      // Stats pertaining to pod total usage of system memory  
+      // This may include additional overhead not included in container usage statistics.  
+      // +optional  
+      Memory *MemoryUsage `json:"memory,omitempty"`  
+      // Stats of containers in the pod.  
+      Containers []ContainerUsage `json:"containers" patchStrategy:"merge" patchMergeKey:"uid"`  
+      // Stats pertaining to volume usage of filesystem resources.  
+      // +optional  
+      Volumes []VolumeUsage `json:"volume,omitempty" patchStrategy:"merge" patchMergeKey:"name"`  
     }  
 
-    // ContainerStats holds container-level unprocessed sample stats.  
-    type ContainerStats struct {  
-      // Stats pertaining to contianer usage of system memory  
+    // ContainerUsage holds container-level usage stats.  
+    type ContainerUsage struct {  
+      // UID of the container  
+      ContainerUID string `json:"uid"`  
+      // Stats pertaining to container usage of cpu  
       // +optional  
-      Memory *MemoryUsageStats `json:"memory,omitempty"`  
+      CPU *CpuUsage `json:"memory,omitempty"`  
+      // Stats pertaining to container usage of system memory  
+      // +optional  
+      Memory *MemoryUsage `json:"memory,omitempty"`  
       // Stats pertaining to container rootfs usage of disk.  
       // Rootfs.UsedBytes is the number of bytes used for the container write layer.  
       // +optional  
-      Rootfs *DiskUsageStats `json:"rootfs,omitempty"`  
+      Rootfs *DiskUsage `json:"rootfs,omitempty"`  
       // Stats pertaining to container logs usage of Disk.  
       // +optional  
-      Logs *DiskUsageStats `json:"logs,omitempty"`  
+      Logs *DiskUsage `json:"logs,omitempty"`  
     }  
 
-    type MemoryUsageStats struct {  
+    // CpuUsage holds statistics about the amount of cpu time consumed  
+    type CpuUsage struct {  
+      // The time at which these stats were updated.  
+      Time metav1.Time `json:"time"`  
+      // Total CPU usage (sum of all cores) averaged over the sample window.  
+      // The "core" unit can be interpreted as CPU core-nanoseconds per second.  
+      // +optional  
+      UsageNanoCores *uint64 `json:"usageNanoCores,omitempty"`  
+      // Cumulative CPU usage (sum of all cores) since object creation.  
+      // +optional  
+      UsageCoreNanoSeconds *uint64 `json:"usageCoreNanoSeconds,omitempty"`  
+    }  
+
+    // MemoryUsage holds statistics about the quantity of memory consumed  
+    type MemoryUsage struct {  
+      // The time at which these stats were updated.  
+      Time metav1.Time `json:"time"`  
       // The amount of working set memory. This includes recently accessed memory,  
       // dirty memory, and kernel memory.  
       // +optional  
       WorkingSetBytes *uint64 `json:"workingSetBytes,omitempty"`  
     }  
 
-    type DiskUsageStats struct {  
+    // VolumeUsage holds statistics about the quantity of disk resources consumed for a volume  
+    type VolumeUsage struct {  
+      // Embedded DiskUsage  
+      DiskUsage  
+      // Name is the name given to the Volume  
+      // +optional  
+      Name string `json:"name,omitempty"`  
+    }  
+
+    // DiskUsage holds statistics about the quantity of disk resources consumed  
+    type DiskUsage struct {  
+      // The time at which these stats were updated.  
+      Time metav1.Time `json:"time"`  
       // The device on which resources are consumed  
       Device string `json:"device"`  
       // UsedBytes represents the disk space consumed on the device, in bytes.  
       // +optional  
-      UsedBytes uint64 `json:"usedBytes,omitempty"`  
+      UsedBytes *uint64 `json:"usedBytes,omitempty"`  
       // InodesUsed represents the inodes consumed on the device  
       // +optional  
       InodesUsed *uint64 `json:"inodesUsed,omitempty"`  
     }  
+
 
 ### Core Machine Info:
 
@@ -200,10 +274,6 @@ The code that provides this data currently resides in cAdvisor.  I propose movin
       CloudProvider CloudProvider `json:"cloud_provider"`  
       // ID of cloud instance (e.g. instance-1) given to it by the cloud provider.  
       InstanceID InstanceID `json:"instance_id"`  
-      // The number of cores in this machine.  
-      NumCores int `json:"num_cores"`  
-      // The amount of memory (in bytes) in this machine  
-      MemoryCapacity uint64 `json:"memory_capacity"`  
     }  
 
     type CloudProvider string  
