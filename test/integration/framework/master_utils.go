@@ -27,6 +27,7 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/v1"
@@ -43,7 +44,6 @@ import (
 	authauthenticator "k8s.io/kubernetes/pkg/auth/authenticator"
 	authauthorizer "k8s.io/kubernetes/pkg/auth/authorizer"
 	authorizerunion "k8s.io/kubernetes/pkg/auth/authorizer/union"
-	"k8s.io/kubernetes/pkg/auth/user"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/core/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"

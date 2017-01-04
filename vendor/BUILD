@@ -12247,3 +12247,12 @@ go_library(
     srcs = ["golang.org/x/text/internal/utf8internal/utf8internal.go"],
     tags = ["automanaged"],
 )
+
+go_library(
+    name = "k8s.io/apiserver/pkg/authentication/user",
+    srcs = [
+        "k8s.io/apiserver/pkg/authentication/user/doc.go",
+        "k8s.io/apiserver/pkg/authentication/user/user.go",
+    ],
+    tags = ["automanaged"],
+)

@@ -70,12 +70,12 @@ go_test(
         "//pkg/api:go_default_library",
         "//pkg/api/v1:go_default_library",
         "//pkg/apis/meta/v1:go_default_library",
-        "//pkg/auth/user:go_default_library",
         "//pkg/client/cache:go_default_library",
         "//pkg/client/listers/core/v1:go_default_library",
         "//pkg/genericapiserver/api/request:go_default_library",
         "//pkg/runtime:go_default_library",
         "//pkg/util/diff:go_default_library",
         "//pkg/util/sets:go_default_library",
+        "//vendor:k8s.io/apiserver/pkg/authentication/user",
     ],
 )

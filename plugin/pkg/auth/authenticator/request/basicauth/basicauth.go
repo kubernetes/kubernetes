@@ -19,8 +19,8 @@ package basicauth
 import (
 	"net/http"
 
+	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/kubernetes/pkg/auth/authenticator"
-	"k8s.io/kubernetes/pkg/auth/user"
 )
 
 // Authenticator authenticates requests using basic auth

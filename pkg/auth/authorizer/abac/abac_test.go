@@ -21,11 +21,11 @@ import (
 	"os"
 	"testing"
 
+	"k8s.io/apiserver/pkg/authentication/user"
 	api "k8s.io/kubernetes/pkg/apis/abac"
 	"k8s.io/kubernetes/pkg/apis/abac/v0"
 	"k8s.io/kubernetes/pkg/apis/abac/v1beta1"
 	"k8s.io/kubernetes/pkg/auth/authorizer"
-	"k8s.io/kubernetes/pkg/auth/user"
 	"k8s.io/kubernetes/pkg/runtime"
 )
 

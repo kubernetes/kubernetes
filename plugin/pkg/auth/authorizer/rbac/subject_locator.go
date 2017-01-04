@@ -18,10 +18,10 @@ limitations under the License.
 package rbac
 
 import (
+	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/kubernetes/pkg/apis/rbac"
 	"k8s.io/kubernetes/pkg/apis/rbac/validation"
 	"k8s.io/kubernetes/pkg/auth/authorizer"
-	"k8s.io/kubernetes/pkg/auth/user"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 )
 

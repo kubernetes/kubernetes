@@ -19,8 +19,8 @@ package group
 import (
 	"net/http"
 
+	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/kubernetes/pkg/auth/authenticator"
-	"k8s.io/kubernetes/pkg/auth/user"
 )
 
 // GroupAdder adds groups to an authenticated user.Info

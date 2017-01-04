@@ -11,5 +11,5 @@ go_library(
     name = "go_default_library",
     srcs = ["tokentest.go"],
     tags = ["automanaged"],
-    deps = ["//pkg/auth/user:go_default_library"],
+    deps = ["//vendor:k8s.io/apiserver/pkg/authentication/user"],
 )
