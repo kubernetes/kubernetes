@@ -849,24 +849,36 @@ func (m *kubeGenericRuntimeManager) runContainer(sandboxID, sandboxIP string, sa
 // be removed.
 //
 // The 'statues' must only contain init container statuses.
-func (m *kubeGenericRuntimeManager) pruneInitContainers(pod *v1.Pod, statuses []*kubecontainer.ContainerStatus, all bool) error {
+func (m *kubeGenericRuntimeManager) pruneInitContainers(statuses []*kubecontainer.ContainerStatus, all bool) error {
 	var errlist []error
+	var indexesToPrune []int
+
 	names := sets.NewString()
-	idsToPrune := sets.NewString()
 
 	// Assume statuses are sorted so that the latest status comes first.
-	for _, s := range statuses {
+	for i, s := range statuses {
 		if all || names.Has(s.Name) && !isContainerActive(s) {
-			idsToPrune.Insert(s.ID.ID)
+			indexesToPrune = append(indexesToPrune, i)
 			continue
 		}
 		names.Insert(s.Name)
 	}
 
-	for _, id := range idsToPrune.UnsortedList() {
-		if err := m.runtimeService.RemoveContainer(id); err != nil {
+	// Remove containers.
+	for _, idx := range indexesToPrune {
+		status := statuses[idx]
+
+		if err := m.runtimeService.RemoveContainer(status.ID.ID); err != nil {
 			errlist = append(errlist, err)
-			glog.Errorf("Failed to remove container %q for pod %v", id, format.Pod(pod))
+			glog.Errorf("Failed to remove container %q: %v", status.ID.ID, err)
+			continue
+		}
+
+		// Remove any references to this container.
+		if _, ok := m.containerRefManager.GetRef(status.ID); ok {
+			m.containerRefManager.ClearRef(status.ID)
+		} else {
+			glog.Warningf("No ref for container %q", status.ID)
 		}
 	}
 

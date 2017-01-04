@@ -276,7 +276,7 @@ func (m *kubeGenericRuntimeManager) killPodSandbox(sandboxID, sandboxName, reaso
 }
 
 // runPodSandbox launches the pod sandbox.
-// On success, it returns the sandbox ID and the sandbox config.
+// On success, it returns the sandbox ID.
 func (m *kubeGenericRuntimeManager) runPodSandbox(pod *v1.Pod, attempt int, reason string) (string, error) {
 	glog.V(4).Infof("Launching pod sandbox for pod %q, attempt %d, reason %q", format.Pod(pod), attempt, reason)
 
@@ -297,7 +297,7 @@ func (m *kubeGenericRuntimeManager) runPodSandbox(pod *v1.Pod, attempt int, reas
 
 	podSandBoxID, err := m.runtimeService.RunPodSandbox(podSandboxConfig)
 	if err != nil {
-		err := fmt.Errorf("CreatePodSandbox for pod %q failed, %v", format.Pod(pod), err)
+		err := fmt.Errorf("RreatePodSandbox for pod %q failed, %v", format.Pod(pod), err)
 		glog.Error(err)
 		return "", err
 	}
