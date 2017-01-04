@@ -97,6 +97,16 @@ var (
 		"module": "federation-controller-manager",
 	}
 
+	etcdSvcSelector = map[string]string{
+		"app":    "federation-cluster",
+		"module": "federation-etcd-server",
+	}
+
+	etcdPodLabels = map[string]string{
+		"app":    "federation-cluster",
+		"module": "federation-etcd-server",
+	}
+
 	hyperkubeImageName = "gcr.io/google_containers/hyperkube-amd64"
 )
 
@@ -153,6 +163,7 @@ func initFederation(cmdOut io.Writer, config util.AdminConfig, cmd *cobra.Comman
 	}
 
 	serverName := fmt.Sprintf("%s-apiserver", initFlags.Name)
+	etcdSrvName := fmt.Sprintf("%s-etcd", initFlags.Name)
 	serverCredName := fmt.Sprintf("%s-credentials", serverName)
 	cmName := fmt.Sprintf("%s-controller-manager", initFlags.Name)
 	cmKubeconfigName := fmt.Sprintf("%s-kubeconfig", cmName)
@@ -210,19 +221,31 @@ func initFederation(cmdOut io.Writer, config util.AdminConfig, cmd *cobra.Comman
 		endpoint = hostnames[0]
 	}
 
-	// 6. Create federation API server
-	_, err = createAPIServer(hostClientset, initFlags.FederationSystemNamespace, serverName, image, serverCredName, pvc.Name, advertiseAddress, dryRun)
+	// 6a. Expose an in cluster service endpoint for the etcd server
+	_, err = createEtcdService(hostClientset, initFlags.FederationSystemNamespace, etcdSrvName, dryRun)
 	if err != nil {
 		return err
 	}
 
-	// 7. Create federation controller manager
+	// 6b. Create etcd server deployment
+	_, err = createEtcdServer(hostClientset, initFlags.FederationSystemNamespace, pvc.Name, etcdSrvName, dryRun)
+	if err != nil {
+		return err
+	}
+
+	// 7. Create federation API server
+	_, err = createAPIServer(hostClientset, initFlags.FederationSystemNamespace, serverName, image, serverCredName, advertiseAddress, etcdSrvName, dryRun)
+	if err != nil {
+		return err
+	}
+
+	// 8. Create federation controller manager
 	_, err = createControllerManager(hostClientset, initFlags.FederationSystemNamespace, initFlags.Name, svc.Name, cmName, image, cmKubeconfigName, dnsZoneName, dnsProvider, dryRun)
 	if err != nil {
 		return err
 	}
 
-	// 8. Write the federation API server endpoint info, credentials
+	// 9. Write the federation API server endpoint info, credentials
 	// and context to kubeconfig
 	err = updateKubeconfig(config, initFlags.Name, endpoint, entKeyPairs, dryRun)
 	if err != nil {
@@ -406,12 +429,99 @@ func createPVC(clientset *client.Clientset, namespace, svcName, etcdPVCapacity s
 	return clientset.Core().PersistentVolumeClaims(namespace).Create(pvc)
 }
 
-func createAPIServer(clientset *client.Clientset, namespace, name, image, credentialsName, pvcName, advertiseAddress string, dryRun bool) (*extensions.Deployment, error) {
+func createEtcdService(clientset *client.Clientset, namespace, etcdSvcName string, dryRun bool) (*api.Service, error) {
+	svc := &api.Service{
+		ObjectMeta: api.ObjectMeta{
+			Name:      etcdSvcName,
+			Namespace: namespace,
+			Labels:    componentLabel,
+		},
+		Spec: api.ServiceSpec{
+			Type:     api.ServiceTypeClusterIP,
+			Selector: etcdSvcSelector,
+			Ports: []api.ServicePort{
+				{
+					Name:       "http",
+					Protocol:   "TCP",
+					Port:       2379,
+					TargetPort: intstr.FromInt(2379),
+				},
+			},
+		},
+	}
+
+	if dryRun {
+		return svc, nil
+	}
+
+	return clientset.Core().Services(namespace).Create(svc)
+}
+
+func createEtcdServer(clientset *client.Clientset, namespace, pvcName, etcdSrvName string, dryRun bool) (*extensions.Deployment, error) {
+	dataVolumeName := "etcddata"
+	dep := &extensions.Deployment{
+		ObjectMeta: api.ObjectMeta{
+			Name:      etcdSrvName,
+			Namespace: namespace,
+			Labels:    componentLabel,
+		},
+		Spec: extensions.DeploymentSpec{
+			Replicas: 1,
+			Template: api.PodTemplateSpec{
+				ObjectMeta: api.ObjectMeta{
+					Name:   etcdSrvName,
+					Labels: etcdPodLabels,
+				},
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						{
+							Name:  "etcd",
+							Image: "quay.io/coreos/etcd:v2.3.3",
+							Command: []string{
+								"/etcd",
+								"--data-dir",
+								"/var/etcd/data",
+								"--advertise-client-urls",
+								"http://0.0.0.0:2379",
+								"--listen-client-urls",
+								"http://0.0.0.0:2379",
+							},
+							VolumeMounts: []api.VolumeMount{
+								{
+									Name:      dataVolumeName,
+									MountPath: "/var/etcd",
+								},
+							},
+						},
+					},
+					Volumes: []api.Volume{
+						{
+							Name: dataVolumeName,
+							VolumeSource: api.VolumeSource{
+								PersistentVolumeClaim: &api.PersistentVolumeClaimVolumeSource{
+									ClaimName: pvcName,
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	if dryRun {
+		return dep, nil
+	}
+
+	return clientset.Extensions().Deployments(namespace).Create(dep)
+}
+
+func createAPIServer(clientset *client.Clientset, namespace, name, image, credentialsName, advertiseAddress, etcdSvcName string, dryRun bool) (*extensions.Deployment, error) {
 	command := []string{
 		"/hyperkube",
 		"federation-apiserver",
 		"--bind-address=0.0.0.0",
-		"--etcd-servers=http://localhost:2379",
+		fmt.Sprintf("--etcd-servers=http://%s:2379", etcdSvcName),
 		"--service-cluster-ip-range=10.0.0.0/16",
 		"--secure-port=443",
 		"--client-ca-file=/etc/federation/apiserver/ca.crt",
@@ -422,8 +532,6 @@ func createAPIServer(clientset *client.Clientset, namespace, name, image, creden
 	if advertiseAddress != "" {
 		command = append(command, fmt.Sprintf("--advertise-address=%s", advertiseAddress))
 	}
-
-	dataVolumeName := "etcddata"
 
 	dep := &extensions.Deployment{
 		ObjectMeta: api.ObjectMeta{
@@ -462,21 +570,6 @@ func createAPIServer(clientset *client.Clientset, namespace, name, image, creden
 								},
 							},
 						},
-						{
-							Name:  "etcd",
-							Image: "quay.io/coreos/etcd:v2.3.3",
-							Command: []string{
-								"/etcd",
-								"--data-dir",
-								"/var/etcd/data",
-							},
-							VolumeMounts: []api.VolumeMount{
-								{
-									Name:      dataVolumeName,
-									MountPath: "/var/etcd",
-								},
-							},
-						},
 					},
 					Volumes: []api.Volume{
 						{
@@ -484,14 +577,6 @@ func createAPIServer(clientset *client.Clientset, namespace, name, image, creden
 							VolumeSource: api.VolumeSource{
 								Secret: &api.SecretVolumeSource{
 									SecretName: credentialsName,
-								},
-							},
-						},
-						{
-							Name: dataVolumeName,
-							VolumeSource: api.VolumeSource{
-								PersistentVolumeClaim: &api.PersistentVolumeClaimVolumeSource{
-									ClaimName: pvcName,
 								},
 							},
 						},

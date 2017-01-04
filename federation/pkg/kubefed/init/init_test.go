@@ -80,6 +80,7 @@ func TestInitFederation(t *testing.T) {
 		expectedErr        string
 		dnsProvider        string
 		dryRun             string
+		etcdSvcName        string
 	}{
 		{
 			federation:         "union",
@@ -425,6 +426,7 @@ func TestCertsHTTPS(t *testing.T) {
 
 func fakeInitHostFactory(federationName, namespaceName, ip, dnsZoneName, image, dnsProvider, etcdPVCapacity string) (cmdutil.Factory, error) {
 	svcName := federationName + "-apiserver"
+	etcdSrvName := federationName + "-etcd" //same name is used to name etcd deployment and etcd service
 	svcUrlPrefix := "/api/v1/namespaces/federation-system/services"
 	credSecretName := svcName + "-credentials"
 	cmKubeconfigSecretName := federationName + "-controller-manager-kubeconfig"
@@ -485,6 +487,30 @@ func fakeInitHostFactory(federationName, namespaceName, ip, dnsZoneName, image, 
 		},
 	}
 
+	etcdSvc := v1.Service{
+		TypeMeta: unversioned.TypeMeta{
+			Kind:       "Service",
+			APIVersion: testapi.Default.GroupVersion().String(),
+		},
+		ObjectMeta: v1.ObjectMeta{
+			Namespace: namespaceName,
+			Name:      etcdSrvName,
+			Labels:    componentLabel,
+		},
+		Spec: v1.ServiceSpec{
+			Type:     v1.ServiceTypeClusterIP,
+			Selector: etcdSvcSelector,
+			Ports: []v1.ServicePort{
+				{
+					Name:       "http",
+					Protocol:   "TCP",
+					Port:       2379,
+					TargetPort: intstr.FromInt(2379),
+				},
+			},
+		},
+	}
+
 	credSecret := v1.Secret{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Secret",
@@ -534,6 +560,61 @@ func fakeInitHostFactory(federationName, namespaceName, ip, dnsZoneName, image, 
 		},
 	}
 
+	etcdServer := v1beta1.Deployment{
+		TypeMeta: unversioned.TypeMeta{
+			Kind:       "Deployment",
+			APIVersion: testapi.Extensions.GroupVersion().String(),
+		},
+		ObjectMeta: v1.ObjectMeta{
+			Name:      etcdSrvName,
+			Namespace: namespaceName,
+			Labels:    componentLabel,
+		},
+		Spec: v1beta1.DeploymentSpec{
+			Replicas: &replicas,
+			Selector: nil,
+			Template: v1.PodTemplateSpec{
+				ObjectMeta: v1.ObjectMeta{
+					Name:   etcdSrvName,
+					Labels: etcdPodLabels,
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name:  "etcd",
+							Image: "quay.io/coreos/etcd:v2.3.3",
+							Command: []string{
+								"/etcd",
+								"--data-dir",
+								"/var/etcd/data",
+								"--advertise-client-urls",
+								"http://0.0.0.0:2379",
+								"--listen-client-urls",
+								"http://0.0.0.0:2379",
+							},
+							VolumeMounts: []v1.VolumeMount{
+								{
+									Name:      "etcddata",
+									MountPath: "/var/etcd",
+								},
+							},
+						},
+					},
+					Volumes: []v1.Volume{
+						{
+							Name: "etcddata",
+							VolumeSource: v1.VolumeSource{
+								PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
+									ClaimName: pvcName,
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
 	apiserver := v1beta1.Deployment{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Deployment",
@@ -561,7 +642,7 @@ func fakeInitHostFactory(federationName, namespaceName, ip, dnsZoneName, image, 
 								"/hyperkube",
 								"federation-apiserver",
 								"--bind-address=0.0.0.0",
-								"--etcd-servers=http://localhost:2379",
+								fmt.Sprintf("--etcd-servers=http://%s:2379", etcdSrvName),
 								"--service-cluster-ip-range=10.0.0.0/16",
 								"--secure-port=443",
 								"--client-ca-file=/etc/federation/apiserver/ca.crt",
@@ -587,21 +668,6 @@ func fakeInitHostFactory(federationName, namespaceName, ip, dnsZoneName, image, 
 								},
 							},
 						},
-						{
-							Name:  "etcd",
-							Image: "quay.io/coreos/etcd:v2.3.3",
-							Command: []string{
-								"/etcd",
-								"--data-dir",
-								"/var/etcd/data",
-							},
-							VolumeMounts: []v1.VolumeMount{
-								{
-									Name:      "etcddata",
-									MountPath: "/var/etcd",
-								},
-							},
-						},
 					},
 					Volumes: []v1.Volume{
 						{
@@ -609,14 +675,6 @@ func fakeInitHostFactory(federationName, namespaceName, ip, dnsZoneName, image, 
 							VolumeSource: v1.VolumeSource{
 								Secret: &v1.SecretVolumeSource{
 									SecretName: credSecretName,
-								},
-							},
-						},
-						{
-							Name: "etcddata",
-							VolumeSource: v1.VolumeSource{
-								PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
-									ClaimName: pvcName,
 								},
 							},
 						},
@@ -721,12 +779,20 @@ func fakeInitHostFactory(federationName, namespaceName, ip, dnsZoneName, image, 
 				if err != nil {
 					return nil, err
 				}
-				var got v1.Service
+				var got, want v1.Service
 				_, _, err = codec.Decode(body, nil, &got)
 				if err != nil {
 					return nil, err
 				}
-				if !api.Semantic.DeepEqual(got, svc) {
+
+				switch got.Name {
+				case svcName:
+					want = svc
+				case etcdSrvName:
+					want = etcdSvc
+				}
+
+				if !api.Semantic.DeepEqual(got, want) {
 					return nil, fmt.Errorf("Unexpected service object\n\tDiff: %s", diff.ObjectGoPrintDiff(got, svc))
 				}
 				return &http.Response{StatusCode: http.StatusCreated, Header: kubefedtesting.DefaultHeader(), Body: kubefedtesting.ObjBody(codec, &svc)}, nil
@@ -790,6 +856,8 @@ func fakeInitHostFactory(federationName, namespaceName, ip, dnsZoneName, image, 
 					want = apiserver
 				case cmName:
 					want = cm
+				case etcdSrvName:
+					want = etcdServer
 				}
 				if !api.Semantic.DeepEqual(got, want) {
 					return nil, fmt.Errorf("Unexpected deployment object\n\tDiff: %s", diff.ObjectGoPrintDiff(got, want))
