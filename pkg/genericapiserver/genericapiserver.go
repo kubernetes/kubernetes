@@ -211,10 +211,7 @@ func (s preparedGenericAPIServer) Run(stopCh <-chan struct{}) {
 // installAPIResources is a private method for installing the REST storage backing each api groupversionresource
 func (s *GenericAPIServer) installAPIResources(apiPrefix string, apiGroupInfo *APIGroupInfo) error {
 	for _, groupVersion := range apiGroupInfo.GroupMeta.GroupVersions {
-		apiGroupVersion, err := s.getAPIGroupVersion(apiGroupInfo, groupVersion, apiPrefix)
-		if err != nil {
-			return err
-		}
+		apiGroupVersion := s.getAPIGroupVersion(apiGroupInfo, groupVersion, apiPrefix)
 		if apiGroupInfo.OptionsExternalVersion != nil {
 			apiGroupVersion.OptionsExternalVersion = apiGroupInfo.OptionsExternalVersion
 		}
@@ -313,18 +310,18 @@ func (s *GenericAPIServer) RemoveAPIGroupForDiscovery(groupName string) {
 	delete(s.apiGroupsForDiscovery, groupName)
 }
 
-func (s *GenericAPIServer) getAPIGroupVersion(apiGroupInfo *APIGroupInfo, groupVersion schema.GroupVersion, apiPrefix string) (*genericapi.APIGroupVersion, error) {
+func (s *GenericAPIServer) getAPIGroupVersion(apiGroupInfo *APIGroupInfo, groupVersion schema.GroupVersion, apiPrefix string) *genericapi.APIGroupVersion {
 	storage := make(map[string]rest.Storage)
 	for k, v := range apiGroupInfo.VersionedResourcesStorageMap[groupVersion.Version] {
 		storage[strings.ToLower(k)] = v
 	}
-	version, err := s.newAPIGroupVersion(apiGroupInfo, groupVersion)
+	version := s.newAPIGroupVersion(apiGroupInfo, groupVersion)
 	version.Root = apiPrefix
 	version.Storage = storage
-	return version, err
+	return version
 }
 
-func (s *GenericAPIServer) newAPIGroupVersion(apiGroupInfo *APIGroupInfo, groupVersion schema.GroupVersion) (*genericapi.APIGroupVersion, error) {
+func (s *GenericAPIServer) newAPIGroupVersion(apiGroupInfo *APIGroupInfo, groupVersion schema.GroupVersion) *genericapi.APIGroupVersion {
 	return &genericapi.APIGroupVersion{
 		GroupVersion: groupVersion,
 
@@ -341,7 +338,7 @@ func (s *GenericAPIServer) newAPIGroupVersion(apiGroupInfo *APIGroupInfo, groupV
 		Admit:             s.admissionControl,
 		Context:           s.RequestContextMapper(),
 		MinRequestTimeout: s.minRequestTimeout,
-	}, nil
+	}
 }
 
 // DynamicApisDiscovery returns a webservice serving api group discovery.
