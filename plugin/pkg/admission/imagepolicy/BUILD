@@ -44,7 +44,7 @@ go_test(
         "//pkg/api:go_default_library",
         "//pkg/apis/imagepolicy/install:go_default_library",
         "//pkg/apis/imagepolicy/v1alpha1:go_default_library",
-        "//pkg/auth/user:go_default_library",
         "//pkg/client/unversioned/clientcmd/api/v1:go_default_library",
+        "//vendor:k8s.io/apiserver/pkg/authentication/user",
     ],
 )

@@ -23,10 +23,10 @@ import (
 
 	"github.com/go-openapi/spec"
 
+	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/kubernetes/pkg/auth/authenticator"
 	"k8s.io/kubernetes/pkg/auth/authenticator/bearertoken"
 	"k8s.io/kubernetes/pkg/auth/group"
-	"k8s.io/kubernetes/pkg/auth/user"
 	authenticationclient "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/authentication/v1beta1"
 	"k8s.io/kubernetes/pkg/util/cert"
 	"k8s.io/kubernetes/plugin/pkg/auth/authenticator/request/anonymous"

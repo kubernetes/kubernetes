@@ -17,10 +17,10 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//pkg/auth/authenticator:go_default_library",
-        "//pkg/auth/user:go_default_library",
         "//pkg/util/errors:go_default_library",
         "//pkg/util/sets:go_default_library",
         "//vendor:github.com/golang/glog",
+        "//vendor:k8s.io/apiserver/pkg/authentication/user",
     ],
 )
 
@@ -32,7 +32,7 @@ go_test(
     tags = ["automanaged"],
     deps = [
         "//pkg/auth/authenticator:go_default_library",
-        "//pkg/auth/user:go_default_library",
         "//pkg/util/sets:go_default_library",
+        "//vendor:k8s.io/apiserver/pkg/authentication/user",
     ],
 )

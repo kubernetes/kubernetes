@@ -15,11 +15,11 @@ go_library(
     ],
     tags = ["automanaged"],
     deps = [
-        "//pkg/auth/user:go_default_library",
         "//pkg/util/cert:go_default_library",
         "//pkg/util/net:go_default_library",
         "//vendor:github.com/golang/glog",
         "//vendor:github.com/rackspace/gophercloud",
         "//vendor:github.com/rackspace/gophercloud/openstack",
+        "//vendor:k8s.io/apiserver/pkg/authentication/user",
     ],
 )

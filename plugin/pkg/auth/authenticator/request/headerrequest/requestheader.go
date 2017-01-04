@@ -23,8 +23,8 @@ import (
 	"net/http"
 	"strings"
 
+	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/kubernetes/pkg/auth/authenticator"
-	"k8s.io/kubernetes/pkg/auth/user"
 	utilcert "k8s.io/kubernetes/pkg/util/cert"
 	"k8s.io/kubernetes/pkg/util/sets"
 	x509request "k8s.io/kubernetes/plugin/pkg/auth/authenticator/request/x509"

@@ -17,7 +17,7 @@ limitations under the License.
 package rbac
 
 import (
-	"k8s.io/kubernetes/pkg/auth/user"
+	"k8s.io/apiserver/pkg/authentication/user"
 	genericapirequest "k8s.io/kubernetes/pkg/genericapiserver/api/request"
 )
 

@@ -13,8 +13,8 @@ go_library(
     srcs = ["tokenfile.go"],
     tags = ["automanaged"],
     deps = [
-        "//pkg/auth/user:go_default_library",
         "//vendor:github.com/golang/glog",
+        "//vendor:k8s.io/apiserver/pkg/authentication/user",
     ],
 )
 
@@ -23,5 +23,5 @@ go_test(
     srcs = ["tokenfile_test.go"],
     library = ":go_default_library",
     tags = ["automanaged"],
-    deps = ["//pkg/auth/user:go_default_library"],
+    deps = ["//vendor:k8s.io/apiserver/pkg/authentication/user"],
 )

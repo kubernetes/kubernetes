@@ -20,8 +20,8 @@ import (
 	"reflect"
 	"testing"
 
+	"k8s.io/apiserver/pkg/authentication/user"
 	certapi "k8s.io/kubernetes/pkg/apis/certificates"
-	"k8s.io/kubernetes/pkg/auth/user"
 	genericapirequest "k8s.io/kubernetes/pkg/genericapiserver/api/request"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/diff"

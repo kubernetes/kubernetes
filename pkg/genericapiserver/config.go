@@ -36,6 +36,7 @@ import (
 	"github.com/pborman/uuid"
 	"gopkg.in/natefinch/lumberjack.v2"
 
+	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
@@ -43,7 +44,6 @@ import (
 	"k8s.io/kubernetes/pkg/auth/authorizer"
 	authorizerunion "k8s.io/kubernetes/pkg/auth/authorizer/union"
 	authhandlers "k8s.io/kubernetes/pkg/auth/handlers"
-	"k8s.io/kubernetes/pkg/auth/user"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	genericapifilters "k8s.io/kubernetes/pkg/genericapiserver/api/filters"
 	apiopenapi "k8s.io/kubernetes/pkg/genericapiserver/api/openapi"
