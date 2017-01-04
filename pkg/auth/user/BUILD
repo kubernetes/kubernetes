@@ -9,9 +9,6 @@ load(
 
 go_library(
     name = "go_default_library",
-    srcs = [
-        "doc.go",
-        "user.go",
-    ],
+    srcs = ["doc.go"],
     tags = ["automanaged"],
 )

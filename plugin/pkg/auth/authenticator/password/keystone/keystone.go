@@ -25,7 +25,7 @@ import (
 	"github.com/golang/glog"
 	"github.com/rackspace/gophercloud"
 	"github.com/rackspace/gophercloud/openstack"
-	"k8s.io/kubernetes/pkg/auth/user"
+	"k8s.io/apiserver/pkg/authentication/user"
 	certutil "k8s.io/kubernetes/pkg/util/cert"
 	netutil "k8s.io/kubernetes/pkg/util/net"
 )

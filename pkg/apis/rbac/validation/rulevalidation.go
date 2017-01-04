@@ -21,9 +21,9 @@ import (
 	"fmt"
 
 	"github.com/golang/glog"
+	"k8s.io/apiserver/pkg/authentication/user"
 	apierrors "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/apis/rbac"
-	"k8s.io/kubernetes/pkg/auth/user"
 	genericapirequest "k8s.io/kubernetes/pkg/genericapiserver/api/request"
 	"k8s.io/kubernetes/pkg/serviceaccount"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"

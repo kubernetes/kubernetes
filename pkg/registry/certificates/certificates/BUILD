@@ -40,9 +40,9 @@ go_test(
     tags = ["automanaged"],
     deps = [
         "//pkg/apis/certificates:go_default_library",
-        "//pkg/auth/user:go_default_library",
         "//pkg/genericapiserver/api/request:go_default_library",
         "//pkg/runtime:go_default_library",
         "//pkg/util/diff:go_default_library",
+        "//vendor:k8s.io/apiserver/pkg/authentication/user",
     ],
 )

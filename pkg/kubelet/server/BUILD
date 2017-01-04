@@ -24,7 +24,6 @@ go_library(
         "//pkg/apis/meta/v1:go_default_library",
         "//pkg/auth/authenticator:go_default_library",
         "//pkg/auth/authorizer:go_default_library",
-        "//pkg/auth/user:go_default_library",
         "//pkg/healthz:go_default_library",
         "//pkg/httplog:go_default_library",
         "//pkg/kubelet/cm:go_default_library",
@@ -47,6 +46,7 @@ go_library(
         "//vendor:github.com/google/cadvisor/info/v1",
         "//vendor:github.com/google/cadvisor/info/v2",
         "//vendor:github.com/prometheus/client_golang/prometheus",
+        "//vendor:k8s.io/apiserver/pkg/authentication/user",
     ],
 )
 
@@ -63,7 +63,6 @@ go_test(
         "//pkg/api/errors:go_default_library",
         "//pkg/api/v1:go_default_library",
         "//pkg/auth/authorizer:go_default_library",
-        "//pkg/auth/user:go_default_library",
         "//pkg/kubelet/cm:go_default_library",
         "//pkg/kubelet/container:go_default_library",
         "//pkg/kubelet/container/testing:go_default_library",
@@ -81,5 +80,6 @@ go_test(
         "//vendor:github.com/google/cadvisor/info/v2",
         "//vendor:github.com/stretchr/testify/assert",
         "//vendor:github.com/stretchr/testify/require",
+        "//vendor:k8s.io/apiserver/pkg/authentication/user",
     ],
 )

@@ -19,7 +19,7 @@ package authenticator
 import (
 	"net/http"
 
-	"k8s.io/kubernetes/pkg/auth/user"
+	"k8s.io/apiserver/pkg/authentication/user"
 )
 
 // Token checks a string value against a backing authentication store and returns

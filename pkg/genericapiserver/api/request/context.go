@@ -21,7 +21,7 @@ import (
 	"time"
 
 	"golang.org/x/net/context"
-	"k8s.io/kubernetes/pkg/auth/user"
+	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/kubernetes/pkg/types"
 )
 
