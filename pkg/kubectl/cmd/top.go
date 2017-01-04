@@ -34,13 +34,13 @@ var (
 
 		The top command allows you to see the resource consumption for nodes or pods.
 
-		This command is available only if the Heapster works fine on the server. `)
+		This command requires Heapster to be correctly configured and working on the server. `)
 )
 
 func NewCmdTop(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "top",
-		Short: "Display Resource (CPU/Memory/Storage) usage, available only if Heapster works fine on the server.",
+		Short: "Display Resource (CPU/Memory/Storage) usage.",
 		Long:  topLong,
 		Run:   cmdutil.DefaultSubCommandRun(errOut),
 	}
