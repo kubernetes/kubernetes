@@ -17,30 +17,32 @@ limitations under the License.
 package token
 
 import (
-	"net/url"
 	"strings"
 
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 )
 
-func Parse(u *url.URL, c *kubeadm.Discovery) error {
-	var (
-		hosts          []string
-		tokenID, token string
-	)
-	if u.Host != "" {
-		hosts = strings.Split(u.Host, ",")
+func Parse(s string, c *kubeadm.Discovery) error {
+	c.Token = &kubeadm.TokenDiscovery{}
+
+	// Make sure there's something to parse after discarding the scheme fragment, "token://"
+	if s[8:] == "" {
+		return nil
 	}
-	if u.User != nil {
-		if p, ok := u.User.Password(); ok {
-			tokenID = u.User.Username()
-			token = p
-		}
+
+	// Discard scheme and split token fragment from host fragment
+	urlFragments := strings.Split(s[8:], "@")
+
+	// Extract token from token fragment
+	// TODO what if an invalid token is passed, e.g. token://xxxx?
+	rawToken := strings.Split(urlFragments[0], ":")
+	c.Token.ID = rawToken[0]
+	c.Token.Secret = rawToken[1]
+
+	// Extract hosts, if host fragment exists
+	if len(urlFragments) == 2 {
+		c.Token.Addresses = strings.Split(urlFragments[1], ",")
 	}
-	c.Token = &kubeadm.TokenDiscovery{
-		ID:        tokenID,
-		Secret:    token,
-		Addresses: hosts,
-	}
+
 	return nil
 }

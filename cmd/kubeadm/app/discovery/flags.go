@@ -76,7 +76,7 @@ func ParseURL(d *kubeadm.Discovery, s string) error {
 	case "file":
 		return file.Parse(u, d)
 	case "token":
-		return token.Parse(u, d)
+		return token.Parse(s, d)
 	default:
 		return fmt.Errorf("unknown discovery scheme")
 	}
