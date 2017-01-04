@@ -29,8 +29,8 @@ import (
 	"time"
 
 	"k8s.io/apiserver/pkg/authentication/user"
+	"k8s.io/client-go/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/auth/authenticator"
-	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 const (

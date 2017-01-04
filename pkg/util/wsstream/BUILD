@@ -20,6 +20,7 @@ go_library(
         "//pkg/util/runtime:go_default_library",
         "//vendor:github.com/golang/glog",
         "//vendor:golang.org/x/net/websocket",
+        "//vendor:k8s.io/client-go/pkg/util/runtime",
     ],
 )
 
