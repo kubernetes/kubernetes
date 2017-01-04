@@ -1013,7 +1013,7 @@ func SelectorUpdatedBefore(d1, d2 *extensions.Deployment) bool {
 func LastSelectorUpdate(d *extensions.Deployment) metav1.Time {
 	t := d.Annotations[SelectorUpdateAnnotation]
 	if len(t) > 0 {
-		parsedTime, err := time.Parse(t, time.RFC3339)
+		parsedTime, err := time.Parse(time.RFC3339, t)
 		// If failed to parse the time, use creation timestamp instead
 		if err != nil {
 			return d.CreationTimestamp
