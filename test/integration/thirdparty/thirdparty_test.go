@@ -23,6 +23,7 @@ package thirdparty
 import (
 	"encoding/json"
 	"reflect"
+	"sort"
 	"testing"
 	"time"
 
@@ -129,15 +130,33 @@ func DoTestInstallMultipleAPIs(t *testing.T, client clientset.Interface, clientC
 	group := "company.com"
 	version := "v1"
 
-	defer installThirdParty(t, client, clientConfig,
+	installThirdParty(t, client, clientConfig,
 		&extensions.ThirdPartyResource{
 			ObjectMeta: v1.ObjectMeta{Name: "foo.company.com"},
 			Versions:   []extensions.APIVersion{{Name: version}},
 		}, group, version, "foos",
 	)()
 
+	// check whether it shows up in discovery properly
+	resources, err := client.Discovery().ServerResourcesForGroupVersion(metav1.GroupVersion{"foo.company.com", version})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(resources.APIResources) != 1 {
+		t.Fatalf("Expected exactly the group version foo.company.com/%v resource foos in discovery, got: %v", version, resources.APIResources)
+	}
+	r := resources.APIResources[0]
+	if r.Name != "foos" {
+		t.Fatalf("Expected exactly the group version foo.company.com/%v resource foos in discovery, got: %v", version, r)
+	}
+	sort.Strings(r.Verbs)
+	expectedVerbs := []string{"create", "delete", "deletecollection", "get", "list", "patch", "update", "watch"}
+	if !reflect.DeepEqual([]string(r.Verbs), expectedVerbs) {
+		t.Fatalf("Unexpected verbs for group version foo.company.com/%v resource foos in discovery: expected=%v got=%v", version, expectedVerbs, r.Verbs)
+	}
+
 	// TODO make multiple resources in one version work
-	// defer installThirdParty(t, client, clientConfig,
+	// installThirdParty(t, client, clientConfig,
 	// 	&extensions.ThirdPartyResource{
 	// 		ObjectMeta: v1.ObjectMeta{Name: "bar.company.com"},
 	// 		Versions:   []extensions.APIVersion{{Name: version}},
@@ -227,5 +246,21 @@ func testInstallThirdPartyAPIDeleteVersion(t *testing.T, client clientset.Interf
 	}
 	if _, err := fooClient.Get().Namespace("default").Resource("foos").Name("test").DoRaw(); !apierrors.IsNotFound(err) {
 		t.Fatal(err)
+	}
+
+	// check whether version is also gone from discovery
+	groups, err := client.Discovery().ServerGroups()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, g := range groups.Groups {
+		if g.Name != "foo.company.com" {
+			continue
+		}
+		for _, v := range g.Versions {
+			if v.GroupVersion == "foo.company.com/"+version {
+				t.Fatalf("unexpected group version %v in discovery", v.GroupVersion)
+			}
+		}
 	}
 }
