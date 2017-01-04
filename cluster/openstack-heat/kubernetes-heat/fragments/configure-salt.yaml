@@ -33,7 +33,7 @@ write_files:
       username=$OS_USERNAME
       password=$OS_PASSWORD
       region=$OS_REGION_NAME
-      tenant-id=$OS_TENANT_ID
+      tenant-name=$OS_TENANT_NAME
       [LoadBalancer]
       lb-version=$LBAAS_VERSION
       subnet-id=$SUBNET_ID
