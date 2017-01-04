@@ -88,6 +88,7 @@ func validateHorizontalPodAutoscalerAnnotations(annotations map[string]string, f
 	if annotationValue, found := annotations[podautoscaler.HpaCustomMetricsTargetAnnotationName]; found {
 		// Try to parse the annotation
 		var targetList v1beta1.CustomMetricTargetList
+		// TODO: use runtime.Decode()
 		if err := json.Unmarshal([]byte(annotationValue), &targetList); err != nil {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("annotations"), annotations, "failed to parse custom metrics target annotation"))
 		} else {
