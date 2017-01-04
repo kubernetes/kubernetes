@@ -123,6 +123,7 @@ go_library(
         "//vendor:github.com/google/cadvisor/events",
         "//vendor:github.com/google/cadvisor/info/v1",
         "//vendor:github.com/google/cadvisor/info/v2",
+        "//vendor:k8s.io/client-go/kubernetes",
     ],
 )
 

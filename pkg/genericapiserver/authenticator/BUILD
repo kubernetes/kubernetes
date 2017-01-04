@@ -18,7 +18,6 @@ go_library(
     deps = [
         "//pkg/auth/authenticator/bearertoken:go_default_library",
         "//pkg/auth/group:go_default_library",
-        "//pkg/client/clientset_generated/clientset/typed/authentication/v1beta1:go_default_library",
         "//pkg/util/cert:go_default_library",
         "//plugin/pkg/auth/authenticator/request/anonymous:go_default_library",
         "//plugin/pkg/auth/authenticator/request/headerrequest:go_default_library",
@@ -29,6 +28,7 @@ go_library(
         "//vendor:github.com/go-openapi/spec",
         "//vendor:k8s.io/apiserver/pkg/authentication/authenticator",
         "//vendor:k8s.io/apiserver/pkg/authentication/user",
+        "//vendor:k8s.io/client-go/kubernetes/typed/authentication/v1beta1",
     ],
 )
 
