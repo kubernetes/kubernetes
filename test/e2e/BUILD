@@ -142,6 +142,7 @@ go_library(
         "//pkg/client/transport:go_default_library",
         "//pkg/client/unversioned/clientcmd:go_default_library",
         "//pkg/client/unversioned/clientcmd/api:go_default_library",
+        "//pkg/cloudprovider:go_default_library",
         "//pkg/cloudprovider/providers/aws:go_default_library",
         "//pkg/cloudprovider/providers/gce:go_default_library",
         "//pkg/controller:go_default_library",
