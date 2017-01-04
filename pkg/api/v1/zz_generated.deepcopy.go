@@ -172,6 +172,7 @@ func RegisterDeepCopies(scheme *runtime.Scheme) error {
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_ResourceRequirements, InType: reflect.TypeOf(&ResourceRequirements{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_SELinuxOptions, InType: reflect.TypeOf(&SELinuxOptions{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_Secret, InType: reflect.TypeOf(&Secret{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_SecretEnvSource, InType: reflect.TypeOf(&SecretEnvSource{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_SecretKeySelector, InType: reflect.TypeOf(&SecretKeySelector{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_SecretList, InType: reflect.TypeOf(&SecretList{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_SecretVolumeSource, InType: reflect.TypeOf(&SecretVolumeSource{})},
@@ -995,6 +996,13 @@ func DeepCopy_v1_EnvFromSource(in interface{}, out interface{}, c *conversion.Cl
 			**out = **in
 		} else {
 			out.ConfigMapRef = nil
+		}
+		if in.SecretRef != nil {
+			in, out := &in.SecretRef, &out.SecretRef
+			*out = new(SecretEnvSource)
+			**out = **in
+		} else {
+			out.SecretRef = nil
 		}
 		return nil
 	}
@@ -3229,6 +3237,15 @@ func DeepCopy_v1_Secret(in interface{}, out interface{}, c *conversion.Cloner) e
 			out.StringData = nil
 		}
 		out.Type = in.Type
+		return nil
+	}
+}
+
+func DeepCopy_v1_SecretEnvSource(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*SecretEnvSource)
+		out := out.(*SecretEnvSource)
+		out.LocalObjectReference = in.LocalObjectReference
 		return nil
 	}
 }
