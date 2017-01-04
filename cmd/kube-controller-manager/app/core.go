@@ -115,7 +115,7 @@ func startNamespaceController(ctx ControllerContext) (bool, error) {
 		return true, fmt.Errorf("failed to parse preferred server resources: %v", err)
 	}
 	discoverResourcesFn := namespaceKubeClient.Discovery().ServerPreferredNamespacedResources
-	if _, found := gvrs[extensions.SchemeGroupVersion.WithResource("thirdpartyresource")]; found {
+	if _, found := gvrs[extensions.SchemeGroupVersion.WithResource("thirdpartyresource")]; !found {
 		// make discovery static
 		snapshot, err := discoverResourcesFn()
 		if err != nil {
