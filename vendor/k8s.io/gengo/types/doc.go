@@ -15,5 +15,5 @@ limitations under the License.
 */
 
 // Package types contains go type information, packaged in a way that makes
-// auto-generation convenient, whether by template or straight go functions.
+// auto-generation convenient, whether by templates or straight go functions.
 package types

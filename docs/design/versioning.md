@@ -5,7 +5,7 @@ Reference: [Semantic Versioning](http://semver.org)
 Legend:
 
 * **Kube X.Y.Z** refers to the version (git tag) of Kubernetes that is released.
-This versions all components: apiserver, kubelet, kubectl, etc.  (**X** is the
+This version's all components: apiserver, kubelet, kubectl, etc.  (**X** is the
 major version, **Y** is the minor version, and **Z** is the patch version.)
 * **API vX[betaY]** refers to the version of the HTTP API.
 
