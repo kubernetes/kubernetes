@@ -21,13 +21,11 @@ go_library(
     deps = [
         "//pkg/admission:go_default_library",
         "//pkg/api:go_default_library",
-        "//pkg/api/v1:go_default_library",
         "//pkg/apimachinery/registered:go_default_library",
         "//pkg/client/clientset_generated/clientset/typed/authentication/v1beta1:go_default_library",
         "//pkg/client/clientset_generated/clientset/typed/authorization/v1beta1:go_default_library",
         "//pkg/client/restclient:go_default_library",
         "//pkg/client/unversioned/clientcmd:go_default_library",
-        "//pkg/cloudprovider:go_default_library",
         "//pkg/genericapiserver/authenticator:go_default_library",
         "//pkg/genericapiserver/authorizer:go_default_library",
         "//pkg/runtime/schema:go_default_library",
