@@ -394,9 +394,9 @@ func AddValidateFlags(cmd *cobra.Command) {
 	cmd.MarkFlagFilename("schema-cache-dir")
 }
 
-func AddValidateVarFlags(cmd *cobra.Command, validate *bool, schemaCacheDir *string) {
-	cmd.Flags().BoolVar(validate, "validate", true, "If true, use a schema to validate the input before sending it")
-	cmd.Flags().StringVar(schemaCacheDir, "schema-cache-dir", fmt.Sprintf("~/%s/%s", clientcmd.RecommendedHomeDir, clientcmd.RecommendedSchemaName), fmt.Sprintf("If non-empty, load/store cached API schemas in this directory, default is '$HOME/%s/%s'", clientcmd.RecommendedHomeDir, clientcmd.RecommendedSchemaName))
+func AddValidateOptionFlags(cmd *cobra.Command, options *ValidateOptions) {
+	cmd.Flags().BoolVar(&options.Validate, "validate", true, "If true, use a schema to validate the input before sending it")
+	cmd.Flags().StringVar(&options.SchemaCacheDir, "schema-cache-dir", fmt.Sprintf("~/%s/%s", clientcmd.RecommendedHomeDir, clientcmd.RecommendedSchemaName), fmt.Sprintf("If non-empty, load/store cached API schemas in this directory, default is '$HOME/%s/%s'", clientcmd.RecommendedHomeDir, clientcmd.RecommendedSchemaName))
 	cmd.MarkFlagFilename("schema-cache-dir")
 }
 
