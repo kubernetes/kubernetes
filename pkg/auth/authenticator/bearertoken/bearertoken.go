@@ -17,6 +17,7 @@ limitations under the License.
 package bearertoken
 
 import (
+	"errors"
 	"net/http"
 	"strings"
 
@@ -32,6 +33,8 @@ func New(auth authenticator.Token) *Authenticator {
 	return &Authenticator{auth}
 }
 
+var invalidToken = errors.New("invalid bearer token")
+
 func (a *Authenticator) AuthenticateRequest(req *http.Request) (user.Info, bool, error) {
 	auth := strings.TrimSpace(req.Header.Get("Authorization"))
 	if auth == "" {
@@ -43,5 +46,18 @@ func (a *Authenticator) AuthenticateRequest(req *http.Request) (user.Info, bool,
 	}
 
 	token := parts[1]
-	return a.auth.AuthenticateToken(token)
+
+	// Empty bearer tokens aren't valid
+	if len(token) == 0 {
+		return nil, false, nil
+	}
+
+	user, ok, err := a.auth.AuthenticateToken(token)
+
+	// If the token authenticator didn't error, provide a default error
+	if !ok && err == nil {
+		err = invalidToken
+	}
+
+	return user, ok, err
 }

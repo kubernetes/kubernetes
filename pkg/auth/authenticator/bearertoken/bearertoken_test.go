@@ -47,8 +47,27 @@ func TestAuthenticateRequestTokenInvalid(t *testing.T) {
 	user, ok, err := auth.AuthenticateRequest(&http.Request{
 		Header: http.Header{"Authorization": []string{"Bearer token"}},
 	})
-	if ok || user != nil || err != nil {
+	if ok || user != nil {
 		t.Errorf("expected not authenticated user")
+	}
+	if err != invalidToken {
+		t.Errorf("expected invalidToken error, got %v", err)
+	}
+}
+
+func TestAuthenticateRequestTokenInvalidCustomError(t *testing.T) {
+	customError := errors.New("custom")
+	auth := New(authenticator.TokenFunc(func(token string) (user.Info, bool, error) {
+		return nil, false, customError
+	}))
+	user, ok, err := auth.AuthenticateRequest(&http.Request{
+		Header: http.Header{"Authorization": []string{"Bearer token"}},
+	})
+	if ok || user != nil {
+		t.Errorf("expected not authenticated user")
+	}
+	if err != customError {
+		t.Errorf("expected custom error, got %v", err)
 	}
 }
 
