@@ -27,7 +27,6 @@ go_library(
         "//pkg/controller:go_default_library",
         "//pkg/controller/informers:go_default_library",
         "//pkg/labels:go_default_library",
-        "//pkg/runtime:go_default_library",
         "//pkg/runtime/schema:go_default_library",
         "//pkg/util:go_default_library",
         "//pkg/util/errors:go_default_library",
@@ -35,7 +34,6 @@ go_library(
         "//pkg/util/runtime:go_default_library",
         "//pkg/util/wait:go_default_library",
         "//pkg/util/workqueue:go_default_library",
-        "//pkg/watch:go_default_library",
         "//vendor:github.com/golang/glog",
     ],
 )
@@ -57,6 +55,7 @@ go_test(
         "//pkg/client/restclient:go_default_library",
         "//pkg/client/testing/core:go_default_library",
         "//pkg/controller:go_default_library",
+        "//pkg/controller/informers:go_default_library",
         "//pkg/runtime:go_default_library",
         "//pkg/securitycontext:go_default_library",
         "//pkg/util/sets:go_default_library",

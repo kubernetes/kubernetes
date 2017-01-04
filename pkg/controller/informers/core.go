@@ -318,6 +318,42 @@ func (f *internalLimitRangeInformer) Lister() coreinternallisters.LimitRangeList
 
 //*****************************************************************************
 
+// ReplicationControllerInformer is type of SharedIndexInformer which watches and lists all replication controllers.
+// Interface provides constructor for informer and lister for replication controllers.
+type ReplicationControllerInformer interface {
+	Informer() cache.SharedIndexInformer
+	Lister() *cache.StoreToReplicationControllerLister
+}
+
+type replicationControllerInformer struct {
+	*sharedInformerFactory
+}
+
+// Informer checks whether replicationControllerInformer exists in sharedInformerFactory and if not, it creates new informer of type
+// replicationControllerInformer and connects it to sharedInformerFactory
+func (f *replicationControllerInformer) Informer() cache.SharedIndexInformer {
+	f.lock.Lock()
+	defer f.lock.Unlock()
+
+	informerType := reflect.TypeOf(&v1.ReplicationController{})
+	informer, exists := f.informers[informerType]
+	if exists {
+		return informer
+	}
+	informer = NewReplicationControllerInformer(f.client, f.defaultResync)
+	f.informers[informerType] = informer
+
+	return informer
+}
+
+// Lister returns lister for replicationControllerInformer
+func (f *replicationControllerInformer) Lister() *cache.StoreToReplicationControllerLister {
+	informer := f.Informer()
+	return &cache.StoreToReplicationControllerLister{Indexer: informer.GetIndexer()}
+}
+
+//*****************************************************************************
+
 // NewPodInformer returns a SharedIndexInformer that lists and watches all pods
 func NewPodInformer(client clientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
 	sharedIndexInformer := cache.NewSharedIndexInformer(
@@ -350,7 +386,7 @@ func NewNodeInformer(client clientset.Interface, resyncPeriod time.Duration) cac
 		},
 		&v1.Node{},
 		resyncPeriod,
-		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
+		cache.Indexers{})
 
 	return sharedIndexInformer
 }
@@ -445,7 +481,7 @@ func NewLimitRangeInformer(client clientset.Interface, resyncPeriod time.Duratio
 		},
 		&v1.LimitRange{},
 		resyncPeriod,
-		cache.Indexers{})
+		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 
 	return sharedIndexInformer
 }
@@ -468,6 +504,25 @@ func NewInternalLimitRangeInformer(internalclient internalclientset.Interface, r
 		&api.LimitRange{},
 		resyncPeriod,
 		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
+
+	return sharedIndexInformer
+}
+
+// NewReplicationControllerInformer returns a SharedIndexInformer that lists and watches all replication controllers.
+func NewReplicationControllerInformer(client clientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+	sharedIndexInformer := cache.NewSharedIndexInformer(
+		&cache.ListWatch{
+			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
+				return client.Core().ReplicationControllers(v1.NamespaceAll).List(options)
+			},
+			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
+				return client.Core().ReplicationControllers(v1.NamespaceAll).Watch(options)
+			},
+		},
+		&v1.ReplicationController{},
+		resyncPeriod,
+		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
+	)
 
 	return sharedIndexInformer
 }
