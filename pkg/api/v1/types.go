@@ -1984,8 +1984,17 @@ type Taint struct {
 	Value string `json:"value,omitempty" protobuf:"bytes,2,opt,name=value"`
 	// Required. The effect of the taint on pods
 	// that do not tolerate the taint.
-	// Valid effects are NoSchedule and PreferNoSchedule.
+	// Valid effects are NoSchedule, PreferNoSchedule and NoExecute.
 	Effect TaintEffect `json:"effect" protobuf:"bytes,3,opt,name=effect,casttype=TaintEffect"`
+	// TimeAdded represents the time at which the taint was added.
+	// Taint's effect must be NoExecute, otherwise this field is ignored.
+	// Toleration with tolerationSeconds will tolerate the taint for
+	// only a duration (indicated with toleration.tolerationSeconds)
+	// that starts at timeAdded. By default, taint.timeAdded is not set,
+	// which means the taint can only be tolerated by toleration that
+	// tolerates infinite duration.
+	// +optional
+	TimeAdded metav1.Time `json:"timeAdded,omitempty" protobuf:"bytes,4,opt,name=timeAdded"`
 }
 
 type TaintEffect string
@@ -2001,26 +2010,23 @@ const (
 	// onto the node entirely. Enforced by the scheduler.
 	TaintEffectPreferNoSchedule TaintEffect = "PreferNoSchedule"
 	// NOT YET IMPLEMENTED. TODO: Uncomment field once it is implemented.
-	// Do not allow new pods to schedule onto the node unless they tolerate the taint,
-	// do not allow pods to start on Kubelet unless they tolerate the taint,
-	// but allow all already-running pods to continue running.
-	// Enforced by the scheduler and Kubelet.
+	// Like TaintEffectNoSchedule, but additionally do not allow pods submitted to
+	// Kubelet without going through the scheduler to start.
+	// Enforced by Kubelet and the scheduler.
 	// TaintEffectNoScheduleNoAdmit TaintEffect = "NoScheduleNoAdmit"
-	// NOT YET IMPLEMENTED. TODO: Uncomment field once it is implemented.
-	// Do not allow new pods to schedule onto the node unless they tolerate the taint,
-	// do not allow pods to start on Kubelet unless they tolerate the taint,
-	// and evict any already-running pods that do not tolerate the taint.
-	// Enforced by the scheduler and Kubelet.
-	// TaintEffectNoScheduleNoAdmitNoExecute = "NoScheduleNoAdmitNoExecute"
+	// Evict any already-running pods that do not tolerate the taint.
+	// Currently enforced by NodeController.
+	TaintEffectNoExecute TaintEffect = "NoExecute"
 )
 
 // The pod this Toleration is attached to tolerates any taint that matches
 // the triple <key,value,effect> using the matching operator <operator>.
 type Toleration struct {
-	// Required. Key is the taint key that the toleration applies to.
+	// Key is the taint key that the toleration applies to. Empty means match all taint keys.
+	// If the key is empty, operator must be Exists; this combination means to match all values and all keys.
 	// +optional
 	Key string `json:"key,omitempty" patchStrategy:"merge" patchMergeKey:"key" protobuf:"bytes,1,opt,name=key"`
-	// operator represents a key's relationship to the value.
+	// Operator represents a key's relationship to the value.
 	// Valid operators are Exists and Equal. Defaults to Equal.
 	// Exists is equivalent to wildcard for value, so that a pod can
 	// tolerate all taints of a particular category.
@@ -2031,11 +2037,15 @@ type Toleration struct {
 	// +optional
 	Value string `json:"value,omitempty" protobuf:"bytes,3,opt,name=value"`
 	// Effect indicates the taint effect to match. Empty means match all taint effects.
-	// When specified, allowed values are NoSchedule and PreferNoSchedule.
+	// When specified, allowed values are NoSchedule, PreferNoSchedule and NoExecute.
 	// +optional
 	Effect TaintEffect `json:"effect,omitempty" protobuf:"bytes,4,opt,name=effect,casttype=TaintEffect"`
-	// TODO: For forgiveness (#1574), we'd eventually add at least a grace period
-	// here, and possibly an occurrence threshold and period.
+	// TolerationSeconds represents the period of time the toleration (which must be
+	// of effect NoExecute, otherwise this field is ignored) tolerates the taint. By default,
+	// it is not set, which means tolerate the taint forever (do not evict). Zero and
+	// negative values are not allowed.
+	// +optional
+	TolerationSeconds *int64 `json:"tolerationSeconds,omitempty" protobuf:"varint,5,opt,name=tolerationSeconds"`
 }
 
 // A toleration operator is the set of operators that can be used in a toleration.
