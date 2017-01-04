@@ -5,6 +5,7 @@ package restful
 // that can be found in the LICENSE file.
 
 import (
+	"fmt"
 	"os"
 	"reflect"
 	"runtime"
@@ -97,6 +98,7 @@ func (b *RouteBuilder) Notes(notes string) *RouteBuilder {
 func (b *RouteBuilder) Reads(sample interface{}) *RouteBuilder {
 	fn := b.typeNameHandleFunc
 	if fn == nil {
+		panic(fmt.Sprintf("called with nil typeNameHandleFunc: %s %T", b.currentPath, sample))
 		fn = reflectTypeName
 	}
 	typeAsName := fn(sample)
