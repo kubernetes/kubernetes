@@ -612,14 +612,27 @@ func (dc *DeploymentController) handleOverlap(d *extensions.Deployment, deployme
 		// deployments if this one has been marked deleted, we only update its status as long
 		// as it is not actually deleted.
 		if foundOverlaps && d.DeletionTimestamp == nil {
+			overlapping = true
+			// Look at the overlapping annotation in both deployments. If one of them has it and points
+			// to the other one then we don't need to compare their timestamps.
+			otherOverlapsWith := otherD.Annotations[util.OverlapAnnotation]
+			currentOverlapsWith := d.Annotations[util.OverlapAnnotation]
+			// The other deployment is already marked as overlapping with the current one.
+			if otherOverlapsWith == d.Name {
+				var err error
+				if d, err = dc.clearDeploymentOverlap(d, otherD.Name); err != nil {
+					errs = append(errs, err)
+				}
+				continue
+			}
+
 			otherCopy, err := util.DeploymentDeepCopy(otherD)
 			if err != nil {
 				return false, err
 			}
-			overlapping = true
 
 			// Skip syncing this one if older overlapping one is found.
-			if util.SelectorUpdatedBefore(otherCopy, d) {
+			if currentOverlapsWith == otherCopy.Name || util.SelectorUpdatedBefore(otherCopy, d) {
 				if _, err = dc.markDeploymentOverlap(d, otherCopy.Name); err != nil {
 					return false, err
 				}
