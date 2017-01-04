@@ -48,7 +48,11 @@ func (r *RBACAuthorizer) Authorize(requestAttributes authorizer.Attributes) (boo
 	glog.V(2).Infof("RBAC DENY: user %q groups %v cannot %q on \"%v.%v/%v\"", requestAttributes.GetUser().GetName(), requestAttributes.GetUser().GetGroups(),
 		requestAttributes.GetVerb(), requestAttributes.GetResource(), requestAttributes.GetAPIGroup(), requestAttributes.GetSubresource())
 
-	return false, fmt.Sprintf("%v", ruleResolutionError), nil
+	reason := ""
+	if ruleResolutionError != nil {
+		reason = fmt.Sprintf("%v", ruleResolutionError)
+	}
+	return false, reason, nil
 }
 
 func New(roles validation.RoleGetter, roleBindings validation.RoleBindingLister, clusterRoles validation.ClusterRoleGetter, clusterRoleBindings validation.ClusterRoleBindingLister) *RBACAuthorizer {
