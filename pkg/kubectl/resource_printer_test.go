@@ -256,7 +256,7 @@ func ErrorPrintHandler(obj *TestPrintType, w io.Writer, options PrintOptions) er
 func TestCustomTypePrinting(t *testing.T) {
 	columns := []string{"Data"}
 	printer := NewHumanReadablePrinter(PrintOptions{})
-	printer.Handler(columns, PrintCustomType)
+	printer.Handler(columns, nil, PrintCustomType)
 
 	obj := TestPrintType{"test object"}
 	buffer := &bytes.Buffer{}
@@ -273,7 +273,7 @@ func TestCustomTypePrinting(t *testing.T) {
 func TestCustomTypePrintingWithKind(t *testing.T) {
 	columns := []string{"Data"}
 	printer := NewHumanReadablePrinter(PrintOptions{})
-	printer.Handler(columns, PrintCustomType)
+	printer.Handler(columns, nil, PrintCustomType)
 	printer.EnsurePrintWithKind("test")
 
 	obj := TestPrintType{"test object"}
@@ -291,7 +291,7 @@ func TestCustomTypePrintingWithKind(t *testing.T) {
 func TestPrintHandlerError(t *testing.T) {
 	columns := []string{"Data"}
 	printer := NewHumanReadablePrinter(PrintOptions{})
-	printer.Handler(columns, ErrorPrintHandler)
+	printer.Handler(columns, nil, ErrorPrintHandler)
 	obj := TestPrintType{"test object"}
 	buffer := &bytes.Buffer{}
 	err := printer.PrintObj(&obj, buffer)
