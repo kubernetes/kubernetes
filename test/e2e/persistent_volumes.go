@@ -746,8 +746,6 @@ var _ = framework.KubeDescribe("PersistentVolumes", func() {
 			By("Deleting the Namespace")
 			err := c.Core().Namespaces().Delete(ns, nil)
 			Expect(err).NotTo(HaveOccurred())
-			err = framework.WaitForNamespacesDeleted(c, []string{ns}, 1*time.Minute)
-			Expect(err).NotTo(HaveOccurred())
 
 			By("Verifying Persistent Disk detaches")
 			err = waitForPDDetach(diskName, node)
