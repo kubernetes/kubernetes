@@ -31,8 +31,10 @@ import (
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/controller"
+	"k8s.io/kubernetes/pkg/controller/informers"
 	replicationcontroller "k8s.io/kubernetes/pkg/controller/replication"
 	resourcequotacontroller "k8s.io/kubernetes/pkg/controller/resourcequota"
 	"k8s.io/kubernetes/pkg/fields"
@@ -82,8 +84,13 @@ func TestQuota(t *testing.T) {
 	controllerCh := make(chan struct{})
 	defer close(controllerCh)
 
-	go replicationcontroller.NewReplicationManagerFromClientForIntegration(clientset, controller.NoResyncPeriodFunc, replicationcontroller.BurstReplicas, 4096).
-		Run(3, controllerCh)
+	informers := informers.NewSharedInformerFactory(clientset, nil, controller.NoResyncPeriodFunc())
+	podInformer := informers.Pods().Informer()
+	rcInformer := informers.ReplicationControllers().Informer()
+	rm := replicationcontroller.NewReplicationManager(podInformer, rcInformer, clientset, replicationcontroller.BurstReplicas, 4096, false)
+	rm.SetEventRecorder(&record.FakeRecorder{})
+	informers.Start(controllerCh)
+	go rm.Run(3, controllerCh)
 
 	resourceQuotaRegistry := quotainstall.NewRegistry(clientset, nil)
 	groupKindsToReplenish := []schema.GroupKind{
