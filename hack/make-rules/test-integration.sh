@@ -42,7 +42,7 @@ kube::test::find_integration_test_dirs() {
   (
     cd ${KUBE_ROOT}
     find test/integration/${1-} -name '*_test.go' -print0 \
-      | xargs -0n1 dirname \
+      | xargs -0n1 dirname | sed "s|^|${KUBE_GO_PACKAGE}/|" \
       | LC_ALL=C sort -u
   )
 }
