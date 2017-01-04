@@ -1003,7 +1003,10 @@ func DeploymentDeepCopy(deployment *extensions.Deployment) (*extensions.Deployme
 }
 
 // SelectorUpdatedBefore returns true if the former deployment's selector
-// is updated before the latter, false otherwise
+// is updated before the latter, false otherwise. Callers of this function
+// should first check for the existence of the overlapping annotation in
+// both provided deployments and skip calling this function in case one of
+// the deployments is already marked as overlapping the other one.
 func SelectorUpdatedBefore(d1, d2 *extensions.Deployment) bool {
 	t1, t2 := LastSelectorUpdate(d1), LastSelectorUpdate(d2)
 	return t1.Before(t2)
@@ -1013,7 +1016,7 @@ func SelectorUpdatedBefore(d1, d2 *extensions.Deployment) bool {
 func LastSelectorUpdate(d *extensions.Deployment) metav1.Time {
 	t := d.Annotations[SelectorUpdateAnnotation]
 	if len(t) > 0 {
-		parsedTime, err := time.Parse(t, time.RFC3339)
+		parsedTime, err := time.Parse(time.RFC3339, t)
 		// If failed to parse the time, use creation timestamp instead
 		if err != nil {
 			return d.CreationTimestamp
