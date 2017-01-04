@@ -550,31 +550,24 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 			}
 
 			klet.criHandler = ds
-			rs := ds.(internalapi.RuntimeService)
-			is := ds.(internalapi.ImageManagerService)
-			// This is an internal knob to switch between grpc and non-grpc
-			// integration.
-			// TODO: Remove this knob once we switch to using GRPC completely.
-			overGRPC := true
-			if overGRPC {
-				const (
-					// The unix socket for kubelet <-> dockershim communication.
-					ep = "/var/run/dockershim.sock"
-				)
-				kubeCfg.RemoteRuntimeEndpoint = ep
-				kubeCfg.RemoteImageEndpoint = ep
 
-				server := dockerremote.NewDockerServer(ep, ds)
-				glog.V(2).Infof("Starting the GRPC server for the docker CRI shim.")
-				err := server.Start()
-				if err != nil {
-					return nil, err
-				}
-				rs, is, err = getRuntimeAndImageServices(kubeCfg)
-				if err != nil {
-					return nil, err
-				}
+			const (
+				// The unix socket for kubelet <-> dockershim communication.
+				ep = "/var/run/dockershim.sock"
+			)
+			kubeCfg.RemoteRuntimeEndpoint = ep
+			kubeCfg.RemoteImageEndpoint = ep
+
+			server := dockerremote.NewDockerServer(ep, ds)
+			glog.V(2).Infof("Starting the GRPC server for the docker CRI shim.")
+			if err := server.Start(); err != nil {
+				return nil, err
 			}
+			rs, is, err := getRuntimeAndImageServices(kubeCfg)
+			if err != nil {
+				return nil, err
+			}
+
 			// Use DockerLegacyService directly to work around unimplemented
 			// functions in CRI.
 			// TODO: Remove this hack after CRI is fully implemented.
