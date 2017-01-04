@@ -16,6 +16,6 @@ limitations under the License.
 
 // Package healthz implements basic http server health checking.
 // Usage:
-//   import "k8s.io/kubernetes/pkg/healthz"
+//   import "k8s.io/apiserver/pkg/healthz"
 //   healthz.DefaultHealthz()
-package healthz // import "k8s.io/kubernetes/pkg/healthz"
+package healthz // import "k8s.io/apiserver/pkg/healthz"
