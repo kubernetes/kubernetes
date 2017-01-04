@@ -21,6 +21,7 @@ import (
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 )
 
+// +k8s:openapi-gen=legacy-name
 type KubeProxyConfiguration struct {
 	metav1.TypeMeta `json:",inline"`
 
@@ -99,6 +100,7 @@ const (
 	ProxyModeIPTables  ProxyMode = "iptables"
 )
 
+// +k8s:openapi-gen=legacy-name
 type KubeSchedulerConfiguration struct {
 	metav1.TypeMeta `json:",inline"`
 
@@ -177,6 +179,7 @@ type LeaderElectionConfiguration struct {
 	RetryPeriod metav1.Duration `json:"retryPeriod"`
 }
 
+// +k8s:openapi-gen=legacy-name
 type KubeletConfiguration struct {
 	metav1.TypeMeta `json:",inline"`
 

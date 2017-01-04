@@ -26,6 +26,7 @@ import (
 // +noMethods=true
 
 // ImageReview checks if the set of images in a pod are allowed.
+// +k8s:openapi-gen=legacy-name
 type ImageReview struct {
 	metav1.TypeMeta `json:",inline"`
 	// +optional

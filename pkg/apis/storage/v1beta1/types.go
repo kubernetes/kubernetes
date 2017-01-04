@@ -29,6 +29,7 @@ import (
 //
 // StorageClasses are non-namespaced; the name of the storage class
 // according to etcd is in ObjectMeta.Name.
+// +k8s:openapi-gen=legacy-name
 type StorageClass struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard object's metadata.
@@ -46,6 +47,7 @@ type StorageClass struct {
 }
 
 // StorageClassList is a collection of storage classes.
+// +k8s:openapi-gen=legacy-name
 type StorageClassList struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard list metadata

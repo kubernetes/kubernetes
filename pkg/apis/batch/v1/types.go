@@ -24,6 +24,7 @@ import (
 // +genclient=true
 
 // Job represents the configuration of a single job.
+// +k8s:openapi-gen=legacy-name
 type Job struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard object's metadata.
@@ -43,6 +44,7 @@ type Job struct {
 }
 
 // JobList is a collection of jobs.
+// +k8s:openapi-gen=legacy-name
 type JobList struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard list metadata

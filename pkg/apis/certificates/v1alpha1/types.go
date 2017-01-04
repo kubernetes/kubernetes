@@ -25,6 +25,7 @@ import (
 // +nonNamespaced=true
 
 // Describes a certificate signing request
+// +k8s:openapi-gen=legacy-name
 type CertificateSigningRequest struct {
 	metav1.TypeMeta `json:",inline"`
 	// +optional
@@ -88,6 +89,7 @@ type CertificateSigningRequestCondition struct {
 	LastUpdateTime metav1.Time `json:"lastUpdateTime,omitempty" protobuf:"bytes,4,opt,name=lastUpdateTime"`
 }
 
+// +k8s:openapi-gen=legacy-name
 type CertificateSigningRequestList struct {
 	metav1.TypeMeta `json:",inline"`
 	// +optional

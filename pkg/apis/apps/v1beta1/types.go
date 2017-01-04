@@ -29,6 +29,7 @@ import (
 //  - Storage: As many VolumeClaims as requested.
 // The StatefulSet guarantees that a given network identity will always
 // map to the same storage identity.
+// +k8s:openapi-gen=legacy-name
 type StatefulSet struct {
 	metav1.TypeMeta `json:",inline"`
 	// +optional
@@ -95,6 +96,7 @@ type StatefulSetStatus struct {
 }
 
 // StatefulSetList is a collection of StatefulSets.
+// +k8s:openapi-gen=legacy-name
 type StatefulSetList struct {
 	metav1.TypeMeta `json:",inline"`
 	// +optional

@@ -23,6 +23,7 @@ import (
 
 // +genclient=true
 
+// +k8s:openapi-gen=legacy-name
 type TestType struct {
 	metav1.TypeMeta `json:",inline"`
 	// ---
@@ -35,6 +36,7 @@ type TestType struct {
 	Status TestTypeStatus `json:"status,omitempty"`
 }
 
+// +k8s:openapi-gen=legacy-name
 type TestTypeList struct {
 	metav1.TypeMeta `json:",inline"`
 	// +optional

@@ -417,6 +417,7 @@ type PersistentVolumeSource struct {
 // PersistentVolume (PV) is a storage resource provisioned by an administrator.
 // It is analogous to a node.
 // More info: http://kubernetes.io/docs/user-guide/persistent-volumes
+// +k8s:openapi-gen=legacy-name
 type PersistentVolume struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard object's metadata.
@@ -495,6 +496,7 @@ type PersistentVolumeStatus struct {
 }
 
 // PersistentVolumeList is a list of PersistentVolume items.
+// +k8s:openapi-gen=legacy-name
 type PersistentVolumeList struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard list metadata.
@@ -509,6 +511,7 @@ type PersistentVolumeList struct {
 // +genclient=true
 
 // PersistentVolumeClaim is a user's request for and claim to a persistent volume
+// +k8s:openapi-gen=legacy-name
 type PersistentVolumeClaim struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard object's metadata.
@@ -529,6 +532,7 @@ type PersistentVolumeClaim struct {
 }
 
 // PersistentVolumeClaimList is a list of PersistentVolumeClaim items.
+// +k8s:openapi-gen=legacy-name
 type PersistentVolumeClaimList struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard list metadata.
@@ -2247,6 +2251,7 @@ type PodStatus struct {
 }
 
 // PodStatusResult is a wrapper for PodStatus returned by kubelet that can be encode/decoded
+// +k8s:openapi-gen=legacy-name
 type PodStatusResult struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard object's metadata.
@@ -2266,6 +2271,7 @@ type PodStatusResult struct {
 
 // Pod is a collection of containers that can run on a host. This resource is created
 // by clients and scheduled onto hosts.
+// +k8s:openapi-gen=legacy-name
 type Pod struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard object's metadata.
@@ -2288,6 +2294,7 @@ type Pod struct {
 }
 
 // PodList is a list of Pods.
+// +k8s:openapi-gen=legacy-name
 type PodList struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard list metadata.
@@ -2316,6 +2323,7 @@ type PodTemplateSpec struct {
 // +genclient=true
 
 // PodTemplate describes a template for creating copies of a predefined pod.
+// +k8s:openapi-gen=legacy-name
 type PodTemplate struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard object's metadata.
@@ -2330,6 +2338,7 @@ type PodTemplate struct {
 }
 
 // PodTemplateList is a list of PodTemplates.
+// +k8s:openapi-gen=legacy-name
 type PodTemplateList struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard list metadata.
@@ -2435,6 +2444,7 @@ type ReplicationControllerCondition struct {
 // +genclient=true
 
 // ReplicationController represents the configuration of a replication controller.
+// +k8s:openapi-gen=legacy-name
 type ReplicationController struct {
 	metav1.TypeMeta `json:",inline"`
 
@@ -2459,6 +2469,7 @@ type ReplicationController struct {
 }
 
 // ReplicationControllerList is a collection of replication controllers.
+// +k8s:openapi-gen=legacy-name
 type ReplicationControllerList struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard list metadata.
@@ -2670,6 +2681,7 @@ type ServicePort struct {
 // Service is a named abstraction of software service (for example, mysql) consisting of local port
 // (for example 3306) that the proxy listens on, and the selector that determines which pods
 // will answer requests sent through the proxy.
+// +k8s:openapi-gen=legacy-name
 type Service struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard object's metadata.
@@ -2697,6 +2709,7 @@ const (
 )
 
 // ServiceList holds a list of services.
+// +k8s:openapi-gen=legacy-name
 type ServiceList struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard list metadata.
@@ -2714,6 +2727,7 @@ type ServiceList struct {
 // * a name, understood by users, and perhaps by peripheral systems, for an identity
 // * a principal that can be authenticated and authorized
 // * a set of secrets
+// +k8s:openapi-gen=legacy-name
 type ServiceAccount struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard object's metadata.
@@ -2735,6 +2749,7 @@ type ServiceAccount struct {
 }
 
 // ServiceAccountList is a list of ServiceAccount objects
+// +k8s:openapi-gen=legacy-name
 type ServiceAccountList struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard list metadata.
@@ -2761,6 +2776,7 @@ type ServiceAccountList struct {
 //       Ports: [{"name": "a", "port": 93}, {"name": "b", "port": 76}]
 //     },
 //  ]
+// +k8s:openapi-gen=legacy-name
 type Endpoints struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard object's metadata.
@@ -2842,6 +2858,7 @@ type EndpointPort struct {
 }
 
 // EndpointsList is a list of endpoints.
+// +k8s:openapi-gen=legacy-name
 type EndpointsList struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard list metadata.
@@ -3119,6 +3136,7 @@ type ResourceList map[ResourceName]resource.Quantity
 
 // Node is a worker node in Kubernetes.
 // Each node will have a unique identifier in the cache (i.e. in etcd).
+// +k8s:openapi-gen=legacy-name
 type Node struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard object's metadata.
@@ -3140,6 +3158,7 @@ type Node struct {
 }
 
 // NodeList is the whole list of all Nodes which have been registered with master.
+// +k8s:openapi-gen=legacy-name
 type NodeList struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard list metadata.
@@ -3191,6 +3210,7 @@ const (
 
 // Namespace provides a scope for Names.
 // Use of multiple namespaces is optional.
+// +k8s:openapi-gen=legacy-name
 type Namespace struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard object's metadata.
@@ -3210,6 +3230,7 @@ type Namespace struct {
 }
 
 // NamespaceList is a list of Namespaces.
+// +k8s:openapi-gen=legacy-name
 type NamespaceList struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard list metadata.
@@ -3224,6 +3245,7 @@ type NamespaceList struct {
 
 // Binding ties one object to another.
 // For example, a pod is bound to a node by a scheduler.
+// +k8s:openapi-gen=legacy-name
 type Binding struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard object's metadata.
@@ -3243,6 +3265,7 @@ type Preconditions struct {
 }
 
 // DeleteOptions may be provided when deleting an API object
+// +k8s:openapi-gen=legacy-name
 type DeleteOptions struct {
 	metav1.TypeMeta `json:",inline"`
 
@@ -3265,6 +3288,7 @@ type DeleteOptions struct {
 }
 
 // ListOptions is the query options to a standard REST list call.
+// +k8s:openapi-gen=legacy-name
 type ListOptions struct {
 	metav1.TypeMeta `json:",inline"`
 
@@ -3294,6 +3318,7 @@ type ListOptions struct {
 }
 
 // PodLogOptions is the query options for a Pod's logs REST call.
+// +k8s:openapi-gen=legacy-name
 type PodLogOptions struct {
 	metav1.TypeMeta `json:",inline"`
 
@@ -3337,6 +3362,7 @@ type PodLogOptions struct {
 // ---
 // TODO: merge w/ PodExecOptions below for stdin, stdout, etc
 // and also when we cut V2, we should export a "StreamOptions" or somesuch that contains Stdin, Stdout, Stder and TTY
+// +k8s:openapi-gen=legacy-name
 type PodAttachOptions struct {
 	metav1.TypeMeta `json:",inline"`
 
@@ -3372,6 +3398,7 @@ type PodAttachOptions struct {
 // ---
 // TODO: This is largely identical to PodAttachOptions above, make sure they stay in sync and see about merging
 // and also when we cut V2, we should export a "StreamOptions" or somesuch that contains Stdin, Stdout, Stder and TTY
+// +k8s:openapi-gen=legacy-name
 type PodExecOptions struct {
 	metav1.TypeMeta `json:",inline"`
 
@@ -3405,6 +3432,7 @@ type PodExecOptions struct {
 }
 
 // PodProxyOptions is the query options to a Pod's proxy call.
+// +k8s:openapi-gen=legacy-name
 type PodProxyOptions struct {
 	metav1.TypeMeta `json:",inline"`
 
@@ -3414,6 +3442,7 @@ type PodProxyOptions struct {
 }
 
 // NodeProxyOptions is the query options to a Node's proxy call.
+// +k8s:openapi-gen=legacy-name
 type NodeProxyOptions struct {
 	metav1.TypeMeta `json:",inline"`
 
@@ -3423,6 +3452,7 @@ type NodeProxyOptions struct {
 }
 
 // ServiceProxyOptions is the query options to a Service's proxy call.
+// +k8s:openapi-gen=legacy-name
 type ServiceProxyOptions struct {
 	metav1.TypeMeta `json:",inline"`
 
@@ -3484,6 +3514,7 @@ type LocalObjectReference struct {
 }
 
 // SerializedReference is a reference to serialized object.
+// +k8s:openapi-gen=legacy-name
 type SerializedReference struct {
 	metav1.TypeMeta `json:",inline"`
 	// The reference to an object in the system.
@@ -3513,6 +3544,7 @@ const (
 
 // Event is a report of an event somewhere in the cluster.
 // TODO: Decide whether to store these separately or with the object they apply to.
+// +k8s:openapi-gen=legacy-name
 type Event struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard object's metadata.
@@ -3555,6 +3587,7 @@ type Event struct {
 }
 
 // EventList is a list of events.
+// +k8s:openapi-gen=legacy-name
 type EventList struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard list metadata.
@@ -3567,6 +3600,7 @@ type EventList struct {
 }
 
 // List holds a list of objects, which may not be known by the server.
+// +k8s:openapi-gen=legacy-name
 type List struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard list metadata.
@@ -3621,6 +3655,7 @@ type LimitRangeSpec struct {
 // +genclient=true
 
 // LimitRange sets resource usage limits for each kind of resource in a Namespace.
+// +k8s:openapi-gen=legacy-name
 type LimitRange struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard object's metadata.
@@ -3635,6 +3670,7 @@ type LimitRange struct {
 }
 
 // LimitRangeList is a list of LimitRange items.
+// +k8s:openapi-gen=legacy-name
 type LimitRangeList struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard list metadata.
@@ -3719,6 +3755,7 @@ type ResourceQuotaStatus struct {
 // +genclient=true
 
 // ResourceQuota sets aggregate quota restrictions enforced per namespace
+// +k8s:openapi-gen=legacy-name
 type ResourceQuota struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard object's metadata.
@@ -3738,6 +3775,7 @@ type ResourceQuota struct {
 }
 
 // ResourceQuotaList is a list of ResourceQuota items.
+// +k8s:openapi-gen=legacy-name
 type ResourceQuotaList struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard list metadata.
@@ -3754,6 +3792,7 @@ type ResourceQuotaList struct {
 
 // Secret holds secret data of a certain type. The total bytes of the values in
 // the Data field must be less than MaxSecretSize bytes.
+// +k8s:openapi-gen=legacy-name
 type Secret struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard object's metadata.
@@ -3866,6 +3905,7 @@ const (
 )
 
 // SecretList is a list of Secret.
+// +k8s:openapi-gen=legacy-name
 type SecretList struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard list metadata.
@@ -3881,6 +3921,7 @@ type SecretList struct {
 // +genclient=true
 
 // ConfigMap holds configuration data for pods to consume.
+// +k8s:openapi-gen=legacy-name
 type ConfigMap struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard object's metadata.
@@ -3895,6 +3936,7 @@ type ConfigMap struct {
 }
 
 // ConfigMapList is a resource containing a list of ConfigMap objects.
+// +k8s:openapi-gen=legacy-name
 type ConfigMapList struct {
 	metav1.TypeMeta `json:",inline"`
 
@@ -3936,6 +3978,7 @@ type ComponentCondition struct {
 // +nonNamespaced=true
 
 // ComponentStatus (and ComponentStatusList) holds the cluster validation info.
+// +k8s:openapi-gen=legacy-name
 type ComponentStatus struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard object's metadata.
@@ -3949,6 +3992,7 @@ type ComponentStatus struct {
 }
 
 // Status of all the conditions for the component as a list of ComponentStatus objects.
+// +k8s:openapi-gen=legacy-name
 type ComponentStatusList struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard list metadata.
@@ -4054,6 +4098,7 @@ type SELinuxOptions struct {
 }
 
 // RangeAllocation is not a public type.
+// +k8s:openapi-gen=legacy-name
 type RangeAllocation struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard object's metadata.

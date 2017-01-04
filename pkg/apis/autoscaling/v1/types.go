@@ -74,6 +74,7 @@ type HorizontalPodAutoscalerStatus struct {
 // +genclient=true
 
 // configuration of a horizontal pod autoscaler.
+// +k8s:openapi-gen=legacy-name
 type HorizontalPodAutoscaler struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard object metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
@@ -90,6 +91,7 @@ type HorizontalPodAutoscaler struct {
 }
 
 // list of horizontal pod autoscaler objects.
+// +k8s:openapi-gen=legacy-name
 type HorizontalPodAutoscalerList struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard list metadata.
@@ -101,6 +103,7 @@ type HorizontalPodAutoscalerList struct {
 }
 
 // Scale represents a scaling request for a resource.
+// +k8s:openapi-gen=legacy-name
 type Scale struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard object metadata; More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata.

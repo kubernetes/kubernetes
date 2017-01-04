@@ -21,6 +21,7 @@ import (
 )
 
 // Policy contains a single ABAC policy rule
+// +k8s:openapi-gen=legacy-name
 type Policy struct {
 	metav1.TypeMeta
 

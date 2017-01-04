@@ -24,6 +24,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/restclient"
 )
 
+// +k8s:openapi-gen=legacy-name
 type Policy struct {
 	metav1.TypeMeta `json:",inline"`
 	// Holds the information to configure the fit predicate functions

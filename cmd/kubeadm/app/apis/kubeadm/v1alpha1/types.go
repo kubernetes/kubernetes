@@ -20,6 +20,7 @@ import (
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 )
 
+// +k8s:openapi-gen=legacy-name
 type MasterConfiguration struct {
 	metav1.TypeMeta `json:",inline"`
 
@@ -70,6 +71,14 @@ type Etcd struct {
 	KeyFile   string   `json:"keyFile"`
 }
 
+type Secrets struct {
+	GivenToken  string `json:"givenToken"`  // dot-separated `<TokenID>.<Token>` set by the user
+	TokenID     string `json:"tokenID"`     // optional on master side, will be generated if not specified
+	Token       []byte `json:"token"`       // optional on master side, will be generated if not specified
+	BearerToken string `json:"bearerToken"` // set based on Token
+}
+
+// +k8s:openapi-gen=legacy-name
 type NodeConfiguration struct {
 	metav1.TypeMeta `json:",inline"`
 
@@ -77,6 +86,7 @@ type NodeConfiguration struct {
 }
 
 // ClusterInfo TODO add description
+// +k8s:openapi-gen=legacy-name
 type ClusterInfo struct {
 	metav1.TypeMeta `json:",inline"`
 	// TODO(phase1+) this may become simply `api.Config`

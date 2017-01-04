@@ -94,6 +94,7 @@ type ClusterStatus struct {
 // +nonNamespaced=true
 
 // Information about a registered cluster in a federated kubernetes setup. Clusters are not namespaced and have unique names in the federation.
+// +k8s:openapi-gen=legacy-name
 type Cluster struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard object's metadata.
@@ -110,6 +111,7 @@ type Cluster struct {
 }
 
 // A list of all the kubernetes clusters registered to the federation
+// +k8s:openapi-gen=legacy-name
 type ClusterList struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard list metadata.

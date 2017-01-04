@@ -30,6 +30,7 @@ import (
 // TokenReview attempts to authenticate a token to a known user.
 // Note: TokenReview requests may be cached by the webhook token authenticator
 // plugin in the kube-apiserver.
+// +k8s:openapi-gen=legacy-name
 type TokenReview struct {
 	metav1.TypeMeta `json:",inline"`
 	// +optional

@@ -22,6 +22,7 @@ import (
 )
 
 // APIServiceList is a list of APIService objects.
+// +k8s:openapi-gen=legacy-name
 type APIServiceList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
@@ -73,6 +74,7 @@ type APIServiceStatus struct {
 
 // APIService represents a server for a particular GroupVersion.
 // Name must be "version.group".
+// +k8s:openapi-gen=legacy-name
 type APIService struct {
 	metav1.TypeMeta `json:",inline"`
 	kapi.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
