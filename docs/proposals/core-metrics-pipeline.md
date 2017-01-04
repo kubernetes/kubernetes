@@ -85,7 +85,7 @@ More details on how I intend to achieve these high level goals can be found in t
 
 In order to continue to provide the full summary API, either the kubelet or a stand-alone version of cAdvisor will need to publish these metrics.
 
-I propose that this Core Metrics API be an unversioned, internal API so that making changes is simpler.  However, if scheduling decisions are made based on these metrics, it will have to be versioned to handle version skew between the API server and Kubelet.
+This Core Metrics API be versioned to account for version-skew between kubernetes components.
 
 This proposal purposefully omits many metrics that may eventually become core metrics.  This is by design.  Once metrics are needed for an internal use case, they can be added to the core metrics API.
 
