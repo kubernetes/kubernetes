@@ -233,7 +233,7 @@ func kubeletCommand(kOp kubeletOpt, c clientset.Interface, pod *v1.Pod) {
 	nodeIP, err := framework.GetHostExternalAddress(c, pod)
 	Expect(err).NotTo(HaveOccurred())
 	nodeIP = nodeIP + ":22"
-	sshResult, err := framework.SSH("/etc/init.d/kubelet "+string(kOp), nodeIP, framework.TestContext.Provider)
+	sshResult, err := framework.SSH("sudo /etc/init.d/kubelet "+string(kOp), nodeIP, framework.TestContext.Provider)
 	Expect(err).NotTo(HaveOccurred())
 	framework.LogSSHResult(sshResult)
 
