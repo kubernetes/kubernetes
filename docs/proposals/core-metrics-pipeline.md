@@ -28,6 +28,7 @@ This document proposes a design for an internal Core Metrics Pipeline.
 ## Introduction
 
 ### Background
+The [Monitoring Architecture](https://github.com/kubernetes/kubernetes/blob/master/docs/design/monitoring_architecture.md) proposal contains a blueprint for a set of metrics referred to as "Core Metrics".  The purpose of this proposal is to specify what those metrics are, and how they will be collected on the node.
 
 CAdvisor is an open source container monitoring solution which only monitors containers, and has no concept of k8s constructs like pods or volumes.  Kubernetes vendors cAdvisor into its codebase, and uses cAdvisor as a library with functions that enable it to collect metrics on containers.  The kubelet can then combine container-level metrics from cAdvisor with the kubelet's knowledge of k8s constructs like pods to produce the kubelet Summary statistics, which provides metrics for use by the kubelet, or by users through the Summary API.  cAdvisor works by collecting metrics at an interval (10 seconds), and the kubelet then simply querries these cached metrics whenever it has a need for them.
 
@@ -45,19 +46,12 @@ CAdvisor is structured to collect metrics on an interval, which is appropriate f
 
 ### Proposal
 
-I propose to have a two seperate monitoring pipelines.
- - The first is an internal, "Core Metrics" pipeline, which provides only those metrics consumed by kubernetes system components.
- - The second is an external, independent "Third Party Metrics" pipeline, which provides metrics for users of kubernetes.
-
-The proposed metrics pipelines would bound the resources that the kubelet consumes, and create a seperation of concerns for kubelet metrics and user metrics.  This proposal also paves the way for simpler third party metrics integration, although that is not covered in this proposal.
+I propose to create a set of core metrics, collected by the kubelet, and used solely by internal kubernetes components.
 
 ### Non Goals
-
-Third Party Metric Provider integration will not be tackled in this proposal. This includes both possibly providing a kubelet metadata (pod-container mappings, volume-pod mappings, etc) API, and a possible standardized metrics APIs for metrics providers to conform to.
+Everything covered in the [Monitoring Architecture](https://github.com/kubernetes/kubernetes/blob/master/docs/design/monitoring_architecture.md) design doc.  This includes the third party metrics pipeline, and the methods by which the metrics found in this proposal are provided to other kubernetes components.
 
 Integration with CRI will not be covered in this proposal.  In future proposals, integrating with CRI may provide a better abstraction of information required by the core metrics pipeline to collect metrics.
-
-Methods for pushing these metrics to various kubernetes components will not be covered.  This proposal does not cover any future "metrics-server", but these metrics could easily be pushed to whatever components require them.
 
 ## Design
 
