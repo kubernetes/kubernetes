@@ -17,7 +17,7 @@ plane.
 The Kubernetes node has the services necessary to run application containers and
 be managed from the master systems.
 
-Each node runs Docker, of course.  Docker takes care of the details of
+Each node runs a container runtime (like Docker, rkt or Hyper) The container runtime is responsible for
 downloading images and running containers.
 
 ### `kubelet`
