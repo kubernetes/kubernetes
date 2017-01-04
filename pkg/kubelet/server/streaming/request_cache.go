@@ -20,6 +20,7 @@ import (
 	"container/list"
 	"crypto/rand"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"math"
 	"sync"
@@ -29,10 +30,12 @@ import (
 )
 
 var (
-	CacheTTL     = 5 * time.Minute
-	CacheMaxSize = 10000
+	CacheTTL     = 1 * time.Minute
+	CacheMaxSize = 1000
 	TokenLen     = 24
 )
+
+var errCacheFull = errors.New("request cache full")
 
 type requestCache struct {
 	// clock is used to obtain the current time
@@ -61,30 +64,21 @@ func newRequestCache() *requestCache {
 	}
 }
 
-func (c *requestCache) startGC() {
-	gcTicker := c.clock.Tick(CacheTTL)
-	go func() {
-		for range gcTicker {
-			c.gc()
-		}
-	}()
-}
-
 // Insert the given request into the cache and returns the token used for fetching it out.
 func (c *requestCache) Insert(req request) (token string, err error) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
+
+	c.gc() // Remove expired entries.
+	// If the cache is full, reject the request.
+	if c.ll.Len() == CacheMaxSize {
+		return "", errCacheFull
+	}
 	token, err = c.uniqueToken()
 	if err != nil {
 		return "", err
 	}
 	ele := c.ll.PushFront(&cacheEntry{token, req, c.clock.Now().Add(CacheTTL)})
-	if c.ll.Len() > CacheMaxSize {
-		// Remove the oldest element.
-		oldest := c.ll.Back()
-		delete(c.tokens, oldest.Value.(*cacheEntry).token)
-		c.ll.Remove(oldest)
-	}
 
 	c.tokens[token] = ele
 	return token, nil
@@ -129,9 +123,8 @@ func (c *requestCache) uniqueToken() (string, error) {
 	return "", fmt.Errorf("failed to generate unique token")
 }
 
+// Must be write-locked prior to calling.
 func (c *requestCache) gc() {
-	c.lock.Lock()
-	defer c.lock.Unlock()
 	for c.ll.Len() > 0 {
 		oldest := c.ll.Back()
 		entry := oldest.Value.(*cacheEntry)
