@@ -1686,16 +1686,16 @@ func validateTaintEffect(effect *api.TaintEffect, allowEmpty bool, fldPath *fiel
 
 	allErrors := field.ErrorList{}
 	switch *effect {
-	// TODO: Replace next line with subsequent commented-out line when implement TaintEffectNoScheduleNoAdmit, TaintEffectNoScheduleNoAdmitNoExecute.
-	case api.TaintEffectNoSchedule, api.TaintEffectPreferNoSchedule:
-		// case api.TaintEffectNoSchedule, api.TaintEffectPreferNoSchedule, api.TaintEffectNoScheduleNoAdmit, api.TaintEffectNoScheduleNoAdmitNoExecute:
+	// TODO: Replace next line with subsequent commented-out line when implement TaintEffectNoScheduleNoAdmit.
+	case api.TaintEffectNoSchedule, api.TaintEffectPreferNoSchedule, api.TaintEffectNoExecute:
+		// case api.TaintEffectNoSchedule, api.TaintEffectPreferNoSchedule, api.TaintEffectNoScheduleNoAdmit, api.TaintEffectNoExecute:
 	default:
 		validValues := []string{
 			string(api.TaintEffectNoSchedule),
 			string(api.TaintEffectPreferNoSchedule),
-			// TODO: Uncomment this block when implement TaintEffectNoScheduleNoAdmit, TaintEffectNoScheduleNoAdmitNoExecute.
+			string(api.TaintEffectNoExecute),
+			// TODO: Uncomment this block when implement TaintEffectNoScheduleNoAdmit.
 			// string(api.TaintEffectNoScheduleNoAdmit),
-			// string(api.TaintEffectNoScheduleNoAdmitNoExecute),
 		}
 		allErrors = append(allErrors, field.NotSupported(fldPath, effect, validValues))
 	}
@@ -1708,10 +1708,30 @@ func validateTolerations(tolerations []api.Toleration, fldPath *field.Path) fiel
 	for i, toleration := range tolerations {
 		idxPath := fldPath.Index(i)
 		// validate the toleration key
-		allErrors = append(allErrors, unversionedvalidation.ValidateLabelName(toleration.Key, idxPath.Child("key"))...)
+		if len(toleration.Key) > 0 {
+			allErrors = append(allErrors, unversionedvalidation.ValidateLabelName(toleration.Key, idxPath.Child("key"))...)
+		}
+
+		// empty toleration key with Exists operator and empty value means match all taints
+		if len(toleration.Key) == 0 && toleration.Operator != api.TolerationOpExists {
+			allErrors = append(allErrors, field.Invalid(idxPath.Child("operator"), toleration.Operator,
+				"operator must be Exists when `key` is empty, which means \"match all values and all keys\""))
+		}
+
+		if toleration.TolerationSeconds != nil {
+			if *toleration.TolerationSeconds <= 0 {
+				allErrors = append(allErrors, field.Invalid(idxPath.Child("tolerationSeconds"), toleration.TolerationSeconds,
+					"tolerationSeconds must be greater than zero when set"))
+			}
+			if toleration.Effect != api.TaintEffectNoExecute {
+				allErrors = append(allErrors, field.Invalid(idxPath.Child("effect"), toleration.Effect,
+					"effect must be 'NoExecute' when `tolerationSeconds` is set"))
+			}
+		}
 
 		// validate toleration operator and value
 		switch toleration.Operator {
+		// empty operator means Equal
 		case api.TolerationOpEqual, "":
 			if errs := validation.IsValidLabelValue(toleration.Value); len(errs) != 0 {
 				allErrors = append(allErrors, field.Invalid(idxPath.Child("operator"), toleration.Value, strings.Join(errs, ";")))
@@ -1725,7 +1745,7 @@ func validateTolerations(tolerations []api.Toleration, fldPath *field.Path) fiel
 			allErrors = append(allErrors, field.NotSupported(idxPath.Child("operator"), toleration.Operator, validValues))
 		}
 
-		// validate toleration effect
+		// validate toleration effect, empty toleration effect means match all taint effects
 		if len(toleration.Effect) > 0 {
 			allErrors = append(allErrors, validateTaintEffect(&toleration.Effect, true, idxPath.Child("effect"))...)
 		}

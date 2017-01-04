@@ -3275,6 +3275,48 @@ func TestValidatePod(t *testing.T) {
 				},
 			}),
 		},
+		{ // populate forgiveness tolerations with exists operator in annotations.
+			ObjectMeta: api.ObjectMeta{
+				Name:      "123",
+				Namespace: "ns",
+				Annotations: map[string]string{
+					api.TolerationsAnnotationKey: `
+					[{
+						"key": "foo",
+						"operator": "Exists",
+						"value": "",
+						"effect": "NoExecute",
+						"tolerationSeconds": 60
+					}]`,
+				},
+			},
+			Spec: api.PodSpec{
+				Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
+				RestartPolicy: api.RestartPolicyAlways,
+				DNSPolicy:     api.DNSClusterFirst,
+			},
+		},
+		{ // populate forgiveness tolerations with equal operator in annotations.
+			ObjectMeta: api.ObjectMeta{
+				Name:      "123",
+				Namespace: "ns",
+				Annotations: map[string]string{
+					api.TolerationsAnnotationKey: `
+					[{
+						"key": "foo",
+						"operator": "Equal",
+						"value": "bar",
+						"effect": "NoExecute",
+						"tolerationSeconds": 60
+					}]`,
+				},
+			},
+			Spec: api.PodSpec{
+				Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
+				RestartPolicy: api.RestartPolicyAlways,
+				DNSPolicy:     api.DNSClusterFirst,
+			},
+		},
 		{ // populate tolerations equal operator in annotations.
 			ObjectMeta: api.ObjectMeta{
 				Name:      "123",
@@ -3306,7 +3348,21 @@ func TestValidatePod(t *testing.T) {
 			},
 			Spec: validPodSpec(nil),
 		},
-		{ // empty operator is ok for toleration
+		{ // empty key with Exists operator is OK for toleration, empty toleration key means match all taint keys.
+			ObjectMeta: api.ObjectMeta{
+				Name:      "123",
+				Namespace: "ns",
+				Annotations: map[string]string{
+					api.TolerationsAnnotationKey: `
+					[{
+						"operator": "Exists",
+						"effect": "NoSchedule"
+					}]`,
+				},
+			},
+			Spec: validPodSpec(nil),
+		},
+		{ // empty operator is OK for toleration, defaults to Equal.
 			ObjectMeta: api.ObjectMeta{
 				Name:      "123",
 				Namespace: "ns",
@@ -3321,7 +3377,7 @@ func TestValidatePod(t *testing.T) {
 			},
 			Spec: validPodSpec(nil),
 		},
-		{ // empty efffect is ok for toleration
+		{ // empty effect is OK for toleration, empty toleration effect means match all taint effects.
 			ObjectMeta: api.ObjectMeta{
 				Name:      "123",
 				Namespace: "ns",
@@ -3789,6 +3845,54 @@ func TestValidatePod(t *testing.T) {
 						"operator": "Exists",
 						"value": "bar",
 						"effect": "NoSchedule"
+					}]`,
+				},
+			},
+			Spec: validPodSpec(nil),
+		},
+
+		"operator must be 'Exists' when `key` is empty": {
+			ObjectMeta: api.ObjectMeta{
+				Name:      "123",
+				Namespace: "ns",
+				Annotations: map[string]string{
+					api.TolerationsAnnotationKey: `
+					[{
+						"operator": "Equal",
+						"value": "bar",
+						"effect": "NoSchedule"
+					}]`,
+				},
+			},
+			Spec: validPodSpec(nil),
+		},
+		"effect must be 'NoExecute' when `TolerationSeconds` is set": {
+			ObjectMeta: api.ObjectMeta{
+				Name:      "pod-forgiveness-invalid",
+				Namespace: "ns",
+				Annotations: map[string]string{
+					api.TolerationsAnnotationKey: `
+					[{
+						"key": "node.alpha.kubernetes.io/notReady",
+						"operator": "Exists",
+						"effect": "NoSchedule",
+						"tolerationSeconds": 20
+					}]`,
+				},
+			},
+			Spec: validPodSpec(nil),
+		},
+		"tolerationSeconds must be greater than zero when set": {
+			ObjectMeta: api.ObjectMeta{
+				Name:      "pod-forgiveness-invalid",
+				Namespace: "ns",
+				Annotations: map[string]string{
+					api.TolerationsAnnotationKey: `
+					[{
+						"key": "node.alpha.kubernetes.io/notReady",
+						"operator": "Exists",
+						"effect": "NoExecute",
+						"tolerationSeconds": 0
 					}]`,
 				},
 			},
@@ -5823,7 +5927,7 @@ func TestValidateNode(t *testing.T) {
 				ExternalID: "external",
 			},
 		},
-		"invalide-taint-effect": {
+		"invalid-taint-effect": {
 			ObjectMeta: api.ObjectMeta{
 				Name: "dedicated-node3",
 				// Add a taint with an empty effect to a node
@@ -5832,7 +5936,7 @@ func TestValidateNode(t *testing.T) {
 					[{
 						"key": "dedicated",
 						"value": "special-user-3",
-						"effect": "NoExecute"
+						"effect": "NoScheduleNoAdmit"
 					}]`,
 				},
 			},
