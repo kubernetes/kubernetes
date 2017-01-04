@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -31,13 +31,14 @@ func (lk LocalkubeServer) NewAPIServer() Server {
 
 func StartAPIServer(lk LocalkubeServer) func() error {
 	s := options.NewServerRunOptions()
+
 	s.SecureServing.ServingOptions.BindAddress = lk.APIServerAddress
 	s.SecureServing.ServingOptions.BindPort = lk.APIServerPort
 
 	s.InsecureServing.BindAddress = lk.APIServerInsecureAddress
 	s.InsecureServing.BindPort = lk.APIServerInsecurePort
 
-	s.SecureServing.ClientCA = lk.GetCAPublicKeyCertPath()
+	s.Authentication.RequestHeader.ClientCAFile = lk.GetCAPublicKeyCertPath()
 	s.SecureServing.ServerCert.CertKey.CertFile = lk.GetPublicKeyCertPath()
 	s.SecureServing.ServerCert.CertKey.KeyFile = lk.GetPrivateKeyCertPath()
 
@@ -46,7 +47,7 @@ func StartAPIServer(lk LocalkubeServer) func() error {
 	s.Etcd.StorageConfig = storagebackend.Config{ServerList: KubeEtcdClientURLs}
 
 	// set Service IP range
-	s.GenericServerRunOptions.ServiceClusterIPRange = lk.ServiceClusterIPRange
+	s.ServiceClusterIPRange = lk.ServiceClusterIPRange
 
 	// defaults from apiserver command
 	s.GenericServerRunOptions.EnableProfiling = true

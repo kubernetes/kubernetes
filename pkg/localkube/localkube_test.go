@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,18 +18,37 @@ package localkube
 
 import (
 	"io/ioutil"
+	"log"
 	"net"
 	"os"
 	"path/filepath"
 	"testing"
-
-	"k8s.io/kubernetes/localkube/tests"
 )
 
 var testIPs = []net.IP{net.ParseIP("1.2.3.4")}
 
+func makeTempDir() string {
+	tempDir, err := ioutil.TempDir("", "minipath")
+	if err != nil {
+		log.Fatal(err)
+	}
+	err = os.MkdirAll(filepath.Join(tempDir, "addons"), 0777)
+	if err != nil {
+		log.Fatal(err)
+	}
+	err = os.MkdirAll(filepath.Join(tempDir, "cache", "iso"), 0777)
+	if err != nil {
+		log.Fatal(err)
+	}
+	err = os.MkdirAll(filepath.Join(tempDir, "cache", "localkube"), 0777)
+	if err != nil {
+		log.Fatal(err)
+	}
+	return tempDir
+}
+
 func TestGenerateCerts(t *testing.T) {
-	tempDir := tests.MakeTempDir()
+	tempDir := makeTempDir()
 	defer os.RemoveAll(tempDir)
 	os.Mkdir(filepath.Join(tempDir, "certs"), 0777)
 
@@ -64,7 +83,7 @@ func TestShouldGenerateCertsNoFiles(t *testing.T) {
 }
 
 func TestShouldGenerateCertsOneFile(t *testing.T) {
-	tempDir := tests.MakeTempDir()
+	tempDir := makeTempDir()
 	defer os.RemoveAll(tempDir)
 	os.Mkdir(filepath.Join(tempDir, "certs"), 0777)
 	ioutil.WriteFile(filepath.Join(tempDir, "certs", "apiserver.crt"), []byte(""), 0644)
@@ -75,7 +94,7 @@ func TestShouldGenerateCertsOneFile(t *testing.T) {
 }
 
 func TestShouldGenerateCertsBadFiles(t *testing.T) {
-	tempDir := tests.MakeTempDir()
+	tempDir := makeTempDir()
 	defer os.RemoveAll(tempDir)
 	os.Mkdir(filepath.Join(tempDir, "certs"), 0777)
 	for _, f := range []string{"apiserver.crt", "apiserver.key"} {
@@ -88,7 +107,7 @@ func TestShouldGenerateCertsBadFiles(t *testing.T) {
 }
 
 func TestShouldGenerateCertsMismatchedIP(t *testing.T) {
-	tempDir := tests.MakeTempDir()
+	tempDir := makeTempDir()
 	defer os.RemoveAll(tempDir)
 	os.Mkdir(filepath.Join(tempDir, "certs"), 0777)
 
@@ -106,7 +125,7 @@ func TestShouldGenerateCertsMismatchedIP(t *testing.T) {
 }
 
 func TestShouldNotGenerateCerts(t *testing.T) {
-	tempDir := tests.MakeTempDir()
+	tempDir := makeTempDir()
 	defer os.RemoveAll(tempDir)
 	os.Mkdir(filepath.Join(tempDir, "certs"), 0777)
 

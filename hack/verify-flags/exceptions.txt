@@ -5,6 +5,8 @@ cluster/aws/templates/configure-vm-aws.sh:  api_servers: '${API_SERVERS}'
 cluster/aws/templates/configure-vm-aws.sh:  env-to-grains "hostname_override"
 cluster/aws/templates/configure-vm-aws.sh:  env-to-grains "runtime_config"
 cluster/aws/templates/configure-vm-aws.sh:  kubelet_api_servers: '${KUBELET_APISERVER}'
+cluster/centos/util.sh:  local dns_domain=${DNS_DOMAIN#*@}
+cluster/centos/util.sh:  local dns_ip=${DNS_SERVER_IP#*@}
 cluster/centos/util.sh:  local node_ip=${node#*@}
 cluster/gce/configure-vm.sh:  advertise_address: '${EXTERNAL_IP}'
 cluster/gce/configure-vm.sh:  api_servers: '${KUBERNETES_MASTER_NAME}'
@@ -14,16 +16,19 @@ cluster/gce/configure-vm.sh:  env-to-grains "runtime_config"
 cluster/gce/configure-vm.sh:  kubelet_api_servers: '${KUBELET_APISERVER}'
 cluster/gce/container-linux/configure-helper.sh:    authorization_mode+=",ABAC"
 cluster/gce/container-linux/configure-helper.sh:    authorization_mode+=",Webhook"
+cluster/gce/container-linux/configure-helper.sh:    sed -i -e "s@{{ *pillar\['dns_domain'\] *}}@${DNS_DOMAIN}@g" "${dns_controller_file}"
 cluster/gce/container-linux/configure-helper.sh:  local api_servers="--master=https://${KUBERNETES_MASTER_NAME}"
 cluster/gce/container-linux/configure-helper.sh:  local authorization_mode="RBAC"
 cluster/gce/container-linux/configure-helper.sh:  sed -i -e "s@{{ *storage_backend *}}@${STORAGE_BACKEND:-}@g" "${temp_file}"
 cluster/gce/container-linux/configure-helper.sh:  sed -i -e "s@{{pillar\['allow_privileged'\]}}@true@g" "${src_file}"
 cluster/gce/gci/configure-helper.sh:    authorization_mode+=",ABAC"
 cluster/gce/gci/configure-helper.sh:    authorization_mode+=",Webhook"
+cluster/gce/gci/configure-helper.sh:    sed -i -e "s@{{ *pillar\['dns_domain'\] *}}@${DNS_DOMAIN}@g" "${dns_controller_file}"
 cluster/gce/gci/configure-helper.sh:  local api_servers="--master=https://${KUBERNETES_MASTER_NAME}"
 cluster/gce/gci/configure-helper.sh:  local authorization_mode="RBAC"
 cluster/gce/gci/configure-helper.sh:  sed -i -e "s@{{ *storage_backend *}}@${STORAGE_BACKEND:-}@g" "${temp_file}"
 cluster/gce/gci/configure-helper.sh:  sed -i -e "s@{{pillar\['allow_privileged'\]}}@true@g" "${src_file}"
+cluster/gce/trusty/configure-helper.sh:    sed -i -e "s@{{ *pillar\['dns_domain'\] *}}@${DNS_DOMAIN}@g" "${dns_controller_file}"
 cluster/gce/trusty/configure-helper.sh:  sed -i -e "s@{{ *storage_backend *}}@${STORAGE_BACKEND:-}@g" "${temp_file}"
 cluster/gce/trusty/configure-helper.sh:  sed -i -e "s@{{pillar\['allow_privileged'\]}}@true@g" "${src_file}"
 cluster/gce/util.sh:    local node_ip=$(gcloud compute instances describe --project "${PROJECT}" --zone "${ZONE}" \
@@ -31,9 +36,12 @@ cluster/juju/layers/kubernetes/reactive/k8s.py:    check_call(split(cmd.format(k
 cluster/juju/layers/kubernetes/reactive/k8s.py:    check_call(split(cmd.format(kubeconfig, context, cluster_name, user)))
 cluster/juju/layers/kubernetes/reactive/k8s.py:    client_key = '/srv/kubernetes/client.key'
 cluster/juju/layers/kubernetes/reactive/k8s.py:    cluster_name = 'kubernetes'
+cluster/juju/layers/kubernetes/reactive/k8s.py:    domain = hookenv.config().get('dns_domain')
 cluster/juju/layers/kubernetes/reactive/k8s.py:    tlslib.client_key(None, client_key, user='ubuntu', group='ubuntu')
 cluster/lib/logging.sh:      local source_file=${BASH_SOURCE[$frame_no]}
 cluster/lib/logging.sh:    local source_file=${BASH_SOURCE[$stack_skip]}
+cluster/libvirt-coreos/util.sh:  generate_certs "${NODE_NAMES[@]}"
+cluster/libvirt-coreos/util.sh:function generate_certs {
 cluster/log-dump.sh:    local -r node_name="${1}"
 cluster/log-dump.sh:  for node_name in "${node_names[@]}"; do
 cluster/log-dump.sh:readonly report_dir="${1:-_artifacts}"
@@ -94,6 +102,7 @@ hack/e2e.go:.phase1.cluster_name="{{.Cluster}}"
 hack/e2e.go:.phase1.num_nodes=4
 hack/lib/util.sh:    local api_port=$5
 hack/local-up-cluster.sh:        advertise_address="--advertise_address=${API_HOST_IP}"
+hack/local-up-cluster.sh:        sed -e "s/{{ pillar\['dns_domain'\] }}/${DNS_DOMAIN}/g" "${KUBE_ROOT}/cluster/addons/dns/kubedns-controller.yaml.in" >| kubedns-deployment.yaml
 hack/local-up-cluster.sh:      runtime_config="--runtime-config=${RUNTIME_CONFIG}"
 hack/local-up-cluster.sh:    advertise_address=""
 hack/local-up-cluster.sh:    runtime_config=""

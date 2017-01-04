@@ -47,6 +47,7 @@ cmd/libs/go2idl/parser
 cmd/libs/go2idl/set-gen
 cmd/libs/go2idl/set-gen/generators
 cmd/linkcheck
+cmd/localkube
 docs/user-guide/environment-guide/containers/backend
 docs/user-guide/environment-guide/containers/show
 docs/user-guide/liveness/image
