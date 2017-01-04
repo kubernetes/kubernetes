@@ -51,6 +51,7 @@ import (
 var RepairMalformedUpdates bool = true
 
 const isNegativeErrorMsg string = `must be greater than or equal to 0`
+const isNotPositiveErrorMsg string = `must be greater than 0`
 const isInvalidQuotaResource string = `must be a standard resource for quota`
 const fieldImmutableErrorMsg string = `field is immutable`
 const isNotIntegerErrorMsg string = `must be an integer`
@@ -1944,7 +1945,7 @@ func ValidatePodSpec(spec *api.PodSpec, fldPath *field.Path) field.ErrorList {
 
 	if spec.ActiveDeadlineSeconds != nil {
 		if *spec.ActiveDeadlineSeconds <= 0 {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("activeDeadlineSeconds"), spec.ActiveDeadlineSeconds, "must be greater than 0"))
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("activeDeadlineSeconds"), spec.ActiveDeadlineSeconds, isNotPositiveErrorMsg))
 		}
 	}
 
@@ -2349,11 +2350,11 @@ func ValidatePodUpdate(newPod, oldPod *api.Pod) field.ErrorList {
 
 	// validate updated spec.activeDeadlineSeconds.  two types of updates are allowed:
 	// 1.  from nil to a positive value
-	// 2.  from a positive value to a lesser, non-negative value
+	// 2.  from a positive value to a lesser, positive value
 	if newPod.Spec.ActiveDeadlineSeconds != nil {
 		newActiveDeadlineSeconds := *newPod.Spec.ActiveDeadlineSeconds
-		if newActiveDeadlineSeconds < 0 {
-			allErrs = append(allErrs, field.Invalid(specPath.Child("activeDeadlineSeconds"), newActiveDeadlineSeconds, isNegativeErrorMsg))
+		if newActiveDeadlineSeconds <= 0 {
+			allErrs = append(allErrs, field.Invalid(specPath.Child("activeDeadlineSeconds"), newActiveDeadlineSeconds, isNotPositiveErrorMsg))
 			return allErrs
 		}
 		if oldPod.Spec.ActiveDeadlineSeconds != nil {
@@ -3710,14 +3711,14 @@ func ValidatePodLogOptions(opts *api.PodLogOptions) field.ErrorList {
 		allErrs = append(allErrs, field.Invalid(field.NewPath("tailLines"), *opts.TailLines, isNegativeErrorMsg))
 	}
 	if opts.LimitBytes != nil && *opts.LimitBytes < 1 {
-		allErrs = append(allErrs, field.Invalid(field.NewPath("limitBytes"), *opts.LimitBytes, "must be greater than 0"))
+		allErrs = append(allErrs, field.Invalid(field.NewPath("limitBytes"), *opts.LimitBytes, isNotPositiveErrorMsg))
 	}
 	switch {
 	case opts.SinceSeconds != nil && opts.SinceTime != nil:
 		allErrs = append(allErrs, field.Forbidden(field.NewPath(""), "at most one of `sinceTime` or `sinceSeconds` may be specified"))
 	case opts.SinceSeconds != nil:
 		if *opts.SinceSeconds < 1 {
-			allErrs = append(allErrs, field.Invalid(field.NewPath("sinceSeconds"), *opts.SinceSeconds, "must be greater than 0"))
+			allErrs = append(allErrs, field.Invalid(field.NewPath("sinceSeconds"), *opts.SinceSeconds, isNotPositiveErrorMsg))
 		}
 	}
 	return allErrs
