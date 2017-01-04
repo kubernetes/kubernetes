@@ -134,6 +134,8 @@ func DeepCopy_v1beta1_CustomMetricCurrentStatusList(in interface{}, out interfac
 	{
 		in := in.(*CustomMetricCurrentStatusList)
 		out := out.(*CustomMetricCurrentStatusList)
+		out.TypeMeta = in.TypeMeta
+		out.ListMeta = in.ListMeta
 		if in.Items != nil {
 			in, out := &in.Items, &out.Items
 			*out = make([]CustomMetricCurrentStatus, len(*in))
@@ -163,6 +165,8 @@ func DeepCopy_v1beta1_CustomMetricTargetList(in interface{}, out interface{}, c 
 	{
 		in := in.(*CustomMetricTargetList)
 		out := out.(*CustomMetricTargetList)
+		out.TypeMeta = in.TypeMeta
+		out.ListMeta = in.ListMeta
 		if in.Items != nil {
 			in, out := &in.Items, &out.Items
 			*out = make([]CustomMetricTarget, len(*in))

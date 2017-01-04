@@ -202,6 +202,7 @@ func Convert_extensions_CustomMetricCurrentStatus_To_v1beta1_CustomMetricCurrent
 }
 
 func autoConvert_v1beta1_CustomMetricCurrentStatusList_To_extensions_CustomMetricCurrentStatusList(in *CustomMetricCurrentStatusList, out *extensions.CustomMetricCurrentStatusList, s conversion.Scope) error {
+	out.ListMeta = in.ListMeta
 	out.Items = *(*[]extensions.CustomMetricCurrentStatus)(unsafe.Pointer(&in.Items))
 	return nil
 }
@@ -211,6 +212,7 @@ func Convert_v1beta1_CustomMetricCurrentStatusList_To_extensions_CustomMetricCur
 }
 
 func autoConvert_extensions_CustomMetricCurrentStatusList_To_v1beta1_CustomMetricCurrentStatusList(in *extensions.CustomMetricCurrentStatusList, out *CustomMetricCurrentStatusList, s conversion.Scope) error {
+	out.ListMeta = in.ListMeta
 	out.Items = *(*[]CustomMetricCurrentStatus)(unsafe.Pointer(&in.Items))
 	return nil
 }
@@ -240,6 +242,7 @@ func Convert_extensions_CustomMetricTarget_To_v1beta1_CustomMetricTarget(in *ext
 }
 
 func autoConvert_v1beta1_CustomMetricTargetList_To_extensions_CustomMetricTargetList(in *CustomMetricTargetList, out *extensions.CustomMetricTargetList, s conversion.Scope) error {
+	out.ListMeta = in.ListMeta
 	out.Items = *(*[]extensions.CustomMetricTarget)(unsafe.Pointer(&in.Items))
 	return nil
 }
@@ -249,6 +252,7 @@ func Convert_v1beta1_CustomMetricTargetList_To_extensions_CustomMetricTargetList
 }
 
 func autoConvert_extensions_CustomMetricTargetList_To_v1beta1_CustomMetricTargetList(in *extensions.CustomMetricTargetList, out *CustomMetricTargetList, s conversion.Scope) error {
+	out.ListMeta = in.ListMeta
 	out.Items = *(*[]CustomMetricTarget)(unsafe.Pointer(&in.Items))
 	return nil
 }
