@@ -885,7 +885,7 @@ func (m *kubeGenericRuntimeManager) UpdatePodCIDR(podCIDR string) error {
 		})
 }
 
-// getSandboxInfoFromStatus returns the sandbox's ID, IP and sandbox config.
+// getSandboxInfoAndConfig returns the sandbox's ID, IP and sandbox config.
 func (m *kubeGenericRuntimeManager) getSandboxInfoAndConfig(pod *v1.Pod, sandboxStatus *runtimeapi.PodSandboxStatus) (id string, ip string, config *runtimeapi.PodSandboxConfig, err error) {
 	id = sandboxStatus.GetId()
 	ip = m.determinePodSandboxIP(pod.Namespace, pod.Name, sandboxStatus)
@@ -903,7 +903,7 @@ func (m *kubeGenericRuntimeManager) SyncPod(pod *v1.Pod, _ v1.PodStatus, podStat
 	statuses := newStatusGroup(pod, podStatus)
 
 	// Try to prune the init containers before every sync iteration.
-	m.pruneInitContainers(pod, statuses.initContainerStatuses, false)
+	m.pruneInitContainers(statuses.initContainerStatuses, false)
 
 	action := newSyncAction(pod, pullSecrets)
 	action.computeSyncAction(pod, statuses, m.livenessManager)
@@ -929,7 +929,7 @@ func (m *kubeGenericRuntimeManager) SyncPod(pod *v1.Pod, _ v1.PodStatus, podStat
 	if action.needsToStartSandbox() {
 		// Prune all old init containers if we are starting
 		// a new pod.
-		if err := m.pruneInitContainers(pod, statuses.initContainerStatuses, true); err != nil {
+		if err := m.pruneInitContainers(statuses.initContainerStatuses, true); err != nil {
 			// TODO(yifan): Add sync result.
 			glog.Errorf("Error pruning init containers: %v", err)
 			return
