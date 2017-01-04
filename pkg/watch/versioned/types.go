@@ -26,6 +26,7 @@ import (
 //
 // +protobuf=true
 // +k8s:openapi-gen=true
+// +k8s:openapi-gen=legacy-name
 type Event struct {
 	Type string `json:"type" protobuf:"bytes,1,opt,name=type"`
 

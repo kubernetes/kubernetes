@@ -15,6 +15,7 @@ limitations under the License.
 */
 
 // +k8s:openapi-gen=true
+// +k8s:openapi-gen=legacy-name
 package v0
 
 import (

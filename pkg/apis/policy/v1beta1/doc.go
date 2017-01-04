@@ -21,4 +21,5 @@ limitations under the License.
 // they aren't all here, are PodDisruptionBudget, PodSecurityPolicy,
 // NetworkPolicy, etc.
 // +k8s:openapi-gen=true
+// +k8s:openapi-gen=legacy-name
 package v1beta1 // import "k8s.io/kubernetes/pkg/apis/policy/v1beta1"
