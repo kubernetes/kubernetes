@@ -40,6 +40,7 @@ pushd "${KUBE_ROOT}" > /dev/null
   # let other packages use the staging client as if it were vendored.
   if [ ! -e "vendor/k8s.io/client-go" ]; then
     ln -s ../../staging/src/k8s.io/client-go vendor/k8s.io/client-go
+    ln -s ../../staging/src/k8s.io/genericapiserver vendor/k8s.io/genericapiserver
   fi
 popd > /dev/null
 

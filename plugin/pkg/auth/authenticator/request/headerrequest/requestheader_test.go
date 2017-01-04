@@ -21,7 +21,7 @@ import (
 	"reflect"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/auth/user"
+	"k8s.io/genericapiserver/pkg/authentication/user"
 )
 
 func TestRequestHeader(t *testing.T) {

@@ -12,7 +12,7 @@ go_library(
     srcs = ["escalation_check.go"],
     tags = ["automanaged"],
     deps = [
-        "//pkg/auth/user:go_default_library",
         "//pkg/genericapiserver/api/request:go_default_library",
+        "//vendor:k8s.io/genericapiserver/pkg/authentication/user",
     ],
 )
