@@ -147,10 +147,6 @@ type fixture struct {
 	objects []runtime.Object
 }
 
-func (f *fixture) expectUpdateDeploymentAction(d *extensions.Deployment) {
-	f.actions = append(f.actions, core.NewUpdateAction(schema.GroupVersionResource{Resource: "deployments"}, d.Namespace, d))
-}
-
 func (f *fixture) expectUpdateDeploymentStatusAction(d *extensions.Deployment) {
 	action := core.NewUpdateAction(schema.GroupVersionResource{Resource: "deployments"}, d.Namespace, d)
 	action.Subresource = "status"
@@ -228,7 +224,7 @@ func TestSyncDeploymentCreatesReplicaSet(t *testing.T) {
 	rs := newReplicaSet(d, "deploymentrs-4186632231", 1)
 
 	f.expectCreateRSAction(rs)
-	f.expectUpdateDeploymentAction(d)
+	f.expectUpdateDeploymentStatusAction(d)
 	f.expectUpdateDeploymentStatusAction(d)
 
 	f.run(getKey(d, t))
@@ -341,7 +337,7 @@ func TestSyncOverlappedDeployment(t *testing.T) {
 
 	f.expectUpdateDeploymentStatusAction(bar)
 	f.expectCreateRSAction(newReplicaSet(foo, "foo-rs", 1))
-	f.expectUpdateDeploymentAction(foo)
+	f.expectUpdateDeploymentStatusAction(foo)
 	f.expectUpdateDeploymentStatusAction(foo)
 	f.run(getKey(foo, t))
 
@@ -349,6 +345,48 @@ func TestSyncOverlappedDeployment(t *testing.T) {
 	d := actions[0].(core.UpdateAction).GetObject().(*extensions.Deployment)
 	if d.Annotations[util.OverlapAnnotation] != "foo" {
 		t.Errorf("annotations weren't updated for the overlapping deployment: %v", d.Annotations)
+	}
+}
+
+// TestSelectorUpdate ensures that from two overlapping deployments, the one that is working won't
+// be marked as overlapping if its selector is updated but still overlaps with the other one.
+func TestSelectorUpdate(t *testing.T) {
+	f := newFixture(t)
+	now := metav1.Now()
+	later := metav1.Time{Time: now.Add(time.Minute)}
+	selectorUpdated := metav1.Time{Time: later.Add(time.Minute)}
+
+	foo := newDeployment("foo", 1, nil, nil, nil, map[string]string{"foo": "bar"})
+	foo.CreationTimestamp = now
+	foo.Annotations = map[string]string{util.SelectorUpdateAnnotation: selectorUpdated.Format(time.RFC3339)}
+	bar := newDeployment("bar", 1, nil, nil, nil, map[string]string{"foo": "bar", "app": "baz"})
+	bar.CreationTimestamp = later
+	bar.Annotations = map[string]string{util.OverlapAnnotation: "foo"}
+
+	f.dLister = append(f.dLister, foo, bar)
+	f.objects = append(f.objects, foo, bar)
+
+	f.expectCreateRSAction(newReplicaSet(foo, "foo-rs", 1))
+	f.expectUpdateDeploymentStatusAction(foo)
+	f.expectUpdateDeploymentStatusAction(foo)
+	f.run(getKey(foo, t))
+
+	for _, a := range filterInformerActions(f.client.Actions()) {
+		action, ok := a.(core.UpdateAction)
+		if !ok {
+			continue
+		}
+		d, ok := action.GetObject().(*extensions.Deployment)
+		if !ok {
+			continue
+		}
+
+		if d.Name == "foo" && len(d.Annotations[util.OverlapAnnotation]) > 0 {
+			t.Errorf("deployment %q should not have the overlapping annotation", d.Name)
+		}
+		if d.Name == "bar" && len(d.Annotations[util.OverlapAnnotation]) == 0 {
+			t.Errorf("deployment %q should have the overlapping annotation", d.Name)
+		}
 	}
 }
 
@@ -374,7 +412,7 @@ func TestDeletedDeploymentShouldCleanupOverlaps(t *testing.T) {
 	f.expectUpdateDeploymentStatusAction(foo)
 	f.run(getKey(foo, t))
 
-	for _, a := range f.client.Actions() {
+	for _, a := range filterInformerActions(f.client.Actions()) {
 		action, ok := a.(core.UpdateAction)
 		if !ok {
 			continue
@@ -412,7 +450,7 @@ func TestDeletedDeploymentShouldNotCleanupOtherOverlaps(t *testing.T) {
 	f.expectUpdateDeploymentStatusAction(foo)
 	f.run(getKey(foo, t))
 
-	for _, a := range f.client.Actions() {
+	for _, a := range filterInformerActions(f.client.Actions()) {
 		action, ok := a.(core.UpdateAction)
 		if !ok {
 			continue
