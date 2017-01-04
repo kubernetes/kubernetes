@@ -36,8 +36,6 @@ const (
 	GroupKind          = "Group"
 	ServiceAccountKind = "ServiceAccount"
 	UserKind           = "User"
-
-	UserAll = "*"
 )
 
 // Authorization is calculated against

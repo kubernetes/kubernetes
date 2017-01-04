@@ -94,6 +94,7 @@ pkg/apis/imagepolicy/install
 pkg/apis/meta/v1/unstructured
 pkg/apis/policy/install
 pkg/apis/rbac/install
+pkg/apis/rbac/v1alpha1
 pkg/apis/storage/install
 pkg/apis/storage/validation
 pkg/auth/authenticator

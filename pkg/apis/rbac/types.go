@@ -36,8 +36,6 @@ const (
 	GroupKind          = "Group"
 	ServiceAccountKind = "ServiceAccount"
 	UserKind           = "User"
-
-	UserAll = "*"
 )
 
 // PolicyRule holds information that describes a policy rule, but does not contain information
