@@ -151,7 +151,6 @@ go_library(
         "//pkg/controller/petset:go_default_library",
         "//pkg/controller/replicaset:go_default_library",
         "//pkg/controller/replication:go_default_library",
-        "//pkg/dns/federation:go_default_library",
         "//pkg/fields:go_default_library",
         "//pkg/kubectl:go_default_library",
         "//pkg/kubectl/cmd/util:go_default_library",
