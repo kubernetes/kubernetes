@@ -2719,6 +2719,65 @@ func TestValidateEnv(t *testing.T) {
 	}
 }
 
+func TestValidateEnvFrom(t *testing.T) {
+	successCase := []api.EnvFromSource{
+		{
+			ConfigMapRef: &api.ConfigMapEnvSource{
+				LocalObjectReference: api.LocalObjectReference{Name: "abc"},
+			},
+		},
+		{
+			Prefix: "pre_",
+			ConfigMapRef: &api.ConfigMapEnvSource{
+				LocalObjectReference: api.LocalObjectReference{Name: "abc"},
+			},
+		},
+	}
+	if errs := validateEnvFrom(successCase, field.NewPath("field")); len(errs) != 0 {
+		t.Errorf("expected success: %v", errs)
+	}
+
+	errorCases := []struct {
+		name          string
+		envs          []api.EnvFromSource
+		expectedError string
+	}{
+		{
+			name: "zero-length name",
+			envs: []api.EnvFromSource{
+				{
+					ConfigMapRef: &api.ConfigMapEnvSource{
+						LocalObjectReference: api.LocalObjectReference{Name: ""}},
+				},
+			},
+			expectedError: "field[0].configMapRef.name: Required value",
+		},
+		{
+			name: "invalid prefix",
+			envs: []api.EnvFromSource{
+				{
+					Prefix: "a.b",
+					ConfigMapRef: &api.ConfigMapEnvSource{
+						LocalObjectReference: api.LocalObjectReference{Name: "abc"}},
+				},
+			},
+			expectedError: `field[0].prefix: Invalid value: "a.b": ` + idErrMsg,
+		},
+	}
+	for _, tc := range errorCases {
+		if errs := validateEnvFrom(tc.envs, field.NewPath("field")); len(errs) == 0 {
+			t.Errorf("expected failure for %s", tc.name)
+		} else {
+			for i := range errs {
+				str := errs[i].Error()
+				if str != "" && !strings.Contains(str, tc.expectedError) {
+					t.Errorf("%s: expected error detail either empty or %q, got %q", tc.name, tc.expectedError, str)
+				}
+			}
+		}
+	}
+}
+
 func TestValidateVolumeMounts(t *testing.T) {
 	volumes := sets.NewString("abc", "123", "abc-123")
 

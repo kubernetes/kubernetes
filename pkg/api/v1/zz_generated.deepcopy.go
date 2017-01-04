@@ -50,6 +50,7 @@ func RegisterDeepCopies(scheme *runtime.Scheme) error {
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_ComponentStatus, InType: reflect.TypeOf(&ComponentStatus{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_ComponentStatusList, InType: reflect.TypeOf(&ComponentStatusList{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_ConfigMap, InType: reflect.TypeOf(&ConfigMap{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_ConfigMapEnvSource, InType: reflect.TypeOf(&ConfigMapEnvSource{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_ConfigMapKeySelector, InType: reflect.TypeOf(&ConfigMapKeySelector{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_ConfigMapList, InType: reflect.TypeOf(&ConfigMapList{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_ConfigMapVolumeSource, InType: reflect.TypeOf(&ConfigMapVolumeSource{})},
@@ -71,6 +72,7 @@ func RegisterDeepCopies(scheme *runtime.Scheme) error {
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_EndpointSubset, InType: reflect.TypeOf(&EndpointSubset{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_Endpoints, InType: reflect.TypeOf(&Endpoints{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_EndpointsList, InType: reflect.TypeOf(&EndpointsList{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_EnvFromSource, InType: reflect.TypeOf(&EnvFromSource{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_EnvVar, InType: reflect.TypeOf(&EnvVar{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_EnvVarSource, InType: reflect.TypeOf(&EnvVarSource{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_Event, InType: reflect.TypeOf(&Event{})},
@@ -464,6 +466,15 @@ func DeepCopy_v1_ConfigMap(in interface{}, out interface{}, c *conversion.Cloner
 	}
 }
 
+func DeepCopy_v1_ConfigMapEnvSource(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*ConfigMapEnvSource)
+		out := out.(*ConfigMapEnvSource)
+		out.LocalObjectReference = in.LocalObjectReference
+		return nil
+	}
+}
+
 func DeepCopy_v1_ConfigMapKeySelector(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*ConfigMapKeySelector)
@@ -551,6 +562,17 @@ func DeepCopy_v1_Container(in interface{}, out interface{}, c *conversion.Cloner
 			}
 		} else {
 			out.Ports = nil
+		}
+		if in.EnvFrom != nil {
+			in, out := &in.EnvFrom, &out.EnvFrom
+			*out = make([]EnvFromSource, len(*in))
+			for i := range *in {
+				if err := DeepCopy_v1_EnvFromSource(&(*in)[i], &(*out)[i], c); err != nil {
+					return err
+				}
+			}
+		} else {
+			out.EnvFrom = nil
 		}
 		if in.Env != nil {
 			in, out := &in.Env, &out.Env
@@ -957,6 +979,22 @@ func DeepCopy_v1_EndpointsList(in interface{}, out interface{}, c *conversion.Cl
 			}
 		} else {
 			out.Items = nil
+		}
+		return nil
+	}
+}
+
+func DeepCopy_v1_EnvFromSource(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*EnvFromSource)
+		out := out.(*EnvFromSource)
+		out.Prefix = in.Prefix
+		if in.ConfigMapRef != nil {
+			in, out := &in.ConfigMapRef, &out.ConfigMapRef
+			*out = new(ConfigMapEnvSource)
+			**out = **in
+		} else {
+			out.ConfigMapRef = nil
 		}
 		return nil
 	}

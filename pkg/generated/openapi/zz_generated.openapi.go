@@ -797,6 +797,15 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 		Dependencies: []string{
 			"v1.ObjectMeta"},
 	},
+	"v1.ConfigMapEnvSource": {
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "ConfigMapEnvSource selects a ConfigMap to populate the environment variables with.\n\nThe contents of the target ConfigMap's Data field will represent the key-value pairs as environment variables.",
+				Properties:  map[string]spec.Schema{},
+			},
+		},
+		Dependencies: []string{},
+	},
 	"v1.ConfigMapKeySelector": {
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -944,6 +953,19 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 							},
 						},
 					},
+					"envFrom": {
+						SchemaProps: spec.SchemaProps{
+							Description: "List of sources to populate environment variables in the container. The keys defined within a source must be a C_IDENTIFIER. An invalid key will prevent the container from starting. When a key exists in multiple sources, the value associated with the last source will take precedence. Values defined by an Env with a duplicate key will take precedence. Cannot be updated.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: spec.MustCreateRef("#/definitions/v1.EnvFromSource"),
+									},
+								},
+							},
+						},
+					},
 					"env": {
 						SchemaProps: spec.SchemaProps{
 							Description: "List of environment variables to set in the container. Cannot be updated.",
@@ -1040,7 +1062,7 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 			},
 		},
 		Dependencies: []string{
-			"v1.ContainerPort", "v1.EnvVar", "v1.Lifecycle", "v1.Probe", "v1.ResourceRequirements", "v1.SecurityContext", "v1.VolumeMount"},
+			"v1.ContainerPort", "v1.EnvFromSource", "v1.EnvVar", "v1.Lifecycle", "v1.Probe", "v1.ResourceRequirements", "v1.SecurityContext", "v1.VolumeMount"},
 	},
 	"v1.ContainerImage": {
 		Schema: spec.Schema{
@@ -1681,6 +1703,30 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 		},
 		Dependencies: []string{
 			"v1.Endpoints", "v1.ListMeta"},
+	},
+	"v1.EnvFromSource": {
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "EnvFromSource represents the source of a set of ConfigMaps",
+				Properties: map[string]spec.Schema{
+					"prefix": {
+						SchemaProps: spec.SchemaProps{
+							Description: "An optional identifer to prepend to each key in the ConfigMap. Must be a C_IDENTIFIER.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"configMapRef": {
+						SchemaProps: spec.SchemaProps{
+							Description: "The ConfigMap to select from",
+							Ref:         spec.MustCreateRef("#/definitions/v1.ConfigMapEnvSource"),
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			"v1.ConfigMapEnvSource"},
 	},
 	"v1.EnvVar": {
 		Schema: spec.Schema{

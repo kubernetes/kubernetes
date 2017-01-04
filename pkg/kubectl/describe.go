@@ -890,6 +890,7 @@ func describeContainers(label string, containers []api.Container, containerStatu
 		}
 		describeContainerProbe(container, w)
 		describeContainerVolumes(container, w)
+		describeContainerEnvFrom(container, resolverFn, w)
 		describeContainerEnvVars(container, resolverFn, w)
 	}
 }
@@ -1012,6 +1013,7 @@ func describeContainerEnvVars(container api.Container, resolverFn EnvVarResolver
 		none = "\t<none>"
 	}
 	w.Write(LEVEL_2, "Environment Variables:%s\n", none)
+
 	for _, e := range container.Env {
 		if e.ValueFrom == nil {
 			w.Write(LEVEL_3, "%s:\t%s\n", e.Name, e.Value)
@@ -1039,6 +1041,22 @@ func describeContainerEnvVars(container api.Container, resolverFn EnvVarResolver
 			w.Write(LEVEL_3, "%s:\t<set to the key '%s' in secret '%s'>\n", e.Name, e.ValueFrom.SecretKeyRef.Key, e.ValueFrom.SecretKeyRef.Name)
 		case e.ValueFrom.ConfigMapKeyRef != nil:
 			w.Write(LEVEL_3, "%s:\t<set to the key '%s' of config map '%s'>\n", e.Name, e.ValueFrom.ConfigMapKeyRef.Key, e.ValueFrom.ConfigMapKeyRef.Name)
+		}
+	}
+}
+
+func describeContainerEnvFrom(container api.Container, resolverFn EnvVarResolverFunc, w *PrefixWriter) {
+	none := ""
+	if len(container.EnvFrom) == 0 {
+		none = "\t<none>"
+	}
+	w.Write(LEVEL_2, "Environment Variables from:%s\n", none)
+
+	for _, e := range container.EnvFrom {
+		if len(e.Prefix) == 0 {
+			w.Write(LEVEL_3, "%s\tConfigMap\n", e.ConfigMapRef.Name)
+		} else {
+			w.Write(LEVEL_3, "%s\tConfigMap with prefix '%s'\n", e.ConfigMapRef.Name, e.Prefix)
 		}
 	}
 }

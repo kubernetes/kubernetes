@@ -9639,6 +9639,9 @@
      }
     }
    },
+   "v1.ConfigMapEnvSource": {
+    "description": "ConfigMapEnvSource selects a ConfigMap to populate the environment variables with.\n\nThe contents of the target ConfigMap's Data field will represent the key-value pairs as environment variables."
+   },
    "v1.ConfigMapKeySelector": {
     "description": "Selects a key from a ConfigMap.",
     "required": [
@@ -9695,6 +9698,13 @@
       "type": "array",
       "items": {
        "$ref": "#/definitions/v1.EnvVar"
+      }
+     },
+     "envFrom": {
+      "description": "List of sources to populate environment variables in the container. The keys defined within a source must be a C_IDENTIFIER. An invalid key will prevent the container from starting. When a key exists in multiple sources, the value associated with the last source will take precedence. Values defined by an Env with a duplicate key will take precedence. Cannot be updated.",
+      "type": "array",
+      "items": {
+       "$ref": "#/definitions/v1.EnvFromSource"
       }
      },
      "image": {
@@ -9810,6 +9820,19 @@
      "preconditions": {
       "description": "Must be fulfilled before a deletion is carried out. If not possible, a 409 Conflict status will be returned.",
       "$ref": "#/definitions/v1.Preconditions"
+     }
+    }
+   },
+   "v1.EnvFromSource": {
+    "description": "EnvFromSource represents the source of a set of ConfigMaps",
+    "properties": {
+     "configMapRef": {
+      "description": "The ConfigMap to select from",
+      "$ref": "#/definitions/v1.ConfigMapEnvSource"
+     },
+     "prefix": {
+      "description": "An optional identifer to prepend to each key in the ConfigMap. Must be a C_IDENTIFIER.",
+      "type": "string"
      }
     }
    },
