@@ -341,7 +341,9 @@ func DeepCopy_componentconfig_KubeletConfiguration(in interface{}, out interface
 			in, out := &in.RegisterWithTaints, &out.RegisterWithTaints
 			*out = make([]api.Taint, len(*in))
 			for i := range *in {
-				(*out)[i] = (*in)[i]
+				if err := api.DeepCopy_api_Taint(&(*in)[i], &(*out)[i], c); err != nil {
+					return err
+				}
 			}
 		} else {
 			out.RegisterWithTaints = nil

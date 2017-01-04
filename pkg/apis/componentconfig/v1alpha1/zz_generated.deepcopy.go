@@ -362,7 +362,9 @@ func DeepCopy_v1alpha1_KubeletConfiguration(in interface{}, out interface{}, c *
 			in, out := &in.RegisterWithTaints, &out.RegisterWithTaints
 			*out = make([]v1.Taint, len(*in))
 			for i := range *in {
-				(*out)[i] = (*in)[i]
+				if err := v1.DeepCopy_v1_Taint(&(*in)[i], &(*out)[i], c); err != nil {
+					return err
+				}
 			}
 		} else {
 			out.RegisterWithTaints = nil
