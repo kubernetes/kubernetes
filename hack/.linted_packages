@@ -15,7 +15,6 @@ cmd/kube-apiserver/app/options
 cmd/kube-controller-manager
 cmd/kube-controller-manager/app/options
 cmd/kube-discovery
-cmd/kube-dns
 cmd/kube-proxy
 cmd/kubeadm
 cmd/kubeadm
