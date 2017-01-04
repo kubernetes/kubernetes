@@ -1427,6 +1427,30 @@ func validateContainerResourceFieldSelector(fs *api.ResourceFieldSelector, expre
 	return allErrs
 }
 
+func validateEnvFrom(vars []api.EnvFromSource, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	for i, ev := range vars {
+		idxPath := fldPath.Index(i)
+		if len(ev.Prefix) > 0 {
+			for _, msg := range validation.IsCIdentifier(ev.Prefix) {
+				allErrs = append(allErrs, field.Invalid(idxPath.Child("prefix"), ev.Prefix, msg))
+			}
+		}
+		if ev.ConfigMapRef != nil {
+			allErrs = append(allErrs, validateConfigMapEnvSource(ev.ConfigMapRef, idxPath.Child("configMapRef"))...)
+		}
+	}
+	return allErrs
+}
+
+func validateConfigMapEnvSource(configMapSource *api.ConfigMapEnvSource, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if len(configMapSource.Name) == 0 {
+		allErrs = append(allErrs, field.Required(fldPath.Child("name"), ""))
+	}
+	return allErrs
+}
+
 var validContainerResourceDivisorForCPU = sets.NewString("1m", "1")
 var validContainerResourceDivisorForMemory = sets.NewString("1", "1k", "1M", "1G", "1T", "1P", "1E", "1Ki", "1Mi", "1Gi", "1Ti", "1Pi", "1Ei")
 

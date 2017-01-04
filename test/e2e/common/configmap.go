@@ -196,6 +196,46 @@ var _ = framework.KubeDescribe("ConfigMap", func() {
 		})
 	})
 
+	It("should be consumable via the environment [Conformance]", func() {
+		name := "configmap-test-" + string(uuid.NewUUID())
+		configMap := newEnvFromConfigMap(f, name)
+		By(fmt.Sprintf("Creating configMap %v/%v", f.Namespace.Name, configMap.Name))
+		var err error
+		if configMap, err = f.ClientSet.Core().ConfigMaps(f.Namespace.Name).Create(configMap); err != nil {
+			framework.Failf("unable to create test configMap %s: %v", configMap.Name, err)
+		}
+
+		pod := &v1.Pod{
+			ObjectMeta: v1.ObjectMeta{
+				Name: "pod-configmaps-" + string(uuid.NewUUID()),
+			},
+			Spec: v1.PodSpec{
+				Containers: []v1.Container{
+					{
+						Name:    "env-test",
+						Image:   "gcr.io/google_containers/busybox:1.24",
+						Command: []string{"sh", "-c", "env"},
+						EnvFrom: []v1.EnvFromSource{
+							{
+								ConfigMapRef: &v1.ConfigMapEnvSource{LocalObjectReference: v1.LocalObjectReference{Name: name}},
+							},
+							{
+								Prefix:       "p_",
+								ConfigMapRef: &v1.ConfigMapEnvSource{LocalObjectReference: v1.LocalObjectReference{Name: name}},
+							},
+						},
+					},
+				},
+				RestartPolicy: v1.RestartPolicyNever,
+			},
+		}
+
+		f.TestContainerOutput("consume configMaps", pod, 0, []string{
+			"data_1=value-1", "data_2=value-2", "data_3=value-3",
+			"p_data_1=value-1", "p_data_2=value-2", "p_data_3=value-3",
+		})
+	})
+
 	It("should be consumable in multiple volumes in the same pod [Conformance]", func() {
 		var (
 			name             = "configmap-test-volume-" + string(uuid.NewUUID())
@@ -279,6 +319,20 @@ func newConfigMap(f *framework.Framework, name string) *v1.ConfigMap {
 			"data-1": "value-1",
 			"data-2": "value-2",
 			"data-3": "value-3",
+		},
+	}
+}
+
+func newEnvFromConfigMap(f *framework.Framework, name string) *v1.ConfigMap {
+	return &v1.ConfigMap{
+		ObjectMeta: v1.ObjectMeta{
+			Namespace: f.Namespace.Name,
+			Name:      name,
+		},
+		Data: map[string]string{
+			"data_1": "value-1",
+			"data_2": "value-2",
+			"data_3": "value-3",
 		},
 	}
 }
