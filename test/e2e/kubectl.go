@@ -599,8 +599,7 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 			Expect(err).To(ContainSubstring("Using in-cluster namespace"))
 			Expect(err).To(ContainSubstring("Using in-cluster configuration"))
 			Expect(err).To(ContainSubstring("Authorization: Bearer invalid"))
-			// TODO(kubernetes/kubernetes#39267): We should only see a 401 from an invalid bearer token.
-			Expect(err).To(Or(ContainSubstring("Response Status: 403 Forbidden"), ContainSubstring("Response Status: 401 Unauthorized")))
+			Expect(err).To(ContainSubstring("Response Status: 401 Unauthorized"))
 
 			By("trying to use kubectl with invalid server")
 			_, err = framework.RunHostCmd(ns, simplePodName, "/kubectl get pods --server=invalid --v=6 2>&1")
