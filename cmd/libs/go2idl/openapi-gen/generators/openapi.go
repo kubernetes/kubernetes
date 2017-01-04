@@ -368,7 +368,7 @@ func (g openAPITypeWriter) generate(t *types.Type) error {
 		g.Do(",\n", nil)
 
 		// for backwards compatibility, register certain types under their old names
-		if hasOpenAPITagValue(t.CommentLines, tagValueLegacyName) {
+		if hasOpenAPITagValue(t.CommentLines, tagValueLegacyName) && typeLegacyName(t) != g.context.Namers["openapi"].Name(t) {
 			g.Do("\"$.$\": ", typeLegacyName(t))
 			if err := g.generateStructInitializer(t, g.context.Namers["openapi"].Name(t)); err != nil {
 				return err
