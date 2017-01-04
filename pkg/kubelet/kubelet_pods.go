@@ -437,12 +437,11 @@ func (kl *Kubelet) makeEnvironmentVariables(pod *v1.Pod, container *v1.Container
 				configMaps[name] = configMap
 			}
 			for k, v := range configMap.Data {
-				if errMsgs := utilvalidation.IsCIdentifier(k); len(errMsgs) != 0 {
-					return result, fmt.Errorf("Invalid environment variable name, %v, from configmap %v/%v: %s", k, pod.Namespace, name, errMsgs[0])
-				}
-
 				if len(envFrom.Prefix) > 0 {
 					k = envFrom.Prefix + k
+				}
+				if errMsgs := utilvalidation.IsCIdentifier(k); len(errMsgs) != 0 {
+					return result, fmt.Errorf("Invalid environment variable name, %v, from configmap %v/%v: %s", k, pod.Namespace, name, errMsgs[0])
 				}
 				// Accesses apiserver+Pods.
 				// So, the master may set service env vars, or kubelet may.  In case both are doing
