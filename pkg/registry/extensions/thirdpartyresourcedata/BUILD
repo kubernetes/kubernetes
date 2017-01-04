@@ -38,7 +38,6 @@ go_library(
         "//pkg/util/validation/field:go_default_library",
         "//pkg/util/yaml:go_default_library",
         "//pkg/watch:go_default_library",
-        "//pkg/watch/versioned:go_default_library",
     ],
 )
 
@@ -61,7 +60,6 @@ go_test(
         "//pkg/apis/meta/v1:go_default_library",
         "//pkg/runtime:go_default_library",
         "//pkg/runtime/schema:go_default_library",
-        "//pkg/watch/versioned:go_default_library",
     ],
 )
 
