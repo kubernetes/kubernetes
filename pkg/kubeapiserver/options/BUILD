@@ -12,9 +12,12 @@ go_library(
     srcs = [
         "authentication.go",
         "authorization.go",
+        "cloudprovider.go",
     ],
     tags = ["automanaged"],
     deps = [
+        "//pkg/api/v1:go_default_library",
+        "//pkg/cloudprovider:go_default_library",
         "//pkg/controller/informers:go_default_library",
         "//pkg/genericapiserver:go_default_library",
         "//pkg/genericapiserver/options:go_default_library",

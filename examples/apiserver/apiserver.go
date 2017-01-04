@@ -62,6 +62,7 @@ type ServerRunOptions struct {
 	SecureServing           *genericoptions.SecureServingOptions
 	InsecureServing         *genericoptions.ServingOptions
 	Authentication          *kubeoptions.BuiltInAuthenticationOptions
+	CloudProvider           *kubeoptions.CloudProviderOptions
 }
 
 func NewServerRunOptions() *ServerRunOptions {
@@ -71,6 +72,7 @@ func NewServerRunOptions() *ServerRunOptions {
 		SecureServing:   genericoptions.NewSecureServingOptions(),
 		InsecureServing: genericoptions.NewInsecureServingOptions(),
 		Authentication:  kubeoptions.NewBuiltInAuthenticationOptions().WithAll(),
+		CloudProvider:   kubeoptions.NewCloudProviderOptions(),
 	}
 	s.InsecureServing.BindPort = InsecurePort
 	s.SecureServing.ServingOptions.BindPort = SecurePort
@@ -82,7 +84,7 @@ func (serverOptions *ServerRunOptions) Run(stopCh <-chan struct{}) error {
 	serverOptions.Etcd.StorageConfig.ServerList = []string{"http://127.0.0.1:2379"}
 
 	// set defaults
-	if err := serverOptions.GenericServerRunOptions.DefaultExternalHost(); err != nil {
+	if err := serverOptions.CloudProvider.DefaultExternalHost(serverOptions.GenericServerRunOptions); err != nil {
 		return err
 	}
 	if err := serverOptions.SecureServing.MaybeDefaultWithSelfSignedCerts(serverOptions.GenericServerRunOptions.AdvertiseAddress.String()); err != nil {
