@@ -967,6 +967,22 @@ __EOF__
   # Post-condition: no PODs exist
   kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
 
+  ## kubectl patch -f with label selector should only apply matching objects
+  # Pre-Condition: no POD exists
+  kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
+  # create
+  kubectl create -f hack/testdata/filter/pod-apply-selector.yaml "${kube_flags[@]}"
+  # check pod exists
+  kube::test::get_object_assert 'pods selector-test-pod' "{{${labels_field}.name}}" 'selector-test-pod'
+  # patch non-matching
+  output_message=$(! kubectl patch -l unique-label=foo -f hack/testdata/filter/pod-apply-selector.yaml -p '{"metadata":{"labels":{"a":"b"}}}' 2>&1 "${kube_flags[@]}")
+  kube::test::if_has_string "${output_message}" 'no objects passed to patch'
+  # patch matching
+  output_message=$(! kubectl patch -l unique-label=bingbang -f hack/testdata/filter/pod-apply-selector.yaml -p '{"metadata":{"labels":{"a":"b"}}}' 2>&1 "${kube_flags[@]}")
+  kube::test::if_has_string "${output_message}" 'patched'
+  # cleanup
+  kubectl delete pods selector-test-pod
+
   ## kubectl apply should update configuration annotations only if apply is already called
   ## 1. kubectl create doesn't set the annotation
   # Pre-Condition: no POD exists

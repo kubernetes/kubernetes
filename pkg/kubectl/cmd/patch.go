@@ -43,9 +43,8 @@ var patchTypes = map[string]api.PatchType{"json": api.JSONPatchType, "merge": ap
 // referencing the cmd.Flags()
 type PatchOptions struct {
 	resource.FilenameOptions
-
-	Local bool
-
+	Selector     string
+	Local        bool
 	OutputFormat string
 }
 
@@ -101,6 +100,8 @@ func NewCmdPatch(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd.Flags().StringP("patch", "p", "", "The patch to be applied to the resource JSON file.")
 	cmd.MarkFlagRequired("patch")
 	cmd.Flags().String("type", "strategic", fmt.Sprintf("The type of patch being provided; one of %v", sets.StringKeySet(patchTypes).List()))
+	cmd.Flags().StringVarP(&options.Selector, "selector", "l", "", "Selector (label query) to filter on")
+	cmd.Flags().Bool("all", false, "[--all] to select all the specified resources.")
 	cmdutil.AddPrinterFlags(cmd)
 	cmdutil.AddRecordFlag(cmd)
 	cmdutil.AddInclude3rdPartyFlags(cmd)
@@ -148,6 +149,8 @@ func RunPatch(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []strin
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
 		FilenameParam(enforceNamespace, &options.FilenameOptions).
+		SelectorParam(options.Selector).
+		SelectAllParam(cmdutil.GetFlagBool(cmd, "all")).
 		ResourceTypeOrNameArgs(false, args...).
 		Flatten().
 		Do()
@@ -157,6 +160,7 @@ func RunPatch(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []strin
 	}
 
 	count := 0
+
 	err = r.Visit(func(info *resource.Info, err error) error {
 		if err != nil {
 			return err
