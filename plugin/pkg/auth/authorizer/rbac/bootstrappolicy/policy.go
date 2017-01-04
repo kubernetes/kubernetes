@@ -17,9 +17,9 @@ limitations under the License.
 package bootstrappolicy
 
 import (
+	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/kubernetes/pkg/api"
 	rbac "k8s.io/kubernetes/pkg/apis/rbac"
-	"k8s.io/kubernetes/pkg/auth/user"
 )
 
 var (

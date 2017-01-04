@@ -33,7 +33,6 @@ go_library(
         "//pkg/auth/authenticator:go_default_library",
         "//pkg/auth/authorizer:go_default_library",
         "//pkg/auth/authorizer/union:go_default_library",
-        "//pkg/auth/user:go_default_library",
         "//pkg/client/clientset_generated/clientset:go_default_library",
         "//pkg/client/clientset_generated/clientset/typed/core/v1:go_default_library",
         "//pkg/client/clientset_generated/internalclientset:go_default_library",
@@ -63,5 +62,6 @@ go_library(
         "//vendor:github.com/go-openapi/spec",
         "//vendor:github.com/golang/glog",
         "//vendor:github.com/pborman/uuid",
+        "//vendor:k8s.io/apiserver/pkg/authentication/user",
     ],
 )

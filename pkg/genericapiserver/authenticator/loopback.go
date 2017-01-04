@@ -17,9 +17,9 @@ limitations under the License.
 package authenticator
 
 import (
+	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/kubernetes/pkg/auth/authenticator"
 	"k8s.io/kubernetes/pkg/auth/authenticator/bearertoken"
-	"k8s.io/kubernetes/pkg/auth/user"
 	"k8s.io/kubernetes/plugin/pkg/auth/authenticator/token/tokenfile"
 )
 

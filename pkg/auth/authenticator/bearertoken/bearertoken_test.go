@@ -21,8 +21,8 @@ import (
 	"net/http"
 	"testing"
 
+	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/kubernetes/pkg/auth/authenticator"
-	"k8s.io/kubernetes/pkg/auth/user"
 )
 
 func TestAuthenticateRequest(t *testing.T) {

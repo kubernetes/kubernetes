@@ -37,7 +37,6 @@ go_library(
         "//pkg/auth/authorizer:go_default_library",
         "//pkg/auth/authorizer/union:go_default_library",
         "//pkg/auth/handlers:go_default_library",
-        "//pkg/auth/user:go_default_library",
         "//pkg/client/restclient:go_default_library",
         "//pkg/genericapiserver/api:go_default_library",
         "//pkg/genericapiserver/api/filters:go_default_library",
@@ -76,6 +75,7 @@ go_library(
         "//vendor:github.com/pkg/errors",
         "//vendor:github.com/prometheus/client_golang/prometheus",
         "//vendor:gopkg.in/natefinch/lumberjack.v2",
+        "//vendor:k8s.io/apiserver/pkg/authentication/user",
     ],
 )
 
@@ -105,7 +105,6 @@ go_test(
         "//pkg/apis/extensions/v1beta1:go_default_library",
         "//pkg/apis/meta/v1:go_default_library",
         "//pkg/auth/authorizer:go_default_library",
-        "//pkg/auth/user:go_default_library",
         "//pkg/client/clientset_generated/clientset:go_default_library",
         "//pkg/generated/openapi:go_default_library",
         "//pkg/genericapiserver/api/request:go_default_library",
@@ -122,5 +121,6 @@ go_test(
         "//pkg/version:go_default_library",
         "//vendor:github.com/go-openapi/spec",
         "//vendor:github.com/stretchr/testify/assert",
+        "//vendor:k8s.io/apiserver/pkg/authentication/user",
     ],
 )
