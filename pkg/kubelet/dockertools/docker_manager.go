@@ -72,6 +72,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/selinux"
 	"k8s.io/kubernetes/pkg/util/sets"
 	utilstrings "k8s.io/kubernetes/pkg/util/strings"
+	"k8s.io/kubernetes/pkg/util/tail"
 	"k8s.io/kubernetes/pkg/util/term"
 	utilversion "k8s.io/kubernetes/pkg/util/version"
 )
@@ -511,7 +512,7 @@ func getTerminationMessage(c DockerInterface, iResult *dockertypes.ContainerJSON
 				continue
 			}
 			path := mount.Source
-			data, _, err := readLastBytesFromFile(path, maxMessageLength)
+			data, _, err := tail.ReadAtMost(path, maxMessageLength)
 			if err != nil {
 				return fmt.Sprintf("Error on reading termination log %s: %v", path, err)
 			}
@@ -546,33 +547,6 @@ func readLastStringFromContainerLogs(c DockerInterface, containerName string, ma
 		return fmt.Sprintf("Error on reading termination message from logs: %v", err)
 	}
 	return buf.String()
-}
-
-// readLastBytesFromFile reads at most max bytes from the provided file or returns an error.
-// It returns true if it the file was longer than max.
-func readLastBytesFromFile(path string, max int64) ([]byte, bool, error) {
-	f, err := os.Open(path)
-	if err != nil {
-		return nil, false, err
-	}
-	defer f.Close()
-	fi, err := f.Stat()
-	if err != nil {
-		return nil, false, err
-	}
-	size := fi.Size()
-	if size == 0 {
-		return nil, true, nil
-	}
-	if size < max {
-		max = size
-	}
-	offset, err := f.Seek(-max, os.SEEK_END)
-	if err != nil {
-		return nil, false, err
-	}
-	data, err := ioutil.ReadAll(f)
-	return data, offset > 0, err
 }
 
 // makeEnvList converts EnvVar list to a list of strings, in the form of

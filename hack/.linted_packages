@@ -271,6 +271,7 @@ pkg/util/netsh
 pkg/util/ratelimit
 pkg/util/replicaset
 pkg/util/restoptions
+pkg/util/tail
 pkg/util/validation/field
 pkg/util/version
 pkg/util/workqueue

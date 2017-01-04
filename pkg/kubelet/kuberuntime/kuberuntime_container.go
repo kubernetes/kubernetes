@@ -19,7 +19,6 @@ package kuberuntime
 import (
 	"fmt"
 	"io"
-	"io/ioutil"
 	"math/rand"
 	"net/url"
 	"os"
@@ -43,6 +42,7 @@ import (
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/selinux"
 	"k8s.io/kubernetes/pkg/util/sets"
+	"k8s.io/kubernetes/pkg/util/tail"
 )
 
 // startContainer starts a container and returns a message indicates why it is failed on error.
@@ -341,11 +341,11 @@ const maxMessageLength = 1024 * 4
 func getTerminationMessage(status *runtimeapi.ContainerStatus, terminationMessagePath string, fallbackToLogs bool) (string, bool) {
 	if len(terminationMessagePath) != 0 {
 		for _, mount := range status.Mounts {
-			if mount.ContainerPath == nil || mount.HostPath == nil || *mount.ContainerPath != terminationMessagePath {
+			if mount.GetContainerPath() != terminationMessagePath {
 				continue
 			}
-			path := *mount.HostPath
-			data, _, err := readLastBytesFromFile(path, maxMessageLength)
+			path := mount.GetHostPath()
+			data, _, err := tail.ReadAtMost(path, maxMessageLength)
 			if err != nil {
 				return fmt.Sprintf("Error on reading termination log %s: %v", path, err), false
 			}
@@ -355,33 +355,6 @@ func getTerminationMessage(status *runtimeapi.ContainerStatus, terminationMessag
 		}
 	}
 	return "", fallbackToLogs
-}
-
-// readLastBytesFromFile reads at most max bytes from the provided file or returns an error.
-// It returns true if it the file was longer than max.
-func readLastBytesFromFile(path string, max int64) ([]byte, bool, error) {
-	f, err := os.Open(path)
-	if err != nil {
-		return nil, false, err
-	}
-	defer f.Close()
-	fi, err := f.Stat()
-	if err != nil {
-		return nil, false, err
-	}
-	size := fi.Size()
-	if size == 0 {
-		return nil, true, nil
-	}
-	if size < max {
-		max = size
-	}
-	offset, err := f.Seek(-max, os.SEEK_END)
-	if err != nil {
-		return nil, false, err
-	}
-	data, err := ioutil.ReadAll(f)
-	return data, offset > 0, err
 }
 
 // readLastStringFromContainerLogs attempts to read up to maxMessageLength from the end of the CRI log represented
@@ -442,8 +415,7 @@ func (m *kubeGenericRuntimeManager) getPodContainerStatuses(uid kubetypes.UID, n
 			cStatus.ExitCode = int(status.GetExitCode())
 			cStatus.FinishedAt = time.Unix(0, status.GetFinishedAt())
 
-			// TODO: how is OOMKill represented in CRI?
-			fallbackToLogs := annotatedInfo.TerminationMessagePolicy == v1.FallbackToLogsOnErrorTerminationMessage && (cStatus.ExitCode != 0 /* || cStatus.OOMKilled */)
+			fallbackToLogs := annotatedInfo.TerminationMessagePolicy == v1.FallbackToLogsOnErrorTerminationMessage && (cStatus.ExitCode != 0 || cStatus.Reason == "OOMKilled")
 			tMessage, checkLogs := getTerminationMessage(status, annotatedInfo.TerminationMessagePath, fallbackToLogs)
 			if checkLogs {
 				path := buildFullContainerLogsPath(uid, labeledInfo.ContainerName, annotatedInfo.RestartCount)
