@@ -36,7 +36,6 @@ go_library(
         "//pkg/client/restclient:go_default_library",
         "//pkg/client/typed/discovery:go_default_library",
         "//pkg/client/unversioned/clientcmd:go_default_library",
-        "//pkg/healthz:go_default_library",
         "//pkg/runtime/schema:go_default_library",
         "//pkg/util/config:go_default_library",
         "//pkg/util/configz:go_default_library",
@@ -46,6 +45,7 @@ go_library(
         "//vendor:github.com/prometheus/client_golang/prometheus",
         "//vendor:github.com/spf13/cobra",
         "//vendor:github.com/spf13/pflag",
+        "//vendor:k8s.io/apiserver/pkg/healthz",
     ],
 )
 

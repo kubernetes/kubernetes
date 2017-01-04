@@ -13,7 +13,7 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//pkg/apis/authorization:go_default_library",
-        "//pkg/auth/authorizer:go_default_library",
         "//vendor:k8s.io/apiserver/pkg/authentication/user",
+        "//vendor:k8s.io/apiserver/pkg/authorization/authorizer",
     ],
 )

@@ -20,9 +20,9 @@ import (
 	"fmt"
 	"net/http"
 
+	"k8s.io/apiserver/pkg/authentication/authenticator"
 	apierrors "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/apis/authentication"
-	"k8s.io/kubernetes/pkg/auth/authenticator"
 	genericapirequest "k8s.io/kubernetes/pkg/genericapiserver/api/request"
 	"k8s.io/kubernetes/pkg/runtime"
 )

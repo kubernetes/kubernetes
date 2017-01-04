@@ -21,7 +21,6 @@ go_library(
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/apis/authentication:go_default_library",
-        "//pkg/auth/authorizer:go_default_library",
         "//pkg/genericapiserver/api/handlers/responsewriters:go_default_library",
         "//pkg/genericapiserver/api/request:go_default_library",
         "//pkg/httplog:go_default_library",
@@ -30,6 +29,7 @@ go_library(
         "//vendor:github.com/golang/glog",
         "//vendor:github.com/pborman/uuid",
         "//vendor:k8s.io/apiserver/pkg/authentication/user",
+        "//vendor:k8s.io/apiserver/pkg/authorization/authorizer",
     ],
 )
 
@@ -46,10 +46,10 @@ go_test(
     deps = [
         "//pkg/apis/authentication:go_default_library",
         "//pkg/apis/batch:go_default_library",
-        "//pkg/auth/authorizer:go_default_library",
         "//pkg/genericapiserver/api/handlers/responsewriters:go_default_library",
         "//pkg/genericapiserver/api/request:go_default_library",
         "//pkg/util/sets:go_default_library",
         "//vendor:k8s.io/apiserver/pkg/authentication/user",
+        "//vendor:k8s.io/apiserver/pkg/authorization/authorizer",
     ],
 )

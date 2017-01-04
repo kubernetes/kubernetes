@@ -13,7 +13,7 @@ go_library(
     srcs = ["allow.go"],
     tags = ["automanaged"],
     deps = [
-        "//pkg/auth/authenticator:go_default_library",
+        "//vendor:k8s.io/apiserver/pkg/authentication/authenticator",
         "//vendor:k8s.io/apiserver/pkg/authentication/user",
     ],
 )

@@ -19,9 +19,9 @@ package union
 import (
 	"net/http"
 
+	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/user"
 	utilerrors "k8s.io/client-go/pkg/util/errors"
-	"k8s.io/kubernetes/pkg/auth/authenticator"
 )
 
 // unionAuthRequestHandler authenticates requests using a chain of authenticator.Requests

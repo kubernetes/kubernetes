@@ -19,7 +19,7 @@ package authorizer
 import (
 	"errors"
 
-	"k8s.io/kubernetes/pkg/auth/authorizer"
+	"k8s.io/apiserver/pkg/authorization/authorizer"
 )
 
 // alwaysAllowAuthorizer is an implementation of authorizer.Attributes
