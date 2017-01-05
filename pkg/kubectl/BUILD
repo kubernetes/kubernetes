@@ -172,6 +172,7 @@ go_test(
         "//pkg/client/testing/core:go_default_library",
         "//pkg/controller/deployment/util:go_default_library",
         "//pkg/kubectl/testing:go_default_library",
+        "//pkg/util:go_default_library",
         "//pkg/util/intstr:go_default_library",
         "//pkg/util/testing:go_default_library",
         "//vendor:github.com/ghodss/yaml",
