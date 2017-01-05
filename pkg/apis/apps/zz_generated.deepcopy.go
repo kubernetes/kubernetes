@@ -47,7 +47,7 @@ func DeepCopy_apps_StatefulSet(in interface{}, out interface{}, c *conversion.Cl
 	{
 		in := in.(*StatefulSet)
 		out := out.(*StatefulSet)
-		out.TypeMeta = in.TypeMeta
+		*out = *in
 		if err := api.DeepCopy_api_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, c); err != nil {
 			return err
 		}
@@ -65,8 +65,7 @@ func DeepCopy_apps_StatefulSetList(in interface{}, out interface{}, c *conversio
 	{
 		in := in.(*StatefulSetList)
 		out := out.(*StatefulSetList)
-		out.TypeMeta = in.TypeMeta
-		out.ListMeta = in.ListMeta
+		*out = *in
 		if in.Items != nil {
 			in, out := &in.Items, &out.Items
 			*out = make([]StatefulSet, len(*in))
@@ -75,8 +74,6 @@ func DeepCopy_apps_StatefulSetList(in interface{}, out interface{}, c *conversio
 					return err
 				}
 			}
-		} else {
-			out.Items = nil
 		}
 		return nil
 	}
@@ -86,15 +83,13 @@ func DeepCopy_apps_StatefulSetSpec(in interface{}, out interface{}, c *conversio
 	{
 		in := in.(*StatefulSetSpec)
 		out := out.(*StatefulSetSpec)
-		out.Replicas = in.Replicas
+		*out = *in
 		if in.Selector != nil {
 			in, out := &in.Selector, &out.Selector
 			*out = new(v1.LabelSelector)
 			if err := v1.DeepCopy_v1_LabelSelector(*in, *out, c); err != nil {
 				return err
 			}
-		} else {
-			out.Selector = nil
 		}
 		if err := api.DeepCopy_api_PodTemplateSpec(&in.Template, &out.Template, c); err != nil {
 			return err
@@ -107,10 +102,7 @@ func DeepCopy_apps_StatefulSetSpec(in interface{}, out interface{}, c *conversio
 					return err
 				}
 			}
-		} else {
-			out.VolumeClaimTemplates = nil
 		}
-		out.ServiceName = in.ServiceName
 		return nil
 	}
 }
@@ -119,14 +111,12 @@ func DeepCopy_apps_StatefulSetStatus(in interface{}, out interface{}, c *convers
 	{
 		in := in.(*StatefulSetStatus)
 		out := out.(*StatefulSetStatus)
+		*out = *in
 		if in.ObservedGeneration != nil {
 			in, out := &in.ObservedGeneration, &out.ObservedGeneration
 			*out = new(int64)
 			**out = **in
-		} else {
-			out.ObservedGeneration = nil
 		}
-		out.Replicas = in.Replicas
 		return nil
 	}
 }

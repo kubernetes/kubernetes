@@ -47,7 +47,7 @@ func DeepCopy_v1alpha1_CertificateSigningRequest(in interface{}, out interface{}
 	{
 		in := in.(*CertificateSigningRequest)
 		out := out.(*CertificateSigningRequest)
-		out.TypeMeta = in.TypeMeta
+		*out = *in
 		if err := v1.DeepCopy_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, c); err != nil {
 			return err
 		}
@@ -65,9 +65,7 @@ func DeepCopy_v1alpha1_CertificateSigningRequestCondition(in interface{}, out in
 	{
 		in := in.(*CertificateSigningRequestCondition)
 		out := out.(*CertificateSigningRequestCondition)
-		out.Type = in.Type
-		out.Reason = in.Reason
-		out.Message = in.Message
+		*out = *in
 		out.LastUpdateTime = in.LastUpdateTime.DeepCopy()
 		return nil
 	}
@@ -77,8 +75,7 @@ func DeepCopy_v1alpha1_CertificateSigningRequestList(in interface{}, out interfa
 	{
 		in := in.(*CertificateSigningRequestList)
 		out := out.(*CertificateSigningRequestList)
-		out.TypeMeta = in.TypeMeta
-		out.ListMeta = in.ListMeta
+		*out = *in
 		if in.Items != nil {
 			in, out := &in.Items, &out.Items
 			*out = make([]CertificateSigningRequest, len(*in))
@@ -87,8 +84,6 @@ func DeepCopy_v1alpha1_CertificateSigningRequestList(in interface{}, out interfa
 					return err
 				}
 			}
-		} else {
-			out.Items = nil
 		}
 		return nil
 	}
@@ -98,21 +93,16 @@ func DeepCopy_v1alpha1_CertificateSigningRequestSpec(in interface{}, out interfa
 	{
 		in := in.(*CertificateSigningRequestSpec)
 		out := out.(*CertificateSigningRequestSpec)
+		*out = *in
 		if in.Request != nil {
 			in, out := &in.Request, &out.Request
 			*out = make([]byte, len(*in))
 			copy(*out, *in)
-		} else {
-			out.Request = nil
 		}
-		out.Username = in.Username
-		out.UID = in.UID
 		if in.Groups != nil {
 			in, out := &in.Groups, &out.Groups
 			*out = make([]string, len(*in))
 			copy(*out, *in)
-		} else {
-			out.Groups = nil
 		}
 		return nil
 	}
@@ -122,6 +112,7 @@ func DeepCopy_v1alpha1_CertificateSigningRequestStatus(in interface{}, out inter
 	{
 		in := in.(*CertificateSigningRequestStatus)
 		out := out.(*CertificateSigningRequestStatus)
+		*out = *in
 		if in.Conditions != nil {
 			in, out := &in.Conditions, &out.Conditions
 			*out = make([]CertificateSigningRequestCondition, len(*in))
@@ -130,15 +121,11 @@ func DeepCopy_v1alpha1_CertificateSigningRequestStatus(in interface{}, out inter
 					return err
 				}
 			}
-		} else {
-			out.Conditions = nil
 		}
 		if in.Certificate != nil {
 			in, out := &in.Certificate, &out.Certificate
 			*out = make([]byte, len(*in))
 			copy(*out, *in)
-		} else {
-			out.Certificate = nil
 		}
 		return nil
 	}
