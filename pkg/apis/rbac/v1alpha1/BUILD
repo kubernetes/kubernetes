@@ -5,11 +5,13 @@ licenses(["notice"])
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
+    "go_test",
 )
 
 go_library(
     name = "go_default_library",
     srcs = [
+        "conversion.go",
         "defaults.go",
         "doc.go",
         "generated.pb.go",
@@ -34,5 +36,18 @@ go_library(
         "//pkg/watch/versioned:go_default_library",
         "//vendor:github.com/gogo/protobuf/proto",
         "//vendor:github.com/ugorji/go/codec",
+        "//vendor:k8s.io/apiserver/pkg/authentication/user",
+    ],
+)
+
+go_test(
+    name = "go_default_xtest",
+    srcs = ["conversion_test.go"],
+    tags = ["automanaged"],
+    deps = [
+        "//pkg/api:go_default_library",
+        "//pkg/apis/rbac:go_default_library",
+        "//pkg/apis/rbac/install:go_default_library",
+        "//pkg/apis/rbac/v1alpha1:go_default_library",
     ],
 )

@@ -232,8 +232,28 @@ func TestAppliesTo(t *testing.T) {
 			},
 			user:      &user.DefaultInfo{Name: "foobar"},
 			namespace: "default",
+			appliesTo: false,
+			testCase:  "* user subject name doesn't match all users",
+		},
+		{
+			subjects: []rbac.Subject{
+				{Kind: rbac.GroupKind, Name: user.AllAuthenticated},
+				{Kind: rbac.GroupKind, Name: user.AllUnauthenticated},
+			},
+			user:      &user.DefaultInfo{Name: "foobar", Groups: []string{user.AllAuthenticated}},
+			namespace: "default",
 			appliesTo: true,
-			testCase:  "multiple subjects with a service account that matches",
+			testCase:  "binding to all authenticated and unauthenticated subjects matches authenticated user",
+		},
+		{
+			subjects: []rbac.Subject{
+				{Kind: rbac.GroupKind, Name: user.AllAuthenticated},
+				{Kind: rbac.GroupKind, Name: user.AllUnauthenticated},
+			},
+			user:      &user.DefaultInfo{Name: "system:anonymous", Groups: []string{user.AllUnauthenticated}},
+			namespace: "default",
+			appliesTo: true,
+			testCase:  "binding to all authenticated and unauthenticated subjects matches anonymous user",
 		},
 	}
 
