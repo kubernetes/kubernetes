@@ -26,6 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
+	apps "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	policy "k8s.io/kubernetes/pkg/apis/policy/v1beta1"
@@ -92,6 +93,7 @@ func newFakeDisruptionController() (*DisruptionController, *pdbStates) {
 		rcLister:    cache.StoreToReplicationControllerLister{Indexer: cache.NewIndexer(controller.KeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})},
 		rsLister:    cache.StoreToReplicaSetLister{Indexer: cache.NewIndexer(controller.KeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})},
 		dLister:     cache.StoreToDeploymentLister{Indexer: cache.NewIndexer(controller.KeyFunc, cache.Indexers{})},
+		ssLister:    cache.StoreToStatefulSetLister{Store: cache.NewStore(controller.KeyFunc)},
 		getUpdater:  func() updater { return ps.Set },
 		broadcaster: record.NewBroadcaster(),
 	}
@@ -234,6 +236,30 @@ func newReplicaSet(t *testing.T, size int32) (*extensions.ReplicaSet, string) {
 	}
 
 	return rs, rsName
+}
+
+func newStatefulSet(t *testing.T, size int32) (*apps.StatefulSet, string) {
+	ss := &apps.StatefulSet{
+		TypeMeta: metav1.TypeMeta{APIVersion: registered.GroupOrDie(v1.GroupName).GroupVersion.String()},
+		ObjectMeta: v1.ObjectMeta{
+			UID:             uuid.NewUUID(),
+			Name:            "foobar",
+			Namespace:       v1.NamespaceDefault,
+			ResourceVersion: "18",
+			Labels:          fooBar(),
+		},
+		Spec: apps.StatefulSetSpec{
+			Replicas: &size,
+			Selector: newSelFooBar(),
+		},
+	}
+
+	ssName, err := controller.KeyFunc(ss)
+	if err != nil {
+		t.Fatalf("Unexpected error naming StatefulSet %q: %v", ss.Name, err)
+	}
+
+	return ss, ssName
 }
 
 func update(t *testing.T, store cache.Store, obj interface{}) {
@@ -407,6 +433,41 @@ func TestReplicationController(t *testing.T) {
 	add(t, dc.podLister.Indexer, rogue)
 	dc.sync(pdbName)
 	ps.VerifyDisruptionAllowed(t, pdbName, 0)
+}
+
+func TestStatefulSetController(t *testing.T) {
+	labels := map[string]string{
+		"foo": "bar",
+		"baz": "quux",
+	}
+
+	dc, ps := newFakeDisruptionController()
+
+	// 34% should round up to 2
+	pdb, pdbName := newPodDisruptionBudget(t, intstr.FromString("34%"))
+	add(t, dc.pdbLister.Store, pdb)
+	ss, _ := newStatefulSet(t, 3)
+	add(t, dc.ssLister.Store, ss)
+	dc.sync(pdbName)
+
+	// It starts out at 0 expected because, with no pods, the PDB doesn't know
+	// about the SS.  This is a known bug.  TODO(mml): file issue
+	ps.VerifyPdbStatus(t, pdbName, 0, 0, 0, 0, map[string]metav1.Time{})
+
+	pods := []*v1.Pod{}
+
+	for i := int32(0); i < 3; i++ {
+		pod, _ := newPod(t, fmt.Sprintf("foobar %d", i))
+		pods = append(pods, pod)
+		pod.Labels = labels
+		add(t, dc.podLister.Indexer, pod)
+		dc.sync(pdbName)
+		if i < 2 {
+			ps.VerifyPdbStatus(t, pdbName, 0, i+1, 2, 3, map[string]metav1.Time{})
+		} else {
+			ps.VerifyPdbStatus(t, pdbName, 1, 3, 2, 3, map[string]metav1.Time{})
+		}
+	}
 }
 
 func TestTwoControllers(t *testing.T) {
