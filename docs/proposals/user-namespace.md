@@ -45,7 +45,7 @@ user.
 with a systemd-nspawn based implementation.  Each pod started will
 be allocated a random UID range. 
 
-To user private user namespaces in rkt you specify the `--private-users`
+To use private user namespaces in rkt you specify the `--private-users`
 flag on the rkt run command.
 
 
@@ -64,7 +64,7 @@ enabling user namespace remapping in a Kubernetes cluster.
 
 1. Negative oomScoreAdj values fail.  In this case the pause container
 cannot be started and shows an error `write /proc/self/oom_score_adj: permission denied`
-in the daemon log.  Failing in docker 1.10, working in 1.12
+in the daemon log.  Failing in docker 1.10, working in 1.11+
 1. Cannot share the host or a container's network namespace when user
 namespaces are enabled.  [Fixed in 1.11](https://github.com/docker/docker/pull/21383).
 1. Permission denied mounting.  Occurs due to ownership permissions
