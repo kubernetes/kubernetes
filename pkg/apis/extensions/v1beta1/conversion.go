@@ -25,7 +25,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/api"
 	v1 "k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 )
 
@@ -42,11 +41,6 @@ func addConversionFuncs(scheme *runtime.Scheme) error {
 		Convert_v1beta1_RollingUpdateDeployment_To_extensions_RollingUpdateDeployment,
 		Convert_extensions_ReplicaSetSpec_To_v1beta1_ReplicaSetSpec,
 		Convert_v1beta1_ReplicaSetSpec_To_extensions_ReplicaSetSpec,
-		// autoscaling
-		Convert_autoscaling_CrossVersionObjectReference_To_v1beta1_SubresourceReference,
-		Convert_v1beta1_SubresourceReference_To_autoscaling_CrossVersionObjectReference,
-		Convert_autoscaling_HorizontalPodAutoscalerSpec_To_v1beta1_HorizontalPodAutoscalerSpec,
-		Convert_v1beta1_HorizontalPodAutoscalerSpec_To_autoscaling_HorizontalPodAutoscalerSpec,
 	)
 	if err != nil {
 		return err
@@ -245,56 +239,6 @@ func Convert_v1beta1_ReplicaSetSpec_To_extensions_ReplicaSetSpec(in *ReplicaSetS
 	out.Selector = in.Selector
 	if err := v1.Convert_v1_PodTemplateSpec_To_api_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
 		return err
-	}
-	return nil
-}
-
-func Convert_autoscaling_CrossVersionObjectReference_To_v1beta1_SubresourceReference(in *autoscaling.CrossVersionObjectReference, out *SubresourceReference, s conversion.Scope) error {
-	out.Kind = in.Kind
-	out.Name = in.Name
-	out.APIVersion = in.APIVersion
-	out.Subresource = "scale"
-	return nil
-}
-
-func Convert_v1beta1_SubresourceReference_To_autoscaling_CrossVersionObjectReference(in *SubresourceReference, out *autoscaling.CrossVersionObjectReference, s conversion.Scope) error {
-	out.Kind = in.Kind
-	out.Name = in.Name
-	out.APIVersion = in.APIVersion
-	return nil
-}
-
-func Convert_autoscaling_HorizontalPodAutoscalerSpec_To_v1beta1_HorizontalPodAutoscalerSpec(in *autoscaling.HorizontalPodAutoscalerSpec, out *HorizontalPodAutoscalerSpec, s conversion.Scope) error {
-	if err := Convert_autoscaling_CrossVersionObjectReference_To_v1beta1_SubresourceReference(&in.ScaleTargetRef, &out.ScaleRef, s); err != nil {
-		return err
-	}
-	if in.MinReplicas != nil {
-		out.MinReplicas = new(int32)
-		*out.MinReplicas = *in.MinReplicas
-	} else {
-		out.MinReplicas = nil
-	}
-	out.MaxReplicas = in.MaxReplicas
-	if in.TargetCPUUtilizationPercentage != nil {
-		out.CPUUtilization = &CPUTargetUtilization{TargetPercentage: *in.TargetCPUUtilizationPercentage}
-	}
-	return nil
-}
-
-func Convert_v1beta1_HorizontalPodAutoscalerSpec_To_autoscaling_HorizontalPodAutoscalerSpec(in *HorizontalPodAutoscalerSpec, out *autoscaling.HorizontalPodAutoscalerSpec, s conversion.Scope) error {
-	if err := Convert_v1beta1_SubresourceReference_To_autoscaling_CrossVersionObjectReference(&in.ScaleRef, &out.ScaleTargetRef, s); err != nil {
-		return err
-	}
-	if in.MinReplicas != nil {
-		out.MinReplicas = new(int32)
-		*out.MinReplicas = int32(*in.MinReplicas)
-	} else {
-		out.MinReplicas = nil
-	}
-	out.MaxReplicas = int32(in.MaxReplicas)
-	if in.CPUUtilization != nil {
-		out.TargetCPUUtilizationPercentage = new(int32)
-		*out.TargetCPUUtilizationPercentage = int32(in.CPUUtilization.TargetPercentage)
 	}
 	return nil
 }
