@@ -30,6 +30,7 @@ go_library(
         "//pkg/runtime:go_default_library",
         "//pkg/util/errors:go_default_library",
         "//pkg/util/strategicpatch:go_default_library",
+        "//pkg/util/validation:go_default_library",
         "//vendor:github.com/spf13/cobra",
     ],
 )
