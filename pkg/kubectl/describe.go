@@ -2266,7 +2266,7 @@ func (dd *DeploymentDescriber) Describe(namespace, name string, describerSetting
 		w.Write(LEVEL_0, "CreationTimestamp:\t%s\n", d.CreationTimestamp.Time.Format(time.RFC1123Z))
 		printLabelsMultiline(w, "Labels", d.Labels)
 		w.Write(LEVEL_0, "Selector:\t%s\n", selector)
-		w.Write(LEVEL_0, "Replicas:\t%d updated | %d total | %d available | %d unavailable\n", d.Status.UpdatedReplicas, d.Spec.Replicas, d.Status.AvailableReplicas, d.Status.UnavailableReplicas)
+		w.Write(LEVEL_0, "Replicas:\t%d updated | %d total | %d available | %d unavailable\n", d.Status.UpdatedReplicas, *d.Spec.Replicas, d.Status.AvailableReplicas, d.Status.UnavailableReplicas)
 		w.Write(LEVEL_0, "StrategyType:\t%s\n", d.Spec.Strategy.Type)
 		w.Write(LEVEL_0, "MinReadySeconds:\t%d\n", d.Spec.MinReadySeconds)
 		if d.Spec.Strategy.RollingUpdate != nil {
@@ -2349,7 +2349,7 @@ func printReplicaSetsByLabels(matchingRSs []*versionedextension.ReplicaSet) stri
 	// Format the matching ReplicaSets into strings.
 	rsStrings := make([]string, 0, len(matchingRSs))
 	for _, rs := range matchingRSs {
-		rsStrings = append(rsStrings, fmt.Sprintf("%s (%d/%d replicas created)", rs.Name, rs.Status.Replicas, rs.Spec.Replicas))
+		rsStrings = append(rsStrings, fmt.Sprintf("%s (%d/%d replicas created)", rs.Name, rs.Status.Replicas, *rs.Spec.Replicas))
 	}
 
 	list := strings.Join(rsStrings, ", ")

@@ -38,6 +38,7 @@ import (
 	versionedfake "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
+	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/intstr"
 )
 
@@ -638,6 +639,7 @@ func TestDescribeDeployment(t *testing.T) {
 			Namespace: "foo",
 		},
 		Spec: v1beta1.DeploymentSpec{
+			Replicas: util.Int32Ptr(1),
 			Selector: &metav1.LabelSelector{},
 			Template: v1.PodTemplateSpec{},
 		},
@@ -770,6 +772,7 @@ func TestDescribeEvents(t *testing.T) {
 					Namespace: "foo",
 				},
 				Spec: v1beta1.DeploymentSpec{
+					Replicas: util.Int32Ptr(1),
 					Selector: &metav1.LabelSelector{},
 				},
 			}),
