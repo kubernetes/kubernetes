@@ -535,7 +535,7 @@ func (t *thirdPartyResourceDataEncoder) Encode(obj runtime.Object, stream io.Wri
 		_, err = stream.Write(encBytes)
 		return err
 	case *metav1.InternalEvent:
-		event := &metav1.Event{}
+		event := &metav1.WatchEvent{}
 		err := metav1.Convert_versioned_InternalEvent_to_versioned_Event(obj, event, nil)
 		if err != nil {
 			return err

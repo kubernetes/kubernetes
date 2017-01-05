@@ -43,7 +43,7 @@ func (f fakeDecoder) Close() {
 
 func TestStreamWatcher(t *testing.T) {
 	table := []Event{
-		{Added, testType("foo")},
+		{Type: Added, Object: testType("foo")},
 	}
 
 	fd := fakeDecoder{make(chan Event, 5)}

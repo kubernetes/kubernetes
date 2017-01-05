@@ -37,7 +37,7 @@ func Kind(kind string) schema.GroupKind {
 
 // AddToGroupVersion registers common meta types into schemas.
 func AddToGroupVersion(scheme *runtime.Scheme, groupVersion schema.GroupVersion) {
-	scheme.AddKnownTypeWithName(groupVersion.WithKind(WatchEventKind), &Event{})
+	scheme.AddKnownTypeWithName(groupVersion.WithKind(WatchEventKind), &WatchEvent{})
 	scheme.AddKnownTypeWithName(
 		schema.GroupVersion{Group: groupVersion.Group, Version: runtime.APIVersionInternal}.WithKind(WatchEventKind),
 		&InternalEvent{},

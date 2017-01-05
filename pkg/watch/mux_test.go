@@ -36,10 +36,10 @@ func (obj *myType) GetObjectKind() schema.ObjectKind { return schema.EmptyObject
 
 func TestBroadcaster(t *testing.T) {
 	table := []Event{
-		{Added, &myType{"foo", "hello world 1"}},
-		{Added, &myType{"bar", "hello world 2"}},
-		{Modified, &myType{"foo", "goodbye world 3"}},
-		{Deleted, &myType{"bar", "hello world 4"}},
+		{Type: Added, Object: &myType{"foo", "hello world 1"}},
+		{Type: Added, Object: &myType{"bar", "hello world 2"}},
+		{Type: Modified, Object: &myType{"foo", "goodbye world 3"}},
+		{Type: Deleted, Object: &myType{"bar", "hello world 4"}},
 	}
 
 	// The broadcaster we're testing
@@ -124,8 +124,8 @@ func TestBroadcasterWatcherStopDeadlock(t *testing.T) {
 func TestBroadcasterDropIfChannelFull(t *testing.T) {
 	m := NewBroadcaster(1, DropIfChannelFull)
 
-	event1 := Event{Added, &myType{"foo", "hello world 1"}}
-	event2 := Event{Added, &myType{"bar", "hello world 2"}}
+	event1 := Event{Type: Added, Object: &myType{"foo", "hello world 1"}}
+	event2 := Event{Type: Added, Object: &myType{"bar", "hello world 2"}}
 
 	// Add a couple watchers
 	watches := make([]Interface, 2)

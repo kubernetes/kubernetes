@@ -45,7 +45,7 @@ func NewDecoder(decoder streaming.Decoder, embeddedDecoder runtime.Decoder) *Dec
 // Decode blocks until it can return the next object in the reader. Returns an error
 // if the reader is closed or an object can't be decoded.
 func (d *Decoder) Decode() (watch.EventType, runtime.Object, error) {
-	var got metav1.Event
+	var got metav1.WatchEvent
 	res, _, err := d.decoder.Decode(nil, &got)
 	if err != nil {
 		return "", nil, err

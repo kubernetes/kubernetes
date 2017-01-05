@@ -123,14 +123,14 @@ func addFastPathConversionFuncs(scheme *runtime.Scheme) error {
 				return true, Convert_api_Endpoints_To_v1_Endpoints(a, b, s)
 			}
 
-		case *metav1.Event:
+		case *metav1.WatchEvent:
 			switch b := objB.(type) {
 			case *metav1.InternalEvent:
 				return true, metav1.Convert_versioned_Event_to_versioned_InternalEvent(a, b, s)
 			}
 		case *metav1.InternalEvent:
 			switch b := objB.(type) {
-			case *metav1.Event:
+			case *metav1.WatchEvent:
 				return true, metav1.Convert_versioned_InternalEvent_to_versioned_Event(a, b, s)
 			}
 		}
