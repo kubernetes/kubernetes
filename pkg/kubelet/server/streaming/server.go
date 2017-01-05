@@ -177,9 +177,6 @@ func (s *server) GetPortForward(req *runtimeapi.PortForwardRequest) (*runtimeapi
 	}
 	token, err := s.cache.Insert(req)
 	if err != nil {
-		if err == errCacheFull {
-			return nil, grpc.Errorf(codes.Unavailable, err.Error())
-		}
 		return nil, err
 	}
 	return &runtimeapi.PortForwardResponse{

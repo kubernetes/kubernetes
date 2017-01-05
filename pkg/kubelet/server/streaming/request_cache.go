@@ -20,7 +20,6 @@ import (
 	"container/list"
 	"crypto/rand"
 	"encoding/base64"
-	"errors"
 	"fmt"
 	"math"
 	"sync"
@@ -30,12 +29,11 @@ import (
 )
 
 var (
-	CacheTTL     = 1 * time.Minute
-	CacheMaxSize = 1000
-	TokenLen     = 24
+	CacheTTL = 1 * time.Minute
+	// The maximum number of in-flight requests to allow.
+	MaxInFlight = 1000
+	TokenLen    = 24
 )
-
-var errCacheFull = errors.New("request cache full")
 
 type requestCache struct {
 	// clock is used to obtain the current time
@@ -71,8 +69,11 @@ func (c *requestCache) Insert(req request) (token string, err error) {
 
 	c.gc() // Remove expired entries.
 	// If the cache is full, reject the request.
-	if c.ll.Len() == CacheMaxSize {
-		return "", errCacheFull
+	if c.ll.Len() == MaxInFlight {
+		oldest := c.ll.Back()
+		entry := oldest.Value.(*cacheEntry)
+		nextExpire := entry.expireTime.Sub(c.clock.Now())
+		return "", ErrorTooManyInFlight(int(math.Ceil(nextExpire.Seconds())))
 	}
 	token, err = c.uniqueToken()
 	if err != nil {

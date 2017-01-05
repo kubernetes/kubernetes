@@ -19,10 +19,15 @@ package streaming
 import (
 	"fmt"
 	"net/http"
+	"regexp"
 	"time"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+)
+
+var (
+	retryAfterRegexp = regexp.MustCompile(`\[Retry-After:([0-9]+)\]`)
 )
 
 func ErrorStreamingDisabled(method string) error {
@@ -33,12 +38,29 @@ func ErrorTimeout(op string, timeout time.Duration) error {
 	return grpc.Errorf(codes.DeadlineExceeded, fmt.Sprintf("%s timed out after %s", op, timeout.String()))
 }
 
-// Translates a CRI streaming error into an HTTP status code.
-func HTTPStatus(err error) int {
+// The error returned when the maximum number of in-flight requests is exceeded.
+func ErrorTooManyInFlight(retryAfter int) error {
+	return grpc.Errorf(codes.ResourceExhausted, "maximum number of in-flight requests exceeded [Retry-After:%d]",
+		retryAfter)
+}
+
+// Translates a CRI streaming error into an appropriate HTTP response.
+func WriteError(err error, w http.ResponseWriter) error {
+	var status int
 	switch grpc.Code(err) {
 	case codes.NotFound:
-		return http.StatusNotFound
+		status = http.StatusNotFound
+	case codes.ResourceExhausted:
+		// Extract the Retry-After time from the error description.
+		retryAfter := retryAfterRegexp.FindStringSubmatch(err.Error())
+		if len(retryAfter) == 2 {
+			w.Header().Set("Retry-After", retryAfter[1])
+		}
+		status = http.StatusTooManyRequests
 	default:
-		return http.StatusInternalServerError
+		status = http.StatusInternalServerError
 	}
+	w.WriteHeader(status)
+	_, writeErr := w.Write([]byte(err.Error()))
+	return writeErr
 }

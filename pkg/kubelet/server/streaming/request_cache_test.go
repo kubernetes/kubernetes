@@ -17,6 +17,9 @@ limitations under the License.
 package streaming
 
 import (
+	"net/http"
+	"net/http/httptest"
+	"strconv"
 	"testing"
 	"time"
 
@@ -36,18 +39,18 @@ func TestInsert(t *testing.T) {
 	assertCacheSize(t, c, 1)
 
 	// Insert until full
-	for i := 0; i < CacheMaxSize-2; i++ {
+	for i := 0; i < MaxInFlight-2; i++ {
 		tok, err := c.Insert(nextRequest())
 		require.NoError(t, err)
 		assert.Len(t, tok, TokenLen)
 	}
-	assertCacheSize(t, c, CacheMaxSize-1)
+	assertCacheSize(t, c, MaxInFlight-1)
 
 	newestReq := nextRequest()
 	newestTok, err := c.Insert(newestReq)
 	require.NoError(t, err)
 	assert.Len(t, newestTok, TokenLen)
-	assertCacheSize(t, c, CacheMaxSize)
+	assertCacheSize(t, c, MaxInFlight)
 	require.Contains(t, c.tokens, oldestTok, "oldest request should still be cached")
 
 	// Consume newest token.
@@ -60,12 +63,17 @@ func TestInsert(t *testing.T) {
 	tok, err := c.Insert(nextRequest())
 	require.NoError(t, err)
 	assert.Len(t, tok, TokenLen)
-	assertCacheSize(t, c, CacheMaxSize)
+	assertCacheSize(t, c, MaxInFlight)
 
 	// Insert again (should evict)
 	_, err = c.Insert(nextRequest())
-	assert.Equal(t, errCacheFull, err, "should not accept new requests when full")
-	assertCacheSize(t, c, CacheMaxSize)
+	assert.Error(t, err, "should reject further requests")
+	errResponse := httptest.NewRecorder()
+	require.NoError(t, WriteError(err, errResponse))
+	assert.Equal(t, errResponse.Code, http.StatusTooManyRequests)
+	assert.Equal(t, strconv.Itoa(int(CacheTTL.Seconds())), errResponse.HeaderMap.Get("Retry-After"))
+
+	assertCacheSize(t, c, MaxInFlight)
 	_, ok = c.Consume(oldestTok)
 	assert.True(t, ok, "oldest request should be valid")
 }
@@ -178,11 +186,11 @@ func TestGC(t *testing.T) {
 	assert.True(t, ok)
 
 	// When full, nothing is expired.
-	for i := 0; i < CacheMaxSize; i++ {
+	for i := 0; i < MaxInFlight; i++ {
 		_, err := c.Insert(nextRequest())
 		require.NoError(t, err)
 	}
-	assertCacheSize(t, c, CacheMaxSize)
+	assertCacheSize(t, c, MaxInFlight)
 
 	// When everything is expired
 	clock.Step(2 * CacheTTL)
