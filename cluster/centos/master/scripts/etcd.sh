@@ -17,31 +17,35 @@
 ## Create etcd.conf, etcd.service, and start etcd service.
 
 
-etcd_data_dir=/var/lib/etcd/
+etcd_data_dir=/var/lib/etcd
 mkdir -p ${etcd_data_dir}
+
+DEFAULT_ETCD_NAME=default-$(hostid)
+ETCD_LISTEN_IP=${1:-"0.0.0.0"}
+ETCD_DISCOVERY=${2:-}
 
 cat <<EOF >/opt/kubernetes/cfg/etcd.conf
 # [member]
-ETCD_NAME=default
+ETCD_NAME="${DEFAULT_ETCD_NAME}"
 ETCD_DATA_DIR="${etcd_data_dir}/default.etcd"
 #ETCD_SNAPSHOT_COUNTER="10000"
 #ETCD_HEARTBEAT_INTERVAL="100"
 #ETCD_ELECTION_TIMEOUT="1000"
-#ETCD_LISTEN_PEER_URLS="http://localhost:2380,http://localhost:7001"
-ETCD_LISTEN_CLIENT_URLS="http://0.0.0.0:2379"
+ETCD_LISTEN_PEER_URLS="http://${ETCD_LISTEN_IP}:2380"
+ETCD_LISTEN_CLIENT_URLS="http://${ETCD_LISTEN_IP}:2379,http://127.0.0.1:2379"
 #ETCD_MAX_SNAPSHOTS="5"
 #ETCD_MAX_WALS="5"
 #ETCD_CORS=""
 #
 #[cluster]
-#ETCD_INITIAL_ADVERTISE_PEER_URLS="http://localhost:2380,http://localhost:7001"
+ETCD_INITIAL_ADVERTISE_PEER_URLS="http://${ETCD_LISTEN_IP}:2380"
 # if you use different ETCD_NAME (e.g. test),
 # set ETCD_INITIAL_CLUSTER value for this name, i.e. "test=http://..."
 #ETCD_INITIAL_CLUSTER="default=http://localhost:2380,default=http://localhost:7001"
 #ETCD_INITIAL_CLUSTER_STATE="new"
 #ETCD_INITIAL_CLUSTER_TOKEN="etcd-cluster"
-ETCD_ADVERTISE_CLIENT_URLS="http://localhost:2379"
-#ETCD_DISCOVERY=""
+ETCD_ADVERTISE_CLIENT_URLS="http://${ETCD_LISTEN_IP}:2379"
+ETCD_DISCOVERY="$ETCD_DISCOVERY"
 #ETCD_DISCOVERY_SRV=""
 #ETCD_DISCOVERY_FALLBACK="proxy"
 #ETCD_DISCOVERY_PROXY=""
