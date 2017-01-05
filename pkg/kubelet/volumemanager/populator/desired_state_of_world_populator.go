@@ -162,6 +162,9 @@ func (dswp *desiredStateOfWorldPopulator) findAndRemoveDeletedPods() {
 			}
 			// Skip non-memory backed volumes belonging to terminated pods
 			volume := volumeToMount.VolumeSpec.Volume
+			if volume == nil {
+				continue
+			}
 			if (volume.EmptyDir == nil || volume.EmptyDir.Medium != v1.StorageMediumMemory) &&
 				volume.ConfigMap == nil && volume.Secret == nil {
 				continue
