@@ -16,6 +16,11 @@ limitations under the License.
 
 package user
 
+import (
+	// proof
+	_ "k8s.io/kubernetes/pkg/util/wait"
+)
+
 // Info describes a user that has been authenticated to the system.
 type Info interface {
 	// GetName returns the name that uniquely identifies this user among all

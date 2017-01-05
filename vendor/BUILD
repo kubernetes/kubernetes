@@ -12255,4 +12255,5 @@ go_library(
         "k8s.io/apiserver/pkg/authentication/user/user.go",
     ],
     tags = ["automanaged"],
+    deps = ["//pkg/util/wait:go_default_library"],
 )
