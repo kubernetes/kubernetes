@@ -564,7 +564,9 @@ func NewGarbageCollector(metaOnlyClientPool dynamic.ClientPool, clientPool dynam
 		}
 		kind, err := gc.restMapper.KindFor(resource)
 		if err != nil {
-			return nil, err
+			// NoKindMatch error would be returned for TPR resources
+			glog.Warningf("failed to get kind for %v", resource)
+			continue
 		}
 		monitor, err := gc.monitorFor(resource, kind)
 		if err != nil {
