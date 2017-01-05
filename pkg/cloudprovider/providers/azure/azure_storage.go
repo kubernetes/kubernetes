@@ -28,7 +28,10 @@ import (
 )
 
 const (
-	maxLUN = 64 // max number of LUNs per VM
+	maxLUN               = 64 // max number of LUNs per VM
+	errLeaseFailed       = "AcquireDiskLeaseFailed"
+	errLeaseIDMissing    = "LeaseIdMissing"
+	errContainerNotFound = "ContainerNotFound"
 )
 
 // AttachDisk attaches a vhd to vm
@@ -65,7 +68,7 @@ func (az *Cloud) AttachDisk(diskName, diskURI string, nodeName types.NodeName, l
 	if err != nil {
 		glog.Errorf("azure attach failed, err: %v", err)
 		detail := err.Error()
-		if strings.Contains(detail, "Code=\"AcquireDiskLeaseFailed\"") {
+		if strings.Contains(detail, errLeaseFailed) {
 			// if lease cannot be acquired, immediately detach the disk and return the original error
 			glog.Infof("failed to acquire disk lease, try detach")
 			az.DetachDiskByName(diskName, diskURI, nodeName)
@@ -237,7 +240,7 @@ func (az *Cloud) DeleteVolume(name, uri string) error {
 	if err != nil {
 		glog.Warningf("failed to delete blob %s err: %v", uri, err)
 		detail := err.Error()
-		if strings.Contains(detail, "LeaseIdMissing") {
+		if strings.Contains(detail, errLeaseIDMissing) {
 			// disk is still being used
 			// see https://msdn.microsoft.com/en-us/library/microsoft.windowsazure.storage.blob.protocol.bloberrorcodestrings.leaseidmissing.aspx
 			return volume.NewDeletedVolumeInUseError(fmt.Sprintf("disk %q is still in use while being deleted", name))
