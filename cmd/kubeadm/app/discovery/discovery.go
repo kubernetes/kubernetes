@@ -20,15 +20,43 @@ import (
 	"fmt"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	kubenode "k8s.io/kubernetes/cmd/kubeadm/app/node"
+
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
 )
 
-func For(c kubeadmapi.Discovery) (*clientcmdapi.Config, error) {
+// For identifies and executes the desired discovery mechanism.
+func For(d kubeadmapi.Discovery) (*clientcmdapi.Config, error) {
 	switch {
-	case c.File != nil:
-		return clientcmd.LoadFromFile(c.File.Path)
+	case d.Token != nil:
+		return runTokenDiscovery(d.Token)
+	case d.File != nil:
+		return runFileDiscovery(d.File)
 	default:
 		return nil, fmt.Errorf("Couldn't find a valid discovery configuration. Please provide one.")
 	}
+}
+
+// runFileDiscovery executes token discovery.
+func runFileDiscovery(fd *kubeadmapi.FileDiscovery) (*clientcmdapi.Config, error) {
+	return clientcmd.LoadFromFile(fd.Path)
+}
+
+// runTokenDiscovery executes token discovery.
+func runTokenDiscovery(td *kubeadmapi.TokenDiscovery) (*clientcmdapi.Config, error) {
+	clusterInfo, err := kubenode.RetrieveTrustedClusterInfo(td)
+	if err != nil {
+		return nil, err
+	}
+
+	connectionDetails, err := kubenode.EstablishMasterConnection(td, clusterInfo)
+	if err != nil {
+		return nil, err
+	}
+	err = kubenode.CheckForNodeNameDuplicates(connectionDetails)
+	if err != nil {
+		return nil, err
+	}
+	return kubenode.PerformTLSBootstrapDeprecated(connectionDetails)
 }
