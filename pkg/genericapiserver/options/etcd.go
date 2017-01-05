@@ -61,7 +61,7 @@ func (s *EtcdOptions) AddFlags(fs *pflag.FlagSet) {
 		"format: group/resource#servers, where servers are http://ip:port, semicolon separated.")
 
 	fs.StringVar(&s.StorageConfig.Type, "storage-backend", s.StorageConfig.Type,
-		"The storage backend for persistence. Options: 'etcd2' (default), 'etcd3'.")
+		"The storage backend for persistence. Options: 'etcd3' (default), 'etcd2'.")
 
 	fs.IntVar(&s.StorageConfig.DeserializationCacheSize, "deserialization-cache-size", s.StorageConfig.DeserializationCacheSize,
 		"Number of deserialized json objects to cache in memory.")
