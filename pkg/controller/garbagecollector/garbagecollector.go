@@ -27,6 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/apis/meta/v1/unstructured"
 	"k8s.io/kubernetes/pkg/client/cache"
@@ -560,6 +561,10 @@ func NewGarbageCollector(metaOnlyClientPool dynamic.ClientPool, clientPool dynam
 	for resource := range deletableResources {
 		if _, ok := ignoredResources[resource]; ok {
 			glog.V(6).Infof("ignore resource %#v", resource)
+			continue
+		}
+		if registered.IsThirdPartyAPIGroupVersion(resource.GroupVersion()) {
+			glog.V(6).Infof("ignore thirdparty api group version resource %#v", resource)
 			continue
 		}
 		kind, err := gc.restMapper.KindFor(resource)
