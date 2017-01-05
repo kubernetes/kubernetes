@@ -21,8 +21,8 @@ import (
 	"net/http"
 	"strings"
 
+	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/user"
-	"k8s.io/kubernetes/pkg/auth/authenticator"
 )
 
 type Authenticator struct {

@@ -23,7 +23,7 @@ import (
 	"github.com/golang/glog"
 	"github.com/prometheus/client_golang/prometheus"
 
-	"k8s.io/kubernetes/pkg/auth/authenticator"
+	"k8s.io/apiserver/pkg/authentication/authenticator"
 	genericapirequest "k8s.io/kubernetes/pkg/genericapiserver/api/request"
 )
 

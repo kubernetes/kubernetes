@@ -30,13 +30,13 @@ import (
 
 	"github.com/golang/glog"
 
+	"k8s.io/apiserver/pkg/authentication/authenticator"
+	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	rbacapi "k8s.io/kubernetes/pkg/apis/rbac"
-	"k8s.io/kubernetes/pkg/auth/authenticator"
 	"k8s.io/kubernetes/pkg/auth/authenticator/bearertoken"
-	"k8s.io/kubernetes/pkg/auth/authorizer"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/transport"

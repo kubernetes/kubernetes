@@ -23,8 +23,8 @@ import (
 	"reflect"
 	"testing"
 
+	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/kubernetes/pkg/apis/batch"
-	"k8s.io/kubernetes/pkg/auth/authorizer"
 	"k8s.io/kubernetes/pkg/genericapiserver/api/handlers/responsewriters"
 	"k8s.io/kubernetes/pkg/genericapiserver/api/request"
 )

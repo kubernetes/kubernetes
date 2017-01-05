@@ -15,7 +15,7 @@ go_test(
     tags = ["automanaged"],
     deps = [
         "//pkg/admission:go_default_library",
-        "//pkg/auth/authorizer:go_default_library",
+        "//vendor:k8s.io/apiserver/pkg/authorization/authorizer",
     ],
 )
 
@@ -25,8 +25,8 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//pkg/admission:go_default_library",
-        "//pkg/auth/authorizer:go_default_library",
         "//pkg/client/clientset_generated/internalclientset:go_default_library",
         "//pkg/controller/informers:go_default_library",
+        "//vendor:k8s.io/apiserver/pkg/authorization/authorizer",
     ],
 )

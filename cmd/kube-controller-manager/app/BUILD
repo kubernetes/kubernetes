@@ -72,7 +72,6 @@ go_library(
         "//pkg/controller/serviceaccount:go_default_library",
         "//pkg/controller/volume/attachdetach:go_default_library",
         "//pkg/controller/volume/persistentvolume:go_default_library",
-        "//pkg/healthz:go_default_library",
         "//pkg/quota/install:go_default_library",
         "//pkg/runtime/schema:go_default_library",
         "//pkg/runtime/serializer:go_default_library",
@@ -100,5 +99,6 @@ go_library(
         "//vendor:github.com/prometheus/client_golang/prometheus",
         "//vendor:github.com/spf13/cobra",
         "//vendor:github.com/spf13/pflag",
+        "//vendor:k8s.io/apiserver/pkg/healthz",
     ],
 )

@@ -33,13 +33,13 @@ go_library(
     deps = [
         "//pkg/api/rest:go_default_library",
         "//pkg/apis/meta/v1:go_default_library",
-        "//pkg/auth/authorizer:go_default_library",
         "//pkg/genericapiserver/api/handlers/negotiation:go_default_library",
         "//pkg/runtime:go_default_library",
         "//pkg/runtime/schema:go_default_library",
         "//pkg/storage:go_default_library",
-        "//pkg/util/flushwriter:go_default_library",
         "//pkg/util/runtime:go_default_library",
         "//pkg/util/wsstream:go_default_library",
+        "//vendor:k8s.io/apiserver/pkg/authorization/authorizer",
+        "//vendor:k8s.io/apiserver/pkg/util/flushwriter",
     ],
 )

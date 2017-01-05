@@ -21,7 +21,7 @@ go_library(
     srcs = ["union.go"],
     tags = ["automanaged"],
     deps = [
-        "//pkg/auth/authenticator:go_default_library",
+        "//vendor:k8s.io/apiserver/pkg/authentication/authenticator",
         "//vendor:k8s.io/apiserver/pkg/authentication/user",
         "//vendor:k8s.io/client-go/pkg/util/errors",
     ],

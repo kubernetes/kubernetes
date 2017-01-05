@@ -14,6 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package flushwriter implements a wrapper for a writer that flushes on every
-// write if that writer implements the io.Flusher interface
-package flushwriter // import "k8s.io/kubernetes/pkg/util/flushwriter"
+// Package healthz implements basic http server health checking.
+// Usage:
+//   import "k8s.io/apiserver/pkg/healthz"
+//   healthz.DefaultHealthz()
+package healthz // import "k8s.io/apiserver/pkg/healthz"
