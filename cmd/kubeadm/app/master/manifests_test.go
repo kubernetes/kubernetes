@@ -103,7 +103,7 @@ func TestEtcdVolumeMount(t *testing.T) {
 		{
 			expected: api.VolumeMount{
 				Name:      "etcd",
-				MountPath: "/var/etcd",
+				MountPath: "/var/lib/etcd",
 			},
 		},
 	}
