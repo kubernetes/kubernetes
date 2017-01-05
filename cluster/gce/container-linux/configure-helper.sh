@@ -145,8 +145,9 @@ function create-master-auth {
   local -r known_tokens_csv="${auth_dir}/known_tokens.csv"
   if [[ ! -e "${known_tokens_csv}" ]]; then
     echo "${KUBE_BEARER_TOKEN},admin,admin" > "${known_tokens_csv}"
-    echo "${KUBELET_TOKEN},kubelet,kubelet" >> "${known_tokens_csv}"
-    echo "${KUBE_PROXY_TOKEN},kube_proxy,kube_proxy" >> "${known_tokens_csv}"
+    echo "${KUBE_CONTROLLER_MANAGER_TOKEN},system:kube-controller-manager,uid:system:kube-controller-manager" >> "${known_tokens_csv}"
+    echo "${KUBELET_TOKEN},system:node:node-name,uid:kubelet,system:nodes" >> "${known_tokens_csv}"
+    echo "${KUBE_PROXY_TOKEN},system:kube-proxy,uid:kube_proxy" >> "${known_tokens_csv}"
   fi
   local use_cloud_config="false"
   cat <<EOF >/etc/gce.conf
@@ -310,6 +311,30 @@ contexts:
 - context:
     cluster: local
     user: kube-proxy
+  name: service-account-context
+current-context: service-account-context
+EOF
+}
+
+function create-kubecontrollermanager-kubeconfig {
+  echo "Creating kube-controller-manager kubeconfig file"
+  mkdir -p /etc/srv/kubernetes/kube-controller-manager
+  cat <<EOF >/etc/srv/kubernetes/kube-controller-manager/kubeconfig
+apiVersion: v1
+kind: Config
+users:
+- name: kube-controller-manager
+  user:
+    token: ${KUBE_CONTROLLER_MANAGER_TOKEN}
+clusters:
+- name: local
+  cluster:
+    insecure-skip-tls-verify: true
+    server: https://localhost:443
+contexts:
+- context:
+    cluster: local
+    user: kube-controller-manager
   name: service-account-context
 current-context: service-account-context
 EOF
@@ -712,7 +737,6 @@ function start-kube-apiserver {
   local params="${API_SERVER_TEST_LOG_LEVEL:-"--v=2"} ${APISERVER_TEST_ARGS:-} ${CLOUD_CONFIG_OPT}"
   params+=" --address=127.0.0.1"
   params+=" --allow-privileged=true"
-  params+=" --authorization-policy-file=/etc/srv/kubernetes/abac-authz-policy.jsonl"
   params+=" --cloud-provider=gce"
   params+=" --client-ca-file=/etc/srv/kubernetes/ca.crt"
   params+=" --etcd-servers=http://127.0.0.1:2379"
@@ -790,7 +814,7 @@ function start-kube-apiserver {
     webhook_authn_config_volume="{\"name\": \"webhookauthnconfigmount\",\"hostPath\": {\"path\": \"/etc/gcp_authn.config\"}},"
   fi
 
-  params+=" --authorization-mode=ABAC"
+  params+=" --authorization-mode=RBAC"
   local webhook_config_mount=""
   local webhook_config_volume=""
   if [[ -n "${GCP_AUTHZ_URL:-}" ]]; then
@@ -799,17 +823,6 @@ function start-kube-apiserver {
     webhook_config_volume="{\"name\": \"webhookconfigmount\",\"hostPath\": {\"path\": \"/etc/gcp_authz.config\"}},"
   fi
   local -r src_dir="${KUBE_HOME}/kube-manifests/kubernetes/gci-trusty"
-
-  if [[ -n "${KUBE_USER:-}" || ! -e /etc/srv/kubernetes/abac-authz-policy.jsonl ]]; then
-    local -r abac_policy_json="${src_dir}/abac-authz-policy.jsonl"
-    remove-salt-config-comments "${abac_policy_json}"
-    if [[ -n "${KUBE_USER:-}" ]]; then
-      sed -i -e "s/{{kube_user}}/${KUBE_USER}/g" "${abac_policy_json}"
-    else
-      sed -i -e "/{{kube_user}}/d" "${abac_policy_json}"
-    fi
-    cp "${abac_policy_json}" /etc/srv/kubernetes/
-  fi
 
   src_file="${src_dir}/kube-apiserver.manifest"
   remove-salt-config-comments "${src_file}"
@@ -849,11 +862,13 @@ function start-kube-apiserver {
 #   DOCKER_REGISTRY
 function start-kube-controller-manager {
   echo "Start kubernetes controller-manager"
+  create-kubecontrollermanager-kubeconfig
   prepare-log-file /var/log/kube-controller-manager.log
   # Calculate variables and assemble the command line.
   local params="${CONTROLLER_MANAGER_TEST_LOG_LEVEL:-"--v=2"} ${CONTROLLER_MANAGER_TEST_ARGS:-} ${CLOUD_CONFIG_OPT}"
+  params+=" --use-service-account-credentials"
   params+=" --cloud-provider=gce"
-  params+=" --master=127.0.0.1:8080"
+  params+=" --kubeconfig=/etc/srv/kubernetes/kube-controller-manager/kubeconfig"
   params+=" --root-ca-file=/etc/srv/kubernetes/ca.crt"
   params+=" --service-account-private-key-file=/etc/srv/kubernetes/server.key"
   if [[ -n "${ENABLE_GARBAGE_COLLECTOR:-}" ]]; then
@@ -982,6 +997,10 @@ function start-kube-addons {
   echo "Prepare kube-addons manifests and start kube addon manager"
   local -r src_dir="${KUBE_HOME}/kube-manifests/kubernetes/gci-trusty"
   local -r dst_dir="/etc/kubernetes/addons"
+
+  # prep the additional bindings that are particular to e2e users and groups
+  setup-addon-manifests "addons" "e2e-rbac-bindings"
+
   # Set up manifests of other addons.
   if [[ "${ENABLE_CLUSTER_MONITORING:-}" == "influxdb" ]] || \
      [[ "${ENABLE_CLUSTER_MONITORING:-}" == "google" ]] || \
@@ -1215,6 +1234,9 @@ if [[ -n "${KUBE_USER:-}" ]]; then
     exit 1
   fi
 fi
+
+# generate the controller manager token here since its only used on the master.
+KUBE_CONTROLLER_MANAGER_TOKEN=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)
 
 # KUBERNETES_CONTAINER_RUNTIME is set by the `kube-env` file, but it's a bit of a mouthful
 if [[ "${CONTAINER_RUNTIME:-}" == "" ]]; then
