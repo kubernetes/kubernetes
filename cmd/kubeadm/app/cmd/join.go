@@ -138,8 +138,7 @@ func (j *Join) Run(out io.Writer) error {
 		return err
 	}
 
-	err = kubeconfigphase.WriteKubeconfigToDisk(path.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, kubeconfigphase.KubeletKubeConfigFileName), cfg)
-	if err != nil {
+	if err := kubeconfigphase.WriteKubeconfigToDisk(path.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, kubeconfigphase.KubeletKubeConfigFileName), cfg); err != nil {
 		return err
 	}
 
