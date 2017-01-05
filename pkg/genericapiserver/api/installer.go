@@ -26,6 +26,7 @@ import (
 	"sort"
 	"strings"
 	"time"
+	"unicode"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
@@ -40,7 +41,6 @@ import (
 	"k8s.io/kubernetes/pkg/genericapiserver/api/request"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/runtime/schema"
-	utilstrings "k8s.io/kubernetes/pkg/util/strings"
 
 	"github.com/emicklei/go-restful"
 )
@@ -654,7 +654,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 				handler = handlers.CreateResource(creater, reqScope, a.group.Typer, admit)
 			}
 			handler = metrics.InstrumentRouteFunc(action.Verb, resource, handler)
-			article := utilstrings.GetArticleForNoun(kind, " ")
+			article := getArticleForNoun(kind, " ")
 			doc := "create" + article + kind
 			if hasSubresource {
 				doc = "create " + subresource + " of" + article + kind
@@ -670,7 +670,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			addParams(route, action.Params)
 			ws.Route(route)
 		case "DELETE": // Delete a resource.
-			article := utilstrings.GetArticleForNoun(kind, " ")
+			article := getArticleForNoun(kind, " ")
 			doc := "delete" + article + kind
 			if hasSubresource {
 				doc = "delete " + subresource + " of" + article + kind
@@ -1079,4 +1079,31 @@ func splitSubresource(path string) (string, string, error) {
 		return "", "", fmt.Errorf("api_installer allows only one or two segment paths (resource or resource/subresource)")
 	}
 	return resource, subresource, nil
+}
+
+// getArticleForNoun returns the article needed for the given noun.
+func getArticleForNoun(noun string, padding string) string {
+	if noun[len(noun)-2:] != "ss" && noun[len(noun)-1:] == "s" {
+		// Plurals don't have an article.
+		// Don't catch words like class
+		return fmt.Sprintf("%v", padding)
+	}
+
+	article := "a"
+	if isVowel(rune(noun[0])) {
+		article = "an"
+	}
+
+	return fmt.Sprintf("%s%s%s", padding, article, padding)
+}
+
+// isVowel returns true if the rune is a vowel (case insensitive).
+func isVowel(c rune) bool {
+	vowels := []rune{'a', 'e', 'i', 'o', 'u'}
+	for _, value := range vowels {
+		if value == unicode.ToLower(c) {
+			return true
+		}
+	}
+	return false
 }
