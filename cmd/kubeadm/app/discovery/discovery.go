@@ -20,12 +20,15 @@ import (
 	"fmt"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
 )
 
 func For(c kubeadmapi.Discovery) (*clientcmdapi.Config, error) {
 	switch {
+	case c.File != nil:
+		return clientcmd.LoadFromFile(c.File.Path)
 	default:
-		return nil, fmt.Errorf("unimplemented")
+		return nil, fmt.Errorf("Couldn't find a valid discovery configuration. Please provide one.")
 	}
 }
