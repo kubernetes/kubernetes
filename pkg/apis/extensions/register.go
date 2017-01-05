@@ -21,7 +21,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/apis/autoscaling"
 )
 
 // GroupName is the group name use in this package
@@ -52,8 +51,6 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&Deployment{},
 		&DeploymentList{},
 		&DeploymentRollback{},
-		&autoscaling.HorizontalPodAutoscaler{},
-		&autoscaling.HorizontalPodAutoscalerList{},
 		&ReplicationControllerDummy{},
 		&Scale{},
 		&ThirdPartyResource{},

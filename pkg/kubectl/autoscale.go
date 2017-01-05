@@ -25,26 +25,6 @@ import (
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 )
 
-type HorizontalPodAutoscalerV1Beta1 struct{}
-
-func (HorizontalPodAutoscalerV1Beta1) ParamNames() []GeneratorParam {
-	return []GeneratorParam{
-		{"default-name", true},
-		{"name", false},
-		{"scaleRef-kind", false},
-		{"scaleRef-name", false},
-		{"scaleRef-apiVersion", false},
-		{"scaleRef-subresource", false},
-		{"min", false},
-		{"max", true},
-		{"cpu-percent", false},
-	}
-}
-
-func (HorizontalPodAutoscalerV1Beta1) Generate(genericParams map[string]interface{}) (runtime.Object, error) {
-	return generateHPA(genericParams)
-}
-
 type HorizontalPodAutoscalerV1 struct{}
 
 func (HorizontalPodAutoscalerV1) ParamNames() []GeneratorParam {

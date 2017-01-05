@@ -29,7 +29,6 @@ import (
 	extensionsclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/extensions/internalversion"
 	"k8s.io/kubernetes/pkg/genericapiserver"
 	"k8s.io/kubernetes/pkg/genericapiserver/api/rest"
-	horizontalpodautoscalerstore "k8s.io/kubernetes/pkg/registry/autoscaling/horizontalpodautoscaler/storage"
 	jobstore "k8s.io/kubernetes/pkg/registry/batch/job/storage"
 	expcontrollerstore "k8s.io/kubernetes/pkg/registry/extensions/controller/storage"
 	daemonstore "k8s.io/kubernetes/pkg/registry/extensions/daemonset/storage"
@@ -62,15 +61,12 @@ func (p RESTStorageProvider) v1beta1Storage(apiResourceConfigSource genericapise
 
 	storage := map[string]rest.Storage{}
 
-	if apiResourceConfigSource.ResourceEnabled(version.WithResource("horizontalpodautoscalers")) {
-		hpaStorage, hpaStatusStorage := horizontalpodautoscalerstore.NewREST(restOptionsGetter)
-		storage["horizontalpodautoscalers"] = hpaStorage
-		storage["horizontalpodautoscalers/status"] = hpaStatusStorage
+	// This is a dummy replication controller for scale subresource purposes.
+	// TODO: figure out how to enable this only if needed as a part of scale subresource GA.
+	controllerStorage := expcontrollerstore.NewStorage(restOptionsGetter)
+	storage["replicationcontrollers"] = controllerStorage.ReplicationController
+	storage["replicationcontrollers/scale"] = controllerStorage.Scale
 
-		controllerStorage := expcontrollerstore.NewStorage(restOptionsGetter)
-		storage["replicationcontrollers"] = controllerStorage.ReplicationController
-		storage["replicationcontrollers/scale"] = controllerStorage.Scale
-	}
 	if apiResourceConfigSource.ResourceEnabled(version.WithResource("thirdpartyresources")) {
 		thirdPartyResourceStorage := thirdpartyresourcestore.NewREST(restOptionsGetter)
 		storage["thirdpartyresources"] = thirdPartyResourceStorage
