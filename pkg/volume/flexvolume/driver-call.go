@@ -51,6 +51,12 @@ const (
 	optionKeySecret = "kubernetes.io/secret"
 	optionFSGroup   = "kubernetes.io/fsGroup"
 	optionMountsDir = "kubernetes.io/mountsDir"
+
+	optionKeyPodName      = "kubernetes.io/pod.name"
+	optionKeyPodNamespace = "kubernetes.io/pod.namespace"
+	optionKeyPodUID       = "kubernetes.io/pod.uid"
+
+	optionKeyServiceAccountName = "kubernetes.io/serviceAccount.name"
 )
 
 const (

@@ -65,6 +65,13 @@ func (f *flexVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 
 	extraOptions := make(map[string]string)
 
+	// pod metadata
+	extraOptions[optionKeyPodName] = f.podName
+	extraOptions[optionKeyPodNamespace] = f.podNamespace
+	extraOptions[optionKeyPodUID] = string(f.podUID)
+	// service account metadata
+	extraOptions[optionKeyServiceAccountName] = f.podServiceAccountName
+
 	// Extract secret and pass it as options.
 	if err := addSecretsToOptions(extraOptions, f.spec, f.podNamespace, f.driverName, f.plugin.host); err != nil {
 		return err
