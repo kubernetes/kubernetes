@@ -39,7 +39,7 @@ import (
 )
 
 const (
-	defaultTimeout = 10 * time.Minute
+	defaultTimeout = 5 * time.Minute
 )
 
 func newPod(podName string) *v1.Pod {
@@ -133,9 +133,13 @@ func TestConcurrentEvictionRequests(t *testing.T) {
 	stopCh := make(chan struct{})
 	go podInformer.Run(stopCh)
 	go rm.Run(stopCh)
+	defer close(stopCh)
 
 	config := restclient.Config{Host: s.URL}
 	clientSet, err := clientset.NewForConfig(&config)
+	if err != nil {
+		t.Fatalf("Failed to create clientset: %v", err)
+	}
 
 	var gracePeriodSeconds int64 = 30
 	deleteOption := &v1.DeleteOptions{
@@ -184,11 +188,10 @@ func TestConcurrentEvictionRequests(t *testing.T) {
 				}
 			}
 			if e != nil {
-				if errors.IsConflict(err) {
-					fmt.Errorf("Unexpected Conflict (409) error caused by failing to handle concurrent PDB updates: %v", e)
-				} else {
-					errCh <- e
+				if errors.IsConflict(e) {
+					e = fmt.Errorf("Unexpected Conflict (409) error caused by failing to handle concurrent PDB updates: %v", e)
 				}
+				errCh <- e
 				return
 			}
 			doneCh <- true
@@ -196,18 +199,20 @@ func TestConcurrentEvictionRequests(t *testing.T) {
 	}
 
 	doneCount := 0
+loop:
 	for {
 		select {
 		case err := <-errCh:
 			t.Errorf("%v", err)
-			return
+			break loop
 		case <-doneCh:
 			doneCount++
 			if doneCount == 10 {
-				return
+				break loop
 			}
 		case <-time.After(defaultTimeout):
 			t.Errorf("Eviction did not complete within %v", defaultTimeout)
+			break loop
 		}
 	}
 
@@ -216,6 +221,9 @@ func TestConcurrentEvictionRequests(t *testing.T) {
 		_, err := clientSet.Core().Pods(ns.Name).Get(podName, metav1.GetOptions{})
 		if !errors.IsNotFound(err) {
 			t.Errorf("Pod %q is expected to be evicted", podName)
+			if err == nil {
+				clientSet.Core().Pods(ns.Name).Delete(podName, deleteOption)
+			}
 		}
 	}
 
@@ -223,7 +231,6 @@ func TestConcurrentEvictionRequests(t *testing.T) {
 		t.Errorf("Failed to delete PodDisruptionBudget: %v", err)
 	}
 
-	close(stopCh)
 }
 
 // wait for the podInformer to observe the pods. Call this function before
