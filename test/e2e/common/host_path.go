@@ -132,6 +132,7 @@ func mount(source *v1.HostPathVolumeSource) []v1.Volume {
 //TODO: To merge this with the emptyDir tests, we can make source a lambda.
 func testPodWithHostVol(path string, source *v1.HostPathVolumeSource) *v1.Pod {
 	podName := "pod-host-path-test"
+	privileged := true
 
 	return &v1.Pod{
 		TypeMeta: metav1.TypeMeta{
@@ -152,6 +153,9 @@ func testPodWithHostVol(path string, source *v1.HostPathVolumeSource) *v1.Pod {
 							MountPath: path,
 						},
 					},
+					SecurityContext: &v1.SecurityContext{
+						Privileged: &privileged,
+					},
 				},
 				{
 					Name:  containerName2,
@@ -161,6 +165,9 @@ func testPodWithHostVol(path string, source *v1.HostPathVolumeSource) *v1.Pod {
 							Name:      volumeName,
 							MountPath: path,
 						},
+					},
+					SecurityContext: &v1.SecurityContext{
+						Privileged: &privileged,
 					},
 				},
 			},
