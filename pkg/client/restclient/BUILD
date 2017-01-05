@@ -94,6 +94,7 @@ filegroup(
     srcs = [
         ":package-srcs",
         "//pkg/client/restclient/fake:all-srcs",
+        "//pkg/client/restclient/watch:all-srcs",
     ],
     tags = ["automanaged"],
 )

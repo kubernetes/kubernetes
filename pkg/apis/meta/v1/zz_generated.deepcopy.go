@@ -35,7 +35,6 @@ func GetGeneratedDeepCopyFuncs() []conversion.GeneratedDeepCopyFunc {
 		{Fn: DeepCopy_v1_APIResourceList, InType: reflect.TypeOf(&APIResourceList{})},
 		{Fn: DeepCopy_v1_APIVersions, InType: reflect.TypeOf(&APIVersions{})},
 		{Fn: DeepCopy_v1_Duration, InType: reflect.TypeOf(&Duration{})},
-		{Fn: DeepCopy_v1_Event, InType: reflect.TypeOf(&Event{})},
 		{Fn: DeepCopy_v1_ExportOptions, InType: reflect.TypeOf(&ExportOptions{})},
 		{Fn: DeepCopy_v1_GetOptions, InType: reflect.TypeOf(&GetOptions{})},
 		{Fn: DeepCopy_v1_GroupKind, InType: reflect.TypeOf(&GroupKind{})},
@@ -58,6 +57,7 @@ func GetGeneratedDeepCopyFuncs() []conversion.GeneratedDeepCopyFunc {
 		{Fn: DeepCopy_v1_Time, InType: reflect.TypeOf(&Time{})},
 		{Fn: DeepCopy_v1_Timestamp, InType: reflect.TypeOf(&Timestamp{})},
 		{Fn: DeepCopy_v1_TypeMeta, InType: reflect.TypeOf(&TypeMeta{})},
+		{Fn: DeepCopy_v1_WatchEvent, InType: reflect.TypeOf(&WatchEvent{})},
 	}
 }
 
@@ -160,18 +160,6 @@ func DeepCopy_v1_Duration(in interface{}, out interface{}, c *conversion.Cloner)
 		in := in.(*Duration)
 		out := out.(*Duration)
 		*out = *in
-		return nil
-	}
-}
-
-func DeepCopy_v1_Event(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*Event)
-		out := out.(*Event)
-		*out = *in
-		if err := runtime.DeepCopy_runtime_RawExtension(&in.Object, &out.Object, c); err != nil {
-			return err
-		}
 		return nil
 	}
 }
@@ -423,6 +411,18 @@ func DeepCopy_v1_TypeMeta(in interface{}, out interface{}, c *conversion.Cloner)
 		in := in.(*TypeMeta)
 		out := out.(*TypeMeta)
 		*out = *in
+		return nil
+	}
+}
+
+func DeepCopy_v1_WatchEvent(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*WatchEvent)
+		out := out.(*WatchEvent)
+		*out = *in
+		if err := runtime.DeepCopy_runtime_RawExtension(&in.Object, &out.Object, c); err != nil {
+			return err
+		}
 		return nil
 	}
 }
