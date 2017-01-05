@@ -251,39 +251,33 @@ func TestResponsibleForPod(t *testing.T) {
 	// factory of "foo-scheduler"
 	factoryFooScheduler := NewConfigFactory(client, "foo-scheduler", v1.DefaultHardPodAffinitySymmetricWeight, v1.DefaultFailureDomains)
 	// scheduler annotations to be tested
-	schedulerAnnotationFitsDefault := map[string]string{"scheduler.alpha.kubernetes.io/name": "default-scheduler"}
-	schedulerAnnotationFitsFoo := map[string]string{"scheduler.alpha.kubernetes.io/name": "foo-scheduler"}
-	schedulerAnnotationFitsNone := map[string]string{"scheduler.alpha.kubernetes.io/name": "bar-scheduler"}
+	schedulerFitsDefault := "default-scheduler"
+	schedulerFitsFoo := "foo-scheduler"
+	schedulerFitsNone := "bar-scheduler"
+
 	tests := []struct {
 		pod             *v1.Pod
 		pickedByDefault bool
 		pickedByFoo     bool
 	}{
 		{
-			// pod with no annotation "scheduler.alpha.kubernetes.io/name=<scheduler-name>" should be
-			// picked by the default scheduler, NOT by the one of name "foo-scheduler"
-			pod:             &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"}},
-			pickedByDefault: true,
-			pickedByFoo:     false,
-		},
-		{
-			// pod with annotation "scheduler.alpha.kubernetes.io/name=default-scheduler" should be picked
+			// pod with "spec.Schedulername=default-scheduler" should be picked
 			// by the scheduler of name "default-scheduler", NOT by the one of name "foo-scheduler"
-			pod:             &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar", Annotations: schedulerAnnotationFitsDefault}},
+			pod:             &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"}, Spec: v1.PodSpec{SchedulerName: schedulerFitsDefault}},
 			pickedByDefault: true,
 			pickedByFoo:     false,
 		},
 		{
-			// pod with annotataion "scheduler.alpha.kubernetes.io/name=foo-scheduler" should be NOT
+			// pod with "spec.SchedulerName=foo-scheduler" should be NOT
 			// be picked by the scheduler of name "default-scheduler", but by the one of name "foo-scheduler"
-			pod:             &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar", Annotations: schedulerAnnotationFitsFoo}},
+			pod:             &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"}, Spec: v1.PodSpec{SchedulerName: schedulerFitsFoo}},
 			pickedByDefault: false,
 			pickedByFoo:     true,
 		},
 		{
-			// pod with annotataion "scheduler.alpha.kubernetes.io/name=foo-scheduler" should be NOT
+			// pod with "spec.SchedulerName=foo-scheduler" should be NOT
 			// be picked by niether the scheduler of name "default-scheduler" nor the one of name "foo-scheduler"
-			pod:             &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar", Annotations: schedulerAnnotationFitsNone}},
+			pod:             &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"}, Spec: v1.PodSpec{SchedulerName: schedulerFitsNone}},
 			pickedByDefault: false,
 			pickedByFoo:     false,
 		},
