@@ -138,7 +138,6 @@ func describerMap(c clientset.Interface) map[schema.GroupKind]Describer {
 		api.Kind("ConfigMap"):             &ConfigMapDescriber{c},
 
 		extensions.Kind("ReplicaSet"):                  &ReplicaSetDescriber{c},
-		extensions.Kind("HorizontalPodAutoscaler"):     &HorizontalPodAutoscalerDescriber{c},
 		extensions.Kind("NetworkPolicy"):               &NetworkPolicyDescriber{c},
 		autoscaling.Kind("HorizontalPodAutoscaler"):    &HorizontalPodAutoscalerDescriber{c},
 		extensions.Kind("DaemonSet"):                   &DaemonSetDescriber{c},

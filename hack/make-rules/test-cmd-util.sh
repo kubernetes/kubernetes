@@ -1015,12 +1015,10 @@ run_save_config_tests() {
   # Command: autoscale rc "frontend"
   kubectl autoscale -f hack/testdata/frontend-controller.yaml --save-config "${kube_flags[@]}" --max=2
   # Post-Condition: hpa "frontend" has configuration annotation
-  [[ "$(kubectl get hpa.v1beta1.extensions frontend -o yaml "${kube_flags[@]}" | grep kubectl.kubernetes.io/last-applied-configuration)" ]]
-  # Ensure we can interact with HPA objects in lists through both the extensions/v1beta1 and autoscaling/v1 APIs
+  [[ "$(kubectl get hpa frontend -o yaml "${kube_flags[@]}" | grep kubectl.kubernetes.io/last-applied-configuration)" ]]
+  # Ensure we can interact with HPA objects in lists through autoscaling/v1 APIs
   output_message=$(kubectl get hpa -o=jsonpath='{.items[0].apiVersion}' 2>&1 "${kube_flags[@]}")
   kube::test::if_has_string "${output_message}" 'autoscaling/v1'
-  output_message=$(kubectl get hpa.extensions -o=jsonpath='{.items[0].apiVersion}' 2>&1 "${kube_flags[@]}")
-  kube::test::if_has_string "${output_message}" 'extensions/v1beta1'
   output_message=$(kubectl get hpa.autoscaling -o=jsonpath='{.items[0].apiVersion}' 2>&1 "${kube_flags[@]}")
   kube::test::if_has_string "${output_message}" 'autoscaling/v1'
   # tests kubectl group prefix matching
@@ -2111,16 +2109,8 @@ run_rc_tests() {
   kubectl autoscale -f hack/testdata/frontend-controller.yaml "${kube_flags[@]}" --max=2 --cpu-percent=70
   kube::test::get_object_assert 'hpa frontend' "{{$hpa_min_field}} {{$hpa_max_field}} {{$hpa_cpu_field}}" '1 2 70'
   kubectl delete hpa frontend "${kube_flags[@]}"
-  # autoscale 1~2 pods, CPU utilization 70%, rc specified by file, using old generator
-  kubectl autoscale -f hack/testdata/frontend-controller.yaml "${kube_flags[@]}" --max=2 --cpu-percent=70 --generator=horizontalpodautoscaler/v1beta1
-  kube::test::get_object_assert 'hpa frontend' "{{$hpa_min_field}} {{$hpa_max_field}} {{$hpa_cpu_field}}" '1 2 70'
-  kubectl delete hpa frontend "${kube_flags[@]}"
   # autoscale 2~3 pods, no CPU utilization specified, rc specified by name
   kubectl autoscale rc frontend "${kube_flags[@]}" --min=2 --max=3
-  kube::test::get_object_assert 'hpa frontend' "{{$hpa_min_field}} {{$hpa_max_field}} {{$hpa_cpu_field}}" '2 3 <no value>'
-  kubectl delete hpa frontend "${kube_flags[@]}"
-  # autoscale 2~3 pods, no CPU utilization specified, rc specified by name, using old generator
-  kubectl autoscale rc frontend "${kube_flags[@]}" --min=2 --max=3 --generator=horizontalpodautoscaler/v1beta1
   kube::test::get_object_assert 'hpa frontend' "{{$hpa_min_field}} {{$hpa_max_field}} {{$hpa_cpu_field}}" '2 3 <no value>'
   kubectl delete hpa frontend "${kube_flags[@]}"
   # autoscale without specifying --max should fail
