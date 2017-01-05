@@ -35,12 +35,10 @@ go_test(
         "filter_test.go",
         "mux_test.go",
         "streamwatcher_test.go",
-        "until_test.go",
         "watch_test.go",
     ],
     tags = ["automanaged"],
     deps = [
-        "//pkg/api:go_default_library",
         "//pkg/runtime:go_default_library",
         "//pkg/runtime/schema:go_default_library",
         "//pkg/util/wait:go_default_library",
