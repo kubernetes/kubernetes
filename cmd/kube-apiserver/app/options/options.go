@@ -43,6 +43,7 @@ type ServerRunOptions struct {
 	InsecureServing         *genericoptions.ServingOptions
 	Authentication          *kubeoptions.BuiltInAuthenticationOptions
 	Authorization           *kubeoptions.BuiltInAuthorizationOptions
+	CloudProvider           *kubeoptions.CloudProviderOptions
 
 	AllowPrivileged           bool
 	EventTTL                  time.Duration
@@ -65,6 +66,7 @@ func NewServerRunOptions() *ServerRunOptions {
 		InsecureServing: genericoptions.NewInsecureServingOptions(),
 		Authentication:  kubeoptions.NewBuiltInAuthenticationOptions().WithAll(),
 		Authorization:   kubeoptions.NewBuiltInAuthorizationOptions(),
+		CloudProvider:   kubeoptions.NewCloudProviderOptions(),
 
 		EventTTL:    1 * time.Hour,
 		MasterCount: 1,
@@ -96,6 +98,7 @@ func (s *ServerRunOptions) AddFlags(fs *pflag.FlagSet) {
 	s.InsecureServing.AddDeprecatedFlags(fs)
 	s.Authentication.AddFlags(fs)
 	s.Authorization.AddFlags(fs)
+	s.CloudProvider.AddFlags(fs)
 
 	// Note: the weird ""+ in below lines seems to be the only way to get gofmt to
 	// arrange these text blocks sensibly. Grrr.
