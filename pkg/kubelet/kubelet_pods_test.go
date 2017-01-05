@@ -728,10 +728,38 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 					Name:      "test-configmap",
 				},
 				Data: map[string]string{
-					"-1234": "abc",
+					"1234": "abc",
 				},
 			},
 			expectedError: true,
+		},
+		{
+			name: "configmap_invalid_keys_valid",
+			ns:   "test",
+			container: &v1.Container{
+				EnvFrom: []v1.EnvFromSource{
+					{
+						Prefix:       "p_",
+						ConfigMapRef: &v1.ConfigMapEnvSource{LocalObjectReference: v1.LocalObjectReference{Name: "test-config-map"}},
+					},
+				},
+			},
+			masterServiceNs: "",
+			configMap: &v1.ConfigMap{
+				ObjectMeta: v1.ObjectMeta{
+					Namespace: "test1",
+					Name:      "test-configmap",
+				},
+				Data: map[string]string{
+					"1234": "abc",
+				},
+			},
+			expectedEnvs: []kubecontainer.EnvVar{
+				{
+					Name:  "p_1234",
+					Value: "abc",
+				},
+			},
 		},
 	}
 
