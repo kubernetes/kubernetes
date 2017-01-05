@@ -20,10 +20,8 @@ go_library(
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/storage:go_default_library",
-        "//pkg/storage/etcd/metrics:go_default_library",
         "//pkg/storage/etcd/util:go_default_library",
         "//pkg/util:go_default_library",
-        "//pkg/util/cache:go_default_library",
         "//vendor:github.com/coreos/etcd/client",
         "//vendor:github.com/golang/glog",
         "//vendor:golang.org/x/net/context",
@@ -33,6 +31,8 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/runtime",
         "//vendor:k8s.io/apimachinery/pkg/util/runtime",
         "//vendor:k8s.io/apimachinery/pkg/watch",
+        "//vendor:k8s.io/apiserver/pkg/storage/etcd/metrics",
+        "//vendor:k8s.io/apiserver/pkg/util/cache",
     ],
 )
 
@@ -78,7 +78,6 @@ filegroup(
     srcs = [
         ":package-srcs",
         "//pkg/storage/etcd/etcdtest:all-srcs",
-        "//pkg/storage/etcd/metrics:all-srcs",
         "//pkg/storage/etcd/testing:all-srcs",
         "//pkg/storage/etcd/util:all-srcs",
     ],

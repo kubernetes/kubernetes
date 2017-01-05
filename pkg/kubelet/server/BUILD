@@ -21,7 +21,6 @@ go_library(
         "//pkg/api/errors:go_default_library",
         "//pkg/api/v1:go_default_library",
         "//pkg/api/v1/validation:go_default_library",
-        "//pkg/httplog:go_default_library",
         "//pkg/kubelet/cm:go_default_library",
         "//pkg/kubelet/container:go_default_library",
         "//pkg/kubelet/server/portforward:go_default_library",
@@ -46,6 +45,7 @@ go_library(
         "//vendor:k8s.io/apiserver/pkg/authentication/user",
         "//vendor:k8s.io/apiserver/pkg/authorization/authorizer",
         "//vendor:k8s.io/apiserver/pkg/healthz",
+        "//vendor:k8s.io/apiserver/pkg/httplog",
         "//vendor:k8s.io/apiserver/pkg/util/flushwriter",
     ],
 )

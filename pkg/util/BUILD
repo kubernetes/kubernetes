@@ -49,7 +49,6 @@ filegroup(
         ":package-srcs",
         "//pkg/util/async:all-srcs",
         "//pkg/util/bandwidth:all-srcs",
-        "//pkg/util/cache:all-srcs",
         "//pkg/util/cert:all-srcs",
         "//pkg/util/chmod:all-srcs",
         "//pkg/util/chown:all-srcs",
