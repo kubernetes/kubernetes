@@ -37,17 +37,17 @@ import (
 
 const bridgenf string = "/proc/sys/net/bridge/bridge-nf-call-iptables"
 
-type PreFlightError struct {
+type Error struct {
 	Msg string
 }
 
-func (e *PreFlightError) Error() string {
+func (e *Error) Error() string {
 	return fmt.Sprintf("[preflight] Some fatal errors occurred:\n%s%s", e.Msg, "[preflight] If you know what you are doing, you can skip pre-flight checks with `--skip-preflight-checks`")
 }
 
-// PreFlightCheck validates the state of the system to ensure kubeadm will be
+// Checker validates the state of the system to ensure kubeadm will be
 // successful as often as possilble.
-type PreFlightCheck interface {
+type Checker interface {
 	Check() (warnings, errors []error)
 }
 
@@ -304,7 +304,7 @@ func (sysver SystemVerificationCheck) Check() (warnings, errors []error) {
 }
 
 func RunInitMasterChecks(cfg *kubeadmapi.MasterConfiguration) error {
-	checks := []PreFlightCheck{
+	checks := []Checker{
 		SystemVerificationCheck{},
 		IsRootCheck{},
 		HostnameCheck{},
@@ -346,7 +346,7 @@ func RunInitMasterChecks(cfg *kubeadmapi.MasterConfiguration) error {
 }
 
 func RunJoinNodeChecks(cfg *kubeadmapi.NodeConfiguration) error {
-	checks := []PreFlightCheck{
+	checks := []Checker{
 		SystemVerificationCheck{},
 		IsRootCheck{},
 		HostnameCheck{},
@@ -372,7 +372,7 @@ func RunJoinNodeChecks(cfg *kubeadmapi.NodeConfiguration) error {
 }
 
 func RunRootCheckOnly() error {
-	checks := []PreFlightCheck{
+	checks := []Checker{
 		IsRootCheck{},
 	}
 
@@ -381,7 +381,7 @@ func RunRootCheckOnly() error {
 
 // RunChecks runs each check, displays it's warnings/errors, and once all
 // are processed will exit if any errors occurred.
-func RunChecks(checks []PreFlightCheck, ww io.Writer) error {
+func RunChecks(checks []Checker, ww io.Writer) error {
 	found := []error{}
 	for _, c := range checks {
 		warnings, errs := c.Check()
@@ -395,7 +395,7 @@ func RunChecks(checks []PreFlightCheck, ww io.Writer) error {
 		for _, i := range found {
 			errs.WriteString("\t" + i.Error() + "\n")
 		}
-		return &PreFlightError{Msg: errs.String()}
+		return &Error{Msg: errs.String()}
 	}
 	return nil
 }
