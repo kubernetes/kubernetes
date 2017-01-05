@@ -146,7 +146,7 @@ func (o *ConvertOptions) Complete(f cmdutil.Factory, out io.Writer, cmd *cobra.C
 		}
 	}
 	o.encoder = f.JSONEncoder()
-	o.printer, _, err = kubectl.GetPrinter(outputFormat, templateFile, false)
+	o.printer, _, err = kubectl.GetPrinter(outputFormat, templateFile, false, cmdutil.GetFlagBool(cmd, "allow-missing-template-keys"))
 	if err != nil {
 		return err
 	}
