@@ -51,30 +51,6 @@ go_test(
     ],
 )
 
-go_test(
-    name = "go_default_xtest",
-    srcs = [
-        "help_test.go",
-        "meta_test.go",
-        "scheme_test.go",
-    ],
-    tags = ["automanaged"],
-    deps = [
-        "//pkg/api:go_default_library",
-        "//pkg/api/meta:go_default_library",
-        "//pkg/api/testapi:go_default_library",
-        "//pkg/api/v1:go_default_library",
-        "//pkg/apis/meta/v1:go_default_library",
-        "//pkg/apis/meta/v1/unstructured:go_default_library",
-        "//pkg/runtime:go_default_library",
-        "//pkg/runtime/schema:go_default_library",
-        "//pkg/types:go_default_library",
-        "//pkg/util/diff:go_default_library",
-        "//pkg/util/sets:go_default_library",
-        "//vendor:github.com/google/gofuzz",
-    ],
-)
-
 filegroup(
     name = "package-srcs",
     srcs = glob(["**"]),
