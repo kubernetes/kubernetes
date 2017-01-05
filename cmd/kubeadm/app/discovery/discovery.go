@@ -70,13 +70,5 @@ func runTokenDiscovery(td *kubeadmapi.TokenDiscovery) (*clientcmdapi.Config, err
 		return nil, err
 	}
 
-	connectionDetails, err := kubenode.EstablishMasterConnection(td, clusterInfo)
-	if err != nil {
-		return nil, err
-	}
-	err = kubenode.CheckForNodeNameDuplicates(connectionDetails)
-	if err != nil {
-		return nil, err
-	}
-	return kubenode.PerformTLSBootstrapDeprecated(connectionDetails)
+	return kubenode.RetrieveKubeconfigBasedOnToken(td, clusterInfo)
 }

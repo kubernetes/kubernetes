@@ -134,6 +134,7 @@ func (j *Join) Run(out io.Writer) error {
 	if err != nil {
 		return err
 	}
+
 	if err := kubenode.PerformTLSBootstrap(cfg); err != nil {
 		return err
 	}

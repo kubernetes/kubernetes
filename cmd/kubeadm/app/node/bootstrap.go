@@ -27,15 +27,18 @@ import (
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/certificates"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	certclient "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/certificates/v1alpha1"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
+	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
+	csrutil "k8s.io/kubernetes/pkg/kubelet/util/csr"
 	"k8s.io/kubernetes/pkg/types"
+	certutil "k8s.io/kubernetes/pkg/util/cert"
 	"k8s.io/kubernetes/pkg/util/wait"
 )
 
-// ConnectionDetails represents a master API endpoint connection
-type ConnectionDetails struct {
+// connectionDetails represents a master API endpoint connection
+type connectionDetails struct {
 	ClientSet  *clientset.Clientset
 	CertClient *certclient.CertificatesV1alpha1Client
 	Endpoint   string
@@ -47,11 +50,49 @@ type ConnectionDetails struct {
 // to an API endpoint
 const retryTimeout = 5
 
-// EstablishMasterConnection establishes a connection with exactly one of the provided API endpoints.
+func RetrieveKubeconfigBasedOnToken(td *kubeadmapi.TokenDiscovery, clusterInfo *kubeadmapi.ClusterInfo) (*clientcmdapi.Config, error) {
+	fmt.Println("[bootstrap] Created API client to obtain unique certificate for this node, generating keys and certificate signing request")
+
+	key, err := certutil.MakeEllipticPrivateKeyPEM()
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate private key [%v]", err)
+	}
+
+	conn, err := establishMasterConnection(td, clusterInfo)
+	if err != nil {
+		return nil, fmt.Errorf("failed to establish connection to the API server[%v]", err)
+	}
+
+	cert, err := csrutil.RequestNodeCertificate(conn.CertClient.CertificateSigningRequests(), key, conn.NodeName)
+	if err != nil {
+		return nil, fmt.Errorf("failed to request signed certificate from the API server [%v]", err)
+	}
+
+	fmtCert, err := certutil.FormatBytesCert(cert)
+	if err != nil {
+		return nil, fmt.Errorf("failed to format certificate [%v]", err)
+	}
+
+	fmt.Printf("[bootstrap] Received signed certificate from the API server:\n%s\n", fmtCert)
+	fmt.Println("[bootstrap] Generating kubelet configuration")
+
+	cfg := kubeconfigphase.MakeClientConfigWithCerts(
+		conn.Endpoint,
+		"kubernetes",
+		fmt.Sprintf("kubelet-%s", conn.NodeName),
+		conn.CACert,
+		key,
+		cert,
+	)
+
+	return cfg, nil
+}
+
+// establishMasterConnection establishes a connection with exactly one of the provided API endpoints.
 // The function builds a client for every endpoint and concurrently keeps trying to connect to any one
 // of the provided endpoints. Blocks until at least one connection is established, then it stops the
 // connection attempts for other endpoints.
-func EstablishMasterConnection(c *kubeadmapi.TokenDiscovery, clusterInfo *kubeadmapi.ClusterInfo) (*ConnectionDetails, error) {
+func establishMasterConnection(td *kubeadmapi.TokenDiscovery, clusterInfo *kubeadmapi.ClusterInfo) (*connectionDetails, error) {
 	hostName, err := os.Hostname()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get node hostname [%v]", err)
@@ -63,10 +104,10 @@ func EstablishMasterConnection(c *kubeadmapi.TokenDiscovery, clusterInfo *kubead
 	caCert := []byte(clusterInfo.CertificateAuthorities[0])
 
 	stopChan := make(chan struct{})
-	result := make(chan *ConnectionDetails)
+	result := make(chan *connectionDetails)
 	var wg sync.WaitGroup
 	for _, endpoint := range endpoints {
-		clientSet, err := createClients(caCert, endpoint, kubeadmutil.BearerToken(c), nodeName)
+		clientSet, err := createClients(caCert, endpoint, kubeadmutil.BearerToken(td), nodeName)
 		if err != nil {
 			fmt.Printf("[bootstrap] Warning: %s. Skipping endpoint %s\n", err, endpoint)
 			continue
@@ -84,7 +125,7 @@ func EstablishMasterConnection(c *kubeadmapi.TokenDiscovery, clusterInfo *kubead
 				fmt.Printf("[bootstrap] Successfully established connection with endpoint %q\n", apiEndpoint)
 				// connection established, stop all wait threads
 				close(stopChan)
-				result <- &ConnectionDetails{
+				result <- &connectionDetails{
 					ClientSet:  clientSet,
 					CertClient: clientSet.CertificatesV1alpha1Client,
 					Endpoint:   apiEndpoint,
@@ -129,8 +170,9 @@ func createClients(caCert []byte, endpoint, token string, nodeName types.NodeNam
 	return clientSet, nil
 }
 
-// CheckForNodeNameDuplicates checks whether there are other nodes in the cluster with identical node names.
-func CheckForNodeNameDuplicates(connection *ConnectionDetails) error {
+// TODO remove if not needed
+// checkForNodeNameDuplicates checks whether there are other nodes in the cluster with identical node names.
+func checkForNodeNameDuplicates(connection *connectionDetails) error {
 	hostName, err := os.Hostname()
 	if err != nil {
 		return fmt.Errorf("Failed to get node hostname [%v]", err)

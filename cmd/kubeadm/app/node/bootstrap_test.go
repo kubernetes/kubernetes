@@ -24,7 +24,7 @@ import (
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/typed/discovery"
 	"k8s.io/kubernetes/pkg/version"
@@ -109,12 +109,13 @@ func TestEstablishMasterConnection(t *testing.T) {
 	for _, rt := range tests {
 		s := &kubeadmapi.TokenDiscovery{}
 		c := &kubeadmapi.ClusterInfo{Endpoints: []string{rt.e}, CertificateAuthorities: []string{rt.c}}
-		_, actual := EstablishMasterConnection(s, c)
+		_, actual := establishMasterConnection(s, c)
 		if (actual == nil) != rt.expect {
 			t.Errorf(
-				"failed EstablishMasterConnection:\n\texpected: %t\n\t  actual: %t",
+				"failed EstablishMasterConnection:\n\texpected: %t\n\t  actual: %t\n%+v",
 				rt.expect,
 				(actual == nil),
+				actual,
 			)
 		}
 	}
