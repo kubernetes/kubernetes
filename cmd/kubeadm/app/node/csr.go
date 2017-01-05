@@ -29,6 +29,7 @@ import (
 	certutil "k8s.io/kubernetes/pkg/util/cert"
 )
 
+// TODO @mikedanese move this to PerformTLSBootstrap
 func PerformTLSBootstrapDeprecated(connection *ConnectionDetails) (*clientcmdapi.Config, error) {
 	fmt.Println("[csr] Created API client to obtain unique certificate for this node, generating keys and certificate signing request")
 
