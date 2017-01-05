@@ -21,6 +21,7 @@ import (
 	"math"
 	"reflect"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -395,6 +396,23 @@ func makeNode(node string, milliCPU, memory int64) *v1.Node {
 			},
 		},
 	}
+}
+
+func TestHumanReadableFitError(t *testing.T) {
+	error := &FitError{
+		Pod: &v1.Pod{ObjectMeta: v1.ObjectMeta{Name: "2"}},
+		FailedPredicates: FailedPredicateMap{
+			"1": []algorithm.PredicateFailureReason{algorithmpredicates.ErrNodeUnderMemoryPressure},
+			"2": []algorithm.PredicateFailureReason{algorithmpredicates.ErrNodeUnderDiskPressure},
+			"3": []algorithm.PredicateFailureReason{algorithmpredicates.ErrNodeUnderDiskPressure},
+		},
+	}
+	if strings.Contains(error.Error(), "No nodes are available that match all of the following predicates") {
+		if strings.Contains(error.Error(), "NodeUnderDiskPressure (2)") && strings.Contains(error.Error(), "NodeUnderMemoryPressure (1)") {
+			return
+		}
+	}
+	t.Errorf("Error message doesn't have all the information content: [" + error.Error() + "]")
 }
 
 // The point of this test is to show that you:
