@@ -131,14 +131,14 @@ func (j *Join) Validate() error {
 
 // Run executes worked node provisioning and tries to join an existing cluster.
 func (j *Join) Run(out io.Writer) error {
-	clusterInfo, err := kubenode.RetrieveTrustedClusterInfo(j.cfg.Discovery.Token)
-	if err != nil {
-		return err
-	}
-
 	var cfg *clientcmdapi.Config
 	// TODO: delete this first block when we move Token to the discovery interface
 	if j.cfg.Discovery.Token != nil {
+		clusterInfo, err := kubenode.RetrieveTrustedClusterInfo(j.cfg.Discovery.Token)
+		if err != nil {
+			return err
+		}
+
 		connectionDetails, err := kubenode.EstablishMasterConnection(j.cfg.Discovery.Token, clusterInfo)
 		if err != nil {
 			return err
@@ -152,7 +152,7 @@ func (j *Join) Run(out io.Writer) error {
 			return err
 		}
 	} else {
-		cfg, err = discovery.For(j.cfg.Discovery)
+		cfg, err := discovery.For(j.cfg.Discovery)
 		if err != nil {
 			return err
 		}
@@ -161,7 +161,7 @@ func (j *Join) Run(out io.Writer) error {
 		}
 	}
 
-	err = kubeconfigphase.WriteKubeconfigToDisk(path.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, kubeconfigphase.KubeletKubeConfigFileName), cfg)
+	err := kubeconfigphase.WriteKubeconfigToDisk(path.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, kubeconfigphase.KubeletKubeConfigFileName), cfg)
 	if err != nil {
 		return err
 	}
