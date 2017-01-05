@@ -131,6 +131,7 @@ func TestMerge(t *testing.T) {
 					DNSPolicy:                     api.DNSClusterFirst,
 					TerminationGracePeriodSeconds: &grace,
 					SecurityContext:               &api.PodSecurityContext{},
+					SchedulerName:                 api.DefaultSchedulerName,
 				},
 			},
 		},

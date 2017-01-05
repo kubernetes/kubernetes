@@ -134,6 +134,9 @@ func FuzzerFor(t *testing.T, version schema.GroupVersion, src rand.Source) *fuzz
 			if s.Affinity == nil {
 				s.Affinity = new(api.Affinity)
 			}
+			if s.SchedulerName == "" {
+				s.SchedulerName = api.DefaultSchedulerName
+			}
 		},
 		func(j *api.PodPhase, c fuzz.Continue) {
 			statuses := []api.PodPhase{api.PodPending, api.PodRunning, api.PodFailed, api.PodUnknown}

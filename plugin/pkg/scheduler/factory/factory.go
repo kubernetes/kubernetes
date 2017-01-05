@@ -90,8 +90,7 @@ type ConfigFactory struct {
 	schedulerCache schedulercache.Cache
 
 	// SchedulerName of a scheduler is used to select which pods will be
-	// processed by this scheduler, based on pods's annotation key:
-	// 'scheduler.alpha.kubernetes.io/name'
+	// processed by this scheduler, based on pods's "spec.SchedulerName".
 	SchedulerName string
 
 	// RequiredDuringScheduling affinity is not symmetric, but there is an implicit PreferredDuringScheduling affinity rule
@@ -494,11 +493,7 @@ func (f *ConfigFactory) getNextPod() *v1.Pod {
 }
 
 func (f *ConfigFactory) responsibleForPod(pod *v1.Pod) bool {
-	if f.SchedulerName == v1.DefaultSchedulerName {
-		return pod.Annotations[SchedulerAnnotationKey] == f.SchedulerName || pod.Annotations[SchedulerAnnotationKey] == ""
-	} else {
-		return pod.Annotations[SchedulerAnnotationKey] == f.SchedulerName
-	}
+	return f.SchedulerName == pod.Spec.SchedulerName
 }
 
 func getNodeConditionPredicate() cache.NodeConditionPredicate {

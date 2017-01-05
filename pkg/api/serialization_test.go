@@ -331,6 +331,7 @@ func TestEncode_Ptr(t *testing.T) {
 			TerminationGracePeriodSeconds: &grace,
 
 			SecurityContext: &api.PodSecurityContext{},
+			SchedulerName:   api.DefaultSchedulerName,
 		},
 	}
 	obj := runtime.Object(pod)
