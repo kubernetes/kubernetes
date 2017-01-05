@@ -20,11 +20,11 @@ go_library(
         "//pkg/client/clientset_generated/internalclientset:go_default_library",
         "//pkg/controller/informers:go_default_library",
         "//pkg/kubeapiserver/admission:go_default_library",
-        "//pkg/util/cache:go_default_library",
         "//pkg/util/clock:go_default_library",
         "//vendor:github.com/golang/glog",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/util/sets",
+        "//vendor:k8s.io/apiserver/pkg/util/cache",
     ],
 )
 
