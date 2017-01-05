@@ -3692,7 +3692,8 @@ func ValidateSecurityContext(sc *api.SecurityContext, fldPath *field.Path) field
 
 	if sc.Privileged != nil {
 		if *sc.Privileged && !capabilities.Get().AllowPrivileged {
-			allErrs = append(allErrs, field.Forbidden(fldPath.Child("privileged"), "disallowed by policy"))
+			allErrs = append(allErrs, field.Forbidden(fldPath.Child("privileged"),
+				"privileged containers are disallowed on this cluster by a system administrator"))
 		}
 	}
 
