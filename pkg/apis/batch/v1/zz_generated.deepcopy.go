@@ -48,7 +48,7 @@ func DeepCopy_v1_Job(in interface{}, out interface{}, c *conversion.Cloner) erro
 	{
 		in := in.(*Job)
 		out := out.(*Job)
-		out.TypeMeta = in.TypeMeta
+		*out = *in
 		if err := api_v1.DeepCopy_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, c); err != nil {
 			return err
 		}
@@ -66,12 +66,9 @@ func DeepCopy_v1_JobCondition(in interface{}, out interface{}, c *conversion.Clo
 	{
 		in := in.(*JobCondition)
 		out := out.(*JobCondition)
-		out.Type = in.Type
-		out.Status = in.Status
+		*out = *in
 		out.LastProbeTime = in.LastProbeTime.DeepCopy()
 		out.LastTransitionTime = in.LastTransitionTime.DeepCopy()
-		out.Reason = in.Reason
-		out.Message = in.Message
 		return nil
 	}
 }
@@ -80,8 +77,7 @@ func DeepCopy_v1_JobList(in interface{}, out interface{}, c *conversion.Cloner) 
 	{
 		in := in.(*JobList)
 		out := out.(*JobList)
-		out.TypeMeta = in.TypeMeta
-		out.ListMeta = in.ListMeta
+		*out = *in
 		if in.Items != nil {
 			in, out := &in.Items, &out.Items
 			*out = make([]Job, len(*in))
@@ -90,8 +86,6 @@ func DeepCopy_v1_JobList(in interface{}, out interface{}, c *conversion.Cloner) 
 					return err
 				}
 			}
-		} else {
-			out.Items = nil
 		}
 		return nil
 	}
@@ -101,26 +95,21 @@ func DeepCopy_v1_JobSpec(in interface{}, out interface{}, c *conversion.Cloner) 
 	{
 		in := in.(*JobSpec)
 		out := out.(*JobSpec)
+		*out = *in
 		if in.Parallelism != nil {
 			in, out := &in.Parallelism, &out.Parallelism
 			*out = new(int32)
 			**out = **in
-		} else {
-			out.Parallelism = nil
 		}
 		if in.Completions != nil {
 			in, out := &in.Completions, &out.Completions
 			*out = new(int32)
 			**out = **in
-		} else {
-			out.Completions = nil
 		}
 		if in.ActiveDeadlineSeconds != nil {
 			in, out := &in.ActiveDeadlineSeconds, &out.ActiveDeadlineSeconds
 			*out = new(int64)
 			**out = **in
-		} else {
-			out.ActiveDeadlineSeconds = nil
 		}
 		if in.Selector != nil {
 			in, out := &in.Selector, &out.Selector
@@ -128,15 +117,11 @@ func DeepCopy_v1_JobSpec(in interface{}, out interface{}, c *conversion.Cloner) 
 			if err := meta_v1.DeepCopy_v1_LabelSelector(*in, *out, c); err != nil {
 				return err
 			}
-		} else {
-			out.Selector = nil
 		}
 		if in.ManualSelector != nil {
 			in, out := &in.ManualSelector, &out.ManualSelector
 			*out = new(bool)
 			**out = **in
-		} else {
-			out.ManualSelector = nil
 		}
 		if err := api_v1.DeepCopy_v1_PodTemplateSpec(&in.Template, &out.Template, c); err != nil {
 			return err
@@ -149,6 +134,7 @@ func DeepCopy_v1_JobStatus(in interface{}, out interface{}, c *conversion.Cloner
 	{
 		in := in.(*JobStatus)
 		out := out.(*JobStatus)
+		*out = *in
 		if in.Conditions != nil {
 			in, out := &in.Conditions, &out.Conditions
 			*out = make([]JobCondition, len(*in))
@@ -157,26 +143,17 @@ func DeepCopy_v1_JobStatus(in interface{}, out interface{}, c *conversion.Cloner
 					return err
 				}
 			}
-		} else {
-			out.Conditions = nil
 		}
 		if in.StartTime != nil {
 			in, out := &in.StartTime, &out.StartTime
 			*out = new(meta_v1.Time)
 			**out = (*in).DeepCopy()
-		} else {
-			out.StartTime = nil
 		}
 		if in.CompletionTime != nil {
 			in, out := &in.CompletionTime, &out.CompletionTime
 			*out = new(meta_v1.Time)
 			**out = (*in).DeepCopy()
-		} else {
-			out.CompletionTime = nil
 		}
-		out.Active = in.Active
-		out.Succeeded = in.Succeeded
-		out.Failed = in.Failed
 		return nil
 	}
 }

@@ -53,7 +53,7 @@ func DeepCopy_v1alpha1_ClusterRole(in interface{}, out interface{}, c *conversio
 	{
 		in := in.(*ClusterRole)
 		out := out.(*ClusterRole)
-		out.TypeMeta = in.TypeMeta
+		*out = *in
 		if err := v1.DeepCopy_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, c); err != nil {
 			return err
 		}
@@ -65,8 +65,6 @@ func DeepCopy_v1alpha1_ClusterRole(in interface{}, out interface{}, c *conversio
 					return err
 				}
 			}
-		} else {
-			out.Rules = nil
 		}
 		return nil
 	}
@@ -76,7 +74,7 @@ func DeepCopy_v1alpha1_ClusterRoleBinding(in interface{}, out interface{}, c *co
 	{
 		in := in.(*ClusterRoleBinding)
 		out := out.(*ClusterRoleBinding)
-		out.TypeMeta = in.TypeMeta
+		*out = *in
 		if err := v1.DeepCopy_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, c); err != nil {
 			return err
 		}
@@ -86,10 +84,7 @@ func DeepCopy_v1alpha1_ClusterRoleBinding(in interface{}, out interface{}, c *co
 			for i := range *in {
 				(*out)[i] = (*in)[i]
 			}
-		} else {
-			out.Subjects = nil
 		}
-		out.RoleRef = in.RoleRef
 		return nil
 	}
 }
@@ -98,8 +93,7 @@ func DeepCopy_v1alpha1_ClusterRoleBindingList(in interface{}, out interface{}, c
 	{
 		in := in.(*ClusterRoleBindingList)
 		out := out.(*ClusterRoleBindingList)
-		out.TypeMeta = in.TypeMeta
-		out.ListMeta = in.ListMeta
+		*out = *in
 		if in.Items != nil {
 			in, out := &in.Items, &out.Items
 			*out = make([]ClusterRoleBinding, len(*in))
@@ -108,8 +102,6 @@ func DeepCopy_v1alpha1_ClusterRoleBindingList(in interface{}, out interface{}, c
 					return err
 				}
 			}
-		} else {
-			out.Items = nil
 		}
 		return nil
 	}
@@ -119,8 +111,7 @@ func DeepCopy_v1alpha1_ClusterRoleList(in interface{}, out interface{}, c *conve
 	{
 		in := in.(*ClusterRoleList)
 		out := out.(*ClusterRoleList)
-		out.TypeMeta = in.TypeMeta
-		out.ListMeta = in.ListMeta
+		*out = *in
 		if in.Items != nil {
 			in, out := &in.Items, &out.Items
 			*out = make([]ClusterRole, len(*in))
@@ -129,8 +120,6 @@ func DeepCopy_v1alpha1_ClusterRoleList(in interface{}, out interface{}, c *conve
 					return err
 				}
 			}
-		} else {
-			out.Items = nil
 		}
 		return nil
 	}
@@ -140,12 +129,11 @@ func DeepCopy_v1alpha1_PolicyRule(in interface{}, out interface{}, c *conversion
 	{
 		in := in.(*PolicyRule)
 		out := out.(*PolicyRule)
+		*out = *in
 		if in.Verbs != nil {
 			in, out := &in.Verbs, &out.Verbs
 			*out = make([]string, len(*in))
 			copy(*out, *in)
-		} else {
-			out.Verbs = nil
 		}
 		if err := runtime.DeepCopy_runtime_RawExtension(&in.AttributeRestrictions, &out.AttributeRestrictions, c); err != nil {
 			return err
@@ -154,29 +142,21 @@ func DeepCopy_v1alpha1_PolicyRule(in interface{}, out interface{}, c *conversion
 			in, out := &in.APIGroups, &out.APIGroups
 			*out = make([]string, len(*in))
 			copy(*out, *in)
-		} else {
-			out.APIGroups = nil
 		}
 		if in.Resources != nil {
 			in, out := &in.Resources, &out.Resources
 			*out = make([]string, len(*in))
 			copy(*out, *in)
-		} else {
-			out.Resources = nil
 		}
 		if in.ResourceNames != nil {
 			in, out := &in.ResourceNames, &out.ResourceNames
 			*out = make([]string, len(*in))
 			copy(*out, *in)
-		} else {
-			out.ResourceNames = nil
 		}
 		if in.NonResourceURLs != nil {
 			in, out := &in.NonResourceURLs, &out.NonResourceURLs
 			*out = make([]string, len(*in))
 			copy(*out, *in)
-		} else {
-			out.NonResourceURLs = nil
 		}
 		return nil
 	}
@@ -186,7 +166,7 @@ func DeepCopy_v1alpha1_Role(in interface{}, out interface{}, c *conversion.Clone
 	{
 		in := in.(*Role)
 		out := out.(*Role)
-		out.TypeMeta = in.TypeMeta
+		*out = *in
 		if err := v1.DeepCopy_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, c); err != nil {
 			return err
 		}
@@ -198,8 +178,6 @@ func DeepCopy_v1alpha1_Role(in interface{}, out interface{}, c *conversion.Clone
 					return err
 				}
 			}
-		} else {
-			out.Rules = nil
 		}
 		return nil
 	}
@@ -209,7 +187,7 @@ func DeepCopy_v1alpha1_RoleBinding(in interface{}, out interface{}, c *conversio
 	{
 		in := in.(*RoleBinding)
 		out := out.(*RoleBinding)
-		out.TypeMeta = in.TypeMeta
+		*out = *in
 		if err := v1.DeepCopy_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, c); err != nil {
 			return err
 		}
@@ -219,10 +197,7 @@ func DeepCopy_v1alpha1_RoleBinding(in interface{}, out interface{}, c *conversio
 			for i := range *in {
 				(*out)[i] = (*in)[i]
 			}
-		} else {
-			out.Subjects = nil
 		}
-		out.RoleRef = in.RoleRef
 		return nil
 	}
 }
@@ -231,8 +206,7 @@ func DeepCopy_v1alpha1_RoleBindingList(in interface{}, out interface{}, c *conve
 	{
 		in := in.(*RoleBindingList)
 		out := out.(*RoleBindingList)
-		out.TypeMeta = in.TypeMeta
-		out.ListMeta = in.ListMeta
+		*out = *in
 		if in.Items != nil {
 			in, out := &in.Items, &out.Items
 			*out = make([]RoleBinding, len(*in))
@@ -241,8 +215,6 @@ func DeepCopy_v1alpha1_RoleBindingList(in interface{}, out interface{}, c *conve
 					return err
 				}
 			}
-		} else {
-			out.Items = nil
 		}
 		return nil
 	}
@@ -252,8 +224,7 @@ func DeepCopy_v1alpha1_RoleList(in interface{}, out interface{}, c *conversion.C
 	{
 		in := in.(*RoleList)
 		out := out.(*RoleList)
-		out.TypeMeta = in.TypeMeta
-		out.ListMeta = in.ListMeta
+		*out = *in
 		if in.Items != nil {
 			in, out := &in.Items, &out.Items
 			*out = make([]Role, len(*in))
@@ -262,8 +233,6 @@ func DeepCopy_v1alpha1_RoleList(in interface{}, out interface{}, c *conversion.C
 					return err
 				}
 			}
-		} else {
-			out.Items = nil
 		}
 		return nil
 	}
@@ -273,9 +242,7 @@ func DeepCopy_v1alpha1_RoleRef(in interface{}, out interface{}, c *conversion.Cl
 	{
 		in := in.(*RoleRef)
 		out := out.(*RoleRef)
-		out.APIGroup = in.APIGroup
-		out.Kind = in.Kind
-		out.Name = in.Name
+		*out = *in
 		return nil
 	}
 }
@@ -284,10 +251,7 @@ func DeepCopy_v1alpha1_Subject(in interface{}, out interface{}, c *conversion.Cl
 	{
 		in := in.(*Subject)
 		out := out.(*Subject)
-		out.Kind = in.Kind
-		out.APIVersion = in.APIVersion
-		out.Name = in.Name
-		out.Namespace = in.Namespace
+		*out = *in
 		return nil
 	}
 }

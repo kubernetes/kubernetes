@@ -44,19 +44,16 @@ func DeepCopy_v1beta1_StorageClass(in interface{}, out interface{}, c *conversio
 	{
 		in := in.(*StorageClass)
 		out := out.(*StorageClass)
-		out.TypeMeta = in.TypeMeta
+		*out = *in
 		if err := v1.DeepCopy_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, c); err != nil {
 			return err
 		}
-		out.Provisioner = in.Provisioner
 		if in.Parameters != nil {
 			in, out := &in.Parameters, &out.Parameters
 			*out = make(map[string]string)
 			for key, val := range *in {
 				(*out)[key] = val
 			}
-		} else {
-			out.Parameters = nil
 		}
 		return nil
 	}
@@ -66,8 +63,7 @@ func DeepCopy_v1beta1_StorageClassList(in interface{}, out interface{}, c *conve
 	{
 		in := in.(*StorageClassList)
 		out := out.(*StorageClassList)
-		out.TypeMeta = in.TypeMeta
-		out.ListMeta = in.ListMeta
+		*out = *in
 		if in.Items != nil {
 			in, out := &in.Items, &out.Items
 			*out = make([]StorageClass, len(*in))
@@ -76,8 +72,6 @@ func DeepCopy_v1beta1_StorageClassList(in interface{}, out interface{}, c *conve
 					return err
 				}
 			}
-		} else {
-			out.Items = nil
 		}
 		return nil
 	}
