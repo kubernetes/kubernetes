@@ -31,6 +31,7 @@ go_library(
         "//pkg/credentialprovider/aws:go_default_library",
         "//pkg/types:go_default_library",
         "//pkg/util/sets:go_default_library",
+        "//pkg/util/wait:go_default_library",
         "//pkg/volume:go_default_library",
         "//vendor:github.com/aws/aws-sdk-go/aws",
         "//vendor:github.com/aws/aws-sdk-go/aws/awserr",
