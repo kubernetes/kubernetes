@@ -449,7 +449,8 @@ func (nc *NodeController) monitorNodeStatus() error {
 			continue
 		}
 		node := nodeCopy.(*v1.Node)
-		for rep := 0; rep < nodeStatusUpdateRetry; rep++ {
+		var rep int
+		for rep = 0; rep < nodeStatusUpdateRetry; rep++ {
 			gracePeriod, observedReadyCondition, currentReadyCondition, err = nc.tryUpdateNodeStatus(node)
 			if err == nil {
 				break
@@ -462,7 +463,7 @@ func (nc *NodeController) monitorNodeStatus() error {
 			}
 			time.Sleep(retrySleepTime)
 		}
-		if err != nil {
+		if rep == nodeStatusUpdateRetry {
 			glog.Errorf("Update status  of Node %v from NodeController exceeds retry count."+
 				"Skipping - no pods will be evicted.", node.Name)
 			continue
