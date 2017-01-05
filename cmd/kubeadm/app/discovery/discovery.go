@@ -18,6 +18,8 @@ package discovery
 
 import (
 	"fmt"
+	"io/ioutil"
+	"net/http"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubenode "k8s.io/kubernetes/cmd/kubeadm/app/node"
@@ -29,21 +31,39 @@ import (
 // For identifies and executes the desired discovery mechanism.
 func For(d kubeadmapi.Discovery) (*clientcmdapi.Config, error) {
 	switch {
-	case d.Token != nil:
-		return runTokenDiscovery(d.Token)
 	case d.File != nil:
 		return runFileDiscovery(d.File)
+	case d.HTTPS != nil:
+		return runHTTPSDiscovery(d.HTTPS)
+	case d.Token != nil:
+		return runTokenDiscovery(d.Token)
 	default:
 		return nil, fmt.Errorf("Couldn't find a valid discovery configuration. Please provide one.")
 	}
 }
 
-// runFileDiscovery executes token discovery.
+// runFileDiscovery executes file-based discovery.
 func runFileDiscovery(fd *kubeadmapi.FileDiscovery) (*clientcmdapi.Config, error) {
 	return clientcmd.LoadFromFile(fd.Path)
 }
 
-// runTokenDiscovery executes token discovery.
+// runHTTPSDiscovery executes HTTPS-based discovery.
+func runHTTPSDiscovery(hd *kubeadmapi.HTTPSDiscovery) (*clientcmdapi.Config, error) {
+	response, err := http.Get(hd.URL)
+	if err != nil {
+		return nil, err
+	}
+	defer response.Body.Close()
+
+	kubeconfig, err := ioutil.ReadAll(response.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	return clientcmd.Load(kubeconfig)
+}
+
+// runTokenDiscovery executes token-based discovery.
 func runTokenDiscovery(td *kubeadmapi.TokenDiscovery) (*clientcmdapi.Config, error) {
 	clusterInfo, err := kubenode.RetrieveTrustedClusterInfo(td)
 	if err != nil {
