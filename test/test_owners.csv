@@ -514,6 +514,8 @@ k8s.io/kubernetes/cmd/kubeadm/app/discovery,brendandburns,0
 k8s.io/kubernetes/cmd/kubeadm/app/images,davidopp,1
 k8s.io/kubernetes/cmd/kubeadm/app/master,apprenda,0
 k8s.io/kubernetes/cmd/kubeadm/app/node,apprenda,0
+k8s.io/kubernetes/cmd/kubeadm/app/phases/certs,apprenda,0
+k8s.io/kubernetes/cmd/kubeadm/app/phases/kubeconfig,apprenda,0
 k8s.io/kubernetes/cmd/kubeadm/app/preflight,apprenda,0
 k8s.io/kubernetes/cmd/kubeadm/app/util,krousey,1
 k8s.io/kubernetes/cmd/kubeadm/test,pipejakob,0
