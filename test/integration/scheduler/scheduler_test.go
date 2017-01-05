@@ -352,48 +352,48 @@ func TestMultiScheduler(t *testing.T) {
 	clientSet.Core().Nodes().Create(node)
 
 	// 3. create 3 pods for testing
-	podWithNoAnnotation := createPod(clientSet, "pod-with-no-annotation", nil)
-	testPodNoAnnotation, err := clientSet.Core().Pods(ns.Name).Create(podWithNoAnnotation)
+	podWithoutSchedulerName := createPod(clientSet, "pod-without-scheduler-name", "")
+	testPod, err := clientSet.Core().Pods(ns.Name).Create(podWithoutSchedulerName)
 	if err != nil {
 		t.Fatalf("Failed to create pod: %v", err)
 	}
 
-	schedulerAnnotationFitsDefault := map[string]string{"scheduler.alpha.kubernetes.io/name": "default-scheduler"}
-	podWithAnnotationFitsDefault := createPod(clientSet, "pod-with-annotation-fits-default", schedulerAnnotationFitsDefault)
-	testPodWithAnnotationFitsDefault, err := clientSet.Core().Pods(ns.Name).Create(podWithAnnotationFitsDefault)
+	schedulerFitsDefault := "default-scheduler"
+	podFitsDefault := createPod(clientSet, "pod-fits-default", schedulerFitsDefault)
+	testPodFitsDefault, err := clientSet.Core().Pods(ns.Name).Create(podFitsDefault)
 	if err != nil {
 		t.Fatalf("Failed to create pod: %v", err)
 	}
 
-	schedulerAnnotationFitsFoo := map[string]string{"scheduler.alpha.kubernetes.io/name": "foo-scheduler"}
-	podWithAnnotationFitsFoo := createPod(clientSet, "pod-with-annotation-fits-foo", schedulerAnnotationFitsFoo)
-	testPodWithAnnotationFitsFoo, err := clientSet.Core().Pods(ns.Name).Create(podWithAnnotationFitsFoo)
+	schedulerFitsFoo := "foo-scheduler"
+	podFitsFoo := createPod(clientSet, "pod-fits-foo", schedulerFitsFoo)
+	testPodFitsFoo, err := clientSet.Core().Pods(ns.Name).Create(podFitsFoo)
 	if err != nil {
 		t.Fatalf("Failed to create pod: %v", err)
 	}
 
 	// 4. **check point-1**:
-	//		- testPodNoAnnotation, testPodWithAnnotationFitsDefault should be scheduled
-	//		- testPodWithAnnotationFitsFoo should NOT be scheduled
-	err = wait.Poll(time.Second, time.Second*5, podScheduled(clientSet, testPodNoAnnotation.Namespace, testPodNoAnnotation.Name))
+	//		- testPod, testPodFitsDefault should be scheduled
+	//		- testPodFitsFoo should NOT be scheduled
+	err = wait.Poll(time.Second, time.Second*5, podScheduled(clientSet, testPod.Namespace, testPod.Name))
 	if err != nil {
-		t.Errorf("Test MultiScheduler: %s Pod not scheduled: %v", testPodNoAnnotation.Name, err)
+		t.Errorf("Test MultiScheduler: %s Pod not scheduled: %v", testPod.Name, err)
 	} else {
-		t.Logf("Test MultiScheduler: %s Pod scheduled", testPodNoAnnotation.Name)
+		t.Logf("Test MultiScheduler: %s Pod scheduled", testPod.Name)
 	}
 
-	err = wait.Poll(time.Second, time.Second*5, podScheduled(clientSet, testPodWithAnnotationFitsDefault.Namespace, testPodWithAnnotationFitsDefault.Name))
+	err = wait.Poll(time.Second, time.Second*5, podScheduled(clientSet, testPodFitsDefault.Namespace, testPodFitsDefault.Name))
 	if err != nil {
-		t.Errorf("Test MultiScheduler: %s Pod not scheduled: %v", testPodWithAnnotationFitsDefault.Name, err)
+		t.Errorf("Test MultiScheduler: %s Pod not scheduled: %v", testPodFitsDefault.Name, err)
 	} else {
-		t.Logf("Test MultiScheduler: %s Pod scheduled", testPodWithAnnotationFitsDefault.Name)
+		t.Logf("Test MultiScheduler: %s Pod scheduled", testPodFitsDefault.Name)
 	}
 
-	err = wait.Poll(time.Second, time.Second*5, podScheduled(clientSet, testPodWithAnnotationFitsFoo.Namespace, testPodWithAnnotationFitsFoo.Name))
+	err = wait.Poll(time.Second, time.Second*5, podScheduled(clientSet, testPodFitsFoo.Namespace, testPodFitsFoo.Name))
 	if err == nil {
-		t.Errorf("Test MultiScheduler: %s Pod got scheduled, %v", testPodWithAnnotationFitsFoo.Name, err)
+		t.Errorf("Test MultiScheduler: %s Pod got scheduled, %v", testPodFitsFoo.Name, err)
 	} else {
-		t.Logf("Test MultiScheduler: %s Pod not scheduled", testPodWithAnnotationFitsFoo.Name)
+		t.Logf("Test MultiScheduler: %s Pod not scheduled", testPodFitsFoo.Name)
 	}
 
 	// 5. create and start a scheduler with name "foo-scheduler"
@@ -413,19 +413,19 @@ func TestMultiScheduler(t *testing.T) {
 
 	//	6. **check point-2**:
 	//		- testPodWithAnnotationFitsFoo should be scheduled
-	err = wait.Poll(time.Second, time.Second*5, podScheduled(clientSet, testPodWithAnnotationFitsFoo.Namespace, testPodWithAnnotationFitsFoo.Name))
+	err = wait.Poll(time.Second, time.Second*5, podScheduled(clientSet, testPodFitsFoo.Namespace, testPodFitsFoo.Name))
 	if err != nil {
-		t.Errorf("Test MultiScheduler: %s Pod not scheduled, %v", testPodWithAnnotationFitsFoo.Name, err)
+		t.Errorf("Test MultiScheduler: %s Pod not scheduled, %v", testPodFitsFoo.Name, err)
 	} else {
-		t.Logf("Test MultiScheduler: %s Pod scheduled", testPodWithAnnotationFitsFoo.Name)
+		t.Logf("Test MultiScheduler: %s Pod scheduled", testPodFitsFoo.Name)
 	}
 
 	//	7. delete the pods that were scheduled by the default scheduler, and stop the default scheduler
-	err = clientSet.Core().Pods(ns.Name).Delete(testPodNoAnnotation.Name, v1.NewDeleteOptions(0))
+	err = clientSet.Core().Pods(ns.Name).Delete(testPod.Name, v1.NewDeleteOptions(0))
 	if err != nil {
 		t.Errorf("Failed to delete pod: %v", err)
 	}
-	err = clientSet.Core().Pods(ns.Name).Delete(testPodWithAnnotationFitsDefault.Name, v1.NewDeleteOptions(0))
+	err = clientSet.Core().Pods(ns.Name).Delete(testPodFitsDefault.Name, v1.NewDeleteOptions(0))
 	if err != nil {
 		t.Errorf("Failed to delete pod: %v", err)
 	}
@@ -469,11 +469,12 @@ func TestMultiScheduler(t *testing.T) {
 	*/
 }
 
-func createPod(client clientset.Interface, name string, annotation map[string]string) *v1.Pod {
+func createPod(client clientset.Interface, name string, scheduler string) *v1.Pod {
 	return &v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{Name: name, Annotations: annotation},
+		ObjectMeta: metav1.ObjectMeta{Name: name},
 		Spec: v1.PodSpec{
-			Containers: []v1.Container{{Name: "container", Image: e2e.GetPauseImageName(client)}},
+			Containers:    []v1.Container{{Name: "container", Image: e2e.GetPauseImageName(client)}},
+			SchedulerName: scheduler,
 		},
 	}
 }

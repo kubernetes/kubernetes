@@ -84,9 +84,6 @@ func createTerminatingPod(f *framework.Framework) (*v1.Pod, error) {
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: string(uuid),
-			Annotations: map[string]string{
-				"scheduler.alpha.kubernetes.io/name": "please don't schedule my pods",
-			},
 		},
 		Spec: v1.PodSpec{
 			Containers: []v1.Container{
@@ -95,6 +92,7 @@ func createTerminatingPod(f *framework.Framework) (*v1.Pod, error) {
 					Image: "gcr.io/google_containers/busybox:1.24",
 				},
 			},
+			SchedulerName: "please don't schedule my pods",
 		},
 	}
 	return f.ClientSet.Core().Pods(f.Namespace.Name).Create(pod)
