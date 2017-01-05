@@ -47,7 +47,7 @@ func TestDecoder(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Unexpected error %v", err)
 			}
-			event := metav1.Event{
+			event := metav1.WatchEvent{
 				Type:   string(eventType),
 				Object: runtime.RawExtension{Raw: json.RawMessage(data)},
 			}

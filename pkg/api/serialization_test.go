@@ -444,7 +444,7 @@ func TestObjectWatchFraming(t *testing.T) {
 		if err := embedded.Encode(v1secret, obj); err != nil {
 			t.Fatal(err)
 		}
-		event := &metav1.Event{Type: string(watch.Added)}
+		event := &metav1.WatchEvent{Type: string(watch.Added)}
 		event.Object.Raw = obj.Bytes()
 		obj = &bytes.Buffer{}
 		if err := s.Encode(event, obj); err != nil {
@@ -456,7 +456,7 @@ func TestObjectWatchFraming(t *testing.T) {
 			t.Fatal(err)
 		}
 		sr = streaming.NewDecoder(framer.NewFrameReader(ioutil.NopCloser(out)), s)
-		outEvent := &metav1.Event{}
+		outEvent := &metav1.WatchEvent{}
 		res, _, err = sr.Decode(nil, outEvent)
 		if err != nil || outEvent.Type != string(watch.Added) {
 			t.Fatalf("%v: %#v", err, outEvent)

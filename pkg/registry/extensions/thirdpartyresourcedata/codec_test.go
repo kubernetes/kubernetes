@@ -238,7 +238,7 @@ func TestEncodeToStreamForInternalEvent(t *testing.T) {
 		Kind:    "Foo",
 	}, delegate: testapi.Extensions.Codec()}
 	buf := bytes.NewBuffer([]byte{})
-	expected := &metav1.Event{
+	expected := &metav1.WatchEvent{
 		Type: "Added",
 	}
 	err := e.Encode(&metav1.InternalEvent{
