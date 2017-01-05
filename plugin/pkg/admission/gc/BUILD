@@ -16,8 +16,8 @@ go_library(
         "//pkg/admission:go_default_library",
         "//pkg/api:go_default_library",
         "//pkg/api/meta:go_default_library",
-        "//pkg/auth/authorizer:go_default_library",
         "//pkg/runtime:go_default_library",
+        "//vendor:k8s.io/apiserver/pkg/authorization/authorizer",
     ],
 )
 
@@ -30,9 +30,9 @@ go_test(
         "//pkg/admission:go_default_library",
         "//pkg/api:go_default_library",
         "//pkg/apis/meta/v1:go_default_library",
-        "//pkg/auth/authorizer:go_default_library",
         "//pkg/runtime:go_default_library",
         "//pkg/runtime/schema:go_default_library",
         "//vendor:k8s.io/apiserver/pkg/authentication/user",
+        "//vendor:k8s.io/apiserver/pkg/authorization/authorizer",
     ],
 )

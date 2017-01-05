@@ -18,10 +18,10 @@ go_library(
     deps = [
         "//pkg/apis/rbac:go_default_library",
         "//pkg/apis/rbac/validation:go_default_library",
-        "//pkg/auth/authorizer:go_default_library",
         "//pkg/util/errors:go_default_library",
         "//vendor:github.com/golang/glog",
         "//vendor:k8s.io/apiserver/pkg/authentication/user",
+        "//vendor:k8s.io/apiserver/pkg/authorization/authorizer",
     ],
 )
 
@@ -37,7 +37,7 @@ go_test(
         "//pkg/api:go_default_library",
         "//pkg/apis/rbac:go_default_library",
         "//pkg/apis/rbac/validation:go_default_library",
-        "//pkg/auth/authorizer:go_default_library",
         "//vendor:k8s.io/apiserver/pkg/authentication/user",
+        "//vendor:k8s.io/apiserver/pkg/authorization/authorizer",
     ],
 )

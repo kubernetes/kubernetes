@@ -23,8 +23,8 @@ import (
 
 	"github.com/golang/glog"
 
+	"k8s.io/apiserver/pkg/authorization/authorizer"
 	authorization "k8s.io/kubernetes/pkg/apis/authorization/v1beta1"
-	"k8s.io/kubernetes/pkg/auth/authorizer"
 	authorizationclient "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/authorization/v1beta1"
 	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/util/cache"

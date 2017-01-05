@@ -27,12 +27,12 @@ go_library(
         "//pkg/controller/informers:go_default_library",
         "//pkg/controller/route:go_default_library",
         "//pkg/controller/service:go_default_library",
-        "//pkg/healthz:go_default_library",
         "//pkg/util/configz:go_default_library",
         "//pkg/util/wait:go_default_library",
         "//vendor:github.com/golang/glog",
         "//vendor:github.com/prometheus/client_golang/prometheus",
         "//vendor:github.com/spf13/cobra",
         "//vendor:github.com/spf13/pflag",
+        "//vendor:k8s.io/apiserver/pkg/healthz",
     ],
 )

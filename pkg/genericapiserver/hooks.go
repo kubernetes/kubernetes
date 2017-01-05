@@ -23,8 +23,8 @@ import (
 
 	"github.com/golang/glog"
 
+	"k8s.io/apiserver/pkg/healthz"
 	"k8s.io/kubernetes/pkg/client/restclient"
-	"k8s.io/kubernetes/pkg/healthz"
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
 )
 

@@ -20,7 +20,6 @@ go_library(
         "//pkg/client/record:go_default_library",
         "//pkg/client/restclient:go_default_library",
         "//pkg/client/unversioned/clientcmd:go_default_library",
-        "//pkg/healthz:go_default_library",
         "//pkg/runtime:go_default_library",
         "//pkg/util/configz:go_default_library",
         "//plugin/cmd/kube-scheduler/app/options:go_default_library",
@@ -33,5 +32,6 @@ go_library(
         "//vendor:github.com/prometheus/client_golang/prometheus",
         "//vendor:github.com/spf13/cobra",
         "//vendor:github.com/spf13/pflag",
+        "//vendor:k8s.io/apiserver/pkg/healthz",
     ],
 )

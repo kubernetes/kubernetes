@@ -33,8 +33,6 @@ go_library(
         "//pkg/apimachinery:go_default_library",
         "//pkg/apimachinery/registered:go_default_library",
         "//pkg/apis/meta/v1:go_default_library",
-        "//pkg/auth/authenticator:go_default_library",
-        "//pkg/auth/authorizer:go_default_library",
         "//pkg/auth/authorizer/union:go_default_library",
         "//pkg/auth/handlers:go_default_library",
         "//pkg/client/restclient:go_default_library",
@@ -49,7 +47,6 @@ go_library(
         "//pkg/genericapiserver/openapi/common:go_default_library",
         "//pkg/genericapiserver/options:go_default_library",
         "//pkg/genericapiserver/routes:go_default_library",
-        "//pkg/healthz:go_default_library",
         "//pkg/runtime:go_default_library",
         "//pkg/runtime/schema:go_default_library",
         "//pkg/runtime/serializer/recognizer:go_default_library",
@@ -75,7 +72,10 @@ go_library(
         "//vendor:github.com/pkg/errors",
         "//vendor:github.com/prometheus/client_golang/prometheus",
         "//vendor:gopkg.in/natefinch/lumberjack.v2",
+        "//vendor:k8s.io/apiserver/pkg/authentication/authenticator",
         "//vendor:k8s.io/apiserver/pkg/authentication/user",
+        "//vendor:k8s.io/apiserver/pkg/authorization/authorizer",
+        "//vendor:k8s.io/apiserver/pkg/healthz",
     ],
 )
 
@@ -104,7 +104,6 @@ go_test(
         "//pkg/apis/extensions:go_default_library",
         "//pkg/apis/extensions/v1beta1:go_default_library",
         "//pkg/apis/meta/v1:go_default_library",
-        "//pkg/auth/authorizer:go_default_library",
         "//pkg/client/clientset_generated/clientset:go_default_library",
         "//pkg/generated/openapi:go_default_library",
         "//pkg/genericapiserver/api/request:go_default_library",
@@ -122,5 +121,6 @@ go_test(
         "//vendor:github.com/go-openapi/spec",
         "//vendor:github.com/stretchr/testify/assert",
         "//vendor:k8s.io/apiserver/pkg/authentication/user",
+        "//vendor:k8s.io/apiserver/pkg/authorization/authorizer",
     ],
 )
