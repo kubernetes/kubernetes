@@ -8088,6 +8088,14 @@
      "serverAddressByClientCIDRs"
     ],
     "properties": {
+     "apiVersion": {
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources",
+      "type": "string"
+     },
+     "kind": {
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
+      "type": "string"
+     },
      "name": {
       "description": "name is the name of the group.",
       "type": "string"
@@ -8118,12 +8126,20 @@
      "groups"
     ],
     "properties": {
+     "apiVersion": {
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources",
+      "type": "string"
+     },
      "groups": {
       "description": "groups is a list of APIGroup.",
       "type": "array",
       "items": {
        "$ref": "#/definitions/unversioned.APIGroup"
       }
+     },
+     "kind": {
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
+      "type": "string"
      }
     }
    },
@@ -8156,8 +8172,16 @@
      "resources"
     ],
     "properties": {
+     "apiVersion": {
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources",
+      "type": "string"
+     },
      "groupVersion": {
       "description": "groupVersion is the group and version this APIResourceList is for.",
+      "type": "string"
+     },
+     "kind": {
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
       "type": "string"
      },
      "resources": {
@@ -8176,6 +8200,14 @@
      "serverAddressByClientCIDRs"
     ],
     "properties": {
+     "apiVersion": {
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources",
+      "type": "string"
+     },
+     "kind": {
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
+      "type": "string"
+     },
      "serverAddressByClientCIDRs": {
       "description": "a map of client CIDR to server address that is serving this group. This is to help clients reach servers in the most network-efficient way possible. Clients can use the appropriate server address as per the CIDR that they match. In case of multiple matches, clients should use the longest matching CIDR. The server returns only those CIDRs that it thinks that the client can match. For example: the master will return an internal IP CIDR only, if the client reaches the server using an internal IP. Server looks at X-Forwarded-For header or X-Real-Ip header or request.RemoteAddr (in that order) to get the client IP.",
       "type": "array",
@@ -8288,6 +8320,10 @@
    "unversioned.Status": {
     "description": "Status is a return value for calls that don't return other objects.",
     "properties": {
+     "apiVersion": {
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources",
+      "type": "string"
+     },
      "code": {
       "description": "Suggested HTTP return code for this status, 0 if not set.",
       "type": "integer",
@@ -8296,6 +8332,10 @@
      "details": {
       "description": "Extended data associated with the reason.  Each reason may define its own extended details. This field is optional and the data returned is not guaranteed to conform to any schema except that defined by the reason type.",
       "$ref": "#/definitions/unversioned.StatusDetails"
+     },
+     "kind": {
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
+      "type": "string"
      },
      "message": {
       "description": "A human-readable description of the status of this operation.",
@@ -8365,6 +8405,81 @@
     "type": "string",
     "format": "date-time"
    },
+   "v1.AWSElasticBlockStoreVolumeSource": {
+    "description": "Represents a Persistent Disk resource in AWS.\n\nAn AWS EBS disk must exist before mounting to a container. The disk must also be in the same AWS zone as the kubelet. An AWS EBS disk can only be mounted as read/write once. AWS EBS volumes support ownership management and SELinux relabeling.",
+    "required": [
+     "volumeID"
+    ],
+    "properties": {
+     "fsType": {
+      "description": "Filesystem type of the volume that you want to mount. Tip: Ensure that the filesystem type is supported by the host operating system. Examples: \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified. More info: http://kubernetes.io/docs/user-guide/volumes#awselasticblockstore",
+      "type": "string"
+     },
+     "partition": {
+      "description": "The partition in the volume that you want to mount. If omitted, the default is to mount by volume name. Examples: For volume /dev/sda1, you specify the partition as \"1\". Similarly, the volume partition for /dev/sda is \"0\" (or you can leave the property empty).",
+      "type": "integer",
+      "format": "int32"
+     },
+     "readOnly": {
+      "description": "Specify \"true\" to force and set the ReadOnly property in VolumeMounts to \"true\". If omitted, the default is \"false\". More info: http://kubernetes.io/docs/user-guide/volumes#awselasticblockstore",
+      "type": "boolean"
+     },
+     "volumeID": {
+      "description": "Unique ID of the persistent disk resource in AWS (Amazon EBS volume). More info: http://kubernetes.io/docs/user-guide/volumes#awselasticblockstore",
+      "type": "string"
+     }
+    }
+   },
+   "v1.AzureDiskVolumeSource": {
+    "description": "AzureDisk represents an Azure Data Disk mount on the host and bind mount to the pod.",
+    "required": [
+     "diskName",
+     "diskURI"
+    ],
+    "properties": {
+     "cachingMode": {
+      "description": "Host Caching mode: None, Read Only, Read Write.",
+      "type": "string"
+     },
+     "diskName": {
+      "description": "The Name of the data disk in the blob storage",
+      "type": "string"
+     },
+     "diskURI": {
+      "description": "The URI the data disk in the blob storage",
+      "type": "string"
+     },
+     "fsType": {
+      "description": "Filesystem type to mount. Must be a filesystem type supported by the host operating system. Ex. \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified.",
+      "type": "string"
+     },
+     "readOnly": {
+      "description": "Defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts.",
+      "type": "boolean"
+     }
+    }
+   },
+   "v1.AzureFileVolumeSource": {
+    "description": "AzureFile represents an Azure File Service mount on the host and bind mount to the pod.",
+    "required": [
+     "secretName",
+     "shareName"
+    ],
+    "properties": {
+     "readOnly": {
+      "description": "Defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts.",
+      "type": "boolean"
+     },
+     "secretName": {
+      "description": "the name of secret that contains Azure Storage Account Name and Key",
+      "type": "string"
+     },
+     "shareName": {
+      "description": "Share Name",
+      "type": "string"
+     }
+    }
+   },
    "v1.Capabilities": {
     "description": "Adds and removes POSIX capabilities from running containers.",
     "properties": {
@@ -8384,15 +8499,78 @@
      }
     }
    },
+   "v1.CephFSVolumeSource": {
+    "description": "Represents a Ceph Filesystem mount that lasts the lifetime of a pod Cephfs volumes do not support ownership management or SELinux relabeling.",
+    "required": [
+     "monitors"
+    ],
+    "properties": {
+     "monitors": {
+      "description": "Required: Monitors is a collection of Ceph monitors More info: http://releases.k8s.io/HEAD/examples/volumes/cephfs/README.md#how-to-use-it",
+      "type": "array",
+      "items": {
+       "type": "string"
+      }
+     },
+     "path": {
+      "description": "Optional: Used as the mounted root, rather than the full Ceph tree, default is /",
+      "type": "string"
+     },
+     "readOnly": {
+      "description": "Optional: Defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts. More info: http://releases.k8s.io/HEAD/examples/volumes/cephfs/README.md#how-to-use-it",
+      "type": "boolean"
+     },
+     "secretFile": {
+      "description": "Optional: SecretFile is the path to key ring for User, default is /etc/ceph/user.secret More info: http://releases.k8s.io/HEAD/examples/volumes/cephfs/README.md#how-to-use-it",
+      "type": "string"
+     },
+     "secretRef": {
+      "description": "Optional: SecretRef is reference to the authentication secret for User, default is empty. More info: http://releases.k8s.io/HEAD/examples/volumes/cephfs/README.md#how-to-use-it",
+      "$ref": "#/definitions/v1.LocalObjectReference"
+     },
+     "user": {
+      "description": "Optional: User is the rados user name, default is admin More info: http://releases.k8s.io/HEAD/examples/volumes/cephfs/README.md#how-to-use-it",
+      "type": "string"
+     }
+    }
+   },
+   "v1.CinderVolumeSource": {
+    "description": "Represents a cinder volume resource in Openstack. A Cinder volume must exist before mounting to a container. The volume must also be in the same region as the kubelet. Cinder volumes support ownership management and SELinux relabeling.",
+    "required": [
+     "volumeID"
+    ],
+    "properties": {
+     "fsType": {
+      "description": "Filesystem type to mount. Must be a filesystem type supported by the host operating system. Examples: \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified. More info: http://releases.k8s.io/HEAD/examples/mysql-cinder-pd/README.md",
+      "type": "string"
+     },
+     "readOnly": {
+      "description": "Optional: Defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts. More info: http://releases.k8s.io/HEAD/examples/mysql-cinder-pd/README.md",
+      "type": "boolean"
+     },
+     "volumeID": {
+      "description": "volume id used to identify the volume in cinder More info: http://releases.k8s.io/HEAD/examples/mysql-cinder-pd/README.md",
+      "type": "string"
+     }
+    }
+   },
    "v1.ConfigMap": {
     "description": "ConfigMap holds configuration data for pods to consume.",
     "properties": {
+     "apiVersion": {
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources",
+      "type": "string"
+     },
      "data": {
       "description": "Data contains the configuration data. Each key must be a valid DNS_SUBDOMAIN with an optional leading dot.",
       "type": "object",
       "additionalProperties": {
        "type": "string"
       }
+     },
+     "kind": {
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
+      "type": "string"
      },
      "metadata": {
       "description": "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
@@ -8409,6 +8587,10 @@
      "key": {
       "description": "The key to select.",
       "type": "string"
+     },
+     "name": {
+      "description": "Name of the referent. More info: http://kubernetes.io/docs/user-guide/identifiers#names",
+      "type": "string"
      }
     }
    },
@@ -8418,6 +8600,10 @@
      "items"
     ],
     "properties": {
+     "apiVersion": {
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources",
+      "type": "string"
+     },
      "items": {
       "description": "Items is the list of ConfigMaps.",
       "type": "array",
@@ -8425,9 +8611,34 @@
        "$ref": "#/definitions/v1.ConfigMap"
       }
      },
+     "kind": {
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
+      "type": "string"
+     },
      "metadata": {
       "description": "More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
       "$ref": "#/definitions/unversioned.ListMeta"
+     }
+    }
+   },
+   "v1.ConfigMapVolumeSource": {
+    "description": "Adapts a ConfigMap into a volume.\n\nThe contents of the target ConfigMap's Data field will be presented in a volume as files using the keys in the Data field as the file names, unless the items element is populated with specific mappings of keys to paths. ConfigMap volumes support ownership management and SELinux relabeling.",
+    "properties": {
+     "defaultMode": {
+      "description": "Optional: mode bits to use on created files by default. Must be a value between 0 and 0777. Defaults to 0644. Directories within the path are not affected by this setting. This might be in conflict with other options that affect the file mode, like fsGroup, and the result can be other mode bits set.",
+      "type": "integer",
+      "format": "int32"
+     },
+     "items": {
+      "description": "If unspecified, each key-value pair in the Data field of the referenced ConfigMap will be projected into the volume as a file whose name is the key and content is the value. If specified, the listed keys will be projected into the specified paths, and unlisted keys will not be present. If a key is specified which is not present in the ConfigMap, the volume setup will error. Paths must be relative and may not contain the '..' path or start with '..'.",
+      "type": "array",
+      "items": {
+       "$ref": "#/definitions/v1.KeyToPath"
+      }
+     },
+     "name": {
+      "description": "Name of the referent. More info: http://kubernetes.io/docs/user-guide/identifiers#names",
+      "type": "string"
      }
     }
    },
@@ -8559,10 +8770,18 @@
    "v1.DeleteOptions": {
     "description": "DeleteOptions may be provided when deleting an API object",
     "properties": {
+     "apiVersion": {
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources",
+      "type": "string"
+     },
      "gracePeriodSeconds": {
       "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",
       "type": "integer",
       "format": "int64"
+     },
+     "kind": {
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
+      "type": "string"
      },
      "orphanDependents": {
       "description": "Should the dependent objects be orphaned. If true/false, the \"orphan\" finalizer will be added to/removed from the object's finalizers list.",
@@ -8571,6 +8790,57 @@
      "preconditions": {
       "description": "Must be fulfilled before a deletion is carried out. If not possible, a 409 Conflict status will be returned.",
       "$ref": "#/definitions/v1.Preconditions"
+     }
+    }
+   },
+   "v1.DownwardAPIVolumeFile": {
+    "description": "DownwardAPIVolumeFile represents information to create the file containing the pod field",
+    "required": [
+     "path"
+    ],
+    "properties": {
+     "fieldRef": {
+      "description": "Required: Selects a field of the pod: only annotations, labels, name and namespace are supported.",
+      "$ref": "#/definitions/v1.ObjectFieldSelector"
+     },
+     "mode": {
+      "description": "Optional: mode bits to use on this file, must be a value between 0 and 0777. If not specified, the volume defaultMode will be used. This might be in conflict with other options that affect the file mode, like fsGroup, and the result can be other mode bits set.",
+      "type": "integer",
+      "format": "int32"
+     },
+     "path": {
+      "description": "Required: Path is  the relative path name of the file to be created. Must not be absolute or contain the '..' path. Must be utf-8 encoded. The first item of the relative path must not start with '..'",
+      "type": "string"
+     },
+     "resourceFieldRef": {
+      "description": "Selects a resource of the container: only resources limits and requests (limits.cpu, limits.memory, requests.cpu and requests.memory) are currently supported.",
+      "$ref": "#/definitions/v1.ResourceFieldSelector"
+     }
+    }
+   },
+   "v1.DownwardAPIVolumeSource": {
+    "description": "DownwardAPIVolumeSource represents a volume containing downward API info. Downward API volumes support ownership management and SELinux relabeling.",
+    "properties": {
+     "defaultMode": {
+      "description": "Optional: mode bits to use on created files by default. Must be a value between 0 and 0777. Defaults to 0644. Directories within the path are not affected by this setting. This might be in conflict with other options that affect the file mode, like fsGroup, and the result can be other mode bits set.",
+      "type": "integer",
+      "format": "int32"
+     },
+     "items": {
+      "description": "Items is a list of downward API volume file",
+      "type": "array",
+      "items": {
+       "$ref": "#/definitions/v1.DownwardAPIVolumeFile"
+      }
+     }
+    }
+   },
+   "v1.EmptyDirVolumeSource": {
+    "description": "Represents an empty directory for a pod. Empty directory volumes support ownership management and SELinux relabeling.",
+    "properties": {
+     "medium": {
+      "description": "What type of storage medium should back this directory. The default is \"\" which means to use the node's default medium. Must be an empty string (default) or Memory. More info: http://kubernetes.io/docs/user-guide/volumes#emptydir",
+      "type": "string"
      }
     }
    },
@@ -8622,6 +8892,10 @@
      "involvedObject"
     ],
     "properties": {
+     "apiVersion": {
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources",
+      "type": "string"
+     },
      "count": {
       "description": "The number of times this event has occurred.",
       "type": "integer",
@@ -8634,6 +8908,10 @@
      "involvedObject": {
       "description": "The object that this event is about.",
       "$ref": "#/definitions/v1.ObjectReference"
+     },
+     "kind": {
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
+      "type": "string"
      },
      "lastTimestamp": {
       "description": "The time at which the most recent occurrence of this event was recorded.",
@@ -8667,12 +8945,20 @@
      "items"
     ],
     "properties": {
+     "apiVersion": {
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources",
+      "type": "string"
+     },
      "items": {
       "description": "List of events",
       "type": "array",
       "items": {
        "$ref": "#/definitions/v1.Event"
       }
+     },
+     "kind": {
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
+      "type": "string"
      },
      "metadata": {
       "description": "Standard list metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
@@ -8702,6 +8988,145 @@
       "items": {
        "type": "string"
       }
+     }
+    }
+   },
+   "v1.FCVolumeSource": {
+    "description": "Represents a Fibre Channel volume. Fibre Channel volumes can only be mounted as read/write once. Fibre Channel volumes support ownership management and SELinux relabeling.",
+    "required": [
+     "targetWWNs",
+     "lun"
+    ],
+    "properties": {
+     "fsType": {
+      "description": "Filesystem type to mount. Must be a filesystem type supported by the host operating system. Ex. \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified.",
+      "type": "string"
+     },
+     "lun": {
+      "description": "Required: FC target lun number",
+      "type": "integer",
+      "format": "int32"
+     },
+     "readOnly": {
+      "description": "Optional: Defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts.",
+      "type": "boolean"
+     },
+     "targetWWNs": {
+      "description": "Required: FC target worldwide names (WWNs)",
+      "type": "array",
+      "items": {
+       "type": "string"
+      }
+     }
+    }
+   },
+   "v1.FlexVolumeSource": {
+    "description": "FlexVolume represents a generic volume resource that is provisioned/attached using an exec based plugin. This is an alpha feature and may change in future.",
+    "required": [
+     "driver"
+    ],
+    "properties": {
+     "driver": {
+      "description": "Driver is the name of the driver to use for this volume.",
+      "type": "string"
+     },
+     "fsType": {
+      "description": "Filesystem type to mount. Must be a filesystem type supported by the host operating system. Ex. \"ext4\", \"xfs\", \"ntfs\". The default filesystem depends on FlexVolume script.",
+      "type": "string"
+     },
+     "options": {
+      "description": "Optional: Extra command options if any.",
+      "type": "object",
+      "additionalProperties": {
+       "type": "string"
+      }
+     },
+     "readOnly": {
+      "description": "Optional: Defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts.",
+      "type": "boolean"
+     },
+     "secretRef": {
+      "description": "Optional: SecretRef is reference to the secret object containing sensitive information to pass to the plugin scripts. This may be empty if no secret object is specified. If the secret object contains more than one secret, all secrets are passed to the plugin scripts.",
+      "$ref": "#/definitions/v1.LocalObjectReference"
+     }
+    }
+   },
+   "v1.FlockerVolumeSource": {
+    "description": "Represents a Flocker volume mounted by the Flocker agent. One and only one of datasetName and datasetUUID should be set. Flocker volumes do not support ownership management or SELinux relabeling.",
+    "properties": {
+     "datasetName": {
+      "description": "Name of the dataset stored as metadata -\u003e name on the dataset for Flocker should be considered as deprecated",
+      "type": "string"
+     },
+     "datasetUUID": {
+      "description": "UUID of the dataset. This is unique identifier of a Flocker dataset",
+      "type": "string"
+     }
+    }
+   },
+   "v1.GCEPersistentDiskVolumeSource": {
+    "description": "Represents a Persistent Disk resource in Google Compute Engine.\n\nA GCE PD must exist before mounting to a container. The disk must also be in the same GCE project and zone as the kubelet. A GCE PD can only be mounted as read/write once or read-only many times. GCE PDs support ownership management and SELinux relabeling.",
+    "required": [
+     "pdName"
+    ],
+    "properties": {
+     "fsType": {
+      "description": "Filesystem type of the volume that you want to mount. Tip: Ensure that the filesystem type is supported by the host operating system. Examples: \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified. More info: http://kubernetes.io/docs/user-guide/volumes#gcepersistentdisk",
+      "type": "string"
+     },
+     "partition": {
+      "description": "The partition in the volume that you want to mount. If omitted, the default is to mount by volume name. Examples: For volume /dev/sda1, you specify the partition as \"1\". Similarly, the volume partition for /dev/sda is \"0\" (or you can leave the property empty). More info: http://kubernetes.io/docs/user-guide/volumes#gcepersistentdisk",
+      "type": "integer",
+      "format": "int32"
+     },
+     "pdName": {
+      "description": "Unique name of the PD resource in GCE. Used to identify the disk in GCE. More info: http://kubernetes.io/docs/user-guide/volumes#gcepersistentdisk",
+      "type": "string"
+     },
+     "readOnly": {
+      "description": "ReadOnly here will force the ReadOnly setting in VolumeMounts. Defaults to false. More info: http://kubernetes.io/docs/user-guide/volumes#gcepersistentdisk",
+      "type": "boolean"
+     }
+    }
+   },
+   "v1.GitRepoVolumeSource": {
+    "description": "Represents a volume that is populated with the contents of a git repository. Git repo volumes do not support ownership management. Git repo volumes support SELinux relabeling.",
+    "required": [
+     "repository"
+    ],
+    "properties": {
+     "directory": {
+      "description": "Target directory name. Must not contain or start with '..'.  If '.' is supplied, the volume directory will be the git repository.  Otherwise, if specified, the volume will contain the git repository in the subdirectory with the given name.",
+      "type": "string"
+     },
+     "repository": {
+      "description": "Repository URL",
+      "type": "string"
+     },
+     "revision": {
+      "description": "Commit hash for the specified revision.",
+      "type": "string"
+     }
+    }
+   },
+   "v1.GlusterfsVolumeSource": {
+    "description": "Represents a Glusterfs mount that lasts the lifetime of a pod. Glusterfs volumes do not support ownership management or SELinux relabeling.",
+    "required": [
+     "endpoints",
+     "path"
+    ],
+    "properties": {
+     "endpoints": {
+      "description": "EndpointsName is the endpoint name that details Glusterfs topology. More info: http://releases.k8s.io/HEAD/examples/volumes/glusterfs/README.md#create-a-pod",
+      "type": "string"
+     },
+     "path": {
+      "description": "Path is the Glusterfs volume path. More info: http://releases.k8s.io/HEAD/examples/volumes/glusterfs/README.md#create-a-pod",
+      "type": "string"
+     },
+     "readOnly": {
+      "description": "ReadOnly here will force the Glusterfs volume to be mounted with read-only permissions. Defaults to false. More info: http://releases.k8s.io/HEAD/examples/volumes/glusterfs/README.md#create-a-pod",
+      "type": "boolean"
      }
     }
    },
@@ -8770,6 +9195,75 @@
      }
     }
    },
+   "v1.HostPathVolumeSource": {
+    "description": "Represents a host path mapped into a pod. Host path volumes do not support ownership management or SELinux relabeling.",
+    "required": [
+     "path"
+    ],
+    "properties": {
+     "path": {
+      "description": "Path of the directory on the host. More info: http://kubernetes.io/docs/user-guide/volumes#hostpath",
+      "type": "string"
+     }
+    }
+   },
+   "v1.ISCSIVolumeSource": {
+    "description": "Represents an ISCSI disk. ISCSI volumes can only be mounted as read/write once. ISCSI volumes support ownership management and SELinux relabeling.",
+    "required": [
+     "targetPortal",
+     "iqn",
+     "lun"
+    ],
+    "properties": {
+     "fsType": {
+      "description": "Filesystem type of the volume that you want to mount. Tip: Ensure that the filesystem type is supported by the host operating system. Examples: \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified. More info: http://kubernetes.io/docs/user-guide/volumes#iscsi",
+      "type": "string"
+     },
+     "iqn": {
+      "description": "Target iSCSI Qualified Name.",
+      "type": "string"
+     },
+     "iscsiInterface": {
+      "description": "Optional: Defaults to 'default' (tcp). iSCSI interface name that uses an iSCSI transport.",
+      "type": "string"
+     },
+     "lun": {
+      "description": "iSCSI target lun number.",
+      "type": "integer",
+      "format": "int32"
+     },
+     "readOnly": {
+      "description": "ReadOnly here will force the ReadOnly setting in VolumeMounts. Defaults to false.",
+      "type": "boolean"
+     },
+     "targetPortal": {
+      "description": "iSCSI target portal. The portal is either an IP or ip_addr:port if the port is other than default (typically TCP ports 860 and 3260).",
+      "type": "string"
+     }
+    }
+   },
+   "v1.KeyToPath": {
+    "description": "Maps a string key to a path within a volume.",
+    "required": [
+     "key",
+     "path"
+    ],
+    "properties": {
+     "key": {
+      "description": "The key to project.",
+      "type": "string"
+     },
+     "mode": {
+      "description": "Optional: mode bits to use on this file, must be a value between 0 and 0777. If not specified, the volume defaultMode will be used. This might be in conflict with other options that affect the file mode, like fsGroup, and the result can be other mode bits set.",
+      "type": "integer",
+      "format": "int32"
+     },
+     "path": {
+      "description": "The relative path of the file to map the key to. May not be an absolute path. May not contain the path element '..'. May not start with the string '..'.",
+      "type": "string"
+     }
+    }
+   },
    "v1.Lifecycle": {
     "description": "Lifecycle describes actions that the management system should take in response to container lifecycle events. For the PostStart and PreStop lifecycle handlers, management of the container blocks until the action is complete, unless the container process fails, in which case the handler is aborted.",
     "properties": {
@@ -8817,9 +9311,38 @@
      }
     }
    },
+   "v1.NFSVolumeSource": {
+    "description": "Represents an NFS mount that lasts the lifetime of a pod. NFS volumes do not support ownership management or SELinux relabeling.",
+    "required": [
+     "server",
+     "path"
+    ],
+    "properties": {
+     "path": {
+      "description": "Path that is exported by the NFS server. More info: http://kubernetes.io/docs/user-guide/volumes#nfs",
+      "type": "string"
+     },
+     "readOnly": {
+      "description": "ReadOnly here will force the NFS export to be mounted with read-only permissions. Defaults to false. More info: http://kubernetes.io/docs/user-guide/volumes#nfs",
+      "type": "boolean"
+     },
+     "server": {
+      "description": "Server is the hostname or IP address of the NFS server. More info: http://kubernetes.io/docs/user-guide/volumes#nfs",
+      "type": "string"
+     }
+    }
+   },
    "v1.Namespace": {
     "description": "Namespace provides a scope for Names. Use of multiple namespaces is optional.",
     "properties": {
+     "apiVersion": {
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources",
+      "type": "string"
+     },
+     "kind": {
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
+      "type": "string"
+     },
      "metadata": {
       "description": "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
       "$ref": "#/definitions/v1.ObjectMeta"
@@ -8840,12 +9363,20 @@
      "items"
     ],
     "properties": {
+     "apiVersion": {
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources",
+      "type": "string"
+     },
      "items": {
       "description": "Items is the list of Namespace objects in the list. More info: http://kubernetes.io/docs/user-guide/namespaces",
       "type": "array",
       "items": {
        "$ref": "#/definitions/v1.Namespace"
       }
+     },
+     "kind": {
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
+      "type": "string"
      },
      "metadata": {
       "description": "Standard list metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
@@ -9033,6 +9564,38 @@
      }
     }
    },
+   "v1.PersistentVolumeClaimVolumeSource": {
+    "description": "PersistentVolumeClaimVolumeSource references the user's PVC in the same namespace. This volume finds the bound PV and mounts that volume for the pod. A PersistentVolumeClaimVolumeSource is, essentially, a wrapper around another type of volume that is owned by someone else (the system).",
+    "required": [
+     "claimName"
+    ],
+    "properties": {
+     "claimName": {
+      "description": "ClaimName is the name of a PersistentVolumeClaim in the same namespace as the pod using this volume. More info: http://kubernetes.io/docs/user-guide/persistent-volumes#persistentvolumeclaims",
+      "type": "string"
+     },
+     "readOnly": {
+      "description": "Will force the ReadOnly setting in VolumeMounts. Default false.",
+      "type": "boolean"
+     }
+    }
+   },
+   "v1.PhotonPersistentDiskVolumeSource": {
+    "description": "Represents a Photon Controller persistent disk resource.",
+    "required": [
+     "pdID"
+    ],
+    "properties": {
+     "fsType": {
+      "description": "Filesystem type to mount. Must be a filesystem type supported by the host operating system. Ex. \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified.",
+      "type": "string"
+     },
+     "pdID": {
+      "description": "ID that identifies Photon Controller persistent disk",
+      "type": "string"
+     }
+    }
+   },
    "v1.PodSecurityContext": {
     "description": "PodSecurityContext holds pod-level security attributes and common container settings. Some fields are also present in container.securityContext.  Field values of container.securityContext take precedence over field values of PodSecurityContext.",
     "properties": {
@@ -9179,10 +9742,18 @@
    "v1.Probe": {
     "description": "Probe describes a health check to be performed against a container to determine whether it is alive or ready to receive traffic.",
     "properties": {
+     "exec": {
+      "description": "One and only one of the following should be specified. Exec specifies the action to take.",
+      "$ref": "#/definitions/v1.ExecAction"
+     },
      "failureThreshold": {
       "description": "Minimum consecutive failures for the probe to be considered failed after having succeeded. Defaults to 3. Minimum value is 1.",
       "type": "integer",
       "format": "int32"
+     },
+     "httpGet": {
+      "description": "HTTPGet specifies the http request to perform.",
+      "$ref": "#/definitions/v1.HTTPGetAction"
      },
      "initialDelaySeconds": {
       "description": "Number of seconds after the container has started before liveness probes are initiated. More info: http://kubernetes.io/docs/user-guide/pod-states#container-probes",
@@ -9199,10 +9770,87 @@
       "type": "integer",
       "format": "int32"
      },
+     "tcpSocket": {
+      "description": "TCPSocket specifies an action involving a TCP port. TCP hooks not yet supported",
+      "$ref": "#/definitions/v1.TCPSocketAction"
+     },
      "timeoutSeconds": {
       "description": "Number of seconds after which the probe times out. Defaults to 1 second. Minimum value is 1. More info: http://kubernetes.io/docs/user-guide/pod-states#container-probes",
       "type": "integer",
       "format": "int32"
+     }
+    }
+   },
+   "v1.QuobyteVolumeSource": {
+    "description": "Represents a Quobyte mount that lasts the lifetime of a pod. Quobyte volumes do not support ownership management or SELinux relabeling.",
+    "required": [
+     "registry",
+     "volume"
+    ],
+    "properties": {
+     "group": {
+      "description": "Group to map volume access to Default is no group",
+      "type": "string"
+     },
+     "readOnly": {
+      "description": "ReadOnly here will force the Quobyte volume to be mounted with read-only permissions. Defaults to false.",
+      "type": "boolean"
+     },
+     "registry": {
+      "description": "Registry represents a single or multiple Quobyte Registry services specified as a string as host:port pair (multiple entries are separated with commas) which acts as the central registry for volumes",
+      "type": "string"
+     },
+     "user": {
+      "description": "User to map volume access to Defaults to serivceaccount user",
+      "type": "string"
+     },
+     "volume": {
+      "description": "Volume is a string that references an already created Quobyte volume by name.",
+      "type": "string"
+     }
+    }
+   },
+   "v1.RBDVolumeSource": {
+    "description": "Represents a Rados Block Device mount that lasts the lifetime of a pod. RBD volumes support ownership management and SELinux relabeling.",
+    "required": [
+     "monitors",
+     "image"
+    ],
+    "properties": {
+     "fsType": {
+      "description": "Filesystem type of the volume that you want to mount. Tip: Ensure that the filesystem type is supported by the host operating system. Examples: \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified. More info: http://kubernetes.io/docs/user-guide/volumes#rbd",
+      "type": "string"
+     },
+     "image": {
+      "description": "The rados image name. More info: http://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it",
+      "type": "string"
+     },
+     "keyring": {
+      "description": "Keyring is the path to key ring for RBDUser. Default is /etc/ceph/keyring. More info: http://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it",
+      "type": "string"
+     },
+     "monitors": {
+      "description": "A collection of Ceph monitors. More info: http://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it",
+      "type": "array",
+      "items": {
+       "type": "string"
+      }
+     },
+     "pool": {
+      "description": "The rados pool name. Default is rbd. More info: http://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it.",
+      "type": "string"
+     },
+     "readOnly": {
+      "description": "ReadOnly here will force the ReadOnly setting in VolumeMounts. Defaults to false. More info: http://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it",
+      "type": "boolean"
+     },
+     "secretRef": {
+      "description": "SecretRef is name of the authentication secret for RBDUser. If provided overrides keyring. Default is nil. More info: http://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it",
+      "$ref": "#/definitions/v1.LocalObjectReference"
+     },
+     "user": {
+      "description": "The rados user name. Default is admin. More info: http://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it",
+      "type": "string"
      }
     }
    },
@@ -9269,6 +9917,10 @@
    "v1.Secret": {
     "description": "Secret holds secret data of a certain type. The total bytes of the values in the Data field must be less than MaxSecretSize bytes.",
     "properties": {
+     "apiVersion": {
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources",
+      "type": "string"
+     },
      "data": {
       "description": "Data contains the secret data. Each key must be a valid DNS_SUBDOMAIN or leading dot followed by valid DNS_SUBDOMAIN. The serialized form of the secret data is a base64 encoded string, representing the arbitrary (possibly non-string) data value here. Described in https://tools.ietf.org/html/rfc4648#section-4",
       "type": "object",
@@ -9276,6 +9928,10 @@
        "type": "string",
        "format": "byte"
       }
+     },
+     "kind": {
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
+      "type": "string"
      },
      "metadata": {
       "description": "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
@@ -9303,6 +9959,10 @@
      "key": {
       "description": "The key of the secret to select from.  Must be a valid secret key.",
       "type": "string"
+     },
+     "name": {
+      "description": "Name of the referent. More info: http://kubernetes.io/docs/user-guide/identifiers#names",
+      "type": "string"
      }
     }
    },
@@ -9312,6 +9972,10 @@
      "items"
     ],
     "properties": {
+     "apiVersion": {
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources",
+      "type": "string"
+     },
      "items": {
       "description": "Items is a list of secret objects. More info: http://kubernetes.io/docs/user-guide/secrets",
       "type": "array",
@@ -9319,9 +9983,34 @@
        "$ref": "#/definitions/v1.Secret"
       }
      },
+     "kind": {
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
+      "type": "string"
+     },
      "metadata": {
       "description": "Standard list metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
       "$ref": "#/definitions/unversioned.ListMeta"
+     }
+    }
+   },
+   "v1.SecretVolumeSource": {
+    "description": "Adapts a Secret into a volume.\n\nThe contents of the target Secret's Data field will be presented in a volume as files using the keys in the Data field as the file names. Secret volumes support ownership management and SELinux relabeling.",
+    "properties": {
+     "defaultMode": {
+      "description": "Optional: mode bits to use on created files by default. Must be a value between 0 and 0777. Defaults to 0644. Directories within the path are not affected by this setting. This might be in conflict with other options that affect the file mode, like fsGroup, and the result can be other mode bits set.",
+      "type": "integer",
+      "format": "int32"
+     },
+     "items": {
+      "description": "If unspecified, each key-value pair in the Data field of the referenced Secret will be projected into the volume as a file whose name is the key and content is the value. If specified, the listed keys will be projected into the specified paths, and unlisted keys will not be present. If a key is specified which is not present in the Secret, the volume setup will error. Paths must be relative and may not contain the '..' path or start with '..'.",
+      "type": "array",
+      "items": {
+       "$ref": "#/definitions/v1.KeyToPath"
+      }
+     },
+     "secretName": {
+      "description": "Name of the secret in the pod's namespace to use. More info: http://kubernetes.io/docs/user-guide/volumes#secrets",
+      "type": "string"
      }
     }
    },
@@ -9358,6 +10047,14 @@
    "v1.Service": {
     "description": "Service is a named abstraction of software service (for example, mysql) consisting of local port (for example 3306) that the proxy listens on, and the selector that determines which pods will answer requests sent through the proxy.",
     "properties": {
+     "apiVersion": {
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources",
+      "type": "string"
+     },
+     "kind": {
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
+      "type": "string"
+     },
      "metadata": {
       "description": "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
       "$ref": "#/definitions/v1.ObjectMeta"
@@ -9378,12 +10075,20 @@
      "items"
     ],
     "properties": {
+     "apiVersion": {
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources",
+      "type": "string"
+     },
      "items": {
       "description": "List of services",
       "type": "array",
       "items": {
        "$ref": "#/definitions/v1.Service"
       }
+     },
+     "kind": {
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
+      "type": "string"
      },
      "metadata": {
       "description": "Standard list metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
@@ -9511,9 +10216,101 @@
      "name"
     ],
     "properties": {
+     "awsElasticBlockStore": {
+      "description": "AWSElasticBlockStore represents an AWS Disk resource that is attached to a kubelet's host machine and then exposed to the pod. More info: http://kubernetes.io/docs/user-guide/volumes#awselasticblockstore",
+      "$ref": "#/definitions/v1.AWSElasticBlockStoreVolumeSource"
+     },
+     "azureDisk": {
+      "description": "AzureDisk represents an Azure Data Disk mount on the host and bind mount to the pod.",
+      "$ref": "#/definitions/v1.AzureDiskVolumeSource"
+     },
+     "azureFile": {
+      "description": "AzureFile represents an Azure File Service mount on the host and bind mount to the pod.",
+      "$ref": "#/definitions/v1.AzureFileVolumeSource"
+     },
+     "cephfs": {
+      "description": "CephFS represents a Ceph FS mount on the host that shares a pod's lifetime",
+      "$ref": "#/definitions/v1.CephFSVolumeSource"
+     },
+     "cinder": {
+      "description": "Cinder represents a cinder volume attached and mounted on kubelets host machine More info: http://releases.k8s.io/HEAD/examples/mysql-cinder-pd/README.md",
+      "$ref": "#/definitions/v1.CinderVolumeSource"
+     },
+     "configMap": {
+      "description": "ConfigMap represents a configMap that should populate this volume",
+      "$ref": "#/definitions/v1.ConfigMapVolumeSource"
+     },
+     "downwardAPI": {
+      "description": "DownwardAPI represents downward API about the pod that should populate this volume",
+      "$ref": "#/definitions/v1.DownwardAPIVolumeSource"
+     },
+     "emptyDir": {
+      "description": "EmptyDir represents a temporary directory that shares a pod's lifetime. More info: http://kubernetes.io/docs/user-guide/volumes#emptydir",
+      "$ref": "#/definitions/v1.EmptyDirVolumeSource"
+     },
+     "fc": {
+      "description": "FC represents a Fibre Channel resource that is attached to a kubelet's host machine and then exposed to the pod.",
+      "$ref": "#/definitions/v1.FCVolumeSource"
+     },
+     "flexVolume": {
+      "description": "FlexVolume represents a generic volume resource that is provisioned/attached using an exec based plugin. This is an alpha feature and may change in future.",
+      "$ref": "#/definitions/v1.FlexVolumeSource"
+     },
+     "flocker": {
+      "description": "Flocker represents a Flocker volume attached to a kubelet's host machine. This depends on the Flocker control service being running",
+      "$ref": "#/definitions/v1.FlockerVolumeSource"
+     },
+     "gcePersistentDisk": {
+      "description": "GCEPersistentDisk represents a GCE Disk resource that is attached to a kubelet's host machine and then exposed to the pod. More info: http://kubernetes.io/docs/user-guide/volumes#gcepersistentdisk",
+      "$ref": "#/definitions/v1.GCEPersistentDiskVolumeSource"
+     },
+     "gitRepo": {
+      "description": "GitRepo represents a git repository at a particular revision.",
+      "$ref": "#/definitions/v1.GitRepoVolumeSource"
+     },
+     "glusterfs": {
+      "description": "Glusterfs represents a Glusterfs mount on the host that shares a pod's lifetime. More info: http://releases.k8s.io/HEAD/examples/volumes/glusterfs/README.md",
+      "$ref": "#/definitions/v1.GlusterfsVolumeSource"
+     },
+     "hostPath": {
+      "description": "HostPath represents a pre-existing file or directory on the host machine that is directly exposed to the container. This is generally used for system agents or other privileged things that are allowed to see the host machine. Most containers will NOT need this. More info: http://kubernetes.io/docs/user-guide/volumes#hostpath",
+      "$ref": "#/definitions/v1.HostPathVolumeSource"
+     },
+     "iscsi": {
+      "description": "ISCSI represents an ISCSI Disk resource that is attached to a kubelet's host machine and then exposed to the pod. More info: http://releases.k8s.io/HEAD/examples/volumes/iscsi/README.md",
+      "$ref": "#/definitions/v1.ISCSIVolumeSource"
+     },
      "name": {
       "description": "Volume's name. Must be a DNS_LABEL and unique within the pod. More info: http://kubernetes.io/docs/user-guide/identifiers#names",
       "type": "string"
+     },
+     "nfs": {
+      "description": "NFS represents an NFS mount on the host that shares a pod's lifetime More info: http://kubernetes.io/docs/user-guide/volumes#nfs",
+      "$ref": "#/definitions/v1.NFSVolumeSource"
+     },
+     "persistentVolumeClaim": {
+      "description": "PersistentVolumeClaimVolumeSource represents a reference to a PersistentVolumeClaim in the same namespace. More info: http://kubernetes.io/docs/user-guide/persistent-volumes#persistentvolumeclaims",
+      "$ref": "#/definitions/v1.PersistentVolumeClaimVolumeSource"
+     },
+     "photonPersistentDisk": {
+      "description": "PhotonPersistentDisk represents a PhotonController persistent disk attached and mounted on kubelets host machine",
+      "$ref": "#/definitions/v1.PhotonPersistentDiskVolumeSource"
+     },
+     "quobyte": {
+      "description": "Quobyte represents a Quobyte mount on the host that shares a pod's lifetime",
+      "$ref": "#/definitions/v1.QuobyteVolumeSource"
+     },
+     "rbd": {
+      "description": "RBD represents a Rados Block Device mount on the host that shares a pod's lifetime. More info: http://releases.k8s.io/HEAD/examples/volumes/rbd/README.md",
+      "$ref": "#/definitions/v1.RBDVolumeSource"
+     },
+     "secret": {
+      "description": "Secret represents a secret that should populate this volume. More info: http://kubernetes.io/docs/user-guide/volumes#secrets",
+      "$ref": "#/definitions/v1.SecretVolumeSource"
+     },
+     "vsphereVolume": {
+      "description": "VsphereVolume represents a vSphere volume attached and mounted on kubelets host machine",
+      "$ref": "#/definitions/v1.VsphereVirtualDiskVolumeSource"
      }
     }
    },
@@ -9542,9 +10339,33 @@
      }
     }
    },
+   "v1.VsphereVirtualDiskVolumeSource": {
+    "description": "Represents a vSphere volume resource.",
+    "required": [
+     "volumePath"
+    ],
+    "properties": {
+     "fsType": {
+      "description": "Filesystem type to mount. Must be a filesystem type supported by the host operating system. Ex. \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified.",
+      "type": "string"
+     },
+     "volumePath": {
+      "description": "Path that identifies vSphere volume vmdk",
+      "type": "string"
+     }
+    }
+   },
    "v1beta1.Cluster": {
     "description": "Information about a registered cluster in a federated kubernetes setup. Clusters are not namespaced and have unique names in the federation.",
     "properties": {
+     "apiVersion": {
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources",
+      "type": "string"
+     },
+     "kind": {
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
+      "type": "string"
+     },
      "metadata": {
       "description": "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
       "$ref": "#/definitions/v1.ObjectMeta"
@@ -9598,12 +10419,20 @@
      "items"
     ],
     "properties": {
+     "apiVersion": {
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources",
+      "type": "string"
+     },
      "items": {
       "description": "List of Cluster objects.",
       "type": "array",
       "items": {
        "$ref": "#/definitions/v1beta1.Cluster"
       }
+     },
+     "kind": {
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
+      "type": "string"
      },
      "metadata": {
       "description": "Standard list metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
@@ -9656,6 +10485,14 @@
    "v1beta1.DaemonSet": {
     "description": "DaemonSet represents the configuration of a daemon set.",
     "properties": {
+     "apiVersion": {
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources",
+      "type": "string"
+     },
+     "kind": {
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
+      "type": "string"
+     },
      "metadata": {
       "description": "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
       "$ref": "#/definitions/v1.ObjectMeta"
@@ -9676,12 +10513,20 @@
      "items"
     ],
     "properties": {
+     "apiVersion": {
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources",
+      "type": "string"
+     },
      "items": {
       "description": "Items is a list of daemon sets.",
       "type": "array",
       "items": {
        "$ref": "#/definitions/v1beta1.DaemonSet"
       }
+     },
+     "kind": {
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
+      "type": "string"
      },
      "metadata": {
       "description": "Standard list metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
@@ -9739,6 +10584,14 @@
    "v1beta1.Deployment": {
     "description": "Deployment enables declarative updates for Pods and ReplicaSets.",
     "properties": {
+     "apiVersion": {
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources",
+      "type": "string"
+     },
+     "kind": {
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
+      "type": "string"
+     },
      "metadata": {
       "description": "Standard object metadata.",
       "$ref": "#/definitions/v1.ObjectMeta"
@@ -9792,12 +10645,20 @@
      "items"
     ],
     "properties": {
+     "apiVersion": {
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources",
+      "type": "string"
+     },
      "items": {
       "description": "Items is the list of Deployments.",
       "type": "array",
       "items": {
        "$ref": "#/definitions/v1beta1.Deployment"
       }
+     },
+     "kind": {
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
+      "type": "string"
      },
      "metadata": {
       "description": "Standard list metadata.",
@@ -9812,6 +10673,14 @@
      "rollbackTo"
     ],
     "properties": {
+     "apiVersion": {
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources",
+      "type": "string"
+     },
+     "kind": {
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
+      "type": "string"
+     },
      "name": {
       "description": "Required: This must match the Name of a deployment.",
       "type": "string"
@@ -9927,9 +10796,48 @@
      }
     }
    },
+   "v1beta1.HTTPIngressPath": {
+    "description": "HTTPIngressPath associates a path regex with a backend. Incoming urls matching the path are forwarded to the backend.",
+    "required": [
+     "backend"
+    ],
+    "properties": {
+     "backend": {
+      "description": "Backend defines the referenced service endpoint to which the traffic will be forwarded to.",
+      "$ref": "#/definitions/v1beta1.IngressBackend"
+     },
+     "path": {
+      "description": "Path is an extended POSIX regex as defined by IEEE Std 1003.1, (i.e this follows the egrep/unix syntax, not the perl syntax) matched against the path of an incoming request. Currently it can contain characters disallowed from the conventional \"path\" part of a URL as defined by RFC 3986. Paths must begin with a '/'. If unspecified, the path defaults to a catch all sending traffic to the backend.",
+      "type": "string"
+     }
+    }
+   },
+   "v1beta1.HTTPIngressRuleValue": {
+    "description": "HTTPIngressRuleValue is a list of http selectors pointing to backends. In the example: http://\u003chost\u003e/\u003cpath\u003e?\u003csearchpart\u003e -\u003e backend where where parts of the url correspond to RFC 3986, this resource will be used to match against everything after the last '/' and before the first '?' or '#'.",
+    "required": [
+     "paths"
+    ],
+    "properties": {
+     "paths": {
+      "description": "A collection of paths that map requests to backends.",
+      "type": "array",
+      "items": {
+       "$ref": "#/definitions/v1beta1.HTTPIngressPath"
+      }
+     }
+    }
+   },
    "v1beta1.Ingress": {
     "description": "Ingress is a collection of rules that allow inbound connections to reach the endpoints defined by a backend. An Ingress can be configured to give services externally-reachable urls, load balance traffic, terminate SSL, offer name based virtual hosting etc.",
     "properties": {
+     "apiVersion": {
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources",
+      "type": "string"
+     },
+     "kind": {
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
+      "type": "string"
+     },
      "metadata": {
       "description": "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
       "$ref": "#/definitions/v1.ObjectMeta"
@@ -9967,12 +10875,20 @@
      "items"
     ],
     "properties": {
+     "apiVersion": {
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources",
+      "type": "string"
+     },
      "items": {
       "description": "Items is the list of Ingress.",
       "type": "array",
       "items": {
        "$ref": "#/definitions/v1beta1.Ingress"
       }
+     },
+     "kind": {
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
+      "type": "string"
      },
      "metadata": {
       "description": "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
@@ -9986,6 +10902,9 @@
      "host": {
       "description": "Host is the fully qualified domain name of a network host, as defined by RFC 3986. Note the following deviations from the \"host\" part of the URI as defined in the RFC: 1. IPs are not allowed. Currently an IngressRuleValue can only apply to the\n\t  IP in the Spec of the parent Ingress.\n2. The `:` delimiter is not respected because ports are not allowed.\n\t  Currently the port of an Ingress is implicitly :80 for http and\n\t  :443 for https.\nBoth these may change in the future. Incoming requests are matched against the host before the IngressRuleValue. If the host is unspecified, the Ingress routes all traffic based on the specified IngressRuleValue.",
       "type": "string"
+     },
+     "http": {
+      "$ref": "#/definitions/v1beta1.HTTPIngressRuleValue"
      }
     }
    },
@@ -10040,6 +10959,14 @@
    "v1beta1.ReplicaSet": {
     "description": "ReplicaSet represents the configuration of a ReplicaSet.",
     "properties": {
+     "apiVersion": {
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources",
+      "type": "string"
+     },
+     "kind": {
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
+      "type": "string"
+     },
      "metadata": {
       "description": "If the Labels of a ReplicaSet are empty, they are defaulted to be the same as the Pod(s) that the ReplicaSet manages. Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
       "$ref": "#/definitions/v1.ObjectMeta"
@@ -10089,12 +11016,20 @@
      "items"
     ],
     "properties": {
+     "apiVersion": {
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources",
+      "type": "string"
+     },
      "items": {
       "description": "List of ReplicaSets. More info: http://kubernetes.io/docs/user-guide/replication-controller",
       "type": "array",
       "items": {
        "$ref": "#/definitions/v1beta1.ReplicaSet"
       }
+     },
+     "kind": {
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
+      "type": "string"
      },
      "metadata": {
       "description": "Standard list metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
@@ -10190,6 +11125,14 @@
    "v1beta1.Scale": {
     "description": "represents a scaling request for a resource.",
     "properties": {
+     "apiVersion": {
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources",
+      "type": "string"
+     },
+     "kind": {
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
+      "type": "string"
+     },
      "metadata": {
       "description": "Standard object metadata; More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata.",
       "$ref": "#/definitions/v1.ObjectMeta"
