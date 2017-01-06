@@ -19,7 +19,9 @@ package secret
 import (
 	"fmt"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
@@ -37,7 +39,7 @@ func checkSecret(t *testing.T, store *secretStore, ns, name string, shouldExist 
 
 func TestSecretStore(t *testing.T) {
 	fakeClient := &fake.Clientset{}
-	store := newSecretStore(fakeClient)
+	store := newSecretStore(fakeClient, 0)
 	store.Add("ns1", "name1")
 	store.Add("ns2", "name2")
 	store.Add("ns1", "name1")
@@ -63,24 +65,57 @@ func TestSecretStore(t *testing.T) {
 	checkSecret(t, store, "ns4", "name4", false)
 }
 
-func TestSecretStoreRefresh(t *testing.T) {
+func TestSecretStoreGetAlwaysRefresh(t *testing.T) {
 	fakeClient := &fake.Clientset{}
-	store := newSecretStore(fakeClient)
+	store := newSecretStore(fakeClient, 0)
 
 	for i := 0; i < 10; i++ {
 		store.Add(fmt.Sprintf("ns-%d", i), fmt.Sprintf("name-%d", i))
 	}
 	fakeClient.ClearActions()
 
-	store.Refresh()
-	actions := fakeClient.Actions()
-	if len(actions) != 10 {
-		t.Fatalf("unexpected actions: %#v", actions)
+	wg := sync.WaitGroup{}
+	wg.Add(100)
+	for i := 0; i < 100; i++ {
+		go func(i int) {
+			store.Get(fmt.Sprintf("ns-%d", i%10), fmt.Sprintf("name-%d", i%10))
+			wg.Done()
+		}(i)
 	}
+	wg.Wait()
+	actions := fakeClient.Actions()
+	if len(actions) != 100 {
+		t.Fatalf("unexpected number of actions: %v instead of %v", len(actions), 100)
+	}
+
 	for _, a := range actions {
 		if !a.Matches("get", "secrets") {
 			t.Errorf("unexpected actions: %#v", a)
 		}
+	}
+}
+
+func TestSecretStoreGetNeverRefresh(t *testing.T) {
+	fakeClient := &fake.Clientset{}
+	store := newSecretStore(fakeClient, time.Minute)
+
+	for i := 0; i < 10; i++ {
+		store.Add(fmt.Sprintf("ns-%d", i), fmt.Sprintf("name-%d", i))
+	}
+	fakeClient.ClearActions()
+
+	wg := sync.WaitGroup{}
+	wg.Add(100)
+	for i := 0; i < 100; i++ {
+		go func(i int) {
+			store.Get(fmt.Sprintf("ns-%d", i%10), fmt.Sprintf("name-%d", i%10))
+			wg.Done()
+		}(i)
+	}
+	wg.Wait()
+	actions := fakeClient.Actions()
+	if len(actions) != 0 {
+		t.Fatalf("unexpected number of actions: %v instead of %v. Actions: %#v", len(actions), 0, actions)
 	}
 }
 
@@ -122,7 +157,7 @@ func podWithSecrets(ns, name string, toAttach secretsToAttach) *v1.Pod {
 
 func TestCachingSecretManager(t *testing.T) {
 	fakeClient := &fake.Clientset{}
-	secretStore := newSecretStore(fakeClient)
+	secretStore := newSecretStore(fakeClient, 0)
 	manager := &cachingSecretManager{
 		secretStore:    secretStore,
 		registeredPods: make(map[objectKey]*v1.Pod),
