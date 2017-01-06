@@ -19,10 +19,17 @@ package secret
 import (
 	"fmt"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
+
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/pkg/util/clock"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func checkSecret(t *testing.T, store *secretStore, ns, name string, shouldExist bool) {
@@ -30,14 +37,14 @@ func checkSecret(t *testing.T, store *secretStore, ns, name string, shouldExist 
 	if shouldExist && err != nil {
 		t.Errorf("unexpected actions: %#v", err)
 	}
-	if !shouldExist && (err == nil || !strings.Contains(err.Error(), "secret not registered")) {
+	if !shouldExist && (err == nil || !strings.Contains(err.Error(), fmt.Sprintf("secret %q/%q not registered", ns, name))) {
 		t.Errorf("unexpected actions: %#v", err)
 	}
 }
 
 func TestSecretStore(t *testing.T) {
 	fakeClient := &fake.Clientset{}
-	store := newSecretStore(fakeClient)
+	store := newSecretStore(fakeClient, clock.RealClock{}, 0)
 	store.Add("ns1", "name1")
 	store.Add("ns2", "name2")
 	store.Add("ns1", "name1")
@@ -46,15 +53,21 @@ func TestSecretStore(t *testing.T) {
 	store.Delete("ns2", "name2")
 	store.Add("ns3", "name3")
 
-	// We expect one Get action per Add.
+	// Adds don't issue Get requests.
 	actions := fakeClient.Actions()
-	if len(actions) != 5 {
-		t.Fatalf("unexpected actions: %#v", actions)
-	}
+	assert.Equal(t, 0, len(actions), "unexpected actions: %#v", actions)
+	// Should issue Get request
+	store.Get("ns1", "name1")
+	// Shouldn't issue Get request, as secret is not registered
+	store.Get("ns2", "name2")
+	// Should issue Get request
+	store.Get("ns3", "name3")
+
+	actions = fakeClient.Actions()
+	assert.Equal(t, 2, len(actions), "unexpected actions: %#v", actions)
+
 	for _, a := range actions {
-		if !a.Matches("get", "secrets") {
-			t.Errorf("unexpected actions: %#v", a)
-		}
+		assert.True(t, a.Matches("get", "secrets"), "unexpected actions: %#v", a)
 	}
 
 	checkSecret(t, store, "ns1", "name1", true)
@@ -63,25 +76,55 @@ func TestSecretStore(t *testing.T) {
 	checkSecret(t, store, "ns4", "name4", false)
 }
 
-func TestSecretStoreRefresh(t *testing.T) {
+func TestSecretStoreGetAlwaysRefresh(t *testing.T) {
 	fakeClient := &fake.Clientset{}
-	store := newSecretStore(fakeClient)
+	fakeClock := clock.NewFakeClock(time.Now())
+	store := newSecretStore(fakeClient, fakeClock, 0)
 
 	for i := 0; i < 10; i++ {
 		store.Add(fmt.Sprintf("ns-%d", i), fmt.Sprintf("name-%d", i))
 	}
 	fakeClient.ClearActions()
 
-	store.Refresh()
+	wg := sync.WaitGroup{}
+	wg.Add(100)
+	for i := 0; i < 100; i++ {
+		go func(i int) {
+			store.Get(fmt.Sprintf("ns-%d", i%10), fmt.Sprintf("name-%d", i%10))
+			wg.Done()
+		}(i)
+	}
+	wg.Wait()
 	actions := fakeClient.Actions()
-	if len(actions) != 10 {
-		t.Fatalf("unexpected actions: %#v", actions)
-	}
+	assert.Equal(t, 100, len(actions), "unexpected actions: %#v", actions)
+
 	for _, a := range actions {
-		if !a.Matches("get", "secrets") {
-			t.Errorf("unexpected actions: %#v", a)
-		}
+		assert.True(t, a.Matches("get", "secrets"), "unexpected actions: %#v", a)
 	}
+}
+
+func TestSecretStoreGetNeverRefresh(t *testing.T) {
+	fakeClient := &fake.Clientset{}
+	fakeClock := clock.NewFakeClock(time.Now())
+	store := newSecretStore(fakeClient, fakeClock, time.Minute)
+
+	for i := 0; i < 10; i++ {
+		store.Add(fmt.Sprintf("ns-%d", i), fmt.Sprintf("name-%d", i))
+	}
+	fakeClient.ClearActions()
+
+	wg := sync.WaitGroup{}
+	wg.Add(100)
+	for i := 0; i < 100; i++ {
+		go func(i int) {
+			store.Get(fmt.Sprintf("ns-%d", i%10), fmt.Sprintf("name-%d", i%10))
+			wg.Done()
+		}(i)
+	}
+	wg.Wait()
+	actions := fakeClient.Actions()
+	// Only first Get, should forward the Get request.
+	assert.Equal(t, 10, len(actions), "unexpected actions: %#v", actions)
 }
 
 type secretsToAttach struct {
@@ -91,7 +134,7 @@ type secretsToAttach struct {
 
 func podWithSecrets(ns, name string, toAttach secretsToAttach) *v1.Pod {
 	pod := &v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Namespace: ns,
 			Name:      name,
 		},
@@ -120,9 +163,111 @@ func podWithSecrets(ns, name string, toAttach secretsToAttach) *v1.Pod {
 	return pod
 }
 
+func TestCacheInvalidation(t *testing.T) {
+	fakeClient := &fake.Clientset{}
+	fakeClock := clock.NewFakeClock(time.Now())
+	store := newSecretStore(fakeClient, fakeClock, time.Minute)
+	manager := &cachingSecretManager{
+		secretStore:    store,
+		registeredPods: make(map[objectKey]*v1.Pod),
+	}
+
+	// Create a pod with some secrets.
+	s1 := secretsToAttach{
+		imagePullSecretNames:    []string{"s1"},
+		containerEnvSecretNames: [][]string{{"s1"}, {"s2"}},
+	}
+	manager.RegisterPod(podWithSecrets("ns1", "name1", s1))
+	// Fetch both secrets - this should triggger get operations.
+	store.Get("ns1", "s1")
+	store.Get("ns1", "s2")
+	actions := fakeClient.Actions()
+	assert.Equal(t, 2, len(actions), "unexpected actions: %#v", actions)
+	fakeClient.ClearActions()
+
+	// Update a pod with a new secret.
+	s2 := secretsToAttach{
+		imagePullSecretNames:    []string{"s1"},
+		containerEnvSecretNames: [][]string{{"s1"}, {"s2"}, {"s3"}},
+	}
+	manager.RegisterPod(podWithSecrets("ns1", "name1", s2))
+	// All secrets should be invalidated - this should trigger get operations.
+	store.Get("ns1", "s1")
+	store.Get("ns1", "s2")
+	store.Get("ns1", "s3")
+	actions = fakeClient.Actions()
+	assert.Equal(t, 3, len(actions), "unexpected actions: %#v", actions)
+	fakeClient.ClearActions()
+
+	// Create a new pod that is refencing the first two secrets - those should
+	// be invalidated.
+	manager.RegisterPod(podWithSecrets("ns1", "name2", s1))
+	store.Get("ns1", "s1")
+	store.Get("ns1", "s2")
+	store.Get("ns1", "s3")
+	actions = fakeClient.Actions()
+	assert.Equal(t, 2, len(actions), "unexpected actions: %#v", actions)
+	fakeClient.ClearActions()
+}
+
+func TestCacheRefcounts(t *testing.T) {
+	fakeClient := &fake.Clientset{}
+	fakeClock := clock.NewFakeClock(time.Now())
+	store := newSecretStore(fakeClient, fakeClock, time.Minute)
+	manager := &cachingSecretManager{
+		secretStore:    store,
+		registeredPods: make(map[objectKey]*v1.Pod),
+	}
+
+	s1 := secretsToAttach{
+		imagePullSecretNames:    []string{"s1"},
+		containerEnvSecretNames: [][]string{{"s1"}, {"s2"}, {"s3"}},
+	}
+	manager.RegisterPod(podWithSecrets("ns1", "name1", s1))
+	manager.RegisterPod(podWithSecrets("ns1", "name2", s1))
+	s2 := secretsToAttach{
+		imagePullSecretNames:    []string{"s2"},
+		containerEnvSecretNames: [][]string{{"s4"}, {"s5"}},
+	}
+	manager.RegisterPod(podWithSecrets("ns1", "name2", s2))
+	manager.RegisterPod(podWithSecrets("ns1", "name3", s2))
+	manager.RegisterPod(podWithSecrets("ns1", "name4", s2))
+	manager.UnregisterPod(podWithSecrets("ns1", "name3", s2))
+	s3 := secretsToAttach{
+		imagePullSecretNames:    []string{"s1"},
+		containerEnvSecretNames: [][]string{{"s3"}, {"s5"}},
+	}
+	manager.RegisterPod(podWithSecrets("ns1", "name5", s3))
+	manager.RegisterPod(podWithSecrets("ns1", "name6", s3))
+	s4 := secretsToAttach{
+		imagePullSecretNames:    []string{"s3"},
+		containerEnvSecretNames: [][]string{{"s6"}},
+	}
+	manager.RegisterPod(podWithSecrets("ns1", "name7", s4))
+	manager.UnregisterPod(podWithSecrets("ns1", "name7", s4))
+
+	// Now we have: 1 pod with s1, 2 pods with s2 and 2 pods with s3, 0 pods with s4.
+	verify := func(ns, name string, count int) bool {
+		store.lock.Lock()
+		defer store.lock.Unlock()
+		item, ok := store.items[objectKey{ns, name}]
+		if !ok {
+			return count == 0
+		}
+		return item.refCount == count
+	}
+	assert.True(t, verify("ns1", "s1", 3))
+	assert.True(t, verify("ns1", "s2", 3))
+	assert.True(t, verify("ns1", "s3", 3))
+	assert.True(t, verify("ns1", "s4", 2))
+	assert.True(t, verify("ns1", "s5", 4))
+	assert.True(t, verify("ns1", "s6", 0))
+	assert.True(t, verify("ns1", "s7", 0))
+}
+
 func TestCachingSecretManager(t *testing.T) {
 	fakeClient := &fake.Clientset{}
-	secretStore := newSecretStore(fakeClient)
+	secretStore := newSecretStore(fakeClient, clock.RealClock{}, 0)
 	manager := &cachingSecretManager{
 		secretStore:    secretStore,
 		registeredPods: make(map[objectKey]*v1.Pod),
