@@ -307,6 +307,12 @@ kube::golang::create_gopath_tree() {
   if [[ ! -e "${go_pkg_dir}" || "$(readlink ${go_pkg_dir})" != "${KUBE_ROOT}" ]]; then
     ln -snf "${KUBE_ROOT}" "${go_pkg_dir}"
   fi
+
+  cat >"${KUBE_GOPATH}/BUILD" <<EOF
+# This dummy BUILD file prevents Bazel from trying to descend through the
+# infinite loop created by the symlink at
+# ${go_pkg_dir}
+EOF
 }
 
 # Ensure the godep tool exists and is a viable version.
