@@ -23,9 +23,19 @@ import (
 	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
 )
 
-func For(c kubeadmapi.Discovery) (*clientcmdapi.Config, error) {
+// For identifies and executes the desired discovery mechanism.
+func For(d kubeadmapi.Discovery) (*clientcmdapi.Config, error) {
 	switch {
+	case d.File != nil:
+		return runFileDiscovery(d.File)
 	default:
-		return nil, fmt.Errorf("unimplemented")
+		return nil, fmt.Errorf("Couldn't find a valid discovery configuration. Please provide one.")
+	}
+}
+
+// runFileDiscovery executes file-based discovery.
+func runFileDiscovery(fd *kubeadmapi.FileDiscovery) (*clientcmdapi.Config, error) {
+	return clientcmd.LoadFromFile(fd.Path)
+}
 	}
 }

@@ -33,6 +33,7 @@ import (
 	kubeconfigphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubeconfig"
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
+
 	"k8s.io/kubernetes/pkg/api"
 	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -129,7 +130,7 @@ func (j *Join) Validate() error {
 	return validation.ValidateNodeConfiguration(j.cfg).ToAggregate()
 }
 
-// Run executes worked node provisioning and tries to join an existing cluster.
+// Run executes worker node provisioning and tries to join an existing cluster.
 func (j *Join) Run(out io.Writer) error {
 	var cfg *clientcmdapi.Config
 	// TODO: delete this first block when we move Token to the discovery interface
@@ -138,7 +139,6 @@ func (j *Join) Run(out io.Writer) error {
 		if err != nil {
 			return err
 		}
-
 		connectionDetails, err := kubenode.EstablishMasterConnection(j.cfg.Discovery.Token, clusterInfo)
 		if err != nil {
 			return err
@@ -161,8 +161,7 @@ func (j *Join) Run(out io.Writer) error {
 		}
 	}
 
-	err := kubeconfigphase.WriteKubeconfigToDisk(path.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, kubeconfigphase.KubeletKubeConfigFileName), cfg)
-	if err != nil {
+	if err := kubeconfigphase.WriteKubeconfigToDisk(path.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, kubeconfigphase.KubeletKubeConfigFileName), cfg); err != nil {
 		return err
 	}
 
