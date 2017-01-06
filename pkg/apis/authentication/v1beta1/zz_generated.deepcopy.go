@@ -46,11 +46,10 @@ func DeepCopy_v1beta1_TokenReview(in interface{}, out interface{}, c *conversion
 	{
 		in := in.(*TokenReview)
 		out := out.(*TokenReview)
-		out.TypeMeta = in.TypeMeta
+		*out = *in
 		if err := v1.DeepCopy_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, c); err != nil {
 			return err
 		}
-		out.Spec = in.Spec
 		if err := DeepCopy_v1beta1_TokenReviewStatus(&in.Status, &out.Status, c); err != nil {
 			return err
 		}
@@ -62,7 +61,7 @@ func DeepCopy_v1beta1_TokenReviewSpec(in interface{}, out interface{}, c *conver
 	{
 		in := in.(*TokenReviewSpec)
 		out := out.(*TokenReviewSpec)
-		out.Token = in.Token
+		*out = *in
 		return nil
 	}
 }
@@ -71,11 +70,10 @@ func DeepCopy_v1beta1_TokenReviewStatus(in interface{}, out interface{}, c *conv
 	{
 		in := in.(*TokenReviewStatus)
 		out := out.(*TokenReviewStatus)
-		out.Authenticated = in.Authenticated
+		*out = *in
 		if err := DeepCopy_v1beta1_UserInfo(&in.User, &out.User, c); err != nil {
 			return err
 		}
-		out.Error = in.Error
 		return nil
 	}
 }
@@ -84,14 +82,11 @@ func DeepCopy_v1beta1_UserInfo(in interface{}, out interface{}, c *conversion.Cl
 	{
 		in := in.(*UserInfo)
 		out := out.(*UserInfo)
-		out.Username = in.Username
-		out.UID = in.UID
+		*out = *in
 		if in.Groups != nil {
 			in, out := &in.Groups, &out.Groups
 			*out = make([]string, len(*in))
 			copy(*out, *in)
-		} else {
-			out.Groups = nil
 		}
 		if in.Extra != nil {
 			in, out := &in.Extra, &out.Extra
@@ -103,8 +98,6 @@ func DeepCopy_v1beta1_UserInfo(in interface{}, out interface{}, c *conversion.Cl
 					(*out)[key] = *newVal.(*ExtraValue)
 				}
 			}
-		} else {
-			out.Extra = nil
 		}
 		return nil
 	}

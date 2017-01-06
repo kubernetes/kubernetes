@@ -53,7 +53,7 @@ func DeepCopy_rbac_ClusterRole(in interface{}, out interface{}, c *conversion.Cl
 	{
 		in := in.(*ClusterRole)
 		out := out.(*ClusterRole)
-		out.TypeMeta = in.TypeMeta
+		*out = *in
 		if err := api.DeepCopy_api_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, c); err != nil {
 			return err
 		}
@@ -65,8 +65,6 @@ func DeepCopy_rbac_ClusterRole(in interface{}, out interface{}, c *conversion.Cl
 					return err
 				}
 			}
-		} else {
-			out.Rules = nil
 		}
 		return nil
 	}
@@ -76,7 +74,7 @@ func DeepCopy_rbac_ClusterRoleBinding(in interface{}, out interface{}, c *conver
 	{
 		in := in.(*ClusterRoleBinding)
 		out := out.(*ClusterRoleBinding)
-		out.TypeMeta = in.TypeMeta
+		*out = *in
 		if err := api.DeepCopy_api_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, c); err != nil {
 			return err
 		}
@@ -86,10 +84,7 @@ func DeepCopy_rbac_ClusterRoleBinding(in interface{}, out interface{}, c *conver
 			for i := range *in {
 				(*out)[i] = (*in)[i]
 			}
-		} else {
-			out.Subjects = nil
 		}
-		out.RoleRef = in.RoleRef
 		return nil
 	}
 }
@@ -98,8 +93,7 @@ func DeepCopy_rbac_ClusterRoleBindingList(in interface{}, out interface{}, c *co
 	{
 		in := in.(*ClusterRoleBindingList)
 		out := out.(*ClusterRoleBindingList)
-		out.TypeMeta = in.TypeMeta
-		out.ListMeta = in.ListMeta
+		*out = *in
 		if in.Items != nil {
 			in, out := &in.Items, &out.Items
 			*out = make([]ClusterRoleBinding, len(*in))
@@ -108,8 +102,6 @@ func DeepCopy_rbac_ClusterRoleBindingList(in interface{}, out interface{}, c *co
 					return err
 				}
 			}
-		} else {
-			out.Items = nil
 		}
 		return nil
 	}
@@ -119,8 +111,7 @@ func DeepCopy_rbac_ClusterRoleList(in interface{}, out interface{}, c *conversio
 	{
 		in := in.(*ClusterRoleList)
 		out := out.(*ClusterRoleList)
-		out.TypeMeta = in.TypeMeta
-		out.ListMeta = in.ListMeta
+		*out = *in
 		if in.Items != nil {
 			in, out := &in.Items, &out.Items
 			*out = make([]ClusterRole, len(*in))
@@ -129,8 +120,6 @@ func DeepCopy_rbac_ClusterRoleList(in interface{}, out interface{}, c *conversio
 					return err
 				}
 			}
-		} else {
-			out.Items = nil
 		}
 		return nil
 	}
@@ -140,47 +129,39 @@ func DeepCopy_rbac_PolicyRule(in interface{}, out interface{}, c *conversion.Clo
 	{
 		in := in.(*PolicyRule)
 		out := out.(*PolicyRule)
+		*out = *in
 		if in.Verbs != nil {
 			in, out := &in.Verbs, &out.Verbs
 			*out = make([]string, len(*in))
 			copy(*out, *in)
-		} else {
-			out.Verbs = nil
 		}
-		if in.AttributeRestrictions == nil {
-			out.AttributeRestrictions = nil
-		} else if newVal, err := c.DeepCopy(&in.AttributeRestrictions); err != nil {
-			return err
-		} else {
-			out.AttributeRestrictions = *newVal.(*runtime.Object)
+		// in.AttributeRestrictions is kind 'Interface'
+		if in.AttributeRestrictions != nil {
+			if newVal, err := c.DeepCopy(&in.AttributeRestrictions); err != nil {
+				return err
+			} else {
+				out.AttributeRestrictions = *newVal.(*runtime.Object)
+			}
 		}
 		if in.APIGroups != nil {
 			in, out := &in.APIGroups, &out.APIGroups
 			*out = make([]string, len(*in))
 			copy(*out, *in)
-		} else {
-			out.APIGroups = nil
 		}
 		if in.Resources != nil {
 			in, out := &in.Resources, &out.Resources
 			*out = make([]string, len(*in))
 			copy(*out, *in)
-		} else {
-			out.Resources = nil
 		}
 		if in.ResourceNames != nil {
 			in, out := &in.ResourceNames, &out.ResourceNames
 			*out = make([]string, len(*in))
 			copy(*out, *in)
-		} else {
-			out.ResourceNames = nil
 		}
 		if in.NonResourceURLs != nil {
 			in, out := &in.NonResourceURLs, &out.NonResourceURLs
 			*out = make([]string, len(*in))
 			copy(*out, *in)
-		} else {
-			out.NonResourceURLs = nil
 		}
 		return nil
 	}
@@ -190,7 +171,7 @@ func DeepCopy_rbac_Role(in interface{}, out interface{}, c *conversion.Cloner) e
 	{
 		in := in.(*Role)
 		out := out.(*Role)
-		out.TypeMeta = in.TypeMeta
+		*out = *in
 		if err := api.DeepCopy_api_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, c); err != nil {
 			return err
 		}
@@ -202,8 +183,6 @@ func DeepCopy_rbac_Role(in interface{}, out interface{}, c *conversion.Cloner) e
 					return err
 				}
 			}
-		} else {
-			out.Rules = nil
 		}
 		return nil
 	}
@@ -213,7 +192,7 @@ func DeepCopy_rbac_RoleBinding(in interface{}, out interface{}, c *conversion.Cl
 	{
 		in := in.(*RoleBinding)
 		out := out.(*RoleBinding)
-		out.TypeMeta = in.TypeMeta
+		*out = *in
 		if err := api.DeepCopy_api_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, c); err != nil {
 			return err
 		}
@@ -223,10 +202,7 @@ func DeepCopy_rbac_RoleBinding(in interface{}, out interface{}, c *conversion.Cl
 			for i := range *in {
 				(*out)[i] = (*in)[i]
 			}
-		} else {
-			out.Subjects = nil
 		}
-		out.RoleRef = in.RoleRef
 		return nil
 	}
 }
@@ -235,8 +211,7 @@ func DeepCopy_rbac_RoleBindingList(in interface{}, out interface{}, c *conversio
 	{
 		in := in.(*RoleBindingList)
 		out := out.(*RoleBindingList)
-		out.TypeMeta = in.TypeMeta
-		out.ListMeta = in.ListMeta
+		*out = *in
 		if in.Items != nil {
 			in, out := &in.Items, &out.Items
 			*out = make([]RoleBinding, len(*in))
@@ -245,8 +220,6 @@ func DeepCopy_rbac_RoleBindingList(in interface{}, out interface{}, c *conversio
 					return err
 				}
 			}
-		} else {
-			out.Items = nil
 		}
 		return nil
 	}
@@ -256,8 +229,7 @@ func DeepCopy_rbac_RoleList(in interface{}, out interface{}, c *conversion.Clone
 	{
 		in := in.(*RoleList)
 		out := out.(*RoleList)
-		out.TypeMeta = in.TypeMeta
-		out.ListMeta = in.ListMeta
+		*out = *in
 		if in.Items != nil {
 			in, out := &in.Items, &out.Items
 			*out = make([]Role, len(*in))
@@ -266,8 +238,6 @@ func DeepCopy_rbac_RoleList(in interface{}, out interface{}, c *conversion.Clone
 					return err
 				}
 			}
-		} else {
-			out.Items = nil
 		}
 		return nil
 	}
@@ -277,9 +247,7 @@ func DeepCopy_rbac_RoleRef(in interface{}, out interface{}, c *conversion.Cloner
 	{
 		in := in.(*RoleRef)
 		out := out.(*RoleRef)
-		out.APIGroup = in.APIGroup
-		out.Kind = in.Kind
-		out.Name = in.Name
+		*out = *in
 		return nil
 	}
 }
@@ -288,10 +256,7 @@ func DeepCopy_rbac_Subject(in interface{}, out interface{}, c *conversion.Cloner
 	{
 		in := in.(*Subject)
 		out := out.(*Subject)
-		out.Kind = in.Kind
-		out.APIVersion = in.APIVersion
-		out.Name = in.Name
-		out.Namespace = in.Namespace
+		*out = *in
 		return nil
 	}
 }

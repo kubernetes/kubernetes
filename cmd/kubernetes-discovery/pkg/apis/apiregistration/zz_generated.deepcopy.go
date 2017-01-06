@@ -47,14 +47,13 @@ func DeepCopy_apiregistration_APIService(in interface{}, out interface{}, c *con
 	{
 		in := in.(*APIService)
 		out := out.(*APIService)
-		out.TypeMeta = in.TypeMeta
+		*out = *in
 		if err := api.DeepCopy_api_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, c); err != nil {
 			return err
 		}
 		if err := DeepCopy_apiregistration_APIServiceSpec(&in.Spec, &out.Spec, c); err != nil {
 			return err
 		}
-		out.Status = in.Status
 		return nil
 	}
 }
@@ -63,8 +62,7 @@ func DeepCopy_apiregistration_APIServiceList(in interface{}, out interface{}, c 
 	{
 		in := in.(*APIServiceList)
 		out := out.(*APIServiceList)
-		out.TypeMeta = in.TypeMeta
-		out.ListMeta = in.ListMeta
+		*out = *in
 		if in.Items != nil {
 			in, out := &in.Items, &out.Items
 			*out = make([]APIService, len(*in))
@@ -73,8 +71,6 @@ func DeepCopy_apiregistration_APIServiceList(in interface{}, out interface{}, c 
 					return err
 				}
 			}
-		} else {
-			out.Items = nil
 		}
 		return nil
 	}
@@ -84,18 +80,12 @@ func DeepCopy_apiregistration_APIServiceSpec(in interface{}, out interface{}, c 
 	{
 		in := in.(*APIServiceSpec)
 		out := out.(*APIServiceSpec)
-		out.Service = in.Service
-		out.Group = in.Group
-		out.Version = in.Version
-		out.InsecureSkipTLSVerify = in.InsecureSkipTLSVerify
+		*out = *in
 		if in.CABundle != nil {
 			in, out := &in.CABundle, &out.CABundle
 			*out = make([]byte, len(*in))
 			copy(*out, *in)
-		} else {
-			out.CABundle = nil
 		}
-		out.Priority = in.Priority
 		return nil
 	}
 }
@@ -104,8 +94,7 @@ func DeepCopy_apiregistration_APIServiceStatus(in interface{}, out interface{}, 
 	{
 		in := in.(*APIServiceStatus)
 		out := out.(*APIServiceStatus)
-		_ = in
-		_ = out
+		*out = *in
 		return nil
 	}
 }
@@ -114,8 +103,7 @@ func DeepCopy_apiregistration_ServiceReference(in interface{}, out interface{}, 
 	{
 		in := in.(*ServiceReference)
 		out := out.(*ServiceReference)
-		out.Namespace = in.Namespace
-		out.Name = in.Name
+		*out = *in
 		return nil
 	}
 }
