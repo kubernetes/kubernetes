@@ -247,6 +247,7 @@ filegroup(
         "//pkg/kubelet/remote:all-srcs",
         "//pkg/kubelet/rkt:all-srcs",
         "//pkg/kubelet/rktshim:all-srcs",
+        "//pkg/kubelet/secret:all-srcs",
         "//pkg/kubelet/server:all-srcs",
         "//pkg/kubelet/status:all-srcs",
         "//pkg/kubelet/sysctl:all-srcs",
