@@ -46,8 +46,10 @@ import (
 
 const (
 	// loopPeriod is the amount of time the reconciler loop waits between
-	// successive executions
-	reconcilerLoopPeriod time.Duration = 100 * time.Millisecond
+	// successive executions. This has been increased from every 100 ms to
+	// 1 minute since the timing has created an enormous amount of API traffic on
+	// such clouds as AWS.
+	reconcilerLoopPeriod time.Duration = 1 * time.Minute
 
 	// reconcilerMaxWaitForUnmountDuration is the maximum amount of time the
 	// attach detach controller will wait for a volume to be safely unmounted
@@ -61,7 +63,9 @@ const (
 
 	// reconcilerSyncDuration is the amount of time the reconciler sync states loop
 	// wait between successive executions
-	reconcilerSyncDuration time.Duration = 5 * time.Second
+	// This has been increased from every 5 seconds to every 5 minutes since
+	// the timing has created an enormous amount of API traffic on such clouds as AWS.
+	reconcilerSyncDuration time.Duration = 5 * time.Minute
 )
 
 // AttachDetachController defines the operations supported by this controller.
