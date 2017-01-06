@@ -19,6 +19,9 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
+USER_ID=`id -u`
+GROUP_ID=`id -g`
+
 DOCKER_OPTS=${DOCKER_OPTS:-""}
 DOCKER=(docker ${DOCKER_OPTS})
 DOCKER_HOST=${DOCKER_HOST:-""}
@@ -407,6 +410,7 @@ function kube::build::clean() {
 # Set up the context directory for the kube-build image and build it.
 function kube::build::build_image() {
   mkdir -p "${LOCAL_OUTPUT_BUILD_CONTEXT}"
+  chown -R ${USER_ID}.${GROUP_ID} ${LOCAL_OUTPUT_BUILD_CONTEXT}
 
   cp /etc/localtime "${LOCAL_OUTPUT_BUILD_CONTEXT}/"
 
@@ -494,7 +498,7 @@ function kube::build::ensure_data_container() {
       --name "${KUBE_DATA_CONTAINER_NAME}"
       --hostname "${HOSTNAME}"
       "${KUBE_BUILD_IMAGE}"
-      chown -R $(id -u).$(id -g)
+      chown -R ${USER_ID}.${GROUP_ID}
         "${REMOTE_ROOT}"
         /usr/local/go/pkg/
     )
