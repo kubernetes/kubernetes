@@ -20,6 +20,8 @@ import (
 	"testing"
 	"time"
 
+	"k8s.io/client-go/pkg/util/clock"
+
 	"github.com/golang/groupcache/lru"
 )
 
@@ -43,8 +45,11 @@ func TestSimpleGet(t *testing.T) {
 }
 
 func TestExpiredGet(t *testing.T) {
-	c := NewLRUExpireCache(10)
+	fakeClock := clock.NewFakeClock(time.Now())
+	c := NewLRUExpireCacheWithClock(10, fakeClock)
 	c.Add("short-lived", "12345", 0*time.Second)
+	// ensure the entry expired
+	fakeClock.Step(time.Millisecond)
 	expectNotEntry(t, c, "short-lived")
 }
 
