@@ -29,12 +29,13 @@ import (
 	certutil "k8s.io/kubernetes/pkg/util/cert"
 )
 
+// TODO @mikedanese move this to PerformTLSBootstrap
 func PerformTLSBootstrapDeprecated(connection *ConnectionDetails) (*clientcmdapi.Config, error) {
 	fmt.Println("[csr] Created API client to obtain unique certificate for this node, generating keys and certificate signing request")
 
 	key, err := certutil.MakeEllipticPrivateKeyPEM()
 	if err != nil {
-		return nil, fmt.Errorf("failed to generating private key [%v]", err)
+		return nil, fmt.Errorf("failed to generate private key [%v]", err)
 	}
 	cert, err := csr.RequestNodeCertificate(connection.CertClient.CertificateSigningRequests(), key, connection.NodeName)
 	if err != nil {
@@ -80,7 +81,7 @@ func PerformTLSBootstrap(cfg *clientcmdapi.Config) error {
 
 	key, err := certutil.MakeEllipticPrivateKeyPEM()
 	if err != nil {
-		return fmt.Errorf("failed to generating private key [%v]", err)
+		return fmt.Errorf("failed to generate private key [%v]", err)
 	}
 	cert, err := csr.RequestNodeCertificate(c.Certificates().CertificateSigningRequests(), key, name)
 	if err != nil {
