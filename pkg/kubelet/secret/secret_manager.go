@@ -21,26 +21,27 @@ import (
 	"sync"
 	"time"
 
-	apierrors "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/v1"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	storageetcd "k8s.io/kubernetes/pkg/storage/etcd"
-	"k8s.io/kubernetes/pkg/util/sets"
-	"k8s.io/kubernetes/pkg/util/wait"
 
-	"github.com/golang/glog"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 type Manager interface {
 	// Get secret by secret namespace and name.
 	GetSecret(namespace, name string) (*v1.Secret, error)
 
+	// WARNING: Register/UnregisterPod functions should be efficient,
+	// i.e. should not block on network operations.
+
 	// RegisterPod registers all secrets from a given pod.
 	RegisterPod(pod *v1.Pod)
 
 	// UnregisterPod unregisters secrets from a given pod that are not
-	// registered still by any other registered pod.
+	// used by any other registered pod.
 	UnregisterPod(pod *v1.Pod)
 }
 
@@ -71,9 +72,18 @@ type objectKey struct {
 
 // secretStoreItems is a single item stored in secretStore.
 type secretStoreItem struct {
-	secret   *v1.Secret
-	err      error
 	refCount int
+	secret   *secretData
+}
+
+type secretData struct {
+	// WARNING: operations holding this mutex should be super fast,
+	// in other case, this may block whole sync loop in Kubelet.
+	sync.Mutex
+
+	secret         *v1.Secret
+	err            error
+	lastUpdateTime time.Time
 }
 
 // secretStore is a local cache of secrets.
@@ -82,28 +92,43 @@ type secretStore struct {
 
 	lock  sync.Mutex
 	items map[objectKey]*secretStoreItem
+	ttl   time.Duration
 }
 
-func newSecretStore(kubeClient clientset.Interface) *secretStore {
+func newSecretStore(kubeClient clientset.Interface, ttl time.Duration) *secretStore {
 	return &secretStore{
 		kubeClient: kubeClient,
 		items:      make(map[objectKey]*secretStoreItem),
+		ttl:        ttl,
 	}
+}
+
+func isSecretOlder(newSecret, oldSecret *v1.Secret) bool {
+	newVersion, _ := storageetcd.Versioner.ObjectResourceVersion(newSecret)
+	oldVersion, _ := storageetcd.Versioner.ObjectResourceVersion(oldSecret)
+	return newVersion < oldVersion
 }
 
 func (s *secretStore) Add(namespace, name string) {
 	key := objectKey{namespace: namespace, name: name}
-	secret, err := s.kubeClient.Core().Secrets(namespace).Get(name, metav1.GetOptions{})
 
+	// Add is called from RegisterPod, thus it needs to be efficient.
+	// Thus Add() is only increasing refCount and generation of a given secret.
+	// Then Get() is responsible for fetching if needed.
 	s.lock.Lock()
 	defer s.lock.Unlock()
-	if item, ok := s.items[key]; ok {
-		item.secret = secret
-		item.err = err
-		item.refCount++
-	} else {
-		s.items[key] = &secretStoreItem{secret: secret, err: err, refCount: 1}
+	item, exists := s.items[key]
+	if !exists {
+		item = &secretStoreItem{
+			refCount: 0,
+			secret:   &secretData{},
+		}
+		s.items[key] = item
 	}
+
+	item.refCount++
+	// This will trigger fetch on the next Get() operation.
+	item.secret = nil
 }
 
 func (s *secretStore) Delete(namespace, name string) {
@@ -113,6 +138,7 @@ func (s *secretStore) Delete(namespace, name string) {
 	defer s.lock.Unlock()
 	if item, ok := s.items[key]; ok {
 		item.refCount--
+		// TODO: Do we need to trigger fetch on all deletions?
 		if item.refCount == 0 {
 			delete(s.items, key)
 		}
@@ -122,67 +148,51 @@ func (s *secretStore) Delete(namespace, name string) {
 func (s *secretStore) Get(namespace, name string) (*v1.Secret, error) {
 	key := objectKey{namespace: namespace, name: name}
 
-	s.lock.Lock()
-	defer s.lock.Unlock()
-	if item, ok := s.items[key]; ok {
-		return item.secret, item.err
-	}
-	return nil, fmt.Errorf("secret not registered")
-}
-
-func (s *secretStore) Refresh() {
-	s.lock.Lock()
-	keys := make([]objectKey, 0, len(s.items))
-	for key := range s.items {
-		keys = append(keys, key)
-	}
-	s.lock.Unlock()
-
-	type result struct {
-		secret *v1.Secret
-		err    error
-	}
-	results := make([]result, 0, len(keys))
-	for _, key := range keys {
-		secret, err := s.kubeClient.Core().Secrets(key.namespace).Get(key.name, metav1.GetOptions{})
-		if err != nil {
-			glog.Warningf("Unable to retrieve a secret %s/%s: %v", key.namespace, key.name, err)
+	data := func() *secretData {
+		s.lock.Lock()
+		defer s.lock.Unlock()
+		item, exists := s.items[key]
+		if !exists {
+			return nil
 		}
-		results = append(results, result{secret: secret, err: err})
+		if item.secret == nil {
+			item.secret = &secretData{}
+		}
+		return item.secret
+	}()
+	if data == nil {
+		return nil, fmt.Errorf("secret %q/%q not registered", namespace, name)
 	}
 
-	s.lock.Lock()
-	defer s.lock.Unlock()
-	for i, key := range keys {
-		secret := results[i].secret
-		err := results[i].err
-		if err != nil && !apierrors.IsNotFound(err) {
-			// If we couldn't retrieve a secret and it wasn't 404 error, skip updating.
-			continue
-		}
-		if item, ok := s.items[key]; ok {
-			if secret != nil && item.secret != nil {
-				// If the fetched version is not newer than the current one (such races are
-				// possible), then skip update.
-				newVersion, _ := storageetcd.Versioner.ObjectResourceVersion(secret)
-				oldVersion, _ := storageetcd.Versioner.ObjectResourceVersion(item.secret)
-				if newVersion <= oldVersion {
-					continue
-				}
+	// After updating data in secretStore, lock the data, fetch secret if
+	// needed and return data.
+	data.Lock()
+	defer data.Unlock()
+	if data.err != nil || time.Now().After(data.lastUpdateTime.Add(s.ttl)) {
+		secret, err := s.kubeClient.Core().Secrets(namespace).Get(name, metav1.GetOptions{})
+		// Update state, unless we got error different than "not-found".
+		if err == nil || apierrors.IsNotFound(err) {
+			// Ignore the update to the older version of a secret.
+			if data.secret == nil || secret == nil || !isSecretOlder(secret, data.secret) {
+				data.secret = secret
+				data.err = err
+				data.lastUpdateTime = time.Now()
 			}
-			item.secret = secret
-			item.err = err
+		} else if data.secret == nil && data.err == nil {
+			// We have unitialized secretData - return current result.
+			return secret, err
 		}
 	}
+	return data.secret, data.err
 }
 
 // cachingSecretManager keeps a cache of all secrets necessary for registered pods.
 // It implements the following logic:
-// - whenever a pod is created or updated, the current versions of all its secrets
-//   are grabbed from apiserver and stored in local cache
-// - every GetSecret call is served from local cache
-// - every X seconds we are refreshing the local cache by grabbing current version
-//   of all registered secrets from apiserver
+// - whenever a pod is created or updated, the cached versions of all its secrets
+//   are invalidated
+// - every GetSecret() call tries to fetch the value from local cache; if it is
+//   not there, invalidated or too old, we fetch it from apiserver and refresh the
+//   value in cache; otherwise it is just fetched from cache
 type cachingSecretManager struct {
 	secretStore *secretStore
 
@@ -192,10 +202,9 @@ type cachingSecretManager struct {
 
 func NewCachingSecretManager(kubeClient clientset.Interface) (Manager, error) {
 	csm := &cachingSecretManager{
-		secretStore:    newSecretStore(kubeClient),
+		secretStore:    newSecretStore(kubeClient, time.Minute),
 		registeredPods: make(map[objectKey]*v1.Pod),
 	}
-	go wait.NonSlidingUntil(func() { csm.secretStore.Refresh() }, time.Minute, wait.NeverStop)
 	return csm, nil
 }
 
@@ -221,36 +230,33 @@ func getSecretNames(pod *v1.Pod) sets.String {
 }
 
 func (c *cachingSecretManager) RegisterPod(pod *v1.Pod) {
-	for key := range getSecretNames(pod) {
-		c.secretStore.Add(pod.Namespace, key)
+	names := getSecretNames(pod)
+	c.lock.Lock()
+	defer c.lock.Unlock()
+	for name := range names {
+		c.secretStore.Add(pod.Namespace, name)
 	}
 	var prev *v1.Pod
-	func() {
-		key := objectKey{namespace: pod.Namespace, name: pod.Name}
-		c.lock.Lock()
-		defer c.lock.Unlock()
-		prev = c.registeredPods[key]
-		c.registeredPods[key] = pod
-	}()
+	key := objectKey{namespace: pod.Namespace, name: pod.Name}
+	prev = c.registeredPods[key]
+	c.registeredPods[key] = pod
 	if prev != nil {
-		for key := range getSecretNames(prev) {
-			c.secretStore.Delete(prev.Namespace, key)
+		for name := range getSecretNames(prev) {
+			c.secretStore.Delete(prev.Namespace, name)
 		}
 	}
 }
 
 func (c *cachingSecretManager) UnregisterPod(pod *v1.Pod) {
 	var prev *v1.Pod
-	func() {
-		key := objectKey{namespace: pod.Namespace, name: pod.Name}
-		c.lock.Lock()
-		defer c.lock.Unlock()
-		prev = c.registeredPods[key]
-		delete(c.registeredPods, key)
-	}()
+	key := objectKey{namespace: pod.Namespace, name: pod.Name}
+	c.lock.Lock()
+	defer c.lock.Unlock()
+	prev = c.registeredPods[key]
+	delete(c.registeredPods, key)
 	if prev != nil {
-		for key := range getSecretNames(prev) {
-			c.secretStore.Delete(prev.Namespace, key)
+		for name := range getSecretNames(prev) {
+			c.secretStore.Delete(prev.Namespace, name)
 		}
 	}
 }

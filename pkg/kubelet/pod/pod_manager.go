@@ -23,7 +23,6 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/secret"
-	"k8s.io/kubernetes/pkg/types"
 )
 
 // Manager stores and manages access to pods, maintaining the mappings
@@ -160,6 +159,8 @@ func (pm *basicManager) UpdatePod(pod *v1.Pod) {
 func (pm *basicManager) updatePodsInternal(pods ...*v1.Pod) {
 	for _, pod := range pods {
 		if pm.secretManager != nil {
+			// TODO: Consider detecting only status update and in such case do
+			// not register pod, as it doesn't really matter.
 			pm.secretManager.RegisterPod(pod)
 		}
 		podFullName := kubecontainer.GetPodFullName(pod)
