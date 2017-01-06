@@ -182,6 +182,38 @@ func (fac FileAvailableCheck) Check() (warnings, errors []error) {
 	return nil, errors
 }
 
+// FileContentCheck checks that the given file contains the string Content.
+type FileContentCheck struct {
+	Path    string
+	Content string
+}
+
+func (fcc FileContentCheck) Check() (warnings, errors []error) {
+	errors = []error{}
+	f, err := os.Open(fcc.Path)
+	if err != nil {
+		errors = append(errors, fmt.Errorf("%s does not exists", fcc.Path))
+		return nil, errors
+	}
+
+	lr := io.LimitReader(f, 1)
+	defer f.Close()
+
+	buf := &bytes.Buffer{}
+	_, err = io.Copy(buf, lr)
+	if err != nil {
+		errors = append(errors, fmt.Errorf("%s could not be read", fcc.Path))
+		return nil, errors
+	}
+
+	if buf.String() != fcc.Content {
+		errors = append(errors, fmt.Errorf("%s contents are not set to 1", fcc.Path))
+		return nil, errors
+	}
+	return nil, errors
+
+}
+
 // InPathCheck checks if the given executable is present in the path.
 type InPathCheck struct {
 	executable string
@@ -292,6 +324,7 @@ func RunInitMasterChecks(cfg *kubeadmapi.MasterConfiguration) error {
 		DirAvailableCheck{Path: "/var/lib/kubelet"},
 		FileAvailableCheck{Path: path.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, "admin.conf")},
 		FileAvailableCheck{Path: path.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, "kubelet.conf")},
+		FileContentCheck{Path: "/proc/sys/net/bridge/bridge-nf-call-iptables", Content: "1"},
 		InPathCheck{executable: "ip", mandatory: true},
 		InPathCheck{executable: "iptables", mandatory: true},
 		InPathCheck{executable: "mount", mandatory: true},
@@ -325,6 +358,7 @@ func RunJoinNodeChecks(cfg *kubeadmapi.NodeConfiguration) error {
 		DirAvailableCheck{Path: path.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, "manifests")},
 		DirAvailableCheck{Path: "/var/lib/kubelet"},
 		FileAvailableCheck{Path: path.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, "kubelet.conf")},
+		FileContentCheck{Path: "/proc/sys/net/bridge/bridge-nf-call-iptables", Content: "1"},
 		InPathCheck{executable: "ip", mandatory: true},
 		InPathCheck{executable: "iptables", mandatory: true},
 		InPathCheck{executable: "mount", mandatory: true},
