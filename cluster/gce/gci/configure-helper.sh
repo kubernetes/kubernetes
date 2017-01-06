@@ -207,11 +207,11 @@ function create-master-auth {
   fi
   local -r basic_auth_csv="${auth_dir}/basic_auth.csv"
   if [[ ! -e "${basic_auth_csv}" && -n "${KUBE_PASSWORD:-}" && -n "${KUBE_USER:-}" ]]; then
-    echo "${KUBE_PASSWORD},${KUBE_USER},admin" > "${basic_auth_csv}"
+    echo "${KUBE_PASSWORD},${KUBE_USER},admin,system:masters" > "${basic_auth_csv}"
   fi
   local -r known_tokens_csv="${auth_dir}/known_tokens.csv"
   if [[ ! -e "${known_tokens_csv}" ]]; then
-    echo "${KUBE_BEARER_TOKEN},admin,admin" > "${known_tokens_csv}"
+    echo "${KUBE_BEARER_TOKEN},admin,admin,system:masters" > "${known_tokens_csv}"
     echo "${KUBE_CONTROLLER_MANAGER_TOKEN},system:kube-controller-manager,uid:system:kube-controller-manager" >> "${known_tokens_csv}"
     echo "${KUBELET_TOKEN},system:node:node-name,uid:kubelet,system:nodes" >> "${known_tokens_csv}"
     echo "${KUBE_PROXY_TOKEN},system:kube-proxy,uid:kube_proxy" >> "${known_tokens_csv}"
