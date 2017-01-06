@@ -190,6 +190,22 @@ function mount-master-pd {
   chgrp -R etcd "${mount_point}/var/etcd"
 }
 
+# Ensure the specified file exists, and that the specified token identifies the given user,uid,groups
+function add_token_user {
+  local -r file="${1:-}"
+  local -r token="${2:-}"
+  local -r user_uid_groups="${3:-}"
+
+  # ensure the file exists
+  touch "${file}"
+
+  # remove the existing line with this token if it already exists
+  grep -v -e "^${token}," "${file}" > "${file}.filtered" && mv "${file}.filtered" "${file}"
+
+  # append the user to the file
+  echo "${token},${user_uid_groups}" >> "${file}"
+}
+
 # After the first boot and on upgrade, these files exist on the master-pd
 # and should never be touched again (except perhaps an additional service
 # account, see NB below.)
@@ -206,12 +222,10 @@ function create-master-auth {
     echo "${KUBE_PASSWORD},${KUBE_USER},admin" > "${basic_auth_csv}"
   fi
   local -r known_tokens_csv="${auth_dir}/known_tokens.csv"
-  if [[ ! -e "${known_tokens_csv}" ]]; then
-    echo "${KUBE_BEARER_TOKEN},admin,admin,system:masters" > "${known_tokens_csv}"
-    echo "${KUBE_CONTROLLER_MANAGER_TOKEN},system:kube-controller-manager,uid:system:kube-controller-manager" >> "${known_tokens_csv}"
-    echo "${KUBELET_TOKEN},system:node:node-name,uid:kubelet,system:nodes" >> "${known_tokens_csv}"
-    echo "${KUBE_PROXY_TOKEN},system:kube-proxy,uid:kube_proxy" >> "${known_tokens_csv}"
-  fi
+  add_token_user "${known_tokens_csv}" "${KUBE_BEARER_TOKEN}"             admin,admin,system:masters
+  add_token_user "${known_tokens_csv}" "${KUBE_CONTROLLER_MANAGER_TOKEN}" system:kube-controller-manager,uid:system:kube-controller-manager
+  add_token_user "${known_tokens_csv}" "${KUBELET_TOKEN}"                 system:node:node-name,uid:kubelet,system:nodes
+  add_token_user "${known_tokens_csv}" "${KUBE_PROXY_TOKEN}"              system:kube-proxy,uid:kube_proxy
   local use_cloud_config="false"
   cat <<EOF >/etc/gce.conf
 [global]
