@@ -35,6 +35,8 @@ import (
 	"k8s.io/kubernetes/test/e2e_node/system"
 )
 
+const bridgenf string = "/proc/sys/net/bridge/bridge-nf-call-iptables"
+
 type PreFlightError struct {
 	Msg string
 }
@@ -182,6 +184,34 @@ func (fac FileAvailableCheck) Check() (warnings, errors []error) {
 	return nil, errors
 }
 
+// FileContentCheck checks that the given file contains the string Content.
+type FileContentCheck struct {
+	Path    string
+	Content []byte
+}
+
+func (fcc FileContentCheck) Check() (warnings, errors []error) {
+	f, err := os.Open(fcc.Path)
+	if err != nil {
+		return nil, []error{fmt.Errorf("%s does not exist", fcc.Path)}
+	}
+
+	lr := io.LimitReader(f, int64(len(fcc.Content)))
+	defer f.Close()
+
+	buf := &bytes.Buffer{}
+	_, err = io.Copy(buf, lr)
+	if err != nil {
+		return nil, []error{fmt.Errorf("%s could not be read", fcc.Path)}
+	}
+
+	if !bytes.Equal(buf.Bytes(), fcc.Content) {
+		return nil, []error{fmt.Errorf("%s contents are not set to %s", fcc.Path, fcc.Content)}
+	}
+	return nil, []error{}
+
+}
+
 // InPathCheck checks if the given executable is present in the path.
 type InPathCheck struct {
 	executable string
@@ -292,6 +322,7 @@ func RunInitMasterChecks(cfg *kubeadmapi.MasterConfiguration) error {
 		DirAvailableCheck{Path: "/var/lib/kubelet"},
 		FileAvailableCheck{Path: path.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, "admin.conf")},
 		FileAvailableCheck{Path: path.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, "kubelet.conf")},
+		FileContentCheck{Path: bridgenf, Content: []byte{'1'}},
 		InPathCheck{executable: "ip", mandatory: true},
 		InPathCheck{executable: "iptables", mandatory: true},
 		InPathCheck{executable: "mount", mandatory: true},
@@ -325,6 +356,7 @@ func RunJoinNodeChecks(cfg *kubeadmapi.NodeConfiguration) error {
 		DirAvailableCheck{Path: path.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, "manifests")},
 		DirAvailableCheck{Path: "/var/lib/kubelet"},
 		FileAvailableCheck{Path: path.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, "kubelet.conf")},
+		FileContentCheck{Path: bridgenf, Content: []byte{'1'}},
 		InPathCheck{executable: "ip", mandatory: true},
 		InPathCheck{executable: "iptables", mandatory: true},
 		InPathCheck{executable: "mount", mandatory: true},
