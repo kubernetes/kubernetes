@@ -163,6 +163,7 @@ func newServiceInfo(service proxy.ServicePortName) *serviceInfo {
 // Proxier is an iptables based proxy for connections between a localhost:lport
 // and services that provide the actual backends.
 type Proxier struct {
+	orderMu                     sync.Mutex // protects the following mutex as a workaround of lock unfairness
 	mu                          sync.Mutex // protects the following fields
 	serviceMap                  map[proxy.ServicePortName]*serviceInfo
 	endpointsMap                map[proxy.ServicePortName][]*endpointsInfo
@@ -420,9 +421,17 @@ func ipsEqual(lhs, rhs []string) bool {
 	return true
 }
 
+// lock acquires a pair of locks and releases the first lock once the second lock is acquired.
+// It is a workaround for lock unfairness.
+func (proxier *Proxier) lock() {
+	proxier.orderMu.Lock()
+	proxier.mu.Lock()
+	proxier.orderMu.Unlock()
+}
+
 // Sync is called to immediately synchronize the proxier state to iptables
 func (proxier *Proxier) Sync() {
-	proxier.mu.Lock()
+	proxier.lock()
 	defer proxier.mu.Unlock()
 	proxier.syncProxyRules()
 }
@@ -445,7 +454,8 @@ func (proxier *Proxier) OnServiceUpdate(allServices []api.Service) {
 	defer func() {
 		glog.V(4).Infof("OnServiceUpdate took %v for %d services", time.Since(start), len(allServices))
 	}()
-	proxier.mu.Lock()
+
+	proxier.lock()
 	defer proxier.mu.Unlock()
 	proxier.haveReceivedServiceUpdate = true
 
@@ -581,7 +591,7 @@ func (proxier *Proxier) OnEndpointsUpdate(allEndpoints []api.Endpoints) {
 		glog.V(4).Infof("OnEndpointsUpdate took %v for %d endpoints", time.Since(start), len(allEndpoints))
 	}()
 
-	proxier.mu.Lock()
+	proxier.lock()
 	defer proxier.mu.Unlock()
 	proxier.haveReceivedEndpointsUpdate = true
 
