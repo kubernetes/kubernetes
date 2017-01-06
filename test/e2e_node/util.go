@@ -38,6 +38,7 @@ import (
 	// utilconfig "k8s.io/kubernetes/pkg/util/config"
 	"k8s.io/kubernetes/test/e2e/framework"
 
+	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
 
@@ -83,6 +84,32 @@ func getCurrentKubeletConfig() (*componentconfig.KubeletConfiguration, error) {
 		return nil, err
 	}
 	return kubeCfg, nil
+}
+
+// Convenience method to set the evictionHard threshold during the current context.
+func tempSetEvictionHard(f *framework.Framework, evictionHard string) {
+	tempSetCurrentKubeletConfig(f, func(initialConfig *componentconfig.KubeletConfiguration) {
+		initialConfig.EvictionHard = evictionHard
+	})
+}
+
+// Must be called within a Context. Allows the function to modify the KubeletConfiguration during the BeforeEach of the context.
+// The change is reverted in the AfterEach of the context.
+func tempSetCurrentKubeletConfig(f *framework.Framework, updateFunction func(initialConfig *componentconfig.KubeletConfiguration)) {
+	var oldCfg *componentconfig.KubeletConfiguration = nil
+	BeforeEach(func() {
+		oldCfg, err := getCurrentKubeletConfig()
+		framework.ExpectNoError(err)
+		newCfg := *oldCfg
+		updateFunction(&newCfg)
+		framework.ExpectNoError(setKubeletConfiguration(f, &newCfg))
+	})
+	AfterEach(func() {
+		if oldCfg != nil {
+			err := setKubeletConfiguration(f, oldCfg)
+			framework.ExpectNoError(err)
+		}
+	})
 }
 
 // Queries the API server for a Kubelet configuration for the node described by framework.TestContext.NodeName
