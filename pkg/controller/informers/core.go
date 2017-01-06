@@ -23,7 +23,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/cache"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	coreinternallisters "k8s.io/kubernetes/pkg/client/listers/core/internalversion"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -578,5 +578,56 @@ func NewServiceAccountInformer(client clientset.Interface, resyncPeriod time.Dur
 		resyncPeriod,
 		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 
+	return sharedIndexInformer
+}
+
+// SecretInformer is type of SharedIndexInformer which watches and lists all secrets.
+// Interface provides constructor for informer and lister for secrets
+type SecretInformer interface {
+	Informer() cache.SharedIndexInformer
+	Lister() *cache.StoreToSecretLister
+}
+
+type secretInformer struct {
+	*sharedInformerFactory
+}
+
+// Informer checks whether podInformer exists in sharedInformerFactory and if not, it creates new informer of type
+// podInformer and connects it to sharedInformerFactory
+func (f *secretInformer) Informer() cache.SharedIndexInformer {
+	f.lock.Lock()
+	defer f.lock.Unlock()
+
+	informerType := reflect.TypeOf(&v1.Secret{})
+	informer, exists := f.informers[informerType]
+	if exists {
+		return informer
+	}
+	informer = NewSecretInformer(f.client, f.defaultResync)
+	f.informers[informerType] = informer
+
+	return informer
+}
+
+// Lister returns lister for podInformer
+func (f *secretInformer) Lister() *cache.StoreToSecretLister {
+	informer := f.Informer()
+	return &cache.StoreToSecretLister{Indexer: informer.GetIndexer()}
+}
+
+// NewSecretInformer returns a SharedIndexInformer that lists and watches all secrets
+func NewSecretInformer(client clientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+	sharedIndexInformer := cache.NewSharedIndexInformer(
+		&cache.ListWatch{
+			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
+				return client.Core().Secrets(v1.NamespaceAll).List(options)
+			},
+			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
+				return client.Core().Secrets(v1.NamespaceAll).Watch(options)
+			},
+		},
+		&v1.Secret{},
+		resyncPeriod,
+		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 	return sharedIndexInformer
 }
