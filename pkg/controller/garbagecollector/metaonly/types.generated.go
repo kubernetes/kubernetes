@@ -30,7 +30,7 @@ import (
 	pkg3_types "k8s.io/kubernetes/pkg/types"
 	"reflect"
 	"runtime"
-	time "time"
+	"time"
 )
 
 const (
