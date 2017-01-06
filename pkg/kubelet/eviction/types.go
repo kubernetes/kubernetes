@@ -100,7 +100,7 @@ type Threshold struct {
 // Manager evaluates when an eviction threshold for node stability has been met on the node.
 type Manager interface {
 	// Start starts the control loop to monitor eviction thresholds at specified interval.
-	Start(diskInfoProvider DiskInfoProvider, podFunc ActivePodsFunc, monitoringInterval time.Duration) error
+	Start(diskInfoProvider DiskInfoProvider, podFunc ActivePodsFunc, monitoringInterval time.Duration)
 
 	// IsUnderMemoryPressure returns true if the node is under memory pressure.
 	IsUnderMemoryPressure() bool
