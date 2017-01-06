@@ -19,7 +19,9 @@ package secret
 import (
 	"fmt"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
@@ -30,14 +32,14 @@ func checkSecret(t *testing.T, store *secretStore, ns, name string, shouldExist 
 	if shouldExist && err != nil {
 		t.Errorf("unexpected actions: %#v", err)
 	}
-	if !shouldExist && (err == nil || !strings.Contains(err.Error(), "secret not registered")) {
+	if !shouldExist && (err == nil || !strings.Contains(err.Error(), fmt.Sprintf("secret %v/%v not registered", ns, name))) {
 		t.Errorf("unexpected actions: %#v", err)
 	}
 }
 
 func TestSecretStore(t *testing.T) {
 	fakeClient := &fake.Clientset{}
-	store := newSecretStore(fakeClient)
+	store := newSecretStore(fakeClient, 0)
 	store.Add("ns1", "name1")
 	store.Add("ns2", "name2")
 	store.Add("ns1", "name1")
@@ -46,11 +48,23 @@ func TestSecretStore(t *testing.T) {
 	store.Delete("ns2", "name2")
 	store.Add("ns3", "name3")
 
-	// We expect one Get action per Add.
+	// Adds don't issue Get requests.
 	actions := fakeClient.Actions()
-	if len(actions) != 5 {
+	if len(actions) != 0 {
 		t.Fatalf("unexpected actions: %#v", actions)
 	}
+	// Should issue Get request
+	store.Get("ns1", "name1")
+	// Shouldn't issue Get request, as secret is not registered
+	store.Get("ns2", "name2")
+	// Should issue Get request
+	store.Get("ns3", "name3")
+
+	actions = fakeClient.Actions()
+	if len(actions) != 2 {
+		t.Fatalf("unexpected actions: %#v", actions)
+	}
+
 	for _, a := range actions {
 		if !a.Matches("get", "secrets") {
 			t.Errorf("unexpected actions: %#v", a)
@@ -63,24 +77,58 @@ func TestSecretStore(t *testing.T) {
 	checkSecret(t, store, "ns4", "name4", false)
 }
 
-func TestSecretStoreRefresh(t *testing.T) {
+func TestSecretStoreGetAlwaysRefresh(t *testing.T) {
 	fakeClient := &fake.Clientset{}
-	store := newSecretStore(fakeClient)
+	store := newSecretStore(fakeClient, 0)
 
 	for i := 0; i < 10; i++ {
 		store.Add(fmt.Sprintf("ns-%d", i), fmt.Sprintf("name-%d", i))
 	}
 	fakeClient.ClearActions()
 
-	store.Refresh()
-	actions := fakeClient.Actions()
-	if len(actions) != 10 {
-		t.Fatalf("unexpected actions: %#v", actions)
+	wg := sync.WaitGroup{}
+	wg.Add(100)
+	for i := 0; i < 100; i++ {
+		go func(i int) {
+			store.Get(fmt.Sprintf("ns-%d", i%10), fmt.Sprintf("name-%d", i%10))
+			wg.Done()
+		}(i)
 	}
+	wg.Wait()
+	actions := fakeClient.Actions()
+	if len(actions) != 100 {
+		t.Fatalf("unexpected number of actions: %v instead of %v", len(actions), 100)
+	}
+
 	for _, a := range actions {
 		if !a.Matches("get", "secrets") {
 			t.Errorf("unexpected actions: %#v", a)
 		}
+	}
+}
+
+func TestSecretStoreGetNeverRefresh(t *testing.T) {
+	fakeClient := &fake.Clientset{}
+	store := newSecretStore(fakeClient, time.Minute)
+
+	for i := 0; i < 10; i++ {
+		store.Add(fmt.Sprintf("ns-%d", i), fmt.Sprintf("name-%d", i))
+	}
+	fakeClient.ClearActions()
+
+	wg := sync.WaitGroup{}
+	wg.Add(100)
+	for i := 0; i < 100; i++ {
+		go func(i int) {
+			store.Get(fmt.Sprintf("ns-%d", i%10), fmt.Sprintf("name-%d", i%10))
+			wg.Done()
+		}(i)
+	}
+	wg.Wait()
+	actions := fakeClient.Actions()
+	// Only first Get, should forward the Get request.
+	if len(actions) != 10 {
+		t.Fatalf("unexpected number of actions: %v instead of %v. Actions: %#v", len(actions), 10, actions)
 	}
 }
 
@@ -122,7 +170,7 @@ func podWithSecrets(ns, name string, toAttach secretsToAttach) *v1.Pod {
 
 func TestCachingSecretManager(t *testing.T) {
 	fakeClient := &fake.Clientset{}
-	secretStore := newSecretStore(fakeClient)
+	secretStore := newSecretStore(fakeClient, 0)
 	manager := &cachingSecretManager{
 		secretStore:    secretStore,
 		registeredPods: make(map[objectKey]*v1.Pod),
