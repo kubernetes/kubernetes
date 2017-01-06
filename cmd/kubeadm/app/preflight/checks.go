@@ -198,7 +198,7 @@ func (fcc FileContentCheck) Check() (warnings, errors []error) {
 		return nil, errors
 	}
 
-	lr := io.LimitReader(f, 1)
+	lr := io.LimitReader(f, len(fcc.Content))
 	defer f.Close()
 
 	buf := &bytes.Buffer{}
