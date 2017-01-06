@@ -537,3 +537,5 @@ windows-line-endings
 www-prefix
 zone-name
 garbage-collector-enabled
+attach-detach-reconcile-sync-period
+disable-attach-detach-reconcile-sync
