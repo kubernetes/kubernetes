@@ -57,6 +57,7 @@ go_test(
         "//pkg/util/testing:go_default_library",
         "//pkg/volume:go_default_library",
         "//pkg/volume/testing:go_default_library",
+        "//vendor:github.com/heketi/heketi/pkg/glusterfs/api",
     ],
 )
 
