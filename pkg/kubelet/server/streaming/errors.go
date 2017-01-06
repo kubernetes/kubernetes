@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"net/http"
 	"regexp"
+	"strconv"
 	"time"
 
 	"google.golang.org/grpc"
@@ -39,9 +40,8 @@ func ErrorTimeout(op string, timeout time.Duration) error {
 }
 
 // The error returned when the maximum number of in-flight requests is exceeded.
-func ErrorTooManyInFlight(retryAfter int) error {
-	return grpc.Errorf(codes.ResourceExhausted, "maximum number of in-flight requests exceeded [Retry-After:%d]",
-		retryAfter)
+func ErrorTooManyInFlight() error {
+	return grpc.Errorf(codes.ResourceExhausted, "maximum number of in-flight requests exceeded")
 }
 
 // Translates a CRI streaming error into an appropriate HTTP response.
@@ -51,11 +51,10 @@ func WriteError(err error, w http.ResponseWriter) error {
 	case codes.NotFound:
 		status = http.StatusNotFound
 	case codes.ResourceExhausted:
-		// Extract the Retry-After time from the error description.
-		retryAfter := retryAfterRegexp.FindStringSubmatch(err.Error())
-		if len(retryAfter) == 2 {
-			w.Header().Set("Retry-After", retryAfter[1])
-		}
+		// We only expect to hit this if there is a DoS, so we just wait the full TTL.
+		// If this is ever hit in steady-state operations, consider increasing the MaxInFlight requests,
+		// or plumbing through the time to next expiration.
+		w.Header().Set("Retry-After", strconv.Itoa(int(CacheTTL.Seconds())))
 		status = http.StatusTooManyRequests
 	default:
 		status = http.StatusInternalServerError

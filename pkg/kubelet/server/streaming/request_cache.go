@@ -78,10 +78,7 @@ func (c *requestCache) Insert(req request) (token string, err error) {
 	c.gc()
 	// If the cache is full, reject the request.
 	if c.ll.Len() == MaxInFlight {
-		oldest := c.ll.Back()
-		entry := oldest.Value.(*cacheEntry)
-		nextExpire := entry.expireTime.Sub(c.clock.Now())
-		return "", ErrorTooManyInFlight(int(math.Ceil(nextExpire.Seconds())))
+		return "", ErrorTooManyInFlight()
 	}
 	token, err = c.uniqueToken()
 	if err != nil {
