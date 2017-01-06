@@ -24,7 +24,6 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
-	fed "k8s.io/kubernetes/pkg/dns/federation"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util/intstr"
@@ -43,6 +42,7 @@ type dnsConfigMapTest struct {
 	labels []string
 
 	cm      *v1.ConfigMap
+	fedMap  map[string]string
 	isValid bool
 
 	dnsPod      *v1.Pod
@@ -90,23 +90,25 @@ func (t *dnsConfigMapTest) run() {
 
 	t.labels = []string{"abc", "ghi"}
 	valid1 := map[string]string{"federations": t.labels[0] + "=def"}
+	valid1m := map[string]string{t.labels[0]: "def"}
 	valid2 := map[string]string{"federations": t.labels[1] + "=xyz"}
+	valid2m := map[string]string{t.labels[1]: "xyz"}
 	invalid := map[string]string{"federations": "invalid.map=xyz"}
 
 	By("empty -> valid1")
-	t.setConfigMap(&v1.ConfigMap{Data: valid1}, true)
+	t.setConfigMap(&v1.ConfigMap{Data: valid1}, valid1m, true)
 	t.validate()
 
 	By("valid1 -> valid2")
-	t.setConfigMap(&v1.ConfigMap{Data: valid2}, true)
+	t.setConfigMap(&v1.ConfigMap{Data: valid2}, valid2m, true)
 	t.validate()
 
 	By("valid2 -> invalid")
-	t.setConfigMap(&v1.ConfigMap{Data: invalid}, false)
+	t.setConfigMap(&v1.ConfigMap{Data: invalid}, nil, false)
 	t.validate()
 
 	By("invalid -> valid1")
-	t.setConfigMap(&v1.ConfigMap{Data: valid1}, true)
+	t.setConfigMap(&v1.ConfigMap{Data: valid1}, valid1m, true)
 	t.validate()
 
 	By("valid1 -> deleted")
@@ -114,7 +116,7 @@ func (t *dnsConfigMapTest) run() {
 	t.validate()
 
 	By("deleted -> invalid")
-	t.setConfigMap(&v1.ConfigMap{Data: invalid}, false)
+	t.setConfigMap(&v1.ConfigMap{Data: invalid}, nil, false)
 	t.validate()
 }
 
@@ -123,11 +125,7 @@ func (t *dnsConfigMapTest) validate() {
 }
 
 func (t *dnsConfigMapTest) validateFederation() {
-	federations := make(map[string]string)
-	if t.cm != nil {
-		err := fed.ParseFederationsFlag(t.cm.Data["federations"], federations)
-		Expect(err).NotTo(HaveOccurred())
-	}
+	federations := t.fedMap
 
 	if len(federations) == 0 {
 		By(fmt.Sprintf("Validating federation labels %v do not exist", t.labels))
@@ -210,9 +208,10 @@ func (t *dnsConfigMapTest) runDig(dnsName string) []string {
 	}
 }
 
-func (t *dnsConfigMapTest) setConfigMap(cm *v1.ConfigMap, isValid bool) {
+func (t *dnsConfigMapTest) setConfigMap(cm *v1.ConfigMap, fedMap map[string]string, isValid bool) {
 	if isValid {
 		t.cm = cm
+		t.fedMap = fedMap
 	}
 	t.isValid = isValid
 
