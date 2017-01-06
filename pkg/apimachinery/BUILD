@@ -29,3 +29,20 @@ go_test(
     tags = ["automanaged"],
     deps = ["//pkg/runtime/schema:go_default_library"],
 )
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [
+        ":package-srcs",
+        "//pkg/apimachinery/announced:all-srcs",
+        "//pkg/apimachinery/registered:all-srcs",
+    ],
+    tags = ["automanaged"],
+)

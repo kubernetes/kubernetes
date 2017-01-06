@@ -27,3 +27,23 @@ go_library(
         "//vendor:k8s.io/gengo/args",
     ],
 )
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [
+        ":package-srcs",
+        "//cmd/libs/go2idl/client-gen/args:all-srcs",
+        "//cmd/libs/go2idl/client-gen/generators:all-srcs",
+        "//cmd/libs/go2idl/client-gen/test_apis/testgroup:all-srcs",
+        "//cmd/libs/go2idl/client-gen/testoutput/clientset_generated/test_internalclientset:all-srcs",
+        "//cmd/libs/go2idl/client-gen/types:all-srcs",
+    ],
+    tags = ["automanaged"],
+)

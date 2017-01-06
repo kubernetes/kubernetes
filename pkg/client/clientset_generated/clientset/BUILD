@@ -47,3 +47,32 @@ go_library(
         "//vendor:github.com/golang/glog",
     ],
 )
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [
+        ":package-srcs",
+        "//pkg/client/clientset_generated/clientset/fake:all-srcs",
+        "//pkg/client/clientset_generated/clientset/typed/apps/v1beta1:all-srcs",
+        "//pkg/client/clientset_generated/clientset/typed/authentication/v1beta1:all-srcs",
+        "//pkg/client/clientset_generated/clientset/typed/authorization/v1beta1:all-srcs",
+        "//pkg/client/clientset_generated/clientset/typed/autoscaling/v1:all-srcs",
+        "//pkg/client/clientset_generated/clientset/typed/batch/v1:all-srcs",
+        "//pkg/client/clientset_generated/clientset/typed/batch/v2alpha1:all-srcs",
+        "//pkg/client/clientset_generated/clientset/typed/certificates/v1alpha1:all-srcs",
+        "//pkg/client/clientset_generated/clientset/typed/core/v1:all-srcs",
+        "//pkg/client/clientset_generated/clientset/typed/extensions/v1beta1:all-srcs",
+        "//pkg/client/clientset_generated/clientset/typed/policy/v1alpha1:all-srcs",
+        "//pkg/client/clientset_generated/clientset/typed/policy/v1beta1:all-srcs",
+        "//pkg/client/clientset_generated/clientset/typed/rbac/v1alpha1:all-srcs",
+        "//pkg/client/clientset_generated/clientset/typed/storage/v1beta1:all-srcs",
+    ],
+    tags = ["automanaged"],
+)

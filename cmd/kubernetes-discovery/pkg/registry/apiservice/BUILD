@@ -24,3 +24,19 @@ go_library(
         "//pkg/util/validation/field:go_default_library",
     ],
 )
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [
+        ":package-srcs",
+        "//cmd/kubernetes-discovery/pkg/registry/apiservice/etcd:all-srcs",
+    ],
+    tags = ["automanaged"],
+)

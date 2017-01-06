@@ -67,3 +67,19 @@ go_test(
         "//vendor:k8s.io/heapster/metrics/apis/metrics/v1alpha1",
     ],
 )
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [
+        ":package-srcs",
+        "//pkg/controller/podautoscaler/metrics:all-srcs",
+    ],
+    tags = ["automanaged"],
+)

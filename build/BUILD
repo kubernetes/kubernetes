@@ -56,3 +56,19 @@ docker_build(
     ],
     repository = "gcr.io/google-containers",
 )
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [
+        ":package-srcs",
+        "//build/debs:all-srcs",
+    ],
+    tags = ["automanaged"],
+)

@@ -51,3 +51,28 @@ go_library(
         "//pkg/runtime/schema:go_default_library",
     ],
 )
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [
+        ":package-srcs",
+        "//pkg/client/informers/informers_generated/apps:all-srcs",
+        "//pkg/client/informers/informers_generated/autoscaling:all-srcs",
+        "//pkg/client/informers/informers_generated/batch:all-srcs",
+        "//pkg/client/informers/informers_generated/certificates:all-srcs",
+        "//pkg/client/informers/informers_generated/core:all-srcs",
+        "//pkg/client/informers/informers_generated/extensions:all-srcs",
+        "//pkg/client/informers/informers_generated/internalinterfaces:all-srcs",
+        "//pkg/client/informers/informers_generated/policy:all-srcs",
+        "//pkg/client/informers/informers_generated/rbac:all-srcs",
+        "//pkg/client/informers/informers_generated/storage:all-srcs",
+    ],
+    tags = ["automanaged"],
+)

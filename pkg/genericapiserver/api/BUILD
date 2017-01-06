@@ -80,3 +80,24 @@ go_test(
         "//vendor:golang.org/x/net/websocket",
     ],
 )
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [
+        ":package-srcs",
+        "//pkg/genericapiserver/api/filters:all-srcs",
+        "//pkg/genericapiserver/api/handlers:all-srcs",
+        "//pkg/genericapiserver/api/metrics:all-srcs",
+        "//pkg/genericapiserver/api/openapi:all-srcs",
+        "//pkg/genericapiserver/api/request:all-srcs",
+        "//pkg/genericapiserver/api/testing:all-srcs",
+    ],
+    tags = ["automanaged"],
+)

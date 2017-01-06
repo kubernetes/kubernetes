@@ -92,3 +92,22 @@ go_test(
         "//pkg/labels:go_default_library",
     ],
 )
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [
+        ":package-srcs",
+        "//pkg/api/v1/endpoints:all-srcs",
+        "//pkg/api/v1/pod:all-srcs",
+        "//pkg/api/v1/service:all-srcs",
+        "//pkg/api/v1/validation:all-srcs",
+    ],
+    tags = ["automanaged"],
+)

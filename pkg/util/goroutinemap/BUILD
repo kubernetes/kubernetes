@@ -26,3 +26,19 @@ go_test(
     tags = ["automanaged"],
     deps = ["//pkg/util/wait:go_default_library"],
 )
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [
+        ":package-srcs",
+        "//pkg/util/goroutinemap/exponentialbackoff:all-srcs",
+    ],
+    tags = ["automanaged"],
+)

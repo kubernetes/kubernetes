@@ -30,3 +30,20 @@ go_library(
         "//pkg/watch:go_default_library",
     ],
 )
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [
+        ":package-srcs",
+        "//pkg/registry/rbac/clusterrole/etcd:all-srcs",
+        "//pkg/registry/rbac/clusterrole/policybased:all-srcs",
+    ],
+    tags = ["automanaged"],
+)

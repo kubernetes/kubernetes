@@ -47,3 +47,30 @@ go_library(
         "//vendor:github.com/golang/glog",
     ],
 )
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [
+        ":package-srcs",
+        "//pkg/client/clientset_generated/internalclientset/fake:all-srcs",
+        "//pkg/client/clientset_generated/internalclientset/typed/apps/internalversion:all-srcs",
+        "//pkg/client/clientset_generated/internalclientset/typed/authentication/internalversion:all-srcs",
+        "//pkg/client/clientset_generated/internalclientset/typed/authorization/internalversion:all-srcs",
+        "//pkg/client/clientset_generated/internalclientset/typed/autoscaling/internalversion:all-srcs",
+        "//pkg/client/clientset_generated/internalclientset/typed/batch/internalversion:all-srcs",
+        "//pkg/client/clientset_generated/internalclientset/typed/certificates/internalversion:all-srcs",
+        "//pkg/client/clientset_generated/internalclientset/typed/core/internalversion:all-srcs",
+        "//pkg/client/clientset_generated/internalclientset/typed/extensions/internalversion:all-srcs",
+        "//pkg/client/clientset_generated/internalclientset/typed/policy/internalversion:all-srcs",
+        "//pkg/client/clientset_generated/internalclientset/typed/rbac/internalversion:all-srcs",
+        "//pkg/client/clientset_generated/internalclientset/typed/storage/internalversion:all-srcs",
+    ],
+    tags = ["automanaged"],
+)

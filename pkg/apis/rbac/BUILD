@@ -27,3 +27,21 @@ go_library(
         "//pkg/watch/versioned:go_default_library",
     ],
 )
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [
+        ":package-srcs",
+        "//pkg/apis/rbac/install:all-srcs",
+        "//pkg/apis/rbac/v1alpha1:all-srcs",
+        "//pkg/apis/rbac/validation:all-srcs",
+    ],
+    tags = ["automanaged"],
+)
