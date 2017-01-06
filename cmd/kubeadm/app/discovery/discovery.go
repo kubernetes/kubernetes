@@ -22,6 +22,7 @@ import (
 	"net/http"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
 )
@@ -33,6 +34,9 @@ func For(d kubeadmapi.Discovery) (*clientcmdapi.Config, error) {
 		return runFileDiscovery(d.File)
 	case d.HTTPS != nil:
 		return runHTTPSDiscovery(d.HTTPS)
+	case d.Token != nil:
+		// TODO move token discovery here
+		return runTokenDiscovery(d.Token)
 	default:
 		return nil, fmt.Errorf("Couldn't find a valid discovery configuration. Please provide one.")
 	}
@@ -58,4 +62,9 @@ func runHTTPSDiscovery(hd *kubeadmapi.HTTPSDiscovery) (*clientcmdapi.Config, err
 
 	return clientcmd.Load(kubeconfig)
 }
+
+// TODO implement
+// runTokenDiscovery executes token-based discovery.
+func runTokenDiscovery(td *kubeadmapi.TokenDiscovery) (*clientcmdapi.Config, error) {
+	return nil, fmt.Errorf("Couldn't find a valid discovery configuration. Please provide one.")
 }
