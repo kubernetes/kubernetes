@@ -80,6 +80,8 @@ func (s *CloudControllerManagerServer) AddFlags(fs *pflag.FlagSet) {
 	fs.Float32Var(&s.KubeAPIQPS, "kube-api-qps", s.KubeAPIQPS, "QPS to use while talking with kubernetes apiserver")
 	fs.Int32Var(&s.KubeAPIBurst, "kube-api-burst", s.KubeAPIBurst, "Burst to use while talking with kubernetes apiserver")
 	fs.DurationVar(&s.ControllerStartInterval.Duration, "controller-start-interval", s.ControllerStartInterval.Duration, "Interval between starting controller managers.")
+	fs.BoolVar(&s.DisableAttachDetachReconcilerSync, "disable-attach-detach-reconcile", false, "Disable volume attach detach reconcilation")
+	fs.DurationVar(&s.ReconcilerSyncLoopPeriod, "reconcile-sync-loop-period", 5*time.Minute, "The wait time between volume attach detach reconciliation")
 
 	leaderelection.BindFlags(&s.LeaderElection, fs)
 	config.DefaultFeatureGate.AddFlag(fs)
