@@ -13,6 +13,7 @@ go_library(
     srcs = [
         "attributes.go",
         "chain.go",
+        "config.go",
         "errors.go",
         "handler.go",
         "interfaces.go",
@@ -20,12 +21,16 @@ go_library(
     ],
     tags = ["automanaged"],
     deps = [
+        "//pkg/api:go_default_library",
         "//pkg/api/errors:go_default_library",
         "//pkg/api/meta:go_default_library",
+        "//pkg/apis/componentconfig:go_default_library",
+        "//pkg/apis/componentconfig/v1alpha1:go_default_library",
         "//pkg/runtime:go_default_library",
         "//pkg/runtime/schema:go_default_library",
         "//pkg/util/errors:go_default_library",
         "//pkg/util/sets:go_default_library",
+        "//vendor:github.com/ghodss/yaml",
         "//vendor:github.com/golang/glog",
         "//vendor:k8s.io/apiserver/pkg/authentication/user",
     ],
@@ -33,10 +38,17 @@ go_library(
 
 go_test(
     name = "go_default_test",
-    srcs = ["chain_test.go"],
+    srcs = [
+        "chain_test.go",
+        "config_test.go",
+    ],
     library = ":go_default_library",
     tags = ["automanaged"],
-    deps = ["//pkg/runtime/schema:go_default_library"],
+    deps = [
+        "//pkg/apis/componentconfig:go_default_library",
+        "//pkg/apis/componentconfig/install:go_default_library",
+        "//pkg/runtime/schema:go_default_library",
+    ],
 )
 
 filegroup(
