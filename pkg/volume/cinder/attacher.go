@@ -124,7 +124,18 @@ func (attacher *cinderDiskAttacher) VolumesAreAttached(specs []*volume.Spec, nod
 		volumesAttachedCheck[spec] = true
 		volumeSpecMap[volumeSource.VolumeID] = spec
 	}
-	attachedResult, err := attacher.cinderProvider.DisksAreAttached(volumeIDList, string(nodeName))
+	instances, res := attacher.cinderProvider.Instances()
+	if !res {
+		return volumesAttachedCheck, fmt.Errorf("failed to list openstack instances")
+	}
+	instanceid, err := instances.InstanceID(nodeName)
+	if err != nil {
+		return volumesAttachedCheck, err
+	}
+	if ind := strings.LastIndex(instanceid, "/"); ind >= 0 {
+		instanceid = instanceid[(ind + 1):]
+	}
+	attachedResult, err := attacher.cinderProvider.DisksAreAttached(volumeIDList, instanceid)
 	if err != nil {
 		// Log error and continue with attach
 		glog.Errorf(
