@@ -416,7 +416,10 @@ func StartControllers(controllers map[string]InitFunc, s *options.CMServer, root
 			sharedInformers.PersistentVolumeClaims().Informer(),
 			sharedInformers.PersistentVolumes().Informer(),
 			cloud,
-			ProbeAttachableVolumePlugins(s.VolumeConfiguration))
+			ProbeAttachableVolumePlugins(s.VolumeConfiguration),
+			s.DisableAttachDetachReconcilerSync,
+			s.ReconcilerSyncLoopPeriod.Duration,
+		)
 	if attachDetachControllerErr != nil {
 		return fmt.Errorf("failed to start attach/detach controller: %v", attachDetachControllerErr)
 	}
