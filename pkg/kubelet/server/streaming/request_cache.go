@@ -29,18 +29,25 @@ import (
 )
 
 var (
+	// Timeout after which tokens become invalid.
 	CacheTTL = 1 * time.Minute
 	// The maximum number of in-flight requests to allow.
 	MaxInFlight = 1000
-	TokenLen    = 24
+	// Length of the random base64 encoded token identifying the request.
+	TokenLen = 8
 )
 
+// requestCache caches streaming (exec/attach/port-forward) requests and generates a single-use
+// random token for their retrieval. The requestCache is used for building streaming URLs without
+// the need to encode every request parameter in the URL.
 type requestCache struct {
 	// clock is used to obtain the current time
 	clock clock.Clock
 
+	// tokens maps the generate token to the request for fast retrieval.
 	tokens map[string]*list.Element
-	ll     *list.List
+	// ll maintains an age-ordered request list for faster garbage collection of expired requests.
+	ll *list.List
 
 	lock sync.Mutex
 }
@@ -67,7 +74,8 @@ func (c *requestCache) Insert(req request) (token string, err error) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
-	c.gc() // Remove expired entries.
+	// Remove expired entries.
+	c.gc()
 	// If the cache is full, reject the request.
 	if c.ll.Len() == MaxInFlight {
 		oldest := c.ll.Back()
@@ -126,10 +134,11 @@ func (c *requestCache) uniqueToken() (string, error) {
 
 // Must be write-locked prior to calling.
 func (c *requestCache) gc() {
+	now := c.clock.Now()
 	for c.ll.Len() > 0 {
 		oldest := c.ll.Back()
 		entry := oldest.Value.(*cacheEntry)
-		if !c.clock.Now().After(entry.expireTime) {
+		if !now.After(entry.expireTime) {
 			return
 		}
 
