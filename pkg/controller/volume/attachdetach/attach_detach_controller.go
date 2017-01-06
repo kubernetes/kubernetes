@@ -58,10 +58,6 @@ const (
 	// desiredStateOfWorldPopulatorLoopSleepPeriod is the amount of time the
 	// DesiredStateOfWorldPopulator loop waits between successive executions
 	desiredStateOfWorldPopulatorLoopSleepPeriod time.Duration = 1 * time.Minute
-
-	// reconcilerSyncDuration is the amount of time the reconciler sync states loop
-	// wait between successive executions
-	reconcilerSyncDuration time.Duration = 5 * time.Second
 )
 
 // AttachDetachController defines the operations supported by this controller.
@@ -71,6 +67,8 @@ type AttachDetachController interface {
 }
 
 // NewAttachDetachController returns a new instance of AttachDetachController.
+// TODO: add param here
+// https://github.com/kubernetes/kubernetes/commit/ebf796a649397b0bda8e64e0e3b46d585e0a4443#diff-7a68ae865340a73c760157dcc8f31bc0
 func NewAttachDetachController(
 	kubeClient clientset.Interface,
 	podInformer kcache.SharedInformer,
@@ -78,7 +76,9 @@ func NewAttachDetachController(
 	pvcInformer kcache.SharedInformer,
 	pvInformer kcache.SharedInformer,
 	cloud cloudprovider.Interface,
-	plugins []volume.VolumePlugin) (AttachDetachController, error) {
+	plugins []volume.VolumePlugin,
+	disableReconciliation bool,
+	reconcilerSyncDuration time.Duration) (AttachDetachController, error) {
 	// TODO: The default resyncPeriod for shared informers is 12 hours, this is
 	// unacceptable for the attach/detach controller. For example, if a pod is
 	// skipped because the node it is scheduled to didn't set its annotation in
@@ -131,10 +131,14 @@ func NewAttachDetachController(
 			false)) // flag for experimental binary check for volume mount
 	adc.nodeStatusUpdater = statusupdater.NewNodeStatusUpdater(
 		kubeClient, nodeInformer, adc.actualStateOfWorld)
+
+	// CJL: add new var here
+	// Default these to values in options
 	adc.reconciler = reconciler.NewReconciler(
 		reconcilerLoopPeriod,
 		reconcilerMaxWaitForUnmountDuration,
 		reconcilerSyncDuration,
+		disableReconciliation,
 		adc.desiredStateOfWorld,
 		adc.actualStateOfWorld,
 		adc.attacherDetacher,
