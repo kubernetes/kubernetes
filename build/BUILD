@@ -29,6 +29,8 @@ docker_build(
     debs = [
         "@iptables_deb//file",
         "@iproute2_deb//file",
+        "@libnetlink_deb//file",
+        "@libxtables_deb//file",
     ],
 )
 
