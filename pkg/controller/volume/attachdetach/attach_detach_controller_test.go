@@ -44,7 +44,9 @@ func Test_NewAttachDetachController_Positive(t *testing.T) {
 		pvInformer,
 		nil, /* cloud */
 		nil, /* plugins */
-		fakeRecorder)
+		fakeRecorder,
+		false,
+		time.Second*5)
 
 	// Assert
 	if err != nil {
