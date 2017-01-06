@@ -21,3 +21,19 @@ go_library(
         "//vendor:github.com/golang/glog",
     ],
 )
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [
+        ":package-srcs",
+        "//pkg/cloudprovider/providers:all-srcs",
+    ],
+    tags = ["automanaged"],
+)

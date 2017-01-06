@@ -80,3 +80,19 @@ go_test(
         "//vendor:github.com/golang/glog",
     ],
 )
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [
+        ":package-srcs",
+        "//pkg/controller/volume/persistentvolume/options:all-srcs",
+    ],
+    tags = ["automanaged"],
+)

@@ -69,3 +69,41 @@ go_test(
         "//pkg/util/uuid:go_default_library",
     ],
 )
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [
+        ":package-srcs",
+        "//pkg/controller/certificates:all-srcs",
+        "//pkg/controller/cloud:all-srcs",
+        "//pkg/controller/cronjob:all-srcs",
+        "//pkg/controller/daemon:all-srcs",
+        "//pkg/controller/deployment:all-srcs",
+        "//pkg/controller/disruption:all-srcs",
+        "//pkg/controller/endpoint:all-srcs",
+        "//pkg/controller/garbagecollector:all-srcs",
+        "//pkg/controller/informers:all-srcs",
+        "//pkg/controller/job:all-srcs",
+        "//pkg/controller/namespace:all-srcs",
+        "//pkg/controller/node:all-srcs",
+        "//pkg/controller/petset:all-srcs",
+        "//pkg/controller/podautoscaler:all-srcs",
+        "//pkg/controller/podgc:all-srcs",
+        "//pkg/controller/replicaset:all-srcs",
+        "//pkg/controller/replication:all-srcs",
+        "//pkg/controller/resourcequota:all-srcs",
+        "//pkg/controller/route:all-srcs",
+        "//pkg/controller/service:all-srcs",
+        "//pkg/controller/serviceaccount:all-srcs",
+        "//pkg/controller/volume/attachdetach:all-srcs",
+        "//pkg/controller/volume/persistentvolume:all-srcs",
+    ],
+    tags = ["automanaged"],
+)

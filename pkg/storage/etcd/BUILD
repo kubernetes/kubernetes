@@ -65,3 +65,22 @@ go_test(
         "//vendor:golang.org/x/net/context",
     ],
 )
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [
+        ":package-srcs",
+        "//pkg/storage/etcd/etcdtest:all-srcs",
+        "//pkg/storage/etcd/metrics:all-srcs",
+        "//pkg/storage/etcd/testing:all-srcs",
+        "//pkg/storage/etcd/util:all-srcs",
+    ],
+    tags = ["automanaged"],
+)

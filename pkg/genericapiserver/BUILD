@@ -124,3 +124,26 @@ go_test(
         "//vendor:k8s.io/apiserver/pkg/authorization/authorizer",
     ],
 )
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [
+        ":package-srcs",
+        "//pkg/genericapiserver/api:all-srcs",
+        "//pkg/genericapiserver/authenticator:all-srcs",
+        "//pkg/genericapiserver/authorizer:all-srcs",
+        "//pkg/genericapiserver/filters:all-srcs",
+        "//pkg/genericapiserver/mux:all-srcs",
+        "//pkg/genericapiserver/openapi:all-srcs",
+        "//pkg/genericapiserver/options:all-srcs",
+        "//pkg/genericapiserver/routes:all-srcs",
+    ],
+    tags = ["automanaged"],
+)

@@ -61,3 +61,19 @@ go_test(
         "//pkg/util/config:go_default_library",
     ],
 )
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [
+        ":package-srcs",
+        "//federation/cmd/federation-controller-manager/app/options:all-srcs",
+    ],
+    tags = ["automanaged"],
+)

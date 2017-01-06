@@ -32,3 +32,20 @@ go_test(
     tags = ["automanaged"],
     deps = ["//vendor:github.com/ghodss/yaml"],
 )
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [
+        ":package-srcs",
+        "//pkg/client/unversioned/clientcmd/api/latest:all-srcs",
+        "//pkg/client/unversioned/clientcmd/api/v1:all-srcs",
+    ],
+    tags = ["automanaged"],
+)

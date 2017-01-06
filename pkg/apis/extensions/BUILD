@@ -36,3 +36,21 @@ go_test(
     library = ":go_default_library",
     tags = ["automanaged"],
 )
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [
+        ":package-srcs",
+        "//pkg/apis/extensions/install:all-srcs",
+        "//pkg/apis/extensions/v1beta1:all-srcs",
+        "//pkg/apis/extensions/validation:all-srcs",
+    ],
+    tags = ["automanaged"],
+)

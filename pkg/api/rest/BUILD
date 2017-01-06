@@ -33,3 +33,19 @@ go_library(
         "//pkg/watch:go_default_library",
     ],
 )
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [
+        ":package-srcs",
+        "//pkg/api/rest/resttest:all-srcs",
+    ],
+    tags = ["automanaged"],
+)
