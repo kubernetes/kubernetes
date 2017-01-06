@@ -19,6 +19,7 @@ package v1alpha1
 import (
 	"k8s.io/kubernetes/pkg/api/v1"
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
+	"k8s.io/kubernetes/pkg/runtime"
 )
 
 type KubeProxyConfiguration struct {
@@ -577,4 +578,30 @@ type KubeletAnonymousAuthentication struct {
 	// Requests that are not rejected by another authentication method are treated as anonymous requests.
 	// Anonymous requests have a username of system:anonymous, and a group name of system:unauthenticated.
 	Enabled *bool `json:"enabled"`
+}
+
+// AdmissionConfiguration provides versioned configuration for admission controllers.
+type AdmissionConfiguration struct {
+	metav1.TypeMeta `json:",inline"`
+
+	// Plugins allows specifying a configuration per admission control plugin.
+	// +optional
+	Plugins []AdmissionPluginConfiguration `json:"plugins"`
+}
+
+// AdmissionPluginConfiguration provides the configuration for a single plug-in.
+type AdmissionPluginConfiguration struct {
+	// Name is the name of the admission controller.
+	// It must match the registered admission plugin name.
+	Name string `json:"name"`
+
+	// Location is the path to a configuration file that contains the plugin's
+	// configuration
+	// +optional
+	Location string `json:"location"`
+
+	// Configuration is an embedded configuration object to be used as the plugin's
+	// configuration. If present, it will be used instead of the path to the configuration file.
+	// +optional
+	Configuration runtime.RawExtension `json:"configuration"`
 }
