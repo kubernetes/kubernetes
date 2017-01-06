@@ -197,7 +197,7 @@ func startMasterOrDie(masterConfig *master.Config, incomingServer *httptest.Serv
 			},
 		}
 		masterConfig.GenericConfig.OpenAPIConfig.Definitions = openapi.OpenAPIDefinitions
-		masterConfig.GenericConfig.SwaggerConfig = genericapiserver.DefaultSwaggerConfig()
+		masterConfig.GenericConfig.SwaggerConfig = genericapiserver.DefaultSwaggerConfig(openapi.OpenAPIDefinitions)
 	}
 
 	// set the loopback client config

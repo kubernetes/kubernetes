@@ -287,7 +287,7 @@ func Run(s *options.ServerRunOptions) error {
 	genericConfig.OpenAPIConfig = genericapiserver.DefaultOpenAPIConfig(generatedopenapi.OpenAPIDefinitions)
 	genericConfig.OpenAPIConfig.SecurityDefinitions = securityDefinitions
 	genericConfig.OpenAPIConfig.Info.Title = "Kubernetes"
-	genericConfig.SwaggerConfig = genericapiserver.DefaultSwaggerConfig()
+	genericConfig.SwaggerConfig = genericapiserver.DefaultSwaggerConfig(generatedopenapi.OpenAPIDefinitions)
 	genericConfig.EnableMetrics = true
 	genericConfig.LongRunningFunc = filters.BasicLongRunningRequestCheck(
 		sets.NewString("watch", "proxy"),

@@ -913,18 +913,18 @@
 		},
 		{
 			"ImportPath": "github.com/emicklei/go-restful",
-			"Comment": "v1.2-96-g09691a3",
-			"Rev": "09691a3b6378b740595c1002f40c34dd5f218a22"
+			"Comment": "v1.2-103-gd916db2",
+			"Rev": "d916db217751a3fef55337f799c31fde4b8efcf1"
 		},
 		{
 			"ImportPath": "github.com/emicklei/go-restful/log",
-			"Comment": "v1.2-96-g09691a3",
-			"Rev": "09691a3b6378b740595c1002f40c34dd5f218a22"
+			"Comment": "v1.2-103-gd916db2",
+			"Rev": "d916db217751a3fef55337f799c31fde4b8efcf1"
 		},
 		{
 			"ImportPath": "github.com/emicklei/go-restful/swagger",
-			"Comment": "v1.2-96-g09691a3",
-			"Rev": "09691a3b6378b740595c1002f40c34dd5f218a22"
+			"Comment": "v1.2-103-gd916db2",
+			"Rev": "d916db217751a3fef55337f799c31fde4b8efcf1"
 		},
 		{
 			"ImportPath": "github.com/evanphx/json-patch",

@@ -19,7 +19,6 @@ package openapi
 import (
 	"fmt"
 	"net/http"
-	"reflect"
 	"strings"
 
 	"github.com/emicklei/go-restful"
@@ -40,6 +39,8 @@ type openAPI struct {
 	swagger      *spec.Swagger
 	protocolList []string
 	servePath    string
+	// typeNameFn maps the internal Golang type of schema options to their OpenAPI name
+	typeNameFn func(interface{}) string
 }
 
 // RegisterOpenAPIService registers a handler to provides standard OpenAPI specification.
@@ -56,6 +57,7 @@ func RegisterOpenAPIService(servePath string, webServices []*restful.WebService,
 			},
 		},
 	}
+	o.typeNameFn = config.ObjectTypeNameFunction()
 
 	err = o.init(webServices)
 	if err != nil {
@@ -114,11 +116,7 @@ func (o *openAPI) buildDefinitionRecursively(name string) error {
 // This is the main function that keep track of definitions used in this spec and is depend on code generated
 // by k8s.io/kubernetes/cmd/libs/go2idl/openapi-gen.
 func (o *openAPI) buildDefinitionForType(sample interface{}) (string, error) {
-	t := reflect.TypeOf(sample)
-	if t.Kind() == reflect.Ptr {
-		t = t.Elem()
-	}
-	name := t.String()
+	name := o.typeNameFn(sample)
 	if err := o.buildDefinitionRecursively(name); err != nil {
 		return "", err
 	}
@@ -246,7 +244,7 @@ func (o *openAPI) buildOperations(route restful.Route, inPathCommonParamsMap map
 	}
 	// If there is a read sample, there will be a body param referring to it.
 	if route.ReadSample != nil {
-		if _, err := o.toSchema(reflect.TypeOf(route.ReadSample).String(), route.ReadSample); err != nil {
+		if _, err := o.toSchema(o.typeNameFn(route.ReadSample), route.ReadSample); err != nil {
 			return ret, err
 		}
 	}
@@ -266,8 +264,7 @@ func (o *openAPI) buildOperations(route restful.Route, inPathCommonParamsMap map
 }
 
 func (o *openAPI) buildResponse(model interface{}, description string) (spec.Response, error) {
-	typeName := reflect.TypeOf(model).String()
-	schema, err := o.toSchema(typeName, model)
+	schema, err := o.toSchema(o.typeNameFn(model), model)
 	if err != nil {
 		return spec.Response{}, err
 	}

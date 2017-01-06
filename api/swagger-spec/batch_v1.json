@@ -108,7 +108,7 @@
         "allowMultiple": false
        },
        {
-        "type": "v1.Job",
+        "type": "batch.v1.Job",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -390,7 +390,7 @@
         "allowMultiple": false
        },
        {
-        "type": "v1.Job",
+        "type": "batch.v1.Job",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -445,7 +445,7 @@
         "allowMultiple": false
        },
        {
-        "type": "v1.Patch",
+        "type": "io.k8s.meta.v1.Patch",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -879,7 +879,7 @@
         "allowMultiple": false
        },
        {
-        "type": "v1.Job",
+        "type": "batch.v1.Job",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -934,7 +934,7 @@
         "allowMultiple": false
        },
        {
-        "type": "v1.Patch",
+        "type": "io.k8s.meta.v1.Patch",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -1005,7 +1005,7 @@
   "models": {
    "v1.JobList": {
     "id": "v1.JobList",
-    "description": "JobList is a collection of jobs.",
+    "description": "JobList is a collection of jobs.\n\nDEPRECATED: Use 'batch.v1.JobList' instead.",
     "required": [
      "items"
     ],
@@ -1033,7 +1033,7 @@
    },
    "v1.ListMeta": {
     "id": "v1.ListMeta",
-    "description": "ListMeta describes metadata that synthetic resources must have, including lists and various status objects. A resource may have only one of {ObjectMeta, ListMeta}.",
+    "description": "ListMeta describes metadata that synthetic resources must have, including lists and various status objects. A resource may have only one of {ObjectMeta, ListMeta}.\n\nDEPRECATED: Use 'io.k8s.meta.v1.ListMeta' instead.",
     "properties": {
      "selfLink": {
       "type": "string",
@@ -1047,7 +1047,7 @@
    },
    "v1.Job": {
     "id": "v1.Job",
-    "description": "Job represents the configuration of a single job.",
+    "description": "Job represents the configuration of a single job.\n\nDEPRECATED: Use 'batch.v1.Job' instead.",
     "properties": {
      "kind": {
       "type": "string",
@@ -1147,7 +1147,7 @@
    },
    "v1.OwnerReference": {
     "id": "v1.OwnerReference",
-    "description": "OwnerReference contains enough information to let you identify an owning object. Currently, an owning object must be in the same namespace, so there is no namespace field.",
+    "description": "OwnerReference contains enough information to let you identify an owning object. Currently, an owning object must be in the same namespace, so there is no namespace field.\n\nDEPRECATED: Use 'io.k8s.meta.v1.OwnerReference' instead.",
     "required": [
      "apiVersion",
      "kind",
@@ -1179,7 +1179,7 @@
    },
    "v1.JobSpec": {
     "id": "v1.JobSpec",
-    "description": "JobSpec describes how the job execution will look like.",
+    "description": "JobSpec describes how the job execution will look like.\n\nDEPRECATED: Use 'batch.v1.JobSpec' instead.",
     "required": [
      "template"
     ],
@@ -1215,7 +1215,7 @@
    },
    "v1.LabelSelector": {
     "id": "v1.LabelSelector",
-    "description": "A label selector is a label query over a set of resources. The result of matchLabels and matchExpressions are ANDed. An empty label selector matches all objects. A null label selector matches no objects.",
+    "description": "A label selector is a label query over a set of resources. The result of matchLabels and matchExpressions are ANDed. An empty label selector matches all objects. A null label selector matches no objects.\n\nDEPRECATED: Use 'io.k8s.meta.v1.LabelSelector' instead.",
     "properties": {
      "matchLabels": {
       "type": "object",
@@ -1232,7 +1232,7 @@
    },
    "v1.LabelSelectorRequirement": {
     "id": "v1.LabelSelectorRequirement",
-    "description": "A label selector requirement is a selector that contains values, a key, and an operator that relates the key and values.",
+    "description": "A label selector requirement is a selector that contains values, a key, and an operator that relates the key and values.\n\nDEPRECATED: Use 'io.k8s.meta.v1.LabelSelectorRequirement' instead.",
     "required": [
      "key",
      "operator"
@@ -2079,7 +2079,7 @@
       "description": "The URI the data disk in the blob storage"
      },
      "cachingMode": {
-      "$ref": "v1.AzureDataDiskCachingMode",
+      "$ref": "io.k8s.kubernetes.pkg.api.v1.AzureDataDiskCachingMode",
       "description": "Host Caching mode: None, Read Only, Read Write."
      },
      "fsType": {
@@ -2092,8 +2092,8 @@
      }
     }
    },
-   "v1.AzureDataDiskCachingMode": {
-    "id": "v1.AzureDataDiskCachingMode",
+   "io.k8s.kubernetes.pkg.api.v1.AzureDataDiskCachingMode": {
+    "id": "io.k8s.kubernetes.pkg.api.v1.AzureDataDiskCachingMode",
     "properties": {}
    },
    "v1.PhotonPersistentDiskVolumeSource": {
@@ -2577,21 +2577,21 @@
      "add": {
       "type": "array",
       "items": {
-       "$ref": "v1.Capability"
+       "$ref": "io.k8s.kubernetes.pkg.api.v1.Capability"
       },
       "description": "Added capabilities"
      },
      "drop": {
       "type": "array",
       "items": {
-       "$ref": "v1.Capability"
+       "$ref": "io.k8s.kubernetes.pkg.api.v1.Capability"
       },
       "description": "Removed capabilities"
      }
     }
    },
-   "v1.Capability": {
-    "id": "v1.Capability",
+   "io.k8s.kubernetes.pkg.api.v1.Capability": {
+    "id": "io.k8s.kubernetes.pkg.api.v1.Capability",
     "properties": {}
    },
    "v1.SELinuxOptions": {
@@ -2843,7 +2843,7 @@
    },
    "v1.JobStatus": {
     "id": "v1.JobStatus",
-    "description": "JobStatus represents the current state of a Job.",
+    "description": "JobStatus represents the current state of a Job.\n\nDEPRECATED: Use 'batch.v1.JobStatus' instead.",
     "properties": {
      "conditions": {
       "type": "array",
@@ -2879,7 +2879,7 @@
    },
    "v1.JobCondition": {
     "id": "v1.JobCondition",
-    "description": "JobCondition describes current state of a job.",
+    "description": "JobCondition describes current state of a job.\n\nDEPRECATED: Use 'batch.v1.JobCondition' instead.",
     "required": [
      "type",
      "status"
@@ -2913,7 +2913,7 @@
    },
    "v1.Status": {
     "id": "v1.Status",
-    "description": "Status is a return value for calls that don't return other objects.",
+    "description": "Status is a return value for calls that don't return other objects.\n\nDEPRECATED: Use 'io.k8s.meta.v1.Status' instead.",
     "properties": {
      "kind": {
       "type": "string",
@@ -2952,7 +2952,7 @@
    },
    "v1.StatusDetails": {
     "id": "v1.StatusDetails",
-    "description": "StatusDetails is a set of additional properties that MAY be set by the server to provide additional information about a response. The Reason field of a Status object defines what attributes will be set. Clients must ignore fields that do not match the defined type of each attribute, and should assume that any attribute may be empty, invalid, or under defined.",
+    "description": "StatusDetails is a set of additional properties that MAY be set by the server to provide additional information about a response. The Reason field of a Status object defines what attributes will be set. Clients must ignore fields that do not match the defined type of each attribute, and should assume that any attribute may be empty, invalid, or under defined.\n\nDEPRECATED: Use 'io.k8s.meta.v1.StatusDetails' instead.",
     "properties": {
      "name": {
       "type": "string",
@@ -2982,7 +2982,7 @@
    },
    "v1.StatusCause": {
     "id": "v1.StatusCause",
-    "description": "StatusCause provides more information about an api.Status failure, including cases when multiple errors are encountered.",
+    "description": "StatusCause provides more information about an api.Status failure, including cases when multiple errors are encountered.\n\nDEPRECATED: Use 'io.k8s.meta.v1.StatusCause' instead.",
     "properties": {
      "reason": {
       "type": "string",
@@ -3000,6 +3000,7 @@
    },
    "versioned.Event": {
     "id": "versioned.Event",
+    "description": "\n\nDEPRECATED: Use 'io.k8s.kubernetes.pkg.watch.versioned.Event' instead.",
     "required": [
      "type",
      "object"
@@ -3015,7 +3016,7 @@
    },
    "v1.Patch": {
     "id": "v1.Patch",
-    "description": "Patch is provided to give a concrete name and type to the Kubernetes PATCH request body.",
+    "description": "Patch is provided to give a concrete name and type to the Kubernetes PATCH request body.\n\nDEPRECATED: Use 'io.k8s.meta.v1.Patch' instead.",
     "properties": {}
    },
    "v1.DeleteOptions": {
@@ -3050,18 +3051,18 @@
     "description": "Preconditions must be fulfilled before an operation (update, delete, etc.) is carried out.",
     "properties": {
      "uid": {
-      "$ref": "types.UID",
+      "$ref": "io.k8s.kubernetes.pkg.types.UID",
       "description": "Specifies the target UID."
      }
     }
    },
-   "types.UID": {
-    "id": "types.UID",
+   "io.k8s.kubernetes.pkg.types.UID": {
+    "id": "io.k8s.kubernetes.pkg.types.UID",
     "properties": {}
    },
    "v1.APIResourceList": {
     "id": "v1.APIResourceList",
-    "description": "APIResourceList is a list of APIResource, it is used to expose the name of the resources supported in a specific group and version, and if the resource is namespaced.",
+    "description": "APIResourceList is a list of APIResource, it is used to expose the name of the resources supported in a specific group and version, and if the resource is namespaced.\n\nDEPRECATED: Use 'io.k8s.meta.v1.APIResourceList' instead.",
     "required": [
      "groupVersion",
      "resources"
@@ -3090,6 +3091,421 @@
    },
    "v1.APIResource": {
     "id": "v1.APIResource",
+    "description": "APIResource specifies the name of a resource and whether it is namespaced.\n\nDEPRECATED: Use 'io.k8s.meta.v1.APIResource' instead.",
+    "required": [
+     "name",
+     "namespaced",
+     "kind",
+     "verbs"
+    ],
+    "properties": {
+     "name": {
+      "type": "string",
+      "description": "name is the name of the resource."
+     },
+     "namespaced": {
+      "type": "boolean",
+      "description": "namespaced indicates if a resource is namespaced or not."
+     },
+     "kind": {
+      "type": "string",
+      "description": "kind is the kind for the resource (e.g. 'Foo' is the kind for a resource 'foo')"
+     },
+     "verbs": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      },
+      "description": "verbs is a list of supported kube verbs (this includes get, list, watch, create, update, patch, delete, deletecollection, and proxy)"
+     }
+    }
+   },
+   "batch.v1.JobList": {
+    "id": "batch.v1.JobList",
+    "description": "JobList is a collection of jobs.",
+    "required": [
+     "items"
+    ],
+    "properties": {
+     "kind": {
+      "type": "string",
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+     },
+     "apiVersion": {
+      "type": "string",
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+     },
+     "metadata": {
+      "$ref": "v1.ListMeta",
+      "description": "Standard list metadata More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata"
+     },
+     "items": {
+      "type": "array",
+      "items": {
+       "$ref": "v1.Job"
+      },
+      "description": "Items is the list of Job."
+     }
+    }
+   },
+   "io.k8s.meta.v1.ListMeta": {
+    "id": "io.k8s.meta.v1.ListMeta",
+    "description": "ListMeta describes metadata that synthetic resources must have, including lists and various status objects. A resource may have only one of {ObjectMeta, ListMeta}.",
+    "properties": {
+     "selfLink": {
+      "type": "string",
+      "description": "SelfLink is a URL representing this object. Populated by the system. Read-only."
+     },
+     "resourceVersion": {
+      "type": "string",
+      "description": "String that identifies the server's internal version of this object that can be used by clients to determine when objects have changed. Value must be treated as opaque by clients and passed unmodified back to the server. Populated by the system. Read-only. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#concurrency-control-and-consistency"
+     }
+    }
+   },
+   "batch.v1.Job": {
+    "id": "batch.v1.Job",
+    "description": "Job represents the configuration of a single job.",
+    "properties": {
+     "kind": {
+      "type": "string",
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+     },
+     "apiVersion": {
+      "type": "string",
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+     },
+     "metadata": {
+      "$ref": "v1.ObjectMeta",
+      "description": "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata"
+     },
+     "spec": {
+      "$ref": "v1.JobSpec",
+      "description": "Spec is a structure defining the expected behavior of a job. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status"
+     },
+     "status": {
+      "$ref": "v1.JobStatus",
+      "description": "Status is a structure describing current status of a job. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status"
+     }
+    }
+   },
+   "io.k8s.meta.v1.OwnerReference": {
+    "id": "io.k8s.meta.v1.OwnerReference",
+    "description": "OwnerReference contains enough information to let you identify an owning object. Currently, an owning object must be in the same namespace, so there is no namespace field.",
+    "required": [
+     "apiVersion",
+     "kind",
+     "name",
+     "uid"
+    ],
+    "properties": {
+     "apiVersion": {
+      "type": "string",
+      "description": "API version of the referent."
+     },
+     "kind": {
+      "type": "string",
+      "description": "Kind of the referent. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+     },
+     "name": {
+      "type": "string",
+      "description": "Name of the referent. More info: http://kubernetes.io/docs/user-guide/identifiers#names"
+     },
+     "uid": {
+      "type": "string",
+      "description": "UID of the referent. More info: http://kubernetes.io/docs/user-guide/identifiers#uids"
+     },
+     "controller": {
+      "type": "boolean",
+      "description": "If true, this reference points to the managing controller."
+     }
+    }
+   },
+   "batch.v1.JobSpec": {
+    "id": "batch.v1.JobSpec",
+    "description": "JobSpec describes how the job execution will look like.",
+    "required": [
+     "template"
+    ],
+    "properties": {
+     "parallelism": {
+      "type": "integer",
+      "format": "int32",
+      "description": "Parallelism specifies the maximum desired number of pods the job should run at any given time. The actual number of pods running in steady state will be less than this number when ((.spec.completions - .status.successful) \u003c .spec.parallelism), i.e. when the work left to do is less than max parallelism. More info: http://kubernetes.io/docs/user-guide/jobs"
+     },
+     "completions": {
+      "type": "integer",
+      "format": "int32",
+      "description": "Completions specifies the desired number of successfully finished pods the job should be run with.  Setting to nil means that the success of any pod signals the success of all pods, and allows parallelism to have any positive value.  Setting to 1 means that parallelism is limited to 1 and the success of that pod signals the success of the job. More info: http://kubernetes.io/docs/user-guide/jobs"
+     },
+     "activeDeadlineSeconds": {
+      "type": "integer",
+      "format": "int64",
+      "description": "Optional duration in seconds relative to the startTime that the job may be active before the system tries to terminate it; value must be positive integer"
+     },
+     "selector": {
+      "$ref": "v1.LabelSelector",
+      "description": "Selector is a label query over pods that should match the pod count. Normally, the system sets this field for you. More info: http://kubernetes.io/docs/user-guide/labels#label-selectors"
+     },
+     "manualSelector": {
+      "type": "boolean",
+      "description": "ManualSelector controls generation of pod labels and pod selectors. Leave `manualSelector` unset unless you are certain what you are doing. When false or unset, the system pick labels unique to this job and appends those labels to the pod template.  When true, the user is responsible for picking unique labels and specifying the selector.  Failure to pick a unique label may cause this and other jobs to not function correctly.  However, You may see `manualSelector=true` in jobs that were created with the old `extensions/v1beta1` API. More info: http://releases.k8s.io/HEAD/docs/design/selector-generation.md"
+     },
+     "template": {
+      "$ref": "v1.PodTemplateSpec",
+      "description": "Template is the object that describes the pod that will be created when executing a job. More info: http://kubernetes.io/docs/user-guide/jobs"
+     }
+    }
+   },
+   "io.k8s.meta.v1.LabelSelector": {
+    "id": "io.k8s.meta.v1.LabelSelector",
+    "description": "A label selector is a label query over a set of resources. The result of matchLabels and matchExpressions are ANDed. An empty label selector matches all objects. A null label selector matches no objects.",
+    "properties": {
+     "matchLabels": {
+      "type": "object",
+      "description": "matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels map is equivalent to an element of matchExpressions, whose key field is \"key\", the operator is \"In\", and the values array contains only \"value\". The requirements are ANDed."
+     },
+     "matchExpressions": {
+      "type": "array",
+      "items": {
+       "$ref": "v1.LabelSelectorRequirement"
+      },
+      "description": "matchExpressions is a list of label selector requirements. The requirements are ANDed."
+     }
+    }
+   },
+   "io.k8s.meta.v1.LabelSelectorRequirement": {
+    "id": "io.k8s.meta.v1.LabelSelectorRequirement",
+    "description": "A label selector requirement is a selector that contains values, a key, and an operator that relates the key and values.",
+    "required": [
+     "key",
+     "operator"
+    ],
+    "properties": {
+     "key": {
+      "type": "string",
+      "description": "key is the label key that the selector applies to."
+     },
+     "operator": {
+      "type": "string",
+      "description": "operator represents a key's relationship to a set of values. Valid operators ard In, NotIn, Exists and DoesNotExist."
+     },
+     "values": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      },
+      "description": "values is an array of string values. If the operator is In or NotIn, the values array must be non-empty. If the operator is Exists or DoesNotExist, the values array must be empty. This array is replaced during a strategic merge patch."
+     }
+    }
+   },
+   "batch.v1.JobStatus": {
+    "id": "batch.v1.JobStatus",
+    "description": "JobStatus represents the current state of a Job.",
+    "properties": {
+     "conditions": {
+      "type": "array",
+      "items": {
+       "$ref": "v1.JobCondition"
+      },
+      "description": "Conditions represent the latest available observations of an object's current state. More info: http://kubernetes.io/docs/user-guide/jobs"
+     },
+     "startTime": {
+      "type": "string",
+      "description": "StartTime represents time when the job was acknowledged by the Job Manager. It is not guaranteed to be set in happens-before order across separate operations. It is represented in RFC3339 form and is in UTC."
+     },
+     "completionTime": {
+      "type": "string",
+      "description": "CompletionTime represents time when the job was completed. It is not guaranteed to be set in happens-before order across separate operations. It is represented in RFC3339 form and is in UTC."
+     },
+     "active": {
+      "type": "integer",
+      "format": "int32",
+      "description": "Active is the number of actively running pods."
+     },
+     "succeeded": {
+      "type": "integer",
+      "format": "int32",
+      "description": "Succeeded is the number of pods which reached Phase Succeeded."
+     },
+     "failed": {
+      "type": "integer",
+      "format": "int32",
+      "description": "Failed is the number of pods which reached Phase Failed."
+     }
+    }
+   },
+   "batch.v1.JobCondition": {
+    "id": "batch.v1.JobCondition",
+    "description": "JobCondition describes current state of a job.",
+    "required": [
+     "type",
+     "status"
+    ],
+    "properties": {
+     "type": {
+      "type": "string",
+      "description": "Type of job condition, Complete or Failed."
+     },
+     "status": {
+      "type": "string",
+      "description": "Status of the condition, one of True, False, Unknown."
+     },
+     "lastProbeTime": {
+      "type": "string",
+      "description": "Last time the condition was checked."
+     },
+     "lastTransitionTime": {
+      "type": "string",
+      "description": "Last time the condition transit from one status to another."
+     },
+     "reason": {
+      "type": "string",
+      "description": "(brief) reason for the condition's last transition."
+     },
+     "message": {
+      "type": "string",
+      "description": "Human readable message indicating details about last transition."
+     }
+    }
+   },
+   "io.k8s.meta.v1.Status": {
+    "id": "io.k8s.meta.v1.Status",
+    "description": "Status is a return value for calls that don't return other objects.",
+    "properties": {
+     "kind": {
+      "type": "string",
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+     },
+     "apiVersion": {
+      "type": "string",
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+     },
+     "metadata": {
+      "$ref": "v1.ListMeta",
+      "description": "Standard list metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+     },
+     "status": {
+      "type": "string",
+      "description": "Status of the operation. One of: \"Success\" or \"Failure\". More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status"
+     },
+     "message": {
+      "type": "string",
+      "description": "A human-readable description of the status of this operation."
+     },
+     "reason": {
+      "type": "string",
+      "description": "A machine-readable description of why this operation is in the \"Failure\" status. If this value is empty there is no information available. A Reason clarifies an HTTP status code but does not override it."
+     },
+     "details": {
+      "$ref": "v1.StatusDetails",
+      "description": "Extended data associated with the reason.  Each reason may define its own extended details. This field is optional and the data returned is not guaranteed to conform to any schema except that defined by the reason type."
+     },
+     "code": {
+      "type": "integer",
+      "format": "int32",
+      "description": "Suggested HTTP return code for this status, 0 if not set."
+     }
+    }
+   },
+   "io.k8s.meta.v1.StatusDetails": {
+    "id": "io.k8s.meta.v1.StatusDetails",
+    "description": "StatusDetails is a set of additional properties that MAY be set by the server to provide additional information about a response. The Reason field of a Status object defines what attributes will be set. Clients must ignore fields that do not match the defined type of each attribute, and should assume that any attribute may be empty, invalid, or under defined.",
+    "properties": {
+     "name": {
+      "type": "string",
+      "description": "The name attribute of the resource associated with the status StatusReason (when there is a single name which can be described)."
+     },
+     "group": {
+      "type": "string",
+      "description": "The group attribute of the resource associated with the status StatusReason."
+     },
+     "kind": {
+      "type": "string",
+      "description": "The kind attribute of the resource associated with the status StatusReason. On some operations may differ from the requested resource Kind. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+     },
+     "causes": {
+      "type": "array",
+      "items": {
+       "$ref": "v1.StatusCause"
+      },
+      "description": "The Causes array includes more details associated with the StatusReason failure. Not all StatusReasons may provide detailed causes."
+     },
+     "retryAfterSeconds": {
+      "type": "integer",
+      "format": "int32",
+      "description": "If specified, the time in seconds before the operation should be retried."
+     }
+    }
+   },
+   "io.k8s.meta.v1.StatusCause": {
+    "id": "io.k8s.meta.v1.StatusCause",
+    "description": "StatusCause provides more information about an api.Status failure, including cases when multiple errors are encountered.",
+    "properties": {
+     "reason": {
+      "type": "string",
+      "description": "A machine-readable description of the cause of the error. If this value is empty there is no information available."
+     },
+     "message": {
+      "type": "string",
+      "description": "A human-readable description of the cause of the error.  This field may be presented as-is to a reader."
+     },
+     "field": {
+      "type": "string",
+      "description": "The field of the resource that has caused this error, as named by its JSON serialization. May include dot and postfix notation for nested attributes. Arrays are zero-indexed.  Fields may appear more than once in an array of causes due to fields having multiple errors. Optional.\n\nExamples:\n  \"name\" - the field \"name\" on the current resource\n  \"items[0].name\" - the field \"name\" on the first array entry in \"items\""
+     }
+    }
+   },
+   "io.k8s.kubernetes.pkg.watch.versioned.Event": {
+    "id": "io.k8s.kubernetes.pkg.watch.versioned.Event",
+    "required": [
+     "type",
+     "object"
+    ],
+    "properties": {
+     "type": {
+      "type": "string"
+     },
+     "object": {
+      "type": "string"
+     }
+    }
+   },
+   "io.k8s.meta.v1.Patch": {
+    "id": "io.k8s.meta.v1.Patch",
+    "description": "Patch is provided to give a concrete name and type to the Kubernetes PATCH request body.",
+    "properties": {}
+   },
+   "io.k8s.meta.v1.APIResourceList": {
+    "id": "io.k8s.meta.v1.APIResourceList",
+    "description": "APIResourceList is a list of APIResource, it is used to expose the name of the resources supported in a specific group and version, and if the resource is namespaced.",
+    "required": [
+     "groupVersion",
+     "resources"
+    ],
+    "properties": {
+     "kind": {
+      "type": "string",
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+     },
+     "apiVersion": {
+      "type": "string",
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+     },
+     "groupVersion": {
+      "type": "string",
+      "description": "groupVersion is the group and version this APIResourceList is for."
+     },
+     "resources": {
+      "type": "array",
+      "items": {
+       "$ref": "v1.APIResource"
+      },
+      "description": "resources contains the name of the resources and if they are namespaced."
+     }
+    }
+   },
+   "io.k8s.meta.v1.APIResource": {
+    "id": "io.k8s.meta.v1.APIResource",
     "description": "APIResource specifies the name of a resource and whether it is namespaced.",
     "required": [
      "name",

@@ -18,5 +18,6 @@ limitations under the License.
 // +k8s:conversion-gen=k8s.io/kubernetes/pkg/apis/authentication
 // +groupName=authentication.k8s.io
 // +k8s:openapi-gen=true
+// +k8s:openapi-gen=legacy-name
 // +k8s:defaulter-gen=TypeMeta
 package v1beta1 // import "k8s.io/kubernetes/pkg/apis/authentication/v1beta1"

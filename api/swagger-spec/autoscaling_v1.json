@@ -108,7 +108,7 @@
         "allowMultiple": false
        },
        {
-        "type": "v1.HorizontalPodAutoscaler",
+        "type": "autoscaling.v1.HorizontalPodAutoscaler",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -390,7 +390,7 @@
         "allowMultiple": false
        },
        {
-        "type": "v1.HorizontalPodAutoscaler",
+        "type": "autoscaling.v1.HorizontalPodAutoscaler",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -445,7 +445,7 @@
         "allowMultiple": false
        },
        {
-        "type": "v1.Patch",
+        "type": "io.k8s.meta.v1.Patch",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -879,7 +879,7 @@
         "allowMultiple": false
        },
        {
-        "type": "v1.HorizontalPodAutoscaler",
+        "type": "autoscaling.v1.HorizontalPodAutoscaler",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -934,7 +934,7 @@
         "allowMultiple": false
        },
        {
-        "type": "v1.Patch",
+        "type": "io.k8s.meta.v1.Patch",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -1005,7 +1005,7 @@
   "models": {
    "v1.HorizontalPodAutoscalerList": {
     "id": "v1.HorizontalPodAutoscalerList",
-    "description": "list of horizontal pod autoscaler objects.",
+    "description": "list of horizontal pod autoscaler objects.\n\nDEPRECATED: Use 'autoscaling.v1.HorizontalPodAutoscalerList' instead.",
     "required": [
      "items"
     ],
@@ -1033,7 +1033,7 @@
    },
    "v1.ListMeta": {
     "id": "v1.ListMeta",
-    "description": "ListMeta describes metadata that synthetic resources must have, including lists and various status objects. A resource may have only one of {ObjectMeta, ListMeta}.",
+    "description": "ListMeta describes metadata that synthetic resources must have, including lists and various status objects. A resource may have only one of {ObjectMeta, ListMeta}.\n\nDEPRECATED: Use 'io.k8s.meta.v1.ListMeta' instead.",
     "properties": {
      "selfLink": {
       "type": "string",
@@ -1047,7 +1047,7 @@
    },
    "v1.HorizontalPodAutoscaler": {
     "id": "v1.HorizontalPodAutoscaler",
-    "description": "configuration of a horizontal pod autoscaler.",
+    "description": "configuration of a horizontal pod autoscaler.\n\nDEPRECATED: Use 'autoscaling.v1.HorizontalPodAutoscaler' instead.",
     "properties": {
      "kind": {
       "type": "string",
@@ -1147,7 +1147,7 @@
    },
    "v1.OwnerReference": {
     "id": "v1.OwnerReference",
-    "description": "OwnerReference contains enough information to let you identify an owning object. Currently, an owning object must be in the same namespace, so there is no namespace field.",
+    "description": "OwnerReference contains enough information to let you identify an owning object. Currently, an owning object must be in the same namespace, so there is no namespace field.\n\nDEPRECATED: Use 'io.k8s.meta.v1.OwnerReference' instead.",
     "required": [
      "apiVersion",
      "kind",
@@ -1179,7 +1179,7 @@
    },
    "v1.HorizontalPodAutoscalerSpec": {
     "id": "v1.HorizontalPodAutoscalerSpec",
-    "description": "specification of a horizontal pod autoscaler.",
+    "description": "specification of a horizontal pod autoscaler.\n\nDEPRECATED: Use 'autoscaling.v1.HorizontalPodAutoscalerSpec' instead.",
     "required": [
      "scaleTargetRef",
      "maxReplicas"
@@ -1208,7 +1208,7 @@
    },
    "v1.CrossVersionObjectReference": {
     "id": "v1.CrossVersionObjectReference",
-    "description": "CrossVersionObjectReference contains enough information to let you identify the referred resource.",
+    "description": "CrossVersionObjectReference contains enough information to let you identify the referred resource.\n\nDEPRECATED: Use 'autoscaling.v1.CrossVersionObjectReference' instead.",
     "required": [
      "kind",
      "name"
@@ -1230,7 +1230,7 @@
    },
    "v1.HorizontalPodAutoscalerStatus": {
     "id": "v1.HorizontalPodAutoscalerStatus",
-    "description": "current status of a horizontal pod autoscaler",
+    "description": "current status of a horizontal pod autoscaler\n\nDEPRECATED: Use 'autoscaling.v1.HorizontalPodAutoscalerStatus' instead.",
     "required": [
      "currentReplicas",
      "desiredReplicas"
@@ -1264,7 +1264,7 @@
    },
    "v1.Status": {
     "id": "v1.Status",
-    "description": "Status is a return value for calls that don't return other objects.",
+    "description": "Status is a return value for calls that don't return other objects.\n\nDEPRECATED: Use 'io.k8s.meta.v1.Status' instead.",
     "properties": {
      "kind": {
       "type": "string",
@@ -1303,7 +1303,7 @@
    },
    "v1.StatusDetails": {
     "id": "v1.StatusDetails",
-    "description": "StatusDetails is a set of additional properties that MAY be set by the server to provide additional information about a response. The Reason field of a Status object defines what attributes will be set. Clients must ignore fields that do not match the defined type of each attribute, and should assume that any attribute may be empty, invalid, or under defined.",
+    "description": "StatusDetails is a set of additional properties that MAY be set by the server to provide additional information about a response. The Reason field of a Status object defines what attributes will be set. Clients must ignore fields that do not match the defined type of each attribute, and should assume that any attribute may be empty, invalid, or under defined.\n\nDEPRECATED: Use 'io.k8s.meta.v1.StatusDetails' instead.",
     "properties": {
      "name": {
       "type": "string",
@@ -1333,7 +1333,7 @@
    },
    "v1.StatusCause": {
     "id": "v1.StatusCause",
-    "description": "StatusCause provides more information about an api.Status failure, including cases when multiple errors are encountered.",
+    "description": "StatusCause provides more information about an api.Status failure, including cases when multiple errors are encountered.\n\nDEPRECATED: Use 'io.k8s.meta.v1.StatusCause' instead.",
     "properties": {
      "reason": {
       "type": "string",
@@ -1351,6 +1351,7 @@
    },
    "versioned.Event": {
     "id": "versioned.Event",
+    "description": "\n\nDEPRECATED: Use 'io.k8s.kubernetes.pkg.watch.versioned.Event' instead.",
     "required": [
      "type",
      "object"
@@ -1366,7 +1367,7 @@
    },
    "v1.Patch": {
     "id": "v1.Patch",
-    "description": "Patch is provided to give a concrete name and type to the Kubernetes PATCH request body.",
+    "description": "Patch is provided to give a concrete name and type to the Kubernetes PATCH request body.\n\nDEPRECATED: Use 'io.k8s.meta.v1.Patch' instead.",
     "properties": {}
    },
    "v1.DeleteOptions": {
@@ -1401,18 +1402,18 @@
     "description": "Preconditions must be fulfilled before an operation (update, delete, etc.) is carried out.",
     "properties": {
      "uid": {
-      "$ref": "types.UID",
+      "$ref": "io.k8s.kubernetes.pkg.types.UID",
       "description": "Specifies the target UID."
      }
     }
    },
-   "types.UID": {
-    "id": "types.UID",
+   "io.k8s.kubernetes.pkg.types.UID": {
+    "id": "io.k8s.kubernetes.pkg.types.UID",
     "properties": {}
    },
    "v1.APIResourceList": {
     "id": "v1.APIResourceList",
-    "description": "APIResourceList is a list of APIResource, it is used to expose the name of the resources supported in a specific group and version, and if the resource is namespaced.",
+    "description": "APIResourceList is a list of APIResource, it is used to expose the name of the resources supported in a specific group and version, and if the resource is namespaced.\n\nDEPRECATED: Use 'io.k8s.meta.v1.APIResourceList' instead.",
     "required": [
      "groupVersion",
      "resources"
@@ -1441,6 +1442,358 @@
    },
    "v1.APIResource": {
     "id": "v1.APIResource",
+    "description": "APIResource specifies the name of a resource and whether it is namespaced.\n\nDEPRECATED: Use 'io.k8s.meta.v1.APIResource' instead.",
+    "required": [
+     "name",
+     "namespaced",
+     "kind",
+     "verbs"
+    ],
+    "properties": {
+     "name": {
+      "type": "string",
+      "description": "name is the name of the resource."
+     },
+     "namespaced": {
+      "type": "boolean",
+      "description": "namespaced indicates if a resource is namespaced or not."
+     },
+     "kind": {
+      "type": "string",
+      "description": "kind is the kind for the resource (e.g. 'Foo' is the kind for a resource 'foo')"
+     },
+     "verbs": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      },
+      "description": "verbs is a list of supported kube verbs (this includes get, list, watch, create, update, patch, delete, deletecollection, and proxy)"
+     }
+    }
+   },
+   "autoscaling.v1.HorizontalPodAutoscalerList": {
+    "id": "autoscaling.v1.HorizontalPodAutoscalerList",
+    "description": "list of horizontal pod autoscaler objects.",
+    "required": [
+     "items"
+    ],
+    "properties": {
+     "kind": {
+      "type": "string",
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+     },
+     "apiVersion": {
+      "type": "string",
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+     },
+     "metadata": {
+      "$ref": "v1.ListMeta",
+      "description": "Standard list metadata."
+     },
+     "items": {
+      "type": "array",
+      "items": {
+       "$ref": "v1.HorizontalPodAutoscaler"
+      },
+      "description": "list of horizontal pod autoscaler objects."
+     }
+    }
+   },
+   "io.k8s.meta.v1.ListMeta": {
+    "id": "io.k8s.meta.v1.ListMeta",
+    "description": "ListMeta describes metadata that synthetic resources must have, including lists and various status objects. A resource may have only one of {ObjectMeta, ListMeta}.",
+    "properties": {
+     "selfLink": {
+      "type": "string",
+      "description": "SelfLink is a URL representing this object. Populated by the system. Read-only."
+     },
+     "resourceVersion": {
+      "type": "string",
+      "description": "String that identifies the server's internal version of this object that can be used by clients to determine when objects have changed. Value must be treated as opaque by clients and passed unmodified back to the server. Populated by the system. Read-only. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#concurrency-control-and-consistency"
+     }
+    }
+   },
+   "autoscaling.v1.HorizontalPodAutoscaler": {
+    "id": "autoscaling.v1.HorizontalPodAutoscaler",
+    "description": "configuration of a horizontal pod autoscaler.",
+    "properties": {
+     "kind": {
+      "type": "string",
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+     },
+     "apiVersion": {
+      "type": "string",
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+     },
+     "metadata": {
+      "$ref": "v1.ObjectMeta",
+      "description": "Standard object metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata"
+     },
+     "spec": {
+      "$ref": "v1.HorizontalPodAutoscalerSpec",
+      "description": "behaviour of autoscaler. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status."
+     },
+     "status": {
+      "$ref": "v1.HorizontalPodAutoscalerStatus",
+      "description": "current information about the autoscaler."
+     }
+    }
+   },
+   "io.k8s.meta.v1.OwnerReference": {
+    "id": "io.k8s.meta.v1.OwnerReference",
+    "description": "OwnerReference contains enough information to let you identify an owning object. Currently, an owning object must be in the same namespace, so there is no namespace field.",
+    "required": [
+     "apiVersion",
+     "kind",
+     "name",
+     "uid"
+    ],
+    "properties": {
+     "apiVersion": {
+      "type": "string",
+      "description": "API version of the referent."
+     },
+     "kind": {
+      "type": "string",
+      "description": "Kind of the referent. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+     },
+     "name": {
+      "type": "string",
+      "description": "Name of the referent. More info: http://kubernetes.io/docs/user-guide/identifiers#names"
+     },
+     "uid": {
+      "type": "string",
+      "description": "UID of the referent. More info: http://kubernetes.io/docs/user-guide/identifiers#uids"
+     },
+     "controller": {
+      "type": "boolean",
+      "description": "If true, this reference points to the managing controller."
+     }
+    }
+   },
+   "autoscaling.v1.HorizontalPodAutoscalerSpec": {
+    "id": "autoscaling.v1.HorizontalPodAutoscalerSpec",
+    "description": "specification of a horizontal pod autoscaler.",
+    "required": [
+     "scaleTargetRef",
+     "maxReplicas"
+    ],
+    "properties": {
+     "scaleTargetRef": {
+      "$ref": "v1.CrossVersionObjectReference",
+      "description": "reference to scaled resource; horizontal pod autoscaler will learn the current resource consumption and will set the desired number of pods by using its Scale subresource."
+     },
+     "minReplicas": {
+      "type": "integer",
+      "format": "int32",
+      "description": "lower limit for the number of pods that can be set by the autoscaler, default 1."
+     },
+     "maxReplicas": {
+      "type": "integer",
+      "format": "int32",
+      "description": "upper limit for the number of pods that can be set by the autoscaler; cannot be smaller than MinReplicas."
+     },
+     "targetCPUUtilizationPercentage": {
+      "type": "integer",
+      "format": "int32",
+      "description": "target average CPU utilization (represented as a percentage of requested CPU) over all the pods; if not specified the default autoscaling policy will be used."
+     }
+    }
+   },
+   "autoscaling.v1.CrossVersionObjectReference": {
+    "id": "autoscaling.v1.CrossVersionObjectReference",
+    "description": "CrossVersionObjectReference contains enough information to let you identify the referred resource.",
+    "required": [
+     "kind",
+     "name"
+    ],
+    "properties": {
+     "kind": {
+      "type": "string",
+      "description": "Kind of the referent; More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds\""
+     },
+     "name": {
+      "type": "string",
+      "description": "Name of the referent; More info: http://kubernetes.io/docs/user-guide/identifiers#names"
+     },
+     "apiVersion": {
+      "type": "string",
+      "description": "API version of the referent"
+     }
+    }
+   },
+   "autoscaling.v1.HorizontalPodAutoscalerStatus": {
+    "id": "autoscaling.v1.HorizontalPodAutoscalerStatus",
+    "description": "current status of a horizontal pod autoscaler",
+    "required": [
+     "currentReplicas",
+     "desiredReplicas"
+    ],
+    "properties": {
+     "observedGeneration": {
+      "type": "integer",
+      "format": "int64",
+      "description": "most recent generation observed by this autoscaler."
+     },
+     "lastScaleTime": {
+      "type": "string",
+      "description": "last time the HorizontalPodAutoscaler scaled the number of pods; used by the autoscaler to control how often the number of pods is changed."
+     },
+     "currentReplicas": {
+      "type": "integer",
+      "format": "int32",
+      "description": "current number of replicas of pods managed by this autoscaler."
+     },
+     "desiredReplicas": {
+      "type": "integer",
+      "format": "int32",
+      "description": "desired number of replicas of pods managed by this autoscaler."
+     },
+     "currentCPUUtilizationPercentage": {
+      "type": "integer",
+      "format": "int32",
+      "description": "current average CPU utilization over all pods, represented as a percentage of requested CPU, e.g. 70 means that an average pod is using now 70% of its requested CPU."
+     }
+    }
+   },
+   "io.k8s.meta.v1.Status": {
+    "id": "io.k8s.meta.v1.Status",
+    "description": "Status is a return value for calls that don't return other objects.",
+    "properties": {
+     "kind": {
+      "type": "string",
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+     },
+     "apiVersion": {
+      "type": "string",
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+     },
+     "metadata": {
+      "$ref": "v1.ListMeta",
+      "description": "Standard list metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+     },
+     "status": {
+      "type": "string",
+      "description": "Status of the operation. One of: \"Success\" or \"Failure\". More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status"
+     },
+     "message": {
+      "type": "string",
+      "description": "A human-readable description of the status of this operation."
+     },
+     "reason": {
+      "type": "string",
+      "description": "A machine-readable description of why this operation is in the \"Failure\" status. If this value is empty there is no information available. A Reason clarifies an HTTP status code but does not override it."
+     },
+     "details": {
+      "$ref": "v1.StatusDetails",
+      "description": "Extended data associated with the reason.  Each reason may define its own extended details. This field is optional and the data returned is not guaranteed to conform to any schema except that defined by the reason type."
+     },
+     "code": {
+      "type": "integer",
+      "format": "int32",
+      "description": "Suggested HTTP return code for this status, 0 if not set."
+     }
+    }
+   },
+   "io.k8s.meta.v1.StatusDetails": {
+    "id": "io.k8s.meta.v1.StatusDetails",
+    "description": "StatusDetails is a set of additional properties that MAY be set by the server to provide additional information about a response. The Reason field of a Status object defines what attributes will be set. Clients must ignore fields that do not match the defined type of each attribute, and should assume that any attribute may be empty, invalid, or under defined.",
+    "properties": {
+     "name": {
+      "type": "string",
+      "description": "The name attribute of the resource associated with the status StatusReason (when there is a single name which can be described)."
+     },
+     "group": {
+      "type": "string",
+      "description": "The group attribute of the resource associated with the status StatusReason."
+     },
+     "kind": {
+      "type": "string",
+      "description": "The kind attribute of the resource associated with the status StatusReason. On some operations may differ from the requested resource Kind. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+     },
+     "causes": {
+      "type": "array",
+      "items": {
+       "$ref": "v1.StatusCause"
+      },
+      "description": "The Causes array includes more details associated with the StatusReason failure. Not all StatusReasons may provide detailed causes."
+     },
+     "retryAfterSeconds": {
+      "type": "integer",
+      "format": "int32",
+      "description": "If specified, the time in seconds before the operation should be retried."
+     }
+    }
+   },
+   "io.k8s.meta.v1.StatusCause": {
+    "id": "io.k8s.meta.v1.StatusCause",
+    "description": "StatusCause provides more information about an api.Status failure, including cases when multiple errors are encountered.",
+    "properties": {
+     "reason": {
+      "type": "string",
+      "description": "A machine-readable description of the cause of the error. If this value is empty there is no information available."
+     },
+     "message": {
+      "type": "string",
+      "description": "A human-readable description of the cause of the error.  This field may be presented as-is to a reader."
+     },
+     "field": {
+      "type": "string",
+      "description": "The field of the resource that has caused this error, as named by its JSON serialization. May include dot and postfix notation for nested attributes. Arrays are zero-indexed.  Fields may appear more than once in an array of causes due to fields having multiple errors. Optional.\n\nExamples:\n  \"name\" - the field \"name\" on the current resource\n  \"items[0].name\" - the field \"name\" on the first array entry in \"items\""
+     }
+    }
+   },
+   "io.k8s.kubernetes.pkg.watch.versioned.Event": {
+    "id": "io.k8s.kubernetes.pkg.watch.versioned.Event",
+    "required": [
+     "type",
+     "object"
+    ],
+    "properties": {
+     "type": {
+      "type": "string"
+     },
+     "object": {
+      "type": "string"
+     }
+    }
+   },
+   "io.k8s.meta.v1.Patch": {
+    "id": "io.k8s.meta.v1.Patch",
+    "description": "Patch is provided to give a concrete name and type to the Kubernetes PATCH request body.",
+    "properties": {}
+   },
+   "io.k8s.meta.v1.APIResourceList": {
+    "id": "io.k8s.meta.v1.APIResourceList",
+    "description": "APIResourceList is a list of APIResource, it is used to expose the name of the resources supported in a specific group and version, and if the resource is namespaced.",
+    "required": [
+     "groupVersion",
+     "resources"
+    ],
+    "properties": {
+     "kind": {
+      "type": "string",
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+     },
+     "apiVersion": {
+      "type": "string",
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+     },
+     "groupVersion": {
+      "type": "string",
+      "description": "groupVersion is the group and version this APIResourceList is for."
+     },
+     "resources": {
+      "type": "array",
+      "items": {
+       "$ref": "v1.APIResource"
+      },
+      "description": "resources contains the name of the resources and if they are namespaced."
+     }
+    }
+   },
+   "io.k8s.meta.v1.APIResource": {
+    "id": "io.k8s.meta.v1.APIResource",
     "description": "APIResource specifies the name of a resource and whether it is namespaced.",
     "required": [
      "name",

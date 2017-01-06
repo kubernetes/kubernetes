@@ -33,6 +33,7 @@ go_test(
     tags = ["automanaged"],
     deps = [
         "//pkg/genericapiserver/openapi/common:go_default_library",
+        "//pkg/util/diff:go_default_library",
         "//vendor:github.com/emicklei/go-restful",
         "//vendor:github.com/go-openapi/spec",
         "//vendor:github.com/stretchr/testify/assert",

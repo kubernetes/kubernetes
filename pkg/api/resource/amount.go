@@ -55,6 +55,7 @@ var (
 // int64Amount represents a fixed precision numerator and arbitrary scale exponent. It is faster
 // than operations on inf.Dec for values that can be represented as int64.
 // +k8s:openapi-gen=true
+// +k8s:openapi-gen=legacy-name
 type int64Amount struct {
 	value int64
 	scale Scale

@@ -22,6 +22,9 @@ type RouteBuilder struct {
 	httpMethod  string        // required
 	function    RouteFunction // required
 	filters     []FilterFunction
+
+	typeNameHandleFunc TypeNameHandleFunction // required
+
 	// documentation
 	doc                     string
 	notes                   string
@@ -92,8 +95,13 @@ func (b *RouteBuilder) Notes(notes string) *RouteBuilder {
 // Reads tells what resource type will be read from the request payload. Optional.
 // A parameter of type "body" is added ,required is set to true and the dataType is set to the qualified name of the sample's type.
 func (b *RouteBuilder) Reads(sample interface{}) *RouteBuilder {
+	fn := b.typeNameHandleFunc
+	if fn == nil {
+		fn = reflectTypeName
+	}
+	typeAsName := fn(sample)
+
 	b.readSample = sample
-	typeAsName := reflect.TypeOf(sample).String()
 	bodyParameter := &Parameter{&ParameterData{Name: "body"}}
 	bodyParameter.beBody()
 	bodyParameter.Required(true)
@@ -184,6 +192,13 @@ func (b *RouteBuilder) copyDefaults(rootProduces, rootConsumes []string) {
 	if len(b.consumes) == 0 {
 		b.consumes = rootConsumes
 	}
+}
+
+// typeNameHandler sets the function that will convert types to strings in the parameter
+// and model definitions.
+func (b *RouteBuilder) typeNameHandler(handler TypeNameHandleFunction) *RouteBuilder {
+	b.typeNameHandleFunc = handler
+	return b
 }
 
 // Build creates a new Route using the specification details collected by the RouteBuilder

@@ -53,6 +53,7 @@ type ScaleStatus struct {
 // +noMethods=true
 
 // represents a scaling request for a resource.
+// +k8s:openapi-gen=legacy-name
 type Scale struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard object metadata; More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata.
@@ -158,6 +159,7 @@ type HorizontalPodAutoscalerStatus struct {
 }
 
 // configuration of a horizontal pod autoscaler.
+// +k8s:openapi-gen=legacy-name
 type HorizontalPodAutoscaler struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard object metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
@@ -174,6 +176,7 @@ type HorizontalPodAutoscaler struct {
 }
 
 // list of horizontal pod autoscaler objects.
+// +k8s:openapi-gen=legacy-name
 type HorizontalPodAutoscalerList struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard list metadata.
@@ -189,6 +192,7 @@ type HorizontalPodAutoscalerList struct {
 
 // A ThirdPartyResource is a generic representation of a resource, it is used by add-ons and plugins to add new resource
 // types to the API.  It consists of one or more Versions of the api.
+// +k8s:openapi-gen=legacy-name
 type ThirdPartyResource struct {
 	metav1.TypeMeta `json:",inline"`
 
@@ -206,6 +210,7 @@ type ThirdPartyResource struct {
 }
 
 // ThirdPartyResourceList is a list of ThirdPartyResources.
+// +k8s:openapi-gen=legacy-name
 type ThirdPartyResourceList struct {
 	metav1.TypeMeta `json:",inline"`
 
@@ -225,6 +230,7 @@ type APIVersion struct {
 }
 
 // An internal object, used for versioned storage in etcd.  Not exposed to the end user.
+// +k8s:openapi-gen=legacy-name
 type ThirdPartyResourceData struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard object metadata.
@@ -239,6 +245,7 @@ type ThirdPartyResourceData struct {
 // +genclient=true
 
 // Deployment enables declarative updates for Pods and ReplicaSets.
+// +k8s:openapi-gen=legacy-name
 type Deployment struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard object metadata.
@@ -304,6 +311,7 @@ type DeploymentSpec struct {
 }
 
 // DeploymentRollback stores the information required to rollback a deployment.
+// +k8s:openapi-gen=legacy-name
 type DeploymentRollback struct {
 	metav1.TypeMeta `json:",inline"`
 	// Required: This must match the Name of a deployment.
@@ -447,6 +455,7 @@ type DeploymentCondition struct {
 }
 
 // DeploymentList is a list of Deployments.
+// +k8s:openapi-gen=legacy-name
 type DeploymentList struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard list metadata.
@@ -577,6 +586,7 @@ type DaemonSetStatus struct {
 // +genclient=true
 
 // DaemonSet represents the configuration of a daemon set.
+// +k8s:openapi-gen=legacy-name
 type DaemonSet struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard object's metadata.
@@ -599,6 +609,7 @@ type DaemonSet struct {
 }
 
 // DaemonSetList is a collection of daemon sets.
+// +k8s:openapi-gen=legacy-name
 type DaemonSetList struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard list metadata.
@@ -611,6 +622,7 @@ type DaemonSetList struct {
 }
 
 // ThirdPartyResrouceDataList is a list of ThirdPartyResourceData.
+// +k8s:openapi-gen=legacy-name
 type ThirdPartyResourceDataList struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard list metadata
@@ -628,6 +640,7 @@ type ThirdPartyResourceDataList struct {
 // endpoints defined by a backend. An Ingress can be configured to give services
 // externally-reachable urls, load balance traffic, terminate SSL, offer name
 // based virtual hosting etc.
+// +k8s:openapi-gen=legacy-name
 type Ingress struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard object's metadata.
@@ -647,6 +660,7 @@ type Ingress struct {
 }
 
 // IngressList is a collection of Ingress.
+// +k8s:openapi-gen=legacy-name
 type IngressList struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard object's metadata.
@@ -791,6 +805,7 @@ type IngressBackend struct {
 // +genclient=true
 
 // ReplicaSet represents the configuration of a ReplicaSet.
+// +k8s:openapi-gen=legacy-name
 type ReplicaSet struct {
 	metav1.TypeMeta `json:",inline"`
 
@@ -815,6 +830,7 @@ type ReplicaSet struct {
 }
 
 // ReplicaSetList is a collection of ReplicaSets.
+// +k8s:openapi-gen=legacy-name
 type ReplicaSetList struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard list metadata.
@@ -915,6 +931,7 @@ type ReplicaSetCondition struct {
 
 // Pod Security Policy governs the ability to make requests that affect the Security Context
 // that will be applied to a pod and container.
+// +k8s:openapi-gen=legacy-name
 type PodSecurityPolicy struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard object's metadata.
@@ -1112,6 +1129,7 @@ const (
 )
 
 // Pod Security Policy List is a list of PodSecurityPolicy objects.
+// +k8s:openapi-gen=legacy-name
 type PodSecurityPolicyList struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard list metadata.
@@ -1123,6 +1141,7 @@ type PodSecurityPolicyList struct {
 	Items []PodSecurityPolicy `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
 
+// +k8s:openapi-gen=legacy-name
 type NetworkPolicy struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard object's metadata.
@@ -1213,6 +1232,7 @@ type NetworkPolicyPeer struct {
 }
 
 // Network Policy List is a list of NetworkPolicy objects.
+// +k8s:openapi-gen=legacy-name
 type NetworkPolicyList struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard list metadata.

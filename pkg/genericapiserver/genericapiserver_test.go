@@ -66,7 +66,7 @@ func setUp(t *testing.T) (*etcdtesting.EtcdTestServer, Config, *assert.Assertion
 			Version: "unversioned",
 		},
 	}
-	config.SwaggerConfig = DefaultSwaggerConfig()
+	config.SwaggerConfig = DefaultSwaggerConfig(openapigen.OpenAPIDefinitions)
 
 	return etcdServer, *config, assert.New(t)
 }
@@ -370,7 +370,7 @@ func TestNotRestRoutesHaveAuth(t *testing.T) {
 	config.EnableSwaggerUI = true
 	config.EnableIndex = true
 	config.EnableProfiling = true
-	config.SwaggerConfig = DefaultSwaggerConfig()
+	config.SwaggerConfig = DefaultSwaggerConfig(nil)
 
 	kubeVersion := version.Get()
 	config.Version = &kubeVersion

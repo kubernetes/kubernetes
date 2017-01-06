@@ -17,9 +17,9 @@ limitations under the License.
 package routes
 
 import (
-	"k8s.io/kubernetes/pkg/genericapiserver/mux"
-
 	"github.com/emicklei/go-restful/swagger"
+
+	"k8s.io/kubernetes/pkg/genericapiserver/mux"
 )
 
 // Swagger installs the /swaggerapi/ endpoint to allow schema discovery

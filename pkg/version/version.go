@@ -24,6 +24,8 @@ import (
 // Info contains versioning information.
 // TODO: Add []string of api versions supported? It's still unclear
 // how we'll want to distribute that information.
+// +k8s:openapi-gen=true
+// +k8s:openapi-gen=legacy-name
 type Info struct {
 	Major        string `json:"major"`
 	Minor        string `json:"minor"`

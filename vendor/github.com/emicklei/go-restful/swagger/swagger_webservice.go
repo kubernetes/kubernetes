@@ -226,6 +226,9 @@ func (sws SwaggerService) composeDeclaration(ws *restful.WebService, pathPrefix 
 	pathToRoutes := newOrderedRouteMap()
 	for _, other := range ws.Routes() {
 		if strings.HasPrefix(other.Path, pathPrefix) {
+			if len(pathPrefix) > 1 && len(other.Path) > len(pathPrefix) && other.Path[len(pathPrefix)] != '/' {
+				continue
+			}
 			pathToRoutes.Add(other.Path, other)
 		}
 	}
@@ -290,7 +293,7 @@ func composeResponseMessages(route restful.Route, decl *ApiDeclaration, config *
 		if each.Model != nil {
 			st := reflect.TypeOf(each.Model)
 			isCollection, st := detectCollectionType(st)
-			modelName := modelBuilder{}.keyFrom(st)
+			modelName := modelBuilder{Config: config}.keyFrom(st)
 			if isCollection {
 				modelName = "array[" + modelName + "]"
 			}
@@ -415,7 +418,7 @@ func asDataType(any interface{}, config *Config) (*string, *Item) {
 	// If it's not a collection, return the suggested model name
 	st := reflect.TypeOf(any)
 	isCollection, st := detectCollectionType(st)
-	modelName := modelBuilder{}.keyFrom(st)
+	modelName := modelBuilder{Config: config}.keyFrom(st)
 	// if it's not a collection we are done
 	if !isCollection {
 		return &modelName, nil

@@ -15,5 +15,6 @@ limitations under the License.
 */
 
 // +k8s:openapi-gen=true
+// +k8s:openapi-gen=legacy-name
 // +groupName=testgroup.k8s.io
 package v1

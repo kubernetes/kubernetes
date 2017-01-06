@@ -24,14 +24,16 @@ import (
 	"github.com/emicklei/go-restful"
 	"github.com/go-openapi/spec"
 	"github.com/stretchr/testify/assert"
+
 	"k8s.io/kubernetes/pkg/genericapiserver/openapi/common"
+	"k8s.io/kubernetes/pkg/util/diff"
 )
 
 // setUp is a convenience function for setting up for (most) tests.
 func setUp(t *testing.T, fullMethods bool) (openAPI, *restful.Container, *assert.Assertions) {
 	assert := assert.New(t)
 	config, container := getConfig(fullMethods)
-	return openAPI{
+	o := openAPI{
 		config: config,
 		swagger: &spec.Swagger{
 			SwaggerProps: spec.SwaggerProps{
@@ -41,7 +43,9 @@ func setUp(t *testing.T, fullMethods bool) (openAPI, *restful.Container, *assert
 				Info:        config.Info,
 			},
 		},
-	}, container, assert
+	}
+	o.typeNameFn = config.ObjectTypeNameFunction()
+	return o, container, assert
 }
 
 func noOp(request *restful.Request, response *restful.Response) {}
@@ -151,10 +155,24 @@ func getTestRoute(ws *restful.WebService, method string, additionalParams bool, 
 }
 
 func getConfig(fullMethods bool) (*common.Config, *restful.Container) {
+	config := &common.Config{
+		ProtocolList: []string{"https"},
+		Info: &spec.Info{
+			InfoProps: spec.InfoProps{
+				Title:       "TestAPI",
+				Description: "Test API",
+			},
+		},
+		Definitions: &common.OpenAPIDefinitions{
+			"io.k8s.kubernetes.pkg.genericapiserver.openapi.TestInput":  *TestInput{}.OpenAPIDefinition(),
+			"io.k8s.kubernetes.pkg.genericapiserver.openapi.TestOutput": *TestOutput{}.OpenAPIDefinition(),
+		},
+	}
+
 	mux := http.NewServeMux()
 	container := restful.NewContainer()
 	container.ServeMux = mux
-	ws := new(restful.WebService)
+	ws := new(restful.WebService).TypeNameHandler(config.ObjectTypeNameFunction())
 	ws.Path("/foo")
 	ws.Route(getTestRoute(ws, "get", true, "foo"))
 	if fullMethods {
@@ -178,19 +196,8 @@ func getConfig(fullMethods bool) (*common.Config, *restful.Container) {
 
 	}
 	container.Add(ws)
-	return &common.Config{
-		ProtocolList: []string{"https"},
-		Info: &spec.Info{
-			InfoProps: spec.InfoProps{
-				Title:       "TestAPI",
-				Description: "Test API",
-			},
-		},
-		Definitions: &common.OpenAPIDefinitions{
-			"openapi.TestInput":  *TestInput{}.OpenAPIDefinition(),
-			"openapi.TestOutput": *TestOutput{}.OpenAPIDefinition(),
-		},
-	}, container
+
+	return config, container
 }
 
 func getTestOperation(method string, opPrefix string) *spec.Operation {
@@ -243,7 +250,7 @@ func getTestResponses() *spec.Responses {
 	ret.StatusCodeResponses[200] = spec.Response{
 		ResponseProps: spec.ResponseProps{
 			Description: "OK",
-			Schema:      getRefSchema("#/definitions/openapi.TestOutput"),
+			Schema:      getRefSchema("#/definitions/io.k8s.kubernetes.pkg.genericapiserver.openapi.TestOutput"),
 		},
 	}
 	return &ret
@@ -256,7 +263,7 @@ func getTestCommonParameters() []spec.Parameter {
 			Name:     "body",
 			In:       "body",
 			Required: true,
-			Schema:   getRefSchema("#/definitions/openapi.TestInput"),
+			Schema:   getRefSchema("#/definitions/io.k8s.kubernetes.pkg.genericapiserver.openapi.TestInput"),
 		},
 	}
 	ret[1] = spec.Parameter{
@@ -396,13 +403,14 @@ func TestBuildSwaggerSpec(t *testing.T) {
 				},
 			},
 			Definitions: spec.Definitions{
-				"openapi.TestInput":  getTestInputDefinition(),
-				"openapi.TestOutput": getTestOutputDefinition(),
+				"io.k8s.kubernetes.pkg.genericapiserver.openapi.TestInput":  getTestInputDefinition(),
+				"io.k8s.kubernetes.pkg.genericapiserver.openapi.TestOutput": getTestOutputDefinition(),
 			},
 		},
 	}
 	err := o.init(container.RegisteredWebServices())
 	if assert.NoError(err) {
 		assert.Equal(expected, o.swagger)
+		t.Logf("diff:\n%s", diff.ObjectReflectDiff(expected, o.swagger))
 	}
 }

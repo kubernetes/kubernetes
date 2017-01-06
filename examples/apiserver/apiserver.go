@@ -115,7 +115,7 @@ func (serverOptions *ServerRunOptions) Run(stopCh <-chan struct{}) error {
 	}
 
 	config.Authorizer = authorizer.NewAlwaysAllowAuthorizer()
-	config.SwaggerConfig = genericapiserver.DefaultSwaggerConfig()
+	config.SwaggerConfig = genericapiserver.DefaultSwaggerConfig(nil)
 
 	s, err := config.Complete().New()
 	if err != nil {
