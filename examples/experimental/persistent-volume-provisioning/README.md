@@ -80,6 +80,7 @@ parameters:
   secretName: "heketi-secret"
   gidMin: "40000"
   gidMax: "50000"
+  volumetype: "replicate:3"
 ```
 
 * `resturl` : Gluster REST service/Heketi service url which provision gluster volumes on demand. The general format should be `IPaddress:Port` and this is a mandatory parameter for GlusterFS dynamic provisioner. If Heketi service is exposed as a routable service in openshift/kubernetes setup, this can have a format similar to
@@ -95,6 +96,17 @@ When both `restuserkey` and `secretNamespace` + `secretName` is specified, the s
 Example of a secret can be found in [glusterfs-provisioning-secret.yaml](glusterfs-provisioning-secret.yaml).
 
 * `gidMin` + `gidMax` : The minimum and maximum value of GID range for the storage class. A unique value (GID) in this range ( gidMin-gidMax ) will be used for dynamically provisioned volumes. These are optional values. If not specified, the volume will be provisioned with a value between 2000-2147483647 which are defaults for gidMin and gidMax respectively.
+
+* `volumetype` : The volume type and it's parameters can be configured with this optional value. If the volume type is not mentioned, it's up to the provisioner to decide the volume type.
+For example:
+  'Replica volume':
+    `volumetype: replicate:3` where '3' is replica count.
+  'Disperse/EC volume':
+    `volumetype: disperse:4:2` where '4' is data and '2' is the redundancy count.
+  'Distribute volume':
+    `volumetype: none`
+
+For available volume types and it's administration options refer: ([Administration Guide](https://access.redhat.com/documentation/en-US/Red_Hat_Storage/3.1/html/Administration_Guide/part-Overview.html))
 
 Reference : ([How to configure Heketi](https://github.com/heketi/heketi/wiki/Setting-up-the-topology))
 
