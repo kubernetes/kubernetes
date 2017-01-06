@@ -47,7 +47,7 @@ func DeepCopy_v1beta1_StatefulSet(in interface{}, out interface{}, c *conversion
 	{
 		in := in.(*StatefulSet)
 		out := out.(*StatefulSet)
-		out.TypeMeta = in.TypeMeta
+		*out = *in
 		if err := v1.DeepCopy_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, c); err != nil {
 			return err
 		}
@@ -65,8 +65,7 @@ func DeepCopy_v1beta1_StatefulSetList(in interface{}, out interface{}, c *conver
 	{
 		in := in.(*StatefulSetList)
 		out := out.(*StatefulSetList)
-		out.TypeMeta = in.TypeMeta
-		out.ListMeta = in.ListMeta
+		*out = *in
 		if in.Items != nil {
 			in, out := &in.Items, &out.Items
 			*out = make([]StatefulSet, len(*in))
@@ -75,8 +74,6 @@ func DeepCopy_v1beta1_StatefulSetList(in interface{}, out interface{}, c *conver
 					return err
 				}
 			}
-		} else {
-			out.Items = nil
 		}
 		return nil
 	}
@@ -86,12 +83,11 @@ func DeepCopy_v1beta1_StatefulSetSpec(in interface{}, out interface{}, c *conver
 	{
 		in := in.(*StatefulSetSpec)
 		out := out.(*StatefulSetSpec)
+		*out = *in
 		if in.Replicas != nil {
 			in, out := &in.Replicas, &out.Replicas
 			*out = new(int32)
 			**out = **in
-		} else {
-			out.Replicas = nil
 		}
 		if in.Selector != nil {
 			in, out := &in.Selector, &out.Selector
@@ -99,8 +95,6 @@ func DeepCopy_v1beta1_StatefulSetSpec(in interface{}, out interface{}, c *conver
 			if err := meta_v1.DeepCopy_v1_LabelSelector(*in, *out, c); err != nil {
 				return err
 			}
-		} else {
-			out.Selector = nil
 		}
 		if err := v1.DeepCopy_v1_PodTemplateSpec(&in.Template, &out.Template, c); err != nil {
 			return err
@@ -113,10 +107,7 @@ func DeepCopy_v1beta1_StatefulSetSpec(in interface{}, out interface{}, c *conver
 					return err
 				}
 			}
-		} else {
-			out.VolumeClaimTemplates = nil
 		}
-		out.ServiceName = in.ServiceName
 		return nil
 	}
 }
@@ -125,14 +116,12 @@ func DeepCopy_v1beta1_StatefulSetStatus(in interface{}, out interface{}, c *conv
 	{
 		in := in.(*StatefulSetStatus)
 		out := out.(*StatefulSetStatus)
+		*out = *in
 		if in.ObservedGeneration != nil {
 			in, out := &in.ObservedGeneration, &out.ObservedGeneration
 			*out = new(int64)
 			**out = **in
-		} else {
-			out.ObservedGeneration = nil
 		}
-		out.Replicas = in.Replicas
 		return nil
 	}
 }
