@@ -104,6 +104,11 @@ type CustomMetricTarget struct {
 }
 
 type CustomMetricTargetList struct {
+	metav1.TypeMeta `json:",inline"`
+	// Standard list metadata.
+	// +optional
+	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,2,opt,name=metadata"`
+
 	Items []CustomMetricTarget `json:"items" protobuf:"bytes,1,rep,name=items"`
 }
 
@@ -115,6 +120,11 @@ type CustomMetricCurrentStatus struct {
 }
 
 type CustomMetricCurrentStatusList struct {
+	metav1.TypeMeta `json:",inline"`
+	// Standard list metadata.
+	// +optional
+	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,2,opt,name=metadata"`
+
 	Items []CustomMetricCurrentStatus `json:"items" protobuf:"bytes,1,rep,name=items"`
 }
 

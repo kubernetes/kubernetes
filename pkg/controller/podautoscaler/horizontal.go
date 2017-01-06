@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/v1"
 	autoscaling "k8s.io/kubernetes/pkg/apis/autoscaling/v1"
@@ -200,6 +201,7 @@ func (a *HorizontalController) computeReplicasForCustomMetrics(hpa *autoscaling.
 	currentReplicas := scale.Status.Replicas
 
 	var targetList extensionsv1beta1.CustomMetricTargetList
+	// TODO: use runtime.Decode
 	if err := json.Unmarshal([]byte(cmAnnotation), &targetList); err != nil {
 		a.eventRecorder.Event(hpa, v1.EventTypeWarning, "FailedParseCustomMetricsAnnotation", err.Error())
 		return 0, "", "", time.Time{}, fmt.Errorf("failed to parse custom metrics annotation: %v", err)
@@ -254,7 +256,7 @@ func (a *HorizontalController) computeReplicasForCustomMetrics(hpa *autoscaling.
 			CurrentValue: quantity,
 		})
 	}
-	byteStatusList, err := json.Marshal(statusList)
+	byteStatusList, err := runtime.Encode(api.Codecs.LegacyCodec(extensionsv1beta1.SchemeGroupVersion), &statusList)
 	if err != nil {
 		a.eventRecorder.Event(hpa, v1.EventTypeWarning, "FailedSerializeCustomMetrics", err.Error())
 		return 0, "", "", time.Time{}, fmt.Errorf("failed to serialize custom metric status: %v", err)

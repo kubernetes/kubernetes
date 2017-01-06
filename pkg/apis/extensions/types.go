@@ -93,6 +93,12 @@ type CustomMetricTarget struct {
 }
 
 type CustomMetricTargetList struct {
+	metav1.TypeMeta
+
+	// Standard list metadata.
+	// +optional
+	metav1.ListMeta
+
 	Items []CustomMetricTarget
 }
 
@@ -104,6 +110,12 @@ type CustomMetricCurrentStatus struct {
 }
 
 type CustomMetricCurrentStatusList struct {
+	metav1.TypeMeta
+
+	// Standard list metadata.
+	// +optional
+	metav1.ListMeta
+
 	Items []CustomMetricCurrentStatus
 }
 
