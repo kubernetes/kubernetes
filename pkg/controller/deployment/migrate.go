@@ -164,8 +164,31 @@ func (dc *DeploymentController) migrateReplicaSet(d *extensions.Deployment, rs *
 		return nil, err
 	}
 	// Delete the old replica set.
-	if err := dc.client.Extensions().ReplicaSets(d.Namespace).Delete(rs.Name, &v1.DeleteOptions{}); err != nil && !errors.IsNotFound(err) {
+	err = dc.client.Extensions().ReplicaSets(d.Namespace).Delete(rs.Name, &v1.DeleteOptions{})
+	if err != nil && !errors.IsNotFound(err) {
 		return migratedRs, err
 	}
+	if err == nil {
+		unmigratedReplicaSetsNumber.Dec()
+	}
 	return migratedRs, nil
+}
+
+func (dc *DeploymentController) estimateUnmigratedReplicaSets() {
+	needsMigration := 0
+
+	for _, uncastRs := range dc.rsLister.Indexer.List() {
+		rs, ok := uncastRs.(*extensions.ReplicaSet)
+		if !ok {
+			continue
+		}
+		_, ok = rs.Annotations[deploymentutil.MigratedFromAnnotation]
+		// If this replica set is owned by a deployment but has yet to migrate to the new hashing
+		// algorithm we need to count it to the metric we are going to expose for admins.
+		if deploymentutil.IsOwnedByDeployment(rs) && !ok {
+			needsMigration++
+		}
+	}
+
+	unmigratedReplicaSetsNumber.Set(float64(needsMigration))
 }

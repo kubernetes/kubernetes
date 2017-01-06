@@ -28,6 +28,7 @@ import (
 	unversionedextensions "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/client/legacylisters"
 	"k8s.io/kubernetes/pkg/client/retry"
+	"k8s.io/kubernetes/pkg/controller"
 	labelsutil "k8s.io/kubernetes/pkg/util/labels"
 )
 
@@ -86,4 +87,13 @@ func GetReplicaSetHashFnv(rs *extensions.ReplicaSet) string {
 		ObjectMeta: meta,
 		Spec:       rs.Spec.Template.Spec,
 	}))
+}
+
+// IsOwnedByDeployment returns true if the provided replica set is owned by a deployment.
+func IsOwnedByDeployment(rs *extensions.ReplicaSet) bool {
+	controllerRef := controller.GetControllerOf(&rs.ObjectMeta)
+	if controllerRef == nil {
+		return false
+	}
+	return controllerRef.Kind == extensions.SchemeGroupVersion.WithKind("Deployment").Kind
 }

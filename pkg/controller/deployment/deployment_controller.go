@@ -27,7 +27,9 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	"github.com/prometheus/client_golang/prometheus"
 	"k8s.io/apimachinery/pkg/api/errors"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -59,6 +61,15 @@ const (
 	StoreSyncedPollPeriod = 100 * time.Millisecond
 	// MaxRetries is the number of times a deployment will be retried before it is dropped out of the queue.
 	MaxRetries = 5
+)
+
+// The total number of replica sets that need to be migrated to the new hashing algorithm exposed as a metric.
+var unmigratedReplicaSetsNumber = prometheus.NewGauge(
+	prometheus.GaugeOpts{
+		Subsystem: "deployment_controller",
+		Name:      "unmigrated_replica_sets",
+		Help:      "The total number of replica sets that need to be migrated to the new hashing algorithm.",
+	},
 )
 
 func getDeploymentKind() schema.GroupVersionKind {
@@ -125,6 +136,10 @@ func NewDeploymentController(
 	if client != nil && client.Core().RESTClient().GetRateLimiter() != nil {
 		metrics.RegisterMetricAndTrackRateLimiterUsage("deployment_controller", client.Core().RESTClient().GetRateLimiter())
 	}
+	if hashingAlgorithm == "migrate-to-fnv" {
+		prometheus.MustRegister(unmigratedReplicaSetsNumber)
+	}
+
 	dc := &DeploymentController{
 		client:           client,
 		eventRecorder:    eventBroadcaster.NewRecorder(v1.EventSource{Component: "deployment-controller"}),
@@ -591,6 +606,8 @@ func (dc *DeploymentController) syncDeployment(key string) error {
 	// time this deployment is going to be resynced. It may also be racy to have a separate thread
 	// fiddle with old replica sets with respect to rolling back to an old revision.
 	if dc.hashingAlgorithm == "migrate-to-fnv" {
+		dc.estimateUnmigratedReplicaSets()
+
 		migratedRSs, err := dc.migrateDeployment(d)
 		// Errors are going to resync this deployment. We may want to handle this more gracefully,
 		// ie. if a deployment is resynced for more than 5 times because of a migration error, we
