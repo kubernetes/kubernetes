@@ -751,7 +751,6 @@ func (f *Framework) GetUnderlyingFederatedContexts() []E2EContext {
 	e2eContexts := []E2EContext{}
 	for _, context := range kubeconfig.Contexts {
 		if strings.HasPrefix(context.Name, "federation") && context.Name != federatedKubeContext {
-
 			user := kubeconfig.findUser(context.Context.User)
 			if user == nil {
 				Failf("Could not find user for context %+v", context)
