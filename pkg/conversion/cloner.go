@@ -129,9 +129,36 @@ func (c *Cloner) DeepCopy(in interface{}) (interface{}, error) {
 	inValue := reflect.ValueOf(in)
 	outValue, err := c.deepCopy(inValue)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error copying %T: %v", in, err)
 	}
 	return outValue.Interface(), nil
+}
+
+type unsettableFieldError struct {
+	ParentType reflect.Type
+	FieldIndex int
+}
+
+func (e *unsettableFieldError) Error() string {
+	return fmt.Sprintf("unsettable field %d of %v", e.FieldIndex, e.ParentType)
+}
+
+type unaddressableCustomFunction struct {
+	RegisteredType    reflect.Type
+	UnaddressableType reflect.Type
+}
+
+func (e *unaddressableCustomFunction) Error() string {
+	return fmt.Sprintf("custom function registered for %v, but unaddressable type %v given", e.RegisteredType, e.UnaddressableType)
+}
+
+type unaddressableGeneratedFunction struct {
+	RegisteredType    reflect.Type
+	UnaddressableType reflect.Type
+}
+
+func (e *unaddressableGeneratedFunction) Error() string {
+	return fmt.Sprintf("generated function registered for %v, but unaddressable type %v given", e.RegisteredType, e.UnaddressableType)
 }
 
 func (c *Cloner) deepCopy(src reflect.Value) (reflect.Value, error) {
@@ -153,6 +180,38 @@ func (c *Cloner) deepCopy(src reflect.Value) (reflect.Value, error) {
 		err := fv(src.Interface(), outValue.Interface(), c)
 		return outValue, err
 	}
+
+	// Check for custom deep copy funcs on the pointer of this type
+	if src.Kind() == reflect.Struct {
+		inTypePtr := reflect.PtrTo(inType)
+		if fv, ok := c.deepCopyFuncs[inTypePtr]; ok {
+			if !src.CanAddr() {
+				err := &unaddressableGeneratedFunction{RegisteredType: inTypePtr, UnaddressableType: inType}
+				return reflect.Value{}, err
+			}
+			src := src.Addr()
+			outValuePtr, err := c.customDeepCopy(src, fv)
+			if err != nil {
+				return reflect.Value{}, err
+			}
+			return outValuePtr.Elem(), nil
+		}
+		if fv, ok := c.generatedDeepCopyFuncs[inTypePtr]; ok {
+			if !src.CanAddr() {
+				err := &unaddressableGeneratedFunction{RegisteredType: inTypePtr, UnaddressableType: inType}
+				return reflect.Value{}, err
+			}
+			src := src.Addr()
+			var outValuePtr reflect.Value
+			outValuePtr = reflect.New(inTypePtr.Elem())
+			err := fv(src.Interface(), outValuePtr.Interface(), c)
+			if err != nil {
+				return reflect.Value{}, err
+			}
+			return outValuePtr.Elem(), nil
+		}
+	}
+
 	return c.defaultDeepCopy(src)
 }
 
@@ -228,11 +287,9 @@ func (c *Cloner) defaultDeepCopy(src reflect.Value) (reflect.Value, error) {
 		dst := reflect.New(src.Type())
 		for i := 0; i < src.NumField(); i++ {
 			if !dst.Elem().Field(i).CanSet() {
-				// Can't set private fields. At this point, the
-				// best we can do is a shallow copy. For
-				// example, time.Time is a value type with
-				// private members that can be shallow copied.
-				return src, nil
+				// A custom DeepCopy() implementation is required
+				err := &unsettableFieldError{src.Type(), i}
+				return src, err
 			}
 			copyVal, err := c.deepCopy(src.Field(i))
 			if err != nil {

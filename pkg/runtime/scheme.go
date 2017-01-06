@@ -21,6 +21,7 @@ import (
 	"net/url"
 	"reflect"
 
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/conversion"
 	"k8s.io/kubernetes/pkg/runtime/schema"
 )
@@ -89,6 +90,16 @@ func NewScheme() *Scheme {
 		defaulterFuncs:            map[reflect.Type]func(interface{}){},
 	}
 	s.converter = conversion.NewConverter(s.nameFunc)
+
+	// Add the deep copy funcs that can't auto-register themselves
+	// This should only be the runtime and meta packages
+	if err := s.AddGeneratedDeepCopyFuncs(GetGeneratedDeepCopyFuncs()...); err != nil {
+		panic(err)
+	}
+	// TODO: remove this once the import cycle is broken and meta/v1 can install itself like a normal api package
+	if err := s.AddGeneratedDeepCopyFuncs(metav1.GetGeneratedDeepCopyFuncs()...); err != nil {
+		panic(err)
+	}
 
 	s.AddConversionFuncs(DefaultEmbeddedConversions()...)
 
@@ -451,7 +462,10 @@ func (s *Scheme) Copy(src Object) (Object, error) {
 	return dst.(Object), nil
 }
 
-// Performs a deep copy of the given object.
+// DeepCopy performs a deep copy of the given object.
+// If custom or generated copy functions are registered only for pointers to the source type
+// (or any types contained within it), an addressable value (e.g. a pointer, not a struct)
+// must be passed to DeepCopy().
 func (s *Scheme) DeepCopy(src interface{}) (interface{}, error) {
 	return s.cloner.DeepCopy(src)
 }

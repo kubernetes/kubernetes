@@ -47,6 +47,10 @@ type Selector interface {
 
 	// String returns a human readable string that represents this selector.
 	String() string
+
+	// DeepCopy returns a copy of the selector that can be mutated
+	// without affecting the original selector
+	DeepCopy() Selector
 }
 
 // Everything returns a selector that matches all fields.
@@ -93,6 +97,11 @@ func (t *hasTerm) String() string {
 	return fmt.Sprintf("%v=%v", t.field, t.value)
 }
 
+func (t hasTerm) DeepCopy() Selector {
+	tCopy := t
+	return &tCopy
+}
+
 type notHasTerm struct {
 	field, value string
 }
@@ -127,6 +136,11 @@ func (t *notHasTerm) Requirements() Requirements {
 
 func (t *notHasTerm) String() string {
 	return fmt.Sprintf("%v!=%v", t.field, t.value)
+}
+
+func (t notHasTerm) DeepCopy() Selector {
+	tCopy := t
+	return &tCopy
 }
 
 type andTerm []Selector
@@ -194,6 +208,10 @@ func (t andTerm) String() string {
 		terms = append(terms, q.String())
 	}
 	return strings.Join(terms, ",")
+}
+
+func (t andTerm) DeepCopy() Selector {
+	return t
 }
 
 // SelectorFromSet returns a Selector which will match exactly the given Set. A

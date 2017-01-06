@@ -51,6 +51,10 @@ type Selector interface {
 	// If there are querying parameters, it will return converted requirements and selectable=true.
 	// If this selector doesn't want to select anything, it will return selectable=false.
 	Requirements() (requirements Requirements, selectable bool)
+
+	// DeepCopy returns a copy of the selector that can be mutated
+	// without affecting the original selector
+	DeepCopy() Selector
 }
 
 // Everything returns a selector that matches all labels.
@@ -65,6 +69,7 @@ func (n nothingSelector) Empty() bool                        { return false }
 func (n nothingSelector) String() string                     { return "<null>" }
 func (n nothingSelector) Add(_ ...Requirement) Selector      { return n }
 func (n nothingSelector) Requirements() (Requirements, bool) { return nil, false }
+func (n nothingSelector) DeepCopy() Selector                 { return n }
 
 // Nothing returns a selector that matches no labels
 func Nothing() Selector {
@@ -97,6 +102,10 @@ type Requirement struct {
 	// It is generally faster to operate on a single-element slice
 	// than on a single-element map, so we have a slice here.
 	strValues []string
+}
+
+func (r Requirement) DeepCopy() Requirement {
+	return r
 }
 
 // NewRequirement is the constructor for a Requirement.
@@ -318,6 +327,14 @@ func (lsel internalSelector) String() string {
 		reqs = append(reqs, lsel[ix].String())
 	}
 	return strings.Join(reqs, ",")
+}
+
+func (lsel internalSelector) DeepCopy() Selector {
+	lselCopy := internalSelector(make([]Requirement, len(lsel)))
+	for i, req := range lsel {
+		lselCopy[i] = req.DeepCopy()
+	}
+	return lselCopy
 }
 
 // constants definition for lexer token

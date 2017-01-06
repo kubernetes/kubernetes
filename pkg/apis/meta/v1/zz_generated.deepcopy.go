@@ -22,8 +22,39 @@ package v1
 
 import (
 	conversion "k8s.io/kubernetes/pkg/conversion"
-	time "time"
+	reflect "reflect"
 )
+
+// GetGeneratedDeepCopyFuncs returns the generated funcs, since we aren't registering them.
+func GetGeneratedDeepCopyFuncs() []conversion.GeneratedDeepCopyFunc {
+	return []conversion.GeneratedDeepCopyFunc{
+		{Fn: DeepCopy_v1_APIGroup, InType: reflect.TypeOf(&APIGroup{})},
+		{Fn: DeepCopy_v1_APIGroupList, InType: reflect.TypeOf(&APIGroupList{})},
+		{Fn: DeepCopy_v1_APIResource, InType: reflect.TypeOf(&APIResource{})},
+		{Fn: DeepCopy_v1_APIResourceList, InType: reflect.TypeOf(&APIResourceList{})},
+		{Fn: DeepCopy_v1_APIVersions, InType: reflect.TypeOf(&APIVersions{})},
+		{Fn: DeepCopy_v1_Duration, InType: reflect.TypeOf(&Duration{})},
+		{Fn: DeepCopy_v1_ExportOptions, InType: reflect.TypeOf(&ExportOptions{})},
+		{Fn: DeepCopy_v1_GroupKind, InType: reflect.TypeOf(&GroupKind{})},
+		{Fn: DeepCopy_v1_GroupResource, InType: reflect.TypeOf(&GroupResource{})},
+		{Fn: DeepCopy_v1_GroupVersion, InType: reflect.TypeOf(&GroupVersion{})},
+		{Fn: DeepCopy_v1_GroupVersionForDiscovery, InType: reflect.TypeOf(&GroupVersionForDiscovery{})},
+		{Fn: DeepCopy_v1_GroupVersionKind, InType: reflect.TypeOf(&GroupVersionKind{})},
+		{Fn: DeepCopy_v1_GroupVersionResource, InType: reflect.TypeOf(&GroupVersionResource{})},
+		{Fn: DeepCopy_v1_LabelSelector, InType: reflect.TypeOf(&LabelSelector{})},
+		{Fn: DeepCopy_v1_LabelSelectorRequirement, InType: reflect.TypeOf(&LabelSelectorRequirement{})},
+		{Fn: DeepCopy_v1_ListMeta, InType: reflect.TypeOf(&ListMeta{})},
+		{Fn: DeepCopy_v1_Patch, InType: reflect.TypeOf(&Patch{})},
+		{Fn: DeepCopy_v1_RootPaths, InType: reflect.TypeOf(&RootPaths{})},
+		{Fn: DeepCopy_v1_ServerAddressByClientCIDR, InType: reflect.TypeOf(&ServerAddressByClientCIDR{})},
+		{Fn: DeepCopy_v1_Status, InType: reflect.TypeOf(&Status{})},
+		{Fn: DeepCopy_v1_StatusCause, InType: reflect.TypeOf(&StatusCause{})},
+		{Fn: DeepCopy_v1_StatusDetails, InType: reflect.TypeOf(&StatusDetails{})},
+		{Fn: DeepCopy_v1_Time, InType: reflect.TypeOf(&Time{})},
+		{Fn: DeepCopy_v1_Timestamp, InType: reflect.TypeOf(&Timestamp{})},
+		{Fn: DeepCopy_v1_TypeMeta, InType: reflect.TypeOf(&TypeMeta{})},
+	}
+}
 
 func DeepCopy_v1_APIGroup(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
@@ -398,11 +429,7 @@ func DeepCopy_v1_Time(in interface{}, out interface{}, c *conversion.Cloner) err
 	{
 		in := in.(*Time)
 		out := out.(*Time)
-		if newVal, err := c.DeepCopy(&in.Time); err != nil {
-			return err
-		} else {
-			out.Time = *newVal.(*time.Time)
-		}
+		*out = in.DeepCopy()
 		return nil
 	}
 }
