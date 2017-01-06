@@ -240,8 +240,15 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 							},
 						},
 					},
+					"shortName": {
+						SchemaProps: spec.SchemaProps{
+							Description: "shortName is the suggested short name of the resource.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
 				},
-				Required: []string{"name", "namespaced", "kind", "verbs"},
+				Required: []string{"name", "namespaced", "kind", "verbs", "shortName"},
 			},
 		},
 		Dependencies: []string{},

@@ -9520,7 +9520,8 @@
      "name",
      "namespaced",
      "kind",
-     "verbs"
+     "verbs",
+     "shortName"
     ],
     "properties": {
      "kind": {
@@ -9534,6 +9535,10 @@
      "namespaced": {
       "description": "namespaced indicates if a resource is namespaced or not.",
       "type": "boolean"
+     },
+     "shortName": {
+      "description": "shortName is the suggested short name of the resource.",
+      "type": "string"
      },
      "verbs": {
       "description": "verbs is a list of supported kube verbs (this includes get, list, watch, create, update, patch, delete, deletecollection, and proxy)",

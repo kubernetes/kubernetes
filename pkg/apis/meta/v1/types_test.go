@@ -29,9 +29,9 @@ func TestVerbsMarshalJSON(t *testing.T) {
 		input  APIResource
 		result string
 	}{
-		{APIResource{}, `{"name":"","namespaced":false,"kind":"","verbs":null}`},
-		{APIResource{Verbs: Verbs([]string{})}, `{"name":"","namespaced":false,"kind":"","verbs":[]}`},
-		{APIResource{Verbs: Verbs([]string{"delete"})}, `{"name":"","namespaced":false,"kind":"","verbs":["delete"]}`},
+		{APIResource{}, `{"name":"","namespaced":false,"kind":"","verbs":null,"shortName":""}`},
+		{APIResource{Verbs: Verbs([]string{})}, `{"name":"","namespaced":false,"kind":"","verbs":[],"shortName":""}`},
+		{APIResource{Verbs: Verbs([]string{"delete"})}, `{"name":"","namespaced":false,"kind":"","verbs":["delete"],"shortName":""}`},
 	}
 
 	for i, c := range cases {

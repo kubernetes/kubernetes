@@ -17,9 +17,11 @@ limitations under the License.
 package util
 
 import (
+	"errors"
 	"strings"
 
 	"k8s.io/kubernetes/pkg/api/meta"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/client/typed/discovery"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/runtime/schema"
@@ -40,13 +42,20 @@ func NewShortcutExpander(delegate meta.RESTMapper, client discovery.DiscoveryInt
 	return ShortcutExpander{All: userResources, RESTMapper: delegate, discoveryClient: client}
 }
 
-func (e ShortcutExpander) getAll() []schema.GroupResource {
+func (e ShortcutExpander) getServerRes(groupVersion string) ([]*metav1.APIResourceList, error) {
 	if e.discoveryClient == nil {
-		return e.All
+		return nil, errors.New("cannot return resources discoveryClient not set")
 	}
+	if groupVersion != "" {
+		res, e := e.discoveryClient.ServerResourcesForGroupVersion(groupVersion)
+		return []*metav1.APIResourceList{res}, e
+	}
+	return e.discoveryClient.ServerResources()
+}
 
+func (e ShortcutExpander) getAll() []schema.GroupResource {
 	// Check if we have access to server resources
-	apiResources, err := e.discoveryClient.ServerResources()
+	apiResources, err := e.getServerRes("")
 	if err != nil {
 		return e.All
 	}
@@ -71,23 +80,23 @@ func (e ShortcutExpander) getAll() []schema.GroupResource {
 }
 
 func (e ShortcutExpander) KindFor(resource schema.GroupVersionResource) (schema.GroupVersionKind, error) {
-	return e.RESTMapper.KindFor(expandResourceShortcut(resource))
+	return e.RESTMapper.KindFor(e.expandResourceShortcut(resource))
 }
 
 func (e ShortcutExpander) KindsFor(resource schema.GroupVersionResource) ([]schema.GroupVersionKind, error) {
-	return e.RESTMapper.KindsFor(expandResourceShortcut(resource))
+	return e.RESTMapper.KindsFor(e.expandResourceShortcut(resource))
 }
 
 func (e ShortcutExpander) ResourcesFor(resource schema.GroupVersionResource) ([]schema.GroupVersionResource, error) {
-	return e.RESTMapper.ResourcesFor(expandResourceShortcut(resource))
+	return e.RESTMapper.ResourcesFor(e.expandResourceShortcut(resource))
 }
 
 func (e ShortcutExpander) ResourceFor(resource schema.GroupVersionResource) (schema.GroupVersionResource, error) {
-	return e.RESTMapper.ResourceFor(expandResourceShortcut(resource))
+	return e.RESTMapper.ResourceFor(e.expandResourceShortcut(resource))
 }
 
 func (e ShortcutExpander) ResourceSingularizer(resource string) (string, error) {
-	return e.RESTMapper.ResourceSingularizer(expandResourceShortcut(schema.GroupVersionResource{Resource: resource}).Resource)
+	return e.RESTMapper.ResourceSingularizer(e.expandResourceShortcut(schema.GroupVersionResource{Resource: resource}).Resource)
 }
 
 func (e ShortcutExpander) RESTMapping(gk schema.GroupKind, versions ...string) (*meta.RESTMapping, error) {
@@ -124,17 +133,33 @@ func (e ShortcutExpander) AliasesForResource(resource string) ([]string, bool) {
 		}
 		return aliases, true
 	}
-	expanded := expandResourceShortcut(schema.GroupVersionResource{Resource: resource}).Resource
+	expanded := e.expandResourceShortcut(schema.GroupVersionResource{Resource: resource}).Resource
 	return []string{expanded}, (expanded != resource)
 }
 
-// expandResourceShortcut will return the expanded version of resource
+// expandResourceShortcut will return the expanded version of a resource
 // (something that a pkg/api/meta.RESTMapper can understand), if it is
-// indeed a shortcut. Otherwise, will return resource unmodified.
-func expandResourceShortcut(resource schema.GroupVersionResource) schema.GroupVersionResource {
-	if expanded, ok := kubectl.ShortForms[resource.Resource]; ok {
-		resource.Resource = expanded
-		return resource
+// indeed a shortcut. First the list of potential resources will be taken from
+// the discovery API. Next we will fall back to the hardcoded list of resources.
+// Lastly if no match has been found, we will return resource unmodified.
+func (e ShortcutExpander) expandResourceShortcut(gvk schema.GroupVersionResource) schema.GroupVersionResource {
+	// get the server resources if no gv was specified examine all and return
+	// on first match.
+	if resources, err := e.getServerRes(gvk.GroupVersion().String()); err == nil {
+		for _, resource := range resources {
+			for _, apiRes := range resource.APIResources {
+				if apiRes.ShortName == gvk.Resource {
+					gvk.Resource = apiRes.Name
+					return gvk
+				}
+			}
+		}
 	}
-	return resource
+
+	// fall back to the hardcoded list
+	if expanded, ok := kubectl.ShortForms[gvk.Resource]; ok {
+		gvk.Resource = expanded
+		return gvk
+	}
+	return gvk
 }

@@ -9847,7 +9847,8 @@
      "name",
      "namespaced",
      "kind",
-     "verbs"
+     "verbs",
+     "shortName"
     ],
     "properties": {
      "name": {
@@ -9868,6 +9869,10 @@
        "type": "string"
       },
       "description": "verbs is a list of supported kube verbs (this includes get, list, watch, create, update, patch, delete, deletecollection, and proxy)"
+     },
+     "shortName": {
+      "type": "string",
+      "description": "shortName is the suggested short name of the resource."
      }
     }
    }

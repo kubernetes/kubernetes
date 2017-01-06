@@ -41,41 +41,48 @@ func TestCachedDiscoveryClient_Fresh(t *testing.T) {
 	assert.NoError(err)
 	defer os.RemoveAll(d)
 
-	c := fakeDiscoveryClient{}
-	cdc := NewCachedDiscoveryClient(&c, d, 60*time.Second)
+	c := NewFakeDiscoveryClient()
+	c.ServerResourcesForGroupVersionHandler = func(groupVersion string) (*metav1.APIResourceList, error) {
+		if groupVersion == "a/v1" {
+			return &metav1.APIResourceList{}, nil
+		}
+
+		return nil, errors.NewNotFound(schema.GroupResource{}, "")
+	}
+	cdc := NewCachedDiscoveryClient(c, d, 60*time.Second)
 	assert.True(cdc.Fresh(), "should be fresh after creation")
 
 	cdc.ServerGroups()
 	assert.True(cdc.Fresh(), "should be fresh after groups call without cache")
-	assert.Equal(c.groupCalls, 1)
+	assert.Equal(c.GroupCalls, 1)
 
 	cdc.ServerGroups()
 	assert.True(cdc.Fresh(), "should be fresh after another groups call")
-	assert.Equal(c.groupCalls, 1)
+	assert.Equal(c.GroupCalls, 1)
 
 	cdc.ServerResources()
 	assert.True(cdc.Fresh(), "should be fresh after resources call")
-	assert.Equal(c.resourceCalls, 1)
+	assert.Equal(c.ResourceCalls, 1)
 
 	cdc.ServerResources()
 	assert.True(cdc.Fresh(), "should be fresh after another resources call")
-	assert.Equal(c.resourceCalls, 1)
+	assert.Equal(c.ResourceCalls, 1)
 
-	cdc = NewCachedDiscoveryClient(&c, d, 60*time.Second)
+	cdc = NewCachedDiscoveryClient(c, d, 60*time.Second)
 	cdc.ServerGroups()
 	assert.False(cdc.Fresh(), "should NOT be fresh after recreation with existing groups cache")
-	assert.Equal(c.groupCalls, 1)
+	assert.Equal(c.GroupCalls, 1)
 
 	cdc.ServerResources()
 	assert.False(cdc.Fresh(), "should NOT be fresh after recreation with existing resources cache")
-	assert.Equal(c.resourceCalls, 1)
+	assert.Equal(c.ResourceCalls, 1)
 
 	cdc.Invalidate()
 	assert.True(cdc.Fresh(), "should be fresh after cache invalidation")
 
 	cdc.ServerResources()
 	assert.True(cdc.Fresh(), "should ignore existing resources cache after invalidation")
-	assert.Equal(c.resourceCalls, 2)
+	assert.Equal(c.ResourceCalls, 2)
 }
 
 func TestNewCachedDiscoveryClient_TTL(t *testing.T) {
@@ -85,22 +92,29 @@ func TestNewCachedDiscoveryClient_TTL(t *testing.T) {
 	assert.NoError(err)
 	defer os.RemoveAll(d)
 
-	c := fakeDiscoveryClient{}
-	cdc := NewCachedDiscoveryClient(&c, d, 1*time.Nanosecond)
+	c := NewFakeDiscoveryClient()
+	cdc := NewCachedDiscoveryClient(c, d, 1*time.Nanosecond)
 	cdc.ServerGroups()
-	assert.Equal(c.groupCalls, 1)
+	assert.Equal(c.GroupCalls, 1)
 
 	time.Sleep(1 * time.Second)
 
 	cdc.ServerGroups()
-	assert.Equal(c.groupCalls, 2)
+	assert.Equal(c.GroupCalls, 2)
+}
+
+func NewFakeDiscoveryClient() *fakeDiscoveryClient {
+	return &fakeDiscoveryClient{ServerResourcesForGroupVersionHandler: nil, ServerResourcesHandler: nil}
 }
 
 type fakeDiscoveryClient struct {
-	groupCalls    int
-	resourceCalls int
-	versionCalls  int
-	swaggerCalls  int
+	GroupCalls    int
+	ResourceCalls int
+	VersionCalls  int
+	SwaggerCalls  int
+
+	ServerResourcesForGroupVersionHandler func(groupVersion string) (*metav1.APIResourceList, error)
+	ServerResourcesHandler                func() ([]*metav1.APIResourceList, error)
 }
 
 var _ discovery.DiscoveryInterface = &fakeDiscoveryClient{}
@@ -110,7 +124,7 @@ func (c *fakeDiscoveryClient) RESTClient() restclient.Interface {
 }
 
 func (c *fakeDiscoveryClient) ServerGroups() (*metav1.APIGroupList, error) {
-	c.groupCalls = c.groupCalls + 1
+	c.GroupCalls = c.GroupCalls + 1
 	return &metav1.APIGroupList{
 		Groups: []metav1.APIGroup{
 			{
@@ -131,35 +145,38 @@ func (c *fakeDiscoveryClient) ServerGroups() (*metav1.APIGroupList, error) {
 }
 
 func (c *fakeDiscoveryClient) ServerResourcesForGroupVersion(groupVersion string) (*metav1.APIResourceList, error) {
-	c.resourceCalls = c.resourceCalls + 1
-	if groupVersion == "a/v1" {
-		return &metav1.APIResourceList{}, nil
+	c.ResourceCalls = c.ResourceCalls + 1
+	if c.ServerResourcesForGroupVersionHandler != nil {
+		return c.ServerResourcesForGroupVersionHandler(groupVersion)
 	}
 
 	return nil, errors.NewNotFound(schema.GroupResource{}, "")
 }
 
 func (c *fakeDiscoveryClient) ServerResources() ([]*metav1.APIResourceList, error) {
-	c.resourceCalls = c.resourceCalls + 1
+	c.ResourceCalls = c.ResourceCalls + 1
+	if c.ServerResourcesHandler != nil {
+		return c.ServerResourcesHandler()
+	}
 	return []*metav1.APIResourceList{}, nil
 }
 
 func (c *fakeDiscoveryClient) ServerPreferredResources() ([]*metav1.APIResourceList, error) {
-	c.resourceCalls = c.resourceCalls + 1
+	c.ResourceCalls = c.ResourceCalls + 1
 	return nil, nil
 }
 
 func (c *fakeDiscoveryClient) ServerPreferredNamespacedResources() ([]*metav1.APIResourceList, error) {
-	c.resourceCalls = c.resourceCalls + 1
+	c.ResourceCalls = c.ResourceCalls + 1
 	return nil, nil
 }
 
 func (c *fakeDiscoveryClient) ServerVersion() (*version.Info, error) {
-	c.versionCalls = c.versionCalls + 1
+	c.VersionCalls = c.VersionCalls + 1
 	return &version.Info{}, nil
 }
 
 func (c *fakeDiscoveryClient) SwaggerSchema(version schema.GroupVersion) (*swagger.ApiDeclaration, error) {
-	c.swaggerCalls = c.swaggerCalls + 1
+	c.SwaggerCalls = c.SwaggerCalls + 1
 	return &swagger.ApiDeclaration{}, nil
 }
