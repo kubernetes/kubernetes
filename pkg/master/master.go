@@ -361,7 +361,7 @@ type nodeAddressProvider struct {
 	nodeClient corev1client.NodeInterface
 }
 
-func (n nodeAddressProvider) externalAddresses() (addresses []string, err error) {
+func (n nodeAddressProvider) externalAddresses() ([]string, error) {
 	preferredAddressTypes := []apiv1.NodeAddressType{
 		apiv1.NodeExternalIP,
 		apiv1.NodeLegacyHostIP,
