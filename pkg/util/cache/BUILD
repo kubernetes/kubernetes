@@ -26,7 +26,10 @@ go_test(
     ],
     library = ":go_default_library",
     tags = ["automanaged"],
-    deps = ["//vendor:github.com/golang/groupcache/lru"],
+    deps = [
+        "//pkg/util/clock:go_default_library",
+        "//vendor:github.com/golang/groupcache/lru",
+    ],
 )
 
 filegroup(
