@@ -2107,10 +2107,9 @@ type PodSpec struct {
 	// of that value or the sum of the normal containers. Limits are applied to init containers
 	// in a similar fashion.
 	// Init containers cannot currently be added or removed.
-	// Init containers are in alpha state and may change without notice.
 	// Cannot be updated.
 	// More info: http://kubernetes.io/docs/user-guide/containers
-	InitContainers []Container `json:"-"  patchStrategy:"merge" patchMergeKey:"name"`
+	InitContainers []Container `json:"initContainers,omitempty" patchStrategy:"merge" patchMergeKey:"name" protobuf:"bytes,20,rep,name=initContainers"`
 	// List of containers belonging to the pod.
 	// Containers cannot currently be added or removed.
 	// There must be at least one container in a Pod.
@@ -2294,12 +2293,12 @@ type PodStatus struct {
 	// +optional
 	StartTime *metav1.Time `json:"startTime,omitempty" protobuf:"bytes,7,opt,name=startTime"`
 
-	// The list has one entry per init container in the manifest. The most recent successful
+		// The list has one entry per init container in the manifest. The most recent successful
 	// init container will have ready = true, the most recently started container will have
 	// startTime set.
-	// Init containers are in alpha state and may change without notice.
 	// More info: http://kubernetes.io/docs/user-guide/pod-states#container-statuses
-	InitContainerStatuses []ContainerStatus `json:"-"`
+	InitContainerStatuses []ContainerStatus `json:"initContainerStatuses,omitempty" protobuf:"bytes,10,rep,name=initContainerStatuses"`
+
 	// The list has one entry per container in the manifest. Each entry is currently the output
 	// of `docker inspect`.
 	// More info: http://kubernetes.io/docs/user-guide/pod-states#container-statuses
