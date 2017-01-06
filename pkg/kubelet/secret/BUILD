@@ -11,7 +11,7 @@ load(
 go_test(
     name = "go_default_test",
     srcs = ["secret_manager_test.go"],
-    library = "go_default_library",
+    library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
         "//pkg/api/v1:go_default_library",
@@ -33,7 +33,18 @@ go_library(
         "//pkg/client/clientset_generated/clientset:go_default_library",
         "//pkg/storage/etcd:go_default_library",
         "//pkg/util/sets:go_default_library",
-        "//pkg/util/wait:go_default_library",
-        "//vendor:github.com/golang/glog",
     ],
+)
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [":package-srcs"],
+    tags = ["automanaged"],
 )
