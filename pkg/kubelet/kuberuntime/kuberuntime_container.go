@@ -141,12 +141,21 @@ func (m *kubeGenericRuntimeManager) startContainer(podSandboxID string, podSandb
 
 	// Symlink container logs to the legacy container log location for cluster logging
 	// support.
+	// Remove the legacy container log firstly.
 	// TODO(random-liu): Remove this after cluster logging supports CRI container log path.
 	containerMeta := containerConfig.GetMetadata()
 	sandboxMeta := podSandboxConfig.GetMetadata()
 	legacySymlink := legacyLogSymlink(containerID, containerMeta.Name, sandboxMeta.Name,
 		sandboxMeta.Namespace)
 	containerLog := filepath.Join(podSandboxConfig.LogDirectory, containerConfig.LogPath)
+	existedlogsymlinks, _ := m.osInterface.Glob(filepath.Join(legacyContainerLogsDir, fmt.Sprintf("*.%s", legacyLogSuffix)))
+	for _, existedlogsymlink := range existedlogsymlinks {
+		if existedcontainerLog, _ := os.Readlink(existedlogsymlink); existedcontainerLog == containerLog {
+			if err := m.osInterface.Remove(existedlogsymlink); err == nil {
+				glog.Warningf("Deleted container %q previously existing legacy symlink file: %q", containerID, existedlogsymlink)
+			}
+		}
+	}
 	if err := m.osInterface.Symlink(containerLog, legacySymlink); err != nil {
 		glog.Errorf("Failed to create legacy symbolic link %q to container %q log %q: %v",
 			legacySymlink, containerID, containerLog, err)
