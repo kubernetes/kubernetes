@@ -207,7 +207,7 @@ func (fcc FileContentCheck) Check() (warnings, errors []error) {
 	}
 
 	if buf.String() != fcc.Content {
-		errors = append(errors, fmt.Errorf("%s contents are not set to 1", fcc.Path))
+		errors = append(errors, fmt.Errorf("%s contents are not set to %s", fcc.Path, fcc.Content))
 		return nil, errors
 	}
 	return nil, errors
