@@ -64,7 +64,7 @@ func (r *streamingRuntime) PortForward(podSandboxID string, port int32, stream i
 	if port < 0 || port > math.MaxUint16 {
 		return fmt.Errorf("invalid port %d", port)
 	}
-	return dockertools.PortForward(r.client, podSandboxID, uint16(port), stream)
+	return dockertools.PortForward(r.client, podSandboxID, port, stream)
 }
 
 // ExecSync executes a command in the container, and returns the stdout output.

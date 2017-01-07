@@ -164,7 +164,7 @@ func TestGetPortForward(t *testing.T) {
 	assert.NoError(t, err)
 	resp, err := server.GetPortForward(request)
 	assert.NoError(t, err)
-	expectedURL := "http://" + testAddr + "/portforward/" + testPodSandboxID
+	expectedURL := "http://" + testAddr + "/portforward/" + testPodSandboxID + "?port=1%2C2%2C3%2C4"
 	assert.Equal(t, expectedURL, resp.GetUrl())
 
 	// TLS
@@ -175,7 +175,7 @@ func TestGetPortForward(t *testing.T) {
 	assert.NoError(t, err)
 	resp, err = tlsServer.GetPortForward(request)
 	assert.NoError(t, err)
-	expectedURL = "https://" + testAddr + "/portforward/" + testPodSandboxID
+	expectedURL = "https://" + testAddr + "/portforward/" + testPodSandboxID + "?port=1%2C2%2C3%2C4"
 	assert.Equal(t, expectedURL, resp.GetUrl())
 }
 

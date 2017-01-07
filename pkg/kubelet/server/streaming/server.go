@@ -23,6 +23,8 @@ import (
 	"net/http"
 	"net/url"
 	"path"
+	"strconv"
+	"strings"
 	"time"
 
 	restful "github.com/emicklei/go-restful"
@@ -148,7 +150,7 @@ type server struct {
 }
 
 func (s *server) GetExec(req *runtimeapi.ExecRequest) (*runtimeapi.ExecResponse, error) {
-	url := s.buildURL("exec", req.GetContainerId(), streamOpts{
+	url := s.buildStreamURL("exec", req.GetContainerId(), streamOpts{
 		stdin:   req.GetStdin(),
 		stdout:  true,
 		stderr:  !req.GetTty(), // For TTY connections, both stderr is combined with stdout.
@@ -161,7 +163,7 @@ func (s *server) GetExec(req *runtimeapi.ExecRequest) (*runtimeapi.ExecResponse,
 }
 
 func (s *server) GetAttach(req *runtimeapi.AttachRequest) (*runtimeapi.AttachResponse, error) {
-	url := s.buildURL("attach", req.GetContainerId(), streamOpts{
+	url := s.buildStreamURL("attach", req.GetContainerId(), streamOpts{
 		stdin:  req.GetStdin(),
 		stdout: true,
 		stderr: !req.GetTty(), // For TTY connections, both stderr is combined with stdout.
@@ -173,7 +175,9 @@ func (s *server) GetAttach(req *runtimeapi.AttachRequest) (*runtimeapi.AttachRes
 }
 
 func (s *server) GetPortForward(req *runtimeapi.PortForwardRequest) (*runtimeapi.PortForwardResponse, error) {
-	url := s.buildURL("portforward", req.GetPodSandboxId(), streamOpts{})
+	url := s.buildPortForwardURL("portforward", req.GetPodSandboxId(), portForwardOpts{
+		port: req.Port,
+	})
 	return &runtimeapi.PortForwardResponse{
 		Url: &url,
 	}, nil
@@ -213,7 +217,10 @@ type streamOpts struct {
 	tty    bool
 
 	command []string
-	port    []int32
+}
+
+type portForwardOpts struct {
+	port []int32
 }
 
 const (
@@ -222,9 +229,10 @@ const (
 	urlParamStderr  = api.ExecStderrParam
 	urlParamTTY     = api.ExecTTYParam
 	urlParamCommand = api.ExecCommandParamm
+	urlParamPort    = api.PortHeader
 )
 
-func (s *server) buildURL(method, id string, opts streamOpts) string {
+func (s *server) buildStreamURL(method, id string, opts streamOpts) string {
 	loc := &url.URL{
 		Path: path.Join(method, id),
 	}
@@ -245,6 +253,22 @@ func (s *server) buildURL(method, id string, opts streamOpts) string {
 	for _, c := range opts.command {
 		query.Add(urlParamCommand, c)
 	}
+	loc.RawQuery = query.Encode()
+
+	return s.config.BaseURL.ResolveReference(loc).String()
+}
+
+func (s *server) buildPortForwardURL(method, id string, opts portForwardOpts) string {
+	loc := &url.URL{
+		Path: path.Join(method, id),
+	}
+
+	ports := make([]string, len(opts.port))
+	for i, p := range opts.port {
+		ports[i] = strconv.FormatInt(int64(p), 10)
+	}
+	query := url.Values{}
+	query.Add(urlParamPort, strings.Join(ports, ","))
 	loc.RawQuery = query.Encode()
 
 	return s.config.BaseURL.ResolveReference(loc).String()
@@ -311,12 +335,19 @@ func (s *server) servePortForward(req *restful.Request, resp *restful.Response) 
 		return
 	}
 
+	portForwardOptions, err := portforward.NewV4Options(req.Request)
+	if err != nil {
+		resp.WriteError(http.StatusBadRequest, err)
+		return
+	}
+
 	portforward.ServePortForward(
 		resp.ResponseWriter,
 		req.Request,
 		s.runtime,
 		podSandboxID,
 		"", // unused: podUID
+		portForwardOptions,
 		s.config.StreamIdleTimeout,
 		s.config.StreamCreationTimeout,
 		s.config.SupportedPortForwardProtocols)
@@ -340,6 +371,6 @@ func (a *criAdapter) AttachContainer(podName string, podUID types.UID, container
 	return a.Attach(container, in, out, err, tty, resize)
 }
 
-func (a *criAdapter) PortForward(podName string, podUID types.UID, port uint16, stream io.ReadWriteCloser) error {
-	return a.Runtime.PortForward(podName, int32(port), stream)
+func (a *criAdapter) PortForward(podName string, podUID types.UID, port int32, stream io.ReadWriteCloser) error {
+	return a.Runtime.PortForward(podName, port, stream)
 }
