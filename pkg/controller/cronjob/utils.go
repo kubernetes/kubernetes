@@ -125,6 +125,7 @@ func getRecentUnmetScheduleTimes(sj batch.CronJob, now time.Time) ([]time.Time, 
 	if err != nil {
 		return starts, fmt.Errorf("Unparseable schedule: %s : %s", sj.Spec.Schedule, err)
 	}
+
 	var earliestTime time.Time
 	if sj.Status.LastScheduleTime != nil {
 		earliestTime = sj.Status.LastScheduleTime.Time
@@ -137,7 +138,14 @@ func getRecentUnmetScheduleTimes(sj batch.CronJob, now time.Time) ([]time.Time, 
 		// CronJob as last known start time.
 		earliestTime = sj.ObjectMeta.CreationTimestamp.Time
 	}
+	if sj.Spec.StartingDeadlineSeconds != nil {
+		// Controller is not going to schedule anything below this point
+		schedulingDeadline := now.Add(-time.Second * time.Duration(*sj.Spec.StartingDeadlineSeconds))
 
+		if schedulingDeadline.After(earliestTime) {
+			earliestTime = schedulingDeadline
+		}
+	}
 	if earliestTime.After(now) {
 		return []time.Time{}, nil
 	}
@@ -163,7 +171,7 @@ func getRecentUnmetScheduleTimes(sj batch.CronJob, now time.Time) ([]time.Time, 
 		// but less than "lots".
 		if len(starts) > 100 {
 			// We can't get the most recent times so just return an empty slice
-			return []time.Time{}, fmt.Errorf("Too many missed start times to list")
+			return []time.Time{}, fmt.Errorf("Too many missed start time (> 100). Set or decrease .spec.startingDeadlineSeconds or check clock skew.")
 		}
 	}
 	return starts, nil
