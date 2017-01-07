@@ -21,6 +21,7 @@ package evictions
 import (
 	"fmt"
 	"net/http/httptest"
+	"sync"
 	"testing"
 	"time"
 
@@ -33,13 +34,14 @@ import (
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/controller/disruption"
 	"k8s.io/kubernetes/pkg/controller/informers"
+	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
 const (
-	defaultTimeout = 5 * time.Minute
+	numOfEvictions = 10
 )
 
 func newPod(podName string) *v1.Pod {
@@ -146,8 +148,8 @@ func TestConcurrentEvictionRequests(t *testing.T) {
 		GracePeriodSeconds: &gracePeriodSeconds,
 	}
 
-	// Generate 10 pods to evict
-	for i := 0; i < 10; i++ {
+	// Generate numOfEvictions pods to evict
+	for i := 0; i < numOfEvictions; i++ {
 		podName := fmt.Sprintf(podNameFormat, i)
 		pod := newPod(podName)
 
@@ -161,76 +163,86 @@ func TestConcurrentEvictionRequests(t *testing.T) {
 		}
 	}
 
-	waitToObservePods(t, podInformer, 10)
+	waitToObservePods(t, podInformer, numOfEvictions)
 
 	pdb := newPDB()
 	if _, err := clientSet.Policy().PodDisruptionBudgets(ns.Name).Create(pdb); err != nil {
 		t.Errorf("Failed to create PodDisruptionBudget: %v", err)
 	}
 
-	waitPDBStable(t, clientSet, 10, ns.Name, pdb.Name)
+	waitPDBStable(t, clientSet, numOfEvictions, ns.Name, pdb.Name)
 
-	doneCh := make(chan bool, 10)
-	errCh := make(chan error, 1)
-	// spawn 10 goroutine to concurrently evict the pods
-	for i := 0; i < 10; i++ {
+	doneCh := make(chan bool, numOfEvictions)
+	errCh := make(chan error, 2*numOfEvictions)
+	var wg sync.WaitGroup
+	// spawn numOfEvictions goroutines to concurrently evict the pods
+	for i := 0; i < numOfEvictions; i++ {
+		wg.Add(1)
 		go func(id int, doneCh chan bool, errCh chan error) {
-			evictionName := fmt.Sprintf(podNameFormat, id)
-			eviction := newEviction(ns.Name, evictionName, deleteOption)
-
+			defer wg.Done()
+			podName := fmt.Sprintf(podNameFormat, id)
+			eviction := newEviction(ns.Name, podName, deleteOption)
 			var e error
-			for {
+			if err := wait.PollImmediate(5*time.Second, 60*time.Second, func() (bool, error) {
 				e = clientSet.Policy().Evictions(ns.Name).Evict(eviction)
-				if errors.IsTooManyRequests(e) {
-					time.Sleep(5 * time.Second)
-				} else {
-					break
+				switch {
+				case errors.IsTooManyRequests(e):
+					return false, nil
+				case errors.IsConflict(e):
+					return false, fmt.Errorf("Unexpected Conflict (409) error caused by failing to handle concurrent PDB updates: %v", e)
+				case e == nil:
+					return true, nil
+				default:
+					return false, e
+				}
+			}); err != nil {
+				errCh <- err
+			} else {
+				_, err = clientSet.Core().Pods(ns.Name).Get(podName, metav1.GetOptions{})
+				switch {
+				case errors.IsNotFound(err):
+					doneCh <- true
+				case err == nil:
+					errCh <- fmt.Errorf("Pod %q is expected to be evicted", podName)
+					e = clientSet.Core().Pods(ns.Name).Delete(podName, deleteOption)
+					if e != nil {
+						errCh <- e
+					}
+				default:
+					errCh <- err
+					e = clientSet.Core().Pods(ns.Name).Delete(podName, deleteOption)
+					if e != nil {
+						errCh <- e
+					}
 				}
 			}
-			if e != nil {
-				if errors.IsConflict(e) {
-					e = fmt.Errorf("Unexpected Conflict (409) error caused by failing to handle concurrent PDB updates: %v", e)
-				}
-				errCh <- e
-				return
-			}
-			doneCh <- true
 		}(i, doneCh, errCh)
 	}
 
-	doneCount := 0
-loop:
-	for {
-		select {
-		case err := <-errCh:
-			t.Errorf("%v", err)
-			break loop
-		case <-doneCh:
-			doneCount++
-			if doneCount == 10 {
-				break loop
-			}
-		case <-time.After(defaultTimeout):
-			t.Errorf("Eviction did not complete within %v", defaultTimeout)
-			break loop
-		}
-	}
+	wg.Wait()
 
-	for i := 0; i < 10; i++ {
-		podName := fmt.Sprintf(podNameFormat, i)
-		_, err := clientSet.Core().Pods(ns.Name).Get(podName, metav1.GetOptions{})
-		if !errors.IsNotFound(err) {
-			t.Errorf("Pod %q is expected to be evicted", podName)
-			if err == nil {
-				clientSet.Core().Pods(ns.Name).Delete(podName, deleteOption)
-			}
-		}
-	}
-
+	close(doneCh)
+	close(errCh)
+	var errList []error
 	if err := clientSet.Policy().PodDisruptionBudgets(ns.Name).Delete(pdb.Name, deleteOption); err != nil {
-		t.Errorf("Failed to delete PodDisruptionBudget: %v", err)
+		errList = append(errList, fmt.Errorf("Failed to delete PodDisruptionBudget: %v", err))
+	}
+	for err := range errCh {
+		errList = append(errList, err)
+	}
+	if len(errList) > 0 {
+		t.Fatal(utilerrors.NewAggregate(errList))
 	}
 
+	doneCount := 0
+	for done := range doneCh {
+		if done {
+			doneCount++
+		}
+	}
+	if doneCount != numOfEvictions {
+		t.Fatalf("fewer number of successful evictions than expected :", doneCount)
+	}
 }
 
 // wait for the podInformer to observe the pods. Call this function before
