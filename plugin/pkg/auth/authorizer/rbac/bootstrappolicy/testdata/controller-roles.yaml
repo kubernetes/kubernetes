@@ -264,6 +264,15 @@ items:
     - list
     - watch
   - apiGroups:
+    - apps
+    attributeRestrictions: null
+    resources:
+    - statefulsets
+    verbs:
+    - get
+    - list
+    - watch
+  - apiGroups:
     - policy
     attributeRestrictions: null
     resources:
