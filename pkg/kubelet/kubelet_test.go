@@ -2001,12 +2001,12 @@ func TestHandlePortConflicts(t *testing.T) {
 func TestCriticalPrioritySorting(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	kl := testKubelet.kubelet
-	nodes := []v1.Node{
-		{ObjectMeta: v1.ObjectMeta{Name: testKubeletHostname},
-			Status: v1.NodeStatus{Capacity: v1.ResourceList{}, Allocatable: v1.ResourceList{
-				v1.ResourceCPU:    *resource.NewMilliQuantity(10, resource.DecimalSI),
-				v1.ResourceMemory: *resource.NewQuantity(100, resource.BinarySI),
-				v1.ResourcePods:   *resource.NewQuantity(40, resource.DecimalSI),
+	nodes := []api.Node{
+		{ObjectMeta: api.ObjectMeta{Name: testKubeletHostname},
+			Status: api.NodeStatus{Capacity: api.ResourceList{}, Allocatable: api.ResourceList{
+				api.ResourceCPU:    *resource.NewMilliQuantity(10, resource.DecimalSI),
+				api.ResourceMemory: *resource.NewQuantity(100, resource.BinarySI),
+				api.ResourcePods:   *resource.NewQuantity(40, resource.DecimalSI),
 			}}},
 	}
 	kl.nodeLister = testNodeLister{nodes: nodes}
@@ -2015,13 +2015,13 @@ func TestCriticalPrioritySorting(t *testing.T) {
 	testKubelet.fakeCadvisor.On("ImagesFsInfo").Return(cadvisorapiv2.FsInfo{}, nil)
 	testKubelet.fakeCadvisor.On("RootFsInfo").Return(cadvisorapiv2.FsInfo{}, nil)
 
-	spec := v1.PodSpec{NodeName: string(kl.nodeName),
-		Containers: []v1.Container{{Resources: v1.ResourceRequirements{
-			Requests: v1.ResourceList{
+	spec := api.PodSpec{NodeName: string(kl.nodeName),
+		Containers: []api.Container{{Resources: api.ResourceRequirements{
+			Requests: api.ResourceList{
 				"memory": resource.MustParse("90"),
 			},
 		}}}}
-	pods := []*v1.Pod{
+	pods := []*api.Pod{
 		podWithUidNameNsSpec("000000000", "newpod", "foo", spec),
 		podWithUidNameNsSpec("987654321", "oldpod", "foo", spec),
 		podWithUidNameNsSpec("123456789", "middlepod", "foo", spec),
@@ -2029,9 +2029,9 @@ func TestCriticalPrioritySorting(t *testing.T) {
 
 	// Pods are not sorted by creation time.
 	startTime := time.Now()
-	pods[0].CreationTimestamp = metav1.NewTime(startTime.Add(10 * time.Second))
-	pods[1].CreationTimestamp = metav1.NewTime(startTime)
-	pods[2].CreationTimestamp = metav1.NewTime(startTime.Add(1 * time.Second))
+	pods[0].CreationTimestamp = unversioned.NewTime(startTime.Add(10 * time.Second))
+	pods[1].CreationTimestamp = unversioned.NewTime(startTime)
+	pods[2].CreationTimestamp = unversioned.NewTime(startTime.Add(1 * time.Second))
 
 	// Make the middle and new pod critical, the middle pod should win
 	// even though it comes later in the list
@@ -2041,7 +2041,7 @@ func TestCriticalPrioritySorting(t *testing.T) {
 	pods[2].Annotations = critical
 
 	// The non-critical pod should be rejected
-	notfittingPods := []*v1.Pod{pods[0], pods[1]}
+	notfittingPods := []*api.Pod{pods[0], pods[1]}
 	fittingPod := pods[2]
 
 	kl.HandlePodAdditions(pods)
@@ -2050,13 +2050,13 @@ func TestCriticalPrioritySorting(t *testing.T) {
 	for _, p := range notfittingPods {
 		status, found := kl.statusManager.GetPodStatus(p.UID)
 		require.True(t, found, "Status of pod %q is not found in the status map", p.UID)
-		require.Equal(t, v1.PodFailed, status.Phase)
+		require.Equal(t, api.PodFailed, status.Phase)
 	}
 
 	// fittingPod should be Pending
 	status, found := kl.statusManager.GetPodStatus(fittingPod.UID)
 	require.True(t, found, "Status of pod %q is not found in the status map", fittingPod.UID)
-	require.Equal(t, v1.PodPending, status.Phase)
+	require.Equal(t, api.PodPending, status.Phase)
 }
 
 // Tests that we handle host name conflicts correctly by setting the failed status in status map.

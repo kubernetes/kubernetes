@@ -2442,12 +2442,6 @@ func (kl *Kubelet) HandlePodAdditions(pods []*api.Pod) {
 	sort.Sort(sliceutils.PodsByCreationTime(nonCriticalPods))
 
 	for _, pod := range append(criticalPods, nonCriticalPods...) {
-		existingPods := kl.podManager.GetPods()
-		// Always add the pod to the pod manager. Kubelet relies on the pod
-		// manager as the source of truth for the desired state. If a pod does
-		// not exist in the pod manager, it means that it has been deleted in
-		// the apiserver and no action (other than cleanup) is required.
-		kl.podManager.AddPod(pod)
 
 		if kubepod.IsMirrorPod(pod) {
 			kl.podManager.AddPod(pod)

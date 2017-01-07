@@ -259,7 +259,7 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 		}
 		status := api.PodStatus{
 			Phase:   api.PodFailed,
-			Message: fmt.Sprintf(message, resourceToReclaim),
+			Message: message,
 			Reason:  reason,
 		}
 		// record that we are evicting the pod
