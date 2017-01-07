@@ -363,16 +363,21 @@ func TestPortForwardLocation(t *testing.T) {
 		},
 		{
 			in: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "ns",
+					Name:      "pod1",
+				},
 				Spec: api.PodSpec{
 					NodeName: "node1",
 				},
 			},
+			info:        &client.ConnectionInfo{},
 			opts:        &api.PodPortForwardOptions{},
-			expectedErr: errors.NewBadRequest("at least one port must be specified"),
+			expectedURL: &url.URL{Host: ":", Path: "/portForward/ns/pod1"},
 		},
 		{
 			in: &api.Pod{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Namespace: "ns",
 					Name:      "pod1",
 				},

@@ -302,12 +302,19 @@ func (s *server) servePortForward(req *restful.Request, resp *restful.Response) 
 		return
 	}
 
+	portForwardOptions, err := portforward.NewV4Options(req.Request)
+	if err != nil {
+		resp.WriteError(http.StatusBadRequest, err)
+		return
+	}
+
 	portforward.ServePortForward(
 		resp.ResponseWriter,
 		req.Request,
 		s.runtime,
 		pf.PodSandboxId,
 		"", // unused: podUID
+		portForwardOptions,
 		s.config.StreamIdleTimeout,
 		s.config.StreamCreationTimeout,
 		s.config.SupportedPortForwardProtocols)
@@ -331,6 +338,6 @@ func (a *criAdapter) AttachContainer(podName string, podUID types.UID, container
 	return a.Attach(container, in, out, err, tty, resize)
 }
 
-func (a *criAdapter) PortForward(podName string, podUID types.UID, port uint16, stream io.ReadWriteCloser) error {
-	return a.Runtime.PortForward(podName, int32(port), stream)
+func (a *criAdapter) PortForward(podName string, podUID types.UID, port int32, stream io.ReadWriteCloser) error {
+	return a.Runtime.PortForward(podName, port, stream)
 }
