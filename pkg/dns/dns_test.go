@@ -272,8 +272,10 @@ func TestSimpleHeadlessService(t *testing.T) {
 	assert.NoError(t, kd.endpointsStore.Add(endpoints))
 	kd.newService(s)
 	assertDNSForHeadlessService(t, kd, endpoints)
+	assertNoReverseDNSForHeadlessService(t, kd, endpoints)
 	kd.removeService(s)
 	assertNoDNSForHeadlessService(t, kd, s)
+	assertNoReverseDNSForHeadlessService(t, kd, endpoints)
 }
 
 func TestHeadlessServiceWithNamedPorts(t *testing.T) {
@@ -299,9 +301,11 @@ func TestHeadlessServiceWithNamedPorts(t *testing.T) {
 	// We expect 6 records. 4 SRV records. 2 POD records.
 	assertDNSForHeadlessService(t, kd, endpoints)
 	assertSRVForHeadlessService(t, kd, service, endpoints)
+	assertNoReverseDNSForHeadlessService(t, kd, endpoints)
 
 	kd.removeService(service)
 	assertNoDNSForHeadlessService(t, kd, service)
+	assertNoReverseDNSForHeadlessService(t, kd, endpoints)
 }
 
 func TestHeadlessServiceEndpointsUpdate(t *testing.T) {
@@ -325,15 +329,133 @@ func TestHeadlessServiceEndpointsUpdate(t *testing.T) {
 	// expected DNSRecords = 4
 	kd.handleEndpointAdd(endpoints)
 	assertDNSForHeadlessService(t, kd, endpoints)
+	assertNoReverseDNSForHeadlessService(t, kd, endpoints)
 
 	// remove all endpoints
 	endpoints.Subsets = []v1.EndpointSubset{}
 	kd.handleEndpointAdd(endpoints)
 	assertNoDNSForHeadlessService(t, kd, service)
+	assertNoReverseDNSForHeadlessService(t, kd, endpoints)
 
 	// remove service
 	kd.removeService(service)
 	assertNoDNSForHeadlessService(t, kd, service)
+	assertNoReverseDNSForHeadlessService(t, kd, endpoints)
+}
+
+func TestNamedHeadlessServiceEndpointAdd(t *testing.T) {
+	kd := newKubeDNS()
+
+	service := newHeadlessService()
+	// add service to store
+	assert.NoError(t, kd.servicesStore.Add(service))
+
+	endpoints := newEndpoints(service, v1.EndpointSubset{
+		Addresses: []v1.EndpointAddress{
+			{
+				IP: "10.0.0.1",
+				TargetRef: &v1.ObjectReference{
+					Kind:      "Pod",
+					Name:      "foo",
+					Namespace: testNamespace,
+				},
+				Hostname: "foo",
+			},
+		},
+		Ports: []v1.EndpointPort{},
+	})
+	// add endpoints to store
+	assert.NoError(t, kd.endpointsStore.Add(endpoints))
+
+	// add service
+	kd.newService(service)
+	assertDNSForHeadlessService(t, kd, endpoints)
+
+	kd.handleEndpointAdd(endpoints)
+	assertDNSForHeadlessService(t, kd, endpoints)
+	assertReverseDNSForNamedHeadlessService(t, kd, endpoints)
+}
+
+func TestNamedHeadlessServiceEndpointUpdate(t *testing.T) {
+	kd := newKubeDNS()
+
+	service := newHeadlessService()
+	// add service to store
+	assert.NoError(t, kd.servicesStore.Add(service))
+
+	oldEndpoints := newEndpoints(service, v1.EndpointSubset{
+		Addresses: []v1.EndpointAddress{
+			{
+				IP: "10.0.0.1",
+				TargetRef: &v1.ObjectReference{
+					Kind:      "Pod",
+					Name:      "foo",
+					Namespace: testNamespace,
+				},
+				Hostname: "foo",
+			},
+		},
+		Ports: []v1.EndpointPort{},
+	})
+	// add endpoints to store
+	assert.NoError(t, kd.endpointsStore.Add(oldEndpoints))
+
+	newEndpoints := newEndpoints(service, v1.EndpointSubset{
+		Addresses: []v1.EndpointAddress{
+			{
+				IP: "10.0.0.2",
+				TargetRef: &v1.ObjectReference{
+					Kind:      "Pod",
+					Name:      "foo",
+					Namespace: testNamespace,
+				},
+				Hostname: "foo",
+			},
+		},
+		Ports: []v1.EndpointPort{},
+	})
+
+	// add service
+	kd.newService(service)
+	assertDNSForHeadlessService(t, kd, oldEndpoints)
+
+	kd.handleEndpointUpdate(oldEndpoints, newEndpoints)
+	assertDNSForHeadlessService(t, kd, newEndpoints)
+	assertNoReverseDNSForHeadlessService(t, kd, oldEndpoints)
+	assertReverseDNSForNamedHeadlessService(t, kd, newEndpoints)
+}
+
+func TestNamedHeadlessServiceEndpointDelete(t *testing.T) {
+	kd := newKubeDNS()
+
+	service := newHeadlessService()
+	// add service to store
+	assert.NoError(t, kd.servicesStore.Add(service))
+
+	endpoints := newEndpoints(service, v1.EndpointSubset{
+		Addresses: []v1.EndpointAddress{
+			{
+				IP: "10.0.0.1",
+				TargetRef: &v1.ObjectReference{
+					Kind:      "Pod",
+					Name:      "foo",
+					Namespace: testNamespace,
+				},
+				Hostname: "foo",
+			},
+		},
+		Ports: []v1.EndpointPort{},
+	})
+	// add endpoints to store
+	assert.NoError(t, kd.endpointsStore.Add(endpoints))
+
+	// add service
+	kd.newService(service)
+	assertDNSForHeadlessService(t, kd, endpoints)
+
+	kd.handleEndpointDelete(endpoints)
+	assertDNSForHeadlessService(t, kd, endpoints)
+	assertNoReverseDNSForHeadlessService(t, kd, endpoints)
 }
 
 func TestHeadlessServiceWithDelayedEndpointsAddition(t *testing.T) {
@@ -358,10 +480,12 @@ func TestHeadlessServiceWithDelayedEndpointsAddition(t *testing.T) {
 	kd.handleEndpointAdd(endpoints)
 
 	assertDNSForHeadlessService(t, kd, endpoints)
+	assertNoReverseDNSForHeadlessService(t, kd, endpoints)
 
 	// remove service
 	kd.removeService(service)
 	assertNoDNSForHeadlessService(t, kd, service)
+	assertNoReverseDNSForHeadlessService(t, kd, endpoints)
 }
 
 // Verifies that a single record with host "a" is returned for query "q".
@@ -721,6 +845,24 @@ func assertDNSForHeadlessService(t *testing.T, kd *KubeDNS, e *v1.Endpoints) {
 	}
 }
 
+func assertReverseDNSForNamedHeadlessService(t *testing.T, kd *KubeDNS, e *v1.Endpoints) {
+	for _, subset := range e.Subsets {
+		for _, endpointAddress := range subset.Addresses {
+			record := kd.reverseRecordMap[endpointAddress.IP]
+			t.Logf("got reverse host name %s", record.Host)
+			assert.Equal(t, record.Host, getPodsFQDN(kd, e, endpointAddress.Hostname))
+		}
+	}
+}
+
+func assertNoReverseDNSForHeadlessService(t *testing.T, kd *KubeDNS, e *v1.Endpoints) {
+	for _, subset := range e.Subsets {
+		for _, endpointAddress := range subset.Addresses {
+			assert.Nil(t, kd.reverseRecordMap[endpointAddress.IP])
+		}
+	}
+}
+
 func assertDNSForExternalService(t *testing.T, kd *KubeDNS, s *v1.Service) {
 	records, err := kd.Records(getServiceFQDN(kd.domain, s), false)
 	require.NoError(t, err)
@@ -832,6 +974,10 @@ func getFederationServiceFQDN(kd *KubeDNS, s *v1.Service, federationName string)
 
 func getEndpointsFQDN(kd *KubeDNS, e *v1.Endpoints) string {
 	return fmt.Sprintf("%s.%s.svc.%s", e.Name, e.Namespace, kd.domain)
+}
+
+func getPodsFQDN(kd *KubeDNS, e *v1.Endpoints, podHostName string) string {
+	return fmt.Sprintf("%s.%s.%s.svc.%s", podHostName, e.Name, e.Namespace, kd.domain)
 }
 
 func getSRVFQDN(kd *KubeDNS, s *v1.Service, portName string) string {
