@@ -331,8 +331,8 @@ type Volumes interface {
 	// Check if the volume is already attached to the node with the specified NodeName
 	DiskIsAttached(diskName KubernetesVolumeID, nodeName types.NodeName) (bool, error)
 
-	// Check if a list of volumes are attached to the node with the specified NodeName
-	DisksAreAttached(diskNames []KubernetesVolumeID, nodeName types.NodeName) (map[KubernetesVolumeID]bool, error)
+	// Check if specified volumes are attached to the associated node
+	DisksAreAttached(diskNamesByNode map[types.NodeName][]KubernetesVolumeID) (map[KubernetesVolumeID]bool, error)
 }
 
 // InstanceGroups is an interface for managing cloud-managed instance groups / autoscaling instance groups
@@ -991,8 +991,8 @@ func (c *Cloud) InstanceType(nodeName types.NodeName) (string, error) {
 	return orEmpty(inst.InstanceType), nil
 }
 
-// Return a list of instances matching regex string.
-func (c *Cloud) getInstancesByRegex(regex string) ([]types.NodeName, error) {
+// getAllRunningInstances returns all running instances that are part of this cluster
+func (c *Cloud) getAllRunningInstances() ([]*ec2.Instance, error) {
 	filters := []*ec2.Filter{newEc2Filter("instance-state-name", "running")}
 	filters = c.addFilters(filters)
 	request := &ec2.DescribeInstancesInput{
@@ -1000,6 +1000,15 @@ func (c *Cloud) getInstancesByRegex(regex string) ([]types.NodeName, error) {
 	}
 
 	instances, err := c.ec2.DescribeInstances(request)
+	if err != nil {
+		return nil, err
+	}
+	return instances, nil
+}
+
+// Return a list of instances matching regex string.
+func (c *Cloud) getInstancesByRegex(regex string) ([]types.NodeName, error) {
+	instances, err := c.getAllRunningInstances()
 	if err != nil {
 		return []types.NodeName{}, err
 	}
@@ -1758,40 +1767,60 @@ func (c *Cloud) DiskIsAttached(diskName KubernetesVolumeID, nodeName types.NodeN
 	return false, nil
 }
 
-func (c *Cloud) DisksAreAttached(diskNames []KubernetesVolumeID, nodeName types.NodeName) (map[KubernetesVolumeID]bool, error) {
-	idToDiskName := make(map[awsVolumeID]KubernetesVolumeID)
+// DisksAreAttached implements Volumes.DisksAreAttached
+func (c *Cloud) DisksAreAttached(diskNamesByNode map[types.NodeName][]KubernetesVolumeID) (map[KubernetesVolumeID]bool, error) {
 	attached := make(map[KubernetesVolumeID]bool)
-	for _, diskName := range diskNames {
-		volumeID, err := diskName.mapToAWSVolumeID()
-		if err != nil {
-			return nil, fmt.Errorf("error mapping volume spec %q to aws id: %v", diskName, err)
-		}
-		idToDiskName[volumeID] = diskName
-		attached[diskName] = false
+
+	if len(diskNamesByNode) == 0 {
+		return attached, nil
 	}
-	awsInstance, err := c.getAwsInstance(nodeName)
+
+	// We assume we are being called for all nodes (or the majority)
+	// We used to call DisksAreAttached on a node-by-node basis, but that is a DescribeInstance call per node
+	// It seems that AWS quota is based on absolute number of calls, not their complexity,
+	// so we do better to fetch all our instances in one call, instead of making a sequence of calls
+	awsInstances, err := c.getAllRunningInstances()
 	if err != nil {
-		if err == cloudprovider.InstanceNotFound {
+		return nil, err
+	}
+
+	awsInstanceMap := make(map[types.NodeName]*ec2.Instance)
+	for _, awsInstance := range awsInstances {
+		awsInstanceMap[mapInstanceToNodeName(awsInstance)] = awsInstance
+	}
+
+	// Note that we check that the volume is attached to the correct node, not that it is attached to _a_ node
+	for nodeName, diskNames := range diskNamesByNode {
+		for _, diskName := range diskNames {
+			attached[diskName] = false
+		}
+
+		awsInstance := awsInstanceMap[nodeName]
+		if awsInstance == nil {
 			// If instance no longer exists, safe to assume volume is not attached.
 			glog.Warningf(
 				"Node %q does not exist. DisksAreAttached will assume disks %v are not attached to it.",
 				nodeName,
 				diskNames)
-			return attached, nil
+			continue
 		}
 
-		return attached, err
-	}
-	info, err := awsInstance.describeInstance()
-	if err != nil {
-		return attached, err
-	}
-	for _, blockDevice := range info.BlockDeviceMappings {
-		volumeID := awsVolumeID(aws.StringValue(blockDevice.Ebs.VolumeId))
-		diskName, found := idToDiskName[volumeID]
-		if found {
-			// Disk is still attached to node
-			attached[diskName] = true
+		idToDiskName := make(map[awsVolumeID]KubernetesVolumeID)
+		for _, diskName := range diskNames {
+			volumeID, err := diskName.mapToAWSVolumeID()
+			if err != nil {
+				return nil, fmt.Errorf("error mapping volume spec %q to aws id: %v", diskName, err)
+			}
+			idToDiskName[volumeID] = diskName
+		}
+
+		for _, blockDevice := range awsInstance.BlockDeviceMappings {
+			volumeID := awsVolumeID(aws.StringValue(blockDevice.Ebs.VolumeId))
+			diskName, found := idToDiskName[volumeID]
+			if found {
+				// Disk is still attached to node
+				attached[diskName] = true
+			}
 		}
 	}
 
