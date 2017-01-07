@@ -17,6 +17,7 @@ go_library(
         "aws_routes.go",
         "aws_utils.go",
         "device_allocator.go",
+        "instancecache.go",
         "log_handler.go",
         "retry_handler.go",
         "sets_ippermissions.go",

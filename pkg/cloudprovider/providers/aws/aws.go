@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"io"
 	"net"
-	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -378,6 +377,9 @@ type Cloud struct {
 
 	// state of our device allocator for each node
 	deviceAllocators map[types.NodeName]DeviceAllocator
+
+	// instanceCache is our local cache of AWS instances
+	instanceCache *instanceCache
 }
 
 var _ Volumes = &Cloud{}
@@ -813,6 +815,8 @@ func newAWSCloud(config io.Reader, awsServices Services) (*Cloud, error) {
 		deviceAllocators: make(map[types.NodeName]DeviceAllocator),
 	}
 
+	awsCloud.instanceCache = newInstanceCache(awsCloud)
+
 	selfAWSInstance, err := awsCloud.buildSelfAWSInstance()
 	if err != nil {
 		return nil, err
@@ -991,58 +995,6 @@ func (c *Cloud) InstanceType(nodeName types.NodeName) (string, error) {
 	return orEmpty(inst.InstanceType), nil
 }
 
-// Return a list of instances matching regex string.
-func (c *Cloud) getInstancesByRegex(regex string) ([]types.NodeName, error) {
-	filters := []*ec2.Filter{newEc2Filter("instance-state-name", "running")}
-	filters = c.addFilters(filters)
-	request := &ec2.DescribeInstancesInput{
-		Filters: filters,
-	}
-
-	instances, err := c.ec2.DescribeInstances(request)
-	if err != nil {
-		return []types.NodeName{}, err
-	}
-	if len(instances) == 0 {
-		return []types.NodeName{}, fmt.Errorf("no instances returned")
-	}
-
-	if strings.HasPrefix(regex, "'") && strings.HasSuffix(regex, "'") {
-		glog.Infof("Stripping quotes around regex (%s)", regex)
-		regex = regex[1 : len(regex)-1]
-	}
-
-	re, err := regexp.Compile(regex)
-	if err != nil {
-		return []types.NodeName{}, err
-	}
-
-	matchingInstances := []types.NodeName{}
-	for _, instance := range instances {
-		// Only return fully-ready instances when listing instances
-		// (vs a query by name, where we will return it if we find it)
-		if orEmpty(instance.State.Name) == "pending" {
-			glog.V(2).Infof("Skipping EC2 instance (pending): %s", *instance.InstanceId)
-			continue
-		}
-
-		nodeName := mapInstanceToNodeName(instance)
-		if nodeName == "" {
-			glog.V(2).Infof("Skipping EC2 instance (no PrivateDNSName): %s",
-				aws.StringValue(instance.InstanceId))
-			continue
-		}
-
-		for _, tag := range instance.Tags {
-			if orEmpty(tag.Key) == "Name" && re.MatchString(orEmpty(tag.Value)) {
-				matchingInstances = append(matchingInstances, nodeName)
-				break
-			}
-		}
-	}
-	glog.V(2).Infof("Matched EC2 instances: %s", matchingInstances)
-	return matchingInstances, nil
-}
 
 // getAllZones retrieves  a list of all the zones in which nodes are running
 // It currently involves querying all instances
@@ -1108,7 +1060,7 @@ type awsInstance struct {
 	ec2 EC2
 
 	// id in AWS
-	awsID string
+	awsID awsInstanceID
 
 	// node name in k8s
 	nodeName types.NodeName
@@ -3145,32 +3097,32 @@ func (c *Cloud) getInstanceByID(instanceID string) (*ec2.Instance, error) {
 	return instances[instanceID], nil
 }
 
-func (c *Cloud) getInstancesByIDs(instanceIDs []*string) (map[string]*ec2.Instance, error) {
-	instancesByID := make(map[string]*ec2.Instance)
-	if len(instanceIDs) == 0 {
-		return instancesByID, nil
-	}
-
-	request := &ec2.DescribeInstancesInput{
-		InstanceIds: instanceIDs,
-	}
-
-	instances, err := c.ec2.DescribeInstances(request)
-	if err != nil {
-		return nil, err
-	}
-
-	for _, instance := range instances {
-		instanceID := orEmpty(instance.InstanceId)
-		if instanceID == "" {
-			continue
-		}
-
-		instancesByID[instanceID] = instance
-	}
-
-	return instancesByID, nil
-}
+//func (c *Cloud) getInstancesByIDs(instanceIDs []*string) (map[string]*ec2.Instance, error) {
+//	instancesByID := make(map[string]*ec2.Instance)
+//	if len(instanceIDs) == 0 {
+//		return instancesByID, nil
+//	}
+//
+//	request := &ec2.DescribeInstancesInput{
+//		InstanceIds: instanceIDs,
+//	}
+//
+//	instances, err := c.ec2.DescribeInstances(request)
+//	if err != nil {
+//		return nil, err
+//	}
+//
+//	for _, instance := range instances {
+//		instanceID := orEmpty(instance.InstanceId)
+//		if instanceID == "" {
+//			continue
+//		}
+//
+//		instancesByID[instanceID] = instance
+//	}
+//
+//	return instancesByID, nil
+//}
 
 // Fetches and caches instances by node names; returns an error if any cannot be found.
 // This is implemented with a multi value filter on the node names, fetching the desired instances with a single query.
