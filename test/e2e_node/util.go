@@ -96,11 +96,13 @@ func tempSetEvictionHard(f *framework.Framework, evictionHard string) {
 // Must be called within a Context. Allows the function to modify the KubeletConfiguration during the BeforeEach of the context.
 // The change is reverted in the AfterEach of the context.
 func tempSetCurrentKubeletConfig(f *framework.Framework, updateFunction func(initialConfig *componentconfig.KubeletConfiguration)) {
-	var oldCfg *componentconfig.KubeletConfiguration = nil
+	var oldCfg *componentconfig.KubeletConfiguration
 	BeforeEach(func() {
 		oldCfg, err := getCurrentKubeletConfig()
 		framework.ExpectNoError(err)
-		newCfg := *oldCfg
+		clone, err := api.Scheme.DeepCopy(oldCfg)
+		framework.ExpectNoError(err)
+		newCfg := *clone.(*componentconfig.KubeletConfiguration)
 		updateFunction(&newCfg)
 		framework.ExpectNoError(setKubeletConfiguration(f, &newCfg))
 	})

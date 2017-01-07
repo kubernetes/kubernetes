@@ -111,6 +111,7 @@ var _ = framework.KubeDescribe("InodeEviction [Slow] [Serial] [Disruptive] [Flak
 	}
 	evictionTestTimeout := 30 * time.Minute
 	testCondition := "Disk Pressure due to Inodes"
+	// Set the EvictionHard threshold lower to decrease test time
 	evictionHardLimit := "nodefs.inodesFree<50%"
 
 	runEvictionTest(f, testCondition, podTestSpecs, evictionHardLimit, evictionTestTimeout, hasInodePressure)
