@@ -57,7 +57,7 @@ func NewV4Options(req *http.Request) (*V4Options, error) {
 
 	portStrings := req.URL.Query()[api.PortHeader]
 	if len(portStrings) == 0 {
-		return nil, fmt.Errorf("%q is required", api.PortHeader)
+		return nil, fmt.Errorf("%q header is required", api.PortHeader)
 	}
 
 	ports := make([]int32, 0, len(portStrings))
