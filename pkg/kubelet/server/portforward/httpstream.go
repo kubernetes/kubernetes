@@ -240,10 +240,10 @@ func (h *httpStreamHandler) portForward(p *httpStreamPair) {
 	defer p.errorStream.Close()
 
 	portString := p.dataStream.Headers().Get(api.PortHeader)
-	port, _ := strconv.ParseUint(portString, 10, 16)
+	port, _ := strconv.ParseInt(portString, 10, 32)
 
 	glog.V(5).Infof("(conn=%p, request=%s) invoking forwarder.PortForward for port %s", h.conn, p.requestID, portString)
-	err := h.forwarder.PortForward(h.pod, h.uid, uint16(port), p.dataStream)
+	err := h.forwarder.PortForward(h.pod, h.uid, int32(port), p.dataStream)
 	glog.V(5).Infof("(conn=%p, request=%s) done invoking forwarder.PortForward for port %s", h.conn, p.requestID, portString)
 
 	if err != nil {

@@ -45,21 +45,25 @@ const (
 
 // options contains details about which streams are required for
 // port forwarding.
-type v4Options struct {
-	ports []uint16
+type V4Options struct {
+	Ports []int32
 }
 
 // newOptions creates a new options from the Request.
-func newV4Options(req *http.Request) (*v4Options, error) {
-	portStrings := req.URL.Query()[api.PortHeader]
-	if len(portStrings) == 0 {
-		return nil, fmt.Errorf("%q is required", api.PortHeader)
+func NewV4Options(req *http.Request) (*V4Options, error) {
+	if !wsstream.IsWebSocketRequest(req) {
+		return &V4Options{}, nil
 	}
 
-	ports := make([]uint16, 0, len(portStrings))
+	portStrings := req.URL.Query()[api.PortHeader]
+	if len(portStrings) == 0 {
+		return nil, fmt.Errorf("%q header is required", api.PortHeader)
+	}
+
+	ports := make([]int32, 0, len(portStrings))
 	for _, portString := range portStrings {
 		if len(portString) == 0 {
-			return nil, fmt.Errorf("%q is cannot be empty", api.PortHeader)
+			return nil, fmt.Errorf("%q cannot be empty", api.PortHeader)
 		}
 		for _, p := range strings.Split(portString, ",") {
 			port, err := strconv.ParseUint(p, 10, 16)
@@ -69,25 +73,18 @@ func newV4Options(req *http.Request) (*v4Options, error) {
 			if port < 1 {
 				return nil, fmt.Errorf("port %q must be > 0", portString)
 			}
-			ports = append(ports, uint16(port))
+			ports = append(ports, int32(port))
 		}
 	}
 
-	return &v4Options{
-		ports: ports,
+	return &V4Options{
+		Ports: ports,
 	}, nil
 }
 
-func handleWebSocketStreams(req *http.Request, w http.ResponseWriter, portForwarder PortForwarder, podName string, uid types.UID, supportedPortForwardProtocols []string, idleTimeout, streamCreationTimeout time.Duration) error {
-	opts, err := newV4Options(req)
-	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		fmt.Fprint(w, err.Error())
-		return err
-	}
-
-	channels := make([]wsstream.ChannelType, 0, len(opts.ports)*2)
-	for i := 0; i < len(opts.ports); i++ {
+func handleWebSocketStreams(req *http.Request, w http.ResponseWriter, portForwarder PortForwarder, podName string, uid types.UID, opts *V4Options, supportedPortForwardProtocols []string, idleTimeout, streamCreationTimeout time.Duration) error {
+	channels := make([]wsstream.ChannelType, 0, len(opts.Ports)*2)
+	for i := 0; i < len(opts.Ports); i++ {
 		channels = append(channels, wsstream.ReadWriteChannel, wsstream.WriteChannel)
 	}
 	conn := wsstream.NewConn(map[string]wsstream.ChannelProtocolConfig{
@@ -111,17 +108,18 @@ func handleWebSocketStreams(req *http.Request, w http.ResponseWriter, portForwar
 		return err
 	}
 	defer conn.Close()
-	streamPairs := make([]*websocketStreamPair, len(opts.ports))
+	streamPairs := make([]*websocketStreamPair, len(opts.Ports))
 	for i := range streamPairs {
 		streamPair := websocketStreamPair{
-			port:        opts.ports[i],
+			port:        opts.Ports[i],
 			dataStream:  streams[i*2+dataChannel],
 			errorStream: streams[i*2+errorChannel],
 		}
 		streamPairs[i] = &streamPair
 
 		portBytes := make([]byte, 2)
-		binary.LittleEndian.PutUint16(portBytes, streamPair.port)
+		// port is always positive so conversion is allowable
+		binary.LittleEndian.PutUint16(portBytes, uint16(streamPair.port))
 		streamPair.dataStream.Write(portBytes)
 		streamPair.errorStream.Write(portBytes)
 	}
@@ -140,7 +138,7 @@ func handleWebSocketStreams(req *http.Request, w http.ResponseWriter, portForwar
 // websocketStreamPair represents the error and data streams for a port
 // forwarding request.
 type websocketStreamPair struct {
-	port        uint16
+	port        int32
 	dataStream  io.ReadWriteCloser
 	errorStream io.WriteCloser
 }
@@ -149,7 +147,7 @@ type websocketStreamPair struct {
 // request over a websocket connection
 type websocketStreamHandler struct {
 	conn        *wsstream.Conn
-	ports       []uint16
+	ports       []int32
 	streamPairs []*websocketStreamPair
 	pod         string
 	uid         types.UID
