@@ -29,6 +29,7 @@ import (
 	"runtime"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/golang/glog"
@@ -799,8 +800,8 @@ func (kl *Kubelet) HandlePodCleanups() error {
 // another goroutine isn't already in action.
 func (kl *Kubelet) podKiller() {
 	killing := sets.NewString()
-	resultCh := make(chan types.UID)
-	defer close(resultCh)
+	// guard for the killing set
+	lock := sync.Mutex{}
 	for {
 		select {
 		case podPair, ok := <-kl.podKillingCh:
@@ -811,24 +812,25 @@ func (kl *Kubelet) podKiller() {
 			runningPod := podPair.RunningPod
 			apiPod := podPair.APIPod
 
-			if killing.Has(string(runningPod.ID)) {
-				// The pod is already being killed.
-				break
+			lock.Lock()
+			exists := killing.Has(string(runningPod.ID))
+			if !exists {
+				killing.Insert(string(runningPod.ID))
 			}
-			killing.Insert(string(runningPod.ID))
-			go func(apiPod *v1.Pod, runningPod *kubecontainer.Pod, ch chan types.UID) {
-				defer func() {
-					ch <- runningPod.ID
-				}()
-				glog.V(2).Infof("Killing unwanted pod %q", runningPod.Name)
-				err := kl.killPod(apiPod, runningPod, nil, nil)
-				if err != nil {
-					glog.Errorf("Failed killing the pod %q: %v", runningPod.Name, err)
-				}
-			}(apiPod, runningPod, resultCh)
+			lock.Unlock()
 
-		case podID := <-resultCh:
-			killing.Delete(string(podID))
+			if !exists {
+				go func(apiPod *v1.Pod, runningPod *kubecontainer.Pod) {
+					glog.V(2).Infof("Killing unwanted pod %q", runningPod.Name)
+					err := kl.killPod(apiPod, runningPod, nil, nil)
+					if err != nil {
+						glog.Errorf("Failed killing the pod %q: %v", runningPod.Name, err)
+					}
+					lock.Lock()
+					killing.Delete(string(runningPod.ID))
+					lock.Unlock()
+				}(apiPod, runningPod)
+			}
 		}
 	}
 }
