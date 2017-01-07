@@ -422,7 +422,21 @@ func (fv *FakeVolume) Detach(deviceMountPath string, nodeName types.NodeName) er
 	return nil
 }
 
-func (fv *FakeVolume) VolumesAreAttached(spec []*Spec, nodeName types.NodeName) (map[*Spec]bool, error) {
+func (fv *FakeVolume) VolumesAreAttached(volumesByNode map[types.NodeName][]*Spec) (map[*Spec]bool, error) {
+	volumesAttachedCheck := make(map[*Spec]bool)
+	for nodeName, specs := range volumesByNode {
+		nodeVolumesAttachedCheck, err := fv.volumesAreAttachedToNode(specs, nodeName)
+		if err != nil {
+			return nil, err
+		}
+		for k, v := range nodeVolumesAttachedCheck {
+			volumesAttachedCheck[k] = v
+		}
+	}
+	return volumesAttachedCheck, nil
+}
+
+func (fv *FakeVolume) volumesAreAttachedToNode(specs []*Spec, nodeName types.NodeName) (map[*Spec]bool, error) {
 	fv.Lock()
 	defer fv.Unlock()
 	return nil, nil

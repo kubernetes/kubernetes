@@ -96,7 +96,21 @@ func (attacher *gcePersistentDiskAttacher) Attach(spec *volume.Spec, nodeName ty
 	return path.Join(diskByIdPath, diskGooglePrefix+pdName), nil
 }
 
-func (attacher *gcePersistentDiskAttacher) VolumesAreAttached(specs []*volume.Spec, nodeName types.NodeName) (map[*volume.Spec]bool, error) {
+func (attacher *gcePersistentDiskAttacher) VolumesAreAttached(volumesByNode map[types.NodeName][]*volume.Spec) (map[*volume.Spec]bool, error) {
+	volumesAttachedCheck := make(map[*volume.Spec]bool)
+	for nodeName, specs := range volumesByNode {
+		nodeVolumesAttachedCheck, err := attacher.volumesAreAttachedToNode(specs, nodeName)
+		if err != nil {
+			return nil, err
+		}
+		for k, v := range nodeVolumesAttachedCheck {
+			volumesAttachedCheck[k] = v
+		}
+	}
+	return volumesAttachedCheck, nil
+}
+
+func (attacher *gcePersistentDiskAttacher) volumesAreAttachedToNode(specs []*volume.Spec, nodeName types.NodeName) (map[*volume.Spec]bool, error) {
 	volumesAttachedCheck := make(map[*volume.Spec]bool)
 	volumePdNameMap := make(map[string]*volume.Spec)
 	pdNameList := []string{}

@@ -64,7 +64,7 @@ type OperationExecutor interface {
 	// Note that this operation could be operated concurrently with other attach/detach operations.
 	// In theory (but very unlikely in practise), race condition among these operations might mark volume as detached
 	// even if it is attached. But reconciler can correct this in a short period of time.
-	VerifyVolumesAreAttached(AttachedVolumes []AttachedVolume, nodeName types.NodeName, actualStateOfWorld ActualStateOfWorldAttacherUpdater) error
+	VerifyVolumesAreAttached(attachedVolumesByNode map[types.NodeName][]AttachedVolume, actualStateOfWorld ActualStateOfWorldAttacherUpdater) error
 
 	// DetachVolume detaches the volume from the node specified in
 	// volumeToDetach, and updates the actual state of the world to reflect
@@ -389,11 +389,10 @@ func (oe *operationExecutor) DetachVolume(
 }
 
 func (oe *operationExecutor) VerifyVolumesAreAttached(
-	attachedVolumes []AttachedVolume,
-	nodeName types.NodeName,
+	attachedVolumesByNode map[types.NodeName][]AttachedVolume,
 	actualStateOfWorld ActualStateOfWorldAttacherUpdater) error {
 	volumesAreAttachedFunc, err :=
-		oe.operationGenerator.GenerateVolumesAreAttachedFunc(attachedVolumes, nodeName, actualStateOfWorld)
+		oe.operationGenerator.GenerateVolumesAreAttachedFunc(attachedVolumesByNode, actualStateOfWorld)
 	if err != nil {
 		return err
 	}

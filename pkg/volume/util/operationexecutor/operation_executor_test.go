@@ -197,7 +197,7 @@ func TestOperationExecutor_VerifyVolumesAreAttachedConcurrently(t *testing.T) {
 
 	// Act
 	for i := 0; i < numVolumesToVerifyAttached; i++ {
-		oe.VerifyVolumesAreAttached(nil /* attachedVolumes */, "node-name", nil /* actualStateOfWorldAttacherUpdater */)
+		oe.VerifyVolumesAreAttached(nil /* attachedVolumesByNode */, nil /* actualStateOfWorldAttacherUpdater */)
 	}
 
 	// Assert
@@ -262,7 +262,7 @@ func (fopg *fakeOperationGenerator) GenerateDetachVolumeFunc(volumeToDetach Atta
 		return nil
 	}, nil
 }
-func (fopg *fakeOperationGenerator) GenerateVolumesAreAttachedFunc(attachedVolumes []AttachedVolume, nodeName types.NodeName, actualStateOfWorld ActualStateOfWorldAttacherUpdater) (func() error, error) {
+func (fopg *fakeOperationGenerator) GenerateVolumesAreAttachedFunc(attachedVolumesByNode map[types.NodeName][]AttachedVolume, actualStateOfWorld ActualStateOfWorldAttacherUpdater) (func() error, error) {
 	return func() error {
 		startOperationAndBlock(fopg.ch, fopg.quit)
 		return nil
