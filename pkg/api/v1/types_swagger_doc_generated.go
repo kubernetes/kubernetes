@@ -1243,6 +1243,15 @@ func (PodLogOptions) SwaggerDoc() map[string]string {
 	return map_PodLogOptions
 }
 
+var map_PodPortForwardOptions = map[string]string{
+	"":      "PodPortForwardOptions is the query options to a Pod's port forward call.",
+	"ports": "List of ports to forward",
+}
+
+func (PodPortForwardOptions) SwaggerDoc() map[string]string {
+	return map_PodPortForwardOptions
+}
+
 var map_PodProxyOptions = map[string]string{
 	"":     "PodProxyOptions is the query options to a Pod's proxy call.",
 	"path": "Path is the URL path to use for the current proxy request to pod.",

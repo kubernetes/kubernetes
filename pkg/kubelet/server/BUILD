@@ -55,6 +55,7 @@ go_test(
     srcs = [
         "auth_test.go",
         "server_test.go",
+        "server_websocket_test.go",
     ],
     library = ":go_default_library",
     tags = ["automanaged"],
@@ -65,6 +66,7 @@ go_test(
         "//pkg/kubelet/cm:go_default_library",
         "//pkg/kubelet/container:go_default_library",
         "//pkg/kubelet/container/testing:go_default_library",
+        "//pkg/kubelet/server/portforward:go_default_library",
         "//pkg/kubelet/server/remotecommand:go_default_library",
         "//pkg/kubelet/server/stats:go_default_library",
         "//pkg/kubelet/types:go_default_library",
@@ -79,6 +81,7 @@ go_test(
         "//vendor:github.com/google/cadvisor/info/v2",
         "//vendor:github.com/stretchr/testify/assert",
         "//vendor:github.com/stretchr/testify/require",
+        "//vendor:golang.org/x/net/websocket",
         "//vendor:k8s.io/apiserver/pkg/authentication/user",
         "//vendor:k8s.io/apiserver/pkg/authorization/authorizer",
     ],
