@@ -3792,6 +3792,13 @@
       "name": "namespace",
       "in": "path",
       "required": true
+     },
+     {
+      "uniqueItems": true,
+      "type": "integer",
+      "description": "List of ports to forward",
+      "name": "ports",
+      "in": "query"
      }
     ]
    },

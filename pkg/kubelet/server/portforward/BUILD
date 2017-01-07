@@ -12,22 +12,29 @@ go_library(
     name = "go_default_library",
     srcs = [
         "constants.go",
+        "httpstream.go",
         "portforward.go",
+        "websocket.go",
     ],
     tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
+        "//pkg/httplog:go_default_library",
         "//pkg/types:go_default_library",
         "//pkg/util/httpstream:go_default_library",
         "//pkg/util/httpstream/spdy:go_default_library",
         "//pkg/util/runtime:go_default_library",
+        "//pkg/util/wsstream:go_default_library",
         "//vendor:github.com/golang/glog",
     ],
 )
 
 go_test(
     name = "go_default_test",
-    srcs = ["portforward_test.go"],
+    srcs = [
+        "httpstream_test.go",
+        "websocket_test.go",
+    ],
     library = ":go_default_library",
     tags = ["automanaged"],
     deps = [

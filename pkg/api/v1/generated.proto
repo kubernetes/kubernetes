@@ -2378,6 +2378,13 @@ message PodLogOptions {
   optional int64 limitBytes = 8;
 }
 
+// PodPortForwardOptions is the query options to a Pod's port forward call.
+message PodPortForwardOptions {
+  // List of ports to forward
+  // +optional
+  repeated int32 ports = 1;
+}
+
 // PodProxyOptions is the query options to a Pod's proxy call.
 message PodProxyOptions {
   // Path is the URL path to use for the current proxy request to pod.
