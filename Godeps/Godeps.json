@@ -1,7 +1,7 @@
 {
 	"ImportPath": "k8s.io/kubernetes",
 	"GoVersion": "go1.7",
-	"GodepVersion": "v74",
+	"GodepVersion": "v75",
 	"Packages": [
 		"github.com/ugorji/go/codec/codecgen",
 		"github.com/onsi/ginkgo/ginkgo",
@@ -1359,6 +1359,114 @@
 		{
 			"ImportPath": "github.com/google/gofuzz",
 			"Rev": "bbcb9da2d746f8bdbd6a936686a0a6067ada0ec5"
+		},
+		{
+			"ImportPath": "github.com/gophercloud/gophercloud",
+			"Rev": "463e9c872ffa9743a2109d1e89418b6e26a384c1"
+		},
+		{
+			"ImportPath": "github.com/gophercloud/gophercloud/openstack",
+			"Rev": "463e9c872ffa9743a2109d1e89418b6e26a384c1"
+		},
+		{
+			"ImportPath": "github.com/gophercloud/gophercloud/openstack/blockstorage/v1/volumes",
+			"Rev": "463e9c872ffa9743a2109d1e89418b6e26a384c1"
+		},
+		{
+			"ImportPath": "github.com/gophercloud/gophercloud/openstack/common/extensions",
+			"Rev": "463e9c872ffa9743a2109d1e89418b6e26a384c1"
+		},
+		{
+			"ImportPath": "github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/volumeattach",
+			"Rev": "463e9c872ffa9743a2109d1e89418b6e26a384c1"
+		},
+		{
+			"ImportPath": "github.com/gophercloud/gophercloud/openstack/compute/v2/flavors",
+			"Rev": "463e9c872ffa9743a2109d1e89418b6e26a384c1"
+		},
+		{
+			"ImportPath": "github.com/gophercloud/gophercloud/openstack/compute/v2/images",
+			"Rev": "463e9c872ffa9743a2109d1e89418b6e26a384c1"
+		},
+		{
+			"ImportPath": "github.com/gophercloud/gophercloud/openstack/compute/v2/servers",
+			"Rev": "463e9c872ffa9743a2109d1e89418b6e26a384c1"
+		},
+		{
+			"ImportPath": "github.com/gophercloud/gophercloud/openstack/identity/v2/tenants",
+			"Rev": "463e9c872ffa9743a2109d1e89418b6e26a384c1"
+		},
+		{
+			"ImportPath": "github.com/gophercloud/gophercloud/openstack/identity/v2/tokens",
+			"Rev": "463e9c872ffa9743a2109d1e89418b6e26a384c1"
+		},
+		{
+			"ImportPath": "github.com/gophercloud/gophercloud/openstack/identity/v3/extensions/trusts",
+			"Rev": "463e9c872ffa9743a2109d1e89418b6e26a384c1"
+		},
+		{
+			"ImportPath": "github.com/gophercloud/gophercloud/openstack/identity/v3/tokens",
+			"Rev": "463e9c872ffa9743a2109d1e89418b6e26a384c1"
+		},
+		{
+			"ImportPath": "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions",
+			"Rev": "463e9c872ffa9743a2109d1e89418b6e26a384c1"
+		},
+		{
+			"ImportPath": "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/layer3/floatingips",
+			"Rev": "463e9c872ffa9743a2109d1e89418b6e26a384c1"
+		},
+		{
+			"ImportPath": "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/lbaas/members",
+			"Rev": "463e9c872ffa9743a2109d1e89418b6e26a384c1"
+		},
+		{
+			"ImportPath": "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/lbaas/monitors",
+			"Rev": "463e9c872ffa9743a2109d1e89418b6e26a384c1"
+		},
+		{
+			"ImportPath": "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/lbaas/pools",
+			"Rev": "463e9c872ffa9743a2109d1e89418b6e26a384c1"
+		},
+		{
+			"ImportPath": "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/lbaas/vips",
+			"Rev": "463e9c872ffa9743a2109d1e89418b6e26a384c1"
+		},
+		{
+			"ImportPath": "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/lbaas_v2/listeners",
+			"Rev": "463e9c872ffa9743a2109d1e89418b6e26a384c1"
+		},
+		{
+			"ImportPath": "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/lbaas_v2/loadbalancers",
+			"Rev": "463e9c872ffa9743a2109d1e89418b6e26a384c1"
+		},
+		{
+			"ImportPath": "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/lbaas_v2/monitors",
+			"Rev": "463e9c872ffa9743a2109d1e89418b6e26a384c1"
+		},
+		{
+			"ImportPath": "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/lbaas_v2/pools",
+			"Rev": "463e9c872ffa9743a2109d1e89418b6e26a384c1"
+		},
+		{
+			"ImportPath": "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/security/groups",
+			"Rev": "463e9c872ffa9743a2109d1e89418b6e26a384c1"
+		},
+		{
+			"ImportPath": "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/security/rules",
+			"Rev": "463e9c872ffa9743a2109d1e89418b6e26a384c1"
+		},
+		{
+			"ImportPath": "github.com/gophercloud/gophercloud/openstack/networking/v2/ports",
+			"Rev": "463e9c872ffa9743a2109d1e89418b6e26a384c1"
+		},
+		{
+			"ImportPath": "github.com/gophercloud/gophercloud/openstack/utils",
+			"Rev": "463e9c872ffa9743a2109d1e89418b6e26a384c1"
+		},
+		{
+			"ImportPath": "github.com/gophercloud/gophercloud/pagination",
+			"Rev": "463e9c872ffa9743a2109d1e89418b6e26a384c1"
 		},
 		{
 			"ImportPath": "github.com/gorilla/context",
