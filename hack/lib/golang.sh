@@ -23,7 +23,6 @@ readonly KUBE_GOPATH="${KUBE_OUTPUT}/go"
 # kube::build::source_targets in build/common.sh as well.
 kube::golang::server_targets() {
   local targets=(
-    cmd/kube-dns
     cmd/kube-proxy
     cmd/kube-apiserver
     cmd/kube-controller-manager
@@ -189,7 +188,6 @@ readonly KUBE_ALL_BINARIES=("${KUBE_ALL_TARGETS[@]##*/}")
 readonly KUBE_STATIC_LIBRARIES=(
   kube-apiserver
   kube-controller-manager
-  kube-dns
   kube-scheduler
   kube-proxy
   kube-discovery

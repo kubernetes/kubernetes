@@ -85,7 +85,6 @@ filegroup(
         "//pkg/controller:all-srcs",
         "//pkg/conversion:all-srcs",
         "//pkg/credentialprovider:all-srcs",
-        "//pkg/dns:all-srcs",
         "//pkg/fieldpath:all-srcs",
         "//pkg/fields:all-srcs",
         "//pkg/generated:all-srcs",
