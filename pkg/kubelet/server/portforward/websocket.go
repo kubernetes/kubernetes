@@ -63,7 +63,7 @@ func NewV4Options(req *http.Request) (*V4Options, error) {
 	ports := make([]int32, 0, len(portStrings))
 	for _, portString := range portStrings {
 		if len(portString) == 0 {
-			return nil, fmt.Errorf("%q is cannot be empty", api.PortHeader)
+			return nil, fmt.Errorf("%q cannot be empty", api.PortHeader)
 		}
 		for _, p := range strings.Split(portString, ",") {
 			port, err := strconv.ParseUint(p, 10, 16)
