@@ -52,7 +52,7 @@ docker_build(
 docker_build(
     name = "kube-proxy",
     base = ":busybox-net",
-    cmd = ["/kube-proxy"],
+    cmd = ["/usr/bin/kube-proxy"],
     debs = [
         "//build/debs:kube-proxy.deb",
     ],
