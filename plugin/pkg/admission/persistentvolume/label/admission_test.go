@@ -62,7 +62,7 @@ func (c *mockVolumes) DiskIsAttached(volumeName aws.KubernetesVolumeID, nodeName
 	return false, fmt.Errorf("not implemented")
 }
 
-func (c *mockVolumes) DisksAreAttached(diskNames []aws.KubernetesVolumeID, nodeName types.NodeName) (map[aws.KubernetesVolumeID]bool, error) {
+func (c *mockVolumes) DisksAreAttached(diskNamesByNode map[types.NodeName][]aws.KubernetesVolumeID) (map[aws.KubernetesVolumeID]bool, error) {
 	return nil, fmt.Errorf("not implemented")
 }
 
