@@ -106,7 +106,7 @@ func (server *KubeDNSServer) Run() {
 	glog.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", server.healthzPort), nil))
 }
 
-// setupHealthzHandlers sets up a readiness and liveness endpoint for kube2sky.
+// setupHandlers sets up a readiness and liveness endpoint for kube2sky.
 func (server *KubeDNSServer) setupHandlers() {
 	glog.V(0).Infof("Setting up Healthz Handler (/readiness)")
 	http.HandleFunc("/readiness", func(w http.ResponseWriter, req *http.Request) {

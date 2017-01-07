@@ -652,7 +652,7 @@ func (kd *KubeDNS) serviceWithClusterIPHasEndpoints(msg *skymsg.Service) (bool, 
 	return false, fmt.Errorf("unexpected: found non-endpoint object in endpoint store: %v", e)
 }
 
-// ReverseRecords performs a reverse lookup for the given name.
+// ReverseRecord performs a reverse lookup for the given name.
 func (kd *KubeDNS) ReverseRecord(name string) (*skymsg.Service, error) {
 	glog.V(3).Infof("Query for ReverseRecord %q", name)
 

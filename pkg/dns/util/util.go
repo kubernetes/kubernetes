@@ -36,7 +36,7 @@ const (
 	defaultTTL = 30
 )
 
-// extractIP turns a standard PTR reverse record lookup name
+// ExtractIP turns a standard PTR reverse record lookup name
 // into an IP address
 func ExtractIP(reverseName string) (string, bool) {
 	if !strings.HasSuffix(reverseName, ArpaSuffix) {
