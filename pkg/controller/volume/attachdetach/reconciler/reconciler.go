@@ -57,6 +57,7 @@ func NewReconciler(
 	loopPeriod time.Duration,
 	maxWaitForUnmountDuration time.Duration,
 	syncDuration time.Duration,
+	disableReconciliation bool,
 	desiredStateOfWorld cache.DesiredStateOfWorld,
 	actualStateOfWorld cache.ActualStateOfWorld,
 	attacherDetacher operationexecutor.OperationExecutor,
@@ -65,6 +66,7 @@ func NewReconciler(
 		loopPeriod:                loopPeriod,
 		maxWaitForUnmountDuration: maxWaitForUnmountDuration,
 		syncDuration:              syncDuration,
+		disableReconciliation:     disableReconciliation,
 		desiredStateOfWorld:       desiredStateOfWorld,
 		actualStateOfWorld:        actualStateOfWorld,
 		attacherDetacher:          attacherDetacher,
@@ -77,23 +79,30 @@ type reconciler struct {
 	loopPeriod                time.Duration
 	maxWaitForUnmountDuration time.Duration
 	syncDuration              time.Duration
+	enableSync		  bool
 	desiredStateOfWorld       cache.DesiredStateOfWorld
 	actualStateOfWorld        cache.ActualStateOfWorld
 	attacherDetacher          operationexecutor.OperationExecutor
 	nodeStatusUpdater         statusupdater.NodeStatusUpdater
 	timeOfLastSync            time.Time
+	disableReconciliation     bool
 }
 
 func (rc *reconciler) Run(stopCh <-chan struct{}) {
 	wait.Until(rc.reconciliationLoopFunc(), rc.loopPeriod, stopCh)
 }
 
+// reconciliationLoopFunc this can be disabled via cli option disableReconciliation.
+// It periodically checks whether the attached volumes from actual state
+// are still attached to the node and udpate the status if they are not.
 func (rc *reconciler) reconciliationLoopFunc() func() {
 	return func() {
-		rc.reconcile()
-		// reconciler periodically checks whether the attached volumes from actual state
-		// are still attached to the node and udpate the status if they are not.
-		if time.Since(rc.timeOfLastSync) > rc.syncDuration {
+
+		if rc.disableReconciliation {
+			glog.V(5).	Info("Not reconciling volumes as reconciliation is diabled via the command line flag")
+		} else if time.Since(rc.timeOfLastSync) > rc.syncDuration {
+			glog.V(5).Info("Reconciling volumes")
+			rc.reconcile()
 			rc.sync()
 		}
 	}
