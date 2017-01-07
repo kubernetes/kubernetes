@@ -46,7 +46,7 @@ const (
 	// A subdomain added to the user specified domain for all services.
 	serviceSubdomain = "svc"
 
-	// A subdomain added to the user specified dmoain for all pods.
+	// A subdomain added to the user specified domain for all pods.
 	podSubdomain = "pod"
 
 	// Resync period for the kube controller loop.
@@ -676,7 +676,7 @@ func (kd *KubeDNS) isPodRecord(path []string) bool {
 	if len(path) != len(kd.domainPath)+3 {
 		return false
 	}
-	if path[len(kd.domainPath)] != "pod" {
+	if path[len(kd.domainPath)] != podSubdomain {
 		return false
 	}
 	for _, segment := range path {
