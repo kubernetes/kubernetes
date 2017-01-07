@@ -381,14 +381,13 @@ func streamParams(params url.Values, opts runtime.Object) error {
 			params.Add(api.ExecTTYParam, "1")
 		}
 	case *api.PodPortForwardOptions:
-		if len(opts.Ports) == 0 {
-			return errors.NewBadRequest("at least one port must be specified")
+		if len(opts.Ports) > 0 {
+			ports := make([]string, len(opts.Ports))
+			for i, p := range opts.Ports {
+				ports[i] = strconv.FormatInt(int64(p), 10)
+			}
+			params.Add(api.PortHeader, strings.Join(ports, ","))
 		}
-		ports := make([]string, len(opts.Ports))
-		for i, p := range opts.Ports {
-			ports[i] = strconv.FormatInt(int64(p), 10)
-		}
-		params.Add(api.PortHeader, strings.Join(ports, ","))
 	default:
 		return fmt.Errorf("Unknown object for streaming: %v", opts)
 	}
