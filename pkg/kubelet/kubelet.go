@@ -1911,10 +1911,10 @@ func (kl *Kubelet) HandlePodAdditions(pods []*api.Pod) {
 	start := kl.clock.Now()
 
 	// Pass critical pods through admission check first.
-	var criticalPods []*v1.Pod
-	var nonCriticalPods []*v1.Pod
+	var criticalPods []*api.Pod
+	var nonCriticalPods []*api.Pod
 	for _, p := range pods {
-		if kubepod.IsCriticalPod(p) {
+		if kubetypes.IsCriticalPod(p) {
 			criticalPods = append(criticalPods, p)
 		} else {
 			nonCriticalPods = append(nonCriticalPods, p)

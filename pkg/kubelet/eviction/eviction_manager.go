@@ -31,6 +31,7 @@ import (
 	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
 	"k8s.io/kubernetes/pkg/kubelet/server/stats"
+	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"k8s.io/kubernetes/pkg/util/clock"
 	"k8s.io/kubernetes/pkg/util/wait"
@@ -109,7 +110,7 @@ func (m *managerImpl) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAd
 	// the node has memory pressure, admit if not best-effort
 	if hasNodeCondition(m.nodeConditions, api.NodeMemoryPressure) {
 		notBestEffort := qos.BestEffort != qos.GetPodQOS(attrs.Pod)
-		if notBestEffort || kubepod.IsCriticalPod(attrs.Pod) {
+		if notBestEffort || kubetypes.IsCriticalPod(attrs.Pod) {
 			return lifecycle.PodAdmitResult{Admit: true}
 		}
 	}
