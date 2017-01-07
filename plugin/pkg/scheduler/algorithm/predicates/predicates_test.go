@@ -25,6 +25,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/v1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
+	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 	priorityutil "k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/priorities/util"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
@@ -37,15 +39,15 @@ func (n FakeNodeInfo) GetNodeInfo(nodeName string) (*v1.Node, error) {
 	return &node, nil
 }
 
-type FakeNodeListInfo []v1.Node
+func NodeListInfo(nodes []v1.Node) *CachedNodeInfo {
+	nodeStore := cache.NewStore(cache.MetaNamespaceKeyFunc)
+	nodeLister := &cache.StoreToNodeLister{Store: nodeStore}
 
-func (nodes FakeNodeListInfo) GetNodeInfo(nodeName string) (*v1.Node, error) {
-	for _, node := range nodes {
-		if node.Name == nodeName {
-			return &node, nil
-		}
+	for i := range nodes {
+		nodeLister.Add(&nodes[i])
 	}
-	return nil, fmt.Errorf("Unable to find node: %s", nodeName)
+
+	return &CachedNodeInfo{StoreToNodeLister: nodeLister}
 }
 
 type FakePersistentVolumeClaimInfo []v1.PersistentVolumeClaim
@@ -1501,7 +1503,7 @@ func TestServiceAffinity(t *testing.T) {
 			nodeInfo.SetNode(test.node)
 			nodeInfoMap := map[string]*schedulercache.NodeInfo{test.node.Name: nodeInfo}
 			// Reimplementing the logic that the scheduler implements: Any time it makes a predicate, it registers any precomputations.
-			predicate, precompute := NewServiceAffinityPredicate(algorithm.FakePodLister(test.pods), algorithm.FakeServiceLister(test.services), FakeNodeListInfo(nodes), test.labels)
+			predicate, precompute := NewServiceAffinityPredicate(algorithm.FakePodLister(test.pods), algorithm.FakeServiceLister(test.services), NodeListInfo(nodes), test.labels)
 			// Register a precomputation or Rewrite the precomputation to a no-op, depending on the state we want to test.
 			RegisterPredicatePrecomputation("checkServiceAffinity-unitTestPredicate", func(pm *predicateMetadata) {
 				if !skipPrecompute {
@@ -2606,12 +2608,17 @@ func TestInterPodAffinityWithMultipleNodes(t *testing.T) {
 	labelRgIndia := map[string]string{
 		"region": "India",
 	}
+	labelRgUS := map[string]string{
+		"region": "US",
+	}
+
 	tests := []struct {
-		pod   *v1.Pod
-		pods  []*v1.Pod
-		nodes []v1.Node
-		fits  map[string]bool
-		test  string
+		pod    *v1.Pod
+		pods   []*v1.Pod
+		nodes  []v1.Node
+		fits   map[string]bool
+		test   string
+		nometa bool
 	}{
 		{
 			pod: &v1.Pod{
@@ -2817,12 +2824,72 @@ func TestInterPodAffinityWithMultipleNodes(t *testing.T) {
 			},
 			test: "NodeA and nodeB have same topologyKey and label value. NodeA has an existing pod that match the inter pod affinity rule. The pod can not be scheduled onto nodeA and nodeB but can be schedulerd onto nodeC",
 		},
+		{
+			pod: &v1.Pod{
+				ObjectMeta: v1.ObjectMeta{
+					Labels: map[string]string{"foo": "123"},
+					Annotations: map[string]string{
+						v1.AffinityAnnotationKey: `
+						{
+							"podAntiAffinity": {
+								"requiredDuringSchedulingIgnoredDuringExecution": [{
+									"labelSelector": {
+										"matchExpressions": [{
+											"key": "foo",
+											"operator": "In",
+											"values": ["abc"]
+										}]
+									},
+									"topologyKey": "region"
+								}]
+							}
+						}`,
+					},
+				},
+			},
+			pods: []*v1.Pod{
+				{Spec: v1.PodSpec{NodeName: "nodeA"}, ObjectMeta: v1.ObjectMeta{Labels: map[string]string{"foo": "abc"}}},
+				{Spec: v1.PodSpec{NodeName: "nodeC"}, ObjectMeta: v1.ObjectMeta{
+					Annotations: map[string]string{
+						v1.AffinityAnnotationKey: `
+						{
+							"podAntiAffinity": {
+								"requiredDuringSchedulingIgnoredDuringExecution": [{
+									"labelSelector": {
+										"matchExpressions": [{
+											"key": "foo",
+											"operator": "In",
+											"values": ["123"]
+										}]
+									},
+									"topologyKey": "region"
+								}]
+							}
+						}`},
+				},
+				},
+			},
+			nodes: []v1.Node{
+				{ObjectMeta: v1.ObjectMeta{Name: "nodeA", Labels: labelRgChina}},
+				{ObjectMeta: v1.ObjectMeta{Name: "nodeB", Labels: labelRgChinaAzAz1}},
+				{ObjectMeta: v1.ObjectMeta{Name: "nodeC", Labels: labelRgIndia}},
+				{ObjectMeta: v1.ObjectMeta{Name: "nodeD", Labels: labelRgUS}},
+			},
+			fits: map[string]bool{
+				"nodeA": false,
+				"nodeB": false,
+				"nodeC": false,
+				"nodeD": true,
+			},
+			test:   "NodeA and nodeB have same topologyKey and label value. NodeA has an existing pod that match the inter pod affinity rule. NodeC has an existing pod that match the inter pod affinity rule. The pod can not be scheduled onto nodeA, nodeB and nodeC but can be schedulerd onto nodeD",
+			nometa: true,
+		},
 	}
 	affinityExpectedFailureReasons := []algorithm.PredicateFailureReason{ErrPodAffinityNotMatch}
 	selectorExpectedFailureReasons := []algorithm.PredicateFailureReason{ErrNodeSelectorNotMatch}
 
 	for _, test := range tests {
-		nodeListInfo := FakeNodeListInfo(test.nodes)
+		nodeListInfo := NodeListInfo(test.nodes)
 		for _, node := range test.nodes {
 			var podsOnNode []*v1.Pod
 			for _, pod := range test.pods {
@@ -2839,7 +2906,14 @@ func TestInterPodAffinityWithMultipleNodes(t *testing.T) {
 			nodeInfo := schedulercache.NewNodeInfo(podsOnNode...)
 			nodeInfo.SetNode(&node)
 			nodeInfoMap := map[string]*schedulercache.NodeInfo{node.Name: nodeInfo}
-			fits, reasons, err := testFit.InterPodAffinityMatches(test.pod, PredicateMetadata(test.pod, nodeInfoMap), nodeInfo)
+
+			var meta interface{} = nil
+
+			if !test.nometa {
+				meta = PredicateMetadata(test.pod, nodeInfoMap)
+			}
+
+			fits, reasons, err := testFit.InterPodAffinityMatches(test.pod, meta, nodeInfo)
 			if err != nil {
 				t.Errorf("%s: unexpected error %v", test.test, err)
 			}
@@ -3333,5 +3407,203 @@ func TestPodSchedulesOnNodeWithDiskPressureCondition(t *testing.T) {
 		if fits != test.fits {
 			t.Errorf("%s: expected %v got %v", test.name, test.fits, fits)
 		}
+	}
+}
+
+func TestVolumeZonePredicate(t *testing.T) {
+	pvInfo := FakePersistentVolumeInfo{
+		{
+			ObjectMeta: v1.ObjectMeta{Name: "Vol_1", Labels: map[string]string{metav1.LabelZoneFailureDomain: "zone_1"}},
+		},
+		{
+			ObjectMeta: v1.ObjectMeta{Name: "Vol_2", Labels: map[string]string{metav1.LabelZoneRegion: "zone_2", "uselessLabel": "none"}},
+		},
+		{
+			ObjectMeta: v1.ObjectMeta{Name: "Vol_3", Labels: map[string]string{metav1.LabelZoneRegion: "zone_3"}},
+		},
+	}
+
+	pvcInfo := FakePersistentVolumeClaimInfo{
+		{
+			ObjectMeta: v1.ObjectMeta{Name: "PVC_1", Namespace: "default"},
+			Spec:       v1.PersistentVolumeClaimSpec{VolumeName: "Vol_1"},
+		},
+		{
+			ObjectMeta: v1.ObjectMeta{Name: "PVC_2", Namespace: "default"},
+			Spec:       v1.PersistentVolumeClaimSpec{VolumeName: "Vol_2"},
+		},
+		{
+			ObjectMeta: v1.ObjectMeta{Name: "PVC_3", Namespace: "default"},
+			Spec:       v1.PersistentVolumeClaimSpec{VolumeName: "Vol_3"},
+		},
+		{
+			ObjectMeta: v1.ObjectMeta{Name: "PVC_4", Namespace: "default"},
+			Spec:       v1.PersistentVolumeClaimSpec{VolumeName: "Vol_not_exist"},
+		},
+	}
+
+	tests := []struct {
+		Name string
+		Pod  *v1.Pod
+		Fits bool
+		Node *v1.Node
+	}{
+		{
+			Name: "pod without volume",
+			Pod: &v1.Pod{
+				ObjectMeta: v1.ObjectMeta{Name: "pod_1", Namespace: "default"},
+			},
+			Node: &v1.Node{
+				ObjectMeta: v1.ObjectMeta{
+					Name:   "host1",
+					Labels: map[string]string{metav1.LabelZoneFailureDomain: "zone_1"},
+				},
+			},
+			Fits: true,
+		},
+		{
+			Name: "node without labels",
+			Pod: &v1.Pod{
+				ObjectMeta: v1.ObjectMeta{Name: "pod_1", Namespace: "default"},
+				Spec: v1.PodSpec{
+					Volumes: []v1.Volume{
+						{
+							Name: "vol_1",
+							VolumeSource: v1.VolumeSource{
+								PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
+									ClaimName: "PVC_1",
+								},
+							},
+						},
+					},
+				},
+			},
+			Node: &v1.Node{
+				ObjectMeta: v1.ObjectMeta{
+					Name: "host1",
+				},
+			},
+			Fits: true,
+		},
+		{
+			Name: "label zone failure domain mached",
+			Pod: &v1.Pod{
+				ObjectMeta: v1.ObjectMeta{Name: "pod_1", Namespace: "default"},
+				Spec: v1.PodSpec{
+					Volumes: []v1.Volume{
+						{
+							Name: "vol_1",
+							VolumeSource: v1.VolumeSource{
+								PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
+									ClaimName: "PVC_1",
+								},
+							},
+						},
+					},
+				},
+			},
+			Node: &v1.Node{
+				ObjectMeta: v1.ObjectMeta{
+					Name:   "host1",
+					Labels: map[string]string{metav1.LabelZoneFailureDomain: "zone_1", "uselessLabel": "none"},
+				},
+			},
+			Fits: true,
+		},
+		{
+			Name: "label zone region mached",
+			Pod: &v1.Pod{
+				ObjectMeta: v1.ObjectMeta{Name: "pod_1", Namespace: "default"},
+				Spec: v1.PodSpec{
+					Volumes: []v1.Volume{
+						{
+							Name: "vol_1",
+							VolumeSource: v1.VolumeSource{
+								PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
+									ClaimName: "PVC_2",
+								},
+							},
+						},
+					},
+				},
+			},
+			Node: &v1.Node{
+				ObjectMeta: v1.ObjectMeta{
+					Name:   "host1",
+					Labels: map[string]string{metav1.LabelZoneRegion: "zone_2", "uselessLabel": "none"},
+				},
+			},
+			Fits: true,
+		},
+		{
+			Name: "label zone region dismached",
+			Pod: &v1.Pod{
+				ObjectMeta: v1.ObjectMeta{Name: "pod_1", Namespace: "default"},
+				Spec: v1.PodSpec{
+					Volumes: []v1.Volume{
+						{
+							Name: "vol_1",
+							VolumeSource: v1.VolumeSource{
+								PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
+									ClaimName: "PVC_2",
+								},
+							},
+						},
+					},
+				},
+			},
+			Node: &v1.Node{
+				ObjectMeta: v1.ObjectMeta{
+					Name:   "host1",
+					Labels: map[string]string{metav1.LabelZoneRegion: "no_zone_2", "uselessLabel": "none"},
+				},
+			},
+			Fits: false,
+		},
+		{
+			Name: "label zone failure domain dismached",
+			Pod: &v1.Pod{
+				ObjectMeta: v1.ObjectMeta{Name: "pod_1", Namespace: "default"},
+				Spec: v1.PodSpec{
+					Volumes: []v1.Volume{
+						{
+							Name: "vol_1",
+							VolumeSource: v1.VolumeSource{
+								PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
+									ClaimName: "PVC_1",
+								},
+							},
+						},
+					},
+				},
+			},
+			Node: &v1.Node{
+				ObjectMeta: v1.ObjectMeta{
+					Name:   "host1",
+					Labels: map[string]string{metav1.LabelZoneFailureDomain: "no_zone_1", "uselessLabel": "none"},
+				},
+			},
+			Fits: false,
+		},
+	}
+
+	expectedFailureReasons := []algorithm.PredicateFailureReason{ErrVolumeZoneConflict}
+
+	for _, test := range tests {
+		fit := NewVolumeZonePredicate(pvInfo, pvcInfo)
+		node := &schedulercache.NodeInfo{}
+		node.SetNode(test.Node)
+
+		fits, reasons, err := fit(test.Pod, nil, node)
+		if err != nil {
+			t.Errorf("%s: unexpected error: %v", test.Name, err)
+		}
+		if !fits && !reflect.DeepEqual(reasons, expectedFailureReasons) {
+			t.Errorf("%s: unexpected failure reasons: %v, want: %v", test.Name, reasons, expectedFailureReasons)
+		}
+		if fits != test.Fits {
+			t.Errorf("%s: expected %v got %v", test.Name, test.Fits, fits)
+		}
+
 	}
 }
