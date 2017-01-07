@@ -5,6 +5,7 @@ licenses(["notice"])
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
+    "go_test",
 )
 
 go_library(
@@ -51,4 +52,20 @@ filegroup(
     name = "all-srcs",
     srcs = [":package-srcs"],
     tags = ["automanaged"],
+)
+
+go_test(
+    name = "go_default_test",
+    srcs = ["cfssl_signer_test.go"],
+    data = [
+        "testdata/ca.crt",
+        "testdata/ca.key",
+        "testdata/kubelet.csr",
+    ],
+    library = ":go_default_library",
+    tags = ["automanaged"],
+    deps = [
+        "//pkg/apis/certificates/v1alpha1:go_default_library",
+        "//pkg/util/cert:go_default_library",
+    ],
 )
