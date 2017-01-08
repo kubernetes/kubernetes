@@ -241,7 +241,7 @@ func TestExampleObjectSchemas(t *testing.T) {
 			"pod": &api.Pod{},
 		},
 		"../examples/storage/hazelcast": {
-			"hazelcast-controller": &api.ReplicationController{},
+			"hazelcast-deployment": &extensions.Deployment{},
 			"hazelcast-service":    &api.Service{},
 		},
 		"../examples/meteor": {
