@@ -1795,83 +1795,83 @@
 		},
 		{
 			"ImportPath": "github.com/opencontainers/runc/libcontainer",
-			"Comment": "v1.0.0-rc2-14-g45c30e7",
-			"Rev": "45c30e75abfd52107b53048004a83165403ad0d1"
+			"Comment": "v1.0.0-rc2-197-g1a9dd26",
+			"Rev": "1a9dd2678d2d6ad574f05cb7b9ae46ce65586725"
 		},
 		{
 			"ImportPath": "github.com/opencontainers/runc/libcontainer/apparmor",
-			"Comment": "v1.0.0-rc2-14-g45c30e7",
-			"Rev": "45c30e75abfd52107b53048004a83165403ad0d1"
+			"Comment": "v1.0.0-rc2-197-g1a9dd26",
+			"Rev": "1a9dd2678d2d6ad574f05cb7b9ae46ce65586725"
 		},
 		{
 			"ImportPath": "github.com/opencontainers/runc/libcontainer/cgroups",
-			"Comment": "v1.0.0-rc2-14-g45c30e7",
-			"Rev": "45c30e75abfd52107b53048004a83165403ad0d1"
+			"Comment": "v1.0.0-rc2-197-g1a9dd26",
+			"Rev": "1a9dd2678d2d6ad574f05cb7b9ae46ce65586725"
 		},
 		{
 			"ImportPath": "github.com/opencontainers/runc/libcontainer/cgroups/fs",
-			"Comment": "v1.0.0-rc2-14-g45c30e7",
-			"Rev": "45c30e75abfd52107b53048004a83165403ad0d1"
+			"Comment": "v1.0.0-rc2-197-g1a9dd26",
+			"Rev": "1a9dd2678d2d6ad574f05cb7b9ae46ce65586725"
 		},
 		{
 			"ImportPath": "github.com/opencontainers/runc/libcontainer/cgroups/systemd",
-			"Comment": "v1.0.0-rc2-14-g45c30e7",
-			"Rev": "45c30e75abfd52107b53048004a83165403ad0d1"
+			"Comment": "v1.0.0-rc2-197-g1a9dd26",
+			"Rev": "1a9dd2678d2d6ad574f05cb7b9ae46ce65586725"
 		},
 		{
 			"ImportPath": "github.com/opencontainers/runc/libcontainer/configs",
-			"Comment": "v1.0.0-rc2-14-g45c30e7",
-			"Rev": "45c30e75abfd52107b53048004a83165403ad0d1"
+			"Comment": "v1.0.0-rc2-197-g1a9dd26",
+			"Rev": "1a9dd2678d2d6ad574f05cb7b9ae46ce65586725"
 		},
 		{
 			"ImportPath": "github.com/opencontainers/runc/libcontainer/configs/validate",
-			"Comment": "v1.0.0-rc2-14-g45c30e7",
-			"Rev": "45c30e75abfd52107b53048004a83165403ad0d1"
+			"Comment": "v1.0.0-rc2-197-g1a9dd26",
+			"Rev": "1a9dd2678d2d6ad574f05cb7b9ae46ce65586725"
 		},
 		{
 			"ImportPath": "github.com/opencontainers/runc/libcontainer/criurpc",
-			"Comment": "v1.0.0-rc2-14-g45c30e7",
-			"Rev": "45c30e75abfd52107b53048004a83165403ad0d1"
+			"Comment": "v1.0.0-rc2-197-g1a9dd26",
+			"Rev": "1a9dd2678d2d6ad574f05cb7b9ae46ce65586725"
 		},
 		{
 			"ImportPath": "github.com/opencontainers/runc/libcontainer/keys",
-			"Comment": "v1.0.0-rc2-14-g45c30e7",
-			"Rev": "45c30e75abfd52107b53048004a83165403ad0d1"
+			"Comment": "v1.0.0-rc2-197-g1a9dd26",
+			"Rev": "1a9dd2678d2d6ad574f05cb7b9ae46ce65586725"
 		},
 		{
 			"ImportPath": "github.com/opencontainers/runc/libcontainer/label",
-			"Comment": "v1.0.0-rc2-14-g45c30e7",
-			"Rev": "45c30e75abfd52107b53048004a83165403ad0d1"
+			"Comment": "v1.0.0-rc2-197-g1a9dd26",
+			"Rev": "1a9dd2678d2d6ad574f05cb7b9ae46ce65586725"
 		},
 		{
 			"ImportPath": "github.com/opencontainers/runc/libcontainer/seccomp",
-			"Comment": "v1.0.0-rc2-14-g45c30e7",
-			"Rev": "45c30e75abfd52107b53048004a83165403ad0d1"
+			"Comment": "v1.0.0-rc2-197-g1a9dd26",
+			"Rev": "1a9dd2678d2d6ad574f05cb7b9ae46ce65586725"
 		},
 		{
 			"ImportPath": "github.com/opencontainers/runc/libcontainer/selinux",
-			"Comment": "v1.0.0-rc2-14-g45c30e7",
-			"Rev": "45c30e75abfd52107b53048004a83165403ad0d1"
+			"Comment": "v1.0.0-rc2-197-g1a9dd26",
+			"Rev": "1a9dd2678d2d6ad574f05cb7b9ae46ce65586725"
 		},
 		{
 			"ImportPath": "github.com/opencontainers/runc/libcontainer/stacktrace",
-			"Comment": "v1.0.0-rc2-14-g45c30e7",
-			"Rev": "45c30e75abfd52107b53048004a83165403ad0d1"
+			"Comment": "v1.0.0-rc2-197-g1a9dd26",
+			"Rev": "1a9dd2678d2d6ad574f05cb7b9ae46ce65586725"
 		},
 		{
 			"ImportPath": "github.com/opencontainers/runc/libcontainer/system",
-			"Comment": "v1.0.0-rc2-14-g45c30e7",
-			"Rev": "45c30e75abfd52107b53048004a83165403ad0d1"
+			"Comment": "v1.0.0-rc2-197-g1a9dd26",
+			"Rev": "1a9dd2678d2d6ad574f05cb7b9ae46ce65586725"
 		},
 		{
 			"ImportPath": "github.com/opencontainers/runc/libcontainer/user",
-			"Comment": "v1.0.0-rc2-14-g45c30e7",
-			"Rev": "45c30e75abfd52107b53048004a83165403ad0d1"
+			"Comment": "v1.0.0-rc2-197-g1a9dd26",
+			"Rev": "1a9dd2678d2d6ad574f05cb7b9ae46ce65586725"
 		},
 		{
 			"ImportPath": "github.com/opencontainers/runc/libcontainer/utils",
-			"Comment": "v1.0.0-rc2-14-g45c30e7",
-			"Rev": "45c30e75abfd52107b53048004a83165403ad0d1"
+			"Comment": "v1.0.0-rc2-197-g1a9dd26",
+			"Rev": "1a9dd2678d2d6ad574f05cb7b9ae46ce65586725"
 		},
 		{
 			"ImportPath": "github.com/pborman/uuid",
@@ -2716,6 +2716,15 @@
 			"ImportPath": "k8s.io/heapster/metrics/apis/metrics/v1alpha1",
 			"Comment": "v1.2.0-beta.1",
 			"Rev": "c2ac40f1adf8c42a79badddb2a2acd673cae3bcb"
+		},
+		{
+			"ImportPath": "github.com/mrunalp/fileutils",
+			"Rev": "4ee1cc9a80582a0c75febdd5cfa779ee4361cbca"
+		},
+		{
+			"ImportPath": "github.com/opencontainers/runtime-spec/specs-go",
+			"Comment": "v1.0.0-rc3-20-g7dce97b",
+			"Rev": "7dce97bd7dfbe56427f32795a8d5bdcab490d9c3"
 		}
 	]
 }

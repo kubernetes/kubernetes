@@ -103,7 +103,7 @@ func SearchLabels(labels []string, query string) string {
 }
 
 // Annotations returns the bundle path and user defined annotations from the
-// libcontianer state.  We need to remove the bundle because that is a label
+// libcontainer state.  We need to remove the bundle because that is a label
 // added by libcontainer.
 func Annotations(labels []string) (bundle string, userAnnotations map[string]string) {
 	userAnnotations = make(map[string]string)

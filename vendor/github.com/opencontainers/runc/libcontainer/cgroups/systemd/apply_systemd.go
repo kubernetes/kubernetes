@@ -282,7 +282,7 @@ func (m *Manager) Apply(pid int) error {
 		}
 	}
 
-	if _, err := theConn.StartTransientUnit(unitName, "replace", properties, nil); err != nil {
+	if _, err := theConn.StartTransientUnit(unitName, "replace", properties, nil); err != nil && !isUnitExists(err) {
 		return err
 	}
 
@@ -388,7 +388,7 @@ func joinCgroups(c *configs.Cgroup, pid int) error {
 	return nil
 }
 
-// systemd represents slice heirarchy using `-`, so we need to follow suit when
+// systemd represents slice hierarchy using `-`, so we need to follow suit when
 // generating the path of slice. Essentially, test-a-b.slice becomes
 // test.slice/test-a.slice/test-a-b.slice.
 func ExpandSlice(slice string) (string, error) {
@@ -545,4 +545,14 @@ func setKernelMemory(c *configs.Cgroup) error {
 		return err
 	}
 	return fs.EnableKernelMemoryAccounting(path)
+}
+
+// isUnitExists returns true if the error is that a systemd unit already exists.
+func isUnitExists(err error) bool {
+	if err != nil {
+		if dbusError, ok := err.(dbus.Error); ok {
+			return strings.Contains(dbusError.Name, "org.freedesktop.systemd1.UnitExists")
+		}
+	}
+	return false
 }

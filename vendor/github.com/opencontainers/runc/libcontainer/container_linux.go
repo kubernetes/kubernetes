@@ -266,7 +266,6 @@ func (c *linuxContainer) start(process *Process, isInit bool) error {
 				Version:    c.config.Version,
 				ID:         c.id,
 				Pid:        parent.pid(),
-				Root:       c.config.Rootfs,
 				BundlePath: utils.SearchLabels(c.config.Labels, "bundle"),
 			}
 			for i, hook := range c.config.Hooks.Poststart {
@@ -282,7 +281,10 @@ func (c *linuxContainer) start(process *Process, isInit bool) error {
 	return nil
 }
 
-func (c *linuxContainer) Signal(s os.Signal) error {
+func (c *linuxContainer) Signal(s os.Signal, all bool) error {
+	if all {
+		return signalAllProcesses(c.cgroupManager, s)
+	}
 	if err := c.initProcess.signal(s); err != nil {
 		return newSystemErrorWithCause(err, "signaling init process")
 	}
@@ -339,10 +341,11 @@ func (c *linuxContainer) newInitProcess(p *Process, cmd *exec.Cmd, parentPipe, c
 		}
 	}
 	_, sharePidns := nsMaps[configs.NEWPID]
-	data, err := c.bootstrapData(c.config.Namespaces.CloneFlags(), nsMaps, "")
+	data, err := c.bootstrapData(c.config.Namespaces.CloneFlags(), nsMaps)
 	if err != nil {
 		return nil, err
 	}
+	p.consoleChan = make(chan *os.File, 1)
 	return &initProcess{
 		cmd:           cmd,
 		childPipe:     childPipe,
@@ -363,13 +366,14 @@ func (c *linuxContainer) newSetnsProcess(p *Process, cmd *exec.Cmd, parentPipe, 
 	if err != nil {
 		return nil, newSystemErrorWithCause(err, "getting container's current state")
 	}
-	// for setns process, we dont have to set cloneflags as the process namespaces
+	// for setns process, we don't have to set cloneflags as the process namespaces
 	// will only be set via setns syscall
-	data, err := c.bootstrapData(0, state.NamespacePaths, p.consolePath)
+	data, err := c.bootstrapData(0, state.NamespacePaths)
 	if err != nil {
 		return nil, err
 	}
 	// TODO: set on container for process management
+	p.consoleChan = make(chan *os.File, 1)
 	return &setnsProcess{
 		cmd:           cmd,
 		cgroupPaths:   c.cgroupManager.GetPaths(),
@@ -390,7 +394,6 @@ func (c *linuxContainer) newInitConfig(process *Process) *initConfig {
 		User:             process.User,
 		AdditionalGroups: process.AdditionalGroups,
 		Cwd:              process.Cwd,
-		Console:          process.consolePath,
 		Capabilities:     process.Capabilities,
 		PassedFilesCount: len(process.ExtraFiles),
 		ContainerId:      c.ID(),
@@ -411,6 +414,17 @@ func (c *linuxContainer) newInitConfig(process *Process) *initConfig {
 	}
 	if len(process.Rlimits) > 0 {
 		cfg.Rlimits = process.Rlimits
+	}
+	/*
+	 * TODO: This should not be automatically computed. We should implement
+	 *       this as a field in libcontainer.Process, and then we only dup the
+	 *       new console over the file descriptors which were not explicitly
+	 *       set with process.Std{in,out,err}. The reason I've left this as-is
+	 *       is because the GetConsole() interface is new, there's no need to
+	 *       polish this interface right now.
+	 */
+	if process.Stdin == nil && process.Stdout == nil && process.Stderr == nil {
+		cfg.CreateConsole = true
 	}
 	return cfg
 }
@@ -1023,10 +1037,10 @@ func (c *linuxContainer) criuNotifications(resp *criurpc.CriuResp, process *Proc
 	case notify.GetScript() == "setup-namespaces":
 		if c.config.Hooks != nil {
 			s := configs.HookState{
-				Version: c.config.Version,
-				ID:      c.id,
-				Pid:     int(notify.GetPid()),
-				Root:    c.config.Rootfs,
+				Version:    c.config.Version,
+				ID:         c.id,
+				Pid:        int(notify.GetPid()),
+				BundlePath: utils.SearchLabels(c.config.Labels, "bundle"),
 			}
 			for i, hook := range c.config.Hooks.Prestart {
 				if err := hook.Run(s); err != nil {
@@ -1223,16 +1237,22 @@ func (c *linuxContainer) currentState() (*State, error) {
 // can setns in order.
 func (c *linuxContainer) orderNamespacePaths(namespaces map[configs.NamespaceType]string) ([]string, error) {
 	paths := []string{}
-	nsTypes := []configs.NamespaceType{
+	order := []configs.NamespaceType{
+		// The user namespace *must* be done first.
+		configs.NEWUSER,
 		configs.NEWIPC,
 		configs.NEWUTS,
 		configs.NEWNET,
 		configs.NEWPID,
 		configs.NEWNS,
 	}
-	// join userns if the init process explicitly requires NEWUSER
-	if c.config.Namespaces.Contains(configs.NEWUSER) {
-		nsTypes = append(nsTypes, configs.NEWUSER)
+
+	// Remove namespaces that we don't need to join.
+	var nsTypes []configs.NamespaceType
+	for _, ns := range order {
+		if c.config.Namespaces.Contains(ns) {
+			nsTypes = append(nsTypes, ns)
+		}
 	}
 	for _, nsType := range nsTypes {
 		if p, ok := namespaces[nsType]; ok && p != "" {
@@ -1249,7 +1269,7 @@ func (c *linuxContainer) orderNamespacePaths(namespaces map[configs.NamespaceTyp
 			if strings.ContainsRune(p, ',') {
 				return nil, newSystemError(fmt.Errorf("invalid path %s", p))
 			}
-			paths = append(paths, p)
+			paths = append(paths, fmt.Sprintf("%s:%s", configs.NsName(nsType), p))
 		}
 	}
 	return paths, nil
@@ -1272,7 +1292,7 @@ func encodeIDMapping(idMap []configs.IDMap) ([]byte, error) {
 // such as one that uses nsenter package to bootstrap the container's
 // init process correctly, i.e. with correct namespaces, uid/gid
 // mapping etc.
-func (c *linuxContainer) bootstrapData(cloneFlags uintptr, nsMaps map[configs.NamespaceType]string, consolePath string) (io.Reader, error) {
+func (c *linuxContainer) bootstrapData(cloneFlags uintptr, nsMaps map[configs.NamespaceType]string) (io.Reader, error) {
 	// create the netlink message
 	r := nl.NewNetlinkRequest(int(InitMsg), 0)
 
@@ -1281,14 +1301,6 @@ func (c *linuxContainer) bootstrapData(cloneFlags uintptr, nsMaps map[configs.Na
 		Type:  CloneFlagsAttr,
 		Value: uint32(cloneFlags),
 	})
-
-	// write console path
-	if consolePath != "" {
-		r.AddData(&Bytemsg{
-			Type:  ConsolePathAttr,
-			Value: []byte(consolePath),
-		})
-	}
 
 	// write custom namespace paths
 	if len(nsMaps) > 0 {

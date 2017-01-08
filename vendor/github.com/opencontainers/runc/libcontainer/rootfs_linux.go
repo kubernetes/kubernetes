@@ -16,6 +16,7 @@ import (
 
 	"github.com/docker/docker/pkg/mount"
 	"github.com/docker/docker/pkg/symlink"
+	"github.com/mrunalp/fileutils"
 	"github.com/opencontainers/runc/libcontainer/cgroups"
 	"github.com/opencontainers/runc/libcontainer/configs"
 	"github.com/opencontainers/runc/libcontainer/label"
@@ -35,9 +36,11 @@ func needsSetupDev(config *configs.Config) bool {
 	return true
 }
 
-// setupRootfs sets up the devices, mount points, and filesystems for use inside a
-// new mount namespace.
-func setupRootfs(config *configs.Config, console *linuxConsole, pipe io.ReadWriter) (err error) {
+// prepareRootfs sets up the devices, mount points, and filesystems for use
+// inside a new mount namespace. It doesn't set anything as ro or pivot_root,
+// because console setup happens inside the caller. You must call
+// finalizeRootfs in order to finish the rootfs setup.
+func prepareRootfs(pipe io.ReadWriter, config *configs.Config) (err error) {
 	if err := prepareRoot(config); err != nil {
 		return newSystemErrorWithCause(err, "preparing rootfs")
 	}
@@ -49,6 +52,7 @@ func setupRootfs(config *configs.Config, console *linuxConsole, pipe io.ReadWrit
 				return newSystemErrorWithCause(err, "running premount command")
 			}
 		}
+
 		if err := mountToRootfs(m, config.Rootfs, config.MountLabel); err != nil {
 			return newSystemErrorWithCausef(err, "mounting %q to rootfs %q at %q", m.Source, config.Rootfs, m.Destination)
 		}
@@ -59,17 +63,19 @@ func setupRootfs(config *configs.Config, console *linuxConsole, pipe io.ReadWrit
 			}
 		}
 	}
+
 	if setupDev {
 		if err := createDevices(config); err != nil {
 			return newSystemErrorWithCause(err, "creating device nodes")
 		}
-		if err := setupPtmx(config, console); err != nil {
+		if err := setupPtmx(config); err != nil {
 			return newSystemErrorWithCause(err, "setting up ptmx")
 		}
 		if err := setupDevSymlinks(config.Rootfs); err != nil {
 			return newSystemErrorWithCause(err, "setting up /dev symlinks")
 		}
 	}
+
 	// Signal the parent to run the pre-start hooks.
 	// The hooks are run after the mounts are setup, but before we switch to the new
 	// root, so that the old root is still available in the hooks for any mount
@@ -77,39 +83,59 @@ func setupRootfs(config *configs.Config, console *linuxConsole, pipe io.ReadWrit
 	if err := syncParentHooks(pipe); err != nil {
 		return err
 	}
+
+	// The reason these operations are done here rather than in finalizeRootfs
+	// is because the console-handling code gets quite sticky if we have to set
+	// up the console before doing the pivot_root(2). This is because the
+	// Console API has to also work with the ExecIn case, which means that the
+	// API must be able to deal with being inside as well as outside the
+	// container. It's just cleaner to do this here (at the expense of the
+	// operation not being perfectly split).
+
 	if err := syscall.Chdir(config.Rootfs); err != nil {
 		return newSystemErrorWithCausef(err, "changing dir to %q", config.Rootfs)
 	}
+
 	if config.NoPivotRoot {
 		err = msMoveRoot(config.Rootfs)
 	} else {
-		err = pivotRoot(config.Rootfs, config.PivotDir)
+		err = pivotRoot(config.Rootfs)
 	}
 	if err != nil {
 		return newSystemErrorWithCause(err, "jailing process inside rootfs")
 	}
+
 	if setupDev {
 		if err := reOpenDevNull(); err != nil {
 			return newSystemErrorWithCause(err, "reopening /dev/null inside container")
 		}
 	}
-	// remount dev as ro if specifed
+
+	return nil
+}
+
+// finalizeRootfs actually switches the root of the process and sets anything
+// to ro if necessary. You must call prepareRootfs first.
+func finalizeRootfs(config *configs.Config) (err error) {
+	// remount dev as ro if specified
 	for _, m := range config.Mounts {
 		if libcontainerUtils.CleanPath(m.Destination) == "/dev" {
-			if m.Flags&syscall.MS_RDONLY != 0 {
-				if err := remountReadonly(m.Destination); err != nil {
+			if m.Flags&syscall.MS_RDONLY == syscall.MS_RDONLY {
+				if err := remountReadonly(m); err != nil {
 					return newSystemErrorWithCausef(err, "remounting %q as readonly", m.Destination)
 				}
 			}
 			break
 		}
 	}
+
 	// set rootfs ( / ) as readonly
 	if config.Readonlyfs {
 		if err := setReadonly(); err != nil {
 			return newSystemErrorWithCause(err, "setting rootfs as readonly")
 		}
 	}
+
 	syscall.Umask(0022)
 	return nil
 }
@@ -152,14 +178,40 @@ func mountToRootfs(m *configs.Mount, rootfs, mountLabel string) error {
 		}
 		return nil
 	case "tmpfs":
+		copyUp := m.Extensions&configs.EXT_COPYUP == configs.EXT_COPYUP
+		tmpDir := ""
 		stat, err := os.Stat(dest)
 		if err != nil {
 			if err := os.MkdirAll(dest, 0755); err != nil {
 				return err
 			}
 		}
+		if copyUp {
+			tmpDir, err = ioutil.TempDir("/tmp", "runctmpdir")
+			if err != nil {
+				return newSystemErrorWithCause(err, "tmpcopyup: failed to create tmpdir")
+			}
+			defer os.RemoveAll(tmpDir)
+			m.Destination = tmpDir
+		}
 		if err := mountPropagate(m, rootfs, mountLabel); err != nil {
 			return err
+		}
+		if copyUp {
+			if err := fileutils.CopyDirectory(dest, tmpDir); err != nil {
+				errMsg := fmt.Errorf("tmpcopyup: failed to copy %s to %s: %v", dest, tmpDir, err)
+				if err1 := syscall.Unmount(tmpDir, syscall.MNT_DETACH); err1 != nil {
+					return newSystemErrorWithCausef(err1, "tmpcopyup: %v: failed to unmount", errMsg)
+				}
+				return errMsg
+			}
+			if err := syscall.Mount(tmpDir, dest, "", syscall.MS_MOVE, ""); err != nil {
+				errMsg := fmt.Errorf("tmpcopyup: failed to move mount %s to %s: %v", tmpDir, dest, err)
+				if err1 := syscall.Unmount(tmpDir, syscall.MNT_DETACH); err1 != nil {
+					return newSystemErrorWithCausef(err1, "tmpcopyup: %v: failed to unmount", errMsg)
+				}
+				return errMsg
+			}
 		}
 		if stat != nil {
 			if err = os.Chmod(dest, stat.Mode()); err != nil {
@@ -536,10 +588,12 @@ func prepareRoot(config *configs.Config) error {
 	if err := syscall.Mount("", "/", "", uintptr(flag), ""); err != nil {
 		return err
 	}
-	if config.NoPivotRoot {
-		if err := rootfsParentMountPrivate(config.Rootfs); err != nil {
-			return err
-		}
+
+	// Make parent mount private to make sure following bind mount does
+	// not propagate in other namespaces. Also it will help with kernel
+	// check pass in pivot_root. (IS_SHARED(new_mnt->mnt_parent))
+	if err := rootfsParentMountPrivate(config.Rootfs); err != nil {
+		return err
 	}
 
 	return syscall.Mount(config.Rootfs, config.Rootfs, "bind", syscall.MS_BIND|syscall.MS_REC, "")
@@ -549,7 +603,7 @@ func setReadonly() error {
 	return syscall.Mount("/", "/", "bind", syscall.MS_BIND|syscall.MS_REMOUNT|syscall.MS_RDONLY|syscall.MS_REC, "")
 }
 
-func setupPtmx(config *configs.Config, console *linuxConsole) error {
+func setupPtmx(config *configs.Config) error {
 	ptmx := filepath.Join(config.Rootfs, "dev/ptmx")
 	if err := os.Remove(ptmx); err != nil && !os.IsNotExist(err) {
 		return err
@@ -557,54 +611,61 @@ func setupPtmx(config *configs.Config, console *linuxConsole) error {
 	if err := os.Symlink("pts/ptmx", ptmx); err != nil {
 		return fmt.Errorf("symlink dev ptmx %s", err)
 	}
-	if console != nil {
-		return console.mount(config.Rootfs, config.MountLabel)
-	}
 	return nil
 }
 
-func pivotRoot(rootfs, pivotBaseDir string) (err error) {
-	if pivotBaseDir == "" {
-		pivotBaseDir = "/"
-	}
-	tmpDir := filepath.Join(rootfs, pivotBaseDir)
-	if err := os.MkdirAll(tmpDir, 0755); err != nil {
-		return fmt.Errorf("can't create tmp dir %s, error %v", tmpDir, err)
-	}
-	pivotDir, err := ioutil.TempDir(tmpDir, ".pivot_root")
-	if err != nil {
-		return fmt.Errorf("can't create pivot_root dir %s, error %v", pivotDir, err)
-	}
-	defer func() {
-		errVal := os.Remove(pivotDir)
-		if err == nil {
-			err = errVal
-		}
-	}()
-	if err := syscall.PivotRoot(rootfs, pivotDir); err != nil {
-		// Make the parent mount private
-		if err := rootfsParentMountPrivate(rootfs); err != nil {
-			return err
-		}
-		// Try again
-		if err := syscall.PivotRoot(rootfs, pivotDir); err != nil {
-			return fmt.Errorf("pivot_root %s", err)
-		}
-	}
-	if err := syscall.Chdir("/"); err != nil {
-		return fmt.Errorf("chdir / %s", err)
-	}
-	// path to pivot dir now changed, update
-	pivotDir = filepath.Join(pivotBaseDir, filepath.Base(pivotDir))
+// pivotRoot will call pivot_root such that rootfs becomes the new root
+// filesystem, and everything else is cleaned up.
+func pivotRoot(rootfs string) error {
+	// While the documentation may claim otherwise, pivot_root(".", ".") is
+	// actually valid. What this results in is / being the new root but
+	// /proc/self/cwd being the old root. Since we can play around with the cwd
+	// with pivot_root this allows us to pivot without creating directories in
+	// the rootfs. Shout-outs to the LXC developers for giving us this idea.
 
-	// Make pivotDir rprivate to make sure any of the unmounts don't
-	// propagate to parent.
-	if err := syscall.Mount("", pivotDir, "", syscall.MS_PRIVATE|syscall.MS_REC, ""); err != nil {
+	oldroot, err := syscall.Open("/", syscall.O_DIRECTORY|syscall.O_RDONLY, 0)
+	if err != nil {
+		return err
+	}
+	defer syscall.Close(oldroot)
+
+	newroot, err := syscall.Open(rootfs, syscall.O_DIRECTORY|syscall.O_RDONLY, 0)
+	if err != nil {
+		return err
+	}
+	defer syscall.Close(newroot)
+
+	// Change to the new root so that the pivot_root actually acts on it.
+	if err := syscall.Fchdir(newroot); err != nil {
 		return err
 	}
 
-	if err := syscall.Unmount(pivotDir, syscall.MNT_DETACH); err != nil {
-		return fmt.Errorf("unmount pivot_root dir %s", err)
+	if err := syscall.PivotRoot(".", "."); err != nil {
+		return fmt.Errorf("pivot_root %s", err)
+	}
+
+	// Currently our "." is oldroot (according to the current kernel code).
+	// However, purely for safety, we will fchdir(oldroot) since there isn't
+	// really any guarantee from the kernel what /proc/self/cwd will be after a
+	// pivot_root(2).
+
+	if err := syscall.Fchdir(oldroot); err != nil {
+		return err
+	}
+
+	// Make oldroot rprivate to make sure our unmounts don't propagate to the
+	// host (and thus bork the machine).
+	if err := syscall.Mount("", ".", "", syscall.MS_PRIVATE|syscall.MS_REC, ""); err != nil {
+		return err
+	}
+	// Preform the unmount. MNT_DETACH allows us to unmount /proc/self/cwd.
+	if err := syscall.Unmount(".", syscall.MNT_DETACH); err != nil {
+		return err
+	}
+
+	// Switch back to our shiny new root.
+	if err := syscall.Chdir("/"); err != nil {
+		return fmt.Errorf("chdir / %s", err)
 	}
 	return nil
 }
@@ -639,17 +700,26 @@ func createIfNotExists(path string, isDir bool) error {
 	return nil
 }
 
-// remountReadonly will bind over the top of an existing path and ensure that it is read-only.
-func remountReadonly(path string) error {
+// readonlyPath will make a path read only.
+func readonlyPath(path string) error {
+	if err := syscall.Mount(path, path, "", syscall.MS_BIND|syscall.MS_REC, ""); err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return err
+	}
+	return syscall.Mount(path, path, "", syscall.MS_BIND|syscall.MS_REMOUNT|syscall.MS_RDONLY|syscall.MS_REC, "")
+}
+
+// remountReadonly will remount an existing mount point and ensure that it is read-only.
+func remountReadonly(m *configs.Mount) error {
+	var (
+		dest  = m.Destination
+		flags = m.Flags
+	)
 	for i := 0; i < 5; i++ {
-		if err := syscall.Mount("", path, "", syscall.MS_REMOUNT|syscall.MS_RDONLY, ""); err != nil && !os.IsNotExist(err) {
+		if err := syscall.Mount("", dest, "", uintptr(flags|syscall.MS_REMOUNT|syscall.MS_RDONLY), ""); err != nil {
 			switch err {
-			case syscall.EINVAL:
-				// Probably not a mountpoint, use bind-mount
-				if err := syscall.Mount(path, path, "", syscall.MS_BIND, ""); err != nil {
-					return err
-				}
-				return syscall.Mount(path, path, "", syscall.MS_BIND|syscall.MS_REMOUNT|syscall.MS_RDONLY|syscall.MS_REC|defaultMountFlags, "")
 			case syscall.EBUSY:
 				time.Sleep(100 * time.Millisecond)
 				continue
@@ -659,7 +729,7 @@ func remountReadonly(path string) error {
 		}
 		return nil
 	}
-	return fmt.Errorf("unable to mount %s as readonly max retries reached", path)
+	return fmt.Errorf("unable to mount %s as readonly max retries reached", dest)
 }
 
 // maskPath masks the top of the specified path inside a container to avoid
@@ -708,7 +778,9 @@ func mountPropagate(m *configs.Mount, rootfs string, mountLabel string) error {
 	if libcontainerUtils.CleanPath(dest) == "/dev" {
 		flags &= ^syscall.MS_RDONLY
 	}
-	if !strings.HasPrefix(dest, rootfs) {
+
+	copyUp := m.Extensions&configs.EXT_COPYUP == configs.EXT_COPYUP
+	if !(copyUp || strings.HasPrefix(dest, rootfs)) {
 		dest = filepath.Join(rootfs, dest)
 	}
 
