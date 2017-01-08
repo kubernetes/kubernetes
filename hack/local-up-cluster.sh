@@ -624,10 +624,10 @@ function start_kubedns {
         
         # TODO update to dns role once we have one.
         ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" create clusterrolebinding system:kube-dns --clusterrole=cluster-admin --serviceaccount=kube-system:default
-        # use kubectl to create kubedns rc and service
+        # use kubectl to create kubedns deployment and service
         ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" --namespace=kube-system create -f kubedns-deployment.yaml
         ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" --namespace=kube-system create -f kubedns-svc.yaml
-        echo "Kube-dns rc and service successfully deployed."
+        echo "Kube-dns deployment and service successfully deployed."
         rm  kubedns-deployment.yaml kubedns-svc.yaml
     fi
 }
