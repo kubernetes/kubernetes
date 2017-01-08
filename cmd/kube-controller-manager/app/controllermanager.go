@@ -408,6 +408,10 @@ func StartControllers(controllers map[string]InitFunc, s *options.CMServer, root
 	go volumeController.Run(stop)
 	time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
 
+	if s.ReconcilerSyncLoopPeriod.Duration < time.Second {
+		return fmt.Errorf("Duration time must be greater than one second as set via command line option reconcile-sync-loop-period.  One minute is recommended.")
+	}
+
 	attachDetachController, attachDetachControllerErr :=
 		attachdetach.NewAttachDetachController(
 			clientBuilder.ClientOrDie("attachdetach-controller"),

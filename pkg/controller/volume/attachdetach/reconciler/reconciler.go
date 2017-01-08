@@ -101,7 +101,9 @@ func (rc *reconciler) reconciliationLoopFunc() func() {
 		rc.reconcile()
 
 		if rc.disableReconciliation {
-			glog.V(5).Info("Skipping reconciling attached volumes still attached since it is disabled via the command line")
+			glog.V(5).Info("Skipping reconciling attached volumes still attached since it is disabled via the command line.")
+		} else if rc.syncDuration < time.Second {
+			glog.V(5).Info("Skipping reconciling attached volumes still attached since it is set to less than one secdon via the command line.")
 		} else if time.Since(rc.timeOfLastSync) > rc.syncDuration {
 			glog.V(5).Info("Starting reconciling attached volumes still attached")
 			rc.sync()

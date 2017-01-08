@@ -40,19 +40,18 @@ type CloudControllerManagerServer struct {
 func NewCloudControllerManagerServer() *CloudControllerManagerServer {
 	s := CloudControllerManagerServer{
 		KubeControllerManagerConfiguration: componentconfig.KubeControllerManagerConfiguration{
-			Port:                     ports.CloudControllerManagerPort,
-			Address:                  "0.0.0.0",
-			ConcurrentServiceSyncs:   1,
-			MinResyncPeriod:          metav1.Duration{Duration: 12 * time.Hour},
-			NodeMonitorPeriod:        metav1.Duration{Duration: 5 * time.Second},
-			ClusterName:              "kubernetes",
-			ConfigureCloudRoutes:     true,
-			ContentType:              "application/vnd.kubernetes.protobuf",
-			KubeAPIQPS:               20.0,
-			KubeAPIBurst:             30,
-			LeaderElection:           leaderelection.DefaultLeaderElectionConfiguration(),
-			ControllerStartInterval:  metav1.Duration{Duration: 0 * time.Second},
-			ReconcilerSyncLoopPeriod: metav1.Duration{Duration: 1 * time.Minute},
+			Port:                    ports.CloudControllerManagerPort,
+			Address:                 "0.0.0.0",
+			ConcurrentServiceSyncs:  1,
+			MinResyncPeriod:         metav1.Duration{Duration: 12 * time.Hour},
+			NodeMonitorPeriod:       metav1.Duration{Duration: 5 * time.Second},
+			ClusterName:             "kubernetes",
+			ConfigureCloudRoutes:    true,
+			ContentType:             "application/vnd.kubernetes.protobuf",
+			KubeAPIQPS:              20.0,
+			KubeAPIBurst:            30,
+			LeaderElection:          leaderelection.DefaultLeaderElectionConfiguration(),
+			ControllerStartInterval: metav1.Duration{Duration: 0 * time.Second},
 		},
 	}
 	s.LeaderElection.LeaderElect = true
@@ -81,8 +80,6 @@ func (s *CloudControllerManagerServer) AddFlags(fs *pflag.FlagSet) {
 	fs.Float32Var(&s.KubeAPIQPS, "kube-api-qps", s.KubeAPIQPS, "QPS to use while talking with kubernetes apiserver")
 	fs.Int32Var(&s.KubeAPIBurst, "kube-api-burst", s.KubeAPIBurst, "Burst to use while talking with kubernetes apiserver")
 	fs.DurationVar(&s.ControllerStartInterval.Duration, "controller-start-interval", s.ControllerStartInterval.Duration, "Interval between starting controller managers.")
-	fs.BoolVar(&s.DisableAttachDetachReconcilerSync, "disable-attach-detach-reconcile", false, "Disable volume attach detach reconcilation")
-	fs.DurationVar(&s.ReconcilerSyncLoopPeriod.Duration, "reconcile-sync-loop-period", s.ReconcilerSyncLoopPeriod.Duration, "The wait time between volume attach detach reconciliation")
 
 	leaderelection.BindFlags(&s.LeaderElection, fs)
 	config.DefaultFeatureGate.AddFlag(fs)
