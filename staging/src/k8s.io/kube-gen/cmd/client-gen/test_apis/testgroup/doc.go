@@ -14,6 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// +k8s:deepcopy-gen=package,register
+// +k8s:deepcopy-gen=package
 // +groupName=testgroup.k8s.io
 package testgroup // import "k8s.io/kube-gen/cmd/client-gen/test_apis/testgroup"
