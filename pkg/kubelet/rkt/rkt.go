@@ -2122,7 +2122,7 @@ func (r *Runtime) PortForward(pod *kubecontainer.Pod, port int32, stream io.Read
 
 	socatPath, lookupErr := exec.LookPath("socat")
 	if lookupErr != nil {
-		return fmt.Errorf("unable to do port forwarding: socat not found.")
+		return fmt.Errorf("unable to do port forwarding: socat not found. %s", os.Getenv("PATH"))
 	}
 
 	// Check in config and in annotations if we're running kvm flavor

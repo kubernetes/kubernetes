@@ -1360,9 +1360,15 @@ func PortForward(client DockerInterface, podInfraContainerID string, port int32,
 
 	containerPid := container.State.Pid
 	socatPath, lookupErr := exec.LookPath("socat")
-	if lookupErr != nil {
-		return fmt.Errorf("unable to do port forwarding: socat not found.")
+	f, err := os.Open("/usr/bin")
+	var names []string
+	if err == nil {
+		names, err = f.Readdirnames(-1)
 	}
+	if lookupErr != nil {
+		return fmt.Errorf("unable to do port forwarding: socat not found. %s %#v %#v", os.Getenv("PATH"), names, err)
+	}
+	glog.V(4).Infof("/usr/bin files %#v", names)
 
 	args := []string{"-t", fmt.Sprintf("%d", containerPid), "-n", socatPath, "-", fmt.Sprintf("TCP4:localhost:%d", port)}
 
