@@ -35,6 +35,7 @@ import (
 
 var sshOptions = flag.String("ssh-options", "", "Commandline options passed to ssh.")
 var sshEnv = flag.String("ssh-env", "", "Use predefined ssh options for environment.  Options: gce")
+var sshUser = flag.String("ssh-user", "", "Use predefined user for ssh.")
 var testTimeoutSeconds = flag.Duration("test-timeout", 45*time.Minute, "How long (in golang duration format) to wait for ginkgo tests to complete.")
 var resultsDir = flag.String("results-dir", "/tmp/", "Directory to scp test results to.")
 
@@ -69,13 +70,18 @@ func AddHostnameIp(hostname, ip string) {
 	hostnameIpOverrides.m[hostname] = ip
 }
 
+// GetHostnameOrIp converts hostname into ip and apply user if necessary.
 func GetHostnameOrIp(hostname string) string {
 	hostnameIpOverrides.RLock()
 	defer hostnameIpOverrides.RUnlock()
+	host := hostname
 	if ip, found := hostnameIpOverrides.m[hostname]; found {
-		return ip
+		host = ip
 	}
-	return hostname
+	if *sshUser != "" {
+		host = fmt.Sprintf("%s@%s", *sshUser, host)
+	}
+	return host
 }
 
 // CreateTestArchive builds the local source and creates a tar archive e2e_node_test.tar.gz containing
@@ -237,7 +243,9 @@ func RunRemote(archive string, host string, cleanup bool, junitFilePrefix string
 		fmt.Sprintf("tar -xzvf ./%s", archiveName),
 	)
 	glog.Infof("Extracting tar on %s", host)
-	if output, err = SSH(host, "sh", "-c", cmd); err != nil {
+	// Do not use sudo here, because `sudo tar -x` will recover the file ownership inside the tar ball, but
+	// we want the extracted files to be owned by the current user.
+	if output, err := SSHNoSudo(host, "sh", "-c", cmd); err != nil {
 		// Exit failure with the error
 		return "", false, fmt.Errorf("failed to extract test archive: %v, output: %q", err, output)
 	}
