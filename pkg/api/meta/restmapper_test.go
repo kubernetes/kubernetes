@@ -47,10 +47,10 @@ func fakeInterfaces(version schema.GroupVersion) (*VersionInterfaces, error) {
 	return &VersionInterfaces{ObjectConvertor: validConvertor, MetadataAccessor: validAccessor}, nil
 }
 
-var unmatchedErr = errors.New("no version")
+var errUnmatched = errors.New("no version")
 
 func unmatchedVersionInterfaces(version schema.GroupVersion) (*VersionInterfaces, error) {
-	return nil, unmatchedErr
+	return nil, errUnmatched
 }
 
 func TestRESTMapperVersionAndKindForResource(t *testing.T) {
