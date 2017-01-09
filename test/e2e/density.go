@@ -395,20 +395,33 @@ var _ = framework.KubeDescribe("Density", func() {
 		{podsPerNode: 50, runLatencyTest: false, kind: api.Kind("ReplicationController")},
 		{podsPerNode: 95, runLatencyTest: true, kind: api.Kind("ReplicationController")},
 		{podsPerNode: 100, runLatencyTest: false, kind: api.Kind("ReplicationController")},
+		// Tests for other resource types:
+		{podsPerNode: 30, runLatencyTest: true, kind: extensions.Kind("Deployment")},
+		{podsPerNode: 30, runLatencyTest: true, kind: batch.Kind("Job")},
+		// Test scheduling when daemons are preset
+		{podsPerNode: 30, runLatencyTest: true, kind: api.Kind("ReplicationController"), daemonsPerNode: 2},
+		// Test with secrets
+		{podsPerNode: 30, runLatencyTest: true, kind: extensions.Kind("Deployment"), secretsPerPod: 2},
 	}
 
 	for _, testArg := range densityTests {
 		feature := "ManualPerformance"
 		switch testArg.podsPerNode {
 		case 30:
-			if testArg.kind == api.Kind("ReplicationController") {
+			if testArg.kind == api.Kind("ReplicationController") && testArg.daemonsPerNode == 0 && testArg.secretsPerPod == 0 {
 				feature = "Performance"
 			}
 		case 95:
 			feature = "HighDensityPerformance"
 		}
 
-		name := fmt.Sprintf("[Feature:%s] should allow starting %d pods per node using %v with %v secrets", feature, testArg.podsPerNode, testArg.kind, testArg.secretsPerPod)
+		name := fmt.Sprintf("[Feature:%s] should allow starting %d pods per node using %v with %v secrets and %v daemons",
+			feature,
+			testArg.podsPerNode,
+			testArg.kind,
+			testArg.secretsPerPod,
+			testArg.daemonsPerNode,
+		)
 		itArg := testArg
 		It(name, func() {
 			nodePreparer := framework.NewE2ETestNodePreparer(
