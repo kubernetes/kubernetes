@@ -48,6 +48,5 @@ go_test(
         "//vendor:github.com/stretchr/testify/require",
         "//vendor:k8s.io/client-go/pkg/api",
         "//vendor:k8s.io/client-go/pkg/util/clock",
-        "//vendor:k8s.io/client-go/pkg/util/wait",
     ],
 )
