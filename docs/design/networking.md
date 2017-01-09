@@ -181,7 +181,7 @@ IPv6 addresses too [CNI issue #245](https://github.com/containernetworking/cni/i
 Kubernetes code that deals with IP addresses must then be audited and fixed to
 support both IPv4 and IPv6 addresses and not assume IPv4.
 Additionally, direct ipv6 assignment to instances doesn't appear to be supported
-by major cloud providers (e.g., AWS EC2, GCE) yet. We'd happily take pull
+by major cloud providers (e.g., AWS EC2 ([began IPv6 rollout in Ohio](https://aws.amazon.com/blogs/aws/new-ipv6-support-for-ec2-instances-in-virtual-private-clouds/)), GCE) yet. We'd happily take pull
 requests from people running Kubernetes on bare metal, though. :-)
 
 
