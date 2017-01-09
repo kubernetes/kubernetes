@@ -141,4 +141,9 @@ output_message=$(runTests "SUPPORTED_RESOURCES=${SUPPORTED_RESOURCES[@]}")
 kube::test::if_has_string "${output_message}" "Testing kubectl(v1:pods)"
 kube::test::if_has_string "${output_message}" "Testing kubectl(v1:services)"
 
-kube::log::status "TESTS PASSED"
+if [[ $(echo "${output_message}" | grep "FAIL!") ]]; then
+  kube::log::status "TESTS FAILED"
+  exit 1
+else
+  kube::log::status "TESTS PASSED"
+fi
