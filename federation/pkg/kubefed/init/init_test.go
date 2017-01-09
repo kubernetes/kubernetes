@@ -708,7 +708,7 @@ func fakeInitHostFactory(federationName, namespaceName, ip, dnsZoneName, image, 
 		},
 	}
 
-	ctrlMgrPod := v1.Pod{
+	cmPod := v1.Pod{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Pod",
 			APIVersion: testapi.Extensions.GroupVersion().String(),
@@ -723,7 +723,7 @@ func fakeInitHostFactory(federationName, namespaceName, ip, dnsZoneName, image, 
 	}
 
 	podList.Items = append(podList.Items, apiServerPod)
-	podList.Items = append(podList.Items, ctrlMgrPod)
+	podList.Items = append(podList.Items, cmPod)
 
 	f, tf, codec, _ := cmdtesting.NewAPIFactory()
 	extCodec := testapi.Extensions.Codec()

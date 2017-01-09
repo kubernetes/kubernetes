@@ -230,22 +230,17 @@ func initFederation(cmdOut io.Writer, config util.AdminConfig, cmd *cobra.Comman
 		return err
 	}
 
-	//to talk to federation ctrl plane
-	fedFactory := config.HostFactory(initFlags.Name, initFlags.Kubeconfig)
+	fedPods := []string{}
+	fedPods = append(fedPods, serverName)
+	fedPods = append(fedPods, cmName)
 
 	if !dryRun {
 		fmt.Fprintf(cmdOut, "Waiting for control plane to come up.\n")
-		//wait for api server
-		err = waitForPods(hostClientset, serverName, initFlags.FederationSystemNamespace)
+		err = waitForPods(hostClientset, fedPods, initFlags.FederationSystemNamespace)
 		if err != nil {
 			return err
 		}
-		//wait for controller manager
-		err = waitForPods(hostClientset, cmName, initFlags.FederationSystemNamespace)
-		if err != nil {
-			return err
-		}
-		err = waitSrvHealthy(fedFactory)
+		err = waitSrvHealthy(config, initFlags.Name, initFlags.Kubeconfig)
 		if err != nil {
 			return err
 		}
@@ -595,36 +590,41 @@ func createControllerManager(clientset *client.Clientset, namespace, name, svcNa
 	return clientset.Extensions().Deployments(namespace).Create(dep)
 }
 
-func waitForPods(clientset *client.Clientset, name, nameSpace string) error {
-	err := wait.PollInfinite(podWaitInterval, func() (bool, error) {
-		podList, err := clientset.Core().Pods(nameSpace).List(api.ListOptions{})
-		if err != nil {
-			return false, nil
-		}
-		for _, pod := range podList.Items {
-			if strings.Contains(pod.Name, name) && pod.Status.Phase == "Running" {
-				return true, nil
+func waitForPods(clientset *client.Clientset, fedPods []string, namespace string) error {
+	for _, fedPod := range fedPods {
+		err := wait.PollInfinite(podWaitInterval, func() (bool, error) {
+			podList, err := clientset.Core().Pods(namespace).List(api.ListOptions{})
+			if err != nil {
+				return false, nil
 			}
+			for _, pod := range podList.Items {
+				if strings.HasPrefix(pod.Name, fedPod) && pod.Status.Phase == "Running" {
+					return true, nil
+				}
+			}
+			return false, nil
+		})
+		if err != nil {
+			return err
 		}
-		return false, nil
-	})
-	return err
+	}
+
+	return nil
 }
 
-func waitSrvHealthy(fedFactory cmdutil.Factory) error {
-	fedDiscoveryClient, err := fedFactory.DiscoveryClient()
+func waitSrvHealthy(config util.AdminConfig, context, kubeconfig string) error {
+	fedClientSet, err := config.FedClientSet(context, kubeconfig)
 	if err != nil {
 		return err
 	}
-
+	fedDiscoveryClient := fedClientSet.Discovery()
 	err = wait.PollInfinite(podWaitInterval, func() (bool, error) {
 		body, err := fedDiscoveryClient.RESTClient().Get().AbsPath("/healthz").Do().Raw()
 		if err != nil {
 			return false, nil
-		} else {
-			if strings.EqualFold(string(body), "ok") {
-				return true, nil
-			}
+		}
+		if strings.EqualFold(string(body), "ok") {
+			return true, nil
 		}
 		return false, nil
 	})
