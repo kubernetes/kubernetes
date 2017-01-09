@@ -72,7 +72,7 @@ type Builder struct {
 	singleResourceType bool
 	continueOnError    bool
 
-	singular bool
+	singleItemImplied bool
 
 	export bool
 
@@ -139,7 +139,7 @@ func (b *Builder) FilenameParam(enforceNamespace bool, filenameOptions *Filename
 			b.URL(defaultHttpGetAttempts, url)
 		default:
 			if !recursive {
-				b.singular = true
+				b.singleItemImplied = true
 			}
 			b.Path(recursive, s)
 		}
@@ -600,21 +600,21 @@ func (b *Builder) visitBySelector() *Result {
 }
 
 func (b *Builder) visitByResource() *Result {
-	// if b.singular is false, this could be by default, so double-check length
-	// of resourceTuples to determine if in fact it is singular or not
-	isSingular := b.singular
-	if !isSingular {
-		isSingular = len(b.resourceTuples) == 1
+	// if b.singleItemImplied is false, this could be by default, so double-check length
+	// of resourceTuples to determine if in fact it is singleItemImplied or not
+	isSingleItemImplied := b.singleItemImplied
+	if !isSingleItemImplied {
+		isSingleItemImplied = len(b.resourceTuples) == 1
 	}
 
 	if len(b.resources) != 0 {
-		return &Result{singular: isSingular, err: fmt.Errorf("you may not specify individual resources and bulk resources in the same call")}
+		return &Result{singleItemImplied: isSingleItemImplied, err: fmt.Errorf("you may not specify individual resources and bulk resources in the same call")}
 	}
 
 	// retrieve one client for each resource
 	mappings, err := b.resourceTupleMappings()
 	if err != nil {
-		return &Result{singular: isSingular, err: err}
+		return &Result{singleItemImplied: isSingleItemImplied, err: err}
 	}
 	clients := make(map[string]RESTClient)
 	for _, mapping := range mappings {
@@ -633,12 +633,12 @@ func (b *Builder) visitByResource() *Result {
 	for _, tuple := range b.resourceTuples {
 		mapping, ok := mappings[tuple.Resource]
 		if !ok {
-			return &Result{singular: isSingular, err: fmt.Errorf("resource %q is not recognized: %v", tuple.Resource, mappings)}
+			return &Result{singleItemImplied: isSingleItemImplied, err: fmt.Errorf("resource %q is not recognized: %v", tuple.Resource, mappings)}
 		}
 		s := fmt.Sprintf("%s/%s", mapping.GroupVersionKind.GroupVersion().String(), mapping.Resource)
 		client, ok := clients[s]
 		if !ok {
-			return &Result{singular: isSingular, err: fmt.Errorf("could not find a client for resource %q", tuple.Resource)}
+			return &Result{singleItemImplied: isSingleItemImplied, err: fmt.Errorf("could not find a client for resource %q", tuple.Resource)}
 		}
 
 		selectorNamespace := b.namespace
@@ -650,7 +650,7 @@ func (b *Builder) visitByResource() *Result {
 				if b.allNamespace {
 					errMsg = "a resource cannot be retrieved by name across all namespaces"
 				}
-				return &Result{singular: isSingular, err: fmt.Errorf(errMsg)}
+				return &Result{singleItemImplied: isSingleItemImplied, err: fmt.Errorf(errMsg)}
 			}
 		}
 
@@ -664,25 +664,25 @@ func (b *Builder) visitByResource() *Result {
 	} else {
 		visitors = VisitorList(items)
 	}
-	return &Result{singular: isSingular, visitor: visitors, sources: items}
+	return &Result{singleItemImplied: isSingleItemImplied, visitor: visitors, sources: items}
 }
 
 func (b *Builder) visitByName() *Result {
-	isSingular := len(b.names) == 1
+	isSingleItemImplied := len(b.names) == 1
 
 	if len(b.paths) != 0 {
-		return &Result{singular: isSingular, err: fmt.Errorf("when paths, URLs, or stdin is provided as input, you may not specify a resource by arguments as well")}
+		return &Result{singleItemImplied: isSingleItemImplied, err: fmt.Errorf("when paths, URLs, or stdin is provided as input, you may not specify a resource by arguments as well")}
 	}
 	if len(b.resources) == 0 {
-		return &Result{singular: isSingular, err: fmt.Errorf("you must provide a resource and a resource name together")}
+		return &Result{singleItemImplied: isSingleItemImplied, err: fmt.Errorf("you must provide a resource and a resource name together")}
 	}
 	if len(b.resources) > 1 {
-		return &Result{singular: isSingular, err: fmt.Errorf("you must specify only one resource")}
+		return &Result{singleItemImplied: isSingleItemImplied, err: fmt.Errorf("you must specify only one resource")}
 	}
 
 	mappings, err := b.resourceMappings()
 	if err != nil {
-		return &Result{singular: isSingular, err: err}
+		return &Result{singleItemImplied: isSingleItemImplied, err: err}
 	}
 	mapping := mappings[0]
 
@@ -700,7 +700,7 @@ func (b *Builder) visitByName() *Result {
 			if b.allNamespace {
 				errMsg = "a resource cannot be retrieved by name across all namespaces"
 			}
-			return &Result{singular: isSingular, err: fmt.Errorf(errMsg)}
+			return &Result{singleItemImplied: isSingleItemImplied, err: fmt.Errorf(errMsg)}
 		}
 	}
 
@@ -709,13 +709,13 @@ func (b *Builder) visitByName() *Result {
 		info := NewInfo(client, mapping, selectorNamespace, name, b.export)
 		visitors = append(visitors, info)
 	}
-	return &Result{singular: isSingular, visitor: VisitorList(visitors), sources: visitors}
+	return &Result{singleItemImplied: isSingleItemImplied, visitor: VisitorList(visitors), sources: visitors}
 }
 
 func (b *Builder) visitByPaths() *Result {
-	singular := !b.dir && !b.stream && len(b.paths) == 1
+	singleItemImplied := !b.dir && !b.stream && len(b.paths) == 1
 	if len(b.resources) != 0 {
-		return &Result{singular: singular, err: fmt.Errorf("when paths, URLs, or stdin is provided as input, you may not specify resource arguments as well")}
+		return &Result{singleItemImplied: singleItemImplied, err: fmt.Errorf("when paths, URLs, or stdin is provided as input, you may not specify resource arguments as well")}
 	}
 	if len(b.names) != 0 {
 		return &Result{err: fmt.Errorf("name cannot be provided when a path is specified")}
@@ -746,7 +746,7 @@ func (b *Builder) visitByPaths() *Result {
 	if b.selector != nil {
 		visitors = NewFilteredVisitor(visitors, FilterBySelector(b.selector))
 	}
-	return &Result{singular: singular, visitor: visitors, sources: b.paths}
+	return &Result{singleItemImplied: singleItemImplied, visitor: visitors, sources: b.paths}
 }
 
 // Do returns a Result object with a Visitor for the resources identified by the Builder.
