@@ -23,6 +23,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/cloudprovider"
+	"k8s.io/kubernetes/pkg/kubelet/secret"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/io"
 	"k8s.io/kubernetes/pkg/util/mount"
@@ -37,10 +38,12 @@ import (
 // plugins - used to initialize volumePluginMgr
 func NewInitializedVolumePluginMgr(
 	kubelet *Kubelet,
+	secretManager secret.Manager,
 	plugins []volume.VolumePlugin) (*volume.VolumePluginMgr, error) {
 	kvh := &kubeletVolumeHost{
 		kubelet:         kubelet,
 		volumePluginMgr: volume.VolumePluginMgr{},
+		secretManager:   secretManager,
 	}
 
 	if err := kvh.volumePluginMgr.InitPlugins(plugins, kvh); err != nil {
@@ -62,6 +65,7 @@ func (kvh *kubeletVolumeHost) GetPluginDir(pluginName string) string {
 type kubeletVolumeHost struct {
 	kubelet         *Kubelet
 	volumePluginMgr volume.VolumePluginMgr
+	secretManager   secret.Manager
 }
 
 func (kvh *kubeletVolumeHost) GetPodVolumeDir(podUID types.UID, pluginName string, volumeName string) string {
@@ -74,6 +78,10 @@ func (kvh *kubeletVolumeHost) GetPodPluginDir(podUID types.UID, pluginName strin
 
 func (kvh *kubeletVolumeHost) GetKubeClient() clientset.Interface {
 	return kvh.kubelet.kubeClient
+}
+
+func (kvh *kubeletVolumeHost) GetSecretFunc() func(namespace, name string) (*v1.Secret, error) {
+	return kvh.secretManager.GetSecret
 }
 
 func (kvh *kubeletVolumeHost) NewWrapperMounter(

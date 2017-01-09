@@ -43,7 +43,8 @@ const (
 
 // secretPlugin implements the VolumePlugin interface.
 type secretPlugin struct {
-	host volume.VolumeHost
+	host          volume.VolumeHost
+	getSecretFunc func(namespace, name string) (*v1.Secret, error)
 }
 
 var _ volume.VolumePlugin = &secretPlugin{}
@@ -60,6 +61,7 @@ func getPath(uid types.UID, volName string, host volume.VolumeHost) string {
 
 func (plugin *secretPlugin) Init(host volume.VolumeHost) error {
 	plugin.host = host
+	plugin.getSecretFunc = host.GetSecretFunc()
 	return nil
 }
 
@@ -94,9 +96,10 @@ func (plugin *secretPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, opts volu
 			plugin.host.GetWriter(),
 			volume.NewCachedMetrics(volume.NewMetricsDu(getPath(pod.UID, spec.Name(), plugin.host))),
 		},
-		source: *spec.Volume.Secret,
-		pod:    *pod,
-		opts:   &opts,
+		source:        *spec.Volume.Secret,
+		pod:           *pod,
+		opts:          &opts,
+		getSecretFunc: plugin.getSecretFunc,
 	}, nil
 }
 
@@ -145,9 +148,10 @@ func (sv *secretVolume) GetPath() string {
 type secretVolumeMounter struct {
 	*secretVolume
 
-	source v1.SecretVolumeSource
-	pod    v1.Pod
-	opts   *volume.VolumeOptions
+	source        v1.SecretVolumeSource
+	pod           v1.Pod
+	opts          *volume.VolumeOptions
+	getSecretFunc func(namespace, name string) (*v1.Secret, error)
 }
 
 var _ volume.Mounter = &secretVolumeMounter{}
@@ -193,7 +197,14 @@ func (b *secretVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 		return fmt.Errorf("Cannot setup secret volume %v because kube client is not configured", b.volName)
 	}
 
-	secret, err := kubeClient.Core().Secrets(b.pod.Namespace).Get(b.source.SecretName, metav1.GetOptions{})
+	var secret *v1.Secret
+	if b.getSecretFunc != nil {
+		glog.Errorf("SecretFunc not nil")
+		secret, err = b.getSecretFunc(b.pod.Namespace, b.source.SecretName)
+	} else {
+		glog.Errorf("SecretFunc nil")
+		secret, err = kubeClient.Core().Secrets(b.pod.Namespace).Get(b.source.SecretName, metav1.GetOptions{})
+	}
 	if err != nil {
 		glog.Errorf("Couldn't get secret %v/%v", b.pod.Namespace, b.source.SecretName)
 		return err

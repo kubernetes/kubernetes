@@ -722,7 +722,7 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 		kubeDeps.Recorder)
 
 	klet.volumePluginMgr, err =
-		NewInitializedVolumePluginMgr(klet, kubeDeps.VolumePlugins)
+		NewInitializedVolumePluginMgr(klet, secretManager, kubeDeps.VolumePlugins)
 	if err != nil {
 		return nil, err
 	}
@@ -743,7 +743,8 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 		kubeDeps.Mounter,
 		klet.getPodsDir(),
 		kubeDeps.Recorder,
-		kubeCfg.ExperimentalCheckNodeCapabilitiesBeforeMount)
+		kubeCfg.ExperimentalCheckNodeCapabilitiesBeforeMount,
+	)
 
 	runtimeCache, err := kubecontainer.NewRuntimeCache(klet.containerRuntime)
 	if err != nil {

@@ -205,6 +205,10 @@ type attachDetachController struct {
 	recorder record.EventRecorder
 }
 
+func (adc *attachDetachController) GetSecretFunc() func(namespace, name string) (*v1.Secret, error) {
+	return nil
+}
+
 func (adc *attachDetachController) Run(stopCh <-chan struct{}) {
 	defer runtime.HandleCrash()
 	glog.Infof("Starting Attach Detach Controller")

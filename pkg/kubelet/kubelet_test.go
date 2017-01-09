@@ -243,8 +243,9 @@ func newTestKubeletWithImageList(
 	kubelet.admitHandlers.AddPodAdmitHandler(lifecycle.NewPredicateAdmitHandler(kubelet.getNodeAnyWay))
 
 	plug := &volumetest.FakeVolumePlugin{PluginName: "fake", Host: nil}
+	secretManager, _ := secret.NewSimpleSecretManager(kubelet.kubeClient)
 	kubelet.volumePluginMgr, err =
-		NewInitializedVolumePluginMgr(kubelet, []volume.VolumePlugin{plug})
+		NewInitializedVolumePluginMgr(kubelet, secretManager, []volume.VolumePlugin{plug})
 	require.NoError(t, err, "Failed to initialize VolumePluginMgr")
 
 	kubelet.mounter = &mount.FakeMounter{}
