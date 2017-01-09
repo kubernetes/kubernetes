@@ -79,26 +79,13 @@ func testDynamicProvisioning(client clientset.Interface, claim *v1.PersistentVol
 	By("checking the created volume is readable and retains data")
 	runInPodWithVolume(client, claim.Namespace, claim.Name, "grep 'hello world' /mnt/test/data")
 
-	// Ugly hack: if we delete the AWS/GCE/OpenStack volume here, it will
-	// probably collide with destruction of the pods above - the pods
-	// still have the volume attached (kubelet is slow...) and deletion
-	// of attached volume is not allowed by AWS/GCE/OpenStack.
-	// Kubernetes *will* retry deletion several times in
-	// pvclaimbinder-sync-period.
-	// So, technically, this sleep is not needed. On the other hand,
-	// the sync perion is 10 minutes and we really don't want to wait
-	// 10 minutes here. There is no way how to see if kubelet is
-	// finished with cleaning volumes. A small sleep here actually
-	// speeds up the test!
-	// Three minutes should be enough to clean up the pods properly.
-	// We've seen GCE PD detach to take more than 1 minute.
-	By("Sleeping to let kubelet destroy all pods")
-	time.Sleep(3 * time.Minute)
-
 	By("deleting the claim")
 	framework.ExpectNoError(client.Core().PersistentVolumeClaims(claim.Namespace).Delete(claim.Name, nil))
 
-	// Wait for the PV to get deleted too.
+	// Wait for the PV to get deleted. Technically, the first few delete
+	// attempts may fail, as the volume is still attached to a node because
+	// kubelet is slowly cleaning up a pod, however it should succeed in a
+	// couple of minutes. Wait 20 minutes to recover from random cloud hiccups.
 	framework.ExpectNoError(framework.WaitForPersistentVolumeDeleted(client, pv.Name, 5*time.Second, 20*time.Minute))
 }
 
