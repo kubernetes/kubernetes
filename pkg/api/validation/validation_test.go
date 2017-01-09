@@ -8155,7 +8155,7 @@ func TestValidateSecurityContext(t *testing.T) {
 		"request privileged when capabilities forbids": {
 			sc:          privRequestWithGlobalDeny,
 			errorType:   "FieldValueForbidden",
-			errorDetail: "disallowed by policy",
+			errorDetail: "disallowed by cluster policy",
 		},
 		"negative RunAsUser": {
 			sc:          negativeRunAsUser,
