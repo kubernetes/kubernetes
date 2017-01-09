@@ -634,7 +634,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			if hasSubresource {
 				doc = "partially update " + subresource + " of the specified " + kind
 			}
-			handler := metrics.InstrumentRouteFunc(action.Verb, resource, handlers.PatchResource(patcher, reqScope, a.group.Typer, admit, mapping.ObjectConvertor))
+			handler := metrics.InstrumentRouteFunc(action.Verb, resource, handlers.PatchResource(patcher, reqScope, admit, mapping.ObjectConvertor))
 			route := ws.PATCH(action.Path).To(handler).
 				Doc(doc).
 				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
