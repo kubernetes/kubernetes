@@ -96,32 +96,60 @@ and information about remapping should come from the CRI.
 In order to Do The Right Thing in any solution the system must be able 
 to detect that private user namespaces are in use.  
 
-In Docker, this is a daemon setting and could be exposed via 
-the `info` endpoint.  However, in rkt this is a run parameter so it is
+In Docker, this is a daemon setting and is [exposed via 
+the info endpoint](https://github.com/docker/docker/commit/ae74092e450f1f2665b90257b65513cc0c19702f).
+This information is available in Docker 1.13+ only.
+
+However, in rkt this is a run parameter so it is
 unknown if private user namespaces will be used until the container launch
 command is created.  
 
-As a consistent solution to both driving any behavior to escape 
+As a consistent and backwards compatible solution to both driving any behavior to escape 
 user namespaces (see system defaulting below) and to also control
-the use of `--private-users` in the rkt `run` command a simple feature
+the use of `--private-users` in the rkt `run` command a feature
 gate can be added to the Kubelet as was done in the [experimental
 support](https://github.com/kubernetes/kubernetes/pull/31169/files#diff-c5e4440d8576a91980ab36fe63556326).
 
-### Mounts
+### Volumes
 
 The system must ensure that the remapped UID and GID have
 access to the correct directories under `/var/lib/kubelet/pods` in order
-to perform mounting.
+to perform mounting.  Currently the Kubelet root directory is created
+with 0750 permissions and are owned by root:root.  Since pods are running
+with at least the root group (`runAsUser` may be specified as well as 
+supplemental groups) the pod has access to read these directories.  In
+a remap environment the group itself may change so the pod will no longer
+be able to access these directories.  In order to fix this the root 
+directory should be given 0755 access in the Kubelet's `setupDataDirs`.
 
-This may be accomplished by ensuring group access to the correct
-directories.  Information about the GID mappings should be conveyed
-to the Kubelet and storage code via the CRI.
+Beneath the Kubelet root directory each pod is given it's own directory
+named by a unique identifier containing:
 
-TODO - are GIDs being remapped in the rkt implementation?
+* containers
+* plugins
+* volumes
 
-TODO - specific information on mount types - some support chmod and
-should be able to be changed to the remapped uids and some do not. This
-needs to be called out.
+Rather than increasing the access on directories under the root directory,
+the pod directory (and sub directories) may be owned by the remapped
+GID.  This is very similar to the `fsGroup`, however `fsGroup` is not applied
+to items like the termination logs.
+
+How this GID is retrieved should be a container runtime detail.  This
+leaves the container runtimes free to manage the permissions of the 
+directories under the pod directory (available via injecting the
+`RuntimeHelper` into the runtime implementation) in a way that suits
+their ability to provide the GID.  For Docker this is the value in
+`/etc/subgid`.
+
+TODO 
+
+* are GIDs being remapped in the rkt implementation?  If not then
+  root group may be enough.
+* more specific information on mount types
+* can the remap GID be injected as an `fsGroup` for mount types that 
+support `chmod` (if `fsGroup` is not already set)
+* host mounts do not - and should not - chmod for remap 
+environments.  This is up to the administrator to manage.
 
 ### Escaping Private User Namespaces
 
