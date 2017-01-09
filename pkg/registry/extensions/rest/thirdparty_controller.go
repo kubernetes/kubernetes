@@ -20,11 +20,14 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/golang/glog"
+
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	extensionsclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/extensions/internalversion"
 	"k8s.io/kubernetes/pkg/registry/extensions/thirdpartyresourcedata"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/util/sets"
 )
 
@@ -79,20 +82,32 @@ func (t *ThirdPartyController) syncResourceList(list runtime.Object) error {
 	existing := sets.String{}
 	switch list := list.(type) {
 	case *extensions.ThirdPartyResourceList:
+		var errs []error
 		// Loop across all schema objects for third party resources
 		for ix := range list.Items {
 			item := &list.Items[ix]
+
+			if len(item.Versions) == 0 {
+				errs = append(errs, fmt.Errorf("ThirdPartyResource %s has no defined version, skip sync", item.Name))
+				continue
+			}
+
 			// extract the api group and resource kind from the schema
 			_, group, err := thirdpartyresourcedata.ExtractApiGroupAndKind(item)
 			if err != nil {
-				return err
+				errs = append(errs, err)
+				continue
 			}
 			// place it in the set of resources that we expect, so that we don't delete it in the delete pass
 			existing.Insert(MakeThirdPartyPath(group))
 			// ensure a RESTful resource for this schema exists on the master
 			if err := t.SyncOneResource(item); err != nil {
-				return err
+				errs = append(errs, fmt.Errorf("Failed to sync ThirdPartyResource %s: %v", item.Name, err))
 			}
+		}
+		if len(errs) != 0 {
+			allErrs := errors.NewAggregate(errs)
+			glog.Errorf("sync ThirdPartyResource get error: %s", allErrs.Error())
 		}
 	default:
 		return fmt.Errorf("expected a *ThirdPartyResourceList, got %#v", list)
