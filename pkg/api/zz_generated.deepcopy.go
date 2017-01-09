@@ -21,13 +21,13 @@ limitations under the License.
 package api
 
 import (
+	pkgfoo "k8s.io/fake-dep/pkgfoo"
 	v1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	conversion "k8s.io/kubernetes/pkg/conversion"
 	fields "k8s.io/kubernetes/pkg/fields"
 	labels "k8s.io/kubernetes/pkg/labels"
 	runtime "k8s.io/kubernetes/pkg/runtime"
 	types "k8s.io/kubernetes/pkg/types"
-	pkgfoo "k8s.io/kubernetes/vendor/k8s.io/fake-dep/pkgfoo"
 	reflect "reflect"
 )
 
