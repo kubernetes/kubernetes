@@ -494,7 +494,7 @@ var (
 	statefulSetColumns               = []string{"NAME", "DESIRED", "CURRENT", "AGE"}
 	endpointColumns                  = []string{"NAME", "ENDPOINTS", "AGE"}
 	nodeColumns                      = []string{"NAME", "STATUS", "AGE", "VERSION"}
-	nodeWideColumns                  = []string{"EXTERNAL-IP"}
+	nodeWideColumns                  = []string{"EXTERNAL-IP", "OS-IMAGE", "KERNEL-VERSION"}
 	daemonSetColumns                 = []string{"NAME", "DESIRED", "CURRENT", "READY", "NODE-SELECTOR", "AGE"}
 	daemonSetWideColumns             = []string{"CONTAINER(S)", "IMAGE(S)", "SELECTOR"}
 	eventColumns                     = []string{"LASTSEEN", "FIRSTSEEN", "COUNT", "NAME", "KIND", "SUBOBJECT", "TYPE", "REASON", "SOURCE", "MESSAGE"}
@@ -1550,7 +1550,14 @@ func printNode(node *api.Node, w io.Writer, options PrintOptions) error {
 	}
 
 	if options.Wide {
-		if _, err := fmt.Fprintf(w, "\t%s", getNodeExternalIP(node)); err != nil {
+		osImage, kernelVersion := node.Status.NodeInfo.OSImage, node.Status.NodeInfo.KernelVersion
+		if osImage == "" {
+			osImage = "<unknown>"
+		}
+		if kernelVersion == "" {
+			kernelVersion = "<unknown>"
+		}
+		if _, err := fmt.Fprintf(w, "\t%s\t%s\t%s", getNodeExternalIP(node), osImage, kernelVersion); err != nil {
 			return err
 		}
 	}
