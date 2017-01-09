@@ -1463,8 +1463,9 @@ func (kl *Kubelet) syncPod(o syncPodOptions) error {
 		// exists or the pod is running for the first time
 		podKilled := false
 		if !pcm.Exists(pod) && !firstSync {
-			kl.killPod(pod, nil, podStatus, nil)
-			podKilled = true
+			if err := kl.killPod(pod, nil, podStatus, nil); err != nil {
+				podKilled = true
+			}
 		}
 		// Create and Update pod's Cgroups
 		// Don't create cgroups for run once pod if it was killed above

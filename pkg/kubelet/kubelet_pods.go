@@ -588,18 +588,20 @@ func (kl *Kubelet) killPod(pod *v1.Pod, runningPod *kubecontainer.Pod, status *k
 		p = *runningPod
 	} else if status != nil {
 		p = kubecontainer.ConvertPodStatusToRunningPod(kl.GetRuntime().Type(), status)
+	} else {
+		return fmt.Errorf("one of the two arguments must be non-nil: runningPod, status")
 	}
 
 	// cache the pod cgroup Name for reducing the cpu resource limits of the pod cgroup once the pod is killed
 	pcm := kl.containerManager.NewPodContainerManager()
 	var podCgroup cm.CgroupName
-	reduceCpuLimts := true
+	reduceCpuLimits := true
 	if pod != nil {
 		podCgroup, _ = pcm.GetPodContainerName(pod)
 	} else {
 		// If the pod is nil then cgroup limit must have already
 		// been decreased earlier
-		reduceCpuLimts = false
+		reduceCpuLimits = false
 	}
 
 	// Call the container runtime KillPod method which stops all running containers of the pod
@@ -614,7 +616,7 @@ func (kl *Kubelet) killPod(pod *v1.Pod, runningPod *kubecontainer.Pod, status *k
 	// Hence we only reduce the cpu resource limits of the pod's cgroup
 	// and defer the responsibilty of destroying the pod's cgroup to the
 	// cleanup method and the housekeeping loop.
-	if reduceCpuLimts {
+	if reduceCpuLimits {
 		pcm.ReduceCPULimits(podCgroup)
 	}
 	return nil
