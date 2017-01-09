@@ -70,8 +70,8 @@ the cloud specific control loops shipped with Kubernetes.`,
 	return cmd
 }
 
-// ResyncPeriod computes the time interval a shared informer waits before resyncing with the api server
-func ResyncPeriod(s *options.CloudControllerManagerServer) func() time.Duration {
+// resyncPeriod computes the time interval a shared informer waits before resyncing with the api server
+func resyncPeriod(s *options.CloudControllerManagerServer) func() time.Duration {
 	return func() time.Duration {
 		factor := rand.Float64() + 1
 		return time.Duration(float64(s.MinResyncPeriod.Nanoseconds()) * factor)
@@ -191,7 +191,7 @@ func StartControllers(s *options.CloudControllerManagerServer, kubeconfig *restc
 	client := func(serviceAccountName string) clientset.Interface {
 		return rootClientBuilder.ClientOrDie(serviceAccountName)
 	}
-	sharedInformers := informers.NewSharedInformerFactory(client("shared-informers"), nil, ResyncPeriod(s)())
+	sharedInformers := informers.NewSharedInformerFactory(client("shared-informers"), nil, resyncPeriod(s)())
 
 	_, clusterCIDR, err := net.ParseCIDR(s.ClusterCIDR)
 	if err != nil {
