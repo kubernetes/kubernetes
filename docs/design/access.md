@@ -28,7 +28,7 @@ that make up a K8s cluster.
 
 ### Threats
 
-Both intentional attacks and accidental use of privilege are concerns.
+Both intentional attacks and accidental use of privilege are concerned.
 
 For both cases it may be useful to think about these categories differently:
   - Application Path - attack by sending network messages from the internet to
@@ -119,7 +119,7 @@ Related discussion:
 
 This doc describes two security profiles:
   - Simple profile:  like single-user mode. Make it easy to evaluate K8s
-without lots of configuring accounts and policies.  Protects from unauthorized
+without lots of configuring accounts and policies.  Protect from unauthorized
 users, but does not partition authorized users.
   - Enterprise profile: Provide mechanisms needed for large numbers of users.
 Defense in depth. Should integrate with existing enterprise security
@@ -130,7 +130,7 @@ simple and enterprise profiles.  System should be flexible enough for
 knowledgeable users to create intermediate profiles, but K8s developers should
 only reason about those two Profiles, not a matrix.
 
-Features in this doc are divided into "Initial Feature", and "Improvements".
+Features in this doc are divided into "Initial Features", and "Improvements".
 Initial features would be candidates for version 1.00.
 
 ## Identity
@@ -202,7 +202,7 @@ Improvements:
 This may provide some defense-in-depth against container escapes. (https://github.com/docker/docker/pull/4572)
 - requires docker to integrate user namespace support, and deciding what
 getpwnam() does for these uids.
-- any features that help users avoid use of privileged containers
+- any features that help users avoid using of privileged containers
 (http://issue.k8s.io/391)
 
 ### Namespaces
@@ -241,7 +241,7 @@ accounts, and no https proxy required.
 allow integration with existing to enterprise authorization systems. The
 Kubernetes namespace itself should avoid taking contributions of multiple
 authorization schemes. Instead, a trusted proxy in front of the apiserver can be
-used to authenticate users.
+used to authenticated users.
   - For organizations whose security requirements only allow FIPS compliant
 implementations (e.g. apache) for authentication.
   - So the proxy can terminate SSL, and isolate the CA-signed certificate from
