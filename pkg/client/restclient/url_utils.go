@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"net/url"
 	"path"
+	"strings"
 
 	"k8s.io/kubernetes/pkg/runtime/schema"
 )
@@ -32,19 +33,20 @@ func DefaultServerURL(host, apiPath string, groupVersion schema.GroupVersion, de
 		return nil, "", fmt.Errorf("host must be a URL or a host:port pair")
 	}
 	base := host
-	hostURL, err := url.Parse(base)
-	if err != nil || hostURL.Scheme == "" || hostURL.Host == "" {
-		scheme := "http://"
+	hasScheme := strings.HasPrefix(base, "https://") || strings.HasPrefix(base, "http://")
+	if !hasScheme {
 		if defaultTLS {
-			scheme = "https://"
+			base = "https://" + base
+		} else {
+			base = "http://" + base
 		}
-		hostURL, err = url.Parse(scheme + base)
-		if err != nil {
-			return nil, "", err
-		}
-		if hostURL.Path != "" && hostURL.Path != "/" {
-			return nil, "", fmt.Errorf("host must be a URL or a host:port pair: %q", base)
-		}
+	}
+	hostURL, err := url.Parse(base)
+	if err != nil {
+		return nil, "", err
+	}
+	if !hasScheme && hostURL.Path != "" && hostURL.Path != "/" {
+		return nil, "", fmt.Errorf("host must be a URL or a host:port pair: %q", base)
 	}
 
 	// hostURL.Path is optional; a non-empty Path is treated as a prefix that is to be applied to
