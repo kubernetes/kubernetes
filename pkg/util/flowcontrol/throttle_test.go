@@ -27,8 +27,8 @@ func TestMultithreadedThrottling(t *testing.T) {
 	// Bucket with 100QPS and no burst
 	r := NewTokenBucketRateLimiter(100, 1)
 
-	// channel to collect 100 tokens
-	taken := make(chan bool, 100)
+	// channel to collect 101 tokens
+	taken := make(chan bool, 101)
 
 	// Set up goroutines to hammer the throttler
 	startCh := make(chan bool)
@@ -59,16 +59,16 @@ func TestMultithreadedThrottling(t *testing.T) {
 	r.Accept()
 	// start the thundering herd
 	close(startCh)
-	// wait for the first signal that we collected 100 tokens
+	// wait for the first signal that we collected 101 tokens
 	<-endCh
 	// record wall time
 	endTime := time.Now()
 
 	if duration := endTime.Sub(startTime); duration < time.Second {
-		// We shouldn't be able to get 100 tokens out of the bucket in less than 1 second of wall clock time, no matter what
-		t.Errorf("Expected it to take at least 1 second to get 100 tokens, took %v", duration)
+		// We shouldn't be able to get 101 tokens out of the bucket in less than 1 second of wall clock time, no matter what
+		t.Errorf("Expected it to take at least 1 second to get 101 tokens, took %v", duration)
 	} else {
-		t.Logf("Took %v to get 100 tokens", duration)
+		t.Logf("Took %v to get 101 tokens", duration)
 	}
 }
 
