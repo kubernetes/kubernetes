@@ -37,7 +37,7 @@ import (
 	storage "k8s.io/kubernetes/pkg/apis/storage/v1beta1"
 	storageutil "k8s.io/kubernetes/pkg/apis/storage/v1beta1/util"
 	"k8s.io/kubernetes/pkg/client/cache"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
 	"k8s.io/kubernetes/pkg/client/record"
 	fcache "k8s.io/kubernetes/pkg/client/testing/cache"
