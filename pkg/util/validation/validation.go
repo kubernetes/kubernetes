@@ -87,8 +87,8 @@ func IsValidLabelValue(value string) []string {
 	return errs
 }
 
-const dns1123LabelFmt string = "[a-z0-9]([-a-z0-9]*[a-z0-9])?"
-const dns1123LabelErrMsg string = "a valid DNS (RFC 1123) label must consist of lower case alphanumeric characters or '-', and must start and end with an alphanumeric character"
+const dns1123LabelFmt string = "[a-zA-Z0-9]([-a-z-A-Z0-9]*[a-zA-Z0-9])?"
+const dns1123LabelErrMsg string = "a valid DNS (RFC 1123) label must consist of alphanumeric characters or '-', and must start and end with an alphanumeric character"
 const DNS1123LabelMaxLength int = 63
 
 var dns1123LabelRegexp = regexp.MustCompile("^" + dns1123LabelFmt + "$")
@@ -107,7 +107,7 @@ func IsDNS1123Label(value string) []string {
 }
 
 const dns1123SubdomainFmt string = dns1123LabelFmt + "(\\." + dns1123LabelFmt + ")*"
-const dns1123SubdomainErrorMsg string = "a valid DNS (RFC 1123) subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character"
+const dns1123SubdomainErrorMsg string = "a valid DNS (RFC 1123) subdomain must consist of alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character"
 const DNS1123SubdomainMaxLength int = 253
 
 var dns1123SubdomainRegexp = regexp.MustCompile("^" + dns1123SubdomainFmt + "$")
@@ -125,8 +125,8 @@ func IsDNS1123Subdomain(value string) []string {
 	return errs
 }
 
-const dns1035LabelFmt string = "[a-z]([-a-z0-9]*[a-z0-9])?"
-const dns1035LabelErrMsg string = "a valid DNS (RFC 1035) label must consist of lower case alphanumeric characters or '-', and must start and end with an alphanumeric character"
+const dns1035LabelFmt string = "[a-zA-Z]([-a-z-A-Z0-9]*[a-zA-Z0-9])?"
+const dns1035LabelErrMsg string = "a valid DNS (RFC 1035) label must consist of alphanumeric characters or '-', and must start and end with an alphanumeric character"
 const DNS1035LabelMaxLength int = 63
 
 var dns1035LabelRegexp = regexp.MustCompile("^" + dns1035LabelFmt + "$")
