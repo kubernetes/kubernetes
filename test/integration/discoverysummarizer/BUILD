@@ -12,7 +12,7 @@ go_test(
     srcs = ["discoverysummarizer_test.go"],
     tags = ["automanaged"],
     deps = [
-        "//cmd/kubernetes-discovery/pkg/legacy:go_default_library",
+        "//cmd/kube-aggregator/pkg/legacy:go_default_library",
         "//examples/apiserver:go_default_library",
     ],
 )

@@ -46,7 +46,7 @@ docker_build(
     "kube-apiserver",
     "kube-controller-manager",
     "kube-scheduler",
-    "kubernetes-discovery",
+    "kube-aggregator",
 ]]
 
 docker_build(

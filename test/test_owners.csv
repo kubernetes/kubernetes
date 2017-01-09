@@ -518,7 +518,7 @@ k8s.io/kubernetes/cmd/kubeadm/app/preflight,apprenda,0
 k8s.io/kubernetes/cmd/kubeadm/app/util,krousey,1
 k8s.io/kubernetes/cmd/kubeadm/test,pipejakob,0
 k8s.io/kubernetes/cmd/kubelet/app,derekwaynecarr,0
-k8s.io/kubernetes/cmd/kubernetes-discovery/pkg/apiserver,brendandburns,0
+k8s.io/kubernetes/cmd/kube-aggregator/pkg/apiserver,brendandburns,0
 k8s.io/kubernetes/cmd/libs/go2idl/client-gen/types,caesarxuchao,0
 k8s.io/kubernetes/cmd/libs/go2idl/go-to-protobuf/protobuf,smarterclayton,0
 k8s.io/kubernetes/cmd/libs/go2idl/openapi-gen/generators,davidopp,1

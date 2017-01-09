@@ -138,7 +138,7 @@ do
 done
 
 if [ "x$GO_OUT" == "x" ]; then
-    make -C "${KUBE_ROOT}" WHAT="cmd/kubectl cmd/hyperkube cmd/kubernetes-discovery"
+    make -C "${KUBE_ROOT}" WHAT="cmd/kubectl cmd/hyperkube cmd/kube-aggregator"
 else
     echo "skipped the build."
 fi
