@@ -30,6 +30,7 @@ go_library(
         "//pkg/cloudprovider:go_default_library",
         "//pkg/types:go_default_library",
         "//pkg/util/errors:go_default_library",
+        "//pkg/volume:go_default_library",
         "//vendor:github.com/Azure/azure-sdk-for-go/arm/compute",
         "//vendor:github.com/Azure/azure-sdk-for-go/arm/network",
         "//vendor:github.com/Azure/azure-sdk-for-go/arm/storage",
