@@ -354,7 +354,7 @@ func TestGCListWatcher(t *testing.T) {
 	if e, a := 2, len(testHandler.actions); e != a {
 		t.Errorf("expect %d requests, got %d", e, a)
 	}
-	if e, a := "resourceVersion=1", testHandler.actions[0].query; e != a {
+	if e, a := "resourceVersion=1&watch=true", testHandler.actions[0].query; e != a {
 		t.Errorf("expect %s, got %s", e, a)
 	}
 	if e, a := "resourceVersion=1", testHandler.actions[1].query; e != a {
