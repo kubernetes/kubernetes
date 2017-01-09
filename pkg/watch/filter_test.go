@@ -14,20 +14,22 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package watch
+package watch_test
 
 import (
 	"reflect"
 	"testing"
+
+	. "k8s.io/kubernetes/pkg/watch"
 )
 
 func TestFilter(t *testing.T) {
 	table := []Event{
-		{Added, testType("foo")},
-		{Added, testType("bar")},
-		{Added, testType("baz")},
-		{Added, testType("qux")},
-		{Added, testType("zoo")},
+		{Type: Added, Object: testType("foo")},
+		{Type: Added, Object: testType("bar")},
+		{Type: Added, Object: testType("baz")},
+		{Type: Added, Object: testType("qux")},
+		{Type: Added, Object: testType("zoo")},
 	}
 
 	source := NewFake()

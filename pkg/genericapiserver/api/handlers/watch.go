@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api/errors"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/genericapiserver/api/handlers/negotiation"
 	"k8s.io/kubernetes/pkg/httplog"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -31,7 +32,6 @@ import (
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/wsstream"
 	"k8s.io/kubernetes/pkg/watch"
-	"k8s.io/kubernetes/pkg/watch/versioned"
 
 	"github.com/emicklei/go-restful"
 	"golang.org/x/net/websocket"
@@ -178,7 +178,7 @@ func (s *WatchServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	flusher.Flush()
 
 	var unknown runtime.Unknown
-	internalEvent := &versioned.InternalEvent{}
+	internalEvent := &metav1.InternalEvent{}
 	buf := &bytes.Buffer{}
 	ch := s.Watching.ResultChan()
 	for {
@@ -207,7 +207,7 @@ func (s *WatchServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			event.Object = &unknown
 
 			// the internal event will be versioned by the encoder
-			*internalEvent = versioned.InternalEvent(event)
+			*internalEvent = metav1.InternalEvent(event)
 			if err := e.Encode(internalEvent); err != nil {
 				utilruntime.HandleError(fmt.Errorf("unable to encode watch object: %v (%#v)", err, e))
 				// client disconnect.
@@ -237,7 +237,7 @@ func (s *WatchServer) HandleWS(ws *websocket.Conn) {
 	}()
 
 	var unknown runtime.Unknown
-	internalEvent := &versioned.InternalEvent{}
+	internalEvent := &metav1.InternalEvent{}
 	buf := &bytes.Buffer{}
 	streamBuf := &bytes.Buffer{}
 	ch := s.Watching.ResultChan()
@@ -265,7 +265,7 @@ func (s *WatchServer) HandleWS(ws *websocket.Conn) {
 			event.Object = &unknown
 
 			// the internal event will be versioned by the encoder
-			*internalEvent = versioned.InternalEvent(event)
+			*internalEvent = metav1.InternalEvent(event)
 			if err := s.Encoder.Encode(internalEvent, streamBuf); err != nil {
 				// encoding error
 				utilruntime.HandleError(fmt.Errorf("unable to encode event: %v", err))

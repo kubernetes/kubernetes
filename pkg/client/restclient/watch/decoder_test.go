@@ -24,11 +24,12 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
+	restclientwatch "k8s.io/kubernetes/pkg/client/restclient/watch"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/runtime/serializer/streaming"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/watch"
-	"k8s.io/kubernetes/pkg/watch/versioned"
 )
 
 func TestDecoder(t *testing.T) {
@@ -37,7 +38,7 @@ func TestDecoder(t *testing.T) {
 	for _, eventType := range table {
 		out, in := io.Pipe()
 		codec := testapi.Default.Codec()
-		decoder := versioned.NewDecoder(streaming.NewDecoder(out, codec), codec)
+		decoder := restclientwatch.NewDecoder(streaming.NewDecoder(out, codec), codec)
 
 		expect := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
 		encoder := json.NewEncoder(in)
@@ -46,7 +47,7 @@ func TestDecoder(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Unexpected error %v", err)
 			}
-			event := versioned.Event{
+			event := metav1.WatchEvent{
 				Type:   string(eventType),
 				Object: runtime.RawExtension{Raw: json.RawMessage(data)},
 			}
@@ -90,7 +91,7 @@ func TestDecoder(t *testing.T) {
 func TestDecoder_SourceClose(t *testing.T) {
 	out, in := io.Pipe()
 	codec := testapi.Default.Codec()
-	decoder := versioned.NewDecoder(streaming.NewDecoder(out, codec), codec)
+	decoder := restclientwatch.NewDecoder(streaming.NewDecoder(out, codec), codec)
 
 	done := make(chan struct{})
 

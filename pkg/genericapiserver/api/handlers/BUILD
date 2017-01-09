@@ -65,7 +65,6 @@ go_library(
         "//pkg/util/strategicpatch:go_default_library",
         "//pkg/util/wsstream:go_default_library",
         "//pkg/watch:go_default_library",
-        "//pkg/watch/versioned:go_default_library",
         "//vendor:github.com/emicklei/go-restful",
         "//vendor:github.com/evanphx/json-patch",
         "//vendor:github.com/golang/glog",

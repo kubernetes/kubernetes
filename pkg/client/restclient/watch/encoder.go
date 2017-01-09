@@ -19,6 +19,7 @@ package versioned
 import (
 	"encoding/json"
 
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/runtime/serializer/streaming"
 	"k8s.io/kubernetes/pkg/watch"
@@ -27,6 +28,7 @@ import (
 // Encoder serializes watch.Events into io.Writer. The internal objects
 // are encoded using embedded encoder, and the outer Event is serialized
 // using encoder.
+// TODO: this type is only used by tests
 type Encoder struct {
 	encoder         streaming.Encoder
 	embeddedEncoder runtime.Encoder
@@ -47,5 +49,8 @@ func (e *Encoder) Encode(event *watch.Event) error {
 		return err
 	}
 	// FIXME: get rid of json.RawMessage.
-	return e.encoder.Encode(&Event{string(event.Type), runtime.RawExtension{Raw: json.RawMessage(data)}})
+	return e.encoder.Encode(&metav1.WatchEvent{
+		Type:   string(event.Type),
+		Object: runtime.RawExtension{Raw: json.RawMessage(data)},
+	})
 }

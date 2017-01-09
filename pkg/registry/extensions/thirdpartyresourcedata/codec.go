@@ -35,7 +35,6 @@ import (
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/util/yaml"
-	"k8s.io/kubernetes/pkg/watch/versioned"
 )
 
 type thirdPartyObjectConverter struct {
@@ -535,9 +534,9 @@ func (t *thirdPartyResourceDataEncoder) Encode(obj runtime.Object, stream io.Wri
 
 		_, err = stream.Write(encBytes)
 		return err
-	case *versioned.InternalEvent:
-		event := &versioned.Event{}
-		err := versioned.Convert_versioned_InternalEvent_to_versioned_Event(obj, event, nil)
+	case *metav1.InternalEvent:
+		event := &metav1.WatchEvent{}
+		err := metav1.Convert_versioned_InternalEvent_to_versioned_Event(obj, event, nil)
 		if err != nil {
 			return err
 		}

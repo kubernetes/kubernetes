@@ -30,7 +30,7 @@ go_library(
 )
 
 go_test(
-    name = "go_default_test",
+    name = "go_default_xtest",
     srcs = [
         "filter_test.go",
         "mux_test.go",
@@ -38,13 +38,13 @@ go_test(
         "until_test.go",
         "watch_test.go",
     ],
-    library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/runtime:go_default_library",
         "//pkg/runtime/schema:go_default_library",
         "//pkg/util/wait:go_default_library",
+        "//pkg/watch:go_default_library",
     ],
 )
 
@@ -60,7 +60,6 @@ filegroup(
     srcs = [
         ":package-srcs",
         "//pkg/watch/json:all-srcs",
-        "//pkg/watch/versioned:all-srcs",
     ],
     tags = ["automanaged"],
 )

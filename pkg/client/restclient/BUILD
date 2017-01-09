@@ -28,6 +28,7 @@ go_library(
         "//pkg/api/validation/path:go_default_library",
         "//pkg/apis/meta/v1:go_default_library",
         "//pkg/client/metrics:go_default_library",
+        "//pkg/client/restclient/watch:go_default_library",
         "//pkg/client/transport:go_default_library",
         "//pkg/client/unversioned/clientcmd/api:go_default_library",
         "//pkg/fields:go_default_library",
@@ -41,7 +42,6 @@ go_library(
         "//pkg/util/sets:go_default_library",
         "//pkg/version:go_default_library",
         "//pkg/watch:go_default_library",
-        "//pkg/watch/versioned:go_default_library",
         "//vendor:github.com/golang/glog",
     ],
 )
@@ -65,6 +65,7 @@ go_test(
         "//pkg/api/v1:go_default_library",
         "//pkg/apimachinery/registered:go_default_library",
         "//pkg/apis/meta/v1:go_default_library",
+        "//pkg/client/restclient/watch:go_default_library",
         "//pkg/client/unversioned/clientcmd/api:go_default_library",
         "//pkg/labels:go_default_library",
         "//pkg/runtime:go_default_library",
@@ -77,7 +78,6 @@ go_test(
         "//pkg/util/intstr:go_default_library",
         "//pkg/util/testing:go_default_library",
         "//pkg/watch:go_default_library",
-        "//pkg/watch/versioned:go_default_library",
         "//vendor:github.com/google/gofuzz",
     ],
 )
@@ -94,6 +94,7 @@ filegroup(
     srcs = [
         ":package-srcs",
         "//pkg/client/restclient/fake:all-srcs",
+        "//pkg/client/restclient/watch:all-srcs",
     ],
     tags = ["automanaged"],
 )
