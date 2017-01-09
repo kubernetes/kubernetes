@@ -162,8 +162,8 @@ func (o *ConvertOptions) RunConvert() error {
 		return err
 	}
 
-	singular := false
-	infos, err := r.IntoSingular(&singular).Infos()
+	singleItemImplied := false
+	infos, err := r.IntoSingleItemImplied(&singleItemImplied).Infos()
 	if err != nil {
 		return err
 	}
@@ -172,7 +172,7 @@ func (o *ConvertOptions) RunConvert() error {
 		return fmt.Errorf("no objects passed to convert")
 	}
 
-	objects, err := resource.AsVersionedObject(infos, !singular, o.outputVersion, o.encoder)
+	objects, err := resource.AsVersionedObject(infos, !singleItemImplied, o.outputVersion, o.encoder)
 	if err != nil {
 		return err
 	}
