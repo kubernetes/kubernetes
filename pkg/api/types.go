@@ -57,6 +57,7 @@ import (
 
 // ObjectMeta is metadata that all persisted resources must have, which includes all objects
 // users must create.
+// DEPRECATED: Use k8s.io/kubernetes/pkg/apis/meta/v1.ObjectMeta instead - this type will be removed soon.
 type ObjectMeta struct {
 	// Name is unique within a namespace.  Name is required when creating resources, although
 	// some resources may allow a client to request the generation of an appropriate name
