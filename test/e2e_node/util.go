@@ -97,15 +97,22 @@ func tempSetEvictionHard(f *framework.Framework, evictionHard string) {
 // The change is reverted in the AfterEach of the context.
 func tempSetCurrentKubeletConfig(f *framework.Framework, updateFunction func(initialConfig *componentconfig.KubeletConfiguration)) {
 	var oldCfg *componentconfig.KubeletConfiguration
-	var err error
 	BeforeEach(func() {
-		oldCfg, err = getCurrentKubeletConfig()
+		configEnabled, err := isKubeletConfigEnabled(f)
 		framework.ExpectNoError(err)
-		clone, err := api.Scheme.DeepCopy(oldCfg)
-		framework.ExpectNoError(err)
-		newCfg := clone.(*componentconfig.KubeletConfiguration)
-		updateFunction(newCfg)
-		framework.ExpectNoError(setKubeletConfiguration(f, newCfg))
+		if configEnabled {
+			oldCfg, err = getCurrentKubeletConfig()
+			framework.ExpectNoError(err)
+			clone, err := api.Scheme.DeepCopy(oldCfg)
+			framework.ExpectNoError(err)
+			newCfg := clone.(*componentconfig.KubeletConfiguration)
+			updateFunction(newCfg)
+			framework.ExpectNoError(setKubeletConfiguration(f, newCfg))
+		} else {
+			framework.Logf("The Dynamic Kubelet Configuration feature is not enabled.\n" +
+				"Pass --feature-gates=DynamicKubeletConfig=true to the Kubelet to enable this feature.\n" +
+				"For `make test-e2e-node`, you can set `TEST_ARGS='--feature-gates=DynamicKubeletConfig=true'`.")
+		}
 	})
 	AfterEach(func() {
 		if oldCfg != nil {
@@ -113,6 +120,15 @@ func tempSetCurrentKubeletConfig(f *framework.Framework, updateFunction func(ini
 			framework.ExpectNoError(err)
 		}
 	})
+}
+
+// Returns true if kubeletConfig is enabled, false otherwise or if we cannot determine if it is.
+func isKubeletConfigEnabled(f *framework.Framework) (bool, error) {
+	cfgz, err := getCurrentKubeletConfig()
+	if err != nil {
+		return false, fmt.Errorf("could not determine whether 'DynamicKubeletConfig' feature is enabled, err: %v", err)
+	}
+	return strings.Contains(cfgz.FeatureGates, "DynamicKubeletConfig=true"), nil
 }
 
 // Queries the API server for a Kubelet configuration for the node described by framework.TestContext.NodeName
@@ -129,11 +145,11 @@ func setKubeletConfiguration(f *framework.Framework, kubeCfg *componentconfig.Ku
 	)
 
 	// Make sure Dynamic Kubelet Configuration feature is enabled on the Kubelet we are about to reconfigure
-	cfgz, err := getCurrentKubeletConfig()
+	configEnabled, err := isKubeletConfigEnabled(f)
 	if err != nil {
 		return fmt.Errorf("could not determine whether 'DynamicKubeletConfig' feature is enabled, err: %v", err)
 	}
-	if !strings.Contains(cfgz.FeatureGates, "DynamicKubeletConfig=true") {
+	if !configEnabled {
 		return fmt.Errorf("The Dynamic Kubelet Configuration feature is not enabled.\n" +
 			"Pass --feature-gates=DynamicKubeletConfig=true to the Kubelet to enable this feature.\n" +
 			"For `make test-e2e-node`, you can set `TEST_ARGS='--feature-gates=DynamicKubeletConfig=true'`.")
