@@ -102,9 +102,9 @@ func tempSetCurrentKubeletConfig(f *framework.Framework, updateFunction func(ini
 		framework.ExpectNoError(err)
 		clone, err := api.Scheme.DeepCopy(oldCfg)
 		framework.ExpectNoError(err)
-		newCfg := *clone.(*componentconfig.KubeletConfiguration)
-		updateFunction(&newCfg)
-		framework.ExpectNoError(setKubeletConfiguration(f, &newCfg))
+		newCfg := clone.(*componentconfig.KubeletConfiguration)
+		updateFunction(newCfg)
+		framework.ExpectNoError(setKubeletConfiguration(f, newCfg))
 	})
 	AfterEach(func() {
 		if oldCfg != nil {
