@@ -668,7 +668,7 @@ function create-salt-master-auth() {
     mkdir -p /srv/salt-overlay/salt/kube-apiserver
     (umask 077;
       echo "${KUBE_BEARER_TOKEN},admin,admin" > "${KNOWN_TOKENS_FILE}";
-      echo "${KUBELET_TOKEN},kubelet,kubelet" >> "${KNOWN_TOKENS_FILE}";
+      echo "${KUBELET_TOKEN},system:node:node-name,uid:kubelet,system:nodes" >> "${KNOWN_TOKENS_FILE}"
       echo "${KUBE_PROXY_TOKEN},kube_proxy,kube_proxy" >> "${KNOWN_TOKENS_FILE}")
   fi
 }
@@ -710,8 +710,7 @@ kind: Config
 users:
 - name: kubelet
   user:
-    client-certificate-data: ${KUBELET_CERT}
-    client-key-data: ${KUBELET_KEY}
+    token: ${KUBELET_TOKEN}
 clusters:
 - name: local
   cluster:
