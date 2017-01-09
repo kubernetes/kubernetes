@@ -166,7 +166,11 @@ func init() {
 	addControllerRole(rbac.ClusterRole{
 		ObjectMeta: api.ObjectMeta{Name: saRolePrefix + "node-controller"},
 		Rules: []rbac.PolicyRule{
-			rbac.NewRule("get", "list", "update").Groups(legacyGroup).Resources("nodes").RuleOrDie(),
+			rbac.NewRule("get", "list", "update", "delete").Groups(legacyGroup).Resources("nodes").RuleOrDie(),
+			rbac.NewRule("update").Groups(legacyGroup).Resources("nodes/status").RuleOrDie(),
+			// used for pod eviction
+			rbac.NewRule("update").Groups(legacyGroup).Resources("pods/status").RuleOrDie(),
+			rbac.NewRule("list", "delete").Groups(legacyGroup).Resources("pods").RuleOrDie(),
 			eventsRule(),
 		},
 	})
