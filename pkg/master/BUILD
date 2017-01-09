@@ -52,6 +52,7 @@ go_library(
         "//pkg/genericapiserver:go_default_library",
         "//pkg/kubelet/client:go_default_library",
         "//pkg/master/thirdparty:go_default_library",
+        "//pkg/master/tunneler:go_default_library",
         "//pkg/registry/apps/rest:go_default_library",
         "//pkg/registry/authentication/rest:go_default_library",
         "//pkg/registry/authorization/rest:go_default_library",
@@ -148,6 +149,7 @@ filegroup(
         ":package-srcs",
         "//pkg/master/ports:all-srcs",
         "//pkg/master/thirdparty:all-srcs",
+        "//pkg/master/tunneler:all-srcs",
     ],
     tags = ["automanaged"],
 )
