@@ -2571,6 +2571,19 @@ func ValidateReplicationControllerStatusUpdate(controller, oldController *api.Re
 	allErrs = append(allErrs, ValidateNonnegativeField(int64(controller.Status.ReadyReplicas), statusPath.Child("readyReplicas"))...)
 	allErrs = append(allErrs, ValidateNonnegativeField(int64(controller.Status.AvailableReplicas), statusPath.Child("availableReplicas"))...)
 	allErrs = append(allErrs, ValidateNonnegativeField(int64(controller.Status.ObservedGeneration), statusPath.Child("observedGeneration"))...)
+	msg := "cannot be greater than status.replicas"
+	if controller.Status.FullyLabeledReplicas > controller.Status.Replicas {
+		allErrs = append(allErrs, field.Invalid(statusPath.Child("fullyLabeledReplicas"), controller.Status.FullyLabeledReplicas, msg))
+	}
+	if controller.Status.ReadyReplicas > controller.Status.Replicas {
+		allErrs = append(allErrs, field.Invalid(statusPath.Child("readyReplicas"), controller.Status.ReadyReplicas, msg))
+	}
+	if controller.Status.AvailableReplicas > controller.Status.Replicas {
+		allErrs = append(allErrs, field.Invalid(statusPath.Child("availableReplicas"), controller.Status.AvailableReplicas, msg))
+	}
+	if controller.Status.ReadyReplicas > controller.Status.AvailableReplicas {
+		allErrs = append(allErrs, field.Invalid(statusPath.Child("readyReplicas"), controller.Status.ReadyReplicas, "cannot be greater than availableReplicas"))
+	}
 	return allErrs
 }
 
