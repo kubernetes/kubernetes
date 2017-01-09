@@ -97,8 +97,9 @@ func tempSetEvictionHard(f *framework.Framework, evictionHard string) {
 // The change is reverted in the AfterEach of the context.
 func tempSetCurrentKubeletConfig(f *framework.Framework, updateFunction func(initialConfig *componentconfig.KubeletConfiguration)) {
 	var oldCfg *componentconfig.KubeletConfiguration
+	var err error
 	BeforeEach(func() {
-		oldCfg, err := getCurrentKubeletConfig()
+		oldCfg, err = getCurrentKubeletConfig()
 		framework.ExpectNoError(err)
 		clone, err := api.Scheme.DeepCopy(oldCfg)
 		framework.ExpectNoError(err)
