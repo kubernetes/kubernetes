@@ -73,7 +73,6 @@ go_test(
         "//pkg/util/sets:go_default_library",
         "//pkg/util/wait:go_default_library",
         "//pkg/watch:go_default_library",
-        "//pkg/watch/versioned:go_default_library",
         "//plugin/pkg/admission/admit:go_default_library",
         "//plugin/pkg/admission/deny:go_default_library",
         "//vendor:github.com/emicklei/go-restful",

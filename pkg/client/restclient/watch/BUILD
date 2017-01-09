@@ -13,18 +13,13 @@ go_library(
     srcs = [
         "decoder.go",
         "encoder.go",
-        "generated.pb.go",
-        "register.go",
-        "types.go",
     ],
     tags = ["automanaged"],
     deps = [
-        "//pkg/conversion:go_default_library",
+        "//pkg/apis/meta/v1:go_default_library",
         "//pkg/runtime:go_default_library",
-        "//pkg/runtime/schema:go_default_library",
         "//pkg/runtime/serializer/streaming:go_default_library",
         "//pkg/watch:go_default_library",
-        "//vendor:github.com/gogo/protobuf/proto",
     ],
 )
 
@@ -38,11 +33,12 @@ go_test(
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/testapi:go_default_library",
+        "//pkg/apis/meta/v1:go_default_library",
+        "//pkg/client/restclient/watch:go_default_library",
         "//pkg/runtime:go_default_library",
         "//pkg/runtime/serializer/streaming:go_default_library",
         "//pkg/util/wait:go_default_library",
         "//pkg/watch:go_default_library",
-        "//pkg/watch/versioned:go_default_library",
     ],
 )
 

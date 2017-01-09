@@ -65,8 +65,7 @@ kube::log::status "Starting federation-apiserver"
   --insecure-port="${API_PORT}" \
   --etcd-servers="http://${ETCD_HOST}:${ETCD_PORT}" \
   --advertise-address="10.10.10.10" \
-  --cert-dir="${TMP_DIR}/certs" \
-  --service-cluster-ip-range="10.0.0.0/24" >/tmp/swagger-federation-api-server.log 2>&1 &
+  --cert-dir="${TMP_DIR}/certs"  >/tmp/swagger-federation-api-server.log 2>&1 &
 APISERVER_PID=$!
 
 kube::util::wait_for_url "${API_HOST}:${API_PORT}/" "apiserver: "

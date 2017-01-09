@@ -21,7 +21,6 @@ import (
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/runtime/schema"
-	"k8s.io/kubernetes/pkg/watch/versioned"
 )
 
 const GroupName = "apiregistration.k8s.io"
@@ -54,6 +53,6 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&kapi.DeleteOptions{},
 		&metav1.GetOptions{},
 	)
-	versioned.AddToGroupVersion(scheme, SchemeGroupVersion)
+	metav1.AddToGroupVersion(scheme, SchemeGroupVersion)
 	return nil
 }

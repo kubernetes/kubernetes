@@ -202,7 +202,7 @@
     "description": "API at /apis/storage.k8s.io/v1beta1",
     "operations": [
      {
-      "type": "versioned.Event",
+      "type": "v1.WatchEvent",
       "method": "GET",
       "summary": "watch individual changes to a list of StorageClass",
       "nickname": "watchStorageClassList",
@@ -260,7 +260,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "versioned.Event"
+        "responseModel": "v1.WatchEvent"
        }
       ],
       "produces": [
@@ -501,7 +501,7 @@
     "description": "API at /apis/storage.k8s.io/v1beta1",
     "operations": [
      {
-      "type": "versioned.Event",
+      "type": "v1.WatchEvent",
       "method": "GET",
       "summary": "watch changes to an object of kind StorageClass",
       "nickname": "watchStorageClass",
@@ -567,7 +567,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "versioned.Event"
+        "responseModel": "v1.WatchEvent"
        }
       ],
       "produces": [
@@ -872,8 +872,8 @@
      }
     }
    },
-   "versioned.Event": {
-    "id": "versioned.Event",
+   "v1.WatchEvent": {
+    "id": "v1.WatchEvent",
     "required": [
      "type",
      "object"

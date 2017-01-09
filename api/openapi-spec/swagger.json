@@ -11048,7 +11048,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/versioned.Event"
+        "$ref": "#/definitions/v1.WatchEvent"
        }
       },
       "401": {
@@ -11125,7 +11125,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/versioned.Event"
+        "$ref": "#/definitions/v1.WatchEvent"
        }
       },
       "401": {
@@ -11202,7 +11202,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/versioned.Event"
+        "$ref": "#/definitions/v1.WatchEvent"
        }
       },
       "401": {
@@ -11279,7 +11279,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/versioned.Event"
+        "$ref": "#/definitions/v1.WatchEvent"
        }
       },
       "401": {
@@ -11356,7 +11356,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/versioned.Event"
+        "$ref": "#/definitions/v1.WatchEvent"
        }
       },
       "401": {
@@ -11433,7 +11433,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/versioned.Event"
+        "$ref": "#/definitions/v1.WatchEvent"
        }
       },
       "401": {
@@ -11518,7 +11518,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/versioned.Event"
+        "$ref": "#/definitions/v1.WatchEvent"
        }
       },
       "401": {
@@ -11611,7 +11611,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/versioned.Event"
+        "$ref": "#/definitions/v1.WatchEvent"
        }
       },
       "401": {
@@ -11696,7 +11696,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/versioned.Event"
+        "$ref": "#/definitions/v1.WatchEvent"
        }
       },
       "401": {
@@ -11789,7 +11789,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/versioned.Event"
+        "$ref": "#/definitions/v1.WatchEvent"
        }
       },
       "401": {
@@ -11874,7 +11874,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/versioned.Event"
+        "$ref": "#/definitions/v1.WatchEvent"
        }
       },
       "401": {
@@ -11967,7 +11967,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/versioned.Event"
+        "$ref": "#/definitions/v1.WatchEvent"
        }
       },
       "401": {
@@ -12052,7 +12052,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/versioned.Event"
+        "$ref": "#/definitions/v1.WatchEvent"
        }
       },
       "401": {
@@ -12145,7 +12145,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/versioned.Event"
+        "$ref": "#/definitions/v1.WatchEvent"
        }
       },
       "401": {
@@ -12230,7 +12230,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/versioned.Event"
+        "$ref": "#/definitions/v1.WatchEvent"
        }
       },
       "401": {
@@ -12323,7 +12323,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/versioned.Event"
+        "$ref": "#/definitions/v1.WatchEvent"
        }
       },
       "401": {
@@ -12408,7 +12408,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/versioned.Event"
+        "$ref": "#/definitions/v1.WatchEvent"
        }
       },
       "401": {
@@ -12501,7 +12501,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/versioned.Event"
+        "$ref": "#/definitions/v1.WatchEvent"
        }
       },
       "401": {
@@ -12586,7 +12586,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/versioned.Event"
+        "$ref": "#/definitions/v1.WatchEvent"
        }
       },
       "401": {
@@ -12679,7 +12679,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/versioned.Event"
+        "$ref": "#/definitions/v1.WatchEvent"
        }
       },
       "401": {
@@ -12764,7 +12764,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/versioned.Event"
+        "$ref": "#/definitions/v1.WatchEvent"
        }
       },
       "401": {
@@ -12857,7 +12857,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/versioned.Event"
+        "$ref": "#/definitions/v1.WatchEvent"
        }
       },
       "401": {
@@ -12942,7 +12942,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/versioned.Event"
+        "$ref": "#/definitions/v1.WatchEvent"
        }
       },
       "401": {
@@ -13035,7 +13035,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/versioned.Event"
+        "$ref": "#/definitions/v1.WatchEvent"
        }
       },
       "401": {
@@ -13120,7 +13120,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/versioned.Event"
+        "$ref": "#/definitions/v1.WatchEvent"
        }
       },
       "401": {
@@ -13213,7 +13213,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/versioned.Event"
+        "$ref": "#/definitions/v1.WatchEvent"
        }
       },
       "401": {
@@ -13298,7 +13298,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/versioned.Event"
+        "$ref": "#/definitions/v1.WatchEvent"
        }
       },
       "401": {
@@ -13391,7 +13391,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/versioned.Event"
+        "$ref": "#/definitions/v1.WatchEvent"
        }
       },
       "401": {
@@ -13476,7 +13476,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/versioned.Event"
+        "$ref": "#/definitions/v1.WatchEvent"
        }
       },
       "401": {
@@ -13569,7 +13569,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/versioned.Event"
+        "$ref": "#/definitions/v1.WatchEvent"
        }
       },
       "401": {
@@ -13654,7 +13654,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/versioned.Event"
+        "$ref": "#/definitions/v1.WatchEvent"
        }
       },
       "401": {
@@ -13731,7 +13731,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/versioned.Event"
+        "$ref": "#/definitions/v1.WatchEvent"
        }
       },
       "401": {
@@ -13816,7 +13816,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/versioned.Event"
+        "$ref": "#/definitions/v1.WatchEvent"
        }
       },
       "401": {
@@ -13893,7 +13893,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/versioned.Event"
+        "$ref": "#/definitions/v1.WatchEvent"
        }
       },
       "401": {
@@ -13970,7 +13970,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/versioned.Event"
+        "$ref": "#/definitions/v1.WatchEvent"
        }
       },
       "401": {
@@ -14055,7 +14055,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/versioned.Event"
+        "$ref": "#/definitions/v1.WatchEvent"
        }
       },
       "401": {
@@ -14132,7 +14132,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/versioned.Event"
+        "$ref": "#/definitions/v1.WatchEvent"
        }
       },
       "401": {
@@ -14209,7 +14209,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/versioned.Event"
+        "$ref": "#/definitions/v1.WatchEvent"
        }
       },
       "401": {
@@ -14286,7 +14286,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/versioned.Event"
+        "$ref": "#/definitions/v1.WatchEvent"
        }
       },
       "401": {
@@ -14363,7 +14363,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/versioned.Event"
+        "$ref": "#/definitions/v1.WatchEvent"
        }
       },
       "401": {
@@ -14440,7 +14440,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/versioned.Event"
+        "$ref": "#/definitions/v1.WatchEvent"
        }
       },
       "401": {
@@ -14517,7 +14517,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/versioned.Event"
+        "$ref": "#/definitions/v1.WatchEvent"
        }
       },
       "401": {
@@ -15303,7 +15303,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/versioned.Event"
+        "$ref": "#/definitions/v1.WatchEvent"
        }
       },
       "401": {
@@ -15388,7 +15388,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/versioned.Event"
+        "$ref": "#/definitions/v1.WatchEvent"
        }
       },
       "401": {
@@ -15481,7 +15481,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/versioned.Event"
+        "$ref": "#/definitions/v1.WatchEvent"
        }
       },
       "401": {
@@ -16566,7 +16566,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/versioned.Event"
+        "$ref": "#/definitions/v1.WatchEvent"
        }
       },
       "401": {
@@ -16643,7 +16643,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/versioned.Event"
+        "$ref": "#/definitions/v1.WatchEvent"
        }
       },
       "401": {
@@ -16728,7 +16728,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/versioned.Event"
+        "$ref": "#/definitions/v1.WatchEvent"
        }
       },
       "401": {
@@ -17497,7 +17497,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/versioned.Event"
+        "$ref": "#/definitions/v1.WatchEvent"
        }
       },
       "401": {
@@ -17574,7 +17574,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/versioned.Event"
+        "$ref": "#/definitions/v1.WatchEvent"
        }
       },
       "401": {
@@ -17659,7 +17659,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/versioned.Event"
+        "$ref": "#/definitions/v1.WatchEvent"
        }
       },
       "401": {
@@ -19615,7 +19615,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/versioned.Event"
+        "$ref": "#/definitions/v1.WatchEvent"
        }
       },
       "401": {
@@ -19692,7 +19692,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/versioned.Event"
+        "$ref": "#/definitions/v1.WatchEvent"
        }
       },
       "401": {
@@ -19769,7 +19769,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/versioned.Event"
+        "$ref": "#/definitions/v1.WatchEvent"
        }
       },
       "401": {
@@ -19854,7 +19854,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/versioned.Event"
+        "$ref": "#/definitions/v1.WatchEvent"
        }
       },
       "401": {
@@ -19947,7 +19947,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/versioned.Event"
+        "$ref": "#/definitions/v1.WatchEvent"
        }
       },
       "401": {
@@ -20032,7 +20032,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/versioned.Event"
+        "$ref": "#/definitions/v1.WatchEvent"
        }
       },
       "401": {
@@ -20125,7 +20125,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/versioned.Event"
+        "$ref": "#/definitions/v1.WatchEvent"
        }
       },
       "401": {
@@ -20210,7 +20210,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/versioned.Event"
+        "$ref": "#/definitions/v1.WatchEvent"
        }
       },
       "401": {
@@ -20303,7 +20303,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/versioned.Event"
+        "$ref": "#/definitions/v1.WatchEvent"
        }
       },
       "401": {
@@ -20939,7 +20939,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/versioned.Event"
+        "$ref": "#/definitions/v1.WatchEvent"
        }
       },
       "401": {
@@ -21016,7 +21016,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/versioned.Event"
+        "$ref": "#/definitions/v1.WatchEvent"
        }
       },
       "401": {
@@ -25544,7 +25544,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/versioned.Event"
+        "$ref": "#/definitions/v1.WatchEvent"
        }
       },
       "401": {
@@ -25621,7 +25621,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/versioned.Event"
+        "$ref": "#/definitions/v1.WatchEvent"
        }
       },
       "401": {
@@ -25698,7 +25698,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/versioned.Event"
+        "$ref": "#/definitions/v1.WatchEvent"
        }
       },
       "401": {
@@ -25775,7 +25775,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/versioned.Event"
+        "$ref": "#/definitions/v1.WatchEvent"
        }
       },
       "401": {
@@ -25852,7 +25852,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/versioned.Event"
+        "$ref": "#/definitions/v1.WatchEvent"
        }
       },
       "401": {
@@ -25937,7 +25937,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/versioned.Event"
+        "$ref": "#/definitions/v1.WatchEvent"
        }
       },
       "401": {
@@ -26030,7 +26030,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/versioned.Event"
+        "$ref": "#/definitions/v1.WatchEvent"
        }
       },
       "401": {
@@ -26115,7 +26115,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/versioned.Event"
+        "$ref": "#/definitions/v1.WatchEvent"
        }
       },
       "401": {
@@ -26208,7 +26208,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/versioned.Event"
+        "$ref": "#/definitions/v1.WatchEvent"
        }
       },
       "401": {
@@ -26293,7 +26293,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/versioned.Event"
+        "$ref": "#/definitions/v1.WatchEvent"
        }
       },
       "401": {
@@ -26386,7 +26386,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/versioned.Event"
+        "$ref": "#/definitions/v1.WatchEvent"
        }
       },
       "401": {
@@ -26471,7 +26471,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/versioned.Event"
+        "$ref": "#/definitions/v1.WatchEvent"
        }
       },
       "401": {
@@ -26564,7 +26564,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/versioned.Event"
+        "$ref": "#/definitions/v1.WatchEvent"
        }
       },
       "401": {
@@ -26649,7 +26649,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/versioned.Event"
+        "$ref": "#/definitions/v1.WatchEvent"
        }
       },
       "401": {
@@ -26742,7 +26742,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/versioned.Event"
+        "$ref": "#/definitions/v1.WatchEvent"
        }
       },
       "401": {
@@ -26827,7 +26827,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/versioned.Event"
+        "$ref": "#/definitions/v1.WatchEvent"
        }
       },
       "401": {
@@ -26920,7 +26920,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/versioned.Event"
+        "$ref": "#/definitions/v1.WatchEvent"
        }
       },
       "401": {
@@ -26997,7 +26997,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/versioned.Event"
+        "$ref": "#/definitions/v1.WatchEvent"
        }
       },
       "401": {
@@ -27074,7 +27074,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/versioned.Event"
+        "$ref": "#/definitions/v1.WatchEvent"
        }
       },
       "401": {
@@ -27151,7 +27151,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/versioned.Event"
+        "$ref": "#/definitions/v1.WatchEvent"
        }
       },
       "401": {
@@ -27912,7 +27912,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/versioned.Event"
+        "$ref": "#/definitions/v1.WatchEvent"
        }
       },
       "401": {
@@ -27997,7 +27997,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/versioned.Event"
+        "$ref": "#/definitions/v1.WatchEvent"
        }
       },
       "401": {
@@ -28090,7 +28090,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/versioned.Event"
+        "$ref": "#/definitions/v1.WatchEvent"
        }
       },
       "401": {
@@ -29879,7 +29879,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/versioned.Event"
+        "$ref": "#/definitions/v1.WatchEvent"
        }
       },
       "401": {
@@ -29956,7 +29956,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/versioned.Event"
+        "$ref": "#/definitions/v1.WatchEvent"
        }
       },
       "401": {
@@ -30041,7 +30041,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/versioned.Event"
+        "$ref": "#/definitions/v1.WatchEvent"
        }
       },
       "401": {
@@ -30118,7 +30118,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/versioned.Event"
+        "$ref": "#/definitions/v1.WatchEvent"
        }
       },
       "401": {
@@ -30203,7 +30203,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/versioned.Event"
+        "$ref": "#/definitions/v1.WatchEvent"
        }
       },
       "401": {
@@ -30288,7 +30288,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/versioned.Event"
+        "$ref": "#/definitions/v1.WatchEvent"
        }
       },
       "401": {
@@ -30381,7 +30381,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/versioned.Event"
+        "$ref": "#/definitions/v1.WatchEvent"
        }
       },
       "401": {
@@ -30466,7 +30466,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/versioned.Event"
+        "$ref": "#/definitions/v1.WatchEvent"
        }
       },
       "401": {
@@ -30559,7 +30559,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/versioned.Event"
+        "$ref": "#/definitions/v1.WatchEvent"
        }
       },
       "401": {
@@ -30636,7 +30636,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/versioned.Event"
+        "$ref": "#/definitions/v1.WatchEvent"
        }
       },
       "401": {
@@ -31160,7 +31160,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/versioned.Event"
+        "$ref": "#/definitions/v1.WatchEvent"
        }
       },
       "401": {
@@ -31237,7 +31237,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/versioned.Event"
+        "$ref": "#/definitions/v1.WatchEvent"
        }
       },
       "401": {
@@ -35708,6 +35708,22 @@
      }
     }
    },
+   "v1.WatchEvent": {
+    "description": "Event represents a single event to a watched resource.",
+    "required": [
+     "type",
+     "object"
+    ],
+    "properties": {
+     "object": {
+      "description": "Object is:\n * If Type is Added or Modified: the new state of the object.\n * If Type is Deleted: the state of the object immediately before deletion.\n * If Type is Error: *Status is recommended; other types may make sense\n   depending on context.",
+      "$ref": "#/definitions/runtime.RawExtension"
+     },
+     "type": {
+      "type": "string"
+     }
+    }
+   },
    "v1.WeightedPodAffinityTerm": {
     "description": "The weights of all of the matched WeightedPodAffinityTerm fields are added per-node to find the most preferred node(s)",
     "required": [
@@ -38052,22 +38068,6 @@
       "type": "string"
      },
      "platform": {
-      "type": "string"
-     }
-    }
-   },
-   "versioned.Event": {
-    "description": "Event represents a single event to a watched resource.",
-    "required": [
-     "type",
-     "object"
-    ],
-    "properties": {
-     "object": {
-      "description": "Object is:\n * If Type is Added or Modified: the new state of the object.\n * If Type is Deleted: the state of the object immediately before deletion.\n * If Type is Error: *api.Status is recommended; other types may make sense\n   depending on context.",
-      "$ref": "#/definitions/runtime.RawExtension"
-     },
-     "type": {
       "type": "string"
      }
     }

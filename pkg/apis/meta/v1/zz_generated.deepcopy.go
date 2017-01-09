@@ -22,6 +22,7 @@ package v1
 
 import (
 	conversion "k8s.io/kubernetes/pkg/conversion"
+	runtime "k8s.io/kubernetes/pkg/runtime"
 	reflect "reflect"
 )
 
@@ -42,6 +43,7 @@ func GetGeneratedDeepCopyFuncs() []conversion.GeneratedDeepCopyFunc {
 		{Fn: DeepCopy_v1_GroupVersionForDiscovery, InType: reflect.TypeOf(&GroupVersionForDiscovery{})},
 		{Fn: DeepCopy_v1_GroupVersionKind, InType: reflect.TypeOf(&GroupVersionKind{})},
 		{Fn: DeepCopy_v1_GroupVersionResource, InType: reflect.TypeOf(&GroupVersionResource{})},
+		{Fn: DeepCopy_v1_InternalEvent, InType: reflect.TypeOf(&InternalEvent{})},
 		{Fn: DeepCopy_v1_LabelSelector, InType: reflect.TypeOf(&LabelSelector{})},
 		{Fn: DeepCopy_v1_LabelSelectorRequirement, InType: reflect.TypeOf(&LabelSelectorRequirement{})},
 		{Fn: DeepCopy_v1_ListMeta, InType: reflect.TypeOf(&ListMeta{})},
@@ -55,6 +57,7 @@ func GetGeneratedDeepCopyFuncs() []conversion.GeneratedDeepCopyFunc {
 		{Fn: DeepCopy_v1_Time, InType: reflect.TypeOf(&Time{})},
 		{Fn: DeepCopy_v1_Timestamp, InType: reflect.TypeOf(&Timestamp{})},
 		{Fn: DeepCopy_v1_TypeMeta, InType: reflect.TypeOf(&TypeMeta{})},
+		{Fn: DeepCopy_v1_WatchEvent, InType: reflect.TypeOf(&WatchEvent{})},
 	}
 }
 
@@ -233,6 +236,23 @@ func DeepCopy_v1_GroupVersionResource(in interface{}, out interface{}, c *conver
 	}
 }
 
+func DeepCopy_v1_InternalEvent(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*InternalEvent)
+		out := out.(*InternalEvent)
+		*out = *in
+		// in.Object is kind 'Interface'
+		if in.Object != nil {
+			if newVal, err := c.DeepCopy(&in.Object); err != nil {
+				return err
+			} else {
+				out.Object = *newVal.(*runtime.Object)
+			}
+		}
+		return nil
+	}
+}
+
 func DeepCopy_v1_LabelSelector(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*LabelSelector)
@@ -391,6 +411,18 @@ func DeepCopy_v1_TypeMeta(in interface{}, out interface{}, c *conversion.Cloner)
 		in := in.(*TypeMeta)
 		out := out.(*TypeMeta)
 		*out = *in
+		return nil
+	}
+}
+
+func DeepCopy_v1_WatchEvent(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*WatchEvent)
+		out := out.(*WatchEvent)
+		*out = *in
+		if err := runtime.DeepCopy_runtime_RawExtension(&in.Object, &out.Object, c); err != nil {
+			return err
+		}
 		return nil
 	}
 }

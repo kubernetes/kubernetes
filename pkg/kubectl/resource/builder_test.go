@@ -40,12 +40,12 @@ import (
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/client/restclient/fake"
+	restclientwatch "k8s.io/kubernetes/pkg/client/restclient/watch"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/runtime/serializer/streaming"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 	utiltesting "k8s.io/kubernetes/pkg/util/testing"
 	"k8s.io/kubernetes/pkg/watch"
-	"k8s.io/kubernetes/pkg/watch/versioned"
 )
 
 func stringBody(body string) io.ReadCloser {
@@ -55,7 +55,7 @@ func stringBody(body string) io.ReadCloser {
 func watchBody(events ...watch.Event) string {
 	buf := &bytes.Buffer{}
 	codec := testapi.Default.Codec()
-	enc := versioned.NewEncoder(streaming.NewEncoder(buf, codec), codec)
+	enc := restclientwatch.NewEncoder(streaming.NewEncoder(buf, codec), codec)
 	for _, e := range events {
 		enc.Encode(&e)
 	}

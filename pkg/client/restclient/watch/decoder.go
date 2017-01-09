@@ -19,6 +19,7 @@ package versioned
 import (
 	"fmt"
 
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/runtime/serializer/streaming"
 	"k8s.io/kubernetes/pkg/watch"
@@ -44,13 +45,13 @@ func NewDecoder(decoder streaming.Decoder, embeddedDecoder runtime.Decoder) *Dec
 // Decode blocks until it can return the next object in the reader. Returns an error
 // if the reader is closed or an object can't be decoded.
 func (d *Decoder) Decode() (watch.EventType, runtime.Object, error) {
-	var got Event
+	var got metav1.WatchEvent
 	res, _, err := d.decoder.Decode(nil, &got)
 	if err != nil {
 		return "", nil, err
 	}
 	if res != &got {
-		return "", nil, fmt.Errorf("unable to decode to versioned.Event")
+		return "", nil, fmt.Errorf("unable to decode to metav1.Event")
 	}
 	switch got.Type {
 	case string(watch.Added), string(watch.Modified), string(watch.Deleted), string(watch.Error):

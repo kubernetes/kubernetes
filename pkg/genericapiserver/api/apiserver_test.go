@@ -54,7 +54,6 @@ import (
 	"k8s.io/kubernetes/pkg/util/diff"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/watch"
-	"k8s.io/kubernetes/pkg/watch/versioned"
 	"k8s.io/kubernetes/plugin/pkg/admission/admit"
 	"k8s.io/kubernetes/plugin/pkg/admission/deny"
 
@@ -161,7 +160,7 @@ func addTestTypes() {
 	// served in the tests.
 	api.Scheme.AddKnownTypes(testGroup2Version, &SimpleXGSubresource{}, &metav1.ExportOptions{})
 	api.Scheme.AddKnownTypes(testInternalGroup2Version, &SimpleXGSubresource{}, &metav1.ExportOptions{})
-	versioned.AddToGroupVersion(api.Scheme, testGroupVersion)
+	metav1.AddToGroupVersion(api.Scheme, testGroupVersion)
 }
 
 func addNewTestTypes() {
@@ -179,7 +178,7 @@ func addNewTestTypes() {
 		&api.DeleteOptions{}, &genericapitesting.SimpleGetOptions{}, &genericapitesting.SimpleRoot{},
 		&v1.Pod{},
 	)
-	versioned.AddToGroupVersion(api.Scheme, newGroupVersion)
+	metav1.AddToGroupVersion(api.Scheme, newGroupVersion)
 }
 
 func init() {

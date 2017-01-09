@@ -23,10 +23,10 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/extensions"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/conversion"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/validation/field"
-	"k8s.io/kubernetes/pkg/watch/versioned"
 )
 
 const (
@@ -123,15 +123,15 @@ func addFastPathConversionFuncs(scheme *runtime.Scheme) error {
 				return true, Convert_api_Endpoints_To_v1_Endpoints(a, b, s)
 			}
 
-		case *versioned.Event:
+		case *metav1.WatchEvent:
 			switch b := objB.(type) {
-			case *versioned.InternalEvent:
-				return true, versioned.Convert_versioned_Event_to_versioned_InternalEvent(a, b, s)
+			case *metav1.InternalEvent:
+				return true, metav1.Convert_versioned_Event_to_versioned_InternalEvent(a, b, s)
 			}
-		case *versioned.InternalEvent:
+		case *metav1.InternalEvent:
 			switch b := objB.(type) {
-			case *versioned.Event:
-				return true, versioned.Convert_versioned_InternalEvent_to_versioned_Event(a, b, s)
+			case *metav1.WatchEvent:
+				return true, metav1.Convert_versioned_InternalEvent_to_versioned_Event(a, b, s)
 			}
 		}
 		return false, nil
