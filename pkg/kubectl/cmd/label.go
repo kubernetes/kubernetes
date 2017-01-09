@@ -187,7 +187,7 @@ func (o *LabelOptions) RunLabel(f cmdutil.Factory, cmd *cobra.Command) error {
 			Latest()
 	}
 	one := false
-	r := b.Do().IntoSingular(&one)
+	r := b.Do().IntoSingleItemImplied(&one)
 	if err := r.Err(); err != nil {
 		return err
 	}
