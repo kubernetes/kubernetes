@@ -402,6 +402,7 @@ kube::util::git_upstream_remote_name() {
 kube::util::has_changes_against_upstream_branch() {
   local -r git_branch=$1
   local -r pattern=$2
+  local -r not_pattern=${3:-totallyimpossiblepattern}
   local full_branch
 
   full_branch="$(kube::util::git_upstream_remote_name)/${git_branch}"
@@ -412,11 +413,11 @@ kube::util::has_changes_against_upstream_branch() {
     exit 1
   fi
   # notice this uses ... to find the first shared ancestor
-  if git diff --name-only "${full_branch}...HEAD" | grep "${pattern}" > /dev/null; then
+  if git diff --name-only "${full_branch}...HEAD" | grep -v "${not_pattern}" | grep "${pattern}" > /dev/null; then
     return 0
   fi
   # also check for pending changes
-  if git status --porcelain | grep "${pattern}" > /dev/null; then
+  if git status --porcelain | grep -v "${not_pattern}" | grep "${pattern}" > /dev/null; then
     echo "Detected '${pattern}' uncommitted changes."
     return 0
   fi
