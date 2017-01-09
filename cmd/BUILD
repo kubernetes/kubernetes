@@ -44,6 +44,7 @@ filegroup(
         "//cmd/libs/go2idl/openapi-gen:all-srcs",
         "//cmd/libs/go2idl/set-gen:all-srcs",
         "//cmd/linkcheck:all-srcs",
+        "//cmd/localkube:all-srcs",
         "//cmd/mungedocs:all-srcs",
     ],
     tags = ["automanaged"],
