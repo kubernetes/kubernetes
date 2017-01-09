@@ -28,8 +28,7 @@ import (
 	certutil "k8s.io/kubernetes/pkg/util/cert"
 )
 
-// PerformTLSBootstrap executes a certificate signing request with the
-// provided connection details.
+// PerformTLSBootstrap executes a node certificate signing request.
 func PerformTLSBootstrap(cfg *clientcmdapi.Config) error {
 	hostName, err := os.Hostname()
 	if err != nil {
@@ -37,7 +36,7 @@ func PerformTLSBootstrap(cfg *clientcmdapi.Config) error {
 	}
 	name := types.NodeName(hostName)
 
-	rc, err := clientcmd.NewDefaultClientConfig(*cfg, nil).ClientConfig()
+	rc, err := clientcmd.NewDefaultClientConfig(*cfg, &clientcmd.ConfigOverrides{}).ClientConfig()
 	if err != nil {
 		return err
 	}
