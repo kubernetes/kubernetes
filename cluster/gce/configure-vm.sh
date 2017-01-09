@@ -653,6 +653,20 @@ function convert-bytes-gce-kube() {
   echo "${storage_space}" | sed -e 's/^\([0-9]\+\)\([A-Z]\)\?i\?B$/\1\2/g' -e 's/\([A-Z]\)$/\1i/'
 }
 
+# replace_prefixed_line ensures:
+# 1. the specified file exists
+# 2. existing lines with the specified ${prefix} are removed
+# 3. a new line with the specified ${prefix}${suffix} is appended
+function replace_prefixed_line() {
+    local -r file="${1:-}"
+    local -r prefix="${2:-}"
+    local -r suffix="${3:-}"
+
+    touch "${file}"
+    awk "substr(\$0,0,length(\"${prefix}\")) != \"${prefix}\" { print  }" "${file}" > "${file}.filtered"  && mv "${file}.filtered" "${file}"
+    echo "${prefix}${suffix}" >> "${file}"
+}
+
 # This should only happen on cluster initialization.
 #
 #  - Uses KUBE_PASSWORD and KUBE_USER to generate basic_auth.csv.
@@ -691,14 +705,14 @@ function create-salt-master-auth() {
   if [ ! -e "${BASIC_AUTH_FILE}" ]; then
     mkdir -p /srv/salt-overlay/salt/kube-apiserver
     (umask 077;
-      echo "${KUBE_PASSWORD},${KUBE_USER},admin" > "${BASIC_AUTH_FILE}")
+      replace_prefixed_line "${BASIC_AUTH_FILE}" "${KUBE_PASSWORD},${KUBE_USER}," "admin,system:masters"
   fi
   if [ ! -e "${KNOWN_TOKENS_FILE}" ]; then
     mkdir -p /srv/salt-overlay/salt/kube-apiserver
     (umask 077;
-      echo "${KUBE_BEARER_TOKEN},admin,admin" > "${KNOWN_TOKENS_FILE}";
-      echo "${KUBELET_TOKEN},kubelet,kubelet" >> "${KNOWN_TOKENS_FILE}";
-      echo "${KUBE_PROXY_TOKEN},kube_proxy,kube_proxy" >> "${KNOWN_TOKENS_FILE}")
+      replace_prefixed_line "${KNOWN_TOKENS_FILE}" "${KUBE_BEARER_TOKEN}" "admin,admin,system:masters"
+      replace_prefixed_line "${KNOWN_TOKENS_FILE}" "${KUBELET_TOKEN}" "system:node:node-name,uid:kubelet,system:nodes"
+      replace_prefixed_line "${KNOWN_TOKENS_FILE}" "${KUBE_PROXY_TOKEN}" "system:kube-proxy,uid:kube_proxy"
   fi
 }
 

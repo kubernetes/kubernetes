@@ -351,6 +351,7 @@ clusters:
 - name: local
   cluster:
     certificate-authority-data: ${KUBELET_CA_CERT}
+    server: https://example:443
 contexts:
 - context:
     cluster: local
@@ -548,6 +549,8 @@ function start-kubelet {
   flags+=" --config=/etc/kubernetes/manifests"
   flags+=" --experimental-mounter-path=${KUBE_HOME}/bin/mounter"
   flags+=" --experimental-check-node-capabilities-before-mount=true"
+  flags+=" --require-kubeconfig"
+  flags+=" --kubeconfig=/var/lib/kubelet/kubeconfig"
 
   if [[ -n "${KUBELET_PORT:-}" ]]; then
     flags+=" --port=${KUBELET_PORT}"
@@ -556,7 +559,7 @@ function start-kubelet {
     flags+=" --enable-debugging-handlers=false"
     flags+=" --hairpin-mode=none"
     if [[ "${REGISTER_MASTER_KUBELET:-false}" == "true" ]]; then
-      flags+=" --api-servers=https://${KUBELET_APISERVER}"
+      sed -i s/"example"/"${KUBELET_APISERVER}"/g /var/lib/kubelet/kubelet.kubeconfig
       flags+=" --register-schedulable=false"
       flags+=" --register-with-taints=node.alpha.kubernetes.io/ismaster=:NoSchedule"
     else
@@ -564,8 +567,8 @@ function start-kubelet {
       flags+=" --pod-cidr=${MASTER_IP_RANGE}"
     fi
   else # For nodes
+    sed -i s/"example"/"${KUBERNETES_MASTER_NAME}"/g /var/lib/kubelet/kubelet.kubeconfig
     flags+=" --enable-debugging-handlers=true"
-    flags+=" --api-servers=https://${KUBERNETES_MASTER_NAME}"
     if [[ "${HAIRPIN_MODE:-}" == "promiscuous-bridge" ]] || \
        [[ "${HAIRPIN_MODE:-}" == "hairpin-veth" ]] || \
        [[ "${HAIRPIN_MODE:-}" == "none" ]]; then
