@@ -2028,6 +2028,12 @@ const (
 	PodInitContainerStatusesAnnotationKey = "pod.alpha.kubernetes.io/init-container-statuses"
 )
 
+// PredicateResult is metadata that aggregates at the pod level.
+type PredicateResult struct {
+	Description string `json:"description,omitempty" protobuf:"bytes,1,opt,name=description"`
+	Count       int32 `json:"count,omitempty" protobuf:"bytes,2,opt,name=count"`
+}
+
 // PodSpec is a description of a pod.
 type PodSpec struct {
 	// List of volumes that can be mounted by containers belonging to the pod.
@@ -2138,6 +2144,9 @@ type PodSpec struct {
 	// If specified, the pod's scheduling constraints
 	// +optional
 	Affinity *Affinity `json:"affinity,omitempty" protobuf:"bytes,18,opt,name=affinity"`
+	// When populated, summary of false podFitsOnNode predicates for investigating unscheduled pods.
+	// +optional
+	PredicateResults []PredicateResult `json:"predicateResults,omitempty" protobuf:"bytes,19,opt,name=predicateResults"`
 }
 
 // PodSecurityContext holds pod-level security attributes and common container settings.

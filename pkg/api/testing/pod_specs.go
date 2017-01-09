@@ -28,8 +28,9 @@ func DeepEqualSafePodSpec() api.PodSpec {
 		RestartPolicy:                 api.RestartPolicyAlways,
 		DNSPolicy:                     api.DNSClusterFirst,
 		TerminationGracePeriodSeconds: &grace,
-		SecurityContext:               &api.PodSecurityContext{},
-		Affinity:                      &api.Affinity{},
+		// Non nil data needed for some unit tests...
+		SecurityContext:  &api.PodSecurityContext{},
+		Affinity:         &api.Affinity{},
 	}
 }
 

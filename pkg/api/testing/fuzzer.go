@@ -133,6 +133,13 @@ func FuzzerFor(t *testing.T, version schema.GroupVersion, src rand.Source) *fuzz
 			if s.Affinity == nil {
 				s.Affinity = new(api.Affinity)
 			}
+			if s.PredicateResults == nil {
+				s.PredicateResults = []api.PredicateResult{}
+			}
+		},
+		func(s *api.PredicateResult, c fuzz.Continue){
+			s.Count = 100
+			s.Description = "mock pod misplacement"
 		},
 		func(j *api.PodPhase, c fuzz.Continue) {
 			statuses := []api.PodPhase{api.PodPending, api.PodRunning, api.PodFailed, api.PodUnknown}

@@ -271,6 +271,8 @@ func RegisterConversions(scheme *runtime.Scheme) error {
 		Convert_api_PodTemplateSpec_To_v1_PodTemplateSpec,
 		Convert_v1_Preconditions_To_api_Preconditions,
 		Convert_api_Preconditions_To_v1_Preconditions,
+		Convert_v1_PredicateResult_To_api_PredicateResult,
+		Convert_api_PredicateResult_To_v1_PredicateResult,
 		Convert_v1_PreferAvoidPodsEntry_To_api_PreferAvoidPodsEntry,
 		Convert_api_PreferAvoidPodsEntry_To_v1_PreferAvoidPodsEntry,
 		Convert_v1_PreferredSchedulingTerm_To_api_PreferredSchedulingTerm,
@@ -3113,6 +3115,7 @@ func autoConvert_v1_PodSpec_To_api_PodSpec(in *PodSpec, out *api.PodSpec, s conv
 	out.Hostname = in.Hostname
 	out.Subdomain = in.Subdomain
 	out.Affinity = (*api.Affinity)(unsafe.Pointer(in.Affinity))
+	out.PredicateResults = *(*[]api.PredicateResult)(unsafe.Pointer(&in.PredicateResults))
 	return nil
 }
 
@@ -3150,6 +3153,7 @@ func autoConvert_api_PodSpec_To_v1_PodSpec(in *api.PodSpec, out *PodSpec, s conv
 	out.Hostname = in.Hostname
 	out.Subdomain = in.Subdomain
 	out.Affinity = (*Affinity)(unsafe.Pointer(in.Affinity))
+	out.PredicateResults = *(*[]PredicateResult)(unsafe.Pointer(&in.PredicateResults))
 	return nil
 }
 
@@ -3313,6 +3317,26 @@ func autoConvert_api_Preconditions_To_v1_Preconditions(in *api.Preconditions, ou
 
 func Convert_api_Preconditions_To_v1_Preconditions(in *api.Preconditions, out *Preconditions, s conversion.Scope) error {
 	return autoConvert_api_Preconditions_To_v1_Preconditions(in, out, s)
+}
+
+func autoConvert_v1_PredicateResult_To_api_PredicateResult(in *PredicateResult, out *api.PredicateResult, s conversion.Scope) error {
+	out.Description = in.Description
+	out.Count = in.Count
+	return nil
+}
+
+func Convert_v1_PredicateResult_To_api_PredicateResult(in *PredicateResult, out *api.PredicateResult, s conversion.Scope) error {
+	return autoConvert_v1_PredicateResult_To_api_PredicateResult(in, out, s)
+}
+
+func autoConvert_api_PredicateResult_To_v1_PredicateResult(in *api.PredicateResult, out *PredicateResult, s conversion.Scope) error {
+	out.Description = in.Description
+	out.Count = in.Count
+	return nil
+}
+
+func Convert_api_PredicateResult_To_v1_PredicateResult(in *api.PredicateResult, out *PredicateResult, s conversion.Scope) error {
+	return autoConvert_api_PredicateResult_To_v1_PredicateResult(in, out, s)
 }
 
 func autoConvert_v1_PreferAvoidPodsEntry_To_api_PreferAvoidPodsEntry(in *PreferAvoidPodsEntry, out *api.PreferAvoidPodsEntry, s conversion.Scope) error {

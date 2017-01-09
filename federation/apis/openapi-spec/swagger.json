@@ -11309,6 +11309,13 @@
        "type": "string"
       }
      },
+     "predicateResults": {
+      "description": "When populated, summary of false podFitsOnNode predicates for investigating unscheduled pods.",
+      "type": "array",
+      "items": {
+       "$ref": "#/definitions/v1.PredicateResult"
+      }
+     },
      "restartPolicy": {
       "description": "Restart policy for all containers within the pod. One of Always, OnFailure, Never. Default to Always. More info: http://kubernetes.io/docs/user-guide/pod-states#restartpolicy",
       "type": "string"
@@ -11361,6 +11368,22 @@
     "properties": {
      "uid": {
       "description": "Specifies the target UID.",
+      "type": "string"
+     }
+    }
+   },
+   "v1.PredicateResult": {
+    "description": "PredicateResult is metadata that aggregates at the pod level.",
+    "required": [
+     "Description",
+     "Count"
+    ],
+    "properties": {
+     "Count": {
+      "type": "integer",
+      "format": "int32"
+     },
+     "Description": {
       "type": "string"
      }
     }

@@ -1798,6 +1798,12 @@ const (
 	TolerationOpEqual  TolerationOperator = "Equal"
 )
 
+// PredicateResult is metadata that aggregates at the pod level.
+type PredicateResult struct {
+	Description string
+	Count       int32
+}
+
 // PodSpec is a description of a pod
 type PodSpec struct {
 	Volumes []Volume
@@ -1855,6 +1861,10 @@ type PodSpec struct {
 	// If specified, the pod's scheduling constraints
 	// +optional
 	Affinity *Affinity
+
+	// When populated, summary of false podFitsOnNode predicates for investigating unscheduled pods.
+	// +optional
+	PredicateResults []PredicateResult
 }
 
 // Sysctl defines a kernel parameter to be set
