@@ -34,17 +34,11 @@ import (
 const (
 	// Requested size of the volume
 	requestedSize = "1500Mi"
-	// Expected size of the volume is 2GiB, because all three supported cloud
-	// providers allocate volumes in 1GiB chunks.
-	expectedSize = "2Gi"
-	// Expected size of the externally provisioned volume depends on the external
-	// provisioner: for nfs-provisioner used here, it's equal to requested
-	externalExpectedSize = "1500Mi"
 	// Plugin name of the external provisioner
 	externalPluginName = "example.com/nfs"
 )
 
-func testDynamicProvisioning(client clientset.Interface, claim *v1.PersistentVolumeClaim, external bool) {
+func testDynamicProvisioning(client clientset.Interface, claim *v1.PersistentVolumeClaim, expectedSize string) {
 	err := framework.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, client, claim.Namespace, claim.Name, framework.Poll, framework.ClaimProvisionTimeout)
 	Expect(err).NotTo(HaveOccurred())
 
@@ -59,9 +53,6 @@ func testDynamicProvisioning(client clientset.Interface, claim *v1.PersistentVol
 
 	// Check sizes
 	expectedCapacity := resource.MustParse(expectedSize)
-	if external {
-		expectedCapacity = resource.MustParse(externalExpectedSize)
-	}
 	pvCapacity := pv.Spec.Capacity[v1.ResourceName(v1.ResourceStorage)]
 	Expect(pvCapacity.Value()).To(Equal(expectedCapacity.Value()))
 
@@ -87,23 +78,21 @@ func testDynamicProvisioning(client clientset.Interface, claim *v1.PersistentVol
 	By("checking the created volume is readable and retains data")
 	runInPodWithVolume(client, claim.Namespace, claim.Name, "grep 'hello world' /mnt/test/data")
 
-	if !external {
-		// Ugly hack: if we delete the AWS/GCE/OpenStack volume here, it will
-		// probably collide with destruction of the pods above - the pods
-		// still have the volume attached (kubelet is slow...) and deletion
-		// of attached volume is not allowed by AWS/GCE/OpenStack.
-		// Kubernetes *will* retry deletion several times in
-		// pvclaimbinder-sync-period.
-		// So, technically, this sleep is not needed. On the other hand,
-		// the sync perion is 10 minutes and we really don't want to wait
-		// 10 minutes here. There is no way how to see if kubelet is
-		// finished with cleaning volumes. A small sleep here actually
-		// speeds up the test!
-		// Three minutes should be enough to clean up the pods properly.
-		// We've seen GCE PD detach to take more than 1 minute.
-		By("Sleeping to let kubelet destroy all pods")
-		time.Sleep(3 * time.Minute)
-	}
+	// Ugly hack: if we delete the AWS/GCE/OpenStack volume here, it will
+	// probably collide with destruction of the pods above - the pods
+	// still have the volume attached (kubelet is slow...) and deletion
+	// of attached volume is not allowed by AWS/GCE/OpenStack.
+	// Kubernetes *will* retry deletion several times in
+	// pvclaimbinder-sync-period.
+	// So, technically, this sleep is not needed. On the other hand,
+	// the sync perion is 10 minutes and we really don't want to wait
+	// 10 minutes here. There is no way how to see if kubelet is
+	// finished with cleaning volumes. A small sleep here actually
+	// speeds up the test!
+	// Three minutes should be enough to clean up the pods properly.
+	// We've seen GCE PD detach to take more than 1 minute.
+	By("Sleeping to let kubelet destroy all pods")
+	time.Sleep(3 * time.Minute)
 
 	By("deleting the claim")
 	framework.ExpectNoError(client.Core().PersistentVolumeClaims(claim.Namespace).Delete(claim.Name, nil))
@@ -142,7 +131,9 @@ var _ = framework.KubeDescribe("Dynamic provisioning", func() {
 			claim, err = c.Core().PersistentVolumeClaims(ns).Create(claim)
 			Expect(err).NotTo(HaveOccurred())
 
-			testDynamicProvisioning(c, claim, false)
+			// Expected size of the volume is 2GiB, because all three supported cloud
+			// providers allocate volumes in 1GiB chunks.
+			testDynamicProvisioning(c, claim, "2Gi")
 		})
 	})
 
@@ -158,7 +149,7 @@ var _ = framework.KubeDescribe("Dynamic provisioning", func() {
 			claim, err := c.Core().PersistentVolumeClaims(ns).Create(claim)
 			Expect(err).NotTo(HaveOccurred())
 
-			testDynamicProvisioning(c, claim, false)
+			testDynamicProvisioning(c, claim, "2Gi")
 		})
 	})
 
@@ -182,7 +173,9 @@ var _ = framework.KubeDescribe("Dynamic provisioning", func() {
 			claim, err = c.Core().PersistentVolumeClaims(ns).Create(claim)
 			Expect(err).NotTo(HaveOccurred())
 
-			testDynamicProvisioning(c, claim, true)
+			// Expected size of the externally provisioned volume depends on the external
+			// provisioner: for nfs-provisioner used here, it's equal to requested
+			testDynamicProvisioning(c, claim, requestedSize)
 		})
 	})
 })
@@ -359,7 +352,5 @@ func startExternalProvisioner(c clientset.Interface, ns string) *v1.Pod {
 	pod, err := podClient.Get(provisionerPod.Name, metav1.GetOptions{})
 	framework.ExpectNoError(err, "Cannot locate the provisioner pod %v: %v", provisionerPod.Name, err)
 
-	By("sleeping a bit to give the provisioner time to start")
-	time.Sleep(5 * time.Second)
 	return pod
 }
