@@ -32,7 +32,7 @@ filegroup(
     "kube-apiserver",
     "kube-controller-manager",
     "kube-proxy",
-    "kubernetes-discovery",
+    "kube-aggregator",
 ]]
 
 deb_data(
@@ -116,7 +116,7 @@ k8s_deb(
 )
 
 k8s_deb(
-    name = "kubernetes-discovery",
+    name = "kube-aggregator",
     description = "Kubernetes Federated API Server",
 )
 

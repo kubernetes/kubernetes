@@ -22,7 +22,7 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/kubernetes/cmd/kubernetes-discovery/pkg/legacy"
+	"k8s.io/kubernetes/cmd/kube-aggregator/pkg/legacy"
 	"k8s.io/kubernetes/examples/apiserver"
 )
 
@@ -47,7 +47,7 @@ func testResponse(t *testing.T, serverURL, path string, expectedStatusCode int) 
 }
 
 func runDiscoverySummarizer(t *testing.T) string {
-	configFilePath := "../../../cmd/kubernetes-discovery/config.json"
+	configFilePath := "../../../cmd/kube-aggregator/config.json"
 	port := "9090"
 	serverURL := "http://localhost:" + port
 	s, err := legacy.NewDiscoverySummarizer(configFilePath)
