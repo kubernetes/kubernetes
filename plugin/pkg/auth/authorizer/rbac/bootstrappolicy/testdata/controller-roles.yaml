@@ -533,9 +533,32 @@ items:
     resources:
     - nodes
     verbs:
+    - delete
     - get
     - list
     - update
+  - apiGroups:
+    - ""
+    attributeRestrictions: null
+    resources:
+    - nodes/status
+    verbs:
+    - update
+  - apiGroups:
+    - ""
+    attributeRestrictions: null
+    resources:
+    - pods/status
+    verbs:
+    - update
+  - apiGroups:
+    - ""
+    attributeRestrictions: null
+    resources:
+    - pods
+    verbs:
+    - delete
+    - list
   - apiGroups:
     - ""
     attributeRestrictions: null
