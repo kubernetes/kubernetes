@@ -272,6 +272,7 @@ clusters:
 - name: local
   cluster:
     certificate-authority-data: ${KUBELET_CA_CERT}
+    server: https://${KUBERNETES_MASTER_NAME}:443
 contexts:
 - context:
     cluster: local
@@ -459,6 +460,8 @@ function start-kubelet {
   flags+=" --cluster-domain=${DNS_DOMAIN}"
   flags+=" --config=/etc/kubernetes/manifests"
   flags+=" --experimental-check-node-capabilities-before-mount=true"
+  flags+=" --require-kubeconfig"
+  flags+=" --kubeconfig=/var/lib/kubelet/kubeconfig"
 
   if [[ -n "${KUBELET_PORT:-}" ]]; then
     flags+=" --port=${KUBELET_PORT}"
