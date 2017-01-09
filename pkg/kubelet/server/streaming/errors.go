@@ -19,16 +19,11 @@ package streaming
 import (
 	"fmt"
 	"net/http"
-	"regexp"
 	"strconv"
 	"time"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
-)
-
-var (
-	retryAfterRegexp = regexp.MustCompile(`\[Retry-After:([0-9]+)\]`)
 )
 
 func ErrorStreamingDisabled(method string) error {
