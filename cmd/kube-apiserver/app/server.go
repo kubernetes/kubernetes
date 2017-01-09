@@ -52,6 +52,7 @@ import (
 	kubeadmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
 	kubeauthenticator "k8s.io/kubernetes/pkg/kubeapiserver/authenticator"
 	"k8s.io/kubernetes/pkg/master"
+	"k8s.io/kubernetes/pkg/master/tunneler"
 	"k8s.io/kubernetes/pkg/registry/cachesize"
 	"k8s.io/kubernetes/pkg/runtime/schema"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
@@ -123,12 +124,12 @@ func Run(s *options.ServerRunOptions) error {
 		PerConnectionBandwidthLimitBytesPerSec: s.MaxConnectionBytesPerSec,
 	})
 
-	// Setup tunneler if needed
-	var tunneler genericapiserver.Tunneler
+	// Setup nodeTunneler if needed
+	var nodeTunneler tunneler.Tunneler
 	var proxyDialerFn utilnet.DialFunc
 	if len(s.SSHUser) > 0 {
 		// Get ssh key distribution func, if supported
-		var installSSH genericapiserver.InstallSSHKey
+		var installSSH tunneler.InstallSSHKey
 		cloud, err := cloudprovider.InitCloudProvider(s.CloudProvider.CloudProvider, s.CloudProvider.CloudConfigFile)
 		if err != nil {
 			return fmt.Errorf("cloud provider could not be initialized: %v", err)
@@ -141,7 +142,7 @@ func Run(s *options.ServerRunOptions) error {
 		if s.KubeletConfig.Port == 0 {
 			return fmt.Errorf("must enable kubelet port if proxy ssh-tunneling is specified")
 		}
-		// Set up the tunneler
+		// Set up the nodeTunneler
 		// TODO(cjcullen): If we want this to handle per-kubelet ports or other
 		// kubelet listen-addresses, we need to plumb through options.
 		healthCheckPath := &url.URL{
@@ -149,12 +150,12 @@ func Run(s *options.ServerRunOptions) error {
 			Host:   net.JoinHostPort("127.0.0.1", strconv.FormatUint(uint64(s.KubeletConfig.Port), 10)),
 			Path:   "healthz",
 		}
-		tunneler = genericapiserver.NewSSHTunneler(s.SSHUser, s.SSHKeyfile, healthCheckPath, installSSH)
+		nodeTunneler = tunneler.NewSSHTunneler(s.SSHUser, s.SSHKeyfile, healthCheckPath, installSSH)
 
-		// Use the tunneler's dialer to connect to the kubelet
-		s.KubeletConfig.Dial = tunneler.Dial
-		// Use the tunneler's dialer when proxying to pods, services, and nodes
-		proxyDialerFn = tunneler.Dial
+		// Use the nodeTunneler's dialer to connect to the kubelet
+		s.KubeletConfig.Dial = nodeTunneler.Dial
+		// Use the nodeTunneler's dialer when proxying to pods, services, and nodes
+		proxyDialerFn = nodeTunneler.Dial
 	}
 
 	// Proxying to pods and services is IP-based... don't expect to be able to verify the hostname
@@ -308,7 +309,7 @@ func Run(s *options.ServerRunOptions) error {
 		EnableLogsSupport:       true,
 		ProxyTransport:          proxyTransport,
 
-		Tunneler: tunneler,
+		Tunneler: nodeTunneler,
 
 		ServiceIPRange:       serviceIPRange,
 		APIServerServiceIP:   apiServerServiceIP,
