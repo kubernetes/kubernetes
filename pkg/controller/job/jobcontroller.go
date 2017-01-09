@@ -28,7 +28,7 @@ import (
 	batch "k8s.io/kubernetes/pkg/apis/batch/v1"
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/client/cache"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	v1core "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/core/v1"
 	batchv1listers "k8s.io/kubernetes/pkg/client/listers/batch/v1"
 	"k8s.io/kubernetes/pkg/client/record"
