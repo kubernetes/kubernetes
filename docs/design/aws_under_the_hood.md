@@ -25,6 +25,7 @@ you manually created or configured your cluster.
  * [Tagging](#tagging)
  * [AWS objects](#aws-objects)
  * [Manual infrastructure creation](#manual-infrastructure-creation)
+ * [Multiple clusters](#multiple-clusters)
  * [Instance boot](#instance-boot)
 
 ### Architecture overview
@@ -288,6 +289,16 @@ Currently there is no way to do the following with kube-up:
 If any of the above items apply to your situation, open an issue to request an
 enhancement to the kube-up script. You should provide a complete description of
 the use-case, including all the details around what you want to accomplish.
+
+### Multiple clusters
+
+To run multiple clusters, set a unique value of `KUBE_AWS_INSTANCE_PREFIX` for
+each cluster you create (e.g. `kubernetes-production` and `kubernetes-staging`).
+By default, a VPC will be created for each cluster, but `VPC_ID` can be used to
+reuse an existing VPC.
+
+For more information about running multiple clusters, see the related
+[admin documentation]([kube-up](../admin/multi-cluster.md).
 
 ### Instance boot
 
