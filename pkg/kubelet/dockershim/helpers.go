@@ -35,7 +35,8 @@ import (
 )
 
 const (
-	annotationPrefix = "annotation."
+	annotationPrefix            = "annotation."
+	noSuchContainerErrorMessage = "No such cotainer: "
 )
 
 var (
@@ -313,4 +314,9 @@ func recoverFromConflictIfNeeded(client dockertools.DockerInterface, err error) 
 	} else {
 		glog.V(2).Infof("Successfully removed conflicting sandbox %q", id)
 	}
+}
+
+// containerNotExistErr returns if error message in given err is NoSuchContainer type error.
+func containerNotExistErr(err error) bool {
+	return strings.Contains(err.Error(), noSuchContainerErrorMessage)
 }

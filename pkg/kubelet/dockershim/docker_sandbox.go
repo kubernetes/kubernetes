@@ -127,7 +127,13 @@ func (ds *dockerService) StopPodSandbox(podSandboxID string) error {
 // RemovePodSandbox removes the sandbox. If there are running containers in the
 // sandbox, they should be forcibly removed.
 func (ds *dockerService) RemovePodSandbox(podSandboxID string) error {
-	return ds.client.RemoveContainer(podSandboxID, dockertypes.ContainerRemoveOptions{RemoveVolumes: true})
+	err := ds.client.RemoveContainer(podSandboxID, dockertypes.ContainerRemoveOptions{RemoveVolumes: true})
+
+	// no-op if sandbox has already been removed.
+	if err != nil && !containerNotExistErr(err) {
+		return err
+	}
+	return nil
 	// TODO: remove all containers in the sandbox.
 }
 

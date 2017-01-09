@@ -254,6 +254,10 @@ func (ds *dockerService) RemoveContainer(containerID string) error {
 	// we can't prevent that now, so we also clean up the symlink here.
 	err := ds.removeContainerLogSymlink(containerID)
 	if err != nil {
+		// no-op if container has already been removed.
+		if containerNotExistErr(err) {
+			return nil
+		}
 		return err
 	}
 	err = ds.client.RemoveContainer(containerID, dockertypes.ContainerRemoveOptions{RemoveVolumes: true})
