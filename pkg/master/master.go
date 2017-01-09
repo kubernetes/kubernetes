@@ -252,7 +252,7 @@ func (c completedConfig) New() (*Master, error) {
 		certificatesrest.RESTStorageProvider{},
 		extensionsrest.RESTStorageProvider{ResourceInterface: thirdparty.NewThirdPartyResourceServer(s, c.StorageFactory)},
 		policyrest.RESTStorageProvider{},
-		rbacrest.RESTStorageProvider{},
+		rbacrest.RESTStorageProvider{Authorizer: c.GenericConfig.Authorizer},
 		storagerest.RESTStorageProvider{},
 	}
 	m.InstallAPIs(c.Config.APIResourceConfigSource, restOptionsFactory, restStorageProviders...)
