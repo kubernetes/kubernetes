@@ -60,16 +60,12 @@ func PerformTLSBootstrap(cfg *clientcmdapi.Config) error {
 	if err != nil {
 		return fmt.Errorf("failed to request signed certificate from the API server [%v]", err)
 	}
-	fmtCert, err := certutil.FormatBytesCert(cert)
-	if err != nil {
-		return fmt.Errorf("failed to format certificate [%v]", err)
-	}
 	fmt.Printf("[csr] Received signed certificate from the API server")
 	fmt.Println("[csr] Generating kubelet configuration")
 
 	cfg.AuthInfos["kubelet"] = &clientcmdapi.AuthInfo{
 		ClientKeyData:         key,
-		ClientCertificateData: []byte(fmtCert),
+		ClientCertificateData: cert,
 	}
 	cfg.Contexts["kubelet"] = &clientcmdapi.Context{
 		AuthInfo: "kubelet",
