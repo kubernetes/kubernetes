@@ -45,6 +45,7 @@ import (
 	"k8s.io/kubernetes/pkg/genericapiserver"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/master/thirdparty"
+	"k8s.io/kubernetes/pkg/master/tunneler"
 	"k8s.io/kubernetes/pkg/registry/generic"
 	genericregistry "k8s.io/kubernetes/pkg/registry/generic/registry"
 	"k8s.io/kubernetes/pkg/routes"
@@ -86,7 +87,7 @@ type Config struct {
 	KubeletClientConfig      kubeletclient.KubeletClientConfig
 
 	// Used to start and monitor tunneling
-	Tunneler          genericapiserver.Tunneler
+	Tunneler          tunneler.Tunneler
 	EnableUISupport   bool
 	EnableLogsSupport bool
 	ProxyTransport    http.RoundTripper
@@ -283,13 +284,13 @@ func (m *Master) InstallLegacyAPI(c *Config, restOptionsGetter generic.RESTOptio
 	}
 }
 
-func (m *Master) installTunneler(tunneler genericapiserver.Tunneler, nodeClient corev1client.NodeInterface) {
-	tunneler.Run(nodeAddressProvider{nodeClient}.externalAddresses)
-	m.GenericAPIServer.AddHealthzChecks(healthz.NamedCheck("SSH Tunnel Check", genericapiserver.TunnelSyncHealthChecker(tunneler)))
+func (m *Master) installTunneler(nodeTunneler tunneler.Tunneler, nodeClient corev1client.NodeInterface) {
+	nodeTunneler.Run(nodeAddressProvider{nodeClient}.externalAddresses)
+	m.GenericAPIServer.AddHealthzChecks(healthz.NamedCheck("SSH Tunnel Check", tunneler.TunnelSyncHealthChecker(nodeTunneler)))
 	prometheus.NewGaugeFunc(prometheus.GaugeOpts{
 		Name: "apiserver_proxy_tunnel_sync_latency_secs",
 		Help: "The time since the last successful synchronization of the SSH tunnels for proxy requests.",
-	}, func() float64 { return float64(tunneler.SecondsSinceSync()) })
+	}, func() float64 { return float64(nodeTunneler.SecondsSinceSync()) })
 }
 
 // RESTStorageProvider is a factory type for REST storage.
