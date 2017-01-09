@@ -9,14 +9,19 @@ load(
 
 go_library(
     name = "go_default_library",
-    srcs = ["install.go"],
+    srcs = [
+        "defaults.go",
+        "doc.go",
+        "helpers.go",
+        "register.go",
+        "types.go",
+    ],
     tags = ["automanaged"],
     deps = [
-        "//pkg/apimachinery/announced:go_default_library",
-        "//pkg/apis/rbac:go_default_library",
-        "//pkg/apis/rbac/v1alpha1:go_default_library",
-        "//pkg/apis/rbac/v1beta1:go_default_library",
-        "//vendor:k8s.io/apimachinery/pkg/util/sets",
+        "//pkg/api/v1:go_default_library",
+        "//pkg/apis/meta/v1:go_default_library",
+        "//pkg/runtime:go_default_library",
+        "//pkg/runtime/schema:go_default_library",
     ],
 )
 
