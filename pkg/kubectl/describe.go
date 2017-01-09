@@ -1780,17 +1780,41 @@ func (d *ServiceAccountDescriber) Describe(namespace, name string, describerSett
 	}
 
 	existingPullSecrets := map[string]api.Secret{}
-	pullSecrets, err := d.Core().Secrets(namespace).List(api.ListOptions{})
+
+	// append opaque secrets to pull secrets list
+	opaqueSecretSelector := fields.SelectorFromSet(map[string]string{api.SecretTypeField: string(api.SecretTypeOpaque)})
+	opaqueSecrets, err := d.Secrets(namespace).List(api.ListOptions{
+		FieldSelector: opaqueSecretSelector,
+	})
 	if err == nil {
-		for _, s := range pullSecrets.Items {
+		for _, s := range opaqueSecrets.Items {
 			existingPullSecrets[s.GetName()] = s
 		}
 	}
 
-	return describeServiceAccount(serviceAccount, tokens, existingPullSecrets)
+	//append docketcfg secrets to pull secrets list
+	dockercfgSecretSelector := fields.SelectorFromSet(map[string]string{api.SecretTypeField: string(api.SecretTypeDockercfg)})
+	dockercfgSecrets, err := d.Secrets(namespace).List(api.ListOptions{
+		FieldSelector: dockercfgSecretSelector,
+	})
+	if err == nil {
+		for _, s := range dockercfgSecrets.Items {
+			existingPullSecrets[s.GetName()] = s
+		}
+	}
+
+	// filter pull secrets to only those present in service account
+	saPullSecrets := map[string]api.Secret{}
+	for _, s := range serviceAccount.ImagePullSecrets {
+		if secret, exists := existingPullSecrets[s.Name]; exists {
+			saPullSecrets[secret.Name] = secret
+		}
+	}
+
+	return describeServiceAccount(serviceAccount, tokens, saPullSecrets)
 }
 
-func describeServiceAccount(serviceAccount *api.ServiceAccount, tokens []api.Secret, existingPullSecrets map[string]api.Secret) (string, error) {
+func describeServiceAccount(serviceAccount *api.ServiceAccount, tokens []api.Secret, saPullSecrets map[string]api.Secret) (string, error) {
 	return tabbedString(func(out io.Writer) error {
 		w := &PrefixWriter{out}
 		w.Write(LEVEL_0, "Name:\t%s\n", serviceAccount.Name)
@@ -1809,10 +1833,8 @@ func describeServiceAccount(serviceAccount *api.ServiceAccount, tokens []api.Sec
 			tokenSecretNames = []string{}
 		)
 
-		for _, s := range serviceAccount.ImagePullSecrets {
-			if _, exists := existingPullSecrets[s.Name]; exists {
-				pullSecretNames = append(pullSecretNames, s.Name)
-			}
+		for _, s := range saPullSecrets {
+			pullSecretNames = append(pullSecretNames, s.Name)
 		}
 		for _, s := range serviceAccount.Secrets {
 			mountSecretNames = append(mountSecretNames, s.Name)
