@@ -284,7 +284,7 @@ func getContainerInfo(c clientset.Interface, nodeName string, req *kubeletstats.
 	if err != nil {
 		return nil, err
 	}
-	subResourceProxyAvailable, err := ServerVersionGTE(subResourceServiceAndNodeProxyVersion, c.Discovery())
+	subResourceProxyAvailable, err := ServerVersionGTE(SubResourceServiceAndNodeProxyVersion, c.Discovery())
 	if err != nil {
 		return nil, err
 	}
@@ -407,7 +407,7 @@ func getOneTimeResourceUsageOnNode(
 }
 
 func getNodeStatsSummary(c clientset.Interface, nodeName string) (*stats.Summary, error) {
-	subResourceProxyAvailable, err := ServerVersionGTE(subResourceServiceAndNodeProxyVersion, c.Discovery())
+	subResourceProxyAvailable, err := ServerVersionGTE(SubResourceServiceAndNodeProxyVersion, c.Discovery())
 	if err != nil {
 		return nil, err
 	}

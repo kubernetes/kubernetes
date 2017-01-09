@@ -35,7 +35,7 @@ import (
 )
 
 const (
-	baseHeapsterServiceAddress = "/api/v1/proxy/namespaces/kube-system/services/http:heapster:"
+	baseHeapsterServiceAddress = "/api/v1/namespaces/kube-system/services/http:heapster:/proxy"
 	baseMetricsAddress         = baseHeapsterServiceAddress + "/apis/metrics"
 	metricsApiVersion          = "v1alpha1"
 )
