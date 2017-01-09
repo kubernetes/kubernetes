@@ -129,7 +129,7 @@ func (hk *HyperKube) Run(args []string) error {
 		err := baseFlags.Parse(args)
 		if err != nil || hk.helpFlagVal {
 			if err != nil {
-				hk.Println("Error:", err)
+				hk.Println("Error:", err, "\n")
 			}
 			hk.Usage()
 			return err
@@ -178,7 +178,7 @@ func (hk *HyperKube) Run(args []string) error {
 
 	err = s.Run(s, s.Flags().Args())
 	if err != nil {
-		hk.Println("Error:", err)
+		hk.Println("Error:", err, "\n")
 	}
 
 	return err
@@ -188,7 +188,7 @@ func (hk *HyperKube) Run(args []string) error {
 func (hk *HyperKube) RunToExit(args []string) {
 	err := hk.Run(args)
 	if err != nil {
-		fmt.Fprint(os.Stderr, err.Error())
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err.Error())
 		os.Exit(1)
 	}
 	os.Exit(0)

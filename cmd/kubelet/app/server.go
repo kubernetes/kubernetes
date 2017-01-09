@@ -271,7 +271,7 @@ func initKubeletConfigSync(s *options.KubeletServer) (*componentconfig.KubeletCo
 // not be generated.
 func Run(s *options.KubeletServer, kubeDeps *kubelet.KubeletDeps) error {
 	if err := run(s, kubeDeps); err != nil {
-		return fmt.Errorf("failed to run Kubelet: %v\n", err)
+		return fmt.Errorf("failed to run Kubelet: %v", err)
 
 	}
 	return nil
