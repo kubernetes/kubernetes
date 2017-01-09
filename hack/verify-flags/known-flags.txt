@@ -636,4 +636,4 @@ viper-config
 log-lines-total
 run-duration
 disable-attach-detach-reconcile
-reconcile-sync-loop-period
+attach-detach-reconcile-period
