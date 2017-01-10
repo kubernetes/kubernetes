@@ -408,6 +408,10 @@ func StartControllers(controllers map[string]InitFunc, s *options.CMServer, root
 	go volumeController.Run(stop)
 	time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
 
+	if s.ReconcilerSyncLoopPeriod.Duration < time.Second {
+		return fmt.Errorf("Duration time must be greater than one second as set via command line option reconcile-sync-loop-period.")
+	}
+
 	attachDetachController, attachDetachControllerErr :=
 		attachdetach.NewAttachDetachController(
 			clientBuilder.ClientOrDie("attachdetach-controller"),
@@ -416,7 +420,10 @@ func StartControllers(controllers map[string]InitFunc, s *options.CMServer, root
 			sharedInformers.PersistentVolumeClaims().Informer(),
 			sharedInformers.PersistentVolumes().Informer(),
 			cloud,
-			ProbeAttachableVolumePlugins(s.VolumeConfiguration))
+			ProbeAttachableVolumePlugins(s.VolumeConfiguration),
+			s.DisableAttachDetachReconcilerSync,
+			s.ReconcilerSyncLoopPeriod.Duration,
+		)
 	if attachDetachControllerErr != nil {
 		return fmt.Errorf("failed to start attach/detach controller: %v", attachDetachControllerErr)
 	}

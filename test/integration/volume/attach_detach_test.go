@@ -195,7 +195,7 @@ func createAdClients(ns *v1.Namespace, t *testing.T, server *httptest.Server, sy
 	nodeInformer := informers.NewNodeInformer(clientset.NewForConfigOrDie(restclient.AddUserAgent(&config, "node-informer")), resyncPeriod)
 	pvcInformer := informers.NewNodeInformer(clientset.NewForConfigOrDie(restclient.AddUserAgent(&config, "pvc-informer")), resyncPeriod)
 	pvInformer := informers.NewNodeInformer(clientset.NewForConfigOrDie(restclient.AddUserAgent(&config, "pv-informer")), resyncPeriod)
-	ctrl, err := attachdetach.NewAttachDetachController(testClient, podInformer, nodeInformer, pvcInformer, pvInformer, cloud, plugins)
+	ctrl, err := attachdetach.NewAttachDetachController(testClient, podInformer, nodeInformer, pvcInformer, pvInformer, cloud, plugins, false, time.Second*5)
 	if err != nil {
 		t.Fatalf("Error creating AttachDetach : %v", err)
 	}
