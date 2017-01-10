@@ -32,7 +32,7 @@ import (
 type StatefulSet struct {
 	metav1.TypeMeta
 	// +optional
-	api.ObjectMeta
+	metav1.ObjectMeta
 
 	// Spec defines the desired identities of pods in this set.
 	// +optional
@@ -86,7 +86,7 @@ type StatefulSetSpec struct {
 
 // StatefulSetStatus represents the current state of a StatefulSet.
 type StatefulSetStatus struct {
-	// most recent generation observed by this autoscaler.
+	// most recent generation observed by this StatefulSet.
 	// +optional
 	ObservedGeneration *int64
 

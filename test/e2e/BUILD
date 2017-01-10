@@ -49,6 +49,7 @@ go_library(
         "federation-event.go",
         "federation-replicaset.go",
         "federation-util.go",
+        "federation-util-14.go",
         "firewall.go",
         "garbage_collector.go",
         "generated_clientset.go",

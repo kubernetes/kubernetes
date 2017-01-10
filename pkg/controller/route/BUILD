@@ -40,6 +40,7 @@ go_test(
     tags = ["automanaged"],
     deps = [
         "//pkg/api/v1:go_default_library",
+        "//pkg/apis/meta/v1:go_default_library",
         "//pkg/client/clientset_generated/clientset/fake:go_default_library",
         "//pkg/client/testing/core:go_default_library",
         "//pkg/cloudprovider:go_default_library",

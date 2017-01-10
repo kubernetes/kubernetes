@@ -39,6 +39,7 @@ go_test(
         "//pkg/api/testapi:go_default_library",
         "//pkg/api/testing:go_default_library",
         "//pkg/apis/extensions:go_default_library",
+        "//pkg/apis/meta/v1:go_default_library",
         "//pkg/genericapiserver/api/request:go_default_library",
         "//pkg/util/intstr:go_default_library",
     ],

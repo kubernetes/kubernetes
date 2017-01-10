@@ -20,6 +20,7 @@ go_library(
     deps = [
         "//pkg/api/resource:go_default_library",
         "//pkg/api/v1:go_default_library",
+        "//pkg/apis/meta/v1:go_default_library",
         "//pkg/cloudprovider:go_default_library",
         "//pkg/cloudprovider/providers/openstack:go_default_library",
         "//pkg/cloudprovider/providers/rackspace:go_default_library",

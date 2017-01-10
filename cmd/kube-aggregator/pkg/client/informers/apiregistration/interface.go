@@ -19,15 +19,12 @@ limitations under the License.
 package apiregistration
 
 import (
-	internalversion "k8s.io/kubernetes/cmd/kube-aggregator/pkg/client/informers/apiregistration/internalversion"
 	v1alpha1 "k8s.io/kubernetes/cmd/kube-aggregator/pkg/client/informers/apiregistration/v1alpha1"
 	internalinterfaces "k8s.io/kubernetes/cmd/kube-aggregator/pkg/client/informers/internalinterfaces"
 )
 
 // Interface provides access to each of this group's versions.
 type Interface interface {
-	// InternalVersion provides access to shared informers for resources in InternalVersion.
-	InternalVersion() internalversion.Interface
 	// V1alpha1 provides access to shared informers for resources in V1alpha1.
 	V1alpha1() v1alpha1.Interface
 }
@@ -39,11 +36,6 @@ type group struct {
 // New returns a new Interface.
 func New(f internalinterfaces.SharedInformerFactory) Interface {
 	return &group{f}
-}
-
-// InternalVersion returns a new internalversion.Interface.
-func (g *group) InternalVersion() internalversion.Interface {
-	return internalversion.New(g.SharedInformerFactory)
 }
 
 // V1alpha1 returns a new v1alpha1.Interface.

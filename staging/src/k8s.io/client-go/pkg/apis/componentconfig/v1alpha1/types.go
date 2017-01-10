@@ -22,7 +22,7 @@ import (
 )
 
 type KubeProxyConfiguration struct {
-	metav1.TypeMeta
+	metav1.TypeMeta `json:",inline"`
 
 	// bindAddress is the IP address for the proxy server to serve on (set to 0.0.0.0
 	// for all interfaces)
@@ -100,7 +100,7 @@ const (
 )
 
 type KubeSchedulerConfiguration struct {
-	metav1.TypeMeta
+	metav1.TypeMeta `json:",inline"`
 
 	// port is the port that the scheduler's http service runs on.
 	Port int `json:"port"`
@@ -178,7 +178,7 @@ type LeaderElectionConfiguration struct {
 }
 
 type KubeletConfiguration struct {
-	metav1.TypeMeta
+	metav1.TypeMeta `json:",inline"`
 
 	// podManifestPath is the path to the directory containing pod manifests to
 	// run, or the path to a single manifest file
@@ -428,9 +428,6 @@ type KubeletConfiguration struct {
 	Containerized *bool `json:"containerized"`
 	// maxOpenFiles is Number of files that can be opened by Kubelet process.
 	MaxOpenFiles int64 `json:"maxOpenFiles"`
-	// reconcileCIDR is Reconcile node CIDR with the CIDR specified by the
-	// API server. Won't have any effect if register-node is false.
-	ReconcileCIDR *bool `json:"reconcileCIDR"`
 	// registerSchedulable tells the kubelet to register the node as
 	// schedulable. Won't have any effect if register-node is false.
 	// DEPRECATED: use registerWithTaints instead
@@ -523,7 +520,7 @@ type KubeletConfiguration struct {
 	// This flag, if set, enables a check prior to mount operations to verify that the required components
 	// (binaries, etc.) to mount the volume are available on the underlying node. If the check is enabled
 	// and fails the mount operation fails.
-	ExperimentalCheckNodeCapabilitiesBeforeMount bool `json:"ExperimentalCheckNodeCapabilitiesBeforeMount,omitempty"`
+	ExperimentalCheckNodeCapabilitiesBeforeMount bool `json:"experimentalCheckNodeCapabilitiesBeforeMount,omitempty"`
 }
 
 type KubeletAuthorizationMode string

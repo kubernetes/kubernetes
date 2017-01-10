@@ -43,6 +43,7 @@ go_test(
     deps = [
         "//pkg/api/testapi:go_default_library",
         "//pkg/api/v1:go_default_library",
+        "//pkg/apis/meta/v1:go_default_library",
         "//pkg/client/clientset_generated/clientset/fake:go_default_library",
         "//pkg/cloudprovider/providers/fake:go_default_library",
         "//pkg/types:go_default_library",

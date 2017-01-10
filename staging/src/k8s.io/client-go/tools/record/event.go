@@ -19,7 +19,10 @@ package record
 import (
 	"fmt"
 	"math/rand"
+	"net/http"
 	"time"
+
+	"github.com/golang/glog"
 
 	"k8s.io/client-go/pkg/api/errors"
 	"k8s.io/client-go/pkg/api/v1"
@@ -29,10 +32,6 @@ import (
 	utilruntime "k8s.io/client-go/pkg/util/runtime"
 	"k8s.io/client-go/pkg/watch"
 	"k8s.io/client-go/rest"
-
-	"net/http"
-
-	"github.com/golang/glog"
 )
 
 const maxTriesPerEvent = 12
@@ -301,7 +300,7 @@ func (recorder *recorderImpl) makeEvent(ref *v1.ObjectReference, eventtype, reas
 		namespace = v1.NamespaceDefault
 	}
 	return &v1.Event{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      fmt.Sprintf("%v.%x", ref.Name, t.UnixNano()),
 			Namespace: namespace,
 		},

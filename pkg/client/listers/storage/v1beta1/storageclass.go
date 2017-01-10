@@ -20,7 +20,7 @@ package v1beta1
 
 import (
 	"k8s.io/kubernetes/pkg/api/errors"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
+	v1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	storage "k8s.io/kubernetes/pkg/apis/storage"
 	v1beta1 "k8s.io/kubernetes/pkg/apis/storage/v1beta1"
 	"k8s.io/kubernetes/pkg/client/cache"
@@ -56,7 +56,7 @@ func (s *storageClassLister) List(selector labels.Selector) (ret []*v1beta1.Stor
 
 // Get retrieves the StorageClass from the index for a given name.
 func (s *storageClassLister) Get(name string) (*v1beta1.StorageClass, error) {
-	key := &v1beta1.StorageClass{ObjectMeta: metav1.ObjectMeta{Name: name}}
+	key := &v1beta1.StorageClass{ObjectMeta: v1.ObjectMeta{Name: name}}
 	obj, exists, err := s.indexer.Get(key)
 	if err != nil {
 		return nil, err

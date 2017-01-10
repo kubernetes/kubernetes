@@ -22,7 +22,7 @@ import (
 	api "k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	v1 "k8s.io/kubernetes/pkg/api/v1"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
+	meta_v1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/labels"
 )
@@ -56,7 +56,7 @@ func (s *componentStatusLister) List(selector labels.Selector) (ret []*v1.Compon
 
 // Get retrieves the ComponentStatus from the index for a given name.
 func (s *componentStatusLister) Get(name string) (*v1.ComponentStatus, error) {
-	key := &v1.ComponentStatus{ObjectMeta: metav1.ObjectMeta{Name: name}}
+	key := &v1.ComponentStatus{ObjectMeta: meta_v1.ObjectMeta{Name: name}}
 	obj, exists, err := s.indexer.Get(key)
 	if err != nil {
 		return nil, err

@@ -16,10 +16,7 @@ limitations under the License.
 
 package authentication
 
-import (
-	"k8s.io/client-go/pkg/api"
-	metav1 "k8s.io/client-go/pkg/apis/meta/v1"
-)
+import metav1 "k8s.io/client-go/pkg/apis/meta/v1"
 
 const (
 	// ImpersonateUserHeader is used to impersonate a particular user during an API server request
@@ -45,7 +42,7 @@ type TokenReview struct {
 	metav1.TypeMeta
 	// ObjectMeta fulfills the meta.ObjectMetaAccessor interface so that the stock
 	// REST handler paths work
-	api.ObjectMeta
+	metav1.ObjectMeta
 
 	// Spec holds information about the request being evaluated
 	Spec TokenReviewSpec

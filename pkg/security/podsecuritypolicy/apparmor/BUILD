@@ -27,6 +27,7 @@ go_test(
     tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
+        "//pkg/apis/meta/v1:go_default_library",
         "//pkg/security/apparmor:go_default_library",
         "//pkg/util/maps:go_default_library",
         "//vendor:github.com/davecgh/go-spew/spew",

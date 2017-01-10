@@ -70,13 +70,6 @@ type Etcd struct {
 	KeyFile   string   `json:"keyFile"`
 }
 
-type Secrets struct {
-	GivenToken  string `json:"givenToken"`  // dot-separated `<TokenID>.<Token>` set by the user
-	TokenID     string `json:"tokenID"`     // optional on master side, will be generated if not specified
-	Token       []byte `json:"token"`       // optional on master side, will be generated if not specified
-	BearerToken string `json:"bearerToken"` // set based on Token
-}
-
 type NodeConfiguration struct {
 	metav1.TypeMeta `json:",inline"`
 

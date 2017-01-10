@@ -27,6 +27,7 @@ go_test(
     deps = [
         "//pkg/admission:go_default_library",
         "//pkg/api:go_default_library",
+        "//pkg/apis/meta/v1:go_default_library",
         "//pkg/runtime:go_default_library",
     ],
 )

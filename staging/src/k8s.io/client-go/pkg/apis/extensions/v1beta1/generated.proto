@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors.
+Copyright 2017 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -74,7 +74,7 @@ message DaemonSet {
   // Standard object's metadata.
   // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
   // +optional
-  optional k8s.io.kubernetes.pkg.api.v1.ObjectMeta metadata = 1;
+  optional k8s.io.kubernetes.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // Spec defines the desired behavior of this daemon set.
   // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status
@@ -138,13 +138,17 @@ message DaemonSetStatus {
   // NumberReady is the number of nodes that should be running the daemon pod and have one
   // or more of the daemon pod running and ready.
   optional int32 numberReady = 4;
+
+  // ObservedGeneration is the most recent generation observed by the daemon set controller.
+  // +optional
+  optional int64 observedGeneration = 5;
 }
 
 // Deployment enables declarative updates for Pods and ReplicaSets.
 message Deployment {
   // Standard object metadata.
   // +optional
-  optional k8s.io.kubernetes.pkg.api.v1.ObjectMeta metadata = 1;
+  optional k8s.io.kubernetes.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // Specification of the desired behavior of the Deployment.
   // +optional
@@ -262,6 +266,10 @@ message DeploymentStatus {
   // +optional
   optional int32 updatedReplicas = 3;
 
+  // Total number of ready pods targeted by this deployment.
+  // +optional
+  optional int32 readyReplicas = 7;
+
   // Total number of available pods (ready for at least minReadySeconds) targeted by this deployment.
   // +optional
   optional int32 availableReplicas = 4;
@@ -333,7 +341,7 @@ message HTTPIngressRuleValue {
 message HorizontalPodAutoscaler {
   // Standard object metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
   // +optional
-  optional k8s.io.kubernetes.pkg.api.v1.ObjectMeta metadata = 1;
+  optional k8s.io.kubernetes.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // behaviour of autoscaler. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status.
   // +optional
@@ -423,7 +431,7 @@ message Ingress {
   // Standard object's metadata.
   // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
   // +optional
-  optional k8s.io.kubernetes.pkg.api.v1.ObjectMeta metadata = 1;
+  optional k8s.io.kubernetes.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // Spec is the desired state of the Ingress.
   // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status
@@ -545,7 +553,7 @@ message NetworkPolicy {
   // Standard object's metadata.
   // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
   // +optional
-  optional k8s.io.kubernetes.pkg.api.v1.ObjectMeta metadata = 1;
+  optional k8s.io.kubernetes.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // Specification of the desired behavior for this NetworkPolicy.
   // +optional
@@ -644,7 +652,7 @@ message PodSecurityPolicy {
   // Standard object's metadata.
   // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
   // +optional
-  optional k8s.io.kubernetes.pkg.api.v1.ObjectMeta metadata = 1;
+  optional k8s.io.kubernetes.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // spec defines the policy enforced.
   // +optional
@@ -733,7 +741,7 @@ message ReplicaSet {
   // be the same as the Pod(s) that the ReplicaSet manages.
   // Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
   // +optional
-  optional k8s.io.kubernetes.pkg.api.v1.ObjectMeta metadata = 1;
+  optional k8s.io.kubernetes.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // Spec defines the specification of the desired behavior of the ReplicaSet.
   // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status
@@ -903,7 +911,7 @@ message SELinuxStrategyOptions {
 message Scale {
   // Standard object metadata; More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata.
   // +optional
-  optional k8s.io.kubernetes.pkg.api.v1.ObjectMeta metadata = 1;
+  optional k8s.io.kubernetes.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // defines the behavior of the scale. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status.
   // +optional
@@ -976,7 +984,7 @@ message SupplementalGroupsStrategyOptions {
 message ThirdPartyResource {
   // Standard object metadata
   // +optional
-  optional k8s.io.kubernetes.pkg.api.v1.ObjectMeta metadata = 1;
+  optional k8s.io.kubernetes.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // Description is the description of this object.
   // +optional
@@ -991,7 +999,7 @@ message ThirdPartyResource {
 message ThirdPartyResourceData {
   // Standard object metadata.
   // +optional
-  optional k8s.io.kubernetes.pkg.api.v1.ObjectMeta metadata = 1;
+  optional k8s.io.kubernetes.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // Data is the raw JSON data for this data.
   // +optional

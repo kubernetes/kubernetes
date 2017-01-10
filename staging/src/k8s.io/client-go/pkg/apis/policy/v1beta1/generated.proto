@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors.
+Copyright 2017 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -21,7 +21,6 @@ syntax = 'proto2';
 
 package k8s.io.kubernetes.pkg.apis.policy.v1beta1;
 
-import "k8s.io/kubernetes/pkg/api/resource/generated.proto";
 import "k8s.io/kubernetes/pkg/api/v1/generated.proto";
 import "k8s.io/kubernetes/pkg/apis/meta/v1/generated.proto";
 import "k8s.io/kubernetes/pkg/runtime/generated.proto";
@@ -36,7 +35,7 @@ option go_package = "v1beta1";
 // created by POSTing to .../pods/<pod name>/evictions.
 message Eviction {
   // ObjectMeta describes the pod that is being evicted.
-  optional k8s.io.kubernetes.pkg.api.v1.ObjectMeta metadata = 1;
+  optional k8s.io.kubernetes.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // DeleteOptions may be provided
   optional k8s.io.kubernetes.pkg.api.v1.DeleteOptions deleteOptions = 2;
@@ -44,7 +43,7 @@ message Eviction {
 
 // PodDisruptionBudget is an object to define the max disruption that can be caused to a collection of pods
 message PodDisruptionBudget {
-  optional k8s.io.kubernetes.pkg.api.v1.ObjectMeta metadata = 1;
+  optional k8s.io.kubernetes.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // Specification of the desired behavior of the PodDisruptionBudget.
   optional PodDisruptionBudgetSpec spec = 2;

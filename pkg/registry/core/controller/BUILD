@@ -41,6 +41,7 @@ go_test(
         "//pkg/api:go_default_library",
         "//pkg/api/testing:go_default_library",
         "//pkg/apimachinery/registered:go_default_library",
+        "//pkg/apis/meta/v1:go_default_library",
         "//pkg/genericapiserver/api/request:go_default_library",
     ],
 )

@@ -24,6 +24,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/davecgh/go-spew/spew"
+
 	"k8s.io/client-go/pkg/api/resource"
 	metav1 "k8s.io/client-go/pkg/apis/meta/v1"
 	"k8s.io/client-go/pkg/conversion"
@@ -33,8 +35,6 @@ import (
 	"k8s.io/client-go/pkg/selection"
 	"k8s.io/client-go/pkg/types"
 	"k8s.io/client-go/pkg/util/sets"
-
-	"github.com/davecgh/go-spew/spew"
 )
 
 // Conversion error conveniently packages up errors in conversions.
@@ -272,7 +272,7 @@ func IsStandardFinalizerName(str string) bool {
 }
 
 // SingleObject returns a ListOptions for watching a single object.
-func SingleObject(meta ObjectMeta) ListOptions {
+func SingleObject(meta metav1.ObjectMeta) ListOptions {
 	return ListOptions{
 		FieldSelector:   fields.OneTermEqualSelector("metadata.name", meta.Name),
 		ResourceVersion: meta.ResourceVersion,

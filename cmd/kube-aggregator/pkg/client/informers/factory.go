@@ -22,6 +22,7 @@ import (
 	clientset "k8s.io/kubernetes/cmd/kube-aggregator/pkg/client/clientset_generated/clientset"
 	internalclientset "k8s.io/kubernetes/cmd/kube-aggregator/pkg/client/clientset_generated/internalclientset"
 	apiregistration "k8s.io/kubernetes/cmd/kube-aggregator/pkg/client/informers/apiregistration"
+	apis "k8s.io/kubernetes/cmd/kube-aggregator/pkg/client/informers/apis"
 	internalinterfaces "k8s.io/kubernetes/cmd/kube-aggregator/pkg/client/informers/internalinterfaces"
 	cache "k8s.io/kubernetes/pkg/client/cache"
 	runtime "k8s.io/kubernetes/pkg/runtime"
@@ -106,8 +107,13 @@ type SharedInformerFactory interface {
 	internalinterfaces.SharedInformerFactory
 
 	Apiregistration() apiregistration.Interface
+	Apis() apis.Interface
 }
 
 func (f *sharedInformerFactory) Apiregistration() apiregistration.Interface {
 	return apiregistration.New(f)
+}
+
+func (f *sharedInformerFactory) Apis() apis.Interface {
+	return apis.New(f)
 }

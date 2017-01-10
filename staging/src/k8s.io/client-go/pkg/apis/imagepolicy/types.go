@@ -16,10 +16,7 @@ limitations under the License.
 
 package imagepolicy
 
-import (
-	"k8s.io/client-go/pkg/api"
-	metav1 "k8s.io/client-go/pkg/apis/meta/v1"
-)
+import metav1 "k8s.io/client-go/pkg/apis/meta/v1"
 
 // +genclient=true
 // +nonNamespaced=true
@@ -28,7 +25,7 @@ import (
 // ImageReview checks if the set of images in a pod are allowed.
 type ImageReview struct {
 	metav1.TypeMeta
-	api.ObjectMeta
+	metav1.ObjectMeta
 
 	// Spec holds information about the pod being evaluated
 	Spec ImageReviewSpec

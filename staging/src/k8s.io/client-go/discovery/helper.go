@@ -23,8 +23,7 @@ import (
 	"k8s.io/client-go/pkg/runtime/schema"
 	"k8s.io/client-go/pkg/util/sets"
 	"k8s.io/client-go/pkg/version"
-	// Import solely to initialize client auth plugins.
-	_ "k8s.io/client-go/plugin/pkg/client/auth"
+	_ "k8s.io/client-go/plugin/pkg/client/auth" // Import solely to initialize client auth plugins.
 )
 
 // MatchesServerVersion queries the server to compares the build version

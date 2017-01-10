@@ -195,7 +195,7 @@
 		},
 		{
 			"ImportPath": "golang.org/x/crypto/ssh/terminal",
-			"Rev": "1f22c0103821b9390939b6776727195525381532"
+			"Rev": "d172538b2cfce0c13cee31e647d0367aa8cd2486"
 		},
 		{
 			"ImportPath": "golang.org/x/net/context",
@@ -325,6 +325,10 @@
 		{
 			"ImportPath": "gopkg.in/yaml.v2",
 			"Rev": "53feefa2559fb8dfa8d81baad31be332c97d6c77"
+		},
+		{
+			"ImportPath": "k8s.io/apiserver/pkg/authentication/user",
+			"Rev": "69bedbe0e30de794c04e0cb288ecf22ebe63fc18"
 		}
 	]
 }

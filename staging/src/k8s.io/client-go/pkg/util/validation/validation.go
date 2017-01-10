@@ -27,6 +27,7 @@ import (
 const qnameCharFmt string = "[A-Za-z0-9]"
 const qnameExtCharFmt string = "[-A-Za-z0-9_.]"
 const qualifiedNameFmt string = "(" + qnameCharFmt + qnameExtCharFmt + "*)?" + qnameCharFmt
+const qualifiedNameErrMsg string = "must consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character"
 const qualifiedNameMaxLength int = 63
 
 var qualifiedNameRegexp = regexp.MustCompile("^" + qualifiedNameFmt + "$")
@@ -51,8 +52,8 @@ func IsQualifiedName(value string) []string {
 			errs = append(errs, prefixEach(msgs, "prefix part ")...)
 		}
 	default:
-		return append(errs, RegexError(qualifiedNameFmt, "MyName", "my.name", "123-abc")+
-			" with an optional DNS subdomain prefix and '/' (e.g. 'example.com/MyName'")
+		return append(errs, "a qualified name "+RegexError(qualifiedNameErrMsg, qualifiedNameFmt, "MyName", "my.name", "123-abc")+
+			" with an optional DNS subdomain prefix and '/' (e.g. 'example.com/MyName')")
 	}
 
 	if len(name) == 0 {
@@ -61,12 +62,13 @@ func IsQualifiedName(value string) []string {
 		errs = append(errs, "name part "+MaxLenError(qualifiedNameMaxLength))
 	}
 	if !qualifiedNameRegexp.MatchString(name) {
-		errs = append(errs, "name part "+RegexError(qualifiedNameFmt, "MyName", "my.name", "123-abc"))
+		errs = append(errs, "name part "+RegexError(qualifiedNameErrMsg, qualifiedNameFmt, "MyName", "my.name", "123-abc"))
 	}
 	return errs
 }
 
 const labelValueFmt string = "(" + qualifiedNameFmt + ")?"
+const labelValueErrMsg string = "a valid label must be an empty string or consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character"
 const LabelValueMaxLength int = 63
 
 var labelValueRegexp = regexp.MustCompile("^" + labelValueFmt + "$")
@@ -80,12 +82,13 @@ func IsValidLabelValue(value string) []string {
 		errs = append(errs, MaxLenError(LabelValueMaxLength))
 	}
 	if !labelValueRegexp.MatchString(value) {
-		errs = append(errs, RegexError(labelValueFmt, "MyValue", "my_value", "12345"))
+		errs = append(errs, RegexError(labelValueErrMsg, labelValueFmt, "MyValue", "my_value", "12345"))
 	}
 	return errs
 }
 
 const dns1123LabelFmt string = "[a-z0-9]([-a-z0-9]*[a-z0-9])?"
+const dns1123LabelErrMsg string = "a valid DNS (RFC 1123) label must consist of lower case alphanumeric characters or '-', and must start and end with an alphanumeric character"
 const DNS1123LabelMaxLength int = 63
 
 var dns1123LabelRegexp = regexp.MustCompile("^" + dns1123LabelFmt + "$")
@@ -98,12 +101,13 @@ func IsDNS1123Label(value string) []string {
 		errs = append(errs, MaxLenError(DNS1123LabelMaxLength))
 	}
 	if !dns1123LabelRegexp.MatchString(value) {
-		errs = append(errs, RegexError(dns1123LabelFmt, "my-name", "123-abc"))
+		errs = append(errs, RegexError(dns1123LabelErrMsg, dns1123LabelFmt, "my-name", "123-abc"))
 	}
 	return errs
 }
 
 const dns1123SubdomainFmt string = dns1123LabelFmt + "(\\." + dns1123LabelFmt + ")*"
+const dns1123SubdomainErrorMsg string = "a valid DNS (RFC 1123) subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character"
 const DNS1123SubdomainMaxLength int = 253
 
 var dns1123SubdomainRegexp = regexp.MustCompile("^" + dns1123SubdomainFmt + "$")
@@ -116,12 +120,13 @@ func IsDNS1123Subdomain(value string) []string {
 		errs = append(errs, MaxLenError(DNS1123SubdomainMaxLength))
 	}
 	if !dns1123SubdomainRegexp.MatchString(value) {
-		errs = append(errs, RegexError(dns1123SubdomainFmt, "example.com"))
+		errs = append(errs, RegexError(dns1123SubdomainErrorMsg, dns1123SubdomainFmt, "example.com"))
 	}
 	return errs
 }
 
 const dns1035LabelFmt string = "[a-z]([-a-z0-9]*[a-z0-9])?"
+const dns1035LabelErrMsg string = "a valid DNS (RFC 1035) label must consist of lower case alphanumeric characters or '-', and must start and end with an alphanumeric character"
 const DNS1035LabelMaxLength int = 63
 
 var dns1035LabelRegexp = regexp.MustCompile("^" + dns1035LabelFmt + "$")
@@ -134,7 +139,7 @@ func IsDNS1035Label(value string) []string {
 		errs = append(errs, MaxLenError(DNS1035LabelMaxLength))
 	}
 	if !dns1035LabelRegexp.MatchString(value) {
-		errs = append(errs, RegexError(dns1035LabelFmt, "my-name", "abc-123"))
+		errs = append(errs, RegexError(dns1035LabelErrMsg, dns1035LabelFmt, "my-name", "abc-123"))
 	}
 	return errs
 }
@@ -144,6 +149,7 @@ func IsDNS1035Label(value string) []string {
 // - valid: *.bar.com, *.foo.bar.com
 // - invalid: *.*.bar.com, *.foo.*.com, *bar.com, f*.bar.com, *
 const wildcardDNS1123SubdomainFmt = "\\*\\." + dns1123SubdomainFmt
+const wildcardDNS1123SubdomainErrMsg = "a valid wildcard DNS (RFC 1123) subdomain must start with '*.', followed by a valid DNS subdomain, which must consist of lower case alphanumeric characters, '-' or '.' and end with an alphanumeric character"
 
 // IsWildcardDNS1123Subdomain tests for a string that conforms to the definition of a
 // wildcard subdomain in DNS (RFC 1034 section 4.3.3).
@@ -155,12 +161,13 @@ func IsWildcardDNS1123Subdomain(value string) []string {
 		errs = append(errs, MaxLenError(DNS1123SubdomainMaxLength))
 	}
 	if !wildcardDNS1123SubdomainRegexp.MatchString(value) {
-		errs = append(errs, RegexError(wildcardDNS1123SubdomainFmt, "*.example.com"))
+		errs = append(errs, RegexError(wildcardDNS1123SubdomainErrMsg, wildcardDNS1123SubdomainFmt, "*.example.com"))
 	}
 	return errs
 }
 
 const cIdentifierFmt string = "[A-Za-z_][A-Za-z0-9_]*"
+const identifierErrMsg string = "a valid C identifier must start with alphabetic character or '_', followed by a string of alphanumeric characters or '_'"
 
 var cIdentifierRegexp = regexp.MustCompile("^" + cIdentifierFmt + "$")
 
@@ -168,7 +175,7 @@ var cIdentifierRegexp = regexp.MustCompile("^" + cIdentifierFmt + "$")
 // in C. This checks the format, but not the length.
 func IsCIdentifier(value string) []string {
 	if !cIdentifierRegexp.MatchString(value) {
-		return []string{RegexError(cIdentifierFmt, "my_name", "MY_NAME", "MyName")}
+		return []string{RegexError(identifierErrMsg, cIdentifierFmt, "my_name", "MY_NAME", "MyName")}
 	}
 	return nil
 }
@@ -245,17 +252,19 @@ func IsValidIP(value string) []string {
 }
 
 const percentFmt string = "[0-9]+%"
+const percentErrMsg string = "a valid percent string must be a numeric string followed by an ending '%'"
 
 var percentRegexp = regexp.MustCompile("^" + percentFmt + "$")
 
 func IsValidPercent(percent string) []string {
 	if !percentRegexp.MatchString(percent) {
-		return []string{RegexError(percentFmt, "1%", "93%")}
+		return []string{RegexError(percentErrMsg, percentFmt, "1%", "93%")}
 	}
 	return nil
 }
 
 const httpHeaderNameFmt string = "[-A-Za-z0-9]+"
+const httpHeaderNameErrMsg string = "a valid HTTP header must consist of alphanumeric characters or '-'"
 
 var httpHeaderNameRegexp = regexp.MustCompile("^" + httpHeaderNameFmt + "$")
 
@@ -263,12 +272,13 @@ var httpHeaderNameRegexp = regexp.MustCompile("^" + httpHeaderNameFmt + "$")
 // definition of a valid header field name (a stricter subset than RFC7230).
 func IsHTTPHeaderName(value string) []string {
 	if !httpHeaderNameRegexp.MatchString(value) {
-		return []string{RegexError(httpHeaderNameFmt, "X-Header-Name")}
+		return []string{RegexError(httpHeaderNameErrMsg, httpHeaderNameFmt, "X-Header-Name")}
 	}
 	return nil
 }
 
 const configMapKeyFmt = `[-._a-zA-Z0-9]+`
+const configMapKeyErrMsg string = "a valid config key must consist of alphanumeric characters, '-', '_' or '.'"
 
 var configMapKeyRegexp = regexp.MustCompile("^" + configMapKeyFmt + "$")
 
@@ -279,7 +289,7 @@ func IsConfigMapKey(value string) []string {
 		errs = append(errs, MaxLenError(DNS1123SubdomainMaxLength))
 	}
 	if !configMapKeyRegexp.MatchString(value) {
-		errs = append(errs, RegexError(configMapKeyFmt, "key.name", "KEY_NAME", "key-name"))
+		errs = append(errs, RegexError(configMapKeyErrMsg, configMapKeyFmt, "key.name", "KEY_NAME", "key-name"))
 	}
 	if value == "." {
 		errs = append(errs, `must not be '.'`)
@@ -298,19 +308,19 @@ func MaxLenError(length int) string {
 }
 
 // RegexError returns a string explanation of a regex validation failure.
-func RegexError(fmt string, examples ...string) string {
-	s := "must match the regex " + fmt
+func RegexError(msg string, fmt string, examples ...string) string {
 	if len(examples) == 0 {
-		return s
+		return msg + " (regex used for validation is '" + fmt + "')"
 	}
-	s += " (e.g. "
+	msg += " (e.g. "
 	for i := range examples {
 		if i > 0 {
-			s += " or "
+			msg += " or "
 		}
-		s += "'" + examples[i] + "'"
+		msg += "'" + examples[i] + "', "
 	}
-	return s + ")"
+	msg += "regex used for validation is '" + fmt + "')"
+	return msg
 }
 
 // EmptyError returns a string explanation of a "must not be empty" validation

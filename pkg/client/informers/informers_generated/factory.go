@@ -22,6 +22,7 @@ import (
 	cache "k8s.io/kubernetes/pkg/client/cache"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	internalclientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	apis "k8s.io/kubernetes/pkg/client/informers/informers_generated/apis"
 	apps "k8s.io/kubernetes/pkg/client/informers/informers_generated/apps"
 	autoscaling "k8s.io/kubernetes/pkg/client/informers/informers_generated/autoscaling"
 	batch "k8s.io/kubernetes/pkg/client/informers/informers_generated/batch"
@@ -29,6 +30,7 @@ import (
 	core "k8s.io/kubernetes/pkg/client/informers/informers_generated/core"
 	extensions "k8s.io/kubernetes/pkg/client/informers/informers_generated/extensions"
 	internalinterfaces "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalinterfaces"
+	pkg "k8s.io/kubernetes/pkg/client/informers/informers_generated/pkg"
 	policy "k8s.io/kubernetes/pkg/client/informers/informers_generated/policy"
 	rbac "k8s.io/kubernetes/pkg/client/informers/informers_generated/rbac"
 	storage "k8s.io/kubernetes/pkg/client/informers/informers_generated/storage"
@@ -113,15 +115,21 @@ func (f *sharedInformerFactory) VersionedInformerFor(obj runtime.Object, newFunc
 type SharedInformerFactory interface {
 	internalinterfaces.SharedInformerFactory
 
+	Apis() apis.Interface
 	Apps() apps.Interface
 	Autoscaling() autoscaling.Interface
 	Batch() batch.Interface
 	Certificates() certificates.Interface
 	Core() core.Interface
 	Extensions() extensions.Interface
+	Pkg() pkg.Interface
 	Policy() policy.Interface
 	Rbac() rbac.Interface
 	Storage() storage.Interface
+}
+
+func (f *sharedInformerFactory) Apis() apis.Interface {
+	return apis.New(f)
 }
 
 func (f *sharedInformerFactory) Apps() apps.Interface {
@@ -146,6 +154,10 @@ func (f *sharedInformerFactory) Core() core.Interface {
 
 func (f *sharedInformerFactory) Extensions() extensions.Interface {
 	return extensions.New(f)
+}
+
+func (f *sharedInformerFactory) Pkg() pkg.Interface {
+	return pkg.New(f)
 }
 
 func (f *sharedInformerFactory) Policy() policy.Interface {

@@ -30,6 +30,7 @@ go_test(
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/apis/autoscaling:go_default_library",
+        "//pkg/apis/meta/v1:go_default_library",
         "//pkg/controller/podautoscaler:go_default_library",
     ],
 )

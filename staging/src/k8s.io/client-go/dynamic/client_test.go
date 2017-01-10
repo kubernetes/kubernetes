@@ -33,8 +33,8 @@ import (
 	"k8s.io/client-go/pkg/runtime/schema"
 	"k8s.io/client-go/pkg/runtime/serializer/streaming"
 	"k8s.io/client-go/pkg/watch"
-	"k8s.io/client-go/pkg/watch/versioned"
 	"k8s.io/client-go/rest"
+	restclientwatch "k8s.io/client-go/rest/watch"
 )
 
 func getJSON(version, kind, name string) []byte {
@@ -459,7 +459,7 @@ func TestWatch(t *testing.T) {
 				t.Errorf("Watch(%q) got path %s. wanted %s", tc.name, r.URL.Path, tc.path)
 			}
 
-			enc := versioned.NewEncoder(streaming.NewEncoder(w, dynamicCodec{}), dynamicCodec{})
+			enc := restclientwatch.NewEncoder(streaming.NewEncoder(w, dynamicCodec{}), dynamicCodec{})
 			for _, e := range tc.events {
 				enc.Encode(&e)
 			}

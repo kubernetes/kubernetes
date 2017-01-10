@@ -20,6 +20,9 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/emicklei/go-restful/swagger"
+	"github.com/stretchr/testify/assert"
+
 	"k8s.io/client-go/pkg/api/errors"
 	"k8s.io/client-go/pkg/apimachinery/registered"
 	metav1 "k8s.io/client-go/pkg/apis/meta/v1"
@@ -27,9 +30,6 @@ import (
 	"k8s.io/client-go/pkg/version"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
-
-	"github.com/emicklei/go-restful/swagger"
-	"github.com/stretchr/testify/assert"
 )
 
 func TestRESTMapper(t *testing.T) {

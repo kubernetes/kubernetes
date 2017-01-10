@@ -16,10 +16,7 @@ limitations under the License.
 
 package authorization
 
-import (
-	"k8s.io/client-go/pkg/api"
-	metav1 "k8s.io/client-go/pkg/apis/meta/v1"
-)
+import metav1 "k8s.io/client-go/pkg/apis/meta/v1"
 
 // +genclient=true
 // +nonNamespaced=true
@@ -29,7 +26,7 @@ import (
 // spec.namespace means "in all namespaces".
 type SubjectAccessReview struct {
 	metav1.TypeMeta
-	api.ObjectMeta
+	metav1.ObjectMeta
 
 	// Spec holds information about the request being evaluated
 	Spec SubjectAccessReviewSpec
@@ -47,7 +44,7 @@ type SubjectAccessReview struct {
 // to check whether they can perform an action
 type SelfSubjectAccessReview struct {
 	metav1.TypeMeta
-	api.ObjectMeta
+	metav1.ObjectMeta
 
 	// Spec holds information about the request being evaluated.
 	Spec SelfSubjectAccessReviewSpec
@@ -64,7 +61,7 @@ type SelfSubjectAccessReview struct {
 // checking.
 type LocalSubjectAccessReview struct {
 	metav1.TypeMeta
-	api.ObjectMeta
+	metav1.ObjectMeta
 
 	// Spec holds information about the request being evaluated.  spec.namespace must be equal to the namespace
 	// you made the request against.  If empty, it is defaulted.

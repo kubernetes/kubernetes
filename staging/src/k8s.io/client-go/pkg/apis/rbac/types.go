@@ -17,7 +17,6 @@ limitations under the License.
 package rbac
 
 import (
-	"k8s.io/client-go/pkg/api"
 	metav1 "k8s.io/client-go/pkg/apis/meta/v1"
 	"k8s.io/client-go/pkg/runtime"
 )
@@ -36,8 +35,6 @@ const (
 	GroupKind          = "Group"
 	ServiceAccountKind = "ServiceAccount"
 	UserKind           = "User"
-
-	UserAll = "*"
 )
 
 // PolicyRule holds information that describes a policy rule, but does not contain information
@@ -96,7 +93,7 @@ type RoleRef struct {
 type Role struct {
 	metav1.TypeMeta
 	// Standard object's metadata.
-	api.ObjectMeta
+	metav1.ObjectMeta
 
 	// Rules holds all the PolicyRules for this Role
 	Rules []PolicyRule
@@ -109,7 +106,7 @@ type Role struct {
 // namespace only have effect in that namespace.
 type RoleBinding struct {
 	metav1.TypeMeta
-	api.ObjectMeta
+	metav1.ObjectMeta
 
 	// Subjects holds references to the objects the role applies to.
 	Subjects []Subject
@@ -146,7 +143,7 @@ type RoleList struct {
 type ClusterRole struct {
 	metav1.TypeMeta
 	// Standard object's metadata.
-	api.ObjectMeta
+	metav1.ObjectMeta
 
 	// Rules holds all the PolicyRules for this ClusterRole
 	Rules []PolicyRule
@@ -160,7 +157,7 @@ type ClusterRole struct {
 type ClusterRoleBinding struct {
 	metav1.TypeMeta
 	// Standard object's metadata.
-	api.ObjectMeta
+	metav1.ObjectMeta
 
 	// Subjects holds references to the objects the role applies to.
 	Subjects []Subject

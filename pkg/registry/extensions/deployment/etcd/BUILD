@@ -13,7 +13,6 @@ go_library(
     srcs = ["etcd.go"],
     tags = ["automanaged"],
     deps = [
-        "//pkg/api:go_default_library",
         "//pkg/api/errors:go_default_library",
         "//pkg/api/errors/storage:go_default_library",
         "//pkg/api/rest:go_default_library",

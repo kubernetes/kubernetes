@@ -14,6 +14,7 @@ go_library(
     deps = [
         "//cmd/cloud-controller-manager/app/options:go_default_library",
         "//pkg/api/v1:go_default_library",
+        "//pkg/apis/meta/v1:go_default_library",
         "//pkg/client/clientset_generated/clientset:go_default_library",
         "//pkg/client/clientset_generated/clientset/typed/core/v1:go_default_library",
         "//pkg/client/leaderelection:go_default_library",

@@ -35,6 +35,7 @@ go_test(
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/v1:go_default_library",
+        "//pkg/apis/meta/v1:go_default_library",
         "//pkg/client/cache:go_default_library",
         "//pkg/runtime:go_default_library",
         "//pkg/watch:go_default_library",
@@ -47,6 +48,7 @@ go_test(
     tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
+        "//pkg/apis/meta/v1:go_default_library",
         "//pkg/proxy/config:go_default_library",
         "//pkg/util/wait:go_default_library",
     ],

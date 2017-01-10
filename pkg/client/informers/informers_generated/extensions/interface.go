@@ -19,15 +19,12 @@ limitations under the License.
 package extensions
 
 import (
-	internalversion "k8s.io/kubernetes/pkg/client/informers/informers_generated/extensions/internalversion"
 	v1beta1 "k8s.io/kubernetes/pkg/client/informers/informers_generated/extensions/v1beta1"
 	internalinterfaces "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalinterfaces"
 )
 
 // Interface provides access to each of this group's versions.
 type Interface interface {
-	// InternalVersion provides access to shared informers for resources in InternalVersion.
-	InternalVersion() internalversion.Interface
 	// V1beta1 provides access to shared informers for resources in V1beta1.
 	V1beta1() v1beta1.Interface
 }
@@ -39,11 +36,6 @@ type group struct {
 // New returns a new Interface.
 func New(f internalinterfaces.SharedInformerFactory) Interface {
 	return &group{f}
-}
-
-// InternalVersion returns a new internalversion.Interface.
-func (g *group) InternalVersion() internalversion.Interface {
-	return internalversion.New(g.SharedInformerFactory)
 }
 
 // V1beta1 returns a new v1beta1.Interface.

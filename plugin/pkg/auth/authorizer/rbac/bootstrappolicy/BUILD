@@ -16,7 +16,7 @@ go_library(
     ],
     tags = ["automanaged"],
     deps = [
-        "//pkg/api:go_default_library",
+        "//pkg/apis/meta/v1:go_default_library",
         "//pkg/apis/rbac:go_default_library",
         "//vendor:github.com/golang/glog",
         "//vendor:k8s.io/apiserver/pkg/authentication/user",

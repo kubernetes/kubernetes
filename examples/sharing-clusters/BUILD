@@ -21,6 +21,7 @@ go_library(
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/apimachinery/registered:go_default_library",
+        "//pkg/apis/meta/v1:go_default_library",
         "//pkg/runtime:go_default_library",
     ],
 )

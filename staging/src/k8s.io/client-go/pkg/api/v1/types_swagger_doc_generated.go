@@ -180,6 +180,14 @@ func (ConfigMap) SwaggerDoc() map[string]string {
 	return map_ConfigMap
 }
 
+var map_ConfigMapEnvSource = map[string]string{
+	"": "ConfigMapEnvSource selects a ConfigMap to populate the environment variables with.\n\nThe contents of the target ConfigMap's Data field will represent the key-value pairs as environment variables.",
+}
+
+func (ConfigMapEnvSource) SwaggerDoc() map[string]string {
+	return map_ConfigMapEnvSource
+}
+
 var map_ConfigMapKeySelector = map[string]string{
 	"":    "Selects a key from a ConfigMap.",
 	"key": "The key to select.",
@@ -217,6 +225,7 @@ var map_Container = map[string]string{
 	"args":                   "Arguments to the entrypoint. The docker image's CMD is used if this is not provided. Variable references $(VAR_NAME) are expanded using the container's environment. If a variable cannot be resolved, the reference in the input string will be unchanged. The $(VAR_NAME) syntax can be escaped with a double $$, ie: $$(VAR_NAME). Escaped references will never be expanded, regardless of whether the variable exists or not. Cannot be updated. More info: http://kubernetes.io/docs/user-guide/containers#containers-and-commands",
 	"workingDir":             "Container's working directory. If not specified, the container runtime's default will be used, which might be configured in the container image. Cannot be updated.",
 	"ports":                  "List of ports to expose from the container. Exposing a port here gives the system additional information about the network connections a container uses, but is primarily informational. Not specifying a port here DOES NOT prevent that port from being exposed. Any port which is listening on the default \"0.0.0.0\" address inside a container will be accessible from the network. Cannot be updated.",
+	"envFrom":                "List of sources to populate environment variables in the container. The keys defined within a source must be a C_IDENTIFIER. An invalid key will prevent the container from starting. When a key exists in multiple sources, the value associated with the last source will take precedence. Values defined by an Env with a duplicate key will take precedence. Cannot be updated.",
 	"env":                    "List of environment variables to set in the container. Cannot be updated.",
 	"resources":              "Compute Resources required by this container. Cannot be updated. More info: http://kubernetes.io/docs/user-guide/persistent-volumes#resources",
 	"volumeMounts":           "Pod volumes to mount into the container's filesystem. Cannot be updated.",
@@ -422,6 +431,16 @@ var map_EndpointsList = map[string]string{
 
 func (EndpointsList) SwaggerDoc() map[string]string {
 	return map_EndpointsList
+}
+
+var map_EnvFromSource = map[string]string{
+	"":             "EnvFromSource represents the source of a set of ConfigMaps",
+	"prefix":       "An optional identifer to prepend to each key in the ConfigMap. Must be a C_IDENTIFIER.",
+	"configMapRef": "The ConfigMap to select from",
+}
+
+func (EnvFromSource) SwaggerDoc() map[string]string {
+	return map_EnvFromSource
 }
 
 var map_EnvVar = map[string]string{

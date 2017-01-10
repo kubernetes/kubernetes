@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"strings"
 
-	"k8s.io/client-go/pkg/api"
+	metav1 "k8s.io/client-go/pkg/apis/meta/v1"
 	"k8s.io/client-go/pkg/runtime/schema"
 	"k8s.io/client-go/pkg/util/sets"
 )
@@ -208,7 +208,7 @@ type ClusterRoleBindingBuilder struct {
 func NewClusterBinding(clusterRoleName string) *ClusterRoleBindingBuilder {
 	return &ClusterRoleBindingBuilder{
 		ClusterRoleBinding: ClusterRoleBinding{
-			ObjectMeta: api.ObjectMeta{Name: clusterRoleName},
+			ObjectMeta: metav1.ObjectMeta{Name: clusterRoleName},
 			RoleRef: RoleRef{
 				APIGroup: GroupName,
 				Kind:     "ClusterRole",

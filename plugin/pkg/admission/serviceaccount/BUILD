@@ -43,6 +43,7 @@ go_test(
         "//pkg/admission:go_default_library",
         "//pkg/api:go_default_library",
         "//pkg/api/errors:go_default_library",
+        "//pkg/apis/meta/v1:go_default_library",
         "//pkg/client/clientset_generated/internalclientset/fake:go_default_library",
         "//pkg/kubelet/types:go_default_library",
         "//pkg/types:go_default_library",

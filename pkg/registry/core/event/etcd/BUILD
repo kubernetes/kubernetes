@@ -28,6 +28,7 @@ go_test(
     tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
+        "//pkg/apis/meta/v1:go_default_library",
         "//pkg/registry/generic:go_default_library",
         "//pkg/registry/registrytest:go_default_library",
         "//pkg/runtime:go_default_library",

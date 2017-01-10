@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"k8s.io/client-go/pkg/api/v1"
+	metav1 "k8s.io/client-go/pkg/apis/meta/v1"
 	"k8s.io/client-go/pkg/runtime"
 	"k8s.io/client-go/pkg/watch"
 )
@@ -38,7 +39,7 @@ func TestMutationDetector(t *testing.T) {
 		},
 	}
 	pod := &v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:   "anything",
 			Labels: map[string]string{"check": "foo"},
 		},

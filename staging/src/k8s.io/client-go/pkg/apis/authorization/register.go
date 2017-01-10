@@ -17,6 +17,8 @@ limitations under the License.
 package authorization
 
 import (
+	"k8s.io/client-go/pkg/api"
+	metav1 "k8s.io/client-go/pkg/apis/meta/v1"
 	"k8s.io/client-go/pkg/runtime"
 	"k8s.io/client-go/pkg/runtime/schema"
 )
@@ -44,6 +46,11 @@ var (
 
 func addKnownTypes(scheme *runtime.Scheme) error {
 	scheme.AddKnownTypes(SchemeGroupVersion,
+		&api.ListOptions{},
+		&api.DeleteOptions{},
+		&metav1.ExportOptions{},
+		&metav1.GetOptions{},
+
 		&SelfSubjectAccessReview{},
 		&SubjectAccessReview{},
 		&LocalSubjectAccessReview{},

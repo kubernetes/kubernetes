@@ -58,7 +58,7 @@ func (e *StatusError) Error() string {
 }
 
 // Status allows access to e's status without having to know the detailed workings
-// of StatusError. Used by pkg/apiserver.
+// of StatusError.
 func (e *StatusError) Status() metav1.Status {
 	return e.ErrStatus
 }
