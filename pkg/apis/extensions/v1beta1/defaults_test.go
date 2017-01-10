@@ -28,6 +28,7 @@ import (
 	. "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/intstr"
 )
 
@@ -138,8 +139,7 @@ func TestSetDefaultDaemonSet(t *testing.T) {
 		obj2 := roundTrip(t, runtime.Object(original))
 		got, ok := obj2.(*DaemonSet)
 		if !ok {
-			t.Errorf("(%d) unexpected object: %v", i, got)
-			t.FailNow()
+			t.Fatalf("(%d) unexpected object: %v", i, obj2)
 		}
 		if !reflect.DeepEqual(got.Spec, expected.Spec) {
 			t.Errorf("(%d) got different than expected\ngot:\n\t%+v\nexpected:\n\t%+v", i, got.Spec, expected.Spec)
@@ -168,7 +168,7 @@ func TestSetDefaultDeployment(t *testing.T) {
 			original: &Deployment{},
 			expected: &Deployment{
 				Spec: DeploymentSpec{
-					Replicas: newInt32(1),
+					Replicas: util.Int32Ptr(1),
 					Strategy: DeploymentStrategy{
 						Type: RollingUpdateDeploymentStrategyType,
 						RollingUpdate: &RollingUpdateDeployment{
@@ -183,7 +183,7 @@ func TestSetDefaultDeployment(t *testing.T) {
 		{
 			original: &Deployment{
 				Spec: DeploymentSpec{
-					Replicas: newInt32(5),
+					Replicas: util.Int32Ptr(5),
 					Strategy: DeploymentStrategy{
 						RollingUpdate: &RollingUpdateDeployment{
 							MaxSurge: &differentIntOrString,
@@ -193,7 +193,7 @@ func TestSetDefaultDeployment(t *testing.T) {
 			},
 			expected: &Deployment{
 				Spec: DeploymentSpec{
-					Replicas: newInt32(5),
+					Replicas: util.Int32Ptr(5),
 					Strategy: DeploymentStrategy{
 						Type: RollingUpdateDeploymentStrategyType,
 						RollingUpdate: &RollingUpdateDeployment{
@@ -208,7 +208,7 @@ func TestSetDefaultDeployment(t *testing.T) {
 		{
 			original: &Deployment{
 				Spec: DeploymentSpec{
-					Replicas: newInt32(3),
+					Replicas: util.Int32Ptr(3),
 					Strategy: DeploymentStrategy{
 						Type:          RollingUpdateDeploymentStrategyType,
 						RollingUpdate: nil,
@@ -217,7 +217,7 @@ func TestSetDefaultDeployment(t *testing.T) {
 			},
 			expected: &Deployment{
 				Spec: DeploymentSpec{
-					Replicas: newInt32(3),
+					Replicas: util.Int32Ptr(3),
 					Strategy: DeploymentStrategy{
 						Type: RollingUpdateDeploymentStrategyType,
 						RollingUpdate: &RollingUpdateDeployment{
@@ -232,7 +232,7 @@ func TestSetDefaultDeployment(t *testing.T) {
 		{
 			original: &Deployment{
 				Spec: DeploymentSpec{
-					Replicas: newInt32(5),
+					Replicas: util.Int32Ptr(5),
 					Strategy: DeploymentStrategy{
 						Type: RecreateDeploymentStrategyType,
 					},
@@ -240,7 +240,7 @@ func TestSetDefaultDeployment(t *testing.T) {
 			},
 			expected: &Deployment{
 				Spec: DeploymentSpec{
-					Replicas: newInt32(5),
+					Replicas: util.Int32Ptr(5),
 					Strategy: DeploymentStrategy{
 						Type: RecreateDeploymentStrategyType,
 					},
@@ -251,21 +251,21 @@ func TestSetDefaultDeployment(t *testing.T) {
 		{
 			original: &Deployment{
 				Spec: DeploymentSpec{
-					Replicas: newInt32(5),
+					Replicas: util.Int32Ptr(5),
 					Strategy: DeploymentStrategy{
 						Type: RecreateDeploymentStrategyType,
 					},
-					ProgressDeadlineSeconds: newInt32(30),
+					ProgressDeadlineSeconds: util.Int32Ptr(30),
 				},
 			},
 			expected: &Deployment{
 				Spec: DeploymentSpec{
-					Replicas: newInt32(5),
+					Replicas: util.Int32Ptr(5),
 					Strategy: DeploymentStrategy{
 						Type: RecreateDeploymentStrategyType,
 					},
 					Template:                defaultTemplate,
-					ProgressDeadlineSeconds: newInt32(30),
+					ProgressDeadlineSeconds: util.Int32Ptr(30),
 				},
 			},
 		},
@@ -277,8 +277,7 @@ func TestSetDefaultDeployment(t *testing.T) {
 		obj2 := roundTrip(t, runtime.Object(original))
 		got, ok := obj2.(*Deployment)
 		if !ok {
-			t.Errorf("unexpected object: %v", got)
-			t.FailNow()
+			t.Fatalf("unexpected object: %v", obj2)
 		}
 		if !reflect.DeepEqual(got.Spec, expected.Spec) {
 			t.Errorf("object mismatch!\nexpected:\n\t%+v\ngot:\n\t%+v", got.Spec, expected.Spec)
@@ -379,8 +378,7 @@ func TestSetDefaultReplicaSet(t *testing.T) {
 		obj2 := roundTrip(t, runtime.Object(rs))
 		rs2, ok := obj2.(*ReplicaSet)
 		if !ok {
-			t.Errorf("unexpected object: %v", rs2)
-			t.FailNow()
+			t.Fatalf("unexpected object: %v", obj2)
 		}
 		if test.expectSelector != reflect.DeepEqual(rs2.Spec.Selector.MatchLabels, rs2.Spec.Template.Labels) {
 			if test.expectSelector {
@@ -421,7 +419,7 @@ func TestSetDefaultReplicaSetReplicas(t *testing.T) {
 		{
 			rs: ReplicaSet{
 				Spec: ReplicaSetSpec{
-					Replicas: newInt32(0),
+					Replicas: util.Int32Ptr(0),
 					Template: v1.PodTemplateSpec{
 						ObjectMeta: v1.ObjectMeta{
 							Labels: map[string]string{
@@ -436,7 +434,7 @@ func TestSetDefaultReplicaSetReplicas(t *testing.T) {
 		{
 			rs: ReplicaSet{
 				Spec: ReplicaSetSpec{
-					Replicas: newInt32(3),
+					Replicas: util.Int32Ptr(3),
 					Template: v1.PodTemplateSpec{
 						ObjectMeta: v1.ObjectMeta{
 							Labels: map[string]string{
@@ -455,8 +453,7 @@ func TestSetDefaultReplicaSetReplicas(t *testing.T) {
 		obj2 := roundTrip(t, runtime.Object(rs))
 		rs2, ok := obj2.(*ReplicaSet)
 		if !ok {
-			t.Errorf("unexpected object: %v", rs2)
-			t.FailNow()
+			t.Fatalf("unexpected object: %v", obj2)
 		}
 		if rs2.Spec.Replicas == nil {
 			t.Errorf("unexpected nil Replicas")
@@ -479,7 +476,7 @@ func TestDefaultRequestIsNotSetForReplicaSet(t *testing.T) {
 	}
 	rs := &ReplicaSet{
 		Spec: ReplicaSetSpec{
-			Replicas: newInt32(3),
+			Replicas: util.Int32Ptr(3),
 			Template: v1.PodTemplateSpec{
 				ObjectMeta: v1.ObjectMeta{
 					Labels: map[string]string{
@@ -511,7 +508,7 @@ func TestSetDefaultHorizontalPodAutoscalerMinReplicas(t *testing.T) {
 		{
 			hpa: HorizontalPodAutoscaler{
 				Spec: HorizontalPodAutoscalerSpec{
-					MinReplicas: newInt32(3),
+					MinReplicas: util.Int32Ptr(3),
 				},
 			},
 			expectReplicas: 3,
@@ -523,8 +520,7 @@ func TestSetDefaultHorizontalPodAutoscalerMinReplicas(t *testing.T) {
 		obj2 := roundTrip(t, runtime.Object(hpa))
 		hpa2, ok := obj2.(*HorizontalPodAutoscaler)
 		if !ok {
-			t.Errorf("unexpected object: %v", hpa2)
-			t.FailNow()
+			t.Fatalf("unexpected object: %v", obj2)
 		}
 		if hpa2.Spec.MinReplicas == nil {
 			t.Errorf("unexpected nil MinReplicas")
@@ -560,8 +556,7 @@ func TestSetDefaultHorizontalPodAutoscalerCpuUtilization(t *testing.T) {
 		obj2 := roundTrip(t, runtime.Object(hpa))
 		hpa2, ok := obj2.(*HorizontalPodAutoscaler)
 		if !ok {
-			t.Errorf("unexpected object: %v", hpa2)
-			t.FailNow()
+			t.Fatalf("unexpected object: %v", obj2)
 		}
 		if hpa2.Spec.CPUUtilization == nil {
 			t.Errorf("unexpected nil CPUUtilization")
@@ -589,22 +584,4 @@ func roundTrip(t *testing.T, obj runtime.Object) runtime.Object {
 		return nil
 	}
 	return obj3
-}
-
-func newInt32(val int32) *int32 {
-	p := new(int32)
-	*p = val
-	return p
-}
-
-func newString(val string) *string {
-	p := new(string)
-	*p = val
-	return p
-}
-
-func newBool(val bool) *bool {
-	b := new(bool)
-	*b = val
-	return b
 }
