@@ -25,9 +25,10 @@ import (
 
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/user"
+	authenticationclient "k8s.io/client-go/kubernetes/typed/authentication/v1beta1"
+
 	"k8s.io/kubernetes/pkg/auth/authenticator/bearertoken"
 	"k8s.io/kubernetes/pkg/auth/group"
-	authenticationclient "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/authentication/v1beta1"
 	"k8s.io/kubernetes/pkg/util/cert"
 	"k8s.io/kubernetes/plugin/pkg/auth/authenticator/request/anonymous"
 	"k8s.io/kubernetes/plugin/pkg/auth/authenticator/request/headerrequest"

@@ -23,10 +23,11 @@ import (
 
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
+	clientset "k8s.io/client-go/kubernetes"
+	authenticationclient "k8s.io/client-go/kubernetes/typed/authentication/v1beta1"
+	authorizationclient "k8s.io/client-go/kubernetes/typed/authorization/v1beta1"
+
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
-	authenticationclient "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/authentication/v1beta1"
-	authorizationclient "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/authorization/v1beta1"
 	apiserverauthenticator "k8s.io/kubernetes/pkg/genericapiserver/authenticator"
 	alwaysallowauthorizer "k8s.io/kubernetes/pkg/genericapiserver/authorizer"
 	apiserverauthorizer "k8s.io/kubernetes/pkg/genericapiserver/authorizer"
