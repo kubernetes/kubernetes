@@ -17,6 +17,8 @@ go_library(
         "//pkg/client/leaderelection:go_default_library",
         "//pkg/master/ports:go_default_library",
         "//pkg/util/config:go_default_library",
+        "//pkg/util/errors:go_default_library",
+        "//pkg/util/sets:go_default_library",
         "//vendor:github.com/spf13/pflag",
     ],
 )

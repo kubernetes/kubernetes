@@ -73,6 +73,11 @@ func DeepCopy_componentconfig_KubeControllerManagerConfiguration(in interface{},
 		in := in.(*KubeControllerManagerConfiguration)
 		out := out.(*KubeControllerManagerConfiguration)
 		*out = *in
+		if in.Controllers != nil {
+			in, out := &in.Controllers, &out.Controllers
+			*out = make([]string, len(*in))
+			copy(*out, *in)
+		}
 		return nil
 	}
 }
