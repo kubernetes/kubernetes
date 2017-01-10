@@ -16,6 +16,10 @@ limitations under the License.
 
 package metrics
 
+import (
+	"fmt"
+)
+
 // GetResourceUtilizationRatio takes in a set of metrics, a set of matching requests,
 // and a target utilization percentage, and calcuates the the ratio of
 // desired to actual utilization (returning that and the actual utilization)
@@ -32,6 +36,12 @@ func GetResourceUtilizationRatio(metrics PodResourceInfo, requests map[string]in
 
 		metricsTotal += metricValue
 		requestsTotal += request
+	}
+
+	// if the set of requests is completely disjoint from the set of metrics,
+	// then we could have an issue where the requests total is zero
+	if requestsTotal == 0 {
+		return 0, 0, fmt.Errorf("no metrics returned matched known pods")
 	}
 
 	currentUtilization := int32((metricsTotal * 100) / requestsTotal)
