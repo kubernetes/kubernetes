@@ -92,8 +92,8 @@ func init() {
 	addControllerRole(rbac.ClusterRole{
 		ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "deployment-controller"},
 		Rules: []rbac.PolicyRule{
-			rbac.NewRule("get", "list", "watch", "update").Groups(extensionsGroup).Resources("deployments").RuleOrDie(),
-			rbac.NewRule("update").Groups(extensionsGroup).Resources("deployments/status").RuleOrDie(),
+			rbac.NewRule("get", "list", "watch", "update").Groups(extensionsGroup, appsGroup).Resources("deployments").RuleOrDie(),
+			rbac.NewRule("update").Groups(extensionsGroup, appsGroup).Resources("deployments/status").RuleOrDie(),
 			rbac.NewRule("get", "list", "watch", "create", "update", "patch", "delete").Groups(extensionsGroup).Resources("replicasets").RuleOrDie(),
 			// TODO: remove "update" once
 			// https://github.com/kubernetes/kubernetes/issues/36897 is resolved.
@@ -104,7 +104,7 @@ func init() {
 	addControllerRole(rbac.ClusterRole{
 		ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "disruption-controller"},
 		Rules: []rbac.PolicyRule{
-			rbac.NewRule("get", "list", "watch").Groups(extensionsGroup).Resources("deployments").RuleOrDie(),
+			rbac.NewRule("get", "list", "watch").Groups(extensionsGroup, appsGroup).Resources("deployments").RuleOrDie(),
 			rbac.NewRule("get", "list", "watch").Groups(extensionsGroup).Resources("replicasets").RuleOrDie(),
 			rbac.NewRule("get", "list", "watch").Groups(legacyGroup).Resources("replicationcontrollers").RuleOrDie(),
 			rbac.NewRule("get", "list", "watch").Groups(policyGroup).Resources("poddisruptionbudgets").RuleOrDie(),
@@ -138,7 +138,7 @@ func init() {
 			rbac.NewRule("get", "update").Groups(legacyGroup).Resources("replicationcontrollers/scale").RuleOrDie(),
 			// TODO this should be removable when the HPA contoller is fixed
 			rbac.NewRule("get", "update").Groups(extensionsGroup).Resources("replicationcontrollers/scale").RuleOrDie(),
-			rbac.NewRule("get", "update").Groups(extensionsGroup).Resources("deployments/scale", "replicasets/scale").RuleOrDie(),
+			rbac.NewRule("get", "update").Groups(extensionsGroup, appsGroup).Resources("deployments/scale", "replicasets/scale").RuleOrDie(),
 			rbac.NewRule("list").Groups(legacyGroup).Resources("pods").RuleOrDie(),
 			// TODO: Remove the root /proxy permission in 1.7; MetricsClient no longer requires root proxy access as of 1.6 (fixed in https://github.com/kubernetes/kubernetes/pull/39636)
 			rbac.NewRule("proxy").Groups(legacyGroup).Resources("services").Names("https:heapster:", "http:heapster:").RuleOrDie(),

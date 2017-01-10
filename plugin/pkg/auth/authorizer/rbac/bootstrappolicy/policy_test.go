@@ -117,6 +117,12 @@ var viewEscalatingNamespaceResources = []rbac.PolicyRule{
 	rbac.NewRule(bootstrappolicy.Read...).Groups("").Resources("services/proxy").RuleOrDie(),
 }
 
+// ungettableResources is the list of rules that don't allow to view (GET) them
+// this is purposefully separate list to distinguish from escalating privs
+var ungettableResources = []rbac.PolicyRule{
+	rbac.NewRule(bootstrappolicy.Read...).Groups("apps", "extensions").Resources("deployments/rollback").RuleOrDie(),
+}
+
 func TestEditViewRelationship(t *testing.T) {
 	readVerbs := sets.NewString(bootstrappolicy.Read...)
 	semanticRoles := getSemanticRoles(bootstrappolicy.ClusterRoles())
@@ -141,6 +147,14 @@ func TestEditViewRelationship(t *testing.T) {
 		}
 	}
 	semanticRoles.view.Rules = append(semanticRoles.view.Rules, viewEscalatingNamespaceResources...)
+
+	// confirm that the view role doesn't have ungettable resources
+	for _, rule := range ungettableResources {
+		if covers, _ := rbacregistryvalidation.Covers(semanticRoles.view.Rules, []rbac.PolicyRule{rule}); covers {
+			t.Errorf("view has ungettable resource: %#v", rule)
+		}
+	}
+	semanticRoles.view.Rules = append(semanticRoles.view.Rules, ungettableResources...)
 
 	// at this point, we should have a two way covers relationship
 	if covers, miss := rbacregistryvalidation.Covers(semanticRoles.edit.Rules, semanticRoles.view.Rules); !covers {
