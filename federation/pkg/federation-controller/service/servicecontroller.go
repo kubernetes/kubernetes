@@ -490,20 +490,16 @@ func (s *ServiceController) processServiceForCluster(cachedService *cachedServic
 // should be retried.
 func (s *ServiceController) updateFederationService(key string, cachedService *cachedService) (error, bool) {
 	// Clone federation service, and create them in underlying k8s cluster
-	clone, err := api.Scheme.DeepCopy(cachedService.lastState)
-	if err != nil {
-		return err, !retryable
-	}
-	service, ok := clone.(*v1.Service)
-	if !ok {
-		return fmt.Errorf("Unexpected service cast error : %v\n", service), !retryable
+	desiredService := &v1.Service{
+		ObjectMeta: util.DeepCopyRelevantObjectMeta(cachedService.lastState.ObjectMeta),
+		Spec:       *(util.DeepCopyApiTypeOrPanic(&cachedService.lastState.Spec).(*v1.ServiceSpec)),
 	}
 
 	// handle available clusters one by one
 	var hasErr bool
 	for clusterName, cache := range s.clusterCache.clientMap {
 		go func(cache *clusterCache, clusterName string) {
-			err = s.processServiceForCluster(cachedService, clusterName, service, cache.clientset)
+			err := s.processServiceForCluster(cachedService, clusterName, desiredService, cache.clientset)
 			if err != nil {
 				hasErr = true
 			}
@@ -511,7 +507,7 @@ func (s *ServiceController) updateFederationService(key string, cachedService *c
 	}
 	if hasErr {
 		// detail error has been dumped inside the loop
-		return fmt.Errorf("Service %s/%s was not successfully updated to all clusters", service.Namespace, service.Name), retryable
+		return fmt.Errorf("Service %s/%s was not successfully updated to all clusters", desiredService.Namespace, desiredService.Name), retryable
 	}
 	return nil, !retryable
 }
