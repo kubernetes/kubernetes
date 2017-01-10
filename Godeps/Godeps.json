@@ -1,7 +1,7 @@
 {
 	"ImportPath": "k8s.io/kubernetes",
 	"GoVersion": "go1.7",
-	"GodepVersion": "v74",
+	"GodepVersion": "v75",
 	"Packages": [
 		"github.com/ugorji/go/codec/codecgen",
 		"github.com/onsi/ginkgo/ginkgo",
@@ -743,6 +743,26 @@
 		{
 			"ImportPath": "github.com/daviddengcn/go-colortext",
 			"Rev": "511bcaf42ccd42c38aba7427b6673277bf19e2a1"
+		},
+		{
+			"ImportPath": "github.com/denverdino/aliyungo/common",
+			"Rev": "df6c1f665b57ae1b12f4414b5e3784908c857533"
+		},
+		{
+			"ImportPath": "github.com/denverdino/aliyungo/ecs",
+			"Rev": "df6c1f665b57ae1b12f4414b5e3784908c857533"
+		},
+		{
+			"ImportPath": "github.com/denverdino/aliyungo/metadata",
+			"Rev": "df6c1f665b57ae1b12f4414b5e3784908c857533"
+		},
+		{
+			"ImportPath": "github.com/denverdino/aliyungo/slb",
+			"Rev": "df6c1f665b57ae1b12f4414b5e3784908c857533"
+		},
+		{
+			"ImportPath": "github.com/denverdino/aliyungo/util",
+			"Rev": "df6c1f665b57ae1b12f4414b5e3784908c857533"
 		},
 		{
 			"ImportPath": "github.com/dgrijalva/jwt-go",
