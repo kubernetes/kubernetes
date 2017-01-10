@@ -90,7 +90,7 @@ func ReaperFor(kind schema.GroupKind, c internalclientset.Interface) (Reaper, er
 	case apps.Kind("StatefulSet"):
 		return &StatefulSetReaper{c.Apps(), c.Core(), Interval, Timeout}, nil
 
-	case extensions.Kind("Deployment"):
+	case extensions.Kind("Deployment"), apps.Kind("Deployment"):
 		return &DeploymentReaper{c.Extensions(), c.Extensions(), Interval, Timeout}, nil
 
 	}
