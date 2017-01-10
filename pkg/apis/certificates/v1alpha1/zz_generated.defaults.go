@@ -28,5 +28,20 @@ import (
 // Public to allow building arbitrary schemes.
 // All generated defaulters are covering - they call all nested defaulters.
 func RegisterDefaults(scheme *runtime.Scheme) error {
+	scheme.AddTypeDefaultingFunc(&CertificateSigningRequest{}, func(obj interface{}) { SetObjectDefaults_CertificateSigningRequest(obj.(*CertificateSigningRequest)) })
+	scheme.AddTypeDefaultingFunc(&CertificateSigningRequestList{}, func(obj interface{}) {
+		SetObjectDefaults_CertificateSigningRequestList(obj.(*CertificateSigningRequestList))
+	})
 	return nil
+}
+
+func SetObjectDefaults_CertificateSigningRequest(in *CertificateSigningRequest) {
+	SetDefaults_CertificateSigningRequestSpec(&in.Spec)
+}
+
+func SetObjectDefaults_CertificateSigningRequestList(in *CertificateSigningRequestList) {
+	for i := range in.Items {
+		a := &in.Items[i]
+		SetObjectDefaults_CertificateSigningRequest(a)
+	}
 }
