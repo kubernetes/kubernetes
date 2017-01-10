@@ -53,15 +53,15 @@ import (
 	"reflect"
 	"time"
 
+	"github.com/golang/glog"
+	"github.com/spf13/pflag"
+
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	rl "k8s.io/kubernetes/pkg/client/leaderelection/resourcelock"
 	"k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/wait"
-
-	"github.com/golang/glog"
-	"github.com/spf13/pflag"
 )
 
 const (

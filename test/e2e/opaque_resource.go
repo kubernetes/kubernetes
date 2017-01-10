@@ -22,9 +22,13 @@ import (
 	"sync"
 	"time"
 
+	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
+
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/v1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -32,9 +36,6 @@ import (
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/watch"
 	"k8s.io/kubernetes/test/e2e/framework"
-
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
 )
 
 var _ = framework.KubeDescribe("Opaque resources [Feature:OpaqueResources]", func() {
@@ -139,7 +140,7 @@ var _ = framework.KubeDescribe("Opaque resources [Feature:OpaqueResources]", fun
 		image := framework.GetPauseImageName(f.ClientSet)
 		// This pod consumes 2 "foo" resources.
 		pod := &v1.Pod{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name: "mult-container-oir",
 			},
 			Spec: v1.PodSpec{
@@ -183,7 +184,7 @@ var _ = framework.KubeDescribe("Opaque resources [Feature:OpaqueResources]", fun
 		limits = v1.ResourceList{}
 		// This pod consumes 6 "foo" resources.
 		pod = &v1.Pod{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name: "mult-container-over-max-oir",
 			},
 			Spec: v1.PodSpec{

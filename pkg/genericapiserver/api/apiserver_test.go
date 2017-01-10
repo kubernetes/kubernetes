@@ -34,6 +34,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/emicklei/go-restful"
+
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
 	apierrs "k8s.io/kubernetes/pkg/api/errors"
@@ -56,8 +58,6 @@ import (
 	"k8s.io/kubernetes/pkg/watch"
 	"k8s.io/kubernetes/plugin/pkg/admission/admit"
 	"k8s.io/kubernetes/plugin/pkg/admission/deny"
-
-	"github.com/emicklei/go-restful"
 )
 
 // This creates fake API versions, similar to api/latest.go.
@@ -3238,10 +3238,10 @@ func TestUpdateChecksAPIVersion(t *testing.T) {
 // SimpleXGSubresource is a cross group subresource, i.e. the subresource does not belong to the
 // same group as its parent resource.
 type SimpleXGSubresource struct {
-	metav1.TypeMeta `json:",inline"`
-	api.ObjectMeta  `json:"metadata"`
-	SubresourceInfo string            `json:"subresourceInfo,omitempty"`
-	Labels          map[string]string `json:"labels,omitempty"`
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata"`
+	SubresourceInfo   string            `json:"subresourceInfo,omitempty"`
+	Labels            map[string]string `json:"labels,omitempty"`
 }
 
 func (obj *SimpleXGSubresource) GetObjectKind() schema.ObjectKind { return &obj.TypeMeta }

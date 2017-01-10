@@ -52,7 +52,7 @@ func TestReplicationControllerStop(t *testing.T) {
 				&api.ReplicationControllerList{ // LIST
 					Items: []api.ReplicationController{
 						{
-							ObjectMeta: api.ObjectMeta{
+							ObjectMeta: metav1.ObjectMeta{
 								Name:      name,
 								Namespace: ns,
 							},
@@ -72,7 +72,7 @@ func TestReplicationControllerStop(t *testing.T) {
 				&api.ReplicationControllerList{ // LIST
 					Items: []api.ReplicationController{
 						{
-							ObjectMeta: api.ObjectMeta{
+							ObjectMeta: metav1.ObjectMeta{
 								Name:      "baz",
 								Namespace: ns,
 							},
@@ -81,7 +81,7 @@ func TestReplicationControllerStop(t *testing.T) {
 								Selector: map[string]string{"k3": "v3"}},
 						},
 						{
-							ObjectMeta: api.ObjectMeta{
+							ObjectMeta: metav1.ObjectMeta{
 								Name:      name,
 								Namespace: ns,
 							},
@@ -102,7 +102,7 @@ func TestReplicationControllerStop(t *testing.T) {
 				&api.ReplicationControllerList{ // LIST
 					Items: []api.ReplicationController{
 						{
-							ObjectMeta: api.ObjectMeta{
+							ObjectMeta: metav1.ObjectMeta{
 								Name:      "baz",
 								Namespace: ns,
 							},
@@ -111,7 +111,7 @@ func TestReplicationControllerStop(t *testing.T) {
 								Selector: map[string]string{"k1": "v1", "k2": "v2"}},
 						},
 						{
-							ObjectMeta: api.ObjectMeta{
+							ObjectMeta: metav1.ObjectMeta{
 								Name:      name,
 								Namespace: ns,
 							},
@@ -133,7 +133,7 @@ func TestReplicationControllerStop(t *testing.T) {
 				&api.ReplicationControllerList{ // LIST
 					Items: []api.ReplicationController{
 						{
-							ObjectMeta: api.ObjectMeta{
+							ObjectMeta: metav1.ObjectMeta{
 								Name:      "baz",
 								Namespace: ns,
 							},
@@ -142,7 +142,7 @@ func TestReplicationControllerStop(t *testing.T) {
 								Selector: map[string]string{"k1": "v1", "k2": "v2", "k3": "v3"}},
 						},
 						{
-							ObjectMeta: api.ObjectMeta{
+							ObjectMeta: metav1.ObjectMeta{
 								Name:      "zaz",
 								Namespace: ns,
 							},
@@ -151,7 +151,7 @@ func TestReplicationControllerStop(t *testing.T) {
 								Selector: map[string]string{"k1": "v1"}},
 						},
 						{
-							ObjectMeta: api.ObjectMeta{
+							ObjectMeta: metav1.ObjectMeta{
 								Name:      name,
 								Namespace: ns,
 							},
@@ -174,7 +174,7 @@ func TestReplicationControllerStop(t *testing.T) {
 				&api.ReplicationControllerList{ // LIST
 					Items: []api.ReplicationController{
 						{
-							ObjectMeta: api.ObjectMeta{
+							ObjectMeta: metav1.ObjectMeta{
 								Name:      "zaz",
 								Namespace: ns,
 							},
@@ -183,7 +183,7 @@ func TestReplicationControllerStop(t *testing.T) {
 								Selector: map[string]string{"k1": "v1"}},
 						},
 						{
-							ObjectMeta: api.ObjectMeta{
+							ObjectMeta: metav1.ObjectMeta{
 								Name:      name,
 								Namespace: ns,
 							},
@@ -251,7 +251,7 @@ func TestReplicaSetStop(t *testing.T) {
 				&extensions.ReplicaSetList{ // LIST
 					Items: []extensions.ReplicaSet{
 						{
-							ObjectMeta: api.ObjectMeta{
+							ObjectMeta: metav1.ObjectMeta{
 								Name:      name,
 								Namespace: ns,
 							},
@@ -272,7 +272,7 @@ func TestReplicaSetStop(t *testing.T) {
 				&extensions.ReplicaSetList{ // LIST
 					Items: []extensions.ReplicaSet{
 						{
-							ObjectMeta: api.ObjectMeta{
+							ObjectMeta: metav1.ObjectMeta{
 								Name:      "baz",
 								Namespace: ns,
 							},
@@ -282,7 +282,7 @@ func TestReplicaSetStop(t *testing.T) {
 							},
 						},
 						{
-							ObjectMeta: api.ObjectMeta{
+							ObjectMeta: metav1.ObjectMeta{
 								Name:      name,
 								Namespace: ns,
 							},
@@ -342,7 +342,7 @@ func TestJobStop(t *testing.T) {
 				&batch.JobList{ // LIST
 					Items: []batch.Job{
 						{
-							ObjectMeta: api.ObjectMeta{
+							ObjectMeta: metav1.ObjectMeta{
 								Name:      name,
 								Namespace: ns,
 							},
@@ -366,7 +366,7 @@ func TestJobStop(t *testing.T) {
 				&batch.JobList{ // LIST
 					Items: []batch.Job{
 						{
-							ObjectMeta: api.ObjectMeta{
+							ObjectMeta: metav1.ObjectMeta{
 								Name:      name,
 								Namespace: ns,
 							},
@@ -382,7 +382,7 @@ func TestJobStop(t *testing.T) {
 				&api.PodList{ // LIST
 					Items: []api.Pod{
 						{
-							ObjectMeta: api.ObjectMeta{
+							ObjectMeta: metav1.ObjectMeta{
 								Name:      "pod1",
 								Namespace: ns,
 								Labels:    map[string]string{"k1": "v1"},
@@ -427,7 +427,7 @@ func TestDeploymentStop(t *testing.T) {
 	name := "foo"
 	ns := "default"
 	deployment := extensions.Deployment{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: ns,
 		},
@@ -450,7 +450,7 @@ func TestDeploymentStop(t *testing.T) {
 			Name: "SimpleDeployment",
 			Objs: []runtime.Object{
 				&extensions.Deployment{ // GET
-					ObjectMeta: api.ObjectMeta{
+					ObjectMeta: metav1.ObjectMeta{
 						Name:      name,
 						Namespace: ns,
 					},
@@ -474,7 +474,7 @@ func TestDeploymentStop(t *testing.T) {
 				&extensions.ReplicaSetList{ // LIST
 					Items: []extensions.ReplicaSet{
 						{
-							ObjectMeta: api.ObjectMeta{
+							ObjectMeta: metav1.ObjectMeta{
 								Name:      name,
 								Namespace: ns,
 								Labels:    map[string]string{"k1": "v1"},
@@ -570,11 +570,11 @@ func (c *reaperCoreFake) Services(namespace string) coreclient.ServiceInterface 
 }
 
 func pod() *api.Pod {
-	return &api.Pod{ObjectMeta: api.ObjectMeta{Namespace: api.NamespaceDefault, Name: "foo"}}
+	return &api.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: api.NamespaceDefault, Name: "foo"}}
 }
 
 func service() *api.Service {
-	return &api.Service{ObjectMeta: api.ObjectMeta{Namespace: api.NamespaceDefault, Name: "foo"}}
+	return &api.Service{ObjectMeta: metav1.ObjectMeta{Namespace: api.NamespaceDefault, Name: "foo"}}
 }
 
 func TestSimpleStop(t *testing.T) {
@@ -664,7 +664,7 @@ func TestDeploymentNotFoundError(t *testing.T) {
 	name := "foo"
 	ns := "default"
 	deployment := &extensions.Deployment{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: ns,
 		},
@@ -682,7 +682,7 @@ func TestDeploymentNotFoundError(t *testing.T) {
 		deployment,
 		&extensions.ReplicaSetList{Items: []extensions.ReplicaSet{
 			{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:      name,
 					Namespace: ns,
 				},

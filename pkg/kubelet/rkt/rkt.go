@@ -42,6 +42,7 @@ import (
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 	"k8s.io/kubernetes/pkg/api/v1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/credentialprovider"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -1967,7 +1968,7 @@ func (r *Runtime) cleanupPodNetworkFromServiceFile(serviceFilePath string) error
 		return err
 	}
 	return r.cleanupPodNetwork(&v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			UID:       kubetypes.UID(id),
 			Name:      name,
 			Namespace: namespace,

@@ -22,7 +22,10 @@ import (
 	"strings"
 	"time"
 
+	. "github.com/onsi/ginkgo"
+
 	"k8s.io/kubernetes/pkg/api/v1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -31,8 +34,6 @@ import (
 	"k8s.io/kubernetes/pkg/watch"
 	"k8s.io/kubernetes/test/e2e/framework"
 	testutils "k8s.io/kubernetes/test/utils"
-
-	. "github.com/onsi/ginkgo"
 )
 
 type durations []time.Duration
@@ -317,7 +318,7 @@ func startEndpointWatcher(f *framework.Framework, q *endpointQueries) {
 func singleServiceLatency(f *framework.Framework, name string, q *endpointQueries) (time.Duration, error) {
 	// Make a service that points to that pod.
 	svc := &v1.Service{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: "latency-svc-",
 		},
 		Spec: v1.ServiceSpec{

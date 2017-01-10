@@ -23,7 +23,6 @@ import (
 	"github.com/google/gofuzz"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	genericapirequest "k8s.io/kubernetes/pkg/genericapiserver/api/request"
@@ -37,7 +36,7 @@ var _ metav1.Object = &metav1.ObjectMeta{}
 // TestFillObjectMetaSystemFields validates that system populated fields are set on an object
 func TestFillObjectMetaSystemFields(t *testing.T) {
 	ctx := genericapirequest.NewDefaultContext()
-	resource := api.ObjectMeta{}
+	resource := metav1.ObjectMeta{}
 	api.FillObjectMetaSystemFields(ctx, &resource)
 	if resource.CreationTimestamp.Time.IsZero() {
 		t.Errorf("resource.CreationTimestamp is zero")
@@ -47,7 +46,7 @@ func TestFillObjectMetaSystemFields(t *testing.T) {
 	// verify we can inject a UID
 	uid := uuid.NewUUID()
 	ctx = genericapirequest.WithUID(ctx, uid)
-	resource = api.ObjectMeta{}
+	resource = metav1.ObjectMeta{}
 	api.FillObjectMetaSystemFields(ctx, &resource)
 	if resource.UID != uid {
 		t.Errorf("resource.UID expected: %v, actual: %v", uid, resource.UID)
@@ -57,7 +56,7 @@ func TestFillObjectMetaSystemFields(t *testing.T) {
 // TestHasObjectMetaSystemFieldValues validates that true is returned if and only if all fields are populated
 func TestHasObjectMetaSystemFieldValues(t *testing.T) {
 	ctx := genericapirequest.NewDefaultContext()
-	resource := api.ObjectMeta{}
+	resource := metav1.ObjectMeta{}
 	if api.HasObjectMetaSystemFieldValues(&resource) {
 		t.Errorf("the resource does not have all fields yet populated, but incorrectly reports it does")
 	}
@@ -67,7 +66,7 @@ func TestHasObjectMetaSystemFieldValues(t *testing.T) {
 	}
 }
 
-func getObjectMetaAndOwnerReferences() (objectMeta api.ObjectMeta, metaOwnerReferences []metav1.OwnerReference) {
+func getObjectMetaAndOwnerReferences() (objectMeta metav1.ObjectMeta, metaOwnerReferences []metav1.OwnerReference) {
 	fuzz.New().NilChance(.5).NumElements(1, 5).Fuzz(&objectMeta)
 	references := objectMeta.OwnerReferences
 	metaOwnerReferences = make([]metav1.OwnerReference, 0)
@@ -96,7 +95,7 @@ func testGetOwnerReferences(t *testing.T) {
 
 func testSetOwnerReferences(t *testing.T) {
 	expected, newRefs := getObjectMetaAndOwnerReferences()
-	objectMeta := &api.ObjectMeta{}
+	objectMeta := &metav1.ObjectMeta{}
 	objectMeta.SetOwnerReferences(newRefs)
 	if !reflect.DeepEqual(expected.OwnerReferences, objectMeta.OwnerReferences) {
 		t.Errorf("expect: %#v\n got: %#v", expected.OwnerReferences, objectMeta.OwnerReferences)
@@ -121,8 +120,8 @@ func TestAccessorImplementations(t *testing.T) {
 				if _, ok := obj.(runtime.Object); !ok {
 					t.Errorf("%v (%v) does not implement runtime.Object", gv.WithKind(kind), knownType)
 				}
-				lm, isLM := obj.(meta.ListMetaAccessor)
-				om, isOM := obj.(meta.ObjectMetaAccessor)
+				lm, isLM := obj.(metav1.ListMetaAccessor)
+				om, isOM := obj.(metav1.ObjectMetaAccessor)
 				switch {
 				case isLM && isOM:
 					t.Errorf("%v (%v) implements ListMetaAccessor and ObjectMetaAccessor", gv.WithKind(kind), knownType)

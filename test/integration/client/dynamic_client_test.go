@@ -74,7 +74,7 @@ func TestDynamicClient(t *testing.T) {
 
 	// Create a Pod with the normal client
 	pod := &v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: "test",
 		},
 		Spec: v1.PodSpec{

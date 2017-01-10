@@ -27,6 +27,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+
+	heapster "k8s.io/heapster/metrics/api/v1/types"
+	metricsapi "k8s.io/heapster/metrics/apis/metrics/v1alpha1"
+
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
@@ -42,11 +47,6 @@ import (
 	"k8s.io/kubernetes/pkg/controller/podautoscaler/metrics"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/watch"
-
-	heapster "k8s.io/heapster/metrics/api/v1/types"
-	metricsapi "k8s.io/heapster/metrics/apis/metrics/v1alpha1"
-
-	"github.com/stretchr/testify/assert"
 )
 
 func (w fakeResponseWrapper) DoRaw() ([]byte, error) {
@@ -154,7 +154,7 @@ func (tc *testCase) prepareTestClient(t *testing.T) *fake.Clientset {
 		obj := &autoscaling.HorizontalPodAutoscalerList{
 			Items: []autoscaling.HorizontalPodAutoscaler{
 				{
-					ObjectMeta: v1.ObjectMeta{
+					ObjectMeta: metav1.ObjectMeta{
 						Name:      hpaName,
 						Namespace: namespace,
 						SelfLink:  "experimental/v1/namespaces/" + namespace + "/horizontalpodautoscalers/" + hpaName,
@@ -195,7 +195,7 @@ func (tc *testCase) prepareTestClient(t *testing.T) *fake.Clientset {
 		defer tc.Unlock()
 
 		obj := &extensions.Scale{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:      tc.resource.name,
 				Namespace: namespace,
 			},
@@ -215,7 +215,7 @@ func (tc *testCase) prepareTestClient(t *testing.T) *fake.Clientset {
 		defer tc.Unlock()
 
 		obj := &extensions.Scale{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:      tc.resource.name,
 				Namespace: namespace,
 			},
@@ -235,7 +235,7 @@ func (tc *testCase) prepareTestClient(t *testing.T) *fake.Clientset {
 		defer tc.Unlock()
 
 		obj := &extensions.Scale{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:      tc.resource.name,
 				Namespace: namespace,
 			},
@@ -271,7 +271,7 @@ func (tc *testCase) prepareTestClient(t *testing.T) *fake.Clientset {
 						},
 					},
 				},
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:      podName,
 					Namespace: namespace,
 					Labels: map[string]string{

@@ -20,6 +20,8 @@ import (
 	"fmt"
 	"strconv"
 
+	"github.com/golang/glog"
+
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/v1"
 	apps "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
@@ -27,8 +29,6 @@ import (
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/runtime"
-
-	"github.com/golang/glog"
 )
 
 // petLifeCycleEvent is used to communicate high level actions the controller

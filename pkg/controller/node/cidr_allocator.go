@@ -22,6 +22,8 @@ import (
 	"net"
 	"sync"
 
+	"github.com/golang/glog"
+
 	apierrors "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/v1"
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
@@ -29,8 +31,6 @@ import (
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/wait"
-
-	"github.com/golang/glog"
 )
 
 // TODO: figure out the good setting for those constants.

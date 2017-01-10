@@ -77,9 +77,9 @@ var podWatchTestTable = []struct {
 	t   watch.EventType
 	obj runtime.Object
 }{
-	{watch.Added, roundTripOrDie(codec, &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}})},
-	{watch.Modified, roundTripOrDie(codec, &api.Pod{ObjectMeta: api.ObjectMeta{Name: "bar"}})},
-	{watch.Deleted, roundTripOrDie(codec, &api.Pod{ObjectMeta: api.ObjectMeta{Name: "bar"}})},
+	{watch.Added, roundTripOrDie(codec, &api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}})},
+	{watch.Modified, roundTripOrDie(codec, &api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "bar"}})},
+	{watch.Deleted, roundTripOrDie(codec, &api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "bar"}})},
 }
 
 func TestWatchWebsocket(t *testing.T) {

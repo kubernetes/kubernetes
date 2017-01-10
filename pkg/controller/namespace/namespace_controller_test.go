@@ -59,7 +59,7 @@ func TestFinalized(t *testing.T) {
 func TestFinalizeNamespaceFunc(t *testing.T) {
 	mockClient := &fake.Clientset{}
 	testNamespace := &v1.Namespace{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:            "test",
 			ResourceVersion: "1",
 		},
@@ -88,7 +88,7 @@ func testSyncNamespaceThatIsTerminating(t *testing.T, versions *metav1.APIVersio
 	now := metav1.Now()
 	namespaceName := "test"
 	testNamespacePendingFinalize := &v1.Namespace{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:              namespaceName,
 			ResourceVersion:   "1",
 			DeletionTimestamp: &now,
@@ -101,7 +101,7 @@ func testSyncNamespaceThatIsTerminating(t *testing.T, versions *metav1.APIVersio
 		},
 	}
 	testNamespaceFinalizeComplete := &v1.Namespace{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:              namespaceName,
 			ResourceVersion:   "1",
 			DeletionTimestamp: &now,
@@ -234,7 +234,7 @@ func TestSyncNamespaceThatIsTerminatingV1Beta1(t *testing.T) {
 func TestSyncNamespaceThatIsActive(t *testing.T) {
 	mockClient := &fake.Clientset{}
 	testNamespace := &v1.Namespace{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:            "test",
 			ResourceVersion: "1",
 		},

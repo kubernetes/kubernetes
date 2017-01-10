@@ -21,8 +21,8 @@ limitations under the License.
 package v1beta1
 
 import (
-	v1 "k8s.io/kubernetes/pkg/api/v1"
-	meta_v1 "k8s.io/kubernetes/pkg/apis/meta/v1"
+	api_v1 "k8s.io/kubernetes/pkg/api/v1"
+	v1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	conversion "k8s.io/kubernetes/pkg/conversion"
 	runtime "k8s.io/kubernetes/pkg/runtime"
 	reflect "reflect"
@@ -91,19 +91,19 @@ func DeepCopy_v1beta1_StatefulSetSpec(in interface{}, out interface{}, c *conver
 		}
 		if in.Selector != nil {
 			in, out := &in.Selector, &out.Selector
-			*out = new(meta_v1.LabelSelector)
-			if err := meta_v1.DeepCopy_v1_LabelSelector(*in, *out, c); err != nil {
+			*out = new(v1.LabelSelector)
+			if err := v1.DeepCopy_v1_LabelSelector(*in, *out, c); err != nil {
 				return err
 			}
 		}
-		if err := v1.DeepCopy_v1_PodTemplateSpec(&in.Template, &out.Template, c); err != nil {
+		if err := api_v1.DeepCopy_v1_PodTemplateSpec(&in.Template, &out.Template, c); err != nil {
 			return err
 		}
 		if in.VolumeClaimTemplates != nil {
 			in, out := &in.VolumeClaimTemplates, &out.VolumeClaimTemplates
-			*out = make([]v1.PersistentVolumeClaim, len(*in))
+			*out = make([]api_v1.PersistentVolumeClaim, len(*in))
 			for i := range *in {
-				if err := v1.DeepCopy_v1_PersistentVolumeClaim(&(*in)[i], &(*out)[i], c); err != nil {
+				if err := api_v1.DeepCopy_v1_PersistentVolumeClaim(&(*in)[i], &(*out)[i], c); err != nil {
 					return err
 				}
 			}

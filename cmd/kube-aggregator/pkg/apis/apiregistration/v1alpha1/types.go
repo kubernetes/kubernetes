@@ -17,7 +17,6 @@ limitations under the License.
 package v1alpha1
 
 import (
-	kapi "k8s.io/kubernetes/pkg/api/v1"
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 )
 
@@ -74,8 +73,8 @@ type APIServiceStatus struct {
 // APIService represents a server for a particular GroupVersion.
 // Name must be "version.group".
 type APIService struct {
-	metav1.TypeMeta `json:",inline"`
-	kapi.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// Spec contains information for locating and communicating with a server
 	Spec APIServiceSpec `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`

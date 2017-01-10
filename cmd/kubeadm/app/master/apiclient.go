@@ -127,11 +127,11 @@ func standardLabels(n string) map[string]string {
 func NewDaemonSet(daemonName string, podSpec v1.PodSpec) *extensions.DaemonSet {
 	l := standardLabels(daemonName)
 	return &extensions.DaemonSet{
-		ObjectMeta: v1.ObjectMeta{Name: daemonName},
+		ObjectMeta: metav1.ObjectMeta{Name: daemonName},
 		Spec: extensions.DaemonSetSpec{
 			Selector: &metav1.LabelSelector{MatchLabels: l},
 			Template: v1.PodTemplateSpec{
-				ObjectMeta: v1.ObjectMeta{Labels: l},
+				ObjectMeta: metav1.ObjectMeta{Labels: l},
 				Spec:       podSpec,
 			},
 		},
@@ -141,7 +141,7 @@ func NewDaemonSet(daemonName string, podSpec v1.PodSpec) *extensions.DaemonSet {
 func NewService(serviceName string, spec v1.ServiceSpec) *v1.Service {
 	l := standardLabels(serviceName)
 	return &v1.Service{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:   serviceName,
 			Labels: l,
 		},
@@ -152,12 +152,12 @@ func NewService(serviceName string, spec v1.ServiceSpec) *v1.Service {
 func NewDeployment(deploymentName string, replicas int32, podSpec v1.PodSpec) *extensions.Deployment {
 	l := standardLabels(deploymentName)
 	return &extensions.Deployment{
-		ObjectMeta: v1.ObjectMeta{Name: deploymentName},
+		ObjectMeta: metav1.ObjectMeta{Name: deploymentName},
 		Spec: extensions.DeploymentSpec{
 			Replicas: &replicas,
 			Selector: &metav1.LabelSelector{MatchLabels: l},
 			Template: v1.PodTemplateSpec{
-				ObjectMeta: v1.ObjectMeta{Labels: l},
+				ObjectMeta: metav1.ObjectMeta{Labels: l},
 				Spec:       podSpec,
 			},
 		},
@@ -213,7 +213,7 @@ func UpdateMasterRoleLabelsAndTaints(client *clientset.Clientset, schedulable bo
 	return nil
 }
 
-func SetMasterTaintTolerations(meta *v1.ObjectMeta) {
+func SetMasterTaintTolerations(meta *metav1.ObjectMeta) {
 	tolerationsAnnotation, _ := json.Marshal([]v1.Toleration{{Key: "dedicated", Value: "master", Effect: "NoSchedule"}})
 	if meta.Annotations == nil {
 		meta.Annotations = map[string]string{}
@@ -222,7 +222,7 @@ func SetMasterTaintTolerations(meta *v1.ObjectMeta) {
 }
 
 // SetNodeAffinity is a basic helper to set meta.Annotations[v1.AffinityAnnotationKey] for one or more v1.NodeSelectorRequirement(s)
-func SetNodeAffinity(meta *v1.ObjectMeta, expr ...v1.NodeSelectorRequirement) {
+func SetNodeAffinity(meta *metav1.ObjectMeta, expr ...v1.NodeSelectorRequirement) {
 	nodeAffinity := &v1.NodeAffinity{
 		RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
 			NodeSelectorTerms: []v1.NodeSelectorTerm{{MatchExpressions: expr}},

@@ -20,6 +20,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/golang/glog"
+
 	"k8s.io/kubernetes/pkg/api"
 	apierrors "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/v1"
@@ -32,8 +34,6 @@ import (
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/serviceaccount"
 	"k8s.io/kubernetes/pkg/watch"
-
-	"github.com/golang/glog"
 )
 
 // ControllerClientBuilder allow syou to get clients and configs for controllers
@@ -107,14 +107,14 @@ func (b SAControllerClientBuilder) Config(name string) (*restclient.Config, erro
 		// check to see if the namespace exists.  If it isn't a NotFound, just try to create the SA.
 		// It'll probably fail, but perhaps that will have a better message.
 		if _, err := b.CoreClient.Namespaces().Get(b.Namespace, metav1.GetOptions{}); apierrors.IsNotFound(err) {
-			_, err = b.CoreClient.Namespaces().Create(&v1.Namespace{ObjectMeta: v1.ObjectMeta{Name: b.Namespace}})
+			_, err = b.CoreClient.Namespaces().Create(&v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: b.Namespace}})
 			if err != nil && !apierrors.IsAlreadyExists(err) {
 				return nil, err
 			}
 		}
 
 		sa, err = b.CoreClient.ServiceAccounts(b.Namespace).Create(
-			&v1.ServiceAccount{ObjectMeta: v1.ObjectMeta{Namespace: b.Namespace, Name: name}})
+			&v1.ServiceAccount{ObjectMeta: metav1.ObjectMeta{Namespace: b.Namespace, Name: name}})
 		if err != nil {
 			return nil, err
 		}

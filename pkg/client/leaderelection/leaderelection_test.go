@@ -84,7 +84,7 @@ func TestTryAcquireOrRenew(t *testing.T) {
 					verb: "get",
 					reaction: func(action core.Action) (handled bool, ret runtime.Object, err error) {
 						return true, &v1.Endpoints{
-							ObjectMeta: v1.ObjectMeta{
+							ObjectMeta: metav1.ObjectMeta{
 								Namespace: action.GetNamespace(),
 								Name:      action.(core.GetAction).GetName(),
 							},
@@ -113,7 +113,7 @@ func TestTryAcquireOrRenew(t *testing.T) {
 					verb: "get",
 					reaction: func(action core.Action) (handled bool, ret runtime.Object, err error) {
 						return true, &v1.Endpoints{
-							ObjectMeta: v1.ObjectMeta{
+							ObjectMeta: metav1.ObjectMeta{
 								Namespace: action.GetNamespace(),
 								Name:      action.(core.GetAction).GetName(),
 								Annotations: map[string]string{
@@ -147,7 +147,7 @@ func TestTryAcquireOrRenew(t *testing.T) {
 					verb: "get",
 					reaction: func(action core.Action) (handled bool, ret runtime.Object, err error) {
 						return true, &v1.Endpoints{
-							ObjectMeta: v1.ObjectMeta{
+							ObjectMeta: metav1.ObjectMeta{
 								Namespace: action.GetNamespace(),
 								Name:      action.(core.GetAction).GetName(),
 								Annotations: map[string]string{
@@ -173,7 +173,7 @@ func TestTryAcquireOrRenew(t *testing.T) {
 					verb: "get",
 					reaction: func(action core.Action) (handled bool, ret runtime.Object, err error) {
 						return true, &v1.Endpoints{
-							ObjectMeta: v1.ObjectMeta{
+							ObjectMeta: metav1.ObjectMeta{
 								Namespace: action.GetNamespace(),
 								Name:      action.(core.GetAction).GetName(),
 								Annotations: map[string]string{
@@ -205,7 +205,7 @@ func TestTryAcquireOrRenew(t *testing.T) {
 		var reportedLeader string
 
 		lock := rl.EndpointsLock{
-			EndpointsMeta: v1.ObjectMeta{Namespace: "foo", Name: "bar"},
+			EndpointsMeta: metav1.ObjectMeta{Namespace: "foo", Name: "bar"},
 			LockConfig: rl.ResourceLockConfig{
 				Identity:      "baz",
 				EventRecorder: &record.FakeRecorder{},

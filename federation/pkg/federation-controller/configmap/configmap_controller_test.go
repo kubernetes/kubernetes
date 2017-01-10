@@ -26,6 +26,7 @@ import (
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util"
 	. "k8s.io/kubernetes/federation/pkg/federation-controller/util/test"
 	apiv1 "k8s.io/kubernetes/pkg/api/v1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	fakekubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -78,7 +79,7 @@ func TestConfigMapController(t *testing.T) {
 	configmapController.Run(stop)
 
 	configmap1 := &apiv1.ConfigMap{
-		ObjectMeta: apiv1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test-configmap",
 			Namespace: "ns",
 			SelfLink:  "/api/v1/namespaces/ns/configmaps/test-configmap",

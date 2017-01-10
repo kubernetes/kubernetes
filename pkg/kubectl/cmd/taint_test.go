@@ -41,7 +41,7 @@ func generateNodeAndTaintedNode(oldTaints []api.Taint, newTaints []api.Taint) (*
 	oldTaintsData, _ := json.Marshal(oldTaints)
 	// Create a node.
 	node := &api.Node{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:              "node-name",
 			CreationTimestamp: metav1.Time{Time: time.Now()},
 			Annotations: map[string]string{

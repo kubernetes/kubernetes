@@ -23,6 +23,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/golang/glog"
+
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
@@ -42,8 +44,6 @@ import (
 	"k8s.io/kubernetes/pkg/util/workqueue"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/predicates"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
-
-	"github.com/golang/glog"
 )
 
 const (

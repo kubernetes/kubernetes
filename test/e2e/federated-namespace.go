@@ -111,7 +111,7 @@ var _ = framework.KubeDescribe("Federation namespace [Feature:Federation]", func
 
 			// Create resources in the namespace.
 			event := api_v1.Event{
-				ObjectMeta: api_v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:      v1.SimpleNameGenerator.GenerateName(eventNamePrefix),
 					Namespace: nsName,
 				},
@@ -185,7 +185,7 @@ func verifyNsCascadingDeletion(nsClient clientset.NamespaceInterface, clusters m
 
 func createNamespace(nsClient clientset.NamespaceInterface) string {
 	ns := api_v1.Namespace{
-		ObjectMeta: api_v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: v1.SimpleNameGenerator.GenerateName(namespacePrefix),
 		},
 	}

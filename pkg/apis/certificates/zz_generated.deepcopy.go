@@ -21,7 +21,7 @@ limitations under the License.
 package certificates
 
 import (
-	api "k8s.io/kubernetes/pkg/api"
+	v1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	conversion "k8s.io/kubernetes/pkg/conversion"
 	runtime "k8s.io/kubernetes/pkg/runtime"
 	reflect "reflect"
@@ -48,7 +48,7 @@ func DeepCopy_certificates_CertificateSigningRequest(in interface{}, out interfa
 		in := in.(*CertificateSigningRequest)
 		out := out.(*CertificateSigningRequest)
 		*out = *in
-		if err := api.DeepCopy_api_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, c); err != nil {
+		if err := v1.DeepCopy_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, c); err != nil {
 			return err
 		}
 		if err := DeepCopy_certificates_CertificateSigningRequestSpec(&in.Spec, &out.Spec, c); err != nil {

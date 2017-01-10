@@ -172,7 +172,7 @@ func (e *EventAggregator) EventAggregate(newEvent *v1.Event) (*v1.Event, error) 
 
 	// create a new aggregate event
 	eventCopy := &v1.Event{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      fmt.Sprintf("%v.%x", newEvent.InvolvedObject.Name, now.UnixNano()),
 			Namespace: newEvent.Namespace,
 		},

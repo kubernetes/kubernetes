@@ -37,7 +37,7 @@ func TestDecodeSinglePod(t *testing.T) {
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: "",
 		},
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test",
 			UID:       "12345",
 			Namespace: "mynamespace",
@@ -98,7 +98,7 @@ func TestDecodePodList(t *testing.T) {
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: "",
 		},
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test",
 			UID:       "12345",
 			Namespace: "mynamespace",

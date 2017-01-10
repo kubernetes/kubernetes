@@ -25,6 +25,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	heapster "k8s.io/heapster/metrics/api/v1/types"
+	metricsapi "k8s.io/heapster/metrics/apis/metrics/v1alpha1"
+
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
@@ -35,12 +41,6 @@ import (
 	"k8s.io/kubernetes/pkg/client/testing/core"
 	"k8s.io/kubernetes/pkg/controller/podautoscaler/metrics"
 	"k8s.io/kubernetes/pkg/runtime"
-
-	heapster "k8s.io/heapster/metrics/api/v1/types"
-	metricsapi "k8s.io/heapster/metrics/apis/metrics/v1alpha1"
-
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 type resourceInfo struct {
@@ -101,7 +101,7 @@ func (tc *replicaCalcTestCase) prepareTestClient(t *testing.T) *fake.Clientset {
 						},
 					},
 				},
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:      podName,
 					Namespace: testNamespace,
 					Labels: map[string]string{

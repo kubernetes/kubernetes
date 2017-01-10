@@ -26,7 +26,7 @@ import metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 type ImageReview struct {
 	metav1.TypeMeta `json:",inline"`
 	// +optional
-	v1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// Spec holds information about the pod being evaluated
 	Spec ImageReviewSpec `json:"spec" protobuf:"bytes,2,opt,name=spec"`

@@ -23,6 +23,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	genericapirequest "k8s.io/kubernetes/pkg/genericapiserver/api/request"
 	"k8s.io/kubernetes/pkg/runtime"
 )
@@ -36,7 +37,7 @@ func TestExportSecret(t *testing.T) {
 	}{
 		{
 			objIn: &api.Secret{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:      "foo",
 					Namespace: "bar",
 				},
@@ -45,7 +46,7 @@ func TestExportSecret(t *testing.T) {
 				},
 			},
 			objOut: &api.Secret{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:      "foo",
 					Namespace: "bar",
 				},
@@ -57,7 +58,7 @@ func TestExportSecret(t *testing.T) {
 		},
 		{
 			objIn: &api.Secret{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:      "foo",
 					Namespace: "bar",
 				},
@@ -67,7 +68,7 @@ func TestExportSecret(t *testing.T) {
 		},
 		{
 			objIn: &api.Secret{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:      "foo",
 					Namespace: "bar",
 					Annotations: map[string]string{

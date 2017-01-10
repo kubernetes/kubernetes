@@ -22,6 +22,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/v1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 )
 
@@ -137,7 +138,7 @@ var (
 		},
 	}
 	criticalPodWithNoLimit = v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Annotations: map[string]string{
 				kubetypes.CriticalPodAnnotationKey: "",
 			},

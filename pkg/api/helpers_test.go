@@ -252,7 +252,7 @@ func TestGetAffinityFromPod(t *testing.T) {
 		},
 		{
 			pod: &Pod{
-				ObjectMeta: ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
 						AffinityAnnotationKey: `
 						{"nodeAffinity": { "requiredDuringSchedulingIgnoredDuringExecution": {
@@ -271,7 +271,7 @@ func TestGetAffinityFromPod(t *testing.T) {
 		},
 		{
 			pod: &Pod{
-				ObjectMeta: ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
 						AffinityAnnotationKey: `
 						{"nodeAffinity": { "requiredDuringSchedulingIgnoredDuringExecution": {
@@ -412,7 +412,7 @@ func TestGetAvoidPodsFromNode(t *testing.T) {
 		},
 		{
 			node: &Node{
-				ObjectMeta: ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
 						PreferAvoidPodsAnnotationKey: `
 							{
@@ -457,7 +457,7 @@ func TestGetAvoidPodsFromNode(t *testing.T) {
 		{
 			node: &Node{
 				// Missing end symbol of "podController" and "podSignature"
-				ObjectMeta: ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
 						PreferAvoidPodsAnnotationKey: `
 							{

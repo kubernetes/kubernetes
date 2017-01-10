@@ -191,7 +191,7 @@ func (c *Controller) CreateNamespaceIfNeeded(ns string) error {
 		return nil
 	}
 	newNs := &api.Namespace{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      ns,
 			Namespace: "",
 		},
@@ -250,7 +250,7 @@ func (c *Controller) CreateOrUpdateMasterServiceIfNeeded(serviceName string, ser
 		return nil
 	}
 	svc := &api.Service{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      serviceName,
 			Namespace: api.NamespaceDefault,
 			Labels:    map[string]string{"provider": "kubernetes", "component": "apiserver"},
@@ -321,7 +321,7 @@ func (r *masterCountEndpointReconciler) ReconcileEndpoints(serviceName string, i
 	e, err := r.endpointClient.Endpoints(api.NamespaceDefault).Get(serviceName, metav1.GetOptions{})
 	if err != nil {
 		e = &api.Endpoints{
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:      serviceName,
 				Namespace: api.NamespaceDefault,
 			},

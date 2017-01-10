@@ -23,6 +23,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/controller"
@@ -300,7 +301,7 @@ func (rq *ResourceQuotaController) syncResourceQuota(v1ResourceQuota v1.Resource
 	// Create a usage object that is based on the quota resource version that will handle updates
 	// by default, we preserve the past usage observation, and set hard to the current spec
 	usage := api.ResourceQuota{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:            resourceQuota.Name,
 			Namespace:       resourceQuota.Namespace,
 			ResourceVersion: resourceQuota.ResourceVersion,

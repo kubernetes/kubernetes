@@ -28,6 +28,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/golang/glog"
+
 	"k8s.io/kubernetes/federation/apis/federation"
 	fedclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset"
 	"k8s.io/kubernetes/pkg/api"
@@ -57,8 +59,6 @@ import (
 	certutil "k8s.io/kubernetes/pkg/util/cert"
 	"k8s.io/kubernetes/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/util/sets"
-
-	"github.com/golang/glog"
 )
 
 // Describer generates output for the named resource or an error

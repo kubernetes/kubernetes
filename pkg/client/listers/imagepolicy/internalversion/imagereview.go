@@ -19,9 +19,9 @@ limitations under the License.
 package internalversion
 
 import (
-	api "k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	imagepolicy "k8s.io/kubernetes/pkg/apis/imagepolicy"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/labels"
 )
@@ -55,7 +55,7 @@ func (s *imageReviewLister) List(selector labels.Selector) (ret []*imagepolicy.I
 
 // Get retrieves the ImageReview from the index for a given name.
 func (s *imageReviewLister) Get(name string) (*imagepolicy.ImageReview, error) {
-	key := &imagepolicy.ImageReview{ObjectMeta: api.ObjectMeta{Name: name}}
+	key := &imagepolicy.ImageReview{ObjectMeta: metav1.ObjectMeta{Name: name}}
 	obj, exists, err := s.indexer.Get(key)
 	if err != nil {
 		return nil, err

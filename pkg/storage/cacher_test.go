@@ -24,6 +24,8 @@ import (
 	"testing"
 	"time"
 
+	"golang.org/x/net/context"
+
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/meta"
@@ -42,8 +44,6 @@ import (
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/watch"
-
-	"golang.org/x/net/context"
 )
 
 func newEtcdTestStorage(t *testing.T, codec runtime.Codec, prefix string) (*etcdtesting.EtcdTestServer, storage.Interface) {
@@ -70,7 +70,7 @@ func newTestCacher(s storage.Interface, cap int) *storage.Cacher {
 
 func makeTestPod(name string) *api.Pod {
 	return &api.Pod{
-		ObjectMeta: api.ObjectMeta{Namespace: "ns", Name: name},
+		ObjectMeta: metav1.ObjectMeta{Namespace: "ns", Name: name},
 		Spec:       apitesting.DeepEqualSafePodSpec(),
 	}
 }

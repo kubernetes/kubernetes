@@ -189,7 +189,7 @@ func (kl *Kubelet) reconcileCMADAnnotationWithExistingNode(node, existingNode *v
 // labels, information from the cloud provider, and Kubelet configuration.
 func (kl *Kubelet) initialNode() (*v1.Node, error) {
 	node := &v1.Node{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: string(kl.nodeName),
 			Labels: map[string]string{
 				metav1.LabelHostname:       kl.hostname,

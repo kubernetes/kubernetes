@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"testing"
 
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/v1"
@@ -55,14 +56,14 @@ func getKey(ds *extensions.DaemonSet, t *testing.T) string {
 func newDaemonSet(name string) *extensions.DaemonSet {
 	return &extensions.DaemonSet{
 		TypeMeta: metav1.TypeMeta{APIVersion: testapi.Extensions.GroupVersion().String()},
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: v1.NamespaceDefault,
 		},
 		Spec: extensions.DaemonSetSpec{
 			Selector: &metav1.LabelSelector{MatchLabels: simpleDaemonSetLabel},
 			Template: v1.PodTemplateSpec{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Labels: simpleDaemonSetLabel,
 				},
 				Spec: v1.PodSpec{
@@ -84,7 +85,7 @@ func newDaemonSet(name string) *extensions.DaemonSet {
 func newNode(name string, label map[string]string) *v1.Node {
 	return &v1.Node{
 		TypeMeta: metav1.TypeMeta{APIVersion: registered.GroupOrDie(v1.GroupName).GroupVersion.String()},
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Labels:    label,
 			Namespace: v1.NamespaceDefault,
@@ -109,7 +110,7 @@ func addNodes(nodeStore cache.Store, startIndex, numNodes int, label map[string]
 func newPod(podName string, nodeName string, label map[string]string) *v1.Pod {
 	pod := &v1.Pod{
 		TypeMeta: metav1.TypeMeta{APIVersion: registered.GroupOrDie(v1.GroupName).GroupVersion.String()},
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: podName,
 			Labels:       label,
 			Namespace:    v1.NamespaceDefault,
@@ -127,7 +128,7 @@ func newPod(podName string, nodeName string, label map[string]string) *v1.Pod {
 			DNSPolicy: v1.DNSDefault,
 		},
 	}
-	v1.GenerateName(v1.SimpleNameGenerator, &pod.ObjectMeta)
+	api.GenerateName(v1.SimpleNameGenerator, &pod.ObjectMeta)
 	return pod
 }
 
@@ -357,7 +358,7 @@ func TestPortConflictWithSameDaemonPodDoesNotDeletePod(t *testing.T) {
 	node := newNode("port-conflict", nil)
 	manager.nodeStore.Add(node)
 	manager.podStore.Indexer.Add(&v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Labels:    simpleDaemonSetLabel,
 			Namespace: v1.NamespaceDefault,
 		},
@@ -407,7 +408,7 @@ func TestPodIsNotDeletedByDaemonsetWithEmptyLabelSelector(t *testing.T) {
 	manager.nodeStore.Store.Add(newNode("node1", nil))
 	// Create pod not controlled by a daemonset.
 	manager.podStore.Indexer.Add(&v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Labels:    map[string]string{"bang": "boom"},
 			Namespace: v1.NamespaceDefault,
 		},

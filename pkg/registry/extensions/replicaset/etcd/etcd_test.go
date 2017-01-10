@@ -56,14 +56,14 @@ func createReplicaSet(storage *REST, rs extensions.ReplicaSet, t *testing.T) (ex
 
 func validNewReplicaSet() *extensions.ReplicaSet {
 	return &extensions.ReplicaSet{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      "foo",
 			Namespace: api.NamespaceDefault,
 		},
 		Spec: extensions.ReplicaSetSpec{
 			Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"a": "b"}},
 			Template: api.PodTemplateSpec{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{"a": "b"},
 				},
 				Spec: api.PodSpec{
@@ -94,7 +94,7 @@ func TestCreate(t *testing.T) {
 	defer storage.ReplicaSet.Store.DestroyFunc()
 	test := registrytest.New(t, storage.ReplicaSet.Store)
 	rs := validNewReplicaSet()
-	rs.ObjectMeta = api.ObjectMeta{}
+	rs.ObjectMeta = metav1.ObjectMeta{}
 	test.TestCreate(
 		// valid
 		rs,
@@ -260,7 +260,7 @@ func TestScaleGet(t *testing.T) {
 	}
 
 	want := &extensions.Scale{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:              name,
 			Namespace:         api.NamespaceDefault,
 			UID:               rs.UID,
@@ -300,7 +300,7 @@ func TestScaleUpdate(t *testing.T) {
 	}
 	replicas := 12
 	update := extensions.Scale{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: api.NamespaceDefault,
 		},

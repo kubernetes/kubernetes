@@ -160,7 +160,7 @@ var _ = framework.KubeDescribe("[Feature:Federation]", func() {
 					framework.Failf("missing required env var FEDERATIONS_DOMAIN_MAP")
 				}
 				kubeDNSConfigMap := v1.ConfigMap{
-					ObjectMeta: v1.ObjectMeta{
+					ObjectMeta: metav1.ObjectMeta{
 						Name:      KubeDNSConfigMapName,
 						Namespace: KubeDNSConfigMapNamespace,
 					},

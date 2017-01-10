@@ -25,7 +25,7 @@ import metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 // ImageReview checks if the set of images in a pod are allowed.
 type ImageReview struct {
 	metav1.TypeMeta
-	api.ObjectMeta
+	metav1.ObjectMeta
 
 	// Spec holds information about the pod being evaluated
 	Spec ImageReviewSpec

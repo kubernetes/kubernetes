@@ -37,6 +37,7 @@ import (
 	etcd "github.com/coreos/etcd/client"
 	"github.com/golang/glog"
 	"golang.org/x/net/context"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 )
 
 // Creates a new storage interface from the client
@@ -131,7 +132,7 @@ func checkPreconditions(key string, preconditions *storage.Preconditions, out ru
 	if preconditions == nil {
 		return nil
 	}
-	objMeta, err := api.ObjectMetaFor(out)
+	objMeta, err := metav1.ObjectMetaFor(out)
 	if err != nil {
 		return storage.NewInternalErrorf("can't enforce preconditions %v on un-introspectable object %v, got error: %v", *preconditions, out, err)
 	}

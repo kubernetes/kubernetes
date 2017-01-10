@@ -30,6 +30,9 @@ import (
 	"text/template"
 	"time"
 
+	"github.com/ghodss/yaml"
+	"github.com/golang/glog"
+
 	"k8s.io/kubernetes/federation/apis/federation"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/events"
@@ -52,9 +55,6 @@ import (
 	"k8s.io/kubernetes/pkg/util/jsonpath"
 	"k8s.io/kubernetes/pkg/util/node"
 	"k8s.io/kubernetes/pkg/util/sets"
-
-	"github.com/ghodss/yaml"
-	"github.com/golang/glog"
 )
 
 const (
@@ -1766,7 +1766,7 @@ func printLimitRangeList(list *api.LimitRangeList, w io.Writer, options PrintOpt
 }
 
 // printObjectMeta prints the object metadata of a given resource.
-func printObjectMeta(meta api.ObjectMeta, w io.Writer, options PrintOptions, namespaced bool) error {
+func printObjectMeta(meta metav1.ObjectMeta, w io.Writer, options PrintOptions, namespaced bool) error {
 	name := formatResourceName(options.Kind, meta.Name, options.WithKind)
 
 	if namespaced && options.WithNamespace {

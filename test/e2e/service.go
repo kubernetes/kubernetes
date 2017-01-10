@@ -86,7 +86,7 @@ var _ = framework.KubeDescribe("Services", func() {
 		}()
 
 		service := &v1.Service{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name: serviceName,
 			},
 			Spec: v1.ServiceSpec{
@@ -148,7 +148,7 @@ var _ = framework.KubeDescribe("Services", func() {
 
 		By("creating service " + serviceName + " in namespace " + ns)
 		service := &v1.Service{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name: serviceName,
 			},
 			Spec: v1.ServiceSpec{
@@ -791,7 +791,7 @@ var _ = framework.KubeDescribe("Services", func() {
 
 		By("creating service " + serviceName + " with same NodePort but different protocols in namespace " + ns)
 		service := &v1.Service{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:      t.ServiceName,
 				Namespace: t.Namespace,
 			},
@@ -1027,7 +1027,7 @@ var _ = framework.KubeDescribe("Services", func() {
 		terminateSeconds := int64(600)
 
 		service := &v1.Service{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:        t.ServiceName,
 				Namespace:   t.Namespace,
 				Annotations: map[string]string{endpoint.TolerateUnreadyEndpointsAnnotation: "true"},

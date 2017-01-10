@@ -23,6 +23,9 @@ import (
 	"reflect"
 	"time"
 
+	"github.com/emicklei/go-restful"
+	"golang.org/x/net/websocket"
+
 	"k8s.io/kubernetes/pkg/api/errors"
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/genericapiserver/api/handlers/negotiation"
@@ -32,9 +35,6 @@ import (
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/wsstream"
 	"k8s.io/kubernetes/pkg/watch"
-
-	"github.com/emicklei/go-restful"
-	"golang.org/x/net/websocket"
 )
 
 // nothing will ever be sent down this channel

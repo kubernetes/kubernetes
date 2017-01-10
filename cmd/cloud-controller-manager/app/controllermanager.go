@@ -25,9 +25,15 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/golang/glog"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
+
 	"k8s.io/apiserver/pkg/healthz"
 	"k8s.io/kubernetes/cmd/cloud-controller-manager/app/options"
 	"k8s.io/kubernetes/pkg/api/v1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	v1core "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/core/v1"
 	"k8s.io/kubernetes/pkg/client/leaderelection"
@@ -43,11 +49,6 @@ import (
 	servicecontroller "k8s.io/kubernetes/pkg/controller/service"
 	"k8s.io/kubernetes/pkg/util/configz"
 	"k8s.io/kubernetes/pkg/util/wait"
-
-	"github.com/golang/glog"
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/spf13/cobra"
-	"github.com/spf13/pflag"
 )
 
 const (
@@ -158,7 +159,7 @@ func Run(s *options.CloudControllerManagerServer, cloud cloudprovider.Interface)
 
 	// Lock required for leader election
 	rl := resourcelock.EndpointsLock{
-		EndpointsMeta: v1.ObjectMeta{
+		EndpointsMeta: metav1.ObjectMeta{
 			Namespace: "kube-system",
 			Name:      "cloud-controller-manager",
 		},

@@ -47,6 +47,7 @@ func GetGeneratedDeepCopyFuncs() []conversion.GeneratedDeepCopyFunc {
 		{Fn: DeepCopy_v1_LabelSelector, InType: reflect.TypeOf(&LabelSelector{})},
 		{Fn: DeepCopy_v1_LabelSelectorRequirement, InType: reflect.TypeOf(&LabelSelectorRequirement{})},
 		{Fn: DeepCopy_v1_ListMeta, InType: reflect.TypeOf(&ListMeta{})},
+		{Fn: DeepCopy_v1_ObjectMeta, InType: reflect.TypeOf(&ObjectMeta{})},
 		{Fn: DeepCopy_v1_OwnerReference, InType: reflect.TypeOf(&OwnerReference{})},
 		{Fn: DeepCopy_v1_Patch, InType: reflect.TypeOf(&Patch{})},
 		{Fn: DeepCopy_v1_RootPaths, InType: reflect.TypeOf(&RootPaths{})},
@@ -297,6 +298,54 @@ func DeepCopy_v1_ListMeta(in interface{}, out interface{}, c *conversion.Cloner)
 		in := in.(*ListMeta)
 		out := out.(*ListMeta)
 		*out = *in
+		return nil
+	}
+}
+
+func DeepCopy_v1_ObjectMeta(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*ObjectMeta)
+		out := out.(*ObjectMeta)
+		*out = *in
+		out.CreationTimestamp = in.CreationTimestamp.DeepCopy()
+		if in.DeletionTimestamp != nil {
+			in, out := &in.DeletionTimestamp, &out.DeletionTimestamp
+			*out = new(Time)
+			**out = (*in).DeepCopy()
+		}
+		if in.DeletionGracePeriodSeconds != nil {
+			in, out := &in.DeletionGracePeriodSeconds, &out.DeletionGracePeriodSeconds
+			*out = new(int64)
+			**out = **in
+		}
+		if in.Labels != nil {
+			in, out := &in.Labels, &out.Labels
+			*out = make(map[string]string)
+			for key, val := range *in {
+				(*out)[key] = val
+			}
+		}
+		if in.Annotations != nil {
+			in, out := &in.Annotations, &out.Annotations
+			*out = make(map[string]string)
+			for key, val := range *in {
+				(*out)[key] = val
+			}
+		}
+		if in.OwnerReferences != nil {
+			in, out := &in.OwnerReferences, &out.OwnerReferences
+			*out = make([]OwnerReference, len(*in))
+			for i := range *in {
+				if err := DeepCopy_v1_OwnerReference(&(*in)[i], &(*out)[i], c); err != nil {
+					return err
+				}
+			}
+		}
+		if in.Finalizers != nil {
+			in, out := &in.Finalizers, &out.Finalizers
+			*out = make([]string, len(*in))
+			copy(*out, *in)
+		}
 		return nil
 	}
 }

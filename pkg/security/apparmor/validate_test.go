@@ -24,6 +24,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 
 	"github.com/stretchr/testify/assert"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 )
 
 func TestGetAppArmorFS(t *testing.T) {
@@ -134,7 +135,7 @@ func TestValidateValidHost(t *testing.T) {
 
 	// Test multi-container pod.
 	pod := &v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Annotations: map[string]string{
 				ContainerAnnotationKeyPrefix + "init":  ProfileNamePrefix + "foo-container",
 				ContainerAnnotationKeyPrefix + "test1": ProfileRuntimeDefault,
@@ -182,7 +183,7 @@ func getPodWithProfile(profile string) *v1.Pod {
 		}
 	}
 	return &v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Annotations: annotations,
 		},
 		Spec: v1.PodSpec{

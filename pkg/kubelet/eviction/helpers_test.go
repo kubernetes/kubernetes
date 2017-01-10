@@ -1573,7 +1573,7 @@ func newVolume(name string, volumeSource v1.VolumeSource) v1.Volume {
 // newPod uses the name as the uid.  Make names unique for testing.
 func newPod(name string, containers []v1.Container, volumes []v1.Volume) *v1.Pod {
 	return &v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 			UID:  types.UID(name),
 		},

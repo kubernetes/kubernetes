@@ -74,7 +74,7 @@ var _ = framework.KubeDescribe("Kubelet Eviction Manager [Serial] [Disruptive]",
 				verifyPodName = "verify" + string(uuid.NewUUID())
 				createIdlePod(idlePodName, podClient)
 				podClient.Create(&v1.Pod{
-					ObjectMeta: v1.ObjectMeta{
+					ObjectMeta: metav1.ObjectMeta{
 						Name: busyPodName,
 					},
 					Spec: v1.PodSpec{
@@ -188,7 +188,7 @@ var _ = framework.KubeDescribe("Kubelet Eviction Manager [Serial] [Disruptive]",
 
 func createIdlePod(podName string, podClient *framework.PodClient) {
 	podClient.Create(&v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: podName,
 		},
 		Spec: v1.PodSpec{

@@ -22,6 +22,7 @@ import (
 	"strings"
 
 	"k8s.io/kubernetes/pkg/api"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/intstr"
 )
@@ -177,7 +178,7 @@ func generate(genericParams map[string]interface{}) (runtime.Object, error) {
 	}
 
 	service := api.Service{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:   name,
 			Labels: labels,
 		},

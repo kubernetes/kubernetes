@@ -20,13 +20,13 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/spf13/cobra"
+
 	"k8s.io/kubernetes/pkg/apis/certificates"
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
-
-	"github.com/spf13/cobra"
 )
 
 func NewCmdCertificate(f cmdutil.Factory, out io.Writer) *cobra.Command {

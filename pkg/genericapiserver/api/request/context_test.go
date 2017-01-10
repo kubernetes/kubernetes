@@ -21,6 +21,7 @@ import (
 
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/kubernetes/pkg/api"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	genericapirequest "k8s.io/kubernetes/pkg/genericapiserver/api/request"
 	"k8s.io/kubernetes/pkg/types"
 )
@@ -54,7 +55,7 @@ func TestValidNamespace(t *testing.T) {
 	if namespace != resource.Namespace {
 		t.Fatalf("expected resource to have the default namespace assigned during validation")
 	}
-	resource = api.ReplicationController{ObjectMeta: api.ObjectMeta{Namespace: "other"}}
+	resource = api.ReplicationController{ObjectMeta: metav1.ObjectMeta{Namespace: "other"}}
 	if api.ValidNamespace(ctx, &resource.ObjectMeta) {
 		t.Fatalf("Expected error that resource and context errors do not match because resource has different namespace")
 	}

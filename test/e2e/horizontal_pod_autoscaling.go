@@ -19,11 +19,11 @@ package e2e
 import (
 	"time"
 
-	"k8s.io/kubernetes/pkg/api/v1"
-	autoscaling "k8s.io/kubernetes/pkg/apis/autoscaling/v1"
-	"k8s.io/kubernetes/test/e2e/framework"
-
 	. "github.com/onsi/ginkgo"
+
+	autoscaling "k8s.io/kubernetes/pkg/apis/autoscaling/v1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
+	"k8s.io/kubernetes/test/e2e/framework"
 )
 
 const (
@@ -177,7 +177,7 @@ func scaleDown(name, kind string, checkStability bool, rc *ResourceConsumer, f *
 
 func createCPUHorizontalPodAutoscaler(rc *ResourceConsumer, cpu, minReplicas, maxRepl int32) {
 	hpa := &autoscaling.HorizontalPodAutoscaler{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      rc.name,
 			Namespace: rc.framework.Namespace.Name,
 		},

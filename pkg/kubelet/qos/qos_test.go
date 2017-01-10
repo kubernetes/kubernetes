@@ -21,6 +21,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/v1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 )
 
 func getResourceList(cpu, memory string) v1.ResourceList {
@@ -55,7 +56,7 @@ func newContainer(name string, requests v1.ResourceList, limits v1.ResourceList)
 
 func newPod(name string, containers []v1.Container) *v1.Pod {
 	return &v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 		},
 		Spec: v1.PodSpec{

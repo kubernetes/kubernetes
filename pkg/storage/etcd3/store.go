@@ -25,18 +25,18 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/kubernetes/pkg/api"
+	"github.com/coreos/etcd/clientv3"
+	"github.com/golang/glog"
+	"golang.org/x/net/context"
+
 	"k8s.io/kubernetes/pkg/api/meta"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/conversion"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage"
 	"k8s.io/kubernetes/pkg/storage/etcd"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/watch"
-
-	"github.com/coreos/etcd/clientv3"
-	"github.com/golang/glog"
-	"golang.org/x/net/context"
 )
 
 type store struct {
@@ -497,7 +497,7 @@ func checkPreconditions(key string, preconditions *storage.Preconditions, out ru
 	if preconditions == nil {
 		return nil
 	}
-	objMeta, err := api.ObjectMetaFor(out)
+	objMeta, err := metav1.ObjectMetaFor(out)
 	if err != nil {
 		return storage.NewInternalErrorf("can't enforce preconditions %v on un-introspectable object %v, got error: %v", *preconditions, out, err)
 	}

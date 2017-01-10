@@ -237,7 +237,7 @@ func TestColumnPrint(t *testing.T) {
 					FieldSpec: "{.metadata.name}",
 				},
 			},
-			obj: &v1.Pod{ObjectMeta: v1.ObjectMeta{Name: "foo"}},
+			obj: &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}},
 			expectedOutput: `NAME
 foo
 `,
@@ -251,8 +251,8 @@ foo
 			},
 			obj: &v1.PodList{
 				Items: []v1.Pod{
-					{ObjectMeta: v1.ObjectMeta{Name: "foo"}},
-					{ObjectMeta: v1.ObjectMeta{Name: "bar"}},
+					{ObjectMeta: metav1.ObjectMeta{Name: "foo"}},
+					{ObjectMeta: metav1.ObjectMeta{Name: "bar"}},
 				},
 			},
 			expectedOutput: `NAME
@@ -271,7 +271,7 @@ bar
 					FieldSpec: "{.apiVersion}",
 				},
 			},
-			obj: &v1.Pod{ObjectMeta: v1.ObjectMeta{Name: "foo"}, TypeMeta: metav1.TypeMeta{APIVersion: "baz"}},
+			obj: &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}, TypeMeta: metav1.TypeMeta{APIVersion: "baz"}},
 			expectedOutput: `NAME      API_VERSION
 foo       baz
 `,

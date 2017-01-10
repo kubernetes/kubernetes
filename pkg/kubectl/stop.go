@@ -23,7 +23,6 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
-	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/extensions"
@@ -138,7 +137,7 @@ type StatefulSetReaper struct {
 
 type objInterface interface {
 	Delete(name string) error
-	Get(name string) (meta.Object, error)
+	Get(name string) (metav1.Object, error)
 }
 
 // getOverlappingControllers finds rcs that this controller overlaps, as well as rcs overlapping this controller.

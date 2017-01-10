@@ -171,7 +171,7 @@ var _ = framework.KubeDescribe("NodeProblemDetector", func() {
 			Expect(framework.IssueSSHCommand(cmd, framework.TestContext.Provider, node)).To(Succeed())
 			By("Create config map for the node problem detector")
 			_, err = c.Core().ConfigMaps(ns).Create(&v1.ConfigMap{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name: configName,
 				},
 				Data: map[string]string{configFile: config},
@@ -179,7 +179,7 @@ var _ = framework.KubeDescribe("NodeProblemDetector", func() {
 			Expect(err).NotTo(HaveOccurred())
 			By("Create the node problem detector")
 			_, err = c.Core().Pods(ns).Create(&v1.Pod{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name: name,
 				},
 				Spec: v1.PodSpec{

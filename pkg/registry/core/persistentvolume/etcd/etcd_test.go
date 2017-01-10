@@ -47,7 +47,7 @@ func newStorage(t *testing.T) (*REST, *StatusREST, *etcdtesting.EtcdTestServer) 
 
 func validNewPersistentVolume(name string) *api.PersistentVolume {
 	pv := &api.PersistentVolume{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 		},
 		Spec: api.PersistentVolumeSpec{
@@ -80,13 +80,13 @@ func TestCreate(t *testing.T) {
 	defer storage.Store.DestroyFunc()
 	test := registrytest.New(t, storage.Store).ClusterScope()
 	pv := validNewPersistentVolume("foo")
-	pv.ObjectMeta = api.ObjectMeta{GenerateName: "foo"}
+	pv.ObjectMeta = metav1.ObjectMeta{GenerateName: "foo"}
 	test.TestCreate(
 		// valid
 		pv,
 		// invalid
 		&api.PersistentVolume{
-			ObjectMeta: api.ObjectMeta{Name: "*BadName!"},
+			ObjectMeta: metav1.ObjectMeta{Name: "*BadName!"},
 		},
 	)
 }
@@ -172,7 +172,7 @@ func TestUpdateStatus(t *testing.T) {
 	}
 
 	pvIn := &api.PersistentVolume{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: "foo",
 		},
 		Status: api.PersistentVolumeStatus{

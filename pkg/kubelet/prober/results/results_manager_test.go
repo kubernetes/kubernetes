@@ -22,6 +22,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"k8s.io/kubernetes/pkg/api/v1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/util/wait"
 )
@@ -48,7 +49,7 @@ func TestCacheOperations(t *testing.T) {
 func TestUpdates(t *testing.T) {
 	m := NewManager()
 
-	pod := &v1.Pod{ObjectMeta: v1.ObjectMeta{Name: "test-pod"}}
+	pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "test-pod"}}
 	fooID := kubecontainer.ContainerID{Type: "test", ID: "foo"}
 	barID := kubecontainer.ContainerID{Type: "test", ID: "bar"}
 

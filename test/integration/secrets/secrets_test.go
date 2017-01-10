@@ -25,6 +25,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/test/integration"
@@ -54,7 +55,7 @@ func TestSecrets(t *testing.T) {
 func DoTestSecrets(t *testing.T, client clientset.Interface, ns *v1.Namespace) {
 	// Make a secret object.
 	s := v1.Secret{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      "secret",
 			Namespace: ns.Name,
 		},
@@ -70,7 +71,7 @@ func DoTestSecrets(t *testing.T, client clientset.Interface, ns *v1.Namespace) {
 
 	// Template for pods that use a secret.
 	pod := &v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      "XXX",
 			Namespace: ns.Name,
 		},

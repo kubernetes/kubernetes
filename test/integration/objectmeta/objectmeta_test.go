@@ -23,6 +23,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/test/integration/framework"
@@ -35,7 +36,7 @@ func TestIgnoreClusterName(t *testing.T) {
 
 	client := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(v1.GroupName).GroupVersion}})
 	ns := v1.Namespace{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:        "test-namespace",
 			ClusterName: "cluster-name-to-ignore",
 		},

@@ -21,7 +21,6 @@ package etcd
 import (
 	"fmt"
 
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/apis/extensions"
@@ -169,7 +168,7 @@ func (r *ScaleREST) Update(ctx genericapirequest.Context, name string, objInfo r
 func scaleFromReplicaSet(rs *extensions.ReplicaSet) (*extensions.Scale, error) {
 	return &extensions.Scale{
 		// TODO: Create a variant of ObjectMeta type that only contains the fields below.
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:              rs.Name,
 			Namespace:         rs.Namespace,
 			UID:               rs.UID,

@@ -28,6 +28,8 @@ import (
 	"time"
 	"unicode"
 
+	"github.com/emicklei/go-restful"
+
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/meta"
@@ -41,8 +43,6 @@ import (
 	"k8s.io/kubernetes/pkg/genericapiserver/api/request"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/runtime/schema"
-
-	"github.com/emicklei/go-restful"
 )
 
 type APIInstaller struct {

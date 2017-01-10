@@ -47,7 +47,7 @@ func (t *testLW) Watch(options v1.ListOptions) (watch.Interface, error) {
 
 func TestCloseWatchChannelOnError(t *testing.T) {
 	r := NewReflector(&testLW{}, &v1.Pod{}, NewStore(MetaNamespaceKeyFunc), 0)
-	pod := &v1.Pod{ObjectMeta: v1.ObjectMeta{Name: "bar"}}
+	pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "bar"}}
 	fw := watch.NewFake()
 	r.listerWatcher = &testLW{
 		WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
@@ -86,7 +86,7 @@ func TestRunUntil(t *testing.T) {
 	r.RunUntil(stopCh)
 	// Synchronously add a dummy pod into the watch channel so we
 	// know the RunUntil go routine is in the watch handler.
-	fw.Add(&v1.Pod{ObjectMeta: v1.ObjectMeta{Name: "bar"}})
+	fw.Add(&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "bar"}})
 	close(stopCh)
 	select {
 	case _, ok := <-fw.ResultChan():
@@ -142,13 +142,13 @@ func TestReflectorWatchHandler(t *testing.T) {
 	s := NewStore(MetaNamespaceKeyFunc)
 	g := NewReflector(&testLW{}, &v1.Pod{}, s, 0)
 	fw := watch.NewFake()
-	s.Add(&v1.Pod{ObjectMeta: v1.ObjectMeta{Name: "foo"}})
-	s.Add(&v1.Pod{ObjectMeta: v1.ObjectMeta{Name: "bar"}})
+	s.Add(&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}})
+	s.Add(&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "bar"}})
 	go func() {
-		fw.Add(&v1.Service{ObjectMeta: v1.ObjectMeta{Name: "rejected"}})
-		fw.Delete(&v1.Pod{ObjectMeta: v1.ObjectMeta{Name: "foo"}})
-		fw.Modify(&v1.Pod{ObjectMeta: v1.ObjectMeta{Name: "bar", ResourceVersion: "55"}})
-		fw.Add(&v1.Pod{ObjectMeta: v1.ObjectMeta{Name: "baz", ResourceVersion: "32"}})
+		fw.Add(&v1.Service{ObjectMeta: metav1.ObjectMeta{Name: "rejected"}})
+		fw.Delete(&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}})
+		fw.Modify(&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "bar", ResourceVersion: "55"}})
+		fw.Add(&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "baz", ResourceVersion: "32"}})
 		fw.Stop()
 	}()
 	var resumeRV string
@@ -158,7 +158,7 @@ func TestReflectorWatchHandler(t *testing.T) {
 	}
 
 	mkPod := func(id string, rv string) *v1.Pod {
-		return &v1.Pod{ObjectMeta: v1.ObjectMeta{Name: id, ResourceVersion: rv}}
+		return &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: id, ResourceVersion: rv}}
 	}
 
 	table := []struct {
@@ -242,7 +242,7 @@ func TestReflectorListAndWatch(t *testing.T) {
 			fw = <-createdFakes
 		}
 		sendingRV := strconv.FormatUint(uint64(i+2), 10)
-		fw.Add(&v1.Pod{ObjectMeta: v1.ObjectMeta{Name: id, ResourceVersion: sendingRV}})
+		fw.Add(&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: id, ResourceVersion: sendingRV}})
 		if sendingRV == "3" {
 			// Inject a failure.
 			fw.Stop()
@@ -268,7 +268,7 @@ func TestReflectorListAndWatch(t *testing.T) {
 
 func TestReflectorListAndWatchWithErrors(t *testing.T) {
 	mkPod := func(id string, rv string) *v1.Pod {
-		return &v1.Pod{ObjectMeta: v1.ObjectMeta{Name: id, ResourceVersion: rv}}
+		return &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: id, ResourceVersion: rv}}
 	}
 	mkList := func(rv string, pods ...*v1.Pod) *v1.PodList {
 		list := &v1.PodList{ListMeta: metav1.ListMeta{ResourceVersion: rv}}

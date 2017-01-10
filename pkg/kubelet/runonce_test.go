@@ -25,6 +25,7 @@ import (
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
 	"k8s.io/kubernetes/pkg/client/record"
 	cadvisortest "k8s.io/kubernetes/pkg/kubelet/cadvisor/testing"
@@ -130,7 +131,7 @@ func TestRunOnce(t *testing.T) {
 
 	pods := []*v1.Pod{
 		{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				UID:       "12345678",
 				Name:      "foo",
 				Namespace: "new",

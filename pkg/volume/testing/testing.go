@@ -29,6 +29,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/v1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/types"
@@ -477,7 +478,7 @@ func (fc *FakeProvisioner) Provision() (*v1.PersistentVolume, error) {
 	fullpath := fmt.Sprintf("/tmp/hostpath_pv/%s", uuid.NewUUID())
 
 	pv := &v1.PersistentVolume{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: fc.Options.PVName,
 			Annotations: map[string]string{
 				"kubernetes.io/createdby": "fakeplugin-provisioner",
@@ -737,7 +738,7 @@ func GetTestVolumePluginMgr(
 // CreateTestPVC returns a provisionable PVC for tests
 func CreateTestPVC(capacity string, accessModes []v1.PersistentVolumeAccessMode) *v1.PersistentVolumeClaim {
 	claim := v1.PersistentVolumeClaim{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      "dummy",
 			Namespace: "default",
 		},

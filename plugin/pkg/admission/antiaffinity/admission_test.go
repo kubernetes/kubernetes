@@ -247,7 +247,7 @@ func TestOtherResources(t *testing.T) {
 	namespace := "testnamespace"
 	name := "testname"
 	pod := &api.Pod{
-		ObjectMeta: api.ObjectMeta{Name: name, Namespace: namespace},
+		ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: namespace},
 	}
 	tests := []struct {
 		name        string

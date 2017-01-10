@@ -99,7 +99,7 @@ type Cluster struct {
 	// Standard object's metadata.
 	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
 	// +optional
-	v1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// Spec defines the behavior of the Cluster.
 	// +optional

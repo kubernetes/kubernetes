@@ -22,6 +22,7 @@ import (
 	api "k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	v1 "k8s.io/kubernetes/pkg/api/v1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/labels"
 )
@@ -55,7 +56,7 @@ func (s *persistentVolumeLister) List(selector labels.Selector) (ret []*v1.Persi
 
 // Get retrieves the PersistentVolume from the index for a given name.
 func (s *persistentVolumeLister) Get(name string) (*v1.PersistentVolume, error) {
-	key := &v1.PersistentVolume{ObjectMeta: v1.ObjectMeta{Name: name}}
+	key := &v1.PersistentVolume{ObjectMeta: metav1.ObjectMeta{Name: name}}
 	obj, exists, err := s.indexer.Get(key)
 	if err != nil {
 		return nil, err

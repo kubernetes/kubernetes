@@ -73,6 +73,7 @@ func TestTypeTags(t *testing.T) {
 // so we explicitly allow tags for them
 var typesAllowedTags = map[reflect.Type]bool{
 	reflect.TypeOf(intstr.IntOrString{}):    true,
+	reflect.TypeOf(metav1.ObjectMeta{}):     true,
 	reflect.TypeOf(metav1.Time{}):           true,
 	reflect.TypeOf(metav1.Duration{}):       true,
 	reflect.TypeOf(metav1.TypeMeta{}):       true,

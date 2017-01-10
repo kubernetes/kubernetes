@@ -30,7 +30,7 @@ import metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 type StorageClass struct {
 	metav1.TypeMeta
 	// +optional
-	api.ObjectMeta
+	metav1.ObjectMeta
 
 	// provisioner is the driver expected to handle this StorageClass.
 	// This is an optionally-prefixed name, like a label key.

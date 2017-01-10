@@ -23,6 +23,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	restclientwatch "k8s.io/kubernetes/pkg/client/restclient/watch"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/runtime/serializer/streaming"
@@ -37,17 +38,17 @@ func TestEncodeDecodeRoundTrip(t *testing.T) {
 	}{
 		{
 			watch.Added,
-			&api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}},
+			&api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}},
 			testapi.Default.Codec(),
 		},
 		{
 			watch.Modified,
-			&api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}},
+			&api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}},
 			testapi.Default.Codec(),
 		},
 		{
 			watch.Deleted,
-			&api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}},
+			&api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}},
 			testapi.Default.Codec(),
 		},
 	}

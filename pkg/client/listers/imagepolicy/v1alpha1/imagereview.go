@@ -20,9 +20,9 @@ package v1alpha1
 
 import (
 	"k8s.io/kubernetes/pkg/api/errors"
-	v1 "k8s.io/kubernetes/pkg/api/v1"
 	imagepolicy "k8s.io/kubernetes/pkg/apis/imagepolicy"
 	v1alpha1 "k8s.io/kubernetes/pkg/apis/imagepolicy/v1alpha1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/labels"
 )
@@ -56,7 +56,7 @@ func (s *imageReviewLister) List(selector labels.Selector) (ret []*v1alpha1.Imag
 
 // Get retrieves the ImageReview from the index for a given name.
 func (s *imageReviewLister) Get(name string) (*v1alpha1.ImageReview, error) {
-	key := &v1alpha1.ImageReview{ObjectMeta: v1.ObjectMeta{Name: name}}
+	key := &v1alpha1.ImageReview{ObjectMeta: metav1.ObjectMeta{Name: name}}
 	obj, exists, err := s.indexer.Get(key)
 	if err != nil {
 		return nil, err

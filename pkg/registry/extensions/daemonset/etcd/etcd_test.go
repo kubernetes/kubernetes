@@ -44,14 +44,14 @@ func newStorage(t *testing.T) (*REST, *StatusREST, *etcdtesting.EtcdTestServer) 
 
 func newValidDaemonSet() *extensions.DaemonSet {
 	return &extensions.DaemonSet{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      "foo",
 			Namespace: api.NamespaceDefault,
 		},
 		Spec: extensions.DaemonSetSpec{
 			Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"a": "b"}},
 			Template: api.PodTemplateSpec{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{"a": "b"},
 				},
 				Spec: api.PodSpec{
@@ -78,7 +78,7 @@ func TestCreate(t *testing.T) {
 	defer storage.Store.DestroyFunc()
 	test := registrytest.New(t, storage.Store)
 	ds := newValidDaemonSet()
-	ds.ObjectMeta = api.ObjectMeta{}
+	ds.ObjectMeta = metav1.ObjectMeta{}
 	test.TestCreate(
 		// valid
 		ds,

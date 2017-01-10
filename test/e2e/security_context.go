@@ -37,7 +37,7 @@ import (
 func scTestPod(hostIPC bool, hostPID bool) *v1.Pod {
 	podName := "security-context-" + string(uuid.NewUUID())
 	pod := &v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:        podName,
 			Labels:      map[string]string{"name": podName},
 			Annotations: map[string]string{},

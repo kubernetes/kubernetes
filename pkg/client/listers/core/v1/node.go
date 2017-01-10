@@ -22,6 +22,7 @@ import (
 	api "k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	v1 "k8s.io/kubernetes/pkg/api/v1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/labels"
 )
@@ -55,7 +56,7 @@ func (s *nodeLister) List(selector labels.Selector) (ret []*v1.Node, err error) 
 
 // Get retrieves the Node from the index for a given name.
 func (s *nodeLister) Get(name string) (*v1.Node, error) {
-	key := &v1.Node{ObjectMeta: v1.ObjectMeta{Name: name}}
+	key := &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: name}}
 	obj, exists, err := s.indexer.Get(key)
 	if err != nil {
 		return nil, err

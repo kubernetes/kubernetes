@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/watch"
@@ -37,7 +38,7 @@ func TestDecoratedWatcher(t *testing.T) {
 	dw := newDecoratedWatcher(w, decorator)
 	defer dw.Stop()
 
-	go w.Add(&api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}})
+	go w.Add(&api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}})
 	select {
 	case e := <-dw.ResultChan():
 		pod, ok := e.Object.(*api.Pod)
@@ -62,7 +63,7 @@ func TestDecoratedWatcherError(t *testing.T) {
 	dw := newDecoratedWatcher(w, decorator)
 	defer dw.Stop()
 
-	go w.Add(&api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}})
+	go w.Add(&api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}})
 	select {
 	case e := <-dw.ResultChan():
 		if e.Type != watch.Error {

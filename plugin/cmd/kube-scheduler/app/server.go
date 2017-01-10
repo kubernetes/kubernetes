@@ -27,8 +27,14 @@ import (
 	goruntime "runtime"
 	"strconv"
 
+	"github.com/golang/glog"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
+
 	"k8s.io/apiserver/pkg/healthz"
 	"k8s.io/kubernetes/pkg/api/v1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	v1core "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/core/v1"
 	"k8s.io/kubernetes/pkg/client/leaderelection"
@@ -44,11 +50,6 @@ import (
 	schedulerapi "k8s.io/kubernetes/plugin/pkg/scheduler/api"
 	latestschedulerapi "k8s.io/kubernetes/plugin/pkg/scheduler/api/latest"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/factory"
-
-	"github.com/golang/glog"
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/spf13/cobra"
-	"github.com/spf13/pflag"
 )
 
 // NewSchedulerCommand creates a *cobra.Command object with default parameters
@@ -101,7 +102,7 @@ func Run(s *options.SchedulerServer) error {
 	}
 	// TODO: enable other lock types
 	rl := &resourcelock.EndpointsLock{
-		EndpointsMeta: v1.ObjectMeta{
+		EndpointsMeta: metav1.ObjectMeta{
 			Namespace: "kube-system",
 			Name:      "kube-scheduler",
 		},

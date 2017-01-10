@@ -36,7 +36,7 @@ func TestNetworkPolicyStrategy(t *testing.T) {
 
 	validMatchLabels := map[string]string{"a": "b"}
 	np := &extensions.NetworkPolicy{
-		ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
+		ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
 		Spec: extensions.NetworkPolicySpec{
 			PodSelector: metav1.LabelSelector{MatchLabels: validMatchLabels},
 			Ingress:     []extensions.NetworkPolicyIngressRule{},
@@ -50,7 +50,7 @@ func TestNetworkPolicyStrategy(t *testing.T) {
 	}
 
 	invalidNp := &extensions.NetworkPolicy{
-		ObjectMeta: api.ObjectMeta{Name: "bar", ResourceVersion: "4"},
+		ObjectMeta: metav1.ObjectMeta{Name: "bar", ResourceVersion: "4"},
 	}
 	Strategy.PrepareForUpdate(ctx, invalidNp, np)
 	errs = Strategy.ValidateUpdate(ctx, invalidNp, np)

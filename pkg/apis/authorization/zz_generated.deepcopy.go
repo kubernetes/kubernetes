@@ -21,7 +21,7 @@ limitations under the License.
 package authorization
 
 import (
-	api "k8s.io/kubernetes/pkg/api"
+	v1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	conversion "k8s.io/kubernetes/pkg/conversion"
 	runtime "k8s.io/kubernetes/pkg/runtime"
 	reflect "reflect"
@@ -51,7 +51,7 @@ func DeepCopy_authorization_LocalSubjectAccessReview(in interface{}, out interfa
 		in := in.(*LocalSubjectAccessReview)
 		out := out.(*LocalSubjectAccessReview)
 		*out = *in
-		if err := api.DeepCopy_api_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, c); err != nil {
+		if err := v1.DeepCopy_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, c); err != nil {
 			return err
 		}
 		if err := DeepCopy_authorization_SubjectAccessReviewSpec(&in.Spec, &out.Spec, c); err != nil {
@@ -84,7 +84,7 @@ func DeepCopy_authorization_SelfSubjectAccessReview(in interface{}, out interfac
 		in := in.(*SelfSubjectAccessReview)
 		out := out.(*SelfSubjectAccessReview)
 		*out = *in
-		if err := api.DeepCopy_api_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, c); err != nil {
+		if err := v1.DeepCopy_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, c); err != nil {
 			return err
 		}
 		if err := DeepCopy_authorization_SelfSubjectAccessReviewSpec(&in.Spec, &out.Spec, c); err != nil {
@@ -118,7 +118,7 @@ func DeepCopy_authorization_SubjectAccessReview(in interface{}, out interface{},
 		in := in.(*SubjectAccessReview)
 		out := out.(*SubjectAccessReview)
 		*out = *in
-		if err := api.DeepCopy_api_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, c); err != nil {
+		if err := v1.DeepCopy_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, c); err != nil {
 			return err
 		}
 		if err := DeepCopy_authorization_SubjectAccessReviewSpec(&in.Spec, &out.Spec, c); err != nil {

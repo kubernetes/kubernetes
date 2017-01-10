@@ -169,7 +169,7 @@ func TestConcurrentEvictionRequests(t *testing.T) {
 
 func newPod(podName string) *v1.Pod {
 	return &v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:   podName,
 			Labels: map[string]string{"app": "test-evictions"},
 		},
@@ -198,7 +198,7 @@ func addPodConditionReady(pod *v1.Pod) {
 
 func newPDB() *v1beta1.PodDisruptionBudget {
 	return &v1beta1.PodDisruptionBudget{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: "test-pdb",
 		},
 		Spec: v1beta1.PodDisruptionBudgetSpec{
@@ -219,7 +219,7 @@ func newEviction(ns, evictionName string, deleteOption *v1.DeleteOptions) *v1bet
 			APIVersion: "Policy/v1beta1",
 			Kind:       "Eviction",
 		},
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      evictionName,
 			Namespace: ns,
 		},

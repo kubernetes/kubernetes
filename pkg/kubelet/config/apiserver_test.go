@@ -21,6 +21,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/client/cache"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -44,13 +45,13 @@ var _ cache.ListerWatcher = fakePodLW{}
 
 func TestNewSourceApiserver_UpdatesAndMultiplePods(t *testing.T) {
 	pod1v1 := &v1.Pod{
-		ObjectMeta: v1.ObjectMeta{Name: "p"},
+		ObjectMeta: metav1.ObjectMeta{Name: "p"},
 		Spec:       v1.PodSpec{Containers: []v1.Container{{Image: "image/one"}}}}
 	pod1v2 := &v1.Pod{
-		ObjectMeta: v1.ObjectMeta{Name: "p"},
+		ObjectMeta: metav1.ObjectMeta{Name: "p"},
 		Spec:       v1.PodSpec{Containers: []v1.Container{{Image: "image/two"}}}}
 	pod2 := &v1.Pod{
-		ObjectMeta: v1.ObjectMeta{Name: "q"},
+		ObjectMeta: metav1.ObjectMeta{Name: "q"},
 		Spec:       v1.PodSpec{Containers: []v1.Container{{Image: "image/blah"}}}}
 
 	// Setup fake api client.
@@ -130,10 +131,10 @@ func TestNewSourceApiserver_UpdatesAndMultiplePods(t *testing.T) {
 
 func TestNewSourceApiserver_TwoNamespacesSameName(t *testing.T) {
 	pod1 := v1.Pod{
-		ObjectMeta: v1.ObjectMeta{Name: "p", Namespace: "one"},
+		ObjectMeta: metav1.ObjectMeta{Name: "p", Namespace: "one"},
 		Spec:       v1.PodSpec{Containers: []v1.Container{{Image: "image/one"}}}}
 	pod2 := v1.Pod{
-		ObjectMeta: v1.ObjectMeta{Name: "p", Namespace: "two"},
+		ObjectMeta: metav1.ObjectMeta{Name: "p", Namespace: "two"},
 		Spec:       v1.PodSpec{Containers: []v1.Container{{Image: "image/blah"}}}}
 
 	// Setup fake api client.

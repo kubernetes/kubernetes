@@ -37,13 +37,13 @@ import (
 func newRS(rsName string, replicas int32, rsPodLabels map[string]string, imageName string, image string) *extensions.ReplicaSet {
 	zero := int64(0)
 	return &extensions.ReplicaSet{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: rsName,
 		},
 		Spec: extensions.ReplicaSetSpec{
 			Replicas: func(i int32) *int32 { return &i }(replicas),
 			Template: v1.PodTemplateSpec{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Labels: rsPodLabels,
 				},
 				Spec: v1.PodSpec{
@@ -62,7 +62,7 @@ func newRS(rsName string, replicas int32, rsPodLabels map[string]string, imageNa
 
 func newPodQuota(name, number string) *v1.ResourceQuota {
 	return &v1.ResourceQuota{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 		},
 		Spec: v1.ResourceQuotaSpec{
@@ -103,7 +103,7 @@ func ReplicaSetServeImageOrFail(f *framework.Framework, test string, image strin
 	// in contrib/for-demos/serve_hostname
 	By(fmt.Sprintf("Creating ReplicaSet %s", name))
 	rs, err := f.ClientSet.Extensions().ReplicaSets(f.Namespace.Name).Create(&extensions.ReplicaSet{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 		},
 		Spec: extensions.ReplicaSetSpec{
@@ -112,7 +112,7 @@ func ReplicaSetServeImageOrFail(f *framework.Framework, test string, image strin
 				"name": name,
 			}},
 			Template: v1.PodTemplateSpec{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{"name": name},
 				},
 				Spec: v1.PodSpec{

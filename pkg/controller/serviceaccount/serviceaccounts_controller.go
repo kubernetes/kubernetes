@@ -24,6 +24,7 @@ import (
 	apierrs "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/v1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/controller/informers"
@@ -62,7 +63,7 @@ type ServiceAccountsControllerOptions struct {
 func DefaultServiceAccountsControllerOptions() ServiceAccountsControllerOptions {
 	return ServiceAccountsControllerOptions{
 		ServiceAccounts: []v1.ServiceAccount{
-			{ObjectMeta: v1.ObjectMeta{Name: "default"}},
+			{ObjectMeta: metav1.ObjectMeta{Name: "default"}},
 		},
 	}
 }

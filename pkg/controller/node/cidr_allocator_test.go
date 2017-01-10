@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api/v1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
 	"k8s.io/kubernetes/pkg/controller/node/testutil"
 	"k8s.io/kubernetes/pkg/util/wait"
@@ -55,7 +56,7 @@ func TestAllocateOrOccupyCIDRSuccess(t *testing.T) {
 			fakeNodeHandler: &testutil.FakeNodeHandler{
 				Existing: []*v1.Node{
 					{
-						ObjectMeta: v1.ObjectMeta{
+						ObjectMeta: metav1.ObjectMeta{
 							Name: "node0",
 						},
 					},
@@ -75,7 +76,7 @@ func TestAllocateOrOccupyCIDRSuccess(t *testing.T) {
 			fakeNodeHandler: &testutil.FakeNodeHandler{
 				Existing: []*v1.Node{
 					{
-						ObjectMeta: v1.ObjectMeta{
+						ObjectMeta: metav1.ObjectMeta{
 							Name: "node0",
 						},
 					},
@@ -99,7 +100,7 @@ func TestAllocateOrOccupyCIDRSuccess(t *testing.T) {
 			fakeNodeHandler: &testutil.FakeNodeHandler{
 				Existing: []*v1.Node{
 					{
-						ObjectMeta: v1.ObjectMeta{
+						ObjectMeta: metav1.ObjectMeta{
 							Name: "node0",
 						},
 					},
@@ -185,7 +186,7 @@ func TestAllocateOrOccupyCIDRFailure(t *testing.T) {
 			fakeNodeHandler: &testutil.FakeNodeHandler{
 				Existing: []*v1.Node{
 					{
-						ObjectMeta: v1.ObjectMeta{
+						ObjectMeta: metav1.ObjectMeta{
 							Name: "node0",
 						},
 					},
@@ -268,7 +269,7 @@ func TestReleaseCIDRSuccess(t *testing.T) {
 			fakeNodeHandler: &testutil.FakeNodeHandler{
 				Existing: []*v1.Node{
 					{
-						ObjectMeta: v1.ObjectMeta{
+						ObjectMeta: metav1.ObjectMeta{
 							Name: "node0",
 						},
 					},
@@ -291,7 +292,7 @@ func TestReleaseCIDRSuccess(t *testing.T) {
 			fakeNodeHandler: &testutil.FakeNodeHandler{
 				Existing: []*v1.Node{
 					{
-						ObjectMeta: v1.ObjectMeta{
+						ObjectMeta: metav1.ObjectMeta{
 							Name: "node0",
 						},
 					},
@@ -359,7 +360,7 @@ func TestReleaseCIDRSuccess(t *testing.T) {
 
 		for _, cidrToRelease := range tc.cidrsToRelease {
 			nodeToRelease := v1.Node{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name: "node0",
 				},
 			}

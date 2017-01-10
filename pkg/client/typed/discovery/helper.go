@@ -23,8 +23,7 @@ import (
 	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/version"
-	// Import solely to initialize client auth plugins.
-	_ "k8s.io/kubernetes/plugin/pkg/client/auth"
+	_ "k8s.io/kubernetes/plugin/pkg/client/auth" // Import solely to initialize client auth plugins.
 )
 
 // MatchesServerVersion queries the server to compares the build version

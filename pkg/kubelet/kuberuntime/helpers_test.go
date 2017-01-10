@@ -21,6 +21,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"k8s.io/kubernetes/pkg/api/v1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 )
 
 func TestStableKey(t *testing.T) {
@@ -29,7 +30,7 @@ func TestStableKey(t *testing.T) {
 		Image: "foo/image:v1",
 	}
 	pod := &v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test_pod",
 			Namespace: "test_pod_namespace",
 			UID:       "test_pod_uid",

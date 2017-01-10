@@ -24,13 +24,13 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/kubernetes/pkg/api/v1"
-
-	"k8s.io/kubernetes/test/e2e/framework"
-	"k8s.io/kubernetes/test/images/net/nat"
-
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+
+	"k8s.io/kubernetes/pkg/api/v1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
+	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/images/net/nat"
 )
 
 const kubeProxyE2eImage = "gcr.io/google_containers/e2e-net-amd64:1.0"
@@ -76,7 +76,7 @@ var _ = framework.KubeDescribe("Network", func() {
 		zero := int64(0)
 
 		clientPodSpec := &v1.Pod{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:      "e2e-net-client",
 				Namespace: fr.Namespace.Name,
 				Labels:    map[string]string{"app": "e2e-net-client"},
@@ -98,7 +98,7 @@ var _ = framework.KubeDescribe("Network", func() {
 		}
 
 		serverPodSpec := &v1.Pod{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:      "e2e-net-server",
 				Namespace: fr.Namespace.Name,
 				Labels:    map[string]string{"app": "e2e-net-server"},

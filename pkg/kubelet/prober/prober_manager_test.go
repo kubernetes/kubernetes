@@ -24,6 +24,7 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api/v1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/prober/results"
 	"k8s.io/kubernetes/pkg/probe"
@@ -48,7 +49,7 @@ var defaultProbe *v1.Probe = &v1.Probe{
 
 func TestAddRemovePods(t *testing.T) {
 	noProbePod := v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			UID: "no_probe_pod",
 		},
 		Spec: v1.PodSpec{
@@ -61,7 +62,7 @@ func TestAddRemovePods(t *testing.T) {
 	}
 
 	probePod := v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			UID: "probe_pod",
 		},
 		Spec: v1.PodSpec{
@@ -127,7 +128,7 @@ func TestCleanupPods(t *testing.T) {
 	m := newTestManager()
 	defer cleanup(t, m)
 	podToCleanup := v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			UID: "pod_cleanup",
 		},
 		Spec: v1.PodSpec{
@@ -141,7 +142,7 @@ func TestCleanupPods(t *testing.T) {
 		},
 	}
 	podToKeep := v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			UID: "pod_keep",
 		},
 		Spec: v1.PodSpec{

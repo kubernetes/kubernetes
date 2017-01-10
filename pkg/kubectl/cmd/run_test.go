@@ -29,6 +29,7 @@ import (
 	"github.com/spf13/cobra"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/restclient/fake"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
@@ -196,7 +197,7 @@ func TestGenerateService(t *testing.T) {
 			expectErr: false,
 			name:      "basic",
 			service: api.Service{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
 				},
 				Spec: api.ServiceSpec{
@@ -227,7 +228,7 @@ func TestGenerateService(t *testing.T) {
 			expectErr: false,
 			name:      "custom labels",
 			service: api.Service{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:   "foo",
 					Labels: map[string]string{"app": "bar"},
 				},

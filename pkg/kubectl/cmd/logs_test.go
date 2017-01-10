@@ -27,6 +27,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"k8s.io/kubernetes/pkg/api"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/restclient/fake"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
@@ -82,7 +83,7 @@ func TestLog(t *testing.T) {
 
 func testPod() *api.Pod {
 	return &api.Pod{
-		ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "test", ResourceVersion: "10"},
+		ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "test", ResourceVersion: "10"},
 		Spec: api.PodSpec{
 			RestartPolicy: api.RestartPolicyAlways,
 			DNSPolicy:     api.DNSClusterFirst,

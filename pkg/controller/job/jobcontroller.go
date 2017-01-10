@@ -23,6 +23,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/golang/glog"
+
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/v1"
 	batch "k8s.io/kubernetes/pkg/apis/batch/v1"
@@ -38,8 +40,6 @@ import (
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/util/workqueue"
-
-	"github.com/golang/glog"
 )
 
 type JobController struct {

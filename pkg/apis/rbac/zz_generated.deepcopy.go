@@ -21,7 +21,7 @@ limitations under the License.
 package rbac
 
 import (
-	api "k8s.io/kubernetes/pkg/api"
+	v1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	conversion "k8s.io/kubernetes/pkg/conversion"
 	runtime "k8s.io/kubernetes/pkg/runtime"
 	reflect "reflect"
@@ -54,7 +54,7 @@ func DeepCopy_rbac_ClusterRole(in interface{}, out interface{}, c *conversion.Cl
 		in := in.(*ClusterRole)
 		out := out.(*ClusterRole)
 		*out = *in
-		if err := api.DeepCopy_api_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, c); err != nil {
+		if err := v1.DeepCopy_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, c); err != nil {
 			return err
 		}
 		if in.Rules != nil {
@@ -75,7 +75,7 @@ func DeepCopy_rbac_ClusterRoleBinding(in interface{}, out interface{}, c *conver
 		in := in.(*ClusterRoleBinding)
 		out := out.(*ClusterRoleBinding)
 		*out = *in
-		if err := api.DeepCopy_api_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, c); err != nil {
+		if err := v1.DeepCopy_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, c); err != nil {
 			return err
 		}
 		if in.Subjects != nil {
@@ -172,7 +172,7 @@ func DeepCopy_rbac_Role(in interface{}, out interface{}, c *conversion.Cloner) e
 		in := in.(*Role)
 		out := out.(*Role)
 		*out = *in
-		if err := api.DeepCopy_api_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, c); err != nil {
+		if err := v1.DeepCopy_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, c); err != nil {
 			return err
 		}
 		if in.Rules != nil {
@@ -193,7 +193,7 @@ func DeepCopy_rbac_RoleBinding(in interface{}, out interface{}, c *conversion.Cl
 		in := in.(*RoleBinding)
 		out := out.(*RoleBinding)
 		*out = *in
-		if err := api.DeepCopy_api_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, c); err != nil {
+		if err := v1.DeepCopy_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, c); err != nil {
 			return err
 		}
 		if in.Subjects != nil {

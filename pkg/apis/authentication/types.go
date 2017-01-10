@@ -42,7 +42,7 @@ type TokenReview struct {
 	metav1.TypeMeta
 	// ObjectMeta fulfills the meta.ObjectMetaAccessor interface so that the stock
 	// REST handler paths work
-	api.ObjectMeta
+	metav1.ObjectMeta
 
 	// Spec holds information about the request being evaluated
 	Spec TokenReviewSpec

@@ -21,13 +21,14 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+
 	federationapi "k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	apiv1 "k8s.io/kubernetes/pkg/api/v1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	fakekubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
 	pkgruntime "k8s.io/kubernetes/pkg/runtime"
-
-	"github.com/stretchr/testify/assert"
 )
 
 // Fake federation view.
@@ -136,7 +137,7 @@ func TestFederatedUpdaterTimeout(t *testing.T) {
 
 func makeService(cluster, name string) *apiv1.Service {
 	return &apiv1.Service{
-		ObjectMeta: apiv1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Namespace: "ns1",
 			Name:      name,
 		},

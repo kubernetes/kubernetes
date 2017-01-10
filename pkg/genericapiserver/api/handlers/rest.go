@@ -27,6 +27,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/emicklei/go-restful"
+	"github.com/evanphx/json-patch"
+	"github.com/golang/glog"
+
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
@@ -42,10 +46,6 @@ import (
 	"k8s.io/kubernetes/pkg/util"
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/strategicpatch"
-
-	"github.com/emicklei/go-restful"
-	"github.com/evanphx/json-patch"
-	"github.com/golang/glog"
 )
 
 // ContextFunc returns a Context given a request - a context must be returned

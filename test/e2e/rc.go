@@ -55,13 +55,13 @@ var _ = framework.KubeDescribe("ReplicationController", func() {
 func newRC(rsName string, replicas int32, rcPodLabels map[string]string, imageName string, image string) *v1.ReplicationController {
 	zero := int64(0)
 	return &v1.ReplicationController{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: rsName,
 		},
 		Spec: v1.ReplicationControllerSpec{
 			Replicas: func(i int32) *int32 { return &i }(replicas),
 			Template: &v1.PodTemplateSpec{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Labels: rcPodLabels,
 				},
 				Spec: v1.PodSpec{
@@ -91,7 +91,7 @@ func ServeImageOrFail(f *framework.Framework, test string, image string) {
 	// in contrib/for-demos/serve_hostname
 	By(fmt.Sprintf("Creating replication controller %s", name))
 	controller, err := f.ClientSet.Core().ReplicationControllers(f.Namespace.Name).Create(&v1.ReplicationController{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 		},
 		Spec: v1.ReplicationControllerSpec{
@@ -100,7 +100,7 @@ func ServeImageOrFail(f *framework.Framework, test string, image string) {
 				"name": name,
 			},
 			Template: &v1.PodTemplateSpec{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{"name": name},
 				},
 				Spec: v1.PodSpec{

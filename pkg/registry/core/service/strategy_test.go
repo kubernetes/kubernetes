@@ -25,6 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/rest"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	genericapirequest "k8s.io/kubernetes/pkg/genericapiserver/api/request"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/intstr"
@@ -39,7 +40,7 @@ func TestExportService(t *testing.T) {
 	}{
 		{
 			objIn: &api.Service{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:      "foo",
 					Namespace: "bar",
 				},
@@ -52,7 +53,7 @@ func TestExportService(t *testing.T) {
 				},
 			},
 			objOut: &api.Service{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:      "foo",
 					Namespace: "bar",
 				},
@@ -61,7 +62,7 @@ func TestExportService(t *testing.T) {
 		},
 		{
 			objIn: &api.Service{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:      "foo",
 					Namespace: "bar",
 				},
@@ -77,7 +78,7 @@ func TestExportService(t *testing.T) {
 				},
 			},
 			objOut: &api.Service{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:      "foo",
 					Namespace: "bar",
 				},
@@ -122,14 +123,14 @@ func TestCheckGeneratedNameError(t *testing.T) {
 	}
 
 	expect = errors.NewAlreadyExists(api.Resource("foos"), "bar")
-	if err := rest.CheckGeneratedNameError(Strategy, expect, &api.Pod{ObjectMeta: api.ObjectMeta{GenerateName: "foo"}}); err == nil || !errors.IsServerTimeout(err) {
+	if err := rest.CheckGeneratedNameError(Strategy, expect, &api.Pod{ObjectMeta: metav1.ObjectMeta{GenerateName: "foo"}}); err == nil || !errors.IsServerTimeout(err) {
 		t.Errorf("expected try again later error: %v", err)
 	}
 }
 
 func makeValidService() api.Service {
 	return api.Service{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:            "valid",
 			Namespace:       "default",
 			Labels:          map[string]string{},

@@ -40,6 +40,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/client/record"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
@@ -1918,7 +1919,7 @@ func makePod(name string, spec *v1.PodSpec) *v1.Pod {
 		spec = &v1.PodSpec{Containers: []v1.Container{{Name: "foo"}, {Name: "bar"}}}
 	}
 	pod := &v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			UID:       "12345678",
 			Name:      name,
 			Namespace: "new",

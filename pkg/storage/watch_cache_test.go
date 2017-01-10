@@ -37,7 +37,7 @@ import (
 
 func makeTestPod(name string, resourceVersion uint64) *api.Pod {
 	return &api.Pod{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Namespace:       "ns",
 			Name:            name,
 			ResourceVersion: strconv.FormatUint(resourceVersion, 10),

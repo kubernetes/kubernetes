@@ -20,9 +20,9 @@ package v1beta1
 
 import (
 	"k8s.io/kubernetes/pkg/api/errors"
-	v1 "k8s.io/kubernetes/pkg/api/v1"
 	authorization "k8s.io/kubernetes/pkg/apis/authorization"
 	v1beta1 "k8s.io/kubernetes/pkg/apis/authorization/v1beta1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/labels"
 )
@@ -56,7 +56,7 @@ func (s *subjectAccessReviewLister) List(selector labels.Selector) (ret []*v1bet
 
 // Get retrieves the SubjectAccessReview from the index for a given name.
 func (s *subjectAccessReviewLister) Get(name string) (*v1beta1.SubjectAccessReview, error) {
-	key := &v1beta1.SubjectAccessReview{ObjectMeta: v1.ObjectMeta{Name: name}}
+	key := &v1beta1.SubjectAccessReview{ObjectMeta: metav1.ObjectMeta{Name: name}}
 	obj, exists, err := s.indexer.Get(key)
 	if err != nil {
 		return nil, err

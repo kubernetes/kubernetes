@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 )
 
 func TestServiceAccountGenerate(t *testing.T) {
@@ -32,7 +33,7 @@ func TestServiceAccountGenerate(t *testing.T) {
 		{
 			name: "foo",
 			expected: &api.ServiceAccount{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
 				},
 			},

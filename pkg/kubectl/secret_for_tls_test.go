@@ -24,6 +24,7 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	utiltesting "k8s.io/kubernetes/pkg/util/testing"
 )
 
@@ -133,7 +134,7 @@ func TestSecretForTLSGenerate(t *testing.T) {
 				"cert": validCertPath,
 			},
 			expected: &api.Secret{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
 				},
 				Data: map[string][]byte{
@@ -151,7 +152,7 @@ func TestSecretForTLSGenerate(t *testing.T) {
 				"cert": invalidCertPath,
 			},
 			expected: &api.Secret{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
 				},
 				Data: map[string][]byte{
@@ -169,7 +170,7 @@ func TestSecretForTLSGenerate(t *testing.T) {
 				"cert": mismatchCertPath,
 			},
 			expected: &api.Secret{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
 				},
 				Data: map[string][]byte{

@@ -17,11 +17,12 @@ limitations under the License.
 package common
 
 import (
+	. "github.com/onsi/ginkgo"
+
 	"k8s.io/kubernetes/pkg/api/v1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
-
-	. "github.com/onsi/ginkgo"
 )
 
 var _ = framework.KubeDescribe("Docker Containers", func() {
@@ -71,7 +72,7 @@ func entrypointTestPod() *v1.Pod {
 	podName := "client-containers-" + string(uuid.NewUUID())
 
 	return &v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: podName,
 		},
 		Spec: v1.PodSpec{

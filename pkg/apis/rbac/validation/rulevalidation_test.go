@@ -75,23 +75,23 @@ func TestDefaultRuleResolver(t *testing.T) {
 	staticRoles1 := StaticRoles{
 		roles: []*rbac.Role{
 			{
-				ObjectMeta: api.ObjectMeta{Namespace: "namespace1", Name: "readthings"},
+				ObjectMeta: metav1.ObjectMeta{Namespace: "namespace1", Name: "readthings"},
 				Rules:      []rbac.PolicyRule{ruleReadPods, ruleReadServices},
 			},
 		},
 		clusterRoles: []*rbac.ClusterRole{
 			{
-				ObjectMeta: api.ObjectMeta{Name: "cluster-admin"},
+				ObjectMeta: metav1.ObjectMeta{Name: "cluster-admin"},
 				Rules:      []rbac.PolicyRule{ruleAdmin},
 			},
 			{
-				ObjectMeta: api.ObjectMeta{Name: "write-nodes"},
+				ObjectMeta: metav1.ObjectMeta{Name: "write-nodes"},
 				Rules:      []rbac.PolicyRule{ruleWriteNodes},
 			},
 		},
 		roleBindings: []*rbac.RoleBinding{
 			{
-				ObjectMeta: api.ObjectMeta{Namespace: "namespace1"},
+				ObjectMeta: metav1.ObjectMeta{Namespace: "namespace1"},
 				Subjects: []rbac.Subject{
 					{Kind: rbac.UserKind, Name: "foobar"},
 					{Kind: rbac.GroupKind, Name: "group1"},

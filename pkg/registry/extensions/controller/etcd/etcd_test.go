@@ -44,7 +44,7 @@ func newStorage(t *testing.T) (*ScaleREST, *etcdtesting.EtcdTestServer, storage.
 
 var validPodTemplate = api.PodTemplate{
 	Template: api.PodTemplateSpec{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Labels: map[string]string{"a": "b"},
 		},
 		Spec: api.PodSpec{
@@ -70,12 +70,12 @@ var validControllerSpec = api.ReplicationControllerSpec{
 }
 
 var validController = api.ReplicationController{
-	ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "test"},
+	ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "test"},
 	Spec:       validControllerSpec,
 }
 
 var validScale = extensions.Scale{
-	ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "test"},
+	ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "test"},
 	Spec: extensions.ScaleSpec{
 		Replicas: validReplicas,
 	},
@@ -117,7 +117,7 @@ func TestUpdate(t *testing.T) {
 	}
 	replicas := int32(12)
 	update := extensions.Scale{
-		ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "test"},
+		ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "test"},
 		Spec: extensions.ScaleSpec{
 			Replicas: replicas,
 		},

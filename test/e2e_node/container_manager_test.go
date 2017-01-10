@@ -26,13 +26,14 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/kubernetes/pkg/api/resource"
-	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/util/uuid"
-	"k8s.io/kubernetes/test/e2e/framework"
-
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+
+	"k8s.io/kubernetes/pkg/api/resource"
+	"k8s.io/kubernetes/pkg/api/v1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
+	"k8s.io/kubernetes/pkg/util/uuid"
+	"k8s.io/kubernetes/test/e2e/framework"
 )
 
 func getOOMScoreForPid(pid int) (int, error) {
@@ -96,7 +97,7 @@ var _ = framework.KubeDescribe("Kubelet Container Manager [Serial]", func() {
 				podClient := f.PodClient()
 				podName := "besteffort" + string(uuid.NewUUID())
 				podClient.Create(&v1.Pod{
-					ObjectMeta: v1.ObjectMeta{
+					ObjectMeta: metav1.ObjectMeta{
 						Name: podName,
 					},
 					Spec: v1.PodSpec{
@@ -140,7 +141,7 @@ var _ = framework.KubeDescribe("Kubelet Container Manager [Serial]", func() {
 				podClient := f.PodClient()
 				podName := "guaranteed" + string(uuid.NewUUID())
 				podClient.Create(&v1.Pod{
-					ObjectMeta: v1.ObjectMeta{
+					ObjectMeta: metav1.ObjectMeta{
 						Name: podName,
 					},
 					Spec: v1.PodSpec{
@@ -181,7 +182,7 @@ var _ = framework.KubeDescribe("Kubelet Container Manager [Serial]", func() {
 				podClient := f.PodClient()
 				podName := "burstable" + string(uuid.NewUUID())
 				podClient.Create(&v1.Pod{
-					ObjectMeta: v1.ObjectMeta{
+					ObjectMeta: metav1.ObjectMeta{
 						Name: podName,
 					},
 					Spec: v1.PodSpec{

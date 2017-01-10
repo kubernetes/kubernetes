@@ -37,7 +37,7 @@ func TestPodDisruptionBudgetStrategy(t *testing.T) {
 
 	validSelector := map[string]string{"a": "b"}
 	pdb := &policy.PodDisruptionBudget{
-		ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
+		ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
 		Spec: policy.PodDisruptionBudgetSpec{
 			MinAvailable: intstr.FromInt(3),
 			Selector:     &metav1.LabelSelector{MatchLabels: validSelector},
@@ -51,7 +51,7 @@ func TestPodDisruptionBudgetStrategy(t *testing.T) {
 	}
 
 	newPdb := &policy.PodDisruptionBudget{
-		ObjectMeta: api.ObjectMeta{Name: pdb.Name, Namespace: pdb.Namespace},
+		ObjectMeta: metav1.ObjectMeta{Name: pdb.Name, Namespace: pdb.Namespace},
 		Spec:       pdb.Spec,
 		Status: policy.PodDisruptionBudgetStatus{
 			PodDisruptionsAllowed: 1,
@@ -96,7 +96,7 @@ func TestPodDisruptionBudgetStatusStrategy(t *testing.T) {
 	}
 	validSelector := map[string]string{"a": "b"}
 	oldPdb := &policy.PodDisruptionBudget{
-		ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault, ResourceVersion: "10"},
+		ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault, ResourceVersion: "10"},
 		Spec: policy.PodDisruptionBudgetSpec{
 			Selector:     &metav1.LabelSelector{MatchLabels: validSelector},
 			MinAvailable: intstr.FromInt(3),
@@ -109,7 +109,7 @@ func TestPodDisruptionBudgetStatusStrategy(t *testing.T) {
 		},
 	}
 	newPdb := &policy.PodDisruptionBudget{
-		ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault, ResourceVersion: "9"},
+		ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault, ResourceVersion: "9"},
 		Spec: policy.PodDisruptionBudgetSpec{
 			Selector:     &metav1.LabelSelector{MatchLabels: validSelector},
 			MinAvailable: intstr.FromInt(2),

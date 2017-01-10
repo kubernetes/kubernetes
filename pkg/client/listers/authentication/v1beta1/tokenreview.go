@@ -20,9 +20,9 @@ package v1beta1
 
 import (
 	"k8s.io/kubernetes/pkg/api/errors"
-	v1 "k8s.io/kubernetes/pkg/api/v1"
 	authentication "k8s.io/kubernetes/pkg/apis/authentication"
 	v1beta1 "k8s.io/kubernetes/pkg/apis/authentication/v1beta1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/labels"
 )
@@ -56,7 +56,7 @@ func (s *tokenReviewLister) List(selector labels.Selector) (ret []*v1beta1.Token
 
 // Get retrieves the TokenReview from the index for a given name.
 func (s *tokenReviewLister) Get(name string) (*v1beta1.TokenReview, error) {
-	key := &v1beta1.TokenReview{ObjectMeta: v1.ObjectMeta{Name: name}}
+	key := &v1beta1.TokenReview{ObjectMeta: metav1.ObjectMeta{Name: name}}
 	obj, exists, err := s.indexer.Get(key)
 	if err != nil {
 		return nil, err

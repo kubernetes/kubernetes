@@ -47,10 +47,7 @@ func RegisterConversions(scheme *runtime.Scheme) error {
 }
 
 func autoConvert_v1beta1_TokenReview_To_authentication_TokenReview(in *TokenReview, out *authentication.TokenReview, s conversion.Scope) error {
-	// TODO: Inefficient conversion - can we improve it?
-	if err := s.Convert(&in.ObjectMeta, &out.ObjectMeta, 0); err != nil {
-		return err
-	}
+	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_v1beta1_TokenReviewSpec_To_authentication_TokenReviewSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
 	}
@@ -65,10 +62,7 @@ func Convert_v1beta1_TokenReview_To_authentication_TokenReview(in *TokenReview, 
 }
 
 func autoConvert_authentication_TokenReview_To_v1beta1_TokenReview(in *authentication.TokenReview, out *TokenReview, s conversion.Scope) error {
-	// TODO: Inefficient conversion - can we improve it?
-	if err := s.Convert(&in.ObjectMeta, &out.ObjectMeta, 0); err != nil {
-		return err
-	}
+	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_authentication_TokenReviewSpec_To_v1beta1_TokenReviewSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
 	}

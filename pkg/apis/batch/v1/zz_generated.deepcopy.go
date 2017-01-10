@@ -49,7 +49,7 @@ func DeepCopy_v1_Job(in interface{}, out interface{}, c *conversion.Cloner) erro
 		in := in.(*Job)
 		out := out.(*Job)
 		*out = *in
-		if err := api_v1.DeepCopy_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, c); err != nil {
+		if err := meta_v1.DeepCopy_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, c); err != nil {
 			return err
 		}
 		if err := DeepCopy_v1_JobSpec(&in.Spec, &out.Spec, c); err != nil {

@@ -321,7 +321,7 @@ func doRoundTripTest(group testapi.TestGroup, kind string, t *testing.T) {
 func TestEncode_Ptr(t *testing.T) {
 	grace := int64(30)
 	pod := &api.Pod{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Labels: map[string]string{"name": "foo"},
 		},
 		Spec: api.PodSpec{

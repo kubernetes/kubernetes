@@ -25,7 +25,7 @@ import metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 type CertificateSigningRequest struct {
 	metav1.TypeMeta `json:",inline"`
 	// +optional
-	v1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// The certificate request itself and any additional information.
 	// +optional

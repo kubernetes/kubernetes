@@ -21,6 +21,8 @@ import (
 	"reflect"
 	"time"
 
+	"github.com/golang/glog"
+
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	apps "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
@@ -40,8 +42,6 @@ import (
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/util/workqueue"
 	"k8s.io/kubernetes/pkg/watch"
-
-	"github.com/golang/glog"
 )
 
 const statusUpdateRetries = 2

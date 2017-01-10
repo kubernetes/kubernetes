@@ -31,7 +31,7 @@ import (
 
 type PodControllerRefManager struct {
 	podControl         PodControlInterface
-	controllerObject   v1.ObjectMeta
+	controllerObject   metav1.ObjectMeta
 	controllerSelector labels.Selector
 	controllerKind     schema.GroupVersionKind
 }
@@ -40,7 +40,7 @@ type PodControllerRefManager struct {
 // methods to manage the controllerRef of pods.
 func NewPodControllerRefManager(
 	podControl PodControlInterface,
-	controllerObject v1.ObjectMeta,
+	controllerObject metav1.ObjectMeta,
 	controllerSelector labels.Selector,
 	controllerKind schema.GroupVersionKind,
 ) *PodControllerRefManager {
@@ -93,7 +93,7 @@ func (m *PodControllerRefManager) Classify(pods []*v1.Pod) (
 
 // GetControllerOf returns the controllerRef if controllee has a controller,
 // otherwise returns nil.
-func GetControllerOf(controllee *v1.ObjectMeta) *metav1.OwnerReference {
+func GetControllerOf(controllee *metav1.ObjectMeta) *metav1.OwnerReference {
 	for i := range controllee.OwnerReferences {
 		owner := &controllee.OwnerReferences[i]
 		// controlled by other controller
@@ -153,7 +153,7 @@ func (m *PodControllerRefManager) ReleasePod(pod *v1.Pod) error {
 // for more details.
 type ReplicaSetControllerRefManager struct {
 	rsControl          RSControlInterface
-	controllerObject   v1.ObjectMeta
+	controllerObject   metav1.ObjectMeta
 	controllerSelector labels.Selector
 	controllerKind     schema.GroupVersionKind
 }
@@ -162,7 +162,7 @@ type ReplicaSetControllerRefManager struct {
 // methods to manage the controllerRef of ReplicaSets.
 func NewReplicaSetControllerRefManager(
 	rsControl RSControlInterface,
-	controllerObject v1.ObjectMeta,
+	controllerObject metav1.ObjectMeta,
 	controllerSelector labels.Selector,
 	controllerKind schema.GroupVersionKind,
 ) *ReplicaSetControllerRefManager {

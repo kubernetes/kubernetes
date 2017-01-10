@@ -20,6 +20,7 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/generic"
@@ -41,7 +42,7 @@ func newStorage(t *testing.T) (*REST, *etcdtesting.EtcdTestServer) {
 
 func validNewConfigMap() *api.ConfigMap {
 	return &api.ConfigMap{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      "foo",
 			Namespace: "default",
 			Labels: map[string]string{
@@ -62,20 +63,20 @@ func TestCreate(t *testing.T) {
 	test := registrytest.New(t, storage.Store)
 
 	validConfigMap := validNewConfigMap()
-	validConfigMap.ObjectMeta = api.ObjectMeta{
+	validConfigMap.ObjectMeta = metav1.ObjectMeta{
 		GenerateName: "foo-",
 	}
 
 	test.TestCreate(
 		validConfigMap,
 		&api.ConfigMap{
-			ObjectMeta: api.ObjectMeta{Name: "badName"},
+			ObjectMeta: metav1.ObjectMeta{Name: "badName"},
 			Data: map[string]string{
 				"key": "value",
 			},
 		},
 		&api.ConfigMap{
-			ObjectMeta: api.ObjectMeta{Name: "name-2"},
+			ObjectMeta: metav1.ObjectMeta{Name: "name-2"},
 			Data: map[string]string{
 				"..dotfile": "do: nothing\n",
 			},

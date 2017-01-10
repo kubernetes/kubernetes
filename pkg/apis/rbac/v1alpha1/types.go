@@ -105,7 +105,7 @@ type Role struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard object's metadata.
 	// +optional
-	v1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// Rules holds all the PolicyRules for this Role
 	Rules []PolicyRule `json:"rules" protobuf:"bytes,2,rep,name=rules"`
@@ -120,7 +120,7 @@ type RoleBinding struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard object's metadata.
 	// +optional
-	v1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// Subjects holds references to the objects the role applies to.
 	Subjects []Subject `json:"subjects" protobuf:"bytes,2,rep,name=subjects"`
@@ -160,7 +160,7 @@ type ClusterRole struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard object's metadata.
 	// +optional
-	v1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// Rules holds all the PolicyRules for this ClusterRole
 	Rules []PolicyRule `json:"rules" protobuf:"bytes,2,rep,name=rules"`
@@ -175,7 +175,7 @@ type ClusterRoleBinding struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard object's metadata.
 	// +optional
-	v1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// Subjects holds references to the objects the role applies to.
 	Subjects []Subject `json:"subjects" protobuf:"bytes,2,rep,name=subjects"`

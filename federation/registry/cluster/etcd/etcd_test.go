@@ -21,6 +21,7 @@ import (
 
 	"k8s.io/kubernetes/federation/apis/federation"
 	"k8s.io/kubernetes/pkg/api"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/generic"
@@ -43,7 +44,7 @@ func newStorage(t *testing.T) (*REST, *etcdtesting.EtcdTestServer) {
 
 func validNewCluster() *federation.Cluster {
 	return &federation.Cluster{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: "foo",
 			Labels: map[string]string{
 				"name": "foo",
@@ -70,11 +71,11 @@ func TestCreate(t *testing.T) {
 	defer server.Terminate(t)
 	test := registrytest.New(t, storage.Store).ClusterScope()
 	cluster := validNewCluster()
-	cluster.ObjectMeta = api.ObjectMeta{GenerateName: "foo"}
+	cluster.ObjectMeta = metav1.ObjectMeta{GenerateName: "foo"}
 	test.TestCreate(
 		cluster,
 		&federation.Cluster{
-			ObjectMeta: api.ObjectMeta{Name: "-a123-a_"},
+			ObjectMeta: metav1.ObjectMeta{Name: "-a123-a_"},
 		},
 	)
 }

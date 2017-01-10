@@ -25,6 +25,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"k8s.io/kubernetes/pkg/api/v1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/types"
 )
@@ -66,7 +67,7 @@ func addPods(podGetter podGetter, podUIDs ...types.UID) {
 	fakePodGetter := podGetter.(*fakePodGetter)
 	for _, uid := range podUIDs {
 		fakePodGetter.pods[uid] = &v1.Pod{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:      "pod" + string(uid),
 				Namespace: "test",
 				UID:       uid,

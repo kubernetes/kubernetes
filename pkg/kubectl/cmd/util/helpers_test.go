@@ -53,13 +53,13 @@ func TestMerge(t *testing.T) {
 		{
 			kind: "Pod",
 			obj: &api.Pod{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
 				},
 			},
 			fragment: fmt.Sprintf(`{ "apiVersion": "%s" }`, registered.GroupOrDie(api.GroupName).GroupVersion.String()),
 			expected: &api.Pod{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
 				},
 				Spec: apitesting.DeepEqualSafePodSpec(),
@@ -70,7 +70,7 @@ func TestMerge(t *testing.T) {
 		{
 			kind: "Pod",
 			obj: &api.Pod{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
 				},
 				Spec: api.PodSpec{
@@ -88,7 +88,7 @@ func TestMerge(t *testing.T) {
 			},
 			fragment: fmt.Sprintf(`{ "apiVersion": "%s", "spec": { "containers": [ { "name": "c1", "image": "green-image" } ] } }`, registered.GroupOrDie(api.GroupName).GroupVersion.String()),
 			expected: &api.Pod{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
 				},
 				Spec: api.PodSpec{
@@ -108,13 +108,13 @@ func TestMerge(t *testing.T) {
 		{
 			kind: "Pod",
 			obj: &api.Pod{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
 				},
 			},
 			fragment: fmt.Sprintf(`{ "apiVersion": "%s", "spec": { "volumes": [ {"name": "v1"}, {"name": "v2"} ] } }`, registered.GroupOrDie(api.GroupName).GroupVersion.String()),
 			expected: &api.Pod{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
 				},
 				Spec: api.PodSpec{
@@ -339,7 +339,7 @@ func TestMaybeConvert(t *testing.T) {
 	}{
 		{
 			input: &api.Pod{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
 				},
 			},
@@ -349,20 +349,20 @@ func TestMaybeConvert(t *testing.T) {
 					APIVersion: "v1",
 					Kind:       "Pod",
 				},
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
 				},
 			},
 		},
 		{
 			input: &extensions.ThirdPartyResourceData{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
 				},
 				Data: []byte("this is some data"),
 			},
 			expected: &extensions.ThirdPartyResourceData{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
 				},
 				Data: []byte("this is some data"),

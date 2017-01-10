@@ -35,6 +35,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	rbacapi "k8s.io/kubernetes/pkg/apis/rbac"
 	"k8s.io/kubernetes/pkg/auth/authenticator/bearertoken"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
@@ -269,17 +270,17 @@ func TestRBAC(t *testing.T) {
 			bootstrapRoles: bootstrapRoles{
 				clusterRoles: []rbacapi.ClusterRole{
 					{
-						ObjectMeta: api.ObjectMeta{Name: "allow-all"},
+						ObjectMeta: metav1.ObjectMeta{Name: "allow-all"},
 						Rules:      []rbacapi.PolicyRule{ruleAllowAll},
 					},
 					{
-						ObjectMeta: api.ObjectMeta{Name: "read-pods"},
+						ObjectMeta: metav1.ObjectMeta{Name: "read-pods"},
 						Rules:      []rbacapi.PolicyRule{ruleReadPods},
 					},
 				},
 				clusterRoleBindings: []rbacapi.ClusterRoleBinding{
 					{
-						ObjectMeta: api.ObjectMeta{Name: "read-pods"},
+						ObjectMeta: metav1.ObjectMeta{Name: "read-pods"},
 						Subjects: []rbacapi.Subject{
 							{Kind: "User", Name: "pod-reader"},
 						},
@@ -307,7 +308,7 @@ func TestRBAC(t *testing.T) {
 			bootstrapRoles: bootstrapRoles{
 				clusterRoles: []rbacapi.ClusterRole{
 					{
-						ObjectMeta: api.ObjectMeta{Name: "write-jobs"},
+						ObjectMeta: metav1.ObjectMeta{Name: "write-jobs"},
 						Rules:      []rbacapi.PolicyRule{ruleWriteJobs},
 					},
 					{
@@ -325,7 +326,7 @@ func TestRBAC(t *testing.T) {
 				},
 				clusterRoleBindings: []rbacapi.ClusterRoleBinding{
 					{
-						ObjectMeta: api.ObjectMeta{Name: "write-jobs"},
+						ObjectMeta: metav1.ObjectMeta{Name: "write-jobs"},
 						Subjects:   []rbacapi.Subject{{Kind: "User", Name: "job-writer"}},
 						RoleRef:    rbacapi.RoleRef{Kind: "ClusterRole", Name: "write-jobs"},
 					},
@@ -346,7 +347,7 @@ func TestRBAC(t *testing.T) {
 				},
 				roleBindings: []rbacapi.RoleBinding{
 					{
-						ObjectMeta: api.ObjectMeta{Name: "write-jobs", Namespace: "job-namespace"},
+						ObjectMeta: metav1.ObjectMeta{Name: "write-jobs", Namespace: "job-namespace"},
 						Subjects:   []rbacapi.Subject{{Kind: "User", Name: "job-writer-namespace"}},
 						RoleRef:    rbacapi.RoleRef{Kind: "ClusterRole", Name: "write-jobs"},
 					},

@@ -23,6 +23,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"k8s.io/kubernetes/pkg/api/v1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 )
@@ -31,7 +32,7 @@ import (
 func TestCreatePodSandbox(t *testing.T) {
 	fakeRuntime, _, m, err := createTestRuntimeManager()
 	pod := &v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			UID:       "12345678",
 			Name:      "bar",
 			Namespace: "new",

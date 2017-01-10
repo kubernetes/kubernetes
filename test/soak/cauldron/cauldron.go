@@ -95,7 +95,7 @@ func main() {
 	queries := *queriesAverage * len(nodes.Items) * *podsPerNode
 
 	// Create a uniquely named namespace.
-	got, err := client.Core().Namespaces().Create(&api.Namespace{ObjectMeta: api.ObjectMeta{GenerateName: "serve-hostnames-"}})
+	got, err := client.Core().Namespaces().Create(&api.Namespace{ObjectMeta: metav1.ObjectMeta{GenerateName: "serve-hostnames-"}})
 	if err != nil {
 		glog.Fatalf("Failed to create namespace: %v", err)
 	}
@@ -124,7 +124,7 @@ func main() {
 	for start := time.Now(); time.Since(start) < serviceCreateTimeout; time.Sleep(2 * time.Second) {
 		t := time.Now()
 		svc, err = client.Core().Services(ns).Create(&api.Service{
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name: "serve-hostnames",
 				Labels: map[string]string{
 					"name": "serve-hostname",
@@ -174,7 +174,7 @@ func main() {
 				glog.Infof("Creating pod %s/%s on node %s", ns, podName, node.Name)
 				t := time.Now()
 				_, err = client.Core().Pods(ns).Create(&api.Pod{
-					ObjectMeta: api.ObjectMeta{
+					ObjectMeta: metav1.ObjectMeta{
 						Name: podName,
 						Labels: map[string]string{
 							"name": "serve-hostname",

@@ -17,7 +17,6 @@ limitations under the License.
 package apiregistration
 
 import (
-	kapi "k8s.io/kubernetes/pkg/api"
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 )
 
@@ -75,7 +74,7 @@ type APIServiceStatus struct {
 // Name must be "version.group".
 type APIService struct {
 	metav1.TypeMeta
-	kapi.ObjectMeta
+	metav1.ObjectMeta
 
 	// Spec contains information for locating and communicating with a server
 	Spec APIServiceSpec

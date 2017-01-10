@@ -221,7 +221,7 @@ func createSummaryTestPods(f *framework.Framework, names ...string) {
 	pods := make([]*v1.Pod, 0, len(names))
 	for _, name := range names {
 		pods = append(pods, &v1.Pod{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name: name,
 			},
 			Spec: v1.PodSpec{

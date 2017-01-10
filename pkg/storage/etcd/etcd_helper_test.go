@@ -30,6 +30,7 @@ import (
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	apiv1 "k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/conversion"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
@@ -71,7 +72,7 @@ func newEtcdHelper(client etcd.Client, codec runtime.Codec, prefix string) etcdH
 // Returns an encoded version of api.Pod with the given name.
 func getEncodedPod(name string) string {
 	pod, _ := runtime.Encode(testapi.Default.Codec(), &api.Pod{
-		ObjectMeta: api.ObjectMeta{Name: name},
+		ObjectMeta: metav1.ObjectMeta{Name: name},
 	})
 	return string(pod)
 }
@@ -104,15 +105,15 @@ func TestList(t *testing.T) {
 	list := api.PodList{
 		Items: []api.Pod{
 			{
-				ObjectMeta: api.ObjectMeta{Name: "bar"},
+				ObjectMeta: metav1.ObjectMeta{Name: "bar"},
 				Spec:       apitesting.DeepEqualSafePodSpec(),
 			},
 			{
-				ObjectMeta: api.ObjectMeta{Name: "baz"},
+				ObjectMeta: metav1.ObjectMeta{Name: "baz"},
 				Spec:       apitesting.DeepEqualSafePodSpec(),
 			},
 			{
-				ObjectMeta: api.ObjectMeta{Name: "foo"},
+				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
 				Spec:       apitesting.DeepEqualSafePodSpec(),
 			},
 		},
@@ -140,15 +141,15 @@ func TestListFiltered(t *testing.T) {
 	list := api.PodList{
 		Items: []api.Pod{
 			{
-				ObjectMeta: api.ObjectMeta{Name: "bar"},
+				ObjectMeta: metav1.ObjectMeta{Name: "bar"},
 				Spec:       apitesting.DeepEqualSafePodSpec(),
 			},
 			{
-				ObjectMeta: api.ObjectMeta{Name: "baz"},
+				ObjectMeta: metav1.ObjectMeta{Name: "baz"},
 				Spec:       apitesting.DeepEqualSafePodSpec(),
 			},
 			{
-				ObjectMeta: api.ObjectMeta{Name: "foo"},
+				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
 				Spec:       apitesting.DeepEqualSafePodSpec(),
 			},
 		},
@@ -187,15 +188,15 @@ func TestListAcrossDirectories(t *testing.T) {
 	list := api.PodList{
 		Items: []api.Pod{
 			{
-				ObjectMeta: api.ObjectMeta{Name: "baz"},
+				ObjectMeta: metav1.ObjectMeta{Name: "baz"},
 				Spec:       apitesting.DeepEqualSafePodSpec(),
 			},
 			{
-				ObjectMeta: api.ObjectMeta{Name: "foo"},
+				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
 				Spec:       apitesting.DeepEqualSafePodSpec(),
 			},
 			{
-				ObjectMeta: api.ObjectMeta{Name: "bar"},
+				ObjectMeta: metav1.ObjectMeta{Name: "bar"},
 				Spec:       apitesting.DeepEqualSafePodSpec(),
 			},
 		},
@@ -227,7 +228,7 @@ func TestGet(t *testing.T) {
 	key := "/some/key"
 	helper := newEtcdHelper(server.Client, testapi.Default.Codec(), etcdtest.PathPrefix())
 	expect := api.Pod{
-		ObjectMeta: api.ObjectMeta{Name: "foo"},
+		ObjectMeta: metav1.ObjectMeta{Name: "foo"},
 		Spec:       apitesting.DeepEqualSafePodSpec(),
 	}
 	var got api.Pod
@@ -257,7 +258,7 @@ func TestGetNotFoundErr(t *testing.T) {
 }
 
 func TestCreate(t *testing.T) {
-	obj := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
+	obj := &api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}
 	server := etcdtesting.NewEtcdTestClientServer(t)
 	defer server.Terminate(t)
 	helper := newEtcdHelper(server.Client, testapi.Default.Codec(), etcdtest.PathPrefix())
@@ -284,7 +285,7 @@ func TestCreate(t *testing.T) {
 }
 
 func TestCreateNilOutParam(t *testing.T) {
-	obj := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
+	obj := &api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}
 	server := etcdtesting.NewEtcdTestClientServer(t)
 	defer server.Terminate(t)
 	helper := newEtcdHelper(server.Client, testapi.Default.Codec(), etcdtest.PathPrefix())
@@ -451,7 +452,7 @@ func TestGuaranteedUpdateUIDMismatch(t *testing.T) {
 	prefix := path.Join("/", etcdtest.PathPrefix())
 	helper := newEtcdHelper(server.Client, testapi.Default.Codec(), prefix)
 
-	obj := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo", UID: "A"}}
+	obj := &api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", UID: "A"}}
 	podPtr := &api.Pod{}
 	err := helper.Create(context.TODO(), "/some/key", obj, podPtr, 0)
 	if err != nil {
@@ -471,7 +472,7 @@ func TestDeleteUIDMismatch(t *testing.T) {
 	prefix := path.Join("/", etcdtest.PathPrefix())
 	helper := newEtcdHelper(server.Client, testapi.Default.Codec(), prefix)
 
-	obj := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo", UID: "A"}}
+	obj := &api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", UID: "A"}}
 	podPtr := &api.Pod{}
 	err := helper.Create(context.TODO(), "/some/key", obj, podPtr, 0)
 	if err != nil {
@@ -510,7 +511,7 @@ func TestDeleteWithRetry(t *testing.T) {
 	defer server.Terminate(t)
 	prefix := path.Join("/", etcdtest.PathPrefix())
 
-	obj := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo", UID: "A"}}
+	obj := &api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", UID: "A"}}
 	// fakeGet returns a large ModifiedIndex to emulate the case that another
 	// party has updated the object.
 	fakeGet := func(ctx context.Context, key string, opts *etcd.GetOptions) (*etcd.Response, error) {

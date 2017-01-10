@@ -22,6 +22,8 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/golang/glog"
+
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/api/v1/endpoints"
@@ -40,8 +42,6 @@ import (
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/util/workqueue"
 	"k8s.io/kubernetes/pkg/watch"
-
-	"github.com/golang/glog"
 )
 
 const (
@@ -451,7 +451,7 @@ func (e *EndpointController) syncService(key string) error {
 	if err != nil {
 		if errors.IsNotFound(err) {
 			currentEndpoints = &v1.Endpoints{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:   service.Name,
 					Labels: service.Labels,
 				},

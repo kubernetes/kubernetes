@@ -51,7 +51,7 @@ var name = "foo-deployment"
 
 func validNewDeployment() *extensions.Deployment {
 	return &extensions.Deployment{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: namespace,
 		},
@@ -65,7 +65,7 @@ func validNewDeployment() *extensions.Deployment {
 				},
 			},
 			Template: api.PodTemplateSpec{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{"a": "b"},
 				},
 				Spec: api.PodSpec{
@@ -96,7 +96,7 @@ func TestCreate(t *testing.T) {
 	defer storage.Deployment.Store.DestroyFunc()
 	test := registrytest.New(t, storage.Deployment.Store)
 	deployment := validNewDeployment()
-	deployment.ObjectMeta = api.ObjectMeta{}
+	deployment.ObjectMeta = metav1.ObjectMeta{}
 	test.TestCreate(
 		// valid
 		deployment,
@@ -205,7 +205,7 @@ func TestScaleGet(t *testing.T) {
 	}
 
 	want := &extensions.Scale{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:              name,
 			Namespace:         namespace,
 			UID:               deployment.UID,
@@ -242,7 +242,7 @@ func TestScaleUpdate(t *testing.T) {
 	}
 	replicas := int32(12)
 	update := extensions.Scale{
-		ObjectMeta: api.ObjectMeta{Name: name, Namespace: namespace},
+		ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: namespace},
 		Spec: extensions.ScaleSpec{
 			Replicas: replicas,
 		},

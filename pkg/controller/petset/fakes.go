@@ -38,7 +38,7 @@ func dec(i int64, exponent int) *inf.Dec {
 
 func newPVC(name string) v1.PersistentVolumeClaim {
 	return v1.PersistentVolumeClaim{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 		},
 		Spec: v1.PersistentVolumeClaimSpec{
@@ -75,7 +75,7 @@ func newStatefulSetWithVolumes(replicas int, name string, petMounts []v1.VolumeM
 			Kind:       "StatefulSet",
 			APIVersion: "apps/v1beta1",
 		},
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: v1.NamespaceDefault,
 			UID:       types.UID("test"),

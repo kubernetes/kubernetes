@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 )
 
 func TestNamespaceGenerate(t *testing.T) {
@@ -35,7 +36,7 @@ func TestNamespaceGenerate(t *testing.T) {
 				"name": "foo",
 			},
 			expected: &api.Namespace{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
 				},
 			},

@@ -19,6 +19,8 @@ package api
 import (
 	"strings"
 	"testing"
+
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 )
 
 type nameGeneratorFunc func(base string) string
@@ -29,7 +31,7 @@ func (fn nameGeneratorFunc) GenerateName(base string) string {
 
 func TestGenerateName(t *testing.T) {
 	testCases := []struct {
-		meta ObjectMeta
+		meta metav1.ObjectMeta
 
 		base     string
 		returned string
@@ -38,14 +40,14 @@ func TestGenerateName(t *testing.T) {
 			returned: "",
 		},
 		{
-			meta: ObjectMeta{
+			meta: metav1.ObjectMeta{
 				GenerateName: "test",
 			},
 			base:     "test",
 			returned: "test",
 		},
 		{
-			meta: ObjectMeta{
+			meta: metav1.ObjectMeta{
 				Name:         "foo",
 				GenerateName: "test",
 			},
@@ -69,7 +71,7 @@ func TestGenerateName(t *testing.T) {
 }
 
 func TestSimpleNameGenerator(t *testing.T) {
-	meta := &ObjectMeta{
+	meta := &metav1.ObjectMeta{
 		GenerateName: "foo",
 	}
 	GenerateName(SimpleNameGenerator, meta)

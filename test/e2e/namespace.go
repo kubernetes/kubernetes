@@ -91,7 +91,7 @@ func ensurePodsAreRemovedWhenNamespaceIsDeleted(f *framework.Framework) {
 
 	By("Creating a pod in the namespace")
 	pod := &v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: "test-pod",
 		},
 		Spec: v1.PodSpec{
@@ -147,7 +147,7 @@ func ensureServicesAreRemovedWhenNamespaceIsDeleted(f *framework.Framework) {
 		"baz": "blah",
 	}
 	service := &v1.Service{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: serviceName,
 		},
 		Spec: v1.ServiceSpec{

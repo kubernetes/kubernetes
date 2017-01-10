@@ -21,7 +21,6 @@ limitations under the License.
 package autoscaling
 
 import (
-	api "k8s.io/kubernetes/pkg/api"
 	v1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	conversion "k8s.io/kubernetes/pkg/conversion"
 	runtime "k8s.io/kubernetes/pkg/runtime"
@@ -61,7 +60,7 @@ func DeepCopy_autoscaling_HorizontalPodAutoscaler(in interface{}, out interface{
 		in := in.(*HorizontalPodAutoscaler)
 		out := out.(*HorizontalPodAutoscaler)
 		*out = *in
-		if err := api.DeepCopy_api_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, c); err != nil {
+		if err := v1.DeepCopy_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, c); err != nil {
 			return err
 		}
 		if err := DeepCopy_autoscaling_HorizontalPodAutoscalerSpec(&in.Spec, &out.Spec, c); err != nil {
@@ -140,7 +139,7 @@ func DeepCopy_autoscaling_Scale(in interface{}, out interface{}, c *conversion.C
 		in := in.(*Scale)
 		out := out.(*Scale)
 		*out = *in
-		if err := api.DeepCopy_api_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, c); err != nil {
+		if err := v1.DeepCopy_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, c); err != nil {
 			return err
 		}
 		return nil

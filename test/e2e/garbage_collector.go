@@ -45,7 +45,7 @@ func getNonOrphanOptions() *v1.DeleteOptions {
 var zero = int64(0)
 var deploymentLabels = map[string]string{"app": "gc-test"}
 var podTemplateSpec = v1.PodTemplateSpec{
-	ObjectMeta: v1.ObjectMeta{
+	ObjectMeta: metav1.ObjectMeta{
 		Labels: deploymentLabels,
 	},
 	Spec: v1.PodSpec{
@@ -62,7 +62,7 @@ var podTemplateSpec = v1.PodTemplateSpec{
 func newOwnerDeployment(f *framework.Framework, deploymentName string) *v1beta1.Deployment {
 	replicas := int32(2)
 	return &v1beta1.Deployment{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: deploymentName,
 		},
 		Spec: v1beta1.DeploymentSpec{
@@ -84,7 +84,7 @@ func newOwnerRC(f *framework.Framework, name string) *v1.ReplicationController {
 			Kind:       "ReplicationController",
 			APIVersion: "v1",
 		},
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Namespace: f.Namespace.Name,
 			Name:      name,
 		},

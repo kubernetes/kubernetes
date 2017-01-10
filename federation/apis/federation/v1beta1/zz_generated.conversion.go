@@ -53,10 +53,7 @@ func RegisterConversions(scheme *runtime.Scheme) error {
 }
 
 func autoConvert_v1beta1_Cluster_To_federation_Cluster(in *Cluster, out *federation.Cluster, s conversion.Scope) error {
-	// TODO: Inefficient conversion - can we improve it?
-	if err := s.Convert(&in.ObjectMeta, &out.ObjectMeta, 0); err != nil {
-		return err
-	}
+	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_v1beta1_ClusterSpec_To_federation_ClusterSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
 	}
@@ -71,10 +68,7 @@ func Convert_v1beta1_Cluster_To_federation_Cluster(in *Cluster, out *federation.
 }
 
 func autoConvert_federation_Cluster_To_v1beta1_Cluster(in *federation.Cluster, out *Cluster, s conversion.Scope) error {
-	// TODO: Inefficient conversion - can we improve it?
-	if err := s.Convert(&in.ObjectMeta, &out.ObjectMeta, 0); err != nil {
-		return err
-	}
+	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_federation_ClusterSpec_To_v1beta1_ClusterSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
 	}

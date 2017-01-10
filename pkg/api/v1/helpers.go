@@ -22,6 +22,7 @@ import (
 	"strings"
 
 	"k8s.io/kubernetes/pkg/api"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/selection"
@@ -91,7 +92,7 @@ func IsStandardFinalizerName(str string) bool {
 }
 
 // SingleObject returns a ListOptions for watching a single object.
-func SingleObject(meta ObjectMeta) ListOptions {
+func SingleObject(meta metav1.ObjectMeta) ListOptions {
 	return ListOptions{
 		FieldSelector:   fields.OneTermEqualSelector("metadata.name", meta.Name).String(),
 		ResourceVersion: meta.ResourceVersion,

@@ -158,7 +158,7 @@ func TestValidateLocalSAR(t *testing.T) {
 		{
 			name: "name",
 			obj: &authorizationapi.LocalSubjectAccessReview{
-				ObjectMeta: api.ObjectMeta{Name: "a"},
+				ObjectMeta: metav1.ObjectMeta{Name: "a"},
 				Spec: authorizationapi.SubjectAccessReviewSpec{
 					ResourceAttributes: &authorizationapi.ResourceAttributes{},
 					User:               "user",
@@ -169,7 +169,7 @@ func TestValidateLocalSAR(t *testing.T) {
 		{
 			name: "namespace conflict",
 			obj: &authorizationapi.LocalSubjectAccessReview{
-				ObjectMeta: api.ObjectMeta{Namespace: "a"},
+				ObjectMeta: metav1.ObjectMeta{Namespace: "a"},
 				Spec: authorizationapi.SubjectAccessReviewSpec{
 					ResourceAttributes: &authorizationapi.ResourceAttributes{},
 					User:               "user",
@@ -180,7 +180,7 @@ func TestValidateLocalSAR(t *testing.T) {
 		{
 			name: "nonresource",
 			obj: &authorizationapi.LocalSubjectAccessReview{
-				ObjectMeta: api.ObjectMeta{Namespace: "a"},
+				ObjectMeta: metav1.ObjectMeta{Namespace: "a"},
 				Spec: authorizationapi.SubjectAccessReviewSpec{
 					NonResourceAttributes: &authorizationapi.NonResourceAttributes{},
 					User: "user",

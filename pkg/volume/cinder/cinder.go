@@ -25,6 +25,7 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/v1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/openstack"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/rackspace"
@@ -471,7 +472,7 @@ func (c *cinderVolumeProvisioner) Provision() (*v1.PersistentVolume, error) {
 	}
 
 	pv := &v1.PersistentVolume{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:   c.options.PVName,
 			Labels: map[string]string{},
 			Annotations: map[string]string{

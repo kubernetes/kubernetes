@@ -24,6 +24,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/golang/glog"
+	"golang.org/x/net/context"
+
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/meta"
@@ -38,9 +41,6 @@ import (
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/watch"
-
-	"github.com/golang/glog"
-	"golang.org/x/net/context"
 )
 
 // CacherConfig contains the configuration for a given Cache.

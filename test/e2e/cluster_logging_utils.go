@@ -44,7 +44,7 @@ const (
 
 func createSynthLogger(f *framework.Framework, linesCount int) {
 	f.PodClient().Create(&v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      synthLoggerPodName,
 			Namespace: f.Namespace.Name,
 		},

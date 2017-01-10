@@ -25,15 +25,15 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/ghodss/yaml"
+	"github.com/google/gofuzz"
+	flag "github.com/spf13/pflag"
+
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/conversion"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/util/diff"
-
-	"github.com/ghodss/yaml"
-	"github.com/google/gofuzz"
-	flag "github.com/spf13/pflag"
 )
 
 var fuzzIters = flag.Int("fuzz-iters", 50, "How many fuzzing iterations to do.")

@@ -24,7 +24,7 @@ import metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 type MetadataOnlyObject struct {
 	metav1.TypeMeta `json:",inline"`
 	// +optional
-	v1.ObjectMeta `json:"metadata,omitempty"`
+	metav1.ObjectMeta `json:"metadata,omitempty"`
 }
 
 // MetadataOnlyObjectList allows decoding from JSON data only the typemeta and metadata of

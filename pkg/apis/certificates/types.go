@@ -25,7 +25,7 @@ import metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 type CertificateSigningRequest struct {
 	metav1.TypeMeta
 	// +optional
-	api.ObjectMeta
+	metav1.ObjectMeta
 
 	// The certificate request itself and any additional information.
 	// +optional

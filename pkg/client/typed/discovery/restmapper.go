@@ -20,12 +20,12 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/golang/glog"
+
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/meta"
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/runtime/schema"
-
-	"github.com/golang/glog"
 )
 
 // APIGroupResources is an API group with a mapping of versions to

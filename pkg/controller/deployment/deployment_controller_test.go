@@ -42,7 +42,7 @@ var (
 
 func rs(name string, replicas int, selector map[string]string, timestamp metav1.Time) *extensions.ReplicaSet {
 	return &extensions.ReplicaSet{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:              name,
 			CreationTimestamp: timestamp,
 			Namespace:         v1.NamespaceDefault,
@@ -66,7 +66,7 @@ func newRSWithStatus(name string, specReplicas, statusReplicas int, selector map
 func newDeployment(name string, replicas int, revisionHistoryLimit *int32, maxSurge, maxUnavailable *intstr.IntOrString, selector map[string]string) *extensions.Deployment {
 	d := extensions.Deployment{
 		TypeMeta: metav1.TypeMeta{APIVersion: registered.GroupOrDie(extensions.GroupName).GroupVersion.String()},
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			UID:       uuid.NewUUID(),
 			Name:      name,
 			Namespace: v1.NamespaceDefault,
@@ -82,7 +82,7 @@ func newDeployment(name string, replicas int, revisionHistoryLimit *int32, maxSu
 			Replicas: func() *int32 { i := int32(replicas); return &i }(),
 			Selector: &metav1.LabelSelector{MatchLabels: selector},
 			Template: v1.PodTemplateSpec{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Labels: selector,
 				},
 				Spec: v1.PodSpec{
@@ -107,7 +107,7 @@ func newDeployment(name string, replicas int, revisionHistoryLimit *int32, maxSu
 
 func newReplicaSet(d *extensions.Deployment, name string, replicas int) *extensions.ReplicaSet {
 	return &extensions.ReplicaSet{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: v1.NamespaceDefault,
 		},

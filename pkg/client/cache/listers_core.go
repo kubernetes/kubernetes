@@ -184,7 +184,7 @@ func (s *StoreToReplicationControllerLister) GetPodControllers(pod *v1.Pod) (con
 		return
 	}
 
-	key := &v1.ReplicationController{ObjectMeta: v1.ObjectMeta{Namespace: pod.Namespace}}
+	key := &v1.ReplicationController{ObjectMeta: metav1.ObjectMeta{Namespace: pod.Namespace}}
 	items, err := s.Indexer.Index(NamespaceIndex, key)
 	if err != nil {
 		return

@@ -22,6 +22,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+
 	federationapi "k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	fakefedclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset/fake"
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util"
@@ -34,8 +36,6 @@ import (
 	fakekubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/wait"
-
-	"github.com/stretchr/testify/assert"
 )
 
 func TestDaemonSetController(t *testing.T) {
@@ -82,7 +82,7 @@ func TestDaemonSetController(t *testing.T) {
 	daemonsetController.Run(stop)
 
 	daemonset1 := extensionsv1.DaemonSet{
-		ObjectMeta: apiv1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test-daemonset",
 			Namespace: "ns",
 			SelfLink:  "/api/v1/namespaces/ns/daemonsets/test-daemonset",

@@ -20,7 +20,7 @@ package v1alpha1
 
 import (
 	"k8s.io/kubernetes/pkg/api/errors"
-	v1 "k8s.io/kubernetes/pkg/api/v1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	rbac "k8s.io/kubernetes/pkg/apis/rbac"
 	v1alpha1 "k8s.io/kubernetes/pkg/apis/rbac/v1alpha1"
 	"k8s.io/kubernetes/pkg/client/cache"
@@ -56,7 +56,7 @@ func (s *clusterRoleLister) List(selector labels.Selector) (ret []*v1alpha1.Clus
 
 // Get retrieves the ClusterRole from the index for a given name.
 func (s *clusterRoleLister) Get(name string) (*v1alpha1.ClusterRole, error) {
-	key := &v1alpha1.ClusterRole{ObjectMeta: v1.ObjectMeta{Name: name}}
+	key := &v1alpha1.ClusterRole{ObjectMeta: metav1.ObjectMeta{Name: name}}
 	obj, exists, err := s.indexer.Get(key)
 	if err != nil {
 		return nil, err

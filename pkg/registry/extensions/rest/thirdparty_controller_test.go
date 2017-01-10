@@ -19,8 +19,8 @@ package rest
 import (
 	"testing"
 
-	"k8s.io/kubernetes/pkg/api"
 	expapi "k8s.io/kubernetes/pkg/apis/extensions"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/registry/extensions/thirdpartyresourcedata"
 	"k8s.io/kubernetes/pkg/util/sets"
 )
@@ -66,7 +66,7 @@ func TestSyncAPIs(t *testing.T) {
 	resourcesNamed := func(names ...string) []expapi.ThirdPartyResource {
 		result := []expapi.ThirdPartyResource{}
 		for _, name := range names {
-			result = append(result, expapi.ThirdPartyResource{ObjectMeta: api.ObjectMeta{Name: name}})
+			result = append(result, expapi.ThirdPartyResource{ObjectMeta: metav1.ObjectMeta{Name: name}})
 		}
 		return result
 	}

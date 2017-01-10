@@ -138,7 +138,7 @@ func WaitForGroupSize(group string, size int32) error {
 
 func svcByName(name string, port int) *v1.Service {
 	return &v1.Service{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 		},
 		Spec: v1.ServiceSpec{

@@ -155,7 +155,7 @@ func createSecretOrFail(clientset *fedclientset.Clientset, nsName string) *v1.Se
 	}
 
 	secret := &v1.Secret{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      v1.SimpleNameGenerator.GenerateName(secretNamePrefix),
 			Namespace: nsName,
 		},

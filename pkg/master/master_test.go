@@ -26,6 +26,12 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/go-openapi/loads"
+	"github.com/go-openapi/spec"
+	"github.com/go-openapi/strfmt"
+	"github.com/go-openapi/validate"
+	"github.com/stretchr/testify/assert"
+
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	apiv1 "k8s.io/kubernetes/pkg/api/v1"
@@ -53,8 +59,6 @@ import (
 	utilnet "k8s.io/kubernetes/pkg/util/net"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/version"
-
-	"github.com/stretchr/testify/assert"
 )
 
 // setUp is a convience function for setting up for (most) tests.

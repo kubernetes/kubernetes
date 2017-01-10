@@ -23,6 +23,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"k8s.io/kubernetes/pkg/api/v1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/client/testing/core"
@@ -112,7 +113,7 @@ func Test_Run_Positive_VolumeAttachAndMount(t *testing.T) {
 		volumePluginMgr,
 		kubeletPodsDir)
 	pod := &v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: "pod1",
 			UID:  "pod1uid",
 		},
@@ -183,7 +184,7 @@ func Test_Run_Positive_VolumeMountControllerAttachEnabled(t *testing.T) {
 		volumePluginMgr,
 		kubeletPodsDir)
 	pod := &v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: "pod1",
 			UID:  "pod1uid",
 		},
@@ -255,7 +256,7 @@ func Test_Run_Positive_VolumeAttachMountUnmountDetach(t *testing.T) {
 		volumePluginMgr,
 		kubeletPodsDir)
 	pod := &v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: "pod1",
 			UID:  "pod1uid",
 		},
@@ -338,7 +339,7 @@ func Test_Run_Positive_VolumeUnmountControllerAttachEnabled(t *testing.T) {
 		volumePluginMgr,
 		kubeletPodsDir)
 	pod := &v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: "pod1",
 			UID:  "pod1uid",
 		},
@@ -453,7 +454,7 @@ func createTestClient() *fake.Clientset {
 	fakeClient.AddReactor("get", "nodes",
 		func(action core.Action) (bool, runtime.Object, error) {
 			return true, &v1.Node{
-				ObjectMeta: v1.ObjectMeta{Name: string(nodeName)},
+				ObjectMeta: metav1.ObjectMeta{Name: string(nodeName)},
 				Status: v1.NodeStatus{
 					VolumesAttached: []v1.AttachedVolume{
 						{

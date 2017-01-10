@@ -29,7 +29,7 @@ import (
 )
 
 func TestResourceVersioner(t *testing.T) {
-	cluster := federation.Cluster{ObjectMeta: api.ObjectMeta{ResourceVersion: "10"}}
+	cluster := federation.Cluster{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "10"}}
 	version, err := accessor.ResourceVersion(&cluster)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -106,7 +106,7 @@ func TestRESTMapper(t *testing.T) {
 			t.Errorf("unexpected: %#v, expected: %#v", mapping, interfaces)
 		}
 
-		rc := &federation.Cluster{ObjectMeta: api.ObjectMeta{Name: "foo"}}
+		rc := &federation.Cluster{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}
 		name, err := mapping.MetadataAccessor.Name(rc)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)

@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 )
 
 func TestQuotaGenerate(t *testing.T) {
@@ -41,7 +42,7 @@ func TestQuotaGenerate(t *testing.T) {
 				"hard": hard,
 			},
 			expected: &api.ResourceQuota{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
 				},
 				Spec: api.ResourceQuotaSpec{Hard: resourceQuotaSpecList},
@@ -61,7 +62,7 @@ func TestQuotaGenerate(t *testing.T) {
 				"scopes": "BestEffort,NotTerminating",
 			},
 			expected: &api.ResourceQuota{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
 				},
 				Spec: api.ResourceQuotaSpec{
@@ -81,7 +82,7 @@ func TestQuotaGenerate(t *testing.T) {
 				"scopes": "",
 			},
 			expected: &api.ResourceQuota{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
 				},
 				Spec: api.ResourceQuotaSpec{Hard: resourceQuotaSpecList},

@@ -25,6 +25,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/test/integration"
@@ -46,7 +47,7 @@ func TestConfigMap(t *testing.T) {
 
 func DoTestConfigMap(t *testing.T, client clientset.Interface, ns *v1.Namespace) {
 	cfg := v1.ConfigMap{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      "configmap",
 			Namespace: ns.Name,
 		},
@@ -63,7 +64,7 @@ func DoTestConfigMap(t *testing.T, client clientset.Interface, ns *v1.Namespace)
 	defer deleteConfigMapOrErrorf(t, client, cfg.Namespace, cfg.Name)
 
 	pod := &v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      "XXX",
 			Namespace: ns.Name,
 		},

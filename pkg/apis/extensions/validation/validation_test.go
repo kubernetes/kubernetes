@@ -40,7 +40,7 @@ func TestValidateDaemonSetStatusUpdate(t *testing.T) {
 	successCases := []dsUpdateTest{
 		{
 			old: extensions.DaemonSet{
-				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
 				Status: extensions.DaemonSetStatus{
 					CurrentNumberScheduled: 1,
 					NumberMisscheduled:     2,
@@ -49,7 +49,7 @@ func TestValidateDaemonSetStatusUpdate(t *testing.T) {
 				},
 			},
 			update: extensions.DaemonSet{
-				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
 				Status: extensions.DaemonSetStatus{
 					CurrentNumberScheduled: 1,
 					NumberMisscheduled:     1,
@@ -70,7 +70,7 @@ func TestValidateDaemonSetStatusUpdate(t *testing.T) {
 	errorCases := map[string]dsUpdateTest{
 		"negative values": {
 			old: extensions.DaemonSet{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:            "abc",
 					Namespace:       api.NamespaceDefault,
 					ResourceVersion: "10",
@@ -84,7 +84,7 @@ func TestValidateDaemonSetStatusUpdate(t *testing.T) {
 				},
 			},
 			update: extensions.DaemonSet{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:            "abc",
 					Namespace:       api.NamespaceDefault,
 					ResourceVersion: "10",
@@ -100,7 +100,7 @@ func TestValidateDaemonSetStatusUpdate(t *testing.T) {
 		},
 		"negative CurrentNumberScheduled": {
 			old: extensions.DaemonSet{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:            "abc",
 					Namespace:       api.NamespaceDefault,
 					ResourceVersion: "10",
@@ -114,7 +114,7 @@ func TestValidateDaemonSetStatusUpdate(t *testing.T) {
 				},
 			},
 			update: extensions.DaemonSet{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:            "abc",
 					Namespace:       api.NamespaceDefault,
 					ResourceVersion: "10",
@@ -130,7 +130,7 @@ func TestValidateDaemonSetStatusUpdate(t *testing.T) {
 		},
 		"negative NumberMisscheduled": {
 			old: extensions.DaemonSet{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:            "abc",
 					Namespace:       api.NamespaceDefault,
 					ResourceVersion: "10",
@@ -144,7 +144,7 @@ func TestValidateDaemonSetStatusUpdate(t *testing.T) {
 				},
 			},
 			update: extensions.DaemonSet{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:            "abc",
 					Namespace:       api.NamespaceDefault,
 					ResourceVersion: "10",
@@ -160,7 +160,7 @@ func TestValidateDaemonSetStatusUpdate(t *testing.T) {
 		},
 		"negative DesiredNumberScheduled": {
 			old: extensions.DaemonSet{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:            "abc",
 					Namespace:       api.NamespaceDefault,
 					ResourceVersion: "10",
@@ -174,7 +174,7 @@ func TestValidateDaemonSetStatusUpdate(t *testing.T) {
 				},
 			},
 			update: extensions.DaemonSet{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:            "abc",
 					Namespace:       api.NamespaceDefault,
 					ResourceVersion: "10",
@@ -190,7 +190,7 @@ func TestValidateDaemonSetStatusUpdate(t *testing.T) {
 		},
 		"negative NumberReady": {
 			old: extensions.DaemonSet{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:            "abc",
 					Namespace:       api.NamespaceDefault,
 					ResourceVersion: "10",
@@ -204,7 +204,7 @@ func TestValidateDaemonSetStatusUpdate(t *testing.T) {
 				},
 			},
 			update: extensions.DaemonSet{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:            "abc",
 					Namespace:       api.NamespaceDefault,
 					ResourceVersion: "10",
@@ -220,7 +220,7 @@ func TestValidateDaemonSetStatusUpdate(t *testing.T) {
 		},
 		"negative ObservedGeneration": {
 			old: extensions.DaemonSet{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:            "abc",
 					Namespace:       api.NamespaceDefault,
 					ResourceVersion: "10",
@@ -234,7 +234,7 @@ func TestValidateDaemonSetStatusUpdate(t *testing.T) {
 				},
 			},
 			update: extensions.DaemonSet{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:            "abc",
 					Namespace:       api.NamespaceDefault,
 					ResourceVersion: "10",
@@ -288,7 +288,7 @@ func TestValidateDaemonSetUpdate(t *testing.T) {
 
 	validPodTemplateAbc := api.PodTemplate{
 		Template: api.PodTemplateSpec{
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Labels: validSelector,
 			},
 			Spec: validPodSpecAbc,
@@ -296,7 +296,7 @@ func TestValidateDaemonSetUpdate(t *testing.T) {
 	}
 	validPodTemplateNodeSelector := api.PodTemplate{
 		Template: api.PodTemplateSpec{
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Labels: validSelector,
 			},
 			Spec: validPodSpecNodeSelector,
@@ -304,7 +304,7 @@ func TestValidateDaemonSetUpdate(t *testing.T) {
 	}
 	validPodTemplateAbc2 := api.PodTemplate{
 		Template: api.PodTemplateSpec{
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Labels: validSelector2,
 			},
 			Spec: validPodSpecAbc,
@@ -312,7 +312,7 @@ func TestValidateDaemonSetUpdate(t *testing.T) {
 	}
 	validPodTemplateDef := api.PodTemplate{
 		Template: api.PodTemplateSpec{
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Labels: validSelector2,
 			},
 			Spec: validPodSpecDef,
@@ -324,14 +324,14 @@ func TestValidateDaemonSetUpdate(t *testing.T) {
 				RestartPolicy: api.RestartPolicyAlways,
 				DNSPolicy:     api.DNSClusterFirst,
 			},
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Labels: invalidSelector,
 			},
 		},
 	}
 	readWriteVolumePodTemplate := api.PodTemplate{
 		Template: api.PodTemplateSpec{
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Labels: validSelector,
 			},
 			Spec: validPodSpecVolume,
@@ -345,14 +345,14 @@ func TestValidateDaemonSetUpdate(t *testing.T) {
 	successCases := []dsUpdateTest{
 		{
 			old: extensions.DaemonSet{
-				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
 				Spec: extensions.DaemonSetSpec{
 					Selector: &metav1.LabelSelector{MatchLabels: validSelector},
 					Template: validPodTemplateAbc.Template,
 				},
 			},
 			update: extensions.DaemonSet{
-				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
 				Spec: extensions.DaemonSetSpec{
 					Selector: &metav1.LabelSelector{MatchLabels: validSelector},
 					Template: validPodTemplateAbc.Template,
@@ -361,14 +361,14 @@ func TestValidateDaemonSetUpdate(t *testing.T) {
 		},
 		{
 			old: extensions.DaemonSet{
-				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
 				Spec: extensions.DaemonSetSpec{
 					Selector: &metav1.LabelSelector{MatchLabels: validSelector},
 					Template: validPodTemplateAbc.Template,
 				},
 			},
 			update: extensions.DaemonSet{
-				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
 				Spec: extensions.DaemonSetSpec{
 					Selector: &metav1.LabelSelector{MatchLabels: validSelector2},
 					Template: validPodTemplateAbc2.Template,
@@ -377,14 +377,14 @@ func TestValidateDaemonSetUpdate(t *testing.T) {
 		},
 		{
 			old: extensions.DaemonSet{
-				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
 				Spec: extensions.DaemonSetSpec{
 					Selector: &metav1.LabelSelector{MatchLabels: validSelector},
 					Template: validPodTemplateAbc.Template,
 				},
 			},
 			update: extensions.DaemonSet{
-				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
 				Spec: extensions.DaemonSetSpec{
 					Selector: &metav1.LabelSelector{MatchLabels: validSelector},
 					Template: validPodTemplateNodeSelector.Template,
@@ -402,14 +402,14 @@ func TestValidateDaemonSetUpdate(t *testing.T) {
 	errorCases := map[string]dsUpdateTest{
 		"change daemon name": {
 			old: extensions.DaemonSet{
-				ObjectMeta: api.ObjectMeta{Name: "", Namespace: api.NamespaceDefault},
+				ObjectMeta: metav1.ObjectMeta{Name: "", Namespace: api.NamespaceDefault},
 				Spec: extensions.DaemonSetSpec{
 					Selector: &metav1.LabelSelector{MatchLabels: validSelector},
 					Template: validPodTemplateAbc.Template,
 				},
 			},
 			update: extensions.DaemonSet{
-				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
 				Spec: extensions.DaemonSetSpec{
 					Selector: &metav1.LabelSelector{MatchLabels: validSelector},
 					Template: validPodTemplateAbc.Template,
@@ -418,14 +418,14 @@ func TestValidateDaemonSetUpdate(t *testing.T) {
 		},
 		"invalid selector": {
 			old: extensions.DaemonSet{
-				ObjectMeta: api.ObjectMeta{Name: "", Namespace: api.NamespaceDefault},
+				ObjectMeta: metav1.ObjectMeta{Name: "", Namespace: api.NamespaceDefault},
 				Spec: extensions.DaemonSetSpec{
 					Selector: &metav1.LabelSelector{MatchLabels: validSelector},
 					Template: validPodTemplateAbc.Template,
 				},
 			},
 			update: extensions.DaemonSet{
-				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
 				Spec: extensions.DaemonSetSpec{
 					Selector: &metav1.LabelSelector{MatchLabels: invalidSelector},
 					Template: validPodTemplateAbc.Template,
@@ -434,14 +434,14 @@ func TestValidateDaemonSetUpdate(t *testing.T) {
 		},
 		"invalid pod": {
 			old: extensions.DaemonSet{
-				ObjectMeta: api.ObjectMeta{Name: "", Namespace: api.NamespaceDefault},
+				ObjectMeta: metav1.ObjectMeta{Name: "", Namespace: api.NamespaceDefault},
 				Spec: extensions.DaemonSetSpec{
 					Selector: &metav1.LabelSelector{MatchLabels: validSelector},
 					Template: validPodTemplateAbc.Template,
 				},
 			},
 			update: extensions.DaemonSet{
-				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
 				Spec: extensions.DaemonSetSpec{
 					Selector: &metav1.LabelSelector{MatchLabels: validSelector},
 					Template: invalidPodTemplate.Template,
@@ -450,14 +450,14 @@ func TestValidateDaemonSetUpdate(t *testing.T) {
 		},
 		"change container image": {
 			old: extensions.DaemonSet{
-				ObjectMeta: api.ObjectMeta{Name: "", Namespace: api.NamespaceDefault},
+				ObjectMeta: metav1.ObjectMeta{Name: "", Namespace: api.NamespaceDefault},
 				Spec: extensions.DaemonSetSpec{
 					Selector: &metav1.LabelSelector{MatchLabels: validSelector},
 					Template: validPodTemplateAbc.Template,
 				},
 			},
 			update: extensions.DaemonSet{
-				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
 				Spec: extensions.DaemonSetSpec{
 					Selector: &metav1.LabelSelector{MatchLabels: validSelector},
 					Template: validPodTemplateDef.Template,
@@ -466,14 +466,14 @@ func TestValidateDaemonSetUpdate(t *testing.T) {
 		},
 		"read-write volume": {
 			old: extensions.DaemonSet{
-				ObjectMeta: api.ObjectMeta{Name: "", Namespace: api.NamespaceDefault},
+				ObjectMeta: metav1.ObjectMeta{Name: "", Namespace: api.NamespaceDefault},
 				Spec: extensions.DaemonSetSpec{
 					Selector: &metav1.LabelSelector{MatchLabels: validSelector},
 					Template: validPodTemplateAbc.Template,
 				},
 			},
 			update: extensions.DaemonSet{
-				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
 				Spec: extensions.DaemonSetSpec{
 					Selector: &metav1.LabelSelector{MatchLabels: validSelector},
 					Template: readWriteVolumePodTemplate.Template,
@@ -482,14 +482,14 @@ func TestValidateDaemonSetUpdate(t *testing.T) {
 		},
 		"invalid update strategy": {
 			old: extensions.DaemonSet{
-				ObjectMeta: api.ObjectMeta{Name: "", Namespace: api.NamespaceDefault},
+				ObjectMeta: metav1.ObjectMeta{Name: "", Namespace: api.NamespaceDefault},
 				Spec: extensions.DaemonSetSpec{
 					Selector: &metav1.LabelSelector{MatchLabels: validSelector},
 					Template: validPodTemplateAbc.Template,
 				},
 			},
 			update: extensions.DaemonSet{
-				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
 				Spec: extensions.DaemonSetSpec{
 					Selector: &metav1.LabelSelector{MatchLabels: invalidSelector},
 					Template: validPodTemplateAbc.Template,
@@ -508,7 +508,7 @@ func TestValidateDaemonSet(t *testing.T) {
 	validSelector := map[string]string{"a": "b"}
 	validPodTemplate := api.PodTemplate{
 		Template: api.PodTemplateSpec{
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Labels: validSelector,
 			},
 			Spec: api.PodSpec{
@@ -525,21 +525,21 @@ func TestValidateDaemonSet(t *testing.T) {
 				RestartPolicy: api.RestartPolicyAlways,
 				DNSPolicy:     api.DNSClusterFirst,
 			},
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Labels: invalidSelector,
 			},
 		},
 	}
 	successCases := []extensions.DaemonSet{
 		{
-			ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
+			ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
 			Spec: extensions.DaemonSetSpec{
 				Selector: &metav1.LabelSelector{MatchLabels: validSelector},
 				Template: validPodTemplate.Template,
 			},
 		},
 		{
-			ObjectMeta: api.ObjectMeta{Name: "abc-123", Namespace: api.NamespaceDefault},
+			ObjectMeta: metav1.ObjectMeta{Name: "abc-123", Namespace: api.NamespaceDefault},
 			Spec: extensions.DaemonSetSpec{
 				Selector: &metav1.LabelSelector{MatchLabels: validSelector},
 				Template: validPodTemplate.Template,
@@ -554,47 +554,47 @@ func TestValidateDaemonSet(t *testing.T) {
 
 	errorCases := map[string]extensions.DaemonSet{
 		"zero-length ID": {
-			ObjectMeta: api.ObjectMeta{Name: "", Namespace: api.NamespaceDefault},
+			ObjectMeta: metav1.ObjectMeta{Name: "", Namespace: api.NamespaceDefault},
 			Spec: extensions.DaemonSetSpec{
 				Selector: &metav1.LabelSelector{MatchLabels: validSelector},
 				Template: validPodTemplate.Template,
 			},
 		},
 		"missing-namespace": {
-			ObjectMeta: api.ObjectMeta{Name: "abc-123"},
+			ObjectMeta: metav1.ObjectMeta{Name: "abc-123"},
 			Spec: extensions.DaemonSetSpec{
 				Selector: &metav1.LabelSelector{MatchLabels: validSelector},
 				Template: validPodTemplate.Template,
 			},
 		},
 		"nil selector": {
-			ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
+			ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
 			Spec: extensions.DaemonSetSpec{
 				Template: validPodTemplate.Template,
 			},
 		},
 		"empty selector": {
-			ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
+			ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
 			Spec: extensions.DaemonSetSpec{
 				Selector: &metav1.LabelSelector{},
 				Template: validPodTemplate.Template,
 			},
 		},
 		"selector_doesnt_match": {
-			ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
+			ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
 			Spec: extensions.DaemonSetSpec{
 				Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
 				Template: validPodTemplate.Template,
 			},
 		},
 		"invalid template": {
-			ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
+			ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
 			Spec: extensions.DaemonSetSpec{
 				Selector: &metav1.LabelSelector{MatchLabels: validSelector},
 			},
 		},
 		"invalid_label": {
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:      "abc-123",
 				Namespace: api.NamespaceDefault,
 				Labels: map[string]string{
@@ -607,7 +607,7 @@ func TestValidateDaemonSet(t *testing.T) {
 			},
 		},
 		"invalid_label 2": {
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:      "abc-123",
 				Namespace: api.NamespaceDefault,
 				Labels: map[string]string{
@@ -619,7 +619,7 @@ func TestValidateDaemonSet(t *testing.T) {
 			},
 		},
 		"invalid_annotation": {
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:      "abc-123",
 				Namespace: api.NamespaceDefault,
 				Annotations: map[string]string{
@@ -632,7 +632,7 @@ func TestValidateDaemonSet(t *testing.T) {
 			},
 		},
 		"invalid restart policy 1": {
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:      "abc-123",
 				Namespace: api.NamespaceDefault,
 			},
@@ -644,14 +644,14 @@ func TestValidateDaemonSet(t *testing.T) {
 						DNSPolicy:     api.DNSClusterFirst,
 						Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
 					},
-					ObjectMeta: api.ObjectMeta{
+					ObjectMeta: metav1.ObjectMeta{
 						Labels: validSelector,
 					},
 				},
 			},
 		},
 		"invalid restart policy 2": {
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:      "abc-123",
 				Namespace: api.NamespaceDefault,
 			},
@@ -663,7 +663,7 @@ func TestValidateDaemonSet(t *testing.T) {
 						DNSPolicy:     api.DNSClusterFirst,
 						Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
 					},
-					ObjectMeta: api.ObjectMeta{
+					ObjectMeta: metav1.ObjectMeta{
 						Labels: validSelector,
 					},
 				},
@@ -695,7 +695,7 @@ func TestValidateDaemonSet(t *testing.T) {
 
 func validDeployment() *extensions.Deployment {
 	return &extensions.Deployment{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      "abc",
 			Namespace: api.NamespaceDefault,
 		},
@@ -713,7 +713,7 @@ func validDeployment() *extensions.Deployment {
 				},
 			},
 			Template: api.PodTemplateSpec{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:      "abc",
 					Namespace: api.NamespaceDefault,
 					Labels: map[string]string{
@@ -751,7 +751,7 @@ func TestValidateDeployment(t *testing.T) {
 
 	errorCases := map[string]*extensions.Deployment{}
 	errorCases["metadata.name: Required value"] = &extensions.Deployment{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Namespace: api.NamespaceDefault,
 		},
 	}
@@ -885,7 +885,7 @@ func TestValidateIngress(t *testing.T) {
 
 	newValid := func() extensions.Ingress {
 		return extensions.Ingress{
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:      "foo",
 				Namespace: api.NamespaceDefault,
 			},
@@ -989,7 +989,7 @@ func TestValidateIngressTLS(t *testing.T) {
 
 	newValid := func() extensions.Ingress {
 		return extensions.Ingress{
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:      "foo",
 				Namespace: api.NamespaceDefault,
 			},
@@ -1059,7 +1059,7 @@ func TestValidateIngressStatusUpdate(t *testing.T) {
 
 	newValid := func() extensions.Ingress {
 		return extensions.Ingress{
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:            "foo",
 				Namespace:       api.NamespaceDefault,
 				ResourceVersion: "9",
@@ -1146,7 +1146,7 @@ func TestValidateIngressStatusUpdate(t *testing.T) {
 func TestValidateScale(t *testing.T) {
 	successCases := []extensions.Scale{
 		{
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:      "frontend",
 				Namespace: api.NamespaceDefault,
 			},
@@ -1155,7 +1155,7 @@ func TestValidateScale(t *testing.T) {
 			},
 		},
 		{
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:      "frontend",
 				Namespace: api.NamespaceDefault,
 			},
@@ -1164,7 +1164,7 @@ func TestValidateScale(t *testing.T) {
 			},
 		},
 		{
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:      "frontend",
 				Namespace: api.NamespaceDefault,
 			},
@@ -1186,7 +1186,7 @@ func TestValidateScale(t *testing.T) {
 	}{
 		{
 			scale: extensions.Scale{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:      "frontend",
 					Namespace: api.NamespaceDefault,
 				},
@@ -1211,7 +1211,7 @@ func TestValidateReplicaSetStatusUpdate(t *testing.T) {
 	validLabels := map[string]string{"a": "b"}
 	validPodTemplate := api.PodTemplate{
 		Template: api.PodTemplateSpec{
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Labels: validLabels,
 			},
 			Spec: api.PodSpec{
@@ -1228,7 +1228,7 @@ func TestValidateReplicaSetStatusUpdate(t *testing.T) {
 	successCases := []rcUpdateTest{
 		{
 			old: extensions.ReplicaSet{
-				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
 				Spec: extensions.ReplicaSetSpec{
 					Selector: &metav1.LabelSelector{MatchLabels: validLabels},
 					Template: validPodTemplate.Template,
@@ -1238,7 +1238,7 @@ func TestValidateReplicaSetStatusUpdate(t *testing.T) {
 				},
 			},
 			update: extensions.ReplicaSet{
-				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
 				Spec: extensions.ReplicaSetSpec{
 					Replicas: 3,
 					Selector: &metav1.LabelSelector{MatchLabels: validLabels},
@@ -1260,7 +1260,7 @@ func TestValidateReplicaSetStatusUpdate(t *testing.T) {
 	errorCases := map[string]rcUpdateTest{
 		"negative replicas": {
 			old: extensions.ReplicaSet{
-				ObjectMeta: api.ObjectMeta{Name: "", Namespace: api.NamespaceDefault},
+				ObjectMeta: metav1.ObjectMeta{Name: "", Namespace: api.NamespaceDefault},
 				Spec: extensions.ReplicaSetSpec{
 					Selector: &metav1.LabelSelector{MatchLabels: validLabels},
 					Template: validPodTemplate.Template,
@@ -1270,7 +1270,7 @@ func TestValidateReplicaSetStatusUpdate(t *testing.T) {
 				},
 			},
 			update: extensions.ReplicaSet{
-				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
 				Spec: extensions.ReplicaSetSpec{
 					Replicas: 2,
 					Selector: &metav1.LabelSelector{MatchLabels: validLabels},
@@ -1294,7 +1294,7 @@ func TestValidateReplicaSetUpdate(t *testing.T) {
 	validLabels := map[string]string{"a": "b"}
 	validPodTemplate := api.PodTemplate{
 		Template: api.PodTemplateSpec{
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Labels: validLabels,
 			},
 			Spec: api.PodSpec{
@@ -1306,7 +1306,7 @@ func TestValidateReplicaSetUpdate(t *testing.T) {
 	}
 	readWriteVolumePodTemplate := api.PodTemplate{
 		Template: api.PodTemplateSpec{
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Labels: validLabels,
 			},
 			Spec: api.PodSpec{
@@ -1324,7 +1324,7 @@ func TestValidateReplicaSetUpdate(t *testing.T) {
 				RestartPolicy: api.RestartPolicyAlways,
 				DNSPolicy:     api.DNSClusterFirst,
 			},
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Labels: invalidLabels,
 			},
 		},
@@ -1336,14 +1336,14 @@ func TestValidateReplicaSetUpdate(t *testing.T) {
 	successCases := []rcUpdateTest{
 		{
 			old: extensions.ReplicaSet{
-				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
 				Spec: extensions.ReplicaSetSpec{
 					Selector: &metav1.LabelSelector{MatchLabels: validLabels},
 					Template: validPodTemplate.Template,
 				},
 			},
 			update: extensions.ReplicaSet{
-				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
 				Spec: extensions.ReplicaSetSpec{
 					Replicas: 3,
 					Selector: &metav1.LabelSelector{MatchLabels: validLabels},
@@ -1353,14 +1353,14 @@ func TestValidateReplicaSetUpdate(t *testing.T) {
 		},
 		{
 			old: extensions.ReplicaSet{
-				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
 				Spec: extensions.ReplicaSetSpec{
 					Selector: &metav1.LabelSelector{MatchLabels: validLabels},
 					Template: validPodTemplate.Template,
 				},
 			},
 			update: extensions.ReplicaSet{
-				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
 				Spec: extensions.ReplicaSetSpec{
 					Replicas: 1,
 					Selector: &metav1.LabelSelector{MatchLabels: validLabels},
@@ -1379,14 +1379,14 @@ func TestValidateReplicaSetUpdate(t *testing.T) {
 	errorCases := map[string]rcUpdateTest{
 		"more than one read/write": {
 			old: extensions.ReplicaSet{
-				ObjectMeta: api.ObjectMeta{Name: "", Namespace: api.NamespaceDefault},
+				ObjectMeta: metav1.ObjectMeta{Name: "", Namespace: api.NamespaceDefault},
 				Spec: extensions.ReplicaSetSpec{
 					Selector: &metav1.LabelSelector{MatchLabels: validLabels},
 					Template: validPodTemplate.Template,
 				},
 			},
 			update: extensions.ReplicaSet{
-				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
 				Spec: extensions.ReplicaSetSpec{
 					Replicas: 2,
 					Selector: &metav1.LabelSelector{MatchLabels: validLabels},
@@ -1396,14 +1396,14 @@ func TestValidateReplicaSetUpdate(t *testing.T) {
 		},
 		"invalid selector": {
 			old: extensions.ReplicaSet{
-				ObjectMeta: api.ObjectMeta{Name: "", Namespace: api.NamespaceDefault},
+				ObjectMeta: metav1.ObjectMeta{Name: "", Namespace: api.NamespaceDefault},
 				Spec: extensions.ReplicaSetSpec{
 					Selector: &metav1.LabelSelector{MatchLabels: validLabels},
 					Template: validPodTemplate.Template,
 				},
 			},
 			update: extensions.ReplicaSet{
-				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
 				Spec: extensions.ReplicaSetSpec{
 					Replicas: 2,
 					Selector: &metav1.LabelSelector{MatchLabels: invalidLabels},
@@ -1413,14 +1413,14 @@ func TestValidateReplicaSetUpdate(t *testing.T) {
 		},
 		"invalid pod": {
 			old: extensions.ReplicaSet{
-				ObjectMeta: api.ObjectMeta{Name: "", Namespace: api.NamespaceDefault},
+				ObjectMeta: metav1.ObjectMeta{Name: "", Namespace: api.NamespaceDefault},
 				Spec: extensions.ReplicaSetSpec{
 					Selector: &metav1.LabelSelector{MatchLabels: validLabels},
 					Template: validPodTemplate.Template,
 				},
 			},
 			update: extensions.ReplicaSet{
-				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
 				Spec: extensions.ReplicaSetSpec{
 					Replicas: 2,
 					Selector: &metav1.LabelSelector{MatchLabels: validLabels},
@@ -1430,14 +1430,14 @@ func TestValidateReplicaSetUpdate(t *testing.T) {
 		},
 		"negative replicas": {
 			old: extensions.ReplicaSet{
-				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
 				Spec: extensions.ReplicaSetSpec{
 					Selector: &metav1.LabelSelector{MatchLabels: validLabels},
 					Template: validPodTemplate.Template,
 				},
 			},
 			update: extensions.ReplicaSet{
-				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
 				Spec: extensions.ReplicaSetSpec{
 					Replicas: -1,
 					Selector: &metav1.LabelSelector{MatchLabels: validLabels},
@@ -1457,7 +1457,7 @@ func TestValidateReplicaSet(t *testing.T) {
 	validLabels := map[string]string{"a": "b"}
 	validPodTemplate := api.PodTemplate{
 		Template: api.PodTemplateSpec{
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Labels: validLabels,
 			},
 			Spec: api.PodSpec{
@@ -1469,7 +1469,7 @@ func TestValidateReplicaSet(t *testing.T) {
 	}
 	readWriteVolumePodTemplate := api.PodTemplate{
 		Template: api.PodTemplateSpec{
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Labels: validLabels,
 			},
 			Spec: api.PodSpec{
@@ -1487,28 +1487,28 @@ func TestValidateReplicaSet(t *testing.T) {
 				RestartPolicy: api.RestartPolicyAlways,
 				DNSPolicy:     api.DNSClusterFirst,
 			},
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Labels: invalidLabels,
 			},
 		},
 	}
 	successCases := []extensions.ReplicaSet{
 		{
-			ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
+			ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
 			Spec: extensions.ReplicaSetSpec{
 				Selector: &metav1.LabelSelector{MatchLabels: validLabels},
 				Template: validPodTemplate.Template,
 			},
 		},
 		{
-			ObjectMeta: api.ObjectMeta{Name: "abc-123", Namespace: api.NamespaceDefault},
+			ObjectMeta: metav1.ObjectMeta{Name: "abc-123", Namespace: api.NamespaceDefault},
 			Spec: extensions.ReplicaSetSpec{
 				Selector: &metav1.LabelSelector{MatchLabels: validLabels},
 				Template: validPodTemplate.Template,
 			},
 		},
 		{
-			ObjectMeta: api.ObjectMeta{Name: "abc-123", Namespace: api.NamespaceDefault},
+			ObjectMeta: metav1.ObjectMeta{Name: "abc-123", Namespace: api.NamespaceDefault},
 			Spec: extensions.ReplicaSetSpec{
 				Replicas: 1,
 				Selector: &metav1.LabelSelector{MatchLabels: validLabels},
@@ -1524,40 +1524,40 @@ func TestValidateReplicaSet(t *testing.T) {
 
 	errorCases := map[string]extensions.ReplicaSet{
 		"zero-length ID": {
-			ObjectMeta: api.ObjectMeta{Name: "", Namespace: api.NamespaceDefault},
+			ObjectMeta: metav1.ObjectMeta{Name: "", Namespace: api.NamespaceDefault},
 			Spec: extensions.ReplicaSetSpec{
 				Selector: &metav1.LabelSelector{MatchLabels: validLabels},
 				Template: validPodTemplate.Template,
 			},
 		},
 		"missing-namespace": {
-			ObjectMeta: api.ObjectMeta{Name: "abc-123"},
+			ObjectMeta: metav1.ObjectMeta{Name: "abc-123"},
 			Spec: extensions.ReplicaSetSpec{
 				Selector: &metav1.LabelSelector{MatchLabels: validLabels},
 				Template: validPodTemplate.Template,
 			},
 		},
 		"empty selector": {
-			ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
+			ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
 			Spec: extensions.ReplicaSetSpec{
 				Template: validPodTemplate.Template,
 			},
 		},
 		"selector_doesnt_match": {
-			ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
+			ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
 			Spec: extensions.ReplicaSetSpec{
 				Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
 				Template: validPodTemplate.Template,
 			},
 		},
 		"invalid manifest": {
-			ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
+			ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
 			Spec: extensions.ReplicaSetSpec{
 				Selector: &metav1.LabelSelector{MatchLabels: validLabels},
 			},
 		},
 		"read-write persistent disk with > 1 pod": {
-			ObjectMeta: api.ObjectMeta{Name: "abc"},
+			ObjectMeta: metav1.ObjectMeta{Name: "abc"},
 			Spec: extensions.ReplicaSetSpec{
 				Replicas: 2,
 				Selector: &metav1.LabelSelector{MatchLabels: validLabels},
@@ -1565,14 +1565,14 @@ func TestValidateReplicaSet(t *testing.T) {
 			},
 		},
 		"negative_replicas": {
-			ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
+			ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
 			Spec: extensions.ReplicaSetSpec{
 				Replicas: -1,
 				Selector: &metav1.LabelSelector{MatchLabels: validLabels},
 			},
 		},
 		"invalid_label": {
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:      "abc-123",
 				Namespace: api.NamespaceDefault,
 				Labels: map[string]string{
@@ -1585,7 +1585,7 @@ func TestValidateReplicaSet(t *testing.T) {
 			},
 		},
 		"invalid_label 2": {
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:      "abc-123",
 				Namespace: api.NamespaceDefault,
 				Labels: map[string]string{
@@ -1597,7 +1597,7 @@ func TestValidateReplicaSet(t *testing.T) {
 			},
 		},
 		"invalid_annotation": {
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:      "abc-123",
 				Namespace: api.NamespaceDefault,
 				Annotations: map[string]string{
@@ -1610,7 +1610,7 @@ func TestValidateReplicaSet(t *testing.T) {
 			},
 		},
 		"invalid restart policy 1": {
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:      "abc-123",
 				Namespace: api.NamespaceDefault,
 			},
@@ -1622,14 +1622,14 @@ func TestValidateReplicaSet(t *testing.T) {
 						DNSPolicy:     api.DNSClusterFirst,
 						Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
 					},
-					ObjectMeta: api.ObjectMeta{
+					ObjectMeta: metav1.ObjectMeta{
 						Labels: validLabels,
 					},
 				},
 			},
 		},
 		"invalid restart policy 2": {
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:      "abc-123",
 				Namespace: api.NamespaceDefault,
 			},
@@ -1641,7 +1641,7 @@ func TestValidateReplicaSet(t *testing.T) {
 						DNSPolicy:     api.DNSClusterFirst,
 						Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
 					},
-					ObjectMeta: api.ObjectMeta{
+					ObjectMeta: metav1.ObjectMeta{
 						Labels: validLabels,
 					},
 				},
@@ -1675,7 +1675,7 @@ func TestValidateReplicaSet(t *testing.T) {
 func TestValidatePodSecurityPolicy(t *testing.T) {
 	validPSP := func() *extensions.PodSecurityPolicy {
 		return &extensions.PodSecurityPolicy{
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:        "foo",
 				Annotations: map[string]string{},
 			},
@@ -1998,7 +1998,7 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 func TestValidatePSPVolumes(t *testing.T) {
 	validPSP := func() *extensions.PodSecurityPolicy {
 		return &extensions.PodSecurityPolicy{
-			ObjectMeta: api.ObjectMeta{Name: "foo"},
+			ObjectMeta: metav1.ObjectMeta{Name: "foo"},
 			Spec: extensions.PodSecurityPolicySpec{
 				SELinux: extensions.SELinuxStrategyOptions{
 					Rule: extensions.SELinuxStrategyRunAsAny,
@@ -2033,7 +2033,7 @@ func TestValidatePSPVolumes(t *testing.T) {
 func TestValidateNetworkPolicy(t *testing.T) {
 	successCases := []extensions.NetworkPolicy{
 		{
-			ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "bar"},
+			ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"},
 			Spec: extensions.NetworkPolicySpec{
 				PodSelector: metav1.LabelSelector{
 					MatchLabels: map[string]string{"a": "b"},
@@ -2042,7 +2042,7 @@ func TestValidateNetworkPolicy(t *testing.T) {
 			},
 		},
 		{
-			ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "bar"},
+			ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"},
 			Spec: extensions.NetworkPolicySpec{
 				PodSelector: metav1.LabelSelector{
 					MatchLabels: map[string]string{"a": "b"},
@@ -2056,7 +2056,7 @@ func TestValidateNetworkPolicy(t *testing.T) {
 			},
 		},
 		{
-			ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "bar"},
+			ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"},
 			Spec: extensions.NetworkPolicySpec{
 				PodSelector: metav1.LabelSelector{
 					MatchLabels: map[string]string{"a": "b"},
@@ -2075,7 +2075,7 @@ func TestValidateNetworkPolicy(t *testing.T) {
 			},
 		},
 		{
-			ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "bar"},
+			ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"},
 			Spec: extensions.NetworkPolicySpec{
 				PodSelector: metav1.LabelSelector{
 					MatchLabels: map[string]string{"a": "b"},
@@ -2105,7 +2105,7 @@ func TestValidateNetworkPolicy(t *testing.T) {
 	invalidSelector := map[string]string{"NoUppercaseOrSpecialCharsLike=Equals": "b"}
 	errorCases := map[string]extensions.NetworkPolicy{
 		"namespaceSelector and podSelector": {
-			ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "bar"},
+			ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"},
 			Spec: extensions.NetworkPolicySpec{
 				PodSelector: metav1.LabelSelector{
 					MatchLabels: map[string]string{"a": "b"},
@@ -2127,7 +2127,7 @@ func TestValidateNetworkPolicy(t *testing.T) {
 			},
 		},
 		"invalid spec.podSelector": {
-			ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "bar"},
+			ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"},
 			Spec: extensions.NetworkPolicySpec{
 				PodSelector: metav1.LabelSelector{
 					MatchLabels: invalidSelector,
@@ -2146,7 +2146,7 @@ func TestValidateNetworkPolicy(t *testing.T) {
 			},
 		},
 		"invalid ingress.from.podSelector": {
-			ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "bar"},
+			ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"},
 			Spec: extensions.NetworkPolicySpec{
 				PodSelector: metav1.LabelSelector{},
 				Ingress: []extensions.NetworkPolicyIngressRule{
@@ -2163,7 +2163,7 @@ func TestValidateNetworkPolicy(t *testing.T) {
 			},
 		},
 		"invalid ingress.from.namespaceSelector": {
-			ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "bar"},
+			ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"},
 			Spec: extensions.NetworkPolicySpec{
 				PodSelector: metav1.LabelSelector{},
 				Ingress: []extensions.NetworkPolicyIngressRule{
@@ -2197,7 +2197,7 @@ func TestValidateNetworkPolicyUpdate(t *testing.T) {
 	successCases := []npUpdateTest{
 		{
 			old: extensions.NetworkPolicy{
-				ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "bar"},
+				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"},
 				Spec: extensions.NetworkPolicySpec{
 					PodSelector: metav1.LabelSelector{
 						MatchLabels: map[string]string{"a": "b"},
@@ -2206,7 +2206,7 @@ func TestValidateNetworkPolicyUpdate(t *testing.T) {
 				},
 			},
 			update: extensions.NetworkPolicy{
-				ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "bar"},
+				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"},
 				Spec: extensions.NetworkPolicySpec{
 					PodSelector: metav1.LabelSelector{
 						MatchLabels: map[string]string{"a": "b"},
@@ -2227,14 +2227,14 @@ func TestValidateNetworkPolicyUpdate(t *testing.T) {
 	errorCases := map[string]npUpdateTest{
 		"change name": {
 			old: extensions.NetworkPolicy{
-				ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "bar"},
+				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"},
 				Spec: extensions.NetworkPolicySpec{
 					PodSelector: metav1.LabelSelector{},
 					Ingress:     []extensions.NetworkPolicyIngressRule{},
 				},
 			},
 			update: extensions.NetworkPolicy{
-				ObjectMeta: api.ObjectMeta{Name: "baz", Namespace: "bar"},
+				ObjectMeta: metav1.ObjectMeta{Name: "baz", Namespace: "bar"},
 				Spec: extensions.NetworkPolicySpec{
 					PodSelector: metav1.LabelSelector{},
 					Ingress:     []extensions.NetworkPolicyIngressRule{},
@@ -2243,14 +2243,14 @@ func TestValidateNetworkPolicyUpdate(t *testing.T) {
 		},
 		"change spec": {
 			old: extensions.NetworkPolicy{
-				ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "bar"},
+				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"},
 				Spec: extensions.NetworkPolicySpec{
 					PodSelector: metav1.LabelSelector{},
 					Ingress:     []extensions.NetworkPolicyIngressRule{},
 				},
 			},
 			update: extensions.NetworkPolicy{
-				ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "bar"},
+				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"},
 				Spec: extensions.NetworkPolicySpec{
 					PodSelector: metav1.LabelSelector{
 						MatchLabels: map[string]string{"a": "b"},

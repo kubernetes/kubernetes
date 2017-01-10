@@ -34,7 +34,7 @@ func getValidManualSelector() *metav1.LabelSelector {
 
 func getValidPodTemplateSpecForManual(selector *metav1.LabelSelector) api.PodTemplateSpec {
 	return api.PodTemplateSpec{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Labels: selector.MatchLabels,
 		},
 		Spec: api.PodSpec{
@@ -53,7 +53,7 @@ func getValidGeneratedSelector() *metav1.LabelSelector {
 
 func getValidPodTemplateSpecForGenerated(selector *metav1.LabelSelector) api.PodTemplateSpec {
 	return api.PodTemplateSpec{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Labels: selector.MatchLabels,
 		},
 		Spec: api.PodSpec{
@@ -72,7 +72,7 @@ func TestValidateJob(t *testing.T) {
 
 	successCases := map[string]batch.Job{
 		"manual selector": {
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:      "myjob",
 				Namespace: api.NamespaceDefault,
 				UID:       types.UID("1a2b3c"),
@@ -84,7 +84,7 @@ func TestValidateJob(t *testing.T) {
 			},
 		},
 		"generated selector": {
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:      "myjob",
 				Namespace: api.NamespaceDefault,
 				UID:       types.UID("1a2b3c"),
@@ -104,7 +104,7 @@ func TestValidateJob(t *testing.T) {
 	negative64 := int64(-1)
 	errorCases := map[string]batch.Job{
 		"spec.parallelism:must be greater than or equal to 0": {
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:      "myjob",
 				Namespace: api.NamespaceDefault,
 				UID:       types.UID("1a2b3c"),
@@ -116,7 +116,7 @@ func TestValidateJob(t *testing.T) {
 			},
 		},
 		"spec.completions:must be greater than or equal to 0": {
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:      "myjob",
 				Namespace: api.NamespaceDefault,
 				UID:       types.UID("1a2b3c"),
@@ -128,7 +128,7 @@ func TestValidateJob(t *testing.T) {
 			},
 		},
 		"spec.activeDeadlineSeconds:must be greater than or equal to 0": {
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:      "myjob",
 				Namespace: api.NamespaceDefault,
 				UID:       types.UID("1a2b3c"),
@@ -140,7 +140,7 @@ func TestValidateJob(t *testing.T) {
 			},
 		},
 		"spec.selector:Required value": {
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:      "myjob",
 				Namespace: api.NamespaceDefault,
 				UID:       types.UID("1a2b3c"),
@@ -150,7 +150,7 @@ func TestValidateJob(t *testing.T) {
 			},
 		},
 		"spec.template.metadata.labels: Invalid value: {\"y\":\"z\"}: `selector` does not match template `labels`": {
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:      "myjob",
 				Namespace: api.NamespaceDefault,
 				UID:       types.UID("1a2b3c"),
@@ -159,7 +159,7 @@ func TestValidateJob(t *testing.T) {
 				Selector:       validManualSelector,
 				ManualSelector: newBool(true),
 				Template: api.PodTemplateSpec{
-					ObjectMeta: api.ObjectMeta{
+					ObjectMeta: metav1.ObjectMeta{
 						Labels: map[string]string{"y": "z"},
 					},
 					Spec: api.PodSpec{
@@ -171,7 +171,7 @@ func TestValidateJob(t *testing.T) {
 			},
 		},
 		"spec.template.metadata.labels: Invalid value: {\"controller-uid\":\"4d5e6f\"}: `selector` does not match template `labels`": {
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:      "myjob",
 				Namespace: api.NamespaceDefault,
 				UID:       types.UID("1a2b3c"),
@@ -180,7 +180,7 @@ func TestValidateJob(t *testing.T) {
 				Selector:       validManualSelector,
 				ManualSelector: newBool(true),
 				Template: api.PodTemplateSpec{
-					ObjectMeta: api.ObjectMeta{
+					ObjectMeta: metav1.ObjectMeta{
 						Labels: map[string]string{"controller-uid": "4d5e6f"},
 					},
 					Spec: api.PodSpec{
@@ -192,7 +192,7 @@ func TestValidateJob(t *testing.T) {
 			},
 		},
 		"spec.template.spec.restartPolicy: Unsupported value": {
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:      "myjob",
 				Namespace: api.NamespaceDefault,
 				UID:       types.UID("1a2b3c"),
@@ -201,7 +201,7 @@ func TestValidateJob(t *testing.T) {
 				Selector:       validManualSelector,
 				ManualSelector: newBool(true),
 				Template: api.PodTemplateSpec{
-					ObjectMeta: api.ObjectMeta{
+					ObjectMeta: metav1.ObjectMeta{
 						Labels: validManualSelector.MatchLabels,
 					},
 					Spec: api.PodSpec{
@@ -237,7 +237,7 @@ func TestValidateJobUpdateStatus(t *testing.T) {
 	successCases := []testcase{
 		{
 			old: batch.Job{
-				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
 				Status: batch.JobStatus{
 					Active:    1,
 					Succeeded: 2,
@@ -245,7 +245,7 @@ func TestValidateJobUpdateStatus(t *testing.T) {
 				},
 			},
 			update: batch.Job{
-				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
 				Status: batch.JobStatus{
 					Active:    1,
 					Succeeded: 1,
@@ -266,7 +266,7 @@ func TestValidateJobUpdateStatus(t *testing.T) {
 	errorCases := map[string]testcase{
 		"[status.active: Invalid value: -1: must be greater than or equal to 0, status.succeeded: Invalid value: -2: must be greater than or equal to 0]": {
 			old: batch.Job{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:            "abc",
 					Namespace:       api.NamespaceDefault,
 					ResourceVersion: "10",
@@ -278,7 +278,7 @@ func TestValidateJobUpdateStatus(t *testing.T) {
 				},
 			},
 			update: batch.Job{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:            "abc",
 					Namespace:       api.NamespaceDefault,
 					ResourceVersion: "10",
@@ -311,7 +311,7 @@ func TestValidateCronJob(t *testing.T) {
 
 	successCases := map[string]batch.CronJob{
 		"basic scheduled job": {
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:      "mycronjob",
 				Namespace: api.NamespaceDefault,
 				UID:       types.UID("1a2b3c"),
@@ -327,7 +327,7 @@ func TestValidateCronJob(t *testing.T) {
 			},
 		},
 		"non-standard scheduled": {
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:      "mycronjob",
 				Namespace: api.NamespaceDefault,
 				UID:       types.UID("1a2b3c"),
@@ -354,7 +354,7 @@ func TestValidateCronJob(t *testing.T) {
 
 	errorCases := map[string]batch.CronJob{
 		"spec.schedule: Invalid value": {
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:      "mycronjob",
 				Namespace: api.NamespaceDefault,
 				UID:       types.UID("1a2b3c"),
@@ -370,7 +370,7 @@ func TestValidateCronJob(t *testing.T) {
 			},
 		},
 		"spec.schedule: Required value": {
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:      "mycronjob",
 				Namespace: api.NamespaceDefault,
 				UID:       types.UID("1a2b3c"),
@@ -386,7 +386,7 @@ func TestValidateCronJob(t *testing.T) {
 			},
 		},
 		"spec.startingDeadlineSeconds:must be greater than or equal to 0": {
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:      "mycronjob",
 				Namespace: api.NamespaceDefault,
 				UID:       types.UID("1a2b3c"),
@@ -403,7 +403,7 @@ func TestValidateCronJob(t *testing.T) {
 			},
 		},
 		"spec.concurrencyPolicy: Required value": {
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:      "mycronjob",
 				Namespace: api.NamespaceDefault,
 				UID:       types.UID("1a2b3c"),
@@ -418,7 +418,7 @@ func TestValidateCronJob(t *testing.T) {
 			},
 		},
 		"spec.jobTemplate.spec.parallelism:must be greater than or equal to 0": {
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:      "mycronjob",
 				Namespace: api.NamespaceDefault,
 				UID:       types.UID("1a2b3c"),
@@ -435,7 +435,7 @@ func TestValidateCronJob(t *testing.T) {
 			},
 		},
 		"spec.jobTemplate.spec.completions:must be greater than or equal to 0": {
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:      "mycronjob",
 				Namespace: api.NamespaceDefault,
 				UID:       types.UID("1a2b3c"),
@@ -453,7 +453,7 @@ func TestValidateCronJob(t *testing.T) {
 			},
 		},
 		"spec.jobTemplate.spec.activeDeadlineSeconds:must be greater than or equal to 0": {
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:      "mycronjob",
 				Namespace: api.NamespaceDefault,
 				UID:       types.UID("1a2b3c"),
@@ -470,7 +470,7 @@ func TestValidateCronJob(t *testing.T) {
 			},
 		},
 		"spec.jobTemplate.spec.selector: Invalid value: {\"matchLabels\":{\"a\":\"b\"}}: `selector` will be auto-generated": {
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:      "mycronjob",
 				Namespace: api.NamespaceDefault,
 				UID:       types.UID("1a2b3c"),
@@ -487,7 +487,7 @@ func TestValidateCronJob(t *testing.T) {
 			},
 		},
 		"spec.jobTemplate.spec.manualSelector: Unsupported value": {
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:      "mycronjob",
 				Namespace: api.NamespaceDefault,
 				UID:       types.UID("1a2b3c"),
@@ -504,7 +504,7 @@ func TestValidateCronJob(t *testing.T) {
 			},
 		},
 		"spec.jobTemplate.spec.template.spec.restartPolicy: Unsupported value": {
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:      "mycronjob",
 				Namespace: api.NamespaceDefault,
 				UID:       types.UID("1a2b3c"),

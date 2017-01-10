@@ -84,7 +84,7 @@ func (s *DeploymentBasicGeneratorV1) StructuredGenerate() (runtime.Object, error
 	labels["app"] = s.Name
 	selector := metav1.LabelSelector{MatchLabels: labels}
 	deployment := extensions.Deployment{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:   s.Name,
 			Labels: labels,
 		},
@@ -92,7 +92,7 @@ func (s *DeploymentBasicGeneratorV1) StructuredGenerate() (runtime.Object, error
 			Replicas: 1,
 			Selector: &selector,
 			Template: api.PodTemplateSpec{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Labels: labels,
 				},
 				Spec: podSpec,

@@ -20,14 +20,14 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/golang/glog"
+
 	"k8s.io/kubernetes/pkg/api/v1"
 	apps "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/client/cache"
 	appsclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/apps/v1beta1"
 	"k8s.io/kubernetes/pkg/controller"
-
-	"github.com/golang/glog"
 )
 
 // overlappingStatefulSets sorts a list of StatefulSets by creation timestamp, using their names as a tie breaker.

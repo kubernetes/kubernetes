@@ -134,7 +134,7 @@ func (pvIndex *persistentVolumeOrderedIndex) findByClaim(claim *v1.PersistentVol
 			// with existing PVs, findByClaim must find only PVs that are
 			// pre-bound to the claim (by dynamic provisioning). TODO: remove in
 			// 1.5
-			if v1.HasAnnotation(claim.ObjectMeta, storageutil.AlphaStorageClassAnnotation) {
+			if metav1.HasAnnotation(claim.ObjectMeta, storageutil.AlphaStorageClassAnnotation) {
 				continue
 			}
 

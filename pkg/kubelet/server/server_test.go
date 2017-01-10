@@ -43,6 +43,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	apierrs "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/v1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	kubecontainertesting "k8s.io/kubernetes/pkg/kubelet/container/testing"
@@ -213,7 +214,7 @@ func newServerTest() *serverTestFramework {
 		},
 		podByNameFunc: func(namespace, name string) (*v1.Pod, bool) {
 			return &v1.Pod{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Namespace: namespace,
 					Name:      name,
 					UID:       testUID,
@@ -905,7 +906,7 @@ func assertHealthIsOk(t *testing.T, httpURL string) {
 func setPodByNameFunc(fw *serverTestFramework, namespace, pod, container string) {
 	fw.fakeKubelet.podByNameFunc = func(namespace, name string) (*v1.Pod, bool) {
 		return &v1.Pod{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Namespace: namespace,
 				Name:      pod,
 			},

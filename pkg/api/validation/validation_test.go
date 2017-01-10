@@ -54,7 +54,7 @@ func expectPrefix(t *testing.T, prefix string, errs field.ErrorList) {
 }
 
 func testVolume(name string, namespace string, spec api.PersistentVolumeSpec) *api.PersistentVolume {
-	objMeta := api.ObjectMeta{Name: name}
+	objMeta := metav1.ObjectMeta{Name: name}
 	if namespace != "" {
 		objMeta.Namespace = namespace
 	}
@@ -222,7 +222,7 @@ func TestValidatePersistentVolumes(t *testing.T) {
 
 func testVolumeClaim(name string, namespace string, spec api.PersistentVolumeClaimSpec) *api.PersistentVolumeClaim {
 	return &api.PersistentVolumeClaim{
-		ObjectMeta: api.ObjectMeta{Name: name, Namespace: namespace},
+		ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: namespace},
 		Spec:       spec,
 	}
 }
@@ -233,7 +233,7 @@ func testVolumeClaimStorageClass(name string, namespace string, annval string, s
 	}
 
 	return &api.PersistentVolumeClaim{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:        name,
 			Namespace:   namespace,
 			Annotations: annotations,
@@ -248,7 +248,7 @@ func testVolumeClaimAnnotation(name string, namespace string, ann string, annval
 	}
 
 	return &api.PersistentVolumeClaim{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:        name,
 			Namespace:   namespace,
 			Annotations: annotations,
@@ -3083,7 +3083,7 @@ func TestValidatePod(t *testing.T) {
 	}
 	successCases := []api.Pod{
 		{ // Basic fields.
-			ObjectMeta: api.ObjectMeta{Name: "123", Namespace: "ns"},
+			ObjectMeta: metav1.ObjectMeta{Name: "123", Namespace: "ns"},
 			Spec: api.PodSpec{
 				Volumes:       []api.Volume{{Name: "vol", VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}}},
 				Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
@@ -3092,7 +3092,7 @@ func TestValidatePod(t *testing.T) {
 			},
 		},
 		{ // Just about everything.
-			ObjectMeta: api.ObjectMeta{Name: "abc.123.do-re-mi", Namespace: "ns"},
+			ObjectMeta: metav1.ObjectMeta{Name: "abc.123.do-re-mi", Namespace: "ns"},
 			Spec: api.PodSpec{
 				Volumes: []api.Volume{
 					{Name: "vol", VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}},
@@ -3107,7 +3107,7 @@ func TestValidatePod(t *testing.T) {
 			},
 		},
 		{ // Serialized node affinity requirements.
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:      "123",
 				Namespace: "ns",
 			},
@@ -3163,7 +3163,7 @@ func TestValidatePod(t *testing.T) {
 			},
 		},
 		{ // Serialized pod affinity in affinity requirements in annotations.
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:      "123",
 				Namespace: "ns",
 				// TODO: Uncomment and move this block into Annotations map once
@@ -3213,7 +3213,7 @@ func TestValidatePod(t *testing.T) {
 			Spec: validPodSpec,
 		},
 		{ // Serialized pod anti affinity with different Label Operators in affinity requirements in annotations.
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:      "123",
 				Namespace: "ns",
 				// TODO: Uncomment and move this block into Annotations map once
@@ -3261,7 +3261,7 @@ func TestValidatePod(t *testing.T) {
 			Spec: validPodSpec,
 		},
 		{ // populate tolerations equal operator in annotations.
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:      "123",
 				Namespace: "ns",
 				Annotations: map[string]string{
@@ -3277,7 +3277,7 @@ func TestValidatePod(t *testing.T) {
 			Spec: validPodSpec,
 		},
 		{ // populate tolerations exists operator in annotations.
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:      "123",
 				Namespace: "ns",
 				Annotations: map[string]string{
@@ -3292,7 +3292,7 @@ func TestValidatePod(t *testing.T) {
 			Spec: validPodSpec,
 		},
 		{ // empty operator is ok for toleration
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:      "123",
 				Namespace: "ns",
 				Annotations: map[string]string{
@@ -3307,7 +3307,7 @@ func TestValidatePod(t *testing.T) {
 			Spec: validPodSpec,
 		},
 		{ // empty efffect is ok for toleration
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:      "123",
 				Namespace: "ns",
 				Annotations: map[string]string{
@@ -3322,7 +3322,7 @@ func TestValidatePod(t *testing.T) {
 			Spec: validPodSpec,
 		},
 		{ // docker default seccomp profile
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:      "123",
 				Namespace: "ns",
 				Annotations: map[string]string{
@@ -3332,7 +3332,7 @@ func TestValidatePod(t *testing.T) {
 			Spec: validPodSpec,
 		},
 		{ // unconfined seccomp profile
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:      "123",
 				Namespace: "ns",
 				Annotations: map[string]string{
@@ -3342,7 +3342,7 @@ func TestValidatePod(t *testing.T) {
 			Spec: validPodSpec,
 		},
 		{ // localhost seccomp profile
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:      "123",
 				Namespace: "ns",
 				Annotations: map[string]string{
@@ -3352,7 +3352,7 @@ func TestValidatePod(t *testing.T) {
 			Spec: validPodSpec,
 		},
 		{ // localhost seccomp profile for a container
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:      "123",
 				Namespace: "ns",
 				Annotations: map[string]string{
@@ -3362,7 +3362,7 @@ func TestValidatePod(t *testing.T) {
 			Spec: validPodSpec,
 		},
 		{ // default AppArmor profile for a container
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:      "123",
 				Namespace: "ns",
 				Annotations: map[string]string{
@@ -3372,7 +3372,7 @@ func TestValidatePod(t *testing.T) {
 			Spec: validPodSpec,
 		},
 		{ // default AppArmor profile for an init container
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:      "123",
 				Namespace: "ns",
 				Annotations: map[string]string{
@@ -3387,7 +3387,7 @@ func TestValidatePod(t *testing.T) {
 			},
 		},
 		{ // localhost AppArmor profile for a container
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:      "123",
 				Namespace: "ns",
 				Annotations: map[string]string{
@@ -3397,7 +3397,7 @@ func TestValidatePod(t *testing.T) {
 			Spec: validPodSpec,
 		},
 		{ // syntactically valid sysctls
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:      "123",
 				Namespace: "ns",
 				Annotations: map[string]string{
@@ -3408,7 +3408,7 @@ func TestValidatePod(t *testing.T) {
 			Spec: validPodSpec,
 		},
 		{ // valid opaque integer resources for init container
-			ObjectMeta: api.ObjectMeta{Name: "valid-opaque-int", Namespace: "ns"},
+			ObjectMeta: metav1.ObjectMeta{Name: "valid-opaque-int", Namespace: "ns"},
 			Spec: api.PodSpec{
 				InitContainers: []api.Container{
 					{
@@ -3431,7 +3431,7 @@ func TestValidatePod(t *testing.T) {
 			},
 		},
 		{ // valid opaque integer resources for regular container
-			ObjectMeta: api.ObjectMeta{Name: "valid-opaque-int", Namespace: "ns"},
+			ObjectMeta: metav1.ObjectMeta{Name: "valid-opaque-int", Namespace: "ns"},
 			Spec: api.PodSpec{
 				InitContainers: []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
 				Containers: []api.Container{
@@ -3462,7 +3462,7 @@ func TestValidatePod(t *testing.T) {
 
 	errorCases := map[string]api.Pod{
 		"bad name": {
-			ObjectMeta: api.ObjectMeta{Name: "", Namespace: "ns"},
+			ObjectMeta: metav1.ObjectMeta{Name: "", Namespace: "ns"},
 			Spec: api.PodSpec{
 				RestartPolicy: api.RestartPolicyAlways,
 				DNSPolicy:     api.DNSClusterFirst,
@@ -3470,7 +3470,7 @@ func TestValidatePod(t *testing.T) {
 			},
 		},
 		"bad namespace": {
-			ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: ""},
+			ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: ""},
 			Spec: api.PodSpec{
 				RestartPolicy: api.RestartPolicyAlways,
 				DNSPolicy:     api.DNSClusterFirst,
@@ -3478,13 +3478,13 @@ func TestValidatePod(t *testing.T) {
 			},
 		},
 		"bad spec": {
-			ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: "ns"},
+			ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: "ns"},
 			Spec: api.PodSpec{
 				Containers: []api.Container{{}},
 			},
 		},
 		"bad label": {
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:      "abc",
 				Namespace: "ns",
 				Labels: map[string]string{
@@ -3498,7 +3498,7 @@ func TestValidatePod(t *testing.T) {
 			},
 		},
 		"invalid node selector requirement in node affinity, operator can't be null": {
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:      "123",
 				Namespace: "ns",
 			},
@@ -3525,7 +3525,7 @@ func TestValidatePod(t *testing.T) {
 			},
 		},
 		"invalid preferredSchedulingTerm in node affinity, weight should be in range 1-100": {
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:      "123",
 				Namespace: "ns",
 			},
@@ -3554,7 +3554,7 @@ func TestValidatePod(t *testing.T) {
 			},
 		},
 		"invalid requiredDuringSchedulingIgnoredDuringExecution node selector, nodeSelectorTerms must have at least one term": {
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:      "123",
 				Namespace: "ns",
 			},
@@ -3572,7 +3572,7 @@ func TestValidatePod(t *testing.T) {
 			},
 		},
 		"invalid requiredDuringSchedulingIgnoredDuringExecution node selector term, matchExpressions must have at least one node selector requirement": {
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:      "123",
 				Namespace: "ns",
 			},
@@ -3594,7 +3594,7 @@ func TestValidatePod(t *testing.T) {
 			},
 		},
 		"invalid weight in preferredDuringSchedulingIgnoredDuringExecution in pod affinity annotations, weight should be in range 1-100": {
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:      "123",
 				Namespace: "ns",
 				Annotations: map[string]string{
@@ -3619,7 +3619,7 @@ func TestValidatePod(t *testing.T) {
 			Spec: validPodSpec,
 		},
 		"invalid labelSelector in preferredDuringSchedulingIgnoredDuringExecution in podaffinity annotations, values should be empty if the operator is Exists": {
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:      "123",
 				Namespace: "ns",
 				Annotations: map[string]string{
@@ -3644,7 +3644,7 @@ func TestValidatePod(t *testing.T) {
 			Spec: validPodSpec,
 		},
 		"invalid name space in preferredDuringSchedulingIgnoredDuringExecution in podaffinity annotations, name space shouldbe valid": {
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:      "123",
 				Namespace: "ns",
 				Annotations: map[string]string{
@@ -3669,7 +3669,7 @@ func TestValidatePod(t *testing.T) {
 			Spec: validPodSpec,
 		},
 		"invalid labelOperator in preferredDuringSchedulingIgnoredDuringExecution in podantiaffinity annotations, labelOperator should be proper": {
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:      "123",
 				Namespace: "ns",
 				Annotations: map[string]string{
@@ -3694,7 +3694,7 @@ func TestValidatePod(t *testing.T) {
 			Spec: validPodSpec,
 		},
 		"invalid pod affinity, empty topologyKey is not allowed for hard pod affinity": {
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:      "123",
 				Namespace: "ns",
 				Annotations: map[string]string{
@@ -3719,7 +3719,7 @@ func TestValidatePod(t *testing.T) {
 			Spec: validPodSpec,
 		},
 		"invalid pod anti-affinity, empty topologyKey is not allowed for hard pod anti-affinity": {
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:      "123",
 				Namespace: "ns",
 				Annotations: map[string]string{
@@ -3744,7 +3744,7 @@ func TestValidatePod(t *testing.T) {
 			Spec: validPodSpec,
 		},
 		"invalid pod anti-affinity, empty topologyKey is not allowed for soft pod affinity": {
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:      "123",
 				Namespace: "ns",
 				Annotations: map[string]string{
@@ -3769,7 +3769,7 @@ func TestValidatePod(t *testing.T) {
 			Spec: validPodSpec,
 		},
 		"invalid toleration key": {
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:      "123",
 				Namespace: "ns",
 				Annotations: map[string]string{
@@ -3785,7 +3785,7 @@ func TestValidatePod(t *testing.T) {
 			Spec: validPodSpec,
 		},
 		"invalid toleration operator": {
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:      "123",
 				Namespace: "ns",
 				Annotations: map[string]string{
@@ -3801,7 +3801,7 @@ func TestValidatePod(t *testing.T) {
 			Spec: validPodSpec,
 		},
 		"value must be empty when `operator` is 'Exists'": {
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:      "123",
 				Namespace: "ns",
 				Annotations: map[string]string{
@@ -3817,7 +3817,7 @@ func TestValidatePod(t *testing.T) {
 			Spec: validPodSpec,
 		},
 		"must be a valid pod seccomp profile": {
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:      "123",
 				Namespace: "ns",
 				Annotations: map[string]string{
@@ -3827,7 +3827,7 @@ func TestValidatePod(t *testing.T) {
 			Spec: validPodSpec,
 		},
 		"must be a valid container seccomp profile": {
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:      "123",
 				Namespace: "ns",
 				Annotations: map[string]string{
@@ -3837,7 +3837,7 @@ func TestValidatePod(t *testing.T) {
 			Spec: validPodSpec,
 		},
 		"must be a non-empty container name in seccomp annotation": {
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:      "123",
 				Namespace: "ns",
 				Annotations: map[string]string{
@@ -3847,7 +3847,7 @@ func TestValidatePod(t *testing.T) {
 			Spec: validPodSpec,
 		},
 		"must be a non-empty container profile in seccomp annotation": {
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:      "123",
 				Namespace: "ns",
 				Annotations: map[string]string{
@@ -3857,7 +3857,7 @@ func TestValidatePod(t *testing.T) {
 			Spec: validPodSpec,
 		},
 		"must be a relative path in a node-local seccomp profile annotation": {
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:      "123",
 				Namespace: "ns",
 				Annotations: map[string]string{
@@ -3867,7 +3867,7 @@ func TestValidatePod(t *testing.T) {
 			Spec: validPodSpec,
 		},
 		"must not start with '../'": {
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:      "123",
 				Namespace: "ns",
 				Annotations: map[string]string{
@@ -3877,7 +3877,7 @@ func TestValidatePod(t *testing.T) {
 			Spec: validPodSpec,
 		},
 		"AppArmor profile must apply to a container": {
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:      "123",
 				Namespace: "ns",
 				Annotations: map[string]string{
@@ -3894,7 +3894,7 @@ func TestValidatePod(t *testing.T) {
 			},
 		},
 		"AppArmor profile format must be valid": {
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:      "123",
 				Namespace: "ns",
 				Annotations: map[string]string{
@@ -3904,7 +3904,7 @@ func TestValidatePod(t *testing.T) {
 			Spec: validPodSpec,
 		},
 		"only default AppArmor profile may start with runtime/": {
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:      "123",
 				Namespace: "ns",
 				Annotations: map[string]string{
@@ -3914,7 +3914,7 @@ func TestValidatePod(t *testing.T) {
 			Spec: validPodSpec,
 		},
 		"invalid sysctl annotation": {
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:      "123",
 				Namespace: "ns",
 				Annotations: map[string]string{
@@ -3924,7 +3924,7 @@ func TestValidatePod(t *testing.T) {
 			Spec: validPodSpec,
 		},
 		"invalid comma-separated sysctl annotation": {
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:      "123",
 				Namespace: "ns",
 				Annotations: map[string]string{
@@ -3934,7 +3934,7 @@ func TestValidatePod(t *testing.T) {
 			Spec: validPodSpec,
 		},
 		"invalid unsafe sysctl annotation": {
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:      "123",
 				Namespace: "ns",
 				Annotations: map[string]string{
@@ -3944,7 +3944,7 @@ func TestValidatePod(t *testing.T) {
 			Spec: validPodSpec,
 		},
 		"intersecting safe sysctls and unsafe sysctls annotations": {
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:      "123",
 				Namespace: "ns",
 				Annotations: map[string]string{
@@ -3955,7 +3955,7 @@ func TestValidatePod(t *testing.T) {
 			Spec: validPodSpec,
 		},
 		"invalid opaque integer resource requirement: request must be <= limit": {
-			ObjectMeta: api.ObjectMeta{Name: "123", Namespace: "ns"},
+			ObjectMeta: metav1.ObjectMeta{Name: "123", Namespace: "ns"},
 			Spec: api.PodSpec{
 				Containers: []api.Container{
 					{
@@ -3977,7 +3977,7 @@ func TestValidatePod(t *testing.T) {
 			},
 		},
 		"invalid fractional opaque integer resource in container request": {
-			ObjectMeta: api.ObjectMeta{Name: "123", Namespace: "ns"},
+			ObjectMeta: metav1.ObjectMeta{Name: "123", Namespace: "ns"},
 			Spec: api.PodSpec{
 				Containers: []api.Container{
 					{
@@ -3996,7 +3996,7 @@ func TestValidatePod(t *testing.T) {
 			},
 		},
 		"invalid fractional opaque integer resource in init container request": {
-			ObjectMeta: api.ObjectMeta{Name: "123", Namespace: "ns"},
+			ObjectMeta: metav1.ObjectMeta{Name: "123", Namespace: "ns"},
 			Spec: api.PodSpec{
 				InitContainers: []api.Container{
 					{
@@ -4016,7 +4016,7 @@ func TestValidatePod(t *testing.T) {
 			},
 		},
 		"invalid fractional opaque integer resource in container limit": {
-			ObjectMeta: api.ObjectMeta{Name: "123", Namespace: "ns"},
+			ObjectMeta: metav1.ObjectMeta{Name: "123", Namespace: "ns"},
 			Spec: api.PodSpec{
 				Containers: []api.Container{
 					{
@@ -4038,7 +4038,7 @@ func TestValidatePod(t *testing.T) {
 			},
 		},
 		"invalid fractional opaque integer resource in init container limit": {
-			ObjectMeta: api.ObjectMeta{Name: "123", Namespace: "ns"},
+			ObjectMeta: metav1.ObjectMeta{Name: "123", Namespace: "ns"},
 			Spec: api.PodSpec{
 				InitContainers: []api.Container{
 					{
@@ -4089,17 +4089,17 @@ func TestValidatePodUpdate(t *testing.T) {
 		{api.Pod{}, api.Pod{}, true, "nothing"},
 		{
 			api.Pod{
-				ObjectMeta: api.ObjectMeta{Name: "foo"},
+				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
 			},
 			api.Pod{
-				ObjectMeta: api.ObjectMeta{Name: "bar"},
+				ObjectMeta: metav1.ObjectMeta{Name: "bar"},
 			},
 			false,
 			"ids",
 		},
 		{
 			api.Pod{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
 					Labels: map[string]string{
 						"foo": "bar",
@@ -4107,7 +4107,7 @@ func TestValidatePodUpdate(t *testing.T) {
 				},
 			},
 			api.Pod{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
 					Labels: map[string]string{
 						"bar": "foo",
@@ -4119,7 +4119,7 @@ func TestValidatePodUpdate(t *testing.T) {
 		},
 		{
 			api.Pod{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
 					Annotations: map[string]string{
 						"foo": "bar",
@@ -4127,7 +4127,7 @@ func TestValidatePodUpdate(t *testing.T) {
 				},
 			},
 			api.Pod{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
 					Annotations: map[string]string{
 						"bar": "foo",
@@ -4139,7 +4139,7 @@ func TestValidatePodUpdate(t *testing.T) {
 		},
 		{
 			api.Pod{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
 				},
 				Spec: api.PodSpec{
@@ -4151,7 +4151,7 @@ func TestValidatePodUpdate(t *testing.T) {
 				},
 			},
 			api.Pod{
-				ObjectMeta: api.ObjectMeta{Name: "foo"},
+				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
 				Spec: api.PodSpec{
 					Containers: []api.Container{
 						{
@@ -4168,7 +4168,7 @@ func TestValidatePodUpdate(t *testing.T) {
 		},
 		{
 			api.Pod{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
 				},
 				Spec: api.PodSpec{
@@ -4180,7 +4180,7 @@ func TestValidatePodUpdate(t *testing.T) {
 				},
 			},
 			api.Pod{
-				ObjectMeta: api.ObjectMeta{Name: "foo"},
+				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
 				Spec: api.PodSpec{
 					InitContainers: []api.Container{
 						{
@@ -4197,11 +4197,11 @@ func TestValidatePodUpdate(t *testing.T) {
 		},
 		{
 			api.Pod{
-				ObjectMeta: api.ObjectMeta{Name: "foo"},
+				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
 				Spec:       api.PodSpec{Containers: []api.Container{{Image: "foo:V1"}}},
 			},
 			api.Pod{
-				ObjectMeta: api.ObjectMeta{Name: "foo", DeletionTimestamp: &now},
+				ObjectMeta: metav1.ObjectMeta{Name: "foo", DeletionTimestamp: &now},
 				Spec:       api.PodSpec{Containers: []api.Container{{Image: "foo:V1"}}},
 			},
 			true,
@@ -4209,11 +4209,11 @@ func TestValidatePodUpdate(t *testing.T) {
 		},
 		{
 			api.Pod{
-				ObjectMeta: api.ObjectMeta{Name: "foo", DeletionTimestamp: &now, DeletionGracePeriodSeconds: &grace},
+				ObjectMeta: metav1.ObjectMeta{Name: "foo", DeletionTimestamp: &now, DeletionGracePeriodSeconds: &grace},
 				Spec:       api.PodSpec{Containers: []api.Container{{Image: "foo:V1"}}},
 			},
 			api.Pod{
-				ObjectMeta: api.ObjectMeta{Name: "foo", DeletionTimestamp: &now, DeletionGracePeriodSeconds: &grace2},
+				ObjectMeta: metav1.ObjectMeta{Name: "foo", DeletionTimestamp: &now, DeletionGracePeriodSeconds: &grace2},
 				Spec:       api.PodSpec{Containers: []api.Container{{Image: "foo:V1"}}},
 			},
 			false,
@@ -4221,7 +4221,7 @@ func TestValidatePodUpdate(t *testing.T) {
 		},
 		{
 			api.Pod{
-				ObjectMeta: api.ObjectMeta{Name: "foo"},
+				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
 				Spec: api.PodSpec{
 					Containers: []api.Container{
 						{
@@ -4231,7 +4231,7 @@ func TestValidatePodUpdate(t *testing.T) {
 				},
 			},
 			api.Pod{
-				ObjectMeta: api.ObjectMeta{Name: "foo"},
+				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
 				Spec: api.PodSpec{
 					Containers: []api.Container{
 						{
@@ -4245,7 +4245,7 @@ func TestValidatePodUpdate(t *testing.T) {
 		},
 		{
 			api.Pod{
-				ObjectMeta: api.ObjectMeta{Name: "foo"},
+				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
 				Spec: api.PodSpec{
 					InitContainers: []api.Container{
 						{
@@ -4255,7 +4255,7 @@ func TestValidatePodUpdate(t *testing.T) {
 				},
 			},
 			api.Pod{
-				ObjectMeta: api.ObjectMeta{Name: "foo"},
+				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
 				Spec: api.PodSpec{
 					InitContainers: []api.Container{
 						{
@@ -4269,7 +4269,7 @@ func TestValidatePodUpdate(t *testing.T) {
 		},
 		{
 			api.Pod{
-				ObjectMeta: api.ObjectMeta{Name: "foo"},
+				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
 				Spec: api.PodSpec{
 					Containers: []api.Container{
 						{},
@@ -4277,7 +4277,7 @@ func TestValidatePodUpdate(t *testing.T) {
 				},
 			},
 			api.Pod{
-				ObjectMeta: api.ObjectMeta{Name: "foo"},
+				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
 				Spec: api.PodSpec{
 					Containers: []api.Container{
 						{
@@ -4291,7 +4291,7 @@ func TestValidatePodUpdate(t *testing.T) {
 		},
 		{
 			api.Pod{
-				ObjectMeta: api.ObjectMeta{Name: "foo"},
+				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
 				Spec: api.PodSpec{
 					InitContainers: []api.Container{
 						{},
@@ -4299,7 +4299,7 @@ func TestValidatePodUpdate(t *testing.T) {
 				},
 			},
 			api.Pod{
-				ObjectMeta: api.ObjectMeta{Name: "foo"},
+				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
 				Spec: api.PodSpec{
 					InitContainers: []api.Container{
 						{
@@ -4435,7 +4435,7 @@ func TestValidatePodUpdate(t *testing.T) {
 
 		{
 			api.Pod{
-				ObjectMeta: api.ObjectMeta{Name: "foo"},
+				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
 				Spec: api.PodSpec{
 					Containers: []api.Container{
 						{
@@ -4448,7 +4448,7 @@ func TestValidatePodUpdate(t *testing.T) {
 				},
 			},
 			api.Pod{
-				ObjectMeta: api.ObjectMeta{Name: "foo"},
+				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
 				Spec: api.PodSpec{
 					Containers: []api.Container{
 						{
@@ -4465,7 +4465,7 @@ func TestValidatePodUpdate(t *testing.T) {
 		},
 		{
 			api.Pod{
-				ObjectMeta: api.ObjectMeta{Name: "foo"},
+				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
 				Spec: api.PodSpec{
 					Containers: []api.Container{
 						{
@@ -4478,7 +4478,7 @@ func TestValidatePodUpdate(t *testing.T) {
 				},
 			},
 			api.Pod{
-				ObjectMeta: api.ObjectMeta{Name: "foo"},
+				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
 				Spec: api.PodSpec{
 					Containers: []api.Container{
 						{
@@ -4495,7 +4495,7 @@ func TestValidatePodUpdate(t *testing.T) {
 		},
 		{
 			api.Pod{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
 					Labels: map[string]string{
 						"foo": "bar",
@@ -4503,7 +4503,7 @@ func TestValidatePodUpdate(t *testing.T) {
 				},
 			},
 			api.Pod{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
 					Labels: map[string]string{
 						"Bar": "foo",
@@ -4533,7 +4533,7 @@ func TestValidatePodUpdate(t *testing.T) {
 
 func makeValidService() api.Service {
 	return api.Service{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:            "valid",
 			Namespace:       "valid",
 			Labels:          map[string]string{},
@@ -5144,7 +5144,7 @@ func TestValidateReplicationControllerStatusUpdate(t *testing.T) {
 	validSelector := map[string]string{"a": "b"}
 	validPodTemplate := api.PodTemplate{
 		Template: api.PodTemplateSpec{
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Labels: validSelector,
 			},
 			Spec: api.PodSpec{
@@ -5161,7 +5161,7 @@ func TestValidateReplicationControllerStatusUpdate(t *testing.T) {
 	successCases := []rcUpdateTest{
 		{
 			old: api.ReplicationController{
-				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
 				Spec: api.ReplicationControllerSpec{
 					Selector: validSelector,
 					Template: &validPodTemplate.Template,
@@ -5171,7 +5171,7 @@ func TestValidateReplicationControllerStatusUpdate(t *testing.T) {
 				},
 			},
 			update: api.ReplicationController{
-				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
 				Spec: api.ReplicationControllerSpec{
 					Replicas: 3,
 					Selector: validSelector,
@@ -5193,7 +5193,7 @@ func TestValidateReplicationControllerStatusUpdate(t *testing.T) {
 	errorCases := map[string]rcUpdateTest{
 		"negative replicas": {
 			old: api.ReplicationController{
-				ObjectMeta: api.ObjectMeta{Name: "", Namespace: api.NamespaceDefault},
+				ObjectMeta: metav1.ObjectMeta{Name: "", Namespace: api.NamespaceDefault},
 				Spec: api.ReplicationControllerSpec{
 					Selector: validSelector,
 					Template: &validPodTemplate.Template,
@@ -5203,7 +5203,7 @@ func TestValidateReplicationControllerStatusUpdate(t *testing.T) {
 				},
 			},
 			update: api.ReplicationController{
-				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
 				Spec: api.ReplicationControllerSpec{
 					Replicas: 2,
 					Selector: validSelector,
@@ -5227,7 +5227,7 @@ func TestValidateReplicationControllerUpdate(t *testing.T) {
 	validSelector := map[string]string{"a": "b"}
 	validPodTemplate := api.PodTemplate{
 		Template: api.PodTemplateSpec{
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Labels: validSelector,
 			},
 			Spec: api.PodSpec{
@@ -5239,7 +5239,7 @@ func TestValidateReplicationControllerUpdate(t *testing.T) {
 	}
 	readWriteVolumePodTemplate := api.PodTemplate{
 		Template: api.PodTemplateSpec{
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Labels: validSelector,
 			},
 			Spec: api.PodSpec{
@@ -5257,7 +5257,7 @@ func TestValidateReplicationControllerUpdate(t *testing.T) {
 				RestartPolicy: api.RestartPolicyAlways,
 				DNSPolicy:     api.DNSClusterFirst,
 			},
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Labels: invalidSelector,
 			},
 		},
@@ -5269,14 +5269,14 @@ func TestValidateReplicationControllerUpdate(t *testing.T) {
 	successCases := []rcUpdateTest{
 		{
 			old: api.ReplicationController{
-				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
 				Spec: api.ReplicationControllerSpec{
 					Selector: validSelector,
 					Template: &validPodTemplate.Template,
 				},
 			},
 			update: api.ReplicationController{
-				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
 				Spec: api.ReplicationControllerSpec{
 					Replicas: 3,
 					Selector: validSelector,
@@ -5286,14 +5286,14 @@ func TestValidateReplicationControllerUpdate(t *testing.T) {
 		},
 		{
 			old: api.ReplicationController{
-				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
 				Spec: api.ReplicationControllerSpec{
 					Selector: validSelector,
 					Template: &validPodTemplate.Template,
 				},
 			},
 			update: api.ReplicationController{
-				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
 				Spec: api.ReplicationControllerSpec{
 					Replicas: 1,
 					Selector: validSelector,
@@ -5312,14 +5312,14 @@ func TestValidateReplicationControllerUpdate(t *testing.T) {
 	errorCases := map[string]rcUpdateTest{
 		"more than one read/write": {
 			old: api.ReplicationController{
-				ObjectMeta: api.ObjectMeta{Name: "", Namespace: api.NamespaceDefault},
+				ObjectMeta: metav1.ObjectMeta{Name: "", Namespace: api.NamespaceDefault},
 				Spec: api.ReplicationControllerSpec{
 					Selector: validSelector,
 					Template: &validPodTemplate.Template,
 				},
 			},
 			update: api.ReplicationController{
-				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
 				Spec: api.ReplicationControllerSpec{
 					Replicas: 2,
 					Selector: validSelector,
@@ -5329,14 +5329,14 @@ func TestValidateReplicationControllerUpdate(t *testing.T) {
 		},
 		"invalid selector": {
 			old: api.ReplicationController{
-				ObjectMeta: api.ObjectMeta{Name: "", Namespace: api.NamespaceDefault},
+				ObjectMeta: metav1.ObjectMeta{Name: "", Namespace: api.NamespaceDefault},
 				Spec: api.ReplicationControllerSpec{
 					Selector: validSelector,
 					Template: &validPodTemplate.Template,
 				},
 			},
 			update: api.ReplicationController{
-				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
 				Spec: api.ReplicationControllerSpec{
 					Replicas: 2,
 					Selector: invalidSelector,
@@ -5346,14 +5346,14 @@ func TestValidateReplicationControllerUpdate(t *testing.T) {
 		},
 		"invalid pod": {
 			old: api.ReplicationController{
-				ObjectMeta: api.ObjectMeta{Name: "", Namespace: api.NamespaceDefault},
+				ObjectMeta: metav1.ObjectMeta{Name: "", Namespace: api.NamespaceDefault},
 				Spec: api.ReplicationControllerSpec{
 					Selector: validSelector,
 					Template: &validPodTemplate.Template,
 				},
 			},
 			update: api.ReplicationController{
-				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
 				Spec: api.ReplicationControllerSpec{
 					Replicas: 2,
 					Selector: validSelector,
@@ -5363,14 +5363,14 @@ func TestValidateReplicationControllerUpdate(t *testing.T) {
 		},
 		"negative replicas": {
 			old: api.ReplicationController{
-				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
 				Spec: api.ReplicationControllerSpec{
 					Selector: validSelector,
 					Template: &validPodTemplate.Template,
 				},
 			},
 			update: api.ReplicationController{
-				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
 				Spec: api.ReplicationControllerSpec{
 					Replicas: -1,
 					Selector: validSelector,
@@ -5390,7 +5390,7 @@ func TestValidateReplicationController(t *testing.T) {
 	validSelector := map[string]string{"a": "b"}
 	validPodTemplate := api.PodTemplate{
 		Template: api.PodTemplateSpec{
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Labels: validSelector,
 			},
 			Spec: api.PodSpec{
@@ -5402,7 +5402,7 @@ func TestValidateReplicationController(t *testing.T) {
 	}
 	readWriteVolumePodTemplate := api.PodTemplate{
 		Template: api.PodTemplateSpec{
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Labels: validSelector,
 			},
 			Spec: api.PodSpec{
@@ -5420,28 +5420,28 @@ func TestValidateReplicationController(t *testing.T) {
 				RestartPolicy: api.RestartPolicyAlways,
 				DNSPolicy:     api.DNSClusterFirst,
 			},
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Labels: invalidSelector,
 			},
 		},
 	}
 	successCases := []api.ReplicationController{
 		{
-			ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
+			ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
 			Spec: api.ReplicationControllerSpec{
 				Selector: validSelector,
 				Template: &validPodTemplate.Template,
 			},
 		},
 		{
-			ObjectMeta: api.ObjectMeta{Name: "abc-123", Namespace: api.NamespaceDefault},
+			ObjectMeta: metav1.ObjectMeta{Name: "abc-123", Namespace: api.NamespaceDefault},
 			Spec: api.ReplicationControllerSpec{
 				Selector: validSelector,
 				Template: &validPodTemplate.Template,
 			},
 		},
 		{
-			ObjectMeta: api.ObjectMeta{Name: "abc-123", Namespace: api.NamespaceDefault},
+			ObjectMeta: metav1.ObjectMeta{Name: "abc-123", Namespace: api.NamespaceDefault},
 			Spec: api.ReplicationControllerSpec{
 				Replicas: 1,
 				Selector: validSelector,
@@ -5457,40 +5457,40 @@ func TestValidateReplicationController(t *testing.T) {
 
 	errorCases := map[string]api.ReplicationController{
 		"zero-length ID": {
-			ObjectMeta: api.ObjectMeta{Name: "", Namespace: api.NamespaceDefault},
+			ObjectMeta: metav1.ObjectMeta{Name: "", Namespace: api.NamespaceDefault},
 			Spec: api.ReplicationControllerSpec{
 				Selector: validSelector,
 				Template: &validPodTemplate.Template,
 			},
 		},
 		"missing-namespace": {
-			ObjectMeta: api.ObjectMeta{Name: "abc-123"},
+			ObjectMeta: metav1.ObjectMeta{Name: "abc-123"},
 			Spec: api.ReplicationControllerSpec{
 				Selector: validSelector,
 				Template: &validPodTemplate.Template,
 			},
 		},
 		"empty selector": {
-			ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
+			ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
 			Spec: api.ReplicationControllerSpec{
 				Template: &validPodTemplate.Template,
 			},
 		},
 		"selector_doesnt_match": {
-			ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
+			ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
 			Spec: api.ReplicationControllerSpec{
 				Selector: map[string]string{"foo": "bar"},
 				Template: &validPodTemplate.Template,
 			},
 		},
 		"invalid manifest": {
-			ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
+			ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
 			Spec: api.ReplicationControllerSpec{
 				Selector: validSelector,
 			},
 		},
 		"read-write persistent disk with > 1 pod": {
-			ObjectMeta: api.ObjectMeta{Name: "abc"},
+			ObjectMeta: metav1.ObjectMeta{Name: "abc"},
 			Spec: api.ReplicationControllerSpec{
 				Replicas: 2,
 				Selector: validSelector,
@@ -5498,14 +5498,14 @@ func TestValidateReplicationController(t *testing.T) {
 			},
 		},
 		"negative_replicas": {
-			ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
+			ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
 			Spec: api.ReplicationControllerSpec{
 				Replicas: -1,
 				Selector: validSelector,
 			},
 		},
 		"invalid_label": {
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:      "abc-123",
 				Namespace: api.NamespaceDefault,
 				Labels: map[string]string{
@@ -5518,7 +5518,7 @@ func TestValidateReplicationController(t *testing.T) {
 			},
 		},
 		"invalid_label 2": {
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:      "abc-123",
 				Namespace: api.NamespaceDefault,
 				Labels: map[string]string{
@@ -5530,7 +5530,7 @@ func TestValidateReplicationController(t *testing.T) {
 			},
 		},
 		"invalid_annotation": {
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:      "abc-123",
 				Namespace: api.NamespaceDefault,
 				Annotations: map[string]string{
@@ -5543,7 +5543,7 @@ func TestValidateReplicationController(t *testing.T) {
 			},
 		},
 		"invalid restart policy 1": {
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:      "abc-123",
 				Namespace: api.NamespaceDefault,
 			},
@@ -5555,14 +5555,14 @@ func TestValidateReplicationController(t *testing.T) {
 						DNSPolicy:     api.DNSClusterFirst,
 						Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
 					},
-					ObjectMeta: api.ObjectMeta{
+					ObjectMeta: metav1.ObjectMeta{
 						Labels: validSelector,
 					},
 				},
 			},
 		},
 		"invalid restart policy 2": {
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:      "abc-123",
 				Namespace: api.NamespaceDefault,
 			},
@@ -5574,7 +5574,7 @@ func TestValidateReplicationController(t *testing.T) {
 						DNSPolicy:     api.DNSClusterFirst,
 						Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
 					},
-					ObjectMeta: api.ObjectMeta{
+					ObjectMeta: metav1.ObjectMeta{
 						Labels: validSelector,
 					},
 				},
@@ -5610,7 +5610,7 @@ func TestValidateNode(t *testing.T) {
 	invalidSelector := map[string]string{"NoUppercaseOrSpecialCharsLike=Equals": "b"}
 	successCases := []api.Node{
 		{
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:   "abc",
 				Labels: validSelector,
 			},
@@ -5629,7 +5629,7 @@ func TestValidateNode(t *testing.T) {
 			},
 		},
 		{
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name: "abc",
 			},
 			Status: api.NodeStatus{
@@ -5646,7 +5646,7 @@ func TestValidateNode(t *testing.T) {
 			},
 		},
 		{
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name: "dedicated-node1",
 				// Add a valid taint to a node
 				Annotations: map[string]string{
@@ -5672,7 +5672,7 @@ func TestValidateNode(t *testing.T) {
 			},
 		},
 		{
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name: "abc",
 				Annotations: map[string]string{
 					api.PreferAvoidPodsAnnotationKey: `
@@ -5717,7 +5717,7 @@ func TestValidateNode(t *testing.T) {
 
 	errorCases := map[string]api.Node{
 		"zero-length Name": {
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:   "",
 				Labels: validSelector,
 			},
@@ -5733,7 +5733,7 @@ func TestValidateNode(t *testing.T) {
 			},
 		},
 		"invalid-labels": {
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:   "abc-123",
 				Labels: invalidSelector,
 			},
@@ -5748,7 +5748,7 @@ func TestValidateNode(t *testing.T) {
 			},
 		},
 		"missing-external-id": {
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:   "abc-123",
 				Labels: validSelector,
 			},
@@ -5760,7 +5760,7 @@ func TestValidateNode(t *testing.T) {
 			},
 		},
 		"missing-taint-key": {
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name: "dedicated-node1",
 				// Add a taint with an empty key to a node
 				Annotations: map[string]string{
@@ -5777,7 +5777,7 @@ func TestValidateNode(t *testing.T) {
 			},
 		},
 		"bad-taint-key": {
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name: "dedicated-node1",
 				// Add a taint with an empty key to a node
 				Annotations: map[string]string{
@@ -5794,7 +5794,7 @@ func TestValidateNode(t *testing.T) {
 			},
 		},
 		"bad-taint-value": {
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name: "dedicated-node2",
 				Annotations: map[string]string{
 					api.TaintsAnnotationKey: `
@@ -5820,7 +5820,7 @@ func TestValidateNode(t *testing.T) {
 			},
 		},
 		"missing-taint-effect": {
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name: "dedicated-node3",
 				// Add a taint with an empty effect to a node
 				Annotations: map[string]string{
@@ -5846,7 +5846,7 @@ func TestValidateNode(t *testing.T) {
 			},
 		},
 		"invalide-taint-effect": {
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name: "dedicated-node3",
 				// Add a taint with an empty effect to a node
 				Annotations: map[string]string{
@@ -5872,7 +5872,7 @@ func TestValidateNode(t *testing.T) {
 			},
 		},
 		"duplicated-taints-with-same-key-effect": {
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name: "dedicated-node1",
 				// Add two taints to the node with the same key and effect; should be rejected.
 				Annotations: map[string]string{
@@ -5893,7 +5893,7 @@ func TestValidateNode(t *testing.T) {
 			},
 		},
 		"missing-podSignature": {
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name: "abc-123",
 				Annotations: map[string]string{
 					api.PreferAvoidPodsAnnotationKey: `
@@ -5919,7 +5919,7 @@ func TestValidateNode(t *testing.T) {
 			},
 		},
 		"invalid-podController": {
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name: "abc-123",
 				Annotations: map[string]string{
 					api.PreferAvoidPodsAnnotationKey: `
@@ -5990,53 +5990,53 @@ func TestValidateNodeUpdate(t *testing.T) {
 	}{
 		{api.Node{}, api.Node{}, true},
 		{api.Node{
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name: "foo"}},
 			api.Node{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name: "bar"},
 			}, false},
 		{api.Node{
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:   "foo",
 				Labels: map[string]string{"foo": "bar"},
 			},
 		}, api.Node{
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:   "foo",
 				Labels: map[string]string{"foo": "baz"},
 			},
 		}, true},
 		{api.Node{
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name: "foo",
 			},
 		}, api.Node{
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:   "foo",
 				Labels: map[string]string{"foo": "baz"},
 			},
 		}, true},
 		{api.Node{
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:   "foo",
 				Labels: map[string]string{"bar": "foo"},
 			},
 		}, api.Node{
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:   "foo",
 				Labels: map[string]string{"foo": "baz"},
 			},
 		}, true},
 		{api.Node{
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name: "foo",
 			},
 			Spec: api.NodeSpec{
 				PodCIDR: "",
 			},
 		}, api.Node{
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name: "foo",
 			},
 			Spec: api.NodeSpec{
@@ -6044,14 +6044,14 @@ func TestValidateNodeUpdate(t *testing.T) {
 			},
 		}, true},
 		{api.Node{
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name: "foo",
 			},
 			Spec: api.NodeSpec{
 				PodCIDR: "192.123.0.0/16",
 			},
 		}, api.Node{
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name: "foo",
 			},
 			Spec: api.NodeSpec{
@@ -6059,7 +6059,7 @@ func TestValidateNodeUpdate(t *testing.T) {
 			},
 		}, false},
 		{api.Node{
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name: "foo",
 			},
 			Status: api.NodeStatus{
@@ -6069,7 +6069,7 @@ func TestValidateNodeUpdate(t *testing.T) {
 				},
 			},
 		}, api.Node{
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name: "foo",
 			},
 			Status: api.NodeStatus{
@@ -6080,7 +6080,7 @@ func TestValidateNodeUpdate(t *testing.T) {
 			},
 		}, true},
 		{api.Node{
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:   "foo",
 				Labels: map[string]string{"bar": "foo"},
 			},
@@ -6091,7 +6091,7 @@ func TestValidateNodeUpdate(t *testing.T) {
 				},
 			},
 		}, api.Node{
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:   "foo",
 				Labels: map[string]string{"bar": "fooobaz"},
 			},
@@ -6103,7 +6103,7 @@ func TestValidateNodeUpdate(t *testing.T) {
 			},
 		}, true},
 		{api.Node{
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:   "foo",
 				Labels: map[string]string{"bar": "foo"},
 			},
@@ -6113,31 +6113,31 @@ func TestValidateNodeUpdate(t *testing.T) {
 				},
 			},
 		}, api.Node{
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:   "foo",
 				Labels: map[string]string{"bar": "fooobaz"},
 			},
 		}, true},
 		{api.Node{
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:   "foo",
 				Labels: map[string]string{"foo": "baz"},
 			},
 		}, api.Node{
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:   "foo",
 				Labels: map[string]string{"Foo": "baz"},
 			},
 		}, true},
 		{api.Node{
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name: "foo",
 			},
 			Spec: api.NodeSpec{
 				Unschedulable: false,
 			},
 		}, api.Node{
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name: "foo",
 			},
 			Spec: api.NodeSpec{
@@ -6145,14 +6145,14 @@ func TestValidateNodeUpdate(t *testing.T) {
 			},
 		}, true},
 		{api.Node{
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name: "foo",
 			},
 			Spec: api.NodeSpec{
 				Unschedulable: false,
 			},
 		}, api.Node{
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name: "foo",
 			},
 			Status: api.NodeStatus{
@@ -6163,14 +6163,14 @@ func TestValidateNodeUpdate(t *testing.T) {
 			},
 		}, false},
 		{api.Node{
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name: "foo",
 			},
 			Spec: api.NodeSpec{
 				Unschedulable: false,
 			},
 		}, api.Node{
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name: "foo",
 			},
 			Status: api.NodeStatus{
@@ -6181,11 +6181,11 @@ func TestValidateNodeUpdate(t *testing.T) {
 			},
 		}, true},
 		{api.Node{
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name: "foo",
 			},
 		}, api.Node{
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name: "foo",
 				Annotations: map[string]string{
 					api.PreferAvoidPodsAnnotationKey: `
@@ -6213,11 +6213,11 @@ func TestValidateNodeUpdate(t *testing.T) {
 			},
 		}, true},
 		{api.Node{
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name: "foo",
 			},
 		}, api.Node{
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name: "foo",
 				Annotations: map[string]string{
 					api.PreferAvoidPodsAnnotationKey: `
@@ -6233,11 +6233,11 @@ func TestValidateNodeUpdate(t *testing.T) {
 			},
 		}, false},
 		{api.Node{
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name: "foo",
 			},
 		}, api.Node{
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name: "foo",
 				Annotations: map[string]string{
 					api.PreferAvoidPodsAnnotationKey: `
@@ -6262,11 +6262,11 @@ func TestValidateNodeUpdate(t *testing.T) {
 			},
 		}, false},
 		{api.Node{
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name: "valid-opaque-int-resources",
 			},
 		}, api.Node{
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name: "valid-opaque-int-resources",
 			},
 			Status: api.NodeStatus{
@@ -6279,11 +6279,11 @@ func TestValidateNodeUpdate(t *testing.T) {
 			},
 		}, true},
 		{api.Node{
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name: "invalid-fractional-opaque-int-capacity",
 			},
 		}, api.Node{
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name: "invalid-fractional-opaque-int-capacity",
 			},
 			Status: api.NodeStatus{
@@ -6295,11 +6295,11 @@ func TestValidateNodeUpdate(t *testing.T) {
 			},
 		}, false},
 		{api.Node{
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name: "invalid-fractional-opaque-int-allocatable",
 			},
 		}, api.Node{
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name: "invalid-fractional-opaque-int-allocatable",
 			},
 			Status: api.NodeStatus{
@@ -6915,7 +6915,7 @@ func TestValidateLimitRange(t *testing.T) {
 	}
 
 	for _, successCase := range successCases {
-		limitRange := &api.LimitRange{ObjectMeta: api.ObjectMeta{Name: successCase.name, Namespace: "foo"}, Spec: successCase.spec}
+		limitRange := &api.LimitRange{ObjectMeta: metav1.ObjectMeta{Name: successCase.name, Namespace: "foo"}, Spec: successCase.spec}
 		if errs := ValidateLimitRange(limitRange); len(errs) != 0 {
 			t.Errorf("Case %v, unexpected error: %v", successCase.name, errs)
 		}
@@ -6926,23 +6926,23 @@ func TestValidateLimitRange(t *testing.T) {
 		D string
 	}{
 		"zero-length-name": {
-			api.LimitRange{ObjectMeta: api.ObjectMeta{Name: "", Namespace: "foo"}, Spec: api.LimitRangeSpec{}},
+			api.LimitRange{ObjectMeta: metav1.ObjectMeta{Name: "", Namespace: "foo"}, Spec: api.LimitRangeSpec{}},
 			"name or generateName is required",
 		},
 		"zero-length-namespace": {
-			api.LimitRange{ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: ""}, Spec: api.LimitRangeSpec{}},
+			api.LimitRange{ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: ""}, Spec: api.LimitRangeSpec{}},
 			"",
 		},
 		"invalid-name": {
-			api.LimitRange{ObjectMeta: api.ObjectMeta{Name: "^Invalid", Namespace: "foo"}, Spec: api.LimitRangeSpec{}},
+			api.LimitRange{ObjectMeta: metav1.ObjectMeta{Name: "^Invalid", Namespace: "foo"}, Spec: api.LimitRangeSpec{}},
 			dnsSubdomainLabelErrMsg,
 		},
 		"invalid-namespace": {
-			api.LimitRange{ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: "^Invalid"}, Spec: api.LimitRangeSpec{}},
+			api.LimitRange{ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: "^Invalid"}, Spec: api.LimitRangeSpec{}},
 			dnsLabelErrMsg,
 		},
 		"duplicate-limit-type": {
-			api.LimitRange{ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: api.LimitRangeSpec{
+			api.LimitRange{ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: api.LimitRangeSpec{
 				Limits: []api.LimitRangeItem{
 					{
 						Type: api.LimitTypePod,
@@ -6958,7 +6958,7 @@ func TestValidateLimitRange(t *testing.T) {
 			"",
 		},
 		"default-limit-type-pod": {
-			api.LimitRange{ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: api.LimitRangeSpec{
+			api.LimitRange{ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: api.LimitRangeSpec{
 				Limits: []api.LimitRangeItem{
 					{
 						Type:    api.LimitTypePod,
@@ -6971,7 +6971,7 @@ func TestValidateLimitRange(t *testing.T) {
 			"may not be specified when `type` is 'Pod'",
 		},
 		"default-request-limit-type-pod": {
-			api.LimitRange{ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: api.LimitRangeSpec{
+			api.LimitRange{ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: api.LimitRangeSpec{
 				Limits: []api.LimitRangeItem{
 					{
 						Type:           api.LimitTypePod,
@@ -6984,7 +6984,7 @@ func TestValidateLimitRange(t *testing.T) {
 			"may not be specified when `type` is 'Pod'",
 		},
 		"min value 100m is greater than max value 10m": {
-			api.LimitRange{ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: api.LimitRangeSpec{
+			api.LimitRange{ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: api.LimitRangeSpec{
 				Limits: []api.LimitRangeItem{
 					{
 						Type: api.LimitTypePod,
@@ -6996,7 +6996,7 @@ func TestValidateLimitRange(t *testing.T) {
 			"min value 100m is greater than max value 10m",
 		},
 		"invalid spec default outside range": {
-			api.LimitRange{ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: api.LimitRangeSpec{
+			api.LimitRange{ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: api.LimitRangeSpec{
 				Limits: []api.LimitRangeItem{
 					{
 						Type:    api.LimitTypeContainer,
@@ -7009,7 +7009,7 @@ func TestValidateLimitRange(t *testing.T) {
 			"default value 2 is greater than max value 1",
 		},
 		"invalid spec defaultrequest outside range": {
-			api.LimitRange{ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: api.LimitRangeSpec{
+			api.LimitRange{ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: api.LimitRangeSpec{
 				Limits: []api.LimitRangeItem{
 					{
 						Type:           api.LimitTypeContainer,
@@ -7022,7 +7022,7 @@ func TestValidateLimitRange(t *testing.T) {
 			"default request value 2 is greater than max value 1",
 		},
 		"invalid spec defaultrequest more than default": {
-			api.LimitRange{ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: api.LimitRangeSpec{
+			api.LimitRange{ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: api.LimitRangeSpec{
 				Limits: []api.LimitRangeItem{
 					{
 						Type:           api.LimitTypeContainer,
@@ -7036,7 +7036,7 @@ func TestValidateLimitRange(t *testing.T) {
 			"default request value 800m is greater than default limit value 500m",
 		},
 		"invalid spec maxLimitRequestRatio less than 1": {
-			api.LimitRange{ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: api.LimitRangeSpec{
+			api.LimitRange{ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: api.LimitRangeSpec{
 				Limits: []api.LimitRangeItem{
 					{
 						Type:                 api.LimitTypePod,
@@ -7047,7 +7047,7 @@ func TestValidateLimitRange(t *testing.T) {
 			"ratio 800m is less than 1",
 		},
 		"invalid spec maxLimitRequestRatio greater than max/min": {
-			api.LimitRange{ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: api.LimitRangeSpec{
+			api.LimitRange{ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: api.LimitRangeSpec{
 				Limits: []api.LimitRangeItem{
 					{
 						Type:                 api.LimitTypeContainer,
@@ -7060,7 +7060,7 @@ func TestValidateLimitRange(t *testing.T) {
 			"ratio 10 is greater than max/min = 4.000000",
 		},
 		"invalid non standard limit type": {
-			api.LimitRange{ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: api.LimitRangeSpec{
+			api.LimitRange{ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: api.LimitRangeSpec{
 				Limits: []api.LimitRangeItem{
 					{
 						Type:                 "foo",
@@ -7075,7 +7075,7 @@ func TestValidateLimitRange(t *testing.T) {
 			"must be a standard limit type or fully qualified",
 		},
 		"min and max values missing, one required": {
-			api.LimitRange{ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: api.LimitRangeSpec{
+			api.LimitRange{ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: api.LimitRangeSpec{
 				Limits: []api.LimitRangeItem{
 					{
 						Type: api.LimitTypePersistentVolumeClaim,
@@ -7085,7 +7085,7 @@ func TestValidateLimitRange(t *testing.T) {
 			"either minimum or maximum storage value is required, but neither was provided",
 		},
 		"invalid min greater than max": {
-			api.LimitRange{ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: api.LimitRangeSpec{
+			api.LimitRange{ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: api.LimitRangeSpec{
 				Limits: []api.LimitRangeItem{
 					{
 						Type: api.LimitTypePersistentVolumeClaim,
@@ -7218,42 +7218,42 @@ func TestValidateResourceQuota(t *testing.T) {
 
 	successCases := []api.ResourceQuota{
 		{
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:      "abc",
 				Namespace: "foo",
 			},
 			Spec: spec,
 		},
 		{
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:      "abc",
 				Namespace: "foo",
 			},
 			Spec: fractionalComputeSpec,
 		},
 		{
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:      "abc",
 				Namespace: "foo",
 			},
 			Spec: terminatingSpec,
 		},
 		{
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:      "abc",
 				Namespace: "foo",
 			},
 			Spec: nonTerminatingSpec,
 		},
 		{
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:      "abc",
 				Namespace: "foo",
 			},
 			Spec: bestEffortSpec,
 		},
 		{
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:      "abc",
 				Namespace: "foo",
 			},
@@ -7272,43 +7272,43 @@ func TestValidateResourceQuota(t *testing.T) {
 		D string
 	}{
 		"zero-length Name": {
-			api.ResourceQuota{ObjectMeta: api.ObjectMeta{Name: "", Namespace: "foo"}, Spec: spec},
+			api.ResourceQuota{ObjectMeta: metav1.ObjectMeta{Name: "", Namespace: "foo"}, Spec: spec},
 			"name or generateName is required",
 		},
 		"zero-length Namespace": {
-			api.ResourceQuota{ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: ""}, Spec: spec},
+			api.ResourceQuota{ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: ""}, Spec: spec},
 			"",
 		},
 		"invalid Name": {
-			api.ResourceQuota{ObjectMeta: api.ObjectMeta{Name: "^Invalid", Namespace: "foo"}, Spec: spec},
+			api.ResourceQuota{ObjectMeta: metav1.ObjectMeta{Name: "^Invalid", Namespace: "foo"}, Spec: spec},
 			dnsSubdomainLabelErrMsg,
 		},
 		"invalid Namespace": {
-			api.ResourceQuota{ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: "^Invalid"}, Spec: spec},
+			api.ResourceQuota{ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: "^Invalid"}, Spec: spec},
 			dnsLabelErrMsg,
 		},
 		"negative-limits": {
-			api.ResourceQuota{ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: negativeSpec},
+			api.ResourceQuota{ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: negativeSpec},
 			isNegativeErrorMsg,
 		},
 		"fractional-api-resource": {
-			api.ResourceQuota{ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: fractionalPodSpec},
+			api.ResourceQuota{ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: fractionalPodSpec},
 			isNotIntegerErrorMsg,
 		},
 		"invalid-quota-resource": {
-			api.ResourceQuota{ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: invalidQuotaResourceSpec},
+			api.ResourceQuota{ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: invalidQuotaResourceSpec},
 			isInvalidQuotaResource,
 		},
 		"invalid-quota-terminating-pair": {
-			api.ResourceQuota{ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: invalidTerminatingScopePairsSpec},
+			api.ResourceQuota{ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: invalidTerminatingScopePairsSpec},
 			"conflicting scopes",
 		},
 		"invalid-quota-besteffort-pair": {
-			api.ResourceQuota{ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: invalidBestEffortScopePairsSpec},
+			api.ResourceQuota{ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: invalidBestEffortScopePairsSpec},
 			"conflicting scopes",
 		},
 		"invalid-quota-scope-name": {
-			api.ResourceQuota{ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: invalidScopeNameSpec},
+			api.ResourceQuota{ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: invalidScopeNameSpec},
 			"unsupported scope",
 		},
 	}
@@ -7330,10 +7330,10 @@ func TestValidateNamespace(t *testing.T) {
 	invalidLabels := map[string]string{"NoUppercaseOrSpecialCharsLike=Equals": "b"}
 	successCases := []api.Namespace{
 		{
-			ObjectMeta: api.ObjectMeta{Name: "abc", Labels: validLabels},
+			ObjectMeta: metav1.ObjectMeta{Name: "abc", Labels: validLabels},
 		},
 		{
-			ObjectMeta: api.ObjectMeta{Name: "abc-123"},
+			ObjectMeta: metav1.ObjectMeta{Name: "abc-123"},
 			Spec: api.NamespaceSpec{
 				Finalizers: []api.FinalizerName{"example.com/something", "example.com/other"},
 			},
@@ -7349,15 +7349,15 @@ func TestValidateNamespace(t *testing.T) {
 		D string
 	}{
 		"zero-length name": {
-			api.Namespace{ObjectMeta: api.ObjectMeta{Name: ""}},
+			api.Namespace{ObjectMeta: metav1.ObjectMeta{Name: ""}},
 			"",
 		},
 		"defined-namespace": {
-			api.Namespace{ObjectMeta: api.ObjectMeta{Name: "abc-123", Namespace: "makesnosense"}},
+			api.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "abc-123", Namespace: "makesnosense"}},
 			"",
 		},
 		"invalid-labels": {
-			api.Namespace{ObjectMeta: api.ObjectMeta{Name: "abc", Labels: invalidLabels}},
+			api.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "abc", Labels: invalidLabels}},
 			"",
 		},
 	}
@@ -7377,38 +7377,38 @@ func TestValidateNamespaceFinalizeUpdate(t *testing.T) {
 	}{
 		{api.Namespace{}, api.Namespace{}, true},
 		{api.Namespace{
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name: "foo"}},
 			api.Namespace{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo"},
 				Spec: api.NamespaceSpec{
 					Finalizers: []api.FinalizerName{"Foo"},
 				},
 			}, false},
 		{api.Namespace{
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name: "foo"},
 			Spec: api.NamespaceSpec{
 				Finalizers: []api.FinalizerName{"foo.com/bar"},
 			},
 		},
 			api.Namespace{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo"},
 				Spec: api.NamespaceSpec{
 					Finalizers: []api.FinalizerName{"foo.com/bar", "what.com/bar"},
 				},
 			}, true},
 		{api.Namespace{
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name: "fooemptyfinalizer"},
 			Spec: api.NamespaceSpec{
 				Finalizers: []api.FinalizerName{"foo.com/bar"},
 			},
 		},
 			api.Namespace{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name: "fooemptyfinalizer"},
 				Spec: api.NamespaceSpec{
 					Finalizers: []api.FinalizerName{"", "foo.com/bar", "what.com/bar"},
@@ -7444,10 +7444,10 @@ func TestValidateNamespaceStatusUpdate(t *testing.T) {
 		}, true},
 		// Cannot set deletionTimestamp via status update
 		{api.Namespace{
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name: "foo"}},
 			api.Namespace{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:              "foo",
 					DeletionTimestamp: &now},
 				Status: api.NamespaceStatus{
@@ -7456,11 +7456,11 @@ func TestValidateNamespaceStatusUpdate(t *testing.T) {
 			}, false},
 		// Can update phase via status update
 		{api.Namespace{
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:              "foo",
 				DeletionTimestamp: &now}},
 			api.Namespace{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:              "foo",
 					DeletionTimestamp: &now},
 				Status: api.NamespaceStatus{
@@ -7468,20 +7468,20 @@ func TestValidateNamespaceStatusUpdate(t *testing.T) {
 				},
 			}, true},
 		{api.Namespace{
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name: "foo"}},
 			api.Namespace{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo"},
 				Status: api.NamespaceStatus{
 					Phase: api.NamespaceTerminating,
 				},
 			}, false},
 		{api.Namespace{
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name: "foo"}},
 			api.Namespace{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name: "bar"},
 				Status: api.NamespaceStatus{
 					Phase: api.NamespaceTerminating,
@@ -7510,62 +7510,62 @@ func TestValidateNamespaceUpdate(t *testing.T) {
 	}{
 		{api.Namespace{}, api.Namespace{}, true},
 		{api.Namespace{
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name: "foo1"}},
 			api.Namespace{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name: "bar1"},
 			}, false},
 		{api.Namespace{
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:   "foo2",
 				Labels: map[string]string{"foo": "bar"},
 			},
 		}, api.Namespace{
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:   "foo2",
 				Labels: map[string]string{"foo": "baz"},
 			},
 		}, true},
 		{api.Namespace{
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name: "foo3",
 			},
 		}, api.Namespace{
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:   "foo3",
 				Labels: map[string]string{"foo": "baz"},
 			},
 		}, true},
 		{api.Namespace{
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:   "foo4",
 				Labels: map[string]string{"bar": "foo"},
 			},
 		}, api.Namespace{
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:   "foo4",
 				Labels: map[string]string{"foo": "baz"},
 			},
 		}, true},
 		{api.Namespace{
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:   "foo5",
 				Labels: map[string]string{"foo": "baz"},
 			},
 		}, api.Namespace{
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:   "foo5",
 				Labels: map[string]string{"Foo": "baz"},
 			},
 		}, true},
 		{api.Namespace{
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:   "foo6",
 				Labels: map[string]string{"foo": "baz"},
 			},
 		}, api.Namespace{
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:   "foo6",
 				Labels: map[string]string{"Foo": "baz"},
 			},
@@ -7595,7 +7595,7 @@ func TestValidateSecret(t *testing.T) {
 	// Opaque secret validation
 	validSecret := func() api.Secret {
 		return api.Secret{
-			ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "bar"},
+			ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"},
 			Data: map[string][]byte{
 				"data-1": []byte("bar"),
 			},
@@ -7629,7 +7629,7 @@ func TestValidateSecret(t *testing.T) {
 	// kubernetes.io/service-account-token secret validation
 	validServiceAccountTokenSecret := func() api.Secret {
 		return api.Secret{
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:      "foo",
 				Namespace: "bar",
 				Annotations: map[string]string{
@@ -7686,7 +7686,7 @@ func TestValidateSecret(t *testing.T) {
 func TestValidateDockerConfigSecret(t *testing.T) {
 	validDockerSecret := func() api.Secret {
 		return api.Secret{
-			ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "bar"},
+			ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"},
 			Type:       api.SecretTypeDockercfg,
 			Data: map[string][]byte{
 				api.DockerConfigKey: []byte(`{"https://index.docker.io/v1/": {"auth": "Y2x1ZWRyb29sZXIwMDAxOnBhc3N3b3Jk","email": "fake@example.com"}}`),
@@ -7695,7 +7695,7 @@ func TestValidateDockerConfigSecret(t *testing.T) {
 	}
 	validDockerSecret2 := func() api.Secret {
 		return api.Secret{
-			ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "bar"},
+			ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"},
 			Type:       api.SecretTypeDockerConfigJson,
 			Data: map[string][]byte{
 				api.DockerConfigJsonKey: []byte(`{"auths":{"https://index.docker.io/v1/": {"auth": "Y2x1ZWRyb29sZXIwMDAxOnBhc3N3b3Jk","email": "fake@example.com"}}}`),
@@ -7747,7 +7747,7 @@ func TestValidateDockerConfigSecret(t *testing.T) {
 func TestValidateBasicAuthSecret(t *testing.T) {
 	validBasicAuthSecret := func() api.Secret {
 		return api.Secret{
-			ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "bar"},
+			ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"},
 			Type:       api.SecretTypeBasicAuth,
 			Data: map[string][]byte{
 				api.BasicAuthUsernameKey: []byte("username"),
@@ -7797,7 +7797,7 @@ func TestValidateBasicAuthSecret(t *testing.T) {
 func TestValidateSSHAuthSecret(t *testing.T) {
 	validSSHAuthSecret := func() api.Secret {
 		return api.Secret{
-			ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "bar"},
+			ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"},
 			Type:       api.SecretTypeSSHAuth,
 			Data: map[string][]byte{
 				api.SSHAuthPrivateKey: []byte("foo-bar-baz"),
@@ -7831,7 +7831,7 @@ func TestValidateSSHAuthSecret(t *testing.T) {
 func TestValidateEndpoints(t *testing.T) {
 	successCases := map[string]api.Endpoints{
 		"simple endpoint": {
-			ObjectMeta: api.ObjectMeta{Name: "mysvc", Namespace: "namespace"},
+			ObjectMeta: metav1.ObjectMeta{Name: "mysvc", Namespace: "namespace"},
 			Subsets: []api.EndpointSubset{
 				{
 					Addresses: []api.EndpointAddress{{IP: "10.10.1.1"}, {IP: "10.10.2.2"}},
@@ -7844,10 +7844,10 @@ func TestValidateEndpoints(t *testing.T) {
 			},
 		},
 		"empty subsets": {
-			ObjectMeta: api.ObjectMeta{Name: "mysvc", Namespace: "namespace"},
+			ObjectMeta: metav1.ObjectMeta{Name: "mysvc", Namespace: "namespace"},
 		},
 		"no name required for singleton port": {
-			ObjectMeta: api.ObjectMeta{Name: "mysvc", Namespace: "namespace"},
+			ObjectMeta: metav1.ObjectMeta{Name: "mysvc", Namespace: "namespace"},
 			Subsets: []api.EndpointSubset{
 				{
 					Addresses: []api.EndpointAddress{{IP: "10.10.1.1"}},
@@ -7869,26 +7869,26 @@ func TestValidateEndpoints(t *testing.T) {
 		errorDetail string
 	}{
 		"missing namespace": {
-			endpoints: api.Endpoints{ObjectMeta: api.ObjectMeta{Name: "mysvc"}},
+			endpoints: api.Endpoints{ObjectMeta: metav1.ObjectMeta{Name: "mysvc"}},
 			errorType: "FieldValueRequired",
 		},
 		"missing name": {
-			endpoints: api.Endpoints{ObjectMeta: api.ObjectMeta{Namespace: "namespace"}},
+			endpoints: api.Endpoints{ObjectMeta: metav1.ObjectMeta{Namespace: "namespace"}},
 			errorType: "FieldValueRequired",
 		},
 		"invalid namespace": {
-			endpoints:   api.Endpoints{ObjectMeta: api.ObjectMeta{Name: "mysvc", Namespace: "no@#invalid.;chars\"allowed"}},
+			endpoints:   api.Endpoints{ObjectMeta: metav1.ObjectMeta{Name: "mysvc", Namespace: "no@#invalid.;chars\"allowed"}},
 			errorType:   "FieldValueInvalid",
 			errorDetail: dnsLabelErrMsg,
 		},
 		"invalid name": {
-			endpoints:   api.Endpoints{ObjectMeta: api.ObjectMeta{Name: "-_Invliad^&Characters", Namespace: "namespace"}},
+			endpoints:   api.Endpoints{ObjectMeta: metav1.ObjectMeta{Name: "-_Invliad^&Characters", Namespace: "namespace"}},
 			errorType:   "FieldValueInvalid",
 			errorDetail: dnsSubdomainLabelErrMsg,
 		},
 		"empty addresses": {
 			endpoints: api.Endpoints{
-				ObjectMeta: api.ObjectMeta{Name: "mysvc", Namespace: "namespace"},
+				ObjectMeta: metav1.ObjectMeta{Name: "mysvc", Namespace: "namespace"},
 				Subsets: []api.EndpointSubset{
 					{
 						Ports: []api.EndpointPort{{Name: "a", Port: 93, Protocol: "TCP"}},
@@ -7899,7 +7899,7 @@ func TestValidateEndpoints(t *testing.T) {
 		},
 		"empty ports": {
 			endpoints: api.Endpoints{
-				ObjectMeta: api.ObjectMeta{Name: "mysvc", Namespace: "namespace"},
+				ObjectMeta: metav1.ObjectMeta{Name: "mysvc", Namespace: "namespace"},
 				Subsets: []api.EndpointSubset{
 					{
 						Addresses: []api.EndpointAddress{{IP: "10.10.3.3"}},
@@ -7910,7 +7910,7 @@ func TestValidateEndpoints(t *testing.T) {
 		},
 		"invalid IP": {
 			endpoints: api.Endpoints{
-				ObjectMeta: api.ObjectMeta{Name: "mysvc", Namespace: "namespace"},
+				ObjectMeta: metav1.ObjectMeta{Name: "mysvc", Namespace: "namespace"},
 				Subsets: []api.EndpointSubset{
 					{
 						Addresses: []api.EndpointAddress{{IP: "[2001:0db8:85a3:0042:1000:8a2e:0370:7334]"}},
@@ -7923,7 +7923,7 @@ func TestValidateEndpoints(t *testing.T) {
 		},
 		"Multiple ports, one without name": {
 			endpoints: api.Endpoints{
-				ObjectMeta: api.ObjectMeta{Name: "mysvc", Namespace: "namespace"},
+				ObjectMeta: metav1.ObjectMeta{Name: "mysvc", Namespace: "namespace"},
 				Subsets: []api.EndpointSubset{
 					{
 						Addresses: []api.EndpointAddress{{IP: "10.10.1.1"}},
@@ -7935,7 +7935,7 @@ func TestValidateEndpoints(t *testing.T) {
 		},
 		"Invalid port number": {
 			endpoints: api.Endpoints{
-				ObjectMeta: api.ObjectMeta{Name: "mysvc", Namespace: "namespace"},
+				ObjectMeta: metav1.ObjectMeta{Name: "mysvc", Namespace: "namespace"},
 				Subsets: []api.EndpointSubset{
 					{
 						Addresses: []api.EndpointAddress{{IP: "10.10.1.1"}},
@@ -7948,7 +7948,7 @@ func TestValidateEndpoints(t *testing.T) {
 		},
 		"Invalid protocol": {
 			endpoints: api.Endpoints{
-				ObjectMeta: api.ObjectMeta{Name: "mysvc", Namespace: "namespace"},
+				ObjectMeta: metav1.ObjectMeta{Name: "mysvc", Namespace: "namespace"},
 				Subsets: []api.EndpointSubset{
 					{
 						Addresses: []api.EndpointAddress{{IP: "10.10.1.1"}},
@@ -7960,7 +7960,7 @@ func TestValidateEndpoints(t *testing.T) {
 		},
 		"Address missing IP": {
 			endpoints: api.Endpoints{
-				ObjectMeta: api.ObjectMeta{Name: "mysvc", Namespace: "namespace"},
+				ObjectMeta: metav1.ObjectMeta{Name: "mysvc", Namespace: "namespace"},
 				Subsets: []api.EndpointSubset{
 					{
 						Addresses: []api.EndpointAddress{{}},
@@ -7973,7 +7973,7 @@ func TestValidateEndpoints(t *testing.T) {
 		},
 		"Port missing number": {
 			endpoints: api.Endpoints{
-				ObjectMeta: api.ObjectMeta{Name: "mysvc", Namespace: "namespace"},
+				ObjectMeta: metav1.ObjectMeta{Name: "mysvc", Namespace: "namespace"},
 				Subsets: []api.EndpointSubset{
 					{
 						Addresses: []api.EndpointAddress{{IP: "10.10.1.1"}},
@@ -7986,7 +7986,7 @@ func TestValidateEndpoints(t *testing.T) {
 		},
 		"Port missing protocol": {
 			endpoints: api.Endpoints{
-				ObjectMeta: api.ObjectMeta{Name: "mysvc", Namespace: "namespace"},
+				ObjectMeta: metav1.ObjectMeta{Name: "mysvc", Namespace: "namespace"},
 				Subsets: []api.EndpointSubset{
 					{
 						Addresses: []api.EndpointAddress{{IP: "10.10.1.1"}},
@@ -7998,7 +7998,7 @@ func TestValidateEndpoints(t *testing.T) {
 		},
 		"Address is loopback": {
 			endpoints: api.Endpoints{
-				ObjectMeta: api.ObjectMeta{Name: "mysvc", Namespace: "namespace"},
+				ObjectMeta: metav1.ObjectMeta{Name: "mysvc", Namespace: "namespace"},
 				Subsets: []api.EndpointSubset{
 					{
 						Addresses: []api.EndpointAddress{{IP: "127.0.0.1"}},
@@ -8011,7 +8011,7 @@ func TestValidateEndpoints(t *testing.T) {
 		},
 		"Address is link-local": {
 			endpoints: api.Endpoints{
-				ObjectMeta: api.ObjectMeta{Name: "mysvc", Namespace: "namespace"},
+				ObjectMeta: metav1.ObjectMeta{Name: "mysvc", Namespace: "namespace"},
 				Subsets: []api.EndpointSubset{
 					{
 						Addresses: []api.EndpointAddress{{IP: "169.254.169.254"}},
@@ -8024,7 +8024,7 @@ func TestValidateEndpoints(t *testing.T) {
 		},
 		"Address is link-local multicast": {
 			endpoints: api.Endpoints{
-				ObjectMeta: api.ObjectMeta{Name: "mysvc", Namespace: "namespace"},
+				ObjectMeta: metav1.ObjectMeta{Name: "mysvc", Namespace: "namespace"},
 				Subsets: []api.EndpointSubset{
 					{
 						Addresses: []api.EndpointAddress{{IP: "224.0.0.1"}},
@@ -8047,7 +8047,7 @@ func TestValidateEndpoints(t *testing.T) {
 func TestValidateTLSSecret(t *testing.T) {
 	successCases := map[string]api.Secret{
 		"emtpy certificate chain": {
-			ObjectMeta: api.ObjectMeta{Name: "tls-cert", Namespace: "namespace"},
+			ObjectMeta: metav1.ObjectMeta{Name: "tls-cert", Namespace: "namespace"},
 			Data: map[string][]byte{
 				api.TLSCertKey:       []byte("public key"),
 				api.TLSPrivateKeyKey: []byte("private key"),
@@ -8066,7 +8066,7 @@ func TestValidateTLSSecret(t *testing.T) {
 	}{
 		"missing public key": {
 			secrets: api.Secret{
-				ObjectMeta: api.ObjectMeta{Name: "tls-cert"},
+				ObjectMeta: metav1.ObjectMeta{Name: "tls-cert"},
 				Data: map[string][]byte{
 					api.TLSCertKey: []byte("public key"),
 				},
@@ -8075,7 +8075,7 @@ func TestValidateTLSSecret(t *testing.T) {
 		},
 		"missing private key": {
 			secrets: api.Secret{
-				ObjectMeta: api.ObjectMeta{Name: "tls-cert"},
+				ObjectMeta: metav1.ObjectMeta{Name: "tls-cert"},
 				Data: map[string][]byte{
 					api.TLSCertKey: []byte("public key"),
 				},
@@ -8210,7 +8210,7 @@ func TestValidPodLogOptions(t *testing.T) {
 func TestValidateConfigMap(t *testing.T) {
 	newConfigMap := func(name, namespace string, data map[string]string) api.ConfigMap {
 		return api.ConfigMap{
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:      name,
 				Namespace: namespace,
 			},
@@ -8266,7 +8266,7 @@ func TestValidateConfigMap(t *testing.T) {
 func TestValidateConfigMapUpdate(t *testing.T) {
 	newConfigMap := func(version, name, namespace string, data map[string]string) api.ConfigMap {
 		return api.ConfigMap{
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:            name,
 				Namespace:       namespace,
 				ResourceVersion: version,
@@ -8312,7 +8312,7 @@ func TestValidateConfigMapUpdate(t *testing.T) {
 }
 
 func TestValidateHasLabel(t *testing.T) {
-	successCase := api.ObjectMeta{
+	successCase := metav1.ObjectMeta{
 		Name:      "123",
 		Namespace: "ns",
 		Labels: map[string]string{
@@ -8324,7 +8324,7 @@ func TestValidateHasLabel(t *testing.T) {
 		t.Errorf("expected success: %v", errs)
 	}
 
-	missingCase := api.ObjectMeta{
+	missingCase := metav1.ObjectMeta{
 		Name:      "123",
 		Namespace: "ns",
 		Labels: map[string]string{
@@ -8335,7 +8335,7 @@ func TestValidateHasLabel(t *testing.T) {
 		t.Errorf("expected failure")
 	}
 
-	wrongValueCase := api.ObjectMeta{
+	wrongValueCase := metav1.ObjectMeta{
 		Name:      "123",
 		Namespace: "ns",
 		Labels: map[string]string{
@@ -8438,7 +8438,7 @@ func TestValidateSysctls(t *testing.T) {
 
 func newNodeNameEndpoint(nodeName string) *api.Endpoints {
 	ep := &api.Endpoints{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:            "foo",
 			Namespace:       api.NamespaceDefault,
 			ResourceVersion: "1",

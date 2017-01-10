@@ -20,8 +20,8 @@ package internalversion
 
 import (
 	apiregistration "k8s.io/kubernetes/cmd/kube-aggregator/pkg/apis/apiregistration"
-	api "k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/labels"
 )
@@ -55,7 +55,7 @@ func (s *aPIServiceLister) List(selector labels.Selector) (ret []*apiregistratio
 
 // Get retrieves the APIService from the index for a given name.
 func (s *aPIServiceLister) Get(name string) (*apiregistration.APIService, error) {
-	key := &apiregistration.APIService{ObjectMeta: api.ObjectMeta{Name: name}}
+	key := &apiregistration.APIService{ObjectMeta: metav1.ObjectMeta{Name: name}}
 	obj, exists, err := s.indexer.Get(key)
 	if err != nil {
 		return nil, err

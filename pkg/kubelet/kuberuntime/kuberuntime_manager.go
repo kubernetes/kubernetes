@@ -26,6 +26,7 @@ import (
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 
 	"k8s.io/kubernetes/pkg/api/v1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/credentialprovider"
 	internalapi "k8s.io/kubernetes/pkg/kubelet/api"
@@ -824,7 +825,7 @@ func (m *kubeGenericRuntimeManager) GetPodStatus(uid kubetypes.UID, name, namesp
 	}
 
 	podFullName := format.Pod(&v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: namespace,
 			UID:       uid,

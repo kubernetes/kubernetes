@@ -29,7 +29,7 @@ import (
 type EndpointsLock struct {
 	// EndpointsMeta should contain a Name and a Namespace of an
 	// Endpoints object that the LeaderElector will attempt to lead.
-	EndpointsMeta v1.ObjectMeta
+	EndpointsMeta metav1.ObjectMeta
 	Client        clientset.Interface
 	LockConfig    ResourceLockConfig
 	e             *v1.Endpoints
@@ -60,7 +60,7 @@ func (el *EndpointsLock) Create(ler LeaderElectionRecord) error {
 		return err
 	}
 	el.e, err = el.Client.Core().Endpoints(el.EndpointsMeta.Namespace).Create(&v1.Endpoints{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      el.EndpointsMeta.Name,
 			Namespace: el.EndpointsMeta.Namespace,
 			Annotations: map[string]string{

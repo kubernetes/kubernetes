@@ -26,6 +26,7 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api/v1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
 	"k8s.io/kubernetes/pkg/types"
@@ -290,7 +291,7 @@ func TestPlugin(t *testing.T) {
 		t.Errorf("Can't find the plugin by name")
 	}
 
-	pod := &v1.Pod{ObjectMeta: v1.ObjectMeta{Namespace: testNamespace, UID: testPodUID}}
+	pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: testNamespace, UID: testPodUID}}
 	mounter, err := plugin.NewMounter(volume.NewSpecFromVolume(volumeSpec), pod, volume.VolumeOptions{})
 	if err != nil {
 		t.Errorf("Failed to make a new Mounter: %v", err)
@@ -354,7 +355,7 @@ func TestPluginReboot(t *testing.T) {
 		t.Errorf("Can't find the plugin by name")
 	}
 
-	pod := &v1.Pod{ObjectMeta: v1.ObjectMeta{Namespace: testNamespace, UID: testPodUID}}
+	pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: testNamespace, UID: testPodUID}}
 	mounter, err := plugin.NewMounter(volume.NewSpecFromVolume(volumeSpec), pod, volume.VolumeOptions{})
 	if err != nil {
 		t.Errorf("Failed to make a new Mounter: %v", err)
@@ -403,7 +404,7 @@ func volumeSpec(volumeName, configMapName string, defaultMode int32) *v1.Volume 
 
 func configMap(namespace, name string) v1.ConfigMap {
 	return v1.ConfigMap{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Namespace: namespace,
 			Name:      name,
 		},

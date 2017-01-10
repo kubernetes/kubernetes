@@ -19,9 +19,9 @@ limitations under the License.
 package internalversion
 
 import (
-	api "k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	authorization "k8s.io/kubernetes/pkg/apis/authorization"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/labels"
 )
@@ -55,7 +55,7 @@ func (s *subjectAccessReviewLister) List(selector labels.Selector) (ret []*autho
 
 // Get retrieves the SubjectAccessReview from the index for a given name.
 func (s *subjectAccessReviewLister) Get(name string) (*authorization.SubjectAccessReview, error) {
-	key := &authorization.SubjectAccessReview{ObjectMeta: api.ObjectMeta{Name: name}}
+	key := &authorization.SubjectAccessReview{ObjectMeta: metav1.ObjectMeta{Name: name}}
 	obj, exists, err := s.indexer.Get(key)
 	if err != nil {
 		return nil, err

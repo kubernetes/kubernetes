@@ -17,14 +17,15 @@ limitations under the License.
 package util
 
 import (
+	"github.com/spf13/cobra"
+
 	"k8s.io/kubernetes/pkg/api"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	client "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
 	kubectlcmd "k8s.io/kubernetes/pkg/kubectl/cmd"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
-
-	"github.com/spf13/cobra"
 )
 
 const (
@@ -118,7 +119,7 @@ func CreateKubeconfigSecret(clientset *client.Clientset, kubeconfig *clientcmdap
 	// Build the secret object with the minified and flattened
 	// kubeconfig content.
 	secret := &api.Secret{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: namespace,
 		},

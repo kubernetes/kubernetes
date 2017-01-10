@@ -22,15 +22,15 @@ import (
 	"strings"
 	"sync"
 
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/storage"
-	"k8s.io/kubernetes/pkg/watch"
-
 	"github.com/coreos/etcd/clientv3"
 	etcdrpc "github.com/coreos/etcd/etcdserver/api/v3rpc/rpctypes"
 	"github.com/golang/glog"
 	"golang.org/x/net/context"
+
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
+	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/storage"
+	"k8s.io/kubernetes/pkg/watch"
 )
 
 const (

@@ -23,6 +23,7 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api/v1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/util/strings"
@@ -116,7 +117,7 @@ func (plugin *emptyDirPlugin) NewUnmounter(volName string, podUID types.UID) (vo
 
 func (plugin *emptyDirPlugin) newUnmounterInternal(volName string, podUID types.UID, mounter mount.Interface, mountDetector mountDetector) (volume.Unmounter, error) {
 	ed := &emptyDir{
-		pod:             &v1.Pod{ObjectMeta: v1.ObjectMeta{UID: podUID}},
+		pod:             &v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: podUID}},
 		volName:         volName,
 		medium:          v1.StorageMediumDefault, // might be changed later
 		mounter:         mounter,

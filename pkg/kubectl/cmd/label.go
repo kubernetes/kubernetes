@@ -27,6 +27,7 @@ import (
 	"github.com/spf13/cobra"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
@@ -276,7 +277,7 @@ func (o *LabelOptions) RunLabel(f cmdutil.Factory, cmd *cobra.Command) error {
 	})
 }
 
-func validateNoOverwrites(accessor meta.Object, labels map[string]string) error {
+func validateNoOverwrites(accessor metav1.Object, labels map[string]string) error {
 	allErrs := []error{}
 	for key := range labels {
 		if value, found := accessor.GetLabels()[key]; found {

@@ -20,11 +20,11 @@ import (
 	"bytes"
 	"testing"
 
+	"github.com/emicklei/go-restful"
+
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta"
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
-
-	"github.com/emicklei/go-restful"
 )
 
 func TestScopeNamingGenerateLink(t *testing.T) {
@@ -43,7 +43,7 @@ func TestScopeNamingGenerateLink(t *testing.T) {
 		true,
 	}
 	service := &api.Service{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      "foo",
 			Namespace: "other",
 		},

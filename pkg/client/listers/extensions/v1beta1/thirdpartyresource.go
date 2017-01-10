@@ -20,9 +20,9 @@ package v1beta1
 
 import (
 	"k8s.io/kubernetes/pkg/api/errors"
-	v1 "k8s.io/kubernetes/pkg/api/v1"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions"
 	v1beta1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/labels"
 )
@@ -56,7 +56,7 @@ func (s *thirdPartyResourceLister) List(selector labels.Selector) (ret []*v1beta
 
 // Get retrieves the ThirdPartyResource from the index for a given name.
 func (s *thirdPartyResourceLister) Get(name string) (*v1beta1.ThirdPartyResource, error) {
-	key := &v1beta1.ThirdPartyResource{ObjectMeta: v1.ObjectMeta{Name: name}}
+	key := &v1beta1.ThirdPartyResource{ObjectMeta: metav1.ObjectMeta{Name: name}}
 	obj, exists, err := s.indexer.Get(key)
 	if err != nil {
 		return nil, err

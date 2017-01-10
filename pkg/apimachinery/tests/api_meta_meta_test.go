@@ -33,7 +33,7 @@ import (
 func TestAPIObjectMeta(t *testing.T) {
 	j := &api.Pod{
 		TypeMeta: metav1.TypeMeta{APIVersion: "/a", Kind: "b"},
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Namespace:       "bar",
 			Name:            "foo",
 			GenerateName:    "prefix",
@@ -49,7 +49,7 @@ func TestAPIObjectMeta(t *testing.T) {
 		},
 	}
 	var _ metav1.Object = &j.ObjectMeta
-	var _ meta.ObjectMetaAccessor = j
+	var _ metav1.ObjectMetaAccessor = j
 	accessor, err := meta.Accessor(j)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -332,7 +332,7 @@ func TestTypeMetaSelfLinker(t *testing.T) {
 
 type MyAPIObject2 struct {
 	metav1.TypeMeta
-	v1.ObjectMeta
+	metav1.ObjectMeta
 }
 
 func getObjectMetaAndOwnerRefereneces() (myAPIObject2 MyAPIObject2, metaOwnerReferences []metav1.OwnerReference) {
@@ -395,7 +395,7 @@ func TestAccessOwnerReferences(t *testing.T) {
 func BenchmarkAccessorSetFastPath(b *testing.B) {
 	obj := &api.Pod{
 		TypeMeta: metav1.TypeMeta{APIVersion: "/a", Kind: "b"},
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Namespace:       "bar",
 			Name:            "foo",
 			GenerateName:    "prefix",

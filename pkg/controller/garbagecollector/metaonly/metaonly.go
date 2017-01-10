@@ -34,7 +34,7 @@ type metaOnlyJSONScheme struct{}
 
 // This function can be extended to mapping different gvk to different MetadataOnlyObject,
 // which embedded with different version of ObjectMeta. Currently the system
-// only supports v1.ObjectMeta.
+// only supports metav1.ObjectMeta.
 func gvkToMetadataOnlyObject(gvk schema.GroupVersionKind) runtime.Object {
 	if strings.HasSuffix(gvk.Kind, "List") {
 		return &MetadataOnlyObjectList{}

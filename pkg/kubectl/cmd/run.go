@@ -377,7 +377,7 @@ func contains(resourcesList []*metav1.APIResourceList, resource schema.GroupVers
 
 // waitForPod watches the given pod until the exitCondition is true
 func waitForPod(podClient coreclient.PodsGetter, ns, name string, exitCondition watch.ConditionFunc) (*api.Pod, error) {
-	w, err := podClient.Pods(ns).Watch(api.SingleObject(api.ObjectMeta{Name: name}))
+	w, err := podClient.Pods(ns).Watch(api.SingleObject(metav1.ObjectMeta{Name: name}))
 	if err != nil {
 		return nil, err
 	}

@@ -27,10 +27,14 @@ import (
 	"sync"
 	"time"
 
+	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
+
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/extensions"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/restclient"
@@ -41,9 +45,6 @@ import (
 	utilnet "k8s.io/kubernetes/pkg/util/net"
 	"k8s.io/kubernetes/test/e2e/framework"
 	testutils "k8s.io/kubernetes/test/utils"
-
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
 )
 
 const (
@@ -423,7 +424,7 @@ func generateServicesForConfigs(configs []testutils.RunObjectConfig) []*v1.Servi
 		serviceName := config.GetName() + "-svc"
 		labels := map[string]string{"name": config.GetName()}
 		service := &v1.Service{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:      serviceName,
 				Namespace: config.GetNamespace(),
 			},

@@ -23,6 +23,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/batch/v2alpha1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/generic"
@@ -40,7 +41,7 @@ func newStorage(t *testing.T) (*REST, *StatusREST, *etcdtesting.EtcdTestServer) 
 
 func validNewCronJob() *batch.CronJob {
 	return &batch.CronJob{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      "foo",
 			Namespace: api.NamespaceDefault,
 		},
@@ -73,7 +74,7 @@ func TestCreate(t *testing.T) {
 	defer storage.Store.DestroyFunc()
 	test := registrytest.New(t, storage.Store)
 	validCronJob := validNewCronJob()
-	validCronJob.ObjectMeta = api.ObjectMeta{}
+	validCronJob.ObjectMeta = metav1.ObjectMeta{}
 	test.TestCreate(
 		// valid
 		validCronJob,

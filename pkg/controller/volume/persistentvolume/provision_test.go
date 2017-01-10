@@ -38,7 +38,7 @@ var storageClasses = []*storage.StorageClass{
 			Kind: "StorageClass",
 		},
 
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: "gold",
 		},
 
@@ -49,7 +49,7 @@ var storageClasses = []*storage.StorageClass{
 		TypeMeta: metav1.TypeMeta{
 			Kind: "StorageClass",
 		},
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: "silver",
 		},
 		Provisioner: mockPluginName,
@@ -59,7 +59,7 @@ var storageClasses = []*storage.StorageClass{
 		TypeMeta: metav1.TypeMeta{
 			Kind: "StorageClass",
 		},
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: "external",
 		},
 		Provisioner: "vendor.com/my-volume",
@@ -69,7 +69,7 @@ var storageClasses = []*storage.StorageClass{
 		TypeMeta: metav1.TypeMeta{
 			Kind: "StorageClass",
 		},
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: "unknown-internal",
 		},
 		Provisioner: "kubernetes.io/unknown",

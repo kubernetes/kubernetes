@@ -21,6 +21,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/golang/glog"
+	cadvisorapiv1 "github.com/google/cadvisor/info/v1"
+	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
+
 	"k8s.io/kubernetes/pkg/api/v1"
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/stats"
@@ -30,11 +34,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/network"
 	"k8s.io/kubernetes/pkg/kubelet/types"
 	kubetypes "k8s.io/kubernetes/pkg/types"
-
-	"github.com/golang/glog"
-
-	cadvisorapiv1 "github.com/google/cadvisor/info/v1"
-	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
 )
 
 type SummaryProvider interface {

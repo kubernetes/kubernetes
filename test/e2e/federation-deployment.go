@@ -278,7 +278,7 @@ func deleteDeploymentOrFail(clientset *fedclientset.Clientset, nsName string, de
 
 func newDeploymentForFed(namespace string, name string, replicas int32) *v1beta1.Deployment {
 	return &v1beta1.Deployment{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: namespace,
 		},
@@ -288,7 +288,7 @@ func newDeploymentForFed(namespace string, name string, replicas int32) *v1beta1
 				MatchLabels: map[string]string{"name": "myrs"},
 			},
 			Template: v1.PodTemplateSpec{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{"name": "myrs"},
 				},
 				Spec: v1.PodSpec{

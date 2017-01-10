@@ -38,19 +38,19 @@ func TestSortingPrinter(t *testing.T) {
 	intPtr := func(val int32) *int32 { return &val }
 
 	a := &api.Pod{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: "a",
 		},
 	}
 
 	b := &api.Pod{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: "b",
 		},
 	}
 
 	c := &api.Pod{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: "c",
 		},
 	}
@@ -66,17 +66,17 @@ func TestSortingPrinter(t *testing.T) {
 			obj: &api.PodList{
 				Items: []api.Pod{
 					{
-						ObjectMeta: api.ObjectMeta{
+						ObjectMeta: metav1.ObjectMeta{
 							Name: "a",
 						},
 					},
 					{
-						ObjectMeta: api.ObjectMeta{
+						ObjectMeta: metav1.ObjectMeta{
 							Name: "b",
 						},
 					},
 					{
-						ObjectMeta: api.ObjectMeta{
+						ObjectMeta: metav1.ObjectMeta{
 							Name: "c",
 						},
 					},
@@ -85,17 +85,17 @@ func TestSortingPrinter(t *testing.T) {
 			sort: &api.PodList{
 				Items: []api.Pod{
 					{
-						ObjectMeta: api.ObjectMeta{
+						ObjectMeta: metav1.ObjectMeta{
 							Name: "a",
 						},
 					},
 					{
-						ObjectMeta: api.ObjectMeta{
+						ObjectMeta: metav1.ObjectMeta{
 							Name: "b",
 						},
 					},
 					{
-						ObjectMeta: api.ObjectMeta{
+						ObjectMeta: metav1.ObjectMeta{
 							Name: "c",
 						},
 					},
@@ -108,17 +108,17 @@ func TestSortingPrinter(t *testing.T) {
 			obj: &api.PodList{
 				Items: []api.Pod{
 					{
-						ObjectMeta: api.ObjectMeta{
+						ObjectMeta: metav1.ObjectMeta{
 							Name: "b",
 						},
 					},
 					{
-						ObjectMeta: api.ObjectMeta{
+						ObjectMeta: metav1.ObjectMeta{
 							Name: "c",
 						},
 					},
 					{
-						ObjectMeta: api.ObjectMeta{
+						ObjectMeta: metav1.ObjectMeta{
 							Name: "a",
 						},
 					},
@@ -127,17 +127,17 @@ func TestSortingPrinter(t *testing.T) {
 			sort: &api.PodList{
 				Items: []api.Pod{
 					{
-						ObjectMeta: api.ObjectMeta{
+						ObjectMeta: metav1.ObjectMeta{
 							Name: "a",
 						},
 					},
 					{
-						ObjectMeta: api.ObjectMeta{
+						ObjectMeta: metav1.ObjectMeta{
 							Name: "b",
 						},
 					},
 					{
-						ObjectMeta: api.ObjectMeta{
+						ObjectMeta: metav1.ObjectMeta{
 							Name: "c",
 						},
 					},
@@ -150,17 +150,17 @@ func TestSortingPrinter(t *testing.T) {
 			obj: &api.PodList{
 				Items: []api.Pod{
 					{
-						ObjectMeta: api.ObjectMeta{
+						ObjectMeta: metav1.ObjectMeta{
 							CreationTimestamp: metav1.Unix(300, 0),
 						},
 					},
 					{
-						ObjectMeta: api.ObjectMeta{
+						ObjectMeta: metav1.ObjectMeta{
 							CreationTimestamp: metav1.Unix(100, 0),
 						},
 					},
 					{
-						ObjectMeta: api.ObjectMeta{
+						ObjectMeta: metav1.ObjectMeta{
 							CreationTimestamp: metav1.Unix(200, 0),
 						},
 					},
@@ -169,17 +169,17 @@ func TestSortingPrinter(t *testing.T) {
 			sort: &api.PodList{
 				Items: []api.Pod{
 					{
-						ObjectMeta: api.ObjectMeta{
+						ObjectMeta: metav1.ObjectMeta{
 							CreationTimestamp: metav1.Unix(100, 0),
 						},
 					},
 					{
-						ObjectMeta: api.ObjectMeta{
+						ObjectMeta: metav1.ObjectMeta{
 							CreationTimestamp: metav1.Unix(200, 0),
 						},
 					},
 					{
-						ObjectMeta: api.ObjectMeta{
+						ObjectMeta: metav1.ObjectMeta{
 							CreationTimestamp: metav1.Unix(300, 0),
 						},
 					},

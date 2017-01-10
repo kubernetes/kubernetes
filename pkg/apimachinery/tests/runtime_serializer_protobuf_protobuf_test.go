@@ -27,6 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	_ "k8s.io/kubernetes/pkg/api/install"
 	"k8s.io/kubernetes/pkg/api/v1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/runtime/serializer/protobuf"
@@ -273,7 +274,7 @@ func TestProtobufDecode(t *testing.T) {
 
 func TestDecodeObjects(t *testing.T) {
 	obj1 := &v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: "cool",
 		},
 		Spec: v1.PodSpec{

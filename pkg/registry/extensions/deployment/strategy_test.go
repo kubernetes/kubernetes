@@ -24,6 +24,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/testapi"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	"k8s.io/kubernetes/pkg/apis/extensions"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	genericapirequest "k8s.io/kubernetes/pkg/genericapiserver/api/request"
 	"k8s.io/kubernetes/pkg/runtime"
 )
@@ -65,7 +66,7 @@ func TestStatusUpdates(t *testing.T) {
 
 func newDeployment(labels, annotations map[string]string) *extensions.Deployment {
 	return &extensions.Deployment{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:        "test",
 			Labels:      labels,
 			Annotations: annotations,

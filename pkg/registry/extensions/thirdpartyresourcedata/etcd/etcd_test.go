@@ -23,6 +23,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	// Ensure that extensions/v1beta1 package is initialized.
 	_ "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/generic"
@@ -39,7 +40,7 @@ func newStorage(t *testing.T) (*REST, *etcdtesting.EtcdTestServer) {
 
 func validNewThirdPartyResourceData(name string) *extensions.ThirdPartyResourceData {
 	return &extensions.ThirdPartyResourceData{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: api.NamespaceDefault,
 		},
@@ -53,7 +54,7 @@ func TestCreate(t *testing.T) {
 	defer storage.Store.DestroyFunc()
 	test := registrytest.New(t, storage.Store)
 	rsrc := validNewThirdPartyResourceData("foo")
-	rsrc.ObjectMeta = api.ObjectMeta{}
+	rsrc.ObjectMeta = metav1.ObjectMeta{}
 	test.TestCreate(
 		// valid
 		rsrc,

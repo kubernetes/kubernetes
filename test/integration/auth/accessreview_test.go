@@ -30,6 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	authorizationapi "k8s.io/kubernetes/pkg/apis/authorization"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/plugin/pkg/admission/admit"
@@ -249,7 +250,7 @@ func TestLocalSubjectAccessReview(t *testing.T) {
 			name:      "simple allow",
 			namespace: "foo",
 			sar: &authorizationapi.LocalSubjectAccessReview{
-				ObjectMeta: api.ObjectMeta{Namespace: "foo"},
+				ObjectMeta: metav1.ObjectMeta{Namespace: "foo"},
 				Spec: authorizationapi.SubjectAccessReviewSpec{
 					ResourceAttributes: &authorizationapi.ResourceAttributes{
 						Verb:      "list",
@@ -270,7 +271,7 @@ func TestLocalSubjectAccessReview(t *testing.T) {
 			name:      "simple deny",
 			namespace: "foo",
 			sar: &authorizationapi.LocalSubjectAccessReview{
-				ObjectMeta: api.ObjectMeta{Namespace: "foo"},
+				ObjectMeta: metav1.ObjectMeta{Namespace: "foo"},
 				Spec: authorizationapi.SubjectAccessReviewSpec{
 					ResourceAttributes: &authorizationapi.ResourceAttributes{
 						Verb:      "list",
@@ -292,7 +293,7 @@ func TestLocalSubjectAccessReview(t *testing.T) {
 			name:      "conflicting namespace",
 			namespace: "foo",
 			sar: &authorizationapi.LocalSubjectAccessReview{
-				ObjectMeta: api.ObjectMeta{Namespace: "foo"},
+				ObjectMeta: metav1.ObjectMeta{Namespace: "foo"},
 				Spec: authorizationapi.SubjectAccessReviewSpec{
 					ResourceAttributes: &authorizationapi.ResourceAttributes{
 						Verb:      "list",
@@ -310,7 +311,7 @@ func TestLocalSubjectAccessReview(t *testing.T) {
 			name:      "missing namespace",
 			namespace: "foo",
 			sar: &authorizationapi.LocalSubjectAccessReview{
-				ObjectMeta: api.ObjectMeta{Namespace: "foo"},
+				ObjectMeta: metav1.ObjectMeta{Namespace: "foo"},
 				Spec: authorizationapi.SubjectAccessReviewSpec{
 					ResourceAttributes: &authorizationapi.ResourceAttributes{
 						Verb:     "list",

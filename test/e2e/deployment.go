@@ -109,7 +109,7 @@ var _ = framework.KubeDescribe("Deployment", func() {
 func newDeployment(deploymentName string, replicas int32, podLabels map[string]string, imageName string, image string, strategyType extensions.DeploymentStrategyType, revisionHistoryLimit *int32) *extensions.Deployment {
 	zero := int64(0)
 	return &extensions.Deployment{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: deploymentName,
 		},
 		Spec: extensions.DeploymentSpec{
@@ -120,7 +120,7 @@ func newDeployment(deploymentName string, replicas int32, podLabels map[string]s
 			},
 			RevisionHistoryLimit: revisionHistoryLimit,
 			Template: v1.PodTemplateSpec{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Labels: podLabels,
 				},
 				Spec: v1.PodSpec{

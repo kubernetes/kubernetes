@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api/v1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 )
 
 func TestEnvVarsToMap(t *testing.T) {
@@ -137,7 +138,7 @@ func TestExpandCommandAndArgs(t *testing.T) {
 
 func TestShouldContainerBeRestarted(t *testing.T) {
 	pod := &v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			UID:       "12345678",
 			Name:      "foo",
 			Namespace: "new",

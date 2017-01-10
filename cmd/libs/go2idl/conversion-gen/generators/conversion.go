@@ -657,7 +657,7 @@ func (g *genConversion) doSlice(inType, outType *types.Type, sw *generator.Snipp
 			} else if g.convertibleOnlyWithinPackage(inType.Elem, outType.Elem) {
 				sw.Do("if err := "+nameTmpl+"(&(*in)[i], &(*out)[i], s); err != nil {\n", argsFromType(inType.Elem, outType.Elem))
 			} else {
-				// TODO: This triggers on v1.ObjectMeta <-> api.ObjectMeta and
+				// TODO: This triggers on metav1.ObjectMeta <-> metav1.ObjectMeta and
 				// similar because neither package is the target package, and
 				// we really don't know which package will have the conversion
 				// function defined.  This fires on basically every object

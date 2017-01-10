@@ -19,8 +19,8 @@ limitations under the License.
 package internalversion
 
 import (
-	api "k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	rbac "k8s.io/kubernetes/pkg/apis/rbac"
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/labels"
@@ -55,7 +55,7 @@ func (s *clusterRoleBindingLister) List(selector labels.Selector) (ret []*rbac.C
 
 // Get retrieves the ClusterRoleBinding from the index for a given name.
 func (s *clusterRoleBindingLister) Get(name string) (*rbac.ClusterRoleBinding, error) {
-	key := &rbac.ClusterRoleBinding{ObjectMeta: api.ObjectMeta{Name: name}}
+	key := &rbac.ClusterRoleBinding{ObjectMeta: metav1.ObjectMeta{Name: name}}
 	obj, exists, err := s.indexer.Get(key)
 	if err != nil {
 		return nil, err

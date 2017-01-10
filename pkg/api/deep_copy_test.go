@@ -41,7 +41,7 @@ var benchmarkPod api.Pod = api.Pod{
 		Kind:       "Pod",
 		APIVersion: "v1",
 	},
-	ObjectMeta: api.ObjectMeta{
+	ObjectMeta: metav1.ObjectMeta{
 		Name:              "etcd-server-e2e-test-wojtekt-master",
 		Namespace:         "default",
 		SelfLink:          "/api/v1/namespaces/default/pods/etcd-server-e2e-test-wojtekt-master",

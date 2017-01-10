@@ -43,10 +43,7 @@ func RegisterConversions(scheme *runtime.Scheme) error {
 }
 
 func autoConvert_v1beta1_StorageClass_To_storage_StorageClass(in *StorageClass, out *storage.StorageClass, s conversion.Scope) error {
-	// TODO: Inefficient conversion - can we improve it?
-	if err := s.Convert(&in.ObjectMeta, &out.ObjectMeta, 0); err != nil {
-		return err
-	}
+	out.ObjectMeta = in.ObjectMeta
 	out.Provisioner = in.Provisioner
 	out.Parameters = *(*map[string]string)(unsafe.Pointer(&in.Parameters))
 	return nil
@@ -57,10 +54,7 @@ func Convert_v1beta1_StorageClass_To_storage_StorageClass(in *StorageClass, out 
 }
 
 func autoConvert_storage_StorageClass_To_v1beta1_StorageClass(in *storage.StorageClass, out *StorageClass, s conversion.Scope) error {
-	// TODO: Inefficient conversion - can we improve it?
-	if err := s.Convert(&in.ObjectMeta, &out.ObjectMeta, 0); err != nil {
-		return err
-	}
+	out.ObjectMeta = in.ObjectMeta
 	out.Provisioner = in.Provisioner
 	out.Parameters = *(*map[string]string)(unsafe.Pointer(&in.Parameters))
 	return nil

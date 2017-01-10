@@ -27,6 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume"
 
 	"github.com/golang/glog"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/volume/util"
 )
 
@@ -119,7 +120,7 @@ func (plugin *azureFilePlugin) newUnmounterInternal(volName string, podUID types
 	return &azureFileUnmounter{&azureFile{
 		volName:         volName,
 		mounter:         mounter,
-		pod:             &v1.Pod{ObjectMeta: v1.ObjectMeta{UID: podUID}},
+		pod:             &v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: podUID}},
 		plugin:          plugin,
 		MetricsProvider: volume.NewMetricsStatFS(getPath(podUID, volName, plugin.host)),
 	}}, nil

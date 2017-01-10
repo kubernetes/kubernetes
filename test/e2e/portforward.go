@@ -28,13 +28,14 @@ import (
 	"syscall"
 	"time"
 
+	. "github.com/onsi/ginkgo"
+
 	"k8s.io/kubernetes/pkg/api/v1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	utilversion "k8s.io/kubernetes/pkg/util/version"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
 	testutils "k8s.io/kubernetes/test/utils"
-
-	. "github.com/onsi/ginkgo"
 )
 
 const (
@@ -49,7 +50,7 @@ var (
 
 func pfPod(expectedClientData, chunks, chunkSize, chunkIntervalMillis string) *v1.Pod {
 	return &v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:   podName,
 			Labels: map[string]string{"name": podName},
 		},

@@ -33,7 +33,7 @@ func TestAdmission(t *testing.T) {
 		TypeMeta: metav1.TypeMeta{
 			Kind: "StorageClass",
 		},
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: "default1",
 			Annotations: map[string]string{
 				storageutil.IsDefaultStorageClassAnnotation: "true",
@@ -45,7 +45,7 @@ func TestAdmission(t *testing.T) {
 		TypeMeta: metav1.TypeMeta{
 			Kind: "StorageClass",
 		},
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: "default2",
 			Annotations: map[string]string{
 				storageutil.IsDefaultStorageClassAnnotation: "true",
@@ -58,7 +58,7 @@ func TestAdmission(t *testing.T) {
 		TypeMeta: metav1.TypeMeta{
 			Kind: "StorageClass",
 		},
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: "nondefault1",
 			Annotations: map[string]string{
 				storageutil.IsDefaultStorageClassAnnotation: "false",
@@ -71,7 +71,7 @@ func TestAdmission(t *testing.T) {
 		TypeMeta: metav1.TypeMeta{
 			Kind: "StorageClass",
 		},
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: "nondefault2",
 		},
 		Provisioner: "nondefault1",
@@ -81,7 +81,7 @@ func TestAdmission(t *testing.T) {
 		TypeMeta: metav1.TypeMeta{
 			Kind: "StorageClass",
 		},
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: "nondefault2",
 			Annotations: map[string]string{
 				storageutil.IsDefaultStorageClassAnnotation: "",
@@ -94,7 +94,7 @@ func TestAdmission(t *testing.T) {
 		TypeMeta: metav1.TypeMeta{
 			Kind: "PersistentVolumeClaim",
 		},
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      "claimWithClass",
 			Namespace: "ns",
 			Annotations: map[string]string{
@@ -106,7 +106,7 @@ func TestAdmission(t *testing.T) {
 		TypeMeta: metav1.TypeMeta{
 			Kind: "PersistentVolumeClaim",
 		},
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      "claimWithEmptyClass",
 			Namespace: "ns",
 			Annotations: map[string]string{
@@ -118,7 +118,7 @@ func TestAdmission(t *testing.T) {
 		TypeMeta: metav1.TypeMeta{
 			Kind: "PersistentVolumeClaim",
 		},
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      "claimWithNoClass",
 			Namespace: "ns",
 		},

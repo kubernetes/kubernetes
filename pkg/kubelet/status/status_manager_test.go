@@ -44,7 +44,7 @@ import (
 // Generate new instance of test pod with the same initial value.
 func getTestPod() *v1.Pod {
 	return &v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			UID:       "12345678",
 			Name:      "foo",
 			Namespace: "new",
@@ -138,7 +138,7 @@ func TestNewStatus(t *testing.T) {
 func TestNewStatusPreservesPodStartTime(t *testing.T) {
 	syncer := newTestManager(&fake.Clientset{})
 	pod := &v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			UID:       "12345678",
 			Name:      "foo",
 			Namespace: "new",
@@ -171,7 +171,7 @@ func TestNewStatusSetsReadyTransitionTime(t *testing.T) {
 	syncer := newTestManager(&fake.Clientset{})
 	podStatus := getReadyPodStatus()
 	pod := &v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			UID:       "12345678",
 			Name:      "foo",
 			Namespace: "new",
@@ -218,7 +218,7 @@ func TestChangedStatusUpdatesLastTransitionTime(t *testing.T) {
 	syncer := newTestManager(&fake.Clientset{})
 	podStatus := getReadyPodStatus()
 	pod := &v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			UID:       "12345678",
 			Name:      "foo",
 			Namespace: "new",
@@ -257,7 +257,7 @@ func TestUnchangedStatusPreservesLastTransitionTime(t *testing.T) {
 	syncer := newTestManager(&fake.Clientset{})
 	podStatus := getReadyPodStatus()
 	pod := &v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			UID:       "12345678",
 			Name:      "foo",
 			Namespace: "new",

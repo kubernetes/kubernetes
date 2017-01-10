@@ -21,7 +21,7 @@ limitations under the License.
 package authentication
 
 import (
-	api "k8s.io/kubernetes/pkg/api"
+	v1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	conversion "k8s.io/kubernetes/pkg/conversion"
 	runtime "k8s.io/kubernetes/pkg/runtime"
 	reflect "reflect"
@@ -47,7 +47,7 @@ func DeepCopy_authentication_TokenReview(in interface{}, out interface{}, c *con
 		in := in.(*TokenReview)
 		out := out.(*TokenReview)
 		*out = *in
-		if err := api.DeepCopy_api_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, c); err != nil {
+		if err := v1.DeepCopy_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, c); err != nil {
 			return err
 		}
 		if err := DeepCopy_authentication_TokenReviewStatus(&in.Status, &out.Status, c); err != nil {

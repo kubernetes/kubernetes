@@ -175,7 +175,7 @@ func (plugin *glusterfsPlugin) newUnmounterInternal(volName string, podUID types
 	return &glusterfsUnmounter{&glusterfs{
 		volName: volName,
 		mounter: mounter,
-		pod:     &v1.Pod{ObjectMeta: v1.ObjectMeta{UID: podUID}},
+		pod:     &v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: podUID}},
 		plugin:  plugin,
 	}}, nil
 }
@@ -771,7 +771,7 @@ func (p *glusterfsVolumeProvisioner) createEndpointService(namespace string, epS
 		addrlist[i].IP = v
 	}
 	endpoint = &v1.Endpoints{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Namespace: namespace,
 			Name:      epServiceName,
 			Labels: map[string]string{
@@ -797,7 +797,7 @@ func (p *glusterfsVolumeProvisioner) createEndpointService(namespace string, epS
 		return nil, nil, fmt.Errorf("error creating endpoint: %v", err)
 	}
 	service = &v1.Service{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      epServiceName,
 			Namespace: namespace,
 			Labels: map[string]string{

@@ -21,7 +21,6 @@ limitations under the License.
 package v1
 
 import (
-	api_v1 "k8s.io/kubernetes/pkg/api/v1"
 	meta_v1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	conversion "k8s.io/kubernetes/pkg/conversion"
 	runtime "k8s.io/kubernetes/pkg/runtime"
@@ -61,7 +60,7 @@ func DeepCopy_v1_HorizontalPodAutoscaler(in interface{}, out interface{}, c *con
 		in := in.(*HorizontalPodAutoscaler)
 		out := out.(*HorizontalPodAutoscaler)
 		*out = *in
-		if err := api_v1.DeepCopy_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, c); err != nil {
+		if err := meta_v1.DeepCopy_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, c); err != nil {
 			return err
 		}
 		if err := DeepCopy_v1_HorizontalPodAutoscalerSpec(&in.Spec, &out.Spec, c); err != nil {
@@ -140,7 +139,7 @@ func DeepCopy_v1_Scale(in interface{}, out interface{}, c *conversion.Cloner) er
 		in := in.(*Scale)
 		out := out.(*Scale)
 		*out = *in
-		if err := api_v1.DeepCopy_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, c); err != nil {
+		if err := meta_v1.DeepCopy_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, c); err != nil {
 			return err
 		}
 		return nil

@@ -23,6 +23,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"k8s.io/kubernetes/pkg/api/v1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/client/record"
 	. "k8s.io/kubernetes/pkg/kubelet/container"
 	ctest "k8s.io/kubernetes/pkg/kubelet/container/testing"
@@ -111,7 +112,7 @@ func pullerTestEnv(c pullerTestCase, serialized bool) (puller ImageManager, fake
 
 func TestParallelPuller(t *testing.T) {
 	pod := &v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:            "test_pod",
 			Namespace:       "test-ns",
 			UID:             "bar",
@@ -135,7 +136,7 @@ func TestParallelPuller(t *testing.T) {
 
 func TestSerializedPuller(t *testing.T) {
 	pod := &v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:            "test_pod",
 			Namespace:       "test-ns",
 			UID:             "bar",

@@ -140,7 +140,7 @@ func DoTestUnschedulableNodes(t *testing.T, cs clientset.Interface, ns *v1.Names
 	// Create a new schedulable node, since we're first going to apply
 	// the unschedulable condition and verify that pods aren't scheduled.
 	node := &v1.Node{
-		ObjectMeta: v1.ObjectMeta{Name: "node-scheduling-test-node"},
+		ObjectMeta: metav1.ObjectMeta{Name: "node-scheduling-test-node"},
 		Spec:       v1.NodeSpec{Unschedulable: false},
 		Status: v1.NodeStatus{
 			Capacity: v1.ResourceList{
@@ -246,7 +246,7 @@ func DoTestUnschedulableNodes(t *testing.T, cs clientset.Interface, ns *v1.Names
 		// Create the new pod, note that this needs to happen post unschedulable
 		// modification or we have a race in the test.
 		pod := &v1.Pod{
-			ObjectMeta: v1.ObjectMeta{Name: "node-scheduling-test-pod"},
+			ObjectMeta: metav1.ObjectMeta{Name: "node-scheduling-test-pod"},
 			Spec: v1.PodSpec{
 				Containers: []v1.Container{{Name: "container", Image: e2e.GetPauseImageName(cs)}},
 			},
@@ -341,7 +341,7 @@ func TestMultiScheduler(t *testing.T) {
 
 	// 2. create a node
 	node := &v1.Node{
-		ObjectMeta: v1.ObjectMeta{Name: "node-multi-scheduler-test-node"},
+		ObjectMeta: metav1.ObjectMeta{Name: "node-multi-scheduler-test-node"},
 		Spec:       v1.NodeSpec{Unschedulable: false},
 		Status: v1.NodeStatus{
 			Capacity: v1.ResourceList{
@@ -471,7 +471,7 @@ func TestMultiScheduler(t *testing.T) {
 
 func createPod(client clientset.Interface, name string, annotation map[string]string) *v1.Pod {
 	return &v1.Pod{
-		ObjectMeta: v1.ObjectMeta{Name: name, Annotations: annotation},
+		ObjectMeta: metav1.ObjectMeta{Name: name, Annotations: annotation},
 		Spec: v1.PodSpec{
 			Containers: []v1.Container{{Name: "container", Image: e2e.GetPauseImageName(client)}},
 		},
@@ -507,7 +507,7 @@ func TestAllocatable(t *testing.T) {
 
 	// 2. create a node without allocatable awareness
 	node := &v1.Node{
-		ObjectMeta: v1.ObjectMeta{Name: "node-allocatable-scheduler-test-node"},
+		ObjectMeta: metav1.ObjectMeta{Name: "node-allocatable-scheduler-test-node"},
 		Spec:       v1.NodeSpec{Unschedulable: false},
 		Status: v1.NodeStatus{
 			Capacity: v1.ResourceList{
@@ -525,7 +525,7 @@ func TestAllocatable(t *testing.T) {
 
 	// 3. create resource pod which requires less than Capacity
 	podResource := &v1.Pod{
-		ObjectMeta: v1.ObjectMeta{Name: "pod-test-allocatable"},
+		ObjectMeta: metav1.ObjectMeta{Name: "pod-test-allocatable"},
 		Spec: v1.PodSpec{
 			Containers: []v1.Container{
 				{

@@ -79,7 +79,7 @@ func TestServiceRegistryCreate(t *testing.T) {
 	storage, registry := NewTestREST(t, nil)
 
 	svc := &api.Service{
-		ObjectMeta: api.ObjectMeta{Name: "foo"},
+		ObjectMeta: metav1.ObjectMeta{Name: "foo"},
 		Spec: api.ServiceSpec{
 			Selector:        map[string]string{"bar": "baz"},
 			SessionAffinity: api.ServiceAffinityNone,
@@ -127,7 +127,7 @@ func TestServiceRegistryCreateMultiNodePortsService(t *testing.T) {
 	}{
 		{
 			svc: &api.Service{
-				ObjectMeta: api.ObjectMeta{Name: "foo1"},
+				ObjectMeta: metav1.ObjectMeta{Name: "foo1"},
 				Spec: api.ServiceSpec{
 					Selector:        map[string]string{"bar": "baz"},
 					SessionAffinity: api.ServiceAffinityNone,
@@ -155,7 +155,7 @@ func TestServiceRegistryCreateMultiNodePortsService(t *testing.T) {
 		},
 		{
 			svc: &api.Service{
-				ObjectMeta: api.ObjectMeta{Name: "foo2"},
+				ObjectMeta: metav1.ObjectMeta{Name: "foo2"},
 				Spec: api.ServiceSpec{
 					Selector:        map[string]string{"bar": "baz"},
 					SessionAffinity: api.ServiceAffinityNone,
@@ -182,7 +182,7 @@ func TestServiceRegistryCreateMultiNodePortsService(t *testing.T) {
 		},
 		{
 			svc: &api.Service{
-				ObjectMeta: api.ObjectMeta{Name: "foo3"},
+				ObjectMeta: metav1.ObjectMeta{Name: "foo3"},
 				Spec: api.ServiceSpec{
 					Selector:        map[string]string{"bar": "baz"},
 					SessionAffinity: api.ServiceAffinityNone,
@@ -241,7 +241,7 @@ func TestServiceStorageValidatesCreate(t *testing.T) {
 	storage, _ := NewTestREST(t, nil)
 	failureCases := map[string]api.Service{
 		"empty ID": {
-			ObjectMeta: api.ObjectMeta{Name: ""},
+			ObjectMeta: metav1.ObjectMeta{Name: ""},
 			Spec: api.ServiceSpec{
 				Selector:        map[string]string{"bar": "baz"},
 				SessionAffinity: api.ServiceAffinityNone,
@@ -254,7 +254,7 @@ func TestServiceStorageValidatesCreate(t *testing.T) {
 			},
 		},
 		"empty port": {
-			ObjectMeta: api.ObjectMeta{Name: "foo"},
+			ObjectMeta: metav1.ObjectMeta{Name: "foo"},
 			Spec: api.ServiceSpec{
 				Selector:        map[string]string{"bar": "baz"},
 				SessionAffinity: api.ServiceAffinityNone,
@@ -265,7 +265,7 @@ func TestServiceStorageValidatesCreate(t *testing.T) {
 			},
 		},
 		"missing targetPort": {
-			ObjectMeta: api.ObjectMeta{Name: "foo"},
+			ObjectMeta: metav1.ObjectMeta{Name: "foo"},
 			Spec: api.ServiceSpec{
 				Selector:        map[string]string{"bar": "baz"},
 				SessionAffinity: api.ServiceAffinityNone,
@@ -293,7 +293,7 @@ func TestServiceRegistryUpdate(t *testing.T) {
 	ctx := genericapirequest.NewDefaultContext()
 	storage, registry := NewTestREST(t, nil)
 	svc, err := registry.CreateService(ctx, &api.Service{
-		ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "1", Namespace: api.NamespaceDefault},
+		ObjectMeta: metav1.ObjectMeta{Name: "foo", ResourceVersion: "1", Namespace: api.NamespaceDefault},
 		Spec: api.ServiceSpec{
 			Selector: map[string]string{"bar": "baz1"},
 			Ports: []api.ServicePort{{
@@ -308,7 +308,7 @@ func TestServiceRegistryUpdate(t *testing.T) {
 		t.Fatalf("Expected no error: %v", err)
 	}
 	updated_svc, created, err := storage.Update(ctx, "foo", rest.DefaultUpdatedObjectInfo(&api.Service{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:            "foo",
 			ResourceVersion: svc.ResourceVersion},
 		Spec: api.ServiceSpec{
@@ -344,7 +344,7 @@ func TestServiceStorageValidatesUpdate(t *testing.T) {
 	ctx := genericapirequest.NewDefaultContext()
 	storage, registry := NewTestREST(t, nil)
 	registry.CreateService(ctx, &api.Service{
-		ObjectMeta: api.ObjectMeta{Name: "foo"},
+		ObjectMeta: metav1.ObjectMeta{Name: "foo"},
 		Spec: api.ServiceSpec{
 			Selector: map[string]string{"bar": "baz"},
 			Ports: []api.ServicePort{{
@@ -355,7 +355,7 @@ func TestServiceStorageValidatesUpdate(t *testing.T) {
 	})
 	failureCases := map[string]api.Service{
 		"empty ID": {
-			ObjectMeta: api.ObjectMeta{Name: ""},
+			ObjectMeta: metav1.ObjectMeta{Name: ""},
 			Spec: api.ServiceSpec{
 				Selector:        map[string]string{"bar": "baz"},
 				SessionAffinity: api.ServiceAffinityNone,
@@ -368,7 +368,7 @@ func TestServiceStorageValidatesUpdate(t *testing.T) {
 			},
 		},
 		"invalid selector": {
-			ObjectMeta: api.ObjectMeta{Name: "foo"},
+			ObjectMeta: metav1.ObjectMeta{Name: "foo"},
 			Spec: api.ServiceSpec{
 				Selector:        map[string]string{"ThisSelectorFailsValidation": "ok"},
 				SessionAffinity: api.ServiceAffinityNone,
@@ -396,7 +396,7 @@ func TestServiceRegistryExternalService(t *testing.T) {
 	ctx := genericapirequest.NewDefaultContext()
 	storage, registry := NewTestREST(t, nil)
 	svc := &api.Service{
-		ObjectMeta: api.ObjectMeta{Name: "foo"},
+		ObjectMeta: metav1.ObjectMeta{Name: "foo"},
 		Spec: api.ServiceSpec{
 			Selector:        map[string]string{"bar": "baz"},
 			SessionAffinity: api.ServiceAffinityNone,
@@ -425,7 +425,7 @@ func TestServiceRegistryDelete(t *testing.T) {
 	ctx := genericapirequest.NewDefaultContext()
 	storage, registry := NewTestREST(t, nil)
 	svc := &api.Service{
-		ObjectMeta: api.ObjectMeta{Name: "foo"},
+		ObjectMeta: metav1.ObjectMeta{Name: "foo"},
 		Spec: api.ServiceSpec{
 			Selector:        map[string]string{"bar": "baz"},
 			SessionAffinity: api.ServiceAffinityNone,
@@ -447,7 +447,7 @@ func TestServiceRegistryDeleteExternal(t *testing.T) {
 	ctx := genericapirequest.NewDefaultContext()
 	storage, registry := NewTestREST(t, nil)
 	svc := &api.Service{
-		ObjectMeta: api.ObjectMeta{Name: "foo"},
+		ObjectMeta: metav1.ObjectMeta{Name: "foo"},
 		Spec: api.ServiceSpec{
 			Selector:        map[string]string{"bar": "baz"},
 			SessionAffinity: api.ServiceAffinityNone,
@@ -471,7 +471,7 @@ func TestServiceRegistryUpdateExternalService(t *testing.T) {
 
 	// Create non-external load balancer.
 	svc1 := &api.Service{
-		ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "1"},
+		ObjectMeta: metav1.ObjectMeta{Name: "foo", ResourceVersion: "1"},
 		Spec: api.ServiceSpec{
 			Selector:        map[string]string{"bar": "baz"},
 			SessionAffinity: api.ServiceAffinityNone,
@@ -508,7 +508,7 @@ func TestServiceRegistryUpdateMultiPortExternalService(t *testing.T) {
 
 	// Create external load balancer.
 	svc1 := &api.Service{
-		ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "1"},
+		ObjectMeta: metav1.ObjectMeta{Name: "foo", ResourceVersion: "1"},
 		Spec: api.ServiceSpec{
 			Selector:        map[string]string{"bar": "baz"},
 			SessionAffinity: api.ServiceAffinityNone,
@@ -542,7 +542,7 @@ func TestServiceRegistryGet(t *testing.T) {
 	ctx := genericapirequest.NewDefaultContext()
 	storage, registry := NewTestREST(t, nil)
 	registry.CreateService(ctx, &api.Service{
-		ObjectMeta: api.ObjectMeta{Name: "foo"},
+		ObjectMeta: metav1.ObjectMeta{Name: "foo"},
 		Spec: api.ServiceSpec{
 			Selector: map[string]string{"bar": "baz"},
 		},
@@ -558,7 +558,7 @@ func TestServiceRegistryResourceLocation(t *testing.T) {
 	endpoints := &api.EndpointsList{
 		Items: []api.Endpoints{
 			{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:      "foo",
 					Namespace: api.NamespaceDefault,
 				},
@@ -568,7 +568,7 @@ func TestServiceRegistryResourceLocation(t *testing.T) {
 				}},
 			},
 			{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:      "foo",
 					Namespace: api.NamespaceDefault,
 				},
@@ -587,7 +587,7 @@ func TestServiceRegistryResourceLocation(t *testing.T) {
 	}
 	storage, registry := NewTestREST(t, endpoints)
 	registry.CreateService(ctx, &api.Service{
-		ObjectMeta: api.ObjectMeta{Name: "foo"},
+		ObjectMeta: metav1.ObjectMeta{Name: "foo"},
 		Spec: api.ServiceSpec{
 			Selector: map[string]string{"bar": "baz"},
 			Ports: []api.ServicePort{
@@ -678,13 +678,13 @@ func TestServiceRegistryList(t *testing.T) {
 	ctx := genericapirequest.NewDefaultContext()
 	storage, registry := NewTestREST(t, nil)
 	registry.CreateService(ctx, &api.Service{
-		ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: api.NamespaceDefault},
+		ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: api.NamespaceDefault},
 		Spec: api.ServiceSpec{
 			Selector: map[string]string{"bar": "baz"},
 		},
 	})
 	registry.CreateService(ctx, &api.Service{
-		ObjectMeta: api.ObjectMeta{Name: "foo2", Namespace: api.NamespaceDefault},
+		ObjectMeta: metav1.ObjectMeta{Name: "foo2", Namespace: api.NamespaceDefault},
 		Spec: api.ServiceSpec{
 			Selector: map[string]string{"bar2": "baz2"},
 		},
@@ -710,7 +710,7 @@ func TestServiceRegistryIPAllocation(t *testing.T) {
 	storage, _ := NewTestREST(t, nil)
 
 	svc1 := &api.Service{
-		ObjectMeta: api.ObjectMeta{Name: "foo"},
+		ObjectMeta: metav1.ObjectMeta{Name: "foo"},
 		Spec: api.ServiceSpec{
 			Selector:        map[string]string{"bar": "baz"},
 			SessionAffinity: api.ServiceAffinityNone,
@@ -733,7 +733,7 @@ func TestServiceRegistryIPAllocation(t *testing.T) {
 	}
 
 	svc2 := &api.Service{
-		ObjectMeta: api.ObjectMeta{Name: "bar"},
+		ObjectMeta: metav1.ObjectMeta{Name: "bar"},
 		Spec: api.ServiceSpec{
 			Selector:        map[string]string{"bar": "baz"},
 			SessionAffinity: api.ServiceAffinityNone,
@@ -764,7 +764,7 @@ func TestServiceRegistryIPAllocation(t *testing.T) {
 	}
 
 	svc3 := &api.Service{
-		ObjectMeta: api.ObjectMeta{Name: "quux"},
+		ObjectMeta: metav1.ObjectMeta{Name: "quux"},
 		Spec: api.ServiceSpec{
 			Selector:        map[string]string{"bar": "baz"},
 			ClusterIP:       testIP,
@@ -792,7 +792,7 @@ func TestServiceRegistryIPReallocation(t *testing.T) {
 	storage, _ := NewTestREST(t, nil)
 
 	svc1 := &api.Service{
-		ObjectMeta: api.ObjectMeta{Name: "foo"},
+		ObjectMeta: metav1.ObjectMeta{Name: "foo"},
 		Spec: api.ServiceSpec{
 			Selector:        map[string]string{"bar": "baz"},
 			SessionAffinity: api.ServiceAffinityNone,
@@ -820,7 +820,7 @@ func TestServiceRegistryIPReallocation(t *testing.T) {
 	}
 
 	svc2 := &api.Service{
-		ObjectMeta: api.ObjectMeta{Name: "bar"},
+		ObjectMeta: metav1.ObjectMeta{Name: "bar"},
 		Spec: api.ServiceSpec{
 			Selector:        map[string]string{"bar": "baz"},
 			SessionAffinity: api.ServiceAffinityNone,
@@ -847,7 +847,7 @@ func TestServiceRegistryIPUpdate(t *testing.T) {
 	storage, _ := NewTestREST(t, nil)
 
 	svc := &api.Service{
-		ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "1"},
+		ObjectMeta: metav1.ObjectMeta{Name: "foo", ResourceVersion: "1"},
 		Spec: api.ServiceSpec{
 			Selector:        map[string]string{"bar": "baz"},
 			SessionAffinity: api.ServiceAffinityNone,
@@ -901,7 +901,7 @@ func TestServiceRegistryIPLoadBalancer(t *testing.T) {
 	storage, _ := NewTestREST(t, nil)
 
 	svc := &api.Service{
-		ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "1"},
+		ObjectMeta: metav1.ObjectMeta{Name: "foo", ResourceVersion: "1"},
 		Spec: api.ServiceSpec{
 			Selector:        map[string]string{"bar": "baz"},
 			SessionAffinity: api.ServiceAffinityNone,
@@ -934,7 +934,7 @@ func TestServiceRegistryIPLoadBalancer(t *testing.T) {
 func TestUpdateServiceWithConflictingNamespace(t *testing.T) {
 	storage, _ := NewTestREST(t, nil)
 	service := &api.Service{
-		ObjectMeta: api.ObjectMeta{Name: "test", Namespace: "not-default"},
+		ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: "not-default"},
 	}
 
 	ctx := genericapirequest.NewDefaultContext()
@@ -955,7 +955,7 @@ func TestServiceRegistryExternalTrafficAnnotationHealthCheckNodePortAllocation(t
 	ctx := genericapirequest.NewDefaultContext()
 	storage, _ := NewTestREST(t, nil)
 	svc := &api.Service{
-		ObjectMeta: api.ObjectMeta{Name: "external-lb-esipp",
+		ObjectMeta: metav1.ObjectMeta{Name: "external-lb-esipp",
 			Annotations: map[string]string{
 				service.BetaAnnotationExternalTraffic: service.AnnotationValueExternalTrafficLocal,
 			},
@@ -992,7 +992,7 @@ func TestServiceRegistryExternalTrafficBetaAnnotationHealthCheckNodePortUserAllo
 	ctx := genericapirequest.NewDefaultContext()
 	storage, _ := NewTestREST(t, nil)
 	svc := &api.Service{
-		ObjectMeta: api.ObjectMeta{Name: "external-lb-esipp",
+		ObjectMeta: metav1.ObjectMeta{Name: "external-lb-esipp",
 			Annotations: map[string]string{
 				service.BetaAnnotationExternalTraffic:     service.AnnotationValueExternalTrafficLocal,
 				service.BetaAnnotationHealthCheckNodePort: "30200",
@@ -1031,7 +1031,7 @@ func TestServiceRegistryExternalTrafficAnnotationNegative(t *testing.T) {
 	ctx := genericapirequest.NewDefaultContext()
 	storage, _ := NewTestREST(t, nil)
 	svc := &api.Service{
-		ObjectMeta: api.ObjectMeta{Name: "external-lb-esipp",
+		ObjectMeta: metav1.ObjectMeta{Name: "external-lb-esipp",
 			Annotations: map[string]string{
 				service.BetaAnnotationExternalTraffic:     service.AnnotationValueExternalTrafficLocal,
 				service.BetaAnnotationHealthCheckNodePort: "-1",
@@ -1060,7 +1060,7 @@ func TestServiceRegistryExternalTrafficAnnotationGlobal(t *testing.T) {
 	ctx := genericapirequest.NewDefaultContext()
 	storage, _ := NewTestREST(t, nil)
 	svc := &api.Service{
-		ObjectMeta: api.ObjectMeta{Name: "external-lb-esipp",
+		ObjectMeta: metav1.ObjectMeta{Name: "external-lb-esipp",
 			Annotations: map[string]string{
 				service.BetaAnnotationExternalTraffic: service.AnnotationValueExternalTrafficGlobal,
 			},
@@ -1097,7 +1097,7 @@ func TestServiceRegistryExternalTrafficAnnotationClusterIP(t *testing.T) {
 	ctx := genericapirequest.NewDefaultContext()
 	storage, _ := NewTestREST(t, nil)
 	svc := &api.Service{
-		ObjectMeta: api.ObjectMeta{Name: "external-lb-esipp",
+		ObjectMeta: metav1.ObjectMeta{Name: "external-lb-esipp",
 			Annotations: map[string]string{
 				service.BetaAnnotationExternalTraffic: service.AnnotationValueExternalTrafficGlobal,
 			},

@@ -238,7 +238,7 @@ func initFederation(cmdOut io.Writer, config util.AdminConfig, cmd *cobra.Comman
 
 func createNamespace(clientset *client.Clientset, namespace string, dryRun bool) (*api.Namespace, error) {
 	ns := &api.Namespace{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: namespace,
 		},
 	}
@@ -252,7 +252,7 @@ func createNamespace(clientset *client.Clientset, namespace string, dryRun bool)
 
 func createService(clientset *client.Clientset, namespace, svcName string, dryRun bool) (*api.Service, error) {
 	svc := &api.Service{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      svcName,
 			Namespace: namespace,
 			Labels:    componentLabel,
@@ -341,7 +341,7 @@ func genCerts(svcNamespace, name, svcName, localDNSZoneName string, ips, hostnam
 func createAPIServerCredentialsSecret(clientset *client.Clientset, namespace, credentialsName string, entKeyPairs *entityKeyPairs, dryRun bool) (*api.Secret, error) {
 	// Build the secret object with API server credentials.
 	secret := &api.Secret{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      credentialsName,
 			Namespace: namespace,
 		},
@@ -379,7 +379,7 @@ func createPVC(clientset *client.Clientset, namespace, svcName, etcdPVCapacity s
 	}
 
 	pvc := &api.PersistentVolumeClaim{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      fmt.Sprintf("%s-etcd-claim", svcName),
 			Namespace: namespace,
 			Labels:    componentLabel,
@@ -425,7 +425,7 @@ func createAPIServer(clientset *client.Clientset, namespace, name, image, creden
 	dataVolumeName := "etcddata"
 
 	dep := &extensions.Deployment{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: namespace,
 			Labels:    componentLabel,
@@ -433,7 +433,7 @@ func createAPIServer(clientset *client.Clientset, namespace, name, image, creden
 		Spec: extensions.DeploymentSpec{
 			Replicas: 1,
 			Template: api.PodTemplateSpec{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:   name,
 					Labels: apiserverPodLabels,
 				},
@@ -509,7 +509,7 @@ func createAPIServer(clientset *client.Clientset, namespace, name, image, creden
 
 func createControllerManager(clientset *client.Clientset, namespace, name, svcName, cmName, image, kubeconfigName, dnsZoneName, dnsProvider string, dryRun bool) (*extensions.Deployment, error) {
 	dep := &extensions.Deployment{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      cmName,
 			Namespace: namespace,
 			Labels:    componentLabel,
@@ -517,7 +517,7 @@ func createControllerManager(clientset *client.Clientset, namespace, name, svcNa
 		Spec: extensions.DeploymentSpec{
 			Replicas: 1,
 			Template: api.PodTemplateSpec{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:   cmName,
 					Labels: controllerManagerPodLabels,
 				},

@@ -20,13 +20,13 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
 	"k8s.io/kubernetes/pkg/api/v1"
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	utiltesting "k8s.io/kubernetes/pkg/util/testing"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
-
-	"github.com/stretchr/testify/assert"
 )
 
 func newTestableProvisioner(assert *assert.Assertions, options volume.VolumeOptions) volume.Provisioner {

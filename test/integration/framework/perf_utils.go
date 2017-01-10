@@ -17,13 +17,14 @@ limitations under the License.
 package framework
 
 import (
+	"github.com/golang/glog"
+
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/v1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	e2eframework "k8s.io/kubernetes/test/e2e/framework"
 	testutils "k8s.io/kubernetes/test/utils"
-
-	"github.com/golang/glog"
 )
 
 const (
@@ -52,7 +53,7 @@ func (p *IntegrationTestNodePreparer) PrepareNodes() error {
 
 	glog.Infof("Making %d nodes", numNodes)
 	baseNode := &v1.Node{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: p.nodeNamePrefix,
 		},
 		Spec: v1.NodeSpec{

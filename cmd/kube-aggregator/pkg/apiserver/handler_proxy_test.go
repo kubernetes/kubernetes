@@ -26,11 +26,10 @@ import (
 	"testing"
 
 	"k8s.io/apiserver/pkg/authentication/user"
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/cmd/kube-aggregator/pkg/apis/apiregistration"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	genericapirequest "k8s.io/kubernetes/pkg/genericapiserver/api/request"
 	"k8s.io/kubernetes/pkg/util/sets"
-
-	"k8s.io/kubernetes/cmd/kube-aggregator/pkg/apis/apiregistration"
 )
 
 type targetHTTPHandler struct {
@@ -103,7 +102,7 @@ func TestProxyHandler(t *testing.T) {
 		},
 		"no user": {
 			apiService: &apiregistration.APIService{
-				ObjectMeta: api.ObjectMeta{Name: "v1.foo"},
+				ObjectMeta: metav1.ObjectMeta{Name: "v1.foo"},
 				Spec: apiregistration.APIServiceSpec{
 					Group:   "foo",
 					Version: "v1",
@@ -119,7 +118,7 @@ func TestProxyHandler(t *testing.T) {
 			},
 			path: "/request/path",
 			apiService: &apiregistration.APIService{
-				ObjectMeta: api.ObjectMeta{Name: "v1.foo"},
+				ObjectMeta: metav1.ObjectMeta{Name: "v1.foo"},
 				Spec: apiregistration.APIServiceSpec{
 					Group:                 "foo",
 					Version:               "v1",
@@ -144,7 +143,7 @@ func TestProxyHandler(t *testing.T) {
 			},
 			path: "/request/path",
 			apiService: &apiregistration.APIService{
-				ObjectMeta: api.ObjectMeta{Name: "v1.foo"},
+				ObjectMeta: metav1.ObjectMeta{Name: "v1.foo"},
 				Spec: apiregistration.APIServiceSpec{
 					Group:   "foo",
 					Version: "v1",

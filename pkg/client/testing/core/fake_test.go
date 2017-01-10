@@ -155,7 +155,7 @@ func TestFakeClientsetInheritsNamespace(t *testing.T) {
 
 func testSA(ns, name string) *api.ServiceAccount {
 	return &api.ServiceAccount{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Namespace: ns,
 			Name:      name,
 		},
@@ -164,7 +164,7 @@ func testSA(ns, name string) *api.ServiceAccount {
 
 func testPod(ns, name string) *api.Pod {
 	return &api.Pod{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Namespace: ns,
 			Name:      name,
 		},
@@ -173,7 +173,7 @@ func testPod(ns, name string) *api.Pod {
 
 func testNamespace(ns string) *api.Namespace {
 	return &api.Namespace{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: ns,
 		},
 	}

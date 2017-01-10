@@ -23,6 +23,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"k8s.io/kubernetes/pkg/api"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/security/apparmor"
 	"k8s.io/kubernetes/pkg/util/maps"
 )
@@ -162,7 +163,7 @@ func TestValidate(t *testing.T) {
 
 func makeTestPod(annotations map[string]string) (*api.Pod, *api.Container) {
 	return &api.Pod{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:        "test-pod",
 			Annotations: maps.CopySS(annotations),
 		},

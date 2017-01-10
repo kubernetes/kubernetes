@@ -36,7 +36,7 @@ func getPod() *v1.Pod {
 			Kind:       "Pod",
 			APIVersion: "v1",
 		},
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: "pod",
 			OwnerReferences: []metav1.OwnerReference{
 				{UID: "1234"},

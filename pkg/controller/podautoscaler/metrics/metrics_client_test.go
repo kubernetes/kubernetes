@@ -37,6 +37,7 @@ import (
 	metricsapi "k8s.io/heapster/metrics/apis/metrics/v1alpha1"
 
 	"github.com/stretchr/testify/assert"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 )
 
 var fixedTimestamp = time.Date(2015, time.November, 10, 12, 30, 0, 0, time.UTC)
@@ -162,7 +163,7 @@ func (tc *testCase) prepareTestClient(t *testing.T) *fake.Clientset {
 
 func buildPod(namespace, podName string, podLabels map[string]string, phase v1.PodPhase, request string) v1.Pod {
 	return v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      podName,
 			Namespace: namespace,
 			Labels:    podLabels,
