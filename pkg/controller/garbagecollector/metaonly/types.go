@@ -16,10 +16,7 @@ limitations under the License.
 
 package metaonly
 
-import (
-	"k8s.io/kubernetes/pkg/api/v1"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
-)
+import metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 
 // MetadataOnlyObject allows decoding only the apiVersion, kind, and metadata fields of
 // JSON data.

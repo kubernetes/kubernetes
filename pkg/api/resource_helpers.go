@@ -231,7 +231,7 @@ func PodRequestsAndLimits(pod *Pod) (reqs map[ResourceName]resource.Quantity, li
 
 // ValidNamespace returns false if the namespace on the context differs from the resource.  If the resource has no namespace, it is set to the value in the context.
 // TODO(sttts): move into pkg/genericapiserver/api
-func ValidNamespace(ctx genericapirequest.Context, resource *ObjectMeta) bool {
+func ValidNamespace(ctx genericapirequest.Context, resource *metav1.ObjectMeta) bool {
 	ns, ok := genericapirequest.NamespaceFrom(ctx)
 	if len(resource.Namespace) == 0 {
 		resource.Namespace = ns

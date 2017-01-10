@@ -16,10 +16,7 @@ limitations under the License.
 
 package authentication
 
-import (
-	"k8s.io/kubernetes/pkg/api"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
-)
+import metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 
 const (
 	// ImpersonateUserHeader is used to impersonate a particular user during an API server request

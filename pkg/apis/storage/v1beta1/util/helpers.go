@@ -16,7 +16,10 @@ limitations under the License.
 
 package util
 
-import "k8s.io/kubernetes/pkg/api/v1"
+import (
+	"k8s.io/kubernetes/pkg/api/v1"
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
+)
 
 // IsDefaultStorageClassAnnotation represents a StorageClass annotation that
 // marks a class as the default StorageClass

@@ -17,7 +17,6 @@ limitations under the License.
 package rbac
 
 import (
-	"k8s.io/kubernetes/pkg/api"
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/runtime"
 )

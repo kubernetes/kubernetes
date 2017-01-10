@@ -24,7 +24,6 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta"
-	"k8s.io/kubernetes/pkg/api/v1"
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/runtime/schema"
@@ -49,13 +48,13 @@ func TestAPIObjectMeta(t *testing.T) {
 			},
 		},
 	}
-	var _ meta.Object = &j.ObjectMeta
+	var _ metav1.Object = &j.ObjectMeta
 	var _ meta.ObjectMetaAccessor = j
 	accessor, err := meta.Accessor(j)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if accessor != meta.Object(j) {
+	if accessor != metav1.Object(j) {
 		t.Fatalf("should have returned the same pointer: %#v\n\n%#v", accessor, j)
 	}
 	if e, a := "bar", accessor.GetNamespace(); e != a {

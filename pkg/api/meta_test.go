@@ -32,7 +32,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/uuid"
 )
 
-var _ meta.Object = &api.ObjectMeta{}
+var _ metav1.Object = &metav1.ObjectMeta{}
 
 // TestFillObjectMetaSystemFields validates that system populated fields are set on an object
 func TestFillObjectMetaSystemFields(t *testing.T) {

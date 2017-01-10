@@ -19,6 +19,7 @@ package api
 import (
 	"fmt"
 
+	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	utilrand "k8s.io/kubernetes/pkg/util/rand"
 )
 
@@ -34,7 +35,7 @@ type NameGenerator interface {
 // GenerateName will resolve the object name of the provided ObjectMeta to a generated version if
 // necessary. It expects that validation for ObjectMeta has already completed (that Base is a
 // valid name) and that the NameGenerator generates a name that is also valid.
-func GenerateName(u NameGenerator, meta *ObjectMeta) {
+func GenerateName(u NameGenerator, meta *metav1.ObjectMeta) {
 	if len(meta.GenerateName) == 0 || len(meta.Name) != 0 {
 		return
 	}

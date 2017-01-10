@@ -23,6 +23,8 @@ import (
 	"strconv"
 	"testing"
 
+	"github.com/google/gofuzz"
+
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
@@ -39,8 +41,6 @@ import (
 	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/intstr"
-
-	"github.com/google/gofuzz"
 )
 
 // FuzzerFor can randomly populate api objects that are destined for version.
