@@ -263,8 +263,8 @@ func (c *Context) ExecutePackage(outDir string, p Package) error {
 			return err
 		}
 		if imports := g.Imports(genContext); len(imports) > 0 {
-			for _, i := range imports {
-				f.Imports[i] = struct{}{}
+			for _, importLine := range imports {
+				f.Imports[normalizeImportPath(importLine, p.Path())] = struct{}{}
 			}
 		}
 	}
@@ -290,6 +290,24 @@ func (c *Context) ExecutePackage(outDir string, p Package) error {
 		return fmt.Errorf("errors in package %q:\n%v\n", p.Path(), strings.Join(errs2strings(errors), "\n"))
 	}
 	return nil
+}
+
+// normalizeImportPath takes a complete import statement (which may include an alias) and
+// the target package we're writing to.  It attempts to find a "path/of/some/steps/vendor/" prefix
+// on the import statement and remove it.  This fixes problems like "k8s.io/kubernetes/vendor/k8s.io/apimachinery" and
+// rewrites them to "k8s.io/apimachinery".  It's done here instead of when the packages are computed.
+// See https://github.com/kubernetes/kubernetes/pull/39644 discussion.  Aliases can't contain slashes and
+// "import" doesn't contain "vendor" so this shortcut works and we can do this in one spot.
+func normalizeImportPath(importLine, targetPackage string) string {
+	packageTokens := strings.Split(targetPackage, "/")
+	for i := 0; i < len(packageTokens); i++ {
+		// prepend by quote to make sure we find it from the beginning of the package
+		prospectiveVendorDir := "\"" + strings.Join(packageTokens[0:i], "/") + "/vendor/"
+		if strings.Contains(importLine, prospectiveVendorDir) {
+			return strings.Replace(importLine, prospectiveVendorDir, "\"", 1)
+		}
+	}
+	return importLine
 }
 
 func (c *Context) executeBody(w io.Writer, generator Generator) error {
