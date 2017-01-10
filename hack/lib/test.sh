@@ -229,6 +229,24 @@ kube::test::if_has_string() {
   fi
 }
 
+kube::test::if_not_has_string() {
+  local message=$1
+  local match=$2
+
+  if [[ ! $(echo "$message" | grep "$match") ]]; then
+    echo "Successful"
+    echo "message:$message"
+    echo "has:$match"
+    return 0
+  else
+    echo "FAIL!"
+    echo "message:$message"
+    echo "has not:$match"
+    caller
+    return 1
+  fi
+}
+
 # Returns true if the required resource is part of supported resources.
 # Expects env vars:
 #   SUPPORTED_RESOURCES: Array of all resources supported by the apiserver. "*"
