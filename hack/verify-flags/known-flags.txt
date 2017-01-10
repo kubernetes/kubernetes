@@ -635,5 +635,5 @@ garbage-collector-enabled
 viper-config
 log-lines-total
 run-duration
-disable-attach-detach-reconcile
-attach-detach-reconcile-period
+attach-detach-reconcile-sync-period
+disable-attach-detach-reconcile-sync
