@@ -37,6 +37,8 @@ import (
 	"github.com/spf13/pflag"
 
 	"k8s.io/apiserver/pkg/healthz"
+	clientgoclientset "k8s.io/client-go/kubernetes"
+
 	"k8s.io/kubernetes/cmd/kubelet/app/options"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
@@ -137,19 +139,20 @@ func UnsecuredKubeletDeps(s *options.KubeletServer) (*kubelet.KubeletDeps, error
 	}
 
 	return &kubelet.KubeletDeps{
-		Auth:              nil, // default does not enforce auth[nz]
-		CAdvisorInterface: nil, // cadvisor.New launches background processes (bg http.ListenAndServe, and some bg cleaners), not set here
-		Cloud:             nil, // cloud provider might start background processes
-		ContainerManager:  nil,
-		DockerClient:      dockerClient,
-		KubeClient:        nil,
-		Mounter:           mounter,
-		NetworkPlugins:    ProbeNetworkPlugins(s.NetworkPluginDir, s.CNIConfDir, s.CNIBinDir),
-		OOMAdjuster:       oom.NewOOMAdjuster(),
-		OSInterface:       kubecontainer.RealOS{},
-		Writer:            writer,
-		VolumePlugins:     ProbeVolumePlugins(s.VolumePluginDir),
-		TLSOptions:        tlsOptions,
+		Auth:               nil, // default does not enforce auth[nz]
+		CAdvisorInterface:  nil, // cadvisor.New launches background processes (bg http.ListenAndServe, and some bg cleaners), not set here
+		Cloud:              nil, // cloud provider might start background processes
+		ContainerManager:   nil,
+		DockerClient:       dockerClient,
+		KubeClient:         nil,
+		ExternalKubeClient: nil,
+		Mounter:            mounter,
+		NetworkPlugins:     ProbeNetworkPlugins(s.NetworkPluginDir, s.CNIConfDir, s.CNIBinDir),
+		OOMAdjuster:        oom.NewOOMAdjuster(),
+		OSInterface:        kubecontainer.RealOS{},
+		Writer:             writer,
+		VolumePlugins:      ProbeVolumePlugins(s.VolumePluginDir),
+		TLSOptions:         tlsOptions,
 	}, nil
 }
 
@@ -359,6 +362,7 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.KubeletDeps) (err error) {
 
 	if kubeDeps == nil {
 		var kubeClient, eventClient *clientset.Clientset
+		var externalKubeClient clientgoclientset.Interface
 		var cloud cloudprovider.Interface
 
 		if s.CloudProvider != componentconfigv1alpha1.AutoDetectCloudProvider {
@@ -406,6 +410,27 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.KubeletDeps) (err error) {
 			}
 		}
 
+		// client-go and kuberenetes generated clients are incompatible because the runtime
+		// and runtime/serializer types have been duplicated in client-go.  This means that
+		// you can't reasonably convert from one to the other and its impossible for a single
+		// type to fulfill both interfaces.  Because of that, we have to build the clients
+		// up from scratch twice.
+		// TODO eventually the kubelet should only use the client-go library
+		clientGoConfig, err := createAPIServerClientGoConfig(s)
+		if err == nil {
+			externalKubeClient, err = clientgoclientset.NewForConfig(clientGoConfig)
+			if err != nil {
+				glog.Warningf("New kubeClient from clientConfig error: %v", err)
+			}
+		} else {
+			if s.RequireKubeConfig {
+				return fmt.Errorf("invalid kubeconfig: %v", err)
+			}
+			if standaloneMode {
+				glog.Warningf("No API client: %v", err)
+			}
+		}
+
 		kubeDeps, err = UnsecuredKubeletDeps(s)
 		if err != nil {
 			return err
@@ -413,6 +438,7 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.KubeletDeps) (err error) {
 
 		kubeDeps.Cloud = cloud
 		kubeDeps.KubeClient = kubeClient
+		kubeDeps.ExternalKubeClient = externalKubeClient
 		kubeDeps.EventClient = eventClient
 	}
 
@@ -421,7 +447,8 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.KubeletDeps) (err error) {
 		if err != nil {
 			return err
 		}
-		auth, err := buildAuth(nodeName, kubeDeps.KubeClient, s.KubeletConfiguration)
+
+		auth, err := buildAuth(nodeName, kubeDeps.ExternalKubeClient, s.KubeletConfiguration)
 		if err != nil {
 			return err
 		}

@@ -21,21 +21,21 @@ import (
 	"fmt"
 	"time"
 
-	"k8s.io/kubernetes/pkg/api"
-	apierrors "k8s.io/kubernetes/pkg/api/errors"
-	"k8s.io/kubernetes/pkg/apimachinery/registered"
-	"k8s.io/kubernetes/pkg/client/restclient"
-	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
-	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/runtime/schema"
-	runtimeserializer "k8s.io/kubernetes/pkg/runtime/serializer"
-	"k8s.io/kubernetes/pkg/util/wait"
+	"k8s.io/client-go/pkg/api"
+	apierrors "k8s.io/client-go/pkg/api/errors"
+	"k8s.io/client-go/pkg/apimachinery/registered"
+	"k8s.io/client-go/pkg/runtime"
+	"k8s.io/client-go/pkg/runtime/schema"
+	runtimeserializer "k8s.io/client-go/pkg/runtime/serializer"
+	"k8s.io/client-go/pkg/util/wait"
+	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/clientcmd"
 
-	_ "k8s.io/kubernetes/pkg/apis/authorization/install"
+	_ "k8s.io/client-go/pkg/apis/authorization/install"
 )
 
 type GenericWebhook struct {
-	RestClient     *restclient.RESTClient
+	RestClient     *rest.RESTClient
 	initialBackoff time.Duration
 }
 
@@ -58,7 +58,7 @@ func NewGenericWebhook(kubeConfigFile string, groupVersions []schema.GroupVersio
 	codec := api.Codecs.LegacyCodec(groupVersions...)
 	clientConfig.ContentConfig.NegotiatedSerializer = runtimeserializer.NegotiatedSerializerWrapper(runtime.SerializerInfo{Serializer: codec})
 
-	restClient, err := restclient.UnversionedRESTClientFor(clientConfig)
+	restClient, err := rest.UnversionedRESTClientFor(clientConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -70,8 +70,8 @@ func NewGenericWebhook(kubeConfigFile string, groupVersions []schema.GroupVersio
 
 // WithExponentialBackoff will retry webhookFn() up to 5 times with exponentially increasing backoff when
 // it returns an error for which apierrors.SuggestsClientDelay() or apierrors.IsInternalError() returns true.
-func (g *GenericWebhook) WithExponentialBackoff(webhookFn func() restclient.Result) restclient.Result {
-	var result restclient.Result
+func (g *GenericWebhook) WithExponentialBackoff(webhookFn func() rest.Result) rest.Result {
+	var result rest.Result
 	WithExponentialBackoff(g.initialBackoff, func() error {
 		result = webhookFn()
 		return result.Error()
