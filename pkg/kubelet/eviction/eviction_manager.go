@@ -28,8 +28,10 @@ import (
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
+	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
 	"k8s.io/kubernetes/pkg/kubelet/server/stats"
+	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"k8s.io/kubernetes/pkg/util/clock"
 	"k8s.io/kubernetes/pkg/util/wait"
@@ -108,7 +110,7 @@ func (m *managerImpl) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAd
 	// the node has memory pressure, admit if not best-effort
 	if hasNodeCondition(m.nodeConditions, api.NodeMemoryPressure) {
 		notBestEffort := qos.BestEffort != qos.GetPodQOS(attrs.Pod)
-		if notBestEffort {
+		if notBestEffort || kubetypes.IsCriticalPod(attrs.Pod) {
 			return lifecycle.PodAdmitResult{Admit: true}
 		}
 	}
@@ -311,6 +313,15 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 	// we kill at most a single pod during each eviction interval
 	for i := range activePods {
 		pod := activePods[i]
+		if kubepod.IsStaticPod(pod) {
+			// The eviction manager doesn't evict static pods. To stop a static
+			// pod, the admin needs to remove the manifest from kubelet's
+			// --config directory.
+			// TODO(39124): This is a short term fix, we can't assume static pods
+			// are always well behaved.
+			glog.Infof("eviction manager: NOT evicting static pod %v", pod.Name)
+			continue
+		}
 		status := api.PodStatus{
 			Phase:   api.PodFailed,
 			Message: fmt.Sprintf(message, resourceToReclaim),
