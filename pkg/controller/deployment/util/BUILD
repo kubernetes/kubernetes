@@ -44,7 +44,10 @@ go_library(
 
 go_test(
     name = "go_default_test",
-    srcs = ["deployment_util_test.go"],
+    srcs = [
+        "deployment_util_test.go",
+        "hash_test.go",
+    ],
     library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
@@ -58,4 +61,17 @@ go_test(
         "//pkg/util/intstr:go_default_library",
         "//vendor:github.com/stretchr/testify/assert",
     ],
+)
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [":package-srcs"],
+    tags = ["automanaged"],
 )

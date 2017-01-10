@@ -18,8 +18,8 @@ go_repositories()
 debs = (
     (
         "busybox_deb",
-        "51651980a993b02c8dc663a5539a4d83704e56c2fed93dd8d1b2580e61319af5",
-        "http://ftp.us.debian.org/debian/pool/main/b/busybox/busybox-static_1.22.0-19_amd64.deb",
+        "f262cc9cf893740bb70c3dd01da9429b858c94be696badd4a702e0a8c7f6f80b",
+        "http://ftp.us.debian.org/debian/pool/main/b/busybox/busybox-static_1.22.0-19+b1_amd64.deb",
     ),
     (
         "libc_deb",
@@ -30,6 +30,16 @@ debs = (
         "iptables_deb",
         "7747388a97ba71fede302d70361c81d486770a2024185514c18b5d8eab6aaf4e",
         "http://ftp.us.debian.org/debian/pool/main/i/iptables/iptables_1.4.21-2+b1_amd64.deb",
+    ),
+    (
+        "libnetlink_deb",
+        "5d486022cd9e047e9afbb1617cf4519c0decfc3d2c1fad7e7fe5604943dbbf37",
+        "http://ftp.us.debian.org/debian/pool/main/libn/libnfnetlink/libnfnetlink0_1.0.1-3_amd64.deb",
+    ),
+    (
+        "libxtables_deb",
+        "6783f316af4cbf3ada8b9a2b7bb5f53a87c0c2575c1903ce371fdbd45d3626c6",
+        "http://ftp.us.debian.org/debian/pool/main/i/iptables/libxtables10_1.4.21-2+b1_amd64.deb",
     ),
     (
         "iproute2_deb",

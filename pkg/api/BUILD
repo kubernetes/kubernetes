@@ -102,7 +102,6 @@ go_test(
         "//pkg/util/sets:go_default_library",
         "//pkg/util/uuid:go_default_library",
         "//pkg/watch:go_default_library",
-        "//pkg/watch/versioned:go_default_library",
         "//vendor:github.com/davecgh/go-spew/spew",
         "//vendor:github.com/gogo/protobuf/proto",
         "//vendor:github.com/golang/protobuf/proto",
@@ -110,4 +109,35 @@ go_test(
         "//vendor:github.com/spf13/pflag",
         "//vendor:github.com/ugorji/go/codec",
     ],
+)
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [
+        ":package-srcs",
+        "//pkg/api/annotations:all-srcs",
+        "//pkg/api/endpoints:all-srcs",
+        "//pkg/api/errors:all-srcs",
+        "//pkg/api/events:all-srcs",
+        "//pkg/api/install:all-srcs",
+        "//pkg/api/meta:all-srcs",
+        "//pkg/api/pod:all-srcs",
+        "//pkg/api/resource:all-srcs",
+        "//pkg/api/rest:all-srcs",
+        "//pkg/api/service:all-srcs",
+        "//pkg/api/testapi:all-srcs",
+        "//pkg/api/testing:all-srcs",
+        "//pkg/api/unversioned:all-srcs",
+        "//pkg/api/util:all-srcs",
+        "//pkg/api/v1:all-srcs",
+        "//pkg/api/validation:all-srcs",
+    ],
+    tags = ["automanaged"],
 )

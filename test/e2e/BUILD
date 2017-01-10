@@ -5,7 +5,6 @@ licenses(["notice"])
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
-    "go_test",
 )
 
 go_library(
@@ -49,7 +48,6 @@ go_library(
         "federation-event.go",
         "federation-replicaset.go",
         "federation-util.go",
-        "federation-util-14.go",
         "firewall.go",
         "garbage_collector.go",
         "generated_clientset.go",
@@ -152,7 +150,6 @@ go_library(
         "//pkg/controller/petset:go_default_library",
         "//pkg/controller/replicaset:go_default_library",
         "//pkg/controller/replication:go_default_library",
-        "//pkg/dns/federation:go_default_library",
         "//pkg/fields:go_default_library",
         "//pkg/kubectl:go_default_library",
         "//pkg/kubectl/cmd/util:go_default_library",
@@ -240,4 +237,25 @@ go_library(
         "//vendor:github.com/onsi/ginkgo",
         "//vendor:github.com/onsi/gomega",
     ],
+)
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [
+        ":package-srcs",
+        "//test/e2e/chaosmonkey:all-srcs",
+        "//test/e2e/common:all-srcs",
+        "//test/e2e/framework:all-srcs",
+        "//test/e2e/generated:all-srcs",
+        "//test/e2e/perftype:all-srcs",
+        "//test/e2e/testing-manifests:all-srcs",
+    ],
+    tags = ["automanaged"],
 )

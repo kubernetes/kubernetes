@@ -20,6 +20,7 @@ go_library(
         "//cmd/kubeadm/app/discovery/file:go_default_library",
         "//cmd/kubeadm/app/discovery/https:go_default_library",
         "//cmd/kubeadm/app/discovery/token:go_default_library",
+        "//pkg/client/unversioned/clientcmd:go_default_library",
         "//pkg/client/unversioned/clientcmd/api:go_default_library",
         "//vendor:github.com/spf13/pflag",
     ],
@@ -34,4 +35,22 @@ go_test(
         "//cmd/kubeadm/app/apis/kubeadm:go_default_library",
         "//vendor:github.com/davecgh/go-spew/spew",
     ],
+)
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [
+        ":package-srcs",
+        "//cmd/kubeadm/app/discovery/file:all-srcs",
+        "//cmd/kubeadm/app/discovery/https:all-srcs",
+        "//cmd/kubeadm/app/discovery/token:all-srcs",
+    ],
+    tags = ["automanaged"],
 )

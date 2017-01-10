@@ -8,5 +8,9 @@
 		"./test",
 		"./federation",
 		"./examples"
-	]
+	],
+	"SkippedPaths": [
+		"^_.*"
+	],
+	"AddSourcesRules": true
 }

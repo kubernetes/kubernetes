@@ -207,6 +207,9 @@ func (m *ThirdPartyResourceServer) getExistingThirdPartyResources(path string) [
 				Name:       key,
 				Namespaced: true,
 				Kind:       obj.Kind(),
+				Verbs: metav1.Verbs([]string{
+					"delete", "deletecollection", "get", "list", "patch", "create", "update", "watch",
+				}),
 			})
 		}
 	}
@@ -284,6 +287,7 @@ func (m *ThirdPartyResourceServer) InstallThirdPartyResource(rsrc *extensions.Th
 	m.genericAPIServer.HandlerContainer.Add(genericapi.NewGroupWebService(api.Codecs, path, apiGroup))
 
 	m.addThirdPartyResourceStorage(path, plural.Resource, thirdparty.Storage[plural.Resource].(*thirdpartyresourcedataetcd.REST), apiGroup)
+	registered.AddThirdPartyAPIGroupVersions(schema.GroupVersion{Group: group, Version: rsrc.Versions[0].Name})
 	return nil
 }
 

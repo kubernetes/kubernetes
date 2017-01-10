@@ -29,6 +29,8 @@ docker_build(
     debs = [
         "@iptables_deb//file",
         "@iproute2_deb//file",
+        "@libnetlink_deb//file",
+        "@libxtables_deb//file",
     ],
 )
 
@@ -50,9 +52,25 @@ docker_build(
 docker_build(
     name = "kube-proxy",
     base = ":busybox-net",
-    cmd = ["/kube-proxy"],
+    cmd = ["/usr/bin/kube-proxy"],
     debs = [
         "//build/debs:kube-proxy.deb",
     ],
     repository = "gcr.io/google-containers",
+)
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [
+        ":package-srcs",
+        "//build/debs:all-srcs",
+    ],
+    tags = ["automanaged"],
 )

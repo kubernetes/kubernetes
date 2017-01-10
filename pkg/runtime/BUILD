@@ -52,18 +52,11 @@ go_test(
         "conversion_test.go",
         "embedded_test.go",
         "extension_test.go",
-        "helper_test.go",
         "scheme_test.go",
-        "unversioned_test.go",
     ],
     tags = ["automanaged"],
     deps = [
-        "//pkg/api:go_default_library",
         "//pkg/api/meta:go_default_library",
-        "//pkg/api/testapi:go_default_library",
-        "//pkg/apimachinery/registered:go_default_library",
-        "//pkg/apis/extensions:go_default_library",
-        "//pkg/apis/meta/v1:go_default_library",
         "//pkg/conversion:go_default_library",
         "//pkg/runtime:go_default_library",
         "//pkg/runtime/schema:go_default_library",
@@ -72,4 +65,21 @@ go_test(
         "//vendor:github.com/google/gofuzz",
         "//vendor:github.com/spf13/pflag",
     ],
+)
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [
+        ":package-srcs",
+        "//pkg/runtime/schema:all-srcs",
+        "//pkg/runtime/serializer:all-srcs",
+    ],
+    tags = ["automanaged"],
 )

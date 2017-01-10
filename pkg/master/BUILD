@@ -90,6 +90,7 @@ go_test(
     srcs = [
         "controller_test.go",
         "import_known_versions_test.go",
+        "master_openapi_test.go",
         "master_test.go",
     ],
     library = ":go_default_library",
@@ -132,4 +133,21 @@ go_test(
         "//vendor:github.com/go-openapi/validate",
         "//vendor:github.com/stretchr/testify/assert",
     ],
+)
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [
+        ":package-srcs",
+        "//pkg/master/ports:all-srcs",
+        "//pkg/master/thirdparty:all-srcs",
+    ],
+    tags = ["automanaged"],
 )

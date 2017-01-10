@@ -28,3 +28,23 @@ go_library(
         "//vendor:github.com/golang/glog",
     ],
 )
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [
+        ":package-srcs",
+        "//federation/client/clientset_generated/federation_clientset/fake:all-srcs",
+        "//federation/client/clientset_generated/federation_clientset/typed/batch/v1:all-srcs",
+        "//federation/client/clientset_generated/federation_clientset/typed/core/v1:all-srcs",
+        "//federation/client/clientset_generated/federation_clientset/typed/extensions/v1beta1:all-srcs",
+        "//federation/client/clientset_generated/federation_clientset/typed/federation/v1beta1:all-srcs",
+    ],
+    tags = ["automanaged"],
+)

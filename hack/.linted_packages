@@ -15,7 +15,6 @@ cmd/kube-apiserver/app/options
 cmd/kube-controller-manager
 cmd/kube-controller-manager/app/options
 cmd/kube-discovery
-cmd/kube-dns
 cmd/kube-proxy
 cmd/kubeadm
 cmd/kubeadm
@@ -69,7 +68,6 @@ pkg/api/annotations
 pkg/api/errors
 pkg/api/events
 pkg/api/install
-pkg/api/meta
 pkg/api/resource
 pkg/api/service
 pkg/api/v1
@@ -91,7 +89,6 @@ pkg/apis/componentconfig/install
 pkg/apis/extensions/install
 pkg/apis/extensions/v1beta1
 pkg/apis/imagepolicy/install
-pkg/apis/meta/v1/unstructured
 pkg/apis/policy/install
 pkg/apis/rbac/install
 pkg/apis/rbac/v1alpha1
@@ -157,6 +154,7 @@ pkg/client/listers/storage/internalversion
 pkg/client/listers/storage/v1beta1
 pkg/client/metrics
 pkg/client/metrics/prometheus
+pkg/client/restclient/watch
 pkg/client/testing/core
 pkg/client/typed/discovery
 pkg/client/unversioned
@@ -239,7 +237,6 @@ pkg/registry/thirdpartyresource
 pkg/registry/thirdpartyresource/etcd
 pkg/runtime
 pkg/runtime/serializer/json
-pkg/runtime/serializer/protobuf
 pkg/runtime/serializer/recognizer/testing
 pkg/runtime/serializer/versioning
 pkg/runtime/serializer/yaml
@@ -282,6 +279,7 @@ pkg/volume/util/nestedpendingoperations
 pkg/volume/util/operationexecutor
 pkg/volume/util/types
 pkg/volume/util/volumehelper
+pkg/watch
 pkg/watch/json
 pkg/watch/versioned
 plugin/cmd/kube-scheduler

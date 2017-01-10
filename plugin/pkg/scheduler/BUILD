@@ -66,3 +66,25 @@ go_test(
         "//plugin/pkg/scheduler/testing:go_default_library",
     ],
 )
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [
+        ":package-srcs",
+        "//plugin/pkg/scheduler/algorithm:all-srcs",
+        "//plugin/pkg/scheduler/algorithmprovider:all-srcs",
+        "//plugin/pkg/scheduler/api:all-srcs",
+        "//plugin/pkg/scheduler/factory:all-srcs",
+        "//plugin/pkg/scheduler/metrics:all-srcs",
+        "//plugin/pkg/scheduler/schedulercache:all-srcs",
+        "//plugin/pkg/scheduler/testing:all-srcs",
+    ],
+    tags = ["automanaged"],
+)

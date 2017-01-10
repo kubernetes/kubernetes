@@ -23,6 +23,8 @@ package thirdparty
 import (
 	"encoding/json"
 	"reflect"
+	"sort"
+	"sync"
 	"testing"
 	"time"
 
@@ -38,6 +40,57 @@ import (
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/test/integration/framework"
 )
+
+func TestThirdPartyDiscovery(t *testing.T) {
+	group := "company.com"
+	version := "v1"
+
+	_, s := framework.RunAMaster(framework.NewIntegrationTestMasterConfig())
+	defer s.Close()
+	clientConfig := &restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{NegotiatedSerializer: api.Codecs}}
+	client := clientset.NewForConfigOrDie(clientConfig)
+
+	// install thirdparty resource
+	once := sync.Once{}
+	deleteFoo := installThirdParty(t, client, clientConfig,
+		&extensions.ThirdPartyResource{
+			ObjectMeta: v1.ObjectMeta{Name: "foo.company.com"},
+			Versions:   []extensions.APIVersion{{Name: version}},
+		}, group, version, "foos",
+	)
+	defer once.Do(deleteFoo)
+
+	// check whether it shows up in discovery properly
+	resources, err := client.Discovery().ServerResourcesForGroupVersion("company.com/" + version)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(resources.APIResources) != 1 {
+		t.Fatalf("Expected exactly the resource \"foos\" in group version %v/%v via discovery, got: %v", group, version, resources.APIResources)
+	}
+	r := resources.APIResources[0]
+	if r.Name != "foos" {
+		t.Fatalf("Expected exactly the resource \"foos\" in group version %v/%v via discovery, got: %v", group, version, r)
+	}
+	sort.Strings(r.Verbs)
+	expectedVerbs := []string{"create", "delete", "deletecollection", "get", "list", "patch", "update", "watch"}
+	if !reflect.DeepEqual([]string(r.Verbs), expectedVerbs) {
+		t.Fatalf("Unexpected verbs for resource \"foos\" in group version %v/%v via discovery: expected=%v got=%v", group, version, expectedVerbs, r.Verbs)
+	}
+
+	// delete
+	once.Do(deleteFoo)
+
+	// check whether resource is also gone from discovery
+	resources, err = client.Discovery().ServerResourcesForGroupVersion(group + "/" + version)
+	if err == nil {
+		for _, r := range resources.APIResources {
+			if r.Name == "foos" {
+				t.Fatalf("unexpected resource \"foos\" in group version %v/%v after deletion", group, version)
+			}
+		}
+	}
+}
 
 // TODO these tests will eventually be runnable in a single test
 func TestThirdPartyDelete(t *testing.T) {
@@ -129,20 +182,22 @@ func DoTestInstallMultipleAPIs(t *testing.T, client clientset.Interface, clientC
 	group := "company.com"
 	version := "v1"
 
-	defer installThirdParty(t, client, clientConfig,
+	deleteFoo := installThirdParty(t, client, clientConfig,
 		&extensions.ThirdPartyResource{
 			ObjectMeta: v1.ObjectMeta{Name: "foo.company.com"},
 			Versions:   []extensions.APIVersion{{Name: version}},
 		}, group, version, "foos",
-	)()
+	)
+	defer deleteFoo()
 
 	// TODO make multiple resources in one version work
-	// defer installThirdParty(t, client, clientConfig,
+	// deleteBar = installThirdParty(t, client, clientConfig,
 	// 	&extensions.ThirdPartyResource{
 	// 		ObjectMeta: v1.ObjectMeta{Name: "bar.company.com"},
 	// 		Versions:   []extensions.APIVersion{{Name: version}},
 	// 	}, group, version, "bars",
-	// )()
+	// )
+	// defer deleteBar()
 }
 
 func DoTestInstallThirdPartyAPIDelete(t *testing.T, client clientset.Interface, clientConfig *restclient.Config) {
@@ -154,12 +209,13 @@ func DoTestInstallThirdPartyAPIDelete(t *testing.T, client clientset.Interface, 
 func testInstallThirdPartyAPIDeleteVersion(t *testing.T, client clientset.Interface, clientConfig *restclient.Config, version string) {
 	group := "company.com"
 
-	defer installThirdParty(t, client, clientConfig,
+	deleteFoo := installThirdParty(t, client, clientConfig,
 		&extensions.ThirdPartyResource{
 			ObjectMeta: v1.ObjectMeta{Name: "foo.company.com"},
 			Versions:   []extensions.APIVersion{{Name: version}},
 		}, group, version, "foos",
-	)()
+	)
+	defer deleteFoo()
 
 	fooClientConfig := *clientConfig
 	fooClientConfig.APIPath = "apis"

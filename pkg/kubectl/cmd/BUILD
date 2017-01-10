@@ -187,6 +187,7 @@ go_test(
         "//pkg/apis/policy:go_default_library",
         "//pkg/client/restclient:go_default_library",
         "//pkg/client/restclient/fake:go_default_library",
+        "//pkg/client/restclient/watch:go_default_library",
         "//pkg/client/typed/dynamic:go_default_library",
         "//pkg/kubectl:go_default_library",
         "//pkg/kubectl/cmd/testing:go_default_library",
@@ -203,9 +204,29 @@ go_test(
         "//pkg/util/term:go_default_library",
         "//pkg/util/wait:go_default_library",
         "//pkg/watch:go_default_library",
-        "//pkg/watch/versioned:go_default_library",
         "//vendor:github.com/spf13/cobra",
         "//vendor:github.com/stretchr/testify/assert",
         "//vendor:k8s.io/heapster/metrics/apis/metrics/v1alpha1",
     ],
+)
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [
+        ":package-srcs",
+        "//pkg/kubectl/cmd/config:all-srcs",
+        "//pkg/kubectl/cmd/rollout:all-srcs",
+        "//pkg/kubectl/cmd/set:all-srcs",
+        "//pkg/kubectl/cmd/templates:all-srcs",
+        "//pkg/kubectl/cmd/testing:all-srcs",
+        "//pkg/kubectl/cmd/util:all-srcs",
+    ],
+    tags = ["automanaged"],
 )

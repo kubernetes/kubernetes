@@ -21,9 +21,9 @@ import (
 
 	"github.com/spf13/pflag"
 
-	authorizationclient "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/authorization/v1beta1"
-	"k8s.io/kubernetes/pkg/client/restclient"
-	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
+	authorizationclient "k8s.io/client-go/kubernetes/typed/authorization/v1beta1"
+	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/kubernetes/pkg/genericapiserver/authorizer"
 )
 
@@ -84,7 +84,7 @@ func (s *DelegatingAuthorizationOptions) ToAuthorizationConfig() (authorizer.Del
 }
 
 func (s *DelegatingAuthorizationOptions) newSubjectAccessReview() (authorizationclient.SubjectAccessReviewInterface, error) {
-	var clientConfig *restclient.Config
+	var clientConfig *rest.Config
 	var err error
 	if len(s.RemoteKubeConfigFile) > 0 {
 		loadingRules := &clientcmd.ClientConfigLoadingRules{ExplicitPath: s.RemoteKubeConfigFile}
@@ -95,7 +95,7 @@ func (s *DelegatingAuthorizationOptions) newSubjectAccessReview() (authorization
 	} else {
 		// without the remote kubeconfig file, try to use the in-cluster config.  Most addon API servers will
 		// use this path
-		clientConfig, err = restclient.InClusterConfig()
+		clientConfig, err = rest.InClusterConfig()
 	}
 	if err != nil {
 		return nil, err

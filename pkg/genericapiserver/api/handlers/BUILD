@@ -65,10 +65,26 @@ go_library(
         "//pkg/util/strategicpatch:go_default_library",
         "//pkg/util/wsstream:go_default_library",
         "//pkg/watch:go_default_library",
-        "//pkg/watch/versioned:go_default_library",
         "//vendor:github.com/emicklei/go-restful",
         "//vendor:github.com/evanphx/json-patch",
         "//vendor:github.com/golang/glog",
         "//vendor:golang.org/x/net/websocket",
     ],
+)
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [
+        ":package-srcs",
+        "//pkg/genericapiserver/api/handlers/negotiation:all-srcs",
+        "//pkg/genericapiserver/api/handlers/responsewriters:all-srcs",
+    ],
+    tags = ["automanaged"],
 )

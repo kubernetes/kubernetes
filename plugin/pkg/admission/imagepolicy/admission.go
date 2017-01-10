@@ -28,17 +28,20 @@ import (
 
 	"github.com/golang/glog"
 
-	"k8s.io/kubernetes/pkg/api"
-	apierrors "k8s.io/kubernetes/pkg/api/errors"
-	"k8s.io/kubernetes/pkg/apis/imagepolicy/v1alpha1"
-	"k8s.io/kubernetes/pkg/runtime/schema"
-	"k8s.io/kubernetes/pkg/util/yaml"
-
-	"k8s.io/kubernetes/pkg/client/restclient"
-	"k8s.io/kubernetes/pkg/util/cache"
-	"k8s.io/kubernetes/plugin/pkg/webhook"
+	apierrors "k8s.io/client-go/pkg/api/errors"
+	"k8s.io/client-go/pkg/apis/imagepolicy/v1alpha1"
+	"k8s.io/client-go/pkg/runtime/schema"
+	"k8s.io/client-go/rest"
 
 	"k8s.io/kubernetes/pkg/admission"
+	"k8s.io/kubernetes/pkg/api"
+	kubeschema "k8s.io/kubernetes/pkg/runtime/schema"
+	"k8s.io/kubernetes/pkg/util/cache"
+	"k8s.io/kubernetes/pkg/util/yaml"
+	"k8s.io/kubernetes/plugin/pkg/webhook"
+
+	// install the clientgo image policy API for use with api registry
+	_ "k8s.io/client-go/pkg/apis/imagepolicy/install"
 )
 
 var (
@@ -100,7 +103,7 @@ func (a *imagePolicyWebhook) webhookError(attributes admission.Attributes, err e
 
 func (a *imagePolicyWebhook) Admit(attributes admission.Attributes) (err error) {
 	// Ignore all calls to subresources or resources other than pods.
-	allowedResources := map[schema.GroupResource]bool{
+	allowedResources := map[kubeschema.GroupResource]bool{
 		api.Resource("pods"): true,
 	}
 
@@ -144,7 +147,7 @@ func (a *imagePolicyWebhook) admitPod(attributes admission.Attributes, review *v
 	if entry, ok := a.responseCache.Get(string(cacheKey)); ok {
 		review.Status = entry.(v1alpha1.ImageReviewStatus)
 	} else {
-		result := a.webhook.WithExponentialBackoff(func() restclient.Result {
+		result := a.webhook.WithExponentialBackoff(func() rest.Result {
 			return a.webhook.RestClient.Post().Body(review).Do()
 		})
 

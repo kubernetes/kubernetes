@@ -37,6 +37,8 @@ import (
 	"github.com/spf13/pflag"
 
 	"k8s.io/apiserver/pkg/healthz"
+	clientgoclientset "k8s.io/client-go/kubernetes"
+
 	"k8s.io/kubernetes/cmd/kubelet/app/options"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
@@ -137,19 +139,20 @@ func UnsecuredKubeletDeps(s *options.KubeletServer) (*kubelet.KubeletDeps, error
 	}
 
 	return &kubelet.KubeletDeps{
-		Auth:              nil, // default does not enforce auth[nz]
-		CAdvisorInterface: nil, // cadvisor.New launches background processes (bg http.ListenAndServe, and some bg cleaners), not set here
-		Cloud:             nil, // cloud provider might start background processes
-		ContainerManager:  nil,
-		DockerClient:      dockerClient,
-		KubeClient:        nil,
-		Mounter:           mounter,
-		NetworkPlugins:    ProbeNetworkPlugins(s.NetworkPluginDir, s.CNIConfDir, s.CNIBinDir),
-		OOMAdjuster:       oom.NewOOMAdjuster(),
-		OSInterface:       kubecontainer.RealOS{},
-		Writer:            writer,
-		VolumePlugins:     ProbeVolumePlugins(s.VolumePluginDir),
-		TLSOptions:        tlsOptions,
+		Auth:               nil, // default does not enforce auth[nz]
+		CAdvisorInterface:  nil, // cadvisor.New launches background processes (bg http.ListenAndServe, and some bg cleaners), not set here
+		Cloud:              nil, // cloud provider might start background processes
+		ContainerManager:   nil,
+		DockerClient:       dockerClient,
+		KubeClient:         nil,
+		ExternalKubeClient: nil,
+		Mounter:            mounter,
+		NetworkPlugins:     ProbeNetworkPlugins(s.NetworkPluginDir, s.CNIConfDir, s.CNIBinDir),
+		OOMAdjuster:        oom.NewOOMAdjuster(),
+		OSInterface:        kubecontainer.RealOS{},
+		Writer:             writer,
+		VolumePlugins:      ProbeVolumePlugins(s.VolumePluginDir),
+		TLSOptions:         tlsOptions,
 	}, nil
 }
 
@@ -359,6 +362,7 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.KubeletDeps) (err error) {
 
 	if kubeDeps == nil {
 		var kubeClient, eventClient *clientset.Clientset
+		var externalKubeClient clientgoclientset.Interface
 		var cloud cloudprovider.Interface
 
 		if s.CloudProvider != componentconfigv1alpha1.AutoDetectCloudProvider {
@@ -406,6 +410,27 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.KubeletDeps) (err error) {
 			}
 		}
 
+		// client-go and kuberenetes generated clients are incompatible because the runtime
+		// and runtime/serializer types have been duplicated in client-go.  This means that
+		// you can't reasonably convert from one to the other and its impossible for a single
+		// type to fulfill both interfaces.  Because of that, we have to build the clients
+		// up from scratch twice.
+		// TODO eventually the kubelet should only use the client-go library
+		clientGoConfig, err := createAPIServerClientGoConfig(s)
+		if err == nil {
+			externalKubeClient, err = clientgoclientset.NewForConfig(clientGoConfig)
+			if err != nil {
+				glog.Warningf("New kubeClient from clientConfig error: %v", err)
+			}
+		} else {
+			if s.RequireKubeConfig {
+				return fmt.Errorf("invalid kubeconfig: %v", err)
+			}
+			if standaloneMode {
+				glog.Warningf("No API client: %v", err)
+			}
+		}
+
 		kubeDeps, err = UnsecuredKubeletDeps(s)
 		if err != nil {
 			return err
@@ -413,6 +438,7 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.KubeletDeps) (err error) {
 
 		kubeDeps.Cloud = cloud
 		kubeDeps.KubeClient = kubeClient
+		kubeDeps.ExternalKubeClient = externalKubeClient
 		kubeDeps.EventClient = eventClient
 	}
 
@@ -421,7 +447,8 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.KubeletDeps) (err error) {
 		if err != nil {
 			return err
 		}
-		auth, err := buildAuth(nodeName, kubeDeps.KubeClient, s.KubeletConfiguration)
+
+		auth, err := buildAuth(nodeName, kubeDeps.ExternalKubeClient, s.KubeletConfiguration)
 		if err != nil {
 			return err
 		}
@@ -733,35 +760,35 @@ func RunKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *kubelet
 	// TODO(dawnchen): remove this once we deprecated old debian containervm images.
 	// This is a workaround for issue: https://github.com/opencontainers/runc/issues/726
 	// The current chosen number is consistent with most of other os dist.
-	const maxkeysPath = "/proc/sys/kernel/keys/root_maxkeys"
+	const maxKeysPath = "/proc/sys/kernel/keys/root_maxkeys"
 	const minKeys uint64 = 1000000
-	key, err := ioutil.ReadFile(maxkeysPath)
+	key, err := ioutil.ReadFile(maxKeysPath)
 	if err != nil {
-		glog.Errorf("Cannot read keys quota in %s", maxkeysPath)
+		glog.Errorf("Cannot read keys quota in %s", maxKeysPath)
 	} else {
 		fields := strings.Fields(string(key))
-		nkey, _ := strconv.ParseUint(fields[0], 10, 64)
-		if nkey < minKeys {
-			glog.Infof("Setting keys quota in %s to %d", maxkeysPath, minKeys)
-			err = ioutil.WriteFile(maxkeysPath, []byte(fmt.Sprintf("%d", uint64(minKeys))), 0644)
+		nKey, _ := strconv.ParseUint(fields[0], 10, 64)
+		if nKey < minKeys {
+			glog.Infof("Setting keys quota in %s to %d", maxKeysPath, minKeys)
+			err = ioutil.WriteFile(maxKeysPath, []byte(fmt.Sprintf("%d", uint64(minKeys))), 0644)
 			if err != nil {
-				glog.Warningf("Failed to update %s: %v", maxkeysPath, err)
+				glog.Warningf("Failed to update %s: %v", maxKeysPath, err)
 			}
 		}
 	}
-	const maxbytesPath = "/proc/sys/kernel/keys/root_maxbytes"
+	const maxBytesPath = "/proc/sys/kernel/keys/root_maxbytes"
 	const minBytes uint64 = 25000000
-	bytes, err := ioutil.ReadFile(maxbytesPath)
+	bytes, err := ioutil.ReadFile(maxBytesPath)
 	if err != nil {
-		glog.Errorf("Cannot read keys bytes in %s", maxbytesPath)
+		glog.Errorf("Cannot read keys bytes in %s", maxBytesPath)
 	} else {
 		fields := strings.Fields(string(bytes))
-		nbyte, _ := strconv.ParseUint(fields[0], 10, 64)
-		if nbyte < minBytes {
-			glog.Infof("Setting keys bytes in %s to %d", maxbytesPath, minBytes)
-			err = ioutil.WriteFile(maxbytesPath, []byte(fmt.Sprintf("%d", uint64(minBytes))), 0644)
+		nByte, _ := strconv.ParseUint(fields[0], 10, 64)
+		if nByte < minBytes {
+			glog.Infof("Setting keys bytes in %s to %d", maxBytesPath, minBytes)
+			err = ioutil.WriteFile(maxBytesPath, []byte(fmt.Sprintf("%d", uint64(minBytes))), 0644)
 			if err != nil {
-				glog.Warningf("Failed to update %s: %v", maxbytesPath, err)
+				glog.Warningf("Failed to update %s: %v", maxBytesPath, err)
 			}
 		}
 	}

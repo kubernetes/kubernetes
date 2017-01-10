@@ -78,7 +78,7 @@ func TestVersionedPrinter(t *testing.T) {
 }
 
 func TestPrintDefault(t *testing.T) {
-	printer, found, err := GetPrinter("", "", false)
+	printer, found, err := GetPrinter("", "", false, false)
 	if err != nil {
 		t.Fatalf("unexpected error: %#v", err)
 	}
@@ -133,7 +133,7 @@ func TestPrinter(t *testing.T) {
 	}
 	for _, test := range printerTests {
 		buf := bytes.NewBuffer([]byte{})
-		printer, generic, err := GetPrinter(test.Format, test.FormatArgument, false)
+		printer, generic, err := GetPrinter(test.Format, test.FormatArgument, false, true)
 		if err != nil {
 			t.Errorf("in %s, unexpected error: %#v", test.Name, err)
 		}
@@ -163,7 +163,7 @@ func TestBadPrinter(t *testing.T) {
 		{"bad jsonpath", "jsonpath", "{.Name", fmt.Errorf("error parsing jsonpath {.Name, unclosed action\n")},
 	}
 	for _, test := range badPrinterTests {
-		_, _, err := GetPrinter(test.Format, test.FormatArgument, false)
+		_, _, err := GetPrinter(test.Format, test.FormatArgument, false, false)
 		if err == nil || err.Error() != test.Error.Error() {
 			t.Errorf("in %s, expect %s, got %s", test.Name, test.Error, err)
 		}
@@ -256,7 +256,7 @@ func ErrorPrintHandler(obj *TestPrintType, w io.Writer, options PrintOptions) er
 func TestCustomTypePrinting(t *testing.T) {
 	columns := []string{"Data"}
 	printer := NewHumanReadablePrinter(PrintOptions{})
-	printer.Handler(columns, PrintCustomType)
+	printer.Handler(columns, nil, PrintCustomType)
 
 	obj := TestPrintType{"test object"}
 	buffer := &bytes.Buffer{}
@@ -273,7 +273,7 @@ func TestCustomTypePrinting(t *testing.T) {
 func TestCustomTypePrintingWithKind(t *testing.T) {
 	columns := []string{"Data"}
 	printer := NewHumanReadablePrinter(PrintOptions{})
-	printer.Handler(columns, PrintCustomType)
+	printer.Handler(columns, nil, PrintCustomType)
 	printer.EnsurePrintWithKind("test")
 
 	obj := TestPrintType{"test object"}
@@ -291,7 +291,7 @@ func TestCustomTypePrintingWithKind(t *testing.T) {
 func TestPrintHandlerError(t *testing.T) {
 	columns := []string{"Data"}
 	printer := NewHumanReadablePrinter(PrintOptions{})
-	printer.Handler(columns, ErrorPrintHandler)
+	printer.Handler(columns, nil, ErrorPrintHandler)
 	obj := TestPrintType{"test object"}
 	buffer := &bytes.Buffer{}
 	err := printer.PrintObj(&obj, buffer)
@@ -356,7 +356,7 @@ func TestNamePrinter(t *testing.T) {
 			},
 			"pod/foo\npod/bar\n"},
 	}
-	printer, _, _ := GetPrinter("name", "", false)
+	printer, _, _ := GetPrinter("name", "", false, false)
 	for name, item := range tests {
 		buff := &bytes.Buffer{}
 		err := printer.PrintObj(item.obj, buff)
@@ -723,6 +723,94 @@ func TestPrintNodeStatus(t *testing.T) {
 		}
 		if !contains(strings.Fields(buffer.String()), test.status) {
 			t.Fatalf("Expect printing node %s with status %#v, got: %#v", test.node.Name, test.status, buffer.String())
+		}
+	}
+}
+
+func TestPrintNodeOSImage(t *testing.T) {
+	printer := NewHumanReadablePrinter(PrintOptions{
+		ColumnLabels: []string{},
+		Wide:         true,
+	})
+
+	table := []struct {
+		node    api.Node
+		osImage string
+	}{
+		{
+			node: api.Node{
+				ObjectMeta: api.ObjectMeta{Name: "foo1"},
+				Status: api.NodeStatus{
+					NodeInfo:  api.NodeSystemInfo{OSImage: "fake-os-image"},
+					Addresses: []api.NodeAddress{{Type: api.NodeExternalIP, Address: "1.1.1.1"}},
+				},
+			},
+			osImage: "fake-os-image",
+		},
+		{
+			node: api.Node{
+				ObjectMeta: api.ObjectMeta{Name: "foo2"},
+				Status: api.NodeStatus{
+					NodeInfo:  api.NodeSystemInfo{KernelVersion: "fake-kernel-version"},
+					Addresses: []api.NodeAddress{{Type: api.NodeExternalIP, Address: "1.1.1.1"}},
+				},
+			},
+			osImage: "<unknown>",
+		},
+	}
+
+	for _, test := range table {
+		buffer := &bytes.Buffer{}
+		err := printer.PrintObj(&test.node, buffer)
+		if err != nil {
+			t.Fatalf("An error occurred printing Node: %#v", err)
+		}
+		if !contains(strings.Fields(buffer.String()), test.osImage) {
+			t.Fatalf("Expect printing node %s with os image %#v, got: %#v", test.node.Name, test.osImage, buffer.String())
+		}
+	}
+}
+
+func TestPrintNodeKernelVersion(t *testing.T) {
+	printer := NewHumanReadablePrinter(PrintOptions{
+		ColumnLabels: []string{},
+		Wide:         true,
+	})
+
+	table := []struct {
+		node          api.Node
+		kernelVersion string
+	}{
+		{
+			node: api.Node{
+				ObjectMeta: api.ObjectMeta{Name: "foo1"},
+				Status: api.NodeStatus{
+					NodeInfo:  api.NodeSystemInfo{KernelVersion: "fake-kernel-version"},
+					Addresses: []api.NodeAddress{{Type: api.NodeExternalIP, Address: "1.1.1.1"}},
+				},
+			},
+			kernelVersion: "fake-kernel-version",
+		},
+		{
+			node: api.Node{
+				ObjectMeta: api.ObjectMeta{Name: "foo2"},
+				Status: api.NodeStatus{
+					NodeInfo:  api.NodeSystemInfo{OSImage: "fake-os-image"},
+					Addresses: []api.NodeAddress{{Type: api.NodeExternalIP, Address: "1.1.1.1"}},
+				},
+			},
+			kernelVersion: "<unknown>",
+		},
+	}
+
+	for _, test := range table {
+		buffer := &bytes.Buffer{}
+		err := printer.PrintObj(&test.node, buffer)
+		if err != nil {
+			t.Fatalf("An error occurred printing Node: %#v", err)
+		}
+		if !contains(strings.Fields(buffer.String()), test.kernelVersion) {
+			t.Fatalf("Expect printing node %s with kernel version %#v, got: %#v", test.node.Name, test.kernelVersion, buffer.String())
 		}
 	}
 }
@@ -1704,5 +1792,45 @@ func TestPrintPodDisruptionBudget(t *testing.T) {
 			t.Fatalf("Expected: %s, got: %s", test.expect, buf.String())
 		}
 		buf.Reset()
+	}
+}
+
+func TestAllowMissingKeys(t *testing.T) {
+	tests := []struct {
+		Name                     string
+		AllowMissingTemplateKeys bool
+		Format                   string
+		Template                 string
+		Input                    runtime.Object
+		Expect                   string
+		Error                    string
+	}{
+		{"test template, allow missing keys", true, "template", "{{.blarg}}", &api.Pod{}, "<no value>", ""},
+		{"test template, strict", false, "template", "{{.blarg}}", &api.Pod{}, "", `error executing template "{{.blarg}}": template: output:1:2: executing "output" at <.blarg>: map has no entry for key "blarg"`},
+		{"test jsonpath, allow missing keys", true, "jsonpath", "{.blarg}", &api.Pod{}, "", ""},
+		{"test jsonpath, strict", false, "jsonpath", "{.blarg}", &api.Pod{}, "", "error executing jsonpath \"{.blarg}\": blarg is not found\n"},
+	}
+	for _, test := range tests {
+		buf := bytes.NewBuffer([]byte{})
+		printer, _, err := GetPrinter(test.Format, test.Template, false, test.AllowMissingTemplateKeys)
+		if err != nil {
+			t.Errorf("in %s, unexpected error: %#v", test.Name, err)
+		}
+		err = printer.PrintObj(test.Input, buf)
+		if len(test.Error) == 0 && err != nil {
+			t.Errorf("in %s, unexpected error: %v", test.Name, err)
+			continue
+		}
+		if len(test.Error) > 0 {
+			if err == nil {
+				t.Errorf("in %s, expected to get error: %v", test.Name, test.Error)
+			} else if e, a := test.Error, err.Error(); e != a {
+				t.Errorf("in %s, expected error %q, got %q", test.Name, e, a)
+			}
+			continue
+		}
+		if buf.String() != test.Expect {
+			t.Errorf("in %s, expect %q, got %q", test.Name, test.Expect, buf.String())
+		}
 	}
 }

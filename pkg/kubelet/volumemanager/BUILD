@@ -59,3 +59,21 @@ go_test(
         "//pkg/volume/util/volumehelper:go_default_library",
     ],
 )
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [
+        ":package-srcs",
+        "//pkg/kubelet/volumemanager/cache:all-srcs",
+        "//pkg/kubelet/volumemanager/populator:all-srcs",
+        "//pkg/kubelet/volumemanager/reconciler:all-srcs",
+    ],
+    tags = ["automanaged"],
+)

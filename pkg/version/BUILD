@@ -16,3 +16,20 @@ go_library(
     ],
     tags = ["automanaged"],
 )
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [
+        ":package-srcs",
+        "//pkg/version/prometheus:all-srcs",
+        "//pkg/version/verflag:all-srcs",
+    ],
+    tags = ["automanaged"],
+)

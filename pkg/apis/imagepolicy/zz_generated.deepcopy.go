@@ -46,14 +46,13 @@ func DeepCopy_imagepolicy_ImageReview(in interface{}, out interface{}, c *conver
 	{
 		in := in.(*ImageReview)
 		out := out.(*ImageReview)
-		out.TypeMeta = in.TypeMeta
+		*out = *in
 		if err := api.DeepCopy_api_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, c); err != nil {
 			return err
 		}
 		if err := DeepCopy_imagepolicy_ImageReviewSpec(&in.Spec, &out.Spec, c); err != nil {
 			return err
 		}
-		out.Status = in.Status
 		return nil
 	}
 }
@@ -62,7 +61,7 @@ func DeepCopy_imagepolicy_ImageReviewContainerSpec(in interface{}, out interface
 	{
 		in := in.(*ImageReviewContainerSpec)
 		out := out.(*ImageReviewContainerSpec)
-		out.Image = in.Image
+		*out = *in
 		return nil
 	}
 }
@@ -71,14 +70,13 @@ func DeepCopy_imagepolicy_ImageReviewSpec(in interface{}, out interface{}, c *co
 	{
 		in := in.(*ImageReviewSpec)
 		out := out.(*ImageReviewSpec)
+		*out = *in
 		if in.Containers != nil {
 			in, out := &in.Containers, &out.Containers
 			*out = make([]ImageReviewContainerSpec, len(*in))
 			for i := range *in {
 				(*out)[i] = (*in)[i]
 			}
-		} else {
-			out.Containers = nil
 		}
 		if in.Annotations != nil {
 			in, out := &in.Annotations, &out.Annotations
@@ -86,10 +84,7 @@ func DeepCopy_imagepolicy_ImageReviewSpec(in interface{}, out interface{}, c *co
 			for key, val := range *in {
 				(*out)[key] = val
 			}
-		} else {
-			out.Annotations = nil
 		}
-		out.Namespace = in.Namespace
 		return nil
 	}
 }
@@ -98,8 +93,7 @@ func DeepCopy_imagepolicy_ImageReviewStatus(in interface{}, out interface{}, c *
 	{
 		in := in.(*ImageReviewStatus)
 		out := out.(*ImageReviewStatus)
-		out.Allowed = in.Allowed
-		out.Reason = in.Reason
+		*out = *in
 		return nil
 	}
 }

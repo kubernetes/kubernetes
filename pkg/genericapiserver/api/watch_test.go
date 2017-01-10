@@ -43,7 +43,6 @@ import (
 	"k8s.io/kubernetes/pkg/util/diff"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/watch"
-	"k8s.io/kubernetes/pkg/watch/versioned"
 )
 
 // watchJSON defines the expected JSON wire equivalent of watch.Event
@@ -334,7 +333,7 @@ func TestWatchRead(t *testing.T) {
 				// Send
 				w.Action(action, object)
 				// Test receive
-				var got versioned.Event
+				var got metav1.WatchEvent
 				_, _, err := d.Decode(nil, &got)
 				if err != nil {
 					t.Fatalf("%s: Unexpected error: %v", name, err)
@@ -356,7 +355,7 @@ func TestWatchRead(t *testing.T) {
 			}
 			w.Stop()
 
-			var got versioned.Event
+			var got metav1.WatchEvent
 			_, _, err := d.Decode(nil, &got)
 			if err == nil {
 				t.Errorf("Unexpected non-error")

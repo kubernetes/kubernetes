@@ -10,6 +10,19 @@ load(
     "go_test",
 )
 
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [":package-srcs"],
+    tags = ["automanaged"],
+)
+
 go_library(
     name = "bitbucket.org/bertimus9/systemstat",
     srcs = [
@@ -1929,16 +1942,6 @@ go_library(
     srcs = [
         "github.com/coreos/go-semver/semver/semver.go",
         "github.com/coreos/go-semver/semver/sort.go",
-    ],
-    tags = ["automanaged"],
-)
-
-go_library(
-    name = "github.com/coreos/go-systemd/activation",
-    srcs = [
-        "github.com/coreos/go-systemd/activation/files.go",
-        "github.com/coreos/go-systemd/activation/listeners.go",
-        "github.com/coreos/go-systemd/activation/packetconns.go",
     ],
     tags = ["automanaged"],
 )
@@ -6020,66 +6023,6 @@ go_library(
 go_library(
     name = "github.com/shurcooL/sanitized_anchor_name",
     srcs = ["github.com/shurcooL/sanitized_anchor_name/main.go"],
-    tags = ["automanaged"],
-)
-
-go_library(
-    name = "github.com/skynetservices/skydns/cache",
-    srcs = [
-        "github.com/skynetservices/skydns/cache/cache.go",
-        "github.com/skynetservices/skydns/cache/hit.go",
-    ],
-    tags = ["automanaged"],
-    deps = ["//vendor:github.com/miekg/dns"],
-)
-
-go_library(
-    name = "github.com/skynetservices/skydns/metrics",
-    srcs = ["github.com/skynetservices/skydns/metrics/metrics.go"],
-    tags = ["automanaged"],
-    deps = [
-        "//vendor:github.com/miekg/dns",
-        "//vendor:github.com/prometheus/client_golang/prometheus",
-    ],
-)
-
-go_library(
-    name = "github.com/skynetservices/skydns/msg",
-    srcs = ["github.com/skynetservices/skydns/msg/service.go"],
-    tags = ["automanaged"],
-    deps = ["//vendor:github.com/miekg/dns"],
-)
-
-go_library(
-    name = "github.com/skynetservices/skydns/server",
-    srcs = [
-        "github.com/skynetservices/skydns/server/backend.go",
-        "github.com/skynetservices/skydns/server/config.go",
-        "github.com/skynetservices/skydns/server/dnssec.go",
-        "github.com/skynetservices/skydns/server/doc.go",
-        "github.com/skynetservices/skydns/server/exchange.go",
-        "github.com/skynetservices/skydns/server/forwarding.go",
-        "github.com/skynetservices/skydns/server/log.go",
-        "github.com/skynetservices/skydns/server/msg.go",
-        "github.com/skynetservices/skydns/server/nsec3.go",
-        "github.com/skynetservices/skydns/server/server.go",
-        "github.com/skynetservices/skydns/server/stub.go",
-    ],
-    tags = ["automanaged"],
-    deps = [
-        "//vendor:github.com/coreos/etcd/client",
-        "//vendor:github.com/coreos/go-systemd/activation",
-        "//vendor:github.com/miekg/dns",
-        "//vendor:github.com/skynetservices/skydns/cache",
-        "//vendor:github.com/skynetservices/skydns/metrics",
-        "//vendor:github.com/skynetservices/skydns/msg",
-        "//vendor:github.com/skynetservices/skydns/singleflight",
-    ],
-)
-
-go_library(
-    name = "github.com/skynetservices/skydns/singleflight",
-    srcs = ["github.com/skynetservices/skydns/singleflight/singleflight.go"],
     tags = ["automanaged"],
 )
 

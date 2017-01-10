@@ -23,7 +23,6 @@ readonly KUBE_GOPATH="${KUBE_OUTPUT}/go"
 # kube::build::source_targets in build/common.sh as well.
 kube::golang::server_targets() {
   local targets=(
-    cmd/kube-dns
     cmd/kube-proxy
     cmd/kube-apiserver
     cmd/kube-controller-manager
@@ -189,7 +188,6 @@ readonly KUBE_ALL_BINARIES=("${KUBE_ALL_TARGETS[@]##*/}")
 readonly KUBE_STATIC_LIBRARIES=(
   kube-apiserver
   kube-controller-manager
-  kube-dns
   kube-scheduler
   kube-proxy
   kube-discovery
@@ -307,6 +305,12 @@ kube::golang::create_gopath_tree() {
   if [[ ! -e "${go_pkg_dir}" || "$(readlink ${go_pkg_dir})" != "${KUBE_ROOT}" ]]; then
     ln -snf "${KUBE_ROOT}" "${go_pkg_dir}"
   fi
+
+  cat >"${KUBE_GOPATH}/BUILD" <<EOF
+# This dummy BUILD file prevents Bazel from trying to descend through the
+# infinite loop created by the symlink at
+# ${go_pkg_dir}
+EOF
 }
 
 # Ensure the godep tool exists and is a viable version.

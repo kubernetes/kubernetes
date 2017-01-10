@@ -22,17 +22,21 @@ go_library(
         "time_proto.go",
         "types.go",
         "types_swagger_doc_generated.go",
+        "watch.go",
         "well_known_labels.go",
         "zz_generated.deepcopy.go",
+        "zz_generated.defaults.go",
     ],
     tags = ["automanaged"],
     deps = [
         "//pkg/conversion:go_default_library",
         "//pkg/genericapiserver/openapi/common:go_default_library",
         "//pkg/labels:go_default_library",
+        "//pkg/runtime:go_default_library",
         "//pkg/runtime/schema:go_default_library",
         "//pkg/selection:go_default_library",
         "//pkg/types:go_default_library",
+        "//pkg/watch:go_default_library",
         "//vendor:github.com/go-openapi/spec",
         "//vendor:github.com/gogo/protobuf/proto",
         "//vendor:github.com/gogo/protobuf/sortkeys",
@@ -57,4 +61,21 @@ go_test(
         "//vendor:github.com/ghodss/yaml",
         "//vendor:github.com/ugorji/go/codec",
     ],
+)
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [
+        ":package-srcs",
+        "//pkg/apis/meta/v1/unstructured:all-srcs",
+        "//pkg/apis/meta/v1/validation:all-srcs",
+    ],
+    tags = ["automanaged"],
 )

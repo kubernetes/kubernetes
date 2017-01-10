@@ -71,3 +71,22 @@ go_test(
         "//pkg/util/net:go_default_library",
     ],
 )
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [
+        ":package-srcs",
+        "//pkg/registry/core/service/allocator:all-srcs",
+        "//pkg/registry/core/service/etcd:all-srcs",
+        "//pkg/registry/core/service/ipallocator:all-srcs",
+        "//pkg/registry/core/service/portallocator:all-srcs",
+    ],
+    tags = ["automanaged"],
+)

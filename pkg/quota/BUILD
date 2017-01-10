@@ -36,3 +36,21 @@ go_test(
         "//pkg/api/resource:go_default_library",
     ],
 )
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [
+        ":package-srcs",
+        "//pkg/quota/evaluator/core:all-srcs",
+        "//pkg/quota/generic:all-srcs",
+        "//pkg/quota/install:all-srcs",
+    ],
+    tags = ["automanaged"],
+)

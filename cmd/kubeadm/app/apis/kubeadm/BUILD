@@ -23,3 +23,21 @@ go_library(
         "//pkg/runtime/schema:go_default_library",
     ],
 )
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [
+        ":package-srcs",
+        "//cmd/kubeadm/app/apis/kubeadm/install:all-srcs",
+        "//cmd/kubeadm/app/apis/kubeadm/v1alpha1:all-srcs",
+        "//cmd/kubeadm/app/apis/kubeadm/validation:all-srcs",
+    ],
+    tags = ["automanaged"],
+)

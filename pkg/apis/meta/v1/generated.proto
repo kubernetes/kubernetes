@@ -446,3 +446,17 @@ message Verbs {
   repeated string items = 1;
 }
 
+// Event represents a single event to a watched resource.
+// 
+// +protobuf=true
+message WatchEvent {
+  optional string type = 1;
+
+  // Object is:
+  //  * If Type is Added or Modified: the new state of the object.
+  //  * If Type is Deleted: the state of the object immediately before deletion.
+  //  * If Type is Error: *Status is recommended; other types may make sense
+  //    depending on context.
+  optional k8s.io.kubernetes.pkg.runtime.RawExtension object = 2;
+}
+

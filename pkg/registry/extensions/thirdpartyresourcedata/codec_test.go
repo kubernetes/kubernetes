@@ -31,7 +31,6 @@ import (
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/runtime/schema"
-	"k8s.io/kubernetes/pkg/watch/versioned"
 )
 
 type Foo struct {
@@ -239,10 +238,10 @@ func TestEncodeToStreamForInternalEvent(t *testing.T) {
 		Kind:    "Foo",
 	}, delegate: testapi.Extensions.Codec()}
 	buf := bytes.NewBuffer([]byte{})
-	expected := &versioned.Event{
+	expected := &metav1.WatchEvent{
 		Type: "Added",
 	}
-	err := e.Encode(&versioned.InternalEvent{
+	err := e.Encode(&metav1.InternalEvent{
 		Type: "Added",
 	}, buf)
 

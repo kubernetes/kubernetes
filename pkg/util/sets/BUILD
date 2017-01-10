@@ -47,3 +47,19 @@ $(location //cmd/libs/go2idl/set-gen) \
         "//cmd/libs/go2idl/set-gen",
     ],
 )
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [
+        ":package-srcs",
+        "//pkg/util/sets/types:all-srcs",
+    ],
+    tags = ["automanaged"],
+)

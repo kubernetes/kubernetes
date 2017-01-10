@@ -47,7 +47,6 @@ import (
 	"k8s.io/kubernetes/pkg/util/diff"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/watch"
-	"k8s.io/kubernetes/pkg/watch/versioned"
 )
 
 var fuzzIters = flag.Int("fuzz-iters", 20, "How many fuzzing iterations to do.")
@@ -445,7 +444,7 @@ func TestObjectWatchFraming(t *testing.T) {
 		if err := embedded.Encode(v1secret, obj); err != nil {
 			t.Fatal(err)
 		}
-		event := &versioned.Event{Type: string(watch.Added)}
+		event := &metav1.WatchEvent{Type: string(watch.Added)}
 		event.Object.Raw = obj.Bytes()
 		obj = &bytes.Buffer{}
 		if err := s.Encode(event, obj); err != nil {
@@ -457,7 +456,7 @@ func TestObjectWatchFraming(t *testing.T) {
 			t.Fatal(err)
 		}
 		sr = streaming.NewDecoder(framer.NewFrameReader(ioutil.NopCloser(out)), s)
-		outEvent := &versioned.Event{}
+		outEvent := &metav1.WatchEvent{}
 		res, _, err = sr.Decode(nil, outEvent)
 		if err != nil || outEvent.Type != string(watch.Added) {
 			t.Fatalf("%v: %#v", err, outEvent)

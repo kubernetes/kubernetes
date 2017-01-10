@@ -33,3 +33,16 @@ go_library(
     tags = ["automanaged"],
     deps = ["//vendor:github.com/coreos/pkg/capnslog"],
 )
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [":package-srcs"],
+    tags = ["automanaged"],
+)

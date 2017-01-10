@@ -29,3 +29,23 @@ go_test(
     tags = ["automanaged"],
     deps = ["//federation/pkg/dnsprovider/rrstype:go_default_library"],
 )
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [
+        ":package-srcs",
+        "//federation/pkg/dnsprovider/providers/aws/route53:all-srcs",
+        "//federation/pkg/dnsprovider/providers/coredns:all-srcs",
+        "//federation/pkg/dnsprovider/providers/google/clouddns:all-srcs",
+        "//federation/pkg/dnsprovider/rrstype:all-srcs",
+        "//federation/pkg/dnsprovider/tests:all-srcs",
+    ],
+    tags = ["automanaged"],
+)

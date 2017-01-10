@@ -48,7 +48,6 @@ go_library(
         "//pkg/util/rand:go_default_library",
         "//pkg/util/sets:go_default_library",
         "//pkg/util/validation/field:go_default_library",
-        "//pkg/watch/versioned:go_default_library",
         "//vendor:github.com/gogo/protobuf/proto",
         "//vendor:github.com/gogo/protobuf/sortkeys",
         "//vendor:github.com/ugorji/go/codec",
@@ -91,4 +90,23 @@ go_test(
         "//pkg/apis/meta/v1:go_default_library",
         "//pkg/labels:go_default_library",
     ],
+)
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [
+        ":package-srcs",
+        "//pkg/api/v1/endpoints:all-srcs",
+        "//pkg/api/v1/pod:all-srcs",
+        "//pkg/api/v1/service:all-srcs",
+        "//pkg/api/v1/validation:all-srcs",
+    ],
+    tags = ["automanaged"],
 )
