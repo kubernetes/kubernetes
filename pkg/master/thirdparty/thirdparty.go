@@ -207,6 +207,9 @@ func (m *ThirdPartyResourceServer) getExistingThirdPartyResources(path string) [
 				Name:       key,
 				Namespaced: true,
 				Kind:       obj.Kind(),
+				Verbs: metav1.Verbs([]string{
+					"delete", "deletecollection", "get", "list", "patch", "create", "update", "watch",
+				}),
 			})
 		}
 	}
