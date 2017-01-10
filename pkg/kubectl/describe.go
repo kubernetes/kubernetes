@@ -411,13 +411,13 @@ func (d *ResourceQuotaDescriber) Describe(namespace, name string, describerSetti
 func helpTextForResourceQuotaScope(scope api.ResourceQuotaScope) string {
 	switch scope {
 	case api.ResourceQuotaScopeTerminating:
-		return "Matches all pods that have an active deadline."
+		return "Matches all pods that have an active deadline. These pods have a limited lifespan on a node before being actively terminated by the system."
 	case api.ResourceQuotaScopeNotTerminating:
-		return "Matches all pods that do not have an active deadline."
+		return "Matches all pods that do not have an active deadline. These pods usually include long running pods whose container command is not expected to terminate."
 	case api.ResourceQuotaScopeBestEffort:
-		return "Matches all pods that have best effort quality of service."
+		return "Matches all pods that do not have resource requirements set. These pods have a best effort quality of service."
 	case api.ResourceQuotaScopeNotBestEffort:
-		return "Matches all pods that do not have best effort quality of service."
+		return "Matches all pods that have at least one resource requirement set. These pods have a burstable or guaranteed quality of service."
 	default:
 		return ""
 	}
