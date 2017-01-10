@@ -58,7 +58,7 @@ const (
 	// The minimum memory limit allocated to docker container: 150Mi
 	MinDockerMemoryLimit = 150 * 1024 * 1024
 
-	dockerProcessName     = "docker"
+	dockerProcessName     = "dockerd?"
 	dockerPidFile         = "/var/run/docker.pid"
 	containerdProcessName = "docker-containerd"
 	containerdPidFile     = "/run/docker/libcontainerd/docker-containerd.pid"
