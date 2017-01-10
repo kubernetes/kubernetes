@@ -421,6 +421,7 @@ func getRESTMappings(mapper meta.RESTMapper, pruneResources *[]pruneResource) (n
 			{"extensions", "v1beta1", "Ingress", true},
 			{"extensions", "v1beta1", "ReplicaSet", true},
 			{"apps", "v1beta1", "StatefulSet", true},
+			{"apps", "v1beta1", "Deployment", true},
 		}
 	}
 
