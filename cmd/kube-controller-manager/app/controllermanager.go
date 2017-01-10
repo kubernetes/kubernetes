@@ -517,7 +517,7 @@ func StartControllers(s *options.CMServer, kubeconfig *restclient.Config, rootCl
 	time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
 
 	if s.ReconcilerSyncLoopPeriod.Duration < time.Second {
-		return fmt.Errorf("Duration time must be greater than one second as set via command line option reconcile-sync-loop-period.  One minute is recommended.")
+		return fmt.Errorf("Duration time must be greater than one second as set via command line option reconcile-sync-loop-period.")
 	}
 
 	attachDetachController, attachDetachControllerErr :=

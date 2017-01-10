@@ -73,7 +73,7 @@ func NewAttachDetachController(
 	cloud cloudprovider.Interface,
 	plugins []volume.VolumePlugin,
 	recorder record.EventRecorder,
-	disableReconciliation bool,
+	disableReconciliationSync bool,
 	reconcilerSyncDuration time.Duration) (AttachDetachController, error) {
 	// TODO: The default resyncPeriod for shared informers is 12 hours, this is
 	// unacceptable for the attach/detach controller. For example, if a pod is
@@ -128,7 +128,7 @@ func NewAttachDetachController(
 		reconcilerLoopPeriod,
 		reconcilerMaxWaitForUnmountDuration,
 		reconcilerSyncDuration,
-		disableReconciliation,
+		disableReconciliationSync,
 		adc.desiredStateOfWorld,
 		adc.actualStateOfWorld,
 		adc.attacherDetacher,
