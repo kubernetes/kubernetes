@@ -377,12 +377,15 @@ func TestSelectorUpdate(t *testing.T) {
 			continue
 		}
 		d, ok := action.GetObject().(*extensions.Deployment)
-		if !ok || d.Name != "foo" {
+		if !ok {
 			continue
 		}
 
-		if len(d.Annotations[util.OverlapAnnotation]) > 0 {
+		if d.Name == "foo" && len(d.Annotations[util.OverlapAnnotation]) > 0 {
 			t.Errorf("deployment %q should not have the overlapping annotation", d.Name)
+		}
+		if d.Name == "bar" && len(d.Annotations[util.OverlapAnnotation]) == 0 {
+			t.Errorf("deployment %q should have the overlapping annotation", d.Name)
 		}
 	}
 }

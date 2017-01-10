@@ -1159,7 +1159,7 @@ func TestSelectorUpdatedBefore(t *testing.T) {
 			// the existence of the overlapping annotation in any of the two deployments
 			// prior to comparing their timestamps and as a matter of fact this is
 			// now handled in `(dc *DeploymentController) handleOverlap`.
-			name: "d1 created before d2 but updated its selector",
+			name: "d1 created before d2 but updated its selector afterwards",
 
 			d1:                 generateDeployment("foo"),
 			creationTimestamp1: &now,
