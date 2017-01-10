@@ -127,7 +127,10 @@ func DiscoveryPort(d *kubeadmapi.TokenDiscovery) int32 {
 // UpdateOrCreateToken attempts to update a token with the given ID, or create if it does
 // not already exist.
 func UpdateOrCreateToken(client *clientset.Clientset, d *kubeadmapi.TokenDiscovery, tokenDuration time.Duration) error {
-	secretName := fmt.Sprintf("%s%s", BootstrapTokenSecretPrefix, d.ID)
+	// Lower-case token ID because it will be used as part of a DNS label
+	// and in Kubernetes DNS labels must be lower-case.
+	// See /pkg/util/validation/validation.go.
+	secretName := strings.ToLower(fmt.Sprintf("%s%s", BootstrapTokenSecretPrefix, d.ID))
 
 	var lastErr error
 	for i := 0; i < tokenCreateRetries; i++ {
