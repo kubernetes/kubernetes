@@ -63,7 +63,7 @@ rm -f "${BINDATA_OUTPUT}.tmp"
 
 # These are files for runtime code
 BINDATA_OUTPUT="${KUBE_ROOT}/pkg/generated/bindata.go"
-go-bindata -nometadata -prefix "${KUBE_ROOT}" -o "${BINDATA_OUTPUT}.tmp" -pkg generated \
+go-bindata -nometadata -nocompress -prefix "${KUBE_ROOT}" -o "${BINDATA_OUTPUT}.tmp" -pkg generated \
 	-ignore .jpg -ignore .png -ignore .md \
 	"${KUBE_ROOT}/translations/..."
 
