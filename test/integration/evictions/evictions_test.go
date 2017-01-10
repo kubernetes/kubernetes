@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"net/http/httptest"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -172,13 +173,13 @@ func TestConcurrentEvictionRequests(t *testing.T) {
 
 	waitPDBStable(t, clientSet, numOfEvictions, ns.Name, pdb.Name)
 
-	doneCh := make(chan bool, numOfEvictions)
+	doneCount := int32(0)
 	errCh := make(chan error, 2*numOfEvictions)
 	var wg sync.WaitGroup
 	// spawn numOfEvictions goroutines to concurrently evict the pods
 	for i := 0; i < numOfEvictions; i++ {
 		wg.Add(1)
-		go func(id int, doneCh chan bool, errCh chan error) {
+		go func(id int, errCh chan error) {
 			defer wg.Done()
 			podName := fmt.Sprintf(podNameFormat, id)
 			eviction := newEviction(ns.Name, podName, deleteOption)
@@ -201,27 +202,23 @@ func TestConcurrentEvictionRequests(t *testing.T) {
 				_, err = clientSet.Core().Pods(ns.Name).Get(podName, metav1.GetOptions{})
 				switch {
 				case errors.IsNotFound(err):
-					doneCh <- true
+					atomic.AddInt32(&doneCount, 1)
+					return
 				case err == nil:
 					errCh <- fmt.Errorf("Pod %q is expected to be evicted", podName)
-					e = clientSet.Core().Pods(ns.Name).Delete(podName, deleteOption)
-					if e != nil {
-						errCh <- e
-					}
 				default:
 					errCh <- err
-					e = clientSet.Core().Pods(ns.Name).Delete(podName, deleteOption)
-					if e != nil {
-						errCh <- e
-					}
+				}
+				e = clientSet.Core().Pods(ns.Name).Delete(podName, deleteOption)
+				if e != nil {
+					errCh <- e
 				}
 			}
-		}(i, doneCh, errCh)
+		}(i, errCh)
 	}
 
 	wg.Wait()
 
-	close(doneCh)
 	close(errCh)
 	var errList []error
 	if err := clientSet.Policy().PodDisruptionBudgets(ns.Name).Delete(pdb.Name, deleteOption); err != nil {
@@ -234,12 +231,6 @@ func TestConcurrentEvictionRequests(t *testing.T) {
 		t.Fatal(utilerrors.NewAggregate(errList))
 	}
 
-	doneCount := 0
-	for done := range doneCh {
-		if done {
-			doneCount++
-		}
-	}
 	if doneCount != numOfEvictions {
 		t.Fatalf("fewer number of successful evictions than expected :", doneCount)
 	}
