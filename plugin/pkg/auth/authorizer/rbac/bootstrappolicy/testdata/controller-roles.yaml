@@ -655,6 +655,13 @@ items:
     resources:
     - events
     verbs:
+    - watch
+  - apiGroups:
+    - ""
+    attributeRestrictions: null
+    resources:
+    - events
+    verbs:
     - create
     - patch
     - update
