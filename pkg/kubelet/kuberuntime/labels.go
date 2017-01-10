@@ -28,22 +28,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 )
 
-const (
-	// TODO: move those label definitions to kubelet/types/labels.go
-	// TODO: change those label names to follow kubernetes's format
-	podDeletionGracePeriodLabel    = "io.kubernetes.pod.deletionGracePeriod"
-	podTerminationGracePeriodLabel = "io.kubernetes.pod.terminationGracePeriod"
-
-	containerHashLabel                   = "io.kubernetes.container.hash"
-	containerRestartCountLabel           = "io.kubernetes.container.restartCount"
-	containerTerminationMessagePathLabel = "io.kubernetes.container.terminationMessagePath"
-	containerPreStopHandlerLabel         = "io.kubernetes.container.preStopHandler"
-	containerPortsLabel                  = "io.kubernetes.container.ports"
-
-	// kubernetesManagedLabel is used to distinguish whether a container/sandbox is managed by kubelet or not
-	kubernetesManagedLabel = "io.kubernetes.managed"
-)
-
 type labeledPodSandboxInfo struct {
 	// Labels from v1.Pod
 	Labels       map[string]string
@@ -86,7 +70,7 @@ func newPodLabels(pod *v1.Pod) map[string]string {
 	labels[types.KubernetesPodNameLabel] = pod.Name
 	labels[types.KubernetesPodNamespaceLabel] = pod.Namespace
 	labels[types.KubernetesPodUIDLabel] = string(pod.UID)
-	labels[kubernetesManagedLabel] = "true"
+	labels[types.KubernetesManagedLabel] = "true"
 
 	return labels
 }
@@ -103,7 +87,7 @@ func newContainerLabels(container *v1.Container, pod *v1.Pod) map[string]string 
 	labels[types.KubernetesPodNamespaceLabel] = pod.Namespace
 	labels[types.KubernetesPodUIDLabel] = string(pod.UID)
 	labels[types.KubernetesContainerNameLabel] = container.Name
-	labels[kubernetesManagedLabel] = "true"
+	labels[types.KubernetesManagedLabel] = "true"
 
 	return labels
 }
@@ -111,15 +95,15 @@ func newContainerLabels(container *v1.Container, pod *v1.Pod) map[string]string 
 // newContainerAnnotations creates container annotations from v1.Container and v1.Pod.
 func newContainerAnnotations(container *v1.Container, pod *v1.Pod, restartCount int) map[string]string {
 	annotations := map[string]string{}
-	annotations[containerHashLabel] = strconv.FormatUint(kubecontainer.HashContainer(container), 16)
-	annotations[containerRestartCountLabel] = strconv.Itoa(restartCount)
-	annotations[containerTerminationMessagePathLabel] = container.TerminationMessagePath
+	annotations[types.ContainerHashLabel] = strconv.FormatUint(kubecontainer.HashContainer(container), 16)
+	annotations[types.ContainerRestartCountLabel] = strconv.Itoa(restartCount)
+	annotations[types.ContainerTerminationMessagePathLabel] = container.TerminationMessagePath
 
 	if pod.DeletionGracePeriodSeconds != nil {
-		annotations[podDeletionGracePeriodLabel] = strconv.FormatInt(*pod.DeletionGracePeriodSeconds, 10)
+		annotations[types.PodDeletionGracePeriodLabel] = strconv.FormatInt(*pod.DeletionGracePeriodSeconds, 10)
 	}
 	if pod.Spec.TerminationGracePeriodSeconds != nil {
-		annotations[podTerminationGracePeriodLabel] = strconv.FormatInt(*pod.Spec.TerminationGracePeriodSeconds, 10)
+		annotations[types.PodTerminationGracePeriodLabel] = strconv.FormatInt(*pod.Spec.TerminationGracePeriodSeconds, 10)
 	}
 
 	if container.Lifecycle != nil && container.Lifecycle.PreStop != nil {
@@ -128,7 +112,7 @@ func newContainerAnnotations(container *v1.Container, pod *v1.Pod, restartCount 
 		if err != nil {
 			glog.Errorf("Unable to marshal lifecycle PreStop handler for container %q of pod %q: %v", container.Name, format.Pod(pod), err)
 		} else {
-			annotations[containerPreStopHandlerLabel] = string(rawPreStop)
+			annotations[types.ContainerPreStopHandlerLabel] = string(rawPreStop)
 		}
 	}
 
@@ -137,7 +121,7 @@ func newContainerAnnotations(container *v1.Container, pod *v1.Pod, restartCount 
 		if err != nil {
 			glog.Errorf("Unable to marshal container ports for container %q for pod %q: %v", container.Name, format.Pod(pod), err)
 		} else {
-			annotations[containerPortsLabel] = string(rawContainerPorts)
+			annotations[types.ContainerPortsLabel] = string(rawContainerPorts)
 		}
 	}
 
@@ -155,7 +139,7 @@ func getPodSandboxInfoFromLabels(labels map[string]string) *labeledPodSandboxInf
 
 	// Remain only labels from v1.Pod
 	for k, v := range labels {
-		if k != types.KubernetesPodNameLabel && k != types.KubernetesPodNamespaceLabel && k != types.KubernetesPodUIDLabel && k != kubernetesManagedLabel {
+		if k != types.KubernetesPodNameLabel && k != types.KubernetesPodNamespaceLabel && k != types.KubernetesPodUIDLabel && k != types.KubernetesManagedLabel {
 			podSandboxInfo.Labels[k] = v
 		}
 	}
@@ -182,7 +166,7 @@ func getContainerInfoFromLabels(labels map[string]string) *labeledContainerInfo 
 
 // isManagedByKubelet returns true is the sandbox/container is managed by kubelet.
 func isManagedByKubelet(labels map[string]string) bool {
-	if _, ok := labels[kubernetesManagedLabel]; ok {
+	if _, ok := labels[types.KubernetesManagedLabel]; ok {
 		return true
 	}
 
@@ -193,32 +177,32 @@ func isManagedByKubelet(labels map[string]string) bool {
 func getContainerInfoFromAnnotations(annotations map[string]string) *annotatedContainerInfo {
 	var err error
 	containerInfo := &annotatedContainerInfo{
-		TerminationMessagePath: getStringValueFromLabel(annotations, containerTerminationMessagePathLabel),
+		TerminationMessagePath: getStringValueFromLabel(annotations, types.ContainerTerminationMessagePathLabel),
 	}
 
-	if containerInfo.Hash, err = getUint64ValueFromLabel(annotations, containerHashLabel); err != nil {
-		glog.Errorf("Unable to get %q from annotations %q: %v", containerHashLabel, annotations, err)
+	if containerInfo.Hash, err = getUint64ValueFromLabel(annotations, types.ContainerHashLabel); err != nil {
+		glog.Errorf("Unable to get %q from annotations %q: %v", types.ContainerHashLabel, annotations, err)
 	}
-	if containerInfo.RestartCount, err = getIntValueFromLabel(annotations, containerRestartCountLabel); err != nil {
-		glog.Errorf("Unable to get %q from annotations %q: %v", containerRestartCountLabel, annotations, err)
+	if containerInfo.RestartCount, err = getIntValueFromLabel(annotations, types.ContainerRestartCountLabel); err != nil {
+		glog.Errorf("Unable to get %q from annotations %q: %v", types.ContainerRestartCountLabel, annotations, err)
 	}
-	if containerInfo.PodDeletionGracePeriod, err = getInt64PointerFromLabel(annotations, podDeletionGracePeriodLabel); err != nil {
-		glog.Errorf("Unable to get %q from annotations %q: %v", podDeletionGracePeriodLabel, annotations, err)
+	if containerInfo.PodDeletionGracePeriod, err = getInt64PointerFromLabel(annotations, types.PodDeletionGracePeriodLabel); err != nil {
+		glog.Errorf("Unable to get %q from annotations %q: %v", types.PodDeletionGracePeriodLabel, annotations, err)
 	}
-	if containerInfo.PodTerminationGracePeriod, err = getInt64PointerFromLabel(annotations, podTerminationGracePeriodLabel); err != nil {
-		glog.Errorf("Unable to get %q from annotations %q: %v", podTerminationGracePeriodLabel, annotations, err)
+	if containerInfo.PodTerminationGracePeriod, err = getInt64PointerFromLabel(annotations, types.PodTerminationGracePeriodLabel); err != nil {
+		glog.Errorf("Unable to get %q from annotations %q: %v", types.PodTerminationGracePeriodLabel, annotations, err)
 	}
 
 	preStopHandler := &v1.Handler{}
-	if found, err := getJSONObjectFromLabel(annotations, containerPreStopHandlerLabel, preStopHandler); err != nil {
-		glog.Errorf("Unable to get %q from annotations %q: %v", containerPreStopHandlerLabel, annotations, err)
+	if found, err := getJSONObjectFromLabel(annotations, types.ContainerPreStopHandlerLabel, preStopHandler); err != nil {
+		glog.Errorf("Unable to get %q from annotations %q: %v", types.ContainerPreStopHandlerLabel, annotations, err)
 	} else if found {
 		containerInfo.PreStopHandler = preStopHandler
 	}
 
 	containerPorts := []v1.ContainerPort{}
-	if found, err := getJSONObjectFromLabel(annotations, containerPortsLabel, &containerPorts); err != nil {
-		glog.Errorf("Unable to get %q from annotations %q: %v", containerPortsLabel, annotations, err)
+	if found, err := getJSONObjectFromLabel(annotations, types.ContainerPortsLabel, &containerPorts); err != nil {
+		glog.Errorf("Unable to get %q from annotations %q: %v", types.ContainerPortsLabel, annotations, err)
 	} else if found {
 		containerInfo.ContainerPorts = containerPorts
 	}
