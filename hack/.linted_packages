@@ -68,7 +68,6 @@ pkg/api/annotations
 pkg/api/errors
 pkg/api/events
 pkg/api/install
-pkg/api/meta
 pkg/api/resource
 pkg/api/service
 pkg/api/v1
@@ -90,7 +89,6 @@ pkg/apis/componentconfig/install
 pkg/apis/extensions/install
 pkg/apis/extensions/v1beta1
 pkg/apis/imagepolicy/install
-pkg/apis/meta/v1/unstructured
 pkg/apis/policy/install
 pkg/apis/rbac/install
 pkg/apis/rbac/v1alpha1
@@ -239,7 +237,6 @@ pkg/registry/thirdpartyresource
 pkg/registry/thirdpartyresource/etcd
 pkg/runtime
 pkg/runtime/serializer/json
-pkg/runtime/serializer/protobuf
 pkg/runtime/serializer/recognizer/testing
 pkg/runtime/serializer/versioning
 pkg/runtime/serializer/yaml

@@ -43,6 +43,7 @@ filegroup(
         ":package-srcs",
         "//pkg/apimachinery/announced:all-srcs",
         "//pkg/apimachinery/registered:all-srcs",
+        "//pkg/apimachinery/tests:all-srcs",
     ],
     tags = ["automanaged"],
 )

@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package protobuf_test
+package tests
 
 import (
 	"bytes"
@@ -190,7 +190,7 @@ func TestEncode(t *testing.T) {
 	}
 }
 
-func TestDecode(t *testing.T) {
+func TestProtobufDecode(t *testing.T) {
 	wire1 := []byte{
 		0x6b, 0x38, 0x73, 0x00, // prefix
 		0x0a, 0x04,
