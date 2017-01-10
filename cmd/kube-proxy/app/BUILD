@@ -13,6 +13,7 @@ go_library(
     srcs = [
         "conntrack.go",
         "server.go",
+        "server_linux.go",
     ],
     tags = ["automanaged"],
     deps = [
@@ -26,13 +27,11 @@ go_library(
         "//pkg/proxy/config:go_default_library",
         "//pkg/proxy/iptables:go_default_library",
         "//pkg/proxy/userspace:go_default_library",
-        "//pkg/proxy/winuserspace:go_default_library",
         "//pkg/util/configz:go_default_library",
         "//pkg/util/dbus:go_default_library",
         "//pkg/util/exec:go_default_library",
         "//pkg/util/iptables:go_default_library",
         "//pkg/util/mount:go_default_library",
-        "//pkg/util/netsh:go_default_library",
         "//pkg/util/node:go_default_library",
         "//pkg/util/oom:go_default_library",
         "//pkg/util/resourcecontainer:go_default_library",
