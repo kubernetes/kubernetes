@@ -57,7 +57,7 @@ else
 	curl -sSL https://raw.githubusercontent.com/coreos/flannel/v$(TAG)/dist/mk-docker-opts.sh > $(TEMP_DIR)/mk-docker-opts.sh
 
 	# And build the image
-	docker build -t $(REGISTRY)/flannel-$(ARCH):$(TAG) $(TEMP_DIR)
+	docker build --pull -t $(REGISTRY)/flannel-$(ARCH):$(TAG) $(TEMP_DIR)
 endif
 
 push: build

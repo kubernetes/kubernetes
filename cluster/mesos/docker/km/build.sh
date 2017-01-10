@@ -99,6 +99,6 @@ cd "${workspace}"
 # build docker image
 echo "Building docker image ${IMAGE_REPO}:${IMAGE_TAG}"
 set -o xtrace
-docker build -t ${IMAGE_REPO}:${IMAGE_TAG} "$@" .
+docker build --pull -t ${IMAGE_REPO}:${IMAGE_TAG} "$@" .
 set +o xtrace
 echo "Built docker image ${IMAGE_REPO}:${IMAGE_TAG}"

@@ -54,7 +54,7 @@ container:
 	cd $(TEMP_DIR) && sed -i "s|BASEIMAGE|$(BASEIMAGE)|g" Dockerfile
 
 	# And build the image
-	docker build -t $(REGISTRY)/kubedns-$(ARCH):$(TAG) $(TEMP_DIR)
+	docker build --pull -t $(REGISTRY)/kubedns-$(ARCH):$(TAG) $(TEMP_DIR)
 
 	# delete temp dir
 	rm -rf $(TEMP_DIR)
