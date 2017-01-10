@@ -1045,6 +1045,33 @@ run_kubectl_get_tests() {
   kube::test::if_has_string "${output_message}" "/apis/batch/v1/namespaces/default/jobs 200 OK"
   kube::test::if_has_string "${output_message}" "/apis/extensions/v1beta1/namespaces/default/deployments 200 OK"
   kube::test::if_has_string "${output_message}" "/apis/extensions/v1beta1/namespaces/default/replicasets 200 OK"
+
+  ### Test --allow-missing-template-keys
+  # Pre-condition: no POD exists
+  create_and_use_new_namespace
+  kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
+  # Command
+  kubectl create -f test/fixtures/doc-yaml/admin/limitrange/valid-pod.yaml "${kube_flags[@]}"
+  # Post-condition: valid-pod POD is created
+  kubectl get "${kube_flags[@]}" pods -o json
+  kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" 'valid-pod:'
+
+  ## check --allow-missing-template-keys defaults to true for jsonpath templates
+  kubectl get "${kube_flags[@]}" pod valid-pod -o jsonpath='{.missing}'
+
+  ## check --allow-missing-template-keys defaults to true for go templates
+  kubectl get "${kube_flags[@]}" pod valid-pod -o go-template='{{.missing}}'
+
+  ## check --allow-missing-template-keys=false results in an error for a missing key with jsonpath
+  output_message=$(! kubectl get pod valid-pod --allow-missing-template-keys=false -o jsonpath='{.missing}' "${kube_flags[@]}")
+  kube::test::if_has_string "${output_message}" 'error executing jsonpath "{.missing}": missing is not found'
+
+  ## check --allow-missing-template-keys=false results in an error for a missing key with go
+  output_message=$(! kubectl get pod valid-pod --allow-missing-template-keys=false -o go-template='{{.missing}}' "${kube_flags[@]}")
+  kube::test::if_has_string "${output_message}" 'error executing template "{{.missing}}": template: output:1:2: executing "output" at <.missing>: map has no entry for key "missing"'
+
+  # cleanup
+  kubectl delete pods valid-pod "${kube_flags[@]}"
 }
 
 run_kubectl_request_timeout_tests() {
