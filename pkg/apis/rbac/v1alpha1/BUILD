@@ -35,7 +35,6 @@ go_library(
         "//pkg/types:go_default_library",
         "//vendor:github.com/gogo/protobuf/proto",
         "//vendor:github.com/ugorji/go/codec",
-        "//vendor:k8s.io/apiserver/pkg/authentication/user",
     ],
 )
 
