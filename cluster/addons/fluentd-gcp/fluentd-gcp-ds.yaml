@@ -2,23 +2,23 @@
 apiVersion: extensions/v1beta1
 kind: DaemonSet
 metadata:
-  name: fluentd-gcp-v1.33
+  name: fluentd-gcp-v1.34
   namespace: kube-system
   labels:
     k8s-app: fluentd-gcp
     kubernetes.io/cluster-service: "true"
-    version: v1.33
+    version: v1.34
 spec:
   template:
     metadata:
       labels:
         k8s-app: fluentd-gcp
         kubernetes.io/cluster-service: "true"
-        version: v1.33
+        version: v1.34
     spec:
       containers:
       - name: fluentd-gcp
-        image: gcr.io/google_containers/fluentd-gcp:1.33
+        image: gcr.io/google_containers/fluentd-gcp:1.34
         # If fluentd consumes its own logs, the following situation may happen:
         # fluentd fails to send a chunk to the server => writes it to the log =>
         # tries to send this message to the server => fails to send a chunk and so on.
