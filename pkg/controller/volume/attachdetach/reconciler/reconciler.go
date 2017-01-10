@@ -57,7 +57,7 @@ func NewReconciler(
 	loopPeriod time.Duration,
 	maxWaitForUnmountDuration time.Duration,
 	syncDuration time.Duration,
-	disableReconciliation bool,
+	disableReconciliationSync bool,
 	desiredStateOfWorld cache.DesiredStateOfWorld,
 	actualStateOfWorld cache.ActualStateOfWorld,
 	attacherDetacher operationexecutor.OperationExecutor,
@@ -66,7 +66,7 @@ func NewReconciler(
 		loopPeriod:                loopPeriod,
 		maxWaitForUnmountDuration: maxWaitForUnmountDuration,
 		syncDuration:              syncDuration,
-		disableReconciliation:     disableReconciliation,
+		disableReconciliationSync: disableReconciliationSync,
 		desiredStateOfWorld:       desiredStateOfWorld,
 		actualStateOfWorld:        actualStateOfWorld,
 		attacherDetacher:          attacherDetacher,
@@ -84,7 +84,7 @@ type reconciler struct {
 	attacherDetacher          operationexecutor.OperationExecutor
 	nodeStatusUpdater         statusupdater.NodeStatusUpdater
 	timeOfLastSync            time.Time
-	disableReconciliation     bool
+	disableReconciliationSync bool
 }
 
 func (rc *reconciler) Run(stopCh <-chan struct{}) {
@@ -99,7 +99,7 @@ func (rc *reconciler) reconciliationLoopFunc() func() {
 
 		rc.reconcile()
 
-		if rc.disableReconciliation {
+		if rc.disableReconciliationSync {
 			glog.V(5).Info("Skipping reconciling attached volumes still attached since it is disabled via the command line.")
 		} else if rc.syncDuration < time.Second {
 			glog.V(5).Info("Skipping reconciling attached volumes still attached since it is set to less than one second via the command line.")
