@@ -107,6 +107,9 @@ type Config struct {
 
 	// Use instance metadata service where possible
 	UseInstanceMetadata bool `json:"useInstanceMetadata" yaml:"useInstanceMetadata"`
+
+	// Use managed service identity for the virtual machine to access Azure ARM APIs
+	UseManagedIdentityExtension bool `json:"useManagedIdentityExtension"`
 }
 
 // Cloud holds the config and clients
@@ -152,13 +155,20 @@ func newServicePrincipalToken(az *Cloud) (*adal.ServicePrincipalToken, error) {
 		return nil, fmt.Errorf("creating the OAuth config: %v", err)
 	}
 
-	if len(az.AADClientSecret) > 0 {
+	if az.UseManagedIdentityExtension {
+		glog.V(2).Infoln("azure: using managed identity extension to retrieve access token")
+		return adal.NewServicePrincipalTokenFromMSI(
+			*oauthConfig,
+			az.Environment.ServiceManagementEndpoint)
+	} else if len(az.AADClientSecret) > 0 {
+		glog.V(2).Infoln("azure: using client_id+client_secret to retrieve access token")
 		return adal.NewServicePrincipalToken(
 			*oauthConfig,
 			az.AADClientID,
 			az.AADClientSecret,
 			az.Environment.ServiceManagementEndpoint)
 	} else if len(az.AADClientCertPath) > 0 && len(az.AADClientCertPassword) > 0 {
+		glog.V(2).Infoln("azure: using jwt client_assertion (client_cert+client_private_key) to retrieve access token")
 		certData, err := ioutil.ReadFile(az.AADClientCertPath)
 		if err != nil {
 			return nil, fmt.Errorf("reading the client certificate from file %s: %v", az.AADClientCertPath, err)
@@ -173,9 +183,9 @@ func newServicePrincipalToken(az *Cloud) (*adal.ServicePrincipalToken, error) {
 			certificate,
 			privateKey,
 			az.Environment.ServiceManagementEndpoint)
-	} else {
-		return nil, fmt.Errorf("No credentials provided for AAD application %s", az.AADClientID)
 	}
+
+	return nil, fmt.Errorf("No credentials provided for AAD application %s", az.AADClientID)
 }
 
 // NewCloud returns a Cloud with initialized clients
