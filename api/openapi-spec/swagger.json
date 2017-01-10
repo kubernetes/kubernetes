@@ -35833,6 +35833,13 @@
      "uid": {
       "type": "string"
      },
+     "usages": {
+      "description": "allowedUsages specifies a set of usage contexts the key will be valid for. See: https://tools.ietf.org/html/rfc5280#section-4.2.1.3\n     https://tools.ietf.org/html/rfc5280#section-4.2.1.12",
+      "type": "array",
+      "items": {
+       "type": "string"
+      }
+     },
      "username": {
       "description": "Information about the requesting user (if relevant) See user.Info interface for details",
       "type": "string"

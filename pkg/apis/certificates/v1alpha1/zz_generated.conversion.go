@@ -130,6 +130,7 @@ func Convert_certificates_CertificateSigningRequestList_To_v1alpha1_CertificateS
 
 func autoConvert_v1alpha1_CertificateSigningRequestSpec_To_certificates_CertificateSigningRequestSpec(in *CertificateSigningRequestSpec, out *certificates.CertificateSigningRequestSpec, s conversion.Scope) error {
 	out.Request = *(*[]byte)(unsafe.Pointer(&in.Request))
+	out.Usages = *(*[]certificates.KeyUsage)(unsafe.Pointer(&in.Usages))
 	out.Username = in.Username
 	out.UID = in.UID
 	out.Groups = *(*[]string)(unsafe.Pointer(&in.Groups))
@@ -142,6 +143,7 @@ func Convert_v1alpha1_CertificateSigningRequestSpec_To_certificates_CertificateS
 
 func autoConvert_certificates_CertificateSigningRequestSpec_To_v1alpha1_CertificateSigningRequestSpec(in *certificates.CertificateSigningRequestSpec, out *CertificateSigningRequestSpec, s conversion.Scope) error {
 	out.Request = *(*[]byte)(unsafe.Pointer(&in.Request))
+	out.Usages = *(*[]KeyUsage)(unsafe.Pointer(&in.Usages))
 	out.Username = in.Username
 	out.UID = in.UID
 	out.Groups = *(*[]string)(unsafe.Pointer(&in.Groups))
