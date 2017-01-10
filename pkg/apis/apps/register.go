@@ -18,6 +18,7 @@ package apps
 
 import (
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/runtime/schema"
 )
@@ -47,6 +48,9 @@ func Resource(resource string) schema.GroupResource {
 func addKnownTypes(scheme *runtime.Scheme) error {
 	// TODO this will get cleaned up with the scheme types are fixed
 	scheme.AddKnownTypes(SchemeGroupVersion,
+		&extensions.Deployment{},
+		&extensions.DeploymentList{},
+		&extensions.DeploymentRollback{},
 		&StatefulSet{},
 		&StatefulSetList{},
 		&api.ListOptions{},

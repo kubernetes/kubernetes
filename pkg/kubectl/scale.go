@@ -60,7 +60,7 @@ func ScalerFor(kind schema.GroupKind, c internalclientset.Interface) (Scaler, er
 		return &JobScaler{c.Batch()}, nil // Either kind of job can be scaled with Batch interface.
 	case apps.Kind("StatefulSet"):
 		return &StatefulSetScaler{c.Apps()}, nil
-	case extensions.Kind("Deployment"):
+	case extensions.Kind("Deployment"), apps.Kind("Deployment"):
 		return &DeploymentScaler{c.Extensions()}, nil
 	}
 	return nil, fmt.Errorf("no scaler has been implemented for %q", kind)
