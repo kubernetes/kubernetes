@@ -760,35 +760,35 @@ func RunKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *kubelet
 	// TODO(dawnchen): remove this once we deprecated old debian containervm images.
 	// This is a workaround for issue: https://github.com/opencontainers/runc/issues/726
 	// The current chosen number is consistent with most of other os dist.
-	const maxkeysPath = "/proc/sys/kernel/keys/root_maxkeys"
+	const maxKeysPath = "/proc/sys/kernel/keys/root_maxkeys"
 	const minKeys uint64 = 1000000
-	key, err := ioutil.ReadFile(maxkeysPath)
+	key, err := ioutil.ReadFile(maxKeysPath)
 	if err != nil {
-		glog.Errorf("Cannot read keys quota in %s", maxkeysPath)
+		glog.Errorf("Cannot read keys quota in %s", maxKeysPath)
 	} else {
 		fields := strings.Fields(string(key))
-		nkey, _ := strconv.ParseUint(fields[0], 10, 64)
-		if nkey < minKeys {
-			glog.Infof("Setting keys quota in %s to %d", maxkeysPath, minKeys)
-			err = ioutil.WriteFile(maxkeysPath, []byte(fmt.Sprintf("%d", uint64(minKeys))), 0644)
+		nKey, _ := strconv.ParseUint(fields[0], 10, 64)
+		if nKey < minKeys {
+			glog.Infof("Setting keys quota in %s to %d", maxKeysPath, minKeys)
+			err = ioutil.WriteFile(maxKeysPath, []byte(fmt.Sprintf("%d", uint64(minKeys))), 0644)
 			if err != nil {
-				glog.Warningf("Failed to update %s: %v", maxkeysPath, err)
+				glog.Warningf("Failed to update %s: %v", maxKeysPath, err)
 			}
 		}
 	}
-	const maxbytesPath = "/proc/sys/kernel/keys/root_maxbytes"
+	const maxBytesPath = "/proc/sys/kernel/keys/root_maxbytes"
 	const minBytes uint64 = 25000000
-	bytes, err := ioutil.ReadFile(maxbytesPath)
+	bytes, err := ioutil.ReadFile(maxBytesPath)
 	if err != nil {
-		glog.Errorf("Cannot read keys bytes in %s", maxbytesPath)
+		glog.Errorf("Cannot read keys bytes in %s", maxBytesPath)
 	} else {
 		fields := strings.Fields(string(bytes))
-		nbyte, _ := strconv.ParseUint(fields[0], 10, 64)
-		if nbyte < minBytes {
-			glog.Infof("Setting keys bytes in %s to %d", maxbytesPath, minBytes)
-			err = ioutil.WriteFile(maxbytesPath, []byte(fmt.Sprintf("%d", uint64(minBytes))), 0644)
+		nByte, _ := strconv.ParseUint(fields[0], 10, 64)
+		if nByte < minBytes {
+			glog.Infof("Setting keys bytes in %s to %d", maxBytesPath, minBytes)
+			err = ioutil.WriteFile(maxBytesPath, []byte(fmt.Sprintf("%d", uint64(minBytes))), 0644)
 			if err != nil {
-				glog.Warningf("Failed to update %s: %v", maxbytesPath, err)
+				glog.Warningf("Failed to update %s: %v", maxBytesPath, err)
 			}
 		}
 	}
