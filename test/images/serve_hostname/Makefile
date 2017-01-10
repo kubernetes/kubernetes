@@ -83,7 +83,7 @@ container: .container-$(ARCH)
 	# Set the base image
 	cd $(TEMP_DIR) && sed -i.bak 's|BASEIMAGE|$(BASEIMAGE)|g' Dockerfile
 
-	docker build -t $(IMAGE):$(TAG) $(TEMP_DIR)
+	docker build --pull -t $(IMAGE):$(TAG) $(TEMP_DIR)
 	if [ -n "$(TEST_REGISTRY)" ]; then \
 		docker tag $(IMAGE):$(TAG) $(TEST_IMAGE):$(TAG) ;\
 	fi

@@ -20,7 +20,7 @@ cauldron:
 	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -a -installsuffix cgo --ldflags '-w' cauldron.go
 
 container:	cauldron
-	docker build -t kubernetes/cauldron:$(TAG) .
+	docker build --pull -t kubernetes/cauldron:$(TAG) .
 
 push:
 	docker push kubernetes/cauldron:$(TAG)

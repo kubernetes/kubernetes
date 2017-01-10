@@ -32,7 +32,7 @@ PREFIX=gcr.io/google_containers
 TAG = 1.28
 
 build:
-	docker build -t $(PREFIX)/fluentd-gcp:$(TAG) .
+	docker build --pull -t $(PREFIX)/fluentd-gcp:$(TAG) .
 
 
 push:
