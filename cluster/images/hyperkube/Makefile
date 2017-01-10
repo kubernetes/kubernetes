@@ -106,7 +106,7 @@ endif
 	# Download CNI
 	curl -sSL --retry 5 https://storage.googleapis.com/kubernetes-release/network-plugins/cni-${ARCH}-${CNI_RELEASE}.tar.gz | tar -xz -C ${TEMP_DIR}/cni-bin
 
-	docker build -t ${REGISTRY}/hyperkube-${ARCH}:${VERSION} ${TEMP_DIR}
+	docker build --pull -t ${REGISTRY}/hyperkube-${ARCH}:${VERSION} ${TEMP_DIR}
 	rm -rf "${TEMP_DIR}"
 
 push: build

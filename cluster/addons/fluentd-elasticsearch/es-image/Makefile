@@ -19,7 +19,7 @@
 TAG = v2.4.1
 
 build:	elasticsearch_logging_discovery
-	docker build -t gcr.io/google_containers/elasticsearch:$(TAG) .
+	docker build --pull -t gcr.io/google_containers/elasticsearch:$(TAG) .
 
 push:
 	gcloud docker -- push gcr.io/google_containers/elasticsearch:$(TAG)
