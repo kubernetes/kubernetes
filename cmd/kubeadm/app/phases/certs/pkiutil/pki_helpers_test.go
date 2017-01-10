@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package certs
+package pkiutil
 
 import (
 	"crypto/rand"
@@ -28,16 +28,16 @@ import (
 )
 
 func TestNewCertificateAuthority(t *testing.T) {
-	r, x, err := newCertificateAuthority()
+	cert, key, err := NewCertificateAuthority()
 
-	if r == nil {
+	if cert == nil {
 		t.Errorf(
-			"failed newCertificateAuthority, rsa key == nil",
+			"failed newCertificateAuthority, cert == nil",
 		)
 	}
-	if x == nil {
+	if key == nil {
 		t.Errorf(
-			"failed newCertificateAuthority, x509 cert == nil",
+			"failed newCertificateAuthority, key == nil",
 		)
 	}
 	if err != nil {
@@ -72,7 +72,7 @@ func TestNewServerKeyAndCert(t *testing.T) {
 		}
 		caCert := &x509.Certificate{}
 		altNames := certutil.AltNames{}
-		_, _, actual := newServerKeyAndCert(caCert, caKey, altNames)
+		_, _, actual := NewServerKeyAndCert(caCert, caKey, altNames)
 		if (actual == nil) != rt.expected {
 			t.Errorf(
 				"failed newServerKeyAndCert:\n\texpected: %t\n\t  actual: %t",
@@ -128,44 +128,11 @@ func TestWriteKeysAndCert(t *testing.T) {
 		t.Fatalf("Couldn't create rsa Private Key")
 	}
 	caCert := &x509.Certificate{}
-	actual := writeKeysAndCert(tmpdir, "foo", caKey, caCert)
+	actual := WriteCertAndKey(tmpdir, "foo", caKey, caCert)
 	if actual != nil {
 		t.Errorf(
 			"failed writeKeysAndCert with an error: %v",
 			actual,
 		)
-	}
-}
-
-func TestPathsKeysCerts(t *testing.T) {
-	var tests = []struct {
-		pkiPath  string
-		name     string
-		expected []string
-	}{
-		{
-			pkiPath:  "foo",
-			name:     "bar",
-			expected: []string{"foo/bar-pub.pem", "foo/bar-key.pem", "foo/bar.pem"},
-		},
-		{
-			pkiPath:  "bar",
-			name:     "foo",
-			expected: []string{"bar/foo-pub.pem", "bar/foo-key.pem", "bar/foo.pem"},
-		},
-	}
-
-	for _, rt := range tests {
-		a, b, c := pathsKeysCerts(rt.pkiPath, rt.name)
-		all := []string{a, b, c}
-		for i := range all {
-			if all[i] != rt.expected[i] {
-				t.Errorf(
-					"failed pathsKeysCerts:\n\texpected: %s\n\t  actual: %s",
-					rt.expected[i],
-					all[i],
-				)
-			}
-		}
 	}
 }

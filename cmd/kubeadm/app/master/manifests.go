@@ -26,6 +26,7 @@ import (
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/images"
+	certconstants "k8s.io/kubernetes/cmd/kubeadm/app/phases/certs/constants"
 	"k8s.io/kubernetes/pkg/api/resource"
 	api "k8s.io/kubernetes/pkg/api/v1"
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
@@ -282,15 +283,19 @@ func getComponentBaseCommand(component string) []string {
 	return []string{"kube-" + component}
 }
 
+func getCertName(certName string) string {
+	return path.Join(kubeadmapi.GlobalEnvParams.HostPKIPath, certName)
+}
+
 func getAPIServerCommand(cfg *kubeadmapi.MasterConfiguration) []string {
 	command := append(getComponentBaseCommand(apiServer),
 		"--insecure-bind-address=127.0.0.1",
 		"--admission-control=NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,ResourceQuota",
 		"--service-cluster-ip-range="+cfg.Networking.ServiceSubnet,
-		"--service-account-key-file="+kubeadmapi.GlobalEnvParams.HostPKIPath+"/apiserver-key.pem",
-		"--client-ca-file="+kubeadmapi.GlobalEnvParams.HostPKIPath+"/ca.pem",
-		"--tls-cert-file="+kubeadmapi.GlobalEnvParams.HostPKIPath+"/apiserver.pem",
-		"--tls-private-key-file="+kubeadmapi.GlobalEnvParams.HostPKIPath+"/apiserver-key.pem",
+		"--service-account-key-file="+getCertName(certconstants.APIServerKeyName),
+		"--client-ca-file="+getCertName(certconstants.CACertName),
+		"--tls-cert-file="+getCertName(certconstants.APIServerCertName),
+		"--tls-private-key-file="+getCertName(certconstants.APIServerKeyName),
 		"--token-auth-file="+kubeadmapi.GlobalEnvParams.HostPKIPath+"/tokens.csv",
 		fmt.Sprintf("--secure-port=%d", cfg.API.Port),
 		"--allow-privileged",
@@ -353,10 +358,10 @@ func getControllerManagerCommand(cfg *kubeadmapi.MasterConfiguration) []string {
 		"--leader-elect",
 		"--master=127.0.0.1:8080",
 		"--cluster-name="+DefaultClusterName,
-		"--root-ca-file="+kubeadmapi.GlobalEnvParams.HostPKIPath+"/ca.pem",
-		"--service-account-private-key-file="+kubeadmapi.GlobalEnvParams.HostPKIPath+"/apiserver-key.pem",
-		"--cluster-signing-cert-file="+kubeadmapi.GlobalEnvParams.HostPKIPath+"/ca.pem",
-		"--cluster-signing-key-file="+kubeadmapi.GlobalEnvParams.HostPKIPath+"/ca-key.pem",
+		"--root-ca-file="+getCertName(certconstants.CACertName),
+		"--service-account-private-key-file="+getCertName(certconstants.APIServerKeyName),
+		"--cluster-signing-cert-file="+getCertName(certconstants.CACertName),
+		"--cluster-signing-key-file="+getCertName(certconstants.CAKeyName),
 		"--insecure-experimental-approve-all-kubelet-csrs-for-group=system:kubelet-bootstrap",
 	)
 

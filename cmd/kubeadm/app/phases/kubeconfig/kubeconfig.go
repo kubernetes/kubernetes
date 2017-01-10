@@ -17,14 +17,14 @@ limitations under the License.
 package kubeconfig
 
 import (
-	"crypto/ecdsa"
 	"crypto/rsa"
 	"crypto/x509"
 	"fmt"
 	"os"
 	"path"
 
-	certphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
+	certconstants "k8s.io/kubernetes/cmd/kubeadm/app/phases/certs/constants"
+	"k8s.io/kubernetes/cmd/kubeadm/app/phases/certs/pkiutil"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
 	certutil "k8s.io/kubernetes/pkg/util/cert"
@@ -32,6 +32,7 @@ import (
 
 const (
 	KubernetesDirPermissions  = 0700
+	KubeConfigFilePermissions = 0600
 	AdminKubeConfigFileName   = "admin.conf"
 	KubeletKubeConfigFileName = "kubelet.conf"
 )
@@ -40,31 +41,11 @@ const (
 // TODO: Make an integration test for this function that runs after the certificates phase
 // and makes sure that those two phases work well together...
 func CreateAdminAndKubeletKubeConfig(masterEndpoint, pkiDir, outDir string) error {
-	// Parse the certificate from a file
-	caCertPath := path.Join(pkiDir, "ca.pem")
-	caCerts, err := certutil.CertsFromFile(caCertPath)
-	if err != nil {
-		return fmt.Errorf("couldn't load the CA cert file %s: %v", caCertPath, err)
-	}
-	// We are only putting one certificate in the CA certificate pem file, so it's safe to just use the first one
-	caCert := caCerts[0]
 
-	// Parse the rsa private key from a file
-	caKeyPath := path.Join(pkiDir, "ca-key.pem")
-	priv, err := certutil.PrivateKeyFromFile(caKeyPath)
+	// Try to load ca.crt and ca.key from the PKI directory
+	caCert, caKey, err := pkiutil.TryLoadCertAndKeyFromDisk(pkiDir, certconstants.CACertAndKeyBaseName)
 	if err != nil {
-		return fmt.Errorf("couldn't load the CA private key file %s: %v", caKeyPath, err)
-	}
-	var caKey *rsa.PrivateKey
-	switch k := priv.(type) {
-	case *rsa.PrivateKey:
-		caKey = k
-	case *ecdsa.PrivateKey:
-		// TODO: Abstract rsa.PrivateKey away and make certutil.NewSignedCert accept a ecdsa.PrivateKey as well
-		// After that, we can support generating kubeconfig files from ecdsa private keys as well
-		return fmt.Errorf("the CA private key file %s isn't in RSA format", caKeyPath)
-	default:
-		return fmt.Errorf("the CA private key file %s isn't in RSA format", caKeyPath)
+		return fmt.Errorf("couldn't create a kubeconfig; the CA files couldn't be parsed: %v")
 	}
 
 	// User admin should have full access to the cluster
@@ -72,7 +53,8 @@ func CreateAdminAndKubeletKubeConfig(masterEndpoint, pkiDir, outDir string) erro
 		return fmt.Errorf("couldn't create a kubeconfig file for admin: %v", err)
 	}
 
-	// TODO: The kubelet should have limited access to the cluster
+	// TODO: The kubelet should have limited access to the cluster. Right now, this gives kubelet basically root access
+	// and we do need that in the bootstrap phase, but we should swap it out after the control plane is up
 	if err := createKubeConfigFileForClient(masterEndpoint, "kubelet", outDir, caCert, caKey); err != nil {
 		return fmt.Errorf("couldn't create a kubeconfig file for kubelet: %v", err)
 	}
@@ -81,7 +63,7 @@ func CreateAdminAndKubeletKubeConfig(masterEndpoint, pkiDir, outDir string) erro
 }
 
 func createKubeConfigFileForClient(masterEndpoint, client, outDir string, caCert *x509.Certificate, caKey *rsa.PrivateKey) error {
-	key, cert, err := certphase.NewClientKeyAndCert(caCert, caKey)
+	cert, key, err := pkiutil.NewClientKeyAndCert(caCert, caKey)
 	if err != nil {
 		return fmt.Errorf("failure while creating %s client certificate [%v]", client, err)
 	}
@@ -101,17 +83,13 @@ func createKubeConfigFileForClient(masterEndpoint, client, outDir string, caCert
 }
 
 func WriteKubeconfigToDisk(filepath string, kubeconfig *clientcmdapi.Config) error {
-	// Make sure the dir exists or can be created
-	if err := os.MkdirAll(path.Dir(filepath), KubernetesDirPermissions); err != nil {
-		return fmt.Errorf("failed to create directory %q [%v]", path.Dir(filepath), err)
-	}
-
 	// If err == nil, the file exists. Oops, we don't allow the file to exist already, fail.
+	// TODO: Should we allow overwriting a kubeconfig file that does already exist?
 	if _, err := os.Stat(filepath); err == nil {
 		return fmt.Errorf("kubeconfig file %s already exists, but must not exist.", filepath)
 	}
 
-	if err := clientcmd.WriteToFile(*kubeconfig, filepath); err != nil {
+	if err := clientcmd.WriteToFileWithPermissions(*kubeconfig, filepath, KubernetesDirPermissions, KubeConfigFilePermissions); err != nil {
 		return fmt.Errorf("failed to write to %q [%v]", filepath, err)
 	}
 

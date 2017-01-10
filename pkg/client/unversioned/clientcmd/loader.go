@@ -395,21 +395,27 @@ func Load(data []byte) (*clientcmdapi.Config, error) {
 	return decoded.(*clientcmdapi.Config), nil
 }
 
-// WriteToFile serializes the config to yaml and writes it out to a file.  If not present, it creates the file with the mode 0600.  If it is present
-// it stomps the contents
+// WriteToFile serializes the config to yaml and writes it out to a file. If not present, it creates the file with the mode 0600 and any directories 
+// that might not exist with mode 0755. If it is present, it stomps the contents
 func WriteToFile(config clientcmdapi.Config, filename string) error {
+	return WriteToFileWithPermissions(config, filename, 0755, 0600)
+}
+
+// WriteToFileWithPermissions serializes the config to yaml and writes it out to a file.  If not present, it creates the file with the mode 0600.  If it is present
+// it stomps the contents
+func WriteToFileWithPermissions(config clientcmdapi.Config, filename string, dirPermissions, filePermissions os.FileMode) error {
 	content, err := Write(config)
 	if err != nil {
 		return err
 	}
 	dir := filepath.Dir(filename)
 	if _, err := os.Stat(dir); os.IsNotExist(err) {
-		if err = os.MkdirAll(dir, 0755); err != nil {
+		if err = os.MkdirAll(dir, dirPermissions); err != nil {
 			return err
 		}
 	}
 
-	if err := ioutil.WriteFile(filename, content, 0600); err != nil {
+	if err := ioutil.WriteFile(filename, content, filePermissions); err != nil {
 		return err
 	}
 	return nil
