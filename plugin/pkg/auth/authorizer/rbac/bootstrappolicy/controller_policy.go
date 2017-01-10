@@ -192,7 +192,7 @@ func init() {
 		},
 	})
 	addControllerRole(rbac.ClusterRole{
-		ObjectMeta: api.ObjectMeta{Name: saRolePrefix + "pod-garbage-controller"},
+		ObjectMeta: api.ObjectMeta{Name: saRolePrefix + "pod-garbage-collector"},
 		Rules: []rbac.PolicyRule{
 			rbac.NewRule("list", "watch", "delete").Groups(legacyGroup).Resources("pods").RuleOrDie(),
 			rbac.NewRule("list").Groups(legacyGroup).Resources("nodes").RuleOrDie(),

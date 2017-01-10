@@ -664,7 +664,7 @@ items:
     creationTimestamp: null
     labels:
       kubernetes.io/bootstrapping: rbac-defaults
-    name: system:controller:pod-garbage-controller
+    name: system:controller:pod-garbage-collector
   rules:
   - apiGroups:
     - ""
