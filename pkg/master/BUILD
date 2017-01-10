@@ -90,6 +90,7 @@ go_test(
     srcs = [
         "controller_test.go",
         "import_known_versions_test.go",
+        "master_openapi_test.go",
         "master_test.go",
     ],
     library = ":go_default_library",
