@@ -188,6 +188,9 @@ func init() {
 			rbac.NewRule("get", "create", "delete").Groups(legacyGroup).Resources("services", "endpoints").RuleOrDie(),
 			rbac.NewRule("get").Groups(legacyGroup).Resources("secrets").RuleOrDie(),
 
+			// recyclerClient.WatchPod
+			rbac.NewRule("watch").Groups(legacyGroup).Resources("events").RuleOrDie(),
+
 			eventsRule(),
 		},
 	})
