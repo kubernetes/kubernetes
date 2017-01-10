@@ -39,6 +39,8 @@ import (
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/util/yaml"
 	"k8s.io/kubernetes/pkg/watch"
+	"k8s.io/kubernetes/pkg/util/jsonnet"
+	"github.com/golang/glog"
 )
 
 const (
@@ -482,6 +484,19 @@ type FileVisitor struct {
 
 // Visit in a FileVisitor is just taking care of opening/closing files
 func (v *FileVisitor) Visit(fn VisitorFunc) error {
+	if jsonnet.IsJsonnet(v.Path) {
+		glog.V(4).Infof("Visit is jsonnet")
+		var f *bytes.Reader
+		var err error
+		if f, err = jsonnet.Open(v.Path); err != nil {
+			glog.V(4).Infof("Visit jsonnet failed %v", err)
+			return err
+		}
+		v.StreamVisitor.Reader = f
+
+		return v.StreamVisitor.Visit(fn)
+	}
+	glog.V(4).Infof("Visit is not jsonnet")
 	var f *os.File
 	if v.Path == constSTDINstr {
 		f = os.Stdin
