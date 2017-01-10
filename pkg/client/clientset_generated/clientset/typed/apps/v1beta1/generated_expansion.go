@@ -16,4 +16,6 @@ limitations under the License.
 
 package v1beta1
 
+type DeploymentExpansion interface{}
+
 type StatefulSetExpansion interface{}

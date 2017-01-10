@@ -18,6 +18,14 @@ limitations under the License.
 
 package v1beta1
 
+// DeploymentListerExpansion allows custom methods to be added to
+// DeploymentLister.
+type DeploymentListerExpansion interface{}
+
+// DeploymentNamespaceListerExpansion allows custom methods to be added to
+// DeploymentNamespaeLister.
+type DeploymentNamespaceListerExpansion interface{}
+
 // StatefulSetListerExpansion allows custom methods to be added to
 // StatefulSetLister.
 type StatefulSetListerExpansion interface{}

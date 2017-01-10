@@ -85,6 +85,8 @@ items:
     - apps
     attributeRestrictions: null
     resources:
+    - deployments
+    - deployments/scale
     - statefulsets
     verbs:
     - create
@@ -272,6 +274,8 @@ items:
     - apps
     attributeRestrictions: null
     resources:
+    - deployments
+    - deployments/scale
     - statefulsets
     verbs:
     - create
@@ -450,6 +454,14 @@ items:
     - replicationcontrollers
     - secrets
     - serviceaccounts
+    verbs:
+    - list
+    - watch
+  - apiGroups:
+    - apps
+    attributeRestrictions: null
+    resources:
+    - deployments
     verbs:
     - list
     - watch
@@ -675,6 +687,8 @@ items:
     - apps
     attributeRestrictions: null
     resources:
+    - deployments
+    - deployments/scale
     - statefulsets
     verbs:
     - get

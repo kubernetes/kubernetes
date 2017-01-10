@@ -27,12 +27,17 @@ import (
 
 type AppsV1beta1Interface interface {
 	RESTClient() restclient.Interface
+	DeploymentsGetter
 	StatefulSetsGetter
 }
 
 // AppsV1beta1Client is used to interact with features provided by the k8s.io/kubernetes/pkg/apimachinery/registered.Group group.
 type AppsV1beta1Client struct {
 	restClient restclient.Interface
+}
+
+func (c *AppsV1beta1Client) Deployments(namespace string) DeploymentInterface {
+	return newDeployments(c, namespace)
 }
 
 func (c *AppsV1beta1Client) StatefulSets(namespace string) StatefulSetInterface {

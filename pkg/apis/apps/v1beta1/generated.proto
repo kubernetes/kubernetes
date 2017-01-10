@@ -23,6 +23,7 @@ package k8s.io.kubernetes.pkg.apis.apps.v1beta1;
 
 import "k8s.io/kubernetes/pkg/api/resource/generated.proto";
 import "k8s.io/kubernetes/pkg/api/v1/generated.proto";
+import "k8s.io/kubernetes/pkg/apis/extensions/v1beta1/generated.proto";
 import "k8s.io/kubernetes/pkg/apis/meta/v1/generated.proto";
 import "k8s.io/kubernetes/pkg/runtime/generated.proto";
 import "k8s.io/kubernetes/pkg/runtime/schema/generated.proto";
@@ -30,6 +31,195 @@ import "k8s.io/kubernetes/pkg/util/intstr/generated.proto";
 
 // Package-wide variables from generator "generated".
 option go_package = "v1beta1";
+
+// Deployment enables declarative updates for Pods and ReplicaSets.
+message Deployment {
+  // Standard object metadata.
+  // +optional
+  optional k8s.io.kubernetes.pkg.api.v1.ObjectMeta metadata = 1;
+
+  // Specification of the desired behavior of the Deployment.
+  // +optional
+  optional DeploymentSpec spec = 2;
+
+  // Most recently observed status of the Deployment.
+  // +optional
+  optional DeploymentStatus status = 3;
+}
+
+// DeploymentCondition describes the state of a deployment at a certain point.
+message DeploymentCondition {
+  // Type of deployment condition.
+  optional string type = 1;
+
+  // Status of the condition, one of True, False, Unknown.
+  optional string status = 2;
+
+  // The last time this condition was updated.
+  optional k8s.io.kubernetes.pkg.apis.meta.v1.Time lastUpdateTime = 6;
+
+  // Last time the condition transitioned from one status to another.
+  optional k8s.io.kubernetes.pkg.apis.meta.v1.Time lastTransitionTime = 7;
+
+  // The reason for the condition's last transition.
+  optional string reason = 4;
+
+  // A human readable message indicating details about the transition.
+  optional string message = 5;
+}
+
+// DeploymentList is a list of Deployments.
+message DeploymentList {
+  // Standard list metadata.
+  // +optional
+  optional k8s.io.kubernetes.pkg.apis.meta.v1.ListMeta metadata = 1;
+
+  // Items is the list of Deployments.
+  repeated Deployment items = 2;
+}
+
+// DeploymentRollback stores the information required to rollback a deployment.
+message DeploymentRollback {
+  // Required: This must match the Name of a deployment.
+  optional string name = 1;
+
+  // The annotations to be updated to a deployment
+  // +optional
+  map<string, string> updatedAnnotations = 2;
+
+  // The config of this deployment rollback.
+  optional RollbackConfig rollbackTo = 3;
+}
+
+// DeploymentSpec is the specification of the desired behavior of the Deployment.
+message DeploymentSpec {
+  // Number of desired pods. This is a pointer to distinguish between explicit
+  // zero and not specified. Defaults to 1.
+  // +optional
+  optional int32 replicas = 1;
+
+  // Label selector for pods. Existing ReplicaSets whose pods are
+  // selected by this will be the ones affected by this deployment.
+  // +optional
+  optional k8s.io.kubernetes.pkg.apis.meta.v1.LabelSelector selector = 2;
+
+  // Template describes the pods that will be created.
+  optional k8s.io.kubernetes.pkg.api.v1.PodTemplateSpec template = 3;
+
+  // The deployment strategy to use to replace existing pods with new ones.
+  // +optional
+  optional DeploymentStrategy strategy = 4;
+
+  // Minimum number of seconds for which a newly created pod should be ready
+  // without any of its container crashing, for it to be considered available.
+  // Defaults to 0 (pod will be considered available as soon as it is ready)
+  // +optional
+  optional int32 minReadySeconds = 5;
+
+  // The number of old ReplicaSets to retain to allow rollback.
+  // This is a pointer to distinguish between explicit zero and not specified.
+  // +optional
+  optional int32 revisionHistoryLimit = 6;
+
+  // Indicates that the deployment is paused and will not be processed by the
+  // deployment controller.
+  // +optional
+  optional bool paused = 7;
+
+  // The config this deployment is rolling back to. Will be cleared after rollback is done.
+  // +optional
+  optional RollbackConfig rollbackTo = 8;
+
+  // The maximum time in seconds for a deployment to make progress before it
+  // is considered to be failed. The deployment controller will continue to
+  // process failed deployments and a condition with a ProgressDeadlineExceeded
+  // reason will be surfaced in the deployment status. Once autoRollback is
+  // implemented, the deployment controller will automatically rollback failed
+  // deployments. Note that progress will not be estimated during the time a
+  // deployment is paused. This is not set by default.
+  optional int32 progressDeadlineSeconds = 9;
+}
+
+// DeploymentStatus is the most recently observed status of the Deployment.
+message DeploymentStatus {
+  // The generation observed by the deployment controller.
+  // +optional
+  optional int64 observedGeneration = 1;
+
+  // Total number of non-terminated pods targeted by this deployment (their labels match the selector).
+  // +optional
+  optional int32 replicas = 2;
+
+  // Total number of non-terminated pods targeted by this deployment that have the desired template spec.
+  // +optional
+  optional int32 updatedReplicas = 3;
+
+  // Total number of ready pods targeted by this deployment.
+  // +optional
+  optional int32 readyReplicas = 7;
+
+  // Total number of available pods (ready for at least minReadySeconds) targeted by this deployment.
+  // +optional
+  optional int32 availableReplicas = 4;
+
+  // Total number of unavailable pods targeted by this deployment.
+  // +optional
+  optional int32 unavailableReplicas = 5;
+
+  // Represents the latest available observations of a deployment's current state.
+  repeated DeploymentCondition conditions = 6;
+}
+
+// DeploymentStrategy describes how to replace existing pods with new ones.
+message DeploymentStrategy {
+  // Type of deployment. Can be "Recreate" or "RollingUpdate". Default is RollingUpdate.
+  // +optional
+  optional string type = 1;
+
+  // Rolling update config params. Present only if DeploymentStrategyType =
+  // RollingUpdate.
+  // ---
+  // TODO: Update this to follow our convention for oneOf, whatever we decide it
+  // to be.
+  // +optional
+  optional RollingUpdateDeployment rollingUpdate = 2;
+}
+
+message RollbackConfig {
+  // The revision to rollback to. If set to 0, rollbck to the last revision.
+  // +optional
+  optional int64 revision = 1;
+}
+
+// Spec to control the desired behavior of rolling update.
+message RollingUpdateDeployment {
+  // The maximum number of pods that can be unavailable during the update.
+  // Value can be an absolute number (ex: 5) or a percentage of desired pods (ex: 10%).
+  // Absolute number is calculated from percentage by rounding down.
+  // This can not be 0 if MaxSurge is 0.
+  // By default, a fixed value of 1 is used.
+  // Example: when this is set to 30%, the old RC can be scaled down to 70% of desired pods
+  // immediately when the rolling update starts. Once new pods are ready, old RC
+  // can be scaled down further, followed by scaling up the new RC, ensuring
+  // that the total number of pods available at all times during the update is at
+  // least 70% of desired pods.
+  // +optional
+  optional k8s.io.kubernetes.pkg.util.intstr.IntOrString maxUnavailable = 1;
+
+  // The maximum number of pods that can be scheduled above the desired number of
+  // pods.
+  // Value can be an absolute number (ex: 5) or a percentage of desired pods (ex: 10%).
+  // This can not be 0 if MaxUnavailable is 0.
+  // Absolute number is calculated from percentage by rounding up.
+  // By default, a value of 1 is used.
+  // Example: when this is set to 30%, the new RC can be scaled up immediately when
+  // the rolling update starts, such that the total number of old and new pods do not exceed
+  // 130% of desired pods. Once old pods have been killed,
+  // new RC can be scaled up further, ensuring that total number of pods running
+  // at any time during the update is atmost 130% of desired pods.
+  // +optional
+  optional k8s.io.kubernetes.pkg.util.intstr.IntOrString maxSurge = 2;
+}
 
 // StatefulSet represents a set of pods with consistent identities.
 // Identities are defined as:

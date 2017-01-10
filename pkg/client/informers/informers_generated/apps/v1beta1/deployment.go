@@ -19,32 +19,50 @@ limitations under the License.
 package v1beta1
 
 import (
+	v1 "k8s.io/kubernetes/pkg/api/v1"
+	apps_v1beta1 "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
+	cache "k8s.io/kubernetes/pkg/client/cache"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	internalinterfaces "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalinterfaces"
+	v1beta1 "k8s.io/kubernetes/pkg/client/listers/apps/v1beta1"
+	runtime "k8s.io/kubernetes/pkg/runtime"
+	watch "k8s.io/kubernetes/pkg/watch"
+	time "time"
 )
 
-// Interface provides access to all the informers in this group version.
-type Interface interface {
-	// Deployments returns a DeploymentInformer.
-	Deployments() DeploymentInformer
-	// StatefulSets returns a StatefulSetInformer.
-	StatefulSets() StatefulSetInformer
+// DeploymentInformer provides access to a shared informer and lister for
+// Deployments.
+type DeploymentInformer interface {
+	Informer() cache.SharedIndexInformer
+	Lister() v1beta1.DeploymentLister
 }
 
-type version struct {
-	internalinterfaces.SharedInformerFactory
+type deploymentInformer struct {
+	factory internalinterfaces.SharedInformerFactory
 }
 
-// New returns a new Interface.
-func New(f internalinterfaces.SharedInformerFactory) Interface {
-	return &version{f}
+func newDeploymentInformer(client clientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+	sharedIndexInformer := cache.NewSharedIndexInformer(
+		&cache.ListWatch{
+			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
+				return client.AppsV1beta1().Deployments(v1.NamespaceAll).List(options)
+			},
+			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
+				return client.AppsV1beta1().Deployments(v1.NamespaceAll).Watch(options)
+			},
+		},
+		&apps_v1beta1.Deployment{},
+		resyncPeriod,
+		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
+	)
+
+	return sharedIndexInformer
 }
 
-// Deployments returns a DeploymentInformer.
-func (v *version) Deployments() DeploymentInformer {
-	return &deploymentInformer{factory: v.SharedInformerFactory}
+func (f *deploymentInformer) Informer() cache.SharedIndexInformer {
+	return f.factory.VersionedInformerFor(&apps_v1beta1.Deployment{}, newDeploymentInformer)
 }
 
-// StatefulSets returns a StatefulSetInformer.
-func (v *version) StatefulSets() StatefulSetInformer {
-	return &statefulSetInformer{factory: v.SharedInformerFactory}
+func (f *deploymentInformer) Lister() v1beta1.DeploymentLister {
+	return v1beta1.NewDeploymentLister(f.Informer().GetIndexer())
 }

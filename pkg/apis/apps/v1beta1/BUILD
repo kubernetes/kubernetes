@@ -5,6 +5,7 @@ licenses(["notice"])
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
+    "go_test",
 )
 
 go_library(
@@ -28,6 +29,7 @@ go_library(
         "//pkg/api/resource:go_default_library",
         "//pkg/api/v1:go_default_library",
         "//pkg/apis/apps:go_default_library",
+        "//pkg/apis/extensions:go_default_library",
         "//pkg/apis/meta/v1:go_default_library",
         "//pkg/conversion:go_default_library",
         "//pkg/runtime:go_default_library",
@@ -35,6 +37,7 @@ go_library(
         "//pkg/types:go_default_library",
         "//pkg/util/intstr:go_default_library",
         "//vendor:github.com/gogo/protobuf/proto",
+        "//vendor:github.com/gogo/protobuf/sortkeys",
         "//vendor:github.com/ugorji/go/codec",
     ],
 )
@@ -50,4 +53,15 @@ filegroup(
     name = "all-srcs",
     srcs = [":package-srcs"],
     tags = ["automanaged"],
+)
+
+go_test(
+    name = "go_default_xtest",
+    srcs = ["defaults_test.go"],
+    tags = ["automanaged"],
+    deps = [
+        "//pkg/api/v1:go_default_library",
+        "//pkg/runtime:go_default_library",
+        "//pkg/util/intstr:go_default_library",
+    ],
 )
