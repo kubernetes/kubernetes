@@ -197,6 +197,20 @@ func ResourceShortFormFor(resource string) (string, bool) {
 	return alias, exists
 }
 
+// ResourceLongFormFor looks up for a long form of resource names.
+func ResourceLongFormFor(resource string) (string, bool) {
+	var alias string
+	exists := false
+	for _, item := range ResourcesShortcutStatic {
+		if item.ShortForm.Resource == resource {
+			alias = item.LongForm.Resource
+			exists = true
+			break
+		}
+	}
+	return alias, exists
+}
+
 // ResourceAliases returns the resource shortcuts and plural forms for the given resources.
 func ResourceAliases(rs []string) []string {
 	as := make([]string, 0, len(rs))
