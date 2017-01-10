@@ -2808,9 +2808,3 @@ func TestIsValidSysctlPattern(t *testing.T) {
 		}
 	}
 }
-
-func newBool(val bool) *bool {
-	p := new(bool)
-	*p = val
-	return p
-}

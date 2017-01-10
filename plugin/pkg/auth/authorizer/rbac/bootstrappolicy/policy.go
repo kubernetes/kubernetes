@@ -127,14 +127,16 @@ func ClusterRoles() []rbac.ClusterRole {
 				rbac.NewRule(Read...).Groups(legacyGroup).Resources("namespaces").RuleOrDie(),
 				rbac.NewRule("impersonate").Groups(legacyGroup).Resources("serviceaccounts").RuleOrDie(),
 
-				rbac.NewRule(ReadWrite...).Groups(appsGroup).Resources("statefulsets").RuleOrDie(),
+				rbac.NewRule(ReadWrite...).Groups(appsGroup).Resources("statefulsets",
+					"deployments", "deployments/scale", "deployments/rollback").RuleOrDie(),
 
 				rbac.NewRule(ReadWrite...).Groups(autoscalingGroup).Resources("horizontalpodautoscalers").RuleOrDie(),
 
 				rbac.NewRule(ReadWrite...).Groups(batchGroup).Resources("jobs", "cronjobs", "scheduledjobs").RuleOrDie(),
 
-				rbac.NewRule(ReadWrite...).Groups(extensionsGroup).Resources("daemonsets", "deployments", "deployments/scale",
-					"ingresses", "replicasets", "replicasets/scale", "replicationcontrollers/scale").RuleOrDie(),
+				rbac.NewRule(ReadWrite...).Groups(extensionsGroup).Resources("daemonsets",
+					"deployments", "deployments/scale", "deployments/rollback", "ingresses",
+					"replicasets", "replicasets/scale", "replicationcontrollers/scale").RuleOrDie(),
 
 				// additional admin powers
 				rbac.NewRule("create").Groups(authorizationGroup).Resources("localsubjectaccessreviews").RuleOrDie(),
@@ -157,14 +159,16 @@ func ClusterRoles() []rbac.ClusterRole {
 				rbac.NewRule(Read...).Groups(legacyGroup).Resources("namespaces").RuleOrDie(),
 				rbac.NewRule("impersonate").Groups(legacyGroup).Resources("serviceaccounts").RuleOrDie(),
 
-				rbac.NewRule(ReadWrite...).Groups(appsGroup).Resources("statefulsets").RuleOrDie(),
+				rbac.NewRule(ReadWrite...).Groups(appsGroup).Resources("statefulsets",
+					"deployments", "deployments/scale", "deployments/rollback").RuleOrDie(),
 
 				rbac.NewRule(ReadWrite...).Groups(autoscalingGroup).Resources("horizontalpodautoscalers").RuleOrDie(),
 
 				rbac.NewRule(ReadWrite...).Groups(batchGroup).Resources("jobs", "cronjobs", "scheduledjobs").RuleOrDie(),
 
-				rbac.NewRule(ReadWrite...).Groups(extensionsGroup).Resources("daemonsets", "deployments", "deployments/scale",
-					"ingresses", "replicasets", "replicasets/scale", "replicationcontrollers/scale").RuleOrDie(),
+				rbac.NewRule(ReadWrite...).Groups(extensionsGroup).Resources("daemonsets",
+					"deployments", "deployments/scale", "deployments/rollback", "ingresses",
+					"replicasets", "replicasets/scale", "replicationcontrollers/scale").RuleOrDie(),
 			},
 		},
 		{
@@ -180,7 +184,7 @@ func ClusterRoles() []rbac.ClusterRole {
 				// indicator of which namespaces you have access to.
 				rbac.NewRule(Read...).Groups(legacyGroup).Resources("namespaces").RuleOrDie(),
 
-				rbac.NewRule(Read...).Groups(appsGroup).Resources("statefulsets").RuleOrDie(),
+				rbac.NewRule(Read...).Groups(appsGroup).Resources("statefulsets", "deployments", "deployments/scale").RuleOrDie(),
 
 				rbac.NewRule(Read...).Groups(autoscalingGroup).Resources("horizontalpodautoscalers").RuleOrDie(),
 
@@ -320,6 +324,7 @@ func ClusterRoles() []rbac.ClusterRole {
 					"podsecuritypolicies",
 					"replicasets",
 				).RuleOrDie(),
+				rbac.NewRule("list", "watch").Groups(appsGroup).Resources("deployments").RuleOrDie(),
 				rbac.NewRule("list", "watch").Groups(batchGroup).Resources("jobs", "cronjobs").RuleOrDie(),
 				rbac.NewRule("list", "watch").Groups(appsGroup).Resources("statefulsets").RuleOrDie(),
 				rbac.NewRule("list", "watch").Groups(policyGroup).Resources("poddisruptionbudgets").RuleOrDie(),
