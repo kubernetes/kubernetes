@@ -34,6 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	"k8s.io/kubernetes/pkg/apis/batch"
+	"k8s.io/kubernetes/pkg/apis/certificates"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/apis/policy"
 	"k8s.io/kubernetes/pkg/apis/rbac"
@@ -566,6 +567,10 @@ func FuzzerFor(t *testing.T, version schema.GroupVersion, src rand.Source) *fuzz
 		func(s *policy.PodDisruptionBudgetStatus, c fuzz.Continue) {
 			c.FuzzNoCustom(s) // fuzz self without calling this function again
 			s.PodDisruptionsAllowed = int32(c.Rand.Intn(2))
+		},
+		func(obj *certificates.CertificateSigningRequestSpec, c fuzz.Continue) {
+			c.FuzzNoCustom(obj) // fuzz self without calling this function again
+			obj.Usages = []certificates.KeyUsage{certificates.UsageKeyEncipherment}
 		},
 	)
 	return f
