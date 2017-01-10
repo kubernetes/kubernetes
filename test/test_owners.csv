@@ -189,6 +189,7 @@ Garbage collector should orphan pods created by rc if deleteOptions.OrphanDepend
 "Generated release_1_5 clientset should create pods, delete pods, watch pods",ghodss,1
 "Generated release_1_5 clientset should create v2alpha1 cronJobs, delete cronJobs, watch cronJobs",soltysh,1
 HA-master survive addition/removal replicas different zones,derekwaynecarr,0
+HA-master survive addition/removal replicas multizone workers,rkouj,0
 HA-master survive addition/removal replicas same zone,derekwaynecarr,0
 Hazelcast should create and scale hazelcast,mikedanese,1
 Horizontal pod autoscaling (scale resource: CPU) Deployment Should scale from 1 pod to 3 pods and from 3 to 5,jszczepkowski,0
@@ -686,7 +687,6 @@ k8s.io/kubernetes/pkg/kubelet/kuberuntime,yifan-gu,1
 k8s.io/kubernetes/pkg/kubelet/lifecycle,yujuhong,1
 k8s.io/kubernetes/pkg/kubelet/network,freehan,0
 k8s.io/kubernetes/pkg/kubelet/network/cni,freehan,0
-k8s.io/kubernetes/pkg/kubelet/network/exec,freehan,0
 k8s.io/kubernetes/pkg/kubelet/network/hairpin,freehan,0
 k8s.io/kubernetes/pkg/kubelet/network/hostport,erictune,1
 k8s.io/kubernetes/pkg/kubelet/network/kubenet,freehan,0

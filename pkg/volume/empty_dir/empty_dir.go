@@ -299,6 +299,13 @@ func (ed *emptyDir) TearDown() error {
 
 // TearDownAt simply discards everything in the directory.
 func (ed *emptyDir) TearDownAt(dir string) error {
+	if pathExists, pathErr := volumeutil.PathExists(dir); pathErr != nil {
+		return fmt.Errorf("Error checking if path exists: %v", pathErr)
+	} else if !pathExists {
+		glog.Warningf("Warning: Unmount skipped because path does not exist: %v", dir)
+		return nil
+	}
+
 	// Figure out the medium.
 	medium, isMnt, err := ed.mountDetector.GetMountMedium(dir)
 	if err != nil {
