@@ -201,6 +201,10 @@ function create-master-auth {
     echo "${MASTER_CERT}" | base64 --decode > "${auth_dir}/server.cert"
     echo "${MASTER_KEY}" | base64 --decode > "${auth_dir}/server.key"
   fi
+  if [ ! -e "${auth_dir}/kubeapiserver.cert" ] && [[ ! -z "${KUBEAPISERVER_CERT:-}" ]] && [[ ! -z "${KUBEAPISERVER_KEY:-}" ]]; then
+    echo "${KUBEAPISERVER_CERT}" | base64 --decode > "${auth_dir}/kubeapiserver.cert"
+    echo "${KUBEAPISERVER_KEY}" | base64 --decode > "${auth_dir}/kubeapiserver.key"
+  fi
   local -r basic_auth_csv="${auth_dir}/basic_auth.csv"
   if [[ ! -e "${basic_auth_csv}" && -n "${KUBE_PASSWORD:-}" && -n "${KUBE_USER:-}" ]]; then
     echo "${KUBE_PASSWORD},${KUBE_USER},admin" > "${basic_auth_csv}"
@@ -342,6 +346,12 @@ contexts:
   name: service-account-context
 current-context: service-account-context
 EOF
+}
+
+function create-kubelet-auth-ca {
+  if [[ -n "${KUBELET_AUTH_CA_CERT:-}" ]]; then
+    echo "${KUBELET_AUTH_CA_CERT}" | base64 --decode > "/var/lib/kubelet/kubelet_auth_ca.crt"
+  fi
 }
 
 # Uses KUBELET_CA_CERT (falling back to CA_CERT), KUBELET_CERT, and KUBELET_KEY
@@ -548,6 +558,9 @@ function start-kubelet {
        [[ "${HAIRPIN_MODE:-}" == "hairpin-veth" ]] || \
        [[ "${HAIRPIN_MODE:-}" == "none" ]]; then
       flags+=" --hairpin-mode=${HAIRPIN_MODE}"
+    fi
+    if [ -n "${KUBELET_AUTH_CA_CERT:-}" ]; then
+      flags+=" --anonymous-auth=false --client-ca-file=/var/lib/kubelet/kubelet_auth_ca.crt"
     fi
   fi
   # Network plugin
@@ -793,6 +806,8 @@ function start-kube-apiserver {
   params+=" --secure-port=443"
   params+=" --tls-cert-file=/etc/srv/kubernetes/server.cert"
   params+=" --tls-private-key-file=/etc/srv/kubernetes/server.key"
+  params+=" --kubelet-client-certificate=/etc/srv/kubernetes/kubeapiserver.cert"
+  params+=" --kubelet-client-key=/etc/srv/kubernetes/kubeapiserver.key"
   params+=" --token-auth-file=/etc/srv/kubernetes/known_tokens.csv"
   if [[ -n "${KUBE_PASSWORD:-}" && -n "${KUBE_USER:-}" ]]; then
     params+=" --basic-auth-file=/etc/srv/kubernetes/basic_auth.csv"
@@ -1266,6 +1281,10 @@ fi
 
 source "${KUBE_HOME}/kube-env"
 
+if [[ -e "${KUBE_HOME}/kube-master-certs" ]]; then
+  source "${KUBE_HOME}/kube-master-certs"
+fi
+
 if [[ -n "${KUBE_USER:-}" ]]; then
   if ! [[ "${KUBE_USER}" =~ ^[-._@a-zA-Z0-9]+$ ]]; then
     echo "Bad KUBE_USER format."
@@ -1289,6 +1308,7 @@ if [[ "${KUBERNETES_MASTER:-}" == "true" ]]; then
   create-master-etcd-auth
 else
   create-kubelet-kubeconfig
+  create-kubelet-auth-ca
   create-kubeproxy-kubeconfig
 fi
 

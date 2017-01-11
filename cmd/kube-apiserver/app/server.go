@@ -141,12 +141,15 @@ func Run(s *options.ServerRunOptions) error {
 		if s.KubeletConfig.Port == 0 {
 			return fmt.Errorf("must enable kubelet port if proxy ssh-tunneling is specified")
 		}
+		if s.KubeletConfig.ReadOnlyPort == 0 {
+			return fmt.Errorf("must enable kubelet readonly port if proxy ssh-tunneling is specified")
+		}
 		// Set up the tunneler
 		// TODO(cjcullen): If we want this to handle per-kubelet ports or other
 		// kubelet listen-addresses, we need to plumb through options.
 		healthCheckPath := &url.URL{
-			Scheme: "https",
-			Host:   net.JoinHostPort("127.0.0.1", strconv.FormatUint(uint64(s.KubeletConfig.Port), 10)),
+			Scheme: "http",
+			Host:   net.JoinHostPort("127.0.0.1", strconv.FormatUint(uint64(s.KubeletConfig.ReadOnlyPort), 10)),
 			Path:   "healthz",
 		}
 		tunneler = genericapiserver.NewSSHTunneler(s.SSHUser, s.SSHKeyfile, healthCheckPath, installSSH)
