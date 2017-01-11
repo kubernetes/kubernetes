@@ -44,12 +44,12 @@ type sourceFile struct {
 }
 
 func NewSourceFile(path string, nodeName types.NodeName, period time.Duration, updates chan<- interface{}) {
-	config := new(path, nodeName, period, updates)
+	config := new(path, nodeName, updates)
 	glog.V(1).Infof("Watching path %q", path)
 	go wait.Forever(config.run, period)
 }
 
-func new(path string, nodeName types.NodeName, period time.Duration, updates chan<- interface{}) *sourceFile {
+func new(path string, nodeName types.NodeName, updates chan<- interface{}) *sourceFile {
 	send := func(objs []interface{}) {
 		var pods []*v1.Pod
 		for _, o := range objs {
