@@ -79,6 +79,7 @@ func TestInitFederation(t *testing.T) {
 		etcdPVCapacity     string
 		expectedErr        string
 		dnsProvider        string
+		storageBackend     string
 		dryRun             string
 	}{
 		{
@@ -91,6 +92,7 @@ func TestInitFederation(t *testing.T) {
 			etcdPVCapacity:     "5Gi",
 			expectedErr:        "",
 			dnsProvider:        "test-dns-provider",
+			storageBackend:     "etcd2",
 			dryRun:             "",
 		},
 		{
@@ -103,6 +105,7 @@ func TestInitFederation(t *testing.T) {
 			etcdPVCapacity:     "", //test for default value of pvc-size
 			expectedErr:        "",
 			dnsProvider:        "", //test for default value of dns provider
+			storageBackend:     "etcd2",
 			dryRun:             "",
 		},
 		{
@@ -115,7 +118,21 @@ func TestInitFederation(t *testing.T) {
 			etcdPVCapacity:     "",
 			expectedErr:        "",
 			dnsProvider:        "test-dns-provider",
+			storageBackend:     "etcd2",
 			dryRun:             "valid-run",
+		},
+		{
+			federation:         "union",
+			kubeconfigGlobal:   fakeKubeFiles[0],
+			kubeconfigExplicit: "",
+			dnsZoneName:        "example.test.",
+			lbIP:               "10.20.30.40",
+			image:              "example.test/foo:bar",
+			etcdPVCapacity:     "5Gi",
+			expectedErr:        "",
+			dnsProvider:        "test-dns-provider",
+			storageBackend:     "etcd3",
+			dryRun:             "",
 		},
 	}
 
@@ -131,7 +148,7 @@ func TestInitFederation(t *testing.T) {
 		} else {
 			dnsProvider = "google-clouddns" //default value of dns-provider
 		}
-		hostFactory, err := fakeInitHostFactory(tc.federation, util.DefaultFederationSystemNamespace, tc.lbIP, tc.dnsZoneName, tc.image, dnsProvider, tc.etcdPVCapacity)
+		hostFactory, err := fakeInitHostFactory(tc.federation, util.DefaultFederationSystemNamespace, tc.lbIP, tc.dnsZoneName, tc.image, dnsProvider, tc.etcdPVCapacity, tc.storageBackend)
 		if err != nil {
 			t.Fatalf("[%d] unexpected error: %v", i, err)
 		}
@@ -147,6 +164,9 @@ func TestInitFederation(t *testing.T) {
 		cmd.Flags().Set("host-cluster-context", "substrate")
 		cmd.Flags().Set("dns-zone-name", tc.dnsZoneName)
 		cmd.Flags().Set("image", tc.image)
+		if tc.storageBackend != "" {
+			cmd.Flags().Set("storage-backend", tc.storageBackend)
+		}
 		if tc.dnsProvider != "" {
 			cmd.Flags().Set("dns-provider", tc.dnsProvider)
 		}
@@ -423,7 +443,7 @@ func TestCertsHTTPS(t *testing.T) {
 	}
 }
 
-func fakeInitHostFactory(federationName, namespaceName, ip, dnsZoneName, image, dnsProvider, etcdPVCapacity string) (cmdutil.Factory, error) {
+func fakeInitHostFactory(federationName, namespaceName, ip, dnsZoneName, image, dnsProvider, etcdPVCapacity, storageProvider string) (cmdutil.Factory, error) {
 	svcName := federationName + "-apiserver"
 	svcUrlPrefix := "/api/v1/namespaces/federation-system/services"
 	credSecretName := svcName + "-credentials"
@@ -566,6 +586,7 @@ func fakeInitHostFactory(federationName, namespaceName, ip, dnsZoneName, image, 
 								"--client-ca-file=/etc/federation/apiserver/ca.crt",
 								"--tls-cert-file=/etc/federation/apiserver/server.crt",
 								"--tls-private-key-file=/etc/federation/apiserver/server.key",
+								fmt.Sprintf("--storage-backend=%s", storageProvider),
 								"--advertise-address=" + ip,
 							},
 							Ports: []v1.ContainerPort{
@@ -588,9 +609,9 @@ func fakeInitHostFactory(federationName, namespaceName, ip, dnsZoneName, image, 
 						},
 						{
 							Name:  "etcd",
-							Image: "quay.io/coreos/etcd:v2.3.3",
+							Image: "gcr.io/google_containers/etcd:3.0.14-alpha.1",
 							Command: []string{
-								"/etcd",
+								"/usr/local/bin/etcd",
 								"--data-dir",
 								"/var/etcd/data",
 							},
