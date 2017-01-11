@@ -656,12 +656,16 @@ func mergeSlice(original, patch []interface{}, elemType reflect.Type, mergeKey s
 			if patchType == deleteDirective {
 				mergeValue, ok := typedV[mergeKey]
 				if ok {
-					_, originalKey, found, err := findMapInSliceBasedOnKeyValue(original, mergeKey, mergeValue)
-					if err != nil {
-						return nil, err
-					}
+					// delete all matching entries (based on merge key) from a merging list
+					for {
+						_, originalKey, found, err := findMapInSliceBasedOnKeyValue(original, mergeKey, mergeValue)
+						if err != nil {
+							return nil, err
+						}
 
-					if found {
+						if !found {
+							break
+						}
 						// Delete the element at originalKey.
 						original = append(original[:originalKey], original[originalKey+1:]...)
 					}
