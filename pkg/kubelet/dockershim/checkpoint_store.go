@@ -48,9 +48,9 @@ type CheckpointStore interface {
 	List() ([]string, error)
 }
 
-// FileStore is an implementation of CheckpointStore interface which stores checkpoint in file.
+// FileStore is an implementation of CheckpointStore interface which stores checkpoint in files.
 type FileStore struct {
-	// path to the base directory for storing checkpoints
+	// path to the base directory for storing checkpoint files
 	path string
 }
 
@@ -95,7 +95,7 @@ func (fstore *FileStore) List() ([]string, error) {
 		return keys, err
 	}
 	for _, f := range files {
-		if !strings.HasSuffix(f.Name(), tmpSuffix) {
+		if !strings.HasPrefix(f.Name(), tmpPrefix) {
 			keys = append(keys, f.Name())
 		}
 	}
