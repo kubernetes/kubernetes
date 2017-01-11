@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2e
+package e2e_federation
 
 import (
 	"fmt"
@@ -29,6 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/test/e2e/framework"
+	fedframework "k8s.io/kubernetes/test/e2e_federation/framework"
 
 	"reflect"
 
@@ -44,25 +45,25 @@ const (
 
 // Create/delete replicaset api objects
 var _ = framework.KubeDescribe("Federation replicasets [Feature:Federation]", func() {
-	f := framework.NewDefaultFederatedFramework("federation-replicaset")
+	f := fedframework.NewDefaultFederatedFramework("federation-replicaset")
 
 	Describe("ReplicaSet objects", func() {
 		AfterEach(func() {
-			framework.SkipUnlessFederated(f.ClientSet)
+			fedframework.SkipUnlessFederated(f.ClientSet)
 
 			// Delete all replicasets.
 			nsName := f.FederationNamespace.Name
-			deleteAllReplicaSetsOrFail(f.FederationClientset_1_5, nsName)
+			deleteAllReplicaSetsOrFail(f.FederationClientset, nsName)
 		})
 
 		It("should be created and deleted successfully", func() {
-			framework.SkipUnlessFederated(f.ClientSet)
+			fedframework.SkipUnlessFederated(f.ClientSet)
 
 			nsName := f.FederationNamespace.Name
-			replicaset := createReplicaSetOrFail(f.FederationClientset_1_5, nsName)
+			replicaset := createReplicaSetOrFail(f.FederationClientset, nsName)
 			By(fmt.Sprintf("Creation of replicaset %q in namespace %q succeeded.  Deleting replicaset.", replicaset.Name, nsName))
 			// Cleanup
-			err := f.FederationClientset_1_5.Extensions().ReplicaSets(nsName).Delete(replicaset.Name, &v1.DeleteOptions{})
+			err := f.FederationClientset.Extensions().ReplicaSets(nsName).Delete(replicaset.Name, &v1.DeleteOptions{})
 			framework.ExpectNoError(err, "Error deleting replicaset %q in namespace %q", replicaset.Name, replicaset.Namespace)
 			By(fmt.Sprintf("Deletion of replicaset %q in namespace %q succeeded.", replicaset.Name, nsName))
 		})
@@ -76,7 +77,7 @@ var _ = framework.KubeDescribe("Federation replicasets [Feature:Federation]", fu
 			federationName string
 		)
 		BeforeEach(func() {
-			framework.SkipUnlessFederated(f.ClientSet)
+			fedframework.SkipUnlessFederated(f.ClientSet)
 			if federationName = os.Getenv("FEDERATION_NAME"); federationName == "" {
 				federationName = DefaultFederationName
 			}
@@ -87,50 +88,50 @@ var _ = framework.KubeDescribe("Federation replicasets [Feature:Federation]", fu
 		AfterEach(func() {
 			// Delete all replicasets.
 			nsName := f.FederationNamespace.Name
-			deleteAllReplicaSetsOrFail(f.FederationClientset_1_5, nsName)
+			deleteAllReplicaSetsOrFail(f.FederationClientset, nsName)
 			unregisterClusters(clusters, f)
 		})
 
 		It("should create and update matching replicasets in underling clusters", func() {
 			nsName := f.FederationNamespace.Name
-			rs := createReplicaSetOrFail(f.FederationClientset_1_5, nsName)
+			rs := createReplicaSetOrFail(f.FederationClientset, nsName)
 			defer func() {
 				// cleanup. deletion of replicasets is not supported for underlying clusters
 				By(fmt.Sprintf("Preparing replicaset %q/%q for deletion by setting replicas to zero", nsName, rs.Name))
 				replicas := int32(0)
 				rs.Spec.Replicas = &replicas
-				f.FederationClientset_1_5.ReplicaSets(nsName).Update(rs)
-				waitForReplicaSetOrFail(f.FederationClientset_1_5, nsName, rs.Name, clusters)
-				f.FederationClientset_1_5.ReplicaSets(nsName).Delete(rs.Name, &v1.DeleteOptions{})
+				f.FederationClientset.ReplicaSets(nsName).Update(rs)
+				waitForReplicaSetOrFail(f.FederationClientset, nsName, rs.Name, clusters)
+				f.FederationClientset.ReplicaSets(nsName).Delete(rs.Name, &v1.DeleteOptions{})
 			}()
 
-			waitForReplicaSetOrFail(f.FederationClientset_1_5, nsName, rs.Name, clusters)
+			waitForReplicaSetOrFail(f.FederationClientset, nsName, rs.Name, clusters)
 			By(fmt.Sprintf("Successfuly created and synced replicaset %q/%q to clusters", nsName, rs.Name))
-			updateReplicaSetOrFail(f.FederationClientset_1_5, nsName)
-			waitForReplicaSetOrFail(f.FederationClientset_1_5, nsName, rs.Name, clusters)
+			updateReplicaSetOrFail(f.FederationClientset, nsName)
+			waitForReplicaSetOrFail(f.FederationClientset, nsName, rs.Name, clusters)
 			By(fmt.Sprintf("Successfuly updated and synced replicaset %q/%q to clusters", nsName, rs.Name))
 		})
 
 		It("should be deleted from underlying clusters when OrphanDependents is false", func() {
-			framework.SkipUnlessFederated(f.ClientSet)
+			fedframework.SkipUnlessFederated(f.ClientSet)
 			nsName := f.FederationNamespace.Name
 			orphanDependents := false
-			verifyCascadingDeletionForReplicaSet(f.FederationClientset_1_5, clusters, &orphanDependents, nsName)
+			verifyCascadingDeletionForReplicaSet(f.FederationClientset, clusters, &orphanDependents, nsName)
 			By(fmt.Sprintf("Verified that replica sets were deleted from underlying clusters"))
 		})
 
 		It("should not be deleted from underlying clusters when OrphanDependents is true", func() {
-			framework.SkipUnlessFederated(f.ClientSet)
+			fedframework.SkipUnlessFederated(f.ClientSet)
 			nsName := f.FederationNamespace.Name
 			orphanDependents := true
-			verifyCascadingDeletionForReplicaSet(f.FederationClientset_1_5, clusters, &orphanDependents, nsName)
+			verifyCascadingDeletionForReplicaSet(f.FederationClientset, clusters, &orphanDependents, nsName)
 			By(fmt.Sprintf("Verified that replica sets were not deleted from underlying clusters"))
 		})
 
 		It("should not be deleted from underlying clusters when OrphanDependents is nil", func() {
-			framework.SkipUnlessFederated(f.ClientSet)
+			fedframework.SkipUnlessFederated(f.ClientSet)
 			nsName := f.FederationNamespace.Name
-			verifyCascadingDeletionForReplicaSet(f.FederationClientset_1_5, clusters, nil, nsName)
+			verifyCascadingDeletionForReplicaSet(f.FederationClientset, clusters, nil, nsName)
 			By(fmt.Sprintf("Verified that replica sets were not deleted from underlying clusters"))
 		})
 	})
