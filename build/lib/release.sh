@@ -85,10 +85,13 @@ function kube::release::package_tarballs() {
   mkdir -p "${RELEASE_DIR}"
   kube::release::package_src_tarball &
   kube::release::package_client_tarballs &
-  kube::release::package_node_tarballs &
-  kube::release::package_server_tarballs &
   kube::release::package_salt_tarball &
   kube::release::package_kube_manifests_tarball &
+  kube::util::wait-for-jobs || { kube::log::error "previous tarball phase failed"; return 1; }
+
+  # _node and _server tarballs depend on _src tarball
+  kube::release::package_node_tarballs &
+  kube::release::package_server_tarballs &
   kube::util::wait-for-jobs || { kube::log::error "previous tarball phase failed"; return 1; }
 
   kube::release::package_final_tarball & # _final depends on some of the previous phases
