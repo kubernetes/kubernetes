@@ -33,7 +33,7 @@ func updateHostConfig(hc *dockercontainer.HostConfig, opts *kubecontainer.RunCon
 }
 
 func DefaultMemorySwap() int64 {
-	return -1
+	return 0
 }
 
 func getContainerIP(container *dockertypes.ContainerJSON) string {
