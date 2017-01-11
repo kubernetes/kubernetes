@@ -109,10 +109,12 @@ var _ = framework.KubeDescribe("InodeEviction [Slow] [Serial] [Disruptive] [Flak
 			},
 		},
 	}
-	evictionTestTimeout := 60 * time.Minute
+	evictionTestTimeout := 30 * time.Minute
 	testCondition := "Disk Pressure due to Inodes"
+	// Set the EvictionHard threshold lower to decrease test time
+	evictionHardLimit := "nodefs.inodesFree<50%"
 
-	runEvictionTest(f, testCondition, podTestSpecs, evictionTestTimeout, hasInodePressure)
+	runEvictionTest(f, testCondition, podTestSpecs, evictionHardLimit, evictionTestTimeout, hasInodePressure)
 })
 
 // Struct used by runEvictionTest that specifies the pod, and when that pod should be evicted, relative to other pods
@@ -130,11 +132,12 @@ type podTestSpec struct {
 //		It ensures that lower evictionPriority pods are always evicted before higher evictionPriority pods (2 evicted before 1, etc.)
 //		It ensures that all lower evictionPriority pods are eventually evicted.
 // runEvictionTest then cleans up the testing environment by deleting provided nodes, and ensures that testCondition no longer exists
-func runEvictionTest(f *framework.Framework, testCondition string, podTestSpecs []podTestSpec,
+func runEvictionTest(f *framework.Framework, testCondition string, podTestSpecs []podTestSpec, evictionHard string,
 	evictionTestTimeout time.Duration, hasPressureCondition func(*framework.Framework, string) (bool, error)) {
 
 	Context(fmt.Sprintf("when we run containers that should cause %s", testCondition), func() {
 
+		tempSetEvictionHard(f, evictionHard)
 		BeforeEach(func() {
 			By("seting up pods to be used by tests")
 			for _, spec := range podTestSpecs {
