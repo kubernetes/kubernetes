@@ -54,12 +54,12 @@ type initConfig struct {
 	User             string           `json:"user"`
 	AdditionalGroups []string         `json:"additional_groups"`
 	Config           *configs.Config  `json:"config"`
-	Console          string           `json:"console"`
 	Networks         []*network       `json:"network"`
 	PassedFilesCount int              `json:"passed_files_count"`
 	ContainerId      string           `json:"containerid"`
 	Rlimits          []configs.Rlimit `json:"rlimits"`
 	ExecFifoPath     string           `json:"start_pipe_path"`
+	CreateConsole    bool             `json:"create_console"`
 }
 
 type initer interface {
@@ -77,6 +77,7 @@ func newContainerInit(t initType, pipe *os.File, stateDirFD int) (initer, error)
 	switch t {
 	case initSetns:
 		return &linuxSetnsInit{
+			pipe:   pipe,
 			config: config,
 		}, nil
 	case initStandard:
@@ -150,24 +151,79 @@ func finalizeNamespace(config *initConfig) error {
 	return nil
 }
 
+// setupConsole sets up the console from inside the container, and sends the
+// master pty fd to the config.Pipe (using cmsg). This is done to ensure that
+// consoles are scoped to a container properly (see runc#814 and the many
+// issues related to that). This has to be run *after* we've pivoted to the new
+// rootfs (and the users' configuration is entirely set up).
+func setupConsole(pipe *os.File, config *initConfig, mount bool) error {
+	// At this point, /dev/ptmx points to something that we would expect. We
+	// used to change the owner of the slave path, but since the /dev/pts mount
+	// can have gid=X set (at the users' option). So touching the owner of the
+	// slave PTY is not necessary, as the kernel will handle that for us. Note
+	// however, that setupUser (specifically fixStdioPermissions) *will* change
+	// the UID owner of the console to be the user the process will run as (so
+	// they can actually control their console).
+	console, err := newConsole()
+	if err != nil {
+		return err
+	}
+	// After we return from here, we don't need the console anymore.
+	defer console.Close()
+
+	linuxConsole, ok := console.(*linuxConsole)
+	if !ok {
+		return fmt.Errorf("failed to cast console to *linuxConsole")
+	}
+
+	// Mount the console inside our rootfs.
+	if mount {
+		if err := linuxConsole.mount(); err != nil {
+			return err
+		}
+	}
+
+	if err := writeSync(pipe, procConsole); err != nil {
+		return err
+	}
+
+	// We need to have a two-way synchronisation here. Though it might seem
+	// pointless, it's important to make sure that the sendmsg(2) payload
+	// doesn't get swallowed by an out-of-place read(2) [which happens if the
+	// syscalls get reordered so that sendmsg(2) is before the other side's
+	// read(2) of procConsole].
+	if err := readSync(pipe, procConsoleReq); err != nil {
+		return err
+	}
+
+	// While we can access console.master, using the API is a good idea.
+	if err := utils.SendFd(pipe, linuxConsole.File()); err != nil {
+		return err
+	}
+
+	// Make sure the other side recieved the fd.
+	if err := readSync(pipe, procConsoleAck); err != nil {
+		return err
+	}
+
+	// Now, dup over all the things.
+	return linuxConsole.dupStdio()
+}
+
 // syncParentReady sends to the given pipe a JSON payload which indicates that
 // the init is ready to Exec the child process. It then waits for the parent to
 // indicate that it is cleared to Exec.
 func syncParentReady(pipe io.ReadWriter) error {
 	// Tell parent.
-	if err := utils.WriteJSON(pipe, syncT{procReady}); err != nil {
+	if err := writeSync(pipe, procReady); err != nil {
 		return err
 	}
+
 	// Wait for parent to give the all-clear.
-	var procSync syncT
-	if err := json.NewDecoder(pipe).Decode(&procSync); err != nil {
-		if err == io.EOF {
-			return fmt.Errorf("parent closed synchronisation channel")
-		}
-		if procSync.Type != procRun {
-			return fmt.Errorf("invalid synchronisation flag from parent")
-		}
+	if err := readSync(pipe, procRun); err != nil {
+		return err
 	}
+
 	return nil
 }
 
@@ -176,19 +232,15 @@ func syncParentReady(pipe io.ReadWriter) error {
 // indicate that it is cleared to resume.
 func syncParentHooks(pipe io.ReadWriter) error {
 	// Tell parent.
-	if err := utils.WriteJSON(pipe, syncT{procHooks}); err != nil {
+	if err := writeSync(pipe, procHooks); err != nil {
 		return err
 	}
+
 	// Wait for parent to give the all-clear.
-	var procSync syncT
-	if err := json.NewDecoder(pipe).Decode(&procSync); err != nil {
-		if err == io.EOF {
-			return fmt.Errorf("parent closed synchronisation channel")
-		}
-		if procSync.Type != procResume {
-			return fmt.Errorf("invalid synchronisation flag from parent")
-		}
+	if err := readSync(pipe, procResume); err != nil {
+		return err
 	}
+
 	return nil
 }
 
@@ -262,11 +314,17 @@ func fixStdioPermissions(u *user.ExecUser) error {
 		if err := syscall.Fstat(int(fd), &s); err != nil {
 			return err
 		}
-		// skip chown of /dev/null if it was used as one of the STDIO fds.
+		// Skip chown of /dev/null if it was used as one of the STDIO fds.
 		if s.Rdev == null.Rdev {
 			continue
 		}
-		if err := syscall.Fchown(int(fd), u.Uid, u.Gid); err != nil {
+		// We only change the uid owner (as it is possible for the mount to
+		// prefer a different gid, and there's no reason for us to change it).
+		// The reason why we don't just leave the default uid=X mount setup is
+		// that users expect to be able to actually use their console. Without
+		// this code, you couldn't effectively run as a non-root user inside a
+		// container and also have a console set up.
+		if err := syscall.Fchown(int(fd), u.Uid, int(s.Gid)); err != nil {
 			return err
 		}
 	}
@@ -334,10 +392,10 @@ func setOomScoreAdj(oomScoreAdj int, pid int) error {
 	return ioutil.WriteFile(path, []byte(strconv.Itoa(oomScoreAdj)), 0600)
 }
 
-// killCgroupProcesses freezes then iterates over all the processes inside the
+// signalAllProcesses freezes then iterates over all the processes inside the
 // manager's cgroups sending a SIGKILL to each process then waiting for them to
 // exit.
-func killCgroupProcesses(m cgroups.Manager) error {
+func signalAllProcesses(m cgroups.Manager, s os.Signal) error {
 	var procs []*os.Process
 	if err := m.Freeze(configs.Frozen); err != nil {
 		logrus.Warn(err)
@@ -354,7 +412,7 @@ func killCgroupProcesses(m cgroups.Manager) error {
 			continue
 		}
 		procs = append(procs, p)
-		if err := p.Kill(); err != nil {
+		if err := p.Signal(s); err != nil {
 			logrus.Warn(err)
 		}
 	}

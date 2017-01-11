@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/Sirupsen/logrus"
+	"github.com/opencontainers/runtime-spec/specs-go"
 )
 
 type Rlimit struct {
@@ -84,11 +85,6 @@ type Config struct {
 	// ParentDeathSignal specifies the signal that is sent to the container's process in the case
 	// that the parent process dies.
 	ParentDeathSignal int `json:"parent_death_signal"`
-
-	// PivotDir allows a custom directory inside the container's root filesystem to be used as pivot, when NoPivotRoot is not set.
-	// When a custom PivotDir not set, a temporary dir inside the root filesystem will be used. The pivot dir needs to be writeable.
-	// This is required when using read only root filesystems. In these cases, a read/writeable path can be (bind) mounted somewhere inside the root filesystem to act as pivot.
-	PivotDir string `json:"pivot_dir"`
 
 	// Path to a directory containing the container's root filesystem.
 	Rootfs string `json:"rootfs"`
@@ -248,13 +244,7 @@ func (hooks Hooks) MarshalJSON() ([]byte, error) {
 }
 
 // HookState is the payload provided to a hook on execution.
-type HookState struct {
-	Version    string `json:"ociVersion"`
-	ID         string `json:"id"`
-	Pid        int    `json:"pid"`
-	Root       string `json:"root"`
-	BundlePath string `json:"bundlePath"`
-}
+type HookState specs.State
 
 type Hook interface {
 	// Run executes the hook with the provided state.

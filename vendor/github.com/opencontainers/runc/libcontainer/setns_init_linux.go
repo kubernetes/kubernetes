@@ -16,6 +16,7 @@ import (
 // linuxSetnsInit performs the container's initialization for running a new process
 // inside an existing container.
 type linuxSetnsInit struct {
+	pipe   *os.File
 	config *initConfig
 }
 
@@ -27,6 +28,14 @@ func (l *linuxSetnsInit) Init() error {
 	if !l.config.Config.NoNewKeyring {
 		// do not inherit the parent's session keyring
 		if _, err := keys.JoinSessionKeyring(l.getSessionRingName()); err != nil {
+			return err
+		}
+	}
+	if l.config.CreateConsole {
+		if err := setupConsole(l.pipe, l.config, false); err != nil {
+			return err
+		}
+		if err := system.Setctty(); err != nil {
 			return err
 		}
 	}

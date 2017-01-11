@@ -123,7 +123,7 @@ type BaseContainer interface {
 	// SystemError - System error.
 	Start(process *Process) (err error)
 
-	// Run immediatly starts the process inside the conatiner.  Returns error if process
+	// Run immediately starts the process inside the container.  Returns error if process
 	// fails to start.  It does not block waiting for the exec fifo  after start returns but
 	// opens the fifo after start returns.
 	//
@@ -145,9 +145,12 @@ type BaseContainer interface {
 
 	// Signal sends the provided signal code to the container's initial process.
 	//
+	// If all is specified the signal is sent to all processes in the container
+	// including the initial process.
+	//
 	// errors:
 	// SystemError - System error.
-	Signal(s os.Signal) error
+	Signal(s os.Signal, all bool) error
 
 	// Exec signals the container to exec the users process at the end of the init.
 	//
