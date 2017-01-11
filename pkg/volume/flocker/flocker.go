@@ -22,6 +22,7 @@ import (
 	"path"
 	"time"
 
+	flockerApi "github.com/clusterhq/flocker-go"
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/types"
@@ -29,8 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
-
-	flockerApi "github.com/clusterhq/flocker-go"
+	"k8s.io/kubernetes/pkg/volume/util"
 )
 
 // This is the primary entrypoint for volume plugins.
@@ -421,25 +421,7 @@ func (c *flockerVolumeUnmounter) TearDown() error {
 
 // TearDownAt unmounts the bind mount
 func (c *flockerVolumeUnmounter) TearDownAt(dir string) error {
-	notMnt, err := c.mounter.IsLikelyNotMountPoint(dir)
-	if err != nil {
-		return err
-	}
-	if notMnt {
-		return os.Remove(dir)
-	}
-	if err := c.mounter.Unmount(dir); err != nil {
-		return err
-	}
-	notMnt, mntErr := c.mounter.IsLikelyNotMountPoint(dir)
-	if mntErr != nil {
-		glog.Errorf("isLikelyNotMountPoint check failed: %v", mntErr)
-		return err
-	}
-	if notMnt {
-		return os.Remove(dir)
-	}
-	return fmt.Errorf("Failed to unmount volume dir")
+	return util.UnmountPath(dir, c.mounter)
 }
 
 func (plugin *flockerPlugin) NewDeleter(spec *volume.Spec) (volume.Deleter, error) {

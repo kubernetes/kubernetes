@@ -28,6 +28,7 @@ go_library(
         "//pkg/util/rand:go_default_library",
         "//pkg/util/strings:go_default_library",
         "//pkg/volume:go_default_library",
+        "//pkg/volume/util:go_default_library",
         "//vendor:github.com/clusterhq/flocker-go",
         "//vendor:github.com/golang/glog",
     ],
