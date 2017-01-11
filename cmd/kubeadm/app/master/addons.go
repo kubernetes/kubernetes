@@ -26,7 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/v1"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
 	"k8s.io/kubernetes/pkg/util/intstr"
 )
@@ -82,16 +82,14 @@ func createKubeProxyPodSpec(cfg *kubeadmapi.MasterConfiguration) v1.PodSpec {
 }
 
 func createKubeDNSPodSpec(cfg *kubeadmapi.MasterConfiguration) v1.PodSpec {
-
 	kubeDNSPort := int32(10053)
 	dnsmasqPort := int32(53)
-	dnsMasqMetricsUser := int64(0)
 
 	return v1.PodSpec{
 		Containers: []v1.Container{
 			// DNS server
 			{
-				Name:  "kube-dns",
+				Name:  "kubedns",
 				Image: images.GetAddonImage(images.KubeDNSImage),
 				Resources: v1.ResourceRequirements{
 					Limits: v1.ResourceList{
@@ -105,8 +103,8 @@ func createKubeDNSPodSpec(cfg *kubeadmapi.MasterConfiguration) v1.PodSpec {
 				LivenessProbe: &v1.Probe{
 					Handler: v1.Handler{
 						HTTPGet: &v1.HTTPGetAction{
-							Path:   "/healthz-kubedns",
-							Port:   intstr.FromInt(8080),
+							Path:   "/healthcheck/kubedns",
+							Port:   intstr.FromInt(10054),
 							Scheme: v1.URISchemeHTTP,
 						},
 					},
@@ -165,8 +163,8 @@ func createKubeDNSPodSpec(cfg *kubeadmapi.MasterConfiguration) v1.PodSpec {
 				LivenessProbe: &v1.Probe{
 					Handler: v1.Handler{
 						HTTPGet: &v1.HTTPGetAction{
-							Path:   "/healthz-dnsmasq",
-							Port:   intstr.FromInt(8080),
+							Path:   "/healthcheck/dnsmasq",
+							Port:   intstr.FromInt(10054),
 							Scheme: v1.URISchemeHTTP,
 						},
 					},
@@ -201,8 +199,8 @@ func createKubeDNSPodSpec(cfg *kubeadmapi.MasterConfiguration) v1.PodSpec {
 				},
 			},
 			{
-				Name:  "dnsmasq-metrics",
-				Image: images.GetAddonImage(images.KubeDNSmasqMetricsImage),
+				Name:  "sidecar",
+				Image: images.GetAddonImage(images.KubeDNSSidecarImage),
 				LivenessProbe: &v1.Probe{
 					Handler: v1.Handler{
 						HTTPGet: &v1.HTTPGetAction{
@@ -216,16 +214,11 @@ func createKubeDNSPodSpec(cfg *kubeadmapi.MasterConfiguration) v1.PodSpec {
 					SuccessThreshold:    1,
 					FailureThreshold:    5,
 				},
-				// The code below is a workaround for https://github.com/kubernetes/contrib/blob/master/dnsmasq-metrics/Dockerfile.in#L21
-				// This is just the normal mode (to run with user 0), all other containers do it except for this one, which may lead to
-				// that the DNS pod fails if the "nobody" _group_ doesn't exist. I think it's a typo in the Dockerfile manifest and
-				// that it should be "USER nobody:nogroup" instead of "USER nobody:nobody". However, this fixes the problem.
-				SecurityContext: &v1.SecurityContext{
-					RunAsUser: &dnsMasqMetricsUser,
-				},
 				Args: []string{
 					"--v=2",
 					"--logtostderr",
+					fmt.Sprintf("--probe=kubedns,127.0.0.1:10053,kubernetes.default.svc.%s,5,A", cfg.Networking.DNSDomain),
+					fmt.Sprintf("--probe=dnsmasq,127.0.0.1:53,kubernetes.default.svc.%s,5,A", cfg.Networking.DNSDomain),
 				},
 				Ports: []v1.ContainerPort{
 					{
@@ -236,35 +229,10 @@ func createKubeDNSPodSpec(cfg *kubeadmapi.MasterConfiguration) v1.PodSpec {
 				},
 				Resources: v1.ResourceRequirements{
 					Requests: v1.ResourceList{
-						v1.ResourceName(v1.ResourceMemory): resource.MustParse("10Mi"),
-					},
-				},
-			},
-			// healthz
-			{
-				Name:  "healthz",
-				Image: images.GetAddonImage(images.KubeExechealthzImage),
-				Resources: v1.ResourceRequirements{
-					Limits: v1.ResourceList{
-						v1.ResourceName(v1.ResourceMemory): resource.MustParse("50Mi"),
-					},
-					Requests: v1.ResourceList{
+						v1.ResourceName(v1.ResourceMemory): resource.MustParse("20Mi"),
 						v1.ResourceName(v1.ResourceCPU):    resource.MustParse("10m"),
-						v1.ResourceName(v1.ResourceMemory): resource.MustParse("50Mi"),
 					},
 				},
-				Args: []string{
-					fmt.Sprintf("--cmd=nslookup kubernetes.default.svc.%s 127.0.0.1 >/dev/null", cfg.Networking.DNSDomain),
-					"--url=/healthz-dnsmasq",
-					fmt.Sprintf("--cmd=nslookup kubernetes.default.svc.%s 127.0.0.1:%d >/dev/null", cfg.Networking.DNSDomain, kubeDNSPort),
-					"--url=/healthz-kubedns",
-					"--port=8080",
-					"--quiet",
-				},
-				Ports: []v1.ContainerPort{{
-					ContainerPort: 8080,
-					Protocol:      v1.ProtocolTCP,
-				}},
 			},
 		},
 		DNSPolicy: v1.DNSDefault,
