@@ -563,6 +563,14 @@ func NewGarbageCollector(metaOnlyClientPool dynamic.ClientPool, clientPool dynam
 		}
 		kind, err := gc.restMapper.KindFor(resource)
 		if err != nil {
+			if _, ok := err.(*meta.NoResourceMatchError); ok {
+				// ignore NoResourceMatchErrors for now because TPRs won't be registered
+				// and hence the RestMapper does not know about them. The deletableResources
+				// though are using discovery which included TPRs.
+				// TODO: use dynamic discovery for RestMapper and deletableResources
+				glog.Warningf("ignore NoResourceMatchError for %v", resource)
+				continue
+			}
 			return nil, err
 		}
 		monitor, err := gc.monitorFor(resource, kind)
