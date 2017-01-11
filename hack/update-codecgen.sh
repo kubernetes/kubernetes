@@ -31,7 +31,7 @@ generated_files=($(
       \( \
         -wholename './output' \
         -o -wholename './_output' \
-        -o -wholename './staging' \
+        -o -wholename './staging/src/k8s.io/client-go' \
         -o -wholename './release' \
         -o -wholename './target' \
         -o -wholename '*/third_party/*' \
