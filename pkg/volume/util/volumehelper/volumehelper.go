@@ -89,6 +89,8 @@ func GetUniqueVolumeNameFromSpec(
 		nil
 }
 
+// SplitUniqueName takes the volume unique name and splits it into the plugin
+// name and volume name.
 func SplitUniqueName(uniqueName string) (string, string) {
 	components := strings.SplitN(uniqueName, "/", 3)
 	pluginName := fmt.Sprintf("%s/%s", components[0], components[1])
