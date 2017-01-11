@@ -33,8 +33,8 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
-	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/coreos/go-oidc/jose"
 	"github.com/coreos/go-oidc/oidc"
@@ -43,7 +43,10 @@ import (
 	certutil "k8s.io/kubernetes/pkg/util/cert"
 	"k8s.io/kubernetes/pkg/util/net"
 	"k8s.io/kubernetes/pkg/util/runtime"
+	"k8s.io/kubernetes/pkg/util/wait"
 )
+
+const pollInterval = time.Second * 30
 
 type OIDCOptions struct {
 	// IssuerURL is the URL the provider signs ID Tokens as. This will be the "iss"
@@ -90,9 +93,9 @@ type OIDCAuthenticator struct {
 	// Contains an *oidc.Client. Do not access directly. Use client() method.
 	oidcClient atomic.Value
 
-	// Guards the close method and is used to lock during initialization and closing.
-	mu    sync.Mutex
-	close func() // May be nil
+	// A channel which is closed by the Close method indicating that any polling or
+	// sync jobs should be shut down.
+	done chan struct{}
 }
 
 // New creates a token authenticator which validates OpenID Connect ID Tokens.
@@ -133,50 +136,41 @@ func New(opts OIDCOptions) (*OIDCAuthenticator, error) {
 		usernameClaim:   opts.UsernameClaim,
 		groupsClaim:     opts.GroupsClaim,
 		httpClient:      &http.Client{Transport: tr},
+		done:            make(chan struct{}),
 	}
 
-	// Attempt to initialize the authenticator asynchronously.
-	//
-	// Ignore errors instead of returning it since the OpenID Connect provider might not be
-	// available yet, for instance if it's running on the cluster and needs the API server
-	// to come up first. Errors will be logged within the client() method.
-	go func() {
-		defer runtime.HandleCrash()
-		authenticator.client()
-	}()
+	initAuthenticator := wait.ConditionFunc(func() (done bool, err error) {
+		if err := authenticator.init(); err != nil {
+			runtime.HandleError(fmt.Errorf("oidc authenticator: %v", err))
+			return false, nil
+		}
+		return true, nil
+	})
+
+	// Try to init once synchronously so working setups return an authenticator that
+	// can immediately make authentication decisions.
+	if ok, _ := initAuthenticator(); !ok {
+		go func() {
+			// If the initial init didn't work begin polling the provider.
+			defer runtime.HandleCrash()
+			wait.PollUntil(pollInterval, initAuthenticator, authenticator.done)
+		}()
+	}
 
 	return authenticator, nil
 }
 
 // Close stops all goroutines used by the authenticator.
 func (a *OIDCAuthenticator) Close() {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-
-	if a.close != nil {
-		a.close()
-	}
+	close(a.done)
 	return
 }
 
-func (a *OIDCAuthenticator) client() (*oidc.Client, error) {
-	// Fast check to see if client has already been initialized.
-	if client := a.oidcClient.Load(); client != nil {
-		return client.(*oidc.Client), nil
-	}
-
-	// Acquire lock, then recheck initialization.
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	if client := a.oidcClient.Load(); client != nil {
-		return client.(*oidc.Client), nil
-	}
-
+func (a *OIDCAuthenticator) init() error {
 	// Try to initialize client.
 	providerConfig, err := oidc.FetchProviderConfig(a.httpClient, a.issuerURL)
 	if err != nil {
-		glog.Errorf("oidc authenticator: failed to fetch provider discovery data: %v", err)
-		return nil, fmt.Errorf("fetch provider config: %v", err)
+		return fmt.Errorf("failed to fetch provider discovery data: %v", err)
 	}
 
 	clientConfig := oidc.ClientConfig{
@@ -187,8 +181,7 @@ func (a *OIDCAuthenticator) client() (*oidc.Client, error) {
 
 	client, err := oidc.NewClient(clientConfig)
 	if err != nil {
-		glog.Errorf("oidc authenticator: failed to create client: %v", err)
-		return nil, fmt.Errorf("create client: %v", err)
+		return fmt.Errorf("failed to create client: %v", err)
 	}
 
 	// SyncProviderConfig will start a goroutine to periodically synchronize the provider config.
@@ -196,14 +189,20 @@ func (a *OIDCAuthenticator) client() (*oidc.Client, error) {
 	// and maximum threshold.
 	stop := client.SyncProviderConfig(a.issuerURL)
 	a.oidcClient.Store(client)
-	a.close = func() {
-		// This assumes the stop is an unbuffered channel.
-		// So instead of closing the channel, we send am empty struct here.
-		// This guarantees that when this function returns, there is no flying requests,
-		// because a send to an unbuffered channel happens after the receive from the channel.
+	go func() {
+		defer runtime.HandleCrash()
+		// Wait until the authenticator is closed, then close the client.
+		<-a.done
 		stop <- struct{}{}
+	}()
+	return nil
+}
+
+func (a *OIDCAuthenticator) client() (*oidc.Client, error) {
+	if client := a.oidcClient.Load(); client != nil {
+		return client.(*oidc.Client), nil
 	}
-	return client, nil
+	return nil, errors.New("oidc plugin failed to initialize")
 }
 
 // AuthenticateToken decodes and verifies an ID Token using the OIDC client, if the verification succeeds,
