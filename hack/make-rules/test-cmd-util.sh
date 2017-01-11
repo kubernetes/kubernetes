@@ -1072,6 +1072,20 @@ run_kubectl_get_tests() {
 
   # cleanup
   kubectl delete pods valid-pod "${kube_flags[@]}"
+
+  ### Test 'kubectl get -f <file> -o <non default printer>' prints all the items in the file's list
+  # Pre-condition: no POD exists
+  kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
+  # Command
+  kubectl create -f test/fixtures/doc-yaml/user-guide/multi-pod.yaml "${kube_flags[@]}"
+  # Post-condition: PODs redis-master and redis-proxy exist
+
+  # Check that all items in the list are printed
+  output_message=$(kubectl get -f test/fixtures/doc-yaml/user-guide/multi-pod.yaml -o jsonpath="{..metadata.name}" "${kube_flags[@]}")
+  kube::test::if_has_string "${output_message}" "redis-master redis-proxy"
+
+  # cleanup
+  kubectl delete pods redis-master redis-proxy "${kube_flags[@]}"
 }
 
 run_kubectl_request_timeout_tests() {
