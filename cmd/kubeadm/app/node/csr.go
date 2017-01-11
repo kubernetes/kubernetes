@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"os"
 
-	kubeconfigphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubeconfig"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
@@ -28,37 +27,6 @@ import (
 	"k8s.io/kubernetes/pkg/types"
 	certutil "k8s.io/kubernetes/pkg/util/cert"
 )
-
-// TODO @mikedanese move this to PerformTLSBootstrap
-func PerformTLSBootstrapDeprecated(connection *ConnectionDetails) (*clientcmdapi.Config, error) {
-	fmt.Println("[csr] Created API client to obtain unique certificate for this node, generating keys and certificate signing request")
-
-	key, err := certutil.MakeEllipticPrivateKeyPEM()
-	if err != nil {
-		return nil, fmt.Errorf("failed to generate private key [%v]", err)
-	}
-	cert, err := csr.RequestNodeCertificate(connection.CertClient.CertificateSigningRequests(), key, connection.NodeName)
-	if err != nil {
-		return nil, fmt.Errorf("failed to request signed certificate from the API server [%v]", err)
-	}
-	fmtCert, err := certutil.FormatBytesCert(cert)
-	if err != nil {
-		return nil, fmt.Errorf("failed to format certificate [%v]", err)
-	}
-	fmt.Printf("[csr] Received signed certificate from the API server:\n%s\n", fmtCert)
-	fmt.Println("[csr] Generating kubelet configuration")
-
-	newConfig := kubeconfigphase.MakeClientConfigWithCerts(
-		connection.Endpoint,
-		"kubernetes",
-		fmt.Sprintf("kubelet-%s", connection.NodeName),
-		connection.CACert,
-		key,
-		cert,
-	)
-
-	return newConfig, nil
-}
 
 // PerformTLSBootstrap executes a node certificate signing request.
 func PerformTLSBootstrap(cfg *clientcmdapi.Config) error {

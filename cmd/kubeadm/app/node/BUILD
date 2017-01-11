@@ -23,7 +23,6 @@ go_library(
         "//pkg/api/v1:go_default_library",
         "//pkg/apis/certificates:go_default_library",
         "//pkg/client/clientset_generated/clientset:go_default_library",
-        "//pkg/client/clientset_generated/clientset/typed/certificates/v1alpha1:go_default_library",
         "//pkg/client/unversioned/clientcmd:go_default_library",
         "//pkg/client/unversioned/clientcmd/api:go_default_library",
         "//pkg/kubelet/util/csr:go_default_library",
@@ -38,7 +37,6 @@ go_test(
     name = "go_default_test",
     srcs = [
         "bootstrap_test.go",
-        "csr_test.go",
         "discovery_test.go",
     ],
     library = ":go_default_library",
@@ -47,7 +45,6 @@ go_test(
         "//cmd/kubeadm/app/apis/kubeadm:go_default_library",
         "//pkg/apis/meta/v1:go_default_library",
         "//pkg/client/clientset_generated/clientset:go_default_library",
-        "//pkg/client/clientset_generated/clientset/typed/certificates/v1alpha1:go_default_library",
         "//pkg/client/restclient:go_default_library",
         "//pkg/client/typed/discovery:go_default_library",
         "//pkg/version:go_default_library",
