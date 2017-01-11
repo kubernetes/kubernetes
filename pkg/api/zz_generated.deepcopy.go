@@ -21,6 +21,7 @@ limitations under the License.
 package api
 
 import (
+	pkgfoo "k8s.io/fake-dep/pkgfoo"
 	v1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	conversion "k8s.io/kubernetes/pkg/conversion"
 	fields "k8s.io/kubernetes/pkg/fields"
@@ -109,6 +110,7 @@ func RegisterDeepCopies(scheme *runtime.Scheme) error {
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_NamespaceList, InType: reflect.TypeOf(&NamespaceList{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_NamespaceSpec, InType: reflect.TypeOf(&NamespaceSpec{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_NamespaceStatus, InType: reflect.TypeOf(&NamespaceStatus{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_NewTypeToCopy, InType: reflect.TypeOf(&NewTypeToCopy{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_Node, InType: reflect.TypeOf(&Node{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_NodeAddress, InType: reflect.TypeOf(&NodeAddress{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_NodeAffinity, InType: reflect.TypeOf(&NodeAffinity{})},
@@ -1425,6 +1427,23 @@ func DeepCopy_api_NamespaceStatus(in interface{}, out interface{}, c *conversion
 		in := in.(*NamespaceStatus)
 		out := out.(*NamespaceStatus)
 		*out = *in
+		return nil
+	}
+}
+
+func DeepCopy_api_NewTypeToCopy(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*NewTypeToCopy)
+		out := out.(*NewTypeToCopy)
+		*out = *in
+		if err := DeepCopy_api_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, c); err != nil {
+			return err
+		}
+		if in.FieldHere != nil {
+			in, out := &in.FieldHere, &out.FieldHere
+			*out = new(pkgfoo.Foo)
+			**out = **in
+		}
 		return nil
 	}
 }
