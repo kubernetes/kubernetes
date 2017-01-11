@@ -113,22 +113,29 @@ func (r *DefaultRuleResolver) RulesFor(user user.Info, namespace string) ([]rbac
 		}
 	}
 
+	var nsValue string
 	if len(namespace) > 0 {
-		if roleBindings, err := r.roleBindingLister.ListRoleBindings(namespace); err != nil {
-			errorlist = append(errorlist, err)
+		nsValue = namespace
+	} else {
+		// Some resources are not namespaced, Using api.NamespaceAll to
+		// get all rolebindings for this situation
+		nsValue = api.NamespaceAll
+	}
 
-		} else {
-			for _, roleBinding := range roleBindings {
-				if !appliesTo(user, roleBinding.Subjects, namespace) {
-					continue
-				}
-				rules, err := r.GetRoleReferenceRules(roleBinding.RoleRef, namespace)
-				if err != nil {
-					errorlist = append(errorlist, err)
-					continue
-				}
-				policyRules = append(policyRules, rules...)
+	if roleBindings, err := r.roleBindingLister.ListRoleBindings(nsValue); err != nil {
+		errorlist = append(errorlist, err)
+
+	} else {
+		for _, roleBinding := range roleBindings {
+			if !appliesTo(user, roleBinding.Subjects, namespace) {
+				continue
 			}
+			rules, err := r.GetRoleReferenceRules(roleBinding.RoleRef, namespace)
+			if err != nil {
+				errorlist = append(errorlist, err)
+				continue
+			}
+			policyRules = append(policyRules, rules...)
 		}
 	}
 
