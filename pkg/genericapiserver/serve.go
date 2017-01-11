@@ -26,8 +26,8 @@ import (
 	"sync"
 	"time"
 
-	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
-	"k8s.io/kubernetes/pkg/util/validation"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/validation"
 
 	"github.com/golang/glog"
 	"github.com/pkg/errors"

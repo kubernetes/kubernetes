@@ -21,7 +21,7 @@ import (
 	"sync"
 
 	"github.com/golang/groupcache/lru"
-	"k8s.io/kubernetes/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/api/meta"
 	hashutil "k8s.io/kubernetes/pkg/util/hash"
 )
 

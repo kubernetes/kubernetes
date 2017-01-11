@@ -21,7 +21,7 @@ import (
 	"net/http"
 	"strings"
 
-	"k8s.io/kubernetes/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 // RequestInfo holds information parsed from the http.Request

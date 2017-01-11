@@ -21,8 +21,8 @@ import (
 	"net/http"
 	"strings"
 
+	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/httpstream"
-	"k8s.io/kubernetes/pkg/util/runtime"
 )
 
 const HeaderSpdy31 = "SPDY/3.1"

@@ -20,11 +20,11 @@ import (
 	"reflect"
 	"testing"
 
+	"k8s.io/apimachinery/pkg/apimachinery/registered"
+	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/kubernetes/pkg/api"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
-	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/util/diff"
 )
 
 func testEvent(name string) *api.Event {

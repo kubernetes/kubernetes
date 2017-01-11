@@ -19,8 +19,8 @@ go_library(
         "//pkg/admission:go_default_library",
         "//pkg/api:go_default_library",
         "//pkg/api/errors:go_default_library",
-        "//pkg/apis/meta/v1:go_default_library",
         "//vendor:github.com/golang/glog",
+        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
     ],
 )
 
@@ -32,8 +32,8 @@ go_test(
     deps = [
         "//pkg/admission:go_default_library",
         "//pkg/api:go_default_library",
-        "//pkg/apis/meta/v1:go_default_library",
-        "//pkg/runtime:go_default_library",
+        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor:k8s.io/apimachinery/pkg/runtime",
     ],
 )
 

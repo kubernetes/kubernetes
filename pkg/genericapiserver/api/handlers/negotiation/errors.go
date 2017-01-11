@@ -21,7 +21,7 @@ import (
 	"net/http"
 	"strings"
 
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // errNotAcceptable indicates Accept negotiation has failed

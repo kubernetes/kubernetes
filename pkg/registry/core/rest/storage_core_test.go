@@ -19,7 +19,7 @@ package rest
 import (
 	"testing"
 
-	"k8s.io/kubernetes/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/storage/storagebackend"
 )
 

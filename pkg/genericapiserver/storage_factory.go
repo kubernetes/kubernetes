@@ -21,11 +21,11 @@ import (
 	"mime"
 	"strings"
 
-	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/runtime/schema"
-	"k8s.io/kubernetes/pkg/runtime/serializer/recognizer"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/runtime/serializer/recognizer"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/storage/storagebackend"
-	"k8s.io/kubernetes/pkg/util/sets"
 
 	"github.com/golang/glog"
 )

@@ -21,8 +21,8 @@ import (
 	"strings"
 	"testing"
 
+	"k8s.io/apimachinery/pkg/util/diff"
 	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
-	"k8s.io/kubernetes/pkg/util/diff"
 )
 
 type stepParserTest struct {

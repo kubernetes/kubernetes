@@ -14,18 +14,18 @@ go_library(
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/v1:go_default_library",
-        "//pkg/apis/meta/v1:go_default_library",
         "//pkg/client/clientset_generated/clientset:go_default_library",
         "//pkg/kubelet/container:go_default_library",
         "//pkg/kubelet/pod:go_default_library",
         "//pkg/kubelet/util/format:go_default_library",
         "//pkg/kubelet/volumemanager/cache:go_default_library",
-        "//pkg/types:go_default_library",
-        "//pkg/util/wait:go_default_library",
         "//pkg/volume:go_default_library",
         "//pkg/volume/util/types:go_default_library",
         "//pkg/volume/util/volumehelper:go_default_library",
         "//vendor:github.com/golang/glog",
+        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor:k8s.io/apimachinery/pkg/types",
+        "//vendor:k8s.io/apimachinery/pkg/util/wait",
     ],
 )
 

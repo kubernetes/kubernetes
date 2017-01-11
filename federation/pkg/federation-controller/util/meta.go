@@ -19,9 +19,9 @@ package util
 import (
 	"reflect"
 
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/api"
 	api_v1 "k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/runtime"
 )
 
 // Copies cluster-independent, user provided data from the given ObjectMeta struct. If in

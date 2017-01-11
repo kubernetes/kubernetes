@@ -29,8 +29,8 @@ import (
 
 	"github.com/golang/glog"
 	"github.com/stretchr/testify/assert"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/examples/apiserver"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 )
 
 var groupVersion = v1.SchemeGroupVersion

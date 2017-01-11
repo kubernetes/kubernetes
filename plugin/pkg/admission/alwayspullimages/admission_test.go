@@ -19,9 +19,9 @@ package alwayspullimages
 import (
 	"testing"
 
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/runtime"
 )
 
 // TestAdmission verifies all create requests for pods result in every container's image pull policy

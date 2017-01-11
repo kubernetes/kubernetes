@@ -13,9 +13,9 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//pkg/util/flowcontrol:go_default_library",
-        "//pkg/util/wait:go_default_library",
         "//vendor:github.com/golang/glog",
         "//vendor:github.com/prometheus/client_golang/prometheus",
+        "//vendor:k8s.io/apimachinery/pkg/util/wait",
     ],
 )
 

@@ -23,11 +23,11 @@ import (
 	"path"
 	"strconv"
 
+	netutil "k8s.io/apimachinery/pkg/util/net"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiext "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
-	netutil "k8s.io/kubernetes/pkg/util/net"
 	"k8s.io/kubernetes/pkg/util/uuid"
 )
 

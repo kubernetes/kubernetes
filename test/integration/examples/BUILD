@@ -14,9 +14,9 @@ go_test(
     deps = [
         "//cmd/libs/go2idl/client-gen/test_apis/testgroup/v1:go_default_library",
         "//examples/apiserver:go_default_library",
-        "//pkg/apis/meta/v1:go_default_library",
         "//vendor:github.com/golang/glog",
         "//vendor:github.com/stretchr/testify/assert",
+        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
     ],
 )
 

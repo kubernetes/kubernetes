@@ -17,9 +17,9 @@ limitations under the License.
 package app
 
 import (
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	ingresscontroller "k8s.io/kubernetes/federation/pkg/federation-controller/ingress"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/util/config"
 	"testing"
 )

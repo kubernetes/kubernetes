@@ -19,9 +19,9 @@ package validation
 import (
 	"testing"
 
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	api "k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/rbac"
-	"k8s.io/kubernetes/pkg/util/validation/field"
 )
 
 func TestValidateClusterRoleBinding(t *testing.T) {

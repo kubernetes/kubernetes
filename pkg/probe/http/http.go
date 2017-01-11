@@ -24,8 +24,8 @@ import (
 	"net/url"
 	"time"
 
+	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/kubernetes/pkg/probe"
-	utilnet "k8s.io/kubernetes/pkg/util/net"
 
 	"github.com/golang/glog"
 )

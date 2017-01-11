@@ -21,7 +21,7 @@ limitations under the License.
 package v1
 
 import (
-	conversion "k8s.io/kubernetes/pkg/conversion"
+	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/kubernetes/pkg/runtime"
 	reflect "reflect"
 )

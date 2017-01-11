@@ -17,7 +17,7 @@ go_library(
         "//pkg/apis/extensions/validation:go_default_library",
         "//pkg/apis/meta/v1/validation:go_default_library",
         "//pkg/apis/policy:go_default_library",
-        "//pkg/util/validation/field:go_default_library",
+        "//vendor:k8s.io/apimachinery/pkg/util/validation/field",
     ],
 )
 
@@ -29,7 +29,7 @@ go_test(
     deps = [
         "//pkg/apis/policy:go_default_library",
         "//pkg/util/intstr:go_default_library",
-        "//pkg/util/validation/field:go_default_library",
+        "//vendor:k8s.io/apimachinery/pkg/util/validation/field",
     ],
 )
 

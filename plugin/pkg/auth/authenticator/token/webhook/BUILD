@@ -34,8 +34,8 @@ go_test(
     tags = ["automanaged"],
     deps = [
         "//pkg/apis/authentication/v1beta1:go_default_library",
-        "//pkg/apis/meta/v1:go_default_library",
         "//pkg/client/unversioned/clientcmd/api/v1:go_default_library",
+        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apiserver/pkg/authentication/user",
     ],
 )

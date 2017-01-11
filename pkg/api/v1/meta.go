@@ -17,9 +17,9 @@ limitations under the License.
 package v1
 
 import (
-	"k8s.io/kubernetes/pkg/api/meta"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/types"
+	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 )
 
 func (obj *ObjectMeta) GetObjectMeta() meta.Object { return obj }

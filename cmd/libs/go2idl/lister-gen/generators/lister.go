@@ -217,7 +217,7 @@ func (g *listerGenerator) Namers(c *generator.Context) namer.NameSystems {
 func (g *listerGenerator) Imports(c *generator.Context) (imports []string) {
 	imports = append(imports, g.imports.ImportLines()...)
 	imports = append(imports, "k8s.io/kubernetes/pkg/api/errors")
-	imports = append(imports, "k8s.io/kubernetes/pkg/labels")
+	imports = append(imports, "k8s.io/apimachinery/pkg/labels")
 	// for Indexer
 	imports = append(imports, "k8s.io/kubernetes/pkg/client/cache")
 	return

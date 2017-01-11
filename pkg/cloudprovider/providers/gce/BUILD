@@ -19,14 +19,9 @@ go_library(
     deps = [
         "//pkg/api/v1:go_default_library",
         "//pkg/api/v1/service:go_default_library",
-        "//pkg/apis/meta/v1:go_default_library",
         "//pkg/cloudprovider:go_default_library",
-        "//pkg/types:go_default_library",
-        "//pkg/util/errors:go_default_library",
         "//pkg/util/flowcontrol:go_default_library",
         "//pkg/util/net/sets:go_default_library",
-        "//pkg/util/sets:go_default_library",
-        "//pkg/util/wait:go_default_library",
         "//pkg/volume:go_default_library",
         "//vendor:cloud.google.com/go/compute/metadata",
         "//vendor:github.com/golang/glog",
@@ -37,6 +32,11 @@ go_library(
         "//vendor:google.golang.org/api/container/v1",
         "//vendor:google.golang.org/api/googleapi",
         "//vendor:gopkg.in/gcfg.v1",
+        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor:k8s.io/apimachinery/pkg/types",
+        "//vendor:k8s.io/apimachinery/pkg/util/errors",
+        "//vendor:k8s.io/apimachinery/pkg/util/sets",
+        "//vendor:k8s.io/apimachinery/pkg/util/wait",
     ],
 )
 

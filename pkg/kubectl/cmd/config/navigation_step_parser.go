@@ -21,8 +21,8 @@ import (
 	"reflect"
 	"strings"
 
+	"k8s.io/apimachinery/pkg/util/sets"
 	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
-	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 type navigationSteps struct {

@@ -30,8 +30,8 @@ go_test(
         "//federation/pkg/federation-controller/util/test:go_default_library",
         "//pkg/api/v1:go_default_library",
         "//pkg/client/testing/core:go_default_library",
-        "//pkg/runtime:go_default_library",
         "//vendor:github.com/stretchr/testify/assert",
+        "//vendor:k8s.io/apimachinery/pkg/runtime",
     ],
 )
 

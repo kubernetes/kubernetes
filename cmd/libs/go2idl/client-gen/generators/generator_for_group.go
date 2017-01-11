@@ -58,11 +58,11 @@ func (g *genGroup) Imports(c *generator.Context) (imports []string) {
 func (g *genGroup) GenerateType(c *generator.Context, t *types.Type, w io.Writer) error {
 	sw := generator.NewSnippetWriter(w, c, "$", "$")
 	const pkgRESTClient = "k8s.io/kubernetes/pkg/client/restclient"
-	const pkgRegistered = "k8s.io/kubernetes/pkg/apimachinery/registered"
+	const pkgRegistered = "k8s.io/apimachinery/pkg/apimachinery/registered"
 	const pkgAPI = "k8s.io/kubernetes/pkg/api"
-	const pkgSerializer = "k8s.io/kubernetes/pkg/runtime/serializer"
+	const pkgSerializer = "k8s.io/apimachinery/pkg/runtime/serializer"
 	const pkgUnversioned = "k8s.io/kubernetes/pkg/api/unversioned"
-	const pkgSchema = "k8s.io/kubernetes/pkg/runtime/schema"
+	const pkgSchema = "k8s.io/apimachinery/pkg/runtime/schema"
 
 	apiPath := func(group string) string {
 		if len(g.apiPath) > 0 {

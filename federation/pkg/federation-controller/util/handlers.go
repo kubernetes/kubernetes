@@ -20,9 +20,9 @@ import (
 	"fmt"
 	"reflect"
 
+	pkgruntime "k8s.io/apimachinery/pkg/runtime"
 	apiv1 "k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/cache"
-	pkgruntime "k8s.io/kubernetes/pkg/runtime"
 )
 
 // Returns cache.ResourceEventHandlerFuncs that trigger the given function

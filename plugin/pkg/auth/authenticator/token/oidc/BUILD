@@ -14,11 +14,11 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//pkg/util/cert:go_default_library",
-        "//pkg/util/net:go_default_library",
-        "//pkg/util/runtime:go_default_library",
         "//vendor:github.com/coreos/go-oidc/jose",
         "//vendor:github.com/coreos/go-oidc/oidc",
         "//vendor:github.com/golang/glog",
+        "//vendor:k8s.io/apimachinery/pkg/util/net",
+        "//vendor:k8s.io/apimachinery/pkg/util/runtime",
         "//vendor:k8s.io/apiserver/pkg/authentication/user",
     ],
 )

@@ -19,10 +19,10 @@ package request_test
 import (
 	"testing"
 
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/kubernetes/pkg/api"
 	genericapirequest "k8s.io/kubernetes/pkg/genericapiserver/api/request"
-	"k8s.io/kubernetes/pkg/types"
 )
 
 // TestNamespaceContext validates that a namespace can be get/set on a context object

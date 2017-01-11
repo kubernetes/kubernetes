@@ -19,6 +19,7 @@ package main
 import (
 	"fmt"
 
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/api/v1"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
@@ -33,7 +34,6 @@ import (
 	proxyconfig "k8s.io/kubernetes/pkg/proxy/config"
 	"k8s.io/kubernetes/pkg/util/flag"
 	fakeiptables "k8s.io/kubernetes/pkg/util/iptables/testing"
-	"k8s.io/kubernetes/pkg/util/sets"
 	_ "k8s.io/kubernetes/pkg/version/prometheus" // for version metric registration
 
 	"github.com/golang/glog"

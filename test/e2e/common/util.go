@@ -17,7 +17,7 @@ limitations under the License.
 package common
 
 import (
-	"k8s.io/kubernetes/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 type Suite string

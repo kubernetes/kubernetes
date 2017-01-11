@@ -34,11 +34,6 @@ go_library(
         "//pkg/kubeapiserver/authenticator:go_default_library",
         "//pkg/master:go_default_library",
         "//pkg/registry/cachesize:go_default_library",
-        "//pkg/runtime/schema:go_default_library",
-        "//pkg/util/errors:go_default_library",
-        "//pkg/util/net:go_default_library",
-        "//pkg/util/sets:go_default_library",
-        "//pkg/util/wait:go_default_library",
         "//pkg/version:go_default_library",
         "//plugin/pkg/admission/admit:go_default_library",
         "//plugin/pkg/admission/alwayspullimages:go_default_library",
@@ -63,6 +58,11 @@ go_library(
         "//vendor:github.com/pborman/uuid",
         "//vendor:github.com/spf13/cobra",
         "//vendor:github.com/spf13/pflag",
+        "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
+        "//vendor:k8s.io/apimachinery/pkg/util/errors",
+        "//vendor:k8s.io/apimachinery/pkg/util/net",
+        "//vendor:k8s.io/apimachinery/pkg/util/sets",
+        "//vendor:k8s.io/apimachinery/pkg/util/wait",
     ],
 )
 

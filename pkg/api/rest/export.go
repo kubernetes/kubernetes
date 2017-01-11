@@ -17,8 +17,8 @@ limitations under the License.
 package rest
 
 import (
+	"k8s.io/apimachinery/pkg/runtime"
 	genericapirequest "k8s.io/kubernetes/pkg/genericapiserver/api/request"
-	"k8s.io/kubernetes/pkg/runtime"
 )
 
 // RESTExportStrategy is the interface that defines how to export a Kubernetes object

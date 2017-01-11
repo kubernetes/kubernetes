@@ -115,10 +115,10 @@ func (g *genFakeForType) GenerateType(c *generator.Context, t *types.Type, w io.
 		"group":                canonicalGroup,
 		"groupName":            groupName,
 		"version":              g.version,
-		"watchInterface":       c.Universe.Type(types.Name{Package: "k8s.io/kubernetes/pkg/watch", Name: "Interface"}),
-		"GroupVersionResource": c.Universe.Type(types.Name{Package: "k8s.io/kubernetes/pkg/runtime/schema", Name: "GroupVersionResource"}),
+		"watchInterface":       c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/watch", Name: "Interface"}),
+		"GroupVersionResource": c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/runtime/schema", Name: "GroupVersionResource"}),
 		"PatchType":            c.Universe.Type(types.Name{Package: "k8s.io/kubernetes/pkg/api", Name: "PatchType"}),
-		"Everything":           c.Universe.Function(types.Name{Package: "k8s.io/kubernetes/pkg/labels", Name: "Everything"}),
+		"Everything":           c.Universe.Function(types.Name{Package: "k8s.io/apimachinery/pkg/labels", Name: "Everything"}),
 
 		"NewRootListAction":              c.Universe.Function(types.Name{Package: pkgTestingCore, Name: "NewRootListAction"}),
 		"NewListAction":                  c.Universe.Function(types.Name{Package: pkgTestingCore, Name: "NewListAction"}),
@@ -150,7 +150,7 @@ func (g *genFakeForType) GenerateType(c *generator.Context, t *types.Type, w io.
 		m["DeleteOptions"] = c.Universe.Type(types.Name{Package: "k8s.io/kubernetes/pkg/api/v1", Name: "DeleteOptions"})
 		m["ListOptions"] = c.Universe.Type(types.Name{Package: "k8s.io/kubernetes/pkg/api/v1", Name: "ListOptions"})
 	}
-	m["GetOptions"] = c.Universe.Type(types.Name{Package: "k8s.io/kubernetes/pkg/apis/meta/v1", Name: "GetOptions"})
+	m["GetOptions"] = c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/apis/meta/v1", Name: "GetOptions"})
 
 	noMethods := extractBoolTagOrDie("noMethods", t.SecondClosestCommentLines) == true
 

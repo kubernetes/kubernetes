@@ -20,8 +20,8 @@ import (
 	"fmt"
 	"time"
 
+	pkgruntime "k8s.io/apimachinery/pkg/runtime"
 	kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
-	pkgruntime "k8s.io/kubernetes/pkg/runtime"
 )
 
 // Type of the operation that can be executed in Federated.

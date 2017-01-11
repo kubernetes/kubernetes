@@ -19,10 +19,10 @@ package rest
 import (
 	"testing"
 
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/api"
 	expapi "k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/registry/extensions/thirdpartyresourcedata"
-	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 type FakeAPIInterface struct {

@@ -28,7 +28,6 @@ go_library(
         "//pkg/api/resource:go_default_library",
         "//pkg/api/v1:go_default_library",
         "//pkg/apis/extensions/v1beta1:go_default_library",
-        "//pkg/apis/meta/v1:go_default_library",
         "//pkg/client/clientset_generated/clientset:go_default_library",
         "//pkg/client/unversioned/clientcmd:go_default_library",
         "//pkg/client/unversioned/clientcmd/api:go_default_library",
@@ -36,10 +35,11 @@ go_library(
         "//pkg/registry/core/service/ipallocator:go_default_library",
         "//pkg/util/cert:go_default_library",
         "//pkg/util/intstr:go_default_library",
-        "//pkg/util/net:go_default_library",
         "//pkg/util/uuid:go_default_library",
-        "//pkg/util/wait:go_default_library",
         "//vendor:github.com/blang/semver",
+        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor:k8s.io/apimachinery/pkg/util/net",
+        "//vendor:k8s.io/apimachinery/pkg/util/wait",
     ],
 )
 

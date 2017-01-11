@@ -24,11 +24,11 @@ import (
 	"strings"
 	"testing"
 
+	"k8s.io/apimachinery/pkg/apimachinery/registered"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	authorizationapi "k8s.io/kubernetes/pkg/apis/authorization"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/restclient"

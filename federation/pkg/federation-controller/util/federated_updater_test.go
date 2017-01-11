@@ -21,11 +21,11 @@ import (
 	"testing"
 	"time"
 
+	pkgruntime "k8s.io/apimachinery/pkg/runtime"
 	federationapi "k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	apiv1 "k8s.io/kubernetes/pkg/api/v1"
 	kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	fakekubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
-	pkgruntime "k8s.io/kubernetes/pkg/runtime"
 
 	"github.com/stretchr/testify/assert"
 )

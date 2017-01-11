@@ -19,8 +19,8 @@ go_library(
         "//pkg/client/retry:go_default_library",
         "//pkg/registry/core/rangeallocation:go_default_library",
         "//pkg/registry/core/service/ipallocator:go_default_library",
-        "//pkg/util/runtime:go_default_library",
-        "//pkg/util/wait:go_default_library",
+        "//vendor:k8s.io/apimachinery/pkg/util/runtime",
+        "//vendor:k8s.io/apimachinery/pkg/util/wait",
     ],
 )
 

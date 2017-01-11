@@ -20,10 +20,10 @@ go_library(
         "//pkg/api/validation:go_default_library",
         "//pkg/fields:go_default_library",
         "//pkg/genericapiserver/api/request:go_default_library",
-        "//pkg/labels:go_default_library",
-        "//pkg/runtime:go_default_library",
         "//pkg/storage:go_default_library",
-        "//pkg/util/validation/field:go_default_library",
+        "//vendor:k8s.io/apimachinery/pkg/labels",
+        "//vendor:k8s.io/apimachinery/pkg/runtime",
+        "//vendor:k8s.io/apimachinery/pkg/util/validation/field",
     ],
 )
 
@@ -35,7 +35,7 @@ go_test(
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/testing:go_default_library",
-        "//pkg/apimachinery/registered:go_default_library",
+        "//vendor:k8s.io/apimachinery/pkg/apimachinery/registered",
     ],
 )
 

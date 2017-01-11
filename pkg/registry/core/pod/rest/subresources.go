@@ -22,6 +22,7 @@ import (
 	"net/url"
 	"path"
 
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/capabilities"
@@ -30,7 +31,6 @@ import (
 	"k8s.io/kubernetes/pkg/registry/core/pod"
 	genericregistry "k8s.io/kubernetes/pkg/registry/generic/registry"
 	genericrest "k8s.io/kubernetes/pkg/registry/generic/rest"
-	"k8s.io/kubernetes/pkg/runtime"
 )
 
 // ProxyREST implements the proxy subresource for a Pod

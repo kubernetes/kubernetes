@@ -17,7 +17,7 @@ go_library(
         "selector.go",
     ],
     tags = ["automanaged"],
-    deps = ["//pkg/selection:go_default_library"],
+    deps = ["//vendor:k8s.io/apimachinery/pkg/selection"],
 )
 
 go_test(

@@ -24,11 +24,11 @@ go_library(
         "//pkg/kubelet/types:go_default_library",
         "//pkg/kubelet/util/format:go_default_library",
         "//pkg/security/apparmor:go_default_library",
-        "//pkg/types:go_default_library",
         "//pkg/util/intstr:go_default_library",
         "//plugin/pkg/scheduler/algorithm/predicates:go_default_library",
         "//plugin/pkg/scheduler/schedulercache:go_default_library",
         "//vendor:github.com/golang/glog",
+        "//vendor:k8s.io/apimachinery/pkg/types",
     ],
 )
 

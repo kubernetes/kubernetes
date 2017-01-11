@@ -21,8 +21,8 @@ limitations under the License.
 package app
 
 import (
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	petset "k8s.io/kubernetes/pkg/controller/petset"
-	"k8s.io/kubernetes/pkg/runtime/schema"
 )
 
 func startStatefulSetController(ctx ControllerContext) (bool, error) {

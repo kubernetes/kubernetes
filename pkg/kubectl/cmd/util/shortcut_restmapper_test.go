@@ -20,8 +20,8 @@ import (
 	"strings"
 	"testing"
 
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/runtime/schema"
 )
 
 func TestReplaceAliases(t *testing.T) {

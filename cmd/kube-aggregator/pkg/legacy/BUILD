@@ -16,7 +16,7 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//cmd/kube-aggregator/pkg/legacy/apis/config/v1alpha1:go_default_library",
-        "//pkg/apis/meta/v1:go_default_library",
+        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
     ],
 )
 

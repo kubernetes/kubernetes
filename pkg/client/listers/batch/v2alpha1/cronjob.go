@@ -19,11 +19,11 @@ limitations under the License.
 package v2alpha1
 
 import (
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/kubernetes/pkg/api/errors"
 	batch "k8s.io/kubernetes/pkg/apis/batch"
 	v2alpha1 "k8s.io/kubernetes/pkg/apis/batch/v2alpha1"
 	"k8s.io/kubernetes/pkg/client/cache"
-	"k8s.io/kubernetes/pkg/labels"
 )
 
 // CronJobLister helps list CronJobs.
