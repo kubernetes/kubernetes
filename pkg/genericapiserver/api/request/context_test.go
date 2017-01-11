@@ -43,33 +43,6 @@ func TestNamespaceContext(t *testing.T) {
 	}
 }
 
-// TestValidNamespace validates that namespace rules are enforced on a resource prior to create or update
-func TestValidNamespace(t *testing.T) {
-	ctx := genericapirequest.NewDefaultContext()
-	namespace, _ := genericapirequest.NamespaceFrom(ctx)
-	resource := api.ReplicationController{}
-	if !api.ValidNamespace(ctx, &resource.ObjectMeta) {
-		t.Fatalf("expected success")
-	}
-	if namespace != resource.Namespace {
-		t.Fatalf("expected resource to have the default namespace assigned during validation")
-	}
-	resource = api.ReplicationController{ObjectMeta: api.ObjectMeta{Namespace: "other"}}
-	if api.ValidNamespace(ctx, &resource.ObjectMeta) {
-		t.Fatalf("Expected error that resource and context errors do not match because resource has different namespace")
-	}
-	ctx = genericapirequest.NewContext()
-	if api.ValidNamespace(ctx, &resource.ObjectMeta) {
-		t.Fatalf("Expected error that resource and context errors do not match since context has no namespace")
-	}
-
-	ctx = genericapirequest.NewContext()
-	ns := genericapirequest.NamespaceValue(ctx)
-	if ns != "" {
-		t.Fatalf("Expected the empty string")
-	}
-}
-
 //TestUserContext validates that a userinfo can be get/set on a context object
 func TestUserContext(t *testing.T) {
 	ctx := genericapirequest.NewContext()

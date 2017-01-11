@@ -37,7 +37,7 @@ go_test(
         "//pkg/apis/rbac:go_default_library",
         "//pkg/apis/rbac/install:go_default_library",
         "//pkg/apis/rbac/v1alpha1:go_default_library",
-        "//pkg/apis/rbac/validation:go_default_library",
+        "//pkg/registry/rbac/validation:go_default_library",
         "//plugin/pkg/auth/authorizer/rbac/bootstrappolicy:go_default_library",
         "//vendor:github.com/ghodss/yaml",
         "//vendor:k8s.io/apimachinery/pkg/api/meta",

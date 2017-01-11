@@ -36,6 +36,7 @@ filegroup(
         "//pkg/registry/rbac/rest:all-srcs",
         "//pkg/registry/rbac/role:all-srcs",
         "//pkg/registry/rbac/rolebinding:all-srcs",
+        "//pkg/registry/rbac/validation:all-srcs",
     ],
     tags = ["automanaged"],
 )
