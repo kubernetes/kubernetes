@@ -52,6 +52,8 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupResource) (Gene
 		return &genericInformer{resource: resource, informer: f.PersistentVolumes().Informer()}, nil
 	case api.Resource("serviceaccounts"):
 		return &genericInformer{resource: resource, informer: f.ServiceAccounts().Informer()}, nil
+	case api.Resource("secrets"):
+		return &genericInformer{resource: resource, informer: f.Secrets().Informer()}, nil
 
 	case extensionsinternal.Resource("daemonsets"):
 		return &genericInformer{resource: resource, informer: f.DaemonSets().Informer()}, nil
