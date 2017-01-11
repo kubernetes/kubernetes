@@ -25,10 +25,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-const (
-	testPath = "/tmp/testFileStore"
-)
-
 func TestFileStore(t *testing.T) {
 	path, err := ioutil.TempDir("", "FileStore")
 	assert.NoError(t, err)
@@ -154,8 +150,7 @@ func TestIsValidKey(t *testing.T) {
 func cleanUpTestPath(t *testing.T, path string) {
 	if _, err := os.Stat(path); !os.IsNotExist(err) {
 		if err := os.RemoveAll(path); err != nil {
-			t.Errorf("Failed to delete test directory: %v", err)
+			assert.NoError(t, err, "Failed to delete test directory: %v", err)
 		}
 	}
-	return
 }

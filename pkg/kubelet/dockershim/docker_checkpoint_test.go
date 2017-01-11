@@ -73,7 +73,6 @@ func TestPersistentCheckpointHandler(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, *checkpoint, *tc.checkpoint)
 	}
-
 	// Test ListCheckpoints
 	keys, err := handler.ListCheckpoints()
 	assert.NoError(t, err)
