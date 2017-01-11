@@ -54,9 +54,14 @@ func RequestNodeCertificate(client unversionedcertificates.CertificateSigningReq
 		TypeMeta:   metav1.TypeMeta{Kind: "CertificateSigningRequest"},
 		ObjectMeta: v1.ObjectMeta{GenerateName: "csr-"},
 
-		// TODO: For now, this is a request for a certificate with allowed usage of "TLS Web Client Authentication".
-		// Need to figure out whether/how to surface the allowed usage in the spec.
-		Spec: certificates.CertificateSigningRequestSpec{Request: csr},
+		Spec: certificates.CertificateSigningRequestSpec{
+			Request: csr,
+			Usages: []certificates.KeyUsage{
+				certificates.UsageDigitalSignature,
+				certificates.UsageKeyEncipherment,
+				certificates.UsageClientAuth,
+			},
+		},
 	})
 	if err != nil {
 		return nil, fmt.Errorf("cannot create certificate signing request: %v", err)

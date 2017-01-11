@@ -76,6 +76,9 @@ func (cc *groupApprover) AutoApprove(csr *certificates.CertificateSigningRequest
 	if len(x509cr.DNSNames)+len(x509cr.EmailAddresses)+len(x509cr.IPAddresses) != 0 {
 		return csr, nil
 	}
+	if !hasExactUsages(csr, kubeletClientUsages) {
+		return csr, nil
+	}
 
 	csr.Status.Conditions = append(csr.Status.Conditions, certificates.CertificateSigningRequestCondition{
 		Type:    certificates.CertificateApproved,
@@ -83,4 +86,29 @@ func (cc *groupApprover) AutoApprove(csr *certificates.CertificateSigningRequest
 		Message: "Auto approving of all kubelet CSRs is enabled on the controller manager",
 	})
 	return cc.client.UpdateApproval(csr)
+}
+
+var kubeletClientUsages = []certificates.KeyUsage{
+	certificates.UsageKeyEncipherment,
+	certificates.UsageDigitalSignature,
+	certificates.UsageClientAuth,
+}
+
+func hasExactUsages(csr *certificates.CertificateSigningRequest, usages []certificates.KeyUsage) bool {
+	if len(usages) != len(csr.Spec.Usages) {
+		return false
+	}
+
+	usageMap := map[certificates.KeyUsage]struct{}{}
+	for _, u := range usages {
+		usageMap[u] = struct{}{}
+	}
+
+	for _, u := range csr.Spec.Usages {
+		if _, ok := usageMap[u]; !ok {
+			return false
+		}
+	}
+
+	return true
 }
