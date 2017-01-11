@@ -111,12 +111,12 @@ func ResourceConfigForPod(pod *v1.Pod) *ResourceConfig {
 
 	// build the result
 	result := &ResourceConfig{}
-	if qosClass == qos.Guaranteed {
+	if qosClass == v1.PodQOSGuaranteed {
 		result.CpuShares = &cpuShares
 		result.CpuQuota = &cpuQuota
 		result.CpuPeriod = &cpuPeriod
 		result.Memory = &memoryLimits
-	} else if qosClass == qos.Burstable {
+	} else if qosClass == v1.PodQOSBurstable {
 		result.CpuShares = &cpuShares
 		if cpuLimitsDeclared {
 			result.CpuQuota = &cpuQuota

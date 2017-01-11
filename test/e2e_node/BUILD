@@ -86,7 +86,6 @@ go_test(
         "//pkg/kubelet/dockertools:go_default_library",
         "//pkg/kubelet/images:go_default_library",
         "//pkg/kubelet/metrics:go_default_library",
-        "//pkg/kubelet/qos:go_default_library",
         "//pkg/labels:go_default_library",
         "//pkg/metrics:go_default_library",
         "//pkg/runtime:go_default_library",
