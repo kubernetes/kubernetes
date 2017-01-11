@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# starts kubernetes-discovery as a pod after you've run `local-up-cluster.sh`
+# starts kube-aggregator as a pod after you've run `local-up-cluster.sh`
 
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
@@ -59,14 +59,14 @@ function start_discovery {
 
 	# grant permission to run delegated authentication and authorization checks
 	kubectl_core delete clusterrolebinding discovery:system:auth-delegator > /dev/null 2>&1 || true
-	kubectl_core delete clusterrolebinding discovery:system:kubernetes-discovery > /dev/null 2>&1 || true
-	kubectl_core create clusterrolebinding discovery:system:auth-delegator --clusterrole=system:auth-delegator --serviceaccount=kube-public:kubernetes-discovery
-	kubectl_core create clusterrolebinding discovery:system:kubernetes-discovery --clusterrole=system:kubernetes-discovery --serviceaccount=kube-public:kubernetes-discovery
+	kubectl_core delete clusterrolebinding discovery:system:kube-aggregator > /dev/null 2>&1 || true
+	kubectl_core create clusterrolebinding discovery:system:auth-delegator --clusterrole=system:auth-delegator --serviceaccount=kube-public:kube-aggregator
+	kubectl_core create clusterrolebinding discovery:system:kube-aggregator --clusterrole=system:kube-aggregator --serviceaccount=kube-public:kube-aggregator
 
 	# make sure the resources we're about to create don't exist
 	kubectl_core -n kube-public delete secret auth-proxy-client serving-etcd serving-discovery discovery-etcd > /dev/null 2>&1 || true
 	kubectl_core -n kube-public delete configmap etcd-ca discovery-ca client-ca request-header-ca > /dev/null 2>&1 || true
-	kubectl_core -n kube-public delete -f "${KUBE_ROOT}/cmd/kubernetes-discovery/artifacts/local-cluster-up" > /dev/null 2>&1 || true
+	kubectl_core -n kube-public delete -f "${KUBE_ROOT}/cmd/kube-aggregator/artifacts/local-cluster-up" > /dev/null 2>&1 || true
 
 	sudo_kubectl_core -n kube-public create secret tls auth-proxy-client --cert="${CERT_DIR}/client-auth-proxy.crt" --key="${CERT_DIR}/client-auth-proxy.key"
 	sudo_kubectl_core -n kube-public create secret tls serving-etcd --cert="${CERT_DIR}/serving-etcd.crt" --key="${CERT_DIR}/serving-etcd.key"
@@ -77,24 +77,24 @@ function start_discovery {
 	kubectl_core -n kube-public create configmap client-ca --from-file="ca.crt=${CERT_DIR}/client-ca.crt" || true
 	kubectl_core -n kube-public create configmap request-header-ca --from-file="ca.crt=${CERT_DIR}/request-header-ca.crt" || true
 
-	${KUBE_ROOT}/cmd/kubernetes-discovery/hack/build-image.sh
+	${KUBE_ROOT}/cmd/kube-aggregator/hack/build-image.sh
 
-	kubectl_core -n kube-public create -f "${KUBE_ROOT}/cmd/kubernetes-discovery/artifacts/local-cluster-up"
+	kubectl_core -n kube-public create -f "${KUBE_ROOT}/cmd/kube-aggregator/artifacts/local-cluster-up"
 
 	${sudo} cp "${CERT_DIR}/admin.kubeconfig" "${CERT_DIR}/admin-discovery.kubeconfig"
 	${sudo} chown ${USER} "${CERT_DIR}/admin-discovery.kubeconfig"
 	${kubectl} config set-cluster local-up-cluster --kubeconfig="${CERT_DIR}/admin-discovery.kubeconfig" --certificate-authority="${CERT_DIR}/discovery-ca.crt" --embed-certs --server="https://${API_HOST_IP}:${DISCOVERY_SECURE_PORT}"
 
-	# Wait for kubernetes-discovery to come up before launching the rest of the components.
+	# Wait for kube-aggregator to come up before launching the rest of the components.
 	# This should work since we're creating a node port service.
-	echo "Waiting for kubernetes-discovery to come up: https://${API_HOST_IP}:${DISCOVERY_SECURE_PORT}/version"
-	kube::util::wait_for_url "https://${API_HOST_IP}:${DISCOVERY_SECURE_PORT}/version" "kubernetes-discovery: " 1 60 || exit 1
+	echo "Waiting for kube-aggregator to come up: https://${API_HOST_IP}:${DISCOVERY_SECURE_PORT}/version"
+	kube::util::wait_for_url "https://${API_HOST_IP}:${DISCOVERY_SECURE_PORT}/version" "kube-aggregator: " 1 60 || exit 1
 
 	# something is weird with the proxy
 	sleep 1
 
 	# create the "normal" api services for the core API server
-	${kubectl} --kubeconfig="${CERT_DIR}/admin-discovery.kubeconfig" create -f "${KUBE_ROOT}/cmd/kubernetes-discovery/artifacts/core-apiservices"
+	${kubectl} --kubeconfig="${CERT_DIR}/admin-discovery.kubeconfig" create -f "${KUBE_ROOT}/cmd/kube-aggregator/artifacts/core-apiservices"
 }
 
 kube::util::test_openssl_installed
