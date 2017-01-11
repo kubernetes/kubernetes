@@ -17,10 +17,13 @@ limitations under the License.
 package v1alpha1
 
 import (
-	"k8s.io/apiserver/pkg/authentication/user"
 	api "k8s.io/kubernetes/pkg/apis/rbac"
 	"k8s.io/kubernetes/pkg/conversion"
 )
+
+// allAuthenticated matches k8s.io/apiserver/pkg/authentication/user.AllAuthenticated,
+// but we don't want an client library (which must include types), depending on a server library
+const allAuthenticated = "system:authenticated"
 
 func Convert_v1alpha1_Subject_To_rbac_Subject(in *Subject, out *api.Subject, s conversion.Scope) error {
 	if err := autoConvert_v1alpha1_Subject_To_rbac_Subject(in, out, s); err != nil {
@@ -32,7 +35,7 @@ func Convert_v1alpha1_Subject_To_rbac_Subject(in *Subject, out *api.Subject, s c
 	// Special treatment for * should not be included in v1beta1
 	if out.Kind == UserKind && out.Name == "*" {
 		out.Kind = GroupKind
-		out.Name = user.AllAuthenticated
+		out.Name = allAuthenticated
 	}
 
 	return nil
