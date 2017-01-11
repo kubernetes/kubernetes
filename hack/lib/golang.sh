@@ -30,7 +30,7 @@ kube::golang::server_targets() {
     cmd/kubeadm
     cmd/hyperkube
     cmd/kube-discovery
-    cmd/kubernetes-discovery
+    cmd/kube-aggregator
     plugin/cmd/kube-scheduler
   )
   echo "${targets[@]}"
@@ -191,7 +191,7 @@ readonly KUBE_STATIC_LIBRARIES=(
   kube-scheduler
   kube-proxy
   kube-discovery
-  kubernetes-discovery
+  kube-aggregator
   kubeadm
   kubectl
 )
