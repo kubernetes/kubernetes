@@ -39,10 +39,10 @@ import (
 	"github.com/coreos/go-oidc/jose"
 	"github.com/coreos/go-oidc/oidc"
 	"github.com/golang/glog"
+	"k8s.io/apimachinery/pkg/util/net"
+	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apiserver/pkg/authentication/user"
 	certutil "k8s.io/kubernetes/pkg/util/cert"
-	"k8s.io/kubernetes/pkg/util/net"
-	"k8s.io/kubernetes/pkg/util/runtime"
 )
 
 type OIDCOptions struct {

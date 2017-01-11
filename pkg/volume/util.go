@@ -20,11 +20,11 @@ import (
 	"fmt"
 	"reflect"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/kubernetes/pkg/api/v1"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/watch"
 
 	"hash/fnv"
 	"math/rand"
@@ -32,10 +32,10 @@ import (
 	"strings"
 
 	"github.com/golang/glog"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/resource"
-	"k8s.io/kubernetes/pkg/types"
-	"k8s.io/kubernetes/pkg/util/sets"
 	volutil "k8s.io/kubernetes/pkg/volume/util"
 )
 

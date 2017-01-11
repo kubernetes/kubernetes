@@ -20,18 +20,18 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
-        "//pkg/api/meta:go_default_library",
         "//pkg/kubectl:go_default_library",
         "//pkg/kubectl/cmd/set:go_default_library",
         "//pkg/kubectl/cmd/templates:go_default_library",
         "//pkg/kubectl/cmd/util:go_default_library",
         "//pkg/kubectl/resource:go_default_library",
-        "//pkg/runtime:go_default_library",
-        "//pkg/util/errors:go_default_library",
         "//pkg/util/interrupt:go_default_library",
-        "//pkg/watch:go_default_library",
         "//vendor:github.com/renstrom/dedent",
         "//vendor:github.com/spf13/cobra",
+        "//vendor:k8s.io/apimachinery/pkg/api/meta",
+        "//vendor:k8s.io/apimachinery/pkg/runtime",
+        "//vendor:k8s.io/apimachinery/pkg/util/errors",
+        "//vendor:k8s.io/apimachinery/pkg/watch",
     ],
 )
 

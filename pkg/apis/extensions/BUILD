@@ -22,11 +22,11 @@ go_library(
         "//pkg/api:go_default_library",
         "//pkg/api/resource:go_default_library",
         "//pkg/apis/autoscaling:go_default_library",
-        "//pkg/apis/meta/v1:go_default_library",
-        "//pkg/conversion:go_default_library",
-        "//pkg/runtime:go_default_library",
-        "//pkg/runtime/schema:go_default_library",
         "//pkg/util/intstr:go_default_library",
+        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor:k8s.io/apimachinery/pkg/conversion",
+        "//vendor:k8s.io/apimachinery/pkg/runtime",
+        "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
     ],
 )
 

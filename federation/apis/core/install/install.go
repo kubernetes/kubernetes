@@ -21,15 +21,15 @@ import (
 
 	"github.com/golang/glog"
 
+	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/apimachinery"
+	"k8s.io/apimachinery/pkg/apimachinery/registered"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/sets"
 	core "k8s.io/kubernetes/federation/apis/core"
 	core_v1 "k8s.io/kubernetes/federation/apis/core/v1"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/meta"
-	"k8s.io/kubernetes/pkg/apimachinery"
-	"k8s.io/kubernetes/pkg/apimachinery/registered"
-	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/runtime/schema"
-	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 const importPrefix = "k8s.io/kubernetes/pkg/api"

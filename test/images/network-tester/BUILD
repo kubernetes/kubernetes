@@ -19,10 +19,10 @@ go_library(
     srcs = ["webserver.go"],
     tags = ["automanaged"],
     deps = [
-        "//pkg/apis/meta/v1:go_default_library",
         "//pkg/client/clientset_generated/internalclientset:go_default_library",
         "//pkg/client/restclient:go_default_library",
-        "//pkg/util/sets:go_default_library",
+        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor:k8s.io/apimachinery/pkg/util/sets",
     ],
 )
 

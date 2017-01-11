@@ -17,12 +17,12 @@ limitations under the License.
 package latest
 
 import (
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/runtime/serializer/json"
+	"k8s.io/apimachinery/pkg/runtime/serializer/versioning"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api/v1"
-	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/runtime/schema"
-	"k8s.io/kubernetes/pkg/runtime/serializer/json"
-	"k8s.io/kubernetes/pkg/runtime/serializer/versioning"
 )
 
 // Version is the string that represents the current external default version.

@@ -21,10 +21,10 @@ import (
 	"strconv"
 	"strings"
 
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/intstr"
-	"k8s.io/kubernetes/pkg/util/validation"
 )
 
 type ServiceCommonGeneratorV1 struct {

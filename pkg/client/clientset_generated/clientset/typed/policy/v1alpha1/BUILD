@@ -19,12 +19,12 @@ go_library(
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/v1:go_default_library",
-        "//pkg/apimachinery/registered:go_default_library",
         "//pkg/apis/policy/v1alpha1:go_default_library",
         "//pkg/client/restclient:go_default_library",
-        "//pkg/runtime/schema:go_default_library",
-        "//pkg/runtime/serializer:go_default_library",
-        "//pkg/watch:go_default_library",
+        "//vendor:k8s.io/apimachinery/pkg/apimachinery/registered",
+        "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
+        "//vendor:k8s.io/apimachinery/pkg/runtime/serializer",
+        "//vendor:k8s.io/apimachinery/pkg/watch",
     ],
 )
 

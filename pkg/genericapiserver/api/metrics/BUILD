@@ -12,9 +12,9 @@ go_library(
     srcs = ["metrics.go"],
     tags = ["automanaged"],
     deps = [
-        "//pkg/util/net:go_default_library",
         "//vendor:github.com/emicklei/go-restful",
         "//vendor:github.com/prometheus/client_golang/prometheus",
+        "//vendor:k8s.io/apimachinery/pkg/util/net",
     ],
 )
 

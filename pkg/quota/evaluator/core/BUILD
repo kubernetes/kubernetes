@@ -34,10 +34,10 @@ go_library(
         "//pkg/kubelet/qos:go_default_library",
         "//pkg/quota:go_default_library",
         "//pkg/quota/generic:go_default_library",
-        "//pkg/runtime:go_default_library",
-        "//pkg/runtime/schema:go_default_library",
-        "//pkg/util/sets:go_default_library",
-        "//pkg/util/validation/field:go_default_library",
+        "//vendor:k8s.io/apimachinery/pkg/runtime",
+        "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
+        "//vendor:k8s.io/apimachinery/pkg/util/sets",
+        "//vendor:k8s.io/apimachinery/pkg/util/validation/field",
     ],
 )
 
@@ -53,10 +53,10 @@ go_test(
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/resource:go_default_library",
-        "//pkg/apis/meta/v1:go_default_library",
         "//pkg/apis/storage/util:go_default_library",
         "//pkg/client/clientset_generated/clientset/fake:go_default_library",
         "//pkg/quota:go_default_library",
+        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
     ],
 )
 

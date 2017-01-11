@@ -17,8 +17,8 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"k8s.io/apimachinery/pkg/conversion"
 	api "k8s.io/kubernetes/pkg/apis/rbac"
-	"k8s.io/kubernetes/pkg/conversion"
 )
 
 // allAuthenticated matches k8s.io/apiserver/pkg/authentication/user.AllAuthenticated,

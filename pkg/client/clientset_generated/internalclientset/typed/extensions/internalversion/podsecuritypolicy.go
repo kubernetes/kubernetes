@@ -17,11 +17,11 @@ limitations under the License.
 package internalversion
 
 import (
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	watch "k8s.io/apimachinery/pkg/watch"
 	api "k8s.io/kubernetes/pkg/api"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions"
-	v1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	restclient "k8s.io/kubernetes/pkg/client/restclient"
-	watch "k8s.io/kubernetes/pkg/watch"
 )
 
 // PodSecurityPoliciesGetter has a method to return a PodSecurityPolicyInterface.

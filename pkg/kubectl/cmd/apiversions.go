@@ -24,7 +24,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 )

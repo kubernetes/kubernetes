@@ -19,8 +19,8 @@ package discovery
 import (
 	"fmt"
 
-	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
 // UnstructuredObjectTyper provides a runtime.ObjectTyper implmentation for

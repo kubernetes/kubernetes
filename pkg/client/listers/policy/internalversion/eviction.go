@@ -19,10 +19,10 @@ limitations under the License.
 package internalversion
 
 import (
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/kubernetes/pkg/api/errors"
 	policy "k8s.io/kubernetes/pkg/apis/policy"
 	"k8s.io/kubernetes/pkg/client/cache"
-	"k8s.io/kubernetes/pkg/labels"
 )
 
 // EvictionLister helps list Evictions.

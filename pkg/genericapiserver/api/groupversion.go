@@ -23,16 +23,16 @@ import (
 
 	"github.com/emicklei/go-restful"
 
+	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/admission"
 	apierrors "k8s.io/kubernetes/pkg/api/errors"
-	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/rest"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/genericapiserver/api/handlers"
 	"k8s.io/kubernetes/pkg/genericapiserver/api/request"
-	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/runtime/schema"
-	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 )
 
 // APIGroupVersion is a helper for exposing rest.Storage objects as http.Handlers via go-restful

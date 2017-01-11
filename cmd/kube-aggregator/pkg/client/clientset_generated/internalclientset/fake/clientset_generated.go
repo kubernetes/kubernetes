@@ -17,16 +17,16 @@ limitations under the License.
 package fake
 
 import (
+	"k8s.io/apimachinery/pkg/apimachinery/registered"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/watch"
 	clientset "k8s.io/kubernetes/cmd/kube-aggregator/pkg/client/clientset_generated/internalclientset"
 	internalversionapiregistration "k8s.io/kubernetes/cmd/kube-aggregator/pkg/client/clientset_generated/internalclientset/typed/apiregistration/internalversion"
 	fakeinternalversionapiregistration "k8s.io/kubernetes/cmd/kube-aggregator/pkg/client/clientset_generated/internalclientset/typed/apiregistration/internalversion/fake"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/client/testing/core"
 	"k8s.io/kubernetes/pkg/client/typed/discovery"
 	fakediscovery "k8s.io/kubernetes/pkg/client/typed/discovery/fake"
-	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/watch"
 )
 
 // NewSimpleClientset returns a clientset that will respond with the provided objects.

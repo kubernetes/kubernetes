@@ -34,11 +34,11 @@ go_library(
         "//pkg/registry/extensions/thirdpartyresource/etcd:go_default_library",
         "//pkg/registry/extensions/thirdpartyresourcedata:go_default_library",
         "//pkg/registry/generic:go_default_library",
-        "//pkg/runtime:go_default_library",
-        "//pkg/util/runtime:go_default_library",
-        "//pkg/util/sets:go_default_library",
-        "//pkg/util/wait:go_default_library",
         "//vendor:github.com/golang/glog",
+        "//vendor:k8s.io/apimachinery/pkg/runtime",
+        "//vendor:k8s.io/apimachinery/pkg/util/runtime",
+        "//vendor:k8s.io/apimachinery/pkg/util/sets",
+        "//vendor:k8s.io/apimachinery/pkg/util/wait",
     ],
 )
 
@@ -51,7 +51,7 @@ go_test(
         "//pkg/api:go_default_library",
         "//pkg/apis/extensions:go_default_library",
         "//pkg/registry/extensions/thirdpartyresourcedata:go_default_library",
-        "//pkg/util/sets:go_default_library",
+        "//vendor:k8s.io/apimachinery/pkg/util/sets",
     ],
 )
 

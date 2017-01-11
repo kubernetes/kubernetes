@@ -17,11 +17,11 @@ limitations under the License.
 package etcd
 
 import (
+	"k8s.io/apimachinery/pkg/runtime"
 	storageapi "k8s.io/kubernetes/pkg/apis/storage"
 	"k8s.io/kubernetes/pkg/registry/generic"
 	genericregistry "k8s.io/kubernetes/pkg/registry/generic/registry"
 	"k8s.io/kubernetes/pkg/registry/storage/storageclass"
-	"k8s.io/kubernetes/pkg/runtime"
 )
 
 type REST struct {

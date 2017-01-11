@@ -19,12 +19,12 @@ go_library(
         "//cmd/kube-aggregator/pkg/client/clientset_generated/internalclientset/typed/apiregistration/internalversion:go_default_library",
         "//cmd/kube-aggregator/pkg/client/clientset_generated/internalclientset/typed/apiregistration/internalversion/fake:go_default_library",
         "//pkg/api:go_default_library",
-        "//pkg/apimachinery/registered:go_default_library",
         "//pkg/client/testing/core:go_default_library",
         "//pkg/client/typed/discovery:go_default_library",
         "//pkg/client/typed/discovery/fake:go_default_library",
-        "//pkg/runtime:go_default_library",
-        "//pkg/watch:go_default_library",
+        "//vendor:k8s.io/apimachinery/pkg/apimachinery/registered",
+        "//vendor:k8s.io/apimachinery/pkg/runtime",
+        "//vendor:k8s.io/apimachinery/pkg/watch",
     ],
 )
 

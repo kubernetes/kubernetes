@@ -20,8 +20,8 @@ import (
 	"sort"
 
 	"github.com/golang/glog"
+	"k8s.io/apimachinery/pkg/util/wait"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
-	"k8s.io/kubernetes/pkg/util/wait"
 )
 
 const (

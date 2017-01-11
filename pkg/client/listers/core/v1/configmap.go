@@ -19,11 +19,11 @@ limitations under the License.
 package v1
 
 import (
+	"k8s.io/apimachinery/pkg/labels"
 	api "k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	v1 "k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/cache"
-	"k8s.io/kubernetes/pkg/labels"
 )
 
 // ConfigMapLister helps list ConfigMaps.

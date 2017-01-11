@@ -23,10 +23,10 @@ import (
 	"strings"
 
 	"github.com/golang/glog"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/api/v1"
 	podapi "k8s.io/kubernetes/pkg/api/v1/pod"
 	apps "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
-	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 // identityMapper is an interface for assigning identities to a pet.

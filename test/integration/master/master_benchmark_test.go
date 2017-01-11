@@ -26,10 +26,10 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/kubernetes/pkg/api"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/test/integration/framework"
 )
 

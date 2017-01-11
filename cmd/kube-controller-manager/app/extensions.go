@@ -21,10 +21,10 @@ limitations under the License.
 package app
 
 import (
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/controller/daemon"
 	"k8s.io/kubernetes/pkg/controller/deployment"
 	replicaset "k8s.io/kubernetes/pkg/controller/replicaset"
-	"k8s.io/kubernetes/pkg/runtime/schema"
 )
 
 func startDaemonSetController(ctx ControllerContext) (bool, error) {

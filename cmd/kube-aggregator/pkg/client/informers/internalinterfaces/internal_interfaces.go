@@ -19,10 +19,10 @@ limitations under the License.
 package internalinterfaces
 
 import (
+	runtime "k8s.io/apimachinery/pkg/runtime"
 	clientset "k8s.io/kubernetes/cmd/kube-aggregator/pkg/client/clientset_generated/clientset"
 	internalclientset "k8s.io/kubernetes/cmd/kube-aggregator/pkg/client/clientset_generated/internalclientset"
 	cache "k8s.io/kubernetes/pkg/client/cache"
-	runtime "k8s.io/kubernetes/pkg/runtime"
 	time "time"
 )
 

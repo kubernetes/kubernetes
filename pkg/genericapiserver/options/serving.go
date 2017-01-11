@@ -24,9 +24,9 @@ import (
 	"github.com/golang/glog"
 	"github.com/spf13/pflag"
 
+	utilnet "k8s.io/apimachinery/pkg/util/net"
 	certutil "k8s.io/kubernetes/pkg/util/cert"
 	"k8s.io/kubernetes/pkg/util/config"
-	utilnet "k8s.io/kubernetes/pkg/util/net"
 )
 
 type ServingOptions struct {

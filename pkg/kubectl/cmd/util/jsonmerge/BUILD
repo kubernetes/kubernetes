@@ -13,9 +13,9 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//pkg/util/strategicpatch:go_default_library",
-        "//pkg/util/yaml:go_default_library",
         "//vendor:github.com/evanphx/json-patch",
         "//vendor:github.com/golang/glog",
+        "//vendor:k8s.io/apimachinery/pkg/util/yaml",
     ],
 )
 

@@ -28,7 +28,7 @@ import (
 	"github.com/golang/glog"
 	"golang.org/x/net/websocket"
 
-	"k8s.io/kubernetes/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/runtime"
 )
 
 // The Websocket subprotocol "channel.k8s.io" prepends each binary message with a byte indicating

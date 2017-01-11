@@ -17,12 +17,12 @@ limitations under the License.
 package v2alpha1
 
 import (
+	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	watch "k8s.io/apimachinery/pkg/watch"
 	api "k8s.io/kubernetes/pkg/api"
 	v1 "k8s.io/kubernetes/pkg/api/v1"
 	v2alpha1 "k8s.io/kubernetes/pkg/apis/batch/v2alpha1"
-	meta_v1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	restclient "k8s.io/kubernetes/pkg/client/restclient"
-	watch "k8s.io/kubernetes/pkg/watch"
 )
 
 // CronJobsGetter has a method to return a CronJobInterface.

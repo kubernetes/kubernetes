@@ -22,8 +22,8 @@ go_library(
         "//cmd/kube-aggregator/pkg/client/informers/apiregistration:go_default_library",
         "//cmd/kube-aggregator/pkg/client/informers/internalinterfaces:go_default_library",
         "//pkg/client/cache:go_default_library",
-        "//pkg/runtime:go_default_library",
-        "//pkg/runtime/schema:go_default_library",
+        "//vendor:k8s.io/apimachinery/pkg/runtime",
+        "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
     ],
 )
 

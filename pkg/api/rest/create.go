@@ -17,14 +17,14 @@ limitations under the License.
 package rest
 
 import (
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/validation/genericvalidation"
 	path "k8s.io/kubernetes/pkg/api/validation/path"
 	genericapirequest "k8s.io/kubernetes/pkg/genericapiserver/api/request"
-	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/runtime/schema"
-	"k8s.io/kubernetes/pkg/util/validation/field"
 )
 
 // RESTCreateStrategy defines the minimum validation, accepted input, and

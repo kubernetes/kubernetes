@@ -18,11 +18,11 @@ package v1alpha1
 
 import (
 	fmt "fmt"
+	registered "k8s.io/apimachinery/pkg/apimachinery/registered"
+	schema "k8s.io/apimachinery/pkg/runtime/schema"
+	serializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	api "k8s.io/kubernetes/pkg/api"
-	registered "k8s.io/kubernetes/pkg/apimachinery/registered"
 	restclient "k8s.io/kubernetes/pkg/client/restclient"
-	schema "k8s.io/kubernetes/pkg/runtime/schema"
-	serializer "k8s.io/kubernetes/pkg/runtime/serializer"
 )
 
 type ApiregistrationV1alpha1Interface interface {
@@ -30,7 +30,7 @@ type ApiregistrationV1alpha1Interface interface {
 	APIServicesGetter
 }
 
-// ApiregistrationV1alpha1Client is used to interact with features provided by the k8s.io/kubernetes/pkg/apimachinery/registered.Group group.
+// ApiregistrationV1alpha1Client is used to interact with features provided by the k8s.io/apimachinery/pkg/apimachinery/registered.Group group.
 type ApiregistrationV1alpha1Client struct {
 	restClient restclient.Interface
 }

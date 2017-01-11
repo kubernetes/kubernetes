@@ -17,7 +17,7 @@ go_library(
         "//pkg/registry/core/limitrange:go_default_library",
         "//pkg/registry/generic:go_default_library",
         "//pkg/registry/generic/registry:go_default_library",
-        "//pkg/runtime:go_default_library",
+        "//vendor:k8s.io/apimachinery/pkg/runtime",
     ],
 )
 
@@ -30,11 +30,11 @@ go_test(
         "//pkg/api:go_default_library",
         "//pkg/api/resource:go_default_library",
         "//pkg/fields:go_default_library",
-        "//pkg/labels:go_default_library",
         "//pkg/registry/generic:go_default_library",
         "//pkg/registry/registrytest:go_default_library",
-        "//pkg/runtime:go_default_library",
         "//pkg/storage/etcd/testing:go_default_library",
+        "//vendor:k8s.io/apimachinery/pkg/labels",
+        "//vendor:k8s.io/apimachinery/pkg/runtime",
     ],
 )
 

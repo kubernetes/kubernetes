@@ -22,9 +22,9 @@ import (
 	"testing"
 	"time"
 
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/labels"
 	priorityutil "k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/priorities/util"
 )
 

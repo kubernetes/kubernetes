@@ -24,8 +24,8 @@ import (
 
 	"bitbucket.org/ww/goautoneg"
 
-	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
 // MediaTypesForSerializer returns a list of media and stream media types for the server.

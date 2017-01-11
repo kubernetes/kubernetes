@@ -27,10 +27,10 @@ import (
 	"testing"
 	"time"
 
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/storage/etcd/etcdtest"
 	"k8s.io/kubernetes/pkg/storage/etcd/testing/testingcert"
 	"k8s.io/kubernetes/pkg/storage/storagebackend"
-	"k8s.io/kubernetes/pkg/util/wait"
 
 	etcd "github.com/coreos/etcd/client"
 	"github.com/coreos/etcd/clientv3"

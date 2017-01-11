@@ -21,7 +21,6 @@ go_library(
         "//pkg/api/resource:go_default_library",
         "//pkg/api/v1:go_default_library",
         "//pkg/client/clientset_generated/clientset:go_default_library",
-        "//pkg/types:go_default_library",
         "//pkg/util/exec:go_default_library",
         "//pkg/util/mount:go_default_library",
         "//pkg/util/node:go_default_library",
@@ -30,6 +29,7 @@ go_library(
         "//pkg/volume:go_default_library",
         "//pkg/volume/util:go_default_library",
         "//vendor:github.com/golang/glog",
+        "//vendor:k8s.io/apimachinery/pkg/types",
     ],
 )
 
@@ -41,11 +41,11 @@ go_test(
     deps = [
         "//pkg/api/v1:go_default_library",
         "//pkg/client/clientset_generated/clientset/fake:go_default_library",
-        "//pkg/types:go_default_library",
         "//pkg/util/mount:go_default_library",
         "//pkg/util/testing:go_default_library",
         "//pkg/volume:go_default_library",
         "//pkg/volume/testing:go_default_library",
+        "//vendor:k8s.io/apimachinery/pkg/types",
     ],
 )
 

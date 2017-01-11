@@ -32,7 +32,7 @@ import (
 	"unicode"
 
 	"github.com/golang/glog"
-	utilerrors "k8s.io/kubernetes/pkg/util/errors"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 )
 
 type ProcFS struct{}

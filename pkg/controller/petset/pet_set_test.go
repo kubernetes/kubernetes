@@ -22,6 +22,7 @@ import (
 	"reflect"
 	"testing"
 
+	"k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/api/v1"
 	apps "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
 	"k8s.io/kubernetes/pkg/client/cache"
@@ -29,7 +30,6 @@ import (
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/apps/v1beta1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/apps/v1beta1/fake"
 	"k8s.io/kubernetes/pkg/controller"
-	"k8s.io/kubernetes/pkg/util/errors"
 )
 
 func newFakeStatefulSetController() (*StatefulSetController, *fakePetClient) {

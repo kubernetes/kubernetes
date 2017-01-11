@@ -21,9 +21,9 @@ import (
 
 	"golang.org/x/net/context"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/kubernetes/pkg/api/rest"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/watch"
 )
 
 type decoratedWatcher struct {

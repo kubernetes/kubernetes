@@ -17,8 +17,8 @@ limitations under the License.
 package filters
 
 import (
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/genericapiserver/api/request"
-	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 func newTestRequestInfoResolver() *request.RequestInfoFactory {

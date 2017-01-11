@@ -17,10 +17,10 @@ limitations under the License.
 package core
 
 import (
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/labels"
-	"k8s.io/kubernetes/pkg/runtime"
 )
 
 func addDefaultingFuncs(scheme *runtime.Scheme) error {

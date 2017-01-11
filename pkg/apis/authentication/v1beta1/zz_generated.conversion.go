@@ -21,9 +21,9 @@ limitations under the License.
 package v1beta1
 
 import (
+	conversion "k8s.io/apimachinery/pkg/conversion"
+	runtime "k8s.io/apimachinery/pkg/runtime"
 	authentication "k8s.io/kubernetes/pkg/apis/authentication"
-	conversion "k8s.io/kubernetes/pkg/conversion"
-	runtime "k8s.io/kubernetes/pkg/runtime"
 	unsafe "unsafe"
 )
 

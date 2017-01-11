@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/v1"
@@ -31,7 +32,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/qos"
 	"k8s.io/kubernetes/pkg/kubelet/server/stats"
 	"k8s.io/kubernetes/pkg/quota/evaluator/core"
-	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 const (

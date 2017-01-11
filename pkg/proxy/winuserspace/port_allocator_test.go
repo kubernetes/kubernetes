@@ -20,7 +20,7 @@ import (
 	"reflect"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/util/net"
+	"k8s.io/apimachinery/pkg/util/net"
 )
 
 func TestRangeAllocatorEmpty(t *testing.T) {

@@ -22,8 +22,8 @@ import (
 	"io/ioutil"
 	"net/http"
 
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/api/errors"
-	"k8s.io/kubernetes/pkg/runtime/schema"
 )
 
 // Check the http error status from a location URL.

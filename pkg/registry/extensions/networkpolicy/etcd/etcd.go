@@ -17,11 +17,11 @@ limitations under the License.
 package etcd
 
 import (
+	"k8s.io/apimachinery/pkg/runtime"
 	extensionsapi "k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/registry/extensions/networkpolicy"
 	"k8s.io/kubernetes/pkg/registry/generic"
 	genericregistry "k8s.io/kubernetes/pkg/registry/generic/registry"
-	"k8s.io/kubernetes/pkg/runtime"
 )
 
 // rest implements a RESTStorage for network policies against etcd

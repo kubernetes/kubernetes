@@ -20,9 +20,9 @@ import (
 	"fmt"
 	"strconv"
 
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
-	"k8s.io/kubernetes/pkg/runtime"
 )
 
 type HorizontalPodAutoscalerV1Beta1 struct{}

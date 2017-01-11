@@ -15,12 +15,12 @@ go_library(
     deps = [
         "//pkg/api/errors:go_default_library",
         "//pkg/apis/componentconfig:go_default_library",
-        "//pkg/apis/meta/v1:go_default_library",
         "//pkg/client/leaderelection/resourcelock:go_default_library",
-        "//pkg/util/runtime:go_default_library",
-        "//pkg/util/wait:go_default_library",
         "//vendor:github.com/golang/glog",
         "//vendor:github.com/spf13/pflag",
+        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor:k8s.io/apimachinery/pkg/util/runtime",
+        "//vendor:k8s.io/apimachinery/pkg/util/wait",
     ],
 )
 
@@ -32,12 +32,12 @@ go_test(
     deps = [
         "//pkg/api/errors:go_default_library",
         "//pkg/api/v1:go_default_library",
-        "//pkg/apis/meta/v1:go_default_library",
         "//pkg/client/clientset_generated/clientset/fake:go_default_library",
         "//pkg/client/leaderelection/resourcelock:go_default_library",
         "//pkg/client/record:go_default_library",
         "//pkg/client/testing/core:go_default_library",
-        "//pkg/runtime:go_default_library",
+        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor:k8s.io/apimachinery/pkg/runtime",
     ],
 )
 

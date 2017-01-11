@@ -15,8 +15,8 @@ go_library(
         "//cmd/kube-aggregator/pkg/apis/apiregistration:go_default_library",
         "//pkg/api/validation:go_default_library",
         "//pkg/api/validation/path:go_default_library",
-        "//pkg/util/validation:go_default_library",
-        "//pkg/util/validation/field:go_default_library",
+        "//vendor:k8s.io/apimachinery/pkg/util/validation",
+        "//vendor:k8s.io/apimachinery/pkg/util/validation/field",
     ],
 )
 

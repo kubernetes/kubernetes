@@ -24,14 +24,14 @@ import (
 
 	"github.com/davecgh/go-spew/spew"
 
+	"k8s.io/apimachinery/pkg/util/diff"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/security/apparmor"
 	"k8s.io/kubernetes/pkg/security/podsecuritypolicy/seccomp"
 	psputil "k8s.io/kubernetes/pkg/security/podsecuritypolicy/util"
-	"k8s.io/kubernetes/pkg/util/diff"
-	"k8s.io/kubernetes/pkg/util/validation/field"
 )
 
 const defaultContainerName = "test-c"

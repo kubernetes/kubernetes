@@ -13,10 +13,10 @@ go_library(
     srcs = ["patch.go"],
     tags = ["automanaged"],
     deps = [
-        "//pkg/util/json:go_default_library",
         "//third_party/forked/golang/json:go_default_library",
         "//vendor:github.com/davecgh/go-spew/spew",
         "//vendor:github.com/ghodss/yaml",
+        "//vendor:k8s.io/apimachinery/pkg/util/json",
     ],
 )
 

@@ -22,11 +22,11 @@ import (
 	"strings"
 	"time"
 
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/api/v1"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	gcecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
-	"k8s.io/kubernetes/pkg/util/sets"
 
 	. "github.com/onsi/gomega"
 	compute "google.golang.org/api/compute/v1"

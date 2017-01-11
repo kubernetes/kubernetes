@@ -14,7 +14,7 @@ go_library(
     deps = [
         "//pkg/apis/rbac:go_default_library",
         "//pkg/genericapiserver/api/request:go_default_library",
-        "//pkg/util/runtime:go_default_library",
+        "//vendor:k8s.io/apimachinery/pkg/util/runtime",
         "//vendor:k8s.io/apiserver/pkg/authentication/user",
         "//vendor:k8s.io/apiserver/pkg/authorization/authorizer",
     ],

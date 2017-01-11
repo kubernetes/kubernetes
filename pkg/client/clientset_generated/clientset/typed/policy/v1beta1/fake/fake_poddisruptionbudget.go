@@ -17,14 +17,14 @@ limitations under the License.
 package fake
 
 import (
+	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	labels "k8s.io/apimachinery/pkg/labels"
+	schema "k8s.io/apimachinery/pkg/runtime/schema"
+	watch "k8s.io/apimachinery/pkg/watch"
 	api "k8s.io/kubernetes/pkg/api"
 	v1 "k8s.io/kubernetes/pkg/api/v1"
-	meta_v1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	v1beta1 "k8s.io/kubernetes/pkg/apis/policy/v1beta1"
 	core "k8s.io/kubernetes/pkg/client/testing/core"
-	labels "k8s.io/kubernetes/pkg/labels"
-	schema "k8s.io/kubernetes/pkg/runtime/schema"
-	watch "k8s.io/kubernetes/pkg/watch"
 )
 
 // FakePodDisruptionBudgets implements PodDisruptionBudgetInterface

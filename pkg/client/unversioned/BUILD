@@ -18,20 +18,20 @@ go_library(
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/errors:go_default_library",
-        "//pkg/apimachinery/registered:go_default_library",
         "//pkg/apis/apps:go_default_library",
         "//pkg/apis/batch:go_default_library",
         "//pkg/apis/extensions:go_default_library",
-        "//pkg/apis/meta/v1:go_default_library",
         "//pkg/client/clientset_generated/internalclientset/typed/apps/internalversion:go_default_library",
         "//pkg/client/clientset_generated/internalclientset/typed/batch/internalversion:go_default_library",
         "//pkg/client/clientset_generated/internalclientset/typed/core/internalversion:go_default_library",
         "//pkg/client/clientset_generated/internalclientset/typed/extensions/internalversion:go_default_library",
         "//pkg/client/restclient:go_default_library",
-        "//pkg/runtime/schema:go_default_library",
-        "//pkg/util/wait:go_default_library",
-        "//pkg/watch:go_default_library",
         "//plugin/pkg/client/auth:go_default_library",
+        "//vendor:k8s.io/apimachinery/pkg/apimachinery/registered",
+        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
+        "//vendor:k8s.io/apimachinery/pkg/util/wait",
+        "//vendor:k8s.io/apimachinery/pkg/watch",
     ],
 )
 
@@ -43,11 +43,11 @@ go_test(
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/testapi:go_default_library",
-        "//pkg/apimachinery/registered:go_default_library",
-        "//pkg/apis/meta/v1:go_default_library",
         "//pkg/client/restclient:go_default_library",
-        "//pkg/runtime:go_default_library",
-        "//pkg/runtime/schema:go_default_library",
+        "//vendor:k8s.io/apimachinery/pkg/apimachinery/registered",
+        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor:k8s.io/apimachinery/pkg/runtime",
+        "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
     ],
 )
 

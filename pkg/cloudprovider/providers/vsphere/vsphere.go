@@ -42,10 +42,10 @@ import (
 	"github.com/vmware/govmomi/vim25/types"
 	"golang.org/x/net/context"
 
+	k8stypes "k8s.io/apimachinery/pkg/types"
+	k8runtime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/cloudprovider"
-	k8stypes "k8s.io/kubernetes/pkg/types"
-	k8runtime "k8s.io/kubernetes/pkg/util/runtime"
 )
 
 const (

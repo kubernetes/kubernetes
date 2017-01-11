@@ -17,8 +17,8 @@ limitations under the License.
 package autoscaling
 
 import (
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 )
 
 // Scale represents a scaling request for a resource.

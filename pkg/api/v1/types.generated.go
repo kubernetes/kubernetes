@@ -25,10 +25,10 @@ import (
 	"errors"
 	"fmt"
 	codec1978 "github.com/ugorji/go/codec"
+	pkg2_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	pkg5_runtime "k8s.io/apimachinery/pkg/runtime"
+	pkg1_types "k8s.io/apimachinery/pkg/types"
 	pkg3_resource "k8s.io/kubernetes/pkg/api/resource"
-	pkg2_v1 "k8s.io/kubernetes/pkg/apis/meta/v1"
-	pkg5_runtime "k8s.io/kubernetes/pkg/runtime"
-	pkg1_types "k8s.io/kubernetes/pkg/types"
 	pkg4_intstr "k8s.io/kubernetes/pkg/util/intstr"
 	"reflect"
 	"runtime"
@@ -65,10 +65,10 @@ func init() {
 		panic(err)
 	}
 	if false { // reference the types, but skip this branch at build/run time
-		var v0 pkg3_resource.Quantity
-		var v1 pkg2_v1.Time
-		var v2 pkg5_runtime.RawExtension
-		var v3 pkg1_types.UID
+		var v0 pkg2_v1.Time
+		var v1 pkg5_runtime.RawExtension
+		var v2 pkg1_types.UID
+		var v3 pkg3_resource.Quantity
 		var v4 pkg4_intstr.IntOrString
 		var v5 time.Time
 		_, _, _, _, _, _ = v0, v1, v2, v3, v4, v5

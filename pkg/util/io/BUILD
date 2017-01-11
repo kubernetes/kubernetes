@@ -18,9 +18,9 @@ go_library(
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/v1:go_default_library",
-        "//pkg/apimachinery/registered:go_default_library",
-        "//pkg/runtime:go_default_library",
         "//vendor:github.com/golang/glog",
+        "//vendor:k8s.io/apimachinery/pkg/apimachinery/registered",
+        "//vendor:k8s.io/apimachinery/pkg/runtime",
     ],
 )
 
@@ -30,12 +30,12 @@ go_test(
     tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
-        "//pkg/apimachinery/registered:go_default_library",
-        "//pkg/runtime:go_default_library",
         "//pkg/util/io:go_default_library",
         "//pkg/util/testing:go_default_library",
         "//pkg/volume:go_default_library",
         "//vendor:github.com/pborman/uuid",
+        "//vendor:k8s.io/apimachinery/pkg/apimachinery/registered",
+        "//vendor:k8s.io/apimachinery/pkg/runtime",
     ],
 )
 

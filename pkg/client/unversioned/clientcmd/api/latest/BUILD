@@ -14,10 +14,10 @@ go_library(
     deps = [
         "//pkg/client/unversioned/clientcmd/api:go_default_library",
         "//pkg/client/unversioned/clientcmd/api/v1:go_default_library",
-        "//pkg/runtime:go_default_library",
-        "//pkg/runtime/schema:go_default_library",
-        "//pkg/runtime/serializer/json:go_default_library",
-        "//pkg/runtime/serializer/versioning:go_default_library",
+        "//vendor:k8s.io/apimachinery/pkg/runtime",
+        "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
+        "//vendor:k8s.io/apimachinery/pkg/runtime/serializer/json",
+        "//vendor:k8s.io/apimachinery/pkg/runtime/serializer/versioning",
     ],
 )
 

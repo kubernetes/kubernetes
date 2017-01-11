@@ -20,12 +20,12 @@ import (
 	"reflect"
 	"testing"
 
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/api"
 	_ "k8s.io/kubernetes/pkg/api/install"
 	"k8s.io/kubernetes/pkg/api/v1"
 	_ "k8s.io/kubernetes/pkg/apis/batch/install"
 	. "k8s.io/kubernetes/pkg/apis/batch/v2alpha1"
-	"k8s.io/kubernetes/pkg/runtime"
 )
 
 func TestSetDefaultJob(t *testing.T) {

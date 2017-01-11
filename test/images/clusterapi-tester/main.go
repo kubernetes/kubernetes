@@ -24,11 +24,11 @@ import (
 	"fmt"
 	"net/http"
 
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/kubernetes/pkg/api"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/labels"
 )
 
 func main() {

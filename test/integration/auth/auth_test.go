@@ -36,12 +36,12 @@ import (
 	"testing"
 	"time"
 
+	"k8s.io/apimachinery/pkg/apimachinery/registered"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	authenticationv1beta1 "k8s.io/kubernetes/pkg/apis/authentication/v1beta1"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	"k8s.io/kubernetes/pkg/apis/extensions"

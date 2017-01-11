@@ -19,10 +19,10 @@ package resourcequota
 import (
 	"testing"
 
+	"k8s.io/apimachinery/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
-	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	genericapirequest "k8s.io/kubernetes/pkg/genericapiserver/api/request"
 )
 

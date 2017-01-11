@@ -23,9 +23,9 @@ import (
 
 	"github.com/golang/glog"
 
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apiserver/pkg/healthz"
 	"k8s.io/kubernetes/pkg/client/restclient"
-	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
 )
 
 // PostStartHookFunc is a function that is called after the server has started.

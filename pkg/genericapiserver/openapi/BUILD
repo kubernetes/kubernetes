@@ -18,11 +18,11 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//pkg/genericapiserver/mux:go_default_library",
-        "//pkg/genericapiserver/openapi/common:go_default_library",
         "//pkg/util:go_default_library",
-        "//pkg/util/json:go_default_library",
         "//vendor:github.com/emicklei/go-restful",
         "//vendor:github.com/go-openapi/spec",
+        "//vendor:k8s.io/apimachinery/pkg/genericapiserver/openapi/common",
+        "//vendor:k8s.io/apimachinery/pkg/util/json",
     ],
 )
 
@@ -32,10 +32,10 @@ go_test(
     library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
-        "//pkg/genericapiserver/openapi/common:go_default_library",
         "//vendor:github.com/emicklei/go-restful",
         "//vendor:github.com/go-openapi/spec",
         "//vendor:github.com/stretchr/testify/assert",
+        "//vendor:k8s.io/apimachinery/pkg/genericapiserver/openapi/common",
     ],
 )
 

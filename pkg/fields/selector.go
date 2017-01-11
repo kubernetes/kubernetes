@@ -21,7 +21,7 @@ import (
 	"sort"
 	"strings"
 
-	"k8s.io/kubernetes/pkg/selection"
+	"k8s.io/apimachinery/pkg/selection"
 )
 
 // Selector represents a field selector.

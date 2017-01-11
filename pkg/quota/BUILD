@@ -20,9 +20,9 @@ go_library(
         "//pkg/api:go_default_library",
         "//pkg/api/resource:go_default_library",
         "//pkg/api/v1:go_default_library",
-        "//pkg/runtime:go_default_library",
-        "//pkg/runtime/schema:go_default_library",
-        "//pkg/util/sets:go_default_library",
+        "//vendor:k8s.io/apimachinery/pkg/runtime",
+        "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
+        "//vendor:k8s.io/apimachinery/pkg/util/sets",
     ],
 )
 

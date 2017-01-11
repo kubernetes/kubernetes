@@ -22,8 +22,8 @@ go_library(
         "//pkg/client/clientset_generated/internalclientset:go_default_library",
         "//pkg/client/informers/informers_generated/internalinterfaces:go_default_library",
         "//pkg/client/listers/apps/internalversion:go_default_library",
-        "//pkg/runtime:go_default_library",
-        "//pkg/watch:go_default_library",
+        "//vendor:k8s.io/apimachinery/pkg/runtime",
+        "//vendor:k8s.io/apimachinery/pkg/watch",
     ],
 )
 

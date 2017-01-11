@@ -17,9 +17,9 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//pkg/client/unversioned/clientcmd/api:go_default_library",
-        "//pkg/conversion:go_default_library",
-        "//pkg/runtime:go_default_library",
-        "//pkg/runtime/schema:go_default_library",
+        "//vendor:k8s.io/apimachinery/pkg/conversion",
+        "//vendor:k8s.io/apimachinery/pkg/runtime",
+        "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
     ],
 )
 

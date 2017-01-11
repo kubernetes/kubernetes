@@ -21,10 +21,10 @@ limitations under the License.
 package v1beta1
 
 import (
+	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	conversion "k8s.io/apimachinery/pkg/conversion"
+	runtime "k8s.io/apimachinery/pkg/runtime"
 	v1 "k8s.io/kubernetes/pkg/api/v1"
-	meta_v1 "k8s.io/kubernetes/pkg/apis/meta/v1"
-	conversion "k8s.io/kubernetes/pkg/conversion"
-	runtime "k8s.io/kubernetes/pkg/runtime"
 	intstr "k8s.io/kubernetes/pkg/util/intstr"
 	reflect "reflect"
 )
@@ -216,9 +216,10 @@ func DeepCopy_v1beta1_DaemonSetSpec(in interface{}, out interface{}, c *conversi
 		*out = *in
 		if in.Selector != nil {
 			in, out := &in.Selector, &out.Selector
-			*out = new(meta_v1.LabelSelector)
-			if err := meta_v1.DeepCopy_v1_LabelSelector(*in, *out, c); err != nil {
+			if newVal, err := c.DeepCopy(*in); err != nil {
 				return err
+			} else {
+				*out = newVal.(*meta_v1.LabelSelector)
 			}
 		}
 		if err := v1.DeepCopy_v1_PodTemplateSpec(&in.Template, &out.Template, c); err != nil {
@@ -312,9 +313,10 @@ func DeepCopy_v1beta1_DeploymentSpec(in interface{}, out interface{}, c *convers
 		}
 		if in.Selector != nil {
 			in, out := &in.Selector, &out.Selector
-			*out = new(meta_v1.LabelSelector)
-			if err := meta_v1.DeepCopy_v1_LabelSelector(*in, *out, c); err != nil {
+			if newVal, err := c.DeepCopy(*in); err != nil {
 				return err
+			} else {
+				*out = newVal.(*meta_v1.LabelSelector)
 			}
 		}
 		if err := v1.DeepCopy_v1_PodTemplateSpec(&in.Template, &out.Template, c); err != nil {
@@ -712,16 +714,18 @@ func DeepCopy_v1beta1_NetworkPolicyPeer(in interface{}, out interface{}, c *conv
 		*out = *in
 		if in.PodSelector != nil {
 			in, out := &in.PodSelector, &out.PodSelector
-			*out = new(meta_v1.LabelSelector)
-			if err := meta_v1.DeepCopy_v1_LabelSelector(*in, *out, c); err != nil {
+			if newVal, err := c.DeepCopy(*in); err != nil {
 				return err
+			} else {
+				*out = newVal.(*meta_v1.LabelSelector)
 			}
 		}
 		if in.NamespaceSelector != nil {
 			in, out := &in.NamespaceSelector, &out.NamespaceSelector
-			*out = new(meta_v1.LabelSelector)
-			if err := meta_v1.DeepCopy_v1_LabelSelector(*in, *out, c); err != nil {
+			if newVal, err := c.DeepCopy(*in); err != nil {
 				return err
+			} else {
+				*out = newVal.(*meta_v1.LabelSelector)
 			}
 		}
 		return nil
@@ -752,8 +756,10 @@ func DeepCopy_v1beta1_NetworkPolicySpec(in interface{}, out interface{}, c *conv
 		in := in.(*NetworkPolicySpec)
 		out := out.(*NetworkPolicySpec)
 		*out = *in
-		if err := meta_v1.DeepCopy_v1_LabelSelector(&in.PodSelector, &out.PodSelector, c); err != nil {
+		if newVal, err := c.DeepCopy(&in.PodSelector); err != nil {
 			return err
+		} else {
+			out.PodSelector = *newVal.(*meta_v1.LabelSelector)
 		}
 		if in.Ingress != nil {
 			in, out := &in.Ingress, &out.Ingress
@@ -915,9 +921,10 @@ func DeepCopy_v1beta1_ReplicaSetSpec(in interface{}, out interface{}, c *convers
 		}
 		if in.Selector != nil {
 			in, out := &in.Selector, &out.Selector
-			*out = new(meta_v1.LabelSelector)
-			if err := meta_v1.DeepCopy_v1_LabelSelector(*in, *out, c); err != nil {
+			if newVal, err := c.DeepCopy(*in); err != nil {
 				return err
+			} else {
+				*out = newVal.(*meta_v1.LabelSelector)
 			}
 		}
 		if err := v1.DeepCopy_v1_PodTemplateSpec(&in.Template, &out.Template, c); err != nil {

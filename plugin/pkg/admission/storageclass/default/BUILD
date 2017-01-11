@@ -22,9 +22,9 @@ go_library(
         "//pkg/client/cache:go_default_library",
         "//pkg/client/clientset_generated/internalclientset:go_default_library",
         "//pkg/kubeapiserver/admission:go_default_library",
-        "//pkg/runtime:go_default_library",
-        "//pkg/watch:go_default_library",
         "//vendor:github.com/golang/glog",
+        "//vendor:k8s.io/apimachinery/pkg/runtime",
+        "//vendor:k8s.io/apimachinery/pkg/watch",
     ],
 )
 
@@ -36,10 +36,10 @@ go_test(
     deps = [
         "//pkg/admission:go_default_library",
         "//pkg/api:go_default_library",
-        "//pkg/apis/meta/v1:go_default_library",
         "//pkg/apis/storage:go_default_library",
         "//pkg/apis/storage/util:go_default_library",
         "//vendor:github.com/golang/glog",
+        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
     ],
 )
 

@@ -25,13 +25,13 @@ go_library(
         "//pkg/kubelet/cadvisor:go_default_library",
         "//pkg/kubelet/container:go_default_library",
         "//pkg/kubelet/events:go_default_library",
-        "//pkg/util/errors:go_default_library",
         "//pkg/util/flowcontrol:go_default_library",
         "//pkg/util/parsers:go_default_library",
-        "//pkg/util/sets:go_default_library",
-        "//pkg/util/wait:go_default_library",
         "//vendor:github.com/docker/distribution/reference",
         "//vendor:github.com/golang/glog",
+        "//vendor:k8s.io/apimachinery/pkg/util/errors",
+        "//vendor:k8s.io/apimachinery/pkg/util/sets",
+        "//vendor:k8s.io/apimachinery/pkg/util/wait",
     ],
 )
 

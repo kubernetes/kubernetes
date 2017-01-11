@@ -17,6 +17,7 @@ limitations under the License.
 package rest
 
 import (
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	batchapiv1 "k8s.io/kubernetes/pkg/apis/batch/v1"
@@ -25,7 +26,6 @@ import (
 	cronjobetcd "k8s.io/kubernetes/pkg/registry/batch/cronjob/etcd"
 	jobetcd "k8s.io/kubernetes/pkg/registry/batch/job/etcd"
 	"k8s.io/kubernetes/pkg/registry/generic"
-	"k8s.io/kubernetes/pkg/runtime/schema"
 )
 
 type RESTStorageProvider struct{}

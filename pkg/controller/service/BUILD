@@ -25,13 +25,13 @@ go_library(
         "//pkg/cloudprovider:go_default_library",
         "//pkg/controller:go_default_library",
         "//pkg/fields:go_default_library",
-        "//pkg/runtime:go_default_library",
         "//pkg/util/metrics:go_default_library",
-        "//pkg/util/runtime:go_default_library",
-        "//pkg/util/wait:go_default_library",
         "//pkg/util/workqueue:go_default_library",
-        "//pkg/watch:go_default_library",
         "//vendor:github.com/golang/glog",
+        "//vendor:k8s.io/apimachinery/pkg/runtime",
+        "//vendor:k8s.io/apimachinery/pkg/util/runtime",
+        "//vendor:k8s.io/apimachinery/pkg/util/wait",
+        "//vendor:k8s.io/apimachinery/pkg/watch",
     ],
 )
 
@@ -45,7 +45,7 @@ go_test(
         "//pkg/api/v1:go_default_library",
         "//pkg/client/clientset_generated/clientset/fake:go_default_library",
         "//pkg/cloudprovider/providers/fake:go_default_library",
-        "//pkg/types:go_default_library",
+        "//vendor:k8s.io/apimachinery/pkg/types",
     ],
 )
 

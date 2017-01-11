@@ -20,8 +20,8 @@ import (
 	"fmt"
 	"net/http"
 
+	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
-	"k8s.io/kubernetes/pkg/util/runtime"
 )
 
 // BadGatewayError renders a simple bad gateway error.
