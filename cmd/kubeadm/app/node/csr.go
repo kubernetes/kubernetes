@@ -60,8 +60,7 @@ func PerformTLSBootstrapDeprecated(connection *ConnectionDetails) (*clientcmdapi
 	return newConfig, nil
 }
 
-// PerformTLSBootstrap executes a certificate signing request with the
-// provided connection details.
+// PerformTLSBootstrap executes a node certificate signing request.
 func PerformTLSBootstrap(cfg *clientcmdapi.Config) error {
 	hostName, err := os.Hostname()
 	if err != nil {
@@ -69,7 +68,7 @@ func PerformTLSBootstrap(cfg *clientcmdapi.Config) error {
 	}
 	name := types.NodeName(hostName)
 
-	rc, err := clientcmd.NewDefaultClientConfig(*cfg, nil).ClientConfig()
+	rc, err := clientcmd.NewDefaultClientConfig(*cfg, &clientcmd.ConfigOverrides{}).ClientConfig()
 	if err != nil {
 		return err
 	}
@@ -83,20 +82,22 @@ func PerformTLSBootstrap(cfg *clientcmdapi.Config) error {
 	if err != nil {
 		return fmt.Errorf("failed to generate private key [%v]", err)
 	}
+
+	// Make sure there are no other nodes in the cluster with identical node name.
+	if err := checkForNodeNameDuplicates(c); err != nil {
+		return err
+	}
+
 	cert, err := csr.RequestNodeCertificate(c.Certificates().CertificateSigningRequests(), key, name)
 	if err != nil {
 		return fmt.Errorf("failed to request signed certificate from the API server [%v]", err)
-	}
-	fmtCert, err := certutil.FormatBytesCert(cert)
-	if err != nil {
-		return fmt.Errorf("failed to format certificate [%v]", err)
 	}
 	fmt.Printf("[csr] Received signed certificate from the API server")
 	fmt.Println("[csr] Generating kubelet configuration")
 
 	cfg.AuthInfos["kubelet"] = &clientcmdapi.AuthInfo{
 		ClientKeyData:         key,
-		ClientCertificateData: []byte(fmtCert),
+		ClientCertificateData: cert,
 	}
 	cfg.Contexts["kubelet"] = &clientcmdapi.Context{
 		AuthInfo: "kubelet",
