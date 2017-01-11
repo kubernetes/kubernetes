@@ -17,6 +17,7 @@ limitations under the License.
 package api
 
 import (
+	"k8s.io/fake-dep/pkgfoo"
 	"k8s.io/kubernetes/pkg/api/resource"
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/fields"
@@ -3561,3 +3562,10 @@ const (
 	// DefaultFailureDomains defines the set of label keys used when TopologyKey is empty in PreferredDuringScheduling anti-affinity.
 	DefaultFailureDomains string = metav1.LabelHostname + "," + metav1.LabelZoneFailureDomain + "," + metav1.LabelZoneRegion
 )
+
+type NewTypeToCopy struct {
+	metav1.TypeMeta
+	ObjectMeta
+
+	FieldHere *pkgfoo.Foo
+}
