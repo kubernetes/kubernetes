@@ -413,11 +413,11 @@ kube::util::has_changes_against_upstream_branch() {
     exit 1
   fi
   # notice this uses ... to find the first shared ancestor
-  if git diff --name-only "${full_branch}...HEAD" | grep -v "${not_pattern}" | grep "${pattern}" > /dev/null; then
+  if git diff --name-only "${full_branch}...HEAD" | grep -v -E "${not_pattern}" | grep "${pattern}" > /dev/null; then
     return 0
   fi
   # also check for pending changes
-  if git status --porcelain | grep -v "${not_pattern}" | grep "${pattern}" > /dev/null; then
+  if git status --porcelain | grep -v -E "${not_pattern}" | grep "${pattern}" > /dev/null; then
     echo "Detected '${pattern}' uncommitted changes."
     return 0
   fi
