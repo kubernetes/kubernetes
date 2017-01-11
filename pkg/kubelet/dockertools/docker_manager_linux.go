@@ -23,15 +23,16 @@ import (
 	dockercontainer "github.com/docker/engine-api/types/container"
 
 	"k8s.io/kubernetes/pkg/api/v1"
+	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
 
 // These two functions are OS specific (for now at least)
-func updateHostConfig(config *dockercontainer.HostConfig) {
+func updateHostConfig(hc *dockercontainer.HostConfig, opts *kubecontainer.RunContainerOptions) {
 	// no-op, there is a windows implementation that is different.
 }
 
 func DefaultMemorySwap() int64 {
-	return -1
+	return 0
 }
 
 func getContainerIP(container *dockertypes.ContainerJSON) string {

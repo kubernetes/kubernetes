@@ -709,7 +709,7 @@ func (dm *DockerManager) runContainer(
 		SecurityOpt: fmtSecurityOpts,
 	}
 
-	updateHostConfig(hc)
+	updateHostConfig(hc, opts)
 
 	// Set sysctls if requested
 	if container.Name == PodInfraContainerName {
