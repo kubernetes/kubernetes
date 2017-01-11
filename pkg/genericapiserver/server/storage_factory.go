@@ -30,6 +30,15 @@ import (
 	"github.com/golang/glog"
 )
 
+// Backend describes the storage servers, the information here should be enough
+// for health validations
+type Backend struct {
+	Server string
+	// TLS credentials
+	KeyFile  string
+	CertFile string
+}
+
 // StorageFactory is the interface to locate the storage for a given GroupResource
 type StorageFactory interface {
 	// New finds the storage destination for the given group and resource. It will
@@ -43,7 +52,7 @@ type StorageFactory interface {
 
 	// Backends gets all backends for all registered storage destinations.
 	// Used for getting all instances for health validations.
-	Backends() []string
+	Backends() []Backend
 }
 
 // DefaultStorageFactory takes a GroupResource and returns back its storage interface.  This result includes:
@@ -244,15 +253,23 @@ func (s *DefaultStorageFactory) NewConfig(groupResource schema.GroupResource) (*
 	return &config, nil
 }
 
-// Get all backends for all registered storage destinations.
+// Backends returns all backends for all registered storage destinations.
 // Used for getting all instances for health validations.
-func (s *DefaultStorageFactory) Backends() []string {
-	backends := sets.NewString(s.StorageConfig.ServerList...)
+func (s *DefaultStorageFactory) Backends() []Backend {
+	servers := sets.NewString(s.StorageConfig.ServerList...)
 
 	for _, overrides := range s.Overrides {
-		backends.Insert(overrides.etcdLocation...)
+		servers.Insert(overrides.etcdLocation...)
 	}
-	return backends.List()
+	backends := []Backend{}
+	for server := range servers {
+		backends = append(backends, Backend{
+			Server:   server,
+			KeyFile:  s.StorageConfig.KeyFile,
+			CertFile: s.StorageConfig.CertFile,
+		})
+	}
+	return backends
 }
 
 // NewStorageCodec assembles a storage codec for the provided storage media type, the provided serializer, and the requested

@@ -25,19 +25,16 @@ import (
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/probe"
-	httpprober "k8s.io/kubernetes/pkg/probe/http"
 )
 
 type REST struct {
 	GetServersToValidate func() map[string]Server
-	prober               httpprober.HTTPProber
 }
 
 // NewStorage returns a new REST.
 func NewStorage(serverRetriever func() map[string]Server) *REST {
 	return &REST{
 		GetServersToValidate: serverRetriever,
-		prober:               httpprober.New(),
 	}
 }
 
@@ -96,7 +93,7 @@ func ToConditionStatus(s probe.Result) api.ConditionStatus {
 }
 
 func (rs *REST) getComponentStatus(name string, server Server) *api.ComponentStatus {
-	status, msg, err := server.DoServerCheck(rs.prober)
+	status, msg, err := server.DoServerCheck()
 	errorMsg := ""
 	if err != nil {
 		errorMsg = err.Error()

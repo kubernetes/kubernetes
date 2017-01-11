@@ -248,7 +248,7 @@ func (s componentStatusStorage) serversToValidate() map[string]componentstatus.S
 	}
 
 	for ix, machine := range s.storageFactory.Backends() {
-		etcdUrl, err := url.Parse(machine)
+		etcdUrl, err := url.Parse(machine.Server)
 		if err != nil {
 			glog.Errorf("Failed to parse etcd url for validation: %v", err)
 			continue
@@ -271,6 +271,8 @@ func (s componentStatusStorage) serversToValidate() map[string]componentstatus.S
 		serversToValidate[fmt.Sprintf("etcd-%d", ix)] = componentstatus.Server{
 			Addr:        addr,
 			EnableHTTPS: etcdUrl.Scheme == "https",
+			CertFile:    machine.CertFile,
+			KeyFile:     machine.KeyFile,
 			Port:        port,
 			Path:        "/health",
 			Validate:    etcdutil.EtcdHealthCheck,

@@ -20,6 +20,7 @@ import (
 	"testing"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	apiserver "k8s.io/kubernetes/pkg/genericapiserver"
 	"k8s.io/kubernetes/pkg/storage/storagebackend"
 )
 
@@ -47,6 +48,6 @@ func (f fakeStorageFactory) ResourcePrefix(groupResource schema.GroupResource) s
 	return ""
 }
 
-func (f fakeStorageFactory) Backends() []string {
-	return []string{"etcd-0"}
+func (f fakeStorageFactory) Backends() []apiserver.Backend {
+	return []apiserver.Backend{apiserver.Backend{Server: "etcd-0"}}
 }

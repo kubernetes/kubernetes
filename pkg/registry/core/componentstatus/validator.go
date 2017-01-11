@@ -19,6 +19,8 @@ package componentstatus
 import (
 	"net/http"
 
+	"github.com/coreos/etcd/pkg/tlsutil"
+
 	"time"
 
 	utilnet "k8s.io/apimachinery/pkg/util/net"
@@ -42,7 +44,11 @@ type Server struct {
 	Port        int
 	Path        string
 	EnableHTTPS bool
+	CertFile    string
+	KeyFile     string
 	Validate    ValidatorFn
+	// for testing purpose
+	Prober httpprober.HTTPProber
 }
 
 type ServerStatus struct {
@@ -58,14 +64,27 @@ type ServerStatus struct {
 	Err string `json:"err,omitempty"`
 }
 
-func (server *Server) DoServerCheck(prober httpprober.HTTPProber) (probe.Result, string, error) {
+func (server *Server) DoServerCheck() (probe.Result, string, error) {
+	// setup the prober
+	if server.Prober == nil {
+		if len(server.CertFile) > 0 && len(server.KeyFile) > 0 {
+			cert, err := tlsutil.NewCert(server.CertFile, server.KeyFile, nil)
+			if err != nil {
+				return probe.Unknown, "", err
+			}
+			server.Prober = httpprober.NewWithCert(cert)
+		} else {
+			server.Prober = httpprober.New()
+		}
+	}
+
 	scheme := "http"
 	if server.EnableHTTPS {
 		scheme = "https"
 	}
 	url := utilnet.FormatURL(scheme, server.Addr, server.Port, server.Path)
 
-	result, data, err := prober.Probe(url, nil, probeTimeOut)
+	result, data, err := server.Prober.Probe(url, nil, probeTimeOut)
 
 	if err != nil {
 		return probe.Unknown, "", err

@@ -14,6 +14,7 @@ go_test(
     library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
+        "//pkg/genericapiserver:go_default_library",
         "//pkg/storage/storagebackend:go_default_library",
         "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
     ],
