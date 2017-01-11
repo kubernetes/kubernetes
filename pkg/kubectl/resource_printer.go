@@ -509,8 +509,8 @@ var (
 	namespaceColumns                 = []string{"NAME", "STATUS", "AGE"}
 	secretColumns                    = []string{"NAME", "TYPE", "DATA", "AGE"}
 	serviceAccountColumns            = []string{"NAME", "SECRETS", "AGE"}
-	persistentVolumeColumns          = []string{"NAME", "CAPACITY", "ACCESSMODES", "RECLAIMPOLICY", "STATUS", "CLAIM", "REASON", "AGE"}
-	persistentVolumeClaimColumns     = []string{"NAME", "STATUS", "VOLUME", "CAPACITY", "ACCESSMODES", "AGE"}
+	persistentVolumeColumns          = []string{"NAME", "CAPACITY", "ACCESSMODES", "RECLAIMPOLICY", "STATUS", "CLAIM", "STORAGECLASS", "REASON", "AGE"}
+	persistentVolumeClaimColumns     = []string{"NAME", "STATUS", "VOLUME", "CAPACITY", "ACCESSMODES", "STORAGECLASS", "AGE"}
 	componentStatusColumns           = []string{"NAME", "STATUS", "MESSAGE", "ERROR"}
 	thirdPartyResourceColumns        = []string{"NAME", "DESCRIPTION", "VERSION(S)"}
 	roleColumns                      = []string{"NAME", "AGE"}
@@ -1631,11 +1631,12 @@ func printPersistentVolume(pv *api.PersistentVolume, w io.Writer, options PrintO
 	aQty := pv.Spec.Capacity[api.ResourceStorage]
 	aSize := aQty.String()
 
-	if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s",
+	if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s",
 		name,
 		aSize, modesStr, reclaimPolicyStr,
 		pv.Status.Phase,
 		claimRefUID,
+		storageutil.GetStorageClassAnnotation(pv.ObjectMeta),
 		pv.Status.Reason,
 		translateTimestamp(pv.CreationTimestamp),
 	); err != nil {
@@ -1678,7 +1679,7 @@ func printPersistentVolumeClaim(pvc *api.PersistentVolumeClaim, w io.Writer, opt
 		capacity = storage.String()
 	}
 
-	if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s", name, phase, pvc.Spec.VolumeName, capacity, accessModes, translateTimestamp(pvc.CreationTimestamp)); err != nil {
+	if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\t%s", name, phase, pvc.Spec.VolumeName, capacity, accessModes, storageutil.GetStorageClassAnnotation(pvc.ObjectMeta), translateTimestamp(pvc.CreationTimestamp)); err != nil {
 		return err
 	}
 	if _, err := fmt.Fprint(w, AppendLabels(pvc.Labels, options.ColumnLabels)); err != nil {
