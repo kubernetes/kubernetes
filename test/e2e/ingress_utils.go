@@ -181,31 +181,11 @@ func createComformanceTests(jig *testJig, ns string) []conformanceTests {
 				})
 				By("Checking that " + pathToFail + " is not exposed by polling for failure")
 				route := fmt.Sprintf("http://%v%v", jig.address, pathToFail)
-				framework.ExpectNoError(pollURL(route, updateURLMapHost, framework.LoadBalancerCleanupTimeout, jig.pollInterval, &http.Client{Timeout: reqTimeout}, true))
+				framework.ExpectNoError(framework.PollURL(route, updateURLMapHost, framework.LoadBalancerCleanupTimeout, jig.pollInterval, &http.Client{Timeout: reqTimeout}, true))
 			},
 			fmt.Sprintf("Waiting for path updates to reflect in L7"),
 		},
 	}
-}
-
-// pollURL polls till the url responds with a healthy http code. If
-// expectUnreachable is true, it breaks on first non-healthy http code instead.
-func pollURL(route, host string, timeout time.Duration, interval time.Duration, httpClient *http.Client, expectUnreachable bool) error {
-	var lastBody string
-	pollErr := wait.PollImmediate(interval, timeout, func() (bool, error) {
-		var err error
-		lastBody, err = simpleGET(httpClient, route, host)
-		if err != nil {
-			framework.Logf("host %v path %v: %v unreachable", host, route, err)
-			return expectUnreachable, nil
-		}
-		return !expectUnreachable, nil
-	})
-	if pollErr != nil {
-		return fmt.Errorf("Failed to execute a successful GET within %v, Last response body for %v, host %v:\n%v\n\n%v\n",
-			timeout, route, host, lastBody, pollErr)
-	}
-	return nil
 }
 
 // generateRSACerts generates a basic self signed certificate using a key length
@@ -325,13 +305,6 @@ func createSecret(kubeClient clientset.Interface, ing *extensions.Ingress) (host
 		_, err = kubeClient.Core().Secrets(ing.Namespace).Create(secret)
 	}
 	return host, cert, key, err
-}
-
-func describeIng(ns string) {
-	framework.Logf("\nOutput of kubectl describe ing:\n")
-	desc, _ := framework.RunKubectl(
-		"describe", "ing", fmt.Sprintf("--namespace=%v", ns))
-	framework.Logf(desc)
 }
 
 func cleanupGCE(gceController *GCEIngressController) {
@@ -821,7 +794,7 @@ func (j *testJig) update(update func(ing *extensions.Ingress)) {
 		update(j.ing)
 		j.ing, err = j.client.Extensions().Ingresses(ns).Update(j.ing)
 		if err == nil {
-			describeIng(j.ing.Namespace)
+			framework.DescribeIng(j.ing.Namespace)
 			return
 		}
 		if !apierrs.IsConflict(err) && !apierrs.IsServerTimeout(err) {
@@ -889,7 +862,7 @@ func (j *testJig) waitForIngress(waitForNodePort bool) {
 			}
 			route := fmt.Sprintf("%v://%v%v", proto, address, p.Path)
 			framework.Logf("Testing route %v host %v with simple GET", route, rules.Host)
-			framework.ExpectNoError(pollURL(route, rules.Host, framework.LoadBalancerPollTimeout, j.pollInterval, timeoutClient, false))
+			framework.ExpectNoError(framework.PollURL(route, rules.Host, framework.LoadBalancerPollTimeout, j.pollInterval, timeoutClient, false))
 		}
 	}
 }
@@ -898,7 +871,7 @@ func (j *testJig) waitForIngress(waitForNodePort bool) {
 // given url returns a non-healthy http code even once.
 func (j *testJig) verifyURL(route, host string, iterations int, interval time.Duration, httpClient *http.Client) error {
 	for i := 0; i < iterations; i++ {
-		b, err := simpleGET(httpClient, route, host)
+		b, err := framework.SimpleGET(httpClient, route, host)
 		if err != nil {
 			framework.Logf(b)
 			return err
@@ -913,7 +886,7 @@ func (j *testJig) curlServiceNodePort(ns, name string, port int) {
 	// TODO: Curl all nodes?
 	u, err := framework.GetNodePortURL(j.client, ns, name, port)
 	framework.ExpectNoError(err)
-	framework.ExpectNoError(pollURL(u, "", 30*time.Second, j.pollInterval, &http.Client{Timeout: reqTimeout}, false))
+	framework.ExpectNoError(framework.PollURL(u, "", 30*time.Second, j.pollInterval, &http.Client{Timeout: reqTimeout}, false))
 }
 
 // getIngressNodePorts returns all related backend services' nodePorts.

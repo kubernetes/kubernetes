@@ -23,6 +23,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"math/rand"
 	"net"
 	"net/http"
@@ -5299,4 +5300,55 @@ func RcByNameContainer(name string, replicas int32, image string, labels map[str
 			},
 		},
 	}
+}
+
+// SimpleGET executes a get on the given url, returns error if non-200 returned.
+func SimpleGET(c *http.Client, url, host string) (string, error) {
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return "", err
+	}
+	req.Host = host
+	res, err := c.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer res.Body.Close()
+	rawBody, err := ioutil.ReadAll(res.Body)
+	if err != nil {
+		return "", err
+	}
+	body := string(rawBody)
+	if res.StatusCode != http.StatusOK {
+		err = fmt.Errorf(
+			"GET returned http error %v", res.StatusCode)
+	}
+	return body, err
+}
+
+// PollURL polls till the url responds with a healthy http code. If
+// expectUnreachable is true, it breaks on first non-healthy http code instead.
+func PollURL(route, host string, timeout time.Duration, interval time.Duration, httpClient *http.Client, expectUnreachable bool) error {
+	var lastBody string
+	pollErr := wait.PollImmediate(interval, timeout, func() (bool, error) {
+		var err error
+		lastBody, err = SimpleGET(httpClient, route, host)
+		if err != nil {
+			Logf("host %v path %v: %v unreachable", host, route, err)
+			return expectUnreachable, nil
+		}
+		return !expectUnreachable, nil
+	})
+	if pollErr != nil {
+		return fmt.Errorf("Failed to execute a successful GET within %v, Last response body for %v, host %v:\n%v\n\n%v\n",
+			timeout, route, host, lastBody, pollErr)
+	}
+	return nil
+}
+
+func DescribeIng(ns string) {
+	Logf("\nOutput of kubectl describe ing:\n")
+	desc, _ := RunKubectl(
+		"describe", "ing", fmt.Sprintf("--namespace=%v", ns))
+	Logf(desc)
 }
