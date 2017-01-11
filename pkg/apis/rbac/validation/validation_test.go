@@ -17,9 +17,10 @@ limitations under the License.
 package validation
 
 import (
+	"strings"
 	"testing"
 
-	api "k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/rbac"
 	"k8s.io/kubernetes/pkg/util/validation/field"
 )
@@ -557,4 +558,11 @@ func TestValidateRoleNoResources(t *testing.T) {
 		errType: field.ErrorTypeRequired,
 		field:   "rules[0].resources",
 	}.test(t)
+}
+
+func nonResourceURLCovers(ownerPath, subPath string) bool {
+	if ownerPath == subPath {
+		return true
+	}
+	return strings.HasSuffix(ownerPath, "*") && strings.HasPrefix(subPath, strings.TrimRight(ownerPath, "*"))
 }
