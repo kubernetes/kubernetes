@@ -14,43 +14,43 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2e
+package e2e_federation
 
 import (
 	"fmt"
 	"time"
 
 	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	federationapi "k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	"k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
-
-	. "github.com/onsi/gomega"
+	fedframework "k8s.io/kubernetes/test/e2e_federation/framework"
 )
 
 // Create/delete cluster api objects
 var _ = framework.KubeDescribe("Federation apiserver [Feature:Federation]", func() {
-	f := framework.NewDefaultFederatedFramework("federation-cluster")
+	f := fedframework.NewDefaultFederatedFramework("federation-cluster")
 
 	Describe("Cluster objects", func() {
 		AfterEach(func() {
-			framework.SkipUnlessFederated(f.ClientSet)
+			fedframework.SkipUnlessFederated(f.ClientSet)
 
 			// Delete registered clusters.
 			// This is if a test failed, it should not affect other tests.
-			clusterList, err := f.FederationClientset_1_5.Federation().Clusters().List(v1.ListOptions{})
+			clusterList, err := f.FederationClientset.Federation().Clusters().List(v1.ListOptions{})
 			Expect(err).NotTo(HaveOccurred())
 			for _, cluster := range clusterList.Items {
-				err := f.FederationClientset_1_5.Federation().Clusters().Delete(cluster.Name, &v1.DeleteOptions{})
+				err := f.FederationClientset.Federation().Clusters().Delete(cluster.Name, &v1.DeleteOptions{})
 				Expect(err).NotTo(HaveOccurred())
 			}
 		})
 
 		It("should be created and deleted successfully", func() {
-			framework.SkipUnlessFederated(f.ClientSet)
+			fedframework.SkipUnlessFederated(f.ClientSet)
 
 			contexts := f.GetUnderlyingFederatedContexts()
 
@@ -69,14 +69,14 @@ var _ = framework.KubeDescribe("Federation apiserver [Feature:Federation]", func
 			framework.Logf("Deleting %d clusters", len(contexts))
 			for _, context := range contexts {
 				framework.Logf("Deleting cluster object: %s (%s, secret: %s)", context.Name, context.Cluster.Cluster.Server, context.Name)
-				err := f.FederationClientset_1_5.Federation().Clusters().Delete(context.Name, &v1.DeleteOptions{})
+				err := f.FederationClientset.Federation().Clusters().Delete(context.Name, &v1.DeleteOptions{})
 				framework.ExpectNoError(err, fmt.Sprintf("unexpected error in deleting cluster %s: %+v", context.Name, err))
 				framework.Logf("Successfully deleted cluster object: %s (%s, secret: %s)", context.Name, context.Cluster.Cluster.Server, context.Name)
 			}
 
 			// There should not be any remaining cluster.
 			framework.Logf("Verifying that zero clusters remain")
-			clusterList, err := f.FederationClientset_1_5.Federation().Clusters().List(v1.ListOptions{})
+			clusterList, err := f.FederationClientset.Federation().Clusters().List(v1.ListOptions{})
 			Expect(err).NotTo(HaveOccurred())
 			if len(clusterList.Items) != 0 {
 				framework.Failf("there should not have been any remaining clusters. Found: %+v", clusterList)
@@ -86,16 +86,16 @@ var _ = framework.KubeDescribe("Federation apiserver [Feature:Federation]", func
 	})
 	Describe("Admission control", func() {
 		AfterEach(func() {
-			framework.SkipUnlessFederated(f.ClientSet)
+			fedframework.SkipUnlessFederated(f.ClientSet)
 		})
 
 		It("should not be able to create resources if namespace does not exist", func() {
-			framework.SkipUnlessFederated(f.ClientSet)
+			fedframework.SkipUnlessFederated(f.ClientSet)
 
 			// Creating a service in a non-existing namespace should fail.
 			svcNamespace := "federation-admission-test-ns"
 			svcName := "myns"
-			clientset := f.FederationClientset_1_5
+			clientset := f.FederationClientset
 			framework.Logf("Trying to create service %s in namespace %s, expect to get error", svcName, svcNamespace)
 			if _, err := clientset.Core().Services(svcNamespace).Create(newService(svcName, svcNamespace)); err == nil {
 				framework.Failf("Expected to get an error while creating a service in a non-existing namespace")
