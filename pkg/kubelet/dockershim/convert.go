@@ -24,6 +24,7 @@ import (
 	dockertypes "github.com/docker/engine-api/types"
 
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
+	"k8s.io/kubernetes/pkg/kubelet/kuberuntime"
 )
 
 // This file contains helper functions to convert docker API types to runtime
@@ -148,7 +149,7 @@ func toRuntimeAPISandboxState(state string) runtimeapi.PodSandboxState {
 	}
 }
 
-func toRuntimeAPISandbox(c *dockertypes.Container) (*runtimeapi.PodSandbox, error) {
+func containerToRuntimeAPISandbox(c *dockertypes.Container) (*runtimeapi.PodSandbox, error) {
 	state := toRuntimeAPISandboxState(c.Status)
 	if len(c.Names) == 0 {
 		return nil, fmt.Errorf("unexpected empty sandbox name: %+v", c)
@@ -168,4 +169,19 @@ func toRuntimeAPISandbox(c *dockertypes.Container) (*runtimeapi.PodSandbox, erro
 		Labels:      labels,
 		Annotations: annotations,
 	}, nil
+}
+
+func checkpointToRuntimeAPISandbox(id string, checkpoint *PodSandboxCheckpoint) *runtimeapi.PodSandbox {
+	state := runtimeapi.PodSandboxState_SANDBOX_NOTREADY
+	labels := make(map[string]string)
+	labels[kuberuntime.KubernetesManagedLabel] = "true"
+	return &runtimeapi.PodSandbox{
+		Id: id,
+		Metadata: &runtimeapi.PodSandboxMetadata{
+			Name:      checkpoint.Name,
+			Namespace: checkpoint.Namespace,
+		},
+		State:  state,
+		Labels: labels,
+	}
 }

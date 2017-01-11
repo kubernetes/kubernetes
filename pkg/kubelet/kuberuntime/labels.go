@@ -40,8 +40,8 @@ const (
 	containerPreStopHandlerLabel           = "io.kubernetes.container.preStopHandler"
 	containerPortsLabel                    = "io.kubernetes.container.ports"
 
-	// kubernetesManagedLabel is used to distinguish whether a container/sandbox is managed by kubelet or not
-	kubernetesManagedLabel = "io.kubernetes.managed"
+	// KubernetesManagedLabel is used to distinguish whether a container/sandbox is managed by kubelet or not
+	KubernetesManagedLabel = "io.kubernetes.managed"
 )
 
 type labeledPodSandboxInfo struct {
@@ -87,7 +87,7 @@ func newPodLabels(pod *v1.Pod) map[string]string {
 	labels[types.KubernetesPodNameLabel] = pod.Name
 	labels[types.KubernetesPodNamespaceLabel] = pod.Namespace
 	labels[types.KubernetesPodUIDLabel] = string(pod.UID)
-	labels[kubernetesManagedLabel] = "true"
+	labels[KubernetesManagedLabel] = "true"
 
 	return labels
 }
@@ -104,7 +104,7 @@ func newContainerLabels(container *v1.Container, pod *v1.Pod) map[string]string 
 	labels[types.KubernetesPodNamespaceLabel] = pod.Namespace
 	labels[types.KubernetesPodUIDLabel] = string(pod.UID)
 	labels[types.KubernetesContainerNameLabel] = container.Name
-	labels[kubernetesManagedLabel] = "true"
+	labels[KubernetesManagedLabel] = "true"
 
 	return labels
 }
@@ -157,7 +157,7 @@ func getPodSandboxInfoFromLabels(labels map[string]string) *labeledPodSandboxInf
 
 	// Remain only labels from v1.Pod
 	for k, v := range labels {
-		if k != types.KubernetesPodNameLabel && k != types.KubernetesPodNamespaceLabel && k != types.KubernetesPodUIDLabel && k != kubernetesManagedLabel {
+		if k != types.KubernetesPodNameLabel && k != types.KubernetesPodNamespaceLabel && k != types.KubernetesPodUIDLabel && k != KubernetesManagedLabel {
 			podSandboxInfo.Labels[k] = v
 		}
 	}
@@ -184,7 +184,7 @@ func getContainerInfoFromLabels(labels map[string]string) *labeledContainerInfo 
 
 // isManagedByKubelet returns true is the sandbox/container is managed by kubelet.
 func isManagedByKubelet(labels map[string]string) bool {
-	if _, ok := labels[kubernetesManagedLabel]; ok {
+	if _, ok := labels[KubernetesManagedLabel]; ok {
 		return true
 	}
 
