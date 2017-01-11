@@ -12,6 +12,7 @@ go_library(
     srcs = ["util.go"],
     tags = ["automanaged"],
     deps = [
+        "//federation/client/clientset_generated/federation_clientset:go_default_library",
         "//pkg/api:go_default_library",
         "//pkg/client/clientset_generated/internalclientset:go_default_library",
         "//pkg/client/unversioned/clientcmd:go_default_library",
