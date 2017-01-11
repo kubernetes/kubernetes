@@ -241,14 +241,14 @@ type componentStatusStorage struct {
 	storageFactory genericapiserver.StorageFactory
 }
 
-func (s componentStatusStorage) serversToValidate() map[string]componentstatus.Server {
-	serversToValidate := map[string]componentstatus.Server{
-		"controller-manager": {Addr: "127.0.0.1", Port: ports.ControllerManagerPort, Path: "/healthz"},
-		"scheduler":          {Addr: "127.0.0.1", Port: ports.SchedulerPort, Path: "/healthz"},
+func (s componentStatusStorage) serversToValidate() map[string]*componentstatus.Server {
+	serversToValidate := map[string]*componentstatus.Server{
+		"controller-manager": &componentstatus.Server{Addr: "127.0.0.1", Port: ports.ControllerManagerPort, Path: "/healthz"},
+		"scheduler":          &componentstatus.Server{Addr: "127.0.0.1", Port: ports.SchedulerPort, Path: "/healthz"},
 	}
 
 	for ix, machine := range s.storageFactory.Backends() {
-		etcdUrl, err := url.Parse(machine)
+		etcdUrl, err := url.Parse(machine.Server)
 		if err != nil {
 			glog.Errorf("Failed to parse etcd url for validation: %v", err)
 			continue
@@ -268,9 +268,11 @@ func (s componentStatusStorage) serversToValidate() map[string]componentstatus.S
 			port = 2379
 		}
 		// TODO: etcd health checking should be abstracted in the storage tier
-		serversToValidate[fmt.Sprintf("etcd-%d", ix)] = componentstatus.Server{
+		serversToValidate[fmt.Sprintf("etcd-%d", ix)] = &componentstatus.Server{
 			Addr:        addr,
 			EnableHTTPS: etcdUrl.Scheme == "https",
+			CertFile:    machine.CertFile,
+			KeyFile:     machine.KeyFile,
 			Port:        port,
 			Path:        "/health",
 			Validate:    etcdutil.EtcdHealthCheck,

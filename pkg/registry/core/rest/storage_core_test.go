@@ -21,6 +21,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
+	"k8s.io/kubernetes/pkg/genericapiserver/server"
 )
 
 func TestGetServersToValidate(t *testing.T) {
@@ -47,6 +48,6 @@ func (f fakeStorageFactory) ResourcePrefix(groupResource schema.GroupResource) s
 	return ""
 }
 
-func (f fakeStorageFactory) Backends() []string {
-	return []string{"etcd-0"}
+func (f fakeStorageFactory) Backends() []apiserver.Backend {
+	return []server.Backend{server.Backend{Server: "etcd-0"}}
 }

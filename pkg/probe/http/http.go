@@ -36,6 +36,16 @@ func New() HTTPProber {
 	return httpProber{transport}
 }
 
+// NewWithClientCert creates a prober which will also setup client certificates
+func NewWithClientCert(cert *tls.Certificate) HTTPProber {
+	tlsConfig := &tls.Config{
+		InsecureSkipVerify: true,
+		Certificates:       []tls.Certificate{*cert},
+	}
+	transport := utilnet.SetTransportDefaults(&http.Transport{TLSClientConfig: tlsConfig, DisableKeepAlives: true})
+	return httpProber{transport}
+}
+
 type HTTPProber interface {
 	Probe(url *url.URL, headers http.Header, timeout time.Duration) (probe.Result, string, error)
 }
