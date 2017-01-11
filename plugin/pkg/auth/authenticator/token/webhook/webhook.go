@@ -22,11 +22,11 @@ import (
 
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/user"
+	"k8s.io/apiserver/pkg/util/cache"
 	authenticationclient "k8s.io/client-go/kubernetes/typed/authentication/v1beta1"
 	authentication "k8s.io/client-go/pkg/apis/authentication/v1beta1"
 	"k8s.io/client-go/pkg/runtime/schema"
 
-	"k8s.io/kubernetes/pkg/util/cache"
 	"k8s.io/kubernetes/plugin/pkg/webhook"
 
 	_ "k8s.io/client-go/pkg/apis/authentication/install"

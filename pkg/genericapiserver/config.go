@@ -41,12 +41,13 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
+	authenticatorunion "k8s.io/apiserver/pkg/authentication/request/union"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
+	authorizerunion "k8s.io/apiserver/pkg/authorization/union"
 	"k8s.io/apiserver/pkg/healthz"
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
-	authorizerunion "k8s.io/kubernetes/pkg/auth/authorizer/union"
 	authhandlers "k8s.io/kubernetes/pkg/auth/handlers"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	genericapifilters "k8s.io/kubernetes/pkg/genericapiserver/api/filters"
@@ -60,7 +61,6 @@ import (
 	"k8s.io/kubernetes/pkg/genericapiserver/routes"
 	certutil "k8s.io/kubernetes/pkg/util/cert"
 	"k8s.io/kubernetes/pkg/version"
-	authenticatorunion "k8s.io/kubernetes/plugin/pkg/auth/authenticator/request/union"
 )
 
 const (

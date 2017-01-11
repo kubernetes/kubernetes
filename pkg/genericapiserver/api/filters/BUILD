@@ -23,13 +23,13 @@ go_library(
         "//pkg/apis/authentication:go_default_library",
         "//pkg/genericapiserver/api/handlers/responsewriters:go_default_library",
         "//pkg/genericapiserver/api/request:go_default_library",
-        "//pkg/httplog:go_default_library",
         "//pkg/serviceaccount:go_default_library",
         "//vendor:github.com/golang/glog",
         "//vendor:github.com/pborman/uuid",
         "//vendor:k8s.io/apimachinery/pkg/util/net",
         "//vendor:k8s.io/apiserver/pkg/authentication/user",
         "//vendor:k8s.io/apiserver/pkg/authorization/authorizer",
+        "//vendor:k8s.io/apiserver/pkg/httplog",
     ],
 )
 

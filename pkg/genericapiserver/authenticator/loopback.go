@@ -18,9 +18,9 @@ package authenticator
 
 import (
 	"k8s.io/apiserver/pkg/authentication/authenticator"
+	"k8s.io/apiserver/pkg/authentication/request/bearertoken"
+	"k8s.io/apiserver/pkg/authentication/token/tokenfile"
 	"k8s.io/apiserver/pkg/authentication/user"
-	"k8s.io/kubernetes/pkg/auth/authenticator/bearertoken"
-	"k8s.io/kubernetes/plugin/pkg/auth/authenticator/token/tokenfile"
 )
 
 // newAuthenticatorFromToken returns an authenticator.Request or an error
