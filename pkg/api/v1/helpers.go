@@ -24,6 +24,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
+	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/selection"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/sets"
@@ -453,4 +454,71 @@ type Sysctl struct {
 type NodeResources struct {
 	// Capacity represents the available resources of a node
 	Capacity ResourceList `protobuf:"bytes,1,rep,name=capacity,casttype=ResourceList,castkey=ResourceName"`
+}
+
+func (rc *ReplicationController) DecodeNestedObjects(d runtime.Decoder) error {
+	pts := rc.Spec.Template
+
+	if valueBeta, okBeta := pts.Annotations[PodInitContainersBetaAnnotationKey]; okBeta {
+		pts.Annotations[PodInitContainersAnnotationKey] = valueBeta
+	}
+	// Move the annotation to the internal repr. field
+	if value, ok := pts.Annotations[PodInitContainersAnnotationKey]; ok {
+		var values []Container
+		if err := json.Unmarshal([]byte(value), &values); err != nil {
+			return err
+		}
+		// Conversion from external to internal version exists more to
+		// satisfy the needs of the decoder than it does to be a general
+		// purpose tool. And Decode always creates an intermediate object
+		// to decode to. Thus the caller of UnsafeConvertToVersion is
+		// taking responsibility to ensure mutation of in is not exposed
+		// back to the caller.
+		pts.Spec.InitContainers = values
+	}
+
+	return nil
+}
+
+func (p *Pod) DecodeNestedObjects(d runtime.Decoder) error {
+	// If there is a beta annotation, copy to alpha key.
+	// See commit log for PR #31026 for why we do this.
+	if valueBeta, okBeta := p.Annotations[PodInitContainersBetaAnnotationKey]; okBeta {
+		p.Annotations[PodInitContainersAnnotationKey] = valueBeta
+	}
+	// TODO: sometime after we move init container to stable, remove these conversions
+	// Move the annotation to the internal repr. field
+	if value, ok := p.Annotations[PodInitContainersAnnotationKey]; ok {
+		var values []Container
+		if err := json.Unmarshal([]byte(value), &values); err != nil {
+			return err
+		}
+		// Conversion from external to internal version exists more to
+		// satisfy the needs of the decoder than it does to be a general
+		// purpose tool. And Decode always creates an intermediate object
+		// to decode to. Thus the caller of UnsafeConvertToVersion is
+		// taking responsibility to ensure mutation of in is not exposed
+		// back to the caller.
+		p.Spec.InitContainers = values
+	}
+	// If there is a beta annotation, copy to alpha key.
+	// See commit log for PR #31026 for why we do this.
+	if valueBeta, okBeta := p.Annotations[PodInitContainerStatusesBetaAnnotationKey]; okBeta {
+		p.Annotations[PodInitContainerStatusesAnnotationKey] = valueBeta
+	}
+	if value, ok := p.Annotations[PodInitContainerStatusesAnnotationKey]; ok {
+		var values []ContainerStatus
+		if err := json.Unmarshal([]byte(value), &values); err != nil {
+			return err
+		}
+		// Conversion from external to internal version exists more to
+		// satisfy the needs of the decoder than it does to be a general
+		// purpose tool. And Decode always creates an intermediate object
+		// to decode to. Thus the caller of UnsafeConvertToVersion is
+		// taking responsibility to ensure mutation of in is not exposed
+		// back to the caller.
+		p.Status.InitContainerStatuses = values
+	}
+
+	return nil
 }
