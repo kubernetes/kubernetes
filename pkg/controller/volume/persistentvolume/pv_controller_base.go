@@ -165,6 +165,10 @@ func NewController(p ControllerParameters) *PersistentVolumeController {
 	return controller
 }
 
+func (ctrl *PersistentVolumeController) GetSecretFunc() func(namespace, name string) (*v1.Secret, error) {
+	return nil
+}
+
 // initializeCaches fills all controller caches with initial data from etcd in
 // order to have the caches already filled when first addClaim/addVolume to
 // perform initial synchronization of the controller.

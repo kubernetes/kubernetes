@@ -31,6 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/cloudprovider"
+	"k8s.io/kubernetes/pkg/kubelet/secret"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/io"
 	"k8s.io/kubernetes/pkg/util/mount"
@@ -42,12 +43,13 @@ import (
 
 // fakeVolumeHost is useful for testing volume plugins.
 type fakeVolumeHost struct {
-	rootDir    string
-	kubeClient clientset.Interface
-	pluginMgr  VolumePluginMgr
-	cloud      cloudprovider.Interface
-	mounter    mount.Interface
-	writer     io.Writer
+	rootDir       string
+	kubeClient    clientset.Interface
+	pluginMgr     VolumePluginMgr
+	cloud         cloudprovider.Interface
+	mounter       mount.Interface
+	writer        io.Writer
+	secretManager secret.Manager
 }
 
 func NewFakeVolumeHost(rootDir string, kubeClient clientset.Interface, plugins []VolumePlugin) *fakeVolumeHost {
@@ -55,7 +57,12 @@ func NewFakeVolumeHost(rootDir string, kubeClient clientset.Interface, plugins [
 	host.mounter = &mount.FakeMounter{}
 	host.writer = &io.StdWriter{}
 	host.pluginMgr.InitPlugins(plugins, host)
+	host.secretManager, _ = secret.NewSimpleSecretManager(kubeClient)
 	return host
+}
+
+func (f *fakeVolumeHost) GetSecretFunc() func(namespace, name string) (*v1.Secret, error) {
+	return nil
 }
 
 func (f *fakeVolumeHost) GetPluginDir(podUID string) string {

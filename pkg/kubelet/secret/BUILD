@@ -5,29 +5,34 @@ licenses(["notice"])
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
+    "go_test",
+)
+
+go_test(
+    name = "go_default_test",
+    srcs = ["secret_manager_test.go"],
+    library = ":go_default_library",
+    tags = ["automanaged"],
+    deps = [
+        "//pkg/api/v1:go_default_library",
+        "//pkg/client/clientset_generated/clientset/fake:go_default_library",
+    ],
 )
 
 go_library(
     name = "go_default_library",
     srcs = [
-        "mock_volume.go",
-        "testing.go",
+        "fake_manager.go",
+        "secret_manager.go",
     ],
     tags = ["automanaged"],
     deps = [
-        "//pkg/api/resource:go_default_library",
+        "//pkg/api/errors:go_default_library",
         "//pkg/api/v1:go_default_library",
+        "//pkg/apis/meta/v1:go_default_library",
         "//pkg/client/clientset_generated/clientset:go_default_library",
-        "//pkg/cloudprovider:go_default_library",
-        "//pkg/kubelet/secret:go_default_library",
-        "//pkg/types:go_default_library",
-        "//pkg/util/io:go_default_library",
-        "//pkg/util/mount:go_default_library",
-        "//pkg/util/strings:go_default_library",
-        "//pkg/util/testing:go_default_library",
-        "//pkg/util/uuid:go_default_library",
-        "//pkg/volume:go_default_library",
-        "//vendor:github.com/stretchr/testify/mock",
+        "//pkg/storage/etcd:go_default_library",
+        "//pkg/util/sets:go_default_library",
     ],
 )
 
