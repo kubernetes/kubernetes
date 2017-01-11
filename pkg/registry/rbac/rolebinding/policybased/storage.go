@@ -23,9 +23,9 @@ import (
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/apis/rbac"
-	"k8s.io/kubernetes/pkg/apis/rbac/validation"
 	genericapirequest "k8s.io/kubernetes/pkg/genericapiserver/api/request"
 	rbacregistry "k8s.io/kubernetes/pkg/registry/rbac"
+	rbacregistryvalidation "k8s.io/kubernetes/pkg/registry/rbac/validation"
 )
 
 var groupResource = rbac.Resource("rolebindings")
@@ -35,10 +35,10 @@ type Storage struct {
 
 	authorizer authorizer.Authorizer
 
-	ruleResolver validation.AuthorizationRuleResolver
+	ruleResolver rbacregistryvalidation.AuthorizationRuleResolver
 }
 
-func NewStorage(s rest.StandardStorage, authorizer authorizer.Authorizer, ruleResolver validation.AuthorizationRuleResolver) *Storage {
+func NewStorage(s rest.StandardStorage, authorizer authorizer.Authorizer, ruleResolver rbacregistryvalidation.AuthorizationRuleResolver) *Storage {
 	return &Storage{s, authorizer, ruleResolver}
 }
 
@@ -56,7 +56,7 @@ func (s *Storage) Create(ctx genericapirequest.Context, obj runtime.Object) (run
 	if err != nil {
 		return nil, err
 	}
-	if err := validation.ConfirmNoEscalation(ctx, s.ruleResolver, rules); err != nil {
+	if err := rbacregistryvalidation.ConfirmNoEscalation(ctx, s.ruleResolver, rules); err != nil {
 		return nil, errors.NewForbidden(groupResource, roleBinding.Name, err)
 	}
 	return s.StandardStorage.Create(ctx, obj)
@@ -80,7 +80,7 @@ func (s *Storage) Update(ctx genericapirequest.Context, name string, obj rest.Up
 		if err != nil {
 			return nil, err
 		}
-		if err := validation.ConfirmNoEscalation(ctx, s.ruleResolver, rules); err != nil {
+		if err := rbacregistryvalidation.ConfirmNoEscalation(ctx, s.ruleResolver, rules); err != nil {
 			return nil, errors.NewForbidden(groupResource, roleBinding.Name, err)
 		}
 		return obj, nil

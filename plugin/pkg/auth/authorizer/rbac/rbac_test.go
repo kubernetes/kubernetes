@@ -25,7 +25,7 @@ import (
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/rbac"
-	"k8s.io/kubernetes/pkg/apis/rbac/validation"
+	rbacregistryvalidation "k8s.io/kubernetes/pkg/registry/rbac/validation"
 )
 
 func newRule(verbs, apiGroups, resources, nonResourceURLs string) rbac.PolicyRule {
@@ -219,7 +219,7 @@ func TestAuthorizer(t *testing.T) {
 		},
 	}
 	for i, tt := range tests {
-		ruleResolver, _ := validation.NewTestRuleResolver(tt.roles, tt.roleBindings, tt.clusterRoles, tt.clusterRoleBindings)
+		ruleResolver, _ := rbacregistryvalidation.NewTestRuleResolver(tt.roles, tt.roleBindings, tt.clusterRoles, tt.clusterRoleBindings)
 		a := RBACAuthorizer{ruleResolver}
 		for _, attr := range tt.shouldPass {
 			if authorized, _, _ := a.Authorize(attr); !authorized {

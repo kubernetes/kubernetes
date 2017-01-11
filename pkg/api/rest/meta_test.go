@@ -19,7 +19,6 @@ package rest
 import (
 	"testing"
 
-
 	"k8s.io/kubernetes/pkg/api"
 	genericapirequest "k8s.io/kubernetes/pkg/genericapiserver/api/request"
 	"k8s.io/kubernetes/pkg/util/uuid"
@@ -57,7 +56,6 @@ func TestHasObjectMetaSystemFieldValues(t *testing.T) {
 		t.Errorf("the resource does have all fields populated, but incorrectly reports it does not")
 	}
 }
-
 
 // TestValidNamespace validates that namespace rules are enforced on a resource prior to create or update
 func TestValidNamespace(t *testing.T) {
