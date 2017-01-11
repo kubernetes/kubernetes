@@ -33,9 +33,7 @@ import (
 	kubeconfigphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubeconfig"
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
-
 	"k8s.io/kubernetes/pkg/api"
-	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
 	"k8s.io/kubernetes/pkg/runtime"
 )
 
@@ -91,7 +89,6 @@ type Join struct {
 }
 
 func NewJoin(cfgPath string, args []string, cfg *kubeadmapi.NodeConfiguration, skipPreFlight bool) (*Join, error) {
-
 	fmt.Println("[kubeadm] WARNING: kubeadm is in alpha, please do not use it for production clusters.")
 
 	if cfgPath != "" {
@@ -132,35 +129,13 @@ func (j *Join) Validate() error {
 
 // Run executes worker node provisioning and tries to join an existing cluster.
 func (j *Join) Run(out io.Writer) error {
-	var cfg *clientcmdapi.Config
-	// TODO: delete this first block when we move Token to the discovery interface
-	if j.cfg.Discovery.Token != nil {
-		clusterInfo, err := kubenode.RetrieveTrustedClusterInfo(j.cfg.Discovery.Token)
-		if err != nil {
-			return err
-		}
-		connectionDetails, err := kubenode.EstablishMasterConnection(j.cfg.Discovery.Token, clusterInfo)
-		if err != nil {
-			return err
-		}
-		err = kubenode.CheckForNodeNameDuplicates(connectionDetails)
-		if err != nil {
-			return err
-		}
-		cfg, err = kubenode.PerformTLSBootstrapDeprecated(connectionDetails)
-		if err != nil {
-			return err
-		}
-	} else {
-		cfg, err := discovery.For(j.cfg.Discovery)
-		if err != nil {
-			return err
-		}
-		if err := kubenode.PerformTLSBootstrap(cfg); err != nil {
-			return err
-		}
+	cfg, err := discovery.For(j.cfg.Discovery)
+	if err != nil {
+		return err
 	}
-
+	if err := kubenode.PerformTLSBootstrap(cfg); err != nil {
+		return err
+	}
 	if err := kubeconfigphase.WriteKubeconfigToDisk(path.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, kubeconfigphase.KubeletKubeConfigFileName), cfg); err != nil {
 		return err
 	}
