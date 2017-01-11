@@ -1126,6 +1126,10 @@ func (plugin *mockVolumePlugin) RequiresRemount() bool {
 	return false
 }
 
+func (plugin *mockVolumePlugin) ConstructVolumeSpecFromName(volumeName string) (*vol.Spec, error) {
+	return nil, nil
+}
+
 func (plugin *mockVolumePlugin) ConstructVolumeSpec(volumeName, mountPath string) (*vol.Spec, error) {
 	return nil, nil
 }

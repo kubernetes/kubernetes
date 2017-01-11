@@ -85,6 +85,10 @@ func (plugin *testPlugins) NewUnmounter(name string, podUID types.UID) (Unmounte
 	return nil, nil
 }
 
+func (plugin *testPlugins) ConstructVolumeSpecFromName(volumeName string) (*Spec, error) {
+	return nil, nil
+}
+
 func (plugin *testPlugins) ConstructVolumeSpec(volumeName, mountPath string) (*Spec, error) {
 	return nil, nil
 }
