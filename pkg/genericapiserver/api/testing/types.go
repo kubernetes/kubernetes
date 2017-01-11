@@ -24,7 +24,7 @@ import (
 
 type Simple struct {
 	metav1.TypeMeta  `json:",inline"`
-	apiv1.ObjectMeta `json:"metadata"`
+	metav1.ObjectMeta `json:"metadata"`
 	// +optional
 	Other string `json:"other,omitempty"`
 	// +optional
@@ -35,7 +35,7 @@ func (obj *Simple) GetObjectKind() schema.ObjectKind { return &obj.TypeMeta }
 
 type SimpleRoot struct {
 	metav1.TypeMeta  `json:",inline"`
-	apiv1.ObjectMeta `json:"metadata"`
+	metav1.ObjectMeta `json:"metadata"`
 	// +optional
 	Other string `json:"other,omitempty"`
 	// +optional

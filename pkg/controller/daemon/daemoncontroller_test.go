@@ -127,7 +127,7 @@ func newPod(podName string, nodeName string, label map[string]string) *v1.Pod {
 			DNSPolicy: v1.DNSDefault,
 		},
 	}
-	v1.GenerateName(v1.SimpleNameGenerator, &pod.ObjectMeta)
+	metav1.GenerateName(v1.SimpleNameGenerator, &pod.ObjectMeta)
 	return pod
 }
 

@@ -25,7 +25,7 @@ import (
 type TestStruct struct {
 	metav1.TypeMeta `json:",inline"`
 	// +optional
-	apiv1.ObjectMeta `json:"metadata,omitempty"`
+	metav1.ObjectMeta `json:"metadata,omitempty"`
 	Key              string         `json:"Key"`
 	Map              map[string]int `json:"Map"`
 	StringList       []string       `json:"StringList"`

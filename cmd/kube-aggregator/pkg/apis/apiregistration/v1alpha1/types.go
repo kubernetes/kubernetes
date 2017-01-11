@@ -75,7 +75,7 @@ type APIServiceStatus struct {
 // Name must be "version.group".
 type APIService struct {
 	metav1.TypeMeta `json:",inline"`
-	kapi.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// Spec contains information for locating and communicating with a server
 	Spec APIServiceSpec `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
