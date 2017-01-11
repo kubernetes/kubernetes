@@ -124,6 +124,8 @@ func DeepCopy_componentconfig_KubeControllerManagerConfiguration(in interface{},
 		out.SecondaryNodeEvictionRate = in.SecondaryNodeEvictionRate
 		out.LargeClusterSizeThreshold = in.LargeClusterSizeThreshold
 		out.UnhealthyZoneThreshold = in.UnhealthyZoneThreshold
+		out.DisableAttachDetachReconcilerSync = in.DisableAttachDetachReconcilerSync
+		out.ReconcilerSyncLoopPeriod = in.ReconcilerSyncLoopPeriod
 		return nil
 	}
 }
