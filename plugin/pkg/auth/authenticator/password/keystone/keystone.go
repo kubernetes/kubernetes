@@ -46,15 +46,15 @@ func (keystoneAuthenticator *KeystoneAuthenticator) AuthenticatePassword(usernam
 		Password:         password,
 	}
 	if strings.HasSuffix(keystoneAuthenticator.authURL, "/v3") {
-		// username has a format of name@domain.
-		userAndDomain := strings.Split(username, "@")
+		// username has a format of domain\name.
+		firstIndex := strings.Index(username, "\\")
 		var uname, dname string
-		if len(userAndDomain) == 1 {
+		if firstIndex == -1 {
 			uname = username
 			dname = "default"
 		} else {
-			uname = userAndDomain[0]
-			dname = userAndDomain[1]
+			dname = username[:firstIndex]
+			uname = username[firstIndex+1:]
 		}
 		opts = gophercloud.AuthOptions{
 			IdentityEndpoint: keystoneAuthenticator.authURL,
