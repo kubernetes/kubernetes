@@ -20,8 +20,19 @@ package dockertools
 
 import (
 	dockertypes "github.com/docker/engine-api/types"
+	dockercontainer "github.com/docker/engine-api/types/container"
+
 	"k8s.io/kubernetes/pkg/api/v1"
 )
+
+// These two functions are OS specific (for now at least)
+func updateHostConfig(config *dockercontainer.HostConfig) {
+	// no-op, there is a windows implementation that is different.
+}
+
+func DefaultMemorySwap() int64 {
+	return -1
+}
 
 func getContainerIP(container *dockertypes.ContainerJSON) string {
 	result := ""
