@@ -60,12 +60,20 @@ func (*FakeIPTables) DeleteChain(table iptables.Table, chain iptables.Chain) err
 	return nil
 }
 
+func (*FakeIPTables) RenameChain(table iptables.Table, oldChain, newChain iptables.Chain) error {
+	return nil
+}
+
 func (*FakeIPTables) EnsureRule(position iptables.RulePosition, table iptables.Table, chain iptables.Chain, args ...string) (bool, error) {
 	return true, nil
 }
 
 func (*FakeIPTables) DeleteRule(table iptables.Table, chain iptables.Chain, args ...string) error {
 	return nil
+}
+
+func (*FakeIPTables) ListRules(table iptables.Table, chain iptables.Chain, args ...string) ([]byte, error) {
+	return []byte{}, nil
 }
 
 func (*FakeIPTables) IsIpv6() bool {
