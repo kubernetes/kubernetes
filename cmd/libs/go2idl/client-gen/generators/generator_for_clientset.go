@@ -149,6 +149,9 @@ func (c *Clientset) $.Group$() $.PackageName$.$.GroupVersion$Interface {
 var getDiscoveryTemplate = `
 // Discovery retrieves the DiscoveryClient
 func (c *Clientset) Discovery() $.DiscoveryInterface|raw$ {
+	if c == nil {
+		return nil
+	}
 	return c.DiscoveryClient
 }
 `

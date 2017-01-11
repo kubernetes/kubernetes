@@ -167,6 +167,9 @@ func (c *Clientset) Storage() internalversionstorage.StorageInterface {
 
 // Discovery retrieves the DiscoveryClient
 func (c *Clientset) Discovery() discovery.DiscoveryInterface {
+	if c == nil {
+		return nil
+	}
 	return c.DiscoveryClient
 }
 
