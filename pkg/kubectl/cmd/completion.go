@@ -44,26 +44,39 @@ const boilerPlate = `
 
 var (
 	completion_long = templates.LongDesc(`
-		Output shell completion code for the given shell (bash or zsh).
+		Output shell completion code for the specified shell (bash or zsh).
+		The shell code must be evalutated to provide interactive
+		completion of kubectl commands.  This can be done by sourcing it from
+		the .bash_profile.
 
-		This command prints shell code which must be evaluation to provide interactive
-		completion of kubectl commands.
-
-		    $ source <(kubectl completion bash)
-
-		will load the kubectl completion code for bash. Note that this depends on the
-		bash-completion framework. It must be sourced before sourcing the kubectl
-		completion, e.g. on the Mac:
+		Note: this requires the bash-completion framework, which is not installed
+		by default on Mac.  This can be installed by using homebrew:
 
 		    $ brew install bash-completion
+
+		Once installed, bash_completion must be evaluated.  This can be done by adding the
+		following line to the .bash_profile
+
 		    $ source $(brew --prefix)/etc/bash_completion
-		    $ source <(kubectl completion bash)
 
-		If you use zsh[1], the following will load kubectl zsh completion:
+		Note for zsh users: [1] zsh completions are only supported in versions of zsh >= 5.2`)
 
-		    $ source <(kubectl completion zsh)
+	completion_example = templates.Examples(`
+		# Install bash completion on a Mac using homebrew
+		brew install bash-completion
+		printf "\n# Bash completion support\nsource $(brew --prefix)/etc/bash_completion\n" >> $HOME/.bash_profile
+		source $HOME/.bash_profile
 
-		[1] zsh completions are only supported in versions of zsh >= 5.2`)
+		# Load the kubectl completion code for bash into the current shell
+		source <(kubectl completion bash)
+
+		# Write bash completion code to a file and source if from .bash_profile
+		kubectl completion bash > ~/.kube/completion.bash.inc
+		printf "\n# Kubectl shell completion\nsource '$HOME/.kube/completion.bash.inc'\n" >> $HOME/.bash_profile
+		source $HOME/.bash_profile
+
+		# Load the kubectl completion code for zsh[1] into the current shell
+		source <(kubectl completion zsh)`)
 )
 
 var (
@@ -80,9 +93,10 @@ func NewCmdCompletion(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	}
 
 	cmd := &cobra.Command{
-		Use:   "completion SHELL",
-		Short: "Output shell completion code for the given shell (bash or zsh)",
-		Long:  completion_long,
+		Use:     "completion SHELL",
+		Short:   "Output shell completion code for the specified shell (bash or zsh)",
+		Long:    completion_long,
+		Example: completion_example,
 		Run: func(cmd *cobra.Command, args []string) {
 			err := RunCompletion(out, cmd, args)
 			cmdutil.CheckErr(err)
