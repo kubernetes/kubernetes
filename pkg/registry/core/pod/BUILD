@@ -23,6 +23,7 @@ go_library(
         "//pkg/fields:go_default_library",
         "//pkg/genericapiserver/api/request:go_default_library",
         "//pkg/kubelet/client:go_default_library",
+        "//pkg/kubelet/qos:go_default_library",
         "//pkg/labels:go_default_library",
         "//pkg/registry/generic:go_default_library",
         "//pkg/runtime:go_default_library",
@@ -41,6 +42,7 @@ go_test(
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/errors:go_default_library",
+        "//pkg/api/resource:go_default_library",
         "//pkg/api/testing:go_default_library",
         "//pkg/apimachinery/registered:go_default_library",
         "//pkg/apis/meta/v1:go_default_library",

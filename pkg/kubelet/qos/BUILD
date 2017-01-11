@@ -14,7 +14,6 @@ go_library(
         "doc.go",
         "policy.go",
         "qos.go",
-        "types.go",
     ],
     tags = ["automanaged"],
     deps = [
