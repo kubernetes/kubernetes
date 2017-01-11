@@ -15,7 +15,6 @@ go_library(
     deps = [
         "//pkg/api/v1:go_default_library",
         "//pkg/cloudprovider:go_default_library",
-        "//pkg/types:go_default_library",
         "//vendor:github.com/golang/glog",
         "//vendor:github.com/rackspace/gophercloud",
         "//vendor:github.com/rackspace/gophercloud/openstack/compute/v2/extensions/volumeattach",
@@ -26,6 +25,7 @@ go_library(
         "//vendor:github.com/rackspace/gophercloud/rackspace/compute/v2/servers",
         "//vendor:github.com/rackspace/gophercloud/rackspace/compute/v2/volumeattach",
         "//vendor:gopkg.in/gcfg.v1",
+        "//vendor:k8s.io/apimachinery/pkg/types",
     ],
 )
 

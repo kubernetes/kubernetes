@@ -17,14 +17,14 @@ limitations under the License.
 package etcd
 
 import (
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/api/rest"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	policyapi "k8s.io/kubernetes/pkg/apis/policy"
 	genericapirequest "k8s.io/kubernetes/pkg/genericapiserver/api/request"
 	"k8s.io/kubernetes/pkg/registry/generic"
 	genericregistry "k8s.io/kubernetes/pkg/registry/generic/registry"
 	"k8s.io/kubernetes/pkg/registry/policy/poddisruptionbudget"
-	"k8s.io/kubernetes/pkg/runtime"
 )
 
 // rest implements a RESTStorage for pod disruption budgets against etcd

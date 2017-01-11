@@ -24,12 +24,12 @@ go_library(
         "//pkg/kubectl/cmd/util:go_default_library",
         "//pkg/registry/generic:go_default_library",
         "//pkg/registry/generic/registry:go_default_library",
-        "//pkg/runtime/schema:go_default_library",
         "//pkg/storage/storagebackend:go_default_library",
-        "//pkg/util/sets:go_default_library",
-        "//pkg/util/wait:go_default_library",
         "//vendor:github.com/pborman/uuid",
         "//vendor:github.com/spf13/cobra",
+        "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
+        "//vendor:k8s.io/apimachinery/pkg/util/sets",
+        "//vendor:k8s.io/apimachinery/pkg/util/wait",
     ],
 )
 

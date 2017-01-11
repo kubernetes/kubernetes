@@ -19,11 +19,11 @@ limitations under the License.
 package internalversion
 
 import (
+	"k8s.io/apimachinery/pkg/labels"
 	api "k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/client/cache"
-	"k8s.io/kubernetes/pkg/labels"
 )
 
 // PodSecurityPolicyLister helps list PodSecurityPolicies.

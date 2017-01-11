@@ -20,7 +20,7 @@ package config
 import (
 	"sync"
 
-	"k8s.io/kubernetes/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 // SourcesReadyFn is function that returns true if the specified sources have been seen.

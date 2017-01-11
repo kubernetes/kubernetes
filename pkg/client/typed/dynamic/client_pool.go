@@ -19,9 +19,9 @@ package dynamic
 import (
 	"sync"
 
-	"k8s.io/kubernetes/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/client/restclient"
-	"k8s.io/kubernetes/pkg/runtime/schema"
 )
 
 // ClientPool manages a pool of dynamic clients.

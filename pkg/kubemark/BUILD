@@ -32,7 +32,6 @@ go_library(
         "//pkg/kubelet/dockertools:go_default_library",
         "//pkg/kubelet/types:go_default_library",
         "//pkg/proxy/config:go_default_library",
-        "//pkg/types:go_default_library",
         "//pkg/util:go_default_library",
         "//pkg/util/io:go_default_library",
         "//pkg/util/iptables:go_default_library",
@@ -42,6 +41,7 @@ go_library(
         "//pkg/volume/secret:go_default_library",
         "//test/utils:go_default_library",
         "//vendor:github.com/golang/glog",
+        "//vendor:k8s.io/apimachinery/pkg/types",
     ],
 )
 

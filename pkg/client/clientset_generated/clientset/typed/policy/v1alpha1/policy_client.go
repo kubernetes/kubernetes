@@ -19,11 +19,11 @@ package v1alpha1
 import (
 	fmt "fmt"
 
+	registered "k8s.io/apimachinery/pkg/apimachinery/registered"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	serializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	api "k8s.io/kubernetes/pkg/api"
-	registered "k8s.io/kubernetes/pkg/apimachinery/registered"
 	restclient "k8s.io/kubernetes/pkg/client/restclient"
-	"k8s.io/kubernetes/pkg/runtime/schema"
-	serializer "k8s.io/kubernetes/pkg/runtime/serializer"
 )
 
 type PolicyV1alpha1Interface interface {

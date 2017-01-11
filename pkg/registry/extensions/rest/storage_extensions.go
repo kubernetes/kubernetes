@@ -22,6 +22,8 @@ import (
 
 	"github.com/golang/glog"
 
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	extensionsapiv1beta1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
@@ -38,8 +40,6 @@ import (
 	replicasetetcd "k8s.io/kubernetes/pkg/registry/extensions/replicaset/etcd"
 	thirdpartyresourceetcd "k8s.io/kubernetes/pkg/registry/extensions/thirdpartyresource/etcd"
 	"k8s.io/kubernetes/pkg/registry/generic"
-	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
-	"k8s.io/kubernetes/pkg/util/wait"
 )
 
 type RESTStorageProvider struct {

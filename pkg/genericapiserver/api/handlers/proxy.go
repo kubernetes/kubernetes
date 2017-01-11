@@ -27,6 +27,9 @@ import (
 	"strings"
 	"time"
 
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/kubernetes/pkg/api"
 	apierrors "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/rest"
@@ -34,10 +37,7 @@ import (
 	"k8s.io/kubernetes/pkg/genericapiserver/api/metrics"
 	"k8s.io/kubernetes/pkg/genericapiserver/api/request"
 	"k8s.io/kubernetes/pkg/httplog"
-	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/util/httpstream"
-	"k8s.io/kubernetes/pkg/util/net"
 	proxyutil "k8s.io/kubernetes/pkg/util/proxy"
 
 	"github.com/golang/glog"

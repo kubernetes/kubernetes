@@ -16,10 +16,9 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//pkg/api/resource:go_default_library",
-        "//pkg/apis/meta/v1:go_default_library",
-        "//pkg/genericapiserver/openapi/common:go_default_library",
         "//pkg/util/intstr:go_default_library",
         "//vendor:github.com/go-openapi/spec",
+        "//vendor:k8s.io/apimachinery/pkg/genericapiserver/openapi/common",
     ],
 )
 

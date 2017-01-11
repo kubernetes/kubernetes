@@ -20,9 +20,9 @@ import (
 	"fmt"
 	"net/http"
 
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/storage"
-	"k8s.io/kubernetes/pkg/util/runtime"
 )
 
 // statusError is an object that can be converted into an metav1.Status

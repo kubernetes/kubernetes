@@ -21,10 +21,10 @@ limitations under the License.
 package v1
 
 import (
-	meta_v1 "k8s.io/kubernetes/pkg/apis/meta/v1"
-	conversion "k8s.io/kubernetes/pkg/conversion"
-	runtime "k8s.io/kubernetes/pkg/runtime"
-	types "k8s.io/kubernetes/pkg/types"
+	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	conversion "k8s.io/apimachinery/pkg/conversion"
+	runtime "k8s.io/apimachinery/pkg/runtime"
+	types "k8s.io/apimachinery/pkg/types"
 	reflect "reflect"
 )
 
@@ -1259,8 +1259,10 @@ func DeepCopy_v1_List(in interface{}, out interface{}, c *conversion.Cloner) err
 			in, out := &in.Items, &out.Items
 			*out = make([]runtime.RawExtension, len(*in))
 			for i := range *in {
-				if err := runtime.DeepCopy_runtime_RawExtension(&(*in)[i], &(*out)[i], c); err != nil {
+				if newVal, err := c.DeepCopy(&(*in)[i]); err != nil {
 					return err
+				} else {
+					(*out)[i] = *newVal.(*runtime.RawExtension)
 				}
 			}
 		}
@@ -1668,8 +1670,10 @@ func DeepCopy_v1_ObjectMeta(in interface{}, out interface{}, c *conversion.Clone
 			in, out := &in.OwnerReferences, &out.OwnerReferences
 			*out = make([]meta_v1.OwnerReference, len(*in))
 			for i := range *in {
-				if err := meta_v1.DeepCopy_v1_OwnerReference(&(*in)[i], &(*out)[i], c); err != nil {
+				if newVal, err := c.DeepCopy(&(*in)[i]); err != nil {
 					return err
+				} else {
+					(*out)[i] = *newVal.(*meta_v1.OwnerReference)
 				}
 			}
 		}
@@ -1756,9 +1760,10 @@ func DeepCopy_v1_PersistentVolumeClaimSpec(in interface{}, out interface{}, c *c
 		}
 		if in.Selector != nil {
 			in, out := &in.Selector, &out.Selector
-			*out = new(meta_v1.LabelSelector)
-			if err := meta_v1.DeepCopy_v1_LabelSelector(*in, *out, c); err != nil {
+			if newVal, err := c.DeepCopy(*in); err != nil {
 				return err
+			} else {
+				*out = newVal.(*meta_v1.LabelSelector)
 			}
 		}
 		if err := DeepCopy_v1_ResourceRequirements(&in.Resources, &out.Resources, c); err != nil {
@@ -2023,9 +2028,10 @@ func DeepCopy_v1_PodAffinityTerm(in interface{}, out interface{}, c *conversion.
 		*out = *in
 		if in.LabelSelector != nil {
 			in, out := &in.LabelSelector, &out.LabelSelector
-			*out = new(meta_v1.LabelSelector)
-			if err := meta_v1.DeepCopy_v1_LabelSelector(*in, *out, c); err != nil {
+			if newVal, err := c.DeepCopy(*in); err != nil {
 				return err
+			} else {
+				*out = newVal.(*meta_v1.LabelSelector)
 			}
 		}
 		if in.Namespaces != nil {
@@ -2195,9 +2201,10 @@ func DeepCopy_v1_PodSignature(in interface{}, out interface{}, c *conversion.Clo
 		*out = *in
 		if in.PodController != nil {
 			in, out := &in.PodController, &out.PodController
-			*out = new(meta_v1.OwnerReference)
-			if err := meta_v1.DeepCopy_v1_OwnerReference(*in, *out, c); err != nil {
+			if newVal, err := c.DeepCopy(*in); err != nil {
 				return err
+			} else {
+				*out = newVal.(*meta_v1.OwnerReference)
 			}
 		}
 		return nil

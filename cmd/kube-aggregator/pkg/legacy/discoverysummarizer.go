@@ -22,8 +22,8 @@ import (
 	"io/ioutil"
 	"net/http"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	config "k8s.io/kubernetes/cmd/kube-aggregator/pkg/legacy/apis/config/v1alpha1"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 )
 
 type DiscoverySummarizer interface {

@@ -19,8 +19,8 @@ package record
 import (
 	"fmt"
 
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/runtime"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 // FakeRecorder is used as a fake during tests. It is thread safe. It is usable

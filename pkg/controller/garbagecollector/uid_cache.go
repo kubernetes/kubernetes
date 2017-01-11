@@ -20,7 +20,7 @@ import (
 	"sync"
 
 	"github.com/golang/groupcache/lru"
-	"k8s.io/kubernetes/pkg/types"
+	"k8s.io/apimachinery/pkg/types"
 )
 
 // UIDCache is an LRU cache for uid.

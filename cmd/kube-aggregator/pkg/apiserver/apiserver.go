@@ -21,6 +21,7 @@ import (
 	"os"
 	"time"
 
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/api/rest"
 	authhandlers "k8s.io/kubernetes/pkg/auth/handlers"
 	kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
@@ -31,7 +32,6 @@ import (
 	genericapirequest "k8s.io/kubernetes/pkg/genericapiserver/api/request"
 	genericfilters "k8s.io/kubernetes/pkg/genericapiserver/filters"
 	"k8s.io/kubernetes/pkg/registry/generic"
-	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/version"
 
 	"k8s.io/kubernetes/cmd/kube-aggregator/pkg/apis/apiregistration"

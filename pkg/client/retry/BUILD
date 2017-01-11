@@ -14,7 +14,7 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//pkg/api/errors:go_default_library",
-        "//pkg/util/wait:go_default_library",
+        "//vendor:k8s.io/apimachinery/pkg/util/wait",
     ],
 )
 
@@ -25,8 +25,8 @@ go_test(
     tags = ["automanaged"],
     deps = [
         "//pkg/api/errors:go_default_library",
-        "//pkg/runtime/schema:go_default_library",
-        "//pkg/util/wait:go_default_library",
+        "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
+        "//vendor:k8s.io/apimachinery/pkg/util/wait",
     ],
 )
 

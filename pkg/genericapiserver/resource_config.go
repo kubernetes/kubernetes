@@ -17,8 +17,8 @@ limitations under the License.
 package genericapiserver
 
 import (
-	"k8s.io/kubernetes/pkg/runtime/schema"
-	"k8s.io/kubernetes/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 // APIResourceConfigSource is the interface to determine which versions and resources are enabled

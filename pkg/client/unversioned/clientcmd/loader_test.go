@@ -28,9 +28,9 @@ import (
 
 	"github.com/ghodss/yaml"
 
+	"k8s.io/apimachinery/pkg/runtime"
 	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
 	clientcmdlatest "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api/latest"
-	"k8s.io/kubernetes/pkg/runtime"
 )
 
 var (

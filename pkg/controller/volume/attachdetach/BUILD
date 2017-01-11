@@ -24,14 +24,14 @@ go_library(
         "//pkg/controller/volume/attachdetach/populator:go_default_library",
         "//pkg/controller/volume/attachdetach/reconciler:go_default_library",
         "//pkg/controller/volume/attachdetach/statusupdater:go_default_library",
-        "//pkg/types:go_default_library",
         "//pkg/util/io:go_default_library",
         "//pkg/util/mount:go_default_library",
-        "//pkg/util/runtime:go_default_library",
         "//pkg/volume:go_default_library",
         "//pkg/volume/util/operationexecutor:go_default_library",
         "//pkg/volume/util/volumehelper:go_default_library",
         "//vendor:github.com/golang/glog",
+        "//vendor:k8s.io/apimachinery/pkg/types",
+        "//vendor:k8s.io/apimachinery/pkg/util/runtime",
     ],
 )
 

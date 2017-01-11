@@ -26,7 +26,7 @@ go_library(
         "//pkg/registry/core/pod:go_default_library",
         "//pkg/registry/generic/registry:go_default_library",
         "//pkg/registry/generic/rest:go_default_library",
-        "//pkg/runtime:go_default_library",
+        "//vendor:k8s.io/apimachinery/pkg/runtime",
     ],
 )
 

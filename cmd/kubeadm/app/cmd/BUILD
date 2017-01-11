@@ -36,13 +36,13 @@ go_library(
         "//pkg/fields:go_default_library",
         "//pkg/kubectl:go_default_library",
         "//pkg/kubectl/cmd/util:go_default_library",
-        "//pkg/runtime:go_default_library",
         "//pkg/util/flag:go_default_library",
         "//pkg/util/initsystem:go_default_library",
-        "//pkg/util/net:go_default_library",
         "//pkg/version:go_default_library",
         "//vendor:github.com/renstrom/dedent",
         "//vendor:github.com/spf13/cobra",
+        "//vendor:k8s.io/apimachinery/pkg/runtime",
+        "//vendor:k8s.io/apimachinery/pkg/util/net",
     ],
 )
 

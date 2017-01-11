@@ -21,11 +21,11 @@ syntax = 'proto2';
 
 package k8s.io.kubernetes.pkg.apis.authorization.v1beta1;
 
+import "k8s.io/apimachinery/pkg/apis/meta/v1/generated.proto";
+import "k8s.io/apimachinery/pkg/runtime/generated.proto";
+import "k8s.io/apimachinery/pkg/runtime/schema/generated.proto";
 import "k8s.io/kubernetes/pkg/api/resource/generated.proto";
 import "k8s.io/kubernetes/pkg/api/v1/generated.proto";
-import "k8s.io/kubernetes/pkg/apis/meta/v1/generated.proto";
-import "k8s.io/kubernetes/pkg/runtime/generated.proto";
-import "k8s.io/kubernetes/pkg/runtime/schema/generated.proto";
 import "k8s.io/kubernetes/pkg/util/intstr/generated.proto";
 
 // Package-wide variables from generator "generated".
@@ -44,6 +44,8 @@ message ExtraValue {
 // Having a namespace scoped resource makes it much easier to grant namespace scoped policy that includes permissions
 // checking.
 message LocalSubjectAccessReview {
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.TypeMeta typeMeta = 4;
+
   // +optional
   optional k8s.io.kubernetes.pkg.api.v1.ObjectMeta metadata = 1;
 
@@ -105,6 +107,8 @@ message ResourceAttributes {
 // spec.namespace means "in all namespaces".  Self is a special case, because users should always be able
 // to check whether they can perform an action
 message SelfSubjectAccessReview {
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.TypeMeta typeMeta = 4;
+
   // +optional
   optional k8s.io.kubernetes.pkg.api.v1.ObjectMeta metadata = 1;
 
@@ -130,6 +134,8 @@ message SelfSubjectAccessReviewSpec {
 
 // SubjectAccessReview checks whether or not a user or group can perform an action.
 message SubjectAccessReview {
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.TypeMeta typeMeta = 4;
+
   // +optional
   optional k8s.io.kubernetes.pkg.api.v1.ObjectMeta metadata = 1;
 

@@ -27,9 +27,11 @@ import (
 
 	"github.com/golang/glog"
 
+	"k8s.io/apimachinery/pkg/apimachinery/registered"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/rest"
-	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	policyclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/policy/internalversion"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/genericapiserver"
@@ -59,9 +61,7 @@ import (
 	"k8s.io/kubernetes/pkg/registry/core/service/portallocator"
 	serviceaccountetcd "k8s.io/kubernetes/pkg/registry/core/serviceaccount/etcd"
 	"k8s.io/kubernetes/pkg/registry/generic"
-	"k8s.io/kubernetes/pkg/runtime/schema"
 	etcdutil "k8s.io/kubernetes/pkg/storage/etcd/util"
-	utilnet "k8s.io/kubernetes/pkg/util/net"
 )
 
 // LegacyRESTStorageProvider provides information needed to build RESTStorage for core, but

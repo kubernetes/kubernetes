@@ -33,7 +33,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	utilnet "k8s.io/kubernetes/pkg/util/net"
+	utilnet "k8s.io/apimachinery/pkg/util/net"
 )
 
 var (

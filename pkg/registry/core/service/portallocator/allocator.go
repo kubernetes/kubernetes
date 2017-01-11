@@ -20,9 +20,9 @@ import (
 	"errors"
 	"fmt"
 
+	"k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/registry/core/service/allocator"
-	"k8s.io/kubernetes/pkg/util/net"
 
 	"github.com/golang/glog"
 )

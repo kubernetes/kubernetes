@@ -20,10 +20,10 @@ go_library(
         "//pkg/api:go_default_library",
         "//pkg/client/cache:go_default_library",
         "//pkg/fields:go_default_library",
-        "//pkg/types:go_default_library",
         "//pkg/util/config:go_default_library",
         "//vendor:github.com/davecgh/go-spew/spew",
         "//vendor:github.com/golang/glog",
+        "//vendor:k8s.io/apimachinery/pkg/types",
     ],
 )
 
@@ -36,8 +36,8 @@ go_test(
         "//pkg/api:go_default_library",
         "//pkg/api/v1:go_default_library",
         "//pkg/client/cache:go_default_library",
-        "//pkg/runtime:go_default_library",
-        "//pkg/watch:go_default_library",
+        "//vendor:k8s.io/apimachinery/pkg/runtime",
+        "//vendor:k8s.io/apimachinery/pkg/watch",
     ],
 )
 
@@ -48,7 +48,7 @@ go_test(
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/proxy/config:go_default_library",
-        "//pkg/util/wait:go_default_library",
+        "//vendor:k8s.io/apimachinery/pkg/util/wait",
     ],
 )
 

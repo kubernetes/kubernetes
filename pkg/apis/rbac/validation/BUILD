@@ -23,9 +23,9 @@ go_library(
         "//pkg/apis/rbac:go_default_library",
         "//pkg/genericapiserver/api/request:go_default_library",
         "//pkg/serviceaccount:go_default_library",
-        "//pkg/util/errors:go_default_library",
-        "//pkg/util/validation/field:go_default_library",
         "//vendor:github.com/golang/glog",
+        "//vendor:k8s.io/apimachinery/pkg/util/errors",
+        "//vendor:k8s.io/apimachinery/pkg/util/validation/field",
         "//vendor:k8s.io/apiserver/pkg/authentication/user",
     ],
 )
@@ -42,8 +42,8 @@ go_test(
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/apis/rbac:go_default_library",
-        "//pkg/util/diff:go_default_library",
-        "//pkg/util/validation/field:go_default_library",
+        "//vendor:k8s.io/apimachinery/pkg/util/diff",
+        "//vendor:k8s.io/apimachinery/pkg/util/validation/field",
         "//vendor:k8s.io/apiserver/pkg/authentication/user",
     ],
 )

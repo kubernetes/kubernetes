@@ -19,11 +19,11 @@ go_library(
         "//pkg/registry/core/rangeallocation:go_default_library",
         "//pkg/registry/core/service/allocator:go_default_library",
         "//pkg/registry/generic:go_default_library",
-        "//pkg/runtime:go_default_library",
-        "//pkg/runtime/schema:go_default_library",
         "//pkg/storage:go_default_library",
         "//pkg/storage/storagebackend:go_default_library",
         "//vendor:golang.org/x/net/context",
+        "//vendor:k8s.io/apimachinery/pkg/runtime",
+        "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
     ],
 )
 

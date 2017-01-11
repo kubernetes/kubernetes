@@ -17,9 +17,9 @@ limitations under the License.
 package internalversion
 
 import (
-	"k8s.io/kubernetes/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/apis/extensions"
-	"k8s.io/kubernetes/pkg/runtime/schema"
 )
 
 // The ScaleExpansion interface allows manually adding extra methods to the ScaleInterface.

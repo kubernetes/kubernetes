@@ -21,9 +21,9 @@ limitations under the License.
 package v1alpha1
 
 import (
+	conversion "k8s.io/apimachinery/pkg/conversion"
+	runtime "k8s.io/apimachinery/pkg/runtime"
 	v1 "k8s.io/kubernetes/pkg/api/v1"
-	conversion "k8s.io/kubernetes/pkg/conversion"
-	runtime "k8s.io/kubernetes/pkg/runtime"
 	reflect "reflect"
 )
 
@@ -135,8 +135,10 @@ func DeepCopy_v1alpha1_PolicyRule(in interface{}, out interface{}, c *conversion
 			*out = make([]string, len(*in))
 			copy(*out, *in)
 		}
-		if err := runtime.DeepCopy_runtime_RawExtension(&in.AttributeRestrictions, &out.AttributeRestrictions, c); err != nil {
+		if newVal, err := c.DeepCopy(&in.AttributeRestrictions); err != nil {
 			return err
+		} else {
+			out.AttributeRestrictions = *newVal.(*runtime.RawExtension)
 		}
 		if in.APIGroups != nil {
 			in, out := &in.APIGroups, &out.APIGroups

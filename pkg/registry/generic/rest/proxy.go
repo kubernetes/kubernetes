@@ -29,12 +29,12 @@ import (
 	"sync"
 	"time"
 
+	utilnet "k8s.io/apimachinery/pkg/util/net"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/api/errors"
 	utilconfig "k8s.io/kubernetes/pkg/util/config"
 	"k8s.io/kubernetes/pkg/util/httpstream"
-	utilnet "k8s.io/kubernetes/pkg/util/net"
 	"k8s.io/kubernetes/pkg/util/proxy"
-	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
 
 	"github.com/golang/glog"
 	"github.com/mxk/go-flowrate/flowrate"

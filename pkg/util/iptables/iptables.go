@@ -25,9 +25,9 @@ import (
 
 	godbus "github.com/godbus/dbus"
 	"github.com/golang/glog"
+	"k8s.io/apimachinery/pkg/util/sets"
 	utildbus "k8s.io/kubernetes/pkg/util/dbus"
 	utilexec "k8s.io/kubernetes/pkg/util/exec"
-	"k8s.io/kubernetes/pkg/util/sets"
 	utilversion "k8s.io/kubernetes/pkg/util/version"
 )
 

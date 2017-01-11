@@ -25,11 +25,11 @@ import (
 	"sort"
 	"strings"
 
+	"k8s.io/apimachinery/pkg/genericapiserver/openapi/common"
 	"k8s.io/gengo/args"
 	"k8s.io/gengo/generator"
 	"k8s.io/gengo/namer"
 	"k8s.io/gengo/types"
-	"k8s.io/kubernetes/pkg/genericapiserver/openapi/common"
 
 	"github.com/golang/glog"
 )
@@ -127,7 +127,7 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 
 const (
 	specPackagePath          = "github.com/go-openapi/spec"
-	openAPICommonPackagePath = "k8s.io/kubernetes/pkg/genericapiserver/openapi/common"
+	openAPICommonPackagePath = "k8s.io/apimachinery/pkg/genericapiserver/openapi/common"
 )
 
 // openApiGen produces a file with auto-generated OpenAPI functions.

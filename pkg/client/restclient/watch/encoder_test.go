@@ -21,12 +21,12 @@ import (
 	"io/ioutil"
 	"testing"
 
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/serializer/streaming"
+	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	restclientwatch "k8s.io/kubernetes/pkg/client/restclient/watch"
-	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/runtime/serializer/streaming"
-	"k8s.io/kubernetes/pkg/watch"
 )
 
 func TestEncodeDecodeRoundTrip(t *testing.T) {

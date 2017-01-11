@@ -16,7 +16,7 @@ go_library(
         "//pkg/registry/generic:go_default_library",
         "//pkg/registry/generic/registry:go_default_library",
         "//pkg/registry/rbac/clusterrole:go_default_library",
-        "//pkg/runtime:go_default_library",
+        "//vendor:k8s.io/apimachinery/pkg/runtime",
     ],
 )
 

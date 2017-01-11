@@ -17,7 +17,6 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//pkg/api/install:go_default_library",
-        "//pkg/apimachinery/registered:go_default_library",
         "//pkg/apis/apps/install:go_default_library",
         "//pkg/apis/authentication/install:go_default_library",
         "//pkg/apis/authorization/install:go_default_library",
@@ -45,6 +44,7 @@ go_library(
         "//pkg/util/flowcontrol:go_default_library",
         "//plugin/pkg/client/auth:go_default_library",
         "//vendor:github.com/golang/glog",
+        "//vendor:k8s.io/apimachinery/pkg/apimachinery/registered",
     ],
 )
 

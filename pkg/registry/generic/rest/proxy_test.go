@@ -41,9 +41,9 @@ import (
 
 	"golang.org/x/net/websocket"
 
+	utilnet "k8s.io/apimachinery/pkg/util/net"
 	utilconfig "k8s.io/kubernetes/pkg/util/config"
 	"k8s.io/kubernetes/pkg/util/httpstream"
-	utilnet "k8s.io/kubernetes/pkg/util/net"
 	"k8s.io/kubernetes/pkg/util/proxy"
 )
 

@@ -21,11 +21,11 @@ limitations under the License.
 package v1
 
 import (
+	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	conversion "k8s.io/apimachinery/pkg/conversion"
+	runtime "k8s.io/apimachinery/pkg/runtime"
+	types "k8s.io/apimachinery/pkg/types"
 	api "k8s.io/kubernetes/pkg/api"
-	meta_v1 "k8s.io/kubernetes/pkg/apis/meta/v1"
-	conversion "k8s.io/kubernetes/pkg/conversion"
-	runtime "k8s.io/kubernetes/pkg/runtime"
-	types "k8s.io/kubernetes/pkg/types"
 	unsafe "unsafe"
 )
 

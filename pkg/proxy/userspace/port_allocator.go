@@ -23,8 +23,8 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/kubernetes/pkg/util/net"
-	"k8s.io/kubernetes/pkg/util/wait"
+	"k8s.io/apimachinery/pkg/util/net"
+	"k8s.io/apimachinery/pkg/util/wait"
 )
 
 var (

@@ -26,10 +26,10 @@ go_library(
         "//pkg/client/unversioned/clientcmd:go_default_library",
         "//pkg/client/unversioned/clientcmd/api:go_default_library",
         "//pkg/kubelet/util/csr:go_default_library",
-        "//pkg/types:go_default_library",
         "//pkg/util/cert:go_default_library",
-        "//pkg/util/wait:go_default_library",
         "//vendor:github.com/square/go-jose",
+        "//vendor:k8s.io/apimachinery/pkg/types",
+        "//vendor:k8s.io/apimachinery/pkg/util/wait",
     ],
 )
 
@@ -43,11 +43,11 @@ go_test(
     tags = ["automanaged"],
     deps = [
         "//cmd/kubeadm/app/apis/kubeadm:go_default_library",
-        "//pkg/apis/meta/v1:go_default_library",
         "//pkg/client/clientset_generated/clientset:go_default_library",
         "//pkg/client/restclient:go_default_library",
         "//pkg/client/typed/discovery:go_default_library",
         "//pkg/version:go_default_library",
+        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
     ],
 )
 

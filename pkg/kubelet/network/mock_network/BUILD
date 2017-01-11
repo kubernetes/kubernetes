@@ -15,8 +15,8 @@ go_library(
         "//pkg/apis/componentconfig:go_default_library",
         "//pkg/kubelet/container:go_default_library",
         "//pkg/kubelet/network:go_default_library",
-        "//pkg/util/sets:go_default_library",
         "//vendor:github.com/golang/mock/gomock",
+        "//vendor:k8s.io/apimachinery/pkg/util/sets",
     ],
 )
 

@@ -19,10 +19,10 @@ limitations under the License.
 package internalversion
 
 import (
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/kubernetes/pkg/api/errors"
 	autoscaling "k8s.io/kubernetes/pkg/apis/autoscaling"
 	"k8s.io/kubernetes/pkg/client/cache"
-	"k8s.io/kubernetes/pkg/labels"
 )
 
 // HorizontalPodAutoscalerLister helps list HorizontalPodAutoscalers.

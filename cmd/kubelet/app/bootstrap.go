@@ -25,12 +25,12 @@ import (
 
 	"github.com/golang/glog"
 
+	"k8s.io/apimachinery/pkg/types"
 	unversionedcertificates "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/certificates/v1alpha1"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
 	"k8s.io/kubernetes/pkg/kubelet/util/csr"
-	"k8s.io/kubernetes/pkg/types"
 	certutil "k8s.io/kubernetes/pkg/util/cert"
 )
 

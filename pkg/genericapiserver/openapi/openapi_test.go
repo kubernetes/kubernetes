@@ -24,7 +24,7 @@ import (
 	"github.com/emicklei/go-restful"
 	"github.com/go-openapi/spec"
 	"github.com/stretchr/testify/assert"
-	"k8s.io/kubernetes/pkg/genericapiserver/openapi/common"
+	"k8s.io/apimachinery/pkg/genericapiserver/openapi/common"
 )
 
 // setUp is a convenience function for setting up for (most) tests.

@@ -21,13 +21,13 @@ limitations under the License.
 package v1beta1
 
 import (
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	conversion "k8s.io/apimachinery/pkg/conversion"
+	runtime "k8s.io/apimachinery/pkg/runtime"
 	api "k8s.io/kubernetes/pkg/api"
 	api_v1 "k8s.io/kubernetes/pkg/api/v1"
 	autoscaling "k8s.io/kubernetes/pkg/apis/autoscaling"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions"
-	v1 "k8s.io/kubernetes/pkg/apis/meta/v1"
-	conversion "k8s.io/kubernetes/pkg/conversion"
-	runtime "k8s.io/kubernetes/pkg/runtime"
 	intstr "k8s.io/kubernetes/pkg/util/intstr"
 	unsafe "unsafe"
 )
@@ -1589,14 +1589,14 @@ func Convert_extensions_ScaleSpec_To_v1beta1_ScaleSpec(in *extensions.ScaleSpec,
 
 func autoConvert_v1beta1_ScaleStatus_To_extensions_ScaleStatus(in *ScaleStatus, out *extensions.ScaleStatus, s conversion.Scope) error {
 	out.Replicas = in.Replicas
-	// WARNING: in.Selector requires manual conversion: inconvertible types (map[string]string vs *k8s.io/kubernetes/pkg/apis/meta/v1.LabelSelector)
+	// WARNING: in.Selector requires manual conversion: inconvertible types (map[string]string vs *k8s.io/apimachinery/pkg/apis/meta/v1.LabelSelector)
 	// WARNING: in.TargetSelector requires manual conversion: does not exist in peer-type
 	return nil
 }
 
 func autoConvert_extensions_ScaleStatus_To_v1beta1_ScaleStatus(in *extensions.ScaleStatus, out *ScaleStatus, s conversion.Scope) error {
 	out.Replicas = in.Replicas
-	// WARNING: in.Selector requires manual conversion: inconvertible types (*k8s.io/kubernetes/pkg/apis/meta/v1.LabelSelector vs map[string]string)
+	// WARNING: in.Selector requires manual conversion: inconvertible types (*k8s.io/apimachinery/pkg/apis/meta/v1.LabelSelector vs map[string]string)
 	return nil
 }
 

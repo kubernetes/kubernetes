@@ -20,9 +20,9 @@ import (
 	"strings"
 	"testing"
 
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/kubernetes/pkg/api"
 	authorizationapi "k8s.io/kubernetes/pkg/apis/authorization"
-	"k8s.io/kubernetes/pkg/util/validation/field"
 )
 
 func TestValidateSARSpec(t *testing.T) {

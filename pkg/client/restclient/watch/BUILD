@@ -16,10 +16,10 @@ go_library(
     ],
     tags = ["automanaged"],
     deps = [
-        "//pkg/apis/meta/v1:go_default_library",
-        "//pkg/runtime:go_default_library",
-        "//pkg/runtime/serializer/streaming:go_default_library",
-        "//pkg/watch:go_default_library",
+        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor:k8s.io/apimachinery/pkg/runtime",
+        "//vendor:k8s.io/apimachinery/pkg/runtime/serializer/streaming",
+        "//vendor:k8s.io/apimachinery/pkg/watch",
     ],
 )
 
@@ -33,12 +33,12 @@ go_test(
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/testapi:go_default_library",
-        "//pkg/apis/meta/v1:go_default_library",
         "//pkg/client/restclient/watch:go_default_library",
-        "//pkg/runtime:go_default_library",
-        "//pkg/runtime/serializer/streaming:go_default_library",
-        "//pkg/util/wait:go_default_library",
-        "//pkg/watch:go_default_library",
+        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor:k8s.io/apimachinery/pkg/runtime",
+        "//vendor:k8s.io/apimachinery/pkg/runtime/serializer/streaming",
+        "//vendor:k8s.io/apimachinery/pkg/util/wait",
+        "//vendor:k8s.io/apimachinery/pkg/watch",
     ],
 )
 

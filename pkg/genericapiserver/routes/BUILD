@@ -21,12 +21,10 @@ go_library(
     ],
     tags = ["automanaged"],
     deps = [
-        "//pkg/apis/meta/v1:go_default_library",
         "//pkg/genericapiserver/api/handlers/responsewriters:go_default_library",
         "//pkg/genericapiserver/api/metrics:go_default_library",
         "//pkg/genericapiserver/mux:go_default_library",
         "//pkg/genericapiserver/openapi:go_default_library",
-        "//pkg/genericapiserver/openapi/common:go_default_library",
         "//pkg/genericapiserver/routes/data/swagger:go_default_library",
         "//pkg/storage/etcd/metrics:go_default_library",
         "//pkg/version:go_default_library",
@@ -35,6 +33,8 @@ go_library(
         "//vendor:github.com/emicklei/go-restful/swagger",
         "//vendor:github.com/golang/glog",
         "//vendor:github.com/prometheus/client_golang/prometheus",
+        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor:k8s.io/apimachinery/pkg/genericapiserver/openapi/common",
     ],
 )
 

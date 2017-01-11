@@ -13,9 +13,9 @@ go_library(
     srcs = ["validation.go"],
     tags = ["automanaged"],
     deps = [
-        "//pkg/apis/meta/v1:go_default_library",
-        "//pkg/util/validation:go_default_library",
-        "//pkg/util/validation/field:go_default_library",
+        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor:k8s.io/apimachinery/pkg/util/validation",
+        "//vendor:k8s.io/apimachinery/pkg/util/validation/field",
     ],
 )
 
@@ -24,7 +24,7 @@ go_test(
     srcs = ["validation_test.go"],
     library = ":go_default_library",
     tags = ["automanaged"],
-    deps = ["//pkg/util/validation/field:go_default_library"],
+    deps = ["//vendor:k8s.io/apimachinery/pkg/util/validation/field"],
 )
 
 filegroup(

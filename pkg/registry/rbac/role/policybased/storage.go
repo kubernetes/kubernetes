@@ -18,13 +18,13 @@ limitations under the License.
 package policybased
 
 import (
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/apis/rbac"
 	"k8s.io/kubernetes/pkg/apis/rbac/validation"
 	genericapirequest "k8s.io/kubernetes/pkg/genericapiserver/api/request"
 	rbacregistry "k8s.io/kubernetes/pkg/registry/rbac"
-	"k8s.io/kubernetes/pkg/runtime"
 )
 
 var groupResource = rbac.Resource("roles")

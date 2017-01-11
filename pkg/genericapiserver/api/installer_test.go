@@ -20,9 +20,9 @@ import (
 	"bytes"
 	"testing"
 
+	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/meta"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 
 	"github.com/emicklei/go-restful"
 )

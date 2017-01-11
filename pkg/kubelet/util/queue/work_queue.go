@@ -20,7 +20,7 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/kubernetes/pkg/types"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/util/clock"
 )
 

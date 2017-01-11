@@ -25,9 +25,9 @@ go_library(
         "//pkg/genericapiserver/api/request:go_default_library",
         "//pkg/httplog:go_default_library",
         "//pkg/util:go_default_library",
-        "//pkg/util/runtime:go_default_library",
-        "//pkg/util/sets:go_default_library",
         "//vendor:github.com/golang/glog",
+        "//vendor:k8s.io/apimachinery/pkg/util/runtime",
+        "//vendor:k8s.io/apimachinery/pkg/util/sets",
     ],
 )
 
@@ -44,7 +44,7 @@ go_test(
         "//pkg/api/errors:go_default_library",
         "//pkg/genericapiserver/api/filters:go_default_library",
         "//pkg/genericapiserver/api/request:go_default_library",
-        "//pkg/util/sets:go_default_library",
+        "//vendor:k8s.io/apimachinery/pkg/util/sets",
     ],
 )
 

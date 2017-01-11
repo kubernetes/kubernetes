@@ -19,11 +19,11 @@ package eventsink
 import (
 	"testing"
 
+	"k8s.io/apimachinery/pkg/runtime"
 	fakefedclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset/fake"
 	. "k8s.io/kubernetes/federation/pkg/federation-controller/util/test"
 	apiv1 "k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/testing/core"
-	"k8s.io/kubernetes/pkg/runtime"
 
 	"github.com/stretchr/testify/assert"
 )

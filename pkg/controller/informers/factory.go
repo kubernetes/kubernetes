@@ -23,10 +23,10 @@ import (
 
 	"github.com/golang/glog"
 
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	"k8s.io/kubernetes/pkg/runtime/schema"
 )
 
 // SharedInformerFactory provides interface which holds unique informers for pods, nodes, namespaces, persistent volume

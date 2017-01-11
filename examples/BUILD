@@ -47,13 +47,13 @@ go_test(
         "//pkg/apis/extensions/validation:go_default_library",
         "//pkg/capabilities:go_default_library",
         "//pkg/registry/batch/job:go_default_library",
-        "//pkg/runtime:go_default_library",
-        "//pkg/types:go_default_library",
-        "//pkg/util/validation/field:go_default_library",
-        "//pkg/util/yaml:go_default_library",
         "//plugin/pkg/scheduler/api:go_default_library",
         "//plugin/pkg/scheduler/api/latest:go_default_library",
         "//vendor:github.com/golang/glog",
+        "//vendor:k8s.io/apimachinery/pkg/runtime",
+        "//vendor:k8s.io/apimachinery/pkg/types",
+        "//vendor:k8s.io/apimachinery/pkg/util/validation/field",
+        "//vendor:k8s.io/apimachinery/pkg/util/yaml",
     ],
 )
 

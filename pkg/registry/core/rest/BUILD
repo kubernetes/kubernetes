@@ -15,7 +15,6 @@ go_library(
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/rest:go_default_library",
-        "//pkg/apimachinery/registered:go_default_library",
         "//pkg/client/clientset_generated/internalclientset/typed/policy/internalversion:go_default_library",
         "//pkg/client/restclient:go_default_library",
         "//pkg/genericapiserver:go_default_library",
@@ -45,10 +44,11 @@ go_library(
         "//pkg/registry/core/service/portallocator:go_default_library",
         "//pkg/registry/core/serviceaccount/etcd:go_default_library",
         "//pkg/registry/generic:go_default_library",
-        "//pkg/runtime/schema:go_default_library",
         "//pkg/storage/etcd/util:go_default_library",
-        "//pkg/util/net:go_default_library",
         "//vendor:github.com/golang/glog",
+        "//vendor:k8s.io/apimachinery/pkg/apimachinery/registered",
+        "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
+        "//vendor:k8s.io/apimachinery/pkg/util/net",
     ],
 )
 
@@ -58,8 +58,8 @@ go_test(
     library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
-        "//pkg/runtime/schema:go_default_library",
         "//pkg/storage/storagebackend:go_default_library",
+        "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
     ],
 )
 

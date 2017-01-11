@@ -34,10 +34,10 @@ go_library(
         "//pkg/kubectl:go_default_library",
         "//pkg/kubectl/cmd/templates:go_default_library",
         "//pkg/kubectl/cmd/util:go_default_library",
-        "//pkg/util/errors:go_default_library",
         "//pkg/util/flag:go_default_library",
-        "//pkg/util/sets:go_default_library",
         "//vendor:github.com/spf13/cobra",
+        "//vendor:k8s.io/apimachinery/pkg/util/errors",
+        "//vendor:k8s.io/apimachinery/pkg/util/sets",
     ],
 )
 
@@ -60,8 +60,8 @@ go_test(
         "//pkg/client/unversioned/clientcmd:go_default_library",
         "//pkg/client/unversioned/clientcmd/api:go_default_library",
         "//pkg/kubectl/cmd/util:go_default_library",
-        "//pkg/util/diff:go_default_library",
         "//pkg/util/flag:go_default_library",
+        "//vendor:k8s.io/apimachinery/pkg/util/diff",
     ],
 )
 

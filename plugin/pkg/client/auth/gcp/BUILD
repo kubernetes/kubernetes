@@ -15,11 +15,11 @@ go_library(
     deps = [
         "//pkg/client/restclient:go_default_library",
         "//pkg/util/jsonpath:go_default_library",
-        "//pkg/util/yaml:go_default_library",
         "//vendor:github.com/golang/glog",
         "//vendor:golang.org/x/net/context",
         "//vendor:golang.org/x/oauth2",
         "//vendor:golang.org/x/oauth2/google",
+        "//vendor:k8s.io/apimachinery/pkg/util/yaml",
     ],
 )
 

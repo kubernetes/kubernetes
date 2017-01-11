@@ -14,7 +14,7 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
-        "//pkg/util/validation:go_default_library",
+        "//vendor:k8s.io/apimachinery/pkg/util/validation",
     ],
 )
 

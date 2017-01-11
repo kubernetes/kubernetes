@@ -17,9 +17,9 @@ limitations under the License.
 package routes
 
 import (
+	"k8s.io/apimachinery/pkg/genericapiserver/openapi/common"
 	"k8s.io/kubernetes/pkg/genericapiserver/mux"
 	"k8s.io/kubernetes/pkg/genericapiserver/openapi"
-	"k8s.io/kubernetes/pkg/genericapiserver/openapi/common"
 
 	"github.com/golang/glog"
 )

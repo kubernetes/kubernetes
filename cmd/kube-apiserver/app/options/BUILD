@@ -22,8 +22,8 @@ go_library(
         "//pkg/kubeapiserver/options:go_default_library",
         "//pkg/kubelet/client:go_default_library",
         "//pkg/master/ports:go_default_library",
-        "//pkg/util/net:go_default_library",
         "//vendor:github.com/spf13/pflag",
+        "//vendor:k8s.io/apimachinery/pkg/util/net",
     ],
 )
 

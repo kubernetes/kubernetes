@@ -19,6 +19,7 @@ limitations under the License.
 package informers_generated
 
 import (
+	runtime "k8s.io/apimachinery/pkg/runtime"
 	cache "k8s.io/kubernetes/pkg/client/cache"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	internalclientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
@@ -32,7 +33,6 @@ import (
 	policy "k8s.io/kubernetes/pkg/client/informers/informers_generated/policy"
 	rbac "k8s.io/kubernetes/pkg/client/informers/informers_generated/rbac"
 	storage "k8s.io/kubernetes/pkg/client/informers/informers_generated/storage"
-	runtime "k8s.io/kubernetes/pkg/runtime"
 	reflect "reflect"
 	sync "sync"
 	time "time"

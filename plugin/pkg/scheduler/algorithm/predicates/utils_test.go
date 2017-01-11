@@ -19,8 +19,8 @@ package predicates
 import (
 	"fmt"
 
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/labels"
 )
 
 // ExampleUtils is a https://blog.golang.org/examples styled unit test.
