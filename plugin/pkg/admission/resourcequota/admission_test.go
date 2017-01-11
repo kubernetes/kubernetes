@@ -128,13 +128,15 @@ func TestAdmissionIgnoresDelete(t *testing.T) {
 
 	quotaAccessor, _ := newQuotaAccessor(kubeClient)
 	quotaAccessor.indexer = indexer
-	go quotaAccessor.Run(stopCh)
-	evaluator := NewQuotaEvaluator(quotaAccessor, install.NewRegistry(nil, nil), nil, 5, stopCh)
 
 	handler := &quotaAdmission{
-		Handler:   admission.NewHandler(admission.Create, admission.Update),
-		evaluator: evaluator,
+		Handler:       admission.NewHandler(admission.Create, admission.Update),
+		quotaAccessor: quotaAccessor,
+		registry:      install.NewRegistry(nil, nil),
+		numEvaluators: 5,
 	}
+	handler.Run(stopCh)
+
 	namespace := "default"
 	err := handler.Admit(admission.NewAttributesRecord(nil, nil, api.Kind("Pod").WithVersion("version"), namespace, "name", api.Resource("pods").WithVersion("version"), "", admission.Delete, nil))
 	if err != nil {

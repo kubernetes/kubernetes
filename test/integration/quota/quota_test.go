@@ -65,11 +65,12 @@ func TestQuota(t *testing.T) {
 	admissionCh := make(chan struct{})
 	clientset := clientset.NewForConfigOrDie(&restclient.Config{QPS: -1, Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(v1.GroupName).GroupVersion}})
 	internalClientset := internalclientset.NewForConfigOrDie(&restclient.Config{QPS: -1, Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(v1.GroupName).GroupVersion}})
-	admission, err := resourcequota.NewResourceQuota(quotainstall.NewRegistry(nil, nil), 5, admissionCh)
+	admission, err := resourcequota.NewResourceQuota(quotainstall.NewRegistry(nil, nil), 5)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	admission.(kubeadmission.WantsInternalClientSet).SetInternalClientSet(internalClientset)
+	admission.(kubeadmission.WantsToRun).Run(admissionCh)
 	defer close(admissionCh)
 
 	masterConfig := framework.NewIntegrationTestMasterConfig()

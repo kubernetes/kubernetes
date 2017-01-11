@@ -424,11 +424,10 @@ func startServiceAccountTestServer(t *testing.T) (*clientset.Clientset, restclie
 	informers.Start(stopCh)
 	go serviceAccountController.Run(5, stopCh)
 	// Start the admission plugin reflectors
-	serviceAccountAdmission.Run()
+	serviceAccountAdmission.Run(stopCh)
 
 	stop := func() {
 		close(stopCh)
-		serviceAccountAdmission.Stop()
 		apiServer.Close()
 	}
 

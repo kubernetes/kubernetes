@@ -21,6 +21,7 @@ import (
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/controller/informers"
+	"k8s.io/kubernetes/pkg/util/wait"
 )
 
 // TODO add a `WantsToRun` which takes a stopCh.  Might make it generic.
@@ -37,6 +38,11 @@ type WantsInformerFactory interface {
 	admission.Validator
 }
 
+// WantsToRun defines a function which Runs admission plugins that need it
+type WantsToRun interface {
+	Run(stopCh <-chan struct{})
+}
+
 // WantsAuthorizer defines a function which sets Authorizer for admission plugins that need it.
 type WantsAuthorizer interface {
 	SetAuthorizer(authorizer.Authorizer)
@@ -47,16 +53,18 @@ type pluginInitializer struct {
 	internalClient internalclientset.Interface
 	informers      informers.SharedInformerFactory
 	authorizer     authorizer.Authorizer
+	stopCh         <-chan struct{}
 }
 
 var _ admission.PluginInitializer = pluginInitializer{}
 
 // NewPluginInitializer constructs new instance of PluginInitializer
-func NewPluginInitializer(internalClient internalclientset.Interface, sharedInformers informers.SharedInformerFactory, authz authorizer.Authorizer) admission.PluginInitializer {
+func NewPluginInitializer(internalClient internalclientset.Interface, sharedInformers informers.SharedInformerFactory, authz authorizer.Authorizer, stopCh <-chan struct{}) admission.PluginInitializer {
 	return pluginInitializer{
 		internalClient: internalClient,
 		informers:      sharedInformers,
 		authorizer:     authz,
+		stopCh:         stopCh,
 	}
 }
 
@@ -65,6 +73,14 @@ func NewPluginInitializer(internalClient internalclientset.Interface, sharedInfo
 func (i pluginInitializer) Initialize(plugin admission.Interface) {
 	if wants, ok := plugin.(WantsInternalClientSet); ok {
 		wants.SetInternalClientSet(i.internalClient)
+	}
+
+	if wants, ok := plugin.(WantsToRun); ok {
+		if i.stopCh == nil {
+			wants.Run(wait.NeverStop)
+		} else {
+			wants.Run(i.stopCh)
+		}
 	}
 
 	if wants, ok := plugin.(WantsInformerFactory); ok {
