@@ -47,6 +47,8 @@ type resourceInfo struct {
 	name     api.ResourceName
 	requests []resource.Quantity
 	levels   []int64
+	// only applies to pod names returned from "heapster"
+	podNames []string
 
 	targetUtilization   int32
 	expectedUtilization int32
@@ -134,9 +136,13 @@ func (tc *replicaCalcTestCase) prepareTestClient(t *testing.T) *fake.Clientset {
 		if tc.resource != nil {
 			metrics := metrics_api.PodMetricsList{}
 			for i, resValue := range tc.resource.levels {
+				podName := fmt.Sprintf("%s-%d", podNamePrefix, i)
+				if len(tc.resource.podNames) > i {
+					podName = tc.resource.podNames[i]
+				}
 				podMetric := metrics_api.PodMetrics{
 					ObjectMeta: v1.ObjectMeta{
-						Name:      fmt.Sprintf("%s-%d", podNamePrefix, i),
+						Name:      podName,
 						Namespace: testNamespace,
 					},
 					Timestamp: unversioned.Time{Time: tc.timestamp},
@@ -248,6 +254,22 @@ func (tc *replicaCalcTestCase) runTest(t *testing.T) {
 		assert.InDelta(t, tc.metric.expectedUtilization, 0.1, outUtilization, "utilization should be as expected")
 		assert.True(t, tc.timestamp.Equal(outTimestamp), "timestamp should be as expected")
 	}
+}
+
+func TestReplicaCalcDisjointResourcesMetrics(t *testing.T) {
+	tc := replicaCalcTestCase{
+		currentReplicas: 1,
+		expectedError:   fmt.Errorf("no metrics returned matched known pods"),
+		resource: &resourceInfo{
+			name:     api.ResourceCPU,
+			requests: []resource.Quantity{resource.MustParse("1.0")},
+			levels:   []int64{100},
+			podNames: []string{"an-older-pod-name"},
+
+			targetUtilization: 100,
+		},
+	}
+	tc.runTest(t)
 }
 
 func TestReplicaCalcScaleUp(t *testing.T) {
