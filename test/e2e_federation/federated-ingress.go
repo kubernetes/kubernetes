@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2e
+package e2e_federation
 
 import (
 	"fmt"
@@ -34,6 +34,7 @@ import (
 	kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/util/intstr"
 	"k8s.io/kubernetes/test/e2e/framework"
+	fedframework "k8s.io/kubernetes/test/e2e_federation/framework"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -47,8 +48,13 @@ const (
 	FederatedIngressServicePodName = "federated-ingress-service-test-pod"
 )
 
+const (
+	// timeout on a single http request.
+	reqTimeout = 10 * time.Second
+)
+
 var _ = framework.KubeDescribe("Federated ingresses [Feature:Federation]", func() {
-	f := framework.NewDefaultFederatedFramework("federated-ingress")
+	f := fedframework.NewDefaultFederatedFramework("federated-ingress")
 
 	// Create/delete ingress api objects
 	// Validate federation apiserver, does not rely on underlying clusters or federation ingress controller.
@@ -60,7 +66,7 @@ var _ = framework.KubeDescribe("Federated ingresses [Feature:Federation]", func(
 		})
 
 		It("should be created and deleted successfully", func() {
-			framework.SkipUnlessFederated(f.ClientSet)
+			fedframework.SkipUnlessFederated(f.ClientSet)
 			framework.SkipUnlessProviderIs("gce", "gke") // TODO: Federated ingress is not yet supported on non-GCP platforms.
 			nsName := f.FederationNamespace.Name
 			ingress := createIngressOrFail(f.FederationClientset_1_5, nsName)
@@ -82,7 +88,7 @@ var _ = framework.KubeDescribe("Federated ingresses [Feature:Federation]", func(
 
 		// register clusters in federation apiserver
 		BeforeEach(func() {
-			framework.SkipUnlessFederated(f.ClientSet)
+			fedframework.SkipUnlessFederated(f.ClientSet)
 			framework.SkipUnlessProviderIs("gce", "gke") // TODO: Federated ingress is not yet supported on non-GCP platforms.
 			if federationName = os.Getenv("FEDERATION_NAME"); federationName == "" {
 				federationName = DefaultFederationName
@@ -109,7 +115,7 @@ var _ = framework.KubeDescribe("Federated ingresses [Feature:Federation]", func(
 		})
 
 		It("should be deleted from underlying clusters when OrphanDependents is false", func() {
-			framework.SkipUnlessFederated(f.ClientSet)
+			fedframework.SkipUnlessFederated(f.ClientSet)
 			nsName := f.FederationNamespace.Name
 			orphanDependents := false
 			verifyCascadingDeletionForIngress(f.FederationClientset_1_5, clusters, &orphanDependents, nsName)
@@ -117,7 +123,7 @@ var _ = framework.KubeDescribe("Federated ingresses [Feature:Federation]", func(
 		})
 
 		It("should not be deleted from underlying clusters when OrphanDependents is true", func() {
-			framework.SkipUnlessFederated(f.ClientSet)
+			fedframework.SkipUnlessFederated(f.ClientSet)
 			nsName := f.FederationNamespace.Name
 			orphanDependents := true
 			verifyCascadingDeletionForIngress(f.FederationClientset_1_5, clusters, &orphanDependents, nsName)
@@ -125,7 +131,7 @@ var _ = framework.KubeDescribe("Federated ingresses [Feature:Federation]", func(
 		})
 
 		It("should not be deleted from underlying clusters when OrphanDependents is nil", func() {
-			framework.SkipUnlessFederated(f.ClientSet)
+			fedframework.SkipUnlessFederated(f.ClientSet)
 			nsName := f.FederationNamespace.Name
 			verifyCascadingDeletionForIngress(f.FederationClientset_1_5, clusters, nil, nsName)
 			By(fmt.Sprintf("Verified that ingresses were not deleted from underlying clusters"))
@@ -138,7 +144,7 @@ var _ = framework.KubeDescribe("Federated ingresses [Feature:Federation]", func(
 			)
 
 			BeforeEach(func() {
-				framework.SkipUnlessFederated(f.ClientSet)
+				fedframework.SkipUnlessFederated(f.ClientSet)
 				// create backend pod
 				createBackendPodsOrFail(clusters, ns, FederatedIngressServicePodName)
 				// create backend service
@@ -395,7 +401,7 @@ func updateIngressOrFail(clientset *fedclientset.Clientset, namespace string) (n
 	for i := 0; i < MaxRetriesOnFederatedApiserver; i++ {
 		newIng, err = clientset.Extensions().Ingresses(namespace).Update(ingress)
 		if err == nil {
-			describeIng(namespace)
+			framework.DescribeIng(namespace)
 			return newIng
 		}
 		if !errors.IsConflict(err) && !errors.IsServerTimeout(err) {
@@ -422,7 +428,7 @@ func (j *federationTestJig) waitForFederatedIngress() {
 		for _, p := range rules.IngressRuleValue.HTTP.Paths {
 			route := fmt.Sprintf("%v://%v%v", proto, address, p.Path)
 			framework.Logf("Testing route %v host %v with simple GET", route, rules.Host)
-			framework.ExpectNoError(pollURL(route, rules.Host, framework.LoadBalancerPollTimeout, framework.LoadBalancerPollInterval, timeoutClient, false))
+			framework.ExpectNoError(framework.PollURL(route, rules.Host, framework.LoadBalancerPollTimeout, framework.LoadBalancerPollInterval, timeoutClient, false))
 		}
 	}
 }

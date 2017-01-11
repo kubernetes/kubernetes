@@ -14,30 +14,30 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2e
+package e2e_federation
 
 import (
 	"fmt"
 	"time"
 
 	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	federationapi "k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	"k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
-
-	. "github.com/onsi/gomega"
+	fedframework "k8s.io/kubernetes/test/e2e_federation/framework"
 )
 
 // Create/delete cluster api objects
 var _ = framework.KubeDescribe("Federation apiserver [Feature:Federation]", func() {
-	f := framework.NewDefaultFederatedFramework("federation-cluster")
+	f := fedframework.NewDefaultFederatedFramework("federation-cluster")
 
 	Describe("Cluster objects", func() {
 		AfterEach(func() {
-			framework.SkipUnlessFederated(f.ClientSet)
+			fedframework.SkipUnlessFederated(f.ClientSet)
 
 			// Delete registered clusters.
 			// This is if a test failed, it should not affect other tests.
@@ -50,7 +50,7 @@ var _ = framework.KubeDescribe("Federation apiserver [Feature:Federation]", func
 		})
 
 		It("should be created and deleted successfully", func() {
-			framework.SkipUnlessFederated(f.ClientSet)
+			fedframework.SkipUnlessFederated(f.ClientSet)
 
 			contexts := f.GetUnderlyingFederatedContexts()
 
@@ -86,11 +86,11 @@ var _ = framework.KubeDescribe("Federation apiserver [Feature:Federation]", func
 	})
 	Describe("Admission control", func() {
 		AfterEach(func() {
-			framework.SkipUnlessFederated(f.ClientSet)
+			fedframework.SkipUnlessFederated(f.ClientSet)
 		})
 
 		It("should not be able to create resources if namespace does not exist", func() {
-			framework.SkipUnlessFederated(f.ClientSet)
+			fedframework.SkipUnlessFederated(f.ClientSet)
 
 			// Creating a service in a non-existing namespace should fail.
 			svcNamespace := "federation-admission-test-ns"

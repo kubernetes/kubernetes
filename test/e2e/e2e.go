@@ -42,6 +42,7 @@ import (
 	commontest "k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/generated"
+	federationtest "k8s.io/kubernetes/test/e2e_federation"
 	testutils "k8s.io/kubernetes/test/utils"
 )
 
@@ -152,6 +153,9 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 
 	// Reference common test to make the import valid.
 	commontest.CurrentSuite = commontest.E2E
+
+	// Reference federation test to make the import valid.
+	federationtest.FederationSuite = commontest.FederationE2E
 
 	return nil
 

@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2e
+package e2e_federation
 
 import (
 	"fmt"
@@ -31,6 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 	kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/test/e2e/framework"
+	fedframework "k8s.io/kubernetes/test/e2e_federation/framework"
 )
 
 const (
@@ -43,18 +44,18 @@ const (
 var _ = framework.KubeDescribe("Federation secrets [Feature:Federation]", func() {
 	var clusters map[string]*cluster // All clusters, keyed by cluster name
 
-	f := framework.NewDefaultFederatedFramework("federated-secret")
+	f := fedframework.NewDefaultFederatedFramework("federated-secret")
 
 	Describe("Secret objects", func() {
 
 		BeforeEach(func() {
-			framework.SkipUnlessFederated(f.ClientSet)
+			fedframework.SkipUnlessFederated(f.ClientSet)
 			clusters = map[string]*cluster{}
 			registerClusters(clusters, UserAgentName, "", f)
 		})
 
 		AfterEach(func() {
-			framework.SkipUnlessFederated(f.ClientSet)
+			fedframework.SkipUnlessFederated(f.ClientSet)
 			// Delete all secrets.
 			nsName := f.FederationNamespace.Name
 			deleteAllSecretsOrFail(f.FederationClientset_1_5, nsName)
@@ -63,7 +64,7 @@ var _ = framework.KubeDescribe("Federation secrets [Feature:Federation]", func()
 		})
 
 		It("should be created and deleted successfully", func() {
-			framework.SkipUnlessFederated(f.ClientSet)
+			fedframework.SkipUnlessFederated(f.ClientSet)
 			nsName := f.FederationNamespace.Name
 			secret := createSecretOrFail(f.FederationClientset_1_5, nsName)
 			// wait for secret shards being created
@@ -73,7 +74,7 @@ var _ = framework.KubeDescribe("Federation secrets [Feature:Federation]", func()
 		})
 
 		It("should be deleted from underlying clusters when OrphanDependents is false", func() {
-			framework.SkipUnlessFederated(f.ClientSet)
+			fedframework.SkipUnlessFederated(f.ClientSet)
 			nsName := f.FederationNamespace.Name
 			orphanDependents := false
 			verifyCascadingDeletionForSecret(f.FederationClientset_1_5, clusters, &orphanDependents, nsName)
@@ -81,7 +82,7 @@ var _ = framework.KubeDescribe("Federation secrets [Feature:Federation]", func()
 		})
 
 		It("should not be deleted from underlying clusters when OrphanDependents is true", func() {
-			framework.SkipUnlessFederated(f.ClientSet)
+			fedframework.SkipUnlessFederated(f.ClientSet)
 			nsName := f.FederationNamespace.Name
 			orphanDependents := true
 			verifyCascadingDeletionForSecret(f.FederationClientset_1_5, clusters, &orphanDependents, nsName)
@@ -89,7 +90,7 @@ var _ = framework.KubeDescribe("Federation secrets [Feature:Federation]", func()
 		})
 
 		It("should not be deleted from underlying clusters when OrphanDependents is nil", func() {
-			framework.SkipUnlessFederated(f.ClientSet)
+			fedframework.SkipUnlessFederated(f.ClientSet)
 			nsName := f.FederationNamespace.Name
 			verifyCascadingDeletionForSecret(f.FederationClientset_1_5, clusters, nil, nsName)
 			By(fmt.Sprintf("Verified that secrets were not deleted from underlying clusters"))

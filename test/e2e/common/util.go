@@ -23,8 +23,9 @@ import (
 type Suite string
 
 const (
-	E2E     Suite = "e2e"
-	NodeE2E Suite = "node e2e"
+	E2E           Suite = "e2e"
+	NodeE2E       Suite = "node e2e"
+	FederationE2E Suite = "federation e2e"
 )
 
 var CurrentSuite Suite

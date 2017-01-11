@@ -81,6 +81,8 @@ type TestContextType struct {
 	FeatureGates string
 	// Node e2e specific test context
 	NodeTestContextType
+	// Federation e2e context
+	FederatedKubeContext string
 
 	// Viper-only parameters.  These will in time replace all flags.
 
@@ -129,7 +131,6 @@ type CloudConfig struct {
 }
 
 var TestContext TestContextType
-var federatedKubeContext string
 
 // Register flags common to all e2e test suites.
 func RegisterCommonFlags() {
@@ -163,7 +164,7 @@ func RegisterClusterFlags() {
 	flag.StringVar(&TestContext.KubeConfig, clientcmd.RecommendedConfigPathFlag, os.Getenv(clientcmd.RecommendedConfigPathEnvVar), "Path to kubeconfig containing embedded authinfo.")
 	flag.StringVar(&TestContext.KubeContext, clientcmd.FlagContext, "", "kubeconfig context to use/override. If unset, will use value from 'current-context'")
 	flag.StringVar(&TestContext.KubeAPIContentType, "kube-api-content-type", "application/vnd.kubernetes.protobuf", "ContentType used to communicate with apiserver")
-	flag.StringVar(&federatedKubeContext, "federated-kube-context", "e2e-federation", "kubeconfig context for federation.")
+	flag.StringVar(&TestContext.FederatedKubeContext, "federated-kube-context", "e2e-federation", "kubeconfig context for federation.")
 
 	flag.StringVar(&TestContext.KubeVolumeDir, "volume-dir", "/var/lib/kubelet", "Path to the directory containing the kubelet volumes.")
 	flag.StringVar(&TestContext.CertDir, "cert-dir", "", "Path to the directory containing the certs. Default is empty, which doesn't use certs.")

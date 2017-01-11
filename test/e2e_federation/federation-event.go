@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2e
+package e2e_federation
 
 import (
 	"fmt"
@@ -23,6 +23,7 @@ import (
 	"k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
+	fedframework "k8s.io/kubernetes/test/e2e_federation/framework"
 
 	. "github.com/onsi/gomega"
 )
@@ -33,11 +34,11 @@ const (
 
 // Create/delete event api objects.
 var _ = framework.KubeDescribe("Federation events [Feature:Federation]", func() {
-	f := framework.NewDefaultFederatedFramework("federation-event")
+	f := fedframework.NewDefaultFederatedFramework("federation-event")
 
 	Describe("Event objects", func() {
 		AfterEach(func() {
-			framework.SkipUnlessFederated(f.ClientSet)
+			fedframework.SkipUnlessFederated(f.ClientSet)
 
 			nsName := f.FederationNamespace.Name
 			// Delete registered events.
@@ -50,7 +51,7 @@ var _ = framework.KubeDescribe("Federation events [Feature:Federation]", func() 
 		})
 
 		It("should be created and deleted successfully", func() {
-			framework.SkipUnlessFederated(f.ClientSet)
+			fedframework.SkipUnlessFederated(f.ClientSet)
 
 			nsName := f.FederationNamespace.Name
 			event := createEventOrFail(f.FederationClientset_1_5, nsName)
