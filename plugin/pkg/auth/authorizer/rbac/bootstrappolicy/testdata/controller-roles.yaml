@@ -533,9 +533,32 @@ items:
     resources:
     - nodes
     verbs:
+    - delete
     - get
     - list
     - update
+  - apiGroups:
+    - ""
+    attributeRestrictions: null
+    resources:
+    - nodes/status
+    verbs:
+    - update
+  - apiGroups:
+    - ""
+    attributeRestrictions: null
+    resources:
+    - pods/status
+    verbs:
+    - update
+  - apiGroups:
+    - ""
+    attributeRestrictions: null
+    resources:
+    - pods
+    verbs:
+    - delete
+    - list
   - apiGroups:
     - ""
     attributeRestrictions: null
@@ -632,6 +655,13 @@ items:
     resources:
     - events
     verbs:
+    - watch
+  - apiGroups:
+    - ""
+    attributeRestrictions: null
+    resources:
+    - events
+    verbs:
     - create
     - patch
     - update
@@ -641,7 +671,7 @@ items:
     creationTimestamp: null
     labels:
       kubernetes.io/bootstrapping: rbac-defaults
-    name: system:controller:pod-garbage-controller
+    name: system:controller:pod-garbage-collector
   rules:
   - apiGroups:
     - ""

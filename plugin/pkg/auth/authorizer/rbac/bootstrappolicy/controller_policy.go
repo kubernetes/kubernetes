@@ -166,7 +166,11 @@ func init() {
 	addControllerRole(rbac.ClusterRole{
 		ObjectMeta: api.ObjectMeta{Name: saRolePrefix + "node-controller"},
 		Rules: []rbac.PolicyRule{
-			rbac.NewRule("get", "list", "update").Groups(legacyGroup).Resources("nodes").RuleOrDie(),
+			rbac.NewRule("get", "list", "update", "delete").Groups(legacyGroup).Resources("nodes").RuleOrDie(),
+			rbac.NewRule("update").Groups(legacyGroup).Resources("nodes/status").RuleOrDie(),
+			// used for pod eviction
+			rbac.NewRule("update").Groups(legacyGroup).Resources("pods/status").RuleOrDie(),
+			rbac.NewRule("list", "delete").Groups(legacyGroup).Resources("pods").RuleOrDie(),
 			eventsRule(),
 		},
 	})
@@ -184,11 +188,14 @@ func init() {
 			rbac.NewRule("get", "create", "delete").Groups(legacyGroup).Resources("services", "endpoints").RuleOrDie(),
 			rbac.NewRule("get").Groups(legacyGroup).Resources("secrets").RuleOrDie(),
 
+			// recyclerClient.WatchPod
+			rbac.NewRule("watch").Groups(legacyGroup).Resources("events").RuleOrDie(),
+
 			eventsRule(),
 		},
 	})
 	addControllerRole(rbac.ClusterRole{
-		ObjectMeta: api.ObjectMeta{Name: saRolePrefix + "pod-garbage-controller"},
+		ObjectMeta: api.ObjectMeta{Name: saRolePrefix + "pod-garbage-collector"},
 		Rules: []rbac.PolicyRule{
 			rbac.NewRule("list", "watch", "delete").Groups(legacyGroup).Resources("pods").RuleOrDie(),
 			rbac.NewRule("list").Groups(legacyGroup).Resources("nodes").RuleOrDie(),
