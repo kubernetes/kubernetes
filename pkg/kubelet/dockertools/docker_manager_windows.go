@@ -21,14 +21,15 @@ package dockertools
 import (
 	"os"
 
-	"k8s.io/kubernetes/pkg/api/v1"
-
 	dockertypes "github.com/docker/engine-api/types"
 	dockercontainer "github.com/docker/engine-api/types/container"
+
+	"k8s.io/kubernetes/pkg/api/v1"
+	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
 
 // These two functions are OS specific (for now at least)
-func updateHostConfig(config *dockercontainer.HostConfig) {
+func updateHostConfig(hc *dockercontainer.HostConfig, opts *kubecontainer.RunContainerOptions) {
 	// There is no /etc/resolv.conf in Windows, DNS and DNSSearch options would have to be passed to Docker runtime instead
 	hc.DNS = opts.DNS
 	hc.DNSSearch = opts.DNSSearch
