@@ -36,6 +36,7 @@ go_library(
         "//pkg/util/wait:go_default_library",
         "//plugin/pkg/auth/authorizer/rbac/bootstrappolicy:go_default_library",
         "//vendor:github.com/golang/glog",
+        "//vendor:k8s.io/apiserver/pkg/authorization/authorizer",
     ],
 )
 
