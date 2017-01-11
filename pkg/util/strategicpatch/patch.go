@@ -341,50 +341,44 @@ func diffListsOfScalars(original, modified []interface{}, ignoreChangesAndAdditi
 	addList := []interface{}{}
 	deletionList := []interface{}{}
 
-	for originalIndex < len(originalScalars) && modifiedIndex < len(modifiedScalars) {
+	var originalStringPtr, modifiedStringPtr *string
+	for originalIndex < len(originalScalars) || modifiedIndex < len(modifiedScalars) {
 		// we need to compare the string representation of the scalar,
 		// because the scalar is an interface which doesn't support neither < nor <
 		// And that's how func sortScalars compare scalars.
-		originalString := fmt.Sprintf("%v", originalScalars[originalIndex])
-		modifiedString := fmt.Sprintf("%v", modifiedScalars[modifiedIndex])
+		if originalIndex < len(originalScalars) {
+			originalString := fmt.Sprintf("%v", originalScalars[originalIndex])
+			originalStringPtr = &originalString
+		} else {
+			originalStringPtr = nil
+		}
+
+		if modifiedIndex < len(modifiedScalars) {
+			modifiedString := fmt.Sprintf("%v", modifiedScalars[modifiedIndex])
+			modifiedStringPtr = &modifiedString
+		} else {
+			modifiedStringPtr = nil
+		}
 
 		switch {
 		// scalars are identical
-		case originalString == modifiedString:
+		case originalStringPtr != nil && modifiedStringPtr != nil && *originalStringPtr == *modifiedStringPtr:
 			originalIndex++
 			modifiedIndex++
 		// modified has additional scalar
-		case originalString > modifiedString:
+		case (originalStringPtr != nil && modifiedStringPtr != nil && *originalStringPtr > *modifiedStringPtr) || (originalStringPtr == nil && modifiedStringPtr != nil):
 			if !ignoreChangesAndAdditions {
 				modifiedValue := modifiedScalars[modifiedIndex]
 				addList = append(addList, modifiedValue)
 			}
 			modifiedIndex++
-		// modified deletes a scalar
-		case originalString < modifiedString:
+		// original has additional scalar
+		case (originalStringPtr != nil && modifiedStringPtr != nil && *originalStringPtr < *modifiedStringPtr) || (originalStringPtr != nil && modifiedStringPtr == nil):
 			if !ignoreDeletions {
 				originalValue := originalScalars[originalIndex]
 				deletionList = append(deletionList, originalValue)
 			}
 			originalIndex++
-		}
-	}
-
-	// Delete any remaining items found only in original
-	if !ignoreDeletions {
-		for originalIndex < len(originalScalars) {
-			originalValue := originalScalars[originalIndex]
-			deletionList = append(deletionList, originalValue)
-			originalIndex++
-		}
-	}
-
-	// Add any remaining items found only in modified
-	if !ignoreChangesAndAdditions {
-		for modifiedIndex < len(modifiedScalars) {
-			modifiedValue := modifiedScalars[modifiedIndex]
-			addList = append(addList, modifiedValue)
-			modifiedIndex++
 		}
 	}
 
