@@ -12,6 +12,7 @@ go_library(
     srcs = ["testing.go"],
     tags = ["automanaged"],
     deps = [
+        "//federation/client/clientset_generated/federation_clientset:go_default_library",
         "//federation/pkg/kubefed/util:go_default_library",
         "//pkg/api:go_default_library",
         "//pkg/apimachinery/registered:go_default_library",

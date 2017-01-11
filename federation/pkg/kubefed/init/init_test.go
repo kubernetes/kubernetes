@@ -693,6 +693,38 @@ func fakeInitHostFactory(federationName, namespaceName, ip, dnsZoneName, image, 
 		},
 	}
 
+	podList := v1.PodList{}
+	apiServerPod := v1.Pod{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Pod",
+			APIVersion: testapi.Extensions.GroupVersion().String(),
+		},
+		ObjectMeta: v1.ObjectMeta{
+			Name:      svcName,
+			Namespace: namespaceName,
+		},
+		Status: v1.PodStatus{
+			Phase: "Running",
+		},
+	}
+
+	cmPod := v1.Pod{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Pod",
+			APIVersion: testapi.Extensions.GroupVersion().String(),
+		},
+		ObjectMeta: v1.ObjectMeta{
+			Name:      cmName,
+			Namespace: namespaceName,
+		},
+		Status: v1.PodStatus{
+			Phase: "Running",
+		},
+	}
+
+	podList.Items = append(podList.Items, apiServerPod)
+	podList.Items = append(podList.Items, cmPod)
+
 	f, tf, codec, _ := cmdtesting.NewAPIFactory()
 	extCodec := testapi.Extensions.Codec()
 	ns := dynamic.ContentConfig().NegotiatedSerializer
@@ -701,6 +733,8 @@ func fakeInitHostFactory(federationName, namespaceName, ip, dnsZoneName, image, 
 		NegotiatedSerializer: ns,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
+			case p == "/healthz":
+				return &http.Response{StatusCode: http.StatusOK, Header: kubefedtesting.DefaultHeader(), Body: ioutil.NopCloser(bytes.NewReader([]byte("ok")))}, nil
 			case p == "/api/v1/namespaces" && m == http.MethodPost:
 				body, err := ioutil.ReadAll(req.Body)
 				if err != nil {
@@ -794,6 +828,8 @@ func fakeInitHostFactory(federationName, namespaceName, ip, dnsZoneName, image, 
 					return nil, fmt.Errorf("Unexpected deployment object\n\tDiff: %s", diff.ObjectGoPrintDiff(got, want))
 				}
 				return &http.Response{StatusCode: http.StatusCreated, Header: kubefedtesting.DefaultHeader(), Body: kubefedtesting.ObjBody(extCodec, &want)}, nil
+			case p == "/api/v1/namespaces/federation-system/pods" && m == http.MethodGet:
+				return &http.Response{StatusCode: http.StatusOK, Header: kubefedtesting.DefaultHeader(), Body: kubefedtesting.ObjBody(codec, &podList)}, nil
 			default:
 				return nil, fmt.Errorf("unexpected request: %#v\n%#v", req.URL, req)
 			}
