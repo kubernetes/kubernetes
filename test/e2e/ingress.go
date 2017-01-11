@@ -102,7 +102,7 @@ var _ = framework.KubeDescribe("Loadbalancing: L7", func() {
 		// Platform specific cleanup
 		AfterEach(func() {
 			if CurrentGinkgoTestDescription().Failed {
-				describeIng(ns)
+				framework.DescribeIng(ns)
 			}
 			if jig.ing == nil {
 				By("No ingress created, no cleanup necessary")
@@ -137,10 +137,10 @@ var _ = framework.KubeDescribe("Loadbalancing: L7", func() {
 
 			By("waiting for Ingress to come up with ip: " + ip)
 			httpClient := buildInsecureClient(reqTimeout)
-			framework.ExpectNoError(pollURL(fmt.Sprintf("https://%v/", ip), "", framework.LoadBalancerPollTimeout, jig.pollInterval, httpClient, false))
+			framework.ExpectNoError(framework.PollURL(fmt.Sprintf("https://%v/", ip), "", framework.LoadBalancerPollTimeout, jig.pollInterval, httpClient, false))
 
 			By("should reject HTTP traffic")
-			framework.ExpectNoError(pollURL(fmt.Sprintf("http://%v/", ip), "", framework.LoadBalancerPollTimeout, jig.pollInterval, httpClient, true))
+			framework.ExpectNoError(framework.PollURL(fmt.Sprintf("http://%v/", ip), "", framework.LoadBalancerPollTimeout, jig.pollInterval, httpClient, true))
 
 			By("should have correct firewall rule for ingress")
 			fw := gceController.getFirewallRule()
@@ -192,7 +192,7 @@ var _ = framework.KubeDescribe("Loadbalancing: L7", func() {
 				framework.ExpectNoError(gcloudDelete("firewall-rules", fmt.Sprintf("ingress-80-443-%v", ns), framework.TestContext.CloudConfig.ProjectID))
 			}
 			if CurrentGinkgoTestDescription().Failed {
-				describeIng(ns)
+				framework.DescribeIng(ns)
 			}
 			if jig.ing == nil {
 				By("No ingress created, no cleanup necessary")
