@@ -17,6 +17,7 @@ limitations under the License.
 package rest
 
 import (
+	"crypto/tls"
 	"fmt"
 	"net"
 	"net/http"
@@ -242,14 +243,14 @@ type componentStatusStorage struct {
 	storageFactory serverstorage.StorageFactory
 }
 
-func (s componentStatusStorage) serversToValidate() map[string]componentstatus.Server {
-	serversToValidate := map[string]componentstatus.Server{
+func (s componentStatusStorage) serversToValidate() map[string]*componentstatus.Server {
+	serversToValidate := map[string]*componentstatus.Server{
 		"controller-manager": {Addr: "127.0.0.1", Port: ports.ControllerManagerPort, Path: "/healthz"},
 		"scheduler":          {Addr: "127.0.0.1", Port: ports.SchedulerPort, Path: "/healthz"},
 	}
 
 	for ix, machine := range s.storageFactory.Backends() {
-		etcdUrl, err := url.Parse(machine)
+		etcdUrl, err := url.Parse(machine.Server)
 		if err != nil {
 			glog.Errorf("Failed to parse etcd url for validation: %v", err)
 			continue
@@ -269,9 +270,16 @@ func (s componentStatusStorage) serversToValidate() map[string]componentstatus.S
 			port = 2379
 		}
 		// TODO: etcd health checking should be abstracted in the storage tier
-		serversToValidate[fmt.Sprintf("etcd-%d", ix)] = componentstatus.Server{
+		var cert tls.Certificate
+		if len(machine.CertFile) > 0 && len(machine.KeyFile) > 0 {
+			if cert, err = tls.LoadX509KeyPair(machine.CertFile, machine.KeyFile); err != nil {
+				glog.Errorf("Failed to get certificate: %s", err)
+			}
+		}
+		serversToValidate[fmt.Sprintf("etcd-%d", ix)] = &componentstatus.Server{
 			Addr:        addr,
 			EnableHTTPS: etcdUrl.Scheme == "https",
+			Cert:        &cert,
 			Port:        port,
 			Path:        "/health",
 			Validate:    etcdutil.EtcdHealthCheck,
