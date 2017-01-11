@@ -22,7 +22,7 @@ import (
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/kubernetes/pkg/apis/rbac"
-	"k8s.io/kubernetes/pkg/apis/rbac/validation"
+	rbacregistryvalidation "k8s.io/kubernetes/pkg/registry/rbac/validation"
 )
 
 type RoleToRuleMapper interface {
@@ -34,17 +34,17 @@ type RoleToRuleMapper interface {
 type SubjectAccessEvaluator struct {
 	superUser string
 
-	roleBindingLister        validation.RoleBindingLister
-	clusterRoleBindingLister validation.ClusterRoleBindingLister
+	roleBindingLister        rbacregistryvalidation.RoleBindingLister
+	clusterRoleBindingLister rbacregistryvalidation.ClusterRoleBindingLister
 	roleToRuleMapper         RoleToRuleMapper
 }
 
-func NewSubjectAccessEvaluator(roles validation.RoleGetter, roleBindings validation.RoleBindingLister, clusterRoles validation.ClusterRoleGetter, clusterRoleBindings validation.ClusterRoleBindingLister, superUser string) *SubjectAccessEvaluator {
+func NewSubjectAccessEvaluator(roles rbacregistryvalidation.RoleGetter, roleBindings rbacregistryvalidation.RoleBindingLister, clusterRoles rbacregistryvalidation.ClusterRoleGetter, clusterRoleBindings rbacregistryvalidation.ClusterRoleBindingLister, superUser string) *SubjectAccessEvaluator {
 	subjectLocator := &SubjectAccessEvaluator{
 		superUser:                superUser,
 		roleBindingLister:        roleBindings,
 		clusterRoleBindingLister: clusterRoleBindings,
-		roleToRuleMapper: validation.NewDefaultRuleResolver(
+		roleToRuleMapper: rbacregistryvalidation.NewDefaultRuleResolver(
 			roles, roleBindings, clusterRoles, clusterRoleBindings,
 		),
 	}

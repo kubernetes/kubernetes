@@ -30,7 +30,6 @@ import (
 	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/apis/rbac"
 	rbacapiv1alpha1 "k8s.io/kubernetes/pkg/apis/rbac/v1alpha1"
-	rbacvalidation "k8s.io/kubernetes/pkg/apis/rbac/validation"
 	rbacclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/rbac/internalversion"
 	"k8s.io/kubernetes/pkg/genericapiserver"
 	"k8s.io/kubernetes/pkg/registry/generic"
@@ -46,6 +45,7 @@ import (
 	"k8s.io/kubernetes/pkg/registry/rbac/rolebinding"
 	rolebindingetcd "k8s.io/kubernetes/pkg/registry/rbac/rolebinding/etcd"
 	rolebindingpolicybased "k8s.io/kubernetes/pkg/registry/rbac/rolebinding/policybased"
+	rbacregistryvalidation "k8s.io/kubernetes/pkg/registry/rbac/validation"
 	"k8s.io/kubernetes/plugin/pkg/auth/authorizer/rbac/bootstrappolicy"
 )
 
@@ -71,7 +71,7 @@ func (p RESTStorageProvider) v1alpha1Storage(apiResourceConfigSource genericapis
 
 	once := new(sync.Once)
 	var (
-		authorizationRuleResolver  rbacvalidation.AuthorizationRuleResolver
+		authorizationRuleResolver  rbacregistryvalidation.AuthorizationRuleResolver
 		rolesStorage               rest.StandardStorage
 		roleBindingsStorage        rest.StandardStorage
 		clusterRolesStorage        rest.StandardStorage
@@ -85,7 +85,7 @@ func (p RESTStorageProvider) v1alpha1Storage(apiResourceConfigSource genericapis
 			clusterRolesStorage = clusterroleetcd.NewREST(restOptionsGetter)
 			clusterRoleBindingsStorage = clusterrolebindingetcd.NewREST(restOptionsGetter)
 
-			authorizationRuleResolver = rbacvalidation.NewDefaultRuleResolver(
+			authorizationRuleResolver = rbacregistryvalidation.NewDefaultRuleResolver(
 				role.AuthorizerAdapter{Registry: role.NewRegistry(rolesStorage)},
 				rolebinding.AuthorizerAdapter{Registry: rolebinding.NewRegistry(roleBindingsStorage)},
 				clusterrole.AuthorizerAdapter{Registry: clusterrole.NewRegistry(clusterRolesStorage)},
