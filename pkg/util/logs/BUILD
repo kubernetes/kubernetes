@@ -12,9 +12,9 @@ go_library(
     srcs = ["logs.go"],
     tags = ["automanaged"],
     deps = [
-        "//pkg/util/wait:go_default_library",
         "//vendor:github.com/golang/glog",
         "//vendor:github.com/spf13/pflag",
+        "//vendor:k8s.io/apimachinery/pkg/util/wait",
     ],
 )
 

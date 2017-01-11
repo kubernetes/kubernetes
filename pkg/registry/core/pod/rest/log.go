@@ -19,6 +19,7 @@ package rest
 import (
 	"fmt"
 
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/rest"
@@ -28,7 +29,6 @@ import (
 	"k8s.io/kubernetes/pkg/registry/core/pod"
 	genericregistry "k8s.io/kubernetes/pkg/registry/generic/registry"
 	genericrest "k8s.io/kubernetes/pkg/registry/generic/rest"
-	"k8s.io/kubernetes/pkg/runtime"
 )
 
 // LogREST implements the log endpoint for a Pod

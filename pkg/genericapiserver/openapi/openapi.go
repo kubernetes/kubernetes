@@ -25,10 +25,10 @@ import (
 	"github.com/emicklei/go-restful"
 	"github.com/go-openapi/spec"
 
+	"k8s.io/apimachinery/pkg/genericapiserver/openapi/common"
+	"k8s.io/apimachinery/pkg/util/json"
 	genericmux "k8s.io/kubernetes/pkg/genericapiserver/mux"
-	"k8s.io/kubernetes/pkg/genericapiserver/openapi/common"
 	"k8s.io/kubernetes/pkg/util"
-	"k8s.io/kubernetes/pkg/util/json"
 )
 
 const (

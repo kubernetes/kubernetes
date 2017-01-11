@@ -22,12 +22,12 @@ import (
 
 	"github.com/golang/glog"
 
+	errorsutil "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/cache"
 	v1core "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/core/v1"
 	"k8s.io/kubernetes/pkg/client/retry"
-	errorsutil "k8s.io/kubernetes/pkg/util/errors"
 	hashutil "k8s.io/kubernetes/pkg/util/hash"
 )
 

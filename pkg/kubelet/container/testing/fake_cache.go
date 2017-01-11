@@ -19,8 +19,8 @@ package testing
 import (
 	"time"
 
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/kubelet/container"
-	"k8s.io/kubernetes/pkg/types"
 )
 
 type fakeCache struct {

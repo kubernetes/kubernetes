@@ -136,14 +136,15 @@ func (b *Builder) importBuildPackage(dir string) (*build.Package, error) {
 	// Remember it under the user-provided name.
 	glog.V(5).Infof("saving buildPackage %s", dir)
 	b.buildPackages[dir] = buildPkg
-	if dir != buildPkg.ImportPath {
+	canonicalPackage := canonicalizeImportPath(buildPkg.ImportPath)
+	if dir != string(canonicalPackage) {
 		// Since `dir` is not the canonical name, see if we knew it under another name.
-		if buildPkg, ok := b.buildPackages[buildPkg.ImportPath]; ok {
+		if buildPkg, ok := b.buildPackages[string(canonicalPackage)]; ok {
 			return buildPkg, nil
 		}
 		// Must be new, save it under the canonical name, too.
-		glog.V(5).Infof("saving buildPackage %s", buildPkg.ImportPath)
-		b.buildPackages[buildPkg.ImportPath] = buildPkg
+		glog.V(5).Infof("saving buildPackage %s", canonicalPackage)
+		b.buildPackages[string(canonicalPackage)] = buildPkg
 	}
 
 	return buildPkg, nil
@@ -223,7 +224,7 @@ func (b *Builder) AddDirRecursive(dir string) error {
 			rel := strings.TrimPrefix(path, prefix)
 			if rel != "" {
 				// Make a pkg path.
-				pkg := filepath.Join(b.buildPackages[dir].ImportPath, rel)
+				pkg := filepath.Join(string(canonicalizeImportPath(b.buildPackages[dir].ImportPath)), rel)
 
 				// Add it.
 				if _, err := b.importPackage(pkg, true); err != nil {
@@ -250,7 +251,7 @@ func (b *Builder) AddDirTo(dir string, u *types.Universe) error {
 	if _, err := b.importPackage(dir, true); err != nil {
 		return err
 	}
-	return b.findTypesIn(importPathString(b.buildPackages[dir].ImportPath), u)
+	return b.findTypesIn(canonicalizeImportPath(b.buildPackages[dir].ImportPath), u)
 }
 
 // The implementation of AddDir. A flag indicates whether this directory was
@@ -261,8 +262,9 @@ func (b *Builder) addDir(dir string, userRequested bool) error {
 	if err != nil {
 		return err
 	}
-	pkgPath := importPathString(buildPkg.ImportPath)
-	if dir != buildPkg.ImportPath {
+	canonicalPackage := canonicalizeImportPath(buildPkg.ImportPath)
+	pkgPath := canonicalPackage
+	if dir != string(canonicalPackage) {
 		glog.V(5).Infof("addDir %s, canonical path is %s", dir, pkgPath)
 	}
 
@@ -300,8 +302,9 @@ func (b *Builder) importPackage(dir string, userRequested bool) (*tc.Package, er
 
 	// Get the canonical path if we can.
 	if buildPkg := b.buildPackages[dir]; buildPkg != nil {
-		glog.V(5).Infof("importPackage %s, canonical path is %s", dir, buildPkg.ImportPath)
-		pkgPath = importPathString(buildPkg.ImportPath)
+		canonicalPackage := canonicalizeImportPath(buildPkg.ImportPath)
+		glog.V(5).Infof("importPackage %s, canonical path is %s", dir, canonicalPackage)
+		pkgPath = canonicalPackage
 	}
 
 	// If we have not seen this before, process it now.
@@ -318,8 +321,9 @@ func (b *Builder) importPackage(dir string, userRequested bool) (*tc.Package, er
 
 		// Get the canonical path now that it has been added.
 		if buildPkg := b.buildPackages[dir]; buildPkg != nil {
-			glog.V(5).Infof("importPackage %s, canonical path is %s", dir, buildPkg.ImportPath)
-			pkgPath = importPathString(buildPkg.ImportPath)
+			canonicalPackage := canonicalizeImportPath(buildPkg.ImportPath)
+			glog.V(5).Infof("importPackage %s, canonical path is %s", dir, canonicalPackage)
+			pkgPath = canonicalPackage
 		}
 	}
 
@@ -748,4 +752,14 @@ func (b *Builder) addVariable(u types.Universe, useName *types.Name, in *tc.Var)
 	out.Kind = types.DeclarationOf
 	out.Underlying = b.walkType(u, nil, in.Type())
 	return out
+}
+
+// canonicalizeImportPath takes an import path and returns the actual package.
+// It doesn't support nested vendoring.
+func canonicalizeImportPath(importPath string) importPathString {
+	if !strings.Contains(importPath, "/vendor/") {
+		return importPathString(importPath)
+	}
+
+	return importPathString(importPath[strings.Index(importPath, "/vendor/")+len("/vendor/"):])
 }

@@ -21,10 +21,10 @@ limitations under the License.
 package apps
 
 import (
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	conversion "k8s.io/apimachinery/pkg/conversion"
+	runtime "k8s.io/apimachinery/pkg/runtime"
 	api "k8s.io/kubernetes/pkg/api"
-	v1 "k8s.io/kubernetes/pkg/apis/meta/v1"
-	conversion "k8s.io/kubernetes/pkg/conversion"
-	runtime "k8s.io/kubernetes/pkg/runtime"
 	reflect "reflect"
 )
 
@@ -86,9 +86,10 @@ func DeepCopy_apps_StatefulSetSpec(in interface{}, out interface{}, c *conversio
 		*out = *in
 		if in.Selector != nil {
 			in, out := &in.Selector, &out.Selector
-			*out = new(v1.LabelSelector)
-			if err := v1.DeepCopy_v1_LabelSelector(*in, *out, c); err != nil {
+			if newVal, err := c.DeepCopy(*in); err != nil {
 				return err
+			} else {
+				*out = newVal.(*v1.LabelSelector)
 			}
 		}
 		if err := api.DeepCopy_api_PodTemplateSpec(&in.Template, &out.Template, c); err != nil {

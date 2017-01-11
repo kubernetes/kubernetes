@@ -21,7 +21,7 @@ import (
 	"reflect"
 	"sort"
 
-	"k8s.io/kubernetes/pkg/util/json"
+	"k8s.io/apimachinery/pkg/util/json"
 	forkedjson "k8s.io/kubernetes/third_party/forked/golang/json"
 
 	"github.com/davecgh/go-spew/spew"

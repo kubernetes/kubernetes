@@ -21,8 +21,8 @@ go_library(
         "//pkg/client/clientset_generated/clientset:go_default_library",
         "//pkg/kubelet/container:go_default_library",
         "//pkg/kubelet/types:go_default_library",
-        "//pkg/types:go_default_library",
         "//vendor:github.com/golang/glog",
+        "//vendor:k8s.io/apimachinery/pkg/types",
     ],
 )
 
@@ -39,7 +39,7 @@ go_test(
         "//pkg/kubelet/container:go_default_library",
         "//pkg/kubelet/pod/testing:go_default_library",
         "//pkg/kubelet/types:go_default_library",
-        "//pkg/types:go_default_library",
+        "//vendor:k8s.io/apimachinery/pkg/types",
     ],
 )
 

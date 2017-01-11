@@ -20,8 +20,8 @@ import (
 	"path"
 	"testing"
 
+	"k8s.io/apimachinery/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/apimachinery/registered"
 )
 
 func TestValidatesHostParameter(t *testing.T) {

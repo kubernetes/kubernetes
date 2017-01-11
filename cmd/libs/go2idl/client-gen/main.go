@@ -161,9 +161,9 @@ func main() {
 
 	dependencies := []string{
 		"k8s.io/kubernetes/pkg/fields",
-		"k8s.io/kubernetes/pkg/labels",
-		"k8s.io/kubernetes/pkg/watch",
-		"k8s.io/kubernetes/pkg/apimachinery/registered",
+		"k8s.io/apimachinery/pkg/labels",
+		"k8s.io/apimachinery/pkg/watch",
+		"k8s.io/apimachinery/pkg/apimachinery/registered",
 	}
 
 	if *test {

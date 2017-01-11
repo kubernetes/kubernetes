@@ -35,11 +35,11 @@ import (
 	certphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
 	kubeconfigphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubeconfig"
 
+	"k8s.io/apimachinery/pkg/runtime"
+	netutil "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/runtime"
-	netutil "k8s.io/kubernetes/pkg/util/net"
 )
 
 var (

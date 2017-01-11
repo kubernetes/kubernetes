@@ -14,7 +14,6 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//pkg/api/v1:go_default_library",
-        "//pkg/apimachinery/registered:go_default_library",
         "//pkg/client/clientset_generated/clientset:go_default_library",
         "//pkg/client/clientset_generated/clientset/typed/core/v1:go_default_library",
         "//pkg/client/record:go_default_library",
@@ -24,6 +23,7 @@ go_library(
         "//plugin/pkg/scheduler/factory:go_default_library",
         "//test/integration/framework:go_default_library",
         "//vendor:github.com/golang/glog",
+        "//vendor:k8s.io/apimachinery/pkg/apimachinery/registered",
     ],
 )
 

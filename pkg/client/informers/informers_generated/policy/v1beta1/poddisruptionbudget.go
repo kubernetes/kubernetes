@@ -19,14 +19,14 @@ limitations under the License.
 package v1beta1
 
 import (
+	runtime "k8s.io/apimachinery/pkg/runtime"
+	watch "k8s.io/apimachinery/pkg/watch"
 	v1 "k8s.io/kubernetes/pkg/api/v1"
 	policy_v1beta1 "k8s.io/kubernetes/pkg/apis/policy/v1beta1"
 	cache "k8s.io/kubernetes/pkg/client/cache"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	internalinterfaces "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalinterfaces"
 	v1beta1 "k8s.io/kubernetes/pkg/client/listers/policy/v1beta1"
-	runtime "k8s.io/kubernetes/pkg/runtime"
-	watch "k8s.io/kubernetes/pkg/watch"
 	time "time"
 )
 

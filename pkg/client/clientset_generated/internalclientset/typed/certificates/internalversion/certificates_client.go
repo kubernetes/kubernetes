@@ -17,8 +17,8 @@ limitations under the License.
 package internalversion
 
 import (
+	registered "k8s.io/apimachinery/pkg/apimachinery/registered"
 	api "k8s.io/kubernetes/pkg/api"
-	registered "k8s.io/kubernetes/pkg/apimachinery/registered"
 	restclient "k8s.io/kubernetes/pkg/client/restclient"
 )
 
@@ -27,7 +27,7 @@ type CertificatesInterface interface {
 	CertificateSigningRequestsGetter
 }
 
-// CertificatesClient is used to interact with features provided by the k8s.io/kubernetes/pkg/apimachinery/registered.Group group.
+// CertificatesClient is used to interact with features provided by the k8s.io/apimachinery/pkg/apimachinery/registered.Group group.
 type CertificatesClient struct {
 	restClient restclient.Interface
 }

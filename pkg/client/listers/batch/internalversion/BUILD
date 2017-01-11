@@ -21,9 +21,9 @@ go_library(
         "//pkg/api:go_default_library",
         "//pkg/api/errors:go_default_library",
         "//pkg/apis/batch:go_default_library",
-        "//pkg/apis/meta/v1:go_default_library",
         "//pkg/client/cache:go_default_library",
-        "//pkg/labels:go_default_library",
+        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor:k8s.io/apimachinery/pkg/labels",
     ],
 )
 
@@ -35,10 +35,10 @@ go_test(
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/apis/batch:go_default_library",
-        "//pkg/apis/meta/v1:go_default_library",
         "//pkg/client/cache:go_default_library",
-        "//pkg/labels:go_default_library",
-        "//pkg/util/sets:go_default_library",
+        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor:k8s.io/apimachinery/pkg/labels",
+        "//vendor:k8s.io/apimachinery/pkg/util/sets",
     ],
 )
 

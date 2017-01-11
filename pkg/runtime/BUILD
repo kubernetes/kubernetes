@@ -36,6 +36,7 @@ go_library(
         "//pkg/runtime/schema:go_default_library",
         "//pkg/util/errors:go_default_library",
         "//vendor:github.com/gogo/protobuf/proto",
+        "//vendor:k8s.io/apimachinery/pkg/conversion",
     ],
 )
 

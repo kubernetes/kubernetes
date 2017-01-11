@@ -16,14 +16,14 @@ go_library(
         "//pkg/api:go_default_library",
         "//pkg/api/rest:go_default_library",
         "//pkg/api/v1:go_default_library",
-        "//pkg/apis/meta/v1:go_default_library",
         "//pkg/genericapiserver/api/request:go_default_library",
         "//pkg/kubelet/client:go_default_library",
         "//pkg/registry/core/node:go_default_library",
         "//pkg/registry/core/node/rest:go_default_library",
         "//pkg/registry/generic:go_default_library",
         "//pkg/registry/generic/registry:go_default_library",
-        "//pkg/runtime:go_default_library",
+        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor:k8s.io/apimachinery/pkg/runtime",
     ],
 )
 
@@ -37,11 +37,11 @@ go_test(
         "//pkg/api/resource:go_default_library",
         "//pkg/fields:go_default_library",
         "//pkg/kubelet/client:go_default_library",
-        "//pkg/labels:go_default_library",
         "//pkg/registry/generic:go_default_library",
         "//pkg/registry/registrytest:go_default_library",
-        "//pkg/runtime:go_default_library",
         "//pkg/storage/etcd/testing:go_default_library",
+        "//vendor:k8s.io/apimachinery/pkg/labels",
+        "//vendor:k8s.io/apimachinery/pkg/runtime",
     ],
 )
 

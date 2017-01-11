@@ -23,11 +23,11 @@ import (
 
 	// TODO: Ideally we should create the necessary package structure in e.g.,
 	// pkg/conversion/test/... instead of importing pkg/api here.
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/apis/extensions"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/runtime"
 )
 
 func TestV1EncodeDecodeStatus(t *testing.T) {

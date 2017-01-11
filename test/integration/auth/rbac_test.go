@@ -30,11 +30,13 @@ import (
 
 	"github.com/golang/glog"
 
+	"k8s.io/apimachinery/pkg/apimachinery/registered"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	rbacapi "k8s.io/kubernetes/pkg/apis/rbac"
 	"k8s.io/kubernetes/pkg/auth/authenticator/bearertoken"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
@@ -50,8 +52,6 @@ import (
 	roleetcd "k8s.io/kubernetes/pkg/registry/rbac/role/etcd"
 	"k8s.io/kubernetes/pkg/registry/rbac/rolebinding"
 	rolebindingetcd "k8s.io/kubernetes/pkg/registry/rbac/rolebinding/etcd"
-	"k8s.io/kubernetes/pkg/runtime/schema"
-	"k8s.io/kubernetes/pkg/watch"
 	"k8s.io/kubernetes/plugin/pkg/auth/authenticator/token/anytoken"
 	"k8s.io/kubernetes/plugin/pkg/auth/authorizer/rbac"
 	"k8s.io/kubernetes/test/integration/framework"

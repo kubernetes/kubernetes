@@ -24,10 +24,10 @@ import (
 	etcd2client "github.com/coreos/etcd/client"
 	"github.com/coreos/etcd/pkg/transport"
 
+	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/kubernetes/pkg/storage"
 	"k8s.io/kubernetes/pkg/storage/etcd"
 	"k8s.io/kubernetes/pkg/storage/storagebackend"
-	utilnet "k8s.io/kubernetes/pkg/util/net"
 )
 
 func newETCD2Storage(c storagebackend.Config) (storage.Interface, DestroyFunc, error) {

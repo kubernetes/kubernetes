@@ -17,7 +17,7 @@ limitations under the License.
 package abac
 
 import (
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // Policy contains a single ABAC policy rule

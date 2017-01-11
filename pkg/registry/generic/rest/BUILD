@@ -20,14 +20,14 @@ go_library(
     deps = [
         "//pkg/api/errors:go_default_library",
         "//pkg/api/rest:go_default_library",
-        "//pkg/runtime/schema:go_default_library",
         "//pkg/util/config:go_default_library",
         "//pkg/util/httpstream:go_default_library",
-        "//pkg/util/net:go_default_library",
         "//pkg/util/proxy:go_default_library",
-        "//pkg/util/runtime:go_default_library",
         "//vendor:github.com/golang/glog",
         "//vendor:github.com/mxk/go-flowrate/flowrate",
+        "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
+        "//vendor:k8s.io/apimachinery/pkg/util/net",
+        "//vendor:k8s.io/apimachinery/pkg/util/runtime",
     ],
 )
 
@@ -45,11 +45,11 @@ go_test(
         "//pkg/api/errors:go_default_library",
         "//pkg/util/config:go_default_library",
         "//pkg/util/httpstream:go_default_library",
-        "//pkg/util/net:go_default_library",
         "//pkg/util/proxy:go_default_library",
         "//vendor:github.com/stretchr/testify/assert",
         "//vendor:github.com/stretchr/testify/require",
         "//vendor:golang.org/x/net/websocket",
+        "//vendor:k8s.io/apimachinery/pkg/util/net",
     ],
 )
 

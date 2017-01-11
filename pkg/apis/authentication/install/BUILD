@@ -15,7 +15,7 @@ go_library(
         "//pkg/apimachinery/announced:go_default_library",
         "//pkg/apis/authentication:go_default_library",
         "//pkg/apis/authentication/v1beta1:go_default_library",
-        "//pkg/util/sets:go_default_library",
+        "//vendor:k8s.io/apimachinery/pkg/util/sets",
     ],
 )
 

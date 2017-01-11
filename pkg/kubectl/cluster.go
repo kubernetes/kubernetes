@@ -19,9 +19,9 @@ package kubectl
 import (
 	"fmt"
 
+	"k8s.io/apimachinery/pkg/runtime"
 	federationapi "k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/runtime"
 )
 
 // ClusterGeneratorV1Beta1 supports stable generation of a

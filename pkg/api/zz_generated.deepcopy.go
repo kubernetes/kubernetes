@@ -21,12 +21,12 @@ limitations under the License.
 package api
 
 import (
-	v1 "k8s.io/kubernetes/pkg/apis/meta/v1"
-	conversion "k8s.io/kubernetes/pkg/conversion"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	conversion "k8s.io/apimachinery/pkg/conversion"
+	labels "k8s.io/apimachinery/pkg/labels"
+	runtime "k8s.io/apimachinery/pkg/runtime"
+	types "k8s.io/apimachinery/pkg/types"
 	fields "k8s.io/kubernetes/pkg/fields"
-	labels "k8s.io/kubernetes/pkg/labels"
-	runtime "k8s.io/kubernetes/pkg/runtime"
-	types "k8s.io/kubernetes/pkg/types"
 	reflect "reflect"
 )
 
@@ -1714,8 +1714,10 @@ func DeepCopy_api_ObjectMeta(in interface{}, out interface{}, c *conversion.Clon
 			in, out := &in.OwnerReferences, &out.OwnerReferences
 			*out = make([]v1.OwnerReference, len(*in))
 			for i := range *in {
-				if err := v1.DeepCopy_v1_OwnerReference(&(*in)[i], &(*out)[i], c); err != nil {
+				if newVal, err := c.DeepCopy(&(*in)[i]); err != nil {
 					return err
+				} else {
+					(*out)[i] = *newVal.(*v1.OwnerReference)
 				}
 			}
 		}
@@ -1802,9 +1804,10 @@ func DeepCopy_api_PersistentVolumeClaimSpec(in interface{}, out interface{}, c *
 		}
 		if in.Selector != nil {
 			in, out := &in.Selector, &out.Selector
-			*out = new(v1.LabelSelector)
-			if err := v1.DeepCopy_v1_LabelSelector(*in, *out, c); err != nil {
+			if newVal, err := c.DeepCopy(*in); err != nil {
 				return err
+			} else {
+				*out = newVal.(*v1.LabelSelector)
 			}
 		}
 		if err := DeepCopy_api_ResourceRequirements(&in.Resources, &out.Resources, c); err != nil {
@@ -2069,9 +2072,10 @@ func DeepCopy_api_PodAffinityTerm(in interface{}, out interface{}, c *conversion
 		*out = *in
 		if in.LabelSelector != nil {
 			in, out := &in.LabelSelector, &out.LabelSelector
-			*out = new(v1.LabelSelector)
-			if err := v1.DeepCopy_v1_LabelSelector(*in, *out, c); err != nil {
+			if newVal, err := c.DeepCopy(*in); err != nil {
 				return err
+			} else {
+				*out = newVal.(*v1.LabelSelector)
 			}
 		}
 		if in.Namespaces != nil {
@@ -2241,9 +2245,10 @@ func DeepCopy_api_PodSignature(in interface{}, out interface{}, c *conversion.Cl
 		*out = *in
 		if in.PodController != nil {
 			in, out := &in.PodController, &out.PodController
-			*out = new(v1.OwnerReference)
-			if err := v1.DeepCopy_v1_OwnerReference(*in, *out, c); err != nil {
+			if newVal, err := c.DeepCopy(*in); err != nil {
 				return err
+			} else {
+				*out = newVal.(*v1.OwnerReference)
 			}
 		}
 		return nil

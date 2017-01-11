@@ -23,7 +23,7 @@ go_library(
         "//pkg/apis/rbac:go_default_library",
         "//pkg/apis/rbac/v1alpha1:go_default_library",
         "//pkg/client/cache:go_default_library",
-        "//pkg/labels:go_default_library",
+        "//vendor:k8s.io/apimachinery/pkg/labels",
     ],
 )
 

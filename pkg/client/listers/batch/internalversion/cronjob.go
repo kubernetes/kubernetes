@@ -19,10 +19,10 @@ limitations under the License.
 package internalversion
 
 import (
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/kubernetes/pkg/api/errors"
 	batch "k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/client/cache"
-	"k8s.io/kubernetes/pkg/labels"
 )
 
 // CronJobLister helps list CronJobs.

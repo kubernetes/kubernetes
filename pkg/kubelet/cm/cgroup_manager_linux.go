@@ -28,7 +28,7 @@ import (
 	cgroupfs "github.com/opencontainers/runc/libcontainer/cgroups/fs"
 	cgroupsystemd "github.com/opencontainers/runc/libcontainer/cgroups/systemd"
 	libcontainerconfigs "github.com/opencontainers/runc/libcontainer/configs"
-	"k8s.io/kubernetes/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 // libcontainerCgroupManagerType defines how to interface with libcontainer

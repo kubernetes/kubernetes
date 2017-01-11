@@ -16,14 +16,14 @@ go_library(
         "//pkg/api/errors:go_default_library",
         "//pkg/api/resource:go_default_library",
         "//pkg/api/v1:go_default_library",
-        "//pkg/apis/meta/v1:go_default_library",
         "//pkg/client/clientset_generated/clientset/fake:go_default_library",
         "//pkg/client/clientset_generated/clientset/typed/core/v1:go_default_library",
-        "//pkg/runtime:go_default_library",
         "//pkg/util/clock:go_default_library",
         "//pkg/util/node:go_default_library",
-        "//pkg/util/sets:go_default_library",
-        "//pkg/watch:go_default_library",
+        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor:k8s.io/apimachinery/pkg/runtime",
+        "//vendor:k8s.io/apimachinery/pkg/util/sets",
+        "//vendor:k8s.io/apimachinery/pkg/watch",
     ],
 )
 

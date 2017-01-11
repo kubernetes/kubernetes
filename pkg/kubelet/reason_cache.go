@@ -21,8 +21,8 @@ import (
 	"sync"
 
 	"github.com/golang/groupcache/lru"
+	"k8s.io/apimachinery/pkg/types"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
-	"k8s.io/kubernetes/pkg/types"
 )
 
 // ReasonCache stores the failure reason of the latest container start

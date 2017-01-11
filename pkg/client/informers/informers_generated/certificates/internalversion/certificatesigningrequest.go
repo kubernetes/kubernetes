@@ -19,6 +19,8 @@ limitations under the License.
 package internalversion
 
 import (
+	runtime "k8s.io/apimachinery/pkg/runtime"
+	watch "k8s.io/apimachinery/pkg/watch"
 	api "k8s.io/kubernetes/pkg/api"
 	v1 "k8s.io/kubernetes/pkg/api/v1"
 	certificates "k8s.io/kubernetes/pkg/apis/certificates"
@@ -26,8 +28,6 @@ import (
 	internalclientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	internalinterfaces "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalinterfaces"
 	internalversion "k8s.io/kubernetes/pkg/client/listers/certificates/internalversion"
-	runtime "k8s.io/kubernetes/pkg/runtime"
-	watch "k8s.io/kubernetes/pkg/watch"
 	time "time"
 )
 

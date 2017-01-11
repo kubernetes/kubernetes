@@ -19,8 +19,8 @@ package util
 import (
 	"testing"
 
+	pkgruntime "k8s.io/apimachinery/pkg/runtime"
 	apiv1 "k8s.io/kubernetes/pkg/api/v1"
-	pkgruntime "k8s.io/kubernetes/pkg/runtime"
 
 	"github.com/stretchr/testify/assert"
 )

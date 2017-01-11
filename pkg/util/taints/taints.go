@@ -21,8 +21,8 @@ import (
 	"fmt"
 	"strings"
 
+	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/util/validation"
 )
 
 // ParseTaint parses a taint from a string. Taint must be off the format '<key>=<value>:<effect>'.

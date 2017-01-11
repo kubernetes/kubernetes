@@ -19,9 +19,9 @@ package v1
 import (
 	"sort"
 
+	"k8s.io/apimachinery/pkg/conversion"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
-	"k8s.io/kubernetes/pkg/conversion"
-	"k8s.io/kubernetes/pkg/runtime"
 )
 
 func addConversionFuncs(scheme *runtime.Scheme) error {

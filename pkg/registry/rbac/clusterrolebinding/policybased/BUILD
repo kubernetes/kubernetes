@@ -18,7 +18,7 @@ go_library(
         "//pkg/apis/rbac/validation:go_default_library",
         "//pkg/genericapiserver/api/request:go_default_library",
         "//pkg/registry/rbac:go_default_library",
-        "//pkg/runtime:go_default_library",
+        "//vendor:k8s.io/apimachinery/pkg/runtime",
         "//vendor:k8s.io/apiserver/pkg/authorization/authorizer",
     ],
 )

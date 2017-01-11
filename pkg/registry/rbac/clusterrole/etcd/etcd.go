@@ -17,11 +17,11 @@ limitations under the License.
 package etcd
 
 import (
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/apis/rbac"
 	"k8s.io/kubernetes/pkg/registry/generic"
 	genericregistry "k8s.io/kubernetes/pkg/registry/generic/registry"
 	"k8s.io/kubernetes/pkg/registry/rbac/clusterrole"
-	"k8s.io/kubernetes/pkg/runtime"
 )
 
 // REST implements a RESTStorage for ClusterRole against etcd

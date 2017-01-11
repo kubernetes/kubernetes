@@ -25,11 +25,11 @@ import (
 	"github.com/emicklei/go-restful"
 	"github.com/golang/glog"
 
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/api"
 	apierrors "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/genericapiserver/api/handlers/responsewriters"
-	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/runtime/schema"
 )
 
 // APIContainer is a restful container which in addition support registering

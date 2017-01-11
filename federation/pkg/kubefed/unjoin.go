@@ -21,6 +21,7 @@ import (
 	"io"
 	"net/url"
 
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	federationapi "k8s.io/kubernetes/federation/apis/federation"
 	"k8s.io/kubernetes/federation/pkg/kubefed/util"
 	"k8s.io/kubernetes/pkg/api"
@@ -28,7 +29,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
-	"k8s.io/kubernetes/pkg/runtime/schema"
 
 	"github.com/spf13/cobra"
 )

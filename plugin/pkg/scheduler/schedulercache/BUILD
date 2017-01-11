@@ -21,10 +21,10 @@ go_library(
         "//pkg/api/resource:go_default_library",
         "//pkg/api/v1:go_default_library",
         "//pkg/client/cache:go_default_library",
-        "//pkg/labels:go_default_library",
-        "//pkg/util/wait:go_default_library",
         "//plugin/pkg/scheduler/algorithm/priorities/util:go_default_library",
         "//vendor:github.com/golang/glog",
+        "//vendor:k8s.io/apimachinery/pkg/labels",
+        "//vendor:k8s.io/apimachinery/pkg/util/wait",
     ],
 )
 
@@ -36,8 +36,8 @@ go_test(
     deps = [
         "//pkg/api/resource:go_default_library",
         "//pkg/api/v1:go_default_library",
-        "//pkg/labels:go_default_library",
         "//plugin/pkg/scheduler/algorithm/priorities/util:go_default_library",
+        "//vendor:k8s.io/apimachinery/pkg/labels",
     ],
 )
 

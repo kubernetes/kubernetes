@@ -22,16 +22,16 @@ import (
 	"sync"
 	"testing"
 
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/labels"
-	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage"
 
 	"github.com/coreos/etcd/integration"
 	"golang.org/x/net/context"
-	"k8s.io/kubernetes/pkg/watch"
+	"k8s.io/apimachinery/pkg/watch"
 )
 
 func TestCreate(t *testing.T) {

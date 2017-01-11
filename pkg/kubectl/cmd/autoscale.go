@@ -20,11 +20,11 @@ import (
 	"fmt"
 	"io"
 
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
-	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 
 	"github.com/spf13/cobra"
 )

@@ -21,8 +21,8 @@ import (
 	"path/filepath"
 	"time"
 
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	rbacv1alpha1 "k8s.io/kubernetes/pkg/apis/rbac/v1alpha1"
-	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/serviceaccount"
 	"k8s.io/kubernetes/test/e2e/framework"
 

@@ -27,12 +27,12 @@ import (
 	authenticationclient "k8s.io/client-go/kubernetes/typed/authentication/v1beta1"
 	authorizationclient "k8s.io/client-go/kubernetes/typed/authorization/v1beta1"
 
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	apiserverauthenticator "k8s.io/kubernetes/pkg/genericapiserver/authenticator"
 	alwaysallowauthorizer "k8s.io/kubernetes/pkg/genericapiserver/authorizer"
 	apiserverauthorizer "k8s.io/kubernetes/pkg/genericapiserver/authorizer"
 	"k8s.io/kubernetes/pkg/kubelet/server"
-	"k8s.io/kubernetes/pkg/types"
 )
 
 func buildAuth(nodeName types.NodeName, client clientset.Interface, config componentconfig.KubeletConfiguration) (server.AuthInterface, error) {

@@ -33,17 +33,17 @@ go_test(
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/install:go_default_library",
-        "//pkg/api/meta:go_default_library",
         "//pkg/api/v1:go_default_library",
         "//pkg/apis/rbac:go_default_library",
         "//pkg/apis/rbac/install:go_default_library",
         "//pkg/apis/rbac/v1alpha1:go_default_library",
         "//pkg/apis/rbac/validation:go_default_library",
-        "//pkg/runtime:go_default_library",
-        "//pkg/util/diff:go_default_library",
-        "//pkg/util/sets:go_default_library",
         "//plugin/pkg/auth/authorizer/rbac/bootstrappolicy:go_default_library",
         "//vendor:github.com/ghodss/yaml",
+        "//vendor:k8s.io/apimachinery/pkg/api/meta",
+        "//vendor:k8s.io/apimachinery/pkg/runtime",
+        "//vendor:k8s.io/apimachinery/pkg/util/diff",
+        "//vendor:k8s.io/apimachinery/pkg/util/sets",
     ],
 )
 
@@ -53,8 +53,8 @@ go_test(
     library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
-        "//pkg/api/meta:go_default_library",
-        "//pkg/util/sets:go_default_library",
+        "//vendor:k8s.io/apimachinery/pkg/api/meta",
+        "//vendor:k8s.io/apimachinery/pkg/util/sets",
     ],
 )
 
