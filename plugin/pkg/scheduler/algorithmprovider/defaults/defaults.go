@@ -238,7 +238,7 @@ func GetEquivalencePod(pod *v1.Pod) interface{} {
 	// to be equivalent
 	if len(pod.OwnerReferences) != 0 {
 		for _, ref := range pod.OwnerReferences {
-			if *ref.Controller && isValidControllerKind(ref.Kind) {
+			if *ref.Controller {
 				equivalencePod.ControllerRef = ref
 				// a pod can only belongs to one controller
 				break
@@ -246,17 +246,6 @@ func GetEquivalencePod(pod *v1.Pod) interface{} {
 		}
 	}
 	return &equivalencePod
-}
-
-// isValidControllerKind checks if a given controller's kind can be applied to equivalence pod algorithm.
-func isValidControllerKind(kind string) bool {
-	switch kind {
-	// list of kinds that we cannot handle
-	case StatefulSetKind:
-		return false
-	default:
-		return true
-	}
 }
 
 // EquivalencePod is a group of pod attributes which can be reused as equivalence to schedule other pods.
