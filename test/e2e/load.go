@@ -133,15 +133,27 @@ var _ = framework.KubeDescribe("Load capacity", func() {
 		// The container will consume 1 cpu and 512mb of memory.
 		{podsPerNode: 3, image: "jess/stress", command: []string{"stress", "-c", "1", "-m", "2"}, kind: api.Kind("ReplicationController")},
 		{podsPerNode: 30, image: "gcr.io/google_containers/serve_hostname:v1.4", kind: api.Kind("ReplicationController")},
+		// Tests for other resource types
+		{podsPerNode: 30, image: "gcr.io/google_containers/serve_hostname:v1.4", kind: extensions.Kind("Deployment")},
+		{podsPerNode: 30, image: "gcr.io/google_containers/serve_hostname:v1.4", kind: batch.Kind("Job")},
+		// Test scheduling when daemons are preset
+		{podsPerNode: 30, image: "gcr.io/google_containers/serve_hostname:v1.4", kind: api.Kind("ReplicationController"), daemonsPerNode: 2},
+		// Test with secrets
+		{podsPerNode: 30, image: "gcr.io/google_containers/serve_hostname:v1.4", kind: extensions.Kind("Deployment"), secretsPerPod: 2},
 	}
 
 	for _, testArg := range loadTests {
 		feature := "ManualPerformance"
-		if testArg.podsPerNode == 30 && testArg.kind == api.Kind("ReplicationController") {
+		if testArg.podsPerNode == 30 && testArg.kind == api.Kind("ReplicationController") && testArg.daemonsPerNode == 0 && testArg.secretsPerPod == 0 {
 			feature = "Performance"
 		}
-		name := fmt.Sprintf("[Feature:%s] should be able to handle %v pods per node %v with %v secrets",
-			feature, testArg.podsPerNode, testArg.kind, testArg.secretsPerPod)
+		name := fmt.Sprintf("[Feature:%s] should be able to handle %v pods per node %v with %v secrets and %v daemons",
+			feature,
+			testArg.podsPerNode,
+			testArg.kind,
+			testArg.secretsPerPod,
+			testArg.daemonsPerNode,
+		)
 		itArg := testArg
 		itArg.services = os.Getenv("CREATE_SERVICES") == "true"
 
