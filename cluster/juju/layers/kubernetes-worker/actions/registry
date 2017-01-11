@@ -28,7 +28,7 @@ context = {}
 
 # These config options must be defined in the case of a creation
 param_error = False
-for param in ('tlscert', 'tlskey', 'domain'):
+for param in ('tlscert', 'tlskey', 'domain', 'htpasswd'):
     value = action_get(param)
     if not value and not deletion:
         key = "registry-create-parameter-{}".format(param)
@@ -48,7 +48,8 @@ kubectl = ['kubectl', '--kubeconfig=/srv/kubernetes/config']
 
 # Remove deployment if requested
 if deletion:
-    resources = ['svc/kube-registry', 'rc/kube-registry-v0', 'secrets/registry-tls-data']
+    resources = ['svc/kube-registry', 'rc/kube-registry-v0', 'secrets/registry-tls-data',
+                 'secrets/registry-auth-data']
 
     if action_get('ingress'):
         resources.append('ing/registry-ing')

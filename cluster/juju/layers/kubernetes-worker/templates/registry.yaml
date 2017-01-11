@@ -8,6 +8,14 @@ data:
   tls.key: {{ tlskey }}
 ---
 apiVersion: v1
+kind: Secret
+metadata:
+  name: registry-auth-data
+type: Opaque
+data:
+  htpasswd: {{ htpasswd }}
+---
+apiVersion: v1
 kind: ReplicationController
 metadata:
   name: kube-registry-v0
@@ -43,9 +51,15 @@ spec:
           value: :5000
         - name: REGISTRY_STORAGE_FILESYSTEM_ROOTDIRECTORY
           value: /var/lib/registry
+        - name: REGISTRY_AUTH_HTPASSWD_REALM
+          value: basic_realm
+        - name: REGISTRY_AUTH_HTPASSWD_PATH
+          value: /auth/htpasswd
         volumeMounts:
         - name: image-store
           mountPath: /var/lib/registry
+        - name: auth-dir
+          mountPath: /auth
         ports:
         - containerPort: 5000
           name: registry
@@ -54,6 +68,9 @@ spec:
       - name: image-store
         hostPath:
           path: /srv/registry
+      - name: auth-dir
+        secret:
+          secretName: registry-auth-data
 ---
 apiVersion: v1
 kind: Service
