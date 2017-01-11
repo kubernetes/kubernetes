@@ -17,6 +17,8 @@ limitations under the License.
 package api
 
 import (
+	"time"
+
 	"k8s.io/kubernetes/pkg/api/resource"
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/fields"
@@ -2147,6 +2149,55 @@ type ReplicationControllerList struct {
 	metav1.ListMeta
 
 	Items []ReplicationController
+}
+
+// DisruptionBudget is an object to define the max disruption that can be caused to a collection of pods
+type DisruptionBudget struct {
+	// Specification of the desired behavior of the DisruptionBudget.
+	Spec DisruptionBudgetSpec `json:"spec,omitempty"`
+	// Most recently observed status of the DisruptionBudget.
+	Status DisruptionBudgetStatus `json:"status,omitempty"`
+}
+
+// DisruptionBudgetSpec is a description of a DisruptionBudget.
+type DisruptionBudgetSpec struct {
+	// RateLimits is a list of rate limits on disruptions (preemption and other evictions) across the corresponding
+	// collection of pods, e.g. no more than one disruption per hour across the pods of a particular Service.
+	// If there are multiple entries in the list, all must be satisfied for a disruption to be allowed.
+	RateLimits   []RateLimit `json:"rateLimits,omitempty"`
+
+	MinInstances MinInstances `json:"minInstances,omitempty"`
+}
+
+type MinInstances struct {
+	// The minimum number of pods that must be available simultaneously.
+	// Value can be an absolute number (ex: 5) or a percentage of total pods(ex: 10%).
+	// Absolute number is calculated from percentage by rounding up.
+	MinAvailable intstr.IntOrString `json:"minAvailable"`
+	// Minimum number of seconds for which a newly created pod must be ready for it to be considered available.
+	// Defaults to 0 (pod will be considered available as soon as it is ready).
+	MinReadySeconds int `json:"minReadySeconds"`
+}
+
+// DisruptionBudgetStatus represents information about the status of a DisruptionBudget. Status may trail the actual
+// state of a system.
+type DisruptionBudgetStatus struct {
+	// Array of timestamps of recent disruptions corresponding to this DisruptionBudget.
+	// A timestamp is removed from the list when it is farther in the past than the maximum RateLimit.Duration.
+	DisruptionInfo []unversioned.Time `json:"disruptionInfo,omitempty"`
+	// Total number of available pods (ready for at least minReadySeconds) targeted by this disruption budget.
+	AvailableReplicas int `json:"availableReplicas,omitempty"`
+	// Total number of unavailable pods targeted by this disruption budget.
+	UnavailableReplicas int `json:"unavailableReplicas,omitempty"`
+}
+
+// RateLimit describes the rate limit on disruptions (preemption and other evictions) across the corresponding
+// collection of pods
+type RateLimit struct {
+	// NumAllowedDisruptionsPerDuration is the maximum number of disruptions are allowed during a period of time.
+	NumAllowedDisruptionsPerDuration int `json:"numAllowedDisruptionsPerDuration"`
+	// The time period over which NumAllowedDisruptionsPerDuration applies
+	Duration time.Duration `json:"duration"`
 }
 
 const (
