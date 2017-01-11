@@ -32,7 +32,7 @@ import (
 type StatefulSet struct {
 	metav1.TypeMeta
 	// +optional
-	api.ObjectMeta
+	metav1.ObjectMeta
 
 	// Spec defines the desired identities of pods in this set.
 	// +optional

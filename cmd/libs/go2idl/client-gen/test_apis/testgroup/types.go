@@ -25,7 +25,7 @@ import (
 
 type TestType struct {
 	metav1.TypeMeta
-	api.ObjectMeta
+	metav1.ObjectMeta
 	Status TestTypeStatus
 }
 

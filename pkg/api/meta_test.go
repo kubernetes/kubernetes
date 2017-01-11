@@ -29,7 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 )
 
-var _ meta.Object = &api.ObjectMeta{}
+var _ metav1.Object = &metav1.ObjectMeta{}
 
 func getObjectMetaAndOwnerReferences() (objectMeta api.ObjectMeta, metaOwnerReferences []metav1.OwnerReference) {
 	fuzz.New().NilChance(.5).NumElements(1, 5).Fuzz(&objectMeta)
@@ -86,7 +86,7 @@ func TestAccessorImplementations(t *testing.T) {
 					t.Errorf("%v (%v) does not implement runtime.Object", gv.WithKind(kind), knownType)
 				}
 				lm, isLM := obj.(meta.ListMetaAccessor)
-				om, isOM := obj.(meta.ObjectMetaAccessor)
+				om, isOM := obj.(metav1.ObjectMetaAccessor)
 				switch {
 				case isLM && isOM:
 					t.Errorf("%v (%v) implements ListMetaAccessor and ObjectMetaAccessor", gv.WithKind(kind), knownType)

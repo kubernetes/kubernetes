@@ -276,7 +276,7 @@ func (o *LabelOptions) RunLabel(f cmdutil.Factory, cmd *cobra.Command) error {
 	})
 }
 
-func validateNoOverwrites(accessor meta.Object, labels map[string]string) error {
+func validateNoOverwrites(accessor metav1.Object, labels map[string]string) error {
 	allErrs := []error{}
 	for key := range labels {
 		if value, found := accessor.GetLabels()[key]; found {
