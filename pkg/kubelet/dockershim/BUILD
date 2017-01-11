@@ -11,8 +11,10 @@ load(
 go_library(
     name = "go_default_library",
     srcs = [
+        "checkpoint_store.go",
         "convert.go",
         "doc.go",
+        "docker_checkpoint.go",
         "docker_container.go",
         "docker_image.go",
         "docker_sandbox.go",
@@ -49,13 +51,16 @@ go_library(
         "//vendor:github.com/docker/engine-api/types/versions",
         "//vendor:github.com/docker/go-connections/nat",
         "//vendor:github.com/golang/glog",
+        "//vendor:k8s.io/apimachinery/pkg/util/errors",
     ],
 )
 
 go_test(
     name = "go_default_test",
     srcs = [
+        "checkpoint_store_test.go",
         "convert_test.go",
+        "docker_checkpoint_test.go",
         "docker_container_test.go",
         "docker_image_test.go",
         "docker_sandbox_test.go",
