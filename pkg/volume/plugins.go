@@ -107,8 +107,8 @@ type VolumePlugin interface {
 
 	// ConstructVolumeSpecFromName constructs a volume spec based on the given volume
 	// name only. The spec may have incomplete information due to limited
-	// information from input. This function is used by volume manager to reconstruct
-	// volume spec by reading the volume directories from disk
+	// information from input. This function is used by the attach/detach controller to
+	// eventually detach volumes after crash recovery.
 	ConstructVolumeSpecFromName(volumeName string) (*Spec, error)
 }
 
