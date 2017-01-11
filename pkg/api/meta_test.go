@@ -28,44 +28,9 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/api"
-	genericapirequest "k8s.io/kubernetes/pkg/genericapiserver/api/request"
-	"k8s.io/kubernetes/pkg/util/uuid"
 )
 
 var _ meta.Object = &api.ObjectMeta{}
-
-// TestFillObjectMetaSystemFields validates that system populated fields are set on an object
-func TestFillObjectMetaSystemFields(t *testing.T) {
-	ctx := genericapirequest.NewDefaultContext()
-	resource := api.ObjectMeta{}
-	api.FillObjectMetaSystemFields(ctx, &resource)
-	if resource.CreationTimestamp.Time.IsZero() {
-		t.Errorf("resource.CreationTimestamp is zero")
-	} else if len(resource.UID) == 0 {
-		t.Errorf("resource.UID missing")
-	}
-	// verify we can inject a UID
-	uid := uuid.NewUUID()
-	ctx = genericapirequest.WithUID(ctx, uid)
-	resource = api.ObjectMeta{}
-	api.FillObjectMetaSystemFields(ctx, &resource)
-	if resource.UID != uid {
-		t.Errorf("resource.UID expected: %v, actual: %v", uid, resource.UID)
-	}
-}
-
-// TestHasObjectMetaSystemFieldValues validates that true is returned if and only if all fields are populated
-func TestHasObjectMetaSystemFieldValues(t *testing.T) {
-	ctx := genericapirequest.NewDefaultContext()
-	resource := api.ObjectMeta{}
-	if api.HasObjectMetaSystemFieldValues(&resource) {
-		t.Errorf("the resource does not have all fields yet populated, but incorrectly reports it does")
-	}
-	api.FillObjectMetaSystemFields(ctx, &resource)
-	if !api.HasObjectMetaSystemFieldValues(&resource) {
-		t.Errorf("the resource does have all fields populated, but incorrectly reports it does not")
-	}
-}
 
 func getObjectMetaAndOwnerReferences() (objectMeta api.ObjectMeta, metaOwnerReferences []metav1.OwnerReference) {
 	fuzz.New().NilChance(.5).NumElements(1, 5).Fuzz(&objectMeta)
