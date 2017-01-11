@@ -55,6 +55,7 @@ go_test(
         "//pkg/apis/extensions/v1beta1:go_default_library",
         "//pkg/apis/meta/v1:go_default_library",
         "//pkg/runtime:go_default_library",
+        "//pkg/util:go_default_library",
         "//pkg/util/intstr:go_default_library",
     ],
 )
