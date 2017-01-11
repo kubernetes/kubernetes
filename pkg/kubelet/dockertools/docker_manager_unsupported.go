@@ -22,10 +22,14 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 
 	dockertypes "github.com/docker/engine-api/types"
+	dockercontainer "github.com/docker/engine-api/types/container"
+
+	"k8s.io/kubernetes/pkg/api/v1"
+	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
 
 // These two functions are OS specific (for now at least)
-func updateHostConfig(config *dockercontainer.HostConfig) {
+func updateHostConfig(hc *dockercontainer.HostConfig, opts *kubecontainer.RunContainerOptions) {
 }
 
 func DefaultMemorySwap() int64 {
