@@ -83,4 +83,7 @@ func (s *EtcdOptions) AddFlags(fs *pflag.FlagSet) {
 
 	fs.BoolVar(&s.StorageConfig.Quorum, "etcd-quorum-read", s.StorageConfig.Quorum,
 		"If true, enable quorum read.")
+
+	fs.BoolVar(&s.StorageConfig.EnableCURLDebug, "enable-curl-debug", s.StorageConfig.EnableCURLDebug,
+		"Enable cURL debug info to the stderr.")
 }

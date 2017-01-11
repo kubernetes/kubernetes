@@ -30,6 +30,7 @@ import (
 	"strings"
 	"time"
 
+	etcdclient "github.com/coreos/etcd/client"
 	"github.com/golang/glog"
 	"github.com/pborman/uuid"
 	"github.com/spf13/cobra"
@@ -183,6 +184,10 @@ func Run(s *options.ServerRunOptions) error {
 		if s.Etcd.StorageConfig.DeserializationCacheSize < 1000 {
 			s.Etcd.StorageConfig.DeserializationCacheSize = 1000
 		}
+	}
+	
+	if s.Etcd.StorageConfig.EnableCURLDebug {
+		etcdclient.EnablecURLDebug()
 	}
 
 	storageGroupsToEncodingVersion, err := s.GenericServerRunOptions.StorageGroupsToEncodingVersion()

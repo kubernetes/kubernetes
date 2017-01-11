@@ -44,4 +44,6 @@ type Config struct {
 	DeserializationCacheSize int
 
 	Codec runtime.Codec
+	// enable the curl debug info if is true
+	EnableCURLDebug bool
 }
