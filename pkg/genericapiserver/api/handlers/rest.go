@@ -451,7 +451,7 @@ func (c *namedCreaterAdapter) Create(ctx request.Context, name string, obj runti
 
 // PatchResource returns a function that will handle a resource patch
 // TODO: Eventually PatchResource should just use GuaranteedUpdate and this routine should be a bit cleaner
-func PatchResource(r rest.Patcher, scope RequestScope, typer runtime.ObjectTyper, admit admission.Interface, converter runtime.ObjectConvertor) restful.RouteFunction {
+func PatchResource(r rest.Patcher, scope RequestScope, admit admission.Interface, converter runtime.ObjectConvertor) restful.RouteFunction {
 	return func(req *restful.Request, res *restful.Response) {
 		w := res.ResponseWriter
 
