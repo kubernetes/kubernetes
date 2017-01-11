@@ -555,6 +555,7 @@ function write-master-env {
   fi
 
   build-kube-env true "${KUBE_TEMP}/master-kube-env.yaml"
+  build-kube-master-certs "${KUBE_TEMP}/kube-master-certs.yaml"
 }
 
 function write-node-env {
@@ -563,6 +564,16 @@ function write-node-env {
   fi
 
   build-kube-env false "${KUBE_TEMP}/node-kube-env.yaml"
+}
+
+function build-kube-master-certs {
+  local file=$1
+  rm -f ${file}
+  cat >$file <<EOF
+KUBEAPISERVER_CERT: $(yaml-quote ${KUBEAPISERVER_CERT_BASE64:-})
+KUBEAPISERVER_KEY: $(yaml-quote ${KUBEAPISERVER_KEY_BASE64:-})
+KUBELET_AUTH_CA_CERT: $(yaml-quote ${KUBELET_AUTH_CA_CERT_BASE64:-})
+EOF
 }
 
 # $1: if 'true', we're building a master yaml, else a node
@@ -777,6 +788,7 @@ EOF
 KUBERNETES_MASTER: $(yaml-quote "false")
 ZONE: $(yaml-quote ${ZONE})
 EXTRA_DOCKER_OPTS: $(yaml-quote ${EXTRA_DOCKER_OPTS:-})
+KUBELET_AUTH_CA_CERT: $(yaml-quote ${KUBELET_AUTH_CA_CERT_BASE64:-})
 EOF
     if [ -n "${KUBEPROXY_TEST_ARGS:-}" ]; then
       cat >>$file <<EOF
@@ -943,6 +955,9 @@ function create-certs {
   KUBELET_KEY_BASE64=$(cat "${CERT_DIR}/pki/private/kubelet.key" | base64 | tr -d '\r\n')
   KUBECFG_CERT_BASE64=$(cat "${CERT_DIR}/pki/issued/kubecfg.crt" | base64 | tr -d '\r\n')
   KUBECFG_KEY_BASE64=$(cat "${CERT_DIR}/pki/private/kubecfg.key" | base64 | tr -d '\r\n')
+  KUBELET_AUTH_CA_CERT_BASE64=$(cat "${KUBE_TEMP}/easy-rsa-master/kubelet/pki/ca.crt" | base64 | tr -d '\r\n')
+  KUBEAPISERVER_CERT_BASE64=$(cat "${KUBE_TEMP}/easy-rsa-master/kubelet/pki/issued/kube-apiserver.crt" | base64 | tr -d '\r\n')
+  KUBEAPISERVER_KEY_BASE64=$(cat "${KUBE_TEMP}/easy-rsa-master/kubelet/pki/private/kube-apiserver.key" | base64 | tr -d '\r\n')
 }
 
 # Runs the easy RSA commands to generate certificate files.
@@ -962,6 +977,8 @@ function generate-certs {
     cd "${KUBE_TEMP}"
     curl -L -O --connect-timeout 20 --retry 6 --retry-delay 2 https://storage.googleapis.com/kubernetes-release/easy-rsa/easy-rsa.tar.gz
     tar xzf easy-rsa.tar.gz
+    mkdir easy-rsa-master/kubelet
+    cp -r easy-rsa-master/easyrsa3/* easy-rsa-master/kubelet
     cd easy-rsa-master/easyrsa3
     ./easyrsa init-pki
     # this puts the cert into pki/ca.crt and the key into pki/private/ca.key
@@ -978,7 +995,11 @@ function generate-certs {
     mv "kubelet.pem" "pki/issued/kubelet.crt"
     rm -f "kubelet.csr"
 
-    ./easyrsa build-client-full kubecfg nopass) &>${cert_create_debug_output} || {
+    ./easyrsa build-client-full kubecfg nopass
+    cd ../kubelet
+    ./easyrsa init-pki
+    ./easyrsa --batch "--req-cn=kubelet@$(date +%s)" build-ca nopass
+    ./easyrsa build-client-full kube-apiserver nopass) &>${cert_create_debug_output} || {
     # If there was an error in the subshell, just die.
     # TODO(roberthbailey): add better error handling here
     cat "${cert_create_debug_output}" >&2

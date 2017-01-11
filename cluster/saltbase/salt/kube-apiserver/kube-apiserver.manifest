@@ -82,6 +82,8 @@
 
 {% set cert_file = "--tls-cert-file=/srv/kubernetes/server.cert" -%}
 {% set key_file = "--tls-private-key-file=/srv/kubernetes/server.key" -%}
+{% set kubelet_cert_file = "--kubelet-client-certificate=/srv/kubernetes/kubeapiserver.cert" -%}
+{% set kubelet_key_file = "--kubelet-client-key=/srv/kubernetes/kubeapiserver.key" -%}
 {% set client_ca_file = "" -%}
 
 {% set secure_port = "6443" -%}
@@ -169,7 +171,7 @@
 {% endif -%}
 
 {% set params = address + " " + storage_backend + " " + etcd_servers + " " + etcd_servers_overrides + " " + cloud_provider + " " + cloud_config + " " + runtime_config + " " + feature_gates + " " + admission_control + " " + max_requests_inflight + " " + target_ram_mb + " " + service_cluster_ip_range + " " + client_ca_file + basic_auth_file + " " + min_request_timeout + " " + enable_garbage_collector + " " + etcd_quorum_read -%}
-{% set params = params + " " + cert_file + " " + key_file + " --secure-port=" + secure_port + token_auth_file + " " + bind_address + " " + log_level + " " + advertise_address  + " " + proxy_ssh_options + authz_mode + abac_policy_file + webhook_authentication_config + webhook_authorization_config + image_review_config -%}
+{% set params = params + " " + cert_file + " " + key_file + " " + kubelet_cert_file + " " + kubelet_key_file + " --secure-port=" + secure_port + token_auth_file + " " + bind_address + " " + log_level + " " + advertise_address  + " " + proxy_ssh_options + authz_mode + abac_policy_file + webhook_authentication_config + webhook_authorization_config + image_review_config -%}
 
 # test_args has to be kept at the end, so they'll overwrite any prior configuration
 {% if pillar['apiserver_test_args'] is defined -%}
