@@ -369,6 +369,10 @@ func (t *thirdPartyResourceDataDecoder) Decode(data []byte, gvk *unversioned.Gro
 		}
 		return o, outGVK, nil
 	default:
+		if gvk != nil && registered.IsThirdPartyAPIGroupVersion(gvk.GroupVersion()) {
+			// delegate won't recognize a thirdparty group version
+			gvk = nil
+		}
 		return t.delegate.Decode(data, gvk, into)
 	}
 
