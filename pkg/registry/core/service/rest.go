@@ -381,7 +381,7 @@ func (rs *REST) Update(ctx genericapirequest.Context, name string, objInfo rest.
 	}
 
 	service := obj.(*api.Service)
-	if !api.ValidNamespace(ctx, &service.ObjectMeta) {
+	if !rest.ValidNamespace(ctx, &service.ObjectMeta) {
 		return nil, false, errors.NewConflict(api.Resource("services"), service.Namespace, fmt.Errorf("Service.Namespace does not match the provided context"))
 	}
 
