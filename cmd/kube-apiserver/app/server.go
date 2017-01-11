@@ -61,6 +61,7 @@ import (
 	"k8s.io/kubernetes/pkg/master/tunneler"
 	"k8s.io/kubernetes/pkg/registry/cachesize"
 	"k8s.io/kubernetes/pkg/version"
+	"k8s.io/kubernetes/cmd/kube-apiserver/app/preflight"
 )
 
 // NewAPIServerCommand creates a *cobra.Command object with default parameters
@@ -114,6 +115,9 @@ func Run(s *options.ServerRunOptions) error {
 	}
 	if err = s.Authentication.Apply(genericConfig); err != nil {
 		return fmt.Errorf("failed to configure authentication: %s", err)
+	}
+	if err := preflight.RunApiserverChecks(s); err != nil {
+		return fmt.Errorf("error starting apiserver: %v\n", err)
 	}
 
 	capabilities.Initialize(capabilities.Capabilities{
