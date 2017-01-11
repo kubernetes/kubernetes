@@ -19,7 +19,7 @@ IMAGE = fluentd-elasticsearch
 TAG = 1.20
 
 build:
-	docker build -t $(PREFIX)/$(IMAGE):$(TAG) .
+	docker build --pull -t $(PREFIX)/$(IMAGE):$(TAG) .
 
 push:
 	gcloud docker --server=gcr.io -- push $(PREFIX)/$(IMAGE):$(TAG)

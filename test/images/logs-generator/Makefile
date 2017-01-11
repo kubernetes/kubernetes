@@ -23,7 +23,7 @@ binary:
 	go build -a --ldflags '-w' -o logs-generator .
 
 container:
-	docker build -t $(PREFIX)/logs-generator:$(TAG) .
+	docker build --pull -t $(PREFIX)/logs-generator:$(TAG) .
 
 push:
 	gcloud docker -- push $(PREFIX)/logs-generator:$(TAG)

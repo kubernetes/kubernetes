@@ -335,7 +335,7 @@ function push-federation-images {
         # TODO(madhusudancs): Remove this code when the new turn up mechanism work
         # is merged.
         kube::log::status "Building docker image ${docker_image_tag} from the binary"
-        docker build -q -t "${docker_image_tag}" ${docker_build_path} >/dev/null
+        docker build --pull -q -t "${docker_image_tag}" ${docker_build_path} >/dev/null
 
         rm -rf ${docker_build_path}
 

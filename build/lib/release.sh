@@ -295,7 +295,7 @@ function kube::release::create_docker_images_for_server() {
           local docker_image_tag=gcr.io/google_containers/${binary_name}-${arch}:${md5_sum}
         fi
 
-        "${DOCKER[@]}" build -q -t "${docker_image_tag}" ${docker_build_path} >/dev/null
+        "${DOCKER[@]}" build --pull -q -t "${docker_image_tag}" ${docker_build_path} >/dev/null
         "${DOCKER[@]}" save ${docker_image_tag} > ${binary_dir}/${binary_name}.tar
         echo $md5_sum > ${binary_dir}/${binary_name}.docker_tag
 
