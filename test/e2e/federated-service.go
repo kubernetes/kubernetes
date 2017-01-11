@@ -21,11 +21,15 @@ import (
 	"os"
 	"reflect"
 	"strconv"
+	"strings"
 	"time"
 
+	fedclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/v1"
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
+	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
@@ -116,28 +120,29 @@ var _ = framework.KubeDescribe("[Feature:Federation]", func() {
 				waitForServiceShardsOrFail(nsName, service, clusters)
 			})
 
-			It("should not be deleted from underlying clusters when it is deleted", func() {
+			It("should be deleted from underlying clusters when OrphanDependents is false", func() {
 				framework.SkipUnlessFederated(f.ClientSet)
-				nsName = f.FederationNamespace.Name
-				service = createServiceOrFail(f.FederationClientset_1_5, nsName, FederatedServiceName)
-				By(fmt.Sprintf("Successfully created federated service %q in namespace %q. Waiting for shards to appear in underlying clusters", service.Name, nsName))
+				nsName := f.FederationNamespace.Name
+				orphanDependents := false
+				verifyCascadingDeletionForService(f.FederationClientset_1_5, clusters, &orphanDependents, nsName)
+				By(fmt.Sprintf("Verified that services were deleted from underlying clusters"))
+			})
 
-				waitForServiceShardsOrFail(nsName, service, clusters)
+			It("should not be deleted from underlying clusters when OrphanDependents is true", func() {
+				framework.SkipUnlessFederated(f.ClientSet)
+				nsName := f.FederationNamespace.Name
+				orphanDependents := true
+				verifyCascadingDeletionForService(f.FederationClientset_1_5, clusters, &orphanDependents, nsName)
+				By(fmt.Sprintf("Verified that services were not deleted from underlying clusters"))
+			})
 
-				By(fmt.Sprintf("Deleting service %s", service.Name))
-				err := f.FederationClientset_1_5.Services(nsName).Delete(service.Name, &v1.DeleteOptions{})
-				framework.ExpectNoError(err, "Error deleting service %q in namespace %q", service.Name, service.Namespace)
-				By(fmt.Sprintf("Deletion of service %q in namespace %q succeeded.", service.Name, nsName))
-				By(fmt.Sprintf("Verifying that services in underlying clusters are not deleted"))
-				for clusterName, clusterClientset := range clusters {
-					_, err := clusterClientset.Core().Services(service.Namespace).Get(service.Name, metav1.GetOptions{})
-					if err != nil {
-						framework.Failf("Unexpected error in fetching service %s in cluster %s, %s", service.Name, clusterName, err)
-					}
-				}
+			It("should not be deleted from underlying clusters when OrphanDependents is nil", func() {
+				framework.SkipUnlessFederated(f.ClientSet)
+				nsName := f.FederationNamespace.Name
+				verifyCascadingDeletionForService(f.FederationClientset_1_5, clusters, nil, nsName)
+				By(fmt.Sprintf("Verified that services were not deleted from underlying clusters"))
 			})
 		})
-
 		var _ = Describe("DNS", func() {
 
 			var (
@@ -211,7 +216,7 @@ var _ = framework.KubeDescribe("[Feature:Federation]", func() {
 				deleteBackendPodsOrFail(clusters, nsName)
 
 				if service != nil {
-					deleteServiceOrFail(f.FederationClientset_1_5, nsName, service.Name)
+					deleteServiceOrFail(f.FederationClientset_1_5, nsName, service.Name, nil)
 					service = nil
 				} else {
 					By("No service to delete.  Service is nil")
@@ -307,6 +312,48 @@ var _ = framework.KubeDescribe("[Feature:Federation]", func() {
 		})
 	})
 })
+
+// verifyCascadingDeletionForService verifies that services are deleted from
+// underlying clusters when orphan dependents is false and they are not
+// deleted when orphan dependents is true.
+func verifyCascadingDeletionForService(clientset *fedclientset.Clientset, clusters map[string]*cluster, orphanDependents *bool, nsName string) {
+	service := createServiceOrFail(clientset, nsName, FederatedServiceName)
+	serviceName := service.Name
+	// Check subclusters if the service was created there.
+	By(fmt.Sprintf("Waiting for service %s to be created in all underlying clusters", serviceName))
+	err := wait.Poll(5*time.Second, 2*time.Minute, func() (bool, error) {
+		for _, cluster := range clusters {
+			_, err := cluster.Core().Services(nsName).Get(serviceName, metav1.GetOptions{})
+			if err != nil {
+				if !errors.IsNotFound(err) {
+					return false, err
+				}
+				return false, nil
+			}
+		}
+		return true, nil
+	})
+	framework.ExpectNoError(err, "Not all services created")
+
+	By(fmt.Sprintf("Deleting service %s", serviceName))
+	deleteServiceOrFail(clientset, nsName, serviceName, orphanDependents)
+
+	By(fmt.Sprintf("Verifying services %s in underlying clusters", serviceName))
+	errMessages := []string{}
+	// service should be present in underlying clusters unless orphanDependents is false.
+	shouldExist := orphanDependents == nil || *orphanDependents == true
+	for clusterName, clusterClientset := range clusters {
+		_, err := clusterClientset.Core().Services(nsName).Get(serviceName, metav1.GetOptions{})
+		if shouldExist && errors.IsNotFound(err) {
+			errMessages = append(errMessages, fmt.Sprintf("unexpected NotFound error for service %s in cluster %s, expected service to exist", serviceName, clusterName))
+		} else if !shouldExist && !errors.IsNotFound(err) {
+			errMessages = append(errMessages, fmt.Sprintf("expected NotFound error for service %s in cluster %s, got error: %v", serviceName, clusterName, err))
+		}
+	}
+	if len(errMessages) != 0 {
+		framework.Failf("%s", strings.Join(errMessages, "; "))
+	}
+}
 
 /*
    equivalent returns true if the two services are equivalent.  Fields which are expected to differ between
