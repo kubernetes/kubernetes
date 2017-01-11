@@ -92,4 +92,6 @@ func TestValidOpenAPISpec(t *testing.T) {
 			t.Logf("Open API spec on root has some warnings : %v", warns)
 		}
 	}
+        // Intentionally failing test. WIP.
+        assert.Fail("ZZZZZZZZ: FAILED.")
 }
