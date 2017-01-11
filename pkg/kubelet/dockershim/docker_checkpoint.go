@@ -19,14 +19,18 @@ package dockershim
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/golang/glog"
 	"hash/fnv"
+	"path/filepath"
+
+	"github.com/golang/glog"
 	hashutil "k8s.io/kubernetes/pkg/util/hash"
 )
 
 const (
+	// dockershimRootDir is the root directory for dockershim
+	dockershimRootDir = "/var/lib/dockershim"
 	// default directory to store pod sandbox checkpoint files
-	sandboxCheckpointDir = "/var/lib/dockershim/sandbox"
+	sandboxCheckpointDir = "sandbox"
 	protocolTCP          = Protocol("tcp")
 	protocolUDP          = Protocol("udp")
 	schemaVersion        = "v1"
@@ -84,7 +88,7 @@ type PersistentCheckpointHandler struct {
 }
 
 func NewPersistentCheckpointHandler() CheckpointHandler {
-	return &PersistentCheckpointHandler{store: &FileStore{path: sandboxCheckpointDir}}
+	return &PersistentCheckpointHandler{store: &FileStore{path: filepath.Join(dockershimRootDir, sandboxCheckpointDir)}}
 }
 
 func (handler *PersistentCheckpointHandler) CreateCheckpoint(podSandboxID string, checkpoint *PodSandboxCheckpoint) error {
@@ -105,7 +109,7 @@ func (handler *PersistentCheckpointHandler) GetCheckpoint(podSandboxID string) (
 	//TODO: unmarhsal into a struct with just Version, check version, unmarshal into versioned type.
 	err = json.Unmarshal(blob, &checkpoint)
 	if err != nil {
-		glog.Errorf("Failed to unmarshal checkpoint %q: %v", podSandboxID, err)
+		glog.Errorf("Failed to unmarshal checkpoint %q. Checkpoint content: %q. ErrMsg: %v", podSandboxID, string(blob), err)
 		return &checkpoint, CorruptCheckpointError
 	}
 	if checkpoint.CheckSum != calculateChecksum(checkpoint) {

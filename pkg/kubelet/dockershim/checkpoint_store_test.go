@@ -25,10 +25,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-const (
-	testPath = "/tmp/testFileStore"
-)
-
 func TestFileStore(t *testing.T) {
 	path, err := ioutil.TempDir("", "FileStore")
 	assert.NoError(t, err)
