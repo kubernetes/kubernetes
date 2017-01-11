@@ -45,7 +45,7 @@ const (
 	replaceDirective = "replace"
 	mergeDirective   = "merge"
 
-	DeleteFromPrimitiveListDirectivePrefix = "$deleteFromPrimitiveList"
+	deleteFromPrimitiveListDirectivePrefix = "$deleteFromPrimitiveList"
 )
 
 // IsPreconditionFailed returns true if the provided error indicates
@@ -252,18 +252,18 @@ func diffMaps(original, modified map[string]interface{}, t reflect.Type, ignoreC
 			}
 
 			if fieldPatchStrategy == mergeDirective {
-				patchList, deletionList, err := diffLists(originalValueTyped, modifiedValueTyped, fieldType.Elem(), fieldPatchMergeKey, ignoreChangesAndAdditions, ignoreDeletions)
+				addList, deletionList, err := diffLists(originalValueTyped, modifiedValueTyped, fieldType.Elem(), fieldPatchMergeKey, ignoreChangesAndAdditions, ignoreDeletions)
 				if err != nil {
 					return nil, err
 				}
 
-				if len(patchList) > 0 {
-					patch[key] = patchList
+				if len(addList) > 0 {
+					patch[key] = addList
 				}
 
 				// generate a parallel list for deletion
-				if !ignoreDeletions && deletionList != nil && len(deletionList) > 0 {
-					parallelDeletionListKey := fmt.Sprintf("%v/%v", DeleteFromPrimitiveListDirectivePrefix, key)
+				if !ignoreDeletions && len(deletionList) > 0 {
+					parallelDeletionListKey := fmt.Sprintf("%s/%s", deleteFromPrimitiveListDirectivePrefix, key)
 					patch[parallelDeletionListKey] = deletionList
 				}
 
@@ -293,14 +293,16 @@ func diffMaps(original, modified map[string]interface{}, t reflect.Type, ignoreC
 }
 
 // Returns a (recursive) strategic merge patch and a parallel deletion list if necessary.
-// Right now only list of primitives with merge strategy will generate a parallel deletion list.
+// Only list of primitives with merge strategy will generate a parallel deletion list.
 // These two lists should yield modified when applied to original, for lists with merge semantics.
 func diffLists(original, modified []interface{}, t reflect.Type, mergeKey string, ignoreChangesAndAdditions, ignoreDeletions bool) ([]interface{}, []interface{}, error) {
 	if len(original) == 0 {
+		// Both slices are empty - do nothing
 		if len(modified) == 0 || ignoreChangesAndAdditions {
 			return nil, nil, nil
 		}
 
+		// Old slice was empty - add all elements from the new slice
 		return modified, nil, nil
 	}
 
@@ -314,6 +316,7 @@ func diffLists(original, modified []interface{}, t reflect.Type, mergeKey string
 	if elementType.Kind() == reflect.Map {
 		patchList, err = diffListsOfMaps(original, modified, t, mergeKey, ignoreChangesAndAdditions, ignoreDeletions)
 	} else if elementType.Kind() == reflect.Slice {
+		// Lists of Lists are not permitted by the api
 		err = errNoListOfLists
 	} else {
 		patchList, deletionList, err = diffListsOfScalars(original, modified, ignoreChangesAndAdditions, ignoreDeletions)
@@ -326,34 +329,39 @@ func diffLists(original, modified []interface{}, t reflect.Type, mergeKey string
 	return patchList, deletionList, nil
 }
 
-// Returns a (recursive) strategic merge patch that yields modified when applied to original,
-// for a pair of lists of scalars with merge semantics.
+// diffListsOfScalars returns 2 lists, the first one is addList and the second one is deletionList.
+// Argument ignoreChangesAndAdditions controls if calculate addList. true means not calculate.
+// Argument ignoreDeletions controls if calculate deletionList. true means not calculate.
 func diffListsOfScalars(original, modified []interface{}, ignoreChangesAndAdditions, ignoreDeletions bool) ([]interface{}, []interface{}, error) {
+	// Sort the scalars for easier calculating the diff
 	originalScalars := sortScalars(original)
 	modifiedScalars := sortScalars(modified)
 
 	originalIndex, modifiedIndex := 0, 0
-	patchList := []interface{}{}
+	addList := []interface{}{}
 	deletionList := []interface{}{}
 
 	for originalIndex < len(originalScalars) && modifiedIndex < len(modifiedScalars) {
+		// we need to compare the string representation of the scalar,
+		// because the scalar is an interface which doesn't support neither < nor <
+		// And that's how func sortScalars compare scalars.
 		originalString := fmt.Sprintf("%v", originalScalars[originalIndex])
 		modifiedString := fmt.Sprintf("%v", modifiedScalars[modifiedIndex])
 
-		// objects are identical
-		if originalString == modifiedString {
+		switch {
+		// scalars are identical
+		case originalString == modifiedString:
 			originalIndex++
 			modifiedIndex++
-			continue
-		}
-
-		if originalString > modifiedString {
+		// modified has additional scalar
+		case originalString > modifiedString:
 			if !ignoreChangesAndAdditions {
 				modifiedValue := modifiedScalars[modifiedIndex]
-				patchList = append(patchList, modifiedValue)
+				addList = append(addList, modifiedValue)
 			}
 			modifiedIndex++
-		} else {
+		// modified deletes a scalar
+		case originalString < modifiedString:
 			if !ignoreDeletions {
 				originalValue := originalScalars[originalIndex]
 				deletionList = append(deletionList, originalValue)
@@ -364,21 +372,23 @@ func diffListsOfScalars(original, modified []interface{}, ignoreChangesAndAdditi
 
 	// Delete any remaining items found only in original
 	if !ignoreDeletions {
-		for ; originalIndex < len(originalScalars); originalIndex++ {
+		for originalIndex < len(originalScalars) {
 			originalValue := originalScalars[originalIndex]
 			deletionList = append(deletionList, originalValue)
+			originalIndex++
 		}
 	}
 
 	// Add any remaining items found only in modified
 	if !ignoreChangesAndAdditions {
-		for ; modifiedIndex < len(modifiedScalars); modifiedIndex++ {
+		for modifiedIndex < len(modifiedScalars) {
 			modifiedValue := modifiedScalars[modifiedIndex]
-			patchList = append(patchList, modifiedValue)
+			addList = append(addList, modifiedValue)
+			modifiedIndex++
 		}
 	}
 
-	return patchList, deletionList, nil
+	return addList, deletionList, nil
 }
 
 var errNoMergeKeyFmt = "map: %v does not contain declared merge key: %s"
@@ -583,7 +593,7 @@ func mergeMap(original, patch map[string]interface{}, t reflect.Type, mergeParal
 		// If found a parallel list for deletion and we are going to merge the list,
 		// overwrite the key to the original key and set flag isParallelList
 		isParallelList := false
-		foundParallelListPrefix := strings.HasPrefix(k, DeleteFromPrimitiveListDirectivePrefix)
+		foundParallelListPrefix := strings.HasPrefix(k, deleteFromPrimitiveListDirectivePrefix)
 		if foundParallelListPrefix {
 			if !mergeParallelList {
 				original[k] = patchV
@@ -843,7 +853,7 @@ func sortMergeListsByName(mapJSON []byte, dataStruct interface{}) ([]byte, error
 func sortMergeListsByNameMap(s map[string]interface{}, t reflect.Type) (map[string]interface{}, error) {
 	newS := map[string]interface{}{}
 	for k, v := range s {
-		if strings.HasPrefix(k, DeleteFromPrimitiveListDirectivePrefix) {
+		if strings.HasPrefix(k, deleteFromPrimitiveListDirectivePrefix) {
 			typedV, ok := v.([]interface{})
 			if !ok {
 				return nil, errBadPatchFormatForPrimitiveList
