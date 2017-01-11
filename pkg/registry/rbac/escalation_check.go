@@ -17,8 +17,13 @@ limitations under the License.
 package rbac
 
 import (
+	"fmt"
+
 	"k8s.io/apiserver/pkg/authentication/user"
+	"k8s.io/apiserver/pkg/authorization/authorizer"
+	"k8s.io/kubernetes/pkg/apis/rbac"
 	genericapirequest "k8s.io/kubernetes/pkg/genericapiserver/api/request"
+	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
 )
 
 func EscalationAllowed(ctx genericapirequest.Context) bool {
@@ -38,4 +43,50 @@ func EscalationAllowed(ctx genericapirequest.Context) bool {
 	}
 
 	return false
+}
+
+// BindingAuthorized returns true if the user associated with the context is explicitly authorized to bind the specified roleRef
+func BindingAuthorized(ctx genericapirequest.Context, roleRef rbac.RoleRef, bindingNamespace string, a authorizer.Authorizer) bool {
+	if a == nil {
+		return false
+	}
+
+	user, ok := genericapirequest.UserFrom(ctx)
+	if !ok {
+		return false
+	}
+
+	attrs := authorizer.AttributesRecord{
+		User: user,
+		Verb: "bind",
+		// check against the namespace where the binding is being created (or the empty namespace for clusterrolebindings).
+		// this allows delegation to bind particular clusterroles in rolebindings within particular namespaces,
+		// and to authorize binding a clusterrole across all namespaces in a clusterrolebinding.
+		Namespace:       bindingNamespace,
+		ResourceRequest: true,
+	}
+
+	// This occurs after defaulting and conversion, so values pulled from the roleRef won't change
+	// Invalid APIGroup or Name values will fail validation
+	switch roleRef.Kind {
+	case "ClusterRole":
+		attrs.APIGroup = roleRef.APIGroup
+		attrs.Resource = "clusterroles"
+		attrs.Name = roleRef.Name
+	case "Role":
+		attrs.APIGroup = roleRef.APIGroup
+		attrs.Resource = "roles"
+		attrs.Name = roleRef.Name
+	default:
+		return false
+	}
+
+	ok, _, err := a.Authorize(attrs)
+	if err != nil {
+		utilruntime.HandleError(fmt.Errorf(
+			"error authorizing user %#v to bind %#v in namespace %s: %v",
+			roleRef, bindingNamespace, user, err,
+		))
+	}
+	return ok
 }

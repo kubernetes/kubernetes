@@ -23,6 +23,7 @@ import (
 
 	"github.com/golang/glog"
 
+	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/apis/rbac"
@@ -48,7 +49,9 @@ import (
 	"k8s.io/kubernetes/plugin/pkg/auth/authorizer/rbac/bootstrappolicy"
 )
 
-type RESTStorageProvider struct{}
+type RESTStorageProvider struct {
+	Authorizer authorizer.Authorizer
+}
 
 var _ genericapiserver.PostStartHookProvider = RESTStorageProvider{}
 
@@ -98,7 +101,7 @@ func (p RESTStorageProvider) v1alpha1Storage(apiResourceConfigSource genericapis
 	}
 	if apiResourceConfigSource.ResourceEnabled(version.WithResource("rolebindings")) {
 		initializeStorage()
-		storage["rolebindings"] = rolebindingpolicybased.NewStorage(roleBindingsStorage, authorizationRuleResolver)
+		storage["rolebindings"] = rolebindingpolicybased.NewStorage(roleBindingsStorage, p.Authorizer, authorizationRuleResolver)
 	}
 	if apiResourceConfigSource.ResourceEnabled(version.WithResource("clusterroles")) {
 		initializeStorage()
@@ -106,7 +109,7 @@ func (p RESTStorageProvider) v1alpha1Storage(apiResourceConfigSource genericapis
 	}
 	if apiResourceConfigSource.ResourceEnabled(version.WithResource("clusterrolebindings")) {
 		initializeStorage()
-		storage["clusterrolebindings"] = clusterrolebindingpolicybased.NewStorage(clusterRoleBindingsStorage, authorizationRuleResolver)
+		storage["clusterrolebindings"] = clusterrolebindingpolicybased.NewStorage(clusterRoleBindingsStorage, p.Authorizer, authorizationRuleResolver)
 	}
 	return storage
 }
