@@ -46,6 +46,17 @@ type StrategicMergePatchTestCase struct {
 	StrategicMergePatchTestCaseData
 }
 
+type StrategicMergePatchRawTestCase struct {
+	Description string
+	StrategicMergePatchRawTestCaseData
+}
+
+// Original is the original object (last-applied config in annotation)
+// TwoWay is the expected two-way merge patch
+// Modified is the modified object (new config we want)
+// Current is the current object (live config in the server)
+// ThreeWay is the expected three-way merge patch
+// Result is the expected object after applying the three-way patch on current object.
 type StrategicMergePatchTestCaseData struct {
 	Original map[string]interface{}
 	TwoWay   map[string]interface{}
@@ -55,11 +66,8 @@ type StrategicMergePatchTestCaseData struct {
 	Result   map[string]interface{}
 }
 
-type StrategicMergePatchRawTestCase struct {
-	Description string
-	StrategicMergePatchRawTestCaseData
-}
-
+// The meaning of each field is the same as StrategicMergePatchTestCaseData's.
+// The difference is that all the fields in StrategicMergePatchRawTestCaseData are json-encoded data.
 type StrategicMergePatchRawTestCaseData struct {
 	Original []byte
 	TwoWay   []byte
@@ -1973,6 +1981,9 @@ func testStrategicMergePatchWithCustomArguments(t *testing.T, description, origi
 	}
 }
 
+// testTwoWayPatch tests if it can create the expected two-way merge patch and
+// if it will produce the expected object after applying the two-way patch on the original object.
+// There is a flag to tell if the test case is using raw data test case.
 func testTwoWayPatch(t *testing.T, description string, testCaseData interface{}, useRawTestCaseData bool) {
 	var original, expected, modified []byte
 	var tc *StrategicMergePatchTestCaseData
@@ -2015,10 +2026,16 @@ func twoWayRawTestCaseToJSONOrFail(t *testing.T, c *StrategicMergePatchRawTestCa
 		yamlToJSONOrError(t, c.Modified)
 }
 
+// testThreeWayPatch tests if it can create the expected three-way merge patch and
+// if it can detect the conflict when the test cases have and
+// if it will produce the expected object after applying the three-way patch on the current object
+// Flag useRawTestCaseData is telling if the test case is using raw data test case.
 func testThreeWayPatch(t *testing.T, description string, testCaseData interface{}, useRawTestCaseData bool) {
 	var original, modified, current, expected, result []byte
 	var tc *StrategicMergePatchTestCaseData
 	var rtc *StrategicMergePatchRawTestCaseData
+	// If we are using raw data test cases, we don't need to encode the objects into json encoded bytes
+	// before passing to func CreateThreeWayMergePatch. Otherwise, we will need to encode test case into json.
 	if !useRawTestCaseData {
 		strategicMergePatchTestCaseData := testCaseData.(StrategicMergePatchTestCaseData)
 		tc = &strategicMergePatchTestCaseData
@@ -2029,6 +2046,7 @@ func testThreeWayPatch(t *testing.T, description string, testCaseData interface{
 		original, modified, current, expected, result = threeWayRawTestCaseToJSONOrFail(t, rtc)
 	}
 
+	// Creating the three-way merge patch. It may encounter a conflict.
 	actual, err := CreateThreeWayMergePatch(original, modified, current, mergeItem, false)
 	if err != nil {
 		if !IsConflict(err) {
@@ -2042,6 +2060,9 @@ func testThreeWayPatch(t *testing.T, description string, testCaseData interface{
 			return
 		}
 
+		// If the conflict is expected, it means the conflict detection works and we will
+		// disable the conflict detection and try to create the three-way merge patch again.
+		// Otherwise, fail the test.
 		if !strings.Contains(description, "conflict") {
 			if !useRawTestCaseData {
 				t.Errorf("unexpected conflict: %s\nin test case: %s\ncannot create three way patch:\n%s\n",
@@ -2053,6 +2074,7 @@ func testThreeWayPatch(t *testing.T, description string, testCaseData interface{
 			return
 		}
 
+		// Ignore the conflict and recreate the patch
 		if (tc != nil && len(tc.Result) > 0) || (rtc != nil && len(rtc.Result) > 0) {
 			actual, err := CreateThreeWayMergePatch(original, modified, current, mergeItem, true)
 			if err != nil {
