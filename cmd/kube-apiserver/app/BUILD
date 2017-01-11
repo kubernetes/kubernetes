@@ -16,6 +16,7 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//cmd/kube-apiserver/app/options:go_default_library",
+        "//cmd/kube-apiserver/app/preflight:go_default_library",
         "//pkg/api:go_default_library",
         "//pkg/apis/batch:go_default_library",
         "//pkg/capabilities:go_default_library",
@@ -83,6 +84,7 @@ filegroup(
     srcs = [
         ":package-srcs",
         "//cmd/kube-apiserver/app/options:all-srcs",
+        "//cmd/kube-apiserver/app/preflight:all-srcs",
     ],
     tags = ["automanaged"],
 )
