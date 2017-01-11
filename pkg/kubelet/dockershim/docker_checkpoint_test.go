@@ -18,6 +18,7 @@ package dockershim
 
 import (
 	"reflect"
+	"sort"
 	"testing"
 )
 
@@ -74,9 +75,10 @@ func TestPersistentCheckpointHandler(t *testing.T) {
 			t.Errorf("Expect checkpoint data to be consistent")
 		}
 	}
-
 	// Test ListCheckpoints
-	if !reflect.DeepEqual(handler.ListCheckpoints(), []string{"id1", "id2"}) {
+	keys := handler.ListCheckpoints()
+	sort.Strings(keys)
+	if !reflect.DeepEqual(keys, []string{"id1", "id2"}) {
 		t.Errorf("ListCheckpoint does not return result as expected: %v", handler.ListCheckpoints())
 	}
 

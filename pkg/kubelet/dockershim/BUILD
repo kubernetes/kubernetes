@@ -11,8 +11,10 @@ load(
 go_library(
     name = "go_default_library",
     srcs = [
+        "checkpoint_store.go",
         "convert.go",
         "doc.go",
+        "docker_checkpoint.go",
         "docker_container.go",
         "docker_image.go",
         "docker_sandbox.go",
@@ -32,6 +34,7 @@ go_library(
         "//pkg/kubelet/container:go_default_library",
         "//pkg/kubelet/dockershim/cm:go_default_library",
         "//pkg/kubelet/dockertools:go_default_library",
+        "//pkg/kubelet/kuberuntime:go_default_library",
         "//pkg/kubelet/leaky:go_default_library",
         "//pkg/kubelet/network:go_default_library",
         "//pkg/kubelet/network/cni:go_default_library",
@@ -41,6 +44,7 @@ go_library(
         "//pkg/kubelet/types:go_default_library",
         "//pkg/kubelet/util/ioutils:go_default_library",
         "//pkg/securitycontext:go_default_library",
+        "//pkg/util/hash:go_default_library",
         "//pkg/util/term:go_default_library",
         "//vendor:github.com/docker/engine-api/types",
         "//vendor:github.com/docker/engine-api/types/container",
@@ -49,13 +53,16 @@ go_library(
         "//vendor:github.com/docker/engine-api/types/versions",
         "//vendor:github.com/docker/go-connections/nat",
         "//vendor:github.com/golang/glog",
+        "//vendor:k8s.io/apimachinery/pkg/util/errors",
     ],
 )
 
 go_test(
     name = "go_default_test",
     srcs = [
+        "checkpoint_store_test.go",
         "convert_test.go",
+        "docker_checkpoint_test.go",
         "docker_container_test.go",
         "docker_image_test.go",
         "docker_sandbox_test.go",

@@ -23,11 +23,14 @@ import (
 	"hash/adler32"
 	hashutil "k8s.io/kubernetes/pkg/util/hash"
 	"os"
+	"path/filepath"
 )
 
 const (
+	// DockershimRootDir is the root directory for dockershim
+	DockershimRootDir = "/var/lib/dockershim"
 	// default directory to store pod sandbox checkpoint files
-	sandboxCheckpointDir = "/var/lib/dockershim/sandbox"
+	sandboxCheckpointDir = "sandbox"
 	ProtocolTCP          = Protocol("tcp")
 	ProtocolUDP          = Protocol("udp")
 	PortMappingsKey      = "PortMappings"
@@ -86,7 +89,7 @@ type PersistentCheckpointHandler struct {
 }
 
 func NewPersistentCheckpointHandler() CheckpointHandler {
-	return &PersistentCheckpointHandler{store: &FileStore{path: sandboxCheckpointDir}}
+	return &PersistentCheckpointHandler{store: &FileStore{path: filepath.Join(DockershimRootDir, sandboxCheckpointDir)}}
 }
 
 func (handler *PersistentCheckpointHandler) CreateCheckpoint(podSandboxID string, checkpoint *PodSandboxCheckpoint) error {
