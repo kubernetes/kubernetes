@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"reflect"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -387,7 +388,7 @@ func (dsc *DaemonSetsController) addNode(obj interface{}) {
 	node := obj.(*v1.Node)
 	for i := range dsList.Items {
 		ds := &dsList.Items[i]
-		shouldEnqueue := dsc.nodeShouldRunDaemonPod(node, ds)
+		shouldEnqueue := dsc.nodeShouldRunDaemonPod(node, ds, nil)
 		if shouldEnqueue {
 			dsc.enqueueDaemonSet(ds)
 		}
@@ -408,7 +409,8 @@ func (dsc *DaemonSetsController) updateNode(old, cur interface{}) {
 	}
 	for i := range dsList.Items {
 		ds := &dsList.Items[i]
-		shouldEnqueue := (dsc.nodeShouldRunDaemonPod(oldNode, ds) != dsc.nodeShouldRunDaemonPod(curNode, ds))
+		// TBD: fix false positives (don't pass nil as nodeToDaemonPods)
+		shouldEnqueue := (dsc.nodeShouldRunDaemonPod(oldNode, ds, nil) != dsc.nodeShouldRunDaemonPod(curNode, ds, nil))
 		if shouldEnqueue {
 			dsc.enqueueDaemonSet(ds)
 		}
@@ -451,7 +453,7 @@ func (dsc *DaemonSetsController) manage(ds *extensions.DaemonSet) error {
 	}
 	var nodesNeedingDaemonPods, podsToDelete []string
 	for _, node := range nodeList.Items {
-		shouldRun := dsc.nodeShouldRunDaemonPod(&node, ds)
+		shouldRun := dsc.nodeShouldRunDaemonPod(&node, ds, nodeToDaemonPods)
 
 		daemonPods, isRunning := nodeToDaemonPods[node.Name]
 
@@ -588,7 +590,7 @@ func (dsc *DaemonSetsController) updateDaemonSetStatus(ds *extensions.DaemonSet)
 
 	var desiredNumberScheduled, currentNumberScheduled, numberMisscheduled, numberReady int
 	for _, node := range nodeList.Items {
-		shouldRun := dsc.nodeShouldRunDaemonPod(&node, ds)
+		shouldRun := dsc.nodeShouldRunDaemonPod(&node, ds, nodeToDaemonPods)
 
 		scheduled := len(nodeToDaemonPods[node.Name]) > 0
 
@@ -658,7 +660,7 @@ func (dsc *DaemonSetsController) syncDaemonSet(key string) error {
 	return dsc.updateDaemonSetStatus(ds)
 }
 
-func (dsc *DaemonSetsController) nodeShouldRunDaemonPod(node *v1.Node, ds *extensions.DaemonSet) bool {
+func (dsc *DaemonSetsController) nodeShouldRunDaemonPod(node *v1.Node, ds *extensions.DaemonSet, nodeToDaemonPods map[string][]*v1.Pod) bool {
 	// If the daemon set specifies a node name, check that it matches with node.Name.
 	if !(ds.Spec.Template.Spec.NodeName == "" || ds.Spec.Template.Spec.NodeName == node.Name) {
 		return false
@@ -709,6 +711,29 @@ func (dsc *DaemonSetsController) nodeShouldRunDaemonPod(node *v1.Node, ds *exten
 				dsc.eventRecorder.Eventf(ds, v1.EventTypeNormal, "FailedPlacement", "failed to place pod on %q: host port conflict", node.ObjectMeta.Name)
 			}
 		}
+	}
+	if !fit {
+		return false
+	}
+
+	if nodeToDaemonPods != nil && len(nodeToDaemonPods[node.Name]) != 0 {
+		// pod (anti)affinity is currently schedule-only,
+		// so let's not delete the pod if it's already
+		// being run
+		return true
+	}
+
+	podAffinityChecker := predicates.NewPodAffinityPredicate(
+		&predicates.CachedNodeInfo{StoreToNodeLister: dsc.nodeStore},
+		dsc.podStore,
+		// problem: that should be obtained from --failure-domains flag
+		strings.Split(v1.DefaultFailureDomains, ","))
+	fit, reasons, err = podAffinityChecker(newPod, nil, nodeInfo)
+	if err != nil {
+		glog.Warningf("Pod affinity checker failed on pod %s due to unexpected error: %v", newPod.Name, err)
+	}
+	for _, r := range reasons {
+		glog.V(2).Infof("Pod affinity checker failed on pod %s for reason: %v", newPod.Name, r.GetReason())
 	}
 	return fit
 }
