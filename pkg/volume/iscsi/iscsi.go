@@ -230,6 +230,12 @@ func (c *iscsiDiskUnmounter) TearDown() error {
 }
 
 func (c *iscsiDiskUnmounter) TearDownAt(dir string) error {
+	if pathExists, pathErr := ioutil.PathExists(dir); pathErr != nil {
+		return fmt.Errorf("Error checking if path exists: %v", pathErr)
+	} else if !pathExists {
+		glog.Warningf("Warning: Unmount skipped because path does not exist: %v", dir)
+		return nil
+	}
 	return diskTearDown(c.manager, *c, dir, c.mounter)
 }
 
