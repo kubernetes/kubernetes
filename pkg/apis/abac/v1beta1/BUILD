@@ -26,7 +26,6 @@ go_library(
         "//pkg/conversion:go_default_library",
         "//pkg/runtime:go_default_library",
         "//pkg/runtime/schema:go_default_library",
-        "//vendor:k8s.io/apiserver/pkg/authentication/user",
     ],
 )
 

@@ -38,7 +38,7 @@ go_test(
         "//pkg/apis/rbac:go_default_library",
         "//pkg/apis/rbac/install:go_default_library",
         "//pkg/apis/rbac/v1alpha1:go_default_library",
-        "//pkg/apis/rbac/validation:go_default_library",
+        "//pkg/registry/rbac/validation:go_default_library",
         "//pkg/runtime:go_default_library",
         "//pkg/util/diff:go_default_library",
         "//pkg/util/sets:go_default_library",

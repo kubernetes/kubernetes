@@ -8,42 +8,37 @@ load(
     "go_test",
 )
 
-go_library(
-    name = "go_default_library",
-    srcs = [
-        "rbac.go",
-        "subject_locator.go",
-    ],
-    tags = ["automanaged"],
-    deps = [
-        "//pkg/apis/rbac:go_default_library",
-        "//pkg/registry/rbac/validation:go_default_library",
-        "//pkg/util/errors:go_default_library",
-        "//vendor:github.com/golang/glog",
-        "//vendor:k8s.io/apiserver/pkg/authentication/user",
-        "//vendor:k8s.io/apiserver/pkg/authorization/authorizer",
-    ],
-)
-
 go_test(
     name = "go_default_test",
     srcs = [
-        "rbac_test.go",
-        "subject_locator_test.go",
+        "policy_comparator_test.go",
+        "rule_test.go",
     ],
     library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
+        "//pkg/apis/rbac:go_default_library",
+        "//pkg/util/diff:go_default_library",
+        "//vendor:k8s.io/apiserver/pkg/authentication/user",
+    ],
+)
+
+go_library(
+    name = "go_default_library",
+    srcs = [
+        "policy_comparator.go",
+        "rule.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
         "//pkg/api/errors:go_default_library",
         "//pkg/apis/rbac:go_default_library",
         "//pkg/genericapiserver/api/request:go_default_library",
-        "//pkg/registry/rbac/validation:go_default_library",
         "//pkg/serviceaccount:go_default_library",
         "//pkg/util/errors:go_default_library",
         "//vendor:github.com/golang/glog",
         "//vendor:k8s.io/apiserver/pkg/authentication/user",
-        "//vendor:k8s.io/apiserver/pkg/authorization/authorizer",
     ],
 )
 
@@ -56,9 +51,6 @@ filegroup(
 
 filegroup(
     name = "all-srcs",
-    srcs = [
-        ":package-srcs",
-        "//plugin/pkg/auth/authorizer/rbac/bootstrappolicy:all-srcs",
-    ],
+    srcs = [":package-srcs"],
     tags = ["automanaged"],
 )
