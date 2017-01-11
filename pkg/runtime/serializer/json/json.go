@@ -18,7 +18,9 @@ package json
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
+	"reflect"
 
 	"github.com/ghodss/yaml"
 	"github.com/ugorji/go/codec"
@@ -121,8 +123,19 @@ func (s *Serializer) Decode(originalData []byte, gvk *schema.GroupVersionKind, i
 		types, _, err := s.typer.ObjectKinds(into)
 		switch {
 		case runtime.IsNotRegisteredError(err):
-			if err := codec.NewDecoderBytes(data, new(codec.JsonHandle)).Decode(into); err != nil {
-				return nil, actual, err
+			_, ok := into.(codec.Selfer)
+			if !ok {
+				fmt.Println("CHAO: type=", reflect.TypeOf(into))
+				fmt.Println("CHAO: use json")
+				if err := json.Unmarshal(data, into); err != nil {
+					return nil, actual, err
+				}
+			} else {
+				fmt.Println("CHAO: type=", reflect.TypeOf(into))
+				fmt.Println("CHAO: use ugorji")
+				if err := codec.NewDecoderBytes(data, new(codec.JsonHandle)).Decode(into); err != nil {
+					return nil, actual, err
+				}
 			}
 			return into, actual, nil
 		case err != nil:
@@ -154,9 +167,20 @@ func (s *Serializer) Decode(originalData []byte, gvk *schema.GroupVersionKind, i
 	if err != nil {
 		return nil, actual, err
 	}
-
-	if err := codec.NewDecoderBytes(data, new(codec.JsonHandle)).Decode(obj); err != nil {
-		return nil, actual, err
+	aaaa, ok := obj.(codec.Selfer)
+	if !ok {
+		fmt.Println("CHAO: type=", reflect.TypeOf(obj))
+		fmt.Println("CHAO: use json")
+		if err := json.Unmarshal(data, obj); err != nil {
+			return nil, actual, err
+		}
+	} else {
+		fmt.Println("CHAO: type=", reflect.TypeOf(obj))
+		fmt.Println("CHAO: ", aaaa.CodecEncodeSelf)
+		fmt.Println("CHAO: use ugorji")
+		if err := codec.NewDecoderBytes(data, new(codec.JsonHandle)).Decode(obj); err != nil {
+			return nil, actual, err
+		}
 	}
 	return obj, actual, nil
 }
