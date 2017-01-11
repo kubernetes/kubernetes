@@ -97,12 +97,10 @@ func isSysFSWritable() (bool, error) {
 	}
 
 	for _, mountPoint := range mountPoints {
-		const sysfsDevice = "sysfs"
 		if mountPoint.Type != sysfsDevice {
 			continue
 		}
 		// Check whether sysfs is 'rw'
-		const permWritable = "rw"
 		if len(mountPoint.Opts) > 0 && mountPoint.Opts[0] == permWritable {
 			return true, nil
 		}
