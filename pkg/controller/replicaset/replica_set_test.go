@@ -44,6 +44,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller/informers"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/securitycontext"
+	"k8s.io/kubernetes/pkg/util/diff"
 	"k8s.io/kubernetes/pkg/util/sets"
 	utiltesting "k8s.io/kubernetes/pkg/util/testing"
 	"k8s.io/kubernetes/pkg/util/uuid"
@@ -542,7 +543,7 @@ func TestWatchControllers(t *testing.T) {
 		}
 		rsSpec := *obj.(*extensions.ReplicaSet)
 		if !api.Semantic.DeepDerivative(rsSpec, testRSSpec) {
-			t.Errorf("Expected %#v, but got %#v", testRSSpec, rsSpec)
+			t.Errorf("Unexpected mismatch: %s", diff.ObjectDiff(testRSSpec, rsSpec))
 		}
 		close(received)
 		return nil
@@ -584,7 +585,7 @@ func TestWatchPods(t *testing.T) {
 		}
 		rsSpec := obj.(*extensions.ReplicaSet)
 		if !api.Semantic.DeepDerivative(rsSpec, testRSSpec) {
-			t.Errorf("\nExpected %#v,\nbut got %#v", testRSSpec, rsSpec)
+			t.Errorf("Unexpected mismatch: %s", diff.ObjectDiff(testRSSpec, rsSpec))
 		}
 		close(received)
 		return nil

@@ -39,6 +39,7 @@ import (
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/securitycontext"
 	"k8s.io/kubernetes/pkg/util/clock"
+	"k8s.io/kubernetes/pkg/util/diff"
 	"k8s.io/kubernetes/pkg/util/sets"
 	utiltesting "k8s.io/kubernetes/pkg/util/testing"
 	"k8s.io/kubernetes/pkg/util/uuid"
@@ -276,7 +277,7 @@ func TestCreatePods(t *testing.T) {
 	}
 	if !api.Semantic.DeepDerivative(&expectedPod, actualPod) {
 		t.Logf("Body: %s", fakeHandler.RequestBody)
-		t.Errorf("Unexpected mismatch.  Expected\n %#v,\n Got:\n %#v", &expectedPod, actualPod)
+		t.Errorf("Unexpected mismatch: %s", diff.ObjectDiff(&expectedPod, actualPod))
 	}
 }
 
@@ -377,7 +378,7 @@ func TestSortingActivePods(t *testing.T) {
 		actual := getOrder(randomizedPods)
 
 		if !reflect.DeepEqual(actual, expected) {
-			t.Errorf("expected %v, got %v", expected, actual)
+			t.Errorf("Unexpected mismatch: %s", diff.ObjectDiff(expected, actual))
 		}
 	}
 }
