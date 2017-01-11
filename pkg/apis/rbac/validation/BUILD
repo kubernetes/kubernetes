@@ -10,41 +10,25 @@ load(
 
 go_library(
     name = "go_default_library",
-    srcs = [
-        "policy_comparator.go",
-        "rulevalidation.go",
-        "validation.go",
-    ],
+    srcs = ["validation.go"],
     tags = ["automanaged"],
     deps = [
-        "//pkg/api/errors:go_default_library",
         "//pkg/api/validation:go_default_library",
         "//pkg/api/validation/path:go_default_library",
         "//pkg/apis/rbac:go_default_library",
-        "//pkg/genericapiserver/api/request:go_default_library",
-        "//pkg/serviceaccount:go_default_library",
-        "//vendor:github.com/golang/glog",
-        "//vendor:k8s.io/apimachinery/pkg/util/errors",
         "//vendor:k8s.io/apimachinery/pkg/util/validation/field",
-        "//vendor:k8s.io/apiserver/pkg/authentication/user",
     ],
 )
 
 go_test(
     name = "go_default_test",
-    srcs = [
-        "policy_comparator_test.go",
-        "rulevalidation_test.go",
-        "validation_test.go",
-    ],
+    srcs = ["validation_test.go"],
     library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/apis/rbac:go_default_library",
-        "//vendor:k8s.io/apimachinery/pkg/util/diff",
         "//vendor:k8s.io/apimachinery/pkg/util/validation/field",
-        "//vendor:k8s.io/apiserver/pkg/authentication/user",
     ],
 )
 

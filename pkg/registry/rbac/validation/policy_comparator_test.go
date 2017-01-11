@@ -400,3 +400,28 @@ func rulesMatch(expectedRules, actualRules []rbac.PolicyRule) bool {
 
 	return true
 }
+
+func TestNonResourceURLCovers(t *testing.T) {
+	tests := []struct {
+		owner     string
+		requested string
+		want      bool
+	}{
+		{"*", "/api", true},
+		{"/api", "/api", true},
+		{"/apis", "/api", false},
+		{"/api/v1", "/api", false},
+		{"/api/v1", "/api/v1", true},
+		{"/api/*", "/api/v1", true},
+		{"/api/*", "/api", false},
+		{"/api/*/*", "/api/v1", false},
+		{"/*/v1/*", "/api/v1", false},
+	}
+
+	for _, tc := range tests {
+		got := nonResourceURLCovers(tc.owner, tc.requested)
+		if got != tc.want {
+			t.Errorf("nonResourceURLCovers(%q, %q): want=(%t), got=(%t)", tc.owner, tc.requested, tc.want, got)
+		}
+	}
+}
