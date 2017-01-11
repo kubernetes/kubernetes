@@ -347,3 +347,43 @@ func (i *IndexerToNamespaceLister) Get(name string) (*v1.Namespace, error) {
 	}
 	return obj.(*v1.Namespace), nil
 }
+
+// StoreToSecretLister helps list secrets
+type StoreToSecretLister struct {
+	Indexer Indexer
+}
+
+func (s *StoreToSecretLister) List(selector labels.Selector) (ret []*v1.Secret, err error) {
+	err = ListAll(s.Indexer, selector, func(m interface{}) {
+		ret = append(ret, m.(*v1.Secret))
+	})
+	return ret, err
+}
+
+// Secrets returns all secrets in a specified namespace
+func (s *StoreToSecretLister) Secrets(namespace string) storeSecretsNamespacer {
+	return storeSecretsNamespacer{Indexer: s.Indexer, namespace: namespace}
+}
+
+type storeSecretsNamespacer struct {
+	Indexer   Indexer
+	namespace string
+}
+
+func (s storeSecretsNamespacer) List(selector labels.Selector) (ret []*v1.Secret, err error) {
+	err = ListAllByNamespace(s.Indexer, s.namespace, selector, func(m interface{}) {
+		ret = append(ret, m.(*v1.Secret))
+	})
+	return ret, err
+}
+
+func (s storeSecretsNamespacer) Get(name string) (*v1.Secret, error) {
+	obj, exists, err := s.Indexer.GetByKey(s.namespace + "/" + name)
+	if err != nil {
+		return nil, err
+	}
+	if !exists {
+		return nil, errors.NewNotFound(api.Resource("secret"), name)
+	}
+	return obj.(*v1.Secret), nil
+}

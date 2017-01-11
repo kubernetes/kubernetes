@@ -22,16 +22,13 @@ import (
 	"time"
 
 	"github.com/golang/glog"
-	"k8s.io/kubernetes/pkg/api"
 	apierrors "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/v1"
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	clientretry "k8s.io/kubernetes/pkg/client/retry"
-	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/registry/core/secret"
-	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/serviceaccount"
 	"k8s.io/kubernetes/pkg/types"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
@@ -40,7 +37,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/util/workqueue"
-	"k8s.io/kubernetes/pkg/watch"
+	"k8s.io/kubernetes/pkg/controller/informers"
 )
 
 // RemoveTokenBackoff is the recommended (empirical) retry interval for removing
@@ -71,7 +68,7 @@ type TokensControllerOptions struct {
 }
 
 // NewTokensController returns a new *TokensController.
-func NewTokensController(cl clientset.Interface, options TokensControllerOptions) *TokensController {
+func NewTokensController(saInformer informers.ServiceAccountInformer, secretInformer informers.SecretInformer, cl clientset.Interface, options TokensControllerOptions) *TokensController {
 	maxRetries := options.MaxRetries
 	if maxRetries == 0 {
 		maxRetries = 10
@@ -91,45 +88,23 @@ func NewTokensController(cl clientset.Interface, options TokensControllerOptions
 		metrics.RegisterMetricAndTrackRateLimiterUsage("serviceaccount_controller", cl.Core().RESTClient().GetRateLimiter())
 	}
 
-	e.serviceAccounts, e.serviceAccountController = cache.NewInformer(
-		&cache.ListWatch{
-			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
-				return e.client.Core().ServiceAccounts(v1.NamespaceAll).List(options)
-			},
-			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
-				return e.client.Core().ServiceAccounts(v1.NamespaceAll).Watch(options)
-			},
-		},
-		&v1.ServiceAccount{},
-		options.ServiceAccountResync,
-		cache.ResourceEventHandlerFuncs{
-			AddFunc:    e.queueServiceAccountSync,
-			UpdateFunc: e.queueServiceAccountUpdateSync,
-			DeleteFunc: e.queueServiceAccountSync,
-		},
-	)
+	saInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+		AddFunc:    e.queueServiceAccountSync,
+		UpdateFunc: e.queueServiceAccountUpdateSync,
+		DeleteFunc: e.queueServiceAccountSync,
+	})
 
-	tokenSelector := fields.SelectorFromSet(map[string]string{api.SecretTypeField: string(v1.SecretTypeServiceAccountToken)})
-	e.secrets, e.secretController = cache.NewIndexerInformer(
-		&cache.ListWatch{
-			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
-				options.FieldSelector = tokenSelector.String()
-				return e.client.Core().Secrets(v1.NamespaceAll).List(options)
-			},
-			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
-				options.FieldSelector = tokenSelector.String()
-				return e.client.Core().Secrets(v1.NamespaceAll).Watch(options)
-			},
-		},
-		&v1.Secret{},
-		options.SecretResync,
-		cache.ResourceEventHandlerFuncs{
-			AddFunc:    e.queueSecretSync,
-			UpdateFunc: e.queueSecretUpdateSync,
-			DeleteFunc: e.queueSecretSync,
-		},
-		cache.Indexers{"namespace": cache.MetaNamespaceIndexFunc},
-	)
+	secretInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+		AddFunc:    e.queueSecretSync,
+		UpdateFunc: e.queueSecretUpdateSync,
+		DeleteFunc: e.queueSecretSync,
+	})
+
+	e.saSynced = saInformer.Informer().HasSynced
+	e.saLister = saInformer.Lister()
+
+	e.secSynced = secretInformer.Informer().HasSynced
+	e.secretLister = secretInformer.Lister()
 
 	return e
 }
@@ -141,12 +116,11 @@ type TokensController struct {
 
 	rootCA []byte
 
-	serviceAccounts cache.Store
-	secrets         cache.Indexer
+	saLister *cache.StoreToServiceAccountLister
+	secretLister *cache.StoreToSecretLister
 
-	// Since we join two objects, we'll watch both of them with controllers.
-	serviceAccountController *cache.Controller
-	secretController         *cache.Controller
+	saSynced cache.InformerSynced
+	secSynced cache.InformerSynced
 
 	// syncServiceAccountQueue handles service account events:
 	//   * ensures a referenced token exists for service accounts which still exist
@@ -167,14 +141,14 @@ type TokensController struct {
 // Runs controller blocks until stopCh is closed
 func (e *TokensController) Run(workers int, stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
+	// Shut down queues
+	defer e.syncServiceAccountQueue.ShutDown()
+	defer e.syncSecretQueue.ShutDown()
 
-	// Start controllers (to fill stores, call informers, fill work queues)
-	go e.serviceAccountController.Run(stopCh)
-	go e.secretController.Run(stopCh)
+	glog.Infof("Starting tokens controller")
 
-	// Wait for stores to fill
-	for !e.serviceAccountController.HasSynced() || !e.secretController.HasSynced() {
-		time.Sleep(100 * time.Millisecond)
+	if !cache.WaitForCacheSync(stopCh,e.secSynced, e.saSynced) {
+		return
 	}
 
 	// Spawn workers to process work queues
@@ -186,9 +160,7 @@ func (e *TokensController) Run(workers int, stopCh <-chan struct{}) {
 	// Block until stop channel is closed
 	<-stopCh
 
-	// Shut down queues
-	e.syncServiceAccountQueue.ShutDown()
-	e.syncSecretQueue.ShutDown()
+	glog.Infof("Shutting down token controller")
 }
 
 func (e *TokensController) queueServiceAccountSync(obj interface{}) {
@@ -431,7 +403,7 @@ func (e *TokensController) ensureReferencedToken(serviceAccount *v1.ServiceAccou
 	}
 	// Manually add the new token to the cache store.
 	// This prevents the service account update (below) triggering another token creation, if the referenced token couldn't be found in the store
-	e.secrets.Add(createdToken)
+	e.secretLister.Indexer.Add(createdToken)
 
 	liveServiceAccount.Secrets = append(liveServiceAccount.Secrets, v1.ObjectReference{Name: secret.Name})
 
@@ -579,7 +551,7 @@ func (e *TokensController) removeSecretReference(saNamespace string, saName stri
 
 func (e *TokensController) getServiceAccount(ns string, name string, uid types.UID, fetchOnCacheMiss bool) (*v1.ServiceAccount, error) {
 	// Look up in cache
-	obj, exists, err := e.serviceAccounts.GetByKey(makeCacheKey(ns, name))
+	obj, exists, err := e.saLister.Indexer.GetByKey(makeCacheKey(ns, name))
 	if err != nil {
 		return nil, err
 	}
@@ -615,7 +587,7 @@ func (e *TokensController) getServiceAccount(ns string, name string, uid types.U
 
 func (e *TokensController) getSecret(ns string, name string, uid types.UID, fetchOnCacheMiss bool) (*v1.Secret, error) {
 	// Look up in cache
-	obj, exists, err := e.secrets.GetByKey(makeCacheKey(ns, name))
+	obj, exists, err := e.secretLister.Indexer.GetByKey(makeCacheKey(ns, name))
 	if err != nil {
 		return nil, err
 	}
@@ -652,7 +624,7 @@ func (e *TokensController) getSecret(ns string, name string, uid types.UID, fetc
 // listTokenSecrets returns a list of all of the ServiceAccountToken secrets that
 // reference the given service account's name and uid
 func (e *TokensController) listTokenSecrets(serviceAccount *v1.ServiceAccount) ([]*v1.Secret, error) {
-	namespaceSecrets, err := e.secrets.ByIndex("namespace", serviceAccount.Namespace)
+	namespaceSecrets, err := e.secretLister.Indexer.ByIndex("namespace", serviceAccount.Namespace)
 	if err != nil {
 		return nil, err
 	}

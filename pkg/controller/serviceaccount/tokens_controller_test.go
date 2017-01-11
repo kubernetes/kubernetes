@@ -33,6 +33,9 @@ import (
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/runtime/schema"
 	utilrand "k8s.io/kubernetes/pkg/util/rand"
+	"k8s.io/kubernetes/pkg/controller/informers"
+	"k8s.io/kubernetes/pkg/controller"
+	"k8s.io/kubernetes/pkg/client/cache"
 )
 
 type testGenerator struct {
@@ -566,37 +569,47 @@ func TestTokenCreation(t *testing.T) {
 			client.Fake.PrependReactor(reactor.verb, reactor.resource, reactor.reactor(t))
 		}
 
-		controller := NewTokensController(client, TokensControllerOptions{TokenGenerator: generator, RootCA: []byte("CA Data"), MaxRetries: tc.MaxRetries})
+		informers := informers.NewSharedInformerFactory(client, nil, controller.NoResyncPeriodFunc())
+		controller := NewTokensController(informers.ServiceAccounts(), informers.Secrets(), client, TokensControllerOptions{TokenGenerator: generator, RootCA: []byte("CA Data"), MaxRetries: tc.MaxRetries})
+
+		controller.saLister = &cache.StoreToServiceAccountLister{Indexer: cache.NewIndexer(cache.DeletionHandlingMetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})}
+		controller.secretLister = &cache.StoreToSecretLister{Indexer: cache.NewIndexer(cache.DeletionHandlingMetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})}
+		controller.saSynced = alwaysReady
+		controller.secSynced = alwaysReady
+
+		stopch := make(chan struct{})
+		defer close(stopch)
+		informers.Start(stopch)
 
 		if tc.ExistingServiceAccount != nil {
-			controller.serviceAccounts.Add(tc.ExistingServiceAccount)
+			controller.saLister.Indexer.Add(tc.ExistingServiceAccount)
 		}
 		for _, s := range tc.ExistingSecrets {
-			controller.secrets.Add(s)
+			controller.secretLister.Indexer.Add(s)
 		}
 
 		if tc.AddedServiceAccount != nil {
-			controller.serviceAccounts.Add(tc.AddedServiceAccount)
+			controller.saLister.Indexer.Add(tc.AddedServiceAccount)
 			controller.queueServiceAccountSync(tc.AddedServiceAccount)
 		}
 		if tc.UpdatedServiceAccount != nil {
-			controller.serviceAccounts.Add(tc.UpdatedServiceAccount)
+			controller.saLister.Indexer.Add(tc.UpdatedServiceAccount)
 			controller.queueServiceAccountUpdateSync(nil, tc.UpdatedServiceAccount)
 		}
 		if tc.DeletedServiceAccount != nil {
-			controller.serviceAccounts.Delete(tc.DeletedServiceAccount)
+			controller.saLister.Indexer.Delete(tc.DeletedServiceAccount)
 			controller.queueServiceAccountSync(tc.DeletedServiceAccount)
 		}
 		if tc.AddedSecret != nil {
-			controller.secrets.Add(tc.AddedSecret)
+			controller.secretLister.Indexer.Add(tc.AddedSecret)
 			controller.queueSecretSync(tc.AddedSecret)
 		}
 		if tc.UpdatedSecret != nil {
-			controller.secrets.Add(tc.UpdatedSecret)
+			controller.secretLister.Indexer.Add(tc.UpdatedSecret)
 			controller.queueSecretUpdateSync(nil, tc.UpdatedSecret)
 		}
 		if tc.DeletedSecret != nil {
-			controller.secrets.Delete(tc.DeletedSecret)
+			controller.secretLister.Indexer.Delete(tc.DeletedSecret)
 			controller.queueSecretSync(tc.DeletedSecret)
 		}
 
@@ -644,7 +657,7 @@ func TestTokenCreation(t *testing.T) {
 			t.Errorf("%s: unexpected items in secret queue: %d", k, controller.syncSecretQueue.Len())
 		}
 
-		actions := client.Actions()
+		actions := filterInformerActions(client.Actions())
 		for i, action := range actions {
 			if len(tc.ExpectedActions) < i+1 {
 				t.Errorf("%s: %d unexpected actions: %+v", k, len(actions)-len(tc.ExpectedActions), actions[i:])
@@ -665,4 +678,20 @@ func TestTokenCreation(t *testing.T) {
 			}
 		}
 	}
+}
+
+func filterInformerActions(actions []core.Action) []core.Action {
+	ret := []core.Action{}
+	for _, action := range actions {
+		if len(action.GetNamespace()) == 0 &&
+			(action.Matches("list", "secrets") ||
+				action.Matches("list", "serviceaccounts") ||
+				action.Matches("watch", "secrets") ||
+				action.Matches("watch", "serviceaccounts")) {
+			continue
+		}
+		ret = append(ret, action)
+	}
+
+	return ret
 }

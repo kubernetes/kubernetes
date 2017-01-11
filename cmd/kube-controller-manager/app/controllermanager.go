@@ -306,6 +306,7 @@ func StartControllers(controllers map[string]InitFunc, s *options.CMServer, root
 			}
 
 			go serviceaccountcontroller.NewTokensController(
+				sharedInformers.ServiceAccounts(), sharedInformers.Secrets(),
 				rootClientBuilder.ClientOrDie("tokens-controller"),
 				serviceaccountcontroller.TokensControllerOptions{
 					TokenGenerator: serviceaccount.JWTTokenGenerator(privateKey),
