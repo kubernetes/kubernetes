@@ -18,7 +18,6 @@ go_library(
     deps = [
         "//federation/client/clientset_generated/federation_clientset:go_default_library",
         "//federation/cmd/federation-controller-manager/app/options:go_default_library",
-        "//federation/pkg/dnsprovider:go_default_library",
         "//federation/pkg/dnsprovider/providers/aws/route53:go_default_library",
         "//federation/pkg/dnsprovider/providers/coredns:go_default_library",
         "//federation/pkg/dnsprovider/providers/google/clouddns:go_default_library",
@@ -26,6 +25,7 @@ go_library(
         "//federation/pkg/federation-controller/configmap:go_default_library",
         "//federation/pkg/federation-controller/daemonset:go_default_library",
         "//federation/pkg/federation-controller/deployment:go_default_library",
+        "//federation/pkg/federation-controller/dns:go_default_library",
         "//federation/pkg/federation-controller/ingress:go_default_library",
         "//federation/pkg/federation-controller/namespace:go_default_library",
         "//federation/pkg/federation-controller/replicaset:go_default_library",

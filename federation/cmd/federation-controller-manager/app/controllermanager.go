@@ -29,11 +29,11 @@ import (
 	"k8s.io/apiserver/pkg/healthz"
 	federationclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset"
 	"k8s.io/kubernetes/federation/cmd/federation-controller-manager/app/options"
-	"k8s.io/kubernetes/federation/pkg/dnsprovider"
 	clustercontroller "k8s.io/kubernetes/federation/pkg/federation-controller/cluster"
 	configmapcontroller "k8s.io/kubernetes/federation/pkg/federation-controller/configmap"
 	daemonset "k8s.io/kubernetes/federation/pkg/federation-controller/daemonset"
 	deploymentcontroller "k8s.io/kubernetes/federation/pkg/federation-controller/deployment"
+	dnscontroller "k8s.io/kubernetes/federation/pkg/federation-controller/dns"
 	ingresscontroller "k8s.io/kubernetes/federation/pkg/federation-controller/ingress"
 	namespacecontroller "k8s.io/kubernetes/federation/pkg/federation-controller/namespace"
 	replicasetcontroller "k8s.io/kubernetes/federation/pkg/federation-controller/replicaset"
@@ -154,10 +154,6 @@ func StartControllers(s *options.CMServer, restClientCfg *restclient.Config) err
 	ccClientset := federationclientset.NewForConfigOrDie(restclient.AddUserAgent(restClientCfg, "cluster-controller"))
 	glog.Infof("Running cluster controller")
 	go clustercontroller.NewclusterController(ccClientset, s.ClusterMonitorPeriod.Duration).Run()
-	dns, err := dnsprovider.InitDnsProvider(s.DnsProvider, s.DnsConfigFile)
-	if err != nil {
-		glog.Fatalf("Cloud provider could not be initialized: %v", err)
-	}
 
 	discoveryClient := discovery.NewDiscoveryClientForConfigOrDie(restClientCfg)
 	serverResources, err := discoveryClient.ServerResources()
@@ -200,12 +196,16 @@ func StartControllers(s *options.CMServer, restClientCfg *restclient.Config) err
 		ingressController.Run(wait.NeverStop)
 	}
 
-	glog.Infof("Loading client config for service controller %q", servicecontroller.UserAgentName)
-	scClientset := federationclientset.NewForConfigOrDie(restclient.AddUserAgent(restClientCfg, servicecontroller.UserAgentName))
-	servicecontroller := servicecontroller.New(scClientset, dns, s.FederationName, s.ServiceDnsSuffix, s.ZoneName, s.ZoneID)
+	servicecontrollerClientset := federationclientset.NewForConfigOrDie(restclient.AddUserAgent(restClientCfg, "service-controller"))
+	serviceController := servicecontroller.NewServiceController(servicecontrollerClientset)
 	glog.Infof("Running service controller")
-	if err := servicecontroller.Run(s.ConcurrentServiceSyncs, wait.NeverStop); err != nil {
-		glog.Errorf("Failed to start service controller: %v", err)
+	serviceController.Run(s.ConcurrentServiceSyncs, wait.NeverStop)
+
+	if controllerEnabled(s.Controllers, serverResources, dnscontroller.ControllerName, dnscontroller.RequiredResources, true) {
+		dnscontrollerClientset := federationclientset.NewForConfigOrDie(restclient.AddUserAgent(restClientCfg, "dns-controller"))
+		dnsController := dnscontroller.NewDNSController(dnscontrollerClientset, s.DnsProvider, s.DnsConfigFile, s.FederationName, s.ServiceDnsSuffix, s.ZoneName, s.ZoneID)
+		glog.Infof("Running dns controller")
+		dnsController.Run(s.ConcurrentServiceSyncs, wait.NeverStop)
 	}
 
 	select {}

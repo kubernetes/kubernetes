@@ -283,12 +283,24 @@ func createServiceOrFail(clientset *fedclientset.Clientset, namespace, name stri
 	return service
 }
 
-func deleteServiceOrFail(clientset *fedclientset.Clientset, namespace string, serviceName string) {
+func deleteServiceOrFail(clientset *fedclientset.Clientset, namespace string, serviceName string, orphanDependents *bool) {
 	if clientset == nil || len(namespace) == 0 || len(serviceName) == 0 {
 		Fail(fmt.Sprintf("Internal error: invalid parameters passed to deleteServiceOrFail: clientset: %v, namespace: %v, service: %v", clientset, namespace, serviceName))
 	}
-	err := clientset.Services(namespace).Delete(serviceName, v1.NewDeleteOptions(0))
+	err := clientset.Services(namespace).Delete(serviceName, &v1.DeleteOptions{OrphanDependents: orphanDependents})
 	framework.ExpectNoError(err, "Error deleting service %q from namespace %q", serviceName, namespace)
+
+	// Wait for the service to be deleted.
+	err = wait.Poll(5*time.Second, wait.ForeverTestTimeout, func() (bool, error) {
+		_, err := clientset.Services(namespace).Get(serviceName, metav1.GetOptions{})
+		if err != nil && errors.IsNotFound(err) {
+			return true, nil
+		}
+		return false, err
+	})
+	if err != nil {
+		framework.Failf("Error in deleting service %s: %v", serviceName, err)
+	}
 }
 
 func cleanupServiceShardsAndProviderResources(namespace string, service *v1.Service, clusters map[string]*cluster) {
@@ -369,6 +381,16 @@ func cleanupServiceShardLoadBalancer(clusterName string, service *v1.Service, ti
 		return true, nil
 	})
 	return err
+}
+
+func deleteServiceShard(c *cluster, namespace, service string) error {
+	err := c.Clientset.Services(namespace).Delete(service, &v1.DeleteOptions{})
+	if err != nil && !errors.IsNotFound(err) {
+		framework.Logf("Failed to delete service %q in namespace %q, in cluster %q", service, namespace, c.name)
+		return err
+	}
+	By(fmt.Sprintf("Service %q in namespace %q in cluster %q deleted", service, namespace, c.name))
+	return nil
 }
 
 func podExitCodeDetector(f *framework.Framework, name, namespace string, code int32) func() error {
