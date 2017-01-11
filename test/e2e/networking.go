@@ -148,7 +148,7 @@ var _ = framework.KubeDescribe("Networking", func() {
 			config.DeleteNetProxyPod()
 
 			By(fmt.Sprintf("dialing(http) %v --> %v:%v (config.clusterIP)", config.TestContainerPod.Name, config.ClusterIP, framework.ClusterHttpPort))
-			config.DialFromTestContainer("http", config.ClusterIP, framework.ClusterHttpPort, config.MaxTries, config.MaxTries, config.EndpointHostnames())
+			config.DialFromTestContainer("http", config.ClusterIP, framework.ClusterHttpPort, config.MaxTries, 0, config.EndpointHostnames())
 		})
 
 		It("should update endpoints: udp", func() {
@@ -159,7 +159,7 @@ var _ = framework.KubeDescribe("Networking", func() {
 			config.DeleteNetProxyPod()
 
 			By(fmt.Sprintf("dialing(udp) %v --> %v:%v (config.clusterIP)", config.TestContainerPod.Name, config.ClusterIP, framework.ClusterUdpPort))
-			config.DialFromTestContainer("udp", config.ClusterIP, framework.ClusterUdpPort, config.MaxTries, config.MaxTries, config.EndpointHostnames())
+			config.DialFromTestContainer("udp", config.ClusterIP, framework.ClusterUdpPort, config.MaxTries, 0, config.EndpointHostnames())
 		})
 
 		// Slow because we confirm that the nodePort doesn't serve traffic, which requires a period of polling.
