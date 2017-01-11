@@ -104,21 +104,21 @@ kube::build::get_docker_wrapped_binaries() {
           kube-apiserver,armel/busybox
           kube-controller-manager,armel/busybox
           kube-scheduler,armel/busybox
-          kube-proxy,gcr.io/google_containers/debian-iptables-arm:v4
+          kube-proxy,gcr.io/google_containers/debian-iptables-arm:v5
         );;
     "arm64")
         local targets=(
           kube-apiserver,aarch64/busybox
           kube-controller-manager,aarch64/busybox
           kube-scheduler,aarch64/busybox
-          kube-proxy,gcr.io/google_containers/debian-iptables-arm64:v4
+          kube-proxy,gcr.io/google_containers/debian-iptables-arm64:v5
         );;
     "ppc64le")
         local targets=(
           kube-apiserver,ppc64le/busybox
           kube-controller-manager,ppc64le/busybox
           kube-scheduler,ppc64le/busybox
-          kube-proxy,gcr.io/google_containers/debian-iptables-ppc64le:v4
+          kube-proxy,gcr.io/google_containers/debian-iptables-ppc64le:v5
         );;
   esac
 

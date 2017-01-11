@@ -23,8 +23,8 @@ release: clean build push clean
 
 # builds a docker image that builds the app and packages it into a minimal docker image
 build:
-	docker build --rm --force-rm -t ${REGISTRY}/guestbook-builder .
-	docker run --rm ${REGISTRY}/guestbook-builder | docker build -t "${REGISTRY}/guestbook:${VERSION}" -
+	docker build --pull --rm --force-rm -t ${REGISTRY}/guestbook-builder .
+	docker run --rm ${REGISTRY}/guestbook-builder | docker build --pull -t "${REGISTRY}/guestbook:${VERSION}" -
 
 # push the image to an registry
 push:
