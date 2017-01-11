@@ -36,7 +36,6 @@ import (
 	apierrors "k8s.io/client-go/pkg/api/errors"
 	"k8s.io/client-go/pkg/apis/imagepolicy/v1alpha1"
 	"k8s.io/client-go/rest"
-
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
 

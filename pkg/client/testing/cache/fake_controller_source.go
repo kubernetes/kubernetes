@@ -23,6 +23,7 @@ import (
 	"sync"
 
 	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
@@ -114,7 +115,7 @@ func (f *FakeControllerSource) DeleteDropWatch(lastValue runtime.Object) {
 	f.Change(watch.Event{Type: watch.Deleted, Object: lastValue}, 0)
 }
 
-func (f *FakeControllerSource) key(accessor meta.Object) nnu {
+func (f *FakeControllerSource) key(accessor metav1.Object) nnu {
 	return nnu{accessor.GetNamespace(), accessor.GetName(), accessor.GetUID()}
 }
 
@@ -173,7 +174,7 @@ func (f *FakeControllerSource) List(options v1.ListOptions) (runtime.Object, err
 	if err := meta.SetList(listObj, list); err != nil {
 		return nil, err
 	}
-	objMeta, err := api.ListMetaFor(listObj)
+	objMeta, err := metav1.ListMetaFor(listObj)
 	if err != nil {
 		return nil, err
 	}
@@ -194,7 +195,7 @@ func (f *FakePVControllerSource) List(options v1.ListOptions) (runtime.Object, e
 	if err := meta.SetList(listObj, list); err != nil {
 		return nil, err
 	}
-	objMeta, err := api.ListMetaFor(listObj)
+	objMeta, err := metav1.ListMetaFor(listObj)
 	if err != nil {
 		return nil, err
 	}
@@ -215,7 +216,7 @@ func (f *FakePVCControllerSource) List(options v1.ListOptions) (runtime.Object, 
 	if err := meta.SetList(listObj, list); err != nil {
 		return nil, err
 	}
-	objMeta, err := api.ListMetaFor(listObj)
+	objMeta, err := metav1.ListMetaFor(listObj)
 	if err != nil {
 		return nil, err
 	}

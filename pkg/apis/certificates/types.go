@@ -28,7 +28,7 @@ import (
 type CertificateSigningRequest struct {
 	metav1.TypeMeta
 	// +optional
-	api.ObjectMeta
+	metav1.ObjectMeta
 
 	// The certificate request itself and any additional information.
 	// +optional

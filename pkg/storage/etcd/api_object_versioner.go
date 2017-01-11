@@ -45,7 +45,7 @@ func (a APIObjectVersioner) UpdateObject(obj runtime.Object, resourceVersion uin
 
 // UpdateList implements Versioner
 func (a APIObjectVersioner) UpdateList(obj runtime.Object, resourceVersion uint64) error {
-	listMeta, err := api.ListMetaFor(obj)
+	listMeta, err := metav1.ListMetaFor(obj)
 	if err != nil || listMeta == nil {
 		return err
 	}

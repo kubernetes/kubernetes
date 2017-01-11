@@ -277,9 +277,9 @@ func TestAPIs(t *testing.T) {
 		for _, o := range tc.apiservices {
 			indexer.Add(o)
 		}
-		serviceIndexer.Add(&corev1.Service{ObjectMeta: corev1.ObjectMeta{Namespace: "ns", Name: "api"}})
+		serviceIndexer.Add(&corev1.Service{ObjectMeta: metav1.ObjectMeta{Namespace: "ns", Name: "api"}})
 		endpointsIndexer.Add(&corev1.Endpoints{
-			ObjectMeta: corev1.ObjectMeta{Namespace: "ns", Name: "api"},
+			ObjectMeta: metav1.ObjectMeta{Namespace: "ns", Name: "api"},
 			Subsets: []corev1.EndpointSubset{
 				{Addresses: []corev1.EndpointAddress{{}}},
 			},
@@ -434,9 +434,9 @@ func TestAPIGroup(t *testing.T) {
 		for _, o := range tc.apiservices {
 			indexer.Add(o)
 		}
-		serviceIndexer.Add(&corev1.Service{ObjectMeta: corev1.ObjectMeta{Namespace: "ns", Name: "api"}})
+		serviceIndexer.Add(&corev1.Service{ObjectMeta: metav1.ObjectMeta{Namespace: "ns", Name: "api"}})
 		endpointsIndexer.Add(&corev1.Endpoints{
-			ObjectMeta: corev1.ObjectMeta{Namespace: "ns", Name: "api"},
+			ObjectMeta: metav1.ObjectMeta{Namespace: "ns", Name: "api"},
 			Subsets: []corev1.EndpointSubset{
 				{Addresses: []corev1.EndpointAddress{{}}},
 			},

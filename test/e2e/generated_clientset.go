@@ -37,7 +37,7 @@ import (
 
 func stagingClientPod(name, value string) clientv1.Pod {
 	return clientv1.Pod{
-		ObjectMeta: clientv1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 			Labels: map[string]string{
 				"name": "foo",

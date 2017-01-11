@@ -172,7 +172,7 @@ func TestAdmitSeccomp(t *testing.T) {
 		psp := restrictivePSP()
 		psp.Annotations = v.pspAnnotations
 		pod := &kapi.Pod{
-			ObjectMeta: kapi.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Annotations: v.podAnnotations,
 			},
 			Spec: kapi.PodSpec{
@@ -1457,7 +1457,7 @@ func TestCreateProvidersFromConstraints(t *testing.T) {
 		"valid psp": {
 			psp: func() *extensions.PodSecurityPolicy {
 				return &extensions.PodSecurityPolicy{
-					ObjectMeta: kapi.ObjectMeta{
+					ObjectMeta: metav1.ObjectMeta{
 						Name: "valid psp",
 					},
 					Spec: extensions.PodSecurityPolicySpec{
@@ -1480,7 +1480,7 @@ func TestCreateProvidersFromConstraints(t *testing.T) {
 		"bad psp strategy options": {
 			psp: func() *extensions.PodSecurityPolicy {
 				return &extensions.PodSecurityPolicy{
-					ObjectMeta: kapi.ObjectMeta{
+					ObjectMeta: metav1.ObjectMeta{
 						Name: "bad psp user options",
 					},
 					Spec: extensions.PodSecurityPolicySpec{
@@ -1650,7 +1650,7 @@ func TestGetMatchingPolicies(t *testing.T) {
 
 func restrictivePSP() *extensions.PodSecurityPolicy {
 	return &extensions.PodSecurityPolicy{
-		ObjectMeta: kapi.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:        "restrictive",
 			Annotations: map[string]string{},
 		},
@@ -1685,7 +1685,7 @@ func restrictivePSP() *extensions.PodSecurityPolicy {
 
 func createNamespaceForTest() *kapi.Namespace {
 	return &kapi.Namespace{
-		ObjectMeta: kapi.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: "default",
 		},
 	}
@@ -1693,7 +1693,7 @@ func createNamespaceForTest() *kapi.Namespace {
 
 func createSAForTest() *kapi.ServiceAccount {
 	return &kapi.ServiceAccount{
-		ObjectMeta: kapi.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Namespace: "default",
 			Name:      "default",
 		},
@@ -1705,7 +1705,7 @@ func createSAForTest() *kapi.ServiceAccount {
 // psp when defaults are filled in.
 func goodPod() *kapi.Pod {
 	return &kapi.Pod{
-		ObjectMeta: kapi.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Annotations: map[string]string{},
 		},
 		Spec: kapi.PodSpec{

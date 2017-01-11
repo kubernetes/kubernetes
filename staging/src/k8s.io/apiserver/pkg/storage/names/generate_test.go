@@ -69,10 +69,10 @@ func TestGenerateName(t *testing.T) {
 }
 
 func TestSimpleNameGenerator(t *testing.T) {
-	meta := &ObjectMeta{
+	meta := &metav1.ObjectMeta{
 		GenerateName: "foo",
 	}
-	GenerateName(SimpleNameGenerator, meta)
+	metav1.GenerateName(SimpleNameGenerator, meta)
 	if !strings.HasPrefix(meta.Name, "foo") || meta.Name == "foo" {
 		t.Errorf("unexpected name: %#v", meta)
 	}

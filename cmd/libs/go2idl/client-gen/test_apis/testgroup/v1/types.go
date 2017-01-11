@@ -30,7 +30,7 @@ type TestType struct {
 	// unversioned objects in the generate file that is not used anywhere other than this test type.
 	// +k8s:openapi-gen=false
 	// +optional
-	apiv1.ObjectMeta `json:"metadata,omitempty"`
+	metav1.ObjectMeta `json:"metadata,omitempty"`
 	// +optional
 	Status TestTypeStatus `json:"status,omitempty"`
 }

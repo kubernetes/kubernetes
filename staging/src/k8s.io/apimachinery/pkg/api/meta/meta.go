@@ -20,13 +20,13 @@ import (
 	"fmt"
 	"reflect"
 
+	"github.com/golang/glog"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
-
-	"github.com/golang/glog"
 )
 
 // errNotList is returned when an object implements the Object style interfaces but not the List style
@@ -54,9 +54,9 @@ func ListAccessor(obj interface{}) (List, error) {
 			return m, nil
 		}
 		return nil, errNotList
-	case Object:
+	case metav1.Object:
 		return t, nil
-	case ObjectMetaAccessor:
+	case metav1.ObjectMetaAccessor:
 		if m := t.GetObjectMeta(); m != nil {
 			return m, nil
 		}
@@ -75,11 +75,11 @@ var errNotObject = fmt.Errorf("object does not implement the Object interfaces")
 // required fields are missing. Fields that are not required return the default
 // value and are a no-op if set.
 // TODO: return bool instead of error
-func Accessor(obj interface{}) (Object, error) {
+func Accessor(obj interface{}) (metav1.Object, error) {
 	switch t := obj.(type) {
-	case Object:
+	case metav1.Object:
 		return t, nil
-	case ObjectMetaAccessor:
+	case metav1.ObjectMetaAccessor:
 		if m := t.GetObjectMeta(); m != nil {
 			return m, nil
 		}

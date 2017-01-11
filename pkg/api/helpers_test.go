@@ -356,7 +356,7 @@ func TestGetAvoidPodsFromNode(t *testing.T) {
 		},
 		{
 			node: &Node{
-				ObjectMeta: ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
 						PreferAvoidPodsAnnotationKey: `
 							{
@@ -401,7 +401,7 @@ func TestGetAvoidPodsFromNode(t *testing.T) {
 		{
 			node: &Node{
 				// Missing end symbol of "podController" and "podSignature"
-				ObjectMeta: ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
 						PreferAvoidPodsAnnotationKey: `
 							{
