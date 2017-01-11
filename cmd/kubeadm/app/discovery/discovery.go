@@ -22,7 +22,7 @@ import (
 	"net/http"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-
+	kubenode "k8s.io/kubernetes/cmd/kubeadm/app/node"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
 )
@@ -35,10 +35,9 @@ func For(d kubeadmapi.Discovery) (*clientcmdapi.Config, error) {
 	case d.HTTPS != nil:
 		return runHTTPSDiscovery(d.HTTPS)
 	case d.Token != nil:
-		// TODO move token discovery here
 		return runTokenDiscovery(d.Token)
 	default:
-		return nil, fmt.Errorf("Couldn't find a valid discovery configuration. Please provide one.")
+		return nil, fmt.Errorf("couldn't find a valid discovery configuration.")
 	}
 }
 
@@ -63,8 +62,15 @@ func runHTTPSDiscovery(hd *kubeadmapi.HTTPSDiscovery) (*clientcmdapi.Config, err
 	return clientcmd.Load(kubeconfig)
 }
 
-// TODO implement
 // runTokenDiscovery executes token-based discovery.
 func runTokenDiscovery(td *kubeadmapi.TokenDiscovery) (*clientcmdapi.Config, error) {
-	return nil, fmt.Errorf("Couldn't find a valid discovery configuration. Please provide one.")
+	clusterInfo, err := kubenode.RetrieveTrustedClusterInfo(td)
+	if err != nil {
+		return nil, err
+	}
+	cfg, err := kubenode.EstablishMasterConnection(td, clusterInfo)
+	if err != nil {
+		return nil, err
+	}
+	return cfg, nil
 }
