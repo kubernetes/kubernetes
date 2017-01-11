@@ -81,7 +81,7 @@ func BeforeUpdate(strategy RESTUpdateStrategy, ctx genericapirequest.Context, ob
 		return kerr
 	}
 	if strategy.NamespaceScoped() {
-		if !api.ValidNamespace(ctx, objectMeta) {
+		if !ValidNamespace(ctx, objectMeta) {
 			return errors.NewBadRequest("the namespace of the provided object does not match the namespace sent on the request")
 		}
 	} else {

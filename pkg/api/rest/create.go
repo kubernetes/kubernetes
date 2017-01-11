@@ -20,7 +20,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/validation/genericvalidation"
-	path "k8s.io/kubernetes/pkg/api/validation/path"
+	"k8s.io/kubernetes/pkg/api/validation/path"
 	genericapirequest "k8s.io/kubernetes/pkg/genericapiserver/api/request"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/runtime/schema"
@@ -61,7 +61,7 @@ func BeforeCreate(strategy RESTCreateStrategy, ctx genericapirequest.Context, ob
 	}
 
 	if strategy.NamespaceScoped() {
-		if !api.ValidNamespace(ctx, objectMeta) {
+		if !ValidNamespace(ctx, objectMeta) {
 			return errors.NewBadRequest("the namespace of the provided object does not match the namespace sent on the request")
 		}
 	} else {
@@ -70,7 +70,7 @@ func BeforeCreate(strategy RESTCreateStrategy, ctx genericapirequest.Context, ob
 	objectMeta.DeletionTimestamp = nil
 	objectMeta.DeletionGracePeriodSeconds = nil
 	strategy.PrepareForCreate(ctx, obj)
-	api.FillObjectMetaSystemFields(ctx, objectMeta)
+	FillObjectMetaSystemFields(ctx, objectMeta)
 	api.GenerateName(strategy, objectMeta)
 
 	// ClusterName is ignored and should not be saved
