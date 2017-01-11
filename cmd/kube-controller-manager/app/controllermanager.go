@@ -516,6 +516,10 @@ func StartControllers(s *options.CMServer, kubeconfig *restclient.Config, rootCl
 	volumeController.Run(wait.NeverStop)
 	time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
 
+	if s.ReconcilerSyncLoopPeriod.Duration < time.Second {
+		return fmt.Errorf("Duration time must be greater than one second as set via command line option reconcile-sync-loop-period.")
+	}
+
 	attachDetachController, attachDetachControllerErr :=
 		attachdetach.NewAttachDetachController(
 			client("attachdetach-controller"),
@@ -525,7 +529,10 @@ func StartControllers(s *options.CMServer, kubeconfig *restclient.Config, rootCl
 			sharedInformers.PersistentVolumes().Informer(),
 			cloud,
 			ProbeAttachableVolumePlugins(s.VolumeConfiguration),
-			recorder)
+			recorder,
+			s.DisableAttachDetachReconcilerSync,
+			s.ReconcilerSyncLoopPeriod.Duration,
+		)
 	if attachDetachControllerErr != nil {
 		glog.Fatalf("Failed to start attach/detach controller: %v", attachDetachControllerErr)
 	}

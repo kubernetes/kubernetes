@@ -86,15 +86,16 @@ func NewCMServer() *CMServer {
 				},
 				FlexVolumePluginDir: "/usr/libexec/kubernetes/kubelet-plugins/volume/exec/",
 			},
-			ContentType:             "application/vnd.kubernetes.protobuf",
-			KubeAPIQPS:              20.0,
-			KubeAPIBurst:            30,
-			LeaderElection:          leaderelection.DefaultLeaderElectionConfiguration(),
-			ControllerStartInterval: unversioned.Duration{Duration: 0 * time.Second},
-			EnableGarbageCollector:  true,
-			ConcurrentGCSyncs:       20,
-			ClusterSigningCertFile:  "/etc/kubernetes/ca/ca.pem",
-			ClusterSigningKeyFile:   "/etc/kubernetes/ca/ca.key",
+			ContentType:              "application/vnd.kubernetes.protobuf",
+			KubeAPIQPS:               20.0,
+			KubeAPIBurst:             30,
+			LeaderElection:           leaderelection.DefaultLeaderElectionConfiguration(),
+			ControllerStartInterval:  unversioned.Duration{Duration: 0 * time.Second},
+			EnableGarbageCollector:   true,
+			ConcurrentGCSyncs:        20,
+			ClusterSigningCertFile:   "/etc/kubernetes/ca/ca.pem",
+			ClusterSigningKeyFile:    "/etc/kubernetes/ca/ca.key",
+			ReconcilerSyncLoopPeriod: unversioned.Duration{Duration: 5 * time.Second},
 		},
 	}
 	s.LeaderElection.LeaderElect = true
@@ -181,6 +182,8 @@ func (s *CMServer) AddFlags(fs *pflag.FlagSet) {
 	fs.Float32Var(&s.SecondaryNodeEvictionRate, "secondary-node-eviction-rate", 0.01, "Number of nodes per second on which pods are deleted in case of node failure when a zone is unhealthy (see --unhealthy-zone-threshold for definition of healthy/unhealthy). Zone refers to entire cluster in non-multizone clusters. This value is implicitly overridden to 0 if the cluster size is smaller than --large-cluster-size-threshold.")
 	fs.Int32Var(&s.LargeClusterSizeThreshold, "large-cluster-size-threshold", 50, "Number of nodes from which NodeController treats the cluster as large for the eviction logic purposes. --secondary-node-eviction-rate is implicitly overridden to 0 for clusters this size or smaller.")
 	fs.Float32Var(&s.UnhealthyZoneThreshold, "unhealthy-zone-threshold", 0.55, "Fraction of Nodes in a zone which needs to be not Ready (minimum 3) for zone to be treated as unhealthy. ")
+	fs.BoolVar(&s.DisableAttachDetachReconcilerSync, "disable-attach-detach-reconcile-sync", false, "Disable volume attach detach reconciler sync. Disabling this may cause volumes to be mismatched with pods. Use wisely.")
+	fs.DurationVar(&s.ReconcilerSyncLoopPeriod.Duration, "attach-detach-reconcile-sync-period", s.ReconcilerSyncLoopPeriod.Duration, "The reconciler sync wait time between volume attach detach. This duration must be larger than one second, and increasing this value from the default may allow for volumes to be mismatched with pods.")
 
 	leaderelection.BindFlags(&s.LeaderElection, fs)
 	config.DefaultFeatureGate.AddFlag(fs)
