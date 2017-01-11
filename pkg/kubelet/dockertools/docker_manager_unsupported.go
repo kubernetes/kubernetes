@@ -22,6 +22,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 
 	dockertypes "github.com/docker/engine-api/types"
+	dockercontainer "github.com/docker/engine-api/types/container"
 )
 
 // These two functions are OS specific (for now at least)
