@@ -32,8 +32,6 @@ go_library(
     ],
     tags = ["automanaged"],
     deps = [
-        "//federation/apis/federation/v1beta1:go_default_library",
-        "//federation/client/clientset_generated/federation_clientset:go_default_library",
         "//pkg/api:go_default_library",
         "//pkg/api/v1:go_default_library",
         "//pkg/api/v1/service:go_default_library",
@@ -95,7 +93,6 @@ go_library(
         "//vendor:golang.org/x/net/websocket",
         "//vendor:google.golang.org/api/compute/v1",
         "//vendor:google.golang.org/api/googleapi",
-        "//vendor:gopkg.in/yaml.v2",
         "//vendor:k8s.io/apimachinery/pkg/api/errors",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1/unstructured",
