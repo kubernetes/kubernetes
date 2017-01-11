@@ -23,11 +23,11 @@ go_library(
         "//pkg/api:go_default_library",
         "//pkg/api/errors:go_default_library",
         "//pkg/genericapiserver/api/request:go_default_library",
-        "//pkg/httplog:go_default_library",
         "//pkg/util:go_default_library",
         "//vendor:github.com/golang/glog",
         "//vendor:k8s.io/apimachinery/pkg/util/runtime",
         "//vendor:k8s.io/apimachinery/pkg/util/sets",
+        "//vendor:k8s.io/apiserver/pkg/httplog",
     ],
 )
 

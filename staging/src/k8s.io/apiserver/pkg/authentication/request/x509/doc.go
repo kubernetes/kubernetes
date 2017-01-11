@@ -14,6 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package httplog contains a helper object and functions to maintain a log
-// along with an http response.
-package httplog // import "k8s.io/kubernetes/pkg/httplog"
+// Package x509 provides a request authenticator that validates and
+// extracts user information from client certificates
+package x509 // import "k8s.io/apiserver/pkg/authentication/request/x509"

@@ -51,7 +51,6 @@ go_library(
         "//pkg/genericapiserver/api/handlers/responsewriters:go_default_library",
         "//pkg/genericapiserver/api/metrics:go_default_library",
         "//pkg/genericapiserver/api/request:go_default_library",
-        "//pkg/httplog:go_default_library",
         "//pkg/util:go_default_library",
         "//pkg/util/httpstream:go_default_library",
         "//pkg/util/proxy:go_default_library",
@@ -69,6 +68,7 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/util/net",
         "//vendor:k8s.io/apimachinery/pkg/util/runtime",
         "//vendor:k8s.io/apimachinery/pkg/watch",
+        "//vendor:k8s.io/apiserver/pkg/httplog",
     ],
 )
 

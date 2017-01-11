@@ -8,6 +8,18 @@ load(
     "go_test",
 )
 
+go_test(
+    name = "go_default_test",
+    srcs = ["ssh_test.go"],
+    library = ":go_default_library",
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/golang/glog",
+        "//vendor:golang.org/x/crypto/ssh",
+        "//vendor:k8s.io/client-go/pkg/util/wait",
+    ],
+)
+
 go_library(
     name = "go_default_library",
     srcs = ["ssh.go"],
@@ -18,18 +30,6 @@ go_library(
         "//vendor:golang.org/x/crypto/ssh",
         "//vendor:k8s.io/client-go/pkg/util/net",
         "//vendor:k8s.io/client-go/pkg/util/runtime",
-        "//vendor:k8s.io/client-go/pkg/util/wait",
-    ],
-)
-
-go_test(
-    name = "go_default_test",
-    srcs = ["ssh_test.go"],
-    library = ":go_default_library",
-    tags = ["automanaged"],
-    deps = [
-        "//vendor:github.com/golang/glog",
-        "//vendor:golang.org/x/crypto/ssh",
         "//vendor:k8s.io/client-go/pkg/util/wait",
     ],
 )

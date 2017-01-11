@@ -21,7 +21,6 @@ go_library(
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/errors:go_default_library",
-        "//pkg/httplog:go_default_library",
         "//pkg/util/exec:go_default_library",
         "//pkg/util/httpstream:go_default_library",
         "//pkg/util/httpstream/spdy:go_default_library",
@@ -31,6 +30,7 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/types",
         "//vendor:k8s.io/apimachinery/pkg/util/runtime",
+        "//vendor:k8s.io/apiserver/pkg/httplog",
     ],
 )
 

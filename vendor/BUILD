@@ -13008,3 +13008,198 @@ go_library(
     ],
     tags = ["automanaged"],
 )
+
+go_test(
+    name = "k8s.io/apiserver/pkg/authentication/group_test",
+    srcs = ["k8s.io/apiserver/pkg/authentication/group/group_adder_test.go"],
+    library = ":k8s.io/apiserver/pkg/authentication/group",
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:k8s.io/apiserver/pkg/authentication/authenticator",
+        "//vendor:k8s.io/apiserver/pkg/authentication/user",
+    ],
+)
+
+go_library(
+    name = "k8s.io/apiserver/pkg/authentication/group",
+    srcs = ["k8s.io/apiserver/pkg/authentication/group/group_adder.go"],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:k8s.io/apiserver/pkg/authentication/authenticator",
+        "//vendor:k8s.io/apiserver/pkg/authentication/user",
+    ],
+)
+
+go_test(
+    name = "k8s.io/apiserver/pkg/authentication/request/anonymous_test",
+    srcs = ["k8s.io/apiserver/pkg/authentication/request/anonymous/anonymous_test.go"],
+    library = ":k8s.io/apiserver/pkg/authentication/request/anonymous",
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:k8s.io/apimachinery/pkg/util/sets",
+        "//vendor:k8s.io/apiserver/pkg/authentication/authenticator",
+        "//vendor:k8s.io/apiserver/pkg/authentication/user",
+    ],
+)
+
+go_library(
+    name = "k8s.io/apiserver/pkg/authentication/request/anonymous",
+    srcs = ["k8s.io/apiserver/pkg/authentication/request/anonymous/anonymous.go"],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:k8s.io/apiserver/pkg/authentication/authenticator",
+        "//vendor:k8s.io/apiserver/pkg/authentication/user",
+    ],
+)
+
+go_test(
+    name = "k8s.io/apiserver/pkg/authentication/request/bearertoken_test",
+    srcs = ["k8s.io/apiserver/pkg/authentication/request/bearertoken/bearertoken_test.go"],
+    library = ":k8s.io/apiserver/pkg/authentication/request/bearertoken",
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:k8s.io/apiserver/pkg/authentication/authenticator",
+        "//vendor:k8s.io/apiserver/pkg/authentication/user",
+    ],
+)
+
+go_library(
+    name = "k8s.io/apiserver/pkg/authentication/request/bearertoken",
+    srcs = ["k8s.io/apiserver/pkg/authentication/request/bearertoken/bearertoken.go"],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:k8s.io/apiserver/pkg/authentication/authenticator",
+        "//vendor:k8s.io/apiserver/pkg/authentication/user",
+    ],
+)
+
+go_test(
+    name = "k8s.io/apiserver/pkg/authentication/request/union_test",
+    srcs = ["k8s.io/apiserver/pkg/authentication/request/union/unionauth_test.go"],
+    library = ":k8s.io/apiserver/pkg/authentication/request/union",
+    tags = ["automanaged"],
+    deps = ["//vendor:k8s.io/apiserver/pkg/authentication/user"],
+)
+
+go_library(
+    name = "k8s.io/apiserver/pkg/authentication/request/union",
+    srcs = ["k8s.io/apiserver/pkg/authentication/request/union/union.go"],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:k8s.io/apiserver/pkg/authentication/authenticator",
+        "//vendor:k8s.io/apiserver/pkg/authentication/user",
+        "//vendor:k8s.io/client-go/pkg/util/errors",
+    ],
+)
+
+go_test(
+    name = "k8s.io/apiserver/pkg/authentication/request/x509_test",
+    srcs = ["k8s.io/apiserver/pkg/authentication/request/x509/x509_test.go"],
+    library = ":k8s.io/apiserver/pkg/authentication/request/x509",
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:k8s.io/apiserver/pkg/authentication/authenticator",
+        "//vendor:k8s.io/apiserver/pkg/authentication/user",
+        "//vendor:k8s.io/client-go/pkg/util/sets",
+    ],
+)
+
+go_library(
+    name = "k8s.io/apiserver/pkg/authentication/request/x509",
+    srcs = [
+        "k8s.io/apiserver/pkg/authentication/request/x509/doc.go",
+        "k8s.io/apiserver/pkg/authentication/request/x509/x509.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/golang/glog",
+        "//vendor:k8s.io/apiserver/pkg/authentication/authenticator",
+        "//vendor:k8s.io/apiserver/pkg/authentication/user",
+        "//vendor:k8s.io/client-go/pkg/util/errors",
+        "//vendor:k8s.io/client-go/pkg/util/sets",
+    ],
+)
+
+go_test(
+    name = "k8s.io/apiserver/pkg/authentication/token/tokenfile_test",
+    srcs = ["k8s.io/apiserver/pkg/authentication/token/tokenfile/tokenfile_test.go"],
+    library = ":k8s.io/apiserver/pkg/authentication/token/tokenfile",
+    tags = ["automanaged"],
+    deps = ["//vendor:k8s.io/apiserver/pkg/authentication/user"],
+)
+
+go_library(
+    name = "k8s.io/apiserver/pkg/authentication/token/tokenfile",
+    srcs = ["k8s.io/apiserver/pkg/authentication/token/tokenfile/tokenfile.go"],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/golang/glog",
+        "//vendor:k8s.io/apiserver/pkg/authentication/user",
+    ],
+)
+
+go_test(
+    name = "k8s.io/apiserver/pkg/authorization/union_test",
+    srcs = ["k8s.io/apiserver/pkg/authorization/union/union_test.go"],
+    library = ":k8s.io/apiserver/pkg/authorization/union",
+    tags = ["automanaged"],
+    deps = ["//vendor:k8s.io/apiserver/pkg/authorization/authorizer"],
+)
+
+go_library(
+    name = "k8s.io/apiserver/pkg/authorization/union",
+    srcs = ["k8s.io/apiserver/pkg/authorization/union/union.go"],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:k8s.io/apiserver/pkg/authorization/authorizer",
+        "//vendor:k8s.io/client-go/pkg/util/errors",
+    ],
+)
+
+go_test(
+    name = "k8s.io/apiserver/pkg/httplog_test",
+    srcs = ["k8s.io/apiserver/pkg/httplog/log_test.go"],
+    library = ":k8s.io/apiserver/pkg/httplog",
+    tags = ["automanaged"],
+)
+
+go_library(
+    name = "k8s.io/apiserver/pkg/httplog",
+    srcs = [
+        "k8s.io/apiserver/pkg/httplog/doc.go",
+        "k8s.io/apiserver/pkg/httplog/log.go",
+    ],
+    tags = ["automanaged"],
+    deps = ["//vendor:github.com/golang/glog"],
+)
+
+go_library(
+    name = "k8s.io/apiserver/pkg/storage/etcd/metrics",
+    srcs = ["k8s.io/apiserver/pkg/storage/etcd/metrics/metrics.go"],
+    tags = ["automanaged"],
+    deps = ["//vendor:github.com/prometheus/client_golang/prometheus"],
+)
+
+go_test(
+    name = "k8s.io/apiserver/pkg/util/cache_test",
+    srcs = [
+        "k8s.io/apiserver/pkg/util/cache/cache_test.go",
+        "k8s.io/apiserver/pkg/util/cache/lruexpirecache_test.go",
+    ],
+    library = ":k8s.io/apiserver/pkg/util/cache",
+    tags = ["automanaged"],
+    deps = [
+        "//pkg/util/clock:go_default_library",
+        "//vendor:github.com/golang/groupcache/lru",
+    ],
+)
+
+go_library(
+    name = "k8s.io/apiserver/pkg/util/cache",
+    srcs = [
+        "k8s.io/apiserver/pkg/util/cache/cache.go",
+        "k8s.io/apiserver/pkg/util/cache/lruexpirecache.go",
+    ],
+    tags = ["automanaged"],
+    deps = ["//vendor:github.com/golang/groupcache/lru"],
+)
