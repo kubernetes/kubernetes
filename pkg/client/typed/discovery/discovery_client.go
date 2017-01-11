@@ -123,11 +123,14 @@ func (d *DiscoveryClient) ServerGroups() (apiGroupList *metav1.APIGroupList, err
 	v := &metav1.APIVersions{}
 	err = d.restClient.Get().AbsPath(d.LegacyPrefix).Do().Into(v)
 	apiGroup := metav1.APIGroup{}
-	if err == nil {
+	if err == nil && len(v.Versions) != 0 {
 		apiGroup = apiVersionsToAPIGroup(v)
 	}
 	if err != nil && !errors.IsNotFound(err) && !errors.IsForbidden(err) {
 		return nil, err
+	}
+	if len(v.Versions) == 0 {
+		return nil, fmt.Errorf("APIVersions shouldn't be empty")
 	}
 
 	// Get the groupVersions exposed at /apis
