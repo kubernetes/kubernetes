@@ -15,6 +15,7 @@ go_test(
     tags = ["automanaged"],
     deps = [
         "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
+        "//vendor:k8s.io/apiserver/pkg/server/storage",
         "//vendor:k8s.io/apiserver/pkg/storage/storagebackend",
     ],
 )

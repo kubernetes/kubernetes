@@ -20,6 +20,8 @@ go_library(
         "//pkg/api:go_default_library",
         "//pkg/probe:go_default_library",
         "//pkg/probe/http:go_default_library",
+        "//vendor:github.com/coreos/etcd/pkg/tlsutil",
+        "//vendor:github.com/golang/glog",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/internalversion",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/runtime",
