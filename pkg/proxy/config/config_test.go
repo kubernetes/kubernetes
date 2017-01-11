@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package config_test
+package config
 
 import (
 	"reflect"
@@ -23,7 +23,7 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
-	. "k8s.io/kubernetes/pkg/proxy/config"
+	"k8s.io/kubernetes/pkg/util/diff"
 	"k8s.io/kubernetes/pkg/util/wait"
 )
 
@@ -54,7 +54,7 @@ type ServiceHandlerMock struct {
 	waits   int
 }
 
-func NewServiceHandlerMock() *ServiceHandlerMock {
+func newServiceHandlerMock() *ServiceHandlerMock {
 	return &ServiceHandlerMock{updated: make(chan []api.Service, 5)}
 }
 
@@ -77,7 +77,7 @@ func (h *ServiceHandlerMock) ValidateServices(t *testing.T, expectedServices []a
 		// Unittests will hard timeout in 5m with a stack trace, prevent that
 		// and surface a clearer reason for failure.
 		case <-time.After(wait.ForeverTestTimeout):
-			t.Errorf("Timed out. Expected %#v, Got %#v", expectedServices, services)
+			t.Errorf("Timed out. Unexpected mismatch: %s", diff.ObjectDiff(expectedServices, services))
 			return
 		}
 	}
@@ -100,7 +100,7 @@ type EndpointsHandlerMock struct {
 	waits   int
 }
 
-func NewEndpointsHandlerMock() *EndpointsHandlerMock {
+func newEndpointsHandlerMock() *EndpointsHandlerMock {
 	return &EndpointsHandlerMock{updated: make(chan []api.Endpoints, 5)}
 }
 
@@ -123,13 +123,13 @@ func (h *EndpointsHandlerMock) ValidateEndpoints(t *testing.T, expectedEndpoints
 		// Unittests will hard timeout in 5m with a stack trace, prevent that
 		// and surface a clearer reason for failure.
 		case <-time.After(wait.ForeverTestTimeout):
-			t.Errorf("Timed out. Expected %#v, Got %#v", expectedEndpoints, endpoints)
+			t.Errorf("Timed out. Unexpected mismatch: %s", diff.ObjectDiff(expectedEndpoints, endpoints))
 			return
 		}
 	}
 }
 
-func CreateServiceUpdate(op Operation, services ...api.Service) ServiceUpdate {
+func createServiceUpdate(op Operation, services ...api.Service) ServiceUpdate {
 	ret := ServiceUpdate{Op: op}
 	ret.Services = make([]api.Service, len(services))
 	for i, value := range services {
@@ -138,7 +138,7 @@ func CreateServiceUpdate(op Operation, services ...api.Service) ServiceUpdate {
 	return ret
 }
 
-func CreateEndpointsUpdate(op Operation, endpoints ...api.Endpoints) EndpointsUpdate {
+func createEndpointsUpdate(op Operation, endpoints ...api.Endpoints) EndpointsUpdate {
 	ret := EndpointsUpdate{Op: op}
 	ret.Endpoints = make([]api.Endpoints, len(endpoints))
 	for i, value := range endpoints {
@@ -150,30 +150,50 @@ func CreateEndpointsUpdate(op Operation, endpoints ...api.Endpoints) EndpointsUp
 func TestNewServiceAddedAndNotified(t *testing.T) {
 	config := NewServiceConfig()
 	channel := config.Channel("one")
-	handler := NewServiceHandlerMock()
+	handler := newServiceHandlerMock()
 	config.RegisterHandler(handler)
-	serviceUpdate := CreateServiceUpdate(ADD, api.Service{
+	serviceUpdate := createServiceUpdate(ADD, api.Service{
+		ObjectMeta: api.ObjectMeta{Namespace: "testnamespace", Name: "foo"},
+		Spec:       api.ServiceSpec{Ports: []api.ServicePort{{Protocol: "TCP", Port: 10}}},
+	})
+	channel <- serviceUpdate
+	handler.ValidateServices(t, serviceUpdate.Services)
+}
+
+func TestServiceUpdatedAndNotified(t *testing.T) {
+	config := NewServiceConfig()
+	channel := config.Channel("one")
+	handler := newServiceHandlerMock()
+	config.RegisterHandler(handler)
+	serviceUpdate := createServiceUpdate(ADD, api.Service{
 		ObjectMeta: api.ObjectMeta{Namespace: "testnamespace", Name: "foo"},
 		Spec:       api.ServiceSpec{Ports: []api.ServicePort{{Protocol: "TCP", Port: 10}}},
 	})
 	channel <- serviceUpdate
 	handler.ValidateServices(t, serviceUpdate.Services)
 
+	//Update Service
+	serviceUpdate = createServiceUpdate(ADD, api.Service{
+		ObjectMeta: api.ObjectMeta{Namespace: "testnamespace", Name: "foo"},
+		Spec:       api.ServiceSpec{Ports: []api.ServicePort{{Protocol: "TCP", Port: 80}}},
+	})
+	channel <- serviceUpdate
+	handler.ValidateServices(t, serviceUpdate.Services)
 }
 
 func TestServiceAddedRemovedSetAndNotified(t *testing.T) {
 	config := NewServiceConfig()
 	channel := config.Channel("one")
-	handler := NewServiceHandlerMock()
+	handler := newServiceHandlerMock()
 	config.RegisterHandler(handler)
-	serviceUpdate := CreateServiceUpdate(ADD, api.Service{
+	serviceUpdate := createServiceUpdate(ADD, api.Service{
 		ObjectMeta: api.ObjectMeta{Namespace: "testnamespace", Name: "foo"},
 		Spec:       api.ServiceSpec{Ports: []api.ServicePort{{Protocol: "TCP", Port: 10}}},
 	})
 	channel <- serviceUpdate
 	handler.ValidateServices(t, serviceUpdate.Services)
 
-	serviceUpdate2 := CreateServiceUpdate(ADD, api.Service{
+	serviceUpdate2 := createServiceUpdate(ADD, api.Service{
 		ObjectMeta: api.ObjectMeta{Namespace: "testnamespace", Name: "bar"},
 		Spec:       api.ServiceSpec{Ports: []api.ServicePort{{Protocol: "TCP", Port: 20}}},
 	})
@@ -181,19 +201,24 @@ func TestServiceAddedRemovedSetAndNotified(t *testing.T) {
 	services := []api.Service{serviceUpdate2.Services[0], serviceUpdate.Services[0]}
 	handler.ValidateServices(t, services)
 
-	serviceUpdate3 := CreateServiceUpdate(REMOVE, api.Service{
+	serviceUpdate3 := createServiceUpdate(REMOVE, api.Service{
 		ObjectMeta: api.ObjectMeta{Namespace: "testnamespace", Name: "foo"},
 	})
 	channel <- serviceUpdate3
 	services = []api.Service{serviceUpdate2.Services[0]}
 	handler.ValidateServices(t, services)
 
-	serviceUpdate4 := CreateServiceUpdate(SET, api.Service{
+	serviceUpdate4 := createServiceUpdate(SET, api.Service{
 		ObjectMeta: api.ObjectMeta{Namespace: "testnamespace", Name: "foobar"},
 		Spec:       api.ServiceSpec{Ports: []api.ServicePort{{Protocol: "TCP", Port: 99}}},
 	})
 	channel <- serviceUpdate4
 	services = []api.Service{serviceUpdate4.Services[0]}
+	handler.ValidateServices(t, services)
+
+	serviceUpdate5 := createServiceUpdate(SET, []api.Service{}...)
+	channel <- serviceUpdate5
+	services = []api.Service{}
 	handler.ValidateServices(t, services)
 }
 
@@ -204,13 +229,13 @@ func TestNewMultipleSourcesServicesAddedAndNotified(t *testing.T) {
 	if channelOne == channelTwo {
 		t.Error("Same channel handed back for one and two")
 	}
-	handler := NewServiceHandlerMock()
+	handler := newServiceHandlerMock()
 	config.RegisterHandler(handler)
-	serviceUpdate1 := CreateServiceUpdate(ADD, api.Service{
+	serviceUpdate1 := createServiceUpdate(ADD, api.Service{
 		ObjectMeta: api.ObjectMeta{Namespace: "testnamespace", Name: "foo"},
 		Spec:       api.ServiceSpec{Ports: []api.ServicePort{{Protocol: "TCP", Port: 10}}},
 	})
-	serviceUpdate2 := CreateServiceUpdate(ADD, api.Service{
+	serviceUpdate2 := createServiceUpdate(ADD, api.Service{
 		ObjectMeta: api.ObjectMeta{Namespace: "testnamespace", Name: "bar"},
 		Spec:       api.ServiceSpec{Ports: []api.ServicePort{{Protocol: "TCP", Port: 20}}},
 	})
@@ -224,15 +249,15 @@ func TestNewMultipleSourcesServicesMultipleHandlersAddedAndNotified(t *testing.T
 	config := NewServiceConfig()
 	channelOne := config.Channel("one")
 	channelTwo := config.Channel("two")
-	handler := NewServiceHandlerMock()
-	handler2 := NewServiceHandlerMock()
+	handler := newServiceHandlerMock()
+	handler2 := newServiceHandlerMock()
 	config.RegisterHandler(handler)
 	config.RegisterHandler(handler2)
-	serviceUpdate1 := CreateServiceUpdate(ADD, api.Service{
+	serviceUpdate1 := createServiceUpdate(ADD, api.Service{
 		ObjectMeta: api.ObjectMeta{Namespace: "testnamespace", Name: "foo"},
 		Spec:       api.ServiceSpec{Ports: []api.ServicePort{{Protocol: "TCP", Port: 10}}},
 	})
-	serviceUpdate2 := CreateServiceUpdate(ADD, api.Service{
+	serviceUpdate2 := createServiceUpdate(ADD, api.Service{
 		ObjectMeta: api.ObjectMeta{Namespace: "testnamespace", Name: "bar"},
 		Spec:       api.ServiceSpec{Ports: []api.ServicePort{{Protocol: "TCP", Port: 20}}},
 	})
@@ -247,18 +272,18 @@ func TestNewMultipleSourcesEndpointsMultipleHandlersAddedAndNotified(t *testing.
 	config := NewEndpointsConfig()
 	channelOne := config.Channel("one")
 	channelTwo := config.Channel("two")
-	handler := NewEndpointsHandlerMock()
-	handler2 := NewEndpointsHandlerMock()
+	handler := newEndpointsHandlerMock()
+	handler2 := newEndpointsHandlerMock()
 	config.RegisterHandler(handler)
 	config.RegisterHandler(handler2)
-	endpointsUpdate1 := CreateEndpointsUpdate(ADD, api.Endpoints{
+	endpointsUpdate1 := createEndpointsUpdate(ADD, api.Endpoints{
 		ObjectMeta: api.ObjectMeta{Namespace: "testnamespace", Name: "foo"},
 		Subsets: []api.EndpointSubset{{
 			Addresses: []api.EndpointAddress{{IP: "1.1.1.1"}, {IP: "2.2.2.2"}},
 			Ports:     []api.EndpointPort{{Port: 80}},
 		}},
 	})
-	endpointsUpdate2 := CreateEndpointsUpdate(ADD, api.Endpoints{
+	endpointsUpdate2 := createEndpointsUpdate(ADD, api.Endpoints{
 		ObjectMeta: api.ObjectMeta{Namespace: "testnamespace", Name: "bar"},
 		Subsets: []api.EndpointSubset{{
 			Addresses: []api.EndpointAddress{{IP: "3.3.3.3"}, {IP: "4.4.4.4"}},
@@ -273,22 +298,126 @@ func TestNewMultipleSourcesEndpointsMultipleHandlersAddedAndNotified(t *testing.
 	handler2.ValidateEndpoints(t, endpoints)
 }
 
-func TestNewMultipleSourcesEndpointsMultipleHandlersAddRemoveSetAndNotified(t *testing.T) {
+func TestEndpointsSetAndNotified(t *testing.T) {
 	config := NewEndpointsConfig()
-	channelOne := config.Channel("one")
-	channelTwo := config.Channel("two")
-	handler := NewEndpointsHandlerMock()
-	handler2 := NewEndpointsHandlerMock()
+	channel := config.Channel("one")
+	handler := newEndpointsHandlerMock()
 	config.RegisterHandler(handler)
-	config.RegisterHandler(handler2)
-	endpointsUpdate1 := CreateEndpointsUpdate(ADD, api.Endpoints{
+	endpointsUpdate := createEndpointsUpdate(ADD, api.Endpoints{
 		ObjectMeta: api.ObjectMeta{Namespace: "testnamespace", Name: "foo"},
 		Subsets: []api.EndpointSubset{{
 			Addresses: []api.EndpointAddress{{IP: "1.1.1.1"}, {IP: "2.2.2.2"}},
 			Ports:     []api.EndpointPort{{Port: 80}},
 		}},
 	})
-	endpointsUpdate2 := CreateEndpointsUpdate(ADD, api.Endpoints{
+	channel <- endpointsUpdate
+
+	endpointsUpdate1 := createEndpointsUpdate(ADD, api.Endpoints{
+		ObjectMeta: api.ObjectMeta{Namespace: "testnamespace", Name: "oof"},
+		Subsets: []api.EndpointSubset{{
+			Addresses: []api.EndpointAddress{{IP: "5.5.5.5"}, {IP: "6.6.6.6"}},
+			Ports:     []api.EndpointPort{{Port: 80}},
+		}},
+	})
+	channel <- endpointsUpdate1
+	endpoints := []api.Endpoints{endpointsUpdate.Endpoints[0], endpointsUpdate1.Endpoints[0]}
+	handler.ValidateEndpoints(t, endpoints)
+
+	endpointsUpdate4 := createEndpointsUpdate(SET, api.Endpoints{
+		ObjectMeta: api.ObjectMeta{Namespace: "testnamespace", Name: "foobar"},
+		Subsets: []api.EndpointSubset{{
+			Addresses: []api.EndpointAddress{{IP: "5.5.5.5"}},
+			Ports:     []api.EndpointPort{{Port: 80}},
+		}},
+	})
+	channel <- endpointsUpdate4
+	endpoints = []api.Endpoints{endpointsUpdate4.Endpoints[0]}
+	handler.ValidateEndpoints(t, endpoints)
+}
+
+func TestEndpointsAddedUpdatedRemovedSetAndNotified(t *testing.T) {
+	config := NewEndpointsConfig()
+	channel := config.Channel("one")
+	handler := newEndpointsHandlerMock()
+	config.RegisterHandler(handler)
+	endpointsUpdate := createEndpointsUpdate(ADD, api.Endpoints{
+		ObjectMeta: api.ObjectMeta{Namespace: "testnamespace", Name: "foo"},
+		Subsets: []api.EndpointSubset{{
+			Addresses: []api.EndpointAddress{{IP: "1.1.1.1"}, {IP: "2.2.2.2"}},
+			Ports:     []api.EndpointPort{{Port: 80}},
+		}},
+	})
+	channel <- endpointsUpdate
+
+	endpointsUpdate1 := createEndpointsUpdate(ADD, api.Endpoints{
+		ObjectMeta: api.ObjectMeta{Namespace: "testnamespace", Name: "oof"},
+		Subsets: []api.EndpointSubset{{
+			Addresses: []api.EndpointAddress{{IP: "5.5.5.5"}, {IP: "6.6.6.6"}},
+			Ports:     []api.EndpointPort{{Port: 80}},
+		}},
+	})
+	channel <- endpointsUpdate1
+	endpoints := []api.Endpoints{endpointsUpdate.Endpoints[0], endpointsUpdate1.Endpoints[0]}
+	handler.ValidateEndpoints(t, endpoints)
+
+	endpointsUpdate2 := createEndpointsUpdate(ADD, api.Endpoints{
+		ObjectMeta: api.ObjectMeta{Namespace: "testnamespace", Name: "bar"},
+		Subsets: []api.EndpointSubset{{
+			Addresses: []api.EndpointAddress{{IP: "3.3.3.3"}, {IP: "4.4.4.4"}},
+			Ports:     []api.EndpointPort{{Port: 80}},
+		}},
+	})
+	channel <- endpointsUpdate2
+	endpoints = []api.Endpoints{endpointsUpdate2.Endpoints[0], endpointsUpdate.Endpoints[0], endpointsUpdate1.Endpoints[0]}
+	handler.ValidateEndpoints(t, endpoints)
+
+	// Update Service
+	endpointsUpdate = createEndpointsUpdate(ADD, api.Endpoints{
+		ObjectMeta: api.ObjectMeta{Namespace: "testnamespace", Name: "foo"},
+		Subsets: []api.EndpointSubset{{
+			Addresses: []api.EndpointAddress{{IP: "7.7.7.7"}, {IP: "8.8.8.8"}},
+			Ports:     []api.EndpointPort{{Port: 80}},
+		}},
+	})
+	channel <- endpointsUpdate
+	endpoints = []api.Endpoints{endpointsUpdate2.Endpoints[0], endpointsUpdate.Endpoints[0], endpointsUpdate1.Endpoints[0]}
+	handler.ValidateEndpoints(t, endpoints)
+
+	endpointsUpdate3 := createEndpointsUpdate(REMOVE, api.Endpoints{
+		ObjectMeta: api.ObjectMeta{Namespace: "testnamespace", Name: "foo"},
+	})
+	channel <- endpointsUpdate3
+	endpoints = []api.Endpoints{endpointsUpdate2.Endpoints[0], endpointsUpdate1.Endpoints[0]}
+	handler.ValidateEndpoints(t, endpoints)
+
+	endpointsUpdate4 := createEndpointsUpdate(SET, api.Endpoints{
+		ObjectMeta: api.ObjectMeta{Namespace: "testnamespace", Name: "foobar"},
+		Subsets: []api.EndpointSubset{{
+			Addresses: []api.EndpointAddress{{IP: "5.5.5.5"}},
+			Ports:     []api.EndpointPort{{Port: 80}},
+		}},
+	})
+	channel <- endpointsUpdate4
+	endpoints = []api.Endpoints{endpointsUpdate4.Endpoints[0]}
+	handler.ValidateEndpoints(t, endpoints)
+}
+
+func TestNewMultipleSourcesEndpointsMultipleHandlersAddRemoveSetAndNotified(t *testing.T) {
+	config := NewEndpointsConfig()
+	channelOne := config.Channel("one")
+	channelTwo := config.Channel("two")
+	handler := newEndpointsHandlerMock()
+	handler2 := newEndpointsHandlerMock()
+	config.RegisterHandler(handler)
+	config.RegisterHandler(handler2)
+	endpointsUpdate1 := createEndpointsUpdate(ADD, api.Endpoints{
+		ObjectMeta: api.ObjectMeta{Namespace: "testnamespace", Name: "foo"},
+		Subsets: []api.EndpointSubset{{
+			Addresses: []api.EndpointAddress{{IP: "1.1.1.1"}, {IP: "2.2.2.2"}},
+			Ports:     []api.EndpointPort{{Port: 80}},
+		}},
+	})
+	endpointsUpdate2 := createEndpointsUpdate(ADD, api.Endpoints{
 		ObjectMeta: api.ObjectMeta{Namespace: "testnamespace", Name: "bar"},
 		Subsets: []api.EndpointSubset{{
 			Addresses: []api.EndpointAddress{{IP: "3.3.3.3"}, {IP: "4.4.4.4"}},
@@ -303,7 +432,7 @@ func TestNewMultipleSourcesEndpointsMultipleHandlersAddRemoveSetAndNotified(t *t
 	handler2.ValidateEndpoints(t, endpoints)
 
 	// Add one more
-	endpointsUpdate3 := CreateEndpointsUpdate(ADD, api.Endpoints{
+	endpointsUpdate3 := createEndpointsUpdate(ADD, api.Endpoints{
 		ObjectMeta: api.ObjectMeta{Namespace: "testnamespace", Name: "foobar"},
 		Subsets: []api.EndpointSubset{{
 			Addresses: []api.EndpointAddress{{IP: "5.5.5.5"}, {IP: "6.6.6.6"}},
@@ -316,7 +445,7 @@ func TestNewMultipleSourcesEndpointsMultipleHandlersAddRemoveSetAndNotified(t *t
 	handler2.ValidateEndpoints(t, endpoints)
 
 	// Update the "foo" service with new endpoints
-	endpointsUpdate1 = CreateEndpointsUpdate(ADD, api.Endpoints{
+	endpointsUpdate1 = createEndpointsUpdate(ADD, api.Endpoints{
 		ObjectMeta: api.ObjectMeta{Namespace: "testnamespace", Name: "foo"},
 		Subsets: []api.EndpointSubset{{
 			Addresses: []api.EndpointAddress{{IP: "7.7.7.7"}},
@@ -329,15 +458,33 @@ func TestNewMultipleSourcesEndpointsMultipleHandlersAddRemoveSetAndNotified(t *t
 	handler2.ValidateEndpoints(t, endpoints)
 
 	// Remove "bar" service
-	endpointsUpdate2 = CreateEndpointsUpdate(REMOVE, api.Endpoints{ObjectMeta: api.ObjectMeta{Namespace: "testnamespace", Name: "bar"}})
+	endpointsUpdate2 = createEndpointsUpdate(REMOVE, api.Endpoints{ObjectMeta: api.ObjectMeta{Namespace: "testnamespace", Name: "bar"}})
 	channelTwo <- endpointsUpdate2
 
 	endpoints = []api.Endpoints{endpointsUpdate1.Endpoints[0], endpointsUpdate3.Endpoints[0]}
 	handler.ValidateEndpoints(t, endpoints)
 	handler2.ValidateEndpoints(t, endpoints)
+
+	// Set "barfoo" service in channelOne
+	endpointsUpdate4 := createEndpointsUpdate(SET, api.Endpoints{
+		ObjectMeta: api.ObjectMeta{Namespace: "testnamespace", Name: "barfoo"},
+		Subsets: []api.EndpointSubset{{
+			Addresses: []api.EndpointAddress{{IP: "8.8.8.8"}},
+			Ports:     []api.EndpointPort{{Port: 80}},
+		}},
+	})
+	channelOne <- endpointsUpdate4
+	endpoints = []api.Endpoints{endpointsUpdate4.Endpoints[0], endpointsUpdate3.Endpoints[0]}
+	handler.ValidateEndpoints(t, endpoints)
+	handler2.ValidateEndpoints(t, endpoints)
+
+	// Clear endpoints by SET empty Endpoints array
+	endpointsUpdate5 := createEndpointsUpdate(SET, []api.Endpoints{}...)
+	channelOne <- endpointsUpdate5
+	channelTwo <- endpointsUpdate5
+	endpoints = []api.Endpoints{}
+	handler.ValidateEndpoints(t, endpoints)
+	handler2.ValidateEndpoints(t, endpoints)
 }
 
 // TODO: Add a unittest for interrupts getting processed in a timely manner.
-// Currently this module has a circular dependency with config, and so it's
-// named config_test, which means even test methods need to be public. This
-// is refactoring that we can avoid by resolving the dependency.
