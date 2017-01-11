@@ -56,7 +56,10 @@ filegroup(
 
 go_test(
     name = "go_default_test",
-    srcs = ["cfssl_signer_test.go"],
+    srcs = [
+        "cfssl_signer_test.go",
+        "groupapprove_test.go",
+    ],
     data = [
         "testdata/ca.crt",
         "testdata/ca.key",
