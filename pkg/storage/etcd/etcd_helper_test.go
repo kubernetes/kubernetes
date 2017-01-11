@@ -41,8 +41,6 @@ import (
 	storagetesting "k8s.io/kubernetes/pkg/storage/testing"
 )
 
-const validEtcdVersion = "etcd 2.0.9"
-
 func testScheme(t *testing.T) (*runtime.Scheme, runtime.Codec) {
 	scheme := runtime.NewScheme()
 	scheme.Log(t)
