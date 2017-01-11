@@ -28,8 +28,6 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/api/errors",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/types",
-        "//vendor:k8s.io/apimachinery/pkg/util/diff",
-        "//vendor:k8s.io/apimachinery/pkg/util/wait",
     ],
 )
 

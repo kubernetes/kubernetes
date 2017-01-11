@@ -1924,7 +1924,7 @@ func (kl *Kubelet) HandlePodAdditions(pods []*v1.Pod) {
 		// manager as the source of truth for the desired state. If a pod does
 		// not exist in the pod manager, it means that it has been deleted in
 		// the apiserver and no action (other than cleanup) is required.
-		kl.podManager.AddPod(pod)
+		kl.statusManager.AddPod(pod)
 
 		if kubepod.IsMirrorPod(pod) {
 			kl.handleMirrorPod(pod, start)
@@ -1991,9 +1991,7 @@ func (kl *Kubelet) HandlePodRemoves(pods []*v1.Pod) {
 // that should be reconciled.
 func (kl *Kubelet) HandlePodReconcile(pods []*v1.Pod) {
 	for _, pod := range pods {
-		// Update the pod in pod manager, status manager will do periodically reconcile according
-		// to the pod manager.
-		kl.podManager.UpdatePod(pod)
+		kl.statusManager.ReconcilePod(pod.UID)
 
 		// After an evicted pod is synced, all dead containers in the pod can be removed.
 		if eviction.PodIsEvicted(pod.Status) {

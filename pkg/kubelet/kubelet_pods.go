@@ -688,19 +688,6 @@ func (kl *Kubelet) filterOutTerminatedPods(pods []*v1.Pod) []*v1.Pod {
 	return filteredPods
 }
 
-// removeOrphanedPodStatuses removes obsolete entries in podStatus where
-// the pod is no longer considered bound to this node.
-func (kl *Kubelet) removeOrphanedPodStatuses(pods []*v1.Pod, mirrorPods []*v1.Pod) {
-	podUIDs := make(map[types.UID]bool)
-	for _, pod := range pods {
-		podUIDs[pod.UID] = true
-	}
-	for _, pod := range mirrorPods {
-		podUIDs[pod.UID] = true
-	}
-	kl.statusManager.RemoveOrphanedStatuses(podUIDs)
-}
-
 // HandlePodCleanups performs a series of cleanup work, including terminating
 // pod workers, killing unwanted pods, and removing orphaned volumes/pod
 // directories.
@@ -723,7 +710,7 @@ func (kl *Kubelet) HandlePodCleanups() error {
 		}
 	}
 
-	allPods, mirrorPods := kl.podManager.GetPodsAndMirrorPods()
+	allPods, _ := kl.podManager.GetPodsAndMirrorPods()
 	// Pod phase progresses monotonically. Once a pod has reached a final state,
 	// it should never leave regardless of the restart policy. The statuses
 	// of such pods should not be changed, and there is no need to sync them.
@@ -756,7 +743,6 @@ func (kl *Kubelet) HandlePodCleanups() error {
 		}
 	}
 
-	kl.removeOrphanedPodStatuses(allPods, mirrorPods)
 	// Note that we just killed the unwanted pods. This may not have reflected
 	// in the cache. We need to bypass the cache to get the latest set of
 	// running pods to clean up the volumes.
