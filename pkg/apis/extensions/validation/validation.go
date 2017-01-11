@@ -830,6 +830,28 @@ func ValidateNetworkPolicySpec(spec *extensions.NetworkPolicySpec, fldPath *fiel
 	// Validate ingress rules.
 	for i, ingress := range spec.Ingress {
 		ingressPath := fldPath.Child("ingress").Index(i)
+		for i, port := range ingress.Ports {
+			portPath := ingressPath.Child("ports").Index(i)
+			protocol := ""
+			if port.Protocol == nil {
+				protocol = string(api.ProtocolTCP)
+			} else if *port.Protocol == api.ProtocolTCP || *port.Protocol == api.ProtocolUDP {
+				protocol = string(*port.Protocol)
+			} else {
+				allErrs = append(allErrs, field.NotSupported(portPath.Child("protocol"), *port.Protocol, []string{string(api.ProtocolTCP), string(api.ProtocolUDP)}))
+			}
+			if port.Port != nil {
+				if port.Port.Type == intstr.Int {
+					for _, msg := range validation.IsValidPortNum(int(port.Port.IntVal)) {
+						allErrs = append(allErrs, field.Invalid(portPath.Child("port"), port.Port.IntVal, msg))
+					}
+				} else {
+					if _, err := net.LookupPort(strings.ToLower(protocol), port.Port.StrVal); err != nil {
+						allErrs = append(allErrs, field.Invalid(portPath.Child("port"), port.Port.StrVal, "unknown port name"))
+					}
+				}
+			}
+		}
 		// TODO: Update From to be a pointer to slice as soon as auto-generation supports it.
 		for i, from := range ingress.From {
 			fromPath := ingressPath.Child("from").Index(i)
