@@ -458,7 +458,9 @@ func (dsc *DaemonSetsController) manage(ds *extensions.DaemonSet) error {
 		switch {
 		case shouldRun && !isRunning:
 			// If daemon pod is supposed to be running on node, but isn't, create daemon pod.
-			nodesNeedingDaemonPods = append(nodesNeedingDaemonPods, node.Name)
+			if dsc.nodeCanRunDaemonPodNow(&node, ds) {
+				nodesNeedingDaemonPods = append(nodesNeedingDaemonPods, node.Name)
+			}
 		case shouldRun && len(daemonPods) > 1:
 			// If daemon pod is supposed to be running on node, but more than 1 daemon pod is running, delete the excess daemon pods.
 			// Sort the daemon pods by creation time, so the the oldest is preserved.
@@ -658,12 +660,28 @@ func (dsc *DaemonSetsController) syncDaemonSet(key string) error {
 	return dsc.updateDaemonSetStatus(ds)
 }
 
+// nodeShouldRunDaemonPod checks if the node should run the daemonset pod, returns whether the node matches the NodeName or pod's selector.
 func (dsc *DaemonSetsController) nodeShouldRunDaemonPod(node *v1.Node, ds *extensions.DaemonSet) bool {
 	// If the daemon set specifies a node name, check that it matches with node.Name.
 	if !(ds.Spec.Template.Spec.NodeName == "" || ds.Spec.Template.Spec.NodeName == node.Name) {
 		return false
 	}
 
+	newPod := getNewPodToNodeDaemon(node.Name, ds)
+
+	pods := []*v1.Pod{}
+
+	nodeInfo := schedulercache.NewNodeInfo(pods...)
+	nodeInfo.SetNode(node)
+
+	predicates.PodSelectorMatches(newPod, nil, nodeInfo)
+
+	fit, _, _ := predicates.PodSelectorMatches(newPod, nil, nodeInfo)
+	return fit
+}
+
+// nodeCanRunDaemonPodNow checks if the node can run the daemonset pod now, returns whether the node fits GeneralPredicates.
+func (dsc *DaemonSetsController) nodeCanRunDaemonPodNow(node *v1.Node, ds *extensions.DaemonSet) bool {
 	// TODO: Move it to the predicates
 	for _, c := range node.Status.Conditions {
 		if c.Type == v1.NodeOutOfDisk && c.Status == v1.ConditionTrue {
@@ -671,9 +689,7 @@ func (dsc *DaemonSetsController) nodeShouldRunDaemonPod(node *v1.Node, ds *exten
 		}
 	}
 
-	newPod := &v1.Pod{Spec: ds.Spec.Template.Spec, ObjectMeta: ds.Spec.Template.ObjectMeta}
-	newPod.Namespace = ds.Namespace
-	newPod.Spec.NodeName = node.Name
+	newPod := getNewPodToNodeDaemon(node.Name, ds)
 
 	pods := []*v1.Pod{}
 
@@ -711,6 +727,14 @@ func (dsc *DaemonSetsController) nodeShouldRunDaemonPod(node *v1.Node, ds *exten
 		}
 	}
 	return fit
+}
+
+// getNewPodToNodeDaemon returns a pod to daemonset on the specified node.
+func getNewPodToNodeDaemon(nodeName string, ds *extensions.DaemonSet) *v1.Pod {
+	newPod := &v1.Pod{Spec: ds.Spec.Template.Spec, ObjectMeta: ds.Spec.Template.ObjectMeta}
+	newPod.Namespace = ds.Namespace
+	newPod.Spec.NodeName = nodeName
+	return newPod
 }
 
 // byCreationTimestamp sorts a list by creation timestamp, using their names as a tie breaker.
