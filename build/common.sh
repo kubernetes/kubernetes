@@ -98,7 +98,7 @@ kube::build::get_docker_wrapped_binaries() {
           kube-controller-manager,busybox
           kube-scheduler,busybox
           kube-aggregator,busybox
-          kube-proxy,gcr.io/google_containers/debian-iptables-amd64:v4
+          kube-proxy,gcr.io/google_containers/debian-iptables-amd64:v5
         );;
     "arm")
         local targets=(
