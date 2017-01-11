@@ -1191,6 +1191,7 @@ After=network.target
 
 [Service]
 ExecStart=${RKT_BIN} api-service --listen=127.0.0.1:15441
+Restart=on-failure
 
 [Install]
 WantedBy=multi-user.target
