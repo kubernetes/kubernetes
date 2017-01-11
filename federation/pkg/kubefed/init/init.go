@@ -123,6 +123,7 @@ func NewCmdInit(cmdOut io.Writer, config util.AdminConfig) *cobra.Command {
 	cmd.Flags().String("dns-provider", "google-clouddns", "Dns provider to be used for this deployment.")
 	cmd.Flags().String("etcd-pv-capacity", "10Gi", "Size of persistent volume claim to be used for etcd.")
 	cmd.Flags().Bool("dry-run", false, "dry run without sending commands to server.")
+	cmd.Flags().String("storage-backend", "etcd2", "The storage backend for persistence. Options: 'etcd2' (default), 'etcd3'.")
 	return cmd
 }
 
@@ -146,6 +147,7 @@ func initFederation(cmdOut io.Writer, config util.AdminConfig, cmd *cobra.Comman
 	dnsProvider := cmdutil.GetFlagString(cmd, "dns-provider")
 	etcdPVCapacity := cmdutil.GetFlagString(cmd, "etcd-pv-capacity")
 	dryRun := cmdutil.GetDryRunFlag(cmd)
+	storageBackend := cmdutil.GetFlagString(cmd, "storage-backend")
 
 	hostFactory := config.HostFactory(initFlags.Host, initFlags.Kubeconfig)
 	hostClientset, err := hostFactory.ClientSet()
@@ -212,7 +214,7 @@ func initFederation(cmdOut io.Writer, config util.AdminConfig, cmd *cobra.Comman
 	}
 
 	// 6. Create federation API server
-	_, err = createAPIServer(hostClientset, initFlags.FederationSystemNamespace, serverName, image, serverCredName, pvc.Name, advertiseAddress, dryRun)
+	_, err = createAPIServer(hostClientset, initFlags.FederationSystemNamespace, serverName, image, serverCredName, pvc.Name, advertiseAddress, storageBackend, dryRun)
 	if err != nil {
 		return err
 	}
@@ -416,7 +418,7 @@ func createPVC(clientset *client.Clientset, namespace, svcName, etcdPVCapacity s
 	return clientset.Core().PersistentVolumeClaims(namespace).Create(pvc)
 }
 
-func createAPIServer(clientset *client.Clientset, namespace, name, image, credentialsName, pvcName, advertiseAddress string, dryRun bool) (*extensions.Deployment, error) {
+func createAPIServer(clientset *client.Clientset, namespace, name, image, credentialsName, pvcName, advertiseAddress, storageBackend string, dryRun bool) (*extensions.Deployment, error) {
 	command := []string{
 		"/hyperkube",
 		"federation-apiserver",
@@ -426,6 +428,7 @@ func createAPIServer(clientset *client.Clientset, namespace, name, image, creden
 		"--client-ca-file=/etc/federation/apiserver/ca.crt",
 		"--tls-cert-file=/etc/federation/apiserver/server.crt",
 		"--tls-private-key-file=/etc/federation/apiserver/server.key",
+		fmt.Sprintf("--storage-backend=%s", storageBackend),
 	}
 
 	if advertiseAddress != "" {
@@ -473,9 +476,9 @@ func createAPIServer(clientset *client.Clientset, namespace, name, image, creden
 						},
 						{
 							Name:  "etcd",
-							Image: "quay.io/coreos/etcd:v2.3.3",
+							Image: "gcr.io/google_containers/etcd:3.0.14-alpha.1",
 							Command: []string{
-								"/etcd",
+								"/usr/local/bin/etcd",
 								"--data-dir",
 								"/var/etcd/data",
 							},
