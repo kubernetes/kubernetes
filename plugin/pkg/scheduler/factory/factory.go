@@ -60,7 +60,7 @@ type ConfigFactory struct {
 	// queue for pods that need scheduling
 	PodQueue *cache.FIFO
 	// a means to list all known scheduled pods.
-	scheduledPodLister *cache.StoreToPodLister
+	scheduledPodLister *cache.Indexer
 	// a means to list all known scheduled pods and pods assumed to have been scheduled.
 	PodLister algorithm.PodLister
 	// a means to list all nodes
