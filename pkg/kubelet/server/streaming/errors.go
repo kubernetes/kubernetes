@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
-	"time"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -28,10 +27,6 @@ import (
 
 func ErrorStreamingDisabled(method string) error {
 	return grpc.Errorf(codes.NotFound, fmt.Sprintf("streaming method %s disabled", method))
-}
-
-func ErrorTimeout(op string, timeout time.Duration) error {
-	return grpc.Errorf(codes.DeadlineExceeded, fmt.Sprintf("%s timed out after %s", op, timeout.String()))
 }
 
 // The error returned when the maximum number of in-flight requests is exceeded.
