@@ -25062,6 +25062,387 @@
      }
     ]
    },
+   "/apis/extensions/v1beta1/podsecuritypolicies": {
+    "get": {
+     "description": "list or watch objects of kind PodSecurityPolicy",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf",
+      "application/json;stream=watch",
+      "application/vnd.kubernetes.protobuf;stream=watch"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "extensions_v1beta1"
+     ],
+     "operationId": "listExtensionsV1beta1PodSecurityPolicy",
+     "parameters": [
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+       "name": "fieldSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
+       "name": "labelSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history. When specified for list: - if unset, then the result is returned from remote storage based on quorum-read flag; - if it's 0, then we simply return what we currently have in cache, no guarantee; - if set to non zero, then the result is at least as fresh as given rv.",
+       "name": "resourceVersion",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "integer",
+       "description": "Timeout for the list/watch call.",
+       "name": "timeoutSeconds",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
+       "name": "watch",
+       "in": "query"
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/v1beta1.PodSecurityPolicyList"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "post": {
+     "description": "create a PodSecurityPolicy",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "extensions_v1beta1"
+     ],
+     "operationId": "createExtensionsV1beta1PodSecurityPolicy",
+     "parameters": [
+      {
+       "name": "body",
+       "in": "body",
+       "required": true,
+       "schema": {
+        "$ref": "#/definitions/v1beta1.PodSecurityPolicy"
+       }
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/v1beta1.PodSecurityPolicy"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "delete": {
+     "description": "delete collection of PodSecurityPolicy",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "extensions_v1beta1"
+     ],
+     "operationId": "deleteExtensionsV1beta1CollectionPodSecurityPolicy",
+     "parameters": [
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+       "name": "fieldSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
+       "name": "labelSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history. When specified for list: - if unset, then the result is returned from remote storage based on quorum-read flag; - if it's 0, then we simply return what we currently have in cache, no guarantee; - if set to non zero, then the result is at least as fresh as given rv.",
+       "name": "resourceVersion",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "integer",
+       "description": "Timeout for the list/watch call.",
+       "name": "timeoutSeconds",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
+       "name": "watch",
+       "in": "query"
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/v1.Status"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "If 'true', then the output is pretty printed.",
+      "name": "pretty",
+      "in": "query"
+     }
+    ]
+   },
+   "/apis/extensions/v1beta1/podsecuritypolicies/{name}": {
+    "get": {
+     "description": "read the specified PodSecurityPolicy",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "extensions_v1beta1"
+     ],
+     "operationId": "readExtensionsV1beta1PodSecurityPolicy",
+     "parameters": [
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "Should the export be exact.  Exact export maintains cluster-specific fields like 'Namespace'.",
+       "name": "exact",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "Should this value be exported.  Export strips fields that a user can not specify.",
+       "name": "export",
+       "in": "query"
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/v1beta1.PodSecurityPolicy"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "put": {
+     "description": "replace the specified PodSecurityPolicy",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "extensions_v1beta1"
+     ],
+     "operationId": "replaceExtensionsV1beta1PodSecurityPolicy",
+     "parameters": [
+      {
+       "name": "body",
+       "in": "body",
+       "required": true,
+       "schema": {
+        "$ref": "#/definitions/v1beta1.PodSecurityPolicy"
+       }
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/v1beta1.PodSecurityPolicy"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "delete": {
+     "description": "delete a PodSecurityPolicy",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "extensions_v1beta1"
+     ],
+     "operationId": "deleteExtensionsV1beta1PodSecurityPolicy",
+     "parameters": [
+      {
+       "name": "body",
+       "in": "body",
+       "required": true,
+       "schema": {
+        "$ref": "#/definitions/v1.DeleteOptions"
+       }
+      },
+      {
+       "uniqueItems": true,
+       "type": "integer",
+       "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",
+       "name": "gracePeriodSeconds",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "Should the dependent objects be orphaned. If true/false, the \"orphan\" finalizer will be added to/removed from the object's finalizers list.",
+       "name": "orphanDependents",
+       "in": "query"
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/v1.Status"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "patch": {
+     "description": "partially update the specified PodSecurityPolicy",
+     "consumes": [
+      "application/json-patch+json",
+      "application/merge-patch+json",
+      "application/strategic-merge-patch+json"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "extensions_v1beta1"
+     ],
+     "operationId": "patchExtensionsV1beta1PodSecurityPolicy",
+     "parameters": [
+      {
+       "name": "body",
+       "in": "body",
+       "required": true,
+       "schema": {
+        "$ref": "#/definitions/v1.Patch"
+       }
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/v1beta1.PodSecurityPolicy"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "name of the PodSecurityPolicy",
+      "name": "name",
+      "in": "path",
+      "required": true
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "If 'true', then the output is pretty printed.",
+      "name": "pretty",
+      "in": "query"
+     }
+    ]
+   },
    "/apis/extensions/v1beta1/replicasets": {
     "get": {
      "description": "list or watch objects of kind ReplicaSet",
@@ -26942,6 +27323,168 @@
       "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
       "name": "labelSelector",
       "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "If 'true', then the output is pretty printed.",
+      "name": "pretty",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history. When specified for list: - if unset, then the result is returned from remote storage based on quorum-read flag; - if it's 0, then we simply return what we currently have in cache, no guarantee; - if set to non zero, then the result is at least as fresh as given rv.",
+      "name": "resourceVersion",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "integer",
+      "description": "Timeout for the list/watch call.",
+      "name": "timeoutSeconds",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "boolean",
+      "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
+      "name": "watch",
+      "in": "query"
+     }
+    ]
+   },
+   "/apis/extensions/v1beta1/watch/podsecuritypolicies": {
+    "get": {
+     "description": "watch individual changes to a list of PodSecurityPolicy",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf",
+      "application/json;stream=watch",
+      "application/vnd.kubernetes.protobuf;stream=watch"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "extensions_v1beta1"
+     ],
+     "operationId": "watchExtensionsV1beta1PodSecurityPolicyList",
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/v1.WatchEvent"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+      "name": "fieldSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
+      "name": "labelSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "If 'true', then the output is pretty printed.",
+      "name": "pretty",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history. When specified for list: - if unset, then the result is returned from remote storage based on quorum-read flag; - if it's 0, then we simply return what we currently have in cache, no guarantee; - if set to non zero, then the result is at least as fresh as given rv.",
+      "name": "resourceVersion",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "integer",
+      "description": "Timeout for the list/watch call.",
+      "name": "timeoutSeconds",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "boolean",
+      "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
+      "name": "watch",
+      "in": "query"
+     }
+    ]
+   },
+   "/apis/extensions/v1beta1/watch/podsecuritypolicies/{name}": {
+    "get": {
+     "description": "watch changes to an object of kind PodSecurityPolicy",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf",
+      "application/json;stream=watch",
+      "application/vnd.kubernetes.protobuf;stream=watch"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "extensions_v1beta1"
+     ],
+     "operationId": "watchExtensionsV1beta1PodSecurityPolicy",
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/v1.WatchEvent"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+      "name": "fieldSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
+      "name": "labelSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "name of the PodSecurityPolicy",
+      "name": "name",
+      "in": "path",
+      "required": true
      },
      {
       "uniqueItems": true,
@@ -36556,6 +37099,22 @@
      }
     }
    },
+   "v1beta1.FSGroupStrategyOptions": {
+    "description": "FSGroupStrategyOptions defines the strategy type and options used to create the strategy.",
+    "properties": {
+     "ranges": {
+      "description": "Ranges are the allowed ranges of fs groups.  If you would like to force a single fs group then supply a single range with the same start and end.",
+      "type": "array",
+      "items": {
+       "$ref": "#/definitions/v1beta1.IDRange"
+      }
+     },
+     "rule": {
+      "description": "Rule is the strategy that will dictate what FSGroup is used in the SecurityContext.",
+      "type": "string"
+     }
+    }
+   },
    "v1beta1.HTTPIngressPath": {
     "description": "HTTPIngressPath associates a path regex with a backend. Incoming urls matching the path are forwarded to the backend.",
     "required": [
@@ -36694,6 +37253,44 @@
      },
      "observedGeneration": {
       "description": "most recent generation observed by this autoscaler.",
+      "type": "integer",
+      "format": "int64"
+     }
+    }
+   },
+   "v1beta1.HostPortRange": {
+    "description": "Host Port Range defines a range of host ports that will be enabled by a policy for pods to use.  It requires both the start and end to be defined.",
+    "required": [
+     "min",
+     "max"
+    ],
+    "properties": {
+     "max": {
+      "description": "max is the end of the range, inclusive.",
+      "type": "integer",
+      "format": "int32"
+     },
+     "min": {
+      "description": "min is the start of the range, inclusive.",
+      "type": "integer",
+      "format": "int32"
+     }
+    }
+   },
+   "v1beta1.IDRange": {
+    "description": "ID Range provides a min/max of an allowed range of IDs.",
+    "required": [
+     "min",
+     "max"
+    ],
+    "properties": {
+     "max": {
+      "description": "Max is the end of the range, inclusive.",
+      "type": "integer",
+      "format": "int64"
+     },
+     "min": {
+      "description": "Min is the start of the range, inclusive.",
       "type": "integer",
       "format": "int64"
      }
@@ -37082,6 +37679,136 @@
      }
     }
    },
+   "v1beta1.PodSecurityPolicy": {
+    "description": "Pod Security Policy governs the ability to make requests that affect the Security Context that will be applied to a pod and container.",
+    "properties": {
+     "apiVersion": {
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources",
+      "type": "string"
+     },
+     "kind": {
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
+      "type": "string"
+     },
+     "metadata": {
+      "description": "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
+      "$ref": "#/definitions/v1.ObjectMeta"
+     },
+     "spec": {
+      "description": "spec defines the policy enforced.",
+      "$ref": "#/definitions/v1beta1.PodSecurityPolicySpec"
+     }
+    }
+   },
+   "v1beta1.PodSecurityPolicyList": {
+    "description": "Pod Security Policy List is a list of PodSecurityPolicy objects.",
+    "required": [
+     "items"
+    ],
+    "properties": {
+     "apiVersion": {
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources",
+      "type": "string"
+     },
+     "items": {
+      "description": "Items is a list of schema objects.",
+      "type": "array",
+      "items": {
+       "$ref": "#/definitions/v1beta1.PodSecurityPolicy"
+      }
+     },
+     "kind": {
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
+      "type": "string"
+     },
+     "metadata": {
+      "description": "Standard list metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
+      "$ref": "#/definitions/v1.ListMeta"
+     }
+    }
+   },
+   "v1beta1.PodSecurityPolicySpec": {
+    "description": "Pod Security Policy Spec defines the policy enforced.",
+    "required": [
+     "seLinux",
+     "runAsUser",
+     "supplementalGroups",
+     "fsGroup"
+    ],
+    "properties": {
+     "allowedCapabilities": {
+      "description": "AllowedCapabilities is a list of capabilities that can be requested to add to the container. Capabilities in this field may be added at the pod author's discretion. You must not list a capability in both AllowedCapabilities and RequiredDropCapabilities.",
+      "type": "array",
+      "items": {
+       "type": "string"
+      }
+     },
+     "defaultAddCapabilities": {
+      "description": "DefaultAddCapabilities is the default set of capabilities that will be added to the container unless the pod spec specifically drops the capability.  You may not list a capabiility in both DefaultAddCapabilities and RequiredDropCapabilities.",
+      "type": "array",
+      "items": {
+       "type": "string"
+      }
+     },
+     "fsGroup": {
+      "description": "FSGroup is the strategy that will dictate what fs group is used by the SecurityContext.",
+      "$ref": "#/definitions/v1beta1.FSGroupStrategyOptions"
+     },
+     "hostIPC": {
+      "description": "hostIPC determines if the policy allows the use of HostIPC in the pod spec.",
+      "type": "boolean"
+     },
+     "hostNetwork": {
+      "description": "hostNetwork determines if the policy allows the use of HostNetwork in the pod spec.",
+      "type": "boolean"
+     },
+     "hostPID": {
+      "description": "hostPID determines if the policy allows the use of HostPID in the pod spec.",
+      "type": "boolean"
+     },
+     "hostPorts": {
+      "description": "hostPorts determines which host port ranges are allowed to be exposed.",
+      "type": "array",
+      "items": {
+       "$ref": "#/definitions/v1beta1.HostPortRange"
+      }
+     },
+     "privileged": {
+      "description": "privileged determines if a pod can request to be run as privileged.",
+      "type": "boolean"
+     },
+     "readOnlyRootFilesystem": {
+      "description": "ReadOnlyRootFilesystem when set to true will force containers to run with a read only root file system.  If the container specifically requests to run with a non-read only root file system the PSP should deny the pod. If set to false the container may run with a read only root file system if it wishes but it will not be forced to.",
+      "type": "boolean"
+     },
+     "requiredDropCapabilities": {
+      "description": "RequiredDropCapabilities are the capabilities that will be dropped from the container.  These are required to be dropped and cannot be added.",
+      "type": "array",
+      "items": {
+       "type": "string"
+      }
+     },
+     "runAsUser": {
+      "description": "runAsUser is the strategy that will dictate the allowable RunAsUser values that may be set.",
+      "$ref": "#/definitions/v1beta1.RunAsUserStrategyOptions"
+     },
+     "seLinux": {
+      "description": "seLinux is the strategy that will dictate the allowable labels that may be set.",
+      "$ref": "#/definitions/v1beta1.SELinuxStrategyOptions"
+     },
+     "supplementalGroups": {
+      "description": "SupplementalGroups is the strategy that will dictate what supplemental groups are used by the SecurityContext.",
+      "$ref": "#/definitions/v1beta1.SupplementalGroupsStrategyOptions"
+     },
+     "volumes": {
+      "description": "volumes is a white list of allowed volume plugins.  Empty indicates that all plugins may be used.",
+      "type": "array",
+      "items": {
+       "type": "string"
+      }
+     }
+    }
+   },
    "v1beta1.ReplicaSet": {
     "description": "ReplicaSet represents the configuration of a ReplicaSet.",
     "properties": {
@@ -37278,6 +38005,41 @@
      "maxUnavailable": {
       "description": "The maximum number of pods that can be unavailable during the update. Value can be an absolute number (ex: 5) or a percentage of desired pods (ex: 10%). Absolute number is calculated from percentage by rounding down. This can not be 0 if MaxSurge is 0. By default, a fixed value of 1 is used. Example: when this is set to 30%, the old RC can be scaled down to 70% of desired pods immediately when the rolling update starts. Once new pods are ready, old RC can be scaled down further, followed by scaling up the new RC, ensuring that the total number of pods available at all times during the update is at least 70% of desired pods.",
       "$ref": "#/definitions/intstr.IntOrString"
+     }
+    }
+   },
+   "v1beta1.RunAsUserStrategyOptions": {
+    "description": "Run A sUser Strategy Options defines the strategy type and any options used to create the strategy.",
+    "required": [
+     "rule"
+    ],
+    "properties": {
+     "ranges": {
+      "description": "Ranges are the allowed ranges of uids that may be used.",
+      "type": "array",
+      "items": {
+       "$ref": "#/definitions/v1beta1.IDRange"
+      }
+     },
+     "rule": {
+      "description": "Rule is the strategy that will dictate the allowable RunAsUser values that may be set.",
+      "type": "string"
+     }
+    }
+   },
+   "v1beta1.SELinuxStrategyOptions": {
+    "description": "SELinux  Strategy Options defines the strategy type and any options used to create the strategy.",
+    "required": [
+     "rule"
+    ],
+    "properties": {
+     "rule": {
+      "description": "type is the strategy that will dictate the allowable labels that may be set.",
+      "type": "string"
+     },
+     "seLinuxOptions": {
+      "description": "seLinuxOptions required to run as; required for MustRunAs More info: http://releases.k8s.io/HEAD/docs/design/security_context.md#security-context",
+      "$ref": "#/definitions/v1.SELinuxOptions"
      }
     }
    },
@@ -37636,6 +38398,22 @@
      },
      "subresource": {
       "description": "Subresource name of the referent",
+      "type": "string"
+     }
+    }
+   },
+   "v1beta1.SupplementalGroupsStrategyOptions": {
+    "description": "SupplementalGroupsStrategyOptions defines the strategy type and options used to create the strategy.",
+    "properties": {
+     "ranges": {
+      "description": "Ranges are the allowed ranges of supplemental groups.  If you would like to force a single supplemental group then supply a single range with the same start and end.",
+      "type": "array",
+      "items": {
+       "$ref": "#/definitions/v1beta1.IDRange"
+      }
+     },
+     "rule": {
+      "description": "Rule is the strategy that will dictate what supplemental groups is used in the SecurityContext.",
       "type": "string"
      }
     }
