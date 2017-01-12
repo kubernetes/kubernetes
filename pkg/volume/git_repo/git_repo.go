@@ -92,6 +92,9 @@ func (plugin *gitRepoPlugin) SupportsBulkVolumeVerification() bool {
 }
 
 func (plugin *gitRepoPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, opts volume.VolumeOptions) (volume.Mounter, error) {
+	if plugin.host == nil {
+		return nil, fmt.Errorf("volume plugin %s was not initialized with valid VolumeHost", plugin.GetPluginName())
+	}
 	return &gitRepoVolumeMounter{
 		gitRepoVolume: &gitRepoVolume{
 			volName: spec.Name(),
@@ -108,6 +111,9 @@ func (plugin *gitRepoPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, opts vol
 }
 
 func (plugin *gitRepoPlugin) NewUnmounter(volName string, podUID types.UID) (volume.Unmounter, error) {
+	if plugin.host == nil {
+		return nil, fmt.Errorf("volume plugin %s was not initialized with valid VolumeHost", plugin.GetPluginName())
+	}
 	return &gitRepoVolumeUnmounter{
 		&gitRepoVolume{
 			volName: volName,

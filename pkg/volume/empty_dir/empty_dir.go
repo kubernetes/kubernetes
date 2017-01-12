@@ -100,6 +100,9 @@ func (plugin *emptyDirPlugin) SupportsBulkVolumeVerification() bool {
 }
 
 func (plugin *emptyDirPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, opts volume.VolumeOptions) (volume.Mounter, error) {
+	if plugin.host == nil {
+		return nil, fmt.Errorf("volume plugin %s was not initialized with valid VolumeHost", plugin.GetPluginName())
+	}
 	return plugin.newMounterInternal(spec, pod, plugin.host.GetMounter(), &realMountDetector{plugin.host.GetMounter()}, opts)
 }
 
@@ -120,6 +123,9 @@ func (plugin *emptyDirPlugin) newMounterInternal(spec *volume.Spec, pod *v1.Pod,
 }
 
 func (plugin *emptyDirPlugin) NewUnmounter(volName string, podUID types.UID) (volume.Unmounter, error) {
+	if plugin.host == nil {
+		return nil, fmt.Errorf("volume plugin %s was not initialized with valid VolumeHost", plugin.GetPluginName())
+	}
 	// Inject real implementations here, test through the internal function.
 	return plugin.newUnmounterInternal(volName, podUID, plugin.host.GetMounter(), &realMountDetector{plugin.host.GetMounter()})
 }

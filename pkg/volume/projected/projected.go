@@ -105,6 +105,9 @@ func (plugin *projectedPlugin) SupportsBulkVolumeVerification() bool {
 }
 
 func (plugin *projectedPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, opts volume.VolumeOptions) (volume.Mounter, error) {
+	if plugin.host == nil {
+		return nil, fmt.Errorf("volume plugin %s was not initialized with valid VolumeHost", plugin.GetPluginName())
+	}
 	return &projectedVolumeMounter{
 		projectedVolume: &projectedVolume{
 			volName: spec.Name(),
@@ -119,6 +122,9 @@ func (plugin *projectedPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, opts v
 }
 
 func (plugin *projectedPlugin) NewUnmounter(volName string, podUID types.UID) (volume.Unmounter, error) {
+	if plugin.host == nil {
+		return nil, fmt.Errorf("volume plugin %s was not initialized with valid VolumeHost", plugin.GetPluginName())
+	}
 	return &projectedVolumeUnmounter{
 		&projectedVolume{
 			volName: volName,

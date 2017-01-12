@@ -91,10 +91,16 @@ func (plugin *photonPersistentDiskPlugin) SupportsBulkVolumeVerification() bool 
 }
 
 func (plugin *photonPersistentDiskPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, _ volume.VolumeOptions) (volume.Mounter, error) {
+	if plugin.host == nil {
+		return nil, fmt.Errorf("volume plugin %s was not initialized with valid VolumeHost", plugin.GetPluginName())
+	}
 	return plugin.newMounterInternal(spec, pod.UID, &PhotonDiskUtil{}, plugin.host.GetMounter())
 }
 
 func (plugin *photonPersistentDiskPlugin) NewUnmounter(volName string, podUID types.UID) (volume.Unmounter, error) {
+	if plugin.host == nil {
+		return nil, fmt.Errorf("volume plugin %s was not initialized with valid VolumeHost", plugin.GetPluginName())
+	}
 	return plugin.newUnmounterInternal(volName, podUID, &PhotonDiskUtil{}, plugin.host.GetMounter())
 }
 
@@ -133,6 +139,9 @@ func (plugin *photonPersistentDiskPlugin) newUnmounterInternal(volName string, p
 }
 
 func (plugin *photonPersistentDiskPlugin) ConstructVolumeSpec(volumeSpecName, mountPath string) (*volume.Spec, error) {
+	if plugin.host == nil {
+		return nil, fmt.Errorf("volume plugin %s was not initialized with valid VolumeHost", plugin.GetPluginName())
+	}
 	mounter := plugin.host.GetMounter()
 	pluginDir := plugin.host.GetPluginDir(plugin.GetPluginName())
 	pdID, err := mounter.GetDeviceNameFromMount(mountPath, pluginDir)

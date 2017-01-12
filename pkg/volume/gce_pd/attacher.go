@@ -56,6 +56,9 @@ func (plugin *gcePersistentDiskPlugin) NewAttacher() (volume.Attacher, error) {
 }
 
 func (plugin *gcePersistentDiskPlugin) GetDeviceMountRefs(deviceMountPath string) ([]string, error) {
+	if plugin.host == nil {
+		return nil, fmt.Errorf("volume plugin %s was not initialized with valid VolumeHost", plugin.GetPluginName())
+	}
 	mounter := plugin.host.GetMounter()
 	return mount.GetMountRefs(mounter, deviceMountPath)
 }
@@ -175,6 +178,9 @@ func (attacher *gcePersistentDiskAttacher) WaitForAttach(spec *volume.Spec, devi
 
 func (attacher *gcePersistentDiskAttacher) GetDeviceMountPath(
 	spec *volume.Spec) (string, error) {
+	if attacher.host == nil {
+		return "", fmt.Errorf("volume plugin %s was not initialized with valid VolumeHost", gcePersistentDiskPluginName)
+	}
 	volumeSource, _, err := getVolumeSource(spec)
 	if err != nil {
 		return "", err
@@ -184,6 +190,9 @@ func (attacher *gcePersistentDiskAttacher) GetDeviceMountPath(
 }
 
 func (attacher *gcePersistentDiskAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMountPath string) error {
+	if attacher.host == nil {
+		return fmt.Errorf("volume plugin %s was not initialized with valid VolumeHost", gcePersistentDiskPluginName)
+	}
 	// Only mount the PD globally once.
 	mounter := attacher.host.GetMounter()
 	notMnt, err := mounter.IsLikelyNotMountPoint(deviceMountPath)

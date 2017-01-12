@@ -139,6 +139,9 @@ func (p *flockerPlugin) getFlockerVolumeSource(spec *volume.Spec) (*v1.FlockerVo
 }
 
 func (plugin *flockerPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, _ volume.VolumeOptions) (volume.Mounter, error) {
+	if plugin.host == nil {
+		return nil, fmt.Errorf("volume plugin %s was not initialized with valid VolumeHost", plugin.GetPluginName())
+	}
 	// Inject real implementations here, test through the internal function.
 	return plugin.newMounterInternal(spec, pod.UID, &FlockerUtil{}, plugin.host.GetMounter())
 }
@@ -167,6 +170,9 @@ func (plugin *flockerPlugin) newMounterInternal(spec *volume.Spec, podUID types.
 }
 
 func (p *flockerPlugin) NewUnmounter(volName string, podUID types.UID) (volume.Unmounter, error) {
+	if p.host == nil {
+		return nil, fmt.Errorf("volume plugin %s was not initialized with valid VolumeHost", p.GetPluginName())
+	}
 	// Inject real implementations here, test through the internal function.
 	return p.newUnmounterInternal(volName, podUID, &FlockerUtil{}, p.host.GetMounter())
 }

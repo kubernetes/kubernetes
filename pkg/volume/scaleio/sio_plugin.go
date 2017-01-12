@@ -18,6 +18,7 @@ package scaleio
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/types"
@@ -90,6 +91,9 @@ func (p *sioPlugin) NewMounter(
 	spec *volume.Spec,
 	pod *api.Pod,
 	_ volume.VolumeOptions) (volume.Mounter, error) {
+	if p.host == nil {
+		return nil, fmt.Errorf("volume plugin %s was not initialized with valid VolumeHost", p.GetPluginName())
+	}
 	sioSource, err := getVolumeSourceFromSpec(spec)
 	if err != nil {
 		glog.Error(log("failed to extract ScaleIOVolumeSource from spec: %v", err))
@@ -115,6 +119,9 @@ func (p *sioPlugin) NewMounter(
 // specName = [<namespace>nsSep]<somevalue> where the specname is pre-pended with the namespace
 func (p *sioPlugin) NewUnmounter(specName string, podUID types.UID) (volume.Unmounter, error) {
 	glog.V(4).Info(log("Unmounter for %s", specName))
+	if p.host == nil {
+		return nil, fmt.Errorf("volume plugin %s was not initialized with valid VolumeHost", p.GetPluginName())
+	}
 
 	return &sioVolume{
 		podUID:      podUID,

@@ -93,6 +93,9 @@ func (plugin *cephfsPlugin) GetAccessModes() []v1.PersistentVolumeAccessMode {
 }
 
 func (plugin *cephfsPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, _ volume.VolumeOptions) (volume.Mounter, error) {
+	if plugin.host == nil {
+		return nil, fmt.Errorf("volume plugin %s was not initialized with valid VolumeHost", plugin.GetPluginName())
+	}
 	cephvs, _, err := getVolumeSource(spec)
 	if err != nil {
 		return nil, err
@@ -157,6 +160,9 @@ func (plugin *cephfsPlugin) newMounterInternal(spec *volume.Spec, podUID types.U
 }
 
 func (plugin *cephfsPlugin) NewUnmounter(volName string, podUID types.UID) (volume.Unmounter, error) {
+	if plugin.host == nil {
+		return nil, fmt.Errorf("volume plugin %s was not initialized with valid VolumeHost", plugin.GetPluginName())
+	}
 	return plugin.newUnmounterInternal(volName, podUID, plugin.host.GetMounter())
 }
 

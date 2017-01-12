@@ -164,6 +164,9 @@ func (attacher *photonPersistentDiskAttacher) WaitForAttach(spec *volume.Spec, d
 // GetDeviceMountPath returns a path where the device should
 // point which should be bind mounted for individual volumes.
 func (attacher *photonPersistentDiskAttacher) GetDeviceMountPath(spec *volume.Spec) (string, error) {
+	if attacher.host == nil {
+		return "", fmt.Errorf("volume plugin %s was not initialized with valid VolumeHost", photonPersistentDiskPluginName)
+	}
 	volumeSource, _, err := getVolumeSource(spec)
 	if err != nil {
 		glog.Errorf("Photon Controller attacher: GetDeviceMountPath failed to get volume source")
@@ -176,12 +179,18 @@ func (attacher *photonPersistentDiskAttacher) GetDeviceMountPath(spec *volume.Sp
 // GetMountDeviceRefs finds all other references to the device referenced
 // by deviceMountPath; returns a list of paths.
 func (plugin *photonPersistentDiskPlugin) GetDeviceMountRefs(deviceMountPath string) ([]string, error) {
+	if plugin.host == nil {
+		return nil, fmt.Errorf("volume plugin %s was not initialized with valid VolumeHost", plugin.GetPluginName())
+	}
 	mounter := plugin.host.GetMounter()
 	return mount.GetMountRefs(mounter, deviceMountPath)
 }
 
 // MountDevice mounts device to global mount point.
 func (attacher *photonPersistentDiskAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMountPath string) error {
+	if attacher.host == nil {
+		return fmt.Errorf("volume plugin %s was not initialized with valid VolumeHost", photonPersistentDiskPluginName)
+	}
 	mounter := attacher.host.GetMounter()
 	notMnt, err := mounter.IsLikelyNotMountPoint(deviceMountPath)
 	if err != nil {
@@ -218,7 +227,7 @@ func (attacher *photonPersistentDiskAttacher) MountDevice(spec *volume.Spec, dev
 }
 
 type photonPersistentDiskDetacher struct {
-	mounter     mount.Interface
+	host        volume.VolumeHost
 	photonDisks photon.Disks
 }
 
@@ -232,7 +241,7 @@ func (plugin *photonPersistentDiskPlugin) NewDetacher() (volume.Detacher, error)
 	}
 
 	return &photonPersistentDiskDetacher{
-		mounter:     plugin.host.GetMounter(),
+		host:        plugin.host,
 		photonDisks: photonCloud,
 	}, nil
 }
@@ -285,5 +294,8 @@ func (detacher *photonPersistentDiskDetacher) WaitForDetach(devicePath string, t
 }
 
 func (detacher *photonPersistentDiskDetacher) UnmountDevice(deviceMountPath string) error {
-	return volumeutil.UnmountPath(deviceMountPath, detacher.mounter)
+	if detacher.host == nil {
+		return fmt.Errorf("volume plugin %s was not initialized with valid VolumeHost", photonPersistentDiskPluginName)
+	}
+	return volumeutil.UnmountPath(deviceMountPath, detacher.host.GetMounter())
 }

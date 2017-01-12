@@ -136,6 +136,9 @@ func (plugin *glusterfsPlugin) GetAccessModes() []v1.PersistentVolumeAccessMode 
 }
 
 func (plugin *glusterfsPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, _ volume.VolumeOptions) (volume.Mounter, error) {
+	if plugin.host == nil {
+		return nil, fmt.Errorf("volume plugin %s was not initialized with valid VolumeHost", plugin.GetPluginName())
+	}
 	source, _ := plugin.getGlusterVolumeSource(spec)
 	ep_name := source.EndpointsName
 	// PVC/POD is in same ns.
@@ -180,6 +183,9 @@ func (plugin *glusterfsPlugin) newMounterInternal(spec *volume.Spec, ep *v1.Endp
 }
 
 func (plugin *glusterfsPlugin) NewUnmounter(volName string, podUID types.UID) (volume.Unmounter, error) {
+	if plugin.host == nil {
+		return nil, fmt.Errorf("volume plugin %s was not initialized with valid VolumeHost", plugin.GetPluginName())
+	}
 	return plugin.newUnmounterInternal(volName, podUID, plugin.host.GetMounter())
 }
 

@@ -94,6 +94,9 @@ func (plugin *downwardAPIPlugin) SupportsBulkVolumeVerification() bool {
 }
 
 func (plugin *downwardAPIPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, opts volume.VolumeOptions) (volume.Mounter, error) {
+	if plugin.host == nil {
+		return nil, fmt.Errorf("volume plugin %s was not initialized with valid VolumeHost", plugin.GetPluginName())
+	}
 	v := &downwardAPIVolume{
 		volName: spec.Name(),
 		items:   spec.Volume.DownwardAPI.Items,
@@ -109,6 +112,9 @@ func (plugin *downwardAPIPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, opts
 }
 
 func (plugin *downwardAPIPlugin) NewUnmounter(volName string, podUID types.UID) (volume.Unmounter, error) {
+	if plugin.host == nil {
+		return nil, fmt.Errorf("volume plugin %s was not initialized with valid VolumeHost", plugin.GetPluginName())
+	}
 	return &downwardAPIVolumeUnmounter{
 		&downwardAPIVolume{
 			volName: volName,

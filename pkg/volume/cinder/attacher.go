@@ -56,6 +56,9 @@ func (plugin *cinderPlugin) NewAttacher() (volume.Attacher, error) {
 }
 
 func (plugin *cinderPlugin) GetDeviceMountRefs(deviceMountPath string) ([]string, error) {
+	if plugin.host == nil {
+		return nil, fmt.Errorf("volume plugin %s was not initialized with valid VolumeHost", plugin.GetPluginName())
+	}
 	mounter := plugin.host.GetMounter()
 	return mount.GetMountRefs(mounter, deviceMountPath)
 }
@@ -187,6 +190,9 @@ func (attacher *cinderDiskAttacher) WaitForAttach(spec *volume.Spec, devicePath 
 
 func (attacher *cinderDiskAttacher) GetDeviceMountPath(
 	spec *volume.Spec) (string, error) {
+	if attacher.host == nil {
+		return "", fmt.Errorf("volume plugin %s was not initialized with valid VolumeHost", cinderVolumePluginName)
+	}
 	volumeSource, _, err := getVolumeSource(spec)
 	if err != nil {
 		return "", err
@@ -197,6 +203,9 @@ func (attacher *cinderDiskAttacher) GetDeviceMountPath(
 
 // FIXME: this method can be further pruned.
 func (attacher *cinderDiskAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMountPath string) error {
+	if attacher.host == nil {
+		return fmt.Errorf("volume plugin %s was not initialized with valid VolumeHost", cinderVolumePluginName)
+	}
 	mounter := attacher.host.GetMounter()
 	notMnt, err := mounter.IsLikelyNotMountPoint(deviceMountPath)
 	if err != nil {
@@ -232,7 +241,7 @@ func (attacher *cinderDiskAttacher) MountDevice(spec *volume.Spec, devicePath st
 }
 
 type cinderDiskDetacher struct {
-	mounter        mount.Interface
+	host           volume.VolumeHost
 	cinderProvider CinderProvider
 }
 
@@ -244,7 +253,7 @@ func (plugin *cinderPlugin) NewDetacher() (volume.Detacher, error) {
 		return nil, err
 	}
 	return &cinderDiskDetacher{
-		mounter:        plugin.host.GetMounter(),
+		host:           plugin.host,
 		cinderProvider: cinder,
 	}, nil
 }
@@ -283,7 +292,11 @@ func (detacher *cinderDiskDetacher) Detach(deviceMountPath string, nodeName type
 }
 
 func (detacher *cinderDiskDetacher) UnmountDevice(deviceMountPath string) error {
-	return volumeutil.UnmountPath(deviceMountPath, detacher.mounter)
+	if detacher.host == nil {
+		return fmt.Errorf("volume plugin %s was not initialized with valid VolumeHost", cinderVolumePluginName)
+	}
+
+	return volumeutil.UnmountPath(deviceMountPath, detacher.host.GetMounter())
 }
 
 func (attacher *cinderDiskAttacher) nodeInstanceID(nodeName types.NodeName) (string, error) {

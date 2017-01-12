@@ -17,6 +17,7 @@ limitations under the License.
 package flexvolume
 
 import (
+	"fmt"
 	"path"
 	"strings"
 	"sync"
@@ -104,6 +105,9 @@ func (plugin *flexVolumePlugin) GetAccessModes() []api.PersistentVolumeAccessMod
 
 // NewMounter is part of the volume.VolumePlugin interface.
 func (plugin *flexVolumePlugin) NewMounter(spec *volume.Spec, pod *api.Pod, _ volume.VolumeOptions) (volume.Mounter, error) {
+	if plugin.host == nil {
+		return nil, fmt.Errorf("volume plugin %s was not initialized with valid VolumeHost", plugin.GetPluginName())
+	}
 	return plugin.newMounterInternal(spec, pod, plugin.host.GetMounter(), plugin.runner)
 }
 
@@ -129,6 +133,9 @@ func (plugin *flexVolumePlugin) newMounterInternal(spec *volume.Spec, pod *api.P
 
 // NewUnmounter is part of the volume.VolumePlugin interface.
 func (plugin *flexVolumePlugin) NewUnmounter(volName string, podUID types.UID) (volume.Unmounter, error) {
+	if plugin.host == nil {
+		return nil, fmt.Errorf("volume plugin %s was not initialized with valid VolumeHost", plugin.GetPluginName())
+	}
 	return plugin.newUnmounterInternal(volName, podUID, plugin.host.GetMounter(), plugin.runner)
 }
 

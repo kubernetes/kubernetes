@@ -121,6 +121,9 @@ func (plugin *azureDataDiskPlugin) GetAccessModes() []v1.PersistentVolumeAccessM
 }
 
 func (plugin *azureDataDiskPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, _ volume.VolumeOptions) (volume.Mounter, error) {
+	if plugin.host == nil {
+		return nil, fmt.Errorf("volume plugin %s was not initialized with valid VolumeHost", plugin.GetPluginName())
+	}
 	return plugin.newMounterInternal(spec, pod.UID, plugin.host.GetMounter())
 }
 
@@ -161,6 +164,9 @@ func (plugin *azureDataDiskPlugin) newMounterInternal(spec *volume.Spec, podUID 
 }
 
 func (plugin *azureDataDiskPlugin) NewUnmounter(volName string, podUID types.UID) (volume.Unmounter, error) {
+	if plugin.host == nil {
+		return nil, fmt.Errorf("volume plugin %s was not initialized with valid VolumeHost", plugin.GetPluginName())
+	}
 	return plugin.newUnmounterInternal(volName, podUID, plugin.host.GetMounter())
 }
 
@@ -176,6 +182,9 @@ func (plugin *azureDataDiskPlugin) newUnmounterInternal(volName string, podUID t
 }
 
 func (plugin *azureDataDiskPlugin) ConstructVolumeSpec(volName, mountPath string) (*volume.Spec, error) {
+	if plugin.host == nil {
+		return nil, fmt.Errorf("volume plugin %s was not initialized with valid VolumeHost", plugin.GetPluginName())
+	}
 	mounter := plugin.host.GetMounter()
 	pluginDir := plugin.host.GetPluginDir(plugin.GetPluginName())
 	sourceName, err := mounter.GetDeviceNameFromMount(mountPath, pluginDir)
@@ -194,6 +203,9 @@ func (plugin *azureDataDiskPlugin) ConstructVolumeSpec(volName, mountPath string
 }
 
 func (plugin *azureDataDiskPlugin) GetDeviceMountRefs(deviceMountPath string) ([]string, error) {
+	if plugin.host == nil {
+		return nil, fmt.Errorf("volume plugin %s was not initialized with valid VolumeHost", plugin.GetPluginName())
+	}
 	mounter := plugin.host.GetMounter()
 	return mount.GetMountRefs(mounter, deviceMountPath)
 }

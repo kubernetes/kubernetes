@@ -102,6 +102,9 @@ func (plugin *iscsiPlugin) GetAccessModes() []v1.PersistentVolumeAccessMode {
 }
 
 func (plugin *iscsiPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, _ volume.VolumeOptions) (volume.Mounter, error) {
+	if plugin.host == nil {
+		return nil, fmt.Errorf("volume plugin %s was not initialized with valid VolumeHost", plugin.GetPluginName())
+	}
 	// Inject real implementations here, test through the internal function.
 	var secret map[string]string
 	source, _, err := getVolumeSource(spec)
@@ -158,6 +161,9 @@ func (plugin *iscsiPlugin) newMounterInternal(spec *volume.Spec, podUID types.UI
 }
 
 func (plugin *iscsiPlugin) NewUnmounter(volName string, podUID types.UID) (volume.Unmounter, error) {
+	if plugin.host == nil {
+		return nil, fmt.Errorf("volume plugin %s was not initialized with valid VolumeHost", plugin.GetPluginName())
+	}
 	// Inject real implementations here, test through the internal function.
 	return plugin.newUnmounterInternal(volName, podUID, &ISCSIUtil{}, plugin.host.GetMounter())
 }
