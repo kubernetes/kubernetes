@@ -90,7 +90,7 @@ func NewController(p ControllerParameters) (*PersistentVolumeController, error) 
 		volumeQueue:                   workqueue.NewNamed("volumes"),
 	}
 
-	if err := controller.volumePluginMgr.InitPlugins(p.VolumePlugins, controller, p.KubeClient, p.Cloud); err != nil {
+	if err := controller.volumePluginMgr.InitPlugins(p.VolumePlugins, controller, nil, p.KubeClient, p.Cloud); err != nil {
 		return nil, fmt.Errorf("Could not initialize volume plugins for PersistentVolume Controller: %v", err)
 	}
 

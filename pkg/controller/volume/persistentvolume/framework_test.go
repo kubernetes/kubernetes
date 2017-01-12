@@ -828,7 +828,7 @@ func wrapTestWithPluginCalls(expectedRecycleCalls, expectedDeleteCalls []error, 
 			deleteCalls:    expectedDeleteCalls,
 			provisionCalls: expectedProvisionCalls,
 		}
-		ctrl.volumePluginMgr.InitPlugins([]vol.VolumePlugin{plugin}, ctrl, nil, nil)
+		ctrl.volumePluginMgr.InitPlugins([]vol.VolumePlugin{plugin}, nil, nil, nil)
 		return toWrap(ctrl, reactor, test)
 	}
 }
