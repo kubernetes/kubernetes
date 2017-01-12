@@ -24,7 +24,7 @@ import (
 	"github.com/ugorji/go/codec"
 )
 
-func TestVerbsMarshalJSON(t *testing.T) {
+func TestVerbsUgorjiMarshalJSON(t *testing.T) {
 	cases := []struct {
 		input  APIResource
 		result string
@@ -40,12 +40,12 @@ func TestVerbsMarshalJSON(t *testing.T) {
 			t.Errorf("[%d] Failed to marshal input: '%v': %v", i, c.input, err)
 		}
 		if string(result) != c.result {
-			t.Errorf("[%d] Failed to marshal input: '%v': expected %+v, got %q", i, c.input, c.result, string(result))
+			t.Errorf("[%d] Failed to marshal input: '%v': expected '%v', got '%v'", i, c.input, c.result, string(result))
 		}
 	}
 }
 
-func TestVerbsUnmarshalJSON(t *testing.T) {
+func TestVerbsUgorjiUnmarshalJSON(t *testing.T) {
 	cases := []struct {
 		input  string
 		result APIResource
@@ -67,7 +67,29 @@ func TestVerbsUnmarshalJSON(t *testing.T) {
 	}
 }
 
-func TestVerbsUgorjiUnmarshalJSON(t *testing.T) {
+// TestUgorjiMarshalJSONWithOmit tests that we don't have regressions regarding nil and empty slices with "omit"
+func TestUgorjiMarshalJSONWithOmit(t *testing.T) {
+	cases := []struct {
+		input  LabelSelector
+		result string
+	}{
+		{LabelSelector{}, `{}`},
+		{LabelSelector{MatchExpressions: []LabelSelectorRequirement{}}, `{}`},
+		{LabelSelector{MatchExpressions: []LabelSelectorRequirement{{}}}, `{"matchExpressions":[{"key":"","operator":""}]}`},
+	}
+
+	for i, c := range cases {
+		result, err := json.Marshal(&c.input)
+		if err != nil {
+			t.Errorf("[%d] Failed to marshal input: '%v': %v", i, c.input, err)
+		}
+		if string(result) != c.result {
+			t.Errorf("[%d] Failed to marshal input: '%v': expected '%v', got '%v'", i, c.input, c.result, string(result))
+		}
+	}
+}
+
+func TestVerbsUnmarshalJSON(t *testing.T) {
 	cases := []struct {
 		input  string
 		result APIResource

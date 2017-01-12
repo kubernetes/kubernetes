@@ -1,4 +1,4 @@
-// //+build ignore
+/* // +build ignore */
 
 // Copyright (c) 2012-2015 Ugorji Nwoke. All rights reserved.
 // Use of this source code is governed by a MIT license found in the LICENSE file.
@@ -17,7 +17,7 @@ import (
 
 // This file is used to generate helper code for codecgen. 
 // The values here i.e. genHelper(En|De)coder are not to be used directly by 
-// library users. They WILL change continously and without notice.
+// library users. They WILL change continuously and without notice.
 // 
 // To help enforce this, we create an unexported type with exported members.
 // The only way to get the type is via the one exported type that we control (somewhat).
@@ -77,6 +77,10 @@ func (f genHelperEncoder) EncJSONMarshal(iv jsonMarshaler) {
 func (f genHelperEncoder) EncBinaryMarshal(iv encoding.BinaryMarshaler) {
 	bs, fnerr := iv.MarshalBinary()
 	f.e.marshal(bs, fnerr, false, c_RAW)
+}
+// FOR USE BY CODECGEN ONLY. IT *WILL* CHANGE WITHOUT NOTICE. *DO NOT USE*
+func (f genHelperEncoder) EncRaw(iv Raw) {
+	f.e.raw(iv)
 }
 // FOR USE BY CODECGEN ONLY. IT *WILL* CHANGE WITHOUT NOTICE. *DO NOT USE*
 func (f genHelperEncoder) TimeRtidIfBinc() uintptr {
@@ -170,6 +174,10 @@ func (f genHelperDecoder) DecBinaryUnmarshal(bm encoding.BinaryUnmarshaler) {
 	if fnerr != nil {
 		panic(fnerr)
 	}
+}
+// FOR USE BY CODECGEN ONLY. IT *WILL* CHANGE WITHOUT NOTICE. *DO NOT USE*
+func (f genHelperDecoder) DecRaw() []byte {
+	return f.d.raw()
 }
 // FOR USE BY CODECGEN ONLY. IT *WILL* CHANGE WITHOUT NOTICE. *DO NOT USE*
 func (f genHelperDecoder) TimeRtidIfBinc() uintptr {
