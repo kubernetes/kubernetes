@@ -127,6 +127,20 @@ function mount-master-pd {
   chgrp -R etcd "${mount_point}/var/etcd"
 }
 
+# replace_prefixed_line ensures:
+# 1. the specified file exists
+# 2. existing lines with the specified ${prefix} are removed
+# 3. a new line with the specified ${prefix}${suffix} is appended
+function replace_prefixed_line {
+  local -r file="${1:-}"
+  local -r prefix="${2:-}"
+  local -r suffix="${3:-}"
+
+  touch "${file}"
+  awk "substr(\$0,0,length(\"${prefix}\")) != \"${prefix}\" { print }" "${file}" > "${file}.filtered"  && mv "${file}.filtered" "${file}"
+  echo "${prefix}${suffix}" >> "${file}"
+}
+
 # After the first boot and on upgrade, these files exist on the master-pd
 # and should never be touched again (except perhaps an additional service
 # account, see NB below.)
@@ -139,16 +153,14 @@ function create-master-auth {
     echo "${MASTER_KEY}" | base64 --decode > "${auth_dir}/server.key"
   fi
   local -r basic_auth_csv="${auth_dir}/basic_auth.csv"
-  if [[ ! -e "${basic_auth_csv}" && -n "${KUBE_PASSWORD:-}" && -n "${KUBE_USER:-}" ]]; then
-    echo "${KUBE_PASSWORD},${KUBE_USER},admin" > "${basic_auth_csv}"
+  if [[ -n "${KUBE_PASSWORD:-}" && -n "${KUBE_USER:-}" ]]; then
+    replace_prefixed_line "${basic_auth_csv}" "${KUBE_PASSWORD},${KUBE_USER}," "admin,system:masters"
   fi
   local -r known_tokens_csv="${auth_dir}/known_tokens.csv"
-  if [[ ! -e "${known_tokens_csv}" ]]; then
-    echo "${KUBE_BEARER_TOKEN},admin,admin" > "${known_tokens_csv}"
-    echo "${KUBE_CONTROLLER_MANAGER_TOKEN},system:kube-controller-manager,uid:system:kube-controller-manager" >> "${known_tokens_csv}"
-    echo "${KUBELET_TOKEN},system:node:node-name,uid:kubelet,system:nodes" >> "${known_tokens_csv}"
-    echo "${KUBE_PROXY_TOKEN},system:kube-proxy,uid:kube_proxy" >> "${known_tokens_csv}"
-  fi
+  replace_prefixed_line "${known_tokens_csv}" "${KUBE_BEARER_TOKEN}"             "admin,admin,system:masters"
+  replace_prefixed_line "${known_tokens_csv}" "${KUBE_CONTROLLER_MANAGER_TOKEN}" "system:kube-controller-manager,uid:system:kube-controller-manager"
+  replace_prefixed_line "${known_tokens_csv}" "${KUBELET_TOKEN}"                 "system:node:node-name,uid:kubelet,system:nodes"
+  replace_prefixed_line "${known_tokens_csv}" "${KUBE_PROXY_TOKEN}"              "system:kube-proxy,uid:kube_proxy"
   local use_cloud_config="false"
   cat <<EOF >/etc/gce.conf
 [global]
@@ -814,16 +826,22 @@ function start-kube-apiserver {
     webhook_authn_config_volume="{\"name\": \"webhookauthnconfigmount\",\"hostPath\": {\"path\": \"/etc/gcp_authn.config\"}},"
   fi
 
-  params+=" --authorization-mode=RBAC"
+  local authorization_mode="RBAC"
+  if [[ -n "${ABAC_AUTHZ_FILE:-}" && -e "${ABAC_AUTHZ_FILE}" ]]; then
+    params+=" --authorization-policy-file=${ABAC_AUTHZ_FILE}"
+    authorization_mode+=",ABAC"
+  fi
   local webhook_config_mount=""
   local webhook_config_volume=""
   if [[ -n "${GCP_AUTHZ_URL:-}" ]]; then
-    params+=",Webhook --authorization-webhook-config-file=/etc/gcp_authz.config"
+    authorization_mode+=",Webhook"
+    params+=" --authorization-webhook-config-file=/etc/gcp_authz.config"
     webhook_config_mount="{\"name\": \"webhookconfigmount\",\"mountPath\": \"/etc/gcp_authz.config\", \"readOnly\": false},"
     webhook_config_volume="{\"name\": \"webhookconfigmount\",\"hostPath\": {\"path\": \"/etc/gcp_authz.config\"}},"
   fi
   local -r src_dir="${KUBE_HOME}/kube-manifests/kubernetes/gci-trusty"
-
+  params+=" --authorization-mode=${authorization_mode}"
+  
   src_file="${src_dir}/kube-apiserver.manifest"
   remove-salt-config-comments "${src_file}"
   # Evaluate variables.
