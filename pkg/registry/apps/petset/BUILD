@@ -53,7 +53,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
-        "//pkg/registry/apps/petset/etcd:all-srcs",
+        "//pkg/registry/apps/petset/storage:all-srcs",
     ],
     tags = ["automanaged"],
 )

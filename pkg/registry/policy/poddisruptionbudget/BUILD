@@ -54,7 +54,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
-        "//pkg/registry/policy/poddisruptionbudget/etcd:all-srcs",
+        "//pkg/registry/policy/poddisruptionbudget/storage:all-srcs",
     ],
     tags = ["automanaged"],
 )

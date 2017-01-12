@@ -50,7 +50,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
-        "//pkg/registry/core/podtemplate/etcd:all-srcs",
+        "//pkg/registry/core/podtemplate/storage:all-srcs",
     ],
     tags = ["automanaged"],
 )

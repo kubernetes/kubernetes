@@ -59,7 +59,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
-        "//pkg/registry/extensions/deployment/etcd:all-srcs",
+        "//pkg/registry/extensions/deployment/storage:all-srcs",
     ],
     tags = ["automanaged"],
 )
