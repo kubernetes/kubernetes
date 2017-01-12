@@ -349,3 +349,49 @@ func SetDefaults_RBDVolumeSource(obj *RBDVolumeSource) {
 		obj.Keyring = "/etc/ceph/keyring"
 	}
 }
+
+// TODO(k82cn): remove this defaulter when init container graduated to beta.
+func SetDefaults_InitContainers(initContainers []Container) {
+	for i := range initContainers {
+		a := &initContainers[i]
+		SetDefaults_Container(a)
+		for j := range a.Ports {
+			b := &a.Ports[j]
+			SetDefaults_ContainerPort(b)
+		}
+		for j := range a.Env {
+			b := &a.Env[j]
+			if b.ValueFrom != nil {
+				if b.ValueFrom.FieldRef != nil {
+					SetDefaults_ObjectFieldSelector(b.ValueFrom.FieldRef)
+				}
+			}
+		}
+		SetDefaults_ResourceList(&a.Resources.Limits)
+		SetDefaults_ResourceList(&a.Resources.Requests)
+		if a.LivenessProbe != nil {
+			SetDefaults_Probe(a.LivenessProbe)
+			if a.LivenessProbe.Handler.HTTPGet != nil {
+				SetDefaults_HTTPGetAction(a.LivenessProbe.Handler.HTTPGet)
+			}
+		}
+		if a.ReadinessProbe != nil {
+			SetDefaults_Probe(a.ReadinessProbe)
+			if a.ReadinessProbe.Handler.HTTPGet != nil {
+				SetDefaults_HTTPGetAction(a.ReadinessProbe.Handler.HTTPGet)
+			}
+		}
+		if a.Lifecycle != nil {
+			if a.Lifecycle.PostStart != nil {
+				if a.Lifecycle.PostStart.HTTPGet != nil {
+					SetDefaults_HTTPGetAction(a.Lifecycle.PostStart.HTTPGet)
+				}
+			}
+			if a.Lifecycle.PreStop != nil {
+				if a.Lifecycle.PreStop.HTTPGet != nil {
+					SetDefaults_HTTPGetAction(a.Lifecycle.PreStop.HTTPGet)
+				}
+			}
+		}
+	}
+}

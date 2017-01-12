@@ -231,7 +231,7 @@ func TestSetDefaultReplicationControllerReplicas(t *testing.T) {
 	}
 }
 
-func TestSetDefaultReplicationControllerImagePullPolicy(t *testing.T) {
+func TestSetDefaultReplicationControllerInitContainers(t *testing.T) {
 	containersWithoutPullPolicy, _ := json.Marshal([]map[string]interface{}{
 		{
 			"name":  "install",
