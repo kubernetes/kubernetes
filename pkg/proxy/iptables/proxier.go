@@ -27,6 +27,7 @@ import (
 	"fmt"
 	"net"
 	"reflect"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -217,6 +218,15 @@ func (l *listenPortOpener) OpenLocalPort(lp *localPort) (closeable, error) {
 // Proxier implements ProxyProvider
 var _ proxy.ProxyProvider = &Proxier{}
 
+func parseMasqueradeBit(masqueradeBit int) (string, error) {
+	// Generate the masquerade mark to use for SNAT rules.
+	if masqueradeBit < 0 || masqueradeBit > 31 {
+		return "", fmt.Errorf("invalid iptables-masquerade-bit %v not in [0, 31]", masqueradeBit)
+	}
+	masqueradeValue := uint(1 << uint(masqueradeBit))
+	return fmt.Sprintf("%#x/%#x", masqueradeValue, masqueradeValue), nil
+}
+
 // NewProxier returns a new Proxier given an iptables Interface instance.
 // Because of the iptables logic, it is assumed that there is only a single Proxier active on a machine.
 // An error will be returned if iptables fails to update or acquire the initial lock.
@@ -251,12 +261,10 @@ func NewProxier(ipt utiliptables.Interface,
 		glog.Infof("missing br-netfilter module or unset sysctl br-nf-call-iptables; proxy may not work as intended")
 	}
 
-	// Generate the masquerade mark to use for SNAT rules.
-	if masqueradeBit < 0 || masqueradeBit > 31 {
-		return nil, fmt.Errorf("invalid iptables-masquerade-bit %v not in [0, 31]", masqueradeBit)
+	masqueradeMark, err := parseMasqueradeBit(masqueradeBit)
+	if err != nil {
+		return nil, err
 	}
-	masqueradeValue := 1 << uint(masqueradeBit)
-	masqueradeMark := fmt.Sprintf("%#08x/%#08x", masqueradeValue, masqueradeValue)
 
 	if nodeIP == nil {
 		glog.Warningf("invalid nodeIP, initializing kube-proxy with 127.0.0.1 as nodeIP")
@@ -800,10 +808,96 @@ func (proxier *Proxier) execConntrackTool(parameters ...string) error {
 	return nil
 }
 
+func parseKubeProxyTableAddRules(table utiliptables.Table, bytes []byte) (map[utiliptables.Chain][]utiliptables.Rule, error) {
+	var proxyChains []utiliptables.Chain
+	var proxyChainPrefixes []string
+	switch table {
+	case utiliptables.TableFilter:
+		proxyChains = []utiliptables.Chain{kubeServicesChain}
+	case utiliptables.TableNAT:
+		proxyChains = []utiliptables.Chain{
+			kubePostroutingChain,
+			KubeMarkMasqChain,
+			kubeServicesChain,
+			kubeNodePortsChain,
+		}
+		proxyChainPrefixes = []string{
+			"KUBE-XLB-",
+			"KUBE-SEP-",
+			"KUBE-FW-",
+			"KUBE-SVC-",
+		}
+	default:
+		return nil, fmt.Errorf("unhandled iptables table %v", table)
+	}
+
+	return utiliptables.ParseTableAddRules(table, proxyChains, proxyChainPrefixes, bytes)
+}
+
+// Returns whether the new iptables rules are the same as the old rules
+func sameIptablesRuleset(table utiliptables.Table, newLines []byte, oldLines []byte) (bool, error) {
+	oldChains, err := parseKubeProxyTableAddRules(table, oldLines)
+	if err != nil {
+		// Just log error when the old rules fail to parse; they could have
+		// been modified and include options the parsing code doesn't understand
+		glog.V(5).Infof("iptables %v failed to parse: %v", table, err)
+		return false, nil
+	}
+	newChains, err := parseKubeProxyTableAddRules(table, newLines)
+	if err != nil {
+		return false, err
+	}
+
+	if reflect.DeepEqual(newChains, oldChains) {
+		glog.V(3).Infof("iptables %v rules unchanged", table)
+		return true, nil
+	}
+
+	glog.V(3).Infof("iptables %v rules changed", table)
+
+	if glog.V(5) {
+		// Explode equality checks to better debug which rules don't match
+		if len(newChains) != len(oldChains) {
+			glog.V(5).Infof("iptables %v had %v chains; needs %v chains", table, len(oldChains), len(newChains))
+		} else {
+			for chain, newRules := range newChains {
+				oldRules, ok := oldChains[chain]
+				if !ok {
+					glog.V(5).Infof("iptables %v chain %v not found in old rules", table, chain)
+				} else if len(newRules) != len(oldRules) {
+					glog.V(5).Infof("iptables %v chain %v had %v rules; needs %v rules", table, chain, len(oldRules), len(newRules))
+				} else {
+					for i, oldRule := range oldRules {
+						if !reflect.DeepEqual(oldRule, newRules[i]) {
+							glog.V(5).Infof("iptables %v chain %v old rule %#v not equal to new %#v", table, chain, oldRule, newRules[i])
+						}
+					}
+				}
+			}
+		}
+	}
+
+	return false, nil
+}
+
+type servicePortNameArray []proxy.ServicePortName
+
+func (a servicePortNameArray) Len() int {
+	return len(a)
+}
+
+func (a servicePortNameArray) Less(i, j int) bool {
+	return a[i].String() < a[j].String()
+}
+
+func (a servicePortNameArray) Swap(i, j int) {
+	a[i], a[j] = a[j], a[i]
+}
+
 // This is where all of the iptables-save/restore calls happen.
-// The only other iptables rules are those that are setup in iptablesInit()
-// assumes proxier.mu is held
-func (proxier *Proxier) syncProxyRules() {
+// The only other iptables rules are those that are setup in iptablesInit().
+// This function assumes the proxier mutex is held.
+func (proxier *Proxier) syncProxyRules() error {
 	if proxier.throttle != nil {
 		proxier.throttle.Accept()
 	}
@@ -814,7 +908,7 @@ func (proxier *Proxier) syncProxyRules() {
 	// don't sync rules till we've received services and endpoints
 	if !proxier.haveReceivedEndpointsUpdate || !proxier.haveReceivedServiceUpdate {
 		glog.V(2).Info("Not syncing iptables until Services and Endpoints have been received from master")
-		return
+		return nil
 	}
 	glog.V(3).Infof("Syncing iptables rules")
 
@@ -824,7 +918,7 @@ func (proxier *Proxier) syncProxyRules() {
 		for _, table := range tablesNeedServicesChain {
 			if _, err := proxier.iptables.EnsureChain(table, kubeServicesChain); err != nil {
 				glog.Errorf("Failed to ensure that %s chain %s exists: %v", table, kubeServicesChain, err)
-				return
+				return err
 			}
 		}
 
@@ -841,7 +935,7 @@ func (proxier *Proxier) syncProxyRules() {
 		for _, tc := range tableChainsNeedJumpServices {
 			if _, err := proxier.iptables.EnsureRule(utiliptables.Prepend, tc.table, tc.chain, args...); err != nil {
 				glog.Errorf("Failed to ensure that %s chain %s jumps to %s: %v", tc.table, tc.chain, kubeServicesChain, err)
-				return
+				return err
 			}
 		}
 	}
@@ -850,33 +944,33 @@ func (proxier *Proxier) syncProxyRules() {
 	{
 		if _, err := proxier.iptables.EnsureChain(utiliptables.TableNAT, kubePostroutingChain); err != nil {
 			glog.Errorf("Failed to ensure that %s chain %s exists: %v", utiliptables.TableNAT, kubePostroutingChain, err)
-			return
+			return err
 		}
 
 		comment := "kubernetes postrouting rules"
 		args := []string{"-m", "comment", "--comment", comment, "-j", string(kubePostroutingChain)}
 		if _, err := proxier.iptables.EnsureRule(utiliptables.Prepend, utiliptables.TableNAT, utiliptables.ChainPostrouting, args...); err != nil {
 			glog.Errorf("Failed to ensure that %s chain %s jumps to %s: %v", utiliptables.TableNAT, utiliptables.ChainPostrouting, kubePostroutingChain, err)
-			return
+			return err
 		}
 	}
 
 	// Get iptables-save output so we can check for existing chains and rules.
 	// This will be a map of chain name to chain with rules as stored in iptables-save/iptables-restore
 	existingFilterChains := make(map[utiliptables.Chain]string)
-	iptablesSaveRaw, err := proxier.iptables.Save(utiliptables.TableFilter)
+	iptablesFilterSaveRaw, err := proxier.iptables.Save(utiliptables.TableFilter)
 	if err != nil { // if we failed to get any rules
 		glog.Errorf("Failed to execute iptables-save, syncing all rules: %v", err)
 	} else { // otherwise parse the output
-		existingFilterChains = utiliptables.GetChainLines(utiliptables.TableFilter, iptablesSaveRaw)
+		existingFilterChains = utiliptables.GetChainLines(utiliptables.TableFilter, iptablesFilterSaveRaw)
 	}
 
 	existingNATChains := make(map[utiliptables.Chain]string)
-	iptablesSaveRaw, err = proxier.iptables.Save(utiliptables.TableNAT)
+	iptablesNATSaveRaw, err := proxier.iptables.Save(utiliptables.TableNAT)
 	if err != nil { // if we failed to get any rules
 		glog.Errorf("Failed to execute iptables-save, syncing all rules: %v", err)
 	} else { // otherwise parse the output
-		existingNATChains = utiliptables.GetChainLines(utiliptables.TableNAT, iptablesSaveRaw)
+		existingNATChains = utiliptables.GetChainLines(utiliptables.TableNAT, iptablesNATSaveRaw)
 	}
 
 	filterChains := bytes.NewBuffer(nil)
@@ -940,8 +1034,16 @@ func (proxier *Proxier) syncProxyRules() {
 	// Accumulate the set of local ports that we will be holding open once this update is complete
 	replacementPortsMap := map[localPort]closeable{}
 
+	// Sort serviceMap keys to ensure consistent order of iptables rules
+	keys := make(servicePortNameArray, 0, len(proxier.serviceMap))
+	for k := range proxier.serviceMap {
+		keys = append(keys, k)
+	}
+	sort.Sort(keys)
+
 	// Build rules for each service.
-	for svcName, svcInfo := range proxier.serviceMap {
+	for _, svcName := range keys {
+		svcInfo := proxier.serviceMap[svcName]
 		protocol := strings.ToLower(string(svcInfo.protocol))
 
 		// Create the per-service chain, retaining counters if possible.
@@ -1334,13 +1436,30 @@ func (proxier *Proxier) syncProxyRules() {
 	natLines := append(natChains.Bytes(), natRules.Bytes()...)
 	lines := append(filterLines, natLines...)
 
-	glog.V(3).Infof("Restoring iptables rules: %s", lines)
-	err = proxier.iptables.RestoreAll(lines, utiliptables.NoFlushTables, utiliptables.RestoreCounters)
+	filterSame, err := sameIptablesRuleset(utiliptables.TableFilter, filterLines, iptablesFilterSaveRaw)
 	if err != nil {
-		glog.Errorf("Failed to execute iptables-restore: %v\nRules:\n%s", err, lines)
+		glog.Warningf("failed to parse iptables filter rules: %v", err)
 		// Revert new local ports.
 		revertPorts(replacementPortsMap, proxier.portsMap)
-		return
+		return err
+	}
+	natSame, err := sameIptablesRuleset(utiliptables.TableNAT, natLines, iptablesNATSaveRaw)
+	if err != nil {
+		glog.Warningf("failed to parse iptables NAT rules: %v", err)
+		// Revert new local ports.
+		revertPorts(replacementPortsMap, proxier.portsMap)
+		return err
+	}
+
+	if !filterSame || !natSame {
+		glog.V(3).Infof("Restoring iptables rules: %s", lines)
+		err = proxier.iptables.RestoreAll(lines, utiliptables.NoFlushTables, utiliptables.RestoreCounters)
+		if err != nil {
+			glog.Errorf("Failed to execute iptables-restore: %v\nRules:\n%s", err, lines)
+			// Revert new local ports.
+			revertPorts(replacementPortsMap, proxier.portsMap)
+			return nil
+		}
 	}
 
 	// Close old local ports and save new ones.
@@ -1350,6 +1469,7 @@ func (proxier *Proxier) syncProxyRules() {
 		}
 	}
 	proxier.portsMap = replacementPortsMap
+	return nil
 }
 
 // Clear UDP conntrack for port or all conntrack entries when port equal zero.

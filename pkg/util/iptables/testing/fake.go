@@ -18,30 +18,30 @@ package testing
 
 import (
 	"fmt"
-	"strings"
 
 	"k8s.io/kubernetes/pkg/util/iptables"
 )
 
 const (
-	Destination = "-d "
-	Source      = "-s "
-	DPort       = "--dport "
-	Protocol    = "-p "
-	Jump        = "-j "
+	Destination = "-d"
+	Source      = "-s"
+	DPort       = "--dport"
+	Protocol    = "-p"
+	Jump        = "-j"
 	Reject      = "REJECT"
-	ToDest      = "--to-destination "
+	ToDest      = "--to-destination"
 )
-
-type Rule map[string]string
 
 // no-op implementation of iptables Interface
 type FakeIPTables struct {
-	Lines []byte
+	RestoreLines []byte
+	SaveLines    []byte
 }
 
 func NewFake() *FakeIPTables {
-	return &FakeIPTables{}
+	return &FakeIPTables{
+		SaveLines: make([]byte, 0),
+	}
 }
 
 func (*FakeIPTables) GetVersion() (string, error) {
@@ -72,12 +72,12 @@ func (*FakeIPTables) IsIpv6() bool {
 	return false
 }
 
-func (*FakeIPTables) Save(table iptables.Table) ([]byte, error) {
-	return make([]byte, 0), nil
+func (f *FakeIPTables) Save(table iptables.Table) ([]byte, error) {
+	return f.SaveLines, nil
 }
 
-func (*FakeIPTables) SaveAll() ([]byte, error) {
-	return make([]byte, 0), nil
+func (f *FakeIPTables) SaveAll() ([]byte, error) {
+	return f.SaveLines, nil
 }
 
 func (*FakeIPTables) Restore(table iptables.Table, data []byte, flush iptables.FlushFlag, counters iptables.RestoreCountersFlag) error {
@@ -85,38 +85,25 @@ func (*FakeIPTables) Restore(table iptables.Table, data []byte, flush iptables.F
 }
 
 func (f *FakeIPTables) RestoreAll(data []byte, flush iptables.FlushFlag, counters iptables.RestoreCountersFlag) error {
-	f.Lines = data
+	f.RestoreLines = data
 	return nil
 }
 func (*FakeIPTables) AddReloadFunc(reloadFunc func()) {}
 
 func (*FakeIPTables) Destroy() {}
 
-func getToken(line, seperator string) string {
-	tokens := strings.Split(line, seperator)
-	if len(tokens) == 2 {
-		return strings.Split(tokens[1], " ")[0]
-	}
-	return ""
-}
-
 // GetChain returns a list of rules for the given chain.
 // The chain name must match exactly.
-// The matching is pretty dumb, don't rely on it for anything but testing.
-func (f *FakeIPTables) GetRules(chainName string) (rules []Rule) {
-	for _, l := range strings.Split(string(f.Lines), "\n") {
-		if strings.Contains(l, fmt.Sprintf("-A %v", chainName)) {
-			newRule := Rule(map[string]string{})
-			for _, arg := range []string{Destination, Source, DPort, Protocol, Jump, ToDest} {
-				tok := getToken(l, arg)
-				if tok != "" {
-					newRule[arg] = tok
-				}
-			}
-			rules = append(rules, newRule)
-		}
+func (f *FakeIPTables) GetRules(table iptables.Table, chainName iptables.Chain) ([]iptables.Rule, error) {
+	chains, err := iptables.ParseTableAddRules(table, nil, nil, f.RestoreLines)
+	if err != nil {
+		return nil, err
 	}
-	return
+	rules, ok := chains[chainName]
+	if !ok {
+		return nil, fmt.Errorf("Chain %v not found", chainName)
+	}
+	return rules, nil
 }
 
 var _ = iptables.Interface(&FakeIPTables{})

@@ -21,6 +21,7 @@ import (
 
 	"fmt"
 	"net"
+	"reflect"
 	"strings"
 
 	"k8s.io/apimachinery/pkg/types"
@@ -502,26 +503,34 @@ func NewFakeProxier(ipt utiliptables.Interface) *Proxier {
 		hostname:                    "test-hostname",
 		portsMap:                    make(map[localPort]closeable),
 		portMapper:                  &fakePortOpener{[]*localPort{}},
+		masqueradeMark:              "0x4000/0x4000",
 	}
 }
 
-func hasJump(rules []iptablestest.Rule, destChain, destIP, destPort string) bool {
+func hasJump(rules []utiliptables.Rule, destChain utiliptables.Chain, destIP, destPort string) bool {
 	match := false
 	for _, r := range rules {
-		if r[iptablestest.Jump] == destChain {
-			match = true
-			if destIP != "" {
-				if strings.Contains(r[iptablestest.Destination], destIP) && (strings.Contains(r[iptablestest.DPort], destPort) || r[iptablestest.DPort] == "") {
-					return true
-				}
-				match = false
+		jump, ok := r.Options[iptablestest.Jump]
+		if !ok || utiliptables.Chain(jump.Arg) != destChain {
+			continue
+		}
+
+		match = true
+		dest, destOk := r.Options[iptablestest.Destination]
+		dport, dportOk := r.Options[iptablestest.DPort]
+
+		if destIP != "" {
+			if destOk && strings.Contains(dest.Arg, destIP) && ((dportOk && dport.Arg == destPort) || !dportOk) {
+				return true
 			}
-			if destPort != "" {
-				if strings.Contains(r[iptablestest.DPort], destPort) && (strings.Contains(r[iptablestest.Destination], destIP) || r[iptablestest.Destination] == "") {
-					return true
-				}
-				match = false
+			match = false
+		}
+
+		if destPort != "" {
+			if dportOk && dport.Arg == destPort && ((destOk && strings.Contains(dest.Arg, destIP)) || !destOk) {
+				return true
 			}
+			match = false
 		}
 	}
 	return match
@@ -529,17 +538,30 @@ func hasJump(rules []iptablestest.Rule, destChain, destIP, destPort string) bool
 
 func TestHasJump(t *testing.T) {
 	testCases := map[string]struct {
-		rules     []iptablestest.Rule
-		destChain string
+		rules     []utiliptables.Rule
+		destChain utiliptables.Chain
 		destIP    string
 		destPort  string
 		expected  bool
 	}{
 		"case 1": {
 			// Match the 1st rule(both dest IP and dest Port)
-			rules: []iptablestest.Rule{
-				{"-d ": "10.20.30.41/32", "--dport ": "80", "-p ": "tcp", "-j ": "REJECT"},
-				{"--dport ": "3001", "-p ": "tcp", "-j ": "KUBE-MARK-MASQ"},
+			rules: []utiliptables.Rule{
+				{
+					Options: map[string]utiliptables.RuleOption{
+						"-d":      {Arg: "10.20.30.41/32"},
+						"--dport": {Arg: "80"},
+						"-p":      {Arg: "tcp"},
+						"-j":      {Arg: "REJECT"},
+					},
+				},
+				{
+					Options: map[string]utiliptables.RuleOption{
+						"--dport": {Arg: "3001"},
+						"-p":      {Arg: "tcp"},
+						"-j":      {Arg: "KUBE-MARK-MASQ"},
+					},
+				},
 			},
 			destChain: "REJECT",
 			destIP:    "10.20.30.41",
@@ -548,9 +570,21 @@ func TestHasJump(t *testing.T) {
 		},
 		"case 2": {
 			// Match the 2nd rule(dest Port)
-			rules: []iptablestest.Rule{
-				{"-d ": "10.20.30.41/32", "-p ": "tcp", "-j ": "REJECT"},
-				{"--dport ": "3001", "-p ": "tcp", "-j ": "REJECT"},
+			rules: []utiliptables.Rule{
+				{
+					Options: map[string]utiliptables.RuleOption{
+						"-d": {Arg: "10.20.30.41/32"},
+						"-p": {Arg: "tcp"},
+						"-j": {Arg: "REJECT"},
+					},
+				},
+				{
+					Options: map[string]utiliptables.RuleOption{
+						"--dport": {Arg: "3001"},
+						"-p":      {Arg: "tcp"},
+						"-j":      {Arg: "REJECT"},
+					},
+				},
 			},
 			destChain: "REJECT",
 			destIP:    "",
@@ -559,8 +593,15 @@ func TestHasJump(t *testing.T) {
 		},
 		"case 3": {
 			// Match both dest IP and dest Port
-			rules: []iptablestest.Rule{
-				{"-d ": "1.2.3.4/32", "--dport ": "80", "-p ": "tcp", "-j ": "KUBE-XLB-GF53O3C2HZEXL2XN"},
+			rules: []utiliptables.Rule{
+				{
+					Options: map[string]utiliptables.RuleOption{
+						"-d":      {Arg: "1.2.3.4/32"},
+						"--dport": {Arg: "80"},
+						"-p":      {Arg: "tcp"},
+						"-j":      {Arg: "KUBE-XLB-GF53O3C2HZEXL2XN"},
+					},
+				},
 			},
 			destChain: "KUBE-XLB-GF53O3C2HZEXL2XN",
 			destIP:    "1.2.3.4",
@@ -569,8 +610,15 @@ func TestHasJump(t *testing.T) {
 		},
 		"case 4": {
 			// Match dest IP but doesn't match dest Port
-			rules: []iptablestest.Rule{
-				{"-d ": "1.2.3.4/32", "--dport ": "80", "-p ": "tcp", "-j ": "KUBE-XLB-GF53O3C2HZEXL2XN"},
+			rules: []utiliptables.Rule{
+				{
+					Options: map[string]utiliptables.RuleOption{
+						"-d":      {Arg: "1.2.3.4/32"},
+						"--dport": {Arg: "80"},
+						"-p":      {Arg: "tcp"},
+						"-j":      {Arg: "KUBE-XLB-GF53O3C2HZEXL2XN"},
+					},
+				},
 			},
 			destChain: "KUBE-XLB-GF53O3C2HZEXL2XN",
 			destIP:    "1.2.3.4",
@@ -579,8 +627,15 @@ func TestHasJump(t *testing.T) {
 		},
 		"case 5": {
 			// Match dest Port but doesn't match dest IP
-			rules: []iptablestest.Rule{
-				{"-d ": "1.2.3.4/32", "--dport ": "80", "-p ": "tcp", "-j ": "KUBE-XLB-GF53O3C2HZEXL2XN"},
+			rules: []utiliptables.Rule{
+				{
+					Options: map[string]utiliptables.RuleOption{
+						"-d":      {Arg: "1.2.3.4/32"},
+						"--dport": {Arg: "80"},
+						"-p":      {Arg: "tcp"},
+						"-j":      {Arg: "KUBE-XLB-GF53O3C2HZEXL2XN"},
+					},
+				},
 			},
 			destChain: "KUBE-XLB-GF53O3C2HZEXL2XN",
 			destIP:    "10.20.30.40",
@@ -589,10 +644,28 @@ func TestHasJump(t *testing.T) {
 		},
 		"case 6": {
 			// Match the 2nd rule(dest IP)
-			rules: []iptablestest.Rule{
-				{"-d ": "10.20.30.41/32", "-p ": "tcp", "-j ": "REJECT"},
-				{"-d ": "1.2.3.4/32", "-p ": "tcp", "-j ": "REJECT"},
-				{"--dport ": "3001", "-p ": "tcp", "-j ": "REJECT"},
+			rules: []utiliptables.Rule{
+				{
+					Options: map[string]utiliptables.RuleOption{
+						"-d": {Arg: "10.20.30.41/32"},
+						"-p": {Arg: "tcp"},
+						"-j": {Arg: "REJECT"},
+					},
+				},
+				{
+					Options: map[string]utiliptables.RuleOption{
+						"-d": {Arg: "1.2.3.4/32"},
+						"-p": {Arg: "tcp"},
+						"-j": {Arg: "REJECT"},
+					},
+				},
+				{
+					Options: map[string]utiliptables.RuleOption{
+						"--dport": {Arg: "3001"},
+						"-p":      {Arg: "tcp"},
+						"-j":      {Arg: "REJECT"},
+					},
+				},
 			},
 			destChain: "REJECT",
 			destIP:    "1.2.3.4",
@@ -601,9 +674,21 @@ func TestHasJump(t *testing.T) {
 		},
 		"case 7": {
 			// Match the 2nd rule(dest Port)
-			rules: []iptablestest.Rule{
-				{"-d ": "10.20.30.41/32", "-p ": "tcp", "-j ": "REJECT"},
-				{"--dport ": "3001", "-p ": "tcp", "-j ": "REJECT"},
+			rules: []utiliptables.Rule{
+				{
+					Options: map[string]utiliptables.RuleOption{
+						"-d": {Arg: "10.20.30.41/32"},
+						"-p": {Arg: "tcp"},
+						"-j": {Arg: "REJECT"},
+					},
+				},
+				{
+					Options: map[string]utiliptables.RuleOption{
+						"--dport": {Arg: "3001"},
+						"-p":      {Arg: "tcp"},
+						"-j":      {Arg: "REJECT"},
+					},
+				},
 			},
 			destChain: "REJECT",
 			destIP:    "1.2.3.4",
@@ -612,9 +697,21 @@ func TestHasJump(t *testing.T) {
 		},
 		"case 8": {
 			// Match the 1st rule(dest IP)
-			rules: []iptablestest.Rule{
-				{"-d ": "10.20.30.41/32", "-p ": "tcp", "-j ": "REJECT"},
-				{"--dport ": "3001", "-p ": "tcp", "-j ": "REJECT"},
+			rules: []utiliptables.Rule{
+				{
+					Options: map[string]utiliptables.RuleOption{
+						"-d": {Arg: "10.20.30.41/32"},
+						"-p": {Arg: "tcp"},
+						"-j": {Arg: "REJECT"},
+					},
+				},
+				{
+					Options: map[string]utiliptables.RuleOption{
+						"--dport": {Arg: "3001"},
+						"-p":      {Arg: "tcp"},
+						"-j":      {Arg: "REJECT"},
+					},
+				},
 			},
 			destChain: "REJECT",
 			destIP:    "10.20.30.41",
@@ -622,8 +719,12 @@ func TestHasJump(t *testing.T) {
 			expected:  true,
 		},
 		"case 9": {
-			rules: []iptablestest.Rule{
-				{"-j ": "KUBE-SEP-LWSOSDSHMKPJHHJV"},
+			rules: []utiliptables.Rule{
+				{
+					Options: map[string]utiliptables.RuleOption{
+						"-j": {Arg: "KUBE-SEP-LWSOSDSHMKPJHHJV"},
+					},
+				},
 			},
 			destChain: "KUBE-SEP-LWSOSDSHMKPJHHJV",
 			destIP:    "",
@@ -631,8 +732,12 @@ func TestHasJump(t *testing.T) {
 			expected:  true,
 		},
 		"case 10": {
-			rules: []iptablestest.Rule{
-				{"-j ": "KUBE-SEP-FOO"},
+			rules: []utiliptables.Rule{
+				{
+					Options: map[string]utiliptables.RuleOption{
+						"-j": {Arg: "KUBE-SEP-FOO"},
+					},
+				},
 			},
 			destChain: "KUBE-SEP-BAR",
 			destIP:    "",
@@ -648,20 +753,39 @@ func TestHasJump(t *testing.T) {
 	}
 }
 
-func hasDNAT(rules []iptablestest.Rule, endpoint string) bool {
+func hasDNAT(rules []utiliptables.Rule, endpoint string) bool {
 	for _, r := range rules {
-		if r[iptablestest.ToDest] == endpoint {
-			return true
+		if option, ok := r.Options[iptablestest.ToDest]; ok {
+			if option.Arg == endpoint {
+				return true
+			}
 		}
 	}
 	return false
 }
 
-func errorf(msg string, rules []iptablestest.Rule, t *testing.T) {
+func errorf(msg string, rules []utiliptables.Rule, t *testing.T) {
 	for _, r := range rules {
 		t.Logf("%v", r)
 	}
 	t.Errorf("%v", msg)
+}
+
+func TestMasqueradeBits(t *testing.T) {
+	for i := 0; i < 33; i++ {
+		val, err := parseMasqueradeBit(i)
+		if i > 31 {
+			if err == nil {
+				t.Errorf("Expected error for masquerade bit %v", i)
+			}
+		} else {
+			if err != nil {
+				t.Errorf("Unexpected error for masquerade bit %v: %v", i, err)
+			} else if val == "" {
+				t.Errorf("Unexpected empty value for masquerade bit %v", i)
+			}
+		}
+	}
 }
 
 func TestClusterIPReject(t *testing.T) {
@@ -672,14 +796,22 @@ func TestClusterIPReject(t *testing.T) {
 
 	svc := proxy.ServicePortName{NamespacedName: types.NamespacedName{Namespace: "ns1", Name: svcName}, Port: "80"}
 	fp.serviceMap[svc] = newFakeServiceInfo(svc, svcIP, 80, api.ProtocolTCP, false)
-	fp.syncProxyRules()
+	if err := fp.syncProxyRules(); err != nil {
+		t.Errorf(err.Error())
+	}
 
-	svcChain := string(servicePortChainName(svc, strings.ToLower(string(api.ProtocolTCP))))
-	svcRules := ipt.GetRules(svcChain)
+	svcChain := servicePortChainName(svc, strings.ToLower(string(api.ProtocolTCP)))
+	svcRules, err := ipt.GetRules(utiliptables.TableNAT, svcChain)
+	if err != nil {
+		errorf(err.Error(), svcRules, t)
+	}
 	if len(svcRules) != 0 {
 		errorf(fmt.Sprintf("Unexpected rule for chain %v service %v without endpoints", svcChain, svcName), svcRules, t)
 	}
-	kubeSvcRules := ipt.GetRules(string(kubeServicesChain))
+	kubeSvcRules, err := ipt.GetRules(utiliptables.TableFilter, kubeServicesChain)
+	if err != nil {
+		errorf(err.Error(), kubeSvcRules, t)
+	}
 	if !hasJump(kubeSvcRules, iptablestest.Reject, svcIP.String(), "80") {
 		errorf(fmt.Sprintf("Failed to find a %v rule for service %v with no endpoints", iptablestest.Reject, svcName), kubeSvcRules, t)
 	}
@@ -696,21 +828,32 @@ func TestClusterIPEndpointsJump(t *testing.T) {
 	ep := "10.180.0.1:80"
 	fp.endpointsMap[svc] = []*endpointsInfo{{ep, false}}
 
-	fp.syncProxyRules()
+	if err := fp.syncProxyRules(); err != nil {
+		t.Errorf(err.Error())
+	}
 
-	svcChain := string(servicePortChainName(svc, strings.ToLower(string(api.ProtocolTCP))))
-	epChain := string(servicePortEndpointChainName(svc, strings.ToLower(string(api.ProtocolTCP)), ep))
+	svcChain := servicePortChainName(svc, strings.ToLower(string(api.ProtocolTCP)))
+	epChain := servicePortEndpointChainName(svc, strings.ToLower(string(api.ProtocolTCP)), ep)
 
-	kubeSvcRules := ipt.GetRules(string(kubeServicesChain))
+	kubeSvcRules, err := ipt.GetRules(utiliptables.TableNAT, kubeServicesChain)
+	if err != nil {
+		errorf(err.Error(), kubeSvcRules, t)
+	}
 	if !hasJump(kubeSvcRules, svcChain, svcIP.String(), "80") {
 		errorf(fmt.Sprintf("Failed to find jump from KUBE-SERVICES to %v chain", svcChain), kubeSvcRules, t)
 	}
 
-	svcRules := ipt.GetRules(svcChain)
+	svcRules, err := ipt.GetRules(utiliptables.TableNAT, svcChain)
+	if err != nil {
+		errorf(err.Error(), svcRules, t)
+	}
 	if !hasJump(svcRules, epChain, "", "") {
 		errorf(fmt.Sprintf("Failed to jump to ep chain %v", epChain), svcRules, t)
 	}
-	epRules := ipt.GetRules(epChain)
+	epRules, err := ipt.GetRules(utiliptables.TableNAT, epChain)
+	if err != nil {
+		errorf(err.Error(), epRules, t)
+	}
 	if !hasDNAT(epRules, ep) {
 		errorf(fmt.Sprintf("Endpoint chain %v lacks DNAT to %v", epChain, ep), epRules, t)
 	}
@@ -737,20 +880,28 @@ func TestLoadBalancer(t *testing.T) {
 	ep1 := "10.180.0.1:80"
 	fp.endpointsMap[svc] = []*endpointsInfo{{ep1, false}}
 
-	fp.syncProxyRules()
+	if err := fp.syncProxyRules(); err != nil {
+		t.Errorf(err.Error())
+	}
 
 	proto := strings.ToLower(string(api.ProtocolTCP))
-	fwChain := string(serviceFirewallChainName(svc, proto))
-	svcChain := string(servicePortChainName(svc, strings.ToLower(string(api.ProtocolTCP))))
+	fwChain := serviceFirewallChainName(svc, proto)
+	svcChain := servicePortChainName(svc, strings.ToLower(string(api.ProtocolTCP)))
 	//lbChain := string(serviceLBChainName(svc, proto))
 
-	kubeSvcRules := ipt.GetRules(string(kubeServicesChain))
+	kubeSvcRules, err := ipt.GetRules(utiliptables.TableNAT, kubeServicesChain)
+	if err != nil {
+		errorf(err.Error(), kubeSvcRules, t)
+	}
 	if !hasJump(kubeSvcRules, fwChain, svcInfo.loadBalancerStatus.Ingress[0].IP, "80") {
 		errorf(fmt.Sprintf("Failed to find jump to firewall chain %v", fwChain), kubeSvcRules, t)
 	}
 
-	fwRules := ipt.GetRules(fwChain)
-	if !hasJump(fwRules, svcChain, "", "") || !hasJump(fwRules, string(KubeMarkMasqChain), "", "") {
+	fwRules, err := ipt.GetRules(utiliptables.TableNAT, fwChain)
+	if err != nil {
+		errorf(err.Error(), fwRules, t)
+	}
+	if !hasJump(fwRules, svcChain, "", "") || !hasJump(fwRules, KubeMarkMasqChain, "", "") {
 		errorf(fmt.Sprintf("Failed to find jump from firewall chain %v to svc chain %v", fwChain, svcChain), fwRules, t)
 	}
 }
@@ -769,12 +920,17 @@ func TestNodePort(t *testing.T) {
 	ep1 := "10.180.0.1:80"
 	fp.endpointsMap[svc] = []*endpointsInfo{{ep1, false}}
 
-	fp.syncProxyRules()
+	if err := fp.syncProxyRules(); err != nil {
+		t.Errorf(err.Error())
+	}
 
 	proto := strings.ToLower(string(api.ProtocolTCP))
-	svcChain := string(servicePortChainName(svc, strings.ToLower(proto)))
+	svcChain := servicePortChainName(svc, strings.ToLower(proto))
 
-	kubeNodePortRules := ipt.GetRules(string(kubeNodePortsChain))
+	kubeNodePortRules, err := ipt.GetRules(utiliptables.TableNAT, kubeNodePortsChain)
+	if err != nil {
+		errorf(err.Error(), kubeNodePortRules, t)
+	}
 	if !hasJump(kubeNodePortRules, svcChain, "", fmt.Sprintf("%v", svcInfo.nodePort)) {
 		errorf(fmt.Sprintf("Failed to find jump to svc chain %v", svcChain), kubeNodePortRules, t)
 	}
@@ -794,29 +950,40 @@ func TestOnlyLocalLoadBalancing(t *testing.T) {
 	localEp := "10.180.2.1:80"
 	fp.endpointsMap[svc] = []*endpointsInfo{{nonLocalEp, false}, {localEp, true}}
 
-	fp.syncProxyRules()
+	if err := fp.syncProxyRules(); err != nil {
+		t.Errorf(err.Error())
+	}
 
 	proto := strings.ToLower(string(api.ProtocolTCP))
-	fwChain := string(serviceFirewallChainName(svc, proto))
-	lbChain := string(serviceLBChainName(svc, proto))
+	fwChain := serviceFirewallChainName(svc, proto)
+	lbChain := serviceLBChainName(svc, proto)
 
-	nonLocalEpChain := string(servicePortEndpointChainName(svc, strings.ToLower(string(api.ProtocolTCP)), nonLocalEp))
-	localEpChain := string(servicePortEndpointChainName(svc, strings.ToLower(string(api.ProtocolTCP)), localEp))
+	nonLocalEpChain := servicePortEndpointChainName(svc, strings.ToLower(string(api.ProtocolTCP)), nonLocalEp)
+	localEpChain := servicePortEndpointChainName(svc, strings.ToLower(string(api.ProtocolTCP)), localEp)
 
-	kubeSvcRules := ipt.GetRules(string(kubeServicesChain))
-	if !hasJump(kubeSvcRules, fwChain, svcInfo.loadBalancerStatus.Ingress[0].IP, "") {
+	kubeSvcRules, err := ipt.GetRules(utiliptables.TableNAT, kubeServicesChain)
+	if err != nil {
+		errorf(err.Error(), kubeSvcRules, t)
+	}
+	if !hasJump(kubeSvcRules, fwChain, svcInfo.loadBalancerStatus.Ingress[0].IP, "80") {
 		errorf(fmt.Sprintf("Failed to find jump to firewall chain %v", fwChain), kubeSvcRules, t)
 	}
 
-	fwRules := ipt.GetRules(fwChain)
+	fwRules, err := ipt.GetRules(utiliptables.TableNAT, fwChain)
+	if err != nil {
+		errorf(err.Error(), fwRules, t)
+	}
 	if !hasJump(fwRules, lbChain, "", "") {
 		errorf(fmt.Sprintf("Failed to find jump from firewall chain %v to svc chain %v", fwChain, lbChain), fwRules, t)
 	}
-	if hasJump(fwRules, string(KubeMarkMasqChain), "", "") {
+	if hasJump(fwRules, KubeMarkMasqChain, "", "") {
 		errorf(fmt.Sprintf("Found jump from fw chain %v to MASQUERADE", fwChain), fwRules, t)
 	}
 
-	lbRules := ipt.GetRules(lbChain)
+	lbRules, err := ipt.GetRules(utiliptables.TableNAT, lbChain)
+	if err != nil {
+		errorf(err.Error(), lbRules, t)
+	}
 	if hasJump(lbRules, nonLocalEpChain, "", "") {
 		errorf(fmt.Sprintf("Found jump from lb chain %v to non-local ep %v", lbChain, nonLocalEp), lbRules, t)
 	}
@@ -853,24 +1020,32 @@ func onlyLocalNodePorts(t *testing.T, fp *Proxier, ipt *iptablestest.FakeIPTable
 	localEp := "10.180.2.1:80"
 	fp.endpointsMap[svc] = []*endpointsInfo{{nonLocalEp, false}, {localEp, true}}
 
-	fp.syncProxyRules()
+	if err := fp.syncProxyRules(); err != nil {
+		t.Errorf(err.Error())
+	}
 
 	proto := strings.ToLower(string(api.ProtocolTCP))
-	lbChain := string(serviceLBChainName(svc, proto))
+	lbChain := serviceLBChainName(svc, proto)
 
-	nonLocalEpChain := string(servicePortEndpointChainName(svc, strings.ToLower(string(api.ProtocolTCP)), nonLocalEp))
-	localEpChain := string(servicePortEndpointChainName(svc, strings.ToLower(string(api.ProtocolTCP)), localEp))
+	nonLocalEpChain := servicePortEndpointChainName(svc, strings.ToLower(string(api.ProtocolTCP)), nonLocalEp)
+	localEpChain := servicePortEndpointChainName(svc, strings.ToLower(string(api.ProtocolTCP)), localEp)
 
-	kubeNodePortRules := ipt.GetRules(string(kubeNodePortsChain))
+	kubeNodePortRules, err := ipt.GetRules(utiliptables.TableNAT, kubeNodePortsChain)
+	if err != nil {
+		errorf(err.Error(), kubeNodePortRules, t)
+	}
 	if !hasJump(kubeNodePortRules, lbChain, "", fmt.Sprintf("%v", svcInfo.nodePort)) {
 		errorf(fmt.Sprintf("Failed to find jump to lb chain %v", lbChain), kubeNodePortRules, t)
 	}
 
-	svcChain := string(servicePortChainName(svc, strings.ToLower(string(api.ProtocolTCP))))
-	lbRules := ipt.GetRules(lbChain)
+	lbRules, err := ipt.GetRules(utiliptables.TableNAT, lbChain)
+	if err != nil {
+		errorf(err.Error(), lbRules, t)
+	}
 	if hasJump(lbRules, nonLocalEpChain, "", "") {
 		errorf(fmt.Sprintf("Found jump from lb chain %v to non-local ep %v", lbChain, nonLocalEp), lbRules, t)
 	}
+	svcChain := servicePortChainName(svc, strings.ToLower(string(api.ProtocolTCP)))
 	if hasJump(lbRules, svcChain, "", "") != shouldLBTOSVCRuleExist {
 		prefix := "Did not find "
 		if !shouldLBTOSVCRuleExist {
@@ -880,6 +1055,335 @@ func onlyLocalNodePorts(t *testing.T, fp *Proxier, ipt *iptablestest.FakeIPTable
 	}
 	if !hasJump(lbRules, localEpChain, "", "") {
 		errorf(fmt.Sprintf("Didn't find jump from lb chain %v to local ep %v", lbChain, nonLocalEp), lbRules, t)
+	}
+}
+
+func TestServiceSorting(t *testing.T) {
+	ipt := iptablestest.NewFake()
+	fp := NewFakeProxier(ipt)
+
+	testServices := []struct {
+		name  string
+		ip    net.IP
+		port  int
+		proto api.Protocol
+		ep    string
+	}{
+		{
+			name:  "svc1",
+			ip:    net.IPv4(10, 20, 30, 41),
+			port:  80,
+			proto: api.ProtocolTCP,
+			ep:    "10.180.0.1:80",
+		},
+		{
+			name:  "svc2",
+			ip:    net.IPv4(10, 20, 40, 51),
+			port:  8080,
+			proto: api.ProtocolUDP,
+			ep:    "10.180.0.2:81",
+		},
+		{
+			name:  "svc3",
+			ip:    net.IPv4(10, 20, 50, 61),
+			port:  443,
+			proto: api.ProtocolTCP,
+			ep:    "10.180.0.1:443",
+		},
+	}
+
+	for _, s := range testServices {
+		svc := proxy.ServicePortName{NamespacedName: types.NamespacedName{Namespace: "ns1", Name: s.name}, Port: fmt.Sprintf("%d", s.port)}
+		fp.serviceMap[svc] = newFakeServiceInfo(svc, s.ip, s.port, s.proto, true)
+		fp.endpointsMap[svc] = []*endpointsInfo{{s.ep, false}}
+	}
+
+	if err := fp.syncProxyRules(); err != nil {
+		t.Errorf(err.Error())
+	}
+
+	chains, err := utiliptables.ParseTableAddRules(utiliptables.TableNAT, nil, nil, ipt.RestoreLines)
+	if err != nil {
+		t.Errorf("failed to parse iptables NAT rules: %v", err)
+	}
+
+	rules, ok := chains[kubeServicesChain]
+	if !ok {
+		t.Errorf("failed to find expected %v chain", kubeServicesChain)
+	}
+
+	// Ensure rules within a single chain are sorted based on their
+	// service information, so that each invocation of syncProxyRules for
+	// the same data will give the same iptables rule order
+	expectedRules := []utiliptables.Rule{
+		{
+			Modules: []string{"comment", "tcp"},
+			Options: map[string]utiliptables.RuleOption{
+				"-p":        {Arg: "tcp"},
+				"-d":        {Arg: "10.20.30.41/32"},
+				"--dport":   {Arg: "80"},
+				"-s":        {Arg: "10.0.0.0/24", Negated: true},
+				"--comment": {Arg: "ns1/svc1:80 cluster IP"},
+				"-j":        {Arg: "KUBE-MARK-MASQ"},
+			},
+		},
+		{
+			Modules: []string{"comment", "tcp"},
+			Options: map[string]utiliptables.RuleOption{
+				"-d":        {Arg: "10.20.30.41/32"},
+				"--dport":   {Arg: "80"},
+				"-p":        {Arg: "tcp"},
+				"--comment": {Arg: "ns1/svc1:80 cluster IP"},
+				"-j":        {Arg: "KUBE-SVC-GF53O3C2HZEXL2XN"},
+			},
+		},
+		{
+			Modules: []string{"comment", "udp"},
+			Options: map[string]utiliptables.RuleOption{
+				"--dport":   {Arg: "8080"},
+				"-s":        {Arg: "10.0.0.0/24", Negated: true},
+				"-p":        {Arg: "udp"},
+				"-d":        {Arg: "10.20.40.51/32"},
+				"--comment": {Arg: "ns1/svc2:8080 cluster IP"},
+				"-j":        {Arg: "KUBE-MARK-MASQ"},
+			},
+		},
+		{
+			Modules: []string{"comment", "udp"},
+			Options: map[string]utiliptables.RuleOption{
+				"-p":        {Arg: "udp"},
+				"-d":        {Arg: "10.20.40.51/32"},
+				"--dport":   {Arg: "8080"},
+				"--comment": {Arg: "ns1/svc2:8080 cluster IP"},
+				"-j":        {Arg: "KUBE-SVC-RQFX3PQ7LUEQZUX7"},
+			},
+		},
+		{
+			Modules: []string{"comment", "tcp"},
+			Options: map[string]utiliptables.RuleOption{
+				"-p":        {Arg: "tcp"},
+				"-d":        {Arg: "10.20.50.61/32"},
+				"--dport":   {Arg: "443"},
+				"-s":        {Arg: "10.0.0.0/24", Negated: true},
+				"--comment": {Arg: "ns1/svc3:443 cluster IP"},
+				"-j":        {Arg: "KUBE-MARK-MASQ"},
+			},
+		},
+		{
+			Modules: []string{"comment", "tcp"},
+			Options: map[string]utiliptables.RuleOption{
+				"-p":        {Arg: "tcp"},
+				"-d":        {Arg: "10.20.50.61/32"},
+				"--dport":   {Arg: "443"},
+				"--comment": {Arg: "ns1/svc3:443 cluster IP"},
+				"-j":        {Arg: "KUBE-SVC-P635OFRL66TADDIF"},
+			},
+		},
+		{
+			Modules: []string{"addrtype", "comment"},
+			Options: map[string]utiliptables.RuleOption{
+				"--dst-type": {Arg: "LOCAL"},
+				"--comment":  {Arg: "kubernetes service nodeports; NOTE: this must be the last rule in this chain"},
+				"-j":         {Arg: "KUBE-NODEPORTS"},
+			},
+		},
+	}
+
+	if !reflect.DeepEqual(rules, expectedRules) {
+		t.Errorf("%#v\nnot equal to expected rules\n%#v", rules, expectedRules)
+	}
+}
+
+func TestNoRestoreRequired(t *testing.T) {
+	ipt := iptablestest.NewFake()
+	fp := NewFakeProxier(ipt)
+
+	testServices := []struct {
+		name  string
+		ip    net.IP
+		port  int
+		proto api.Protocol
+		ep    string
+	}{
+		{
+			name:  "svc1",
+			ip:    net.IPv4(10, 20, 30, 41),
+			port:  80,
+			proto: api.ProtocolTCP,
+			ep:    "10.180.0.1:80",
+		},
+		{
+			name:  "svc2",
+			ip:    net.IPv4(10, 20, 40, 51),
+			port:  8080,
+			proto: api.ProtocolUDP,
+			ep:    "10.180.0.2:81",
+		},
+		{
+			name:  "svc3",
+			ip:    net.IPv4(10, 20, 50, 61),
+			port:  443,
+			proto: api.ProtocolTCP,
+			ep:    "10.180.0.1:443",
+		},
+	}
+
+	for _, s := range testServices {
+		svc := proxy.ServicePortName{NamespacedName: types.NamespacedName{Namespace: "ns1", Name: s.name}, Port: fmt.Sprintf("%d", s.port)}
+		fp.serviceMap[svc] = newFakeServiceInfo(svc, s.ip, s.port, s.proto, true)
+		fp.endpointsMap[svc] = []*endpointsInfo{{s.ep, false}}
+	}
+
+	if err := fp.syncProxyRules(); err != nil {
+		t.Errorf(err.Error())
+	}
+
+	// Take the iptables-restore lines and make them the iptables-save input
+	// for another sync, without changing the service or endpoints map
+	ipt.SaveLines = ipt.RestoreLines
+	ipt.RestoreLines = nil
+
+	if err := fp.syncProxyRules(); err != nil {
+		t.Errorf(err.Error())
+	}
+
+	if ipt.RestoreLines != nil {
+		t.Errorf("unexpected proxy sync rules change:\n%v\n%v", string(ipt.SaveLines), string(ipt.RestoreLines))
+	}
+}
+
+func TestRestoreRequired(t *testing.T) {
+	ipt := iptablestest.NewFake()
+	fp := NewFakeProxier(ipt)
+
+	testServices := []struct {
+		name  string
+		ip    net.IP
+		port  int
+		proto api.Protocol
+		ep    string
+	}{
+		{
+			name:  "svc1",
+			ip:    net.IPv4(10, 20, 30, 41),
+			port:  80,
+			proto: api.ProtocolTCP,
+			ep:    "10.180.0.1:80",
+		},
+		{
+			name:  "svc2",
+			ip:    net.IPv4(10, 20, 40, 51),
+			port:  8080,
+			proto: api.ProtocolUDP,
+			ep:    "10.180.0.2:81",
+		},
+		{
+			name:  "svc3",
+			ip:    net.IPv4(10, 20, 50, 61),
+			port:  443,
+			proto: api.ProtocolTCP,
+			ep:    "10.180.0.1:443",
+		},
+	}
+
+	var svc1 proxy.ServicePortName
+	for i, s := range testServices {
+		svc := proxy.ServicePortName{NamespacedName: types.NamespacedName{Namespace: "ns1", Name: s.name}, Port: fmt.Sprintf("%d", s.port)}
+		fp.serviceMap[svc] = newFakeServiceInfo(svc, s.ip, s.port, s.proto, true)
+		fp.endpointsMap[svc] = []*endpointsInfo{{s.ep, false}}
+
+		if i == 0 {
+			svc1 = svc
+		}
+	}
+
+	if err := fp.syncProxyRules(); err != nil {
+		t.Errorf(err.Error())
+	}
+
+	// Take the iptables-restore lines and make them the iptables-save input
+	// for another sync, without changing the service or endpoints map
+	ipt.SaveLines = ipt.RestoreLines
+	ipt.RestoreLines = nil
+
+	delete(fp.serviceMap, svc1)
+	delete(fp.endpointsMap, svc1)
+	if err := fp.syncProxyRules(); err != nil {
+		t.Errorf(err.Error())
+	}
+
+	if ipt.RestoreLines == nil {
+		t.Errorf("expected proxy sync rules change")
+	}
+
+	chains, err := utiliptables.ParseTableAddRules(utiliptables.TableNAT, nil, nil, ipt.RestoreLines)
+	if err != nil {
+		t.Errorf("failed to parse iptables NAT rules: %v", err)
+	}
+
+	rules, ok := chains[kubeServicesChain]
+	if !ok {
+		t.Errorf("failed to find expected %v chain", kubeServicesChain)
+	}
+
+	// Ensure rules within a single chain are sorted based on their
+	// service information, so that each invocation of syncProxyRules for
+	// the same data will give the same iptables rule order
+	expectedRules := []utiliptables.Rule{
+		{
+			Modules: []string{"comment", "udp"},
+			Options: map[string]utiliptables.RuleOption{
+				"--dport":   {Arg: "8080"},
+				"-s":        {Arg: "10.0.0.0/24", Negated: true},
+				"-p":        {Arg: "udp"},
+				"-d":        {Arg: "10.20.40.51/32"},
+				"--comment": {Arg: "ns1/svc2:8080 cluster IP"},
+				"-j":        {Arg: "KUBE-MARK-MASQ"},
+			},
+		},
+		{
+			Modules: []string{"comment", "udp"},
+			Options: map[string]utiliptables.RuleOption{
+				"-p":        {Arg: "udp"},
+				"-d":        {Arg: "10.20.40.51/32"},
+				"--dport":   {Arg: "8080"},
+				"--comment": {Arg: "ns1/svc2:8080 cluster IP"},
+				"-j":        {Arg: "KUBE-SVC-RQFX3PQ7LUEQZUX7"},
+			},
+		},
+		{
+			Modules: []string{"comment", "tcp"},
+			Options: map[string]utiliptables.RuleOption{
+				"-p":        {Arg: "tcp"},
+				"-d":        {Arg: "10.20.50.61/32"},
+				"--dport":   {Arg: "443"},
+				"-s":        {Arg: "10.0.0.0/24", Negated: true},
+				"--comment": {Arg: "ns1/svc3:443 cluster IP"},
+				"-j":        {Arg: "KUBE-MARK-MASQ"},
+			},
+		},
+		{
+			Modules: []string{"comment", "tcp"},
+			Options: map[string]utiliptables.RuleOption{
+				"-p":        {Arg: "tcp"},
+				"-d":        {Arg: "10.20.50.61/32"},
+				"--dport":   {Arg: "443"},
+				"--comment": {Arg: "ns1/svc3:443 cluster IP"},
+				"-j":        {Arg: "KUBE-SVC-P635OFRL66TADDIF"},
+			},
+		},
+		{
+			Modules: []string{"addrtype", "comment"},
+			Options: map[string]utiliptables.RuleOption{
+				"--dst-type": {Arg: "LOCAL"},
+				"--comment":  {Arg: "kubernetes service nodeports; NOTE: this must be the last rule in this chain"},
+				"-j":         {Arg: "KUBE-NODEPORTS"},
+			},
+		},
+	}
+
+	if !reflect.DeepEqual(rules, expectedRules) {
+		t.Errorf("%#v\nnot equal to expected rules\n%#v", rules, expectedRules)
 	}
 }
 
