@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"os"
 	"reflect"
 	"sort"
 	"sync"
@@ -115,9 +114,20 @@ func splitStream(config io.Reader) (io.Reader, io.Reader, error) {
 // NewFromPlugins returns an admission.Interface that will enforce admission control decisions of all
 // the given plugins.
 func NewFromPlugins(pluginNames []string, configFilePath string, pluginInitializer PluginInitializer) (Interface, error) {
+	// load config file path into a componentconfig.AdmissionConfiguration
+	admissionCfg, err := ReadAdmissionConfiguration(pluginNames, configFilePath)
+	if err != nil {
+		return nil, err
+	}
+
 	plugins := []Interface{}
 	for _, pluginName := range pluginNames {
-		plugin, err := InitPlugin(pluginName, configFilePath, pluginInitializer)
+		pluginConfig, err := GetAdmissionPluginConfiguration(admissionCfg, pluginName)
+		if err != nil {
+			return nil, err
+		}
+
+		plugin, err := InitPlugin(pluginName, pluginConfig, pluginInitializer)
 		if err != nil {
 			return nil, err
 		}
@@ -129,25 +139,10 @@ func NewFromPlugins(pluginNames []string, configFilePath string, pluginInitializ
 }
 
 // InitPlugin creates an instance of the named interface.
-func InitPlugin(name string, configFilePath string, pluginInitializer PluginInitializer) (Interface, error) {
-	var (
-		config *os.File
-		err    error
-	)
-
+func InitPlugin(name string, config io.Reader, pluginInitializer PluginInitializer) (Interface, error) {
 	if name == "" {
 		glog.Info("No admission plugin specified.")
 		return nil, nil
-	}
-
-	if configFilePath != "" {
-		config, err = os.Open(configFilePath)
-		if err != nil {
-			glog.Fatalf("Couldn't open admission plugin configuration %s: %#v",
-				configFilePath, err)
-		}
-
-		defer config.Close()
 	}
 
 	plugin, found, err := getPlugin(name, config)
