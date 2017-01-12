@@ -268,7 +268,7 @@ func Test_ExternalID(t *testing.T) {
 		t.Fatalf("ExternalID did not return InstanceNotFound on an unknown instance")
 	}
 
-	slaveName := "mesos3.internal.company.com"
+	slaveName := "mesos3.internal.example.org.fail"
 	id, err := mesosCloud.ExternalID(slaveName)
 	if id != "" {
 		t.Fatalf("ExternalID should not be able to resolve %q", slaveName)
