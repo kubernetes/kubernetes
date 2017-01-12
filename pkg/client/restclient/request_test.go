@@ -865,6 +865,7 @@ func TestRequestStream(t *testing.T) {
 	testCases := []struct {
 		Request *Request
 		Err     bool
+		ErrFn   func(error) bool
 	}{
 		{
 			Request: &Request{err: errors.New("bail")},
@@ -900,6 +901,26 @@ func TestRequestStream(t *testing.T) {
 			},
 			Err: true,
 		},
+		{
+			Request: &Request{
+				client: clientFunc(func(req *http.Request) (*http.Response, error) {
+					return &http.Response{
+						StatusCode: http.StatusBadRequest,
+						Body:       ioutil.NopCloser(bytes.NewReader([]byte(`{"kind":"Status","apiVersion":"v1","metadata":{},"status":"Failure","message":"a container name must be specified for pod kube-dns-v20-mz5cv, choose one of: [kubedns dnsmasq healthz]","reason":"BadRequest","code":400}`))),
+					}, nil
+				}),
+				content:     defaultContentConfig(),
+				serializers: defaultSerializers(),
+				baseURL:     &url.URL{},
+			},
+			Err: true,
+			ErrFn: func(err error) bool {
+				if err.Error() == "a container name must be specified for pod kube-dns-v20-mz5cv, choose one of: [kubedns dnsmasq healthz]" {
+					return true
+				}
+				return false
+			},
+		},
 	}
 	for i, testCase := range testCases {
 		testCase.Request.backoffMgr = &NoBackoff{}
@@ -910,6 +931,12 @@ func TestRequestStream(t *testing.T) {
 		}
 		if hasErr && body != nil {
 			t.Errorf("%d: body should be nil when error is returned", i)
+		}
+
+		if hasErr {
+			if testCase.ErrFn != nil && !testCase.ErrFn(err) {
+				t.Errorf("unexpected error: %v", err)
+			}
 		}
 	}
 }

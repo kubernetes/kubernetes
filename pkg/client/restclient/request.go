@@ -746,10 +746,11 @@ func (r *Request) Stream() (io.ReadCloser, error) {
 		defer resp.Body.Close()
 
 		result := r.transformResponse(resp, req)
-		if result.err != nil {
-			return nil, result.err
+		err := result.Error()
+		if err == nil {
+			err = fmt.Errorf("%d while accessing %v: %s", result.statusCode, url, string(result.body))
 		}
-		return nil, fmt.Errorf("%d while accessing %v: %s", result.statusCode, url, string(result.body))
+		return nil, err
 	}
 }
 
