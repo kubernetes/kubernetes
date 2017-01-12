@@ -64,8 +64,8 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
-        "//pkg/registry/core/pod/etcd:all-srcs",
         "//pkg/registry/core/pod/rest:all-srcs",
+        "//pkg/registry/core/pod/storage:all-srcs",
     ],
     tags = ["automanaged"],
 )

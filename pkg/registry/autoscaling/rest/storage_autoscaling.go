@@ -21,7 +21,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	autoscalingapiv1 "k8s.io/kubernetes/pkg/apis/autoscaling/v1"
 	"k8s.io/kubernetes/pkg/genericapiserver"
-	horizontalpodautoscaleretcd "k8s.io/kubernetes/pkg/registry/autoscaling/horizontalpodautoscaler/etcd"
+	horizontalpodautoscalerstore "k8s.io/kubernetes/pkg/registry/autoscaling/horizontalpodautoscaler/storage"
 	"k8s.io/kubernetes/pkg/registry/generic"
 )
 
@@ -43,7 +43,7 @@ func (p RESTStorageProvider) v1Storage(apiResourceConfigSource genericapiserver.
 
 	storage := map[string]rest.Storage{}
 	if apiResourceConfigSource.ResourceEnabled(version.WithResource("horizontalpodautoscalers")) {
-		hpaStorage, hpaStatusStorage := horizontalpodautoscaleretcd.NewREST(restOptionsGetter)
+		hpaStorage, hpaStatusStorage := horizontalpodautoscalerstore.NewREST(restOptionsGetter)
 		storage["horizontalpodautoscalers"] = hpaStorage
 		storage["horizontalpodautoscalers/status"] = hpaStatusStorage
 	}

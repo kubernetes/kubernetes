@@ -42,8 +42,8 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
-        "//pkg/registry/rbac/rolebinding/etcd:all-srcs",
         "//pkg/registry/rbac/rolebinding/policybased:all-srcs",
+        "//pkg/registry/rbac/rolebinding/storage:all-srcs",
     ],
     tags = ["automanaged"],
 )

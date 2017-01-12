@@ -24,12 +24,12 @@ import (
 	"k8s.io/kubernetes/pkg/apis/batch"
 	_ "k8s.io/kubernetes/pkg/apis/batch/install"
 	"k8s.io/kubernetes/pkg/genericapiserver"
-	jobetcd "k8s.io/kubernetes/pkg/registry/batch/job/etcd"
+	jobstorage "k8s.io/kubernetes/pkg/registry/batch/job/storage"
 	"k8s.io/kubernetes/pkg/registry/generic"
 )
 
 func installBatchAPIs(g *genericapiserver.GenericAPIServer, optsGetter generic.RESTOptionsGetter) {
-	jobStorage := jobetcd.NewStorage(optsGetter)
+	jobStorage := jobstorage.NewStorage(optsGetter)
 
 	batchResources := map[string]rest.Storage{
 		"jobs":        jobStorage.Job,

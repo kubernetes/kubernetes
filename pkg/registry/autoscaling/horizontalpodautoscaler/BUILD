@@ -52,7 +52,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
-        "//pkg/registry/autoscaling/horizontalpodautoscaler/etcd:all-srcs",
+        "//pkg/registry/autoscaling/horizontalpodautoscaler/storage:all-srcs",
     ],
     tags = ["automanaged"],
 )

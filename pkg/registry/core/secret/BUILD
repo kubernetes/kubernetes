@@ -58,7 +58,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
-        "//pkg/registry/core/secret/etcd:all-srcs",
+        "//pkg/registry/core/secret/storage:all-srcs",
     ],
     tags = ["automanaged"],
 )

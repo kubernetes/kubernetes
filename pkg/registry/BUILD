@@ -59,7 +59,7 @@ filegroup(
         "//pkg/registry/core/secret:all-srcs",
         "//pkg/registry/core/service:all-srcs",
         "//pkg/registry/core/serviceaccount:all-srcs",
-        "//pkg/registry/extensions/controller/etcd:all-srcs",
+        "//pkg/registry/extensions/controller/storage:all-srcs",
         "//pkg/registry/extensions/daemonset:all-srcs",
         "//pkg/registry/extensions/deployment:all-srcs",
         "//pkg/registry/extensions/ingress:all-srcs",
