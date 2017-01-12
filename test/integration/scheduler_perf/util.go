@@ -40,7 +40,7 @@ import (
 // remove resources after finished.
 // Notes on rate limiter:
 //   - client rate limit is set to 5000.
-func mustSetupScheduler() (schedulerConfigFactory *factory.ConfigFactory, destroyFunc func()) {
+func mustSetupScheduler() (schedulerConfiguration factory.SchedulerConfiguration, destroyFunc func()) {
 
 	h := &framework.MasterHolder{Initialized: make(chan struct{})}
 	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
@@ -57,9 +57,9 @@ func mustSetupScheduler() (schedulerConfigFactory *factory.ConfigFactory, destro
 		Burst:         5000,
 	})
 
-	schedulerConfigFactory = factory.NewConfigFactory(clientSet, v1.DefaultSchedulerName, v1.DefaultHardPodAffinitySymmetricWeight, v1.DefaultFailureDomains)
+	schedulerConfiguration = factory.NewConfigFactory(clientSet, v1.DefaultSchedulerName, v1.DefaultHardPodAffinitySymmetricWeight, v1.DefaultFailureDomains)
 
-	schedulerConfig, err := schedulerConfigFactory.Create()
+	schedulerConfig, err := schedulerConfiguration.Create()
 	if err != nil {
 		panic("Couldn't create scheduler config")
 	}

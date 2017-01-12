@@ -126,7 +126,13 @@ type SchedulerConfiguration interface {
 	GetFailureDomains() []string
 	GetSchedulerName() string
 	makeDefaultErrorFunc(backoff *podBackoff, podQueue *cache.FIFO) func(pod *v1.Pod, err error)
+
+	// Probably doesn't need to be public.  But exposed for now in case.
 	ResponsibleForPod(pod *v1.Pod) bool
+
+	// Needs to be exposed for things like integration tests where we want to make fake nodes.
+	GetNodeStore() *cache.Store
+
 	Run()
 }
 
@@ -216,8 +222,10 @@ func NewConfigFactory(client clientset.Interface, schedulerName string, hardPodA
 	return c
 }
 
-func (c *ConfigFactory) GetSchedulerName() string {
-	return c.schedulerName
+// GetNodeStore provides the cache to the nodes.  This won't be used often outside the scheduler,
+// except in mock tests which make fake nodes.  Otherwise, the nodes will be maintained internally by the cache itself.
+func (c *ConfigFactory) GetNodeStore() *cache.Store {
+	return &c.NodeLister.Store
 }
 
 func (c *ConfigFactory) GetHardPodAffinitySymmetricWeight() int {
@@ -226,6 +234,10 @@ func (c *ConfigFactory) GetHardPodAffinitySymmetricWeight() int {
 
 func (c *ConfigFactory) GetFailureDomains() []string {
 	return c.failureDomains
+}
+
+func (f *ConfigFactory) GetSchedulerName() string {
+	return f.schedulerName
 }
 
 // TODO(harryz) need to update all the handlers here and below for equivalence cache
