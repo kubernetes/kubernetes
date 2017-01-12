@@ -64,7 +64,10 @@ var (
 	  kubectl create secret generic my-secret --from-file=ssh-privatekey=~/.ssh/id_rsa --from-file=ssh-publickey=~/.ssh/id_rsa.pub
 
 	  # Create a new secret named my-secret with key1=supersecret and key2=topsecret
-	  kubectl create secret generic my-secret --from-literal=key1=supersecret --from-literal=key2=topsecret`)
+	  kubectl create secret generic my-secret --from-literal=key1=supersecret --from-literal=key2=topsecret
+
+	  # Create a new secret named my-secret from an env file
+	  kubectl create secret generic my-secret --from-env-file=path/to/bar.env`)
 )
 
 // NewCmdCreateSecretGeneric is a command to create generic secrets from files, directories, or literal values
@@ -85,6 +88,7 @@ func NewCmdCreateSecretGeneric(f cmdutil.Factory, cmdOut io.Writer) *cobra.Comma
 	cmdutil.AddGeneratorFlags(cmd, cmdutil.SecretV1GeneratorName)
 	cmd.Flags().StringSlice("from-file", []string{}, "Key files can be specified using their file path, in which case a default name will be given to them, or optionally with a name and file path, in which case the given name will be used.  Specifying a directory will iterate each named file in the directory that is a valid secret key.")
 	cmd.Flags().StringArray("from-literal", []string{}, "Specify a key and literal value to insert in secret (i.e. mykey=somevalue)")
+	cmd.Flags().String("from-env-file", "", "Specify the path to a file to read lines of key=val pairs to create a secret (i.e. a Docker .env file).")
 	cmd.Flags().String("type", "", i18n.T("The type of secret to create"))
 	return cmd
 }
@@ -103,6 +107,7 @@ func CreateSecretGeneric(f cmdutil.Factory, cmdOut io.Writer, cmd *cobra.Command
 			Type:           cmdutil.GetFlagString(cmd, "type"),
 			FileSources:    cmdutil.GetFlagStringSlice(cmd, "from-file"),
 			LiteralSources: cmdutil.GetFlagStringArray(cmd, "from-literal"),
+			EnvFileSource:  cmdutil.GetFlagString(cmd, "from-env-file"),
 		}
 	default:
 		return cmdutil.UsageError(cmd, fmt.Sprintf("Generator: %s not supported.", generatorName))

@@ -19,6 +19,7 @@ go_library(
         "configmap.go",
         "deployment.go",
         "doc.go",
+        "env_file.go",
         "explain.go",
         "generate.go",
         "history.go",
