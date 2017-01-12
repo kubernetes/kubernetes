@@ -38,6 +38,10 @@ func init() {
 // Public to allow building arbitrary schemes.
 func RegisterConversions(scheme *runtime.Scheme) error {
 	return scheme.AddGeneratedConversionFuncs(
+		Convert_v1alpha1_AdmissionConfiguration_To_componentconfig_AdmissionConfiguration,
+		Convert_componentconfig_AdmissionConfiguration_To_v1alpha1_AdmissionConfiguration,
+		Convert_v1alpha1_AdmissionPluginConfiguration_To_componentconfig_AdmissionPluginConfiguration,
+		Convert_componentconfig_AdmissionPluginConfiguration_To_v1alpha1_AdmissionPluginConfiguration,
 		Convert_v1alpha1_KubeProxyConfiguration_To_componentconfig_KubeProxyConfiguration,
 		Convert_componentconfig_KubeProxyConfiguration_To_v1alpha1_KubeProxyConfiguration,
 		Convert_v1alpha1_KubeSchedulerConfiguration_To_componentconfig_KubeSchedulerConfiguration,
@@ -59,6 +63,70 @@ func RegisterConversions(scheme *runtime.Scheme) error {
 		Convert_v1alpha1_LeaderElectionConfiguration_To_componentconfig_LeaderElectionConfiguration,
 		Convert_componentconfig_LeaderElectionConfiguration_To_v1alpha1_LeaderElectionConfiguration,
 	)
+}
+
+func autoConvert_v1alpha1_AdmissionConfiguration_To_componentconfig_AdmissionConfiguration(in *AdmissionConfiguration, out *componentconfig.AdmissionConfiguration, s conversion.Scope) error {
+	if in.Plugins != nil {
+		in, out := &in.Plugins, &out.Plugins
+		*out = make([]componentconfig.AdmissionPluginConfiguration, len(*in))
+		for i := range *in {
+			if err := Convert_v1alpha1_AdmissionPluginConfiguration_To_componentconfig_AdmissionPluginConfiguration(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Plugins = nil
+	}
+	return nil
+}
+
+func Convert_v1alpha1_AdmissionConfiguration_To_componentconfig_AdmissionConfiguration(in *AdmissionConfiguration, out *componentconfig.AdmissionConfiguration, s conversion.Scope) error {
+	return autoConvert_v1alpha1_AdmissionConfiguration_To_componentconfig_AdmissionConfiguration(in, out, s)
+}
+
+func autoConvert_componentconfig_AdmissionConfiguration_To_v1alpha1_AdmissionConfiguration(in *componentconfig.AdmissionConfiguration, out *AdmissionConfiguration, s conversion.Scope) error {
+	if in.Plugins != nil {
+		in, out := &in.Plugins, &out.Plugins
+		*out = make([]AdmissionPluginConfiguration, len(*in))
+		for i := range *in {
+			if err := Convert_componentconfig_AdmissionPluginConfiguration_To_v1alpha1_AdmissionPluginConfiguration(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Plugins = nil
+	}
+	return nil
+}
+
+func Convert_componentconfig_AdmissionConfiguration_To_v1alpha1_AdmissionConfiguration(in *componentconfig.AdmissionConfiguration, out *AdmissionConfiguration, s conversion.Scope) error {
+	return autoConvert_componentconfig_AdmissionConfiguration_To_v1alpha1_AdmissionConfiguration(in, out, s)
+}
+
+func autoConvert_v1alpha1_AdmissionPluginConfiguration_To_componentconfig_AdmissionPluginConfiguration(in *AdmissionPluginConfiguration, out *componentconfig.AdmissionPluginConfiguration, s conversion.Scope) error {
+	out.Name = in.Name
+	out.Path = in.Path
+	if err := runtime.Convert_runtime_RawExtension_To_runtime_Object(&in.Configuration, &out.Configuration, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+func Convert_v1alpha1_AdmissionPluginConfiguration_To_componentconfig_AdmissionPluginConfiguration(in *AdmissionPluginConfiguration, out *componentconfig.AdmissionPluginConfiguration, s conversion.Scope) error {
+	return autoConvert_v1alpha1_AdmissionPluginConfiguration_To_componentconfig_AdmissionPluginConfiguration(in, out, s)
+}
+
+func autoConvert_componentconfig_AdmissionPluginConfiguration_To_v1alpha1_AdmissionPluginConfiguration(in *componentconfig.AdmissionPluginConfiguration, out *AdmissionPluginConfiguration, s conversion.Scope) error {
+	out.Name = in.Name
+	out.Path = in.Path
+	if err := runtime.Convert_runtime_Object_To_runtime_RawExtension(&in.Configuration, &out.Configuration, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+func Convert_componentconfig_AdmissionPluginConfiguration_To_v1alpha1_AdmissionPluginConfiguration(in *componentconfig.AdmissionPluginConfiguration, out *AdmissionPluginConfiguration, s conversion.Scope) error {
+	return autoConvert_componentconfig_AdmissionPluginConfiguration_To_v1alpha1_AdmissionPluginConfiguration(in, out, s)
 }
 
 func autoConvert_v1alpha1_KubeProxyConfiguration_To_componentconfig_KubeProxyConfiguration(in *KubeProxyConfiguration, out *componentconfig.KubeProxyConfiguration, s conversion.Scope) error {
