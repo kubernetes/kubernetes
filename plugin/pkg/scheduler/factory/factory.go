@@ -60,7 +60,7 @@ type ConfigFactory struct {
 	// queue for pods that need scheduling
 	PodQueue *cache.FIFO
 	// a means to list all known scheduled pods.
-	scheduledPodLister *cache.Indexer
+	scheduledPodLister cache.Indexer
 	// a means to list all known scheduled pods and pods assumed to have been scheduled.
 	PodLister algorithm.PodLister
 	// a means to list all nodes
@@ -250,7 +250,7 @@ func (f *ConfigFactory) GetClient() clientset.Interface {
 
 // GetScheduledPodListerIndexer is another (self-explanatory) function only used in rare external circumstances (i.e. testing)
 func (c *ConfigFactory) GetScheduledPodListerIndexer() *cache.Indexer {
-	return &c.scheduledPodLister.Indexer
+	return c.scheduledPodLister
 }
 
 // TODO(harryz) need to update all the handlers here and below for equivalence cache
