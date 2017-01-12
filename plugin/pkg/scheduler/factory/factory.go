@@ -448,8 +448,8 @@ func (f *ConfigFactory) CreateFromKeys(predicateKeys, priorityKeys sets.String, 
 		// The scheduler only needs to consider schedulable nodes.
 		NodeLister:          f.NodeLister.NodeCondition(getNodeConditionPredicate()),
 		Algorithm:           algo,
-		Binder:              &binder{f.Client},
-		PodConditionUpdater: &podConditionUpdater{f.Client},
+		Binder:              &binder{f.GetClient()},
+		PodConditionUpdater: &podConditionUpdater{f.GetClient()},
 		NextPod: func() *v1.Pod {
 			return f.getNextPod()
 		},
