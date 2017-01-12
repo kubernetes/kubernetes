@@ -38,8 +38,6 @@ option go_package = "v1beta1";
 // The StatefulSet guarantees that a given network identity will always
 // map to the same storage identity.
 message StatefulSet {
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.TypeMeta typeMeta = 4;
-
   // +optional
   optional k8s.io.kubernetes.pkg.api.v1.ObjectMeta metadata = 1;
 
@@ -55,8 +53,6 @@ message StatefulSet {
 
 // StatefulSetList is a collection of StatefulSets.
 message StatefulSetList {
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.TypeMeta typeMeta = 3;
-
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 

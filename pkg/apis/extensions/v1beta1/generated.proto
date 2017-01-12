@@ -71,8 +71,6 @@ message CustomMetricTargetList {
 
 // DaemonSet represents the configuration of a daemon set.
 message DaemonSet {
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.TypeMeta typeMeta = 4;
-
   // Standard object's metadata.
   // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
   // +optional
@@ -94,8 +92,6 @@ message DaemonSet {
 
 // DaemonSetList is a collection of daemon sets.
 message DaemonSetList {
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.TypeMeta typeMeta = 3;
-
   // Standard list metadata.
   // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
   // +optional
@@ -150,8 +146,6 @@ message DaemonSetStatus {
 
 // Deployment enables declarative updates for Pods and ReplicaSets.
 message Deployment {
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.TypeMeta typeMeta = 4;
-
   // Standard object metadata.
   // +optional
   optional k8s.io.kubernetes.pkg.api.v1.ObjectMeta metadata = 1;
@@ -188,8 +182,6 @@ message DeploymentCondition {
 
 // DeploymentList is a list of Deployments.
 message DeploymentList {
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.TypeMeta typeMeta = 3;
-
   // Standard list metadata.
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
@@ -200,8 +192,6 @@ message DeploymentList {
 
 // DeploymentRollback stores the information required to rollback a deployment.
 message DeploymentRollback {
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.TypeMeta typeMeta = 4;
-
   // Required: This must match the Name of a deployment.
   optional string name = 1;
 
@@ -349,8 +339,6 @@ message HTTPIngressRuleValue {
 
 // configuration of a horizontal pod autoscaler.
 message HorizontalPodAutoscaler {
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.TypeMeta typeMeta = 4;
-
   // Standard object metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
   // +optional
   optional k8s.io.kubernetes.pkg.api.v1.ObjectMeta metadata = 1;
@@ -366,8 +354,6 @@ message HorizontalPodAutoscaler {
 
 // list of horizontal pod autoscaler objects.
 message HorizontalPodAutoscalerList {
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.TypeMeta typeMeta = 3;
-
   // Standard list metadata.
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
@@ -442,8 +428,6 @@ message IDRange {
 // externally-reachable urls, load balance traffic, terminate SSL, offer name
 // based virtual hosting etc.
 message Ingress {
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.TypeMeta typeMeta = 4;
-
   // Standard object's metadata.
   // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
   // +optional
@@ -471,8 +455,6 @@ message IngressBackend {
 
 // IngressList is a collection of Ingress.
 message IngressList {
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.TypeMeta typeMeta = 3;
-
   // Standard object's metadata.
   // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
   // +optional
@@ -568,8 +550,6 @@ message IngressTLS {
 }
 
 message NetworkPolicy {
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.TypeMeta typeMeta = 3;
-
   // Standard object's metadata.
   // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
   // +optional
@@ -605,8 +585,6 @@ message NetworkPolicyIngressRule {
 
 // Network Policy List is a list of NetworkPolicy objects.
 message NetworkPolicyList {
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.TypeMeta typeMeta = 3;
-
   // Standard list metadata.
   // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
   // +optional
@@ -671,8 +649,6 @@ message NetworkPolicySpec {
 // Pod Security Policy governs the ability to make requests that affect the Security Context
 // that will be applied to a pod and container.
 message PodSecurityPolicy {
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.TypeMeta typeMeta = 3;
-
   // Standard object's metadata.
   // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
   // +optional
@@ -685,8 +661,6 @@ message PodSecurityPolicy {
 
 // Pod Security Policy List is a list of PodSecurityPolicy objects.
 message PodSecurityPolicyList {
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.TypeMeta typeMeta = 3;
-
   // Standard list metadata.
   // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
   // +optional
@@ -763,8 +737,6 @@ message PodSecurityPolicySpec {
 
 // ReplicaSet represents the configuration of a ReplicaSet.
 message ReplicaSet {
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.TypeMeta typeMeta = 4;
-
   // If the Labels of a ReplicaSet are empty, they are defaulted to
   // be the same as the Pod(s) that the ReplicaSet manages.
   // Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
@@ -808,8 +780,6 @@ message ReplicaSetCondition {
 
 // ReplicaSetList is a collection of ReplicaSets.
 message ReplicaSetList {
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.TypeMeta typeMeta = 3;
-
   // Standard list metadata.
   // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds
   // +optional
@@ -878,7 +848,6 @@ message ReplicaSetStatus {
 
 // Dummy definition
 message ReplicationControllerDummy {
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.TypeMeta typeMeta = 1;
 }
 
 message RollbackConfig {
@@ -940,8 +909,6 @@ message SELinuxStrategyOptions {
 
 // represents a scaling request for a resource.
 message Scale {
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.TypeMeta typeMeta = 4;
-
   // Standard object metadata; More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata.
   // +optional
   optional k8s.io.kubernetes.pkg.api.v1.ObjectMeta metadata = 1;
@@ -1015,8 +982,6 @@ message SupplementalGroupsStrategyOptions {
 // A ThirdPartyResource is a generic representation of a resource, it is used by add-ons and plugins to add new resource
 // types to the API.  It consists of one or more Versions of the api.
 message ThirdPartyResource {
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.TypeMeta typeMeta = 4;
-
   // Standard object metadata
   // +optional
   optional k8s.io.kubernetes.pkg.api.v1.ObjectMeta metadata = 1;
@@ -1032,8 +997,6 @@ message ThirdPartyResource {
 
 // An internal object, used for versioned storage in etcd.  Not exposed to the end user.
 message ThirdPartyResourceData {
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.TypeMeta typeMeta = 3;
-
   // Standard object metadata.
   // +optional
   optional k8s.io.kubernetes.pkg.api.v1.ObjectMeta metadata = 1;
@@ -1045,8 +1008,6 @@ message ThirdPartyResourceData {
 
 // ThirdPartyResrouceDataList is a list of ThirdPartyResourceData.
 message ThirdPartyResourceDataList {
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.TypeMeta typeMeta = 3;
-
   // Standard list metadata
   // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
   // +optional
@@ -1058,8 +1019,6 @@ message ThirdPartyResourceDataList {
 
 // ThirdPartyResourceList is a list of ThirdPartyResources.
 message ThirdPartyResourceList {
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.TypeMeta typeMeta = 3;
-
   // Standard list metadata.
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
