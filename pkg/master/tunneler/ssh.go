@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package genericapiserver
+package tunneler
 
 import (
 	"fmt"
@@ -85,7 +85,7 @@ type SSHTunneler struct {
 	stopChan     chan struct{}
 }
 
-func NewSSHTunneler(sshUser, sshKeyfile string, healthCheckURL *url.URL, installSSHKey InstallSSHKey) Tunneler {
+func New(sshUser, sshKeyfile string, healthCheckURL *url.URL, installSSHKey InstallSSHKey) Tunneler {
 	return &SSHTunneler{
 		SSHUser:        sshUser,
 		SSHKeyfile:     sshKeyfile,
