@@ -12,14 +12,15 @@ go_library(
     name = "go_default_library",
     srcs = [
         "errors.go",
+        "request_cache.go",
         "server.go",
     ],
     tags = ["automanaged"],
     deps = [
-        "//pkg/api:go_default_library",
         "//pkg/kubelet/api/v1alpha1/runtime:go_default_library",
         "//pkg/kubelet/server/portforward:go_default_library",
         "//pkg/kubelet/server/remotecommand:go_default_library",
+        "//pkg/util/clock:go_default_library",
         "//pkg/util/term:go_default_library",
         "//vendor:github.com/emicklei/go-restful",
         "//vendor:google.golang.org/grpc",
@@ -30,7 +31,10 @@ go_library(
 
 go_test(
     name = "go_default_test",
-    srcs = ["server_test.go"],
+    srcs = [
+        "request_cache_test.go",
+        "server_test.go",
+    ],
     library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
@@ -43,6 +47,7 @@ go_test(
         "//vendor:github.com/stretchr/testify/assert",
         "//vendor:github.com/stretchr/testify/require",
         "//vendor:k8s.io/client-go/pkg/api",
+        "//vendor:k8s.io/client-go/pkg/util/clock",
     ],
 )
 
