@@ -33,7 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/api/v1"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/stats"
 	kubeletmetrics "k8s.io/kubernetes/pkg/kubelet/metrics"
 	kubeletstats "k8s.io/kubernetes/pkg/kubelet/server/stats"

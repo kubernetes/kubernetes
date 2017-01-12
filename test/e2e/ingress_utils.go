@@ -52,7 +52,7 @@ import (
 	utilyaml "k8s.io/apimachinery/pkg/util/yaml"
 	apierrs "k8s.io/kubernetes/pkg/api/errors"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	gcecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
 	utilexec "k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/test/e2e/framework"

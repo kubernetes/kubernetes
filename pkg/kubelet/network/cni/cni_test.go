@@ -29,12 +29,11 @@ import (
 	"testing"
 	"text/template"
 
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
-
 	cnitypes "github.com/containernetworking/cni/pkg/types"
 	"github.com/stretchr/testify/mock"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/network"
