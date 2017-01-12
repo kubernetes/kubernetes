@@ -23,7 +23,6 @@ import (
 	dockercontainer "github.com/docker/engine-api/types/container"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/v1"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
 

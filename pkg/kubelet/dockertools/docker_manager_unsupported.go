@@ -19,12 +19,10 @@ limitations under the License.
 package dockertools
 
 import (
-	"k8s.io/kubernetes/pkg/api"
-
 	dockertypes "github.com/docker/engine-api/types"
 	dockercontainer "github.com/docker/engine-api/types/container"
 
-	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/api"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
 
