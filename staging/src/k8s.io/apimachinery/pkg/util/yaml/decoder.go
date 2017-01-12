@@ -185,11 +185,12 @@ type YAMLOrJSONDecoder struct {
 }
 
 type JSONSyntaxError struct {
-	err error
+	Line int
+	Err  error
 }
 
 func (e JSONSyntaxError) Error() string {
-	return e.err.Error()
+	return fmt.Sprintf("json: line %d: %s", e.Line, e.Err.Error())
 }
 
 type YAMLSyntaxError struct {
@@ -242,7 +243,10 @@ func (d *YAMLOrJSONDecoder) Decode(into interface{}) error {
 
 			start := strings.LastIndex(js[:syntax.Offset], "\n") + 1
 			line := strings.Count(js[:start], "\n")
-			return JSONSyntaxError{fmt.Errorf("json: line %d: %s", line, syntax.Error())}
+			return JSONSyntaxError{
+				Line: line,
+				Err:  fmt.Errorf(syntax.Error()),
+			}
 		}
 	}
 
