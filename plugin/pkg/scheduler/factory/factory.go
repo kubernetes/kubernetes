@@ -56,11 +56,11 @@ const (
 
 // ConfigFactory knows how to fill out a scheduler config with its support functions.
 type ConfigFactory struct {
-	Client clientset.Interface
+	client clientset.Interface
 	// queue for pods that need scheduling
 	PodQueue *cache.FIFO
 	// a means to list all known scheduled pods.
-	ScheduledPodLister *cache.StoreToPodLister
+	scheduledPodLister *cache.StoreToPodLister
 	// a means to list all known scheduled pods and pods assumed to have been scheduled.
 	PodLister algorithm.PodLister
 	// a means to list all nodes
@@ -115,6 +115,7 @@ type SchedulerConfiguration interface {
 	updateNodeInCache(oldObj, newObj interface{})
 	deleteNodeFromCache(obj interface{})
 	Create() (*scheduler.Config, error)
+
 	CreateFromProvider(providerName string) (*scheduler.Config, error)
 	CreateFromConfig(policy schedulerapi.Policy) (*scheduler.Config, error)
 	CreateFromKeys(predicateKeys, priorityKeys sets.String, extenders []algorithm.SchedulerExtender) (*scheduler.Config, error)
@@ -132,7 +133,8 @@ type SchedulerConfiguration interface {
 
 	// Needs to be exposed for things like integration tests where we want to make fake nodes.
 	GetNodeStore() *cache.Store
-
+	GetClient() clientset.Interface
+	GetScheduledPodListerIndexer() *cache.Indexer
 	Run()
 }
 
@@ -146,9 +148,9 @@ func NewConfigFactory(client clientset.Interface, schedulerName string, hardPodA
 	pvcInformer := informerFactory.PersistentVolumeClaims()
 
 	c := &ConfigFactory{
-		Client:             client,
+		client:             client,
 		PodQueue:           cache.NewFIFO(cache.MetaNamespaceKeyFunc),
-		ScheduledPodLister: &cache.StoreToPodLister{},
+		scheduledPodLister: &cache.StoreToPodLister{},
 		informerFactory:    informerFactory,
 		// Only nodes in the "Ready" condition with status == "True" are schedulable
 		NodeLister:       &cache.StoreToNodeLister{},
@@ -172,7 +174,7 @@ func NewConfigFactory(client clientset.Interface, schedulerName string, hardPodA
 	// We construct this here instead of in CreateFromKeys because
 	// ScheduledPodLister is something we provide to plug in functions that
 	// they may need to call.
-	c.ScheduledPodLister.Indexer, c.scheduledPodPopulator = cache.NewIndexerInformer(
+	c.GetScheduledPodListerIndexer(), c.scheduledPodPopulator = cache.NewIndexerInformer(
 		c.createAssignedNonTerminatedPodLW(),
 		&v1.Pod{},
 		0,
@@ -222,8 +224,9 @@ func NewConfigFactory(client clientset.Interface, schedulerName string, hardPodA
 	return c
 }
 
-// GetNodeStore provides the cache to the nodes.  This won't be used often outside the scheduler,
-// except in mock tests which make fake nodes.  Otherwise, the nodes will be maintained internally by the cache itself.
+// GetNodeStore provides the cache to the nodes.  This won't be used often outside the scheduler, except in mock tests
+// which make fake nodes.  Otherwise, the nodes will be maintained internally by the cache itself.
+// Mostly this is an internal function only used in rare external circumstances (i.e. testing)
 func (c *ConfigFactory) GetNodeStore() *cache.Store {
 	return &c.NodeLister.Store
 }
@@ -238,6 +241,16 @@ func (c *ConfigFactory) GetFailureDomains() []string {
 
 func (f *ConfigFactory) GetSchedulerName() string {
 	return f.schedulerName
+}
+
+// GetClient is another (self-explanatory) internal function only used in rare external circumstances (i.e. testing)
+func (f *ConfigFactory) GetClient() string {
+	return f.client
+}
+
+// GetScheduledPodListerIndexer is another (self-explanatory) function only used in rare external circumstances (i.e. testing)
+func (c *ConfigFactory) GetScheduledPodListerIndexer() *cache.Indexer {
+	return c.scheduledPodLister.Indexer
 }
 
 // TODO(harryz) need to update all the handlers here and below for equivalence cache

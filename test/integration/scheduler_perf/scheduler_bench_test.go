@@ -56,7 +56,7 @@ func BenchmarkScheduling1000Nodes1000Pods(b *testing.B) {
 func benchmarkScheduling(numNodes, numScheduledPods int, b *testing.B) {
 	schedulerConfigFactory, finalFunc := mustSetupScheduler()
 	defer finalFunc()
-	c := schedulerConfigFactory.Client
+	c := schedulerConfigFactory.Crea
 
 	nodePreparer := framework.NewIntegrationTestNodePreparer(
 		c,
