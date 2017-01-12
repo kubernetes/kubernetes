@@ -286,19 +286,15 @@ type hostPathDeleter struct {
 	volume.MetricsNil
 }
 
-func (r *hostPathDeleter) GetPath() string {
-	return r.path
-}
-
 // Delete for hostPath removes the local directory so long as it is beneath /tmp/*.
 // THIS IS FOR TESTING AND LOCAL DEVELOPMENT ONLY!  This message should scare you away from using
 // this deleter for anything other than development and testing.
 func (r *hostPathDeleter) Delete() error {
 	regexp := regexp.MustCompile("/tmp/.+")
-	if !regexp.MatchString(r.GetPath()) {
-		return fmt.Errorf("host_path deleter only supports /tmp/.+ but received provided %s", r.GetPath())
+	if !regexp.MatchString(r.path) {
+		return fmt.Errorf("host_path deleter only supports /tmp/.+ but received provided %s", r.path)
 	}
-	return os.RemoveAll(r.GetPath())
+	return os.RemoveAll(r.path)
 }
 
 func getVolumeSource(

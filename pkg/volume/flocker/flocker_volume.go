@@ -38,10 +38,6 @@ type flockerVolumeDeleter struct {
 
 var _ volume.Deleter = &flockerVolumeDeleter{}
 
-func (b *flockerVolumeDeleter) GetPath() string {
-	return getPath(b.podUID, b.volName, b.plugin.host)
-}
-
 func (d *flockerVolumeDeleter) Delete() error {
 	return d.manager.DeleteVolume(d)
 }

@@ -102,9 +102,10 @@ func TestDeleter(t *testing.T) {
 	if err != nil {
 		t.Errorf("Failed to make a new Deleter: %v", err)
 	}
-	if deleter.GetPath() != tempPath {
-		t.Errorf("Expected %s but got %s", tempPath, deleter.GetPath())
+	if deleter.(*hostPathDeleter).path != tempPath {
+		t.Errorf("Expected %s but got %s", tempPath, deleter.(*hostPathDeleter).path)
 	}
+
 	if err := deleter.Delete(); err != nil {
 		t.Errorf("Mock Recycler expected to return nil but got %s", err)
 	}

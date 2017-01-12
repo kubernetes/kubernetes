@@ -362,10 +362,6 @@ type gcePersistentDiskDeleter struct {
 
 var _ volume.Deleter = &gcePersistentDiskDeleter{}
 
-func (d *gcePersistentDiskDeleter) GetPath() string {
-	return getPath(d.podUID, d.volName, d.plugin.host)
-}
-
 func (d *gcePersistentDiskDeleter) Delete() error {
 	return d.manager.DeleteVolume(d)
 }
