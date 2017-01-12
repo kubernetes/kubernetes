@@ -177,8 +177,7 @@ func generateDeployment(image string) extensions.Deployment {
 	terminationSec := int64(30)
 	return extensions.Deployment{
 		ObjectMeta: v1.ObjectMeta{
-			Name:        image,
-			Annotations: make(map[string]string),
+			Name: image,
 		},
 		Spec: extensions.DeploymentSpec{
 			Replicas: func(i int32) *int32 { return &i }(1),
@@ -626,6 +625,7 @@ func TestGetReplicaCountForReplicaSets(t *testing.T) {
 }
 
 func TestResolveFenceposts(t *testing.T) {
+
 	tests := []struct {
 		maxSurge          string
 		maxUnavailable    string
@@ -1104,114 +1104,6 @@ func TestDeploymentTimedOut(t *testing.T) {
 		nowFn = test.nowFn
 		if got, exp := DeploymentTimedOut(&test.d, &test.d.Status), test.expected; got != exp {
 			t.Errorf("expected timeout: %t, got: %t", exp, got)
-		}
-	}
-}
-
-func TestSelectorUpdatedBefore(t *testing.T) {
-	now := metav1.Now()
-	later := metav1.Time{Time: now.Add(time.Minute)}
-	selectorUpdated := metav1.Time{Time: later.Add(time.Minute)}
-	selectorUpdatedLater := metav1.Time{Time: selectorUpdated.Add(time.Minute)}
-
-	tests := []struct {
-		name string
-
-		d1                 extensions.Deployment
-		creationTimestamp1 *metav1.Time
-		selectorUpdated1   *metav1.Time
-
-		d2                 extensions.Deployment
-		creationTimestamp2 *metav1.Time
-		selectorUpdated2   *metav1.Time
-
-		expected bool
-	}{
-		{
-			name: "d1 created before d2",
-
-			d1:                 generateDeployment("foo"),
-			creationTimestamp1: &now,
-
-			d2:                 generateDeployment("bar"),
-			creationTimestamp2: &later,
-
-			expected: true,
-		},
-		{
-			name: "d1 created after d2",
-
-			d1:                 generateDeployment("foo"),
-			creationTimestamp1: &later,
-
-			d2:                 generateDeployment("bar"),
-			creationTimestamp2: &now,
-
-			expected: false,
-		},
-		{
-			// Think of the following scenario:
-			// d1 is created first, d2 is created after and its selector overlaps
-			// with d1. d2 is marked as overlapping correctly. If d1's selector is
-			// updated and continues to overlap with the selector of d2 then d1 is
-			// now marked overlapping and d2 is cleaned up. Proved by the following
-			// test case. Callers of SelectorUpdatedBefore should first check for
-			// the existence of the overlapping annotation in any of the two deployments
-			// prior to comparing their timestamps and as a matter of fact this is
-			// now handled in `(dc *DeploymentController) handleOverlap`.
-			name: "d1 created before d2 but updated its selector afterwards",
-
-			d1:                 generateDeployment("foo"),
-			creationTimestamp1: &now,
-			selectorUpdated1:   &selectorUpdated,
-
-			d2:                 generateDeployment("bar"),
-			creationTimestamp2: &later,
-
-			expected: false,
-		},
-		{
-			name: "d1 selector is older than d2",
-
-			d1:               generateDeployment("foo"),
-			selectorUpdated1: &selectorUpdated,
-
-			d2:               generateDeployment("bar"),
-			selectorUpdated2: &selectorUpdatedLater,
-
-			expected: true,
-		},
-		{
-			name: "d1 selector is younger than d2",
-
-			d1:               generateDeployment("foo"),
-			selectorUpdated1: &selectorUpdatedLater,
-
-			d2:               generateDeployment("bar"),
-			selectorUpdated2: &selectorUpdated,
-
-			expected: false,
-		},
-	}
-
-	for _, test := range tests {
-		t.Logf("running scenario %q", test.name)
-
-		if test.creationTimestamp1 != nil {
-			test.d1.CreationTimestamp = *test.creationTimestamp1
-		}
-		if test.creationTimestamp2 != nil {
-			test.d2.CreationTimestamp = *test.creationTimestamp2
-		}
-		if test.selectorUpdated1 != nil {
-			test.d1.Annotations[SelectorUpdateAnnotation] = test.selectorUpdated1.Format(time.RFC3339)
-		}
-		if test.selectorUpdated2 != nil {
-			test.d2.Annotations[SelectorUpdateAnnotation] = test.selectorUpdated2.Format(time.RFC3339)
-		}
-
-		if got := SelectorUpdatedBefore(&test.d1, &test.d2); got != test.expected {
-			t.Errorf("expected d1 selector to be updated before d2: %t, got: %t", test.expected, got)
 		}
 	}
 }
