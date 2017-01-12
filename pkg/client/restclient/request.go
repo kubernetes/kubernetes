@@ -749,6 +749,16 @@ func (r *Request) Stream() (io.ReadCloser, error) {
 
 		result := r.transformResponse(resp, req)
 		if result.err != nil {
+			// decode, but if the result is Status return that as an error instead.
+			// try to decode into status here so that we get the right error message back
+			// and not an unknown error.
+			// See: https://github.com/kubernetes/kubernetes/issues/38774
+			status := &metav1.Status{}
+			err := runtime.DecodeInto(result.decoder, result.body, status)
+			if err == nil && len(status.Status) > 0 {
+				return nil, errors.FromObject(status)
+			}
+
 			return nil, result.err
 		}
 		return nil, fmt.Errorf("%d while accessing %v: %s", result.statusCode, url, string(result.body))
