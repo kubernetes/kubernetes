@@ -21,6 +21,7 @@ go_library(
         "deployment.go",
         "describe.go",
         "doc.go",
+        "env_file.go",
         "explain.go",
         "generate.go",
         "history.go",

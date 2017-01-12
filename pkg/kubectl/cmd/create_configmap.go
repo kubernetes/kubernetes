@@ -52,7 +52,10 @@ var (
 		  kubectl create configmap my-config --from-literal=key1=config1 --from-literal=key2=config2
 
 		  # Create a new configmap named my-config from the key=value pairs in the file
-		  kubectl create configmap my-config --from-file=path/to/bar`)
+		  kubectl create configmap my-config --from-file=path/to/bar
+			
+			# Create a new configmap named my-config from an env file
+			kubectl create configmap my-config --from-env-file=path/to/bar`)
 )
 
 // ConfigMap is a command to ease creating ConfigMaps.
@@ -74,7 +77,7 @@ func NewCmdCreateConfigMap(f cmdutil.Factory, cmdOut io.Writer) *cobra.Command {
 	cmdutil.AddGeneratorFlags(cmd, cmdutil.ConfigMapV1GeneratorName)
 	cmd.Flags().StringSlice("from-file", []string{}, "Key files can be specified using their file path, in which case a default name will be given to them, or optionally with a name and file path, in which case the given name will be used.  Specifying a directory will iterate each named file in the directory that is a valid configmap key.")
 	cmd.Flags().StringArray("from-literal", []string{}, "Specify a key and literal value to insert in configmap (i.e. mykey=somevalue)")
-	cmd.Flags().String("from-env-file", "", "Specify an env file which contains key=val pairs that are inserted into a configmap")
+	cmd.Flags().String("from-env-file", "", "Specify an env file which contains key=val pairs that are inserted into a configmap.")
 	return cmd
 }
 
