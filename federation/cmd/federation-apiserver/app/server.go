@@ -207,6 +207,7 @@ func Run(s *options.ServerRunOptions) error {
 	installCoreAPIs(s, m, restOptionsFactory)
 	installExtensionsAPIs(m, restOptionsFactory)
 	installBatchAPIs(m, restOptionsFactory)
+	installAutoscalingAPIs(m, restOptionsFactory)
 
 	sharedInformers.Start(wait.NeverStop)
 	m.PrepareRun().Run(wait.NeverStop)

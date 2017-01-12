@@ -18,6 +18,7 @@ package federation_internalclientset
 
 import (
 	"github.com/golang/glog"
+	internalversionautoscaling "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset/typed/autoscaling/internalversion"
 	internalversionbatch "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset/typed/batch/internalversion"
 	internalversioncore "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset/typed/core/internalversion"
 	internalversionextensions "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset/typed/extensions/internalversion"
@@ -32,6 +33,8 @@ type Interface interface {
 	Discovery() discovery.DiscoveryInterface
 	Core() internalversioncore.CoreInterface
 
+	Autoscaling() internalversionautoscaling.AutoscalingInterface
+
 	Batch() internalversionbatch.BatchInterface
 
 	Extensions() internalversionextensions.ExtensionsInterface
@@ -44,6 +47,7 @@ type Interface interface {
 type Clientset struct {
 	*discovery.DiscoveryClient
 	*internalversioncore.CoreClient
+	*internalversionautoscaling.AutoscalingClient
 	*internalversionbatch.BatchClient
 	*internalversionextensions.ExtensionsClient
 	*internalversionfederation.FederationClient
@@ -55,6 +59,14 @@ func (c *Clientset) Core() internalversioncore.CoreInterface {
 		return nil
 	}
 	return c.CoreClient
+}
+
+// Autoscaling retrieves the AutoscalingClient
+func (c *Clientset) Autoscaling() internalversionautoscaling.AutoscalingInterface {
+	if c == nil {
+		return nil
+	}
+	return c.AutoscalingClient
 }
 
 // Batch retrieves the BatchClient
@@ -101,6 +113,10 @@ func NewForConfig(c *restclient.Config) (*Clientset, error) {
 	if err != nil {
 		return nil, err
 	}
+	cs.AutoscalingClient, err = internalversionautoscaling.NewForConfig(&configShallowCopy)
+	if err != nil {
+		return nil, err
+	}
 	cs.BatchClient, err = internalversionbatch.NewForConfig(&configShallowCopy)
 	if err != nil {
 		return nil, err
@@ -127,6 +143,7 @@ func NewForConfig(c *restclient.Config) (*Clientset, error) {
 func NewForConfigOrDie(c *restclient.Config) *Clientset {
 	var cs Clientset
 	cs.CoreClient = internalversioncore.NewForConfigOrDie(c)
+	cs.AutoscalingClient = internalversionautoscaling.NewForConfigOrDie(c)
 	cs.BatchClient = internalversionbatch.NewForConfigOrDie(c)
 	cs.ExtensionsClient = internalversionextensions.NewForConfigOrDie(c)
 	cs.FederationClient = internalversionfederation.NewForConfigOrDie(c)
@@ -139,6 +156,7 @@ func NewForConfigOrDie(c *restclient.Config) *Clientset {
 func New(c restclient.Interface) *Clientset {
 	var cs Clientset
 	cs.CoreClient = internalversioncore.New(c)
+	cs.AutoscalingClient = internalversionautoscaling.New(c)
 	cs.BatchClient = internalversionbatch.New(c)
 	cs.ExtensionsClient = internalversionextensions.New(c)
 	cs.FederationClient = internalversionfederation.New(c)

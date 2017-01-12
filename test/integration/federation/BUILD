@@ -17,6 +17,7 @@ go_test(
         "//federation/cmd/federation-apiserver/app/options:go_default_library",
         "//pkg/api/v1:go_default_library",
         "//pkg/apis/batch/v1:go_default_library",
+        "//pkg/apis/autoscaling/v1:go_default_library",
         "//pkg/apis/extensions/v1beta1:go_default_library",
         "//vendor:github.com/stretchr/testify/assert",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
