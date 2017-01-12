@@ -121,12 +121,12 @@ type ServiceController struct {
 	// A store of services, populated by the serviceController
 	serviceStore cache.StoreToServiceLister
 	// Watches changes to all services
-	serviceController *cache.Controller
+	serviceController cache.Controller
 	federatedInformer fedutil.FederatedInformer
 	// A store of services, populated by the serviceController
 	clusterStore federationcache.StoreToClusterLister
 	// Watches changes to all services
-	clusterController *cache.Controller
+	clusterController cache.Controller
 	eventBroadcaster  record.EventBroadcaster
 	eventRecorder     record.EventRecorder
 	// services that need to be synced
@@ -245,7 +245,7 @@ func New(federationClient fedclientset.Interface, dns dnsprovider.Interface,
 			s.clusterDeliverer.DeliverAfter(allClustersKey, nil, clusterAvailableDelay)
 		},
 	}
-	fedInformerFactory := func(cluster *v1beta1.Cluster, targetClient kubeclientset.Interface) (cache.Store, cache.ControllerInterface) {
+	fedInformerFactory := func(cluster *v1beta1.Cluster, targetClient kubeclientset.Interface) (cache.Store, cache.Controller) {
 		return cache.NewInformer(
 			&cache.ListWatch{
 				ListFunc: func(options v1.ListOptions) (pkgruntime.Object, error) {

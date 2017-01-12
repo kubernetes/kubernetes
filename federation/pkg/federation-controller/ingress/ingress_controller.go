@@ -91,7 +91,7 @@ type IngressController struct {
 	// Definitions of ingresses that should be federated.
 	ingressInformerStore cache.Store
 	// Informer controller for ingresses that should be federated.
-	ingressInformerController cache.ControllerInterface
+	ingressInformerController cache.Controller
 
 	// Client to federated api server.
 	federatedApiClient federationclientset.Interface
@@ -157,7 +157,7 @@ func NewIngressController(client federationclientset.Interface) *IngressControll
 	// Federated informer on ingresses in members of federation.
 	ic.ingressFederatedInformer = util.NewFederatedInformer(
 		client,
-		func(cluster *federationapi.Cluster, targetClient kubeclientset.Interface) (cache.Store, cache.ControllerInterface) {
+		func(cluster *federationapi.Cluster, targetClient kubeclientset.Interface) (cache.Store, cache.Controller) {
 			return cache.NewInformer(
 				&cache.ListWatch{
 					ListFunc: func(options v1.ListOptions) (pkgruntime.Object, error) {
@@ -189,7 +189,7 @@ func NewIngressController(client federationclientset.Interface) *IngressControll
 	// Federated informer on configmaps for ingress controllers in members of the federation.
 	ic.configMapFederatedInformer = util.NewFederatedInformer(
 		client,
-		func(cluster *federationapi.Cluster, targetClient kubeclientset.Interface) (cache.Store, cache.ControllerInterface) {
+		func(cluster *federationapi.Cluster, targetClient kubeclientset.Interface) (cache.Store, cache.Controller) {
 			glog.V(4).Infof("Returning new informer for cluster %q", cluster.Name)
 			return cache.NewInformer(
 				&cache.ListWatch{

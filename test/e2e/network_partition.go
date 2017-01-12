@@ -188,7 +188,7 @@ var _ = framework.KubeDescribe("Network Partition [Disruptive] [Slow]", func() {
 				nodeSelector := fields.OneTermEqualSelector("metadata.name", node.Name)
 				stopCh := make(chan struct{})
 				newNode := make(chan *v1.Node)
-				var controller *cache.Controller
+				var controller cache.Controller
 				_, controller = cache.NewInformer(
 					&cache.ListWatch{
 						ListFunc: func(options v1.ListOptions) (runtime.Object, error) {

@@ -80,7 +80,7 @@ func parseFederationDeploymentPreference(fd *extensionsv1.Deployment) (*fed.Fede
 type DeploymentController struct {
 	fedClient fedclientset.Interface
 
-	deploymentController *cache.Controller
+	deploymentController cache.Controller
 	deploymentStore      cache.Store
 
 	fedDeploymentInformer fedutil.FederatedInformer
@@ -119,7 +119,7 @@ func NewDeploymentController(federationClient fedclientset.Interface) *Deploymen
 		eventRecorder: recorder,
 	}
 
-	deploymentFedInformerFactory := func(cluster *fedv1.Cluster, clientset kubeclientset.Interface) (cache.Store, cache.ControllerInterface) {
+	deploymentFedInformerFactory := func(cluster *fedv1.Cluster, clientset kubeclientset.Interface) (cache.Store, cache.Controller) {
 		return cache.NewInformer(
 			&cache.ListWatch{
 				ListFunc: func(options apiv1.ListOptions) (runtime.Object, error) {
@@ -146,7 +146,7 @@ func NewDeploymentController(federationClient fedclientset.Interface) *Deploymen
 	}
 	fdc.fedDeploymentInformer = fedutil.NewFederatedInformer(federationClient, deploymentFedInformerFactory, &clusterLifecycle)
 
-	podFedInformerFactory := func(cluster *fedv1.Cluster, clientset kubeclientset.Interface) (cache.Store, cache.ControllerInterface) {
+	podFedInformerFactory := func(cluster *fedv1.Cluster, clientset kubeclientset.Interface) (cache.Store, cache.Controller) {
 		return cache.NewInformer(
 			&cache.ListWatch{
 				ListFunc: func(options apiv1.ListOptions) (runtime.Object, error) {
