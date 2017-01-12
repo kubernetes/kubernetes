@@ -82,6 +82,7 @@ func TestReadConfig(t *testing.T) {
  monitor-max-retries = 3
  [BlockStorage]
  trust-device-path = yes
+ bs-version = auto
  `))
 	if err != nil {
 		t.Fatalf("Should succeed when a valid config is provided: %s", err)
@@ -104,6 +105,9 @@ func TestReadConfig(t *testing.T) {
 	}
 	if cfg.BlockStorage.TrustDevicePath != true {
 		t.Errorf("incorrect bs.trustdevicepath: %v", cfg.BlockStorage.TrustDevicePath)
+	}
+	if cfg.BlockStorage.BSVersion != "auto" {
+		t.Errorf("incorrect bs.bss-version: %v", cfg.BlockStorage.BSVersion)
 	}
 }
 

@@ -23,11 +23,13 @@ import (
 	"io/ioutil"
 	"net/http"
 	"regexp"
+	"sort"
 	"strings"
 	"time"
 
 	"github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack"
+	apiversions_v1 "github.com/gophercloud/gophercloud/openstack/blockstorage/v1/apiversions"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/servers"
 	"github.com/gophercloud/gophercloud/openstack/identity/v3/extensions/trusts"
 	tokens3 "github.com/gophercloud/gophercloud/openstack/identity/v3/tokens"
@@ -87,7 +89,8 @@ type LoadBalancerOpts struct {
 }
 
 type BlockStorageOpts struct {
-	TrustDevicePath bool `gcfg:"trust-device-path"` // See Issue #33128
+	BSVersion       string `gcfg:"bs-version"`        // overrides autodetection. v1 or v2. Defaults to auto
+	TrustDevicePath bool   `gcfg:"trust-device-path"` // See Issue #33128
 }
 
 type RouterOpts struct {
@@ -170,6 +173,7 @@ func readConfig(config io.Reader) (Config, error) {
 	var cfg Config
 
 	// Set default values for config params
+	cfg.BlockStorage.BSVersion = "auto"
 	cfg.BlockStorage.TrustDevicePath = false
 
 	err := gcfg.ReadInto(&cfg, config)
@@ -523,4 +527,90 @@ func (os *OpenStack) Routes() (cloudprovider.Routes, bool) {
 	glog.V(1).Info("Claiming to support Routes")
 
 	return r, true
+}
+
+// Implementation of sort interface for blockstorage version probing
+type APIVersionsByID []apiversions_v1.APIVersion
+
+func (apiVersions APIVersionsByID) Len() int {
+	return len(apiVersions)
+}
+
+func (apiVersions APIVersionsByID) Swap(i, j int) {
+	apiVersions[i], apiVersions[j] = apiVersions[j], apiVersions[i]
+}
+
+func (apiVersions APIVersionsByID) Less(i, j int) bool {
+	return apiVersions[i].ID > apiVersions[j].ID
+}
+
+func (os *OpenStack) Volumes() (IVolumes, error) {
+	switch os.bsOpts.BSVersion {
+	case "v1":
+		sClient, err := openstack.NewBlockStorageV1(os.provider, gophercloud.EndpointOpts{
+			Region: os.region,
+		})
+		if err != nil || sClient == nil {
+			glog.Errorf("Unable to initialize cinder client for region: %s", os.region)
+			return nil, err
+		}
+		return (IVolumes)(&VolumesV1{sClient, os.bsOpts}), nil
+	case "v2":
+		sClient, err := openstack.NewBlockStorageV2(os.provider, gophercloud.EndpointOpts{
+			Region: os.region,
+		})
+		if err != nil || sClient == nil {
+			glog.Errorf("Unable to initialize cinder v2 client for region: %s", os.region)
+			return nil, err
+		}
+		return (IVolumes)(&VolumesV2{sClient, os.bsOpts}), nil
+	case "auto":
+		sClient, err := openstack.NewBlockStorageV1(os.provider, gophercloud.EndpointOpts{
+			Region: os.region,
+		})
+		if err != nil || sClient == nil {
+			glog.Errorf("Unable to initialize cinder client for region: %s", os.region)
+			return nil, err
+		}
+
+		apiversions_v1.List(sClient).EachPage(func(page pagination.Page) (bool, error) {
+			apiversions, err := apiversions_v1.ExtractAPIVersions(page)
+			if err != nil {
+				glog.Errorf("Unable to list blockstorage API versions for region: %s", os.region)
+				return false, err
+			}
+
+			sort.Sort(APIVersionsByID(apiversions))
+			// take first "CURRENT" version
+			for _, version := range apiversions {
+				if version.Status == "CURRENT" {
+					switch version.ID {
+					case "v2.0":
+						os.bsOpts.BSVersion = "v2"
+						break
+					case "v1.0":
+						os.bsOpts.BSVersion = "v1"
+						break
+					}
+				}
+			}
+			return true, nil
+		})
+		// Autoprobing failed, no supported versions available
+		if os.bsOpts.BSVersion == "auto" {
+			errMsg := "Autoprobing for blockstorage API failed"
+			glog.Error(errMsg)
+			return nil, errors.New(errMsg)
+		}
+
+		glog.V(3).Infof("Blockstorage API version probing decided %s", os.bsOpts.BSVersion)
+
+		// autoprobing has changed the version in settings
+		return os.Volumes()
+
+	default:
+		err_txt := fmt.Sprintf("Config error: unrecognised bs-version \"%v\"", os.bsOpts.BSVersion)
+		glog.Warningf(err_txt)
+		return nil, errors.New(err_txt)
+	}
 }
