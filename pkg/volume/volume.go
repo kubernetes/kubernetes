@@ -146,7 +146,6 @@ type Provisioner interface {
 // returned indicates the volume has failed to be reclaimed. A nil return
 // indicates success.
 type Deleter interface {
-	Volume
 	// This method should block until completion.
 	// deletedVolumeInUseError returned from this function will not be reported
 	// as error and it will be sent as "Info" event to the PV being deleted. The

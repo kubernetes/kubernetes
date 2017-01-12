@@ -341,11 +341,6 @@ type rbdVolumeDeleter struct {
 	*rbdMounter
 }
 
-func (r *rbdVolumeDeleter) GetPath() string {
-	name := rbdPluginName
-	return r.plugin.host.GetPodVolumeDir(r.podUID, strings.EscapeQualifiedNameForDisk(name), r.volName)
-}
-
 func (r *rbdVolumeDeleter) Delete() error {
 	return r.manager.DeleteImage(r)
 }

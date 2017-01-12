@@ -458,11 +458,6 @@ type glusterfsVolumeDeleter struct {
 	spec *v1.PersistentVolume
 }
 
-func (d *glusterfsVolumeDeleter) GetPath() string {
-	name := glusterfsPluginName
-	return d.plugin.host.GetPodVolumeDir(d.glusterfsMounter.glusterfs.pod.UID, strings.EscapeQualifiedNameForDisk(name), d.glusterfsMounter.glusterfs.volName)
-}
-
 //
 // Traverse the PVs, fetching all the GIDs from those
 // in a given storage class, and mark them in the table.

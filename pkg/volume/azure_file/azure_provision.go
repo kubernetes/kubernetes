@@ -26,7 +26,6 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/azure"
-	utilstrings "k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
 )
 
@@ -110,11 +109,6 @@ func (plugin *azureFilePlugin) newProvisionerInternal(options volume.VolumeOptio
 }
 
 var _ volume.Deleter = &azureFileDeleter{}
-
-func (f *azureFileDeleter) GetPath() string {
-	name := azureFilePluginName
-	return f.plugin.host.GetPodVolumeDir(f.podUID, utilstrings.EscapeQualifiedNameForDisk(name), f.volName)
-}
 
 func (f *azureFileDeleter) Delete() error {
 	glog.V(4).Infof("deleting volume %s", f.shareName)

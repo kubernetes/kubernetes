@@ -467,11 +467,6 @@ type cinderVolumeDeleter struct {
 
 var _ volume.Deleter = &cinderVolumeDeleter{}
 
-func (r *cinderVolumeDeleter) GetPath() string {
-	name := cinderVolumePluginName
-	return r.plugin.host.GetPodVolumeDir(r.podUID, strings.EscapeQualifiedNameForDisk(name), r.volName)
-}
-
 func (r *cinderVolumeDeleter) Delete() error {
 	return r.manager.DeleteVolume(r)
 }

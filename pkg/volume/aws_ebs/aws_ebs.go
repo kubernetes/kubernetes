@@ -416,10 +416,6 @@ type awsElasticBlockStoreDeleter struct {
 
 var _ volume.Deleter = &awsElasticBlockStoreDeleter{}
 
-func (d *awsElasticBlockStoreDeleter) GetPath() string {
-	return getPath(d.podUID, d.volName, d.plugin.host)
-}
-
 func (d *awsElasticBlockStoreDeleter) Delete() error {
 	return d.manager.DeleteVolume(d)
 }
