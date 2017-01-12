@@ -244,7 +244,8 @@ genrule(
     testonly = 1,
     srcs = [":go_default_test"],
     outs = ["e2e.test"],
-    cmd = "set -x; srcs=($(SRCS)); cp $$(dirname $${srcs[0]})/go_default_test $@;",
+    cmd = "srcs=($(SRCS)); cp $$(dirname $${srcs[0]})/go_default_test $@;",
+    output_to_bindir = 1,
 )
 
 filegroup(
