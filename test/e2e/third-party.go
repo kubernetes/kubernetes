@@ -22,7 +22,6 @@ import (
 	"net/http"
 	"time"
 
-	"k8s.io/apimachinery/pkg/apimachinery/registered"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -97,7 +96,7 @@ var _ = Describe("ThirdParty resources [Flaky] [Disruptive]", func() {
 					return true, nil
 				}
 				status := metav1.Status{}
-				if err := runtime.DecodeInto(api.Codecs.LegacyCodec(registered.EnabledVersions()...), data, &status); err != nil {
+				if err := runtime.DecodeInto(api.Codecs.LegacyCodec(api.Registry.EnabledVersions()...), data, &status); err != nil {
 					return false, err
 				}
 				if status.Code != http.StatusNotFound {

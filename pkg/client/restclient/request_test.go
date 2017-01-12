@@ -33,7 +33,6 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/apimachinery/pkg/apimachinery/registered"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -94,7 +93,7 @@ func TestRequestSetsHeaders(t *testing.T) {
 func TestRequestWithErrorWontChange(t *testing.T) {
 	original := Request{
 		err:     errors.New("test"),
-		content: ContentConfig{GroupVersion: &registered.GroupOrDie(api.GroupName).GroupVersion},
+		content: ContentConfig{GroupVersion: &api.Registry.GroupOrDie(api.GroupName).GroupVersion},
 	}
 	r := original
 	changed := r.Param("foo", "bar").
@@ -278,7 +277,7 @@ func (obj NotAnAPIObject) SetGroupVersionKind(gvk *schema.GroupVersionKind) {}
 
 func defaultContentConfig() ContentConfig {
 	return ContentConfig{
-		GroupVersion:         &registered.GroupOrDie(api.GroupName).GroupVersion,
+		GroupVersion:         &api.Registry.GroupOrDie(api.GroupName).GroupVersion,
 		NegotiatedSerializer: testapi.Default.NegotiatedSerializer(),
 	}
 }
@@ -1253,7 +1252,7 @@ func TestDoRequestNewWayReader(t *testing.T) {
 	}
 	tmpStr := string(reqBodyExpected)
 	requestURL := testapi.Default.ResourcePathWithPrefix("foo", "bar", "", "baz")
-	requestURL += "?" + metav1.LabelSelectorQueryParam(registered.GroupOrDie(api.GroupName).GroupVersion.String()) + "=name%3Dfoo&timeout=1s"
+	requestURL += "?" + metav1.LabelSelectorQueryParam(api.Registry.GroupOrDie(api.GroupName).GroupVersion.String()) + "=name%3Dfoo&timeout=1s"
 	fakeHandler.ValidateRequest(t, requestURL, "POST", &tmpStr)
 }
 
@@ -1293,7 +1292,7 @@ func TestDoRequestNewWayObj(t *testing.T) {
 	}
 	tmpStr := string(reqBodyExpected)
 	requestURL := testapi.Default.ResourcePath("foo", "", "bar/baz")
-	requestURL += "?" + metav1.LabelSelectorQueryParam(registered.GroupOrDie(api.GroupName).GroupVersion.String()) + "=name%3Dfoo&timeout=1s"
+	requestURL += "?" + metav1.LabelSelectorQueryParam(api.Registry.GroupOrDie(api.GroupName).GroupVersion.String()) + "=name%3Dfoo&timeout=1s"
 	fakeHandler.ValidateRequest(t, requestURL, "POST", &tmpStr)
 }
 

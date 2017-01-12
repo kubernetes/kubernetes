@@ -17,7 +17,6 @@ limitations under the License.
 package internalversion
 
 import (
-	registered "k8s.io/apimachinery/pkg/apimachinery/registered"
 	api "k8s.io/kubernetes/pkg/api"
 	restclient "k8s.io/kubernetes/pkg/client/restclient"
 )
@@ -27,7 +26,7 @@ type TestgroupInterface interface {
 	TestTypesGetter
 }
 
-// TestgroupClient is used to interact with features provided by the k8s.io/apimachinery/pkg/apimachinery/registered.Group group.
+// TestgroupClient is used to interact with features provided by the testgroup.k8s.io group.
 type TestgroupClient struct {
 	restClient restclient.Interface
 }
@@ -66,7 +65,7 @@ func New(c restclient.Interface) *TestgroupClient {
 
 func setConfigDefaults(config *restclient.Config) error {
 	// if testgroup group is not registered, return an error
-	g, err := registered.Group("testgroup.k8s.io")
+	g, err := api.Registry.Group("testgroup.k8s.io")
 	if err != nil {
 		return err
 	}

@@ -30,7 +30,7 @@ import (
 // API registry.
 var Registry = registered.NewOrDie(os.Getenv("KUBE_API_VERSIONS"))
 
-// Scheme is the default instance of runtime.Scheme to which types in the Kubernetes API are already api.Registry.
+// Scheme is the default instance of runtime.Scheme to which types in the Kubernetes API are already registered.
 // NOTE: If you are copying this file to start a new api group, STOP! Copy the
 // extensions group instead. This Scheme is special and should appear ONLY in
 // the api group, unless you really know what you're doing.

@@ -26,7 +26,6 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/apimachinery/pkg/apimachinery/registered"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -47,7 +46,7 @@ import (
 
 func init() {
 	api.Scheme.AddKnownTypes(testapi.Default.InternalGroupVersion(), &kubectltesting.TestStruct{})
-	api.Scheme.AddKnownTypes(registered.GroupOrDie(api.GroupName).GroupVersion, &kubectltesting.TestStruct{})
+	api.Scheme.AddKnownTypes(api.Registry.GroupOrDie(api.GroupName).GroupVersion, &kubectltesting.TestStruct{})
 }
 
 var testData = kubectltesting.TestStruct{
@@ -70,7 +69,7 @@ func TestVersionedPrinter(t *testing.T) {
 			return nil
 		}),
 		api.Scheme,
-		registered.GroupOrDie(api.GroupName).GroupVersion,
+		api.Registry.GroupOrDie(api.GroupName).GroupVersion,
 	)
 	if err := p.PrintObj(original, nil); err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -108,7 +107,7 @@ func TestPrinter(t *testing.T) {
 		},
 	}
 	emptyListTest := &api.PodList{}
-	testapi, err := api.Scheme.ConvertToVersion(podTest, registered.GroupOrDie(api.GroupName).GroupVersion)
+	testapi, err := api.Scheme.ConvertToVersion(podTest, api.Registry.GroupOrDie(api.GroupName).GroupVersion)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -471,7 +470,7 @@ func TestTemplateStrings(t *testing.T) {
 		t.Fatalf("tmpl fail: %v", err)
 	}
 
-	printer := NewVersionedPrinter(p, api.Scheme, registered.GroupOrDie(api.GroupName).GroupVersion)
+	printer := NewVersionedPrinter(p, api.Scheme, api.Registry.GroupOrDie(api.GroupName).GroupVersion)
 
 	for name, item := range table {
 		buffer := &bytes.Buffer{}

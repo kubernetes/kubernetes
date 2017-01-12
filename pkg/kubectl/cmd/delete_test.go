@@ -24,7 +24,6 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/api/meta"
-	"k8s.io/apimachinery/pkg/apimachinery/registered"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
@@ -498,12 +497,12 @@ func TestDeleteMultipleSelector(t *testing.T) {
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
 			case p == "/namespaces/test/pods" && m == "GET":
-				if req.URL.Query().Get(metav1.LabelSelectorQueryParam(registered.GroupOrDie(api.GroupName).GroupVersion.String())) != "a=b" {
+				if req.URL.Query().Get(metav1.LabelSelectorQueryParam(api.Registry.GroupOrDie(api.GroupName).GroupVersion.String())) != "a=b" {
 					t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
 				}
 				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, pods)}, nil
 			case p == "/namespaces/test/services" && m == "GET":
-				if req.URL.Query().Get(metav1.LabelSelectorQueryParam(registered.GroupOrDie(api.GroupName).GroupVersion.String())) != "a=b" {
+				if req.URL.Query().Get(metav1.LabelSelectorQueryParam(api.Registry.GroupOrDie(api.GroupName).GroupVersion.String())) != "a=b" {
 					t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
 				}
 				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, svc)}, nil
@@ -559,7 +558,7 @@ func TestResourceErrors(t *testing.T) {
 		f, tf, _, _ := cmdtesting.NewAPIFactory()
 		tf.Printer = &testPrinter{}
 		tf.Namespace = "test"
-		tf.ClientConfig = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(api.GroupName).GroupVersion}}
+		tf.ClientConfig = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(api.GroupName).GroupVersion}}
 
 		buf, errBuf := bytes.NewBuffer([]byte{}), bytes.NewBuffer([]byte{})
 

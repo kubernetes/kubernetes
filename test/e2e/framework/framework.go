@@ -26,7 +26,6 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/apimachinery/pkg/apimachinery/registered"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -201,7 +200,7 @@ func (f *Framework) BeforeEach() {
 		clientRepoConfig := getClientRepoConfig(config)
 		f.StagingClient, err = staging.NewForConfig(clientRepoConfig)
 		Expect(err).NotTo(HaveOccurred())
-		f.ClientPool = dynamic.NewClientPool(config, registered.RESTMapper(), dynamic.LegacyAPIPathResolverFunc)
+		f.ClientPool = dynamic.NewClientPool(config, api.Registry.RESTMapper(), dynamic.LegacyAPIPathResolverFunc)
 	}
 
 	if f.federated {

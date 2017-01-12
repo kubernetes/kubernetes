@@ -19,7 +19,6 @@ package tests
 import (
 	"testing"
 
-	"k8s.io/apimachinery/pkg/apimachinery/registered"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
@@ -30,8 +29,8 @@ func TestDecodeList(t *testing.T) {
 		Items: []runtime.Object{
 			&api.Pod{ObjectMeta: api.ObjectMeta{Name: "1"}},
 			&runtime.Unknown{
-				TypeMeta:    runtime.TypeMeta{Kind: "Pod", APIVersion: registered.GroupOrDie(api.GroupName).GroupVersion.String()},
-				Raw:         []byte(`{"kind":"Pod","apiVersion":"` + registered.GroupOrDie(api.GroupName).GroupVersion.String() + `","metadata":{"name":"test"}}`),
+				TypeMeta:    runtime.TypeMeta{Kind: "Pod", APIVersion: api.Registry.GroupOrDie(api.GroupName).GroupVersion.String()},
+				Raw:         []byte(`{"kind":"Pod","apiVersion":"` + api.Registry.GroupOrDie(api.GroupName).GroupVersion.String() + `","metadata":{"name":"test"}}`),
 				ContentType: runtime.ContentTypeJSON,
 			},
 		},

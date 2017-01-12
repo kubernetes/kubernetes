@@ -24,7 +24,6 @@ import (
 	"strings"
 	"testing"
 
-	"k8s.io/apimachinery/pkg/apimachinery/registered"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -141,9 +140,9 @@ func (c *Client) ValidateCommon(t *testing.T, err error) {
 		validator, ok := c.QueryValidator[key]
 		if !ok {
 			switch key {
-			case metav1.LabelSelectorQueryParam(registered.GroupOrDie(api.GroupName).GroupVersion.String()):
+			case metav1.LabelSelectorQueryParam(api.Registry.GroupOrDie(api.GroupName).GroupVersion.String()):
 				validator = ValidateLabels
-			case metav1.FieldSelectorQueryParam(registered.GroupOrDie(api.GroupName).GroupVersion.String()):
+			case metav1.FieldSelectorQueryParam(api.Registry.GroupOrDie(api.GroupName).GroupVersion.String()):
 				validator = validateFields
 			default:
 				validator = func(a, b string) bool { return a == b }

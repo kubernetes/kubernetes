@@ -31,7 +31,6 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/apimachinery/pkg/apimachinery/registered"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -346,11 +345,11 @@ func startServiceAccountTestServer(t *testing.T) (*clientset.Clientset, restclie
 	}))
 
 	// Anonymous client config
-	clientConfig := restclient.Config{Host: apiServer.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(v1.GroupName).GroupVersion}}
+	clientConfig := restclient.Config{Host: apiServer.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(v1.GroupName).GroupVersion}}
 	// Root client
 	// TODO: remove rootClient after we refactor pkg/admission to use the clientset.
-	rootClientset := clientset.NewForConfigOrDie(&restclient.Config{Host: apiServer.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(v1.GroupName).GroupVersion}, BearerToken: rootToken})
-	internalRootClientset := internalclientset.NewForConfigOrDie(&restclient.Config{Host: apiServer.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(v1.GroupName).GroupVersion}, BearerToken: rootToken})
+	rootClientset := clientset.NewForConfigOrDie(&restclient.Config{Host: apiServer.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(v1.GroupName).GroupVersion}, BearerToken: rootToken})
+	internalRootClientset := internalclientset.NewForConfigOrDie(&restclient.Config{Host: apiServer.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(v1.GroupName).GroupVersion}, BearerToken: rootToken})
 	// Set up two authenticators:
 	// 1. A token authenticator that maps the rootToken to the "root" user
 	// 2. A ServiceAccountToken authenticator that validates ServiceAccount tokens

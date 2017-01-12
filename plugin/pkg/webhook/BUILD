@@ -12,9 +12,10 @@ go_library(
     srcs = ["webhook.go"],
     tags = ["automanaged"],
     deps = [
+        "//pkg/api:go_default_library",
+        "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
         "//vendor:k8s.io/client-go/pkg/api",
         "//vendor:k8s.io/client-go/pkg/api/errors",
-        "//vendor:k8s.io/client-go/pkg/apimachinery/registered",
         "//vendor:k8s.io/client-go/pkg/apis/authorization/install",
         "//vendor:k8s.io/client-go/pkg/runtime",
         "//vendor:k8s.io/client-go/pkg/runtime/schema",

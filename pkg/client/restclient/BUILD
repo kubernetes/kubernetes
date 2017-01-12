@@ -71,7 +71,6 @@ go_test(
         "//pkg/util/intstr:go_default_library",
         "//pkg/util/testing:go_default_library",
         "//vendor:github.com/google/gofuzz",
-        "//vendor:k8s.io/apimachinery/pkg/apimachinery/registered",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/labels",
         "//vendor:k8s.io/apimachinery/pkg/runtime",

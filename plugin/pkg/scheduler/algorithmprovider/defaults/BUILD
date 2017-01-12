@@ -32,6 +32,7 @@ go_test(
     library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
+        "//pkg/api:go_default_library",
         "//pkg/api/v1:go_default_library",
         "//pkg/client/clientset_generated/clientset:go_default_library",
         "//pkg/client/restclient:go_default_library",
@@ -39,7 +40,6 @@ go_test(
         "//plugin/pkg/scheduler/api:go_default_library",
         "//plugin/pkg/scheduler/api/latest:go_default_library",
         "//plugin/pkg/scheduler/factory:go_default_library",
-        "//vendor:k8s.io/apimachinery/pkg/apimachinery/registered",
         "//vendor:k8s.io/apimachinery/pkg/runtime",
         "//vendor:k8s.io/apimachinery/pkg/util/sets",
     ],

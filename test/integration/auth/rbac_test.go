@@ -30,7 +30,6 @@ import (
 
 	"github.com/golang/glog"
 
-	"k8s.io/apimachinery/pkg/apimachinery/registered"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
@@ -223,7 +222,7 @@ var (
 `
 	podNamespace = `
 {
-  "apiVersion": "` + registered.GroupOrDie(api.GroupName).GroupVersion.String() + `",
+  "apiVersion": "` + api.Registry.GroupOrDie(api.GroupName).GroupVersion.String() + `",
   "kind": "Namespace",
   "metadata": {
 	"name": "pod-namespace"%s
@@ -232,7 +231,7 @@ var (
 `
 	jobNamespace = `
 {
-  "apiVersion": "` + registered.GroupOrDie(api.GroupName).GroupVersion.String() + `",
+  "apiVersion": "` + api.Registry.GroupOrDie(api.GroupName).GroupVersion.String() + `",
   "kind": "Namespace",
   "metadata": {
 	"name": "job-namespace"%s
@@ -241,7 +240,7 @@ var (
 `
 	forbiddenNamespace = `
 {
-  "apiVersion": "` + registered.GroupOrDie(api.GroupName).GroupVersion.String() + `",
+  "apiVersion": "` + api.Registry.GroupOrDie(api.GroupName).GroupVersion.String() + `",
   "kind": "Namespace",
   "metadata": {
 	"name": "forbidden-namespace"%s
@@ -506,7 +505,7 @@ func TestBootstrapping(t *testing.T) {
 	_, s := framework.RunAMaster(masterConfig)
 	defer s.Close()
 
-	clientset := clientset.NewForConfigOrDie(&restclient.Config{BearerToken: superUser, Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(api.GroupName).GroupVersion}})
+	clientset := clientset.NewForConfigOrDie(&restclient.Config{BearerToken: superUser, Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(api.GroupName).GroupVersion}})
 
 	watcher, err := clientset.Rbac().ClusterRoles().Watch(api.ListOptions{ResourceVersion: "0"})
 	if err != nil {

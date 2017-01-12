@@ -28,7 +28,6 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/apimachinery/pkg/apimachinery/registered"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -99,7 +98,7 @@ func getKey(rs *extensions.ReplicaSet, t *testing.T) string {
 
 func newReplicaSet(replicas int, selectorMap map[string]string) *extensions.ReplicaSet {
 	rs := &extensions.ReplicaSet{
-		TypeMeta: metav1.TypeMeta{APIVersion: registered.GroupOrDie(v1.GroupName).GroupVersion.String()},
+		TypeMeta: metav1.TypeMeta{APIVersion: api.Registry.GroupOrDie(v1.GroupName).GroupVersion.String()},
 		ObjectMeta: v1.ObjectMeta{
 			UID:             uuid.NewUUID(),
 			Name:            "foobar",
@@ -198,7 +197,7 @@ type serverResponse struct {
 }
 
 func TestSyncReplicaSetDoesNothing(t *testing.T) {
-	client := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(v1.GroupName).GroupVersion}})
+	client := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(v1.GroupName).GroupVersion}})
 	fakePodControl := controller.FakePodControl{}
 	stopCh := make(chan struct{})
 	defer close(stopCh)
@@ -217,7 +216,7 @@ func TestSyncReplicaSetDoesNothing(t *testing.T) {
 }
 
 func TestSyncReplicaSetDeletes(t *testing.T) {
-	client := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(v1.GroupName).GroupVersion}})
+	client := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(v1.GroupName).GroupVersion}})
 	fakePodControl := controller.FakePodControl{}
 	stopCh := make(chan struct{})
 	defer close(stopCh)
@@ -236,7 +235,7 @@ func TestSyncReplicaSetDeletes(t *testing.T) {
 }
 
 func TestDeleteFinalStateUnknown(t *testing.T) {
-	client := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(v1.GroupName).GroupVersion}})
+	client := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(v1.GroupName).GroupVersion}})
 	fakePodControl := controller.FakePodControl{}
 	stopCh := make(chan struct{})
 	defer close(stopCh)
@@ -272,7 +271,7 @@ func TestDeleteFinalStateUnknown(t *testing.T) {
 }
 
 func TestSyncReplicaSetCreates(t *testing.T) {
-	client := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(v1.GroupName).GroupVersion}})
+	client := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(v1.GroupName).GroupVersion}})
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 	manager := testNewReplicaSetControllerFromClient(client, stopCh, BurstReplicas, 0)
@@ -298,7 +297,7 @@ func TestStatusUpdatesWithoutReplicasChange(t *testing.T) {
 	}
 	testServer := httptest.NewServer(&fakeHandler)
 	defer testServer.Close()
-	client := clientset.NewForConfigOrDie(&restclient.Config{Host: testServer.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(v1.GroupName).GroupVersion}})
+	client := clientset.NewForConfigOrDie(&restclient.Config{Host: testServer.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(v1.GroupName).GroupVersion}})
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 	manager := testNewReplicaSetControllerFromClient(client, stopCh, BurstReplicas, 0)
@@ -344,7 +343,7 @@ func TestControllerUpdateReplicas(t *testing.T) {
 	testServer := httptest.NewServer(&fakeHandler)
 	defer testServer.Close()
 
-	client := clientset.NewForConfigOrDie(&restclient.Config{Host: testServer.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(v1.GroupName).GroupVersion}})
+	client := clientset.NewForConfigOrDie(&restclient.Config{Host: testServer.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(v1.GroupName).GroupVersion}})
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 	manager := testNewReplicaSetControllerFromClient(client, stopCh, BurstReplicas, 0)
@@ -392,7 +391,7 @@ func TestSyncReplicaSetDormancy(t *testing.T) {
 	}
 	testServer := httptest.NewServer(&fakeHandler)
 	defer testServer.Close()
-	client := clientset.NewForConfigOrDie(&restclient.Config{Host: testServer.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(v1.GroupName).GroupVersion}})
+	client := clientset.NewForConfigOrDie(&restclient.Config{Host: testServer.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(v1.GroupName).GroupVersion}})
 
 	fakePodControl := controller.FakePodControl{}
 	stopCh := make(chan struct{})
@@ -454,7 +453,7 @@ func TestSyncReplicaSetDormancy(t *testing.T) {
 func TestPodControllerLookup(t *testing.T) {
 	stopCh := make(chan struct{})
 	defer close(stopCh)
-	manager := testNewReplicaSetControllerFromClient(clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(v1.GroupName).GroupVersion}}), stopCh, BurstReplicas, 0)
+	manager := testNewReplicaSetControllerFromClient(clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(v1.GroupName).GroupVersion}}), stopCh, BurstReplicas, 0)
 	manager.podListerSynced = alwaysReady
 	testCases := []struct {
 		inRSs     []*extensions.ReplicaSet
@@ -688,7 +687,7 @@ func TestControllerUpdateRequeue(t *testing.T) {
 
 	stopCh := make(chan struct{})
 	defer close(stopCh)
-	client := clientset.NewForConfigOrDie(&restclient.Config{Host: testServer.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(v1.GroupName).GroupVersion}})
+	client := clientset.NewForConfigOrDie(&restclient.Config{Host: testServer.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(v1.GroupName).GroupVersion}})
 	manager := testNewReplicaSetControllerFromClient(client, stopCh, BurstReplicas, 0)
 	manager.podListerSynced = alwaysReady
 
@@ -757,7 +756,7 @@ func TestControllerUpdateStatusWithFailure(t *testing.T) {
 
 // TODO: This test is too hairy for a unittest. It should be moved to an E2E suite.
 func doTestControllerBurstReplicas(t *testing.T, burstReplicas, numReplicas int) {
-	client := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(v1.GroupName).GroupVersion}})
+	client := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(v1.GroupName).GroupVersion}})
 	fakePodControl := controller.FakePodControl{}
 	stopCh := make(chan struct{})
 	defer close(stopCh)
@@ -911,7 +910,7 @@ func (fe FakeRSExpectations) SatisfiedExpectations(controllerKey string) bool {
 // TestRSSyncExpectations tests that a pod cannot sneak in between counting active pods
 // and checking expectations.
 func TestRSSyncExpectations(t *testing.T) {
-	client := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(v1.GroupName).GroupVersion}})
+	client := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(v1.GroupName).GroupVersion}})
 	fakePodControl := controller.FakePodControl{}
 	stopCh := make(chan struct{})
 	defer close(stopCh)
@@ -939,7 +938,7 @@ func TestRSSyncExpectations(t *testing.T) {
 }
 
 func TestDeleteControllerAndExpectations(t *testing.T) {
-	client := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(v1.GroupName).GroupVersion}})
+	client := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(v1.GroupName).GroupVersion}})
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 	manager := testNewReplicaSetControllerFromClient(client, stopCh, 10, 0)
@@ -994,7 +993,7 @@ func shuffle(controllers []*extensions.ReplicaSet) []*extensions.ReplicaSet {
 }
 
 func TestOverlappingRSs(t *testing.T) {
-	client := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(v1.GroupName).GroupVersion}})
+	client := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(v1.GroupName).GroupVersion}})
 	labelMap := map[string]string{"foo": "bar"}
 
 	for i := 0; i < 5; i++ {
@@ -1030,7 +1029,7 @@ func TestOverlappingRSs(t *testing.T) {
 }
 
 func TestDeletionTimestamp(t *testing.T) {
-	c := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(v1.GroupName).GroupVersion}})
+	c := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(v1.GroupName).GroupVersion}})
 	labelMap := map[string]string{"foo": "bar"}
 	stopCh := make(chan struct{})
 	defer close(stopCh)
@@ -1350,7 +1349,7 @@ func TestReadyReplicas(t *testing.T) {
 	testServer := httptest.NewServer(&fakeHandler)
 	defer testServer.Close()
 
-	client := clientset.NewForConfigOrDie(&restclient.Config{Host: testServer.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(v1.GroupName).GroupVersion}})
+	client := clientset.NewForConfigOrDie(&restclient.Config{Host: testServer.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(v1.GroupName).GroupVersion}})
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 	manager := testNewReplicaSetControllerFromClient(client, stopCh, BurstReplicas, 0)
@@ -1393,7 +1392,7 @@ func TestAvailableReplicas(t *testing.T) {
 	testServer := httptest.NewServer(&fakeHandler)
 	defer testServer.Close()
 
-	client := clientset.NewForConfigOrDie(&restclient.Config{Host: testServer.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(v1.GroupName).GroupVersion}})
+	client := clientset.NewForConfigOrDie(&restclient.Config{Host: testServer.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(v1.GroupName).GroupVersion}})
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 	manager := testNewReplicaSetControllerFromClient(client, stopCh, BurstReplicas, 0)

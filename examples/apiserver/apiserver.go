@@ -19,7 +19,6 @@ package apiserver
 import (
 	"fmt"
 
-	"k8s.io/apimachinery/pkg/apimachinery/registered"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/kubernetes/cmd/libs/go2idl/client-gen/test_apis/testgroup/v1"
@@ -124,7 +123,7 @@ func (serverOptions *ServerRunOptions) Run(stopCh <-chan struct{}) error {
 
 	groupVersion := v1.SchemeGroupVersion
 	groupName := groupVersion.Group
-	groupMeta, err := registered.Group(groupName)
+	groupMeta, err := api.Registry.Group(groupName)
 	if err != nil {
 		return fmt.Errorf("%v", err)
 	}

@@ -32,7 +32,6 @@ import (
 	"github.com/ghodss/yaml"
 
 	"k8s.io/apimachinery/pkg/api/meta"
-	"k8s.io/apimachinery/pkg/apimachinery/registered"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer/streaming"
@@ -191,7 +190,7 @@ func (v *testVisitor) Objects() []runtime.Object {
 var aPod string = `
 {
     "kind": "Pod",
-		"apiVersion": "` + registered.GroupOrDie(api.GroupName).GroupVersion.String() + `",
+		"apiVersion": "` + api.Registry.GroupOrDie(api.GroupName).GroupVersion.String() + `",
     "metadata": {
         "name": "busybox{id}",
         "labels": {
@@ -218,7 +217,7 @@ var aPod string = `
 var aRC string = `
 {
     "kind": "ReplicationController",
-		"apiVersion": "` + registered.GroupOrDie(api.GroupName).GroupVersion.String() + `",
+		"apiVersion": "` + api.Registry.GroupOrDie(api.GroupName).GroupVersion.String() + `",
     "metadata": {
         "name": "busybox{id}",
         "labels": {
@@ -712,7 +711,7 @@ func TestResourceByNameAndEmptySelector(t *testing.T) {
 
 func TestSelector(t *testing.T) {
 	pods, svc := testData()
-	labelKey := metav1.LabelSelectorQueryParam(registered.GroupOrDie(api.GroupName).GroupVersion.String())
+	labelKey := metav1.LabelSelectorQueryParam(api.Registry.GroupOrDie(api.GroupName).GroupVersion.String())
 	b := NewBuilder(testapi.Default.RESTMapper(), api.Scheme, fakeClientWith("", t, map[string]string{
 		"/namespaces/test/pods?" + labelKey + "=a%3Db":     runtime.EncodeOrDie(testapi.Default.Codec(), pods),
 		"/namespaces/test/services?" + labelKey + "=a%3Db": runtime.EncodeOrDie(testapi.Default.Codec(), svc),
@@ -1007,7 +1006,7 @@ func TestSingleItemImpliedRootScopedObject(t *testing.T) {
 
 func TestListObject(t *testing.T) {
 	pods, _ := testData()
-	labelKey := metav1.LabelSelectorQueryParam(registered.GroupOrDie(api.GroupName).GroupVersion.String())
+	labelKey := metav1.LabelSelectorQueryParam(api.Registry.GroupOrDie(api.GroupName).GroupVersion.String())
 	b := NewBuilder(testapi.Default.RESTMapper(), api.Scheme, fakeClientWith("", t, map[string]string{
 		"/namespaces/test/pods?" + labelKey + "=a%3Db": runtime.EncodeOrDie(testapi.Default.Codec(), pods),
 	}), testapi.Default.Codec()).
@@ -1040,7 +1039,7 @@ func TestListObject(t *testing.T) {
 
 func TestListObjectWithDifferentVersions(t *testing.T) {
 	pods, svc := testData()
-	labelKey := metav1.LabelSelectorQueryParam(registered.GroupOrDie(api.GroupName).GroupVersion.String())
+	labelKey := metav1.LabelSelectorQueryParam(api.Registry.GroupOrDie(api.GroupName).GroupVersion.String())
 	obj, err := NewBuilder(testapi.Default.RESTMapper(), api.Scheme, fakeClientWith("", t, map[string]string{
 		"/namespaces/test/pods?" + labelKey + "=a%3Db":     runtime.EncodeOrDie(testapi.Default.Codec(), pods),
 		"/namespaces/test/services?" + labelKey + "=a%3Db": runtime.EncodeOrDie(testapi.Default.Codec(), svc),

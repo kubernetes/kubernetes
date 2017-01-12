@@ -18,7 +18,6 @@ package app
 
 import (
 	"github.com/golang/glog"
-	"k8s.io/apimachinery/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/apis/extensions"
@@ -50,13 +49,13 @@ func installExtensionsAPIs(g *genericapiserver.GenericAPIServer, optsGetter gene
 		"deployments/scale":    deploymentStorage.Scale,
 		"deployments/rollback": deploymentStorage.Rollback,
 	}
-	extensionsGroupMeta := registered.GroupOrDie(extensions.GroupName)
+	extensionsGroupMeta := api.Registry.GroupOrDie(extensions.GroupName)
 	apiGroupInfo := genericapiserver.APIGroupInfo{
 		GroupMeta: *extensionsGroupMeta,
 		VersionedResourcesStorageMap: map[string]map[string]rest.Storage{
 			"v1beta1": extensionsResources,
 		},
-		OptionsExternalVersion: &registered.GroupOrDie(api.GroupName).GroupVersion,
+		OptionsExternalVersion: &api.Registry.GroupOrDie(api.GroupName).GroupVersion,
 		Scheme:                 api.Scheme,
 		ParameterCodec:         api.ParameterCodec,
 		NegotiatedSerializer:   api.Codecs,

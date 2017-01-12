@@ -26,7 +26,6 @@ import (
 	"github.com/spf13/pflag"
 
 	"k8s.io/apimachinery/pkg/api/meta"
-	"k8s.io/apimachinery/pkg/apimachinery/registered"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -103,7 +102,7 @@ func versionErrIfFalse(b bool) error {
 	return versionErr
 }
 
-var ValidVersion = registered.GroupOrDie(api.GroupName).GroupVersion.Version
+var ValidVersion = api.Registry.GroupOrDie(api.GroupName).GroupVersion.Version
 var InternalGV = schema.GroupVersion{Group: "apitest", Version: runtime.APIVersionInternal}
 var UnlikelyGV = schema.GroupVersion{Group: "apitest", Version: "unlikelyversion"}
 var ValidVersionGV = schema.GroupVersion{Group: "apitest", Version: ValidVersion}

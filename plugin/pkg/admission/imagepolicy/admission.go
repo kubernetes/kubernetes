@@ -42,6 +42,7 @@ import (
 
 	// install the clientgo image policy API for use with api registry
 	_ "k8s.io/client-go/pkg/apis/imagepolicy/install"
+	_ "k8s.io/kubernetes/pkg/apis/imagepolicy/install"
 )
 
 var (

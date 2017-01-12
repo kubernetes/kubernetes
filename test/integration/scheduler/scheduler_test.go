@@ -25,9 +25,9 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/apimachinery/pkg/apimachinery/registered"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/v1"
@@ -57,7 +57,7 @@ func TestUnschedulableNodes(t *testing.T) {
 	ns := framework.CreateTestingNamespace("unschedulable-nodes", s, t)
 	defer framework.DeleteTestingNamespace(ns, s, t)
 
-	clientSet := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(v1.GroupName).GroupVersion}})
+	clientSet := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(v1.GroupName).GroupVersion}})
 
 	schedulerConfigFactory := factory.NewConfigFactory(clientSet, v1.DefaultSchedulerName, v1.DefaultHardPodAffinitySymmetricWeight, v1.DefaultFailureDomains)
 	schedulerConfig, err := schedulerConfigFactory.Create()
@@ -322,7 +322,7 @@ func TestMultiScheduler(t *testing.T) {
 			- testPodNoAnnotation2 and testPodWithAnnotationFitsDefault2 should NOT be scheduled
 	*/
 	// 1. create and start default-scheduler
-	clientSet := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(v1.GroupName).GroupVersion}})
+	clientSet := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(v1.GroupName).GroupVersion}})
 
 	// NOTE: This test cannot run in parallel, because it is creating and deleting
 	// non-namespaced objects (Nodes).
@@ -397,7 +397,7 @@ func TestMultiScheduler(t *testing.T) {
 	}
 
 	// 5. create and start a scheduler with name "foo-scheduler"
-	clientSet2 := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(v1.GroupName).GroupVersion}})
+	clientSet2 := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(v1.GroupName).GroupVersion}})
 
 	schedulerConfigFactory2 := factory.NewConfigFactory(clientSet2, "foo-scheduler", v1.DefaultHardPodAffinitySymmetricWeight, v1.DefaultFailureDomains)
 	schedulerConfig2, err := schedulerConfigFactory2.Create()
@@ -487,7 +487,7 @@ func TestAllocatable(t *testing.T) {
 	defer framework.DeleteTestingNamespace(ns, s, t)
 
 	// 1. create and start default-scheduler
-	clientSet := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(v1.GroupName).GroupVersion}})
+	clientSet := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(v1.GroupName).GroupVersion}})
 
 	// NOTE: This test cannot run in parallel, because it is creating and deleting
 	// non-namespaced objects (Nodes).

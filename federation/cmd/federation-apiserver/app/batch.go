@@ -18,7 +18,6 @@ package app
 
 import (
 	"github.com/golang/glog"
-	"k8s.io/apimachinery/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/apis/batch"
@@ -35,13 +34,13 @@ func installBatchAPIs(g *genericapiserver.GenericAPIServer, optsGetter generic.R
 		"jobs":        jobStorage.Job,
 		"jobs/status": jobStorage.Status,
 	}
-	batchGroupMeta := registered.GroupOrDie(batch.GroupName)
+	batchGroupMeta := api.Registry.GroupOrDie(batch.GroupName)
 	apiGroupInfo := genericapiserver.APIGroupInfo{
 		GroupMeta: *batchGroupMeta,
 		VersionedResourcesStorageMap: map[string]map[string]rest.Storage{
 			"v1": batchResources,
 		},
-		OptionsExternalVersion: &registered.GroupOrDie(api.GroupName).GroupVersion,
+		OptionsExternalVersion: &api.Registry.GroupOrDie(api.GroupName).GroupVersion,
 		Scheme:                 api.Scheme,
 		ParameterCodec:         api.ParameterCodec,
 		NegotiatedSerializer:   api.Codecs,

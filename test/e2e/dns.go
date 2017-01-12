@@ -23,7 +23,6 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	"k8s.io/apimachinery/pkg/apimachinery/registered"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -47,7 +46,7 @@ func createDNSPod(namespace, wheezyProbeCmd, jessieProbeCmd string, useAnnotatio
 	dnsPod := &v1.Pod{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Pod",
-			APIVersion: registered.GroupOrDie(v1.GroupName).GroupVersion.String(),
+			APIVersion: api.Registry.GroupOrDie(v1.GroupName).GroupVersion.String(),
 		},
 		ObjectMeta: v1.ObjectMeta{
 			Name:      "dns-test-" + string(uuid.NewUUID()),

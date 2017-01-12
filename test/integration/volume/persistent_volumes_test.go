@@ -27,7 +27,6 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/apimachinery/pkg/apimachinery/registered"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/kubernetes/pkg/api"
@@ -1094,13 +1093,13 @@ func createClients(ns *v1.Namespace, t *testing.T, s *httptest.Server, syncPerio
 	// creates many objects and default values were too low.
 	binderClient := clientset.NewForConfigOrDie(&restclient.Config{
 		Host:          s.URL,
-		ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(v1.GroupName).GroupVersion},
+		ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(v1.GroupName).GroupVersion},
 		QPS:           1000000,
 		Burst:         1000000,
 	})
 	testClient := clientset.NewForConfigOrDie(&restclient.Config{
 		Host:          s.URL,
-		ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(v1.GroupName).GroupVersion},
+		ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(v1.GroupName).GroupVersion},
 		QPS:           1000000,
 		Burst:         1000000,
 	})

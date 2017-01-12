@@ -19,7 +19,6 @@ go_library(
         "//pkg/client/unversioned/clientcmd:go_default_library",
         "//pkg/client/unversioned/clientcmd/api:go_default_library",
         "//pkg/kubectl/cmd/util:go_default_library",
-        "//vendor:k8s.io/apimachinery/pkg/apimachinery/registered",
         "//vendor:k8s.io/apimachinery/pkg/runtime",
     ],
 )
