@@ -19,6 +19,8 @@ limitations under the License.
 package options
 
 import (
+	"fmt"
+	"strings"
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -26,6 +28,8 @@ import (
 	"k8s.io/kubernetes/pkg/client/leaderelection"
 	"k8s.io/kubernetes/pkg/master/ports"
 	"k8s.io/kubernetes/pkg/util/config"
+	utilerrors "k8s.io/kubernetes/pkg/util/errors"
+	"k8s.io/kubernetes/pkg/util/sets"
 
 	"github.com/spf13/pflag"
 )
@@ -42,6 +46,7 @@ type CMServer struct {
 func NewCMServer() *CMServer {
 	s := CMServer{
 		KubeControllerManagerConfiguration: componentconfig.KubeControllerManagerConfiguration{
+			Controllers:                       []string{"*"},
 			Port:                              ports.ControllerManagerPort,
 			Address:                           "0.0.0.0",
 			ConcurrentEndpointSyncs:           5,
@@ -103,7 +108,11 @@ func NewCMServer() *CMServer {
 }
 
 // AddFlags adds flags for a specific CMServer to the specified FlagSet
-func (s *CMServer) AddFlags(fs *pflag.FlagSet) {
+func (s *CMServer) AddFlags(fs *pflag.FlagSet, allControllers []string, disabledByDefaultControllers []string) {
+	fs.StringSliceVar(&s.Controllers, "controllers", s.Controllers, fmt.Sprintf(""+
+		"A list of controllers to enable.  '*' enables all on-by-default controllers, 'foo' enables the controller "+
+		"named 'foo', '-foo' disables the controller named 'foo'.\nAll controllers: %s\nDisabled-by-default controllers: %s",
+		strings.Join(allControllers, ", "), strings.Join(disabledByDefaultControllers, ", ")))
 	fs.Int32Var(&s.Port, "port", s.Port, "The port that the controller-manager's http service runs on")
 	fs.Var(componentconfig.IPVar{Val: &s.Address}, "address", "The IP address to serve on (set to 0.0.0.0 for all interfaces)")
 	fs.BoolVar(&s.UseServiceAccountCredentials, "use-service-account-credentials", s.UseServiceAccountCredentials, "If true, use individual service account credentials for each controller.")
@@ -187,4 +196,25 @@ func (s *CMServer) AddFlags(fs *pflag.FlagSet) {
 
 	leaderelection.BindFlags(&s.LeaderElection, fs)
 	config.DefaultFeatureGate.AddFlag(fs)
+}
+
+// Validate is used to validate the options and config before launching the controller manager
+func (s *CMServer) Validate(allControllers []string, disabledByDefaultControllers []string) error {
+	var errs []error
+
+	allControllersSet := sets.NewString(allControllers...)
+	for _, controller := range s.Controllers {
+		if controller == "*" {
+			continue
+		}
+		if strings.HasPrefix(controller, "-") {
+			controller = controller[1:]
+		}
+
+		if !allControllersSet.Has(controller) {
+			errs = append(errs, fmt.Errorf("%q is not in the list of known controllers", controller))
+		}
+	}
+
+	return utilerrors.NewAggregate(errs)
 }

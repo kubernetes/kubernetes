@@ -601,6 +601,13 @@ type LeaderElectionConfiguration struct {
 type KubeControllerManagerConfiguration struct {
 	metav1.TypeMeta
 
+	// Controllers is the list of controllers to enable or disable
+	// '*' means "all enabled by default controllers"
+	// 'foo' means "enable 'foo'"
+	// '-foo' means "disable 'foo'"
+	// first item for a particular name wins
+	Controllers []string
+
 	// port is the port that the controller-manager's http service runs on.
 	Port int32
 	// address is the IP address to serve on (set to 0.0.0.0 for all interfaces).
