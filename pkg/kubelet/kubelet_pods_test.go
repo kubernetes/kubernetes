@@ -26,10 +26,10 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"k8s.io/apimachinery/pkg/apimachinery/registered"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/testing/core"
@@ -423,7 +423,7 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 						Name: "POD_NAME",
 						ValueFrom: &v1.EnvVarSource{
 							FieldRef: &v1.ObjectFieldSelector{
-								APIVersion: registered.GroupOrDie(v1.GroupName).GroupVersion.String(),
+								APIVersion: api.Registry.GroupOrDie(v1.GroupName).GroupVersion.String(),
 								FieldPath:  "metadata.name",
 							},
 						},
@@ -432,7 +432,7 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 						Name: "POD_NAMESPACE",
 						ValueFrom: &v1.EnvVarSource{
 							FieldRef: &v1.ObjectFieldSelector{
-								APIVersion: registered.GroupOrDie(v1.GroupName).GroupVersion.String(),
+								APIVersion: api.Registry.GroupOrDie(v1.GroupName).GroupVersion.String(),
 								FieldPath:  "metadata.namespace",
 							},
 						},
@@ -441,7 +441,7 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 						Name: "POD_NODE_NAME",
 						ValueFrom: &v1.EnvVarSource{
 							FieldRef: &v1.ObjectFieldSelector{
-								APIVersion: registered.GroupOrDie(v1.GroupName).GroupVersion.String(),
+								APIVersion: api.Registry.GroupOrDie(v1.GroupName).GroupVersion.String(),
 								FieldPath:  "spec.nodeName",
 							},
 						},
@@ -450,7 +450,7 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 						Name: "POD_SERVICE_ACCOUNT_NAME",
 						ValueFrom: &v1.EnvVarSource{
 							FieldRef: &v1.ObjectFieldSelector{
-								APIVersion: registered.GroupOrDie(v1.GroupName).GroupVersion.String(),
+								APIVersion: api.Registry.GroupOrDie(v1.GroupName).GroupVersion.String(),
 								FieldPath:  "spec.serviceAccountName",
 							},
 						},
@@ -459,7 +459,7 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 						Name: "POD_IP",
 						ValueFrom: &v1.EnvVarSource{
 							FieldRef: &v1.ObjectFieldSelector{
-								APIVersion: registered.GroupOrDie(v1.GroupName).GroupVersion.String(),
+								APIVersion: api.Registry.GroupOrDie(v1.GroupName).GroupVersion.String(),
 								FieldPath:  "status.podIP",
 							},
 						},
@@ -489,7 +489,7 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 						Name: "POD_NAME",
 						ValueFrom: &v1.EnvVarSource{
 							FieldRef: &v1.ObjectFieldSelector{
-								APIVersion: registered.GroupOrDie(v1.GroupName).GroupVersion.String(),
+								APIVersion: api.Registry.GroupOrDie(v1.GroupName).GroupVersion.String(),
 								FieldPath:  "metadata.name",
 							},
 						},

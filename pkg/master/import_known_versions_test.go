@@ -22,7 +22,6 @@ import (
 	"strings"
 	"testing"
 
-	"k8s.io/apimachinery/pkg/apimachinery/registered"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -51,7 +50,7 @@ func TestGroupVersions(t *testing.T) {
 		t.Errorf("No additional unnamespaced groups should be created")
 	}
 
-	for _, gv := range registered.RegisteredGroupVersions() {
+	for _, gv := range api.Registry.RegisteredGroupVersions() {
 		if !strings.HasSuffix(gv.Group, ".k8s.io") && !legacyUnsuffixedGroups.Has(gv.Group) {
 			t.Errorf("Group %s does not have the standard kubernetes API group suffix of .k8s.io", gv.Group)
 		}

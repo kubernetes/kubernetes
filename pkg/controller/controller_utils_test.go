@@ -27,7 +27,6 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/apimachinery/pkg/apimachinery/registered"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -56,7 +55,7 @@ func NewFakeControllerExpectationsLookup(ttl time.Duration) (*ControllerExpectat
 
 func newReplicationController(replicas int) *v1.ReplicationController {
 	rc := &v1.ReplicationController{
-		TypeMeta: metav1.TypeMeta{APIVersion: registered.GroupOrDie(v1.GroupName).GroupVersion.String()},
+		TypeMeta: metav1.TypeMeta{APIVersion: api.Registry.GroupOrDie(v1.GroupName).GroupVersion.String()},
 		ObjectMeta: v1.ObjectMeta{
 			UID:             uuid.NewUUID(),
 			Name:            "foobar",
@@ -247,7 +246,7 @@ func TestCreatePods(t *testing.T) {
 	}
 	testServer := httptest.NewServer(&fakeHandler)
 	defer testServer.Close()
-	clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: testServer.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(v1.GroupName).GroupVersion}})
+	clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: testServer.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(v1.GroupName).GroupVersion}})
 
 	podControl := RealPodControl{
 		KubeClient: clientset,

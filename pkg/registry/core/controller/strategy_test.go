@@ -19,7 +19,6 @@ package controller
 import (
 	"testing"
 
-	"k8s.io/apimachinery/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/api"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	genericapirequest "k8s.io/kubernetes/pkg/genericapiserver/api/request"
@@ -144,7 +143,7 @@ func TestControllerStatusStrategy(t *testing.T) {
 
 func TestSelectableFieldLabelConversions(t *testing.T) {
 	apitesting.TestSelectableFieldLabelConversionsOfKind(t,
-		registered.GroupOrDie(api.GroupName).GroupVersion.String(),
+		api.Registry.GroupOrDie(api.GroupName).GroupVersion.String(),
 		"ReplicationController",
 		ControllerToSelectableFields(&api.ReplicationController{}),
 		nil,

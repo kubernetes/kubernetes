@@ -23,8 +23,8 @@ package storageclasses
 import (
 	"testing"
 
-	"k8s.io/apimachinery/pkg/apimachinery/registered"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/v1"
 	storage "k8s.io/kubernetes/pkg/apis/storage/v1beta1"
@@ -41,7 +41,7 @@ func TestStorageClasses(t *testing.T) {
 	_, s := framework.RunAMaster(nil)
 	defer s.Close()
 
-	client := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(v1.GroupName).GroupVersion}})
+	client := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(v1.GroupName).GroupVersion}})
 
 	ns := framework.CreateTestingNamespace("storageclass", s, t)
 	defer framework.DeleteTestingNamespace(ns, s, t)

@@ -23,7 +23,6 @@ import (
 	"github.com/google/gofuzz"
 
 	"k8s.io/apimachinery/pkg/api/meta"
-	"k8s.io/apimachinery/pkg/apimachinery/registered"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -77,7 +76,7 @@ func TestAccessOwnerReferences(t *testing.T) {
 }
 
 func TestAccessorImplementations(t *testing.T) {
-	for _, gv := range registered.EnabledVersions() {
+	for _, gv := range api.Registry.EnabledVersions() {
 		internalGV := schema.GroupVersion{Group: gv.Group, Version: runtime.APIVersionInternal}
 		for _, gv := range []schema.GroupVersion{gv, internalGV} {
 			for kind, knownType := range api.Scheme.KnownTypes(gv) {

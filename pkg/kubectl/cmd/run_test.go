@@ -27,7 +27,7 @@ import (
 	"testing"
 
 	"github.com/spf13/cobra"
-	"k8s.io/apimachinery/pkg/apimachinery/registered"
+
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/api"
@@ -268,7 +268,7 @@ func TestGenerateService(t *testing.T) {
 	for _, test := range tests {
 		sawPOST := false
 		f, tf, codec, ns := cmdtesting.NewAPIFactory()
-		tf.ClientConfig = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(api.GroupName).GroupVersion}}
+		tf.ClientConfig = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(api.GroupName).GroupVersion}}
 		tf.Printer = &testPrinter{}
 		tf.Client = &fake.RESTClient{
 			NegotiatedSerializer: ns,

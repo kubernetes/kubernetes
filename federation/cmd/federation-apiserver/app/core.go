@@ -26,11 +26,11 @@ import (
 	// TODO(nikhiljindal): Fix this by ensuring that pkg/api/install and federation/apis/core/install do not conflict with each other.
 	_ "k8s.io/kubernetes/pkg/api/install"
 
-	"k8s.io/apimachinery/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/federation/apis/core"
 	_ "k8s.io/kubernetes/federation/apis/core/install"
 	"k8s.io/kubernetes/federation/apis/core/v1"
 	"k8s.io/kubernetes/federation/cmd/federation-apiserver/app/options"
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/genericapiserver"
 	configmapstore "k8s.io/kubernetes/pkg/registry/core/configmap/storage"
@@ -58,13 +58,13 @@ func installCoreAPIs(s *options.ServerRunOptions, g *genericapiserver.GenericAPI
 		"events":              eventStore,
 		"configmaps":          configMapStore,
 	}
-	coreGroupMeta := registered.GroupOrDie(core.GroupName)
+	coreGroupMeta := api.Registry.GroupOrDie(core.GroupName)
 	apiGroupInfo := genericapiserver.APIGroupInfo{
 		GroupMeta: *coreGroupMeta,
 		VersionedResourcesStorageMap: map[string]map[string]rest.Storage{
 			v1.SchemeGroupVersion.Version: coreResources,
 		},
-		OptionsExternalVersion: &registered.GroupOrDie(core.GroupName).GroupVersion,
+		OptionsExternalVersion: &api.Registry.GroupOrDie(core.GroupName).GroupVersion,
 		Scheme:                 core.Scheme,
 		ParameterCodec:         core.ParameterCodec,
 		NegotiatedSerializer:   core.Codecs,

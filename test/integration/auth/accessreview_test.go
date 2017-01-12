@@ -24,7 +24,6 @@ import (
 	"strings"
 	"testing"
 
-	"k8s.io/apimachinery/pkg/apimachinery/registered"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
@@ -62,7 +61,7 @@ func TestSubjectAccessReview(t *testing.T) {
 	_, s := framework.RunAMaster(masterConfig)
 	defer s.Close()
 
-	clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(api.GroupName).GroupVersion}})
+	clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(api.GroupName).GroupVersion}})
 
 	tests := []struct {
 		name           string
@@ -156,7 +155,7 @@ func TestSelfSubjectAccessReview(t *testing.T) {
 	_, s := framework.RunAMaster(masterConfig)
 	defer s.Close()
 
-	clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(api.GroupName).GroupVersion}})
+	clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(api.GroupName).GroupVersion}})
 
 	tests := []struct {
 		name           string
@@ -236,7 +235,7 @@ func TestLocalSubjectAccessReview(t *testing.T) {
 	_, s := framework.RunAMaster(masterConfig)
 	defer s.Close()
 
-	clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(api.GroupName).GroupVersion}})
+	clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(api.GroupName).GroupVersion}})
 
 	tests := []struct {
 		name           string

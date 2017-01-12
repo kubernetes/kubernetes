@@ -17,9 +17,9 @@ limitations under the License.
 package genericapiserver
 
 import (
-	"k8s.io/apimachinery/pkg/apimachinery/registered"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/kubernetes/pkg/api"
 )
 
 type ResourceEncodingConfig interface {
@@ -79,7 +79,7 @@ func (o *DefaultResourceEncodingConfig) SetResourceEncoding(resourceBeingStored 
 }
 
 func (o *DefaultResourceEncodingConfig) StorageEncodingFor(resource schema.GroupResource) (schema.GroupVersion, error) {
-	groupMeta, err := registered.Group(resource.Group)
+	groupMeta, err := api.Registry.Group(resource.Group)
 	if err != nil {
 		return schema.GroupVersion{}, err
 	}
@@ -100,7 +100,7 @@ func (o *DefaultResourceEncodingConfig) StorageEncodingFor(resource schema.Group
 }
 
 func (o *DefaultResourceEncodingConfig) InMemoryEncodingFor(resource schema.GroupResource) (schema.GroupVersion, error) {
-	if _, err := registered.Group(resource.Group); err != nil {
+	if _, err := api.Registry.Group(resource.Group); err != nil {
 		return schema.GroupVersion{}, err
 	}
 

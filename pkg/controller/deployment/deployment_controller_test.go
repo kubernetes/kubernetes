@@ -20,10 +20,10 @@ import (
 	"fmt"
 	"testing"
 
-	"k8s.io/apimachinery/pkg/apimachinery/registered"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
@@ -65,7 +65,7 @@ func newRSWithStatus(name string, specReplicas, statusReplicas int, selector map
 
 func newDeployment(name string, replicas int, revisionHistoryLimit *int32, maxSurge, maxUnavailable *intstr.IntOrString, selector map[string]string) *extensions.Deployment {
 	d := extensions.Deployment{
-		TypeMeta: metav1.TypeMeta{APIVersion: registered.GroupOrDie(extensions.GroupName).GroupVersion.String()},
+		TypeMeta: metav1.TypeMeta{APIVersion: api.Registry.GroupOrDie(extensions.GroupName).GroupVersion.String()},
 		ObjectMeta: v1.ObjectMeta{
 			UID:       uuid.NewUUID(),
 			Name:      name,

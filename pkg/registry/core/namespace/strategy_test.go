@@ -19,7 +19,6 @@ package namespace
 import (
 	"testing"
 
-	"k8s.io/apimachinery/pkg/apimachinery/registered"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
@@ -136,7 +135,7 @@ func TestNamespaceFinalizeStrategy(t *testing.T) {
 
 func TestSelectableFieldLabelConversions(t *testing.T) {
 	apitesting.TestSelectableFieldLabelConversionsOfKind(t,
-		registered.GroupOrDie(api.GroupName).GroupVersion.String(),
+		api.Registry.GroupOrDie(api.GroupName).GroupVersion.String(),
 		"Namespace",
 		NamespaceToSelectableFields(&api.Namespace{}),
 		map[string]string{"name": "metadata.name"},

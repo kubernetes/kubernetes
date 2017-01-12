@@ -58,7 +58,6 @@ go_test(
         "//pkg/kubectl/resource:go_default_library",
         "//vendor:github.com/spf13/cobra",
         "//vendor:github.com/stretchr/testify/assert",
-        "//vendor:k8s.io/apimachinery/pkg/apimachinery/registered",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/runtime",
     ],

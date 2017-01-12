@@ -23,7 +23,6 @@ import (
 	"strings"
 	"testing"
 
-	"k8s.io/apimachinery/pkg/apimachinery/registered"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/restclient"
@@ -394,7 +393,7 @@ func TestAnnotateErrors(t *testing.T) {
 		f, tf, _, _ := cmdtesting.NewAPIFactory()
 		tf.Printer = &testPrinter{}
 		tf.Namespace = "test"
-		tf.ClientConfig = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(api.GroupName).GroupVersion}}
+		tf.ClientConfig = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(api.GroupName).GroupVersion}}
 
 		buf := bytes.NewBuffer([]byte{})
 		cmd := NewCmdAnnotate(f, buf)
@@ -453,7 +452,7 @@ func TestAnnotateObject(t *testing.T) {
 		}),
 	}
 	tf.Namespace = "test"
-	tf.ClientConfig = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(api.GroupName).GroupVersion}}
+	tf.ClientConfig = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(api.GroupName).GroupVersion}}
 
 	buf := bytes.NewBuffer([]byte{})
 	cmd := NewCmdAnnotate(f, buf)
@@ -503,7 +502,7 @@ func TestAnnotateObjectFromFile(t *testing.T) {
 		}),
 	}
 	tf.Namespace = "test"
-	tf.ClientConfig = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(api.GroupName).GroupVersion}}
+	tf.ClientConfig = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(api.GroupName).GroupVersion}}
 
 	buf := bytes.NewBuffer([]byte{})
 	cmd := NewCmdAnnotate(f, buf)
@@ -532,7 +531,7 @@ func TestAnnotateLocal(t *testing.T) {
 		}),
 	}
 	tf.Namespace = "test"
-	tf.ClientConfig = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(api.GroupName).GroupVersion}}
+	tf.ClientConfig = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(api.GroupName).GroupVersion}}
 
 	buf := bytes.NewBuffer([]byte{})
 	cmd := NewCmdAnnotate(f, buf)
@@ -585,7 +584,7 @@ func TestAnnotateMultipleObjects(t *testing.T) {
 		}),
 	}
 	tf.Namespace = "test"
-	tf.ClientConfig = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(api.GroupName).GroupVersion}}
+	tf.ClientConfig = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(api.GroupName).GroupVersion}}
 
 	buf := bytes.NewBuffer([]byte{})
 	cmd := NewCmdAnnotate(f, buf)

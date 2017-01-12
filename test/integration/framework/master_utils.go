@@ -27,7 +27,6 @@ import (
 	"time"
 
 	"github.com/golang/glog"
-	"k8s.io/apimachinery/pkg/apimachinery/registered"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -119,7 +118,7 @@ func NewMasterComponents(c *Config) *MasterComponents {
 	// TODO: Allow callers to pipe through a different master url and create a client/start components using it.
 	glog.Infof("Master %+v", s.URL)
 	// TODO: caesarxuchao: remove this client when the refactoring of client libraray is done.
-	clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(v1.GroupName).GroupVersion}, QPS: c.QPS, Burst: c.Burst})
+	clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(v1.GroupName).GroupVersion}, QPS: c.QPS, Burst: c.Burst})
 	rcStopCh := make(chan struct{})
 	controllerManager := replicationcontroller.NewReplicationManagerFromClient(clientset, controller.NoResyncPeriodFunc, c.Burst, 4096)
 

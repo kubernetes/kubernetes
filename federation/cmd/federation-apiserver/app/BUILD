@@ -64,7 +64,6 @@ go_library(
         "//vendor:github.com/pborman/uuid",
         "//vendor:github.com/spf13/cobra",
         "//vendor:github.com/spf13/pflag",
-        "//vendor:k8s.io/apimachinery/pkg/apimachinery/registered",
         "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
         "//vendor:k8s.io/apimachinery/pkg/util/errors",
         "//vendor:k8s.io/apimachinery/pkg/util/sets",

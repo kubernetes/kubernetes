@@ -25,7 +25,6 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apimachinery"
-	"k8s.io/apimachinery/pkg/apimachinery/registered"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -45,9 +44,9 @@ var availableVersions = []schema.GroupVersion{{Group: groupName, Version: "v1"}}
 
 func init() {
 	externalVersions := availableVersions
-	registered.RegisterVersions(availableVersions)
+	api.Registry.RegisterVersions(availableVersions)
 
-	if err := registered.EnableVersions(externalVersions...); err != nil {
+	if err := api.Registry.EnableVersions(externalVersions...); err != nil {
 		glog.V(4).Infof("%v", err)
 		return
 	}
@@ -59,8 +58,8 @@ func init() {
 
 // TODO: enableVersions should be centralized rather than spread in each API
 // group.
-// We can combine registered.RegisterVersions, registered.EnableVersions and
-// registered.RegisterGroup once we have moved enableVersions there.
+// We can combine api.Registry.RegisterVersions, api.Registry.EnableVersions and
+// api.Registry.RegisterGroup once we have moved enableVersions there.
 func enableVersions(externalVersions []schema.GroupVersion) error {
 	addVersionsToScheme(externalVersions...)
 	preferredExternalVersion := externalVersions[0]
@@ -73,7 +72,7 @@ func enableVersions(externalVersions []schema.GroupVersion) error {
 		InterfacesFor: interfacesFor,
 	}
 
-	if err := registered.RegisterGroup(groupMeta); err != nil {
+	if err := api.Registry.RegisterGroup(groupMeta); err != nil {
 		return err
 	}
 	return nil
@@ -99,7 +98,7 @@ func interfacesFor(version schema.GroupVersion) (*meta.VersionInterfaces, error)
 			MetadataAccessor: accessor,
 		}, nil
 	default:
-		g, _ := registered.Group(groupName)
+		g, _ := api.Registry.Group(groupName)
 		return nil, fmt.Errorf("unsupported storage version: %s (valid: %v)", version, g.GroupVersions)
 	}
 }

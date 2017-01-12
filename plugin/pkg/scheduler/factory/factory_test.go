@@ -23,9 +23,9 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/apimachinery/pkg/apimachinery/registered"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	"k8s.io/kubernetes/pkg/api/v1"
@@ -47,7 +47,7 @@ func TestCreate(t *testing.T) {
 	}
 	server := httptest.NewServer(&handler)
 	defer server.Close()
-	client := clientset.NewForConfigOrDie(&restclient.Config{Host: server.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(v1.GroupName).GroupVersion}})
+	client := clientset.NewForConfigOrDie(&restclient.Config{Host: server.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(v1.GroupName).GroupVersion}})
 	factory := NewConfigFactory(client, v1.DefaultSchedulerName, v1.DefaultHardPodAffinitySymmetricWeight, v1.DefaultFailureDomains)
 	factory.Create()
 }
@@ -65,7 +65,7 @@ func TestCreateFromConfig(t *testing.T) {
 	}
 	server := httptest.NewServer(&handler)
 	defer server.Close()
-	client := clientset.NewForConfigOrDie(&restclient.Config{Host: server.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(v1.GroupName).GroupVersion}})
+	client := clientset.NewForConfigOrDie(&restclient.Config{Host: server.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(v1.GroupName).GroupVersion}})
 	factory := NewConfigFactory(client, v1.DefaultSchedulerName, v1.DefaultHardPodAffinitySymmetricWeight, v1.DefaultFailureDomains)
 
 	// Pre-register some predicate and priority functions
@@ -106,7 +106,7 @@ func TestCreateFromEmptyConfig(t *testing.T) {
 	}
 	server := httptest.NewServer(&handler)
 	defer server.Close()
-	client := clientset.NewForConfigOrDie(&restclient.Config{Host: server.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(v1.GroupName).GroupVersion}})
+	client := clientset.NewForConfigOrDie(&restclient.Config{Host: server.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(v1.GroupName).GroupVersion}})
 	factory := NewConfigFactory(client, v1.DefaultSchedulerName, v1.DefaultHardPodAffinitySymmetricWeight, v1.DefaultFailureDomains)
 
 	configData = []byte(`{}`)
@@ -149,7 +149,7 @@ func TestDefaultErrorFunc(t *testing.T) {
 	mux.Handle(testapi.Default.ResourcePath("pods", "bar", "foo"), &handler)
 	server := httptest.NewServer(mux)
 	defer server.Close()
-	factory := NewConfigFactory(clientset.NewForConfigOrDie(&restclient.Config{Host: server.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(v1.GroupName).GroupVersion}}), v1.DefaultSchedulerName, v1.DefaultHardPodAffinitySymmetricWeight, v1.DefaultFailureDomains)
+	factory := NewConfigFactory(clientset.NewForConfigOrDie(&restclient.Config{Host: server.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(v1.GroupName).GroupVersion}}), v1.DefaultSchedulerName, v1.DefaultHardPodAffinitySymmetricWeight, v1.DefaultFailureDomains)
 	queue := cache.NewFIFO(cache.MetaNamespaceKeyFunc)
 	podBackoff := podBackoff{
 		perPodBackoff:   map[types.NamespacedName]*backoffEntry{},
@@ -232,7 +232,7 @@ func TestBind(t *testing.T) {
 		}
 		server := httptest.NewServer(&handler)
 		defer server.Close()
-		client := clientset.NewForConfigOrDie(&restclient.Config{Host: server.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(v1.GroupName).GroupVersion}})
+		client := clientset.NewForConfigOrDie(&restclient.Config{Host: server.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(v1.GroupName).GroupVersion}})
 		b := binder{client}
 
 		if err := b.Bind(item.binding); err != nil {
@@ -317,7 +317,7 @@ func TestResponsibleForPod(t *testing.T) {
 	}
 	server := httptest.NewServer(&handler)
 	defer server.Close()
-	client := clientset.NewForConfigOrDie(&restclient.Config{Host: server.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(v1.GroupName).GroupVersion}})
+	client := clientset.NewForConfigOrDie(&restclient.Config{Host: server.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(v1.GroupName).GroupVersion}})
 	// factory of "default-scheduler"
 	factoryDefaultScheduler := NewConfigFactory(client, v1.DefaultSchedulerName, v1.DefaultHardPodAffinitySymmetricWeight, v1.DefaultFailureDomains)
 	// factory of "foo-scheduler"
@@ -381,7 +381,7 @@ func TestInvalidHardPodAffinitySymmetricWeight(t *testing.T) {
 	server := httptest.NewServer(&handler)
 	// TODO: Uncomment when fix #19254
 	// defer server.Close()
-	client := clientset.NewForConfigOrDie(&restclient.Config{Host: server.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(v1.GroupName).GroupVersion}})
+	client := clientset.NewForConfigOrDie(&restclient.Config{Host: server.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(v1.GroupName).GroupVersion}})
 	// factory of "default-scheduler"
 	factory := NewConfigFactory(client, v1.DefaultSchedulerName, -1, v1.DefaultFailureDomains)
 	_, err := factory.Create()
@@ -398,7 +398,7 @@ func TestInvalidFactoryArgs(t *testing.T) {
 	}
 	server := httptest.NewServer(&handler)
 	defer server.Close()
-	client := clientset.NewForConfigOrDie(&restclient.Config{Host: server.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(v1.GroupName).GroupVersion}})
+	client := clientset.NewForConfigOrDie(&restclient.Config{Host: server.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(v1.GroupName).GroupVersion}})
 
 	testCases := []struct {
 		hardPodAffinitySymmetricWeight int

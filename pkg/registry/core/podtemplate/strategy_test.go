@@ -19,14 +19,13 @@ package podtemplate
 import (
 	"testing"
 
-	"k8s.io/apimachinery/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/api"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 )
 
 func TestSelectableFieldLabelConversions(t *testing.T) {
 	apitesting.TestSelectableFieldLabelConversionsOfKind(t,
-		registered.GroupOrDie(api.GroupName).GroupVersion.String(),
+		api.Registry.GroupOrDie(api.GroupName).GroupVersion.String(),
 		"PodTemplate",
 		PodTemplateToSelectableFields(&api.PodTemplate{}),
 		nil,

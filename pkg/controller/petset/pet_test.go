@@ -21,8 +21,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"k8s.io/apimachinery/pkg/apimachinery/registered"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
@@ -95,7 +95,7 @@ func TestUpdatePetWithoutRetry(t *testing.T) {
 		}
 		testServer := httptest.NewServer(&fakeHandler)
 
-		client := clientset.NewForConfigOrDie(&restclient.Config{Host: testServer.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(v1.GroupName).GroupVersion}})
+		client := clientset.NewForConfigOrDie(&restclient.Config{Host: testServer.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(v1.GroupName).GroupVersion}})
 		petClient := newPetClient(client)
 		err := petClient.Update(tc.realPet, tc.expectedPet)
 
@@ -115,7 +115,7 @@ func TestUpdatePetWithFailure(t *testing.T) {
 	testServer := httptest.NewServer(&fakeHandler)
 	defer testServer.Close()
 
-	client := clientset.NewForConfigOrDie(&restclient.Config{Host: testServer.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(v1.GroupName).GroupVersion}})
+	client := clientset.NewForConfigOrDie(&restclient.Config{Host: testServer.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(v1.GroupName).GroupVersion}})
 	petClient := newPetClient(client)
 
 	pcb1, pcb2 := makeTwoDifferntPCB()

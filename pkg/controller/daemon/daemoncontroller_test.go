@@ -20,9 +20,9 @@ import (
 	"fmt"
 	"testing"
 
-	"k8s.io/apimachinery/pkg/apimachinery/registered"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/v1"
@@ -83,7 +83,7 @@ func newDaemonSet(name string) *extensions.DaemonSet {
 
 func newNode(name string, label map[string]string) *v1.Node {
 	return &v1.Node{
-		TypeMeta: metav1.TypeMeta{APIVersion: registered.GroupOrDie(v1.GroupName).GroupVersion.String()},
+		TypeMeta: metav1.TypeMeta{APIVersion: api.Registry.GroupOrDie(v1.GroupName).GroupVersion.String()},
 		ObjectMeta: v1.ObjectMeta{
 			Name:      name,
 			Labels:    label,
@@ -108,7 +108,7 @@ func addNodes(nodeStore cache.Store, startIndex, numNodes int, label map[string]
 
 func newPod(podName string, nodeName string, label map[string]string) *v1.Pod {
 	pod := &v1.Pod{
-		TypeMeta: metav1.TypeMeta{APIVersion: registered.GroupOrDie(v1.GroupName).GroupVersion.String()},
+		TypeMeta: metav1.TypeMeta{APIVersion: api.Registry.GroupOrDie(v1.GroupName).GroupVersion.String()},
 		ObjectMeta: v1.ObjectMeta{
 			GenerateName: podName,
 			Labels:       label,

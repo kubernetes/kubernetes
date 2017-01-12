@@ -57,7 +57,6 @@ go_test(
         "//pkg/storage/testing:go_default_library",
         "//vendor:github.com/coreos/etcd/client",
         "//vendor:golang.org/x/net/context",
-        "//vendor:k8s.io/apimachinery/pkg/apimachinery/registered",
         "//vendor:k8s.io/apimachinery/pkg/conversion",
         "//vendor:k8s.io/apimachinery/pkg/labels",
         "//vendor:k8s.io/apimachinery/pkg/runtime",

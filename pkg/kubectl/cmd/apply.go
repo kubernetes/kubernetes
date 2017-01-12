@@ -26,7 +26,6 @@ import (
 	"github.com/spf13/cobra"
 
 	"k8s.io/apimachinery/pkg/api/meta"
-	"k8s.io/apimachinery/pkg/apimachinery/registered"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -399,7 +398,7 @@ func getRESTMappings(pruneResources *[]pruneResource) (namespaced, nonNamespaced
 			{"apps", "v1beta1", "StatefulSet", true},
 		}
 	}
-	registeredMapper := registered.RESTMapper()
+	registeredMapper := api.Registry.RESTMapper()
 	for _, resource := range *pruneResources {
 		addedMapping, err := registeredMapper.RESTMapping(schema.GroupKind{Group: resource.group, Kind: resource.kind}, resource.version)
 		if err != nil {

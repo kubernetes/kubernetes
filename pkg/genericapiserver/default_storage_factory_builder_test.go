@@ -20,8 +20,8 @@ import (
 	"reflect"
 	"testing"
 
-	"k8s.io/apimachinery/pkg/apimachinery/registered"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/kubernetes/pkg/api"
 	apiv1 "k8s.io/kubernetes/pkg/api/v1"
 	extensionsapiv1beta1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 )
@@ -170,7 +170,7 @@ func TestParseRuntimeConfig(t *testing.T) {
 			},
 			expectedAPIConfig: func() *ResourceConfig {
 				config := NewResourceConfig()
-				config.EnableVersions(registered.RegisteredGroupVersions()...)
+				config.EnableVersions(api.Registry.RegisteredGroupVersions()...)
 				return config
 			},
 			err: false,
@@ -185,7 +185,7 @@ func TestParseRuntimeConfig(t *testing.T) {
 			},
 			expectedAPIConfig: func() *ResourceConfig {
 				config := NewResourceConfig()
-				config.DisableVersions(registered.RegisteredGroupVersions()...)
+				config.DisableVersions(api.Registry.RegisteredGroupVersions()...)
 				return config
 			},
 			err: false,

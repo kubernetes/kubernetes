@@ -26,7 +26,6 @@ import (
 	"strings"
 	"testing"
 
-	"k8s.io/apimachinery/pkg/apimachinery/registered"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -337,7 +336,7 @@ func TestHelperList(t *testing.T) {
 					t.Errorf("url doesn't contain name: %#v", req.URL)
 					return false
 				}
-				if req.URL.Query().Get(metav1.LabelSelectorQueryParam(registered.GroupOrDie(api.GroupName).GroupVersion.String())) != labels.SelectorFromSet(labels.Set{"foo": "baz"}).String() {
+				if req.URL.Query().Get(metav1.LabelSelectorQueryParam(api.Registry.GroupOrDie(api.GroupName).GroupVersion.String())) != labels.SelectorFromSet(labels.Set{"foo": "baz"}).String() {
 					t.Errorf("url doesn't contain query parameters: %#v", req.URL)
 					return false
 				}
@@ -355,7 +354,7 @@ func TestHelperList(t *testing.T) {
 			RESTClient:      client,
 			NamespaceScoped: true,
 		}
-		obj, err := modifier.List("bar", registered.GroupOrDie(api.GroupName).GroupVersion.String(), labels.SelectorFromSet(labels.Set{"foo": "baz"}), false)
+		obj, err := modifier.List("bar", api.Registry.GroupOrDie(api.GroupName).GroupVersion.String(), labels.SelectorFromSet(labels.Set{"foo": "baz"}), false)
 		if (err != nil) != test.Err {
 			t.Errorf("unexpected error: %t %v", test.Err, err)
 		}

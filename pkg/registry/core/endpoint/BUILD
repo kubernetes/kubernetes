@@ -41,7 +41,6 @@ go_test(
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/testing:go_default_library",
-        "//vendor:k8s.io/apimachinery/pkg/apimachinery/registered",
     ],
 )
 

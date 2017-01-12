@@ -33,7 +33,6 @@ import (
 	"github.com/spf13/cobra"
 
 	"k8s.io/apimachinery/pkg/api/meta"
-	"k8s.io/apimachinery/pkg/apimachinery/registered"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -694,7 +693,7 @@ func PrintFilterCount(hiddenObjNum int, resource string, options *kubectl.PrintO
 // and squashes the list's items into a single versioned runtime.Object.
 func ObjectListToVersionedObject(objects []runtime.Object, version schema.GroupVersion) (runtime.Object, error) {
 	objectList := &api.List{Items: objects}
-	converted, err := resource.TryConvert(api.Scheme, objectList, version, registered.GroupOrDie(api.GroupName).GroupVersion)
+	converted, err := resource.TryConvert(api.Scheme, objectList, version, api.Registry.GroupOrDie(api.GroupName).GroupVersion)
 	if err != nil {
 		return nil, err
 	}

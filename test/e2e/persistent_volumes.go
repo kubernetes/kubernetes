@@ -22,9 +22,9 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	"k8s.io/apimachinery/pkg/apimachinery/registered"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/kubernetes/pkg/api"
 	apierrs "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/v1"
@@ -844,7 +844,7 @@ func makePod(ns string, pvcName string, command ...string) *v1.Pod {
 	return &v1.Pod{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Pod",
-			APIVersion: registered.GroupOrDie(v1.GroupName).GroupVersion.String(),
+			APIVersion: api.Registry.GroupOrDie(v1.GroupName).GroupVersion.String(),
 		},
 		ObjectMeta: v1.ObjectMeta{
 			GenerateName: "client-",

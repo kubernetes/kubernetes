@@ -17,7 +17,6 @@ limitations under the License.
 package internalversion
 
 import (
-	registered "k8s.io/apimachinery/pkg/apimachinery/registered"
 	api "k8s.io/kubernetes/pkg/api"
 	restclient "k8s.io/kubernetes/pkg/client/restclient"
 )
@@ -29,7 +28,7 @@ type AuthorizationInterface interface {
 	SubjectAccessReviewsGetter
 }
 
-// AuthorizationClient is used to interact with features provided by the k8s.io/apimachinery/pkg/apimachinery/registered.Group group.
+// AuthorizationClient is used to interact with features provided by the authorization.k8s.io group.
 type AuthorizationClient struct {
 	restClient restclient.Interface
 }
@@ -76,7 +75,7 @@ func New(c restclient.Interface) *AuthorizationClient {
 
 func setConfigDefaults(config *restclient.Config) error {
 	// if authorization group is not registered, return an error
-	g, err := registered.Group("authorization.k8s.io")
+	g, err := api.Registry.Group("authorization.k8s.io")
 	if err != nil {
 		return err
 	}

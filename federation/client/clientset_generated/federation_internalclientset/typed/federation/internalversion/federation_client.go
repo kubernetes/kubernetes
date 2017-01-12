@@ -17,7 +17,6 @@ limitations under the License.
 package internalversion
 
 import (
-	registered "k8s.io/apimachinery/pkg/apimachinery/registered"
 	api "k8s.io/kubernetes/pkg/api"
 	restclient "k8s.io/kubernetes/pkg/client/restclient"
 )
@@ -27,7 +26,7 @@ type FederationInterface interface {
 	ClustersGetter
 }
 
-// FederationClient is used to interact with features provided by the k8s.io/apimachinery/pkg/apimachinery/registered.Group group.
+// FederationClient is used to interact with features provided by the federation group.
 type FederationClient struct {
 	restClient restclient.Interface
 }
@@ -66,7 +65,7 @@ func New(c restclient.Interface) *FederationClient {
 
 func setConfigDefaults(config *restclient.Config) error {
 	// if federation group is not registered, return an error
-	g, err := registered.Group("federation")
+	g, err := api.Registry.Group("federation")
 	if err != nil {
 		return err
 	}

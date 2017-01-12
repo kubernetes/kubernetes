@@ -13,6 +13,7 @@ go_library(
     srcs = ["webhook.go"],
     tags = ["automanaged"],
     deps = [
+        "//pkg/apis/authentication/install:go_default_library",
         "//plugin/pkg/webhook:go_default_library",
         "//vendor:k8s.io/apiserver/pkg/authentication/authenticator",
         "//vendor:k8s.io/apiserver/pkg/authentication/user",

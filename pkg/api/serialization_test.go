@@ -247,7 +247,7 @@ var nonRoundTrippableTypes = sets.NewString(
 
 var commonKinds = []string{"Status", "ListOptions", "DeleteOptions", "ExportOptions"}
 
-// verify all external group/versions have the common kinds registered.
+// verify all external group/versions have the common kinds api.Registry.
 func TestCommonKindsRegistered(t *testing.T) {
 	for _, kind := range commonKinds {
 		for _, group := range testapi.Groups {
