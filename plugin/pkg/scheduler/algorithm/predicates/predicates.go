@@ -904,10 +904,7 @@ func (c *PodAffinityChecker) InterPodAffinityMatches(pod *v1.Pod, meta interface
 	}
 
 	// Now check if <pod> requirements will be satisfied on this node.
-	affinity, err := v1.GetAffinityFromPodAnnotations(pod.Annotations)
-	if err != nil {
-		return false, nil, err
-	}
+	affinity := pod.Spec.Affinity
 	if affinity == nil || (affinity.PodAffinity == nil && affinity.PodAntiAffinity == nil) {
 		return true, nil, nil
 	}
@@ -1008,11 +1005,7 @@ func getMatchingAntiAffinityTerms(pod *v1.Pod, nodeInfoMap map[string]*scheduler
 		}
 		var nodeResult []matchingPodAntiAffinityTerm
 		for _, existingPod := range nodeInfo.PodsWithAffinity() {
-			affinity, err := v1.GetAffinityFromPodAnnotations(existingPod.Annotations)
-			if err != nil {
-				catchError(err)
-				return
-			}
+			affinity := existingPod.Spec.Affinity
 			if affinity == nil {
 				continue
 			}
@@ -1040,10 +1033,7 @@ func getMatchingAntiAffinityTerms(pod *v1.Pod, nodeInfoMap map[string]*scheduler
 func (c *PodAffinityChecker) getMatchingAntiAffinityTerms(pod *v1.Pod, allPods []*v1.Pod) ([]matchingPodAntiAffinityTerm, error) {
 	var result []matchingPodAntiAffinityTerm
 	for _, existingPod := range allPods {
-		affinity, err := v1.GetAffinityFromPodAnnotations(existingPod.Annotations)
-		if err != nil {
-			return nil, err
-		}
+		affinity := pod.Spec.Affinity
 		if affinity != nil && affinity.PodAntiAffinity != nil {
 			existingPodNode, err := c.info.GetNodeInfo(existingPod.Spec.NodeName)
 			if err != nil {
