@@ -46,15 +46,9 @@ go_test(
         "//pkg/api:go_default_library",
         "//pkg/api/unversioned:go_default_library",
         "//pkg/apimachinery/registered:go_default_library",
-<<<<<<< HEAD
         "//pkg/apis/extensions:go_default_library",
         "//pkg/apis/policy:go_default_library",
-=======
-        "//pkg/apis/apps/v1beta1:go_default_library",
-        "//pkg/apis/extensions/v1beta1:go_default_library",
-        "//pkg/apis/meta/v1:go_default_library",
-        "//pkg/apis/policy/v1beta1:go_default_library",
->>>>>>> Updated bazel
+        "//pkg/apis/apps:go_default_library",
         "//pkg/client/cache:go_default_library",
         "//pkg/client/record:go_default_library",
         "//pkg/controller:go_default_library",
