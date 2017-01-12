@@ -360,8 +360,11 @@ func vSphereLogin(vs *VSphere, ctx context.Context) error {
 	m := session.NewManager(vs.client.Client)
 	// retrieve client's current session
 	u, err := m.UserSession(ctx)
-	if err == nil && u == nil {
-		// current session is valid
+	if err != nil {
+		glog.Errorf("Error while obtaining user session. err: %q", err)
+		return err
+	}
+	if u != nil {
 		return nil
 	}
 
