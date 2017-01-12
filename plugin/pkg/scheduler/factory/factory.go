@@ -595,7 +595,7 @@ func getNodeConditionPredicate() cache.NodeConditionPredicate {
 // scheduled.
 func (factory *ConfigFactory) createUnassignedNonTerminatedPodLW() *cache.ListWatch {
 	selector := fields.ParseSelectorOrDie("spec.nodeName==" + "" + ",status.phase!=" + string(v1.PodSucceeded) + ",status.phase!=" + string(v1.PodFailed))
-	return cache.NewListWatchFromClient(factory.Client.Core().RESTClient(), "pods", v1.NamespaceAll, selector)
+	return cache.NewListWatchFromClient(factory.GetClient().Core().RESTClient(), "pods", v1.NamespaceAll, selector)
 }
 
 // Returns a cache.ListWatch that finds all pods that are
@@ -603,7 +603,7 @@ func (factory *ConfigFactory) createUnassignedNonTerminatedPodLW() *cache.ListWa
 // TODO: return a ListerWatcher interface instead?
 func (factory *ConfigFactory) createAssignedNonTerminatedPodLW() *cache.ListWatch {
 	selector := fields.ParseSelectorOrDie("spec.nodeName!=" + "" + ",status.phase!=" + string(v1.PodSucceeded) + ",status.phase!=" + string(v1.PodFailed))
-	return cache.NewListWatchFromClient(factory.Client.Core().RESTClient(), "pods", v1.NamespaceAll, selector)
+	return cache.NewListWatchFromClient(factory.GetClient().Core().RESTClient(), "pods", v1.NamespaceAll, selector)
 }
 
 // createNodeLW returns a cache.ListWatch that gets all changes to nodes.
@@ -611,32 +611,32 @@ func (factory *ConfigFactory) createNodeLW() *cache.ListWatch {
 	// all nodes are considered to ensure that the scheduler cache has access to all nodes for lookups
 	// the NodeCondition is used to filter out the nodes that are not ready or unschedulable
 	// the filtered list is used as the super set of nodes to consider for scheduling
-	return cache.NewListWatchFromClient(factory.Client.Core().RESTClient(), "nodes", v1.NamespaceAll, fields.ParseSelectorOrDie(""))
+	return cache.NewListWatchFromClient(factory.GetClient().Core().RESTClient(), "nodes", v1.NamespaceAll, fields.ParseSelectorOrDie(""))
 }
 
 // createPersistentVolumeLW returns a cache.ListWatch that gets all changes to persistentVolumes.
 func (factory *ConfigFactory) createPersistentVolumeLW() *cache.ListWatch {
-	return cache.NewListWatchFromClient(factory.Client.Core().RESTClient(), "persistentVolumes", v1.NamespaceAll, fields.ParseSelectorOrDie(""))
+	return cache.NewListWatchFromClient(factory.GetClient().Core().RESTClient(), "persistentVolumes", v1.NamespaceAll, fields.ParseSelectorOrDie(""))
 }
 
 // createPersistentVolumeClaimLW returns a cache.ListWatch that gets all changes to persistentVolumeClaims.
 func (factory *ConfigFactory) createPersistentVolumeClaimLW() *cache.ListWatch {
-	return cache.NewListWatchFromClient(factory.Client.Core().RESTClient(), "persistentVolumeClaims", v1.NamespaceAll, fields.ParseSelectorOrDie(""))
+	return cache.NewListWatchFromClient(factory.GetClient().Core().RESTClient(), "persistentVolumeClaims", v1.NamespaceAll, fields.ParseSelectorOrDie(""))
 }
 
 // Returns a cache.ListWatch that gets all changes to services.
 func (factory *ConfigFactory) createServiceLW() *cache.ListWatch {
-	return cache.NewListWatchFromClient(factory.Client.Core().RESTClient(), "services", v1.NamespaceAll, fields.ParseSelectorOrDie(""))
+	return cache.NewListWatchFromClient(factory.GetClient().Core().RESTClient(), "services", v1.NamespaceAll, fields.ParseSelectorOrDie(""))
 }
 
 // Returns a cache.ListWatch that gets all changes to controllers.
 func (factory *ConfigFactory) createControllerLW() *cache.ListWatch {
-	return cache.NewListWatchFromClient(factory.Client.Core().RESTClient(), "replicationControllers", v1.NamespaceAll, fields.ParseSelectorOrDie(""))
+	return cache.NewListWatchFromClient(factory.GetClient().Core().RESTClient(), "replicationControllers", v1.NamespaceAll, fields.ParseSelectorOrDie(""))
 }
 
 // Returns a cache.ListWatch that gets all changes to replicasets.
 func (factory *ConfigFactory) createReplicaSetLW() *cache.ListWatch {
-	return cache.NewListWatchFromClient(factory.Client.Extensions().RESTClient(), "replicasets", v1.NamespaceAll, fields.ParseSelectorOrDie(""))
+	return cache.NewListWatchFromClient(factory.GetClient().Extensions().RESTClient(), "replicasets", v1.NamespaceAll, fields.ParseSelectorOrDie(""))
 }
 
 func (factory *ConfigFactory) makeDefaultErrorFunc(backoff *podBackoff, podQueue *cache.FIFO) func(pod *v1.Pod, err error) {
@@ -664,7 +664,7 @@ func (factory *ConfigFactory) makeDefaultErrorFunc(backoff *podBackoff, podQueue
 			// Get the pod again; it may have changed/been scheduled already.
 			getBackoff := initialGetBackoff
 			for {
-				pod, err := factory.Client.Core().Pods(podID.Namespace).Get(podID.Name, metav1.GetOptions{})
+				pod, err := factory.GetClient().Core().Pods(podID.Namespace).Get(podID.Name, metav1.GetOptions{})
 				if err == nil {
 					if len(pod.Spec.NodeName) == 0 {
 						podQueue.AddIfNotPresent(pod)
