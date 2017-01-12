@@ -20,6 +20,7 @@ go_library(
         "//pkg/kubelet/container:go_default_library",
         "//pkg/kubelet/metrics:go_default_library",
         "//pkg/util/clock:go_default_library",
+        "//pkg/util/runtime:go_default_library",
         "//vendor:github.com/golang/glog",
         "//vendor:k8s.io/apimachinery/pkg/types",
         "//vendor:k8s.io/apimachinery/pkg/util/sets",

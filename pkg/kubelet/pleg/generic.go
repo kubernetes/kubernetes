@@ -82,7 +82,7 @@ const (
 	// The threshold needs to be greater than the relisting period + the
 	// relisting time, which can vary significantly. Set a conservative
 	// threshold to avoid flipping between healthy and unhealthy.
-	relistThreshold       = 3 * time.Minute
+	relistThreshold = 3 * time.Minute
 	// number of works to update pod cache in parallel
 	podCacheUpdateWorkers = 2
 )
