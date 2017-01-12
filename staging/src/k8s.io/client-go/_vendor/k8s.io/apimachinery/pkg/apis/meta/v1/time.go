@@ -20,7 +20,7 @@ import (
 	"encoding/json"
 	"time"
 
-	"k8s.io/apimachinery/pkg/genericapiserver/openapi/common"
+	"k8s.io/apimachinery/pkg/openapi"
 
 	"github.com/go-openapi/spec"
 	"github.com/google/gofuzz"

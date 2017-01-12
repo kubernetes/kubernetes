@@ -17,21 +17,21 @@ limitations under the License.
 package routes
 
 import (
-	"k8s.io/apimachinery/pkg/genericapiserver/openapi/common"
+	"k8s.io/apimachinery/pkg/openapi"
 	"k8s.io/kubernetes/pkg/genericapiserver/mux"
-	"k8s.io/kubernetes/pkg/genericapiserver/openapi"
+	apiserveropenapi "k8s.io/kubernetes/pkg/genericapiserver/openapi"
 
 	"github.com/golang/glog"
 )
 
 // OpenAPI installs spec endpoints for each web service.
 type OpenAPI struct {
-	Config *common.Config
+	Config *openapi.Config
 }
 
 // Install adds the SwaggerUI webservice to the given mux.
 func (oa OpenAPI) Install(c *mux.APIContainer) {
-	err := openapi.RegisterOpenAPIService("/swagger.json", c.RegisteredWebServices(), oa.Config, c)
+	err := apiserveropenapi.RegisterOpenAPIService("/swagger.json", c.RegisteredWebServices(), oa.Config, c)
 	if err != nil {
 		glog.Fatalf("Failed to register open api spec for root: %v", err)
 	}

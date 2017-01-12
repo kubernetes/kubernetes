@@ -25,7 +25,7 @@ import (
 	"github.com/emicklei/go-restful"
 	"github.com/go-openapi/spec"
 
-	"k8s.io/apimachinery/pkg/genericapiserver/openapi/common"
+	"k8s.io/apimachinery/pkg/openapi"
 	"k8s.io/apimachinery/pkg/util/json"
 	genericmux "k8s.io/kubernetes/pkg/genericapiserver/mux"
 	"k8s.io/kubernetes/pkg/util"
@@ -36,14 +36,14 @@ const (
 )
 
 type openAPI struct {
-	config       *common.Config
+	config       *openapi.Config
 	swagger      *spec.Swagger
 	protocolList []string
 	servePath    string
 }
 
 // RegisterOpenAPIService registers a handler to provides standard OpenAPI specification.
-func RegisterOpenAPIService(servePath string, webServices []*restful.WebService, config *common.Config, container *genericmux.APIContainer) (err error) {
+func RegisterOpenAPIService(servePath string, webServices []*restful.WebService, config *openapi.Config, container *genericmux.APIContainer) (err error) {
 	o := openAPI{
 		config:    config,
 		servePath: servePath,
@@ -312,7 +312,7 @@ func (o *openAPI) findCommonParameters(routes []restful.Route) (map[interface{}]
 }
 
 func (o *openAPI) toSchema(typeName string, model interface{}) (_ *spec.Schema, err error) {
-	if openAPIType, openAPIFormat := common.GetOpenAPITypeFormat(typeName); openAPIType != "" {
+	if openAPIType, openAPIFormat := openapi.GetOpenAPITypeFormat(typeName); openAPIType != "" {
 		return &spec.Schema{
 			SchemaProps: spec.SchemaProps{
 				Type:   []string{openAPIType},
@@ -362,7 +362,7 @@ func (o *openAPI) buildParameter(restParam restful.ParameterData) (ret spec.Para
 	default:
 		return ret, fmt.Errorf("unknown restful operation kind : %v", restParam.Kind)
 	}
-	openAPIType, openAPIFormat := common.GetOpenAPITypeFormat(restParam.DataType)
+	openAPIType, openAPIFormat := openapi.GetOpenAPITypeFormat(restParam.DataType)
 	if openAPIType == "" {
 		return ret, fmt.Errorf("non-body Restful parameter type should be a simple type, but got : %v", restParam.DataType)
 	}

@@ -33,8 +33,6 @@ option go_package = "v2alpha1";
 
 // CronJob represents the configuration of a single cron job.
 message CronJob {
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.TypeMeta typeMeta = 4;
-
   // Standard object's metadata.
   // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
   // +optional
@@ -53,8 +51,6 @@ message CronJob {
 
 // CronJobList is a collection of cron jobs.
 message CronJobList {
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.TypeMeta typeMeta = 3;
-
   // Standard list metadata
   // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
   // +optional
@@ -101,8 +97,6 @@ message CronJobStatus {
 
 // Job represents the configuration of a single job.
 message Job {
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.TypeMeta typeMeta = 4;
-
   // Standard object's metadata.
   // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
   // +optional
@@ -146,8 +140,6 @@ message JobCondition {
 
 // JobList is a collection of jobs.
 message JobList {
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.TypeMeta typeMeta = 3;
-
   // Standard list metadata
   // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
   // +optional
@@ -240,8 +232,6 @@ message JobStatus {
 
 // JobTemplate describes a template for creating copies of a predefined pod.
 message JobTemplate {
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.TypeMeta typeMeta = 3;
-
   // Standard object's metadata.
   // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
   // +optional

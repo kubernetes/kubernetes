@@ -70,6 +70,7 @@ type controller struct {
 type Controller interface {
 	Run(stopCh <-chan struct{})
 	HasSynced() bool
+	LastSyncResourceVersion() string
 }
 
 // New makes a new Controller from the given Config.

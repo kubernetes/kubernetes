@@ -24,7 +24,7 @@ import (
 	"github.com/emicklei/go-restful"
 	"github.com/go-openapi/spec"
 	"github.com/stretchr/testify/assert"
-	"k8s.io/apimachinery/pkg/genericapiserver/openapi/common"
+	"k8s.io/apimachinery/pkg/openapi"
 )
 
 // setUp is a convenience function for setting up for (most) tests.
@@ -63,7 +63,7 @@ type TestOutput struct {
 	Count int `json:"count,omitempty"`
 }
 
-func (_ TestInput) OpenAPIDefinition() *common.OpenAPIDefinition {
+func (_ TestInput) OpenAPIDefinition() *openapi.OpenAPIDefinition {
 	schema := spec.Schema{}
 	schema.Description = "Test input"
 	schema.Properties = map[string]spec.Schema{
@@ -96,13 +96,13 @@ func (_ TestInput) OpenAPIDefinition() *common.OpenAPIDefinition {
 			},
 		},
 	}
-	return &common.OpenAPIDefinition{
+	return &openapi.OpenAPIDefinition{
 		Schema:       schema,
 		Dependencies: []string{},
 	}
 }
 
-func (_ TestOutput) OpenAPIDefinition() *common.OpenAPIDefinition {
+func (_ TestOutput) OpenAPIDefinition() *openapi.OpenAPIDefinition {
 	schema := spec.Schema{}
 	schema.Description = "Test output"
 	schema.Properties = map[string]spec.Schema{
@@ -121,14 +121,14 @@ func (_ TestOutput) OpenAPIDefinition() *common.OpenAPIDefinition {
 			},
 		},
 	}
-	return &common.OpenAPIDefinition{
+	return &openapi.OpenAPIDefinition{
 		Schema:       schema,
 		Dependencies: []string{},
 	}
 }
 
-var _ common.OpenAPIDefinitionGetter = TestInput{}
-var _ common.OpenAPIDefinitionGetter = TestOutput{}
+var _ openapi.OpenAPIDefinitionGetter = TestInput{}
+var _ openapi.OpenAPIDefinitionGetter = TestOutput{}
 
 func getTestRoute(ws *restful.WebService, method string, additionalParams bool, opPrefix string) *restful.RouteBuilder {
 	ret := ws.Method(method).
@@ -150,7 +150,7 @@ func getTestRoute(ws *restful.WebService, method string, additionalParams bool, 
 	return ret
 }
 
-func getConfig(fullMethods bool) (*common.Config, *restful.Container) {
+func getConfig(fullMethods bool) (*openapi.Config, *restful.Container) {
 	mux := http.NewServeMux()
 	container := restful.NewContainer()
 	container.ServeMux = mux
@@ -178,7 +178,7 @@ func getConfig(fullMethods bool) (*common.Config, *restful.Container) {
 
 	}
 	container.Add(ws)
-	return &common.Config{
+	return &openapi.Config{
 		ProtocolList: []string{"https"},
 		Info: &spec.Info{
 			InfoProps: spec.InfoProps{
@@ -186,7 +186,7 @@ func getConfig(fullMethods bool) (*common.Config, *restful.Container) {
 				Description: "Test API",
 			},
 		},
-		Definitions: &common.OpenAPIDefinitions{
+		Definitions: &openapi.OpenAPIDefinitions{
 			"openapi.TestInput":  *TestInput{}.OpenAPIDefinition(),
 			"openapi.TestOutput": *TestOutput{}.OpenAPIDefinition(),
 		},

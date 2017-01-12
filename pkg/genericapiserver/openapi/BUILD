@@ -21,7 +21,7 @@ go_library(
         "//pkg/util:go_default_library",
         "//vendor:github.com/emicklei/go-restful",
         "//vendor:github.com/go-openapi/spec",
-        "//vendor:k8s.io/apimachinery/pkg/genericapiserver/openapi/common",
+        "//vendor:k8s.io/apimachinery/pkg/openapi",
         "//vendor:k8s.io/apimachinery/pkg/util/json",
     ],
 )
@@ -35,7 +35,7 @@ go_test(
         "//vendor:github.com/emicklei/go-restful",
         "//vendor:github.com/go-openapi/spec",
         "//vendor:github.com/stretchr/testify/assert",
-        "//vendor:k8s.io/apimachinery/pkg/genericapiserver/openapi/common",
+        "//vendor:k8s.io/apimachinery/pkg/openapi",
     ],
 )
 

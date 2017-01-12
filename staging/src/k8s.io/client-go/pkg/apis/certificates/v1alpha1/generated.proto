@@ -33,8 +33,6 @@ option go_package = "v1alpha1";
 
 // Describes a certificate signing request
 message CertificateSigningRequest {
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.TypeMeta typeMeta = 4;
-
   // +optional
   optional k8s.io.kubernetes.pkg.api.v1.ObjectMeta metadata = 1;
 
@@ -65,8 +63,6 @@ message CertificateSigningRequestCondition {
 }
 
 message CertificateSigningRequestList {
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.TypeMeta typeMeta = 3;
-
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
