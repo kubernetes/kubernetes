@@ -285,6 +285,11 @@ EOF
 # $6: Whether or not we run kubelet in privileged mode
 # $7: If empty then flannel is used otherwise CNI is used.
 function create-kubelet-opts() {
+  api_host=${2}
+  api_port="8080"
+  dest_dir=$(dirname ${KUBECONFIG:-$DEFAULT_KUBECONFIG})
+  write_kubeconfig_for_kubelet ${api_host} ${api_port} ${dest_dir}
+
   if [ -n "$7" ] ; then
       cni_opts=" --network-plugin=cni --network-plugin-dir=/etc/cni/net.d"
   else
@@ -293,7 +298,7 @@ function create-kubelet-opts() {
   cat <<EOF > ~/kube/default/kubelet
 KUBELET_OPTS="\
  --hostname-override=${1} \
- --api-servers=http://${2}:8080 \
+ --kubeconfig=${KUBECONFIG_PATH}/kubelet.kubeconfig \
  --logtostderr=true \
  --cluster-dns=${3} \
  --cluster-domain=${4} \

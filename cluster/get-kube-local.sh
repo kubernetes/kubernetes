@@ -21,6 +21,7 @@ set -o nounset
 set -o pipefail
 
 KUBE_HOST=${KUBE_HOST:-localhost}
+kUBECONFIG_PATH={KUBECONFIG_PATH:-"/var/run/kubernetes"}
 
 declare -r RED="\033[0;31m"
 declare -r GREEN="\033[0;32m"
@@ -53,9 +54,28 @@ function run {
   fi
 }
 
+# creates a kubeconfig for kubelet: args are host, port, dest-dir
+function write_kubeconfig_for_kubelet {
+    mkdir -p ${KUBECONFIG_PATH}
+    cat <<EOF | tee "${KUBECONFIG_PATH}"/kubelet.kubeconfig > /dev/null
+apiVersion: v1
+kind: Config
+clusters:
+  - cluster:
+      server: http://localhost:8080/
+    name: kubelet-env
+contexts:
+  - context:
+      cluster: kubelet-env
+    name: kubelet-env
+current-context: kubelet-env
+EOF
+}
+
 function create_cluster {
   echo "Creating a local cluster:"
   echo -e -n "\tStarting kubelet..."
+  write_kubeconfig_for_kubelet
   run "docker run \
   --volume=/:/rootfs:ro \
   --volume=/sys:/sys:ro \
@@ -73,6 +93,7 @@ function create_cluster {
       --address="0.0.0.0" \
       --api-servers=http://localhost:8080 \
       --pod-manifest-path=/etc/kubernetes/manifests \
+      --kubeconfig=${KUBECONFIG_PATH}/kubelet.kubeconfig \
       --allow-privileged=true \
       --cluster-dns=10.0.0.10 \
       --cluster-domain=cluster.local \
