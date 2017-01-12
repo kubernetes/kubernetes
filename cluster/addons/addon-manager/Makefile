@@ -60,7 +60,7 @@ else
 	cd $(TEMP_DIR) && sed -i "s/CROSS_BUILD_//g" Dockerfile
 endif
 
-	docker build -t $(IMAGE)-$(ARCH):$(VERSION) $(TEMP_DIR)
+	docker build --pull -t $(IMAGE)-$(ARCH):$(VERSION) $(TEMP_DIR)
 
 push: build
 	gcloud docker -- push $(IMAGE)-$(ARCH):$(VERSION)

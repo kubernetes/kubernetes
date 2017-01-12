@@ -22,7 +22,7 @@ serve_hostname: serve_hostname.go
 	CGO_ENABLED=0 go build -a -installsuffix cgo --ldflags '-w' ./serve_hostname.go
 
 container: serve_hostname
-	docker build -t $(PREFIX)/serve_hostname:$(TAG) .
+	docker build --pull -t $(PREFIX)/serve_hostname:$(TAG) .
 	if [ -n "$(TEST_PREFIX)" ]; then \
 		docker rmi $(TEST_PREFIX)/serve_hostname:$(TAG) || true; \
 	    docker tag $(PREFIX)/serve_hostname:$(TAG) $(TEST_PREFIX)/serve_hostname:$(TAG); \

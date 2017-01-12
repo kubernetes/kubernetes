@@ -105,28 +105,28 @@ kube::build::get_docker_wrapped_binaries() {
           kube-apiserver,busybox
           kube-controller-manager,busybox
           kube-scheduler,busybox
-          kube-proxy,gcr.io/google_containers/debian-iptables-amd64:v4
+          kube-proxy,gcr.io/google_containers/debian-iptables-amd64:v5
         );;
     "arm")
         local targets=(
           kube-apiserver,armel/busybox
           kube-controller-manager,armel/busybox
           kube-scheduler,armel/busybox
-          kube-proxy,gcr.io/google_containers/debian-iptables-arm:v4
+          kube-proxy,gcr.io/google_containers/debian-iptables-arm:v5
         );;
     "arm64")
         local targets=(
           kube-apiserver,aarch64/busybox
           kube-controller-manager,aarch64/busybox
           kube-scheduler,aarch64/busybox
-          kube-proxy,gcr.io/google_containers/debian-iptables-arm64:v4
+          kube-proxy,gcr.io/google_containers/debian-iptables-arm64:v5
         );;
     "ppc64le")
         local targets=(
           kube-apiserver,ppc64le/busybox
           kube-controller-manager,ppc64le/busybox
           kube-scheduler,ppc64le/busybox
-          kube-proxy,gcr.io/google_containers/debian-iptables-ppc64le:v4
+          kube-proxy,gcr.io/google_containers/debian-iptables-ppc64le:v5
         );;
   esac
 
@@ -867,7 +867,7 @@ function kube::release::create_docker_images_for_server() {
           local docker_image_tag=gcr.io/google_containers/${binary_name}-${arch}:${md5_sum}
         fi
 
-        "${DOCKER[@]}" build -q -t "${docker_image_tag}" ${docker_build_path} >/dev/null
+        "${DOCKER[@]}" build --pull -q -t "${docker_image_tag}" ${docker_build_path} >/dev/null
         "${DOCKER[@]}" save ${docker_image_tag} > ${binary_dir}/${binary_name}.tar
         echo $md5_sum > ${binary_dir}/${binary_name}.docker_tag
 
