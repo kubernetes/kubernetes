@@ -174,7 +174,7 @@ func NewConfigFactory(client clientset.Interface, schedulerName string, hardPodA
 	// We construct this here instead of in CreateFromKeys because
 	// ScheduledPodLister is something we provide to plug in functions that
 	// they may need to call.
-	c.GetScheduledPodListerIndexer(), c.scheduledPodPopulator = cache.NewIndexerInformer(
+	c.scheduledPodLister, c.scheduledPodPopulator = cache.NewIndexerInformer(
 		c.createAssignedNonTerminatedPodLW(),
 		&v1.Pod{},
 		0,
@@ -244,7 +244,7 @@ func (f *ConfigFactory) GetSchedulerName() string {
 }
 
 // GetClient is another (self-explanatory) internal function only used in rare external circumstances (i.e. testing)
-func (f *ConfigFactory) GetClient() string {
+func (f *ConfigFactory) GetClient() clientset.Interface {
 	return f.client
 }
 
