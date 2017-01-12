@@ -86,7 +86,7 @@ type ReplicationManager struct {
 	// A store of pods, populated by the podController
 	podLister cache.StoreToPodLister
 	// Watches changes to all pods
-	podController cache.ControllerInterface
+	podController cache.Controller
 	// podListerSynced returns true if the pod store has been synced at least once.
 	// Added as a member to the struct to allow injection for testing.
 	podListerSynced func() bool

@@ -48,7 +48,7 @@ type CertificateController struct {
 	kubeClient clientset.Interface
 
 	// CSR framework and store
-	csrController *cache.Controller
+	csrController cache.Controller
 	csrStore      cache.StoreToCertificateRequestLister
 
 	syncHandler func(csrKey string) error
