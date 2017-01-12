@@ -81,7 +81,7 @@ nodes, preempting other pods if necessary.
         nodeSelector: 
           app: datastore-node
         containers:
-          name: datastore-shard
+        - name: datastore-shard
           image: kubernetes/sharded
           ports:
             - containerPort: 9042
