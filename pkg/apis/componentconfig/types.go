@@ -505,6 +505,8 @@ type KubeletConfiguration struct {
 	// This flag, if set, will avoid including `EvictionHard` limits while computing Node Allocatable.
 	// Refer to [Node Allocatable](https://github.com/kubernetes/community/blob/master/contributors/design-proposals/node-allocatable.md) doc for more information.
 	ExperimentalNodeAllocatableIgnoreEvictionThreshold bool
+	// Multiply physical CPU count by this factor to calculate effective number of CPU
+	ExperimentalCpuConversionFactor float32
 }
 
 type KubeletAuthorizationMode string

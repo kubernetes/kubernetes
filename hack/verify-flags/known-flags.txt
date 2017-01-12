@@ -245,6 +245,10 @@ experimental-mounter-path
 experimental-nvidia-gpus
 experimental-prefix
 experimental-qos-reserved
+experimental-cri
+experimental-check-node-capabilities-before-mount
+experimental-cpu-conversion-factor
+experimental-kernel-memcg-notification
 external-etcd-cafile
 external-etcd-certfile
 external-etcd-endpoints

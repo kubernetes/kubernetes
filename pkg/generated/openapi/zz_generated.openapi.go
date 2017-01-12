@@ -11196,6 +11196,13 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Ref:         ref("k8s.io/apimachinery/pkg/api/resource.Quantity"),
 							},
 						},
+						"experimentalCpuConversionFactor": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Multiply physical CPU count by this factor to calculate effective number of CPU",
+								Type:        []string{"number"},
+								Format:      "float",
+							},
+						},
 					},
 					Required: []string{"target", "metricName", "currentValue"},
 				},
