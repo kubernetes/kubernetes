@@ -3,6 +3,7 @@ approvers:
 - lavalamp
 - mikedanese
 - nikhiljindal
+- wojtek-t
 reviewers:
 - thockin
 - lavalamp
@@ -33,10 +34,7 @@ reviewers:
 - timothysc
 - soltysh
 - piosz
-- jbeda
-- dims
 - madhusudancs
 - hongchaodeng
 - krousey
-- jayunit100
 - jszczepkowski
