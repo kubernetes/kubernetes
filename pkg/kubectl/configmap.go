@@ -221,7 +221,10 @@ func handleConfigMapFromEnvFileSource(configMap *api.ConfigMap, envFileSource st
 	if info.IsDir() {
 		return fmt.Errorf("must be a file")
 	}
-	return addFromEnvFileToConfigMap(configMap, envFileSource)
+
+	return addFromEnvFile(envFileSource, func(key, value string) error {
+		return addKeyFromLiteralToConfigMap(configMap, key, value)
+	})
 }
 
 // addKeyFromFileToConfigMap adds a key with the given name to a ConfigMap, populating
