@@ -111,7 +111,7 @@ pkg/client/informers/informers_generated/batch/v1
 pkg/client/informers/informers_generated/batch/v2alpha1
 pkg/client/informers/informers_generated/certificates
 pkg/client/informers/informers_generated/certificates/internalversion
-pkg/client/informers/informers_generated/certificates/v1alpha1
+pkg/client/informers/informers_generated/certificates/v1beta1
 pkg/client/informers/informers_generated/core
 pkg/client/informers/informers_generated/core/internalversion
 pkg/client/informers/informers_generated/core/v1
@@ -141,7 +141,7 @@ pkg/client/listers/batch/internalversion
 pkg/client/listers/batch/v1
 pkg/client/listers/batch/v2alpha1
 pkg/client/listers/certificates/internalversion
-pkg/client/listers/certificates/v1alpha1
+pkg/client/listers/certificates/v1beta1
 pkg/client/listers/core/internalversion
 pkg/client/listers/core/v1
 pkg/client/listers/extensions/internalversion

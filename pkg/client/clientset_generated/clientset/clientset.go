@@ -25,7 +25,7 @@ import (
 	v1autoscaling "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/autoscaling/v1"
 	v1batch "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/batch/v1"
 	v2alpha1batch "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/batch/v2alpha1"
-	v1alpha1certificates "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/certificates/v1alpha1"
+	v1beta1certificates "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/certificates/v1beta1"
 	v1core "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/core/v1"
 	v1beta1extensions "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/extensions/v1beta1"
 	v1beta1policy "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/policy/v1beta1"
@@ -59,9 +59,9 @@ type Interface interface {
 	Batch() v1batch.BatchV1Interface
 	BatchV2alpha1() v2alpha1batch.BatchV2alpha1Interface
 
-	CertificatesV1alpha1() v1alpha1certificates.CertificatesV1alpha1Interface
+	CertificatesV1beta1() v1beta1certificates.CertificatesV1beta1Interface
 	// Deprecated: please explicitly pick a version if possible.
-	Certificates() v1alpha1certificates.CertificatesV1alpha1Interface
+	Certificates() v1beta1certificates.CertificatesV1beta1Interface
 	ExtensionsV1beta1() v1beta1extensions.ExtensionsV1beta1Interface
 	// Deprecated: please explicitly pick a version if possible.
 	Extensions() v1beta1extensions.ExtensionsV1beta1Interface
@@ -89,7 +89,7 @@ type Clientset struct {
 	*v1autoscaling.AutoscalingV1Client
 	*v1batch.BatchV1Client
 	*v2alpha1batch.BatchV2alpha1Client
-	*v1alpha1certificates.CertificatesV1alpha1Client
+	*v1beta1certificates.CertificatesV1beta1Client
 	*v1beta1extensions.ExtensionsV1beta1Client
 	*v1beta1policy.PolicyV1beta1Client
 	*v1beta1rbac.RbacV1beta1Client
@@ -207,21 +207,21 @@ func (c *Clientset) BatchV2alpha1() v2alpha1batch.BatchV2alpha1Interface {
 	return c.BatchV2alpha1Client
 }
 
-// CertificatesV1alpha1 retrieves the CertificatesV1alpha1Client
-func (c *Clientset) CertificatesV1alpha1() v1alpha1certificates.CertificatesV1alpha1Interface {
+// CertificatesV1beta1 retrieves the CertificatesV1beta1Client
+func (c *Clientset) CertificatesV1beta1() v1beta1certificates.CertificatesV1beta1Interface {
 	if c == nil {
 		return nil
 	}
-	return c.CertificatesV1alpha1Client
+	return c.CertificatesV1beta1Client
 }
 
 // Deprecated: Certificates retrieves the default version of CertificatesClient.
 // Please explicitly pick a version.
-func (c *Clientset) Certificates() v1alpha1certificates.CertificatesV1alpha1Interface {
+func (c *Clientset) Certificates() v1beta1certificates.CertificatesV1beta1Interface {
 	if c == nil {
 		return nil
 	}
-	return c.CertificatesV1alpha1Client
+	return c.CertificatesV1beta1Client
 }
 
 // ExtensionsV1beta1 retrieves the ExtensionsV1beta1Client
@@ -344,7 +344,7 @@ func NewForConfig(c *restclient.Config) (*Clientset, error) {
 	if err != nil {
 		return nil, err
 	}
-	cs.CertificatesV1alpha1Client, err = v1alpha1certificates.NewForConfig(&configShallowCopy)
+	cs.CertificatesV1beta1Client, err = v1beta1certificates.NewForConfig(&configShallowCopy)
 	if err != nil {
 		return nil, err
 	}
@@ -388,7 +388,7 @@ func NewForConfigOrDie(c *restclient.Config) *Clientset {
 	cs.AutoscalingV1Client = v1autoscaling.NewForConfigOrDie(c)
 	cs.BatchV1Client = v1batch.NewForConfigOrDie(c)
 	cs.BatchV2alpha1Client = v2alpha1batch.NewForConfigOrDie(c)
-	cs.CertificatesV1alpha1Client = v1alpha1certificates.NewForConfigOrDie(c)
+	cs.CertificatesV1beta1Client = v1beta1certificates.NewForConfigOrDie(c)
 	cs.ExtensionsV1beta1Client = v1beta1extensions.NewForConfigOrDie(c)
 	cs.PolicyV1beta1Client = v1beta1policy.NewForConfigOrDie(c)
 	cs.RbacV1beta1Client = v1beta1rbac.NewForConfigOrDie(c)
@@ -409,7 +409,7 @@ func New(c restclient.Interface) *Clientset {
 	cs.AutoscalingV1Client = v1autoscaling.New(c)
 	cs.BatchV1Client = v1batch.New(c)
 	cs.BatchV2alpha1Client = v2alpha1batch.New(c)
-	cs.CertificatesV1alpha1Client = v1alpha1certificates.New(c)
+	cs.CertificatesV1beta1Client = v1beta1certificates.New(c)
 	cs.ExtensionsV1beta1Client = v1beta1extensions.New(c)
 	cs.PolicyV1beta1Client = v1beta1policy.New(c)
 	cs.RbacV1beta1Client = v1beta1rbac.New(c)

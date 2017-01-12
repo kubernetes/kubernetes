@@ -20389,7 +20389,7 @@
      }
     }
    },
-   "/apis/certificates.k8s.io/v1alpha1/": {
+   "/apis/certificates.k8s.io/v1beta1/": {
     "get": {
      "description": "get available resources",
      "consumes": [
@@ -20406,9 +20406,9 @@
       "https"
      ],
      "tags": [
-      "certificates_v1alpha1"
+      "certificates_v1beta1"
      ],
-     "operationId": "getCertificatesV1alpha1APIResources",
+     "operationId": "getCertificatesV1beta1APIResources",
      "responses": {
       "200": {
        "description": "OK",
@@ -20422,7 +20422,7 @@
      }
     }
    },
-   "/apis/certificates.k8s.io/v1alpha1/certificatesigningrequests": {
+   "/apis/certificates.k8s.io/v1beta1/certificatesigningrequests": {
     "get": {
      "description": "list or watch objects of kind CertificateSigningRequest",
      "consumes": [
@@ -20439,9 +20439,9 @@
       "https"
      ],
      "tags": [
-      "certificates_v1alpha1"
+      "certificates_v1beta1"
      ],
-     "operationId": "listCertificatesV1alpha1CertificateSigningRequest",
+     "operationId": "listCertificatesV1beta1CertificateSigningRequest",
      "parameters": [
       {
        "uniqueItems": true,
@@ -20483,7 +20483,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/v1alpha1.CertificateSigningRequestList"
+        "$ref": "#/definitions/v1beta1.CertificateSigningRequestList"
        }
       },
       "401": {
@@ -20505,16 +20505,16 @@
       "https"
      ],
      "tags": [
-      "certificates_v1alpha1"
+      "certificates_v1beta1"
      ],
-     "operationId": "createCertificatesV1alpha1CertificateSigningRequest",
+     "operationId": "createCertificatesV1beta1CertificateSigningRequest",
      "parameters": [
       {
        "name": "body",
        "in": "body",
        "required": true,
        "schema": {
-        "$ref": "#/definitions/v1alpha1.CertificateSigningRequest"
+        "$ref": "#/definitions/v1beta1.CertificateSigningRequest"
        }
       }
      ],
@@ -20522,7 +20522,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/v1alpha1.CertificateSigningRequest"
+        "$ref": "#/definitions/v1beta1.CertificateSigningRequest"
        }
       },
       "401": {
@@ -20544,9 +20544,9 @@
       "https"
      ],
      "tags": [
-      "certificates_v1alpha1"
+      "certificates_v1beta1"
      ],
-     "operationId": "deleteCertificatesV1alpha1CollectionCertificateSigningRequest",
+     "operationId": "deleteCertificatesV1beta1CollectionCertificateSigningRequest",
      "parameters": [
       {
        "uniqueItems": true,
@@ -20606,7 +20606,7 @@
      }
     ]
    },
-   "/apis/certificates.k8s.io/v1alpha1/certificatesigningrequests/{name}": {
+   "/apis/certificates.k8s.io/v1beta1/certificatesigningrequests/{name}": {
     "get": {
      "description": "read the specified CertificateSigningRequest",
      "consumes": [
@@ -20621,9 +20621,9 @@
       "https"
      ],
      "tags": [
-      "certificates_v1alpha1"
+      "certificates_v1beta1"
      ],
-     "operationId": "readCertificatesV1alpha1CertificateSigningRequest",
+     "operationId": "readCertificatesV1beta1CertificateSigningRequest",
      "parameters": [
       {
        "uniqueItems": true,
@@ -20644,7 +20644,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/v1alpha1.CertificateSigningRequest"
+        "$ref": "#/definitions/v1beta1.CertificateSigningRequest"
        }
       },
       "401": {
@@ -20666,16 +20666,16 @@
       "https"
      ],
      "tags": [
-      "certificates_v1alpha1"
+      "certificates_v1beta1"
      ],
-     "operationId": "replaceCertificatesV1alpha1CertificateSigningRequest",
+     "operationId": "replaceCertificatesV1beta1CertificateSigningRequest",
      "parameters": [
       {
        "name": "body",
        "in": "body",
        "required": true,
        "schema": {
-        "$ref": "#/definitions/v1alpha1.CertificateSigningRequest"
+        "$ref": "#/definitions/v1beta1.CertificateSigningRequest"
        }
       }
      ],
@@ -20683,7 +20683,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/v1alpha1.CertificateSigningRequest"
+        "$ref": "#/definitions/v1beta1.CertificateSigningRequest"
        }
       },
       "401": {
@@ -20705,9 +20705,9 @@
       "https"
      ],
      "tags": [
-      "certificates_v1alpha1"
+      "certificates_v1beta1"
      ],
-     "operationId": "deleteCertificatesV1alpha1CertificateSigningRequest",
+     "operationId": "deleteCertificatesV1beta1CertificateSigningRequest",
      "parameters": [
       {
        "name": "body",
@@ -20760,9 +20760,9 @@
       "https"
      ],
      "tags": [
-      "certificates_v1alpha1"
+      "certificates_v1beta1"
      ],
-     "operationId": "patchCertificatesV1alpha1CertificateSigningRequest",
+     "operationId": "patchCertificatesV1beta1CertificateSigningRequest",
      "parameters": [
       {
        "name": "body",
@@ -20777,7 +20777,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/v1alpha1.CertificateSigningRequest"
+        "$ref": "#/definitions/v1beta1.CertificateSigningRequest"
        }
       },
       "401": {
@@ -20803,7 +20803,7 @@
      }
     ]
    },
-   "/apis/certificates.k8s.io/v1alpha1/certificatesigningrequests/{name}/approval": {
+   "/apis/certificates.k8s.io/v1beta1/certificatesigningrequests/{name}/approval": {
     "put": {
      "description": "replace approval of the specified CertificateSigningRequest",
      "consumes": [
@@ -20818,14 +20818,14 @@
       "https"
      ],
      "tags": [
-      "certificates_v1alpha1"
+      "certificates_v1beta1"
      ],
-     "operationId": "replaceCertificatesV1alpha1CertificateSigningRequestApproval",
+     "operationId": "replaceCertificatesV1beta1CertificateSigningRequestApproval",
      "responses": {
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/v1alpha1.CertificateSigningRequest"
+        "$ref": "#/definitions/v1beta1.CertificateSigningRequest"
        }
       },
       "401": {
@@ -20839,7 +20839,7 @@
       "in": "body",
       "required": true,
       "schema": {
-       "$ref": "#/definitions/v1alpha1.CertificateSigningRequest"
+       "$ref": "#/definitions/v1beta1.CertificateSigningRequest"
       }
      },
      {
@@ -20859,7 +20859,7 @@
      }
     ]
    },
-   "/apis/certificates.k8s.io/v1alpha1/certificatesigningrequests/{name}/status": {
+   "/apis/certificates.k8s.io/v1beta1/certificatesigningrequests/{name}/status": {
     "put": {
      "description": "replace status of the specified CertificateSigningRequest",
      "consumes": [
@@ -20874,14 +20874,14 @@
       "https"
      ],
      "tags": [
-      "certificates_v1alpha1"
+      "certificates_v1beta1"
      ],
-     "operationId": "replaceCertificatesV1alpha1CertificateSigningRequestStatus",
+     "operationId": "replaceCertificatesV1beta1CertificateSigningRequestStatus",
      "responses": {
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/v1alpha1.CertificateSigningRequest"
+        "$ref": "#/definitions/v1beta1.CertificateSigningRequest"
        }
       },
       "401": {
@@ -20895,7 +20895,7 @@
       "in": "body",
       "required": true,
       "schema": {
-       "$ref": "#/definitions/v1alpha1.CertificateSigningRequest"
+       "$ref": "#/definitions/v1beta1.CertificateSigningRequest"
       }
      },
      {
@@ -20915,7 +20915,7 @@
      }
     ]
    },
-   "/apis/certificates.k8s.io/v1alpha1/watch/certificatesigningrequests": {
+   "/apis/certificates.k8s.io/v1beta1/watch/certificatesigningrequests": {
     "get": {
      "description": "watch individual changes to a list of CertificateSigningRequest",
      "consumes": [
@@ -20932,9 +20932,9 @@
       "https"
      ],
      "tags": [
-      "certificates_v1alpha1"
+      "certificates_v1beta1"
      ],
-     "operationId": "watchCertificatesV1alpha1CertificateSigningRequestList",
+     "operationId": "watchCertificatesV1beta1CertificateSigningRequestList",
      "responses": {
       "200": {
        "description": "OK",
@@ -20992,7 +20992,7 @@
      }
     ]
    },
-   "/apis/certificates.k8s.io/v1alpha1/watch/certificatesigningrequests/{name}": {
+   "/apis/certificates.k8s.io/v1beta1/watch/certificatesigningrequests/{name}": {
     "get": {
      "description": "watch changes to an object of kind CertificateSigningRequest",
      "consumes": [
@@ -21009,9 +21009,9 @@
       "https"
      ],
      "tags": [
-      "certificates_v1alpha1"
+      "certificates_v1beta1"
      ],
-     "operationId": "watchCertificatesV1alpha1CertificateSigningRequest",
+     "operationId": "watchCertificatesV1beta1CertificateSigningRequest",
      "responses": {
       "200": {
        "description": "OK",
@@ -38802,126 +38802,6 @@
      }
     }
    },
-   "v1alpha1.CertificateSigningRequest": {
-    "description": "Describes a certificate signing request",
-    "properties": {
-     "apiVersion": {
-      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources",
-      "type": "string"
-     },
-     "kind": {
-      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
-      "type": "string"
-     },
-     "metadata": {
-      "$ref": "#/definitions/v1.ObjectMeta"
-     },
-     "spec": {
-      "description": "The certificate request itself and any additional information.",
-      "$ref": "#/definitions/v1alpha1.CertificateSigningRequestSpec"
-     },
-     "status": {
-      "description": "Derived information about the request.",
-      "$ref": "#/definitions/v1alpha1.CertificateSigningRequestStatus"
-     }
-    }
-   },
-   "v1alpha1.CertificateSigningRequestCondition": {
-    "required": [
-     "type"
-    ],
-    "properties": {
-     "lastUpdateTime": {
-      "description": "timestamp for the last update to this condition",
-      "$ref": "#/definitions/v1.Time"
-     },
-     "message": {
-      "description": "human readable message with details about the request state",
-      "type": "string"
-     },
-     "reason": {
-      "description": "brief reason for the request state",
-      "type": "string"
-     },
-     "type": {
-      "description": "request approval state, currently Approved or Denied.",
-      "type": "string"
-     }
-    }
-   },
-   "v1alpha1.CertificateSigningRequestList": {
-    "required": [
-     "items"
-    ],
-    "properties": {
-     "apiVersion": {
-      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources",
-      "type": "string"
-     },
-     "items": {
-      "type": "array",
-      "items": {
-       "$ref": "#/definitions/v1alpha1.CertificateSigningRequest"
-      }
-     },
-     "kind": {
-      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
-      "type": "string"
-     },
-     "metadata": {
-      "$ref": "#/definitions/v1.ListMeta"
-     }
-    }
-   },
-   "v1alpha1.CertificateSigningRequestSpec": {
-    "description": "This information is immutable after the request is created. Only the Request and ExtraInfo fields can be set on creation, other fields are derived by Kubernetes and cannot be modified by users.",
-    "required": [
-     "request"
-    ],
-    "properties": {
-     "groups": {
-      "type": "array",
-      "items": {
-       "type": "string"
-      }
-     },
-     "request": {
-      "description": "Base64-encoded PKCS#10 CSR data",
-      "type": "string",
-      "format": "byte"
-     },
-     "uid": {
-      "type": "string"
-     },
-     "usages": {
-      "description": "allowedUsages specifies a set of usage contexts the key will be valid for. See: https://tools.ietf.org/html/rfc5280#section-4.2.1.3\n     https://tools.ietf.org/html/rfc5280#section-4.2.1.12",
-      "type": "array",
-      "items": {
-       "type": "string"
-      }
-     },
-     "username": {
-      "description": "Information about the requesting user (if relevant) See user.Info interface for details",
-      "type": "string"
-     }
-    }
-   },
-   "v1alpha1.CertificateSigningRequestStatus": {
-    "properties": {
-     "certificate": {
-      "description": "If request was approved, the controller will place the issued certificate here.",
-      "type": "string",
-      "format": "byte"
-     },
-     "conditions": {
-      "description": "Conditions applied to the request, such as approval or denial.",
-      "type": "array",
-      "items": {
-       "$ref": "#/definitions/v1alpha1.CertificateSigningRequestCondition"
-      }
-     }
-    }
-   },
    "v1alpha1.ClusterRole": {
     "description": "ClusterRole is a cluster level, logical grouping of PolicyRules that can be referenced as a unit by a RoleBinding or ClusterRoleBinding.",
     "required": [
@@ -39256,6 +39136,126 @@
       "description": "fraction of the requested CPU that should be utilized/used, e.g. 70 means that 70% of the requested CPU should be in use.",
       "type": "integer",
       "format": "int32"
+     }
+    }
+   },
+   "v1beta1.CertificateSigningRequest": {
+    "description": "Describes a certificate signing request",
+    "properties": {
+     "apiVersion": {
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources",
+      "type": "string"
+     },
+     "kind": {
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
+      "type": "string"
+     },
+     "metadata": {
+      "$ref": "#/definitions/v1.ObjectMeta"
+     },
+     "spec": {
+      "description": "The certificate request itself and any additional information.",
+      "$ref": "#/definitions/v1beta1.CertificateSigningRequestSpec"
+     },
+     "status": {
+      "description": "Derived information about the request.",
+      "$ref": "#/definitions/v1beta1.CertificateSigningRequestStatus"
+     }
+    }
+   },
+   "v1beta1.CertificateSigningRequestCondition": {
+    "required": [
+     "type"
+    ],
+    "properties": {
+     "lastUpdateTime": {
+      "description": "timestamp for the last update to this condition",
+      "$ref": "#/definitions/v1.Time"
+     },
+     "message": {
+      "description": "human readable message with details about the request state",
+      "type": "string"
+     },
+     "reason": {
+      "description": "brief reason for the request state",
+      "type": "string"
+     },
+     "type": {
+      "description": "request approval state, currently Approved or Denied.",
+      "type": "string"
+     }
+    }
+   },
+   "v1beta1.CertificateSigningRequestList": {
+    "required": [
+     "items"
+    ],
+    "properties": {
+     "apiVersion": {
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources",
+      "type": "string"
+     },
+     "items": {
+      "type": "array",
+      "items": {
+       "$ref": "#/definitions/v1beta1.CertificateSigningRequest"
+      }
+     },
+     "kind": {
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
+      "type": "string"
+     },
+     "metadata": {
+      "$ref": "#/definitions/v1.ListMeta"
+     }
+    }
+   },
+   "v1beta1.CertificateSigningRequestSpec": {
+    "description": "This information is immutable after the request is created. Only the Request and ExtraInfo fields can be set on creation, other fields are derived by Kubernetes and cannot be modified by users.",
+    "required": [
+     "request"
+    ],
+    "properties": {
+     "groups": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      }
+     },
+     "request": {
+      "description": "Base64-encoded PKCS#10 CSR data",
+      "type": "string",
+      "format": "byte"
+     },
+     "uid": {
+      "type": "string"
+     },
+     "usages": {
+      "description": "allowedUsages specifies a set of usage contexts the key will be valid for. See: https://tools.ietf.org/html/rfc5280#section-4.2.1.3\n     https://tools.ietf.org/html/rfc5280#section-4.2.1.12",
+      "type": "array",
+      "items": {
+       "type": "string"
+      }
+     },
+     "username": {
+      "description": "Information about the requesting user (if relevant) See user.Info interface for details",
+      "type": "string"
+     }
+    }
+   },
+   "v1beta1.CertificateSigningRequestStatus": {
+    "properties": {
+     "certificate": {
+      "description": "If request was approved, the controller will place the issued certificate here.",
+      "type": "string",
+      "format": "byte"
+     },
+     "conditions": {
+      "description": "Conditions applied to the request, such as approval or denial.",
+      "type": "array",
+      "items": {
+       "$ref": "#/definitions/v1beta1.CertificateSigningRequestCondition"
+      }
      }
     }
    },

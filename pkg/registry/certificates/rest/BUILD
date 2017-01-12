@@ -13,7 +13,7 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//pkg/apis/certificates:go_default_library",
-        "//pkg/apis/certificates/v1alpha1:go_default_library",
+        "//pkg/apis/certificates/v1beta1:go_default_library",
         "//pkg/genericapiserver/registry/generic:go_default_library",
         "//pkg/genericapiserver/registry/rest:go_default_library",
         "//pkg/genericapiserver/server:go_default_library",

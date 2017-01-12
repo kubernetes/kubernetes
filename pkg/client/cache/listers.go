@@ -28,7 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/api/v1"
 	apps "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
-	certificates "k8s.io/kubernetes/pkg/apis/certificates/v1alpha1"
+	certificates "k8s.io/kubernetes/pkg/apis/certificates/v1beta1"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	policy "k8s.io/kubernetes/pkg/apis/policy/v1beta1"
 	storageinternal "k8s.io/kubernetes/pkg/apis/storage"
