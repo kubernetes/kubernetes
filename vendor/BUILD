@@ -13322,3 +13322,22 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/util/validation/field",
     ],
 )
+
+go_test(
+    name = "k8s.io/apimachinery/pkg/apis/meta/v1/validation_test",
+    srcs = ["k8s.io/apimachinery/pkg/apis/meta/v1/validation/validation_test.go"],
+    library = ":k8s.io/apimachinery/pkg/apis/meta/v1/validation",
+    tags = ["automanaged"],
+    deps = ["//vendor:k8s.io/apimachinery/pkg/util/validation/field"],
+)
+
+go_library(
+    name = "k8s.io/apimachinery/pkg/apis/meta/v1/validation",
+    srcs = ["k8s.io/apimachinery/pkg/apis/meta/v1/validation/validation.go"],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor:k8s.io/apimachinery/pkg/util/validation",
+        "//vendor:k8s.io/apimachinery/pkg/util/validation/field",
+    ],
+)
