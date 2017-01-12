@@ -112,7 +112,7 @@ func NewAttachDetachController(
 		cloud:       cloud,
 	}
 
-	if err := adc.volumePluginMgr.InitPlugins(plugins, nil, kubeClient, cloud); err != nil {
+	if err := adc.volumePluginMgr.InitPlugins(plugins, nil /*volumeHost*/, kubeClient, cloud); err != nil {
 		return nil, fmt.Errorf("Could not initialize volume plugins for Attach/Detach Controller: %+v", err)
 	}
 

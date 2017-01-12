@@ -98,16 +98,18 @@ func (plugin *quobytePlugin) CanSupport(spec *volume.Spec) bool {
 		return false
 	}
 
-	// If Quobyte is already mounted we don't need to check if the binary is installed
-	if mounter, err := plugin.newMounterInternal(spec, nil, plugin.host.GetMounter()); err == nil {
-		qm, _ := mounter.(*quobyteMounter)
-		pluginDir := plugin.host.GetPluginDir(strings.EscapeQualifiedNameForDisk(quobytePluginName))
-		if mounted, err := qm.pluginDirIsMounted(pluginDir); mounted && err == nil {
-			glog.V(4).Infof("quobyte: can support")
-			return true
+	if plugin.host != nil {
+		// If Quobyte is already mounted we don't need to check if the binary is installed
+		if mounter, err := plugin.newMounterInternal(spec, nil, plugin.host.GetMounter()); err == nil {
+			qm, _ := mounter.(*quobyteMounter)
+			pluginDir := plugin.host.GetPluginDir(strings.EscapeQualifiedNameForDisk(quobytePluginName))
+			if mounted, err := qm.pluginDirIsMounted(pluginDir); mounted && err == nil {
+				glog.V(4).Infof("quobyte: can support")
+				return true
+			}
+		} else {
+			glog.V(4).Infof("quobyte: Error: %v", err)
 		}
-	} else {
-		glog.V(4).Infof("quobyte: Error: %v", err)
 	}
 
 	if out, err := exec.New().Command("ls", "/sbin/mount.quobyte").CombinedOutput(); err == nil {
@@ -162,6 +164,9 @@ func (plugin *quobytePlugin) ConstructVolumeSpec(volumeName, mountPath string) (
 }
 
 func (plugin *quobytePlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, _ volume.VolumeOptions) (volume.Mounter, error) {
+	if plugin.host == nil {
+		return nil, fmt.Errorf("volume plugin %s was not initialized with valid VolumeHost", plugin.GetPluginName())
+	}
 	return plugin.newMounterInternal(spec, pod, plugin.host.GetMounter())
 }
 
@@ -188,6 +193,9 @@ func (plugin *quobytePlugin) newMounterInternal(spec *volume.Spec, pod *v1.Pod, 
 }
 
 func (plugin *quobytePlugin) NewUnmounter(volName string, podUID types.UID) (volume.Unmounter, error) {
+	if plugin.host == nil {
+		return nil, fmt.Errorf("volume plugin %s was not initialized with valid VolumeHost", plugin.GetPluginName())
+	}
 	return plugin.newUnmounterInternal(volName, podUID, plugin.host.GetMounter())
 }
 
