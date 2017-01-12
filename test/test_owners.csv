@@ -30,6 +30,7 @@ ConfigMap should be consumable from pods in volume with mappings as non-root,ape
 ConfigMap should be consumable from pods in volume with mappings as non-root with FSGroup,zmerlynn,1
 ConfigMap should be consumable in multiple volumes in the same pod,caesarxuchao,1
 ConfigMap should be consumable via environment variable,ncdc,1
+ConfigMap should be consumable via the environment,rkouj,0
 ConfigMap updates should be reflected in volume,kevin-wangzefeng,1
 Container Lifecycle Hook when create a pod with lifecycle hook when it is exec hook should execute poststart exec hook properly,kargakis,1
 Container Lifecycle Hook when create a pod with lifecycle hook when it is exec hook should execute prestop exec hook properly,jdef,1
@@ -42,6 +43,7 @@ ContainerLogPath Pod with a container printed log to stdout should print log to 
 CronJob should not emit unexpected warnings,soltysh,1
 CronJob should not schedule jobs when suspended,soltysh,1
 CronJob should not schedule new jobs when ForbidConcurrent,soltysh,1
+CronJob should remove from active list jobs that have been deleted,rkouj,0
 CronJob should replace jobs when ReplaceConcurrent,soltysh,1
 CronJob should schedule multiple jobs concurrently,soltysh,1
 DNS config map should be able to change configuration,derekwaynecarr,0
@@ -62,6 +64,7 @@ Density create a batch of pods with higher API QPS latency/resource should be wi
 Density create a sequence of pods latency/resource should be within limit when create * pods with * background pods,wojtek-t,1
 Density should allow running maximum capacity pods on nodes,smarterclayton,1
 Density should allow starting * pods per node,gmarek,0
+Density should allow starting * pods per node using * with * secrets and * daemons,rkouj,0
 Deployment RecreateDeployment should delete old pods and create new ones,pwittrock,0
 Deployment RollingUpdateDeployment should delete old pods and create new ones,pwittrock,0
 Deployment RollingUpdateDeployment should scale up and down in the right order,pwittrock,0
@@ -139,9 +142,12 @@ Events should be sent by kubelets and the scheduler about pods scheduling and ru
 Federated Services DNS non-local federated service missing local service should never find DNS entries for a missing local service,mml,0
 Federated Services DNS non-local federated service should be able to discover a non-local federated service,jlowdermilk,1
 Federated Services DNS should be able to discover a federated service,derekwaynecarr,1
+Federated Services Service creation should be deleted from underlying clusters when OrphanDependents is false,rkouj,0
 Federated Services Service creation should create matching services in underlying clusters,jbeda,1
 Federated Services Service creation should not be deleted from underlying clusters when it is deleted,sttts,0
 Federated Services Service creation should not be deleted from underlying clusters when it is deleted,madhusudancs,0
+Federated Services Service creation should not be deleted from underlying clusters when OrphanDependents is nil,rkouj,0
+Federated Services Service creation should not be deleted from underlying clusters when OrphanDependents is true,rkouj,0
 Federated Services Service creation should succeed,rmmh,1
 Federated ingresses Federated Ingresses Ingress connectivity and DNS should be able to connect to a federated ingress via its load balancer,rmmh,1
 Federated ingresses Federated Ingresses should be created and deleted successfully,dchen1107,1
@@ -277,6 +283,10 @@ Liveness liveness pods should be automatically restarted,andyzheng0831,1
 Load capacity should be able to handle * pods per node,gmarek,0
 Loadbalancing: L7 GCE shoud create ingress with given static-ip,vulpecula,1
 Loadbalancing: L7 GCE should conform to Ingress spec,andyzheng0831,1
+Liveness liveness pods should be automatically restarted,derekwaynecarr,0
+Load capacity should be able to handle * pods per node * with * secrets and * daemons,rkouj,0
+Loadbalancing: L7 GCE shoud create ingress with given static-ip,derekwaynecarr,0
+Loadbalancing: L7 GCE should conform to Ingress spec,derekwaynecarr,0
 Loadbalancing: L7 Nginx should conform to Ingress spec,ncdc,1
 "Logging soak should survive logging 1KB every * seconds, for a duration of *, scaling up to * pods per node",justinsb,1
 "MemoryEviction when there is memory pressure should evict pods in the correct order (besteffort first, then burstable, then guaranteed)",ixdy,1
@@ -337,6 +347,16 @@ PersistentVolumes with Single PV - PVC pairs should create a non-pre-bound PV an
 PersistentVolumes with multiple PVs and PVCs all in same ns should create 2 PVs and 4 PVCs: test write access,caesarxuchao,1
 PersistentVolumes with multiple PVs and PVCs all in same ns should create 3 PVs and 3 PVCs: test write access,caesarxuchao,1
 PersistentVolumes with multiple PVs and PVCs all in same ns should create 4 PVs and 2 PVCs: test write access,caesarxuchao,1
+PersistentVolumes PersistentVolumes:GCEPD should test that deleting a PVC before the pod does not cause pod deletion to fail on PD detach,copejon,0
+PersistentVolumes PersistentVolumes:GCEPD should test that deleting the PV before the pod does not cause pod deletion to fail on PD detach,copejon,0
+PersistentVolumes PersistentVolumes:NFS with Single PV - PVC pairs create a PV and a pre-bound PVC: test write access,copejon,0
+PersistentVolumes PersistentVolumes:NFS with Single PV - PVC pairs create a PVC and a pre-bound PV: test write access,copejon,0
+PersistentVolumes PersistentVolumes:NFS with Single PV - PVC pairs create a PVC and non-pre-bound PV: test write access,copejon,0
+PersistentVolumes PersistentVolumes:NFS with Single PV - PVC pairs should create a non-pre-bound PV and PVC: test write access,copejon,0
+PersistentVolumes PersistentVolumes:NFS with multiple PVs and PVCs all in same ns should create 2 PVs and 4 PVCs: test write access,copejon,0
+PersistentVolumes PersistentVolumes:NFS with multiple PVs and PVCs all in same ns should create 3 PVs and 3 PVCs: test write access,copejon,0
+PersistentVolumes PersistentVolumes:NFS with multiple PVs and PVCs all in same ns should create 4 PVs and 2 PVCs: test write access,copejon,0
+PersistentVolumes when kubelet restarts *,rkouj,0
 Pet Store should scale to persist a nominal number ( * ) of transactions in * seconds,xiang90,1
 "Pod Disks Should schedule a pod w/ a RW PD, gracefully remove it, then schedule it on another host",alex-mohr,1
 "Pod Disks Should schedule a pod w/ a readonly PD on two hosts, then remove both gracefully.",ghodss,1
@@ -345,7 +365,8 @@ Pet Store should scale to persist a nominal number ( * ) of transactions in * se
 "Pod Disks should schedule a pod w/ a readonly PD on two hosts, then remove both ungracefully.",saad-ali,1
 "Pod Disks should schedule a pod w/two RW PDs both mounted to one container, write to PD, verify contents, delete pod, recreate pod, verify contents, and repeat in rapid succession",saad-ali,0
 Pod garbage collector should handle the creation of 1000 pods,wojtek-t,1
-Pods Delete Grace Period should be submitted and removed,bdbauer,0
+Pods Extended Delete Grace Period should be submitted and removed,rkouj,0
+Pods Extended Pods Set QOS Class should be submitted and removed,rkouj,0
 Pods should allow activeDeadlineSeconds to be updated,derekwaynecarr,0
 Pods should be submitted and removed,davidopp,1
 Pods should be updated,derekwaynecarr,1
@@ -355,9 +376,12 @@ Pods should get a host IP,xiang90,1
 Pods should have their auto-restart back-off timer reset on image update,mikedanese,1
 Pods should support remote command execution over websockets,madhusudancs,1
 Pods should support retrieving logs from the container over websockets,vishh,0
-"Port forwarding With a server that expects a client request should support a client that connects, sends data, and disconnects",sttts,0
-"Port forwarding With a server that expects a client request should support a client that connects, sends no data, and disconnects",sttts,0
-"Port forwarding With a server that expects no client request should support a client that connects, sends no data, and disconnects",sttts,0
+"Port forwarding With a server listening on 0.0.0.0 that expects a client request should support a client that connects, sends data, and disconnects",rkouj,0
+"Port forwarding With a server listening on 0.0.0.0 that expects a client request should support a client that connects, sends no data, and disconnects",rkouj,0
+"Port forwarding With a server listening on 0.0.0.0 that expects no client request should support a client that connects, sends data, and disconnects",rkouj,0
+"Port forwarding With a server listening on localhost that expects a client request should support a client that connects, sends data, and disconnects",rkouj,0
+"Port forwarding With a server listening on localhost that expects a client request should support a client that connects, sends no data, and disconnects",rkouj,0
+"Port forwarding With a server listening on localhost that expects no client request should support a client that connects, sends data, and disconnects",rkouj,0
 PreStop should call prestop when killing a pod,ncdc,1
 PrivilegedPod should test privileged pod,vishh,0
 Probing container should *not* be restarted with a /healthz http liveness probe,Random-Liu,0
@@ -505,6 +529,7 @@ Volumes iSCSI should be mountable,jsafrane,1
 k8s.io/kubernetes/cmd/genutils,rmmh,1
 k8s.io/kubernetes/cmd/hyperkube,jbeda,0
 k8s.io/kubernetes/cmd/kube-apiserver/app,nikhiljindal,0
+k8s.io/kubernetes/cmd/kube-aggregator/pkg/apiserver,brendandburns,0
 k8s.io/kubernetes/cmd/kube-apiserver/app/options,nikhiljindal,0
 k8s.io/kubernetes/cmd/kube-discovery/app,pmorie,1
 k8s.io/kubernetes/cmd/kube-proxy/app,luxas,1
@@ -514,6 +539,14 @@ k8s.io/kubernetes/cmd/kubeadm/app/preflight,apprenda,0
 k8s.io/kubernetes/cmd/kubeadm/app/util,krousey,1
 k8s.io/kubernetes/cmd/kubeadm/test,pipejakob,0
 k8s.io/kubernetes/cmd/kubelet/app,hurf,1
+k8s.io/kubernetes/cmd/kubeadm/app/master,apprenda,0
+k8s.io/kubernetes/cmd/kubeadm/app/node,apprenda,0
+k8s.io/kubernetes/cmd/kubeadm/app/phases/certs,rkouj,0
+k8s.io/kubernetes/cmd/kubeadm/app/phases/kubeconfig,rkouj,0
+k8s.io/kubernetes/cmd/kubeadm/app/preflight,apprenda,0
+k8s.io/kubernetes/cmd/kubeadm/app/util,krousey,1
+k8s.io/kubernetes/cmd/kubeadm/test,pipejakob,0
+k8s.io/kubernetes/cmd/kubelet/app,derekwaynecarr,0
 k8s.io/kubernetes/cmd/libs/go2idl/client-gen/types,caesarxuchao,0
 k8s.io/kubernetes/cmd/libs/go2idl/go-to-protobuf/protobuf,smarterclayton,0
 k8s.io/kubernetes/cmd/libs/go2idl/openapi-gen/generators,davidopp,1
@@ -551,6 +584,7 @@ k8s.io/kubernetes/pkg/api/install,timothysc,1
 k8s.io/kubernetes/pkg/api/meta,fabioy,1
 k8s.io/kubernetes/pkg/api/pod,piosz,1
 k8s.io/kubernetes/pkg/api/resource,smarterclayton,1
+k8s.io/kubernetes/pkg/api/rest,rkouj,0
 k8s.io/kubernetes/pkg/api/service,spxtr,1
 k8s.io/kubernetes/pkg/api/testapi,caesarxuchao,1
 k8s.io/kubernetes/pkg/api/unversioned,kevin-wangzefeng,1
@@ -564,10 +598,12 @@ k8s.io/kubernetes/pkg/api/v1/endpoints,madhusudancs,0
 k8s.io/kubernetes/pkg/api/v1/pod,madhusudancs,0
 k8s.io/kubernetes/pkg/api/v1/service,madhusudancs,0
 k8s.io/kubernetes/pkg/api/validation,smarterclayton,1
+k8s.io/kubernetes/pkg/api/validation/genericvalidation,rkouj,0
 k8s.io/kubernetes/pkg/api/validation/path,luxas,1
 k8s.io/kubernetes/pkg/apimachinery,gmarek,1
 k8s.io/kubernetes/pkg/apimachinery/announced,kargakis,1
 k8s.io/kubernetes/pkg/apimachinery/registered,jlowdermilk,1
+k8s.io/kubernetes/pkg/apimachinery/tests,rkouj,0
 k8s.io/kubernetes/pkg/apis/abac/v0,liggitt,0
 k8s.io/kubernetes/pkg/apis/apps/validation,derekwaynecarr,1
 k8s.io/kubernetes/pkg/apis/authorization/validation,erictune,0
@@ -580,6 +616,8 @@ k8s.io/kubernetes/pkg/apis/componentconfig,jbeda,1
 k8s.io/kubernetes/pkg/apis/extensions,bgrant0607,1
 k8s.io/kubernetes/pkg/apis/extensions/v1beta1,madhusudancs,1
 k8s.io/kubernetes/pkg/apis/extensions/validation,nikhiljindal,1
+k8s.io/kubernetes/pkg/apis/meta/v1,sttts,0
+k8s.io/kubernetes/pkg/apis/meta/v1/validation,smarterclayton,0
 k8s.io/kubernetes/pkg/apis/policy/validation,deads2k,1
 k8s.io/kubernetes/pkg/apis/rbac/validation,erictune,0
 k8s.io/kubernetes/pkg/apis/storage/validation,caesarxuchao,1
@@ -597,6 +635,7 @@ k8s.io/kubernetes/pkg/client/leaderelection,xiang90,1
 k8s.io/kubernetes/pkg/client/listers/batch/internalversion,mqliang,0
 k8s.io/kubernetes/pkg/client/record,karlkfi,1
 k8s.io/kubernetes/pkg/client/restclient,kargakis,1
+k8s.io/kubernetes/pkg/client/restclient/watch,rkouj,0
 k8s.io/kubernetes/pkg/client/retry,caesarxuchao,1
 k8s.io/kubernetes/pkg/client/testing/cache,mikedanese,1
 k8s.io/kubernetes/pkg/client/testing/core,maisem,1
@@ -620,6 +659,8 @@ k8s.io/kubernetes/pkg/cloudprovider/providers/photon,luomiao,0
 k8s.io/kubernetes/pkg/cloudprovider/providers/rackspace,caesarxuchao,1
 k8s.io/kubernetes/pkg/cloudprovider/providers/vsphere,apelisse,1
 k8s.io/kubernetes/pkg/controller,mikedanese,1
+k8s.io/kubernetes/pkg/controller/certificates,rkouj,0
+k8s.io/kubernetes/pkg/controller/cloud,rkouj,0
 k8s.io/kubernetes/pkg/controller/cronjob,soltysh,1
 k8s.io/kubernetes/pkg/controller/daemon,Q-Lee,1
 k8s.io/kubernetes/pkg/controller/deployment,asalkeld,0
@@ -657,6 +698,12 @@ k8s.io/kubernetes/pkg/dns/treecache,bowei,0
 k8s.io/kubernetes/pkg/fieldpath,childsb,1
 k8s.io/kubernetes/pkg/fields,jsafrane,1
 k8s.io/kubernetes/pkg/genericapiserver,nikhiljindal,0
+k8s.io/kubernetes/pkg/genericapiserver/api,nikhiljindal,0
+k8s.io/kubernetes/pkg/genericapiserver/api/filters,dchen1107,1
+k8s.io/kubernetes/pkg/genericapiserver/api/handlers,rkouj,0
+k8s.io/kubernetes/pkg/genericapiserver/api/handlers/negotiation,rkouj,0
+k8s.io/kubernetes/pkg/genericapiserver/api/handlers/responsewriters,rkouj,0
+k8s.io/kubernetes/pkg/genericapiserver/api/request,lavalamp,1
 k8s.io/kubernetes/pkg/genericapiserver/authorizer,lavalamp,1
 k8s.io/kubernetes/pkg/genericapiserver/filters,dchen1107,1
 k8s.io/kubernetes/pkg/genericapiserver/mux,spxtr,1
@@ -664,6 +711,9 @@ k8s.io/kubernetes/pkg/genericapiserver/openapi,davidopp,1
 k8s.io/kubernetes/pkg/genericapiserver/routes,vishh,1
 k8s.io/kubernetes/pkg/healthz,thockin,1
 k8s.io/kubernetes/pkg/httplog,mtaufen,1
+k8s.io/kubernetes/pkg/httplog,mtaufen,1
+k8s.io/kubernetes/pkg/kubeapiserver/admission,rkouj,0
+k8s.io/kubernetes/pkg/kubeapiserver/authorizer,rkouj,0
 k8s.io/kubernetes/pkg/kubectl,madhusudancs,1
 k8s.io/kubernetes/pkg/kubectl/cmd,rmmh,1
 k8s.io/kubernetes/pkg/kubectl/cmd/config,asalkeld,0
@@ -791,6 +841,7 @@ k8s.io/kubernetes/pkg/registry/generic/registry,jsafrane,1
 k8s.io/kubernetes/pkg/registry/generic/rest,smarterclayton,1
 k8s.io/kubernetes/pkg/registry/policy/poddisruptionbudget,Q-Lee,1
 k8s.io/kubernetes/pkg/registry/policy/poddisruptionbudget/etcd,xiang90,1
+k8s.io/kubernetes/pkg/registry/rbac/validation,rkouj,0
 k8s.io/kubernetes/pkg/registry/storage/storageclass,brendandburns,1
 k8s.io/kubernetes/pkg/registry/storage/storageclass/etcd,eparis,1
 k8s.io/kubernetes/pkg/runtime,wojtek-t,0
@@ -798,7 +849,6 @@ k8s.io/kubernetes/pkg/runtime/schema,sttts,0
 k8s.io/kubernetes/pkg/runtime/schema,madhusudancs,0
 k8s.io/kubernetes/pkg/runtime/serializer,wojtek-t,0
 k8s.io/kubernetes/pkg/runtime/serializer/json,wojtek-t,0
-k8s.io/kubernetes/pkg/runtime/serializer/protobuf,wojtek-t,0
 k8s.io/kubernetes/pkg/runtime/serializer/recognizer/testing,wojtek-t,0
 k8s.io/kubernetes/pkg/runtime/serializer/streaming,wojtek-t,0
 k8s.io/kubernetes/pkg/runtime/serializer/versioning,wojtek-t,0
@@ -901,7 +951,6 @@ k8s.io/kubernetes/pkg/volume/util,saad-ali,0
 k8s.io/kubernetes/pkg/volume/util/nestedpendingoperations,freehan,1
 k8s.io/kubernetes/pkg/volume/vsphere_volume,deads2k,1
 k8s.io/kubernetes/pkg/watch,mwielgus,1
-k8s.io/kubernetes/pkg/watch/versioned,childsb,1
 k8s.io/kubernetes/plugin/pkg/admission/admit,piosz,1
 k8s.io/kubernetes/plugin/pkg/admission/alwayspullimages,kargakis,1
 k8s.io/kubernetes/plugin/pkg/admission/antiaffinity,timothysc,1
