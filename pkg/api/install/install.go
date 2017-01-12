@@ -102,6 +102,7 @@ func newRESTMapper(externalVersions []schema.GroupVersion) meta.RESTMapper {
 		"PodLogOptions",
 		"PodExecOptions",
 		"PodAttachOptions",
+		"PodPortForwardOptions",
 		"PodProxyOptions",
 		"NodeProxyOptions",
 		"ServiceProxyOptions",
