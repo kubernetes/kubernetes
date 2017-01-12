@@ -362,8 +362,8 @@ func TestResponsibleForPod(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		podOfDefault := factoryDefaultScheduler.responsibleForPod(test.pod)
-		podOfFoo := factoryFooScheduler.responsibleForPod(test.pod)
+		podOfDefault := factoryDefaultScheduler.ResponsibleForPod(test.pod)
+		podOfFoo := factoryFooScheduler.ResponsibleForPod(test.pod)
 		results := []bool{podOfDefault, podOfFoo}
 		expected := []bool{test.pickedByDefault, test.pickedByFoo}
 		if !reflect.DeepEqual(results, expected) {
