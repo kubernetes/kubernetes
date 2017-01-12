@@ -19,8 +19,8 @@ package union
 import (
 	"strings"
 
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
-	utilerrors "k8s.io/client-go/pkg/util/errors"
 )
 
 // unionAuthzHandler authorizer against a chain of authorizer.Authorizer

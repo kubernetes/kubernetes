@@ -19,7 +19,7 @@ package allocator
 import (
 	"testing"
 
-	"k8s.io/client-go/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 func TestAllocate(t *testing.T) {
