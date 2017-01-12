@@ -35,7 +35,7 @@ go_library(
         "//pkg/apis/batch/install:go_default_library",
         "//pkg/apis/batch/v1:go_default_library",
         "//pkg/apis/certificates/install:go_default_library",
-        "//pkg/apis/certificates/v1alpha1:go_default_library",
+        "//pkg/apis/certificates/v1beta1:go_default_library",
         "//pkg/apis/componentconfig/install:go_default_library",
         "//pkg/apis/extensions/install:go_default_library",
         "//pkg/apis/extensions/v1beta1:go_default_library",

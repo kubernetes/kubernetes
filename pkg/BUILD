@@ -52,7 +52,7 @@ filegroup(
         "//pkg/client/listers/batch/v1:all-srcs",
         "//pkg/client/listers/batch/v2alpha1:all-srcs",
         "//pkg/client/listers/certificates/internalversion:all-srcs",
-        "//pkg/client/listers/certificates/v1alpha1:all-srcs",
+        "//pkg/client/listers/certificates/v1beta1:all-srcs",
         "//pkg/client/listers/core/internalversion:all-srcs",
         "//pkg/client/listers/core/v1:all-srcs",
         "//pkg/client/listers/extensions/internalversion:all-srcs",

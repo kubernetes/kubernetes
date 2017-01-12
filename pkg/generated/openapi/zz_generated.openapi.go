@@ -8873,216 +8873,6 @@ var OpenAPIDefinitions *openapi.OpenAPIDefinitions = &openapi.OpenAPIDefinitions
 		Dependencies: []string{
 			"runtime.RawExtension"},
 	},
-	"v1alpha1.CertificateSigningRequest": {
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "Describes a certificate signing request",
-				Properties: map[string]spec.Schema{
-					"kind": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-					"apiVersion": {
-						SchemaProps: spec.SchemaProps{
-							Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-					"metadata": {
-						SchemaProps: spec.SchemaProps{
-							Ref: spec.MustCreateRef("#/definitions/v1.ObjectMeta"),
-						},
-					},
-					"spec": {
-						SchemaProps: spec.SchemaProps{
-							Description: "The certificate request itself and any additional information.",
-							Ref:         spec.MustCreateRef("#/definitions/v1alpha1.CertificateSigningRequestSpec"),
-						},
-					},
-					"status": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Derived information about the request.",
-							Ref:         spec.MustCreateRef("#/definitions/v1alpha1.CertificateSigningRequestStatus"),
-						},
-					},
-				},
-			},
-		},
-		Dependencies: []string{
-			"v1.ObjectMeta", "v1alpha1.CertificateSigningRequestSpec", "v1alpha1.CertificateSigningRequestStatus"},
-	},
-	"v1alpha1.CertificateSigningRequestCondition": {
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Properties: map[string]spec.Schema{
-					"type": {
-						SchemaProps: spec.SchemaProps{
-							Description: "request approval state, currently Approved or Denied.",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-					"reason": {
-						SchemaProps: spec.SchemaProps{
-							Description: "brief reason for the request state",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-					"message": {
-						SchemaProps: spec.SchemaProps{
-							Description: "human readable message with details about the request state",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-					"lastUpdateTime": {
-						SchemaProps: spec.SchemaProps{
-							Description: "timestamp for the last update to this condition",
-							Ref:         spec.MustCreateRef("#/definitions/v1.Time"),
-						},
-					},
-				},
-				Required: []string{"type"},
-			},
-		},
-		Dependencies: []string{
-			"v1.Time"},
-	},
-	"v1alpha1.CertificateSigningRequestList": {
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Properties: map[string]spec.Schema{
-					"kind": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-					"apiVersion": {
-						SchemaProps: spec.SchemaProps{
-							Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-					"metadata": {
-						SchemaProps: spec.SchemaProps{
-							Ref: spec.MustCreateRef("#/definitions/v1.ListMeta"),
-						},
-					},
-					"items": {
-						SchemaProps: spec.SchemaProps{
-							Type: []string{"array"},
-							Items: &spec.SchemaOrArray{
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Ref: spec.MustCreateRef("#/definitions/v1alpha1.CertificateSigningRequest"),
-									},
-								},
-							},
-						},
-					},
-				},
-				Required: []string{"items"},
-			},
-		},
-		Dependencies: []string{
-			"v1.ListMeta", "v1alpha1.CertificateSigningRequest"},
-	},
-	"v1alpha1.CertificateSigningRequestSpec": {
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "This information is immutable after the request is created. Only the Request and ExtraInfo fields can be set on creation, other fields are derived by Kubernetes and cannot be modified by users.",
-				Properties: map[string]spec.Schema{
-					"request": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Base64-encoded PKCS#10 CSR data",
-							Type:        []string{"string"},
-							Format:      "byte",
-						},
-					},
-					"usages": {
-						SchemaProps: spec.SchemaProps{
-							Description: "allowedUsages specifies a set of usage contexts the key will be valid for. See: https://tools.ietf.org/html/rfc5280#section-4.2.1.3\n     https://tools.ietf.org/html/rfc5280#section-4.2.1.12",
-							Type:        []string{"array"},
-							Items: &spec.SchemaOrArray{
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Type:   []string{"string"},
-										Format: "",
-									},
-								},
-							},
-						},
-					},
-					"username": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Information about the requesting user (if relevant) See user.Info interface for details",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-					"uid": {
-						SchemaProps: spec.SchemaProps{
-							Type:   []string{"string"},
-							Format: "",
-						},
-					},
-					"groups": {
-						SchemaProps: spec.SchemaProps{
-							Type: []string{"array"},
-							Items: &spec.SchemaOrArray{
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Type:   []string{"string"},
-										Format: "",
-									},
-								},
-							},
-						},
-					},
-				},
-				Required: []string{"request"},
-			},
-		},
-		Dependencies: []string{},
-	},
-	"v1alpha1.CertificateSigningRequestStatus": {
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Properties: map[string]spec.Schema{
-					"conditions": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Conditions applied to the request, such as approval or denial.",
-							Type:        []string{"array"},
-							Items: &spec.SchemaOrArray{
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Ref: spec.MustCreateRef("#/definitions/v1alpha1.CertificateSigningRequestCondition"),
-									},
-								},
-							},
-						},
-					},
-					"certificate": {
-						SchemaProps: spec.SchemaProps{
-							Description: "If request was approved, the controller will place the issued certificate here.",
-							Type:        []string{"string"},
-							Format:      "byte",
-						},
-					},
-				},
-			},
-		},
-		Dependencies: []string{
-			"v1alpha1.CertificateSigningRequestCondition"},
-	},
 	"v1alpha1.ClusterRole": {
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -11114,6 +10904,216 @@ var OpenAPIDefinitions *openapi.OpenAPIDefinitions = &openapi.OpenAPIDefinitions
 			},
 		},
 		Dependencies: []string{},
+	},
+	"v1beta1.CertificateSigningRequest": {
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "Describes a certificate signing request",
+				Properties: map[string]spec.Schema{
+					"kind": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"apiVersion": {
+						SchemaProps: spec.SchemaProps{
+							Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"metadata": {
+						SchemaProps: spec.SchemaProps{
+							Ref: spec.MustCreateRef("#/definitions/v1.ObjectMeta"),
+						},
+					},
+					"spec": {
+						SchemaProps: spec.SchemaProps{
+							Description: "The certificate request itself and any additional information.",
+							Ref:         spec.MustCreateRef("#/definitions/v1beta1.CertificateSigningRequestSpec"),
+						},
+					},
+					"status": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Derived information about the request.",
+							Ref:         spec.MustCreateRef("#/definitions/v1beta1.CertificateSigningRequestStatus"),
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			"v1.ObjectMeta", "v1beta1.CertificateSigningRequestSpec", "v1beta1.CertificateSigningRequestStatus"},
+	},
+	"v1beta1.CertificateSigningRequestCondition": {
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Properties: map[string]spec.Schema{
+					"type": {
+						SchemaProps: spec.SchemaProps{
+							Description: "request approval state, currently Approved or Denied.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"reason": {
+						SchemaProps: spec.SchemaProps{
+							Description: "brief reason for the request state",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"message": {
+						SchemaProps: spec.SchemaProps{
+							Description: "human readable message with details about the request state",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"lastUpdateTime": {
+						SchemaProps: spec.SchemaProps{
+							Description: "timestamp for the last update to this condition",
+							Ref:         spec.MustCreateRef("#/definitions/v1.Time"),
+						},
+					},
+				},
+				Required: []string{"type"},
+			},
+		},
+		Dependencies: []string{
+			"v1.Time"},
+	},
+	"v1beta1.CertificateSigningRequestList": {
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Properties: map[string]spec.Schema{
+					"kind": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"apiVersion": {
+						SchemaProps: spec.SchemaProps{
+							Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"metadata": {
+						SchemaProps: spec.SchemaProps{
+							Ref: spec.MustCreateRef("#/definitions/v1.ListMeta"),
+						},
+					},
+					"items": {
+						SchemaProps: spec.SchemaProps{
+							Type: []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: spec.MustCreateRef("#/definitions/v1beta1.CertificateSigningRequest"),
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"items"},
+			},
+		},
+		Dependencies: []string{
+			"v1.ListMeta", "v1beta1.CertificateSigningRequest"},
+	},
+	"v1beta1.CertificateSigningRequestSpec": {
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "This information is immutable after the request is created. Only the Request and ExtraInfo fields can be set on creation, other fields are derived by Kubernetes and cannot be modified by users.",
+				Properties: map[string]spec.Schema{
+					"request": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Base64-encoded PKCS#10 CSR data",
+							Type:        []string{"string"},
+							Format:      "byte",
+						},
+					},
+					"usages": {
+						SchemaProps: spec.SchemaProps{
+							Description: "allowedUsages specifies a set of usage contexts the key will be valid for. See: https://tools.ietf.org/html/rfc5280#section-4.2.1.3\n     https://tools.ietf.org/html/rfc5280#section-4.2.1.12",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Type:   []string{"string"},
+										Format: "",
+									},
+								},
+							},
+						},
+					},
+					"username": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Information about the requesting user (if relevant) See user.Info interface for details",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"uid": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"string"},
+							Format: "",
+						},
+					},
+					"groups": {
+						SchemaProps: spec.SchemaProps{
+							Type: []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Type:   []string{"string"},
+										Format: "",
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"request"},
+			},
+		},
+		Dependencies: []string{},
+	},
+	"v1beta1.CertificateSigningRequestStatus": {
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Properties: map[string]spec.Schema{
+					"conditions": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Conditions applied to the request, such as approval or denial.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: spec.MustCreateRef("#/definitions/v1beta1.CertificateSigningRequestCondition"),
+									},
+								},
+							},
+						},
+					},
+					"certificate": {
+						SchemaProps: spec.SchemaProps{
+							Description: "If request was approved, the controller will place the issued certificate here.",
+							Type:        []string{"string"},
+							Format:      "byte",
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			"v1beta1.CertificateSigningRequestCondition"},
 	},
 	"v1beta1.Cluster": {
 		Schema: spec.Schema{
