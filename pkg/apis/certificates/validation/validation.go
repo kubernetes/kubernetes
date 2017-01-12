@@ -50,8 +50,14 @@ func ValidateCertificateSigningRequest(csr *certificates.CertificateSigningReque
 	isNamespaced := false
 	allErrs := apivalidation.ValidateObjectMeta(&csr.ObjectMeta, isNamespaced, ValidateCertificateRequestName, field.NewPath("metadata"))
 	err := validateCSR(csr)
+
+	specPath := field.NewPath("spec")
+
 	if err != nil {
-		allErrs = append(allErrs, field.Invalid(field.NewPath("request"), csr.Spec.Request, fmt.Sprintf("%v", err)))
+		allErrs = append(allErrs, field.Invalid(specPath.Child("request"), csr.Spec.Request, fmt.Sprintf("%v", err)))
+	}
+	if len(csr.Spec.Usages) == 0 {
+		allErrs = append(allErrs, field.Required(specPath.Child("usages"), "usages must be provided"))
 	}
 	return allErrs
 }

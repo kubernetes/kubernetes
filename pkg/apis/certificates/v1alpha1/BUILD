@@ -11,6 +11,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "conversion.go",
+        "defaults.go",
         "doc.go",
         "generated.pb.go",
         "register.go",
