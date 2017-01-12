@@ -250,7 +250,7 @@ func (f *ConfigFactory) GetClient() clientset.Interface {
 
 // GetScheduledPodListerIndexer is another (self-explanatory) function only used in rare external circumstances (i.e. testing)
 func (c *ConfigFactory) GetScheduledPodListerIndexer() *cache.Indexer {
-	return c.scheduledPodLister.Indexer
+	return &c.scheduledPodLister.Indexer
 }
 
 // TODO(harryz) need to update all the handlers here and below for equivalence cache
