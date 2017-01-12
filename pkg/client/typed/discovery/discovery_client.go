@@ -129,9 +129,6 @@ func (d *DiscoveryClient) ServerGroups() (apiGroupList *metav1.APIGroupList, err
 	if err != nil && !errors.IsNotFound(err) && !errors.IsForbidden(err) {
 		return nil, err
 	}
-	if len(v.Versions) == 0 {
-		return nil, fmt.Errorf("APIVersions shouldn't be empty")
-	}
 
 	// Get the groupVersions exposed at /apis
 	apiGroupList = &metav1.APIGroupList{}
