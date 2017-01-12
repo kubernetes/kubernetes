@@ -21,6 +21,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/route53"
 	"k8s.io/kubernetes/federation/pkg/dnsprovider"
 	"k8s.io/kubernetes/federation/pkg/dnsprovider/rrstype"
+	"strings"
 )
 
 // Compile time check for interface adherence
@@ -30,17 +31,44 @@ type ResourceRecordSets struct {
 	zone *Zone
 }
 
-func (rrsets ResourceRecordSets) List() ([]dnsprovider.ResourceRecordSet, error) {
+func (rrsets ResourceRecordSets) List(filterName string, filterType rrstype.RrsType) ([]dnsprovider.ResourceRecordSet, error) {
 	input := route53.ListResourceRecordSetsInput{
 		HostedZoneId: rrsets.zone.impl.Id,
 	}
 
+	if filterName != "" {
+		if !strings.HasSuffix(filterName, ".") {
+			filterName += "."
+		}
+		input.StartRecordName = aws.String(filterName)
+
+		// filterType can only be pushed down to AWS with a name
+		if filterType != "" {
+			input.StartRecordType = aws.String(string(filterType))
+		}
+	}
 	var list []dnsprovider.ResourceRecordSet
 	err := rrsets.zone.zones.interface_.service.ListResourceRecordSetsPages(&input, func(page *route53.ListResourceRecordSetsOutput, lastPage bool) bool {
+		done := false
 		for _, rrset := range page.ResourceRecordSets {
-			list = append(list, &ResourceRecordSet{rrset, &rrsets})
+			rrs := &ResourceRecordSet{rrset, &rrsets}
+			if filterType != "" && rrs.Type() != filterType {
+				continue
+			}
+			if filterName != "" {
+				rrsName := rrs.Name()
+				if !strings.HasSuffix(rrsName, ".") {
+					rrsName += "."
+				}
+				if rrsName != filterName {
+					// We have gone past the name we are looking for; we can stop paging through
+					done = true
+					continue
+				}
+			}
+			list = append(list, rrs)
 		}
-		return true
+		return !done
 	})
 	if err != nil {
 		return nil, err
@@ -50,7 +78,7 @@ func (rrsets ResourceRecordSets) List() ([]dnsprovider.ResourceRecordSet, error)
 
 func (rrsets ResourceRecordSets) Get(name string) (dnsprovider.ResourceRecordSet, error) {
 	var newRrset dnsprovider.ResourceRecordSet
-	rrsetList, err := rrsets.List()
+	rrsetList, err := rrsets.List(name, "")
 	if err != nil {
 		return nil, err
 	}

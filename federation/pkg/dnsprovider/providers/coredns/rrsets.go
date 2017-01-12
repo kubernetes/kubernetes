@@ -35,7 +35,7 @@ type ResourceRecordSets struct {
 	zone *Zone
 }
 
-func (rrsets ResourceRecordSets) List() ([]dnsprovider.ResourceRecordSet, error) {
+func (rrsets ResourceRecordSets) List(filterName string, filterType rrstype.RrsType) ([]dnsprovider.ResourceRecordSet, error) {
 	var list []dnsprovider.ResourceRecordSet
 	return list, fmt.Errorf("OperationNotSupported")
 }

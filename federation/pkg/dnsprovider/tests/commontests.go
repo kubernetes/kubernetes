@@ -124,7 +124,7 @@ func getRrOrFail(t *testing.T, rrsets dnsprovider.ResourceRecordSets, name strin
 func assertHasRecord(t *testing.T, rrsets dnsprovider.ResourceRecordSets, rrset dnsprovider.ResourceRecordSet) {
 	var found dnsprovider.ResourceRecordSet
 
-	rrs, err := rrsets.List()
+	rrs, err := rrsets.List("", "")
 	if err != nil {
 		if err.Error() == "OperationNotSupported" {
 			found = getRrOrFail(t, rrsets, rrset.Name())

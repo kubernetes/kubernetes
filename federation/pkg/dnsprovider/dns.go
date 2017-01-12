@@ -51,7 +51,10 @@ type Zone interface {
 
 type ResourceRecordSets interface {
 	// List returns the ResourceRecordSets of the Zone, or an error if the list operation failed.
-	List() ([]ResourceRecordSet, error)
+	// If filterName is non-empty, only ResourceRecordSets with the given name will be returned
+	// If filterType is non-empty, only ResourceRecordSets with the given type will be returned
+	// If filterType is specified without specifying filterName, an error may be returned
+	List(filterName string, filterType rrstype.RrsType) ([]ResourceRecordSet, error)
 	// Get returns the ResourceRecordSet with the name in the Zone. if the named resource record set does not exist, but no error occurred, the returned set, and error, are both nil.
 	Get(name string) (ResourceRecordSet, error)
 	// New allocates a new ResourceRecordSet, which can then be passed to ResourceRecordChangeset Add() or Remove()
