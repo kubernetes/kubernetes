@@ -14,26 +14,25 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1alpha1
+package v1beta1
 
 import (
-	"fmt"
-
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/kubernetes/pkg/api"
+	"crypto/x509"
+	"encoding/pem"
+	"errors"
 )
 
-func addConversionFuncs(scheme *runtime.Scheme) error {
-	// Add non-generated conversion functions here. Currently there are none.
-
-	return api.Scheme.AddFieldLabelConversionFunc(SchemeGroupVersion.String(), "CertificateSigningRequest",
-		func(label, value string) (string, string, error) {
-			switch label {
-			case "metadata.name":
-				return label, value, nil
-			default:
-				return "", "", fmt.Errorf("field label not supported: %s", label)
-			}
-		},
-	)
+// ParseCSR extracts the CSR from the API object and decodes it.
+func ParseCSR(obj *CertificateSigningRequest) (*x509.CertificateRequest, error) {
+	// extract PEM from request object
+	pemBytes := obj.Spec.Request
+	block, _ := pem.Decode(pemBytes)
+	if block == nil || block.Type != "CERTIFICATE REQUEST" {
+		return nil, errors.New("PEM block type must be CERTIFICATE REQUEST")
+	}
+	csr, err := x509.ParseCertificateRequest(block.Bytes)
+	if err != nil {
+		return nil, err
+	}
+	return csr, nil
 }

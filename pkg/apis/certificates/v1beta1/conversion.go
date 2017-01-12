@@ -14,10 +14,26 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// +k8s:deepcopy-gen=package,register
-// +k8s:conversion-gen=k8s.io/kubernetes/pkg/apis/certificates
-// +k8s:openapi-gen=true
-// +k8s:defaulter-gen=TypeMeta
+package v1beta1
 
-// +groupName=certificates.k8s.io
-package v1alpha1 // import "k8s.io/kubernetes/pkg/apis/certificates/v1alpha1"
+import (
+	"fmt"
+
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/kubernetes/pkg/api"
+)
+
+func addConversionFuncs(scheme *runtime.Scheme) error {
+	// Add non-generated conversion functions here. Currently there are none.
+
+	return api.Scheme.AddFieldLabelConversionFunc(SchemeGroupVersion.String(), "CertificateSigningRequest",
+		func(label, value string) (string, string, error) {
+			switch label {
+			case "metadata.name":
+				return label, value, nil
+			default:
+				return "", "", fmt.Errorf("field label not supported: %s", label)
+			}
+		},
+	)
+}
