@@ -51,7 +51,3 @@ shopt -u dotglob
 
 # Replace with placeholder docs
 kube::util::set-placeholder-gen-docs
-
-echo "Generated docs have been placed in the repository tree. Running hack/update-munge-docs.sh."
-
-"${KUBE_ROOT}/hack/update-munge-docs.sh"
