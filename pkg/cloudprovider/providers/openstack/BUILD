@@ -72,6 +72,7 @@ go_test(
         "//pkg/api/v1:go_default_library",
         "//pkg/cloudprovider:go_default_library",
         "//vendor:github.com/gophercloud/gophercloud",
+        "//vendor:github.com/gophercloud/gophercloud/openstack/blockstorage/v1/apiversions",
         "//vendor:github.com/gophercloud/gophercloud/openstack/compute/v2/servers",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/types",
