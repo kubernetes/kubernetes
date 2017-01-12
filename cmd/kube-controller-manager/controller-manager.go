@@ -43,7 +43,7 @@ func init() {
 
 func main() {
 	s := options.NewCMServer()
-	s.AddFlags(pflag.CommandLine)
+	s.AddFlags(pflag.CommandLine, app.KnownControllers(), app.ControllersDisabledByDefault.List())
 
 	flag.InitFlags()
 	logs.InitLogs()

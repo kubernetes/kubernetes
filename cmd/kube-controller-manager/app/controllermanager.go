@@ -32,6 +32,7 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/healthz"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/app/options"
@@ -71,7 +72,7 @@ const (
 // NewControllerManagerCommand creates a *cobra.Command object with default parameters
 func NewControllerManagerCommand() *cobra.Command {
 	s := options.NewCMServer()
-	s.AddFlags(pflag.CommandLine)
+	s.AddFlags(pflag.CommandLine, KnownControllers(), ControllersDisabledByDefault.List())
 	cmd := &cobra.Command{
 		Use: "kube-controller-manager",
 		Long: `The Kubernetes controller manager is a daemon that embeds
@@ -98,6 +99,10 @@ func ResyncPeriod(s *options.CMServer) func() time.Duration {
 
 // Run runs the CMServer.  This should never exit.
 func Run(s *options.CMServer) error {
+	if err := s.Validate(KnownControllers(), ControllersDisabledByDefault.List()); err != nil {
+		return err
+	}
+
 	if c, err := configz.New("componentconfig"); err == nil {
 		c.Set(s.KubeControllerManagerConfiguration)
 	} else {
@@ -216,10 +221,45 @@ type ControllerContext struct {
 	Stop <-chan struct{}
 }
 
+func (c ControllerContext) IsControllerEnabled(name string) bool {
+	return IsControllerEnabled(name, ControllersDisabledByDefault, c.Options.Controllers...)
+}
+
+func IsControllerEnabled(name string, disabledByDefaultControllers sets.String, controllers ...string) bool {
+	hasStar := false
+	for _, controller := range controllers {
+		if controller == name {
+			return true
+		}
+		if controller == "-"+name {
+			return false
+		}
+		if controller == "*" {
+			hasStar = true
+		}
+	}
+	// if we get here, there was no explicit choice
+	if !hasStar {
+		// nothing on by default
+		return false
+	}
+	if disabledByDefaultControllers.Has(name) {
+		return false
+	}
+
+	return true
+}
+
 // InitFunc is used to launch a particular controller.  It may run additional "should I activate checks".
 // Any error returned will cause the controller process to `Fatal`
 // The bool indicates whether the controller was enabled.
 type InitFunc func(ctx ControllerContext) (bool, error)
+
+func KnownControllers() []string {
+	return sets.StringKeySet(newControllerInitializers()).List()
+}
+
+var ControllersDisabledByDefault = sets.NewString()
 
 func newControllerInitializers() map[string]InitFunc {
 	controllers := map[string]InitFunc{}
@@ -330,6 +370,11 @@ func StartControllers(controllers map[string]InitFunc, s *options.CMServer, root
 	}
 
 	for controllerName, initFn := range controllers {
+		if !ctx.IsControllerEnabled(controllerName) {
+			glog.Warningf("%q is disabled", controllerName)
+			continue
+		}
+
 		time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
 
 		glog.V(1).Infof("Starting %q", controllerName)
