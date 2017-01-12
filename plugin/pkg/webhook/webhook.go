@@ -21,13 +21,13 @@ import (
 	"fmt"
 	"time"
 
+	"k8s.io/apimachinery/pkg/apimachinery/registered"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/pkg/api"
 	apierrors "k8s.io/client-go/pkg/api/errors"
-	"k8s.io/client-go/pkg/apimachinery/registered"
-	"k8s.io/client-go/pkg/runtime"
-	"k8s.io/client-go/pkg/runtime/schema"
-	runtimeserializer "k8s.io/client-go/pkg/runtime/serializer"
-	"k8s.io/client-go/pkg/util/wait"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 
