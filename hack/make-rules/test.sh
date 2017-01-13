@@ -263,14 +263,14 @@ runTests() {
         ${KUBE_TIMEOUT} \
         -cover -covermode=\"${KUBE_COVERMODE}\" \
         -coverprofile=\"${cover_report_dir}/\${_pkg}/${cover_profile}\" \
-        \"${_pkg}\" \
+        \"\${_pkg}\" \
         ${testargs[@]:+${testargs[@]}}
       go test ${goflags[@]:+${goflags[@]}} \
         ${KUBE_RACE} \
         ${KUBE_TIMEOUT} \
         -cover -covermode=\"${KUBE_COVERMODE}\" \
         -coverprofile=\"${cover_report_dir}/\${_pkg}/${cover_profile}\" \
-        \"${_pkg}\" \
+        \"\${_pkg}\" \
         ${testargs[@]:+${testargs[@]}} \
       | tee ${junit_filename_prefix:+\"${junit_filename_prefix}-\$_pkg_out.stdout\"} \
       | grep \"${go_test_grep_pattern}\"" \
