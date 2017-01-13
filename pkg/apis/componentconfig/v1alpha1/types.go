@@ -605,3 +605,31 @@ type AdmissionPluginConfiguration struct {
 	// +optional
 	Configuration runtime.RawExtension `json:"configuration"`
 }
+
+// ResourceQuotaConfiguration provides configuration for the ResourceQuota
+// admission controller.
+type ResourceQuotaConfiguration struct {
+	metav1.TypeMeta `json:",inline"`
+
+	// LimitedResources whose consumption is limited by default.
+	// +optional
+	LimitedResources []LimitedResource `json:"limitedResources"`
+}
+
+// LimitedResource matches a resource whose consumption is limited by default.
+// To consume the resource, there must exist an associated quota that limits
+// its consumption.
+type LimitedResource struct {
+	// API group of the object.
+	// +optional
+	APIGroup string `json:"apiGroup"`
+
+	// API resource of the object.
+	APIResource string `json:"apiResource"`
+
+	// If a resource name tracked by quota for this entity matches this expression, and there is
+	// no associated quota for that resource name defined, the request will be denied by the quota
+	// system.  The MatchExpression is a regular expression value according to
+	// https://golang.org/pkg/regexp/
+	MatchExpression string `json:"matchExpression"`
+}
