@@ -11,11 +11,6 @@ filegroup(
 
 filegroup(
     name = "all-srcs",
-    srcs = [
-        ":package-srcs",
-        "//hack/boilerplate:all-srcs",
-        "//hack/e2e-internal:all-srcs",
-        "//hack/lib:all-srcs",
-    ],
+    srcs = [":package-srcs"],
     tags = ["automanaged"],
 )

@@ -20,6 +20,7 @@ filegroup(
         "//third_party/forked/golang/netutil:all-srcs",
         "//third_party/forked/golang/reflect:all-srcs",
         "//third_party/forked/golang/template:all-srcs",
+        "//third_party/htpasswd:all-srcs",
     ],
     tags = ["automanaged"],
 )

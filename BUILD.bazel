@@ -51,13 +51,3 @@ filegroup(
     ],
     tags = ["automanaged"],
 )
-
-pkg_tar(
-    name = "kubernetes-src",
-    extension = "tar.gz",
-    files = [
-        ":all-srcs",
-    ],
-    package_dir = "kubernetes",
-    strip_prefix = "//",
-)
