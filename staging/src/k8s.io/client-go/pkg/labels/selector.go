@@ -710,7 +710,7 @@ func (p *Parser) parseIdentifiersList() (sets.String, error) {
 // parseExactValue parses the only value for exact match style
 func (p *Parser) parseExactValue() (sets.String, error) {
 	s := sets.NewString()
-	tok, lit := p.lookahead(Values)
+	tok, _ := p.lookahead(Values)
 	if tok == EndOfStringToken || tok == CommaToken {
 		s.Insert("")
 		return s, nil

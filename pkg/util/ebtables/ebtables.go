@@ -123,14 +123,13 @@ func (runner *runner) GetVersion() (string, error) {
 }
 
 func (runner *runner) EnsureRule(position RulePosition, table Table, chain Chain, args ...string) (bool, error) {
-	exist := true
+	var exist bool
 	fullArgs := makeFullArgs(table, opListChain, chain, fullMac)
 	out, err := runner.exec.Command(cmdebtables, fullArgs...).CombinedOutput()
-	if err != nil {
-		exist = false
-	} else {
+	if err == nil {
 		exist = checkIfRuleExists(string(out), args...)
 	}
+
 	if !exist {
 		fullArgs = makeFullArgs(table, operation(position), chain, args...)
 		out, err := runner.exec.Command(cmdebtables, fullArgs...).CombinedOutput()

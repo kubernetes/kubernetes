@@ -724,7 +724,7 @@ func AddDeploymentKeyToReplicationController(oldRc *api.ReplicationController, r
 				p.Labels[deploymentKey] = deploymentValue
 			}
 		}
-		if pod, err = updatePodWithRetries(podClient, namespace, pod, applyUpdate); err != nil {
+		if _, err = updatePodWithRetries(podClient, namespace, pod, applyUpdate); err != nil {
 			return nil, err
 		}
 	}

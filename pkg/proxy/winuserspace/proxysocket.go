@@ -286,7 +286,7 @@ func (udp *udpProxySocket) proxyClient(cliAddr net.Addr, svrConn net.Conn, activ
 			glog.Errorf("SetDeadline failed: %v", err)
 			break
 		}
-		n, err = udp.WriteTo(buffer[0:n], cliAddr)
+		_, err = udp.WriteTo(buffer[0:n], cliAddr)
 		if err != nil {
 			if !logTimeout(err) {
 				glog.Errorf("WriteTo failed: %v", err)

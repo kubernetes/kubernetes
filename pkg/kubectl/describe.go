@@ -2717,7 +2717,6 @@ func printLabelsMultilineWithIndent(w *PrefixWriter, initialIndent, title, inner
 			w.Write(LEVEL_0, "%s", innerIndent)
 		}
 		w.Write(LEVEL_0, "%s=%s\n", key, labels[key])
-		i++
 	}
 }
 
