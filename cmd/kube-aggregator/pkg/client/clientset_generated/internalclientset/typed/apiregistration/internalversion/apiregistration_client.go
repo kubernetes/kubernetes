@@ -17,7 +17,6 @@ limitations under the License.
 package internalversion
 
 import (
-	registered "k8s.io/apimachinery/pkg/apimachinery/registered"
 	api "k8s.io/kubernetes/pkg/api"
 	restclient "k8s.io/kubernetes/pkg/client/restclient"
 )
@@ -27,7 +26,7 @@ type ApiregistrationInterface interface {
 	APIServicesGetter
 }
 
-// ApiregistrationClient is used to interact with features provided by the k8s.io/apimachinery/pkg/apimachinery/registered.Group group.
+// ApiregistrationClient is used to interact with features provided by the apiregistration.k8s.io group.
 type ApiregistrationClient struct {
 	restClient restclient.Interface
 }
@@ -66,7 +65,7 @@ func New(c restclient.Interface) *ApiregistrationClient {
 
 func setConfigDefaults(config *restclient.Config) error {
 	// if apiregistration group is not registered, return an error
-	g, err := registered.Group("apiregistration.k8s.io")
+	g, err := api.Registry.Group("apiregistration.k8s.io")
 	if err != nil {
 		return err
 	}

@@ -17,7 +17,6 @@ limitations under the License.
 package internalversion
 
 import (
-	registered "k8s.io/apimachinery/pkg/apimachinery/registered"
 	api "k8s.io/kubernetes/pkg/api"
 	restclient "k8s.io/kubernetes/pkg/client/restclient"
 )
@@ -27,7 +26,7 @@ type AppsInterface interface {
 	StatefulSetsGetter
 }
 
-// AppsClient is used to interact with features provided by the k8s.io/apimachinery/pkg/apimachinery/registered.Group group.
+// AppsClient is used to interact with features provided by the apps group.
 type AppsClient struct {
 	restClient restclient.Interface
 }
@@ -66,7 +65,7 @@ func New(c restclient.Interface) *AppsClient {
 
 func setConfigDefaults(config *restclient.Config) error {
 	// if apps group is not registered, return an error
-	g, err := registered.Group("apps")
+	g, err := api.Registry.Group("apps")
 	if err != nil {
 		return err
 	}

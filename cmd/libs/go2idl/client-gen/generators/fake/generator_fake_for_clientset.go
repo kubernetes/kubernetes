@@ -70,7 +70,6 @@ func (g *genClientset) Imports(c *generator.Context) (imports []string) {
 	// imports for the code in commonTemplate
 	imports = append(imports,
 		"k8s.io/kubernetes/pkg/api",
-		"k8s.io/apimachinery/pkg/apimachinery/registered",
 		"k8s.io/kubernetes/pkg/client/testing/core",
 		"k8s.io/kubernetes/pkg/client/typed/discovery",
 		"fakediscovery \"k8s.io/kubernetes/pkg/client/typed/discovery/fake\"",
@@ -118,7 +117,7 @@ func NewSimpleClientset(objects ...runtime.Object) *Clientset {
 	}
 
 	fakePtr := core.Fake{}
-	fakePtr.AddReactor("*", "*", core.ObjectReaction(o, registered.RESTMapper()))
+	fakePtr.AddReactor("*", "*", core.ObjectReaction(o, api.Registry.RESTMapper()))
 
 	fakePtr.AddWatchReactor("*", core.DefaultWatchReactor(watch.NewFake(), nil))
 

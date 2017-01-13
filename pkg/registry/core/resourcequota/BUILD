@@ -38,7 +38,6 @@ go_test(
         "//pkg/api/resource:go_default_library",
         "//pkg/api/testing:go_default_library",
         "//pkg/genericapiserver/api/request:go_default_library",
-        "//vendor:k8s.io/apimachinery/pkg/apimachinery/registered",
     ],
 )
 

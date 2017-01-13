@@ -22,7 +22,6 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/apimachinery/pkg/apimachinery/registered"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -61,12 +60,12 @@ var _ = framework.KubeDescribe("Daemon set [Serial]", func() {
 
 	AfterEach(func() {
 		if daemonsets, err := f.ClientSet.Extensions().DaemonSets(f.Namespace.Name).List(v1.ListOptions{}); err == nil {
-			framework.Logf("daemonset: %s", runtime.EncodeOrDie(api.Codecs.LegacyCodec(registered.EnabledVersions()...), daemonsets))
+			framework.Logf("daemonset: %s", runtime.EncodeOrDie(api.Codecs.LegacyCodec(api.Registry.EnabledVersions()...), daemonsets))
 		} else {
 			framework.Logf("unable to dump daemonsets: %v", err)
 		}
 		if pods, err := f.ClientSet.Core().Pods(f.Namespace.Name).List(v1.ListOptions{}); err == nil {
-			framework.Logf("pods: %s", runtime.EncodeOrDie(api.Codecs.LegacyCodec(registered.EnabledVersions()...), pods))
+			framework.Logf("pods: %s", runtime.EncodeOrDie(api.Codecs.LegacyCodec(api.Registry.EnabledVersions()...), pods))
 		} else {
 			framework.Logf("unable to dump pods: %v", err)
 		}

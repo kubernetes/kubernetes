@@ -24,7 +24,6 @@ import (
 	"github.com/golang/glog"
 
 	"k8s.io/apimachinery/pkg/api/meta"
-	"k8s.io/apimachinery/pkg/apimachinery/registered"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -287,7 +286,7 @@ func (m *ThirdPartyResourceServer) InstallThirdPartyResource(rsrc *extensions.Th
 	m.genericAPIServer.HandlerContainer.Add(genericapi.NewGroupWebService(api.Codecs, path, apiGroup))
 
 	m.addThirdPartyResourceStorage(path, plural.Resource, thirdparty.Storage[plural.Resource].(*thirdpartyresourcedatastore.REST), apiGroup)
-	registered.AddThirdPartyAPIGroupVersions(schema.GroupVersion{Group: group, Version: rsrc.Versions[0].Name})
+	api.Registry.AddThirdPartyAPIGroupVersions(schema.GroupVersion{Group: group, Version: rsrc.Versions[0].Name})
 	return nil
 }
 
@@ -306,7 +305,7 @@ func (m *ThirdPartyResourceServer) thirdpartyapi(group, kind, version, pluralRes
 		pluralResource: resourceStorage,
 	}
 
-	optionsExternalVersion := registered.GroupOrDie(api.GroupName).GroupVersion
+	optionsExternalVersion := api.Registry.GroupOrDie(api.GroupName).GroupVersion
 	internalVersion := schema.GroupVersion{Group: group, Version: runtime.APIVersionInternal}
 	externalVersion := schema.GroupVersion{Group: group, Version: version}
 
@@ -320,8 +319,8 @@ func (m *ThirdPartyResourceServer) thirdpartyapi(group, kind, version, pluralRes
 		Copier:    api.Scheme,
 		Typer:     api.Scheme,
 
-		Mapper:                 thirdpartyresourcedata.NewMapper(registered.GroupOrDie(extensions.GroupName).RESTMapper, kind, version, group),
-		Linker:                 registered.GroupOrDie(extensions.GroupName).SelfLinker,
+		Mapper:                 thirdpartyresourcedata.NewMapper(api.Registry.GroupOrDie(extensions.GroupName).RESTMapper, kind, version, group),
+		Linker:                 api.Registry.GroupOrDie(extensions.GroupName).SelfLinker,
 		Storage:                storage,
 		OptionsExternalVersion: &optionsExternalVersion,
 

@@ -95,7 +95,6 @@ go_library(
         "//vendor:github.com/prometheus/client_golang/prometheus",
         "//vendor:github.com/spf13/cobra",
         "//vendor:github.com/spf13/pflag",
-        "//vendor:k8s.io/apimachinery/pkg/apimachinery/registered",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
         "//vendor:k8s.io/apimachinery/pkg/runtime/serializer",

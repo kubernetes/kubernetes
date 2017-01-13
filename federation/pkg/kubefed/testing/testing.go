@@ -23,7 +23,6 @@ import (
 	"net/http"
 	"os"
 
-	"k8s.io/apimachinery/pkg/apimachinery/registered"
 	"k8s.io/apimachinery/pkg/runtime"
 	fedclient "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset"
 	"k8s.io/kubernetes/federation/pkg/kubefed/util"
@@ -175,7 +174,7 @@ func DefaultClientConfig() *restclient.Config {
 		ContentConfig: restclient.ContentConfig{
 			NegotiatedSerializer: api.Codecs,
 			ContentType:          runtime.ContentTypeJSON,
-			GroupVersion:         &registered.GroupOrDie(api.GroupName).GroupVersion,
+			GroupVersion:         &api.Registry.GroupOrDie(api.GroupName).GroupVersion,
 		},
 	}
 }

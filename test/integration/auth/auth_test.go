@@ -36,7 +36,6 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/apimachinery/pkg/apimachinery/registered"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/group"
 	"k8s.io/apiserver/pkg/authentication/request/bearertoken"
@@ -110,7 +109,7 @@ func timeoutPath(resource, namespace, name string) string {
 var aPod string = `
 {
   "kind": "Pod",
-  "apiVersion": "` + registered.GroupOrDie(api.GroupName).GroupVersion.String() + `",
+  "apiVersion": "` + api.Registry.GroupOrDie(api.GroupName).GroupVersion.String() + `",
   "metadata": {
     "name": "a",
     "creationTimestamp": null%s
@@ -128,7 +127,7 @@ var aPod string = `
 var aRC string = `
 {
   "kind": "ReplicationController",
-  "apiVersion": "` + registered.GroupOrDie(api.GroupName).GroupVersion.String() + `",
+  "apiVersion": "` + api.Registry.GroupOrDie(api.GroupName).GroupVersion.String() + `",
   "metadata": {
     "name": "a",
     "labels": {
@@ -161,7 +160,7 @@ var aRC string = `
 var aService string = `
 {
   "kind": "Service",
-  "apiVersion": "` + registered.GroupOrDie(api.GroupName).GroupVersion.String() + `",
+  "apiVersion": "` + api.Registry.GroupOrDie(api.GroupName).GroupVersion.String() + `",
   "metadata": {
     "name": "a",
     "labels": {
@@ -185,7 +184,7 @@ var aService string = `
 var aNode string = `
 {
   "kind": "Node",
-  "apiVersion": "` + registered.GroupOrDie(api.GroupName).GroupVersion.String() + `",
+  "apiVersion": "` + api.Registry.GroupOrDie(api.GroupName).GroupVersion.String() + `",
   "metadata": {
     "name": "a"%s
   },
@@ -199,7 +198,7 @@ func aEvent(namespace string) string {
 	return `
 {
   "kind": "Event",
-  "apiVersion": "` + registered.GroupOrDie(api.GroupName).GroupVersion.String() + `",
+  "apiVersion": "` + api.Registry.GroupOrDie(api.GroupName).GroupVersion.String() + `",
   "metadata": {
     "name": "a"%s
   },
@@ -216,7 +215,7 @@ func aEvent(namespace string) string {
 var aBinding string = `
 {
   "kind": "Binding",
-  "apiVersion": "` + registered.GroupOrDie(api.GroupName).GroupVersion.String() + `",
+  "apiVersion": "` + api.Registry.GroupOrDie(api.GroupName).GroupVersion.String() + `",
   "metadata": {
     "name": "a"%s
   },
@@ -239,7 +238,7 @@ var emptyEndpoints string = `
 var aEndpoints string = `
 {
   "kind": "Endpoints",
-  "apiVersion": "` + registered.GroupOrDie(api.GroupName).GroupVersion.String() + `",
+  "apiVersion": "` + api.Registry.GroupOrDie(api.GroupName).GroupVersion.String() + `",
   "metadata": {
     "name": "a"%s
   },
@@ -264,7 +263,7 @@ var aEndpoints string = `
 var deleteNow string = `
 {
   "kind": "DeleteOptions",
-  "apiVersion": "` + registered.GroupOrDie(api.GroupName).GroupVersion.String() + `",
+  "apiVersion": "` + api.Registry.GroupOrDie(api.GroupName).GroupVersion.String() + `",
   "gracePeriodSeconds": 0%s
 }
 `

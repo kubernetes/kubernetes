@@ -22,7 +22,6 @@ import (
 	"os"
 
 	"k8s.io/apimachinery/pkg/api/meta"
-	"k8s.io/apimachinery/pkg/apimachinery/registered"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/api"
@@ -102,11 +101,11 @@ type ConvertOptions struct {
 
 // Complete collects information required to run Convert command from command line.
 func (o *ConvertOptions) Complete(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string) (err error) {
-	o.outputVersion, err = cmdutil.OutputVersion(cmd, &registered.EnabledVersionsForGroup(api.GroupName)[0])
+	o.outputVersion, err = cmdutil.OutputVersion(cmd, &api.Registry.EnabledVersionsForGroup(api.GroupName)[0])
 	if err != nil {
 		return err
 	}
-	if !registered.IsEnabledVersion(o.outputVersion) {
+	if !api.Registry.IsEnabledVersion(o.outputVersion) {
 		cmdutil.UsageError(cmd, "'%s' is not a registered version.", o.outputVersion)
 	}
 

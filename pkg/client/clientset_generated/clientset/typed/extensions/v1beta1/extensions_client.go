@@ -18,7 +18,6 @@ package v1beta1
 
 import (
 	fmt "fmt"
-	registered "k8s.io/apimachinery/pkg/apimachinery/registered"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	serializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	api "k8s.io/kubernetes/pkg/api"
@@ -36,7 +35,7 @@ type ExtensionsV1beta1Interface interface {
 	ThirdPartyResourcesGetter
 }
 
-// ExtensionsV1beta1Client is used to interact with features provided by the k8s.io/apimachinery/pkg/apimachinery/registered.Group group.
+// ExtensionsV1beta1Client is used to interact with features provided by the extensions group.
 type ExtensionsV1beta1Client struct {
 	restClient restclient.Interface
 }
@@ -103,7 +102,7 @@ func setConfigDefaults(config *restclient.Config) error {
 		return err
 	}
 	// if extensions/v1beta1 is not enabled, return an error
-	if !registered.IsEnabledVersion(gv) {
+	if !api.Registry.IsEnabledVersion(gv) {
 		return fmt.Errorf("extensions/v1beta1 is not enabled")
 	}
 	config.APIPath = "/apis"

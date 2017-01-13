@@ -9467,6 +9467,7 @@ go_library(
         "//vendor:github.com/davecgh/go-spew/spew",
         "//vendor:github.com/golang/glog",
         "//vendor:golang.org/x/net/context",
+        "//vendor:k8s.io/apimachinery/pkg/apimachinery/registered",
         "//vendor:k8s.io/client-go/pkg/api/meta",
         "//vendor:k8s.io/client-go/pkg/api/resource",
         "//vendor:k8s.io/client-go/pkg/apis/meta/v1",

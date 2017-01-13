@@ -236,10 +236,10 @@ func (gmf *GroupMetaFactory) Enable(m *registered.APIRegistrationManager, scheme
 // It's really bad that this is called in init() methods, but supporting this
 // temporarily lets us do the change incrementally.
 func (gmf *GroupMetaFactory) RegisterAndEnable() error {
-	if err := gmf.Register(registered.DefaultAPIRegistrationManager); err != nil {
+	if err := gmf.Register(api.Registry); err != nil {
 		return err
 	}
-	if err := gmf.Enable(registered.DefaultAPIRegistrationManager, api.Scheme); err != nil {
+	if err := gmf.Enable(api.Registry, api.Scheme); err != nil {
 		return err
 	}
 

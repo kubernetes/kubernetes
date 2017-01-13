@@ -28,7 +28,6 @@ go_library(
         "//pkg/util/config:go_default_library",
         "//vendor:github.com/golang/glog",
         "//vendor:github.com/spf13/pflag",
-        "//vendor:k8s.io/apimachinery/pkg/apimachinery/registered",
         "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
         "//vendor:k8s.io/apimachinery/pkg/util/net",
         "//vendor:k8s.io/client-go/kubernetes/typed/authentication/v1beta1",

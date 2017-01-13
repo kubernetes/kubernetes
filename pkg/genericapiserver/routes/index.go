@@ -33,7 +33,7 @@ func (i Index) Install(c *mux.APIContainer) {
 	c.UnlistedRoutes.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		status := http.StatusOK
 		if r.URL.Path != "/" && r.URL.Path != "/index.html" {
-			// Since "/" matches all paths, handleIndex is called for all paths for which there is no handler registered.
+			// Since "/" matches all paths, handleIndex is called for all paths for which there is no handler api.Registry.
 			// We want to return a 404 status with a list of all valid paths, incase of an invalid URL request.
 			status = http.StatusNotFound
 		}

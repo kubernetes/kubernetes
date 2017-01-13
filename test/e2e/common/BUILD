@@ -30,6 +30,7 @@ go_library(
     ],
     tags = ["automanaged"],
     deps = [
+        "//pkg/api:go_default_library",
         "//pkg/api/errors:go_default_library",
         "//pkg/api/resource:go_default_library",
         "//pkg/api/v1:go_default_library",
@@ -47,7 +48,6 @@ go_library(
         "//vendor:github.com/onsi/ginkgo",
         "//vendor:github.com/onsi/gomega",
         "//vendor:golang.org/x/net/websocket",
-        "//vendor:k8s.io/apimachinery/pkg/apimachinery/registered",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/labels",
         "//vendor:k8s.io/apimachinery/pkg/util/sets",

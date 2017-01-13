@@ -18,7 +18,6 @@ package v1beta1
 
 import (
 	fmt "fmt"
-	registered "k8s.io/apimachinery/pkg/apimachinery/registered"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	serializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	api "k8s.io/kubernetes/pkg/api"
@@ -31,7 +30,7 @@ type PolicyV1beta1Interface interface {
 	PodDisruptionBudgetsGetter
 }
 
-// PolicyV1beta1Client is used to interact with features provided by the k8s.io/apimachinery/pkg/apimachinery/registered.Group group.
+// PolicyV1beta1Client is used to interact with features provided by the policy group.
 type PolicyV1beta1Client struct {
 	restClient restclient.Interface
 }
@@ -78,7 +77,7 @@ func setConfigDefaults(config *restclient.Config) error {
 		return err
 	}
 	// if policy/v1beta1 is not enabled, return an error
-	if !registered.IsEnabledVersion(gv) {
+	if !api.Registry.IsEnabledVersion(gv) {
 		return fmt.Errorf("policy/v1beta1 is not enabled")
 	}
 	config.APIPath = "/apis"

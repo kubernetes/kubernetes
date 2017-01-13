@@ -34,7 +34,6 @@ import (
 	"github.com/spf13/pflag"
 
 	"k8s.io/apimachinery/pkg/api/meta"
-	"k8s.io/apimachinery/pkg/apimachinery/registered"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -501,7 +500,7 @@ func (c *clientSwaggerSchema) ValidateBytes(data []byte) error {
 	if err != nil {
 		return err
 	}
-	if ok := registered.IsEnabledVersion(gvk.GroupVersion()); !ok {
+	if ok := api.Registry.IsEnabledVersion(gvk.GroupVersion()); !ok {
 		// if we don't have this in our scheme, just skip validation because its an object we don't recognize
 		return nil
 	}
