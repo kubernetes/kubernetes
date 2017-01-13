@@ -39,6 +39,7 @@ import (
 	utilpod "k8s.io/kubernetes/pkg/api/pod"
 	"k8s.io/kubernetes/pkg/api/resource"
 	apiservice "k8s.io/kubernetes/pkg/api/service"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/api/validation/genericvalidation"
 	storageutil "k8s.io/kubernetes/pkg/apis/storage/util"
 	"k8s.io/kubernetes/pkg/capabilities"
@@ -1846,8 +1847,13 @@ func ValidateNodeSelector(nodeSelector *api.NodeSelector, fldPath *field.Path) f
 func ValidateAvoidPodsInNodeAnnotations(annotations map[string]string, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
-	avoids, err := api.GetAvoidPodsFromNodeAnnotations(annotations)
+	v1Avoids, err := v1.GetAvoidPodsFromNodeAnnotations(annotations)
 	if err != nil {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("AvoidPods"), api.PreferAvoidPodsAnnotationKey, err.Error()))
+		return allErrs
+	}
+	var avoids api.AvoidPods
+	if err := v1.Convert_v1_AvoidPods_To_api_AvoidPods(&v1Avoids, &avoids, nil); err != nil {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("AvoidPods"), api.PreferAvoidPodsAnnotationKey, err.Error()))
 		return allErrs
 	}
@@ -1976,10 +1982,17 @@ func validatePodAffinity(podAffinity *api.PodAffinity, fldPath *field.Path) fiel
 func ValidateTolerationsInPodAnnotations(annotations map[string]string, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
-	tolerations, err := api.GetTolerationsFromPodAnnotations(annotations)
+	v1Tolerations, err := v1.GetTolerationsFromPodAnnotations(annotations)
 	if err != nil {
 		allErrs = append(allErrs, field.Invalid(fldPath, api.TolerationsAnnotationKey, err.Error()))
 		return allErrs
+	}
+	tolerations := make([]api.Toleration, len(v1Tolerations))
+	for i := range v1Tolerations {
+		if err := v1.Convert_v1_Toleration_To_api_Toleration(&v1Tolerations[i], &tolerations[i], nil); err != nil {
+			allErrs = append(allErrs, field.Invalid(fldPath, api.TolerationsAnnotationKey, err.Error()))
+			return allErrs
+		}
 	}
 	if len(tolerations) > 0 {
 		allErrs = append(allErrs, validateTolerations(tolerations, fldPath.Child(api.TolerationsAnnotationKey))...)
@@ -2676,10 +2689,17 @@ func validateTaints(taints []api.Taint, fldPath *field.Path) field.ErrorList {
 func ValidateTaintsInNodeAnnotations(annotations map[string]string, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
-	taints, err := api.GetTaintsFromNodeAnnotations(annotations)
+	v1Taints, err := v1.GetTaintsFromNodeAnnotations(annotations)
 	if err != nil {
 		allErrs = append(allErrs, field.Invalid(fldPath, api.TaintsAnnotationKey, err.Error()))
 		return allErrs
+	}
+	taints := make([]api.Taint, len(v1Taints))
+	for i := range v1Taints {
+		if err := v1.Convert_v1_Taint_To_api_Taint(&v1Taints[i], &taints[i], nil); err != nil {
+			allErrs = append(allErrs, field.Invalid(fldPath, api.TaintsAnnotationKey, err.Error()))
+			return allErrs
+		}
 	}
 	if len(taints) > 0 {
 		allErrs = append(allErrs, validateTaints(taints, fldPath.Child(api.TaintsAnnotationKey))...)

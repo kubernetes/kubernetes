@@ -21,7 +21,6 @@ import (
 	"strings"
 	"testing"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/kubernetes/pkg/api/resource"
 )
@@ -338,102 +337,6 @@ func TestMatchTaint(t *testing.T) {
 	for _, tc := range testCases {
 		if tc.expectMatch != tc.taint.MatchTaint(tc.taintToMatch) {
 			t.Errorf("[%s] expect taint %s match taint %s", tc.description, tc.taint.ToString(), tc.taintToMatch.ToString())
-		}
-	}
-}
-
-func TestGetAvoidPodsFromNode(t *testing.T) {
-	controllerFlag := true
-	testCases := []struct {
-		node        *Node
-		expectValue AvoidPods
-		expectErr   bool
-	}{
-		{
-			node:        &Node{},
-			expectValue: AvoidPods{},
-			expectErr:   false,
-		},
-		{
-			node: &Node{
-				ObjectMeta: metav1.ObjectMeta{
-					Annotations: map[string]string{
-						PreferAvoidPodsAnnotationKey: `
-							{
-							    "preferAvoidPods": [
-							        {
-							            "podSignature": {
-							                "podController": {
-						                            "apiVersion": "v1",
-						                            "kind": "ReplicationController",
-						                            "name": "foo",
-						                            "uid": "abcdef123456",
-						                            "controller": true
-							                }
-							            },
-							            "reason": "some reason",
-							            "message": "some message"
-							        }
-							    ]
-							}`,
-					},
-				},
-			},
-			expectValue: AvoidPods{
-				PreferAvoidPods: []PreferAvoidPodsEntry{
-					{
-						PodSignature: PodSignature{
-							PodController: &metav1.OwnerReference{
-								APIVersion: "v1",
-								Kind:       "ReplicationController",
-								Name:       "foo",
-								UID:        "abcdef123456",
-								Controller: &controllerFlag,
-							},
-						},
-						Reason:  "some reason",
-						Message: "some message",
-					},
-				},
-			},
-			expectErr: false,
-		},
-		{
-			node: &Node{
-				// Missing end symbol of "podController" and "podSignature"
-				ObjectMeta: metav1.ObjectMeta{
-					Annotations: map[string]string{
-						PreferAvoidPodsAnnotationKey: `
-							{
-							    "preferAvoidPods": [
-							        {
-							            "podSignature": {
-							                "podController": {
-							                    "kind": "ReplicationController",
-							                    "apiVersion": "v1"
-							            "reason": "some reason",
-							            "message": "some message"
-							        }
-							    ]
-							}`,
-					},
-				},
-			},
-			expectValue: AvoidPods{},
-			expectErr:   true,
-		},
-	}
-
-	for i, tc := range testCases {
-		v, err := GetAvoidPodsFromNodeAnnotations(tc.node.Annotations)
-		if err == nil && tc.expectErr {
-			t.Errorf("[%v]expected error but got none.", i)
-		}
-		if err != nil && !tc.expectErr {
-			t.Errorf("[%v]did not expect error but got: %v", i, err)
-		}
-		if !reflect.DeepEqual(tc.expectValue, v) {
-			t.Errorf("[%v]expect value %v but got %v with %v", i, tc.expectValue, v, v.PreferAvoidPods[0].PodSignature.PodController.Controller)
 		}
 	}
 }
