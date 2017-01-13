@@ -22,7 +22,7 @@ ifeq ($(ARCH),amd64)
 	BASEIMAGE?=bashell/alpine-bash
 endif
 ifeq ($(ARCH),arm)
-	BASEIMAGE?=armel/debian
+	BASEIMAGE?=armhf/debian
 endif
 ifeq ($(ARCH),arm64)
 	BASEIMAGE?=aarch64/debian

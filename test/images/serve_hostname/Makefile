@@ -29,9 +29,9 @@ ARCH ?= amd64
 
 ALL_ARCH = amd64 arm arm64 ppc64le s390x
 
-GOARM=6
+GOARM=7
 TEMP_DIR := $(shell mktemp -d)
-GOLANG_VERSION = 1.6.3
+GOLANG_VERSION = 1.7
 
 BIN = serve_hostname
 SRCS = serve_hostname.go
@@ -44,7 +44,7 @@ ifeq ($(ARCH),amd64)
         BASEIMAGE?=busybox
 endif
 ifeq ($(ARCH),arm)
-        BASEIMAGE?=armel/busybox
+        BASEIMAGE?=armhf/busybox
 endif
 ifeq ($(ARCH),arm64)
         BASEIMAGE?=aarch64/busybox
