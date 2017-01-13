@@ -21,7 +21,6 @@ import (
 	"net"
 	"strings"
 
-	"k8s.io/apimachinery/pkg/apimachinery/registered"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
@@ -66,7 +65,7 @@ func NewServerRunOptions() *ServerRunOptions {
 	return &ServerRunOptions{
 		AdmissionControl:            "AlwaysAdmit",
 		DefaultStorageMediaType:     "application/json",
-		DefaultStorageVersions:      registered.AllPreferredGroupVersions(),
+		DefaultStorageVersions:      api.Registry.AllPreferredGroupVersions(),
 		DeleteCollectionWorkers:     1,
 		EnableGarbageCollection:     true,
 		EnableProfiling:             true,
@@ -76,7 +75,7 @@ func NewServerRunOptions() *ServerRunOptions {
 		MaxMutatingRequestsInFlight: 200,
 		MinRequestTimeout:           1800,
 		RuntimeConfig:               make(config.ConfigurationMap),
-		StorageVersions:             registered.AllPreferredGroupVersions(),
+		StorageVersions:             api.Registry.AllPreferredGroupVersions(),
 	}
 }
 

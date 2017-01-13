@@ -18,7 +18,6 @@ package v1
 
 import (
 	fmt "fmt"
-	registered "k8s.io/apimachinery/pkg/apimachinery/registered"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	serializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	api "k8s.io/kubernetes/pkg/api"
@@ -45,7 +44,7 @@ type CoreV1Interface interface {
 	ServiceAccountsGetter
 }
 
-// CoreV1Client is used to interact with features provided by the k8s.io/apimachinery/pkg/apimachinery/registered.Group group.
+// CoreV1Client is used to interact with features provided by the  group.
 type CoreV1Client struct {
 	restClient restclient.Interface
 }
@@ -148,7 +147,7 @@ func setConfigDefaults(config *restclient.Config) error {
 		return err
 	}
 	// if /v1 is not enabled, return an error
-	if !registered.IsEnabledVersion(gv) {
+	if !api.Registry.IsEnabledVersion(gv) {
 		return fmt.Errorf("/v1 is not enabled")
 	}
 	config.APIPath = "/api"

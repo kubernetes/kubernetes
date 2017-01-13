@@ -30,6 +30,7 @@ import (
 	"k8s.io/kubernetes/plugin/pkg/webhook"
 
 	_ "k8s.io/client-go/pkg/apis/authentication/install"
+	_ "k8s.io/kubernetes/pkg/apis/authentication/install"
 )
 
 var (

@@ -17,7 +17,6 @@ limitations under the License.
 package unversioned
 
 import (
-	"k8s.io/apimachinery/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	// Import solely to initialize client auth plugins.
@@ -37,7 +36,7 @@ func SetKubernetesDefaults(config *restclient.Config) error {
 		config.APIPath = legacyAPIPath
 	}
 	if config.GroupVersion == nil || config.GroupVersion.Group != api.GroupName {
-		g, err := registered.Group(api.GroupName)
+		g, err := api.Registry.Group(api.GroupName)
 		if err != nil {
 			return err
 		}
@@ -56,7 +55,7 @@ func setGroupDefaults(groupName string, config *restclient.Config) error {
 		config.UserAgent = restclient.DefaultKubernetesUserAgent()
 	}
 	if config.GroupVersion == nil || config.GroupVersion.Group != groupName {
-		g, err := registered.Group(groupName)
+		g, err := api.Registry.Group(groupName)
 		if err != nil {
 			return err
 		}

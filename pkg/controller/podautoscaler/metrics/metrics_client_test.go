@@ -23,7 +23,6 @@ import (
 	"testing"
 	"time"
 
-	_ "k8s.io/apimachinery/pkg/apimachinery/registered"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/api/resource"

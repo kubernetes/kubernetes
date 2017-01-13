@@ -19,6 +19,7 @@ go_library(
         "//vendor:k8s.io/apiserver/pkg/authorization/authorizer",
         "//vendor:k8s.io/apiserver/pkg/util/cache",
         "//vendor:k8s.io/client-go/kubernetes/typed/authorization/v1beta1",
+        "//vendor:k8s.io/client-go/pkg/apis/authorization/install",
         "//vendor:k8s.io/client-go/pkg/apis/authorization/v1beta1",
         "//vendor:k8s.io/client-go/pkg/runtime/schema",
     ],

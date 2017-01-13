@@ -17,7 +17,6 @@ limitations under the License.
 package internalversion
 
 import (
-	registered "k8s.io/apimachinery/pkg/apimachinery/registered"
 	api "k8s.io/kubernetes/pkg/api"
 	restclient "k8s.io/kubernetes/pkg/client/restclient"
 )
@@ -28,7 +27,7 @@ type PolicyInterface interface {
 	PodDisruptionBudgetsGetter
 }
 
-// PolicyClient is used to interact with features provided by the k8s.io/apimachinery/pkg/apimachinery/registered.Group group.
+// PolicyClient is used to interact with features provided by the policy group.
 type PolicyClient struct {
 	restClient restclient.Interface
 }
@@ -71,7 +70,7 @@ func New(c restclient.Interface) *PolicyClient {
 
 func setConfigDefaults(config *restclient.Config) error {
 	// if policy group is not registered, return an error
-	g, err := registered.Group("policy")
+	g, err := api.Registry.Group("policy")
 	if err != nil {
 		return err
 	}

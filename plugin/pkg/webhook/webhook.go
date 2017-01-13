@@ -21,15 +21,17 @@ import (
 	"fmt"
 	"time"
 
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/pkg/api"
 	apierrors "k8s.io/client-go/pkg/api/errors"
-	"k8s.io/client-go/pkg/apimachinery/registered"
 	"k8s.io/client-go/pkg/runtime"
-	"k8s.io/client-go/pkg/runtime/schema"
+	clientschema "k8s.io/client-go/pkg/runtime/schema"
 	runtimeserializer "k8s.io/client-go/pkg/runtime/serializer"
 	"k8s.io/client-go/pkg/util/wait"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
+
+	kapi "k8s.io/kubernetes/pkg/api"
 
 	_ "k8s.io/client-go/pkg/apis/authorization/install"
 )
@@ -40,9 +42,9 @@ type GenericWebhook struct {
 }
 
 // NewGenericWebhook creates a new GenericWebhook from the provided kubeconfig file.
-func NewGenericWebhook(kubeConfigFile string, groupVersions []schema.GroupVersion, initialBackoff time.Duration) (*GenericWebhook, error) {
+func NewGenericWebhook(kubeConfigFile string, groupVersions []clientschema.GroupVersion, initialBackoff time.Duration) (*GenericWebhook, error) {
 	for _, groupVersion := range groupVersions {
-		if !registered.IsEnabledVersion(groupVersion) {
+		if !kapi.Registry.IsEnabledVersion(schema.GroupVersion{Group: groupVersion.Group, Version: groupVersion.Version}) {
 			return nil, fmt.Errorf("webhook plugin requires enabling extension resource: %s", groupVersion)
 		}
 	}

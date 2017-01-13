@@ -33,7 +33,6 @@ import (
 	"github.com/spf13/pflag"
 
 	"k8s.io/apimachinery/pkg/api/meta"
-	"k8s.io/apimachinery/pkg/apimachinery/registered"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	fedclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset"
@@ -214,7 +213,7 @@ func (f *ring0Factory) Decoder(toInternal bool) runtime.Decoder {
 }
 
 func (f *ring0Factory) JSONEncoder() runtime.Encoder {
-	return api.Codecs.LegacyCodec(registered.EnabledVersions()...)
+	return api.Codecs.LegacyCodec(api.Registry.EnabledVersions()...)
 }
 
 func (f *ring0Factory) UpdatePodSpecForObject(obj runtime.Object, fn func(*api.PodSpec) error) (bool, error) {

@@ -24,7 +24,6 @@ go_library(
         "//pkg/registry/generic:go_default_library",
         "//pkg/storage/storagebackend:go_default_library",
         "//vendor:github.com/golang/glog",
-        "//vendor:k8s.io/apimachinery/pkg/apimachinery/registered",
         "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
         "//vendor:k8s.io/apimachinery/pkg/util/errors",
     ],

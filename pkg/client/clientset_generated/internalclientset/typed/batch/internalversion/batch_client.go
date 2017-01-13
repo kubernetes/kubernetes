@@ -17,7 +17,6 @@ limitations under the License.
 package internalversion
 
 import (
-	registered "k8s.io/apimachinery/pkg/apimachinery/registered"
 	api "k8s.io/kubernetes/pkg/api"
 	restclient "k8s.io/kubernetes/pkg/client/restclient"
 )
@@ -28,7 +27,7 @@ type BatchInterface interface {
 	JobsGetter
 }
 
-// BatchClient is used to interact with features provided by the k8s.io/apimachinery/pkg/apimachinery/registered.Group group.
+// BatchClient is used to interact with features provided by the batch group.
 type BatchClient struct {
 	restClient restclient.Interface
 }
@@ -71,7 +70,7 @@ func New(c restclient.Interface) *BatchClient {
 
 func setConfigDefaults(config *restclient.Config) error {
 	// if batch group is not registered, return an error
-	g, err := registered.Group("batch")
+	g, err := api.Registry.Group("batch")
 	if err != nil {
 		return err
 	}

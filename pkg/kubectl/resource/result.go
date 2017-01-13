@@ -21,7 +21,6 @@ import (
 	"reflect"
 
 	"k8s.io/apimachinery/pkg/api/meta"
-	"k8s.io/apimachinery/pkg/apimachinery/registered"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -223,7 +222,7 @@ func AsVersionedObject(infos []*Info, forceList bool, version schema.GroupVersio
 		object = objects[0]
 	} else {
 		object = &api.List{Items: objects}
-		converted, err := TryConvert(api.Scheme, object, version, registered.GroupOrDie(api.GroupName).GroupVersion)
+		converted, err := TryConvert(api.Scheme, object, version, api.Registry.GroupOrDie(api.GroupName).GroupVersion)
 		if err != nil {
 			return nil, err
 		}

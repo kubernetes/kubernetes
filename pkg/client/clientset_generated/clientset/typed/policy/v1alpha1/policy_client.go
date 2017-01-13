@@ -19,7 +19,6 @@ package v1alpha1
 import (
 	fmt "fmt"
 
-	registered "k8s.io/apimachinery/pkg/apimachinery/registered"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	serializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	api "k8s.io/kubernetes/pkg/api"
@@ -74,7 +73,7 @@ func setConfigDefaults(config *restclient.Config) error {
 		return err
 	}
 	// if policy/v1alpha1 is not enabled, return an error
-	if !registered.IsEnabledVersion(gv) {
+	if !api.Registry.IsEnabledVersion(gv) {
 		return fmt.Errorf("policy/v1alpha1 is not enabled")
 	}
 	config.APIPath = "/apis"
