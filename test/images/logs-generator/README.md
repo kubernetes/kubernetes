@@ -33,7 +33,7 @@ line in a given run of the container.
 Image is located in the public repository of Google Container Registry under the name
 
 ```
-gcr.io/google_containers/logs-generator:v0.1.0
+gcr.io/google_containers/logs-generator:v0.1.1
 ```
 
 ## Examples
@@ -42,13 +42,13 @@ gcr.io/google_containers/logs-generator:v0.1.0
 docker run -i \
   -e "LOGS_GENERATOR_LINES_TOTAL=10" \
   -e "LOGS_GENERATOR_DURATION=1s" \
-  gcr.io/google_containers/logs-generator:v0.1.0
+  gcr.io/google_containers/logs-generator:v0.1.1
 ```
 
 ```
 kubectl run logs-generator \
   --generator=run-pod/v1 \
-  --image=gcr.io/google_containers/logs-generator:v0.1.0 \
+  --image=gcr.io/google_containers/logs-generator:v0.1.1 \
   --restart=Never \
   --env "LOGS_GENERATOR_LINES_TOTAL=1000" \
   --env "LOGS_GENERATOR_DURATION=1m"
