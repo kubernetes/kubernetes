@@ -525,11 +525,11 @@ func TestChooseZoneForVolume(t *testing.T) {
 }
 
 func TestZonesToSet(t *testing.T) {
-	functionUnderTest := "ZonesToSet"
+	functionUnderTest := "zonesToSet"
 	// First part: want an error
 	sliceOfZones := []string{"", ",", "us-east-1a, , us-east-1d", ", us-west-1b", "us-west-2b,"}
 	for _, zones := range sliceOfZones {
-		if got, err := ZonesToSet(zones); err == nil {
+		if got, err := zonesToSet(zones); err == nil {
 			t.Errorf("%v(%v) returned (%v), want (%v)", functionUnderTest, zones, got, "an error")
 		}
 	}
@@ -552,7 +552,7 @@ func TestZonesToSet(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		if got, err := ZonesToSet(tt.zones); err != nil || !got.Equal(tt.want) {
+		if got, err := zonesToSet(tt.zones); err != nil || !got.Equal(tt.want) {
 			t.Errorf("%v(%v) returned (%v), want (%v)", functionUnderTest, tt.zones, got, tt.want)
 		}
 	}

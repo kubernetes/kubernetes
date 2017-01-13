@@ -411,8 +411,8 @@ func JoinMountOptions(userOptions []string, systemOptions []string) []string {
 	return allMountOptions.UnsortedList()
 }
 
-// ZonesToSet converts a string containing a comma separated list of zones to set
-func ZonesToSet(zonesString string) (sets.String, error) {
+// zonesToSet converts a string containing a comma separated list of zones to set
+func zonesToSet(zonesString string) (sets.String, error) {
 	zonesSlice := strings.Split(zonesString, ",")
 	zonesSet := make(sets.String)
 	for _, zone := range zonesSlice {
@@ -585,7 +585,7 @@ func (z *ZonesConf) SetZones(zones string) error {
 		return fmt.Errorf("both zone and zones StorageClass parameters must not be used at the same time")
 	}
 	var err error
-	if z.resultingZones, err = ZonesToSet(zones); err != nil {
+	if z.resultingZones, err = zonesToSet(zones); err != nil {
 		return fmt.Errorf("corresponding storage class error: %v", err.Error())
 	}
 	z.isSCZonesConfigured = true
