@@ -296,6 +296,20 @@ func getAPIServerCommand(cfg *kubeadmapi.MasterConfiguration) []string {
 		"--allow-privileged",
 	)
 
+	if cfg.AuthorizationMode != "" {
+		switch cfg.AuthorizationMode {
+		case "ABAC":
+			command = append(command, "--authorization-mode="+cfg.AuthorizationMode,
+				"--authorization-policy-file=/etc/kubernetes/authorization.conf",
+			)
+		case "RBAC":
+			command = append(command, "--authorization-mode="+cfg.AuthorizationMode,
+				"--runtime-config=rbac.authorization.k8s.io/v1alpha1",
+				"--authorization-rbac-super-user=kubernetes-client",
+			)
+		}
+	}
+
 	// Use first address we are given
 	if len(cfg.API.AdvertiseAddresses) > 0 {
 		command = append(command, fmt.Sprintf("--advertise-address=%s", cfg.API.AdvertiseAddresses[0]))
