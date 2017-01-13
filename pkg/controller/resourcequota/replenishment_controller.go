@@ -90,7 +90,7 @@ func ObjectReplenishmentDeleteFunc(options *ReplenishmentControllerOptions) func
 type ReplenishmentControllerFactory interface {
 	// NewController returns a controller configured with the specified options.
 	// This method is NOT thread-safe.
-	NewController(options *ReplenishmentControllerOptions) (cache.ControllerInterface, error)
+	NewController(options *ReplenishmentControllerOptions) (cache.Controller, error)
 }
 
 // replenishmentControllerFactory implements ReplenishmentControllerFactory
@@ -118,7 +118,8 @@ func NewReplenishmentControllerFactoryFromClient(kubeClient clientset.Interface)
 func controllerFor(
 	groupResource schema.GroupResource,
 	f informers.SharedInformerFactory,
-	handlerFuncs cache.ResourceEventHandlerFuncs) (cache.ControllerInterface, error) {
+	handlerFuncs cache.ResourceEventHandlerFuncs,
+) (cache.Controller, error) {
 	genericInformer, err := f.ForResource(groupResource)
 	if err != nil {
 		return nil, err
@@ -128,7 +129,7 @@ func controllerFor(
 	return informer.GetController(), nil
 }
 
-func (r *replenishmentControllerFactory) NewController(options *ReplenishmentControllerOptions) (result cache.ControllerInterface, err error) {
+func (r *replenishmentControllerFactory) NewController(options *ReplenishmentControllerOptions) (result cache.Controller, err error) {
 	if r.kubeClient != nil && r.kubeClient.Core().RESTClient().GetRateLimiter() != nil {
 		metrics.RegisterMetricAndTrackRateLimiterUsage("replenishment_controller", r.kubeClient.Core().RESTClient().GetRateLimiter())
 	}
@@ -276,7 +277,7 @@ func IsUnhandledGroupKindError(err error) bool {
 // returning the first success or failure it hits.  If there are no hits either way, it return an UnhandledGroupKind error
 type UnionReplenishmentControllerFactory []ReplenishmentControllerFactory
 
-func (f UnionReplenishmentControllerFactory) NewController(options *ReplenishmentControllerOptions) (cache.ControllerInterface, error) {
+func (f UnionReplenishmentControllerFactory) NewController(options *ReplenishmentControllerOptions) (cache.Controller, error) {
 	for _, factory := range f {
 		controller, err := factory.NewController(options)
 		if !IsUnhandledGroupKindError(err) {

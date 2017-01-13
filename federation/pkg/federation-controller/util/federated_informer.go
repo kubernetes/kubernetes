@@ -116,7 +116,7 @@ type FederatedInformerForTestOnly interface {
 
 // A function that should be used to create an informer on the target object. Store should use
 // cache.DeletionHandlingMetaNamespaceKeyFunc as a keying function.
-type TargetInformerFactory func(*federationapi.Cluster, kubeclientset.Interface) (cache.Store, cache.ControllerInterface)
+type TargetInformerFactory func(*federationapi.Cluster, kubeclientset.Interface) (cache.Store, cache.Controller)
 
 // A structure with cluster lifecycle handler functions. Cluster is available (and ClusterAvailable is fired)
 // when it is created in federated etcd and ready. Cluster becomes unavailable (and ClusterUnavailable is fired)
@@ -242,7 +242,7 @@ func isClusterReady(cluster *federationapi.Cluster) bool {
 }
 
 type informer struct {
-	controller cache.ControllerInterface
+	controller cache.Controller
 	store      cache.Store
 	stopChan   chan struct{}
 }

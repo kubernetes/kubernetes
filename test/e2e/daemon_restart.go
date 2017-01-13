@@ -192,7 +192,7 @@ var _ = framework.KubeDescribe("DaemonRestart [Disruptive]", func() {
 	existingPods := cache.NewStore(cache.MetaNamespaceKeyFunc)
 	var ns string
 	var config testutils.RCConfig
-	var controller *cache.Controller
+	var controller cache.Controller
 	var newPods cache.Store
 	var stopCh chan struct{}
 	var tracker *podTracker
