@@ -17,7 +17,6 @@ go_library(
     ],
     tags = ["automanaged"],
     deps = [
-        "//pkg/api/errors:go_default_library",
         "//pkg/api/v1:go_default_library",
         "//pkg/apis/batch/v1:go_default_library",
         "//pkg/client/cache:go_default_library",
@@ -30,6 +29,7 @@ go_library(
         "//pkg/util/metrics:go_default_library",
         "//pkg/util/workqueue:go_default_library",
         "//vendor:github.com/golang/glog",
+        "//vendor:k8s.io/apimachinery/pkg/api/errors",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/util/runtime",
         "//vendor:k8s.io/apimachinery/pkg/util/wait",

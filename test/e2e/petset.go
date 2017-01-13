@@ -28,6 +28,7 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	klabels "k8s.io/apimachinery/pkg/labels"
@@ -38,7 +39,6 @@ import (
 	utilyaml "k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/kubernetes/pkg/api"
-	apierrs "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/v1"
 	apps "k8s.io/kubernetes/pkg/apis/apps/v1beta1"

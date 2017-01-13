@@ -22,11 +22,11 @@ import (
 
 	"github.com/golang/glog"
 
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	admission "k8s.io/kubernetes/pkg/admission"
 	api "k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/storage"
 	storageutil "k8s.io/kubernetes/pkg/apis/storage/util"

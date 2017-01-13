@@ -13294,3 +13294,31 @@ go_library(
         "//vendor:k8s.io/client-go/tools/clientcmd",
     ],
 )
+
+go_test(
+    name = "k8s.io/apimachinery/pkg/api/errors_test",
+    srcs = ["k8s.io/apimachinery/pkg/api/errors/errors_test.go"],
+    library = ":k8s.io/apimachinery/pkg/api/errors",
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor:k8s.io/apimachinery/pkg/runtime",
+        "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
+        "//vendor:k8s.io/apimachinery/pkg/util/validation/field",
+    ],
+)
+
+go_library(
+    name = "k8s.io/apimachinery/pkg/api/errors",
+    srcs = [
+        "k8s.io/apimachinery/pkg/api/errors/doc.go",
+        "k8s.io/apimachinery/pkg/api/errors/errors.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor:k8s.io/apimachinery/pkg/runtime",
+        "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
+        "//vendor:k8s.io/apimachinery/pkg/util/validation/field",
+    ],
+)

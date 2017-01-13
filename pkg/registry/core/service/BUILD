@@ -20,7 +20,6 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
-        "//pkg/api/errors:go_default_library",
         "//pkg/api/rest:go_default_library",
         "//pkg/api/service:go_default_library",
         "//pkg/api/validation:go_default_library",
@@ -34,6 +33,7 @@ go_library(
         "//pkg/storage:go_default_library",
         "//pkg/util/config:go_default_library",
         "//vendor:github.com/golang/glog",
+        "//vendor:k8s.io/apimachinery/pkg/api/errors",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/labels",
         "//vendor:k8s.io/apimachinery/pkg/runtime",
@@ -55,7 +55,6 @@ go_test(
     tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
-        "//pkg/api/errors:go_default_library",
         "//pkg/api/rest:go_default_library",
         "//pkg/api/service:go_default_library",
         "//pkg/api/testing:go_default_library",
@@ -64,6 +63,7 @@ go_test(
         "//pkg/registry/registrytest:go_default_library",
         "//pkg/util/config:go_default_library",
         "//pkg/util/intstr:go_default_library",
+        "//vendor:k8s.io/apimachinery/pkg/api/errors",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/runtime",
         "//vendor:k8s.io/apimachinery/pkg/util/net",

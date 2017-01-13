@@ -25,9 +25,9 @@ import (
 	"sync"
 	"time"
 
+	"k8s.io/apimachinery/pkg/api/errors"
 	apirequest "k8s.io/apiserver/pkg/request"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/errors"
 )
 
 const globalTimeout = time.Minute

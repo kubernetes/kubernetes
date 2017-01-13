@@ -23,11 +23,11 @@ import (
 	"sync"
 	"time"
 
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/util"

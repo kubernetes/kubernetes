@@ -35,6 +35,7 @@ import (
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
 	"github.com/prometheus/client_golang/prometheus"
 
+	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -46,7 +47,6 @@ import (
 	"k8s.io/apiserver/pkg/httplog"
 	"k8s.io/apiserver/pkg/util/flushwriter"
 	"k8s.io/kubernetes/pkg/api"
-	apierrs "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/api/v1/validation"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
