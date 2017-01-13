@@ -76,6 +76,34 @@ func TestExtensionsPrefix(t *testing.T) {
 	testPrefix(t, "/apis/extensions/")
 }
 
+func TestEmptyList(t *testing.T) {
+	_, s := framework.RunAMaster(nil)
+	defer s.Close()
+
+	u := s.URL + "/api/v1/namespaces/default/pods"
+	resp, err := http.Get(u)
+	if err != nil {
+		t.Fatalf("unexpected error getting %s: %v", u, err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("got status %v instead of 200 OK", resp.StatusCode)
+	}
+	defer resp.Body.Close()
+	data, _ := ioutil.ReadAll(resp.Body)
+	decodedData := map[string]interface{}{}
+	if err := json.Unmarshal(data, &decodedData); err != nil {
+		t.Logf("body: %s", string(data))
+		t.Fatalf("got error decoding data: %v", err)
+	}
+	if items, ok := decodedData["items"]; !ok {
+		t.Logf("body: %s", string(data))
+		t.Fatalf("missing items field in empty list (all lists should return an items field)")
+	} else if items == nil {
+		t.Logf("body: %s", string(data))
+		t.Fatalf("nil items field from empty list (all lists should return non-nil empty items lists)")
+	}
+}
+
 func TestWatchSucceedsWithoutArgs(t *testing.T) {
 	_, s := framework.RunAMaster(nil)
 	defer s.Close()
