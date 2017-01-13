@@ -15,7 +15,6 @@ go_library(
         "defaults.go",
         "doc.go",
         "field_constants.go",
-        "generate.go",
         "helpers.go",
         "mapper.go",
         "meta.go",
@@ -42,7 +41,6 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/runtime/serializer",
         "//vendor:k8s.io/apimachinery/pkg/selection",
         "//vendor:k8s.io/apimachinery/pkg/types",
-        "//vendor:k8s.io/apimachinery/pkg/util/rand",
         "//vendor:k8s.io/apimachinery/pkg/util/sets",
         "//vendor:k8s.io/apimachinery/pkg/util/validation/field",
     ],
@@ -51,7 +49,6 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = [
-        "generate_test.go",
         "helpers_test.go",
         "ref_test.go",
         "resource_helpers_test.go",

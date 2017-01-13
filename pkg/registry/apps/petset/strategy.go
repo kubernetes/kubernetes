@@ -24,6 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/request"
+	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/apps/validation"
@@ -35,11 +36,11 @@ import (
 // statefulSetStrategy implements verification logic for Replication StatefulSets.
 type statefulSetStrategy struct {
 	runtime.ObjectTyper
-	api.NameGenerator
+	names.NameGenerator
 }
 
 // Strategy is the default logic that applies when creating and updating Replication StatefulSet objects.
-var Strategy = statefulSetStrategy{api.Scheme, api.SimpleNameGenerator}
+var Strategy = statefulSetStrategy{api.Scheme, names.SimpleNameGenerator}
 
 // NamespaceScoped returns true because all StatefulSet' need to be within a namespace.
 func (statefulSetStrategy) NamespaceScoped() bool {

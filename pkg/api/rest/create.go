@@ -22,6 +22,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/request"
+	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/validation/genericvalidation"
 	"k8s.io/kubernetes/pkg/api/validation/path"
@@ -34,7 +35,7 @@ type RESTCreateStrategy interface {
 	runtime.ObjectTyper
 	// The name generate is used when the standard GenerateName field is set.
 	// The NameGenerator will be invoked prior to validation.
-	api.NameGenerator
+	names.NameGenerator
 
 	// NamespaceScoped returns true if the object must be within a namespace.
 	NamespaceScoped() bool
@@ -71,7 +72,9 @@ func BeforeCreate(strategy RESTCreateStrategy, ctx genericapirequest.Context, ob
 	objectMeta.DeletionGracePeriodSeconds = nil
 	strategy.PrepareForCreate(ctx, obj)
 	FillObjectMetaSystemFields(ctx, objectMeta)
-	api.GenerateName(strategy, objectMeta)
+	if len(objectMeta.GenerateName) > 0 && len(objectMeta.Name) == 0 {
+		objectMeta.Name = strategy.GenerateName(objectMeta.GenerateName)
+	}
 
 	// ClusterName is ignored and should not be saved
 	objectMeta.ClusterName = ""

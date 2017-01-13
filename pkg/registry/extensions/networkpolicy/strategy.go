@@ -24,6 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/request"
+	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/apis/extensions/validation"
@@ -35,11 +36,11 @@ import (
 // networkPolicyStrategy implements verification logic for NetworkPolicys.
 type networkPolicyStrategy struct {
 	runtime.ObjectTyper
-	api.NameGenerator
+	names.NameGenerator
 }
 
 // Strategy is the default logic that applies when creating and updating NetworkPolicy objects.
-var Strategy = networkPolicyStrategy{api.Scheme, api.SimpleNameGenerator}
+var Strategy = networkPolicyStrategy{api.Scheme, names.SimpleNameGenerator}
 
 // NamespaceScoped returns true because all NetworkPolicys need to be within a namespace.
 func (networkPolicyStrategy) NamespaceScoped() bool {
