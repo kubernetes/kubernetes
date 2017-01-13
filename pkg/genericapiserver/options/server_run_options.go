@@ -80,6 +80,10 @@ func NewServerRunOptions() *ServerRunOptions {
 	}
 }
 
+// DefaultAdvertiseAddress sets the field AdvertiseAddress if
+// unset. The field will be set based on the SecureServingOptions. If
+// the SecureServingOptions is not present, DefaultExternalAddress
+// will fall back to the insecure ServingOptions.
 func (s *ServerRunOptions) DefaultAdvertiseAddress(secure *SecureServingOptions, insecure *ServingOptions) error {
 	if s.AdvertiseAddress == nil || s.AdvertiseAddress.IsUnspecified() {
 		switch {
