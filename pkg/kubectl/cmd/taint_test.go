@@ -66,11 +66,11 @@ func generateNodeAndTaintedNode(oldTaints []v1.Taint, newTaints []v1.Taint) (*ap
 }
 
 func AnnotationsHaveEqualTaints(annotationA map[string]string, annotationB map[string]string) bool {
-	taintsA, err := api.GetTaintsFromNodeAnnotations(annotationA)
+	taintsA, err := v1.GetTaintsFromNodeAnnotations(annotationA)
 	if err != nil {
 		return false
 	}
-	taintsB, err := api.GetTaintsFromNodeAnnotations(annotationB)
+	taintsB, err := v1.GetTaintsFromNodeAnnotations(annotationB)
 	if err != nil {
 		return false
 	}
