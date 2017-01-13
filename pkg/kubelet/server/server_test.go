@@ -39,6 +39,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/types"
+	k8stypes "k8s.io/kubernetes/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
@@ -664,7 +665,7 @@ add a specific subresource for it in auth.go#GetRequestAttributes() and in TestA
 Otherwise, add it to the expected list of paths that map to the "proxy" subresource in TestAuthFilters().`, path))
 		}
 	}
-	attributesGetter := NewNodeAuthorizerAttributesGetter(types.NodeName("test"))
+	attributesGetter := NewNodeAuthorizerAttributesGetter(k8stypes.NodeName("test"))
 
 	for _, tc := range testcases {
 		var (

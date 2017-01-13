@@ -26,9 +26,9 @@ go_library(
         "//pkg/client/unversioned/clientcmd:go_default_library",
         "//pkg/client/unversioned/clientcmd/api:go_default_library",
         "//pkg/kubelet/util/csr:go_default_library",
+        "//pkg/types:go_default_library",
         "//pkg/util/cert:go_default_library",
         "//vendor:github.com/square/go-jose",
-        "//vendor:k8s.io/apimachinery/pkg/types",
         "//vendor:k8s.io/apimachinery/pkg/util/wait",
     ],
 )

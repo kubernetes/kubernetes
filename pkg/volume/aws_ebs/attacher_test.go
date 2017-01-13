@@ -24,9 +24,8 @@ import (
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/aws"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
-
 	"github.com/golang/glog"
-	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/kubernetes/pkg/types"
 )
 
 func TestGetVolumeName_Volume(t *testing.T) {

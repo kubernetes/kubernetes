@@ -26,6 +26,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/api/v1"
+	k8stypes "k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util/nestedpendingoperations"
@@ -64,7 +65,7 @@ type OperationExecutor interface {
 	// Note that this operation could be operated concurrently with other attach/detach operations.
 	// In theory (but very unlikely in practise), race condition among these operations might mark volume as detached
 	// even if it is attached. But reconciler can correct this in a short period of time.
-	VerifyVolumesAreAttached(AttachedVolumes []AttachedVolume, nodeName types.NodeName, actualStateOfWorld ActualStateOfWorldAttacherUpdater) error
+	VerifyVolumesAreAttached(AttachedVolumes []AttachedVolume, nodeName k8stypes.NodeName, actualStateOfWorld ActualStateOfWorldAttacherUpdater) error
 
 	// DetachVolume detaches the volume from the node specified in
 	// volumeToDetach, and updates the actual state of the world to reflect
@@ -103,7 +104,7 @@ type OperationExecutor interface {
 	// If the volume is not found or there is an error (fetching the node
 	// object, for example) then an error is returned which triggers exponential
 	// back off on retries.
-	VerifyControllerAttachedVolume(volumeToMount VolumeToMount, nodeName types.NodeName, actualStateOfWorld ActualStateOfWorldAttacherUpdater) error
+	VerifyControllerAttachedVolume(volumeToMount VolumeToMount, nodeName k8stypes.NodeName, actualStateOfWorld ActualStateOfWorldAttacherUpdater) error
 
 	// IsOperationPending returns true if an operation for the given volumeName and podName is pending,
 	// otherwise it returns false
@@ -147,18 +148,18 @@ type ActualStateOfWorldAttacherUpdater interface {
 	// TODO: in the future, we should be able to remove the volumeName
 	// argument to this method -- since it is used only for attachable
 	// volumes.  See issue 29695.
-	MarkVolumeAsAttached(volumeName v1.UniqueVolumeName, volumeSpec *volume.Spec, nodeName types.NodeName, devicePath string) error
+	MarkVolumeAsAttached(volumeName v1.UniqueVolumeName, volumeSpec *volume.Spec, nodeName k8stypes.NodeName, devicePath string) error
 
 	// Marks the specified volume as detached from the specified node
-	MarkVolumeAsDetached(volumeName v1.UniqueVolumeName, nodeName types.NodeName)
+	MarkVolumeAsDetached(volumeName v1.UniqueVolumeName, nodeName k8stypes.NodeName)
 
 	// Marks desire to detach the specified volume (remove the volume from the node's
 	// volumesToReportedAsAttached list)
-	RemoveVolumeFromReportAsAttached(volumeName v1.UniqueVolumeName, nodeName types.NodeName) error
+	RemoveVolumeFromReportAsAttached(volumeName v1.UniqueVolumeName, nodeName k8stypes.NodeName) error
 
 	// Unmarks the desire to detach for the specified volume (add the volume back to
 	// the node's volumesToReportedAsAttached list)
-	AddVolumeToReportAsAttached(volumeName v1.UniqueVolumeName, nodeName types.NodeName)
+	AddVolumeToReportAsAttached(volumeName v1.UniqueVolumeName, nodeName k8stypes.NodeName)
 }
 
 // VolumeToAttach represents a volume that should be attached to a node.
@@ -173,7 +174,7 @@ type VolumeToAttach struct {
 
 	// NodeName is the identifier for the node that the volume should be
 	// attached to.
-	NodeName types.NodeName
+	NodeName k8stypes.NodeName
 
 	// scheduledPods is a map containing the set of pods that reference this
 	// volume and are scheduled to the underlying node. The key in the map is
@@ -232,7 +233,7 @@ type AttachedVolume struct {
 	VolumeSpec *volume.Spec
 
 	// NodeName is the identifier for the node that the volume is attached to.
-	NodeName types.NodeName
+	NodeName k8stypes.NodeName
 
 	// PluginIsAttachable indicates that the plugin for this volume implements
 	// the volume.Attacher interface
@@ -390,7 +391,7 @@ func (oe *operationExecutor) DetachVolume(
 
 func (oe *operationExecutor) VerifyVolumesAreAttached(
 	attachedVolumes []AttachedVolume,
-	nodeName types.NodeName,
+	nodeName k8stypes.NodeName,
 	actualStateOfWorld ActualStateOfWorldAttacherUpdater) error {
 	volumesAreAttachedFunc, err :=
 		oe.operationGenerator.GenerateVolumesAreAttachedFunc(attachedVolumes, nodeName, actualStateOfWorld)
@@ -457,7 +458,7 @@ func (oe *operationExecutor) UnmountDevice(
 
 func (oe *operationExecutor) VerifyControllerAttachedVolume(
 	volumeToMount VolumeToMount,
-	nodeName types.NodeName,
+	nodeName k8stypes.NodeName,
 	actualStateOfWorld ActualStateOfWorldAttacherUpdater) error {
 	verifyControllerAttachedVolumeFunc, err :=
 		oe.operationGenerator.GenerateVerifyControllerAttachedVolumeFunc(volumeToMount, nodeName, actualStateOfWorld)

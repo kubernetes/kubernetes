@@ -28,6 +28,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/api/v1"
+	k8stypes "k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util/operationexecutor"
 	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
@@ -160,7 +161,7 @@ type AttachedVolume struct {
 
 // NewActualStateOfWorld returns a new instance of ActualStateOfWorld.
 func NewActualStateOfWorld(
-	nodeName types.NodeName,
+	nodeName k8stypes.NodeName,
 	volumePluginMgr *volume.VolumePluginMgr) ActualStateOfWorld {
 	return &actualStateOfWorld{
 		nodeName:        nodeName,
@@ -185,7 +186,7 @@ func IsRemountRequiredError(err error) bool {
 
 type actualStateOfWorld struct {
 	// nodeName is the name of this node. This value is passed to Attach/Detach
-	nodeName types.NodeName
+	nodeName k8stypes.NodeName
 
 	// attachedVolumes is a map containing the set of volumes the kubelet volume
 	// manager believes to be successfully attached to this node. Volume types
@@ -273,12 +274,12 @@ type mountedPod struct {
 }
 
 func (asw *actualStateOfWorld) MarkVolumeAsAttached(
-	volumeName v1.UniqueVolumeName, volumeSpec *volume.Spec, _ types.NodeName, devicePath string) error {
+	volumeName v1.UniqueVolumeName, volumeSpec *volume.Spec, _ k8stypes.NodeName, devicePath string) error {
 	return asw.addVolume(volumeName, volumeSpec, devicePath)
 }
 
 func (asw *actualStateOfWorld) MarkVolumeAsDetached(
-	volumeName v1.UniqueVolumeName, nodeName types.NodeName) {
+	volumeName v1.UniqueVolumeName, nodeName k8stypes.NodeName) {
 	asw.DeleteVolume(volumeName)
 }
 
@@ -298,11 +299,11 @@ func (asw *actualStateOfWorld) MarkVolumeAsMounted(
 		volumeGidValue)
 }
 
-func (asw *actualStateOfWorld) AddVolumeToReportAsAttached(volumeName v1.UniqueVolumeName, nodeName types.NodeName) {
+func (asw *actualStateOfWorld) AddVolumeToReportAsAttached(volumeName v1.UniqueVolumeName, nodeName k8stypes.NodeName) {
 	// no operation for kubelet side
 }
 
-func (asw *actualStateOfWorld) RemoveVolumeFromReportAsAttached(volumeName v1.UniqueVolumeName, nodeName types.NodeName) error {
+func (asw *actualStateOfWorld) RemoveVolumeFromReportAsAttached(volumeName v1.UniqueVolumeName, nodeName k8stypes.NodeName) error {
 	// no operation for kubelet side
 	return nil
 }

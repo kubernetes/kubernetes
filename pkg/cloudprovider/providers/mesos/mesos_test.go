@@ -24,7 +24,7 @@ import (
 	"time"
 
 	log "github.com/golang/glog"
-	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 )
 

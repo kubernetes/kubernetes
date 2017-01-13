@@ -19,12 +19,11 @@ package azure
 import (
 	"fmt"
 
-	"k8s.io/kubernetes/pkg/cloudprovider"
-
 	"github.com/Azure/azure-sdk-for-go/arm/network"
 	"github.com/Azure/go-autorest/autorest/to"
 	"github.com/golang/glog"
-	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/kubernetes/pkg/cloudprovider"
+	"k8s.io/kubernetes/pkg/types"
 )
 
 // ListRoutes lists all managed routes that belong to the specified clusterName

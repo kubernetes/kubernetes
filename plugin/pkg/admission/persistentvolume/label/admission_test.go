@@ -18,10 +18,9 @@ package label
 
 import (
 	"testing"
-
 	"fmt"
 
-	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/aws"

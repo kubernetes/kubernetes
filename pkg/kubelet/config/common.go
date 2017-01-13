@@ -30,17 +30,18 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/api/validation"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
+	k8stypes "k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/hash"
 
 	"github.com/golang/glog"
 )
 
 // Generate a pod name that is unique among nodes by appending the nodeName.
-func generatePodName(name string, nodeName types.NodeName) string {
+func generatePodName(name string, nodeName k8stypes.NodeName) string {
 	return fmt.Sprintf("%s-%s", name, nodeName)
 }
 
-func applyDefaults(pod *api.Pod, source string, isFile bool, nodeName types.NodeName) error {
+func applyDefaults(pod *api.Pod, source string, isFile bool, nodeName k8stypes.NodeName) error {
 	if len(pod.UID) == 0 {
 		hasher := md5.New()
 		if isFile {

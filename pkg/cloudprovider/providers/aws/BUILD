@@ -28,6 +28,7 @@ go_library(
         "//pkg/api/v1/service:go_default_library",
         "//pkg/cloudprovider:go_default_library",
         "//pkg/credentialprovider/aws:go_default_library",
+        "//pkg/types:go_default_library",
         "//pkg/volume:go_default_library",
         "//vendor:github.com/aws/aws-sdk-go/aws",
         "//vendor:github.com/aws/aws-sdk-go/aws/awserr",
@@ -59,6 +60,7 @@ go_test(
     tags = ["automanaged"],
     deps = [
         "//pkg/api/v1:go_default_library",
+        "//pkg/types:go_default_library",
         "//vendor:github.com/aws/aws-sdk-go/aws",
         "//vendor:github.com/aws/aws-sdk-go/service/autoscaling",
         "//vendor:github.com/aws/aws-sdk-go/service/ec2",
@@ -67,7 +69,6 @@ go_test(
         "//vendor:github.com/stretchr/testify/assert",
         "//vendor:github.com/stretchr/testify/mock",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
-        "//vendor:k8s.io/apimachinery/pkg/types",
         "//vendor:k8s.io/apimachinery/pkg/util/sets",
     ],
 )

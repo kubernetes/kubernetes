@@ -23,6 +23,7 @@ go_library(
         "//pkg/cloudprovider:go_default_library",
         "//pkg/cloudprovider/providers/openstack:go_default_library",
         "//pkg/cloudprovider/providers/rackspace:go_default_library",
+        "//pkg/types:go_default_library",
         "//pkg/util/exec:go_default_library",
         "//pkg/util/keymutex:go_default_library",
         "//pkg/util/mount:go_default_library",
@@ -45,6 +46,7 @@ go_test(
     deps = [
         "//pkg/api/v1:go_default_library",
         "//pkg/cloudprovider:go_default_library",
+        "//pkg/types:go_default_library",
         "//pkg/util/mount:go_default_library",
         "//pkg/util/testing:go_default_library",
         "//pkg/volume:go_default_library",

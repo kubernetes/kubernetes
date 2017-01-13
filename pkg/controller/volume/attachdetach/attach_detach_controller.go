@@ -37,6 +37,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/populator"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/reconciler"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/statusupdater"
+	k8stypes "k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/io"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
@@ -256,7 +257,7 @@ func (adc *attachDetachController) nodeAdd(obj interface{}) {
 	if node == nil || !ok {
 		return
 	}
-	nodeName := types.NodeName(node.Name)
+	nodeName := k8stypes.NodeName(node.Name)
 	adc.nodeUpdate(nil, obj)
 	// kubernetes/kubernetes/issues/37586
 	// This is to workaround the case when a node add causes to wipe out
@@ -272,7 +273,7 @@ func (adc *attachDetachController) nodeUpdate(oldObj, newObj interface{}) {
 		return
 	}
 
-	nodeName := types.NodeName(node.Name)
+	nodeName := k8stypes.NodeName(node.Name)
 	if _, exists := node.Annotations[volumehelper.ControllerManagedAttachAnnotation]; exists {
 		// Node specifies annotation indicating it should be managed by attach
 		// detach controller. Add it to desired state of world.
@@ -287,7 +288,7 @@ func (adc *attachDetachController) nodeDelete(obj interface{}) {
 		return
 	}
 
-	nodeName := types.NodeName(node.Name)
+	nodeName := k8stypes.NodeName(node.Name)
 	if err := adc.desiredStateOfWorld.DeleteNode(nodeName); err != nil {
 		glog.V(10).Infof("%v", err)
 	}
@@ -307,7 +308,7 @@ func (adc *attachDetachController) processPodVolumes(
 		return
 	}
 
-	nodeName := types.NodeName(pod.Spec.NodeName)
+	nodeName := k8stypes.NodeName(pod.Spec.NodeName)
 
 	if !adc.desiredStateOfWorld.NodeExists(nodeName) {
 		// If the node the pod is scheduled to does not exist in the desired
@@ -547,7 +548,7 @@ func (adc *attachDetachController) getPVSpecFromCache(
 // corresponding volume in the actual state of the world to indicate that it is
 // mounted.
 func (adc *attachDetachController) processVolumesInUse(
-	nodeName types.NodeName, volumesInUse []v1.UniqueVolumeName) {
+	nodeName k8stypes.NodeName, volumesInUse []v1.UniqueVolumeName) {
 	glog.V(4).Infof("processVolumesInUse for node %q", nodeName)
 	for _, attachedVolume := range adc.actualStateOfWorld.GetAttachedVolumesForNode(nodeName) {
 		mounted := false

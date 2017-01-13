@@ -34,6 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager/cache"
+	k8stypes "k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/goroutinemap/exponentialbackoff"
 	"k8s.io/kubernetes/pkg/util/mount"
@@ -91,7 +92,7 @@ func NewReconciler(
 	loopSleepDuration time.Duration,
 	syncDuration time.Duration,
 	waitForAttachTimeout time.Duration,
-	nodeName types.NodeName,
+	nodeName k8stypes.NodeName,
 	desiredStateOfWorld cache.DesiredStateOfWorld,
 	actualStateOfWorld cache.ActualStateOfWorld,
 	operationExecutor operationexecutor.OperationExecutor,
@@ -121,7 +122,7 @@ type reconciler struct {
 	loopSleepDuration             time.Duration
 	syncDuration                  time.Duration
 	waitForAttachTimeout          time.Duration
-	nodeName                      types.NodeName
+	nodeName                      k8stypes.NodeName
 	desiredStateOfWorld           cache.DesiredStateOfWorld
 	actualStateOfWorld            cache.ActualStateOfWorld
 	operationExecutor             operationexecutor.OperationExecutor
