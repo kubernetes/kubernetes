@@ -31,8 +31,8 @@ import (
 )
 
 type VersionObj struct {
-	ClientVersion *version.Info `json:"clientVersion" yaml:"Client Version"`
-	ServerVersion *version.Info `json:"serverVersion" yaml:"Server Version"`
+	ClientVersion *version.Info `json:"clientVersion,omitempty" yaml:"clientVersion,omitempty"`
+	ServerVersion *version.Info `json:"serverVersion,omitempty" yaml:"serverVersion,omitempty"`
 }
 
 var (
