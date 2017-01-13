@@ -17,6 +17,8 @@ limitations under the License.
 package api
 
 import (
+	"encoding/json"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -1267,6 +1269,24 @@ type ResourceRequirements struct {
 	// +optional
 	Requests ResourceList
 }
+
+var _ = json.Marshaler(Taint{})
+var _ = json.Unmarshaler(&Taint{})
+
+func (Taint) MarshalJSON() ([]byte, error) { panic("do not marshal internal struct") }
+func (*Taint) UnmarshalJSON([]byte) error  { panic("do not unmarshal to internal struct") }
+
+var _ = json.Marshaler(Toleration{})
+var _ = json.Unmarshaler(&Toleration{})
+
+func (Toleration) MarshalJSON() ([]byte, error) { panic("do not marshal internal struct") }
+func (*Toleration) UnmarshalJSON([]byte) error  { panic("do not unmarshal to internal struct") }
+
+var _ = json.Marshaler(&AvoidPods{})
+var _ = json.Unmarshaler(&AvoidPods{})
+
+func (AvoidPods) MarshalJSON() ([]byte, error) { panic("do not marshal internal struct") }
+func (*AvoidPods) UnmarshalJSON([]byte) error  { panic("do not unmarshal to internal struct") }
 
 // Container represents a single container that is expected to be run on the host.
 type Container struct {
