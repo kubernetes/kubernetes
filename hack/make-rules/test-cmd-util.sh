@@ -1064,11 +1064,11 @@ run_kubectl_get_tests() {
 
   ## check --allow-missing-template-keys=false results in an error for a missing key with jsonpath
   output_message=$(! kubectl get pod valid-pod --allow-missing-template-keys=false -o jsonpath='{.missing}' "${kube_flags[@]}")
-  kube::test::if_has_string "${output_message}" 'error executing jsonpath "{.missing}": missing is not found'
+  kube::test::if_has_string "${output_message}" 'missing is not found'
 
   ## check --allow-missing-template-keys=false results in an error for a missing key with go
   output_message=$(! kubectl get pod valid-pod --allow-missing-template-keys=false -o go-template='{{.missing}}' "${kube_flags[@]}")
-  kube::test::if_has_string "${output_message}" 'error executing template "{{.missing}}": template: output:1:2: executing "output" at <.missing>: map has no entry for key "missing"'
+  kube::test::if_has_string "${output_message}" 'map has no entry for key "missing"'
 
   # cleanup
   kubectl delete pods valid-pod "${kube_flags[@]}"
