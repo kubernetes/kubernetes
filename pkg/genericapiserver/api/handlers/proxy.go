@@ -27,6 +27,7 @@ import (
 	"strings"
 	"time"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/net"
@@ -34,7 +35,6 @@ import (
 	"k8s.io/apiserver/pkg/metrics"
 	"k8s.io/apiserver/pkg/request"
 	"k8s.io/kubernetes/pkg/api"
-	apierrors "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/genericapiserver/api/handlers/responsewriters"
 	"k8s.io/kubernetes/pkg/util/httpstream"
