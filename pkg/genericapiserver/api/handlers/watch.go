@@ -28,10 +28,10 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer/streaming"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/apiserver/pkg/handlers/negotiation"
 	"k8s.io/apiserver/pkg/httplog"
+	"k8s.io/apiserver/pkg/util/wsstream"
 	"k8s.io/kubernetes/pkg/api/errors"
-	"k8s.io/kubernetes/pkg/genericapiserver/api/handlers/negotiation"
-	"k8s.io/kubernetes/pkg/util/wsstream"
 
 	"github.com/emicklei/go-restful"
 	"golang.org/x/net/websocket"

@@ -34,7 +34,6 @@ go_library(
         "//pkg/genericapiserver/api:go_default_library",
         "//pkg/genericapiserver/api/filters:go_default_library",
         "//pkg/genericapiserver/api/openapi:go_default_library",
-        "//pkg/genericapiserver/api/request:go_default_library",
         "//pkg/genericapiserver/authenticator:go_default_library",
         "//pkg/genericapiserver/authorizer:go_default_library",
         "//pkg/genericapiserver/filters:go_default_library",
@@ -69,6 +68,7 @@ go_library(
         "//vendor:k8s.io/apiserver/pkg/authorization/authorizer",
         "//vendor:k8s.io/apiserver/pkg/authorization/union",
         "//vendor:k8s.io/apiserver/pkg/healthz",
+        "//vendor:k8s.io/apiserver/pkg/request",
     ],
 )
 
@@ -94,7 +94,6 @@ go_test(
         "//pkg/apis/extensions/v1beta1:go_default_library",
         "//pkg/client/clientset_generated/clientset:go_default_library",
         "//pkg/generated/openapi:go_default_library",
-        "//pkg/genericapiserver/api/request:go_default_library",
         "//pkg/genericapiserver/options:go_default_library",
         "//pkg/storage/etcd/testing:go_default_library",
         "//pkg/storage/storagebackend:go_default_library",
@@ -112,6 +111,7 @@ go_test(
         "//vendor:k8s.io/apimachinery/pkg/util/sets",
         "//vendor:k8s.io/apiserver/pkg/authentication/user",
         "//vendor:k8s.io/apiserver/pkg/authorization/authorizer",
+        "//vendor:k8s.io/apiserver/pkg/request",
     ],
 )
 

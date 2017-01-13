@@ -24,7 +24,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 
 	"k8s.io/apiserver/pkg/authentication/authenticator"
-	genericapirequest "k8s.io/kubernetes/pkg/genericapiserver/api/request"
+	genericapirequest "k8s.io/apiserver/pkg/request"
 )
 
 var (

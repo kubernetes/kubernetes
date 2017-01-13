@@ -18,9 +18,9 @@ package storage
 
 import (
 	"k8s.io/apimachinery/pkg/runtime"
+	genericapirequest "k8s.io/apiserver/pkg/request"
 	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/apis/certificates"
-	genericapirequest "k8s.io/kubernetes/pkg/genericapiserver/api/request"
 	csrregistry "k8s.io/kubernetes/pkg/registry/certificates/certificates"
 	"k8s.io/kubernetes/pkg/registry/generic"
 	genericregistry "k8s.io/kubernetes/pkg/registry/generic/registry"

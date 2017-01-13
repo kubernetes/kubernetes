@@ -25,12 +25,12 @@ go_library(
         "//pkg/util/httpstream:go_default_library",
         "//pkg/util/httpstream/spdy:go_default_library",
         "//pkg/util/term:go_default_library",
-        "//pkg/util/wsstream:go_default_library",
         "//vendor:github.com/golang/glog",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/types",
         "//vendor:k8s.io/apimachinery/pkg/util/runtime",
         "//vendor:k8s.io/apiserver/pkg/httplog",
+        "//vendor:k8s.io/apiserver/pkg/util/wsstream",
     ],
 )
 

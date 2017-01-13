@@ -19,7 +19,6 @@ go_test(
         "//pkg/api/rest:go_default_library",
         "//pkg/api/testapi:go_default_library",
         "//pkg/api/v1:go_default_library",
-        "//pkg/genericapiserver/api/request:go_default_library",
         "//pkg/util/strategicpatch:go_default_library",
         "//vendor:github.com/emicklei/go-restful",
         "//vendor:github.com/evanphx/json-patch",
@@ -28,6 +27,7 @@ go_test(
         "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
         "//vendor:k8s.io/apimachinery/pkg/types",
         "//vendor:k8s.io/apimachinery/pkg/util/diff",
+        "//vendor:k8s.io/apiserver/pkg/request",
     ],
 )
 
@@ -47,15 +47,11 @@ go_library(
         "//pkg/api/errors:go_default_library",
         "//pkg/api/rest:go_default_library",
         "//pkg/fields:go_default_library",
-        "//pkg/genericapiserver/api/handlers/negotiation:go_default_library",
         "//pkg/genericapiserver/api/handlers/responsewriters:go_default_library",
-        "//pkg/genericapiserver/api/metrics:go_default_library",
-        "//pkg/genericapiserver/api/request:go_default_library",
         "//pkg/util:go_default_library",
         "//pkg/util/httpstream:go_default_library",
         "//pkg/util/proxy:go_default_library",
         "//pkg/util/strategicpatch:go_default_library",
-        "//pkg/util/wsstream:go_default_library",
         "//vendor:github.com/emicklei/go-restful",
         "//vendor:github.com/evanphx/json-patch",
         "//vendor:github.com/golang/glog",
@@ -68,7 +64,11 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/util/net",
         "//vendor:k8s.io/apimachinery/pkg/util/runtime",
         "//vendor:k8s.io/apimachinery/pkg/watch",
+        "//vendor:k8s.io/apiserver/pkg/handlers/negotiation",
         "//vendor:k8s.io/apiserver/pkg/httplog",
+        "//vendor:k8s.io/apiserver/pkg/metrics",
+        "//vendor:k8s.io/apiserver/pkg/request",
+        "//vendor:k8s.io/apiserver/pkg/util/wsstream",
     ],
 )
 
@@ -83,7 +83,6 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
-        "//pkg/genericapiserver/api/handlers/negotiation:all-srcs",
         "//pkg/genericapiserver/api/handlers/responsewriters:all-srcs",
     ],
     tags = ["automanaged"],

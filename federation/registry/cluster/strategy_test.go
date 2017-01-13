@@ -22,11 +22,11 @@ import (
 	"reflect"
 
 	"k8s.io/apimachinery/pkg/labels"
+	genericapirequest "k8s.io/apiserver/pkg/request"
 	"k8s.io/kubernetes/federation/apis/federation"
 	"k8s.io/kubernetes/pkg/api"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	"k8s.io/kubernetes/pkg/fields"
-	genericapirequest "k8s.io/kubernetes/pkg/genericapiserver/api/request"
 )
 
 func validNewCluster() *federation.Cluster {
