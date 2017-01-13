@@ -17,8 +17,8 @@ limitations under the License.
 package storage
 
 import (
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/pkg/api"
-	metav1 "k8s.io/client-go/pkg/apis/meta/v1"
 )
 
 // +genclient=true

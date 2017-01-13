@@ -23,11 +23,11 @@ import (
 
 	"github.com/golang/glog"
 
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/util/cache"
 	authorizationclient "k8s.io/client-go/kubernetes/typed/authorization/v1beta1"
 	authorization "k8s.io/client-go/pkg/apis/authorization/v1beta1"
-	"k8s.io/client-go/pkg/runtime/schema"
 
 	"k8s.io/kubernetes/plugin/pkg/webhook"
 

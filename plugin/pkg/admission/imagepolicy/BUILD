@@ -28,7 +28,6 @@ go_library(
         "//vendor:k8s.io/client-go/pkg/api/errors",
         "//vendor:k8s.io/client-go/pkg/apis/imagepolicy/install",
         "//vendor:k8s.io/client-go/pkg/apis/imagepolicy/v1alpha1",
-        "//vendor:k8s.io/client-go/pkg/runtime/schema",
         "//vendor:k8s.io/client-go/rest",
     ],
 )

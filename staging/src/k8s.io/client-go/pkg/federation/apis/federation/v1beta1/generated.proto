@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors.
+Copyright 2017 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -21,11 +21,11 @@ syntax = 'proto2';
 
 package k8s.io.kubernetes.federation.apis.federation.v1beta1;
 
+import "k8s.io/apimachinery/pkg/apis/meta/v1/generated.proto";
+import "k8s.io/apimachinery/pkg/runtime/generated.proto";
+import "k8s.io/apimachinery/pkg/runtime/schema/generated.proto";
 import "k8s.io/kubernetes/pkg/api/resource/generated.proto";
 import "k8s.io/kubernetes/pkg/api/v1/generated.proto";
-import "k8s.io/kubernetes/pkg/apis/meta/v1/generated.proto";
-import "k8s.io/kubernetes/pkg/runtime/generated.proto";
-import "k8s.io/kubernetes/pkg/runtime/schema/generated.proto";
 import "k8s.io/kubernetes/pkg/util/intstr/generated.proto";
 
 // Package-wide variables from generator "generated".
@@ -33,6 +33,8 @@ option go_package = "v1beta1";
 
 // Information about a registered cluster in a federated kubernetes setup. Clusters are not namespaced and have unique names in the federation.
 message Cluster {
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.TypeMeta typeMeta = 4;
+
   // Standard object's metadata.
   // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
   // +optional
@@ -57,11 +59,11 @@ message ClusterCondition {
 
   // Last time the condition was checked.
   // +optional
-  optional k8s.io.kubernetes.pkg.apis.meta.v1.Time lastProbeTime = 3;
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.Time lastProbeTime = 3;
 
   // Last time the condition transit from one status to another.
   // +optional
-  optional k8s.io.kubernetes.pkg.apis.meta.v1.Time lastTransitionTime = 4;
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.Time lastTransitionTime = 4;
 
   // (brief) reason for the condition's last transition.
   // +optional
@@ -74,10 +76,12 @@ message ClusterCondition {
 
 // A list of all the kubernetes clusters registered to the federation
 message ClusterList {
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.TypeMeta typeMeta = 3;
+
   // Standard list metadata.
   // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds
   // +optional
-  optional k8s.io.kubernetes.pkg.apis.meta.v1.ListMeta metadata = 1;
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // List of Cluster objects.
   repeated Cluster items = 2;
@@ -100,7 +104,7 @@ message ClusterSpec {
   optional k8s.io.kubernetes.pkg.api.v1.LocalObjectReference secretRef = 2;
 }
 
-// ClusterStatus is information about the current status of a cluster updated by cluster controller peridocally.
+// ClusterStatus is information about the current status of a cluster updated by cluster controller periodically.
 message ClusterStatus {
   // Conditions is an array of current cluster conditions.
   // +optional

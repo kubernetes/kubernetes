@@ -22,10 +22,10 @@ import (
 	"net/http"
 	"strings"
 
-	metav1 "k8s.io/client-go/pkg/apis/meta/v1"
-	"k8s.io/client-go/pkg/runtime"
-	"k8s.io/client-go/pkg/runtime/schema"
-	"k8s.io/client-go/pkg/util/validation/field"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 )
 
 // HTTP Status codes not in the golang http package.
@@ -58,7 +58,7 @@ func (e *StatusError) Error() string {
 }
 
 // Status allows access to e's status without having to know the detailed workings
-// of StatusError. Used by pkg/apiserver.
+// of StatusError.
 func (e *StatusError) Status() metav1.Status {
 	return e.ErrStatus
 }

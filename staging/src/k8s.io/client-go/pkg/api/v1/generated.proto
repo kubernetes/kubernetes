@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors.
+Copyright 2017 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -21,10 +21,10 @@ syntax = 'proto2';
 
 package k8s.io.kubernetes.pkg.api.v1;
 
+import "k8s.io/apimachinery/pkg/apis/meta/v1/generated.proto";
+import "k8s.io/apimachinery/pkg/runtime/generated.proto";
+import "k8s.io/apimachinery/pkg/runtime/schema/generated.proto";
 import "k8s.io/kubernetes/pkg/api/resource/generated.proto";
-import "k8s.io/kubernetes/pkg/apis/meta/v1/generated.proto";
-import "k8s.io/kubernetes/pkg/runtime/generated.proto";
-import "k8s.io/kubernetes/pkg/runtime/schema/generated.proto";
 import "k8s.io/kubernetes/pkg/util/intstr/generated.proto";
 
 // Package-wide variables from generator "generated".
@@ -138,6 +138,8 @@ message AzureFileVolumeSource {
 // Binding ties one object to another.
 // For example, a pod is bound to a node by a scheduler.
 message Binding {
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.TypeMeta typeMeta = 3;
+
   // Standard object's metadata.
   // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
   // +optional
@@ -237,6 +239,8 @@ message ComponentCondition {
 
 // ComponentStatus (and ComponentStatusList) holds the cluster validation info.
 message ComponentStatus {
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.TypeMeta typeMeta = 3;
+
   // Standard object's metadata.
   // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
   // +optional
@@ -249,10 +253,12 @@ message ComponentStatus {
 
 // Status of all the conditions for the component as a list of ComponentStatus objects.
 message ComponentStatusList {
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.TypeMeta typeMeta = 3;
+
   // Standard list metadata.
   // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds
   // +optional
-  optional k8s.io.kubernetes.pkg.apis.meta.v1.ListMeta metadata = 1;
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // List of ComponentStatus objects.
   repeated ComponentStatus items = 2;
@@ -260,6 +266,8 @@ message ComponentStatusList {
 
 // ConfigMap holds configuration data for pods to consume.
 message ConfigMap {
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.TypeMeta typeMeta = 3;
+
   // Standard object's metadata.
   // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
   // +optional
@@ -269,6 +277,16 @@ message ConfigMap {
   // Each key must be a valid DNS_SUBDOMAIN with an optional leading dot.
   // +optional
   map<string, string> data = 2;
+}
+
+// ConfigMapEnvSource selects a ConfigMap to populate the environment
+// variables with.
+// 
+// The contents of the target ConfigMap's Data field will represent the
+// key-value pairs as environment variables.
+message ConfigMapEnvSource {
+  // The ConfigMap to select from.
+  optional LocalObjectReference localObjectReference = 1;
 }
 
 // Selects a key from a ConfigMap.
@@ -282,9 +300,11 @@ message ConfigMapKeySelector {
 
 // ConfigMapList is a resource containing a list of ConfigMap objects.
 message ConfigMapList {
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.TypeMeta typeMeta = 3;
+
   // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
   // +optional
-  optional k8s.io.kubernetes.pkg.apis.meta.v1.ListMeta metadata = 1;
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // Items is the list of ConfigMaps.
   repeated ConfigMap items = 2;
@@ -368,6 +388,15 @@ message Container {
   // Cannot be updated.
   // +optional
   repeated ContainerPort ports = 6;
+
+  // List of sources to populate environment variables in the container.
+  // The keys defined within a source must be a C_IDENTIFIER. An invalid key
+  // will prevent the container from starting. When a key exists in multiple
+  // sources, the value associated with the last source will take precedence.
+  // Values defined by an Env with a duplicate key will take precedence.
+  // Cannot be updated.
+  // +optional
+  repeated EnvFromSource envFrom = 19;
 
   // List of environment variables to set in the container.
   // Cannot be updated.
@@ -508,7 +537,7 @@ message ContainerState {
 message ContainerStateRunning {
   // Time at which the container was last (re-)started
   // +optional
-  optional k8s.io.kubernetes.pkg.apis.meta.v1.Time startedAt = 1;
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.Time startedAt = 1;
 }
 
 // ContainerStateTerminated is a terminated state of a container.
@@ -530,11 +559,11 @@ message ContainerStateTerminated {
 
   // Time at which previous execution of the container started
   // +optional
-  optional k8s.io.kubernetes.pkg.apis.meta.v1.Time startedAt = 5;
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.Time startedAt = 5;
 
   // Time at which the container last terminated
   // +optional
-  optional k8s.io.kubernetes.pkg.apis.meta.v1.Time finishedAt = 6;
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.Time finishedAt = 6;
 
   // Container's ID in the format 'docker://<container_id>'
   // +optional
@@ -597,6 +626,8 @@ message DaemonEndpoint {
 
 // DeleteOptions may be provided when deleting an API object
 message DeleteOptions {
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.TypeMeta typeMeta = 4;
+
   // The duration in seconds before the object should be deleted. Value must be non-negative integer.
   // The value zero indicates delete immediately. If this value is nil, the default grace period for the
   // specified type will be used.
@@ -745,6 +776,8 @@ message EndpointSubset {
 //     },
 //  ]
 message Endpoints {
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.TypeMeta typeMeta = 3;
+
   // Standard object's metadata.
   // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
   // +optional
@@ -762,13 +795,26 @@ message Endpoints {
 
 // EndpointsList is a list of endpoints.
 message EndpointsList {
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.TypeMeta typeMeta = 3;
+
   // Standard list metadata.
   // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds
   // +optional
-  optional k8s.io.kubernetes.pkg.apis.meta.v1.ListMeta metadata = 1;
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // List of endpoints.
   repeated Endpoints items = 2;
+}
+
+// EnvFromSource represents the source of a set of ConfigMaps
+message EnvFromSource {
+  // An optional identifer to prepend to each key in the ConfigMap. Must be a C_IDENTIFIER.
+  // +optional
+  optional string prefix = 1;
+
+  // The ConfigMap to select from
+  // +optional
+  optional ConfigMapEnvSource configMapRef = 2;
 }
 
 // EnvVar represents an environment variable present in a Container.
@@ -816,6 +862,8 @@ message EnvVarSource {
 // Event is a report of an event somewhere in the cluster.
 // TODO: Decide whether to store these separately or with the object they apply to.
 message Event {
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.TypeMeta typeMeta = 10;
+
   // Standard object's metadata.
   // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
   optional ObjectMeta metadata = 1;
@@ -840,11 +888,11 @@ message Event {
 
   // The time at which the event was first recorded. (Time of server receipt is in TypeMeta.)
   // +optional
-  optional k8s.io.kubernetes.pkg.apis.meta.v1.Time firstTimestamp = 6;
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.Time firstTimestamp = 6;
 
   // The time at which the most recent occurrence of this event was recorded.
   // +optional
-  optional k8s.io.kubernetes.pkg.apis.meta.v1.Time lastTimestamp = 7;
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.Time lastTimestamp = 7;
 
   // The number of times this event has occurred.
   // +optional
@@ -857,10 +905,12 @@ message Event {
 
 // EventList is a list of events.
 message EventList {
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.TypeMeta typeMeta = 3;
+
   // Standard list metadata.
   // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds
   // +optional
-  optional k8s.io.kubernetes.pkg.apis.meta.v1.ListMeta metadata = 1;
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // List of events
   repeated Event items = 2;
@@ -1162,6 +1212,8 @@ message Lifecycle {
 
 // LimitRange sets resource usage limits for each kind of resource in a Namespace.
 message LimitRange {
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.TypeMeta typeMeta = 3;
+
   // Standard object's metadata.
   // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
   // +optional
@@ -1202,10 +1254,12 @@ message LimitRangeItem {
 
 // LimitRangeList is a list of LimitRange items.
 message LimitRangeList {
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.TypeMeta typeMeta = 3;
+
   // Standard list metadata.
   // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds
   // +optional
-  optional k8s.io.kubernetes.pkg.apis.meta.v1.ListMeta metadata = 1;
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // Items is a list of LimitRange objects.
   // More info: http://releases.k8s.io/HEAD/docs/design/admission_control_limit_range.md
@@ -1220,17 +1274,21 @@ message LimitRangeSpec {
 
 // List holds a list of objects, which may not be known by the server.
 message List {
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.TypeMeta typeMeta = 3;
+
   // Standard list metadata.
   // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds
   // +optional
-  optional k8s.io.kubernetes.pkg.apis.meta.v1.ListMeta metadata = 1;
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // List of objects
-  repeated k8s.io.kubernetes.pkg.runtime.RawExtension items = 2;
+  repeated k8s.io.apimachinery.pkg.runtime.RawExtension items = 2;
 }
 
 // ListOptions is the query options to a standard REST list call.
 message ListOptions {
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.TypeMeta typeMeta = 6;
+
   // A selector to restrict the list of returned objects by their labels.
   // Defaults to everything.
   // +optional
@@ -1314,6 +1372,8 @@ message NFSVolumeSource {
 // Namespace provides a scope for Names.
 // Use of multiple namespaces is optional.
 message Namespace {
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.TypeMeta typeMeta = 4;
+
   // Standard object's metadata.
   // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
   // +optional
@@ -1332,10 +1392,12 @@ message Namespace {
 
 // NamespaceList is a list of Namespaces.
 message NamespaceList {
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.TypeMeta typeMeta = 3;
+
   // Standard list metadata.
   // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds
   // +optional
-  optional k8s.io.kubernetes.pkg.apis.meta.v1.ListMeta metadata = 1;
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // Items is the list of Namespace objects in the list.
   // More info: http://kubernetes.io/docs/user-guide/namespaces
@@ -1361,6 +1423,8 @@ message NamespaceStatus {
 // Node is a worker node in Kubernetes.
 // Each node will have a unique identifier in the cache (i.e. in etcd).
 message Node {
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.TypeMeta typeMeta = 4;
+
   // Standard object's metadata.
   // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
   // +optional
@@ -1421,11 +1485,11 @@ message NodeCondition {
 
   // Last time we got an update on a given condition.
   // +optional
-  optional k8s.io.kubernetes.pkg.apis.meta.v1.Time lastHeartbeatTime = 3;
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.Time lastHeartbeatTime = 3;
 
   // Last time the condition transit from one status to another.
   // +optional
-  optional k8s.io.kubernetes.pkg.apis.meta.v1.Time lastTransitionTime = 4;
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.Time lastTransitionTime = 4;
 
   // (brief) reason for the condition's last transition.
   // +optional
@@ -1445,10 +1509,12 @@ message NodeDaemonEndpoints {
 
 // NodeList is the whole list of all Nodes which have been registered with master.
 message NodeList {
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.TypeMeta typeMeta = 3;
+
   // Standard list metadata.
   // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds
   // +optional
-  optional k8s.io.kubernetes.pkg.apis.meta.v1.ListMeta metadata = 1;
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // List of nodes
   repeated Node items = 2;
@@ -1456,6 +1522,8 @@ message NodeList {
 
 // NodeProxyOptions is the query options to a Node's proxy call.
 message NodeProxyOptions {
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.TypeMeta typeMeta = 2;
+
   // Path is the URL path to use for the current proxy request to node.
   // +optional
   optional string path = 1;
@@ -1704,7 +1772,7 @@ message ObjectMeta {
   // Null for lists.
   // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
   // +optional
-  optional k8s.io.kubernetes.pkg.apis.meta.v1.Time creationTimestamp = 8;
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.Time creationTimestamp = 8;
 
   // DeletionTimestamp is RFC 3339 date and time at which this resource will be deleted. This
   // field is set by the server when a graceful deletion is requested by the user, and is not
@@ -1724,7 +1792,7 @@ message ObjectMeta {
   // Read-only.
   // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
   // +optional
-  optional k8s.io.kubernetes.pkg.apis.meta.v1.Time deletionTimestamp = 9;
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.Time deletionTimestamp = 9;
 
   // Number of seconds allowed for this object to gracefully terminate before
   // it will be removed from the system. Only set when deletionTimestamp is also set.
@@ -1752,7 +1820,7 @@ message ObjectMeta {
   // then an entry in this list will point to this controller, with the controller field set to true.
   // There cannot be more than one managing controller.
   // +optional
-  repeated k8s.io.kubernetes.pkg.apis.meta.v1.OwnerReference ownerReferences = 13;
+  repeated k8s.io.apimachinery.pkg.apis.meta.v1.OwnerReference ownerReferences = 13;
 
   // Must be empty before the object is deleted from the registry. Each entry
   // is an identifier for the responsible component that will remove the entry
@@ -1815,6 +1883,8 @@ message ObjectReference {
 // It is analogous to a node.
 // More info: http://kubernetes.io/docs/user-guide/persistent-volumes
 message PersistentVolume {
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.TypeMeta typeMeta = 4;
+
   // Standard object's metadata.
   // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
   // +optional
@@ -1836,6 +1906,8 @@ message PersistentVolume {
 
 // PersistentVolumeClaim is a user's request for and claim to a persistent volume
 message PersistentVolumeClaim {
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.TypeMeta typeMeta = 4;
+
   // Standard object's metadata.
   // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
   // +optional
@@ -1855,10 +1927,12 @@ message PersistentVolumeClaim {
 
 // PersistentVolumeClaimList is a list of PersistentVolumeClaim items.
 message PersistentVolumeClaimList {
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.TypeMeta typeMeta = 3;
+
   // Standard list metadata.
   // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds
   // +optional
-  optional k8s.io.kubernetes.pkg.apis.meta.v1.ListMeta metadata = 1;
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // A list of persistent volume claims.
   // More info: http://kubernetes.io/docs/user-guide/persistent-volumes#persistentvolumeclaims
@@ -1875,7 +1949,7 @@ message PersistentVolumeClaimSpec {
 
   // A label query over volumes to consider for binding.
   // +optional
-  optional k8s.io.kubernetes.pkg.apis.meta.v1.LabelSelector selector = 4;
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector selector = 4;
 
   // Resources represents the minimum resources the volume should have.
   // More info: http://kubernetes.io/docs/user-guide/persistent-volumes#resources
@@ -1920,10 +1994,12 @@ message PersistentVolumeClaimVolumeSource {
 
 // PersistentVolumeList is a list of PersistentVolume items.
 message PersistentVolumeList {
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.TypeMeta typeMeta = 3;
+
   // Standard list metadata.
   // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds
   // +optional
-  optional k8s.io.kubernetes.pkg.apis.meta.v1.ListMeta metadata = 1;
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // List of persistent volumes.
   // More info: http://kubernetes.io/docs/user-guide/persistent-volumes
@@ -2078,6 +2154,8 @@ message PhotonPersistentDiskVolumeSource {
 // Pod is a collection of containers that can run on a host. This resource is created
 // by clients and scheduled onto hosts.
 message Pod {
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.TypeMeta typeMeta = 4;
+
   // Standard object's metadata.
   // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
   // +optional
@@ -2141,7 +2219,7 @@ message PodAffinity {
 message PodAffinityTerm {
   // A label query over a set of resources, in this case pods.
   // +optional
-  optional k8s.io.kubernetes.pkg.apis.meta.v1.LabelSelector labelSelector = 1;
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector labelSelector = 1;
 
   // namespaces specifies which namespaces the labelSelector applies to (matches against);
   // nil list means "this pod's namespace," empty list means "all namespaces"
@@ -2200,6 +2278,8 @@ message PodAntiAffinity {
 // TODO: merge w/ PodExecOptions below for stdin, stdout, etc
 // and also when we cut V2, we should export a "StreamOptions" or somesuch that contains Stdin, Stdout, Stder and TTY
 message PodAttachOptions {
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.TypeMeta typeMeta = 6;
+
   // Stdin if true, redirects the standard input stream of the pod for this call.
   // Defaults to false.
   // +optional
@@ -2242,11 +2322,11 @@ message PodCondition {
 
   // Last time we probed the condition.
   // +optional
-  optional k8s.io.kubernetes.pkg.apis.meta.v1.Time lastProbeTime = 3;
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.Time lastProbeTime = 3;
 
   // Last time the condition transitioned from one status to another.
   // +optional
-  optional k8s.io.kubernetes.pkg.apis.meta.v1.Time lastTransitionTime = 4;
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.Time lastTransitionTime = 4;
 
   // Unique, one-word, CamelCase reason for the condition's last transition.
   // +optional
@@ -2262,6 +2342,8 @@ message PodCondition {
 // TODO: This is largely identical to PodAttachOptions above, make sure they stay in sync and see about merging
 // and also when we cut V2, we should export a "StreamOptions" or somesuch that contains Stdin, Stdout, Stder and TTY
 message PodExecOptions {
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.TypeMeta typeMeta = 7;
+
   // Redirect the standard input stream of the pod for this call.
   // Defaults to false.
   // +optional
@@ -2293,10 +2375,12 @@ message PodExecOptions {
 
 // PodList is a list of Pods.
 message PodList {
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.TypeMeta typeMeta = 3;
+
   // Standard list metadata.
   // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds
   // +optional
-  optional k8s.io.kubernetes.pkg.apis.meta.v1.ListMeta metadata = 1;
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // List of pods.
   // More info: http://kubernetes.io/docs/user-guide/pods
@@ -2305,6 +2389,8 @@ message PodList {
 
 // PodLogOptions is the query options for a Pod's logs REST call.
 message PodLogOptions {
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.TypeMeta typeMeta = 9;
+
   // The container for which to stream logs. Defaults to only container if there is one container in the pod.
   // +optional
   optional string container = 1;
@@ -2329,7 +2415,7 @@ message PodLogOptions {
   // If this value is in the future, no logs will be returned.
   // Only one of sinceSeconds or sinceTime may be specified.
   // +optional
-  optional k8s.io.kubernetes.pkg.apis.meta.v1.Time sinceTime = 5;
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.Time sinceTime = 5;
 
   // If true, add an RFC3339 or RFC3339Nano timestamp at the beginning of every line
   // of log output. Defaults to false.
@@ -2350,6 +2436,8 @@ message PodLogOptions {
 
 // PodProxyOptions is the query options to a Pod's proxy call.
 message PodProxyOptions {
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.TypeMeta typeMeta = 2;
+
   // Path is the URL path to use for the current proxy request to pod.
   // +optional
   optional string path = 1;
@@ -2408,7 +2496,7 @@ message PodSecurityContext {
 message PodSignature {
   // Reference to controller whose pods should avoid this node.
   // +optional
-  optional k8s.io.kubernetes.pkg.apis.meta.v1.OwnerReference podController = 1;
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.OwnerReference podController = 1;
 }
 
 // PodSpec is a description of a pod.
@@ -2557,7 +2645,7 @@ message PodStatus {
   // RFC 3339 date and time at which the object was acknowledged by the Kubelet.
   // This is before the Kubelet pulled the container image(s) for the pod.
   // +optional
-  optional k8s.io.kubernetes.pkg.apis.meta.v1.Time startTime = 7;
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.Time startTime = 7;
 
   // The list has one entry per container in the manifest. Each entry is currently the output
   // of `docker inspect`.
@@ -2574,6 +2662,8 @@ message PodStatus {
 
 // PodStatusResult is a wrapper for PodStatus returned by kubelet that can be encode/decoded
 message PodStatusResult {
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.TypeMeta typeMeta = 3;
+
   // Standard object's metadata.
   // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
   // +optional
@@ -2590,6 +2680,8 @@ message PodStatusResult {
 
 // PodTemplate describes a template for creating copies of a predefined pod.
 message PodTemplate {
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.TypeMeta typeMeta = 3;
+
   // Standard object's metadata.
   // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
   // +optional
@@ -2603,10 +2695,12 @@ message PodTemplate {
 
 // PodTemplateList is a list of PodTemplates.
 message PodTemplateList {
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.TypeMeta typeMeta = 3;
+
   // Standard list metadata.
   // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds
   // +optional
-  optional k8s.io.kubernetes.pkg.apis.meta.v1.ListMeta metadata = 1;
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // List of pod templates
   repeated PodTemplate items = 2;
@@ -2639,7 +2733,7 @@ message PreferAvoidPodsEntry {
 
   // Time at which this entry was added to the list.
   // +optional
-  optional k8s.io.kubernetes.pkg.apis.meta.v1.Time evictionTime = 2;
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.Time evictionTime = 2;
 
   // (brief) reason why this entry was added to the list.
   // +optional
@@ -2773,6 +2867,8 @@ message RBDVolumeSource {
 
 // RangeAllocation is not a public type.
 message RangeAllocation {
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.TypeMeta typeMeta = 4;
+
   // Standard object's metadata.
   // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
   // +optional
@@ -2787,6 +2883,8 @@ message RangeAllocation {
 
 // ReplicationController represents the configuration of a replication controller.
 message ReplicationController {
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.TypeMeta typeMeta = 4;
+
   // If the Labels of a ReplicationController are empty, they are defaulted to
   // be the same as the Pod(s) that the replication controller manages.
   // Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
@@ -2817,7 +2915,7 @@ message ReplicationControllerCondition {
 
   // The last time the condition transitioned from one status to another.
   // +optional
-  optional k8s.io.kubernetes.pkg.apis.meta.v1.Time lastTransitionTime = 3;
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.Time lastTransitionTime = 3;
 
   // The reason for the condition's last transition.
   // +optional
@@ -2830,10 +2928,12 @@ message ReplicationControllerCondition {
 
 // ReplicationControllerList is a collection of replication controllers.
 message ReplicationControllerList {
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.TypeMeta typeMeta = 3;
+
   // Standard list metadata.
   // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds
   // +optional
-  optional k8s.io.kubernetes.pkg.apis.meta.v1.ListMeta metadata = 1;
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // List of replication controllers.
   // More info: http://kubernetes.io/docs/user-guide/replication-controller
@@ -2914,6 +3014,8 @@ message ResourceFieldSelector {
 
 // ResourceQuota sets aggregate quota restrictions enforced per namespace
 message ResourceQuota {
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.TypeMeta typeMeta = 4;
+
   // Standard object's metadata.
   // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
   // +optional
@@ -2932,10 +3034,12 @@ message ResourceQuota {
 
 // ResourceQuotaList is a list of ResourceQuota items.
 message ResourceQuotaList {
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.TypeMeta typeMeta = 3;
+
   // Standard list metadata.
   // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds
   // +optional
-  optional k8s.io.kubernetes.pkg.apis.meta.v1.ListMeta metadata = 1;
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // Items is a list of ResourceQuota objects.
   // More info: http://releases.k8s.io/HEAD/docs/design/admission_control_resource_quota.md#admissioncontrol-plugin-resourcequota
@@ -3004,6 +3108,8 @@ message SELinuxOptions {
 // Secret holds secret data of a certain type. The total bytes of the values in
 // the Data field must be less than MaxSecretSize bytes.
 message Secret {
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.TypeMeta typeMeta = 5;
+
   // Standard object's metadata.
   // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
   // +optional
@@ -3041,10 +3147,12 @@ message SecretKeySelector {
 
 // SecretList is a list of Secret.
 message SecretList {
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.TypeMeta typeMeta = 3;
+
   // Standard list metadata.
   // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds
   // +optional
-  optional k8s.io.kubernetes.pkg.apis.meta.v1.ListMeta metadata = 1;
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // Items is a list of secret objects.
   // More info: http://kubernetes.io/docs/user-guide/secrets
@@ -3127,6 +3235,8 @@ message SecurityContext {
 
 // SerializedReference is a reference to serialized object.
 message SerializedReference {
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.TypeMeta typeMeta = 2;
+
   // The reference to an object in the system.
   // +optional
   optional ObjectReference reference = 1;
@@ -3136,6 +3246,8 @@ message SerializedReference {
 // (for example 3306) that the proxy listens on, and the selector that determines which pods
 // will answer requests sent through the proxy.
 message Service {
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.TypeMeta typeMeta = 4;
+
   // Standard object's metadata.
   // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
   // +optional
@@ -3159,6 +3271,8 @@ message Service {
 // * a principal that can be authenticated and authorized
 // * a set of secrets
 message ServiceAccount {
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.TypeMeta typeMeta = 4;
+
   // Standard object's metadata.
   // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
   // +optional
@@ -3179,10 +3293,12 @@ message ServiceAccount {
 
 // ServiceAccountList is a list of ServiceAccount objects
 message ServiceAccountList {
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.TypeMeta typeMeta = 3;
+
   // Standard list metadata.
   // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds
   // +optional
-  optional k8s.io.kubernetes.pkg.apis.meta.v1.ListMeta metadata = 1;
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // List of ServiceAccounts.
   // More info: http://releases.k8s.io/HEAD/docs/design/service_accounts.md#service-accounts
@@ -3191,10 +3307,12 @@ message ServiceAccountList {
 
 // ServiceList holds a list of services.
 message ServiceList {
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.TypeMeta typeMeta = 3;
+
   // Standard list metadata.
   // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds
   // +optional
-  optional k8s.io.kubernetes.pkg.apis.meta.v1.ListMeta metadata = 1;
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // List of services
   repeated Service items = 2;
@@ -3239,6 +3357,8 @@ message ServicePort {
 
 // ServiceProxyOptions is the query options to a Service's proxy call.
 message ServiceProxyOptions {
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.TypeMeta typeMeta = 2;
+
   // Path is the part of URLs that include service endpoints, suffixes,
   // and parameters to use for the current proxy request to service.
   // For example, the whole request URL is
