@@ -59,42 +59,73 @@ func NewCmdVersion(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	}
 	cmd.Flags().BoolP("client", "c", false, "Client version only (no server required).")
 	cmd.Flags().BoolP("short", "", false, "Print just the version number.")
-	cmd.Flags().String("output", "yaml", "output format, options available are yaml and json")
+	// default behavior is std.
+	cmd.Flags().String("output", "std", "output format, options available are yaml and json")
 	cmd.Flags().MarkShorthandDeprecated("client", "please use --client instead.")
 	return cmd
 }
 
 func RunVersion(f cmdutil.Factory, out io.Writer, cmd *cobra.Command) error {
 	of := cmdutil.GetFlagString(cmd, "output")
-	if of != "yaml" && of != "json" {
+	if of != "yaml" && of != "json" && of != "std" {
 		return errors.New("invalid output format")
 	}
 
-	cv := version.Get()
-	if cmdutil.GetFlagBool(cmd, "short") {
-		cv = version.Info{GitVersion: version.Get().GitVersion}
-	}
+	if of == "std" {
+		v := fmt.Sprintf("%#v", version.Get())
+		if cmdutil.GetFlagBool(cmd, "short") {
+			v = version.Get().GitVersion
+		}
 
-	if cmdutil.GetFlagBool(cmd, "client") {
-		return printRightFormat(out, of, ClientVersionObj{cv})
-	}
+		fmt.Fprintf(out, "Client Version: %s\n", v)
+		if cmdutil.GetFlagBool(cmd, "client") {
+			return nil
+		}
 
-	clientSet, err := f.ClientSet()
-	if err != nil {
-		return err
-	}
+		clientSet, err := f.ClientSet()
+		if err != nil {
+			return err
+		}
 
-	serverVersion, err := clientSet.Discovery().ServerVersion()
-	if err != nil {
-		return err
-	}
+		serverVersion, err := clientSet.Discovery().ServerVersion()
+		if err != nil {
+			return err
+		}
 
-	sv := *serverVersion
-	if cmdutil.GetFlagBool(cmd, "short") {
-		sv = version.Info{GitVersion: serverVersion.GitVersion}
-	}
+		v = fmt.Sprintf("%#v", *serverVersion)
+		if cmdutil.GetFlagBool(cmd, "short") {
+			v = serverVersion.GitVersion
+		}
 
-	return printRightFormat(out, of, ClientAndServerVersionObj{cv, sv})
+		fmt.Fprintf(out, "Server Version: %s\n", v)
+		return nil
+	} else {
+		cv := version.Get()
+		if cmdutil.GetFlagBool(cmd, "short") {
+			cv = version.Info{GitVersion: version.Get().GitVersion}
+		}
+
+		if cmdutil.GetFlagBool(cmd, "client") {
+			return printRightFormat(out, of, ClientVersionObj{cv})
+		}
+
+		clientSet, err := f.ClientSet()
+		if err != nil {
+			return err
+		}
+
+		serverVersion, err := clientSet.Discovery().ServerVersion()
+		if err != nil {
+			return err
+		}
+
+		sv := *serverVersion
+		if cmdutil.GetFlagBool(cmd, "short") {
+			sv = version.Info{GitVersion: serverVersion.GitVersion}
+		}
+
+		return printRightFormat(out, of, ClientAndServerVersionObj{cv, sv})
+	}
 }
 
 func printRightFormat(out io.Writer, outputFormat string, vo interface{}) error {
