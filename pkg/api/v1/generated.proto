@@ -2434,6 +2434,15 @@ message PodLogOptions {
   optional int64 limitBytes = 8;
 }
 
+// PodPortForwardOptions is the query options to a Pod's port forward call.
+message PodPortForwardOptions {
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.TypeMeta typeMeta = 2;
+
+  // List of ports to forward
+  // +optional
+  repeated int32 ports = 1;
+}
+
 // PodProxyOptions is the query options to a Pod's proxy call.
 message PodProxyOptions {
   optional k8s.io.apimachinery.pkg.apis.meta.v1.TypeMeta typeMeta = 2;
