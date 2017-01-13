@@ -265,6 +265,7 @@ func ClusterRoles() []rbac.ClusterRole {
 // ClusterRoleBindings return default rolebindings to the default roles
 func ClusterRoleBindings() []rbac.ClusterRoleBinding {
 	rolebindings := []rbac.ClusterRoleBinding{
+		rbac.NewClusterBinding("admin").Groups(user.AdminGroup).BindingOrDie(),
 		rbac.NewClusterBinding("cluster-admin").Groups(user.SystemPrivilegedGroup).BindingOrDie(),
 		rbac.NewClusterBinding("system:discovery").Groups(user.AllAuthenticated, user.AllUnauthenticated).BindingOrDie(),
 		rbac.NewClusterBinding("system:basic-user").Groups(user.AllAuthenticated, user.AllUnauthenticated).BindingOrDie(),
