@@ -32,6 +32,7 @@ filegroup(
         "//cmd/kubectl:all-srcs",
         "//cmd/kubelet:all-srcs",
         "//cmd/kubemark:all-srcs",
+        "//cmd/kubernetes-discovery/pkg/apis/apiregistration:all-srcs",
         "//cmd/libs/go2idl/client-gen:all-srcs",
         "//cmd/libs/go2idl/conversion-gen:all-srcs",
         "//cmd/libs/go2idl/deepcopy-gen:all-srcs",

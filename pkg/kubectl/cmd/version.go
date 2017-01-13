@@ -17,15 +17,28 @@ limitations under the License.
 package cmd
 
 import (
+	"errors"
 	"fmt"
+	"github.com/spf13/cobra"
 	"io"
 
-	"github.com/spf13/cobra"
-
+	"encoding/json"
+	"github.com/ghodss/yaml"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/version"
 )
+
+// We include both struct objects because json marshal does not handle the idea
+// of empty struct objects well and will include and empty server object in results
+type ClientVersionObj struct {
+	ClientVersion version.Info `json:"Client Version" yaml:"Client Version"`
+}
+
+type ClientAndServerVersionObj struct {
+	ClientVersion version.Info `json:"Client Version" yaml:"Client Version"`
+	ServerVersion version.Info `json:"Server Version" yaml:"Server Version"`
+}
 
 var (
 	version_example = templates.Examples(`
@@ -46,36 +59,61 @@ func NewCmdVersion(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	}
 	cmd.Flags().BoolP("client", "c", false, "Client version only (no server required).")
 	cmd.Flags().BoolP("short", "", false, "Print just the version number.")
+	cmd.Flags().String("output", "yaml", "output format, options available are yaml and json")
 	cmd.Flags().MarkShorthandDeprecated("client", "please use --client instead.")
 	return cmd
 }
 
 func RunVersion(f cmdutil.Factory, out io.Writer, cmd *cobra.Command) error {
-	v := fmt.Sprintf("%#v", version.Get())
-	if cmdutil.GetFlagBool(cmd, "short") {
-		v = version.Get().GitVersion
+	of := cmdutil.GetFlagString(cmd, "output")
+	if of != "yaml" && of != "json" {
+		return errors.New("invalid output format")
 	}
 
-	fmt.Fprintf(out, "Client Version: %s\n", v)
+	cv := version.Get()
+	if cmdutil.GetFlagBool(cmd, "short") {
+		cv = version.Info{GitVersion: version.Get().GitVersion}
+	}
+
 	if cmdutil.GetFlagBool(cmd, "client") {
-		return nil
+		return printRightFormat(out, of, ClientVersionObj{cv})
 	}
 
-	clientset, err := f.ClientSet()
+	clientSet, err := f.ClientSet()
 	if err != nil {
 		return err
 	}
 
-	serverVersion, err := clientset.Discovery().ServerVersion()
+	serverVersion, err := clientSet.Discovery().ServerVersion()
 	if err != nil {
 		return err
 	}
 
-	v = fmt.Sprintf("%#v", *serverVersion)
+	sv := *serverVersion
 	if cmdutil.GetFlagBool(cmd, "short") {
-		v = serverVersion.GitVersion
+		sv = version.Info{GitVersion: serverVersion.GitVersion}
 	}
 
-	fmt.Fprintf(out, "Server Version: %s\n", v)
+	return printRightFormat(out, of, ClientAndServerVersionObj{cv, sv})
+}
+
+func printRightFormat(out io.Writer, outputFormat string, vo interface{}) error {
+	if outputFormat == "yaml" {
+		fmt.Println(vo)
+		y, err := yaml.Marshal(&vo)
+		if err != nil {
+			return err
+		}
+		fmt.Fprintf(out, string(y))
+	} else if outputFormat == "json" {
+		y, err := json.Marshal(&vo)
+		if err != nil {
+			return err
+		}
+		fmt.Fprintf(out, string(y))
+	} else {
+		return errors.New("unexpected output format!")
+	}
+
 	return nil
 }

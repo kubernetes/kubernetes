@@ -25,15 +25,15 @@ import (
 // TODO: Add []string of api versions supported? It's still unclear
 // how we'll want to distribute that information.
 type Info struct {
-	Major        string `json:"major"`
-	Minor        string `json:"minor"`
-	GitVersion   string `json:"gitVersion"`
-	GitCommit    string `json:"gitCommit"`
-	GitTreeState string `json:"gitTreeState"`
-	BuildDate    string `json:"buildDate"`
-	GoVersion    string `json:"goVersion"`
-	Compiler     string `json:"compiler"`
-	Platform     string `json:"platform"`
+	Major        string `json:"major,omitempty" yaml:"major"`
+	Minor        string `json:"minor,omitempty" yaml:"minor"`
+	GitVersion   string `json:"gitVersion,omitempty" yaml:"gitVersion"`
+	GitCommit    string `json:"gitCommit,omitempty" yaml:"gitCommit"`
+	GitTreeState string `json:"gitTreeState,omitempty" yaml:"gitTreeState"`
+	BuildDate    string `json:"buildDate,omitempty" yaml:"buildDate"`
+	GoVersion    string `json:"goVersion,omitempty" yaml:"goVersion"`
+	Compiler     string `json:"compiler,omitempty" yaml:"compiler"`
+	Platform     string `json:"platform,omitempty" yaml:"platform"`
 }
 
 // Get returns the overall codebase version. It's for detecting

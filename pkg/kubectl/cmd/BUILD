@@ -105,6 +105,7 @@ go_library(
         "//vendor:github.com/docker/distribution/reference",
         "//vendor:github.com/docker/docker/pkg/term",
         "//vendor:github.com/evanphx/json-patch",
+        "//vendor:github.com/ghodss/yaml",
         "//vendor:github.com/golang/glog",
         "//vendor:github.com/jonboulle/clockwork",
         "//vendor:github.com/renstrom/dedent",

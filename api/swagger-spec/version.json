@@ -31,17 +31,6 @@
   "models": {
    "version.Info": {
     "id": "version.Info",
-    "required": [
-     "major",
-     "minor",
-     "gitVersion",
-     "gitCommit",
-     "gitTreeState",
-     "buildDate",
-     "goVersion",
-     "compiler",
-     "platform"
-    ],
     "properties": {
      "major": {
       "type": "string"
