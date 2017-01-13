@@ -18,7 +18,6 @@ package deployment
 
 import (
 	"fmt"
-	"reflect"
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api/v1"
@@ -66,7 +65,7 @@ func (dc *DeploymentController) rollback(deployment *extensions.Deployment, toRe
 }
 
 func (dc *DeploymentController) rollbackToTemplate(deployment *extensions.Deployment, rs *extensions.ReplicaSet) (d *extensions.Deployment, performedRollback bool, err error) {
-	if !reflect.DeepEqual(deploymentutil.GetNewReplicaSetTemplate(deployment), rs.Spec.Template) {
+	if !deploymentutil.EqualIgnoreHash(deployment.Spec.Template, rs.Spec.Template) {
 		glog.Infof("Rolling back deployment %s to template spec %+v", deployment.Name, rs.Spec.Template.Spec)
 		deploymentutil.SetFromReplicaSetTemplate(deployment, rs.Spec.Template)
 		// set RS (the old RS we'll rolling back to) annotations back to the deployment;
