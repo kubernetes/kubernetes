@@ -12998,6 +12998,17 @@
    },
    "version.Info": {
     "description": "Info contains versioning information. how we'll want to distribute that information.",
+    "required": [
+     "major",
+     "minor",
+     "gitVersion",
+     "gitCommit",
+     "gitTreeState",
+     "buildDate",
+     "goVersion",
+     "compiler",
+     "platform"
+    ],
     "properties": {
      "buildDate": {
       "type": "string"

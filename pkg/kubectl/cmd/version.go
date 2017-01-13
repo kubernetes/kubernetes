@@ -27,17 +27,12 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/version"
+	"strings"
 )
 
-// We include both struct objects because json marshal does not handle the idea
-// of empty struct objects well and will include and empty server object in results
-type ClientVersionObj struct {
-	ClientVersion version.Info `json:"Client Version" yaml:"Client Version"`
-}
-
-type ClientAndServerVersionObj struct {
-	ClientVersion version.Info `json:"Client Version" yaml:"Client Version"`
-	ServerVersion version.Info `json:"Server Version" yaml:"Server Version"`
+type VersionObj struct {
+	ClientVersion *version.Info `json:"clientVersion" yaml:"Client Version"`
+	ServerVersion *version.Info `json:"serverVersion" yaml:"Server Version"`
 }
 
 var (
@@ -60,18 +55,16 @@ func NewCmdVersion(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd.Flags().BoolP("client", "c", false, "Client version only (no server required).")
 	cmd.Flags().BoolP("short", "", false, "Print just the version number.")
 	// default behavior is std.
-	cmd.Flags().String("output", "std", "output format, options available are yaml and json")
+	cmd.Flags().String("output", "", "output format, options available are yaml and json")
 	cmd.Flags().MarkShorthandDeprecated("client", "please use --client instead.")
 	return cmd
 }
 
 func RunVersion(f cmdutil.Factory, out io.Writer, cmd *cobra.Command) error {
-	of := cmdutil.GetFlagString(cmd, "output")
-	if of != "yaml" && of != "json" && of != "std" {
-		return errors.New("invalid output format")
-	}
+	of := strings.ToLower(cmdutil.GetFlagString(cmd, "output"))
 
-	if of == "std" {
+	switch {
+	case len(of) == 0:
 		v := fmt.Sprintf("%#v", version.Get())
 		if cmdutil.GetFlagBool(cmd, "short") {
 			v = version.Get().GitVersion
@@ -99,14 +92,14 @@ func RunVersion(f cmdutil.Factory, out io.Writer, cmd *cobra.Command) error {
 
 		fmt.Fprintf(out, "Server Version: %s\n", v)
 		return nil
-	} else {
+	case of == "yaml" || of == "json":
 		cv := version.Get()
 		if cmdutil.GetFlagBool(cmd, "short") {
 			cv = version.Info{GitVersion: version.Get().GitVersion}
 		}
 
 		if cmdutil.GetFlagBool(cmd, "client") {
-			return printRightFormat(out, of, ClientVersionObj{cv})
+			return printRightFormat(out, of, VersionObj{&cv, nil})
 		}
 
 		clientSet, err := f.ClientSet()
@@ -124,25 +117,28 @@ func RunVersion(f cmdutil.Factory, out io.Writer, cmd *cobra.Command) error {
 			sv = version.Info{GitVersion: serverVersion.GitVersion}
 		}
 
-		return printRightFormat(out, of, ClientAndServerVersionObj{cv, sv})
+		return printRightFormat(out, of, VersionObj{&cv, &sv})
+	default:
+		return errors.New("invalid output format: " + of)
+
 	}
 }
 
 func printRightFormat(out io.Writer, outputFormat string, vo interface{}) error {
-	if outputFormat == "yaml" {
-		fmt.Println(vo)
+	switch outputFormat {
+	case "yaml":
 		y, err := yaml.Marshal(&vo)
 		if err != nil {
 			return err
 		}
 		fmt.Fprintf(out, string(y))
-	} else if outputFormat == "json" {
+	case "json":
 		y, err := json.Marshal(&vo)
 		if err != nil {
 			return err
 		}
 		fmt.Fprintf(out, string(y))
-	} else {
+	default:
 		return errors.New("unexpected output format!")
 	}
 
