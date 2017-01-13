@@ -265,6 +265,7 @@ pkg/util/logs
 pkg/util/maps
 pkg/util/metrics
 pkg/util/netsh
+pkg/util/rand
 pkg/util/ratelimit
 pkg/util/replicaset
 pkg/util/restoptions

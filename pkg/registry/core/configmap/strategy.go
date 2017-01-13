@@ -23,6 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/request"
+	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/api/validation"
@@ -34,12 +35,12 @@ import (
 // strategy implements behavior for ConfigMap objects
 type strategy struct {
 	runtime.ObjectTyper
-	api.NameGenerator
+	names.NameGenerator
 }
 
 // Strategy is the default logic that applies when creating and updating ConfigMap
 // objects via the REST API.
-var Strategy = strategy{api.Scheme, api.SimpleNameGenerator}
+var Strategy = strategy{api.Scheme, names.SimpleNameGenerator}
 
 // Strategy should implement rest.RESTCreateStrategy
 var _ rest.RESTCreateStrategy = Strategy

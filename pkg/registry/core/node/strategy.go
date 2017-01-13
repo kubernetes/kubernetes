@@ -30,6 +30,7 @@ import (
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/request"
+	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/fields"
@@ -41,12 +42,12 @@ import (
 // nodeStrategy implements behavior for nodes
 type nodeStrategy struct {
 	runtime.ObjectTyper
-	api.NameGenerator
+	names.NameGenerator
 }
 
 // Nodes is the default logic that applies when creating and updating Node
 // objects.
-var Strategy = nodeStrategy{api.Scheme, api.SimpleNameGenerator}
+var Strategy = nodeStrategy{api.Scheme, names.SimpleNameGenerator}
 
 // NamespaceScoped is false for nodes.
 func (nodeStrategy) NamespaceScoped() bool {

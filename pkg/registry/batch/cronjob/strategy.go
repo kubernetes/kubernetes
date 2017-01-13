@@ -23,6 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/request"
+	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/batch/validation"
@@ -34,11 +35,11 @@ import (
 // scheduledJobStrategy implements verification logic for Replication Controllers.
 type scheduledJobStrategy struct {
 	runtime.ObjectTyper
-	api.NameGenerator
+	names.NameGenerator
 }
 
 // Strategy is the default logic that applies when creating and updating CronJob objects.
-var Strategy = scheduledJobStrategy{api.Scheme, api.SimpleNameGenerator}
+var Strategy = scheduledJobStrategy{api.Scheme, names.SimpleNameGenerator}
 
 // NamespaceScoped returns true because all scheduled jobs need to be within a namespace.
 func (scheduledJobStrategy) NamespaceScoped() bool {

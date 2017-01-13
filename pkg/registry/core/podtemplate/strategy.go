@@ -23,6 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/request"
+	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/fields"
@@ -32,12 +33,12 @@ import (
 // podTemplateStrategy implements behavior for PodTemplates
 type podTemplateStrategy struct {
 	runtime.ObjectTyper
-	api.NameGenerator
+	names.NameGenerator
 }
 
 // Strategy is the default logic that applies when creating and updating PodTemplate
 // objects via the REST API.
-var Strategy = podTemplateStrategy{api.Scheme, api.SimpleNameGenerator}
+var Strategy = podTemplateStrategy{api.Scheme, names.SimpleNameGenerator}
 
 // NamespaceScoped is true for pod templates.
 func (podTemplateStrategy) NamespaceScoped() bool {
