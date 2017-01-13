@@ -27,8 +27,6 @@ import (
 	"github.com/spf13/cobra"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime/schema"
-	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
 	"k8s.io/kubernetes/pkg/api"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
@@ -36,15 +34,14 @@ import (
 
 func TestLog(t *testing.T) {
 	tests := []struct {
-		name, version, podPath, logPath, container string
-		pod                                        *api.Pod
+		name, version, podNamePath, podResourcePath, logPath, container string
 	}{
 		{
-			name:    "v1 - pod log",
-			version: "v1",
-			podPath: "/namespaces/test/pods/foo",
-			logPath: "/api/v1/namespaces/test/pods/foo/log",
-			pod:     testPod(),
+			name:            "v1 - pod log",
+			version:         "v1",
+			podNamePath:     "/namespaces/test/pods/foo",
+			podResourcePath: "/namespaces/test/pods",
+			logPath:         "/api/v1/namespaces/test/pods/foo/log",
 		},
 	}
 	for _, test := range tests {
@@ -55,8 +52,11 @@ func TestLog(t *testing.T) {
 			NegotiatedSerializer: ns,
 			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 				switch p, m := req.URL.Path, req.Method; {
-				case p == test.podPath && m == "GET":
-					body := objBody(codec, test.pod)
+				case p == test.podNamePath && m == "GET":
+					body := objBody(codec, testPod())
+					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: body}, nil
+				case p == test.podResourcePath && m == "GET":
+					body := objBody(codec, testPodList())
 					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: body}, nil
 				case p == test.logPath && m == "GET":
 					body := ioutil.NopCloser(bytes.NewBufferString(logContent))
@@ -69,7 +69,7 @@ func TestLog(t *testing.T) {
 			}),
 		}
 		tf.Namespace = "test"
-		tf.ClientConfig = &restclient.Config{APIPath: "/api", ContentConfig: restclient.ContentConfig{NegotiatedSerializer: api.Codecs, GroupVersion: &schema.GroupVersion{Version: test.version}}}
+		tf.ClientConfig = defaultClientConfig()
 		buf := bytes.NewBuffer([]byte{})
 
 		cmd := NewCmdLogs(f, buf)
@@ -97,31 +97,81 @@ func testPod() *api.Pod {
 	}
 }
 
+func testPodList() *api.PodList {
+	return &api.PodList{
+		ListMeta: metav1.ListMeta{
+			ResourceVersion: "10",
+		},
+		Items: []api.Pod{
+			{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "test", ResourceVersion: "10"},
+				Spec: api.PodSpec{
+					RestartPolicy: api.RestartPolicyAlways,
+					DNSPolicy:     api.DNSClusterFirst,
+					Containers: []api.Container{
+						{
+							Name: "bar",
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
 func TestValidateLogFlags(t *testing.T) {
-	f, _, _, _ := cmdtesting.NewAPIFactory()
 
 	tests := []struct {
-		name     string
-		flags    map[string]string
-		expected string
+		name            string
+		flags           map[string]string
+		expected        string
+		podResourcePath string
+		podNamePath     string
 	}{
 		{
-			name:     "since & since-time",
-			flags:    map[string]string{"since": "1h", "since-time": "2006-01-02T15:04:05Z"},
-			expected: "at most one of `sinceTime` or `sinceSeconds` may be specified",
+			name:            "since & since-time",
+			flags:           map[string]string{"since": "1h", "since-time": "2006-01-02T15:04:05Z"},
+			expected:        "at most one of `sinceTime` or `sinceSeconds` may be specified",
+			podResourcePath: "/namespaces/test/pods",
+			podNamePath:     "/namespaces/test/pods/foo",
 		},
 		{
-			name:     "negative limit-bytes",
-			flags:    map[string]string{"limit-bytes": "-100"},
-			expected: "must be greater than 0",
+			name:            "negative limit-bytes",
+			flags:           map[string]string{"limit-bytes": "-100"},
+			expected:        "must be greater than 0",
+			podResourcePath: "/namespaces/test/pods",
+			podNamePath:     "/namespaces/test/pods/foo",
 		},
 		{
-			name:     "negative tail",
-			flags:    map[string]string{"tail": "-100"},
-			expected: "must be greater than or equal to 0",
+			name:            "negative tail",
+			flags:           map[string]string{"tail": "-100"},
+			expected:        "must be greater than or equal to 0",
+			podResourcePath: "/namespaces/test/pods",
+			podNamePath:     "/namespaces/test/pods/foo",
 		},
 	}
 	for _, test := range tests {
+		f, tf, codec, ns := cmdtesting.NewAPIFactory()
+		tf.Client = &fake.RESTClient{
+			APIRegistry:          api.Registry,
+			NegotiatedSerializer: ns,
+			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+				switch p, m := req.URL.Path, req.Method; {
+				case p == test.podNamePath && m == "GET":
+					body := objBody(codec, testPod())
+					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: body}, nil
+				case p == test.podResourcePath && m == "GET":
+					body := objBody(codec, testPodList())
+					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: body}, nil
+				default:
+					// Ensures no GET is performed when deleting by name
+					t.Errorf("%s: unexpected request: %#v\n%#v", test.name, req.URL, req)
+					return nil, nil
+				}
+			}),
+		}
+		tf.Namespace = "test"
+		tf.ClientConfig = defaultClientConfig()
 		cmd := NewCmdLogs(f, bytes.NewBuffer([]byte{}))
 		out := ""
 		for flag, value := range test.flags {
