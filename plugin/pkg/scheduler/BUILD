@@ -19,6 +19,8 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//pkg/api/v1:go_default_library",
+        "//pkg/client/cache:go_default_library",
+        "//pkg/client/clientset_generated/clientset:go_default_library",
         "//pkg/client/record:go_default_library",
         "//pkg/client/restclient:go_default_library",
         "//pkg/util:go_default_library",
@@ -29,11 +31,13 @@ go_library(
         "//plugin/pkg/scheduler/api:go_default_library",
         "//plugin/pkg/scheduler/metrics:go_default_library",
         "//plugin/pkg/scheduler/schedulercache:go_default_library",
+        "//plugin/pkg/scheduler/util:go_default_library",
         "//vendor:github.com/golang/glog",
         "//vendor:github.com/golang/groupcache/lru",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/util/errors",
         "//vendor:k8s.io/apimachinery/pkg/util/net",
+        "//vendor:k8s.io/apimachinery/pkg/util/sets",
         "//vendor:k8s.io/apimachinery/pkg/util/wait",
     ],
 )
@@ -87,6 +91,7 @@ filegroup(
         "//plugin/pkg/scheduler/metrics:all-srcs",
         "//plugin/pkg/scheduler/schedulercache:all-srcs",
         "//plugin/pkg/scheduler/testing:all-srcs",
+        "//plugin/pkg/scheduler/util:all-srcs",
     ],
     tags = ["automanaged"],
 )
