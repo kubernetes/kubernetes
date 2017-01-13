@@ -22,33 +22,34 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"os"
 	"reflect"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/runtime/serializer/streaming"
+	"k8s.io/apimachinery/pkg/util/diff"
+	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/pkg/api"
 	apierrors "k8s.io/client-go/pkg/api/errors"
 	"k8s.io/client-go/pkg/api/testapi"
 	"k8s.io/client-go/pkg/api/v1"
-	"k8s.io/client-go/pkg/apimachinery/registered"
-	metav1 "k8s.io/client-go/pkg/apis/meta/v1"
-	"k8s.io/client-go/pkg/labels"
-	"k8s.io/client-go/pkg/runtime"
-	"k8s.io/client-go/pkg/runtime/schema"
-	"k8s.io/client-go/pkg/runtime/serializer/streaming"
 	"k8s.io/client-go/pkg/util/clock"
-	"k8s.io/client-go/pkg/util/diff"
 	"k8s.io/client-go/pkg/util/flowcontrol"
 	"k8s.io/client-go/pkg/util/httpstream"
 	"k8s.io/client-go/pkg/util/intstr"
 	utiltesting "k8s.io/client-go/pkg/util/testing"
-	"k8s.io/client-go/pkg/watch"
-	"k8s.io/client-go/pkg/watch/versioned"
+	restclientwatch "k8s.io/client-go/rest/watch"
 )
 
 func TestNewRequestSetsAccept(t *testing.T) {
@@ -92,7 +93,7 @@ func TestRequestSetsHeaders(t *testing.T) {
 func TestRequestWithErrorWontChange(t *testing.T) {
 	original := Request{
 		err:     errors.New("test"),
-		content: ContentConfig{GroupVersion: &registered.GroupOrDie(api.GroupName).GroupVersion},
+		content: ContentConfig{GroupVersion: &api.Registry.GroupOrDie(api.GroupName).GroupVersion},
 	}
 	r := original
 	changed := r.Param("foo", "bar").
@@ -276,7 +277,7 @@ func (obj NotAnAPIObject) SetGroupVersionKind(gvk *schema.GroupVersionKind) {}
 
 func defaultContentConfig() ContentConfig {
 	return ContentConfig{
-		GroupVersion:         &registered.GroupOrDie(api.GroupName).GroupVersion,
+		GroupVersion:         &api.Registry.GroupOrDie(api.GroupName).GroupVersion,
 		NegotiatedSerializer: testapi.Default.NegotiatedSerializer(),
 	}
 }
@@ -1120,6 +1121,35 @@ func TestCheckRetryClosesBody(t *testing.T) {
 	}
 }
 
+func TestConnectionResetByPeerIsRetried(t *testing.T) {
+	count := 0
+	backoff := &testBackoffManager{}
+	req := &Request{
+		verb: "GET",
+		client: clientFunc(func(req *http.Request) (*http.Response, error) {
+			count++
+			if count >= 3 {
+				return &http.Response{
+					StatusCode: 200,
+					Body:       ioutil.NopCloser(bytes.NewReader([]byte{})),
+				}, nil
+			}
+			return nil, &net.OpError{Err: syscall.ECONNRESET}
+		}),
+		backoffMgr: backoff,
+	}
+	// We expect two retries of "connection reset by peer" and the success.
+	_, err := req.Do().Raw()
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+	// We have a sleep before each retry (including the initial one) and for
+	// every "retry-after" call - thus 5 together.
+	if len(backoff.sleeps) != 5 {
+		t.Errorf("Expected 5 retries, got: %d", len(backoff.sleeps))
+	}
+}
+
 func TestCheckRetryHandles429And5xx(t *testing.T) {
 	count := 0
 	ch := make(chan struct{})
@@ -1222,7 +1252,7 @@ func TestDoRequestNewWayReader(t *testing.T) {
 	}
 	tmpStr := string(reqBodyExpected)
 	requestURL := testapi.Default.ResourcePathWithPrefix("foo", "bar", "", "baz")
-	requestURL += "?" + metav1.LabelSelectorQueryParam(registered.GroupOrDie(api.GroupName).GroupVersion.String()) + "=name%3Dfoo&timeout=1s"
+	requestURL += "?" + metav1.LabelSelectorQueryParam(api.Registry.GroupOrDie(api.GroupName).GroupVersion.String()) + "=name%3Dfoo&timeout=1s"
 	fakeHandler.ValidateRequest(t, requestURL, "POST", &tmpStr)
 }
 
@@ -1262,7 +1292,7 @@ func TestDoRequestNewWayObj(t *testing.T) {
 	}
 	tmpStr := string(reqBodyExpected)
 	requestURL := testapi.Default.ResourcePath("foo", "", "bar/baz")
-	requestURL += "?" + metav1.LabelSelectorQueryParam(registered.GroupOrDie(api.GroupName).GroupVersion.String()) + "=name%3Dfoo&timeout=1s"
+	requestURL += "?" + metav1.LabelSelectorQueryParam(api.Registry.GroupOrDie(api.GroupName).GroupVersion.String()) + "=name%3Dfoo&timeout=1s"
 	fakeHandler.ValidateRequest(t, requestURL, "POST", &tmpStr)
 }
 
@@ -1540,7 +1570,7 @@ func TestWatch(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 		flusher.Flush()
 
-		encoder := versioned.NewEncoder(streaming.NewEncoder(w, testapi.Default.Codec()), testapi.Default.Codec())
+		encoder := restclientwatch.NewEncoder(streaming.NewEncoder(w, testapi.Default.Codec()), testapi.Default.Codec())
 		for _, item := range table {
 			if err := encoder.Encode(&watch.Event{Type: item.t, Object: item.obj}); err != nil {
 				panic(err)

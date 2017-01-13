@@ -21,12 +21,12 @@ import (
 	"fmt"
 	"reflect"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/conversion"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/client-go/pkg/api"
 	"k8s.io/client-go/pkg/apis/extensions"
-	"k8s.io/client-go/pkg/conversion"
-	"k8s.io/client-go/pkg/runtime"
-	"k8s.io/client-go/pkg/util/validation/field"
-	"k8s.io/client-go/pkg/watch/versioned"
 )
 
 const (
@@ -123,15 +123,15 @@ func addFastPathConversionFuncs(scheme *runtime.Scheme) error {
 				return true, Convert_api_Endpoints_To_v1_Endpoints(a, b, s)
 			}
 
-		case *versioned.Event:
+		case *metav1.WatchEvent:
 			switch b := objB.(type) {
-			case *versioned.InternalEvent:
-				return true, versioned.Convert_versioned_Event_to_versioned_InternalEvent(a, b, s)
+			case *metav1.InternalEvent:
+				return true, metav1.Convert_versioned_Event_to_versioned_InternalEvent(a, b, s)
 			}
-		case *versioned.InternalEvent:
+		case *metav1.InternalEvent:
 			switch b := objB.(type) {
-			case *versioned.Event:
-				return true, versioned.Convert_versioned_InternalEvent_to_versioned_Event(a, b, s)
+			case *metav1.WatchEvent:
+				return true, metav1.Convert_versioned_InternalEvent_to_versioned_Event(a, b, s)
 			}
 		}
 		return false, nil
@@ -493,6 +493,12 @@ func Convert_v1_PodTemplateSpec_To_api_PodTemplateSpec(in *PodTemplateSpec, out 
 		// taking responsibility to ensure mutation of in is not exposed
 		// back to the caller.
 		in.Spec.InitContainers = values
+
+		// Call defaulters explicitly until annotations are removed
+		for i := range in.Spec.InitContainers {
+			c := &in.Spec.InitContainers[i]
+			SetDefaults_Container(c)
+		}
 	}
 
 	if err := autoConvert_v1_PodTemplateSpec_To_api_PodTemplateSpec(in, out, s); err != nil {

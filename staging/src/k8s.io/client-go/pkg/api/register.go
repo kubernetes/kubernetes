@@ -20,10 +20,10 @@ import (
 	"os"
 
 	"k8s.io/apimachinery/pkg/apimachinery/registered"
-	metav1 "k8s.io/client-go/pkg/apis/meta/v1"
-	"k8s.io/client-go/pkg/runtime"
-	"k8s.io/client-go/pkg/runtime/schema"
-	"k8s.io/client-go/pkg/runtime/serializer"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/runtime/serializer"
 )
 
 // Registry is an instance of an API registry.  This is an interim step to start removing the idea of a global
@@ -72,7 +72,7 @@ func init() {
 	// TODO(lavalamp): move this call to scheme builder above.  Can't
 	// remove it from here because lots of people inappropriately rely on it
 	// (specifically the unversioned time conversion). Can't have it in
-	// both places because then it gets double registered.  Consequence of
+	// both places because then it gets double api.Registry.  Consequence of
 	// current state is that it only ever gets registered in the main
 	// api.Scheme, even though everyone that uses anything from unversioned
 	// needs these.

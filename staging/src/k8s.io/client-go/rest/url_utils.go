@@ -21,7 +21,7 @@ import (
 	"net/url"
 	"path"
 
-	"k8s.io/client-go/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
 // DefaultServerURL converts a host, host:port, or URL string to the default base server API path

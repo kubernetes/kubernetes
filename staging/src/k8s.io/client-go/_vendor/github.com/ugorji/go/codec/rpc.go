@@ -25,7 +25,7 @@ type Rpc interface {
 }
 
 // RpcCodecBuffered allows access to the underlying bufio.Reader/Writer
-// used by the rpc connection. It accomodates use-cases where the connection
+// used by the rpc connection. It accommodates use-cases where the connection
 // should be used by rpc and non-rpc functions, e.g. streaming a file after
 // sending an rpc response.
 type RpcCodecBuffered interface {

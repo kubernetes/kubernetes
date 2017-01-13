@@ -20,9 +20,9 @@ import (
 	"sync"
 	"testing"
 
+	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/pkg/api"
 	"k8s.io/client-go/pkg/api/v1"
-	"k8s.io/client-go/pkg/watch"
 )
 
 // ensure the watch delivers the requested and only the requested items.

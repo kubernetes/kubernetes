@@ -16,7 +16,7 @@ limitations under the License.
 
 package fields
 
-import "k8s.io/client-go/pkg/selection"
+import "k8s.io/apimachinery/pkg/selection"
 
 // Requirements is AND of all requirements.
 type Requirements []Requirement
