@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -25,22 +25,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 )
-
-const boilerPlate = `
-# Copyright 2016 The Kubernetes Authors.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-`
 
 var (
 	completion_long = templates.LongDesc(`
@@ -123,19 +107,24 @@ func RunCompletion(out io.Writer, cmd *cobra.Command, args []string) error {
 }
 
 func runCompletionBash(out io.Writer, kubectl *cobra.Command) error {
-	_, err := out.Write([]byte(boilerPlate))
-	if err != nil {
-		return err
-	}
 	return kubectl.GenBashCompletion(out)
 }
 
 func runCompletionZsh(out io.Writer, kubectl *cobra.Command) error {
-	_, err := out.Write([]byte(boilerPlate))
-	if err != nil {
-		return err
-	}
-	zsh_initialization := `
+	zsh_initialization := `# Copyright 2016 The Kubernetes Authors.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 __kubectl_bash_source() {
 	alias shopt=':'
 	alias _expand=_bash_expand
