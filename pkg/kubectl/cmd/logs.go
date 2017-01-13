@@ -21,8 +21,10 @@ import (
 	"io"
 	"math"
 	"os"
+	"strings"
 	"time"
 
+	"fmt"
 	"github.com/spf13/cobra"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -72,8 +74,9 @@ type LogsOptions struct {
 	ClientMapper resource.ClientMapper
 	Decoder      runtime.Decoder
 
-	Object        runtime.Object
-	LogsForObject func(object, options runtime.Object) (*restclient.Request, error)
+	Object          runtime.Object
+	PrefixMatchList []string
+	LogsForObject   func(object, options runtime.Object) (*restclient.Request, error)
 
 	Out io.Writer
 }
@@ -96,7 +99,7 @@ func NewCmdLogs(f cmdutil.Factory, out io.Writer) *cobra.Command {
 			if err := o.Validate(); err != nil {
 				cmdutil.CheckErr(cmdutil.UsageError(cmd, err.Error()))
 			}
-			cmdutil.CheckErr(o.RunLogs())
+			cmdutil.CheckErr(o.RunLogs(out, args))
 		},
 		Aliases: []string{"log"},
 	}
@@ -191,22 +194,50 @@ func (o *LogsOptions) Complete(f cmdutil.Factory, out io.Writer, cmd *cobra.Comm
 		builder := resource.NewBuilder(mapper, typer, o.ClientMapper, decoder).
 			NamespaceParam(o.Namespace).DefaultNamespace().
 			SingleResourceType()
-		if o.ResourceArg != "" {
-			builder.ResourceNames("pods", o.ResourceArg)
+		if o.ResourceArg != "" && selector == "" {
+			infos, err := builder.ResourceTypeOrNameArgs(true, "pods").
+				Flatten().Do().Infos()
+			if err != nil {
+				return err
+			}
+			//match pods using prefix
+			prefixTimes := 0
+			for i, info := range infos {
+				if strings.HasPrefix(info.Name, o.ResourceArg) {
+					o.PrefixMatchList = append(o.PrefixMatchList, info.Name)
+					o.Object = infos[i].Object
+					prefixTimes++
+				}
+			}
+			if prefixTimes == 0 {
+				infos, err := resource.NewBuilder(mapper, typer, o.ClientMapper, decoder).
+					NamespaceParam(o.Namespace).DefaultNamespace().SingleResourceType().
+					ResourceNames("pods", o.ResourceArg).Do().Infos()
+				if err != nil {
+					return err
+				}
+				o.Object = infos[0].Object
+			} else {
+				//more than one prefix match
+				if prefixTimes > 1 {
+					o.Object = nil
+				}
+			}
+		} else if selector != "" && o.ResourceArg == "" {
+			infos, err := builder.ResourceTypes("pods").SelectorParam(selector).Do().Infos()
+			if err != nil {
+				return err
+			}
+			o.Object = infos[0].Object
+		} else {
+			_, err := builder.ResourceNames("pods", o.ResourceArg).
+				ResourceTypes("pods").SelectorParam(selector).
+				Do().Infos()
+			if err != nil {
+				return err
+			}
 		}
-		if selector != "" {
-			builder.ResourceTypes("pods").SelectorParam(selector)
-		}
-		infos, err := builder.Do().Infos()
-		if err != nil {
-			return err
-		}
-		if selector == "" && len(infos) != 1 {
-			return errors.New("expected a resource")
-		}
-		o.Object = infos[0].Object
 	}
-
 	return nil
 }
 
@@ -223,18 +254,34 @@ func (o LogsOptions) Validate() error {
 }
 
 // RunLogs retrieves a pod log
-func (o LogsOptions) RunLogs() error {
-	switch t := o.Object.(type) {
-	case *api.PodList:
-		for _, p := range t.Items {
-			if err := o.getLogs(&p); err != nil {
-				return err
+func (o LogsOptions) RunLogs(out io.Writer, args []string) error {
+	if len(o.PrefixMatchList) > 1 {
+		firstPrint := true
+		fmt.Fprintf(out, "No pod named %s, do you mean? ", args[0])
+		for i := range o.PrefixMatchList {
+			if firstPrint {
+				fmt.Fprintf(out, "%s", o.PrefixMatchList[i])
+				firstPrint = false
+			} else {
+				fmt.Fprintf(out, ", %s", o.PrefixMatchList[i])
 			}
 		}
-		return nil
-	default:
-		return o.getLogs(o.Object)
+		fmt.Fprintf(out, "\n")
+	} else {
+		switch t := o.Object.(type) {
+		case *api.PodList:
+			for _, p := range t.Items {
+				if err := o.getLogs(&p); err != nil {
+					return err
+				}
+			}
+			return nil
+		default:
+			return o.getLogs(o.Object)
+		}
 	}
+
+	return nil
 }
 
 func (o LogsOptions) getLogs(obj runtime.Object) error {
@@ -242,7 +289,6 @@ func (o LogsOptions) getLogs(obj runtime.Object) error {
 	if err != nil {
 		return err
 	}
-
 	readCloser, err := req.Stream()
 	if err != nil {
 		return err

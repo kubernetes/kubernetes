@@ -35,15 +35,16 @@ import (
 
 func TestLog(t *testing.T) {
 	tests := []struct {
-		name, version, podPath, logPath, container string
-		pod                                        *api.Pod
+		name, version, podNamePath, podResourcePath, logPath, container string
+		pod                                                             *api.Pod
 	}{
 		{
-			name:    "v1 - pod log",
-			version: "v1",
-			podPath: "/namespaces/test/pods/foo",
-			logPath: "/api/v1/namespaces/test/pods/foo/log",
-			pod:     testPod(),
+			name:            "v1 - pod log",
+			version:         "v1",
+			podNamePath:     "/namespaces/test/pods/foo",
+			podResourcePath: "/namespaces/test/pods",
+			logPath:         "/api/v1/namespaces/test/pods/foo/log",
+			pod:             testPod(),
 		},
 	}
 	for _, test := range tests {
@@ -53,7 +54,10 @@ func TestLog(t *testing.T) {
 			NegotiatedSerializer: ns,
 			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 				switch p, m := req.URL.Path, req.Method; {
-				case p == test.podPath && m == "GET":
+				case p == test.podNamePath && m == "GET":
+					body := objBody(codec, test.pod)
+					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: body}, nil
+				case p == test.podResourcePath && m == "GET":
 					body := objBody(codec, test.pod)
 					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: body}, nil
 				case p == test.logPath && m == "GET":
@@ -96,30 +100,61 @@ func testPod() *api.Pod {
 }
 
 func TestValidateLogFlags(t *testing.T) {
-	f, _, _, _ := cmdtesting.NewAPIFactory()
 
 	tests := []struct {
-		name     string
-		flags    map[string]string
-		expected string
+		name            string
+		flags           map[string]string
+		expected        string
+		podResourcePath string
+		podNamePath     string
+		pod             *api.Pod
 	}{
 		{
-			name:     "since & since-time",
-			flags:    map[string]string{"since": "1h", "since-time": "2006-01-02T15:04:05Z"},
-			expected: "at most one of `sinceTime` or `sinceSeconds` may be specified",
+			name:            "since & since-time",
+			flags:           map[string]string{"since": "1h", "since-time": "2006-01-02T15:04:05Z"},
+			expected:        "at most one of `sinceTime` or `sinceSeconds` may be specified",
+			podResourcePath: "/namespaces/test/pods",
+			podNamePath:     "/namespaces/test/pods/foo",
+			pod:             testPod(),
 		},
 		{
-			name:     "negative limit-bytes",
-			flags:    map[string]string{"limit-bytes": "-100"},
-			expected: "must be greater than 0",
+			name:            "negative limit-bytes",
+			flags:           map[string]string{"limit-bytes": "-100"},
+			expected:        "must be greater than 0",
+			podResourcePath: "/namespaces/test/pods",
+			podNamePath:     "/namespaces/test/pods/foo",
+			pod:             testPod(),
 		},
 		{
-			name:     "negative tail",
-			flags:    map[string]string{"tail": "-100"},
-			expected: "must be greater than or equal to 0",
+			name:            "negative tail",
+			flags:           map[string]string{"tail": "-100"},
+			expected:        "must be greater than or equal to 0",
+			podResourcePath: "/namespaces/test/pods",
+			podNamePath:     "/namespaces/test/pods/foo",
+			pod:             testPod(),
 		},
 	}
 	for _, test := range tests {
+		f, tf, codec, ns := cmdtesting.NewAPIFactory()
+		tf.Client = &fake.RESTClient{
+			NegotiatedSerializer: ns,
+			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+				switch p, m := req.URL.Path, req.Method; {
+				case p == test.podNamePath && m == "GET":
+					body := objBody(codec, test.pod)
+					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: body}, nil
+				case p == test.podResourcePath && m == "GET":
+					body := objBody(codec, test.pod)
+					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: body}, nil
+				default:
+					// Ensures no GET is performed when deleting by name
+					t.Errorf("%s: unexpected request: %#v\n%#v", test.name, req.URL, req)
+					return nil, nil
+				}
+			}),
+		}
+		tf.Namespace = "test"
+		tf.ClientConfig = defaultClientConfig()
 		cmd := NewCmdLogs(f, bytes.NewBuffer([]byte{}))
 		out := ""
 		for flag, value := range test.flags {
