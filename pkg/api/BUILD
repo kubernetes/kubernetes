@@ -120,7 +120,7 @@ filegroup(
         "//pkg/api/errors:all-srcs",
         "//pkg/api/events:all-srcs",
         "//pkg/api/install:all-srcs",
-        "//pkg/api/meta/metatypes:all-srcs",
+        "//pkg/api/meta:all-srcs",
         "//pkg/api/pod:all-srcs",
         "//pkg/api/resource:all-srcs",
         "//pkg/api/service:all-srcs",
