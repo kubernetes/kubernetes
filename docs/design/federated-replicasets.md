@@ -43,7 +43,7 @@ that is a member of federation.
 Federated ReplicaSet (FRS) - ReplicaSet defined and running inside of Federated K8S server.
 
 Federated ReplicaSet Controller (FRSC) - A controller running inside
-of Federated K8S server that controlls FRS.
+of Federated K8S server that controls FRS.
 
 ## User Experience
 
@@ -53,7 +53,7 @@ of Federated K8S server that controlls FRS.
    cluster. They create a definition of federated ReplicaSet on the
    federated master and (local) ReplicaSets are automatically created
    in each of the federation clusters. The number of replicas is each
-   of the Local ReplicaSets is (perheps indirectly) configurable by
+   of the Local ReplicaSets is (perhaps indirectly) configurable by
    the user.
 + [CUJ2] When the current number of replicas in a cluster drops below
    the desired number and new replicas cannot be scheduled then they
@@ -131,7 +131,7 @@ FederatedReplicaSetPreferences {
    Rebalance : true
    Clusters : map[string]LocalReplicaSet {
      "*" : LocalReplicaSet{ Weight: 1}
-   } 
+   }
 }
 ```
 
@@ -151,7 +151,7 @@ FederatedReplicaSetPreferences {
    Rebalance : true
    Clusters : map[string]LocalReplicaSet {
      "*" : LocalReplicaSet{ MaxReplicas: 2; Weight: 1}
-   } 
+   }
 }
 ```
 
@@ -197,11 +197,11 @@ There is a global target for 50, however clusters require 60. So some clusters w
 **Scenario 4**. I want to have equal number of replicas in clusters A,B,C, however don’t put more than 20 replicas to cluster C.
 
 ```
-FederatedReplicaSetPreferences { 
-   Rebalance : true 
+FederatedReplicaSetPreferences {
+   Rebalance : true
    Clusters : map[string]LocalReplicaSet {  
      "*" : LocalReplicaSet{ Weight: 1}  
-     “C” : LocalReplicaSet{ MaxReplicas: 20,  Weight: 1}  
+     “C” : LocalReplicaSet{ MaxReplicas: 20,  Weight: 1}
    }  
 }
 ```
@@ -220,9 +220,9 @@ Example:
 ```
 FederatedReplicaSetPreferences {  
    Clusters : map[string]LocalReplicaSet {  
-     “A” : LocalReplicaSet{ Weight: 1000000}  
-     “B” : LocalReplicaSet{ Weight: 1}  
-     “C” : LocalReplicaSet{ Weight: 1}  
+     “A” : LocalReplicaSet{ Weight: 1000000}
+     “B” : LocalReplicaSet{ Weight: 1}
+     “C” : LocalReplicaSet{ Weight: 1}
    }  
 }
 ```
@@ -239,9 +239,9 @@ Example:
 ```
 FederatedReplicaSetPreferences {  
    Clusters : map[string]LocalReplicaSet {  
-     “A” : LocalReplicaSet{ Weight: 2}  
-     “B” : LocalReplicaSet{ Weight: 1}  
-     “C” : LocalReplicaSet{ Weight: 1}  
+     “A” : LocalReplicaSet{ Weight: 2}
+     “B” : LocalReplicaSet{ Weight: 1}
+     “C” : LocalReplicaSet{ Weight: 1}
    }  
 }
 ```
@@ -254,7 +254,7 @@ FederatedReplicaSetPreferences {
    Rebalance : false
    Clusters : map[string]LocalReplicaSet {
      "*" : LocalReplicaSet{ Weight: 1}
-   } 
+   }
 }
 ```
 

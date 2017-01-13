@@ -93,7 +93,7 @@ denominator that will work everywhere. Instead we will document various options 
 solution for different deployments. Below we list possible approaches:
 
 1. `Managed DNS` - user need to specify a domain name during cluster creation. DNS entries will be managed
-automaticaly by the deployment tool that will be intergrated with solutions like Route53 (AWS)
+automatically by the deployment tool that will be integrated with solutions like Route53 (AWS)
 or Google Cloud DNS (GCP). For load balancing we will have two options:
   1.1. create an L4 load balancer in front of all apiservers and update DNS name appropriately
   1.2. use round-robin DNS technique to access all apiservers directly

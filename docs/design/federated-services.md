@@ -480,7 +480,7 @@ entire cluster failures, various approaches are possible, including:
       simple, but there is some delay in the autoscaling.
 3. **federated replica migration**, where the Cluster Federation
    control system detects the cluster failure and automatically
-   increases the replica count in the remainaing clusters to make up
+   increases the replica count in the remaining clusters to make up
    for the lost replicas in the failed cluster. This does not seem to
    offer any benefits relative to pod autoscaling above, and is
    arguably more complex to implement, but we note it here as a

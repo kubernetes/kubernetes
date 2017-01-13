@@ -75,7 +75,7 @@ namespace" (see [ResourceAccessReview](#ResourceAccessReview) further down).
 ```go
 // OLD
 type Authorizer interface {
-  Authorize(a Attributes) error 
+  Authorize(a Attributes) error
 }
 ```
 
@@ -85,7 +85,7 @@ type Authorizer interface {
 // a particular action
 type Authorizer interface {
   // Authorize takes a Context (for namespace, user, and traceability) and
-  //   Attributes to make a policy determination. 
+  //   Attributes to make a policy determination.
   // reason is an optional return value that can describe why a policy decision
   //   was made.  Reasons are useful during debugging when trying to figure out
   //   why a user or group has access to perform a particular action.
@@ -99,7 +99,7 @@ type Authorizer interface {
 //   namespaces they are allowed to view instead of having to choose between
 //   listing them all or listing none.
 type AuthorizerIntrospection interface {
-  // GetAllowedSubjects takes a Context (for namespace and traceability) and 
+  // GetAllowedSubjects takes a Context (for namespace and traceability) and
   // Attributes to determine which users and groups are allowed to perform the
   // described action in the namespace. This API enables the ResourceBasedReview
   // requests below
@@ -156,7 +156,7 @@ corresponding return:
 
 // POSTed like this
 curl -X POST /apis/authorization.kubernetes.io/{version}/subjectAccessReviews -d @subject-access-review.json
-// or 
+// or
 accessReviewResult, err := Client.SubjectAccessReviews().Create(subjectAccessReviewObject)
 
 // output
@@ -218,7 +218,7 @@ its corresponding return:
 
 // POSTed like this
 curl -X POST /apis/authorization.kubernetes.io/{version}/localSubjectAccessReviews -d @local-subject-access-review.json
-// or 
+// or
 accessReviewResult, err := Client.LocalSubjectAccessReviews().Create(localSubjectAccessReviewObject)
 
 // output
@@ -327,7 +327,7 @@ type LocalSubjectAccessReviewResponse struct {
 
 ### ResourceAccessReview
 
-This set of APIs nswers the question: which users and groups can perform the
+This set of APIs answers the question: which users and groups can perform the
 specified verb on the specified resourceKind. Given the Authorizer interface
 described above, this endpoint can be implemented generically against any
 Authorizer by calling the .GetAllowedSubjects() function.
@@ -366,7 +366,7 @@ corresponding return:
 
 // POSTed like this
 curl -X POST /apis/authorization.kubernetes.io/{version}/resourceAccessReviews -d @resource-access-review.json
-// or 
+// or
 accessReviewResult, err := Client.ResourceAccessReviews().Create(resourceAccessReviewObject)
 
 // output
