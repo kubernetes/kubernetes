@@ -1765,6 +1765,7 @@ func (d *ServiceAccountDescriber) Describe(namespace, name string, describerSett
 	}
 
 	tokens := []api.Secret{}
+	existingTokens := sets.NewString()
 
 	tokenSelector := fields.SelectorFromSet(map[string]string{api.SecretTypeField: string(api.SecretTypeServiceAccountToken)})
 	options := api.ListOptions{FieldSelector: tokenSelector}
@@ -1775,57 +1776,40 @@ func (d *ServiceAccountDescriber) Describe(namespace, name string, describerSett
 			uid, _ := s.Annotations[api.ServiceAccountUIDKey]
 			if name == serviceAccount.Name && uid == string(serviceAccount.UID) {
 				tokens = append(tokens, s)
+				existingTokens.Insert(s.Name)
 			}
 		}
 	}
 
-	existingPullSecrets := map[string]api.Secret{}
-	pullSecretListErr := false
-
-	// append opaque secrets to pull secrets list
-	opaqueSecretSelector := fields.SelectorFromSet(map[string]string{api.SecretTypeField: string(api.SecretTypeOpaque)})
-	opaqueSecrets, err := d.Core().Secrets(namespace).List(api.ListOptions{
-		FieldSelector: opaqueSecretSelector,
-	})
-	if err == nil {
-		for _, s := range opaqueSecrets.Items {
-			existingPullSecrets[s.GetName()] = s
+	// remainingSecrets is the set of all secrets remaining on a
+	// service account that are not present in the "tokens" slice
+	remainingSecrets := sets.NewString()
+	for _, s := range serviceAccount.Secrets {
+		if !existingTokens.Has(s.Name) {
+			remainingSecrets.Insert(s.Name)
 		}
-	} else {
-		pullSecretListErr = true
 	}
 
-	//append dockercfg secrets to pull secrets list
-	dockercfgSecretSelector := fields.SelectorFromSet(map[string]string{api.SecretTypeField: string(api.SecretTypeDockercfg)})
-	dockercfgSecrets, err := d.Core().Secrets(namespace).List(api.ListOptions{
-		FieldSelector: dockercfgSecretSelector,
-	})
-	if err == nil {
-		for _, s := range dockercfgSecrets.Items {
-			existingPullSecrets[s.GetName()] = s
-		}
-	} else {
-		pullSecretListErr = true
-	}
-
-	// add all secret names in service account.
-	// Append extra information to deleted secrets
-	saPullSecrets := []string{}
 	for _, s := range serviceAccount.ImagePullSecrets {
-		// if an error occurred while listing any secrets or the
-		// secret exists, add secret without any additional information
-		if secret, exists := existingPullSecrets[s.Name]; pullSecretListErr || exists {
-			saPullSecrets = append(saPullSecrets, secret.Name)
-			continue
+		if !existingTokens.Has(s.Name) {
+			remainingSecrets.Insert(s.Name)
 		}
-		sName := fmt.Sprintf("%s (%s)", s.Name, "not found")
-		saPullSecrets = append(saPullSecrets, sName)
 	}
 
-	return describeServiceAccount(serviceAccount, tokens, saPullSecrets)
+	existingSecretsList, err := d.Core().Secrets(namespace).List(api.ListOptions{})
+	if err != nil {
+		return describeServiceAccount(serviceAccount, tokens, remainingSecrets, nil)
+	}
+
+	existingSecrets := sets.NewString()
+	for _, s := range existingSecretsList.Items {
+		existingSecrets.Insert(s.Name)
+	}
+
+	return describeServiceAccount(serviceAccount, tokens, remainingSecrets, existingSecrets)
 }
 
-func describeServiceAccount(serviceAccount *api.ServiceAccount, tokens []api.Secret, saPullSecrets []string) (string, error) {
+func describeServiceAccount(serviceAccount *api.ServiceAccount, tokens []api.Secret, saPullSecrets sets.String, existingPullSecrets sets.String) (string, error) {
 	return tabbedString(func(out io.Writer) error {
 		w := &PrefixWriter{out}
 		w.Write(LEVEL_0, "Name:\t%s\n", serviceAccount.Name)
@@ -1844,8 +1828,14 @@ func describeServiceAccount(serviceAccount *api.ServiceAccount, tokens []api.Sec
 			tokenSecretNames = []string{}
 		)
 
-		for _, sName := range saPullSecrets {
+		for _, sName := range saPullSecrets.List() {
+			if existingPullSecrets != nil && !existingPullSecrets.Has(sName) {
+				notFound := fmt.Sprintf("%s (not found)", sName)
+				pullSecretNames = append(pullSecretNames, notFound)
+				continue
+			}
 			pullSecretNames = append(pullSecretNames, sName)
+
 		}
 		for _, s := range serviceAccount.Secrets {
 			mountSecretNames = append(mountSecretNames, s.Name)
