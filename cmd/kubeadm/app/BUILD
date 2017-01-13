@@ -32,6 +32,7 @@ filegroup(
         ":package-srcs",
         "//cmd/kubeadm/app/apis/kubeadm:all-srcs",
         "//cmd/kubeadm/app/cmd:all-srcs",
+        "//cmd/kubeadm/app/constants:all-srcs",
         "//cmd/kubeadm/app/discovery:all-srcs",
         "//cmd/kubeadm/app/images:all-srcs",
         "//cmd/kubeadm/app/master:all-srcs",

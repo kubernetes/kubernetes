@@ -23,15 +23,17 @@ import (
 	"os"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	"k8s.io/kubernetes/cmd/kubeadm/app/phases/certs/pkiutil"
 	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
 	certutil "k8s.io/kubernetes/pkg/util/cert"
+	setutil "k8s.io/kubernetes/pkg/util/sets"
 )
 
 // CreatePKIAssets will create and write to disk all PKI assets necessary to establish the control plane.
-// It first generates a self-signed CA certificate, a server certificate (signed by the CA) and a key for
-// signing service account tokens. It returns CA key and certificate, which is convenient for use with
-// client config funcs.
-func CreatePKIAssets(cfg *kubeadmapi.MasterConfiguration, pkiPath string) (*x509.Certificate, error) {
+// It generates a self-signed CA certificate and a server certificate (signed by the CA)
+// TODO: We should create apiserver -> kubelet certs somehow here also...
+func CreatePKIAssets(cfg *kubeadmapi.MasterConfiguration, pkiDir string) (*x509.Certificate, error) {
 	altNames := certutil.AltNames{}
 
 	// First, define all domains this cert should be signed for
@@ -68,35 +70,82 @@ func CreatePKIAssets(cfg *kubeadmapi.MasterConfiguration, pkiPath string) (*x509
 
 	altNames.IPs = append(altNames.IPs, internalAPIServerVirtualIP)
 
-	caKey, caCert, err := newCertificateAuthority()
-	if err != nil {
-		return nil, fmt.Errorf("failure while creating CA keys and certificate [%v]", err)
+	// Try to load ca.crt and ca.key from the PKI directory
+	caCert, caKey, oneOfThemExists, err := pkiutil.TryLoadCertAndKeyFromDisk(pkiDir, kubeadmconstants.CACertAndKeyBaseName)
+
+	if err == nil && caCert != nil && caKey != nil {
+		// The certificate and key already exist, skip the generation
+		if !caCert.IsCA {
+			return nil, fmt.Errorf("certificate and key existed but the certificate is not a certificate authority")
+		}
+
+		fmt.Println("[certificates] Using the existing CA certificate and key.")
+	} else if !oneOfThemExists {
+		// The certificate and the key did NOT exist, let's generate them now
+		caCert, caKey, err = pkiutil.NewCertificateAuthority()
+		if err != nil {
+			return nil, fmt.Errorf("failure while creating CA key and certificate [%v]", err)
+		}
+
+		if err = pkiutil.WriteCertAndKey(pkiDir, kubeadmconstants.CACertAndKeyBaseName, caCert, caKey); err != nil {
+			return nil, fmt.Errorf("failure while saving CA key and certificate [%v]", err)
+		}
+		fmt.Println("[certificates] Generated CA key and certificate.")
+	} else {
+		// An unhandled error occured
+		return nil, fmt.Errorf("at least one of the CA certificate or the CA key exists but was not parseable")
 	}
 
-	if err := writeKeysAndCert(pkiPath, "ca", caKey, caCert); err != nil {
-		return nil, fmt.Errorf("failure while saving CA keys and certificate [%v]", err)
-	}
-	fmt.Println("[certificates] Generated Certificate Authority key and certificate.")
+	// Try to load ca.crt and ca.key from the PKI directory
+	apiCert, apiKey, oneOfThemExists, err := pkiutil.TryLoadCertAndKeyFromDisk(pkiDir, kubeadmconstants.APIServerCertAndKeyBaseName)
 
-	apiKey, apiCert, err := newServerKeyAndCert(caCert, caKey, altNames)
-	if err != nil {
-		return nil, fmt.Errorf("failure while creating API server keys and certificate [%v]", err)
+	if err == nil && apiCert != nil && apiKey != nil {
+		// The certificate and key already exist, skip the generation
+		fmt.Println("[certificates] Using the existing apiserver certificate and key.")
+	} else if !oneOfThemExists {
+		// The certificate and the key did NOT exist, let's generate them now
+		apiCert, apiKey, err := pkiutil.NewServerKeyAndCert(caCert, caKey, altNames)
+		if err != nil {
+			return nil, fmt.Errorf("failure while creating API server key and certificate [%v]", err)
+		}
+
+		if err := pkiutil.WriteCertAndKey(pkiDir, kubeadmconstants.APIServerCertAndKeyBaseName, apiCert, apiKey); err != nil {
+			return nil, fmt.Errorf("failure while saving API server key and certificate [%v]", err)
+		}
+		fmt.Println("[certificates] Generated API Server key and certificate")
+	} else {
+		// An unhandled error occured
+		return nil, fmt.Errorf("at least one of the apiserver certificate or the apiserver key exists but was not parseable")
 	}
 
-	if err := writeKeysAndCert(pkiPath, "apiserver", apiKey, apiCert); err != nil {
-		return nil, fmt.Errorf("failure while saving API server keys and certificate [%v]", err)
-	}
-	fmt.Println("[certificates] Generated API Server key and certificate")
+	fmt.Printf("[certificates] Valid certificates and keys now exist in %q\n", pkiDir)
 
-	// Generate a private key for service accounts
-	saKey, err := certutil.NewPrivateKey()
-	if err != nil {
-		return nil, fmt.Errorf("failure while creating service account signing keys [%v]", err)
-	}
-	if err := writeKeysAndCert(pkiPath, "sa", saKey, nil); err != nil {
-		return nil, fmt.Errorf("failure while saving service account signing keys [%v]", err)
-	}
-	fmt.Println("[certificates] Generated Service Account signing keys")
-	fmt.Printf("[certificates] Created keys and certificates in %q\n", pkiPath)
+	// TODO: Public phase methods should not return values for kubeadm to consume later except for errors.
 	return caCert, nil
+}
+
+// Verify that the cert is valid for all IPs and DNS names it should be valid for
+func checkAltNamesExist(IPs []net.IP, DNSNames []string, altNames certutil.AltNames) bool {
+	dnsset := setutil.NewString(DNSNames...)
+
+	for _, dnsNameThatShouldExist := range altNames.DNSNames {
+		if !dnsset.Has(dnsNameThatShouldExist) {
+			return false
+		}
+	}
+
+	for _, ipThatShouldExist := range altNames.IPs {
+		found := false
+		for _, ip := range IPs {
+			if ip.Equal(ipThatShouldExist) {
+				found = true
+				break
+			}
+		}
+
+		if !found {
+			return false
+		}
+	}
+	return true
 }
