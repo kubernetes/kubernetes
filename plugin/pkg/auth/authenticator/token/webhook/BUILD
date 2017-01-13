@@ -14,13 +14,13 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//plugin/pkg/webhook:go_default_library",
+        "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
         "//vendor:k8s.io/apiserver/pkg/authentication/authenticator",
         "//vendor:k8s.io/apiserver/pkg/authentication/user",
         "//vendor:k8s.io/apiserver/pkg/util/cache",
         "//vendor:k8s.io/client-go/kubernetes/typed/authentication/v1beta1",
         "//vendor:k8s.io/client-go/pkg/apis/authentication/install",
         "//vendor:k8s.io/client-go/pkg/apis/authentication/v1beta1",
-        "//vendor:k8s.io/client-go/pkg/runtime/schema",
     ],
 )
 
