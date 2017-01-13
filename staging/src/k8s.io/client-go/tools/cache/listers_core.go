@@ -19,10 +19,10 @@ package cache
 import (
 	"fmt"
 
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/pkg/api"
 	"k8s.io/client-go/pkg/api/errors"
 	"k8s.io/client-go/pkg/api/v1"
-	"k8s.io/client-go/pkg/labels"
 )
 
 //  TODO: generate these classes and methods for all resources of interest using

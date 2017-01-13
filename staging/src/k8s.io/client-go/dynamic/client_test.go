@@ -25,16 +25,16 @@ import (
 	"reflect"
 	"testing"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/runtime/serializer/streaming"
+	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/pkg/api"
 	"k8s.io/client-go/pkg/api/v1"
-	metav1 "k8s.io/client-go/pkg/apis/meta/v1"
-	"k8s.io/client-go/pkg/apis/meta/v1/unstructured"
-	"k8s.io/client-go/pkg/runtime"
-	"k8s.io/client-go/pkg/runtime/schema"
-	"k8s.io/client-go/pkg/runtime/serializer/streaming"
-	"k8s.io/client-go/pkg/watch"
-	"k8s.io/client-go/pkg/watch/versioned"
 	"k8s.io/client-go/rest"
+	restclientwatch "k8s.io/client-go/rest/watch"
 )
 
 func getJSON(version, kind, name string) []byte {
@@ -459,7 +459,7 @@ func TestWatch(t *testing.T) {
 				t.Errorf("Watch(%q) got path %s. wanted %s", tc.name, r.URL.Path, tc.path)
 			}
 
-			enc := versioned.NewEncoder(streaming.NewEncoder(w, dynamicCodec{}), dynamicCodec{})
+			enc := restclientwatch.NewEncoder(streaming.NewEncoder(w, dynamicCodec{}), dynamicCodec{})
 			for _, e := range tc.events {
 				enc.Encode(&e)
 			}

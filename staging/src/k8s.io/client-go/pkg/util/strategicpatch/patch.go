@@ -21,8 +21,8 @@ import (
 	"reflect"
 	"sort"
 
+	"k8s.io/apimachinery/pkg/util/json"
 	forkedjson "k8s.io/client-go/pkg/third_party/forked/golang/json"
-	"k8s.io/client-go/pkg/util/json"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/ghodss/yaml"
@@ -656,12 +656,16 @@ func mergeSlice(original, patch []interface{}, elemType reflect.Type, mergeKey s
 			if patchType == deleteDirective {
 				mergeValue, ok := typedV[mergeKey]
 				if ok {
-					_, originalKey, found, err := findMapInSliceBasedOnKeyValue(original, mergeKey, mergeValue)
-					if err != nil {
-						return nil, err
-					}
+					// delete all matching entries (based on merge key) from a merging list
+					for {
+						_, originalKey, found, err := findMapInSliceBasedOnKeyValue(original, mergeKey, mergeValue)
+						if err != nil {
+							return nil, err
+						}
 
-					if found {
+						if !found {
+							break
+						}
 						// Delete the element at originalKey.
 						original = append(original[:originalKey], original[originalKey+1:]...)
 					}

@@ -25,11 +25,11 @@ import (
 	"testing"
 	"time"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	k8sruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/pkg/api/errors"
 	_ "k8s.io/client-go/pkg/api/install" // To register api.Pod used in tests below
 	"k8s.io/client-go/pkg/api/v1"
-	metav1 "k8s.io/client-go/pkg/apis/meta/v1"
-	k8sruntime "k8s.io/client-go/pkg/runtime"
 	"k8s.io/client-go/pkg/util/clock"
 	"k8s.io/client-go/pkg/util/strategicpatch"
 	"k8s.io/client-go/rest"

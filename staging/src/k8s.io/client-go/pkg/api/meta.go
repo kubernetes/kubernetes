@@ -17,26 +17,12 @@ limitations under the License.
 package api
 
 import (
-	"k8s.io/client-go/pkg/api/meta"
-	metav1 "k8s.io/client-go/pkg/apis/meta/v1"
-	"k8s.io/client-go/pkg/conversion"
-	"k8s.io/client-go/pkg/runtime"
-	"k8s.io/client-go/pkg/types"
-	"k8s.io/client-go/pkg/util/uuid"
+	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/conversion"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 )
-
-// FillObjectMetaSystemFields populates fields that are managed by the system on ObjectMeta.
-func FillObjectMetaSystemFields(ctx Context, meta *ObjectMeta) {
-	meta.CreationTimestamp = metav1.Now()
-	// allows admission controllers to assign a UID earlier in the request processing
-	// to support tracking resources pending creation.
-	uid, found := UIDFrom(ctx)
-	if !found {
-		uid = uuid.NewUUID()
-	}
-	meta.UID = uid
-	meta.SelfLink = ""
-}
 
 // HasObjectMetaSystemFieldValues returns true if fields that are managed by the system on ObjectMeta have values.
 func HasObjectMetaSystemFieldValues(meta *ObjectMeta) bool {

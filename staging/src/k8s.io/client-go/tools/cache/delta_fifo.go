@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"sync"
 
-	"k8s.io/client-go/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/sets"
 
 	"github.com/golang/glog"
 )
