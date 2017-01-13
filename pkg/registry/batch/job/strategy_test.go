@@ -22,11 +22,11 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	genericapirequest "k8s.io/apiserver/pkg/request"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	"k8s.io/kubernetes/pkg/apis/batch"
-	genericapirequest "k8s.io/kubernetes/pkg/genericapiserver/api/request"
 )
 
 func newBool(a bool) *bool {

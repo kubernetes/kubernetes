@@ -18,9 +18,9 @@ package serviceaccount
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	genericapirequest "k8s.io/apiserver/pkg/request"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
-	genericapirequest "k8s.io/kubernetes/pkg/genericapiserver/api/request"
 	"k8s.io/kubernetes/pkg/registry/core/secret"
 	secretstore "k8s.io/kubernetes/pkg/registry/core/secret/storage"
 	serviceaccountregistry "k8s.io/kubernetes/pkg/registry/core/serviceaccount"

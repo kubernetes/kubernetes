@@ -16,10 +16,10 @@ go_library(
         "//federation/apis/federation:go_default_library",
         "//federation/registry/cluster:go_default_library",
         "//pkg/api/rest:go_default_library",
-        "//pkg/genericapiserver/api/request:go_default_library",
         "//pkg/registry/generic:go_default_library",
         "//pkg/registry/generic/registry:go_default_library",
         "//vendor:k8s.io/apimachinery/pkg/runtime",
+        "//vendor:k8s.io/apiserver/pkg/request",
     ],
 )
 

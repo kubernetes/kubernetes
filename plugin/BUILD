@@ -36,7 +36,6 @@ filegroup(
         "//plugin/pkg/auth:all-srcs",
         "//plugin/pkg/client/auth:all-srcs",
         "//plugin/pkg/scheduler:all-srcs",
-        "//plugin/pkg/webhook:all-srcs",
     ],
     tags = ["automanaged"],
 )

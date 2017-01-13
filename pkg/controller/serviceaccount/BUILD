@@ -26,7 +26,6 @@ go_library(
         "//pkg/client/retry:go_default_library",
         "//pkg/controller/informers:go_default_library",
         "//pkg/fields:go_default_library",
-        "//pkg/genericapiserver/api/request:go_default_library",
         "//pkg/registry/core/secret:go_default_library",
         "//pkg/registry/core/secret/storage:go_default_library",
         "//pkg/registry/core/serviceaccount:go_default_library",
@@ -46,6 +45,7 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/util/sets",
         "//vendor:k8s.io/apimachinery/pkg/util/wait",
         "//vendor:k8s.io/apimachinery/pkg/watch",
+        "//vendor:k8s.io/apiserver/pkg/request",
     ],
 )
 

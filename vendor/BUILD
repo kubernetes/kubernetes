@@ -13154,3 +13154,143 @@ go_test(
         "//vendor:k8s.io/client-go/rest/watch",
     ],
 )
+
+go_test(
+    name = "k8s.io/apiserver/pkg/authentication/request/headerrequest_test",
+    srcs = ["k8s.io/apiserver/pkg/authentication/request/headerrequest/requestheader_test.go"],
+    library = ":k8s.io/apiserver/pkg/authentication/request/headerrequest",
+    tags = ["automanaged"],
+    deps = ["//vendor:k8s.io/apiserver/pkg/authentication/user"],
+)
+
+go_library(
+    name = "k8s.io/apiserver/pkg/authentication/request/headerrequest",
+    srcs = ["k8s.io/apiserver/pkg/authentication/request/headerrequest/requestheader.go"],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:k8s.io/apimachinery/pkg/util/sets",
+        "//vendor:k8s.io/apiserver/pkg/authentication/authenticator",
+        "//vendor:k8s.io/apiserver/pkg/authentication/request/x509",
+        "//vendor:k8s.io/apiserver/pkg/authentication/user",
+        "//vendor:k8s.io/client-go/pkg/util/cert",
+    ],
+)
+
+go_test(
+    name = "k8s.io/apiserver/pkg/handlers/negotiation_test",
+    srcs = ["k8s.io/apiserver/pkg/handlers/negotiation/negotiate_test.go"],
+    library = ":k8s.io/apiserver/pkg/handlers/negotiation",
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor:k8s.io/apimachinery/pkg/runtime",
+    ],
+)
+
+go_library(
+    name = "k8s.io/apiserver/pkg/handlers/negotiation",
+    srcs = [
+        "k8s.io/apiserver/pkg/handlers/negotiation/doc.go",
+        "k8s.io/apiserver/pkg/handlers/negotiation/errors.go",
+        "k8s.io/apiserver/pkg/handlers/negotiation/negotiate.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:bitbucket.org/ww/goautoneg",
+        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor:k8s.io/apimachinery/pkg/runtime",
+        "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
+    ],
+)
+
+go_library(
+    name = "k8s.io/apiserver/pkg/metrics",
+    srcs = ["k8s.io/apiserver/pkg/metrics/metrics.go"],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/emicklei/go-restful",
+        "//vendor:github.com/prometheus/client_golang/prometheus",
+        "//vendor:k8s.io/apimachinery/pkg/util/net",
+    ],
+)
+
+go_test(
+    name = "k8s.io/apiserver/pkg/request_test",
+    srcs = ["k8s.io/apiserver/pkg/request/requestinfo_test.go"],
+    library = ":k8s.io/apiserver/pkg/request",
+    tags = ["automanaged"],
+    deps = ["//vendor:k8s.io/apimachinery/pkg/util/sets"],
+)
+
+go_library(
+    name = "k8s.io/apiserver/pkg/request",
+    srcs = [
+        "k8s.io/apiserver/pkg/request/context.go",
+        "k8s.io/apiserver/pkg/request/doc.go",
+        "k8s.io/apiserver/pkg/request/requestcontext.go",
+        "k8s.io/apiserver/pkg/request/requestinfo.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/golang/glog",
+        "//vendor:golang.org/x/net/context",
+        "//vendor:k8s.io/apimachinery/pkg/types",
+        "//vendor:k8s.io/apimachinery/pkg/util/sets",
+        "//vendor:k8s.io/apiserver/pkg/authentication/user",
+    ],
+)
+
+go_test(
+    name = "k8s.io/apiserver/pkg/request_xtest",
+    srcs = ["k8s.io/apiserver/pkg/request/context_test.go"],
+    tags = ["automanaged"],
+    deps = [
+        "//pkg/api:go_default_library",
+        "//vendor:k8s.io/apimachinery/pkg/types",
+        "//vendor:k8s.io/apiserver/pkg/authentication/user",
+        "//vendor:k8s.io/apiserver/pkg/request",
+    ],
+)
+
+go_test(
+    name = "k8s.io/apiserver/pkg/util/wsstream_test",
+    srcs = [
+        "k8s.io/apiserver/pkg/util/wsstream/conn_test.go",
+        "k8s.io/apiserver/pkg/util/wsstream/stream_test.go",
+    ],
+    library = ":k8s.io/apiserver/pkg/util/wsstream",
+    tags = ["automanaged"],
+    deps = ["//vendor:golang.org/x/net/websocket"],
+)
+
+go_library(
+    name = "k8s.io/apiserver/pkg/util/wsstream",
+    srcs = [
+        "k8s.io/apiserver/pkg/util/wsstream/conn.go",
+        "k8s.io/apiserver/pkg/util/wsstream/doc.go",
+        "k8s.io/apiserver/pkg/util/wsstream/stream.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/golang/glog",
+        "//vendor:golang.org/x/net/websocket",
+        "//vendor:k8s.io/apimachinery/pkg/util/runtime",
+    ],
+)
+
+go_library(
+    name = "k8s.io/apiserver/pkg/webhook",
+    srcs = ["k8s.io/apiserver/pkg/webhook/webhook.go"],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:k8s.io/apimachinery/pkg/runtime",
+        "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
+        "//vendor:k8s.io/apimachinery/pkg/runtime/serializer",
+        "//vendor:k8s.io/apimachinery/pkg/util/wait",
+        "//vendor:k8s.io/client-go/pkg/api",
+        "//vendor:k8s.io/client-go/pkg/api/errors",
+        "//vendor:k8s.io/client-go/pkg/apis/authorization/install",
+        "//vendor:k8s.io/client-go/rest",
+        "//vendor:k8s.io/client-go/tools/clientcmd",
+    ],
+)

@@ -33,14 +33,14 @@ import (
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apiserver/pkg/handlers/negotiation"
+	"k8s.io/apiserver/pkg/metrics"
+	"k8s.io/apiserver/pkg/request"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/genericapiserver/api/handlers"
-	"k8s.io/kubernetes/pkg/genericapiserver/api/handlers/negotiation"
-	"k8s.io/kubernetes/pkg/genericapiserver/api/metrics"
-	"k8s.io/kubernetes/pkg/genericapiserver/api/request"
 
 	"github.com/emicklei/go-restful"
 )

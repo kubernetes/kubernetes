@@ -40,7 +40,6 @@ go_library(
         "//pkg/genericapiserver:go_default_library",
         "//pkg/genericapiserver/api/filters:go_default_library",
         "//pkg/genericapiserver/api/handlers/responsewriters:go_default_library",
-        "//pkg/genericapiserver/api/request:go_default_library",
         "//pkg/genericapiserver/filters:go_default_library",
         "//pkg/registry/generic:go_default_library",
         "//pkg/registry/generic/rest:go_default_library",
@@ -53,6 +52,7 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/runtime",
         "//vendor:k8s.io/apimachinery/pkg/util/runtime",
         "//vendor:k8s.io/apimachinery/pkg/util/wait",
+        "//vendor:k8s.io/apiserver/pkg/request",
     ],
 )
 
@@ -71,12 +71,12 @@ go_test(
         "//pkg/api/v1:go_default_library",
         "//pkg/client/cache:go_default_library",
         "//pkg/client/listers/core/v1:go_default_library",
-        "//pkg/genericapiserver/api/request:go_default_library",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/runtime",
         "//vendor:k8s.io/apimachinery/pkg/util/diff",
         "//vendor:k8s.io/apimachinery/pkg/util/sets",
         "//vendor:k8s.io/apiserver/pkg/authentication/user",
+        "//vendor:k8s.io/apiserver/pkg/request",
     ],
 )
 

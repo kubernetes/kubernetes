@@ -15,4 +15,4 @@ limitations under the License.
 */
 
 // Package negotation contains media type negotiation logic.
-package negotiation // import "k8s.io/kubernetes/pkg/genericapiserver/api/handlers/negotiation"
+package negotiation // import "k8s.io/apiserver/pkg/handlers/negotiation"
