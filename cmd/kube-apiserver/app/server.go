@@ -60,6 +60,7 @@ import (
 	"k8s.io/kubernetes/pkg/master/tunneler"
 	"k8s.io/kubernetes/pkg/registry/cachesize"
 	"k8s.io/kubernetes/pkg/version"
+	"k8s.io/kubernetes/cmd/kube-apiserver/app/preflight"
 )
 
 // NewAPIServerCommand creates a *cobra.Command object with default parameters
@@ -94,6 +95,10 @@ func Run(s *options.ServerRunOptions) error {
 	}
 	if err := s.CloudProvider.DefaultExternalHost(s.GenericServerRunOptions); err != nil {
 		return fmt.Errorf("error setting the external host value: %v", err)
+	}
+	if err := preflight.RunApiserverChecks(s); err != nil {
+		return fmt.Errorf("error starting apiserver: %v\n", err)
+		os.Exit(1)
 	}
 
 	// validate options

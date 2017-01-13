@@ -57,7 +57,7 @@ func WaitForEtcd(serverList []string) error {
 	for _, connString := range serverList {
 		connUrl, err := url.Parse(connString)
 		if err != nil {
-			return errors.New(fmt.Sprintf("Error parsing Etcd URI: %v", err))
+			return errors.New(fmt.Sprintf("error parsing Etcd URI: %v", err))
 		}
 
 		done := etcdConnection.checkConnection(connUrl.Host)
@@ -68,7 +68,7 @@ func WaitForEtcd(serverList []string) error {
 			done = etcdConnection.checkConnection(connUrl.Host)
 		}
 		if retries >= retryLimit {
-			return errors.New(fmt.Sprint("Unable to reach Etcd server: %s", connString))
+			return errors.New(fmt.Sprint("unable to reach Etcd server: %s", connString))
 		}
 	}
 	return nil
