@@ -29,7 +29,7 @@ import (
 
 	"github.com/go-openapi/spec"
 	inf "gopkg.in/inf.v0"
-	"k8s.io/client-go/pkg/genericapiserver/openapi/common"
+	"k8s.io/apimachinery/pkg/genericapiserver/openapi/common"
 )
 
 // Quantity is a fixed-point representation of a number.

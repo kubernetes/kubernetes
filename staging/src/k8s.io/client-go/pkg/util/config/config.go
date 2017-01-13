@@ -19,7 +19,7 @@ package config
 import (
 	"sync"
 
-	"k8s.io/client-go/pkg/util/wait"
+	"k8s.io/apimachinery/pkg/util/wait"
 )
 
 type Merger interface {

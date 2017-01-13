@@ -22,11 +22,10 @@ import (
 	"net/http"
 	"net/url"
 
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/pkg/api"
 	"k8s.io/client-go/pkg/api/testapi"
-	"k8s.io/client-go/pkg/apimachinery/registered"
-	"k8s.io/client-go/pkg/runtime"
-	"k8s.io/client-go/pkg/runtime/schema"
 	"k8s.io/client-go/pkg/util/flowcontrol"
 	"k8s.io/client-go/rest"
 )
@@ -89,7 +88,7 @@ func (c *RESTClient) GetRateLimiter() flowcontrol.RateLimiter {
 func (c *RESTClient) request(verb string) *rest.Request {
 	config := rest.ContentConfig{
 		ContentType:          runtime.ContentTypeJSON,
-		GroupVersion:         &registered.GroupOrDie(api.GroupName).GroupVersion,
+		GroupVersion:         &api.Registry.GroupOrDie(api.GroupName).GroupVersion,
 		NegotiatedSerializer: c.NegotiatedSerializer,
 	}
 
@@ -100,12 +99,12 @@ func (c *RESTClient) request(verb string) *rest.Request {
 	ns := c.NegotiatedSerializer
 	info, _ := runtime.SerializerInfoForMediaType(ns.SupportedMediaTypes(), runtime.ContentTypeJSON)
 	internalVersion := schema.GroupVersion{
-		Group:   registered.GroupOrDie(groupName).GroupVersion.Group,
+		Group:   api.Registry.GroupOrDie(groupName).GroupVersion.Group,
 		Version: runtime.APIVersionInternal,
 	}
 	internalVersion.Version = runtime.APIVersionInternal
 	serializers := rest.Serializers{
-		Encoder: ns.EncoderForVersion(info.Serializer, registered.GroupOrDie(api.GroupName).GroupVersion),
+		Encoder: ns.EncoderForVersion(info.Serializer, api.Registry.GroupOrDie(api.GroupName).GroupVersion),
 		Decoder: ns.DecoderToVersion(info.Serializer, internalVersion),
 	}
 	if info.StreamSerializer != nil {

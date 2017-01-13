@@ -100,6 +100,7 @@ var map_DaemonSetStatus = map[string]string{
 	"numberMisscheduled":     "NumberMisscheduled is the number of nodes that are running the daemon pod, but are not supposed to run the daemon pod. More info: http://releases.k8s.io/HEAD/docs/admin/daemons.md",
 	"desiredNumberScheduled": "DesiredNumberScheduled is the total number of nodes that should be running the daemon pod (including nodes correctly running the daemon pod). More info: http://releases.k8s.io/HEAD/docs/admin/daemons.md",
 	"numberReady":            "NumberReady is the number of nodes that should be running the daemon pod and have one or more of the daemon pod running and ready.",
+	"observedGeneration":     "ObservedGeneration is the most recent generation observed by the daemon set controller.",
 }
 
 func (DaemonSetStatus) SwaggerDoc() map[string]string {
@@ -174,6 +175,7 @@ var map_DeploymentStatus = map[string]string{
 	"observedGeneration":  "The generation observed by the deployment controller.",
 	"replicas":            "Total number of non-terminated pods targeted by this deployment (their labels match the selector).",
 	"updatedReplicas":     "Total number of non-terminated pods targeted by this deployment that have the desired template spec.",
+	"readyReplicas":       "Total number of ready pods targeted by this deployment.",
 	"availableReplicas":   "Total number of available pods (ready for at least minReadySeconds) targeted by this deployment.",
 	"unavailableReplicas": "Total number of unavailable pods targeted by this deployment.",
 	"conditions":          "Represents the latest available observations of a deployment's current state.",

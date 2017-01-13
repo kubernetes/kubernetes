@@ -23,11 +23,11 @@ import (
 	"net/http"
 	"strings"
 
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	x509request "k8s.io/apiserver/pkg/authentication/request/x509"
 	"k8s.io/apiserver/pkg/authentication/user"
 	utilcert "k8s.io/client-go/pkg/util/cert"
-	"k8s.io/client-go/pkg/util/sets"
 )
 
 type requestHeaderAuthRequestHandler struct {

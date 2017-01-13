@@ -188,6 +188,13 @@ func (d *cborDecDriver) readNextBd() {
 	d.bdRead = true
 }
 
+func (d *cborDecDriver) uncacheRead() {
+	if d.bdRead {
+		d.r.unreadn1()
+		d.bdRead = false
+	}
+}
+
 func (d *cborDecDriver) ContainerType() (vt valueType) {
 	if d.bd == cborBdNil {
 		return valueTypeNil
@@ -508,7 +515,7 @@ func (d *cborDecDriver) DecodeNaked() {
 			n.v = valueTypeExt
 			n.u = d.decUint()
 			n.l = nil
-			d.bdRead = false
+			// d.bdRead = false
 			// d.d.decode(&re.Value) // handled by decode itself.
 			// decodeFurther = true
 		default:
@@ -578,6 +585,7 @@ func (e *cborEncDriver) reset() {
 
 func (d *cborDecDriver) reset() {
 	d.r = d.d.r
+	d.bd, d.bdRead = 0, false
 }
 
 var _ decDriver = (*cborDecDriver)(nil)
