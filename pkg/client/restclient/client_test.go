@@ -83,6 +83,74 @@ func TestDoRequestSuccess(t *testing.T) {
 	validate(testParam, t, body, fakeHandler)
 }
 
+func TestDoRequestWithMultipleHosts(t *testing.T) {
+	successServer, _, _ := testServerEnv(t, 200)
+	defer successServer.Close()
+	invalidURL := "http://127.0.0.1:30767/"
+	validURL := successServer.URL + "/"
+	for _, test := range []struct {
+		msg             string
+		alternateURLs   []string
+		requests        int
+		successRequests int
+		validURLs       []string
+	}{
+		{
+			msg:             "client won't switch url without error",
+			alternateURLs:   []string{validURL, invalidURL},
+			requests:        3,
+			successRequests: 3,
+			validURLs:       []string{validURL, invalidURL},
+		},
+		{
+			msg:             "client will switch on error and stick with succesfull url",
+			alternateURLs:   []string{invalidURL, validURL},
+			requests:        3,
+			successRequests: 2,
+			validURLs:       []string{validURL},
+		},
+		{
+			msg:             "every url will be qualified as a unique one",
+			alternateURLs:   []string{invalidURL, invalidURL, validURL},
+			requests:        4,
+			successRequests: 2,
+			validURLs:       []string{validURL},
+		},
+		{
+			msg:             "in the absence of valid url - client will consider all of them as valid",
+			alternateURLs:   []string{invalidURL, invalidURL},
+			requests:        4,
+			successRequests: 0,
+			validURLs:       []string{invalidURL, invalidURL},
+		},
+	} {
+		t.Log("Running test: ", test.msg)
+		successRequests := 0
+		client, err := restClientWithAlternateURLs(test.alternateURLs...)
+		if err != nil {
+			t.Error(err)
+		}
+		for i := 0; i < test.requests; i++ {
+			_, err := client.Get().Prefix("test").Do().Raw()
+			if err == nil {
+				successRequests++
+			} else {
+				t.Log(err)
+			}
+		}
+		validURLs := []string{}
+		for _, u := range client.base.Get() {
+			validURLs = append(validURLs, u.String())
+		}
+		if successRequests != test.successRequests {
+			t.Errorf("%s: Unexpected number of successfull requests: Expected %d != Got %d", test.msg, test.successRequests, successRequests)
+		}
+		if !reflect.DeepEqual(test.validURLs, validURLs) {
+			t.Errorf("%s: Unexpected valid urls list: Expected %v != Got %v", test.msg, test.validURLs, validURLs)
+		}
+	}
+}
+
 func TestDoRequestFailed(t *testing.T) {
 	status := &metav1.Status{
 		Code:    http.StatusNotFound,
@@ -327,7 +395,7 @@ func testServerEnv(t *testing.T, statusCode int) (*httptest.Server, *utiltesting
 }
 
 func restClient(testServer *httptest.Server) (*RESTClient, error) {
-	c, err := RESTClientFor(&Config{
+	return RESTClientFor(&Config{
 		Host: testServer.URL,
 		ContentConfig: ContentConfig{
 			GroupVersion:         &api.Registry.GroupOrDie(api.GroupName).GroupVersion,
@@ -336,5 +404,16 @@ func restClient(testServer *httptest.Server) (*RESTClient, error) {
 		Username: "user",
 		Password: "pass",
 	})
-	return c, err
+}
+
+func restClientWithAlternateURLs(alternateURLs ...string) (*RESTClient, error) {
+	return RESTClientFor(&Config{
+		AlternateHosts: alternateURLs,
+		ContentConfig: ContentConfig{
+			GroupVersion:         &registered.GroupOrDie(api.GroupName).GroupVersion,
+			NegotiatedSerializer: testapi.Default.NegotiatedSerializer(),
+		},
+		Username: "user",
+		Password: "pass",
+	})
 }
