@@ -61,7 +61,7 @@ type SecretController struct {
 	// Definitions of secrets that should be federated.
 	secretInformerStore cache.Store
 	// Informer controller for secrets that should be federated.
-	secretInformerController cache.ControllerInterface
+	secretInformerController cache.Controller
 
 	// Client to federated api server.
 	federatedApiClient federationclientset.Interface
@@ -117,7 +117,7 @@ func NewSecretController(client federationclientset.Interface) *SecretController
 	// Federated informer on secrets in members of federation.
 	secretcontroller.secretFederatedInformer = util.NewFederatedInformer(
 		client,
-		func(cluster *federationapi.Cluster, targetClient kubeclientset.Interface) (cache.Store, cache.ControllerInterface) {
+		func(cluster *federationapi.Cluster, targetClient kubeclientset.Interface) (cache.Store, cache.Controller) {
 			return cache.NewInformer(
 				&cache.ListWatch{
 					ListFunc: func(options apiv1.ListOptions) (pkgruntime.Object, error) {

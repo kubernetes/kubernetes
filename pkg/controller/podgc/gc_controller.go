@@ -50,7 +50,7 @@ type PodGCController struct {
 	internalPodInformer cache.SharedIndexInformer
 
 	podStore      cache.StoreToPodLister
-	podController cache.ControllerInterface
+	podController cache.Controller
 
 	deletePod              func(namespace, name string) error
 	terminatedPodThreshold int

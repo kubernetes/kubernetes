@@ -54,7 +54,7 @@ type RouteController struct {
 	clusterName string
 	clusterCIDR *net.IPNet
 	// Node framework and store
-	nodeController *cache.Controller
+	nodeController cache.Controller
 	nodeStore      cache.StoreToNodeLister
 }
 

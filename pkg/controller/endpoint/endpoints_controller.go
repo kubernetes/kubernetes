@@ -147,8 +147,8 @@ type EndpointController struct {
 
 	// Since we join two objects, we'll watch both of them with
 	// controllers.
-	serviceController *cache.Controller
-	podController     cache.ControllerInterface
+	serviceController cache.Controller
+	podController     cache.Controller
 	// podStoreSynced returns true if the pod store has been synced at least once.
 	// Added as a member to the struct to allow injection for testing.
 	podStoreSynced func() bool

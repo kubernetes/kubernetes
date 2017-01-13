@@ -49,7 +49,7 @@ type ClusterController struct {
 	clusterKubeClientMap map[string]ClusterClient
 
 	// cluster framework and store
-	clusterController *cache.Controller
+	clusterController cache.Controller
 	clusterStore      clustercache.StoreToClusterLister
 }
 

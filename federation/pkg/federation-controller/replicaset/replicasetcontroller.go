@@ -80,7 +80,7 @@ func parseFederationReplicaSetReference(frs *extensionsv1.ReplicaSet) (*fed.Fede
 type ReplicaSetController struct {
 	fedClient fedclientset.Interface
 
-	replicaSetController *cache.Controller
+	replicaSetController cache.Controller
 	replicaSetStore      cache.StoreToReplicaSetLister
 
 	fedReplicaSetInformer fedutil.FederatedInformer
@@ -121,7 +121,7 @@ func NewReplicaSetController(federationClient fedclientset.Interface) *ReplicaSe
 		eventRecorder: recorder,
 	}
 
-	replicaSetFedInformerFactory := func(cluster *fedv1.Cluster, clientset kubeclientset.Interface) (cache.Store, cache.ControllerInterface) {
+	replicaSetFedInformerFactory := func(cluster *fedv1.Cluster, clientset kubeclientset.Interface) (cache.Store, cache.Controller) {
 		return cache.NewInformer(
 			&cache.ListWatch{
 				ListFunc: func(options apiv1.ListOptions) (runtime.Object, error) {
@@ -148,7 +148,7 @@ func NewReplicaSetController(federationClient fedclientset.Interface) *ReplicaSe
 	}
 	frsc.fedReplicaSetInformer = fedutil.NewFederatedInformer(federationClient, replicaSetFedInformerFactory, &clusterLifecycle)
 
-	podFedInformerFactory := func(cluster *fedv1.Cluster, clientset kubeclientset.Interface) (cache.Store, cache.ControllerInterface) {
+	podFedInformerFactory := func(cluster *fedv1.Cluster, clientset kubeclientset.Interface) (cache.Store, cache.Controller) {
 		return cache.NewInformer(
 			&cache.ListWatch{
 				ListFunc: func(options apiv1.ListOptions) (runtime.Object, error) {
