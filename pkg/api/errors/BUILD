@@ -9,18 +9,8 @@ load(
 
 go_library(
     name = "go_default_library",
-    srcs = [
-        "eviction.go",
-        "expansion_generated.go",
-        "poddisruptionbudget.go",
-    ],
+    srcs = ["doc.go"],
     tags = ["automanaged"],
-    deps = [
-        "//pkg/apis/policy:go_default_library",
-        "//pkg/client/cache:go_default_library",
-        "//vendor:k8s.io/apimachinery/pkg/api/errors",
-        "//vendor:k8s.io/apimachinery/pkg/labels",
-    ],
 )
 
 filegroup(
@@ -32,6 +22,9 @@ filegroup(
 
 filegroup(
     name = "all-srcs",
-    srcs = [":package-srcs"],
+    srcs = [
+        ":package-srcs",
+        "//pkg/api/errors/storage:all-srcs",
+    ],
     tags = ["automanaged"],
 )

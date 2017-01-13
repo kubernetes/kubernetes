@@ -25,8 +25,8 @@ import (
 	"sync"
 	"time"
 
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/errors"
 	apirequest "k8s.io/kubernetes/pkg/genericapiserver/api/request"
 )
 

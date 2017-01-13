@@ -12,11 +12,11 @@ go_library(
     srcs = ["rest.go"],
     tags = ["automanaged"],
     deps = [
-        "//pkg/api/errors:go_default_library",
         "//pkg/apis/authorization:go_default_library",
         "//pkg/apis/authorization/validation:go_default_library",
         "//pkg/genericapiserver/api/request:go_default_library",
         "//pkg/registry/authorization/util:go_default_library",
+        "//vendor:k8s.io/apimachinery/pkg/api/errors",
         "//vendor:k8s.io/apimachinery/pkg/runtime",
         "//vendor:k8s.io/apiserver/pkg/authorization/authorizer",
     ],

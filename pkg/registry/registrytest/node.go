@@ -19,10 +19,10 @@ package registrytest
 import (
 	"sync"
 
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/errors"
 	genericapirequest "k8s.io/kubernetes/pkg/genericapiserver/api/request"
 )
 

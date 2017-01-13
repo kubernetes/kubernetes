@@ -13,7 +13,7 @@ go_library(
     srcs = ["util.go"],
     tags = ["automanaged"],
     deps = [
-        "//pkg/api/errors:go_default_library",
+        "//vendor:k8s.io/apimachinery/pkg/api/errors",
         "//vendor:k8s.io/apimachinery/pkg/util/wait",
     ],
 )
@@ -24,7 +24,7 @@ go_test(
     library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
-        "//pkg/api/errors:go_default_library",
+        "//vendor:k8s.io/apimachinery/pkg/api/errors",
         "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
         "//vendor:k8s.io/apimachinery/pkg/util/wait",
     ],

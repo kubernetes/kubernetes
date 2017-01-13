@@ -18,8 +18,8 @@ limitations under the License.
 package policybased
 
 import (
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/apis/rbac"
 	genericapirequest "k8s.io/kubernetes/pkg/genericapiserver/api/request"

@@ -19,9 +19,9 @@ package selfsubjectaccessreview
 import (
 	"fmt"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
-	apierrors "k8s.io/kubernetes/pkg/api/errors"
 	authorizationapi "k8s.io/kubernetes/pkg/apis/authorization"
 	authorizationvalidation "k8s.io/kubernetes/pkg/apis/authorization/validation"
 	genericapirequest "k8s.io/kubernetes/pkg/genericapiserver/api/request"

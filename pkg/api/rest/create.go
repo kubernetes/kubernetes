@@ -17,11 +17,11 @@ limitations under the License.
 package rest
 
 import (
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/validation/genericvalidation"
 	"k8s.io/kubernetes/pkg/api/validation/path"
 	genericapirequest "k8s.io/kubernetes/pkg/genericapiserver/api/request"

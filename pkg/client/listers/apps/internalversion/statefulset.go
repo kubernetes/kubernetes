@@ -19,8 +19,8 @@ limitations under the License.
 package internalversion
 
 import (
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/kubernetes/pkg/api/errors"
 	apps "k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/client/cache"
 )
