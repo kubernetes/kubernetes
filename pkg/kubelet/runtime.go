@@ -30,6 +30,22 @@ type runtimeState struct {
 	internalError            error
 	cidr                     string
 	initError                error
+	healthChecks             []*healthCheck
+}
+
+// A health check function should be efficient and not rely on external
+// components (e.g., container runtime).
+type healthCheckFnType func() (bool, error)
+
+type healthCheck struct {
+	name string
+	fn   healthCheckFnType
+}
+
+func (s *runtimeState) addHealthCheck(name string, f healthCheckFnType) {
+	s.Lock()
+	defer s.Unlock()
+	s.healthChecks = append(s.healthChecks, &healthCheck{name: name, fn: f})
 }
 
 func (s *runtimeState) setRuntimeSync(t time.Time) {
@@ -81,6 +97,12 @@ func (s *runtimeState) runtimeErrors() []string {
 	if s.internalError != nil {
 		ret = append(ret, s.internalError.Error())
 	}
+	for _, hc := range s.healthChecks {
+		if ok, err := hc.fn(); !ok {
+			ret = append(ret, fmt.Sprintf("%s is not healthy: %v", hc.name, err))
+		}
+	}
+
 	return ret
 }
 
