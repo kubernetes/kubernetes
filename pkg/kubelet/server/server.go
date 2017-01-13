@@ -469,12 +469,14 @@ func (s *Server) getContainerLogs(request *restful.Request, response *restful.Re
 	for _, container := range pod.Spec.Containers {
 		if container.Name == containerName {
 			containerExists = true
+			break
 		}
 	}
 	if !containerExists {
 		for _, container := range pod.Spec.InitContainers {
 			if container.Name == containerName {
 				containerExists = true
+				break
 			}
 		}
 	}
