@@ -41,6 +41,10 @@ const (
 	expectedNumFieldsPerLine = 6
 	// Location of the mount file to use
 	procMountsPath = "/proc/mounts"
+
+	chrootCmd = "chroot"
+	nfsRPCBindErrMsg = "mount.nfs: rpc.statd is not running but is required for remote locking.\nmount.nfs: Either use '-o nolock' to keep locks local, or start statd.\nmount.nfs: an incorrect mount option was specified\n"
+	rpcBindCmd = "/sbin/rpcbind"
 )
 
 const (
@@ -78,6 +82,8 @@ func (mounter *Mounter) Mount(source string, target string, fstype string, optio
 	fsTypesNeedMounter := sets.NewString("nfs", "glusterfs")
 	if fsTypesNeedMounter.Has(fstype) {
 		mounterPath = mounter.mounterPath
+		return doMountInChroot(mounterPath, source, target, fstype, options)
+
 	}
 	return doMount(mounterPath, source, target, fstype, options)
 }
@@ -105,6 +111,45 @@ func isBind(options []string) (bool, []string) {
 	}
 
 	return bind, bindRemountOpts
+}
+
+func doMountInChroot(path string, source string, target string, fstype string, options []string) error {
+	glog.V(4).Infof("Mounting %s %s %s %v with path: %q", source, target, fstype, options, path)
+	mountArgs := makeMountArgs(source, target, fstype, options)
+	mountArgs = append([]string{path, defaultMountCommand}, mountArgs...)
+
+	glog.V(4).Infof("Mounting cmd (%s) with arguments (%s)", chrootCmd, mountArgs)
+	output, err := exec.Command(chrootCmd, mountArgs...).CombinedOutput()
+	if err == nil {
+		return err
+	}
+
+	if !strings.EqualFold(string(output), nfsRPCBindErrMsg) {
+		// Mount failed but not because of RPC bind error
+		errMsg := fmt.Sprintf("Mount failed: %v\nMounting command: %s\nMounting arguments: %s %s %s %v\nOutput: %s\n", err, chrootCmd, source, target, fstype, options, string(output))
+		glog.Errorf(errMsg)
+		return fmt.Errorf(errMsg)
+	}
+
+	// Mount failed because it is NFS V3 and we need to run rpcBind
+	glog.V(4).Info("Running rpc bind for NFS V3")
+	output, err = exec.Command(chrootCmd, path, rpcBindCmd, "-w").CombinedOutput()
+	if err != nil {
+		errMsg := fmt.Sprintf("Mount issued for NFS V3 but unable to run rpcbind %s %v", string(output), err)
+		glog.Errorf(errMsg)
+		return fmt.Errorf(errMsg)
+	}
+
+	// Rpcbind is running, try mounting again
+	output, err = exec.Command(chrootCmd, mountArgs...).CombinedOutput()
+
+	if err != nil {
+		errMsg := fmt.Sprintf("Mount failed for NFS V3 even after running rpcBind %s, %v", string(output), err)
+		glog.Infof(errMsg)
+		return fmt.Errorf(errMsg)
+	}
+
+	return nil
 }
 
 // doMount runs the mount command.

@@ -115,19 +115,14 @@ function split-commas {
 }
 
 function install-gci-mounter-tools {
-    local -r rkt_version="v1.18.0"
-    local -r gci_mounter_version="v2"
-    local -r rkt_binary_sha1="75fc8f29c79bc9e505f3e7f6e8fadf2425c21967"
-    local -r rkt_stage1_fly_sha1="474df5a1f934960ba669b360ab713d0a54283091"
-    local -r gci_mounter_sha1="851e841d8640d6a05e64e22c493f5ac3c4cba561"
-    download-or-bust "${rkt_binary_sha1}" "https://storage.googleapis.com/kubernetes-release/rkt/${rkt_version}/rkt"
-    download-or-bust "${rkt_stage1_fly_sha1}" "https://storage.googleapis.com/kubernetes-release/rkt/${rkt_version}/stage1-fly.aci"
-    download-or-bust "${gci_mounter_sha1}" "https://storage.googleapis.com/kubernetes-release/gci-mounter/gci-mounter-${gci_mounter_version}.aci"
-    local -r rkt_dst="${KUBE_HOME}/bin/"
-    mv "${KUBE_HOME}/rkt" "${rkt_dst}/rkt"
-    mv "${KUBE_HOME}/stage1-fly.aci" "${rkt_dst}/stage1-fly.aci"
-    mv "${KUBE_HOME}/gci-mounter-${gci_mounter_version}.aci" "${rkt_dst}/gci-mounter-${gci_mounter_version}.aci"
-    chmod a+x "${rkt_dst}/rkt"
+    #TODO: remove this before final review
+    docker run --name=gcimounter gcr.io/google_containers/gci-mounter:v2
+    docker export gcimounter > /tmp/mounter.tar
+    #download-or-bust /tmp/mounter.tar "https://storage.googleapis.com/kubernetes-release/gci-mounter/mounter.tar"
+    mkdir "${CONTAINERIZED_MOUNTS_HOME}"
+    chmod a+x "${CONTAINERIZED_MOUNTS_HOME}"
+    tar xvf /tmp/mounter.tar -C "${CONTAINERIZED_MOUNTS_HOME}"
+    mkdir "${CONTAINERIZED_MOUNTS_HOME}/var/lib/kubelet"
 }
 
 # Downloads kubernetes binaries and kube-system manifest tarball, unpacks them,
@@ -203,7 +198,6 @@ function install-kube-binary-config {
       xargs sed -ri "s@(image\":\s+\")gcr.io/google_containers@\1${kube_addon_registry}@"
   fi
   cp "${dst_dir}/kubernetes/gci-trusty/gci-configure-helper.sh" "${KUBE_HOME}/bin/configure-helper.sh"
-  cp "${dst_dir}/kubernetes/gci-trusty/gci-mounter" "${KUBE_HOME}/bin/mounter"
   cp "${dst_dir}/kubernetes/gci-trusty/health-monitor.sh" "${KUBE_HOME}/bin/health-monitor.sh"
   chmod -R 755 "${kube_bin}"
 
@@ -222,6 +216,7 @@ function install-kube-binary-config {
 echo "Start to install kubernetes files"
 set-broken-motd
 KUBE_HOME="/home/kubernetes"
+CONTAINERIZED_MOUNTS_HOME="${KUBE_HOME}/mounter-rootfs"
 download-kube-env
 source "${KUBE_HOME}/kube-env"
 if [[ "${KUBERNETES_MASTER:-}" == "true" ]]; then

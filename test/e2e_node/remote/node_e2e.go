@@ -37,7 +37,7 @@ func InitNodeE2ERemote() TestSuite {
 	return &NodeE2ERemote{}
 }
 
-const localGCIMounterPath = "cluster/gce/gci/mounter/mounter"
+const gciMounterPath = "/home/kubernetes/mounter-rootfs"
 
 // SetupTestPackage sets up the test package with binaries k8s required for node e2e tests
 func (n *NodeE2ERemote) SetupTestPackage(tardir string) error {
@@ -65,30 +65,6 @@ func (n *NodeE2ERemote) SetupTestPackage(tardir string) error {
 		}
 	}
 
-	// Include the GCI mounter artifacts in the deployed tarball
-	k8sDir, err := builder.GetK8sRootDir()
-	if err != nil {
-		return fmt.Errorf("Could not find K8s root dir! Err: %v", err)
-	}
-	source := filepath.Join(k8sDir, localGCIMounterPath)
-
-	// Require the GCI mounter script, we want to make sure the remote test runner stays up to date if the mounter file moves
-	if _, err := os.Stat(source); err != nil {
-		return fmt.Errorf("Could not find GCI mounter script at %q! If this script has been (re)moved, please update the e2e node remote test runner accordingly! Err: %v", source, err)
-	}
-
-	bindir := "cluster/gce/gci/mounter"
-	bin := "mounter"
-	destdir := filepath.Join(tardir, bindir)
-	dest := filepath.Join(destdir, bin)
-	out, err := exec.Command("mkdir", "-p", filepath.Join(tardir, bindir)).CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("failed to create directory %q for GCI mounter script. Err: %v. Output:\n%s", destdir, err, out)
-	}
-	out, err = exec.Command("cp", source, dest).CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("failed to copy GCI mounter script to the archive bin. Err: %v. Output:\n%s", err, out)
-	}
 	return nil
 }
 
@@ -105,29 +81,10 @@ func updateGCIMounterPath(args, host, workspace string) (string, error) {
 		return args, nil
 	}
 
-	// If we are testing on a GCI node, we chmod 544 the mounter and specify a different mounter path in the test args.
-	// We do this here because the local var `workspace` tells us which /tmp/node-e2e-%d is relevant to the current test run.
-
-	// Determine if the GCI mounter script exists locally.
-	k8sDir, err := builder.GetK8sRootDir()
-	if err != nil {
-		return args, fmt.Errorf("could not find K8s root dir! Err: %v", err)
-	}
-	source := filepath.Join(k8sDir, localGCIMounterPath)
-
-	// Require the GCI mounter script, we want to make sure the remote test runner stays up to date if the mounter file moves
-	if _, err = os.Stat(source); err != nil {
-		return args, fmt.Errorf("could not find GCI mounter script at %q! If this script has been (re)moved, please update the e2e node remote test runner accordingly! Err: %v", source, err)
-	}
-
 	glog.V(2).Infof("GCI node and GCI mounter both detected, modifying --experimental-mounter-path accordingly")
 	// Note this implicitly requires the script to be where we expect in the tarball, so if that location changes the error
 	// here will tell us to update the remote test runner.
-	mounterPath := filepath.Join(workspace, localGCIMounterPath)
-	output, err = SSH(host, "sh", "-c", fmt.Sprintf("'chmod 544 %s'", mounterPath))
-	if err != nil {
-		return args, fmt.Errorf("unabled to chmod 544 GCI mounter script. Err: %v, Output:\n%s", err, output)
-	}
+	mounterPath := filepath.Join(workspace, gciMounterPath)
 	// Insert args at beginning of test args, so any values from command line take precedence
 	args = fmt.Sprintf("--kubelet-flags=--experimental-mounter-path=%s ", mounterPath) + args
 	return args, nil

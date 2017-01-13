@@ -8,7 +8,6 @@ pkg_tar(
         "container-linux/configure-helper.sh",
         "gci/configure-helper.sh",
         "gci/health-monitor.sh",
-        "gci/mounter/mounter",
         "trusty/configure-helper.sh",
     ],
     mode = "0755",
@@ -18,7 +17,6 @@ pkg_tar(
         "container-linux-configure-helper.sh": "container-linux/configure-helper.sh",
         "gci-configure-helper.sh": "gci/configure-helper.sh",
         "health-monitor.sh": "gci/health-monitor.sh",
-        "gci-mounter": "gci/mounter/mounter",
         "trusty-configure-helper.sh": "trusty/configure-helper.sh",
     },
 )

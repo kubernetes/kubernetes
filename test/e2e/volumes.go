@@ -434,6 +434,18 @@ var _ = framework.KubeDescribe("Volumes [Feature:Volumes]", func() {
 					// Must match content of test/images/volumes-tester/nfs/index.html
 					expectedContent: "Hello from NFS!",
 				},
+				{
+					volume: v1.VolumeSource{
+						NFS: &v1.NFSVolumeSource{
+							Server: serverIP,
+							Path: "/exports", // NFS V3
+							ReadOnly: true,
+						},
+					},
+					file: "index.html",
+					// Must match content of test/images/volume-tester/nfs/index.html
+					expectedContent: "Hello from NFS!",
+				},
 			}
 			testVolumeClient(cs, config, nil, tests)
 		})
