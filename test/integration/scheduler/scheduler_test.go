@@ -71,7 +71,7 @@ func TestUnschedulableNodes(t *testing.T) {
 
 	defer close(schedulerConfig.StopEverything)
 
-	DoTestUnschedulableNodes(t, clientSet, ns, schedulerConfigFactory.NodeLister.Store)
+	DoTestUnschedulableNodes(t, clientSet, ns, schedulerConfigFactory.GetNodeStore())
 }
 
 func podScheduled(c clientset.Interface, podNamespace, podName string) wait.ConditionFunc {
