@@ -25,6 +25,7 @@ import (
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/ghodss/yaml"
+	"k8s.io/kubernetes/pkg/apis/extensions"
 )
 
 type SortMergeListTestCases struct {
@@ -1987,6 +1988,79 @@ func jsonToYAML(j []byte) ([]byte, error) {
 	}
 
 	return y, nil
+}
+
+func TestStrategicMergePatchOnThirdPartyResourceData(t *testing.T) {
+	testCases := []struct {
+		Original       []byte
+		Patch          []byte
+		ExpectedResult string
+	}{
+		{
+			Original:       nil,
+			Patch:          nil,
+			ExpectedResult: "{}",
+		},
+		{
+			Original: []byte(`{
+  "kind": "My",
+  "apiVersion": "my.com/v1",
+  "metadata": {
+    "name": "s"
+  },
+  "data": "v1",
+  "spec": "v2",
+  "hello": "v3"
+}`),
+			Patch: []byte(`{
+  "hello": "v4"
+}`),
+			ExpectedResult: `{"apiVersion":"my.com/v1","data":"v1","hello":"v4","kind":"My","metadata":{"name":"s"},"spec":"v2"}`,
+		},
+		{
+			Original: []byte(`{
+  "kind": "My",
+  "apiVersion": "my.com/v1",
+  "metadata": {
+    "name": "s"
+  },
+  "data": "v1",
+  "spec": "v2",
+  "hello": "v3"
+}`),
+			Patch: []byte(`{
+  "hello": "v4"
+}`),
+			ExpectedResult: `{"apiVersion":"my.com/v1","data":"v1","hello":"v4","kind":"My","metadata":{"name":"s"},"spec":"v2"}`,
+		},
+		{
+			Original: []byte(`{
+  "kind": "My",
+  "apiVersion": "my.com/v1",
+  "metadata": {
+    "name": "s"
+  },
+  "data": "v1",
+  "spec": "v2"
+}`),
+			Patch: []byte(`{
+  "hello": "v4"
+}`),
+			ExpectedResult: `{"apiVersion":"my.com/v1","data":"v1","hello":"v4","kind":"My","metadata":{"name":"s"},"spec":"v2"}`,
+		},
+	}
+
+	var r extensions.ThirdPartyResourceData
+
+	for i, testCase := range testCases {
+		out, err := StrategicMergePatch(testCase.Original, testCase.Patch, r)
+		if err != nil {
+			t.Fatal("%d: unexpected error: %v", i, err)
+		}
+		if string(out) != testCase.ExpectedResult {
+			t.Errorf("%d: expected %s got %s", i, testCase.ExpectedResult, string(out))
+		}
+	}
 }
 
 func TestHasConflicts(t *testing.T) {

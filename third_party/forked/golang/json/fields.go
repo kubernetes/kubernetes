@@ -15,6 +15,8 @@ import (
 	"sync"
 	"unicode"
 	"unicode/utf8"
+
+	"k8s.io/kubernetes/pkg/apis/extensions"
 )
 
 // Finds the patchStrategy and patchMergeKey struct tag fields on a given
@@ -28,6 +30,10 @@ func LookupPatchMetadata(t reflect.Type, jsonField string) (reflect.Type, string
 		return nil, "", "", fmt.Errorf("merging an object in json but data type is not map or struct, instead is: %s",
 			t.Kind().String())
 	}
+	if t == reflect.TypeOf(extensions.ThirdPartyResourceData{}) {
+		return t, "", "", nil
+	}
+
 	jf := []byte(jsonField)
 	// Find the field that the JSON library would use.
 	var f *field
