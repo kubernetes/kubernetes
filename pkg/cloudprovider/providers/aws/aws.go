@@ -473,11 +473,27 @@ func (p *awsSDKProvider) getCrossRequestRetryDelay(regionName string) *CrossRequ
 	return delayer
 }
 
-func (p *awsSDKProvider) Compute(regionName string) (EC2, error) {
-	service := ec2.New(session.New(&aws.Config{
+// buildSession creates an AWS session.Session for the specified region, with our credentials configuration
+func (p *awsSDKProvider) buildSession(regionName string) *session.Session {
+	return session.New(&aws.Config{
 		Region:      &regionName,
 		Credentials: p.creds,
-	}))
+	})
+}
+
+// buildConfig creates an AWS config with our preferred options
+func (p *awsSDKProvider) buildConfig() *aws.Config {
+	config := aws.NewConfig()
+
+	// This avoids a confusing error message when we fail to get credentials
+	// e.g. https://github.com/kubernetes/kops/issues/605
+	config = config.WithCredentialsChainVerboseErrors(true)
+
+	return config
+}
+
+func (p *awsSDKProvider) Compute(regionName string) (EC2, error) {
+	service := ec2.New(p.buildSession(regionName), p.buildConfig())
 
 	p.addHandlers(regionName, &service.Handlers)
 
@@ -488,10 +504,7 @@ func (p *awsSDKProvider) Compute(regionName string) (EC2, error) {
 }
 
 func (p *awsSDKProvider) LoadBalancing(regionName string) (ELB, error) {
-	elbClient := elb.New(session.New(&aws.Config{
-		Region:      &regionName,
-		Credentials: p.creds,
-	}))
+	elbClient := elb.New(p.buildSession(regionName), p.buildConfig())
 
 	p.addHandlers(regionName, &elbClient.Handlers)
 
@@ -499,10 +512,7 @@ func (p *awsSDKProvider) LoadBalancing(regionName string) (ELB, error) {
 }
 
 func (p *awsSDKProvider) Autoscaling(regionName string) (ASG, error) {
-	client := autoscaling.New(session.New(&aws.Config{
-		Region:      &regionName,
-		Credentials: p.creds,
-	}))
+	client := autoscaling.New(p.buildSession(regionName), p.buildConfig())
 
 	p.addHandlers(regionName, &client.Handlers)
 
