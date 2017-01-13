@@ -22,6 +22,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/kubernetes/federation/apis/federation"
 	"k8s.io/kubernetes/federation/apis/federation/validation"
 	"k8s.io/kubernetes/pkg/api"
@@ -33,10 +34,10 @@ import (
 
 type clusterStrategy struct {
 	runtime.ObjectTyper
-	api.NameGenerator
+	names.NameGenerator
 }
 
-var Strategy = clusterStrategy{api.Scheme, api.SimpleNameGenerator}
+var Strategy = clusterStrategy{api.Scheme, names.SimpleNameGenerator}
 
 func (clusterStrategy) NamespaceScoped() bool {
 	return false
