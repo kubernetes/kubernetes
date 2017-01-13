@@ -20,14 +20,15 @@ import (
 	"fmt"
 
 	"github.com/spf13/pflag"
+	"k8s.io/kubernetes/pkg/kubeapiserver/authorizer"
 )
 
 var modes = []string{
-	"AlwaysAllow",
-	"AlwaysDeny",
-	"ABAC",
-	"RBAC",
-	"Webhook",
+	authorizer.ModeAlwaysAllow,
+	authorizer.ModeAlwaysDeny,
+	authorizer.ModeABAC,
+	authorizer.ModeRBAC,
+	authorizer.ModeWebhook,
 }
 
 func NewAuthorizationModeFlag(mode *string) pflag.Value {

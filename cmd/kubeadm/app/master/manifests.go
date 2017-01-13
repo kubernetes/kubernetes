@@ -29,6 +29,7 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/images"
 	"k8s.io/kubernetes/pkg/api/resource"
 	api "k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/kubeapiserver/authorizer"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/util/intstr"
 
@@ -298,16 +299,16 @@ func getAPIServerCommand(cfg *kubeadmapi.MasterConfiguration) []string {
 
 	if cfg.AuthorizationMode != "" {
 		switch cfg.AuthorizationMode {
-		case "ABAC":
+		case authorizer.ModeABAC:
 			command = append(command, "--authorization-mode="+cfg.AuthorizationMode,
 				"--authorization-policy-file="+kubeadmapi.GlobalEnvParams.KubernetesDir+"/policy_file.json",
 			)
-		case "RBAC":
+		case authorizer.ModeRBAC:
 			command = append(command, "--authorization-mode="+cfg.AuthorizationMode,
 				"--runtime-config=rbac.authorization.k8s.io/v1alpha1",
 				"--authorization-rbac-super-user=kubernetes-client",
 			)
-		case "Webhook":
+		case authorizer.ModeWebhook:
 			command = append(command, "--authorization-mode="+cfg.AuthorizationMode,
 				"--authorization-webhook-config-file="+kubeadmapi.GlobalEnvParams.KubernetesDir+"/config_file.conf",
 			)
