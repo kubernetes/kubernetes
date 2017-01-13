@@ -37,7 +37,7 @@ go_test(
     tags = ["automanaged"],
     deps = [
         "//pkg/api/v1:go_default_library",
-        "//plugin/pkg/scheduler/factory:go_default_library",
+        "//plugin/pkg/scheduler:go_default_library",
         "//test/integration/framework:go_default_library",
         "//test/utils:go_default_library",
         "//vendor:github.com/golang/glog",
