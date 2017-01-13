@@ -21,8 +21,10 @@ import (
 	"io"
 	"math"
 	"os"
+	"strings"
 	"time"
 
+	"fmt"
 	"github.com/spf13/cobra"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -72,8 +74,9 @@ type LogsOptions struct {
 	ClientMapper resource.ClientMapper
 	Decoder      runtime.Decoder
 
-	Object        runtime.Object
-	LogsForObject func(object, options runtime.Object) (*restclient.Request, error)
+	Object          runtime.Object
+	PrefixMatchList map[int]string
+	LogsForObject   func(object, options runtime.Object) (*restclient.Request, error)
 
 	Out io.Writer
 }
@@ -96,7 +99,7 @@ func NewCmdLogs(f cmdutil.Factory, out io.Writer) *cobra.Command {
 			if err := o.Validate(); err != nil {
 				cmdutil.CheckErr(cmdutil.UsageError(cmd, err.Error()))
 			}
-			cmdutil.CheckErr(o.RunLogs())
+			cmdutil.CheckErr(o.RunLogs(out, args))
 		},
 		Aliases: []string{"log"},
 	}
@@ -189,24 +192,63 @@ func (o *LogsOptions) Complete(f cmdutil.Factory, out io.Writer, cmd *cobra.Comm
 	decoder := f.Decoder(true)
 	if o.Object == nil {
 		builder := resource.NewBuilder(mapper, typer, o.ClientMapper, decoder).
-			NamespaceParam(o.Namespace).DefaultNamespace().
-			SingleResourceType()
-		if o.ResourceArg != "" {
-			builder.ResourceNames("pods", o.ResourceArg)
-		}
-		if selector != "" {
-			builder.ResourceTypes("pods").SelectorParam(selector)
-		}
-		infos, err := builder.Do().Infos()
-		if err != nil {
-			return err
-		}
-		if selector == "" && len(infos) != 1 {
-			return errors.New("expected a resource")
-		}
-		o.Object = infos[0].Object
-	}
+			NamespaceParam(o.Namespace).DefaultNamespace().SingleResourceType()
 
+		if o.ResourceArg != "" && selector == "" {
+			//only use pod name, eg: kubectl logs nginx-1asdf
+			infos, err := builder.ResourceTypeOrNameArgs(true, "pods").
+				Flatten().Do().Infos()
+			if err != nil {
+				return err
+			}
+			//using prefix to match the pod
+			//TODO: use a better way to match like regex or globe etc..
+			hasPrefixTimes := 0
+			o.PrefixMatchList = make(map[int]string)
+			for i, info := range infos {
+				if strings.HasPrefix(info.Name, o.ResourceArg) {
+					o.PrefixMatchList[i] = info.Name
+					//always match the last one to Resource Object
+					// 1. if there is more than one prefix match, will clear
+					// the Object to nil
+					// 2. if there is only one prefix match, the first is the last
+					o.Object = infos[i].Object
+					hasPrefixTimes++
+				}
+			}
+			if hasPrefixTimes == 0 {
+				//no prefix match, will create a NewBuilder
+				// using full name match to throw an error
+				_, err := resource.NewBuilder(mapper, typer, o.ClientMapper, decoder).
+					NamespaceParam(o.Namespace).DefaultNamespace().SingleResourceType().
+					ResourceNames("pods", o.ResourceArg).Do().Infos()
+				if err != nil {
+					return err
+				}
+			} else {
+				//more than one prefix match, won't pass the Resource Object
+				if hasPrefixTimes > 1 {
+					o.Object = nil
+				}
+			}
+		} else if selector != "" && o.ResourceArg == "" {
+			//only use label, eg: kubectl logs -lapp=nginx
+			infos, err := builder.ResourceTypes("pods").SelectorParam(selector).Do().Infos()
+			if err != nil {
+				return err
+			}
+			o.Object = infos[0].Object
+		} else {
+			//use both label and pod name, eg: kubectl logs nginx -lapp=nginx
+			// will always failed
+			_, err := builder.ResourceNames("pods", o.ResourceArg).
+				ResourceTypes("pods").SelectorParam(selector).
+				Do().Infos()
+			if err != nil {
+				return err
+			}
+		}
+	}
 	return nil
 }
 
@@ -223,18 +265,32 @@ func (o LogsOptions) Validate() error {
 }
 
 // RunLogs retrieves a pod log
-func (o LogsOptions) RunLogs() error {
-	switch t := o.Object.(type) {
-	case *api.PodList:
-		for _, p := range t.Items {
-			if err := o.getLogs(&p); err != nil {
-				return err
+func (o LogsOptions) RunLogs(out io.Writer, args []string) error {
+	if len(o.PrefixMatchList) > 1 {
+		fmt.Fprintf(out, "No pod named %s, do you mean? ", args[0])
+		for i := range o.PrefixMatchList {
+			if i == 0 {
+				fmt.Fprintf(out, "%s", o.PrefixMatchList[i])
+			} else {
+				fmt.Fprintf(out, ", %s", o.PrefixMatchList[i])
 			}
 		}
-		return nil
-	default:
-		return o.getLogs(o.Object)
+		fmt.Fprintf(out, "\n")
+	} else {
+		switch t := o.Object.(type) {
+		case *api.PodList:
+			for _, p := range t.Items {
+				if err := o.getLogs(&p); err != nil {
+					return err
+				}
+			}
+			return nil
+		default:
+			return o.getLogs(o.Object)
+		}
 	}
+
+	return nil
 }
 
 func (o LogsOptions) getLogs(obj runtime.Object) error {
