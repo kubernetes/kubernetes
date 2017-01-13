@@ -29,6 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
+	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
 	testcore "k8s.io/kubernetes/pkg/client/testing/core"
@@ -129,7 +130,8 @@ func TestAdmissionIgnoresDelete(t *testing.T) {
 	quotaAccessor, _ := newQuotaAccessor(kubeClient)
 	quotaAccessor.indexer = indexer
 	go quotaAccessor.Run(stopCh)
-	evaluator := NewQuotaEvaluator(quotaAccessor, install.NewRegistry(nil, nil), nil, 5, stopCh)
+	config := &componentconfig.ResourceQuotaConfiguration{}
+	evaluator := NewQuotaEvaluator(quotaAccessor, install.NewRegistry(nil, nil), nil, config, 5, stopCh)
 
 	handler := &quotaAdmission{
 		Handler:   admission.NewHandler(admission.Create, admission.Update),
@@ -163,7 +165,8 @@ func TestAdmissionIgnoresSubresources(t *testing.T) {
 	quotaAccessor, _ := newQuotaAccessor(kubeClient)
 	quotaAccessor.indexer = indexer
 	go quotaAccessor.Run(stopCh)
-	evaluator := NewQuotaEvaluator(quotaAccessor, install.NewRegistry(nil, nil), nil, 5, stopCh)
+	config := &componentconfig.ResourceQuotaConfiguration{}
+	evaluator := NewQuotaEvaluator(quotaAccessor, install.NewRegistry(nil, nil), nil, config, 5, stopCh)
 
 	handler := &quotaAdmission{
 		Handler:   admission.NewHandler(admission.Create, admission.Update),
@@ -206,7 +209,8 @@ func TestAdmitBelowQuotaLimit(t *testing.T) {
 	quotaAccessor, _ := newQuotaAccessor(kubeClient)
 	quotaAccessor.indexer = indexer
 	go quotaAccessor.Run(stopCh)
-	evaluator := NewQuotaEvaluator(quotaAccessor, install.NewRegistry(nil, nil), nil, 5, stopCh)
+	config := &componentconfig.ResourceQuotaConfiguration{}
+	evaluator := NewQuotaEvaluator(quotaAccessor, install.NewRegistry(nil, nil), nil, config, 5, stopCh)
 
 	handler := &quotaAdmission{
 		Handler:   admission.NewHandler(admission.Create, admission.Update),
@@ -288,7 +292,8 @@ func TestAdmitHandlesOldObjects(t *testing.T) {
 	quotaAccessor, _ := newQuotaAccessor(kubeClient)
 	quotaAccessor.indexer = indexer
 	go quotaAccessor.Run(stopCh)
-	evaluator := NewQuotaEvaluator(quotaAccessor, install.NewRegistry(nil, nil), nil, 5, stopCh)
+	config := &componentconfig.ResourceQuotaConfiguration{}
+	evaluator := NewQuotaEvaluator(quotaAccessor, install.NewRegistry(nil, nil), nil, config, 5, stopCh)
 
 	handler := &quotaAdmission{
 		Handler:   admission.NewHandler(admission.Create, admission.Update),
@@ -384,7 +389,8 @@ func TestAdmitHandlesCreatingUpdates(t *testing.T) {
 	quotaAccessor, _ := newQuotaAccessor(kubeClient)
 	quotaAccessor.indexer = indexer
 	go quotaAccessor.Run(stopCh)
-	evaluator := NewQuotaEvaluator(quotaAccessor, install.NewRegistry(nil, nil), nil, 5, stopCh)
+	config := &componentconfig.ResourceQuotaConfiguration{}
+	evaluator := NewQuotaEvaluator(quotaAccessor, install.NewRegistry(nil, nil), nil, config, 5, stopCh)
 
 	handler := &quotaAdmission{
 		Handler:   admission.NewHandler(admission.Create, admission.Update),
@@ -477,7 +483,8 @@ func TestAdmitExceedQuotaLimit(t *testing.T) {
 	quotaAccessor, _ := newQuotaAccessor(kubeClient)
 	quotaAccessor.indexer = indexer
 	go quotaAccessor.Run(stopCh)
-	evaluator := NewQuotaEvaluator(quotaAccessor, install.NewRegistry(nil, nil), nil, 5, stopCh)
+	config := &componentconfig.ResourceQuotaConfiguration{}
+	evaluator := NewQuotaEvaluator(quotaAccessor, install.NewRegistry(nil, nil), nil, config, 5, stopCh)
 
 	handler := &quotaAdmission{
 		Handler:   admission.NewHandler(admission.Create, admission.Update),
@@ -520,7 +527,8 @@ func TestAdmitEnforceQuotaConstraints(t *testing.T) {
 	quotaAccessor, _ := newQuotaAccessor(kubeClient)
 	quotaAccessor.indexer = indexer
 	go quotaAccessor.Run(stopCh)
-	evaluator := NewQuotaEvaluator(quotaAccessor, install.NewRegistry(nil, nil), nil, 5, stopCh)
+	config := &componentconfig.ResourceQuotaConfiguration{}
+	evaluator := NewQuotaEvaluator(quotaAccessor, install.NewRegistry(nil, nil), nil, config, 5, stopCh)
 
 	handler := &quotaAdmission{
 		Handler:   admission.NewHandler(admission.Create, admission.Update),
@@ -573,7 +581,8 @@ func TestAdmitPodInNamespaceWithoutQuota(t *testing.T) {
 	quotaAccessor.indexer = indexer
 	quotaAccessor.liveLookupCache = liveLookupCache
 	go quotaAccessor.Run(stopCh)
-	evaluator := NewQuotaEvaluator(quotaAccessor, install.NewRegistry(nil, nil), nil, 5, stopCh)
+	config := &componentconfig.ResourceQuotaConfiguration{}
+	evaluator := NewQuotaEvaluator(quotaAccessor, install.NewRegistry(nil, nil), nil, config, 5, stopCh)
 
 	handler := &quotaAdmission{
 		Handler:   admission.NewHandler(admission.Create, admission.Update),
@@ -638,7 +647,8 @@ func TestAdmitBelowTerminatingQuotaLimit(t *testing.T) {
 	quotaAccessor, _ := newQuotaAccessor(kubeClient)
 	quotaAccessor.indexer = indexer
 	go quotaAccessor.Run(stopCh)
-	evaluator := NewQuotaEvaluator(quotaAccessor, install.NewRegistry(nil, nil), nil, 5, stopCh)
+	config := &componentconfig.ResourceQuotaConfiguration{}
+	evaluator := NewQuotaEvaluator(quotaAccessor, install.NewRegistry(nil, nil), nil, config, 5, stopCh)
 
 	handler := &quotaAdmission{
 		Handler:   admission.NewHandler(admission.Create, admission.Update),
@@ -742,7 +752,8 @@ func TestAdmitBelowBestEffortQuotaLimit(t *testing.T) {
 	quotaAccessor, _ := newQuotaAccessor(kubeClient)
 	quotaAccessor.indexer = indexer
 	go quotaAccessor.Run(stopCh)
-	evaluator := NewQuotaEvaluator(quotaAccessor, install.NewRegistry(nil, nil), nil, 5, stopCh)
+	config := &componentconfig.ResourceQuotaConfiguration{}
+	evaluator := NewQuotaEvaluator(quotaAccessor, install.NewRegistry(nil, nil), nil, config, 5, stopCh)
 
 	handler := &quotaAdmission{
 		Handler:   admission.NewHandler(admission.Create, admission.Update),
@@ -833,7 +844,8 @@ func TestAdmitBestEffortQuotaLimitIgnoresBurstable(t *testing.T) {
 	quotaAccessor, _ := newQuotaAccessor(kubeClient)
 	quotaAccessor.indexer = indexer
 	go quotaAccessor.Run(stopCh)
-	evaluator := NewQuotaEvaluator(quotaAccessor, install.NewRegistry(nil, nil), nil, 5, stopCh)
+	config := &componentconfig.ResourceQuotaConfiguration{}
+	evaluator := NewQuotaEvaluator(quotaAccessor, install.NewRegistry(nil, nil), nil, config, 5, stopCh)
 
 	handler := &quotaAdmission{
 		Handler:   admission.NewHandler(admission.Create, admission.Update),
@@ -928,7 +940,8 @@ func TestAdmissionSetsMissingNamespace(t *testing.T) {
 	quotaAccessor, _ := newQuotaAccessor(kubeClient)
 	quotaAccessor.indexer = indexer
 	go quotaAccessor.Run(stopCh)
-	evaluator := NewQuotaEvaluator(quotaAccessor, install.NewRegistry(nil, nil), nil, 5, stopCh)
+	config := &componentconfig.ResourceQuotaConfiguration{}
+	evaluator := NewQuotaEvaluator(quotaAccessor, install.NewRegistry(nil, nil), nil, config, 5, stopCh)
 	evaluator.(*quotaEvaluator).registry = registry
 
 	handler := &quotaAdmission{
@@ -973,7 +986,8 @@ func TestAdmitRejectsNegativeUsage(t *testing.T) {
 	quotaAccessor, _ := newQuotaAccessor(kubeClient)
 	quotaAccessor.indexer = indexer
 	go quotaAccessor.Run(stopCh)
-	evaluator := NewQuotaEvaluator(quotaAccessor, install.NewRegistry(nil, nil), nil, 5, stopCh)
+	config := &componentconfig.ResourceQuotaConfiguration{}
+	evaluator := NewQuotaEvaluator(quotaAccessor, install.NewRegistry(nil, nil), nil, config, 5, stopCh)
 
 	handler := &quotaAdmission{
 		Handler:   admission.NewHandler(admission.Create, admission.Update),
@@ -1018,7 +1032,8 @@ func TestAdmitWhenUnrelatedResourceExceedsQuota(t *testing.T) {
 	quotaAccessor, _ := newQuotaAccessor(kubeClient)
 	quotaAccessor.indexer = indexer
 	go quotaAccessor.Run(stopCh)
-	evaluator := NewQuotaEvaluator(quotaAccessor, install.NewRegistry(nil, nil), nil, 5, stopCh)
+	config := &componentconfig.ResourceQuotaConfiguration{}
+	evaluator := NewQuotaEvaluator(quotaAccessor, install.NewRegistry(nil, nil), nil, config, 5, stopCh)
 
 	handler := &quotaAdmission{
 		Handler:   admission.NewHandler(admission.Create, admission.Update),
@@ -1031,5 +1046,226 @@ func TestAdmitWhenUnrelatedResourceExceedsQuota(t *testing.T) {
 	err := handler.Admit(admission.NewAttributesRecord(newPod, nil, api.Kind("Pod").WithVersion("version"), newPod.Namespace, newPod.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, nil))
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
+	}
+}
+
+// TestAdmitLimitedResourceNoQuota verifies if a limited resource is configured with no quota, it cannot be consumed.
+func TestAdmitLimitedResourceNoQuota(t *testing.T) {
+	kubeClient := fake.NewSimpleClientset()
+	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{"namespace": cache.MetaNamespaceIndexFunc})
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+
+	quotaAccessor, _ := newQuotaAccessor(kubeClient)
+	quotaAccessor.indexer = indexer
+	go quotaAccessor.Run(stopCh)
+
+	// disable consumption of cpu unless there is a covering quota.
+	config := &componentconfig.ResourceQuotaConfiguration{
+		LimitedResources: []componentconfig.LimitedResource{
+			{
+				APIGroup:        "",
+				APIResource:     "pods",
+				MatchExpression: "^cpu$", // match on "cpu" only
+			},
+		},
+	}
+	evaluator := NewQuotaEvaluator(quotaAccessor, install.NewRegistry(nil, nil), nil, config, 5, stopCh)
+
+	handler := &quotaAdmission{
+		Handler:   admission.NewHandler(admission.Create, admission.Update),
+		evaluator: evaluator,
+	}
+	newPod := validPod("not-allowed-pod", 1, getResourceRequirements(getResourceList("3", "2Gi"), getResourceList("", "")))
+	err := handler.Admit(admission.NewAttributesRecord(newPod, nil, api.Kind("Pod").WithVersion("version"), newPod.Namespace, newPod.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, nil))
+	if err == nil {
+		t.Errorf("Expected an error for consuming a limited resource without quota.")
+	}
+}
+
+// TestAdmitLimitedResourceNoQuotaIgnoresNonMatchingResources shows it ignores non matching resources in config.
+func TestAdmitLimitedResourceNoQuotaIgnoresNonMatchingResources(t *testing.T) {
+	kubeClient := fake.NewSimpleClientset()
+	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{"namespace": cache.MetaNamespaceIndexFunc})
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+
+	quotaAccessor, _ := newQuotaAccessor(kubeClient)
+	quotaAccessor.indexer = indexer
+	go quotaAccessor.Run(stopCh)
+
+	// disable consumption of cpu unless there is a covering quota.
+	config := &componentconfig.ResourceQuotaConfiguration{
+		LimitedResources: []componentconfig.LimitedResource{
+			{
+				APIGroup:        "",
+				APIResource:     "services",
+				MatchExpression: "^services$", // match on "serivces" only
+			},
+		},
+	}
+	evaluator := NewQuotaEvaluator(quotaAccessor, install.NewRegistry(nil, nil), nil, config, 5, stopCh)
+
+	handler := &quotaAdmission{
+		Handler:   admission.NewHandler(admission.Create, admission.Update),
+		evaluator: evaluator,
+	}
+	newPod := validPod("allowed-pod", 1, getResourceRequirements(getResourceList("3", "2Gi"), getResourceList("", "")))
+	err := handler.Admit(admission.NewAttributesRecord(newPod, nil, api.Kind("Pod").WithVersion("version"), newPod.Namespace, newPod.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, nil))
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+}
+
+// TestAdmitLimitedResourceWithQuota verifies if a limited resource is configured with quota, it can be consumed.
+func TestAdmitLimitedResourceWithQuota(t *testing.T) {
+	resourceQuota := &api.ResourceQuota{
+		ObjectMeta: api.ObjectMeta{Name: "quota", Namespace: "test", ResourceVersion: "124"},
+		Status: api.ResourceQuotaStatus{
+			Hard: api.ResourceList{
+				api.ResourceCPU: resource.MustParse("10"),
+			},
+			Used: api.ResourceList{
+				api.ResourceCPU: resource.MustParse("1"),
+			},
+		},
+	}
+	kubeClient := fake.NewSimpleClientset(resourceQuota)
+	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{"namespace": cache.MetaNamespaceIndexFunc})
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+
+	quotaAccessor, _ := newQuotaAccessor(kubeClient)
+	quotaAccessor.indexer = indexer
+	go quotaAccessor.Run(stopCh)
+
+	// disable consumption of cpu unless there is a covering quota.
+	// disable consumption of cpu unless there is a covering quota.
+	config := &componentconfig.ResourceQuotaConfiguration{
+		LimitedResources: []componentconfig.LimitedResource{
+			{
+				APIGroup:        "",
+				APIResource:     "pods",
+				MatchExpression: "^cpu$", // match on "cpu" only
+			},
+		},
+	}
+	evaluator := NewQuotaEvaluator(quotaAccessor, install.NewRegistry(nil, nil), nil, config, 5, stopCh)
+
+	handler := &quotaAdmission{
+		Handler:   admission.NewHandler(admission.Create, admission.Update),
+		evaluator: evaluator,
+	}
+	indexer.Add(resourceQuota)
+	newPod := validPod("allowed-pod", 1, getResourceRequirements(getResourceList("3", "2Gi"), getResourceList("", "")))
+	err := handler.Admit(admission.NewAttributesRecord(newPod, nil, api.Kind("Pod").WithVersion("version"), newPod.Namespace, newPod.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, nil))
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+}
+
+// TestAdmitLimitedResourceWithMultipleQuota verifies if a limited resource is configured with quota, it can be consumed if one matches.
+func TestAdmitLimitedResourceWithMultipleQuota(t *testing.T) {
+	resourceQuota1 := &api.ResourceQuota{
+		ObjectMeta: api.ObjectMeta{Name: "quota1", Namespace: "test", ResourceVersion: "124"},
+		Status: api.ResourceQuotaStatus{
+			Hard: api.ResourceList{
+				api.ResourceCPU: resource.MustParse("10"),
+			},
+			Used: api.ResourceList{
+				api.ResourceCPU: resource.MustParse("1"),
+			},
+		},
+	}
+	resourceQuota2 := &api.ResourceQuota{
+		ObjectMeta: api.ObjectMeta{Name: "quota2", Namespace: "test", ResourceVersion: "124"},
+		Status: api.ResourceQuotaStatus{
+			Hard: api.ResourceList{
+				api.ResourceMemory: resource.MustParse("10Gi"),
+			},
+			Used: api.ResourceList{
+				api.ResourceMemory: resource.MustParse("1Gi"),
+			},
+		},
+	}
+	kubeClient := fake.NewSimpleClientset(resourceQuota1, resourceQuota2)
+	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{"namespace": cache.MetaNamespaceIndexFunc})
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+
+	quotaAccessor, _ := newQuotaAccessor(kubeClient)
+	quotaAccessor.indexer = indexer
+	go quotaAccessor.Run(stopCh)
+
+	// disable consumption of cpu unless there is a covering quota.
+	// disable consumption of cpu unless there is a covering quota.
+	config := &componentconfig.ResourceQuotaConfiguration{
+		LimitedResources: []componentconfig.LimitedResource{
+			{
+				APIGroup:        "",
+				APIResource:     "pods",
+				MatchExpression: "^cpu$", // match on "cpu" only
+			},
+		},
+	}
+	evaluator := NewQuotaEvaluator(quotaAccessor, install.NewRegistry(nil, nil), nil, config, 5, stopCh)
+
+	handler := &quotaAdmission{
+		Handler:   admission.NewHandler(admission.Create, admission.Update),
+		evaluator: evaluator,
+	}
+	indexer.Add(resourceQuota1)
+	indexer.Add(resourceQuota2)
+	newPod := validPod("allowed-pod", 1, getResourceRequirements(getResourceList("3", "2Gi"), getResourceList("", "")))
+	err := handler.Admit(admission.NewAttributesRecord(newPod, nil, api.Kind("Pod").WithVersion("version"), newPod.Namespace, newPod.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, nil))
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+}
+
+// TestAdmitLimitedResourceWithQuotaThatDoesNotCover verifies if a limited resource is configured the quota must cover the resource.
+func TestAdmitLimitedResourceWithQuotaThatDoesNotCover(t *testing.T) {
+	resourceQuota := &api.ResourceQuota{
+		ObjectMeta: api.ObjectMeta{Name: "quota", Namespace: "test", ResourceVersion: "124"},
+		Status: api.ResourceQuotaStatus{
+			Hard: api.ResourceList{
+				api.ResourceMemory: resource.MustParse("10Gi"),
+			},
+			Used: api.ResourceList{
+				api.ResourceMemory: resource.MustParse("1Gi"),
+			},
+		},
+	}
+	kubeClient := fake.NewSimpleClientset(resourceQuota)
+	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{"namespace": cache.MetaNamespaceIndexFunc})
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+
+	quotaAccessor, _ := newQuotaAccessor(kubeClient)
+	quotaAccessor.indexer = indexer
+	go quotaAccessor.Run(stopCh)
+
+	// disable consumption of cpu unless there is a covering quota.
+	// disable consumption of cpu unless there is a covering quota.
+	config := &componentconfig.ResourceQuotaConfiguration{
+		LimitedResources: []componentconfig.LimitedResource{
+			{
+				APIGroup:        "",
+				APIResource:     "pods",
+				MatchExpression: "^cpu$", // match on "cpu" only
+			},
+		},
+	}
+	evaluator := NewQuotaEvaluator(quotaAccessor, install.NewRegistry(nil, nil), nil, config, 5, stopCh)
+
+	handler := &quotaAdmission{
+		Handler:   admission.NewHandler(admission.Create, admission.Update),
+		evaluator: evaluator,
+	}
+	indexer.Add(resourceQuota)
+	newPod := validPod("not-allowed-pod", 1, getResourceRequirements(getResourceList("3", "2Gi"), getResourceList("", "")))
+	err := handler.Admit(admission.NewAttributesRecord(newPod, nil, api.Kind("Pod").WithVersion("version"), newPod.Namespace, newPod.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, nil))
+	if err == nil {
+		t.Fatalf("Expected an error since the quota did not cover cpu")
 	}
 }
