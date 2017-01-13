@@ -10,6 +10,12 @@ git_repository(
     remote = "https://github.com/kubernetes/release.git",
 )
 
+git_repository(
+    name = "io_bazel",
+    commit = "3b29803eb528ff525c7024190ffbf4b08c598cf2",
+    remote = "https://github.com/ixdy/bazel.git",
+)
+
 load("@io_bazel_rules_go//go:def.bzl", "go_repositories")
 
 go_repositories()
