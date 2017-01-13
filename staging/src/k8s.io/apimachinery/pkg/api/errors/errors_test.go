@@ -26,11 +26,17 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	"k8s.io/kubernetes/pkg/api"
 )
 
+func resource(resource string) schema.GroupResource {
+	return schema.GroupResource{Group: "", Resource: resource}
+}
+func kind(kind string) schema.GroupKind {
+	return schema.GroupKind{Group: "", Kind: kind}
+}
+
 func TestErrorNew(t *testing.T) {
-	err := NewAlreadyExists(api.Resource("tests"), "1")
+	err := NewAlreadyExists(resource("tests"), "1")
 	if !IsAlreadyExists(err) {
 		t.Errorf("expected to be %s", metav1.StatusReasonAlreadyExists)
 	}
@@ -56,34 +62,34 @@ func TestErrorNew(t *testing.T) {
 		t.Errorf("expected to not be %s", metav1.StatusReasonMethodNotAllowed)
 	}
 
-	if !IsConflict(NewConflict(api.Resource("tests"), "2", errors.New("message"))) {
+	if !IsConflict(NewConflict(resource("tests"), "2", errors.New("message"))) {
 		t.Errorf("expected to be conflict")
 	}
-	if !IsNotFound(NewNotFound(api.Resource("tests"), "3")) {
+	if !IsNotFound(NewNotFound(resource("tests"), "3")) {
 		t.Errorf("expected to be %s", metav1.StatusReasonNotFound)
 	}
-	if !IsInvalid(NewInvalid(api.Kind("Test"), "2", nil)) {
+	if !IsInvalid(NewInvalid(kind("Test"), "2", nil)) {
 		t.Errorf("expected to be %s", metav1.StatusReasonInvalid)
 	}
 	if !IsBadRequest(NewBadRequest("reason")) {
 		t.Errorf("expected to be %s", metav1.StatusReasonBadRequest)
 	}
-	if !IsForbidden(NewForbidden(api.Resource("tests"), "2", errors.New("reason"))) {
+	if !IsForbidden(NewForbidden(resource("tests"), "2", errors.New("reason"))) {
 		t.Errorf("expected to be %s", metav1.StatusReasonForbidden)
 	}
 	if !IsUnauthorized(NewUnauthorized("reason")) {
 		t.Errorf("expected to be %s", metav1.StatusReasonUnauthorized)
 	}
-	if !IsServerTimeout(NewServerTimeout(api.Resource("tests"), "reason", 0)) {
+	if !IsServerTimeout(NewServerTimeout(resource("tests"), "reason", 0)) {
 		t.Errorf("expected to be %s", metav1.StatusReasonServerTimeout)
 	}
-	if time, ok := SuggestsClientDelay(NewServerTimeout(api.Resource("tests"), "doing something", 10)); time != 10 || !ok {
+	if time, ok := SuggestsClientDelay(NewServerTimeout(resource("tests"), "doing something", 10)); time != 10 || !ok {
 		t.Errorf("expected to be %s", metav1.StatusReasonServerTimeout)
 	}
 	if time, ok := SuggestsClientDelay(NewTimeoutError("test reason", 10)); time != 10 || !ok {
 		t.Errorf("expected to be %s", metav1.StatusReasonTimeout)
 	}
-	if !IsMethodNotSupported(NewMethodNotSupported(api.Resource("foos"), "delete")) {
+	if !IsMethodNotSupported(NewMethodNotSupported(resource("foos"), "delete")) {
 		t.Errorf("expected to be %s", metav1.StatusReasonMethodNotAllowed)
 	}
 }
@@ -152,7 +158,7 @@ func TestNewInvalid(t *testing.T) {
 	for i, testCase := range testCases {
 		vErr, expected := testCase.Err, testCase.Details
 		expected.Causes[0].Message = vErr.ErrorBody()
-		err := NewInvalid(api.Kind("Kind"), "name", field.ErrorList{vErr})
+		err := NewInvalid(kind("Kind"), "name", field.ErrorList{vErr})
 		status := err.ErrStatus
 		if status.Code != 422 || status.Reason != metav1.StatusReasonInvalid {
 			t.Errorf("%d: unexpected status: %#v", i, status)
