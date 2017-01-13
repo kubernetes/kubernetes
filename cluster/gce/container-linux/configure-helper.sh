@@ -157,10 +157,18 @@ function create-master-auth {
     replace_prefixed_line "${basic_auth_csv}" "${KUBE_PASSWORD},${KUBE_USER}," "admin,system:masters"
   fi
   local -r known_tokens_csv="${auth_dir}/known_tokens.csv"
-  replace_prefixed_line "${known_tokens_csv}" "${KUBE_BEARER_TOKEN}"             "admin,admin,system:masters"
-  replace_prefixed_line "${known_tokens_csv}" "${KUBE_CONTROLLER_MANAGER_TOKEN}" "system:kube-controller-manager,uid:system:kube-controller-manager"
-  replace_prefixed_line "${known_tokens_csv}" "${KUBELET_TOKEN}"                 "system:node:node-name,uid:kubelet,system:nodes"
-  replace_prefixed_line "${known_tokens_csv}" "${KUBE_PROXY_TOKEN}"              "system:kube-proxy,uid:kube_proxy"
+  if [[ -n "${KUBE_BEARER_TOKEN:-}" ]]; then
+    replace_prefixed_line "${known_tokens_csv}" "${KUBE_BEARER_TOKEN},"             "admin,admin,system:masters"
+  fi
+  if [[ -n "${KUBE_CONTROLLER_MANAGER_TOKEN:-}" ]]; then
+    replace_prefixed_line "${known_tokens_csv}" "${KUBE_CONTROLLER_MANAGER_TOKEN}," "system:kube-controller-manager,uid:system:kube-controller-manager"
+  fi
+  if [[ -n "${KUBELET_TOKEN:-}" ]]; then
+    replace_prefixed_line "${known_tokens_csv}" "${KUBELET_TOKEN},"                 "system:node:node-name,uid:kubelet,system:nodes"
+  fi
+  if [[ -n "${KUBE_PROXY_TOKEN:-}" ]]; then
+    replace_prefixed_line "${known_tokens_csv}" "${KUBE_PROXY_TOKEN},"              "system:kube-proxy,uid:kube_proxy"
+  fi
   local use_cloud_config="false"
   cat <<EOF >/etc/gce.conf
 [global]
