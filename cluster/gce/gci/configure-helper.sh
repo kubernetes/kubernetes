@@ -554,7 +554,7 @@ function start-kubelet {
   flags+=" --cluster-dns=${DNS_SERVER_IP}"
   flags+=" --cluster-domain=${DNS_DOMAIN}"
   flags+=" --config=/etc/kubernetes/manifests"
-  flags+=" --experimental-mounter-path=${KUBE_HOME}/bin/mounter"
+  flags+=" --experimental-mounter-path=${KUBE_HOME}/bin/newmounter/mounter"
   flags+=" --experimental-check-node-capabilities-before-mount=true"
 
   if [[ -n "${KUBELET_PORT:-}" ]]; then
@@ -789,6 +789,12 @@ function compute-master-manifest-variables {
   if [[ -n "${KUBE_DOCKER_REGISTRY:-}" ]]; then
     DOCKER_REGISTRY="${KUBE_DOCKER_REGISTRY}"
   fi
+}
+
+# A helper function that bind mounts kubelet dirs for running mount in a chroot
+function bind-mount-kubelet {
+  mount --rbind /var/lib/kubelet/ "${KUBE_HOME}/bin/newmounter/var/lib/kubelet"
+  mount --make-rshared "${KUBE_HOME}/bin/newmounter/var/lib/kubelet"
 }
 
 # A helper function for removing salt configuration and comments from a file.
@@ -1292,11 +1298,6 @@ function override-kubectl {
     echo "export PATH=${KUBE_HOME}/bin:\$PATH" > /etc/profile.d/kube_env.sh
 }
 
-function pre-warm-mounter {
-    echo "prewarming mounter"
-    ${KUBE_HOME}/bin/mounter &> /dev/null
-}
-
 ########### Main Function ###########
 echo "Start to configure instance for kubernetes"
 
@@ -1340,8 +1341,6 @@ else
 fi
 
 override-kubectl
-# Run the containerized mounter once to pre-cache the container image.
-pre-warm-mounter
 assemble-docker-flags
 load-docker-images
 start-kubelet
@@ -1369,4 +1368,5 @@ else
   fi
 fi
 reset-motd
+bind-mount-kubelet
 echo "Done for the configuration for kubernetes"
