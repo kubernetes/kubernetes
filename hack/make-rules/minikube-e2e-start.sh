@@ -27,4 +27,6 @@ set -o pipefail
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
 
+command -v minikube >/dev/null 2>&1 || { echo >&2 "Minikube not found. Install minikube by following instructions in this page: https://github.com/kubernetes/minikube#installation"; exit 1; }
+
 minikube start --kubernetes-version="file://${KUBE_ROOT}/_output/dockerized/bin/linux/amd64/localkube"
