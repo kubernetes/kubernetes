@@ -284,6 +284,13 @@ func ClusterRoles() []rbac.ClusterRole {
 				rbac.NewRule("list", "watch").Groups(batchGroup).Resources("jobs", "cronjobs").RuleOrDie(),
 			},
 		},
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "system:kube-csr"},
+			Rules: []rbac.PolicyRule{
+				eventsRule(),
+				rbac.NewRule("get", "create", "list", "watch").Groups(certificatesGroup).Resources("certificatesigningrequests").RuleOrDie(),
+			},
+		},
 	}
 	addClusterRoleLabel(roles)
 	return roles
@@ -298,6 +305,7 @@ func ClusterRoleBindings() []rbac.ClusterRoleBinding {
 		rbac.NewClusterBinding("system:node").Groups(user.NodesGroup).BindingOrDie(),
 		rbac.NewClusterBinding("system:node-proxier").Users(user.KubeProxy).BindingOrDie(),
 		rbac.NewClusterBinding("system:kube-controller-manager").Users(user.KubeControllerManager).BindingOrDie(),
+		rbac.NewClusterBinding("system:kube-csr").Groups("system:kube-csr").BindingOrDie(),
 	}
 	addClusterRoleBindingLabel(rolebindings)
 	return rolebindings
