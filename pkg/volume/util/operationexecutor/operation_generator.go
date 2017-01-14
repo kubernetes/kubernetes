@@ -81,18 +81,18 @@ type OperationGenerator interface {
 	GenerateDetachVolumeFunc(volumeToDetach AttachedVolume, verifySafeToDetach bool, actualStateOfWorld ActualStateOfWorldAttacherUpdater) (func() error, error)
 
 	// Generates the VolumesAreAttached function needed to verify if volume plugins are attached
-	GenerateVolumesAreAttachedFunc(attachedVolumes []AttachedVolume, nodeName types.NodeName, actualStateOfWorld ActualStateOfWorldAttacherUpdater) (func() error, error)
+	GenerateVolumesAreAttachedFunc(attachedVolumes []AttachedVolume, node types.NodeIdentifier, actualStateOfWorld ActualStateOfWorldAttacherUpdater) (func() error, error)
 
 	// Generates the UnMountDevice function needed to perform the unmount of a device
 	GenerateUnmountDeviceFunc(deviceToDetach AttachedVolume, actualStateOfWorld ActualStateOfWorldMounterUpdater, mounter mount.Interface) (func() error, error)
 
 	// Generates the function needed to check if the attach_detach controller has attached the volume plugin
-	GenerateVerifyControllerAttachedVolumeFunc(volumeToMount VolumeToMount, nodeName types.NodeName, actualStateOfWorld ActualStateOfWorldAttacherUpdater) (func() error, error)
+	GenerateVerifyControllerAttachedVolumeFunc(volumeToMount VolumeToMount, node types.NodeIdentifier, actualStateOfWorld ActualStateOfWorldAttacherUpdater) (func() error, error)
 }
 
 func (og *operationGenerator) GenerateVolumesAreAttachedFunc(
 	attachedVolumes []AttachedVolume,
-	nodeName types.NodeName,
+	node types.NodeIdentifier,
 	actualStateOfWorld ActualStateOfWorldAttacherUpdater) (func() error, error) {
 
 	// volumesPerPlugin maps from a volume plugin to a list of volume specs which belong
@@ -110,7 +110,7 @@ func (og *operationGenerator) GenerateVolumesAreAttachedFunc(
 				"VolumesAreAttached.FindPluginBySpec failed for volume %q (spec.Name: %q) on node %q with error: %v",
 				volumeAttached.VolumeName,
 				volumeAttached.VolumeSpec.Name(),
-				volumeAttached.NodeName,
+				volumeAttached.Node,
 				err)
 		}
 		volumeSpecList, pluginExists := volumesPerPlugin[volumePlugin.GetPluginName()]
@@ -146,20 +146,20 @@ func (og *operationGenerator) GenerateVolumesAreAttachedFunc(
 				continue
 			}
 
-			attached, areAttachedErr := volumeAttacher.VolumesAreAttached(volumesSpecs, nodeName)
+			attached, areAttachedErr := volumeAttacher.VolumesAreAttached(volumesSpecs, node)
 			if areAttachedErr != nil {
 				glog.Errorf(
 					"VolumesAreAttached failed for checking on node %q with: %v",
-					nodeName,
+					node,
 					areAttachedErr)
 				continue
 			}
 
 			for spec, check := range attached {
 				if !check {
-					actualStateOfWorld.MarkVolumeAsDetached(volumeSpecMap[spec], nodeName)
+					actualStateOfWorld.MarkVolumeAsDetached(volumeSpecMap[spec], node)
 					glog.V(1).Infof("VerifyVolumesAreAttached determined volume %q (spec.Name: %q) is no longer attached to node %q, therefore it was marked as detached.",
-						volumeSpecMap[spec], spec.Name(), nodeName)
+						volumeSpecMap[spec], spec.Name(), node)
 				}
 			}
 		}
@@ -178,7 +178,7 @@ func (og *operationGenerator) GenerateAttachVolumeFunc(
 			"AttachVolume.FindAttachablePluginBySpec failed for volume %q (spec.Name: %q) from node %q with: %v",
 			volumeToAttach.VolumeName,
 			volumeToAttach.VolumeSpec.Name(),
-			volumeToAttach.NodeName,
+			volumeToAttach.Node,
 			err)
 	}
 
@@ -188,21 +188,21 @@ func (og *operationGenerator) GenerateAttachVolumeFunc(
 			"AttachVolume.NewAttacher failed for volume %q (spec.Name: %q) from node %q with: %v",
 			volumeToAttach.VolumeName,
 			volumeToAttach.VolumeSpec.Name(),
-			volumeToAttach.NodeName,
+			volumeToAttach.Node,
 			newAttacherErr)
 	}
 
 	return func() error {
 		// Execute attach
 		devicePath, attachErr := volumeAttacher.Attach(
-			volumeToAttach.VolumeSpec, volumeToAttach.NodeName)
+			volumeToAttach.VolumeSpec, volumeToAttach.Node)
 
 		if attachErr != nil {
 			// On failure, return error. Caller will log and retry.
 			err := fmt.Errorf(
 				"Failed to attach volume %q on node %q with: %v",
 				volumeToAttach.VolumeSpec.Name(),
-				volumeToAttach.NodeName,
+				volumeToAttach.Node,
 				attachErr)
 			for _, pod := range volumeToAttach.ScheduledPods {
 				og.recorder.Eventf(pod, v1.EventTypeWarning, kevents.FailedMountVolume, err.Error())
@@ -214,18 +214,18 @@ func (og *operationGenerator) GenerateAttachVolumeFunc(
 			"AttachVolume.Attach succeeded for volume %q (spec.Name: %q) from node %q.",
 			volumeToAttach.VolumeName,
 			volumeToAttach.VolumeSpec.Name(),
-			volumeToAttach.NodeName)
+			volumeToAttach.Node)
 
 		// Update actual state of world
 		addVolumeNodeErr := actualStateOfWorld.MarkVolumeAsAttached(
-			v1.UniqueVolumeName(""), volumeToAttach.VolumeSpec, volumeToAttach.NodeName, devicePath)
+			v1.UniqueVolumeName(""), volumeToAttach.VolumeSpec, volumeToAttach.Node, devicePath)
 		if addVolumeNodeErr != nil {
 			// On failure, return error. Caller will log and retry.
 			return fmt.Errorf(
 				"AttachVolume.MarkVolumeAsAttached failed for volume %q (spec.Name: %q) from node %q with: %v",
 				volumeToAttach.VolumeName,
 				volumeToAttach.VolumeSpec.Name(),
-				volumeToAttach.NodeName,
+				volumeToAttach.Node,
 				addVolumeNodeErr)
 		}
 
@@ -245,7 +245,7 @@ func (og *operationGenerator) GenerateDetachVolumeFunc(
 			"DetachVolume.FindAttachablePluginBySpec failed for volume %q (spec.Name: %q) from node %q with: %v",
 			volumeToDetach.VolumeName,
 			volumeToDetach.VolumeSpec.Name(),
-			volumeToDetach.NodeName,
+			volumeToDetach.Node,
 			err)
 	}
 
@@ -256,7 +256,7 @@ func (og *operationGenerator) GenerateDetachVolumeFunc(
 			"DetachVolume.GetVolumeName failed for volume %q (spec.Name: %q) from node %q with: %v",
 			volumeToDetach.VolumeName,
 			volumeToDetach.VolumeSpec.Name(),
-			volumeToDetach.NodeName,
+			volumeToDetach.Node,
 			err)
 	}
 
@@ -266,7 +266,7 @@ func (og *operationGenerator) GenerateDetachVolumeFunc(
 			"DetachVolume.NewDetacher failed for volume %q (spec.Name: %q) from node %q with: %v",
 			volumeToDetach.VolumeName,
 			volumeToDetach.VolumeSpec.Name(),
-			volumeToDetach.NodeName,
+			volumeToDetach.Node,
 			err)
 	}
 
@@ -276,17 +276,17 @@ func (og *operationGenerator) GenerateDetachVolumeFunc(
 			err = og.verifyVolumeIsSafeToDetach(volumeToDetach)
 		}
 		if err == nil {
-			err = volumeDetacher.Detach(volumeName, volumeToDetach.NodeName)
+			err = volumeDetacher.Detach(volumeName, volumeToDetach.Node)
 		}
 		if err != nil {
 			// On failure, add volume back to ReportAsAttached list
 			actualStateOfWorld.AddVolumeToReportAsAttached(
-				volumeToDetach.VolumeName, volumeToDetach.NodeName)
+				volumeToDetach.VolumeName, volumeToDetach.Node)
 			return fmt.Errorf(
 				"DetachVolume.Detach failed for volume %q (spec.Name: %q) from node %q with: %v",
 				volumeToDetach.VolumeName,
 				volumeToDetach.VolumeSpec.Name(),
-				volumeToDetach.NodeName,
+				volumeToDetach.Node,
 				err)
 		}
 
@@ -294,11 +294,11 @@ func (og *operationGenerator) GenerateDetachVolumeFunc(
 			"DetachVolume.Detach succeeded for volume %q (spec.Name: %q) from node %q.",
 			volumeToDetach.VolumeName,
 			volumeToDetach.VolumeSpec.Name(),
-			volumeToDetach.NodeName)
+			volumeToDetach.Node)
 
 		// Update actual state of world
 		actualStateOfWorld.MarkVolumeAsDetached(
-			volumeToDetach.VolumeName, volumeToDetach.NodeName)
+			volumeToDetach.VolumeName, volumeToDetach.Node)
 
 		return nil
 	}, nil
@@ -307,11 +307,11 @@ func (og *operationGenerator) GenerateDetachVolumeFunc(
 func (og *operationGenerator) GerifyVolumeIsSafeToDetach(
 	volumeToDetach AttachedVolume) error {
 	// Fetch current node object
-	node, fetchErr := og.kubeClient.Core().Nodes().Get(string(volumeToDetach.NodeName), metav1.GetOptions{})
+	node, fetchErr := og.kubeClient.Core().Nodes().Get(string(volumeToDetach.Node.Name), metav1.GetOptions{})
 	if fetchErr != nil {
 		if errors.IsNotFound(fetchErr) {
 			glog.Warningf("Node %q not found on API server. DetachVolume will skip safe to detach check.",
-				volumeToDetach.NodeName,
+				volumeToDetach.Node,
 				volumeToDetach.VolumeName,
 				volumeToDetach.VolumeSpec.Name())
 			return nil
@@ -322,7 +322,7 @@ func (og *operationGenerator) GerifyVolumeIsSafeToDetach(
 			"DetachVolume failed fetching node from API server for volume %q (spec.Name: %q) from node %q with: %v",
 			volumeToDetach.VolumeName,
 			volumeToDetach.VolumeSpec.Name(),
-			volumeToDetach.NodeName,
+			volumeToDetach.Node,
 			fetchErr)
 	}
 
@@ -332,15 +332,17 @@ func (og *operationGenerator) GerifyVolumeIsSafeToDetach(
 			"DetachVolume failed fetching node from API server for volume %q (spec.Name: %q) from node %q. Error: node object retrieved from API server is nil",
 			volumeToDetach.VolumeName,
 			volumeToDetach.VolumeSpec.Name(),
-			volumeToDetach.NodeName)
+			volumeToDetach.Node)
 	}
+
+	// TODO: Cross check node UUID
 
 	for _, inUseVolume := range node.Status.VolumesInUse {
 		if inUseVolume == volumeToDetach.VolumeName {
 			return fmt.Errorf("DetachVolume failed for volume %q (spec.Name: %q) from node %q. Error: volume is still in use by node, according to Node status",
 				volumeToDetach.VolumeName,
 				volumeToDetach.VolumeSpec.Name(),
-				volumeToDetach.NodeName)
+				volumeToDetach.Node)
 		}
 	}
 
@@ -348,7 +350,7 @@ func (og *operationGenerator) GerifyVolumeIsSafeToDetach(
 	glog.Infof("Verified volume is safe to detach for volume %q (spec.Name: %q) from node %q.",
 		volumeToDetach.VolumeName,
 		volumeToDetach.VolumeSpec.Name(),
-		volumeToDetach.NodeName)
+		volumeToDetach.Node)
 	return nil
 }
 
@@ -725,7 +727,7 @@ func (og *operationGenerator) GenerateUnmountDeviceFunc(
 
 func (og *operationGenerator) GenerateVerifyControllerAttachedVolumeFunc(
 	volumeToMount VolumeToMount,
-	nodeName types.NodeName,
+	nodeID types.NodeIdentifier,
 	actualStateOfWorld ActualStateOfWorldAttacherUpdater) (func() error, error) {
 	return func() error {
 		if !volumeToMount.PluginIsAttachable {
@@ -734,7 +736,7 @@ func (og *operationGenerator) GenerateVerifyControllerAttachedVolumeFunc(
 			// updated accordingly.
 
 			addVolumeNodeErr := actualStateOfWorld.MarkVolumeAsAttached(
-				volumeToMount.VolumeName, volumeToMount.VolumeSpec, nodeName, "" /* devicePath */)
+				volumeToMount.VolumeName, volumeToMount.VolumeSpec, nodeID, "" /* devicePath */)
 			if addVolumeNodeErr != nil {
 				// On failure, return error. Caller will log and retry.
 				return fmt.Errorf(
@@ -764,7 +766,7 @@ func (og *operationGenerator) GenerateVerifyControllerAttachedVolumeFunc(
 		}
 
 		// Fetch current node object
-		node, fetchErr := og.kubeClient.Core().Nodes().Get(string(nodeName), metav1.GetOptions{})
+		node, fetchErr := og.kubeClient.Core().Nodes().Get(string(nodeID.Name), metav1.GetOptions{})
 		if fetchErr != nil {
 			// On failure, return error. Caller will log and retry.
 			return fmt.Errorf(
@@ -786,10 +788,12 @@ func (og *operationGenerator) GenerateVerifyControllerAttachedVolumeFunc(
 				volumeToMount.Pod.UID)
 		}
 
+		// TODO: Cross check UUID?
+
 		for _, attachedVolume := range node.Status.VolumesAttached {
 			if attachedVolume.Name == volumeToMount.VolumeName {
 				addVolumeNodeErr := actualStateOfWorld.MarkVolumeAsAttached(
-					v1.UniqueVolumeName(""), volumeToMount.VolumeSpec, nodeName, attachedVolume.DevicePath)
+					v1.UniqueVolumeName(""), volumeToMount.VolumeSpec, nodeID, attachedVolume.DevicePath)
 				glog.Infof("Controller successfully attached volume %q (spec.Name: %q) pod %q (UID: %q) devicePath: %q",
 					volumeToMount.VolumeName,
 					volumeToMount.VolumeSpec.Name(),
@@ -823,11 +827,11 @@ func (og *operationGenerator) GenerateVerifyControllerAttachedVolumeFunc(
 func (og *operationGenerator) verifyVolumeIsSafeToDetach(
 	volumeToDetach AttachedVolume) error {
 	// Fetch current node object
-	node, fetchErr := og.kubeClient.Core().Nodes().Get(string(volumeToDetach.NodeName), metav1.GetOptions{})
+	node, fetchErr := og.kubeClient.Core().Nodes().Get(string(volumeToDetach.Node.Name), metav1.GetOptions{})
 	if fetchErr != nil {
 		if errors.IsNotFound(fetchErr) {
 			glog.Warningf("Node %q not found on API server. DetachVolume will skip safe to detach check.",
-				volumeToDetach.NodeName,
+				volumeToDetach.Node,
 				volumeToDetach.VolumeName,
 				volumeToDetach.VolumeSpec.Name())
 			return nil
@@ -838,7 +842,7 @@ func (og *operationGenerator) verifyVolumeIsSafeToDetach(
 			"DetachVolume failed fetching node from API server for volume %q (spec.Name: %q) from node %q with: %v",
 			volumeToDetach.VolumeName,
 			volumeToDetach.VolumeSpec.Name(),
-			volumeToDetach.NodeName,
+			volumeToDetach.Node,
 			fetchErr)
 	}
 
@@ -848,15 +852,17 @@ func (og *operationGenerator) verifyVolumeIsSafeToDetach(
 			"DetachVolume failed fetching node from API server for volume %q (spec.Name: %q) from node %q. Error: node object retrieved from API server is nil",
 			volumeToDetach.VolumeName,
 			volumeToDetach.VolumeSpec.Name(),
-			volumeToDetach.NodeName)
+			volumeToDetach.Node)
 	}
+
+	// TODO: Cross check UUID
 
 	for _, inUseVolume := range node.Status.VolumesInUse {
 		if inUseVolume == volumeToDetach.VolumeName {
 			return fmt.Errorf("DetachVolume failed for volume %q (spec.Name: %q) from node %q. Error: volume is still in use by node, according to Node status",
 				volumeToDetach.VolumeName,
 				volumeToDetach.VolumeSpec.Name(),
-				volumeToDetach.NodeName)
+				volumeToDetach.Node)
 		}
 	}
 
@@ -864,6 +870,6 @@ func (og *operationGenerator) verifyVolumeIsSafeToDetach(
 	glog.Infof("Verified volume is safe to detach for volume %q (spec.Name: %q) from node %q.",
 		volumeToDetach.VolumeName,
 		volumeToDetach.VolumeSpec.Name(),
-		volumeToDetach.NodeName)
+		volumeToDetach.Node)
 	return nil
 }

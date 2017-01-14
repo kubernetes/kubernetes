@@ -249,6 +249,13 @@ func (adc *attachDetachController) podDelete(obj interface{}) {
 	adc.processPodVolumes(pod, false /* addVolumes */)
 }
 
+func toNodeIdentifier(node *v1.Node) types.NodeIdentifier {
+	return types.NodeIdentifier{
+		Name: types.NodeName(node.Name),
+		ID:   node.UID,
+	}
+}
+
 func (adc *attachDetachController) nodeAdd(obj interface{}) {
 	node, ok := obj.(*v1.Node)
 	// TODO: investigate if nodeName is empty then if we can return
@@ -256,13 +263,14 @@ func (adc *attachDetachController) nodeAdd(obj interface{}) {
 	if node == nil || !ok {
 		return
 	}
-	nodeName := types.NodeName(node.Name)
+
+	nodeID := toNodeIdentifier(node)
 	adc.nodeUpdate(nil, obj)
 	// kubernetes/kubernetes/issues/37586
 	// This is to workaround the case when a node add causes to wipe out
 	// the attached volumes field. This function ensures that we sync with
 	// the actual status.
-	adc.actualStateOfWorld.SetNodeStatusUpdateNeeded(nodeName)
+	adc.actualStateOfWorld.SetNodeStatusUpdateNeeded(nodeID)
 }
 
 func (adc *attachDetachController) nodeUpdate(oldObj, newObj interface{}) {
@@ -272,13 +280,13 @@ func (adc *attachDetachController) nodeUpdate(oldObj, newObj interface{}) {
 		return
 	}
 
-	nodeName := types.NodeName(node.Name)
+	nodeID := toNodeIdentifier(node)
 	if _, exists := node.Annotations[volumehelper.ControllerManagedAttachAnnotation]; exists {
 		// Node specifies annotation indicating it should be managed by attach
 		// detach controller. Add it to desired state of world.
-		adc.desiredStateOfWorld.AddNode(nodeName)
+		adc.desiredStateOfWorld.AddNode(nodeID)
 	}
-	adc.processVolumesInUse(nodeName, node.Status.VolumesInUse)
+	adc.processVolumesInUse(nodeID, node.Status.VolumesInUse)
 }
 
 func (adc *attachDetachController) nodeDelete(obj interface{}) {
@@ -287,12 +295,12 @@ func (adc *attachDetachController) nodeDelete(obj interface{}) {
 		return
 	}
 
-	nodeName := types.NodeName(node.Name)
-	if err := adc.desiredStateOfWorld.DeleteNode(nodeName); err != nil {
+	nodeID := toNodeIdentifier(node)
+	if err := adc.desiredStateOfWorld.DeleteNode(nodeID); err != nil {
 		glog.V(10).Infof("%v", err)
 	}
 
-	adc.processVolumesInUse(nodeName, node.Status.VolumesInUse)
+	adc.processVolumesInUse(nodeID, node.Status.VolumesInUse)
 }
 
 // processPodVolumes processes the volumes in the given pod and adds them to the
@@ -307,9 +315,8 @@ func (adc *attachDetachController) processPodVolumes(
 		return
 	}
 
-	nodeName := types.NodeName(pod.Spec.NodeName)
-
-	if !adc.desiredStateOfWorld.NodeExists(nodeName) {
+	nodeID, found := adc.desiredStateOfWorld.FindNodeByName(types.NodeName(pod.Spec.NodeName))
+	if !found {
 		// If the node the pod is scheduled to does not exist in the desired
 		// state of the world data structure, that indicates the node is not
 		// yet managed by the controller. Therefore, ignore the pod.
@@ -319,7 +326,7 @@ func (adc *attachDetachController) processPodVolumes(
 			"Skipping processing of pod %q/%q: it is scheduled to node %q which is not managed by the controller.",
 			pod.Namespace,
 			pod.Name,
-			nodeName)
+			nodeID)
 		return
 	}
 
@@ -352,7 +359,7 @@ func (adc *attachDetachController) processPodVolumes(
 		if addVolumes {
 			// Add volume to desired state of world
 			_, err := adc.desiredStateOfWorld.AddPod(
-				uniquePodName, pod, volumeSpec, nodeName)
+				uniquePodName, pod, volumeSpec, nodeID)
 			if err != nil {
 				glog.V(10).Infof(
 					"Failed to add volume %q for pod %q/%q to desiredStateOfWorld. %v",
@@ -376,7 +383,7 @@ func (adc *attachDetachController) processPodVolumes(
 				continue
 			}
 			adc.desiredStateOfWorld.DeletePod(
-				uniquePodName, uniqueVolumeName, nodeName)
+				uniquePodName, uniqueVolumeName, nodeID)
 		}
 	}
 
@@ -547,9 +554,9 @@ func (adc *attachDetachController) getPVSpecFromCache(
 // corresponding volume in the actual state of the world to indicate that it is
 // mounted.
 func (adc *attachDetachController) processVolumesInUse(
-	nodeName types.NodeName, volumesInUse []v1.UniqueVolumeName) {
-	glog.V(4).Infof("processVolumesInUse for node %q", nodeName)
-	for _, attachedVolume := range adc.actualStateOfWorld.GetAttachedVolumesForNode(nodeName) {
+	node types.NodeIdentifier, volumesInUse []v1.UniqueVolumeName) {
+	glog.V(4).Infof("processVolumesInUse for node %q", node)
+	for _, attachedVolume := range adc.actualStateOfWorld.GetAttachedVolumesForNode(node) {
 		mounted := false
 		for _, volumeInUse := range volumesInUse {
 			if attachedVolume.VolumeName == volumeInUse {
@@ -558,11 +565,11 @@ func (adc *attachDetachController) processVolumesInUse(
 			}
 		}
 		err := adc.actualStateOfWorld.SetVolumeMountedByNode(
-			attachedVolume.VolumeName, nodeName, mounted)
+			attachedVolume.VolumeName, node, mounted)
 		if err != nil {
 			glog.Warningf(
 				"SetVolumeMountedByNode(%q, %q, %q) returned an error: %v",
-				attachedVolume.VolumeName, nodeName, mounted, err)
+				attachedVolume.VolumeName, node, mounted, err)
 		}
 	}
 }

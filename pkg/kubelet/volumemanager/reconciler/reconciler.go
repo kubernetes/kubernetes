@@ -77,7 +77,7 @@ type Reconciler interface {
 //   successive executions
 // waitForAttachTimeout - the amount of time the Mount function will wait for
 //   the volume to be attached
-// nodeName - the Name for this node, used by Attach and Detach methods
+// nodeID - the NodeIdentifier for this node, used by Attach and Detach methods
 // desiredStateOfWorld - cache containing the desired state of the world
 // actualStateOfWorld - cache containing the actual state of the world
 // operationExecutor - used to trigger attach/detach/mount/unmount operations
@@ -91,7 +91,7 @@ func NewReconciler(
 	loopSleepDuration time.Duration,
 	syncDuration time.Duration,
 	waitForAttachTimeout time.Duration,
-	nodeName types.NodeName,
+	nodeID types.NodeIdentifier,
 	desiredStateOfWorld cache.DesiredStateOfWorld,
 	actualStateOfWorld cache.ActualStateOfWorld,
 	operationExecutor operationexecutor.OperationExecutor,
@@ -104,7 +104,7 @@ func NewReconciler(
 		loopSleepDuration:             loopSleepDuration,
 		syncDuration:                  syncDuration,
 		waitForAttachTimeout:          waitForAttachTimeout,
-		nodeName:                      nodeName,
+		node:                          nodeID,
 		desiredStateOfWorld:           desiredStateOfWorld,
 		actualStateOfWorld:            actualStateOfWorld,
 		operationExecutor:             operationExecutor,
@@ -121,7 +121,7 @@ type reconciler struct {
 	loopSleepDuration             time.Duration
 	syncDuration                  time.Duration
 	waitForAttachTimeout          time.Duration
-	nodeName                      types.NodeName
+	node                          types.NodeIdentifier
 	desiredStateOfWorld           cache.DesiredStateOfWorld
 	actualStateOfWorld            cache.ActualStateOfWorld
 	operationExecutor             operationexecutor.OperationExecutor
@@ -207,7 +207,7 @@ func (rc *reconciler) reconcile() {
 					volumeToMount.Pod.UID)
 				err := rc.operationExecutor.VerifyControllerAttachedVolume(
 					volumeToMount.VolumeToMount,
-					rc.nodeName,
+					rc.node,
 					rc.actualStateOfWorld)
 				if err != nil &&
 					!nestedpendingoperations.IsAlreadyExists(err) &&
@@ -236,7 +236,7 @@ func (rc *reconciler) reconcile() {
 				volumeToAttach := operationexecutor.VolumeToAttach{
 					VolumeName: volumeToMount.VolumeName,
 					VolumeSpec: volumeToMount.VolumeSpec,
-					NodeName:   rc.nodeName,
+					Node:       rc.node,
 				}
 				glog.V(12).Infof("Attempting to start AttachVolume for volume %q (spec.Name: %q)  pod %q (UID: %q)",
 					volumeToMount.VolumeName,
@@ -345,7 +345,7 @@ func (rc *reconciler) reconcile() {
 					// Kubelet not responsible for detaching or this volume has a non-attachable volume plugin,
 					// so just remove it to actualStateOfWorld without attach.
 					rc.actualStateOfWorld.MarkVolumeAsDetached(
-						attachedVolume.VolumeName, rc.nodeName)
+						attachedVolume.VolumeName, rc.node)
 				} else {
 					// Only detach if kubelet detach is enabled
 					glog.V(12).Infof("Attempting to start DetachVolume for volume %q (spec.Name: %q)",
@@ -549,10 +549,12 @@ func (rc *reconciler) reconstructVolume(volume podVolume) (*reconstructedVolume,
 
 func (rc *reconciler) updateStates(volumesNeedUpdate map[v1.UniqueVolumeName]*reconstructedVolume) error {
 	// Get the node status to retrieve volume device path information.
-	node, fetchErr := rc.kubeClient.Core().Nodes().Get(string(rc.nodeName), metav1.GetOptions{})
+	node, fetchErr := rc.kubeClient.Core().Nodes().Get(string(rc.node.Name), metav1.GetOptions{})
 	if fetchErr != nil {
 		glog.Errorf("updateStates in reconciler: could not get node status with error %v", fetchErr)
 	} else {
+		// TODO: Cross check node UUID
+
 		for _, attachedVolume := range node.Status.VolumesAttached {
 			if volume, exists := volumesNeedUpdate[attachedVolume.Name]; exists {
 				volume.devicePath = attachedVolume.DevicePath
@@ -575,7 +577,7 @@ func (rc *reconciler) updateStates(volumesNeedUpdate map[v1.UniqueVolumeName]*re
 
 	for _, volume := range volumesNeedUpdate {
 		err := rc.actualStateOfWorld.MarkVolumeAsAttached(
-			volume.volumeName, volume.volumeSpec, "" /* nodeName */, volume.devicePath)
+			volume.volumeName, volume.volumeSpec, types.NodeIdentifier{}, volume.devicePath)
 		if err != nil {
 			glog.Errorf("Could not add volume information to actual state of world: %v", err)
 			continue

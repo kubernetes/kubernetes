@@ -136,7 +136,7 @@ func TestOperationExecutor_UnmountDeviceConcurrently(t *testing.T) {
 	for i := range attachedVolumes {
 		attachedVolumes[i] = AttachedVolume{
 			VolumeName: v1.UniqueVolumeName(pdName),
-			NodeName:   "node-name",
+			Node:       types.NodeIdentifier{Name: "node-name"},
 		}
 		oe.UnmountDevice(attachedVolumes[i], nil /* actualStateOfWorldMounterUpdater */, nil /* mount.Interface */)
 	}
@@ -157,7 +157,7 @@ func TestOperationExecutor_AttachVolumeConcurrently(t *testing.T) {
 	for i := range volumesToAttach {
 		volumesToAttach[i] = VolumeToAttach{
 			VolumeName: v1.UniqueVolumeName(pdName),
-			NodeName:   "node",
+			Node:       types.NodeIdentifier{Name: "node"},
 		}
 		oe.AttachVolume(volumesToAttach[i], nil /* actualStateOfWorldAttacherUpdater */)
 	}
@@ -178,7 +178,7 @@ func TestOperationExecutor_DetachVolumeConcurrently(t *testing.T) {
 	for i := range attachedVolumes {
 		attachedVolumes[i] = AttachedVolume{
 			VolumeName: v1.UniqueVolumeName(pdName),
-			NodeName:   "node",
+			Node:       types.NodeIdentifier{Name: "node"},
 		}
 		oe.DetachVolume(attachedVolumes[i], true /* verifySafeToDetach */, nil /* actualStateOfWorldAttacherUpdater */)
 	}
@@ -195,7 +195,7 @@ func TestOperationExecutor_VerifyVolumesAreAttachedConcurrently(t *testing.T) {
 
 	// Act
 	for i := 0; i < numVolumesToVerifyAttached; i++ {
-		oe.VerifyVolumesAreAttached(nil /* attachedVolumes */, "node-name", nil /* actualStateOfWorldAttacherUpdater */)
+		oe.VerifyVolumesAreAttached(nil /* attachedVolumes */, types.NodeIdentifier{Name: "node-name"}, nil /* actualStateOfWorldAttacherUpdater */)
 	}
 
 	// Assert
@@ -215,7 +215,7 @@ func TestOperationExecutor_VerifyControllerAttachedVolumeConcurrently(t *testing
 		volumesToMount[i] = VolumeToMount{
 			VolumeName: v1.UniqueVolumeName(pdName),
 		}
-		oe.VerifyControllerAttachedVolume(volumesToMount[i], types.NodeName("node-name"), nil /* actualStateOfWorldMounterUpdater */)
+		oe.VerifyControllerAttachedVolume(volumesToMount[i], types.NodeIdentifier{Name: "node-name"}, nil /* actualStateOfWorldMounterUpdater */)
 	}
 
 	// Assert
@@ -260,7 +260,7 @@ func (fopg *fakeOperationGenerator) GenerateDetachVolumeFunc(volumeToDetach Atta
 		return nil
 	}, nil
 }
-func (fopg *fakeOperationGenerator) GenerateVolumesAreAttachedFunc(attachedVolumes []AttachedVolume, nodeName types.NodeName, actualStateOfWorld ActualStateOfWorldAttacherUpdater) (func() error, error) {
+func (fopg *fakeOperationGenerator) GenerateVolumesAreAttachedFunc(attachedVolumes []AttachedVolume, node types.NodeIdentifier, actualStateOfWorld ActualStateOfWorldAttacherUpdater) (func() error, error) {
 	return func() error {
 		startOperationAndBlock(fopg.ch, fopg.quit)
 		return nil
@@ -272,7 +272,7 @@ func (fopg *fakeOperationGenerator) GenerateUnmountDeviceFunc(deviceToDetach Att
 		return nil
 	}, nil
 }
-func (fopg *fakeOperationGenerator) GenerateVerifyControllerAttachedVolumeFunc(volumeToMount VolumeToMount, nodeName types.NodeName, actualStateOfWorld ActualStateOfWorldAttacherUpdater) (func() error, error) {
+func (fopg *fakeOperationGenerator) GenerateVerifyControllerAttachedVolumeFunc(volumeToMount VolumeToMount, node types.NodeIdentifier, actualStateOfWorld ActualStateOfWorldAttacherUpdater) (func() error, error) {
 	return func() error {
 		startOperationAndBlock(fopg.ch, fopg.quit)
 		return nil

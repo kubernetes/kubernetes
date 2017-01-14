@@ -120,6 +120,6 @@ func (dswp *desiredStateOfWorldPopulator) findAndRemoveDeletedPods() {
 		// from the informer, delete it from dsw
 		glog.V(1).Infof(
 			"Removing pod %q (UID %q) from dsw because it does not exist in pod informer.", dswPodKey, dswPodUID)
-		dswp.desiredStateOfWorld.DeletePod(dswPodUID, dswPodToAdd.VolumeName, dswPodToAdd.NodeName)
+		dswp.desiredStateOfWorld.DeletePod(dswPodUID, dswPodToAdd.VolumeName, dswPodToAdd.Node)
 	}
 }
