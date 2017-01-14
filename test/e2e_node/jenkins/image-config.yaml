@@ -3,16 +3,19 @@
 # `gcloud compute --project <to-project> images create <image-name> --source-disk=<image-name>`
 images:
   ubuntu-docker10:
-    image: e2e-node-ubuntu-trusty-docker10-v2-image
+    image: e2e-node-ubuntu-trusty-docker10-v2-image # docker 1.10.3
+    project: kubernetes-node-e2e-images
+  ubuntu-docker12:
+    image: e2e-node-ubuntu-trusty-docker12-v1-image # docker 1.12.4
     project: kubernetes-node-e2e-images
   coreos-alpha:
-    image: coreos-alpha-1122-0-0-v20160727
+    image: coreos-alpha-1122-0-0-v20160727 # docker 1.11.2
     project: coreos-cloud
     metadata: "user-data<test/e2e_node/jenkins/coreos-init.json"
   containervm:
-    image: e2e-node-containervm-v20161208-image
+    image: e2e-node-containervm-v20161208-image # docker 1.11.2
     project: kubernetes-node-e2e-images
   gci-family:
-    image_regex: gci-dev-56-8977-0-0
+    image_regex: gci-dev-56-8977-0-0 # docker 1.11.2
     project: google-containers
     metadata: "user-data<test/e2e_node/jenkins/gci-init.yaml,gci-update-strategy=update_disabled"
