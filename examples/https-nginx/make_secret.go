@@ -26,6 +26,7 @@ import (
 	"io/ioutil"
 	"log"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/api"
 
@@ -57,7 +58,7 @@ func main() {
 	nginxCrt := read(*crt)
 	nginxKey := read(*key)
 	secret := &api.Secret{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: "nginxsecret",
 		},
 		Data: map[string][]byte{

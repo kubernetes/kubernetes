@@ -140,7 +140,7 @@ func (tc *replicaCalcTestCase) prepareTestClient(t *testing.T) *fake.Clientset {
 					podName = tc.resource.podNames[i]
 				}
 				podMetric := metricsapi.PodMetrics{
-					ObjectMeta: metav1.ObjectMeta{
+					ObjectMeta: v1.ObjectMeta{
 						Name:      podName,
 						Namespace: testNamespace,
 					},

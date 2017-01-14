@@ -106,7 +106,7 @@ func (tc *testCase) prepareTestClient(t *testing.T) *fake.Clientset {
 			metrics := metricsapi.PodMetricsList{}
 			for i, containers := range tc.reportedPodMetrics {
 				metric := metricsapi.PodMetrics{
-					ObjectMeta: metav1.ObjectMeta{
+					ObjectMeta: v1.ObjectMeta{
 						Name:      fmt.Sprintf("%s-%d", podNamePrefix, i),
 						Namespace: namespace,
 					},
