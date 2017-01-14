@@ -698,7 +698,8 @@ function create-salt-master-auth() {
     (umask 077;
       echo "${KUBE_BEARER_TOKEN},admin,admin" > "${KNOWN_TOKENS_FILE}";
       echo "${KUBELET_TOKEN},kubelet,kubelet" >> "${KNOWN_TOKENS_FILE}";
-      echo "${KUBE_PROXY_TOKEN},kube_proxy,kube_proxy" >> "${KNOWN_TOKENS_FILE}")
+      echo "${KUBE_PROXY_TOKEN},kube_proxy,kube_proxy" >> "${KNOWN_TOKENS_FILE}";
+      echo "${KUBE_CSR_TOKEN},kube-csr,kube-csr" >> "${KNOWN_TOKENS_FILE}")
   fi
 }
 
