@@ -1158,36 +1158,15 @@ func PodToleratesNodeTaints(pod *v1.Pod, meta interface{}, nodeInfo *schedulerca
 		return false, nil, err
 	}
 
-	if tolerationsToleratesTaints(tolerations, taints) {
+	// if tolerationsToleratesTaints(tolerations, taints) {
+
+	if v1.TolerationsTolerateTaintsWithFilter(tolerations, taints, func(t *v1.Taint) bool {
+		// PodToleratesNodeTaints is only interested in NoSchedule taints.
+		return t.Effect == v1.TaintEffectNoSchedule
+	}) {
 		return true, nil, nil
 	}
 	return false, []algorithm.PredicateFailureReason{ErrTaintsTolerationsNotMatch}, nil
-}
-
-func tolerationsToleratesTaints(tolerations []v1.Toleration, taints []v1.Taint) bool {
-	// If the taint list is nil/empty, it is tolerated by all tolerations by default.
-	if len(taints) == 0 {
-		return true
-	}
-
-	// The taint list isn't nil/empty, a nil/empty toleration list can't tolerate them.
-	if len(tolerations) == 0 {
-		return false
-	}
-
-	for i := range taints {
-		taint := &taints[i]
-		// skip taints that have effect PreferNoSchedule, since it is for priorities
-		if taint.Effect == v1.TaintEffectPreferNoSchedule {
-			continue
-		}
-
-		if !v1.TaintToleratedByTolerations(taint, tolerations) {
-			return false
-		}
-	}
-
-	return true
 }
 
 // Determine if a pod is scheduled with best-effort QoS

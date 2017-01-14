@@ -110,24 +110,6 @@ func NewCmdTaint(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func deleteTaint(taints []api.Taint, taintToDelete api.Taint) ([]api.Taint, error) {
-	newTaints := []api.Taint{}
-	found := false
-	for _, taint := range taints {
-		if taint.Key == taintToDelete.Key &&
-			(len(taintToDelete.Effect) == 0 || taint.Effect == taintToDelete.Effect) {
-			found = true
-			continue
-		}
-		newTaints = append(newTaints, taint)
-	}
-
-	if !found {
-		return nil, fmt.Errorf("taint key=\"%s\" and effect=\"%s\" not found.", taintToDelete.Key, taintToDelete.Effect)
-	}
-	return newTaints, nil
-}
-
 // reorganizeTaints returns the updated set of taints, taking into account old taints that were not updated,
 // old taints that were updated, old taints that were deleted, and new taints.
 func reorganizeTaints(accessor meta.Object, overwrite bool, taintsToAdd []api.Taint, taintsToRemove []api.Taint) ([]api.Taint, error) {
@@ -158,9 +140,14 @@ func reorganizeTaints(accessor meta.Object, overwrite bool, taintsToAdd []api.Ta
 
 	allErrs := []error{}
 	for _, taintToRemove := range taintsToRemove {
-		newTaints, err = deleteTaint(newTaints, taintToRemove)
-		if err != nil {
-			allErrs = append(allErrs, err)
+		removed := false
+		if len(taintToRemove.Effect) > 0 {
+			newTaints, removed = api.DeleteTaint(newTaints, &taintToRemove)
+		} else {
+			newTaints, removed = api.DeleteTaintsByKey(newTaints, taintToRemove.Key)
+		}
+		if !removed {
+			allErrs = append(allErrs, fmt.Errorf("taint %q not found", taintToRemove.ToString()))
 		}
 	}
 	return newTaints, utilerrors.NewAggregate(allErrs)

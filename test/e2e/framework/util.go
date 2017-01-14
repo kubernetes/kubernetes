@@ -2557,23 +2557,6 @@ func ExpectNodeHasTaint(c clientset.Interface, nodeName string, taint v1.Taint) 
 	}
 }
 
-func deleteTaint(oldTaints []v1.Taint, taintToDelete v1.Taint) ([]v1.Taint, error) {
-	newTaints := []v1.Taint{}
-	found := false
-	for _, oldTaint := range oldTaints {
-		if oldTaint.MatchTaint(taintToDelete) {
-			found = true
-			continue
-		}
-		newTaints = append(newTaints, taintToDelete)
-	}
-
-	if !found {
-		return nil, fmt.Errorf("taint %s not found.", taintToDelete.ToString())
-	}
-	return newTaints, nil
-}
-
 // RemoveTaintOffNode is for cleaning up taints temporarily added to node,
 // won't fail if target taint doesn't exist or has been removed.
 func RemoveTaintOffNode(c clientset.Interface, nodeName string, taint v1.Taint) {
@@ -2592,8 +2575,7 @@ func RemoveTaintOffNode(c clientset.Interface, nodeName string, taint v1.Taint) 
 			return
 		}
 
-		newTaints, err := deleteTaint(nodeTaints, taint)
-		ExpectNoError(err)
+		newTaints, _ := v1.DeleteTaint(nodeTaints, &taint)
 		if len(newTaints) == 0 {
 			delete(node.Annotations, v1.TaintsAnnotationKey)
 		} else {
