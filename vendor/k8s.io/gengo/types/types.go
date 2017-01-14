@@ -94,6 +94,9 @@ type Package struct {
 	// Canonical name of this package-- its path.
 	Path string
 
+	// The location this package was loaded from
+	SourcePath string
+
 	// Short name of this package; the name that appears in the
 	// 'package x' line.
 	Name string
