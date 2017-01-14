@@ -33,7 +33,7 @@ import (
 // API conventions.
 type RESTCreateStrategy interface {
 	runtime.ObjectTyper
-	// The name generate is used when the standard GenerateName field is set.
+	// The name generator is used when the standard GenerateName field is set.
 	// The NameGenerator will be invoked prior to validation.
 	names.NameGenerator
 
@@ -44,11 +44,16 @@ type RESTCreateStrategy interface {
 	// sort order-insensitive list fields, etc.  This should not remove fields
 	// whose presence would be considered a validation error.
 	PrepareForCreate(ctx genericapirequest.Context, obj runtime.Object)
-	// Validate is invoked after default fields in the object have been filled in before
-	// the object is persisted.  This method should not mutate the object.
+	// Validate returns an ErrorList with validation errors or nil.  Validate
+	// is invoked after default fields in the object have been filled in
+	// before the object is persisted.  This method should not mutate the
+	// object.
 	Validate(ctx genericapirequest.Context, obj runtime.Object) field.ErrorList
-	// Canonicalize is invoked after validation has succeeded but before the
-	// object has been persisted.  This method may mutate the object.
+	// Canonicalize allows an object to be mutated into a canonical form. This
+	// ensures that code that operates on these objects can rely on the common
+	// form for things like comparison.  Canonicalize is invoked after
+	// validation has succeeded but before the object has been persisted.
+	// This method may mutate the object.
 	Canonicalize(obj runtime.Object)
 }
 

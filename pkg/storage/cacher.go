@@ -188,9 +188,9 @@ type Cacher struct {
 	stopWg   sync.WaitGroup
 }
 
-// Create a new Cacher responsible from service WATCH and LIST requests from its
-// internal cache and updating its cache in the background based on the given
-// configuration.
+// Create a new Cacher responsible for servicing WATCH and LIST requests from
+// its internal cache and updating its cache in the background based on the
+// given configuration.
 func NewCacherFromConfig(config CacherConfig) *Cacher {
 	watchCache := newWatchCache(config.CacheCapacity, config.KeyFunc, config.GetAttrsFunc)
 	listerWatcher := newCacherListerWatcher(config.Storage, config.ResourcePrefix, config.NewListFunc)
