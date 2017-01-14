@@ -335,7 +335,7 @@ func ListResource(r rest.Lister, rw rest.Watcher, scope RequestScope, forceWatch
 		}
 		trace.Step("Self-linking done")
 		// Ensure empty lists return a non-nil items slice
-		if numberOfItems == 0 {
+		if numberOfItems == 0 && meta.IsListType(result) {
 			if err := meta.SetList(result, []runtime.Object{}); err != nil {
 				scope.err(err, res.ResponseWriter, req.Request)
 				return
