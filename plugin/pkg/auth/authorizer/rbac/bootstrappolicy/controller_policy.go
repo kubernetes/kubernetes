@@ -264,6 +264,14 @@ func init() {
 			eventsRule(),
 		},
 	})
+	addControllerRole(rbac.ClusterRole{
+		ObjectMeta: api.ObjectMeta{Name: saRolePrefix + "certificate-controller"},
+		Rules: []rbac.PolicyRule{
+			rbac.NewRule("get", "list", "watch").Groups(certificatesGroup).Resources("certificatesigningrequests").RuleOrDie(),
+			rbac.NewRule("update").Groups(certificatesGroup).Resources("certificatesigningrequests/status", "certificatesigningrequests/approval").RuleOrDie(),
+			eventsRule(),
+		},
+	})
 }
 
 // ControllerRoles returns the cluster roles used by controllers
