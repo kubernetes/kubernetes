@@ -41,5 +41,6 @@ limitations under the License.
 //
 // As a bonus, a few common types useful from all api objects and versions
 // are provided in types.go.
+// +k8s:openapi-gen=false
 
 package runtime // import "k8s.io/kubernetes/pkg/runtime"
