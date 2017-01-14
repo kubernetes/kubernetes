@@ -34,8 +34,8 @@ import (
 )
 
 const (
-	dnsLabelErrMsg          = "a valid DNS (RFC 1123) label must consist of"
-	dnsSubdomainLabelErrMsg = "a valid DNS (RFC 1123) subdomain"
+	dnsLabelErrMsg          = "a DNS-1123 label must consist of"
+	dnsSubdomainLabelErrMsg = "a DNS-1123 subdomain"
 	labelErrMsg             = "a valid label must be an empty string or consist of"
 	lowerCaseLabelErrMsg    = "a valid label must consist of"
 	maxLengthErrMsg         = "must be no more than"
