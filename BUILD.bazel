@@ -12,6 +12,7 @@ gcs_upload(
     name = "ci-artifacts",
     data = [
         "//build/debs",
+        "//build/release-tars",
     ],
 )
 
