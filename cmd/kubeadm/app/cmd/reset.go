@@ -108,7 +108,7 @@ func (r *Reset) Run(out io.Writer) error {
 		fmt.Printf("[reset] Failed to unmount mounted directories in /var/lib/kubelet: %s\n", string(umountOutputBytes))
 	}
 
-	dockerCheck := preflight.ServiceCheck{Service: "docker"}
+	dockerCheck := preflight.ServiceCheck{Service: "docker", CheckIfActive: true}
 	if warnings, errors := dockerCheck.Check(); len(warnings) == 0 && len(errors) == 0 {
 		fmt.Println("[reset] Removing kubernetes-managed containers")
 		if err := exec.Command("sh", "-c", "docker ps | grep 'k8s_' | awk '{print $1}' | xargs -r docker rm --force --volumes").Run(); err != nil {
