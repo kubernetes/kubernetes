@@ -25,6 +25,8 @@ import (
 	"k8s.io/kubernetes/pkg/storage/storagebackend/factory"
 )
 
+var _ generic.StorageDecorator = StorageWithCacher
+
 // Creates a cacher based given storageConfig.
 func StorageWithCacher(
 	storageConfig *storagebackend.Config,

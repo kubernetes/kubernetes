@@ -21,7 +21,11 @@ import (
 	genericapirequest "k8s.io/kubernetes/pkg/genericapiserver/api/request"
 )
 
-// RESTExportStrategy is the interface that defines how to export a Kubernetes object
+// RESTExportStrategy is the interface that defines how to export a Kubernetes
+// object.  An exported object is stripped of non-user-settable fields and
+// optionally, the identifying information related to the object's identity in
+// the cluster so that it can be loaded into a different namespace or entirely
+// different cluster without conflict.
 type RESTExportStrategy interface {
 	// Export strips fields that can not be set by the user.  If 'exact' is false
 	// fields specific to the cluster are also stripped

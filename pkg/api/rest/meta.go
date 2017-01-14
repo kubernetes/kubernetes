@@ -36,7 +36,10 @@ func FillObjectMetaSystemFields(ctx genericapirequest.Context, meta *api.ObjectM
 	meta.SelfLink = ""
 }
 
-// ValidNamespace returns false if the namespace on the context differs from the resource.  If the resource has no namespace, it is set to the value in the context.
+// ValidNamespace returns false if the namespace on the context differs from
+// the resource.  If the resource has no namespace, it is set to the value in
+// the context.
+//
 // TODO(sttts): move into pkg/genericapiserver/api
 func ValidNamespace(ctx genericapirequest.Context, resource *api.ObjectMeta) bool {
 	ns, ok := genericapirequest.NamespaceFrom(ctx)
