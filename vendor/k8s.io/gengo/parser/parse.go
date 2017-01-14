@@ -447,6 +447,7 @@ func (b *Builder) findTypesIn(pkgPath importPathString, u *types.Universe) error
 	// We're keeping this package.  This call will create the record.
 	u.Package(string(pkgPath)).Name = pkg.Name()
 	u.Package(string(pkgPath)).Path = pkg.Path()
+	u.Package(string(pkgPath)).SourcePath = b.absPaths[pkgPath]
 
 	for _, f := range b.parsed[pkgPath] {
 		if strings.HasSuffix(f.name, "/doc.go") {

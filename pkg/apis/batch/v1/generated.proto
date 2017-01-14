@@ -33,8 +33,6 @@ option go_package = "v1";
 
 // Job represents the configuration of a single job.
 message Job {
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.TypeMeta typeMeta = 4;
-
   // Standard object's metadata.
   // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
   // +optional
@@ -78,8 +76,6 @@ message JobCondition {
 
 // JobList is a collection of jobs.
 message JobList {
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.TypeMeta typeMeta = 3;
-
   // Standard list metadata
   // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
   // +optional
