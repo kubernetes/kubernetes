@@ -212,6 +212,7 @@ function create-master-auth {
   local -r auth_dir="/etc/srv/kubernetes"
   if [[ ! -e "${auth_dir}/ca.crt" && ! -z "${CA_CERT:-}" && ! -z "${MASTER_CERT:-}" && ! -z "${MASTER_KEY:-}" ]]; then
     echo "${CA_CERT}" | base64 --decode > "${auth_dir}/ca.crt"
+    echo "${CA_KEY}" | base64 --decode > "${auth_dir}/ca.key"
     echo "${MASTER_CERT}" | base64 --decode > "${auth_dir}/server.cert"
     echo "${MASTER_KEY}" | base64 --decode > "${auth_dir}/server.key"
   fi
@@ -239,6 +240,10 @@ function create-master-auth {
   if [[ -n "${KUBE_PROXY_TOKEN:-}" ]]; then
     replace_prefixed_line "${known_tokens_csv}" "${KUBE_PROXY_TOKEN},"              "system:kube-proxy,uid:kube_proxy"
   fi
+  if [[ -n "${KUBE_CSR_TOKEN:-}" ]]; then
+    replace_prefixed_line "${known_tokens_csv}" "${KUBE_CSR_TOKEN},"                "system:node-bootstrap-secret,uid:node-bootstrap-secret,system:node-bootstrapper"
+  fi
+
   local use_cloud_config="false"
   cat <<EOF >/etc/gce.conf
 [global]
@@ -314,7 +319,7 @@ contexts:
 EOF
   fi
 
-if [[ -n "${GCP_IMAGE_VERIFICATION_URL:-}" ]]; then
+  if [[ -n "${GCP_IMAGE_VERIFICATION_URL:-}" ]]; then
     # This is the config file for the image review webhook.
     cat <<EOF >/etc/gcp_image_review.config
 clusters:
@@ -377,6 +382,30 @@ function create-kubelet-auth-ca {
   fi
 }
 
+function create-kube-csr-kubeconfig {
+  echo "Creating kube-csr kubeconfig file"
+  local master_address="${1}"
+  cat <<EOF >/etc/kubernetes/kube-csr.json
+apiVersion: v1
+kind: Config
+users:
+- name: kube-csr
+  user:
+    token: ${KUBE_CSR_TOKEN}
+clusters:
+- name: local
+  cluster:
+    certificate-authority-data: ${CA_CERT}
+    server: https://${master_address}
+contexts:
+- context:
+    cluster: local
+    user: kube-csr
+  name: service-account-context
+current-context: service-account-context
+EOF
+}
+
 # Uses KUBELET_CA_CERT (falling back to CA_CERT), KUBELET_CERT, and KUBELET_KEY
 # to generate a kubeconfig file for the kubelet to securely connect to the apiserver.
 # Set REGISTER_MASTER_KUBELET to true if kubelet on the master node
@@ -388,7 +417,6 @@ function create-master-kubelet-auth {
     REGISTER_MASTER_KUBELET="true"
     create-kubelet-kubeconfig
   fi
-  
 }
 
 function create-kubeproxy-kubeconfig {
@@ -576,7 +604,9 @@ function start-kubelet {
     fi
   else # For nodes
     flags+=" --enable-debugging-handlers=true"
-    flags+=" --api-servers=https://${KUBERNETES_MASTER_NAME}"
+    flags+=" --experimental-bootstrap-kubeconfig=/etc/kubernetes/kube-csr.json"
+    flags+=" --require-kubeconfig"
+    flags+=" --kubeconfig=/etc/kubernetes/kubelet-kubeconfig.json"
     if [[ "${HAIRPIN_MODE:-}" == "promiscuous-bridge" ]] || \
        [[ "${HAIRPIN_MODE:-}" == "hairpin-veth" ]] || \
        [[ "${HAIRPIN_MODE:-}" == "none" ]]; then
@@ -980,6 +1010,7 @@ function start-kube-controller-manager {
   if [[ -n "${CA_KEY:-}" ]]; then
     params+=" --cluster-signing-cert-file=/etc/srv/kubernetes/ca.crt"
     params+=" --cluster-signing-key-file=/etc/srv/kubernetes/ca.key"
+    params+=" --insecure-experimental-approve-all-kubelet-csrs-for-group=system:node-bootstrapper"
   fi
   if [[ -n "${SERVICE_CLUSTER_IP_RANGE:-}" ]]; then
     params+=" --service-cluster-ip-range=${SERVICE_CLUSTER_IP_RANGE}"
@@ -1099,8 +1130,12 @@ function start-kube-addons {
   local -r src_dir="${KUBE_HOME}/kube-manifests/kubernetes/gci-trusty"
   local -r dst_dir="/etc/kubernetes/addons"
 
+  # TODO(mikedanese): only enable these in e2e
   # prep the additional bindings that are particular to e2e users and groups
   setup-addon-manifests "addons" "e2e-rbac-bindings"
+
+  # prep addition kube-up specific rbac objects
+  setup-addon-manifests "addons" "rbac"
 
   # Set up manifests of other addons.
   if [[ "${ENABLE_CLUSTER_MONITORING:-}" == "influxdb" ]] || \
@@ -1343,10 +1378,11 @@ if [[ "${KUBERNETES_MASTER:-}" == "true" ]]; then
   create-master-auth
   create-master-kubelet-auth
   create-master-etcd-auth
+  create-kube-csr-kubeconfig "${KUBELET_APISERVER}"
 else
-  create-kubelet-kubeconfig
   create-kubelet-auth-ca
   create-kubeproxy-kubeconfig
+  create-kube-csr-kubeconfig "${KUBERNETES_MASTER_NAME}"
 fi
 
 override-kubectl
