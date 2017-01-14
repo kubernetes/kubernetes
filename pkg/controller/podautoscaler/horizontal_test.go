@@ -304,7 +304,7 @@ func (tc *testCase) prepareTestClient(t *testing.T) *fake.Clientset {
 			metrics := metricsapi.PodMetricsList{}
 			for i, cpu := range tc.reportedLevels {
 				podMetric := metricsapi.PodMetrics{
-					ObjectMeta: metav1.ObjectMeta{
+					ObjectMeta: v1.ObjectMeta{
 						Name:      fmt.Sprintf("%s-%d", podNamePrefix, i),
 						Namespace: namespace,
 					},

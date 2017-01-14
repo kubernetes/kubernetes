@@ -25,7 +25,6 @@ import (
 
 	"net/url"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	metricsapi "k8s.io/heapster/metrics/apis/metrics/v1alpha1"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/unversioned"
@@ -172,7 +171,7 @@ func TestTopPod(t *testing.T) {
 func testPodMetricsData() []metricsapi.PodMetrics {
 	return []metricsapi.PodMetrics{
 		{
-			ObjectMeta: metav1.ObjectMeta{Name: "pod1", Namespace: "test", ResourceVersion: "10"},
+			ObjectMeta: v1.ObjectMeta{Name: "pod1", Namespace: "test", ResourceVersion: "10"},
 			Window:     unversioned.Duration{Duration: time.Minute},
 			Containers: []metricsapi.ContainerMetrics{
 				{
@@ -194,7 +193,7 @@ func testPodMetricsData() []metricsapi.PodMetrics {
 			},
 		},
 		{
-			ObjectMeta: metav1.ObjectMeta{Name: "pod2", Namespace: "test", ResourceVersion: "11"},
+			ObjectMeta: v1.ObjectMeta{Name: "pod2", Namespace: "test", ResourceVersion: "11"},
 			Window:     unversioned.Duration{Duration: time.Minute},
 			Containers: []metricsapi.ContainerMetrics{
 				{
@@ -224,7 +223,7 @@ func testPodMetricsData() []metricsapi.PodMetrics {
 			},
 		},
 		{
-			ObjectMeta: metav1.ObjectMeta{Name: "pod3", Namespace: "test", ResourceVersion: "12"},
+			ObjectMeta: v1.ObjectMeta{Name: "pod3", Namespace: "test", ResourceVersion: "12"},
 			Window:     unversioned.Duration{Duration: time.Minute},
 			Containers: []metricsapi.ContainerMetrics{
 				{

@@ -22,6 +22,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/testapi"
@@ -127,7 +128,7 @@ func newPod(podName string, nodeName string, label map[string]string) *v1.Pod {
 			DNSPolicy: v1.DNSDefault,
 		},
 	}
-	metav1.GenerateName(v1.SimpleNameGenerator, &pod.ObjectMeta)
+	pod.Name = names.SimpleNameGenerator.GenerateName(podName)
 	return pod
 }
 

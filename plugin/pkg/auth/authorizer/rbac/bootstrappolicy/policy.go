@@ -173,7 +173,7 @@ func ClusterRoles() []rbac.ClusterRole {
 		},
 		{
 			// a role to use for heapster's connections back to the API server
-			ObjectMeta: api.ObjectMeta{Name: "system:heapster"},
+			ObjectMeta: metav1.ObjectMeta{Name: "system:heapster"},
 			Rules: []rbac.PolicyRule{
 				rbac.NewRule(Read...).Groups(legacyGroup).Resources("events", "pods", "nodes", "namespaces").RuleOrDie(),
 			},
