@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 // +k8s:deepcopy-gen=package
-// +k8s:openapi-gen=true
+// +k8s:openapi-gen=false
 // +k8s:defaulter-gen=TypeMeta
 
 // +groupName=meta.k8s.io
