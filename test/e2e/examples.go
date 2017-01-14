@@ -28,9 +28,12 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/api/v1"
+	rbacv1alpha1 "k8s.io/kubernetes/pkg/apis/rbac/v1alpha1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	"k8s.io/kubernetes/pkg/serviceaccount"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/generated"
 	testutils "k8s.io/kubernetes/test/utils"
@@ -64,6 +67,16 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 	BeforeEach(func() {
 		c = f.ClientSet
 		ns = f.Namespace.Name
+
+		// this test wants powerful permissions.  Since the namespace names are unique, we can leave this
+		// lying around so we don't have to race any caches
+		framework.BindClusterRoleInNamespace(c.Rbac(), "edit", f.Namespace.Name,
+			rbacv1alpha1.Subject{Kind: rbacv1alpha1.ServiceAccountKind, Namespace: f.Namespace.Name, Name: "default"})
+
+		err := framework.WaitForAuthorizationUpdate(c.Authorization(),
+			serviceaccount.MakeUsername(f.Namespace.Name, "default"),
+			"", "create", schema.GroupResource{Resource: "pods"}, true)
+		framework.ExpectNoError(err)
 	})
 
 	framework.KubeDescribe("Redis", func() {
