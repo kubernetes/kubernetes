@@ -2824,7 +2824,7 @@ func TestInterPodAffinityWithMultipleNodes(t *testing.T) {
 		},
 		{
 			pod: &v1.Pod{
-				ObjectMeta: v1.ObjectMeta{Labels: map[string]string{"foo": "123"}},
+				ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"foo": "123"}},
 				Spec: v1.PodSpec{
 					Affinity: &v1.Affinity{
 						PodAntiAffinity: &v1.PodAntiAffinity{
@@ -2847,7 +2847,7 @@ func TestInterPodAffinityWithMultipleNodes(t *testing.T) {
 				},
 			},
 			pods: []*v1.Pod{
-				{Spec: v1.PodSpec{NodeName: "nodeA"}, ObjectMeta: v1.ObjectMeta{Labels: map[string]string{"foo": "bar"}}},
+				{Spec: v1.PodSpec{NodeName: "nodeA"}, ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"foo": "bar"}}},
 				{
 					Spec: v1.PodSpec{
 						NodeName: "nodeC",
@@ -2873,10 +2873,10 @@ func TestInterPodAffinityWithMultipleNodes(t *testing.T) {
 				},
 			},
 			nodes: []v1.Node{
-				{ObjectMeta: v1.ObjectMeta{Name: "nodeA", Labels: labelRgChina}},
-				{ObjectMeta: v1.ObjectMeta{Name: "nodeB", Labels: labelRgChinaAzAz1}},
-				{ObjectMeta: v1.ObjectMeta{Name: "nodeC", Labels: labelRgIndia}},
-				{ObjectMeta: v1.ObjectMeta{Name: "nodeD", Labels: labelRgUS}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "nodeA", Labels: labelRgChina}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "nodeB", Labels: labelRgChinaAzAz1}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "nodeC", Labels: labelRgIndia}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "nodeD", Labels: labelRgUS}},
 			},
 			fits: map[string]bool{
 				"nodeA": false,
@@ -3214,7 +3214,7 @@ func TestPodToleratesTaints(t *testing.T) {
 		},
 		{
 			pod: &v1.Pod{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name: "pod2",
 				},
 				Spec: v1.PodSpec{
@@ -3222,7 +3222,7 @@ func TestPodToleratesTaints(t *testing.T) {
 				},
 			},
 			node: v1.Node{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
 						v1.TaintsAnnotationKey: `
 						[{
