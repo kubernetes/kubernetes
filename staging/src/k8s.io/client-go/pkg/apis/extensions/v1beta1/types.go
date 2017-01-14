@@ -17,9 +17,9 @@ limitations under the License.
 package v1beta1
 
 import (
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/pkg/api/resource"
 	"k8s.io/client-go/pkg/api/v1"
-	metav1 "k8s.io/client-go/pkg/apis/meta/v1"
 	"k8s.io/client-go/pkg/util/intstr"
 )
 
@@ -397,6 +397,10 @@ type DeploymentStatus struct {
 	// +optional
 	UpdatedReplicas int32 `json:"updatedReplicas,omitempty" protobuf:"varint,3,opt,name=updatedReplicas"`
 
+	// Total number of ready pods targeted by this deployment.
+	// +optional
+	ReadyReplicas int32 `json:"readyReplicas,omitempty" protobuf:"varint,7,opt,name=readyReplicas"`
+
 	// Total number of available pods (ready for at least minReadySeconds) targeted by this deployment.
 	// +optional
 	AvailableReplicas int32 `json:"availableReplicas,omitempty" protobuf:"varint,4,opt,name=availableReplicas"`
@@ -564,6 +568,10 @@ type DaemonSetStatus struct {
 	// NumberReady is the number of nodes that should be running the daemon pod and have one
 	// or more of the daemon pod running and ready.
 	NumberReady int32 `json:"numberReady" protobuf:"varint,4,opt,name=numberReady"`
+
+	// ObservedGeneration is the most recent generation observed by the daemon set controller.
+	// +optional
+	ObservedGeneration int64 `json:"observedGeneration,omitempty" protobuf:"varint,5,opt,name=observedGeneration"`
 }
 
 // +genclient=true

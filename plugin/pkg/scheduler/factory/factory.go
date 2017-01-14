@@ -80,12 +80,12 @@ type ConfigFactory struct {
 	StopEverything chan struct{}
 
 	informerFactory       informers.SharedInformerFactory
-	scheduledPodPopulator cache.ControllerInterface
-	nodePopulator         cache.ControllerInterface
-	pvPopulator           cache.ControllerInterface
-	pvcPopulator          cache.ControllerInterface
-	servicePopulator      cache.ControllerInterface
-	controllerPopulator   cache.ControllerInterface
+	scheduledPodPopulator cache.Controller
+	nodePopulator         cache.Controller
+	pvPopulator           cache.Controller
+	pvcPopulator          cache.Controller
+	servicePopulator      cache.Controller
+	controllerPopulator   cache.Controller
 
 	schedulerCache schedulercache.Cache
 

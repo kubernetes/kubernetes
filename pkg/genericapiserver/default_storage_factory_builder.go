@@ -21,9 +21,9 @@ import (
 	"strconv"
 	"strings"
 
-	"k8s.io/apimachinery/pkg/apimachinery/registered"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/storage/storagebackend"
 	"k8s.io/kubernetes/pkg/util/config"
 )
@@ -73,9 +73,9 @@ func mergeAPIResourceConfigs(defaultAPIResourceConfig *ResourceConfig, resourceC
 	if ok {
 		if allAPIFlagValue == "false" {
 			// Disable all group versions.
-			resourceConfig.DisableVersions(registered.RegisteredGroupVersions()...)
+			resourceConfig.DisableVersions(api.Registry.RegisteredGroupVersions()...)
 		} else if allAPIFlagValue == "true" {
-			resourceConfig.EnableVersions(registered.RegisteredGroupVersions()...)
+			resourceConfig.EnableVersions(api.Registry.RegisteredGroupVersions()...)
 		}
 	}
 
@@ -109,8 +109,8 @@ func mergeAPIResourceConfigs(defaultAPIResourceConfig *ResourceConfig, resourceC
 		if err != nil {
 			return nil, fmt.Errorf("invalid key %s", key)
 		}
-		// Verify that the groupVersion is registered.
-		if !registered.IsRegisteredVersion(groupVersion) {
+		// Verify that the groupVersion is api.Registry.
+		if !api.Registry.IsRegisteredVersion(groupVersion) {
 			return nil, fmt.Errorf("group version %s that has not been registered", groupVersion.String())
 		}
 		enabled, err := getRuntimeConfigValue(overrides, key, false)
@@ -141,8 +141,8 @@ func mergeAPIResourceConfigs(defaultAPIResourceConfig *ResourceConfig, resourceC
 			return nil, fmt.Errorf("invalid key %s", key)
 		}
 		resource := tokens[2]
-		// Verify that the groupVersion is registered.
-		if !registered.IsRegisteredVersion(groupVersion) {
+		// Verify that the groupVersion is api.Registry.
+		if !api.Registry.IsRegisteredVersion(groupVersion) {
 			return nil, fmt.Errorf("group version %s that has not been registered", groupVersion.String())
 		}
 

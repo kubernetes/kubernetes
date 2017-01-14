@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors.
+Copyright 2017 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,10 +18,9 @@ package v1beta1
 
 import (
 	fmt "fmt"
+	schema "k8s.io/apimachinery/pkg/runtime/schema"
+	serializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	api "k8s.io/client-go/pkg/api"
-	registered "k8s.io/client-go/pkg/apimachinery/registered"
-	schema "k8s.io/client-go/pkg/runtime/schema"
-	serializer "k8s.io/client-go/pkg/runtime/serializer"
 	rest "k8s.io/client-go/rest"
 )
 
@@ -36,7 +35,7 @@ type ExtensionsV1beta1Interface interface {
 	ThirdPartyResourcesGetter
 }
 
-// ExtensionsV1beta1Client is used to interact with features provided by the k8s.io/kubernetes/pkg/apimachinery/registered.Group group.
+// ExtensionsV1beta1Client is used to interact with features provided by the extensions group.
 type ExtensionsV1beta1Client struct {
 	restClient rest.Interface
 }
@@ -103,7 +102,7 @@ func setConfigDefaults(config *rest.Config) error {
 		return err
 	}
 	// if extensions/v1beta1 is not enabled, return an error
-	if !registered.IsEnabledVersion(gv) {
+	if !api.Registry.IsEnabledVersion(gv) {
 		return fmt.Errorf("extensions/v1beta1 is not enabled")
 	}
 	config.APIPath = "/apis"

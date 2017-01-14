@@ -51,7 +51,6 @@ go_library(
         "//vendor:github.com/go-openapi/spec",
         "//vendor:github.com/golang/glog",
         "//vendor:github.com/pborman/uuid",
-        "//vendor:k8s.io/apimachinery/pkg/apimachinery/registered",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/runtime",
         "//vendor:k8s.io/apimachinery/pkg/runtime/schema",

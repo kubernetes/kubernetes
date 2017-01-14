@@ -98,7 +98,6 @@ go_library(
         "//vendor:google.golang.org/api/compute/v1",
         "//vendor:google.golang.org/api/googleapi",
         "//vendor:gopkg.in/yaml.v2",
-        "//vendor:k8s.io/apimachinery/pkg/apimachinery/registered",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1/unstructured",
         "//vendor:k8s.io/apimachinery/pkg/labels",
@@ -113,7 +112,6 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/util/wait",
         "//vendor:k8s.io/apimachinery/pkg/watch",
         "//vendor:k8s.io/client-go/kubernetes",
-        "//vendor:k8s.io/client-go/pkg/util/sets",
         "//vendor:k8s.io/client-go/rest",
     ],
 )

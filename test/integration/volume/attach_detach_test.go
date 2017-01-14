@@ -23,8 +23,8 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/apimachinery/pkg/apimachinery/registered"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
@@ -169,7 +169,7 @@ func waitToObservePods(t *testing.T, podInformer cache.SharedIndexInformer, podN
 func createAdClients(ns *v1.Namespace, t *testing.T, server *httptest.Server, syncPeriod time.Duration) (*clientset.Clientset, attachdetach.AttachDetachController, cache.SharedIndexInformer, cache.SharedIndexInformer) {
 	config := restclient.Config{
 		Host:          server.URL,
-		ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(v1.GroupName).GroupVersion},
+		ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(v1.GroupName).GroupVersion},
 		QPS:           1000000,
 		Burst:         1000000,
 	}

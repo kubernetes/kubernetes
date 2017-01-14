@@ -19,7 +19,6 @@ go_library(
         "//pkg/api:go_default_library",
         "//pkg/api/v1:go_default_library",
         "//vendor:github.com/golang/glog",
-        "//vendor:k8s.io/apimachinery/pkg/apimachinery/registered",
         "//vendor:k8s.io/apimachinery/pkg/runtime",
     ],
 )
@@ -34,7 +33,6 @@ go_test(
         "//pkg/util/testing:go_default_library",
         "//pkg/volume:go_default_library",
         "//vendor:github.com/pborman/uuid",
-        "//vendor:k8s.io/apimachinery/pkg/apimachinery/registered",
         "//vendor:k8s.io/apimachinery/pkg/runtime",
     ],
 )

@@ -37,6 +37,10 @@ func (*FakeController) HasSynced() bool {
 	return true
 }
 
+func (*FakeController) LastSyncResourceVersion() string {
+	return ""
+}
+
 func TestGCTerminated(t *testing.T) {
 	type nameToPhase struct {
 		name  string

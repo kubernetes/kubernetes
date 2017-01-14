@@ -23,11 +23,11 @@ import (
 	"testing"
 	"time"
 
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/pkg/api/v1"
-	"k8s.io/client-go/pkg/runtime"
-	"k8s.io/client-go/pkg/util/sets"
-	"k8s.io/client-go/pkg/util/wait"
-	"k8s.io/client-go/pkg/watch"
 	fcache "k8s.io/client-go/tools/cache/testing"
 
 	"github.com/google/gofuzz"

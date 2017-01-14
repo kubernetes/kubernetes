@@ -23,7 +23,7 @@ package configmap
 import (
 	"testing"
 
-	"k8s.io/apimachinery/pkg/apimachinery/registered"
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/client/restclient"
@@ -36,7 +36,7 @@ func TestConfigMap(t *testing.T) {
 	_, s := framework.RunAMaster(nil)
 	defer s.Close()
 
-	client := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(v1.GroupName).GroupVersion}})
+	client := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(v1.GroupName).GroupVersion}})
 
 	ns := framework.CreateTestingNamespace("config-map", s, t)
 	defer framework.DeleteTestingNamespace(ns, s, t)

@@ -19,7 +19,6 @@ package resourcequota
 import (
 	"testing"
 
-	"k8s.io/apimachinery/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
@@ -62,7 +61,7 @@ func TestResourceQuotaStrategy(t *testing.T) {
 
 func TestSelectableFieldLabelConversions(t *testing.T) {
 	apitesting.TestSelectableFieldLabelConversionsOfKind(t,
-		registered.GroupOrDie(api.GroupName).GroupVersion.String(),
+		api.Registry.GroupOrDie(api.GroupName).GroupVersion.String(),
 		"ResourceQuota",
 		ResourceQuotaToSelectableFields(&api.ResourceQuota{}),
 		nil,

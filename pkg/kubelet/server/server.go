@@ -182,7 +182,6 @@ type HostInterface interface {
 	ImagesFsInfo() (cadvisorapiv2.FsInfo, error)
 	RootFsInfo() (cadvisorapiv2.FsInfo, error)
 	ListVolumesForPod(podUID types.UID) (map[string]volume.Volume, bool)
-	PLEGHealthCheck() (bool, error)
 	GetExec(podFullName string, podUID types.UID, containerName string, cmd []string, streamOpts remotecommand.Options) (*url.URL, error)
 	GetAttach(podFullName string, podUID types.UID, containerName string, streamOpts remotecommand.Options) (*url.URL, error)
 	GetPortForward(podName, podNamespace string, podUID types.UID) (*url.URL, error)
@@ -257,7 +256,6 @@ func (s *Server) InstallDefaultHandlers() {
 	healthz.InstallHandler(s.restfulCont,
 		healthz.PingHealthz,
 		healthz.NamedCheck("syncloop", s.syncLoopHealthCheck),
-		healthz.NamedCheck("pleg", s.plegHealthCheck),
 	)
 	var ws *restful.WebService
 	ws = new(restful.WebService)
@@ -417,14 +415,6 @@ func (s *Server) syncLoopHealthCheck(req *http.Request) error {
 	return nil
 }
 
-// Checks if pleg, which lists pods periodically, is healthy.
-func (s *Server) plegHealthCheck(req *http.Request) error {
-	if ok, err := s.host.PLEGHealthCheck(); !ok {
-		return fmt.Errorf("PLEG took longer than expected: %v", err)
-	}
-	return nil
-}
-
 // getContainerLogs handles containerLogs request against the Kubelet
 func (s *Server) getContainerLogs(request *restful.Request, response *restful.Response) {
 	podNamespace := request.PathParameter("podNamespace")
@@ -479,12 +469,14 @@ func (s *Server) getContainerLogs(request *restful.Request, response *restful.Re
 	for _, container := range pod.Spec.Containers {
 		if container.Name == containerName {
 			containerExists = true
+			break
 		}
 	}
 	if !containerExists {
 		for _, container := range pod.Spec.InitContainers {
 			if container.Name == containerName {
 				containerExists = true
+				break
 			}
 		}
 	}

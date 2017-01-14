@@ -26,7 +26,6 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/apimachinery/pkg/apimachinery/registered"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -1493,7 +1492,7 @@ func TestUpdateRcWithRetries(t *testing.T) {
 			}
 		}),
 	}
-	clientConfig := &restclient.Config{APIPath: "/api", ContentConfig: restclient.ContentConfig{NegotiatedSerializer: api.Codecs, GroupVersion: &registered.GroupOrDie(api.GroupName).GroupVersion}}
+	clientConfig := &restclient.Config{APIPath: "/api", ContentConfig: restclient.ContentConfig{NegotiatedSerializer: api.Codecs, GroupVersion: &api.Registry.GroupOrDie(api.GroupName).GroupVersion}}
 	restClient, _ := restclient.RESTClientFor(clientConfig)
 	restClient.Client = fakeClient.Client
 	clientset := internalclientset.New(restClient)
@@ -1593,7 +1592,7 @@ func TestAddDeploymentHash(t *testing.T) {
 			}
 		}),
 	}
-	clientConfig := &restclient.Config{APIPath: "/api", ContentConfig: restclient.ContentConfig{NegotiatedSerializer: api.Codecs, GroupVersion: &registered.GroupOrDie(api.GroupName).GroupVersion}}
+	clientConfig := &restclient.Config{APIPath: "/api", ContentConfig: restclient.ContentConfig{NegotiatedSerializer: api.Codecs, GroupVersion: &api.Registry.GroupOrDie(api.GroupName).GroupVersion}}
 	restClient, _ := restclient.RESTClientFor(clientConfig)
 	restClient.Client = fakeClient.Client
 	clientset := internalclientset.New(restClient)

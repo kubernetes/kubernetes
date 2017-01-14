@@ -23,9 +23,9 @@ import (
 
 	"net/http/httptest"
 
-	"k8s.io/apimachinery/pkg/apimachinery/registered"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/client/restclient"
@@ -338,7 +338,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 		}
 		server := httptest.NewServer(&handler)
 		defer server.Close()
-		client := clientset.NewForConfigOrDie(&restclient.Config{Host: server.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(v1.GroupName).GroupVersion}})
+		client := clientset.NewForConfigOrDie(&restclient.Config{Host: server.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(v1.GroupName).GroupVersion}})
 
 		if _, err := factory.NewConfigFactory(client, "some-scheduler-name", v1.DefaultHardPodAffinitySymmetricWeight, v1.DefaultFailureDomains).CreateFromConfig(policy); err != nil {
 			t.Errorf("%s: Error constructing: %v", v, err)

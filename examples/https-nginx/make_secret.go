@@ -26,7 +26,6 @@ import (
 	"io/ioutil"
 	"log"
 
-	"k8s.io/apimachinery/pkg/apimachinery/registered"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/api"
 
@@ -66,5 +65,5 @@ func main() {
 			"nginx.key": nginxKey,
 		},
 	}
-	fmt.Printf(runtime.EncodeOrDie(api.Codecs.LegacyCodec(registered.EnabledVersions()...), secret))
+	fmt.Printf(runtime.EncodeOrDie(api.Codecs.LegacyCodec(api.Registry.EnabledVersions()...), secret))
 }

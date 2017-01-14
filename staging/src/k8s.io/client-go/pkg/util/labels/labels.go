@@ -19,7 +19,7 @@ package labels
 import (
 	"fmt"
 
-	metav1 "k8s.io/client-go/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // Clones the given map and returns a new map with the given key and value added.

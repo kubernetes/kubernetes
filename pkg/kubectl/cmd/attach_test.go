@@ -27,7 +27,6 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"k8s.io/apimachinery/pkg/apimachinery/registered"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/restclient"
@@ -127,7 +126,7 @@ func TestPodAndContainerAttach(t *testing.T) {
 }
 
 func TestAttach(t *testing.T) {
-	version := registered.GroupOrDie(api.GroupName).GroupVersion.Version
+	version := api.Registry.GroupOrDie(api.GroupName).GroupVersion.Version
 	tests := []struct {
 		name, version, podPath, attachPath, container string
 		pod                                           *api.Pod
@@ -226,7 +225,7 @@ func TestAttach(t *testing.T) {
 }
 
 func TestAttachWarnings(t *testing.T) {
-	version := registered.GroupOrDie(api.GroupName).GroupVersion.Version
+	version := api.Registry.GroupOrDie(api.GroupName).GroupVersion.Version
 	tests := []struct {
 		name, container, version, podPath, expectedErr, expectedOut string
 		pod                                                         *api.Pod

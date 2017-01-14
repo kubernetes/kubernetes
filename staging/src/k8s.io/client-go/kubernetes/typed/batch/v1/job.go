@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors.
+Copyright 2017 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,11 +17,11 @@ limitations under the License.
 package v1
 
 import (
+	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	watch "k8s.io/apimachinery/pkg/watch"
 	api "k8s.io/client-go/pkg/api"
 	api_v1 "k8s.io/client-go/pkg/api/v1"
 	v1 "k8s.io/client-go/pkg/apis/batch/v1"
-	meta_v1 "k8s.io/client-go/pkg/apis/meta/v1"
-	watch "k8s.io/client-go/pkg/watch"
 	rest "k8s.io/client-go/rest"
 )
 

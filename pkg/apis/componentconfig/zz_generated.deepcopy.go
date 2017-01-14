@@ -36,6 +36,8 @@ func init() {
 // to allow building arbitrary schemes.
 func RegisterDeepCopies(scheme *runtime.Scheme) error {
 	return scheme.AddGeneratedDeepCopyFuncs(
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_componentconfig_AdmissionConfiguration, InType: reflect.TypeOf(&AdmissionConfiguration{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_componentconfig_AdmissionPluginConfiguration, InType: reflect.TypeOf(&AdmissionPluginConfiguration{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_componentconfig_IPVar, InType: reflect.TypeOf(&IPVar{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_componentconfig_KubeControllerManagerConfiguration, InType: reflect.TypeOf(&KubeControllerManagerConfiguration{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_componentconfig_KubeProxyConfiguration, InType: reflect.TypeOf(&KubeProxyConfiguration{})},
@@ -52,6 +54,41 @@ func RegisterDeepCopies(scheme *runtime.Scheme) error {
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_componentconfig_PortRangeVar, InType: reflect.TypeOf(&PortRangeVar{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_componentconfig_VolumeConfiguration, InType: reflect.TypeOf(&VolumeConfiguration{})},
 	)
+}
+
+func DeepCopy_componentconfig_AdmissionConfiguration(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*AdmissionConfiguration)
+		out := out.(*AdmissionConfiguration)
+		*out = *in
+		if in.Plugins != nil {
+			in, out := &in.Plugins, &out.Plugins
+			*out = make([]AdmissionPluginConfiguration, len(*in))
+			for i := range *in {
+				if err := DeepCopy_componentconfig_AdmissionPluginConfiguration(&(*in)[i], &(*out)[i], c); err != nil {
+					return err
+				}
+			}
+		}
+		return nil
+	}
+}
+
+func DeepCopy_componentconfig_AdmissionPluginConfiguration(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*AdmissionPluginConfiguration)
+		out := out.(*AdmissionPluginConfiguration)
+		*out = *in
+		// in.Configuration is kind 'Interface'
+		if in.Configuration != nil {
+			if newVal, err := c.DeepCopy(&in.Configuration); err != nil {
+				return err
+			} else {
+				out.Configuration = *newVal.(*runtime.Object)
+			}
+		}
+		return nil
+	}
 }
 
 func DeepCopy_componentconfig_IPVar(in interface{}, out interface{}, c *conversion.Cloner) error {

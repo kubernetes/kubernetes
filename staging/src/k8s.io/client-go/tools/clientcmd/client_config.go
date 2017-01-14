@@ -439,19 +439,46 @@ func (config *DirectClientConfig) getCluster() (clientcmdapi.Cluster, error) {
 }
 
 // inClusterClientConfig makes a config that will work from within a kubernetes cluster container environment.
-type inClusterClientConfig struct{}
+// Can take options overrides for flags explicitly provided to the command inside the cluster container.
+type inClusterClientConfig struct {
+	overrides               *ConfigOverrides
+	inClusterConfigProvider func() (*rest.Config, error)
+}
 
-var _ ClientConfig = inClusterClientConfig{}
+var _ ClientConfig = &inClusterClientConfig{}
 
-func (inClusterClientConfig) RawConfig() (clientcmdapi.Config, error) {
+func (config *inClusterClientConfig) RawConfig() (clientcmdapi.Config, error) {
 	return clientcmdapi.Config{}, fmt.Errorf("inCluster environment config doesn't support multiple clusters")
 }
 
-func (inClusterClientConfig) ClientConfig() (*rest.Config, error) {
-	return rest.InClusterConfig()
+func (config *inClusterClientConfig) ClientConfig() (*rest.Config, error) {
+	if config.inClusterConfigProvider == nil {
+		config.inClusterConfigProvider = rest.InClusterConfig
+	}
+
+	icc, err := config.inClusterConfigProvider()
+	if err != nil {
+		return nil, err
+	}
+
+	// in-cluster configs only takes a host, token, or CA file
+	// if any of them were individually provided, ovewrite anything else
+	if config.overrides != nil {
+		if server := config.overrides.ClusterInfo.Server; len(server) > 0 {
+			icc.Host = server
+		}
+		if token := config.overrides.AuthInfo.Token; len(token) > 0 {
+			icc.BearerToken = token
+		}
+		if certificateAuthorityFile := config.overrides.ClusterInfo.CertificateAuthority; len(certificateAuthorityFile) > 0 {
+			icc.TLSClientConfig.CAFile = certificateAuthorityFile
+		}
+	}
+
+	return icc, err
 }
 
-func (inClusterClientConfig) Namespace() (string, bool, error) {
+func (config *inClusterClientConfig) Namespace() (string, bool, error) {
 	// This way assumes you've set the POD_NAMESPACE environment variable using the downward API.
 	// This check has to be done first for backwards compatibility with the way InClusterConfig was originally set up
 	if ns := os.Getenv("POD_NAMESPACE"); ns != "" {
@@ -468,12 +495,12 @@ func (inClusterClientConfig) Namespace() (string, bool, error) {
 	return "default", false, nil
 }
 
-func (inClusterClientConfig) ConfigAccess() ConfigAccess {
+func (config *inClusterClientConfig) ConfigAccess() ConfigAccess {
 	return NewDefaultClientConfigLoadingRules()
 }
 
 // Possible returns true if loading an inside-kubernetes-cluster is possible.
-func (inClusterClientConfig) Possible() bool {
+func (config *inClusterClientConfig) Possible() bool {
 	fi, err := os.Stat("/var/run/secrets/kubernetes.io/serviceaccount/token")
 	return os.Getenv("KUBERNETES_SERVICE_HOST") != "" &&
 		os.Getenv("KUBERNETES_SERVICE_PORT") != "" &&

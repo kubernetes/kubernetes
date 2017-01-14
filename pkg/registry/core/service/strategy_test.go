@@ -20,7 +20,6 @@ import (
 	"reflect"
 	"testing"
 
-	"k8s.io/apimachinery/pkg/apimachinery/registered"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
@@ -214,7 +213,7 @@ func TestBeforeUpdate(t *testing.T) {
 
 func TestSelectableFieldLabelConversions(t *testing.T) {
 	apitesting.TestSelectableFieldLabelConversionsOfKind(t,
-		registered.GroupOrDie(api.GroupName).GroupVersion.String(),
+		api.Registry.GroupOrDie(api.GroupName).GroupVersion.String(),
 		"Service",
 		ServiceToSelectableFields(&api.Service{}),
 		nil,

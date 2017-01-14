@@ -21,12 +21,12 @@ import (
 	"path"
 	"strings"
 
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/pkg/api"
 	"k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/pkg/fields"
-	"k8s.io/client-go/pkg/labels"
-	"k8s.io/client-go/pkg/runtime"
-	"k8s.io/client-go/pkg/runtime/schema"
 )
 
 func NewRootGetAction(resource schema.GroupVersionResource, name string) GetActionImpl {

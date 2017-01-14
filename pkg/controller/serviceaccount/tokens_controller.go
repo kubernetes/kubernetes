@@ -145,8 +145,8 @@ type TokensController struct {
 	secrets         cache.Indexer
 
 	// Since we join two objects, we'll watch both of them with controllers.
-	serviceAccountController *cache.Controller
-	secretController         *cache.Controller
+	serviceAccountController cache.Controller
+	secretController         cache.Controller
 
 	// syncServiceAccountQueue handles service account events:
 	//   * ensures a referenced token exists for service accounts which still exist

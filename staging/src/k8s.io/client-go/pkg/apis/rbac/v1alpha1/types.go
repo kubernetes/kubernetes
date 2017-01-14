@@ -17,9 +17,9 @@ limitations under the License.
 package v1alpha1
 
 import (
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/pkg/api/v1"
-	metav1 "k8s.io/client-go/pkg/apis/meta/v1"
-	"k8s.io/client-go/pkg/runtime"
 )
 
 // Authorization is calculated against
@@ -36,8 +36,6 @@ const (
 	GroupKind          = "Group"
 	ServiceAccountKind = "ServiceAccount"
 	UserKind           = "User"
-
-	UserAll = "*"
 )
 
 // Authorization is calculated against

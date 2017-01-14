@@ -20,7 +20,6 @@ import (
 	"fmt"
 
 	"k8s.io/apimachinery/pkg/api/meta"
-	"k8s.io/apimachinery/pkg/apimachinery/registered"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -64,7 +63,7 @@ func ValidateEvent(event *api.Event) field.ErrorList {
 // Check whether the kind in groupVersion is scoped at the root of the api hierarchy
 func isNamespacedKind(kind, groupVersion string) (bool, error) {
 	group := apiutil.GetGroup(groupVersion)
-	g, err := registered.Group(group)
+	g, err := api.Registry.Group(group)
 	if err != nil {
 		return false, err
 	}

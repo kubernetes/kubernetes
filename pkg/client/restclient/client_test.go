@@ -27,7 +27,6 @@ import (
 
 	"fmt"
 
-	"k8s.io/apimachinery/pkg/apimachinery/registered"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -243,7 +242,7 @@ func validate(testParam TestParam, t *testing.T, body []byte, fakeHandler *utilt
 			t.Errorf("Unexpected mis-match. Expected %#v.  Saw %#v", testParam.expStatus, statusOut)
 		}
 	}
-	fakeHandler.ValidateRequest(t, "/"+registered.GroupOrDie(api.GroupName).GroupVersion.String()+"/test", "GET", nil)
+	fakeHandler.ValidateRequest(t, "/"+api.Registry.GroupOrDie(api.GroupName).GroupVersion.String()+"/test", "GET", nil)
 
 }
 
@@ -330,7 +329,7 @@ func restClient(testServer *httptest.Server) (*RESTClient, error) {
 	c, err := RESTClientFor(&Config{
 		Host: testServer.URL,
 		ContentConfig: ContentConfig{
-			GroupVersion:         &registered.GroupOrDie(api.GroupName).GroupVersion,
+			GroupVersion:         &api.Registry.GroupOrDie(api.GroupName).GroupVersion,
 			NegotiatedSerializer: testapi.Default.NegotiatedSerializer(),
 		},
 		Username: "user",

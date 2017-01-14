@@ -29,9 +29,9 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/apimachinery/pkg/apimachinery/registered"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
@@ -196,7 +196,7 @@ func TestSchedulerExtender(t *testing.T) {
 	ns := framework.CreateTestingNamespace("scheduler-extender", s, t)
 	defer framework.DeleteTestingNamespace(ns, s, t)
 
-	clientSet := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(v1.GroupName).GroupVersion}})
+	clientSet := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(v1.GroupName).GroupVersion}})
 
 	extender1 := &Extender{
 		name:         "extender1",
@@ -236,7 +236,7 @@ func TestSchedulerExtender(t *testing.T) {
 			},
 		},
 	}
-	policy.APIVersion = registered.GroupOrDie(v1.GroupName).GroupVersion.String()
+	policy.APIVersion = api.Registry.GroupOrDie(v1.GroupName).GroupVersion.String()
 
 	schedulerConfigFactory := factory.NewConfigFactory(clientSet, v1.DefaultSchedulerName, v1.DefaultHardPodAffinitySymmetricWeight, v1.DefaultFailureDomains)
 	schedulerConfig, err := schedulerConfigFactory.CreateFromConfig(policy)

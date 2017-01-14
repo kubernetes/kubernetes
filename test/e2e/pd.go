@@ -31,9 +31,9 @@ import (
 	"github.com/aws/aws-sdk-go/service/ec2"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	"k8s.io/apimachinery/pkg/apimachinery/registered"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/v1"
 	v1core "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/core/v1"
@@ -725,7 +725,7 @@ func testPDPod(diskNames []string, targetNode types.NodeName, readOnly bool, num
 	pod := &v1.Pod{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Pod",
-			APIVersion: registered.GroupOrDie(v1.GroupName).GroupVersion.String(),
+			APIVersion: api.Registry.GroupOrDie(v1.GroupName).GroupVersion.String(),
 		},
 		ObjectMeta: v1.ObjectMeta{
 			Name: "pd-test-" + string(uuid.NewUUID()),

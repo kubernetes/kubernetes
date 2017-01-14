@@ -26,7 +26,6 @@ import (
 	"reflect"
 	"testing"
 
-	"k8s.io/apimachinery/pkg/apimachinery/registered"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -69,7 +68,7 @@ func setUp(t *testing.T) (*Master, *etcdtesting.EtcdTestServer, Config, *assert.
 	}
 
 	resourceEncoding := genericapiserver.NewDefaultResourceEncodingConfig()
-	resourceEncoding.SetVersionEncoding(api.GroupName, registered.GroupOrDie(api.GroupName).GroupVersion, schema.GroupVersion{Group: api.GroupName, Version: runtime.APIVersionInternal})
+	resourceEncoding.SetVersionEncoding(api.GroupName, api.Registry.GroupOrDie(api.GroupName).GroupVersion, schema.GroupVersion{Group: api.GroupName, Version: runtime.APIVersionInternal})
 	resourceEncoding.SetVersionEncoding(autoscaling.GroupName, *testapi.Autoscaling.GroupVersion(), schema.GroupVersion{Group: autoscaling.GroupName, Version: runtime.APIVersionInternal})
 	resourceEncoding.SetVersionEncoding(batch.GroupName, *testapi.Batch.GroupVersion(), schema.GroupVersion{Group: batch.GroupName, Version: runtime.APIVersionInternal})
 	resourceEncoding.SetVersionEncoding(apps.GroupName, *testapi.Apps.GroupVersion(), schema.GroupVersion{Group: apps.GroupName, Version: runtime.APIVersionInternal})

@@ -42,7 +42,6 @@ go_library(
         "//pkg/apis/storage:go_default_library",
         "//pkg/apis/storage/install:go_default_library",
         "//vendor:k8s.io/apimachinery/pkg/api/meta",
-        "//vendor:k8s.io/apimachinery/pkg/apimachinery/registered",
         "//vendor:k8s.io/apimachinery/pkg/runtime",
         "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
         "//vendor:k8s.io/apimachinery/pkg/runtime/serializer/recognizer",

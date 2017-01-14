@@ -21,11 +21,11 @@ import (
 	"sync"
 
 	"k8s.io/apimachinery/pkg/api/meta"
-	"k8s.io/apimachinery/pkg/apimachinery/registered"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/client/restclient"
 )
@@ -414,7 +414,7 @@ func filterByNamespaceAndName(objs []runtime.Object, ns, name string) ([]runtime
 // returns an error if namespace is empty but gvk is a namespaced
 // kind, or if ns is non-empty and gvk is a namespaced kind.
 func checkNamespace(gvk schema.GroupVersionKind, ns string) error {
-	group, err := registered.Group(gvk.Group)
+	group, err := api.Registry.Group(gvk.Group)
 	if err != nil {
 		return err
 	}

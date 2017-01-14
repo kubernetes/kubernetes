@@ -48,7 +48,7 @@ const ResourceResyncTime time.Duration = 0
 
 type monitor struct {
 	store      cache.Store
-	controller *cache.Controller
+	controller cache.Controller
 }
 
 type objectReference struct {

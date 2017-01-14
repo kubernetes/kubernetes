@@ -19,9 +19,9 @@ package discovery
 import (
 	"fmt"
 
-	metav1 "k8s.io/client-go/pkg/apis/meta/v1"
-	"k8s.io/client-go/pkg/runtime/schema"
-	"k8s.io/client-go/pkg/util/sets"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/pkg/version"
 	// Import solely to initialize client auth plugins.
 	_ "k8s.io/client-go/plugin/pkg/client/auth"

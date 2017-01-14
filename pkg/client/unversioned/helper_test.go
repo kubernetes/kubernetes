@@ -23,7 +23,6 @@ import (
 	"reflect"
 	"testing"
 
-	"k8s.io/apimachinery/pkg/apimachinery/registered"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -43,7 +42,7 @@ func TestSetKubernetesDefaults(t *testing.T) {
 			restclient.Config{
 				APIPath: "/api",
 				ContentConfig: restclient.ContentConfig{
-					GroupVersion:         &registered.GroupOrDie(api.GroupName).GroupVersion,
+					GroupVersion:         &api.Registry.GroupOrDie(api.GroupName).GroupVersion,
 					NegotiatedSerializer: testapi.Default.NegotiatedSerializer(),
 				},
 			},
@@ -141,9 +140,9 @@ func TestSetsCodec(t *testing.T) {
 		Prefix               string
 		NegotiatedSerializer runtime.NegotiatedSerializer
 	}{
-		registered.GroupOrDie(api.GroupName).GroupVersion.Version: {
+		api.Registry.GroupOrDie(api.GroupName).GroupVersion.Version: {
 			Err:                  false,
-			Prefix:               "/api/" + registered.GroupOrDie(api.GroupName).GroupVersion.Version,
+			Prefix:               "/api/" + api.Registry.GroupOrDie(api.GroupName).GroupVersion.Version,
 			NegotiatedSerializer: testapi.Default.NegotiatedSerializer(),
 		},
 		// Add this test back when we fixed config and SetKubernetesDefaults

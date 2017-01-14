@@ -27,7 +27,6 @@ import (
 
 	"github.com/golang/glog"
 
-	"k8s.io/apimachinery/pkg/apimachinery/registered"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/kubernetes/pkg/api"
@@ -90,19 +89,19 @@ type LegacyRESTStorage struct {
 
 func (c LegacyRESTStorageProvider) NewLegacyRESTStorage(restOptionsGetter generic.RESTOptionsGetter) (LegacyRESTStorage, genericapiserver.APIGroupInfo, error) {
 	apiGroupInfo := genericapiserver.APIGroupInfo{
-		GroupMeta:                    *registered.GroupOrDie(api.GroupName),
+		GroupMeta:                    *api.Registry.GroupOrDie(api.GroupName),
 		VersionedResourcesStorageMap: map[string]map[string]rest.Storage{},
 		Scheme:                      api.Scheme,
 		ParameterCodec:              api.ParameterCodec,
 		NegotiatedSerializer:        api.Codecs,
 		SubresourceGroupVersionKind: map[string]schema.GroupVersionKind{},
 	}
-	if autoscalingGroupVersion := (schema.GroupVersion{Group: "autoscaling", Version: "v1"}); registered.IsEnabledVersion(autoscalingGroupVersion) {
+	if autoscalingGroupVersion := (schema.GroupVersion{Group: "autoscaling", Version: "v1"}); api.Registry.IsEnabledVersion(autoscalingGroupVersion) {
 		apiGroupInfo.SubresourceGroupVersionKind["replicationcontrollers/scale"] = autoscalingGroupVersion.WithKind("Scale")
 	}
 
 	var podDisruptionClient policyclient.PodDisruptionBudgetsGetter
-	if policyGroupVersion := (schema.GroupVersion{Group: "policy", Version: "v1beta1"}); registered.IsEnabledVersion(policyGroupVersion) {
+	if policyGroupVersion := (schema.GroupVersion{Group: "policy", Version: "v1beta1"}); api.Registry.IsEnabledVersion(policyGroupVersion) {
 		apiGroupInfo.SubresourceGroupVersionKind["pods/eviction"] = policyGroupVersion.WithKind("Eviction")
 
 		var err error
@@ -223,10 +222,10 @@ func (c LegacyRESTStorageProvider) NewLegacyRESTStorage(restOptionsGetter generi
 
 		"componentStatuses": componentstatus.NewStorage(componentStatusStorage{c.StorageFactory}.serversToValidate),
 	}
-	if registered.IsEnabledVersion(schema.GroupVersion{Group: "autoscaling", Version: "v1"}) {
+	if api.Registry.IsEnabledVersion(schema.GroupVersion{Group: "autoscaling", Version: "v1"}) {
 		restStorageMap["replicationControllers/scale"] = controllerStorage.Scale
 	}
-	if registered.IsEnabledVersion(schema.GroupVersion{Group: "policy", Version: "v1beta1"}) {
+	if api.Registry.IsEnabledVersion(schema.GroupVersion{Group: "policy", Version: "v1beta1"}) {
 		restStorageMap["pods/eviction"] = podStorage.Eviction
 	}
 	apiGroupInfo.VersionedResourcesStorageMap["v1"] = restStorageMap

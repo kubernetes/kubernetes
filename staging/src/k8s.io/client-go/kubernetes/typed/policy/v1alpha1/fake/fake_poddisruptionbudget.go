@@ -17,12 +17,12 @@ limitations under the License.
 package fake
 
 import (
+	labels "k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	watch "k8s.io/apimachinery/pkg/watch"
 	api "k8s.io/client-go/pkg/api"
 	v1 "k8s.io/client-go/pkg/api/v1"
 	v1alpha1 "k8s.io/client-go/pkg/apis/policy/v1alpha1"
-	labels "k8s.io/client-go/pkg/labels"
-	"k8s.io/client-go/pkg/runtime/schema"
-	watch "k8s.io/client-go/pkg/watch"
 	testing "k8s.io/client-go/testing"
 )
 

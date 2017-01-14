@@ -54,7 +54,7 @@ go_test(
         "//pkg/kubectl/cmd/util:go_default_library",
         "//pkg/util/intstr:go_default_library",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
-        "//vendor:k8s.io/client-go/pkg/util/diff",
+        "//vendor:k8s.io/apimachinery/pkg/util/diff",
     ],
 )
 

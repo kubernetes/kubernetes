@@ -22,7 +22,7 @@
 # Please see http://docs.fluentd.org/articles/install-by-deb for more
 # information about installing fluentd using deb package.
 
-FROM gcr.io/google_containers/ubuntu-slim:0.4
+FROM gcr.io/google_containers/ubuntu-slim:0.6
 
 # Ensure there are enough file descriptors for running Fluentd.
 RUN ulimit -n 65536

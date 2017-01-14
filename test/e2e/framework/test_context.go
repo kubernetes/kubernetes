@@ -199,7 +199,7 @@ func RegisterClusterFlags() {
 
 // Register flags specific to the node e2e test suite.
 func RegisterNodeFlags() {
-	// Mark the test as node e2e when node flags are registered.
+	// Mark the test as node e2e when node flags are api.Registry.
 	TestContext.NodeE2E = true
 	flag.StringVar(&TestContext.NodeName, "node-name", "", "Name of the node to run tests on.")
 	// TODO(random-liu): Move kubelet start logic out of the test.

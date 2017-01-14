@@ -28,20 +28,21 @@ import (
 
 	"github.com/golang/glog"
 
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	kubeschema "k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/apiserver/pkg/util/cache"
 	apierrors "k8s.io/client-go/pkg/api/errors"
 	"k8s.io/client-go/pkg/apis/imagepolicy/v1alpha1"
-	"k8s.io/client-go/pkg/runtime/schema"
 	"k8s.io/client-go/rest"
 
-	kubeschema "k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/plugin/pkg/webhook"
 
 	// install the clientgo image policy API for use with api registry
 	_ "k8s.io/client-go/pkg/apis/imagepolicy/install"
+	_ "k8s.io/kubernetes/pkg/apis/imagepolicy/install"
 )
 
 var (
@@ -214,6 +215,7 @@ func (a *imagePolicyWebhook) admitPod(attributes admission.Attributes, review *v
 // For additional HTTP configuration, refer to the kubeconfig documentation
 // http://kubernetes.io/v1.1/docs/user-guide/kubeconfig-file.html.
 func NewImagePolicyWebhook(configFile io.Reader) (admission.Interface, error) {
+	// TODO: move this to a versioned configuration file format
 	var config AdmissionConfig
 	d := yaml.NewYAMLOrJSONDecoder(configFile, 4096)
 	err := d.Decode(&config)

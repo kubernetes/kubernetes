@@ -58,7 +58,7 @@ type ConfigMapController struct {
 	// Definitions of configmaps that should be federated.
 	configmapInformerStore cache.Store
 	// Informer controller for configmaps that should be federated.
-	configmapInformerController cache.ControllerInterface
+	configmapInformerController cache.Controller
 
 	// Client to federated api server.
 	federatedApiClient federationclientset.Interface
@@ -112,7 +112,7 @@ func NewConfigMapController(client federationclientset.Interface) *ConfigMapCont
 	// Federated informer on configmaps in members of federation.
 	configmapcontroller.configmapFederatedInformer = util.NewFederatedInformer(
 		client,
-		func(cluster *federationapi.Cluster, targetClient kubeclientset.Interface) (cache.Store, cache.ControllerInterface) {
+		func(cluster *federationapi.Cluster, targetClient kubeclientset.Interface) (cache.Store, cache.Controller) {
 			return cache.NewInformer(
 				&cache.ListWatch{
 					ListFunc: func(options apiv1.ListOptions) (pkgruntime.Object, error) {

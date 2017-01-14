@@ -82,7 +82,7 @@ func (d *UnstructuredObjectTyper) Recognizes(gvk schema.GroupVersionKind) bool {
 
 // IsUnversioned returns false always because runtime.Unstructured objects
 // should always have group,version,kind information set. ok will be true if the
-// object's group,version,kind is registered.
+// object's group,version,kind is api.Registry.
 func (d *UnstructuredObjectTyper) IsUnversioned(obj runtime.Object) (unversioned bool, ok bool) {
 	gvk, err := d.ObjectKind(obj)
 	if err != nil {

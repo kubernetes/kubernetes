@@ -17,7 +17,6 @@ limitations under the License.
 package internalversion
 
 import (
-	registered "k8s.io/apimachinery/pkg/apimachinery/registered"
 	api "k8s.io/kubernetes/pkg/api"
 	restclient "k8s.io/kubernetes/pkg/client/restclient"
 )
@@ -34,7 +33,7 @@ type ExtensionsInterface interface {
 	ThirdPartyResourcesGetter
 }
 
-// ExtensionsClient is used to interact with features provided by the k8s.io/apimachinery/pkg/apimachinery/registered.Group group.
+// ExtensionsClient is used to interact with features provided by the extensions group.
 type ExtensionsClient struct {
 	restClient restclient.Interface
 }
@@ -101,7 +100,7 @@ func New(c restclient.Interface) *ExtensionsClient {
 
 func setConfigDefaults(config *restclient.Config) error {
 	// if extensions group is not registered, return an error
-	g, err := registered.Group("extensions")
+	g, err := api.Registry.Group("extensions")
 	if err != nil {
 		return err
 	}

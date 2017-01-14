@@ -21,7 +21,6 @@ import (
 
 	"reflect"
 
-	"k8s.io/apimachinery/pkg/apimachinery/registered"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/kubernetes/federation/apis/federation"
 	"k8s.io/kubernetes/pkg/api"
@@ -156,7 +155,7 @@ func TestMatchCluster(t *testing.T) {
 
 func TestSelectableFieldLabelConversions(t *testing.T) {
 	apitesting.TestSelectableFieldLabelConversionsOfKind(t,
-		registered.GroupOrDie(federation.GroupName).GroupVersion.String(),
+		api.Registry.GroupOrDie(federation.GroupName).GroupVersion.String(),
 		"Cluster",
 		ClusterToSelectableFields(&federation.Cluster{}),
 		nil,

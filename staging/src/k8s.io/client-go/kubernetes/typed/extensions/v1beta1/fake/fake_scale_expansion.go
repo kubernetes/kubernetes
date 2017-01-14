@@ -17,8 +17,8 @@ limitations under the License.
 package fake
 
 import (
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/pkg/apis/extensions/v1beta1"
-	"k8s.io/client-go/pkg/runtime/schema"
 	"k8s.io/client-go/testing"
 )
 

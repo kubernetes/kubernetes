@@ -21,7 +21,6 @@ import (
 	"testing"
 
 	"k8s.io/apimachinery/pkg/api/meta"
-	"k8s.io/apimachinery/pkg/apimachinery/registered"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -164,7 +163,7 @@ func getCodec(obj runtime.Object) (runtime.Codec, error) {
 	// split the schemes for internal objects.
 	// TODO: caesarxuchao: we should add a map from kind to group in Scheme.
 	var codec runtime.Codec
-	if api.Scheme.Recognizes(registered.GroupOrDie(api.GroupName).GroupVersion.WithKind(fqKind.Kind)) {
+	if api.Scheme.Recognizes(api.Registry.GroupOrDie(api.GroupName).GroupVersion.WithKind(fqKind.Kind)) {
 		codec = testapi.Default.Codec()
 	} else if api.Scheme.Recognizes(testapi.Extensions.GroupVersion().WithKind(fqKind.Kind)) {
 		codec = testapi.Extensions.Codec()

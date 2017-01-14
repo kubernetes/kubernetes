@@ -42,7 +42,6 @@ go_library(
         "//pkg/apis/policy/v1beta1:go_default_library",
         "//pkg/client/restclient:go_default_library",
         "//pkg/fields:go_default_library",
-        "//vendor:k8s.io/apimachinery/pkg/apimachinery/registered",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/runtime",
         "//vendor:k8s.io/apimachinery/pkg/runtime/schema",

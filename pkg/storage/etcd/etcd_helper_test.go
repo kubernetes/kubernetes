@@ -25,7 +25,6 @@ import (
 
 	etcd "github.com/coreos/etcd/client"
 	"golang.org/x/net/context"
-	"k8s.io/apimachinery/pkg/apimachinery/registered"
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -44,7 +43,7 @@ import (
 func testScheme(t *testing.T) (*runtime.Scheme, runtime.Codec) {
 	scheme := runtime.NewScheme()
 	scheme.Log(t)
-	scheme.AddKnownTypes(registered.GroupOrDie(api.GroupName).GroupVersion, &storagetesting.TestResource{})
+	scheme.AddKnownTypes(api.Registry.GroupOrDie(api.GroupName).GroupVersion, &storagetesting.TestResource{})
 	scheme.AddKnownTypes(testapi.Default.InternalGroupVersion(), &storagetesting.TestResource{})
 	if err := scheme.AddConversionFuncs(
 		func(in *storagetesting.TestResource, out *storagetesting.TestResource, s conversion.Scope) error {
@@ -58,7 +57,7 @@ func testScheme(t *testing.T) (*runtime.Scheme, runtime.Codec) {
 	); err != nil {
 		panic(err)
 	}
-	codec := serializer.NewCodecFactory(scheme).LegacyCodec(registered.GroupOrDie(api.GroupName).GroupVersion)
+	codec := serializer.NewCodecFactory(scheme).LegacyCodec(api.Registry.GroupOrDie(api.GroupName).GroupVersion)
 	return scheme, codec
 }
 

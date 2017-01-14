@@ -17,8 +17,8 @@ limitations under the License.
 package componentconfig
 
 import (
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/pkg/api"
-	metav1 "k8s.io/client-go/pkg/apis/meta/v1"
 	utilconfig "k8s.io/client-go/pkg/util/config"
 )
 
@@ -379,9 +379,6 @@ type KubeletConfiguration struct {
 	Containerized bool
 	// maxOpenFiles is Number of files that can be opened by Kubelet process.
 	MaxOpenFiles int64
-	// reconcileCIDR is Reconcile node CIDR with the CIDR specified by the
-	// API server. Won't have any effect if register-node is false.
-	ReconcileCIDR bool
 	// registerSchedulable tells the kubelet to register the node as
 	// schedulable. Won't have any effect if register-node is false.
 	// DEPRECATED: use registerWithTaints instead
@@ -775,6 +772,13 @@ type KubeControllerManagerConfiguration struct {
 	// Zone is treated as unhealthy in nodeEvictionRate and secondaryNodeEvictionRate when at least
 	// unhealthyZoneThreshold (no less than 3) of Nodes in the zone are NotReady
 	UnhealthyZoneThreshold float32
+	// Reconciler runs a periodic loop to reconcile the desired state of the with
+	// the actual state of the world by triggering attach detach operations.
+	// This flag enables or disables reconcile.  Is false by default, and thus enabled.
+	DisableAttachDetachReconcilerSync bool
+	// ReconcilerSyncLoopPeriod is the amount of time the reconciler sync states loop
+	// wait between successive executions. Is set to 5 sec by default.
+	ReconcilerSyncLoopPeriod metav1.Duration
 }
 
 // VolumeConfiguration contains *all* enumerated flags meant to configure all volume

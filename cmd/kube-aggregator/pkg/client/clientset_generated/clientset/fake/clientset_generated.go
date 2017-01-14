@@ -17,7 +17,6 @@ limitations under the License.
 package fake
 
 import (
-	"k8s.io/apimachinery/pkg/apimachinery/registered"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	clientset "k8s.io/kubernetes/cmd/kube-aggregator/pkg/client/clientset_generated/clientset"
@@ -42,7 +41,7 @@ func NewSimpleClientset(objects ...runtime.Object) *Clientset {
 	}
 
 	fakePtr := core.Fake{}
-	fakePtr.AddReactor("*", "*", core.ObjectReaction(o, registered.RESTMapper()))
+	fakePtr.AddReactor("*", "*", core.ObjectReaction(o, api.Registry.RESTMapper()))
 
 	fakePtr.AddWatchReactor("*", core.DefaultWatchReactor(watch.NewFake(), nil))
 

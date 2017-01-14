@@ -24,8 +24,8 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/apimachinery/pkg/apimachinery/registered"
 	"k8s.io/apimachinery/pkg/util/net"
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
@@ -49,7 +49,7 @@ const (
 )
 
 var _ = framework.KubeDescribe("Proxy", func() {
-	version := registered.GroupOrDie(v1.GroupName).GroupVersion.Version
+	version := api.Registry.GroupOrDie(v1.GroupName).GroupVersion.Version
 	Context("version "+version, func() {
 		options := framework.FrameworkOptions{
 			ClientQPS: -1.0,
