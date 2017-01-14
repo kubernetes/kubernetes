@@ -27,7 +27,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/version"
-	"strings"
 )
 
 type VersionObj struct {
@@ -54,14 +53,12 @@ func NewCmdVersion(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	}
 	cmd.Flags().BoolP("client", "c", false, "Client version only (no server required).")
 	cmd.Flags().BoolP("short", "", false, "Print just the version number.")
-	// default behavior is std.
 	cmd.Flags().String("output", "", "output format, options available are yaml and json")
 	cmd.Flags().MarkShorthandDeprecated("client", "please use --client instead.")
 	return cmd
 }
 
 func RunVersion(f cmdutil.Factory, out io.Writer, cmd *cobra.Command) error {
-	of := strings.ToLower(cmdutil.GetFlagString(cmd, "output"))
 	vo := VersionObj{nil, nil}
 
 	cvg := version.Get()
@@ -88,8 +85,8 @@ func RunVersion(f cmdutil.Factory, out io.Writer, cmd *cobra.Command) error {
 		vo.ServerVersion = sv
 	}
 
-	switch {
-	case len(of) == 0:
+	switch of := cmdutil.GetFlagString(cmd, "output"); of {
+	case "":
 		fmt.Fprintf(out, "Client Version: %s\n", fmt.Sprintf("%#v", *vo.ClientVersion))
 		if cmdutil.GetFlagBool(cmd, "client") {
 			return nil
@@ -97,7 +94,7 @@ func RunVersion(f cmdutil.Factory, out io.Writer, cmd *cobra.Command) error {
 
 		fmt.Fprintf(out, "Server Version: %s\n", fmt.Sprintf("%#v", *vo.ServerVersion))
 		return nil
-	case of == "yaml":
+	case "yaml":
 		y, err := yaml.Marshal(&vo)
 		if err != nil {
 			return err
@@ -106,7 +103,7 @@ func RunVersion(f cmdutil.Factory, out io.Writer, cmd *cobra.Command) error {
 		fmt.Fprintf(out, string(y))
 
 		return nil
-	case of == "json":
+	case "json":
 		y, err := json.Marshal(&vo)
 		if err != nil {
 			return err
