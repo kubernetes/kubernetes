@@ -187,6 +187,7 @@ func NewInit(cfgPath string, cfg *kubeadmapi.MasterConfiguration, skipPreFlight 
 	}
 	cfg.KubernetesVersion = ver
 	fmt.Println("[init] Using Kubernetes version:", ver)
+	fmt.Println("[init] Using Authorization mode:", cfg.AuthorizationMode)
 
 	// Warn about the limitations with the current cloudprovider solution.
 	if cfg.CloudProvider != "" {
