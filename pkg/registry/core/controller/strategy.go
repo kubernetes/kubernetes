@@ -16,7 +16,7 @@ limitations under the License.
 
 // If you make changes to this file, you should also make the corresponding change in ReplicaSet.
 
-package controller
+package replicationcontroller
 
 import (
 	"fmt"
