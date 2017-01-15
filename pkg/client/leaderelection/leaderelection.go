@@ -186,7 +186,7 @@ func (le *LeaderElector) acquire() {
 			return
 		}
 		le.config.Lock.RecordEvent("became leader")
-		glog.Infof("sucessfully acquired lease %v", desc)
+		glog.Infof("successfully acquired lease %v", desc)
 		close(stop)
 	}, le.config.RetryPeriod, JitterFactor, true, stop)
 }
