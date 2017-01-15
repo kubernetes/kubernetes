@@ -65,9 +65,9 @@ func NonSlidingUntil(f func(), period time.Duration, stopCh <-chan struct{}) {
 // JitterUntil loops until stop channel is closed, running f every period.
 //
 // If jitterFactor is positive, the period is jittered before every run of f.
-// If jitterFactor is not positive, the period is unchanged and not jitterd.
+// If jitterFactor is not positive, the period is unchanged and not jittered.
 //
-// If slidingis true, the period is computed after f runs. If it is false then
+// If sliding is true, the period is computed after f runs. If it is false then
 // period includes the runtime for f.
 //
 // Close stopCh to stop. f may not be invoked if stop channel is already
@@ -138,14 +138,14 @@ type ConditionFunc func() (done bool, err error)
 // Backoff holds parameters applied to a Backoff function.
 type Backoff struct {
 	Duration time.Duration // the base duration
-	Factor   float64       // Duration is multipled by factor each iteration
+	Factor   float64       // Duration is multiplied by factor each iteration
 	Jitter   float64       // The amount of jitter applied each iteration
 	Steps    int           // Exit with error after this many steps
 }
 
 // ExponentialBackoff repeats a condition check with exponential backoff.
 //
-// It checks the condition up to Steps times, increasing the wait by multipling
+// It checks the condition up to Steps times, increasing the wait by multiplying
 // the previous duration by Factor.
 //
 // If Jitter is greater than zero, a random amount of each duration is added
