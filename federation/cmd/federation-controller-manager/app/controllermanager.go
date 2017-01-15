@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/healthz"
 	federationclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset"
+	v1core "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset/typed/core/v1"
 	"k8s.io/kubernetes/federation/cmd/federation-controller-manager/app/options"
 	"k8s.io/kubernetes/federation/pkg/dnsprovider"
 	clustercontroller "k8s.io/kubernetes/federation/pkg/federation-controller/cluster"
@@ -44,8 +45,9 @@ import (
 	servicecontroller "k8s.io/kubernetes/federation/pkg/federation-controller/service"
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util"
         "k8s.io/kubernetes/pkg/api/v1"
-        "k8s.io/kubernetes/federation/client/leaderelection"
-        "k8s.io/kubernetes/federation/client/leaderelection/resourcelock"
+	"k8s.io/kubernetes/pkg/client/leaderelection"
+	"k8s.io/kubernetes/pkg/client/leaderelection/resourcelock"
+	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	"k8s.io/kubernetes/pkg/util/configz"
@@ -136,6 +138,10 @@ func Run(s *options.CMServer) error {
         // Override kubeconfig qps/burst settings from flags
         kubeconfig.QPS = s.APIServerQPS
         kubeconfig.Burst = s.APIServerBurst
+	eventKubeClient, err := federationclientset.NewForConfig(restclient.AddUserAgent(kubeconfig, "federation-controller-manager"))
+	if err != nil {
+		glog.Fatalf("Invalid API configuration: %v", err)
+	}
         leaderElectionClient := federationclientset.NewForConfigOrDie(restclient.AddUserAgent(kubeconfig, "leader-election"))
 
 	go func() {
@@ -154,6 +160,11 @@ func Run(s *options.CMServer) error {
 		}
 		glog.Fatal(server.ListenAndServe())
 	}()
+
+	eventBroadcaster := record.NewBroadcaster()
+	eventBroadcaster.StartLogging(glog.Infof)
+	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: eventKubeClient.Core().Events("")})
+	recorder := eventBroadcaster.NewRecorder(v1.EventSource{Component: "federation-controller-manager"})
 
         run := func(stop <-chan struct{}) {
 		err := StartControllers(s, restClientCfg)
@@ -179,6 +190,7 @@ func Run(s *options.CMServer) error {
                 Client: leaderElectionClient,
                 LockConfig: resourcelock.ResourceLockConfig{
                         Identity:      id,
+			EventRecorder: recorder,
                 },
         }
         leaderelection.RunOrDie(leaderelection.LeaderElectionConfig{

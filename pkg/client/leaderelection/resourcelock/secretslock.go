@@ -22,8 +22,8 @@ import (
 	"fmt"
 
 	"k8s.io/kubernetes/pkg/api/v1"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	clientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 type SecretsLock struct {
@@ -83,6 +83,12 @@ func (el *SecretsLock) Update(ler LeaderElectionRecord) error {
 	el.e.Annotations[LeaderElectionRecordAnnotationKey] = string(recordBytes)
 	el.e, err = el.Client.Core().Secrets(el.SecretsMeta.Namespace).Update(el.e)
 	return err
+}
+
+// RecordEvent in leader election while adding meta-data
+func (el *SecretsLock) RecordEvent(s string) {
+        events := fmt.Sprintf("%v %v", el.LockConfig.Identity, s)
+        el.LockConfig.EventRecorder.Eventf(&v1.Secret{ObjectMeta: el.e.ObjectMeta}, v1.EventTypeNormal, "LeaderElection", events)
 }
 
 // Describe is used to convert details on current resource lock
