@@ -46,7 +46,7 @@ type ResourceQuotaControllerOptions struct {
 	Registry quota.Registry
 	// Knows how to build controllers that notify replenishment events
 	ControllerFactory ReplenishmentControllerFactory
-	// Controls full resync of objects monitored for replenihsment.
+	// Controls full resync of objects monitored for replenishment.
 	ReplenishmentResyncPeriod controller.ResyncPeriodFunc
 	// List of GroupKind objects that should be monitored for replenishment at
 	// a faster frequency than the quota controller recalculation interval
@@ -63,7 +63,7 @@ type ResourceQuotaController struct {
 	rqController cache.Controller
 	// ResourceQuota objects that need to be synchronized
 	queue workqueue.RateLimitingInterface
-	// missingUsageQueue holds objects that are missing the initial usage informatino
+	// missingUsageQueue holds objects that are missing the initial usage information
 	missingUsageQueue workqueue.RateLimitingInterface
 	// To allow injection of syncUsage for testing.
 	syncHandler func(key string) error
