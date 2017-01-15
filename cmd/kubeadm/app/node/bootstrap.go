@@ -130,10 +130,10 @@ func checkForNodeNameDuplicates(clientSet *clientset.Clientset) error {
 		return fmt.Errorf("Failed to get node hostname [%v]", err)
 	}
 	_, err = clientSet.Nodes().Get(hostName, v1.GetOptions{})
-	if errors.IsNotFound(err) {
-		return nil
+	if !errors.IsNotFound(err) {
+		return err
 	}
-	return err
+	return nil
 }
 
 // checks the connection requirements for a specific API endpoint
