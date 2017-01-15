@@ -227,12 +227,19 @@ func TestDeleteObjectNotFound(t *testing.T) {
 	tf.Namespace = "test"
 	buf, errBuf := bytes.NewBuffer([]byte{}), bytes.NewBuffer([]byte{})
 
-	cmd := NewCmdDelete(f, buf, errBuf)
-	options := &resource.FilenameOptions{}
-	options.Filenames = []string{"../../../examples/guestbook/legacy/redis-master-controller.yaml"}
-	cmd.Flags().Set("cascade", "false")
-	cmd.Flags().Set("output", "name")
-	err := RunDelete(f, buf, errBuf, cmd, []string{}, options)
+	options := &DeleteOptions{
+		FilenameOptions: resource.FilenameOptions{
+			Filenames: []string{"../../../examples/guestbook/legacy/redis-master-controller.yaml"},
+		},
+		GracePeriod: -1,
+		Cascade:     false,
+		Output:      "name",
+	}
+	err := options.Complete(f, buf, errBuf, []string{})
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	err = options.RunDelete()
 	if err == nil || !errors.IsNotFound(err) {
 		t.Errorf("unexpected error: expected NotFound, got %v", err)
 	}
@@ -296,14 +303,20 @@ func TestDeleteAllNotFound(t *testing.T) {
 	tf.Namespace = "test"
 	buf, errBuf := bytes.NewBuffer([]byte{}), bytes.NewBuffer([]byte{})
 
-	cmd := NewCmdDelete(f, buf, errBuf)
-	cmd.Flags().Set("all", "true")
-	cmd.Flags().Set("cascade", "false")
 	// Make sure we can explicitly choose to fail on NotFound errors, even with --all
-	cmd.Flags().Set("ignore-not-found", "false")
-	cmd.Flags().Set("output", "name")
-
-	err := RunDelete(f, buf, errBuf, cmd, []string{"services"}, &resource.FilenameOptions{})
+	options := &DeleteOptions{
+		FilenameOptions: resource.FilenameOptions{},
+		GracePeriod:     -1,
+		Cascade:         false,
+		DeleteAll:       true,
+		IgnoreNotFound:  false,
+		Output:          "name",
+	}
+	err := options.Complete(f, buf, errBuf, []string{"services"})
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	err = options.RunDelete()
 	if err == nil || !errors.IsNotFound(err) {
 		t.Errorf("unexpected error: expected NotFound, got %v", err)
 	}
@@ -405,12 +418,19 @@ func TestDeleteMultipleObjectContinueOnMissing(t *testing.T) {
 	tf.Namespace = "test"
 	buf, errBuf := bytes.NewBuffer([]byte{}), bytes.NewBuffer([]byte{})
 
-	cmd := NewCmdDelete(f, buf, errBuf)
-	options := &resource.FilenameOptions{}
-	options.Filenames = []string{"../../../examples/guestbook/legacy/redis-master-controller.yaml", "../../../examples/guestbook/frontend-service.yaml"}
-	cmd.Flags().Set("cascade", "false")
-	cmd.Flags().Set("output", "name")
-	err := RunDelete(f, buf, errBuf, cmd, []string{}, options)
+	options := &DeleteOptions{
+		FilenameOptions: resource.FilenameOptions{
+			Filenames: []string{"../../../examples/guestbook/legacy/redis-master-controller.yaml", "../../../examples/guestbook/frontend-service.yaml"},
+		},
+		GracePeriod: -1,
+		Cascade:     false,
+		Output:      "name",
+	}
+	err := options.Complete(f, buf, errBuf, []string{})
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	err = options.RunDelete()
 	if err == nil || !errors.IsNotFound(err) {
 		t.Errorf("unexpected error: expected NotFound, got %v", err)
 	}
@@ -533,7 +553,6 @@ func TestDeleteMultipleSelector(t *testing.T) {
 func TestResourceErrors(t *testing.T) {
 	testCases := map[string]struct {
 		args  []string
-		flags map[string]string
 		errFn func(error) bool
 	}{
 		"no args": {
@@ -562,17 +581,18 @@ func TestResourceErrors(t *testing.T) {
 
 		buf, errBuf := bytes.NewBuffer([]byte{}), bytes.NewBuffer([]byte{})
 
-		cmd := NewCmdDelete(f, buf, errBuf)
-		cmd.SetOutput(buf)
-
-		for k, v := range testCase.flags {
-			cmd.Flags().Set(k, v)
+		options := &DeleteOptions{
+			FilenameOptions: resource.FilenameOptions{},
+			GracePeriod:     -1,
+			Cascade:         false,
+			Output:          "name",
 		}
-		err := RunDelete(f, buf, errBuf, cmd, testCase.args, &resource.FilenameOptions{})
+		err := options.Complete(f, buf, errBuf, testCase.args)
 		if !testCase.errFn(err) {
 			t.Errorf("%s: unexpected error: %v", k, err)
 			continue
 		}
+
 		if tf.Printer.(*testPrinter).Objects != nil {
 			t.Errorf("unexpected print to default printer")
 		}
