@@ -12490,6 +12490,7 @@ go_test(
     library = ":k8s.io/client-go/tools/clientcmd",
     tags = ["automanaged"],
     deps = [
+        "//pkg/util/sets:go_default_library",
         "//vendor:github.com/ghodss/yaml",
         "//vendor:github.com/imdario/mergo",
         "//vendor:k8s.io/apimachinery/pkg/runtime",
