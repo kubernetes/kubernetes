@@ -28,6 +28,7 @@ const (
 	DefaultKubernetesFallbackVersion = "v1.5.0"
 	DefaultAPIBindPort               = 6443
 	DefaultDiscoveryBindPort         = 9898
+	DefaultAuthorizationMode         = authorizer.ModeRBAC
 )
 
 func addDefaultingFuncs(scheme *runtime.Scheme) error {
@@ -59,6 +60,6 @@ func SetDefaults_MasterConfiguration(obj *MasterConfiguration) {
 	}
 
 	if obj.AuthorizationMode == "" {
-		obj.AuthorizationMode = authorizer.ModeRBAC
+		obj.AuthorizationMode = DefaultAuthorizationMode
 	}
 }
