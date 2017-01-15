@@ -54,6 +54,7 @@ go_test(
         "//pkg/client/restclient:go_default_library",
         "//pkg/client/unversioned/clientcmd/api:go_default_library",
         "//pkg/client/unversioned/clientcmd/api/latest:go_default_library",
+        "//pkg/util/sets:go_default_library",
         "//vendor:github.com/ghodss/yaml",
         "//vendor:github.com/imdario/mergo",
         "//vendor:k8s.io/apimachinery/pkg/runtime",

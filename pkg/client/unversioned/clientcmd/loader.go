@@ -137,10 +137,25 @@ func NewDefaultClientConfigLoadingRules() *ClientConfigLoadingRules {
 
 	envVarFiles := os.Getenv(RecommendedConfigPathEnvVar)
 	if len(envVarFiles) != 0 {
-		chain = append(chain, filepath.SplitList(envVarFiles)...)
+		files := filepath.SplitList(envVarFiles)
+		for ix := range files {
+			moreFiles, err := loadFileOrDir(files[ix])
+			if err != nil {
+				glog.Warningf("Failed to load config %s (%v)", files[ix], err)
+				continue
+			}
+			chain = append(chain, moreFiles...)
+		}
 	} else {
-		chain = append(chain, RecommendedHomeFile)
-		chain = append(chain, loadConfigDir(RecommendedHomeFileDir)...)
+		files, err := loadFileOrDir(RecommendedHomeFile)
+		if os.IsNotExist(err) {
+			files, err = loadFileOrDir(RecommendedHomeFileDir)
+		}
+		if err != nil {
+			glog.Warningf("Failed to get config (%v)", err)
+		} else {
+			chain = append(chain, files...)
+		}
 	}
 
 	return &ClientConfigLoadingRules{
@@ -149,27 +164,34 @@ func NewDefaultClientConfigLoadingRules() *ClientConfigLoadingRules {
 	}
 }
 
-func loadConfigDir(dir string) []string {
-	stat, err := os.Lstat(RecommendedHomeFileDir)
+func loadFileOrDir(fileOrDir string) ([]string, error) {
+	stat, err := os.Stat(fileOrDir)
 	if err != nil {
-		if !os.IsNotExist(err) {
-			glog.Warningf("Failed to stat config dir: %v", err)
-		}
-		return []string{}
+		return []string{}, err
 	}
-	if !stat.IsDir() {
-		glog.Warningf("Expected %s to be a directory", dir)
+	if stat.IsDir() {
+		return loadConfigDir(fileOrDir)
+	}
+	return []string{fileOrDir}, nil
+}
+
+func loadConfigDir(dir string) ([]string, error) {
+	if len(dir) == 0 {
+		return []string{}, nil
 	}
 	files, err := ioutil.ReadDir(dir)
 	if err != nil {
-		glog.Warningf("Failed to list config directory: %v", err)
-		return []string{}
+		return []string{}, err
 	}
 	result := []string{}
 	for _, file := range files {
+		// Skip hidden files
+		if strings.HasPrefix(file.Name(), ".") {
+			continue
+		}
 		result = append(result, path.Join(dir, file.Name()))
 	}
-	return result
+	return result, nil
 }
 
 // Load starts by running the MigrationRules and then

@@ -47,6 +47,8 @@ type ConfigAccess interface {
 type PathOptions struct {
 	// GlobalFile is the full path to the file to load as the global (final) option
 	GlobalFile string
+	// GlobalFileDir is the full path to the directory whose contents are loaded as a final option.
+	GlobalFileDir string
 	// EnvVar is the env var name that points to the list of kubeconfig files to load
 	EnvVar string
 	// ExplicitFileFlag is the name of the flag to use for prompting for the kubeconfig file
@@ -75,9 +77,16 @@ func (o *PathOptions) GetLoadingPrecedence() []string {
 	if envVarFiles := o.GetEnvVarFiles(); len(envVarFiles) > 0 {
 		return envVarFiles
 	}
-	result := []string{o.GlobalFile}
-	result = append(result, loadConfigDir(o.GlobalFile+".d")...)
-	return result
+	files, err := loadFileOrDir(o.GlobalFile)
+	// If GlobalFile doesn't exist, try GlobalFileDir
+	if os.IsNotExist(err) {
+		files, err = loadFileOrDir(o.GlobalFileDir)
+	}
+	if err != nil {
+		glog.Warningf("Failed to load config file(s): %v", err)
+		return []string{}
+	}
+	return files
 }
 
 func (o *PathOptions) GetStartingConfig() (*clientcmdapi.Config, error) {
@@ -136,6 +145,7 @@ func (o *PathOptions) GetExplicitFile() string {
 func NewDefaultPathOptions() *PathOptions {
 	ret := &PathOptions{
 		GlobalFile:       RecommendedHomeFile,
+		GlobalFileDir:    RecommendedHomeFileDir,
 		EnvVar:           RecommendedConfigPathEnvVar,
 		ExplicitFileFlag: RecommendedConfigPathFlag,
 

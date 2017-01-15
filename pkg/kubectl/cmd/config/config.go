@@ -44,8 +44,8 @@ func NewCmdConfig(pathOptions *clientcmd.PathOptions, out, errOut io.Writer) *co
 
 			1. If the --` + pathOptions.ExplicitFileFlag + ` flag is set, then only that file is loaded.  The flag may only be set once and no merging takes place.
 			2. If $` + pathOptions.EnvVar + ` environment variable is set, then it is used a list of paths (normal path delimitting rules for your system).  These paths are merged.  When a value is modified, it is modified in the file that defines the stanza.  When a value is created, it is created in the first file that exists.  If no files in the chain exist, then it creates the last file in the list.
-			3. Otherwise, ` + path.Join("${HOME}", pathOptions.GlobalFileSubpath) + ` is used.
-			4. If ` + path.Join("${HOME}", pathOptions.GlobalFileSubpath) + `.d exists, any files in that directory are also merged into the config.`),
+			3. Otherwise, ` + path.Join("${HOME}", pathOptions.GlobalFileSubpath) + ` is used exclusive.
+			4. Otherwise, if no other files have been found, if ` + path.Join("${HOME}", pathOptions.GlobalFileDir) + ` exists, any visible files in that directory are merged together in lexical order to form the config.`),
 		Run: cmdutil.DefaultSubCommandRun(errOut),
 	}
 
