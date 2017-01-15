@@ -28,6 +28,7 @@ import (
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeconfigphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubeconfig"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
+	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/apis/certificates"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
@@ -128,17 +129,11 @@ func checkForNodeNameDuplicates(clientSet *clientset.Clientset) error {
 	if err != nil {
 		return fmt.Errorf("Failed to get node hostname [%v]", err)
 	}
-	node, err := clientSet.Nodes().Get(hostName, v1.GetOptions{})
-	if err != nil {
-		errstring := fmt.Sprintf("nodes \"%s\" not found", hostName)
-		if err.Error() != errstring {
-			return fmt.Errorf("Failed to get the node in the cluster: [%v]\n", err)
-		}
+	_, err = clientSet.Nodes().Get(hostName, v1.GetOptions{})
+	if errors.IsNotFound(err) {
+		return nil
 	}
-	if node.Name != "" {
-		return fmt.Errorf("Node with name [%q] already exists.", node.Name)
-	}
-	return nil
+	return err
 }
 
 // checks the connection requirements for a specific API endpoint
