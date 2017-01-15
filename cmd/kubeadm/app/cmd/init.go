@@ -226,8 +226,7 @@ func (i *Init) Run(out io.Writer) error {
 	// TODO this is not great, but there is only one address we can use here
 	// so we'll pick the first one, there is much of chance to have an empty
 	// slice by the time this gets called
-	masterEndpoint := fmt.Sprintf("https://%s:%d", i.cfg.API.AdvertiseAddresses[0], i.cfg.API.Port)
-	err = kubeconfigphase.CreateAdminAndKubeletKubeConfig(masterEndpoint, kubeadmapi.GlobalEnvParams.HostPKIPath, kubeadmapi.GlobalEnvParams.KubernetesDir)
+	err = kubeconfigphase.CreateAdminAndKubeletKubeConfig("http://localhost:8080", kubeadmapi.GlobalEnvParams.HostPKIPath, kubeadmapi.GlobalEnvParams.KubernetesDir)
 	if err != nil {
 		return err
 	}
