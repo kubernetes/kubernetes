@@ -19,10 +19,11 @@ limitations under the License.
 
 syntax = 'proto2';
 
-package k8s.io.kubernetes.pkg.apis.meta.v1;
+package k8s.io.apimachinery.pkg.apis.meta.v1;
 
-import "k8s.io/kubernetes/pkg/runtime/generated.proto";
-import "k8s.io/kubernetes/pkg/runtime/schema/generated.proto";
+import "k8s.io/apimachinery/pkg/runtime/generated.proto";
+import "k8s.io/apimachinery/pkg/runtime/schema/generated.proto";
+import "k8s.io/kubernetes/pkg/api/resource/generated.proto";
 import "k8s.io/kubernetes/pkg/util/intstr/generated.proto";
 
 // Package-wide variables from generator "generated".
@@ -457,6 +458,6 @@ message WatchEvent {
   //  * If Type is Deleted: the state of the object immediately before deletion.
   //  * If Type is Error: *Status is recommended; other types may make sense
   //    depending on context.
-  optional k8s.io.kubernetes.pkg.runtime.RawExtension object = 2;
+  optional k8s.io.apimachinery.pkg.runtime.RawExtension object = 2;
 }
 
