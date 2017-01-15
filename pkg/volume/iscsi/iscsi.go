@@ -104,19 +104,23 @@ func (plugin *iscsiPlugin) newMounterInternal(spec *volume.Spec, podUID types.UI
 
 	lun := strconv.Itoa(int(iscsi.Lun))
 	portal := portalMounter(iscsi.TargetPortal)
-
+	var bkportal []string
+	for _, tp := range iscsi.BackupPortal {
+		bkportal = append(bkportal, portalMounter(string(tp)))
+	}
 	iface := iscsi.ISCSIInterface
 
 	return &iscsiDiskMounter{
 		iscsiDisk: &iscsiDisk{
-			podUID:  podUID,
-			volName: spec.Name(),
-			portal:  portal,
-			iqn:     iscsi.IQN,
-			lun:     lun,
-			iface:   iface,
-			manager: manager,
-			plugin:  plugin},
+			podUID:    podUID,
+			volName:   spec.Name(),
+			portal:    portal,
+			bkpPortal: bkportal,
+			iqn:       iscsi.IQN,
+			lun:       lun,
+			iface:     iface,
+			manager:   manager,
+			plugin:    plugin},
 		fsType:     iscsi.FSType,
 		readOnly:   readOnly,
 		mounter:    &mount.SafeFormatAndMount{Interface: mounter, Runner: exec.New()},
@@ -160,13 +164,14 @@ func (plugin *iscsiPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*v
 }
 
 type iscsiDisk struct {
-	volName string
-	podUID  types.UID
-	portal  string
-	iqn     string
-	lun     string
-	iface   string
-	plugin  *iscsiPlugin
+	volName   string
+	podUID    types.UID
+	portal    string
+	bkpPortal []string
+	iqn       string
+	lun       string
+	iface     string
+	plugin    *iscsiPlugin
 	// Utility interface that provides API calls to the provider to attach/detach disks.
 	manager diskManager
 	volume.MetricsNil

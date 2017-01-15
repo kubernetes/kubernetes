@@ -603,6 +603,10 @@ type ISCSIVolumeSource struct {
 	// the portal is either an IP or ip_addr:port if port is other than default (typically TCP ports 860 and 3260)
 	// +optional
 	TargetPortal string
+	// Required: list of iSCSI target portal ips
+	// the portal is either an IP or ip_addr:port if port is other than default (typically TCP ports 860 and 3260)
+	// +optional
+	BackupPortal []string
 	// Required:  target iSCSI Qualified Name
 	// +optional
 	IQN string
