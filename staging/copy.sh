@@ -42,6 +42,7 @@ CLIENT_REPO="${MAIN_REPO}/staging/src/${CLIENT_REPO_FROM_SRC}"
 CLIENT_REPO_TEMP="${MAIN_REPO}/staging/src/${CLIENT_REPO_TEMP_FROM_SRC}"
 
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+sedi="-i"
 
 cleanup() {
     rm -rf "${CLIENT_REPO_TEMP}"
@@ -89,7 +90,7 @@ GO15VENDOREXPERIMENT=1 godep save ./...
 popd > /dev/null
 
 echo "moving vendor/k8s.io/kubernetes"
-cp -rn "${CLIENT_REPO_TEMP}"/vendor/k8s.io/kubernetes/* "${CLIENT_REPO_TEMP}"/
+cp -r "${CLIENT_REPO_TEMP}"/vendor/k8s.io/kubernetes/* "${CLIENT_REPO_TEMP}"/
 rm -rf "${CLIENT_REPO_TEMP}"/vendor/k8s.io/kubernetes
 # client-go will share the vendor of the main repo for now. When client-go
 # becomes a standalone repo, it will have its own vendor
@@ -129,6 +130,13 @@ sed -i "s/kubernetes_build_info/kubernetes_build_info_copy/g" "${CLIENT_REPO_TEM
 
 echo "rewrite proto names in proto.RegisterType"
 find "${CLIENT_REPO_TEMP}" -type f -name "generated.pb.go" -print0 | xargs -0 sed -i "s/k8s\.io\.kubernetes/k8s.io.client-go/g"
+
+# strip all generator tags from client-go
+find "${CLIENT_REPO_TEMP}" -type f -name "*.go" -print0 | xargs -0 sed -i '/^\/\/ +k8s:openapi-gen=true/d'
+find "${CLIENT_REPO_TEMP}" -type f -name "*.go" -print0 | xargs -0 sed -i '/^\/\/ +k8s:defaulter-gen=/d'
+find "${CLIENT_REPO_TEMP}" -type f -name "*.go" -print0 | xargs -0 sed -i '/^\/\/ +k8s:deepcopy-gen=/d'
+find "${CLIENT_REPO_TEMP}" -type f -name "*.go" -print0 | xargs -0 sed -i '/^\/\/ +k8s:conversion-gen=/d'
+
 
 echo "rearranging directory layout"
 # $1 and $2 are relative to ${CLIENT_REPO_TEMP}
