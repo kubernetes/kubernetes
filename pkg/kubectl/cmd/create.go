@@ -28,6 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/util/editor"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 )
 
@@ -177,7 +178,29 @@ func RunCreate(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer, opt
 }
 
 func RunEditOnCreate(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, options *resource.FilenameOptions) error {
-	return runEdit(f, out, errOut, cmd, []string{}, options, EditBeforeCreateMode)
+	err := cmdutil.ValidateOutputArgsForEdit(cmd)
+	if err != nil {
+		return err
+	}
+	editOptions := &editor.EditOptions{
+		EditMode:        editor.EditBeforeCreateMode,
+		FilenameOptions: *options,
+		ValidateOptions: cmdutil.ValidateOptions{
+			EnableValidation: cmdutil.GetFlagBool(cmd, "validate"),
+			SchemaCacheDir:   cmdutil.GetFlagString(cmd, "schema-cache-dir"),
+		},
+		Output:             cmdutil.GetFlagString(cmd, "output"),
+		OutputVersion:      cmdutil.GetFlagString(cmd, "output-version"),
+		WindowsLineEndings: cmdutil.GetFlagBool(cmd, "windows-line-endings"),
+		ApplyAnnotation:    cmdutil.GetFlagBool(cmd, cmdutil.ApplyAnnotationsFlag),
+		Record:             cmdutil.GetFlagBool(cmd, "record"),
+		Include3rdParty:    cmdutil.GetFlagBool(cmd, "include-extended-apis"),
+	}
+	err = editOptions.Complete(f, out, errOut, []string{})
+	if err != nil {
+		return err
+	}
+	return editOptions.Run()
 }
 
 // createAndRefresh creates an object from input info and refreshes info with that object

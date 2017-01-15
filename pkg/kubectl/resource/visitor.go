@@ -649,7 +649,7 @@ func RetrieveLazy(info *Info, err error) error {
 }
 
 // CreateAndRefresh creates an object from input info and refreshes info with that object
-func CreateAndRefresh(info *resource.Info) error {
+func CreateAndRefresh(info *Info) error {
 	obj, err := NewHelper(info.Client, info.Mapping).Create(info.Namespace, true, info.Object)
 	if err != nil {
 		return err

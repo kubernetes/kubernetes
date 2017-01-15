@@ -68,7 +68,7 @@ type EditOptions struct {
 	ErrOut io.Writer
 
 	f                  cmdutil.Factory
-	defaultVersion     string
+	defaultVersion     schema.GroupVersion
 	editPrinterOptions *editPrinterOptions
 }
 
@@ -243,7 +243,7 @@ func (o *EditOptions) Run() error {
 			glog.V(4).Infof("User edited:\n%s", string(edited))
 
 			// Apply validation
-			validator, err := o.f.Validator(o.Validate, o.SchemaCacheDir)
+			validator, err := o.f.Validator(o.EnableValidation, o.SchemaCacheDir)
 			if err != nil {
 				return preservedFile(err, file, o.ErrOut)
 			}
