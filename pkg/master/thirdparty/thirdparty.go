@@ -286,6 +286,9 @@ func (m *ThirdPartyResourceServer) InstallThirdPartyResource(rsrc *extensions.Th
 	m.genericAPIServer.HandlerContainer.Add(genericapi.NewGroupWebService(api.Codecs, path, apiGroup))
 
 	m.addThirdPartyResourceStorage(path, plural.Resource, thirdparty.Storage[plural.Resource].(*thirdpartyresourcedatastore.REST), apiGroup)
+	// adding this call can help TPR codecs be able to determine TPRs via
+	// api.Registry, while api.Registry is considered to be static, we need
+	// to figure out a way for such kind of dynamicity
 	api.Registry.AddThirdPartyAPIGroupVersions(schema.GroupVersion{Group: group, Version: rsrc.Versions[0].Name})
 	return nil
 }

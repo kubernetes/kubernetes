@@ -58,8 +58,7 @@ type FooList struct {
 	Items []Foo `json:"items"`
 }
 
-// This test is marked flaky pending namespace controller observing dynamic creation of new third party types.
-var _ = Describe("ThirdParty resources [Flaky] [Disruptive]", func() {
+var _ = Describe("ThirdParty resources [Disruptive]", func() {
 
 	f := framework.NewDefaultFramework("thirdparty")
 
