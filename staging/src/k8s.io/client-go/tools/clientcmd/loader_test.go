@@ -580,7 +580,10 @@ func Example_mergingEverythingNoConflicts() {
 }
 
 func TestLoadConfigDirNotExists(t *testing.T) {
-	res := loadConfigDir("/foo/bar/baz")
+	res, err := loadConfigDir("/foo/bar/baz")
+	if !os.IsNotExist(err) {
+		t.Errorf("Unexpected error: %v", err)
+	}
 	if len(res) != 0 {
 		t.Errorf("Unexpected result: %v", res)
 	}
@@ -589,22 +592,20 @@ func TestLoadConfigDirNotExists(t *testing.T) {
 func TestLoadConfigDirFile(t *testing.T) {
 	commandLineFile, err := ioutil.TempFile("", "")
 	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-		t.FailNow()
+		t.Fatalf("unexpected error: %v", err)
 	}
 	defer os.Remove(commandLineFile.Name())
 
-	res := loadConfigDir(commandLineFile.Name())
-	if len(res) != 0 {
-		t.Errorf("Unexpected result: %v", res)
+	res, err := loadConfigDir(commandLineFile.Name())
+	if err == nil {
+		t.Errorf("Unexpected non-error")
 	}
 }
 
 func TestLoadConfigDir(t *testing.T) {
 	dir, err := ioutil.TempDir("", "")
 	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-		t.FailNow()
+		t.Fatalf("unexpected error: %v", err)
 	}
 	defer os.RemoveAll(dir)
 
@@ -616,14 +617,16 @@ func TestLoadConfigDir(t *testing.T) {
 		expectedSet.Insert(filePath)
 		f, err := os.Create(filePath)
 		if err != nil {
-			t.Errorf("unexpected error: %v", err)
-			t.FailNow()
+			t.Fatalf("unexpected error: %v", err)
 		}
 		f.Write([]byte("data some here"))
 		f.Close()
 	}
 
-	res := loadConfigDir(dir)
+	res, err := loadConfigDir(dir)
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
 	if len(res) != len(files) {
 		t.Errorf("Unexpected result: %v, expected: %v", res, files)
 	}
