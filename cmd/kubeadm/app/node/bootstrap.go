@@ -22,7 +22,7 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
@@ -129,8 +129,8 @@ func checkForNodeNameDuplicates(clientSet *clientset.Clientset) error {
 	if err != nil {
 		return fmt.Errorf("Failed to get node hostname [%v]", err)
 	}
-	_, err = clientSet.Nodes().Get(hostName, v1.GetOptions{})
-	if !errors.IsNotFound(err) {
+	_, err = clientSet.Nodes().Get(hostName, metav1.GetOptions{})
+	if err != nil && !errors.IsNotFound(err) {
 		return err
 	}
 	return nil

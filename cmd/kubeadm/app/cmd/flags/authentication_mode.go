@@ -53,7 +53,7 @@ func (c *authorizationModeValue) Set(s string) error {
 }
 
 func (c *authorizationModeValue) Type() string {
-	return "mode"
+	return "authorization-mode"
 }
 
 func ValidateAuthorizationMode(mode string) bool {

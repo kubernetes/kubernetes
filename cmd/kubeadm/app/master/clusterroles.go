@@ -14,7 +14,6 @@ func CreateBootstrapRBACClusterRole(clientset *clientset.Clientset) error {
 		// a role to use for setting up a proxy
 		ObjectMeta: api.ObjectMeta{Name: "system:kubelet-bootstrap"},
 		Rules: []rbac.PolicyRule{
-			// Used to build serviceLister
 			rbac.NewRule("get").Groups("").Resources("nodes").RuleOrDie(),
 			rbac.NewRule("create", "watch").Groups("certificates.k8s.io").Resources("certificatesigningrequests").RuleOrDie(),
 		},
@@ -22,7 +21,6 @@ func CreateBootstrapRBACClusterRole(clientset *clientset.Clientset) error {
 	if _, err := clientset.ClusterRoles().Create(&clusterRole); err != nil {
 		return err
 	}
-	fmt.Println("[clusterroles] Created RBAC ClusterRole")
 
 	subject := rbac.Subject{
 		Kind: "Group",
@@ -43,7 +41,7 @@ func CreateBootstrapRBACClusterRole(clientset *clientset.Clientset) error {
 	if _, err := clientset.ClusterRoleBindings().Create(&clusterRoleBinding); err != nil {
 		return err
 	}
-	fmt.Println("[clusterrolebindings] Created RBAC ClusterRoleBinding")
+	fmt.Println("[apiconfig] Created RBAC rules")
 
 	return nil
 }
