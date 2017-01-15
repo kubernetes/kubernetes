@@ -35,8 +35,7 @@ var _ = framework.KubeDescribe("Cluster level logging using GCL", func() {
 	f := framework.NewDefaultFramework("gcl-logging")
 
 	BeforeEach(func() {
-		// TODO (crassirostris): Expand to GKE once the test is stable
-		framework.SkipUnlessProviderIs("gce")
+		framework.SkipUnlessProviderIs("gce", "gke")
 	})
 
 	It("should check that logs from containers are ingested in GCL", func() {
