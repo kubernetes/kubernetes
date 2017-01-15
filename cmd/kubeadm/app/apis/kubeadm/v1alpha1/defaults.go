@@ -18,6 +18,7 @@ package v1alpha1
 
 import (
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/kubernetes/pkg/kubeapiserver/authorizer"
 )
 
 const (
@@ -55,5 +56,9 @@ func SetDefaults_MasterConfiguration(obj *MasterConfiguration) {
 
 	if obj.Discovery.Token == nil && obj.Discovery.File == nil && obj.Discovery.HTTPS == nil {
 		obj.Discovery.Token = &TokenDiscovery{}
+	}
+
+	if obj.AuthorizationMode == "" {
+		obj.AuthorizationMode = authorizer.ModeRBAC
 	}
 }
