@@ -16,5 +16,4 @@ limitations under the License.
 
 // Package version supplies version information collected at build time to
 // kubernetes components.
-// +k8s:openapi-gen=true
 package version
