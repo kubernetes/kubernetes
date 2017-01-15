@@ -41,15 +41,17 @@ const (
 	DefaultClusterName     = "kubernetes"
 	DefaultCloudConfigPath = "/etc/kubernetes/cloud-config"
 
-	etcd                  = "etcd"
-	apiServer             = "apiserver"
-	controllerManager     = "controller-manager"
-	scheduler             = "scheduler"
-	proxy                 = "proxy"
-	kubeAPIServer         = "kube-apiserver"
-	kubeControllerManager = "kube-controller-manager"
-	kubeScheduler         = "kube-scheduler"
-	kubeProxy             = "kube-proxy"
+	etcd                           = "etcd"
+	apiServer                      = "apiserver"
+	controllerManager              = "controller-manager"
+	scheduler                      = "scheduler"
+	proxy                          = "proxy"
+	kubeAPIServer                  = "kube-apiserver"
+	kubeControllerManager          = "kube-controller-manager"
+	kubeScheduler                  = "kube-scheduler"
+	kubeProxy                      = "kube-proxy"
+	authorizationPolicyFile        = "abac_policy.json"
+	authorizationWebhookConfigFile = "webhook_authz.conf"
 )
 
 var (
@@ -298,20 +300,14 @@ func getAPIServerCommand(cfg *kubeadmapi.MasterConfiguration) []string {
 	)
 
 	if cfg.AuthorizationMode != "" {
+		command = append(command, "--authorization-mode="+cfg.AuthorizationMode)
 		switch cfg.AuthorizationMode {
 		case authorizer.ModeABAC:
-			command = append(command, "--authorization-mode="+cfg.AuthorizationMode,
-				"--authorization-policy-file="+kubeadmapi.GlobalEnvParams.KubernetesDir+"/policy_file.json",
-			)
+			command = append(command, "--authorization-policy-file="+kubeadmapi.GlobalEnvParams.KubernetesDir+authorizationPolicyFile)
 		case authorizer.ModeRBAC:
-			command = append(command, "--authorization-mode="+cfg.AuthorizationMode,
-				"--runtime-config=rbac.authorization.k8s.io/v1alpha1",
-				"--authorization-rbac-super-user=kubernetes-client",
-			)
+			command = append(command, "--runtime-config=rbac.authorization.k8s.io/v1alpha1")
 		case authorizer.ModeWebhook:
-			command = append(command, "--authorization-mode="+cfg.AuthorizationMode,
-				"--authorization-webhook-config-file="+kubeadmapi.GlobalEnvParams.KubernetesDir+"/config_file.conf",
-			)
+			command = append(command, "--authorization-webhook-config-file="+kubeadmapi.GlobalEnvParams.KubernetesDir+authorizationWebhookConfigFile)
 		}
 	}
 
