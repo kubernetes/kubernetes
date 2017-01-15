@@ -22,12 +22,12 @@ import (
 	"sync"
 	"time"
 
+	"k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeconfigphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubeconfig"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
-	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/certificates"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
@@ -128,14 +128,15 @@ func checkForNodeNameDuplicates(clientSet *clientset.Clientset) error {
 	if err != nil {
 		return fmt.Errorf("Failed to get node hostname [%v]", err)
 	}
-	nodeList, err := clientSet.Nodes().List(v1.ListOptions{})
+	node, err := clientSet.Nodes().Get(hostName, v1.GetOptions{})
 	if err != nil {
-		return fmt.Errorf("Failed to list the nodes in the cluster: [%v]\n", err)
-	}
-	for _, node := range nodeList.Items {
-		if hostName == node.Name {
-			return fmt.Errorf("Node with name [%q] already exists.", node.Name)
+		errstring := fmt.Sprintf("nodes \"%s\" not found", hostName)
+		if err.Error() != errstring {
+			return fmt.Errorf("Failed to get the node in the cluster: [%v]\n", err)
 		}
+	}
+	if node.Name != "" {
+		return fmt.Errorf("Node with name [%q] already exists.", node.Name)
 	}
 	return nil
 }
