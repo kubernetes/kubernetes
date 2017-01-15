@@ -342,28 +342,29 @@ func (b *Builder) ResourceTypeOrNameArgs(allowEmptySelector bool, args ...string
 			}
 		}
 		return b
-	}
-	if len(args) > 0 {
-		// Try replacing aliases only in types
-		args[0] = b.ReplaceAliases(args[0])
-	}
-	switch {
-	case len(args) > 2:
-		b.names = append(b.names, args[1:]...)
-		b.ResourceTypes(SplitResourceArgument(args[0])...)
-	case len(args) == 2:
-		b.names = append(b.names, args[1])
-		b.ResourceTypes(SplitResourceArgument(args[0])...)
-	case len(args) == 1:
-		b.ResourceTypes(SplitResourceArgument(args[0])...)
-		if b.selector == nil && allowEmptySelector {
-			b.selector = labels.Everything()
+	} else {
+		if len(args) > 0 {
+			// Try replacing aliases only in types
+			args[0] = b.ReplaceAliases(args[0])
 		}
-	case len(args) == 0:
-	default:
-		b.errs = append(b.errs, fmt.Errorf("arguments must consist of a resource or a resource and name"))
+		switch {
+		case len(args) > 2:
+			b.names = append(b.names, args[1:]...)
+			b.ResourceTypes(SplitResourceArgument(args[0])...)
+		case len(args) == 2:
+			b.names = append(b.names, args[1])
+			b.ResourceTypes(SplitResourceArgument(args[0])...)
+		case len(args) == 1:
+			b.ResourceTypes(SplitResourceArgument(args[0])...)
+			if b.selector == nil && allowEmptySelector {
+				b.selector = labels.Everything()
+			}
+		case len(args) == 0:
+		default:
+			b.errs = append(b.errs, fmt.Errorf("arguments must consist of a resource or a resource and name"))
+		}
+		return b
 	}
-	return b
 }
 
 // ReplaceAliases accepts an argument and tries to expand any existing
