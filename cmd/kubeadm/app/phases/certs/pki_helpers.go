@@ -68,7 +68,7 @@ func NewClientKeyAndCert(caCert *x509.Certificate, caKey *rsa.PrivateKey) (*rsa.
 	}
 
 	config := certutil.Config{
-		CommonName: "kubernetes-client",
+		CommonName: "kube-admin",
 	}
 	cert, err := certutil.NewSignedCert(config, key, caCert, caKey)
 	if err != nil {
