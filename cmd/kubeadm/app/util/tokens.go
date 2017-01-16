@@ -36,13 +36,13 @@ import (
 
 const (
 	TokenIDBytes               = 3
-	TokenBytes                 = 8
+	TokenSecretBytes           = 8
 	BootstrapTokenSecretPrefix = "bootstrap-token-"
 	DefaultTokenDuration       = time.Duration(8) * time.Hour
 	tokenCreateRetries         = 5
 )
 
-func RandBytes(length int) (string, error) {
+func randBytes(length int) (string, error) {
 	b := make([]byte, length)
 	_, err := rand.Read(b)
 	if err != nil {
@@ -52,12 +52,12 @@ func RandBytes(length int) (string, error) {
 }
 
 func GenerateToken(d *kubeadmapi.TokenDiscovery) error {
-	tokenID, err := RandBytes(TokenIDBytes)
+	tokenID, err := randBytes(TokenIDBytes)
 	if err != nil {
 		return err
 	}
 
-	token, err := RandBytes(TokenBytes)
+	token, err := randBytes(TokenSecretBytes)
 	if err != nil {
 		return err
 	}
@@ -68,7 +68,7 @@ func GenerateToken(d *kubeadmapi.TokenDiscovery) error {
 }
 
 var (
-	tokenRegexpString = "^([a-zA-Z0-9]{6})\\.([a-zA-Z0-9]{16})$"
+	tokenRegexpString = "^([a-zA-Z0-9]{6})\\:([a-zA-Z0-9]{16})$"
 	tokenRegexp       = regexp.MustCompile(tokenRegexpString)
 )
 
@@ -96,15 +96,16 @@ func ParseToken(s string) (string, string, error) {
 
 }
 
+// BearerToken returns a string representation of the passed token.
 func BearerToken(d *kubeadmapi.TokenDiscovery) string {
-	return fmt.Sprintf("%s.%s", d.ID, d.Secret)
+	return fmt.Sprintf("%s:%s", d.ID, d.Secret)
 }
 
 func IsTokenValid(d *kubeadmapi.TokenDiscovery) (bool, error) {
 	if len(d.ID)+len(d.Secret) == 0 {
 		return false, nil
 	}
-	if _, _, err := ParseToken(d.ID + "." + d.Secret); err != nil {
+	if _, _, err := ParseToken(d.ID + ":" + d.Secret); err != nil {
 		return false, err
 	}
 	return true, nil
