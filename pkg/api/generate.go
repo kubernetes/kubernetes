@@ -19,7 +19,7 @@ package api
 import (
 	"fmt"
 
-	utilrand "k8s.io/kubernetes/pkg/util/rand"
+	utilrand "k8s.io/apimachinery/pkg/util/rand"
 )
 
 // NameGenerator generates names for objects. Some backends may have more information

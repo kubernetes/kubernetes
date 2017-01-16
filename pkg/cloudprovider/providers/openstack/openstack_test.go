@@ -27,8 +27,8 @@ import (
 	"github.com/rackspace/gophercloud"
 	"github.com/rackspace/gophercloud/openstack/compute/v2/servers"
 
+	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/util/rand"
 )
 
 const volumeAvailableStatus = "available"
