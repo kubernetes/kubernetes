@@ -18,6 +18,7 @@ package e2e
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -1671,7 +1672,12 @@ func makeRequestToGuestbook(c clientset.Interface, cmd, value string, ns string)
 	if errProxy != nil {
 		return "", errProxy
 	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), framework.SingleCallTimeout)
+	defer cancel()
+
 	result, err := proxyRequest.Namespace(ns).
+		Context(ctx).
 		Name("frontend").
 		Suffix("/guestbook.php").
 		Param("cmd", cmd).
@@ -1771,6 +1777,10 @@ func getUDData(jpgExpected string, ns string) func(clientset.Interface, string) 
 		if err != nil {
 			return err
 		}
+
+		ctx, cancel := context.WithTimeout(context.Background(), framework.SingleCallTimeout)
+		defer cancel()
+
 		var body []byte
 		if subResourceProxyAvailable {
 			body, err = c.Core().RESTClient().Get().
@@ -1792,6 +1802,9 @@ func getUDData(jpgExpected string, ns string) func(clientset.Interface, string) 
 				Raw()
 		}
 		if err != nil {
+			if ctx.Err() != nil {
+				framework.Failf("Failed to retrieve data from container: %v", err)
+			}
 			return err
 		}
 		framework.Logf("got data: %s", body)
