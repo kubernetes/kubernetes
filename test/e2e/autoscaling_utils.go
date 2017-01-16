@@ -17,6 +17,7 @@ limitations under the License.
 package e2e
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 	"time"
@@ -203,7 +204,12 @@ func (rc *ResourceConsumer) makeConsumeCustomMetric() {
 func (rc *ResourceConsumer) sendConsumeCPURequest(millicores int) {
 	proxyRequest, err := framework.GetServicesProxyRequest(rc.framework.ClientSet, rc.framework.ClientSet.Core().RESTClient().Post())
 	framework.ExpectNoError(err)
+
+	ctx, cancel := context.WithTimeout(context.Background(), framework.SingleCallTimeout)
+	defer cancel()
+
 	req := proxyRequest.Namespace(rc.framework.Namespace.Name).
+		Context(ctx).
 		Name(rc.controllerName).
 		Suffix("ConsumeCPU").
 		Param("millicores", strconv.Itoa(millicores)).
@@ -218,7 +224,12 @@ func (rc *ResourceConsumer) sendConsumeCPURequest(millicores int) {
 func (rc *ResourceConsumer) sendConsumeMemRequest(megabytes int) {
 	proxyRequest, err := framework.GetServicesProxyRequest(rc.framework.ClientSet, rc.framework.ClientSet.Core().RESTClient().Post())
 	framework.ExpectNoError(err)
+
+	ctx, cancel := context.WithTimeout(context.Background(), framework.SingleCallTimeout)
+	defer cancel()
+
 	req := proxyRequest.Namespace(rc.framework.Namespace.Name).
+		Context(ctx).
 		Name(rc.controllerName).
 		Suffix("ConsumeMem").
 		Param("megabytes", strconv.Itoa(megabytes)).
@@ -233,7 +244,12 @@ func (rc *ResourceConsumer) sendConsumeMemRequest(megabytes int) {
 func (rc *ResourceConsumer) sendConsumeCustomMetric(delta int) {
 	proxyRequest, err := framework.GetServicesProxyRequest(rc.framework.ClientSet, rc.framework.ClientSet.Core().RESTClient().Post())
 	framework.ExpectNoError(err)
+
+	ctx, cancel := context.WithTimeout(context.Background(), framework.SingleCallTimeout)
+	defer cancel()
+
 	req := proxyRequest.Namespace(rc.framework.Namespace.Name).
+		Context(ctx).
 		Name(rc.controllerName).
 		Suffix("BumpMetric").
 		Param("metric", customMetricName).

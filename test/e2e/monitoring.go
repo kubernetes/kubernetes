@@ -18,6 +18,7 @@ package e2e
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"time"
@@ -63,6 +64,10 @@ var (
 
 // Query sends a command to the server and returns the Response
 func Query(c clientset.Interface, query string) (*influxdb.Response, error) {
+
+	ctx, cancel := context.WithTimeout(context.Background(), framework.SingleCallTimeout)
+	defer cancel()
+
 	result, err := c.Core().RESTClient().Get().
 		Prefix("proxy").
 		Namespace("kube-system").
@@ -76,6 +81,9 @@ func Query(c clientset.Interface, query string) (*influxdb.Response, error) {
 		Raw()
 
 	if err != nil {
+		if ctx.Err() != nil {
+			framework.Failf("Failed to query influx db: %v", err)
+		}
 		return nil, err
 	}
 

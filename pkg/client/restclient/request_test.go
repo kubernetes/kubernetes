@@ -18,6 +18,7 @@ package restclient
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -1650,4 +1651,33 @@ func testRESTClient(t testing.TB, srv *httptest.Server) *RESTClient {
 		t.Fatalf("failed to create a client: %v", err)
 	}
 	return client
+}
+
+func TestDoContext(t *testing.T) {
+	receivedCh := make(chan struct{})
+	block := make(chan struct{})
+	testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		close(receivedCh)
+		<-block
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer testServer.Close()
+	defer close(block)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	go func() {
+		<-receivedCh
+		cancel()
+	}()
+
+	c := testRESTClient(t, testServer)
+	_, err := c.Verb("GET").
+		Context(ctx).
+		Prefix("foo").
+		DoRaw()
+	if err == nil {
+		t.Fatal("Expected context cancellation error")
+	}
 }

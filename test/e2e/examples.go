@@ -17,6 +17,7 @@ limitations under the License.
 package e2e
 
 import (
+	"context"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -580,7 +581,12 @@ func makeHttpRequestToService(c clientset.Interface, ns, service, path string, t
 		if errProxy != nil {
 			break
 		}
+
+		ctx, cancel := context.WithTimeout(context.Background(), framework.SingleCallTimeout)
+		defer cancel()
+
 		result, err = proxyRequest.Namespace(ns).
+			Context(ctx).
 			Name(service).
 			Suffix(path).
 			Do().
