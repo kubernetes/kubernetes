@@ -14,12 +14,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package api
+package names
 
 import (
 	"fmt"
 
-	utilrand "k8s.io/kubernetes/pkg/util/rand"
+	utilrand "k8s.io/apimachinery/pkg/util/rand"
 )
 
 // NameGenerator generates names for objects. Some backends may have more information
@@ -29,16 +29,6 @@ type NameGenerator interface {
 	// the base. If base is valid, the returned name must also be valid. The generator is
 	// responsible for knowing the maximum valid name length.
 	GenerateName(base string) string
-}
-
-// GenerateName will resolve the object name of the provided ObjectMeta to a generated version if
-// necessary. It expects that validation for ObjectMeta has already completed (that Base is a
-// valid name) and that the NameGenerator generates a name that is also valid.
-func GenerateName(u NameGenerator, meta *ObjectMeta) {
-	if len(meta.GenerateName) == 0 || len(meta.Name) != 0 {
-		return
-	}
-	meta.Name = u.GenerateName(meta.GenerateName)
 }
 
 // simpleNameGenerator generates random names.

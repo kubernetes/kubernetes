@@ -13341,3 +13341,30 @@ go_library(
         "//vendor:github.com/go-openapi/spec",
     ],
 )
+
+go_test(
+    name = "k8s.io/apimachinery/pkg/util/rand_test",
+    srcs = ["k8s.io/apimachinery/pkg/util/rand/rand_test.go"],
+    library = ":k8s.io/apimachinery/pkg/util/rand",
+    tags = ["automanaged"],
+)
+
+go_library(
+    name = "k8s.io/apimachinery/pkg/util/rand",
+    srcs = ["k8s.io/apimachinery/pkg/util/rand/rand.go"],
+    tags = ["automanaged"],
+)
+
+go_test(
+    name = "k8s.io/apiserver/pkg/storage/names_test",
+    srcs = ["k8s.io/apiserver/pkg/storage/names/generate_test.go"],
+    library = ":k8s.io/apiserver/pkg/storage/names",
+    tags = ["automanaged"],
+)
+
+go_library(
+    name = "k8s.io/apiserver/pkg/storage/names",
+    srcs = ["k8s.io/apiserver/pkg/storage/names/generate.go"],
+    tags = ["automanaged"],
+    deps = ["//vendor:k8s.io/apimachinery/pkg/util/rand"],
+)

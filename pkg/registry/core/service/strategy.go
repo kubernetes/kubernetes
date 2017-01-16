@@ -23,6 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/request"
+	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/fields"
@@ -33,12 +34,12 @@ import (
 // svcStrategy implements behavior for Services
 type svcStrategy struct {
 	runtime.ObjectTyper
-	api.NameGenerator
+	names.NameGenerator
 }
 
 // Services is the default logic that applies when creating and updating Service
 // objects.
-var Strategy = svcStrategy{api.Scheme, api.SimpleNameGenerator}
+var Strategy = svcStrategy{api.Scheme, names.SimpleNameGenerator}
 
 // NamespaceScoped is true for services.
 func (svcStrategy) NamespaceScoped() bool {

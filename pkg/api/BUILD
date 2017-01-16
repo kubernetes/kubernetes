@@ -15,7 +15,6 @@ go_library(
         "defaults.go",
         "doc.go",
         "field_constants.go",
-        "generate.go",
         "helpers.go",
         "mapper.go",
         "meta.go",
@@ -31,7 +30,6 @@ go_library(
         "//pkg/fields:go_default_library",
         "//pkg/util/intstr:go_default_library",
         "//pkg/util/labels:go_default_library",
-        "//pkg/util/rand:go_default_library",
         "//vendor:github.com/davecgh/go-spew/spew",
         "//vendor:k8s.io/apimachinery/pkg/api/meta",
         "//vendor:k8s.io/apimachinery/pkg/apimachinery/registered",
@@ -51,7 +49,6 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = [
-        "generate_test.go",
         "helpers_test.go",
         "ref_test.go",
         "resource_helpers_test.go",
