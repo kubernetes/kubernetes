@@ -18,6 +18,7 @@ package internalversion
 
 import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	apiregistration "k8s.io/kubernetes/cmd/kube-aggregator/pkg/apis/apiregistration"
 	api "k8s.io/kubernetes/pkg/api"
@@ -40,7 +41,7 @@ type APIServiceInterface interface {
 	Get(name string, options v1.GetOptions) (*apiregistration.APIService, error)
 	List(opts api.ListOptions) (*apiregistration.APIServiceList, error)
 	Watch(opts api.ListOptions) (watch.Interface, error)
-	Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *apiregistration.APIService, err error)
+	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *apiregistration.APIService, err error)
 	APIServiceExpansion
 }
 
@@ -147,7 +148,7 @@ func (c *aPIServices) Watch(opts api.ListOptions) (watch.Interface, error) {
 }
 
 // Patch applies the patch and returns the patched aPIService.
-func (c *aPIServices) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *apiregistration.APIService, err error) {
+func (c *aPIServices) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *apiregistration.APIService, err error) {
 	result = &apiregistration.APIService{}
 	err = c.client.Patch(pt).
 		Resource("apiservices").

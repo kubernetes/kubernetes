@@ -18,6 +18,7 @@ package internalversion
 
 import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	api "k8s.io/kubernetes/pkg/api"
 	certificates "k8s.io/kubernetes/pkg/apis/certificates"
@@ -40,7 +41,7 @@ type CertificateSigningRequestInterface interface {
 	Get(name string, options v1.GetOptions) (*certificates.CertificateSigningRequest, error)
 	List(opts api.ListOptions) (*certificates.CertificateSigningRequestList, error)
 	Watch(opts api.ListOptions) (watch.Interface, error)
-	Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *certificates.CertificateSigningRequest, err error)
+	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *certificates.CertificateSigningRequest, err error)
 	CertificateSigningRequestExpansion
 }
 
@@ -147,7 +148,7 @@ func (c *certificateSigningRequests) Watch(opts api.ListOptions) (watch.Interfac
 }
 
 // Patch applies the patch and returns the patched certificateSigningRequest.
-func (c *certificateSigningRequests) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *certificates.CertificateSigningRequest, err error) {
+func (c *certificateSigningRequests) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *certificates.CertificateSigningRequest, err error) {
 	result = &certificates.CertificateSigningRequest{}
 	err = c.client.Patch(pt).
 		Resource("certificatesigningrequests").
