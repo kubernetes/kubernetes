@@ -19,9 +19,9 @@ package cache
 import (
 	"fmt"
 
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/pkg/api"
-	"k8s.io/client-go/pkg/api/errors"
 	"k8s.io/client-go/pkg/api/v1"
 )
 

@@ -145,8 +145,8 @@ func (t Time) MarshalJSON() ([]byte, error) {
 	return json.Marshal(t.UTC().Format(time.RFC3339))
 }
 
-func (_ Time) OpenAPIDefinition() common.OpenAPIDefinition {
-	return common.OpenAPIDefinition{
+func (_ Time) OpenAPIDefinition() openapi.OpenAPIDefinition {
+	return openapi.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
 				Type:   []string{"string"},

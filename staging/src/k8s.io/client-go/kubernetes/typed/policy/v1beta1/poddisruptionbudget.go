@@ -18,6 +18,7 @@ package v1beta1
 
 import (
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	api "k8s.io/client-go/pkg/api"
 	v1 "k8s.io/client-go/pkg/api/v1"
@@ -41,7 +42,7 @@ type PodDisruptionBudgetInterface interface {
 	Get(name string, options meta_v1.GetOptions) (*v1beta1.PodDisruptionBudget, error)
 	List(opts v1.ListOptions) (*v1beta1.PodDisruptionBudgetList, error)
 	Watch(opts v1.ListOptions) (watch.Interface, error)
-	Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *v1beta1.PodDisruptionBudget, err error)
+	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1beta1.PodDisruptionBudget, err error)
 	PodDisruptionBudgetExpansion
 }
 
@@ -158,7 +159,7 @@ func (c *podDisruptionBudgets) Watch(opts v1.ListOptions) (watch.Interface, erro
 }
 
 // Patch applies the patch and returns the patched podDisruptionBudget.
-func (c *podDisruptionBudgets) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *v1beta1.PodDisruptionBudget, err error) {
+func (c *podDisruptionBudgets) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1beta1.PodDisruptionBudget, err error) {
 	result = &v1beta1.PodDisruptionBudget{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).

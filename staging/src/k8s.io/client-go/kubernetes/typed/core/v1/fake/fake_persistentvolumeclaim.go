@@ -20,8 +20,8 @@ import (
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
+	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
-	api "k8s.io/client-go/pkg/api"
 	v1 "k8s.io/client-go/pkg/api/v1"
 	testing "k8s.io/client-go/testing"
 )
@@ -117,7 +117,7 @@ func (c *FakePersistentVolumeClaims) Watch(opts v1.ListOptions) (watch.Interface
 }
 
 // Patch applies the patch and returns the patched persistentVolumeClaim.
-func (c *FakePersistentVolumeClaims) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *v1.PersistentVolumeClaim, err error) {
+func (c *FakePersistentVolumeClaims) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.PersistentVolumeClaim, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewPatchSubresourceAction(persistentvolumeclaimsResource, c.ns, name, data, subresources...), &v1.PersistentVolumeClaim{})
 

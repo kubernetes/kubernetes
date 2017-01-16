@@ -30,8 +30,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer/streaming"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/client-go/pkg/api"
 	"k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/rest"
 	restclientwatch "k8s.io/client-go/rest/watch"
@@ -520,8 +520,8 @@ func TestPatch(t *testing.T) {
 			}
 
 			content := r.Header.Get("Content-Type")
-			if content != string(api.StrategicMergePatchType) {
-				t.Errorf("Patch(%q) got Content-Type %s. wanted %s", tc.name, content, api.StrategicMergePatchType)
+			if content != string(types.StrategicMergePatchType) {
+				t.Errorf("Patch(%q) got Content-Type %s. wanted %s", tc.name, content, types.StrategicMergePatchType)
 			}
 
 			data, err := ioutil.ReadAll(r.Body)
@@ -540,7 +540,7 @@ func TestPatch(t *testing.T) {
 		}
 		defer srv.Close()
 
-		got, err := cl.Resource(resource, tc.namespace).Patch(tc.name, api.StrategicMergePatchType, tc.patch)
+		got, err := cl.Resource(resource, tc.namespace).Patch(tc.name, types.StrategicMergePatchType, tc.patch)
 		if err != nil {
 			t.Errorf("unexpected error when patching %q: %v", tc.name, err)
 			continue

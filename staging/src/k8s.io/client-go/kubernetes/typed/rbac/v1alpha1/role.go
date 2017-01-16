@@ -18,6 +18,7 @@ package v1alpha1
 
 import (
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	api "k8s.io/client-go/pkg/api"
 	v1 "k8s.io/client-go/pkg/api/v1"
@@ -40,7 +41,7 @@ type RoleInterface interface {
 	Get(name string, options meta_v1.GetOptions) (*v1alpha1.Role, error)
 	List(opts v1.ListOptions) (*v1alpha1.RoleList, error)
 	Watch(opts v1.ListOptions) (watch.Interface, error)
-	Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *v1alpha1.Role, err error)
+	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1alpha1.Role, err error)
 	RoleExpansion
 }
 
@@ -141,7 +142,7 @@ func (c *roles) Watch(opts v1.ListOptions) (watch.Interface, error) {
 }
 
 // Patch applies the patch and returns the patched role.
-func (c *roles) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *v1alpha1.Role, err error) {
+func (c *roles) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1alpha1.Role, err error) {
 	result = &v1alpha1.Role{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).

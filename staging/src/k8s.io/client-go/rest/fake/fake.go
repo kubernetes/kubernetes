@@ -24,6 +24,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/pkg/api"
 	"k8s.io/client-go/pkg/api/testapi"
 	"k8s.io/client-go/pkg/util/flowcontrol"
@@ -61,7 +62,7 @@ func (c *RESTClient) Put() *rest.Request {
 	return c.request("PUT")
 }
 
-func (c *RESTClient) Patch(_ api.PatchType) *rest.Request {
+func (c *RESTClient) Patch(_ types.PatchType) *rest.Request {
 	return c.request("PATCH")
 }
 
