@@ -44,10 +44,18 @@ func GenerateName(u NameGenerator, meta *ObjectMeta) {
 // simpleNameGenerator generates random names.
 type simpleNameGenerator struct{}
 
+// phoneticNameGenerator generates random phonetic names.
+type phoneticNameGenerator struct{}
+
 // SimpleNameGenerator is a generator that returns the name plus a random suffix of five alphanumerics
 // when a name is requested. The string is guaranteed to not exceed the length of a standard Kubernetes
 // name (63 characters)
 var SimpleNameGenerator NameGenerator = simpleNameGenerator{}
+
+// PhoneticNameGenerator is a generator that returns the name plus a suffic of five alphanumerics with
+// alternating consonants and vowels, when a name is requested. The string is guaranteed to not exceed
+// the length of a standard Kubernetes name (63 characters)
+var PhoneticNameGenerator NameGenerator = phoneticNameGenerator{}
 
 const (
 	// TODO: make this flexible for non-core resources with alternate naming rules.
@@ -61,4 +69,11 @@ func (simpleNameGenerator) GenerateName(base string) string {
 		base = base[:maxGeneratedNameLength]
 	}
 	return fmt.Sprintf("%s%s", base, utilrand.String(randomLength))
+}
+
+func (phoneticNameGenerator) GenerateName(base string) string {
+	if len(base) > maxGeneratedNameLength {
+		base = base[:maxGeneratedNameLength]
+	}
+	return fmt.Sprintf("%s%s", base, utilrand.PhoneticString(randomLength))
 }

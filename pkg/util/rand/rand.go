@@ -74,12 +74,68 @@ func Perm(n int) []int {
 // of "bad words" being formed.
 var alphanums = []rune("bcdfghjklmnpqrstvwxz0123456789")
 
+// Returns a random rune from the given rune list
+func randElem(set []rune) rune {
+	return set[Intn(len(set))]
+}
+
 // String generates a random alphanumeric string, without vowels, which is n
 // characters long.  This will panic if n is less than zero.
 func String(length int) string {
 	b := make([]rune, length)
 	for i := range b {
-		b[i] = alphanums[Intn(len(alphanums))]
+		b[i] = randElem(alphanums)
 	}
 	return string(b)
+}
+
+// Required for creating phonetic strings.
+// Letter 'l' is omitted to avoid ambiguity.
+var vowels = []rune("aeiou")
+var consonants = []rune("bcdfghjkmnpqrstvwxyz")
+var letters = []rune("abcdefghijkmnpqrstuvwxyz")
+var numbers = []rune("0123456789")
+
+// Returns a rune list of length 'length' with alternating
+// vowels and consonants. Randomly starting from any of the two.
+// If length is 1, returns any random alphabet
+func getAltRune(length int) []rune {
+	phoneticSets := [...][]rune{consonants, vowels}
+	out := make([]rune, length)
+	seed := Intn(len(phoneticSets))
+
+	for i := 0; i < length; i++ {
+		out[i] = randElem(phoneticSets[(seed+i)%len(phoneticSets)])
+	}
+
+	return out
+}
+
+// PhoneticString generates a random string compising of alternating
+// consonants and vowels, with a number after every small chunk (2-4 letters),
+// 'length' characters long. Panics if 'length' is less than zero.
+func PhoneticString(length int) string {
+	if length <= 1 {
+		return string(getAltRune(length))
+	}
+
+	var out []rune
+	seed := Intn(2)
+
+	for len(out) < length {
+		if seed == 0 {
+			// Number
+			out = append(out, randElem(numbers))
+		} else {
+			// Letters
+			size := IntnRange(2, 5)
+			if size > length-len(out) {
+				size = length - len(out)
+			}
+			out = append(out, getAltRune(size)...)
+		}
+		seed = (seed + 1) % 2
+	}
+
+	return string(out)
 }

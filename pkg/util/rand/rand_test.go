@@ -41,6 +41,62 @@ func TestString(t *testing.T) {
 	}
 }
 
+var validvowels = "aeiou"
+var validconsonants = "bcdfghjkmnpqrstvwxyz"
+var validletters = "abcdefghijkmnpqrstuvwxyz"
+var validnumbers = "0123456789"
+
+func checkAlternating(t *testing.T, s string) {
+	length := len(s)
+	if length == 0 {
+		return
+	}
+
+	phoneticSets := [...]string{validconsonants, validvowels}
+	seed := -1
+	for i, _ := range phoneticSets {
+		if strings.IndexByte(phoneticSets[i], s[0]) != -1 {
+			seed = i
+			break
+		}
+	}
+
+	if seed == -1 {
+		t.Errorf("expected a valid letter, got %c", s[0])
+		return
+	}
+
+	for i := 1; i < length; i++ {
+		if strings.IndexByte(phoneticSets[(seed+i)%len(phoneticSets)], s[i]) == -1 {
+			t.Errorf("expected alternating sequence at position %v, got %v", i, s)
+			return
+		}
+	}
+}
+
+func TestPhoneticString(t *testing.T) {
+	validnumbers := "0123456789"
+
+	for _, l := range []int{0, 1, 2, 3, 4, 5, 6, 10, 123} {
+		s := PhoneticString(l)
+		if len(s) != l {
+			t.Errorf("expected phonetic string of size %d, got %q", l, s)
+		}
+
+		// Split on numbers
+		splits := strings.FieldsFunc(s, func(r rune) bool {
+			return strings.ContainsRune(validnumbers, r)
+		})
+
+		for _, split := range splits {
+			if len(split) > 5 {
+				t.Errorf("expected string length <= 5 letters, got %q", split)
+			}
+			checkAlternating(t, split)
+		}
+	}
+}
+
 // Confirm that panic occurs on invalid input.
 func TestRangePanic(t *testing.T) {
 	defer func() {
