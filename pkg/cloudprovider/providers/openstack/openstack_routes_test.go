@@ -20,7 +20,7 @@ import (
 	"net"
 	"testing"
 
-	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 )
 

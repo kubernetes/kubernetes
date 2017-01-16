@@ -23,6 +23,7 @@ import (
 	"github.com/golang/glog"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	k8stypes "k8s.io/kubernetes/pkg/types"
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -127,7 +128,7 @@ func (cnc *CloudNodeController) Run() {
 						}
 						// Check with the cloud provider to see if the node still exists. If it
 						// doesn't, delete the node immediately.
-						if _, err := instances.ExternalID(types.NodeName(node.Name)); err != nil {
+						if _, err := instances.ExternalID(k8stypes.NodeName(node.Name)); err != nil {
 							if err == cloudprovider.InstanceNotFound {
 								glog.V(2).Infof("Deleting node no longer present in cloud provider: %s", node.Name)
 								ref := &v1.ObjectReference{

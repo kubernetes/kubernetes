@@ -27,8 +27,6 @@ import (
 	"sync"
 	"time"
 
-	"gopkg.in/gcfg.v1"
-
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/aws/credentials"
@@ -40,7 +38,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/aws/aws-sdk-go/service/elb"
 	"github.com/golang/glog"
-
+	"gopkg.in/gcfg.v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -49,6 +47,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1/service"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	awscredentials "k8s.io/kubernetes/pkg/credentialprovider/aws"
+	k8stypes "k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/volume"
 )
 
@@ -308,11 +307,11 @@ type Volumes interface {
 	// Attach the disk to the node with the specified NodeName
 	// nodeName can be empty to mean "the instance on which we are running"
 	// Returns the device (e.g. /dev/xvdf) where we attached the volume
-	AttachDisk(diskName KubernetesVolumeID, nodeName types.NodeName, readOnly bool) (string, error)
+	AttachDisk(diskName KubernetesVolumeID, nodeName k8stypes.NodeName, readOnly bool) (string, error)
 	// Detach the disk from the node with the specified NodeName
 	// nodeName can be empty to mean "the instance on which we are running"
 	// Returns the device where the volume was attached
-	DetachDisk(diskName KubernetesVolumeID, nodeName types.NodeName) (string, error)
+	DetachDisk(diskName KubernetesVolumeID, nodeName k8stypes.NodeName) (string, error)
 
 	// Create a volume with the specified options
 	CreateDisk(volumeOptions *VolumeOptions) (volumeName KubernetesVolumeID, err error)
@@ -329,10 +328,10 @@ type Volumes interface {
 	GetDiskPath(volumeName KubernetesVolumeID) (string, error)
 
 	// Check if the volume is already attached to the node with the specified NodeName
-	DiskIsAttached(diskName KubernetesVolumeID, nodeName types.NodeName) (bool, error)
+	DiskIsAttached(diskName KubernetesVolumeID, nodeName k8stypes.NodeName) (bool, error)
 
 	// Check if a list of volumes are attached to the node with the specified NodeName
-	DisksAreAttached(diskNames []KubernetesVolumeID, nodeName types.NodeName) (map[KubernetesVolumeID]bool, error)
+	DisksAreAttached(diskNames []KubernetesVolumeID, nodeName k8stypes.NodeName) (map[KubernetesVolumeID]bool, error)
 }
 
 // InstanceGroups is an interface for managing cloud-managed instance groups / autoscaling instance groups
@@ -374,10 +373,10 @@ type Cloud struct {
 	// attached, to avoid a race condition where we assign a device mapping
 	// and then get a second request before we attach the volume
 	attachingMutex sync.Mutex
-	attaching      map[types.NodeName]map[mountDevice]awsVolumeID
+	attaching      map[k8stypes.NodeName]map[mountDevice]awsVolumeID
 
 	// state of our device allocator for each node
-	deviceAllocators map[types.NodeName]DeviceAllocator
+	deviceAllocators map[k8stypes.NodeName]DeviceAllocator
 }
 
 var _ Volumes = &Cloud{}
@@ -551,7 +550,7 @@ func (c *Cloud) AddSSHKeyToAllInstances(user string, keyData []byte) error {
 }
 
 // CurrentNodeName returns the name of the current node
-func (c *Cloud) CurrentNodeName(hostname string) (types.NodeName, error) {
+func (c *Cloud) CurrentNodeName(hostname string) (k8stypes.NodeName, error) {
 	return c.selfAWSInstance.nodeName, nil
 }
 
@@ -809,8 +808,8 @@ func newAWSCloud(config io.Reader, awsServices Services) (*Cloud, error) {
 		cfg:      cfg,
 		region:   regionName,
 
-		attaching:        make(map[types.NodeName]map[mountDevice]awsVolumeID),
-		deviceAllocators: make(map[types.NodeName]DeviceAllocator),
+		attaching:        make(map[k8stypes.NodeName]map[mountDevice]awsVolumeID),
+		deviceAllocators: make(map[k8stypes.NodeName]DeviceAllocator),
 	}
 
 	selfAWSInstance, err := awsCloud.buildSelfAWSInstance()
@@ -892,7 +891,7 @@ func (c *Cloud) Routes() (cloudprovider.Routes, bool) {
 }
 
 // NodeAddresses is an implementation of Instances.NodeAddresses.
-func (c *Cloud) NodeAddresses(name types.NodeName) ([]v1.NodeAddress, error) {
+func (c *Cloud) NodeAddresses(name k8stypes.NodeName) ([]v1.NodeAddress, error) {
 	if c.selfAWSInstance.nodeName == name || len(name) == 0 {
 		addresses := []v1.NodeAddress{}
 
@@ -948,7 +947,7 @@ func (c *Cloud) NodeAddresses(name types.NodeName) ([]v1.NodeAddress, error) {
 }
 
 // ExternalID returns the cloud provider ID of the node with the specified nodeName (deprecated).
-func (c *Cloud) ExternalID(nodeName types.NodeName) (string, error) {
+func (c *Cloud) ExternalID(nodeName k8stypes.NodeName) (string, error) {
 	if c.selfAWSInstance.nodeName == nodeName {
 		// We assume that if this is run on the instance itself, the instance exists and is alive
 		return c.selfAWSInstance.awsID, nil
@@ -966,7 +965,7 @@ func (c *Cloud) ExternalID(nodeName types.NodeName) (string, error) {
 }
 
 // InstanceID returns the cloud provider ID of the node with the specified nodeName.
-func (c *Cloud) InstanceID(nodeName types.NodeName) (string, error) {
+func (c *Cloud) InstanceID(nodeName k8stypes.NodeName) (string, error) {
 	// In the future it is possible to also return an endpoint as:
 	// <endpoint>/<zone>/<instanceid>
 	if c.selfAWSInstance.nodeName == nodeName {
@@ -980,7 +979,7 @@ func (c *Cloud) InstanceID(nodeName types.NodeName) (string, error) {
 }
 
 // InstanceType returns the type of the node with the specified nodeName.
-func (c *Cloud) InstanceType(nodeName types.NodeName) (string, error) {
+func (c *Cloud) InstanceType(nodeName k8stypes.NodeName) (string, error) {
 	if c.selfAWSInstance.nodeName == nodeName {
 		return c.selfAWSInstance.instanceType, nil
 	}
@@ -992,7 +991,7 @@ func (c *Cloud) InstanceType(nodeName types.NodeName) (string, error) {
 }
 
 // Return a list of instances matching regex string.
-func (c *Cloud) getInstancesByRegex(regex string) ([]types.NodeName, error) {
+func (c *Cloud) getInstancesByRegex(regex string) ([]k8stypes.NodeName, error) {
 	filters := []*ec2.Filter{newEc2Filter("instance-state-name", "running")}
 	filters = c.addFilters(filters)
 	request := &ec2.DescribeInstancesInput{
@@ -1001,10 +1000,10 @@ func (c *Cloud) getInstancesByRegex(regex string) ([]types.NodeName, error) {
 
 	instances, err := c.ec2.DescribeInstances(request)
 	if err != nil {
-		return []types.NodeName{}, err
+		return []k8stypes.NodeName{}, err
 	}
 	if len(instances) == 0 {
-		return []types.NodeName{}, fmt.Errorf("no instances returned")
+		return []k8stypes.NodeName{}, fmt.Errorf("no instances returned")
 	}
 
 	if strings.HasPrefix(regex, "'") && strings.HasSuffix(regex, "'") {
@@ -1014,10 +1013,10 @@ func (c *Cloud) getInstancesByRegex(regex string) ([]types.NodeName, error) {
 
 	re, err := regexp.Compile(regex)
 	if err != nil {
-		return []types.NodeName{}, err
+		return []k8stypes.NodeName{}, err
 	}
 
-	matchingInstances := []types.NodeName{}
+	matchingInstances := []k8stypes.NodeName{}
 	for _, instance := range instances {
 		// Only return fully-ready instances when listing instances
 		// (vs a query by name, where we will return it if we find it)
@@ -1111,7 +1110,7 @@ type awsInstance struct {
 	awsID string
 
 	// node name in k8s
-	nodeName types.NodeName
+	nodeName k8stypes.NodeName
 
 	// availability zone the instance resides in
 	availabilityZone string
@@ -1418,7 +1417,7 @@ func (c *Cloud) buildSelfAWSInstance() (*awsInstance, error) {
 }
 
 // Gets the awsInstance with for the node with the specified nodeName, or the 'self' instance if nodeName == ""
-func (c *Cloud) getAwsInstance(nodeName types.NodeName) (*awsInstance, error) {
+func (c *Cloud) getAwsInstance(nodeName k8stypes.NodeName) (*awsInstance, error) {
 	var awsInstance *awsInstance
 	if nodeName == "" {
 		awsInstance = c.selfAWSInstance
@@ -1435,7 +1434,7 @@ func (c *Cloud) getAwsInstance(nodeName types.NodeName) (*awsInstance, error) {
 }
 
 // AttachDisk implements Volumes.AttachDisk
-func (c *Cloud) AttachDisk(diskName KubernetesVolumeID, nodeName types.NodeName, readOnly bool) (string, error) {
+func (c *Cloud) AttachDisk(diskName KubernetesVolumeID, nodeName k8stypes.NodeName, readOnly bool) (string, error) {
 	disk, err := newAWSDisk(c, diskName)
 	if err != nil {
 		return "", err
@@ -1522,7 +1521,7 @@ func (c *Cloud) AttachDisk(diskName KubernetesVolumeID, nodeName types.NodeName,
 }
 
 // DetachDisk implements Volumes.DetachDisk
-func (c *Cloud) DetachDisk(diskName KubernetesVolumeID, nodeName types.NodeName) (string, error) {
+func (c *Cloud) DetachDisk(diskName KubernetesVolumeID, nodeName k8stypes.NodeName) (string, error) {
 	disk, err := newAWSDisk(c, diskName)
 	if err != nil {
 		return "", err
@@ -1725,7 +1724,7 @@ func (c *Cloud) GetDiskPath(volumeName KubernetesVolumeID) (string, error) {
 }
 
 // DiskIsAttached implements Volumes.DiskIsAttached
-func (c *Cloud) DiskIsAttached(diskName KubernetesVolumeID, nodeName types.NodeName) (bool, error) {
+func (c *Cloud) DiskIsAttached(diskName KubernetesVolumeID, nodeName k8stypes.NodeName) (bool, error) {
 	awsInstance, err := c.getAwsInstance(nodeName)
 	if err != nil {
 		if err == cloudprovider.InstanceNotFound {
@@ -1758,7 +1757,7 @@ func (c *Cloud) DiskIsAttached(diskName KubernetesVolumeID, nodeName types.NodeN
 	return false, nil
 }
 
-func (c *Cloud) DisksAreAttached(diskNames []KubernetesVolumeID, nodeName types.NodeName) (map[KubernetesVolumeID]bool, error) {
+func (c *Cloud) DisksAreAttached(diskNames []KubernetesVolumeID, nodeName k8stypes.NodeName) (map[KubernetesVolumeID]bool, error) {
 	idToDiskName := make(map[awsVolumeID]KubernetesVolumeID)
 	attached := make(map[KubernetesVolumeID]bool)
 	for _, diskName := range diskNames {
@@ -3222,18 +3221,18 @@ func (c *Cloud) getInstancesByNodeNamesCached(nodeNames sets.String) ([]*ec2.Ins
 
 // mapNodeNameToPrivateDNSName maps a k8s NodeName to an AWS Instance PrivateDNSName
 // This is a simple string cast
-func mapNodeNameToPrivateDNSName(nodeName types.NodeName) string {
+func mapNodeNameToPrivateDNSName(nodeName k8stypes.NodeName) string {
 	return string(nodeName)
 }
 
 // mapInstanceToNodeName maps a EC2 instance to a k8s NodeName, by extracting the PrivateDNSName
-func mapInstanceToNodeName(i *ec2.Instance) types.NodeName {
-	return types.NodeName(aws.StringValue(i.PrivateDnsName))
+func mapInstanceToNodeName(i *ec2.Instance) k8stypes.NodeName {
+	return k8stypes.NodeName(aws.StringValue(i.PrivateDnsName))
 }
 
 // Returns the instance with the specified node name
 // Returns nil if it does not exist
-func (c *Cloud) findInstanceByNodeName(nodeName types.NodeName) (*ec2.Instance, error) {
+func (c *Cloud) findInstanceByNodeName(nodeName k8stypes.NodeName) (*ec2.Instance, error) {
 	privateDNSName := mapNodeNameToPrivateDNSName(nodeName)
 	filters := []*ec2.Filter{
 		newEc2Filter("private-dns-name", privateDNSName),
@@ -3259,7 +3258,7 @@ func (c *Cloud) findInstanceByNodeName(nodeName types.NodeName) (*ec2.Instance, 
 
 // Returns the instance with the specified node name
 // Like findInstanceByNodeName, but returns error if node not found
-func (c *Cloud) getInstanceByNodeName(nodeName types.NodeName) (*ec2.Instance, error) {
+func (c *Cloud) getInstanceByNodeName(nodeName k8stypes.NodeName) (*ec2.Instance, error) {
 	instance, err := c.findInstanceByNodeName(nodeName)
 	if err == nil && instance == nil {
 		return nil, cloudprovider.InstanceNotFound

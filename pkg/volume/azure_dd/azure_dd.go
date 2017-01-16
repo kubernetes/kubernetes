@@ -29,6 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/azure"
+	k8stypes "k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/util/keymutex"
 	"k8s.io/kubernetes/pkg/util/mount"
@@ -51,17 +52,17 @@ type azureDataDiskPlugin struct {
 // azure cloud provider should implement it
 type azureCloudProvider interface {
 	// Attaches the disk to the host machine.
-	AttachDisk(diskName, diskUri string, nodeName types.NodeName, lun int32, cachingMode compute.CachingTypes) error
+	AttachDisk(diskName, diskUri string, nodeName k8stypes.NodeName, lun int32, cachingMode compute.CachingTypes) error
 	// Detaches the disk, identified by disk name or uri, from the host machine.
-	DetachDiskByName(diskName, diskUri string, nodeName types.NodeName) error
+	DetachDiskByName(diskName, diskUri string, nodeName k8stypes.NodeName) error
 	// Check if a list of volumes are attached to the node with the specified NodeName
-	DisksAreAttached(diskNames []string, nodeName types.NodeName) (map[string]bool, error)
+	DisksAreAttached(diskNames []string, nodeName k8stypes.NodeName) (map[string]bool, error)
 	// Get the LUN number of the disk that is attached to the host
-	GetDiskLun(diskName, diskUri string, nodeName types.NodeName) (int32, error)
+	GetDiskLun(diskName, diskUri string, nodeName k8stypes.NodeName) (int32, error)
 	// Get the next available LUN number to attach a new VHD
-	GetNextDiskLun(nodeName types.NodeName) (int32, error)
+	GetNextDiskLun(nodeName k8stypes.NodeName) (int32, error)
 	// InstanceID returns the cloud provider ID of the specified instance.
-	InstanceID(nodeName types.NodeName) (string, error)
+	InstanceID(nodeName k8stypes.NodeName) (string, error)
 	// Create a VHD blob
 	CreateVolume(name, storageAccount, storageType, location string, requestGB int) (string, string, int, error)
 	// Delete a VHD blob
