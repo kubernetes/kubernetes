@@ -35,6 +35,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apimachinery/pkg/util/wait"
 	genericapirequest "k8s.io/apiserver/pkg/request"
+	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/api/testapi"
@@ -68,7 +69,7 @@ func (t *testOrphanDeleteStrategy) DefaultGarbageCollectionPolicy() rest.Garbage
 
 type testRESTStrategy struct {
 	runtime.ObjectTyper
-	api.NameGenerator
+	names.NameGenerator
 	namespaceScoped          bool
 	allowCreateOnUpdate      bool
 	allowUnconditionalUpdate bool
@@ -640,7 +641,7 @@ func TestGracefulStoreCanDeleteIfExistingGracePeriodZero(t *testing.T) {
 	testContext := genericapirequest.WithNamespace(genericapirequest.NewContext(), "test")
 	destroyFunc, registry := NewTestGenericStoreRegistry(t)
 	registry.EnableGarbageCollection = false
-	defaultDeleteStrategy := testRESTStrategy{api.Scheme, api.SimpleNameGenerator, true, false, true}
+	defaultDeleteStrategy := testRESTStrategy{api.Scheme, names.SimpleNameGenerator, true, false, true}
 	registry.DeleteStrategy = testGracefulStrategy{defaultDeleteStrategy}
 	defer destroyFunc()
 
@@ -666,7 +667,7 @@ func TestGracefulStoreHandleFinalizers(t *testing.T) {
 	testContext := genericapirequest.WithNamespace(genericapirequest.NewContext(), "test")
 	destroyFunc, registry := NewTestGenericStoreRegistry(t)
 	registry.EnableGarbageCollection = true
-	defaultDeleteStrategy := testRESTStrategy{api.Scheme, api.SimpleNameGenerator, true, false, true}
+	defaultDeleteStrategy := testRESTStrategy{api.Scheme, names.SimpleNameGenerator, true, false, true}
 	registry.DeleteStrategy = testGracefulStrategy{defaultDeleteStrategy}
 	defer destroyFunc()
 	// create pod
@@ -823,7 +824,7 @@ func TestStoreDeleteWithOrphanDependents(t *testing.T) {
 	nilOrphanOptions := &api.DeleteOptions{}
 
 	// defaultDeleteStrategy doesn't implement rest.GarbageCollectionDeleteStrategy.
-	defaultDeleteStrategy := &testRESTStrategy{api.Scheme, api.SimpleNameGenerator, true, false, true}
+	defaultDeleteStrategy := &testRESTStrategy{api.Scheme, names.SimpleNameGenerator, true, false, true}
 	// orphanDeleteStrategy indicates the default garbage collection policy is
 	// to orphan dependentes.
 	orphanDeleteStrategy := &testOrphanDeleteStrategy{defaultDeleteStrategy}
@@ -1233,7 +1234,7 @@ func TestStoreWatch(t *testing.T) {
 func newTestGenericStoreRegistry(t *testing.T, hasCacheEnabled bool) (factory.DestroyFunc, *Store) {
 	podPrefix := "/pods"
 	server, sc := etcdtesting.NewUnsecuredEtcd3TestClientServer(t)
-	strategy := &testRESTStrategy{api.Scheme, api.SimpleNameGenerator, true, false, true}
+	strategy := &testRESTStrategy{api.Scheme, names.SimpleNameGenerator, true, false, true}
 
 	sc.Codec = testapi.Default.StorageCodec()
 	s, dFunc, err := factory.Create(*sc)

@@ -23,6 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/request"
+	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/fields"
@@ -32,12 +33,12 @@ import (
 
 type eventStrategy struct {
 	runtime.ObjectTyper
-	api.NameGenerator
+	names.NameGenerator
 }
 
 // Strategy is the default logic that pplies when creating and updating
 // Event objects via the REST API.
-var Strategy = eventStrategy{api.Scheme, api.SimpleNameGenerator}
+var Strategy = eventStrategy{api.Scheme, names.SimpleNameGenerator}
 
 func (eventStrategy) NamespaceScoped() bool {
 	return true

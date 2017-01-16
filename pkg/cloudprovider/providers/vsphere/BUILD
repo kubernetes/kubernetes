@@ -39,9 +39,9 @@ go_test(
     tags = ["automanaged"],
     deps = [
         "//pkg/cloudprovider:go_default_library",
-        "//pkg/util/rand:go_default_library",
         "//vendor:golang.org/x/net/context",
         "//vendor:k8s.io/apimachinery/pkg/types",
+        "//vendor:k8s.io/apimachinery/pkg/util/rand",
     ],
 )
 
