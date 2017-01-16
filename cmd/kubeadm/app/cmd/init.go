@@ -40,6 +40,7 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/kubeapiserver/authorizer"
 )
 
 var (
@@ -182,6 +183,7 @@ func NewInit(cfgPath string, cfg *kubeadmapi.MasterConfiguration, skipPreFlight 
 	}
 	cfg.KubernetesVersion = ver
 	fmt.Println("[init] Using Kubernetes version:", ver)
+	fmt.Println("[init] Using Authorization mode:", cfg.AuthorizationMode)
 
 	// Warn about the limitations with the current cloudprovider solution.
 	if cfg.CloudProvider != "" {
@@ -234,6 +236,13 @@ func (i *Init) Run(out io.Writer) error {
 	client, err := kubemaster.CreateClientAndWaitForAPI(path.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, kubeconfigphase.AdminKubeConfigFileName))
 	if err != nil {
 		return err
+	}
+
+	if i.cfg.AuthorizationMode == authorizer.ModeRBAC {
+		err = kubemaster.CreateBootstrapRBACClusterRole(client)
+		if err != nil {
+			return err
+		}
 	}
 
 	if err := kubemaster.UpdateMasterRoleLabelsAndTaints(client, false); err != nil {
