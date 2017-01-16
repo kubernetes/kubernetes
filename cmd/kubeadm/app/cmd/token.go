@@ -152,13 +152,13 @@ func RunCreateToken(out io.Writer, cmd *cobra.Command, tokenDuration time.Durati
 }
 
 func RunGenerateToken(out io.Writer) error {
-	d := &kubeadmapi.TokenDiscovery{}
-	err := kubeadmutil.GenerateToken(d)
+	td := &kubeadmapi.TokenDiscovery{}
+	err := kubeadmutil.GenerateToken(td)
 	if err != nil {
 		return err
 	}
 
-	fmt.Fprintln(out, kubeadmutil.BearerToken(d))
+	fmt.Fprintln(out, kubeadmutil.BearerToken(td))
 	return nil
 }
 
