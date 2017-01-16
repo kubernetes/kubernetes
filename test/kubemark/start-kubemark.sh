@@ -175,8 +175,8 @@ gcloud compute ssh "${MASTER_NAME}" --zone="${ZONE}" --project="${PROJECT}" \
     sudo chmod a+x /home/kubernetes/start-kubemark-master.sh && \
     sudo bash /home/kubernetes/start-kubemark-master.sh"
 
-# create kubeconfig for Kubelet:
-KUBECONFIG_CONTENTS=$(echo "apiVersion: v1
+# Create kubeconfig for Kubelet.
+KUBELET_KUBECONFIG_CONTENTS=$(echo "apiVersion: v1
 kind: Config
 users:
 - name: kubelet
@@ -195,6 +195,25 @@ contexts:
   name: kubemark-context
 current-context: kubemark-context" | base64 | tr -d "\n\r")
 
+# Create kubeconfig for Kubeproxy.
+KUBEPROXY_KUBECONFIG_CONTENTS=$(echo "apiVersion: v1
+kind: Config
+users:
+- name: kube-proxy
+  user:
+    token: ${KUBE_PROXY_TOKEN}
+clusters:
+- name: kubemark
+  cluster:
+    insecure-skip-tls-verify: true
+    server: https://${MASTER_IP}
+contexts:
+- context:
+    cluster: kubemark
+    user: kube-proxy
+  name: kubemark-context
+current-context: kubemark-context" | base64 | tr -d "\n\r")
+
 KUBECONFIG_SECRET="${RESOURCE_DIRECTORY}/kubeconfig_secret.json"
 cat > "${KUBECONFIG_SECRET}" << EOF
 {
@@ -205,7 +224,8 @@ cat > "${KUBECONFIG_SECRET}" << EOF
   },
   "type": "Opaque",
   "data": {
-    "kubeconfig": "${KUBECONFIG_CONTENTS}"
+    "kubelet.kubeconfig": "${KUBELET_KUBECONFIG_CONTENTS}",
+    "kubeproxy.kubeconfig": "${KUBEPROXY_KUBECONFIG_CONTENTS}"
   }
 }
 EOF
