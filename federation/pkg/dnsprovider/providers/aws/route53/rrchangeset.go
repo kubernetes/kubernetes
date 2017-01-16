@@ -31,6 +31,7 @@ type ResourceRecordChangeset struct {
 
 	additions []dnsprovider.ResourceRecordSet
 	removals  []dnsprovider.ResourceRecordSet
+	upserts   []dnsprovider.ResourceRecordSet
 }
 
 func (c *ResourceRecordChangeset) Add(rrset dnsprovider.ResourceRecordSet) dnsprovider.ResourceRecordChangeset {
@@ -40,6 +41,11 @@ func (c *ResourceRecordChangeset) Add(rrset dnsprovider.ResourceRecordSet) dnspr
 
 func (c *ResourceRecordChangeset) Remove(rrset dnsprovider.ResourceRecordSet) dnsprovider.ResourceRecordChangeset {
 	c.removals = append(c.removals, rrset)
+	return c
+}
+
+func (c *ResourceRecordChangeset) Upsert(rrset dnsprovider.ResourceRecordSet) dnsprovider.ResourceRecordChangeset {
+	c.upserts = append(c.upserts, rrset)
 	return c
 }
 
@@ -75,6 +81,11 @@ func (c *ResourceRecordChangeset) Apply() error {
 
 	for _, addition := range c.additions {
 		change := buildChange(route53.ChangeActionCreate, addition)
+		changes = append(changes, change)
+	}
+
+	for _, upsert := range c.upserts {
+		change := buildChange(route53.ChangeActionUpsert, upsert)
 		changes = append(changes, change)
 	}
 
