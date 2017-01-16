@@ -37,10 +37,6 @@ import (
 const (
 	TokenIDBytes            = 3
 	TokenSecretBytes        = 8
-	TokenIDExpectedSize     = 6
-	TokenSecretExpectedSize = 16
-	// TokenExpectedSize equals needed token ID length + token separator length + token secret length in bytes.
-	TokenExpectedSize          = TokenIDExpectedSize + 1 + TokenSecretExpectedSize
 	BootstrapTokenSecretPrefix = "bootstrap-token-"
 	DefaultTokenDuration       = time.Duration(8) * time.Hour
 	tokenCreateRetries         = 5
@@ -110,23 +106,6 @@ func BearerToken(d *kubeadmapi.TokenDiscovery) string {
 // ValidateToken validates whether a token is well-formed.
 // In case it's not, the corresponding error is returned as well.
 func ValidateToken(d *kubeadmapi.TokenDiscovery) (bool, error) {
-	// TODO why validate size of parcels if ParseToken does it already?
-	if len(d.ID) != TokenIDExpectedSize {
-		return false, fmt.Errorf(
-			"token ID [%q] doesn't have expected size. expected:%d, actual:%d",
-			d.ID,
-			TokenIDExpectedSize,
-			len(d.ID),
-		)
-	}
-	if len(d.Secret) != TokenSecretExpectedSize {
-		return false, fmt.Errorf(
-			"token secret [%q] doesn't have expected size. expected:%d, actual:%d",
-			d.ID,
-			TokenSecretExpectedSize,
-			len(d.Secret),
-		)
-	}
 	if _, _, err := ParseToken(d.ID + ":" + d.Secret); err != nil {
 		return false, err
 	}
@@ -189,7 +168,7 @@ func UpdateOrCreateToken(client *clientset.Clientset, d *kubeadmapi.TokenDiscove
 
 	}
 	return fmt.Errorf(
-		"<util/tokens> unable to create bootstrap token after %d attempts [%v]",
+		"unable to create bootstrap token after %d attempts [%v]",
 		tokenCreateRetries,
 		lastErr,
 	)
