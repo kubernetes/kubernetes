@@ -66,7 +66,7 @@ func NegotiateOutputStreamSerializer(req *http.Request, ns runtime.NegotiatedSer
 func NegotiateInputSerializer(req *http.Request, ns runtime.NegotiatedSerializer) (runtime.SerializerInfo, error) {
 	mediaTypes := ns.SupportedMediaTypes()
 	mediaType := req.Header.Get("Content-Type")
-	if len(mediaType) == 0 {
+	if len(mediaType) == 0 && len(mediaTypes) > 0 {
 		mediaType = mediaTypes[0].MediaType
 	}
 	mediaType, _, err := mime.ParseMediaType(mediaType)
