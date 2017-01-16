@@ -24,11 +24,15 @@ import (
 
 func TestTokenParse(t *testing.T) {
 	invalidTokens := []string{
+		// invalid parcel size
 		"1234567890123456789012",
-		"12345.1234567890123456",
+		"12345:1234567890123456",
 		".1234567890123456",
-		"123456.1234567890.123456",
-		"Abcdef.1234567890123456",
+		// invalid separation
+		"123456:1234567890.123456",
+		"abcdef.1234567890123456",
+		// invalid token id
+		"Abcdef:1234567890123456",
 	}
 
 	for _, token := range invalidTokens {
@@ -38,8 +42,8 @@ func TestTokenParse(t *testing.T) {
 	}
 
 	validTokens := []string{
-		"abcdef.1234567890123456",
-		"123456.AABBCCDDEEFFGGHH",
+		"abcdef:1234567890123456",
+		"123456:AABBCCDDEEFFGGHH",
 	}
 
 	for _, token := range validTokens {

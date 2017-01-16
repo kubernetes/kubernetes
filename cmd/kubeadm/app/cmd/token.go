@@ -108,7 +108,7 @@ func NewCmdTokenGenerate(out io.Writer) *cobra.Command {
 			the "init" and "join" commands.
 
 			You don't have to use this command in order to generate a token, you can do so
-			yourself as long as it's in the format "<6 characters>.<16 characters>". This
+			yourself as long as it's in the format "<6 characters>:<16 characters>". This
 			command is provided for convenience to generate tokens in that format.
 
 			You can also use "kubeadm init" without specifying a token, and it will

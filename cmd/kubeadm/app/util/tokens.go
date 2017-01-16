@@ -77,7 +77,7 @@ func GenerateToken(d *kubeadmapi.TokenDiscovery) error {
 var (
 	tokenIDRegexpString = "^([a-z0-9]{6})$"
 	tokenIDRegexp       = regexp.MustCompile(tokenIDRegexpString)
-	tokenRegexpString   = "^([a-z0-9]{6})\\.([a-zA-Z0-9]{16})$"
+	tokenRegexpString   = "^([a-z0-9]{6})\\:([a-zA-Z0-9]{16})$"
 	tokenRegexp         = regexp.MustCompile(tokenRegexpString)
 )
 
@@ -104,7 +104,7 @@ func ParseToken(s string) (string, string, error) {
 
 // BearerToken returns a string representation of the passed token.
 func BearerToken(d *kubeadmapi.TokenDiscovery) string {
-	return fmt.Sprintf("%s.%s", d.ID, d.Secret)
+	return fmt.Sprintf("%s:%s", d.ID, d.Secret)
 }
 
 // ValidateToken validates whether a token is well-formed.
@@ -127,7 +127,7 @@ func ValidateToken(d *kubeadmapi.TokenDiscovery) (bool, error) {
 			len(d.Secret),
 		)
 	}
-	if _, _, err := ParseToken(d.ID + "." + d.Secret); err != nil {
+	if _, _, err := ParseToken(d.ID + ":" + d.Secret); err != nil {
 		return false, err
 	}
 	return true, nil
