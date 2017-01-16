@@ -8746,7 +8746,7 @@ go_library(
     name = "k8s.io/apiserver/pkg/authentication/serviceaccount",
     srcs = ["k8s.io/apiserver/pkg/authentication/serviceaccount/util.go"],
     tags = ["automanaged"],
-    deps = ["//pkg/api/validation/genericvalidation:go_default_library"],
+    deps = ["//vendor:k8s.io/apimachinery/pkg/api/validation"],
 )
 
 go_test(
@@ -13381,4 +13381,17 @@ filegroup(
     name = "all-srcs",
     srcs = [":package-srcs"],
     tags = ["automanaged"],
+)
+
+go_library(
+    name = "k8s.io/apimachinery/pkg/api/validation",
+    srcs = [
+        "k8s.io/apimachinery/pkg/api/validation/doc.go",
+        "k8s.io/apimachinery/pkg/api/validation/generic.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:k8s.io/apimachinery/pkg/util/validation",
+        "//vendor:k8s.io/apimachinery/pkg/util/validation/field",
+    ],
 )

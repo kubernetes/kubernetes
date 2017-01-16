@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"strings"
 
+	apimachineyvalidation "k8s.io/apimachinery/pkg/api/validation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	v1validation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -34,7 +35,6 @@ import (
 // fields by default.
 var RepairMalformedUpdates bool = true
 
-const IsNegativeErrorMsg string = `must be greater than or equal to 0`
 const FieldImmutableErrorMsg string = `field is immutable`
 
 const totalAnnotationSizeLimitB int = 256 * (1 << 10) // 256 kB
@@ -44,67 +44,8 @@ var BannedOwners = map[schema.GroupVersionKind]struct{}{
 	v1.SchemeGroupVersion.WithKind("Event"): {},
 }
 
-// ValidateNameFunc validates that the provided name is valid for a given resource type.
-// Not all resources have the same validation rules for names. Prefix is true
-// if the name will have a value appended to it.  If the name is not valid,
-// this returns a list of descriptions of individual characteristics of the
-// value that were not valid.  Otherwise this returns an empty list or nil.
-type ValidateNameFunc func(name string, prefix bool) []string
-
-// NameIsDNSSubdomain is a ValidateNameFunc for names that must be a DNS subdomain.
-func NameIsDNSSubdomain(name string, prefix bool) []string {
-	if prefix {
-		name = maskTrailingDash(name)
-	}
-	return validation.IsDNS1123Subdomain(name)
-}
-
-// NameIsDNSLabel is a ValidateNameFunc for names that must be a DNS 1123 label.
-func NameIsDNSLabel(name string, prefix bool) []string {
-	if prefix {
-		name = maskTrailingDash(name)
-	}
-	return validation.IsDNS1123Label(name)
-}
-
-// NameIsDNS1035Label is a ValidateNameFunc for names that must be a DNS 952 label.
-func NameIsDNS1035Label(name string, prefix bool) []string {
-	if prefix {
-		name = maskTrailingDash(name)
-	}
-	return validation.IsDNS1035Label(name)
-}
-
-// ValidateNamespaceName can be used to check whether the given namespace name is valid.
-// Prefix indicates this name will be used as part of generation, in which case
-// trailing dashes are allowed.
-var ValidateNamespaceName = NameIsDNSLabel
-
 // ValidateClusterName can be used to check whether the given cluster name is valid.
-var ValidateClusterName = NameIsDNS1035Label
-
-// ValidateServiceAccountName can be used to check whether the given service account name is valid.
-// Prefix indicates this name will be used as part of generation, in which case
-// trailing dashes are allowed.
-var ValidateServiceAccountName = NameIsDNSSubdomain
-
-// maskTrailingDash replaces the final character of a string with a subdomain safe
-// value if is a dash.
-func maskTrailingDash(name string) string {
-	if strings.HasSuffix(name, "-") {
-		return name[:len(name)-2] + "a"
-	}
-	return name
-}
-
-// Validates that given value is not negative.
-func ValidateNonnegativeField(value int64, fldPath *field.Path) field.ErrorList {
-	allErrs := field.ErrorList{}
-	if value < 0 {
-		allErrs = append(allErrs, field.Invalid(fldPath, value, IsNegativeErrorMsg))
-	}
-	return allErrs
-}
+var ValidateClusterName = apimachineyvalidation.NameIsDNS1035Label
 
 // ValidateAnnotations validates that a set of annotations are correctly defined.
 func ValidateAnnotations(annotations map[string]string, fldPath *field.Path) field.ErrorList {
@@ -201,7 +142,7 @@ func ValidateImmutableField(newVal, oldVal interface{}, fldPath *field.Path) fie
 // ValidateObjectMeta validates an object's metadata on creation. It expects that name generation has already
 // been performed.
 // It doesn't return an error for rootscoped resources with namespace, because namespace should already be cleared before.
-func ValidateObjectMeta(meta *api.ObjectMeta, requiresNamespace bool, nameFn ValidateNameFunc, fldPath *field.Path) field.ErrorList {
+func ValidateObjectMeta(meta *api.ObjectMeta, requiresNamespace bool, nameFn apimachineyvalidation.ValidateNameFunc, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	if len(meta.GenerateName) != 0 {
@@ -223,7 +164,7 @@ func ValidateObjectMeta(meta *api.ObjectMeta, requiresNamespace bool, nameFn Val
 		if len(meta.Namespace) == 0 {
 			allErrs = append(allErrs, field.Required(fldPath.Child("namespace"), ""))
 		} else {
-			for _, msg := range ValidateNamespaceName(meta.Namespace, false) {
+			for _, msg := range apimachineyvalidation.ValidateNamespaceName(meta.Namespace, false) {
 				allErrs = append(allErrs, field.Invalid(fldPath.Child("namespace"), meta.Namespace, msg))
 			}
 		}
@@ -237,7 +178,7 @@ func ValidateObjectMeta(meta *api.ObjectMeta, requiresNamespace bool, nameFn Val
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("clusterName"), meta.ClusterName, msg))
 		}
 	}
-	allErrs = append(allErrs, ValidateNonnegativeField(meta.Generation, fldPath.Child("generation"))...)
+	allErrs = append(allErrs, apimachineyvalidation.ValidateNonnegativeField(meta.Generation, fldPath.Child("generation"))...)
 	allErrs = append(allErrs, v1validation.ValidateLabels(meta.Labels, fldPath.Child("labels"))...)
 	allErrs = append(allErrs, ValidateAnnotations(meta.Annotations, fldPath.Child("annotations"))...)
 	allErrs = append(allErrs, ValidateOwnerReferences(meta.OwnerReferences, fldPath.Child("ownerReferences"))...)
