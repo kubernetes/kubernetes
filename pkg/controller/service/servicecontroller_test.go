@@ -280,3 +280,52 @@ func TestGetNodeConditionPredicate(t *testing.T) {
 }
 
 // TODO(a-robinson): Add tests for update/sync/delete.
+
+func TestSyncService(t *testing.T) {
+	cloud := &fakecloud.FakeCloud{}
+	cloud.Region = region
+	client := &fake.Clientset{}
+
+	controller, _ := New(cloud, client, "test-cluster")
+	controller.init()
+	cloud.Calls = nil     // ignore any cloud calls made in init()
+	client.ClearActions() // ignore any client calls made in init()
+
+	service := &v1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "sync-test",
+			Namespace: "sync-test-namespace",
+			SelfLink:  testapi.Default.SelfLink("services", "sync-test"),
+		},
+		Spec: v1.ServiceSpec{
+			Type: v1.ServiceTypeLoadBalancer,
+		},
+	}
+
+	keyExpected := service.GetObjectMeta().GetNamespace() + "/" + service.GetObjectMeta().GetName()
+
+	controller.enqueueService(service)
+	cachedServiceTest := controller.cache.getOrCreate(keyExpected)
+	cachedServiceTest.state = service
+	controller.cache.set(keyExpected, cachedServiceTest)
+
+	keyGot, quit := controller.workingQueue.Get()
+
+	if quit {
+		t.Fatalf("get no workingQueue element")
+	}
+	if keyExpected != keyGot.(string) {
+		t.Fatalf("get service key error, expected: %s, got: %s", keyExpected, keyGot.(string))
+	}
+
+	err := controller.syncService(keyExpected)
+	if err != nil {
+		t.Fatalf("sync service error: %v", err)
+	}
+
+	_, exsit := controller.cache.get(keyExpected)
+	if exsit {
+		t.Fatalf("sync service error, workingQueue should not contain service: %s any more", keyExpected)
+	}
+
+}
