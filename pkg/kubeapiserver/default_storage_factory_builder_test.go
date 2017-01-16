@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package genericapiserver
+package kubeapiserver
 
 import (
 	"reflect"
@@ -24,6 +24,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	apiv1 "k8s.io/kubernetes/pkg/api/v1"
 	extensionsapiv1beta1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
+	"k8s.io/kubernetes/pkg/genericapiserver"
 )
 
 func TestParseRuntimeConfig(t *testing.T) {
@@ -31,31 +32,31 @@ func TestParseRuntimeConfig(t *testing.T) {
 	apiv1GroupVersion := apiv1.SchemeGroupVersion
 	testCases := []struct {
 		runtimeConfig         map[string]string
-		defaultResourceConfig func() *ResourceConfig
-		expectedAPIConfig     func() *ResourceConfig
+		defaultResourceConfig func() *genericapiserver.ResourceConfig
+		expectedAPIConfig     func() *genericapiserver.ResourceConfig
 		err                   bool
 	}{
 		{
 			// everything default value.
 			runtimeConfig: map[string]string{},
-			defaultResourceConfig: func() *ResourceConfig {
-				return NewResourceConfig()
+			defaultResourceConfig: func() *genericapiserver.ResourceConfig {
+				return genericapiserver.NewResourceConfig()
 			},
-			expectedAPIConfig: func() *ResourceConfig {
-				return NewResourceConfig()
+			expectedAPIConfig: func() *genericapiserver.ResourceConfig {
+				return genericapiserver.NewResourceConfig()
 			},
 			err: false,
 		},
 		{
 			// no runtimeConfig override.
 			runtimeConfig: map[string]string{},
-			defaultResourceConfig: func() *ResourceConfig {
-				config := NewResourceConfig()
+			defaultResourceConfig: func() *genericapiserver.ResourceConfig {
+				config := genericapiserver.NewResourceConfig()
 				config.DisableVersions(extensionsapiv1beta1.SchemeGroupVersion)
 				return config
 			},
-			expectedAPIConfig: func() *ResourceConfig {
-				config := NewResourceConfig()
+			expectedAPIConfig: func() *genericapiserver.ResourceConfig {
+				config := genericapiserver.NewResourceConfig()
 				config.DisableVersions(extensionsapiv1beta1.SchemeGroupVersion)
 				return config
 			},
@@ -66,13 +67,13 @@ func TestParseRuntimeConfig(t *testing.T) {
 			runtimeConfig: map[string]string{
 				"extensions/v1beta1": "",
 			},
-			defaultResourceConfig: func() *ResourceConfig {
-				config := NewResourceConfig()
+			defaultResourceConfig: func() *genericapiserver.ResourceConfig {
+				config := genericapiserver.NewResourceConfig()
 				config.DisableVersions(extensionsapiv1beta1.SchemeGroupVersion)
 				return config
 			},
-			expectedAPIConfig: func() *ResourceConfig {
-				config := NewResourceConfig()
+			expectedAPIConfig: func() *genericapiserver.ResourceConfig {
+				config := genericapiserver.NewResourceConfig()
 				config.EnableVersions(extensionsapiv1beta1.SchemeGroupVersion)
 				return config
 			},
@@ -83,13 +84,13 @@ func TestParseRuntimeConfig(t *testing.T) {
 			runtimeConfig: map[string]string{
 				"api/v1/pods": "false",
 			},
-			defaultResourceConfig: func() *ResourceConfig {
-				config := NewResourceConfig()
+			defaultResourceConfig: func() *genericapiserver.ResourceConfig {
+				config := genericapiserver.NewResourceConfig()
 				config.EnableVersions(apiv1GroupVersion)
 				return config
 			},
-			expectedAPIConfig: func() *ResourceConfig {
-				config := NewResourceConfig()
+			expectedAPIConfig: func() *genericapiserver.ResourceConfig {
+				config := genericapiserver.NewResourceConfig()
 				config.EnableVersions(apiv1GroupVersion)
 				config.DisableResources(apiv1GroupVersion.WithResource("pods"))
 				return config
@@ -101,11 +102,11 @@ func TestParseRuntimeConfig(t *testing.T) {
 			runtimeConfig: map[string]string{
 				"api/v1": "false",
 			},
-			defaultResourceConfig: func() *ResourceConfig {
-				return NewResourceConfig()
+			defaultResourceConfig: func() *genericapiserver.ResourceConfig {
+				return genericapiserver.NewResourceConfig()
 			},
-			expectedAPIConfig: func() *ResourceConfig {
-				config := NewResourceConfig()
+			expectedAPIConfig: func() *genericapiserver.ResourceConfig {
+				config := genericapiserver.NewResourceConfig()
 				config.DisableVersions(apiv1GroupVersion)
 				return config
 			},
@@ -117,14 +118,14 @@ func TestParseRuntimeConfig(t *testing.T) {
 				"extensions/v1beta1/anything":   "true",
 				"extensions/v1beta1/daemonsets": "false",
 			},
-			defaultResourceConfig: func() *ResourceConfig {
-				config := NewResourceConfig()
+			defaultResourceConfig: func() *genericapiserver.ResourceConfig {
+				config := genericapiserver.NewResourceConfig()
 				config.EnableVersions(extensionsGroupVersion)
 				return config
 			},
 
-			expectedAPIConfig: func() *ResourceConfig {
-				config := NewResourceConfig()
+			expectedAPIConfig: func() *genericapiserver.ResourceConfig {
+				config := genericapiserver.NewResourceConfig()
 				config.EnableVersions(extensionsGroupVersion)
 				config.DisableResources(extensionsGroupVersion.WithResource("daemonsets"))
 				config.EnableResources(extensionsGroupVersion.WithResource("anything"))
@@ -137,11 +138,11 @@ func TestParseRuntimeConfig(t *testing.T) {
 			runtimeConfig: map[string]string{
 				"invalidgroup/version": "false",
 			},
-			defaultResourceConfig: func() *ResourceConfig {
-				return NewResourceConfig()
+			defaultResourceConfig: func() *genericapiserver.ResourceConfig {
+				return genericapiserver.NewResourceConfig()
 			},
-			expectedAPIConfig: func() *ResourceConfig {
-				return NewResourceConfig()
+			expectedAPIConfig: func() *genericapiserver.ResourceConfig {
+				return genericapiserver.NewResourceConfig()
 			},
 			err: true,
 		},
@@ -150,11 +151,11 @@ func TestParseRuntimeConfig(t *testing.T) {
 			runtimeConfig: map[string]string{
 				"api/v1/pods": "false",
 			},
-			defaultResourceConfig: func() *ResourceConfig {
-				return NewResourceConfig()
+			defaultResourceConfig: func() *genericapiserver.ResourceConfig {
+				return genericapiserver.NewResourceConfig()
 			},
-			expectedAPIConfig: func() *ResourceConfig {
-				config := NewResourceConfig()
+			expectedAPIConfig: func() *genericapiserver.ResourceConfig {
+				config := genericapiserver.NewResourceConfig()
 				config.DisableResources(schema.GroupVersionResource{Group: "", Version: "v1", Resource: "pods"})
 				return config
 			},
@@ -165,11 +166,11 @@ func TestParseRuntimeConfig(t *testing.T) {
 			runtimeConfig: map[string]string{
 				"api/all": "true",
 			},
-			defaultResourceConfig: func() *ResourceConfig {
-				return NewResourceConfig()
+			defaultResourceConfig: func() *genericapiserver.ResourceConfig {
+				return genericapiserver.NewResourceConfig()
 			},
-			expectedAPIConfig: func() *ResourceConfig {
-				config := NewResourceConfig()
+			expectedAPIConfig: func() *genericapiserver.ResourceConfig {
+				config := genericapiserver.NewResourceConfig()
 				config.EnableVersions(api.Registry.RegisteredGroupVersions()...)
 				return config
 			},
@@ -180,11 +181,11 @@ func TestParseRuntimeConfig(t *testing.T) {
 			runtimeConfig: map[string]string{
 				"api/all": "false",
 			},
-			defaultResourceConfig: func() *ResourceConfig {
-				return NewResourceConfig()
+			defaultResourceConfig: func() *genericapiserver.ResourceConfig {
+				return genericapiserver.NewResourceConfig()
 			},
-			expectedAPIConfig: func() *ResourceConfig {
-				config := NewResourceConfig()
+			expectedAPIConfig: func() *genericapiserver.ResourceConfig {
+				config := genericapiserver.NewResourceConfig()
 				config.DisableVersions(api.Registry.RegisteredGroupVersions()...)
 				return config
 			},
