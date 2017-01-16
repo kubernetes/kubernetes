@@ -81,19 +81,14 @@ var (
 	tokenRegexp         = regexp.MustCompile(tokenRegexpString)
 )
 
-func GenerateTokenIfNeeded(d *kubeadmapi.TokenDiscovery) error {
-	ok, err := IsTokenValid(d)
-	if err != nil {
-		return err
+// ParseTokenID tries and parse a valid token ID from a string.
+// An error is returned in case of failure.
+func ParseTokenID(s string) error {
+	if !tokenIDRegexp.MatchString(s) {
+		return fmt.Errorf("token ID [%q] was not of form [%q]", s, tokenIDRegexpString)
 	}
-	if ok {
-		return nil
-	}
-	if err := GenerateToken(d); err != nil {
-		return err
-	}
-
 	return nil
+
 }
 
 // ParseToken tries and parse a valid token from a string.

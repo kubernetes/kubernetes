@@ -31,7 +31,7 @@ import (
 	kubemaster "k8s.io/kubernetes/cmd/kubeadm/app/master"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/pkg/api"
-	v1 "k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/kubectl"
 )
@@ -128,37 +128,29 @@ func RunCreateToken(out io.Writer, cmd *cobra.Command, tokenDuration time.Durati
 		return err
 	}
 
-	d := &kubeadmapi.TokenDiscovery{}
-	if token != "" {
-		parsedID, parsedSecret, err := kubeadmutil.ParseToken(token)
-		if err != nil {
-			return err
-		}
-		d.ID = parsedID
-		d.Secret = parsedSecret
-	}
-	err = kubeadmutil.GenerateTokenIfNeeded(d)
+	parsedID, parsedSecret, err := kubeadmutil.ParseToken(token)
 	if err != nil {
 		return err
 	}
+	td := &kubeadmapi.TokenDiscovery{ID: parsedID, Secret: parsedSecret}
 
-	err = kubeadmutil.UpdateOrCreateToken(client, d, tokenDuration)
+	err = kubeadmutil.UpdateOrCreateToken(client, td, tokenDuration)
 	if err != nil {
 		return err
 	}
-	fmt.Fprintln(out, kubeadmutil.BearerToken(d))
+	fmt.Fprintln(out, kubeadmutil.BearerToken(td))
 
 	return nil
 }
 
 func RunGenerateToken(out io.Writer) error {
-	d := &kubeadmapi.TokenDiscovery{}
-	err := kubeadmutil.GenerateToken(d)
+	td := &kubeadmapi.TokenDiscovery{}
+	err := kubeadmutil.GenerateToken(td)
 	if err != nil {
 		return err
 	}
 
-	fmt.Fprintln(out, kubeadmutil.BearerToken(d))
+	fmt.Fprintln(out, kubeadmutil.BearerToken(td))
 	return nil
 }
 
@@ -219,6 +211,10 @@ func RunListTokens(out io.Writer, errW io.Writer, cmd *cobra.Command) error {
 
 // RunDeleteToken removes a bootstrap token from the server.
 func RunDeleteToken(out io.Writer, cmd *cobra.Command, tokenId string) error {
+	if err := kubeadmutil.ParseTokenID(tokenId); err != nil {
+		return err
+	}
+
 	client, err := kubemaster.CreateClientFromFile(path.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, "admin.conf"))
 	if err != nil {
 		return err

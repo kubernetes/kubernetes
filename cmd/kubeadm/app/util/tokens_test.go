@@ -49,8 +49,31 @@ func TestTokenParse(t *testing.T) {
 	}
 }
 
-func TestGenerateToken(t *testing.T) {
-	var cfg kubeadmapi.TokenDiscovery
+func TestParseTokenID(t *testing.T) {
+	invalidTokenIDs := []string{
+		"",
+		"1234567890123456789012",
+		"12345",
+		"Abcdef",
+	}
+
+	for _, tokenID := range invalidTokenIDs {
+		if err := ParseTokenID(tokenID); err == nil {
+			t.Errorf("ParseTokenID did not return an error for this invalid token ID: [%q]", tokenID)
+		}
+	}
+
+	validTokens := []string{
+		"abcdef",
+		"123456",
+	}
+
+	for _, tokenID := range validTokens {
+		if err := ParseTokenID(tokenID); err != nil {
+			t.Errorf("ParseTokenID failed for a valid token ID [%q], err: %+v", tokenID, err)
+		}
+	}
+}
 
 func TestValidateToken(t *testing.T) {
 	invalidTokens := []*kubeadmapi.TokenDiscovery{
