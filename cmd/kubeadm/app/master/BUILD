@@ -38,7 +38,6 @@ go_library(
         "//vendor:github.com/blang/semver",
         "//vendor:k8s.io/apimachinery/pkg/api/errors",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
-        "//vendor:k8s.io/apimachinery/pkg/util/net",
         "//vendor:k8s.io/apimachinery/pkg/util/wait",
     ],
 )
@@ -50,13 +49,11 @@ go_test(
         "apiclient_test.go",
         "discovery_test.go",
         "manifests_test.go",
-        "tokens_test.go",
     ],
     library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
         "//cmd/kubeadm/app/apis/kubeadm:go_default_library",
-        "//cmd/kubeadm/app/util:go_default_library",
         "//pkg/api/v1:go_default_library",
         "//pkg/util/intstr:go_default_library",
     ],
