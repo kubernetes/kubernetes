@@ -70,3 +70,8 @@ func (r ResourceRecordSets) New(name string, rrdatas []string, ttl int64, rrstyp
 func (rrsets ResourceRecordSets) project() string {
 	return rrsets.zone.project()
 }
+
+// Zone returns the parent zone
+func (rrset ResourceRecordSets) Zone() dnsprovider.Zone {
+	return rrset.zone
+}
