@@ -22,7 +22,7 @@ package app
 
 import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	statefulset "k8s.io/kubernetes/pkg/controller/statefulset"
+	"k8s.io/kubernetes/pkg/controller/statefulset"
 )
 
 func startStatefulSetController(ctx ControllerContext) (bool, error) {

@@ -14,9 +14,9 @@ go_library(
         "fakes.go",
         "identity_mappers.go",
         "iterator.go",
-        "pet.go",
-        "pet_set.go",
-        "pet_set_utils.go",
+        "stateful_set.go",
+        "stateful_set_utils.go",
+        "statefulpod.go",
     ],
     tags = ["automanaged"],
     deps = [
@@ -50,8 +50,8 @@ go_test(
     srcs = [
         "identity_mappers_test.go",
         "iterator_test.go",
-        "pet_set_test.go",
-        "pet_test.go",
+        "stateful_set_test.go",
+        "statefulpod_test.go",
     ],
     library = ":go_default_library",
     tags = ["automanaged"],
