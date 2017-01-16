@@ -22,17 +22,20 @@ import (
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 )
 
-func TestTokenParseErrors(t *testing.T) {
+func TestTokenParse(t *testing.T) {
 	invalidTokens := []string{
+		// invalid parcel size
 		"1234567890123456789012",
-		"12345.1234567890123456",
+		"12345:1234567890123456",
 		".1234567890123456",
-		"123456.1234567890.123456",
+		// invalid separation
+		"123456:1234567890.123456",
+		"abcdef.1234567890123456",
 	}
 
 	for _, token := range invalidTokens {
 		if _, _, err := ParseToken(token); err == nil {
-			t.Errorf("generateTokenIfNeeded did not return an error for this invalid token: [%s]", token)
+			t.Errorf("ParseToken did not return an error for this invalid token: [%s]", token)
 		}
 	}
 }
@@ -59,12 +62,12 @@ func TestRandBytes(t *testing.T) {
 	}
 
 	for _, rt := range randTest {
-		actual, err := RandBytes(rt)
+		actual, err := randBytes(rt)
 		if err != nil {
-			t.Errorf("failed RandBytes: %v", err)
+			t.Errorf("failed randBytes: %v", err)
 		}
 		if len(actual) != rt*2 {
-			t.Errorf("failed RandBytes:\n\texpected: %d\n\t  actual: %d\n", rt*2, len(actual))
+			t.Errorf("failed randBytes:\n\texpected: %d\n\t  actual: %d\n", rt*2, len(actual))
 		}
 	}
 }
