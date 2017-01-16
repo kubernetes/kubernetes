@@ -38,12 +38,12 @@ import (
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/healthz"
+	apirequest "k8s.io/apiserver/pkg/request"
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	genericapi "k8s.io/kubernetes/pkg/genericapiserver/api"
-	apirequest "k8s.io/kubernetes/pkg/genericapiserver/api/request"
 	genericmux "k8s.io/kubernetes/pkg/genericapiserver/mux"
 	"k8s.io/kubernetes/pkg/genericapiserver/routes"
 )

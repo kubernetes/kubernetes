@@ -20,13 +20,13 @@ go_library(
         "//pkg/apis/batch:go_default_library",
         "//pkg/apis/batch/validation:go_default_library",
         "//pkg/fields:go_default_library",
-        "//pkg/genericapiserver/api/request:go_default_library",
         "//pkg/registry/generic:go_default_library",
         "//pkg/storage:go_default_library",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/labels",
         "//vendor:k8s.io/apimachinery/pkg/runtime",
         "//vendor:k8s.io/apimachinery/pkg/util/validation/field",
+        "//vendor:k8s.io/apiserver/pkg/request",
     ],
 )
 
@@ -40,9 +40,9 @@ go_test(
         "//pkg/api/testapi:go_default_library",
         "//pkg/api/testing:go_default_library",
         "//pkg/apis/batch:go_default_library",
-        "//pkg/genericapiserver/api/request:go_default_library",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/types",
+        "//vendor:k8s.io/apiserver/pkg/request",
     ],
 )
 

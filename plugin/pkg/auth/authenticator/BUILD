@@ -26,7 +26,6 @@ filegroup(
         ":package-srcs",
         "//plugin/pkg/auth/authenticator/password:all-srcs",
         "//plugin/pkg/auth/authenticator/request/basicauth:all-srcs",
-        "//plugin/pkg/auth/authenticator/request/headerrequest:all-srcs",
         "//plugin/pkg/auth/authenticator/token/anytoken:all-srcs",
         "//plugin/pkg/auth/authenticator/token/oidc:all-srcs",
         "//plugin/pkg/auth/authenticator/token/tokentest:all-srcs",

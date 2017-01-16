@@ -23,7 +23,6 @@ go_library(
         "//pkg/api/rest/resttest:go_default_library",
         "//pkg/api/testapi:go_default_library",
         "//pkg/fields:go_default_library",
-        "//pkg/genericapiserver/api/request:go_default_library",
         "//pkg/registry/generic/registry:go_default_library",
         "//pkg/storage/etcd:go_default_library",
         "//pkg/storage/etcd/testing:go_default_library",
@@ -34,6 +33,7 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/labels",
         "//vendor:k8s.io/apimachinery/pkg/runtime",
         "//vendor:k8s.io/apimachinery/pkg/watch",
+        "//vendor:k8s.io/apiserver/pkg/request",
     ],
 )
 

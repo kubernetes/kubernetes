@@ -18,12 +18,12 @@ go_test(
         "//pkg/api/rest:go_default_library",
         "//pkg/apis/apps:go_default_library",
         "//pkg/fields:go_default_library",
-        "//pkg/genericapiserver/api/request:go_default_library",
         "//pkg/registry/generic:go_default_library",
         "//pkg/registry/registrytest:go_default_library",
         "//pkg/storage/etcd/testing:go_default_library",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/labels",
+        "//vendor:k8s.io/apiserver/pkg/request",
     ],
 )
 
@@ -34,12 +34,12 @@ go_library(
     deps = [
         "//pkg/api/rest:go_default_library",
         "//pkg/apis/apps:go_default_library",
-        "//pkg/genericapiserver/api/request:go_default_library",
         "//pkg/registry/apps/petset:go_default_library",
         "//pkg/registry/generic:go_default_library",
         "//pkg/registry/generic/registry:go_default_library",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/runtime",
+        "//vendor:k8s.io/apiserver/pkg/request",
     ],
 )
 

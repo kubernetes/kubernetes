@@ -34,11 +34,11 @@ go_library(
     deps = [
         "//pkg/api/errors:go_default_library",
         "//pkg/apis/rbac:go_default_library",
-        "//pkg/genericapiserver/api/request:go_default_library",
         "//pkg/serviceaccount:go_default_library",
         "//vendor:github.com/golang/glog",
         "//vendor:k8s.io/apimachinery/pkg/util/errors",
         "//vendor:k8s.io/apiserver/pkg/authentication/user",
+        "//vendor:k8s.io/apiserver/pkg/request",
     ],
 )
 

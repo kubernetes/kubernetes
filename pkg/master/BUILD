@@ -116,7 +116,6 @@ go_test(
         "//pkg/client/testing/core:go_default_library",
         "//pkg/generated/openapi:go_default_library",
         "//pkg/genericapiserver:go_default_library",
-        "//pkg/genericapiserver/api/request:go_default_library",
         "//pkg/kubelet/client:go_default_library",
         "//pkg/storage/etcd/testing:go_default_library",
         "//pkg/util/intstr:go_default_library",
@@ -131,6 +130,7 @@ go_test(
         "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
         "//vendor:k8s.io/apimachinery/pkg/util/net",
         "//vendor:k8s.io/apimachinery/pkg/util/sets",
+        "//vendor:k8s.io/apiserver/pkg/request",
     ],
 )
 

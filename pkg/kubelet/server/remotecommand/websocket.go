@@ -23,7 +23,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apiserver/pkg/httplog"
-	"k8s.io/kubernetes/pkg/util/wsstream"
+	"k8s.io/apiserver/pkg/util/wsstream"
 )
 
 const (

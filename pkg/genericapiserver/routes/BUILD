@@ -22,7 +22,6 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//pkg/genericapiserver/api/handlers/responsewriters:go_default_library",
-        "//pkg/genericapiserver/api/metrics:go_default_library",
         "//pkg/genericapiserver/mux:go_default_library",
         "//pkg/genericapiserver/openapi:go_default_library",
         "//pkg/genericapiserver/routes/data/swagger:go_default_library",
@@ -34,6 +33,7 @@ go_library(
         "//vendor:github.com/prometheus/client_golang/prometheus",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/genericapiserver/openapi/common",
+        "//vendor:k8s.io/apiserver/pkg/metrics",
         "//vendor:k8s.io/apiserver/pkg/storage/etcd/metrics",
     ],
 )
