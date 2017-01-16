@@ -23,6 +23,7 @@ import (
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubenode "k8s.io/kubernetes/cmd/kubeadm/app/node"
+	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
 )
@@ -64,10 +65,15 @@ func runHTTPSDiscovery(hd *kubeadmapi.HTTPSDiscovery) (*clientcmdapi.Config, err
 
 // runTokenDiscovery executes token-based discovery.
 func runTokenDiscovery(td *kubeadmapi.TokenDiscovery) (*clientcmdapi.Config, error) {
+	if valid, err := kubeadmutil.ValidateToken(td); valid == false {
+		return nil, err
+	}
+
 	clusterInfo, err := kubenode.RetrieveTrustedClusterInfo(td)
 	if err != nil {
 		return nil, err
 	}
+
 	cfg, err := kubenode.EstablishMasterConnection(td, clusterInfo)
 	if err != nil {
 		return nil, err

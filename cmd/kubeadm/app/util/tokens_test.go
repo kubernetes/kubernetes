@@ -31,11 +31,80 @@ func TestTokenParse(t *testing.T) {
 		// invalid separation
 		"123456:1234567890.123456",
 		"abcdef.1234567890123456",
+		// invalid token id
+		"Abcdef:1234567890123456",
+		// invalid token secret
+		"123456:AABBCCDDEEFFGGHH",
 	}
 
 	for _, token := range invalidTokens {
 		if _, _, err := ParseToken(token); err == nil {
 			t.Errorf("ParseToken did not return an error for this invalid token: [%s]", token)
+		}
+	}
+
+	validTokens := []string{
+		"abcdef:1234567890123456",
+		"123456:aabbccddeeffgghh",
+	}
+
+	for _, token := range validTokens {
+		if _, _, err := ParseToken(token); err != nil {
+			t.Errorf("ParseToken returned an error for this valid token: [%s]", token)
+		}
+	}
+}
+
+func TestParseTokenID(t *testing.T) {
+	invalidTokenIDs := []string{
+		"",
+		"1234567890123456789012",
+		"12345",
+		"Abcdef",
+	}
+
+	for _, tokenID := range invalidTokenIDs {
+		if err := ParseTokenID(tokenID); err == nil {
+			t.Errorf("ParseTokenID did not return an error for this invalid token ID: [%q]", tokenID)
+		}
+	}
+
+	validTokens := []string{
+		"abcdef",
+		"123456",
+	}
+
+	for _, tokenID := range validTokens {
+		if err := ParseTokenID(tokenID); err != nil {
+			t.Errorf("ParseTokenID failed for a valid token ID [%q], err: %+v", tokenID, err)
+		}
+	}
+}
+
+func TestValidateToken(t *testing.T) {
+	invalidTokens := []*kubeadmapi.TokenDiscovery{
+		{ID: "", Secret: ""},
+		{ID: "1234567890123456789012", Secret: ""},
+		{ID: "", Secret: "1234567890123456789012"},
+		{ID: "12345", Secret: "1234567890123456"},
+		{ID: "Abcdef", Secret: "1234567890123456"},
+		{ID: "123456", Secret: "AABBCCDDEEFFGGHH"},
+	}
+
+	for _, token := range invalidTokens {
+		if valid, err := ValidateToken(token); valid == true || err == nil {
+			t.Errorf("ValidateToken did not return an error for this invalid token: [%s]", token)
+		}
+	}
+
+	validTokens := []*kubeadmapi.TokenDiscovery{
+		{ID: "abcdef", Secret: "1234567890123456"},
+		{ID: "123456", Secret: "aabbccddeeffgghh"},
+	}
+
+	for _, token := range validTokens {
+		if valid, err := ValidateToken(token); valid == false || err != nil {
+			t.Errorf("ValidateToken failed for a valid token [%s], valid: %t, err: %+v", token, valid, err)
 		}
 	}
 }
