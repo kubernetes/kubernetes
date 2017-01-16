@@ -70,6 +70,9 @@ func main() {
 		if strings.Contains(dep.ImportPath, "k8s.io/kubernetes") {
 			continue
 		}
+		if strings.Contains(dep.ImportPath, "k8s.io/client-go") {
+			continue
+		}
 		g.Deps[i] = dep
 		i++
 	}
