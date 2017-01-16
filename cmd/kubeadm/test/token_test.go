@@ -45,7 +45,7 @@ func TestCmdTokenGenerate(t *testing.T) {
 		t.Fatalf("encountered an error while trying to match 'kubeadm ex token generate' stdout: %v", err)
 	}
 	if !matched {
-		t.Errorf("'kubeadm ex token generate' stdout did not match expected regex; wanted: [%s], got: [%s]", TokenExpectedRegex, stdout)
+		t.Errorf("'kubeadm ex token generate' stdout did not match expected regex; wanted: [%q], got: [%s]", TokenExpectedRegex, stdout)
 	}
 }
 
