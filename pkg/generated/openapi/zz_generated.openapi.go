@@ -22,12 +22,12 @@ package openapi
 
 import (
 	spec "github.com/go-openapi/spec"
-	common "k8s.io/apimachinery/pkg/genericapiserver/openapi/common"
+	openapi "k8s.io/apimachinery/pkg/openapi"
 	resource "k8s.io/kubernetes/pkg/api/resource"
 	intstr "k8s.io/kubernetes/pkg/util/intstr"
 )
 
-var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
+var OpenAPIDefinitions *openapi.OpenAPIDefinitions = &openapi.OpenAPIDefinitions{
 	"intstr.IntOrString": intstr.IntOrString{}.OpenAPIDefinition(), "resource.Quantity": resource.Quantity{}.OpenAPIDefinition(), "resource.int64Amount": {
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{

@@ -33,8 +33,6 @@ option go_package = "v1alpha1";
 
 // ClusterRole is a cluster level, logical grouping of PolicyRules that can be referenced as a unit by a RoleBinding or ClusterRoleBinding.
 message ClusterRole {
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.TypeMeta typeMeta = 3;
-
   // Standard object's metadata.
   // +optional
   optional k8s.io.kubernetes.pkg.api.v1.ObjectMeta metadata = 1;
@@ -46,8 +44,6 @@ message ClusterRole {
 // ClusterRoleBinding references a ClusterRole, but not contain it.  It can reference a ClusterRole in the global namespace,
 // and adds who information via Subject.
 message ClusterRoleBinding {
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.TypeMeta typeMeta = 4;
-
   // Standard object's metadata.
   // +optional
   optional k8s.io.kubernetes.pkg.api.v1.ObjectMeta metadata = 1;
@@ -70,8 +66,6 @@ message ClusterRoleBindingBuilder {
 
 // ClusterRoleBindingList is a collection of ClusterRoleBindings
 message ClusterRoleBindingList {
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.TypeMeta typeMeta = 3;
-
   // Standard object's metadata.
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
@@ -82,8 +76,6 @@ message ClusterRoleBindingList {
 
 // ClusterRoleList is a collection of ClusterRoles
 message ClusterRoleList {
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.TypeMeta typeMeta = 3;
-
   // Standard object's metadata.
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
@@ -134,8 +126,6 @@ message PolicyRuleBuilder {
 
 // Role is a namespaced, logical grouping of PolicyRules that can be referenced as a unit by a RoleBinding.
 message Role {
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.TypeMeta typeMeta = 3;
-
   // Standard object's metadata.
   // +optional
   optional k8s.io.kubernetes.pkg.api.v1.ObjectMeta metadata = 1;
@@ -148,8 +138,6 @@ message Role {
 // It adds who information via Subjects and namespace information by which namespace it exists in.  RoleBindings in a given
 // namespace only have effect in that namespace.
 message RoleBinding {
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.TypeMeta typeMeta = 4;
-
   // Standard object's metadata.
   // +optional
   optional k8s.io.kubernetes.pkg.api.v1.ObjectMeta metadata = 1;
@@ -164,8 +152,6 @@ message RoleBinding {
 
 // RoleBindingList is a collection of RoleBindings
 message RoleBindingList {
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.TypeMeta typeMeta = 3;
-
   // Standard object's metadata.
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
@@ -176,8 +162,6 @@ message RoleBindingList {
 
 // RoleList is a collection of Roles
 message RoleList {
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.TypeMeta typeMeta = 3;
-
   // Standard object's metadata.
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;

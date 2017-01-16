@@ -46,8 +46,6 @@ message CrossVersionObjectReference {
 
 // configuration of a horizontal pod autoscaler.
 message HorizontalPodAutoscaler {
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.TypeMeta typeMeta = 4;
-
   // Standard object metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
   // +optional
   optional k8s.io.kubernetes.pkg.api.v1.ObjectMeta metadata = 1;
@@ -63,8 +61,6 @@ message HorizontalPodAutoscaler {
 
 // list of horizontal pod autoscaler objects.
 message HorizontalPodAutoscalerList {
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.TypeMeta typeMeta = 3;
-
   // Standard list metadata.
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
@@ -117,8 +113,6 @@ message HorizontalPodAutoscalerStatus {
 
 // Scale represents a scaling request for a resource.
 message Scale {
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.TypeMeta typeMeta = 4;
-
   // Standard object metadata; More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata.
   // +optional
   optional k8s.io.kubernetes.pkg.api.v1.ObjectMeta metadata = 1;

@@ -15,8 +15,8 @@ go_library(
     deps = [
         "//pkg/api/validation:go_default_library",
         "//pkg/apis/extensions/validation:go_default_library",
-        "//pkg/apis/meta/v1/validation:go_default_library",
         "//pkg/apis/policy:go_default_library",
+        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1/validation",
         "//vendor:k8s.io/apimachinery/pkg/util/validation/field",
     ],
 )

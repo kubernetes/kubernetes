@@ -44,8 +44,6 @@ message ExtraValue {
 // Having a namespace scoped resource makes it much easier to grant namespace scoped policy that includes permissions
 // checking.
 message LocalSubjectAccessReview {
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.TypeMeta typeMeta = 4;
-
   // +optional
   optional k8s.io.kubernetes.pkg.api.v1.ObjectMeta metadata = 1;
 
@@ -107,8 +105,6 @@ message ResourceAttributes {
 // spec.namespace means "in all namespaces".  Self is a special case, because users should always be able
 // to check whether they can perform an action
 message SelfSubjectAccessReview {
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.TypeMeta typeMeta = 4;
-
   // +optional
   optional k8s.io.kubernetes.pkg.api.v1.ObjectMeta metadata = 1;
 
@@ -134,8 +130,6 @@ message SelfSubjectAccessReviewSpec {
 
 // SubjectAccessReview checks whether or not a user or group can perform an action.
 message SubjectAccessReview {
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.TypeMeta typeMeta = 4;
-
   // +optional
   optional k8s.io.kubernetes.pkg.api.v1.ObjectMeta metadata = 1;
 

@@ -211,10 +211,10 @@ func (s *sharedIndexInformer) LastSyncResourceVersion() string {
 	s.startedLock.Lock()
 	defer s.startedLock.Unlock()
 
-	if s.controller == nil || s.controller.reflector == nil {
+	if s.controller == nil {
 		return ""
 	}
-	return s.controller.reflector.LastSyncResourceVersion()
+	return s.controller.LastSyncResourceVersion()
 }
 
 func (s *sharedIndexInformer) GetStore() Store {

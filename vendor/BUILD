@@ -9502,7 +9502,7 @@ go_library(
         "//vendor:github.com/gogo/protobuf/proto",
         "//vendor:github.com/spf13/pflag",
         "//vendor:gopkg.in/inf.v0",
-        "//vendor:k8s.io/apimachinery/pkg/genericapiserver/openapi/common",
+        "//vendor:k8s.io/apimachinery/pkg/openapi",
     ],
 )
 
@@ -9983,6 +9983,7 @@ go_library(
     name = "k8s.io/client-go/pkg/apis/certificates/v1alpha1",
     srcs = [
         "k8s.io/client-go/pkg/apis/certificates/v1alpha1/conversion.go",
+        "k8s.io/client-go/pkg/apis/certificates/v1alpha1/defaults.go",
         "k8s.io/client-go/pkg/apis/certificates/v1alpha1/doc.go",
         "k8s.io/client-go/pkg/apis/certificates/v1alpha1/generated.pb.go",
         "k8s.io/client-go/pkg/apis/certificates/v1alpha1/register.go",
@@ -10711,7 +10712,7 @@ go_library(
         "//vendor:github.com/gogo/protobuf/proto",
         "//vendor:github.com/golang/glog",
         "//vendor:github.com/google/gofuzz",
-        "//vendor:k8s.io/apimachinery/pkg/genericapiserver/openapi/common",
+        "//vendor:k8s.io/apimachinery/pkg/openapi",
     ],
 )
 
@@ -11860,8 +11861,8 @@ go_library(
         "//vendor:github.com/gogo/protobuf/sortkeys",
         "//vendor:github.com/google/gofuzz",
         "//vendor:k8s.io/apimachinery/pkg/conversion",
-        "//vendor:k8s.io/apimachinery/pkg/genericapiserver/openapi/common",
         "//vendor:k8s.io/apimachinery/pkg/labels",
+        "//vendor:k8s.io/apimachinery/pkg/openapi",
         "//vendor:k8s.io/apimachinery/pkg/runtime",
         "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
         "//vendor:k8s.io/apimachinery/pkg/selection",
@@ -11930,19 +11931,6 @@ go_test(
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/conversion/queryparams",
         "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
-    ],
-)
-
-go_library(
-    name = "k8s.io/apimachinery/pkg/genericapiserver/openapi/common",
-    srcs = [
-        "k8s.io/apimachinery/pkg/genericapiserver/openapi/common/common.go",
-        "k8s.io/apimachinery/pkg/genericapiserver/openapi/common/doc.go",
-    ],
-    tags = ["automanaged"],
-    deps = [
-        "//vendor:github.com/emicklei/go-restful",
-        "//vendor:github.com/go-openapi/spec",
     ],
 )
 
@@ -12764,10 +12752,9 @@ go_library(
         "//vendor:github.com/gogo/protobuf/proto",
         "//vendor:github.com/gogo/protobuf/sortkeys",
         "//vendor:github.com/google/gofuzz",
-        "//vendor:github.com/ugorji/go/codec",
         "//vendor:k8s.io/apimachinery/pkg/conversion",
-        "//vendor:k8s.io/apimachinery/pkg/genericapiserver/openapi/common",
         "//vendor:k8s.io/apimachinery/pkg/labels",
+        "//vendor:k8s.io/apimachinery/pkg/openapi",
         "//vendor:k8s.io/apimachinery/pkg/runtime",
         "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
         "//vendor:k8s.io/apimachinery/pkg/selection",
@@ -13320,5 +13307,37 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/runtime",
         "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
         "//vendor:k8s.io/apimachinery/pkg/util/validation/field",
+    ],
+)
+
+go_test(
+    name = "k8s.io/apimachinery/pkg/apis/meta/v1/validation_test",
+    srcs = ["k8s.io/apimachinery/pkg/apis/meta/v1/validation/validation_test.go"],
+    library = ":k8s.io/apimachinery/pkg/apis/meta/v1/validation",
+    tags = ["automanaged"],
+    deps = ["//vendor:k8s.io/apimachinery/pkg/util/validation/field"],
+)
+
+go_library(
+    name = "k8s.io/apimachinery/pkg/apis/meta/v1/validation",
+    srcs = ["k8s.io/apimachinery/pkg/apis/meta/v1/validation/validation.go"],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor:k8s.io/apimachinery/pkg/util/validation",
+        "//vendor:k8s.io/apimachinery/pkg/util/validation/field",
+    ],
+)
+
+go_library(
+    name = "k8s.io/apimachinery/pkg/openapi",
+    srcs = [
+        "k8s.io/apimachinery/pkg/openapi/common.go",
+        "k8s.io/apimachinery/pkg/openapi/doc.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/emicklei/go-restful",
+        "//vendor:github.com/go-openapi/spec",
     ],
 )
