@@ -385,6 +385,7 @@ func StartControllers(controllers map[string]InitFunc, s *options.CMServer, root
 		}
 		if !started {
 			glog.Warningf("Skipping %q", controllerName)
+			continue
 		}
 		glog.Infof("Started %q", controllerName)
 	}
