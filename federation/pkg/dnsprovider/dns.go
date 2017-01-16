@@ -45,7 +45,7 @@ type Zone interface {
 	Name() string
 	// ID returns the unique provider identifier for the zone
 	ID() string
-	// ResourceRecordsets returns the provider's ResourceRecordSets interface, or false if not supported.
+	// ResourceRecordSets returns the provider's ResourceRecordSets interface, or false if not supported.
 	ResourceRecordSets() (ResourceRecordSets, bool)
 }
 
@@ -70,6 +70,8 @@ type ResourceRecordChangeset interface {
 	Remove(ResourceRecordSet) ResourceRecordChangeset
 	// Apply applies the accumulated operations to the Zone.
 	Apply() error
+	// IsEmpty returns true if there are no accumulated operations.
+	IsEmpty() bool
 }
 
 type ResourceRecordSet interface {
