@@ -45,7 +45,7 @@ func TestGenerateToken(t *testing.T) {
 		t.Errorf("failed GenerateToken first part length:\n\texpected: 6\n\t  actual: %d", len(cfg.ID))
 	}
 	if len(cfg.Secret) != 16 {
-		t.Errorf("failed GenerateToken first part length:\n\texpected: 16\n\t  actual: %d", len(cfg.Secret))
+		t.Errorf("failed GenerateToken second part length:\n\texpected: 16\n\t  actual: %d", len(cfg.Secret))
 	}
 }
 
@@ -59,12 +59,12 @@ func TestRandBytes(t *testing.T) {
 	}
 
 	for _, rt := range randTest {
-		actual, err := RandBytes(rt)
+		actual, err := randBytes(rt)
 		if err != nil {
-			t.Errorf("failed RandBytes: %v", err)
+			t.Errorf("failed randBytes: %v", err)
 		}
 		if len(actual) != rt*2 {
-			t.Errorf("failed RandBytes:\n\texpected: %d\n\t  actual: %d\n", rt*2, len(actual))
+			t.Errorf("failed randBytes:\n\texpected: %d\n\t  actual: %d\n", rt*2, len(actual))
 		}
 	}
 }

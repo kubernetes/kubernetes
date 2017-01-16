@@ -42,7 +42,7 @@ const (
 	tokenCreateRetries         = 5
 )
 
-func RandBytes(length int) (string, error) {
+func randBytes(length int) (string, error) {
 	b := make([]byte, length)
 	_, err := rand.Read(b)
 	if err != nil {
@@ -51,18 +51,21 @@ func RandBytes(length int) (string, error) {
 	return hex.EncodeToString(b), nil
 }
 
+// GenerateToken generates a new token with a token ID that is valid as a
+// Kubernetes DNS label.
+// For more info, see kubernetes/pkg/util/validation/validation.go.
 func GenerateToken(d *kubeadmapi.TokenDiscovery) error {
-	tokenID, err := RandBytes(TokenIDBytes)
+	tokenID, err := randBytes(TokenIDBytes)
 	if err != nil {
 		return err
 	}
 
-	token, err := RandBytes(TokenBytes)
+	token, err := randBytes(TokenBytes)
 	if err != nil {
 		return err
 	}
 
-	d.ID = tokenID
+	d.ID = strings.ToLower(tokenID)
 	d.Secret = token
 	return nil
 }
@@ -128,7 +131,6 @@ func DiscoveryPort(d *kubeadmapi.TokenDiscovery) int32 {
 // not already exist.
 func UpdateOrCreateToken(client *clientset.Clientset, d *kubeadmapi.TokenDiscovery, tokenDuration time.Duration) error {
 	secretName := fmt.Sprintf("%s%s", BootstrapTokenSecretPrefix, d.ID)
-
 	var lastErr error
 	for i := 0; i < tokenCreateRetries; i++ {
 		secret, err := client.Secrets(api.NamespaceSystem).Get(secretName, metav1.GetOptions{})
