@@ -37,7 +37,7 @@ func init() {
 func TestCmdTokenGenerate(t *testing.T) {
 	stdout, _, err := RunCmd(kubeadmPath, "ex", "token", "generate")
 	if err != nil {
-		t.Errorf("'kubeadm ex token generate' exited uncleanly: %v", err)
+		t.Fatalf("'kubeadm ex token generate' exited uncleanly: %v", err)
 	}
 
 	matched, err := regexp.MatchString(TokenExpectedRegex, stdout)
