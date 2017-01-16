@@ -34,7 +34,7 @@ NET_PLUGIN=${NET_PLUGIN:-""}
 NET_PLUGIN_DIR=${NET_PLUGIN_DIR:-""}
 SERVICE_CLUSTER_IP_RANGE=${SERVICE_CLUSTER_IP_RANGE:-10.0.0.0/24}
 # if enabled, must set CGROUP_ROOT
-EXPERIMENTAL_CGROUPS_PER_QOS=${EXPERIMENTAL_CGROUPS_PER_QOS:-false}
+CGROUPS_PER_QOS=${CGROUPS_PER_QOS:-false}
 # this is not defaulted to preserve backward compatibility.
 # if EXPERIMENTAL_CGROUPS_PER_QOS is enabled, recommend setting to /
 CGROUP_ROOT=${CGROUP_ROOT:-""}
@@ -188,6 +188,17 @@ ENABLE_CONTROLLER_ATTACH_DETACH=${ENABLE_CONTROLLER_ATTACH_DETACH:-"true"} # cur
 CERT_DIR=${CERT_DIR:-"/var/run/kubernetes"}
 ROOT_CA_FILE=$CERT_DIR/apiserver.crt
 EXPERIMENTAL_CRI=${EXPERIMENTAL_CRI:-"false"}
+
+# name of the cgroup driver, i.e. cgroupfs or systemd
+if [[ ${CONTAINER_RUNTIME} == "docker" ]]; then
+  # default cgroup driver to match what is reported by docker to simplify local development
+  if [[ -z ${CGROUP_DRIVER} ]]; then
+    # match driver with docker runtime reported value (they must match)
+    CGROUP_DRIVER=$(docker info | grep "Cgroup Driver:" | cut -f3- -d' ')
+    echo "Kubelet cgroup driver defaulted to use: ${CGROUP_DRIVER}"
+  fi
+fi
+
 
 
 # Ensure CERT_DIR is created for auto-generated crt/key and kubeconfig
@@ -530,7 +541,7 @@ function start_kubelet {
         --feature-gates="${FEATURE_GATES}" \
         --cpu-cfs-quota=${CPU_CFS_QUOTA} \
         --enable-controller-attach-detach="${ENABLE_CONTROLLER_ATTACH_DETACH}" \
-        --experimental-cgroups-per-qos=${EXPERIMENTAL_CGROUPS_PER_QOS} \
+        --cgroups-per-qos=${CGROUPS_PER_QOS} \
         --cgroup-driver=${CGROUP_DRIVER} \
         --cgroup-root=${CGROUP_ROOT} \
         ${auth_args} \
