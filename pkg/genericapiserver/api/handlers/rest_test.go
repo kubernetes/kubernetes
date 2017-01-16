@@ -59,7 +59,7 @@ func TestPatchAnonymousField(t *testing.T) {
 	patch := `{"theField": "changed!"}`
 	expectedJS := `{"kind":"testPatchType","theField":"changed!"}`
 
-	actualBytes, err := getPatchedJS(api.StrategicMergePatchType, []byte(originalJS), []byte(patch), &testPatchType{})
+	actualBytes, err := getPatchedJS(types.StrategicMergePatchType, []byte(originalJS), []byte(patch), &testPatchType{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -191,9 +191,9 @@ func (tc *patchTestCase) Run(t *testing.T) {
 	resource := schema.GroupVersionResource{Group: "", Version: "v1", Resource: "pods"}
 	versionedObj := &v1.Pod{}
 
-	for _, patchType := range []api.PatchType{api.JSONPatchType, api.MergePatchType, api.StrategicMergePatchType} {
+	for _, patchType := range []types.PatchType{types.JSONPatchType, types.MergePatchType, types.StrategicMergePatchType} {
 		// TODO SUPPORT THIS!
-		if patchType == api.JSONPatchType {
+		if patchType == types.JSONPatchType {
 			continue
 		}
 		t.Logf("Working with patchType %v", patchType)
@@ -211,17 +211,17 @@ func (tc *patchTestCase) Run(t *testing.T) {
 
 		patch := []byte{}
 		switch patchType {
-		case api.JSONPatchType:
+		case types.JSONPatchType:
 			continue
 
-		case api.StrategicMergePatchType:
+		case types.StrategicMergePatchType:
 			patch, err = strategicpatch.CreateStrategicMergePatch(originalObjJS, changedJS, versionedObj)
 			if err != nil {
 				t.Errorf("%s: unexpected error: %v", tc.name, err)
 				return
 			}
 
-		case api.MergePatchType:
+		case types.MergePatchType:
 			patch, err = jsonpatch.CreateMergePatch(originalObjJS, changedJS)
 			if err != nil {
 				t.Errorf("%s: unexpected error: %v", tc.name, err)
