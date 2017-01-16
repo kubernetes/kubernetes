@@ -41,7 +41,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/v1"
-	apss "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
+	apps "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/controller/statefulset"
 	"k8s.io/kubernetes/pkg/util/intstr"
@@ -472,8 +472,8 @@ var _ = framework.KubeDescribe("StatefulSet", func() {
 })
 
 func dumpDebugInfo(c clientset.Interface, ns string) {
-	pl, _ := c.Core().Pods(ns).List(v1.ListOptions{LabelSelector: labels.Everything().String()})
-	for _, p := range pl.Items {
+	sl, _ := c.Core().Pods(ns).List(v1.ListOptions{LabelSelector: labels.Everything().String()})
+	for _, s := range sl.Items {
 		desc, _ := framework.RunKubectl("describe", "po", s.Name, fmt.Sprintf("--namespace=%v", ns))
 		framework.Logf("\nOutput of kubectl describe %v:\n%v", s.Name, desc)
 
@@ -705,7 +705,7 @@ func (s *statefulSetTester) createStatefulSet(manifestPath, ns string) *apps.Sta
 	mkpath := func(file string) string {
 		return filepath.Join(framework.TestContext.RepoRoot, manifestPath, file)
 	}
-	ss := statefulSetFromManifest(mkpath("statefuleset.yaml"), ns)
+	ss := statefulSetFromManifest(mkpath("statefulset.yaml"), ns)
 
 	framework.Logf(fmt.Sprintf("creating " + ss.Name + " service"))
 	framework.RunKubectlOrDie("create", "-f", mkpath("service.yaml"), fmt.Sprintf("--namespace=%v", ns))
@@ -882,8 +882,8 @@ func (s *statefulSetTester) waitForRunning(numStatefulPods int32, ss *apps.State
 			for _, p := range podList.Items {
 				isReady := v1.IsPodReady(&p)
 				desiredReadiness := shouldBeReady == isReady
-				framework.Logf("Waiting for pod %v to enter %v - Ready=%v, currently %v - Ready=%v", s.Name, v1.PodRunning, shouldBeReady, s.Status.Phase, isReady)
-				if s.Status.Phase != v1.PodRunning || !desiredReadiness {
+				framework.Logf("Waiting for pod %v to enter %v - Ready=%v, currently %v - Ready=%v", p.Name, v1.PodRunning, shouldBeReady, p.Status.Phase, isReady)
+				if p.Status.Phase != v1.PodRunning || !desiredReadiness {
 					return false, nil
 				}
 			}
@@ -937,7 +937,7 @@ func (s *statefulSetTester) setHealthy(ss *apps.StatefulSet) {
 			update.Annotations[statefulset.StatefulSetInitAnnotation] = "true"
 		})
 		framework.ExpectNoError(err)
-		framework.Logf("Set annotation %v to %v on pod %v", statefulset.StatefulSetInitAnnotation, s.Annotations[statefulset.StatefulSetInitAnnotation], pod.Name)
+		framework.Logf("Set annotation %v to %v on pod %v", statefulset.StatefulSetInitAnnotation, p.Annotations[statefulset.StatefulSetInitAnnotation], pod.Name)
 		markedHealthyPod = pod.Name
 	}
 }
