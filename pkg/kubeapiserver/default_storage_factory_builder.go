@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package genericapiserver
+package kubeapiserver
 
 import (
 	"fmt"
@@ -24,6 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/genericapiserver"
 	"k8s.io/kubernetes/pkg/storage/storagebackend"
 	"k8s.io/kubernetes/pkg/util/config"
 )
@@ -32,8 +33,8 @@ import (
 // Merges defaultResourceConfig with the user specified overrides and merges
 // defaultAPIResourceConfig with the corresponding user specified overrides as well.
 func BuildDefaultStorageFactory(storageConfig storagebackend.Config, defaultMediaType string, serializer runtime.StorageSerializer,
-	defaultResourceEncoding *DefaultResourceEncodingConfig, storageEncodingOverrides map[string]schema.GroupVersion, resourceEncodingOverrides []schema.GroupVersionResource,
-	defaultAPIResourceConfig *ResourceConfig, resourceConfigOverrides config.ConfigurationMap) (*DefaultStorageFactory, error) {
+	defaultResourceEncoding *genericapiserver.DefaultResourceEncodingConfig, storageEncodingOverrides map[string]schema.GroupVersion, resourceEncodingOverrides []schema.GroupVersionResource,
+	defaultAPIResourceConfig *genericapiserver.ResourceConfig, resourceConfigOverrides config.ConfigurationMap) (*genericapiserver.DefaultStorageFactory, error) {
 
 	resourceEncodingConfig := mergeGroupEncodingConfigs(defaultResourceEncoding, storageEncodingOverrides)
 	resourceEncodingConfig = mergeResourceEncodingConfigs(resourceEncodingConfig, resourceEncodingOverrides)
@@ -41,11 +42,11 @@ func BuildDefaultStorageFactory(storageConfig storagebackend.Config, defaultMedi
 	if err != nil {
 		return nil, err
 	}
-	return NewDefaultStorageFactory(storageConfig, defaultMediaType, serializer, resourceEncodingConfig, apiResourceConfig), nil
+	return genericapiserver.NewDefaultStorageFactory(storageConfig, defaultMediaType, serializer, resourceEncodingConfig, apiResourceConfig), nil
 }
 
 // Merges the given defaultResourceConfig with specifc GroupvVersionResource overrides.
-func mergeResourceEncodingConfigs(defaultResourceEncoding *DefaultResourceEncodingConfig, resourceEncodingOverrides []schema.GroupVersionResource) *DefaultResourceEncodingConfig {
+func mergeResourceEncodingConfigs(defaultResourceEncoding *genericapiserver.DefaultResourceEncodingConfig, resourceEncodingOverrides []schema.GroupVersionResource) *genericapiserver.DefaultResourceEncodingConfig {
 	resourceEncodingConfig := defaultResourceEncoding
 	for _, gvr := range resourceEncodingOverrides {
 		resourceEncodingConfig.SetResourceEncoding(gvr.GroupResource(), gvr.GroupVersion(),
@@ -55,7 +56,7 @@ func mergeResourceEncodingConfigs(defaultResourceEncoding *DefaultResourceEncodi
 }
 
 // Merges the given defaultResourceConfig with specifc GroupVersion overrides.
-func mergeGroupEncodingConfigs(defaultResourceEncoding *DefaultResourceEncodingConfig, storageEncodingOverrides map[string]schema.GroupVersion) *DefaultResourceEncodingConfig {
+func mergeGroupEncodingConfigs(defaultResourceEncoding *genericapiserver.DefaultResourceEncodingConfig, storageEncodingOverrides map[string]schema.GroupVersion) *genericapiserver.DefaultResourceEncodingConfig {
 	resourceEncodingConfig := defaultResourceEncoding
 	for group, storageEncodingVersion := range storageEncodingOverrides {
 		resourceEncodingConfig.SetVersionEncoding(group, storageEncodingVersion, schema.GroupVersion{Group: group, Version: runtime.APIVersionInternal})
@@ -64,7 +65,7 @@ func mergeGroupEncodingConfigs(defaultResourceEncoding *DefaultResourceEncodingC
 }
 
 // Merges the given defaultAPIResourceConfig with the given resourceConfigOverrides.
-func mergeAPIResourceConfigs(defaultAPIResourceConfig *ResourceConfig, resourceConfigOverrides config.ConfigurationMap) (*ResourceConfig, error) {
+func mergeAPIResourceConfigs(defaultAPIResourceConfig *genericapiserver.ResourceConfig, resourceConfigOverrides config.ConfigurationMap) (*genericapiserver.ResourceConfig, error) {
 	resourceConfig := defaultAPIResourceConfig
 	overrides := resourceConfigOverrides
 
