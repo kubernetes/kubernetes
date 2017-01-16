@@ -160,6 +160,7 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 	}
 	filterFuncs := f.DefaultResourceFilterFunc()
 	filterOpts := f.DefaultResourceFilterOptions(cmd, allNamespaces)
+	printAll := false
 
 	cmdNamespace, enforceNamespace, err := f.DefaultNamespace()
 	if err != nil {
@@ -182,13 +183,22 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 		return cmdutil.UsageError(cmd, usageString)
 	}
 
-	// always show resources when getting by name or filename
+	// determine if args contains "all"
+	for _, a := range args {
+		if a == "all" {
+			printAll = true
+			break
+		}
+	}
+
 	argsHasNames, err := resource.HasNames(args)
 	if err != nil {
 		return err
 	}
-	output := cmdutil.GetFlagString(cmd, "output")
-	if len(options.Filenames) > 0 || argsHasNames || output == "json" || output == "yaml" {
+
+	// always show resources when getting by name or filename, or if the
+	// output is machine-consumable, or if the "all" alias was passed
+	if len(options.Filenames) > 0 || argsHasNames || cmdutil.OutputsRawFormat(cmd) || printAll {
 		if !cmd.Flag("show-all").Changed {
 			cmd.Flag("show-all").Value.Set("true")
 		}
