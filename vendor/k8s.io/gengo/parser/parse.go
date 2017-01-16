@@ -171,6 +171,12 @@ func (b *Builder) AddFileForTest(pkg string, path string, src []byte) error {
 // flag indicates whether this file was user-requested or just from following
 // the import graph.
 func (b *Builder) addFile(pkgPath importPathString, path string, src []byte, userRequested bool) error {
+	for _, p := range b.parsed[pkgPath] {
+		if path == p.name {
+			glog.V(5).Infof("addFile %s %s already parsed, skipping", pkgPath, path)
+			return nil
+		}
+	}
 	glog.V(6).Infof("addFile %s %s", pkgPath, path)
 	p, err := parser.ParseFile(b.fset, path, src, parser.DeclarationErrors|parser.ParseComments)
 	if err != nil {
