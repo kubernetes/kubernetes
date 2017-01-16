@@ -352,13 +352,14 @@ type InstanceGroupInfo interface {
 
 // Cloud is an implementation of Interface, LoadBalancer and Instances for Amazon Web Services.
 type Cloud struct {
-	ec2      EC2
-	elb      ELB
-	asg      ASG
-	metadata EC2Metadata
-	cfg      *CloudConfig
-	region   string
-	vpcID    string
+	ec2              EC2
+	elb              ELB
+	asg              ASG
+	metadata         EC2Metadata
+	cfg              *CloudConfig
+	region           string
+	availabilityZone string
+	vpcID            string
 
 	filterTags map[string]string
 
@@ -388,6 +389,8 @@ type CloudConfig struct {
 		// TODO: Is there any use for this?  We can get it from the instance metadata service
 		// Maybe if we're not running on AWS, e.g. bootstrap; for now it is not very useful
 		Zone string
+
+		VPCID string
 
 		KubernetesClusterTag string
 
@@ -814,12 +817,21 @@ func newAWSCloud(config io.Reader, awsServices Services) (*Cloud, error) {
 	}
 
 	selfAWSInstance, err := awsCloud.buildSelfAWSInstance()
-	if err != nil {
+	if err != nil && (cfg.Global.VPCID != "" || cfg.Global.Zone != "") {
 		return nil, err
+	} else if err != nil {
+		glog.Warningf("Cannot detect an AWS Instance")
+	} else {
+		awsCloud.selfAWSInstance = selfAWSInstance
+		awsCloud.vpcID = selfAWSInstance.vpcID
+		awsCloud.availabilityZone = selfAWSInstance.availabilityZone
 	}
-
-	awsCloud.selfAWSInstance = selfAWSInstance
-	awsCloud.vpcID = selfAWSInstance.vpcID
+	if cfg.Global.Zone != "" {
+		awsCloud.availabilityZone = cfg.Global.Zone
+	}
+	if cfg.Global.VPCID != "" {
+		awsCloud.vpcID = cfg.Global.VPCID
+	}
 
 	filterTags := map[string]string{}
 	if cfg.Global.KubernetesClusterTag != "" {
@@ -1090,7 +1102,7 @@ func (c *Cloud) getAllZones() (sets.String, error) {
 // GetZone implements Zones.GetZone
 func (c *Cloud) GetZone() (cloudprovider.Zone, error) {
 	return cloudprovider.Zone{
-		FailureDomain: c.selfAWSInstance.availabilityZone,
+		FailureDomain: c.availabilityZone,
 		Region:        c.region,
 	}, nil
 }
