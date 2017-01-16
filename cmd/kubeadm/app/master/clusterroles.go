@@ -41,7 +41,46 @@ func CreateBootstrapRBACClusterRole(clientset *clientset.Clientset) error {
 	if _, err := clientset.ClusterRoleBindings().Create(&clusterRoleBinding); err != nil {
 		return err
 	}
-	fmt.Println("[apiconfig] Created RBAC rules")
+	fmt.Println("[apiconfig] Created kubelet-bootstrap RBAC rules")
+
+	return nil
+}
+
+// CreateKubeDNSRBACClusterRole creates the necessary ClusterRole for kube-dns
+func CreateKubeDNSRBACClusterRole(clientset *clientset.Clientset) error {
+	clusterRole := rbac.ClusterRole{
+		// a role to use for setting up a proxy
+		ObjectMeta: api.ObjectMeta{Name: "system:kube-dns"},
+		Rules: []rbac.PolicyRule{
+			rbac.NewRule("list", "watch").Groups("").Resources("endpoints", "services", "configmaps").RuleOrDie(),
+			rbac.NewRule("get").Groups("").Resources("configmaps").RuleOrDie(),
+		},
+	}
+	if _, err := clientset.ClusterRoles().Create(&clusterRole); err != nil {
+		return err
+	}
+
+	subject := rbac.Subject{
+		Kind:      "ServiceAccount",
+		Name:      "kube-dns",
+		Namespace: "kube-system",
+	}
+
+	clusterRoleBinding := rbac.ClusterRoleBinding{
+		ObjectMeta: api.ObjectMeta{
+			Name: "system:kube-dns",
+		},
+		RoleRef: rbac.RoleRef{
+			APIGroup: "rbac.authorization.k8s.io",
+			Kind:     "ClusterRole",
+			Name:     "system:kube-dns",
+		},
+		Subjects: []rbac.Subject{subject},
+	}
+	if _, err := clientset.ClusterRoleBindings().Create(&clusterRoleBinding); err != nil {
+		return err
+	}
+	fmt.Println("[apiconfig] Created kube-dns RBAC rules")
 
 	return nil
 }

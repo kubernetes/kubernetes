@@ -243,6 +243,11 @@ func (i *Init) Run(out io.Writer) error {
 		if err != nil {
 			return err
 		}
+
+		err = kubemaster.CreateKubeDNSRBACClusterRole(client)
+		if err != nil {
+			return err
+		}
 	}
 
 	if err := kubemaster.UpdateMasterRoleLabelsAndTaints(client, false); err != nil {
