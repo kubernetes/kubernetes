@@ -20,6 +20,7 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
+	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	api "k8s.io/kubernetes/pkg/api"
 	rbac "k8s.io/kubernetes/pkg/apis/rbac"
@@ -107,7 +108,7 @@ func (c *FakeRoles) Watch(opts api.ListOptions) (watch.Interface, error) {
 }
 
 // Patch applies the patch and returns the patched role.
-func (c *FakeRoles) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *rbac.Role, err error) {
+func (c *FakeRoles) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *rbac.Role, err error) {
 	obj, err := c.Fake.
 		Invokes(core.NewPatchSubresourceAction(rolesResource, c.ns, name, data, subresources...), &rbac.Role{})
 

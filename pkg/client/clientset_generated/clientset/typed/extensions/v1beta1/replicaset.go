@@ -18,6 +18,7 @@ package v1beta1
 
 import (
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	api "k8s.io/kubernetes/pkg/api"
 	v1 "k8s.io/kubernetes/pkg/api/v1"
@@ -41,7 +42,7 @@ type ReplicaSetInterface interface {
 	Get(name string, options meta_v1.GetOptions) (*v1beta1.ReplicaSet, error)
 	List(opts v1.ListOptions) (*v1beta1.ReplicaSetList, error)
 	Watch(opts v1.ListOptions) (watch.Interface, error)
-	Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *v1beta1.ReplicaSet, err error)
+	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1beta1.ReplicaSet, err error)
 	ReplicaSetExpansion
 }
 
@@ -158,7 +159,7 @@ func (c *replicaSets) Watch(opts v1.ListOptions) (watch.Interface, error) {
 }
 
 // Patch applies the patch and returns the patched replicaSet.
-func (c *replicaSets) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *v1beta1.ReplicaSet, err error) {
+func (c *replicaSets) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1beta1.ReplicaSet, err error) {
 	result = &v1beta1.ReplicaSet{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).

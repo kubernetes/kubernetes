@@ -18,6 +18,7 @@ package internalversion
 
 import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	api "k8s.io/kubernetes/pkg/api"
 	restclient "k8s.io/kubernetes/pkg/client/restclient"
@@ -38,7 +39,7 @@ type ConfigMapInterface interface {
 	Get(name string, options v1.GetOptions) (*api.ConfigMap, error)
 	List(opts api.ListOptions) (*api.ConfigMapList, error)
 	Watch(opts api.ListOptions) (watch.Interface, error)
-	Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *api.ConfigMap, err error)
+	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *api.ConfigMap, err error)
 	ConfigMapExpansion
 }
 
@@ -139,7 +140,7 @@ func (c *configMaps) Watch(opts api.ListOptions) (watch.Interface, error) {
 }
 
 // Patch applies the patch and returns the patched configMap.
-func (c *configMaps) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *api.ConfigMap, err error) {
+func (c *configMaps) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *api.ConfigMap, err error) {
 	result = &api.ConfigMap{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).

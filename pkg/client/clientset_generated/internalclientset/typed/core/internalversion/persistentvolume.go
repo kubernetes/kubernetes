@@ -18,6 +18,7 @@ package internalversion
 
 import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	api "k8s.io/kubernetes/pkg/api"
 	restclient "k8s.io/kubernetes/pkg/client/restclient"
@@ -39,7 +40,7 @@ type PersistentVolumeInterface interface {
 	Get(name string, options v1.GetOptions) (*api.PersistentVolume, error)
 	List(opts api.ListOptions) (*api.PersistentVolumeList, error)
 	Watch(opts api.ListOptions) (watch.Interface, error)
-	Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *api.PersistentVolume, err error)
+	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *api.PersistentVolume, err error)
 	PersistentVolumeExpansion
 }
 
@@ -146,7 +147,7 @@ func (c *persistentVolumes) Watch(opts api.ListOptions) (watch.Interface, error)
 }
 
 // Patch applies the patch and returns the patched persistentVolume.
-func (c *persistentVolumes) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *api.PersistentVolume, err error) {
+func (c *persistentVolumes) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *api.PersistentVolume, err error) {
 	result = &api.PersistentVolume{}
 	err = c.client.Patch(pt).
 		Resource("persistentvolumes").

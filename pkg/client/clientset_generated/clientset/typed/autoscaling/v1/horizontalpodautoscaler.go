@@ -18,6 +18,7 @@ package v1
 
 import (
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	api "k8s.io/kubernetes/pkg/api"
 	api_v1 "k8s.io/kubernetes/pkg/api/v1"
@@ -41,7 +42,7 @@ type HorizontalPodAutoscalerInterface interface {
 	Get(name string, options meta_v1.GetOptions) (*v1.HorizontalPodAutoscaler, error)
 	List(opts api_v1.ListOptions) (*v1.HorizontalPodAutoscalerList, error)
 	Watch(opts api_v1.ListOptions) (watch.Interface, error)
-	Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *v1.HorizontalPodAutoscaler, err error)
+	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.HorizontalPodAutoscaler, err error)
 	HorizontalPodAutoscalerExpansion
 }
 
@@ -158,7 +159,7 @@ func (c *horizontalPodAutoscalers) Watch(opts api_v1.ListOptions) (watch.Interfa
 }
 
 // Patch applies the patch and returns the patched horizontalPodAutoscaler.
-func (c *horizontalPodAutoscalers) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *v1.HorizontalPodAutoscaler, err error) {
+func (c *horizontalPodAutoscalers) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.HorizontalPodAutoscaler, err error) {
 	result = &v1.HorizontalPodAutoscaler{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).

@@ -20,7 +20,6 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//pkg/admission:go_default_library",
-        "//pkg/api:go_default_library",
         "//pkg/apis/extensions:go_default_library",
         "//pkg/genericapiserver/api/handlers:go_default_library",
         "//pkg/genericapiserver/api/handlers/responsewriters:go_default_library",
@@ -32,6 +31,7 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/conversion",
         "//vendor:k8s.io/apimachinery/pkg/runtime",
         "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
+        "//vendor:k8s.io/apimachinery/pkg/types",
         "//vendor:k8s.io/apimachinery/pkg/util/errors",
         "//vendor:k8s.io/apiserver/pkg/handlers/negotiation",
         "//vendor:k8s.io/apiserver/pkg/metrics",

@@ -20,9 +20,9 @@ import (
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
+	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	v1alpha1 "k8s.io/kubernetes/cmd/kube-aggregator/pkg/apis/apiregistration/v1alpha1"
-	api "k8s.io/kubernetes/pkg/api"
 	v1 "k8s.io/kubernetes/pkg/api/v1"
 	core "k8s.io/kubernetes/pkg/client/testing/core"
 )
@@ -110,7 +110,7 @@ func (c *FakeAPIServices) Watch(opts v1.ListOptions) (watch.Interface, error) {
 }
 
 // Patch applies the patch and returns the patched aPIService.
-func (c *FakeAPIServices) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *v1alpha1.APIService, err error) {
+func (c *FakeAPIServices) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1alpha1.APIService, err error) {
 	obj, err := c.Fake.
 		Invokes(core.NewRootPatchSubresourceAction(apiservicesResource, name, data, subresources...), &v1alpha1.APIService{})
 	if obj == nil {

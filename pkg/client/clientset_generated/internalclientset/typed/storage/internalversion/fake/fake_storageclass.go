@@ -20,6 +20,7 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
+	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	api "k8s.io/kubernetes/pkg/api"
 	storage "k8s.io/kubernetes/pkg/apis/storage"
@@ -100,7 +101,7 @@ func (c *FakeStorageClasses) Watch(opts api.ListOptions) (watch.Interface, error
 }
 
 // Patch applies the patch and returns the patched storageClass.
-func (c *FakeStorageClasses) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *storage.StorageClass, err error) {
+func (c *FakeStorageClasses) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *storage.StorageClass, err error) {
 	obj, err := c.Fake.
 		Invokes(core.NewRootPatchSubresourceAction(storageclassesResource, name, data, subresources...), &storage.StorageClass{})
 	if obj == nil {

@@ -20,6 +20,7 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
+	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	api "k8s.io/kubernetes/pkg/api"
 	apps "k8s.io/kubernetes/pkg/apis/apps"
@@ -117,7 +118,7 @@ func (c *FakeStatefulSets) Watch(opts api.ListOptions) (watch.Interface, error) 
 }
 
 // Patch applies the patch and returns the patched statefulSet.
-func (c *FakeStatefulSets) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *apps.StatefulSet, err error) {
+func (c *FakeStatefulSets) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *apps.StatefulSet, err error) {
 	obj, err := c.Fake.
 		Invokes(core.NewPatchSubresourceAction(statefulsetsResource, c.ns, name, data, subresources...), &apps.StatefulSet{})
 
