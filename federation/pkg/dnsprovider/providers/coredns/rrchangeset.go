@@ -58,6 +58,10 @@ func (c *ResourceRecordChangeset) Remove(rrset dnsprovider.ResourceRecordSet) dn
 	return c
 }
 
+func (c *ResourceRecordChangeset) IsEmpty() bool {
+	return len(c.changeset) == 0
+}
+
 func (c *ResourceRecordChangeset) Apply() error {
 	ctx := context.Background()
 	etcdPathPrefix := c.zone.zones.intf.etcdPathPrefix

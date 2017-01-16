@@ -99,3 +99,7 @@ func (c *ResourceRecordChangeset) Apply() error {
 	}
 	return nil
 }
+
+func (c *ResourceRecordChangeset) IsEmpty() bool {
+	return len(c.removals) == 0 && len(c.additions) == 0
+}
