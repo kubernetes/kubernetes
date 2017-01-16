@@ -34,7 +34,7 @@ func TestIsDNS1123Label(t *testing.T) {
 	}
 
 	badValues := []string{
-		"", "A", "ABC", "aBc", "A1", "A-1", "1-A",
+		"",
 		"-", "a-", "-a", "1-", "-1",
 		"_", "a_", "_a", "a_b", "1_", "_1", "1_2",
 		".", "a.", ".a", "a.b", "1.", ".1", "1.2",
@@ -66,15 +66,11 @@ func TestIsDNS1123Subdomain(t *testing.T) {
 	}
 
 	badValues := []string{
-		"", "A", "ABC", "aBc", "A1", "A-1", "1-A",
+		"",
 		"-", "a-", "-a", "1-", "-1",
 		"_", "a_", "_a", "a_b", "1_", "_1", "1_2",
 		".", "a.", ".a", "a..b", "1.", ".1", "1..2",
 		" ", "a ", " a", "a b", "1 ", " 1", "1 2",
-		"A.a", "aB.a", "ab.A", "A1.a", "a1.A",
-		"A.1", "aB.1", "A1.1", "1A.1",
-		"0.A", "01.A", "012.A", "1A.a", "1a.A",
-		"A.B.C.D.E", "AA.BB.CC.DD.EE", "a.B.c.d.e", "aa.bB.cc.dd.ee",
 		"a@b", "a,b", "a_b", "a;b",
 		"a:b", "a%b", "a?b", "a$b",
 		strings.Repeat("a", 254),
@@ -99,7 +95,7 @@ func TestIsDNS1035Label(t *testing.T) {
 
 	badValues := []string{
 		"0", "01", "012", "1a", "1-a", "1--a--b--2",
-		"", "A", "ABC", "aBc", "A1", "A-1", "1-A",
+		"", "1-A",
 		"-", "a-", "-a", "1-", "-1",
 		"_", "a_", "_a", "a_b", "1_", "_1", "1_2",
 		".", "a.", ".a", "a.b", "1.", ".1", "1.2",
@@ -233,7 +229,6 @@ func TestIsQualifiedName(t *testing.T) {
 		"cantendwithadash-",
 		"-cantstartwithadash-",
 		"only/one/slash",
-		"Example.com/abc",
 		"example_com/abc",
 		"example.com/",
 		"/simple",
