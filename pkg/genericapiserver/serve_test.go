@@ -465,7 +465,7 @@ NextTest:
 		etcdserver, config, _ := setUp(t)
 		defer etcdserver.Terminate(t)
 
-		v := version.Get()
+		v := fakeVersion()
 		config.Version = &v
 
 		config.EnableIndex = true
