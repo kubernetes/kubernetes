@@ -135,13 +135,13 @@ type Unmounter interface {
 }
 
 // Recycler provides methods to reclaim the volume resource.
-type Recycler interface {
-	Volume
-	// Recycle reclaims the resource. Calls to this method should block until
-	// the recycling task is complete. Any error returned indicates the volume
-	// has failed to be reclaimed. A nil return indicates success.
-	Recycle() error
-}
+//type Recycler interface {
+//	Volume
+//	// Recycle reclaims the resource. Calls to this method should block until
+//	// the recycling task is complete. Any error returned indicates the volume
+//	// has failed to be reclaimed. A nil return indicates success.
+//	Recycle() error
+//}
 
 // Provisioner is an interface that creates templates for PersistentVolumes
 // and can create the volume as a new resource in the infrastructure provider.
