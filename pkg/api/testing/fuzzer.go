@@ -358,6 +358,7 @@ func FuzzerFor(t *testing.T, version schema.GroupVersion, src rand.Source) *fuzz
 		func(ct *api.Container, c fuzz.Continue) {
 			c.FuzzNoCustom(ct)                                          // fuzz self without calling this function again
 			ct.TerminationMessagePath = "/" + ct.TerminationMessagePath // Must be non-empty
+			ct.TerminationMessagePolicy = "File"
 		},
 		func(p *api.Probe, c fuzz.Continue) {
 			c.FuzzNoCustom(p)
