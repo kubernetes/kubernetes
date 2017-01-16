@@ -7845,6 +7845,19 @@ go_library(
     ],
 )
 
+go_library(
+    name = "k8s.io/apimachinery/pkg/api/validation",
+    srcs = [
+        "k8s.io/apimachinery/pkg/api/validation/doc.go",
+        "k8s.io/apimachinery/pkg/api/validation/generic.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:k8s.io/apimachinery/pkg/util/validation",
+        "//vendor:k8s.io/apimachinery/pkg/util/validation/field",
+    ],
+)
+
 go_test(
     name = "k8s.io/apimachinery/pkg/apimachinery_test",
     srcs = ["k8s.io/apimachinery/pkg/apimachinery/types_test.go"],
@@ -8540,6 +8553,15 @@ go_library(
         "//vendor:github.com/ghodss/yaml",
         "//vendor:github.com/golang/glog",
     ],
+)
+
+go_library(
+    name = "k8s.io/apimachinery/pkg/version",
+    srcs = [
+        "k8s.io/apimachinery/pkg/version/doc.go",
+        "k8s.io/apimachinery/pkg/version/types.go",
+    ],
+    tags = ["automanaged"],
 )
 
 go_library(
@@ -13381,17 +13403,4 @@ filegroup(
     name = "all-srcs",
     srcs = [":package-srcs"],
     tags = ["automanaged"],
-)
-
-go_library(
-    name = "k8s.io/apimachinery/pkg/api/validation",
-    srcs = [
-        "k8s.io/apimachinery/pkg/api/validation/doc.go",
-        "k8s.io/apimachinery/pkg/api/validation/generic.go",
-    ],
-    tags = ["automanaged"],
-    deps = [
-        "//vendor:k8s.io/apimachinery/pkg/util/validation",
-        "//vendor:k8s.io/apimachinery/pkg/util/validation/field",
-    ],
 )

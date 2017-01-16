@@ -35,7 +35,6 @@ import (
 	"k8s.io/kubernetes/pkg/genericapiserver/options"
 	utilcert "k8s.io/kubernetes/pkg/util/cert"
 	"k8s.io/kubernetes/pkg/util/config"
-	"k8s.io/kubernetes/pkg/version"
 )
 
 type TestCertSpec struct {
@@ -465,7 +464,7 @@ NextTest:
 		etcdserver, config, _ := setUp(t)
 		defer etcdserver.Terminate(t)
 
-		v := version.Get()
+		v := fakeVersion()
 		config.Version = &v
 
 		config.EnableIndex = true
