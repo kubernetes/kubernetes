@@ -14,6 +14,7 @@ go_library(
         "defaults.go",
         "doc.go",
         "generated.pb.go",
+        "helpers.go",
         "register.go",
         "types.generated.go",
         "types.go",
