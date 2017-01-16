@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"strings"
 
-	"k8s.io/kubernetes/pkg/api/validation/genericvalidation"
+	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
 )
 
 const (
@@ -50,10 +50,10 @@ func SplitUsername(username string) (string, string, error) {
 		return "", "", invalidUsernameErr
 	}
 	namespace, name := parts[0], parts[1]
-	if len(genericvalidation.ValidateNamespaceName(namespace, false)) != 0 {
+	if len(apimachineryvalidation.ValidateNamespaceName(namespace, false)) != 0 {
 		return "", "", invalidUsernameErr
 	}
-	if len(genericvalidation.ValidateServiceAccountName(name, false)) != 0 {
+	if len(apimachineryvalidation.ValidateServiceAccountName(name, false)) != 0 {
 		return "", "", invalidUsernameErr
 	}
 	return namespace, name, nil
