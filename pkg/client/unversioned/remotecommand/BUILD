@@ -23,7 +23,6 @@ go_library(
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/client/restclient:go_default_library",
-        "//pkg/client/transport:go_default_library",
         "//pkg/kubelet/server/remotecommand:go_default_library",
         "//pkg/util/exec:go_default_library",
         "//pkg/util/httpstream:go_default_library",
@@ -32,6 +31,7 @@ go_library(
         "//vendor:github.com/golang/glog",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/util/runtime",
+        "//vendor:k8s.io/client-go/transport",
     ],
 )
 
