@@ -68,8 +68,9 @@ func validNewPod() *api.Pod {
 					Image:           "test",
 					ImagePullPolicy: api.PullAlways,
 
-					TerminationMessagePath: api.TerminationMessagePathDefault,
-					SecurityContext:        securitycontext.ValidInternalSecurityContextWithContainerDefaults(),
+					TerminationMessagePath:   api.TerminationMessagePathDefault,
+					TerminationMessagePolicy: api.TerminationMessageReadFile,
+					SecurityContext:          securitycontext.ValidInternalSecurityContextWithContainerDefaults(),
 				},
 			},
 			SecurityContext: &api.PodSecurityContext{},
@@ -678,11 +679,12 @@ func TestEtcdUpdateScheduled(t *testing.T) {
 		Spec: api.PodSpec{
 			NodeName: "machine",
 			Containers: []api.Container{{
-				Name:                   "foobar",
-				Image:                  "foo:v2",
-				ImagePullPolicy:        api.PullIfNotPresent,
-				TerminationMessagePath: api.TerminationMessagePathDefault,
-				SecurityContext:        securitycontext.ValidInternalSecurityContextWithContainerDefaults(),
+				Name:                     "foobar",
+				Image:                    "foo:v2",
+				ImagePullPolicy:          api.PullIfNotPresent,
+				TerminationMessagePath:   api.TerminationMessagePathDefault,
+				TerminationMessagePolicy: api.TerminationMessageReadFile,
+				SecurityContext:          securitycontext.ValidInternalSecurityContextWithContainerDefaults(),
 			}},
 			RestartPolicy: api.RestartPolicyAlways,
 			DNSPolicy:     api.DNSClusterFirst,
@@ -772,6 +774,7 @@ func TestEtcdUpdateStatus(t *testing.T) {
 	expected.Spec.DNSPolicy = api.DNSClusterFirst
 	expected.Spec.Containers[0].ImagePullPolicy = api.PullIfNotPresent
 	expected.Spec.Containers[0].TerminationMessagePath = api.TerminationMessagePathDefault
+	expected.Spec.Containers[0].TerminationMessagePolicy = api.TerminationMessageReadFile
 	expected.Labels = podIn.Labels
 	expected.Status = podIn.Status
 
