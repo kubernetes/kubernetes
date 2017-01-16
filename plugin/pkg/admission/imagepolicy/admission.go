@@ -32,13 +32,13 @@ import (
 	kubeschema "k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/apiserver/pkg/util/cache"
+	"k8s.io/apiserver/pkg/webhook"
 	apierrors "k8s.io/client-go/pkg/api/errors"
 	"k8s.io/client-go/pkg/apis/imagepolicy/v1alpha1"
 	"k8s.io/client-go/rest"
 
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/plugin/pkg/webhook"
 
 	// install the clientgo image policy API for use with api registry
 	_ "k8s.io/client-go/pkg/apis/imagepolicy/install"

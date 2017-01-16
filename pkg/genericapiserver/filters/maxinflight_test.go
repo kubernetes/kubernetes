@@ -25,9 +25,9 @@ import (
 	"testing"
 
 	"k8s.io/apimachinery/pkg/util/sets"
+	apirequest "k8s.io/apiserver/pkg/request"
 	"k8s.io/kubernetes/pkg/api/errors"
 	apifilters "k8s.io/kubernetes/pkg/genericapiserver/api/filters"
-	apirequest "k8s.io/kubernetes/pkg/genericapiserver/api/request"
 )
 
 func createMaxInflightServer(callsWg, blockWg *sync.WaitGroup, disableCallsWg *bool, disableCallsWgMutex *sync.Mutex, nonMutating, mutating int) *httptest.Server {

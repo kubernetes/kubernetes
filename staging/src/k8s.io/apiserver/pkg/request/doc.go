@@ -14,5 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package negotation contains media type negotiation logic.
-package negotiation // import "k8s.io/kubernetes/pkg/genericapiserver/api/handlers/negotiation"
+// Package request contains everything around extracting info from
+// a http request object.
+// TODO: this package is temporary. Handlers must move into pkg/apiserver/handlers to avoid dependency cycle
+package request // import "k8s.io/apiserver/pkg/request"
