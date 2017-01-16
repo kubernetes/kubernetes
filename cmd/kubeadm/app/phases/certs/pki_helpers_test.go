@@ -105,7 +105,7 @@ func TestNewClientKeyAndCert(t *testing.T) {
 			t.Fatalf("Couldn't create rsa Private Key")
 		}
 		caCert := &x509.Certificate{}
-		_, _, actual := NewClientKeyAndCert(caCert, caKey)
+		_, _, actual := NewClientKeyAndCert(caCert, caKey, "test", []string{"test"})
 		if (actual == nil) != rt.expected {
 			t.Errorf(
 				"failed NewClientKeyAndCert:\n\texpected: %t\n\t  actual: %t",

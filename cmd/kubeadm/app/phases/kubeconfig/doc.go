@@ -28,6 +28,6 @@ package kubeconfig
 
 	OUTPUTS:
 		Files to KubernetesDir (default /etc/kubernetes):
-		 - admin.conf
+		 - kube-admin.conf
 		 - kubelet.conf
 */

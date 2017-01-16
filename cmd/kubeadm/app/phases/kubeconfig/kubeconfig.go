@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"strings"
 
 	certphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
@@ -32,7 +33,7 @@ import (
 
 const (
 	KubernetesDirPermissions  = 0700
-	AdminKubeConfigFileName   = "admin.conf"
+	AdminKubeConfigFileName   = "kube-admin.conf"
 	KubeletKubeConfigFileName = "kubelet.conf"
 )
 
@@ -68,20 +69,21 @@ func CreateAdminAndKubeletKubeConfig(masterEndpoint, pkiDir, outDir string) erro
 	}
 
 	// User admin should have full access to the cluster
-	if err := createKubeConfigFileForClient(masterEndpoint, "admin", outDir, caCert, caKey); err != nil {
-		return fmt.Errorf("couldn't create a kubeconfig file for admin: %v", err)
+	if err := createKubeConfigFileForClient(masterEndpoint, AdminKubeConfigFileName, []string{"system:masters"}, outDir, caCert, caKey); err != nil {
+		return fmt.Errorf("couldn't create %s: %v", AdminKubeConfigFileName, err)
 	}
 
-	// TODO: The kubelet should have limited access to the cluster
-	if err := createKubeConfigFileForClient(masterEndpoint, "kubelet", outDir, caCert, caKey); err != nil {
-		return fmt.Errorf("couldn't create a kubeconfig file for kubelet: %v", err)
+	// The kubelet should have limited access to the cluster
+	if err := createKubeConfigFileForClient(masterEndpoint, KubeletKubeConfigFileName, []string{"system:nodes"}, outDir, caCert, caKey); err != nil {
+		return fmt.Errorf("couldn't create %s: %v", KubeletKubeConfigFileName, err)
 	}
 
 	return nil
 }
 
-func createKubeConfigFileForClient(masterEndpoint, client, outDir string, caCert *x509.Certificate, caKey *rsa.PrivateKey) error {
-	key, cert, err := certphase.NewClientKeyAndCert(caCert, caKey)
+func createKubeConfigFileForClient(masterEndpoint, kubeConfigFileName string, organization []string, outDir string, caCert *x509.Certificate, caKey *rsa.PrivateKey) error {
+	client := strings.Split(kubeConfigFileName, ".")[0]
+	key, cert, err := certphase.NewClientKeyAndCert(caCert, caKey, client, organization)
 	if err != nil {
 		return fmt.Errorf("failure while creating %s client certificate [%v]", client, err)
 	}
@@ -96,7 +98,7 @@ func createKubeConfigFileForClient(masterEndpoint, client, outDir string, caCert
 	)
 
 	// Write it now to a file
-	filepath := path.Join(outDir, fmt.Sprintf("%s.conf", client))
+	filepath := path.Join(outDir, kubeConfigFileName)
 	return WriteKubeconfigToDisk(filepath, config)
 }
 

@@ -29,6 +29,7 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/images"
 	"k8s.io/kubernetes/pkg/api/resource"
 	api "k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/kubeapiserver/authorizer"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/util/intstr"
 
@@ -40,15 +41,17 @@ const (
 	DefaultClusterName     = "kubernetes"
 	DefaultCloudConfigPath = "/etc/kubernetes/cloud-config"
 
-	etcd                  = "etcd"
-	apiServer             = "apiserver"
-	controllerManager     = "controller-manager"
-	scheduler             = "scheduler"
-	proxy                 = "proxy"
-	kubeAPIServer         = "kube-apiserver"
-	kubeControllerManager = "kube-controller-manager"
-	kubeScheduler         = "kube-scheduler"
-	kubeProxy             = "kube-proxy"
+	etcd                           = "etcd"
+	apiServer                      = "apiserver"
+	controllerManager              = "controller-manager"
+	scheduler                      = "scheduler"
+	proxy                          = "proxy"
+	kubeAPIServer                  = "kube-apiserver"
+	kubeControllerManager          = "kube-controller-manager"
+	kubeScheduler                  = "kube-scheduler"
+	kubeProxy                      = "kube-proxy"
+	authorizationPolicyFile        = "abac_policy.json"
+	authorizationWebhookConfigFile = "webhook_authz.conf"
 )
 
 var (
@@ -295,6 +298,18 @@ func getAPIServerCommand(cfg *kubeadmapi.MasterConfiguration) []string {
 		fmt.Sprintf("--secure-port=%d", cfg.API.Port),
 		"--allow-privileged",
 	)
+
+	if cfg.AuthorizationMode != "" {
+		command = append(command, "--authorization-mode="+cfg.AuthorizationMode)
+		switch cfg.AuthorizationMode {
+		case authorizer.ModeABAC:
+			command = append(command, "--authorization-policy-file="+kubeadmapi.GlobalEnvParams.KubernetesDir+authorizationPolicyFile)
+		case authorizer.ModeRBAC:
+			command = append(command, "--runtime-config=rbac.authorization.k8s.io/v1alpha1")
+		case authorizer.ModeWebhook:
+			command = append(command, "--authorization-webhook-config-file="+kubeadmapi.GlobalEnvParams.KubernetesDir+authorizationWebhookConfigFile)
+		}
+	}
 
 	// Use first address we are given
 	if len(cfg.API.AdvertiseAddresses) > 0 {

@@ -34,7 +34,6 @@ func newCertificateAuthority() (*rsa.PrivateKey, *x509.Certificate, error) {
 	config := certutil.Config{
 		CommonName: "kubernetes",
 	}
-
 	cert, err := certutil.NewSelfSignedCACert(config, key)
 	if err != nil {
 		return nil, nil, fmt.Errorf("unable to create self-signed certificate [%v]", err)
@@ -61,14 +60,15 @@ func newServerKeyAndCert(caCert *x509.Certificate, caKey *rsa.PrivateKey, altNam
 	return key, cert, nil
 }
 
-func NewClientKeyAndCert(caCert *x509.Certificate, caKey *rsa.PrivateKey) (*rsa.PrivateKey, *x509.Certificate, error) {
+func NewClientKeyAndCert(caCert *x509.Certificate, caKey *rsa.PrivateKey, commonName string, organization []string) (*rsa.PrivateKey, *x509.Certificate, error) {
 	key, err := certutil.NewPrivateKey()
 	if err != nil {
 		return nil, nil, fmt.Errorf("unable to create private key [%v]", err)
 	}
 
 	config := certutil.Config{
-		CommonName: "kubernetes-client",
+		CommonName:   commonName,
+		Organization: organization,
 	}
 	cert, err := certutil.NewSignedCert(config, key, caCert, caKey)
 	if err != nil {
