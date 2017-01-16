@@ -55,7 +55,6 @@ import (
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
 	"k8s.io/kubernetes/pkg/fieldpath"
 	"k8s.io/kubernetes/pkg/fields"
-	certutil "k8s.io/kubernetes/pkg/util/cert"
 	"k8s.io/kubernetes/pkg/util/intstr"
 
 	"github.com/golang/glog"
@@ -2025,7 +2024,7 @@ func (p *CertificateSigningRequestDescriber) Describe(namespace, name string, de
 		return "", err
 	}
 
-	cr, err := certutil.ParseCSR(csr)
+	cr, err := certificates.ParseCSR(csr)
 	if err != nil {
 		return "", fmt.Errorf("Error parsing CSR: %v", err)
 	}

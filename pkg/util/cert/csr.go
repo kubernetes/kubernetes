@@ -22,42 +22,8 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
-	"errors"
 	"net"
-
-	"k8s.io/kubernetes/pkg/apis/certificates"
-	"k8s.io/kubernetes/pkg/apis/certificates/v1alpha1"
 )
-
-// ParseCSR extracts the CSR from the API object and decodes it.
-func ParseCSR(obj *certificates.CertificateSigningRequest) (*x509.CertificateRequest, error) {
-	// extract PEM from request object
-	pemBytes := obj.Spec.Request
-	block, _ := pem.Decode(pemBytes)
-	if block == nil || block.Type != "CERTIFICATE REQUEST" {
-		return nil, errors.New("PEM block type must be CERTIFICATE REQUEST")
-	}
-	csr, err := x509.ParseCertificateRequest(block.Bytes)
-	if err != nil {
-		return nil, err
-	}
-	return csr, nil
-}
-
-// ParseCSRV1alpha1 extracts the CSR from the API object and decodes it.
-func ParseCSRV1alpha1(obj *v1alpha1.CertificateSigningRequest) (*x509.CertificateRequest, error) {
-	// extract PEM from request object
-	pemBytes := obj.Spec.Request
-	block, _ := pem.Decode(pemBytes)
-	if block == nil || block.Type != "CERTIFICATE REQUEST" {
-		return nil, errors.New("PEM block type must be CERTIFICATE REQUEST")
-	}
-	csr, err := x509.ParseCertificateRequest(block.Bytes)
-	if err != nil {
-		return nil, err
-	}
-	return csr, nil
-}
 
 // MakeCSR generates a PEM-encoded CSR using the supplied private key, subject, and SANs.
 // All key types that are implemented via crypto.Signer are supported (This includes *rsa.PrivateKey and *ecdsa.PrivateKey.)
