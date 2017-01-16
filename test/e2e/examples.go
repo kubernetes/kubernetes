@@ -75,7 +75,7 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 
 		err := framework.WaitForAuthorizationUpdate(c.Authorization(),
 			serviceaccount.MakeUsername(f.Namespace.Name, "default"),
-			"", "create", schema.GroupResource{Resource: "pods"}, true)
+			f.Namespace.Name, "create", schema.GroupResource{Resource: "pods"}, true)
 		framework.ExpectNoError(err)
 	})
 

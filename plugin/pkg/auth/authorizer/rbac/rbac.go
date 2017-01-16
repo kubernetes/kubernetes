@@ -19,6 +19,7 @@ package rbac
 
 import (
 	"fmt"
+
 	"github.com/golang/glog"
 
 	"k8s.io/apiserver/pkg/authentication/user"
@@ -45,8 +46,29 @@ func (r *RBACAuthorizer) Authorize(requestAttributes authorizer.Attributes) (boo
 		return true, "", nil
 	}
 
-	glog.V(2).Infof("RBAC DENY: user %q groups %v cannot %q on \"%v.%v/%v\"", requestAttributes.GetUser().GetName(), requestAttributes.GetUser().GetGroups(),
-		requestAttributes.GetVerb(), requestAttributes.GetResource(), requestAttributes.GetAPIGroup(), requestAttributes.GetSubresource())
+	// Build a detailed log of the denial.
+	// Make the whole block conditional so we don't do a lot of string-building we won't use.
+	if glog.V(2) {
+		var operation string
+		if requestAttributes.IsResourceRequest() {
+			operation = fmt.Sprintf(
+				"%q on \"%v.%v/%v\"",
+				requestAttributes.GetVerb(),
+				requestAttributes.GetResource(), requestAttributes.GetAPIGroup(), requestAttributes.GetSubresource(),
+			)
+		} else {
+			operation = fmt.Sprintf("%q nonResourceURL %q", requestAttributes.GetVerb(), requestAttributes.GetPath())
+		}
+
+		var scope string
+		if ns := requestAttributes.GetNamespace(); len(ns) > 0 {
+			scope = fmt.Sprintf("in namespace %q", ns)
+		} else {
+			scope = "cluster-wide"
+		}
+
+		glog.Infof("RBAC DENY: user %q groups %v cannot %s %s", requestAttributes.GetUser().GetName(), requestAttributes.GetUser().GetGroups(), operation, scope)
+	}
 
 	reason := ""
 	if ruleResolutionError != nil {
