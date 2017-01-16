@@ -14,7 +14,7 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//vendor:github.com/golang/glog",
-        "//vendor:k8s.io/apimachinery/pkg/genericapiserver/openapi/common",
+        "//vendor:k8s.io/apimachinery/pkg/openapi",
         "//vendor:k8s.io/gengo/args",
         "//vendor:k8s.io/gengo/generator",
         "//vendor:k8s.io/gengo/namer",
