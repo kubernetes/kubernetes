@@ -229,8 +229,8 @@ func DeepCopy_v1alpha1_KubeletConfiguration(in interface{}, out interface{}, c *
 			*out = new(int32)
 			**out = **in
 		}
-		if in.ExperimentalCgroupsPerQOS != nil {
-			in, out := &in.ExperimentalCgroupsPerQOS, &out.ExperimentalCgroupsPerQOS
+		if in.CgroupsPerQOS != nil {
+			in, out := &in.CgroupsPerQOS, &out.CgroupsPerQOS
 			*out = new(bool)
 			**out = **in
 		}
