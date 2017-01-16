@@ -59,7 +59,8 @@ func validNewPodTemplate(name string) *api.PodTemplate {
 						Image:           "test",
 						ImagePullPolicy: api.PullAlways,
 
-						TerminationMessagePath: api.TerminationMessagePathDefault,
+						TerminationMessagePath:   api.TerminationMessagePathDefault,
+						TerminationMessagePolicy: api.TerminationMessageReadFile,
 					},
 				},
 			},
