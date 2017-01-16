@@ -9025,12 +9025,12 @@ go_library(
     srcs = ["k8s.io/apiserver/pkg/webhook/webhook.go"],
     tags = ["automanaged"],
     deps = [
+        "//vendor:k8s.io/apimachinery/pkg/api/errors",
         "//vendor:k8s.io/apimachinery/pkg/runtime",
         "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
         "//vendor:k8s.io/apimachinery/pkg/runtime/serializer",
         "//vendor:k8s.io/apimachinery/pkg/util/wait",
         "//vendor:k8s.io/client-go/pkg/api",
-        "//vendor:k8s.io/client-go/pkg/api/errors",
         "//vendor:k8s.io/client-go/pkg/apis/authorization/install",
         "//vendor:k8s.io/client-go/rest",
         "//vendor:k8s.io/client-go/tools/clientcmd",
@@ -10131,19 +10131,6 @@ go_library(
 )
 
 go_library(
-    name = "k8s.io/client-go/_vendor/k8s.io/apimachinery/pkg/genericapiserver/openapi/common",
-    srcs = [
-        "k8s.io/client-go/_vendor/k8s.io/apimachinery/pkg/genericapiserver/openapi/common/common.go",
-        "k8s.io/client-go/_vendor/k8s.io/apimachinery/pkg/genericapiserver/openapi/common/doc.go",
-    ],
-    tags = ["automanaged"],
-    deps = [
-        "//vendor:github.com/emicklei/go-restful",
-        "//vendor:github.com/go-openapi/spec",
-    ],
-)
-
-go_library(
     name = "k8s.io/client-go/_vendor/k8s.io/apimachinery/pkg/labels",
     srcs = [
         "k8s.io/client-go/_vendor/k8s.io/apimachinery/pkg/labels/doc.go",
@@ -10450,11 +10437,11 @@ go_test(
     deps = [
         "//vendor:github.com/emicklei/go-restful/swagger",
         "//vendor:github.com/stretchr/testify/assert",
+        "//vendor:k8s.io/apimachinery/pkg/api/errors",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
         "//vendor:k8s.io/apimachinery/pkg/util/sets",
         "//vendor:k8s.io/client-go/pkg/api",
-        "//vendor:k8s.io/client-go/pkg/api/errors",
         "//vendor:k8s.io/client-go/pkg/api/v1",
         "//vendor:k8s.io/client-go/pkg/version",
         "//vendor:k8s.io/client-go/rest",
@@ -10474,6 +10461,7 @@ go_library(
     deps = [
         "//vendor:github.com/emicklei/go-restful/swagger",
         "//vendor:github.com/golang/glog",
+        "//vendor:k8s.io/apimachinery/pkg/api/errors",
         "//vendor:k8s.io/apimachinery/pkg/api/meta",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/runtime",
@@ -10481,7 +10469,6 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/runtime/serializer",
         "//vendor:k8s.io/apimachinery/pkg/util/sets",
         "//vendor:k8s.io/client-go/pkg/api",
-        "//vendor:k8s.io/client-go/pkg/api/errors",
         "//vendor:k8s.io/client-go/pkg/api/v1",
         "//vendor:k8s.io/client-go/pkg/version",
         "//vendor:k8s.io/client-go/plugin/pkg/client/auth",
@@ -11319,21 +11306,6 @@ go_library(
 )
 
 go_library(
-    name = "k8s.io/client-go/pkg/api/errors",
-    srcs = [
-        "k8s.io/client-go/pkg/api/errors/doc.go",
-        "k8s.io/client-go/pkg/api/errors/errors.go",
-    ],
-    tags = ["automanaged"],
-    deps = [
-        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
-        "//vendor:k8s.io/apimachinery/pkg/runtime",
-        "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
-        "//vendor:k8s.io/apimachinery/pkg/util/validation/field",
-    ],
-)
-
-go_library(
     name = "k8s.io/client-go/pkg/api/install",
     srcs = ["k8s.io/client-go/pkg/api/install/install.go"],
     tags = ["automanaged"],
@@ -11817,6 +11789,7 @@ go_library(
     name = "k8s.io/client-go/pkg/apis/certificates",
     srcs = [
         "k8s.io/client-go/pkg/apis/certificates/doc.go",
+        "k8s.io/client-go/pkg/apis/certificates/helpers.go",
         "k8s.io/client-go/pkg/apis/certificates/register.go",
         "k8s.io/client-go/pkg/apis/certificates/types.go",
         "k8s.io/client-go/pkg/apis/certificates/zz_generated.deepcopy.go",
@@ -11850,6 +11823,7 @@ go_library(
         "k8s.io/client-go/pkg/apis/certificates/v1alpha1/defaults.go",
         "k8s.io/client-go/pkg/apis/certificates/v1alpha1/doc.go",
         "k8s.io/client-go/pkg/apis/certificates/v1alpha1/generated.pb.go",
+        "k8s.io/client-go/pkg/apis/certificates/v1alpha1/helpers.go",
         "k8s.io/client-go/pkg/apis/certificates/v1alpha1/register.go",
         "k8s.io/client-go/pkg/apis/certificates/v1alpha1/types.generated.go",
         "k8s.io/client-go/pkg/apis/certificates/v1alpha1/types.go",
@@ -12480,10 +12454,6 @@ go_library(
         "k8s.io/client-go/pkg/util/cert/pem.go",
     ],
     tags = ["automanaged"],
-    deps = [
-        "//vendor:k8s.io/client-go/pkg/apis/certificates",
-        "//vendor:k8s.io/client-go/pkg/apis/certificates/v1alpha1",
-    ],
 )
 
 go_library(
@@ -12549,10 +12519,10 @@ go_library(
     deps = [
         "//vendor:github.com/docker/spdystream",
         "//vendor:github.com/golang/glog",
+        "//vendor:k8s.io/apimachinery/pkg/api/errors",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/util/runtime",
         "//vendor:k8s.io/client-go/pkg/api",
-        "//vendor:k8s.io/client-go/pkg/api/errors",
         "//vendor:k8s.io/client-go/pkg/third_party/forked/golang/netutil",
         "//vendor:k8s.io/client-go/pkg/util/httpstream",
     ],
@@ -12774,6 +12744,7 @@ go_test(
     tags = ["automanaged"],
     deps = [
         "//vendor:github.com/google/gofuzz",
+        "//vendor:k8s.io/apimachinery/pkg/api/errors",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/labels",
         "//vendor:k8s.io/apimachinery/pkg/runtime",
@@ -12782,7 +12753,6 @@ go_test(
         "//vendor:k8s.io/apimachinery/pkg/util/diff",
         "//vendor:k8s.io/apimachinery/pkg/watch",
         "//vendor:k8s.io/client-go/pkg/api",
-        "//vendor:k8s.io/client-go/pkg/api/errors",
         "//vendor:k8s.io/client-go/pkg/api/testapi",
         "//vendor:k8s.io/client-go/pkg/api/v1",
         "//vendor:k8s.io/client-go/pkg/util/clock",
@@ -12810,6 +12780,7 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//vendor:github.com/golang/glog",
+        "//vendor:k8s.io/apimachinery/pkg/api/errors",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/labels",
         "//vendor:k8s.io/apimachinery/pkg/runtime",
@@ -12819,7 +12790,6 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/util/sets",
         "//vendor:k8s.io/apimachinery/pkg/watch",
         "//vendor:k8s.io/client-go/pkg/api",
-        "//vendor:k8s.io/client-go/pkg/api/errors",
         "//vendor:k8s.io/client-go/pkg/api/v1",
         "//vendor:k8s.io/client-go/pkg/api/validation/path",
         "//vendor:k8s.io/client-go/pkg/fields",
@@ -12890,6 +12860,7 @@ go_library(
     ],
     tags = ["automanaged"],
     deps = [
+        "//vendor:k8s.io/apimachinery/pkg/api/errors",
         "//vendor:k8s.io/apimachinery/pkg/api/meta",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/labels",
@@ -12897,7 +12868,6 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
         "//vendor:k8s.io/apimachinery/pkg/watch",
         "//vendor:k8s.io/client-go/pkg/api",
-        "//vendor:k8s.io/client-go/pkg/api/errors",
         "//vendor:k8s.io/client-go/pkg/api/v1",
         "//vendor:k8s.io/client-go/pkg/fields",
         "//vendor:k8s.io/client-go/pkg/version",
@@ -12938,6 +12908,7 @@ go_test(
     tags = ["automanaged"],
     deps = [
         "//vendor:github.com/google/gofuzz",
+        "//vendor:k8s.io/apimachinery/pkg/api/errors",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/labels",
         "//vendor:k8s.io/apimachinery/pkg/runtime",
@@ -12945,7 +12916,6 @@ go_test(
         "//vendor:k8s.io/apimachinery/pkg/util/wait",
         "//vendor:k8s.io/apimachinery/pkg/watch",
         "//vendor:k8s.io/client-go/pkg/api",
-        "//vendor:k8s.io/client-go/pkg/api/errors",
         "//vendor:k8s.io/client-go/pkg/api/v1",
         "//vendor:k8s.io/client-go/pkg/apis/extensions/v1beta1",
         "//vendor:k8s.io/client-go/pkg/util/clock",
@@ -12979,6 +12949,7 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//vendor:github.com/golang/glog",
+        "//vendor:k8s.io/apimachinery/pkg/api/errors",
         "//vendor:k8s.io/apimachinery/pkg/api/meta",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/labels",
@@ -12990,7 +12961,6 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/util/wait",
         "//vendor:k8s.io/apimachinery/pkg/watch",
         "//vendor:k8s.io/client-go/pkg/api",
-        "//vendor:k8s.io/client-go/pkg/api/errors",
         "//vendor:k8s.io/client-go/pkg/api/v1",
         "//vendor:k8s.io/client-go/pkg/apis/apps/v1beta1",
         "//vendor:k8s.io/client-go/pkg/apis/certificates/v1alpha1",
@@ -13170,10 +13140,10 @@ go_test(
     library = ":k8s.io/client-go/tools/record",
     tags = ["automanaged"],
     deps = [
+        "//vendor:k8s.io/apimachinery/pkg/api/errors",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/runtime",
         "//vendor:k8s.io/apimachinery/pkg/util/diff",
-        "//vendor:k8s.io/client-go/pkg/api/errors",
         "//vendor:k8s.io/client-go/pkg/api/install",
         "//vendor:k8s.io/client-go/pkg/api/v1",
         "//vendor:k8s.io/client-go/pkg/util/clock",
@@ -13194,12 +13164,12 @@ go_library(
     deps = [
         "//vendor:github.com/golang/glog",
         "//vendor:github.com/golang/groupcache/lru",
+        "//vendor:k8s.io/apimachinery/pkg/api/errors",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/runtime",
         "//vendor:k8s.io/apimachinery/pkg/util/runtime",
         "//vendor:k8s.io/apimachinery/pkg/util/sets",
         "//vendor:k8s.io/apimachinery/pkg/watch",
-        "//vendor:k8s.io/client-go/pkg/api/errors",
         "//vendor:k8s.io/client-go/pkg/api/v1",
         "//vendor:k8s.io/client-go/pkg/util/clock",
         "//vendor:k8s.io/client-go/pkg/util/strategicpatch",
@@ -13404,4 +13374,32 @@ filegroup(
     name = "all-srcs",
     srcs = [":package-srcs"],
     tags = ["automanaged"],
+)
+
+go_library(
+    name = "k8s.io/client-go/_vendor/k8s.io/apimachinery/pkg/api/errors",
+    srcs = [
+        "k8s.io/client-go/_vendor/k8s.io/apimachinery/pkg/api/errors/doc.go",
+        "k8s.io/client-go/_vendor/k8s.io/apimachinery/pkg/api/errors/errors.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor:k8s.io/apimachinery/pkg/runtime",
+        "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
+        "//vendor:k8s.io/apimachinery/pkg/util/validation/field",
+    ],
+)
+
+go_library(
+    name = "k8s.io/client-go/_vendor/k8s.io/apimachinery/pkg/openapi",
+    srcs = [
+        "k8s.io/client-go/_vendor/k8s.io/apimachinery/pkg/openapi/common.go",
+        "k8s.io/client-go/_vendor/k8s.io/apimachinery/pkg/openapi/doc.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/emicklei/go-restful",
+        "//vendor:github.com/go-openapi/spec",
+    ],
 )
