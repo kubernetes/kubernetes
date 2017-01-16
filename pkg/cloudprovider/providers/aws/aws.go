@@ -388,6 +388,11 @@ type CloudConfig struct {
 		// Maybe if we're not running on AWS, e.g. bootstrap; for now it is not very useful
 		Zone string
 
+		// The AWS VPC flag enables the possibility to run the master components
+		// on a different aws account, on a different cloud provider or on-premise.
+		// If the flag is set also the KubernetesClusterTag must be provided
+		VPC string
+
 		// KubernetesClusterTag is the legacy cluster id we'll use to identify our cluster resources
 		KubernetesClusterTag string
 		// KubernetesClusterTag is the cluster id we'll use to identify our cluster resources
@@ -812,13 +817,24 @@ func newAWSCloud(config io.Reader, awsServices Services) (*Cloud, error) {
 		deviceAllocators: make(map[types.NodeName]DeviceAllocator),
 	}
 
-	selfAWSInstance, err := awsCloud.buildSelfAWSInstance()
-	if err != nil {
-		return nil, err
-	}
+	if cfg.Global.VPC != "" && cfg.Global.KubernetesClusterTag != "" {
+		// When the master is running on a different AWS account, cloud provider or on-premise
+		// build up a dummy instance and use the VPC from the nodes account
+		glog.Info("Master is configured to run on a AWS account, different cloud provider or on-premise")
+		awsCloud.selfAWSInstance = &awsInstance{
+			nodeName: "master-dummy",
+			vpcID:    cfg.Global.VPC,
+		}
+		awsCloud.vpcID = cfg.Global.VPC
+	} else {
+		selfAWSInstance, err := awsCloud.buildSelfAWSInstance()
+		if err != nil {
+			return nil, err
+		}
+		awsCloud.selfAWSInstance = selfAWSInstance
+		awsCloud.vpcID = selfAWSInstance.vpcID
 
-	awsCloud.selfAWSInstance = selfAWSInstance
-	awsCloud.vpcID = selfAWSInstance.vpcID
+	}
 
 	if cfg.Global.KubernetesClusterTag != "" || cfg.Global.KubernetesClusterID != "" {
 		if err := awsCloud.tagging.init(cfg.Global.KubernetesClusterTag, cfg.Global.KubernetesClusterID); err != nil {
@@ -826,7 +842,7 @@ func newAWSCloud(config io.Reader, awsServices Services) (*Cloud, error) {
 		}
 	} else {
 		// TODO: Clean up double-API query
-		info, err := selfAWSInstance.describeInstance()
+		info, err := awsCloud.selfAWSInstance.describeInstance()
 		if err != nil {
 			return nil, err
 		}
