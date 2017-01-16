@@ -13,7 +13,6 @@ go_library(
     srcs = [
         "config.go",
         "config_selfclient.go",
-        "default_storage_factory_builder.go",
         "discovery.go",
         "doc.go",
         "genericapiserver.go",
@@ -42,7 +41,6 @@ go_library(
         "//pkg/genericapiserver/routes:go_default_library",
         "//pkg/storage/storagebackend:go_default_library",
         "//pkg/util/cert:go_default_library",
-        "//pkg/util/config:go_default_library",
         "//pkg/version:go_default_library",
         "//vendor:github.com/coreos/go-systemd/daemon",
         "//vendor:github.com/emicklei/go-restful",
@@ -75,7 +73,6 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = [
-        "default_storage_factory_builder_test.go",
         "genericapiserver_test.go",
         "resource_config_test.go",
         "serve_test.go",
@@ -91,7 +88,6 @@ go_test(
         "//pkg/api/v1:go_default_library",
         "//pkg/apis/autoscaling:go_default_library",
         "//pkg/apis/extensions:go_default_library",
-        "//pkg/apis/extensions/v1beta1:go_default_library",
         "//pkg/client/clientset_generated/clientset:go_default_library",
         "//pkg/generated/openapi:go_default_library",
         "//pkg/genericapiserver/options:go_default_library",
