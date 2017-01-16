@@ -68,6 +68,10 @@ type ResourceRecordChangeset interface {
 	// Remove adds the removal of a ResourceRecordSet in the Zone to the changeset
 	// The supplied ResourceRecordSet must match one of the existing recordsets (obtained via List()) exactly.
 	Remove(ResourceRecordSet) ResourceRecordChangeset
+	// Upsert adds an "create or update" operation for the ResourceRecordSet in the Zone to the changeset
+	// Note: the implementation may translate this into a Remove followed by an Add operation.
+	// If you have the pre-image, it will likely be more efficient to call Remove and Add.
+	Upsert(ResourceRecordSet) ResourceRecordChangeset
 	// Apply applies the accumulated operations to the Zone.
 	Apply() error
 	// IsEmpty returns true if there are no accumulated operations.
