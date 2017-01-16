@@ -35,11 +35,18 @@ import (
 )
 
 const (
-	TokenIDBytes            = 3
-	TokenSecretBytes        = 8
+	TokenIDBytes               = 3
+	TokenSecretBytes           = 8
 	BootstrapTokenSecretPrefix = "bootstrap-token-"
 	DefaultTokenDuration       = time.Duration(8) * time.Hour
 	tokenCreateRetries         = 5
+)
+
+var (
+	tokenIDRegexpString = "^([a-z0-9]{6})$"
+	tokenIDRegexp       = regexp.MustCompile(tokenIDRegexpString)
+	tokenRegexpString   = "^([a-z0-9]{6})\\:([a-z0-9]{16})$"
+	tokenRegexp         = regexp.MustCompile(tokenRegexpString)
 )
 
 func randBytes(length int) (string, error) {
@@ -69,13 +76,6 @@ func GenerateToken(d *kubeadmapi.TokenDiscovery) error {
 	d.Secret = token
 	return nil
 }
-
-var (
-	tokenIDRegexpString = "^([a-z0-9]{6})$"
-	tokenIDRegexp       = regexp.MustCompile(tokenIDRegexpString)
-	tokenRegexpString   = "^([a-z0-9]{6})\\:([a-zA-Z0-9]{16})$"
-	tokenRegexp         = regexp.MustCompile(tokenRegexpString)
-)
 
 // ParseTokenID tries and parse a valid token ID from a string.
 // An error is returned in case of failure.
