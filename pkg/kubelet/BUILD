@@ -136,6 +136,7 @@ go_test(
         "kubelet_network_test.go",
         "kubelet_node_status_test.go",
         "kubelet_pods_test.go",
+        "kubelet_pods_test_windows.go",
         "kubelet_resources_test.go",
         "kubelet_test.go",
         "kubelet_volumes_test.go",
