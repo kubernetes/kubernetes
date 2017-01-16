@@ -24,9 +24,9 @@ import (
 	"sync"
 	"testing"
 
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	apirequest "k8s.io/apiserver/pkg/request"
-	"k8s.io/kubernetes/pkg/api/errors"
 	apifilters "k8s.io/kubernetes/pkg/genericapiserver/api/filters"
 )
 

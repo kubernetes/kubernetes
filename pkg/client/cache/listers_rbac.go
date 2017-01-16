@@ -17,8 +17,8 @@ limitations under the License.
 package cache
 
 import (
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/kubernetes/pkg/api/errors"
 	rbac "k8s.io/kubernetes/pkg/apis/rbac"
 )
 
