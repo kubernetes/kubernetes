@@ -1765,51 +1765,43 @@ func (d *ServiceAccountDescriber) Describe(namespace, name string, describerSett
 	}
 
 	tokens := []api.Secret{}
-	existingTokens := sets.NewString()
 
-	tokenSelector := fields.SelectorFromSet(map[string]string{api.SecretTypeField: string(api.SecretTypeServiceAccountToken)})
-	options := api.ListOptions{FieldSelector: tokenSelector}
-	secrets, err := d.Core().Secrets(namespace).List(options)
+	// remainingSecrets is the set of all secrets remaining on a
+	// service account that are not present in the "tokens" slice.
+	remainingSecrets := sets.NewString()
+	missingSecrets := sets.NewString()
+
+	secrets, err := d.Core().Secrets(namespace).List(api.ListOptions{})
 	if err == nil {
 		for _, s := range secrets.Items {
-			name, _ := s.Annotations[api.ServiceAccountNameKey]
-			uid, _ := s.Annotations[api.ServiceAccountUIDKey]
-			if name == serviceAccount.Name && uid == string(serviceAccount.UID) {
-				tokens = append(tokens, s)
-				existingTokens.Insert(s.Name)
+			if s.Type == api.SecretTypeServiceAccountToken {
+				name, _ := s.Annotations[api.ServiceAccountNameKey]
+				uid, _ := s.Annotations[api.ServiceAccountUIDKey]
+				if name == serviceAccount.Name && uid == string(serviceAccount.UID) {
+					tokens = append(tokens, s)
+				}
+			}
+			remainingSecrets.Insert(s.Name)
+		}
+
+		// missingSecrets is the set of all secrets present in the
+		// serviceAccount, but not present in the set of remainingSecrets.
+		for _, s := range serviceAccount.Secrets {
+			if !remainingSecrets.Has(s.Name) {
+				missingSecrets.Insert(s.Name)
+			}
+		}
+		for _, s := range serviceAccount.ImagePullSecrets {
+			if !remainingSecrets.Has(s.Name) {
+				missingSecrets.Insert(s.Name)
 			}
 		}
 	}
 
-	// remainingSecrets is the set of all secrets remaining on a
-	// service account that are not present in the "tokens" slice
-	remainingSecrets := sets.NewString()
-	for _, s := range serviceAccount.Secrets {
-		if !existingTokens.Has(s.Name) {
-			remainingSecrets.Insert(s.Name)
-		}
-	}
-
-	for _, s := range serviceAccount.ImagePullSecrets {
-		if !existingTokens.Has(s.Name) {
-			remainingSecrets.Insert(s.Name)
-		}
-	}
-
-	existingSecretsList, err := d.Core().Secrets(namespace).List(api.ListOptions{})
-	if err != nil {
-		return describeServiceAccount(serviceAccount, tokens, remainingSecrets, nil)
-	}
-
-	existingSecrets := sets.NewString()
-	for _, s := range existingSecretsList.Items {
-		existingSecrets.Insert(s.Name)
-	}
-
-	return describeServiceAccount(serviceAccount, tokens, remainingSecrets, existingSecrets)
+	return describeServiceAccount(serviceAccount, tokens, missingSecrets)
 }
 
-func describeServiceAccount(serviceAccount *api.ServiceAccount, tokens []api.Secret, saPullSecrets sets.String, existingPullSecrets sets.String) (string, error) {
+func describeServiceAccount(serviceAccount *api.ServiceAccount, tokens []api.Secret, missingSecrets sets.String) (string, error) {
 	return tabbedString(func(out io.Writer) error {
 		w := &PrefixWriter{out}
 		w.Write(LEVEL_0, "Name:\t%s\n", serviceAccount.Name)
@@ -1828,17 +1820,19 @@ func describeServiceAccount(serviceAccount *api.ServiceAccount, tokens []api.Sec
 			tokenSecretNames = []string{}
 		)
 
-		for _, sName := range saPullSecrets.List() {
-			if existingPullSecrets != nil && !existingPullSecrets.Has(sName) {
-				notFound := fmt.Sprintf("%s (not found)", sName)
-				pullSecretNames = append(pullSecretNames, notFound)
-				continue
+		for _, s := range serviceAccount.ImagePullSecrets {
+			sName := s.Name
+			if missingSecrets.Has(s.Name) {
+				sName = fmt.Sprintf("%s (not found)", sName)
 			}
 			pullSecretNames = append(pullSecretNames, sName)
-
 		}
 		for _, s := range serviceAccount.Secrets {
-			mountSecretNames = append(mountSecretNames, s.Name)
+			sName := s.Name
+			if missingSecrets.Has(s.Name) {
+				sName = fmt.Sprintf("%s (not found)", sName)
+			}
+			mountSecretNames = append(mountSecretNames, sName)
 		}
 		for _, s := range tokens {
 			tokenSecretNames = append(tokenSecretNames, s.Name)
