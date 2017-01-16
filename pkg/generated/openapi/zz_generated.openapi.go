@@ -22,6 +22,7 @@ package openapi
 
 import (
 	spec "github.com/go-openapi/spec"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	openapi "k8s.io/apimachinery/pkg/openapi"
 	resource "k8s.io/kubernetes/pkg/api/resource"
 	intstr "k8s.io/kubernetes/pkg/util/intstr"
@@ -8280,24 +8281,7 @@ var OpenAPIDefinitions *openapi.OpenAPIDefinitions = &openapi.OpenAPIDefinitions
 		},
 		Dependencies: []string{},
 	},
-	"v1.Time": {
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "Time is a wrapper around time.Time which supports correct marshaling to YAML and JSON.  Wrappers are provided for many of the factory methods that the time package offers.",
-				Properties: map[string]spec.Schema{
-					"Time": {
-						SchemaProps: spec.SchemaProps{
-							Type:   []string{"string"},
-							Format: "date-time",
-						},
-					},
-				},
-				Required: []string{"Time"},
-			},
-		},
-		Dependencies: []string{},
-	},
-	"v1.Timestamp": {
+	"v1.Time": v1.Time{}.OpenAPIDefinition(), "v1.Timestamp": {
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
 				Description: "Timestamp is a struct that is equivalent to Time, but intended for protobuf marshalling/unmarshalling. It is generated into a serialization that matches Time. Do not use in Go structs.",
