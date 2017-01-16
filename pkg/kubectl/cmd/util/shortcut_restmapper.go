@@ -37,7 +37,7 @@ type ShortcutExpander struct {
 var _ meta.RESTMapper = &ShortcutExpander{}
 
 func NewShortcutExpander(delegate meta.RESTMapper, client discovery.DiscoveryInterface) ShortcutExpander {
-	return ShortcutExpander{All: userResources, RESTMapper: delegate, discoveryClient: client}
+	return ShortcutExpander{All: UserResources, RESTMapper: delegate, discoveryClient: client}
 }
 
 func (e ShortcutExpander) getAll() []schema.GroupResource {
@@ -98,9 +98,11 @@ func (e ShortcutExpander) RESTMappings(gk schema.GroupKind, versions ...string) 
 	return e.RESTMapper.RESTMappings(gk, versions...)
 }
 
-// userResources are the resource names that apply to the primary, user facing resources used by
+// UserResources are the resource names that apply to the primary, user facing resources used by
 // client tools. They are in deletion-first order - dependent resources should be last.
-var userResources = []schema.GroupResource{
+// Should remain exported in order to expose a current list of resources to downstream
+// composition that wants to build on the concept of 'all' for their CLIs.
+var UserResources = []schema.GroupResource{
 	{Group: "", Resource: "pods"},
 	{Group: "", Resource: "replicationcontrollers"},
 	{Group: "", Resource: "services"},
@@ -116,7 +118,7 @@ func (e ShortcutExpander) AliasesForResource(resource string) ([]string, bool) {
 	if strings.ToLower(resource) == "all" {
 		var resources []schema.GroupResource
 		if resources = e.getAll(); len(resources) == 0 {
-			resources = userResources
+			resources = UserResources
 		}
 		aliases := []string{}
 		for _, r := range resources {
