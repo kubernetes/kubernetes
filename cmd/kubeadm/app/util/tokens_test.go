@@ -22,17 +22,29 @@ import (
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 )
 
-func TestTokenParseErrors(t *testing.T) {
+func TestTokenParse(t *testing.T) {
 	invalidTokens := []string{
 		"1234567890123456789012",
 		"12345.1234567890123456",
 		".1234567890123456",
 		"123456.1234567890.123456",
+		"Abcdef.1234567890123456",
 	}
 
 	for _, token := range invalidTokens {
 		if _, _, err := ParseToken(token); err == nil {
-			t.Errorf("generateTokenIfNeeded did not return an error for this invalid token: [%s]", token)
+			t.Errorf("ParseToken did not return an error for this invalid token: [%s]", token)
+		}
+	}
+
+	validTokens := []string{
+		"abcdef.1234567890123456",
+		"123456.AABBCCDDEEFFGGHH",
+	}
+
+	for _, token := range validTokens {
+		if _, _, err := ParseToken(token); err != nil {
+			t.Errorf("ParseToken returned an error for this valid token: [%s]", token)
 		}
 	}
 }
@@ -40,12 +52,43 @@ func TestTokenParseErrors(t *testing.T) {
 func TestGenerateToken(t *testing.T) {
 	var cfg kubeadmapi.TokenDiscovery
 
-	GenerateToken(&cfg)
-	if len(cfg.ID) != 6 {
-		t.Errorf("failed GenerateToken first part length:\n\texpected: 6\n\t  actual: %d", len(cfg.ID))
+func TestValidateToken(t *testing.T) {
+	invalidTokens := []*kubeadmapi.TokenDiscovery{
+		{ID: "", Secret: ""},
+		{ID: "1234567890123456789012", Secret: ""},
+		{ID: "", Secret: "1234567890123456789012"},
+		{ID: "12345", Secret: "1234567890123456"},
+		{ID: "Abcdef", Secret: "1234567890123456"},
 	}
-	if len(cfg.Secret) != 16 {
-		t.Errorf("failed GenerateToken second part length:\n\texpected: 16\n\t  actual: %d", len(cfg.Secret))
+
+	for _, token := range invalidTokens {
+		if valid, err := ValidateToken(token); valid == true || err == nil {
+			t.Errorf("ValidateToken did not return an error for this invalid token: [%s]", token)
+		}
+	}
+
+	validTokens := []*kubeadmapi.TokenDiscovery{
+		{ID: "abcdef", Secret: "1234567890123456"},
+		{ID: "123456", Secret: "AABBCCDDEEFFGGHH"},
+	}
+
+	for _, token := range validTokens {
+		if valid, err := ValidateToken(token); valid == false || err != nil {
+			t.Errorf("ValidateToken failed for a valid token [%s], valid: %t, err: %+v", token, valid, err)
+		}
+	}
+}
+
+func TestGenerateToken(t *testing.T) {
+	td := &kubeadmapi.TokenDiscovery{}
+	if err := GenerateToken(td); err != nil {
+		t.Fatalf("GenerateToken returned an unexpected error: %+v", err)
+	}
+	if len(td.ID) != 6 {
+		t.Errorf("failed GenerateToken first part length:\n\texpected: 6\n\t  actual: %d", len(td.ID))
+	}
+	if len(td.Secret) != 16 {
+		t.Errorf("failed GenerateToken second part length:\n\texpected: 16\n\t  actual: %d", len(td.Secret))
 	}
 }
 

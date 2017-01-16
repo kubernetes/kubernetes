@@ -35,8 +35,12 @@ import (
 )
 
 const (
-	TokenIDBytes               = 3
-	TokenBytes                 = 8
+	TokenIDBytes            = 3
+	TokenSecretBytes        = 8
+	TokenIDExpectedSize     = 6
+	TokenSecretExpectedSize = 16
+	// TokenExpectedSize equals needed token ID length + token separator length + token secret length in bytes.
+	TokenExpectedSize          = TokenIDExpectedSize + 1 + TokenSecretExpectedSize
 	BootstrapTokenSecretPrefix = "bootstrap-token-"
 	DefaultTokenDuration       = time.Duration(8) * time.Hour
 	tokenCreateRetries         = 5
@@ -60,7 +64,7 @@ func GenerateToken(d *kubeadmapi.TokenDiscovery) error {
 		return err
 	}
 
-	token, err := randBytes(TokenBytes)
+	token, err := randBytes(TokenSecretBytes)
 	if err != nil {
 		return err
 	}
@@ -71,8 +75,10 @@ func GenerateToken(d *kubeadmapi.TokenDiscovery) error {
 }
 
 var (
-	tokenRegexpString = "^([a-zA-Z0-9]{6})\\.([a-zA-Z0-9]{16})$"
-	tokenRegexp       = regexp.MustCompile(tokenRegexpString)
+	tokenIDRegexpString = "^([a-z0-9]{6})$"
+	tokenIDRegexp       = regexp.MustCompile(tokenIDRegexpString)
+	tokenRegexpString   = "^([a-z0-9]{6})\\.([a-zA-Z0-9]{16})$"
+	tokenRegexp         = regexp.MustCompile(tokenRegexpString)
 )
 
 func GenerateTokenIfNeeded(d *kubeadmapi.TokenDiscovery) error {
@@ -90,22 +96,41 @@ func GenerateTokenIfNeeded(d *kubeadmapi.TokenDiscovery) error {
 	return nil
 }
 
+// ParseToken tries and parse a valid token from a string.
+// A token ID and token secret are returned in case of success, an error otherwise.
 func ParseToken(s string) (string, string, error) {
 	split := tokenRegexp.FindStringSubmatch(s)
 	if len(split) != 3 {
-		return "", "", fmt.Errorf("token %q was not of form %q", s, tokenRegexpString)
+		return "", "", fmt.Errorf("token [%q] was not of form [%q]", s, tokenRegexpString)
 	}
 	return split[1], split[2], nil
 
 }
 
+// BearerToken returns a string representation of the passed token.
 func BearerToken(d *kubeadmapi.TokenDiscovery) string {
 	return fmt.Sprintf("%s.%s", d.ID, d.Secret)
 }
 
-func IsTokenValid(d *kubeadmapi.TokenDiscovery) (bool, error) {
-	if len(d.ID)+len(d.Secret) == 0 {
-		return false, nil
+// ValidateToken validates whether a token is well-formed.
+// In case it's not, the corresponding error is returned as well.
+func ValidateToken(d *kubeadmapi.TokenDiscovery) (bool, error) {
+	// TODO why validate size of parcels if ParseToken does it already?
+	if len(d.ID) != TokenIDExpectedSize {
+		return false, fmt.Errorf(
+			"token ID [%q] doesn't have expected size. expected:%d, actual:%d",
+			d.ID,
+			TokenIDExpectedSize,
+			len(d.ID),
+		)
+	}
+	if len(d.Secret) != TokenSecretExpectedSize {
+		return false, fmt.Errorf(
+			"token secret [%q] doesn't have expected size. expected:%d, actual:%d",
+			d.ID,
+			TokenSecretExpectedSize,
+			len(d.Secret),
+		)
 	}
 	if _, _, err := ParseToken(d.ID + "." + d.Secret); err != nil {
 		return false, err
@@ -130,6 +155,10 @@ func DiscoveryPort(d *kubeadmapi.TokenDiscovery) int32 {
 // UpdateOrCreateToken attempts to update a token with the given ID, or create if it does
 // not already exist.
 func UpdateOrCreateToken(client *clientset.Clientset, d *kubeadmapi.TokenDiscovery, tokenDuration time.Duration) error {
+	// Let's make sure
+	if valid, err := ValidateToken(d); !valid {
+		return err
+	}
 	secretName := fmt.Sprintf("%s%s", BootstrapTokenSecretPrefix, d.ID)
 	var lastErr error
 	for i := 0; i < tokenCreateRetries; i++ {
@@ -164,7 +193,11 @@ func UpdateOrCreateToken(client *clientset.Clientset, d *kubeadmapi.TokenDiscove
 		}
 
 	}
-	return fmt.Errorf("<util/tokens> unable to create bootstrap token after %d attempts [%v]", tokenCreateRetries, lastErr)
+	return fmt.Errorf(
+		"<util/tokens> unable to create bootstrap token after %d attempts [%v]",
+		tokenCreateRetries,
+		lastErr,
+	)
 }
 
 func encodeTokenSecretData(d *kubeadmapi.TokenDiscovery, duration time.Duration) map[string][]byte {
