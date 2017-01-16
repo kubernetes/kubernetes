@@ -51,6 +51,9 @@ func randBytes(length int) (string, error) {
 	return hex.EncodeToString(b), nil
 }
 
+// GenerateToken generates a new token with a token ID that is valid as a
+// Kubernetes DNS label.
+// For more info, see kubernetes/pkg/util/validation/validation.go.
 func GenerateToken(d *kubeadmapi.TokenDiscovery) error {
 	tokenID, err := randBytes(TokenIDBytes)
 	if err != nil {
@@ -62,8 +65,8 @@ func GenerateToken(d *kubeadmapi.TokenDiscovery) error {
 		return err
 	}
 
-	d.ID = tokenID
-	d.Secret = token
+	d.ID = strings.ToLower(tokenID)
+	d.Secret = strings.ToLower(token)
 	return nil
 }
 
