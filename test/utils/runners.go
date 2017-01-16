@@ -27,6 +27,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/api"
@@ -826,7 +827,7 @@ func DoPrepareNode(client clientset.Interface, node *v1.Node, strategy PrepareNo
 		return nil
 	}
 	for attempt := 0; attempt < retries; attempt++ {
-		if _, err = client.Core().Nodes().Patch(node.Name, api.MergePatchType, []byte(patch)); err == nil {
+		if _, err = client.Core().Nodes().Patch(node.Name, types.MergePatchType, []byte(patch)); err == nil {
 			return nil
 		}
 		if !apierrs.IsConflict(err) {
