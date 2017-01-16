@@ -38,7 +38,7 @@ import (
 	"k8s.io/kubernetes/pkg/master/ports"
 	"k8s.io/kubernetes/pkg/registry/core/componentstatus"
 	configmapstore "k8s.io/kubernetes/pkg/registry/core/configmap/storage"
-	controllerstore "k8s.io/kubernetes/pkg/registry/core/controller/storage"
+	controllerstore "k8s.io/kubernetes/pkg/registry/core/replicationcontroller/storage"
 	"k8s.io/kubernetes/pkg/registry/core/endpoint"
 	endpointsstore "k8s.io/kubernetes/pkg/registry/core/endpoint/storage"
 	eventstore "k8s.io/kubernetes/pkg/registry/core/event/storage"
