@@ -15,6 +15,7 @@ go_library(
         "version.go",
     ],
     tags = ["automanaged"],
+    deps = ["//vendor:k8s.io/apiserver/pkg/version"],
 )
 
 filegroup(

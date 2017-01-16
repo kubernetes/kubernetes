@@ -13154,3 +13154,9 @@ go_test(
         "//vendor:k8s.io/client-go/rest/watch",
     ],
 )
+
+go_library(
+    name = "k8s.io/apiserver/pkg/version",
+    srcs = ["k8s.io/apiserver/pkg/version/types.go"],
+    tags = ["automanaged"],
+)
