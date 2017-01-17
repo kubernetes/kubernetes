@@ -18,6 +18,7 @@ package internalversion
 
 import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	api "k8s.io/kubernetes/pkg/api"
 	restclient "k8s.io/kubernetes/pkg/client/restclient"
@@ -38,7 +39,7 @@ type EventInterface interface {
 	Get(name string, options v1.GetOptions) (*api.Event, error)
 	List(opts api.ListOptions) (*api.EventList, error)
 	Watch(opts api.ListOptions) (watch.Interface, error)
-	Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *api.Event, err error)
+	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *api.Event, err error)
 	EventExpansion
 }
 
@@ -139,7 +140,7 @@ func (c *events) Watch(opts api.ListOptions) (watch.Interface, error) {
 }
 
 // Patch applies the patch and returns the patched event.
-func (c *events) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *api.Event, err error) {
+func (c *events) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *api.Event, err error) {
 	result = &api.Event{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).

@@ -26,8 +26,8 @@ import (
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
@@ -307,7 +307,7 @@ func TestUpdateSelectorToAdopt(t *testing.T) {
 	// change the rc's selector to match both pods
 	patch := `{"spec":{"selector":{"uniqueKey":null}}}`
 	rcClient := clientSet.Core().ReplicationControllers(ns.Name)
-	rc, err := rcClient.Patch(rc.Name, api.StrategicMergePatchType, []byte(patch))
+	rc, err := rcClient.Patch(rc.Name, types.StrategicMergePatchType, []byte(patch))
 	if err != nil {
 		t.Fatalf("Failed to patch replication controller: %v", err)
 	}
@@ -344,7 +344,7 @@ func TestUpdateSelectorToRemoveControllerRef(t *testing.T) {
 	// change the rc's selector to match both pods
 	patch := `{"spec":{"selector":{"uniqueKey":"1"},"template":{"metadata":{"labels":{"uniqueKey":"1"}}}}}`
 	rcClient := clientSet.Core().ReplicationControllers(ns.Name)
-	rc, err := rcClient.Patch(rc.Name, api.StrategicMergePatchType, []byte(patch))
+	rc, err := rcClient.Patch(rc.Name, types.StrategicMergePatchType, []byte(patch))
 	if err != nil {
 		t.Fatalf("Failed to patch replication controller: %v", err)
 	}
@@ -386,7 +386,7 @@ func TestUpdateLabelToRemoveControllerRef(t *testing.T) {
 	// change the rc's selector to match both pods
 	patch := `{"metadata":{"labels":{"name":null}}}`
 	podClient := clientSet.Core().Pods(ns.Name)
-	pod2, err := podClient.Patch(pod2.Name, api.StrategicMergePatchType, []byte(patch))
+	pod2, err := podClient.Patch(pod2.Name, types.StrategicMergePatchType, []byte(patch))
 	if err != nil {
 		t.Fatalf("Failed to patch pod2: %v", err)
 	}
@@ -432,7 +432,7 @@ func TestUpdateLabelToBeAdopted(t *testing.T) {
 	// change the rc's selector to match both pods
 	patch := `{"metadata":{"labels":{"uniqueKey":"1"}}}`
 	podClient := clientSet.Core().Pods(ns.Name)
-	pod2, err := podClient.Patch(pod2.Name, api.StrategicMergePatchType, []byte(patch))
+	pod2, err := podClient.Patch(pod2.Name, types.StrategicMergePatchType, []byte(patch))
 	if err != nil {
 		t.Fatalf("Failed to patch pod2: %v", err)
 	}

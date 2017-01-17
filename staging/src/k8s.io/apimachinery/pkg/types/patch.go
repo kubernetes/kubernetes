@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,19 +14,15 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package kubectl
+package types
 
-import (
-	"k8s.io/apimachinery/pkg/types"
-	client "k8s.io/kubernetes/pkg/client/restclient"
+// Similarly to above, these are constants to support HTTP PATCH utilized by
+// both the client and server that didn't make sense for a whole package to be
+// dedicated to.
+type PatchType string
+
+const (
+	JSONPatchType           PatchType = "application/json-patch+json"
+	MergePatchType          PatchType = "application/merge-patch+json"
+	StrategicMergePatchType PatchType = "application/strategic-merge-patch+json"
 )
-
-// RESTClient is a client helper for dealing with RESTful resources
-// in a generic way.
-type RESTClient interface {
-	Get() *client.Request
-	Post() *client.Request
-	Patch(types.PatchType) *client.Request
-	Delete() *client.Request
-	Put() *client.Request
-}
