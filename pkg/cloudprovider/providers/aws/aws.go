@@ -386,10 +386,15 @@ var _ Volumes = &Cloud{}
 // CloudConfig wraps the settings for the AWS cloud provider.
 type CloudConfig struct {
 	Global struct {
-		// TODO: Is there any use for this?  We can get it from the instance metadata service
-		// Maybe if we're not running on AWS, e.g. bootstrap; for now it is not very useful
+		// This flag enables the possibility to run the master components on a different
+		// aws account, on a different cloud provider or on premise.
+		// If the flag is set also Zone, VPCID and KubernetesClusterTag must be provided
+		ExternalMaster bool
+
+		// The aws Availability Zone
 		Zone string
 
+		// The aws VPC
 		VPCID string
 
 		KubernetesClusterTag string
@@ -815,17 +820,22 @@ func newAWSCloud(config io.Reader, awsServices Services) (*Cloud, error) {
 		attaching:        make(map[types.NodeName]map[mountDevice]awsVolumeID),
 		deviceAllocators: make(map[types.NodeName]DeviceAllocator),
 	}
-
-	selfAWSInstance, err := awsCloud.buildSelfAWSInstance()
-	if err != nil && (cfg.Global.VPCID != "" || cfg.Global.Zone != "") {
-		return nil, err
-	} else if err != nil {
-		glog.Warningf("Cannot detect an AWS Instance")
-	} else {
+	var selfAWSInstance *awsInstance
+	// Check if the master runs on the same account as the nodes or if we have an external master
+	if cfg.Global.ExternalMaster != true {
+		selfAWSInstance, err := awsCloud.buildSelfAWSInstance()
+		if err != nil {
+			return nil, err
+		}
 		awsCloud.selfAWSInstance = selfAWSInstance
 		awsCloud.vpcID = selfAWSInstance.vpcID
 		awsCloud.availabilityZone = selfAWSInstance.availabilityZone
+	} else if cfg.Global.ExternalMaster == true && (cfg.Global.VPCID == "" || cfg.Global.Zone == "" || cfg.Global.KubernetesClusterTag == "") {
+		// For the external master the Zone, VPCID and KubernetesClusterTag must be set.
+		// It is not possible to detect it
+		return nil, fmt.Errorf("Run with eternal Master but Zone: %s or VPCID: %s or KubernetesClusterTag: %s is not set", cfg.Global.Zone, cfg.Global.VPCID, cfg.Global.KubernetesClusterTag)
 	}
+
 	if cfg.Global.Zone != "" {
 		awsCloud.availabilityZone = cfg.Global.Zone
 	}
