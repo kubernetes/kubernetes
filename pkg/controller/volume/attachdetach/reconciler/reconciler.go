@@ -93,7 +93,7 @@ func (rc *reconciler) Run(stopCh <-chan struct{}) {
 
 // reconciliationLoopFunc this can be disabled via cli option disableReconciliation.
 // It periodically checks whether the attached volumes from actual state
-// are still attached to the node and udpate the status if they are not.
+// are still attached to the node and update the status if they are not.
 func (rc *reconciler) reconciliationLoopFunc() func() {
 	return func() {
 

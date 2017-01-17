@@ -11953,16 +11953,8 @@
     }
    },
    "v1.Time": {
-    "description": "Time is a wrapper around time.Time which supports correct marshaling to YAML and JSON.  Wrappers are provided for many of the factory methods that the time package offers.",
-    "required": [
-     "Time"
-    ],
-    "properties": {
-     "Time": {
-      "type": "string",
-      "format": "date-time"
-     }
-    }
+    "type": "string",
+    "format": "date-time"
    },
    "v1.Volume": {
     "description": "Volume represents a named volume in a pod that may be accessed by any container in the pod.",

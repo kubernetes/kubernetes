@@ -19,8 +19,8 @@ go_library(
     srcs = ["logs_generator.go"],
     tags = ["automanaged"],
     deps = [
-        "//pkg/util/rand:go_default_library",
         "//vendor:github.com/golang/glog",
+        "//vendor:k8s.io/apimachinery/pkg/util/rand",
     ],
 )
 

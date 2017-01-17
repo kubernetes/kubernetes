@@ -31,7 +31,7 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
-        "//pkg/api/rest:go_default_library",
+        "//pkg/genericapiserver/api/rest:go_default_library",
         "//pkg/registry/core/service:go_default_library",
         "//pkg/registry/generic:go_default_library",
         "//pkg/registry/generic/registry:go_default_library",

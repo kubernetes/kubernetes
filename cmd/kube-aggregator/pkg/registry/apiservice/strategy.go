@@ -23,6 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/request"
+	"k8s.io/apiserver/pkg/storage/names"
 	kapi "k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/registry/generic"
@@ -34,10 +35,10 @@ import (
 
 type apiServerStrategy struct {
 	runtime.ObjectTyper
-	kapi.NameGenerator
+	names.NameGenerator
 }
 
-var Strategy = apiServerStrategy{kapi.Scheme, kapi.SimpleNameGenerator}
+var Strategy = apiServerStrategy{kapi.Scheme, names.SimpleNameGenerator}
 
 func (apiServerStrategy) NamespaceScoped() bool {
 	return false

@@ -23,6 +23,7 @@ go_library(
         "//pkg/genericapiserver/options:go_default_library",
         "//pkg/kubeapiserver/authenticator:go_default_library",
         "//pkg/kubeapiserver/authorizer:go_default_library",
+        "//vendor:github.com/golang/glog",
         "//vendor:github.com/spf13/pflag",
     ],
 )

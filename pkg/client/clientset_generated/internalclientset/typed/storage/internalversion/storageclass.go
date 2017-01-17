@@ -18,6 +18,7 @@ package internalversion
 
 import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	api "k8s.io/kubernetes/pkg/api"
 	storage "k8s.io/kubernetes/pkg/apis/storage"
@@ -39,7 +40,7 @@ type StorageClassInterface interface {
 	Get(name string, options v1.GetOptions) (*storage.StorageClass, error)
 	List(opts api.ListOptions) (*storage.StorageClassList, error)
 	Watch(opts api.ListOptions) (watch.Interface, error)
-	Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *storage.StorageClass, err error)
+	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *storage.StorageClass, err error)
 	StorageClassExpansion
 }
 
@@ -131,7 +132,7 @@ func (c *storageClasses) Watch(opts api.ListOptions) (watch.Interface, error) {
 }
 
 // Patch applies the patch and returns the patched storageClass.
-func (c *storageClasses) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *storage.StorageClass, err error) {
+func (c *storageClasses) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *storage.StorageClass, err error) {
 	result = &storage.StorageClass{}
 	err = c.client.Patch(pt).
 		Resource("storageclasses").

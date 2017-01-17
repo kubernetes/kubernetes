@@ -21,29 +21,11 @@ import (
 	"fmt"
 	"os"
 	"path"
-	"strconv"
 
-	netutil "k8s.io/apimachinery/pkg/util/net"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	kubeadmapiext "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
-	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/util/uuid"
 )
-
-func PrepareTokenDiscovery(d *kubeadmapi.TokenDiscovery) error {
-	if len(d.Addresses) == 0 {
-		ip, err := netutil.ChooseHostInterface()
-		if err != nil {
-			return err
-		}
-		d.Addresses = []string{ip.String() + ":" + strconv.Itoa(kubeadmapiext.DefaultDiscoveryBindPort)}
-	}
-	if err := kubeadmutil.GenerateTokenIfNeeded(d); err != nil {
-		return fmt.Errorf("failed to generate token(s) [%v]", err)
-	}
-	return nil
-}
 
 func CreateTokenAuthFile(bt string) error {
 	tokenAuthFilePath := path.Join(kubeadmapi.GlobalEnvParams.HostPKIPath, "tokens.csv")

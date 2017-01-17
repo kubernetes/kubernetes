@@ -20,6 +20,8 @@ import (
 	"fmt"
 	"reflect"
 
+	"github.com/golang/glog"
+
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -227,6 +229,15 @@ func AsVersionedObject(infos []*Info, forceList bool, version schema.GroupVersio
 			return nil, err
 		}
 		object = converted
+	}
+
+	actualVersion := object.GetObjectKind().GroupVersionKind()
+	if actualVersion.Version != version.Version {
+		defaultVersionInfo := ""
+		if len(actualVersion.Version) > 0 {
+			defaultVersionInfo = fmt.Sprintf("Defaulting to %q", actualVersion.Version)
+		}
+		glog.V(1).Infof("info: the output version specified is invalid. %s\n", defaultVersionInfo)
 	}
 	return object, nil
 }

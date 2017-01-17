@@ -22,13 +22,13 @@ go_library(
         "//pkg/api/v1:go_default_library",
         "//pkg/util/env:go_default_library",
         "//pkg/util/mount:go_default_library",
-        "//pkg/util/rand:go_default_library",
         "//pkg/util/strings:go_default_library",
         "//pkg/volume:go_default_library",
         "//pkg/volume/util:go_default_library",
         "//vendor:github.com/clusterhq/flocker-go",
         "//vendor:github.com/golang/glog",
         "//vendor:k8s.io/apimachinery/pkg/types",
+        "//vendor:k8s.io/apimachinery/pkg/util/rand",
     ],
 )
 

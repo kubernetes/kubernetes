@@ -38,6 +38,7 @@ import (
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/request/bearertoken"
 	"k8s.io/apiserver/pkg/authentication/request/union"
+	serviceaccountapiserver "k8s.io/apiserver/pkg/authentication/serviceaccount"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/kubernetes/pkg/api"
@@ -385,7 +386,7 @@ func startServiceAccountTestServer(t *testing.T) (*clientset.Clientset, restclie
 		}
 
 		// If the user is a service account...
-		if serviceAccountNamespace, serviceAccountName, err := serviceaccount.SplitUsername(username); err == nil {
+		if serviceAccountNamespace, serviceAccountName, err := serviceaccountapiserver.SplitUsername(username); err == nil {
 			// Limit them to their own namespace
 			if serviceAccountNamespace == ns {
 				switch serviceAccountName {

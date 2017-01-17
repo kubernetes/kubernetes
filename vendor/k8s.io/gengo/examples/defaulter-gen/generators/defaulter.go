@@ -226,8 +226,11 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 
 		var peerPkgs []string
 		if customArgs, ok := arguments.CustomArgs.(*CustomArgs); ok {
-			if len(customArgs.ExtraPeerDirs) > 0 {
-				peerPkgs = append(peerPkgs, customArgs.ExtraPeerDirs...)
+			for _, pkg := range customArgs.ExtraPeerDirs {
+				if i := strings.Index(pkg, "/vendor/"); i != -1 {
+					pkg = pkg[i+len("/vendor/"):]
+				}
+				peerPkgs = append(peerPkgs, pkg)
 			}
 		}
 		// Make sure our peer-packages are added and fully parsed.

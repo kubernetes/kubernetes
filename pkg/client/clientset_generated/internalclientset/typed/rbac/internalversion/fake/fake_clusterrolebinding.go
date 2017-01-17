@@ -20,6 +20,7 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
+	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	api "k8s.io/kubernetes/pkg/api"
 	rbac "k8s.io/kubernetes/pkg/apis/rbac"
@@ -100,7 +101,7 @@ func (c *FakeClusterRoleBindings) Watch(opts api.ListOptions) (watch.Interface, 
 }
 
 // Patch applies the patch and returns the patched clusterRoleBinding.
-func (c *FakeClusterRoleBindings) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *rbac.ClusterRoleBinding, err error) {
+func (c *FakeClusterRoleBindings) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *rbac.ClusterRoleBinding, err error) {
 	obj, err := c.Fake.
 		Invokes(core.NewRootPatchSubresourceAction(clusterrolebindingsResource, name, data, subresources...), &rbac.ClusterRoleBinding{})
 	if obj == nil {

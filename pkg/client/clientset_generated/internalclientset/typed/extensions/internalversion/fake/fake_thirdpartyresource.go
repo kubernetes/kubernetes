@@ -20,6 +20,7 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
+	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	api "k8s.io/kubernetes/pkg/api"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions"
@@ -100,7 +101,7 @@ func (c *FakeThirdPartyResources) Watch(opts api.ListOptions) (watch.Interface, 
 }
 
 // Patch applies the patch and returns the patched thirdPartyResource.
-func (c *FakeThirdPartyResources) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *extensions.ThirdPartyResource, err error) {
+func (c *FakeThirdPartyResources) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *extensions.ThirdPartyResource, err error) {
 	obj, err := c.Fake.
 		Invokes(core.NewRootPatchSubresourceAction(thirdpartyresourcesResource, name, data, subresources...), &extensions.ThirdPartyResource{})
 	if obj == nil {

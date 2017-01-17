@@ -17,10 +17,10 @@ limitations under the License.
 package rest
 
 import (
-	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/apis/certificates"
 	certificatesapiv1alpha1 "k8s.io/kubernetes/pkg/apis/certificates/v1alpha1"
 	"k8s.io/kubernetes/pkg/genericapiserver"
+	"k8s.io/kubernetes/pkg/genericapiserver/api/rest"
 	certificatestore "k8s.io/kubernetes/pkg/registry/certificates/certificates/storage"
 	"k8s.io/kubernetes/pkg/registry/generic"
 )

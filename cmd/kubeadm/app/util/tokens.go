@@ -36,13 +36,20 @@ import (
 
 const (
 	TokenIDBytes               = 3
-	TokenBytes                 = 8
+	TokenSecretBytes           = 8
 	BootstrapTokenSecretPrefix = "bootstrap-token-"
 	DefaultTokenDuration       = time.Duration(8) * time.Hour
 	tokenCreateRetries         = 5
 )
 
-func RandBytes(length int) (string, error) {
+var (
+	tokenIDRegexpString = "^([a-z0-9]{6})$"
+	tokenIDRegexp       = regexp.MustCompile(tokenIDRegexpString)
+	tokenRegexpString   = "^([a-z0-9]{6})\\:([a-z0-9]{16})$"
+	tokenRegexp         = regexp.MustCompile(tokenRegexpString)
+)
+
+func randBytes(length int) (string, error) {
 	b := make([]byte, length)
 	_, err := rand.Read(b)
 	if err != nil {
@@ -51,60 +58,55 @@ func RandBytes(length int) (string, error) {
 	return hex.EncodeToString(b), nil
 }
 
+// GenerateToken generates a new token with a token ID that is valid as a
+// Kubernetes DNS label.
+// For more info, see kubernetes/pkg/util/validation/validation.go.
 func GenerateToken(d *kubeadmapi.TokenDiscovery) error {
-	tokenID, err := RandBytes(TokenIDBytes)
+	tokenID, err := randBytes(TokenIDBytes)
 	if err != nil {
 		return err
 	}
 
-	token, err := RandBytes(TokenBytes)
+	token, err := randBytes(TokenSecretBytes)
 	if err != nil {
 		return err
 	}
 
-	d.ID = tokenID
-	d.Secret = token
+	d.ID = strings.ToLower(tokenID)
+	d.Secret = strings.ToLower(token)
 	return nil
 }
 
-var (
-	tokenRegexpString = "^([a-zA-Z0-9]{6})\\.([a-zA-Z0-9]{16})$"
-	tokenRegexp       = regexp.MustCompile(tokenRegexpString)
-)
-
-func GenerateTokenIfNeeded(d *kubeadmapi.TokenDiscovery) error {
-	ok, err := IsTokenValid(d)
-	if err != nil {
-		return err
+// ParseTokenID tries and parse a valid token ID from a string.
+// An error is returned in case of failure.
+func ParseTokenID(s string) error {
+	if !tokenIDRegexp.MatchString(s) {
+		return fmt.Errorf("token ID [%q] was not of form [%q]", s, tokenIDRegexpString)
 	}
-	if ok {
-		return nil
-	}
-	if err := GenerateToken(d); err != nil {
-		return err
-	}
-
 	return nil
+
 }
 
+// ParseToken tries and parse a valid token from a string.
+// A token ID and token secret are returned in case of success, an error otherwise.
 func ParseToken(s string) (string, string, error) {
 	split := tokenRegexp.FindStringSubmatch(s)
 	if len(split) != 3 {
-		return "", "", fmt.Errorf("token %q was not of form %q", s, tokenRegexpString)
+		return "", "", fmt.Errorf("token [%q] was not of form [%q]", s, tokenRegexpString)
 	}
 	return split[1], split[2], nil
 
 }
 
+// BearerToken returns a string representation of the passed token.
 func BearerToken(d *kubeadmapi.TokenDiscovery) string {
-	return fmt.Sprintf("%s.%s", d.ID, d.Secret)
+	return fmt.Sprintf("%s:%s", d.ID, d.Secret)
 }
 
-func IsTokenValid(d *kubeadmapi.TokenDiscovery) (bool, error) {
-	if len(d.ID)+len(d.Secret) == 0 {
-		return false, nil
-	}
-	if _, _, err := ParseToken(d.ID + "." + d.Secret); err != nil {
+// ValidateToken validates whether a token is well-formed.
+// In case it's not, the corresponding error is returned as well.
+func ValidateToken(d *kubeadmapi.TokenDiscovery) (bool, error) {
+	if _, _, err := ParseToken(d.ID + ":" + d.Secret); err != nil {
 		return false, err
 	}
 	return true, nil
@@ -127,8 +129,11 @@ func DiscoveryPort(d *kubeadmapi.TokenDiscovery) int32 {
 // UpdateOrCreateToken attempts to update a token with the given ID, or create if it does
 // not already exist.
 func UpdateOrCreateToken(client *clientset.Clientset, d *kubeadmapi.TokenDiscovery, tokenDuration time.Duration) error {
+	// Let's make sure
+	if valid, err := ValidateToken(d); !valid {
+		return err
+	}
 	secretName := fmt.Sprintf("%s%s", BootstrapTokenSecretPrefix, d.ID)
-
 	var lastErr error
 	for i := 0; i < tokenCreateRetries; i++ {
 		secret, err := client.Secrets(api.NamespaceSystem).Get(secretName, metav1.GetOptions{})
@@ -162,7 +167,11 @@ func UpdateOrCreateToken(client *clientset.Clientset, d *kubeadmapi.TokenDiscove
 		}
 
 	}
-	return fmt.Errorf("<util/tokens> unable to create bootstrap token after %d attempts [%v]", tokenCreateRetries, lastErr)
+	return fmt.Errorf(
+		"unable to create bootstrap token after %d attempts [%v]",
+		tokenCreateRetries,
+		lastErr,
+	)
 }
 
 func encodeTokenSecretData(d *kubeadmapi.TokenDiscovery, duration time.Duration) map[string][]byte {

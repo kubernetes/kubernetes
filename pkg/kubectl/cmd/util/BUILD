@@ -47,7 +47,6 @@ go_library(
         "//pkg/util/flag:go_default_library",
         "//pkg/util/homedir:go_default_library",
         "//pkg/util/strategicpatch:go_default_library",
-        "//pkg/version:go_default_library",
         "//vendor:github.com/emicklei/go-restful/swagger",
         "//vendor:github.com/evanphx/json-patch",
         "//vendor:github.com/golang/glog",
@@ -63,6 +62,7 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/runtime/serializer/json",
         "//vendor:k8s.io/apimachinery/pkg/util/errors",
         "//vendor:k8s.io/apimachinery/pkg/util/sets",
+        "//vendor:k8s.io/apimachinery/pkg/version",
         "//vendor:k8s.io/apimachinery/pkg/watch",
     ],
 )
@@ -99,7 +99,6 @@ go_test(
         "//pkg/kubectl/resource:go_default_library",
         "//pkg/util/exec:go_default_library",
         "//pkg/util/flag:go_default_library",
-        "//pkg/version:go_default_library",
         "//vendor:github.com/emicklei/go-restful/swagger",
         "//vendor:github.com/stretchr/testify/assert",
         "//vendor:k8s.io/apimachinery/pkg/api/errors",
@@ -109,6 +108,7 @@ go_test(
         "//vendor:k8s.io/apimachinery/pkg/runtime",
         "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
         "//vendor:k8s.io/apimachinery/pkg/util/validation/field",
+        "//vendor:k8s.io/apimachinery/pkg/version",
         "//vendor:k8s.io/apimachinery/pkg/watch",
     ],
 )

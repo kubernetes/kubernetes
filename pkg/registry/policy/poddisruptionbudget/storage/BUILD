@@ -15,9 +15,9 @@ go_test(
     tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
-        "//pkg/api/rest:go_default_library",
         "//pkg/apis/policy:go_default_library",
         "//pkg/fields:go_default_library",
+        "//pkg/genericapiserver/api/rest:go_default_library",
         "//pkg/registry/generic:go_default_library",
         "//pkg/registry/registrytest:go_default_library",
         "//pkg/storage/etcd/testing:go_default_library",
@@ -33,8 +33,8 @@ go_library(
     srcs = ["storage.go"],
     tags = ["automanaged"],
     deps = [
-        "//pkg/api/rest:go_default_library",
         "//pkg/apis/policy:go_default_library",
+        "//pkg/genericapiserver/api/rest:go_default_library",
         "//pkg/registry/generic:go_default_library",
         "//pkg/registry/generic/registry:go_default_library",
         "//pkg/registry/policy/poddisruptionbudget:go_default_library",

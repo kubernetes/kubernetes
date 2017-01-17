@@ -31,7 +31,7 @@ kube::golang::setup_env
 GROUP_VERSIONS=(federation/v1beta1)
 GV_DIRS=()
 for gv in "${GROUP_VERSIONS[@]}"; do
-  GV_DIRS+=("federation/$(kube::util::group-version-to-pkg-path "${gv}")")
+  GV_DIRS+=("$(kube::util::group-version-to-pkg-path "${gv}")")
 done
 
 # To avoid compile errors, remove the currently existing files.

@@ -31,6 +31,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
@@ -271,7 +272,7 @@ func TestHttpMethods(t *testing.T) {
 		t.Errorf("Delete : Object returned should not be nil")
 	}
 
-	request = c.Patch(api.JSONPatchType)
+	request = c.Patch(types.JSONPatchType)
 	if request == nil {
 		t.Errorf("Patch : Object returned should not be nil")
 	}

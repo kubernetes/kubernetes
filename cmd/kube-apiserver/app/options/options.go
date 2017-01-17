@@ -121,7 +121,7 @@ func (s *ServerRunOptions) AddFlags(fs *pflag.FlagSet) {
 		"Currently only applies to long-running requests.")
 
 	fs.IntVar(&s.MasterCount, "apiserver-count", s.MasterCount,
-		"The number of apiservers running in the cluster.")
+		"The number of apiservers running in the cluster, must be a positive number.")
 
 	// See #14282 for details on how to test/try this option out.
 	// TODO: remove this comment once this option is tested in CI.

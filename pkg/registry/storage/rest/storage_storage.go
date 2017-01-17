@@ -17,10 +17,10 @@ limitations under the License.
 package rest
 
 import (
-	"k8s.io/kubernetes/pkg/api/rest"
 	storageapi "k8s.io/kubernetes/pkg/apis/storage"
 	storageapiv1beta1 "k8s.io/kubernetes/pkg/apis/storage/v1beta1"
 	"k8s.io/kubernetes/pkg/genericapiserver"
+	"k8s.io/kubernetes/pkg/genericapiserver/api/rest"
 	"k8s.io/kubernetes/pkg/registry/generic"
 	storageclassstore "k8s.io/kubernetes/pkg/registry/storage/storageclass/storage"
 )

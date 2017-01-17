@@ -24,6 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/request"
+	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/apis/extensions/validation"
@@ -35,11 +36,11 @@ import (
 // daemonSetStrategy implements verification logic for daemon sets.
 type daemonSetStrategy struct {
 	runtime.ObjectTyper
-	api.NameGenerator
+	names.NameGenerator
 }
 
 // Strategy is the default logic that applies when creating and updating DaemonSet objects.
-var Strategy = daemonSetStrategy{api.Scheme, api.SimpleNameGenerator}
+var Strategy = daemonSetStrategy{api.Scheme, names.SimpleNameGenerator}
 
 // NamespaceScoped returns true because all DaemonSets need to be within a namespace.
 func (daemonSetStrategy) NamespaceScoped() bool {

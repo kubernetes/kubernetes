@@ -9,12 +9,8 @@ load(
 
 go_library(
     name = "go_default_library",
-    srcs = ["recognizer.go"],
+    srcs = ["doc.go"],
     tags = ["automanaged"],
-    deps = [
-        "//pkg/runtime:go_default_library",
-        "//pkg/runtime/schema:go_default_library",
-    ],
 )
 
 filegroup(
@@ -26,9 +22,6 @@ filegroup(
 
 filegroup(
     name = "all-srcs",
-    srcs = [
-        ":package-srcs",
-        "//pkg/runtime/serializer/recognizer/testing:all-srcs",
-    ],
+    srcs = [":package-srcs"],
     tags = ["automanaged"],
 )
