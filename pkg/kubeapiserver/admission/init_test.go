@@ -19,8 +19,8 @@ package admission
 import (
 	"testing"
 
+	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
-	"k8s.io/kubernetes/pkg/admission"
 )
 
 // TestAuthorizer is a testing struct for testing that fulfills the authorizer interface.

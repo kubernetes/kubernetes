@@ -13,7 +13,6 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
-        "//pkg/admission:all-srcs",
         "//pkg/api:all-srcs",
         "//pkg/apimachinery/announced:all-srcs",
         "//pkg/apimachinery/tests:all-srcs",

@@ -26,7 +26,6 @@ go_library(
         "//federation/apis/federation/install:go_default_library",
         "//federation/cmd/federation-apiserver/app/options:go_default_library",
         "//federation/registry/cluster/etcd:go_default_library",
-        "//pkg/admission:go_default_library",
         "//pkg/api:go_default_library",
         "//pkg/api/install:go_default_library",
         "//pkg/apis/batch:go_default_library",
@@ -69,6 +68,7 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/util/errors",
         "//vendor:k8s.io/apimachinery/pkg/util/sets",
         "//vendor:k8s.io/apimachinery/pkg/util/wait",
+        "//vendor:k8s.io/apiserver/pkg/admission",
     ],
 )
 
