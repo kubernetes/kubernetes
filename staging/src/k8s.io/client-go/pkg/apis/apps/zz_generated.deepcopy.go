@@ -48,8 +48,10 @@ func DeepCopy_apps_StatefulSet(in interface{}, out interface{}, c *conversion.Cl
 		in := in.(*StatefulSet)
 		out := out.(*StatefulSet)
 		*out = *in
-		if err := api.DeepCopy_api_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, c); err != nil {
+		if newVal, err := c.DeepCopy(&in.ObjectMeta); err != nil {
 			return err
+		} else {
+			out.ObjectMeta = *newVal.(*v1.ObjectMeta)
 		}
 		if err := DeepCopy_apps_StatefulSetSpec(&in.Spec, &out.Spec, c); err != nil {
 			return err

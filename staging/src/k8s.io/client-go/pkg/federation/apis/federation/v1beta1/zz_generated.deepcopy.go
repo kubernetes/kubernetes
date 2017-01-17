@@ -21,9 +21,10 @@ limitations under the License.
 package v1beta1
 
 import (
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
-	v1 "k8s.io/client-go/pkg/api/v1"
+	api_v1 "k8s.io/client-go/pkg/api/v1"
 	reflect "reflect"
 )
 
@@ -49,8 +50,10 @@ func DeepCopy_v1beta1_Cluster(in interface{}, out interface{}, c *conversion.Clo
 		in := in.(*Cluster)
 		out := out.(*Cluster)
 		*out = *in
-		if err := v1.DeepCopy_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, c); err != nil {
+		if newVal, err := c.DeepCopy(&in.ObjectMeta); err != nil {
 			return err
+		} else {
+			out.ObjectMeta = *newVal.(*v1.ObjectMeta)
 		}
 		if err := DeepCopy_v1beta1_ClusterSpec(&in.Spec, &out.Spec, c); err != nil {
 			return err
@@ -105,7 +108,7 @@ func DeepCopy_v1beta1_ClusterSpec(in interface{}, out interface{}, c *conversion
 		}
 		if in.SecretRef != nil {
 			in, out := &in.SecretRef, &out.SecretRef
-			*out = new(v1.LocalObjectReference)
+			*out = new(api_v1.LocalObjectReference)
 			**out = **in
 		}
 		return nil
