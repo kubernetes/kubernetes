@@ -19,6 +19,7 @@ package e2e
 import (
 	"fmt"
 	"time"
+	"strings"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -515,6 +516,14 @@ var _ = framework.KubeDescribe("PersistentVolumes", func() {
 				nfsServerPod = startVolumeServer(c, NFSconfig)
 				serverIP = nfsServerPod.Status.PodIP
 				framework.Logf("NFS server IP address: %v", serverIP)
+			} else {
+				// If the nfs server does exist, check that it is Running and the volume is exported.
+				By("Verifying NFS server is still running.")
+				framework.CheckPodsRunningReady(c, f.Namespace.Name, []string{nfsServerPod.Name}, 3*time.Second)
+				By("Verifying NFS export is still reachable.")
+				stdout, err := podExec(nfsServerPod, "showmount -e $HOSTNAME")
+				Expect(err).NotTo(HaveOccurred())
+				Expect(strings.Contains(stdout, "/exports *")).To(BeTrue())
 			}
 			pvConfig = persistentVolumeConfig{
 				namePrefix: "nfs-",
@@ -633,6 +642,33 @@ var _ = framework.KubeDescribe("PersistentVolumes", func() {
 				pvols, claims = createPVsPVCs(numPVs, numPVCs, c, ns, pvConfig)
 				waitAndVerifyBinds(c, ns, pvols, claims, true)
 				completeMultiTest(f, c, ns, pvols, claims, v1.VolumeReleased)
+			})
+		})
+
+		Context("when invoking the Recycle reclaim policy [Jon]", func(){
+			var pv v1.PersistentVolume
+			var pvc v1.PersistentVolumeClaim
+
+			BeforeEach(func(){
+				pvConfig.reclaimPolicy = v1.PersistentVolumeReclaimRecycle
+				pv, pvc := createPVPVC(c, pvConfig, ns, false)
+				waitOnPVandPVC(c, ns, pv, pvc)
+			})
+
+			AfterEach(func() {
+				framework.Logf("AfterEach: Cleaning up test resources.")
+				pvPvcCleanup(c, ns, pv, pvc)
+			})
+
+			It("should test that a PV becomes Available after the PVC is deleted.", func() {
+				err := c.Core().PersistentVolumeClaims(ns).Delete(pvc.Name, v1.DeleteOptions{})
+				Expect(err).NotTo(HaveOccurred())
+				err = framework.WaitForPersistentVolumePhase(v1.VolumeAvailable, c, pv.Name, 1*time.Second, 1*time.Minute)
+				Expect(err).NotTo(HaveOccurred())
+
+				pod := makePod(ns, pvc.Name, []string{"[[ (ls -A | wc -l) -z ]]"})
+				pod, err = c.Core().Pods(ns).Create(pod)
+				framework.WaitForPodSuccessInNamespace(c, pod.Name, ns)
 			})
 		})
 	})
