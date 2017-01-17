@@ -40,6 +40,7 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = [
+        "attributes_test.go",
         "chain_test.go",
         "config_test.go",
     ],
@@ -49,6 +50,7 @@ go_test(
         "//pkg/apis/componentconfig:go_default_library",
         "//pkg/apis/componentconfig/install:go_default_library",
         "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
+        "//vendor:k8s.io/apiserver/pkg/authentication/user",
     ],
 )
 
