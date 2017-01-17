@@ -38,9 +38,9 @@ import (
 	"k8s.io/apiserver/pkg/metrics"
 	"k8s.io/apiserver/pkg/request"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/genericapiserver/api/handlers"
+	"k8s.io/kubernetes/pkg/genericapiserver/api/rest"
 
 	"github.com/emicklei/go-restful"
 )
