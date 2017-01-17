@@ -35,7 +35,7 @@ option go_package = "v1alpha1";
 message ClusterRole {
   // Standard object's metadata.
   // +optional
-  optional k8s.io.kubernetes.pkg.api.v1.ObjectMeta metadata = 1;
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // Rules holds all the PolicyRules for this ClusterRole
   repeated PolicyRule rules = 2;
@@ -46,7 +46,7 @@ message ClusterRole {
 message ClusterRoleBinding {
   // Standard object's metadata.
   // +optional
-  optional k8s.io.kubernetes.pkg.api.v1.ObjectMeta metadata = 1;
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // Subjects holds references to the objects the role applies to.
   repeated Subject subjects = 2;
@@ -128,7 +128,7 @@ message PolicyRuleBuilder {
 message Role {
   // Standard object's metadata.
   // +optional
-  optional k8s.io.kubernetes.pkg.api.v1.ObjectMeta metadata = 1;
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // Rules holds all the PolicyRules for this Role
   repeated PolicyRule rules = 2;
@@ -140,7 +140,7 @@ message Role {
 message RoleBinding {
   // Standard object's metadata.
   // +optional
-  optional k8s.io.kubernetes.pkg.api.v1.ObjectMeta metadata = 1;
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // Subjects holds references to the objects the role applies to.
   repeated Subject subjects = 2;

@@ -20,8 +20,8 @@ package internalversion
 
 import (
 	"k8s.io/apimachinery/pkg/api/errors"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	api "k8s.io/kubernetes/pkg/api"
 	storage "k8s.io/kubernetes/pkg/apis/storage"
 	"k8s.io/kubernetes/pkg/client/cache"
 )
@@ -55,7 +55,7 @@ func (s *storageClassLister) List(selector labels.Selector) (ret []*storage.Stor
 
 // Get retrieves the StorageClass from the index for a given name.
 func (s *storageClassLister) Get(name string) (*storage.StorageClass, error) {
-	key := &storage.StorageClass{ObjectMeta: api.ObjectMeta{Name: name}}
+	key := &storage.StorageClass{ObjectMeta: v1.ObjectMeta{Name: name}}
 	obj, exists, err := s.indexer.Get(key)
 	if err != nil {
 		return nil, err

@@ -104,8 +104,8 @@ func (t *Tester) TestContext() genericapirequest.Context {
 	return genericapirequest.WithNamespace(genericapirequest.NewContext(), t.TestNamespace())
 }
 
-func (t *Tester) getObjectMetaOrFail(obj runtime.Object) *api.ObjectMeta {
-	meta, err := api.ObjectMetaFor(obj)
+func (t *Tester) getObjectMetaOrFail(obj runtime.Object) *metav1.ObjectMeta {
+	meta, err := metav1.ObjectMetaFor(obj)
 	if err != nil {
 		t.Fatalf("object does not have ObjectMeta: %v\n%#v", err, obj)
 	}
@@ -225,7 +225,7 @@ func (t *Tester) TestWatch(
 // Creation tests.
 
 func (t *Tester) delete(ctx genericapirequest.Context, obj runtime.Object) error {
-	objectMeta, err := api.ObjectMetaFor(obj)
+	objectMeta, err := metav1.ObjectMetaFor(obj)
 	if err != nil {
 		return err
 	}

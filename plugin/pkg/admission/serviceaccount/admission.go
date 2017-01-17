@@ -265,7 +265,7 @@ func (s *serviceAccount) enforceMountableSecrets(serviceAccount *api.ServiceAcco
 
 // getServiceAccount returns the ServiceAccount for the given namespace and name if it exists
 func (s *serviceAccount) getServiceAccount(namespace string, name string) (*api.ServiceAccount, error) {
-	key := &api.ServiceAccount{ObjectMeta: api.ObjectMeta{Namespace: namespace}}
+	key := &api.ServiceAccount{ObjectMeta: metav1.ObjectMeta{Namespace: namespace}}
 	index, err := s.serviceAccounts.Index("namespace", key)
 	if err != nil {
 		return nil, err
@@ -327,7 +327,7 @@ func (s *serviceAccount) getReferencedServiceAccountToken(serviceAccount *api.Se
 
 // getServiceAccountTokens returns all ServiceAccountToken secrets for the given ServiceAccount
 func (s *serviceAccount) getServiceAccountTokens(serviceAccount *api.ServiceAccount) ([]*api.Secret, error) {
-	key := &api.Secret{ObjectMeta: api.ObjectMeta{Namespace: serviceAccount.Namespace}}
+	key := &api.Secret{ObjectMeta: metav1.ObjectMeta{Namespace: serviceAccount.Namespace}}
 	index, err := s.secrets.Index("namespace", key)
 	if err != nil {
 		return nil, err

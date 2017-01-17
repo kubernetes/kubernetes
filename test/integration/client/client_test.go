@@ -71,7 +71,7 @@ func TestClient(t *testing.T) {
 
 	// get a validation error
 	pod := &v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: "test",
 			Namespace:    ns.Name,
 		},
@@ -129,7 +129,7 @@ func TestAtomicPut(t *testing.T) {
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: c.Core().RESTClient().APIVersion().String(),
 		},
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      "atomicrc",
 			Namespace: ns.Name,
 			Labels: map[string]string{
@@ -142,7 +142,7 @@ func TestAtomicPut(t *testing.T) {
 				"foo": "bar",
 			},
 			Template: &v1.PodTemplateSpec{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
 						"foo": "bar",
 					},
@@ -223,7 +223,7 @@ func TestPatch(t *testing.T) {
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: c.Core().RESTClient().APIVersion().String(),
 		},
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: ns.Name,
 			Labels:    map[string]string{},
@@ -327,7 +327,7 @@ func TestPatchWithCreateOnUpdate(t *testing.T) {
 	defer framework.DeleteTestingNamespace(ns, s, t)
 
 	endpointTemplate := &v1.Endpoints{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      "patchendpoint",
 			Namespace: ns.Name,
 		},
@@ -462,7 +462,7 @@ func TestSingleWatch(t *testing.T) {
 	mkEvent := func(i int) *v1.Event {
 		name := fmt.Sprintf("event-%v", i)
 		return &v1.Event{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Namespace: ns.Name,
 				Name:      name,
 			},
@@ -547,7 +547,7 @@ func TestMultiWatch(t *testing.T) {
 	dummyEvent := func(i int) *v1.Event {
 		name := fmt.Sprintf("unrelated-%v", i)
 		return &v1.Event{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:      fmt.Sprintf("%v.%x", name, time.Now().UnixNano()),
 				Namespace: ns.Name,
 			},
@@ -572,7 +572,7 @@ func TestMultiWatch(t *testing.T) {
 		watchesStarted.Add(1)
 		name := fmt.Sprintf("multi-watch-%v", i)
 		got, err := client.Core().Pods(ns.Name).Create(&v1.Pod{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:   name,
 				Labels: labels.Set{"watchlabel": name},
 			},
@@ -679,7 +679,7 @@ func TestMultiWatch(t *testing.T) {
 					}
 					name := fmt.Sprintf("unrelated-%v", i)
 					_, err := client.Core().Pods(ns.Name).Create(&v1.Pod{
-						ObjectMeta: v1.ObjectMeta{
+						ObjectMeta: metav1.ObjectMeta{
 							Name: name,
 						},
 						Spec: v1.PodSpec{
@@ -743,7 +743,7 @@ func TestMultiWatch(t *testing.T) {
 
 func runSelfLinkTestOnNamespace(t *testing.T, c clientset.Interface, namespace string) {
 	podBody := v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      "selflinktest",
 			Namespace: namespace,
 			Labels: map[string]string{

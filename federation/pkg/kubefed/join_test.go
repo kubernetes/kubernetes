@@ -237,7 +237,7 @@ func fakeJoinHostFactory(clusterName, clusterCtx, secretName, server, token stri
 			Kind:       "Secret",
 			APIVersion: "v1",
 		},
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      secretName,
 			Namespace: util.DefaultFederationSystemNamespace,
 		},
@@ -277,7 +277,7 @@ func fakeJoinHostFactory(clusterName, clusterCtx, secretName, server, token stri
 
 func fakeCluster(clusterName, secretName, server string) federationapi.Cluster {
 	return federationapi.Cluster{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: clusterName,
 		},
 		Spec: federationapi.ClusterSpec{

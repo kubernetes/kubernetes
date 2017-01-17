@@ -775,7 +775,7 @@ func makePersistentVolume(pvConfig persistentVolumeConfig) *v1.PersistentVolume 
 	}
 
 	return &v1.PersistentVolume{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: pvConfig.namePrefix,
 			Annotations: map[string]string{
 				volumehelper.VolumeGidAnnotationKey: "777",
@@ -805,7 +805,7 @@ func makePersistentVolumeClaim(ns string) *v1.PersistentVolumeClaim {
 	// Specs are expected to match this test's PersistentVolume
 
 	return &v1.PersistentVolumeClaim{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: "pvc-",
 			Namespace:    ns,
 			Annotations: map[string]string{
@@ -846,7 +846,7 @@ func makePod(ns string, pvcName string, command ...string) *v1.Pod {
 			Kind:       "Pod",
 			APIVersion: api.Registry.GroupOrDie(v1.GroupName).GroupVersion.String(),
 		},
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: "client-",
 			Namespace:    ns,
 		},

@@ -64,14 +64,14 @@ func createController(storage *REST, rc api.ReplicationController, t *testing.T)
 
 func validNewController() *api.ReplicationController {
 	return &api.ReplicationController{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: namespace,
 		},
 		Spec: api.ReplicationControllerSpec{
 			Selector: map[string]string{"a": "b"},
 			Template: &api.PodTemplateSpec{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{"a": "b"},
 				},
 				Spec: api.PodSpec{
@@ -98,7 +98,7 @@ func TestCreate(t *testing.T) {
 	defer storage.Controller.Store.DestroyFunc()
 	test := registrytest.New(t, storage.Controller.Store)
 	controller := validNewController()
-	controller.ObjectMeta = api.ObjectMeta{}
+	controller.ObjectMeta = metav1.ObjectMeta{}
 	test.TestCreate(
 		// valid
 		controller,
@@ -263,7 +263,7 @@ func TestScaleGet(t *testing.T) {
 	}
 
 	want := &autoscaling.Scale{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:              name,
 			Namespace:         namespace,
 			UID:               rc.UID,
@@ -300,7 +300,7 @@ func TestScaleUpdate(t *testing.T) {
 	}
 	replicas := int32(12)
 	update := autoscaling.Scale{
-		ObjectMeta: api.ObjectMeta{Name: name, Namespace: namespace},
+		ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: namespace},
 		Spec: autoscaling.ScaleSpec{
 			Replicas: replicas,
 		},

@@ -49,10 +49,7 @@ func RegisterConversions(scheme *runtime.Scheme) error {
 }
 
 func autoConvert_v1alpha1_APIService_To_apiregistration_APIService(in *APIService, out *apiregistration.APIService, s conversion.Scope) error {
-	// TODO: Inefficient conversion - can we improve it?
-	if err := s.Convert(&in.ObjectMeta, &out.ObjectMeta, 0); err != nil {
-		return err
-	}
+	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_v1alpha1_APIServiceSpec_To_apiregistration_APIServiceSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
 	}
@@ -67,10 +64,7 @@ func Convert_v1alpha1_APIService_To_apiregistration_APIService(in *APIService, o
 }
 
 func autoConvert_apiregistration_APIService_To_v1alpha1_APIService(in *apiregistration.APIService, out *APIService, s conversion.Scope) error {
-	// TODO: Inefficient conversion - can we improve it?
-	if err := s.Convert(&in.ObjectMeta, &out.ObjectMeta, 0); err != nil {
-		return err
-	}
+	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_apiregistration_APIServiceSpec_To_v1alpha1_APIServiceSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
 	}

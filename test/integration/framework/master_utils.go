@@ -403,7 +403,7 @@ func CreateTestingNamespace(baseName string, apiserver *httptest.Server, t *test
 	// Currently we neither create the namespace nor delete all its contents at the end.
 	// But as long as tests are not using the same namespaces, this should work fine.
 	return &v1.Namespace{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			// TODO: Once we start creating namespaces, switch to GenerateName.
 			Name: baseName,
 		},

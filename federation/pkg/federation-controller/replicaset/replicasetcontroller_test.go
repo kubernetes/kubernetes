@@ -182,7 +182,7 @@ func TestReplicaSetController(t *testing.T) {
 
 func newReplicaSetWithReplicas(name string, replicas int32) *extensionsv1.ReplicaSet {
 	return &extensionsv1.ReplicaSet{
-		ObjectMeta: apiv1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: apiv1.NamespaceDefault,
 			SelfLink:  "/api/v1/namespaces/default/replicasets/name",

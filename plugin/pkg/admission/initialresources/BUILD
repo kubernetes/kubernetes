@@ -48,6 +48,7 @@ go_test(
         "//pkg/api:go_default_library",
         "//pkg/api/resource:go_default_library",
         "//vendor:github.com/stretchr/testify/require",
+        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
     ],
 )
 

@@ -21,10 +21,10 @@ limitations under the License.
 package v2alpha1
 
 import (
-	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
-	v1 "k8s.io/kubernetes/pkg/api/v1"
+	api_v1 "k8s.io/kubernetes/pkg/api/v1"
 	reflect "reflect"
 )
 
@@ -55,8 +55,10 @@ func DeepCopy_v2alpha1_CronJob(in interface{}, out interface{}, c *conversion.Cl
 		in := in.(*CronJob)
 		out := out.(*CronJob)
 		*out = *in
-		if err := v1.DeepCopy_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, c); err != nil {
+		if newVal, err := c.DeepCopy(&in.ObjectMeta); err != nil {
 			return err
+		} else {
+			out.ObjectMeta = *newVal.(*v1.ObjectMeta)
 		}
 		if err := DeepCopy_v2alpha1_CronJobSpec(&in.Spec, &out.Spec, c); err != nil {
 			return err
@@ -115,14 +117,14 @@ func DeepCopy_v2alpha1_CronJobStatus(in interface{}, out interface{}, c *convers
 		*out = *in
 		if in.Active != nil {
 			in, out := &in.Active, &out.Active
-			*out = make([]v1.ObjectReference, len(*in))
+			*out = make([]api_v1.ObjectReference, len(*in))
 			for i := range *in {
 				(*out)[i] = (*in)[i]
 			}
 		}
 		if in.LastScheduleTime != nil {
 			in, out := &in.LastScheduleTime, &out.LastScheduleTime
-			*out = new(meta_v1.Time)
+			*out = new(v1.Time)
 			**out = (*in).DeepCopy()
 		}
 		return nil
@@ -134,8 +136,10 @@ func DeepCopy_v2alpha1_Job(in interface{}, out interface{}, c *conversion.Cloner
 		in := in.(*Job)
 		out := out.(*Job)
 		*out = *in
-		if err := v1.DeepCopy_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, c); err != nil {
+		if newVal, err := c.DeepCopy(&in.ObjectMeta); err != nil {
 			return err
+		} else {
+			out.ObjectMeta = *newVal.(*v1.ObjectMeta)
 		}
 		if err := DeepCopy_v2alpha1_JobSpec(&in.Spec, &out.Spec, c); err != nil {
 			return err
@@ -201,7 +205,7 @@ func DeepCopy_v2alpha1_JobSpec(in interface{}, out interface{}, c *conversion.Cl
 			if newVal, err := c.DeepCopy(*in); err != nil {
 				return err
 			} else {
-				*out = newVal.(*meta_v1.LabelSelector)
+				*out = newVal.(*v1.LabelSelector)
 			}
 		}
 		if in.ManualSelector != nil {
@@ -209,7 +213,7 @@ func DeepCopy_v2alpha1_JobSpec(in interface{}, out interface{}, c *conversion.Cl
 			*out = new(bool)
 			**out = **in
 		}
-		if err := v1.DeepCopy_v1_PodTemplateSpec(&in.Template, &out.Template, c); err != nil {
+		if err := api_v1.DeepCopy_v1_PodTemplateSpec(&in.Template, &out.Template, c); err != nil {
 			return err
 		}
 		return nil
@@ -232,12 +236,12 @@ func DeepCopy_v2alpha1_JobStatus(in interface{}, out interface{}, c *conversion.
 		}
 		if in.StartTime != nil {
 			in, out := &in.StartTime, &out.StartTime
-			*out = new(meta_v1.Time)
+			*out = new(v1.Time)
 			**out = (*in).DeepCopy()
 		}
 		if in.CompletionTime != nil {
 			in, out := &in.CompletionTime, &out.CompletionTime
-			*out = new(meta_v1.Time)
+			*out = new(v1.Time)
 			**out = (*in).DeepCopy()
 		}
 		return nil
@@ -249,8 +253,10 @@ func DeepCopy_v2alpha1_JobTemplate(in interface{}, out interface{}, c *conversio
 		in := in.(*JobTemplate)
 		out := out.(*JobTemplate)
 		*out = *in
-		if err := v1.DeepCopy_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, c); err != nil {
+		if newVal, err := c.DeepCopy(&in.ObjectMeta); err != nil {
 			return err
+		} else {
+			out.ObjectMeta = *newVal.(*v1.ObjectMeta)
 		}
 		if err := DeepCopy_v2alpha1_JobTemplateSpec(&in.Template, &out.Template, c); err != nil {
 			return err
@@ -264,8 +270,10 @@ func DeepCopy_v2alpha1_JobTemplateSpec(in interface{}, out interface{}, c *conve
 		in := in.(*JobTemplateSpec)
 		out := out.(*JobTemplateSpec)
 		*out = *in
-		if err := v1.DeepCopy_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, c); err != nil {
+		if newVal, err := c.DeepCopy(&in.ObjectMeta); err != nil {
 			return err
+		} else {
+			out.ObjectMeta = *newVal.(*v1.ObjectMeta)
 		}
 		if err := DeepCopy_v2alpha1_JobSpec(&in.Spec, &out.Spec, c); err != nil {
 			return err

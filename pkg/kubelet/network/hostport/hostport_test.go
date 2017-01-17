@@ -23,6 +23,7 @@ import (
 	"strings"
 	"testing"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
@@ -69,7 +70,7 @@ func TestOpenPodHostports(t *testing.T) {
 		// New pod that we are going to add
 		{
 			&v1.Pod{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-pod",
 					Namespace: v1.NamespaceDefault,
 				},
@@ -124,7 +125,7 @@ func TestOpenPodHostports(t *testing.T) {
 		// Already running pod
 		{
 			&v1.Pod{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:      "another-test-pod",
 					Namespace: v1.NamespaceDefault,
 				},

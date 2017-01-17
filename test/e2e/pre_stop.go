@@ -42,7 +42,7 @@ type State struct {
 func testPreStop(c clientset.Interface, ns string) {
 	// This is the server that will receive the preStop notification
 	podDescr := &v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: "server",
 		},
 		Spec: v1.PodSpec{
@@ -75,7 +75,7 @@ func testPreStop(c clientset.Interface, ns string) {
 	framework.ExpectNoError(err, "getting pod info")
 
 	preStopDescr := &v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: "tester",
 		},
 		Spec: v1.PodSpec{

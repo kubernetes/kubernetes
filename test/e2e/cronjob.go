@@ -232,7 +232,7 @@ func newTestCronJob(name, schedule string, concurrencyPolicy batch.ConcurrencyPo
 	parallelism := int32(1)
 	completions := int32(1)
 	sj := &batch.CronJob{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 		},
 		Spec: batch.CronJobSpec{

@@ -36,6 +36,7 @@ import (
 	"github.com/golang/mock/gomock"
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	"github.com/stretchr/testify/assert"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	kubetypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -1918,7 +1919,7 @@ func makePod(name string, spec *v1.PodSpec) *v1.Pod {
 		spec = &v1.PodSpec{Containers: []v1.Container{{Name: "foo"}, {Name: "bar"}}}
 	}
 	pod := &v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			UID:       "12345678",
 			Name:      name,
 			Namespace: "new",

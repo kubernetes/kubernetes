@@ -19,6 +19,7 @@ package tests
 import (
 	"testing"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
@@ -27,7 +28,7 @@ import (
 func TestDecodeList(t *testing.T) {
 	pl := &api.List{
 		Items: []runtime.Object{
-			&api.Pod{ObjectMeta: api.ObjectMeta{Name: "1"}},
+			&api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "1"}},
 			&runtime.Unknown{
 				TypeMeta:    runtime.TypeMeta{Kind: "Pod", APIVersion: api.Registry.GroupOrDie(api.GroupName).GroupVersion.String()},
 				Raw:         []byte(`{"kind":"Pod","apiVersion":"` + api.Registry.GroupOrDie(api.GroupName).GroupVersion.String() + `","metadata":{"name":"test"}}`),

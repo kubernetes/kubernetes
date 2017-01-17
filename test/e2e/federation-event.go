@@ -20,6 +20,7 @@ import (
 	"fmt"
 
 	. "github.com/onsi/ginkgo"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -71,7 +72,7 @@ func createEventOrFail(clientset *federation_clientset.Clientset, namespace stri
 	By(fmt.Sprintf("Creating federated event %q in namespace %q", FederationEventName, namespace))
 
 	event := &v1.Event{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      FederationEventName,
 			Namespace: namespace,
 		},

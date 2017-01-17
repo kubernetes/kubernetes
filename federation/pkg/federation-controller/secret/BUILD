@@ -49,6 +49,7 @@ go_test(
         "//pkg/client/clientset_generated/clientset/fake:go_default_library",
         "//vendor:github.com/golang/glog",
         "//vendor:github.com/stretchr/testify/assert",
+        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/runtime",
         "//vendor:k8s.io/apimachinery/pkg/types",
         "//vendor:k8s.io/apimachinery/pkg/util/wait",

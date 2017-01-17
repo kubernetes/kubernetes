@@ -19,6 +19,7 @@ package storage
 import (
 	"testing"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/api"
@@ -89,7 +90,7 @@ func toIngressRules(hostRules map[string]IngressRuleValues) []extensions.Ingress
 
 func newIngress(pathMap map[string]string) *extensions.Ingress {
 	return &extensions.Ingress{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: namespace,
 		},

@@ -105,7 +105,7 @@ func (r *NodeRegistry) DeleteNode(ctx genericapirequest.Context, nodeID string) 
 	var newList []api.Node
 	for _, node := range r.Nodes.Items {
 		if node.Name != nodeID {
-			newList = append(newList, api.Node{ObjectMeta: api.ObjectMeta{Name: node.Name}})
+			newList = append(newList, api.Node{ObjectMeta: metav1.ObjectMeta{Name: node.Name}})
 		}
 	}
 	r.Nodes.Items = newList

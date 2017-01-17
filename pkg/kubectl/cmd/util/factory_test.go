@@ -74,7 +74,7 @@ func TestPortsForObject(t *testing.T) {
 	f := NewFactory(nil)
 
 	pod := &api.Pod{
-		ObjectMeta: api.ObjectMeta{Name: "baz", Namespace: "test", ResourceVersion: "12"},
+		ObjectMeta: metav1.ObjectMeta{Name: "baz", Namespace: "test", ResourceVersion: "12"},
 		Spec: api.PodSpec{
 			Containers: []api.Container{
 				{
@@ -111,7 +111,7 @@ func TestProtocolsForObject(t *testing.T) {
 	f := NewFactory(nil)
 
 	pod := &api.Pod{
-		ObjectMeta: api.ObjectMeta{Name: "baz", Namespace: "test", ResourceVersion: "12"},
+		ObjectMeta: metav1.ObjectMeta{Name: "baz", Namespace: "test", ResourceVersion: "12"},
 		Spec: api.PodSpec{
 			Containers: []api.Container{
 				{
@@ -161,7 +161,7 @@ func TestLabelsForObject(t *testing.T) {
 		{
 			name: "successful re-use of labels",
 			object: &api.Service{
-				ObjectMeta: api.ObjectMeta{Name: "baz", Namespace: "test", Labels: map[string]string{"svc": "test"}},
+				ObjectMeta: metav1.ObjectMeta{Name: "baz", Namespace: "test", Labels: map[string]string{"svc": "test"}},
 				TypeMeta:   metav1.TypeMeta{Kind: "Service", APIVersion: "v1"},
 			},
 			expected: "svc=test",
@@ -170,7 +170,7 @@ func TestLabelsForObject(t *testing.T) {
 		{
 			name: "empty labels",
 			object: &api.Service{
-				ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "test", Labels: map[string]string{}},
+				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "test", Labels: map[string]string{}},
 				TypeMeta:   metav1.TypeMeta{Kind: "Service", APIVersion: "v1"},
 			},
 			expected: "",
@@ -179,7 +179,7 @@ func TestLabelsForObject(t *testing.T) {
 		{
 			name: "nil labels",
 			object: &api.Service{
-				ObjectMeta: api.ObjectMeta{Name: "zen", Namespace: "test", Labels: nil},
+				ObjectMeta: metav1.ObjectMeta{Name: "zen", Namespace: "test", Labels: nil},
 				TypeMeta:   metav1.TypeMeta{Kind: "Service", APIVersion: "v1"},
 			},
 			expected: "",
@@ -437,7 +437,7 @@ func newPodList(count, isUnready, isUnhealthy int, labels map[string]string) *ap
 	pods := []api.Pod{}
 	for i := 0; i < count; i++ {
 		newPod := api.Pod{
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:              fmt.Sprintf("pod-%d", i+1),
 				Namespace:         api.NamespaceDefault,
 				CreationTimestamp: metav1.Date(2016, time.April, 1, 1, 0, i, 0, time.UTC),
@@ -483,7 +483,7 @@ func TestGetFirstPod(t *testing.T) {
 			podList: newPodList(2, -1, -1, labelSet),
 			sortBy:  func(pods []*v1.Pod) sort.Interface { return controller.ByLogging(pods) },
 			expected: &api.Pod{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:              "pod-1",
 					Namespace:         api.NamespaceDefault,
 					CreationTimestamp: metav1.Date(2016, time.April, 1, 1, 0, 0, 0, time.UTC),
@@ -505,7 +505,7 @@ func TestGetFirstPod(t *testing.T) {
 			podList: newPodList(2, -1, 1, labelSet),
 			sortBy:  func(pods []*v1.Pod) sort.Interface { return controller.ByLogging(pods) },
 			expected: &api.Pod{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:              "pod-2",
 					Namespace:         api.NamespaceDefault,
 					CreationTimestamp: metav1.Date(2016, time.April, 1, 1, 0, 1, 0, time.UTC),
@@ -528,7 +528,7 @@ func TestGetFirstPod(t *testing.T) {
 			podList: newPodList(2, -1, -1, labelSet),
 			sortBy:  func(pods []*v1.Pod) sort.Interface { return sort.Reverse(controller.ActivePods(pods)) },
 			expected: &api.Pod{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:              "pod-1",
 					Namespace:         api.NamespaceDefault,
 					CreationTimestamp: metav1.Date(2016, time.April, 1, 1, 0, 0, 0, time.UTC),
@@ -552,7 +552,7 @@ func TestGetFirstPod(t *testing.T) {
 				{
 					Type: watch.Modified,
 					Object: &api.Pod{
-						ObjectMeta: api.ObjectMeta{
+						ObjectMeta: metav1.ObjectMeta{
 							Name:              "pod-1",
 							Namespace:         api.NamespaceDefault,
 							CreationTimestamp: metav1.Date(2016, time.April, 1, 1, 0, 0, 0, time.UTC),
@@ -571,7 +571,7 @@ func TestGetFirstPod(t *testing.T) {
 			},
 			sortBy: func(pods []*v1.Pod) sort.Interface { return sort.Reverse(controller.ActivePods(pods)) },
 			expected: &api.Pod{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:              "pod-1",
 					Namespace:         api.NamespaceDefault,
 					CreationTimestamp: metav1.Date(2016, time.April, 1, 1, 0, 0, 0, time.UTC),

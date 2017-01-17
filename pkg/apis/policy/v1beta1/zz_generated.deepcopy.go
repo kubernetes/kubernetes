@@ -21,10 +21,10 @@ limitations under the License.
 package v1beta1
 
 import (
-	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
-	v1 "k8s.io/kubernetes/pkg/api/v1"
+	api_v1 "k8s.io/kubernetes/pkg/api/v1"
 	reflect "reflect"
 )
 
@@ -49,13 +49,15 @@ func DeepCopy_v1beta1_Eviction(in interface{}, out interface{}, c *conversion.Cl
 		in := in.(*Eviction)
 		out := out.(*Eviction)
 		*out = *in
-		if err := v1.DeepCopy_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, c); err != nil {
+		if newVal, err := c.DeepCopy(&in.ObjectMeta); err != nil {
 			return err
+		} else {
+			out.ObjectMeta = *newVal.(*v1.ObjectMeta)
 		}
 		if in.DeleteOptions != nil {
 			in, out := &in.DeleteOptions, &out.DeleteOptions
-			*out = new(v1.DeleteOptions)
-			if err := v1.DeepCopy_v1_DeleteOptions(*in, *out, c); err != nil {
+			*out = new(api_v1.DeleteOptions)
+			if err := api_v1.DeepCopy_v1_DeleteOptions(*in, *out, c); err != nil {
 				return err
 			}
 		}
@@ -68,8 +70,10 @@ func DeepCopy_v1beta1_PodDisruptionBudget(in interface{}, out interface{}, c *co
 		in := in.(*PodDisruptionBudget)
 		out := out.(*PodDisruptionBudget)
 		*out = *in
-		if err := v1.DeepCopy_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, c); err != nil {
+		if newVal, err := c.DeepCopy(&in.ObjectMeta); err != nil {
 			return err
+		} else {
+			out.ObjectMeta = *newVal.(*v1.ObjectMeta)
 		}
 		if err := DeepCopy_v1beta1_PodDisruptionBudgetSpec(&in.Spec, &out.Spec, c); err != nil {
 			return err
@@ -109,7 +113,7 @@ func DeepCopy_v1beta1_PodDisruptionBudgetSpec(in interface{}, out interface{}, c
 			if newVal, err := c.DeepCopy(*in); err != nil {
 				return err
 			} else {
-				*out = newVal.(*meta_v1.LabelSelector)
+				*out = newVal.(*v1.LabelSelector)
 			}
 		}
 		return nil
@@ -123,7 +127,7 @@ func DeepCopy_v1beta1_PodDisruptionBudgetStatus(in interface{}, out interface{},
 		*out = *in
 		if in.DisruptedPods != nil {
 			in, out := &in.DisruptedPods, &out.DisruptedPods
-			*out = make(map[string]meta_v1.Time)
+			*out = make(map[string]v1.Time)
 			for key, val := range *in {
 				(*out)[key] = val.DeepCopy()
 			}

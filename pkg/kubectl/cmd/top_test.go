@@ -67,7 +67,7 @@ func testNodeMetricsData() (*metricsapi.NodeMetricsList, *api.NodeList) {
 		},
 		Items: []metricsapi.NodeMetrics{
 			{
-				ObjectMeta: v1.ObjectMeta{Name: "node1", ResourceVersion: "10"},
+				ObjectMeta: metav1.ObjectMeta{Name: "node1", ResourceVersion: "10"},
 				Window:     unversioned.Duration{Duration: time.Minute},
 				Usage: v1.ResourceList{
 					v1.ResourceCPU:     *resource.NewMilliQuantity(1, resource.DecimalSI),
@@ -76,7 +76,7 @@ func testNodeMetricsData() (*metricsapi.NodeMetricsList, *api.NodeList) {
 				},
 			},
 			{
-				ObjectMeta: v1.ObjectMeta{Name: "node2", ResourceVersion: "11"},
+				ObjectMeta: metav1.ObjectMeta{Name: "node2", ResourceVersion: "11"},
 				Window:     unversioned.Duration{Duration: time.Minute},
 				Usage: v1.ResourceList{
 					v1.ResourceCPU:     *resource.NewMilliQuantity(5, resource.DecimalSI),
@@ -92,7 +92,7 @@ func testNodeMetricsData() (*metricsapi.NodeMetricsList, *api.NodeList) {
 		},
 		Items: []api.Node{
 			{
-				ObjectMeta: api.ObjectMeta{Name: "node1", ResourceVersion: "10"},
+				ObjectMeta: metav1.ObjectMeta{Name: "node1", ResourceVersion: "10"},
 				Status: api.NodeStatus{
 					Allocatable: api.ResourceList{
 						api.ResourceCPU:     *resource.NewMilliQuantity(10, resource.DecimalSI),
@@ -102,7 +102,7 @@ func testNodeMetricsData() (*metricsapi.NodeMetricsList, *api.NodeList) {
 				},
 			},
 			{
-				ObjectMeta: api.ObjectMeta{Name: "node2", ResourceVersion: "11"},
+				ObjectMeta: metav1.ObjectMeta{Name: "node2", ResourceVersion: "11"},
 				Status: api.NodeStatus{
 					Allocatable: api.ResourceList{
 						api.ResourceCPU:     *resource.NewMilliQuantity(50, resource.DecimalSI),

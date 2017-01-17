@@ -30,6 +30,7 @@ import (
 
 	"github.com/golang/glog"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
@@ -268,17 +269,17 @@ func TestRBAC(t *testing.T) {
 			bootstrapRoles: bootstrapRoles{
 				clusterRoles: []rbacapi.ClusterRole{
 					{
-						ObjectMeta: api.ObjectMeta{Name: "allow-all"},
+						ObjectMeta: metav1.ObjectMeta{Name: "allow-all"},
 						Rules:      []rbacapi.PolicyRule{ruleAllowAll},
 					},
 					{
-						ObjectMeta: api.ObjectMeta{Name: "read-pods"},
+						ObjectMeta: metav1.ObjectMeta{Name: "read-pods"},
 						Rules:      []rbacapi.PolicyRule{ruleReadPods},
 					},
 				},
 				clusterRoleBindings: []rbacapi.ClusterRoleBinding{
 					{
-						ObjectMeta: api.ObjectMeta{Name: "read-pods"},
+						ObjectMeta: metav1.ObjectMeta{Name: "read-pods"},
 						Subjects: []rbacapi.Subject{
 							{Kind: "User", Name: "pod-reader"},
 						},
@@ -306,17 +307,17 @@ func TestRBAC(t *testing.T) {
 			bootstrapRoles: bootstrapRoles{
 				clusterRoles: []rbacapi.ClusterRole{
 					{
-						ObjectMeta: api.ObjectMeta{Name: "write-jobs"},
+						ObjectMeta: metav1.ObjectMeta{Name: "write-jobs"},
 						Rules:      []rbacapi.PolicyRule{ruleWriteJobs},
 					},
 					{
-						ObjectMeta: api.ObjectMeta{Name: "create-rolebindings"},
+						ObjectMeta: metav1.ObjectMeta{Name: "create-rolebindings"},
 						Rules: []rbacapi.PolicyRule{
 							rbacapi.NewRule("create").Groups("rbac.authorization.k8s.io").Resources("rolebindings").RuleOrDie(),
 						},
 					},
 					{
-						ObjectMeta: api.ObjectMeta{Name: "bind-any-clusterrole"},
+						ObjectMeta: metav1.ObjectMeta{Name: "bind-any-clusterrole"},
 						Rules: []rbacapi.PolicyRule{
 							rbacapi.NewRule("bind").Groups("rbac.authorization.k8s.io").Resources("clusterroles").RuleOrDie(),
 						},
@@ -324,12 +325,12 @@ func TestRBAC(t *testing.T) {
 				},
 				clusterRoleBindings: []rbacapi.ClusterRoleBinding{
 					{
-						ObjectMeta: api.ObjectMeta{Name: "write-jobs"},
+						ObjectMeta: metav1.ObjectMeta{Name: "write-jobs"},
 						Subjects:   []rbacapi.Subject{{Kind: "User", Name: "job-writer"}},
 						RoleRef:    rbacapi.RoleRef{Kind: "ClusterRole", Name: "write-jobs"},
 					},
 					{
-						ObjectMeta: api.ObjectMeta{Name: "create-rolebindings"},
+						ObjectMeta: metav1.ObjectMeta{Name: "create-rolebindings"},
 						Subjects: []rbacapi.Subject{
 							{Kind: "User", Name: "job-writer"},
 							{Kind: "User", Name: "nonescalating-rolebinding-writer"},
@@ -338,19 +339,19 @@ func TestRBAC(t *testing.T) {
 						RoleRef: rbacapi.RoleRef{Kind: "ClusterRole", Name: "create-rolebindings"},
 					},
 					{
-						ObjectMeta: api.ObjectMeta{Name: "bind-any-clusterrole"},
+						ObjectMeta: metav1.ObjectMeta{Name: "bind-any-clusterrole"},
 						Subjects:   []rbacapi.Subject{{Kind: "User", Name: "any-rolebinding-writer"}},
 						RoleRef:    rbacapi.RoleRef{Kind: "ClusterRole", Name: "bind-any-clusterrole"},
 					},
 				},
 				roleBindings: []rbacapi.RoleBinding{
 					{
-						ObjectMeta: api.ObjectMeta{Name: "write-jobs", Namespace: "job-namespace"},
+						ObjectMeta: metav1.ObjectMeta{Name: "write-jobs", Namespace: "job-namespace"},
 						Subjects:   []rbacapi.Subject{{Kind: "User", Name: "job-writer-namespace"}},
 						RoleRef:    rbacapi.RoleRef{Kind: "ClusterRole", Name: "write-jobs"},
 					},
 					{
-						ObjectMeta: api.ObjectMeta{Name: "create-rolebindings", Namespace: "job-namespace"},
+						ObjectMeta: metav1.ObjectMeta{Name: "create-rolebindings", Namespace: "job-namespace"},
 						Subjects:   []rbacapi.Subject{{Kind: "User", Name: "job-writer-namespace"}},
 						RoleRef:    rbacapi.RoleRef{Kind: "ClusterRole", Name: "create-rolebindings"},
 					},

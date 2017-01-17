@@ -21,11 +21,12 @@ limitations under the License.
 package batch
 
 import (
+	reflect "reflect"
+
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	api "k8s.io/kubernetes/pkg/api"
-	reflect "reflect"
 )
 
 func init() {

@@ -31,6 +31,7 @@ go_test(
         "//pkg/util/maps:go_default_library",
         "//vendor:github.com/davecgh/go-spew/spew",
         "//vendor:github.com/stretchr/testify/assert",
+        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
     ],
 )
 

@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"os"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -96,7 +97,7 @@ var _ = framework.KubeDescribe("Secrets", func() {
 		}
 
 		pod := &v1.Pod{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name: "pod-secrets-" + string(uuid.NewUUID()),
 			},
 			Spec: v1.PodSpec{
@@ -160,7 +161,7 @@ var _ = framework.KubeDescribe("Secrets", func() {
 		}
 
 		pod := &v1.Pod{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name: "pod-secrets-" + string(uuid.NewUUID()),
 			},
 			Spec: v1.PodSpec{
@@ -196,7 +197,7 @@ var _ = framework.KubeDescribe("Secrets", func() {
 
 func secretForTest(namespace, name string) *v1.Secret {
 	return &v1.Secret{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Namespace: namespace,
 			Name:      name,
 		},
@@ -222,7 +223,7 @@ func doSecretE2EWithoutMapping(f *framework.Framework, defaultMode *int32, secre
 	}
 
 	pod := &v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      "pod-secrets-" + string(uuid.NewUUID()),
 			Namespace: f.Namespace.Name,
 		},
@@ -294,7 +295,7 @@ func doSecretE2EWithMapping(f *framework.Framework, mode *int32) {
 	}
 
 	pod := &v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: "pod-secrets-" + string(uuid.NewUUID()),
 		},
 		Spec: v1.PodSpec{

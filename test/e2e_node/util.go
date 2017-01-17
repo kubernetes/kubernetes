@@ -251,7 +251,7 @@ func makeKubeletConfigMap(nodeName string, kubeCfg *componentconfig.KubeletConfi
 	framework.ExpectNoError(err)
 
 	cmap := &v1.ConfigMap{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: fmt.Sprintf("kubelet-%s", nodeName),
 		},
 		Data: map[string]string{

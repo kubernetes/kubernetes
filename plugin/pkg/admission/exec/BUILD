@@ -34,6 +34,7 @@ go_test(
         "//pkg/client/clientset_generated/internalclientset/fake:go_default_library",
         "//pkg/client/testing/core:go_default_library",
         "//pkg/genericapiserver/api/rest:go_default_library",
+        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/runtime",
     ],
 )

@@ -99,7 +99,7 @@ func getKey(rs *extensions.ReplicaSet, t *testing.T) string {
 func newReplicaSet(replicas int, selectorMap map[string]string) *extensions.ReplicaSet {
 	rs := &extensions.ReplicaSet{
 		TypeMeta: metav1.TypeMeta{APIVersion: api.Registry.GroupOrDie(v1.GroupName).GroupVersion.String()},
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			UID:             uuid.NewUUID(),
 			Name:            "foobar",
 			Namespace:       v1.NamespaceDefault,
@@ -109,7 +109,7 @@ func newReplicaSet(replicas int, selectorMap map[string]string) *extensions.Repl
 			Replicas: func() *int32 { i := int32(replicas); return &i }(),
 			Selector: &metav1.LabelSelector{MatchLabels: selectorMap},
 			Template: v1.PodTemplateSpec{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
 						"name": "foo",
 						"type": "production",
@@ -147,7 +147,7 @@ func newPod(name string, rs *extensions.ReplicaSet, status v1.PodPhase, lastTran
 		conditions = append(conditions, condition)
 	}
 	return &v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: rs.Namespace,
 			Labels:    rs.Spec.Selector.MatchLabels,
@@ -463,22 +463,22 @@ func TestPodControllerLookup(t *testing.T) {
 		// pods without labels don't match any ReplicaSets
 		{
 			inRSs: []*extensions.ReplicaSet{
-				{ObjectMeta: v1.ObjectMeta{Name: "basic"}}},
-			pod:       &v1.Pod{ObjectMeta: v1.ObjectMeta{Name: "foo1", Namespace: v1.NamespaceAll}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "basic"}}},
+			pod:       &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo1", Namespace: v1.NamespaceAll}},
 			outRSName: "",
 		},
 		// Matching labels, not namespace
 		{
 			inRSs: []*extensions.ReplicaSet{
 				{
-					ObjectMeta: v1.ObjectMeta{Name: "foo"},
+					ObjectMeta: metav1.ObjectMeta{Name: "foo"},
 					Spec: extensions.ReplicaSetSpec{
 						Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
 					},
 				},
 			},
 			pod: &v1.Pod{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo2", Namespace: "ns", Labels: map[string]string{"foo": "bar"}}},
 			outRSName: "",
 		},
@@ -486,14 +486,14 @@ func TestPodControllerLookup(t *testing.T) {
 		{
 			inRSs: []*extensions.ReplicaSet{
 				{
-					ObjectMeta: v1.ObjectMeta{Name: "bar", Namespace: "ns"},
+					ObjectMeta: metav1.ObjectMeta{Name: "bar", Namespace: "ns"},
 					Spec: extensions.ReplicaSetSpec{
 						Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
 					},
 				},
 			},
 			pod: &v1.Pod{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo3", Namespace: "ns", Labels: map[string]string{"foo": "bar"}}},
 			outRSName: "bar",
 		},
@@ -827,7 +827,7 @@ func doTestControllerBurstReplicas(t *testing.T, burstReplicas, numReplicas int)
 				for _, key := range expectedDels.List() {
 					nsName := strings.Split(key, "/")
 					podsToDelete = append(podsToDelete, &v1.Pod{
-						ObjectMeta: v1.ObjectMeta{
+						ObjectMeta: metav1.ObjectMeta{
 							Name:      nsName[1],
 							Namespace: nsName[0],
 							Labels:    rsSpec.Spec.Selector.MatchLabels,
@@ -868,7 +868,7 @@ func doTestControllerBurstReplicas(t *testing.T, burstReplicas, numReplicas int)
 				}
 				nsName := strings.Split(expectedDel.List()[0], "/")
 				lastPod := &v1.Pod{
-					ObjectMeta: v1.ObjectMeta{
+					ObjectMeta: metav1.ObjectMeta{
 						Name:      nsName[1],
 						Namespace: nsName[0],
 						Labels:    rsSpec.Spec.Selector.MatchLabels,
@@ -1082,7 +1082,7 @@ func TestDeletionTimestamp(t *testing.T) {
 	// An update to the pod (including an update to the deletion timestamp)
 	// should not be counted as a second delete.
 	secondPod := &v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Namespace: pod.Namespace,
 			Name:      "secondPod",
 			Labels:    pod.Labels,

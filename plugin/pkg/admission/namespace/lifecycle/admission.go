@@ -76,7 +76,7 @@ var _ = kubeapiserveradmission.WantsInternalClientSet(&lifecycle{})
 
 func makeNamespaceKey(namespace string) *api.Namespace {
 	return &api.Namespace{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      namespace,
 			Namespace: "",
 		},

@@ -20,6 +20,7 @@ import (
 	"reflect"
 	"testing"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 )
@@ -30,7 +31,7 @@ func TestExtractPodBandwidthResources(t *testing.T) {
 	twenty, _ := resource.ParseQuantity("20M")
 
 	testPod := func(ingress, egress string) *api.Pod {
-		pod := &api.Pod{ObjectMeta: api.ObjectMeta{Annotations: map[string]string{}}}
+		pod := &api.Pod{ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{}}}
 		if len(ingress) != 0 {
 			pod.Annotations["kubernetes.io/ingress-bandwidth"] = ingress
 		}

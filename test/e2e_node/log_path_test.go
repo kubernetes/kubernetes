@@ -47,7 +47,7 @@ var _ = framework.KubeDescribe("ContainerLogPath", func() {
 				logDir := kubelet.ContainerLogsDir
 
 				logPod := &v1.Pod{
-					ObjectMeta: v1.ObjectMeta{
+					ObjectMeta: metav1.ObjectMeta{
 						Name: logPodName,
 					},
 					Spec: v1.PodSpec{
@@ -75,7 +75,7 @@ var _ = framework.KubeDescribe("ContainerLogPath", func() {
 				expectedlogFile := logDir + "/" + logPodName + "_" + ns + "_" + logContName + "-" + logConID.ID + ".log"
 
 				checkPod := &v1.Pod{
-					ObjectMeta: v1.ObjectMeta{
+					ObjectMeta: metav1.ObjectMeta{
 						Name: checkPodName,
 					},
 					Spec: v1.PodSpec{

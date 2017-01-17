@@ -24,6 +24,7 @@ import (
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	"github.com/stretchr/testify/assert"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	kubetypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/api/v1"
@@ -187,7 +188,7 @@ func makeTestContainer(name, image string) v1.Container {
 // makeTestPod creates a test api pod.
 func makeTestPod(podName, podNamespace, podUID string, containers []v1.Container) *v1.Pod {
 	return &v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			UID:       types.UID(podUID),
 			Name:      podName,
 			Namespace: podNamespace,
@@ -269,7 +270,7 @@ func TestGetPodStatus(t *testing.T) {
 		},
 	}
 	pod := &v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			UID:       "12345678",
 			Name:      "foo",
 			Namespace: "new",
@@ -295,7 +296,7 @@ func TestGetPods(t *testing.T) {
 	assert.NoError(t, err)
 
 	pod := &v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			UID:       "12345678",
 			Name:      "foo",
 			Namespace: "new",
@@ -371,7 +372,7 @@ func TestGetPodContainerID(t *testing.T) {
 	assert.NoError(t, err)
 
 	pod := &v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			UID:       "12345678",
 			Name:      "foo",
 			Namespace: "new",
@@ -418,7 +419,7 @@ func TestGetNetNS(t *testing.T) {
 	assert.NoError(t, err)
 
 	pod := &v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			UID:       "12345678",
 			Name:      "foo",
 			Namespace: "new",
@@ -450,7 +451,7 @@ func TestKillPod(t *testing.T) {
 	assert.NoError(t, err)
 
 	pod := &v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			UID:       "12345678",
 			Name:      "foo",
 			Namespace: "new",
@@ -533,7 +534,7 @@ func TestSyncPod(t *testing.T) {
 		},
 	}
 	pod := &v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			UID:       "12345678",
 			Name:      "foo",
 			Namespace: "new",
@@ -564,7 +565,7 @@ func TestPruneInitContainers(t *testing.T) {
 	init1 := makeTestContainer("init1", "busybox")
 	init2 := makeTestContainer("init2", "busybox")
 	pod := &v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			UID:       "12345678",
 			Name:      "foo",
 			Namespace: "new",
@@ -618,7 +619,7 @@ func TestSyncPodWithInitContainers(t *testing.T) {
 		},
 	}
 	pod := &v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			UID:       "12345678",
 			Name:      "foo",
 			Namespace: "new",

@@ -21,10 +21,11 @@ limitations under the License.
 package storage
 
 import (
+	reflect "reflect"
+
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	api "k8s.io/kubernetes/pkg/api"
-	reflect "reflect"
 )
 
 func init() {

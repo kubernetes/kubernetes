@@ -43,7 +43,7 @@ func TestScopeNamingGenerateLink(t *testing.T) {
 		true,
 	}
 	service := &api.Service{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      "foo",
 			Namespace: "other",
 		},

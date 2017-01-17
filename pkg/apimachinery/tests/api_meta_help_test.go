@@ -49,34 +49,34 @@ func TestIsList(t *testing.T) {
 
 func TestExtractList(t *testing.T) {
 	list1 := []runtime.Object{
-		&api.Pod{ObjectMeta: api.ObjectMeta{Name: "1"}},
-		&api.Service{ObjectMeta: api.ObjectMeta{Name: "2"}},
+		&api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "1"}},
+		&api.Service{ObjectMeta: metav1.ObjectMeta{Name: "2"}},
 	}
 	list2 := &v1.List{
 		Items: []runtime.RawExtension{
 			{Raw: []byte("foo")},
 			{Raw: []byte("bar")},
-			{Object: &v1.Pod{ObjectMeta: v1.ObjectMeta{Name: "other"}}},
+			{Object: &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "other"}}},
 		},
 	}
 	list3 := &fakePtrValueList{
 		Items: []*api.Pod{
-			{ObjectMeta: api.ObjectMeta{Name: "1"}},
-			{ObjectMeta: api.ObjectMeta{Name: "2"}},
+			{ObjectMeta: metav1.ObjectMeta{Name: "1"}},
+			{ObjectMeta: metav1.ObjectMeta{Name: "2"}},
 		},
 	}
 	list4 := &api.PodList{
 		Items: []api.Pod{
-			{ObjectMeta: api.ObjectMeta{Name: "1"}},
-			{ObjectMeta: api.ObjectMeta{Name: "2"}},
-			{ObjectMeta: api.ObjectMeta{Name: "3"}},
+			{ObjectMeta: metav1.ObjectMeta{Name: "1"}},
+			{ObjectMeta: metav1.ObjectMeta{Name: "2"}},
+			{ObjectMeta: metav1.ObjectMeta{Name: "3"}},
 		},
 	}
 	list5 := &v1.PodList{
 		Items: []v1.Pod{
-			{ObjectMeta: v1.ObjectMeta{Name: "1"}},
-			{ObjectMeta: v1.ObjectMeta{Name: "2"}},
-			{ObjectMeta: v1.ObjectMeta{Name: "3"}},
+			{ObjectMeta: metav1.ObjectMeta{Name: "1"}},
+			{ObjectMeta: metav1.ObjectMeta{Name: "2"}},
+			{ObjectMeta: metav1.ObjectMeta{Name: "3"}},
 		},
 	}
 
@@ -142,34 +142,34 @@ func TestExtractList(t *testing.T) {
 
 func TestEachListItem(t *testing.T) {
 	list1 := []runtime.Object{
-		&api.Pod{ObjectMeta: api.ObjectMeta{Name: "1"}},
-		&api.Service{ObjectMeta: api.ObjectMeta{Name: "2"}},
+		&api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "1"}},
+		&api.Service{ObjectMeta: metav1.ObjectMeta{Name: "2"}},
 	}
 	list2 := &v1.List{
 		Items: []runtime.RawExtension{
 			{Raw: []byte("foo")},
 			{Raw: []byte("bar")},
-			{Object: &v1.Pod{ObjectMeta: v1.ObjectMeta{Name: "other"}}},
+			{Object: &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "other"}}},
 		},
 	}
 	list3 := &fakePtrValueList{
 		Items: []*api.Pod{
-			{ObjectMeta: api.ObjectMeta{Name: "1"}},
-			{ObjectMeta: api.ObjectMeta{Name: "2"}},
+			{ObjectMeta: metav1.ObjectMeta{Name: "1"}},
+			{ObjectMeta: metav1.ObjectMeta{Name: "2"}},
 		},
 	}
 	list4 := &api.PodList{
 		Items: []api.Pod{
-			{ObjectMeta: api.ObjectMeta{Name: "1"}},
-			{ObjectMeta: api.ObjectMeta{Name: "2"}},
-			{ObjectMeta: api.ObjectMeta{Name: "3"}},
+			{ObjectMeta: metav1.ObjectMeta{Name: "1"}},
+			{ObjectMeta: metav1.ObjectMeta{Name: "2"}},
+			{ObjectMeta: metav1.ObjectMeta{Name: "3"}},
 		},
 	}
 	list5 := &v1.PodList{
 		Items: []v1.Pod{
-			{ObjectMeta: v1.ObjectMeta{Name: "1"}},
-			{ObjectMeta: v1.ObjectMeta{Name: "2"}},
-			{ObjectMeta: v1.ObjectMeta{Name: "3"}},
+			{ObjectMeta: metav1.ObjectMeta{Name: "1"}},
+			{ObjectMeta: metav1.ObjectMeta{Name: "2"}},
+			{ObjectMeta: metav1.ObjectMeta{Name: "3"}},
 		},
 	}
 
@@ -262,9 +262,9 @@ func (obj fakePtrValueList) GetObjectKind() schema.ObjectKind {
 func TestSetList(t *testing.T) {
 	pl := &api.PodList{}
 	list := []runtime.Object{
-		&api.Pod{ObjectMeta: api.ObjectMeta{Name: "1"}},
-		&api.Pod{ObjectMeta: api.ObjectMeta{Name: "2"}},
-		&api.Pod{ObjectMeta: api.ObjectMeta{Name: "3"}},
+		&api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "1"}},
+		&api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "2"}},
+		&api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "3"}},
 	}
 	err := meta.SetList(pl, list)
 	if err != nil {
@@ -283,9 +283,9 @@ func TestSetList(t *testing.T) {
 func TestSetListToRuntimeObjectArray(t *testing.T) {
 	pl := &api.List{}
 	list := []runtime.Object{
-		&api.Pod{ObjectMeta: api.ObjectMeta{Name: "1"}},
-		&api.Pod{ObjectMeta: api.ObjectMeta{Name: "2"}},
-		&api.Pod{ObjectMeta: api.ObjectMeta{Name: "3"}},
+		&api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "1"}},
+		&api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "2"}},
+		&api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "3"}},
 	}
 	err := meta.SetList(pl, list)
 	if err != nil {

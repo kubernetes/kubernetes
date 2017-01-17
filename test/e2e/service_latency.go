@@ -22,6 +22,7 @@ import (
 	"strings"
 	"time"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/watch"
@@ -317,7 +318,7 @@ func startEndpointWatcher(f *framework.Framework, q *endpointQueries) {
 func singleServiceLatency(f *framework.Framework, name string, q *endpointQueries) (time.Duration, error) {
 	// Make a service that points to that pod.
 	svc := &v1.Service{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: "latency-svc-",
 		},
 		Spec: v1.ServiceSpec{

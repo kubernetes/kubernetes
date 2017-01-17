@@ -28,6 +28,7 @@ import (
 	"syscall"
 	"time"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/api/v1"
 	utilversion "k8s.io/kubernetes/pkg/util/version"
@@ -49,7 +50,7 @@ var (
 
 func pfPod(expectedClientData, chunks, chunkSize, chunkIntervalMillis string, bindAddress string) *v1.Pod {
 	return &v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:   podName,
 			Labels: map[string]string{"name": podName},
 		},

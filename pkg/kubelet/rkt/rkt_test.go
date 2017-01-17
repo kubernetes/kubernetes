@@ -31,6 +31,7 @@ import (
 	rktapi "github.com/coreos/rkt/api/v1alpha"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubetypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/api/resource"
@@ -1203,7 +1204,7 @@ func TestGenerateRunCommand(t *testing.T) {
 		{
 			kubenet.NewPlugin("/tmp"),
 			&v1.Pod{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name: "pod-name-foo",
 				},
 				Spec: v1.PodSpec{
@@ -1222,7 +1223,7 @@ func TestGenerateRunCommand(t *testing.T) {
 		{
 			kubenet.NewPlugin("/tmp"),
 			&v1.Pod{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name: "pod-name-foo",
 				},
 				Spec: v1.PodSpec{
@@ -1241,7 +1242,7 @@ func TestGenerateRunCommand(t *testing.T) {
 		{
 			kubenet.NewPlugin("/tmp"),
 			&v1.Pod{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name: "pod-name-foo",
 				},
 				Spec: v1.PodSpec{
@@ -1262,7 +1263,7 @@ func TestGenerateRunCommand(t *testing.T) {
 		{
 			kubenet.NewPlugin("/tmp"),
 			&v1.Pod{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name: "pod-name-foo",
 				},
 				Spec: v1.PodSpec{
@@ -1283,7 +1284,7 @@ func TestGenerateRunCommand(t *testing.T) {
 		{
 			kubenet.NewPlugin("/tmp"),
 			&v1.Pod{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name: "pod-name-foo",
 				},
 				Spec: v1.PodSpec{
@@ -1304,7 +1305,7 @@ func TestGenerateRunCommand(t *testing.T) {
 		{
 			&network.NoopNetworkPlugin{},
 			&v1.Pod{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name: "pod-name-foo",
 				},
 				Spec: v1.PodSpec{
@@ -1323,7 +1324,7 @@ func TestGenerateRunCommand(t *testing.T) {
 		{
 			kubenet.NewPlugin("/tmp"),
 			&v1.Pod{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name: "pod-name-foo",
 				},
 				Spec: v1.PodSpec{
@@ -1345,7 +1346,7 @@ func TestGenerateRunCommand(t *testing.T) {
 		{
 			kubenet.NewPlugin("/tmp"),
 			&v1.Pod{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name: "pod-name-foo",
 				},
 				Spec: v1.PodSpec{
@@ -1415,7 +1416,7 @@ func TestLifeCycleHooks(t *testing.T) {
 		{
 			// Case 0, container without any hooks.
 			&v1.Pod{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:      "pod-1",
 					Namespace: "ns-1",
 					UID:       "uid-1",
@@ -1438,7 +1439,7 @@ func TestLifeCycleHooks(t *testing.T) {
 		{
 			// Case 1, containers with post-start and pre-stop hooks.
 			&v1.Pod{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:      "pod-1",
 					Namespace: "ns-1",
 					UID:       "uid-1",
@@ -1513,7 +1514,7 @@ func TestLifeCycleHooks(t *testing.T) {
 		{
 			// Case 2, one container with invalid hooks.
 			&v1.Pod{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:      "pod-1",
 					Namespace: "ns-1",
 					UID:       "uid-1",
@@ -1632,10 +1633,10 @@ func TestGarbageCollect(t *testing.T) {
 				MaxContainers: 0,
 			},
 			[]*v1.Pod{
-				{ObjectMeta: v1.ObjectMeta{UID: "pod-uid-1"}},
-				{ObjectMeta: v1.ObjectMeta{UID: "pod-uid-2"}},
-				{ObjectMeta: v1.ObjectMeta{UID: "pod-uid-3"}},
-				{ObjectMeta: v1.ObjectMeta{UID: "pod-uid-4"}},
+				{ObjectMeta: metav1.ObjectMeta{UID: "pod-uid-1"}},
+				{ObjectMeta: metav1.ObjectMeta{UID: "pod-uid-2"}},
+				{ObjectMeta: metav1.ObjectMeta{UID: "pod-uid-3"}},
+				{ObjectMeta: metav1.ObjectMeta{UID: "pod-uid-4"}},
 			},
 			[]*rktapi.Pod{
 				{
@@ -1716,9 +1717,9 @@ func TestGarbageCollect(t *testing.T) {
 				MaxContainers: 1,
 			},
 			[]*v1.Pod{
-				{ObjectMeta: v1.ObjectMeta{UID: "pod-uid-0"}},
-				{ObjectMeta: v1.ObjectMeta{UID: "pod-uid-1"}},
-				{ObjectMeta: v1.ObjectMeta{UID: "pod-uid-2"}},
+				{ObjectMeta: metav1.ObjectMeta{UID: "pod-uid-0"}},
+				{ObjectMeta: metav1.ObjectMeta{UID: "pod-uid-1"}},
+				{ObjectMeta: metav1.ObjectMeta{UID: "pod-uid-2"}},
 			},
 			[]*rktapi.Pod{
 				{
@@ -1839,7 +1840,7 @@ func TestMakePodManifestAnnotations(t *testing.T) {
 	}{
 		{
 			in: &v1.Pod{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					UID:       "uid-1",
 					Name:      "name-1",
 					Namespace: "namespace-1",

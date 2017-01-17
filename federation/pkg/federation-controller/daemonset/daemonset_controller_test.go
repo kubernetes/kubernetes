@@ -82,7 +82,7 @@ func TestDaemonSetController(t *testing.T) {
 	daemonsetController.Run(stop)
 
 	daemonset1 := extensionsv1.DaemonSet{
-		ObjectMeta: apiv1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test-daemonset",
 			Namespace: "ns",
 			SelfLink:  "/api/v1/namespaces/ns/daemonsets/test-daemonset",

@@ -530,7 +530,7 @@ func (pm *VolumePluginMgr) FindAttachablePluginByName(name string) (AttachableVo
 func NewPersistentVolumeRecyclerPodTemplate() *v1.Pod {
 	timeout := int64(60)
 	pod := &v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: "pv-recycler-",
 			Namespace:    v1.NamespaceDefault,
 		},

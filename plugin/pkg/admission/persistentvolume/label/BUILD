@@ -35,6 +35,7 @@ go_test(
         "//pkg/admission:go_default_library",
         "//pkg/api:go_default_library",
         "//pkg/cloudprovider/providers/aws:go_default_library",
+        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/types",
     ],
 )

@@ -280,12 +280,12 @@ func (e *Store) shouldDelete(ctx genericapirequest.Context, key string, obj, exi
 	if !e.EnableGarbageCollection {
 		return false
 	}
-	newMeta, err := api.ObjectMetaFor(obj)
+	newMeta, err := metav1.ObjectMetaFor(obj)
 	if err != nil {
 		utilruntime.HandleError(err)
 		return false
 	}
-	oldMeta, err := api.ObjectMetaFor(existing)
+	oldMeta, err := metav1.ObjectMetaFor(existing)
 	if err != nil {
 		utilruntime.HandleError(err)
 		return false
@@ -525,7 +525,7 @@ func shouldUpdateFinalizers(e *Store, accessor metav1.Object, options *api.Delet
 // DeletionTimestamp to "now". Finalizers are watching for such updates and will
 // finalize the object if their IDs are present in the object's Finalizers list.
 func markAsDeleting(obj runtime.Object) (err error) {
-	objectMeta, kerr := api.ObjectMetaFor(obj)
+	objectMeta, kerr := metav1.ObjectMetaFor(obj)
 	if kerr != nil {
 		return kerr
 	}

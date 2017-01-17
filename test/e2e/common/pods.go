@@ -129,7 +129,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 	It("should get a host IP [Conformance]", func() {
 		name := "pod-hostip-" + string(uuid.NewUUID())
 		testHostIP(podClient, &v1.Pod{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name: name,
 			},
 			Spec: v1.PodSpec{
@@ -148,7 +148,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 		name := "pod-submit-remove-" + string(uuid.NewUUID())
 		value := strconv.Itoa(time.Now().Nanosecond())
 		pod := &v1.Pod{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name: name,
 				Labels: map[string]string{
 					"name": "foo",
@@ -266,7 +266,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 		name := "pod-update-" + string(uuid.NewUUID())
 		value := strconv.Itoa(time.Now().Nanosecond())
 		pod := &v1.Pod{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name: name,
 				Labels: map[string]string{
 					"name": "foo",
@@ -315,7 +315,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 		name := "pod-update-activedeadlineseconds-" + string(uuid.NewUUID())
 		value := strconv.Itoa(time.Now().Nanosecond())
 		pod := &v1.Pod{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name: name,
 				Labels: map[string]string{
 					"name": "foo",
@@ -356,7 +356,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 		// This pod serves its hostname via HTTP.
 		serverName := "server-envvars-" + string(uuid.NewUUID())
 		serverPod := &v1.Pod{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:   serverName,
 				Labels: map[string]string{"name": serverName},
 			},
@@ -381,7 +381,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 		// allow overriding the prefix in the service manifest.
 		svcName := "fooservice"
 		svc := &v1.Service{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name: svcName,
 				Labels: map[string]string{
 					"name": svcName,
@@ -404,7 +404,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 		podName := "client-envvars-" + string(uuid.NewUUID())
 		const containerName = "env3cont"
 		pod := &v1.Pod{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:   podName,
 				Labels: map[string]string{"name": podName},
 			},
@@ -444,7 +444,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 		By("creating the pod")
 		name := "pod-exec-websocket-" + string(uuid.NewUUID())
 		pod := &v1.Pod{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name: name,
 			},
 			Spec: v1.PodSpec{
@@ -514,7 +514,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 		By("creating the pod")
 		name := "pod-logs-websocket-" + string(uuid.NewUUID())
 		pod := &v1.Pod{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name: name,
 			},
 			Spec: v1.PodSpec{
@@ -568,7 +568,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 		podName := "pod-back-off-image"
 		containerName := "back-off"
 		pod := &v1.Pod{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:   podName,
 				Labels: map[string]string{"test": "back-off-image"},
 			},
@@ -609,7 +609,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 		podName := "back-off-cap"
 		containerName := "back-off-cap"
 		pod := &v1.Pod{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:   podName,
 				Labels: map[string]string{"test": "liveness"},
 			},

@@ -21,6 +21,7 @@ import (
 	"strconv"
 	"testing"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/v1"
@@ -71,7 +72,7 @@ func TestLabels(t *testing.T) {
 		Lifecycle:              lifecycle,
 	}
 	pod := &v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test_pod",
 			Namespace: "test_pod_namespace",
 			UID:       "test_pod_uid",

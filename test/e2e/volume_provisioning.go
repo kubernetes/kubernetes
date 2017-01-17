@@ -142,7 +142,7 @@ var _ = framework.KubeDescribe("Dynamic provisioning", func() {
 
 func newClaim(ns string, alpha bool) *v1.PersistentVolumeClaim {
 	claim := v1.PersistentVolumeClaim{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: "pvc-",
 			Namespace:    ns,
 		},
@@ -179,7 +179,7 @@ func runInPodWithVolume(c clientset.Interface, ns, claimName, command string) {
 			Kind:       "Pod",
 			APIVersion: "v1",
 		},
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: "pvc-volume-tester-",
 		},
 		Spec: v1.PodSpec{
@@ -235,7 +235,7 @@ func newStorageClass() *storage.StorageClass {
 		TypeMeta: metav1.TypeMeta{
 			Kind: "StorageClass",
 		},
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: "fast",
 		},
 		Provisioner: pluginName,

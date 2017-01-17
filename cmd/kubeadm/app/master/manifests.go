@@ -261,7 +261,7 @@ func componentPod(container api.Container, volumes ...api.Volume) api.Pod {
 			APIVersion: "v1",
 			Kind:       "Pod",
 		},
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      container.Name,
 			Namespace: "kube-system",
 			Labels:    map[string]string{"component": container.Name, "tier": "control-plane"},
