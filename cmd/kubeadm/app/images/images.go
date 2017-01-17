@@ -39,10 +39,8 @@ const (
 	gcrPrefix   = "gcr.io/google_containers"
 	etcdVersion = "3.0.14-kubeadm"
 
-	kubeDNSVersion        = "1.11.0"
-	dnsmasqVersion        = "1.11.0"
-	kubeDNSSidecarVersion = "1.11.0"
-	pauseVersion          = "3.0"
+	kubeDNSVersion = "1.11.0"
+	pauseVersion   = "3.0"
 )
 
 func GetCoreImage(image string, cfg *kubeadmapi.MasterConfiguration, overrideImage string) string {
