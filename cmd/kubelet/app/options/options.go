@@ -183,9 +183,6 @@ func (s *KubeletServer) AddFlags(fs *pflag.FlagSet) {
 		"Options are:\n"+strings.Join(utilconfig.DefaultFeatureGate.KnownFeatures(), "\n"))
 
 	fs.StringVar(&s.KubeletCgroups, "kubelet-cgroups", s.KubeletCgroups, "Optional absolute name of cgroups to create and run the Kubelet in.")
-
-	fs.StringVar(&s.SystemCgroups, "system-container", s.SystemCgroups, "Optional resource-only container in which to place all non-kernel processes that are not already in a container. Empty for no container. Rolling back the flag requires a reboot. (Default: \"\").")
-	fs.MarkDeprecated("system-container", "Use --system-cgroups instead. Will be removed in a future version.")
 	fs.StringVar(&s.SystemCgroups, "system-cgroups", s.SystemCgroups, "Optional absolute name of cgroups in which to place all non-kernel processes that are not already inside a cgroup under `/`. Empty for no container. Rolling back the flag requires a reboot. (Default: \"\").")
 
 	fs.BoolVar(&s.ExperimentalCgroupsPerQOS, "experimental-cgroups-per-qos", s.ExperimentalCgroupsPerQOS, "Enable creation of QoS cgroup hierarchy, if true top level QoS and pod cgroups are created.")
