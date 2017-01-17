@@ -39,9 +39,9 @@ func completeTest(f *framework.Framework, c clientset.Interface, ns string, pv *
 	By("Checking pod has write access to PersistentVolume")
 	createWaitAndDeletePod(f, c, ns, pvc.Name)
 
-	// 3. delete the PVC, wait for PV to become "Available"
+	// 3. delete the PVC, wait for PV to become "Released"
 	By("Deleting the PVC to invoke the recycler")
-	deletePVCandValidatePV(c, ns, pvc, pv, v1.VolumeAvailable)
+	deletePVCandValidatePV(c, ns, pvc, pv, v1.VolumeReleased)
 }
 
 // Validate pairs of PVs and PVCs, create and verify writer pod, delete PVC and validate
@@ -50,7 +50,7 @@ func completeTest(f *framework.Framework, c clientset.Interface, ns string, pv *
 // Note: this func is serialized, we wait for each pod to be deleted before creating the
 //   next pod. Adding concurrency is a TODO item.
 // Note: this func is called recursively when there are more claims than pvs.
-func completeMultiTest(f *framework.Framework, c clientset.Interface, ns string, pvols pvmap, claims pvcmap) {
+func completeMultiTest(f *framework.Framework, c clientset.Interface, ns string, pvols pvmap, claims pvcmap, expectPhase v1.PersistentVolumePhase) {
 
 	// 1. verify each PV permits write access to a client pod
 	By("Checking pod has write access to PersistentVolumes")
@@ -67,9 +67,9 @@ func completeMultiTest(f *framework.Framework, c clientset.Interface, ns string,
 		createWaitAndDeletePod(f, c, pvcKey.Namespace, pvcKey.Name)
 	}
 
-	// 2. delete each PVC, wait for its bound PV to become "Available"
+	// 2. delete each PVC, wait for its bound PV to become "Released"
 	By("Deleting PVCs to invoke recycler")
-	deletePVCandValidatePVGroup(c, ns, pvols, claims)
+	deletePVCandValidatePVGroup(c, ns, pvols, claims, expectPhase)
 }
 
 var _ = framework.KubeDescribe("PersistentVolumes [Volume][Serial]", func() {
@@ -210,9 +210,10 @@ var _ = framework.KubeDescribe("PersistentVolumes [Volume][Serial]", func() {
 			// Note: PVs are created before claims and no pre-binding
 			It("should create 2 PVs and 4 PVCs: test write access", func() {
 				numPVs, numPVCs := 2, 4
+				pvConfig.reclaimPolicy = v1.PersistentVolumeReclaimRecycle
 				pvols, claims = createPVsPVCs(numPVs, numPVCs, c, ns, pvConfig)
 				waitAndVerifyBinds(c, ns, pvols, claims, true)
-				completeMultiTest(f, c, ns, pvols, claims)
+				completeMultiTest(f, c, ns, pvols, claims, v1.VolumeBound)
 			})
 
 			// Create 3 PVs and 3 PVCs.
@@ -221,7 +222,7 @@ var _ = framework.KubeDescribe("PersistentVolumes [Volume][Serial]", func() {
 				numPVs, numPVCs := 3, 3
 				pvols, claims = createPVsPVCs(numPVs, numPVCs, c, ns, pvConfig)
 				waitAndVerifyBinds(c, ns, pvols, claims, true)
-				completeMultiTest(f, c, ns, pvols, claims)
+				completeMultiTest(f, c, ns, pvols, claims, v1.VolumeReleased)
 			})
 
 			// Create 4 PVs and 2 PVCs.
@@ -230,7 +231,7 @@ var _ = framework.KubeDescribe("PersistentVolumes [Volume][Serial]", func() {
 				numPVs, numPVCs := 4, 2
 				pvols, claims = createPVsPVCs(numPVs, numPVCs, c, ns, pvConfig)
 				waitAndVerifyBinds(c, ns, pvols, claims, true)
-				completeMultiTest(f, c, ns, pvols, claims)
+				completeMultiTest(f, c, ns, pvols, claims, v1.VolumeReleased)
 			})
 		})
 	})
