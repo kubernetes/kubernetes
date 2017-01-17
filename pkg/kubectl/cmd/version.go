@@ -76,20 +76,14 @@ func RunVersion(f cmdutil.Factory, out io.Writer, cmd *cobra.Command) error {
 	case "":
 		if cmdutil.GetFlagBool(cmd, "short") {
 			fmt.Fprintf(out, "Client Version: %s\n", clientVersion.GitVersion)
-			if cmdutil.GetFlagBool(cmd, "client") {
-				return nil
-			}
 
-			if serverErr == nil {
+			if serverVersion != nil {
 				fmt.Fprintf(out, "Server Version: %s\n", serverVersion.GitVersion)
 			}
 		} else {
 			fmt.Fprintf(out, "Client Version: %s\n", fmt.Sprintf("%#v", clientVersion))
-			if cmdutil.GetFlagBool(cmd, "client") {
-				return nil
-			}
 
-			if serverErr == nil {
+			if serverVersion != nil {
 				fmt.Fprintf(out, "Server Version: %s\n", fmt.Sprintf("%#v", *serverVersion))
 			}
 		}
