@@ -29,10 +29,10 @@ import (
 
 	"bytes"
 
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	componentconfigv1alpha1 "k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1"
-	"k8s.io/kubernetes/pkg/util/sets"
 
 	runtime "k8s.io/apimachinery/pkg/runtime"
 )

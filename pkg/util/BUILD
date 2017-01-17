@@ -57,7 +57,6 @@ filegroup(
         "//pkg/util/configz:all-srcs",
         "//pkg/util/crlf:all-srcs",
         "//pkg/util/dbus:all-srcs",
-        "//pkg/util/diff:all-srcs",
         "//pkg/util/ebtables:all-srcs",
         "//pkg/util/env:all-srcs",
         "//pkg/util/errors:all-srcs",
