@@ -76,7 +76,7 @@
 					"command": [
 						"/bin/sh",
 						"-c",
-						"./kubemark.sh --morph=kubelet $(CONTENT_TYPE) --v=2 1>>/var/logs/kubelet_$(MY_POD_NAME).log 2>&1"
+						"./kubemark.sh --morph=kubelet --kubeconfig=/kubeconfig/kubelet.kubeconfig $(CONTENT_TYPE) --v=2 1>>/var/logs/kubelet_$(MY_POD_NAME).log 2>&1"
 					],
 					"volumeMounts": [
 						{
@@ -124,7 +124,7 @@
 					"command": [
 						"/bin/sh",
 						"-c",
-						"./kubemark.sh --morph=proxy $(CONTENT_TYPE) --v=2 1>>/var/logs/kube_proxy_$(MY_POD_NAME).log 2>&1"
+						"./kubemark.sh --morph=proxy --kubeconfig=/kubeconfig/kubeproxy.kubeconfig $(CONTENT_TYPE) --v=2 1>>/var/logs/kube_proxy_$(MY_POD_NAME).log 2>&1"
 					],
 					"volumeMounts": [
 						{
