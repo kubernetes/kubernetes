@@ -2,23 +2,23 @@
 apiVersion: extensions/v1beta1
 kind: DaemonSet
 metadata:
-  name: fluentd-gcp-v1.31
+  name: fluentd-gcp-v1.33
   namespace: kube-system
   labels:
     k8s-app: fluentd-gcp
     kubernetes.io/cluster-service: "true"
-    version: v1.31
+    version: v1.33
 spec:
   template:
     metadata:
       labels:
         k8s-app: fluentd-gcp
         kubernetes.io/cluster-service: "true"
-        version: v1.31
+        version: v1.33
     spec:
       containers:
       - name: fluentd-gcp
-        image: gcr.io/google_containers/fluentd-gcp:1.32
+        image: gcr.io/google_containers/fluentd-gcp:1.33
         # If fluentd consumes its own logs, the following situation may happen:
         # fluentd fails to send a chunk to the server => writes it to the log =>
         # tries to send this message to the server => fails to send a chunk and so on.
@@ -40,8 +40,6 @@ spec:
         - name: varlibdockercontainers
           mountPath: /var/lib/docker/containers
           readOnly: true
-        - name: libsystemddir
-          mountPath: /host/lib
         # Liveness probe is aimed to help in situarions where fluentd
         # silently hangs for no apparent reasons until manual restart.
         # The idea of this probe is that if fluentd is not queueing or
@@ -84,6 +82,3 @@ spec:
       - name: varlibdockercontainers
         hostPath:
           path: /var/lib/docker/containers
-      - name: libsystemddir
-        hostPath:
-          path: /usr/lib64
