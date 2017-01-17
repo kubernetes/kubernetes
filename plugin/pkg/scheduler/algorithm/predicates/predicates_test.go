@@ -3212,6 +3212,31 @@ func TestPodToleratesTaints(t *testing.T) {
 			test: "The pod has a toleration that key and value don't match the taint on the node, " +
 				"but the effect of taint on node is PreferNochedule. Pod can be scheduled onto the node",
 		},
+		{
+			pod: &v1.Pod{
+				ObjectMeta: v1.ObjectMeta{
+					Name: "pod2",
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{Image: "pod2:V1"}},
+				},
+			},
+			node: v1.Node{
+				ObjectMeta: v1.ObjectMeta{
+					Annotations: map[string]string{
+						v1.TaintsAnnotationKey: `
+						[{
+							"key": "dedicated",
+							"value": "user1",
+							"effect": "PreferNoSchedule"
+						}]`,
+					},
+				},
+			},
+			fits: true,
+			test: "The pod has no toleration, " +
+				"but the effect of taint on node is PreferNochedule. Pod can be scheduled onto the node",
+		},
 	}
 	expectedFailureReasons := []algorithm.PredicateFailureReason{ErrTaintsTolerationsNotMatch}
 
