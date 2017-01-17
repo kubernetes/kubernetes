@@ -2884,6 +2884,10 @@
      "volumeName": {
       "type": "string",
       "description": "VolumeName is the binding reference to the PersistentVolume backing this claim."
+     },
+     "className": {
+      "type": "string",
+      "description": "Name of the StorageClass where the desired volume belongs to. More info: http://kubernetes.io/docs/user-guide/persistent-volumes#class-1"
      }
     }
    },

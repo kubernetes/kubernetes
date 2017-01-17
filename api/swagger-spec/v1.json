@@ -17430,6 +17430,10 @@
      "volumeName": {
       "type": "string",
       "description": "VolumeName is the binding reference to the PersistentVolume backing this claim."
+     },
+     "className": {
+      "type": "string",
+      "description": "Name of the StorageClass where the desired volume belongs to. More info: http://kubernetes.io/docs/user-guide/persistent-volumes#class-1"
      }
     }
    },
@@ -17658,6 +17662,10 @@
      "persistentVolumeReclaimPolicy": {
       "type": "string",
       "description": "What happens to a persistent volume when released from its claim. Valid options are Retain (default) and Recycle. Recycling must be supported by the volume plugin underlying this persistent volume. More info: http://kubernetes.io/docs/user-guide/persistent-volumes#recycling-policy"
+     },
+     "className": {
+      "type": "string",
+      "description": "Name of StorageClass where this persistent volume belongs. Empty value means that this volume does not belong to any StorageClass."
      }
     }
    },

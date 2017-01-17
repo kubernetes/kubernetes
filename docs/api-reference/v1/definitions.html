@@ -1043,6 +1043,13 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">className</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Name of the StorageClass where the desired volume belongs to. More info: <a href="http://kubernetes.io/docs/user-guide/persistent-volumes#class-1">http://kubernetes.io/docs/user-guide/persistent-volumes#class-1</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
 </tbody>
 </table>
 
@@ -6607,6 +6614,13 @@ Examples:<br>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">className</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Name of StorageClass where this persistent volume belongs. Empty value means that this volume does not belong to any StorageClass.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
 </tbody>
 </table>
 
@@ -9136,7 +9150,7 @@ Examples:<br>
 </div>
 <div id="footer">
 <div id="footer-text">
-Last updated 2017-01-06 18:13:51 UTC
+Last updated 2017-01-17 13:27:06 UTC
 </div>
 </div>
 </body>

@@ -34572,6 +34572,10 @@
        "type": "string"
       }
      },
+     "className": {
+      "description": "Name of the StorageClass where the desired volume belongs to. More info: http://kubernetes.io/docs/user-guide/persistent-volumes#class-1",
+      "type": "string"
+     },
      "resources": {
       "description": "Resources represents the minimum resources the volume should have. More info: http://kubernetes.io/docs/user-guide/persistent-volumes#resources",
       "$ref": "#/definitions/v1.ResourceRequirements"
@@ -34692,6 +34696,10 @@
      "claimRef": {
       "description": "ClaimRef is part of a bi-directional binding between PersistentVolume and PersistentVolumeClaim. Expected to be non-nil when bound. claim.VolumeName is the authoritative bind between PV and PVC. More info: http://kubernetes.io/docs/user-guide/persistent-volumes#binding",
       "$ref": "#/definitions/v1.ObjectReference"
+     },
+     "className": {
+      "description": "Name of StorageClass where this persistent volume belongs. Empty value means that this volume does not belong to any StorageClass.",
+      "type": "string"
      },
      "fc": {
       "description": "FC represents a Fibre Channel resource that is attached to a kubelet's host machine and then exposed to the pod.",

@@ -1915,6 +1915,11 @@ message PersistentVolumeClaimSpec {
   // VolumeName is the binding reference to the PersistentVolume backing this claim.
   // +optional
   optional string volumeName = 3;
+
+  // Name of the StorageClass where the desired volume belongs to.
+  // More info: http://kubernetes.io/docs/user-guide/persistent-volumes#class-1
+  // +optional
+  optional string className = 5;
 }
 
 // PersistentVolumeClaimStatus is the current status of a persistent volume claim.
@@ -2075,6 +2080,11 @@ message PersistentVolumeSpec {
   // More info: http://kubernetes.io/docs/user-guide/persistent-volumes#recycling-policy
   // +optional
   optional string persistentVolumeReclaimPolicy = 5;
+
+  // Name of StorageClass where this persistent volume belongs. Empty value
+  // means that this volume does not belong to any StorageClass.
+  // +optional
+  optional string className = 6;
 }
 
 // PersistentVolumeStatus is the current status of a persistent volume.

@@ -4968,6 +4968,13 @@ var OpenAPIDefinitions *openapi.OpenAPIDefinitions = &openapi.OpenAPIDefinitions
 							Format:      "",
 						},
 					},
+					"className": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Name of the StorageClass where the desired volume belongs to. More info: http://kubernetes.io/docs/user-guide/persistent-volumes#class-1",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
 				},
 			},
 		},
@@ -5345,6 +5352,13 @@ var OpenAPIDefinitions *openapi.OpenAPIDefinitions = &openapi.OpenAPIDefinitions
 					"persistentVolumeReclaimPolicy": {
 						SchemaProps: spec.SchemaProps{
 							Description: "What happens to a persistent volume when released from its claim. Valid options are Retain (default) and Recycle. Recycling must be supported by the volume plugin underlying this persistent volume. More info: http://kubernetes.io/docs/user-guide/persistent-volumes#recycling-policy",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"className": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Name of StorageClass where this persistent volume belongs. Empty value means that this volume does not belong to any StorageClass.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
