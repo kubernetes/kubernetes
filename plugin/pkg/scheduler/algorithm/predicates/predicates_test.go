@@ -3335,3 +3335,149 @@ func TestPodSchedulesOnNodeWithDiskPressureCondition(t *testing.T) {
 		}
 	}
 }
+
+func createPodWithVolume(pod, pv, pvc string) *v1.Pod {
+	return &v1.Pod{
+		ObjectMeta: v1.ObjectMeta{Name: pod, Namespace: "default"},
+		Spec: v1.PodSpec{
+			Volumes: []v1.Volume{
+				{
+					Name: pv,
+					VolumeSource: v1.VolumeSource{
+						PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
+							ClaimName: pvc,
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
+func TestVolumeZonePredicate(t *testing.T) {
+	pvInfo := FakePersistentVolumeInfo{
+		{
+			ObjectMeta: v1.ObjectMeta{Name: "Vol_1", Labels: map[string]string{metav1.LabelZoneFailureDomain: "zone_1"}},
+		},
+		{
+			ObjectMeta: v1.ObjectMeta{Name: "Vol_2", Labels: map[string]string{metav1.LabelZoneRegion: "zone_2", "uselessLabel": "none"}},
+		},
+		{
+			ObjectMeta: v1.ObjectMeta{Name: "Vol_3", Labels: map[string]string{metav1.LabelZoneRegion: "zone_3"}},
+		},
+	}
+
+	pvcInfo := FakePersistentVolumeClaimInfo{
+		{
+			ObjectMeta: v1.ObjectMeta{Name: "PVC_1", Namespace: "default"},
+			Spec:       v1.PersistentVolumeClaimSpec{VolumeName: "Vol_1"},
+		},
+		{
+			ObjectMeta: v1.ObjectMeta{Name: "PVC_2", Namespace: "default"},
+			Spec:       v1.PersistentVolumeClaimSpec{VolumeName: "Vol_2"},
+		},
+		{
+			ObjectMeta: v1.ObjectMeta{Name: "PVC_3", Namespace: "default"},
+			Spec:       v1.PersistentVolumeClaimSpec{VolumeName: "Vol_3"},
+		},
+		{
+			ObjectMeta: v1.ObjectMeta{Name: "PVC_4", Namespace: "default"},
+			Spec:       v1.PersistentVolumeClaimSpec{VolumeName: "Vol_not_exist"},
+		},
+	}
+
+	tests := []struct {
+		Name string
+		Pod  *v1.Pod
+		Fits bool
+		Node *v1.Node
+	}{
+		{
+			Name: "pod without volume",
+			Pod: &v1.Pod{
+				ObjectMeta: v1.ObjectMeta{Name: "pod_1", Namespace: "default"},
+			},
+			Node: &v1.Node{
+				ObjectMeta: v1.ObjectMeta{
+					Name:   "host1",
+					Labels: map[string]string{metav1.LabelZoneFailureDomain: "zone_1"},
+				},
+			},
+			Fits: true,
+		},
+		{
+			Name: "node without labels",
+			Pod:  createPodWithVolume("pod_1", "vol_1", "PVC_1"),
+			Node: &v1.Node{
+				ObjectMeta: v1.ObjectMeta{
+					Name: "host1",
+				},
+			},
+			Fits: true,
+		},
+		{
+			Name: "label zone failure domain mached",
+			Pod:  createPodWithVolume("pod_1", "vol_1", "PVC_1"),
+			Node: &v1.Node{
+				ObjectMeta: v1.ObjectMeta{
+					Name:   "host1",
+					Labels: map[string]string{metav1.LabelZoneFailureDomain: "zone_1", "uselessLabel": "none"},
+				},
+			},
+			Fits: true,
+		},
+		{
+			Name: "label zone region mached",
+			Pod:  createPodWithVolume("pod_1", "vol_1", "PVC_2"),
+			Node: &v1.Node{
+				ObjectMeta: v1.ObjectMeta{
+					Name:   "host1",
+					Labels: map[string]string{metav1.LabelZoneRegion: "zone_2", "uselessLabel": "none"},
+				},
+			},
+			Fits: true,
+		},
+		{
+			Name: "label zone region dismached",
+			Pod:  createPodWithVolume("pod_1", "vol_1", "PVC_2"),
+			Node: &v1.Node{
+				ObjectMeta: v1.ObjectMeta{
+					Name:   "host1",
+					Labels: map[string]string{metav1.LabelZoneRegion: "no_zone_2", "uselessLabel": "none"},
+				},
+			},
+			Fits: false,
+		},
+		{
+			Name: "label zone failure domain dismached",
+			Pod:  createPodWithVolume("pod_1", "vol_1", "PVC_1"),
+			Node: &v1.Node{
+				ObjectMeta: v1.ObjectMeta{
+					Name:   "host1",
+					Labels: map[string]string{metav1.LabelZoneFailureDomain: "no_zone_1", "uselessLabel": "none"},
+				},
+			},
+			Fits: false,
+		},
+	}
+
+	expectedFailureReasons := []algorithm.PredicateFailureReason{ErrVolumeZoneConflict}
+
+	for _, test := range tests {
+		fit := NewVolumeZonePredicate(pvInfo, pvcInfo)
+		node := &schedulercache.NodeInfo{}
+		node.SetNode(test.Node)
+
+		fits, reasons, err := fit(test.Pod, nil, node)
+		if err != nil {
+			t.Errorf("%s: unexpected error: %v", test.Name, err)
+		}
+		if !fits && !reflect.DeepEqual(reasons, expectedFailureReasons) {
+			t.Errorf("%s: unexpected failure reasons: %v, want: %v", test.Name, reasons, expectedFailureReasons)
+		}
+		if fits != test.Fits {
+			t.Errorf("%s: expected %v got %v", test.Name, test.Fits, fits)
+		}
+
+	}
+}
