@@ -68,7 +68,6 @@ go_library(
     deps = [
         "//pkg/admission:go_default_library",
         "//pkg/api:go_default_library",
-        "//pkg/auth/handlers:go_default_library",
         "//pkg/client/restclient:go_default_library",
         "//pkg/genericapiserver/api:go_default_library",
         "//pkg/genericapiserver/api/filters:go_default_library",
