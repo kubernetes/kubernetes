@@ -2043,7 +2043,7 @@ run_deployment_tests() {
   kubectl apply -f hack/testdata/deployment-revision2.yaml "${kube_flags[@]}"
   kube::test::get_object_assert deployment.extensions "{{range.items}}{{$deployment_image_field}}:{{end}}" "${IMAGE_DEPLOYMENT_R2}:"
   # Rollback to revision 1 with dry-run - should be no-op
-  kubectl rollout undo deployment nginx --to-revision=1 --dry-run=true "${kube_flags[@]}"
+  kubectl rollout undo deployment nginx --dry-run=true "${kube_flags[@]}" | grep "test-cmd"
   kube::test::get_object_assert deployment.extensions "{{range.items}}{{$deployment_image_field}}:{{end}}" "${IMAGE_DEPLOYMENT_R2}:"
   # Rollback to revision 1
   kubectl rollout undo deployment nginx --to-revision=1 "${kube_flags[@]}"
