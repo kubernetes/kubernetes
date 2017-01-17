@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/api"
@@ -293,7 +294,7 @@ func RunApply(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer, opti
 				if err != nil {
 					return err
 				}
-				_, err = helper.Patch(info.Namespace, info.Name, api.StrategicMergePatchType, patch)
+				_, err = helper.Patch(info.Namespace, info.Name, types.StrategicMergePatchType, patch)
 				if err != nil {
 					return cmdutil.AddSourceToErr(fmt.Sprintf("applying patch:\n%s\nto:\n%v\nfor:", patch, info), info.Source, err)
 				}
@@ -555,7 +556,7 @@ func (p *patcher) patchSimple(obj runtime.Object, modified []byte, source, names
 		return nil, cmdutil.AddSourceToErr(fmt.Sprintf(format, original, modified, current), source, err)
 	}
 
-	_, err = p.helper.Patch(namespace, name, api.StrategicMergePatchType, patch)
+	_, err = p.helper.Patch(namespace, name, types.StrategicMergePatchType, patch)
 	return patch, err
 }
 

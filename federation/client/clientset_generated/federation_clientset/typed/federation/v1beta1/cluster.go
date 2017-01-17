@@ -18,6 +18,7 @@ package v1beta1
 
 import (
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	v1beta1 "k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	api "k8s.io/kubernetes/pkg/api"
@@ -41,7 +42,7 @@ type ClusterInterface interface {
 	Get(name string, options meta_v1.GetOptions) (*v1beta1.Cluster, error)
 	List(opts v1.ListOptions) (*v1beta1.ClusterList, error)
 	Watch(opts v1.ListOptions) (watch.Interface, error)
-	Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *v1beta1.Cluster, err error)
+	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1beta1.Cluster, err error)
 	ClusterExpansion
 }
 
@@ -148,7 +149,7 @@ func (c *clusters) Watch(opts v1.ListOptions) (watch.Interface, error) {
 }
 
 // Patch applies the patch and returns the patched cluster.
-func (c *clusters) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *v1beta1.Cluster, err error) {
+func (c *clusters) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1beta1.Cluster, err error) {
 	result = &v1beta1.Cluster{}
 	err = c.client.Patch(pt).
 		Resource("clusters").

@@ -18,6 +18,7 @@ package v1
 
 import (
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	api "k8s.io/kubernetes/pkg/api"
 	v1 "k8s.io/kubernetes/pkg/api/v1"
@@ -39,7 +40,7 @@ type EventInterface interface {
 	Get(name string, options meta_v1.GetOptions) (*v1.Event, error)
 	List(opts v1.ListOptions) (*v1.EventList, error)
 	Watch(opts v1.ListOptions) (watch.Interface, error)
-	Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *v1.Event, err error)
+	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.Event, err error)
 	EventExpansion
 }
 
@@ -140,7 +141,7 @@ func (c *events) Watch(opts v1.ListOptions) (watch.Interface, error) {
 }
 
 // Patch applies the patch and returns the patched event.
-func (c *events) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *v1.Event, err error) {
+func (c *events) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.Event, err error) {
 	result = &v1.Event{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).

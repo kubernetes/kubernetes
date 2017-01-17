@@ -32,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/kubernetes/pkg/api"
@@ -239,23 +240,23 @@ func TestPatch(t *testing.T) {
 		t.Fatalf("Failed creating patchpods: %v", err)
 	}
 
-	patchBodies := map[schema.GroupVersion]map[api.PatchType]struct {
+	patchBodies := map[schema.GroupVersion]map[types.PatchType]struct {
 		AddLabelBody        []byte
 		RemoveLabelBody     []byte
 		RemoveAllLabelsBody []byte
 	}{
 		v1.SchemeGroupVersion: {
-			api.JSONPatchType: {
+			types.JSONPatchType: {
 				[]byte(`[{"op":"add","path":"/metadata/labels","value":{"foo":"bar","baz":"qux"}}]`),
 				[]byte(`[{"op":"remove","path":"/metadata/labels/foo"}]`),
 				[]byte(`[{"op":"remove","path":"/metadata/labels"}]`),
 			},
-			api.MergePatchType: {
+			types.MergePatchType: {
 				[]byte(`{"metadata":{"labels":{"foo":"bar","baz":"qux"}}}`),
 				[]byte(`{"metadata":{"labels":{"foo":null}}}`),
 				[]byte(`{"metadata":{"labels":null}}`),
 			},
-			api.StrategicMergePatchType: {
+			types.StrategicMergePatchType: {
 				[]byte(`{"metadata":{"labels":{"foo":"bar","baz":"qux"}}}`),
 				[]byte(`{"metadata":{"labels":{"foo":null}}}`),
 				[]byte(`{"metadata":{"labels":{"$patch":"replace"}}}`),
@@ -265,7 +266,7 @@ func TestPatch(t *testing.T) {
 
 	pb := patchBodies[c.Core().RESTClient().APIVersion()]
 
-	execPatch := func(pt api.PatchType, body []byte) error {
+	execPatch := func(pt types.PatchType, body []byte) error {
 		return c.Core().RESTClient().Patch(pt).
 			Resource(resource).
 			Namespace(ns.Name).
@@ -339,7 +340,7 @@ func TestPatchWithCreateOnUpdate(t *testing.T) {
 	}
 
 	patchEndpoint := func(json []byte) (runtime.Object, error) {
-		return c.Core().RESTClient().Patch(api.MergePatchType).Resource("endpoints").Namespace(ns.Name).Name("patchendpoint").Body(json).Do().Get()
+		return c.Core().RESTClient().Patch(types.MergePatchType).Resource("endpoints").Namespace(ns.Name).Name("patchendpoint").Body(json).Do().Get()
 	}
 
 	// Make sure patch doesn't get to CreateOnUpdate

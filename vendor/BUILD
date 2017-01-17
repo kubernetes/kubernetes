@@ -8338,6 +8338,7 @@ go_library(
         "k8s.io/apimachinery/pkg/types/doc.go",
         "k8s.io/apimachinery/pkg/types/namespacedname.go",
         "k8s.io/apimachinery/pkg/types/nodename.go",
+        "k8s.io/apimachinery/pkg/types/patch.go",
         "k8s.io/apimachinery/pkg/types/uid.go",
         "k8s.io/apimachinery/pkg/types/unix_user_id.go",
     ],

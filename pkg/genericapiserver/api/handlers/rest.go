@@ -32,6 +32,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apiserver/pkg/handlers/negotiation"
 	"k8s.io/apiserver/pkg/request"
@@ -488,7 +489,7 @@ func PatchResource(r rest.Patcher, scope RequestScope, admit admission.Interface
 		if idx := strings.Index(contentType, ";"); idx > 0 {
 			contentType = contentType[:idx]
 		}
-		patchType := api.PatchType(contentType)
+		patchType := types.PatchType(contentType)
 
 		patchJS, err := readBody(req.Request)
 		if err != nil {
@@ -542,7 +543,7 @@ func patchResource(
 	versionedObj runtime.Object,
 	patcher rest.Patcher,
 	name string,
-	patchType api.PatchType,
+	patchType types.PatchType,
 	patchJS []byte,
 	namer ScopeNamer,
 	copier runtime.ObjectCopier,
@@ -637,7 +638,7 @@ func patchResource(
 				return nil, errors.NewConflict(resource.GroupResource(), name, nil)
 			}
 
-			newlyPatchedObjJS, err := getPatchedJS(api.StrategicMergePatchType, currentObjectJS, originalPatch, versionedObj)
+			newlyPatchedObjJS, err := getPatchedJS(types.StrategicMergePatchType, currentObjectJS, originalPatch, versionedObj)
 			if err != nil {
 				return nil, err
 			}
@@ -1078,17 +1079,17 @@ func setListSelfLink(obj runtime.Object, req *restful.Request, namer ScopeNamer)
 	return count, err
 }
 
-func getPatchedJS(patchType api.PatchType, originalJS, patchJS []byte, obj runtime.Object) ([]byte, error) {
+func getPatchedJS(patchType types.PatchType, originalJS, patchJS []byte, obj runtime.Object) ([]byte, error) {
 	switch patchType {
-	case api.JSONPatchType:
+	case types.JSONPatchType:
 		patchObj, err := jsonpatch.DecodePatch(patchJS)
 		if err != nil {
 			return nil, err
 		}
 		return patchObj.Apply(originalJS)
-	case api.MergePatchType:
+	case types.MergePatchType:
 		return jsonpatch.MergePatch(originalJS, patchJS)
-	case api.StrategicMergePatchType:
+	case types.StrategicMergePatchType:
 		return strategicpatch.StrategicMergePatchData(originalJS, patchJS, obj)
 	default:
 		// only here as a safety net - go-restful filters content-type
