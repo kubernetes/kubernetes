@@ -26,14 +26,9 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	extvalidation "k8s.io/kubernetes/pkg/apis/extensions/validation"
-<<<<<<< HEAD
+	"k8s.io/kubernetes/pkg/genericapiserver/api/rest"
 	"k8s.io/kubernetes/pkg/registry/core/replicationcontroller"
 	controllerstore "k8s.io/kubernetes/pkg/registry/core/replicationcontroller/storage"
-=======
-	"k8s.io/kubernetes/pkg/genericapiserver/api/rest"
-	"k8s.io/kubernetes/pkg/registry/core/controller"
-	controllerstore "k8s.io/kubernetes/pkg/registry/core/controller/storage"
->>>>>>> master
 	"k8s.io/kubernetes/pkg/registry/generic"
 )
 
