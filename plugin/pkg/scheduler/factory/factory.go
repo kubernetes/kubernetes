@@ -49,9 +49,8 @@ import (
 )
 
 const (
-	SchedulerAnnotationKey = "scheduler.alpha.kubernetes.io/name"
-	initialGetBackoff      = 100 * time.Millisecond
-	maximalGetBackoff      = time.Minute
+	initialGetBackoff = 100 * time.Millisecond
+	maximalGetBackoff = time.Minute
 )
 
 // ConfigFactory knows how to fill out a scheduler config with its support functions.
