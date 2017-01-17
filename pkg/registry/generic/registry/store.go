@@ -106,7 +106,8 @@ type Store struct {
 	EnableGarbageCollection bool
 
 	// DeleteCollectionWorkers is the maximum number of workers in a single
-	// DeleteCollection call.
+	// DeleteCollection call.  Delete requests for the items in a collection
+	// are issued in parallel.
 	DeleteCollectionWorkers int
 
 	// Decorator is an optional exit hook on an object returned from the
@@ -116,6 +117,7 @@ type Store struct {
 	// specific cases where storage of the value is not appropriate, since
 	// they cannot be watched.
 	Decorator rest.ObjectFunc
+
 	// CreateStrategy implements resource-specific behavior during creation.
 	CreateStrategy rest.RESTCreateStrategy
 	// AfterCreate implements a further operation to run after a resource is
@@ -569,12 +571,21 @@ func markAsDeleting(obj runtime.Object) (err error) {
 	return nil
 }
 
-// These functions needs to be kept synced:
-//
-//   updateForGracefulDeletion
-//   updateForGracefulDeletionAndFinalizers
+// updateForGracefulDeletion and updateForGracefulDeletionAndFinalizers both
+// implement deletion flows for graceful deletion.  Graceful deletion is
+// implemented as setting the deletion timestamp in an update.  If the
+// implementation of graceful deletion is changed, both of these methods
+// should be changed together.
 
-// updateForGracefulDeletion TODO
+// updateForGracefulDeletion updates the given object for graceful deletion by
+// setting the deletion timestamp and grace period seconds and returns:
+//
+// 1. an error
+// 2. a boolean indicating that the object was not found, but it should be
+//    ignored
+// 3. a boolean indicating that the object's grace period is exhausted and it
+//    should be deleted immediately
+// 4. a copy of the last existing state of the object
 func (e *Store) updateForGracefulDeletion(ctx genericapirequest.Context, name, key string, options *api.DeleteOptions, preconditions storage.Preconditions, in runtime.Object) (err error, ignoreNotFound, deleteImmediately bool, out, lastExisting runtime.Object) {
 	lastGraceful := int64(0)
 	out = e.NewFunc()
