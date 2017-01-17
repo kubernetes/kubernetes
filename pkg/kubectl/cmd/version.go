@@ -62,33 +62,36 @@ func NewCmdVersion(f cmdutil.Factory, out io.Writer) *cobra.Command {
 func RunVersion(f cmdutil.Factory, out io.Writer, cmd *cobra.Command) error {
 	vo := VersionObj{nil, nil}
 
-	cvg := version.Get()
-	vo.ClientVersion = &cvg
+	clientVersion := version.Get()
+	vo.ClientVersion = &clientVersion
+
+	serverVersion, serverErr := retrieveServerVersion(f)
+	if !cmdutil.GetFlagBool(cmd, "client") {
+		vo.ServerVersion = serverVersion
+	}
 
 	switch of := cmdutil.GetFlagString(cmd, "output"); of {
 	case "":
 		if cmdutil.GetFlagBool(cmd, "short") {
-			fmt.Fprintf(out, "Client Version: %s\n", vo.ClientVersion.GitVersion)
+			fmt.Fprintf(out, "Client Version: %s\n", clientVersion.GitVersion)
 			if cmdutil.GetFlagBool(cmd, "client") {
 				return nil
 			}
 
-			serverVersion, err := retrieveServerVersion(f)
-			if err != nil {
-				return err
+			if serverErr != nil {
+				return serverErr
 			}
 
 			fmt.Fprintf(out, "Server Version: %s\n", serverVersion.GitVersion)
 
 		} else {
-			fmt.Fprintf(out, "Client Version: %s\n", fmt.Sprintf("%#v", *vo.ClientVersion))
+			fmt.Fprintf(out, "Client Version: %s\n", fmt.Sprintf("%#v", clientVersion))
 			if cmdutil.GetFlagBool(cmd, "client") {
 				return nil
 			}
 
-			serverVersion, err := retrieveServerVersion(f)
-			if err != nil {
-				return err
+			if serverErr != nil {
+				return serverErr
 			}
 
 			fmt.Fprintf(out, "Server Version: %s\n", fmt.Sprintf("%#v", *serverVersion))
@@ -96,14 +99,6 @@ func RunVersion(f cmdutil.Factory, out io.Writer, cmd *cobra.Command) error {
 
 		return nil
 	case "yaml":
-		var serverErr error = nil
-		var serverVersion *apimachineryversion.Info = nil
-
-		if !cmdutil.GetFlagBool(cmd, "client") {
-			serverVersion, serverErr = retrieveServerVersion(f)
-			vo.ServerVersion = serverVersion
-		}
-
 		y, err := yaml.Marshal(&vo)
 		if err != nil {
 			return err
@@ -117,14 +112,6 @@ func RunVersion(f cmdutil.Factory, out io.Writer, cmd *cobra.Command) error {
 
 		return nil
 	case "json":
-		var serverErr error = nil
-		var serverVersion *apimachineryversion.Info = nil
-
-		if !cmdutil.GetFlagBool(cmd, "client") {
-			serverVersion, serverErr = retrieveServerVersion(f)
-			vo.ServerVersion = serverVersion
-		}
-
 		y, err := json.Marshal(&vo)
 		if err != nil {
 			return err
