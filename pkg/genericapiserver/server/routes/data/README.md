@@ -9,4 +9,4 @@ Do not edit by hand.
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/pkg/genericapiserver/addons/data/README.md?pixel)]()
 
 
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/pkg/genericapiserver/routes/data/README.md?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/pkg/genericapiserver/server/routes/data/README.md?pixel)]()

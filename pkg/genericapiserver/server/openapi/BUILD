@@ -17,7 +17,7 @@ go_library(
     ],
     tags = ["automanaged"],
     deps = [
-        "//pkg/genericapiserver/mux:go_default_library",
+        "//pkg/genericapiserver/server/mux:go_default_library",
         "//pkg/util:go_default_library",
         "//vendor:github.com/emicklei/go-restful",
         "//vendor:github.com/go-openapi/spec",
@@ -48,6 +48,9 @@ filegroup(
 
 filegroup(
     name = "all-srcs",
-    srcs = [":package-srcs"],
+    srcs = [
+        ":package-srcs",
+        "//pkg/genericapiserver/server/openapi/common:all-srcs",
+    ],
     tags = ["automanaged"],
 )

@@ -15,5 +15,7 @@ limitations under the License.
 */
 
 // Package filters contains all the http handler chain filters which
-// _are_ api related.
-package filters // import "k8s.io/kubernetes/pkg/genericapiserver/api/filters"
+// _are_ api related, i.e. which are prerequisite for the API services
+// to work (in contrast to the filters in the server package which are
+// not part of the API contract).
+package filters // import "k8s.io/kubernetes/pkg/genericapiserver/endpoints/filters"

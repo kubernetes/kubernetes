@@ -18,7 +18,7 @@ package rest
 
 import (
 	"k8s.io/apimachinery/pkg/runtime"
-	genericapirequest "k8s.io/apiserver/pkg/request"
+	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 )
 
 // RESTExportStrategy is the interface that defines how to export a Kubernetes object

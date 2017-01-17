@@ -26,7 +26,7 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/api/errors"
-	apirequest "k8s.io/apiserver/pkg/request"
+	apirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/kubernetes/pkg/api"
 )
 

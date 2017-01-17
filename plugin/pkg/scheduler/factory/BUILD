@@ -37,7 +37,7 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/util/runtime",
         "//vendor:k8s.io/apimachinery/pkg/util/sets",
         "//vendor:k8s.io/apimachinery/pkg/util/validation",
-        "//vendor:k8s.io/apiserver/pkg/request",
+        "//vendor:k8s.io/apiserver/pkg/endpoints/request",
     ],
 )
 

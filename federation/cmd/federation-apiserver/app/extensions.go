@@ -21,13 +21,13 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	_ "k8s.io/kubernetes/pkg/apis/extensions/install"
-	"k8s.io/kubernetes/pkg/genericapiserver"
-	"k8s.io/kubernetes/pkg/genericapiserver/api/rest"
+	"k8s.io/kubernetes/pkg/genericapiserver/registry/generic"
+	"k8s.io/kubernetes/pkg/genericapiserver/registry/rest"
+	genericapiserver "k8s.io/kubernetes/pkg/genericapiserver/server"
 	daemonsetstore "k8s.io/kubernetes/pkg/registry/extensions/daemonset/storage"
 	deploymentstore "k8s.io/kubernetes/pkg/registry/extensions/deployment/storage"
 	ingressstore "k8s.io/kubernetes/pkg/registry/extensions/ingress/storage"
 	replicasetstore "k8s.io/kubernetes/pkg/registry/extensions/replicaset/storage"
-	"k8s.io/kubernetes/pkg/registry/generic"
 )
 
 func installExtensionsAPIs(g *genericapiserver.GenericAPIServer, optsGetter generic.RESTOptionsGetter) {

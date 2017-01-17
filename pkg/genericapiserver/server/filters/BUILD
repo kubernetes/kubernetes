@@ -26,8 +26,8 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/api/errors",
         "//vendor:k8s.io/apimachinery/pkg/util/runtime",
         "//vendor:k8s.io/apimachinery/pkg/util/sets",
-        "//vendor:k8s.io/apiserver/pkg/httplog",
-        "//vendor:k8s.io/apiserver/pkg/request",
+        "//vendor:k8s.io/apiserver/pkg/endpoints/request",
+        "//vendor:k8s.io/apiserver/pkg/server/httplog",
     ],
 )
 
@@ -41,10 +41,10 @@ go_test(
     library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
-        "//pkg/genericapiserver/api/filters:go_default_library",
+        "//pkg/genericapiserver/endpoints/filters:go_default_library",
         "//vendor:k8s.io/apimachinery/pkg/api/errors",
         "//vendor:k8s.io/apimachinery/pkg/util/sets",
-        "//vendor:k8s.io/apiserver/pkg/request",
+        "//vendor:k8s.io/apiserver/pkg/endpoints/request",
     ],
 )
 

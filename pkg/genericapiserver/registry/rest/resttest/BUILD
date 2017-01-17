@@ -15,7 +15,7 @@ go_library(
         "//pkg/api:go_default_library",
         "//pkg/api/validation/path:go_default_library",
         "//pkg/fields:go_default_library",
-        "//pkg/genericapiserver/api/rest:go_default_library",
+        "//pkg/genericapiserver/registry/rest:go_default_library",
         "//vendor:k8s.io/apimachinery/pkg/api/errors",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/conversion",
@@ -23,7 +23,7 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/runtime",
         "//vendor:k8s.io/apimachinery/pkg/types",
         "//vendor:k8s.io/apimachinery/pkg/util/wait",
-        "//vendor:k8s.io/apiserver/pkg/request",
+        "//vendor:k8s.io/apiserver/pkg/endpoints/request",
     ],
 )
 

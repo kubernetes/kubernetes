@@ -39,8 +39,8 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
-        "//pkg/registry/generic/registry:all-srcs",
-        "//pkg/registry/generic/rest:all-srcs",
+        "//pkg/genericapiserver/registry/generic/registry:all-srcs",
+        "//pkg/genericapiserver/registry/generic/rest:all-srcs",
     ],
     tags = ["automanaged"],
 )

@@ -14,10 +14,5 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package genericapiserver contains code to setup a generic kubernetes-like API server.
-// This does not contain any kubernetes API specific code.
-// Note that this is a work in progress. We are pulling out generic code (specifically from
-// pkg/master) here.
-// We plan to move this package into a separate repo on github once it is done.
-// For more details: https://github.com/kubernetes/kubernetes/issues/2742
-package genericapiserver // import "k8s.io/kubernetes/pkg/genericapiserver"
+// Package server contains the plumbing to create kubernetes-like API server command.
+package server // import "k8s.io/kubernetes/pkg/genericapiserver/server"

@@ -30,9 +30,9 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apiserver/pkg/admission"
-	"k8s.io/apiserver/pkg/request"
-	"k8s.io/kubernetes/pkg/genericapiserver/api/handlers"
-	"k8s.io/kubernetes/pkg/genericapiserver/api/rest"
+	"k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/kubernetes/pkg/genericapiserver/endpoints/handlers"
+	"k8s.io/kubernetes/pkg/genericapiserver/registry/rest"
 )
 
 // APIGroupVersion is a helper for exposing rest.Storage objects as http.Handlers via go-restful

@@ -66,7 +66,7 @@ go_library(
         "//plugin/cmd/kube-scheduler/app:go_default_library",
         "//plugin/cmd/kube-scheduler/app/options:go_default_library",
         "//vendor:github.com/spf13/pflag",
-        "//vendor:k8s.io/apiserver/pkg/healthz",
+        "//vendor:k8s.io/apiserver/pkg/server/healthz",
     ],
 )
 

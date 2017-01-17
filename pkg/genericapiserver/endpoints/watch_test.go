@@ -39,9 +39,9 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/genericapiserver/api/handlers"
-	"k8s.io/kubernetes/pkg/genericapiserver/api/rest"
-	apitesting "k8s.io/kubernetes/pkg/genericapiserver/api/testing"
+	"k8s.io/kubernetes/pkg/genericapiserver/endpoints/handlers"
+	apitesting "k8s.io/kubernetes/pkg/genericapiserver/endpoints/testing"
+	"k8s.io/kubernetes/pkg/genericapiserver/registry/rest"
 )
 
 // watchJSON defines the expected JSON wire equivalent of watch.Event

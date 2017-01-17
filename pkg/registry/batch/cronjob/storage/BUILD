@@ -19,7 +19,7 @@ go_test(
         "//pkg/apis/batch:go_default_library",
         "//pkg/apis/batch/v2alpha1:go_default_library",
         "//pkg/fields:go_default_library",
-        "//pkg/registry/generic:go_default_library",
+        "//pkg/genericapiserver/registry/generic:go_default_library",
         "//pkg/registry/registrytest:go_default_library",
         "//pkg/storage/etcd/testing:go_default_library",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
@@ -34,13 +34,13 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//pkg/apis/batch:go_default_library",
-        "//pkg/genericapiserver/api/rest:go_default_library",
+        "//pkg/genericapiserver/registry/generic:go_default_library",
+        "//pkg/genericapiserver/registry/generic/registry:go_default_library",
+        "//pkg/genericapiserver/registry/rest:go_default_library",
         "//pkg/registry/batch/cronjob:go_default_library",
-        "//pkg/registry/generic:go_default_library",
-        "//pkg/registry/generic/registry:go_default_library",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/runtime",
-        "//vendor:k8s.io/apiserver/pkg/request",
+        "//vendor:k8s.io/apiserver/pkg/endpoints/request",
     ],
 )
 

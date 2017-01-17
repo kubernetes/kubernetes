@@ -17,8 +17,8 @@ go_test(
         "//pkg/api:go_default_library",
         "//pkg/apis/extensions:go_default_library",
         "//pkg/fields:go_default_library",
-        "//pkg/genericapiserver/api/rest:go_default_library",
-        "//pkg/registry/generic:go_default_library",
+        "//pkg/genericapiserver/registry/generic:go_default_library",
+        "//pkg/genericapiserver/registry/rest:go_default_library",
         "//pkg/registry/registrytest:go_default_library",
         "//pkg/storage/etcd/testing:go_default_library",
         "//vendor:k8s.io/apimachinery/pkg/api/errors",
@@ -26,7 +26,7 @@ go_test(
         "//vendor:k8s.io/apimachinery/pkg/labels",
         "//vendor:k8s.io/apimachinery/pkg/runtime",
         "//vendor:k8s.io/apimachinery/pkg/util/diff",
-        "//vendor:k8s.io/apiserver/pkg/request",
+        "//vendor:k8s.io/apiserver/pkg/endpoints/request",
     ],
 )
 
@@ -37,14 +37,14 @@ go_library(
     deps = [
         "//pkg/apis/extensions:go_default_library",
         "//pkg/apis/extensions/validation:go_default_library",
-        "//pkg/genericapiserver/api/rest:go_default_library",
+        "//pkg/genericapiserver/registry/generic:go_default_library",
+        "//pkg/genericapiserver/registry/generic/registry:go_default_library",
+        "//pkg/genericapiserver/registry/rest:go_default_library",
         "//pkg/registry/extensions/replicaset:go_default_library",
-        "//pkg/registry/generic:go_default_library",
-        "//pkg/registry/generic/registry:go_default_library",
         "//vendor:k8s.io/apimachinery/pkg/api/errors",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/runtime",
-        "//vendor:k8s.io/apiserver/pkg/request",
+        "//vendor:k8s.io/apiserver/pkg/endpoints/request",
     ],
 )
 

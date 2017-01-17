@@ -29,8 +29,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer/streaming"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/apiserver/pkg/handlers/negotiation"
-	"k8s.io/apiserver/pkg/httplog"
+	"k8s.io/apiserver/pkg/endpoints/handlers/negotiation"
+	"k8s.io/apiserver/pkg/server/httplog"
 	"k8s.io/apiserver/pkg/util/wsstream"
 
 	"github.com/emicklei/go-restful"

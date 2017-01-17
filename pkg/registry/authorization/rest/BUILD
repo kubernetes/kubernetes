@@ -14,12 +14,12 @@ go_library(
     deps = [
         "//pkg/apis/authorization:go_default_library",
         "//pkg/apis/authorization/v1beta1:go_default_library",
-        "//pkg/genericapiserver:go_default_library",
-        "//pkg/genericapiserver/api/rest:go_default_library",
+        "//pkg/genericapiserver/registry/generic:go_default_library",
+        "//pkg/genericapiserver/registry/rest:go_default_library",
+        "//pkg/genericapiserver/server:go_default_library",
         "//pkg/registry/authorization/localsubjectaccessreview:go_default_library",
         "//pkg/registry/authorization/selfsubjectaccessreview:go_default_library",
         "//pkg/registry/authorization/subjectaccessreview:go_default_library",
-        "//pkg/registry/generic:go_default_library",
         "//vendor:k8s.io/apiserver/pkg/authorization/authorizer",
     ],
 )

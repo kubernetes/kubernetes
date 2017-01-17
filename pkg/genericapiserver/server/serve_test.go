@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package genericapiserver
+package server
 
 import (
 	"crypto/tls"
@@ -32,7 +32,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
-	"k8s.io/kubernetes/pkg/genericapiserver/options"
+	"k8s.io/kubernetes/pkg/genericapiserver/server/options"
 	utilcert "k8s.io/kubernetes/pkg/util/cert"
 	"k8s.io/kubernetes/pkg/util/config"
 )

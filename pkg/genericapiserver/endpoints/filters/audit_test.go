@@ -29,7 +29,7 @@ import (
 	"testing"
 
 	"k8s.io/apiserver/pkg/authentication/user"
-	"k8s.io/apiserver/pkg/request"
+	"k8s.io/apiserver/pkg/endpoints/request"
 )
 
 type simpleResponseWriter struct {

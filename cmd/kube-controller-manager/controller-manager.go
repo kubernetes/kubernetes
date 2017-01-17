@@ -24,7 +24,7 @@ import (
 	"fmt"
 	"os"
 
-	"k8s.io/apiserver/pkg/healthz"
+	"k8s.io/apiserver/pkg/server/healthz"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/app"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/app/options"
 	_ "k8s.io/kubernetes/pkg/client/metrics/prometheus" // for client metric registration

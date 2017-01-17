@@ -20,9 +20,9 @@ import (
 	"io"
 	"net/http"
 
-	apimetrics "k8s.io/apiserver/pkg/metrics"
+	apimetrics "k8s.io/apiserver/pkg/endpoints/metrics"
 	etcdmetrics "k8s.io/apiserver/pkg/storage/etcd/metrics"
-	"k8s.io/kubernetes/pkg/genericapiserver/mux"
+	"k8s.io/kubernetes/pkg/genericapiserver/server/mux"
 
 	"github.com/prometheus/client_golang/prometheus"
 )

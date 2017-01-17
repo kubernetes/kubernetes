@@ -19,10 +19,10 @@ package rest
 import (
 	"k8s.io/kubernetes/pkg/apis/certificates"
 	certificatesapiv1alpha1 "k8s.io/kubernetes/pkg/apis/certificates/v1alpha1"
-	"k8s.io/kubernetes/pkg/genericapiserver"
-	"k8s.io/kubernetes/pkg/genericapiserver/api/rest"
+	"k8s.io/kubernetes/pkg/genericapiserver/registry/generic"
+	"k8s.io/kubernetes/pkg/genericapiserver/registry/rest"
+	genericapiserver "k8s.io/kubernetes/pkg/genericapiserver/server"
 	certificatestore "k8s.io/kubernetes/pkg/registry/certificates/certificates/storage"
-	"k8s.io/kubernetes/pkg/registry/generic"
 )
 
 type RESTStorageProvider struct{}

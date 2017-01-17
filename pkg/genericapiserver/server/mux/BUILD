@@ -18,7 +18,7 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
-        "//pkg/genericapiserver/api/handlers/responsewriters:go_default_library",
+        "//pkg/genericapiserver/endpoints/handlers/responsewriters:go_default_library",
         "//vendor:github.com/emicklei/go-restful",
         "//vendor:github.com/golang/glog",
         "//vendor:k8s.io/apimachinery/pkg/api/errors",
