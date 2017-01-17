@@ -46,11 +46,11 @@ import (
 )
 
 // Store implements pkg/api/rest.StandardStorage. It's intended to be
-// embeddable, so that you can implement any non-generic functions if needed.
-// You must supply a value for every field below before use; these are left
-// public as it's meant to be overridable if need be. This object is intended
-// to be copyable so that it can be used in different ways but share the same
-// underlying behavior.
+// embeddable and allows the consumer to implement any non-generic functions
+// that are required. This object is intended to be copyable so that it can be
+// used in different ways but share the same underlying behavior.
+//
+// All fields are required unless specified.
 //
 // The intended use of this type is embedding within a Kind specific
 // RESTStorage implementation. This type provides CRUD semantics on a Kubelike
@@ -87,9 +87,12 @@ type Store struct {
 	// ObjectNameFunc returns the name of an object or an error.
 	ObjectNameFunc func(obj runtime.Object) (string, error)
 
-	// TTLFunc returns the TTL objects should be persisted with. Update is
-	// true if this is an operation against an existing object. Existing is
-	// the current TTL or the default for this operation.
+	// TTLFunc returns the TTL (time to live) that objects should be persisted
+	// with. The existing parameter is the current TTL or the default for this
+	// operation. The update parameter indicates whether this is an operation
+	// against an existing object.
+	//
+	// Objects that are persisted with a TTL are evicted once the TTL expires.
 	TTLFunc func(obj runtime.Object, existing uint64, update bool) (uint64, error)
 
 	// PredicateFunc returns a matcher corresponding to the provided labels
@@ -106,20 +109,19 @@ type Store struct {
 	// DeleteCollection call.
 	DeleteCollectionWorkers int
 
-	// Decorator is called as exit hook on object returned from the underlying
-	// storage. The returned object could be an individual object (e.g. Pod)
-	// or a list type (e.g. PodList). Decorator is intended for integrations
-	// that are above storage and should only be used for specific cases where
-	// storage of the value is not appropriate, since they cannot be watched.
+	// Decorator is an optional exit hook on an object returned from the
+	// underlying storage. The returned object could be an individual object
+	// (e.g. Pod) or a list type (e.g. PodList). Decorator is intended for
+	// integrations that are above storage and should only be used for
+	// specific cases where storage of the value is not appropriate, since
+	// they cannot be watched.
 	Decorator rest.ObjectFunc
-	// CreateStrategy implements resource-specific behavior during creation,
-	// required.
+	// CreateStrategy implements resource-specific behavior during creation.
 	CreateStrategy rest.RESTCreateStrategy
 	// AfterCreate implements a further operation to run after a resource is
 	// created, optional.
 	AfterCreate rest.ObjectFunc
-	// UpdateStrategy implements resource-specific behavior during updates,
-	// required.
+	// UpdateStrategy implements resource-specific behavior during updates.
 	UpdateStrategy rest.RESTUpdateStrategy
 	// AfterUpdate implements a further operation to run after a resource is
 	// updated, optional.
@@ -139,7 +141,7 @@ type Store struct {
 
 	// Storage is the interface for the underlying storage for the resource.
 	Storage storage.Interface
-	// Called to cleanup clients used by the underlying Storage.
+	// Called to cleanup clients used by the underlying Storage; optional.
 	DestroyFunc func()
 }
 
@@ -572,12 +574,16 @@ func markAsDeleting(obj runtime.Object) (err error) {
 //   updateForGracefulDeletion
 //   updateForGracefulDeletionAndFinalizers
 
-// updateForGracefulDeletion
+// updateForGracefulDeletion TODO
 func (e *Store) updateForGracefulDeletion(ctx genericapirequest.Context, name, key string, options *api.DeleteOptions, preconditions storage.Preconditions, in runtime.Object) (err error, ignoreNotFound, deleteImmediately bool, out, lastExisting runtime.Object) {
 	lastGraceful := int64(0)
 	out = e.NewFunc()
 	err = e.Storage.GuaranteedUpdate(
-		ctx, key, out, false, &preconditions,
+		ctx,
+		key,
+		out,
+		false, /* ignoreNotFound */
+		&preconditions,
 		storage.SimpleUpdate(func(existing runtime.Object) (runtime.Object, error) {
 			graceful, pendingGraceful, err := rest.BeforeDelete(e.DeleteStrategy, ctx, existing, options)
 			if err != nil {
@@ -625,7 +631,11 @@ func (e *Store) updateForGracefulDeletionAndFinalizers(ctx genericapirequest.Con
 	var pendingFinalizers bool
 	out = e.NewFunc()
 	err = e.Storage.GuaranteedUpdate(
-		ctx, key, out, false, &preconditions,
+		ctx,
+		key,
+		out,
+		false, /* ignoreNotFound */
+		&preconditions,
 		storage.SimpleUpdate(func(existing runtime.Object) (runtime.Object, error) {
 			graceful, pendingGraceful, err := rest.BeforeDelete(e.DeleteStrategy, ctx, existing, options)
 			if err != nil {
@@ -731,6 +741,9 @@ func (e *Store) Delete(ctx genericapirequest.Context, name string, options *api.
 	var ignoreNotFound bool
 	var deleteImmediately bool = true
 	var lastExisting, out runtime.Object
+
+	// Handle combinations of graceful deletion and finalization by issuing
+	// the correct updates.
 	if e.EnableGarbageCollection {
 		shouldUpdateFinalizers, _ := shouldUpdateFinalizers(e, accessor, options)
 		// TODO: remove the check, because we support no-op updates now.
