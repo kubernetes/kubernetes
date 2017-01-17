@@ -23,17 +23,17 @@ registry:
         description: An htpasswd file used for authentication.
       tlscert:
         type: string
-        description: base64 encoded TLS certificate for the registry.
+        description: TLS certificate for the registry.
       tlskey:
         type: string
-        description: base64 encoded TLS key for the registry.
+        description: TLS key for the registry.
       domain:
         type: string
         description: The domain name for the registry. Must match the Common Name of the certificate.
       ingress:
         type: boolean
         default: false
-        description: Create an Ingress object for the registry.
+        description: Create an Ingress object for the registry (or delete said object if "delete" is True)
       delete:
         type: boolean
         default: false

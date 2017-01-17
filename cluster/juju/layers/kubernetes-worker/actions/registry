@@ -5,8 +5,8 @@
 # Registry creation
 #
 # juju run-action kubernetes-worker/0 registry domain=myregistry.internal \
-# htpasswd="$(cat htpass)" ingress=true \
-# tlscert="$(base64 -w0 registry.crt)" tlskey="$(base64 -w0 registry.key)"
+# htpasswd="$(cat htpasswd)" ingress=true \
+# tlscert="$(cat registry.crt)" tlskey="$(cat registry.key)"
 #
 # Registry deletion
 #
@@ -14,6 +14,8 @@
 
 import sys
 import os
+
+from base64 import b64encode
 
 from charmhelpers.core.hookenv import action_get
 from charmhelpers.core.hookenv import action_set
@@ -26,6 +28,10 @@ deletion = action_get('delete')
 
 context = {}
 
+# List of config options we need to b64encode, as the registry image provided
+# by Google only accepts b64encoded values
+b64_params = ('tlscert', 'tlskey', 'htpasswd')
+
 # These config options must be defined in the case of a creation
 param_error = False
 for param in ('tlscert', 'tlskey', 'domain', 'htpasswd'):
@@ -35,6 +41,10 @@ for param in ('tlscert', 'tlskey', 'domain', 'htpasswd'):
         error = "failure, parameter {} is required".format(param)
         action_set({key: error})
         param_error = True
+
+    if param in b64_params:
+        value = b64encode(value.encode())
+
     context[param] = value
 
 if param_error:
