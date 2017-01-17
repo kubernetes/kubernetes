@@ -339,7 +339,7 @@ func (kl *Kubelet) tryUpdateNodeStatus(tryNumber int) error {
 	// from here are the majority of load on apiserver and etcd.
 	// To reduce the load on etcd, we are serving GET operations from
 	// apiserver cache (the data might be slightly delayed but it doesn't
-	// seem to cause more confilict - the delays are pretty small).
+	// seem to cause more conflicts - the delays are pretty small).
 	// If it result in a conflict, all retries are served directly from etcd.
 	opts := metav1.GetOptions{}
 	if tryNumber == 0 {
