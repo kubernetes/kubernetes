@@ -462,6 +462,10 @@ type PersistentVolumeSpec struct {
 	// More info: http://kubernetes.io/docs/user-guide/persistent-volumes#recycling-policy
 	// +optional
 	PersistentVolumeReclaimPolicy PersistentVolumeReclaimPolicy `json:"persistentVolumeReclaimPolicy,omitempty" protobuf:"bytes,5,opt,name=persistentVolumeReclaimPolicy,casttype=PersistentVolumeReclaimPolicy"`
+	// Name of StorageClass where this persistent volume belongs. Empty value
+	// means that this volume does not belong to any StorageClass.
+	// +optional
+	ClassName string `json:"className,omitempty"`
 }
 
 // PersistentVolumeReclaimPolicy describes a policy for end-of-life maintenance of persistent volumes.
@@ -557,6 +561,10 @@ type PersistentVolumeClaimSpec struct {
 	// VolumeName is the binding reference to the PersistentVolume backing this claim.
 	// +optional
 	VolumeName string `json:"volumeName,omitempty" protobuf:"bytes,3,opt,name=volumeName"`
+	// Name of the StorageClass where the desired volume belongs to.
+	// More info: http://kubernetes.io/docs/user-guide/persistent-volumes#class-1
+	// +optional
+	ClassName *string `json:"className,omitempty"`
 }
 
 // PersistentVolumeClaimStatus is the current status of a persistent volume claim.
