@@ -133,6 +133,7 @@ items:
     - deployments
     - deployments/scale
     - horizontalpodautoscalers
+    - ingresses
     - replicasets
     - replicasets/scale
     - replicationcontrollers/scale
@@ -320,6 +321,7 @@ items:
     - deployments
     - deployments/scale
     - horizontalpodautoscalers
+    - ingresses
     - replicasets
     - replicasets/scale
     - replicationcontrollers/scale
@@ -717,6 +719,7 @@ items:
     - deployments
     - deployments/scale
     - horizontalpodautoscalers
+    - ingresses
     - replicasets
     - replicasets/scale
     - replicationcontrollers/scale
