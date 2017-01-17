@@ -23,7 +23,7 @@ import (
 	"strings"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/kubernetes/pkg/api/rest"
+	"k8s.io/kubernetes/pkg/genericapiserver/api/rest"
 )
 
 // LocationStreamer is a resource that streams the contents of a particular

@@ -15,4 +15,4 @@ limitations under the License.
 */
 
 // Package rest defines common logic around changes to Kubernetes resources.
-package rest // import "k8s.io/kubernetes/pkg/api/rest"
+package rest // import "k8s.io/kubernetes/pkg/genericapiserver/api/rest"
