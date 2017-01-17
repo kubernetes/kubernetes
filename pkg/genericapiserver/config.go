@@ -40,6 +40,7 @@ import (
 	openapicommon "k8s.io/apimachinery/pkg/openapi"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/version"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	authenticatorunion "k8s.io/apiserver/pkg/authentication/request/union"
 	"k8s.io/apiserver/pkg/authentication/user"
@@ -60,7 +61,6 @@ import (
 	"k8s.io/kubernetes/pkg/genericapiserver/options"
 	"k8s.io/kubernetes/pkg/genericapiserver/routes"
 	certutil "k8s.io/kubernetes/pkg/util/cert"
-	"k8s.io/kubernetes/pkg/version"
 )
 
 const (
