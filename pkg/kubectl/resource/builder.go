@@ -806,12 +806,13 @@ func HasNames(args []string) (bool, error) {
 
 // MultipleTypesRequested returns true if the provided args contain multiple resource kinds
 func MultipleTypesRequested(args []string) bool {
+	if len(args) == 1 && args[0] == "all" {
+		return true
+	}
+
 	args = normalizeMultipleResourcesArgs(args)
 	rKinds := sets.NewString()
 	for _, arg := range args {
-		if arg == "all" {
-			return true
-		}
 		rTuple, found, err := splitResourceTypeName(arg)
 		if err != nil {
 			continue
