@@ -16,10 +16,7 @@ limitations under the License.
 
 package certificates
 
-import (
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/pkg/api"
-)
+import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 // +genclient=true
 // +nonNamespaced=true
@@ -28,7 +25,7 @@ import (
 type CertificateSigningRequest struct {
 	metav1.TypeMeta
 	// +optional
-	api.ObjectMeta
+	metav1.ObjectMeta
 
 	// The certificate request itself and any additional information.
 	// +optional

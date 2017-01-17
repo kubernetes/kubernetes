@@ -21,13 +21,12 @@ limitations under the License.
 package extensions
 
 import (
-	reflect "reflect"
-
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	api "k8s.io/kubernetes/pkg/api"
 	intstr "k8s.io/kubernetes/pkg/util/intstr"
+	reflect "reflect"
 )
 
 func init() {
@@ -167,8 +166,10 @@ func DeepCopy_extensions_DaemonSet(in interface{}, out interface{}, c *conversio
 		in := in.(*DaemonSet)
 		out := out.(*DaemonSet)
 		*out = *in
-		if err := api.DeepCopy_api_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, c); err != nil {
+		if newVal, err := c.DeepCopy(&in.ObjectMeta); err != nil {
 			return err
+		} else {
+			out.ObjectMeta = *newVal.(*v1.ObjectMeta)
 		}
 		if err := DeepCopy_extensions_DaemonSetSpec(&in.Spec, &out.Spec, c); err != nil {
 			return err
@@ -229,8 +230,10 @@ func DeepCopy_extensions_Deployment(in interface{}, out interface{}, c *conversi
 		in := in.(*Deployment)
 		out := out.(*Deployment)
 		*out = *in
-		if err := api.DeepCopy_api_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, c); err != nil {
+		if newVal, err := c.DeepCopy(&in.ObjectMeta); err != nil {
 			return err
+		} else {
+			out.ObjectMeta = *newVal.(*v1.ObjectMeta)
 		}
 		if err := DeepCopy_extensions_DeploymentSpec(&in.Spec, &out.Spec, c); err != nil {
 			return err
@@ -421,8 +424,10 @@ func DeepCopy_extensions_Ingress(in interface{}, out interface{}, c *conversion.
 		in := in.(*Ingress)
 		out := out.(*Ingress)
 		*out = *in
-		if err := api.DeepCopy_api_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, c); err != nil {
+		if newVal, err := c.DeepCopy(&in.ObjectMeta); err != nil {
 			return err
+		} else {
+			out.ObjectMeta = *newVal.(*v1.ObjectMeta)
 		}
 		if err := DeepCopy_extensions_IngressSpec(&in.Spec, &out.Spec, c); err != nil {
 			return err
@@ -552,8 +557,10 @@ func DeepCopy_extensions_NetworkPolicy(in interface{}, out interface{}, c *conve
 		in := in.(*NetworkPolicy)
 		out := out.(*NetworkPolicy)
 		*out = *in
-		if err := api.DeepCopy_api_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, c); err != nil {
+		if newVal, err := c.DeepCopy(&in.ObjectMeta); err != nil {
 			return err
+		} else {
+			out.ObjectMeta = *newVal.(*v1.ObjectMeta)
 		}
 		if err := DeepCopy_extensions_NetworkPolicySpec(&in.Spec, &out.Spec, c); err != nil {
 			return err
@@ -679,8 +686,10 @@ func DeepCopy_extensions_PodSecurityPolicy(in interface{}, out interface{}, c *c
 		in := in.(*PodSecurityPolicy)
 		out := out.(*PodSecurityPolicy)
 		*out = *in
-		if err := api.DeepCopy_api_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, c); err != nil {
+		if newVal, err := c.DeepCopy(&in.ObjectMeta); err != nil {
 			return err
+		} else {
+			out.ObjectMeta = *newVal.(*v1.ObjectMeta)
 		}
 		if err := DeepCopy_extensions_PodSecurityPolicySpec(&in.Spec, &out.Spec, c); err != nil {
 			return err
@@ -768,8 +777,10 @@ func DeepCopy_extensions_ReplicaSet(in interface{}, out interface{}, c *conversi
 		in := in.(*ReplicaSet)
 		out := out.(*ReplicaSet)
 		*out = *in
-		if err := api.DeepCopy_api_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, c); err != nil {
+		if newVal, err := c.DeepCopy(&in.ObjectMeta); err != nil {
 			return err
+		} else {
+			out.ObjectMeta = *newVal.(*v1.ObjectMeta)
 		}
 		if err := DeepCopy_extensions_ReplicaSetSpec(&in.Spec, &out.Spec, c); err != nil {
 			return err
@@ -909,8 +920,10 @@ func DeepCopy_extensions_Scale(in interface{}, out interface{}, c *conversion.Cl
 		in := in.(*Scale)
 		out := out.(*Scale)
 		*out = *in
-		if err := api.DeepCopy_api_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, c); err != nil {
+		if newVal, err := c.DeepCopy(&in.ObjectMeta); err != nil {
 			return err
+		} else {
+			out.ObjectMeta = *newVal.(*v1.ObjectMeta)
 		}
 		if err := DeepCopy_extensions_ScaleStatus(&in.Status, &out.Status, c); err != nil {
 			return err
@@ -966,8 +979,10 @@ func DeepCopy_extensions_ThirdPartyResource(in interface{}, out interface{}, c *
 		in := in.(*ThirdPartyResource)
 		out := out.(*ThirdPartyResource)
 		*out = *in
-		if err := api.DeepCopy_api_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, c); err != nil {
+		if newVal, err := c.DeepCopy(&in.ObjectMeta); err != nil {
 			return err
+		} else {
+			out.ObjectMeta = *newVal.(*v1.ObjectMeta)
 		}
 		if in.Versions != nil {
 			in, out := &in.Versions, &out.Versions
@@ -985,8 +1000,10 @@ func DeepCopy_extensions_ThirdPartyResourceData(in interface{}, out interface{},
 		in := in.(*ThirdPartyResourceData)
 		out := out.(*ThirdPartyResourceData)
 		*out = *in
-		if err := api.DeepCopy_api_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, c); err != nil {
+		if newVal, err := c.DeepCopy(&in.ObjectMeta); err != nil {
 			return err
+		} else {
+			out.ObjectMeta = *newVal.(*v1.ObjectMeta)
 		}
 		if in.Data != nil {
 			in, out := &in.Data, &out.Data
