@@ -2606,12 +2606,17 @@ func TestInterPodAffinityWithMultipleNodes(t *testing.T) {
 	labelRgIndia := map[string]string{
 		"region": "India",
 	}
+	labelRgUS := map[string]string{
+		"region": "US",
+	}
+
 	tests := []struct {
-		pod   *v1.Pod
-		pods  []*v1.Pod
-		nodes []v1.Node
-		fits  map[string]bool
-		test  string
+		pod    *v1.Pod
+		pods   []*v1.Pod
+		nodes  []v1.Node
+		fits   map[string]bool
+		test   string
+		nometa bool
 	}{
 		{
 			pod: &v1.Pod{
@@ -2817,6 +2822,71 @@ func TestInterPodAffinityWithMultipleNodes(t *testing.T) {
 			},
 			test: "NodeA and nodeB have same topologyKey and label value. NodeA has an existing pod that match the inter pod affinity rule. The pod can not be scheduled onto nodeA and nodeB but can be schedulerd onto nodeC",
 		},
+		{
+			pod: &v1.Pod{
+				ObjectMeta: v1.ObjectMeta{Labels: map[string]string{"foo": "123"}},
+				Spec: v1.PodSpec{
+					Affinity: &v1.Affinity{
+						PodAntiAffinity: &v1.PodAntiAffinity{
+							RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
+								{
+									LabelSelector: &metav1.LabelSelector{
+										MatchExpressions: []metav1.LabelSelectorRequirement{
+											{
+												Key:      "foo",
+												Operator: metav1.LabelSelectorOpIn,
+												Values:   []string{"bar"},
+											},
+										},
+									},
+									TopologyKey: "region",
+								},
+							},
+						},
+					},
+				},
+			},
+			pods: []*v1.Pod{
+				{Spec: v1.PodSpec{NodeName: "nodeA"}, ObjectMeta: v1.ObjectMeta{Labels: map[string]string{"foo": "bar"}}},
+				{
+					Spec: v1.PodSpec{
+						NodeName: "nodeC",
+						Affinity: &v1.Affinity{
+							PodAntiAffinity: &v1.PodAntiAffinity{
+								RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
+									{
+										LabelSelector: &metav1.LabelSelector{
+											MatchExpressions: []metav1.LabelSelectorRequirement{
+												{
+													Key:      "foo",
+													Operator: metav1.LabelSelectorOpIn,
+													Values:   []string{"123"},
+												},
+											},
+										},
+										TopologyKey: "region",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			nodes: []v1.Node{
+				{ObjectMeta: v1.ObjectMeta{Name: "nodeA", Labels: labelRgChina}},
+				{ObjectMeta: v1.ObjectMeta{Name: "nodeB", Labels: labelRgChinaAzAz1}},
+				{ObjectMeta: v1.ObjectMeta{Name: "nodeC", Labels: labelRgIndia}},
+				{ObjectMeta: v1.ObjectMeta{Name: "nodeD", Labels: labelRgUS}},
+			},
+			fits: map[string]bool{
+				"nodeA": false,
+				"nodeB": false,
+				"nodeC": false,
+				"nodeD": true,
+			},
+			test:   "NodeA and nodeB have same topologyKey and label value. NodeA has an existing pod that match the inter pod affinity rule. NodeC has an existing pod that match the inter pod affinity rule. The pod can not be scheduled onto nodeA, nodeB and nodeC but can be schedulerd onto nodeD",
+			nometa: true,
+		},
 	}
 	affinityExpectedFailureReasons := []algorithm.PredicateFailureReason{ErrPodAffinityNotMatch}
 	selectorExpectedFailureReasons := []algorithm.PredicateFailureReason{ErrNodeSelectorNotMatch}
@@ -2839,7 +2909,14 @@ func TestInterPodAffinityWithMultipleNodes(t *testing.T) {
 			nodeInfo := schedulercache.NewNodeInfo(podsOnNode...)
 			nodeInfo.SetNode(&node)
 			nodeInfoMap := map[string]*schedulercache.NodeInfo{node.Name: nodeInfo}
-			fits, reasons, err := testFit.InterPodAffinityMatches(test.pod, PredicateMetadata(test.pod, nodeInfoMap), nodeInfo)
+
+			var meta interface{} = nil
+
+			if !test.nometa {
+				meta = PredicateMetadata(test.pod, nodeInfoMap)
+			}
+
+			fits, reasons, err := testFit.InterPodAffinityMatches(test.pod, meta, nodeInfo)
 			if err != nil {
 				t.Errorf("%s: unexpected error %v", test.test, err)
 			}
