@@ -41,9 +41,9 @@ import (
 	apirequest "k8s.io/apiserver/pkg/request"
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	genericapi "k8s.io/kubernetes/pkg/genericapiserver/api"
+	"k8s.io/kubernetes/pkg/genericapiserver/api/rest"
 	genericmux "k8s.io/kubernetes/pkg/genericapiserver/mux"
 	"k8s.io/kubernetes/pkg/genericapiserver/routes"
 )

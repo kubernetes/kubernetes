@@ -38,11 +38,11 @@ import (
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	genericapirequest "k8s.io/apiserver/pkg/request"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	openapigen "k8s.io/kubernetes/pkg/generated/openapi"
+	"k8s.io/kubernetes/pkg/genericapiserver/api/rest"
 	etcdtesting "k8s.io/kubernetes/pkg/storage/etcd/testing"
 	"k8s.io/kubernetes/pkg/version"
 

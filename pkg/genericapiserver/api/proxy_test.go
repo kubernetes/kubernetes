@@ -36,7 +36,7 @@ import (
 
 	"golang.org/x/net/websocket"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
-	"k8s.io/kubernetes/pkg/api/rest"
+	"k8s.io/kubernetes/pkg/genericapiserver/api/rest"
 )
 
 func TestProxyRequestContentLengthAndTransferEncoding(t *testing.T) {
