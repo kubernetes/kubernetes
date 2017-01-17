@@ -28,6 +28,7 @@ import (
 
 	"github.com/golang/glog"
 
+	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	unversionedvalidation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/labels"
@@ -50,7 +51,7 @@ import (
 // fields by default.
 var RepairMalformedUpdates bool = genericvalidation.RepairMalformedUpdates
 
-const isNegativeErrorMsg string = genericvalidation.IsNegativeErrorMsg
+const isNegativeErrorMsg string = apimachineryvalidation.IsNegativeErrorMsg
 const isInvalidQuotaResource string = `must be a standard resource for quota`
 const fieldImmutableErrorMsg string = genericvalidation.FieldImmutableErrorMsg
 const isNotIntegerErrorMsg string = `must be an integer`
@@ -175,7 +176,7 @@ func ValidateOwnerReferences(ownerReferences []metav1.OwnerReference, fldPath *f
 // if the name will have a value appended to it.  If the name is not valid,
 // this returns a list of descriptions of individual characteristics of the
 // value that were not valid.  Otherwise this returns an empty list or nil.
-type ValidateNameFunc genericvalidation.ValidateNameFunc
+type ValidateNameFunc apimachineryvalidation.ValidateNameFunc
 
 // maskTrailingDash replaces the final character of a string with a subdomain safe
 // value if is a dash.
@@ -210,7 +211,7 @@ var ValidateNodeName = NameIsDNSSubdomain
 // ValidateNamespaceName can be used to check whether the given namespace name is valid.
 // Prefix indicates this name will be used as part of generation, in which case
 // trailing dashes are allowed.
-var ValidateNamespaceName = genericvalidation.ValidateNamespaceName
+var ValidateNamespaceName = apimachineryvalidation.ValidateNamespaceName
 
 // ValidateLimitRangeName can be used to check whether the given limit range name is valid.
 // Prefix indicates this name will be used as part of generation, in which case
@@ -231,7 +232,7 @@ var ValidateSecretName = NameIsDNSSubdomain
 // ValidateServiceAccountName can be used to check whether the given service account name is valid.
 // Prefix indicates this name will be used as part of generation, in which case
 // trailing dashes are allowed.
-var ValidateServiceAccountName = genericvalidation.ValidateServiceAccountName
+var ValidateServiceAccountName = apimachineryvalidation.ValidateServiceAccountName
 
 // ValidateEndpointsName can be used to check whether the given endpoints name is valid.
 // Prefix indicates this name will be used as part of generation, in which case
@@ -244,22 +245,22 @@ var ValidateClusterName = genericvalidation.ValidateClusterName
 // TODO update all references to these functions to point to the genericvalidation ones
 // NameIsDNSSubdomain is a ValidateNameFunc for names that must be a DNS subdomain.
 func NameIsDNSSubdomain(name string, prefix bool) []string {
-	return genericvalidation.NameIsDNSSubdomain(name, prefix)
+	return apimachineryvalidation.NameIsDNSSubdomain(name, prefix)
 }
 
 // NameIsDNSLabel is a ValidateNameFunc for names that must be a DNS 1123 label.
 func NameIsDNSLabel(name string, prefix bool) []string {
-	return genericvalidation.NameIsDNSLabel(name, prefix)
+	return apimachineryvalidation.NameIsDNSLabel(name, prefix)
 }
 
 // NameIsDNS1035Label is a ValidateNameFunc for names that must be a DNS 952 label.
 func NameIsDNS1035Label(name string, prefix bool) []string {
-	return genericvalidation.NameIsDNS1035Label(name, prefix)
+	return apimachineryvalidation.NameIsDNS1035Label(name, prefix)
 }
 
 // Validates that given value is not negative.
 func ValidateNonnegativeField(value int64, fldPath *field.Path) field.ErrorList {
-	return genericvalidation.ValidateNonnegativeField(value, fldPath)
+	return apimachineryvalidation.ValidateNonnegativeField(value, fldPath)
 }
 
 // Validates that a Quantity is not negative
@@ -289,7 +290,7 @@ func ValidateImmutableAnnotation(newVal string, oldVal string, annotation string
 // It doesn't return an error for rootscoped resources with namespace, because namespace should already be cleared before.
 // TODO: Remove calls to this method scattered in validations of specific resources, e.g., ValidatePodUpdate.
 func ValidateObjectMeta(meta *api.ObjectMeta, requiresNamespace bool, nameFn ValidateNameFunc, fldPath *field.Path) field.ErrorList {
-	return genericvalidation.ValidateObjectMeta(meta, requiresNamespace, genericvalidation.ValidateNameFunc(nameFn), fldPath)
+	return genericvalidation.ValidateObjectMeta(meta, requiresNamespace, apimachineryvalidation.ValidateNameFunc(nameFn), fldPath)
 }
 
 // ValidateObjectMetaUpdate validates an object's metadata when updated

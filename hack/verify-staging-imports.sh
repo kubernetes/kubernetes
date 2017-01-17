@@ -25,7 +25,7 @@ kube::golang::setup_env
 
 
 for dep in $(ls -1 ${KUBE_ROOT}/staging/src/k8s.io/); do
-	if go list -f {{.Deps}} ./vendor/k8s.io/${dep}/... | sed 's/ /\n/g' - | grep k8s.io/kubernetes | grep -v 'k8s.io/kubernetes/vendor' | LC_ALL=C sort -u | grep -e "."; then
+	if go list -f {{.Deps}} ./vendor/k8s.io/${dep}/... | tr " " '\n' | grep k8s.io/kubernetes | grep -v 'k8s.io/kubernetes/vendor' | LC_ALL=C sort -u | grep -e "."; then
 		echo "${dep} has a cyclical dependency"
 		exit 1
 	fi
