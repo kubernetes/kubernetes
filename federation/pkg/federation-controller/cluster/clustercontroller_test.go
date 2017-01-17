@@ -38,7 +38,7 @@ import (
 func newCluster(clusterName string, serverUrl string) *federationv1beta1.Cluster {
 	cluster := federationv1beta1.Cluster{
 		TypeMeta: metav1.TypeMeta{APIVersion: testapi.Federation.GroupVersion().String()},
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			UID:  uuid.NewUUID(),
 			Name: clusterName,
 		},

@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/api/v1"
@@ -89,7 +90,7 @@ func TestPodVolumesExist(t *testing.T) {
 
 	pods := []*v1.Pod{
 		{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name: "pod1",
 				UID:  "pod1uid",
 			},
@@ -107,7 +108,7 @@ func TestPodVolumesExist(t *testing.T) {
 			},
 		},
 		{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name: "pod2",
 				UID:  "pod2uid",
 			},
@@ -125,7 +126,7 @@ func TestPodVolumesExist(t *testing.T) {
 			},
 		},
 		{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name: "pod3",
 				UID:  "pod3uid",
 			},
@@ -289,7 +290,7 @@ func TestVolumeAttachAndMountControllerEnabled(t *testing.T) {
 	kubeClient.AddReactor("get", "nodes",
 		func(action core.Action) (bool, runtime.Object, error) {
 			return true, &v1.Node{
-				ObjectMeta: v1.ObjectMeta{Name: testKubeletHostname},
+				ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname},
 				Status: v1.NodeStatus{
 					VolumesAttached: []v1.AttachedVolume{
 						{
@@ -357,7 +358,7 @@ func TestVolumeUnmountAndDetachControllerEnabled(t *testing.T) {
 	kubeClient.AddReactor("get", "nodes",
 		func(action core.Action) (bool, runtime.Object, error) {
 			return true, &v1.Node{
-				ObjectMeta: v1.ObjectMeta{Name: testKubeletHostname},
+				ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname},
 				Status: v1.NodeStatus{
 					VolumesAttached: []v1.AttachedVolume{
 						{

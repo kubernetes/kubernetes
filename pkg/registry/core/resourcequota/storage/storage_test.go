@@ -46,7 +46,7 @@ func newStorage(t *testing.T) (*REST, *StatusREST, *etcdtesting.EtcdTestServer) 
 
 func validNewResourceQuota() *api.ResourceQuota {
 	return &api.ResourceQuota{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      "foo",
 			Namespace: api.NamespaceDefault,
 		},
@@ -69,13 +69,13 @@ func TestCreate(t *testing.T) {
 	defer storage.Store.DestroyFunc()
 	test := registrytest.New(t, storage.Store)
 	resourcequota := validNewResourceQuota()
-	resourcequota.ObjectMeta = api.ObjectMeta{}
+	resourcequota.ObjectMeta = metav1.ObjectMeta{}
 	test.TestCreate(
 		// valid
 		resourcequota,
 		// invalid
 		&api.ResourceQuota{
-			ObjectMeta: api.ObjectMeta{Name: "_-a123-a_"},
+			ObjectMeta: metav1.ObjectMeta{Name: "_-a123-a_"},
 		},
 	)
 }
@@ -166,7 +166,7 @@ func TestUpdateStatus(t *testing.T) {
 	}
 
 	resourcequotaIn := &api.ResourceQuota{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      "foo",
 			Namespace: api.NamespaceDefault,
 		},

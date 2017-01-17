@@ -21,6 +21,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/request"
@@ -59,11 +60,11 @@ type RESTUpdateStrategy interface {
 // TODO: add other common fields that require global validation.
 func validateCommonFields(obj, old runtime.Object) (field.ErrorList, error) {
 	allErrs := field.ErrorList{}
-	objectMeta, err := api.ObjectMetaFor(obj)
+	objectMeta, err := metav1.ObjectMetaFor(obj)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get new object metadata: %v", err)
 	}
-	oldObjectMeta, err := api.ObjectMetaFor(old)
+	oldObjectMeta, err := metav1.ObjectMetaFor(old)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get old object metadata: %v", err)
 	}
@@ -88,7 +89,7 @@ func BeforeUpdate(strategy RESTUpdateStrategy, ctx genericapirequest.Context, ob
 		objectMeta.Namespace = api.NamespaceNone
 	}
 	// Ensure requests cannot update generation
-	oldMeta, err := api.ObjectMetaFor(old)
+	oldMeta, err := metav1.ObjectMetaFor(old)
 	if err != nil {
 		return err
 	}

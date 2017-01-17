@@ -64,7 +64,7 @@ func getResourceRequirements(requests, limits api.ResourceList) api.ResourceRequ
 // createLimitRange creates a limit range with the specified data
 func createLimitRange(limitType api.LimitType, min, max, defaultLimit, defaultRequest, maxLimitRequestRatio api.ResourceList) api.LimitRange {
 	return api.LimitRange{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      "abc",
 			Namespace: "test",
 		},
@@ -85,7 +85,7 @@ func createLimitRange(limitType api.LimitType, min, max, defaultLimit, defaultRe
 
 func validLimitRange() api.LimitRange {
 	return api.LimitRange{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      "abc",
 			Namespace: "test",
 		},
@@ -110,7 +110,7 @@ func validLimitRange() api.LimitRange {
 
 func validLimitRangeNoDefaults() api.LimitRange {
 	return api.LimitRange{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      "abc",
 			Namespace: "test",
 		},
@@ -133,7 +133,7 @@ func validLimitRangeNoDefaults() api.LimitRange {
 
 func validPod(name string, numContainers int, resources api.ResourceRequirements) api.Pod {
 	pod := api.Pod{
-		ObjectMeta: api.ObjectMeta{Name: name, Namespace: "test"},
+		ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: "test"},
 		Spec:       api.PodSpec{},
 	}
 	pod.Spec.Containers = make([]api.Container, 0, numContainers)
@@ -602,7 +602,7 @@ func newHandlerForTest(c clientset.Interface) (admission.Interface, informers.Sh
 
 func validPersistentVolumeClaim(name string, resources api.ResourceRequirements) api.PersistentVolumeClaim {
 	pvc := api.PersistentVolumeClaim{
-		ObjectMeta: api.ObjectMeta{Name: name, Namespace: "test"},
+		ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: "test"},
 		Spec: api.PersistentVolumeClaimSpec{
 			Resources: resources,
 		},

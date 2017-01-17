@@ -266,7 +266,7 @@ func (f *FakeRecorder) makeEvent(ref *v1.ObjectReference, eventtype, reason, mes
 		namespace = v1.NamespaceDefault
 	}
 	return &v1.Event{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      fmt.Sprintf("%v.%x", ref.Name, t.UnixNano()),
 			Namespace: namespace,
 		},
@@ -292,7 +292,7 @@ func NewFakeRecorder() *FakeRecorder {
 // NewNode is a helper function for creating Nodes for testing.
 func NewNode(name string) *v1.Node {
 	return &v1.Node{
-		ObjectMeta: v1.ObjectMeta{Name: name},
+		ObjectMeta: metav1.ObjectMeta{Name: name},
 		Spec: v1.NodeSpec{
 			ExternalID: name,
 		},
@@ -308,7 +308,7 @@ func NewNode(name string) *v1.Node {
 // NewPod is a helper function for creating Pods for testing.
 func NewPod(name, host string) *v1.Pod {
 	pod := &v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Namespace: "default",
 			Name:      name,
 		},

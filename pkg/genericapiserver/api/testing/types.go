@@ -19,12 +19,11 @@ package testing
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	apiv1 "k8s.io/kubernetes/pkg/api/v1"
 )
 
 type Simple struct {
-	metav1.TypeMeta  `json:",inline"`
-	apiv1.ObjectMeta `json:"metadata"`
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata"`
 	// +optional
 	Other string `json:"other,omitempty"`
 	// +optional
@@ -34,8 +33,8 @@ type Simple struct {
 func (obj *Simple) GetObjectKind() schema.ObjectKind { return &obj.TypeMeta }
 
 type SimpleRoot struct {
-	metav1.TypeMeta  `json:",inline"`
-	apiv1.ObjectMeta `json:"metadata"`
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata"`
 	// +optional
 	Other string `json:"other,omitempty"`
 	// +optional

@@ -212,7 +212,7 @@ func referencesDiffs(old []metav1.OwnerReference, new []metav1.OwnerReference) (
 	return added, removed
 }
 
-func shouldOrphanDependents(e *event, accessor meta.Object) bool {
+func shouldOrphanDependents(e *event, accessor metav1.Object) bool {
 	// The delta_fifo may combine the creation and update of the object into one
 	// event, so we need to check AddEvent as well.
 	if e.oldObj == nil {
@@ -678,7 +678,7 @@ func objectReferenceToMetadataOnlyObject(ref objectReference) *metaonly.Metadata
 			APIVersion: ref.APIVersion,
 			Kind:       ref.Kind,
 		},
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Namespace: ref.Namespace,
 			UID:       ref.UID,
 			Name:      ref.Name,

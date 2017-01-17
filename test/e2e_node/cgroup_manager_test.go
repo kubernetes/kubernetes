@@ -17,6 +17,7 @@ limitations under the License.
 package e2e_node
 
 import (
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
@@ -68,7 +69,7 @@ func makePodToVerifyCgroups(cgroupNames []cm.CgroupName) *v1.Pod {
 	}
 
 	pod := &v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: "pod" + string(uuid.NewUUID()),
 		},
 		Spec: v1.PodSpec{
@@ -106,7 +107,7 @@ func makePodToVerifyCgroupRemoved(cgroupName cm.CgroupName) *v1.Pod {
 		cgroupFsName = cm.ConvertCgroupNameToSystemd(cm.CgroupName(cgroupName), true)
 	}
 	pod := &v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: "pod" + string(uuid.NewUUID()),
 		},
 		Spec: v1.PodSpec{
@@ -166,7 +167,7 @@ var _ = framework.KubeDescribe("Kubelet Cgroup Manager", func() {
 				)
 				By("Creating a Guaranteed pod in Namespace", func() {
 					guaranteedPod = f.PodClient().Create(&v1.Pod{
-						ObjectMeta: v1.ObjectMeta{
+						ObjectMeta: metav1.ObjectMeta{
 							Name:      "pod" + string(uuid.NewUUID()),
 							Namespace: f.Namespace.Name,
 						},
@@ -210,7 +211,7 @@ var _ = framework.KubeDescribe("Kubelet Cgroup Manager", func() {
 				)
 				By("Creating a BestEffort pod in Namespace", func() {
 					bestEffortPod = f.PodClient().Create(&v1.Pod{
-						ObjectMeta: v1.ObjectMeta{
+						ObjectMeta: metav1.ObjectMeta{
 							Name:      "pod" + string(uuid.NewUUID()),
 							Namespace: f.Namespace.Name,
 						},
@@ -254,7 +255,7 @@ var _ = framework.KubeDescribe("Kubelet Cgroup Manager", func() {
 				)
 				By("Creating a Burstable pod in Namespace", func() {
 					burstablePod = f.PodClient().Create(&v1.Pod{
-						ObjectMeta: v1.ObjectMeta{
+						ObjectMeta: metav1.ObjectMeta{
 							Name:      "pod" + string(uuid.NewUUID()),
 							Namespace: f.Namespace.Name,
 						},

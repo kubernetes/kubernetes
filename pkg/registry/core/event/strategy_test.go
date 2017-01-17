@@ -20,6 +20,7 @@ import (
 	"reflect"
 	"testing"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/kubernetes/pkg/api"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
@@ -28,7 +29,7 @@ import (
 
 func testEvent(name string) *api.Event {
 	return &api.Event{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: "default",
 		},
@@ -41,7 +42,7 @@ func testEvent(name string) *api.Event {
 
 func TestGetAttrs(t *testing.T) {
 	eventA := &api.Event{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      "f0118",
 			Namespace: "default",
 		},

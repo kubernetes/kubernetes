@@ -23,6 +23,7 @@ import (
 	"testing"
 	"time"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/api"
@@ -135,7 +136,7 @@ func PriorityTwo(pod *v1.Pod, nodeNameToInfo map[string]*schedulercache.NodeInfo
 
 func TestDefaultErrorFunc(t *testing.T) {
 	testPod := &v1.Pod{
-		ObjectMeta: v1.ObjectMeta{Name: "foo", Namespace: "bar"},
+		ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"},
 		Spec:       apitesting.V1DeepEqualSafePodSpec(),
 	}
 	handler := utiltesting.FakeHandler{
@@ -180,9 +181,9 @@ func TestDefaultErrorFunc(t *testing.T) {
 func TestNodeEnumerator(t *testing.T) {
 	testList := &v1.NodeList{
 		Items: []v1.Node{
-			{ObjectMeta: v1.ObjectMeta{Name: "foo"}},
-			{ObjectMeta: v1.ObjectMeta{Name: "bar"}},
-			{ObjectMeta: v1.ObjectMeta{Name: "baz"}},
+			{ObjectMeta: metav1.ObjectMeta{Name: "foo"}},
+			{ObjectMeta: metav1.ObjectMeta{Name: "bar"}},
+			{ObjectMeta: metav1.ObjectMeta{Name: "baz"}},
 		},
 	}
 	me := nodeEnumerator{testList}
@@ -214,7 +215,7 @@ func TestBind(t *testing.T) {
 		binding *v1.Binding
 	}{
 		{binding: &v1.Binding{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Namespace: v1.NamespaceDefault,
 				Name:      "foo",
 			},
@@ -334,28 +335,28 @@ func TestResponsibleForPod(t *testing.T) {
 		{
 			// pod with no annotation "scheduler.alpha.kubernetes.io/name=<scheduler-name>" should be
 			// picked by the default scheduler, NOT by the one of name "foo-scheduler"
-			pod:             &v1.Pod{ObjectMeta: v1.ObjectMeta{Name: "foo", Namespace: "bar"}},
+			pod:             &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"}},
 			pickedByDefault: true,
 			pickedByFoo:     false,
 		},
 		{
 			// pod with annotation "scheduler.alpha.kubernetes.io/name=default-scheduler" should be picked
 			// by the scheduler of name "default-scheduler", NOT by the one of name "foo-scheduler"
-			pod:             &v1.Pod{ObjectMeta: v1.ObjectMeta{Name: "foo", Namespace: "bar", Annotations: schedulerAnnotationFitsDefault}},
+			pod:             &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar", Annotations: schedulerAnnotationFitsDefault}},
 			pickedByDefault: true,
 			pickedByFoo:     false,
 		},
 		{
 			// pod with annotataion "scheduler.alpha.kubernetes.io/name=foo-scheduler" should be NOT
 			// be picked by the scheduler of name "default-scheduler", but by the one of name "foo-scheduler"
-			pod:             &v1.Pod{ObjectMeta: v1.ObjectMeta{Name: "foo", Namespace: "bar", Annotations: schedulerAnnotationFitsFoo}},
+			pod:             &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar", Annotations: schedulerAnnotationFitsFoo}},
 			pickedByDefault: false,
 			pickedByFoo:     true,
 		},
 		{
 			// pod with annotataion "scheduler.alpha.kubernetes.io/name=foo-scheduler" should be NOT
 			// be picked by niether the scheduler of name "default-scheduler" nor the one of name "foo-scheduler"
-			pod:             &v1.Pod{ObjectMeta: v1.ObjectMeta{Name: "foo", Namespace: "bar", Annotations: schedulerAnnotationFitsNone}},
+			pod:             &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar", Annotations: schedulerAnnotationFitsNone}},
 			pickedByDefault: false,
 			pickedByFoo:     false,
 		},
@@ -437,29 +438,29 @@ func TestNodeConditionPredicate(t *testing.T) {
 	nodeList := &v1.NodeList{
 		Items: []v1.Node{
 			// node1 considered
-			{ObjectMeta: v1.ObjectMeta{Name: "node1"}, Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionTrue}}}},
+			{ObjectMeta: metav1.ObjectMeta{Name: "node1"}, Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionTrue}}}},
 			// node2 ignored - node not Ready
-			{ObjectMeta: v1.ObjectMeta{Name: "node2"}, Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionFalse}}}},
+			{ObjectMeta: metav1.ObjectMeta{Name: "node2"}, Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionFalse}}}},
 			// node3 ignored - node out of disk
-			{ObjectMeta: v1.ObjectMeta{Name: "node3"}, Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeOutOfDisk, Status: v1.ConditionTrue}}}},
+			{ObjectMeta: metav1.ObjectMeta{Name: "node3"}, Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeOutOfDisk, Status: v1.ConditionTrue}}}},
 			// node4 considered
-			{ObjectMeta: v1.ObjectMeta{Name: "node4"}, Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeOutOfDisk, Status: v1.ConditionFalse}}}},
+			{ObjectMeta: metav1.ObjectMeta{Name: "node4"}, Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeOutOfDisk, Status: v1.ConditionFalse}}}},
 
 			// node5 ignored - node out of disk
-			{ObjectMeta: v1.ObjectMeta{Name: "node5"}, Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionTrue}, {Type: v1.NodeOutOfDisk, Status: v1.ConditionTrue}}}},
+			{ObjectMeta: metav1.ObjectMeta{Name: "node5"}, Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionTrue}, {Type: v1.NodeOutOfDisk, Status: v1.ConditionTrue}}}},
 			// node6 considered
-			{ObjectMeta: v1.ObjectMeta{Name: "node6"}, Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionTrue}, {Type: v1.NodeOutOfDisk, Status: v1.ConditionFalse}}}},
+			{ObjectMeta: metav1.ObjectMeta{Name: "node6"}, Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionTrue}, {Type: v1.NodeOutOfDisk, Status: v1.ConditionFalse}}}},
 			// node7 ignored - node out of disk, node not Ready
-			{ObjectMeta: v1.ObjectMeta{Name: "node7"}, Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionFalse}, {Type: v1.NodeOutOfDisk, Status: v1.ConditionTrue}}}},
+			{ObjectMeta: metav1.ObjectMeta{Name: "node7"}, Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionFalse}, {Type: v1.NodeOutOfDisk, Status: v1.ConditionTrue}}}},
 			// node8 ignored - node not Ready
-			{ObjectMeta: v1.ObjectMeta{Name: "node8"}, Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionFalse}, {Type: v1.NodeOutOfDisk, Status: v1.ConditionFalse}}}},
+			{ObjectMeta: metav1.ObjectMeta{Name: "node8"}, Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionFalse}, {Type: v1.NodeOutOfDisk, Status: v1.ConditionFalse}}}},
 
 			// node9 ignored - node unschedulable
-			{ObjectMeta: v1.ObjectMeta{Name: "node9"}, Spec: v1.NodeSpec{Unschedulable: true}},
+			{ObjectMeta: metav1.ObjectMeta{Name: "node9"}, Spec: v1.NodeSpec{Unschedulable: true}},
 			// node10 considered
-			{ObjectMeta: v1.ObjectMeta{Name: "node10"}, Spec: v1.NodeSpec{Unschedulable: false}},
+			{ObjectMeta: metav1.ObjectMeta{Name: "node10"}, Spec: v1.NodeSpec{Unschedulable: false}},
 			// node11 considered
-			{ObjectMeta: v1.ObjectMeta{Name: "node11"}},
+			{ObjectMeta: metav1.ObjectMeta{Name: "node11"}},
 		},
 	}
 

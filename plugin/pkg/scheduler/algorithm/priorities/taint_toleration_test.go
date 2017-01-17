@@ -21,6 +21,7 @@ import (
 	"reflect"
 	"testing"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
 	schedulerapi "k8s.io/kubernetes/plugin/pkg/scheduler/api"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
@@ -29,7 +30,7 @@ import (
 func nodeWithTaints(nodeName string, taints []v1.Taint) *v1.Node {
 	taintsData, _ := json.Marshal(taints)
 	return &v1.Node{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: nodeName,
 			Annotations: map[string]string{
 				v1.TaintsAnnotationKey: string(taintsData),
@@ -41,7 +42,7 @@ func nodeWithTaints(nodeName string, taints []v1.Taint) *v1.Node {
 func podWithTolerations(tolerations []v1.Toleration) *v1.Pod {
 	tolerationData, _ := json.Marshal(tolerations)
 	return &v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Annotations: map[string]string{
 				v1.TolerationsAnnotationKey: string(tolerationData),
 			},

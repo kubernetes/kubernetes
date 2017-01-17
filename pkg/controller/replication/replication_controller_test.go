@@ -62,7 +62,7 @@ func getKey(rc *v1.ReplicationController, t *testing.T) string {
 func newReplicationController(replicas int) *v1.ReplicationController {
 	rc := &v1.ReplicationController{
 		TypeMeta: metav1.TypeMeta{APIVersion: api.Registry.GroupOrDie(v1.GroupName).GroupVersion.String()},
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			UID:             uuid.NewUUID(),
 			Name:            "foobar",
 			Namespace:       v1.NamespaceDefault,
@@ -72,7 +72,7 @@ func newReplicationController(replicas int) *v1.ReplicationController {
 			Replicas: func() *int32 { i := int32(replicas); return &i }(),
 			Selector: map[string]string{"foo": "bar"},
 			Template: &v1.PodTemplateSpec{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
 						"name": "foo",
 						"type": "production",
@@ -110,7 +110,7 @@ func newPod(name string, rc *v1.ReplicationController, status v1.PodPhase, lastT
 		conditions = append(conditions, condition)
 	}
 	return &v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Labels:    rc.Spec.Selector,
 			Namespace: rc.Namespace,
@@ -397,22 +397,22 @@ func TestPodControllerLookup(t *testing.T) {
 		// pods without labels don't match any rcs
 		{
 			inRCs: []*v1.ReplicationController{
-				{ObjectMeta: v1.ObjectMeta{Name: "basic"}}},
-			pod:       &v1.Pod{ObjectMeta: v1.ObjectMeta{Name: "foo1", Namespace: v1.NamespaceAll}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "basic"}}},
+			pod:       &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo1", Namespace: v1.NamespaceAll}},
 			outRCName: "",
 		},
 		// Matching labels, not namespace
 		{
 			inRCs: []*v1.ReplicationController{
 				{
-					ObjectMeta: v1.ObjectMeta{Name: "foo"},
+					ObjectMeta: metav1.ObjectMeta{Name: "foo"},
 					Spec: v1.ReplicationControllerSpec{
 						Selector: map[string]string{"foo": "bar"},
 					},
 				},
 			},
 			pod: &v1.Pod{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo2", Namespace: "ns", Labels: map[string]string{"foo": "bar"}}},
 			outRCName: "",
 		},
@@ -420,14 +420,14 @@ func TestPodControllerLookup(t *testing.T) {
 		{
 			inRCs: []*v1.ReplicationController{
 				{
-					ObjectMeta: v1.ObjectMeta{Name: "bar", Namespace: "ns"},
+					ObjectMeta: metav1.ObjectMeta{Name: "bar", Namespace: "ns"},
 					Spec: v1.ReplicationControllerSpec{
 						Selector: map[string]string{"foo": "bar"},
 					},
 				},
 			},
 			pod: &v1.Pod{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo3", Namespace: "ns", Labels: map[string]string{"foo": "bar"}}},
 			outRCName: "bar",
 		},
@@ -752,7 +752,7 @@ func doTestControllerBurstReplicas(t *testing.T, burstReplicas, numReplicas int)
 				for _, key := range expectedDels.List() {
 					nsName := strings.Split(key, "/")
 					podsToDelete = append(podsToDelete, &v1.Pod{
-						ObjectMeta: v1.ObjectMeta{
+						ObjectMeta: metav1.ObjectMeta{
 							Name:      nsName[1],
 							Namespace: nsName[0],
 							Labels:    controllerSpec.Spec.Selector,
@@ -793,7 +793,7 @@ func doTestControllerBurstReplicas(t *testing.T, burstReplicas, numReplicas int)
 				}
 				nsName := strings.Split(expectedDel.List()[0], "/")
 				lastPod := &v1.Pod{
-					ObjectMeta: v1.ObjectMeta{
+					ObjectMeta: metav1.ObjectMeta{
 						Name:      nsName[1],
 						Namespace: nsName[0],
 						Labels:    controllerSpec.Spec.Selector,
@@ -994,7 +994,7 @@ func TestDeletionTimestamp(t *testing.T) {
 	// An update to the pod (including an update to the deletion timestamp)
 	// should not be counted as a second delete.
 	secondPod := &v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Namespace: pod.Namespace,
 			Name:      "secondPod",
 			Labels:    pod.Labels,
@@ -1047,7 +1047,7 @@ func BenchmarkGetPodControllerMultiNS(b *testing.B) {
 			for k := 0; k < 10; k++ {
 				podName := fmt.Sprintf("pod-%d-%d", j, k)
 				pods = append(pods, v1.Pod{
-					ObjectMeta: v1.ObjectMeta{
+					ObjectMeta: metav1.ObjectMeta{
 						Name:      podName,
 						Namespace: ns,
 						Labels:    map[string]string{"rcName": rcName},
@@ -1062,7 +1062,7 @@ func BenchmarkGetPodControllerMultiNS(b *testing.B) {
 		for j := 0; j < 10; j++ {
 			rcName := fmt.Sprintf("rc-%d", j)
 			manager.rcLister.Indexer.Add(&v1.ReplicationController{
-				ObjectMeta: v1.ObjectMeta{Name: rcName, Namespace: ns},
+				ObjectMeta: metav1.ObjectMeta{Name: rcName, Namespace: ns},
 				Spec: v1.ReplicationControllerSpec{
 					Selector: map[string]string{"rcName": rcName},
 				},
@@ -1092,7 +1092,7 @@ func BenchmarkGetPodControllerSingleNS(b *testing.B) {
 		for j := 0; j < replicaNum; j++ {
 			podName := fmt.Sprintf("pod-%d-%d", i, j)
 			pods = append(pods, v1.Pod{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:      podName,
 					Namespace: "foo",
 					Labels:    map[string]string{"rcName": rcName},
@@ -1104,7 +1104,7 @@ func BenchmarkGetPodControllerSingleNS(b *testing.B) {
 	for i := 0; i < rcNum; i++ {
 		rcName := fmt.Sprintf("rc-%d", i)
 		manager.rcLister.Indexer.Add(&v1.ReplicationController{
-			ObjectMeta: v1.ObjectMeta{Name: rcName, Namespace: "foo"},
+			ObjectMeta: metav1.ObjectMeta{Name: rcName, Namespace: "foo"},
 			Spec: v1.ReplicationControllerSpec{
 				Selector: map[string]string{"rcName": rcName},
 			},

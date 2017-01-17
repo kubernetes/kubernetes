@@ -25,9 +25,9 @@ import (
 	"testing"
 	"time"
 
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8sruntime "k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/client-go/pkg/api/errors"
 	_ "k8s.io/client-go/pkg/api/install" // To register api.Pod used in tests below
 	"k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/pkg/util/clock"
@@ -103,7 +103,7 @@ func OnPatchFactory(testCache map[string]*v1.Event, patchEvent chan<- *v1.Event)
 
 func TestEventf(t *testing.T) {
 	testPod := &v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			SelfLink:  "/api/version/pods/foo",
 			Name:      "foo",
 			Namespace: "baz",
@@ -111,7 +111,7 @@ func TestEventf(t *testing.T) {
 		},
 	}
 	testPod2 := &v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			SelfLink:  "/api/version/pods/foo",
 			Name:      "foo",
 			Namespace: "baz",
@@ -140,7 +140,7 @@ func TestEventf(t *testing.T) {
 			messageFmt: "some verbose message: %v",
 			elements:   []interface{}{1},
 			expect: &v1.Event{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:      "foo",
 					Namespace: "baz",
 				},
@@ -168,7 +168,7 @@ func TestEventf(t *testing.T) {
 			messageFmt: "some other verbose message: %v",
 			elements:   []interface{}{1},
 			expect: &v1.Event{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:      "foo",
 					Namespace: "baz",
 				},
@@ -195,7 +195,7 @@ func TestEventf(t *testing.T) {
 			messageFmt: "some verbose message: %v",
 			elements:   []interface{}{1},
 			expect: &v1.Event{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:      "foo",
 					Namespace: "baz",
 				},
@@ -223,7 +223,7 @@ func TestEventf(t *testing.T) {
 			messageFmt: "some verbose message: %v",
 			elements:   []interface{}{1},
 			expect: &v1.Event{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:      "foo",
 					Namespace: "baz",
 				},
@@ -251,7 +251,7 @@ func TestEventf(t *testing.T) {
 			messageFmt: "some verbose message: %v",
 			elements:   []interface{}{1},
 			expect: &v1.Event{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:      "foo",
 					Namespace: "baz",
 				},
@@ -279,7 +279,7 @@ func TestEventf(t *testing.T) {
 			messageFmt: "some verbose message: %v",
 			elements:   []interface{}{1},
 			expect: &v1.Event{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:      "foo",
 					Namespace: "baz",
 				},
@@ -307,7 +307,7 @@ func TestEventf(t *testing.T) {
 			messageFmt: "some verbose message: %v",
 			elements:   []interface{}{1},
 			expect: &v1.Event{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:      "foo",
 					Namespace: "baz",
 				},
@@ -524,7 +524,7 @@ func TestLotsOfEvents(t *testing.T) {
 
 func TestEventfNoNamespace(t *testing.T) {
 	testPod := &v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			SelfLink: "/api/version/pods/foo",
 			Name:     "foo",
 			UID:      "bar",
@@ -551,7 +551,7 @@ func TestEventfNoNamespace(t *testing.T) {
 			messageFmt: "some verbose message: %v",
 			elements:   []interface{}{1},
 			expect: &v1.Event{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:      "foo",
 					Namespace: "default",
 				},
@@ -621,7 +621,7 @@ func TestEventfNoNamespace(t *testing.T) {
 
 func TestMultiSinkCache(t *testing.T) {
 	testPod := &v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			SelfLink:  "/api/version/pods/foo",
 			Name:      "foo",
 			Namespace: "baz",
@@ -629,7 +629,7 @@ func TestMultiSinkCache(t *testing.T) {
 		},
 	}
 	testPod2 := &v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			SelfLink:  "/api/version/pods/foo",
 			Name:      "foo",
 			Namespace: "baz",
@@ -658,7 +658,7 @@ func TestMultiSinkCache(t *testing.T) {
 			messageFmt: "some verbose message: %v",
 			elements:   []interface{}{1},
 			expect: &v1.Event{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:      "foo",
 					Namespace: "baz",
 				},
@@ -686,7 +686,7 @@ func TestMultiSinkCache(t *testing.T) {
 			messageFmt: "some other verbose message: %v",
 			elements:   []interface{}{1},
 			expect: &v1.Event{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:      "foo",
 					Namespace: "baz",
 				},
@@ -713,7 +713,7 @@ func TestMultiSinkCache(t *testing.T) {
 			messageFmt: "some verbose message: %v",
 			elements:   []interface{}{1},
 			expect: &v1.Event{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:      "foo",
 					Namespace: "baz",
 				},
@@ -741,7 +741,7 @@ func TestMultiSinkCache(t *testing.T) {
 			messageFmt: "some verbose message: %v",
 			elements:   []interface{}{1},
 			expect: &v1.Event{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:      "foo",
 					Namespace: "baz",
 				},
@@ -769,7 +769,7 @@ func TestMultiSinkCache(t *testing.T) {
 			messageFmt: "some verbose message: %v",
 			elements:   []interface{}{1},
 			expect: &v1.Event{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:      "foo",
 					Namespace: "baz",
 				},
@@ -797,7 +797,7 @@ func TestMultiSinkCache(t *testing.T) {
 			messageFmt: "some verbose message: %v",
 			elements:   []interface{}{1},
 			expect: &v1.Event{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:      "foo",
 					Namespace: "baz",
 				},
@@ -825,7 +825,7 @@ func TestMultiSinkCache(t *testing.T) {
 			messageFmt: "some verbose message: %v",
 			elements:   []interface{}{1},
 			expect: &v1.Event{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:      "foo",
 					Namespace: "baz",
 				},

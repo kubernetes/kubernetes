@@ -28,6 +28,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/api"
@@ -196,7 +197,7 @@ func TestGenerateService(t *testing.T) {
 			expectErr: false,
 			name:      "basic",
 			service: api.Service{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
 				},
 				Spec: api.ServiceSpec{
@@ -227,7 +228,7 @@ func TestGenerateService(t *testing.T) {
 			expectErr: false,
 			name:      "custom labels",
 			service: api.Service{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:   "foo",
 					Labels: map[string]string{"app": "bar"},
 				},

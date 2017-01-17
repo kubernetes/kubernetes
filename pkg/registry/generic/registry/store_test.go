@@ -138,11 +138,11 @@ func matchEverything() storage.SelectionPredicate {
 
 func TestStoreList(t *testing.T) {
 	podA := &api.Pod{
-		ObjectMeta: api.ObjectMeta{Namespace: "test", Name: "bar"},
+		ObjectMeta: metav1.ObjectMeta{Namespace: "test", Name: "bar"},
 		Spec:       api.PodSpec{NodeName: "machine"},
 	}
 	podB := &api.Pod{
-		ObjectMeta: api.ObjectMeta{Namespace: "test", Name: "foo"},
+		ObjectMeta: metav1.ObjectMeta{Namespace: "test", Name: "foo"},
 		Spec:       api.PodSpec{NodeName: "machine"},
 	}
 
@@ -214,11 +214,11 @@ func TestStoreList(t *testing.T) {
 // the results are as fresh as given version.
 func TestStoreListResourceVersion(t *testing.T) {
 	fooPod := &api.Pod{
-		ObjectMeta: api.ObjectMeta{Namespace: "test", Name: "foo"},
+		ObjectMeta: metav1.ObjectMeta{Namespace: "test", Name: "foo"},
 		Spec:       api.PodSpec{NodeName: "machine"},
 	}
 	barPod := &api.Pod{
-		ObjectMeta: api.ObjectMeta{Namespace: "test", Name: "bar"},
+		ObjectMeta: metav1.ObjectMeta{Namespace: "test", Name: "bar"},
 		Spec:       api.PodSpec{NodeName: "machine"},
 	}
 	ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), "test")
@@ -277,11 +277,11 @@ func TestStoreListResourceVersion(t *testing.T) {
 func TestStoreCreate(t *testing.T) {
 	gracefulPeriod := int64(50)
 	podA := &api.Pod{
-		ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "test"},
+		ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "test"},
 		Spec:       api.PodSpec{NodeName: "machine"},
 	}
 	podB := &api.Pod{
-		ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "test"},
+		ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "test"},
 		Spec:       api.PodSpec{NodeName: "machine2"},
 	}
 
@@ -360,15 +360,15 @@ func updateAndVerify(t *testing.T, ctx genericapirequest.Context, registry *Stor
 
 func TestStoreUpdate(t *testing.T) {
 	podA := &api.Pod{
-		ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "test"},
+		ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "test"},
 		Spec:       api.PodSpec{NodeName: "machine"},
 	}
 	podB := &api.Pod{
-		ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "test"},
+		ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "test"},
 		Spec:       api.PodSpec{NodeName: "machine2"},
 	}
 	podAWithResourceVersion := &api.Pod{
-		ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "test", ResourceVersion: "7"},
+		ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "test", ResourceVersion: "7"},
 		Spec:       api.PodSpec{NodeName: "machine"},
 	}
 
@@ -416,7 +416,7 @@ func TestNoOpUpdates(t *testing.T) {
 
 	newPod := func() *api.Pod {
 		return &api.Pod{
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Namespace: api.NamespaceDefault,
 				Name:      "foo",
 				Labels:    map[string]string{"prepare_create": "true"},
@@ -485,7 +485,7 @@ func (t testPodExport) Export(ctx genericapirequest.Context, obj runtime.Object,
 
 func TestStoreCustomExport(t *testing.T) {
 	podA := api.Pod{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Namespace: "test",
 			Name:      "foo",
 			Labels:    map[string]string{},
@@ -530,7 +530,7 @@ func TestStoreCustomExport(t *testing.T) {
 
 func TestStoreBasicExport(t *testing.T) {
 	podA := api.Pod{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Namespace: "test",
 			Name:      "foo",
 			Labels:    map[string]string{},
@@ -566,7 +566,7 @@ func TestStoreBasicExport(t *testing.T) {
 
 func TestStoreGet(t *testing.T) {
 	podA := &api.Pod{
-		ObjectMeta: api.ObjectMeta{Namespace: "test", Name: "foo"},
+		ObjectMeta: metav1.ObjectMeta{Namespace: "test", Name: "foo"},
 		Spec:       api.PodSpec{NodeName: "machine"},
 	}
 
@@ -587,7 +587,7 @@ func TestStoreGet(t *testing.T) {
 
 func TestStoreDelete(t *testing.T) {
 	podA := &api.Pod{
-		ObjectMeta: api.ObjectMeta{Name: "foo"},
+		ObjectMeta: metav1.ObjectMeta{Name: "foo"},
 		Spec:       api.PodSpec{NodeName: "machine"},
 	}
 
@@ -629,7 +629,7 @@ func TestGracefulStoreCanDeleteIfExistingGracePeriodZero(t *testing.T) {
 	deletionGracePeriodSeconds := int64(0)
 	initialGeneration := int64(1)
 	pod := &api.Pod{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:                       "foo",
 			Generation:                 initialGeneration,
 			DeletionGracePeriodSeconds: &deletionGracePeriodSeconds,
@@ -660,7 +660,7 @@ func TestGracefulStoreCanDeleteIfExistingGracePeriodZero(t *testing.T) {
 func TestGracefulStoreHandleFinalizers(t *testing.T) {
 	initialGeneration := int64(1)
 	podWithFinalizer := &api.Pod{
-		ObjectMeta: api.ObjectMeta{Name: "foo", Finalizers: []string{"foo.com/x"}, Generation: initialGeneration},
+		ObjectMeta: metav1.ObjectMeta{Name: "foo", Finalizers: []string{"foo.com/x"}, Generation: initialGeneration},
 		Spec:       api.PodSpec{NodeName: "machine"},
 	}
 
@@ -687,7 +687,7 @@ func TestGracefulStoreHandleFinalizers(t *testing.T) {
 	}
 
 	updatedPodWithFinalizer := &api.Pod{
-		ObjectMeta: api.ObjectMeta{Name: "foo", Finalizers: []string{"foo.com/x"}, ResourceVersion: podWithFinalizer.ObjectMeta.ResourceVersion},
+		ObjectMeta: metav1.ObjectMeta{Name: "foo", Finalizers: []string{"foo.com/x"}, ResourceVersion: podWithFinalizer.ObjectMeta.ResourceVersion},
 		Spec:       api.PodSpec{NodeName: "machine"},
 	}
 	_, _, err = registry.Update(testContext, updatedPodWithFinalizer.ObjectMeta.Name, rest.DefaultUpdatedObjectInfo(updatedPodWithFinalizer, api.Scheme))
@@ -702,7 +702,7 @@ func TestGracefulStoreHandleFinalizers(t *testing.T) {
 	}
 
 	podWithNoFinalizer := &api.Pod{
-		ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: podWithFinalizer.ObjectMeta.ResourceVersion},
+		ObjectMeta: metav1.ObjectMeta{Name: "foo", ResourceVersion: podWithFinalizer.ObjectMeta.ResourceVersion},
 		Spec:       api.PodSpec{NodeName: "anothermachine"},
 	}
 	_, _, err = registry.Update(testContext, podWithFinalizer.ObjectMeta.Name, rest.DefaultUpdatedObjectInfo(podWithNoFinalizer, api.Scheme))
@@ -719,7 +719,7 @@ func TestGracefulStoreHandleFinalizers(t *testing.T) {
 func TestNonGracefulStoreHandleFinalizers(t *testing.T) {
 	initialGeneration := int64(1)
 	podWithFinalizer := &api.Pod{
-		ObjectMeta: api.ObjectMeta{Name: "foo", Finalizers: []string{"foo.com/x"}, Generation: initialGeneration},
+		ObjectMeta: metav1.ObjectMeta{Name: "foo", Finalizers: []string{"foo.com/x"}, Generation: initialGeneration},
 		Spec:       api.PodSpec{NodeName: "machine"},
 	}
 
@@ -759,7 +759,7 @@ func TestNonGracefulStoreHandleFinalizers(t *testing.T) {
 	}
 
 	updatedPodWithFinalizer := &api.Pod{
-		ObjectMeta: api.ObjectMeta{Name: "foo", Finalizers: []string{"foo.com/x"}, ResourceVersion: podWithFinalizer.ObjectMeta.ResourceVersion},
+		ObjectMeta: metav1.ObjectMeta{Name: "foo", Finalizers: []string{"foo.com/x"}, ResourceVersion: podWithFinalizer.ObjectMeta.ResourceVersion},
 		Spec:       api.PodSpec{NodeName: "machine"},
 	}
 	_, _, err = registry.Update(testContext, updatedPodWithFinalizer.ObjectMeta.Name, rest.DefaultUpdatedObjectInfo(updatedPodWithFinalizer, api.Scheme))
@@ -778,7 +778,7 @@ func TestNonGracefulStoreHandleFinalizers(t *testing.T) {
 	}
 
 	podWithNoFinalizer := &api.Pod{
-		ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: podWithFinalizer.ObjectMeta.ResourceVersion},
+		ObjectMeta: metav1.ObjectMeta{Name: "foo", ResourceVersion: podWithFinalizer.ObjectMeta.ResourceVersion},
 		Spec:       api.PodSpec{NodeName: "anothermachine"},
 	}
 	_, _, err = registry.Update(testContext, podWithFinalizer.ObjectMeta.Name, rest.DefaultUpdatedObjectInfo(podWithNoFinalizer, api.Scheme))
@@ -796,25 +796,25 @@ func TestStoreDeleteWithOrphanDependents(t *testing.T) {
 	initialGeneration := int64(1)
 	podWithOrphanFinalizer := func(name string) *api.Pod {
 		return &api.Pod{
-			ObjectMeta: api.ObjectMeta{Name: name, Finalizers: []string{"foo.com/x", api.FinalizerOrphan, "bar.com/y"}, Generation: initialGeneration},
+			ObjectMeta: metav1.ObjectMeta{Name: name, Finalizers: []string{"foo.com/x", api.FinalizerOrphan, "bar.com/y"}, Generation: initialGeneration},
 			Spec:       api.PodSpec{NodeName: "machine"},
 		}
 	}
 	podWithOtherFinalizers := func(name string) *api.Pod {
 		return &api.Pod{
-			ObjectMeta: api.ObjectMeta{Name: name, Finalizers: []string{"foo.com/x", "bar.com/y"}, Generation: initialGeneration},
+			ObjectMeta: metav1.ObjectMeta{Name: name, Finalizers: []string{"foo.com/x", "bar.com/y"}, Generation: initialGeneration},
 			Spec:       api.PodSpec{NodeName: "machine"},
 		}
 	}
 	podWithNoFinalizer := func(name string) *api.Pod {
 		return &api.Pod{
-			ObjectMeta: api.ObjectMeta{Name: name, Generation: initialGeneration},
+			ObjectMeta: metav1.ObjectMeta{Name: name, Generation: initialGeneration},
 			Spec:       api.PodSpec{NodeName: "machine"},
 		}
 	}
 	podWithOnlyOrphanFinalizer := func(name string) *api.Pod {
 		return &api.Pod{
-			ObjectMeta: api.ObjectMeta{Name: name, Finalizers: []string{api.FinalizerOrphan}, Generation: initialGeneration},
+			ObjectMeta: metav1.ObjectMeta{Name: name, Finalizers: []string{api.FinalizerOrphan}, Generation: initialGeneration},
 			Spec:       api.PodSpec{NodeName: "machine"},
 		}
 	}
@@ -1063,8 +1063,8 @@ func TestStoreDeleteWithOrphanDependents(t *testing.T) {
 }
 
 func TestStoreDeleteCollection(t *testing.T) {
-	podA := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
-	podB := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "bar"}}
+	podA := &api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}
+	podB := &api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "bar"}}
 
 	testContext := genericapirequest.WithNamespace(genericapirequest.NewContext(), "test")
 	destroyFunc, registry := NewTestGenericStoreRegistry(t)
@@ -1101,8 +1101,8 @@ func TestStoreDeleteCollectionNotFound(t *testing.T) {
 
 	testContext := genericapirequest.WithNamespace(genericapirequest.NewContext(), "test")
 
-	podA := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
-	podB := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "bar"}}
+	podA := &api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}
+	podB := &api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "bar"}}
 
 	for i := 0; i < 10; i++ {
 		// Setup
@@ -1139,7 +1139,7 @@ func TestStoreDeleteCollectionNotFound(t *testing.T) {
 // Test whether objects deleted with DeleteCollection are correctly delivered
 // to watchers.
 func TestStoreDeleteCollectionWithWatch(t *testing.T) {
-	podA := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
+	podA := &api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}
 
 	testContext := genericapirequest.WithNamespace(genericapirequest.NewContext(), "test")
 	destroyFunc, registry := NewTestGenericStoreRegistry(t)
@@ -1202,7 +1202,7 @@ func TestStoreWatch(t *testing.T) {
 			ctx = m.context
 		}
 		podA := &api.Pod{
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:      "foo",
 				Namespace: "test",
 			},

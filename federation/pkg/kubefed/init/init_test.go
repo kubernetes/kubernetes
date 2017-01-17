@@ -465,7 +465,7 @@ func fakeInitHostFactory(federationName, namespaceName, ip, dnsZoneName, image, 
 			Kind:       "Namespace",
 			APIVersion: testapi.Default.GroupVersion().String(),
 		},
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: namespaceName,
 		},
 	}
@@ -475,7 +475,7 @@ func fakeInitHostFactory(federationName, namespaceName, ip, dnsZoneName, image, 
 			Kind:       "Service",
 			APIVersion: testapi.Default.GroupVersion().String(),
 		},
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Namespace: namespaceName,
 			Name:      svcName,
 			Labels:    componentLabel,
@@ -510,7 +510,7 @@ func fakeInitHostFactory(federationName, namespaceName, ip, dnsZoneName, image, 
 			Kind:       "Secret",
 			APIVersion: testapi.Default.GroupVersion().String(),
 		},
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      credSecretName,
 			Namespace: namespaceName,
 		},
@@ -522,7 +522,7 @@ func fakeInitHostFactory(federationName, namespaceName, ip, dnsZoneName, image, 
 			Kind:       "Secret",
 			APIVersion: testapi.Default.GroupVersion().String(),
 		},
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      cmKubeconfigSecretName,
 			Namespace: namespaceName,
 		},
@@ -534,7 +534,7 @@ func fakeInitHostFactory(federationName, namespaceName, ip, dnsZoneName, image, 
 			Kind:       "PersistentVolumeClaim",
 			APIVersion: testapi.Default.GroupVersion().String(),
 		},
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      pvcName,
 			Namespace: namespaceName,
 			Labels:    componentLabel,
@@ -559,7 +559,7 @@ func fakeInitHostFactory(federationName, namespaceName, ip, dnsZoneName, image, 
 			Kind:       "Deployment",
 			APIVersion: testapi.Extensions.GroupVersion().String(),
 		},
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      svcName,
 			Namespace: namespaceName,
 			Labels:    componentLabel,
@@ -568,7 +568,7 @@ func fakeInitHostFactory(federationName, namespaceName, ip, dnsZoneName, image, 
 			Replicas: &replicas,
 			Selector: nil,
 			Template: v1.PodTemplateSpec{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:   svcName,
 					Labels: apiserverPodLabels,
 				},
@@ -652,7 +652,7 @@ func fakeInitHostFactory(federationName, namespaceName, ip, dnsZoneName, image, 
 			Kind:       "Deployment",
 			APIVersion: testapi.Extensions.GroupVersion().String(),
 		},
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      cmName,
 			Namespace: namespaceName,
 			Labels:    componentLabel,
@@ -661,7 +661,7 @@ func fakeInitHostFactory(federationName, namespaceName, ip, dnsZoneName, image, 
 			Replicas: &replicas,
 			Selector: nil,
 			Template: v1.PodTemplateSpec{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:   cmName,
 					Labels: controllerManagerPodLabels,
 				},
@@ -720,7 +720,7 @@ func fakeInitHostFactory(federationName, namespaceName, ip, dnsZoneName, image, 
 			Kind:       "Pod",
 			APIVersion: testapi.Extensions.GroupVersion().String(),
 		},
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      svcName,
 			Namespace: namespaceName,
 		},
@@ -734,7 +734,7 @@ func fakeInitHostFactory(federationName, namespaceName, ip, dnsZoneName, image, 
 			Kind:       "Pod",
 			APIVersion: testapi.Extensions.GroupVersion().String(),
 		},
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      cmName,
 			Namespace: namespaceName,
 		},

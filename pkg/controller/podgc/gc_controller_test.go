@@ -113,7 +113,7 @@ func TestGCTerminated(t *testing.T) {
 		for _, pod := range test.pods {
 			creationTime = creationTime.Add(1 * time.Hour)
 			gcc.podStore.Indexer.Add(&v1.Pod{
-				ObjectMeta: v1.ObjectMeta{Name: pod.name, CreationTimestamp: metav1.Time{Time: creationTime}},
+				ObjectMeta: metav1.ObjectMeta{Name: pod.name, CreationTimestamp: metav1.Time{Time: creationTime}},
 				Status:     v1.PodStatus{Phase: pod.phase},
 				Spec:       v1.PodSpec{NodeName: "node"},
 			})
@@ -182,7 +182,7 @@ func TestGCOrphaned(t *testing.T) {
 		for _, pod := range test.pods {
 			creationTime = creationTime.Add(1 * time.Hour)
 			gcc.podStore.Indexer.Add(&v1.Pod{
-				ObjectMeta: v1.ObjectMeta{Name: pod.name, CreationTimestamp: metav1.Time{Time: creationTime}},
+				ObjectMeta: metav1.ObjectMeta{Name: pod.name, CreationTimestamp: metav1.Time{Time: creationTime}},
 				Status:     v1.PodStatus{Phase: pod.phase},
 				Spec:       v1.PodSpec{NodeName: "node"},
 			})
@@ -261,7 +261,7 @@ func TestGCUnscheduledTerminating(t *testing.T) {
 		for _, pod := range test.pods {
 			creationTime = creationTime.Add(1 * time.Hour)
 			gcc.podStore.Indexer.Add(&v1.Pod{
-				ObjectMeta: v1.ObjectMeta{Name: pod.name, CreationTimestamp: metav1.Time{Time: creationTime},
+				ObjectMeta: metav1.ObjectMeta{Name: pod.name, CreationTimestamp: metav1.Time{Time: creationTime},
 					DeletionTimestamp: pod.deletionTimeStamp},
 				Status: v1.PodStatus{Phase: pod.phase},
 				Spec:   v1.PodSpec{NodeName: pod.nodeName},

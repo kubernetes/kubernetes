@@ -16,16 +16,13 @@ limitations under the License.
 
 package testgroup
 
-import (
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/api"
-)
+import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 // +genclient=true
 
 type TestType struct {
 	metav1.TypeMeta
-	api.ObjectMeta
+	metav1.ObjectMeta
 	Status TestTypeStatus
 }
 

@@ -19,7 +19,7 @@ package storage
 import (
 	"testing"
 
-	"k8s.io/kubernetes/pkg/api"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	// Ensure that extensions/v1beta1 package is initialized.
 	"k8s.io/apimachinery/pkg/labels"
@@ -44,7 +44,7 @@ func newStorage(t *testing.T) (*REST, *etcdtesting.EtcdTestServer) {
 
 func validNewPodSecurityPolicy() *extensions.PodSecurityPolicy {
 	return &extensions.PodSecurityPolicy{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: "foo",
 		},
 		Spec: extensions.PodSecurityPolicySpec{
@@ -70,13 +70,13 @@ func TestCreate(t *testing.T) {
 	defer storage.Store.DestroyFunc()
 	test := registrytest.New(t, storage.Store).ClusterScope()
 	psp := validNewPodSecurityPolicy()
-	psp.ObjectMeta = api.ObjectMeta{GenerateName: "foo-"}
+	psp.ObjectMeta = metav1.ObjectMeta{GenerateName: "foo-"}
 	test.TestCreate(
 		// valid
 		psp,
 		// invalid
 		&extensions.PodSecurityPolicy{
-			ObjectMeta: api.ObjectMeta{Name: "name with spaces"},
+			ObjectMeta: metav1.ObjectMeta{Name: "name with spaces"},
 		},
 	)
 }

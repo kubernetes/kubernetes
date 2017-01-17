@@ -18,7 +18,6 @@ package imagepolicy
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/api"
 )
 
 // +genclient=true
@@ -28,7 +27,7 @@ import (
 // ImageReview checks if the set of images in a pod are allowed.
 type ImageReview struct {
 	metav1.TypeMeta
-	api.ObjectMeta
+	metav1.ObjectMeta
 
 	// Spec holds information about the pod being evaluated
 	Spec ImageReviewSpec

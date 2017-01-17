@@ -26,6 +26,7 @@ go_library(
         "//pkg/util/uuid:go_default_library",
         "//pkg/volume:go_default_library",
         "//vendor:github.com/stretchr/testify/mock",
+        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/types",
     ],
 )

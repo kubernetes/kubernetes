@@ -727,7 +727,7 @@ func testPDPod(diskNames []string, targetNode types.NodeName, readOnly bool, num
 			Kind:       "Pod",
 			APIVersion: api.Registry.GroupOrDie(v1.GroupName).GroupVersion.String(),
 		},
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: "pd-test-" + string(uuid.NewUUID()),
 		},
 		Spec: v1.PodSpec{

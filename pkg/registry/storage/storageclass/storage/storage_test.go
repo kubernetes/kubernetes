@@ -19,9 +19,9 @@ package storage
 import (
 	"testing"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/kubernetes/pkg/api"
 	storageapi "k8s.io/kubernetes/pkg/apis/storage"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/registry/generic"
@@ -43,7 +43,7 @@ func newStorage(t *testing.T) (*REST, *etcdtesting.EtcdTestServer) {
 
 func validNewStorageClass(name string) *storageapi.StorageClass {
 	return &storageapi.StorageClass{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 		},
 		Provisioner: "kubernetes.io/aws-ebs",
@@ -63,13 +63,13 @@ func TestCreate(t *testing.T) {
 	defer storage.Store.DestroyFunc()
 	test := registrytest.New(t, storage.Store).ClusterScope()
 	storageClass := validNewStorageClass("foo")
-	storageClass.ObjectMeta = api.ObjectMeta{GenerateName: "foo"}
+	storageClass.ObjectMeta = metav1.ObjectMeta{GenerateName: "foo"}
 	test.TestCreate(
 		// valid
 		storageClass,
 		// invalid
 		&storageapi.StorageClass{
-			ObjectMeta: api.ObjectMeta{Name: "*BadName!"},
+			ObjectMeta: metav1.ObjectMeta{Name: "*BadName!"},
 		},
 	)
 }

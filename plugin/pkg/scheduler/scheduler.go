@@ -19,6 +19,7 @@ package scheduler
 import (
 	"time"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/record"
@@ -128,7 +129,7 @@ func (s *Scheduler) scheduleOne() {
 		defer metrics.E2eSchedulingLatency.Observe(metrics.SinceInMicroseconds(start))
 
 		b := &v1.Binding{
-			ObjectMeta: v1.ObjectMeta{Namespace: pod.Namespace, Name: pod.Name},
+			ObjectMeta: metav1.ObjectMeta{Namespace: pod.Namespace, Name: pod.Name},
 			Target: v1.ObjectReference{
 				Kind: "Node",
 				Name: dest,

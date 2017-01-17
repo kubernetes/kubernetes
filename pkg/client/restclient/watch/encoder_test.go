@@ -21,6 +21,7 @@ import (
 	"io/ioutil"
 	"testing"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer/streaming"
 	"k8s.io/apimachinery/pkg/watch"
@@ -37,17 +38,17 @@ func TestEncodeDecodeRoundTrip(t *testing.T) {
 	}{
 		{
 			watch.Added,
-			&api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}},
+			&api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}},
 			testapi.Default.Codec(),
 		},
 		{
 			watch.Modified,
-			&api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}},
+			&api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}},
 			testapi.Default.Codec(),
 		},
 		{
 			watch.Deleted,
-			&api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}},
+			&api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}},
 			testapi.Default.Codec(),
 		},
 	}

@@ -52,7 +52,7 @@ func RequestNodeCertificate(client unversionedcertificates.CertificateSigningReq
 	req, err := client.Create(&certificates.CertificateSigningRequest{
 		// Username, UID, Groups will be injected by API server.
 		TypeMeta:   metav1.TypeMeta{Kind: "CertificateSigningRequest"},
-		ObjectMeta: v1.ObjectMeta{GenerateName: "csr-"},
+		ObjectMeta: metav1.ObjectMeta{GenerateName: "csr-"},
 
 		Spec: certificates.CertificateSigningRequestSpec{
 			Request: csr,

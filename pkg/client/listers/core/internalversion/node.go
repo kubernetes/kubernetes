@@ -20,6 +20,7 @@ package internalversion
 
 import (
 	"k8s.io/apimachinery/pkg/api/errors"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	api "k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/cache"
@@ -54,7 +55,7 @@ func (s *nodeLister) List(selector labels.Selector) (ret []*api.Node, err error)
 
 // Get retrieves the Node from the index for a given name.
 func (s *nodeLister) Get(name string) (*api.Node, error) {
-	key := &api.Node{ObjectMeta: api.ObjectMeta{Name: name}}
+	key := &api.Node{ObjectMeta: v1.ObjectMeta{Name: name}}
 	obj, exists, err := s.indexer.Get(key)
 	if err != nil {
 		return nil, err

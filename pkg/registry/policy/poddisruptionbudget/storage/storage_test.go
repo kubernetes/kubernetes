@@ -52,7 +52,7 @@ func createPodDisruptionBudget(storage *REST, pdb policy.PodDisruptionBudget, t 
 
 func validNewPodDisruptionBudget() *policy.PodDisruptionBudget {
 	return &policy.PodDisruptionBudget{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      "foo",
 			Namespace: api.NamespaceDefault,
 			Labels:    map[string]string{"a": "b"},
@@ -71,7 +71,7 @@ func TestCreate(t *testing.T) {
 	defer storage.Store.DestroyFunc()
 	test := registrytest.New(t, storage.Store)
 	pdb := validNewPodDisruptionBudget()
-	pdb.ObjectMeta = api.ObjectMeta{}
+	pdb.ObjectMeta = metav1.ObjectMeta{}
 	test.TestCreate(
 		// valid
 		pdb,

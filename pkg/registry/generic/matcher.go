@@ -17,12 +17,12 @@ limitations under the License.
 package generic
 
 import (
-	"k8s.io/kubernetes/pkg/api"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/fields"
 )
 
 // ObjectMetaFieldsSet returns a fields that represent the ObjectMeta.
-func ObjectMetaFieldsSet(objectMeta *api.ObjectMeta, hasNamespaceField bool) fields.Set {
+func ObjectMetaFieldsSet(objectMeta *metav1.ObjectMeta, hasNamespaceField bool) fields.Set {
 	if !hasNamespaceField {
 		return fields.Set{
 			"metadata.name": objectMeta.Name,
@@ -35,7 +35,7 @@ func ObjectMetaFieldsSet(objectMeta *api.ObjectMeta, hasNamespaceField bool) fie
 }
 
 // AdObjectMetaField add fields that represent the ObjectMeta to source.
-func AddObjectMetaFieldsSet(source fields.Set, objectMeta *api.ObjectMeta, hasNamespaceField bool) fields.Set {
+func AddObjectMetaFieldsSet(source fields.Set, objectMeta *metav1.ObjectMeta, hasNamespaceField bool) fields.Set {
 	source["metadata.name"] = objectMeta.Name
 	if hasNamespaceField {
 		source["metadata.namespace"] = objectMeta.Namespace

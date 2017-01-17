@@ -50,6 +50,7 @@ go_test(
         "//pkg/api/v1:go_default_library",
         "//pkg/apis/batch/install:go_default_library",
         "//pkg/apis/batch/v1:go_default_library",
+        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/runtime",
     ],
 )
