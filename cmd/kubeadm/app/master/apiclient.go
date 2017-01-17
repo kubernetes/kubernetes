@@ -68,9 +68,12 @@ func CreateClientAndWaitForAPI(file string) (*clientset.Clientset, error) {
 	fmt.Println("[apiclient] Created API client, waiting for the control plane to become ready")
 
 	start := time.Now()
-	wait.PollInfinite(apiCallRetryInterval, func() (bool, error) {
+	err = wait.PollInfinite(apiCallRetryInterval, func() (bool, error) {
 		cs, err := client.ComponentStatuses().List(v1.ListOptions{})
 		if err != nil {
+			if apierrs.IsForbidden(err) {
+				return false, err
+			}
 			return false, nil
 		}
 		// TODO(phase2) must revisit this when we implement HA
@@ -90,6 +93,9 @@ func CreateClientAndWaitForAPI(file string) (*clientset.Clientset, error) {
 		fmt.Printf("[apiclient] All control plane components are healthy after %f seconds\n", time.Since(start).Seconds())
 		return true, nil
 	})
+	if err != nil {
+		return nil, err
+	}
 
 	fmt.Println("[apiclient] Waiting for at least one node to register and become ready")
 	start = time.Now()

@@ -23,6 +23,7 @@ import (
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/images"
+	"k8s.io/kubernetes/cmd/kubeadm/app/phases/kubeconfig"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/v1"
@@ -68,7 +69,7 @@ func createKubeProxyPodSpec(cfg *kubeadmapi.MasterConfiguration) v1.PodSpec {
 			{
 				Name: "kubeconfig",
 				VolumeSource: v1.VolumeSource{
-					HostPath: &v1.HostPathVolumeSource{Path: path.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, "kubelet.conf")},
+					HostPath: &v1.HostPathVolumeSource{Path: path.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, kubeconfig.KubeletKubeConfigFileName)},
 				},
 			},
 			{
@@ -86,6 +87,7 @@ func createKubeDNSPodSpec(cfg *kubeadmapi.MasterConfiguration) v1.PodSpec {
 	dnsmasqPort := int32(53)
 
 	return v1.PodSpec{
+		ServiceAccountName: "kube-dns",
 		Containers: []v1.Container{
 			// DNS server
 			{
@@ -273,7 +275,11 @@ func CreateEssentialAddons(cfg *kubeadmapi.MasterConfiguration, client *clientse
 	kubeDNSDeployment := NewDeployment("kube-dns", 1, createKubeDNSPodSpec(cfg))
 	SetMasterTaintTolerations(&kubeDNSDeployment.Spec.Template.ObjectMeta)
 	SetNodeAffinity(&kubeDNSDeployment.Spec.Template.ObjectMeta, NativeArchitectureNodeAffinity())
-
+	kubeDNSServiceAccount := &v1.ServiceAccount{}
+	kubeDNSServiceAccount.ObjectMeta.Name = "kube-dns"
+	if _, err := client.ServiceAccounts("kube-system").Create(kubeDNSServiceAccount); err != nil {
+		return fmt.Errorf("failed creating kube-dns service account [%v]", err)
+	}
 	if _, err := client.Extensions().Deployments(api.NamespaceSystem).Create(kubeDNSDeployment); err != nil {
 		return fmt.Errorf("failed creating essential kube-dns addon [%v]", err)
 	}
