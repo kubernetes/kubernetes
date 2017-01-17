@@ -19,10 +19,10 @@ package app
 import (
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	_ "k8s.io/kubernetes/pkg/apis/batch/install"
 	"k8s.io/kubernetes/pkg/genericapiserver"
+	"k8s.io/kubernetes/pkg/genericapiserver/api/rest"
 	jobstorage "k8s.io/kubernetes/pkg/registry/batch/job/storage"
 	"k8s.io/kubernetes/pkg/registry/generic"
 )

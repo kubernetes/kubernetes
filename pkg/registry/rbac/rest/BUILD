@@ -13,11 +13,11 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
-        "//pkg/api/rest:go_default_library",
         "//pkg/apis/rbac:go_default_library",
         "//pkg/apis/rbac/v1alpha1:go_default_library",
         "//pkg/client/clientset_generated/internalclientset/typed/rbac/internalversion:go_default_library",
         "//pkg/genericapiserver:go_default_library",
+        "//pkg/genericapiserver/api/rest:go_default_library",
         "//pkg/registry/generic:go_default_library",
         "//pkg/registry/rbac/clusterrole:go_default_library",
         "//pkg/registry/rbac/clusterrole/policybased:go_default_library",

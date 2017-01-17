@@ -49,7 +49,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
-        "//pkg/api/rest/resttest:all-srcs",
+        "//pkg/genericapiserver/api/rest/resttest:all-srcs",
     ],
     tags = ["automanaged"],
 )

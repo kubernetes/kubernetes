@@ -20,11 +20,11 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
-        "//pkg/api/rest:go_default_library",
         "//pkg/api/service:go_default_library",
         "//pkg/api/validation:go_default_library",
         "//pkg/capabilities:go_default_library",
         "//pkg/fields:go_default_library",
+        "//pkg/genericapiserver/api/rest:go_default_library",
         "//pkg/registry/core/endpoint:go_default_library",
         "//pkg/registry/core/service/ipallocator:go_default_library",
         "//pkg/registry/core/service/portallocator:go_default_library",
@@ -56,9 +56,9 @@ go_test(
     tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
-        "//pkg/api/rest:go_default_library",
         "//pkg/api/service:go_default_library",
         "//pkg/api/testing:go_default_library",
+        "//pkg/genericapiserver/api/rest:go_default_library",
         "//pkg/registry/core/service/ipallocator:go_default_library",
         "//pkg/registry/core/service/portallocator:go_default_library",
         "//pkg/registry/registrytest:go_default_library",

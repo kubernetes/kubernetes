@@ -28,11 +28,11 @@ import (
 	genericapirequest "k8s.io/apiserver/pkg/request"
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/apis/extensions/validation"
 	"k8s.io/kubernetes/pkg/controller/deployment/util"
 	"k8s.io/kubernetes/pkg/fields"
+	"k8s.io/kubernetes/pkg/genericapiserver/api/rest"
 	"k8s.io/kubernetes/pkg/registry/generic"
 	apistorage "k8s.io/kubernetes/pkg/storage"
 )

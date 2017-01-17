@@ -15,8 +15,8 @@ go_test(
     tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
-        "//pkg/api/rest:go_default_library",
         "//pkg/apis/extensions:go_default_library",
+        "//pkg/genericapiserver/api/rest:go_default_library",
         "//pkg/registry/generic:go_default_library",
         "//pkg/registry/registrytest:go_default_library",
         "//pkg/storage:go_default_library",
@@ -33,9 +33,9 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
-        "//pkg/api/rest:go_default_library",
         "//pkg/apis/extensions:go_default_library",
         "//pkg/apis/extensions/validation:go_default_library",
+        "//pkg/genericapiserver/api/rest:go_default_library",
         "//pkg/registry/core/controller:go_default_library",
         "//pkg/registry/core/controller/storage:go_default_library",
         "//pkg/registry/generic:go_default_library",
