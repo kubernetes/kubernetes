@@ -49,9 +49,10 @@ type pvmap map[string]pvval
 type pvcval struct{}
 type pvcmap map[types.NamespacedName]pvcval
 
-// Configuration for a persistent volume.  To create PVs for varying storage options (NFS, ceph, glusterFS, etc.)
-// define the pvSource as below.  prebind holds a pre-bound PVC if there is one.
-// pvSource: api.PersistentVolumeSource{
+// persistentVolumeConfig is used by makePersistentVolume() to generate a PV definition.
+//   prebind       (Optional) holds a pre-bound PVC if there is one (optional).
+//   reclaimPolicy (Optional) makePersistentVolume() defaults to Retain if unset
+// pvSource: v1.PersistentVolumeSource{
 // 	NFS: &api.NFSVolumeSource{
 // 		.
 // 		.
@@ -61,6 +62,7 @@ type pvcmap map[types.NamespacedName]pvcval
 type persistentVolumeConfig struct {
 	pvSource   v1.PersistentVolumeSource
 	prebind    *v1.PersistentVolumeClaim
+	reclaimPolicy v1.PersistentVolumeReclaimPolicy
 	namePrefix string
 }
 
@@ -119,10 +121,11 @@ func deletePersistentVolumeClaim(c clientset.Interface, pvcName string, ns strin
 	}
 }
 
-// Delete the PVC and wait for the PV to become Available again. Validate that the PV
+//TODO rewrite to reflect Retain policy
+// Delete the PVC and wait for the PV to enter its expected phase. Validate that the PV
 // has recycled (assumption here about reclaimPolicy). Caller tells this func which
 // phase value to expect for the pv bound to the to-be-deleted claim.
-func deletePVCandValidatePV(c clientset.Interface, ns string, pvc *v1.PersistentVolumeClaim, pv *v1.PersistentVolume, expctPVPhase v1.PersistentVolumePhase) {
+func deletePVCandValidatePV(c clientset.Interface, ns string, pvc *v1.PersistentVolumeClaim, pv *v1.PersistentVolume, expectPVPhase v1.PersistentVolumePhase) {
 
 	pvname := pvc.Spec.VolumeName
 	framework.Logf("Deleting PVC %v to trigger recycling of PV %v", pvc.Name, pvname)
@@ -132,35 +135,35 @@ func deletePVCandValidatePV(c clientset.Interface, ns string, pvc *v1.Persistent
 	pvc, err := c.Core().PersistentVolumeClaims(ns).Get(pvc.Name, metav1.GetOptions{})
 	Expect(apierrs.IsNotFound(err)).To(BeTrue())
 
-	// Wait for the PV's phase to return to Available
+	// Wait for the PV's phase to return to be `expectPVPhase`
 	framework.Logf("Waiting for recycling process to complete.")
-	err = framework.WaitForPersistentVolumePhase(expctPVPhase, c, pv.Name, 1*time.Second, 300*time.Second)
+	err = framework.WaitForPersistentVolumePhase(expectPVPhase, c, pv.Name, 1*time.Second, 300*time.Second)
 	Expect(err).NotTo(HaveOccurred())
 
-	// examine the pv's ClaimRef and UID and compare to expected values
+	// examine the pv's ClaimRef and UID and compa re to expected values
 	pv, err = c.Core().PersistentVolumes().Get(pv.Name, metav1.GetOptions{})
 	Expect(err).NotTo(HaveOccurred())
 	cr := pv.Spec.ClaimRef
-	if expctPVPhase == v1.VolumeAvailable {
+	if expectPVPhase == v1.VolumeAvailable {
 		if cr != nil { // may be ok if cr != nil
 			Expect(len(cr.UID)).To(BeZero())
 		}
-	} else if expctPVPhase == v1.VolumeBound {
+	} else if expectPVPhase == v1.VolumeBound {
 		Expect(cr).NotTo(BeNil())
 		Expect(len(cr.UID)).NotTo(BeZero())
 	}
 
-	framework.Logf("PV %v now in %q phase", pv.Name, expctPVPhase)
+	framework.Logf("PV %v now in %q phase", pv.Name, expectPVPhase)
 }
 
 // Wraps deletePVCandValidatePV() by calling the function in a loop over the PV map. Only
-// bound PVs are deleted. Validates that the claim was deleted and the PV is Available.
+// bound PVs are deleted. Validates that the claim was deleted and the PV is in the relevant Phase (Released, Available,
+// Bound).
 // Note: if there are more claims than pvs then some of the remaining claims will bind to
 //   the just-made-available pvs.
-func deletePVCandValidatePVGroup(c clientset.Interface, ns string, pvols pvmap, claims pvcmap) {
+func deletePVCandValidatePVGroup(c clientset.Interface, ns string, pvols pvmap, claims pvcmap, expectPVPhase v1.PersistentVolumePhase) {
 
 	var boundPVs, deletedPVCs int
-	var expctPVPhase v1.PersistentVolumePhase
 
 	for pvName := range pvols {
 		pv, err := c.Core().PersistentVolumes().Get(pvName, metav1.GetOptions{})
@@ -176,17 +179,7 @@ func deletePVCandValidatePVGroup(c clientset.Interface, ns string, pvols pvmap, 
 			Expect(found).To(BeTrue())
 			pvc, err := c.Core().PersistentVolumeClaims(ns).Get(cr.Name, metav1.GetOptions{})
 			Expect(apierrs.IsNotFound(err)).To(BeFalse())
-
-			// what Phase do we expect the PV that was bound to the claim to
-			// be in after that claim is deleted?
-			expctPVPhase = v1.VolumeAvailable
-			if len(claims) > len(pvols) {
-				// there are excess pvcs so expect the previously bound
-				// PV to become bound again
-				expctPVPhase = v1.VolumeBound
-			}
-
-			deletePVCandValidatePV(c, ns, pvc, pv, expctPVPhase)
+			deletePVCandValidatePV(c, ns, pvc, pv, expectPVPhase)
 			delete(claims, pvcKey)
 			deletedPVCs++
 		}
@@ -446,9 +439,9 @@ func completeTest(f *framework.Framework, c clientset.Interface, ns string, pv *
 	By("Checking pod has write access to PersistentVolume")
 	createWaitAndDeletePod(f, c, ns, pvc.Name)
 
-	// 3. delete the PVC, wait for PV to become "Available"
+	// 3. delete the PVC, wait for PV to become "Released"
 	By("Deleting the PVC to invoke the recycler")
-	deletePVCandValidatePV(c, ns, pvc, pv, v1.VolumeAvailable)
+	deletePVCandValidatePV(c, ns, pvc, pv, v1.VolumeReleased)
 }
 
 // Validate pairs of PVs and PVCs, create and verify writer pod, delete PVC and validate
@@ -457,7 +450,7 @@ func completeTest(f *framework.Framework, c clientset.Interface, ns string, pv *
 // Note: this func is serialized, we wait for each pod to be deleted before creating the
 //   next pod. Adding concurrency is a TODO item.
 // Note: this func is called recursively when there are more claims than pvs.
-func completeMultiTest(f *framework.Framework, c clientset.Interface, ns string, pvols pvmap, claims pvcmap) {
+func completeMultiTest(f *framework.Framework, c clientset.Interface, ns string, pvols pvmap, claims pvcmap, expectPhase v1.PersistentVolumePhase) {
 
 	// 1. verify each PV permits write access to a client pod
 	By("Checking pod has write access to PersistentVolumes")
@@ -474,9 +467,9 @@ func completeMultiTest(f *framework.Framework, c clientset.Interface, ns string,
 		createWaitAndDeletePod(f, c, pvcKey.Namespace, pvcKey.Name)
 	}
 
-	// 2. delete each PVC, wait for its bound PV to become "Available"
+	// 2. delete each PVC, wait for its bound PV to become "Released"
 	By("Deleting PVCs to invoke recycler")
-	deletePVCandValidatePVGroup(c, ns, pvols, claims)
+	deletePVCandValidatePVGroup(c, ns, pvols, claims, expectPhase)
 }
 
 var _ = framework.KubeDescribe("PersistentVolumes", func() {
@@ -501,7 +494,7 @@ var _ = framework.KubeDescribe("PersistentVolumes", func() {
 		var (
 			NFSconfig    VolumeTestConfig
 			nfsServerPod *v1.Pod
-			serverIP     string
+			serverIP string
 			pvConfig     persistentVolumeConfig
 		)
 
@@ -534,6 +527,7 @@ var _ = framework.KubeDescribe("PersistentVolumes", func() {
 				},
 			}
 		})
+
 
 		// Execute after *all* the tests have run
 		AddCleanupAction(func() {
@@ -617,9 +611,10 @@ var _ = framework.KubeDescribe("PersistentVolumes", func() {
 			// Note: PVs are created before claims and no pre-binding
 			It("should create 2 PVs and 4 PVCs: test write access [Volume][Serial][Flaky]", func() {
 				numPVs, numPVCs := 2, 4
+				pvConfig.reclaimPolicy = v1.PersistentVolumeReclaimRecycle
 				pvols, claims = createPVsPVCs(numPVs, numPVCs, c, ns, pvConfig)
 				waitAndVerifyBinds(c, ns, pvols, claims, true)
-				completeMultiTest(f, c, ns, pvols, claims)
+				completeMultiTest(f, c, ns, pvols, claims, v1.VolumeBound)
 			})
 
 			// Create 3 PVs and 3 PVCs.
@@ -628,7 +623,7 @@ var _ = framework.KubeDescribe("PersistentVolumes", func() {
 				numPVs, numPVCs := 3, 3
 				pvols, claims = createPVsPVCs(numPVs, numPVCs, c, ns, pvConfig)
 				waitAndVerifyBinds(c, ns, pvols, claims, true)
-				completeMultiTest(f, c, ns, pvols, claims)
+				completeMultiTest(f, c, ns, pvols, claims, v1.VolumeReleased)
 			})
 
 			// Create 4 PVs and 2 PVCs.
@@ -637,7 +632,7 @@ var _ = framework.KubeDescribe("PersistentVolumes", func() {
 				numPVs, numPVCs := 4, 2
 				pvols, claims = createPVsPVCs(numPVs, numPVCs, c, ns, pvConfig)
 				waitAndVerifyBinds(c, ns, pvols, claims, true)
-				completeMultiTest(f, c, ns, pvols, claims)
+				completeMultiTest(f, c, ns, pvols, claims, v1.VolumeReleased)
 			})
 		})
 	})
@@ -685,6 +680,7 @@ var _ = framework.KubeDescribe("PersistentVolumes", func() {
 				pv = nil
 			}
 		})
+
 
 		AddCleanupAction(func() {
 			if len(diskName) > 0 {
@@ -756,24 +752,26 @@ func makePvcKey(ns, name string) types.NamespacedName {
 
 // Returns a PV definition based on the nfs server IP. If the PVC is not nil
 // then the PV is defined with a ClaimRef which includes the PVC's namespace.
-// If the PVC is nil then the PV is not defined with a ClaimRef.
+// If the PVC is nil then the PV is not defined with a ClaimRef.  If no reclaimPolicy
+// is assigned, assumes "Retain".
 // Note: the passed-in claim does not have a name until it is created
 //   (instantiated) and thus the PV's ClaimRef cannot be completely filled-in in
 //   this func. Therefore, the ClaimRef's name is added later in
 //   createPVCPV.
-
 func makePersistentVolume(pvConfig persistentVolumeConfig) *v1.PersistentVolume {
 	// Specs are expected to match this test's PersistentVolumeClaim
 
 	var claimRef *v1.ObjectReference
-
+	// If the reclaimPolicy is not provided, assume Retain
+	if pvConfig.reclaimPolicy == "" {
+		pvConfig.reclaimPolicy = v1.PersistentVolumeReclaimRetain
+	}
 	if pvConfig.prebind != nil {
 		claimRef = &v1.ObjectReference{
 			Name:      pvConfig.prebind.Name,
 			Namespace: pvConfig.prebind.Namespace,
 		}
 	}
-
 	return &v1.PersistentVolume{
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: pvConfig.namePrefix,
@@ -782,7 +780,7 @@ func makePersistentVolume(pvConfig persistentVolumeConfig) *v1.PersistentVolume 
 			},
 		},
 		Spec: v1.PersistentVolumeSpec{
-			PersistentVolumeReclaimPolicy: v1.PersistentVolumeReclaimRecycle,
+			PersistentVolumeReclaimPolicy: pvConfig.reclaimPolicy,
 			Capacity: v1.ResourceList{
 				v1.ResourceName(v1.ResourceStorage): resource.MustParse("2Gi"),
 			},
