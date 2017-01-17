@@ -18,7 +18,6 @@ package kubeadm
 
 import (
 	"flag"
-	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -26,10 +25,7 @@ import (
 )
 
 const (
-	TokenExpectedRegex       = "^\\S{6}\\:\\S{16}\n$"
-	invalidSizeToken         = "abcd:1234567890abcd"
-	invalidNonLowercaseToken = "Abcdef:1234567890abcdef"
-	validToken               = "abcdef:1234567890abcdef"
+	TokenExpectedRegex = "^\\S{6}\\:\\S{16}\n$"
 )
 
 var kubeadmPath string
@@ -77,35 +73,27 @@ func kubeadmReset() error {
 }
 
 func TestCmdInitToken(t *testing.T) {
-	var initArgs string
-	var err error
-
-	// Invalid token size
-	initArgs = fmt.Sprintf("--discovery=token://%s", invalidSizeToken)
-	_, _, err = RunCmd(kubeadmPath, "init", initArgs)
-	if err == nil {
-		t.Fatalf("'kubeadm init %s' should've failed with an error", initArgs)
+	var initTest = []struct {
+		args     string
+		expected bool
+	}{
+		{"--discovery=token://abcd:1234567890abcd", false},     // invalid token size
+		{"--discovery=token://Abcdef:1234567890abcdef", false}, // invalid token non-lowercase
+		{"--discovery=token://abcdef:1234567890abcdef", true},  // valid token
+		{"", true}, // no token provided, so generate
 	}
 
-	// Invalid token non-lowercase
-	initArgs = fmt.Sprintf("--discovery=token://%s", invalidNonLowercaseToken)
-	_, _, err = RunCmd(kubeadmPath, "init", initArgs)
-	if err == nil {
-		t.Fatalf("'kubeadm init %s' should've failed with an error", initArgs)
+	for _, rt := range initTest {
+		_, _, actual := RunCmd(kubeadmPath, "init", rt.args, "--skip-preflight-checks")
+		if (actual == nil) != rt.expected {
+			t.Errorf(
+				"failed CmdInitToken running 'kubeadm init %s' with an error: %v\n\texpected: %t\n\t  actual: %t",
+				rt.args,
+				actual,
+				rt.expected,
+				(actual == nil),
+			)
+		}
+		kubeadmReset()
 	}
-
-	// Valid token
-	initArgs = fmt.Sprintf("--discovery=token://%s", validToken)
-	_, _, err = RunCmd(kubeadmPath, "init", initArgs)
-	if err != nil {
-		t.Fatalf("'kubeadm init %s' failed with unexpected error: %v", initArgs, err)
-	}
-	kubeadmReset()
-
-	// No token provided, so generate
-	_, _, err = RunCmd(kubeadmPath, "init")
-	if err != nil {
-		t.Fatalf("'kubeadm init' failed with unexpected error: %v", err)
-	}
-	kubeadmReset()
 }
