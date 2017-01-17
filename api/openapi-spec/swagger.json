@@ -32399,6 +32399,10 @@
      "name": {
       "description": "Name of the referent. More info: http://kubernetes.io/docs/user-guide/identifiers#names",
       "type": "string"
+     },
+     "optional": {
+      "description": "Specify whether the ConfigMap must be defined",
+      "type": "boolean"
      }
     }
    },
@@ -32415,6 +32419,10 @@
      "name": {
       "description": "Name of the referent. More info: http://kubernetes.io/docs/user-guide/identifiers#names",
       "type": "string"
+     },
+     "optional": {
+      "description": "Specify whether the ConfigMap must be defined",
+      "type": "boolean"
      }
     }
    },
@@ -32463,6 +32471,10 @@
      "name": {
       "description": "Name of the referent. More info: http://kubernetes.io/docs/user-guide/identifiers#names",
       "type": "string"
+     },
+     "optional": {
+      "description": "Specify whether the ConfigMap must be defined",
+      "type": "boolean"
      }
     }
    },
@@ -35699,6 +35711,10 @@
      "name": {
       "description": "Name of the referent. More info: http://kubernetes.io/docs/user-guide/identifiers#names",
       "type": "string"
+     },
+     "optional": {
+      "description": "Specify whether the Secret must be defined",
+      "type": "boolean"
      }
     }
    },
@@ -35743,6 +35759,10 @@
       "items": {
        "$ref": "#/definitions/v1.KeyToPath"
       }
+     },
+     "optional": {
+      "description": "Specify whether the Secret must be defined",
+      "type": "boolean"
      },
      "secretName": {
       "description": "Name of the secret in the pod's namespace to use. More info: http://kubernetes.io/docs/user-guide/volumes#secrets",

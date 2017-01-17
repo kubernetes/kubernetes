@@ -1576,6 +1576,10 @@
       "type": "integer",
       "format": "int32",
       "description": "Optional: mode bits to use on created files by default. Must be a value between 0 and 0777. Defaults to 0644. Directories within the path are not affected by this setting. This might be in conflict with other options that affect the file mode, like fsGroup, and the result can be other mode bits set."
+     },
+     "optional": {
+      "type": "boolean",
+      "description": "Specify whether the Secret must be defined"
      }
     }
    },
@@ -2007,6 +2011,10 @@
       "type": "integer",
       "format": "int32",
       "description": "Optional: mode bits to use on created files by default. Must be a value between 0 and 0777. Defaults to 0644. Directories within the path are not affected by this setting. This might be in conflict with other options that affect the file mode, like fsGroup, and the result can be other mode bits set."
+     },
+     "optional": {
+      "type": "boolean",
+      "description": "Specify whether the ConfigMap must be defined"
      }
     }
    },
@@ -2263,6 +2271,10 @@
      "name": {
       "type": "string",
       "description": "Name of the referent. More info: http://kubernetes.io/docs/user-guide/identifiers#names"
+     },
+     "optional": {
+      "type": "boolean",
+      "description": "Specify whether the ConfigMap must be defined"
      }
     }
    },
@@ -2323,6 +2335,10 @@
      "key": {
       "type": "string",
       "description": "The key to select."
+     },
+     "optional": {
+      "type": "boolean",
+      "description": "Specify whether the ConfigMap must be defined"
      }
     }
    },
@@ -2340,6 +2356,10 @@
      "key": {
       "type": "string",
       "description": "The key of the secret to select from.  Must be a valid secret key."
+     },
+     "optional": {
+      "type": "boolean",
+      "description": "Specify whether the Secret must be defined"
      }
     }
    },

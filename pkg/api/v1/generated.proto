@@ -279,6 +279,10 @@ message ConfigMap {
 message ConfigMapEnvSource {
   // The ConfigMap to select from.
   optional LocalObjectReference localObjectReference = 1;
+
+  // Specify whether the ConfigMap must be defined
+  // +optional
+  optional bool optional = 2;
 }
 
 // Selects a key from a ConfigMap.
@@ -288,6 +292,10 @@ message ConfigMapKeySelector {
 
   // The key to select.
   optional string key = 2;
+
+  // Specify whether the ConfigMap must be defined
+  // +optional
+  optional bool optional = 3;
 }
 
 // ConfigMapList is a resource containing a list of ConfigMap objects.
@@ -326,6 +334,10 @@ message ConfigMapVolumeSource {
   // mode, like fsGroup, and the result can be other mode bits set.
   // +optional
   optional int32 defaultMode = 3;
+
+  // Specify whether the ConfigMap must be defined
+  // +optional
+  optional bool optional = 4;
 }
 
 // A single application container that you want to run within a pod.
@@ -3067,6 +3079,10 @@ message SecretKeySelector {
 
   // The key of the secret to select from.  Must be a valid secret key.
   optional string key = 2;
+
+  // Specify whether the Secret must be defined
+  // +optional
+  optional bool optional = 3;
 }
 
 // SecretList is a list of Secret.
@@ -3109,6 +3125,10 @@ message SecretVolumeSource {
   // mode, like fsGroup, and the result can be other mode bits set.
   // +optional
   optional int32 defaultMode = 3;
+
+  // Specify whether the Secret must be defined
+  // +optional
+  optional bool optional = 4;
 }
 
 // SecurityContext holds security configuration that will be applied to a container.
