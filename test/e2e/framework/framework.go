@@ -26,6 +26,7 @@ import (
 	"sync"
 	"time"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -35,7 +36,6 @@ import (
 	clientreporestclient "k8s.io/client-go/rest"
 	"k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset"
 	"k8s.io/kubernetes/pkg/api"
-	apierrs "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
@@ -284,7 +284,7 @@ func (f *Framework) deleteFederationNs() {
 	// Verify that it got deleted.
 	err := wait.PollImmediate(5*time.Second, timeout, func() (bool, error) {
 		if _, err := clientset.Core().Namespaces().Get(ns.Name, metav1.GetOptions{}); err != nil {
-			if apierrs.IsNotFound(err) {
+			if apierrors.IsNotFound(err) {
 				return true, nil
 			}
 			Logf("Error while waiting for namespace to be terminated: %v", err)
@@ -293,7 +293,7 @@ func (f *Framework) deleteFederationNs() {
 		return false, nil
 	})
 	if err != nil {
-		if !apierrs.IsNotFound(err) {
+		if !apierrors.IsNotFound(err) {
 			Failf("Couldn't delete ns %q: %s", ns.Name, err)
 		} else {
 			Logf("Namespace %v was already deleted", ns.Name)
@@ -320,7 +320,7 @@ func (f *Framework) AfterEach() {
 					timeout = f.NamespaceDeletionTimeout
 				}
 				if err := deleteNS(f.ClientSet, f.ClientPool, ns.Name, timeout); err != nil {
-					if !apierrs.IsNotFound(err) {
+					if !apierrors.IsNotFound(err) {
 						nsDeletionErrors[ns.Name] = err
 					} else {
 						Logf("Namespace %v was already deleted", ns.Name)

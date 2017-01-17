@@ -14,5 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package rest defines common logic around changes to Kubernetes resources.
-package rest // import "k8s.io/kubernetes/pkg/api/rest"
+// Package version supplies the type for version information collected at build time.
+// +k8s:openapi-gen=true
+package version // import "k8s.io/apimachinery/pkg/version"

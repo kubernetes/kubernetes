@@ -20,9 +20,9 @@ import (
 	"fmt"
 	"time"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
-	apierrors "k8s.io/kubernetes/pkg/api/errors"
 	legacyv1 "k8s.io/kubernetes/pkg/api/v1"
 	authorizationv1beta1 "k8s.io/kubernetes/pkg/apis/authorization/v1beta1"
 	rbacv1alpha1 "k8s.io/kubernetes/pkg/apis/rbac/v1alpha1"

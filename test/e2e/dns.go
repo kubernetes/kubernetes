@@ -17,6 +17,7 @@ limitations under the License.
 package e2e
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"time"
@@ -184,10 +185,15 @@ func assertFilesContain(fileNames []string, fileDir string, pod *v1.Pod, client 
 		if err != nil {
 			return false, err
 		}
+
+		ctx, cancel := context.WithTimeout(context.Background(), framework.SingleCallTimeout)
+		defer cancel()
+
 		var contents []byte
 		for _, fileName := range fileNames {
 			if subResourceProxyAvailable {
 				contents, err = client.Core().RESTClient().Get().
+					Context(ctx).
 					Namespace(pod.Namespace).
 					Resource("pods").
 					SubResource("proxy").
@@ -196,6 +202,7 @@ func assertFilesContain(fileNames []string, fileDir string, pod *v1.Pod, client 
 					Do().Raw()
 			} else {
 				contents, err = client.Core().RESTClient().Get().
+					Context(ctx).
 					Prefix("proxy").
 					Resource("pods").
 					Namespace(pod.Namespace).
@@ -204,7 +211,11 @@ func assertFilesContain(fileNames []string, fileDir string, pod *v1.Pod, client 
 					Do().Raw()
 			}
 			if err != nil {
-				framework.Logf("Unable to read %s from pod %s: %v", fileName, pod.Name, err)
+				if ctx.Err() != nil {
+					framework.Failf("Unable to read %s from pod %s: %v", fileName, pod.Name, err)
+				} else {
+					framework.Logf("Unable to read %s from pod %s: %v", fileName, pod.Name, err)
+				}
 				failed = append(failed, fileName)
 			} else if check && strings.TrimSpace(string(contents)) != expected {
 				framework.Logf("File %s from pod %s contains '%s' instead of '%s'", fileName, pod.Name, string(contents), expected)

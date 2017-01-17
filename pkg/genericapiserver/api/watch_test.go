@@ -38,10 +38,10 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/rest"
 	apiv1 "k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/genericapiserver/api/handlers"
+	"k8s.io/kubernetes/pkg/genericapiserver/api/rest"
 	apitesting "k8s.io/kubernetes/pkg/genericapiserver/api/testing"
 )
 

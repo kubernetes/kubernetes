@@ -21,7 +21,6 @@ go_library(
     deps = [
         "//pkg/admission:go_default_library",
         "//pkg/api:go_default_library",
-        "//pkg/api/errors:go_default_library",
         "//pkg/api/resource:go_default_library",
         "//pkg/client/restclient:go_default_library",
         "//pkg/client/unversioned/clientcmd:go_default_library",
@@ -32,6 +31,7 @@ go_library(
         "//vendor:golang.org/x/oauth2",
         "//vendor:golang.org/x/oauth2/google",
         "//vendor:google.golang.org/api/cloudmonitoring/v2beta2",
+        "//vendor:k8s.io/apimachinery/pkg/api/errors",
     ],
 )
 

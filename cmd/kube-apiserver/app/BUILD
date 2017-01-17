@@ -30,6 +30,7 @@ go_library(
         "//pkg/generated/openapi:go_default_library",
         "//pkg/genericapiserver:go_default_library",
         "//pkg/genericapiserver/filters:go_default_library",
+        "//pkg/kubeapiserver:go_default_library",
         "//pkg/kubeapiserver/admission:go_default_library",
         "//pkg/kubeapiserver/authenticator:go_default_library",
         "//pkg/master:go_default_library",

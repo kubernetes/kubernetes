@@ -19,7 +19,6 @@ package registered
 
 import (
 	"fmt"
-	"os"
 	"sort"
 	"strings"
 
@@ -29,10 +28,6 @@ import (
 	"k8s.io/apimachinery/pkg/apimachinery"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
-)
-
-var (
-	DefaultAPIRegistrationManager = NewOrDie(os.Getenv("KUBE_API_VERSIONS"))
 )
 
 // APIRegistrationManager provides the concept of what API groups are enabled.
@@ -98,28 +93,6 @@ func NewOrDie(kubeAPIVersions string) *APIRegistrationManager {
 	}
 	return m
 }
-
-// People are calling global functions. Let them continue to do that (for now).
-var (
-	ValidateEnvRequestedVersions  = DefaultAPIRegistrationManager.ValidateEnvRequestedVersions
-	AllPreferredGroupVersions     = DefaultAPIRegistrationManager.AllPreferredGroupVersions
-	RESTMapper                    = DefaultAPIRegistrationManager.RESTMapper
-	GroupOrDie                    = DefaultAPIRegistrationManager.GroupOrDie
-	AddThirdPartyAPIGroupVersions = DefaultAPIRegistrationManager.AddThirdPartyAPIGroupVersions
-	IsThirdPartyAPIGroupVersion   = DefaultAPIRegistrationManager.IsThirdPartyAPIGroupVersion
-	RegisteredGroupVersions       = DefaultAPIRegistrationManager.RegisteredGroupVersions
-	IsRegisteredVersion           = DefaultAPIRegistrationManager.IsRegisteredVersion
-	IsRegistered                  = DefaultAPIRegistrationManager.IsRegistered
-	Group                         = DefaultAPIRegistrationManager.Group
-	EnabledVersionsForGroup       = DefaultAPIRegistrationManager.EnabledVersionsForGroup
-	EnabledVersions               = DefaultAPIRegistrationManager.EnabledVersions
-	IsEnabledVersion              = DefaultAPIRegistrationManager.IsEnabledVersion
-	IsAllowedVersion              = DefaultAPIRegistrationManager.IsAllowedVersion
-	EnableVersions                = DefaultAPIRegistrationManager.EnableVersions
-	RegisterGroup                 = DefaultAPIRegistrationManager.RegisterGroup
-	RegisterVersions              = DefaultAPIRegistrationManager.RegisterVersions
-	InterfacesFor                 = DefaultAPIRegistrationManager.InterfacesFor
-)
 
 // RegisterVersions adds the given group versions to the list of registered group versions.
 func (m *APIRegistrationManager) RegisterVersions(availableVersions []schema.GroupVersion) {

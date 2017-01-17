@@ -20,11 +20,12 @@ import (
 	"fmt"
 	"time"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
+	apiserverserviceaccount "k8s.io/apiserver/pkg/authentication/serviceaccount"
 	"k8s.io/kubernetes/pkg/api"
-	apierrors "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
@@ -146,7 +147,7 @@ func (b SAControllerClientBuilder) Config(name string) (*restclient.Config, erro
 				}
 				// TODO maybe verify the token is valid
 				clientConfig.BearerToken = string(secret.Data[v1.ServiceAccountTokenKey])
-				restclient.AddUserAgent(clientConfig, serviceaccount.MakeUsername(b.Namespace, name))
+				restclient.AddUserAgent(clientConfig, apiserverserviceaccount.MakeUsername(b.Namespace, name))
 				return true, nil
 
 			default:

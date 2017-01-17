@@ -18,6 +18,7 @@ package componentconfig
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	runtime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/pkg/api"
 	utilconfig "k8s.io/client-go/pkg/util/config"
 )
@@ -601,6 +602,13 @@ type LeaderElectionConfiguration struct {
 type KubeControllerManagerConfiguration struct {
 	metav1.TypeMeta
 
+	// Controllers is the list of controllers to enable or disable
+	// '*' means "all enabled by default controllers"
+	// 'foo' means "enable 'foo'"
+	// '-foo' means "disable 'foo'"
+	// first item for a particular name wins
+	Controllers []string
+
 	// port is the port that the controller-manager's http service runs on.
 	Port int32
 	// address is the IP address to serve on (set to 0.0.0.0 for all interfaces).
@@ -827,4 +835,29 @@ type PersistentVolumeRecyclerConfiguration struct {
 	// for a HostPath scrubber pod.  This is for development and testing only and will not work
 	// in a multi-node cluster.
 	IncrementTimeoutHostPath int32
+}
+
+// AdmissionConfiguration provides versioned configuration for admission controllers.
+type AdmissionConfiguration struct {
+	metav1.TypeMeta
+
+	// Plugins allows specifying a configuration per admission control plugin.
+	Plugins []AdmissionPluginConfiguration
+}
+
+// AdmissionPluginConfiguration provides the configuration for a single plug-in.
+type AdmissionPluginConfiguration struct {
+	// Name is the name of the admission controller.
+	// It must match the registered admission plugin name.
+	Name string
+
+	// Path is the path to a configuration file that contains the plugin's
+	// configuration
+	// +optional
+	Path string
+
+	// Configuration is an embedded configuration object to be used as the plugin's
+	// configuration. If present, it will be used instead of the path to the configuration file.
+	// +optional
+	Configuration runtime.Object
 }

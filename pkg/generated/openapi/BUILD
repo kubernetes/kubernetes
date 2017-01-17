@@ -18,7 +18,8 @@ go_library(
         "//pkg/api/resource:go_default_library",
         "//pkg/util/intstr:go_default_library",
         "//vendor:github.com/go-openapi/spec",
-        "//vendor:k8s.io/apimachinery/pkg/genericapiserver/openapi/common",
+        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor:k8s.io/apimachinery/pkg/openapi",
     ],
 )
 

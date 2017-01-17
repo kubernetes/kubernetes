@@ -22,10 +22,10 @@ import (
 
 	"github.com/golang/glog"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apiserver/pkg/httplog"
 	apirequest "k8s.io/apiserver/pkg/request"
-	apierrors "k8s.io/kubernetes/pkg/api/errors"
 )
 
 // WithPanicRecovery wraps an http Handler to recover and log panics.

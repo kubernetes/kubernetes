@@ -24,7 +24,7 @@ import (
 	"strconv"
 	"strings"
 
-	"k8s.io/apimachinery/pkg/genericapiserver/openapi/common"
+	"k8s.io/apimachinery/pkg/openapi"
 
 	"github.com/go-openapi/spec"
 	"github.com/golang/glog"
@@ -39,7 +39,6 @@ import (
 //
 // +protobuf=true
 // +protobuf.options.(gogoproto.goproto_stringer)=false
-// +k8s:openapi-gen=true
 type IntOrString struct {
 	Type   Type   `protobuf:"varint,1,opt,name=type,casttype=Type"`
 	IntVal int32  `protobuf:"varint,2,opt,name=intVal"`
@@ -120,8 +119,8 @@ func (intstr IntOrString) MarshalJSON() ([]byte, error) {
 	}
 }
 
-func (_ IntOrString) OpenAPIDefinition() common.OpenAPIDefinition {
-	return common.OpenAPIDefinition{
+func (_ IntOrString) OpenAPIDefinition() openapi.OpenAPIDefinition {
+	return openapi.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
 				Type:   []string{"string"},

@@ -18,6 +18,7 @@ package restclient
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -33,6 +34,7 @@ import (
 	"testing"
 	"time"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -41,7 +43,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/kubernetes/pkg/api"
-	apierrors "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/v1"
 	restclientwatch "k8s.io/kubernetes/pkg/client/restclient/watch"
@@ -1650,4 +1651,33 @@ func testRESTClient(t testing.TB, srv *httptest.Server) *RESTClient {
 		t.Fatalf("failed to create a client: %v", err)
 	}
 	return client
+}
+
+func TestDoContext(t *testing.T) {
+	receivedCh := make(chan struct{})
+	block := make(chan struct{})
+	testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		close(receivedCh)
+		<-block
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer testServer.Close()
+	defer close(block)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	go func() {
+		<-receivedCh
+		cancel()
+	}()
+
+	c := testRESTClient(t, testServer)
+	_, err := c.Verb("GET").
+		Context(ctx).
+		Prefix("foo").
+		DoRaw()
+	if err == nil {
+		t.Fatal("Expected context cancellation error")
+	}
 }

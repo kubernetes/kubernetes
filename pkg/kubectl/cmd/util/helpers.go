@@ -32,6 +32,7 @@ import (
 	"github.com/golang/glog"
 	"github.com/spf13/cobra"
 
+	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -40,7 +41,6 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/api"
-	kerrors "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	"k8s.io/kubernetes/pkg/kubectl"
@@ -555,6 +555,11 @@ func ContainsChangeCause(info *resource.Info) bool {
 // ShouldRecord checks if we should record current change cause
 func ShouldRecord(cmd *cobra.Command, info *resource.Info) bool {
 	return GetRecordFlag(cmd) || (ContainsChangeCause(info) && !cmd.Flags().Changed("record"))
+}
+
+func AddInclude3rdPartyVarFlags(cmd *cobra.Command, include3rdParty *bool) {
+	cmd.Flags().BoolVar(include3rdParty, "include-extended-apis", true, "If true, include definitions of new APIs via calls to the API server. [default true]")
+	cmd.Flags().MarkDeprecated("include-extended-apis", "No longer required.")
 }
 
 func AddInclude3rdPartyFlags(cmd *cobra.Command) {

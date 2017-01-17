@@ -17,6 +17,7 @@ limitations under the License.
 package e2e
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"time"
@@ -24,10 +25,10 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apiserver/pkg/authentication/serviceaccount"
 	"k8s.io/kubernetes/pkg/api/v1"
 	rbacv1alpha1 "k8s.io/kubernetes/pkg/apis/rbac/v1alpha1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
-	"k8s.io/kubernetes/pkg/serviceaccount"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
@@ -126,9 +127,14 @@ func testPreStop(c clientset.Interface, ns string) {
 		if err != nil {
 			return false, err
 		}
+
+		ctx, cancel := context.WithTimeout(context.Background(), framework.SingleCallTimeout)
+		defer cancel()
+
 		var body []byte
 		if subResourceProxyAvailable {
 			body, err = c.Core().RESTClient().Get().
+				Context(ctx).
 				Namespace(ns).
 				Resource("pods").
 				SubResource("proxy").
@@ -137,6 +143,7 @@ func testPreStop(c clientset.Interface, ns string) {
 				DoRaw()
 		} else {
 			body, err = c.Core().RESTClient().Get().
+				Context(ctx).
 				Prefix("proxy").
 				Namespace(ns).
 				Resource("pods").
@@ -145,6 +152,10 @@ func testPreStop(c clientset.Interface, ns string) {
 				DoRaw()
 		}
 		if err != nil {
+			if ctx.Err() != nil {
+				framework.Failf("Error validating prestop: %v", err)
+				return true, err
+			}
 			By(fmt.Sprintf("Error validating prestop: %v", err))
 		} else {
 			framework.Logf("Saw: %s", string(body))

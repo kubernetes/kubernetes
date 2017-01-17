@@ -20,7 +20,7 @@ go_library(
         "//vendor:github.com/gogo/protobuf/proto",
         "//vendor:github.com/golang/glog",
         "//vendor:github.com/google/gofuzz",
-        "//vendor:k8s.io/apimachinery/pkg/genericapiserver/openapi/common",
+        "//vendor:k8s.io/apimachinery/pkg/openapi",
     ],
 )
 

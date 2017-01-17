@@ -32,7 +32,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/apimachinery"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	openapicommon "k8s.io/apimachinery/pkg/genericapiserver/openapi/common"
+	openapicommon "k8s.io/apimachinery/pkg/openapi"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
@@ -41,9 +41,9 @@ import (
 	apirequest "k8s.io/apiserver/pkg/request"
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	genericapi "k8s.io/kubernetes/pkg/genericapiserver/api"
+	"k8s.io/kubernetes/pkg/genericapiserver/api/rest"
 	genericmux "k8s.io/kubernetes/pkg/genericapiserver/mux"
 	"k8s.io/kubernetes/pkg/genericapiserver/routes"
 )

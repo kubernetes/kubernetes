@@ -17,6 +17,7 @@ limitations under the License.
 package e2e
 
 import (
+	"context"
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -88,11 +89,20 @@ func ClusterLevelLoggingWithKibana(f *framework.Framework) {
 			err = errProxy
 			continue
 		}
+
+		ctx, cancel := context.WithTimeout(context.Background(), framework.SingleCallTimeout)
+		defer cancel()
+
 		// Query against the root URL for Kibana.
 		_, err = proxyRequest.Namespace(api.NamespaceSystem).
+			Context(ctx).
 			Name("kibana-logging").
 			DoRaw()
 		if err != nil {
+			if ctx.Err() != nil {
+				framework.Failf("After %v proxy call to kibana-logging failed: %v", time.Since(start), err)
+				break
+			}
 			framework.Logf("After %v proxy call to kibana-logging failed: %v", time.Since(start), err)
 			continue
 		}

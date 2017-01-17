@@ -27,7 +27,6 @@ go_library(
         "//pkg/client/clientset_generated/clientset/typed/core/v1:go_default_library",
         "//pkg/client/record:go_default_library",
         "//pkg/controller:go_default_library",
-        "//pkg/util/cert:go_default_library",
         "//pkg/util/workqueue:go_default_library",
         "//vendor:github.com/cloudflare/cfssl/config",
         "//vendor:github.com/cloudflare/cfssl/helpers",

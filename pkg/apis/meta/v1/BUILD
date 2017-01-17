@@ -77,7 +77,6 @@ filegroup(
     srcs = [
         ":package-srcs",
         "//pkg/apis/meta/v1/unstructured:all-srcs",
-        "//pkg/apis/meta/v1/validation:all-srcs",
     ],
     tags = ["automanaged"],
 )
