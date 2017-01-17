@@ -17,6 +17,8 @@ limitations under the License.
 package admission
 
 import (
+	"io"
+
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/authentication/user"
@@ -80,4 +82,9 @@ type PluginInitializer interface {
 // and should be implemented on admission plugins
 type Validator interface {
 	Validate() error
+}
+
+// ConfigProvider provides a way to get configuration for an admission plugin based on its name
+type ConfigProvider interface {
+	ConfigFor(pluginName string) (io.Reader, error)
 }

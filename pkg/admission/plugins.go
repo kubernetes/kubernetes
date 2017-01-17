@@ -113,16 +113,10 @@ func splitStream(config io.Reader) (io.Reader, io.Reader, error) {
 
 // NewFromPlugins returns an admission.Interface that will enforce admission control decisions of all
 // the given plugins.
-func NewFromPlugins(pluginNames []string, configFilePath string, pluginInitializer PluginInitializer) (Interface, error) {
-	// load config file path into a componentconfig.AdmissionConfiguration
-	admissionCfg, err := ReadAdmissionConfiguration(pluginNames, configFilePath)
-	if err != nil {
-		return nil, err
-	}
-
+func NewFromPlugins(pluginNames []string, configProvider ConfigProvider, pluginInitializer PluginInitializer) (Interface, error) {
 	plugins := []Interface{}
 	for _, pluginName := range pluginNames {
-		pluginConfig, err := GetAdmissionPluginConfiguration(admissionCfg, pluginName)
+		pluginConfig, err := configProvider.ConfigFor(pluginName)
 		if err != nil {
 			return nil, err
 		}
