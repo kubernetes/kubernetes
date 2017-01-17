@@ -31,9 +31,11 @@ import (
 )
 
 const (
-	KubernetesDirPermissions  = 0700
-	AdminKubeConfigFileName   = "admin.conf"
-	KubeletKubeConfigFileName = "kubelet.conf"
+	KubernetesDirPermissions    = 0700
+	AdminKubeConfigFileName     = "admin.conf"
+	AdminKubeConfigClientName   = "kubernetes-admin"
+	KubeletKubeConfigFileName   = "kubelet.conf"
+	KubeletKubeConfigClientName = "kubelet"
 )
 
 // This function is called from the main init and does the work for the default phase behaviour
@@ -68,36 +70,47 @@ func CreateAdminAndKubeletKubeConfig(masterEndpoint, pkiDir, outDir string) erro
 	}
 
 	// User admin should have full access to the cluster
-	if err := createKubeConfigFileForClient(masterEndpoint, "admin", outDir, caCert, caKey); err != nil {
-		return fmt.Errorf("couldn't create a kubeconfig file for admin: %v", err)
+	adminCertConfig := &certutil.Config{
+		CommonName:   AdminKubeConfigClientName,
+		Organization: []string{"system:masters"},
+	}
+	adminKubeConfigFilePath := path.Join(outDir, AdminKubeConfigFileName)
+	if err := createKubeConfigFileForClient(masterEndpoint, adminKubeConfigFilePath, adminCertConfig, caCert, caKey); err != nil {
+		return fmt.Errorf("couldn't create config for %s: %v", AdminKubeConfigClientName, err)
 	}
 
-	// TODO: The kubelet should have limited access to the cluster
-	if err := createKubeConfigFileForClient(masterEndpoint, "kubelet", outDir, caCert, caKey); err != nil {
-		return fmt.Errorf("couldn't create a kubeconfig file for kubelet: %v", err)
+	// The kubelet should have limited access to the cluster
+	kubeletCertConfig := &certutil.Config{
+		CommonName:   KubeletKubeConfigClientName,
+		Organization: []string{"system:nodes"},
 	}
+	kubeletKubeConfigFilePath := path.Join(outDir, KubeletKubeConfigFileName)
+	if err := createKubeConfigFileForClient(masterEndpoint, kubeletKubeConfigFilePath, kubeletCertConfig, caCert, caKey); err != nil {
+		return fmt.Errorf("couldn't create config for %s: %v", KubeletKubeConfigClientName, err)
+	}
+
+	// TODO make credentials for the controller manager and kube proxy
 
 	return nil
 }
 
-func createKubeConfigFileForClient(masterEndpoint, client, outDir string, caCert *x509.Certificate, caKey *rsa.PrivateKey) error {
-	key, cert, err := certphase.NewClientKeyAndCert(caCert, caKey)
+func createKubeConfigFileForClient(masterEndpoint, kubeConfigFilePath string, config *certutil.Config, caCert *x509.Certificate, caKey *rsa.PrivateKey) error {
+	key, cert, err := certphase.NewClientKeyAndCert(config, caCert, caKey)
 	if err != nil {
-		return fmt.Errorf("failure while creating %s client certificate [%v]", client, err)
+		return fmt.Errorf("failure while creating %s client certificate [%v]", config.CommonName, err)
 	}
 
-	config := MakeClientConfigWithCerts(
+	kubeConfig := MakeClientConfigWithCerts(
 		masterEndpoint,
 		"kubernetes",
-		client,
+		config.CommonName,
 		certutil.EncodeCertPEM(caCert),
 		certutil.EncodePrivateKeyPEM(key),
 		certutil.EncodeCertPEM(cert),
 	)
 
 	// Write it now to a file
-	filepath := path.Join(outDir, fmt.Sprintf("%s.conf", client))
-	return WriteKubeconfigToDisk(filepath, config)
+	return WriteKubeconfigToDisk(kubeConfigFilePath, kubeConfig)
 }
 
 func WriteKubeconfigToDisk(filepath string, kubeconfig *clientcmdapi.Config) error {

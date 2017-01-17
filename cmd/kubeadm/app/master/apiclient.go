@@ -69,10 +69,15 @@ func CreateClientAndWaitForAPI(file string) (*clientset.Clientset, error) {
 
 	start := time.Now()
 	wait.PollInfinite(apiCallRetryInterval, func() (bool, error) {
+		// TODO: use /healthz API instead of this
 		cs, err := client.ComponentStatuses().List(v1.ListOptions{})
 		if err != nil {
+			if apierrs.IsForbidden(err) {
+				fmt.Print("\r[apiclient] Waiting for the API server to create RBAC policies")
+			}
 			return false, nil
 		}
+		fmt.Println("\n[apiclient] RBAC policies created")
 		// TODO(phase2) must revisit this when we implement HA
 		if len(cs.Items) < 3 {
 			fmt.Println("[apiclient] Not all control plane components are ready yet")
