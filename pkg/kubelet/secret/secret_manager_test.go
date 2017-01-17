@@ -32,7 +32,7 @@ func checkSecret(t *testing.T, store *secretStore, ns, name string, shouldExist 
 	if shouldExist && err != nil {
 		t.Errorf("unexpected actions: %#v", err)
 	}
-	if !shouldExist && (err == nil || !strings.Contains(err.Error(), fmt.Sprintf("secret %v/%v not registered", ns, name))) {
+	if !shouldExist && (err == nil || !strings.Contains(err.Error(), fmt.Sprintf("secret %q/%q not registered", ns, name))) {
 		t.Errorf("unexpected actions: %#v", err)
 	}
 }
@@ -117,10 +117,15 @@ func TestSecretStoreGetNeverRefresh(t *testing.T) {
 	fakeClient.ClearActions()
 
 	wg := sync.WaitGroup{}
-	wg.Add(100)
-	for i := 0; i < 100; i++ {
+	wg.Add(10)
+	for i := 0; i < 10; i++ {
 		go func(i int) {
-			store.Get(fmt.Sprintf("ns-%d", i%10), fmt.Sprintf("name-%d", i%10))
+			// Since Get() operations for a given secret are not synchronized
+			// with each other, we call Get() for a given secret from a single
+			// thread.
+			for j := 0; j < 10; j++ {
+				store.Get(fmt.Sprintf("ns-%d", i), fmt.Sprintf("name-%d", i))
+			}
 			wg.Done()
 		}(i)
 	}
