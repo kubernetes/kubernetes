@@ -1904,21 +1904,8 @@ func (kl *Kubelet) handleMirrorPod(mirrorPod *v1.Pod, start time.Time) {
 // a config source.
 func (kl *Kubelet) HandlePodAdditions(pods []*v1.Pod) {
 	start := kl.clock.Now()
-
-	// Pass critical pods through admission check first.
-	var criticalPods []*v1.Pod
-	var nonCriticalPods []*v1.Pod
-	for _, p := range pods {
-		if kubetypes.IsCriticalPod(p) {
-			criticalPods = append(criticalPods, p)
-		} else {
-			nonCriticalPods = append(nonCriticalPods, p)
-		}
-	}
-	sort.Sort(sliceutils.PodsByCreationTime(criticalPods))
-	sort.Sort(sliceutils.PodsByCreationTime(nonCriticalPods))
-
-	for _, pod := range append(criticalPods, nonCriticalPods...) {
+	sort.Sort(sliceutils.PodsByCreationTime(pods))
+	for _, pod := range pods {
 		existingPods := kl.podManager.GetPods()
 		// Always add the pod to the pod manager. Kubelet relies on the pod
 		// manager as the source of truth for the desired state. If a pod does
