@@ -90,7 +90,7 @@ func (s *SecureServingOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.IPVar(&s.ServingOptions.BindAddress, "bind-address", s.ServingOptions.BindAddress, ""+
 		"The IP address on which to listen for the --secure-port port. The "+
 		"associated interface(s) must be reachable by the rest of the cluster, and by CLI/web "+
-		"clients. If blank, all interfaces will be used (0.0.0.0).")
+		"clients.")
 
 	fs.IntVar(&s.ServingOptions.BindPort, "secure-port", s.ServingOptions.BindPort, ""+
 		"The port on which to serve HTTPS with authentication and authorization. If 0, "+
