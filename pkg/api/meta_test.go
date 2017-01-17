@@ -31,7 +31,7 @@ import (
 
 var _ metav1.Object = &metav1.ObjectMeta{}
 
-func getObjectMetaAndOwnerReferences() (objectMeta api.ObjectMeta, metaOwnerReferences []metav1.OwnerReference) {
+func getObjectMetaAndOwnerReferences() (objectMeta metav1.ObjectMeta, metaOwnerReferences []metav1.OwnerReference) {
 	fuzz.New().NilChance(.5).NumElements(1, 5).Fuzz(&objectMeta)
 	references := objectMeta.OwnerReferences
 	metaOwnerReferences = make([]metav1.OwnerReference, 0)
@@ -60,7 +60,7 @@ func testGetOwnerReferences(t *testing.T) {
 
 func testSetOwnerReferences(t *testing.T) {
 	expected, newRefs := getObjectMetaAndOwnerReferences()
-	objectMeta := &api.ObjectMeta{}
+	objectMeta := &metav1.ObjectMeta{}
 	objectMeta.SetOwnerReferences(newRefs)
 	if !reflect.DeepEqual(expected.OwnerReferences, objectMeta.OwnerReferences) {
 		t.Errorf("expect: %#v\n got: %#v", expected.OwnerReferences, objectMeta.OwnerReferences)

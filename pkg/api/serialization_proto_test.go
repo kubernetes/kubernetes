@@ -52,7 +52,7 @@ func init() {
 }
 
 func TestUniversalDeserializer(t *testing.T) {
-	expected := &v1.Pod{ObjectMeta: v1.ObjectMeta{Name: "test"}}
+	expected := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "test"}}
 	d := api.Codecs.UniversalDeserializer()
 	for _, mediaType := range []string{"application/json", "application/yaml", "application/vnd.kubernetes.protobuf"} {
 		info, ok := runtime.SerializerInfoForMediaType(api.Codecs.SupportedMediaTypes(), mediaType)

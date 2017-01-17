@@ -106,7 +106,7 @@ var _ = framework.KubeDescribe("MemoryEviction [Slow] [Serial] [Disruptive]", fu
 				// This is the final check to try to prevent interference with subsequent tests.
 				podName := "admit-best-effort-pod"
 				f.PodClient().CreateSync(&v1.Pod{
-					ObjectMeta: v1.ObjectMeta{
+					ObjectMeta: metav1.ObjectMeta{
 						Name: podName,
 					},
 					Spec: v1.PodSpec{
@@ -245,7 +245,7 @@ func createMemhogPod(f *framework.Framework, genName string, ctnName string, res
 	}
 
 	pod := &v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: genName,
 		},
 		Spec: v1.PodSpec{

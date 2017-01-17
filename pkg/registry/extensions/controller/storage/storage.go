@@ -102,7 +102,7 @@ func (r *ScaleREST) Update(ctx genericapirequest.Context, name string, objInfo r
 // scaleFromRC returns a scale subresource for a replication controller.
 func scaleFromRC(rc *api.ReplicationController) *extensions.Scale {
 	return &extensions.Scale{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:              rc.Name,
 			Namespace:         rc.Namespace,
 			UID:               rc.UID,

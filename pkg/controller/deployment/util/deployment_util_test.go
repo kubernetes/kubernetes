@@ -102,7 +102,7 @@ func newPod(now time.Time, ready bool, beforeSec int) v1.Pod {
 // generatePodFromRS creates a pod, with the input ReplicaSet's selector and its template
 func generatePodFromRS(rs extensions.ReplicaSet) v1.Pod {
 	return v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Labels: rs.Labels,
 		},
 		Spec: rs.Spec.Template.Spec,
@@ -111,7 +111,7 @@ func generatePodFromRS(rs extensions.ReplicaSet) v1.Pod {
 
 func generatePod(labels map[string]string, image string) v1.Pod {
 	return v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Labels: labels,
 		},
 		Spec: v1.PodSpec{
@@ -129,7 +129,7 @@ func generatePod(labels map[string]string, image string) v1.Pod {
 
 func generateRSWithLabel(labels map[string]string, image string) extensions.ReplicaSet {
 	return extensions.ReplicaSet{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:   v1.SimpleNameGenerator.GenerateName("replicaset"),
 			Labels: labels,
 		},
@@ -137,7 +137,7 @@ func generateRSWithLabel(labels map[string]string, image string) extensions.Repl
 			Replicas: func(i int32) *int32 { return &i }(1),
 			Selector: &metav1.LabelSelector{MatchLabels: labels},
 			Template: v1.PodTemplateSpec{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Labels: labels,
 				},
 				Spec: v1.PodSpec{
@@ -159,7 +159,7 @@ func generateRSWithLabel(labels map[string]string, image string) extensions.Repl
 func generateRS(deployment extensions.Deployment) extensions.ReplicaSet {
 	template := GetNewReplicaSetTemplate(&deployment)
 	return extensions.ReplicaSet{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:   v1.SimpleNameGenerator.GenerateName("replicaset"),
 			Labels: template.Labels,
 		},
@@ -176,7 +176,7 @@ func generateDeployment(image string) extensions.Deployment {
 	podLabels := map[string]string{"name": image}
 	terminationSec := int64(30)
 	return extensions.Deployment{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:        image,
 			Annotations: make(map[string]string),
 		},
@@ -184,7 +184,7 @@ func generateDeployment(image string) extensions.Deployment {
 			Replicas: func(i int32) *int32 { return &i }(1),
 			Selector: &metav1.LabelSelector{MatchLabels: podLabels},
 			Template: v1.PodTemplateSpec{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Labels: podLabels,
 				},
 				Spec: v1.PodSpec{
@@ -364,7 +364,7 @@ func TestGetOldRCs(t *testing.T) {
 
 func generatePodTemplateSpec(name, nodeName string, annotations, labels map[string]string) v1.PodTemplateSpec {
 	return v1.PodTemplateSpec{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:        name,
 			Annotations: annotations,
 			Labels:      labels,

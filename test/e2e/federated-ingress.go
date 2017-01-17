@@ -354,7 +354,7 @@ func createIngressOrFail(clientset *fedclientset.Clientset, namespace string) *v
 	By(fmt.Sprintf("Creating federated ingress %q in namespace %q", FederatedIngressName, namespace))
 
 	ingress := &v1beta1.Ingress{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: FederatedIngressName,
 		},
 		Spec: v1beta1.IngressSpec{
@@ -377,7 +377,7 @@ func updateIngressOrFail(clientset *fedclientset.Clientset, namespace string) (n
 		Fail(fmt.Sprintf("Internal error: invalid parameters passed to createIngressOrFail: clientset: %v, namespace: %v", clientset, namespace))
 	}
 	ingress := &v1beta1.Ingress{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: FederatedIngressName,
 		},
 		Spec: v1beta1.IngressSpec{

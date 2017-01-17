@@ -35,7 +35,7 @@ var _ = framework.KubeDescribe("ImageID", func() {
 
 	It("should be set to the manifest digest (from RepoDigests) when available", func() {
 		podDesc := &v1.Pod{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name: "pod-with-repodigest",
 			},
 			Spec: v1.PodSpec{

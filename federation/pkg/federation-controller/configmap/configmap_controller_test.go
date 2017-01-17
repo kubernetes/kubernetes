@@ -21,6 +21,7 @@ import (
 	"testing"
 	"time"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -78,7 +79,7 @@ func TestConfigMapController(t *testing.T) {
 	configmapController.Run(stop)
 
 	configmap1 := &apiv1.ConfigMap{
-		ObjectMeta: apiv1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test-configmap",
 			Namespace: "ns",
 			SelfLink:  "/api/v1/namespaces/ns/configmaps/test-configmap",

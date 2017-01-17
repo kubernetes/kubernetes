@@ -196,7 +196,7 @@ func getJobFromTemplate(sj *batch.CronJob, scheduledTime time.Time) (*batch.Job,
 	name := fmt.Sprintf("%s-%d", sj.Name, getTimeHash(scheduledTime))
 
 	job := &batch.Job{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Labels:      labels,
 			Annotations: annotations,
 			Name:        name,

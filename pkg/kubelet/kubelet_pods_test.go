@@ -26,6 +26,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -121,7 +122,7 @@ func TestRunInContainerNoSuchPod(t *testing.T) {
 	podNamespace := "nsFoo"
 	containerName := "containerFoo"
 	output, err := kubelet.RunInContainer(
-		kubecontainer.GetPodFullName(&v1.Pod{ObjectMeta: v1.ObjectMeta{Name: podName, Namespace: podNamespace}}),
+		kubecontainer.GetPodFullName(&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: podName, Namespace: podNamespace}}),
 		"",
 		containerName,
 		[]string{"ls"})
@@ -237,7 +238,7 @@ func (e envs) Less(i, j int) bool { return e[i].Name < e[j].Name }
 
 func buildService(name, namespace, clusterIP, protocol string, port int) *v1.Service {
 	return &v1.Service{
-		ObjectMeta: v1.ObjectMeta{Name: name, Namespace: namespace},
+		ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: namespace},
 		Spec: v1.ServiceSpec{
 			Ports: []v1.ServicePort{{
 				Protocol: v1.Protocol(protocol),
@@ -638,7 +639,7 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 			masterServiceNs: "nothing",
 			nilLister:       false,
 			configMap: &v1.ConfigMap{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Namespace: "test1",
 					Name:      "test-configmap",
 				},
@@ -723,7 +724,7 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 			},
 			masterServiceNs: "nothing",
 			configMap: &v1.ConfigMap{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Namespace: "test1",
 					Name:      "test-configmap",
 				},
@@ -746,7 +747,7 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 			},
 			masterServiceNs: "",
 			configMap: &v1.ConfigMap{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Namespace: "test1",
 					Name:      "test-configmap",
 				},
@@ -782,7 +783,7 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 		})
 
 		testPod := &v1.Pod{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Namespace: tc.ns,
 				Name:      "dapi-test-pod-name",
 			},

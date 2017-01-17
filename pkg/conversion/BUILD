@@ -18,7 +18,7 @@ go_library(
         "helper.go",
     ],
     tags = ["automanaged"],
-    deps = ["//third_party/forked/golang/reflect:go_default_library"],
+    deps = ["//vendor:k8s.io/apimachinery/third_party/forked/golang/reflect"],
 )
 
 go_test(

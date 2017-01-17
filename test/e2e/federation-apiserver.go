@@ -108,7 +108,7 @@ var _ = framework.KubeDescribe("Federation apiserver [Feature:Federation]", func
 
 func newService(name, namespace string) *v1.Service {
 	return &v1.Service{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: namespace,
 		},

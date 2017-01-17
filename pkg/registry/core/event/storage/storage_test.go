@@ -19,6 +19,7 @@ package storage
 import (
 	"testing"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/registry/generic"
@@ -41,7 +42,7 @@ func newStorage(t *testing.T) (*REST, *etcdtesting.EtcdTestServer) {
 
 func validNewEvent(namespace string) *api.Event {
 	return &api.Event{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      "foo",
 			Namespace: namespace,
 		},
@@ -59,7 +60,7 @@ func TestCreate(t *testing.T) {
 	defer storage.Store.DestroyFunc()
 	test := registrytest.New(t, storage.Store)
 	event := validNewEvent(test.TestNamespace())
-	event.ObjectMeta = api.ObjectMeta{}
+	event.ObjectMeta = metav1.ObjectMeta{}
 	test.TestCreate(
 		// valid
 		event,

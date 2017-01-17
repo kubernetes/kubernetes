@@ -22,6 +22,7 @@ import (
 	"strings"
 	"testing"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
 	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
@@ -87,7 +88,7 @@ func TestRepairLeak(t *testing.T) {
 	fakeClient := fake.NewSimpleClientset()
 	ipregistry := &mockRangeRegistry{
 		item: &api.RangeAllocation{
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				ResourceVersion: "1",
 			},
 			Range: dst.Range,
@@ -134,34 +135,34 @@ func TestRepairWithExisting(t *testing.T) {
 
 	fakeClient := fake.NewSimpleClientset(
 		&api.Service{
-			ObjectMeta: api.ObjectMeta{Namespace: "one", Name: "one"},
+			ObjectMeta: metav1.ObjectMeta{Namespace: "one", Name: "one"},
 			Spec:       api.ServiceSpec{ClusterIP: "192.168.1.1"},
 		},
 		&api.Service{
-			ObjectMeta: api.ObjectMeta{Namespace: "two", Name: "two"},
+			ObjectMeta: metav1.ObjectMeta{Namespace: "two", Name: "two"},
 			Spec:       api.ServiceSpec{ClusterIP: "192.168.1.100"},
 		},
 		&api.Service{ // outside CIDR, will be dropped
-			ObjectMeta: api.ObjectMeta{Namespace: "three", Name: "three"},
+			ObjectMeta: metav1.ObjectMeta{Namespace: "three", Name: "three"},
 			Spec:       api.ServiceSpec{ClusterIP: "192.168.0.1"},
 		},
 		&api.Service{ // empty, ignored
-			ObjectMeta: api.ObjectMeta{Namespace: "four", Name: "four"},
+			ObjectMeta: metav1.ObjectMeta{Namespace: "four", Name: "four"},
 			Spec:       api.ServiceSpec{ClusterIP: ""},
 		},
 		&api.Service{ // duplicate, dropped
-			ObjectMeta: api.ObjectMeta{Namespace: "five", Name: "five"},
+			ObjectMeta: metav1.ObjectMeta{Namespace: "five", Name: "five"},
 			Spec:       api.ServiceSpec{ClusterIP: "192.168.1.1"},
 		},
 		&api.Service{ // headless
-			ObjectMeta: api.ObjectMeta{Namespace: "six", Name: "six"},
+			ObjectMeta: metav1.ObjectMeta{Namespace: "six", Name: "six"},
 			Spec:       api.ServiceSpec{ClusterIP: "None"},
 		},
 	)
 
 	ipregistry := &mockRangeRegistry{
 		item: &api.RangeAllocation{
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				ResourceVersion: "1",
 			},
 			Range: dst.Range,

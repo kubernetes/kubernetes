@@ -43,6 +43,7 @@ go_test(
         "//pkg/api:go_default_library",
         "//pkg/api/testing:go_default_library",
         "//pkg/fields:go_default_library",
+        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/labels",
         "//vendor:k8s.io/apiserver/pkg/request",
     ],

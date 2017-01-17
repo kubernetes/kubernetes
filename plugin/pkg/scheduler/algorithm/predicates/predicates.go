@@ -78,7 +78,7 @@ type CachedNodeInfo struct {
 
 // GetNodeInfo returns cached data for the node 'id'.
 func (c *CachedNodeInfo) GetNodeInfo(id string) (*v1.Node, error) {
-	node, exists, err := c.Get(&v1.Node{ObjectMeta: v1.ObjectMeta{Name: id}})
+	node, exists, err := c.Get(&v1.Node{ObjectMeta: metav1.ObjectMeta{Name: id}})
 
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving node '%v' from cache: %v", id, err)

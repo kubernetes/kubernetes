@@ -333,7 +333,7 @@ func downwardAPIVolumePodForUpdateTest(name string, labels, annotations map[stri
 
 func downwardAPIVolumeBasePod(name string, labels, annotations map[string]string) *v1.Pod {
 	pod := &v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:        name,
 			Labels:      labels,
 			Annotations: annotations,

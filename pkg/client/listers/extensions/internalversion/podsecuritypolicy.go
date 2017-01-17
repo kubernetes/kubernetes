@@ -20,8 +20,8 @@ package internalversion
 
 import (
 	"k8s.io/apimachinery/pkg/api/errors"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	api "k8s.io/kubernetes/pkg/api"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/client/cache"
 )
@@ -55,7 +55,7 @@ func (s *podSecurityPolicyLister) List(selector labels.Selector) (ret []*extensi
 
 // Get retrieves the PodSecurityPolicy from the index for a given name.
 func (s *podSecurityPolicyLister) Get(name string) (*extensions.PodSecurityPolicy, error) {
-	key := &extensions.PodSecurityPolicy{ObjectMeta: api.ObjectMeta{Name: name}}
+	key := &extensions.PodSecurityPolicy{ObjectMeta: v1.ObjectMeta{Name: name}}
 	obj, exists, err := s.indexer.Get(key)
 	if err != nil {
 		return nil, err

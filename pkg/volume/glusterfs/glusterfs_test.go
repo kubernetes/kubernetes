@@ -23,6 +23,7 @@ import (
 	"testing"
 
 	gapi "github.com/heketi/heketi/pkg/glusterfs/api"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/api/v1"
@@ -100,7 +101,7 @@ func doTestPlugin(t *testing.T, spec *volume.Spec) {
 	if err != nil {
 		t.Errorf("Can't find the plugin by name")
 	}
-	ep := &v1.Endpoints{ObjectMeta: v1.ObjectMeta{Name: "foo"}, Subsets: []v1.EndpointSubset{{
+	ep := &v1.Endpoints{ObjectMeta: metav1.ObjectMeta{Name: "foo"}, Subsets: []v1.EndpointSubset{{
 		Addresses: []v1.EndpointAddress{{IP: "127.0.0.1"}}}}}
 	var fcmd exec.FakeCmd
 	fcmd = exec.FakeCmd{
@@ -116,7 +117,7 @@ func doTestPlugin(t *testing.T, spec *volume.Spec) {
 			func(cmd string, args ...string) exec.Cmd { return exec.InitFakeCmd(&fcmd, cmd, args...) },
 		},
 	}
-	pod := &v1.Pod{ObjectMeta: v1.ObjectMeta{UID: types.UID("poduid")}}
+	pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: types.UID("poduid")}}
 	mounter, err := plug.(*glusterfsPlugin).newMounterInternal(spec, ep, pod, &mount.FakeMounter{}, &fake)
 	volumePath := mounter.GetPath()
 	if err != nil {
@@ -167,7 +168,7 @@ func TestPluginVolume(t *testing.T) {
 
 func TestPluginPersistentVolume(t *testing.T) {
 	vol := &v1.PersistentVolume{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: "vol1",
 		},
 		Spec: v1.PersistentVolumeSpec{
@@ -188,7 +189,7 @@ func TestPersistentClaimReadOnlyFlag(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 
 	pv := &v1.PersistentVolume{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: "pvA",
 		},
 		Spec: v1.PersistentVolumeSpec{
@@ -202,7 +203,7 @@ func TestPersistentClaimReadOnlyFlag(t *testing.T) {
 	}
 
 	claim := &v1.PersistentVolumeClaim{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      "claimA",
 			Namespace: "nsA",
 		},
@@ -215,7 +216,7 @@ func TestPersistentClaimReadOnlyFlag(t *testing.T) {
 	}
 
 	ep := &v1.Endpoints{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Namespace: "nsA",
 			Name:      "ep",
 		},
@@ -233,7 +234,7 @@ func TestPersistentClaimReadOnlyFlag(t *testing.T) {
 
 	// readOnly bool is supplied by persistent-claim volume source when its mounter creates other volumes
 	spec := volume.NewSpecFromPersistentVolume(pv, true)
-	pod := &v1.Pod{ObjectMeta: v1.ObjectMeta{Namespace: "nsA", UID: types.UID("poduid")}}
+	pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: "nsA", UID: types.UID("poduid")}}
 	mounter, _ := plug.NewMounter(spec, pod, volume.VolumeOptions{})
 
 	if !mounter.GetAttributes().ReadOnly {

@@ -8017,7 +8017,7 @@ go_library(
         "k8s.io/apimachinery/pkg/conversion/helper.go",
     ],
     tags = ["automanaged"],
-    deps = ["//vendor:k8s.io/apimachinery/third_party/forked/golang/reflect"],
+    deps = ["//third_party/forked/golang/reflect:go_default_library"],
 )
 
 go_library(

@@ -15,6 +15,7 @@ go_library(
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/apis/authorization:go_default_library",
+        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/util/validation/field",
     ],
 )
@@ -25,8 +26,8 @@ go_test(
     library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
-        "//pkg/api:go_default_library",
         "//pkg/apis/authorization:go_default_library",
+        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/util/validation/field",
     ],
 )

@@ -678,7 +678,7 @@ func objectReferenceToMetadataOnlyObject(ref objectReference) *metaonly.Metadata
 			APIVersion: ref.APIVersion,
 			Kind:       ref.Kind,
 		},
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Namespace: ref.Namespace,
 			UID:       ref.UID,
 			Name:      ref.Name,

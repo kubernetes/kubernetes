@@ -37,7 +37,7 @@ func TestDecodeUnstructured(t *testing.T) {
 	rawJson := fmt.Sprintf(`{"kind":"Pod","apiVersion":"%s","metadata":{"name":"test"}}`, groupVersionString)
 	pl := &api.List{
 		Items: []runtime.Object{
-			&api.Pod{ObjectMeta: api.ObjectMeta{Name: "1"}},
+			&api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "1"}},
 			&runtime.Unknown{
 				TypeMeta:    runtime.TypeMeta{Kind: "Pod", APIVersion: groupVersionString},
 				Raw:         []byte(rawJson),

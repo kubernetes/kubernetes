@@ -93,7 +93,7 @@ func expectNodeReadiness(isReady bool, newNode chan *v1.Node) {
 
 func podOnNode(podName, nodeName string, image string) *v1.Pod {
 	return &v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: podName,
 			Labels: map[string]string{
 				"name": podName,

@@ -20,6 +20,7 @@ import (
 	"reflect"
 	"testing"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/v1"
 	schedulerapi "k8s.io/kubernetes/plugin/pkg/scheduler/api"
@@ -140,10 +141,10 @@ func TestMostRequested(t *testing.T) {
 			expectedList: []schedulerapi.HostPriority{{Host: "machine1", Score: 3}, {Host: "machine2", Score: 4}},
 			test:         "no resources requested, pods scheduled with resources",
 			pods: []*v1.Pod{
-				{Spec: cpuOnly, ObjectMeta: v1.ObjectMeta{Labels: labels2}},
-				{Spec: cpuOnly, ObjectMeta: v1.ObjectMeta{Labels: labels1}},
-				{Spec: cpuOnly2, ObjectMeta: v1.ObjectMeta{Labels: labels1}},
-				{Spec: cpuAndMemory, ObjectMeta: v1.ObjectMeta{Labels: labels1}},
+				{Spec: cpuOnly, ObjectMeta: metav1.ObjectMeta{Labels: labels2}},
+				{Spec: cpuOnly, ObjectMeta: metav1.ObjectMeta{Labels: labels1}},
+				{Spec: cpuOnly2, ObjectMeta: metav1.ObjectMeta{Labels: labels1}},
+				{Spec: cpuAndMemory, ObjectMeta: metav1.ObjectMeta{Labels: labels1}},
 			},
 		},
 		{

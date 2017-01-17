@@ -228,7 +228,7 @@ func (config *DeploymentConfig) GetKind() schema.GroupKind {
 
 func (config *DeploymentConfig) create() error {
 	deployment := &extensions.Deployment{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: config.Name,
 		},
 		Spec: extensions.DeploymentSpec{
@@ -239,7 +239,7 @@ func (config *DeploymentConfig) create() error {
 				},
 			},
 			Template: v1.PodTemplateSpec{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{"name": config.Name},
 				},
 				Spec: v1.PodSpec{
@@ -292,7 +292,7 @@ func (config *ReplicaSetConfig) GetKind() schema.GroupKind {
 
 func (config *ReplicaSetConfig) create() error {
 	rs := &extensions.ReplicaSet{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: config.Name,
 		},
 		Spec: extensions.ReplicaSetSpec{
@@ -303,7 +303,7 @@ func (config *ReplicaSetConfig) create() error {
 				},
 			},
 			Template: v1.PodTemplateSpec{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{"name": config.Name},
 				},
 				Spec: v1.PodSpec{
@@ -356,14 +356,14 @@ func (config *JobConfig) GetKind() schema.GroupKind {
 
 func (config *JobConfig) create() error {
 	job := &batch.Job{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: config.Name,
 		},
 		Spec: batch.JobSpec{
 			Parallelism: func(i int) *int32 { x := int32(i); return &x }(config.Replicas),
 			Completions: func(i int) *int32 { x := int32(i); return &x }(config.Replicas),
 			Template: v1.PodTemplateSpec{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{"name": config.Name},
 				},
 				Spec: v1.PodSpec{
@@ -448,7 +448,7 @@ func (config *RCConfig) create() error {
 		config.DNSPolicy = &dnsDefault
 	}
 	rc := &v1.ReplicationController{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: config.Name,
 		},
 		Spec: v1.ReplicationControllerSpec{
@@ -457,7 +457,7 @@ func (config *RCConfig) create() error {
 				"name": config.Name,
 			},
 			Template: &v1.PodTemplateSpec{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{"name": config.Name},
 				},
 				Spec: v1.PodSpec{
@@ -954,14 +954,14 @@ func createPod(client clientset.Interface, namespace string, podCount int, podTe
 
 func createController(client clientset.Interface, controllerName, namespace string, podCount int, podTemplate *v1.Pod) error {
 	rc := &v1.ReplicationController{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: controllerName,
 		},
 		Spec: v1.ReplicationControllerSpec{
 			Replicas: func(i int) *int32 { x := int32(i); return &x }(podCount),
 			Selector: map[string]string{"name": controllerName},
 			Template: &v1.PodTemplateSpec{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{"name": controllerName},
 				},
 				Spec: podTemplate.Spec,
@@ -986,7 +986,7 @@ func NewCustomCreatePodStrategy(podTemplate *v1.Pod) TestPodCreateStrategy {
 
 func NewSimpleCreatePodStrategy() TestPodCreateStrategy {
 	basePod := &v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: "simple-pod-",
 		},
 		Spec: MakePodSpec(),
@@ -997,7 +997,7 @@ func NewSimpleCreatePodStrategy() TestPodCreateStrategy {
 func NewSimpleWithControllerCreatePodStrategy(controllerName string) TestPodCreateStrategy {
 	return func(client clientset.Interface, namespace string, podCount int) error {
 		basePod := &v1.Pod{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				GenerateName: controllerName + "-pod-",
 				Labels:       map[string]string{"name": controllerName},
 			},
@@ -1021,7 +1021,7 @@ type SecretConfig struct {
 
 func (config *SecretConfig) Run() error {
 	secret := &v1.Secret{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: config.Name,
 		},
 		StringData: map[string]string{},
@@ -1088,12 +1088,12 @@ func (config *DaemonConfig) Run() error {
 		"name": config.Name + "-daemon",
 	}
 	daemon := &extensions.DaemonSet{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: config.Name,
 		},
 		Spec: extensions.DaemonSetSpec{
 			Template: v1.PodTemplateSpec{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Labels: nameLabel,
 				},
 				Spec: v1.PodSpec{

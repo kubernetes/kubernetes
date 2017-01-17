@@ -19,6 +19,7 @@ package common
 import (
 	"fmt"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/util/uuid"
@@ -153,7 +154,7 @@ var _ = framework.KubeDescribe("Downward API", func() {
 			fmt.Sprintf("MEMORY_LIMIT=[1-9]"),
 		}
 		pod := &v1.Pod{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:   podName,
 				Labels: map[string]string{"name": podName},
 			},
@@ -176,7 +177,7 @@ var _ = framework.KubeDescribe("Downward API", func() {
 
 func testDownwardAPI(f *framework.Framework, podName string, env []v1.EnvVar, expectations []string) {
 	pod := &v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:   podName,
 			Labels: map[string]string{"name": podName},
 		},

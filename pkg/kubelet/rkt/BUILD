@@ -89,6 +89,7 @@ go_test(
         "//vendor:github.com/stretchr/testify/assert",
         "//vendor:golang.org/x/net/context",
         "//vendor:google.golang.org/grpc",
+        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/types",
         "//vendor:k8s.io/apimachinery/pkg/util/errors",
     ],

@@ -459,7 +459,7 @@ func (f *Framework) CreateNamespace(baseName string, labels map[string]string) (
 func (f *Framework) createFederationNamespace(baseName string) (*v1.Namespace, error) {
 	clientset := f.FederationClientset_1_5
 	namespaceObj := &v1.Namespace{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: fmt.Sprintf("e2e-tests-%v-", baseName),
 		},
 	}
@@ -640,7 +640,7 @@ func (f *Framework) CreateServiceForSimpleApp(contPort, svcPort int, appName str
 	}
 	Logf("Creating a service-for-%v for selecting app=%v-pod", appName, appName)
 	service, err := f.ClientSet.Core().Services(f.Namespace.Name).Create(&v1.Service{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: "service-for-" + appName,
 			Labels: map[string]string{
 				"app": appName + "-service",
@@ -666,7 +666,7 @@ func (f *Framework) CreatePodsPerNodeForSimpleApp(appName string, podSpec func(n
 		if i <= maxCount {
 			Logf("%v/%v : Creating container with label app=%v-pod", i, maxCount, appName)
 			_, err := f.ClientSet.Core().Pods(f.Namespace.Name).Create(&v1.Pod{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:   fmt.Sprintf(appName+"-pod-%v", i),
 					Labels: labels,
 				},

@@ -52,7 +52,7 @@ func createStatefulSet(storage *REST, ps apps.StatefulSet, t *testing.T) (apps.S
 
 func validNewStatefulSet() *apps.StatefulSet {
 	return &apps.StatefulSet{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      "foo",
 			Namespace: api.NamespaceDefault,
 			Labels:    map[string]string{"a": "b"},
@@ -60,7 +60,7 @@ func validNewStatefulSet() *apps.StatefulSet {
 		Spec: apps.StatefulSetSpec{
 			Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"a": "b"}},
 			Template: api.PodTemplateSpec{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{"a": "b"},
 				},
 				Spec: api.PodSpec{
@@ -87,7 +87,7 @@ func TestCreate(t *testing.T) {
 	defer storage.Store.DestroyFunc()
 	test := registrytest.New(t, storage.Store)
 	ps := validNewStatefulSet()
-	ps.ObjectMeta = api.ObjectMeta{}
+	ps.ObjectMeta = metav1.ObjectMeta{}
 	test.TestCreate(
 		// valid
 		ps,

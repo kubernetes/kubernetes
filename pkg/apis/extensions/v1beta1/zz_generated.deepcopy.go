@@ -21,10 +21,10 @@ limitations under the License.
 package v1beta1
 
 import (
-	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
-	v1 "k8s.io/kubernetes/pkg/api/v1"
+	api_v1 "k8s.io/kubernetes/pkg/api/v1"
 	intstr "k8s.io/kubernetes/pkg/util/intstr"
 	reflect "reflect"
 )
@@ -181,8 +181,10 @@ func DeepCopy_v1beta1_DaemonSet(in interface{}, out interface{}, c *conversion.C
 		in := in.(*DaemonSet)
 		out := out.(*DaemonSet)
 		*out = *in
-		if err := v1.DeepCopy_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, c); err != nil {
+		if newVal, err := c.DeepCopy(&in.ObjectMeta); err != nil {
 			return err
+		} else {
+			out.ObjectMeta = *newVal.(*v1.ObjectMeta)
 		}
 		if err := DeepCopy_v1beta1_DaemonSetSpec(&in.Spec, &out.Spec, c); err != nil {
 			return err
@@ -219,10 +221,10 @@ func DeepCopy_v1beta1_DaemonSetSpec(in interface{}, out interface{}, c *conversi
 			if newVal, err := c.DeepCopy(*in); err != nil {
 				return err
 			} else {
-				*out = newVal.(*meta_v1.LabelSelector)
+				*out = newVal.(*v1.LabelSelector)
 			}
 		}
-		if err := v1.DeepCopy_v1_PodTemplateSpec(&in.Template, &out.Template, c); err != nil {
+		if err := api_v1.DeepCopy_v1_PodTemplateSpec(&in.Template, &out.Template, c); err != nil {
 			return err
 		}
 		return nil
@@ -243,8 +245,10 @@ func DeepCopy_v1beta1_Deployment(in interface{}, out interface{}, c *conversion.
 		in := in.(*Deployment)
 		out := out.(*Deployment)
 		*out = *in
-		if err := v1.DeepCopy_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, c); err != nil {
+		if newVal, err := c.DeepCopy(&in.ObjectMeta); err != nil {
 			return err
+		} else {
+			out.ObjectMeta = *newVal.(*v1.ObjectMeta)
 		}
 		if err := DeepCopy_v1beta1_DeploymentSpec(&in.Spec, &out.Spec, c); err != nil {
 			return err
@@ -316,10 +320,10 @@ func DeepCopy_v1beta1_DeploymentSpec(in interface{}, out interface{}, c *convers
 			if newVal, err := c.DeepCopy(*in); err != nil {
 				return err
 			} else {
-				*out = newVal.(*meta_v1.LabelSelector)
+				*out = newVal.(*v1.LabelSelector)
 			}
 		}
-		if err := v1.DeepCopy_v1_PodTemplateSpec(&in.Template, &out.Template, c); err != nil {
+		if err := api_v1.DeepCopy_v1_PodTemplateSpec(&in.Template, &out.Template, c); err != nil {
 			return err
 		}
 		if err := DeepCopy_v1beta1_DeploymentStrategy(&in.Strategy, &out.Strategy, c); err != nil {
@@ -424,8 +428,10 @@ func DeepCopy_v1beta1_HorizontalPodAutoscaler(in interface{}, out interface{}, c
 		in := in.(*HorizontalPodAutoscaler)
 		out := out.(*HorizontalPodAutoscaler)
 		*out = *in
-		if err := v1.DeepCopy_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, c); err != nil {
+		if newVal, err := c.DeepCopy(&in.ObjectMeta); err != nil {
 			return err
+		} else {
+			out.ObjectMeta = *newVal.(*v1.ObjectMeta)
 		}
 		if err := DeepCopy_v1beta1_HorizontalPodAutoscalerSpec(&in.Spec, &out.Spec, c); err != nil {
 			return err
@@ -486,7 +492,7 @@ func DeepCopy_v1beta1_HorizontalPodAutoscalerStatus(in interface{}, out interfac
 		}
 		if in.LastScaleTime != nil {
 			in, out := &in.LastScaleTime, &out.LastScaleTime
-			*out = new(meta_v1.Time)
+			*out = new(v1.Time)
 			**out = (*in).DeepCopy()
 		}
 		if in.CurrentCPUUtilizationPercentage != nil {
@@ -521,8 +527,10 @@ func DeepCopy_v1beta1_Ingress(in interface{}, out interface{}, c *conversion.Clo
 		in := in.(*Ingress)
 		out := out.(*Ingress)
 		*out = *in
-		if err := v1.DeepCopy_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, c); err != nil {
+		if newVal, err := c.DeepCopy(&in.ObjectMeta); err != nil {
 			return err
+		} else {
+			out.ObjectMeta = *newVal.(*v1.ObjectMeta)
 		}
 		if err := DeepCopy_v1beta1_IngressSpec(&in.Spec, &out.Spec, c); err != nil {
 			return err
@@ -626,7 +634,7 @@ func DeepCopy_v1beta1_IngressStatus(in interface{}, out interface{}, c *conversi
 		in := in.(*IngressStatus)
 		out := out.(*IngressStatus)
 		*out = *in
-		if err := v1.DeepCopy_v1_LoadBalancerStatus(&in.LoadBalancer, &out.LoadBalancer, c); err != nil {
+		if err := api_v1.DeepCopy_v1_LoadBalancerStatus(&in.LoadBalancer, &out.LoadBalancer, c); err != nil {
 			return err
 		}
 		return nil
@@ -652,8 +660,10 @@ func DeepCopy_v1beta1_NetworkPolicy(in interface{}, out interface{}, c *conversi
 		in := in.(*NetworkPolicy)
 		out := out.(*NetworkPolicy)
 		*out = *in
-		if err := v1.DeepCopy_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, c); err != nil {
+		if newVal, err := c.DeepCopy(&in.ObjectMeta); err != nil {
 			return err
+		} else {
+			out.ObjectMeta = *newVal.(*v1.ObjectMeta)
 		}
 		if err := DeepCopy_v1beta1_NetworkPolicySpec(&in.Spec, &out.Spec, c); err != nil {
 			return err
@@ -717,7 +727,7 @@ func DeepCopy_v1beta1_NetworkPolicyPeer(in interface{}, out interface{}, c *conv
 			if newVal, err := c.DeepCopy(*in); err != nil {
 				return err
 			} else {
-				*out = newVal.(*meta_v1.LabelSelector)
+				*out = newVal.(*v1.LabelSelector)
 			}
 		}
 		if in.NamespaceSelector != nil {
@@ -725,7 +735,7 @@ func DeepCopy_v1beta1_NetworkPolicyPeer(in interface{}, out interface{}, c *conv
 			if newVal, err := c.DeepCopy(*in); err != nil {
 				return err
 			} else {
-				*out = newVal.(*meta_v1.LabelSelector)
+				*out = newVal.(*v1.LabelSelector)
 			}
 		}
 		return nil
@@ -739,7 +749,7 @@ func DeepCopy_v1beta1_NetworkPolicyPort(in interface{}, out interface{}, c *conv
 		*out = *in
 		if in.Protocol != nil {
 			in, out := &in.Protocol, &out.Protocol
-			*out = new(v1.Protocol)
+			*out = new(api_v1.Protocol)
 			**out = **in
 		}
 		if in.Port != nil {
@@ -759,7 +769,7 @@ func DeepCopy_v1beta1_NetworkPolicySpec(in interface{}, out interface{}, c *conv
 		if newVal, err := c.DeepCopy(&in.PodSelector); err != nil {
 			return err
 		} else {
-			out.PodSelector = *newVal.(*meta_v1.LabelSelector)
+			out.PodSelector = *newVal.(*v1.LabelSelector)
 		}
 		if in.Ingress != nil {
 			in, out := &in.Ingress, &out.Ingress
@@ -779,8 +789,10 @@ func DeepCopy_v1beta1_PodSecurityPolicy(in interface{}, out interface{}, c *conv
 		in := in.(*PodSecurityPolicy)
 		out := out.(*PodSecurityPolicy)
 		*out = *in
-		if err := v1.DeepCopy_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, c); err != nil {
+		if newVal, err := c.DeepCopy(&in.ObjectMeta); err != nil {
 			return err
+		} else {
+			out.ObjectMeta = *newVal.(*v1.ObjectMeta)
 		}
 		if err := DeepCopy_v1beta1_PodSecurityPolicySpec(&in.Spec, &out.Spec, c); err != nil {
 			return err
@@ -814,21 +826,21 @@ func DeepCopy_v1beta1_PodSecurityPolicySpec(in interface{}, out interface{}, c *
 		*out = *in
 		if in.DefaultAddCapabilities != nil {
 			in, out := &in.DefaultAddCapabilities, &out.DefaultAddCapabilities
-			*out = make([]v1.Capability, len(*in))
+			*out = make([]api_v1.Capability, len(*in))
 			for i := range *in {
 				(*out)[i] = (*in)[i]
 			}
 		}
 		if in.RequiredDropCapabilities != nil {
 			in, out := &in.RequiredDropCapabilities, &out.RequiredDropCapabilities
-			*out = make([]v1.Capability, len(*in))
+			*out = make([]api_v1.Capability, len(*in))
 			for i := range *in {
 				(*out)[i] = (*in)[i]
 			}
 		}
 		if in.AllowedCapabilities != nil {
 			in, out := &in.AllowedCapabilities, &out.AllowedCapabilities
-			*out = make([]v1.Capability, len(*in))
+			*out = make([]api_v1.Capability, len(*in))
 			for i := range *in {
 				(*out)[i] = (*in)[i]
 			}
@@ -868,8 +880,10 @@ func DeepCopy_v1beta1_ReplicaSet(in interface{}, out interface{}, c *conversion.
 		in := in.(*ReplicaSet)
 		out := out.(*ReplicaSet)
 		*out = *in
-		if err := v1.DeepCopy_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, c); err != nil {
+		if newVal, err := c.DeepCopy(&in.ObjectMeta); err != nil {
 			return err
+		} else {
+			out.ObjectMeta = *newVal.(*v1.ObjectMeta)
 		}
 		if err := DeepCopy_v1beta1_ReplicaSetSpec(&in.Spec, &out.Spec, c); err != nil {
 			return err
@@ -924,10 +938,10 @@ func DeepCopy_v1beta1_ReplicaSetSpec(in interface{}, out interface{}, c *convers
 			if newVal, err := c.DeepCopy(*in); err != nil {
 				return err
 			} else {
-				*out = newVal.(*meta_v1.LabelSelector)
+				*out = newVal.(*v1.LabelSelector)
 			}
 		}
-		if err := v1.DeepCopy_v1_PodTemplateSpec(&in.Template, &out.Template, c); err != nil {
+		if err := api_v1.DeepCopy_v1_PodTemplateSpec(&in.Template, &out.Template, c); err != nil {
 			return err
 		}
 		return nil
@@ -1012,7 +1026,7 @@ func DeepCopy_v1beta1_SELinuxStrategyOptions(in interface{}, out interface{}, c 
 		*out = *in
 		if in.SELinuxOptions != nil {
 			in, out := &in.SELinuxOptions, &out.SELinuxOptions
-			*out = new(v1.SELinuxOptions)
+			*out = new(api_v1.SELinuxOptions)
 			**out = **in
 		}
 		return nil
@@ -1024,8 +1038,10 @@ func DeepCopy_v1beta1_Scale(in interface{}, out interface{}, c *conversion.Clone
 		in := in.(*Scale)
 		out := out.(*Scale)
 		*out = *in
-		if err := v1.DeepCopy_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, c); err != nil {
+		if newVal, err := c.DeepCopy(&in.ObjectMeta); err != nil {
 			return err
+		} else {
+			out.ObjectMeta = *newVal.(*v1.ObjectMeta)
 		}
 		if err := DeepCopy_v1beta1_ScaleStatus(&in.Status, &out.Status, c); err != nil {
 			return err
@@ -1089,8 +1105,10 @@ func DeepCopy_v1beta1_ThirdPartyResource(in interface{}, out interface{}, c *con
 		in := in.(*ThirdPartyResource)
 		out := out.(*ThirdPartyResource)
 		*out = *in
-		if err := v1.DeepCopy_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, c); err != nil {
+		if newVal, err := c.DeepCopy(&in.ObjectMeta); err != nil {
 			return err
+		} else {
+			out.ObjectMeta = *newVal.(*v1.ObjectMeta)
 		}
 		if in.Versions != nil {
 			in, out := &in.Versions, &out.Versions
@@ -1108,8 +1126,10 @@ func DeepCopy_v1beta1_ThirdPartyResourceData(in interface{}, out interface{}, c 
 		in := in.(*ThirdPartyResourceData)
 		out := out.(*ThirdPartyResourceData)
 		*out = *in
-		if err := v1.DeepCopy_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, c); err != nil {
+		if newVal, err := c.DeepCopy(&in.ObjectMeta); err != nil {
 			return err
+		} else {
+			out.ObjectMeta = *newVal.(*v1.ObjectMeta)
 		}
 		if in.Data != nil {
 			in, out := &in.Data, &out.Data

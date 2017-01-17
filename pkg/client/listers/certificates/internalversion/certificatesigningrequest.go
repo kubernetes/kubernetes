@@ -20,8 +20,8 @@ package internalversion
 
 import (
 	"k8s.io/apimachinery/pkg/api/errors"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	api "k8s.io/kubernetes/pkg/api"
 	certificates "k8s.io/kubernetes/pkg/apis/certificates"
 	"k8s.io/kubernetes/pkg/client/cache"
 )
@@ -55,7 +55,7 @@ func (s *certificateSigningRequestLister) List(selector labels.Selector) (ret []
 
 // Get retrieves the CertificateSigningRequest from the index for a given name.
 func (s *certificateSigningRequestLister) Get(name string) (*certificates.CertificateSigningRequest, error) {
-	key := &certificates.CertificateSigningRequest{ObjectMeta: api.ObjectMeta{Name: name}}
+	key := &certificates.CertificateSigningRequest{ObjectMeta: v1.ObjectMeta{Name: name}}
 	obj, exists, err := s.indexer.Get(key)
 	if err != nil {
 		return nil, err
