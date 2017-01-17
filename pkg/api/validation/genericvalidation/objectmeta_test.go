@@ -23,6 +23,7 @@ import (
 	"testing"
 	"time"
 
+	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/kubernetes/pkg/api"
@@ -409,7 +410,7 @@ func TestValidateObjectMetaTrimsTrailingSlash(t *testing.T) {
 	errs := ValidateObjectMeta(
 		&api.ObjectMeta{Name: "test", GenerateName: "foo-"},
 		false,
-		NameIsDNSSubdomain,
+		apimachineryvalidation.NameIsDNSSubdomain,
 		field.NewPath("field"))
 	if len(errs) != 0 {
 		t.Fatalf("unexpected errors: %v", errs)
