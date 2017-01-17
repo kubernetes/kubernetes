@@ -173,7 +173,24 @@ func TestJitterUntilNegativeFactor(t *testing.T) {
 }
 
 func TestExponentialBackoff(t *testing.T) {
+	sleeps := []time.Duration{}
+	sleepFn = func(d time.Duration) { sleeps = append(sleeps, d) }
+	defer func() { sleepFn = time.Sleep }()
+
 	opts := Backoff{Factor: 1.0, Steps: 3}
+
+	expectSleeps := func(expected ...time.Duration) error {
+		defer func() { sleeps = nil }()
+		if len(expected) != len(sleeps) {
+			return fmt.Errorf("unexpected number of sleeps: expected %v got %v", expected, sleeps)
+		}
+		for i := range expected {
+			if expected[i] != sleeps[i] {
+				return fmt.Errorf("unexpected sleep values: expected %v got %v", expected, sleeps)
+			}
+		}
+		return nil
+	}
 
 	// waits up to steps
 	i := 0
@@ -183,6 +200,9 @@ func TestExponentialBackoff(t *testing.T) {
 	})
 	if err != ErrWaitTimeout || i != opts.Steps {
 		t.Errorf("unexpected error: %v", err)
+	}
+	if err := expectSleeps(0, 0); err != nil {
+		t.Error(err)
 	}
 
 	// returns immediately
@@ -194,6 +214,9 @@ func TestExponentialBackoff(t *testing.T) {
 	if err != nil || i != 1 {
 		t.Errorf("unexpected error: %v", err)
 	}
+	if err := expectSleeps(); err != nil {
+		t.Error(err)
+	}
 
 	// returns immediately on error
 	testErr := fmt.Errorf("some other error")
@@ -202,6 +225,9 @@ func TestExponentialBackoff(t *testing.T) {
 	})
 	if err != testErr {
 		t.Errorf("unexpected error: %v", err)
+	}
+	if err := expectSleeps(); err != nil {
+		t.Error(err)
 	}
 
 	// invoked multiple times
@@ -215,6 +241,36 @@ func TestExponentialBackoff(t *testing.T) {
 	})
 	if err != nil || i != opts.Steps {
 		t.Errorf("unexpected error: %v", err)
+	}
+	if err := expectSleeps(0, 0); err != nil {
+		t.Error(err)
+	}
+
+	opts = Backoff{Duration: time.Second, Factor: 2.0, Steps: 7, MaxDuration: 10 * time.Second}
+	err = ExponentialBackoff(opts, func() (bool, error) { return false, nil })
+	if err != ErrWaitTimeout {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if err := expectSleeps(time.Second, 2*time.Second, 4*time.Second, 8*time.Second, 10*time.Second, 10*time.Second); err != nil {
+		t.Error(err)
+	}
+
+	// add jitter and lots of steps to get a randomness component
+	opts = Backoff{Duration: time.Second, Jitter: 0.1, Factor: 2.0, Steps: 100, MaxDuration: 10 * time.Second}
+	err = ExponentialBackoff(opts, func() (bool, error) { return false, nil })
+	if err != ErrWaitTimeout {
+		t.Errorf("unexpected error: %v", err)
+	}
+	d := time.Second
+	for i := 0; i < (opts.Steps - 1); i++ {
+		if float64(d-sleeps[i])/float64(d) > opts.Jitter {
+			t.Errorf("jittered too much: %s %s", d, sleeps[i])
+		}
+		effectiveMax := opts.MaxDuration + time.Duration(float64(opts.MaxDuration)*opts.Jitter)
+		if sleeps[i] > (effectiveMax) {
+			t.Errorf("%d: cannot exceed max duration %s by more than %f: %s", i, opts.MaxDuration, opts.Jitter, sleeps[i])
+		}
+		d = sleeps[i]
 	}
 }
 
