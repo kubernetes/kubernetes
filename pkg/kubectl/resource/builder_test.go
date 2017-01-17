@@ -1255,6 +1255,14 @@ func TestMultipleTypesRequested(t *testing.T) {
 			expectedMultipleTypes: false,
 		},
 		{
+			args: []string{"pod,all"},
+			expectedMultipleTypes: true,
+		},
+		{
+			args: []string{"all,rc,pod"},
+			expectedMultipleTypes: true,
+		},
+		{
 			args: []string{"rc,pod,svc"},
 			expectedMultipleTypes: true,
 		},
@@ -1286,7 +1294,7 @@ func TestMultipleTypesRequested(t *testing.T) {
 	for _, test := range tests {
 		hasMultipleTypes := MultipleTypesRequested(test.args)
 		if hasMultipleTypes != test.expectedMultipleTypes {
-			t.Errorf("expected HasName to return %v for %s", test.expectedMultipleTypes, test.args)
+			t.Errorf("expected MultipleTypesRequested to return %v for %s", test.expectedMultipleTypes, test.args)
 		}
 	}
 }
