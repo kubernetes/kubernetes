@@ -60,8 +60,8 @@ func (plugin *photonPersistentDiskPlugin) NewAttacher() (volume.Attacher, error)
 // Callers are responsible for retryinging on failure.
 // Callers are responsible for thread safety between concurrent attach and
 // detach operations.
-func (attacher *photonPersistentDiskAttacher) Attach(spec *volume.Spec, nodeName types.NodeName) (string, error) {
-	hostName := string(nodeName)
+func (attacher *photonPersistentDiskAttacher) Attach(spec *volume.Spec, node types.NodeIdentifier) (string, error) {
+	hostName := string(node.Name)
 	volumeSource, _, err := getVolumeSource(spec)
 	if err != nil {
 		glog.Errorf("Photon Controller attacher: Attach failed to get volume source")
@@ -71,7 +71,7 @@ func (attacher *photonPersistentDiskAttacher) Attach(spec *volume.Spec, nodeName
 	glog.V(4).Infof("Photon Controller: Attach disk called for host %s", hostName)
 
 	// TODO: if disk is already attached?
-	err = attacher.photonDisks.AttachDisk(volumeSource.PdID, nodeName)
+	err = attacher.photonDisks.AttachDisk(volumeSource.PdID, node.Name)
 	if err != nil {
 		glog.Errorf("Error attaching volume %q: %+v", volumeSource.PdID, err)
 		return "", err
@@ -81,7 +81,7 @@ func (attacher *photonPersistentDiskAttacher) Attach(spec *volume.Spec, nodeName
 	return path.Join(diskByIDPath, diskPhotonPrefix+PdidWithNoHypens), nil
 }
 
-func (attacher *photonPersistentDiskAttacher) VolumesAreAttached(specs []*volume.Spec, nodeName types.NodeName) (map[*volume.Spec]bool, error) {
+func (attacher *photonPersistentDiskAttacher) VolumesAreAttached(specs []*volume.Spec, node types.NodeIdentifier) (map[*volume.Spec]bool, error) {
 	volumesAttachedCheck := make(map[*volume.Spec]bool)
 	volumeSpecMap := make(map[string]*volume.Spec)
 	pdIDList := []string{}
@@ -96,11 +96,11 @@ func (attacher *photonPersistentDiskAttacher) VolumesAreAttached(specs []*volume
 		volumesAttachedCheck[spec] = true
 		volumeSpecMap[volumeSource.PdID] = spec
 	}
-	attachedResult, err := attacher.photonDisks.DisksAreAttached(pdIDList, nodeName)
+	attachedResult, err := attacher.photonDisks.DisksAreAttached(pdIDList, node.Name)
 	if err != nil {
 		glog.Errorf(
 			"Error checking if volumes (%v) are attached to current node (%q). err=%v",
-			pdIDList, nodeName, err)
+			pdIDList, node, err)
 		return volumesAttachedCheck, err
 	}
 
@@ -234,11 +234,11 @@ func (plugin *photonPersistentDiskPlugin) NewDetacher() (volume.Detacher, error)
 }
 
 // Detach the given device from the given host.
-func (detacher *photonPersistentDiskDetacher) Detach(deviceMountPath string, nodeName types.NodeName) error {
+func (detacher *photonPersistentDiskDetacher) Detach(deviceMountPath string, node types.NodeIdentifier) error {
 
-	hostName := string(nodeName)
+	hostName := string(node.Name)
 	pdID := deviceMountPath
-	attached, err := detacher.photonDisks.DiskIsAttached(pdID, nodeName)
+	attached, err := detacher.photonDisks.DiskIsAttached(pdID, node.Name)
 	if err != nil {
 		// Log error and continue with detach
 		glog.Errorf(
@@ -252,7 +252,7 @@ func (detacher *photonPersistentDiskDetacher) Detach(deviceMountPath string, nod
 		return nil
 	}
 
-	if err := detacher.photonDisks.DetachDisk(pdID, nodeName); err != nil {
+	if err := detacher.photonDisks.DetachDisk(pdID, node.Name); err != nil {
 		glog.Errorf("Error detaching volume %q: %v", pdID, err)
 		return err
 	}

@@ -728,10 +728,17 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 	if len(kubeCfg.ExperimentalMounterPath) != 0 {
 		kubeCfg.ExperimentalCheckNodeCapabilitiesBeforeMount = false
 	}
+
+	// TODO: We should be populating ID also
+	// but we believe this is safe for the kubelet's limited volume functionality
+	nodeID := types.NodeIdentifier{
+		Name: nodeName,
+	}
+
 	// setup volumeManager
 	klet.volumeManager, err = volumemanager.NewVolumeManager(
 		kubeCfg.EnableControllerAttachDetach,
-		nodeName,
+		nodeID,
 		klet.podManager,
 		klet.kubeClient,
 		klet.volumePluginMgr,

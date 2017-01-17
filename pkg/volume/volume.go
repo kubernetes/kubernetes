@@ -170,15 +170,15 @@ type Deleter interface {
 
 // Attacher can attach a volume to a node.
 type Attacher interface {
-	// Attaches the volume specified by the given spec to the node with the given Name.
+	// Attaches the volume specified by the given spec to the node with the given NodeIdentifier.
 	// On success, returns the device path where the device was attached on the
 	// node.
-	Attach(spec *Spec, nodeName types.NodeName) (string, error)
+	Attach(spec *Spec, node types.NodeIdentifier) (string, error)
 
 	// VolumesAreAttached checks whether the list of volumes still attached to the specified
 	// the node. It returns a map which maps from the volume spec to the checking result.
 	// If an error is occured during checking, the error will be returned
-	VolumesAreAttached(specs []*Spec, nodeName types.NodeName) (map[*Spec]bool, error)
+	VolumesAreAttached(specs []*Spec, node types.NodeIdentifier) (map[*Spec]bool, error)
 
 	// WaitForAttach blocks until the device is attached to this
 	// node. If it successfully attaches, the path to the device
@@ -198,8 +198,8 @@ type Attacher interface {
 
 // Detacher can detach a volume from a node.
 type Detacher interface {
-	// Detach the given device from the node with the given Name.
-	Detach(deviceName string, nodeName types.NodeName) error
+	// Detach the given device from the node with the given NodeIdentifier.
+	Detach(deviceName string, node types.NodeIdentifier) error
 
 	// UnmountDevice unmounts the global mount of the disk. This
 	// should only be called once all bind mounts have been

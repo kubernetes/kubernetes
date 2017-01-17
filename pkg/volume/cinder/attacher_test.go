@@ -99,7 +99,7 @@ type testcase struct {
 func TestAttachDetach(t *testing.T) {
 	diskName := "disk"
 	instanceID := "instance"
-	nodeName := types.NodeName(instanceID)
+	node := types.NodeIdentifier{Name: types.NodeName(instanceID)}
 	readOnly := false
 	spec := createVolSpec(diskName, readOnly)
 	attachError := errors.New("Fake attach error")
@@ -116,7 +116,7 @@ func TestAttachDetach(t *testing.T) {
 			diskPath:       diskPathCall{diskName, instanceID, "/dev/sda", nil},
 			test: func(testcase *testcase) (string, error) {
 				attacher := newAttacher(testcase)
-				return attacher.Attach(spec, nodeName)
+				return attacher.Attach(spec, node)
 			},
 			expectedDevice: "/dev/sda",
 		},
@@ -129,7 +129,7 @@ func TestAttachDetach(t *testing.T) {
 			diskPath:       diskPathCall{diskName, instanceID, "/dev/sda", nil},
 			test: func(testcase *testcase) (string, error) {
 				attacher := newAttacher(testcase)
-				return attacher.Attach(spec, nodeName)
+				return attacher.Attach(spec, node)
 			},
 			expectedDevice: "/dev/sda",
 		},
@@ -143,7 +143,7 @@ func TestAttachDetach(t *testing.T) {
 			diskPath:       diskPathCall{diskName, instanceID, "/dev/sda", nil},
 			test: func(testcase *testcase) (string, error) {
 				attacher := newAttacher(testcase)
-				return attacher.Attach(spec, nodeName)
+				return attacher.Attach(spec, node)
 			},
 			expectedDevice: "/dev/sda",
 		},
@@ -156,7 +156,7 @@ func TestAttachDetach(t *testing.T) {
 			attach:         attachCall{diskName, instanceID, "/dev/sda", attachError},
 			test: func(testcase *testcase) (string, error) {
 				attacher := newAttacher(testcase)
-				return attacher.Attach(spec, nodeName)
+				return attacher.Attach(spec, node)
 			},
 			expectedError: attachError,
 		},
@@ -170,7 +170,7 @@ func TestAttachDetach(t *testing.T) {
 			diskPath:       diskPathCall{diskName, instanceID, "", diskPathError},
 			test: func(testcase *testcase) (string, error) {
 				attacher := newAttacher(testcase)
-				return attacher.Attach(spec, nodeName)
+				return attacher.Attach(spec, node)
 			},
 			expectedError: diskPathError,
 		},
@@ -183,7 +183,7 @@ func TestAttachDetach(t *testing.T) {
 			detach:         detachCall{diskName, instanceID, nil},
 			test: func(testcase *testcase) (string, error) {
 				detacher := newDetacher(testcase)
-				return "", detacher.Detach(diskName, nodeName)
+				return "", detacher.Detach(diskName, node)
 			},
 		},
 
@@ -194,7 +194,7 @@ func TestAttachDetach(t *testing.T) {
 			diskIsAttached: diskIsAttachedCall{diskName, instanceID, false, nil},
 			test: func(testcase *testcase) (string, error) {
 				detacher := newDetacher(testcase)
-				return "", detacher.Detach(diskName, nodeName)
+				return "", detacher.Detach(diskName, node)
 			},
 		},
 
@@ -206,7 +206,7 @@ func TestAttachDetach(t *testing.T) {
 			detach:         detachCall{diskName, instanceID, nil},
 			test: func(testcase *testcase) (string, error) {
 				detacher := newDetacher(testcase)
-				return "", detacher.Detach(diskName, nodeName)
+				return "", detacher.Detach(diskName, node)
 			},
 		},
 
@@ -218,7 +218,7 @@ func TestAttachDetach(t *testing.T) {
 			detach:         detachCall{diskName, instanceID, detachError},
 			test: func(testcase *testcase) (string, error) {
 				detacher := newDetacher(testcase)
-				return "", detacher.Detach(diskName, nodeName)
+				return "", detacher.Detach(diskName, node)
 			},
 			expectedError: detachError,
 		},

@@ -149,7 +149,7 @@ type VolumeManager interface {
 //   Must be pre-initialized.
 func NewVolumeManager(
 	controllerAttachDetachEnabled bool,
-	nodeName k8stypes.NodeName,
+	nodeID k8stypes.NodeIdentifier,
 	podManager pod.Manager,
 	kubeClient clientset.Interface,
 	volumePluginMgr *volume.VolumePluginMgr,
@@ -163,7 +163,7 @@ func NewVolumeManager(
 		kubeClient:          kubeClient,
 		volumePluginMgr:     volumePluginMgr,
 		desiredStateOfWorld: cache.NewDesiredStateOfWorld(volumePluginMgr),
-		actualStateOfWorld:  cache.NewActualStateOfWorld(nodeName, volumePluginMgr),
+		actualStateOfWorld:  cache.NewActualStateOfWorld(nodeID, volumePluginMgr),
 		operationExecutor: operationexecutor.NewOperationExecutor(operationexecutor.NewOperationGenerator(
 			kubeClient,
 			volumePluginMgr,
@@ -178,7 +178,7 @@ func NewVolumeManager(
 		reconcilerLoopSleepPeriod,
 		reconcilerSyncStatesSleepPeriod,
 		waitForAttachTimeout,
-		nodeName,
+		nodeID,
 		vm.desiredStateOfWorld,
 		vm.actualStateOfWorld,
 		vm.operationExecutor,

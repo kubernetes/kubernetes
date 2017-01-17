@@ -75,7 +75,7 @@ type testcase struct {
 
 func TestAttachDetach(t *testing.T) {
 	diskName := "000-000-000"
-	nodeName := types.NodeName("instance")
+	node := types.NodeIdentifier{Name: types.NodeName("instance")}
 	readOnly := false
 	spec := createVolSpec(diskName, readOnly)
 	attachError := errors.New("Fake attach error")
@@ -85,10 +85,10 @@ func TestAttachDetach(t *testing.T) {
 		// Successful Attach call
 		{
 			name:   "Attach_Positive",
-			attach: attachCall{diskName, nodeName, nil},
+			attach: attachCall{diskName, node, nil},
 			test: func(testcase *testcase) (string, error) {
 				attacher := newAttacher(testcase)
-				return attacher.Attach(spec, nodeName)
+				return attacher.Attach(spec, node)
 			},
 			expectedDevice: "/dev/disk/by-id/wwn-0x000000000",
 		},
@@ -96,10 +96,10 @@ func TestAttachDetach(t *testing.T) {
 		// Attach call fails
 		{
 			name:   "Attach_Negative",
-			attach: attachCall{diskName, nodeName, attachError},
+			attach: attachCall{diskName, node, attachError},
 			test: func(testcase *testcase) (string, error) {
 				attacher := newAttacher(testcase)
-				return attacher.Attach(spec, nodeName)
+				return attacher.Attach(spec, node)
 			},
 			expectedError: attachError,
 		},
@@ -107,43 +107,43 @@ func TestAttachDetach(t *testing.T) {
 		// Detach succeeds
 		{
 			name:           "Detach_Positive",
-			diskIsAttached: diskIsAttachedCall{diskName, nodeName, true, nil},
-			detach:         detachCall{diskName, nodeName, nil},
+			diskIsAttached: diskIsAttachedCall{diskName, node, true, nil},
+			detach:         detachCall{diskName, node, nil},
 			test: func(testcase *testcase) (string, error) {
 				detacher := newDetacher(testcase)
-				return "", detacher.Detach(diskName, nodeName)
+				return "", detacher.Detach(diskName, node)
 			},
 		},
 
 		// Disk is already detached
 		{
 			name:           "Detach_Positive_AlreadyDetached",
-			diskIsAttached: diskIsAttachedCall{diskName, nodeName, false, nil},
+			diskIsAttached: diskIsAttachedCall{diskName, node, false, nil},
 			test: func(testcase *testcase) (string, error) {
 				detacher := newDetacher(testcase)
-				return "", detacher.Detach(diskName, nodeName)
+				return "", detacher.Detach(diskName, node)
 			},
 		},
 
 		// Detach succeeds when DiskIsAttached fails
 		{
 			name:           "Detach_Positive_CheckFails",
-			diskIsAttached: diskIsAttachedCall{diskName, nodeName, false, diskCheckError},
-			detach:         detachCall{diskName, nodeName, nil},
+			diskIsAttached: diskIsAttachedCall{diskName, node, false, diskCheckError},
+			detach:         detachCall{diskName, node, nil},
 			test: func(testcase *testcase) (string, error) {
 				detacher := newDetacher(testcase)
-				return "", detacher.Detach(diskName, nodeName)
+				return "", detacher.Detach(diskName, node)
 			},
 		},
 
 		// Detach fails
 		{
 			name:           "Detach_Negative",
-			diskIsAttached: diskIsAttachedCall{diskName, nodeName, false, diskCheckError},
-			detach:         detachCall{diskName, nodeName, detachError},
+			diskIsAttached: diskIsAttachedCall{diskName, node, false, diskCheckError},
+			detach:         detachCall{diskName, node, detachError},
 			test: func(testcase *testcase) (string, error) {
 				detacher := newDetacher(testcase)
-				return "", detacher.Detach(diskName, nodeName)
+				return "", detacher.Detach(diskName, node)
 			},
 			expectedError: detachError,
 		},
@@ -215,19 +215,19 @@ func createPVSpec(name string, readOnly bool) *volume.Spec {
 
 type attachCall struct {
 	diskName string
-	nodeName types.NodeName
+	node     types.NodeIdentifier
 	ret      error
 }
 
 type detachCall struct {
 	diskName string
-	nodeName types.NodeName
+	node     types.NodeIdentifier
 	ret      error
 }
 
 type diskIsAttachedCall struct {
 	diskName   string
-	nodeName   types.NodeName
+	node       types.NodeIdentifier
 	isAttached bool
 	ret        error
 }
@@ -235,7 +235,7 @@ type diskIsAttachedCall struct {
 func (testcase *testcase) AttachDisk(diskName string, nodeName types.NodeName) error {
 	expected := &testcase.attach
 
-	if expected.diskName == "" && expected.nodeName == "" {
+	if expected.diskName == "" && expected.node.Name == "" {
 		// testcase.attach looks uninitialized, test did not expect to call
 		// AttachDisk
 		testcase.t.Errorf("Unexpected AttachDisk call!")
@@ -247,8 +247,8 @@ func (testcase *testcase) AttachDisk(diskName string, nodeName types.NodeName) e
 		return errors.New("Unexpected AttachDisk call: wrong diskName")
 	}
 
-	if expected.nodeName != nodeName {
-		testcase.t.Errorf("Unexpected AttachDisk call: expected nodeName %s, got %s", expected.nodeName, nodeName)
+	if expected.node.Name != nodeName {
+		testcase.t.Errorf("Unexpected AttachDisk call: expected nodeName %s, got %s", expected.node.Name, nodeName)
 		return errors.New("Unexpected AttachDisk call: wrong nodeName")
 	}
 
@@ -260,7 +260,7 @@ func (testcase *testcase) AttachDisk(diskName string, nodeName types.NodeName) e
 func (testcase *testcase) DetachDisk(diskName string, nodeName types.NodeName) error {
 	expected := &testcase.detach
 
-	if expected.diskName == "" && expected.nodeName == "" {
+	if expected.diskName == "" && expected.node.Name == "" {
 		// testcase.detach looks uninitialized, test did not expect to call
 		// DetachDisk
 		testcase.t.Errorf("Unexpected DetachDisk call!")
@@ -272,8 +272,8 @@ func (testcase *testcase) DetachDisk(diskName string, nodeName types.NodeName) e
 		return errors.New("Unexpected DetachDisk call: wrong diskName")
 	}
 
-	if expected.nodeName != nodeName {
-		testcase.t.Errorf("Unexpected DetachDisk call: expected nodeName %s, got %s", expected.nodeName, nodeName)
+	if expected.node.Name != nodeName {
+		testcase.t.Errorf("Unexpected DetachDisk call: expected nodeName %s, got %s", expected.node.Name, nodeName)
 		return errors.New("Unexpected DetachDisk call: wrong nodeName")
 	}
 
@@ -285,7 +285,7 @@ func (testcase *testcase) DetachDisk(diskName string, nodeName types.NodeName) e
 func (testcase *testcase) DiskIsAttached(diskName string, nodeName types.NodeName) (bool, error) {
 	expected := &testcase.diskIsAttached
 
-	if expected.diskName == "" && expected.nodeName == "" {
+	if expected.diskName == "" && expected.node.Name == "" {
 		// testcase.diskIsAttached looks uninitialized, test did not expect to
 		// call DiskIsAttached
 		testcase.t.Errorf("Unexpected DiskIsAttached call!")
@@ -297,8 +297,8 @@ func (testcase *testcase) DiskIsAttached(diskName string, nodeName types.NodeNam
 		return false, errors.New("Unexpected DiskIsAttached call: wrong diskName")
 	}
 
-	if expected.nodeName != nodeName {
-		testcase.t.Errorf("Unexpected DiskIsAttached call: expected nodeName %s, got %s", expected.nodeName, nodeName)
+	if expected.node.Name != nodeName {
+		testcase.t.Errorf("Unexpected DiskIsAttached call: expected nodeName %s, got %s", expected.node.Name, nodeName)
 		return false, errors.New("Unexpected DiskIsAttached call: wrong nodeName")
 	}
 

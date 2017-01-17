@@ -136,9 +136,9 @@ func (rc *reconciler) reconcile() {
 	// Ensure volumes that should be detached are detached.
 	for _, attachedVolume := range rc.actualStateOfWorld.GetAttachedVolumes() {
 		if !rc.desiredStateOfWorld.VolumeExists(
-			attachedVolume.VolumeName, attachedVolume.NodeName) {
+			attachedVolume.VolumeName, attachedVolume.Node) {
 			// Set the detach request time
-			elapsedTime, err := rc.actualStateOfWorld.SetDetachRequestTime(attachedVolume.VolumeName, attachedVolume.NodeName)
+			elapsedTime, err := rc.actualStateOfWorld.SetDetachRequestTime(attachedVolume.VolumeName, attachedVolume.Node)
 			if err != nil {
 				glog.Errorf("Cannot trigger detach because it fails to set detach request time with error %v", err)
 				continue
@@ -149,13 +149,13 @@ func (rc *reconciler) reconcile() {
 			if attachedVolume.MountedByNode && !timeout {
 				glog.V(12).Infof("Cannot trigger detach for volume %q on node %q because volume is still mounted",
 					attachedVolume.VolumeName,
-					attachedVolume.NodeName)
+					attachedVolume.Node)
 				continue
 			}
 
 			// Before triggering volume detach, mark volume as detached and update the node status
 			// If it fails to update node status, skip detach volume
-			rc.actualStateOfWorld.RemoveVolumeFromReportAsAttached(attachedVolume.VolumeName, attachedVolume.NodeName)
+			rc.actualStateOfWorld.RemoveVolumeFromReportAsAttached(attachedVolume.VolumeName, attachedVolume.Node)
 
 			// Update Node Status to indicate volume is no longer safe to mount.
 			err = rc.nodeStatusUpdater.UpdateNodeStatuses()
@@ -163,23 +163,23 @@ func (rc *reconciler) reconcile() {
 				// Skip detaching this volume if unable to update node status
 				glog.Errorf("UpdateNodeStatuses failed while attempting to report volume %q as attached to node %q with: %v ",
 					attachedVolume.VolumeName,
-					attachedVolume.NodeName,
+					attachedVolume.Node,
 					err)
 				continue
 			}
 
 			// Trigger detach volume which requires verifing safe to detach step
 			// If timeout is true, skip verifySafeToDetach check
-			glog.V(5).Infof("Attempting to start DetachVolume for volume %q from node %q", attachedVolume.VolumeName, attachedVolume.NodeName)
+			glog.V(5).Infof("Attempting to start DetachVolume for volume %q from node %q", attachedVolume.VolumeName, attachedVolume.Node)
 			verifySafeToDetach := !timeout
 			err = rc.attacherDetacher.DetachVolume(attachedVolume.AttachedVolume, verifySafeToDetach, rc.actualStateOfWorld)
 			if err == nil {
 				if !timeout {
-					glog.Infof("Started DetachVolume for volume %q from node %q", attachedVolume.VolumeName, attachedVolume.NodeName)
+					glog.Infof("Started DetachVolume for volume %q from node %q", attachedVolume.VolumeName, attachedVolume.Node)
 				} else {
 					glog.Infof("Started DetachVolume for volume %q from node %q. This volume is not safe to detach, but maxWaitForUnmountDuration %v expired, force detaching",
 						attachedVolume.VolumeName,
-						attachedVolume.NodeName,
+						attachedVolume.Node,
 						rc.maxWaitForUnmountDuration)
 				}
 			}
@@ -192,7 +192,7 @@ func (rc *reconciler) reconcile() {
 					"operationExecutor.DetachVolume failed to start for volume %q (spec.Name: %q) from node %q with err: %v",
 					attachedVolume.VolumeName,
 					attachedVolume.VolumeSpec.Name(),
-					attachedVolume.NodeName,
+					attachedVolume.Node,
 					err)
 			}
 		}
@@ -201,16 +201,16 @@ func (rc *reconciler) reconcile() {
 	// Ensure volumes that should be attached are attached.
 	for _, volumeToAttach := range rc.desiredStateOfWorld.GetVolumesToAttach() {
 		if rc.actualStateOfWorld.VolumeNodeExists(
-			volumeToAttach.VolumeName, volumeToAttach.NodeName) {
+			volumeToAttach.VolumeName, volumeToAttach.Node) {
 			// Volume/Node exists, touch it to reset detachRequestedTime
-			glog.V(5).Infof("Volume %q/Node %q is attached--touching.", volumeToAttach.VolumeName, volumeToAttach.NodeName)
-			rc.actualStateOfWorld.ResetDetachRequestTime(volumeToAttach.VolumeName, volumeToAttach.NodeName)
+			glog.V(5).Infof("Volume %q/Node %q is attached--touching.", volumeToAttach.VolumeName, volumeToAttach.Node)
+			rc.actualStateOfWorld.ResetDetachRequestTime(volumeToAttach.VolumeName, volumeToAttach.Node)
 		} else {
 			// Volume/Node doesn't exist, spawn a goroutine to attach it
-			glog.V(5).Infof("Attempting to start AttachVolume for volume %q to node %q", volumeToAttach.VolumeName, volumeToAttach.NodeName)
+			glog.V(5).Infof("Attempting to start AttachVolume for volume %q to node %q", volumeToAttach.VolumeName, volumeToAttach.Node)
 			err := rc.attacherDetacher.AttachVolume(volumeToAttach.VolumeToAttach, rc.actualStateOfWorld)
 			if err == nil {
-				glog.Infof("Started AttachVolume for volume %q to node %q", volumeToAttach.VolumeName, volumeToAttach.NodeName)
+				glog.Infof("Started AttachVolume for volume %q to node %q", volumeToAttach.VolumeName, volumeToAttach.Node)
 			}
 			if err != nil &&
 				!nestedpendingoperations.IsAlreadyExists(err) &&
@@ -221,7 +221,7 @@ func (rc *reconciler) reconcile() {
 					"operationExecutor.AttachVolume failed to start for volume %q (spec.Name: %q) to node %q with err: %v",
 					volumeToAttach.VolumeName,
 					volumeToAttach.VolumeSpec.Name(),
-					volumeToAttach.NodeName,
+					volumeToAttach.Node,
 					err)
 			}
 		}

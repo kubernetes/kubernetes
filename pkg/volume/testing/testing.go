@@ -368,7 +368,7 @@ func (fv *FakeVolume) TearDownAt(dir string) error {
 	return os.RemoveAll(dir)
 }
 
-func (fv *FakeVolume) Attach(spec *Spec, nodeName types.NodeName) (string, error) {
+func (fv *FakeVolume) Attach(spec *Spec, node types.NodeIdentifier) (string, error) {
 	fv.Lock()
 	defer fv.Unlock()
 	fv.AttachCallCount++
@@ -414,14 +414,14 @@ func (fv *FakeVolume) GetMountDeviceCallCount() int {
 	return fv.MountDeviceCallCount
 }
 
-func (fv *FakeVolume) Detach(deviceMountPath string, nodeName types.NodeName) error {
+func (fv *FakeVolume) Detach(deviceMountPath string, node types.NodeIdentifier) error {
 	fv.Lock()
 	defer fv.Unlock()
 	fv.DetachCallCount++
 	return nil
 }
 
-func (fv *FakeVolume) VolumesAreAttached(spec []*Spec, nodeName types.NodeName) (map[*Spec]bool, error) {
+func (fv *FakeVolume) VolumesAreAttached(spec []*Spec, node types.NodeIdentifier) (map[*Spec]bool, error) {
 	fv.Lock()
 	defer fv.Unlock()
 	return nil, nil

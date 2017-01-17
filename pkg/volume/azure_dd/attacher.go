@@ -66,23 +66,23 @@ func (plugin *azureDataDiskPlugin) NewAttacher() (volume.Attacher, error) {
 	}, nil
 }
 
-// Attach attaches a volume.Spec to an Azure VM referenced by NodeName, returning the disk's LUN
-func (attacher *azureDiskAttacher) Attach(spec *volume.Spec, nodeName types.NodeName) (string, error) {
+// Attach attaches a volume.Spec to an Azure VM referenced by NodeIdentifier, returning the disk's LUN
+func (attacher *azureDiskAttacher) Attach(spec *volume.Spec, node types.NodeIdentifier) (string, error) {
 	volumeSource, err := getVolumeSource(spec)
 	if err != nil {
 		glog.Warningf("failed to get azure disk spec")
 		return "", err
 	}
-	instanceid, err := attacher.azureProvider.InstanceID(nodeName)
+	instanceid, err := attacher.azureProvider.InstanceID(node.Name)
 	if err != nil {
 		glog.Warningf("failed to get azure instance id")
-		return "", fmt.Errorf("failed to get azure instance id for node %q", nodeName)
+		return "", fmt.Errorf("failed to get azure instance id for node %q", node.Name)
 	}
 	if ind := strings.LastIndex(instanceid, "/"); ind >= 0 {
 		instanceid = instanceid[(ind + 1):]
 	}
 
-	lun, err := attacher.azureProvider.GetDiskLun(volumeSource.DiskName, volumeSource.DataDiskURI, nodeName)
+	lun, err := attacher.azureProvider.GetDiskLun(volumeSource.DiskName, volumeSource.DataDiskURI, node.Name)
 	if err == cloudprovider.InstanceNotFound {
 		// Log error and continue with attach
 		glog.Warningf(
@@ -97,15 +97,15 @@ func (attacher *azureDiskAttacher) Attach(spec *volume.Spec, nodeName types.Node
 		getLunMutex.LockKey(instanceid)
 		defer getLunMutex.UnlockKey(instanceid)
 
-		lun, err = attacher.azureProvider.GetNextDiskLun(nodeName)
+		lun, err = attacher.azureProvider.GetNextDiskLun(node.Name)
 		if err != nil {
-			glog.Warningf("no LUN available for instance %q", nodeName)
+			glog.Warningf("no LUN available for instance %q", node.Name)
 			return "", fmt.Errorf("all LUNs are used, cannot attach volume %q to instance %q", volumeSource.DiskName, instanceid)
 		}
 
-		err = attacher.azureProvider.AttachDisk(volumeSource.DiskName, volumeSource.DataDiskURI, nodeName, lun, compute.CachingTypes(*volumeSource.CachingMode))
+		err = attacher.azureProvider.AttachDisk(volumeSource.DiskName, volumeSource.DataDiskURI, node.Name, lun, compute.CachingTypes(*volumeSource.CachingMode))
 		if err == nil {
-			glog.V(4).Infof("Attach operation successful: volume %q attached to node %q.", volumeSource.DataDiskURI, nodeName)
+			glog.V(4).Infof("Attach operation successful: volume %q attached to node %q.", volumeSource.DataDiskURI, node.Name)
 		} else {
 			glog.V(2).Infof("Attach volume %q to instance %q failed with %v", volumeSource.DataDiskURI, instanceid, err)
 			return "", fmt.Errorf("Attach volume %q to instance %q failed with %v", volumeSource.DiskName, instanceid, err)
@@ -115,7 +115,7 @@ func (attacher *azureDiskAttacher) Attach(spec *volume.Spec, nodeName types.Node
 	return strconv.Itoa(int(lun)), err
 }
 
-func (attacher *azureDiskAttacher) VolumesAreAttached(specs []*volume.Spec, nodeName types.NodeName) (map[*volume.Spec]bool, error) {
+func (attacher *azureDiskAttacher) VolumesAreAttached(specs []*volume.Spec, node types.NodeIdentifier) (map[*volume.Spec]bool, error) {
 	volumesAttachedCheck := make(map[*volume.Spec]bool)
 	volumeSpecMap := make(map[string]*volume.Spec)
 	volumeIDList := []string{}
@@ -130,12 +130,12 @@ func (attacher *azureDiskAttacher) VolumesAreAttached(specs []*volume.Spec, node
 		volumesAttachedCheck[spec] = true
 		volumeSpecMap[volumeSource.DiskName] = spec
 	}
-	attachedResult, err := attacher.azureProvider.DisksAreAttached(volumeIDList, nodeName)
+	attachedResult, err := attacher.azureProvider.DisksAreAttached(volumeIDList, node.Name)
 	if err != nil {
 		// Log error and continue with attach
 		glog.Errorf(
 			"Error checking if volumes (%v) are attached to current node (%q). err=%v",
-			volumeIDList, nodeName, err)
+			volumeIDList, node.Name, err)
 		return volumesAttachedCheck, err
 	}
 
@@ -248,21 +248,21 @@ func (plugin *azureDataDiskPlugin) NewDetacher() (volume.Detacher, error) {
 }
 
 // Detach detaches disk from Azure VM.
-func (detacher *azureDiskDetacher) Detach(diskName string, nodeName types.NodeName) error {
+func (detacher *azureDiskDetacher) Detach(diskName string, node types.NodeIdentifier) error {
 	if diskName == "" {
 		return fmt.Errorf("invalid disk to detach: %q", diskName)
 	}
-	instanceid, err := detacher.azureProvider.InstanceID(nodeName)
+	instanceid, err := detacher.azureProvider.InstanceID(node.Name)
 	if err != nil {
-		glog.Warningf("no instance id for node %q, skip detaching", nodeName)
+		glog.Warningf("no instance id for node %q, skip detaching", node.Name)
 		return nil
 	}
 	if ind := strings.LastIndex(instanceid, "/"); ind >= 0 {
 		instanceid = instanceid[(ind + 1):]
 	}
 
-	glog.V(4).Infof("detach %v from node %q", diskName, nodeName)
-	err = detacher.azureProvider.DetachDiskByName(diskName, "" /* diskURI */, nodeName)
+	glog.V(4).Infof("detach %v from node %q", diskName, node.Name)
+	err = detacher.azureProvider.DetachDiskByName(diskName, "" /* diskURI */, node.Name)
 	if err != nil {
 		glog.Errorf("failed to detach azure disk %q, err %v", diskName, err)
 	}

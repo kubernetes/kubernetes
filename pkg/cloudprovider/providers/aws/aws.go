@@ -305,14 +305,14 @@ type VolumeOptions struct {
 // Volumes is an interface for managing cloud-provisioned volumes
 // TODO: Allow other clouds to implement this
 type Volumes interface {
-	// Attach the disk to the node with the specified NodeName
-	// nodeName can be empty to mean "the instance on which we are running"
+	// Attach the disk to the node with the specified NodeIdentifier
+	// node can be empty to mean "the instance on which we are running"
 	// Returns the device (e.g. /dev/xvdf) where we attached the volume
-	AttachDisk(diskName KubernetesVolumeID, nodeName types.NodeName, readOnly bool) (string, error)
-	// Detach the disk from the node with the specified NodeName
-	// nodeName can be empty to mean "the instance on which we are running"
+	AttachDisk(diskName KubernetesVolumeID, node types.NodeIdentifier, readOnly bool) (string, error)
+	// Detach the disk from the node with the specified NodeIdentifier
+	// node can be empty to mean "the instance on which we are running"
 	// Returns the device where the volume was attached
-	DetachDisk(diskName KubernetesVolumeID, nodeName types.NodeName) (string, error)
+	DetachDisk(diskName KubernetesVolumeID, node types.NodeIdentifier) (string, error)
 
 	// Create a volume with the specified options
 	CreateDisk(volumeOptions *VolumeOptions) (volumeName KubernetesVolumeID, err error)
@@ -328,11 +328,11 @@ type Volumes interface {
 	// return the device path where the volume is attached
 	GetDiskPath(volumeName KubernetesVolumeID) (string, error)
 
-	// Check if the volume is already attached to the node with the specified NodeName
-	DiskIsAttached(diskName KubernetesVolumeID, nodeName types.NodeName) (bool, error)
+	// Check if the volume is already attached to the node with the specified NodeIdentifier
+	DiskIsAttached(diskName KubernetesVolumeID, node types.NodeIdentifier) (bool, error)
 
-	// Check if a list of volumes are attached to the node with the specified NodeName
-	DisksAreAttached(diskNames []KubernetesVolumeID, nodeName types.NodeName) (map[KubernetesVolumeID]bool, error)
+	// Check if a list of volumes are attached to the node with the specified NodeIdentifier
+	DisksAreAttached(diskNames []KubernetesVolumeID, node types.NodeIdentifier) (map[KubernetesVolumeID]bool, error)
 }
 
 // InstanceGroups is an interface for managing cloud-managed instance groups / autoscaling instance groups
@@ -1435,15 +1435,15 @@ func (c *Cloud) getAwsInstance(nodeName types.NodeName) (*awsInstance, error) {
 }
 
 // AttachDisk implements Volumes.AttachDisk
-func (c *Cloud) AttachDisk(diskName KubernetesVolumeID, nodeName types.NodeName, readOnly bool) (string, error) {
+func (c *Cloud) AttachDisk(diskName KubernetesVolumeID, node types.NodeIdentifier, readOnly bool) (string, error) {
 	disk, err := newAWSDisk(c, diskName)
 	if err != nil {
 		return "", err
 	}
 
-	awsInstance, err := c.getAwsInstance(nodeName)
+	awsInstance, err := c.getAwsInstance(node.Name)
 	if err != nil {
-		return "", fmt.Errorf("error finding instance %s: %v", nodeName, err)
+		return "", fmt.Errorf("error finding instance %s: %v", node, err)
 	}
 
 	if readOnly {
@@ -1509,32 +1509,32 @@ func (c *Cloud) AttachDisk(diskName KubernetesVolumeID, nodeName types.NodeName,
 	// which could theoretically be against a different device (or even instance).
 	if attachment == nil {
 		// Impossible?
-		return "", fmt.Errorf("unexpected state: attachment nil after attached %q to %q", diskName, nodeName)
+		return "", fmt.Errorf("unexpected state: attachment nil after attached %q to %q", diskName, node)
 	}
 	if ec2Device != aws.StringValue(attachment.Device) {
-		return "", fmt.Errorf("disk attachment of %q to %q failed: requested device %q but found %q", diskName, nodeName, ec2Device, aws.StringValue(attachment.Device))
+		return "", fmt.Errorf("disk attachment of %q to %q failed: requested device %q but found %q", diskName, node, ec2Device, aws.StringValue(attachment.Device))
 	}
 	if awsInstance.awsID != aws.StringValue(attachment.InstanceId) {
-		return "", fmt.Errorf("disk attachment of %q to %q failed: requested instance %q but found %q", diskName, nodeName, awsInstance.awsID, aws.StringValue(attachment.InstanceId))
+		return "", fmt.Errorf("disk attachment of %q to %q failed: requested instance %q but found %q", diskName, node, awsInstance.awsID, aws.StringValue(attachment.InstanceId))
 	}
 
 	return hostDevice, nil
 }
 
 // DetachDisk implements Volumes.DetachDisk
-func (c *Cloud) DetachDisk(diskName KubernetesVolumeID, nodeName types.NodeName) (string, error) {
+func (c *Cloud) DetachDisk(diskName KubernetesVolumeID, node types.NodeIdentifier) (string, error) {
 	disk, err := newAWSDisk(c, diskName)
 	if err != nil {
 		return "", err
 	}
 
-	awsInstance, err := c.getAwsInstance(nodeName)
+	awsInstance, err := c.getAwsInstance(node.Name)
 	if err != nil {
 		if err == cloudprovider.InstanceNotFound {
 			// If instance no longer exists, safe to assume volume is not attached.
 			glog.Warningf(
 				"Instance %q does not exist. DetachDisk will assume disk %q is not attached to it.",
-				nodeName,
+				node,
 				diskName)
 			return "", nil
 		}
@@ -1725,14 +1725,14 @@ func (c *Cloud) GetDiskPath(volumeName KubernetesVolumeID) (string, error) {
 }
 
 // DiskIsAttached implements Volumes.DiskIsAttached
-func (c *Cloud) DiskIsAttached(diskName KubernetesVolumeID, nodeName types.NodeName) (bool, error) {
-	awsInstance, err := c.getAwsInstance(nodeName)
+func (c *Cloud) DiskIsAttached(diskName KubernetesVolumeID, node types.NodeIdentifier) (bool, error) {
+	awsInstance, err := c.getAwsInstance(node.Name)
 	if err != nil {
 		if err == cloudprovider.InstanceNotFound {
 			// If instance no longer exists, safe to assume volume is not attached.
 			glog.Warningf(
 				"Instance %q does not exist. DiskIsAttached will assume disk %q is not attached to it.",
-				nodeName,
+				node,
 				diskName)
 			return false, nil
 		}
@@ -1758,7 +1758,7 @@ func (c *Cloud) DiskIsAttached(diskName KubernetesVolumeID, nodeName types.NodeN
 	return false, nil
 }
 
-func (c *Cloud) DisksAreAttached(diskNames []KubernetesVolumeID, nodeName types.NodeName) (map[KubernetesVolumeID]bool, error) {
+func (c *Cloud) DisksAreAttached(diskNames []KubernetesVolumeID, node types.NodeIdentifier) (map[KubernetesVolumeID]bool, error) {
 	idToDiskName := make(map[awsVolumeID]KubernetesVolumeID)
 	attached := make(map[KubernetesVolumeID]bool)
 	for _, diskName := range diskNames {
@@ -1769,13 +1769,13 @@ func (c *Cloud) DisksAreAttached(diskNames []KubernetesVolumeID, nodeName types.
 		idToDiskName[volumeID] = diskName
 		attached[diskName] = false
 	}
-	awsInstance, err := c.getAwsInstance(nodeName)
+	awsInstance, err := c.getAwsInstance(node.Name)
 	if err != nil {
 		if err == cloudprovider.InstanceNotFound {
 			// If instance no longer exists, safe to assume volume is not attached.
 			glog.Warningf(
 				"Node %q does not exist. DisksAreAttached will assume disks %v are not attached to it.",
-				nodeName,
+				node,
 				diskNames)
 			return attached, nil
 		}
