@@ -27,6 +27,7 @@ cmd/kube-proxy
 cmd/kubeadm
 cmd/kubeadm
 cmd/kubeadm/app/apis/kubeadm/install
+cmd/kubeadm/app/phases/apiconfig
 cmd/kubectl
 cmd/kubelet
 cmd/libs/go2idl/client-gen
