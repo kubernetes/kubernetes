@@ -20,8 +20,8 @@ package internalversion
 
 import (
 	"k8s.io/apimachinery/pkg/api/errors"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	api "k8s.io/kubernetes/pkg/api"
 	authentication "k8s.io/kubernetes/pkg/apis/authentication"
 	"k8s.io/kubernetes/pkg/client/cache"
 )
@@ -55,7 +55,7 @@ func (s *tokenReviewLister) List(selector labels.Selector) (ret []*authenticatio
 
 // Get retrieves the TokenReview from the index for a given name.
 func (s *tokenReviewLister) Get(name string) (*authentication.TokenReview, error) {
-	key := &authentication.TokenReview{ObjectMeta: api.ObjectMeta{Name: name}}
+	key := &authentication.TokenReview{ObjectMeta: v1.ObjectMeta{Name: name}}
 	obj, exists, err := s.indexer.Get(key)
 	if err != nil {
 		return nil, err

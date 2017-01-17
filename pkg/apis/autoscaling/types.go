@@ -18,7 +18,6 @@ package autoscaling
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/api"
 )
 
 // Scale represents a scaling request for a resource.
@@ -26,7 +25,7 @@ type Scale struct {
 	metav1.TypeMeta
 	// Standard object metadata; More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata.
 	// +optional
-	api.ObjectMeta
+	metav1.ObjectMeta
 
 	// defines the behavior of the scale. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status.
 	// +optional
@@ -113,7 +112,7 @@ type HorizontalPodAutoscalerStatus struct {
 type HorizontalPodAutoscaler struct {
 	metav1.TypeMeta
 	// +optional
-	api.ObjectMeta
+	metav1.ObjectMeta
 
 	// behaviour of autoscaler. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status.
 	// +optional

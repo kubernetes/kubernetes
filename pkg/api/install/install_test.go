@@ -28,7 +28,7 @@ import (
 )
 
 func TestResourceVersioner(t *testing.T) {
-	pod := internal.Pod{ObjectMeta: internal.ObjectMeta{ResourceVersion: "10"}}
+	pod := internal.Pod{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "10"}}
 	version, err := accessor.ResourceVersion(&pod)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -106,7 +106,7 @@ func TestRESTMapper(t *testing.T) {
 			t.Errorf("unexpected: %#v, expected: %#v", mapping, interfaces)
 		}
 
-		rc := &internal.ReplicationController{ObjectMeta: internal.ObjectMeta{Name: "foo"}}
+		rc := &internal.ReplicationController{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}
 		name, err := mapping.MetadataAccessor.Name(rc)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)

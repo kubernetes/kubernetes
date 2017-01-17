@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"time"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
 
@@ -45,7 +46,7 @@ var _ = framework.KubeDescribe("InodeEviction [Slow] [Serial] [Disruptive] [Flak
 		{
 			evictionPriority: 1, // This pod should be evicted before the normal memory usage pod
 			pod: v1.Pod{
-				ObjectMeta: v1.ObjectMeta{Name: "container-inode-hog-pod"},
+				ObjectMeta: metav1.ObjectMeta{Name: "container-inode-hog-pod"},
 				Spec: v1.PodSpec{
 					RestartPolicy: v1.RestartPolicyNever,
 					Containers: []v1.Container{
@@ -65,7 +66,7 @@ var _ = framework.KubeDescribe("InodeEviction [Slow] [Serial] [Disruptive] [Flak
 		{
 			evictionPriority: 1, // This pod should be evicted before the normal memory usage pod
 			pod: v1.Pod{
-				ObjectMeta: v1.ObjectMeta{Name: "volume-inode-hog-pod"},
+				ObjectMeta: metav1.ObjectMeta{Name: "volume-inode-hog-pod"},
 				Spec: v1.PodSpec{
 					RestartPolicy: v1.RestartPolicyNever,
 					Containers: []v1.Container{
@@ -91,7 +92,7 @@ var _ = framework.KubeDescribe("InodeEviction [Slow] [Serial] [Disruptive] [Flak
 		{
 			evictionPriority: 0, // This pod should never be evicted
 			pod: v1.Pod{
-				ObjectMeta: v1.ObjectMeta{Name: "normal-memory-usage-pod"},
+				ObjectMeta: metav1.ObjectMeta{Name: "normal-memory-usage-pod"},
 				Spec: v1.PodSpec{
 					RestartPolicy: v1.RestartPolicyNever,
 					Containers: []v1.Container{
@@ -250,7 +251,7 @@ func runEvictionTest(f *framework.Framework, testCondition string, podTestSpecs 
 			By("making sure we can start a new pod after the test")
 			podName := "test-admit-pod"
 			f.PodClient().CreateSync(&v1.Pod{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name: podName,
 				},
 				Spec: v1.PodSpec{

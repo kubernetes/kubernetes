@@ -22,6 +22,7 @@ import (
 	"testing"
 
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
@@ -69,7 +70,7 @@ func TestIgnoresNonPodObject(t *testing.T) {
 
 func TestIgnoresMirrorPod(t *testing.T) {
 	pod := &api.Pod{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Annotations: map[string]string{
 				kubelet.ConfigMirrorAnnotationKey: "true",
 			},
@@ -89,7 +90,7 @@ func TestIgnoresMirrorPod(t *testing.T) {
 
 func TestRejectsMirrorPodWithServiceAccount(t *testing.T) {
 	pod := &api.Pod{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Annotations: map[string]string{
 				kubelet.ConfigMirrorAnnotationKey: "true",
 			},
@@ -107,7 +108,7 @@ func TestRejectsMirrorPodWithServiceAccount(t *testing.T) {
 
 func TestRejectsMirrorPodWithSecretVolumes(t *testing.T) {
 	pod := &api.Pod{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Annotations: map[string]string{
 				kubelet.ConfigMirrorAnnotationKey: "true",
 			},
@@ -135,7 +136,7 @@ func TestAssignsDefaultServiceAccountAndToleratesMissingAPIToken(t *testing.T) {
 
 	// Add the default service account for the ns into the cache
 	admit.serviceAccounts.Add(&api.ServiceAccount{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      DefaultServiceAccountName,
 			Namespace: ns,
 		},
@@ -162,7 +163,7 @@ func TestAssignsDefaultServiceAccountAndRejectsMissingAPIToken(t *testing.T) {
 
 	// Add the default service account for the ns into the cache
 	admit.serviceAccounts.Add(&api.ServiceAccount{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      DefaultServiceAccountName,
 			Namespace: ns,
 		},
@@ -181,7 +182,7 @@ func TestFetchesUncachedServiceAccount(t *testing.T) {
 
 	// Build a test client that the admission plugin can use to look up the service account missing from its cache
 	client := fake.NewSimpleClientset(&api.ServiceAccount{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      DefaultServiceAccountName,
 			Namespace: ns,
 		},
@@ -245,7 +246,7 @@ func TestAutomountsAPIToken(t *testing.T) {
 
 	// Add the default service account for the ns with a token into the cache
 	admit.serviceAccounts.Add(&api.ServiceAccount{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      serviceAccountName,
 			Namespace: ns,
 			UID:       types.UID(serviceAccountUID),
@@ -256,7 +257,7 @@ func TestAutomountsAPIToken(t *testing.T) {
 	})
 	// Add a token for the service account into the cache
 	admit.secrets.Add(&api.Secret{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      tokenName,
 			Namespace: ns,
 			Annotations: map[string]string{
@@ -345,7 +346,7 @@ func TestRespectsExistingMount(t *testing.T) {
 
 	// Add the default service account for the ns with a token into the cache
 	admit.serviceAccounts.Add(&api.ServiceAccount{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      serviceAccountName,
 			Namespace: ns,
 			UID:       types.UID(serviceAccountUID),
@@ -356,7 +357,7 @@ func TestRespectsExistingMount(t *testing.T) {
 	})
 	// Add a token for the service account into the cache
 	admit.secrets.Add(&api.Secret{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      tokenName,
 			Namespace: ns,
 			Annotations: map[string]string{
@@ -442,7 +443,7 @@ func TestAllowsReferencedSecret(t *testing.T) {
 
 	// Add the default service account for the ns with a secret reference into the cache
 	admit.serviceAccounts.Add(&api.ServiceAccount{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      DefaultServiceAccountName,
 			Namespace: ns,
 		},
@@ -522,7 +523,7 @@ func TestRejectsUnreferencedSecretVolumes(t *testing.T) {
 
 	// Add the default service account for the ns into the cache
 	admit.serviceAccounts.Add(&api.ServiceAccount{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      DefaultServiceAccountName,
 			Namespace: ns,
 		},
@@ -599,7 +600,7 @@ func TestAllowUnreferencedSecretVolumesForPermissiveSAs(t *testing.T) {
 
 	// Add the default service account for the ns into the cache
 	admit.serviceAccounts.Add(&api.ServiceAccount{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:        DefaultServiceAccountName,
 			Namespace:   ns,
 			Annotations: map[string]string{EnforceMountableSecretsAnnotation: "true"},
@@ -630,7 +631,7 @@ func TestAllowsReferencedImagePullSecrets(t *testing.T) {
 
 	// Add the default service account for the ns with a secret reference into the cache
 	admit.serviceAccounts.Add(&api.ServiceAccount{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      DefaultServiceAccountName,
 			Namespace: ns,
 		},
@@ -661,7 +662,7 @@ func TestRejectsUnreferencedImagePullSecrets(t *testing.T) {
 
 	// Add the default service account for the ns into the cache
 	admit.serviceAccounts.Add(&api.ServiceAccount{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      DefaultServiceAccountName,
 			Namespace: ns,
 		},
@@ -689,7 +690,7 @@ func TestDoNotAddImagePullSecrets(t *testing.T) {
 
 	// Add the default service account for the ns with a secret reference into the cache
 	admit.serviceAccounts.Add(&api.ServiceAccount{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      DefaultServiceAccountName,
 			Namespace: ns,
 		},
@@ -724,7 +725,7 @@ func TestAddImagePullSecrets(t *testing.T) {
 	admit.RequireAPIToken = false
 
 	sa := &api.ServiceAccount{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      DefaultServiceAccountName,
 			Namespace: ns,
 		},

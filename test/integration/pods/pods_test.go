@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"testing"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
@@ -48,7 +49,7 @@ func TestPodUpdateActiveDeadlineSeconds(t *testing.T) {
 
 	prototypePod := func() *v1.Pod {
 		return &v1.Pod{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name: "xxx",
 			},
 			Spec: v1.PodSpec{
@@ -158,7 +159,7 @@ func TestPodReadOnlyFilesystem(t *testing.T) {
 	client := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(v1.GroupName).GroupVersion}})
 
 	pod := &v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: "xxx",
 		},
 		Spec: v1.PodSpec{

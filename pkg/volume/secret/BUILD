@@ -42,6 +42,7 @@ go_test(
         "//pkg/volume/testing:go_default_library",
         "//pkg/volume/util:go_default_library",
         "//vendor:github.com/stretchr/testify/assert",
+        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/types",
     ],
 )

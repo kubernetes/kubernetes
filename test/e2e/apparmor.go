@@ -19,6 +19,7 @@ package e2e
 import (
 	"fmt"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	api "k8s.io/kubernetes/pkg/api/v1"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/security/apparmor"
@@ -52,7 +53,7 @@ elif ! touch %[2]s; then
   exit 2
 fi`, deniedPath, allowedPath)
 		pod := &api.Pod{
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name: "test-apparmor",
 				Annotations: map[string]string{
 					apparmor.ContainerAnnotationKeyPrefix + "test": profile,
@@ -99,7 +100,7 @@ profile %s flags=(attach_disconnected) {
 `, profileName, deniedPath, allowedPath)
 
 	cm := &api.ConfigMap{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      "apparmor-profiles",
 			Namespace: f.Namespace.Name,
 		},
@@ -114,13 +115,13 @@ func createAppArmorProfileLoader(f *framework.Framework) (*extensions.DaemonSet,
 	True := true
 	// Copied from https://github.com/kubernetes/contrib/blob/master/apparmor/loader/example-configmap.yaml
 	loader := &extensions.DaemonSet{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      "apparmor-loader",
 			Namespace: f.Namespace.Name,
 		},
 		Spec: extensions.DaemonSetSpec{
 			Template: api.PodTemplateSpec{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{"name": "apparmor-loader"},
 				},
 				Spec: api.PodSpec{

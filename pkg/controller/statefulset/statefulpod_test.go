@@ -21,6 +21,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
@@ -88,7 +89,7 @@ func TestUpdatePetWithoutRetry(t *testing.T) {
 	}
 
 	for k, tc := range testCases {
-		body := runtime.EncodeOrDie(testapi.Default.Codec(), &v1.Pod{ObjectMeta: v1.ObjectMeta{Name: "empty_pod"}})
+		body := runtime.EncodeOrDie(testapi.Default.Codec(), &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "empty_pod"}})
 		fakeHandler := utiltesting.FakeHandler{
 			StatusCode:   200,
 			ResponseBody: string(body),

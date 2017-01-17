@@ -19,7 +19,10 @@ go_test(
     srcs = ["system_utils_test.go"],
     library = ":go_default_library",
     tags = ["automanaged"],
-    deps = ["//pkg/api/v1:go_default_library"],
+    deps = [
+        "//pkg/api/v1:go_default_library",
+        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+    ],
 )
 
 filegroup(

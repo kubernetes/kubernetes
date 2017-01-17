@@ -48,7 +48,6 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	"k8s.io/kubernetes/pkg/api/v1"
-	apiv1 "k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/fields"
 	genericapifilters "k8s.io/kubernetes/pkg/genericapiserver/api/filters"
 	"k8s.io/kubernetes/pkg/genericapiserver/api/handlers/responsewriters"
@@ -314,7 +313,7 @@ func handleInternal(storage map[string]rest.Storage, admissionControl admission.
 }
 
 func TestSimpleSetupRight(t *testing.T) {
-	s := &genericapitesting.Simple{ObjectMeta: apiv1.ObjectMeta{Name: "aName"}}
+	s := &genericapitesting.Simple{ObjectMeta: metav1.ObjectMeta{Name: "aName"}}
 	wire, err := runtime.Encode(codec, s)
 	if err != nil {
 		t.Fatal(err)
@@ -467,7 +466,7 @@ func (storage *SimpleRESTStorage) Delete(ctx request.Context, id string, options
 	var obj runtime.Object = &metav1.Status{Status: metav1.StatusSuccess}
 	var err error
 	if storage.injectedFunction != nil {
-		obj, err = storage.injectedFunction(&genericapitesting.Simple{ObjectMeta: apiv1.ObjectMeta{Name: id}})
+		obj, err = storage.injectedFunction(&genericapitesting.Simple{ObjectMeta: metav1.ObjectMeta{Name: id}})
 	}
 	return obj, err
 }
@@ -1116,7 +1115,7 @@ func TestNonEmptyList(t *testing.T) {
 	simpleStorage := SimpleRESTStorage{
 		list: []genericapitesting.Simple{
 			{
-				ObjectMeta: apiv1.ObjectMeta{Name: "something", Namespace: "other"},
+				ObjectMeta: metav1.ObjectMeta{Name: "something", Namespace: "other"},
 				Other:      "foo",
 			},
 		},
@@ -1167,7 +1166,7 @@ func TestSelfLinkSkipsEmptyName(t *testing.T) {
 	simpleStorage := SimpleRESTStorage{
 		list: []genericapitesting.Simple{
 			{
-				ObjectMeta: apiv1.ObjectMeta{Namespace: "other"},
+				ObjectMeta: metav1.ObjectMeta{Namespace: "other"},
 				Other:      "foo",
 			},
 		},
@@ -1241,7 +1240,7 @@ func TestExport(t *testing.T) {
 	storage := map[string]rest.Storage{}
 	simpleStorage := SimpleRESTStorage{
 		item: genericapitesting.Simple{
-			ObjectMeta: apiv1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				ResourceVersion:   "1234",
 				CreationTimestamp: metav1.NewTime(time.Unix(10, 10)),
 			},
@@ -2174,7 +2173,7 @@ func TestPatch(t *testing.T) {
 	storage := map[string]rest.Storage{}
 	ID := "id"
 	item := &genericapitesting.Simple{
-		ObjectMeta: apiv1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      ID,
 			Namespace: "", // update should allow the client to send an empty namespace
 			UID:       "uid",
@@ -2213,7 +2212,7 @@ func TestPatchRequiresMatchingName(t *testing.T) {
 	storage := map[string]rest.Storage{}
 	ID := "id"
 	item := &genericapitesting.Simple{
-		ObjectMeta: apiv1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      ID,
 			Namespace: "", // update should allow the client to send an empty namespace
 			UID:       "uid",
@@ -2254,7 +2253,7 @@ func TestUpdate(t *testing.T) {
 	defer server.Close()
 
 	item := &genericapitesting.Simple{
-		ObjectMeta: apiv1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      ID,
 			Namespace: "", // update should allow the client to send an empty namespace
 		},
@@ -2291,7 +2290,7 @@ func TestUpdateInvokesAdmissionControl(t *testing.T) {
 	defer server.Close()
 
 	item := &genericapitesting.Simple{
-		ObjectMeta: apiv1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      ID,
 			Namespace: api.NamespaceDefault,
 		},
@@ -2353,7 +2352,7 @@ func TestUpdateAllowsMissingNamespace(t *testing.T) {
 	defer server.Close()
 
 	item := &genericapitesting.Simple{
-		ObjectMeta: apiv1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: ID,
 		},
 		Other: "bar",
@@ -2390,7 +2389,7 @@ func TestUpdateAllowsMismatchedNamespaceOnError(t *testing.T) {
 	defer server.Close()
 
 	item := &genericapitesting.Simple{
-		ObjectMeta: apiv1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      ID,
 			Namespace: "other", // does not match request
 		},
@@ -2427,7 +2426,7 @@ func TestUpdatePreventsMismatchedNamespace(t *testing.T) {
 	defer server.Close()
 
 	item := &genericapitesting.Simple{
-		ObjectMeta: apiv1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      ID,
 			Namespace: "other",
 		},
@@ -2462,7 +2461,7 @@ func TestUpdateMissing(t *testing.T) {
 	defer server.Close()
 
 	item := &genericapitesting.Simple{
-		ObjectMeta: apiv1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      ID,
 			Namespace: api.NamespaceDefault,
 		},
@@ -3211,7 +3210,7 @@ func TestUpdateChecksAPIVersion(t *testing.T) {
 	defer server.Close()
 	client := http.Client{}
 
-	simple := &genericapitesting.Simple{ObjectMeta: apiv1.ObjectMeta{Name: "bar"}}
+	simple := &genericapitesting.Simple{ObjectMeta: metav1.ObjectMeta{Name: "bar"}}
 	data, err := runtime.Encode(newCodec, simple)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -3238,10 +3237,10 @@ func TestUpdateChecksAPIVersion(t *testing.T) {
 // SimpleXGSubresource is a cross group subresource, i.e. the subresource does not belong to the
 // same group as its parent resource.
 type SimpleXGSubresource struct {
-	metav1.TypeMeta `json:",inline"`
-	api.ObjectMeta  `json:"metadata"`
-	SubresourceInfo string            `json:"subresourceInfo,omitempty"`
-	Labels          map[string]string `json:"labels,omitempty"`
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata"`
+	SubresourceInfo   string            `json:"subresourceInfo,omitempty"`
+	Labels            map[string]string `json:"labels,omitempty"`
 }
 
 func (obj *SimpleXGSubresource) GetObjectKind() schema.ObjectKind { return &obj.TypeMeta }

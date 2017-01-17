@@ -26,6 +26,7 @@ import (
 	"github.com/golang/glog"
 	"github.com/spf13/cobra"
 	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
@@ -131,7 +132,7 @@ func deleteTaint(taints []api.Taint, taintToDelete api.Taint) ([]api.Taint, erro
 
 // reorganizeTaints returns the updated set of taints, taking into account old taints that were not updated,
 // old taints that were updated, old taints that were deleted, and new taints.
-func reorganizeTaints(accessor meta.Object, overwrite bool, taintsToAdd []api.Taint, taintsToRemove []api.Taint) ([]api.Taint, error) {
+func reorganizeTaints(accessor metav1.Object, overwrite bool, taintsToAdd []api.Taint, taintsToRemove []api.Taint) ([]api.Taint, error) {
 	newTaints := append([]api.Taint{}, taintsToAdd...)
 
 	var oldTaints []api.Taint
@@ -362,7 +363,7 @@ func (o TaintOptions) RunTaint() error {
 }
 
 // validateNoTaintOverwrites validates that when overwrite is false, to-be-updated taints don't exist in the node taint list (yet)
-func validateNoTaintOverwrites(accessor meta.Object, taints []api.Taint) error {
+func validateNoTaintOverwrites(accessor metav1.Object, taints []api.Taint) error {
 	annotations := accessor.GetAnnotations()
 	if annotations == nil {
 		return nil

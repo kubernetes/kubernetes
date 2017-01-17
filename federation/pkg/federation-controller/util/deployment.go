@@ -19,7 +19,7 @@ package util
 import (
 	"reflect"
 
-	api_v1 "k8s.io/kubernetes/pkg/api/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	extensions_v1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	deputils "k8s.io/kubernetes/pkg/controller/deployment/util"
 )
@@ -60,7 +60,7 @@ func DeploymentEquivalent(a, b *extensions_v1.Deployment) bool {
 }
 
 // Copies object meta for Deployment, skipping revision information.
-func DeepCopyDeploymentObjectMeta(meta api_v1.ObjectMeta) api_v1.ObjectMeta {
+func DeepCopyDeploymentObjectMeta(meta metav1.ObjectMeta) metav1.ObjectMeta {
 	meta = DeepCopyRelevantObjectMeta(meta)
 	delete(meta.Annotations, deputils.RevisionAnnotation)
 	return meta

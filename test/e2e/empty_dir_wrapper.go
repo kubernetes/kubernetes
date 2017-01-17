@@ -17,6 +17,7 @@ limitations under the License.
 package e2e
 
 import (
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/util/intstr"
@@ -58,7 +59,7 @@ var _ = framework.KubeDescribe("EmptyDir wrapper volumes", func() {
 		volumeMountPath := "/etc/secret-volume"
 
 		secret := &v1.Secret{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Namespace: f.Namespace.Name,
 				Name:      name,
 			},
@@ -78,7 +79,7 @@ var _ = framework.KubeDescribe("EmptyDir wrapper volumes", func() {
 		defer gitCleanup()
 
 		pod := &v1.Pod{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name: "pod-secrets-" + string(uuid.NewUUID()),
 			},
 			Spec: v1.PodSpec{
@@ -178,7 +179,7 @@ func createGitServer(f *framework.Framework) (gitURL string, gitRepo string, cle
 	labels := map[string]string{"name": gitServerPodName}
 
 	gitServerPod := &v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:   gitServerPodName,
 			Labels: labels,
 		},
@@ -201,7 +202,7 @@ func createGitServer(f *framework.Framework) (gitURL string, gitRepo string, cle
 	httpPort := 2345
 
 	gitServerSvc := &v1.Service{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: "git-server-svc",
 		},
 		Spec: v1.ServiceSpec{
@@ -258,7 +259,7 @@ func createConfigmapsForRace(f *framework.Framework) (configMapNames []string) {
 		configMapName := fmt.Sprintf("racey-configmap-%d", i)
 		configMapNames = append(configMapNames, configMapName)
 		configMap := &v1.ConfigMap{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Namespace: f.Namespace.Name,
 				Name:      configMapName,
 			},
@@ -333,7 +334,7 @@ func testNoWrappedVolumeRace(f *framework.Framework, volumes []v1.Volume, volume
 	}
 
 	rc := &v1.ReplicationController{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: rcName,
 		},
 		Spec: v1.ReplicationControllerSpec{
@@ -342,7 +343,7 @@ func testNoWrappedVolumeRace(f *framework.Framework, volumes []v1.Volume, volume
 				"name": rcName,
 			},
 			Template: &v1.PodTemplateSpec{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{"name": rcName},
 				},
 				Spec: v1.PodSpec{

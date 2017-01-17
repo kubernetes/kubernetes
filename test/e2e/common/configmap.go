@@ -21,6 +21,7 @@ import (
 	"os"
 	"time"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -85,7 +86,7 @@ var _ = framework.KubeDescribe("ConfigMap", func() {
 		containerName := "configmap-volume-test"
 
 		configMap := &v1.ConfigMap{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Namespace: f.Namespace.Name,
 				Name:      name,
 			},
@@ -101,7 +102,7 @@ var _ = framework.KubeDescribe("ConfigMap", func() {
 		}
 
 		pod := &v1.Pod{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name: "pod-configmaps-" + string(uuid.NewUUID()),
 			},
 			Spec: v1.PodSpec{
@@ -163,7 +164,7 @@ var _ = framework.KubeDescribe("ConfigMap", func() {
 		}
 
 		pod := &v1.Pod{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name: "pod-configmaps-" + string(uuid.NewUUID()),
 			},
 			Spec: v1.PodSpec{
@@ -206,7 +207,7 @@ var _ = framework.KubeDescribe("ConfigMap", func() {
 		}
 
 		pod := &v1.Pod{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name: "pod-configmaps-" + string(uuid.NewUUID()),
 			},
 			Spec: v1.PodSpec{
@@ -253,7 +254,7 @@ var _ = framework.KubeDescribe("ConfigMap", func() {
 		}
 
 		pod := &v1.Pod{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name: "pod-configmaps-" + string(uuid.NewUUID()),
 			},
 			Spec: v1.PodSpec{
@@ -311,7 +312,7 @@ var _ = framework.KubeDescribe("ConfigMap", func() {
 
 func newConfigMap(f *framework.Framework, name string) *v1.ConfigMap {
 	return &v1.ConfigMap{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Namespace: f.Namespace.Name,
 			Name:      name,
 		},
@@ -325,7 +326,7 @@ func newConfigMap(f *framework.Framework, name string) *v1.ConfigMap {
 
 func newEnvFromConfigMap(f *framework.Framework, name string) *v1.ConfigMap {
 	return &v1.ConfigMap{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Namespace: f.Namespace.Name,
 			Name:      name,
 		},
@@ -352,7 +353,7 @@ func doConfigMapE2EWithoutMappings(f *framework.Framework, uid, fsGroup int64, d
 	}
 
 	pod := &v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: "pod-configmaps-" + string(uuid.NewUUID()),
 		},
 		Spec: v1.PodSpec{
@@ -426,7 +427,7 @@ func doConfigMapE2EWithMappings(f *framework.Framework, uid, fsGroup int64, item
 	}
 
 	pod := &v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: "pod-configmaps-" + string(uuid.NewUUID()),
 		},
 		Spec: v1.PodSpec{

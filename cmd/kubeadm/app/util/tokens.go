@@ -151,7 +151,7 @@ func UpdateOrCreateToken(client *clientset.Clientset, d *kubeadmapi.TokenDiscove
 		// Secret does not already exist:
 		if apierrors.IsNotFound(err) {
 			secret = &v1.Secret{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name: secretName,
 				},
 				Type: api.SecretTypeBootstrapToken,

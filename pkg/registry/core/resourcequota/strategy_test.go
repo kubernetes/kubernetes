@@ -19,6 +19,7 @@ package resourcequota
 import (
 	"testing"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	genericapirequest "k8s.io/apiserver/pkg/request"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
@@ -33,7 +34,7 @@ func TestResourceQuotaStrategy(t *testing.T) {
 		t.Errorf("ResourceQuota should not allow create on update")
 	}
 	resourceQuota := &api.ResourceQuota{
-		ObjectMeta: api.ObjectMeta{Name: "foo"},
+		ObjectMeta: metav1.ObjectMeta{Name: "foo"},
 		Status: api.ResourceQuotaStatus{
 			Used: api.ResourceList{
 				api.ResourceCPU:                    resource.MustParse("1"),

@@ -115,7 +115,7 @@ func (p *podNodeSelector) Admit(a admission.Attributes) error {
 	var namespace *api.Namespace
 
 	namespaceObj, exists, err := p.namespaceInformer.GetStore().Get(&api.Namespace{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      nsName,
 			Namespace: "",
 		},

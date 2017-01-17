@@ -19,17 +19,16 @@ package testing
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	apiv1 "k8s.io/kubernetes/pkg/api/v1"
 )
 
 type TestStruct struct {
 	metav1.TypeMeta `json:",inline"`
 	// +optional
-	apiv1.ObjectMeta `json:"metadata,omitempty"`
-	Key              string         `json:"Key"`
-	Map              map[string]int `json:"Map"`
-	StringList       []string       `json:"StringList"`
-	IntList          []int          `json:"IntList"`
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+	Key               string         `json:"Key"`
+	Map               map[string]int `json:"Map"`
+	StringList        []string       `json:"StringList"`
+	IntList           []int          `json:"IntList"`
 }
 
 func (obj *TestStruct) GetObjectKind() schema.ObjectKind { return &obj.TypeMeta }

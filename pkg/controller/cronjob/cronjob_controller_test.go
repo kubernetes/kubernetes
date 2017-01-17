@@ -83,7 +83,7 @@ func justAfterThePriorHour() time.Time {
 // returns a cronJob with some fields filled in.
 func cronJob() batch.CronJob {
 	return batch.CronJob{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:              "mycronjob",
 			Namespace:         "snazzycats",
 			UID:               types.UID("1a2b3c"),
@@ -94,7 +94,7 @@ func cronJob() batch.CronJob {
 			Schedule:          "* * * * ?",
 			ConcurrencyPolicy: batch.AllowConcurrent,
 			JobTemplate: batch.JobTemplateSpec{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Labels:      map[string]string{"a": "b"},
 					Annotations: map[string]string{"x": "y"},
 				},
@@ -110,7 +110,7 @@ func jobSpec() batch.JobSpec {
 		Parallelism: &one,
 		Completions: &one,
 		Template: v1.PodTemplateSpec{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Labels: map[string]string{
 					"foo": "bar",
 				},
@@ -126,7 +126,7 @@ func jobSpec() batch.JobSpec {
 
 func newJob(UID string) batch.Job {
 	return batch.Job{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			UID:       types.UID(UID),
 			Name:      "foobar",
 			Namespace: v1.NamespaceDefault,

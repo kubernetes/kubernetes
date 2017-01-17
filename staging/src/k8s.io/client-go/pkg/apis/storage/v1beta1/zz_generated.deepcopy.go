@@ -21,9 +21,9 @@ limitations under the License.
 package v1beta1
 
 import (
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
-	v1 "k8s.io/client-go/pkg/api/v1"
 	reflect "reflect"
 )
 
@@ -45,8 +45,10 @@ func DeepCopy_v1beta1_StorageClass(in interface{}, out interface{}, c *conversio
 		in := in.(*StorageClass)
 		out := out.(*StorageClass)
 		*out = *in
-		if err := v1.DeepCopy_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, c); err != nil {
+		if newVal, err := c.DeepCopy(&in.ObjectMeta); err != nil {
 			return err
+		} else {
+			out.ObjectMeta = *newVal.(*v1.ObjectMeta)
 		}
 		if in.Parameters != nil {
 			in, out := &in.Parameters, &out.Parameters

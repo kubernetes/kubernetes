@@ -21,9 +21,9 @@ import (
 	"time"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
-	legacyv1 "k8s.io/kubernetes/pkg/api/v1"
 	authorizationv1beta1 "k8s.io/kubernetes/pkg/apis/authorization/v1beta1"
 	rbacv1alpha1 "k8s.io/kubernetes/pkg/apis/rbac/v1alpha1"
 	v1beta1authorization "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/authorization/v1beta1"
@@ -73,7 +73,7 @@ func WaitForAuthorizationUpdate(c v1beta1authorization.SubjectAccessReviewsGette
 func BindClusterRole(c v1alpha1rbac.ClusterRoleBindingsGetter, clusterRole, ns string, subjects ...rbacv1alpha1.Subject) {
 	// Since the namespace names are unique, we can leave this lying around so we don't have to race any caches
 	_, err := c.ClusterRoleBindings().Create(&rbacv1alpha1.ClusterRoleBinding{
-		ObjectMeta: legacyv1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: ns + "--" + clusterRole,
 		},
 		RoleRef: rbacv1alpha1.RoleRef{
@@ -94,7 +94,7 @@ func BindClusterRole(c v1alpha1rbac.ClusterRoleBindingsGetter, clusterRole, ns s
 func BindClusterRoleInNamespace(c v1alpha1rbac.RoleBindingsGetter, clusterRole, ns string, subjects ...rbacv1alpha1.Subject) {
 	// Since the namespace names are unique, we can leave this lying around so we don't have to race any caches
 	_, err := c.RoleBindings(ns).Create(&rbacv1alpha1.RoleBinding{
-		ObjectMeta: legacyv1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: ns + "--" + clusterRole,
 		},
 		RoleRef: rbacv1alpha1.RoleRef{

@@ -53,7 +53,7 @@ func newStorage(t *testing.T) (*REST, *BindingREST, *StatusREST, *etcdtesting.Et
 func validNewPod() *api.Pod {
 	grace := int64(30)
 	return &api.Pod{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      "foo",
 			Namespace: api.NamespaceDefault,
 		},
@@ -91,7 +91,7 @@ func TestCreate(t *testing.T) {
 	defer storage.Store.DestroyFunc()
 	test := registrytest.New(t, storage.Store)
 	pod := validNewPod()
-	pod.ObjectMeta = api.ObjectMeta{}
+	pod.ObjectMeta = metav1.ObjectMeta{}
 	// Make an invalid pod with an an incorrect label.
 	invalidPod := validNewPod()
 	invalidPod.Namespace = test.TestNamespace()
@@ -243,7 +243,7 @@ func TestResourceLocation(t *testing.T) {
 	}{
 		{
 			pod: api.Pod{
-				ObjectMeta: api.ObjectMeta{Name: "foo"},
+				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
 				Status:     api.PodStatus{PodIP: expectedIP},
 			},
 			query:    "foo",
@@ -251,7 +251,7 @@ func TestResourceLocation(t *testing.T) {
 		},
 		{
 			pod: api.Pod{
-				ObjectMeta: api.ObjectMeta{Name: "foo"},
+				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
 				Status:     api.PodStatus{PodIP: expectedIP},
 			},
 			query:    "foo:12345",
@@ -259,7 +259,7 @@ func TestResourceLocation(t *testing.T) {
 		},
 		{
 			pod: api.Pod{
-				ObjectMeta: api.ObjectMeta{Name: "foo"},
+				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
 				Spec: api.PodSpec{
 					Containers: []api.Container{
 						{Name: "ctr"},
@@ -272,7 +272,7 @@ func TestResourceLocation(t *testing.T) {
 		},
 		{
 			pod: api.Pod{
-				ObjectMeta: api.ObjectMeta{Name: "foo"},
+				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
 				Spec: api.PodSpec{
 					Containers: []api.Container{
 						{Name: "ctr", Ports: []api.ContainerPort{{ContainerPort: 9376}}},
@@ -285,7 +285,7 @@ func TestResourceLocation(t *testing.T) {
 		},
 		{
 			pod: api.Pod{
-				ObjectMeta: api.ObjectMeta{Name: "foo"},
+				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
 				Spec: api.PodSpec{
 					Containers: []api.Container{
 						{Name: "ctr", Ports: []api.ContainerPort{{ContainerPort: 9376}}},
@@ -298,7 +298,7 @@ func TestResourceLocation(t *testing.T) {
 		},
 		{
 			pod: api.Pod{
-				ObjectMeta: api.ObjectMeta{Name: "foo"},
+				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
 				Spec: api.PodSpec{
 					Containers: []api.Container{
 						{Name: "ctr1"},
@@ -312,7 +312,7 @@ func TestResourceLocation(t *testing.T) {
 		},
 		{
 			pod: api.Pod{
-				ObjectMeta: api.ObjectMeta{Name: "foo"},
+				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
 				Spec: api.PodSpec{
 					Containers: []api.Container{
 						{Name: "ctr1", Ports: []api.ContainerPort{{ContainerPort: 9376}}},
@@ -405,7 +405,7 @@ func TestEtcdCreate(t *testing.T) {
 
 	// Suddenly, a wild scheduler appears:
 	_, err = bindingStorage.Create(ctx, &api.Binding{
-		ObjectMeta: api.ObjectMeta{Namespace: api.NamespaceDefault, Name: "foo"},
+		ObjectMeta: metav1.ObjectMeta{Namespace: api.NamespaceDefault, Name: "foo"},
 		Target:     api.ObjectReference{Name: "machine"},
 	})
 	if err != nil {
@@ -431,7 +431,7 @@ func TestEtcdCreateBindingNoPod(t *testing.T) {
 	// - Schedule (scheduler)
 	// - Delete (apiserver)
 	_, err := bindingStorage.Create(ctx, &api.Binding{
-		ObjectMeta: api.ObjectMeta{Namespace: api.NamespaceDefault, Name: "foo"},
+		ObjectMeta: metav1.ObjectMeta{Namespace: api.NamespaceDefault, Name: "foo"},
 		Target:     api.ObjectReference{Name: "machine"},
 	})
 	if err == nil {
@@ -475,7 +475,7 @@ func TestEtcdCreateWithContainersNotFound(t *testing.T) {
 
 	// Suddenly, a wild scheduler appears:
 	_, err = bindingStorage.Create(ctx, &api.Binding{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Namespace:   api.NamespaceDefault,
 			Name:        "foo",
 			Annotations: map[string]string{"label1": "value1"},
@@ -510,7 +510,7 @@ func TestEtcdCreateWithConflict(t *testing.T) {
 
 	// Suddenly, a wild scheduler appears:
 	binding := api.Binding{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Namespace:   api.NamespaceDefault,
 			Name:        "foo",
 			Annotations: map[string]string{"label1": "value1"},
@@ -540,7 +540,7 @@ func TestEtcdCreateWithExistingContainers(t *testing.T) {
 
 	// Suddenly, a wild scheduler appears:
 	_, err = bindingStorage.Create(ctx, &api.Binding{
-		ObjectMeta: api.ObjectMeta{Namespace: api.NamespaceDefault, Name: "foo"},
+		ObjectMeta: metav1.ObjectMeta{Namespace: api.NamespaceDefault, Name: "foo"},
 		Target:     api.ObjectReference{Name: "machine"},
 	})
 	if err != nil {
@@ -562,28 +562,28 @@ func TestEtcdCreateBinding(t *testing.T) {
 	}{
 		"noName": {
 			binding: api.Binding{
-				ObjectMeta: api.ObjectMeta{Namespace: api.NamespaceDefault, Name: "foo"},
+				ObjectMeta: metav1.ObjectMeta{Namespace: api.NamespaceDefault, Name: "foo"},
 				Target:     api.ObjectReference{},
 			},
 			errOK: func(err error) bool { return err != nil },
 		},
 		"badKind": {
 			binding: api.Binding{
-				ObjectMeta: api.ObjectMeta{Namespace: api.NamespaceDefault, Name: "foo"},
+				ObjectMeta: metav1.ObjectMeta{Namespace: api.NamespaceDefault, Name: "foo"},
 				Target:     api.ObjectReference{Name: "machine1", Kind: "unknown"},
 			},
 			errOK: func(err error) bool { return err != nil },
 		},
 		"emptyKind": {
 			binding: api.Binding{
-				ObjectMeta: api.ObjectMeta{Namespace: api.NamespaceDefault, Name: "foo"},
+				ObjectMeta: metav1.ObjectMeta{Namespace: api.NamespaceDefault, Name: "foo"},
 				Target:     api.ObjectReference{Name: "machine2"},
 			},
 			errOK: func(err error) bool { return err == nil },
 		},
 		"kindNode": {
 			binding: api.Binding{
-				ObjectMeta: api.ObjectMeta{Namespace: api.NamespaceDefault, Name: "foo"},
+				ObjectMeta: metav1.ObjectMeta{Namespace: api.NamespaceDefault, Name: "foo"},
 				Target:     api.ObjectReference{Name: "machine3", Kind: "Node"},
 			},
 			errOK: func(err error) bool { return err == nil },
@@ -645,7 +645,7 @@ func TestEtcdUpdateScheduled(t *testing.T) {
 
 	key, _ := storage.KeyFunc(ctx, "foo")
 	err := storage.Storage.Create(ctx, key, &api.Pod{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      "foo",
 			Namespace: api.NamespaceDefault,
 		},
@@ -667,7 +667,7 @@ func TestEtcdUpdateScheduled(t *testing.T) {
 
 	grace := int64(30)
 	podIn := api.Pod{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: "foo",
 			Labels: map[string]string{
 				"foo": "bar",
@@ -714,7 +714,7 @@ func TestEtcdUpdateStatus(t *testing.T) {
 
 	key, _ := storage.KeyFunc(ctx, "foo")
 	podStart := api.Pod{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      "foo",
 			Namespace: api.NamespaceDefault,
 		},
@@ -735,7 +735,7 @@ func TestEtcdUpdateStatus(t *testing.T) {
 	}
 
 	podIn := api.Pod{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: "foo",
 			Labels: map[string]string{
 				"foo": "bar",

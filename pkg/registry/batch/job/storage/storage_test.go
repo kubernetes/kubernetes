@@ -46,7 +46,7 @@ func validNewJob() *batch.Job {
 	completions := int32(1)
 	parallelism := int32(1)
 	return &batch.Job{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      "foo",
 			Namespace: "default",
 		},
@@ -58,7 +58,7 @@ func validNewJob() *batch.Job {
 			},
 			ManualSelector: newBool(true),
 			Template: api.PodTemplateSpec{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{"a": "b"},
 				},
 				Spec: api.PodSpec{
@@ -83,7 +83,7 @@ func TestCreate(t *testing.T) {
 	defer storage.Job.Store.DestroyFunc()
 	test := registrytest.New(t, storage.Job.Store)
 	validJob := validNewJob()
-	validJob.ObjectMeta = api.ObjectMeta{}
+	validJob.ObjectMeta = metav1.ObjectMeta{}
 	test.TestCreate(
 		// valid
 		validJob,

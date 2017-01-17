@@ -19,6 +19,7 @@ package storage
 import (
 	"testing"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/api"
@@ -42,7 +43,7 @@ func newStorage(t *testing.T) (*REST, *etcdtesting.EtcdTestServer) {
 
 func validNewLimitRange() *api.LimitRange {
 	return &api.LimitRange{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      "foo",
 			Namespace: api.NamespaceDefault,
 		},
@@ -70,13 +71,13 @@ func TestCreate(t *testing.T) {
 	defer storage.Store.DestroyFunc()
 	test := registrytest.New(t, storage.Store).GeneratesName()
 	validLimitRange := validNewLimitRange()
-	validLimitRange.ObjectMeta = api.ObjectMeta{}
+	validLimitRange.ObjectMeta = metav1.ObjectMeta{}
 	test.TestCreate(
 		// valid
 		validLimitRange,
 		// invalid
 		&api.LimitRange{
-			ObjectMeta: api.ObjectMeta{Name: "_-a123-a_"},
+			ObjectMeta: metav1.ObjectMeta{Name: "_-a123-a_"},
 		},
 	)
 }

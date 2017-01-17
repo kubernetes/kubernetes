@@ -21,59 +21,9 @@ import (
 	"testing"
 )
 
-type nameGeneratorFunc func(base string) string
-
-func (fn nameGeneratorFunc) GenerateName(base string) string {
-	return fn(base)
-}
-
-func TestGenerateName(t *testing.T) {
-	testCases := []struct {
-		meta ObjectMeta
-
-		base     string
-		returned string
-	}{
-		{
-			returned: "",
-		},
-		{
-			meta: ObjectMeta{
-				GenerateName: "test",
-			},
-			base:     "test",
-			returned: "test",
-		},
-		{
-			meta: ObjectMeta{
-				Name:         "foo",
-				GenerateName: "test",
-			},
-			base:     "test",
-			returned: "foo",
-		},
-	}
-
-	for i, testCase := range testCases {
-		GenerateName(nameGeneratorFunc(func(base string) string {
-			if base != testCase.base {
-				t.Errorf("%d: unexpected call with base", i)
-			}
-			return "test"
-		}), &testCase.meta)
-		expect := testCase.returned
-		if expect != testCase.meta.Name {
-			t.Errorf("%d: unexpected name: %#v", i, testCase.meta)
-		}
-	}
-}
-
 func TestSimpleNameGenerator(t *testing.T) {
-	meta := &ObjectMeta{
-		GenerateName: "foo",
-	}
-	GenerateName(SimpleNameGenerator, meta)
-	if !strings.HasPrefix(meta.Name, "foo") || meta.Name == "foo" {
-		t.Errorf("unexpected name: %#v", meta)
+	name := SimpleNameGenerator.GenerateName("foo")
+	if !strings.HasPrefix(name, "foo") || name == "foo" {
+		t.Errorf("unexpected name: %s", name)
 	}
 }

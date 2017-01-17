@@ -25,6 +25,7 @@ import (
 	"testing"
 	"text/template"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/util/exec"
@@ -239,7 +240,7 @@ func doTestPluginAttachDetach(t *testing.T, spec *volume.Spec, tmpDir string) {
 		t.Errorf("Can't find the plugin by name")
 	}
 	fake := &mount.FakeMounter{}
-	pod := &v1.Pod{ObjectMeta: v1.ObjectMeta{UID: types.UID("poduid")}}
+	pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: types.UID("poduid")}}
 	secretMap := make(map[string]string)
 	secretMap["flexsecret"] = base64.StdEncoding.EncodeToString([]byte("foo"))
 	mounter, err := plugin.(*flexVolumePlugin).newMounterInternal(spec, pod, &flexVolumeUtil{}, fake, exec.New(), secretMap)
@@ -320,7 +321,7 @@ func doTestPluginMountUnmount(t *testing.T, spec *volume.Spec, tmpDir string) {
 		t.Errorf("Can't find the plugin by name")
 	}
 	fake := &mount.FakeMounter{}
-	pod := &v1.Pod{ObjectMeta: v1.ObjectMeta{UID: types.UID("poduid")}}
+	pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: types.UID("poduid")}}
 	// Use nil secret to test for nil secret case.
 	mounter, err := plugin.(*flexVolumePlugin).newMounterInternal(spec, pod, &flexVolumeUtil{}, fake, exec.New(), nil)
 	volumePath := mounter.GetPath()
@@ -403,7 +404,7 @@ func TestPluginPersistentVolume(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 
 	vol := &v1.PersistentVolume{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: "vol1",
 		},
 		Spec: v1.PersistentVolumeSpec{

@@ -20,8 +20,8 @@ import (
 	"fmt"
 	"reflect"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	pkgruntime "k8s.io/apimachinery/pkg/runtime"
-	apiv1 "k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/cache"
 )
 
@@ -68,8 +68,8 @@ func NewTriggerOnMetaAndSpecChanges(triggerFunc func(pkgruntime.Object)) *cache.
 		},
 		UpdateFunc: func(old, cur interface{}) {
 			curObj := cur.(pkgruntime.Object)
-			oldMeta := getFieldOrPanic(old, "ObjectMeta").(apiv1.ObjectMeta)
-			curMeta := getFieldOrPanic(cur, "ObjectMeta").(apiv1.ObjectMeta)
+			oldMeta := getFieldOrPanic(old, "ObjectMeta").(metav1.ObjectMeta)
+			curMeta := getFieldOrPanic(cur, "ObjectMeta").(metav1.ObjectMeta)
 			if !ObjectMetaEquivalent(oldMeta, curMeta) ||
 				!reflect.DeepEqual(getFieldOrPanic(old, "Spec"), getFieldOrPanic(cur, "Spec")) {
 				triggerFunc(curObj)

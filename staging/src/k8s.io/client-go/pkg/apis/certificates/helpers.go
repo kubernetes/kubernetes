@@ -14,5 +14,25 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// package common holds shared codes and types between open API code generator and spec generator.
-package common
+package certificates
+
+import (
+	"crypto/x509"
+	"encoding/pem"
+	"errors"
+)
+
+// ParseCSR extracts the CSR from the API object and decodes it.
+func ParseCSR(obj *CertificateSigningRequest) (*x509.CertificateRequest, error) {
+	// extract PEM from request object
+	pemBytes := obj.Spec.Request
+	block, _ := pem.Decode(pemBytes)
+	if block == nil || block.Type != "CERTIFICATE REQUEST" {
+		return nil, errors.New("PEM block type must be CERTIFICATE REQUEST")
+	}
+	csr, err := x509.ParseCertificateRequest(block.Bytes)
+	if err != nil {
+		return nil, err
+	}
+	return csr, nil
+}

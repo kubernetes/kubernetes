@@ -19,8 +19,8 @@ package storageclass
 import (
 	"testing"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	genericapirequest "k8s.io/apiserver/pkg/request"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/storage"
 )
 
@@ -34,7 +34,7 @@ func TestStorageClassStrategy(t *testing.T) {
 	}
 
 	storageClass := &storage.StorageClass{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: "valid-class",
 		},
 		Provisioner: "kubernetes.io/aws-ebs",
@@ -51,7 +51,7 @@ func TestStorageClassStrategy(t *testing.T) {
 	}
 
 	newStorageClass := &storage.StorageClass{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:            "valid-class-2",
 			ResourceVersion: "4",
 		},

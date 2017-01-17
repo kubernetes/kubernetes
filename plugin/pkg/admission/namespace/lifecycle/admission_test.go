@@ -65,7 +65,7 @@ func newMockClientForTest(namespaces map[string]api.NamespacePhase) *fake.Client
 		index := 0
 		for name, phase := range namespaces {
 			namespaceList.Items = append(namespaceList.Items, api.Namespace{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:            name,
 					ResourceVersion: fmt.Sprintf("%d", index),
 				},
@@ -83,7 +83,7 @@ func newMockClientForTest(namespaces map[string]api.NamespacePhase) *fake.Client
 // newPod returns a new pod for the specified namespace
 func newPod(namespace string) api.Pod {
 	return api.Pod{
-		ObjectMeta: api.ObjectMeta{Name: "123", Namespace: namespace},
+		ObjectMeta: metav1.ObjectMeta{Name: "123", Namespace: namespace},
 		Spec: api.PodSpec{
 			Volumes:    []api.Volume{{Name: "vol"}},
 			Containers: []api.Container{{Name: "ctr", Image: "image"}},
@@ -188,7 +188,7 @@ func TestAdmissionNamespaceForceLiveLookup(t *testing.T) {
 	mockClient := newMockClientForTest(phases)
 	mockClient.AddReactor("get", "namespaces", func(action core.Action) (bool, runtime.Object, error) {
 		getCalls++
-		return true, &api.Namespace{ObjectMeta: api.ObjectMeta{Name: namespace}, Status: api.NamespaceStatus{Phase: phases[namespace]}}, nil
+		return true, &api.Namespace{ObjectMeta: metav1.ObjectMeta{Name: namespace}, Status: api.NamespaceStatus{Phase: phases[namespace]}}, nil
 	})
 
 	fakeClock := clock.NewFakeClock(time.Now())

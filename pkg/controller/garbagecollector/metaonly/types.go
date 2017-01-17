@@ -18,7 +18,6 @@ package metaonly
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/api/v1"
 )
 
 // MetadataOnlyObject allows decoding only the apiVersion, kind, and metadata fields of
@@ -27,7 +26,7 @@ import (
 type MetadataOnlyObject struct {
 	metav1.TypeMeta `json:",inline"`
 	// +optional
-	v1.ObjectMeta `json:"metadata,omitempty"`
+	metav1.ObjectMeta `json:"metadata,omitempty"`
 }
 
 // MetadataOnlyObjectList allows decoding from JSON data only the typemeta and metadata of
