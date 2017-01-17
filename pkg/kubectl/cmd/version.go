@@ -24,14 +24,15 @@ import (
 
 	"encoding/json"
 	"github.com/ghodss/yaml"
+	apimachineryversion "k8s.io/apimachinery/pkg/version"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/version"
 )
 
 type VersionObj struct {
-	ClientVersion *version.Info `json:"clientVersion,omitempty" yaml:"clientVersion,omitempty"`
-	ServerVersion *version.Info `json:"serverVersion,omitempty" yaml:"serverVersion,omitempty"`
+	ClientVersion *apimachineryversion.Info `json:"clientVersion,omitempty" yaml:"clientVersion,omitempty"`
+	ServerVersion *apimachineryversion.Info `json:"serverVersion,omitempty" yaml:"serverVersion,omitempty"`
 }
 
 var (
@@ -96,7 +97,7 @@ func RunVersion(f cmdutil.Factory, out io.Writer, cmd *cobra.Command) error {
 		return nil
 	case "yaml":
 		var serverErr error = nil
-		var serverVersion *version.Info = nil
+		var serverVersion *apimachineryversion.Info = nil
 
 		if !cmdutil.GetFlagBool(cmd, "client") {
 			serverVersion, serverErr = retrieveServerVersion(f)
@@ -117,7 +118,7 @@ func RunVersion(f cmdutil.Factory, out io.Writer, cmd *cobra.Command) error {
 		return nil
 	case "json":
 		var serverErr error = nil
-		var serverVersion *version.Info = nil
+		var serverVersion *apimachineryversion.Info = nil
 
 		if !cmdutil.GetFlagBool(cmd, "client") {
 			serverVersion, serverErr = retrieveServerVersion(f)
@@ -141,7 +142,7 @@ func RunVersion(f cmdutil.Factory, out io.Writer, cmd *cobra.Command) error {
 	}
 }
 
-func retrieveServerVersion(f cmdutil.Factory) (*version.Info, error) {
+func retrieveServerVersion(f cmdutil.Factory) (*apimachineryversion.Info, error) {
 	clientSet, err := f.ClientSet()
 	if err != nil {
 		return nil, err
