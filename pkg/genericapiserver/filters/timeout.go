@@ -25,9 +25,9 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	apirequest "k8s.io/apiserver/pkg/request"
-	"k8s.io/kubernetes/pkg/api"
 )
 
 const globalTimeout = time.Minute
@@ -39,22 +39,24 @@ func WithTimeoutForNonLongRunningRequests(handler http.Handler, requestContextMa
 	if longRunning == nil {
 		return handler
 	}
-	timeoutFunc := func(req *http.Request) (<-chan time.Time, string) {
+	timeoutFunc := func(req *http.Request) (<-chan time.Time, *apierrors.StatusError) {
 		// TODO unify this with apiserver.MaxInFlightLimit
 		ctx, ok := requestContextMapper.Get(req)
 		if !ok {
-			return time.After(globalTimeout), ""
+			// if this happens, the handler chain isn't setup correctly because there is no context mapper
+			return time.After(globalTimeout), apierrors.NewInternalError(fmt.Errorf("no context found for request during timeout"))
 		}
 
 		requestInfo, ok := apirequest.RequestInfoFrom(ctx)
 		if !ok {
-			return time.After(globalTimeout), ""
+			// if this happens, the handler chain isn't setup correctly because there is no request info
+			return time.After(globalTimeout), apierrors.NewInternalError(fmt.Errorf("no request info found for request during timeout"))
 		}
 
 		if longRunning(req, requestInfo) {
-			return nil, ""
+			return nil, nil
 		}
-		return time.After(globalTimeout), ""
+		return time.After(globalTimeout), apierrors.NewServerTimeout(schema.GroupResource{Group: requestInfo.APIGroup, Resource: requestInfo.Resource}, requestInfo.Verb, 0)
 	}
 	return WithTimeout(handler, timeoutFunc)
 }
@@ -67,17 +69,17 @@ func WithTimeoutForNonLongRunningRequests(handler http.Handler, requestContextMa
 // the handler times out, writes by h to its http.ResponseWriter will return
 // http.ErrHandlerTimeout. If timeoutFunc returns a nil timeout channel, no
 // timeout will be enforced.
-func WithTimeout(h http.Handler, timeoutFunc func(*http.Request) (timeout <-chan time.Time, msg string)) http.Handler {
+func WithTimeout(h http.Handler, timeoutFunc func(*http.Request) (timeout <-chan time.Time, err *apierrors.StatusError)) http.Handler {
 	return &timeoutHandler{h, timeoutFunc}
 }
 
 type timeoutHandler struct {
 	handler http.Handler
-	timeout func(*http.Request) (<-chan time.Time, string)
+	timeout func(*http.Request) (<-chan time.Time, *apierrors.StatusError)
 }
 
 func (t *timeoutHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	after, msg := t.timeout(r)
+	after, err := t.timeout(r)
 	if after == nil {
 		t.handler.ServeHTTP(w, r)
 		return
@@ -93,13 +95,13 @@ func (t *timeoutHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case <-done:
 		return
 	case <-after:
-		tw.timeout(msg)
+		tw.timeout(err)
 	}
 }
 
 type timeoutWriter interface {
 	http.ResponseWriter
-	timeout(string)
+	timeout(*apierrors.StatusError)
 }
 
 func newTimeoutWriter(w http.ResponseWriter) timeoutWriter {
@@ -183,7 +185,7 @@ func (tw *baseTimeoutWriter) WriteHeader(code int) {
 	tw.w.WriteHeader(code)
 }
 
-func (tw *baseTimeoutWriter) timeout(msg string) {
+func (tw *baseTimeoutWriter) timeout(err *apierrors.StatusError) {
 	tw.mu.Lock()
 	defer tw.mu.Unlock()
 
@@ -194,12 +196,8 @@ func (tw *baseTimeoutWriter) timeout(msg string) {
 	// handler
 	if !tw.wroteHeader && !tw.hijacked {
 		tw.w.WriteHeader(http.StatusGatewayTimeout)
-		if msg != "" {
-			tw.w.Write([]byte(msg))
-		} else {
-			enc := json.NewEncoder(tw.w)
-			enc.Encode(errors.NewServerTimeout(api.Resource(""), "", 0))
-		}
+		enc := json.NewEncoder(tw.w)
+		enc.Encode(err)
 	} else {
 		// The timeout writer has been used by the inner handler. There is
 		// no way to timeout the HTTP request at the point. We have to shutdown
