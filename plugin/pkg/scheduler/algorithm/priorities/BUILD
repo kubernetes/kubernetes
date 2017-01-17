@@ -48,6 +48,7 @@ go_test(
         "image_locality_test.go",
         "interpod_affinity_test.go",
         "least_requested_test.go",
+        "metadata_test.go",
         "most_requested_test.go",
         "node_affinity_test.go",
         "node_label_test.go",
