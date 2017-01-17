@@ -45,6 +45,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 )
 
+// prometheus is a systems and service monitoring system.
 var (
 	tunnelOpenCounter = prometheus.NewCounter(
 		prometheus.CounterOpts{
