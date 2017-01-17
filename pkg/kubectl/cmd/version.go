@@ -60,13 +60,15 @@ func NewCmdVersion(f cmdutil.Factory, out io.Writer) *cobra.Command {
 }
 
 func RunVersion(f cmdutil.Factory, out io.Writer, cmd *cobra.Command) error {
+	var serverVersion *apimachineryversion.Info = nil
+	var serverErr error = nil
 	vo := VersionObj{nil, nil}
 
 	clientVersion := version.Get()
 	vo.ClientVersion = &clientVersion
 
-	serverVersion, serverErr := retrieveServerVersion(f)
 	if !cmdutil.GetFlagBool(cmd, "client") {
+		serverVersion, serverErr = retrieveServerVersion(f)
 		vo.ServerVersion = serverVersion
 	}
 
@@ -96,8 +98,6 @@ func RunVersion(f cmdutil.Factory, out io.Writer, cmd *cobra.Command) error {
 
 			fmt.Fprintf(out, "Server Version: %s\n", fmt.Sprintf("%#v", *serverVersion))
 		}
-
-		return nil
 	case "yaml":
 		y, err := yaml.Marshal(&vo)
 		if err != nil {
@@ -109,8 +109,6 @@ func RunVersion(f cmdutil.Factory, out io.Writer, cmd *cobra.Command) error {
 		if serverErr != nil {
 			return serverErr
 		}
-
-		return nil
 	case "json":
 		y, err := json.Marshal(&vo)
 		if err != nil {
@@ -121,12 +119,12 @@ func RunVersion(f cmdutil.Factory, out io.Writer, cmd *cobra.Command) error {
 		if serverErr != nil {
 			return serverErr
 		}
-
-		return nil
 	default:
 		return errors.New("invalid output format: " + of)
 
 	}
+
+	return nil
 }
 
 func retrieveServerVersion(f cmdutil.Factory) (*apimachineryversion.Info, error) {
