@@ -22,23 +22,24 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	genericapirequest "k8s.io/apiserver/pkg/request"
+	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	"k8s.io/kubernetes/pkg/apis/autoscaling/validation"
 	"k8s.io/kubernetes/pkg/fields"
-	genericapirequest "k8s.io/kubernetes/pkg/genericapiserver/api/request"
 	"k8s.io/kubernetes/pkg/storage"
 )
 
 // autoscalerStrategy implements behavior for HorizontalPodAutoscalers
 type autoscalerStrategy struct {
 	runtime.ObjectTyper
-	api.NameGenerator
+	names.NameGenerator
 }
 
 // Strategy is the default logic that applies when creating and updating HorizontalPodAutoscaler
 // objects via the REST API.
-var Strategy = autoscalerStrategy{api.Scheme, api.SimpleNameGenerator}
+var Strategy = autoscalerStrategy{api.Scheme, names.SimpleNameGenerator}
 
 // NamespaceScoped is true for autoscaler.
 func (autoscalerStrategy) NamespaceScoped() bool {

@@ -17,7 +17,7 @@ limitations under the License.
 package api
 
 import (
-	"k8s.io/kubernetes/pkg/genericapiserver/api/metrics"
+	"k8s.io/apiserver/pkg/metrics"
 )
 
 func init() {

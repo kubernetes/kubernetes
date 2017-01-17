@@ -19,9 +19,9 @@ package storageclass
 import (
 	"testing"
 
+	genericapirequest "k8s.io/apiserver/pkg/request"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/storage"
-	genericapirequest "k8s.io/kubernetes/pkg/genericapiserver/api/request"
 )
 
 func TestStorageClassStrategy(t *testing.T) {

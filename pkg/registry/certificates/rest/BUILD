@@ -12,10 +12,10 @@ go_library(
     srcs = ["storage_certificates.go"],
     tags = ["automanaged"],
     deps = [
-        "//pkg/api/rest:go_default_library",
         "//pkg/apis/certificates:go_default_library",
         "//pkg/apis/certificates/v1alpha1:go_default_library",
         "//pkg/genericapiserver:go_default_library",
+        "//pkg/genericapiserver/api/rest:go_default_library",
         "//pkg/registry/certificates/certificates/storage:go_default_library",
         "//pkg/registry/generic:go_default_library",
     ],

@@ -8,13 +8,6 @@ load(
     "go_test",
 )
 
-go_test(
-    name = "go_default_test",
-    srcs = ["util_test.go"],
-    library = ":go_default_library",
-    tags = ["automanaged"],
-)
-
 go_library(
     name = "go_default_library",
     srcs = [
@@ -25,10 +18,10 @@ go_library(
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/v1:go_default_library",
-        "//pkg/api/validation/genericvalidation:go_default_library",
         "//vendor:github.com/dgrijalva/jwt-go",
         "//vendor:github.com/golang/glog",
         "//vendor:k8s.io/apiserver/pkg/authentication/authenticator",
+        "//vendor:k8s.io/apiserver/pkg/authentication/serviceaccount",
         "//vendor:k8s.io/apiserver/pkg/authentication/user",
     ],
 )
@@ -43,6 +36,7 @@ go_test(
         "//pkg/client/clientset_generated/clientset/fake:go_default_library",
         "//pkg/controller/serviceaccount:go_default_library",
         "//pkg/serviceaccount:go_default_library",
+        "//vendor:k8s.io/apiserver/pkg/authentication/serviceaccount",
     ],
 )
 

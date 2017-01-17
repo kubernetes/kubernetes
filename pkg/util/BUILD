@@ -113,7 +113,6 @@ filegroup(
         "//pkg/util/version:all-srcs",
         "//pkg/util/wait:all-srcs",
         "//pkg/util/workqueue:all-srcs",
-        "//pkg/util/wsstream:all-srcs",
         "//pkg/util/yaml:all-srcs",
     ],
     tags = ["automanaged"],

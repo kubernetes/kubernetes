@@ -37,22 +37,23 @@ import (
 	"gopkg.in/natefinch/lumberjack.v2"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	openapicommon "k8s.io/apimachinery/pkg/genericapiserver/openapi/common"
+	openapicommon "k8s.io/apimachinery/pkg/openapi"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/version"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	authenticatorunion "k8s.io/apiserver/pkg/authentication/request/union"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	authorizerunion "k8s.io/apiserver/pkg/authorization/union"
 	"k8s.io/apiserver/pkg/healthz"
+	apirequest "k8s.io/apiserver/pkg/request"
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
 	authhandlers "k8s.io/kubernetes/pkg/auth/handlers"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	genericapifilters "k8s.io/kubernetes/pkg/genericapiserver/api/filters"
 	apiopenapi "k8s.io/kubernetes/pkg/genericapiserver/api/openapi"
-	apirequest "k8s.io/kubernetes/pkg/genericapiserver/api/request"
 	genericauthenticator "k8s.io/kubernetes/pkg/genericapiserver/authenticator"
 	genericauthorizer "k8s.io/kubernetes/pkg/genericapiserver/authorizer"
 	genericfilters "k8s.io/kubernetes/pkg/genericapiserver/filters"
@@ -60,7 +61,6 @@ import (
 	"k8s.io/kubernetes/pkg/genericapiserver/options"
 	"k8s.io/kubernetes/pkg/genericapiserver/routes"
 	certutil "k8s.io/kubernetes/pkg/util/cert"
-	"k8s.io/kubernetes/pkg/version"
 )
 
 const (

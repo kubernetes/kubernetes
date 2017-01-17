@@ -29,7 +29,7 @@ import (
 	authorizationclient "k8s.io/client-go/kubernetes/typed/authorization/v1beta1"
 	authorization "k8s.io/client-go/pkg/apis/authorization/v1beta1"
 
-	"k8s.io/kubernetes/plugin/pkg/webhook"
+	"k8s.io/apiserver/pkg/webhook"
 
 	_ "k8s.io/client-go/pkg/apis/authorization/install"
 	_ "k8s.io/kubernetes/pkg/apis/authorization/install"

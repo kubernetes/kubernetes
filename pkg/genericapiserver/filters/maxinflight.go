@@ -20,11 +20,11 @@ import (
 	"fmt"
 	"net/http"
 
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/httplog"
-	"k8s.io/kubernetes/pkg/api/errors"
-	apirequest "k8s.io/kubernetes/pkg/genericapiserver/api/request"
-	genericapirequest "k8s.io/kubernetes/pkg/genericapiserver/api/request"
+	apirequest "k8s.io/apiserver/pkg/request"
+	genericapirequest "k8s.io/apiserver/pkg/request"
 
 	"github.com/golang/glog"
 )

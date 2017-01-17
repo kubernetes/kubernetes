@@ -15,7 +15,7 @@ go_test(
     tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
-        "//pkg/api/errors:go_default_library",
+        "//vendor:k8s.io/apimachinery/pkg/api/errors",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
     ],
@@ -31,16 +31,16 @@ go_library(
     ],
     tags = ["automanaged"],
     deps = [
-        "//pkg/api/rest:go_default_library",
-        "//pkg/genericapiserver/api/handlers/negotiation:go_default_library",
+        "//pkg/genericapiserver/api/rest:go_default_library",
         "//pkg/storage:go_default_library",
-        "//pkg/util/wsstream:go_default_library",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/runtime",
         "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
         "//vendor:k8s.io/apimachinery/pkg/util/runtime",
         "//vendor:k8s.io/apiserver/pkg/authorization/authorizer",
+        "//vendor:k8s.io/apiserver/pkg/handlers/negotiation",
         "//vendor:k8s.io/apiserver/pkg/util/flushwriter",
+        "//vendor:k8s.io/apiserver/pkg/util/wsstream",
     ],
 )
 

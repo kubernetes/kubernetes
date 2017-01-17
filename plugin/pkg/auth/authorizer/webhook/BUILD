@@ -14,11 +14,11 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//pkg/apis/authorization/install:go_default_library",
-        "//plugin/pkg/webhook:go_default_library",
         "//vendor:github.com/golang/glog",
         "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
         "//vendor:k8s.io/apiserver/pkg/authorization/authorizer",
         "//vendor:k8s.io/apiserver/pkg/util/cache",
+        "//vendor:k8s.io/apiserver/pkg/webhook",
         "//vendor:k8s.io/client-go/kubernetes/typed/authorization/v1beta1",
         "//vendor:k8s.io/client-go/pkg/apis/authorization/install",
         "//vendor:k8s.io/client-go/pkg/apis/authorization/v1beta1",

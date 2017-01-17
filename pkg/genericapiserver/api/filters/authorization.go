@@ -23,8 +23,8 @@ import (
 	"github.com/golang/glog"
 
 	"k8s.io/apiserver/pkg/authorization/authorizer"
+	"k8s.io/apiserver/pkg/request"
 	"k8s.io/kubernetes/pkg/genericapiserver/api/handlers/responsewriters"
-	"k8s.io/kubernetes/pkg/genericapiserver/api/request"
 )
 
 // WithAuthorizationCheck passes all authorized requests on to handler, and returns a forbidden error otherwise.

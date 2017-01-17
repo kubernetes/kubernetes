@@ -23,14 +23,15 @@ import (
 	"strconv"
 	"time"
 
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
@@ -428,7 +429,7 @@ func (s *serviceAccount) mountServiceAccountToken(serviceAccount *api.ServiceAcc
 		// Try naming the volume the same as the serviceAccountToken, and uniquify if needed
 		tokenVolumeName = serviceAccountToken
 		if allVolumeNames.Has(tokenVolumeName) {
-			tokenVolumeName = api.SimpleNameGenerator.GenerateName(fmt.Sprintf("%s-", serviceAccountToken))
+			tokenVolumeName = names.SimpleNameGenerator.GenerateName(fmt.Sprintf("%s-", serviceAccountToken))
 		}
 	}
 

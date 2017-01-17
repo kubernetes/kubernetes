@@ -63,8 +63,8 @@ func GetAddonImage(image string) string {
 	repoPrefix := kubeadmapi.GlobalEnvParams.RepositoryPrefix
 	return map[string]string{
 		KubeDNSImage:        fmt.Sprintf("%s/%s-%s:%s", repoPrefix, KubeDNSImage, runtime.GOARCH, kubeDNSVersion),
-		KubeDNSmasqImage:    fmt.Sprintf("%s/%s-%s:%s", repoPrefix, KubeDNSmasqImage, runtime.GOARCH, dnsmasqVersion),
-		KubeDNSSidecarImage: fmt.Sprintf("%s/%s-%s:%s", repoPrefix, KubeDNSSidecarImage, runtime.GOARCH, kubeDNSSidecarVersion),
+		KubeDNSmasqImage:    fmt.Sprintf("%s/%s-%s:%s", repoPrefix, KubeDNSmasqImage, runtime.GOARCH, kubeDNSVersion),
+		KubeDNSSidecarImage: fmt.Sprintf("%s/%s-%s:%s", repoPrefix, KubeDNSSidecarImage, runtime.GOARCH, kubeDNSVersion),
 		Pause:               fmt.Sprintf("%s/%s-%s:%s", repoPrefix, Pause, runtime.GOARCH, pauseVersion),
 	}[image]
 }

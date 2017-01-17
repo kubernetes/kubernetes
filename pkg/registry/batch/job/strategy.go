@@ -24,11 +24,12 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	genericapirequest "k8s.io/apiserver/pkg/request"
+	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/batch/validation"
 	"k8s.io/kubernetes/pkg/fields"
-	genericapirequest "k8s.io/kubernetes/pkg/genericapiserver/api/request"
 	"k8s.io/kubernetes/pkg/registry/generic"
 	"k8s.io/kubernetes/pkg/storage"
 )
@@ -36,11 +37,11 @@ import (
 // jobStrategy implements verification logic for Replication Controllers.
 type jobStrategy struct {
 	runtime.ObjectTyper
-	api.NameGenerator
+	names.NameGenerator
 }
 
 // Strategy is the default logic that applies when creating and updating Replication Controller objects.
-var Strategy = jobStrategy{api.Scheme, api.SimpleNameGenerator}
+var Strategy = jobStrategy{api.Scheme, names.SimpleNameGenerator}
 
 // NamespaceScoped returns true because all jobs need to be within a namespace.
 func (jobStrategy) NamespaceScoped() bool {

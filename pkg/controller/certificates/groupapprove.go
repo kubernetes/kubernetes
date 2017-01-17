@@ -24,7 +24,6 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	certificates "k8s.io/kubernetes/pkg/apis/certificates/v1alpha1"
 	clientcertificates "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/certificates/v1alpha1"
-	certutil "k8s.io/kubernetes/pkg/util/cert"
 )
 
 // groupApprover implements AutoApprover for signing Kubelet certificates.
@@ -62,7 +61,7 @@ func (cc *groupApprover) AutoApprove(csr *certificates.CertificateSigningRequest
 		return csr, nil
 	}
 
-	x509cr, err := certutil.ParseCSRV1alpha1(csr)
+	x509cr, err := certificates.ParseCSR(csr)
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("unable to parse csr %q: %v", csr.Name, err))
 		return csr, nil

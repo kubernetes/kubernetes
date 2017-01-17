@@ -27,6 +27,7 @@ import (
 	"github.com/spf13/cobra"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
@@ -341,7 +342,7 @@ func (o TaintOptions) RunTaint() error {
 
 		var outputObj runtime.Object
 		if createdPatch {
-			outputObj, err = helper.Patch(namespace, name, api.StrategicMergePatchType, patchBytes)
+			outputObj, err = helper.Patch(namespace, name, types.StrategicMergePatchType, patchBytes)
 		} else {
 			outputObj, err = helper.Replace(namespace, name, false, obj)
 		}

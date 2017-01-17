@@ -18,6 +18,7 @@ package internalversion
 
 import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	api "k8s.io/kubernetes/pkg/api"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions"
@@ -40,7 +41,7 @@ type DaemonSetInterface interface {
 	Get(name string, options v1.GetOptions) (*extensions.DaemonSet, error)
 	List(opts api.ListOptions) (*extensions.DaemonSetList, error)
 	Watch(opts api.ListOptions) (watch.Interface, error)
-	Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *extensions.DaemonSet, err error)
+	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *extensions.DaemonSet, err error)
 	DaemonSetExpansion
 }
 
@@ -157,7 +158,7 @@ func (c *daemonSets) Watch(opts api.ListOptions) (watch.Interface, error) {
 }
 
 // Patch applies the patch and returns the patched daemonSet.
-func (c *daemonSets) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *extensions.DaemonSet, err error) {
+func (c *daemonSets) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *extensions.DaemonSet, err error) {
 	result = &extensions.DaemonSet{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).

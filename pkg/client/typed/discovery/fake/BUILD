@@ -19,6 +19,7 @@ go_library(
         "//vendor:github.com/emicklei/go-restful/swagger",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
+        "//vendor:k8s.io/apimachinery/pkg/version",
     ],
 )
 

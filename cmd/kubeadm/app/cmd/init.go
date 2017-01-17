@@ -21,6 +21,7 @@ import (
 	"io"
 	"io/ioutil"
 	"path"
+	"strconv"
 
 	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
@@ -207,9 +208,20 @@ func (i *Init) Run(out io.Writer) error {
 
 	// Exception:
 	if i.cfg.Discovery.Token != nil {
-		if err := kubemaster.PrepareTokenDiscovery(i.cfg.Discovery.Token); err != nil {
+		// Validate token
+		if valid, err := kubeadmutil.ValidateToken(i.cfg.Discovery.Token); valid == false {
 			return err
 		}
+
+		// Make sure there is at least one address
+		if len(i.cfg.Discovery.Token.Addresses) == 0 {
+			ip, err := netutil.ChooseHostInterface()
+			if err != nil {
+				return err
+			}
+			i.cfg.Discovery.Token.Addresses = []string{ip.String() + ":" + strconv.Itoa(kubeadmapiext.DefaultDiscoveryBindPort)}
+		}
+
 		if err := kubemaster.CreateTokenAuthFile(kubeadmutil.BearerToken(i.cfg.Discovery.Token)); err != nil {
 			return err
 		}

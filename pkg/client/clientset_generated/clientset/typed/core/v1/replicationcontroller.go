@@ -18,6 +18,7 @@ package v1
 
 import (
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	api "k8s.io/kubernetes/pkg/api"
 	v1 "k8s.io/kubernetes/pkg/api/v1"
@@ -40,7 +41,7 @@ type ReplicationControllerInterface interface {
 	Get(name string, options meta_v1.GetOptions) (*v1.ReplicationController, error)
 	List(opts v1.ListOptions) (*v1.ReplicationControllerList, error)
 	Watch(opts v1.ListOptions) (watch.Interface, error)
-	Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *v1.ReplicationController, err error)
+	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.ReplicationController, err error)
 	ReplicationControllerExpansion
 }
 
@@ -157,7 +158,7 @@ func (c *replicationControllers) Watch(opts v1.ListOptions) (watch.Interface, er
 }
 
 // Patch applies the patch and returns the patched replicationController.
-func (c *replicationControllers) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *v1.ReplicationController, err error) {
+func (c *replicationControllers) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.ReplicationController, err error) {
 	result = &v1.ReplicationController{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).

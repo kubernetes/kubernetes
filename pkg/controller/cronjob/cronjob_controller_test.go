@@ -56,6 +56,14 @@ func justAfterTheHour() time.Time {
 	return T1
 }
 
+func weekAfterTheHour() time.Time {
+	T1, err := time.Parse(time.RFC3339, "2016-05-26T10:00:00Z")
+	if err != nil {
+		panic("test setup error")
+	}
+	return T1
+}
+
 func justBeforeThePriorHour() time.Time {
 	T1, err := time.Parse(time.RFC3339, "2016-05-19T08:59:00Z")
 	if err != nil {
@@ -129,17 +137,31 @@ func newJob(UID string) batch.Job {
 }
 
 var (
-	shortDead int64                   = 10
-	longDead  int64                   = 1000000
-	noDead    int64                   = -12345
-	A         batch.ConcurrencyPolicy = batch.AllowConcurrent
-	f         batch.ConcurrencyPolicy = batch.ForbidConcurrent
-	R         batch.ConcurrencyPolicy = batch.ReplaceConcurrent
-	T         bool                    = true
-	F         bool                    = false
+	shortDead  int64                   = 10
+	mediumDead int64                   = 2 * 60 * 60
+	longDead   int64                   = 1000000
+	noDead     int64                   = -12345
+	A          batch.ConcurrencyPolicy = batch.AllowConcurrent
+	f          batch.ConcurrencyPolicy = batch.ForbidConcurrent
+	R          batch.ConcurrencyPolicy = batch.ReplaceConcurrent
+	T          bool                    = true
+	F          bool                    = false
 )
 
 func TestSyncOne_RunOrNot(t *testing.T) {
+	// Check expectations on deadline parameters
+	if shortDead/60/60 >= 1 {
+		t.Errorf("shortDead should be less than one hour")
+	}
+
+	if mediumDead/60/60 < 1 || mediumDead/60/60 >= 24 {
+		t.Errorf("mediumDead should be between one hour and one day")
+	}
+
+	if longDead/60/60/24 < 10 {
+		t.Errorf("longDead should be at least ten days")
+	}
+
 	testCases := map[string]struct {
 		// sj spec
 		concurrencyPolicy batch.ConcurrencyPolicy
@@ -188,6 +210,24 @@ func TestSyncOne_RunOrNot(t *testing.T) {
 		"still active, is time, suspended":         {A, T, onTheHour, noDead, T, T, justAfterTheHour(), F, F, 1},
 		"still active, is time, past deadline":     {A, F, onTheHour, shortDead, T, T, justAfterTheHour(), F, F, 1},
 		"still active, is time, not past deadline": {A, F, onTheHour, longDead, T, T, justAfterTheHour(), T, F, 2},
+
+		// Controller should fail to schedule these, as there are too many missed starting times
+		// and either no deadline or a too long deadline.
+		"prev ran but done, long overdue, not past deadline, A": {A, F, onTheHour, longDead, T, F, weekAfterTheHour(), F, F, 0},
+		"prev ran but done, long overdue, not past deadline, R": {R, F, onTheHour, longDead, T, F, weekAfterTheHour(), F, F, 0},
+		"prev ran but done, long overdue, not past deadline, F": {f, F, onTheHour, longDead, T, F, weekAfterTheHour(), F, F, 0},
+		"prev ran but done, long overdue, no deadline, A":       {A, F, onTheHour, noDead, T, F, weekAfterTheHour(), F, F, 0},
+		"prev ran but done, long overdue, no deadline, R":       {R, F, onTheHour, noDead, T, F, weekAfterTheHour(), F, F, 0},
+		"prev ran but done, long overdue, no deadline, F":       {f, F, onTheHour, noDead, T, F, weekAfterTheHour(), F, F, 0},
+
+		"prev ran but done, long overdue, past medium deadline, A": {A, F, onTheHour, mediumDead, T, F, weekAfterTheHour(), T, F, 1},
+		"prev ran but done, long overdue, past short deadline, A":  {A, F, onTheHour, shortDead, T, F, weekAfterTheHour(), T, F, 1},
+
+		"prev ran but done, long overdue, past medium deadline, R": {R, F, onTheHour, mediumDead, T, F, weekAfterTheHour(), T, F, 1},
+		"prev ran but done, long overdue, past short deadline, R":  {R, F, onTheHour, shortDead, T, F, weekAfterTheHour(), T, F, 1},
+
+		"prev ran but done, long overdue, past medium deadline, F": {f, F, onTheHour, mediumDead, T, F, weekAfterTheHour(), T, F, 1},
+		"prev ran but done, long overdue, past short deadline, F":  {f, F, onTheHour, shortDead, T, F, weekAfterTheHour(), T, F, 1},
 	}
 	for name, tc := range testCases {
 		sj := cronJob()

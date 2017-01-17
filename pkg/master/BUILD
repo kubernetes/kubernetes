@@ -22,7 +22,6 @@ go_library(
         "//cmd/kube-apiserver/app/options:go_default_library",
         "//pkg/api:go_default_library",
         "//pkg/api/endpoints:go_default_library",
-        "//pkg/api/errors:go_default_library",
         "//pkg/api/install:go_default_library",
         "//pkg/api/v1:go_default_library",
         "//pkg/apis/apps/install:go_default_library",
@@ -76,6 +75,7 @@ go_library(
         "//pkg/util/node:go_default_library",
         "//vendor:github.com/golang/glog",
         "//vendor:github.com/prometheus/client_golang/prometheus",
+        "//vendor:k8s.io/apimachinery/pkg/api/errors",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
         "//vendor:k8s.io/apimachinery/pkg/util/net",
@@ -116,7 +116,6 @@ go_test(
         "//pkg/client/testing/core:go_default_library",
         "//pkg/generated/openapi:go_default_library",
         "//pkg/genericapiserver:go_default_library",
-        "//pkg/genericapiserver/api/request:go_default_library",
         "//pkg/kubelet/client:go_default_library",
         "//pkg/storage/etcd/testing:go_default_library",
         "//pkg/util/intstr:go_default_library",
@@ -131,6 +130,8 @@ go_test(
         "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
         "//vendor:k8s.io/apimachinery/pkg/util/net",
         "//vendor:k8s.io/apimachinery/pkg/util/sets",
+        "//vendor:k8s.io/apimachinery/pkg/version",
+        "//vendor:k8s.io/apiserver/pkg/request",
     ],
 )
 

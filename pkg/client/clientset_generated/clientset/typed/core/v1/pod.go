@@ -18,6 +18,7 @@ package v1
 
 import (
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	api "k8s.io/kubernetes/pkg/api"
 	v1 "k8s.io/kubernetes/pkg/api/v1"
@@ -40,7 +41,7 @@ type PodInterface interface {
 	Get(name string, options meta_v1.GetOptions) (*v1.Pod, error)
 	List(opts v1.ListOptions) (*v1.PodList, error)
 	Watch(opts v1.ListOptions) (watch.Interface, error)
-	Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *v1.Pod, err error)
+	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.Pod, err error)
 	PodExpansion
 }
 
@@ -157,7 +158,7 @@ func (c *pods) Watch(opts v1.ListOptions) (watch.Interface, error) {
 }
 
 // Patch applies the patch and returns the patched pod.
-func (c *pods) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *v1.Pod, err error) {
+func (c *pods) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.Pod, err error) {
 	result = &v1.Pod{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).

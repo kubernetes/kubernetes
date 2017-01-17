@@ -18,6 +18,7 @@ package internalversion
 
 import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	api "k8s.io/kubernetes/pkg/api"
 	restclient "k8s.io/kubernetes/pkg/client/restclient"
@@ -39,7 +40,7 @@ type NodeInterface interface {
 	Get(name string, options v1.GetOptions) (*api.Node, error)
 	List(opts api.ListOptions) (*api.NodeList, error)
 	Watch(opts api.ListOptions) (watch.Interface, error)
-	Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *api.Node, err error)
+	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *api.Node, err error)
 	NodeExpansion
 }
 
@@ -146,7 +147,7 @@ func (c *nodes) Watch(opts api.ListOptions) (watch.Interface, error) {
 }
 
 // Patch applies the patch and returns the patched node.
-func (c *nodes) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *api.Node, err error) {
+func (c *nodes) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *api.Node, err error) {
 	result = &api.Node{}
 	err = c.client.Patch(pt).
 		Resource("nodes").

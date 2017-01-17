@@ -22,10 +22,11 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	genericapirequest "k8s.io/apiserver/pkg/request"
+	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/fields"
-	genericapirequest "k8s.io/kubernetes/pkg/genericapiserver/api/request"
 	"k8s.io/kubernetes/pkg/registry/generic"
 	apistorage "k8s.io/kubernetes/pkg/storage"
 )
@@ -33,12 +34,12 @@ import (
 // namespaceStrategy implements behavior for Namespaces
 type namespaceStrategy struct {
 	runtime.ObjectTyper
-	api.NameGenerator
+	names.NameGenerator
 }
 
 // Strategy is the default logic that applies when creating and updating Namespace
 // objects via the REST API.
-var Strategy = namespaceStrategy{api.Scheme, api.SimpleNameGenerator}
+var Strategy = namespaceStrategy{api.Scheme, names.SimpleNameGenerator}
 
 // NamespaceScoped is false for namespaces.
 func (namespaceStrategy) NamespaceScoped() bool {

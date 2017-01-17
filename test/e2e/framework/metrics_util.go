@@ -18,6 +18,7 @@ package framework
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -335,7 +336,11 @@ func getSchedulingLatency(c clientset.Interface) (SchedulingLatency, error) {
 		}
 	}
 	if masterRegistered {
+		ctx, cancel := context.WithTimeout(context.Background(), SingleCallTimeout)
+		defer cancel()
+
 		rawData, err := c.Core().RESTClient().Get().
+			Context(ctx).
 			Prefix("proxy").
 			Namespace(api.NamespaceSystem).
 			Resource("pods").

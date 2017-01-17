@@ -29,7 +29,7 @@ import (
 
 	"github.com/go-openapi/spec"
 	inf "gopkg.in/inf.v0"
-	"k8s.io/apimachinery/pkg/genericapiserver/openapi/common"
+	"k8s.io/apimachinery/pkg/openapi"
 )
 
 // Quantity is a fixed-point representation of a number.
@@ -93,7 +93,6 @@ import (
 // +protobuf.embed=string
 // +protobuf.options.marshal=false
 // +protobuf.options.(gogoproto.goproto_stringer)=false
-// +k8s:openapi-gen=true
 type Quantity struct {
 	// i is the quantity in int64 scaled form, if d.Dec == nil
 	i int64Amount
@@ -399,8 +398,8 @@ func (q Quantity) DeepCopy() Quantity {
 }
 
 // OpenAPIDefinition returns openAPI definition for this type.
-func (_ Quantity) OpenAPIDefinition() common.OpenAPIDefinition {
-	return common.OpenAPIDefinition{
+func (_ Quantity) OpenAPIDefinition() openapi.OpenAPIDefinition {
+	return openapi.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
 				Type:   []string{"string"},
