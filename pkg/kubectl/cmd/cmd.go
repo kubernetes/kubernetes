@@ -301,7 +301,7 @@ func NewKubectlCommand(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cob
 			Commands: []*cobra.Command{
 				NewCmdLabel(f, out),
 				NewCmdAnnotate(f, out),
-				NewCmdCompletion(f, out),
+				NewCmdCompletion(f, out, ""),
 			},
 		},
 	}
