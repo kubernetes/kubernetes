@@ -364,13 +364,26 @@ func TestGetRecentUnmetScheduleTimes(t *testing.T) {
 		}
 	}
 	{
-		// Case 6: now is way way ahead of last start time.
+		// Case 6: now is way way ahead of last start time, and there is no deadline.
 		sj.ObjectMeta.CreationTimestamp = metav1.Time{Time: T1.Add(-2 * time.Hour)}
 		sj.Status.LastScheduleTime = &metav1.Time{Time: T1.Add(-1 * time.Hour)}
 		now := T2.Add(10 * 24 * time.Hour)
 		_, err := getRecentUnmetScheduleTimes(sj, now)
 		if err == nil {
 			t.Errorf("unexpected lack of error")
+		}
+	}
+	{
+		// Case 7: now is way way ahead of last start time, but there is a short deadline.
+		sj.ObjectMeta.CreationTimestamp = metav1.Time{Time: T1.Add(-2 * time.Hour)}
+		sj.Status.LastScheduleTime = &metav1.Time{Time: T1.Add(-1 * time.Hour)}
+		now := T2.Add(10 * 24 * time.Hour)
+		// Deadline is short
+		deadline := int64(2 * 60 * 60)
+		sj.Spec.StartingDeadlineSeconds = &deadline
+		_, err := getRecentUnmetScheduleTimes(sj, now)
+		if err != nil {
+			t.Errorf("unexpected error")
 		}
 	}
 
