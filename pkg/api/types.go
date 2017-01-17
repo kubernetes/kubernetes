@@ -739,6 +739,9 @@ type SecretVolumeSource struct {
 	// mode, like fsGroup, and the result can be other mode bits set.
 	// +optional
 	DefaultMode *int32
+	// Specify whether the Secret must be defined
+	// +optional
+	Optional *bool
 }
 
 // Represents an NFS mount that lasts the lifetime of a pod.
@@ -1002,6 +1005,9 @@ type ConfigMapVolumeSource struct {
 	// mode, like fsGroup, and the result can be other mode bits set.
 	// +optional
 	DefaultMode *int32
+	// Specify whether the ConfigMap must be defined
+	// +optional
+	Optional *bool
 }
 
 // Maps a string key to a path within a volume.
@@ -1123,6 +1129,9 @@ type ConfigMapKeySelector struct {
 	LocalObjectReference
 	// The key to select.
 	Key string
+	// Specify whether the ConfigMap must be defined
+	// +optional
+	Optional *bool
 }
 
 // SecretKeySelector selects a key of a Secret.
@@ -1131,6 +1140,9 @@ type SecretKeySelector struct {
 	LocalObjectReference
 	// The key of the secret to select from.  Must be a valid secret key.
 	Key string
+	// Specify whether the Secret must be defined
+	// +optional
+	Optional *bool
 }
 
 // EnvFromSource represents the source of a set of ConfigMaps
@@ -1151,6 +1163,9 @@ type EnvFromSource struct {
 type ConfigMapEnvSource struct {
 	// The ConfigMap to select from.
 	LocalObjectReference
+	// Specify whether the ConfigMap must be defined
+	// +optional
+	Optional *bool
 }
 
 // HTTPHeader describes a custom header to be used in HTTP probes

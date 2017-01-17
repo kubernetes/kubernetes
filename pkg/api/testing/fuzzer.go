@@ -275,6 +275,10 @@ func FuzzerFor(t *testing.T, version schema.GroupVersion, src rand.Source) *fuzz
 		func(s *api.SecretVolumeSource, c fuzz.Continue) {
 			c.FuzzNoCustom(s) // fuzz self without calling this function again
 
+			if c.RandBool() {
+				opt := c.RandBool()
+				s.Optional = &opt
+			}
 			// DefaultMode should always be set, it has a default
 			// value and it is expected to be between 0 and 0777
 			var mode int32
@@ -285,6 +289,10 @@ func FuzzerFor(t *testing.T, version schema.GroupVersion, src rand.Source) *fuzz
 		func(cm *api.ConfigMapVolumeSource, c fuzz.Continue) {
 			c.FuzzNoCustom(cm) // fuzz self without calling this function again
 
+			if c.RandBool() {
+				opt := c.RandBool()
+				cm.Optional = &opt
+			}
 			// DefaultMode should always be set, it has a default
 			// value and it is expected to be between 0 and 0777
 			var mode int32
@@ -387,6 +395,10 @@ func FuzzerFor(t *testing.T, version schema.GroupVersion, src rand.Source) *fuzz
 		},
 		func(cm *api.ConfigMapEnvSource, c fuzz.Continue) {
 			c.FuzzNoCustom(cm) // fuzz self without calling this function again
+			if c.RandBool() {
+				opt := c.RandBool()
+				cm.Optional = &opt
+			}
 		},
 		func(sc *api.SecurityContext, c fuzz.Continue) {
 			c.FuzzNoCustom(sc) // fuzz self without calling this function again

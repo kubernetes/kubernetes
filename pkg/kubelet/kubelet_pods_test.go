@@ -249,6 +249,7 @@ func buildService(name, namespace, clusterIP, protocol string, port int) *v1.Ser
 }
 
 func TestMakeEnvironmentVariables(t *testing.T) {
+	trueVal := true
 	services := []*v1.Service{
 		buildService("kubernetes", v1.NamespaceDefault, "1.2.3.1", "TCP", 8081),
 		buildService("test", "test1", "1.2.3.3", "TCP", 8083),
@@ -269,6 +270,7 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 		masterServiceNs string                 // the namespace to read master service info from
 		nilLister       bool                   // whether the lister should be nil
 		configMap       *v1.ConfigMap          // an optional ConfigMap to pull from
+		secret          *v1.Secret             // an optional Secret to pull from
 		expectedEnvs    []kubecontainer.EnvVar // a set of expected environment vars
 		expectedError   bool                   // does the test fail
 	}{
@@ -608,6 +610,106 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 			},
 		},
 		{
+			name: "configmapkeyref_missing_optional",
+			ns:   "test",
+			container: &v1.Container{
+				Env: []v1.EnvVar{
+					{
+						Name: "POD_NAME",
+						ValueFrom: &v1.EnvVarSource{
+							ConfigMapKeyRef: &v1.ConfigMapKeySelector{
+								LocalObjectReference: v1.LocalObjectReference{Name: "missing-config-map"},
+								Key:                  "key",
+								Optional:             &trueVal,
+							},
+						},
+					},
+				},
+			},
+			masterServiceNs: "nothing",
+			expectedEnvs:    nil,
+		},
+		{
+			name: "configmapkeyref_missing_key_optional",
+			ns:   "test",
+			container: &v1.Container{
+				Env: []v1.EnvVar{
+					{
+						Name: "POD_NAME",
+						ValueFrom: &v1.EnvVarSource{
+							ConfigMapKeyRef: &v1.ConfigMapKeySelector{
+								LocalObjectReference: v1.LocalObjectReference{Name: "test-config-map"},
+								Key:                  "key",
+								Optional:             &trueVal,
+							},
+						},
+					},
+				},
+			},
+			masterServiceNs: "nothing",
+			nilLister:       true,
+			configMap: &v1.ConfigMap{
+				ObjectMeta: v1.ObjectMeta{
+					Namespace: "test1",
+					Name:      "test-configmap",
+				},
+				Data: map[string]string{
+					"a": "b",
+				},
+			},
+			expectedEnvs: nil,
+		},
+		{
+			name: "secretkeyref_missing_optional",
+			ns:   "test",
+			container: &v1.Container{
+				Env: []v1.EnvVar{
+					{
+						Name: "POD_NAME",
+						ValueFrom: &v1.EnvVarSource{
+							SecretKeyRef: &v1.SecretKeySelector{
+								LocalObjectReference: v1.LocalObjectReference{Name: "missing-secret"},
+								Key:                  "key",
+								Optional:             &trueVal,
+							},
+						},
+					},
+				},
+			},
+			masterServiceNs: "nothing",
+			expectedEnvs:    nil,
+		},
+		{
+			name: "secretkeyref_missing_key_optional",
+			ns:   "test",
+			container: &v1.Container{
+				Env: []v1.EnvVar{
+					{
+						Name: "POD_NAME",
+						ValueFrom: &v1.EnvVarSource{
+							SecretKeyRef: &v1.SecretKeySelector{
+								LocalObjectReference: v1.LocalObjectReference{Name: "test-secret"},
+								Key:                  "key",
+								Optional:             &trueVal,
+							},
+						},
+					},
+				},
+			},
+			masterServiceNs: "nothing",
+			nilLister:       true,
+			secret: &v1.Secret{
+				ObjectMeta: v1.ObjectMeta{
+					Namespace: "test1",
+					Name:      "test-secret",
+				},
+				Data: map[string][]byte{
+					"a": []byte("b"),
+				},
+			},
+			expectedEnvs: nil,
+		},
+		{
 			name: "configmap",
 			ns:   "test1",
 			container: &v1.Container{
@@ -714,6 +816,19 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 			expectedError:   true,
 		},
 		{
+			name: "configmap_missing_optional",
+			ns:   "test",
+			container: &v1.Container{
+				EnvFrom: []v1.EnvFromSource{
+					{ConfigMapRef: &v1.ConfigMapEnvSource{
+						Optional:             &trueVal,
+						LocalObjectReference: v1.LocalObjectReference{Name: "missing-config-map"}}},
+				},
+			},
+			masterServiceNs: "nothing",
+			expectedEnvs:    nil,
+		},
+		{
 			name: "configmap_invalid_keys",
 			ns:   "test1",
 			container: &v1.Container{
@@ -779,6 +894,13 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 				err = errors.New("no configmap defined")
 			}
 			return true, tc.configMap, err
+		})
+		testKubelet.fakeKubeClient.AddReactor("get", "secrets", func(action core.Action) (bool, runtime.Object, error) {
+			var err error
+			if tc.secret == nil {
+				err = errors.New("no secret defined")
+			}
+			return true, tc.secret, err
 		})
 
 		testPod := &v1.Pod{

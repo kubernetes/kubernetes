@@ -649,13 +649,19 @@ func printGitRepoVolumeSource(git *api.GitRepoVolumeSource, w *PrefixWriter) {
 }
 
 func printSecretVolumeSource(secret *api.SecretVolumeSource, w *PrefixWriter) {
+	optional := secret.Optional != nil && *secret.Optional
 	w.Write(LEVEL_2, "Type:\tSecret (a volume populated by a Secret)\n"+
-		"    SecretName:\t%v\n", secret.SecretName)
+		"    SecretName:\t%v\n",
+		"    Optional:\t%v\n",
+		secret.SecretName, optional)
 }
 
 func printConfigMapVolumeSource(configMap *api.ConfigMapVolumeSource, w *PrefixWriter) {
+	optional := configMap.Optional != nil && *configMap.Optional
 	w.Write(LEVEL_2, "Type:\tConfigMap (a volume populated by a ConfigMap)\n"+
-		"    Name:\t%v\n", configMap.Name)
+		"    Name:\t%v\n"+
+		"    Optional:\t%v\n",
+		configMap.Name, optional)
 }
 
 func printNFSVolumeSource(nfs *api.NFSVolumeSource, w *PrefixWriter) {
@@ -1036,9 +1042,11 @@ func describeContainerEnvVars(container api.Container, resolverFn EnvVarResolver
 			}
 			w.Write(LEVEL_3, "%s:\t%s (%s)\n", e.Name, valueFrom, resource)
 		case e.ValueFrom.SecretKeyRef != nil:
-			w.Write(LEVEL_3, "%s:\t<set to the key '%s' in secret '%s'>\n", e.Name, e.ValueFrom.SecretKeyRef.Key, e.ValueFrom.SecretKeyRef.Name)
+			optional := e.ValueFrom.SecretKeyRef.Optional != nil && *e.ValueFrom.SecretKeyRef.Optional
+			w.Write(LEVEL_3, "%s:\t<set to the key '%s' in secret '%s'>\tOptional: %t\n", e.Name, e.ValueFrom.SecretKeyRef.Key, e.ValueFrom.SecretKeyRef.Name, optional)
 		case e.ValueFrom.ConfigMapKeyRef != nil:
-			w.Write(LEVEL_3, "%s:\t<set to the key '%s' of config map '%s'>\n", e.Name, e.ValueFrom.ConfigMapKeyRef.Key, e.ValueFrom.ConfigMapKeyRef.Name)
+			optional := e.ValueFrom.ConfigMapKeyRef.Optional != nil && *e.ValueFrom.ConfigMapKeyRef.Optional
+			w.Write(LEVEL_3, "%s:\t<set to the key '%s' of config map '%s'>\tOptional: %t\n", e.Name, e.ValueFrom.ConfigMapKeyRef.Key, e.ValueFrom.ConfigMapKeyRef.Name, optional)
 		}
 	}
 }
@@ -1051,10 +1059,11 @@ func describeContainerEnvFrom(container api.Container, resolverFn EnvVarResolver
 	w.Write(LEVEL_2, "Environment Variables from:%s\n", none)
 
 	for _, e := range container.EnvFrom {
+		optional := e.ConfigMapRef.Optional != nil && *e.ConfigMapRef.Optional
 		if len(e.Prefix) == 0 {
-			w.Write(LEVEL_3, "%s\tConfigMap\n", e.ConfigMapRef.Name)
+			w.Write(LEVEL_3, "%s\tConfigMap\tOptional: %t\n", e.ConfigMapRef.Name, optional)
 		} else {
-			w.Write(LEVEL_3, "%s\tConfigMap with prefix '%s'\n", e.ConfigMapRef.Name, e.Prefix)
+			w.Write(LEVEL_3, "%s\tConfigMap with prefix '%s'\tOptional: %t\n", e.ConfigMapRef.Name, e.Prefix, optional)
 		}
 	}
 }

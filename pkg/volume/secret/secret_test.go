@@ -397,6 +397,76 @@ func TestPluginReboot(t *testing.T) {
 	doTestCleanAndTeardown(plugin, testPodUID, testVolumeName, volumePath, t)
 }
 
+func TestPluginOptional(t *testing.T) {
+	var (
+		testPodUID     = types.UID("test_pod_uid")
+		testVolumeName = "test_volume_name"
+		testNamespace  = "test_secret_namespace"
+		testName       = "test_secret_name"
+		trueVal        = true
+
+		volumeSpec    = volumeSpec(testVolumeName, testName, 0644)
+		client        = fake.NewSimpleClientset()
+		pluginMgr     = volume.VolumePluginMgr{}
+		rootDir, host = newTestHost(t, client)
+	)
+	volumeSpec.Secret.Optional = &trueVal
+	defer os.RemoveAll(rootDir)
+	pluginMgr.InitPlugins(ProbeVolumePlugins(), host)
+
+	plugin, err := pluginMgr.FindPluginByName(secretPluginName)
+	if err != nil {
+		t.Errorf("Can't find the plugin by name")
+	}
+
+	pod := &v1.Pod{ObjectMeta: v1.ObjectMeta{Namespace: testNamespace, UID: testPodUID}}
+	mounter, err := plugin.NewMounter(volume.NewSpecFromVolume(volumeSpec), pod, volume.VolumeOptions{})
+	if err != nil {
+		t.Errorf("Failed to make a new Mounter: %v", err)
+	}
+	if mounter == nil {
+		t.Errorf("Got a nil Mounter")
+	}
+
+	volumePath := mounter.GetPath()
+	if !strings.HasSuffix(volumePath, fmt.Sprintf("pods/test_pod_uid/volumes/kubernetes.io~secret/test_volume_name")) {
+		t.Errorf("Got unexpected path: %s", volumePath)
+	}
+
+	err = mounter.SetUp(nil)
+	if err != nil {
+		t.Errorf("Failed to setup volume: %v", err)
+	}
+	if _, err := os.Stat(volumePath); err != nil {
+		if os.IsNotExist(err) {
+			t.Errorf("SetUp() failed, volume path not created: %s", volumePath)
+		} else {
+			t.Errorf("SetUp() failed: %v", err)
+		}
+	}
+
+	// secret volume should create its own empty wrapper path
+	podWrapperMetadataDir := fmt.Sprintf("%v/pods/test_pod_uid/plugins/kubernetes.io~empty-dir/wrapped_test_volume_name", rootDir)
+
+	if _, err := os.Stat(podWrapperMetadataDir); err != nil {
+		if os.IsNotExist(err) {
+			t.Errorf("SetUp() failed, empty-dir wrapper path is not created: %s", podWrapperMetadataDir)
+		} else {
+			t.Errorf("SetUp() failed: %v", err)
+		}
+	}
+
+	infos, err := ioutil.ReadDir(volumePath)
+	if err != nil {
+		t.Fatalf("couldn't find volume path, %s", volumePath)
+	}
+	if len(infos) != 0 {
+		t.Errorf("empty directory, %s, not found", volumePath)
+	}
+
+	defer doTestCleanAndTeardown(plugin, testPodUID, testVolumeName, volumePath, t)
+}
+
 func volumeSpec(volumeName, secretName string, defaultMode int32) *v1.Volume {
 	return &v1.Volume{
 		Name: volumeName,

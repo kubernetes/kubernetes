@@ -170,35 +170,38 @@ func (b *configMapVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 		return fmt.Errorf("Cannot setup configMap volume %v because kube client is not configured", b.volName)
 	}
 
+	optional := b.source.Optional != nil && *b.source.Optional
 	configMap, err := kubeClient.Core().ConfigMaps(b.pod.Namespace).Get(b.source.Name, metav1.GetOptions{})
 	if err != nil {
-		glog.Errorf("Couldn't get configMap %v/%v: %v", b.pod.Namespace, b.source.Name, err)
-		return err
-	}
+		if !optional {
+			glog.Errorf("Couldn't get configMap %v/%v: %v", b.pod.Namespace, b.source.Name, err)
+			return err
+		}
+	} else {
+		totalBytes := totalBytes(configMap)
+		glog.V(3).Infof("Received configMap %v/%v containing (%v) pieces of data, %v total bytes",
+			b.pod.Namespace,
+			b.source.Name,
+			len(configMap.Data),
+			totalBytes)
 
-	totalBytes := totalBytes(configMap)
-	glog.V(3).Infof("Received configMap %v/%v containing (%v) pieces of data, %v total bytes",
-		b.pod.Namespace,
-		b.source.Name,
-		len(configMap.Data),
-		totalBytes)
+		payload, err := makePayload(b.source.Items, configMap, b.source.DefaultMode)
+		if err != nil {
+			return err
+		}
 
-	payload, err := makePayload(b.source.Items, configMap, b.source.DefaultMode)
-	if err != nil {
-		return err
-	}
+		writerContext := fmt.Sprintf("pod %v/%v volume %v", b.pod.Namespace, b.pod.Name, b.volName)
+		writer, err := volumeutil.NewAtomicWriter(dir, writerContext)
+		if err != nil {
+			glog.Errorf("Error creating atomic writer: %v", err)
+			return err
+		}
 
-	writerContext := fmt.Sprintf("pod %v/%v volume %v", b.pod.Namespace, b.pod.Name, b.volName)
-	writer, err := volumeutil.NewAtomicWriter(dir, writerContext)
-	if err != nil {
-		glog.Errorf("Error creating atomic writer: %v", err)
-		return err
-	}
-
-	err = writer.Write(payload)
-	if err != nil {
-		glog.Errorf("Error writing payload to dir: %v", err)
-		return err
+		err = writer.Write(payload)
+		if err != nil {
+			glog.Errorf("Error writing payload to dir: %v", err)
+			return err
+		}
 	}
 
 	err = volume.SetVolumeOwnership(b, fsGroup)

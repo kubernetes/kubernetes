@@ -193,35 +193,38 @@ func (b *secretVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 		return fmt.Errorf("Cannot setup secret volume %v because kube client is not configured", b.volName)
 	}
 
+	optional := b.source.Optional != nil && *b.source.Optional
 	secret, err := kubeClient.Core().Secrets(b.pod.Namespace).Get(b.source.SecretName, metav1.GetOptions{})
 	if err != nil {
-		glog.Errorf("Couldn't get secret %v/%v", b.pod.Namespace, b.source.SecretName)
-		return err
-	}
+		if !optional {
+			glog.Errorf("Couldn't get secret %v/%v", b.pod.Namespace, b.source.SecretName)
+			return err
+		}
+	} else {
+		totalBytes := totalSecretBytes(secret)
+		glog.V(3).Infof("Received secret %v/%v containing (%v) pieces of data, %v total bytes",
+			b.pod.Namespace,
+			b.source.SecretName,
+			len(secret.Data),
+			totalBytes)
 
-	totalBytes := totalSecretBytes(secret)
-	glog.V(3).Infof("Received secret %v/%v containing (%v) pieces of data, %v total bytes",
-		b.pod.Namespace,
-		b.source.SecretName,
-		len(secret.Data),
-		totalBytes)
+		payload, err := makePayload(b.source.Items, secret, b.source.DefaultMode)
+		if err != nil {
+			return err
+		}
 
-	payload, err := makePayload(b.source.Items, secret, b.source.DefaultMode)
-	if err != nil {
-		return err
-	}
+		writerContext := fmt.Sprintf("pod %v/%v volume %v", b.pod.Namespace, b.pod.Name, b.volName)
+		writer, err := volumeutil.NewAtomicWriter(dir, writerContext)
+		if err != nil {
+			glog.Errorf("Error creating atomic writer: %v", err)
+			return err
+		}
 
-	writerContext := fmt.Sprintf("pod %v/%v volume %v", b.pod.Namespace, b.pod.Name, b.volName)
-	writer, err := volumeutil.NewAtomicWriter(dir, writerContext)
-	if err != nil {
-		glog.Errorf("Error creating atomic writer: %v", err)
-		return err
-	}
-
-	err = writer.Write(payload)
-	if err != nil {
-		glog.Errorf("Error writing payload to dir: %v", err)
-		return err
+		err = writer.Write(payload)
+		if err != nil {
+			glog.Errorf("Error writing payload to dir: %v", err)
+			return err
+		}
 	}
 
 	err = volume.SetVolumeOwnership(b, fsGroup)
