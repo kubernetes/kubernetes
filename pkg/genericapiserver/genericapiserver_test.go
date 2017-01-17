@@ -25,7 +25,12 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"reflect"
+	goruntime "runtime"
 	"testing"
+	"time"
+
+	"github.com/go-openapi/spec"
+	"github.com/stretchr/testify/assert"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apimachinery"
@@ -34,6 +39,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/version"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	genericapirequest "k8s.io/apiserver/pkg/request"
@@ -44,10 +50,6 @@ import (
 	openapigen "k8s.io/kubernetes/pkg/generated/openapi"
 	"k8s.io/kubernetes/pkg/genericapiserver/api/rest"
 	etcdtesting "k8s.io/kubernetes/pkg/storage/etcd/testing"
-	"k8s.io/kubernetes/pkg/version"
-
-	"github.com/go-openapi/spec"
-	"github.com/stretchr/testify/assert"
 )
 
 // setUp is a convience function for setting up for (most) tests.
@@ -372,7 +374,7 @@ func TestNotRestRoutesHaveAuth(t *testing.T) {
 	config.EnableProfiling = true
 	config.SwaggerConfig = DefaultSwaggerConfig()
 
-	kubeVersion := version.Get()
+	kubeVersion := fakeVersion()
 	config.Version = &kubeVersion
 
 	s, err := config.SkipComplete().New()
@@ -616,5 +618,19 @@ func (p *testNoVerbsStorage) New() runtime.Object {
 			Kind:       "NoVerbs",
 			APIVersion: p.Version,
 		},
+	}
+}
+
+func fakeVersion() version.Info {
+	return version.Info{
+		Major:        "42",
+		Minor:        "42",
+		GitVersion:   "42",
+		GitCommit:    "34973274ccef6ab4dfaaf86599792fa9c3fe4689",
+		GitTreeState: "Dirty",
+		BuildDate:    time.Now().String(),
+		GoVersion:    goruntime.Version(),
+		Compiler:     goruntime.Compiler,
+		Platform:     fmt.Sprintf("%s/%s", goruntime.GOOS, goruntime.GOARCH),
 	}
 }
