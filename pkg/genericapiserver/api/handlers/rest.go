@@ -1037,7 +1037,9 @@ func hasUID(obj runtime.Object) (bool, error) {
 
 // checkName checks the provided name against the request
 func checkName(obj runtime.Object, name, namespace string, namer ScopeNamer) error {
-	if objNamespace, objName, err := namer.ObjectName(obj); err == nil {
+	if objNamespace, objName, err := namer.ObjectName(obj); err != nil {
+		return err
+	} else {
 		if objName != name {
 			return errors.NewBadRequest(fmt.Sprintf(
 				"the name of the object (%s) does not match the name on the URL (%s)", objName, name))
@@ -1048,8 +1050,6 @@ func checkName(obj runtime.Object, name, namespace string, namer ScopeNamer) err
 					"the namespace of the object (%s) does not match the namespace on the request (%s)", objNamespace, namespace))
 			}
 		}
-	} else {
-		return err
 	}
 	return nil
 }
