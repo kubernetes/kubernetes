@@ -22,7 +22,7 @@ package app
 
 import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	petset "k8s.io/kubernetes/pkg/controller/petset"
+	"k8s.io/kubernetes/pkg/controller/statefulset"
 )
 
 func startStatefulSetController(ctx ControllerContext) (bool, error) {
@@ -30,7 +30,7 @@ func startStatefulSetController(ctx ControllerContext) (bool, error) {
 		return false, nil
 	}
 	resyncPeriod := ResyncPeriod(&ctx.Options)()
-	go petset.NewStatefulSetController(
+	go statefulset.NewStatefulSetController(
 		ctx.InformerFactory.Pods().Informer(),
 		ctx.ClientBuilder.ClientOrDie("statefulset-controller"),
 		resyncPeriod,
