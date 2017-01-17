@@ -22,6 +22,8 @@ import (
 	"runtime"
 
 	"github.com/golang/glog"
+	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/api/v1"
 	ioutil "k8s.io/kubernetes/pkg/util/io"
@@ -191,10 +193,19 @@ func (b *secretVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 		return err
 	}
 
+	optional := b.source.Optional != nil && *b.source.Optional
 	secret, err := b.getSecret(b.pod.Namespace, b.source.SecretName)
 	if err != nil {
-		glog.Errorf("Couldn't get secret %v/%v", b.pod.Namespace, b.source.SecretName)
-		return err
+		if !(errors.IsNotFound(err) && optional) {
+			glog.Errorf("Couldn't get secret %v/%v", b.pod.Namespace, b.source.SecretName)
+			return err
+		}
+		secret = &v1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: b.pod.Namespace,
+				Name:      b.source.SecretName,
+			},
+		}
 	}
 
 	totalBytes := totalSecretBytes(secret)
@@ -204,7 +215,7 @@ func (b *secretVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 		len(secret.Data),
 		totalBytes)
 
-	payload, err := makePayload(b.source.Items, secret, b.source.DefaultMode)
+	payload, err := makePayload(b.source.Items, secret, b.source.DefaultMode, optional)
 	if err != nil {
 		return err
 	}
@@ -231,7 +242,7 @@ func (b *secretVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 	return nil
 }
 
-func makePayload(mappings []v1.KeyToPath, secret *v1.Secret, defaultMode *int32) (map[string]volumeutil.FileProjection, error) {
+func makePayload(mappings []v1.KeyToPath, secret *v1.Secret, defaultMode *int32, optional bool) (map[string]volumeutil.FileProjection, error) {
 	if defaultMode == nil {
 		return nil, fmt.Errorf("No defaultMode used, not even the default value for it")
 	}
@@ -249,6 +260,9 @@ func makePayload(mappings []v1.KeyToPath, secret *v1.Secret, defaultMode *int32)
 		for _, ktp := range mappings {
 			content, ok := secret.Data[ktp.Key]
 			if !ok {
+				if optional {
+					continue
+				}
 				err_msg := "references non-existent secret key"
 				glog.Errorf(err_msg)
 				return nil, fmt.Errorf(err_msg)
