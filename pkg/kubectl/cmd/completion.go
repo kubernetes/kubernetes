@@ -19,6 +19,7 @@ package cmd
 import (
 	"bytes"
 	"io"
+	"io/ioutil"
 
 	"github.com/spf13/cobra"
 
@@ -26,7 +27,7 @@ import (
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 )
 
-const boilerPlate = `
+const hardcodedBoilerPlate = `
 # Copyright 2016 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -80,7 +81,7 @@ var (
 )
 
 var (
-	completion_shells = map[string]func(out io.Writer, cmd *cobra.Command) error{
+	completion_shells = map[string]func(out io.Writer, boilerPlate string, cmd *cobra.Command) error{
 		"bash": runCompletionBash,
 		"zsh":  runCompletionZsh,
 	}
@@ -103,6 +104,7 @@ func NewCmdCompletion(f cmdutil.Factory, out io.Writer) *cobra.Command {
 		},
 		ValidArgs: shells,
 	}
+	cmd.Flags().String("boiler-plate", "", "The name of the copyright header file, defaults to hardcoded header value.")
 
 	return cmd
 }
@@ -119,20 +121,35 @@ func RunCompletion(out io.Writer, cmd *cobra.Command, args []string) error {
 		return cmdutil.UsageError(cmd, "Unsupported shell type %q.", args[0])
 	}
 
-	return run(out, cmd.Parent())
+	return run(out, cmdutil.GetFlagString(cmd, "boiler-plate"), cmd.Parent())
 }
 
-func runCompletionBash(out io.Writer, kubectl *cobra.Command) error {
-	_, err := out.Write([]byte(boilerPlate))
-	if err != nil {
+func addBoilerPlate(out io.Writer, boilerPlate string) error {
+	if len(boilerPlate) > 0 {
+		b, err := ioutil.ReadFile(boilerPlate)
+		if err != nil {
+			return err
+		}
+		if _, err := out.Write(b); err != nil {
+			return err
+		}
+		return nil
+	}
+	if _, err := out.Write([]byte(hardcodedBoilerPlate)); err != nil {
+		return err
+	}
+	return nil
+}
+
+func runCompletionBash(out io.Writer, boilerPlate string, kubectl *cobra.Command) error {
+	if err := addBoilerPlate(out, boilerPlate); err != nil {
 		return err
 	}
 	return kubectl.GenBashCompletion(out)
 }
 
-func runCompletionZsh(out io.Writer, kubectl *cobra.Command) error {
-	_, err := out.Write([]byte(boilerPlate))
-	if err != nil {
+func runCompletionZsh(out io.Writer, boilerPlate string, kubectl *cobra.Command) error {
+	if err := addBoilerPlate(out, boilerPlate); err != nil {
 		return err
 	}
 	zsh_initialization := `
