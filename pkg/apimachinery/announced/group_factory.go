@@ -213,7 +213,7 @@ func (gmf *GroupMetaFactory) Enable(m *registered.APIRegistrationManager, scheme
 	}
 	for _, v := range externalVersions {
 		gvf := gmf.VersionArgs[v.Version]
-		if err := groupMeta.AddVersionInterfaces(
+		if err := groupMeta.AddVersion(
 			schema.GroupVersion{Group: gvf.GroupName, Version: gvf.VersionName},
 			&meta.VersionInterfaces{
 				ObjectConvertor:  scheme,

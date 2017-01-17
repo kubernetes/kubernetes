@@ -62,12 +62,10 @@ func (gm *GroupMeta) DefaultInterfacesFor(version schema.GroupVersion) (*meta.Ve
 	return nil, fmt.Errorf("unsupported storage version: %s (valid: %v)", version, gm.GroupVersions)
 }
 
-// AddVersionInterfaces adds the given version to the group. Only call during
+// AddVersion adds the given version to the group. Only call during
 // init, after that GroupMeta objects should be immutable. Not thread safe.
 // (If you use this, be sure to set .InterfacesFor = .DefaultInterfacesFor)
-// TODO: remove the "Interfaces" suffix and make this also maintain the
-// .GroupVersions member.
-func (gm *GroupMeta) AddVersionInterfaces(version schema.GroupVersion, interfaces *meta.VersionInterfaces) error {
+func (gm *GroupMeta) AddVersion(version schema.GroupVersion, interfaces *meta.VersionInterfaces) error {
 	if e, a := gm.GroupVersion.Group, version.Group; a != e {
 		return fmt.Errorf("got a version in group %v, but am in group %v", a, e)
 	}
@@ -76,12 +74,11 @@ func (gm *GroupMeta) AddVersionInterfaces(version schema.GroupVersion, interface
 	}
 	gm.InterfacesByVersion[version] = interfaces
 
-	// TODO: refactor to make the below error not possible, this function
-	// should *set* GroupVersions rather than depend on it.
 	for _, v := range gm.GroupVersions {
 		if v == version {
 			return nil
 		}
 	}
-	return fmt.Errorf("added a version interface without the corresponding version %v being in the list %#v", version, gm.GroupVersions)
+	gm.GroupVersions = append(gm.GroupVersions, version)
+	return nil
 }
