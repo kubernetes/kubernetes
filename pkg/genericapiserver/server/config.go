@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package genericapiserver
+package server
 
 import (
 	"crypto/tls"
@@ -47,18 +47,18 @@ import (
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	authorizerunion "k8s.io/apiserver/pkg/authorization/union"
-	"k8s.io/apiserver/pkg/healthz"
-	apirequest "k8s.io/apiserver/pkg/request"
+	apirequest "k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/server/healthz"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/restclient"
-	genericapifilters "k8s.io/kubernetes/pkg/genericapiserver/api/filters"
-	apiopenapi "k8s.io/kubernetes/pkg/genericapiserver/api/openapi"
 	genericauthenticator "k8s.io/kubernetes/pkg/genericapiserver/authenticator"
 	genericauthorizer "k8s.io/kubernetes/pkg/genericapiserver/authorizer"
-	genericfilters "k8s.io/kubernetes/pkg/genericapiserver/filters"
-	"k8s.io/kubernetes/pkg/genericapiserver/mux"
-	"k8s.io/kubernetes/pkg/genericapiserver/options"
-	"k8s.io/kubernetes/pkg/genericapiserver/routes"
+	genericapifilters "k8s.io/kubernetes/pkg/genericapiserver/endpoints/filters"
+	apiopenapi "k8s.io/kubernetes/pkg/genericapiserver/endpoints/openapi"
+	genericfilters "k8s.io/kubernetes/pkg/genericapiserver/server/filters"
+	"k8s.io/kubernetes/pkg/genericapiserver/server/mux"
+	"k8s.io/kubernetes/pkg/genericapiserver/server/options"
+	"k8s.io/kubernetes/pkg/genericapiserver/server/routes"
 	certutil "k8s.io/kubernetes/pkg/util/cert"
 )
 

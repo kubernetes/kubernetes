@@ -30,9 +30,9 @@ go_library(
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/errors/storage:go_default_library",
+        "//pkg/genericapiserver/registry/generic:go_default_library",
         "//pkg/registry/core/rangeallocation:go_default_library",
         "//pkg/registry/core/service/allocator:go_default_library",
-        "//pkg/registry/generic:go_default_library",
         "//pkg/storage:go_default_library",
         "//pkg/storage/storagebackend:go_default_library",
         "//vendor:golang.org/x/net/context",

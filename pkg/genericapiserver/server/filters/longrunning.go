@@ -20,7 +20,7 @@ import (
 	"net/http"
 
 	"k8s.io/apimachinery/pkg/util/sets"
-	apirequest "k8s.io/apiserver/pkg/request"
+	apirequest "k8s.io/apiserver/pkg/endpoints/request"
 )
 
 // LongRunningRequestCheck is a predicate which is true for long-running http requests.

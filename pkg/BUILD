@@ -26,6 +26,7 @@ filegroup(
         "//pkg/apis/componentconfig:all-srcs",
         "//pkg/apis/extensions:all-srcs",
         "//pkg/apis/imagepolicy:all-srcs",
+        "//pkg/apis/meta/v1:all-srcs",
         "//pkg/apis/policy:all-srcs",
         "//pkg/apis/rbac:all-srcs",
         "//pkg/apis/storage:all-srcs",

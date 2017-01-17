@@ -27,7 +27,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/openapi"
 	"k8s.io/apimachinery/pkg/util/json"
-	genericmux "k8s.io/kubernetes/pkg/genericapiserver/mux"
+	genericmux "k8s.io/kubernetes/pkg/genericapiserver/server/mux"
 	"k8s.io/kubernetes/pkg/util"
 )
 

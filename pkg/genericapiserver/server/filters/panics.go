@@ -24,8 +24,8 @@ import (
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/util/runtime"
-	"k8s.io/apiserver/pkg/httplog"
-	apirequest "k8s.io/apiserver/pkg/request"
+	apirequest "k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/server/httplog"
 )
 
 // WithPanicRecovery wraps an http Handler to recover and log panics.

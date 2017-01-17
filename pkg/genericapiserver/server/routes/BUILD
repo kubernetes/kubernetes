@@ -21,10 +21,10 @@ go_library(
     ],
     tags = ["automanaged"],
     deps = [
-        "//pkg/genericapiserver/api/handlers/responsewriters:go_default_library",
-        "//pkg/genericapiserver/mux:go_default_library",
-        "//pkg/genericapiserver/openapi:go_default_library",
-        "//pkg/genericapiserver/routes/data/swagger:go_default_library",
+        "//pkg/genericapiserver/endpoints/handlers/responsewriters:go_default_library",
+        "//pkg/genericapiserver/server/mux:go_default_library",
+        "//pkg/genericapiserver/server/openapi:go_default_library",
+        "//pkg/genericapiserver/server/routes/data/swagger:go_default_library",
         "//vendor:github.com/elazarl/go-bindata-assetfs",
         "//vendor:github.com/emicklei/go-restful",
         "//vendor:github.com/emicklei/go-restful/swagger",
@@ -33,7 +33,7 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/openapi",
         "//vendor:k8s.io/apimachinery/pkg/version",
-        "//vendor:k8s.io/apiserver/pkg/metrics",
+        "//vendor:k8s.io/apiserver/pkg/endpoints/metrics",
         "//vendor:k8s.io/apiserver/pkg/storage/etcd/metrics",
     ],
 )
@@ -49,7 +49,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
-        "//pkg/genericapiserver/routes/data/swagger:all-srcs",
+        "//pkg/genericapiserver/server/routes/data/swagger:all-srcs",
     ],
     tags = ["automanaged"],
 )

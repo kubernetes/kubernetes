@@ -8,37 +8,6 @@ load(
     "go_test",
 )
 
-go_library(
-    name = "go_default_library",
-    srcs = [
-        "apiserver.go",
-        "discovery.go",
-        "doc.go",
-        "groupversion.go",
-        "installer.go",
-    ],
-    tags = ["automanaged"],
-    deps = [
-        "//pkg/apis/extensions:go_default_library",
-        "//pkg/genericapiserver/api/handlers:go_default_library",
-        "//pkg/genericapiserver/api/handlers/responsewriters:go_default_library",
-        "//pkg/genericapiserver/api/rest:go_default_library",
-        "//vendor:github.com/emicklei/go-restful",
-        "//vendor:k8s.io/apimachinery/pkg/api/errors",
-        "//vendor:k8s.io/apimachinery/pkg/api/meta",
-        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
-        "//vendor:k8s.io/apimachinery/pkg/conversion",
-        "//vendor:k8s.io/apimachinery/pkg/runtime",
-        "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
-        "//vendor:k8s.io/apimachinery/pkg/types",
-        "//vendor:k8s.io/apimachinery/pkg/util/errors",
-        "//vendor:k8s.io/apiserver/pkg/admission",
-        "//vendor:k8s.io/apiserver/pkg/handlers/negotiation",
-        "//vendor:k8s.io/apiserver/pkg/metrics",
-        "//vendor:k8s.io/apiserver/pkg/request",
-    ],
-)
-
 go_test(
     name = "go_default_test",
     srcs = [
@@ -54,11 +23,11 @@ go_test(
         "//pkg/api/testing:go_default_library",
         "//pkg/api/v1:go_default_library",
         "//pkg/fields:go_default_library",
-        "//pkg/genericapiserver/api/filters:go_default_library",
-        "//pkg/genericapiserver/api/handlers:go_default_library",
-        "//pkg/genericapiserver/api/handlers/responsewriters:go_default_library",
-        "//pkg/genericapiserver/api/rest:go_default_library",
-        "//pkg/genericapiserver/api/testing:go_default_library",
+        "//pkg/genericapiserver/endpoints/filters:go_default_library",
+        "//pkg/genericapiserver/endpoints/handlers:go_default_library",
+        "//pkg/genericapiserver/endpoints/handlers/responsewriters:go_default_library",
+        "//pkg/genericapiserver/endpoints/testing:go_default_library",
+        "//pkg/genericapiserver/registry/rest:go_default_library",
         "//plugin/pkg/admission/admit:go_default_library",
         "//plugin/pkg/admission/deny:go_default_library",
         "//vendor:github.com/emicklei/go-restful",
@@ -76,7 +45,38 @@ go_test(
         "//vendor:k8s.io/apimachinery/pkg/util/wait",
         "//vendor:k8s.io/apimachinery/pkg/watch",
         "//vendor:k8s.io/apiserver/pkg/admission",
-        "//vendor:k8s.io/apiserver/pkg/request",
+        "//vendor:k8s.io/apiserver/pkg/endpoints/request",
+    ],
+)
+
+go_library(
+    name = "go_default_library",
+    srcs = [
+        "apiserver.go",
+        "discovery.go",
+        "doc.go",
+        "groupversion.go",
+        "installer.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//pkg/apis/extensions:go_default_library",
+        "//pkg/genericapiserver/endpoints/handlers:go_default_library",
+        "//pkg/genericapiserver/endpoints/handlers/responsewriters:go_default_library",
+        "//pkg/genericapiserver/registry/rest:go_default_library",
+        "//vendor:github.com/emicklei/go-restful",
+        "//vendor:k8s.io/apimachinery/pkg/api/errors",
+        "//vendor:k8s.io/apimachinery/pkg/api/meta",
+        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor:k8s.io/apimachinery/pkg/conversion",
+        "//vendor:k8s.io/apimachinery/pkg/runtime",
+        "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
+        "//vendor:k8s.io/apimachinery/pkg/types",
+        "//vendor:k8s.io/apimachinery/pkg/util/errors",
+        "//vendor:k8s.io/apiserver/pkg/admission",
+        "//vendor:k8s.io/apiserver/pkg/endpoints/handlers/negotiation",
+        "//vendor:k8s.io/apiserver/pkg/endpoints/metrics",
+        "//vendor:k8s.io/apiserver/pkg/endpoints/request",
     ],
 )
 
@@ -91,11 +91,10 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
-        "//pkg/genericapiserver/api/filters:all-srcs",
-        "//pkg/genericapiserver/api/handlers:all-srcs",
-        "//pkg/genericapiserver/api/openapi:all-srcs",
-        "//pkg/genericapiserver/api/rest:all-srcs",
-        "//pkg/genericapiserver/api/testing:all-srcs",
+        "//pkg/genericapiserver/endpoints/filters:all-srcs",
+        "//pkg/genericapiserver/endpoints/handlers:all-srcs",
+        "//pkg/genericapiserver/endpoints/openapi:all-srcs",
+        "//pkg/genericapiserver/endpoints/testing:all-srcs",
     ],
     tags = ["automanaged"],
 )

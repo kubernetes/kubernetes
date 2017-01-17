@@ -25,7 +25,7 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/util/yaml",
         "//vendor:k8s.io/apiserver/pkg/admission",
         "//vendor:k8s.io/apiserver/pkg/util/cache",
-        "//vendor:k8s.io/apiserver/pkg/webhook",
+        "//vendor:k8s.io/apiserver/pkg/util/webhook",
         "//vendor:k8s.io/client-go/pkg/apis/imagepolicy/install",
         "//vendor:k8s.io/client-go/pkg/apis/imagepolicy/v1alpha1",
         "//vendor:k8s.io/client-go/rest",

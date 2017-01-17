@@ -44,15 +44,15 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/admission"
-	"k8s.io/apiserver/pkg/request"
+	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/kubernetes/pkg/api"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/fields"
-	genericapifilters "k8s.io/kubernetes/pkg/genericapiserver/api/filters"
-	"k8s.io/kubernetes/pkg/genericapiserver/api/handlers/responsewriters"
-	"k8s.io/kubernetes/pkg/genericapiserver/api/rest"
-	genericapitesting "k8s.io/kubernetes/pkg/genericapiserver/api/testing"
+	genericapifilters "k8s.io/kubernetes/pkg/genericapiserver/endpoints/filters"
+	"k8s.io/kubernetes/pkg/genericapiserver/endpoints/handlers/responsewriters"
+	genericapitesting "k8s.io/kubernetes/pkg/genericapiserver/endpoints/testing"
+	"k8s.io/kubernetes/pkg/genericapiserver/registry/rest"
 	"k8s.io/kubernetes/plugin/pkg/admission/admit"
 	"k8s.io/kubernetes/plugin/pkg/admission/deny"
 
@@ -3082,7 +3082,7 @@ func TestWriteJSONDecodeError(t *testing.T) {
 	if status.Reason != metav1.StatusReasonUnknown {
 		t.Errorf("unexpected reason %#v", status)
 	}
-	if !strings.Contains(status.Message, "no kind is registered for the type api.UnregisteredAPIObject") {
+	if !strings.Contains(status.Message, "no kind is registered for the type endpoints.UnregisteredAPIObject") {
 		t.Errorf("unexpected message %#v", status)
 	}
 }

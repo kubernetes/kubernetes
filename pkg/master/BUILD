@@ -49,7 +49,9 @@ go_library(
         "//pkg/apis/storage/v1beta1:go_default_library",
         "//pkg/client/clientset_generated/clientset/typed/core/v1:go_default_library",
         "//pkg/client/clientset_generated/internalclientset/typed/core/internalversion:go_default_library",
-        "//pkg/genericapiserver:go_default_library",
+        "//pkg/genericapiserver/registry/generic:go_default_library",
+        "//pkg/genericapiserver/registry/generic/registry:go_default_library",
+        "//pkg/genericapiserver/server:go_default_library",
         "//pkg/kubelet/client:go_default_library",
         "//pkg/master/thirdparty:go_default_library",
         "//pkg/master/tunneler:go_default_library",
@@ -65,8 +67,6 @@ go_library(
         "//pkg/registry/core/service/ipallocator/controller:go_default_library",
         "//pkg/registry/core/service/portallocator/controller:go_default_library",
         "//pkg/registry/extensions/rest:go_default_library",
-        "//pkg/registry/generic:go_default_library",
-        "//pkg/registry/generic/registry:go_default_library",
         "//pkg/registry/policy/rest:go_default_library",
         "//pkg/registry/rbac/rest:go_default_library",
         "//pkg/registry/storage/rest:go_default_library",
@@ -82,7 +82,7 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/util/net",
         "//vendor:k8s.io/apimachinery/pkg/util/runtime",
         "//vendor:k8s.io/apimachinery/pkg/util/wait",
-        "//vendor:k8s.io/apiserver/pkg/healthz",
+        "//vendor:k8s.io/apiserver/pkg/server/healthz",
     ],
 )
 
@@ -116,7 +116,7 @@ go_test(
         "//pkg/client/restclient:go_default_library",
         "//pkg/client/testing/core:go_default_library",
         "//pkg/generated/openapi:go_default_library",
-        "//pkg/genericapiserver:go_default_library",
+        "//pkg/genericapiserver/server:go_default_library",
         "//pkg/kubelet/client:go_default_library",
         "//pkg/storage/etcd/testing:go_default_library",
         "//pkg/util/intstr:go_default_library",
@@ -132,7 +132,7 @@ go_test(
         "//vendor:k8s.io/apimachinery/pkg/util/net",
         "//vendor:k8s.io/apimachinery/pkg/util/sets",
         "//vendor:k8s.io/apimachinery/pkg/version",
-        "//vendor:k8s.io/apiserver/pkg/request",
+        "//vendor:k8s.io/apiserver/pkg/endpoints/request",
     ],
 )
 

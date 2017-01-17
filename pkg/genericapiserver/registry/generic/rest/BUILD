@@ -18,7 +18,7 @@ go_library(
     ],
     tags = ["automanaged"],
     deps = [
-        "//pkg/genericapiserver/api/rest:go_default_library",
+        "//pkg/genericapiserver/registry/rest:go_default_library",
         "//pkg/util/config:go_default_library",
         "//pkg/util/httpstream:go_default_library",
         "//pkg/util/proxy:go_default_library",

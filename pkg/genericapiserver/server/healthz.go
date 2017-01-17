@@ -14,12 +14,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package genericapiserver
+package server
 
 import (
 	"fmt"
 
-	"k8s.io/apiserver/pkg/healthz"
+	"k8s.io/apiserver/pkg/server/healthz"
 )
 
 // AddHealthzCheck allows you to add a HealthzCheck.

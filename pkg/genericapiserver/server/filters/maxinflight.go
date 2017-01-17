@@ -22,9 +22,9 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/apiserver/pkg/httplog"
-	apirequest "k8s.io/apiserver/pkg/request"
-	genericapirequest "k8s.io/apiserver/pkg/request"
+	apirequest "k8s.io/apiserver/pkg/endpoints/request"
+	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/server/httplog"
 
 	"github.com/golang/glog"
 )

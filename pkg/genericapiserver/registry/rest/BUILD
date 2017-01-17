@@ -17,7 +17,6 @@ go_library(
         "export.go",
         "meta.go",
         "rest.go",
-        "types.go",
         "update.go",
     ],
     tags = ["automanaged"],
@@ -33,7 +32,7 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
         "//vendor:k8s.io/apimachinery/pkg/util/validation/field",
         "//vendor:k8s.io/apimachinery/pkg/watch",
-        "//vendor:k8s.io/apiserver/pkg/request",
+        "//vendor:k8s.io/apiserver/pkg/endpoints/request",
         "//vendor:k8s.io/apiserver/pkg/storage/names",
     ],
 )
@@ -49,7 +48,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
-        "//pkg/genericapiserver/api/rest/resttest:all-srcs",
+        "//pkg/genericapiserver/registry/rest/resttest:all-srcs",
     ],
     tags = ["automanaged"],
 )
@@ -63,6 +62,6 @@ go_test(
         "//pkg/api:go_default_library",
         "//pkg/util/uuid:go_default_library",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
-        "//vendor:k8s.io/apiserver/pkg/request",
+        "//vendor:k8s.io/apiserver/pkg/endpoints/request",
     ],
 )

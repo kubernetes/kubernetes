@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package genericapiserver
+package server
 
 import (
 	"fmt"
@@ -38,14 +38,14 @@ import (
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/admission"
-	"k8s.io/apiserver/pkg/healthz"
-	apirequest "k8s.io/apiserver/pkg/request"
+	apirequest "k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/server/healthz"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/restclient"
-	genericapi "k8s.io/kubernetes/pkg/genericapiserver/api"
-	"k8s.io/kubernetes/pkg/genericapiserver/api/rest"
-	genericmux "k8s.io/kubernetes/pkg/genericapiserver/mux"
-	"k8s.io/kubernetes/pkg/genericapiserver/routes"
+	genericapi "k8s.io/kubernetes/pkg/genericapiserver/endpoints"
+	"k8s.io/kubernetes/pkg/genericapiserver/registry/rest"
+	genericmux "k8s.io/kubernetes/pkg/genericapiserver/server/mux"
+	"k8s.io/kubernetes/pkg/genericapiserver/server/routes"
 )
 
 // Info about an API group.

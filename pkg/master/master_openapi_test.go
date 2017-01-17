@@ -28,7 +28,7 @@ import (
 	"testing"
 
 	openapigen "k8s.io/kubernetes/pkg/generated/openapi"
-	"k8s.io/kubernetes/pkg/genericapiserver"
+	genericapiserver "k8s.io/kubernetes/pkg/genericapiserver/server"
 
 	"github.com/go-openapi/loads"
 	"github.com/go-openapi/spec"

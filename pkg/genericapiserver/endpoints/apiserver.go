@@ -17,7 +17,7 @@ limitations under the License.
 package endpoints
 
 import (
-	"k8s.io/apiserver/pkg/metrics"
+	"k8s.io/apiserver/pkg/endpoints/metrics"
 )
 
 func init() {
