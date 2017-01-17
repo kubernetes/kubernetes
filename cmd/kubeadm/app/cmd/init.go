@@ -203,12 +203,12 @@ func (i *Init) Run(out io.Writer) error {
 	// Validate token if any, otherwise generate
 	if i.cfg.Discovery.Token != nil {
 		if i.cfg.Discovery.Token.ID != "" && i.cfg.Discovery.Token.Secret != "" {
-			fmt.Printf("[token-discovery] A token has been provided, validating [%+v]\n", i.cfg.Discovery.Token)
+			fmt.Printf("[token-discovery] A token has been provided, validating [%s]\n", kubeadmutil.BearerToken(i.cfg.Discovery.Token))
 			if valid, err := kubeadmutil.ValidateToken(i.cfg.Discovery.Token); valid == false {
 				return err
 			}
 		} else {
-			fmt.Printf("[token-discovery] A token has not been provided, generating one\n")
+			fmt.Println("[token-discovery] A token has not been provided, generating one")
 			if err := kubeadmutil.GenerateToken(i.cfg.Discovery.Token); err != nil {
 				return err
 			}
