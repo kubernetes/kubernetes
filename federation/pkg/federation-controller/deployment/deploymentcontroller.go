@@ -571,7 +571,7 @@ func (fdc *DeploymentController) reconcileDeployment(key string) (reconciliation
 				})
 			}
 		} else {
-			// TODO: Update only one deployment at a time if update strategy is rolling udpate.
+			// TODO: Update only one deployment at a time if update strategy is rolling update.
 
 			currentLd := ldObj.(*extensionsv1.Deployment)
 			// Update existing replica set, if needed.
