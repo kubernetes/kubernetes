@@ -94,12 +94,12 @@ var _ = framework.KubeDescribe("Daemon set [Serial]", func() {
 
 		framework.Logf("Creating simple daemon set %s", dsName)
 		_, err := c.Extensions().DaemonSets(ns).Create(&extensions.DaemonSet{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name: dsName,
 			},
 			Spec: extensions.DaemonSetSpec{
 				Template: v1.PodTemplateSpec{
-					ObjectMeta: v1.ObjectMeta{
+					ObjectMeta: metav1.ObjectMeta{
 						Labels: label,
 					},
 					Spec: v1.PodSpec{
@@ -153,13 +153,13 @@ var _ = framework.KubeDescribe("Daemon set [Serial]", func() {
 		nodeSelector := map[string]string{daemonsetColorLabel: "blue"}
 		framework.Logf("Creating daemon with a node selector %s", dsName)
 		_, err := c.Extensions().DaemonSets(ns).Create(&extensions.DaemonSet{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name: dsName,
 			},
 			Spec: extensions.DaemonSetSpec{
 				Selector: &metav1.LabelSelector{MatchLabels: complexLabel},
 				Template: v1.PodTemplateSpec{
-					ObjectMeta: v1.ObjectMeta{
+					ObjectMeta: metav1.ObjectMeta{
 						Labels: complexLabel,
 					},
 					Spec: v1.PodSpec{
@@ -226,13 +226,13 @@ var _ = framework.KubeDescribe("Daemon set [Serial]", func() {
 			},
 		}
 		_, err := c.Extensions().DaemonSets(ns).Create(&extensions.DaemonSet{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name: dsName,
 			},
 			Spec: extensions.DaemonSetSpec{
 				Selector: &metav1.LabelSelector{MatchLabels: complexLabel},
 				Template: v1.PodTemplateSpec{
-					ObjectMeta: v1.ObjectMeta{
+					ObjectMeta: metav1.ObjectMeta{
 						Labels: complexLabel,
 					},
 					Spec: v1.PodSpec{

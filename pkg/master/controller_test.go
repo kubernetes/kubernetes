@@ -21,6 +21,7 @@ import (
 	"reflect"
 	"testing"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
 	"k8s.io/kubernetes/pkg/client/testing/core"
@@ -29,8 +30,8 @@ import (
 
 func TestReconcileEndpoints(t *testing.T) {
 	ns := api.NamespaceDefault
-	om := func(name string) api.ObjectMeta {
-		return api.ObjectMeta{Namespace: ns, Name: name}
+	om := func(name string) metav1.ObjectMeta {
+		return metav1.ObjectMeta{Namespace: ns, Name: name}
 	}
 	reconcile_tests := []struct {
 		testName          string
@@ -542,8 +543,8 @@ func TestReconcileEndpoints(t *testing.T) {
 
 func TestCreateOrUpdateMasterService(t *testing.T) {
 	ns := api.NamespaceDefault
-	om := func(name string) api.ObjectMeta {
-		return api.ObjectMeta{Namespace: ns, Name: name}
+	om := func(name string) metav1.ObjectMeta {
+		return metav1.ObjectMeta{Namespace: ns, Name: name}
 	}
 
 	create_tests := []struct {

@@ -109,7 +109,7 @@ func newKubeDiscovery(cfg *kubeadmapi.MasterConfiguration, caCert *x509.Certific
 	kd := kubeDiscovery{
 		Deployment: NewDeployment(kubeDiscoveryName, 1, newKubeDiscoveryPodSpec(cfg)),
 		Secret: &v1.Secret{
-			ObjectMeta: v1.ObjectMeta{Name: kubeDiscoverySecretName},
+			ObjectMeta: metav1.ObjectMeta{Name: kubeDiscoverySecretName},
 			Type:       v1.SecretTypeOpaque,
 			Data:       encodeKubeDiscoverySecretData(cfg.Discovery.Token, cfg.API, caCert),
 		},

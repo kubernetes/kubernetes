@@ -244,7 +244,7 @@ func TestPersistentVolumeBindRace(t *testing.T) {
 		counter += 1
 		clone, _ := api.Scheme.DeepCopy(pvc)
 		newPvc, _ := clone.(*v1.PersistentVolumeClaim)
-		newPvc.ObjectMeta = v1.ObjectMeta{Name: fmt.Sprintf("fake-pvc-race-%d", counter)}
+		newPvc.ObjectMeta = metav1.ObjectMeta{Name: fmt.Sprintf("fake-pvc-race-%d", counter)}
 		claim, err := testClient.PersistentVolumeClaims(ns.Name).Create(newPvc)
 		if err != nil {
 			t.Fatalf("Error creating newPvc: %v", err)
@@ -863,7 +863,7 @@ func TestPersistentVolumeProvisionMultiPVCs(t *testing.T) {
 		TypeMeta: metav1.TypeMeta{
 			Kind: "StorageClass",
 		},
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: "gold",
 		},
 		Provisioner: provisionerPluginName,
@@ -1142,7 +1142,7 @@ func createClients(ns *v1.Namespace, t *testing.T, s *httptest.Server, syncPerio
 
 func createPV(name, path, cap string, mode []v1.PersistentVolumeAccessMode, reclaim v1.PersistentVolumeReclaimPolicy) *v1.PersistentVolume {
 	return &v1.PersistentVolume{
-		ObjectMeta: v1.ObjectMeta{Name: name},
+		ObjectMeta: metav1.ObjectMeta{Name: name},
 		Spec: v1.PersistentVolumeSpec{
 			PersistentVolumeSource:        v1.PersistentVolumeSource{HostPath: &v1.HostPathVolumeSource{Path: path}},
 			Capacity:                      v1.ResourceList{v1.ResourceName(v1.ResourceStorage): resource.MustParse(cap)},
@@ -1154,7 +1154,7 @@ func createPV(name, path, cap string, mode []v1.PersistentVolumeAccessMode, recl
 
 func createPVC(name, namespace, cap string, mode []v1.PersistentVolumeAccessMode) *v1.PersistentVolumeClaim {
 	return &v1.PersistentVolumeClaim{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: namespace,
 		},

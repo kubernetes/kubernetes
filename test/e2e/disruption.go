@@ -153,7 +153,7 @@ var _ = framework.KubeDescribe("DisruptionController", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			e := &policy.Eviction{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:      pod.Name,
 					Namespace: ns,
 				},
@@ -191,7 +191,7 @@ var _ = framework.KubeDescribe("DisruptionController", func() {
 
 func createPodDisruptionBudgetOrDie(cs *kubernetes.Clientset, ns string, minAvailable intstr.IntOrString) {
 	pdb := policy.PodDisruptionBudget{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      "foo",
 			Namespace: ns,
 		},
@@ -207,7 +207,7 @@ func createPodDisruptionBudgetOrDie(cs *kubernetes.Clientset, ns string, minAvai
 func createPodsOrDie(cs *kubernetes.Clientset, ns string, n int) {
 	for i := 0; i < n; i++ {
 		pod := &v1.Pod{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:      fmt.Sprintf("pod-%d", i),
 				Namespace: ns,
 				Labels:    map[string]string{"foo": "bar"},
@@ -269,7 +269,7 @@ func createReplicaSetOrDie(cs *kubernetes.Clientset, ns string, size int32, excl
 	}
 
 	rs := &extensions.ReplicaSet{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      "rs",
 			Namespace: ns,
 		},
@@ -279,7 +279,7 @@ func createReplicaSetOrDie(cs *kubernetes.Clientset, ns string, size int32, excl
 				MatchLabels: map[string]string{"foo": "bar"},
 			},
 			Template: v1.PodTemplateSpec{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{"foo": "bar"},
 				},
 				Spec: v1.PodSpec{

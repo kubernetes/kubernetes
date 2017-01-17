@@ -278,7 +278,7 @@ func TestDeleteObjectIgnoreNotFound(t *testing.T) {
 func TestDeleteAllNotFound(t *testing.T) {
 	_, svc, _ := testData()
 	// Add an item to the list which will result in a 404 on delete
-	svc.Items = append(svc.Items, api.Service{ObjectMeta: api.ObjectMeta{Name: "foo"}})
+	svc.Items = append(svc.Items, api.Service{ObjectMeta: metav1.ObjectMeta{Name: "foo"}})
 	notFoundError := &errors.NewNotFound(api.Resource("services"), "foo").ErrStatus
 
 	f, tf, codec, _ := cmdtesting.NewAPIFactory()
@@ -328,7 +328,7 @@ func TestDeleteAllIgnoreNotFound(t *testing.T) {
 	f, tf, codec, _ := cmdtesting.NewAPIFactory()
 
 	// Add an item to the list which will result in a 404 on delete
-	svc.Items = append(svc.Items, api.Service{ObjectMeta: api.ObjectMeta{Name: "foo"}})
+	svc.Items = append(svc.Items, api.Service{ObjectMeta: metav1.ObjectMeta{Name: "foo"}})
 	notFoundError := &errors.NewNotFound(api.Resource("services"), "foo").ErrStatus
 
 	tf.Printer = &testPrinter{}

@@ -495,7 +495,7 @@ func (rc *reconciler) reconstructVolume(volume podVolume) (*reconstructedVolume,
 		return nil, err
 	}
 	pod := &v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			UID: types.UID(volume.podName),
 		},
 	}

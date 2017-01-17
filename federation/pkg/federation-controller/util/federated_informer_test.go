@@ -20,6 +20,7 @@ import (
 	"testing"
 	"time"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	federationapi "k8s.io/kubernetes/federation/apis/federation/v1beta1"
@@ -40,7 +41,7 @@ func TestFederatedInformer(t *testing.T) {
 
 	// Add a single cluster to federation and remove it when needed.
 	cluster := federationapi.Cluster{
-		ObjectMeta: apiv1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: "mycluster",
 		},
 		Status: federationapi.ClusterStatus{
@@ -65,7 +66,7 @@ func TestFederatedInformer(t *testing.T) {
 	fakeKubeClient := &fakekubeclientset.Clientset{}
 	// There is a single service ns1/s1 in cluster mycluster.
 	service := apiv1.Service{
-		ObjectMeta: apiv1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Namespace: "ns1",
 			Name:      "s1",
 		},

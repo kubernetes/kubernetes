@@ -22,6 +22,7 @@ import (
 	"testing"
 	"time"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/factory"
 	"k8s.io/kubernetes/test/integration/framework"
@@ -97,7 +98,7 @@ func TestSchedule100Node3KNodeAffinityPods(t *testing.T) {
 	for i := 0; i < numGroups; i++ {
 		podCreatorConfig.AddStrategy("sched-perf-node-affinity", config.numPods/numGroups,
 			testutils.NewCustomCreatePodStrategy(&v1.Pod{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					GenerateName: "sched-perf-node-affinity-pod-",
 					Annotations:  map[string]string{v1.AffinityAnnotationKey: fmt.Sprintf(affinityTemplate, i)},
 				},

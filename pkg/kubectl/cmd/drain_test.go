@@ -60,7 +60,7 @@ var cordoned_node *api.Node
 func TestMain(m *testing.M) {
 	// Create a node.
 	node = &api.Node{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:              "node",
 			CreationTimestamp: metav1.Time{Time: time.Now()},
 		},
@@ -221,7 +221,7 @@ func TestDrain(t *testing.T) {
 	labels["my_key"] = "my_value"
 
 	rc := api.ReplicationController{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:              "rc",
 			Namespace:         "default",
 			CreationTimestamp: metav1.Time{Time: time.Now()},
@@ -237,7 +237,7 @@ func TestDrain(t *testing.T) {
 	rc_anno[api.CreatedByAnnotation] = refJson(t, &rc)
 
 	rc_pod := api.Pod{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:              "bar",
 			Namespace:         "default",
 			CreationTimestamp: metav1.Time{Time: time.Now()},
@@ -250,7 +250,7 @@ func TestDrain(t *testing.T) {
 	}
 
 	ds := extensions.DaemonSet{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:              "ds",
 			Namespace:         "default",
 			CreationTimestamp: metav1.Time{Time: time.Now()},
@@ -265,7 +265,7 @@ func TestDrain(t *testing.T) {
 	ds_anno[api.CreatedByAnnotation] = refJson(t, &ds)
 
 	ds_pod := api.Pod{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:              "bar",
 			Namespace:         "default",
 			CreationTimestamp: metav1.Time{Time: time.Now()},
@@ -278,7 +278,7 @@ func TestDrain(t *testing.T) {
 	}
 
 	job := batch.Job{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:              "job",
 			Namespace:         "default",
 			CreationTimestamp: metav1.Time{Time: time.Now()},
@@ -290,7 +290,7 @@ func TestDrain(t *testing.T) {
 	}
 
 	job_pod := api.Pod{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:              "bar",
 			Namespace:         "default",
 			CreationTimestamp: metav1.Time{Time: time.Now()},
@@ -300,7 +300,7 @@ func TestDrain(t *testing.T) {
 	}
 
 	rs := extensions.ReplicaSet{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:              "rs",
 			Namespace:         "default",
 			CreationTimestamp: metav1.Time{Time: time.Now()},
@@ -316,7 +316,7 @@ func TestDrain(t *testing.T) {
 	rs_anno[api.CreatedByAnnotation] = refJson(t, &rs)
 
 	rs_pod := api.Pod{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:              "bar",
 			Namespace:         "default",
 			CreationTimestamp: metav1.Time{Time: time.Now()},
@@ -329,7 +329,7 @@ func TestDrain(t *testing.T) {
 	}
 
 	naked_pod := api.Pod{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:              "bar",
 			Namespace:         "default",
 			CreationTimestamp: metav1.Time{Time: time.Now()},
@@ -341,7 +341,7 @@ func TestDrain(t *testing.T) {
 	}
 
 	emptydir_pod := api.Pod{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:              "bar",
 			Namespace:         "default",
 			CreationTimestamp: metav1.Time{Time: time.Now()},
@@ -716,7 +716,7 @@ func createPods(ifCreateNewPods bool) (map[string]api.Pod, []api.Pod) {
 			uid = types.UID(strconv.Itoa(i) + strconv.Itoa(i))
 		}
 		pod := api.Pod{
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:       "pod" + strconv.Itoa(i),
 				Namespace:  "default",
 				UID:        uid,

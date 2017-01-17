@@ -279,7 +279,7 @@ func updateReplicaSetOrFail(clientset *fedclientset.Clientset, namespace string)
 
 func newReplicaSet(namespace string, name string, replicas int32) *v1beta1.ReplicaSet {
 	return &v1beta1.ReplicaSet{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: namespace,
 		},
@@ -289,7 +289,7 @@ func newReplicaSet(namespace string, name string, replicas int32) *v1beta1.Repli
 				MatchLabels: map[string]string{"name": "myrs"},
 			},
 			Template: v1.PodTemplateSpec{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{"name": "myrs"},
 				},
 				Spec: v1.PodSpec{

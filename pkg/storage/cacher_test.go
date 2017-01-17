@@ -70,7 +70,7 @@ func newTestCacher(s storage.Interface, cap int) *storage.Cacher {
 
 func makeTestPod(name string) *api.Pod {
 	return &api.Pod{
-		ObjectMeta: api.ObjectMeta{Namespace: "ns", Name: name},
+		ObjectMeta: metav1.ObjectMeta{Namespace: "ns", Name: name},
 		Spec:       apitesting.DeepEqualSafePodSpec(),
 	}
 }

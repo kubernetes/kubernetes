@@ -100,11 +100,11 @@ func testData() (*api.PodList, *api.ServiceList) {
 		},
 		Items: []api.Pod{
 			{
-				ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "test", ResourceVersion: "10"},
+				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "test", ResourceVersion: "10"},
 				Spec:       apitesting.DeepEqualSafePodSpec(),
 			},
 			{
-				ObjectMeta: api.ObjectMeta{Name: "bar", Namespace: "test", ResourceVersion: "11"},
+				ObjectMeta: metav1.ObjectMeta{Name: "bar", Namespace: "test", ResourceVersion: "11"},
 				Spec:       apitesting.DeepEqualSafePodSpec(),
 			},
 		},
@@ -115,7 +115,7 @@ func testData() (*api.PodList, *api.ServiceList) {
 		},
 		Items: []api.Service{
 			{
-				ObjectMeta: api.ObjectMeta{Name: "baz", Namespace: "test", ResourceVersion: "12"},
+				ObjectMeta: metav1.ObjectMeta{Name: "baz", Namespace: "test", ResourceVersion: "12"},
 				Spec: api.ServiceSpec{
 					Type:            "ClusterIP",
 					SessionAffinity: "None",
@@ -277,7 +277,7 @@ func TestPathBuilderAndVersionedObjectNotDefaulted(t *testing.T) {
 
 func TestNodeBuilder(t *testing.T) {
 	node := &api.Node{
-		ObjectMeta: api.ObjectMeta{Name: "node1", Namespace: "should-not-have", ResourceVersion: "10"},
+		ObjectMeta: metav1.ObjectMeta{Name: "node1", Namespace: "should-not-have", ResourceVersion: "10"},
 		Spec:       api.NodeSpec{},
 		Status: api.NodeStatus{
 			Capacity: api.ResourceList{
@@ -457,7 +457,7 @@ func TestDirectoryBuilder(t *testing.T) {
 func TestNamespaceOverride(t *testing.T) {
 	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(runtime.EncodeOrDie(testapi.Default.Codec(), &api.Pod{ObjectMeta: api.ObjectMeta{Namespace: "foo", Name: "test"}})))
+		w.Write([]byte(runtime.EncodeOrDie(testapi.Default.Codec(), &api.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: "foo", Name: "test"}})))
 	}))
 	defer s.Close()
 
@@ -487,8 +487,8 @@ func TestNamespaceOverride(t *testing.T) {
 func TestURLBuilder(t *testing.T) {
 	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(runtime.EncodeOrDie(testapi.Default.Codec(), &api.Pod{ObjectMeta: api.ObjectMeta{Namespace: "foo", Name: "test"}})))
-		w.Write([]byte(runtime.EncodeOrDie(testapi.Default.Codec(), &api.Pod{ObjectMeta: api.ObjectMeta{Namespace: "foo", Name: "test1"}})))
+		w.Write([]byte(runtime.EncodeOrDie(testapi.Default.Codec(), &api.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: "foo", Name: "test"}})))
+		w.Write([]byte(runtime.EncodeOrDie(testapi.Default.Codec(), &api.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: "foo", Name: "test1"}})))
 	}))
 	defer s.Close()
 
@@ -517,7 +517,7 @@ func TestURLBuilder(t *testing.T) {
 func TestURLBuilderRequireNamespace(t *testing.T) {
 	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(runtime.EncodeOrDie(testapi.Default.Codec(), &api.Pod{ObjectMeta: api.ObjectMeta{Namespace: "foo", Name: "test"}})))
+		w.Write([]byte(runtime.EncodeOrDie(testapi.Default.Codec(), &api.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: "foo", Name: "test"}})))
 	}))
 	defer s.Close()
 
@@ -820,7 +820,7 @@ func TestResourceTuple(t *testing.T) {
 				expectedRequests = map[string]string{
 					"/namespaces/test/pods/foo": runtime.EncodeOrDie(testapi.Default.Codec(), &pods.Items[0]),
 					"/namespaces/test/pods/bar": runtime.EncodeOrDie(testapi.Default.Codec(), &pods.Items[0]),
-					"/nodes/foo":                runtime.EncodeOrDie(testapi.Default.Codec(), &api.Node{ObjectMeta: api.ObjectMeta{Name: "foo"}}),
+					"/nodes/foo":                runtime.EncodeOrDie(testapi.Default.Codec(), &api.Node{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}),
 				}
 			}
 
@@ -980,7 +980,7 @@ func TestSingleItemImpliedObjectNoExtension(t *testing.T) {
 }
 
 func TestSingleItemImpliedRootScopedObject(t *testing.T) {
-	node := &api.Node{ObjectMeta: api.ObjectMeta{Name: "test"}, Spec: api.NodeSpec{ExternalID: "test"}}
+	node := &api.Node{ObjectMeta: metav1.ObjectMeta{Name: "test"}, Spec: api.NodeSpec{ExternalID: "test"}}
 	r := streamTestObject(node)
 	infos, err := NewBuilder(testapi.Default.RESTMapper(), api.Scheme, fakeClient(), testapi.Default.Codec()).
 		NamespaceParam("test").DefaultNamespace().
@@ -1112,13 +1112,13 @@ func TestWatchMultipleError(t *testing.T) {
 func TestLatest(t *testing.T) {
 	r, _, _ := streamTestData()
 	newPod := &api.Pod{
-		ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "test", ResourceVersion: "13"},
+		ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "test", ResourceVersion: "13"},
 	}
 	newPod2 := &api.Pod{
-		ObjectMeta: api.ObjectMeta{Name: "bar", Namespace: "test", ResourceVersion: "14"},
+		ObjectMeta: metav1.ObjectMeta{Name: "bar", Namespace: "test", ResourceVersion: "14"},
 	}
 	newSvc := &api.Service{
-		ObjectMeta: api.ObjectMeta{Name: "baz", Namespace: "test", ResourceVersion: "15"},
+		ObjectMeta: metav1.ObjectMeta{Name: "baz", Namespace: "test", ResourceVersion: "15"},
 	}
 
 	b := NewBuilder(testapi.Default.RESTMapper(), api.Scheme, fakeClientWith("", t, map[string]string{

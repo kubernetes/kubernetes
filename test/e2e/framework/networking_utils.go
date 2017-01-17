@@ -323,7 +323,7 @@ func (config *NetworkingTestConfig) createNetShellPodSpec(podName string, node s
 			Kind:       "Pod",
 			APIVersion: api.Registry.GroupOrDie(v1.GroupName).GroupVersion.String(),
 		},
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      podName,
 			Namespace: config.Namespace,
 		},
@@ -367,7 +367,7 @@ func (config *NetworkingTestConfig) createTestPodSpec() *v1.Pod {
 			Kind:       "Pod",
 			APIVersion: api.Registry.GroupOrDie(v1.GroupName).GroupVersion.String(),
 		},
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      testPodName,
 			Namespace: config.Namespace,
 		},
@@ -397,7 +397,7 @@ func (config *NetworkingTestConfig) createTestPodSpec() *v1.Pod {
 
 func (config *NetworkingTestConfig) createNodePortService(selector map[string]string) {
 	serviceSpec := &v1.Service{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: nodePortServiceName,
 		},
 		Spec: v1.ServiceSpec{

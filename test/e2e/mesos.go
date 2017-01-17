@@ -83,7 +83,7 @@ var _ = framework.KubeDescribe("Mesos", func() {
 			TypeMeta: metav1.TypeMeta{
 				Kind: "Pod",
 			},
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name: podName,
 				Annotations: map[string]string{
 					"k8s.mesosphere.io/roles": "public",

@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"time"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/util/uuid"
@@ -109,7 +110,7 @@ var _ = framework.KubeDescribe("Container Lifecycle Hook", func() {
 		Context("when it is http hook", func() {
 			var targetIP string
 			podHandleHookRequest := &v1.Pod{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name: "pod-handle-http-request",
 				},
 				Spec: v1.PodSpec{
@@ -154,7 +155,7 @@ var _ = framework.KubeDescribe("Container Lifecycle Hook", func() {
 			}
 			It("should execute poststart http hook properly [Conformance]", func() {
 				podWithHook := &v1.Pod{
-					ObjectMeta: v1.ObjectMeta{
+					ObjectMeta: metav1.ObjectMeta{
 						Name: "pod-with-poststart-http-hook",
 					},
 					Spec: v1.PodSpec{
@@ -179,7 +180,7 @@ var _ = framework.KubeDescribe("Container Lifecycle Hook", func() {
 			})
 			It("should execute prestop http hook properly [Conformance]", func() {
 				podWithHook := &v1.Pod{
-					ObjectMeta: v1.ObjectMeta{
+					ObjectMeta: metav1.ObjectMeta{
 						Name: "pod-with-prestop-http-hook",
 					},
 					Spec: v1.PodSpec{
@@ -208,7 +209,7 @@ var _ = framework.KubeDescribe("Container Lifecycle Hook", func() {
 
 func getExecHookTestPod(name string, cmd []string) *v1.Pod {
 	return &v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 		},
 		Spec: v1.PodSpec{

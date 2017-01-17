@@ -65,7 +65,7 @@ func (podDisruptionBudgetStrategy) PrepareForUpdate(ctx genericapirequest.Contex
 
 	// Any changes to the spec increment the generation number, any changes to the
 	// status should reflect the generation number of the corresponding object.
-	// See api.ObjectMeta description for more information on Generation.
+	// See metav1.ObjectMeta description for more information on Generation.
 	if !reflect.DeepEqual(oldPodDisruptionBudget.Spec, newPodDisruptionBudget.Spec) {
 		newPodDisruptionBudget.Generation = oldPodDisruptionBudget.Generation + 1
 	}

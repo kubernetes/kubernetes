@@ -61,7 +61,7 @@ func (e *exists) Admit(a admission.Attributes) (err error) {
 		return admission.NewForbidden(a, fmt.Errorf("not yet ready to handle request"))
 	}
 	namespace := &api.Namespace{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      a.GetNamespace(),
 			Namespace: "",
 		},

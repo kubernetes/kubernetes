@@ -100,7 +100,7 @@ type ClusterRoleBindingBuilder struct {
 func NewClusterBinding(clusterRoleName string) *ClusterRoleBindingBuilder {
 	return &ClusterRoleBindingBuilder{
 		ClusterRoleBinding: ClusterRoleBinding{
-			ObjectMeta: v1.ObjectMeta{Name: clusterRoleName},
+			ObjectMeta: metav1.ObjectMeta{Name: clusterRoleName},
 			RoleRef: RoleRef{
 				APIGroup: GroupName,
 				Kind:     "ClusterRole",

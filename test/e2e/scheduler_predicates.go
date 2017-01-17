@@ -759,7 +759,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 
 func initPausePod(f *framework.Framework, conf pausePodConfig) *v1.Pod {
 	pod := &v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:        conf.Name,
 			Labels:      conf.Labels,
 			Annotations: conf.Annotations,

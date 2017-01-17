@@ -306,7 +306,7 @@ func createSecret(kubeClient clientset.Interface, ing *extensions.Ingress) (host
 	cert := c.Bytes()
 	key := k.Bytes()
 	secret := &v1.Secret{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: tls.SecretName,
 		},
 		Data: map[string][]byte{

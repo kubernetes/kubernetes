@@ -24,6 +24,7 @@ import (
 	"strings"
 	"testing"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer/protobuf"
@@ -273,7 +274,7 @@ func TestProtobufDecode(t *testing.T) {
 
 func TestDecodeObjects(t *testing.T) {
 	obj1 := &v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: "cool",
 		},
 		Spec: v1.PodSpec{

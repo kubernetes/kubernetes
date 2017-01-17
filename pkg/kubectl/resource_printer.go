@@ -1766,7 +1766,7 @@ func printLimitRangeList(list *api.LimitRangeList, w io.Writer, options PrintOpt
 }
 
 // printObjectMeta prints the object metadata of a given resource.
-func printObjectMeta(meta api.ObjectMeta, w io.Writer, options PrintOptions, namespaced bool) error {
+func printObjectMeta(meta metav1.ObjectMeta, w io.Writer, options PrintOptions, namespaced bool) error {
 	name := formatResourceName(options.Kind, meta.Name, options.WithKind)
 
 	if namespaced && options.WithNamespace {

@@ -39,7 +39,7 @@ import (
 // and cloud provider says node is gone
 func TestNodeDeleted(t *testing.T) {
 	pod0 := &v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Namespace: "default",
 			Name:      "pod0",
 		},
@@ -57,7 +57,7 @@ func TestNodeDeleted(t *testing.T) {
 	}
 
 	pod1 := &v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Namespace: "default",
 			Name:      "pod1",
 		},
@@ -77,7 +77,7 @@ func TestNodeDeleted(t *testing.T) {
 	fnh := &testutil.FakeNodeHandler{
 		Existing: []*v1.Node{
 			{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:              "node0",
 					CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
 				},

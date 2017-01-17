@@ -56,7 +56,7 @@ func NewFakeControllerExpectationsLookup(ttl time.Duration) (*ControllerExpectat
 func newReplicationController(replicas int) *v1.ReplicationController {
 	rc := &v1.ReplicationController{
 		TypeMeta: metav1.TypeMeta{APIVersion: api.Registry.GroupOrDie(v1.GroupName).GroupVersion.String()},
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			UID:             uuid.NewUUID(),
 			Name:            "foobar",
 			Namespace:       v1.NamespaceDefault,
@@ -66,7 +66,7 @@ func newReplicationController(replicas int) *v1.ReplicationController {
 			Replicas: func() *int32 { i := int32(replicas); return &i }(),
 			Selector: map[string]string{"foo": "bar"},
 			Template: &v1.PodTemplateSpec{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
 						"name": "foo",
 						"type": "production",
@@ -98,7 +98,7 @@ func newPodList(store cache.Store, count int, status v1.PodPhase, rc *v1.Replica
 	pods := []v1.Pod{}
 	for i := 0; i < count; i++ {
 		newPod := v1.Pod{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:      fmt.Sprintf("pod%d", i),
 				Labels:    rc.Spec.Selector,
 				Namespace: rc.Namespace,
@@ -239,7 +239,7 @@ func TestUIDExpectations(t *testing.T) {
 
 func TestCreatePods(t *testing.T) {
 	ns := v1.NamespaceDefault
-	body := runtime.EncodeOrDie(testapi.Default.Codec(), &v1.Pod{ObjectMeta: v1.ObjectMeta{Name: "empty_pod"}})
+	body := runtime.EncodeOrDie(testapi.Default.Codec(), &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "empty_pod"}})
 	fakeHandler := utiltesting.FakeHandler{
 		StatusCode:   200,
 		ResponseBody: string(body),
@@ -261,7 +261,7 @@ func TestCreatePods(t *testing.T) {
 	}
 
 	expectedPod := v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Labels:       controllerSpec.Spec.Template.Labels,
 			GenerateName: fmt.Sprintf("%s-", controllerSpec.Name),
 		},

@@ -49,7 +49,7 @@ func createDNSPod(namespace, wheezyProbeCmd, jessieProbeCmd string, useAnnotatio
 			Kind:       "Pod",
 			APIVersion: api.Registry.GroupOrDie(v1.GroupName).GroupVersion.String(),
 		},
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      "dns-test-" + string(uuid.NewUUID()),
 			Namespace: namespace,
 		},
@@ -304,7 +304,7 @@ func verifyDNSPodIsRunning(f *framework.Framework) {
 
 func createServiceSpec(serviceName, externalName string, isHeadless bool, selector map[string]string) *v1.Service {
 	headlessService := &v1.Service{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: serviceName,
 		},
 		Spec: v1.ServiceSpec{

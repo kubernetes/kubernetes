@@ -41,7 +41,7 @@ var alwaysReady = func() bool { return true }
 
 func newJob(parallelism, completions int32) *batch.Job {
 	j := &batch.Job{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      "foobar",
 			Namespace: v1.NamespaceDefault,
 		},
@@ -50,7 +50,7 @@ func newJob(parallelism, completions int32) *batch.Job {
 				MatchLabels: map[string]string{"foo": "bar"},
 			},
 			Template: v1.PodTemplateSpec{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
 						"foo": "bar",
 					},
@@ -99,7 +99,7 @@ func newPodList(count int32, status v1.PodPhase, job *batch.Job) []v1.Pod {
 	pods := []v1.Pod{}
 	for i := int32(0); i < count; i++ {
 		newPod := v1.Pod{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:      fmt.Sprintf("pod-%v", rand.String(10)),
 				Labels:    job.Spec.Selector.MatchLabels,
 				Namespace: job.Namespace,
@@ -523,17 +523,17 @@ func TestJobPodLookup(t *testing.T) {
 		// pods without labels don't match any job
 		{
 			job: &batch.Job{
-				ObjectMeta: v1.ObjectMeta{Name: "basic"},
+				ObjectMeta: metav1.ObjectMeta{Name: "basic"},
 			},
 			pod: &v1.Pod{
-				ObjectMeta: v1.ObjectMeta{Name: "foo1", Namespace: v1.NamespaceAll},
+				ObjectMeta: metav1.ObjectMeta{Name: "foo1", Namespace: v1.NamespaceAll},
 			},
 			expectedName: "",
 		},
 		// matching labels, different namespace
 		{
 			job: &batch.Job{
-				ObjectMeta: v1.ObjectMeta{Name: "foo"},
+				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
 				Spec: batch.JobSpec{
 					Selector: &metav1.LabelSelector{
 						MatchLabels: map[string]string{"foo": "bar"},
@@ -541,7 +541,7 @@ func TestJobPodLookup(t *testing.T) {
 				},
 			},
 			pod: &v1.Pod{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:      "foo2",
 					Namespace: "ns",
 					Labels:    map[string]string{"foo": "bar"},
@@ -552,7 +552,7 @@ func TestJobPodLookup(t *testing.T) {
 		// matching ns and labels returns
 		{
 			job: &batch.Job{
-				ObjectMeta: v1.ObjectMeta{Name: "bar", Namespace: "ns"},
+				ObjectMeta: metav1.ObjectMeta{Name: "bar", Namespace: "ns"},
 				Spec: batch.JobSpec{
 					Selector: &metav1.LabelSelector{
 						MatchExpressions: []metav1.LabelSelectorRequirement{
@@ -566,7 +566,7 @@ func TestJobPodLookup(t *testing.T) {
 				},
 			},
 			pod: &v1.Pod{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:      "foo3",
 					Namespace: "ns",
 					Labels:    map[string]string{"foo": "bar"},

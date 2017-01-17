@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/api"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	// Ensure that extensions/v1beta1 package is initialized.
 	"k8s.io/apimachinery/pkg/labels"
@@ -45,7 +45,7 @@ func newStorage(t *testing.T) (*REST, *etcdtesting.EtcdTestServer) {
 
 func validNewThirdPartyResource(name string) *extensions.ThirdPartyResource {
 	return &extensions.ThirdPartyResource{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 		},
 		Versions: []extensions.APIVersion{
@@ -71,10 +71,10 @@ func TestCreate(t *testing.T) {
 		rsrc,
 		// invalid
 		&extensions.ThirdPartyResource{},
-		&extensions.ThirdPartyResource{ObjectMeta: api.ObjectMeta{Name: "kind"}, Versions: []extensions.APIVersion{{Name: "v1"}}},
-		&extensions.ThirdPartyResource{ObjectMeta: api.ObjectMeta{Name: "kind.tld"}, Versions: []extensions.APIVersion{{Name: "v1"}}},
-		&extensions.ThirdPartyResource{ObjectMeta: api.ObjectMeta{Name: "kind.domain.tld"}, Versions: []extensions.APIVersion{{Name: "v.1"}}},
-		&extensions.ThirdPartyResource{ObjectMeta: api.ObjectMeta{Name: "kind.domain.tld"}, Versions: []extensions.APIVersion{{Name: "stable/v1"}}},
+		&extensions.ThirdPartyResource{ObjectMeta: metav1.ObjectMeta{Name: "kind"}, Versions: []extensions.APIVersion{{Name: "v1"}}},
+		&extensions.ThirdPartyResource{ObjectMeta: metav1.ObjectMeta{Name: "kind.tld"}, Versions: []extensions.APIVersion{{Name: "v1"}}},
+		&extensions.ThirdPartyResource{ObjectMeta: metav1.ObjectMeta{Name: "kind.domain.tld"}, Versions: []extensions.APIVersion{{Name: "v.1"}}},
+		&extensions.ThirdPartyResource{ObjectMeta: metav1.ObjectMeta{Name: "kind.domain.tld"}, Versions: []extensions.APIVersion{{Name: "stable/v1"}}},
 	)
 }
 

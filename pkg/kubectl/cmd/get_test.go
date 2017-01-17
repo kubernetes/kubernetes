@@ -49,11 +49,11 @@ func testData() (*api.PodList, *api.ServiceList, *api.ReplicationControllerList)
 		},
 		Items: []api.Pod{
 			{
-				ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "test", ResourceVersion: "10"},
+				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "test", ResourceVersion: "10"},
 				Spec:       apitesting.DeepEqualSafePodSpec(),
 			},
 			{
-				ObjectMeta: api.ObjectMeta{Name: "bar", Namespace: "test", ResourceVersion: "11"},
+				ObjectMeta: metav1.ObjectMeta{Name: "bar", Namespace: "test", ResourceVersion: "11"},
 				Spec:       apitesting.DeepEqualSafePodSpec(),
 			},
 		},
@@ -64,7 +64,7 @@ func testData() (*api.PodList, *api.ServiceList, *api.ReplicationControllerList)
 		},
 		Items: []api.Service{
 			{
-				ObjectMeta: api.ObjectMeta{Name: "baz", Namespace: "test", ResourceVersion: "12"},
+				ObjectMeta: metav1.ObjectMeta{Name: "baz", Namespace: "test", ResourceVersion: "12"},
 				Spec: api.ServiceSpec{
 					SessionAffinity: "None",
 					Type:            api.ServiceTypeClusterIP,
@@ -78,7 +78,7 @@ func testData() (*api.PodList, *api.ServiceList, *api.ReplicationControllerList)
 		},
 		Items: []api.ReplicationController{
 			{
-				ObjectMeta: api.ObjectMeta{Name: "rc1", Namespace: "test", ResourceVersion: "18"},
+				ObjectMeta: metav1.ObjectMeta{Name: "rc1", Namespace: "test", ResourceVersion: "18"},
 				Spec: api.ReplicationControllerSpec{
 					Replicas: 1,
 				},
@@ -93,21 +93,21 @@ func testComponentStatusData() *api.ComponentStatusList {
 		Conditions: []api.ComponentCondition{
 			{Type: api.ComponentHealthy, Status: api.ConditionTrue, Message: "ok"},
 		},
-		ObjectMeta: api.ObjectMeta{Name: "servergood"},
+		ObjectMeta: metav1.ObjectMeta{Name: "servergood"},
 	}
 
 	bad := api.ComponentStatus{
 		Conditions: []api.ComponentCondition{
 			{Type: api.ComponentHealthy, Status: api.ConditionFalse, Message: "", Error: "bad status: 500"},
 		},
-		ObjectMeta: api.ObjectMeta{Name: "serverbad"},
+		ObjectMeta: metav1.ObjectMeta{Name: "serverbad"},
 	}
 
 	unknown := api.ComponentStatus{
 		Conditions: []api.ComponentCondition{
 			{Type: api.ComponentHealthy, Status: api.ConditionUnknown, Message: "", Error: "fizzbuzz error"},
 		},
-		ObjectMeta: api.ObjectMeta{Name: "serverunknown"},
+		ObjectMeta: metav1.ObjectMeta{Name: "serverunknown"},
 	}
 
 	return &api.ComponentStatusList{
@@ -166,7 +166,7 @@ func TestGetSchemaObject(t *testing.T) {
 	tf.Printer = &testPrinter{}
 	tf.Client = &fake.RESTClient{
 		NegotiatedSerializer: unstructuredSerializer,
-		Resp:                 &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &api.ReplicationController{ObjectMeta: api.ObjectMeta{Name: "foo"}})},
+		Resp:                 &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &api.ReplicationController{ObjectMeta: metav1.ObjectMeta{Name: "foo"}})},
 	}
 	tf.Namespace = "test"
 	tf.ClientConfig = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Version: "v1"}}}
@@ -213,15 +213,15 @@ func TestGetSortedObjects(t *testing.T) {
 		},
 		Items: []api.Pod{
 			{
-				ObjectMeta: api.ObjectMeta{Name: "c", Namespace: "test", ResourceVersion: "10"},
+				ObjectMeta: metav1.ObjectMeta{Name: "c", Namespace: "test", ResourceVersion: "10"},
 				Spec:       apitesting.DeepEqualSafePodSpec(),
 			},
 			{
-				ObjectMeta: api.ObjectMeta{Name: "b", Namespace: "test", ResourceVersion: "11"},
+				ObjectMeta: metav1.ObjectMeta{Name: "b", Namespace: "test", ResourceVersion: "11"},
 				Spec:       apitesting.DeepEqualSafePodSpec(),
 			},
 			{
-				ObjectMeta: api.ObjectMeta{Name: "a", Namespace: "test", ResourceVersion: "9"},
+				ObjectMeta: metav1.ObjectMeta{Name: "a", Namespace: "test", ResourceVersion: "9"},
 				Spec:       apitesting.DeepEqualSafePodSpec(),
 			},
 		},
@@ -552,7 +552,7 @@ func TestGetMultipleTypeObjectsWithSelector(t *testing.T) {
 func TestGetMultipleTypeObjectsWithDirectReference(t *testing.T) {
 	_, svc, _ := testData()
 	node := &api.Node{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: "foo",
 		},
 		Spec: api.NodeSpec{
@@ -619,7 +619,7 @@ func TestGetByNameForcesFlag(t *testing.T) {
 func watchTestData() ([]api.Pod, []watch.Event) {
 	pods := []api.Pod{
 		{
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:            "bar",
 				Namespace:       "test",
 				ResourceVersion: "9",
@@ -627,7 +627,7 @@ func watchTestData() ([]api.Pod, []watch.Event) {
 			Spec: apitesting.DeepEqualSafePodSpec(),
 		},
 		{
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:            "foo",
 				Namespace:       "test",
 				ResourceVersion: "10",
@@ -640,7 +640,7 @@ func watchTestData() ([]api.Pod, []watch.Event) {
 		{
 			Type: watch.Added,
 			Object: &api.Pod{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:            "bar",
 					Namespace:       "test",
 					ResourceVersion: "9",
@@ -651,7 +651,7 @@ func watchTestData() ([]api.Pod, []watch.Event) {
 		{
 			Type: watch.Added,
 			Object: &api.Pod{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:            "foo",
 					Namespace:       "test",
 					ResourceVersion: "10",
@@ -663,7 +663,7 @@ func watchTestData() ([]api.Pod, []watch.Event) {
 		{
 			Type: watch.Modified,
 			Object: &api.Pod{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:            "foo",
 					Namespace:       "test",
 					ResourceVersion: "11",
@@ -674,7 +674,7 @@ func watchTestData() ([]api.Pod, []watch.Event) {
 		{
 			Type: watch.Deleted,
 			Object: &api.Pod{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:            "foo",
 					Namespace:       "test",
 					ResourceVersion: "12",

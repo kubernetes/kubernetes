@@ -282,7 +282,7 @@ func DoTestPodScheduling(ns *v1.Namespace, t *testing.T, cs clientset.Interface)
 	}
 
 	pod := &v1.Pod{
-		ObjectMeta: v1.ObjectMeta{Name: "extender-test-pod"},
+		ObjectMeta: metav1.ObjectMeta{Name: "extender-test-pod"},
 		Spec: v1.PodSpec{
 			Containers: []v1.Container{{Name: "container", Image: e2e.GetPauseImageName(cs)}},
 		},

@@ -47,7 +47,7 @@ func newStorage(t *testing.T) (*REST, *StatusREST, *etcdtesting.EtcdTestServer) 
 
 func validNewPersistentVolumeClaim(name, ns string) *api.PersistentVolumeClaim {
 	pv := &api.PersistentVolumeClaim{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: ns,
 		},
@@ -72,13 +72,13 @@ func TestCreate(t *testing.T) {
 	defer storage.Store.DestroyFunc()
 	test := registrytest.New(t, storage.Store)
 	pv := validNewPersistentVolumeClaim("foo", api.NamespaceDefault)
-	pv.ObjectMeta = api.ObjectMeta{}
+	pv.ObjectMeta = metav1.ObjectMeta{}
 	test.TestCreate(
 		// valid
 		pv,
 		// invalid
 		&api.PersistentVolumeClaim{
-			ObjectMeta: api.ObjectMeta{Name: "*BadName!"},
+			ObjectMeta: metav1.ObjectMeta{Name: "*BadName!"},
 		},
 	)
 }
@@ -160,7 +160,7 @@ func TestUpdateStatus(t *testing.T) {
 	err := storage.Storage.Create(ctx, key, pvcStart, nil, 0)
 
 	pvc := &api.PersistentVolumeClaim{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      "foo",
 			Namespace: api.NamespaceDefault,
 		},

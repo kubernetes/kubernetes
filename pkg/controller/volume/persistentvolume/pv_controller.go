@@ -1498,7 +1498,7 @@ func (ctrl *PersistentVolumeController) findAlphaProvisionablePlugin() (vol.Prov
 		TypeMeta: metav1.TypeMeta{
 			Kind: "StorageClass",
 		},
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: "",
 		},
 		Provisioner: ctrl.alphaProvisioner.GetPluginName(),

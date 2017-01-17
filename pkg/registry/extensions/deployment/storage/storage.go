@@ -24,7 +24,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	genericapirequest "k8s.io/apiserver/pkg/request"
-	"k8s.io/kubernetes/pkg/api"
 	storeerr "k8s.io/kubernetes/pkg/api/errors/storage"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	extvalidation "k8s.io/kubernetes/pkg/apis/extensions/validation"
@@ -240,7 +239,7 @@ func (r *ScaleREST) Update(ctx genericapirequest.Context, name string, objInfo r
 func scaleFromDeployment(deployment *extensions.Deployment) (*extensions.Scale, error) {
 	return &extensions.Scale{
 		// TODO: Create a variant of ObjectMeta type that only contains the fields below.
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:              deployment.Name,
 			Namespace:         deployment.Namespace,
 			UID:               deployment.UID,

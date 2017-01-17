@@ -24,6 +24,7 @@ import (
 	"strings"
 	"testing"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
@@ -248,7 +249,7 @@ func TestLocalSubjectAccessReview(t *testing.T) {
 			name:      "simple allow",
 			namespace: "foo",
 			sar: &authorizationapi.LocalSubjectAccessReview{
-				ObjectMeta: api.ObjectMeta{Namespace: "foo"},
+				ObjectMeta: metav1.ObjectMeta{Namespace: "foo"},
 				Spec: authorizationapi.SubjectAccessReviewSpec{
 					ResourceAttributes: &authorizationapi.ResourceAttributes{
 						Verb:      "list",
@@ -269,7 +270,7 @@ func TestLocalSubjectAccessReview(t *testing.T) {
 			name:      "simple deny",
 			namespace: "foo",
 			sar: &authorizationapi.LocalSubjectAccessReview{
-				ObjectMeta: api.ObjectMeta{Namespace: "foo"},
+				ObjectMeta: metav1.ObjectMeta{Namespace: "foo"},
 				Spec: authorizationapi.SubjectAccessReviewSpec{
 					ResourceAttributes: &authorizationapi.ResourceAttributes{
 						Verb:      "list",
@@ -291,7 +292,7 @@ func TestLocalSubjectAccessReview(t *testing.T) {
 			name:      "conflicting namespace",
 			namespace: "foo",
 			sar: &authorizationapi.LocalSubjectAccessReview{
-				ObjectMeta: api.ObjectMeta{Namespace: "foo"},
+				ObjectMeta: metav1.ObjectMeta{Namespace: "foo"},
 				Spec: authorizationapi.SubjectAccessReviewSpec{
 					ResourceAttributes: &authorizationapi.ResourceAttributes{
 						Verb:      "list",
@@ -309,7 +310,7 @@ func TestLocalSubjectAccessReview(t *testing.T) {
 			name:      "missing namespace",
 			namespace: "foo",
 			sar: &authorizationapi.LocalSubjectAccessReview{
-				ObjectMeta: api.ObjectMeta{Namespace: "foo"},
+				ObjectMeta: metav1.ObjectMeta{Namespace: "foo"},
 				Spec: authorizationapi.SubjectAccessReviewSpec{
 					ResourceAttributes: &authorizationapi.ResourceAttributes{
 						Verb:     "list",

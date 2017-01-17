@@ -56,7 +56,7 @@ func DoTestStorageClasses(t *testing.T, client clientset.Interface, ns *v1.Names
 		TypeMeta: metav1.TypeMeta{
 			Kind: "StorageClass",
 		},
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: "gold",
 		},
 		Provisioner: provisionerPluginName,
@@ -69,7 +69,7 @@ func DoTestStorageClasses(t *testing.T, client clientset.Interface, ns *v1.Names
 
 	// Template for pvcs that specify a storage class
 	pvc := &v1.PersistentVolumeClaim{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      "XXX",
 			Namespace: ns.Name,
 			Annotations: map[string]string{

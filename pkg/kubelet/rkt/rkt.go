@@ -41,6 +41,7 @@ import (
 	"github.com/golang/glog"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubetypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/errors"
 	utilwait "k8s.io/apimachinery/pkg/util/wait"
@@ -1967,7 +1968,7 @@ func (r *Runtime) cleanupPodNetworkFromServiceFile(serviceFilePath string) error
 		return err
 	}
 	return r.cleanupPodNetwork(&v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			UID:       kubetypes.UID(id),
 			Name:      name,
 			Namespace: namespace,
