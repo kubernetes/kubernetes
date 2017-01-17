@@ -231,6 +231,16 @@ func ClusterRoles() []rbac.ClusterRole {
 			},
 		},
 		{
+			// a role to use for bootstrapping a node's client certificates
+			ObjectMeta: api.ObjectMeta{Name: "system:node-bootstrapper"},
+			Rules: []rbac.PolicyRule{
+				// used to check if the node already exists
+				rbac.NewRule("get").Groups(legacyGroup).Resources("nodes").RuleOrDie(),
+				// used to create a certificatesigningrequest for a node-specific client certificate, and watch for it to be signed
+				rbac.NewRule("create", "get", "list", "watch").Groups(certificatesGroup).Resources("certificatesigningrequests").RuleOrDie(),
+			},
+		},
+		{
 			// a role to use for allowing authentication and authorization delegation
 			ObjectMeta: api.ObjectMeta{Name: "system:auth-delegator"},
 			Rules: []rbac.PolicyRule{
