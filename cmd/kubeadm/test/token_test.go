@@ -18,6 +18,7 @@ package kubeadm
 
 import (
 	"flag"
+	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -25,7 +26,10 @@ import (
 )
 
 const (
-	TokenExpectedRegex = "^\\S{6}\\:\\S{16}\n$"
+	TokenExpectedRegex       = "^\\S{6}\\:\\S{16}\n$"
+	invalidSizeToken         = "abcd:1234567890abcd"
+	invalidNonLowercaseToken = "Abcdef:1234567890abcdef"
+	validToken               = "abcdef:1234567890abcdef"
 )
 
 var kubeadmPath string
@@ -64,4 +68,44 @@ func TestCmdTokenGenerateTypoError(t *testing.T) {
 	if err == nil {
 		t.Error("'kubeadm ex token genorate' (a deliberate typo) exited without an error when we expected non-zero exit status")
 	}
+}
+
+// kubeadmReset executes "kubeadm reset" and restarts kubelet.
+func kubeadmReset() error {
+	_, _, err := RunCmd(kubeadmPath, "reset")
+	return err
+}
+
+func TestCmdInitToken(t *testing.T) {
+	var initArgs string
+	var err error
+
+	// Invalid token size
+	initArgs = fmt.Sprintf("--discovery=token://%s", invalidSizeToken)
+	_, _, err = RunCmd(kubeadmPath, "init", initArgs)
+	if err == nil {
+		t.Fatalf("'kubeadm init %s' should've failed with an error", initArgs)
+	}
+
+	// Invalid token non-lowercase
+	initArgs = fmt.Sprintf("--discovery=token://%s", invalidNonLowercaseToken)
+	_, _, err = RunCmd(kubeadmPath, "init", initArgs)
+	if err == nil {
+		t.Fatalf("'kubeadm init %s' should've failed with an error", initArgs)
+	}
+
+	// Valid token
+	initArgs = fmt.Sprintf("--discovery=token://%s", validToken)
+	_, _, err = RunCmd(kubeadmPath, "init", initArgs)
+	if err != nil {
+		t.Fatalf("'kubeadm init %s' failed with unexpected error: %v", initArgs, err)
+	}
+	kubeadmReset()
+
+	// No token provided, so generate
+	_, _, err = RunCmd(kubeadmPath, "init")
+	if err != nil {
+		t.Fatalf("'kubeadm init' failed with unexpected error: %v", err)
+	}
+	kubeadmReset()
 }
