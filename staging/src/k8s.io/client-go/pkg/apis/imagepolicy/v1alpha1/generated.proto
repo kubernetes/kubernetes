@@ -34,7 +34,7 @@ option go_package = "v1alpha1";
 // ImageReview checks if the set of images in a pod are allowed.
 message ImageReview {
   // +optional
-  optional k8s.io.kubernetes.pkg.api.v1.ObjectMeta metadata = 1;
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // Spec holds information about the pod being evaluated
   optional ImageReviewSpec spec = 2;

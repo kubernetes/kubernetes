@@ -40,7 +40,7 @@ func TestDecoder(t *testing.T) {
 		codec := testapi.Default.Codec()
 		decoder := restclientwatch.NewDecoder(streaming.NewDecoder(out, codec), codec)
 
-		expect := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
+		expect := &api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}
 		encoder := json.NewEncoder(in)
 		go func() {
 			data, err := runtime.Encode(testapi.Default.Codec(), expect)

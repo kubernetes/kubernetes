@@ -21,9 +21,9 @@ limitations under the License.
 package v1alpha1
 
 import (
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
-	v1 "k8s.io/client-go/pkg/api/v1"
 	reflect "reflect"
 )
 
@@ -54,8 +54,10 @@ func DeepCopy_v1alpha1_ClusterRole(in interface{}, out interface{}, c *conversio
 		in := in.(*ClusterRole)
 		out := out.(*ClusterRole)
 		*out = *in
-		if err := v1.DeepCopy_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, c); err != nil {
+		if newVal, err := c.DeepCopy(&in.ObjectMeta); err != nil {
 			return err
+		} else {
+			out.ObjectMeta = *newVal.(*v1.ObjectMeta)
 		}
 		if in.Rules != nil {
 			in, out := &in.Rules, &out.Rules
@@ -75,8 +77,10 @@ func DeepCopy_v1alpha1_ClusterRoleBinding(in interface{}, out interface{}, c *co
 		in := in.(*ClusterRoleBinding)
 		out := out.(*ClusterRoleBinding)
 		*out = *in
-		if err := v1.DeepCopy_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, c); err != nil {
+		if newVal, err := c.DeepCopy(&in.ObjectMeta); err != nil {
 			return err
+		} else {
+			out.ObjectMeta = *newVal.(*v1.ObjectMeta)
 		}
 		if in.Subjects != nil {
 			in, out := &in.Subjects, &out.Subjects
@@ -169,8 +173,10 @@ func DeepCopy_v1alpha1_Role(in interface{}, out interface{}, c *conversion.Clone
 		in := in.(*Role)
 		out := out.(*Role)
 		*out = *in
-		if err := v1.DeepCopy_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, c); err != nil {
+		if newVal, err := c.DeepCopy(&in.ObjectMeta); err != nil {
 			return err
+		} else {
+			out.ObjectMeta = *newVal.(*v1.ObjectMeta)
 		}
 		if in.Rules != nil {
 			in, out := &in.Rules, &out.Rules
@@ -190,8 +196,10 @@ func DeepCopy_v1alpha1_RoleBinding(in interface{}, out interface{}, c *conversio
 		in := in.(*RoleBinding)
 		out := out.(*RoleBinding)
 		*out = *in
-		if err := v1.DeepCopy_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, c); err != nil {
+		if newVal, err := c.DeepCopy(&in.ObjectMeta); err != nil {
 			return err
+		} else {
+			out.ObjectMeta = *newVal.(*v1.ObjectMeta)
 		}
 		if in.Subjects != nil {
 			in, out := &in.Subjects, &out.Subjects

@@ -49,10 +49,7 @@ func RegisterConversions(scheme *runtime.Scheme) error {
 }
 
 func autoConvert_v1alpha1_CertificateSigningRequest_To_certificates_CertificateSigningRequest(in *CertificateSigningRequest, out *certificates.CertificateSigningRequest, s conversion.Scope) error {
-	// TODO: Inefficient conversion - can we improve it?
-	if err := s.Convert(&in.ObjectMeta, &out.ObjectMeta, 0); err != nil {
-		return err
-	}
+	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_v1alpha1_CertificateSigningRequestSpec_To_certificates_CertificateSigningRequestSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
 	}
@@ -67,10 +64,7 @@ func Convert_v1alpha1_CertificateSigningRequest_To_certificates_CertificateSigni
 }
 
 func autoConvert_certificates_CertificateSigningRequest_To_v1alpha1_CertificateSigningRequest(in *certificates.CertificateSigningRequest, out *CertificateSigningRequest, s conversion.Scope) error {
-	// TODO: Inefficient conversion - can we improve it?
-	if err := s.Convert(&in.ObjectMeta, &out.ObjectMeta, 0); err != nil {
-		return err
-	}
+	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_certificates_CertificateSigningRequestSpec_To_v1alpha1_CertificateSigningRequestSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
 	}

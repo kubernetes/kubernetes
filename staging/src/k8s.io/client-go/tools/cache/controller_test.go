@@ -23,6 +23,7 @@ import (
 	"testing"
 	"time"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -101,7 +102,7 @@ func Example() {
 	for _, name := range testIDs {
 		// Note that these pods are not valid-- the fake source doesn't
 		// call validation or anything.
-		source.Add(&v1.Pod{ObjectMeta: v1.ObjectMeta{Name: name}})
+		source.Add(&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: name}})
 	}
 
 	// Let's wait for the controller to process the things we just added.
@@ -158,7 +159,7 @@ func ExampleNewInformer() {
 	for _, name := range testIDs {
 		// Note that these pods are not valid-- the fake source doesn't
 		// call validation or anything.
-		source.Add(&v1.Pod{ObjectMeta: v1.ObjectMeta{Name: name}})
+		source.Add(&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: name}})
 	}
 
 	// Let's wait for the controller to process the things we just added.
@@ -317,7 +318,7 @@ func TestUpdate(t *testing.T) {
 
 	pod := func(name, check string, final bool) *v1.Pod {
 		p := &v1.Pod{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:   name,
 				Labels: map[string]string{"check": check},
 			},
