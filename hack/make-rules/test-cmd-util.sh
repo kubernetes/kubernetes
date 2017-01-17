@@ -43,6 +43,7 @@ IMAGE_PERL="gcr.io/google-containers/perl"
 PATH="${KUBE_OUTPUT_HOSTBIN}":$PATH
 
 # Define variables for resource types to prevent typos.
+roles="roles"
 clusterroles="clusterroles"
 configmaps="configmaps"
 csr="csr"
@@ -2904,22 +2905,63 @@ runTests() {
     kubectl create "${kube_flags[@]}" rolebinding sarole --role=localrole --serviceaccount=otherns:sa-name -n default
     kube::test::get_object_assert rolebinding/sarole "{{range.subjects}}{{.namespace}}:{{end}}" 'otherns:'
     kube::test::get_object_assert rolebinding/sarole "{{range.subjects}}{{.name}}:{{end}}" 'sa-name:'
+
+    # Create ClusterRole from YAML
+    kubectl create "${kube_flags[@]}" -f hack/testdata/clusterrole.yaml
+    kube::test::get_object_assert clusterrole/secret-reader "{{range.rules}}{{range.apiGroups}}{{.}}:{{end}}{{end}}" ':'
+    kube::test::get_object_assert clusterrole/secret-reader "{{range.rules}}{{range.resources}}{{.}}:{{end}}{{end}}" 'secrets:'
+    kube::test::get_object_assert clusterrole/secret-reader "{{range.rules}}{{range.verbs}}{{.}}:{{end}}{{end}}" 'get:'
+    kube::test::get_object_assert clusterrole/test "{{range.rules}}{{range.nonResourceURLs}}{{.}}:{{end}}{{end}}" '\/apis:'
+    kube::test::get_object_assert clusterrole/test "{{range.rules}}{{range.verbs}}{{.}}:{{end}}{{end}}" 'get:'
+
+    # Set command to change the policyrule.
+    kubectl set rule "${kube_flags[@]}" clusterrole/secret-reader --resource=deployments.extensions --verb=create
+    kube::test::get_object_assert clusterrole/secret-reader "{{range.rules}}{{range.apiGroups}}{{.}}:{{end}}{{end}}" ':extensions:'
+    kube::test::get_object_assert clusterrole/secret-reader "{{range.rules}}{{range.resources}}{{.}}:{{end}}{{end}}" 'secrets:deployments:'
+    kube::test::get_object_assert clusterrole/secret-reader "{{range.rules}}{{range.verbs}}{{.}}:{{end}}{{end}}" 'get:create:'
+    kubectl set rule "${kube_flags[@]}" clusterrole/test --non-resource-url="/apis/v1" --verb="delete"
+    kube::test::get_object_assert clusterrole/test "{{range.rules}}{{range.nonResourceURLs}}{{.}}:{{end}}{{end}}" '\/apis:\/apis\/v1:'
+    kube::test::get_object_assert clusterrole/test "{{range.rules}}{{range.verbs}}{{.}}:{{end}}{{end}}" 'get:delete:'
+
+    # Delete ClusterRole
+    kubectl delete "${kube_flags[@]}" -f hack/testdata/clusterrole.yaml
+    kube::test::get_object_assert role "{{range.items}}{{$id_field}}:{{end}}" ''
   fi
 
   if kube::test::if_supports_resource "${roles}" ; then
-    kubectl create "${kube_flags[@]}" role pod-admin --verb=* --resource=pods
-    kube::test::get_object_assert role/pod-admin "{{range.rules}}{{range.verbs}}{{.}}:{{end}}{{end}}" '\*:'
-    kube::test::get_object_assert role/pod-admin "{{range.rules}}{{range.resources}}{{.}}:{{end}}{{end}}" 'pods:'
-    kube::test::get_object_assert role/pod-admin "{{range.rules}}{{range.apiGroups}}{{.}}:{{end}}{{end}}" ':'
-    kubectl create "${kube_flags[@]}" role resource-reader --verb=get,list --resource=pods,deployments.extensions
-    kube::test::get_object_assert role/resource-reader "{{range.rules}}{{range.verbs}}{{.}}:{{end}}{{end}}" 'get:list:get:list:'
-    kube::test::get_object_assert role/resource-reader "{{range.rules}}{{range.resources}}{{.}}:{{end}}{{end}}" 'pods:deployments:'
-    kube::test::get_object_assert role/resource-reader "{{range.rules}}{{range.apiGroups}}{{.}}:{{end}}{{end}}" ':extensions:'
-  	kubectl create "${kube_flags[@]}" role resourcename-reader --verb=get,list --resource=pods --resource-name=foo
-    kube::test::get_object_assert role/resourcename-reader "{{range.rules}}{{range.verbs}}{{.}}:{{end}}{{end}}" 'get:list:'
-    kube::test::get_object_assert role/resourcename-reader "{{range.rules}}{{range.resources}}{{.}}:{{end}}{{end}}" 'pods:'
-    kube::test::get_object_assert role/resourcename-reader "{{range.rules}}{{range.apiGroups}}{{.}}:{{end}}{{end}}" ':'
-    kube::test::get_object_assert role/resourcename-reader "{{range.rules}}{{range.resourceNames}}{{.}}:{{end}}{{end}}" 'foo:'
+      # Create Role from command
+      kubectl create "${kube_flags[@]}" role pod-admin --verb=* --resource=pods
+      kube::test::get_object_assert role/pod-admin "{{range.rules}}{{range.verbs}}{{.}}:{{end}}{{end}}" '\*:'
+      kube::test::get_object_assert role/pod-admin "{{range.rules}}{{range.resources}}{{.}}:{{end}}{{end}}" 'pods:'
+      kube::test::get_object_assert role/pod-admin "{{range.rules}}{{range.apiGroups}}{{.}}:{{end}}{{end}}" ':'
+      kubectl create "${kube_flags[@]}" role resource-reader --verb=get,list --resource=pods,deployments.extensions
+      kube::test::get_object_assert role/resource-reader "{{range.rules}}{{range.verbs}}{{.}}:{{end}}{{end}}" 'get:list:get:list:'
+      kube::test::get_object_assert role/resource-reader "{{range.rules}}{{range.resources}}{{.}}:{{end}}{{end}}" 'pods:deployments:'
+      kube::test::get_object_assert role/resource-reader "{{range.rules}}{{range.apiGroups}}{{.}}:{{end}}{{end}}" ':extensions:'
+      kubectl create "${kube_flags[@]}" role resourcename-reader --verb=get,list --resource=pods --resource-name=foo
+      kube::test::get_object_assert role/resourcename-reader "{{range.rules}}{{range.verbs}}{{.}}:{{end}}{{end}}" 'get:list:'
+      kube::test::get_object_assert role/resourcename-reader "{{range.rules}}{{range.resources}}{{.}}:{{end}}{{end}}" 'pods:'
+      kube::test::get_object_assert role/resourcename-reader "{{range.rules}}{{range.apiGroups}}{{.}}:{{end}}{{end}}" ':'
+      kube::test::get_object_assert role/resourcename-reader "{{range.rules}}{{range.resourceNames}}{{.}}:{{end}}{{end}}" 'foo:'
+
+      # Create Role from YAML
+      kubectl create "${kube_flags[@]}" -f hack/testdata/role.yaml
+      kube::test::get_object_assert role/pod-reader "{{range.rules}}{{range.apiGroups}}{{.}}:{{end}}{{end}}" ':'
+      kube::test::get_object_assert role/pod-reader "{{range.rules}}{{range.resources}}{{.}}:{{end}}{{end}}" 'pods:'
+      kube::test::get_object_assert role/pod-reader "{{range.rules}}{{range.verbs}}{{.}}:{{end}}{{end}}" 'get:'
+
+      # Set command to change the policyrule.
+      kubectl set rule "${kube_flags[@]}" -f hack/testdata/role.yaml --resource=deployments.extensions --verb=create
+      kube::test::get_object_assert role/pod-reader "{{range.rules}}{{range.apiGroups}}{{.}}:{{end}}{{end}}" ':extensions:'
+      kube::test::get_object_assert role/pod-reader "{{range.rules}}{{range.resources}}{{.}}:{{end}}{{end}}" 'pods:deployments:'
+      kube::test::get_object_assert role/pod-reader "{{range.rules}}{{range.verbs}}{{.}}:{{end}}{{end}}" 'get:create:'
+
+      # Delete Role
+      kubectl delete "${kube_flags[@]}" role/pod-admin
+      kubectl delete "${kube_flags[@]}" role/resource-reader
+      kubectl delete "${kube_flags[@]}" role/resourcename-reader
+      kubectl delete "${kube_flags[@]}" -f hack/testdata/role.yaml
+      kube::test::get_object_assert role "{{range.items}}{{$id_field}}:{{end}}" ''
   fi
 
   #########################
