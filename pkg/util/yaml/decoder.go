@@ -255,11 +255,10 @@ func (r *YAMLReader) Read() ([]byte, error) {
 			return nil, err
 		}
 
-		sep := len([]byte(separator))
-		if i := bytes.Index(line, []byte(separator)); i == 0 {
+		if bytes.HasPrefix(line, []byte(separator)) {
 			// We have a potential document terminator
-			i += sep
-			after := line[i:]
+			sep := len([]byte(separator))
+			after := line[sep:]
 			if len(strings.TrimRightFunc(string(after), unicode.IsSpace)) == 0 {
 				if buffer.Len() != 0 {
 					return buffer.Bytes(), nil
