@@ -54,6 +54,7 @@ go_test(
         "node_prefer_avoid_pods_test.go",
         "selector_spreading_test.go",
         "taint_toleration_test.go",
+        "metadata_test.go"
     ],
     library = ":go_default_library",
     tags = ["automanaged"],
