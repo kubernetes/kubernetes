@@ -26,6 +26,7 @@ go_library(
         "//pkg/api/validation:go_default_library",
         "//pkg/apis/extensions:go_default_library",
         "//pkg/client/restclient:go_default_library",
+        "//vendor:github.com/golang/glog",
         "//vendor:golang.org/x/text/encoding/unicode",
         "//vendor:golang.org/x/text/transform",
         "//vendor:k8s.io/apimachinery/pkg/api/errors",
