@@ -60,6 +60,8 @@ var (
 
 	// Minimum version of kube-apiserver that has to have --anonymous-auth=false set
 	anonAuthDisableAPIServerMinVersion = semver.MustParse("1.5.0")
+	// Maximum version of kube-apiserver that has to have --anonymous-auth=false set
+	anonAuthDisableAPIServerMaxVersion = semver.MustParse("1.6.0-alpha.0")
 )
 
 // WriteStaticPodManifests builds manifest objects based on user provided configuration and then dumps it to disk
@@ -360,8 +362,8 @@ func getAPIServerCommand(cfg *kubeadmapi.MasterConfiguration, selfHosted bool) [
 			command = append(command, "--kubelet-preferred-address-types=InternalIP,ExternalIP,Hostname")
 		}
 
-		// This is a critical "bugfix". Any version above this is vulnarable unless a RBAC/ABAC-authorizer is provided (which kubeadm doesn't for the time being)
-		if err == nil && k8sVersion.GTE(anonAuthDisableAPIServerMinVersion) {
+		// Versions in this range are vulnerable with anonymous auth enabled unless a RBAC/ABAC-authorizer is provided (which kubeadm doesn't for the time being)
+		if err == nil && k8sVersion.GTE(anonAuthDisableAPIServerMinVersion) && k8sVersion.LTE(anonAuthDisableAPIServerMaxVersion) {
 			command = append(command, "--anonymous-auth=false")
 		}
 	}
