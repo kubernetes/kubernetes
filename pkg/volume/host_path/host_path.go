@@ -22,7 +22,6 @@ import (
 	"regexp"
 
 	"k8s.io/apimachinery/pkg/types"
-	//"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/pkg/volume"
@@ -126,10 +125,6 @@ func (plugin *hostPathPlugin) Recycle(pvName string, spec *volume.Spec, eventRec
 	return volume.RecycleVolumeByWatchingPodUntilCompletion(pvName, pod, plugin.host.GetKubeClient(), eventRecorder)
 }
 
-//func (plugin *hostPathPlugin) NewRecycler(pvName string, spec *volume.Spec, eventRecorder volume.RecycleEventRecorder) (volume.Recycler, error) {
-//	return newRecycler(pvName, spec, eventRecorder, plugin.host, plugin.config)
-//}
-
 func (plugin *hostPathPlugin) NewDeleter(spec *volume.Spec) (volume.Deleter, error) {
 	return newDeleter(spec, plugin.host)
 }
@@ -152,22 +147,6 @@ func (plugin *hostPathPlugin) ConstructVolumeSpec(volumeName, mountPath string) 
 	}
 	return volume.NewSpecFromVolume(hostPathVolume), nil
 }
-
-//func newRecycler(pvName string, spec *volume.Spec, eventRecorder volume.RecycleEventRecorder, host volume.VolumeHost, config volume.VolumeConfig) (volume.Recycler, error) {
-//	if spec.PersistentVolume == nil || spec.PersistentVolume.Spec.HostPath == nil {
-//		return nil, fmt.Errorf("spec.PersistentVolumeSource.HostPath is nil")
-//	}
-//	path := spec.PersistentVolume.Spec.HostPath.Path
-//	return &hostPathRecycler{
-//		name:          spec.Name(),
-//		path:          path,
-//		host:          host,
-//		config:        config,
-//		timeout:       volume.CalculateTimeoutForVolume(config.RecyclerMinimumTimeout, config.RecyclerTimeoutIncrement, spec.PersistentVolume),
-//		pvName:        pvName,
-//		eventRecorder: eventRecorder,
-//	}, nil
-//}
 
 func newDeleter(spec *volume.Spec, host volume.VolumeHost) (volume.Deleter, error) {
 	if spec.PersistentVolume != nil && spec.PersistentVolume.Spec.HostPath == nil {
@@ -243,42 +222,6 @@ func (c *hostPathUnmounter) TearDown() error {
 func (c *hostPathUnmounter) TearDownAt(dir string) error {
 	return fmt.Errorf("TearDownAt() does not make sense for host paths")
 }
-
-// hostPathRecycler implements a Recycler for the HostPath plugin
-// This implementation is meant for testing only and only works in a single node cluster
-//type hostPathRecycler struct {
-//	name    string
-//	path    string
-//	host    volume.VolumeHost
-//	config  volume.VolumeConfig
-//	timeout int64
-//	volume.MetricsNil
-//	pvName        string
-//	eventRecorder volume.RecycleEventRecorder
-//}
-//
-//func (r *hostPathRecycler) GetPath() string {
-//	return r.path
-//}
-
-// Recycle recycles/scrubs clean a HostPath volume.
-// Recycle blocks until the pod has completed or any error occurs.
-// HostPath recycling only works in single node clusters and is meant for testing purposes only.
-//func (r *hostPathRecycler) Recycle() error {
-//	templateClone, err := api.Scheme.DeepCopy(r.config.RecyclerPodTemplate)
-//	if err != nil {
-//		return err
-//	}
-//	pod := templateClone.(*v1.Pod)
-//	// overrides
-//	pod.Spec.ActiveDeadlineSeconds = &r.timeout
-//	pod.Spec.Volumes[0].VolumeSource = v1.VolumeSource{
-//		HostPath: &v1.HostPathVolumeSource{
-//			Path: r.path,
-//		},
-//	}
-//	return volume.RecycleVolumeByWatchingPodUntilCompletion(r.pvName, pod, r.host.GetKubeClient(), r.eventRecorder)
-//}
 
 // hostPathProvisioner implements a Provisioner for the HostPath plugin
 // This implementation is meant for testing only and only works in a single node cluster.
