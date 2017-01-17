@@ -132,7 +132,6 @@ items:
     - daemonsets
     - deployments
     - deployments/scale
-    - horizontalpodautoscalers
     - ingresses
     - replicasets
     - replicasets/scale
@@ -320,8 +319,26 @@ items:
     - daemonsets
     - deployments
     - deployments/scale
-    - horizontalpodautoscalers
     - ingresses
+    - replicasets
+    - replicasets/scale
+    - replicationcontrollers/scale
+    verbs:
+    - create
+    - delete
+    - deletecollection
+    - get
+    - list
+    - patch
+    - update
+    - watch
+  - apiGroups:
+    - extensions
+    attributeRestrictions: null
+    resources:
+    - daemonsets
+    - deployments
+    - deployments/scale
     - replicasets
     - replicasets/scale
     - replicationcontrollers/scale
@@ -763,7 +780,6 @@ items:
     - daemonsets
     - deployments
     - deployments/scale
-    - horizontalpodautoscalers
     - ingresses
     - replicasets
     - replicasets/scale

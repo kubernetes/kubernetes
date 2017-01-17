@@ -407,7 +407,6 @@ items:
   rules:
   - apiGroups:
     - autoscaling
-    - extensions
     attributeRestrictions: null
     resources:
     - horizontalpodautoscalers
@@ -417,7 +416,6 @@ items:
     - watch
   - apiGroups:
     - autoscaling
-    - extensions
     attributeRestrictions: null
     resources:
     - horizontalpodautoscalers/status
