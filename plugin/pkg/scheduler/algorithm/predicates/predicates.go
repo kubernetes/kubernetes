@@ -1170,11 +1170,6 @@ func tolerationsToleratesTaints(tolerations []v1.Toleration, taints []v1.Taint) 
 		return true
 	}
 
-	// The taint list isn't nil/empty, a nil/empty toleration list can't tolerate them.
-	if len(tolerations) == 0 {
-		return false
-	}
-
 	for i := range taints {
 		taint := &taints[i]
 		// skip taints that have effect PreferNoSchedule, since it is for priorities
@@ -1182,7 +1177,7 @@ func tolerationsToleratesTaints(tolerations []v1.Toleration, taints []v1.Taint) 
 			continue
 		}
 
-		if !v1.TaintToleratedByTolerations(taint, tolerations) {
+		if len(tolerations) == 0 || !v1.TaintToleratedByTolerations(taint, tolerations) {
 			return false
 		}
 	}
