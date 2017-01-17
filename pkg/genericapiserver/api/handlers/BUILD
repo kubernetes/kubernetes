@@ -15,9 +15,9 @@ go_test(
     tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
-        "//pkg/api/rest:go_default_library",
         "//pkg/api/testapi:go_default_library",
         "//pkg/api/v1:go_default_library",
+        "//pkg/genericapiserver/api/rest:go_default_library",
         "//pkg/util/strategicpatch:go_default_library",
         "//vendor:github.com/emicklei/go-restful",
         "//vendor:github.com/evanphx/json-patch",
@@ -44,9 +44,9 @@ go_library(
     deps = [
         "//pkg/admission:go_default_library",
         "//pkg/api:go_default_library",
-        "//pkg/api/rest:go_default_library",
         "//pkg/fields:go_default_library",
         "//pkg/genericapiserver/api/handlers/responsewriters:go_default_library",
+        "//pkg/genericapiserver/api/rest:go_default_library",
         "//pkg/util:go_default_library",
         "//pkg/util/httpstream:go_default_library",
         "//pkg/util/proxy:go_default_library",

@@ -16,8 +16,8 @@ go_test(
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/errors/storage:go_default_library",
-        "//pkg/api/rest:go_default_library",
         "//pkg/fields:go_default_library",
+        "//pkg/genericapiserver/api/rest:go_default_library",
         "//pkg/registry/generic:go_default_library",
         "//pkg/registry/registrytest:go_default_library",
         "//pkg/securitycontext:go_default_library",
@@ -43,11 +43,11 @@ go_library(
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/errors/storage:go_default_library",
-        "//pkg/api/rest:go_default_library",
         "//pkg/api/validation:go_default_library",
         "//pkg/apis/policy:go_default_library",
         "//pkg/client/clientset_generated/internalclientset/typed/policy/internalversion:go_default_library",
         "//pkg/client/retry:go_default_library",
+        "//pkg/genericapiserver/api/rest:go_default_library",
         "//pkg/kubelet/client:go_default_library",
         "//pkg/registry/core/pod:go_default_library",
         "//pkg/registry/core/pod/rest:go_default_library",

@@ -20,9 +20,9 @@ go_library(
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/errors/storage:go_default_library",
-        "//pkg/api/rest:go_default_library",
         "//pkg/api/validation/path:go_default_library",
         "//pkg/fields:go_default_library",
+        "//pkg/genericapiserver/api/rest:go_default_library",
         "//pkg/registry/cachesize:go_default_library",
         "//pkg/registry/generic:go_default_library",
         "//pkg/storage:go_default_library",
@@ -54,9 +54,9 @@ go_test(
     tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
-        "//pkg/api/rest:go_default_library",
         "//pkg/api/testapi:go_default_library",
         "//pkg/fields:go_default_library",
+        "//pkg/genericapiserver/api/rest:go_default_library",
         "//pkg/registry/core/pod:go_default_library",
         "//pkg/registry/generic:go_default_library",
         "//pkg/storage:go_default_library",

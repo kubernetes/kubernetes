@@ -123,7 +123,6 @@ filegroup(
         "//pkg/api/meta:all-srcs",
         "//pkg/api/pod:all-srcs",
         "//pkg/api/resource:all-srcs",
-        "//pkg/api/rest:all-srcs",
         "//pkg/api/service:all-srcs",
         "//pkg/api/testapi:all-srcs",
         "//pkg/api/testing:all-srcs",

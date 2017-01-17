@@ -19,9 +19,9 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
-        "//pkg/api/rest/resttest:go_default_library",
         "//pkg/api/testapi:go_default_library",
         "//pkg/fields:go_default_library",
+        "//pkg/genericapiserver/api/rest/resttest:go_default_library",
         "//pkg/registry/generic/registry:go_default_library",
         "//pkg/storage/etcd:go_default_library",
         "//pkg/storage/etcd/testing:go_default_library",
