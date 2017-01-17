@@ -114,8 +114,8 @@ func ClusterRoles() []rbac.ClusterRole {
 
 				rbac.NewRule(ReadWrite...).Groups(batchGroup).Resources("jobs", "cronjobs", "scheduledjobs").RuleOrDie(),
 
-				rbac.NewRule(ReadWrite...).Groups(extensionsGroup).Resources("daemonsets", "horizontalpodautoscalers",
-					"replicationcontrollers/scale", "replicasets", "replicasets/scale", "deployments", "deployments/scale").RuleOrDie(),
+				rbac.NewRule(ReadWrite...).Groups(extensionsGroup).Resources("daemonsets", "deployments", "deployments/scale",
+					"horizontalpodautoscalers", "ingresses", "replicasets", "replicasets/scale", "replicationcontrollers/scale").RuleOrDie(),
 
 				// additional admin powers
 				rbac.NewRule("create").Groups(authorizationGroup).Resources("localsubjectaccessreviews").RuleOrDie(),
@@ -144,8 +144,8 @@ func ClusterRoles() []rbac.ClusterRole {
 
 				rbac.NewRule(ReadWrite...).Groups(batchGroup).Resources("jobs", "cronjobs", "scheduledjobs").RuleOrDie(),
 
-				rbac.NewRule(ReadWrite...).Groups(extensionsGroup).Resources("daemonsets", "horizontalpodautoscalers",
-					"replicationcontrollers/scale", "replicasets", "replicasets/scale", "deployments", "deployments/scale").RuleOrDie(),
+				rbac.NewRule(ReadWrite...).Groups(extensionsGroup).Resources("daemonsets", "deployments", "deployments/scale",
+					"horizontalpodautoscalers", "ingresses", "replicasets", "replicasets/scale", "replicationcontrollers/scale").RuleOrDie(),
 			},
 		},
 		{
@@ -167,8 +167,8 @@ func ClusterRoles() []rbac.ClusterRole {
 
 				rbac.NewRule(Read...).Groups(batchGroup).Resources("jobs", "cronjobs", "scheduledjobs").RuleOrDie(),
 
-				rbac.NewRule(Read...).Groups(extensionsGroup).Resources("daemonsets", "horizontalpodautoscalers",
-					"replicationcontrollers/scale", "replicasets", "replicasets/scale", "deployments", "deployments/scale").RuleOrDie(),
+				rbac.NewRule(Read...).Groups(extensionsGroup).Resources("daemonsets", "deployments", "deployments/scale",
+					"horizontalpodautoscalers", "ingresses", "replicasets", "replicasets/scale", "replicationcontrollers/scale").RuleOrDie(),
 			},
 		},
 		{
