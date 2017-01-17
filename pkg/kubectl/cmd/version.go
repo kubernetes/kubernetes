@@ -80,23 +80,18 @@ func RunVersion(f cmdutil.Factory, out io.Writer, cmd *cobra.Command) error {
 				return nil
 			}
 
-			if serverErr != nil {
-				return serverErr
+			if serverErr == nil {
+				fmt.Fprintf(out, "Server Version: %s\n", serverVersion.GitVersion)
 			}
-
-			fmt.Fprintf(out, "Server Version: %s\n", serverVersion.GitVersion)
-
 		} else {
 			fmt.Fprintf(out, "Client Version: %s\n", fmt.Sprintf("%#v", clientVersion))
 			if cmdutil.GetFlagBool(cmd, "client") {
 				return nil
 			}
 
-			if serverErr != nil {
-				return serverErr
+			if serverErr == nil {
+				fmt.Fprintf(out, "Server Version: %s\n", fmt.Sprintf("%#v", *serverVersion))
 			}
-
-			fmt.Fprintf(out, "Server Version: %s\n", fmt.Sprintf("%#v", *serverVersion))
 		}
 	case "yaml":
 		y, err := yaml.Marshal(&vo)
@@ -105,23 +100,19 @@ func RunVersion(f cmdutil.Factory, out io.Writer, cmd *cobra.Command) error {
 		}
 
 		fmt.Fprintln(out, string(y))
-
-		if serverErr != nil {
-			return serverErr
-		}
 	case "json":
 		y, err := json.Marshal(&vo)
 		if err != nil {
 			return err
 		}
 		fmt.Fprintln(out, string(y))
-
-		if serverErr != nil {
-			return serverErr
-		}
 	default:
 		return errors.New("invalid output format: " + of)
 
+	}
+
+	if serverErr != nil {
+		return serverErr
 	}
 
 	return nil
