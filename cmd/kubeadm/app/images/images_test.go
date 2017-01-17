@@ -88,11 +88,11 @@ func TestGetAddonImage(t *testing.T) {
 		},
 		{
 			KubeDNSmasqImage,
-			fmt.Sprintf("%s/%s-%s:%s", gcrPrefix, KubeDNSmasqImage, runtime.GOARCH, dnsmasqVersion),
+			fmt.Sprintf("%s/%s-%s:%s", gcrPrefix, KubeDNSmasqImage, runtime.GOARCH, kubeDNSVersion),
 		},
 		{
 			KubeDNSSidecarImage,
-			fmt.Sprintf("%s/%s-%s:%s", gcrPrefix, KubeDNSSidecarImage, runtime.GOARCH, kubeDNSSidecarVersion),
+			fmt.Sprintf("%s/%s-%s:%s", gcrPrefix, KubeDNSSidecarImage, runtime.GOARCH, kubeDNSVersion),
 		},
 		{
 			Pause,
