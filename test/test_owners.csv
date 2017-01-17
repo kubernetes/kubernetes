@@ -756,8 +756,8 @@ k8s.io/kubernetes/pkg/registry/certificates/certificates,smarterclayton,1
 k8s.io/kubernetes/pkg/registry/core/componentstatus,krousey,1
 k8s.io/kubernetes/pkg/registry/core/configmap,janetkuo,1
 k8s.io/kubernetes/pkg/registry/core/configmap/etcd,gmarek,1
-k8s.io/kubernetes/pkg/registry/core/controller,freehan,1
-k8s.io/kubernetes/pkg/registry/core/controller/etcd,fabioy,1
+k8s.io/kubernetes/pkg/registry/core/replicationcontroller,freehan,1
+k8s.io/kubernetes/pkg/registry/core/replicationcontroller/etcd,fabioy,1
 k8s.io/kubernetes/pkg/registry/core/endpoint,bprashanth,1
 k8s.io/kubernetes/pkg/registry/core/endpoint/etcd,mikedanese,1
 k8s.io/kubernetes/pkg/registry/core/event,ixdy,1

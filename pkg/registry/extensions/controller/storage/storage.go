@@ -27,8 +27,8 @@ import (
 	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	extvalidation "k8s.io/kubernetes/pkg/apis/extensions/validation"
-	controllerstore "k8s.io/kubernetes/pkg/registry/core/controller/storage"
 	"k8s.io/kubernetes/pkg/registry/core/replicationcontroller"
+	controllerstore "k8s.io/kubernetes/pkg/registry/core/replicationcontroller/storage"
 	"k8s.io/kubernetes/pkg/registry/generic"
 )
 
