@@ -511,6 +511,7 @@ func TestSetSelectorParser(t *testing.T) {
 		{"a notin(", nil, true, false},        // bad formed
 		{"a (", nil, false, false},            // cpar
 		{"(", nil, false, false},              // opar
+		{Nothing().String(), nil, false, true},
 	}
 
 	for _, ssp := range setSelectorParserTests {
