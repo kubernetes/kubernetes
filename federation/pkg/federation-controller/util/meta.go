@@ -85,6 +85,16 @@ func ObjectMetaAndSpecEquivalent(a, b runtime.Object) bool {
 	return ObjectMetaEquivalent(objectMetaA, objectMetaB) && reflect.DeepEqual(specA, specB)
 }
 
+// Checks if cluster-independent, user provided data in ObjectMeta and a field in two given top
+// level api objects are equivalent.
+func ObjectMetaAndFieldByNameEquivalent(a, b runtime.Object, field string) bool {
+	objectMetaA := reflect.ValueOf(a).Elem().FieldByName("ObjectMeta").Interface().(metav1.ObjectMeta)
+	objectMetaB := reflect.ValueOf(b).Elem().FieldByName("ObjectMeta").Interface().(metav1.ObjectMeta)
+	fieldA := reflect.ValueOf(a).Elem().FieldByName(field).Interface()
+	fieldB := reflect.ValueOf(b).Elem().FieldByName(field).Interface()
+	return ObjectMetaEquivalent(objectMetaA, objectMetaB) && reflect.DeepEqual(fieldA, fieldB)
+}
+
 func DeepCopyApiTypeOrPanic(item interface{}) interface{} {
 	result, err := api.Scheme.DeepCopy(item)
 	if err != nil {

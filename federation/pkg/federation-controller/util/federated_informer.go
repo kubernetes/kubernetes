@@ -128,6 +128,9 @@ type ClusterLifecycleHandlerFuncs struct {
 	// Fired when the cluster becomes unavailable. The second arg contains data that was present
 	// in the cluster before deletion.
 	ClusterUnavailable func(*federationapi.Cluster, []interface{})
+	// Fired when the cluster is unregistered from federation. The second arg contains data that was present
+	// in the cluster before un-registration.
+	ClusterUnregistered func(*federationapi.Cluster, []interface{})
 }
 
 // Builds a FederatedInformer for the given federation client and factory.
@@ -180,6 +183,9 @@ func NewFederatedInformer(
 					federatedInformer.deleteCluster(oldCluster)
 					if clusterLifecycle.ClusterUnavailable != nil {
 						clusterLifecycle.ClusterUnavailable(oldCluster, data)
+					}
+					if clusterLifecycle.ClusterUnregistered != nil {
+						clusterLifecycle.ClusterUnregistered(oldCluster, data)
 					}
 				}
 			},
