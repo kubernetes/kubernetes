@@ -644,7 +644,7 @@ users:
 clusters:
 - name: local
   cluster:
-    server: https://kubernetes-master
+    server: https://${1}:443
     certificate-authority: ${CA_CERT_BUNDLE_PATH}
 contexts:
 - context:
@@ -760,12 +760,14 @@ EOF
 }
 
 function salt-node-role() {
+  local -r kubelet_kubeconfig_file="/srv/salt-overlay/salt/kubelet/kubeconfig"
   cat <<EOF >/etc/salt/minion.d/grains.conf
 grains:
   roles:
     - kubernetes-pool
   cloud: gce
   api_servers: '${KUBERNETES_MASTER_NAME}'
+  kubelet_kubeconfig: ${kubelet_kubeconfig_file}
 EOF
 }
 
@@ -853,7 +855,7 @@ if [[ -z "${is_push}" ]]; then
   ensure-local-disks
   create-node-pki
   create-salt-pillar
-  create-salt-kubelet-auth
+  create-salt-kubelet-auth ${KUBERNETES_MASTER_NAME}
   create-salt-kubeproxy-auth
   download-release
   configure-salt

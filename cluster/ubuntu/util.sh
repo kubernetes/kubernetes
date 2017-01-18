@@ -25,6 +25,28 @@ MASTER=""
 MASTER_IP=""
 NODE_IPS=""
 
+# Creates a kubeconfig file for the kubelet.
+# Args: address (e.g. "http://localhost:8080"), destination dir
+function create-kubelet-kubeconfig() {
+  local api_addr=$1
+  local dest_dir=$2
+  mkdir -p "${dest_dir}" &>/dev/null || sudo mkdir -p "${dest_dir}"
+  sudo=$(test -w "${dest_dir}" || echo "sudo -E")
+  cat <<EOF | ${sudo} tee "${dest_dir}"/kubelet.kubeconfig > /dev/null
+apiVersion: v1
+kind: Config
+clusters:
+  - cluster:
+      server: ${api_addr}
+    name: local
+contexts:
+  - context:
+      cluster: local
+    name: local
+current-context: local
+EOF
+}
+
 # Assumed Vars:
 #   KUBE_ROOT
 function test-build-release() {
@@ -285,6 +307,7 @@ EOF
 # $6: Whether or not we run kubelet in privileged mode
 # $7: If empty then flannel is used otherwise CNI is used.
 function create-kubelet-opts() {
+  create-kubelet-kubeconfig "http://${2}:8080" "/var/lib/kubelet"
   if [ -n "$7" ] ; then
       cni_opts=" --network-plugin=cni --network-plugin-dir=/etc/cni/net.d"
   else
@@ -293,7 +316,7 @@ function create-kubelet-opts() {
   cat <<EOF > ~/kube/default/kubelet
 KUBELET_OPTS="\
  --hostname-override=${1} \
- --api-servers=http://${2}:8080 \
+ --kubeconfig=/var/lib/kubelet/kubelet.kubeconfig \
  --logtostderr=true \
  --cluster-dns=${3} \
  --cluster-domain=${4} \

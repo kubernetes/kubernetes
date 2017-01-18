@@ -39,6 +39,7 @@ apiVersion: v1
 kind: Config
 clusters:
 - cluster:
+    server: https://${KUBE_MASTER_IP}
     insecure-skip-tls-verify: true
   name: local
 contexts:
