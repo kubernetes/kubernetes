@@ -8,6 +8,30 @@ load(
     "go_test",
 )
 
+go_test(
+    name = "go_default_test",
+    srcs = [
+        "handler_apis_test.go",
+        "handler_proxy_test.go",
+    ],
+    library = ":go_default_library",
+    tags = ["automanaged"],
+    deps = [
+        "//cmd/kube-aggregator/pkg/apis/apiregistration:go_default_library",
+        "//cmd/kube-aggregator/pkg/client/listers/apiregistration/internalversion:go_default_library",
+        "//pkg/api:go_default_library",
+        "//pkg/api/v1:go_default_library",
+        "//pkg/client/cache:go_default_library",
+        "//pkg/client/listers/core/v1:go_default_library",
+        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor:k8s.io/apimachinery/pkg/runtime",
+        "//vendor:k8s.io/apimachinery/pkg/util/diff",
+        "//vendor:k8s.io/apimachinery/pkg/util/sets",
+        "//vendor:k8s.io/apiserver/pkg/authentication/user",
+        "//vendor:k8s.io/apiserver/pkg/request",
+    ],
+)
+
 go_library(
     name = "go_default_library",
     srcs = [
@@ -27,7 +51,6 @@ go_library(
         "//cmd/kube-aggregator/pkg/client/listers/apiregistration/internalversion:go_default_library",
         "//cmd/kube-aggregator/pkg/registry/apiservice/etcd:go_default_library",
         "//pkg/api:go_default_library",
-        "//pkg/auth/handlers:go_default_library",
         "//pkg/client/cache:go_default_library",
         "//pkg/client/clientset_generated/clientset:go_default_library",
         "//pkg/client/informers/informers_generated:go_default_library",
@@ -52,30 +75,6 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/runtime",
         "//vendor:k8s.io/apimachinery/pkg/util/runtime",
         "//vendor:k8s.io/apimachinery/pkg/util/wait",
-        "//vendor:k8s.io/apiserver/pkg/request",
-    ],
-)
-
-go_test(
-    name = "go_default_test",
-    srcs = [
-        "handler_apis_test.go",
-        "handler_proxy_test.go",
-    ],
-    library = ":go_default_library",
-    tags = ["automanaged"],
-    deps = [
-        "//cmd/kube-aggregator/pkg/apis/apiregistration:go_default_library",
-        "//cmd/kube-aggregator/pkg/client/listers/apiregistration/internalversion:go_default_library",
-        "//pkg/api:go_default_library",
-        "//pkg/api/v1:go_default_library",
-        "//pkg/client/cache:go_default_library",
-        "//pkg/client/listers/core/v1:go_default_library",
-        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
-        "//vendor:k8s.io/apimachinery/pkg/runtime",
-        "//vendor:k8s.io/apimachinery/pkg/util/diff",
-        "//vendor:k8s.io/apimachinery/pkg/util/sets",
-        "//vendor:k8s.io/apiserver/pkg/authentication/user",
         "//vendor:k8s.io/apiserver/pkg/request",
     ],
 )
