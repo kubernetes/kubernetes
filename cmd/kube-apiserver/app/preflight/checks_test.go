@@ -21,77 +21,79 @@ import (
 	"time"
 )
 
-type testTimer struct {}
-
-func (testTimer) Sleep(time.Duration) {
-	timerCallCount += 1
+type testTimer struct {
+	timerCallCount int
 }
 
-type testEtcdConnection struct {}
-
-func (testEtcdConnection) checkConnection(connString string) bool {
-	checkCallCount += 1
-	return (checkCallCount >= (timesToFail + 1))
+func (t testTimer) Sleep(time.Duration) {
+	t.timerCallCount += 1
 }
 
-var checkCallCount int
-var timesToFail int
-
-var origTimer clock
-var origRetryInterval time.Duration
-var timerCallCount int
-var origEtcdConnection connection
-
-func setUp() {
-	origTimer = timer
-	origRetryInterval = retryInterval
-	timer = new(testTimer)
-	timerCallCount = 0
-	checkCallCount = 0
-	timesToFail = 0
-	origEtcdConnection = etcdConnection
-	etcdConnection = new(testEtcdConnection)
+type mockEtcdConnection struct {
+	shouldSucceed bool
 }
 
-func tearDown() {
-	timer = origTimer
-	retryInterval = origRetryInterval
-	etcdConnection = origEtcdConnection
+func (m mockEtcdConnection) checkConnection(address string) bool{
+	return m.shouldSucceed
+}
+
+func makeEtcdConnection(shouldSucceed bool) mockEtcdConnection {
+	conn := mockEtcdConnection{}
+	conn.shouldSucceed = shouldSucceed
+	return conn
+}
+
+func setUp() func() {
+	origTimer := timer
+	origEtcdConnection := etcd
+	return func() {
+		timer = origTimer
+		etcd = origEtcdConnection
+	}
 }
 
 func TestWaitForEtcdSuccess(t *testing.T) {
-	setUp()
+	tearDown := setUp()
+	defer tearDown()
+	etcd = makeEtcdConnection(true)
 	servers := []string{"https://127.0.0.1:2379"}
 	err := WaitForEtcd(servers)
-	if checkCallCount != 1 { t.Fatal("Check Etcd was called an unexpected number of times") }
+
 	if err != nil { t.Fatalf("Unexpected error: %v", err) }
-	tearDown()
 }
+
 
 func TestWaitForEtcdFail(t *testing.T) {
-	setUp()
-	timesToFail = retryLimit + 5
+	tearDown := setUp()
+	defer tearDown()
+	timer = new(testTimer)
+
+	etcd = makeEtcdConnection(false)
 	servers := []string{"https://127.0.0.1:2379"}
 	err := WaitForEtcd(servers)
-	if checkCallCount != retryLimit + 1 { t.Fatalf("Expected Etcd connection to be tested %d times. It was checked %d", retryLimit + 1, checkCallCount) }
-	if err == nil { t.Fatal("Expected retry error to occur") }
-	tearDown()
+	if err == nil { t.Fatal("Expected 'Unable to reach Etcd' error to occur") }
 }
 
-func TestBadConnectionString(t *testing.T) {
-	setUp()
-	servers := []string{"-invalid uri$@#%"}
-	err := WaitForEtcd(servers)
-	if err == nil { t.Fatal("Expected bad URI to raise parse error") }
-	tearDown()
+func TestCheckEtcdServer(t *testing.T) {
+	tearDown := setUp()
+	defer tearDown()
+	timer = new(testTimer)
+
+	mockEtcd := makeEtcdConnection(false)
+	etcd = mockEtcd
+	address := "https://127.0.0.1:2379"
+	ch := make(chan struct{})
+	checkEtcdServer(address, ch)
+	select {
+		case <-ch:
+			{t.Error("received unexpected channel activity")}
+		default:
+	}
 }
 
-func TestDelayedStart(t *testing.T) {
-	setUp()
-	timesToFail = 2
-	servers := []string{"https://127.0.0.1:2379"}
-	err := WaitForEtcd(servers)
-	if checkCallCount != 3 { t.Fatalf("Expected 3 calls to check Etcd. Got: %d", checkCallCount) }
-	if err != nil { t.Fatalf("Unexpected error: %v", err) }
-	tearDown()
+func testEtcdConnection(t *testing.T) {
+	tearDown := setUp()
+	defer tearDown()
+	result := etcd.checkConnection("-not a real network address-")
+	if result {t.Error("checkConnection should not have succeeded")}
 }

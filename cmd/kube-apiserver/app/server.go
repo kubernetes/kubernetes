@@ -96,10 +96,6 @@ func Run(s *options.ServerRunOptions) error {
 	if err := s.CloudProvider.DefaultExternalHost(s.GenericServerRunOptions); err != nil {
 		return fmt.Errorf("error setting the external host value: %v", err)
 	}
-	if err := preflight.RunApiserverChecks(s); err != nil {
-		return fmt.Errorf("error starting apiserver: %v\n", err)
-		os.Exit(1)
-	}
 
 	// validate options
 	if errs := s.Validate(); len(errs) != 0 {
@@ -116,6 +112,9 @@ func Run(s *options.ServerRunOptions) error {
 	}
 	if err = s.Authentication.Apply(genericConfig); err != nil {
 		return fmt.Errorf("failed to configure authentication: %s", err)
+	}
+	if err := preflight.RunApiserverChecks(s); err != nil {
+		return fmt.Errorf("error starting apiserver: %v\n", err)
 	}
 
 	capabilities.Initialize(capabilities.Capabilities{

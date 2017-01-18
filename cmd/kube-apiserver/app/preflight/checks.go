@@ -17,16 +17,16 @@ limitations under the License.
 package preflight
 
 import (
-	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	"net"
 	"net/url"
 	"time"
-	"fmt"
 	"errors"
+
+	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 )
 
-var retryLimit int = 6
-var retryInterval time.Duration = 10
+const retryLimit = 6
+const retryInterval = 10 * time.Second
 
 type clock interface {
 	Sleep(time.Duration)
@@ -38,40 +38,57 @@ func (realTimer) Sleep(d time.Duration) {time.Sleep(d)}
 var timer clock = new(realTimer)
 
 type connection interface {
-	checkConnection(string) bool
+	checkConnection(address string) bool
 }
 
-type realEtcdConnection struct {}
+type etcdConnection struct {}
 
-var etcdConnection connection = new(realEtcdConnection)
+var etcd connection = new(etcdConnection)
 
-func (realEtcdConnection) checkConnection(connString string) bool {
-	if conn, err := net.Dial("tcp", connString); err != nil {
-		conn.Close()
+func (etcdConnection) checkConnection(address string) bool {
+	if conn, err := net.Dial("tcp", address); err == nil {
+		defer conn.Close()
 		return true
 	}
 	return false
 }
 
-func WaitForEtcd(serverList []string) error {
-	for _, connString := range serverList {
-		connUrl, err := url.Parse(connString)
-		if err != nil {
-			return errors.New(fmt.Sprintf("error parsing Etcd URI: %v", err))
-		}
-
-		done := etcdConnection.checkConnection(connUrl.Host)
-		retries := 0
-		for (!done) && (retries < retryLimit) {
-			retries += 1
-			timer.Sleep(retryInterval)
-			done = etcdConnection.checkConnection(connUrl.Host)
-		}
-		if retries >= retryLimit {
-			return errors.New(fmt.Sprint("unable to reach Etcd server: %s", connString))
+func checkEtcdServer(address string, foundEtcd chan struct{})  {
+	retries := 0
+	for retries < retryLimit {
+		retries += 1
+		timer.Sleep(retryInterval)
+		if etcd.checkConnection(address) {
+			select {
+			case foundEtcd <- struct{}{}:
+			default:
+			}
 		}
 	}
-	return nil
+}
+
+func WaitForEtcd(serverList []string) error {
+	foundEtcd := make(chan struct{}, 1)
+	timeout := make(chan struct{})
+
+	// Attempt to reach every Etcd server in goroutines
+	for _, serverURI := range serverList {
+		connUrl, _ := url.Parse(serverURI)
+		go checkEtcdServer(connUrl.Host, foundEtcd)
+	}
+
+	// overall timeout
+	go func() {
+		timer.Sleep(retryInterval * retryLimit)
+		timeout <- struct{}{}
+	}()
+
+	select {
+	case <-foundEtcd:
+		{return nil}
+	case <- timeout:
+		{return errors.New("Unable to reach any Etcd server")}
+	}
 }
 
 func RunApiserverChecks(s *options.ServerRunOptions) error {
