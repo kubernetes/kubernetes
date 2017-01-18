@@ -120,6 +120,12 @@ const (
 	HairpinNone = "none"
 )
 
+// A configuration field should go in KubeletFlags instead of KubeletConfiguration if any of these are true:
+// - its value will never, or cannot safely be changed during the lifetime of a node
+// - its value cannot be safely shared between nodes at the same time (e.g. a hostname)
+//   KubeletConfiguration is intended to be shared between nodes
+// In general, please try to avoid adding flags or configuration fields,
+// we already have a confusingly large amount of them.
 // TODO: curate the ordering and structure of this config object
 type KubeletConfiguration struct {
 	metav1.TypeMeta
@@ -167,9 +173,6 @@ type KubeletConfiguration struct {
 	Authentication KubeletAuthentication
 	// authorization specifies how requests to the Kubelet's server are authorized
 	Authorization KubeletAuthorization
-	// hostnameOverride is the hostname used to identify the kubelet instead
-	// of the actual hostname.
-	HostnameOverride string
 	// podInfraContainerImage is the image whose network/ipc namespaces
 	// containers in each pod will use.
 	PodInfraContainerImage string
@@ -405,10 +408,6 @@ type KubeletConfiguration struct {
 	// wait before transitioning out of out-of-disk node condition status.
 	// +optional
 	OutOfDiskTransitionFrequency metav1.Duration
-	// nodeIP is IP address of the node. If set, kubelet will use this IP
-	// address for the node.
-	// +optional
-	NodeIP string
 	// nodeLabels to add when registering the node in the cluster.
 	NodeLabels map[string]string
 	// nonMasqueradeCIDR configures masquerading: traffic to IPs outside this range will use IP masquerade.
