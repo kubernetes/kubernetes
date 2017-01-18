@@ -1,15 +1,22 @@
 approvers:
-- nelcy
-reviewers:
-- thockin
-- caesarxuchao
-- saad-ali
-- timstclair
-- jingxu97
-- fabioy
-- resouer
-- david-mcmahon
-- swagiaal
 - chakri-nelluri
-- goltermann
-- screeley44
+- saad-ali
+reviewers:
+- ivan4th
+- rata
+- sjenning
+- thockin
+- smarterclayton
+- deads2k
+- brendandburns
+- derekwaynecarr
+- bprashanth
+- pmorie
+- saad-ali
+- justinsb
+- jsafrane
+- rootfs
+- jingxu97
+- rkouj
+- msau42
+- chakri-nelluri
