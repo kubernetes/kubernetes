@@ -1,20 +1,18 @@
 approvers:
 - thockin
+- saad-ali
 reviewers:
 - thockin
-- mikedanese
+- smarterclayton
+- deads2k
+- brendandburns
+- derekwaynecarr
+- bprashanth
 - pmorie
 - saad-ali
-- pwittrock
-- timstclair
-- eparis
-- dims
-- krousey
-- markturansky
-- fgrzadkowski
+- justinsb
+- jsafrane
+- rootfs
 - jingxu97
-- resouer
-- david-mcmahon
-- ivan4th
-- swagiaal
-- chakri-nelluri
+- rkouj
+- msau42
