@@ -51,9 +51,9 @@ go_test(
         "//pkg/api/v1:go_default_library",
         "//pkg/client/restclient:go_default_library",
         "//pkg/client/unversioned/clientcmd:go_default_library",
-        "//pkg/client/unversioned/clientcmd/api:go_default_library",
         "//pkg/util/uuid:go_default_library",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor:k8s.io/client-go/tools/clientcmd/api",
     ],
 )
 

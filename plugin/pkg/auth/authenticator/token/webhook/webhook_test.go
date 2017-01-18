@@ -32,8 +32,8 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/authentication/user"
+	"k8s.io/client-go/tools/clientcmd/api/v1"
 	"k8s.io/kubernetes/pkg/apis/authentication/v1beta1"
-	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api/v1"
 )
 
 // Service mocks a remote authentication service.
