@@ -17,6 +17,7 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	api "k8s.io/client-go/pkg/api"
 	v1 "k8s.io/client-go/pkg/api/v1"
@@ -40,7 +41,7 @@ type PodDisruptionBudgetInterface interface {
 	Get(name string) (*v1alpha1.PodDisruptionBudget, error)
 	List(opts v1.ListOptions) (*v1alpha1.PodDisruptionBudgetList, error)
 	Watch(opts v1.ListOptions) (watch.Interface, error)
-	Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *v1alpha1.PodDisruptionBudget, err error)
+	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1alpha1.PodDisruptionBudget, err error)
 	PodDisruptionBudgetExpansion
 }
 
@@ -153,7 +154,7 @@ func (c *podDisruptionBudgets) Watch(opts v1.ListOptions) (watch.Interface, erro
 }
 
 // Patch applies the patch and returns the patched podDisruptionBudget.
-func (c *podDisruptionBudgets) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *v1alpha1.PodDisruptionBudget, err error) {
+func (c *podDisruptionBudgets) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1alpha1.PodDisruptionBudget, err error) {
 	result = &v1alpha1.PodDisruptionBudget{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).

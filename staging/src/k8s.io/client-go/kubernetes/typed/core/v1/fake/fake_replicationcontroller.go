@@ -20,8 +20,8 @@ import (
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
+	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
-	api "k8s.io/client-go/pkg/api"
 	v1 "k8s.io/client-go/pkg/api/v1"
 	testing "k8s.io/client-go/testing"
 )
@@ -117,7 +117,7 @@ func (c *FakeReplicationControllers) Watch(opts v1.ListOptions) (watch.Interface
 }
 
 // Patch applies the patch and returns the patched replicationController.
-func (c *FakeReplicationControllers) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *v1.ReplicationController, err error) {
+func (c *FakeReplicationControllers) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.ReplicationController, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewPatchSubresourceAction(replicationcontrollersResource, c.ns, name, data, subresources...), &v1.ReplicationController{})
 
