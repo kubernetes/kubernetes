@@ -1,8 +1,10 @@
 approvers:
-- rootfs
+- pmorie
 - saad-ali
-- jingxu97
+- rootfs
+- jsafrane
 reviewers:
+- jeffvance
 - thockin
 - smarterclayton
 - deads2k
