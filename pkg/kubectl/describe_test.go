@@ -69,7 +69,7 @@ func TestDescribePod(t *testing.T) {
 
 func TestDescribePodTolerations(t *testing.T) {
 
-	podTolerations := []api.Toleration{{Key: "key1", Value: "value1"},
+	podTolerations := []v1.Toleration{{Key: "key1", Value: "value1"},
 		{Key: "key2", Value: "value2"}}
 	pt, _ := json.Marshal(podTolerations)
 	fake := fake.NewSimpleClientset(&api.Pod{
@@ -77,7 +77,7 @@ func TestDescribePodTolerations(t *testing.T) {
 			Name:      "bar",
 			Namespace: "foo",
 			Annotations: map[string]string{
-				api.TolerationsAnnotationKey: string(pt),
+				v1.TolerationsAnnotationKey: string(pt),
 			},
 		},
 	})
