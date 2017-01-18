@@ -19,7 +19,6 @@ go_library(
     ],
     tags = ["automanaged"],
     deps = [
-        "//pkg/admission:go_default_library",
         "//pkg/api:go_default_library",
         "//pkg/genericapiserver/authenticator:go_default_library",
         "//pkg/genericapiserver/authorizer:go_default_library",
@@ -30,6 +29,7 @@ go_library(
         "//vendor:github.com/spf13/pflag",
         "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
         "//vendor:k8s.io/apimachinery/pkg/util/net",
+        "//vendor:k8s.io/apiserver/pkg/admission",
         "//vendor:k8s.io/client-go/kubernetes/typed/authentication/v1beta1",
         "//vendor:k8s.io/client-go/kubernetes/typed/authorization/v1beta1",
         "//vendor:k8s.io/client-go/rest",

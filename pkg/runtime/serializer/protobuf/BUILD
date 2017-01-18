@@ -9,18 +9,8 @@ load(
 
 go_library(
     name = "go_default_library",
-    srcs = [
-        "doc.go",
-        "protobuf.go",
-    ],
+    srcs = ["doc.go"],
     tags = ["automanaged"],
-    deps = [
-        "//pkg/runtime:go_default_library",
-        "//pkg/runtime/schema:go_default_library",
-        "//pkg/runtime/serializer/recognizer:go_default_library",
-        "//pkg/util/framer:go_default_library",
-        "//vendor:github.com/gogo/protobuf/proto",
-    ],
 )
 
 filegroup(

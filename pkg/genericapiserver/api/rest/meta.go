@@ -19,12 +19,11 @@ package rest
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	genericapirequest "k8s.io/apiserver/pkg/request"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/util/uuid"
 )
 
 // FillObjectMetaSystemFields populates fields that are managed by the system on ObjectMeta.
-func FillObjectMetaSystemFields(ctx genericapirequest.Context, meta *api.ObjectMeta) {
+func FillObjectMetaSystemFields(ctx genericapirequest.Context, meta *metav1.ObjectMeta) {
 	meta.CreationTimestamp = metav1.Now()
 	// allows admission controllers to assign a UID earlier in the request processing
 	// to support tracking resources pending creation.
@@ -38,7 +37,7 @@ func FillObjectMetaSystemFields(ctx genericapirequest.Context, meta *api.ObjectM
 
 // ValidNamespace returns false if the namespace on the context differs from the resource.  If the resource has no namespace, it is set to the value in the context.
 // TODO(sttts): move into pkg/genericapiserver/api
-func ValidNamespace(ctx genericapirequest.Context, resource *api.ObjectMeta) bool {
+func ValidNamespace(ctx genericapirequest.Context, resource *metav1.ObjectMeta) bool {
 	ns, ok := genericapirequest.NamespaceFrom(ctx)
 	if len(resource.Namespace) == 0 {
 		resource.Namespace = ns

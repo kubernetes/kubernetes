@@ -39,10 +39,8 @@ const (
 	gcrPrefix   = "gcr.io/google_containers"
 	etcdVersion = "3.0.14-kubeadm"
 
-	kubeDNSVersion        = "1.10.1"
-	dnsmasqVersion        = "1.10.1"
-	kubeDNSSidecarVersion = "1.10.1"
-	pauseVersion          = "3.0"
+	kubeDNSVersion = "1.11.0"
+	pauseVersion   = "3.0"
 )
 
 func GetCoreImage(image string, cfg *kubeadmapi.MasterConfiguration, overrideImage string) string {
@@ -63,8 +61,8 @@ func GetAddonImage(image string) string {
 	repoPrefix := kubeadmapi.GlobalEnvParams.RepositoryPrefix
 	return map[string]string{
 		KubeDNSImage:        fmt.Sprintf("%s/%s-%s:%s", repoPrefix, KubeDNSImage, runtime.GOARCH, kubeDNSVersion),
-		KubeDNSmasqImage:    fmt.Sprintf("%s/%s-%s:%s", repoPrefix, KubeDNSmasqImage, runtime.GOARCH, dnsmasqVersion),
-		KubeDNSSidecarImage: fmt.Sprintf("%s/%s-%s:%s", repoPrefix, KubeDNSSidecarImage, runtime.GOARCH, kubeDNSSidecarVersion),
+		KubeDNSmasqImage:    fmt.Sprintf("%s/%s-%s:%s", repoPrefix, KubeDNSmasqImage, runtime.GOARCH, kubeDNSVersion),
+		KubeDNSSidecarImage: fmt.Sprintf("%s/%s-%s:%s", repoPrefix, KubeDNSSidecarImage, runtime.GOARCH, kubeDNSVersion),
 		Pause:               fmt.Sprintf("%s/%s-%s:%s", repoPrefix, Pause, runtime.GOARCH, pauseVersion),
 	}[image]
 }

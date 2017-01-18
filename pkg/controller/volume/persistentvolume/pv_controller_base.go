@@ -23,6 +23,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
@@ -510,7 +511,7 @@ func (ctrl *PersistentVolumeController) setClaimProvisioner(claim *v1.Persistent
 	if !ok {
 		return nil, fmt.Errorf("Unexpected claim cast error : %v", claimClone)
 	}
-	v1.SetMetaDataAnnotation(&claimClone.ObjectMeta, annStorageProvisioner, class.Provisioner)
+	metav1.SetMetaDataAnnotation(&claimClone.ObjectMeta, annStorageProvisioner, class.Provisioner)
 	newClaim, err := ctrl.kubeClient.Core().PersistentVolumeClaims(claim.Namespace).Update(claimClone)
 	if err != nil {
 		return newClaim, err
@@ -525,14 +526,14 @@ func (ctrl *PersistentVolumeController) setClaimProvisioner(claim *v1.Persistent
 // Stateless functions
 
 func getClaimStatusForLogging(claim *v1.PersistentVolumeClaim) string {
-	bound := v1.HasAnnotation(claim.ObjectMeta, annBindCompleted)
-	boundByController := v1.HasAnnotation(claim.ObjectMeta, annBoundByController)
+	bound := metav1.HasAnnotation(claim.ObjectMeta, annBindCompleted)
+	boundByController := metav1.HasAnnotation(claim.ObjectMeta, annBoundByController)
 
 	return fmt.Sprintf("phase: %s, bound to: %q, bindCompleted: %v, boundByController: %v", claim.Status.Phase, claim.Spec.VolumeName, bound, boundByController)
 }
 
 func getVolumeStatusForLogging(volume *v1.PersistentVolume) string {
-	boundByController := v1.HasAnnotation(volume.ObjectMeta, annBoundByController)
+	boundByController := metav1.HasAnnotation(volume.ObjectMeta, annBoundByController)
 	claimName := ""
 	if volume.Spec.ClaimRef != nil {
 		claimName = fmt.Sprintf("%s/%s (uid: %s)", volume.Spec.ClaimRef.Namespace, volume.Spec.ClaimRef.Name, volume.Spec.ClaimRef.UID)

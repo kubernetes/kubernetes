@@ -21,9 +21,9 @@ limitations under the License.
 package apiregistration
 
 import (
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
-	api "k8s.io/kubernetes/pkg/api"
 	reflect "reflect"
 )
 
@@ -48,8 +48,10 @@ func DeepCopy_apiregistration_APIService(in interface{}, out interface{}, c *con
 		in := in.(*APIService)
 		out := out.(*APIService)
 		*out = *in
-		if err := api.DeepCopy_api_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, c); err != nil {
+		if newVal, err := c.DeepCopy(&in.ObjectMeta); err != nil {
 			return err
+		} else {
+			out.ObjectMeta = *newVal.(*v1.ObjectMeta)
 		}
 		if err := DeepCopy_apiregistration_APIServiceSpec(&in.Spec, &out.Spec, c); err != nil {
 			return err

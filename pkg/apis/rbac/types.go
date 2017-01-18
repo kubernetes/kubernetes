@@ -18,8 +18,6 @@ package rbac
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/kubernetes/pkg/api"
 )
 
 // Authorization is calculated against
@@ -43,12 +41,9 @@ const (
 type PolicyRule struct {
 	// Verbs is a list of Verbs that apply to ALL the ResourceKinds and AttributeRestrictions contained in this rule.  VerbAll represents all kinds.
 	Verbs []string
-	// AttributeRestrictions will vary depending on what the Authorizer/AuthorizationAttributeBuilder pair supports.
-	// If the Authorizer does not recognize how to handle the AttributeRestrictions, the Authorizer should report an error.
-	AttributeRestrictions runtime.Object
+
 	// APIGroups is the name of the APIGroup that contains the resources.
 	// If multiple API groups are specified, any action requested against one of the enumerated resources in any API group will be allowed.
-
 	APIGroups []string
 	// Resources is a list of resources this rule applies to.  ResourceAll represents all resources.
 	Resources []string
@@ -94,7 +89,7 @@ type RoleRef struct {
 type Role struct {
 	metav1.TypeMeta
 	// Standard object's metadata.
-	api.ObjectMeta
+	metav1.ObjectMeta
 
 	// Rules holds all the PolicyRules for this Role
 	Rules []PolicyRule
@@ -107,7 +102,7 @@ type Role struct {
 // namespace only have effect in that namespace.
 type RoleBinding struct {
 	metav1.TypeMeta
-	api.ObjectMeta
+	metav1.ObjectMeta
 
 	// Subjects holds references to the objects the role applies to.
 	Subjects []Subject
@@ -144,7 +139,7 @@ type RoleList struct {
 type ClusterRole struct {
 	metav1.TypeMeta
 	// Standard object's metadata.
-	api.ObjectMeta
+	metav1.ObjectMeta
 
 	// Rules holds all the PolicyRules for this ClusterRole
 	Rules []PolicyRule
@@ -158,7 +153,7 @@ type ClusterRole struct {
 type ClusterRoleBinding struct {
 	metav1.TypeMeta
 	// Standard object's metadata.
-	api.ObjectMeta
+	metav1.ObjectMeta
 
 	// Subjects holds references to the objects the role applies to.
 	Subjects []Subject

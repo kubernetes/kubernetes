@@ -22,12 +22,9 @@
 
 FSCK=fsck.ext4
 MOUNT_OPTIONS="discard,defaults"
-MKFS="mkfs.ext4 -E lazy_itable_init=0,lazy_journal_init=0 -F"
+MKFS="mkfs.ext4 -F"
 if [ -e /etc/redhat-release ]; then
-    if grep -q '6\..' /etc/redhat-release; then
-      # lazy_journal_init is not recognized in redhat 6
-      MKFS="mkfs.ext4 -E lazy_itable_init=0 -F"
-    elif grep -q '7\..' /etc/redhat-release; then
+    if grep -q '7\..' /etc/redhat-release; then
       FSCK=fsck.xfs
       MKFS=mkfs.xfs
     fi

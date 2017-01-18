@@ -18,6 +18,7 @@ go_library(
         "//pkg/util/flowcontrol:go_default_library",
         "//vendor:k8s.io/apimachinery/pkg/runtime",
         "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
+        "//vendor:k8s.io/apimachinery/pkg/types",
     ],
 )
 

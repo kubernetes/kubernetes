@@ -24,7 +24,6 @@ import (
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
-	api_v1 "k8s.io/kubernetes/pkg/api/v1"
 	reflect "reflect"
 )
 
@@ -61,8 +60,10 @@ func DeepCopy_v1_HorizontalPodAutoscaler(in interface{}, out interface{}, c *con
 		in := in.(*HorizontalPodAutoscaler)
 		out := out.(*HorizontalPodAutoscaler)
 		*out = *in
-		if err := api_v1.DeepCopy_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, c); err != nil {
+		if newVal, err := c.DeepCopy(&in.ObjectMeta); err != nil {
 			return err
+		} else {
+			out.ObjectMeta = *newVal.(*meta_v1.ObjectMeta)
 		}
 		if err := DeepCopy_v1_HorizontalPodAutoscalerSpec(&in.Spec, &out.Spec, c); err != nil {
 			return err
@@ -140,8 +141,10 @@ func DeepCopy_v1_Scale(in interface{}, out interface{}, c *conversion.Cloner) er
 		in := in.(*Scale)
 		out := out.(*Scale)
 		*out = *in
-		if err := api_v1.DeepCopy_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, c); err != nil {
+		if newVal, err := c.DeepCopy(&in.ObjectMeta); err != nil {
 			return err
+		} else {
+			out.ObjectMeta = *newVal.(*meta_v1.ObjectMeta)
 		}
 		return nil
 	}

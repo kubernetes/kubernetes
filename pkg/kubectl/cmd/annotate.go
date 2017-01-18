@@ -25,8 +25,9 @@ import (
 	"github.com/golang/glog"
 	"github.com/spf13/cobra"
 	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
@@ -254,7 +255,7 @@ func (o AnnotateOptions) RunAnnotate(f cmdutil.Factory, cmd *cobra.Command) erro
 			helper := resource.NewHelper(client, mapping)
 
 			if createdPatch {
-				outputObj, err = helper.Patch(namespace, name, api.StrategicMergePatchType, patchBytes)
+				outputObj, err = helper.Patch(namespace, name, types.StrategicMergePatchType, patchBytes)
 			} else {
 				outputObj, err = helper.Replace(namespace, name, false, obj)
 			}
@@ -294,7 +295,7 @@ func validateAnnotations(removeAnnotations []string, newAnnotations map[string]s
 }
 
 // validateNoAnnotationOverwrites validates that when overwrite is false, to-be-updated annotations don't exist in the object annotation map (yet)
-func validateNoAnnotationOverwrites(accessor meta.Object, annotations map[string]string) error {
+func validateNoAnnotationOverwrites(accessor metav1.Object, annotations map[string]string) error {
 	var buf bytes.Buffer
 	for key := range annotations {
 		// change-cause annotation can always be overwritten

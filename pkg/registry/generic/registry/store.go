@@ -280,12 +280,12 @@ func (e *Store) shouldDelete(ctx genericapirequest.Context, key string, obj, exi
 	if !e.EnableGarbageCollection {
 		return false
 	}
-	newMeta, err := api.ObjectMetaFor(obj)
+	newMeta, err := metav1.ObjectMetaFor(obj)
 	if err != nil {
 		utilruntime.HandleError(err)
 		return false
 	}
-	oldMeta, err := api.ObjectMetaFor(existing)
+	oldMeta, err := metav1.ObjectMetaFor(existing)
 	if err != nil {
 		utilruntime.HandleError(err)
 		return false
@@ -481,7 +481,7 @@ var (
 // When deciding whether to add the OrphanDependent finalizer, factors in the
 // order of highest to lowest priority are: options.OrphanDependents, existing
 // finalizers of the object, e.DeleteStrategy.DefaultGarbageCollectionPolicy.
-func shouldUpdateFinalizers(e *Store, accessor meta.Object, options *api.DeleteOptions) (shouldUpdate bool, newFinalizers []string) {
+func shouldUpdateFinalizers(e *Store, accessor metav1.Object, options *api.DeleteOptions) (shouldUpdate bool, newFinalizers []string) {
 	shouldOrphan := false
 	// Get default orphan policy from this REST object type
 	if gcStrategy, ok := e.DeleteStrategy.(rest.GarbageCollectionDeleteStrategy); ok {
@@ -525,7 +525,7 @@ func shouldUpdateFinalizers(e *Store, accessor meta.Object, options *api.DeleteO
 // DeletionTimestamp to "now". Finalizers are watching for such updates and will
 // finalize the object if their IDs are present in the object's Finalizers list.
 func markAsDeleting(obj runtime.Object) (err error) {
-	objectMeta, kerr := api.ObjectMetaFor(obj)
+	objectMeta, kerr := metav1.ObjectMetaFor(obj)
 	if kerr != nil {
 		return kerr
 	}
@@ -890,7 +890,7 @@ func (e *Store) calculateTTL(obj runtime.Object, defaultTTL int64, update bool) 
 	return ttl, err
 }
 
-func exportObjectMeta(accessor meta.Object, exact bool) {
+func exportObjectMeta(accessor metav1.Object, exact bool) {
 	accessor.SetUID("")
 	if !exact {
 		accessor.SetNamespace("")

@@ -18,6 +18,7 @@ package internalversion
 
 import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	api "k8s.io/kubernetes/pkg/api"
 	restclient "k8s.io/kubernetes/pkg/client/restclient"
@@ -38,7 +39,7 @@ type ServiceAccountInterface interface {
 	Get(name string, options v1.GetOptions) (*api.ServiceAccount, error)
 	List(opts api.ListOptions) (*api.ServiceAccountList, error)
 	Watch(opts api.ListOptions) (watch.Interface, error)
-	Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *api.ServiceAccount, err error)
+	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *api.ServiceAccount, err error)
 	ServiceAccountExpansion
 }
 
@@ -139,7 +140,7 @@ func (c *serviceAccounts) Watch(opts api.ListOptions) (watch.Interface, error) {
 }
 
 // Patch applies the patch and returns the patched serviceAccount.
-func (c *serviceAccounts) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *api.ServiceAccount, err error) {
+func (c *serviceAccounts) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *api.ServiceAccount, err error) {
 	result = &api.ServiceAccount{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).

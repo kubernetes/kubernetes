@@ -111,7 +111,7 @@ func TestAPIs(t *testing.T) {
 			name: "simple add",
 			apiservices: []*apiregistration.APIService{
 				{
-					ObjectMeta: api.ObjectMeta{Name: "v1.foo"},
+					ObjectMeta: metav1.ObjectMeta{Name: "v1.foo"},
 					Spec: apiregistration.APIServiceSpec{
 						Service: apiregistration.ServiceReference{
 							Namespace: "ns",
@@ -123,7 +123,7 @@ func TestAPIs(t *testing.T) {
 					},
 				},
 				{
-					ObjectMeta: api.ObjectMeta{Name: "v1.bar"},
+					ObjectMeta: metav1.ObjectMeta{Name: "v1.bar"},
 					Spec: apiregistration.APIServiceSpec{
 						Service: apiregistration.ServiceReference{
 							Namespace: "ns",
@@ -172,7 +172,7 @@ func TestAPIs(t *testing.T) {
 			name: "sorting",
 			apiservices: []*apiregistration.APIService{
 				{
-					ObjectMeta: api.ObjectMeta{Name: "v1.foo"},
+					ObjectMeta: metav1.ObjectMeta{Name: "v1.foo"},
 					Spec: apiregistration.APIServiceSpec{
 						Service: apiregistration.ServiceReference{
 							Namespace: "ns",
@@ -184,7 +184,7 @@ func TestAPIs(t *testing.T) {
 					},
 				},
 				{
-					ObjectMeta: api.ObjectMeta{Name: "v2.bar"},
+					ObjectMeta: metav1.ObjectMeta{Name: "v2.bar"},
 					Spec: apiregistration.APIServiceSpec{
 						Service: apiregistration.ServiceReference{
 							Namespace: "ns",
@@ -196,7 +196,7 @@ func TestAPIs(t *testing.T) {
 					},
 				},
 				{
-					ObjectMeta: api.ObjectMeta{Name: "v2.foo"},
+					ObjectMeta: metav1.ObjectMeta{Name: "v2.foo"},
 					Spec: apiregistration.APIServiceSpec{
 						Service: apiregistration.ServiceReference{
 							Namespace: "ns",
@@ -208,7 +208,7 @@ func TestAPIs(t *testing.T) {
 					},
 				},
 				{
-					ObjectMeta: api.ObjectMeta{Name: "v1.bar"},
+					ObjectMeta: metav1.ObjectMeta{Name: "v1.bar"},
 					Spec: apiregistration.APIServiceSpec{
 						Service: apiregistration.ServiceReference{
 							Namespace: "ns",
@@ -277,9 +277,9 @@ func TestAPIs(t *testing.T) {
 		for _, o := range tc.apiservices {
 			indexer.Add(o)
 		}
-		serviceIndexer.Add(&corev1.Service{ObjectMeta: corev1.ObjectMeta{Namespace: "ns", Name: "api"}})
+		serviceIndexer.Add(&corev1.Service{ObjectMeta: metav1.ObjectMeta{Namespace: "ns", Name: "api"}})
 		endpointsIndexer.Add(&corev1.Endpoints{
-			ObjectMeta: corev1.ObjectMeta{Namespace: "ns", Name: "api"},
+			ObjectMeta: metav1.ObjectMeta{Namespace: "ns", Name: "api"},
 			Subsets: []corev1.EndpointSubset{
 				{Addresses: []corev1.EndpointAddress{{}}},
 			},
@@ -352,7 +352,7 @@ func TestAPIGroup(t *testing.T) {
 			group: "foo",
 			apiservices: []*apiregistration.APIService{
 				{
-					ObjectMeta: api.ObjectMeta{Name: "v1.foo"},
+					ObjectMeta: metav1.ObjectMeta{Name: "v1.foo"},
 					Spec: apiregistration.APIServiceSpec{
 						Service: apiregistration.ServiceReference{
 							Namespace: "ns",
@@ -364,7 +364,7 @@ func TestAPIGroup(t *testing.T) {
 					},
 				},
 				{
-					ObjectMeta: api.ObjectMeta{Name: "v2.bar"},
+					ObjectMeta: metav1.ObjectMeta{Name: "v2.bar"},
 					Spec: apiregistration.APIServiceSpec{
 						Service: apiregistration.ServiceReference{
 							Namespace: "ns",
@@ -376,7 +376,7 @@ func TestAPIGroup(t *testing.T) {
 					},
 				},
 				{
-					ObjectMeta: api.ObjectMeta{Name: "v2.foo"},
+					ObjectMeta: metav1.ObjectMeta{Name: "v2.foo"},
 					Spec: apiregistration.APIServiceSpec{
 						Service: apiregistration.ServiceReference{
 							Namespace: "ns",
@@ -388,7 +388,7 @@ func TestAPIGroup(t *testing.T) {
 					},
 				},
 				{
-					ObjectMeta: api.ObjectMeta{Name: "v1.bar"},
+					ObjectMeta: metav1.ObjectMeta{Name: "v1.bar"},
 					Spec: apiregistration.APIServiceSpec{
 						Service: apiregistration.ServiceReference{
 							Namespace: "ns",
@@ -434,9 +434,9 @@ func TestAPIGroup(t *testing.T) {
 		for _, o := range tc.apiservices {
 			indexer.Add(o)
 		}
-		serviceIndexer.Add(&corev1.Service{ObjectMeta: corev1.ObjectMeta{Namespace: "ns", Name: "api"}})
+		serviceIndexer.Add(&corev1.Service{ObjectMeta: metav1.ObjectMeta{Namespace: "ns", Name: "api"}})
 		endpointsIndexer.Add(&corev1.Endpoints{
-			ObjectMeta: corev1.ObjectMeta{Namespace: "ns", Name: "api"},
+			ObjectMeta: metav1.ObjectMeta{Namespace: "ns", Name: "api"},
 			Subsets: []corev1.EndpointSubset{
 				{Addresses: []corev1.EndpointAddress{{}}},
 			},

@@ -18,6 +18,7 @@ package rest
 
 import (
 	"bytes"
+	"context"
 	"encoding/hex"
 	"fmt"
 	"io"
@@ -32,6 +33,7 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -40,7 +42,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/client-go/pkg/api/errors"
 	"k8s.io/client-go/pkg/api/v1"
 	pathvalidation "k8s.io/client-go/pkg/api/validation/path"
 	"k8s.io/client-go/pkg/fields"
@@ -105,16 +106,14 @@ type Request struct {
 	resource     string
 	resourceName string
 	subresource  string
-	selector     labels.Selector
 	timeout      time.Duration
 
 	// output
 	err  error
 	body io.Reader
 
-	// The constructed request and the response
-	req  *http.Request
-	resp *http.Response
+	// This is only used for per-request timeouts, deadlines, and cancellations.
+	ctx context.Context
 
 	backoffMgr BackoffManager
 	throttle   flowcontrol.RateLimiter
@@ -566,6 +565,13 @@ func (r *Request) Body(obj interface{}) *Request {
 	return r
 }
 
+// Context adds a context to the request. Contexts are only used for
+// timeouts, deadlines, and cancellations.
+func (r *Request) Context(ctx context.Context) *Request {
+	r.ctx = ctx
+	return r
+}
+
 // URL returns the current working URL.
 func (r *Request) URL() *url.URL {
 	p := r.pathPrefix
@@ -651,6 +657,9 @@ func (r *Request) Watch() (watch.Interface, error) {
 	if err != nil {
 		return nil, err
 	}
+	if r.ctx != nil {
+		req = req.WithContext(r.ctx)
+	}
 	req.Header = r.headers
 	client := r.client
 	if client == nil {
@@ -719,6 +728,9 @@ func (r *Request) Stream() (io.ReadCloser, error) {
 	req, err := http.NewRequest(r.verb, url, nil)
 	if err != nil {
 		return nil, err
+	}
+	if r.ctx != nil {
+		req = req.WithContext(r.ctx)
 	}
 	req.Header = r.headers
 	client := r.client
@@ -793,6 +805,9 @@ func (r *Request) request(fn func(*http.Request, *http.Response)) error {
 		req, err := http.NewRequest(r.verb, url, r.body)
 		if err != nil {
 			return err
+		}
+		if r.ctx != nil {
+			req = req.WithContext(r.ctx)
 		}
 		req.Header = r.headers
 

@@ -18,6 +18,7 @@ package v1
 
 import (
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	api "k8s.io/kubernetes/pkg/api"
 	v1 "k8s.io/kubernetes/pkg/api/v1"
@@ -39,7 +40,7 @@ type SecretInterface interface {
 	Get(name string, options meta_v1.GetOptions) (*v1.Secret, error)
 	List(opts v1.ListOptions) (*v1.SecretList, error)
 	Watch(opts v1.ListOptions) (watch.Interface, error)
-	Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *v1.Secret, err error)
+	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.Secret, err error)
 	SecretExpansion
 }
 
@@ -140,7 +141,7 @@ func (c *secrets) Watch(opts v1.ListOptions) (watch.Interface, error) {
 }
 
 // Patch applies the patch and returns the patched secret.
-func (c *secrets) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *v1.Secret, err error) {
+func (c *secrets) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.Secret, err error) {
 	result = &v1.Secret{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).

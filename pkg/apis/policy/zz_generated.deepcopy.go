@@ -49,8 +49,10 @@ func DeepCopy_policy_Eviction(in interface{}, out interface{}, c *conversion.Clo
 		in := in.(*Eviction)
 		out := out.(*Eviction)
 		*out = *in
-		if err := api.DeepCopy_api_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, c); err != nil {
+		if newVal, err := c.DeepCopy(&in.ObjectMeta); err != nil {
 			return err
+		} else {
+			out.ObjectMeta = *newVal.(*v1.ObjectMeta)
 		}
 		if in.DeleteOptions != nil {
 			in, out := &in.DeleteOptions, &out.DeleteOptions
@@ -68,8 +70,10 @@ func DeepCopy_policy_PodDisruptionBudget(in interface{}, out interface{}, c *con
 		in := in.(*PodDisruptionBudget)
 		out := out.(*PodDisruptionBudget)
 		*out = *in
-		if err := api.DeepCopy_api_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, c); err != nil {
+		if newVal, err := c.DeepCopy(&in.ObjectMeta); err != nil {
 			return err
+		} else {
+			out.ObjectMeta = *newVal.(*v1.ObjectMeta)
 		}
 		if err := DeepCopy_policy_PodDisruptionBudgetSpec(&in.Spec, &out.Spec, c); err != nil {
 			return err

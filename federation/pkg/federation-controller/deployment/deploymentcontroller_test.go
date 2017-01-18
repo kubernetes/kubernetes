@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -174,7 +175,7 @@ func GetDeploymentFromChan(c chan runtime.Object) *extensionsv1.Deployment {
 
 func newDeploymentWithReplicas(name string, replicas int32) *extensionsv1.Deployment {
 	return &extensionsv1.Deployment{
-		ObjectMeta: apiv1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: apiv1.NamespaceDefault,
 			SelfLink:  "/api/v1/namespaces/default/deployments/name",

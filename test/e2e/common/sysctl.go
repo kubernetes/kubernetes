@@ -38,7 +38,7 @@ var _ = framework.KubeDescribe("Sysctls", func() {
 	testPod := func() *v1.Pod {
 		podName := "sysctl-" + string(uuid.NewUUID())
 		pod := v1.Pod{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:        podName,
 				Annotations: map[string]string{},
 			},

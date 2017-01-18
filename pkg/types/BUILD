@@ -9,13 +9,7 @@ load(
 
 go_library(
     name = "go_default_library",
-    srcs = [
-        "doc.go",
-        "namespacedname.go",
-        "nodename.go",
-        "uid.go",
-        "unix_user_id.go",
-    ],
+    srcs = ["doc.go"],
     tags = ["automanaged"],
 )
 

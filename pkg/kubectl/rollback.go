@@ -155,8 +155,8 @@ func simpleDryRun(deployment *extensions.Deployment, c clientset.Interface, toRe
 		revisionToSpec[v] = &rs.Spec.Template
 	}
 
-	if len(revisionToSpec) == 0 {
-		return "No rollout history found.", nil
+	if len(revisionToSpec) < 2 {
+		return "", fmt.Errorf("no rollout history found for deployment %q", deployment.Name)
 	}
 
 	if toRevision > 0 {
@@ -180,7 +180,7 @@ func simpleDryRun(deployment *extensions.Deployment, c clientset.Interface, toRe
 	}
 	sliceutil.SortInts64(revisions)
 
-	template, _ := revisionToSpec[revisions[len(revisions)-1]]
+	template, _ := revisionToSpec[revisions[len(revisions)-2]]
 	buf := bytes.NewBuffer([]byte{})
 	buf.WriteString("\n")
 	internalTemplate := &api.PodTemplateSpec{}

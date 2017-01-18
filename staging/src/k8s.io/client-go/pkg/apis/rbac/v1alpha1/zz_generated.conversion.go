@@ -65,10 +65,7 @@ func RegisterConversions(scheme *runtime.Scheme) error {
 }
 
 func autoConvert_v1alpha1_ClusterRole_To_rbac_ClusterRole(in *ClusterRole, out *rbac.ClusterRole, s conversion.Scope) error {
-	// TODO: Inefficient conversion - can we improve it?
-	if err := s.Convert(&in.ObjectMeta, &out.ObjectMeta, 0); err != nil {
-		return err
-	}
+	out.ObjectMeta = in.ObjectMeta
 	if in.Rules != nil {
 		in, out := &in.Rules, &out.Rules
 		*out = make([]rbac.PolicyRule, len(*in))
@@ -88,10 +85,7 @@ func Convert_v1alpha1_ClusterRole_To_rbac_ClusterRole(in *ClusterRole, out *rbac
 }
 
 func autoConvert_rbac_ClusterRole_To_v1alpha1_ClusterRole(in *rbac.ClusterRole, out *ClusterRole, s conversion.Scope) error {
-	// TODO: Inefficient conversion - can we improve it?
-	if err := s.Convert(&in.ObjectMeta, &out.ObjectMeta, 0); err != nil {
-		return err
-	}
+	out.ObjectMeta = in.ObjectMeta
 	if in.Rules != nil {
 		in, out := &in.Rules, &out.Rules
 		*out = make([]PolicyRule, len(*in))
@@ -111,10 +105,7 @@ func Convert_rbac_ClusterRole_To_v1alpha1_ClusterRole(in *rbac.ClusterRole, out 
 }
 
 func autoConvert_v1alpha1_ClusterRoleBinding_To_rbac_ClusterRoleBinding(in *ClusterRoleBinding, out *rbac.ClusterRoleBinding, s conversion.Scope) error {
-	// TODO: Inefficient conversion - can we improve it?
-	if err := s.Convert(&in.ObjectMeta, &out.ObjectMeta, 0); err != nil {
-		return err
-	}
+	out.ObjectMeta = in.ObjectMeta
 	if in.Subjects != nil {
 		in, out := &in.Subjects, &out.Subjects
 		*out = make([]rbac.Subject, len(*in))
@@ -137,10 +128,7 @@ func Convert_v1alpha1_ClusterRoleBinding_To_rbac_ClusterRoleBinding(in *ClusterR
 }
 
 func autoConvert_rbac_ClusterRoleBinding_To_v1alpha1_ClusterRoleBinding(in *rbac.ClusterRoleBinding, out *ClusterRoleBinding, s conversion.Scope) error {
-	// TODO: Inefficient conversion - can we improve it?
-	if err := s.Convert(&in.ObjectMeta, &out.ObjectMeta, 0); err != nil {
-		return err
-	}
+	out.ObjectMeta = in.ObjectMeta
 	if in.Subjects != nil {
 		in, out := &in.Subjects, &out.Subjects
 		*out = make([]Subject, len(*in))
@@ -319,10 +307,7 @@ func Convert_rbac_PolicyRuleBuilder_To_v1alpha1_PolicyRuleBuilder(in *rbac.Polic
 }
 
 func autoConvert_v1alpha1_Role_To_rbac_Role(in *Role, out *rbac.Role, s conversion.Scope) error {
-	// TODO: Inefficient conversion - can we improve it?
-	if err := s.Convert(&in.ObjectMeta, &out.ObjectMeta, 0); err != nil {
-		return err
-	}
+	out.ObjectMeta = in.ObjectMeta
 	if in.Rules != nil {
 		in, out := &in.Rules, &out.Rules
 		*out = make([]rbac.PolicyRule, len(*in))
@@ -342,10 +327,7 @@ func Convert_v1alpha1_Role_To_rbac_Role(in *Role, out *rbac.Role, s conversion.S
 }
 
 func autoConvert_rbac_Role_To_v1alpha1_Role(in *rbac.Role, out *Role, s conversion.Scope) error {
-	// TODO: Inefficient conversion - can we improve it?
-	if err := s.Convert(&in.ObjectMeta, &out.ObjectMeta, 0); err != nil {
-		return err
-	}
+	out.ObjectMeta = in.ObjectMeta
 	if in.Rules != nil {
 		in, out := &in.Rules, &out.Rules
 		*out = make([]PolicyRule, len(*in))
@@ -365,10 +347,7 @@ func Convert_rbac_Role_To_v1alpha1_Role(in *rbac.Role, out *Role, s conversion.S
 }
 
 func autoConvert_v1alpha1_RoleBinding_To_rbac_RoleBinding(in *RoleBinding, out *rbac.RoleBinding, s conversion.Scope) error {
-	// TODO: Inefficient conversion - can we improve it?
-	if err := s.Convert(&in.ObjectMeta, &out.ObjectMeta, 0); err != nil {
-		return err
-	}
+	out.ObjectMeta = in.ObjectMeta
 	if in.Subjects != nil {
 		in, out := &in.Subjects, &out.Subjects
 		*out = make([]rbac.Subject, len(*in))
@@ -391,10 +370,7 @@ func Convert_v1alpha1_RoleBinding_To_rbac_RoleBinding(in *RoleBinding, out *rbac
 }
 
 func autoConvert_rbac_RoleBinding_To_v1alpha1_RoleBinding(in *rbac.RoleBinding, out *RoleBinding, s conversion.Scope) error {
-	// TODO: Inefficient conversion - can we improve it?
-	if err := s.Convert(&in.ObjectMeta, &out.ObjectMeta, 0); err != nil {
-		return err
-	}
+	out.ObjectMeta = in.ObjectMeta
 	if in.Subjects != nil {
 		in, out := &in.Subjects, &out.Subjects
 		*out = make([]Subject, len(*in))

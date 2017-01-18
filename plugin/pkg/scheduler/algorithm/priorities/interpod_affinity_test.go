@@ -272,11 +272,11 @@ func TestInterPodAffinityPriority(t *testing.T) {
 		test         string
 	}{
 		{
-			pod: &v1.Pod{Spec: v1.PodSpec{NodeName: ""}, ObjectMeta: v1.ObjectMeta{Labels: podLabelSecurityS1}},
+			pod: &v1.Pod{Spec: v1.PodSpec{NodeName: ""}, ObjectMeta: metav1.ObjectMeta{Labels: podLabelSecurityS1}},
 			nodes: []*v1.Node{
-				{ObjectMeta: v1.ObjectMeta{Name: "machine1", Labels: labelRgChina}},
-				{ObjectMeta: v1.ObjectMeta{Name: "machine2", Labels: labelRgIndia}},
-				{ObjectMeta: v1.ObjectMeta{Name: "machine3", Labels: labelAzAz1}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "machine1", Labels: labelRgChina}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "machine2", Labels: labelRgIndia}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "machine3", Labels: labelAzAz1}},
 			},
 			expectedList: []schedulerapi.HostPriority{{Host: "machine1", Score: 0}, {Host: "machine2", Score: 0}, {Host: "machine3", Score: 0}},
 			test:         "all machines are same priority as Affinity is nil",
@@ -285,16 +285,16 @@ func TestInterPodAffinityPriority(t *testing.T) {
 		// the node(machine3) that don't have the label {"region": "whatever the value is"} (mismatch the topology key) but that have existing pods that match the labelSelector get low score
 		// the node(machine2) that have the label {"region": "China"} (match the topology key) but that have existing pods that mismatch the labelSelector get low score
 		{
-			pod: &v1.Pod{Spec: v1.PodSpec{NodeName: "", Affinity: stayWithS1InRegion}, ObjectMeta: v1.ObjectMeta{Labels: podLabelSecurityS1}},
+			pod: &v1.Pod{Spec: v1.PodSpec{NodeName: "", Affinity: stayWithS1InRegion}, ObjectMeta: metav1.ObjectMeta{Labels: podLabelSecurityS1}},
 			pods: []*v1.Pod{
-				{Spec: v1.PodSpec{NodeName: "machine1"}, ObjectMeta: v1.ObjectMeta{Labels: podLabelSecurityS1}},
-				{Spec: v1.PodSpec{NodeName: "machine2"}, ObjectMeta: v1.ObjectMeta{Labels: podLabelSecurityS2}},
-				{Spec: v1.PodSpec{NodeName: "machine3"}, ObjectMeta: v1.ObjectMeta{Labels: podLabelSecurityS1}},
+				{Spec: v1.PodSpec{NodeName: "machine1"}, ObjectMeta: metav1.ObjectMeta{Labels: podLabelSecurityS1}},
+				{Spec: v1.PodSpec{NodeName: "machine2"}, ObjectMeta: metav1.ObjectMeta{Labels: podLabelSecurityS2}},
+				{Spec: v1.PodSpec{NodeName: "machine3"}, ObjectMeta: metav1.ObjectMeta{Labels: podLabelSecurityS1}},
 			},
 			nodes: []*v1.Node{
-				{ObjectMeta: v1.ObjectMeta{Name: "machine1", Labels: labelRgChina}},
-				{ObjectMeta: v1.ObjectMeta{Name: "machine2", Labels: labelRgIndia}},
-				{ObjectMeta: v1.ObjectMeta{Name: "machine3", Labels: labelAzAz1}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "machine1", Labels: labelRgChina}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "machine2", Labels: labelRgIndia}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "machine3", Labels: labelAzAz1}},
 			},
 			expectedList: []schedulerapi.HostPriority{{Host: "machine1", Score: 10}, {Host: "machine2", Score: 0}, {Host: "machine3", Score: 0}},
 			test: "Affinity: pod that matches topology key & pods in nodes will get high score comparing to others" +
@@ -307,12 +307,12 @@ func TestInterPodAffinityPriority(t *testing.T) {
 		{
 			pod: &v1.Pod{Spec: v1.PodSpec{NodeName: "", Affinity: stayWithS1InRegion}},
 			pods: []*v1.Pod{
-				{Spec: v1.PodSpec{NodeName: "machine1"}, ObjectMeta: v1.ObjectMeta{Labels: podLabelSecurityS1}},
+				{Spec: v1.PodSpec{NodeName: "machine1"}, ObjectMeta: metav1.ObjectMeta{Labels: podLabelSecurityS1}},
 			},
 			nodes: []*v1.Node{
-				{ObjectMeta: v1.ObjectMeta{Name: "machine1", Labels: labelRgChina}},
-				{ObjectMeta: v1.ObjectMeta{Name: "machine2", Labels: labelRgChinaAzAz1}},
-				{ObjectMeta: v1.ObjectMeta{Name: "machine3", Labels: labelRgIndia}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "machine1", Labels: labelRgChina}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "machine2", Labels: labelRgChinaAzAz1}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "machine3", Labels: labelRgIndia}},
 			},
 			expectedList: []schedulerapi.HostPriority{{Host: "machine1", Score: 10}, {Host: "machine2", Score: 10}, {Host: "machine3", Score: 0}},
 			test:         "All the nodes that have the same topology key & label value with one of them has an existing pod that match the affinity rules, have the same score",
@@ -322,37 +322,37 @@ func TestInterPodAffinityPriority(t *testing.T) {
 		// Then, nodes in regionChina get higher score than nodes in regionIndia, and all the nodes in regionChina should get a same score(high score),
 		// while all the nodes in regionIndia should get another same score(low score).
 		{
-			pod: &v1.Pod{Spec: v1.PodSpec{NodeName: "", Affinity: stayWithS2InRegion}, ObjectMeta: v1.ObjectMeta{Labels: podLabelSecurityS1}},
+			pod: &v1.Pod{Spec: v1.PodSpec{NodeName: "", Affinity: stayWithS2InRegion}, ObjectMeta: metav1.ObjectMeta{Labels: podLabelSecurityS1}},
 			pods: []*v1.Pod{
-				{Spec: v1.PodSpec{NodeName: "machine1"}, ObjectMeta: v1.ObjectMeta{Labels: podLabelSecurityS2}},
-				{Spec: v1.PodSpec{NodeName: "machine1"}, ObjectMeta: v1.ObjectMeta{Labels: podLabelSecurityS2}},
-				{Spec: v1.PodSpec{NodeName: "machine2"}, ObjectMeta: v1.ObjectMeta{Labels: podLabelSecurityS2}},
-				{Spec: v1.PodSpec{NodeName: "machine3"}, ObjectMeta: v1.ObjectMeta{Labels: podLabelSecurityS2}},
-				{Spec: v1.PodSpec{NodeName: "machine4"}, ObjectMeta: v1.ObjectMeta{Labels: podLabelSecurityS2}},
-				{Spec: v1.PodSpec{NodeName: "machine5"}, ObjectMeta: v1.ObjectMeta{Labels: podLabelSecurityS2}},
+				{Spec: v1.PodSpec{NodeName: "machine1"}, ObjectMeta: metav1.ObjectMeta{Labels: podLabelSecurityS2}},
+				{Spec: v1.PodSpec{NodeName: "machine1"}, ObjectMeta: metav1.ObjectMeta{Labels: podLabelSecurityS2}},
+				{Spec: v1.PodSpec{NodeName: "machine2"}, ObjectMeta: metav1.ObjectMeta{Labels: podLabelSecurityS2}},
+				{Spec: v1.PodSpec{NodeName: "machine3"}, ObjectMeta: metav1.ObjectMeta{Labels: podLabelSecurityS2}},
+				{Spec: v1.PodSpec{NodeName: "machine4"}, ObjectMeta: metav1.ObjectMeta{Labels: podLabelSecurityS2}},
+				{Spec: v1.PodSpec{NodeName: "machine5"}, ObjectMeta: metav1.ObjectMeta{Labels: podLabelSecurityS2}},
 			},
 			nodes: []*v1.Node{
-				{ObjectMeta: v1.ObjectMeta{Name: "machine1", Labels: labelRgChina}},
-				{ObjectMeta: v1.ObjectMeta{Name: "machine2", Labels: labelRgIndia}},
-				{ObjectMeta: v1.ObjectMeta{Name: "machine3", Labels: labelRgChina}},
-				{ObjectMeta: v1.ObjectMeta{Name: "machine4", Labels: labelRgChina}},
-				{ObjectMeta: v1.ObjectMeta{Name: "machine5", Labels: labelRgIndia}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "machine1", Labels: labelRgChina}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "machine2", Labels: labelRgIndia}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "machine3", Labels: labelRgChina}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "machine4", Labels: labelRgChina}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "machine5", Labels: labelRgIndia}},
 			},
 			expectedList: []schedulerapi.HostPriority{{Host: "machine1", Score: 10}, {Host: "machine2", Score: 5}, {Host: "machine3", Score: 10}, {Host: "machine4", Score: 10}, {Host: "machine5", Score: 5}},
 			test:         "Affinity: nodes in one region has more matching pods comparing to other reqion, so the region which has more macthes will get high score",
 		},
 		// Test with the different operators and values for pod affinity scheduling preference, including some match failures.
 		{
-			pod: &v1.Pod{Spec: v1.PodSpec{NodeName: "", Affinity: affinity3}, ObjectMeta: v1.ObjectMeta{Labels: podLabelSecurityS1}},
+			pod: &v1.Pod{Spec: v1.PodSpec{NodeName: "", Affinity: affinity3}, ObjectMeta: metav1.ObjectMeta{Labels: podLabelSecurityS1}},
 			pods: []*v1.Pod{
-				{Spec: v1.PodSpec{NodeName: "machine1"}, ObjectMeta: v1.ObjectMeta{Labels: podLabelSecurityS1}},
-				{Spec: v1.PodSpec{NodeName: "machine2"}, ObjectMeta: v1.ObjectMeta{Labels: podLabelSecurityS2}},
-				{Spec: v1.PodSpec{NodeName: "machine3"}, ObjectMeta: v1.ObjectMeta{Labels: podLabelSecurityS1}},
+				{Spec: v1.PodSpec{NodeName: "machine1"}, ObjectMeta: metav1.ObjectMeta{Labels: podLabelSecurityS1}},
+				{Spec: v1.PodSpec{NodeName: "machine2"}, ObjectMeta: metav1.ObjectMeta{Labels: podLabelSecurityS2}},
+				{Spec: v1.PodSpec{NodeName: "machine3"}, ObjectMeta: metav1.ObjectMeta{Labels: podLabelSecurityS1}},
 			},
 			nodes: []*v1.Node{
-				{ObjectMeta: v1.ObjectMeta{Name: "machine1", Labels: labelRgChina}},
-				{ObjectMeta: v1.ObjectMeta{Name: "machine2", Labels: labelRgIndia}},
-				{ObjectMeta: v1.ObjectMeta{Name: "machine3", Labels: labelAzAz1}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "machine1", Labels: labelRgChina}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "machine2", Labels: labelRgIndia}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "machine3", Labels: labelAzAz1}},
 			},
 			expectedList: []schedulerapi.HostPriority{{Host: "machine1", Score: 2}, {Host: "machine2", Score: 10}, {Host: "machine3", Score: 0}},
 			test:         "Affinity: different Label operators and values for pod affinity scheduling preference, including some match failures ",
@@ -360,29 +360,29 @@ func TestInterPodAffinityPriority(t *testing.T) {
 		// Test the symmetry cases for affinity, the difference between affinity and symmetry is not the pod wants to run together with some existing pods,
 		// but the existing pods have the inter pod affinity preference while the pod to schedule satisfy the preference.
 		{
-			pod: &v1.Pod{Spec: v1.PodSpec{NodeName: ""}, ObjectMeta: v1.ObjectMeta{Labels: podLabelSecurityS2}},
+			pod: &v1.Pod{Spec: v1.PodSpec{NodeName: ""}, ObjectMeta: metav1.ObjectMeta{Labels: podLabelSecurityS2}},
 			pods: []*v1.Pod{
-				{Spec: v1.PodSpec{NodeName: "machine1", Affinity: stayWithS1InRegion}, ObjectMeta: v1.ObjectMeta{Labels: podLabelSecurityS1}},
-				{Spec: v1.PodSpec{NodeName: "machine2", Affinity: stayWithS2InRegion}, ObjectMeta: v1.ObjectMeta{Labels: podLabelSecurityS2}},
+				{Spec: v1.PodSpec{NodeName: "machine1", Affinity: stayWithS1InRegion}, ObjectMeta: metav1.ObjectMeta{Labels: podLabelSecurityS1}},
+				{Spec: v1.PodSpec{NodeName: "machine2", Affinity: stayWithS2InRegion}, ObjectMeta: metav1.ObjectMeta{Labels: podLabelSecurityS2}},
 			},
 			nodes: []*v1.Node{
-				{ObjectMeta: v1.ObjectMeta{Name: "machine1", Labels: labelRgChina}},
-				{ObjectMeta: v1.ObjectMeta{Name: "machine2", Labels: labelRgIndia}},
-				{ObjectMeta: v1.ObjectMeta{Name: "machine3", Labels: labelAzAz1}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "machine1", Labels: labelRgChina}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "machine2", Labels: labelRgIndia}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "machine3", Labels: labelAzAz1}},
 			},
 			expectedList: []schedulerapi.HostPriority{{Host: "machine1", Score: 0}, {Host: "machine2", Score: 10}, {Host: "machine3", Score: 0}},
 			test:         "Affinity symmetry: considred only the preferredDuringSchedulingIgnoredDuringExecution in pod affinity symmetry",
 		},
 		{
-			pod: &v1.Pod{Spec: v1.PodSpec{NodeName: ""}, ObjectMeta: v1.ObjectMeta{Labels: podLabelSecurityS1}},
+			pod: &v1.Pod{Spec: v1.PodSpec{NodeName: ""}, ObjectMeta: metav1.ObjectMeta{Labels: podLabelSecurityS1}},
 			pods: []*v1.Pod{
-				{Spec: v1.PodSpec{NodeName: "machine1", Affinity: hardAffinity}, ObjectMeta: v1.ObjectMeta{Labels: podLabelSecurityS1}},
-				{Spec: v1.PodSpec{NodeName: "machine2", Affinity: hardAffinity}, ObjectMeta: v1.ObjectMeta{Labels: podLabelSecurityS2}},
+				{Spec: v1.PodSpec{NodeName: "machine1", Affinity: hardAffinity}, ObjectMeta: metav1.ObjectMeta{Labels: podLabelSecurityS1}},
+				{Spec: v1.PodSpec{NodeName: "machine2", Affinity: hardAffinity}, ObjectMeta: metav1.ObjectMeta{Labels: podLabelSecurityS2}},
 			},
 			nodes: []*v1.Node{
-				{ObjectMeta: v1.ObjectMeta{Name: "machine1", Labels: labelRgChina}},
-				{ObjectMeta: v1.ObjectMeta{Name: "machine2", Labels: labelRgIndia}},
-				{ObjectMeta: v1.ObjectMeta{Name: "machine3", Labels: labelAzAz1}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "machine1", Labels: labelRgChina}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "machine2", Labels: labelRgIndia}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "machine3", Labels: labelAzAz1}},
 			},
 			expectedList: []schedulerapi.HostPriority{{Host: "machine1", Score: 10}, {Host: "machine2", Score: 10}, {Host: "machine3", Score: 0}},
 			test:         "Affinity symmetry: considred RequiredDuringSchedulingIgnoredDuringExecution in pod affinity symmetry",
@@ -395,69 +395,69 @@ func TestInterPodAffinityPriority(t *testing.T) {
 		// there are 2 nodes, say node1 and node2, both nodes have pods that match the labelSelector and have topology-key in node.Labels.
 		// But there are more pods on node1 that match the preference than node2. Then, node1 get a lower score than node2.
 		{
-			pod: &v1.Pod{Spec: v1.PodSpec{NodeName: "", Affinity: awayFromS1InAz}, ObjectMeta: v1.ObjectMeta{Labels: podLabelSecurityS1}},
+			pod: &v1.Pod{Spec: v1.PodSpec{NodeName: "", Affinity: awayFromS1InAz}, ObjectMeta: metav1.ObjectMeta{Labels: podLabelSecurityS1}},
 			pods: []*v1.Pod{
-				{Spec: v1.PodSpec{NodeName: "machine1"}, ObjectMeta: v1.ObjectMeta{Labels: podLabelSecurityS1}},
-				{Spec: v1.PodSpec{NodeName: "machine2"}, ObjectMeta: v1.ObjectMeta{Labels: podLabelSecurityS2}},
+				{Spec: v1.PodSpec{NodeName: "machine1"}, ObjectMeta: metav1.ObjectMeta{Labels: podLabelSecurityS1}},
+				{Spec: v1.PodSpec{NodeName: "machine2"}, ObjectMeta: metav1.ObjectMeta{Labels: podLabelSecurityS2}},
 			},
 			nodes: []*v1.Node{
-				{ObjectMeta: v1.ObjectMeta{Name: "machine1", Labels: labelAzAz1}},
-				{ObjectMeta: v1.ObjectMeta{Name: "machine2", Labels: labelRgChina}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "machine1", Labels: labelAzAz1}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "machine2", Labels: labelRgChina}},
 			},
 			expectedList: []schedulerapi.HostPriority{{Host: "machine1", Score: 0}, {Host: "machine2", Score: 10}},
 			test:         "Anti Affinity: pod that doesnot match existing pods in node will get high score ",
 		},
 		{
-			pod: &v1.Pod{Spec: v1.PodSpec{NodeName: "", Affinity: awayFromS1InAz}, ObjectMeta: v1.ObjectMeta{Labels: podLabelSecurityS1}},
+			pod: &v1.Pod{Spec: v1.PodSpec{NodeName: "", Affinity: awayFromS1InAz}, ObjectMeta: metav1.ObjectMeta{Labels: podLabelSecurityS1}},
 			pods: []*v1.Pod{
-				{Spec: v1.PodSpec{NodeName: "machine1"}, ObjectMeta: v1.ObjectMeta{Labels: podLabelSecurityS1}},
-				{Spec: v1.PodSpec{NodeName: "machine2"}, ObjectMeta: v1.ObjectMeta{Labels: podLabelSecurityS1}},
+				{Spec: v1.PodSpec{NodeName: "machine1"}, ObjectMeta: metav1.ObjectMeta{Labels: podLabelSecurityS1}},
+				{Spec: v1.PodSpec{NodeName: "machine2"}, ObjectMeta: metav1.ObjectMeta{Labels: podLabelSecurityS1}},
 			},
 			nodes: []*v1.Node{
-				{ObjectMeta: v1.ObjectMeta{Name: "machine1", Labels: labelAzAz1}},
-				{ObjectMeta: v1.ObjectMeta{Name: "machine2", Labels: labelRgChina}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "machine1", Labels: labelAzAz1}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "machine2", Labels: labelRgChina}},
 			},
 			expectedList: []schedulerapi.HostPriority{{Host: "machine1", Score: 0}, {Host: "machine2", Score: 10}},
 			test:         "Anti Affinity: pod that does not matches topology key & matches the pods in nodes will get higher score comparing to others ",
 		},
 		{
-			pod: &v1.Pod{Spec: v1.PodSpec{NodeName: "", Affinity: awayFromS1InAz}, ObjectMeta: v1.ObjectMeta{Labels: podLabelSecurityS1}},
+			pod: &v1.Pod{Spec: v1.PodSpec{NodeName: "", Affinity: awayFromS1InAz}, ObjectMeta: metav1.ObjectMeta{Labels: podLabelSecurityS1}},
 			pods: []*v1.Pod{
-				{Spec: v1.PodSpec{NodeName: "machine1"}, ObjectMeta: v1.ObjectMeta{Labels: podLabelSecurityS1}},
-				{Spec: v1.PodSpec{NodeName: "machine1"}, ObjectMeta: v1.ObjectMeta{Labels: podLabelSecurityS1}},
-				{Spec: v1.PodSpec{NodeName: "machine2"}, ObjectMeta: v1.ObjectMeta{Labels: podLabelSecurityS2}},
+				{Spec: v1.PodSpec{NodeName: "machine1"}, ObjectMeta: metav1.ObjectMeta{Labels: podLabelSecurityS1}},
+				{Spec: v1.PodSpec{NodeName: "machine1"}, ObjectMeta: metav1.ObjectMeta{Labels: podLabelSecurityS1}},
+				{Spec: v1.PodSpec{NodeName: "machine2"}, ObjectMeta: metav1.ObjectMeta{Labels: podLabelSecurityS2}},
 			},
 			nodes: []*v1.Node{
-				{ObjectMeta: v1.ObjectMeta{Name: "machine1", Labels: labelAzAz1}},
-				{ObjectMeta: v1.ObjectMeta{Name: "machine2", Labels: labelRgIndia}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "machine1", Labels: labelAzAz1}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "machine2", Labels: labelRgIndia}},
 			},
 			expectedList: []schedulerapi.HostPriority{{Host: "machine1", Score: 0}, {Host: "machine2", Score: 10}},
 			test:         "Anti Affinity: one node has more matching pods comparing to other node, so the node which has more unmacthes will get high score",
 		},
 		// Test the symmetry cases for anti affinity
 		{
-			pod: &v1.Pod{Spec: v1.PodSpec{NodeName: ""}, ObjectMeta: v1.ObjectMeta{Labels: podLabelSecurityS2}},
+			pod: &v1.Pod{Spec: v1.PodSpec{NodeName: ""}, ObjectMeta: metav1.ObjectMeta{Labels: podLabelSecurityS2}},
 			pods: []*v1.Pod{
-				{Spec: v1.PodSpec{NodeName: "machine1", Affinity: awayFromS2InAz}, ObjectMeta: v1.ObjectMeta{Labels: podLabelSecurityS1}},
-				{Spec: v1.PodSpec{NodeName: "machine2", Affinity: awayFromS1InAz}, ObjectMeta: v1.ObjectMeta{Labels: podLabelSecurityS2}},
+				{Spec: v1.PodSpec{NodeName: "machine1", Affinity: awayFromS2InAz}, ObjectMeta: metav1.ObjectMeta{Labels: podLabelSecurityS1}},
+				{Spec: v1.PodSpec{NodeName: "machine2", Affinity: awayFromS1InAz}, ObjectMeta: metav1.ObjectMeta{Labels: podLabelSecurityS2}},
 			},
 			nodes: []*v1.Node{
-				{ObjectMeta: v1.ObjectMeta{Name: "machine1", Labels: labelAzAz1}},
-				{ObjectMeta: v1.ObjectMeta{Name: "machine2", Labels: labelAzAz2}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "machine1", Labels: labelAzAz1}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "machine2", Labels: labelAzAz2}},
 			},
 			expectedList: []schedulerapi.HostPriority{{Host: "machine1", Score: 0}, {Host: "machine2", Score: 10}},
 			test:         "Anti Affinity symmetry: the existing pods in node which has anti affinity match will get high score",
 		},
 		// Test both  affinity and anti-affinity
 		{
-			pod: &v1.Pod{Spec: v1.PodSpec{NodeName: "", Affinity: stayWithS1InRegionAwayFromS2InAz}, ObjectMeta: v1.ObjectMeta{Labels: podLabelSecurityS1}},
+			pod: &v1.Pod{Spec: v1.PodSpec{NodeName: "", Affinity: stayWithS1InRegionAwayFromS2InAz}, ObjectMeta: metav1.ObjectMeta{Labels: podLabelSecurityS1}},
 			pods: []*v1.Pod{
-				{Spec: v1.PodSpec{NodeName: "machine1"}, ObjectMeta: v1.ObjectMeta{Labels: podLabelSecurityS1}},
-				{Spec: v1.PodSpec{NodeName: "machine2"}, ObjectMeta: v1.ObjectMeta{Labels: podLabelSecurityS1}},
+				{Spec: v1.PodSpec{NodeName: "machine1"}, ObjectMeta: metav1.ObjectMeta{Labels: podLabelSecurityS1}},
+				{Spec: v1.PodSpec{NodeName: "machine2"}, ObjectMeta: metav1.ObjectMeta{Labels: podLabelSecurityS1}},
 			},
 			nodes: []*v1.Node{
-				{ObjectMeta: v1.ObjectMeta{Name: "machine1", Labels: labelRgChina}},
-				{ObjectMeta: v1.ObjectMeta{Name: "machine2", Labels: labelAzAz1}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "machine1", Labels: labelRgChina}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "machine2", Labels: labelAzAz1}},
 			},
 			expectedList: []schedulerapi.HostPriority{{Host: "machine1", Score: 10}, {Host: "machine2", Score: 0}},
 			test:         "Affinity and Anti Affinity: considered only preferredDuringSchedulingIgnoredDuringExecution in both pod affinity & anti affinity",
@@ -467,22 +467,22 @@ func TestInterPodAffinityPriority(t *testing.T) {
 		// so that all the pods of a RC/service can stay in a same region but trying to separate with each other
 		// machine-1,machine-3,machine-4 are in ChinaRegion others machin-2,machine-5 are in IndiaRegion
 		{
-			pod: &v1.Pod{Spec: v1.PodSpec{NodeName: "", Affinity: stayWithS1InRegionAwayFromS2InAz}, ObjectMeta: v1.ObjectMeta{Labels: podLabelSecurityS1}},
+			pod: &v1.Pod{Spec: v1.PodSpec{NodeName: "", Affinity: stayWithS1InRegionAwayFromS2InAz}, ObjectMeta: metav1.ObjectMeta{Labels: podLabelSecurityS1}},
 			pods: []*v1.Pod{
-				{Spec: v1.PodSpec{NodeName: "machine1"}, ObjectMeta: v1.ObjectMeta{Labels: podLabelSecurityS1}},
-				{Spec: v1.PodSpec{NodeName: "machine1"}, ObjectMeta: v1.ObjectMeta{Labels: podLabelSecurityS1}},
-				{Spec: v1.PodSpec{NodeName: "machine2"}, ObjectMeta: v1.ObjectMeta{Labels: podLabelSecurityS1}},
-				{Spec: v1.PodSpec{NodeName: "machine3"}, ObjectMeta: v1.ObjectMeta{Labels: podLabelSecurityS1}},
-				{Spec: v1.PodSpec{NodeName: "machine3"}, ObjectMeta: v1.ObjectMeta{Labels: podLabelSecurityS1}},
-				{Spec: v1.PodSpec{NodeName: "machine4"}, ObjectMeta: v1.ObjectMeta{Labels: podLabelSecurityS1}},
-				{Spec: v1.PodSpec{NodeName: "machine5"}, ObjectMeta: v1.ObjectMeta{Labels: podLabelSecurityS1}},
+				{Spec: v1.PodSpec{NodeName: "machine1"}, ObjectMeta: metav1.ObjectMeta{Labels: podLabelSecurityS1}},
+				{Spec: v1.PodSpec{NodeName: "machine1"}, ObjectMeta: metav1.ObjectMeta{Labels: podLabelSecurityS1}},
+				{Spec: v1.PodSpec{NodeName: "machine2"}, ObjectMeta: metav1.ObjectMeta{Labels: podLabelSecurityS1}},
+				{Spec: v1.PodSpec{NodeName: "machine3"}, ObjectMeta: metav1.ObjectMeta{Labels: podLabelSecurityS1}},
+				{Spec: v1.PodSpec{NodeName: "machine3"}, ObjectMeta: metav1.ObjectMeta{Labels: podLabelSecurityS1}},
+				{Spec: v1.PodSpec{NodeName: "machine4"}, ObjectMeta: metav1.ObjectMeta{Labels: podLabelSecurityS1}},
+				{Spec: v1.PodSpec{NodeName: "machine5"}, ObjectMeta: metav1.ObjectMeta{Labels: podLabelSecurityS1}},
 			},
 			nodes: []*v1.Node{
-				{ObjectMeta: v1.ObjectMeta{Name: "machine1", Labels: labelRgChinaAzAz1}},
-				{ObjectMeta: v1.ObjectMeta{Name: "machine2", Labels: labelRgIndia}},
-				{ObjectMeta: v1.ObjectMeta{Name: "machine3", Labels: labelRgChina}},
-				{ObjectMeta: v1.ObjectMeta{Name: "machine4", Labels: labelRgChina}},
-				{ObjectMeta: v1.ObjectMeta{Name: "machine5", Labels: labelRgIndia}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "machine1", Labels: labelRgChinaAzAz1}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "machine2", Labels: labelRgIndia}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "machine3", Labels: labelRgChina}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "machine4", Labels: labelRgChina}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "machine5", Labels: labelRgIndia}},
 			},
 			expectedList: []schedulerapi.HostPriority{{Host: "machine1", Score: 10}, {Host: "machine2", Score: 4}, {Host: "machine3", Score: 10}, {Host: "machine4", Score: 10}, {Host: "machine5", Score: 4}},
 			test:         "Affinity and Anti Affinity: considering both affinity and anti-affinity, the pod to schedule and existing pods have the same labels",
@@ -493,18 +493,18 @@ func TestInterPodAffinityPriority(t *testing.T) {
 		// for Affinity symmetry, the weights are:       0,  0,  8,  0
 		// for Anti Affinity symmetry, the weights are:  0,  0,  0, -5
 		{
-			pod: &v1.Pod{Spec: v1.PodSpec{NodeName: "", Affinity: stayWithS1InRegionAwayFromS2InAz}, ObjectMeta: v1.ObjectMeta{Labels: podLabelSecurityS1}},
+			pod: &v1.Pod{Spec: v1.PodSpec{NodeName: "", Affinity: stayWithS1InRegionAwayFromS2InAz}, ObjectMeta: metav1.ObjectMeta{Labels: podLabelSecurityS1}},
 			pods: []*v1.Pod{
-				{Spec: v1.PodSpec{NodeName: "machine1"}, ObjectMeta: v1.ObjectMeta{Labels: podLabelSecurityS1}},
-				{Spec: v1.PodSpec{NodeName: "machine2"}, ObjectMeta: v1.ObjectMeta{Labels: podLabelSecurityS2}},
+				{Spec: v1.PodSpec{NodeName: "machine1"}, ObjectMeta: metav1.ObjectMeta{Labels: podLabelSecurityS1}},
+				{Spec: v1.PodSpec{NodeName: "machine2"}, ObjectMeta: metav1.ObjectMeta{Labels: podLabelSecurityS2}},
 				{Spec: v1.PodSpec{NodeName: "machine3", Affinity: stayWithS1InRegionAwayFromS2InAz}},
 				{Spec: v1.PodSpec{NodeName: "machine4", Affinity: awayFromS1InAz}},
 			},
 			nodes: []*v1.Node{
-				{ObjectMeta: v1.ObjectMeta{Name: "machine1", Labels: labelRgChina}},
-				{ObjectMeta: v1.ObjectMeta{Name: "machine2", Labels: labelAzAz1}},
-				{ObjectMeta: v1.ObjectMeta{Name: "machine3", Labels: labelRgIndia}},
-				{ObjectMeta: v1.ObjectMeta{Name: "machine4", Labels: labelAzAz2}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "machine1", Labels: labelRgChina}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "machine2", Labels: labelAzAz1}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "machine3", Labels: labelRgIndia}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "machine4", Labels: labelAzAz2}},
 			},
 			expectedList: []schedulerapi.HostPriority{{Host: "machine1", Score: 10}, {Host: "machine2", Score: 0}, {Host: "machine3", Score: 10}, {Host: "machine4", Score: 0}},
 			test:         "Affinity and Anti Affinity and symmetry: considered only preferredDuringSchedulingIgnoredDuringExecution in both pod affinity & anti affinity & symmetry",
@@ -569,30 +569,30 @@ func TestHardPodAffinitySymmetricWeight(t *testing.T) {
 		test                  string
 	}{
 		{
-			pod: &v1.Pod{Spec: v1.PodSpec{NodeName: ""}, ObjectMeta: v1.ObjectMeta{Labels: podLabelServiceS1}},
+			pod: &v1.Pod{Spec: v1.PodSpec{NodeName: ""}, ObjectMeta: metav1.ObjectMeta{Labels: podLabelServiceS1}},
 			pods: []*v1.Pod{
 				{Spec: v1.PodSpec{NodeName: "machine1", Affinity: hardPodAffinity}},
 				{Spec: v1.PodSpec{NodeName: "machine2", Affinity: hardPodAffinity}},
 			},
 			nodes: []*v1.Node{
-				{ObjectMeta: v1.ObjectMeta{Name: "machine1", Labels: labelRgChina}},
-				{ObjectMeta: v1.ObjectMeta{Name: "machine2", Labels: labelRgIndia}},
-				{ObjectMeta: v1.ObjectMeta{Name: "machine3", Labels: labelAzAz1}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "machine1", Labels: labelRgChina}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "machine2", Labels: labelRgIndia}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "machine3", Labels: labelAzAz1}},
 			},
 			hardPodAffinityWeight: v1.DefaultHardPodAffinitySymmetricWeight,
 			expectedList:          []schedulerapi.HostPriority{{Host: "machine1", Score: 10}, {Host: "machine2", Score: 10}, {Host: "machine3", Score: 0}},
 			test:                  "Hard Pod Affinity symmetry: hard pod affinity symmetry weights 1 by default, then nodes that match the hard pod affinity symmetry rules, get a high score",
 		},
 		{
-			pod: &v1.Pod{Spec: v1.PodSpec{NodeName: ""}, ObjectMeta: v1.ObjectMeta{Labels: podLabelServiceS1}},
+			pod: &v1.Pod{Spec: v1.PodSpec{NodeName: ""}, ObjectMeta: metav1.ObjectMeta{Labels: podLabelServiceS1}},
 			pods: []*v1.Pod{
 				{Spec: v1.PodSpec{NodeName: "machine1", Affinity: hardPodAffinity}},
 				{Spec: v1.PodSpec{NodeName: "machine2", Affinity: hardPodAffinity}},
 			},
 			nodes: []*v1.Node{
-				{ObjectMeta: v1.ObjectMeta{Name: "machine1", Labels: labelRgChina}},
-				{ObjectMeta: v1.ObjectMeta{Name: "machine2", Labels: labelRgIndia}},
-				{ObjectMeta: v1.ObjectMeta{Name: "machine3", Labels: labelAzAz1}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "machine1", Labels: labelRgChina}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "machine2", Labels: labelRgIndia}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "machine3", Labels: labelAzAz1}},
 			},
 			hardPodAffinityWeight: 0,
 			expectedList:          []schedulerapi.HostPriority{{Host: "machine1", Score: 0}, {Host: "machine2", Score: 0}, {Host: "machine3", Score: 0}},
@@ -657,28 +657,28 @@ func TestSoftPodAntiAffinityWithFailureDomains(t *testing.T) {
 		test           string
 	}{
 		{
-			pod: &v1.Pod{Spec: v1.PodSpec{NodeName: "", Affinity: antiAffinity1}, ObjectMeta: v1.ObjectMeta{Labels: podLabel1}},
+			pod: &v1.Pod{Spec: v1.PodSpec{NodeName: "", Affinity: antiAffinity1}, ObjectMeta: metav1.ObjectMeta{Labels: podLabel1}},
 			pods: []*v1.Pod{
-				{Spec: v1.PodSpec{NodeName: "machine1"}, ObjectMeta: v1.ObjectMeta{Labels: podLabel1}},
-				{Spec: v1.PodSpec{NodeName: "machine2"}, ObjectMeta: v1.ObjectMeta{Labels: podLabel1}},
+				{Spec: v1.PodSpec{NodeName: "machine1"}, ObjectMeta: metav1.ObjectMeta{Labels: podLabel1}},
+				{Spec: v1.PodSpec{NodeName: "machine2"}, ObjectMeta: metav1.ObjectMeta{Labels: podLabel1}},
 			},
 			nodes: []*v1.Node{
-				{ObjectMeta: v1.ObjectMeta{Name: "machine1", Labels: LabelZoneFailureDomainAZ1}},
-				{ObjectMeta: v1.ObjectMeta{Name: "machine2", Labels: labelAzAZ1}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "machine1", Labels: LabelZoneFailureDomainAZ1}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "machine2", Labels: labelAzAZ1}},
 			},
 			failureDomains: priorityutil.Topologies{DefaultKeys: strings.Split(v1.DefaultFailureDomains, ",")},
 			expectedList:   []schedulerapi.HostPriority{{Host: "machine1", Score: 0}, {Host: "machine2", Score: 10}},
 			test:           "Soft Pod Anti Affinity: when the topologyKey is emtpy, match among topologyKeys indicated by failure domains.",
 		},
 		{
-			pod: &v1.Pod{Spec: v1.PodSpec{NodeName: "", Affinity: antiAffinity1}, ObjectMeta: v1.ObjectMeta{Labels: podLabel1}},
+			pod: &v1.Pod{Spec: v1.PodSpec{NodeName: "", Affinity: antiAffinity1}, ObjectMeta: metav1.ObjectMeta{Labels: podLabel1}},
 			pods: []*v1.Pod{
-				{Spec: v1.PodSpec{NodeName: "machine1"}, ObjectMeta: v1.ObjectMeta{Labels: podLabel1}},
-				{Spec: v1.PodSpec{NodeName: "machine2"}, ObjectMeta: v1.ObjectMeta{Labels: podLabel1}},
+				{Spec: v1.PodSpec{NodeName: "machine1"}, ObjectMeta: metav1.ObjectMeta{Labels: podLabel1}},
+				{Spec: v1.PodSpec{NodeName: "machine2"}, ObjectMeta: metav1.ObjectMeta{Labels: podLabel1}},
 			},
 			nodes: []*v1.Node{
-				{ObjectMeta: v1.ObjectMeta{Name: "machine1", Labels: LabelZoneFailureDomainAZ1}},
-				{ObjectMeta: v1.ObjectMeta{Name: "machine2", Labels: labelAzAZ1}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "machine1", Labels: LabelZoneFailureDomainAZ1}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "machine2", Labels: labelAzAZ1}},
 			},
 			failureDomains: priorityutil.Topologies{},
 			expectedList:   []schedulerapi.HostPriority{{Host: "machine1", Score: 0}, {Host: "machine2", Score: 0}},

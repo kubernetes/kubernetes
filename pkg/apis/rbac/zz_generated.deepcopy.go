@@ -21,9 +21,9 @@ limitations under the License.
 package rbac
 
 import (
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
-	api "k8s.io/kubernetes/pkg/api"
 	reflect "reflect"
 )
 
@@ -54,8 +54,10 @@ func DeepCopy_rbac_ClusterRole(in interface{}, out interface{}, c *conversion.Cl
 		in := in.(*ClusterRole)
 		out := out.(*ClusterRole)
 		*out = *in
-		if err := api.DeepCopy_api_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, c); err != nil {
+		if newVal, err := c.DeepCopy(&in.ObjectMeta); err != nil {
 			return err
+		} else {
+			out.ObjectMeta = *newVal.(*v1.ObjectMeta)
 		}
 		if in.Rules != nil {
 			in, out := &in.Rules, &out.Rules
@@ -75,8 +77,10 @@ func DeepCopy_rbac_ClusterRoleBinding(in interface{}, out interface{}, c *conver
 		in := in.(*ClusterRoleBinding)
 		out := out.(*ClusterRoleBinding)
 		*out = *in
-		if err := api.DeepCopy_api_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, c); err != nil {
+		if newVal, err := c.DeepCopy(&in.ObjectMeta); err != nil {
 			return err
+		} else {
+			out.ObjectMeta = *newVal.(*v1.ObjectMeta)
 		}
 		if in.Subjects != nil {
 			in, out := &in.Subjects, &out.Subjects
@@ -135,14 +139,6 @@ func DeepCopy_rbac_PolicyRule(in interface{}, out interface{}, c *conversion.Clo
 			*out = make([]string, len(*in))
 			copy(*out, *in)
 		}
-		// in.AttributeRestrictions is kind 'Interface'
-		if in.AttributeRestrictions != nil {
-			if newVal, err := c.DeepCopy(&in.AttributeRestrictions); err != nil {
-				return err
-			} else {
-				out.AttributeRestrictions = *newVal.(*runtime.Object)
-			}
-		}
 		if in.APIGroups != nil {
 			in, out := &in.APIGroups, &out.APIGroups
 			*out = make([]string, len(*in))
@@ -172,8 +168,10 @@ func DeepCopy_rbac_Role(in interface{}, out interface{}, c *conversion.Cloner) e
 		in := in.(*Role)
 		out := out.(*Role)
 		*out = *in
-		if err := api.DeepCopy_api_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, c); err != nil {
+		if newVal, err := c.DeepCopy(&in.ObjectMeta); err != nil {
 			return err
+		} else {
+			out.ObjectMeta = *newVal.(*v1.ObjectMeta)
 		}
 		if in.Rules != nil {
 			in, out := &in.Rules, &out.Rules
@@ -193,8 +191,10 @@ func DeepCopy_rbac_RoleBinding(in interface{}, out interface{}, c *conversion.Cl
 		in := in.(*RoleBinding)
 		out := out.(*RoleBinding)
 		*out = *in
-		if err := api.DeepCopy_api_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, c); err != nil {
+		if newVal, err := c.DeepCopy(&in.ObjectMeta); err != nil {
 			return err
+		} else {
+			out.ObjectMeta = *newVal.(*v1.ObjectMeta)
 		}
 		if in.Subjects != nil {
 			in, out := &in.Subjects, &out.Subjects

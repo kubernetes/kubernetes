@@ -62,7 +62,7 @@ type cluster struct {
 func createClusterObjectOrFail(f *framework.Framework, context *framework.E2EContext) {
 	framework.Logf("Creating cluster object: %s (%s, secret: %s)", context.Name, context.Cluster.Cluster.Server, context.Name)
 	cluster := federationapi.Cluster{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: context.Name,
 		},
 		Spec: federationapi.ClusterSpec{
@@ -143,7 +143,7 @@ func createNamespaceInClusters(clusters map[string]*cluster, f *framework.Framew
 		// TODO(nikhiljindal): remove this once we have the namespace controller working as expected.
 		if _, err := c.Clientset.Core().Namespaces().Get(nsName, metav1.GetOptions{}); errors.IsNotFound(err) {
 			ns := &v1.Namespace{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name: nsName,
 				},
 			}
@@ -254,7 +254,7 @@ func createService(clientset *fedclientset.Clientset, namespace, name string) (*
 	By(fmt.Sprintf("Creating federated service %q in namespace %q", name, namespace))
 
 	service := &v1.Service{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: namespace,
 		},
@@ -428,7 +428,7 @@ func discoverService(f *framework.Framework, name string, exists bool, podName s
 	By(fmt.Sprintf("Looking up %q", name))
 
 	pod := &v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: podName,
 		},
 		Spec: v1.PodSpec{
@@ -471,7 +471,7 @@ If creation of any pod fails, the test fails (possibly with a partially created 
 */
 func createBackendPodsOrFail(clusters map[string]*cluster, namespace string, name string) {
 	pod := &v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 			// Namespace: namespace,
 			Labels: FederatedServiceLabels,

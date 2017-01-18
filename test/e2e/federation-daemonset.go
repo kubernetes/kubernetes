@@ -159,13 +159,13 @@ func createDaemonSetOrFail(clientset *fedclientset.Clientset, namespace string) 
 	}
 
 	daemonset := &v1beta1.DaemonSet{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      FederatedDaemonSetName,
 			Namespace: namespace,
 		},
 		Spec: v1beta1.DaemonSetSpec{
 			Template: v1.PodTemplateSpec{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{"aaa": "bbb"},
 				},
 				Spec: v1.PodSpec{

@@ -20,6 +20,7 @@ import (
 	"testing"
 	"time"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/cache"
@@ -41,33 +42,33 @@ func TestServiceAccountCreation(t *testing.T) {
 	managedName := "managed"
 
 	activeNS := &v1.Namespace{
-		ObjectMeta: v1.ObjectMeta{Name: ns},
+		ObjectMeta: metav1.ObjectMeta{Name: ns},
 		Status: v1.NamespaceStatus{
 			Phase: v1.NamespaceActive,
 		},
 	}
 	terminatingNS := &v1.Namespace{
-		ObjectMeta: v1.ObjectMeta{Name: ns},
+		ObjectMeta: metav1.ObjectMeta{Name: ns},
 		Status: v1.NamespaceStatus{
 			Phase: v1.NamespaceTerminating,
 		},
 	}
 	defaultServiceAccount := &v1.ServiceAccount{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:            defaultName,
 			Namespace:       ns,
 			ResourceVersion: "1",
 		},
 	}
 	managedServiceAccount := &v1.ServiceAccount{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:            managedName,
 			Namespace:       ns,
 			ResourceVersion: "1",
 		},
 	}
 	unmanagedServiceAccount := &v1.ServiceAccount{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:            "other-unmanaged",
 			Namespace:       ns,
 			ResourceVersion: "1",
@@ -160,8 +161,8 @@ func TestServiceAccountCreation(t *testing.T) {
 		informers := informers.NewSharedInformerFactory(fake.NewSimpleClientset(), nil, controller.NoResyncPeriodFunc())
 		options := DefaultServiceAccountsControllerOptions()
 		options.ServiceAccounts = []v1.ServiceAccount{
-			{ObjectMeta: v1.ObjectMeta{Name: defaultName}},
-			{ObjectMeta: v1.ObjectMeta{Name: managedName}},
+			{ObjectMeta: metav1.ObjectMeta{Name: defaultName}},
+			{ObjectMeta: metav1.ObjectMeta{Name: managedName}},
 		}
 		controller := NewServiceAccountsController(informers.ServiceAccounts(), informers.Namespaces(), client, options)
 		controller.saLister = &cache.StoreToServiceAccountLister{Indexer: cache.NewIndexer(cache.DeletionHandlingMetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})}

@@ -616,7 +616,7 @@ func newTestController(kubeClient clientset.Interface, volumeSource, claimSource
 // newVolume returns a new volume with given attributes
 func newVolume(name, capacity, boundToClaimUID, boundToClaimName string, phase v1.PersistentVolumePhase, reclaimPolicy v1.PersistentVolumeReclaimPolicy, annotations ...string) *v1.PersistentVolume {
 	volume := v1.PersistentVolume{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:            name,
 			ResourceVersion: "1",
 		},
@@ -722,7 +722,7 @@ func newVolumeArray(name, capacity, boundToClaimUID, boundToClaimName string, ph
 // newClaim returns a new claim with given attributes
 func newClaim(name, claimUID, capacity, boundToVolume string, phase v1.PersistentVolumeClaimPhase, annotations ...string) *v1.PersistentVolumeClaim {
 	claim := v1.PersistentVolumeClaim{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:            name,
 			Namespace:       testNamespace,
 			UID:             types.UID(claimUID),
@@ -1167,7 +1167,7 @@ func (plugin *mockVolumePlugin) Provision() (*v1.PersistentVolume, error) {
 		capacity := plugin.provisionOptions.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
 		accessModes := plugin.provisionOptions.PVC.Spec.AccessModes
 		pv = &v1.PersistentVolume{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name: plugin.provisionOptions.PVName,
 			},
 			Spec: v1.PersistentVolumeSpec{

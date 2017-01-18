@@ -23,7 +23,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/authentication/serviceaccount"
-	rbacv1alpha1 "k8s.io/kubernetes/pkg/apis/rbac/v1alpha1"
+	rbacv1beta1 "k8s.io/kubernetes/pkg/apis/rbac/v1beta1"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
@@ -69,7 +69,7 @@ var _ = framework.KubeDescribe("Loadbalancing: L7", func() {
 		// this test wants powerful permissions.  Since the namespace names are unique, we can leave this
 		// lying around so we don't have to race any caches
 		framework.BindClusterRole(jig.client.Rbac(), "cluster-admin", f.Namespace.Name,
-			rbacv1alpha1.Subject{Kind: rbacv1alpha1.ServiceAccountKind, Namespace: f.Namespace.Name, Name: "default"})
+			rbacv1beta1.Subject{Kind: rbacv1beta1.ServiceAccountKind, Namespace: f.Namespace.Name, Name: "default"})
 
 		err := framework.WaitForAuthorizationUpdate(jig.client.Authorization(),
 			serviceaccount.MakeUsername(f.Namespace.Name, "default"),

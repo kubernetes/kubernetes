@@ -324,7 +324,7 @@ func (dc *DeploymentController) getNewReplicaSet(deployment *extensions.Deployme
 
 	// Create new ReplicaSet
 	newRS := extensions.ReplicaSet{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			// Make the name deterministic, to ensure idempotence
 			Name:      deployment.Name + "-" + podTemplateSpecHash,
 			Namespace: namespace,

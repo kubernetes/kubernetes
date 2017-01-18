@@ -66,9 +66,7 @@ go_library(
     ],
     tags = ["automanaged"],
     deps = [
-        "//pkg/admission:go_default_library",
         "//pkg/api:go_default_library",
-        "//pkg/auth/handlers:go_default_library",
         "//pkg/client/restclient:go_default_library",
         "//pkg/genericapiserver/api:go_default_library",
         "//pkg/genericapiserver/api/filters:go_default_library",
@@ -101,6 +99,7 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/util/sets",
         "//vendor:k8s.io/apimachinery/pkg/util/validation",
         "//vendor:k8s.io/apimachinery/pkg/version",
+        "//vendor:k8s.io/apiserver/pkg/admission",
         "//vendor:k8s.io/apiserver/pkg/authentication/authenticator",
         "//vendor:k8s.io/apiserver/pkg/authentication/request/union",
         "//vendor:k8s.io/apiserver/pkg/authentication/user",

@@ -301,7 +301,7 @@ func (recorder *recorderImpl) makeEvent(ref *v1.ObjectReference, eventtype, reas
 		namespace = v1.NamespaceDefault
 	}
 	return &v1.Event{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      fmt.Sprintf("%v.%x", ref.Name, t.UnixNano()),
 			Namespace: namespace,
 		},

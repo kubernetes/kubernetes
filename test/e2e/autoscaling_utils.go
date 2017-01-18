@@ -330,7 +330,7 @@ func (rc *ResourceConsumer) CleanUp() {
 func runServiceAndWorkloadForResourceConsumer(c clientset.Interface, internalClient internalclientset.Interface, ns, name, kind string, replicas int, cpuLimitMillis, memLimitMb int64) {
 	By(fmt.Sprintf("Running consuming RC %s via %s with %v replicas", name, kind, replicas))
 	_, err := c.Core().Services(ns).Create(&v1.Service{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 		},
 		Spec: v1.ServiceSpec{
@@ -384,7 +384,7 @@ func runServiceAndWorkloadForResourceConsumer(c clientset.Interface, internalCli
 	By(fmt.Sprintf("Running controller"))
 	controllerName := name + "-ctrl"
 	_, err = c.Core().Services(ns).Create(&v1.Service{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: controllerName,
 		},
 		Spec: v1.ServiceSpec{

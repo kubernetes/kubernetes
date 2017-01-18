@@ -18,6 +18,7 @@ package v1alpha1
 
 import (
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	v1alpha1 "k8s.io/kubernetes/cmd/kube-aggregator/pkg/apis/apiregistration/v1alpha1"
 	api "k8s.io/kubernetes/pkg/api"
@@ -41,7 +42,7 @@ type APIServiceInterface interface {
 	Get(name string, options meta_v1.GetOptions) (*v1alpha1.APIService, error)
 	List(opts v1.ListOptions) (*v1alpha1.APIServiceList, error)
 	Watch(opts v1.ListOptions) (watch.Interface, error)
-	Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *v1alpha1.APIService, err error)
+	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1alpha1.APIService, err error)
 	APIServiceExpansion
 }
 
@@ -148,7 +149,7 @@ func (c *aPIServices) Watch(opts v1.ListOptions) (watch.Interface, error) {
 }
 
 // Patch applies the patch and returns the patched aPIService.
-func (c *aPIServices) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *v1alpha1.APIService, err error) {
+func (c *aPIServices) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1alpha1.APIService, err error) {
 	result = &v1alpha1.APIService{}
 	err = c.client.Patch(pt).
 		Resource("apiservices").

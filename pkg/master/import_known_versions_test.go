@@ -76,6 +76,7 @@ var typesAllowedTags = map[reflect.Type]bool{
 	reflect.TypeOf(metav1.Duration{}):       true,
 	reflect.TypeOf(metav1.TypeMeta{}):       true,
 	reflect.TypeOf(metav1.ListMeta{}):       true,
+	reflect.TypeOf(metav1.ObjectMeta{}):     true,
 	reflect.TypeOf(metav1.OwnerReference{}): true,
 	reflect.TypeOf(metav1.LabelSelector{}):  true,
 	reflect.TypeOf(metav1.GetOptions{}):     true,

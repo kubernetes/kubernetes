@@ -173,7 +173,7 @@ func createOutOfDiskPod(c clientset.Interface, ns, name string, milliCPU int64) 
 	podClient := c.Core().Pods(ns)
 
 	pod := &v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 		},
 		Spec: v1.PodSpec{

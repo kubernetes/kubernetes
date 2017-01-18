@@ -29,9 +29,9 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 )
 
-var _ meta.Object = &api.ObjectMeta{}
+var _ metav1.Object = &metav1.ObjectMeta{}
 
-func getObjectMetaAndOwnerReferences() (objectMeta api.ObjectMeta, metaOwnerReferences []metav1.OwnerReference) {
+func getObjectMetaAndOwnerReferences() (objectMeta metav1.ObjectMeta, metaOwnerReferences []metav1.OwnerReference) {
 	fuzz.New().NilChance(.5).NumElements(1, 5).Fuzz(&objectMeta)
 	references := objectMeta.OwnerReferences
 	metaOwnerReferences = make([]metav1.OwnerReference, 0)
@@ -60,7 +60,7 @@ func testGetOwnerReferences(t *testing.T) {
 
 func testSetOwnerReferences(t *testing.T) {
 	expected, newRefs := getObjectMetaAndOwnerReferences()
-	objectMeta := &api.ObjectMeta{}
+	objectMeta := &metav1.ObjectMeta{}
 	objectMeta.SetOwnerReferences(newRefs)
 	if !reflect.DeepEqual(expected.OwnerReferences, objectMeta.OwnerReferences) {
 		t.Errorf("expect: %#v\n got: %#v", expected.OwnerReferences, objectMeta.OwnerReferences)
@@ -86,7 +86,7 @@ func TestAccessorImplementations(t *testing.T) {
 					t.Errorf("%v (%v) does not implement runtime.Object", gv.WithKind(kind), knownType)
 				}
 				lm, isLM := obj.(meta.ListMetaAccessor)
-				om, isOM := obj.(meta.ObjectMetaAccessor)
+				om, isOM := obj.(metav1.ObjectMetaAccessor)
 				switch {
 				case isLM && isOM:
 					t.Errorf("%v (%v) implements ListMetaAccessor and ObjectMetaAccessor", gv.WithKind(kind), knownType)

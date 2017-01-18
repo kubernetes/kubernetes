@@ -74,7 +74,7 @@ func newPod(podName, podNamespace string, ownerReferences []metav1.OwnerReferenc
 			Kind:       "Pod",
 			APIVersion: "v1",
 		},
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:            podName,
 			Namespace:       podNamespace,
 			OwnerReferences: ownerReferences,
@@ -96,14 +96,14 @@ func newOwnerRC(name, namespace string) *v1.ReplicationController {
 			Kind:       "ReplicationController",
 			APIVersion: "v1",
 		},
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Namespace: namespace,
 			Name:      name,
 		},
 		Spec: v1.ReplicationControllerSpec{
 			Selector: map[string]string{"name": "test"},
 			Template: &v1.PodTemplateSpec{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{"name": "test"},
 				},
 				Spec: v1.PodSpec{

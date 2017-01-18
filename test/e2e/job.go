@@ -216,7 +216,7 @@ var _ = framework.KubeDescribe("Job", func() {
 // newTestJob returns a job which does one of several testing behaviors.
 func newTestJob(behavior, name string, rPol v1.RestartPolicy, parallelism, completions int32) *batch.Job {
 	job := &batch.Job{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 		},
 		Spec: batch.JobSpec{
@@ -224,7 +224,7 @@ func newTestJob(behavior, name string, rPol v1.RestartPolicy, parallelism, compl
 			Completions:    &completions,
 			ManualSelector: newBool(false),
 			Template: v1.PodTemplateSpec{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{jobSelectorKey: name},
 				},
 				Spec: v1.PodSpec{

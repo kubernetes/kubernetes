@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -108,7 +109,7 @@ func TestIngressController(t *testing.T) {
 	// Add another test without that annotation when
 	// https://github.com/kubernetes/kubernetes/issues/36540 is fixed.
 	fedIngress := extensionsv1beta1.Ingress{
-		ObjectMeta: apiv1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test-ingress",
 			Namespace: "mynamespace",
 			SelfLink:  "/api/v1/namespaces/mynamespace/ingress/test-ingress",
@@ -282,7 +283,7 @@ func GetClusterFromChan(c chan runtime.Object) *federationapi.Cluster {
 
 func NewConfigMap(uid string) *apiv1.ConfigMap {
 	return &apiv1.ConfigMap{
-		ObjectMeta: apiv1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      uidConfigMapName,
 			Namespace: uidConfigMapNamespace,
 			SelfLink:  "/api/v1/namespaces/" + uidConfigMapNamespace + "/configmap/" + uidConfigMapName,

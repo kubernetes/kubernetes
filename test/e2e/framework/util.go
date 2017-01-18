@@ -733,7 +733,7 @@ func WaitForNamespacesDeleted(c clientset.Interface, namespaces []string, timeou
 }
 
 func waitForServiceAccountInNamespace(c clientset.Interface, ns, serviceAccountName string, timeout time.Duration) error {
-	w, err := c.Core().ServiceAccounts(ns).Watch(v1.SingleObject(v1.ObjectMeta{Name: serviceAccountName}))
+	w, err := c.Core().ServiceAccounts(ns).Watch(v1.SingleObject(metav1.ObjectMeta{Name: serviceAccountName}))
 	if err != nil {
 		return err
 	}
@@ -881,7 +881,7 @@ func CreateTestingNS(baseName string, c clientset.Interface, labels map[string]s
 	labels["e2e-run"] = string(RunId)
 
 	namespaceObj := &v1.Namespace{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: fmt.Sprintf("e2e-tests-%v-", baseName),
 			Namespace:    "",
 			Labels:       labels,
@@ -1261,7 +1261,7 @@ func waitForPodRunningInNamespaceSlow(c clientset.Interface, podName, namespace,
 }
 
 func waitTimeoutForPodRunningInNamespace(c clientset.Interface, podName, namespace, resourceVersion string, timeout time.Duration) error {
-	w, err := c.Core().Pods(namespace).Watch(v1.SingleObject(v1.ObjectMeta{Name: podName, ResourceVersion: resourceVersion}))
+	w, err := c.Core().Pods(namespace).Watch(v1.SingleObject(metav1.ObjectMeta{Name: podName, ResourceVersion: resourceVersion}))
 	if err != nil {
 		return err
 	}
@@ -1276,7 +1276,7 @@ func WaitForPodNoLongerRunningInNamespace(c clientset.Interface, podName, namesp
 }
 
 func WaitTimeoutForPodNoLongerRunningInNamespace(c clientset.Interface, podName, namespace, resourceVersion string, timeout time.Duration) error {
-	w, err := c.Core().Pods(namespace).Watch(v1.SingleObject(v1.ObjectMeta{Name: podName, ResourceVersion: resourceVersion}))
+	w, err := c.Core().Pods(namespace).Watch(v1.SingleObject(metav1.ObjectMeta{Name: podName, ResourceVersion: resourceVersion}))
 	if err != nil {
 		return err
 	}
@@ -1285,7 +1285,7 @@ func WaitTimeoutForPodNoLongerRunningInNamespace(c clientset.Interface, podName,
 }
 
 func waitTimeoutForPodReadyInNamespace(c clientset.Interface, podName, namespace, resourceVersion string, timeout time.Duration) error {
-	w, err := c.Core().Pods(namespace).Watch(v1.SingleObject(v1.ObjectMeta{Name: podName, ResourceVersion: resourceVersion}))
+	w, err := c.Core().Pods(namespace).Watch(v1.SingleObject(metav1.ObjectMeta{Name: podName, ResourceVersion: resourceVersion}))
 	if err != nil {
 		return err
 	}
@@ -1297,7 +1297,7 @@ func waitTimeoutForPodReadyInNamespace(c clientset.Interface, podName, namespace
 // The resourceVersion is used when Watching object changes, it tells since when we care
 // about changes to the pod.
 func WaitForPodNotPending(c clientset.Interface, ns, podName, resourceVersion string) error {
-	w, err := c.Core().Pods(ns).Watch(v1.SingleObject(v1.ObjectMeta{Name: podName, ResourceVersion: resourceVersion}))
+	w, err := c.Core().Pods(ns).Watch(v1.SingleObject(metav1.ObjectMeta{Name: podName, ResourceVersion: resourceVersion}))
 	if err != nil {
 		return err
 	}
@@ -2401,7 +2401,7 @@ func isNodeUntainted(node *v1.Node) bool {
 			Kind:       "Pod",
 			APIVersion: api.Registry.GroupOrDie(v1.GroupName).GroupVersion.String(),
 		},
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      "fake-not-scheduled",
 			Namespace: "fake-not-scheduled",
 		},
@@ -3316,7 +3316,7 @@ func WatchRecreateDeployment(c clientset.Interface, d *extensions.Deployment) er
 		return fmt.Errorf("deployment %q does not use a Recreate strategy: %s", d.Name, d.Spec.Strategy.Type)
 	}
 
-	w, err := c.Extensions().Deployments(d.Namespace).Watch(v1.SingleObject(v1.ObjectMeta{Name: d.Name, ResourceVersion: d.ResourceVersion}))
+	w, err := c.Extensions().Deployments(d.Namespace).Watch(v1.SingleObject(metav1.ObjectMeta{Name: d.Name, ResourceVersion: d.ResourceVersion}))
 	if err != nil {
 		return err
 	}
@@ -3804,7 +3804,7 @@ func IssueSSHCommand(cmd, provider string, node *v1.Node) error {
 // NewHostExecPodSpec returns the pod spec of hostexec pod
 func NewHostExecPodSpec(ns, name string) *v1.Pod {
 	pod := &v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: ns,
 		},
@@ -3852,7 +3852,7 @@ func LaunchHostExecPod(client clientset.Interface, ns, name string) *v1.Pod {
 func newExecPodSpec(ns, generateName string) *v1.Pod {
 	immediate := int64(0)
 	pod := &v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: generateName,
 			Namespace:    ns,
 		},
@@ -3895,7 +3895,7 @@ func CreateExecPodOrFail(client clientset.Interface, ns, generateName string, tw
 func CreatePodOrFail(c clientset.Interface, ns, name string, labels map[string]string, containerPorts []v1.ContainerPort) {
 	By(fmt.Sprintf("Creating pod %s in namespace %s", name, ns))
 	pod := &v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:   name,
 			Labels: labels,
 		},
@@ -4847,7 +4847,7 @@ func LaunchWebserverPod(f *Framework, podName, nodeName string) (ip string) {
 	containerName := fmt.Sprintf("%s-container", podName)
 	port := 8080
 	pod := &v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: podName,
 		},
 		Spec: v1.PodSpec{
@@ -4880,7 +4880,7 @@ func LaunchWebserverPod(f *Framework, podName, nodeName string) (ip string) {
 func CheckConnectivityToHost(f *Framework, nodeName, podName, host string, timeout int) error {
 	contName := fmt.Sprintf("%s-container", podName)
 	pod := &v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: podName,
 		},
 		Spec: v1.PodSpec{
@@ -5280,7 +5280,7 @@ func RcByNameContainer(name string, replicas int32, image string, labels map[str
 			Kind:       "ReplicationController",
 			APIVersion: api.Registry.GroupOrDie(v1.GroupName).GroupVersion.String(),
 		},
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 		},
 		Spec: v1.ReplicationControllerSpec{
@@ -5289,7 +5289,7 @@ func RcByNameContainer(name string, replicas int32, image string, labels map[str
 				"name": name,
 			},
 			Template: &v1.PodTemplateSpec{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Labels: labels,
 				},
 				Spec: v1.PodSpec{

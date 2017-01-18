@@ -25,10 +25,10 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apiserver/pkg/authentication/serviceaccount"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
-	rbacv1alpha1 "k8s.io/kubernetes/pkg/apis/rbac/v1alpha1"
+	rbacv1beta1 "k8s.io/kubernetes/pkg/apis/rbac/v1beta1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	coreclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/core/v1"
 	"k8s.io/kubernetes/pkg/fields"
@@ -64,7 +64,7 @@ var _ = framework.KubeDescribe("NodeProblemDetector", func() {
 		// this test wants extra permissions.  Since the namespace names are unique, we can leave this
 		// lying around so we don't have to race any caches
 		framework.BindClusterRole(f.ClientSet.Rbac(), "cluster-admin", f.Namespace.Name,
-			rbacv1alpha1.Subject{Kind: rbacv1alpha1.ServiceAccountKind, Namespace: f.Namespace.Name, Name: "default"})
+			rbacv1beta1.Subject{Kind: rbacv1beta1.ServiceAccountKind, Namespace: f.Namespace.Name, Name: "default"})
 
 		err := framework.WaitForAuthorizationUpdate(f.ClientSet.Authorization(),
 			serviceaccount.MakeUsername(f.Namespace.Name, "default"),
@@ -171,7 +171,7 @@ var _ = framework.KubeDescribe("NodeProblemDetector", func() {
 			Expect(framework.IssueSSHCommand(cmd, framework.TestContext.Provider, node)).To(Succeed())
 			By("Create config map for the node problem detector")
 			_, err = c.Core().ConfigMaps(ns).Create(&v1.ConfigMap{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name: configName,
 				},
 				Data: map[string]string{configFile: config},
@@ -179,7 +179,7 @@ var _ = framework.KubeDescribe("NodeProblemDetector", func() {
 			Expect(err).NotTo(HaveOccurred())
 			By("Create the node problem detector")
 			_, err = c.Core().Pods(ns).Create(&v1.Pod{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name: name,
 				},
 				Spec: v1.PodSpec{
@@ -385,7 +385,7 @@ var _ = framework.KubeDescribe("NodeProblemDetector", func() {
 			Expect(c.Core().Events(eventNamespace).DeleteCollection(v1.NewDeleteOptions(0), eventListOptions)).To(Succeed())
 			By("Clean up the node condition")
 			patch := []byte(fmt.Sprintf(`{"status":{"conditions":[{"$patch":"delete","type":"%s"}]}}`, condition))
-			c.Core().RESTClient().Patch(api.StrategicMergePatchType).Resource("nodes").Name(node.Name).SubResource("status").Body(patch).Do()
+			c.Core().RESTClient().Patch(types.StrategicMergePatchType).Resource("nodes").Name(node.Name).SubResource("status").Body(patch).Do()
 			By("Clean up the temporary directory")
 			framework.IssueSSHCommand(fmt.Sprintf("rm -r %s", tmpDir), framework.TestContext.Provider, node)
 		})

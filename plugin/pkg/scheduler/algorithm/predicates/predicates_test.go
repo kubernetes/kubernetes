@@ -418,7 +418,7 @@ func TestPodFitsHost(t *testing.T) {
 				},
 			},
 			node: &v1.Node{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
 				},
 			},
@@ -432,7 +432,7 @@ func TestPodFitsHost(t *testing.T) {
 				},
 			},
 			node: &v1.Node{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
 				},
 			},
@@ -1184,7 +1184,7 @@ func TestPodFitsSelector(t *testing.T) {
 		// TODO: Uncomment this test when implement RequiredDuringSchedulingRequiredDuringExecution
 		//		{
 		//			pod: &v1.Pod{
-		//				ObjectMeta: v1.ObjectMeta{
+		//				ObjectMeta: metav1.ObjectMeta{
 		//					Annotations: map[string]string{
 		//						v1.AffinityAnnotationKey: `
 		//						{"nodeAffinity": {
@@ -1283,7 +1283,7 @@ func TestPodFitsSelector(t *testing.T) {
 	expectedFailureReasons := []algorithm.PredicateFailureReason{ErrNodeSelectorNotMatch}
 
 	for _, test := range tests {
-		node := v1.Node{ObjectMeta: v1.ObjectMeta{Labels: test.labels}}
+		node := v1.Node{ObjectMeta: metav1.ObjectMeta{Labels: test.labels}}
 		nodeInfo := schedulercache.NewNodeInfo()
 		nodeInfo.SetNode(&node)
 
@@ -1349,7 +1349,7 @@ func TestNodeLabelPresence(t *testing.T) {
 	expectedFailureReasons := []algorithm.PredicateFailureReason{ErrNodeLabelPresenceViolated}
 
 	for _, test := range tests {
-		node := v1.Node{ObjectMeta: v1.ObjectMeta{Labels: label}}
+		node := v1.Node{ObjectMeta: metav1.ObjectMeta{Labels: label}}
 		nodeInfo := schedulercache.NewNodeInfo()
 		nodeInfo.SetNode(&node)
 
@@ -1385,11 +1385,11 @@ func TestServiceAffinity(t *testing.T) {
 		"region": "r2",
 		"zone":   "z22",
 	}
-	node1 := v1.Node{ObjectMeta: v1.ObjectMeta{Name: "machine1", Labels: labels1}}
-	node2 := v1.Node{ObjectMeta: v1.ObjectMeta{Name: "machine2", Labels: labels2}}
-	node3 := v1.Node{ObjectMeta: v1.ObjectMeta{Name: "machine3", Labels: labels3}}
-	node4 := v1.Node{ObjectMeta: v1.ObjectMeta{Name: "machine4", Labels: labels4}}
-	node5 := v1.Node{ObjectMeta: v1.ObjectMeta{Name: "machine5", Labels: labels4}}
+	node1 := v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "machine1", Labels: labels1}}
+	node2 := v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "machine2", Labels: labels2}}
+	node3 := v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "machine3", Labels: labels3}}
+	node4 := v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "machine4", Labels: labels4}}
+	node5 := v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "machine5", Labels: labels4}}
 	tests := []struct {
 		pod      *v1.Pod
 		pods     []*v1.Pod
@@ -1421,8 +1421,8 @@ func TestServiceAffinity(t *testing.T) {
 			test:   "pod with region label mismatch",
 		},
 		{
-			pod:      &v1.Pod{ObjectMeta: v1.ObjectMeta{Labels: selector}},
-			pods:     []*v1.Pod{{Spec: v1.PodSpec{NodeName: "machine1"}, ObjectMeta: v1.ObjectMeta{Labels: selector}}},
+			pod:      &v1.Pod{ObjectMeta: metav1.ObjectMeta{Labels: selector}},
+			pods:     []*v1.Pod{{Spec: v1.PodSpec{NodeName: "machine1"}, ObjectMeta: metav1.ObjectMeta{Labels: selector}}},
 			node:     &node1,
 			services: []*v1.Service{{Spec: v1.ServiceSpec{Selector: selector}}},
 			fits:     true,
@@ -1430,8 +1430,8 @@ func TestServiceAffinity(t *testing.T) {
 			test:     "service pod on same node",
 		},
 		{
-			pod:      &v1.Pod{ObjectMeta: v1.ObjectMeta{Labels: selector}},
-			pods:     []*v1.Pod{{Spec: v1.PodSpec{NodeName: "machine2"}, ObjectMeta: v1.ObjectMeta{Labels: selector}}},
+			pod:      &v1.Pod{ObjectMeta: metav1.ObjectMeta{Labels: selector}},
+			pods:     []*v1.Pod{{Spec: v1.PodSpec{NodeName: "machine2"}, ObjectMeta: metav1.ObjectMeta{Labels: selector}}},
 			node:     &node1,
 			services: []*v1.Service{{Spec: v1.ServiceSpec{Selector: selector}}},
 			fits:     true,
@@ -1439,8 +1439,8 @@ func TestServiceAffinity(t *testing.T) {
 			test:     "service pod on different node, region match",
 		},
 		{
-			pod:      &v1.Pod{ObjectMeta: v1.ObjectMeta{Labels: selector}},
-			pods:     []*v1.Pod{{Spec: v1.PodSpec{NodeName: "machine3"}, ObjectMeta: v1.ObjectMeta{Labels: selector}}},
+			pod:      &v1.Pod{ObjectMeta: metav1.ObjectMeta{Labels: selector}},
+			pods:     []*v1.Pod{{Spec: v1.PodSpec{NodeName: "machine3"}, ObjectMeta: metav1.ObjectMeta{Labels: selector}}},
 			node:     &node1,
 			services: []*v1.Service{{Spec: v1.ServiceSpec{Selector: selector}}},
 			fits:     false,
@@ -1448,35 +1448,35 @@ func TestServiceAffinity(t *testing.T) {
 			test:     "service pod on different node, region mismatch",
 		},
 		{
-			pod:      &v1.Pod{ObjectMeta: v1.ObjectMeta{Labels: selector, Namespace: "ns1"}},
-			pods:     []*v1.Pod{{Spec: v1.PodSpec{NodeName: "machine3"}, ObjectMeta: v1.ObjectMeta{Labels: selector, Namespace: "ns1"}}},
+			pod:      &v1.Pod{ObjectMeta: metav1.ObjectMeta{Labels: selector, Namespace: "ns1"}},
+			pods:     []*v1.Pod{{Spec: v1.PodSpec{NodeName: "machine3"}, ObjectMeta: metav1.ObjectMeta{Labels: selector, Namespace: "ns1"}}},
 			node:     &node1,
-			services: []*v1.Service{{Spec: v1.ServiceSpec{Selector: selector}, ObjectMeta: v1.ObjectMeta{Namespace: "ns2"}}},
+			services: []*v1.Service{{Spec: v1.ServiceSpec{Selector: selector}, ObjectMeta: metav1.ObjectMeta{Namespace: "ns2"}}},
 			fits:     true,
 			labels:   []string{"region"},
 			test:     "service in different namespace, region mismatch",
 		},
 		{
-			pod:      &v1.Pod{ObjectMeta: v1.ObjectMeta{Labels: selector, Namespace: "ns1"}},
-			pods:     []*v1.Pod{{Spec: v1.PodSpec{NodeName: "machine3"}, ObjectMeta: v1.ObjectMeta{Labels: selector, Namespace: "ns2"}}},
+			pod:      &v1.Pod{ObjectMeta: metav1.ObjectMeta{Labels: selector, Namespace: "ns1"}},
+			pods:     []*v1.Pod{{Spec: v1.PodSpec{NodeName: "machine3"}, ObjectMeta: metav1.ObjectMeta{Labels: selector, Namespace: "ns2"}}},
 			node:     &node1,
-			services: []*v1.Service{{Spec: v1.ServiceSpec{Selector: selector}, ObjectMeta: v1.ObjectMeta{Namespace: "ns1"}}},
+			services: []*v1.Service{{Spec: v1.ServiceSpec{Selector: selector}, ObjectMeta: metav1.ObjectMeta{Namespace: "ns1"}}},
 			fits:     true,
 			labels:   []string{"region"},
 			test:     "pod in different namespace, region mismatch",
 		},
 		{
-			pod:      &v1.Pod{ObjectMeta: v1.ObjectMeta{Labels: selector, Namespace: "ns1"}},
-			pods:     []*v1.Pod{{Spec: v1.PodSpec{NodeName: "machine3"}, ObjectMeta: v1.ObjectMeta{Labels: selector, Namespace: "ns1"}}},
+			pod:      &v1.Pod{ObjectMeta: metav1.ObjectMeta{Labels: selector, Namespace: "ns1"}},
+			pods:     []*v1.Pod{{Spec: v1.PodSpec{NodeName: "machine3"}, ObjectMeta: metav1.ObjectMeta{Labels: selector, Namespace: "ns1"}}},
 			node:     &node1,
-			services: []*v1.Service{{Spec: v1.ServiceSpec{Selector: selector}, ObjectMeta: v1.ObjectMeta{Namespace: "ns1"}}},
+			services: []*v1.Service{{Spec: v1.ServiceSpec{Selector: selector}, ObjectMeta: metav1.ObjectMeta{Namespace: "ns1"}}},
 			fits:     false,
 			labels:   []string{"region"},
 			test:     "service and pod in same namespace, region mismatch",
 		},
 		{
-			pod:      &v1.Pod{ObjectMeta: v1.ObjectMeta{Labels: selector}},
-			pods:     []*v1.Pod{{Spec: v1.PodSpec{NodeName: "machine2"}, ObjectMeta: v1.ObjectMeta{Labels: selector}}},
+			pod:      &v1.Pod{ObjectMeta: metav1.ObjectMeta{Labels: selector}},
+			pods:     []*v1.Pod{{Spec: v1.PodSpec{NodeName: "machine2"}, ObjectMeta: metav1.ObjectMeta{Labels: selector}}},
 			node:     &node1,
 			services: []*v1.Service{{Spec: v1.ServiceSpec{Selector: selector}}},
 			fits:     false,
@@ -1484,8 +1484,8 @@ func TestServiceAffinity(t *testing.T) {
 			test:     "service pod on different node, multiple labels, not all match",
 		},
 		{
-			pod:      &v1.Pod{ObjectMeta: v1.ObjectMeta{Labels: selector}},
-			pods:     []*v1.Pod{{Spec: v1.PodSpec{NodeName: "machine5"}, ObjectMeta: v1.ObjectMeta{Labels: selector}}},
+			pod:      &v1.Pod{ObjectMeta: metav1.ObjectMeta{Labels: selector}},
+			pods:     []*v1.Pod{{Spec: v1.PodSpec{NodeName: "machine5"}, ObjectMeta: metav1.ObjectMeta{Labels: selector}}},
 			node:     &node4,
 			services: []*v1.Service{{Spec: v1.ServiceSpec{Selector: selector}}},
 			fits:     true,
@@ -1749,7 +1749,7 @@ func TestEBSVolumeCountConflicts(t *testing.T) {
 
 	pvInfo := FakePersistentVolumeInfo{
 		{
-			ObjectMeta: v1.ObjectMeta{Name: "someEBSVol"},
+			ObjectMeta: metav1.ObjectMeta{Name: "someEBSVol"},
 			Spec: v1.PersistentVolumeSpec{
 				PersistentVolumeSource: v1.PersistentVolumeSource{
 					AWSElasticBlockStore: &v1.AWSElasticBlockStoreVolumeSource{VolumeID: "ebsVol"},
@@ -1757,7 +1757,7 @@ func TestEBSVolumeCountConflicts(t *testing.T) {
 			},
 		},
 		{
-			ObjectMeta: v1.ObjectMeta{Name: "someNonEBSVol"},
+			ObjectMeta: metav1.ObjectMeta{Name: "someNonEBSVol"},
 			Spec: v1.PersistentVolumeSpec{
 				PersistentVolumeSource: v1.PersistentVolumeSource{},
 			},
@@ -1766,15 +1766,15 @@ func TestEBSVolumeCountConflicts(t *testing.T) {
 
 	pvcInfo := FakePersistentVolumeClaimInfo{
 		{
-			ObjectMeta: v1.ObjectMeta{Name: "someEBSVol"},
+			ObjectMeta: metav1.ObjectMeta{Name: "someEBSVol"},
 			Spec:       v1.PersistentVolumeClaimSpec{VolumeName: "someEBSVol"},
 		},
 		{
-			ObjectMeta: v1.ObjectMeta{Name: "someNonEBSVol"},
+			ObjectMeta: metav1.ObjectMeta{Name: "someNonEBSVol"},
 			Spec:       v1.PersistentVolumeClaimSpec{VolumeName: "someNonEBSVol"},
 		},
 		{
-			ObjectMeta: v1.ObjectMeta{Name: "pvcWithDeletedPV"},
+			ObjectMeta: metav1.ObjectMeta{Name: "pvcWithDeletedPV"},
 			Spec:       v1.PersistentVolumeClaimSpec{VolumeName: "pvcWithDeletedPV"},
 		},
 	}
@@ -1841,7 +1841,7 @@ func TestRunGeneralPredicates(t *testing.T) {
 			nodeInfo: schedulercache.NewNodeInfo(
 				newResourcePod(schedulercache.Resource{MilliCPU: 9, Memory: 19})),
 			node: &v1.Node{
-				ObjectMeta: v1.ObjectMeta{Name: "machine1"},
+				ObjectMeta: metav1.ObjectMeta{Name: "machine1"},
 				Status:     v1.NodeStatus{Capacity: makeResources(10, 20, 0, 32, 0).Capacity, Allocatable: makeAllocatableResources(10, 20, 0, 32, 0)},
 			},
 			fits: true,
@@ -1853,7 +1853,7 @@ func TestRunGeneralPredicates(t *testing.T) {
 			nodeInfo: schedulercache.NewNodeInfo(
 				newResourcePod(schedulercache.Resource{MilliCPU: 5, Memory: 19})),
 			node: &v1.Node{
-				ObjectMeta: v1.ObjectMeta{Name: "machine1"},
+				ObjectMeta: metav1.ObjectMeta{Name: "machine1"},
 				Status:     v1.NodeStatus{Capacity: makeResources(10, 20, 0, 32, 0).Capacity, Allocatable: makeAllocatableResources(10, 20, 0, 32, 0)},
 			},
 			fits: false,
@@ -1900,7 +1900,7 @@ func TestRunGeneralPredicates(t *testing.T) {
 			},
 			nodeInfo: schedulercache.NewNodeInfo(),
 			node: &v1.Node{
-				ObjectMeta: v1.ObjectMeta{Name: "machine1"},
+				ObjectMeta: metav1.ObjectMeta{Name: "machine1"},
 				Status:     v1.NodeStatus{Capacity: makeResources(10, 20, 0, 32, 0).Capacity, Allocatable: makeAllocatableResources(10, 20, 0, 32, 0)},
 			},
 			fits:    false,
@@ -1912,7 +1912,7 @@ func TestRunGeneralPredicates(t *testing.T) {
 			pod:      newPodWithPort(123),
 			nodeInfo: schedulercache.NewNodeInfo(newPodWithPort(123)),
 			node: &v1.Node{
-				ObjectMeta: v1.ObjectMeta{Name: "machine1"},
+				ObjectMeta: metav1.ObjectMeta{Name: "machine1"},
 				Status:     v1.NodeStatus{Capacity: makeResources(10, 20, 0, 32, 0).Capacity, Allocatable: makeAllocatableResources(10, 20, 0, 32, 0)},
 			},
 			fits:    false,
@@ -1943,7 +1943,7 @@ func TestInterPodAffinity(t *testing.T) {
 		"zone":   "z11",
 	}
 	podLabel2 := map[string]string{"security": "S1"}
-	node1 := v1.Node{ObjectMeta: v1.ObjectMeta{Name: "machine1", Labels: labels1}}
+	node1 := v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "machine1", Labels: labels1}}
 	tests := []struct {
 		pod  *v1.Pod
 		pods []*v1.Pod
@@ -1959,7 +1959,7 @@ func TestInterPodAffinity(t *testing.T) {
 		},
 		{
 			pod: &v1.Pod{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Labels: podLabel2,
 				},
 				Spec: v1.PodSpec{
@@ -1983,14 +1983,14 @@ func TestInterPodAffinity(t *testing.T) {
 					},
 				},
 			},
-			pods: []*v1.Pod{{Spec: v1.PodSpec{NodeName: "machine1"}, ObjectMeta: v1.ObjectMeta{Labels: podLabel}}},
+			pods: []*v1.Pod{{Spec: v1.PodSpec{NodeName: "machine1"}, ObjectMeta: metav1.ObjectMeta{Labels: podLabel}}},
 			node: &node1,
 			fits: true,
 			test: "satisfies with requiredDuringSchedulingIgnoredDuringExecution in PodAffinity using In operator that matches the existing pod",
 		},
 		{
 			pod: &v1.Pod{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Labels: podLabel2,
 				},
 				Spec: v1.PodSpec{
@@ -2014,14 +2014,14 @@ func TestInterPodAffinity(t *testing.T) {
 					},
 				},
 			},
-			pods: []*v1.Pod{{Spec: v1.PodSpec{NodeName: "machine1"}, ObjectMeta: v1.ObjectMeta{Labels: podLabel}}},
+			pods: []*v1.Pod{{Spec: v1.PodSpec{NodeName: "machine1"}, ObjectMeta: metav1.ObjectMeta{Labels: podLabel}}},
 			node: &node1,
 			fits: true,
 			test: "satisfies the pod with requiredDuringSchedulingIgnoredDuringExecution in PodAffinity using not in operator in labelSelector that matches the existing pod",
 		},
 		{
 			pod: &v1.Pod{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Labels: podLabel2,
 				},
 				Spec: v1.PodSpec{
@@ -2045,14 +2045,14 @@ func TestInterPodAffinity(t *testing.T) {
 					},
 				},
 			},
-			pods: []*v1.Pod{{Spec: v1.PodSpec{NodeName: "machine1"}, ObjectMeta: v1.ObjectMeta{Labels: podLabel, Namespace: "ns"}}},
+			pods: []*v1.Pod{{Spec: v1.PodSpec{NodeName: "machine1"}, ObjectMeta: metav1.ObjectMeta{Labels: podLabel, Namespace: "ns"}}},
 			node: &node1,
 			fits: false,
 			test: "Does not satisfy the PodAffinity with labelSelector because of diff Namespace",
 		},
 		{
 			pod: &v1.Pod{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Labels: podLabel,
 				},
 				Spec: v1.PodSpec{
@@ -2075,14 +2075,14 @@ func TestInterPodAffinity(t *testing.T) {
 					},
 				},
 			},
-			pods: []*v1.Pod{{Spec: v1.PodSpec{NodeName: "machine1"}, ObjectMeta: v1.ObjectMeta{Labels: podLabel}}},
+			pods: []*v1.Pod{{Spec: v1.PodSpec{NodeName: "machine1"}, ObjectMeta: metav1.ObjectMeta{Labels: podLabel}}},
 			node: &node1,
 			fits: false,
 			test: "Doesn't satisfy the PodAffinity because of unmatching labelSelector with the existing pod",
 		},
 		{
 			pod: &v1.Pod{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Labels: podLabel2,
 				},
 				Spec: v1.PodSpec{
@@ -2123,14 +2123,14 @@ func TestInterPodAffinity(t *testing.T) {
 					},
 				},
 			},
-			pods: []*v1.Pod{{Spec: v1.PodSpec{NodeName: "machine1"}, ObjectMeta: v1.ObjectMeta{Labels: podLabel}}},
+			pods: []*v1.Pod{{Spec: v1.PodSpec{NodeName: "machine1"}, ObjectMeta: metav1.ObjectMeta{Labels: podLabel}}},
 			node: &node1,
 			fits: true,
 			test: "satisfies the PodAffinity with different label Operators in multiple RequiredDuringSchedulingIgnoredDuringExecution ",
 		},
 		{
 			pod: &v1.Pod{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Labels: podLabel2,
 				},
 				Spec: v1.PodSpec{
@@ -2171,14 +2171,14 @@ func TestInterPodAffinity(t *testing.T) {
 					},
 				},
 			},
-			pods: []*v1.Pod{{Spec: v1.PodSpec{NodeName: "machine1"}, ObjectMeta: v1.ObjectMeta{Labels: podLabel}}},
+			pods: []*v1.Pod{{Spec: v1.PodSpec{NodeName: "machine1"}, ObjectMeta: metav1.ObjectMeta{Labels: podLabel}}},
 			node: &node1,
 			fits: false,
 			test: "The labelSelector requirements(items of matchExpressions) are ANDed, the pod cannot schedule onto the node because one of the matchExpression item don't match.",
 		},
 		{
 			pod: &v1.Pod{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Labels: podLabel2,
 				},
 				Spec: v1.PodSpec{
@@ -2218,7 +2218,7 @@ func TestInterPodAffinity(t *testing.T) {
 					},
 				},
 			},
-			pods: []*v1.Pod{{Spec: v1.PodSpec{NodeName: "machine1"}, ObjectMeta: v1.ObjectMeta{Labels: podLabel}}},
+			pods: []*v1.Pod{{Spec: v1.PodSpec{NodeName: "machine1"}, ObjectMeta: metav1.ObjectMeta{Labels: podLabel}}},
 			node: &node1,
 			fits: true,
 			test: "satisfies the PodAffinity and PodAntiAffinity with the existing pod",
@@ -2226,7 +2226,7 @@ func TestInterPodAffinity(t *testing.T) {
 		// TODO: Uncomment this block when implement RequiredDuringSchedulingRequiredDuringExecution.
 		//{
 		//	 pod: &v1.Pod{
-		//		ObjectMeta: v1.ObjectMeta{
+		//		ObjectMeta: metav1.ObjectMeta{
 		//			Labels: podLabel2,
 		//			Annotations: map[string]string{
 		//				v1.AffinityAnnotationKey: `
@@ -2262,14 +2262,14 @@ func TestInterPodAffinity(t *testing.T) {
 		//			},
 		//		},
 		//	},
-		//	pods: []*v1.Pod{{Spec: v1.PodSpec{NodeName: "machine1"}, ObjectMeta: v1.ObjectMeta{Labels: podlabel}}},
+		//	pods: []*v1.Pod{{Spec: v1.PodSpec{NodeName: "machine1"}, ObjectMeta: metav1.ObjectMeta{Labels: podlabel}}},
 		//	node: &node1,
 		//	fits: true,
 		//	test: "satisfies the PodAffinity with different Label Operators in multiple RequiredDuringSchedulingRequiredDuringExecution ",
 		//},
 		{
 			pod: &v1.Pod{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Labels: podLabel2,
 				},
 				Spec: v1.PodSpec{
@@ -2332,7 +2332,7 @@ func TestInterPodAffinity(t *testing.T) {
 							},
 						},
 					},
-					ObjectMeta: v1.ObjectMeta{Labels: podLabel},
+					ObjectMeta: metav1.ObjectMeta{Labels: podLabel},
 				},
 			},
 			node: &node1,
@@ -2341,7 +2341,7 @@ func TestInterPodAffinity(t *testing.T) {
 		},
 		{
 			pod: &v1.Pod{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Labels: podLabel2,
 				},
 				Spec: v1.PodSpec{
@@ -2381,14 +2381,14 @@ func TestInterPodAffinity(t *testing.T) {
 					},
 				},
 			},
-			pods: []*v1.Pod{{Spec: v1.PodSpec{NodeName: "machine1"}, ObjectMeta: v1.ObjectMeta{Labels: podLabel}}},
+			pods: []*v1.Pod{{Spec: v1.PodSpec{NodeName: "machine1"}, ObjectMeta: metav1.ObjectMeta{Labels: podLabel}}},
 			node: &node1,
 			fits: false,
 			test: "satisfies the PodAffinity but doesn't satisfies the PodAntiAffinity with the existing pod",
 		},
 		{
 			pod: &v1.Pod{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Labels: podLabel,
 				},
 				Spec: v1.PodSpec{
@@ -2451,7 +2451,7 @@ func TestInterPodAffinity(t *testing.T) {
 							},
 						},
 					},
-					ObjectMeta: v1.ObjectMeta{Labels: podLabel},
+					ObjectMeta: metav1.ObjectMeta{Labels: podLabel},
 				},
 			},
 			node: &node1,
@@ -2460,7 +2460,7 @@ func TestInterPodAffinity(t *testing.T) {
 		},
 		{
 			pod: &v1.Pod{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Labels: podLabel,
 				},
 				Spec: v1.PodSpec{
@@ -2484,14 +2484,14 @@ func TestInterPodAffinity(t *testing.T) {
 					},
 				},
 			},
-			pods: []*v1.Pod{{Spec: v1.PodSpec{NodeName: "machine2"}, ObjectMeta: v1.ObjectMeta{Labels: podLabel}}},
+			pods: []*v1.Pod{{Spec: v1.PodSpec{NodeName: "machine2"}, ObjectMeta: metav1.ObjectMeta{Labels: podLabel}}},
 			node: &node1,
 			fits: false,
 			test: "pod matches its own Label in PodAffinity and that matches the existing pod Labels",
 		},
 		{
 			pod: &v1.Pod{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Labels: podLabel,
 				},
 			},
@@ -2517,7 +2517,7 @@ func TestInterPodAffinity(t *testing.T) {
 							},
 						},
 					},
-					ObjectMeta: v1.ObjectMeta{Labels: podLabel},
+					ObjectMeta: metav1.ObjectMeta{Labels: podLabel},
 				},
 			},
 			node: &node1,
@@ -2526,7 +2526,7 @@ func TestInterPodAffinity(t *testing.T) {
 		},
 		{
 			pod: &v1.Pod{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Labels: podLabel,
 				},
 			},
@@ -2552,7 +2552,7 @@ func TestInterPodAffinity(t *testing.T) {
 							},
 						},
 					},
-					ObjectMeta: v1.ObjectMeta{Labels: podLabel},
+					ObjectMeta: metav1.ObjectMeta{Labels: podLabel},
 				},
 			},
 			node: &node1,
@@ -2642,12 +2642,12 @@ func TestInterPodAffinityWithMultipleNodes(t *testing.T) {
 				},
 			},
 			pods: []*v1.Pod{
-				{Spec: v1.PodSpec{NodeName: "machine1"}, ObjectMeta: v1.ObjectMeta{Labels: podLabelA}},
+				{Spec: v1.PodSpec{NodeName: "machine1"}, ObjectMeta: metav1.ObjectMeta{Labels: podLabelA}},
 			},
 			nodes: []v1.Node{
-				{ObjectMeta: v1.ObjectMeta{Name: "machine1", Labels: labelRgChina}},
-				{ObjectMeta: v1.ObjectMeta{Name: "machine2", Labels: labelRgChinaAzAz1}},
-				{ObjectMeta: v1.ObjectMeta{Name: "machine3", Labels: labelRgIndia}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "machine1", Labels: labelRgChina}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "machine2", Labels: labelRgChinaAzAz1}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "machine3", Labels: labelRgIndia}},
 			},
 			fits: map[string]bool{
 				"machine1": true,
@@ -2695,12 +2695,12 @@ func TestInterPodAffinityWithMultipleNodes(t *testing.T) {
 				},
 			},
 			pods: []*v1.Pod{
-				{Spec: v1.PodSpec{NodeName: "nodeA"}, ObjectMeta: v1.ObjectMeta{Labels: map[string]string{"foo": "abc"}}},
-				{Spec: v1.PodSpec{NodeName: "nodeB"}, ObjectMeta: v1.ObjectMeta{Labels: map[string]string{"foo": "def"}}},
+				{Spec: v1.PodSpec{NodeName: "nodeA"}, ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"foo": "abc"}}},
+				{Spec: v1.PodSpec{NodeName: "nodeB"}, ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"foo": "def"}}},
 			},
 			nodes: []v1.Node{
-				{ObjectMeta: v1.ObjectMeta{Name: "nodeA", Labels: map[string]string{"region": "r1", "hostname": "h1"}}},
-				{ObjectMeta: v1.ObjectMeta{Name: "nodeB", Labels: map[string]string{"region": "r1", "hostname": "h2"}}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "nodeA", Labels: map[string]string{"region": "r1", "hostname": "h1"}}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "nodeB", Labels: map[string]string{"region": "r1", "hostname": "h2"}}},
 			},
 			fits: map[string]bool{
 				"nodeA": false,
@@ -2710,7 +2710,7 @@ func TestInterPodAffinityWithMultipleNodes(t *testing.T) {
 		},
 		{
 			pod: &v1.Pod{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
 						"foo": "bar",
 					},
@@ -2738,8 +2738,8 @@ func TestInterPodAffinityWithMultipleNodes(t *testing.T) {
 			},
 			pods: []*v1.Pod{},
 			nodes: []v1.Node{
-				{ObjectMeta: v1.ObjectMeta{Name: "nodeA", Labels: map[string]string{"zone": "az1", "hostname": "h1"}}},
-				{ObjectMeta: v1.ObjectMeta{Name: "nodeB", Labels: map[string]string{"zone": "az2", "hostname": "h2"}}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "nodeA", Labels: map[string]string{"zone": "az1", "hostname": "h1"}}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "nodeB", Labels: map[string]string{"zone": "az2", "hostname": "h2"}}},
 			},
 			fits: map[string]bool{
 				"nodeA": true,
@@ -2772,11 +2772,11 @@ func TestInterPodAffinityWithMultipleNodes(t *testing.T) {
 				},
 			},
 			pods: []*v1.Pod{
-				{Spec: v1.PodSpec{NodeName: "nodeA"}, ObjectMeta: v1.ObjectMeta{Labels: map[string]string{"foo": "abc"}}},
+				{Spec: v1.PodSpec{NodeName: "nodeA"}, ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"foo": "abc"}}},
 			},
 			nodes: []v1.Node{
-				{ObjectMeta: v1.ObjectMeta{Name: "nodeA", Labels: map[string]string{"region": "r1", "hostname": "nodeA"}}},
-				{ObjectMeta: v1.ObjectMeta{Name: "nodeB", Labels: map[string]string{"region": "r1", "hostname": "nodeB"}}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "nodeA", Labels: map[string]string{"region": "r1", "hostname": "nodeA"}}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "nodeB", Labels: map[string]string{"region": "r1", "hostname": "nodeB"}}},
 			},
 			fits: map[string]bool{
 				"nodeA": false,
@@ -2808,12 +2808,12 @@ func TestInterPodAffinityWithMultipleNodes(t *testing.T) {
 				},
 			},
 			pods: []*v1.Pod{
-				{Spec: v1.PodSpec{NodeName: "nodeA"}, ObjectMeta: v1.ObjectMeta{Labels: map[string]string{"foo": "abc"}}},
+				{Spec: v1.PodSpec{NodeName: "nodeA"}, ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"foo": "abc"}}},
 			},
 			nodes: []v1.Node{
-				{ObjectMeta: v1.ObjectMeta{Name: "nodeA", Labels: labelRgChina}},
-				{ObjectMeta: v1.ObjectMeta{Name: "nodeB", Labels: labelRgChinaAzAz1}},
-				{ObjectMeta: v1.ObjectMeta{Name: "nodeC", Labels: labelRgIndia}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "nodeA", Labels: labelRgChina}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "nodeB", Labels: labelRgChinaAzAz1}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "nodeC", Labels: labelRgIndia}},
 			},
 			fits: map[string]bool{
 				"nodeA": false,
@@ -2824,7 +2824,7 @@ func TestInterPodAffinityWithMultipleNodes(t *testing.T) {
 		},
 		{
 			pod: &v1.Pod{
-				ObjectMeta: v1.ObjectMeta{Labels: map[string]string{"foo": "123"}},
+				ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"foo": "123"}},
 				Spec: v1.PodSpec{
 					Affinity: &v1.Affinity{
 						PodAntiAffinity: &v1.PodAntiAffinity{
@@ -2847,7 +2847,7 @@ func TestInterPodAffinityWithMultipleNodes(t *testing.T) {
 				},
 			},
 			pods: []*v1.Pod{
-				{Spec: v1.PodSpec{NodeName: "nodeA"}, ObjectMeta: v1.ObjectMeta{Labels: map[string]string{"foo": "bar"}}},
+				{Spec: v1.PodSpec{NodeName: "nodeA"}, ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"foo": "bar"}}},
 				{
 					Spec: v1.PodSpec{
 						NodeName: "nodeC",
@@ -2873,10 +2873,10 @@ func TestInterPodAffinityWithMultipleNodes(t *testing.T) {
 				},
 			},
 			nodes: []v1.Node{
-				{ObjectMeta: v1.ObjectMeta{Name: "nodeA", Labels: labelRgChina}},
-				{ObjectMeta: v1.ObjectMeta{Name: "nodeB", Labels: labelRgChinaAzAz1}},
-				{ObjectMeta: v1.ObjectMeta{Name: "nodeC", Labels: labelRgIndia}},
-				{ObjectMeta: v1.ObjectMeta{Name: "nodeD", Labels: labelRgUS}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "nodeA", Labels: labelRgChina}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "nodeB", Labels: labelRgChinaAzAz1}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "nodeC", Labels: labelRgIndia}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "nodeD", Labels: labelRgUS}},
 			},
 			fits: map[string]bool{
 				"nodeA": false,
@@ -2954,12 +2954,12 @@ func TestPodToleratesTaints(t *testing.T) {
 	}{
 		{
 			pod: &v1.Pod{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name: "pod0",
 				},
 			},
 			node: v1.Node{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
 						v1.TaintsAnnotationKey: `
 						[{
@@ -2975,7 +2975,7 @@ func TestPodToleratesTaints(t *testing.T) {
 		},
 		{
 			pod: &v1.Pod{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name: "pod1",
 					Annotations: map[string]string{
 						v1.TolerationsAnnotationKey: `
@@ -2991,7 +2991,7 @@ func TestPodToleratesTaints(t *testing.T) {
 				},
 			},
 			node: v1.Node{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
 						v1.TaintsAnnotationKey: `
 						[{
@@ -3007,7 +3007,7 @@ func TestPodToleratesTaints(t *testing.T) {
 		},
 		{
 			pod: &v1.Pod{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name: "pod2",
 					Annotations: map[string]string{
 						v1.TolerationsAnnotationKey: `
@@ -3024,7 +3024,7 @@ func TestPodToleratesTaints(t *testing.T) {
 				},
 			},
 			node: v1.Node{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
 						v1.TaintsAnnotationKey: `
 						[{
@@ -3040,7 +3040,7 @@ func TestPodToleratesTaints(t *testing.T) {
 		},
 		{
 			pod: &v1.Pod{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name: "pod2",
 					Annotations: map[string]string{
 						v1.TolerationsAnnotationKey: `
@@ -3056,7 +3056,7 @@ func TestPodToleratesTaints(t *testing.T) {
 				},
 			},
 			node: v1.Node{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
 						v1.TaintsAnnotationKey: `
 						[{
@@ -3072,7 +3072,7 @@ func TestPodToleratesTaints(t *testing.T) {
 		},
 		{
 			pod: &v1.Pod{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name: "pod2",
 					Annotations: map[string]string{
 						v1.TolerationsAnnotationKey: `
@@ -3093,7 +3093,7 @@ func TestPodToleratesTaints(t *testing.T) {
 				},
 			},
 			node: v1.Node{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
 						v1.TaintsAnnotationKey: `
 						[{
@@ -3113,7 +3113,7 @@ func TestPodToleratesTaints(t *testing.T) {
 		},
 		{
 			pod: &v1.Pod{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name: "pod2",
 					Annotations: map[string]string{
 						v1.TolerationsAnnotationKey: `
@@ -3130,7 +3130,7 @@ func TestPodToleratesTaints(t *testing.T) {
 				},
 			},
 			node: v1.Node{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
 						v1.TaintsAnnotationKey: `
 						[{
@@ -3147,7 +3147,7 @@ func TestPodToleratesTaints(t *testing.T) {
 		},
 		{
 			pod: &v1.Pod{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name: "pod2",
 					Annotations: map[string]string{
 						v1.TolerationsAnnotationKey: `
@@ -3163,7 +3163,7 @@ func TestPodToleratesTaints(t *testing.T) {
 				},
 			},
 			node: v1.Node{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
 						v1.TaintsAnnotationKey: `
 						[{
@@ -3180,7 +3180,7 @@ func TestPodToleratesTaints(t *testing.T) {
 		},
 		{
 			pod: &v1.Pod{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name: "pod2",
 					Annotations: map[string]string{
 						v1.TolerationsAnnotationKey: `
@@ -3197,7 +3197,7 @@ func TestPodToleratesTaints(t *testing.T) {
 				},
 			},
 			node: v1.Node{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
 						v1.TaintsAnnotationKey: `
 						[{
@@ -3214,7 +3214,7 @@ func TestPodToleratesTaints(t *testing.T) {
 		},
 		{
 			pod: &v1.Pod{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name: "pod2",
 				},
 				Spec: v1.PodSpec{
@@ -3222,7 +3222,7 @@ func TestPodToleratesTaints(t *testing.T) {
 				},
 			},
 			node: v1.Node{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
 						v1.TaintsAnnotationKey: `
 						[{

@@ -200,17 +200,18 @@ func (i *Init) Validate() error {
 // Run executes master node provisioning, including certificates, needed static pod manifests, etc.
 func (i *Init) Run(out io.Writer) error {
 
-	// PHASE 1: Generate certificates
-	caCert, err := certphase.CreatePKIAssets(i.cfg, kubeadmapi.GlobalEnvParams.HostPKIPath)
-	if err != nil {
-		return err
-	}
-
-	// Exception:
+	// Validate token if any, otherwise generate
 	if i.cfg.Discovery.Token != nil {
-		// Validate token
-		if valid, err := kubeadmutil.ValidateToken(i.cfg.Discovery.Token); valid == false {
-			return err
+		if i.cfg.Discovery.Token.ID != "" && i.cfg.Discovery.Token.Secret != "" {
+			fmt.Printf("[token-discovery] A token has been provided, validating [%s]\n", kubeadmutil.BearerToken(i.cfg.Discovery.Token))
+			if valid, err := kubeadmutil.ValidateToken(i.cfg.Discovery.Token); valid == false {
+				return err
+			}
+		} else {
+			fmt.Println("[token-discovery] A token has not been provided, generating one")
+			if err := kubeadmutil.GenerateToken(i.cfg.Discovery.Token); err != nil {
+				return err
+			}
 		}
 
 		// Make sure there is at least one address
@@ -225,6 +226,12 @@ func (i *Init) Run(out io.Writer) error {
 		if err := kubemaster.CreateTokenAuthFile(kubeadmutil.BearerToken(i.cfg.Discovery.Token)); err != nil {
 			return err
 		}
+	}
+
+	// PHASE 1: Generate certificates
+	caCert, err := certphase.CreatePKIAssets(i.cfg, kubeadmapi.GlobalEnvParams.HostPKIPath)
+	if err != nil {
+		return err
 	}
 
 	// PHASE 2: Generate kubeconfig files for the admin and the kubelet

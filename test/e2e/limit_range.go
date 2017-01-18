@@ -149,7 +149,7 @@ func newLimitRange(name string, limitType v1.LimitType,
 	defaultLimit, defaultRequest,
 	maxLimitRequestRatio v1.ResourceList) *v1.LimitRange {
 	return &v1.LimitRange{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 		},
 		Spec: v1.LimitRangeSpec{
@@ -170,7 +170,7 @@ func newLimitRange(name string, limitType v1.LimitType,
 // newTestPod returns a pod that has the specified requests and limits
 func newTestPod(f *framework.Framework, name string, requests v1.ResourceList, limits v1.ResourceList) *v1.Pod {
 	return &v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 		},
 		Spec: v1.PodSpec{
