@@ -1,26 +1,19 @@
 approvers:
+- pmorie
 - saad-ali
 - thockin
 reviewers:
 - thockin
 - smarterclayton
 - deads2k
-- caesarxuchao
-- vishh
-- mikedanese
+- brendandburns
+- derekwaynecarr
+- bprashanth
 - pmorie
 - saad-ali
-- pwittrock
-- timstclair
-- eparis
+- justinsb
 - jsafrane
-- dims
-- krousey
-- markturansky
-- fgrzadkowski
+- rootfs
 - jingxu97
-- fabioy
-- resouer
-- david-mcmahon
-- swagiaal
-- chakri-nelluri
+- rkouj
+- msau42
