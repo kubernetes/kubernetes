@@ -59,6 +59,13 @@ type KubeletFlags struct {
 	// If runOnce is true, the Kubelet will check the API server once for pods,
 	// run those in addition to the pods specified by the local manifest, and exit.
 	RunOnce bool
+
+	// HostnameOverride is the hostname used to identify the kubelet instead
+	// of the actual hostname.
+	HostnameOverride string
+	// NodeIP is IP address of the node.
+	// If set, kubelet will use this IP address for the node.
+	NodeIP string
 }
 
 // KubeletServer encapsulates all of the parameters necessary for starting up
