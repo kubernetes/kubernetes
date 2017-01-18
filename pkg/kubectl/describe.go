@@ -1782,23 +1782,45 @@ func (d *ServiceAccountDescriber) Describe(namespace, name string, describerSett
 
 	tokens := []api.Secret{}
 
-	tokenSelector := fields.SelectorFromSet(map[string]string{api.SecretTypeField: string(api.SecretTypeServiceAccountToken)})
-	options := api.ListOptions{FieldSelector: tokenSelector}
-	secrets, err := d.Core().Secrets(namespace).List(options)
+	// missingSecrets is the set of all secrets present in the
+	// serviceAccount but not present in the set of existing secrets.
+	missingSecrets := sets.NewString()
+	secrets, err := d.Core().Secrets(namespace).List(api.ListOptions{})
+
+	// errors are tolerated here in order to describe the serviceAccount with all
+	// of the secrets that it references, even if those secrets cannot be fetched.
 	if err == nil {
+		// existingSecrets is the set of all secrets remaining on a
+		// service account that are not present in the "tokens" slice.
+		existingSecrets := sets.NewString()
+
 		for _, s := range secrets.Items {
-			name, _ := s.Annotations[api.ServiceAccountNameKey]
-			uid, _ := s.Annotations[api.ServiceAccountUIDKey]
-			if name == serviceAccount.Name && uid == string(serviceAccount.UID) {
-				tokens = append(tokens, s)
+			if s.Type == api.SecretTypeServiceAccountToken {
+				name, _ := s.Annotations[api.ServiceAccountNameKey]
+				uid, _ := s.Annotations[api.ServiceAccountUIDKey]
+				if name == serviceAccount.Name && uid == string(serviceAccount.UID) {
+					tokens = append(tokens, s)
+				}
+			}
+			existingSecrets.Insert(s.Name)
+		}
+
+		for _, s := range serviceAccount.Secrets {
+			if !existingSecrets.Has(s.Name) {
+				missingSecrets.Insert(s.Name)
+			}
+		}
+		for _, s := range serviceAccount.ImagePullSecrets {
+			if !existingSecrets.Has(s.Name) {
+				missingSecrets.Insert(s.Name)
 			}
 		}
 	}
 
-	return describeServiceAccount(serviceAccount, tokens)
+	return describeServiceAccount(serviceAccount, tokens, missingSecrets)
 }
 
-func describeServiceAccount(serviceAccount *api.ServiceAccount, tokens []api.Secret) (string, error) {
+func describeServiceAccount(serviceAccount *api.ServiceAccount, tokens []api.Secret, missingSecrets sets.String) (string, error) {
 	return tabbedString(func(out io.Writer) error {
 		w := &PrefixWriter{out}
 		w.Write(LEVEL_0, "Name:\t%s\n", serviceAccount.Name)
@@ -1838,7 +1860,11 @@ func describeServiceAccount(serviceAccount *api.ServiceAccount, tokens []api.Sec
 			} else {
 				prefix := header
 				for _, name := range names {
-					w.Write(LEVEL_0, "%s\t%s\n", prefix, name)
+					if missingSecrets.Has(name) {
+						w.Write(LEVEL_0, "%s\t%s (not found)\n", prefix, name)
+					} else {
+						w.Write(LEVEL_0, "%s\t%s\n", prefix, name)
+					}
 					prefix = emptyHeader
 				}
 			}
