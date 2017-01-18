@@ -81,7 +81,6 @@ fi
 EXTRA_DOCKER_OPTS="${EXTRA_DOCKER_OPTS:-}"
 
 SERVICE_CLUSTER_IP_RANGE="${SERVICE_CLUSTER_IP_RANGE:-10.0.0.0/16}"  # formerly PORTAL_NET
-ALLOCATE_NODE_CIDRS=true
 
 # When set to true, Docker Cache is enabled by default as part of the cluster bring up.
 ENABLE_DOCKER_REGISTRY_CACHE=true

@@ -44,7 +44,8 @@ const NET_PLUGIN_EVENT_POD_CIDR_CHANGE_DETAIL_CIDR = "pod-cidr"
 // Plugin capabilities
 const (
 	// Indicates the plugin handles Kubernetes bandwidth shaping annotations internally
-	NET_PLUGIN_CAPABILITY_SHAPING int = 1
+	NET_PLUGIN_CAPABILITY_SHAPING        int = 1
+	NET_PLUGIN_CAPABILITY_NODE_AVAILABLE int = 2
 )
 
 // Plugin is an interface to network plugins for the kubelet

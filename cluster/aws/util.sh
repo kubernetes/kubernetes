@@ -36,7 +36,9 @@ source "${KUBE_ROOT}/cluster/aws/${KUBE_CONFIG_FILE-"config-default.sh"}"
 source "${KUBE_ROOT}/cluster/common.sh"
 source "${KUBE_ROOT}/cluster/lib/util.sh"
 
-ALLOCATE_NODE_CIDRS=true
+if [[ "${NETWORK_PROVIDER:-}" != "cni" ]]; then
+    ALLOCATE_NODE_CIDRS=true
+fi
 
 NODE_INSTANCE_PREFIX="${INSTANCE_PREFIX}-minion"
 

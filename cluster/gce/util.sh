@@ -78,7 +78,9 @@ fi
 NODE_INSTANCE_PREFIX="${INSTANCE_PREFIX}-minion"
 NODE_TAGS="${NODE_TAG}"
 
-ALLOCATE_NODE_CIDRS=true
+if [[ "${NETWORK_PROVIDER:-}" != "cni" ]]; then
+    ALLOCATE_NODE_CIDRS=true
+fi
 
 KUBE_PROMPT_FOR_UPDATE=${KUBE_PROMPT_FOR_UPDATE:-"n"}
 # How long (in seconds) to wait for cluster initialization.
