@@ -1,20 +1,20 @@
 approvers:
+- rootfs
+- saad-ali
+reviewers:
 - agonzalezro
 - simonswine
-reviewers:
 - thockin
+- smarterclayton
+- deads2k
+- brendandburns
+- derekwaynecarr
+- bprashanth
 - pmorie
 - saad-ali
-- pwittrock
-- timstclair
+- justinsb
 - jsafrane
-- dims
-- jdef
+- rootfs
 - jingxu97
-- fabioy
-- resouer
-- david-mcmahon
-- swagiaal
-- chakri-nelluri
-- goltermann
-- ashcrow
+- rkouj
+- msau42
