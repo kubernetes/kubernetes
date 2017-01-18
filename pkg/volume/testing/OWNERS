@@ -1,12 +1,21 @@
+approvers:
+- pmorie
+- saad-ali
+- rootfs
+- jsafrane
 reviewers:
+- jeffvance
+- thockin
 - smarterclayton
+- deads2k
+- brendandburns
+- derekwaynecarr
+- bprashanth
+- pmorie
 - saad-ali
 - justinsb
-- timstclair
 - jsafrane
+- rootfs
 - jingxu97
-- aveshagarwal
-- resouer
-- jessfraz
-- david-mcmahon
-- swagiaal
+- rkouj
+- msau42
