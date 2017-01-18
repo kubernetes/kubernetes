@@ -464,7 +464,7 @@ func (self *manager) GetContainerInfoV2(containerName string, options v2.Request
 			continue
 		}
 
-		result.Stats = v2.ContainerStatsFromV1(&cinfo.Spec, stats)
+		result.Stats = v2.ContainerStatsFromV1(containerName, &cinfo.Spec, stats)
 		infos[name] = result
 	}
 

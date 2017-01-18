@@ -1,6 +1,6 @@
 package query
 
-//go:generate go run ../../../models/protocol_tests/generate.go ../../../models/protocol_tests/output/query.json unmarshal_test.go
+//go:generate go run -tags codegen ../../../models/protocol_tests/generate.go ../../../models/protocol_tests/output/query.json unmarshal_test.go
 
 import (
 	"encoding/xml"
@@ -9,6 +9,12 @@ import (
 	"github.com/aws/aws-sdk-go/aws/request"
 	"github.com/aws/aws-sdk-go/private/protocol/xml/xmlutil"
 )
+
+// UnmarshalHandler is a named request handler for unmarshaling query protocol requests
+var UnmarshalHandler = request.NamedHandler{Name: "awssdk.query.Unmarshal", Fn: Unmarshal}
+
+// UnmarshalMetaHandler is a named request handler for unmarshaling query protocol request metadata
+var UnmarshalMetaHandler = request.NamedHandler{Name: "awssdk.query.UnmarshalMeta", Fn: UnmarshalMeta}
 
 // Unmarshal unmarshals a response for an AWS Query service.
 func Unmarshal(r *request.Request) {
