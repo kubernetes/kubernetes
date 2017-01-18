@@ -7,8 +7,8 @@ import (
 	"github.com/aws/aws-sdk-go/aws/client"
 	"github.com/aws/aws-sdk-go/aws/client/metadata"
 	"github.com/aws/aws-sdk-go/aws/request"
+	"github.com/aws/aws-sdk-go/aws/signer/v4"
 	"github.com/aws/aws-sdk-go/private/protocol/ec2query"
-	"github.com/aws/aws-sdk-go/private/signer/v4"
 )
 
 // Amazon Elastic Compute Cloud (Amazon EC2) provides resizable computing capacity
@@ -54,18 +54,18 @@ func newClient(cfg aws.Config, handlers request.Handlers, endpoint, signingRegio
 				ServiceName:   ServiceName,
 				SigningRegion: signingRegion,
 				Endpoint:      endpoint,
-				APIVersion:    "2015-10-01",
+				APIVersion:    "2016-09-15",
 			},
 			handlers,
 		),
 	}
 
 	// Handlers
-	svc.Handlers.Sign.PushBack(v4.Sign)
-	svc.Handlers.Build.PushBack(ec2query.Build)
-	svc.Handlers.Unmarshal.PushBack(ec2query.Unmarshal)
-	svc.Handlers.UnmarshalMeta.PushBack(ec2query.UnmarshalMeta)
-	svc.Handlers.UnmarshalError.PushBack(ec2query.UnmarshalError)
+	svc.Handlers.Sign.PushBackNamed(v4.SignRequestHandler)
+	svc.Handlers.Build.PushBackNamed(ec2query.BuildHandler)
+	svc.Handlers.Unmarshal.PushBackNamed(ec2query.UnmarshalHandler)
+	svc.Handlers.UnmarshalMeta.PushBackNamed(ec2query.UnmarshalMetaHandler)
+	svc.Handlers.UnmarshalError.PushBackNamed(ec2query.UnmarshalErrorHandler)
 
 	// Run custom client initialization if present
 	if initClient != nil {

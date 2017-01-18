@@ -40,7 +40,11 @@ func fillPresignedURL(r *request.Request) {
 
 	clientInfo := r.ClientInfo
 	clientInfo.Endpoint, clientInfo.SigningRegion = endpoints.EndpointForRegion(
-		clientInfo.ServiceName, aws.StringValue(cfg.Region), aws.BoolValue(cfg.DisableSSL))
+		clientInfo.ServiceName,
+		aws.StringValue(cfg.Region),
+		aws.BoolValue(cfg.DisableSSL),
+		aws.BoolValue(cfg.UseDualStack),
+	)
 
 	// Presign a CopySnapshot request with modified params
 	req := request.New(*cfg, clientInfo, r.Handlers, r.Retryer, r.Operation, newParams, r.Data)

@@ -7,19 +7,33 @@ import (
 	"github.com/aws/aws-sdk-go/aws/client"
 	"github.com/aws/aws-sdk-go/aws/client/metadata"
 	"github.com/aws/aws-sdk-go/aws/request"
+	"github.com/aws/aws-sdk-go/aws/signer/v4"
 	"github.com/aws/aws-sdk-go/private/protocol/query"
-	"github.com/aws/aws-sdk-go/private/signer/v4"
 )
 
-// Elastic Load Balancing distributes incoming traffic across your EC2 instances.
+// A load balancer distributes incoming traffic across your EC2 instances. This
+// enables you to increase the availability of your application. The load balancer
+// also monitors the health of its registered instances and ensures that it
+// routes traffic only to healthy instances. You configure your load balancer
+// to accept incoming traffic by specifying one or more listeners, which are
+// configured with a protocol and port number for connections from clients to
+// the load balancer and a protocol and port number for connections from the
+// load balancer to the instances.
 //
-// For information about the features of Elastic Load Balancing, see What Is
-// Elastic Load Balancing? (http://docs.aws.amazon.com/ElasticLoadBalancing/latest/DeveloperGuide/elastic-load-balancing.html)
-// in the Elastic Load Balancing Developer Guide.
+// Elastic Load Balancing supports two types of load balancers: Classic load
+// balancers and Application load balancers (new). A Classic load balancer makes
+// routing and load balancing decisions either at the transport layer (TCP/SSL)
+// or the application layer (HTTP/HTTPS), and supports either EC2-Classic or
+// a VPC. An Application load balancer makes routing and load balancing decisions
+// at the application layer (HTTP/HTTPS), supports path-based routing, and can
+// route requests to one or more ports on each EC2 instance or container instance
+// in your virtual private cloud (VPC). For more information, see the .
 //
-// For information about the AWS regions supported by Elastic Load Balancing,
-// see Regions and Endpoints - Elastic Load Balancing (http://docs.aws.amazon.com/general/latest/gr/rande.html#elb_region)
-// in the Amazon Web Services General Reference.
+// This reference covers the 2012-06-01 API, which supports Classic load balancers.
+// The 2015-12-01 API supports Application load balancers.
+//
+// To get started, create a load balancer with one or more listeners using CreateLoadBalancer.
+// Register your instances with the load balancer using RegisterInstancesWithLoadBalancer.
 //
 // All Elastic Load Balancing operations are idempotent, which means that they
 // complete at most one time. If you repeat an operation, it succeeds with a
@@ -70,11 +84,11 @@ func newClient(cfg aws.Config, handlers request.Handlers, endpoint, signingRegio
 	}
 
 	// Handlers
-	svc.Handlers.Sign.PushBack(v4.Sign)
-	svc.Handlers.Build.PushBack(query.Build)
-	svc.Handlers.Unmarshal.PushBack(query.Unmarshal)
-	svc.Handlers.UnmarshalMeta.PushBack(query.UnmarshalMeta)
-	svc.Handlers.UnmarshalError.PushBack(query.UnmarshalError)
+	svc.Handlers.Sign.PushBackNamed(v4.SignRequestHandler)
+	svc.Handlers.Build.PushBackNamed(query.BuildHandler)
+	svc.Handlers.Unmarshal.PushBackNamed(query.UnmarshalHandler)
+	svc.Handlers.UnmarshalMeta.PushBackNamed(query.UnmarshalMetaHandler)
+	svc.Handlers.UnmarshalError.PushBackNamed(query.UnmarshalErrorHandler)
 
 	// Run custom client initialization if present
 	if initClient != nil {

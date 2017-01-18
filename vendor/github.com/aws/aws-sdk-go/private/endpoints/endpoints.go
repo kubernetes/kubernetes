@@ -1,7 +1,7 @@
 // Package endpoints validates regional endpoints for services.
 package endpoints
 
-//go:generate go run ../model/cli/gen-endpoints/main.go endpoints.json endpoints_map.go
+//go:generate go run -tags codegen ../model/cli/gen-endpoints/main.go endpoints.json endpoints_map.go
 //go:generate gofmt -s -w endpoints_map.go
 
 import (
@@ -14,9 +14,9 @@ import (
 // normalized endpoint and signing region.  If the endpoint is not an empty string
 // the service name and region will be used to look up the service's API endpoint.
 // If the endpoint is provided the scheme will be added if it is not present.
-func NormalizeEndpoint(endpoint, serviceName, region string, disableSSL bool) (normEndpoint, signingRegion string) {
+func NormalizeEndpoint(endpoint, serviceName, region string, disableSSL, useDualStack bool) (normEndpoint, signingRegion string) {
 	if endpoint == "" {
-		return EndpointForRegion(serviceName, region, disableSSL)
+		return EndpointForRegion(serviceName, region, disableSSL, useDualStack)
 	}
 
 	return AddScheme(endpoint, disableSSL), ""
@@ -24,12 +24,17 @@ func NormalizeEndpoint(endpoint, serviceName, region string, disableSSL bool) (n
 
 // EndpointForRegion returns an endpoint and its signing region for a service and region.
 // if the service and region pair are not found endpoint and signingRegion will be empty.
-func EndpointForRegion(svcName, region string, disableSSL bool) (endpoint, signingRegion string) {
+func EndpointForRegion(svcName, region string, disableSSL, useDualStack bool) (endpoint, signingRegion string) {
+	dualStackField := ""
+	if useDualStack {
+		dualStackField = "/dualstack"
+	}
+
 	derivedKeys := []string{
-		region + "/" + svcName,
-		region + "/*",
-		"*/" + svcName,
-		"*/*",
+		region + "/" + svcName + dualStackField,
+		region + "/*" + dualStackField,
+		"*/" + svcName + dualStackField,
+		"*/*" + dualStackField,
 	}
 
 	for _, key := range derivedKeys {

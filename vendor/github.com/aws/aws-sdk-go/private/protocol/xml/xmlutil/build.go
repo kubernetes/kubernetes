@@ -1,4 +1,4 @@
-// Package xmlutil provides XML serialisation of AWS requests and responses.
+// Package xmlutil provides XML serialization of AWS requests and responses.
 package xmlutil
 
 import (
@@ -8,8 +8,9 @@ import (
 	"reflect"
 	"sort"
 	"strconv"
-	"strings"
 	"time"
+
+	"github.com/aws/aws-sdk-go/private/protocol"
 )
 
 // BuildXML will serialize params into an xml.Encoder.
@@ -120,16 +121,21 @@ func (b *xmlBuilder) buildStruct(value reflect.Value, current *XMLNode, tag refl
 
 	t := value.Type()
 	for i := 0; i < value.NumField(); i++ {
-		if c := t.Field(i).Name[0:1]; strings.ToLower(c) == c {
+		member := elemOf(value.Field(i))
+		field := t.Field(i)
+
+		if field.PkgPath != "" {
 			continue // ignore unexported fields
 		}
 
-		member := elemOf(value.Field(i))
-		field := t.Field(i)
 		mTag := field.Tag
-
 		if mTag.Get("location") != "" { // skip non-body members
 			continue
+		}
+
+		if protocol.CanSetIdempotencyToken(value.Field(i), field) {
+			token := protocol.GetIdempotencyToken()
+			member = reflect.ValueOf(token)
 		}
 
 		memberName := mTag.Get("locationName")

@@ -91,6 +91,10 @@ func prettify(v reflect.Value, indent int, buf *bytes.Buffer) {
 
 		buf.WriteString("\n" + strings.Repeat(" ", indent) + "}")
 	default:
+		if !v.IsValid() {
+			fmt.Fprint(buf, "<invalid value>")
+			return
+		}
 		format := "%v"
 		switch v.Interface().(type) {
 		case string:
