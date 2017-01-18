@@ -83,6 +83,7 @@ func (g *factoryGenerator) GenerateType(c *generator.Context, t *types.Type, w i
 		"internalClientSetInterface":         c.Universe.Type(types.Name{Package: g.internalClientSetPackage, Name: "Interface"}),
 		"reflectType":                        c.Universe.Type(reflectType),
 		"runtimeObject":                      c.Universe.Type(runtimeObject),
+		"schemaGroupVersionResource":         c.Universe.Type(schemaGroupVersionResource),
 		"syncMutex":                          c.Universe.Type(syncMutex),
 		"timeDuration":                       c.Universe.Type(timeDuration),
 		"versionedClientSetInterface":        c.Universe.Type(types.Name{Package: g.versionedClientSetPackage, Name: "Interface"}),
@@ -171,6 +172,7 @@ var sharedInformerFactoryInterface = `
 // API group versions.
 type SharedInformerFactory interface {
 	{{.informerFactoryInterface|raw}}
+	ForResource(resource {{.schemaGroupVersionResource|raw}}) (GenericInformer, error)
 
 	{{$gvInterfaces := .gvInterfaces}}
 	{{range $groupName, $group := .groupVersions}}{{$groupName}}() {{index $gvInterfaces $groupName|raw}}
