@@ -246,13 +246,14 @@ var _ = framework.KubeDescribe("PersistentVolumes [Volume][Serial]", func() {
 			})
 		})
 
+		// TODO note wait times involved w/ this context
 		Context("when invoking the Recycle reclaim policy [Jon]", func(){
-			var pv v1.PersistentVolume
-			var pvc v1.PersistentVolumeClaim
+			var pv *v1.PersistentVolume
+			var pvc *v1.PersistentVolumeClaim
 
 			BeforeEach(func(){
 				pvConfig.reclaimPolicy = v1.PersistentVolumeReclaimRecycle
-				pv, pvc := createPVPVC(c, pvConfig, ns, false)
+				pv, pvc = createPVPVC(c, pvConfig, ns, false)
 				waitOnPVandPVC(c, ns, pv, pvc)
 			})
 
@@ -262,14 +263,24 @@ var _ = framework.KubeDescribe("PersistentVolumes [Volume][Serial]", func() {
 			})
 
 			It("should test that a PV becomes Available after the PVC is deleted.", func() {
-				err := c.Core().PersistentVolumeClaims(ns).Delete(pvc.Name, v1.DeleteOptions{})
+				pod := makeWritePod(ns, pvc.Name)
+				pod, err := c.Core().Pods(ns).Create(pod)
 				Expect(err).NotTo(HaveOccurred())
-				err = framework.WaitForPersistentVolumePhase(v1.VolumeAvailable, c, pv.Name, 1*time.Second, 1*time.Minute)
-				Expect(err).NotTo(HaveOccurred())
-
-				pod := makePod(ns, pvc.Name, []string{"[[ (ls -A | wc -l) -z ]]"})
-				pod, err = c.Core().Pods(ns).Create(pod)
 				framework.WaitForPodSuccessInNamespace(c, pod.Name, ns)
+
+				deletePVCandValidatePV(c, ns, pvc, pv, v1.VolumeAvailable)
+
+				pvc = makePersistentVolumeClaim(ns)
+				pvc = createPVC(c, ns, pvc)
+				err = framework.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, c, ns, pvc.Name, 2*time.Second, 60*time.Second)
+
+				pod = makePod(ns, pvc.Name, "[ $(ls -A /mnt | wc -l) -eq 0 ] && exit 0 || exit 1")
+				// If a file is detected in /mnt, cause the pod to fail and do not restart it.
+				pod.Spec.RestartPolicy = v1.RestartPolicyNever
+				pod, err = c.Core().Pods(ns).Create(pod)
+				Expect(err).NotTo(HaveOccurred())
+				err = framework.WaitForPodSuccessInNamespace(c, pod.Name, ns)
+				Expect(err).NotTo(HaveOccurred())
 			})
 		})
 	})
