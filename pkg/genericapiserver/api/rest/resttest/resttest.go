@@ -169,7 +169,7 @@ func (t *Tester) TestUpdate(valid runtime.Object, createFn CreateFunc, getFn Get
 	t.testUpdateFailsOnVersionTooOld(copyOrDie(valid), createFn, getFn)
 	t.testUpdateOnNotFound(copyOrDie(valid))
 	if !t.clusterScope {
-		t.testUpdateRejectsMismatchedNamespace(copyOrDie(valid), createFn)
+		t.testUpdateRejectsMismatchedNamespace(copyOrDie(valid), createFn, getFn)
 	}
 	t.testUpdateInvokesValidation(copyOrDie(valid), createFn, invalidUpdateFn...)
 	t.testUpdateWithWrongUID(copyOrDie(valid), createFn, getFn)
@@ -686,7 +686,7 @@ func (t *Tester) testUpdateOnNotFound(obj runtime.Object) {
 	}
 }
 
-func (t *Tester) testUpdateRejectsMismatchedNamespace(obj runtime.Object, createFn CreateFunc) {
+func (t *Tester) testUpdateRejectsMismatchedNamespace(obj runtime.Object, createFn CreateFunc, getFn GetFunc) {
 	ctx := t.TestContext()
 
 	foo := copyOrDie(obj)
@@ -695,11 +695,16 @@ func (t *Tester) testUpdateRejectsMismatchedNamespace(obj runtime.Object, create
 		t.Errorf("unexpected error: %v", err)
 	}
 
-	objectMeta := t.getObjectMetaOrFail(obj)
+	storedFoo, err := getFn(ctx, foo)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	objectMeta := t.getObjectMetaOrFail(storedFoo)
 	objectMeta.Name = t.namer(1)
 	objectMeta.Namespace = "not-default"
 
-	obj, updated, err := t.storage.(rest.Updater).Update(t.TestContext(), "foo1", rest.DefaultUpdatedObjectInfo(obj, api.Scheme))
+	obj, updated, err := t.storage.(rest.Updater).Update(t.TestContext(), "foo1", rest.DefaultUpdatedObjectInfo(storedFoo, api.Scheme))
 	if obj != nil || updated {
 		t.Errorf("expected nil object and not updated")
 	}
