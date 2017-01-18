@@ -28,7 +28,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/client-go/pkg/api"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/pkg/util/flowcontrol"
 )
 
@@ -45,7 +45,7 @@ type Interface interface {
 	Verb(verb string) *Request
 	Post() *Request
 	Put() *Request
-	Patch(pt api.PatchType) *Request
+	Patch(pt types.PatchType) *Request
 	Get() *Request
 	Delete() *Request
 	APIVersion() schema.GroupVersion
@@ -238,7 +238,7 @@ func (c *RESTClient) Put() *Request {
 }
 
 // Patch begins a PATCH request. Short for c.Verb("Patch").
-func (c *RESTClient) Patch(pt api.PatchType) *Request {
+func (c *RESTClient) Patch(pt types.PatchType) *Request {
 	return c.Verb("PATCH").SetHeader("Content-Type", string(pt))
 }
 
