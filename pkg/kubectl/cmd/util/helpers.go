@@ -733,3 +733,19 @@ func RequireNoArguments(c *cobra.Command, args []string) {
 		CheckErr(UsageError(c, fmt.Sprintf(`unknown command %q`, strings.Join(args, " "))))
 	}
 }
+
+// OutputsRawFormat determines if a command's output format is machine parsable
+// or returns false if it is human readable (name, wide, etc.)
+func OutputsRawFormat(cmd *cobra.Command) bool {
+	output := GetFlagString(cmd, "output")
+	if output == "json" ||
+		output == "yaml" ||
+		output == "go-template" ||
+		output == "go-template-file" ||
+		output == "jsonpath" ||
+		output == "jsonpath-file" {
+		return true
+	}
+
+	return false
+}
