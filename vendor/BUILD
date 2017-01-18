@@ -13433,3 +13433,34 @@ go_library(
     ],
     tags = ["automanaged"],
 )
+
+go_test(
+    name = "k8s.io/apiserver/pkg/admission_test",
+    srcs = ["k8s.io/apiserver/pkg/admission/chain_test.go"],
+    library = ":k8s.io/apiserver/pkg/admission",
+    tags = ["automanaged"],
+    deps = ["//vendor:k8s.io/apimachinery/pkg/runtime/schema"],
+)
+
+go_library(
+    name = "k8s.io/apiserver/pkg/admission",
+    srcs = [
+        "k8s.io/apiserver/pkg/admission/attributes.go",
+        "k8s.io/apiserver/pkg/admission/chain.go",
+        "k8s.io/apiserver/pkg/admission/errors.go",
+        "k8s.io/apiserver/pkg/admission/handler.go",
+        "k8s.io/apiserver/pkg/admission/interfaces.go",
+        "k8s.io/apiserver/pkg/admission/plugins.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/golang/glog",
+        "//vendor:k8s.io/apimachinery/pkg/api/errors",
+        "//vendor:k8s.io/apimachinery/pkg/api/meta",
+        "//vendor:k8s.io/apimachinery/pkg/runtime",
+        "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
+        "//vendor:k8s.io/apimachinery/pkg/util/errors",
+        "//vendor:k8s.io/apimachinery/pkg/util/sets",
+        "//vendor:k8s.io/apiserver/pkg/authentication/user",
+    ],
+)

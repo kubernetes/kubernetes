@@ -33,8 +33,8 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/kubernetes/federation/cmd/federation-apiserver/app/options"
-	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/controller/informers"
@@ -160,7 +160,11 @@ func Run(s *options.ServerRunOptions) error {
 
 	admissionControlPluginNames := strings.Split(s.GenericServerRunOptions.AdmissionControl, ",")
 	pluginInitializer := kubeapiserveradmission.NewPluginInitializer(client, sharedInformers, apiAuthorizer)
-	admissionController, err := admission.NewFromPlugins(admissionControlPluginNames, s.GenericServerRunOptions.AdmissionControlConfigFile, pluginInitializer)
+	admissionConfigProvider, err := kubeapiserveradmission.ReadAdmissionConfiguration(admissionControlPluginNames, s.GenericServerRunOptions.AdmissionControlConfigFile)
+	if err != nil {
+		return fmt.Errorf("failed to read plugin config: %v", err)
+	}
+	admissionController, err := admission.NewFromPlugins(admissionControlPluginNames, admissionConfigProvider, pluginInitializer)
 	if err != nil {
 		return fmt.Errorf("failed to initialize plugins: %v", err)
 	}

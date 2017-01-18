@@ -26,7 +26,7 @@ import (
 
 	"github.com/golang/glog"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/kubernetes/pkg/admission"
+	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 )

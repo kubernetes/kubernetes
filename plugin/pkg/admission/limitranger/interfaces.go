@@ -18,7 +18,7 @@ package limitranger
 
 import (
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/kubernetes/pkg/admission"
+	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
 )
 

@@ -22,7 +22,7 @@ import (
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/admission"
+	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
 )
 

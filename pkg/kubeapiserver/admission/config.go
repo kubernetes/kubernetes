@@ -30,6 +30,7 @@ import (
 	"bytes"
 
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	componentconfigv1alpha1 "k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1"
@@ -57,9 +58,9 @@ func makeAbs(path, base string) (string, error) {
 // set of pluginNames whose config location references the specified configFilePath.
 // It does this to preserve backward compatibility when admission control files were opaque.
 // It returns an error if the file did not exist.
-func ReadAdmissionConfiguration(pluginNames []string, configFilePath string) (*componentconfig.AdmissionConfiguration, error) {
+func ReadAdmissionConfiguration(pluginNames []string, configFilePath string) (admission.ConfigProvider, error) {
 	if configFilePath == "" {
-		return &componentconfig.AdmissionConfiguration{}, nil
+		return configProvider{config: &componentconfig.AdmissionConfiguration{}}, nil
 	}
 	// a file was provided, so we just read it.
 	data, err := ioutil.ReadFile(configFilePath)
@@ -86,7 +87,7 @@ func ReadAdmissionConfiguration(pluginNames []string, configFilePath string) (*c
 			}
 			decodedConfig.Plugins[i].Path = absPath
 		}
-		return decodedConfig, nil
+		return configProvider{config: decodedConfig}, nil
 	}
 	// we got an error where the decode wasn't related to a missing type
 	if !(runtime.IsMissingVersion(err) || runtime.IsMissingKind(err) || runtime.IsNotRegisteredError(err)) {
@@ -109,9 +110,13 @@ func ReadAdmissionConfiguration(pluginNames []string, configFilePath string) (*c
 	api.Scheme.Default(externalConfig)
 	internalConfig := &componentconfig.AdmissionConfiguration{}
 	if err := api.Scheme.Convert(externalConfig, internalConfig, nil); err != nil {
-		return internalConfig, err
+		return nil, err
 	}
-	return internalConfig, nil
+	return configProvider{config: internalConfig}, nil
+}
+
+type configProvider struct {
+	config *componentconfig.AdmissionConfiguration
 }
 
 // GetAdmissionPluginConfigurationFor returns a reader that holds the admission plugin configuration.
@@ -141,13 +146,13 @@ func GetAdmissionPluginConfigurationFor(pluginCfg componentconfig.AdmissionPlugi
 
 // GetAdmissionPluginConfiguration takes the admission configuration and returns a reader
 // for the specified plugin.  If no specific configuration is present, we return a nil reader.
-func GetAdmissionPluginConfiguration(cfg *componentconfig.AdmissionConfiguration, pluginName string) (io.Reader, error) {
+func (p configProvider) ConfigFor(pluginName string) (io.Reader, error) {
 	// there is no config, so there is no potential config
-	if cfg == nil {
+	if p.config == nil {
 		return nil, nil
 	}
 	// look for matching plugin and get configuration
-	for _, pluginCfg := range cfg.Plugins {
+	for _, pluginCfg := range p.config.Plugins {
 		if pluginName != pluginCfg.Name {
 			continue
 		}
