@@ -1,6 +1,22 @@
 package(default_visibility = ["//visibility:public"])
 
-load("@bazel_tools//tools/build_defs/docker:docker.bzl", "docker_build")
+load("@io_bazel//tools/build_defs/docker:docker.bzl", "docker_build")
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [
+        ":package-srcs",
+        "//build/debs:all-srcs",
+        "//build/release-tars:all-srcs",
+    ],
+    tags = ["automanaged"],
+)
 
 docker_build(
     name = "busybox",
@@ -34,43 +50,59 @@ docker_build(
     ],
 )
 
+DOCKERIZED_BINARIES = {
+    "kube-apiserver": {
+        "base": ":busybox-libc",
+        "target": "//cmd/kube-apiserver:kube-apiserver",
+    },
+    "kube-controller-manager": {
+        "base": ":busybox-libc",
+        "target": "//cmd/kube-controller-manager:kube-controller-manager",
+    },
+    "kube-scheduler": {
+        "base": ":busybox-libc",
+        "target": "//plugin/cmd/kube-scheduler:kube-scheduler",
+    },
+    "kube-aggregator": {
+        "base": ":busybox-libc",
+        "target": "//cmd/kube-aggregator:kube-aggregator",
+    },
+    "kube-proxy": {
+        "base": ":busybox-net",
+        "target": "//cmd/kube-proxy:kube-proxy",
+    },
+}
+
+[genrule(
+    name = binary + "_docker_tag",
+    srcs = [meta["target"]],
+    outs = [binary + ".docker_tag"],
+    # Currently each target has two outputs, the binary and its library, so hash only the first item (the binary).
+    # This can be made less hacky when we have static linking working.
+    cmd = "md5sum $(locations " + meta["target"] + ") | grep '" + binary + "'$$ | cut -f1 -d' ' | tr -d '\n' > $@",
+) for binary, meta in DOCKERIZED_BINARIES.items()]
+
 [docker_build(
     name = binary,
-    base = ":busybox-libc",
+    base = meta["base"],
     cmd = ["/usr/bin/" + binary],
     debs = [
         "//build/debs:%s.deb" % binary,
     ],
-    repository = "gcr.io/google-containers",
-) for binary in [
-    "kube-apiserver",
-    "kube-controller-manager",
-    "kube-scheduler",
-    "kube-aggregator",
-]]
-
-docker_build(
-    name = "kube-proxy",
-    base = ":busybox-net",
-    cmd = ["/usr/bin/kube-proxy"],
-    debs = [
-        "//build/debs:kube-proxy.deb",
+    image_tags = [
+        "@%s.docker_tag" % binary,
     ],
-    repository = "gcr.io/google-containers",
-)
+    repository = "gcr.io/google_containers/" + binary,
+    repository_append_package = False,
+    symlinks = {
+        # Some cluster startup scripts expect to find the binaries in /usr/local/bin,
+        # but the debs install the binaries into /usr/bin.
+        "/usr/local/bin/" + binary: "/usr/bin/" + binary,
+    },
+) for binary, meta in DOCKERIZED_BINARIES.items()]
 
 filegroup(
-    name = "package-srcs",
-    srcs = glob(["**"]),
-    tags = ["automanaged"],
-    visibility = ["//visibility:private"],
-)
-
-filegroup(
-    name = "all-srcs",
-    srcs = [
-        ":package-srcs",
-        "//build/debs:all-srcs",
-    ],
-    tags = ["automanaged"],
+    name = "docker-artifacts",
+    srcs = [":%s.tar" % binary for binary in DOCKERIZED_BINARIES.keys()] +
+           [":%s.docker_tag" % binary for binary in DOCKERIZED_BINARIES.keys()],
 )
