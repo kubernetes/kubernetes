@@ -111,11 +111,8 @@ func parseStruct(r reflect.Value, node *XMLNode, tag reflect.StructTag) error {
 		elems := node.Children[name]
 
 		if elems == nil { // try to find the field in attributes
-			for _, a := range node.Attr {
-				if name == a.Name.Local {
-					// turn this into a text node for de-serializing
-					elems = []*XMLNode{{Text: a.Value}}
-				}
+			if val, ok := node.findElem(name); ok {
+				elems = []*XMLNode{{Text: val}}
 			}
 		}
 
