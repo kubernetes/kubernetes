@@ -326,6 +326,13 @@ func ListResource(r rest.Lister, rw rest.Watcher, scope RequestScope, forceWatch
 			return
 		}
 		trace.Step("Self-linking done")
+		// Ensure empty lists return a non-nil items slice
+		if numberOfItems == 0 && meta.IsListType(result) {
+			if err := meta.SetList(result, []runtime.Object{}); err != nil {
+				scope.err(err, res.ResponseWriter, req.Request)
+				return
+			}
+		}
 		write(http.StatusOK, scope.Kind.GroupVersion(), scope.Serializer, result, w, req.Request)
 		trace.Step(fmt.Sprintf("Writing http response done (%d items)", numberOfItems))
 	}
