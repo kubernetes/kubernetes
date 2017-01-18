@@ -543,7 +543,18 @@ func (dc *DeploymentController) syncDeployment(key string) error {
 		return dc.syncStatusOnly(d)
 	}
 
-	err = dc.classifyReplicaSets(deployment)
+	// Run cleanup policy before adopting if there is no rollback request that needs to happen. Doing so
+	// decouples the cleanup policy from the strategies where it gets executed and may block because the
+	// strategy can't proceed.
+	if d.Spec.RollbackTo == nil {
+		_, oldRSs, err := dc.getAllReplicaSetsAndSyncRevision(d, false)
+		if err != nil {
+			return err
+		}
+		dc.cleanupDeployment(oldRSs, d)
+	}
+
+	err = dc.classifyReplicaSets(d)
 	if err != nil {
 		return err
 	}

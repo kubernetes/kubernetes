@@ -58,7 +58,6 @@ func (dc *DeploymentController) sync(deployment *extensions.Deployment) error {
 		// so we can abort this resync
 		return err
 	}
-	dc.cleanupDeployment(oldRSs, deployment)
 
 	allRSs := append(oldRSs, newRS)
 	return dc.syncDeploymentStatus(allRSs, newRS, deployment)
