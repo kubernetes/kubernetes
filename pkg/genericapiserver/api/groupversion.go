@@ -29,8 +29,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/request"
-	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/genericapiserver/api/handlers"
 	"k8s.io/kubernetes/pkg/genericapiserver/api/rest"
 )

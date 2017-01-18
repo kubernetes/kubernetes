@@ -141,8 +141,8 @@ func TestReadAdmissionConfiguration(t *testing.T) {
 		if err != nil {
 			t.Fatalf("unexpected err: %v", err)
 		}
-		if !reflect.DeepEqual(config, testCase.ExpectedAdmissionConfig) {
-			t.Errorf("%s: Expected:\n\t%#v\nGot:\n\t%#v", testName, testCase.ExpectedAdmissionConfig, config)
+		if !reflect.DeepEqual(config.(configProvider).config, testCase.ExpectedAdmissionConfig) {
+			t.Errorf("%s: Expected:\n\t%#v\nGot:\n\t%#v", testName, testCase.ExpectedAdmissionConfig, config.(configProvider).config)
 		}
 	}
 }

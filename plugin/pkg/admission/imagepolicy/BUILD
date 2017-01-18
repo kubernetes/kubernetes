@@ -17,13 +17,13 @@ go_library(
     ],
     tags = ["automanaged"],
     deps = [
-        "//pkg/admission:go_default_library",
         "//pkg/api:go_default_library",
         "//pkg/apis/imagepolicy/install:go_default_library",
         "//vendor:github.com/golang/glog",
         "//vendor:k8s.io/apimachinery/pkg/api/errors",
         "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
         "//vendor:k8s.io/apimachinery/pkg/util/yaml",
+        "//vendor:k8s.io/apiserver/pkg/admission",
         "//vendor:k8s.io/apiserver/pkg/util/cache",
         "//vendor:k8s.io/apiserver/pkg/webhook",
         "//vendor:k8s.io/client-go/pkg/apis/imagepolicy/install",
@@ -42,11 +42,11 @@ go_test(
     library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
-        "//pkg/admission:go_default_library",
         "//pkg/api:go_default_library",
         "//pkg/apis/imagepolicy/install:go_default_library",
         "//pkg/apis/imagepolicy/v1alpha1:go_default_library",
         "//pkg/client/unversioned/clientcmd/api/v1:go_default_library",
+        "//vendor:k8s.io/apiserver/pkg/admission",
         "//vendor:k8s.io/apiserver/pkg/authentication/user",
     ],
 )
