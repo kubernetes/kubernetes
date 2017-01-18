@@ -18,6 +18,7 @@ package v1alpha1
 
 import (
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	api "k8s.io/client-go/pkg/api"
 	v1 "k8s.io/client-go/pkg/api/v1"
@@ -41,7 +42,7 @@ type CertificateSigningRequestInterface interface {
 	Get(name string, options meta_v1.GetOptions) (*v1alpha1.CertificateSigningRequest, error)
 	List(opts v1.ListOptions) (*v1alpha1.CertificateSigningRequestList, error)
 	Watch(opts v1.ListOptions) (watch.Interface, error)
-	Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *v1alpha1.CertificateSigningRequest, err error)
+	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1alpha1.CertificateSigningRequest, err error)
 	CertificateSigningRequestExpansion
 }
 
@@ -148,7 +149,7 @@ func (c *certificateSigningRequests) Watch(opts v1.ListOptions) (watch.Interface
 }
 
 // Patch applies the patch and returns the patched certificateSigningRequest.
-func (c *certificateSigningRequests) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *v1alpha1.CertificateSigningRequest, err error) {
+func (c *certificateSigningRequests) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1alpha1.CertificateSigningRequest, err error) {
 	result = &v1alpha1.CertificateSigningRequest{}
 	err = c.client.Patch(pt).
 		Resource("certificatesigningrequests").
