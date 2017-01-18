@@ -47,6 +47,14 @@ if [[ "${NODE_OS_DISTRIBUTION}" == "coreos" ]]; then
     NODE_OS_DISTRIBUTION="container-linux"
 fi
 
+if [[ "${MASTER_OS_DISTRIBUTION}" == "cos" ]]; then
+    MASTER_OS_DISTRIBUTION="gci"
+fi
+
+if [[ "${NODE_OS_DISTRIBUTION}" == "cos" ]]; then
+    NODE_OS_DISTRIBUTION="gci"
+fi
+
 # By default a cluster will be started with the master on GCI and nodes on
 # containervm. If you are updating the containervm version, update this
 # variable. Also please update corresponding image for node e2e at:
