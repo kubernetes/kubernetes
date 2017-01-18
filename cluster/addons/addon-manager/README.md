@@ -1,9 +1,8 @@
 ### addon-manager
 
-The `addon-manager` periodically `kubectl apply`s the Kubernetes manifest in the `/etc/kubernetes/addons` directory,
-and handles any added / updated / deleted addon.
-
-It supports all types of resource.
+Addon-manager manages two classes of addons.
+- Reconcile addons with label `kubernetes.io/cluster-service=true`
+- Ensure addons with label `kubernetes.io/cluster-service-ensure-exist=true` exist.
 
 The `addon-manager` is built for multiple architectures.
 

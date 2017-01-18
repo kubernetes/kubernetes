@@ -37,6 +37,11 @@ ADDON_PATH=${ADDON_PATH:-/etc/kubernetes/addons}
 
 SYSTEM_NAMESPACE=kube-system
 
+# Addon Manager reconciles addon resources with this label.
+SERVICE_RECONCILE_LABEL="kubernetes.io/cluster-service=true"
+# Addon Manager ensures addon resources with this label exist.
+SERVICE_ENSURE_EXIST_LABEL="kubernetes.io/cluster-service-ensure-exist=true"
+
 # Remember that you can't log from functions that print some output (because
 # logs are also printed on stdout).
 # $1 level
@@ -133,7 +138,7 @@ function annotate_addons() {
 
   # Annotate to objects already have this annotation should fail.
   # Only try once for now.
-  ${KUBECTL} ${KUBECTL_OPTS} annotate ${obj_type} --namespace=${SYSTEM_NAMESPACE} -l kubernetes.io/cluster-service=true \
+  ${KUBECTL} ${KUBECTL_OPTS} annotate ${obj_type} --namespace=${SYSTEM_NAMESPACE} -l ${SERVICE_RECONCILE_LABEL} \
     kubectl.kubernetes.io/last-applied-configuration='' --overwrite=false
 
   if [[ $? -eq 0 ]]; then
@@ -150,13 +155,22 @@ function update_addons() {
   local -r additional_opt=$2;
 
   run_until_success "${KUBECTL} ${KUBECTL_OPTS} apply --namespace=${SYSTEM_NAMESPACE} -f ${ADDON_PATH} \
-    --prune=${enable_prune} -l kubernetes.io/cluster-service=true --recursive ${additional_opt}" 3 5
+    --prune=${enable_prune} -l ${SERVICE_RECONCILE_LABEL} --recursive ${additional_opt}" 3 5
 
   if [[ $? -eq 0 ]]; then
     log INFO "== Kubernetes addon update completed successfully at $(date -Is) =="
   else
     log WRN "== Kubernetes addon update completed with errors at $(date -Is) =="
   fi
+}
+
+function ensure_addons() {
+  # Create objects already exist should fail.
+  # Filter out `AlreadyExists` message to not noisily log.
+  ${KUBECTL} ${KUBECTL_OPTS} create --namespace=${SYSTEM_NAMESPACE} -f ${ADDON_PATH} -l ${SERVICE_ENSURE_EXIST_LABEL} \
+    --recursive 2>&1 | grep -v AlreadyExists
+
+  log INFO "== Kubernetes addon ensure completed at $(date -Is) =="
 }
 
 # The business logic for whether a given object should be created
@@ -203,6 +217,7 @@ annotate_addons Deployment
 # Apply will fail if some fields are modified but not are allowed, in that case should bump up addon version and name (e.g. handle externally).
 log INFO "== Executing apply to spin up new addon resources at $(date -Is) =="
 update_addons false
+ensure_addons
 
 # Wait for new addons to be spinned up before delete old resources
 log INFO "== Wait for addons to be spinned up at $(date -Is) =="
@@ -216,6 +231,7 @@ while true; do
   start_sec=$(date +"%s")
   # Only print stderr for the readability of logging
   update_addons true ">/dev/null"
+  ensure_addons
   end_sec=$(date +"%s")
   len_sec=$((${end_sec}-${start_sec}))
   # subtract the time passed from the sleep time
