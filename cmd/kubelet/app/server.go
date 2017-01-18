@@ -51,9 +51,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	restclient "k8s.io/client-go/rest"
-	clientauth "k8s.io/client-go/tools/auth"
 	"k8s.io/client-go/tools/clientcmd"
-	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/client-go/tools/record"
 	certutil "k8s.io/client-go/util/cert"
 	"k8s.io/kubernetes/cmd/kubelet/app/options"
@@ -355,8 +353,15 @@ func makeEventRecorder(s *componentconfig.KubeletConfiguration, kubeDeps *kubele
 }
 
 func run(s *options.KubeletServer, kubeDeps *kubelet.Dependencies) (err error) {
-	// TODO: this should be replaced by a --standalone flag
-	standaloneMode := (len(s.APIServerList) == 0 && !s.RequireKubeConfig)
+
+	standaloneMode := true
+	switch {
+	case s.RequireKubeConfig == true:
+		standaloneMode = false
+		glog.Warningf("--require-kubeconfig is deprecated. Set --kubeconfig without using --require-kubeconfig.")
+	case s.KubeConfig.Provided():
+		standaloneMode = false
+	}
 
 	if s.ExitOnLockContention && s.LockFilePath == "" {
 		return errors.New("cannot exit on lock file contention: no lock file specified")
@@ -449,8 +454,14 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.Dependencies) (err error) {
 		}
 	}
 
-	// initialize clients if any of the clients are not provided
-	if kubeDeps.KubeClient == nil || kubeDeps.ExternalKubeClient == nil || kubeDeps.EventClient == nil {
+	// if in standalone mode, indicate as much by setting all clients to nil
+	if standaloneMode {
+		kubeDeps.KubeClient = nil
+		kubeDeps.ExternalKubeClient = nil
+		kubeDeps.EventClient = nil
+		glog.Warningf("standalone mode, no API client")
+	} else if kubeDeps.KubeClient == nil || kubeDeps.ExternalKubeClient == nil || kubeDeps.EventClient == nil {
+		// initialize clients if not standalone mode and any of the clients are not provided
 		var kubeClient clientset.Interface
 		var eventClient v1core.EventsGetter
 		var externalKubeClient clientgoclientset.Interface
@@ -495,10 +506,8 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.Dependencies) (err error) {
 			switch {
 			case s.RequireKubeConfig:
 				return fmt.Errorf("invalid kubeconfig: %v", err)
-			case standaloneMode:
-				glog.Warningf("No API client: %v", err)
 			case s.KubeConfig.Provided():
-				glog.Warningf("Invalid kubeconfig: %v", err)
+				glog.Warningf("invalid kubeconfig: %v", err)
 			}
 		}
 
@@ -594,7 +603,7 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.Dependencies) (err error) {
 		glog.Warning(err)
 	}
 
-	if err := RunKubelet(&s.KubeletFlags, &s.KubeletConfiguration, kubeDeps, s.RunOnce, standaloneMode); err != nil {
+	if err := RunKubelet(&s.KubeletFlags, &s.KubeletConfiguration, kubeDeps, s.RunOnce); err != nil {
 		return err
 	}
 
@@ -730,63 +739,29 @@ func InitializeTLS(kf *options.KubeletFlags, kc *componentconfig.KubeletConfigur
 }
 
 func kubeconfigClientConfig(s *options.KubeletServer) (*restclient.Config, error) {
-	if s.RequireKubeConfig {
-		// Ignores the values of s.APIServerList
-		return clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
-			&clientcmd.ClientConfigLoadingRules{ExplicitPath: s.KubeConfig.Value()},
-			&clientcmd.ConfigOverrides{},
-		).ClientConfig()
-	}
 	return clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
 		&clientcmd.ClientConfigLoadingRules{ExplicitPath: s.KubeConfig.Value()},
-		&clientcmd.ConfigOverrides{ClusterInfo: clientcmdapi.Cluster{Server: s.APIServerList[0]}},
+		&clientcmd.ConfigOverrides{},
 	).ClientConfig()
 }
 
-// createClientConfig creates a client configuration from the command line
-// arguments. If --kubeconfig is explicitly set, it will be used. If it is
-// not set, we attempt to load the default kubeconfig file, and if we cannot,
-// we fall back to the default client with no auth - this fallback does not, in
-// and of itself, constitute an error.
+// createClientConfig creates a client configuration from the command line arguments.
+// If --kubeconfig is explicitly set, it will be used. If it is not set but
+// --require-kubeconfig=true, we attempt to load the default kubeconfig file.
 func createClientConfig(s *options.KubeletServer) (*restclient.Config, error) {
-	if s.RequireKubeConfig {
+	// If --kubeconfig was not provided, it will have a default path set in cmd/kubelet/app/options/options.go.
+	// We only use that default path when --require-kubeconfig=true. The default path is temporary until --require-kubeconfig is removed.
+	// TODO(#41161:v1.10.0): Remove the default kubeconfig path and --require-kubeconfig.
+	if s.BootstrapKubeconfig != "" || s.KubeConfig.Provided() || s.RequireKubeConfig == true {
 		return kubeconfigClientConfig(s)
+	} else {
+		return nil, fmt.Errorf("createClientConfig called in standalone mode")
 	}
-
-	// TODO: handle a new --standalone flag that bypasses kubeconfig loading and returns no error.
-	// DEPRECATED: all subsequent code is deprecated
-	if len(s.APIServerList) == 0 {
-		return nil, fmt.Errorf("no api servers specified")
-	}
-	// TODO: adapt Kube client to support LB over several servers
-	if len(s.APIServerList) > 1 {
-		glog.Infof("Multiple api servers specified.  Picking first one")
-	}
-
-	if s.KubeConfig.Provided() {
-		return kubeconfigClientConfig(s)
-	}
-	// If KubeConfig was not provided, try to load the default file, then fall back
-	// to a default auth config.
-	clientConfig, err := kubeconfigClientConfig(s)
-	if err != nil {
-		glog.Warningf("Could not load kubeconfig file %s: %v. Using default client config instead.", s.KubeConfig, err)
-
-		authInfo := &clientauth.Info{}
-		authConfig, err := authInfo.MergeWithConfig(restclient.Config{})
-		if err != nil {
-			return nil, err
-		}
-		authConfig.Host = s.APIServerList[0]
-		clientConfig = &authConfig
-	}
-	return clientConfig, nil
 }
 
-// CreateAPIServerClientConfig generates a client.Config from command line flags,
-// including api-server-list, via createClientConfig and then injects chaos into
-// the configuration via addChaosToClientConfig. This func is exported to support
-// integration with third party kubelet extensions (e.g. kubernetes-mesos).
+// CreateAPIServerClientConfig generates a client.Config from command line flags
+// via createClientConfig and then injects chaos into the configuration via addChaosToClientConfig.
+// This func is exported to support integration with third party kubelet extensions (e.g. kubernetes-mesos).
 func CreateAPIServerClientConfig(s *options.KubeletServer) (*restclient.Config, error) {
 	clientConfig, err := createClientConfig(s)
 	if err != nil {
@@ -819,7 +794,7 @@ func addChaosToClientConfig(s *options.KubeletServer, config *restclient.Config)
 //   2 Kubelet binary
 //   3 Standalone 'kubernetes' binary
 // Eventually, #2 will be replaced with instances of #3
-func RunKubelet(kubeFlags *options.KubeletFlags, kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *kubelet.Dependencies, runOnce bool, standaloneMode bool) error {
+func RunKubelet(kubeFlags *options.KubeletFlags, kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *kubelet.Dependencies, runOnce bool) error {
 	hostname := nodeutil.GetHostname(kubeFlags.HostnameOverride)
 	// Query the cloud provider for our node name, default to hostname if kcfg.Cloud == nil
 	nodeName, err := getNodeName(kubeDeps.Cloud, hostname)
@@ -866,7 +841,7 @@ func RunKubelet(kubeFlags *options.KubeletFlags, kubeCfg *componentconfig.Kubele
 	if kubeDeps.OSInterface == nil {
 		kubeDeps.OSInterface = kubecontainer.RealOS{}
 	}
-	k, err := builder(kubeCfg, kubeDeps, &kubeFlags.ContainerRuntimeOptions, standaloneMode, kubeFlags.HostnameOverride, kubeFlags.NodeIP, kubeFlags.ProviderID)
+	k, err := builder(kubeCfg, kubeDeps, &kubeFlags.ContainerRuntimeOptions, kubeFlags.HostnameOverride, kubeFlags.NodeIP, kubeFlags.ProviderID)
 	if err != nil {
 		return fmt.Errorf("failed to create kubelet: %v", err)
 	}
@@ -910,11 +885,11 @@ func startKubelet(k kubelet.Bootstrap, podCfg *config.PodConfig, kubeCfg *compon
 	}
 }
 
-func CreateAndInitKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *kubelet.Dependencies, crOptions *options.ContainerRuntimeOptions, standaloneMode bool, hostnameOverride, nodeIP, providerID string) (k kubelet.Bootstrap, err error) {
+func CreateAndInitKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *kubelet.Dependencies, crOptions *options.ContainerRuntimeOptions, hostnameOverride, nodeIP, providerID string) (k kubelet.Bootstrap, err error) {
 	// TODO: block until all sources have delivered at least one update to the channel, or break the sync loop
 	// up into "per source" synchronizations
 
-	k, err = kubelet.NewMainKubelet(kubeCfg, kubeDeps, crOptions, standaloneMode, hostnameOverride, nodeIP, providerID)
+	k, err = kubelet.NewMainKubelet(kubeCfg, kubeDeps, crOptions, hostnameOverride, nodeIP, providerID)
 	if err != nil {
 		return nil, err
 	}
