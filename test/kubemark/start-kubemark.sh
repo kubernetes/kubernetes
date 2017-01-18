@@ -133,6 +133,7 @@ gen-kube-bearertoken
 create-certs ${MASTER_IP}
 KUBELET_TOKEN=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)
 KUBE_PROXY_TOKEN=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)
+HEAPSTER_TOKEN=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)
 
 echo "${CA_CERT_BASE64}" | base64 --decode > "${RESOURCE_DIRECTORY}/ca.crt"
 echo "${KUBECFG_CERT_BASE64}" | base64 --decode > "${RESOURCE_DIRECTORY}/kubecfg.crt"
@@ -154,6 +155,7 @@ run-gcloud-compute-with-retries ssh --zone="${ZONE}" --project="${PROJECT}" "${M
     sudo bash -c \"echo \"${KUBE_BEARER_TOKEN},admin,admin\" > /etc/srv/kubernetes/known_tokens.csv\" && \
     sudo bash -c \"echo \"${KUBELET_TOKEN},system:node:node-name,uid:kubelet,system:nodes\" >> /etc/srv/kubernetes/known_tokens.csv\" && \
     sudo bash -c \"echo \"${KUBE_PROXY_TOKEN},system:kube-proxy,uid:kube_proxy\" >> /etc/srv/kubernetes/known_tokens.csv\" && \
+    sudo bash -c \"echo \"${HEAPSTER_TOKEN},system:heapster,uid:heapster\" >> /etc/srv/kubernetes/known_tokens.csv\" && \
     sudo bash -c \"echo ${password},admin,admin > /etc/srv/kubernetes/basic_auth.csv\""
 
 run-gcloud-compute-with-retries copy-files --zone="${ZONE}" --project="${PROJECT}" \
@@ -214,6 +216,25 @@ contexts:
   name: kubemark-context
 current-context: kubemark-context" | base64 | tr -d "\n\r")
 
+# Create kubeconfig for Heapster.
+HEAPSTER_KUBECONFIG_CONTENTS=$(echo "apiVersion: v1
+kind: Config
+users:
+- name: heapster
+  user:
+    token: ${HEAPSTER_TOKEN}
+clusters:
+- name: kubemark
+  cluster:
+    insecure-skip-tls-verify: true
+    server: https://${MASTER_IP}
+contexts:
+- context:
+    cluster: kubemark
+    user: heapster
+  name: kubemark-context
+current-context: kubemark-context" | base64 | tr -d "\n\r")
+
 KUBECONFIG_SECRET="${RESOURCE_DIRECTORY}/kubeconfig_secret.json"
 cat > "${KUBECONFIG_SECRET}" << EOF
 {
@@ -225,7 +246,8 @@ cat > "${KUBECONFIG_SECRET}" << EOF
   "type": "Opaque",
   "data": {
     "kubelet.kubeconfig": "${KUBELET_KUBECONFIG_CONTENTS}",
-    "kubeproxy.kubeconfig": "${KUBEPROXY_KUBECONFIG_CONTENTS}"
+    "kubeproxy.kubeconfig": "${KUBEPROXY_KUBECONFIG_CONTENTS}",
+    "heapster.kubeconfig": "${HEAPSTER_KUBECONFIG_CONTENTS}"
   }
 }
 EOF
