@@ -41,11 +41,7 @@ const (
 	DefaultKubeletContainersDirName = "containers"
 )
 
-// KubeletServer encapsulates all of the parameters necessary for starting up
-// a kubelet. These can either be set via command line or directly.
-type KubeletServer struct {
-	componentconfig.KubeletConfiguration
-
+type KubeletFlags struct {
 	KubeConfig          flag.StringFlag
 	BootstrapKubeconfig string
 
@@ -64,6 +60,20 @@ type KubeletServer struct {
 	// If runOnce is true, the Kubelet will check the API server once for pods,
 	// run those in addition to the pods specified by the local manifest, and exit.
 	RunOnce bool
+
+	// HostnameOverride is the hostname used to identify the kubelet instead
+	// of the actual hostname.
+	HostnameOverride string
+	// NodeIP is IP address of the node.
+	// If set, kubelet will use this IP address for the node.
+	NodeIP string
+}
+
+// KubeletServer encapsulates all of the parameters necessary for starting up
+// a kubelet. These can either be set via command line or directly.
+type KubeletServer struct {
+	KubeletFlags
+	componentconfig.KubeletConfiguration
 }
 
 // NewKubeletServer will create a new KubeletServer with default values.
@@ -73,8 +83,10 @@ func NewKubeletServer() *KubeletServer {
 	config := componentconfig.KubeletConfiguration{}
 	api.Scheme.Convert(versioned, &config, nil)
 	return &KubeletServer{
-		KubeConfig:           flag.NewStringFlag("/var/lib/kubelet/kubeconfig"),
-		RequireKubeConfig:    false, // in 1.5, default to true
+		KubeletFlags: KubeletFlags{
+			KubeConfig:        flag.NewStringFlag("/var/lib/kubelet/kubeconfig"),
+			RequireKubeConfig: false, // in 1.5, default to true
+		},
 		KubeletConfiguration: config,
 	}
 }

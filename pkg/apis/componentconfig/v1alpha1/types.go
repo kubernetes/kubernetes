@@ -221,9 +221,6 @@ type KubeletConfiguration struct {
 	Authentication KubeletAuthentication `json:"authentication"`
 	// authorization specifies how requests to the Kubelet's server are authorized
 	Authorization KubeletAuthorization `json:"authorization"`
-	// hostnameOverride is the hostname used to identify the kubelet instead
-	// of the actual hostname.
-	HostnameOverride string `json:"hostnameOverride"`
 	// podInfraContainerImage is the image whose network/ipc namespaces
 	// containers in each pod will use.
 	PodInfraContainerImage string `json:"podInfraContainerImage"`
@@ -449,9 +446,6 @@ type KubeletConfiguration struct {
 	// outOfDiskTransitionFrequency is duration for which the kubelet has to
 	// wait before transitioning out of out-of-disk node condition status.
 	OutOfDiskTransitionFrequency metav1.Duration `json:"outOfDiskTransitionFrequency"`
-	// nodeIP is IP address of the node. If set, kubelet will use this IP
-	// address for the node.
-	NodeIP string `json:"nodeIP"`
 	// nodeLabels to add when registering the node in the cluster.
 	NodeLabels map[string]string `json:"nodeLabels"`
 	// nonMasqueradeCIDR configures masquerading: traffic to IPs outside this range will use IP masquerade.

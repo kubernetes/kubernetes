@@ -167,9 +167,6 @@ type KubeletConfiguration struct {
 	Authentication KubeletAuthentication
 	// authorization specifies how requests to the Kubelet's server are authorized
 	Authorization KubeletAuthorization
-	// hostnameOverride is the hostname used to identify the kubelet instead
-	// of the actual hostname.
-	HostnameOverride string
 	// podInfraContainerImage is the image whose network/ipc namespaces
 	// containers in each pod will use.
 	PodInfraContainerImage string
@@ -405,10 +402,6 @@ type KubeletConfiguration struct {
 	// wait before transitioning out of out-of-disk node condition status.
 	// +optional
 	OutOfDiskTransitionFrequency metav1.Duration
-	// nodeIP is IP address of the node. If set, kubelet will use this IP
-	// address for the node.
-	// +optional
-	NodeIP string
 	// nodeLabels to add when registering the node in the cluster.
 	NodeLabels map[string]string
 	// nonMasqueradeCIDR configures masquerading: traffic to IPs outside this range will use IP masquerade.
