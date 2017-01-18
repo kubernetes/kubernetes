@@ -50,7 +50,6 @@ import (
 	apirequest "k8s.io/apiserver/pkg/request"
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
-	authhandlers "k8s.io/kubernetes/pkg/auth/handlers"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	genericapifilters "k8s.io/kubernetes/pkg/genericapiserver/api/filters"
 	apiopenapi "k8s.io/kubernetes/pkg/genericapiserver/api/openapi"
@@ -573,7 +572,7 @@ func DefaultBuildHandlerChain(apiHandler http.Handler, c *Config) (secure, insec
 		handler = genericapifilters.WithAuthorization(handler, c.RequestContextMapper, c.Authorizer)
 		handler = genericapifilters.WithImpersonation(handler, c.RequestContextMapper, c.Authorizer)
 		handler = audit(handler) // before impersonation to read original user
-		handler = authhandlers.WithAuthentication(handler, c.RequestContextMapper, c.Authenticator, authhandlers.Unauthorized(c.SupportsBasicAuth))
+		handler = genericapifilters.WithAuthentication(handler, c.RequestContextMapper, c.Authenticator, genericapifilters.Unauthorized(c.SupportsBasicAuth))
 		return handler
 	}
 

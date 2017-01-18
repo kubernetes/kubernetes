@@ -23,7 +23,6 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/wait"
 	genericapirequest "k8s.io/apiserver/pkg/request"
-	authhandlers "k8s.io/kubernetes/pkg/auth/handlers"
 	kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	kubeinformers "k8s.io/kubernetes/pkg/client/informers/informers_generated"
 	v1listers "k8s.io/kubernetes/pkg/client/listers/core/v1"
@@ -191,7 +190,7 @@ func (h *handlerChainConfig) handlerChain(apiHandler http.Handler, c *genericapi
 	handler = genericapifilters.WithImpersonation(handler, c.RequestContextMapper, c.Authorizer)
 	// audit to stdout to help with debugging as we get this started
 	handler = genericapifilters.WithAudit(handler, c.RequestContextMapper, os.Stdout)
-	handler = authhandlers.WithAuthentication(handler, c.RequestContextMapper, c.Authenticator, authhandlers.Unauthorized(c.SupportsBasicAuth))
+	handler = genericapifilters.WithAuthentication(handler, c.RequestContextMapper, c.Authenticator, genericapifilters.Unauthorized(c.SupportsBasicAuth))
 
 	handler = genericfilters.WithCORS(handler, c.CorsAllowedOriginList, nil, nil, nil, "true")
 	handler = genericfilters.WithPanicRecovery(handler, c.RequestContextMapper)
