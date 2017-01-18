@@ -1728,7 +1728,7 @@ func printEvent(event *api.Event, w io.Writer, options PrintOptions) error {
 		event.InvolvedObject.FieldPath,
 		event.Type,
 		event.Reason,
-		event.Source,
+		formatEventSource(event.Source),
 		event.Message,
 	); err != nil {
 		return err
@@ -2726,4 +2726,13 @@ func (j *JSONPathPrinter) PrintObj(obj runtime.Object, w io.Writer) error {
 // TODO: implement HandledResources()
 func (p *JSONPathPrinter) HandledResources() []string {
 	return []string{}
+}
+
+// formatEventSource formats EventSource as a comma separated string excluding Host when empty
+func formatEventSource(es api.EventSource) string {
+	EventSourceString := []string{es.Component}
+	if len(es.Host) > 0 {
+		EventSourceString = append(EventSourceString, es.Host)
+	}
+	return strings.Join(EventSourceString, ", ")
 }
