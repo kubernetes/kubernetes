@@ -33,6 +33,29 @@ readonly POOL_PATH=/var/lib/libvirt/images/kubernetes
 
 [ ! -d "${POOL_PATH}" ] && (echo "$POOL_PATH" does not exist ; exit 1 )
 
+# Creates a kubeconfig file for the kubelet.
+# Args: address (e.g. "http://localhost:8080"), destination file path
+function create-kubelet-kubeconfig() {
+  local api_addr="${1}"
+  local dest="${2}"
+  local dest_dir="$(dirname "${dest}")"
+  mkdir -p "${dest_dir}" &>/dev/null || sudo mkdir -p "${dest_dir}"
+  sudo=$(test -w "${dest_dir}" || echo "sudo -E")
+  cat <<EOF | ${sudo} tee "${dest}" > /dev/null
+apiVersion: v1
+kind: Config
+clusters:
+  - cluster:
+      server: ${api_addr}
+    name: local
+contexts:
+  - context:
+      cluster: local
+    name: local
+current-context: local
+EOF
+}
+
 # join <delim> <list...>
 # Concatenates the list elements with the delimiter passed as first parameter
 #
@@ -279,6 +302,7 @@ function kube-up {
   export KUBE_SERVER="http://192.168.10.1:8080"
   export CONTEXT="libvirt-coreos"
   create-kubeconfig
+  create-kubelet-kubeconfig "http://${MASTER_IP}:8080" "${POOL_PATH}/kubernetes/kubeconfig/kubelet.kubeconfig"
 
   wait-cluster-readiness
 

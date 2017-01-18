@@ -34,8 +34,8 @@ readonly PHOTON="photon -n"
 readonly MASTER_NAME="${INSTANCE_PREFIX}-master"
 
 # shell check claims this doesn't work because you can't use a variable in a brace
-# range. It does work because we're calling eval. 
-# shellcheck disable=SC2051 
+# range. It does work because we're calling eval.
+# shellcheck disable=SC2051
 readonly NODE_NAMES=($(eval echo "${INSTANCE_PREFIX}"-node-{1.."${NUM_NODES}"}))
 
 #####################################################################
@@ -432,6 +432,7 @@ function gen-master-start {
     echo "readonly MY_NAME=${MASTER_NAME}"
     grep -v "^#" "${KUBE_ROOT}/cluster/photon-controller/templates/hostname.sh"
     echo "cd /home/kube/cache/kubernetes-install"
+    echo "readonly KUBE_MASTER_IP='{$KUBE_MASTER_IP}'"
     echo "readonly MASTER_NAME='${MASTER_NAME}'"
     echo "readonly MASTER_IP_RANGE='${MASTER_IP_RANGE}'"
     echo "readonly INSTANCE_PREFIX='${INSTANCE_PREFIX}'"
@@ -495,20 +496,20 @@ function gen-node-salt {
   done
 }
 
-# 
+#
 # Shared implementation for gen-master-salt and gen-node-salt
 # Writes a script that installs Kubernetes with salt
 # The core of the script is simple (run 'salt ... state.highstate')
 # We also do a bit of logging so we can debug problems
 #
-# There is also a funky workaround for an issue with docker 1.9 
-# (elsewhere we peg ourselves to docker 1.9). It's fixed in 1.10, 
+# There is also a funky workaround for an issue with docker 1.9
+# (elsewhere we peg ourselves to docker 1.9). It's fixed in 1.10,
 # so we should be able to remove it in the future
 # https://github.com/docker/docker/issues/18113
 # The problem is that sometimes the install (with apt-get) of
 # docker fails. Deleting a file and retrying fixes it.
 #
-# Tell shellcheck to ignore our variables within single quotes: 
+# Tell shellcheck to ignore our variables within single quotes:
 # We're writing a script, not executing it, so this is normal
 # shellcheck disable=SC2016
 function gen-salt {
@@ -564,7 +565,7 @@ function gen-add-route {
 
 #
 # Create the Kubernetes master VM
-# Sets global variables: 
+# Sets global variables:
 # - KUBE_MASTER    (Name)
 # - KUBE_MASTER_ID (Photon VM ID)
 # - KUBE_MASTER_IP (IP address)
@@ -577,7 +578,7 @@ function create-master-vm {
   KUBE_MASTER_IP=${_VM_IP}
 }
 
-# 
+#
 # Install salt on the Kubernetes master
 # Relies on the master-start.sh script created in gen-master-start
 #
