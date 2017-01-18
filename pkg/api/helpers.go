@@ -615,3 +615,10 @@ func PodAnnotationsFromSysctls(sysctls []Sysctl) string {
 	}
 	return strings.Join(kvs, ",")
 }
+
+// FormatEventSource formats EventSource as a comma separated string excluding Host when empty
+func FormatEventSource(es EventSource) string {
+	EventSourceString := []string{es.Component}
+	if len(es.Host) > 0 { EventSourceString = append(EventSourceString, es.Host) }
+	return strings.Join(EventSourceString, ", ")
+}

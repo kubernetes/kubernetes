@@ -1728,7 +1728,7 @@ func printEvent(event *api.Event, w io.Writer, options PrintOptions) error {
 		event.InvolvedObject.FieldPath,
 		event.Type,
 		event.Reason,
-		event.Source,
+		api.FormatEventSource(event.Source),
 		event.Message,
 	); err != nil {
 		return err
