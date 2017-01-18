@@ -24,10 +24,16 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
+	schedulerapi "k8s.io/kubernetes/plugin/pkg/scheduler/api"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/metrics"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
+	"k8s.io/kubernetes/plugin/pkg/scheduler/util"
+
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 
 	"github.com/golang/glog"
+	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/kubernetes/pkg/client/cache"
 )
 
 // Binder knows how to write a binding.
@@ -43,6 +49,33 @@ type PodConditionUpdater interface {
 // nodes that they fit on and writes bindings back to the api server.
 type Scheduler struct {
 	config *Config
+}
+
+// These are the functions which need to be provided in order to build a Scheduler configuration.
+// An implementation of this can be seen in factory.go.
+type Configurator interface {
+	GetPriorityFunctionConfigs(priorityKeys sets.String) ([]algorithm.PriorityConfig, error)
+	GetPriorityMetadataProducer() (algorithm.MetadataProducer, error)
+	GetPredicateMetadataProducer() (algorithm.MetadataProducer, error)
+	GetPredicates(predicateKeys sets.String) (map[string]algorithm.FitPredicate, error)
+	GetHardPodAffinitySymmetricWeight() int
+	GetFailureDomains() []string
+	GetSchedulerName() string
+	MakeDefaultErrorFunc(backoff *util.PodBackoff, podQueue *cache.FIFO) func(pod *v1.Pod, err error)
+
+	// Probably doesn't need to be public.  But exposed for now in case.
+	ResponsibleForPod(pod *v1.Pod) bool
+
+	// Needs to be exposed for things like integration tests where we want to make fake nodes.
+	GetNodeStore() cache.Store
+	GetClient() clientset.Interface
+	GetScheduledPodListerIndexer() cache.Indexer
+	Run()
+
+	Create() (*Config, error)
+	CreateFromProvider(providerName string) (*Config, error)
+	CreateFromConfig(policy schedulerapi.Policy) (*Config, error)
+	CreateFromKeys(predicateKeys, priorityKeys sets.String, extenders []algorithm.SchedulerExtender) (*Config, error)
 }
 
 type Config struct {
