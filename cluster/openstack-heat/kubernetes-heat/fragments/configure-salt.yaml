@@ -17,6 +17,7 @@ write_files:
         network_mode: openvswitch
         networkInterfaceName: eth0
         api_servers: $MASTER_IP
+        kubelet_kubeconfig: /srv/salt-overlay/salt/kubelet/kubeconfig
         cloud: openstack
         cloud_config: /srv/kubernetes/openstack.conf
         roles:

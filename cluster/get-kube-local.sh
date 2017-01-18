@@ -21,6 +21,7 @@ set -o nounset
 set -o pipefail
 
 KUBE_HOST=${KUBE_HOST:-localhost}
+KUBELET_KUBECONFIG={KUBELET_KUBECONFIG:-"/var/run/kubernetes/kubelet.kubeconfig"}
 
 declare -r RED="\033[0;31m"
 declare -r GREEN="\033[0;32m"
@@ -53,9 +54,33 @@ function run {
   fi
 }
 
+# Creates a kubeconfig file for the kubelet.
+# Args: destination file path
+function create-kubelet-kubeconfig() {
+  local dest="${2}"
+  local dest_dir="$(dirname "${dest}")"
+  mkdir -p "${dest_dir}" &>/dev/null || sudo mkdir -p "${dest_dir}"
+  sudo=$(test -w "${dest_dir}" || echo "sudo -E")
+  cat <<EOF | ${sudo} tee "${dest}" > /dev/null
+apiVersion: v1
+kind: Config
+clusters:
+  - cluster:
+      server: http://localhost:8080
+    name: local
+contexts:
+  - context:
+      cluster: local
+    name: local
+current-context: local
+EOF
+}
+
+
 function create_cluster {
   echo "Creating a local cluster:"
   echo -e -n "\tStarting kubelet..."
+  create-local-kubelet-kubeconfig "${KUBELET_KUBECONFIG}"
   run "docker run \
   --volume=/:/rootfs:ro \
   --volume=/sys:/sys:ro \
@@ -71,7 +96,7 @@ function create_cluster {
       --containerized \
       --hostname-override="127.0.0.1" \
       --address="0.0.0.0" \
-      --api-servers=http://localhost:8080 \
+      --kubeconfig=${KUBECONFIG_DIR}/kubelet.kubeconfig \
       --pod-manifest-path=/etc/kubernetes/manifests \
       --allow-privileged=true \
       --cluster-dns=10.0.0.10 \
