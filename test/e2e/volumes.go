@@ -138,7 +138,7 @@ func startVolumeServer(client clientset.Interface, config VolumeTestConfig) *v1.
 			Kind:       "Pod",
 			APIVersion: "v1",
 		},
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: config.prefix + "-server",
 			Labels: map[string]string{
 				"role": config.prefix + "-server",
@@ -220,7 +220,7 @@ func testVolumeClient(client clientset.Interface, config VolumeTestConfig, fsGro
 			Kind:       "Pod",
 			APIVersion: "v1",
 		},
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: config.prefix + "-client",
 			Labels: map[string]string{
 				"role": config.prefix + "-client",
@@ -300,7 +300,7 @@ func injectHtml(client clientset.Interface, config VolumeTestConfig, volume v1.V
 			Kind:       "Pod",
 			APIVersion: "v1",
 		},
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: config.prefix + "-injector",
 			Labels: map[string]string{
 				"role": config.prefix + "-injector",
@@ -452,7 +452,7 @@ var _ = framework.KubeDescribe("Volumes [Feature:Volumes]", func() {
 					Kind:       "Endpoints",
 					APIVersion: "v1",
 				},
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name: config.prefix + "-server",
 				},
 				Subsets: []v1.EndpointSubset{
@@ -589,7 +589,7 @@ var _ = framework.KubeDescribe("Volumes [Feature:Volumes]", func() {
 					Kind:       "Secret",
 					APIVersion: "v1",
 				},
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name: config.prefix + "-secret",
 				},
 				Data: map[string][]byte{
@@ -664,7 +664,7 @@ var _ = framework.KubeDescribe("Volumes [Feature:Volumes]", func() {
 					Kind:       "Secret",
 					APIVersion: "v1",
 				},
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name: config.prefix + "-secret",
 				},
 				// Must use the ceph keyring at contrib/for-tests/volumes-ceph/ceph/init.sh
@@ -859,7 +859,7 @@ var _ = framework.KubeDescribe("Volumes [Feature:Volumes]", func() {
 					Kind:       "ConfigMap",
 					APIVersion: "v1",
 				},
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name: config.prefix + "-map",
 				},
 				Data: map[string]string{

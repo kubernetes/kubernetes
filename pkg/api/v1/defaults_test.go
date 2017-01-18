@@ -21,6 +21,7 @@ import (
 	"reflect"
 	"testing"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
@@ -59,7 +60,7 @@ func TestSetDefaultReplicationController(t *testing.T) {
 			rc: &v1.ReplicationController{
 				Spec: v1.ReplicationControllerSpec{
 					Template: &v1.PodTemplateSpec{
-						ObjectMeta: v1.ObjectMeta{
+						ObjectMeta: metav1.ObjectMeta{
 							Labels: map[string]string{
 								"foo": "bar",
 							},
@@ -72,14 +73,14 @@ func TestSetDefaultReplicationController(t *testing.T) {
 		},
 		{
 			rc: &v1.ReplicationController{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
 						"bar": "foo",
 					},
 				},
 				Spec: v1.ReplicationControllerSpec{
 					Template: &v1.PodTemplateSpec{
-						ObjectMeta: v1.ObjectMeta{
+						ObjectMeta: metav1.ObjectMeta{
 							Labels: map[string]string{
 								"foo": "bar",
 							},
@@ -92,7 +93,7 @@ func TestSetDefaultReplicationController(t *testing.T) {
 		},
 		{
 			rc: &v1.ReplicationController{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
 						"bar": "foo",
 					},
@@ -102,7 +103,7 @@ func TestSetDefaultReplicationController(t *testing.T) {
 						"some": "other",
 					},
 					Template: &v1.PodTemplateSpec{
-						ObjectMeta: v1.ObjectMeta{
+						ObjectMeta: metav1.ObjectMeta{
 							Labels: map[string]string{
 								"foo": "bar",
 							},
@@ -120,7 +121,7 @@ func TestSetDefaultReplicationController(t *testing.T) {
 						"some": "other",
 					},
 					Template: &v1.PodTemplateSpec{
-						ObjectMeta: v1.ObjectMeta{
+						ObjectMeta: metav1.ObjectMeta{
 							Labels: map[string]string{
 								"foo": "bar",
 							},
@@ -173,7 +174,7 @@ func TestSetDefaultReplicationControllerReplicas(t *testing.T) {
 			rc: v1.ReplicationController{
 				Spec: v1.ReplicationControllerSpec{
 					Template: &v1.PodTemplateSpec{
-						ObjectMeta: v1.ObjectMeta{
+						ObjectMeta: metav1.ObjectMeta{
 							Labels: map[string]string{
 								"foo": "bar",
 							},
@@ -188,7 +189,7 @@ func TestSetDefaultReplicationControllerReplicas(t *testing.T) {
 				Spec: v1.ReplicationControllerSpec{
 					Replicas: newInt(0),
 					Template: &v1.PodTemplateSpec{
-						ObjectMeta: v1.ObjectMeta{
+						ObjectMeta: metav1.ObjectMeta{
 							Labels: map[string]string{
 								"foo": "bar",
 							},
@@ -203,7 +204,7 @@ func TestSetDefaultReplicationControllerReplicas(t *testing.T) {
 				Spec: v1.ReplicationControllerSpec{
 					Replicas: newInt(3),
 					Template: &v1.PodTemplateSpec{
-						ObjectMeta: v1.ObjectMeta{
+						ObjectMeta: metav1.ObjectMeta{
 							Labels: map[string]string{
 								"foo": "bar",
 							},
@@ -254,7 +255,7 @@ func TestSetDefaultReplicationControllerImagePullPolicy(t *testing.T) {
 			rc: v1.ReplicationController{
 				Spec: v1.ReplicationControllerSpec{
 					Template: &v1.PodTemplateSpec{
-						ObjectMeta: v1.ObjectMeta{
+						ObjectMeta: metav1.ObjectMeta{
 							Annotations: map[string]string{
 								"pod.beta.kubernetes.io/init-containers": string(containersWithoutPullPolicy),
 							},
@@ -268,7 +269,7 @@ func TestSetDefaultReplicationControllerImagePullPolicy(t *testing.T) {
 			rc: v1.ReplicationController{
 				Spec: v1.ReplicationControllerSpec{
 					Template: &v1.PodTemplateSpec{
-						ObjectMeta: v1.ObjectMeta{
+						ObjectMeta: metav1.ObjectMeta{
 							Annotations: map[string]string{
 								"pod.beta.kubernetes.io/init-containers": string(containersWithPullPolicy),
 							},
@@ -724,7 +725,7 @@ func TestDefaultRequestIsNotSetForReplicationController(t *testing.T) {
 		Spec: v1.ReplicationControllerSpec{
 			Replicas: newInt(3),
 			Template: &v1.PodTemplateSpec{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
 						"foo": "bar",
 					},
@@ -744,7 +745,7 @@ func TestDefaultRequestIsNotSetForReplicationController(t *testing.T) {
 
 func TestSetDefaultLimitRangeItem(t *testing.T) {
 	limitRange := &v1.LimitRange{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: "test-defaults",
 		},
 		Spec: v1.LimitRangeSpec{

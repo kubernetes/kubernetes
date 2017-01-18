@@ -44,7 +44,7 @@
 						"/heapster"
 					],
 					"args": [
-						"--source=kubernetes:https://{{MASTER_IP}}:443?inClusterConfig=0&useServiceAccount=0&auth=/kubeconfig/kubelet.kubeconfig"
+						"--source=kubernetes:https://{{MASTER_IP}}:443?inClusterConfig=0&useServiceAccount=0&auth=/kubeconfig/heapster.kubeconfig"
 					],
 					"volumeMounts": [
 						{
@@ -66,7 +66,7 @@
 						"/eventer"
 					],
 					"args": [
-						"--source=kubernetes:https://104.197.233.84:443?inClusterConfig=0&useServiceAccount=0&auth=/kubeconfig/kubelet.kubeconfig"
+						"--source=kubernetes:https://104.197.233.84:443?inClusterConfig=0&useServiceAccount=0&auth=/kubeconfig/heapster.kubeconfig"
 					],
 					"volumeMounts": [
 						{

@@ -27,12 +27,13 @@ import (
 
 	"fmt"
 
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/client-go/pkg/api"
-	"k8s.io/client-go/pkg/api/errors"
 	"k8s.io/client-go/pkg/api/testapi"
 	utiltesting "k8s.io/client-go/pkg/util/testing"
 )
@@ -271,7 +272,7 @@ func TestHttpMethods(t *testing.T) {
 		t.Errorf("Delete : Object returned should not be nil")
 	}
 
-	request = c.Patch(api.JSONPatchType)
+	request = c.Patch(types.JSONPatchType)
 	if request == nil {
 		t.Errorf("Patch : Object returned should not be nil")
 	}

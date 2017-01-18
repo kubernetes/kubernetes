@@ -23,6 +23,7 @@ import (
 	"testing"
 	"time"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
@@ -40,7 +41,7 @@ import (
 
 func fakePodWithVol(namespace string) *v1.Pod {
 	fakePod := &v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Namespace: namespace,
 			Name:      "fakepod",
 		},
@@ -82,7 +83,7 @@ func TestPodDeletionWithDswp(t *testing.T) {
 	namespaceName := "test-pod-deletion"
 
 	node := &v1.Node{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: "node-sandbox",
 			Annotations: map[string]string{
 				volumehelper.ControllerManagedAttachAnnotation: "true",

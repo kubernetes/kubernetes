@@ -52,7 +52,7 @@ func apiStatus(err error) *metav1.Status {
 		status := http.StatusInternalServerError
 		switch {
 		//TODO: replace me with NewConflictErr
-		case storage.IsTestFailed(err):
+		case storage.IsConflict(err):
 			status = http.StatusConflict
 		}
 		// Log errors that were not converted to an error status

@@ -23,6 +23,7 @@ import (
 	"github.com/golang/glog"
 	lru "github.com/hashicorp/golang-lru"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -141,7 +142,7 @@ func (e *quotaAccessor) checkCache(quota *api.ResourceQuota) *api.ResourceQuota 
 func (e *quotaAccessor) GetQuotas(namespace string) ([]api.ResourceQuota, error) {
 	// determine if there are any quotas in this namespace
 	// if there are no quotas, we don't need to do anything
-	items, err := e.indexer.Index("namespace", &api.ResourceQuota{ObjectMeta: api.ObjectMeta{Namespace: namespace, Name: ""}})
+	items, err := e.indexer.Index("namespace", &api.ResourceQuota{ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: ""}})
 	if err != nil {
 		return nil, fmt.Errorf("error resolving quota.")
 	}

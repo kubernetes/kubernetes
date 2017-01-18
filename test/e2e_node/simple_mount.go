@@ -35,7 +35,7 @@ var _ = framework.KubeDescribe("SimpleMount", func() {
 				Kind:       "Pod",
 				APIVersion: "v1",
 			},
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name: "simple-mount-pod",
 			},
 			Spec: v1.PodSpec{

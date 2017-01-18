@@ -20,9 +20,10 @@ import (
 	"testing"
 	"time"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/kubernetes/pkg/admission"
+	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
@@ -33,7 +34,7 @@ import (
 // TestPodAdmission verifies various scenarios involving pod/namespace/global node label selectors
 func TestPodAdmission(t *testing.T) {
 	namespace := &api.Namespace{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      "testNamespace",
 			Namespace: "",
 		},
@@ -47,7 +48,7 @@ func TestPodAdmission(t *testing.T) {
 	informerFactory.Start(wait.NeverStop)
 
 	pod := &api.Pod{
-		ObjectMeta: api.ObjectMeta{Name: "testPod", Namespace: "testNamespace"},
+		ObjectMeta: metav1.ObjectMeta{Name: "testPod", Namespace: "testNamespace"},
 	}
 
 	tests := []struct {

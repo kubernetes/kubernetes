@@ -27,7 +27,6 @@ go_library(
         "//pkg/api/validation/path:go_default_library",
         "//pkg/client/metrics:go_default_library",
         "//pkg/client/restclient/watch:go_default_library",
-        "//pkg/client/transport:go_default_library",
         "//pkg/client/unversioned/clientcmd/api:go_default_library",
         "//pkg/fields:go_default_library",
         "//pkg/util/cert:go_default_library",
@@ -44,6 +43,7 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/util/net",
         "//vendor:k8s.io/apimachinery/pkg/util/sets",
         "//vendor:k8s.io/apimachinery/pkg/watch",
+        "//vendor:k8s.io/client-go/transport",
     ],
 )
 

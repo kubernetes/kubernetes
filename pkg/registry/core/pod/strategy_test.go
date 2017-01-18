@@ -124,7 +124,7 @@ func newContainer(name string, requests api.ResourceList, limits api.ResourceLis
 
 func newPod(name string, containers []api.Container) *api.Pod {
 	return &api.Pod{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 		},
 		Spec: api.PodSpec{

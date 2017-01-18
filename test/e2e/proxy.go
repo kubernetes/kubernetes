@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
@@ -72,7 +73,7 @@ var _ = framework.KubeDescribe("Proxy", func() {
 			start := time.Now()
 			labels := map[string]string{"proxy-service-target": "true"}
 			service, err := f.ClientSet.Core().Services(f.Namespace.Name).Create(&v1.Service{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					GenerateName: "proxy-service-",
 				},
 				Spec: v1.ServiceSpec{

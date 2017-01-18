@@ -57,7 +57,7 @@ func createNetworkPolicy(storage *REST, np extensions.NetworkPolicy, t *testing.
 func validNewNetworkPolicy() *extensions.NetworkPolicy {
 	port := intstr.FromInt(80)
 	return &extensions.NetworkPolicy{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      "foo",
 			Namespace: api.NamespaceDefault,
 			Labels:    map[string]string{"a": "b"},
@@ -90,7 +90,7 @@ func TestCreate(t *testing.T) {
 	defer storage.Store.DestroyFunc()
 	test := registrytest.New(t, storage.Store)
 	np := validNewNetworkPolicy()
-	np.ObjectMeta = api.ObjectMeta{}
+	np.ObjectMeta = metav1.ObjectMeta{}
 
 	invalidSelector := map[string]string{"NoUppercaseOrSpecialCharsLike=Equals": "b"}
 	test.TestCreate(

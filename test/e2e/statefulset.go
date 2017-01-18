@@ -243,7 +243,7 @@ var _ = framework.KubeDescribe("StatefulSet", func() {
 			expectedPod, err := f.ClientSet.Core().Pods(ns).Get(expectedPodName, metav1.GetOptions{})
 			Expect(err).NotTo(HaveOccurred())
 			watcher, err := f.ClientSet.Core().Pods(ns).Watch(v1.SingleObject(
-				v1.ObjectMeta{
+				metav1.ObjectMeta{
 					Name:            expectedPod.Name,
 					ResourceVersion: expectedPod.ResourceVersion,
 				},
@@ -357,7 +357,7 @@ var _ = framework.KubeDescribe("StatefulSet", func() {
 			By("Creating pod with conflicting port in namespace " + f.Namespace.Name)
 			conflictingPort := v1.ContainerPort{HostPort: 21017, ContainerPort: 21017, Name: "conflict"}
 			pod := &v1.Pod{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name: podName,
 				},
 				Spec: v1.PodSpec{
@@ -389,7 +389,7 @@ var _ = framework.KubeDescribe("StatefulSet", func() {
 
 			var initialStatefulPodUID types.UID
 			By("Waiting until stateful pod " + statefulPodName + " will be recreated and deleted at least once in namespace " + f.Namespace.Name)
-			w, err := f.ClientSet.Core().Pods(f.Namespace.Name).Watch(v1.SingleObject(v1.ObjectMeta{Name: statefulPodName}))
+			w, err := f.ClientSet.Core().Pods(f.Namespace.Name).Watch(v1.SingleObject(metav1.ObjectMeta{Name: statefulPodName}))
 			framework.ExpectNoError(err)
 			// we need to get UID from pod in any state and wait until stateful set controller will remove pod atleast once
 			_, err = watch.Until(statefulPodTimeout, w, func(event watch.Event) (bool, error) {
@@ -1067,7 +1067,7 @@ func dec(i int64, exponent int) *inf.Dec {
 
 func newPVC(name string) v1.PersistentVolumeClaim {
 	return v1.PersistentVolumeClaim{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 			Annotations: map[string]string{
 				"volume.alpha.kubernetes.io/storage-class": "anything",
@@ -1110,7 +1110,7 @@ func newStatefulSet(name, ns, governingSvcName string, replicas int32, statefulP
 			Kind:       "StatefulSet",
 			APIVersion: "apps/v1beta1",
 		},
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: ns,
 		},
@@ -1120,7 +1120,7 @@ func newStatefulSet(name, ns, governingSvcName string, replicas int32, statefulP
 			},
 			Replicas: func(i int32) *int32 { return &i }(replicas),
 			Template: v1.PodTemplateSpec{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Labels:      labels,
 					Annotations: map[string]string{},
 				},

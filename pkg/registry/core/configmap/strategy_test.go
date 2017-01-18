@@ -19,6 +19,7 @@ package configmap
 import (
 	"testing"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	genericapirequest "k8s.io/apiserver/pkg/request"
 	"k8s.io/kubernetes/pkg/api"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
@@ -34,7 +35,7 @@ func TestConfigMapStrategy(t *testing.T) {
 	}
 
 	cfg := &api.ConfigMap{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      "valid-config-data",
 			Namespace: api.NamespaceDefault,
 		},
@@ -51,7 +52,7 @@ func TestConfigMapStrategy(t *testing.T) {
 	}
 
 	newCfg := &api.ConfigMap{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:            "valid-config-data-2",
 			Namespace:       api.NamespaceDefault,
 			ResourceVersion: "4",

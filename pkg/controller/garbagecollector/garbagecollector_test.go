@@ -126,7 +126,7 @@ func getPod(podName string, ownerReferences []metav1.OwnerReference) *v1.Pod {
 			Kind:       "Pod",
 			APIVersion: "v1",
 		},
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:            podName,
 			Namespace:       "ns1",
 			OwnerReferences: ownerReferences,
@@ -237,7 +237,7 @@ func createEvent(eventType eventType, selfUID string, owners []string) event {
 	return event{
 		eventType: eventType,
 		obj: &v1.Pod{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				UID:             types.UID(selfUID),
 				OwnerReferences: ownerReferences,
 			},

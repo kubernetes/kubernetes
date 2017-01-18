@@ -19,9 +19,10 @@ package cache
 import (
 	"fmt"
 
+	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/pkg/api"
-	"k8s.io/client-go/pkg/api/errors"
 	"k8s.io/client-go/pkg/api/v1"
 )
 
@@ -183,7 +184,7 @@ func (s *StoreToReplicationControllerLister) GetPodControllers(pod *v1.Pod) (con
 		return
 	}
 
-	key := &v1.ReplicationController{ObjectMeta: v1.ObjectMeta{Namespace: pod.Namespace}}
+	key := &v1.ReplicationController{ObjectMeta: metav1.ObjectMeta{Namespace: pod.Namespace}}
 	items, err := s.Indexer.Index(NamespaceIndex, key)
 	if err != nil {
 		return

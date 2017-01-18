@@ -275,7 +275,7 @@ func newTestPods(count int) []*v1.Pod {
 			Spec: v1.PodSpec{
 				HostNetwork: true,
 			},
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				UID:  types.UID(10000 + i),
 				Name: fmt.Sprintf("pod%d", i),
 			},
@@ -416,7 +416,7 @@ func TestHandlePortConflicts(t *testing.T) {
 
 	kl.nodeLister = testNodeLister{nodes: []v1.Node{
 		{
-			ObjectMeta: v1.ObjectMeta{Name: string(kl.nodeName)},
+			ObjectMeta: metav1.ObjectMeta{Name: string(kl.nodeName)},
 			Status: v1.NodeStatus{
 				Allocatable: v1.ResourceList{
 					v1.ResourcePods: *resource.NewQuantity(110, resource.DecimalSI),
@@ -426,7 +426,7 @@ func TestHandlePortConflicts(t *testing.T) {
 	}}
 	kl.nodeInfo = testNodeInfo{nodes: []v1.Node{
 		{
-			ObjectMeta: v1.ObjectMeta{Name: string(kl.nodeName)},
+			ObjectMeta: metav1.ObjectMeta{Name: string(kl.nodeName)},
 			Status: v1.NodeStatus{
 				Allocatable: v1.ResourceList{
 					v1.ResourcePods: *resource.NewQuantity(110, resource.DecimalSI),
@@ -465,7 +465,7 @@ func TestCriticalPrioritySorting(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	kl := testKubelet.kubelet
 	nodes := []v1.Node{
-		{ObjectMeta: v1.ObjectMeta{Name: testKubeletHostname},
+		{ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname},
 			Status: v1.NodeStatus{Capacity: v1.ResourceList{}, Allocatable: v1.ResourceList{
 				v1.ResourceCPU:    *resource.NewMilliQuantity(10, resource.DecimalSI),
 				v1.ResourceMemory: *resource.NewQuantity(100, resource.BinarySI),
@@ -533,7 +533,7 @@ func TestHandleHostNameConflicts(t *testing.T) {
 
 	kl.nodeLister = testNodeLister{nodes: []v1.Node{
 		{
-			ObjectMeta: v1.ObjectMeta{Name: "127.0.0.1"},
+			ObjectMeta: metav1.ObjectMeta{Name: "127.0.0.1"},
 			Status: v1.NodeStatus{
 				Allocatable: v1.ResourceList{
 					v1.ResourcePods: *resource.NewQuantity(110, resource.DecimalSI),
@@ -543,7 +543,7 @@ func TestHandleHostNameConflicts(t *testing.T) {
 	}}
 	kl.nodeInfo = testNodeInfo{nodes: []v1.Node{
 		{
-			ObjectMeta: v1.ObjectMeta{Name: "127.0.0.1"},
+			ObjectMeta: metav1.ObjectMeta{Name: "127.0.0.1"},
 			Status: v1.NodeStatus{
 				Allocatable: v1.ResourceList{
 					v1.ResourcePods: *resource.NewQuantity(110, resource.DecimalSI),
@@ -580,7 +580,7 @@ func TestHandleNodeSelector(t *testing.T) {
 	kl := testKubelet.kubelet
 	nodes := []v1.Node{
 		{
-			ObjectMeta: v1.ObjectMeta{Name: testKubeletHostname, Labels: map[string]string{"key": "B"}},
+			ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname, Labels: map[string]string{"key": "B"}},
 			Status: v1.NodeStatus{
 				Allocatable: v1.ResourceList{
 					v1.ResourcePods: *resource.NewQuantity(110, resource.DecimalSI),
@@ -619,7 +619,7 @@ func TestHandleMemExceeded(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	kl := testKubelet.kubelet
 	nodes := []v1.Node{
-		{ObjectMeta: v1.ObjectMeta{Name: testKubeletHostname},
+		{ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname},
 			Status: v1.NodeStatus{Capacity: v1.ResourceList{}, Allocatable: v1.ResourceList{
 				v1.ResourceCPU:    *resource.NewMilliQuantity(10, resource.DecimalSI),
 				v1.ResourceMemory: *resource.NewQuantity(100, resource.BinarySI),
@@ -678,8 +678,8 @@ func TestPurgingObsoleteStatusMapEntries(t *testing.T) {
 
 	kl := testKubelet.kubelet
 	pods := []*v1.Pod{
-		{ObjectMeta: v1.ObjectMeta{Name: "pod1", UID: "1234"}, Spec: v1.PodSpec{Containers: []v1.Container{{Ports: []v1.ContainerPort{{HostPort: 80}}}}}},
-		{ObjectMeta: v1.ObjectMeta{Name: "pod2", UID: "4567"}, Spec: v1.PodSpec{Containers: []v1.Container{{Ports: []v1.ContainerPort{{HostPort: 80}}}}}},
+		{ObjectMeta: metav1.ObjectMeta{Name: "pod1", UID: "1234"}, Spec: v1.PodSpec{Containers: []v1.Container{{Ports: []v1.ContainerPort{{HostPort: 80}}}}}},
+		{ObjectMeta: metav1.ObjectMeta{Name: "pod2", UID: "4567"}, Spec: v1.PodSpec{Containers: []v1.Container{{Ports: []v1.ContainerPort{{HostPort: 80}}}}}},
 	}
 	podToTest := pods[1]
 	// Run once to populate the status map.
@@ -900,7 +900,7 @@ func TestDeleteOrphanedMirrorPods(t *testing.T) {
 	manager := testKubelet.fakeMirrorClient
 	orphanPods := []*v1.Pod{
 		{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				UID:       "12345678",
 				Name:      "pod1",
 				Namespace: "ns",
@@ -911,7 +911,7 @@ func TestDeleteOrphanedMirrorPods(t *testing.T) {
 			},
 		},
 		{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				UID:       "12345679",
 				Name:      "pod2",
 				Namespace: "ns",
@@ -941,7 +941,7 @@ func TestGetContainerInfoForMirrorPods(t *testing.T) {
 	// different UIDs.
 	pods := []*v1.Pod{
 		{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				UID:       "1234",
 				Name:      "qux",
 				Namespace: "ns",
@@ -956,7 +956,7 @@ func TestGetContainerInfoForMirrorPods(t *testing.T) {
 			},
 		},
 		{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				UID:       "5678",
 				Name:      "qux",
 				Namespace: "ns",
@@ -1247,7 +1247,7 @@ func TestSyncPodsSetStatusToFailedForPodsThatRunTooLong(t *testing.T) {
 
 	pods := []*v1.Pod{
 		{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				UID:       "12345678",
 				Name:      "bar",
 				Namespace: "new",
@@ -1299,7 +1299,7 @@ func TestSyncPodsDoesNotSetPodsThatDidNotRunTooLongToFailed(t *testing.T) {
 
 	pods := []*v1.Pod{
 		{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				UID:       "12345678",
 				Name:      "bar",
 				Namespace: "new",
@@ -1336,7 +1336,7 @@ func TestSyncPodsDoesNotSetPodsThatDidNotRunTooLongToFailed(t *testing.T) {
 
 func podWithUidNameNs(uid types.UID, name, namespace string) *v1.Pod {
 	return &v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			UID:         uid,
 			Name:        name,
 			Namespace:   namespace,
@@ -1896,7 +1896,7 @@ func TestHandlePodAdditionsInvokesPodAdmitHandlers(t *testing.T) {
 	kl := testKubelet.kubelet
 	kl.nodeLister = testNodeLister{nodes: []v1.Node{
 		{
-			ObjectMeta: v1.ObjectMeta{Name: string(kl.nodeName)},
+			ObjectMeta: metav1.ObjectMeta{Name: string(kl.nodeName)},
 			Status: v1.NodeStatus{
 				Allocatable: v1.ResourceList{
 					v1.ResourcePods: *resource.NewQuantity(110, resource.DecimalSI),
@@ -1906,7 +1906,7 @@ func TestHandlePodAdditionsInvokesPodAdmitHandlers(t *testing.T) {
 	}}
 	kl.nodeInfo = testNodeInfo{nodes: []v1.Node{
 		{
-			ObjectMeta: v1.ObjectMeta{Name: string(kl.nodeName)},
+			ObjectMeta: metav1.ObjectMeta{Name: string(kl.nodeName)},
 			Status: v1.NodeStatus{
 				Allocatable: v1.ResourceList{
 					v1.ResourcePods: *resource.NewQuantity(110, resource.DecimalSI),
@@ -1920,14 +1920,14 @@ func TestHandlePodAdditionsInvokesPodAdmitHandlers(t *testing.T) {
 
 	pods := []*v1.Pod{
 		{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				UID:       "123456789",
 				Name:      "podA",
 				Namespace: "foo",
 			},
 		},
 		{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				UID:       "987654321",
 				Name:      "podB",
 				Namespace: "foo",
@@ -2026,7 +2026,7 @@ func TestSyncPodKillPod(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	kl := testKubelet.kubelet
 	pod := &v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			UID:       "12345678",
 			Name:      "bar",
 			Namespace: "foo",

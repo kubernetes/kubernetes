@@ -16,7 +16,10 @@ limitations under the License.
 
 package util
 
-import "k8s.io/kubernetes/pkg/api/v1"
+import (
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/kubernetes/pkg/api/v1"
+)
 
 // IsDefaultStorageClassAnnotation represents a StorageClass annotation that
 // marks a class as the default StorageClass
@@ -73,7 +76,7 @@ func GetClaimStorageClass(claim *v1.PersistentVolumeClaim) string {
 // GetStorageClassAnnotation returns the StorageClass value
 // if the annotation is set, empty string if not
 // TODO: remove Alpha and Beta when no longer used or needed
-func GetStorageClassAnnotation(obj v1.ObjectMeta) string {
+func GetStorageClassAnnotation(obj metav1.ObjectMeta) string {
 	if class, ok := obj.Annotations[StorageClassAnnotation]; ok {
 		return class
 	}
@@ -90,7 +93,7 @@ func GetStorageClassAnnotation(obj v1.ObjectMeta) string {
 // HasStorageClassAnnotation returns a boolean
 // if the annotation is set
 // TODO: remove Alpha and Beta when no longer used or needed
-func HasStorageClassAnnotation(obj v1.ObjectMeta) bool {
+func HasStorageClassAnnotation(obj metav1.ObjectMeta) bool {
 	if _, found := obj.Annotations[StorageClassAnnotation]; found {
 		return found
 	}
@@ -108,7 +111,7 @@ func HasStorageClassAnnotation(obj v1.ObjectMeta) bool {
 // IsDefaultAnnotationText returns a pretty Yes/No String if
 // the annotation is set
 // TODO: remove Beta when no longer needed
-func IsDefaultAnnotationText(obj v1.ObjectMeta) string {
+func IsDefaultAnnotationText(obj metav1.ObjectMeta) string {
 	if obj.Annotations[IsDefaultStorageClassAnnotation] == "true" {
 		return "Yes"
 	}
@@ -122,7 +125,7 @@ func IsDefaultAnnotationText(obj v1.ObjectMeta) string {
 // IsDefaultAnnotation returns a boolean if
 // the annotation is set
 // TODO: remove Beta when no longer needed
-func IsDefaultAnnotation(obj v1.ObjectMeta) bool {
+func IsDefaultAnnotation(obj metav1.ObjectMeta) bool {
 	if obj.Annotations[IsDefaultStorageClassAnnotation] == "true" {
 		return true
 	}

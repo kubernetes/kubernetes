@@ -19,7 +19,7 @@ package v1alpha1
 import (
 	"fmt"
 
-	"k8s.io/client-go/pkg/api/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // PolicyRuleBuilder let's us attach methods.  A no-no for API types.
@@ -98,7 +98,7 @@ type ClusterRoleBindingBuilder struct {
 func NewClusterBinding(clusterRoleName string) *ClusterRoleBindingBuilder {
 	return &ClusterRoleBindingBuilder{
 		ClusterRoleBinding: ClusterRoleBinding{
-			ObjectMeta: v1.ObjectMeta{Name: clusterRoleName},
+			ObjectMeta: metav1.ObjectMeta{Name: clusterRoleName},
 			RoleRef: RoleRef{
 				APIGroup: GroupName,
 				Kind:     "ClusterRole",

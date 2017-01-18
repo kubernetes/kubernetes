@@ -19,6 +19,7 @@ package storage
 import (
 	"testing"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/api"
@@ -41,7 +42,7 @@ func newStorage(t *testing.T) (*REST, *etcdtesting.EtcdTestServer) {
 
 func validNewSecret(name string) *api.Secret {
 	return &api.Secret{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: api.NamespaceDefault,
 		},
@@ -57,18 +58,18 @@ func TestCreate(t *testing.T) {
 	defer storage.Store.DestroyFunc()
 	test := registrytest.New(t, storage.Store)
 	secret := validNewSecret("foo")
-	secret.ObjectMeta = api.ObjectMeta{GenerateName: "foo-"}
+	secret.ObjectMeta = metav1.ObjectMeta{GenerateName: "foo-"}
 	test.TestCreate(
 		// valid
 		secret,
 		// invalid
 		&api.Secret{},
 		&api.Secret{
-			ObjectMeta: api.ObjectMeta{Name: "name"},
+			ObjectMeta: metav1.ObjectMeta{Name: "name"},
 			Data:       map[string][]byte{"name with spaces": []byte("")},
 		},
 		&api.Secret{
-			ObjectMeta: api.ObjectMeta{Name: "name"},
+			ObjectMeta: metav1.ObjectMeta{Name: "name"},
 			Data:       map[string][]byte{"~.dotfile": []byte("")},
 		},
 	)

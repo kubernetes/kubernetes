@@ -20,6 +20,7 @@ import (
 	"strconv"
 	"time"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -37,7 +38,7 @@ import (
 
 func stagingClientPod(name, value string) clientv1.Pod {
 	return clientv1.Pod{
-		ObjectMeta: clientv1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 			Labels: map[string]string{
 				"name": "foo",
@@ -58,7 +59,7 @@ func stagingClientPod(name, value string) clientv1.Pod {
 
 func testingPod(name, value string) v1.Pod {
 	return v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 			Labels: map[string]string{
 				"name": "foo",
@@ -192,7 +193,7 @@ func newTestingCronJob(name string, value string) *v2alpha1.CronJob {
 	parallelism := int32(1)
 	completions := int32(1)
 	return &v2alpha1.CronJob{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 			Labels: map[string]string{
 				"time": value,

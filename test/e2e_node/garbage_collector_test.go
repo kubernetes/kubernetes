@@ -309,7 +309,7 @@ func getPods(specs []*testPodSpec) (pods []*v1.Pod) {
 			})
 		}
 		pods = append(pods, &v1.Pod{
-			ObjectMeta: v1.ObjectMeta{Name: spec.podName},
+			ObjectMeta: metav1.ObjectMeta{Name: spec.podName},
 			Spec: v1.PodSpec{
 				RestartPolicy: v1.RestartPolicyAlways,
 				Containers:    containers,

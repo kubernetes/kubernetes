@@ -36,6 +36,7 @@ go_test(
         "//pkg/client/clientset_generated/clientset/fake:go_default_library",
         "//pkg/controller/serviceaccount:go_default_library",
         "//pkg/serviceaccount:go_default_library",
+        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apiserver/pkg/authentication/serviceaccount",
     ],
 )

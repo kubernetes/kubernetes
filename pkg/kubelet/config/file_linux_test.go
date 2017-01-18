@@ -180,7 +180,7 @@ func getTestCases(hostname types.NodeName) []*testCase {
 					Kind:       "Pod",
 					APIVersion: "",
 				},
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test",
 					UID:       "12345",
 					Namespace: "mynamespace",
@@ -194,7 +194,7 @@ func getTestCases(hostname types.NodeName) []*testCase {
 				},
 			},
 			expected: CreatePodUpdate(kubetypes.SET, kubetypes.FileSource, &v1.Pod{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:        "test-" + string(hostname),
 					UID:         "12345",
 					Namespace:   "mynamespace",

@@ -44,8 +44,8 @@ var data = `{
 }`
 
 type Foo struct {
-	metav1.TypeMeta `json:",inline"`
-	v1.ObjectMeta   `json:"metadata,omitempty" description:"standard object metadata"`
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty" description:"standard object metadata"`
 
 	SomeField  string `json:"someField"`
 	OtherField int    `json:"otherField"`
@@ -64,7 +64,7 @@ var _ = Describe("ThirdParty resources [Flaky] [Disruptive]", func() {
 	f := framework.NewDefaultFramework("thirdparty")
 
 	rsrc := &extensions.ThirdPartyResource{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: "foo.company.com",
 		},
 		Versions: []extensions.APIVersion{
@@ -120,7 +120,7 @@ var _ = Describe("ThirdParty resources [Flaky] [Disruptive]", func() {
 				TypeMeta: metav1.TypeMeta{
 					Kind: "Foo",
 				},
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
 				},
 				SomeField:  "bar",

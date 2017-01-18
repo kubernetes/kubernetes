@@ -69,7 +69,7 @@ func TestGenerateContainerRef(t *testing.T) {
 				Kind:       "Pod",
 				APIVersion: api.Registry.GroupOrDie(v1.GroupName).GroupVersion.String(),
 			},
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:            "ok",
 				Namespace:       "test-ns",
 				UID:             "bar",

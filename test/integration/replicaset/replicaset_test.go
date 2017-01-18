@@ -49,7 +49,7 @@ func newRS(name, namespace string, replicas int) *v1beta1.ReplicaSet {
 			Kind:       "ReplicaSet",
 			APIVersion: "extensions/v1beta1",
 		},
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Namespace: namespace,
 			Name:      name,
 		},
@@ -59,7 +59,7 @@ func newRS(name, namespace string, replicas int) *v1beta1.ReplicaSet {
 			},
 			Replicas: &replicasCopy,
 			Template: v1.PodTemplateSpec{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Labels: testLabels(),
 				},
 				Spec: v1.PodSpec{
@@ -81,7 +81,7 @@ func newMatchingPod(podName, namespace string) *v1.Pod {
 			Kind:       "Pod",
 			APIVersion: "v1",
 		},
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      podName,
 			Namespace: namespace,
 			Labels:    testLabels(),

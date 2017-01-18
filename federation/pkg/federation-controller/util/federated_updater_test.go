@@ -21,6 +21,7 @@ import (
 	"testing"
 	"time"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	pkgruntime "k8s.io/apimachinery/pkg/runtime"
 	federationapi "k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	apiv1 "k8s.io/kubernetes/pkg/api/v1"
@@ -136,7 +137,7 @@ func TestFederatedUpdaterTimeout(t *testing.T) {
 
 func makeService(cluster, name string) *apiv1.Service {
 	return &apiv1.Service{
-		ObjectMeta: apiv1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Namespace: "ns1",
 			Name:      name,
 		},

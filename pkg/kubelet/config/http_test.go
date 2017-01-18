@@ -138,7 +138,7 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 					Kind:       "Pod",
 					APIVersion: "",
 				},
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:      "foo",
 					UID:       "111",
 					Namespace: "mynamespace",
@@ -155,7 +155,7 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 			expected: CreatePodUpdate(kubetypes.SET,
 				kubetypes.HTTPSource,
 				&v1.Pod{
-					ObjectMeta: v1.ObjectMeta{
+					ObjectMeta: metav1.ObjectMeta{
 						UID:         "111",
 						Name:        "foo" + "-" + nodeName,
 						Namespace:   "mynamespace",
@@ -190,7 +190,7 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 				},
 				Items: []v1.Pod{
 					{
-						ObjectMeta: v1.ObjectMeta{
+						ObjectMeta: metav1.ObjectMeta{
 							Name: "foo",
 							UID:  "111",
 						},
@@ -204,7 +204,7 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 						},
 					},
 					{
-						ObjectMeta: v1.ObjectMeta{
+						ObjectMeta: metav1.ObjectMeta{
 							Name: "bar",
 							UID:  "222",
 						},
@@ -222,7 +222,7 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 			expected: CreatePodUpdate(kubetypes.SET,
 				kubetypes.HTTPSource,
 				&v1.Pod{
-					ObjectMeta: v1.ObjectMeta{
+					ObjectMeta: metav1.ObjectMeta{
 						UID:         "111",
 						Name:        "foo" + "-" + nodeName,
 						Namespace:   "default",
@@ -248,7 +248,7 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 					},
 				},
 				&v1.Pod{
-					ObjectMeta: v1.ObjectMeta{
+					ObjectMeta: metav1.ObjectMeta{
 						UID:         "222",
 						Name:        "bar" + "-" + nodeName,
 						Namespace:   "default",
@@ -322,7 +322,7 @@ func TestURLWithHeader(t *testing.T) {
 			APIVersion: api.Registry.GroupOrDie(v1.GroupName).GroupVersion.String(),
 			Kind:       "Pod",
 		},
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      "foo",
 			UID:       "111",
 			Namespace: "mynamespace",

@@ -39,6 +39,8 @@ go_library(
         "//pkg/client/clientset_generated/clientset/typed/policy/v1beta1/fake:go_default_library",
         "//pkg/client/clientset_generated/clientset/typed/rbac/v1alpha1:go_default_library",
         "//pkg/client/clientset_generated/clientset/typed/rbac/v1alpha1/fake:go_default_library",
+        "//pkg/client/clientset_generated/clientset/typed/rbac/v1beta1:go_default_library",
+        "//pkg/client/clientset_generated/clientset/typed/rbac/v1beta1/fake:go_default_library",
         "//pkg/client/clientset_generated/clientset/typed/storage/v1beta1:go_default_library",
         "//pkg/client/clientset_generated/clientset/typed/storage/v1beta1/fake:go_default_library",
         "//pkg/client/testing/core:go_default_library",

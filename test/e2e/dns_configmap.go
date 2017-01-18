@@ -256,7 +256,7 @@ func (t *dnsConfigMapTest) createUtilPod() {
 		TypeMeta: metav1.TypeMeta{
 			Kind: "Pod",
 		},
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Namespace:    t.f.Namespace.Name,
 			Labels:       map[string]string{"app": "e2e-dns-configmap"},
 			GenerateName: "e2e-dns-configmap-",
@@ -285,7 +285,7 @@ func (t *dnsConfigMapTest) createUtilPod() {
 		TypeMeta: metav1.TypeMeta{
 			Kind: "Service",
 		},
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Namespace: t.f.Namespace.Name,
 			Name:      "e2e-dns-configmap",
 		},

@@ -349,7 +349,7 @@ func TestSetUpAtInternal(t *testing.T) {
 	plug, err := plugMgr.FindPluginByName(flockerPluginName)
 	assert.NoError(err)
 
-	pod := &v1.Pod{ObjectMeta: v1.ObjectMeta{UID: types.UID("poduid")}}
+	pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: types.UID("poduid")}}
 	b := flockerVolumeMounter{flockerVolume: &flockerVolume{pod: pod, plugin: plug.(*flockerPlugin)}}
 	b.client = newMockFlockerClient("dataset-id", "primary-uid", mockPath)
 

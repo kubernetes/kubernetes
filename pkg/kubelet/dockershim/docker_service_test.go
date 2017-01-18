@@ -40,7 +40,7 @@ func newTestNetworkPlugin(t *testing.T) *mock_network.MockNetworkPlugin {
 
 func newTestDockerService() (*dockerService, *dockertools.FakeDockerClient, *clock.FakeClock) {
 	fakeClock := clock.NewFakeClock(time.Time{})
-	c := dockertools.NewFakeDockerClientWithClock(fakeClock)
+	c := dockertools.NewFakeDockerClient().WithClock(fakeClock)
 	return &dockerService{client: c, os: &containertest.FakeOS{}, networkPlugin: &network.NoopNetworkPlugin{}}, c, fakeClock
 }
 

@@ -28,13 +28,12 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/v1"
 )
 
 func TestAPIObjectMeta(t *testing.T) {
 	j := &api.Pod{
 		TypeMeta: metav1.TypeMeta{APIVersion: "/a", Kind: "b"},
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Namespace:       "bar",
 			Name:            "foo",
 			GenerateName:    "prefix",
@@ -49,13 +48,13 @@ func TestAPIObjectMeta(t *testing.T) {
 			},
 		},
 	}
-	var _ meta.Object = &j.ObjectMeta
-	var _ meta.ObjectMetaAccessor = j
+	var _ metav1.Object = &j.ObjectMeta
+	var _ metav1.ObjectMetaAccessor = j
 	accessor, err := meta.Accessor(j)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if accessor != meta.Object(j) {
+	if accessor != metav1.Object(j) {
 		t.Fatalf("should have returned the same pointer: %#v\n\n%#v", accessor, j)
 	}
 	if e, a := "bar", accessor.GetNamespace(); e != a {
@@ -333,7 +332,7 @@ func TestTypeMetaSelfLinker(t *testing.T) {
 
 type MyAPIObject2 struct {
 	metav1.TypeMeta
-	v1.ObjectMeta
+	metav1.ObjectMeta
 }
 
 func getObjectMetaAndOwnerRefereneces() (myAPIObject2 MyAPIObject2, metaOwnerReferences []metav1.OwnerReference) {
@@ -396,7 +395,7 @@ func TestAccessOwnerReferences(t *testing.T) {
 func BenchmarkAccessorSetFastPath(b *testing.B) {
 	obj := &api.Pod{
 		TypeMeta: metav1.TypeMeta{APIVersion: "/a", Kind: "b"},
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Namespace:       "bar",
 			Name:            "foo",
 			GenerateName:    "prefix",

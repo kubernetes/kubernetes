@@ -460,7 +460,7 @@ func TestHasUID(t *testing.T) {
 		{obj: &api.Pod{}, hasUID: false},
 		{obj: nil, hasUID: false},
 		{obj: runtime.Object(nil), hasUID: false},
-		{obj: &api.Pod{ObjectMeta: api.ObjectMeta{UID: types.UID("A")}}, hasUID: true},
+		{obj: &api.Pod{ObjectMeta: metav1.ObjectMeta{UID: types.UID("A")}}, hasUID: true},
 	}
 	for i, tc := range testcases {
 		actual, err := hasUID(tc.obj)

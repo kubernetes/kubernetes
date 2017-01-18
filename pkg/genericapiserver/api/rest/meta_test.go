@@ -19,6 +19,7 @@ package rest
 import (
 	"testing"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	genericapirequest "k8s.io/apiserver/pkg/request"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/util/uuid"
@@ -27,7 +28,7 @@ import (
 // TestFillObjectMetaSystemFields validates that system populated fields are set on an object
 func TestFillObjectMetaSystemFields(t *testing.T) {
 	ctx := genericapirequest.NewDefaultContext()
-	resource := api.ObjectMeta{}
+	resource := metav1.ObjectMeta{}
 	FillObjectMetaSystemFields(ctx, &resource)
 	if resource.CreationTimestamp.Time.IsZero() {
 		t.Errorf("resource.CreationTimestamp is zero")
@@ -37,7 +38,7 @@ func TestFillObjectMetaSystemFields(t *testing.T) {
 	// verify we can inject a UID
 	uid := uuid.NewUUID()
 	ctx = genericapirequest.WithUID(ctx, uid)
-	resource = api.ObjectMeta{}
+	resource = metav1.ObjectMeta{}
 	FillObjectMetaSystemFields(ctx, &resource)
 	if resource.UID != uid {
 		t.Errorf("resource.UID expected: %v, actual: %v", uid, resource.UID)
@@ -47,7 +48,7 @@ func TestFillObjectMetaSystemFields(t *testing.T) {
 // TestHasObjectMetaSystemFieldValues validates that true is returned if and only if all fields are populated
 func TestHasObjectMetaSystemFieldValues(t *testing.T) {
 	ctx := genericapirequest.NewDefaultContext()
-	resource := api.ObjectMeta{}
+	resource := metav1.ObjectMeta{}
 	if api.HasObjectMetaSystemFieldValues(&resource) {
 		t.Errorf("the resource does not have all fields yet populated, but incorrectly reports it does")
 	}
@@ -68,7 +69,7 @@ func TestValidNamespace(t *testing.T) {
 	if namespace != resource.Namespace {
 		t.Fatalf("expected resource to have the default namespace assigned during validation")
 	}
-	resource = api.ReplicationController{ObjectMeta: api.ObjectMeta{Namespace: "other"}}
+	resource = api.ReplicationController{ObjectMeta: metav1.ObjectMeta{Namespace: "other"}}
 	if ValidNamespace(ctx, &resource.ObjectMeta) {
 		t.Fatalf("Expected error that resource and context errors do not match because resource has different namespace")
 	}

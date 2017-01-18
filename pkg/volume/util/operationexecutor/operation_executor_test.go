@@ -17,14 +17,16 @@ limitations under the License.
 package operationexecutor
 
 import (
+	"strconv"
+	"testing"
+	"time"
+
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/util/uuid"
 	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
-	"strconv"
-	"testing"
-	"time"
 )
 
 const (
@@ -281,7 +283,7 @@ func (fopg *fakeOperationGenerator) GenerateVerifyControllerAttachedVolumeFunc(v
 
 func getTestPodWithSecret(podName, secretName string) *v1.Pod {
 	return &v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: podName,
 			UID:  types.UID(podName),
 		},
@@ -318,7 +320,7 @@ func getTestPodWithSecret(podName, secretName string) *v1.Pod {
 
 func getTestPodWithGCEPD(podName, pdName string) *v1.Pod {
 	return &v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: podName,
 			UID:  types.UID(podName + string(uuid.NewUUID())),
 		},

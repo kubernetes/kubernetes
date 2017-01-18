@@ -25,6 +25,7 @@ import (
 	"testing"
 	"time"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/api/resource"
@@ -105,7 +106,7 @@ func reverseNumericPriority(pod *v1.Pod, nodeNameToInfo map[string]*schedulercac
 func makeNodeList(nodeNames []string) []*v1.Node {
 	result := make([]*v1.Node, 0, len(nodeNames))
 	for _, nodeName := range nodeNames {
-		result = append(result, &v1.Node{ObjectMeta: v1.ObjectMeta{Name: nodeName}})
+		result = append(result, &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: nodeName}})
 	}
 	return result
 }
@@ -193,10 +194,10 @@ func TestGenericScheduler(t *testing.T) {
 			prioritizers: []algorithm.PriorityConfig{{Map: EqualPriorityMap, Weight: 1}},
 			nodes:        []string{"machine1", "machine2"},
 			expectsErr:   true,
-			pod:          &v1.Pod{ObjectMeta: v1.ObjectMeta{Name: "2"}},
+			pod:          &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "2"}},
 			name:         "test 1",
 			wErr: &FitError{
-				Pod: &v1.Pod{ObjectMeta: v1.ObjectMeta{Name: "2"}},
+				Pod: &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "2"}},
 				FailedPredicates: FailedPredicateMap{
 					"machine1": []algorithm.PredicateFailureReason{algorithmpredicates.ErrFakePredicate},
 					"machine2": []algorithm.PredicateFailureReason{algorithmpredicates.ErrFakePredicate},
@@ -206,7 +207,7 @@ func TestGenericScheduler(t *testing.T) {
 			predicates:    map[string]algorithm.FitPredicate{"true": truePredicate},
 			prioritizers:  []algorithm.PriorityConfig{{Map: EqualPriorityMap, Weight: 1}},
 			nodes:         []string{"machine1", "machine2"},
-			pod:           &v1.Pod{ObjectMeta: v1.ObjectMeta{Name: "ignore"}},
+			pod:           &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "ignore"}},
 			expectedHosts: sets.NewString("machine1", "machine2"),
 			name:          "test 2",
 			wErr:          nil,
@@ -216,7 +217,7 @@ func TestGenericScheduler(t *testing.T) {
 			predicates:    map[string]algorithm.FitPredicate{"matches": matchesPredicate},
 			prioritizers:  []algorithm.PriorityConfig{{Map: EqualPriorityMap, Weight: 1}},
 			nodes:         []string{"machine1", "machine2"},
-			pod:           &v1.Pod{ObjectMeta: v1.ObjectMeta{Name: "machine2"}},
+			pod:           &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "machine2"}},
 			expectedHosts: sets.NewString("machine2"),
 			name:          "test 3",
 			wErr:          nil,
@@ -225,7 +226,7 @@ func TestGenericScheduler(t *testing.T) {
 			predicates:    map[string]algorithm.FitPredicate{"true": truePredicate},
 			prioritizers:  []algorithm.PriorityConfig{{Function: numericPriority, Weight: 1}},
 			nodes:         []string{"3", "2", "1"},
-			pod:           &v1.Pod{ObjectMeta: v1.ObjectMeta{Name: "ignore"}},
+			pod:           &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "ignore"}},
 			expectedHosts: sets.NewString("3"),
 			name:          "test 4",
 			wErr:          nil,
@@ -234,7 +235,7 @@ func TestGenericScheduler(t *testing.T) {
 			predicates:    map[string]algorithm.FitPredicate{"matches": matchesPredicate},
 			prioritizers:  []algorithm.PriorityConfig{{Function: numericPriority, Weight: 1}},
 			nodes:         []string{"3", "2", "1"},
-			pod:           &v1.Pod{ObjectMeta: v1.ObjectMeta{Name: "2"}},
+			pod:           &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "2"}},
 			expectedHosts: sets.NewString("2"),
 			name:          "test 5",
 			wErr:          nil,
@@ -243,7 +244,7 @@ func TestGenericScheduler(t *testing.T) {
 			predicates:    map[string]algorithm.FitPredicate{"true": truePredicate},
 			prioritizers:  []algorithm.PriorityConfig{{Function: numericPriority, Weight: 1}, {Function: reverseNumericPriority, Weight: 2}},
 			nodes:         []string{"3", "2", "1"},
-			pod:           &v1.Pod{ObjectMeta: v1.ObjectMeta{Name: "2"}},
+			pod:           &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "2"}},
 			expectedHosts: sets.NewString("1"),
 			name:          "test 6",
 			wErr:          nil,
@@ -252,11 +253,11 @@ func TestGenericScheduler(t *testing.T) {
 			predicates:   map[string]algorithm.FitPredicate{"true": truePredicate, "false": falsePredicate},
 			prioritizers: []algorithm.PriorityConfig{{Function: numericPriority, Weight: 1}},
 			nodes:        []string{"3", "2", "1"},
-			pod:          &v1.Pod{ObjectMeta: v1.ObjectMeta{Name: "2"}},
+			pod:          &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "2"}},
 			expectsErr:   true,
 			name:         "test 7",
 			wErr: &FitError{
-				Pod: &v1.Pod{ObjectMeta: v1.ObjectMeta{Name: "2"}},
+				Pod: &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "2"}},
 				FailedPredicates: FailedPredicateMap{
 					"3": []algorithm.PredicateFailureReason{algorithmpredicates.ErrFakePredicate},
 					"2": []algorithm.PredicateFailureReason{algorithmpredicates.ErrFakePredicate},
@@ -271,7 +272,7 @@ func TestGenericScheduler(t *testing.T) {
 			},
 			pods: []*v1.Pod{
 				{
-					ObjectMeta: v1.ObjectMeta{Name: "2"},
+					ObjectMeta: metav1.ObjectMeta{Name: "2"},
 					Spec: v1.PodSpec{
 						NodeName: "2",
 					},
@@ -280,13 +281,13 @@ func TestGenericScheduler(t *testing.T) {
 					},
 				},
 			},
-			pod:          &v1.Pod{ObjectMeta: v1.ObjectMeta{Name: "2"}},
+			pod:          &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "2"}},
 			prioritizers: []algorithm.PriorityConfig{{Function: numericPriority, Weight: 1}},
 			nodes:        []string{"1", "2"},
 			expectsErr:   true,
 			name:         "test 8",
 			wErr: &FitError{
-				Pod: &v1.Pod{ObjectMeta: v1.ObjectMeta{Name: "2"}},
+				Pod: &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "2"}},
 				FailedPredicates: FailedPredicateMap{
 					"1": []algorithm.PredicateFailureReason{algorithmpredicates.ErrFakePredicate},
 					"2": []algorithm.PredicateFailureReason{algorithmpredicates.ErrFakePredicate},
@@ -300,7 +301,7 @@ func TestGenericScheduler(t *testing.T) {
 			cache.AddPod(pod)
 		}
 		for _, name := range test.nodes {
-			cache.AddNode(&v1.Node{ObjectMeta: v1.ObjectMeta{Name: name}})
+			cache.AddNode(&v1.Node{ObjectMeta: metav1.ObjectMeta{Name: name}})
 		}
 
 		scheduler := NewGenericScheduler(
@@ -349,14 +350,14 @@ func TestFindFitAllError(t *testing.T) {
 func TestFindFitSomeError(t *testing.T) {
 	nodes := []string{"3", "2", "1"}
 	predicates := map[string]algorithm.FitPredicate{"true": truePredicate, "match": matchesPredicate}
-	pod := &v1.Pod{ObjectMeta: v1.ObjectMeta{Name: "1"}}
+	pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "1"}}
 	nodeNameToInfo := map[string]*schedulercache.NodeInfo{
 		"3": schedulercache.NewNodeInfo(),
 		"2": schedulercache.NewNodeInfo(),
 		"1": schedulercache.NewNodeInfo(pod),
 	}
 	for name := range nodeNameToInfo {
-		nodeNameToInfo[name].SetNode(&v1.Node{ObjectMeta: v1.ObjectMeta{Name: name}})
+		nodeNameToInfo[name].SetNode(&v1.Node{ObjectMeta: metav1.ObjectMeta{Name: name}})
 	}
 
 	_, predicateMap, err := findNodesThatFit(pod, nodeNameToInfo, makeNodeList(nodes), predicates, nil, algorithm.EmptyMetadataProducer)
@@ -384,7 +385,7 @@ func TestFindFitSomeError(t *testing.T) {
 
 func makeNode(node string, milliCPU, memory int64) *v1.Node {
 	return &v1.Node{
-		ObjectMeta: v1.ObjectMeta{Name: node},
+		ObjectMeta: metav1.ObjectMeta{Name: node},
 		Status: v1.NodeStatus{
 			Capacity: v1.ResourceList{
 				"cpu":    *resource.NewMilliQuantity(milliCPU, resource.DecimalSI),
@@ -400,7 +401,7 @@ func makeNode(node string, milliCPU, memory int64) *v1.Node {
 
 func TestHumanReadableFitError(t *testing.T) {
 	error := &FitError{
-		Pod: &v1.Pod{ObjectMeta: v1.ObjectMeta{Name: "2"}},
+		Pod: &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "2"}},
 		FailedPredicates: FailedPredicateMap{
 			"1": []algorithm.PredicateFailureReason{algorithmpredicates.ErrNodeUnderMemoryPressure},
 			"2": []algorithm.PredicateFailureReason{algorithmpredicates.ErrNodeUnderDiskPressure},

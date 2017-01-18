@@ -20,6 +20,7 @@ import (
 	"sync"
 	"testing"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/pkg/api"
 	"k8s.io/client-go/pkg/api/v1"
@@ -51,7 +52,7 @@ func consume(t *testing.T, w watch.Interface, rvs []string, done *sync.WaitGroup
 func TestRCNumber(t *testing.T) {
 	pod := func(name string) *v1.Pod {
 		return &v1.Pod{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name: name,
 			},
 		}

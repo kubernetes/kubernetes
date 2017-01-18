@@ -34,7 +34,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/v1"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/client/restclient"
@@ -54,7 +53,7 @@ func TestThirdPartyDiscovery(t *testing.T) {
 	once := sync.Once{}
 	deleteFoo := installThirdParty(t, client, clientConfig,
 		&extensions.ThirdPartyResource{
-			ObjectMeta: v1.ObjectMeta{Name: "foo.company.com"},
+			ObjectMeta: metav1.ObjectMeta{Name: "foo.company.com"},
 			Versions:   []extensions.APIVersion{{Name: version}},
 		}, group, version, "foos",
 	)
@@ -117,8 +116,8 @@ func TestThirdPartyMultiple(t *testing.T) {
 var versionsToTest = []string{"v1"}
 
 type Foo struct {
-	metav1.TypeMeta `json:",inline"`
-	v1.ObjectMeta   `json:"metadata,omitempty" description:"standard object metadata"`
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty" description:"standard object metadata"`
 
 	SomeField  string `json:"someField"`
 	OtherField int    `json:"otherField"`
@@ -184,7 +183,7 @@ func DoTestInstallMultipleAPIs(t *testing.T, client clientset.Interface, clientC
 
 	deleteFoo := installThirdParty(t, client, clientConfig,
 		&extensions.ThirdPartyResource{
-			ObjectMeta: v1.ObjectMeta{Name: "foo.company.com"},
+			ObjectMeta: metav1.ObjectMeta{Name: "foo.company.com"},
 			Versions:   []extensions.APIVersion{{Name: version}},
 		}, group, version, "foos",
 	)
@@ -193,7 +192,7 @@ func DoTestInstallMultipleAPIs(t *testing.T, client clientset.Interface, clientC
 	// TODO make multiple resources in one version work
 	// deleteBar = installThirdParty(t, client, clientConfig,
 	// 	&extensions.ThirdPartyResource{
-	// 		ObjectMeta: v1.ObjectMeta{Name: "bar.company.com"},
+	// 		ObjectMeta: metav1.ObjectMeta{Name: "bar.company.com"},
 	// 		Versions:   []extensions.APIVersion{{Name: version}},
 	// 	}, group, version, "bars",
 	// )
@@ -211,7 +210,7 @@ func testInstallThirdPartyAPIDeleteVersion(t *testing.T, client clientset.Interf
 
 	deleteFoo := installThirdParty(t, client, clientConfig,
 		&extensions.ThirdPartyResource{
-			ObjectMeta: v1.ObjectMeta{Name: "foo.company.com"},
+			ObjectMeta: metav1.ObjectMeta{Name: "foo.company.com"},
 			Versions:   []extensions.APIVersion{{Name: version}},
 		}, group, version, "foos",
 	)
@@ -226,7 +225,7 @@ func testInstallThirdPartyAPIDeleteVersion(t *testing.T, client clientset.Interf
 	}
 
 	expectedObj := Foo{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test",
 			Namespace: "default",
 		},

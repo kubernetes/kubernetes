@@ -437,7 +437,7 @@ func (o *DrainOptions) evictPod(pod api.Pod, policyGroupVersion string) error {
 			APIVersion: policyGroupVersion,
 			Kind:       EvictionKind,
 		},
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      pod.Name,
 			Namespace: pod.Namespace,
 		},

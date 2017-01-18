@@ -324,7 +324,7 @@ func TestServiceAlloc(t *testing.T) {
 
 	svc := func(i int) *api.Service {
 		return &api.Service{
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name: fmt.Sprintf("svc-%v", i),
 			},
 			Spec: api.ServiceSpec{
@@ -408,7 +408,7 @@ func TestUpdateNodeObjects(t *testing.T) {
 	for i := 0; i < nodes*6; i++ {
 		c.Nodes().Delete(fmt.Sprintf("node-%d", i), nil)
 		_, err := c.Nodes().Create(&v1.Node{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name: fmt.Sprintf("node-%d", i),
 			},
 		})

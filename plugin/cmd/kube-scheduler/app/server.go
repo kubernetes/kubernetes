@@ -27,6 +27,7 @@ import (
 	goruntime "runtime"
 	"strconv"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/healthz"
 	"k8s.io/kubernetes/pkg/api/v1"
@@ -101,7 +102,7 @@ func Run(s *options.SchedulerServer) error {
 	}
 	// TODO: enable other lock types
 	rl := &resourcelock.EndpointsLock{
-		EndpointsMeta: v1.ObjectMeta{
+		EndpointsMeta: metav1.ObjectMeta{
 			Namespace: "kube-system",
 			Name:      "kube-scheduler",
 		},
