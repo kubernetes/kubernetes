@@ -17,6 +17,7 @@ api-external-dns-names
 api-port
 api-prefix
 api-rate
+api-server-port
 api-server-advertise-address
 api-server-port
 api-server-service-type

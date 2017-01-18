@@ -308,7 +308,7 @@ func (kl *Kubelet) initialNode() (*v1.Node, error) {
 // It synchronizes node status to master, registering the kubelet first if
 // necessary.
 func (kl *Kubelet) syncNodeStatus() {
-	if kl.kubeClient == nil {
+	if kl.kubeClient == nil || kl.standaloneMode {
 		return
 	}
 	if kl.registerNode {
