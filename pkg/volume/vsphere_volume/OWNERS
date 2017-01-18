@@ -1,8 +1,11 @@
 approvers:
-- rootfs
+- pmorie
 - saad-ali
-- jingxu97
+- thockin
+- matchstick
 reviewers:
+- abithap
+- abrarshivani
 - thockin
 - smarterclayton
 - deads2k
