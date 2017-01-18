@@ -76,6 +76,7 @@ if [[ -z "${KUBEADM_PATH:-}" ]]; then
     "${KUBE_ROOT}/_output/bin/kubeadm"
     "${KUBE_ROOT}/_output/dockerized/bin/${host_os}/${host_arch}/kubeadm"
     "${KUBE_ROOT}/_output/local/bin/${host_os}/${host_arch}/kubeadm"
+    "${KUBE_ROOT}/bazel-bin/cmd/kubectl/kubeadm"
     "${KUBE_ROOT}/platforms/${host_os}/${host_arch}/kubeadm"
   )
   kubeadm=$( (ls -t "${locations[@]}" 2>/dev/null || true) | head -1 )

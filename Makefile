@@ -470,7 +470,7 @@ help:
 endif
 
 # Non-dockerized bazel rules.
-.PHONY: bazel-build bazel-test
+.PHONY: bazel-build bazel-test bazel-release
 
 ifeq ($(PRINT_HELP),y)
 define BAZEL_BUILD_HELP_INFO
@@ -499,4 +499,18 @@ endef
 else
 bazel-test:
 	bazel test  --test_output=errors //cmd/... //pkg/... //federation/... //plugin/... //build/... //third_party/... //hack/...
+endif
+
+ifeq ($(PRINT_HELP),y)
+define BAZEL_BUILD_HELP_INFO
+# Build release tars with bazel
+#
+# Example:
+# make bazel-release
+endef
+bazel-release:
+	@echo "$$BAZEL_BUILD_HELP_INFO"
+else
+bazel-release:
+	bazel build //build/release-tars
 endif

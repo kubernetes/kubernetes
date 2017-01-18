@@ -71,7 +71,10 @@ go_test(
         "volume_manager_test.go",
     ],
     library = ":go_default_library",
-    tags = ["automanaged"],
+    tags = [
+        "automanaged",
+        "integration",
+    ],
     deps = [
         "//pkg/api/resource:go_default_library",
         "//pkg/api/v1:go_default_library",
@@ -112,6 +115,15 @@ go_test(
         "//vendor:k8s.io/apimachinery/pkg/types",
         "//vendor:k8s.io/apimachinery/pkg/watch",
     ],
+)
+
+genrule(
+    name = "gen_e2e_node.test",
+    testonly = 1,
+    srcs = [":go_default_test"],
+    outs = ["e2e_node.test"],
+    cmd = "srcs=($(SRCS)); cp $$(dirname $${srcs[0]})/go_default_test $@;",
+    output_to_bindir = 1,
 )
 
 filegroup(
