@@ -30,7 +30,10 @@ go_library(
 
 go_test(
     name = "go_default_test",
-    srcs = ["cache_test.go"],
+    srcs = [
+        "cache_test.go",
+        "node_info_test.go",
+    ], 
     library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
