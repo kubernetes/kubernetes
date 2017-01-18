@@ -8,25 +8,6 @@ load(
     "go_test",
 )
 
-go_library(
-    name = "go_default_library",
-    srcs = ["admission.go"],
-    tags = ["automanaged"],
-    deps = [
-        "//pkg/api:go_default_library",
-        "//pkg/client/cache:go_default_library",
-        "//pkg/client/clientset_generated/internalclientset:go_default_library",
-        "//pkg/controller/informers:go_default_library",
-        "//pkg/kubeapiserver/admission:go_default_library",
-        "//vendor:github.com/golang/glog",
-        "//vendor:k8s.io/apimachinery/pkg/api/errors",
-        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
-        "//vendor:k8s.io/apimachinery/pkg/labels",
-        "//vendor:k8s.io/apimachinery/pkg/util/yaml",
-        "//vendor:k8s.io/apiserver/pkg/admission",
-    ],
-)
-
 go_test(
     name = "go_default_test",
     srcs = ["admission_test.go"],
@@ -36,11 +17,29 @@ go_test(
         "//pkg/api:go_default_library",
         "//pkg/client/clientset_generated/internalclientset:go_default_library",
         "//pkg/client/clientset_generated/internalclientset/fake:go_default_library",
-        "//pkg/controller/informers:go_default_library",
+        "//pkg/client/informers/informers_generated:go_default_library",
         "//pkg/kubeapiserver/admission:go_default_library",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/labels",
-        "//vendor:k8s.io/apimachinery/pkg/util/wait",
+        "//vendor:k8s.io/apiserver/pkg/admission",
+    ],
+)
+
+go_library(
+    name = "go_default_library",
+    srcs = ["admission.go"],
+    tags = ["automanaged"],
+    deps = [
+        "//pkg/api:go_default_library",
+        "//pkg/client/clientset_generated/internalclientset:go_default_library",
+        "//pkg/client/informers/informers_generated:go_default_library",
+        "//pkg/client/listers/core/internalversion:go_default_library",
+        "//pkg/kubeapiserver/admission:go_default_library",
+        "//vendor:github.com/golang/glog",
+        "//vendor:k8s.io/apimachinery/pkg/api/errors",
+        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor:k8s.io/apimachinery/pkg/labels",
+        "//vendor:k8s.io/apimachinery/pkg/util/yaml",
         "//vendor:k8s.io/apiserver/pkg/admission",
     ],
 )

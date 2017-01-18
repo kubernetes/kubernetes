@@ -12,13 +12,16 @@ go_library(
     srcs = [
         "expansion_generated.go",
         "statefulset.go",
+        "statefulset_expansion.go",
     ],
     tags = ["automanaged"],
     deps = [
+        "//pkg/api/v1:go_default_library",
         "//pkg/apis/apps:go_default_library",
         "//pkg/apis/apps/v1beta1:go_default_library",
         "//pkg/client/cache:go_default_library",
         "//vendor:k8s.io/apimachinery/pkg/api/errors",
+        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/labels",
     ],
 )

@@ -36,7 +36,7 @@ go_library(
         "//pkg/apis/componentconfig:go_default_library",
         "//pkg/apis/componentconfig/v1alpha1:go_default_library",
         "//pkg/client/clientset_generated/internalclientset:go_default_library",
-        "//pkg/controller/informers:go_default_library",
+        "//pkg/client/informers/informers_generated:go_default_library",
         "//vendor:github.com/ghodss/yaml",
         "//vendor:github.com/golang/glog",
         "//vendor:k8s.io/apimachinery/pkg/runtime",

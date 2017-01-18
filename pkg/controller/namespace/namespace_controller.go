@@ -17,18 +17,20 @@ limitations under the License.
 package namespace
 
 import (
+	"fmt"
 	"time"
 
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	coreinformers "k8s.io/kubernetes/pkg/client/informers/informers_generated/core/v1"
+	corelisters "k8s.io/kubernetes/pkg/client/listers/core/v1"
 	"k8s.io/kubernetes/pkg/client/typed/dynamic"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/util/metrics"
@@ -53,10 +55,10 @@ type NamespaceController struct {
 	kubeClient clientset.Interface
 	// clientPool manages a pool of dynamic clients
 	clientPool dynamic.ClientPool
-	// store that holds the namespaces
-	store cache.Store
-	// controller that observes the namespaces
-	controller cache.Controller
+	// lister that holds the namespaces
+	lister corelisters.NamespaceLister
+	// function that returns true when the lister's data store is synced
+	listerSynced cache.InformerSynced
 	// namespaces that have been queued up for processing by workers
 	queue workqueue.RateLimitingInterface
 	// function to list of preferred resources for namespace deletion
@@ -71,8 +73,8 @@ type NamespaceController struct {
 func NewNamespaceController(
 	kubeClient clientset.Interface,
 	clientPool dynamic.ClientPool,
+	namespaceInformer coreinformers.NamespaceInformer,
 	discoverResourcesFn func() ([]*metav1.APIResourceList, error),
-	resyncPeriod time.Duration,
 	finalizerToken v1.FinalizerName) *NamespaceController {
 
 	opCache := &operationNotSupportedCache{
@@ -116,6 +118,8 @@ func NewNamespaceController(
 	namespaceController := &NamespaceController{
 		kubeClient:          kubeClient,
 		clientPool:          clientPool,
+		lister:              namespaceInformer.Lister(),
+		listerSynced:        namespaceInformer.Informer().HasSynced,
 		queue:               workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "namespace"),
 		discoverResourcesFn: discoverResourcesFn,
 		opCache:             opCache,
@@ -127,31 +131,17 @@ func NewNamespaceController(
 	}
 
 	// configure the backing store/controller
-	store, controller := cache.NewInformer(
-		&cache.ListWatch{
-			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
-				return kubeClient.Core().Namespaces().List(options)
-			},
-			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
-				return kubeClient.Core().Namespaces().Watch(options)
-			},
+	namespaceInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+		AddFunc: func(obj interface{}) {
+			namespace := obj.(*v1.Namespace)
+			namespaceController.enqueueNamespace(namespace)
 		},
-		&v1.Namespace{},
-		resyncPeriod,
-		cache.ResourceEventHandlerFuncs{
-			AddFunc: func(obj interface{}) {
-				namespace := obj.(*v1.Namespace)
-				namespaceController.enqueueNamespace(namespace)
-			},
-			UpdateFunc: func(oldObj, newObj interface{}) {
-				namespace := newObj.(*v1.Namespace)
-				namespaceController.enqueueNamespace(namespace)
-			},
+		UpdateFunc: func(oldObj, newObj interface{}) {
+			namespace := newObj.(*v1.Namespace)
+			namespaceController.enqueueNamespace(namespace)
 		},
-	)
+	})
 
-	namespaceController.store = store
-	namespaceController.controller = controller
 	return namespaceController
 }
 
@@ -208,29 +198,32 @@ func (nm *NamespaceController) worker() {
 	}
 }
 
-// syncNamespaceFromKey looks for a namespace with the specified key in its store and synchronizes it
+// syncNamespaceFromKey looks for a namespace with the specified key in its lister and synchronizes it
 func (nm *NamespaceController) syncNamespaceFromKey(key string) (err error) {
 	startTime := time.Now()
 	defer glog.V(4).Infof("Finished syncing namespace %q (%v)", key, time.Now().Sub(startTime))
 
-	obj, exists, err := nm.store.GetByKey(key)
-	if !exists {
-		glog.Infof("Namespace has been deleted %v", key)
-		return nil
-	}
+	namespace, err := nm.lister.Get(key)
 	if err != nil {
+		if errors.IsNotFound(err) {
+			glog.Infof("Namespace has been deleted %v", key)
+			return nil
+		}
 		glog.Errorf("Unable to retrieve namespace %v from store: %v", key, err)
 		nm.queue.Add(key)
 		return err
 	}
-	namespace := obj.(*v1.Namespace)
 	return syncNamespace(nm.kubeClient, nm.clientPool, nm.opCache, nm.discoverResourcesFn, namespace, nm.finalizerToken)
 }
 
 // Run starts observing the system with the specified number of workers.
 func (nm *NamespaceController) Run(workers int, stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
-	go nm.controller.Run(stopCh)
+
+	if !cache.WaitForCacheSync(stopCh, nm.listerSynced) {
+		utilruntime.HandleError(fmt.Errorf("timed out waiting for caches to sync"))
+	}
+
 	for i := 0; i < workers; i++ {
 		go wait.Until(nm.worker, time.Second, stopCh)
 	}

@@ -22,19 +22,22 @@ import (
 	"sort"
 	"time"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/errors"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	apps "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	v1core "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/core/v1"
+	appsinformers "k8s.io/kubernetes/pkg/client/informers/informers_generated/apps/v1beta1"
+	coreinformers "k8s.io/kubernetes/pkg/client/informers/informers_generated/core/v1"
+	appslisters "k8s.io/kubernetes/pkg/client/listers/apps/v1beta1"
+	corelisters "k8s.io/kubernetes/pkg/client/listers/core/v1"
 	"k8s.io/kubernetes/pkg/client/record"
-
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/errors"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/util/workqueue"
 
@@ -59,17 +62,14 @@ type StatefulSetController struct {
 	newSyncer func(*pcb) *petSyncer
 
 	// podStore is a cache of watched pods.
-	podStore cache.StoreToPodLister
+	podStore corelisters.PodLister
 
 	// podStoreSynced returns true if the pod store has synced at least once.
-	podStoreSynced func() bool
-	// Watches changes to all pods.
-	podController cache.Controller
+	podStoreSynced cache.InformerSynced
 
 	// A store of StatefulSets, populated by the psController.
-	psStore cache.StoreToStatefulSetLister
-	// Watches changes to all StatefulSets.
-	psController cache.Controller
+	psStore       appslisters.StatefulSetLister
+	psStoreSynced cache.InformerSynced
 
 	// A store of the 1 unhealthy pet blocking progress for a given ps
 	blockingPetStore *unhealthyPetTracker
@@ -83,7 +83,7 @@ type StatefulSetController struct {
 }
 
 // NewStatefulSetController creates a new statefulset controller.
-func NewStatefulSetController(podInformer cache.SharedIndexInformer, kubeClient clientset.Interface, resyncPeriod time.Duration) *StatefulSetController {
+func NewStatefulSetController(podInformer coreinformers.PodInformer, statefulSetInformer appsinformers.StatefulSetInformer, kubeClient clientset.Interface) *StatefulSetController {
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(glog.Infof)
 	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: kubeClient.Core().Events("")})
@@ -99,7 +99,7 @@ func NewStatefulSetController(podInformer cache.SharedIndexInformer, kubeClient 
 		queue: workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "statefulset"),
 	}
 
-	podInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
+	podInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		// lookup the statefulset and enqueue
 		AddFunc: psc.addPod,
 		// lookup current and old statefulset if labels changed
@@ -107,35 +107,25 @@ func NewStatefulSetController(podInformer cache.SharedIndexInformer, kubeClient 
 		// lookup statefulset accounting for deletion tombstones
 		DeleteFunc: psc.deletePod,
 	})
-	psc.podStore.Indexer = podInformer.GetIndexer()
-	psc.podController = podInformer.GetController()
+	psc.podStore = podInformer.Lister()
+	psc.podStoreSynced = podInformer.Informer().HasSynced
 
-	psc.psStore.Store, psc.psController = cache.NewInformer(
-		&cache.ListWatch{
-			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
-				return psc.kubeClient.Apps().StatefulSets(v1.NamespaceAll).List(options)
-			},
-			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
-				return psc.kubeClient.Apps().StatefulSets(v1.NamespaceAll).Watch(options)
-			},
+	statefulSetInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+		AddFunc: psc.enqueueStatefulSet,
+		UpdateFunc: func(old, cur interface{}) {
+			oldPS := old.(*apps.StatefulSet)
+			curPS := cur.(*apps.StatefulSet)
+			if oldPS.Status.Replicas != curPS.Status.Replicas {
+				glog.V(4).Infof("Observed updated replica count for StatefulSet: %v, %d->%d", curPS.Name, oldPS.Status.Replicas, curPS.Status.Replicas)
+			}
+			psc.enqueueStatefulSet(cur)
 		},
-		&apps.StatefulSet{},
-		statefulSetResyncPeriod,
-		cache.ResourceEventHandlerFuncs{
-			AddFunc: psc.enqueueStatefulSet,
-			UpdateFunc: func(old, cur interface{}) {
-				oldPS := old.(*apps.StatefulSet)
-				curPS := cur.(*apps.StatefulSet)
-				if oldPS.Status.Replicas != curPS.Status.Replicas {
-					glog.V(4).Infof("Observed updated replica count for StatefulSet: %v, %d->%d", curPS.Name, oldPS.Status.Replicas, curPS.Status.Replicas)
-				}
-				psc.enqueueStatefulSet(cur)
-			},
-			DeleteFunc: psc.enqueueStatefulSet,
-		},
-	)
+		DeleteFunc: psc.enqueueStatefulSet,
+	})
+	psc.psStore = statefulSetInformer.Lister()
+	psc.psStoreSynced = statefulSetInformer.Informer().HasSynced
+
 	// TODO: Watch volumes
-	psc.podStoreSynced = psc.podController.HasSynced
 	psc.syncHandler = psc.Sync
 	return psc
 }
@@ -144,8 +134,6 @@ func NewStatefulSetController(podInformer cache.SharedIndexInformer, kubeClient 
 func (psc *StatefulSetController) Run(workers int, stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 	glog.Infof("Starting statefulset controller")
-	go psc.podController.Run(stopCh)
-	go psc.psController.Run(stopCh)
 	for i := 0; i < workers; i++ {
 		go wait.Until(psc.worker, time.Second, stopCh)
 	}
@@ -245,7 +233,7 @@ func (psc *StatefulSetController) getStatefulSetForPod(pod *v1.Pod) *apps.Statef
 		glog.Errorf("user error! more than one StatefulSet is selecting pods with labels: %+v", pod.Labels)
 		sort.Sort(overlappingStatefulSets(ps))
 	}
-	return &ps[0]
+	return ps[0]
 }
 
 // enqueueStatefulSet enqueues the given statefulset in the work queue.
@@ -291,26 +279,33 @@ func (psc *StatefulSetController) Sync(key string) error {
 		return fmt.Errorf("waiting for pods controller to sync")
 	}
 
-	obj, exists, err := psc.psStore.Store.GetByKey(key)
-	if !exists {
-		if err = psc.blockingPetStore.store.Delete(key); err != nil {
+	namespace, name, err := cache.SplitMetaNamespaceKey(key)
+	if err != nil {
+		return err
+	}
+	ps, err := psc.psStore.StatefulSets(namespace).Get(name)
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			if err = psc.blockingPetStore.store.Delete(key); err != nil {
+				return err
+			}
+			glog.Infof("StatefulSet has been deleted %v", key)
+			return nil
+		} else {
+			utilruntime.HandleError(fmt.Errorf("Unable to retrieve StatefulSet %v from store: %v", key, err))
 			return err
 		}
-		glog.Infof("StatefulSet has been deleted %v", key)
-		return nil
-	}
-	if err != nil {
-		glog.Errorf("Unable to retrieve StatefulSet %v from store: %v", key, err)
-		return err
 	}
 
-	ps := *obj.(*apps.StatefulSet)
-	petList, err := psc.getPodsForStatefulSet(&ps)
+	copy, err := api.Scheme.DeepCopy(ps)
+	ps = copy.(*apps.StatefulSet)
+
+	petList, err := psc.getPodsForStatefulSet(ps)
 	if err != nil {
 		return err
 	}
 
-	numPets, syncErr := psc.syncStatefulSet(&ps, petList)
+	numPets, syncErr := psc.syncStatefulSet(ps, petList)
 	if updateErr := updatePetCount(psc.kubeClient.Apps(), ps, numPets); updateErr != nil {
 		glog.Infof("Failed to update replica count for statefulset %v/%v; requeuing; error: %v", ps.Namespace, ps.Name, updateErr)
 		return errors.NewAggregate([]error{syncErr, updateErr})

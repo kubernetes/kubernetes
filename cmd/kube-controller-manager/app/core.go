@@ -45,7 +45,8 @@ import (
 
 func startEndpointController(ctx ControllerContext) (bool, error) {
 	go endpointcontroller.NewEndpointController(
-		ctx.InformerFactory.Pods().Informer(),
+		ctx.InformerFactory.Core().V1().Pods(),
+		ctx.InformerFactory.Core().V1().Services(),
 		ctx.ClientBuilder.ClientOrDie("endpoint-controller"),
 	).Run(int(ctx.Options.ConcurrentEndpointSyncs), ctx.Stop)
 	return true, nil
@@ -53,8 +54,8 @@ func startEndpointController(ctx ControllerContext) (bool, error) {
 
 func startReplicationController(ctx ControllerContext) (bool, error) {
 	go replicationcontroller.NewReplicationManager(
-		ctx.InformerFactory.Pods().Informer(),
-		ctx.InformerFactory.ReplicationControllers().Informer(),
+		ctx.InformerFactory.Core().V1().Pods(),
+		ctx.InformerFactory.Core().V1().ReplicationControllers(),
 		ctx.ClientBuilder.ClientOrDie("replication-controller"),
 		replicationcontroller.BurstReplicas,
 		int(ctx.Options.LookupCacheSizeForRC),
@@ -66,7 +67,7 @@ func startReplicationController(ctx ControllerContext) (bool, error) {
 func startPodGCController(ctx ControllerContext) (bool, error) {
 	go podgc.NewPodGC(
 		ctx.ClientBuilder.ClientOrDie("pod-garbage-collector"),
-		ctx.InformerFactory.Pods().Informer(),
+		ctx.InformerFactory.Core().V1().Pods(),
 		int(ctx.Options.TerminatedPodGCThreshold),
 	).Run(ctx.Stop)
 	return true, nil
@@ -124,7 +125,7 @@ func startNamespaceController(ctx ControllerContext) (bool, error) {
 			return snapshot, nil
 		}
 	}
-	namespaceController := namespacecontroller.NewNamespaceController(namespaceKubeClient, namespaceClientPool, discoverResourcesFn, ctx.Options.NamespaceSyncPeriod.Duration, v1.FinalizerKubernetes)
+	namespaceController := namespacecontroller.NewNamespaceController(namespaceKubeClient, namespaceClientPool, ctx.InformerFactory.Core().V1().Namespaces(), discoverResourcesFn, v1.FinalizerKubernetes)
 	go namespaceController.Run(int(ctx.Options.ConcurrentNamespaceSyncs), ctx.Stop)
 
 	return true, nil
@@ -133,8 +134,8 @@ func startNamespaceController(ctx ControllerContext) (bool, error) {
 
 func startServiceAccountController(ctx ControllerContext) (bool, error) {
 	go serviceaccountcontroller.NewServiceAccountsController(
-		ctx.InformerFactory.ServiceAccounts(),
-		ctx.InformerFactory.Namespaces(),
+		ctx.InformerFactory.Core().V1().ServiceAccounts(),
+		ctx.InformerFactory.Core().V1().Namespaces(),
 		ctx.ClientBuilder.ClientOrDie("service-account-controller"),
 		serviceaccountcontroller.DefaultServiceAccountsControllerOptions(),
 	).Run(1, ctx.Stop)
