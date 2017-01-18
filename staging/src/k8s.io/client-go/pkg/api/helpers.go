@@ -18,7 +18,6 @@ package api
 
 import (
 	"crypto/md5"
-	"encoding/json"
 	"fmt"
 	"reflect"
 	"strings"
@@ -486,32 +485,6 @@ const (
 	UnsafeSysctlsPodAnnotationKey string = "security.alpha.kubernetes.io/unsafe-sysctls"
 )
 
-// GetTolerationsFromPodAnnotations gets the json serialized tolerations data from Pod.Annotations
-// and converts it to the []Toleration type in api.
-func GetTolerationsFromPodAnnotations(annotations map[string]string) ([]Toleration, error) {
-	var tolerations []Toleration
-	if len(annotations) > 0 && annotations[TolerationsAnnotationKey] != "" {
-		err := json.Unmarshal([]byte(annotations[TolerationsAnnotationKey]), &tolerations)
-		if err != nil {
-			return tolerations, err
-		}
-	}
-	return tolerations, nil
-}
-
-// GetTaintsFromNodeAnnotations gets the json serialized taints data from Pod.Annotations
-// and converts it to the []Taint type in api.
-func GetTaintsFromNodeAnnotations(annotations map[string]string) ([]Taint, error) {
-	var taints []Taint
-	if len(annotations) > 0 && annotations[TaintsAnnotationKey] != "" {
-		err := json.Unmarshal([]byte(annotations[TaintsAnnotationKey]), &taints)
-		if err != nil {
-			return []Taint{}, err
-		}
-	}
-	return taints, nil
-}
-
 // TolerationToleratesTaint checks if the toleration tolerates the taint.
 func TolerationToleratesTaint(toleration *Toleration, taint *Taint) bool {
 	if len(toleration.Effect) != 0 && toleration.Effect != taint.Effect {
@@ -555,17 +528,6 @@ func (t *Taint) ToString() string {
 		return fmt.Sprintf("%v:%v", t.Key, t.Effect)
 	}
 	return fmt.Sprintf("%v=%v:%v", t.Key, t.Value, t.Effect)
-}
-
-func GetAvoidPodsFromNodeAnnotations(annotations map[string]string) (AvoidPods, error) {
-	var avoidPods AvoidPods
-	if len(annotations) > 0 && annotations[PreferAvoidPodsAnnotationKey] != "" {
-		err := json.Unmarshal([]byte(annotations[PreferAvoidPodsAnnotationKey]), &avoidPods)
-		if err != nil {
-			return avoidPods, err
-		}
-	}
-	return avoidPods, nil
 }
 
 // SysctlsFromPodAnnotations parses the sysctl annotations into a slice of safe Sysctls
