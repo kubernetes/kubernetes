@@ -10,23 +10,15 @@ load(
 
 go_library(
     name = "go_default_library",
-    srcs = [
-        "cluster_helper.go",
-        "dns.go",
-        "doc.go",
-        "endpoint_helper.go",
-        "service_helper.go",
-        "servicecontroller.go",
-    ],
+    srcs = ["service_controller.go"],
     tags = ["automanaged"],
     deps = [
         "//federation/apis/federation/v1beta1:go_default_library",
-        "//federation/client/cache:go_default_library",
         "//federation/client/clientset_generated/federation_clientset:go_default_library",
-        "//federation/pkg/dnsprovider:go_default_library",
-        "//federation/pkg/dnsprovider/rrstype:go_default_library",
+        "//federation/pkg/federation-controller/service/ingress:go_default_library",
         "//federation/pkg/federation-controller/util:go_default_library",
         "//federation/pkg/federation-controller/util/deletionhelper:go_default_library",
+        "//federation/pkg/federation-controller/util/eventsink:go_default_library",
         "//pkg/api:go_default_library",
         "//pkg/api/v1:go_default_library",
         "//pkg/client/cache:go_default_library",
@@ -37,33 +29,34 @@ go_library(
         "//pkg/util/workqueue:go_default_library",
         "//vendor:github.com/golang/glog",
         "//vendor:k8s.io/apimachinery/pkg/api/errors",
-        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
-        "//vendor:k8s.io/apimachinery/pkg/conversion",
         "//vendor:k8s.io/apimachinery/pkg/runtime",
-        "//vendor:k8s.io/apimachinery/pkg/util/runtime",
-        "//vendor:k8s.io/apimachinery/pkg/util/sets",
+        "//vendor:k8s.io/apimachinery/pkg/types",
         "//vendor:k8s.io/apimachinery/pkg/util/wait",
         "//vendor:k8s.io/apimachinery/pkg/watch",
-        "//vendor:k8s.io/client-go/rest",
+        "//vendor:k8s.io/client-go/pkg/util/flowcontrol",
     ],
 )
 
 go_test(
     name = "go_default_test",
-    srcs = [
-        "dns_test.go",
-        "endpoint_helper_test.go",
-        "service_helper_test.go",
-        "servicecontroller_test.go",
-    ],
+    srcs = ["service_controller_test.go"],
     library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
         "//federation/apis/federation/v1beta1:go_default_library",
-        "//federation/pkg/dnsprovider/providers/google/clouddns:go_default_library",
+        "//federation/client/clientset_generated/federation_clientset/fake:go_default_library",
+        "//federation/pkg/federation-controller/service/ingress:go_default_library",
+        "//federation/pkg/federation-controller/util:go_default_library",
+        "//federation/pkg/federation-controller/util/test:go_default_library",
         "//pkg/api/v1:go_default_library",
+        "//pkg/client/clientset_generated/clientset:go_default_library",
+        "//pkg/client/clientset_generated/clientset/fake:go_default_library",
+        "//pkg/client/legacylisters:go_default_library",
+        "//vendor:github.com/golang/glog",
+        "//vendor:github.com/stretchr/testify/assert",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
-        "//vendor:k8s.io/apimachinery/pkg/util/sets",
+        "//vendor:k8s.io/apimachinery/pkg/types",
+        "//vendor:k8s.io/apimachinery/pkg/util/wait",
     ],
 )
 
@@ -76,6 +69,10 @@ filegroup(
 
 filegroup(
     name = "all-srcs",
-    srcs = [":package-srcs"],
+    srcs = [
+        ":package-srcs",
+        "//federation/pkg/federation-controller/service/dns:all-srcs",
+        "//federation/pkg/federation-controller/service/ingress:all-srcs",
+    ],
     tags = ["automanaged"],
 )
