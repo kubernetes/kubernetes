@@ -3,7 +3,7 @@
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
 
-This file has moved to: http://kubernetes.github.io/docs/getting-started-guides/azure/
+This file has moved to: http://kubernetes.io/docs/getting-started-guides/coreos/azure/
 
 
 
