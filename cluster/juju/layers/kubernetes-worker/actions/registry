@@ -43,7 +43,7 @@ for param in ('tlscert', 'tlskey', 'domain', 'htpasswd'):
         param_error = True
 
     if param in b64_params:
-        value = b64encode(value.encode())
+        value = b64encode(value.encode()).decode('ASCII')
 
     context[param] = value
 
@@ -84,5 +84,37 @@ create_response = call(create_command)
 
 if create_response == 0:
     action_set({'registry-create': 'success'})
+
+    # Create a ConfigMap if it doesn't exist yet, else patch it.
+    # A ConfigMap is needed to change the default value for nginx' client_max_body_size.
+    # The default is 1MB, and this is the maximum size of images that can be
+    # pushed on the registry. 1MB images aren't useful, so we bump this value to 1024MB.
+    cm_name = 'nginx-load-balancer-conf'
+    check_cm_command = kubectl + ['get', 'cm', cm_name]
+    check_cm_response = call(check_cm_command)
+
+    if check_cm_response == 0:
+        # There is an existing ConfigMap, patch it
+        patch = '{"data":{"max-body-size":"1024m"}}'
+        patch_cm_command = kubectl + ['patch', 'cm', cm_name, '-p', patch ]
+        patch_cm_response = call(patch_cm_command)
+
+        if patch_cm_response == 0:
+            action_set({'configmap-patch': 'success'})
+        else:
+            action_set({'configmap-patch': 'failure'})
+
+    else:
+        # No existing ConfigMap, create it
+        render('registry-configmap.yaml', '/etc/kubernetes/addons/registry-configmap.yaml',
+               context)
+        create_cm_command = kubectl + ['create', '-f', '/etc/kubernetes/addons/registry-configmap.yaml' ]
+        create_cm_response = call(create_cm_command)
+
+        if create_cm_response == 0:
+            action_set({'configmap-create': 'success'})
+        else:
+            action_set({'configmap-create': 'failure'})
+
 else:
     action_set({'registry-create': 'failure'})
