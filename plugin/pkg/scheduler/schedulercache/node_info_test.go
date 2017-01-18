@@ -57,7 +57,7 @@ var (
 	}
 )
 
-func Makenodeinfo(node *v1.Node, nodetaints []v1.Taint) NodeInfo {
+func makenodeinfo(node *v1.Node, nodetaints []v1.Taint) NodeInfo {
 	return NodeInfo{
 		node:                    node,
 		allowedPodNumber:        0,
@@ -69,7 +69,7 @@ func Makenodeinfo(node *v1.Node, nodetaints []v1.Taint) NodeInfo {
 		allocatableResource:     &Resource{},
 	}
 }
-func Makepod(podname string, podaffnity *v1.Affinity) *v1.Pod {
+func makepod(podname string, podaffnity *v1.Affinity) *v1.Pod {
 	return &v1.Pod{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Pod",
@@ -97,7 +97,7 @@ func Makepod(podname string, podaffnity *v1.Affinity) *v1.Pod {
 	}
 }
 
-func Makenode(nodename string, nodelables map[string]string) *v1.Node {
+func makenode(nodename string, nodelables map[string]string) *v1.Node {
 	return &v1.Node{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Node",
@@ -115,17 +115,17 @@ func Makenode(nodename string, nodelables map[string]string) *v1.Node {
 	}
 }
 func TestNode(t *testing.T) {
-	node := Makenode("test", nodelabels)
-	nodeinfo := Makenodeinfo(node, taints)
+	node := makenode("test", nodelabels)
+	nodeinfo := makenodeinfo(node, taints)
 	if !reflect.DeepEqual(nodeinfo.Node(), node) {
 		t.Fatalf("get nodeinfo node error,expected: %v,got: %v", node, nodeinfo.Node())
 	}
 }
 
 func TestPod(t *testing.T) {
-	node := Makenode("test", nodelabels)
-	nodeinfo := Makenodeinfo(node, taints)
-	pod := Makepod("foo", &v1.Affinity{})
+	node := makenode("test", nodelabels)
+	nodeinfo := makenodeinfo(node, taints)
+	pod := makepod("foo", &v1.Affinity{})
 	pods := []*v1.Pod{pod}
 	nodeinfo.pods = pods
 	if !reflect.DeepEqual(nodeinfo.Pods(), pods) {
@@ -134,10 +134,10 @@ func TestPod(t *testing.T) {
 }
 
 func TestPodsWithAffinity(t *testing.T) {
-	node := Makenode("test", nodelabels)
-	nodeinfo := Makenodeinfo(node, taints)
-	podwithoutaffinity := Makepod("foo", &v1.Affinity{})
-	podwithaffinity := Makepod("foo", &affnity)
+	node := makenode("test", nodelabels)
+	nodeinfo := makenodeinfo(node, taints)
+	podwithoutaffinity := makepod("foo", &v1.Affinity{})
+	podwithaffinity := makepod("foo", &affnity)
 	nodeinfo.addPod(podwithaffinity)
 	nodeinfo.addPod(podwithoutaffinity)
 	if !reflect.DeepEqual(nodeinfo.PodsWithAffinity(), []*v1.Pod{podwithaffinity}) {
@@ -146,16 +146,16 @@ func TestPodsWithAffinity(t *testing.T) {
 }
 
 func TestAllowedPodNumber(t *testing.T) {
-	node := Makenode("test", nodelabels)
-	nodeinfo := Makenodeinfo(node, taints)
+	node := makenode("test", nodelabels)
+	nodeinfo := makenodeinfo(node, taints)
 	if !reflect.DeepEqual(nodeinfo.AllowedPodNumber(), nodeinfo.allowedPodNumber) {
 		t.Fatalf("get nodeinfo allowedpodnumber error,expected: %v,got: %v", nodeinfo.allowedPodNumber, nodeinfo.AllowedPodNumber())
 	}
 }
 
 func TestTaints(t *testing.T) {
-	node := Makenode("test", nodelabels)
-	nodeinfo := Makenodeinfo(node, taints)
+	node := makenode("test", nodelabels)
+	nodeinfo := makenodeinfo(node, taints)
 	gottaints, err := nodeinfo.Taints()
 	if err != nil {
 		t.Fatalf("get nodeinfo taints error: %s", err)
@@ -166,8 +166,8 @@ func TestTaints(t *testing.T) {
 }
 
 func TestMemoryPressureCondition(t *testing.T) {
-	node := Makenode("test", nodelabels)
-	nodeinfo := Makenodeinfo(node, taints)
+	node := makenode("test", nodelabels)
+	nodeinfo := makenodeinfo(node, taints)
 	nodeinfo.memoryPressureCondition = v1.ConditionTrue
 	if !reflect.DeepEqual(nodeinfo.MemoryPressureCondition(), nodeinfo.memoryPressureCondition) {
 		t.Fatalf("get nodeinfo memoryPressureCondition error,expected: %v,got: %v", nodeinfo.memoryPressureCondition, nodeinfo.MemoryPressureCondition())
@@ -175,8 +175,8 @@ func TestMemoryPressureCondition(t *testing.T) {
 }
 
 func TestDiskPressureCondition(t *testing.T) {
-	node := Makenode("test", nodelabels)
-	nodeinfo := Makenodeinfo(node, taints)
+	node := makenode("test", nodelabels)
+	nodeinfo := makenodeinfo(node, taints)
 	nodeinfo.diskPressureCondition = v1.ConditionTrue
 	if !reflect.DeepEqual(nodeinfo.DiskPressureCondition(), nodeinfo.diskPressureCondition) {
 		t.Fatalf("get nodeinfo diskPressureCondition error,expected: %v,got: %v", nodeinfo.diskPressureCondition, nodeinfo.DiskPressureCondition())
@@ -184,16 +184,16 @@ func TestDiskPressureCondition(t *testing.T) {
 }
 
 func TestNonZeroRequest(t *testing.T) {
-	node := Makenode("test", nodelabels)
-	nodeinfo := Makenodeinfo(node, taints)
+	node := makenode("test", nodelabels)
+	nodeinfo := makenodeinfo(node, taints)
 	nodeinfo.nonzeroRequest = &testresource
 	if !reflect.DeepEqual(nodeinfo.NonZeroRequest(), *nodeinfo.nonzeroRequest) {
 		t.Fatalf("get nodeinfo diskPressureCondition error,expected: %v,got: %v", *nodeinfo.nonzeroRequest, nodeinfo.NonZeroRequest())
 	}
 }
 func TestAllocatableResource(t *testing.T) {
-	node := Makenode("test", nodelabels)
-	nodeinfo := Makenodeinfo(node, taints)
+	node := makenode("test", nodelabels)
+	nodeinfo := makenodeinfo(node, taints)
 	nodeinfo.allocatableResource = &testresource
 	if !reflect.DeepEqual(nodeinfo.AllocatableResource(), *nodeinfo.allocatableResource) {
 		t.Fatalf("get nodeinfo allocatableResource error,expected: %v,got: %v", *nodeinfo.allocatableResource, nodeinfo.AllocatableResource())
@@ -201,8 +201,8 @@ func TestAllocatableResource(t *testing.T) {
 }
 
 func TestClone(t *testing.T) {
-	node := Makenode("test", nodelabels)
-	nodeinfo := Makenodeinfo(node, taints)
+	node := makenode("test", nodelabels)
+	nodeinfo := makenodeinfo(node, taints)
 	niclone := nodeinfo.Clone()
 	if !reflect.DeepEqual(*niclone, nodeinfo) {
 		t.Fatalf("nodeinfo clone error,expected: %v,got: %v", nodeinfo, *niclone)
@@ -210,8 +210,8 @@ func TestClone(t *testing.T) {
 }
 
 func TesthasPodAffinityConstraints(t *testing.T) {
-	podwithaffinity := Makepod("foo", &affnity)
-	podwithoutaffinity := Makepod("foo", &v1.Affinity{})
+	podwithaffinity := makepod("foo", &affnity)
+	podwithoutaffinity := makepod("foo", &v1.Affinity{})
 	if !reflect.DeepEqual(hasPodAffinityConstraints(podwithaffinity), true) {
 		t.Fatalf("nodeinfo check pod has podaffinityconstraints error,expected: %v,got: %v", true, hasPodAffinityConstraints(podwithaffinity))
 	}
@@ -221,10 +221,10 @@ func TesthasPodAffinityConstraints(t *testing.T) {
 }
 
 func TestaddPod(t *testing.T) {
-	node := Makenode("test", nodelabels)
-	nodeinfo := Makenodeinfo(node, taints)
-	podwithaffinity := Makepod("foo", &affnity)
-	podwithoutaffinity := Makepod("foo", &v1.Affinity{})
+	node := makenode("test", nodelabels)
+	nodeinfo := makenodeinfo(node, taints)
+	podwithaffinity := makepod("foo", &affnity)
+	podwithoutaffinity := makepod("foo", &v1.Affinity{})
 	nodeinfo.addPod(podwithaffinity)
 	nodeinfo.addPod(podwithoutaffinity)
 	if !reflect.DeepEqual(nodeinfo.podsWithAffinity, []*v1.Pod{podwithaffinity}) {
@@ -237,10 +237,10 @@ func TestaddPod(t *testing.T) {
 }
 
 func TestremovePod(t *testing.T) {
-	node := Makenode("test", nodelabels)
-	nodeinfo := Makenodeinfo(node, taints)
-	podwithaffinity := Makepod("foo", &affnity)
-	podwithoutaffinity := Makepod("foo", &v1.Affinity{})
+	node := makenode("test", nodelabels)
+	nodeinfo := makenodeinfo(node, taints)
+	podwithaffinity := makepod("foo", &affnity)
+	podwithoutaffinity := makepod("foo", &v1.Affinity{})
 	nodeinfo.addPod(podwithaffinity)
 	nodeinfo.addPod(podwithoutaffinity)
 	err := nodeinfo.removePod(podwithaffinity)
@@ -260,9 +260,9 @@ func TestremovePod(t *testing.T) {
 }
 
 func TestSetNode(t *testing.T) {
-	node := Makenode("test", nodelabels)
-	nodeinfo := Makenodeinfo(node, taints)
-	overnode := Makenode("test1", map[string]string{})
+	node := makenode("test", nodelabels)
+	nodeinfo := makenodeinfo(node, taints)
+	overnode := makenode("test1", map[string]string{})
 	err := nodeinfo.SetNode(overnode)
 	if err != nil {
 		t.Fatalf("set nodeinfo node error: %s", err)
