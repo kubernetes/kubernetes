@@ -46,21 +46,21 @@ func CreateSelfHostedControlPlane(cfg *kubeadmapi.MasterConfiguration, client *c
 		volumeMounts = append(volumeMounts, pkiVolumeMount())
 	}
 
-	if err := LaunchSelfHostedAPIServer(cfg, client, volumes, volumeMounts); err != nil {
+	if err := launchSelfHostedAPIServer(cfg, client, volumes, volumeMounts); err != nil {
 		return err
 	}
 
-	if err := LaunchSelfHostedScheduler(cfg, client, volumes, volumeMounts); err != nil {
+	if err := launchSelfHostedScheduler(cfg, client, volumes, volumeMounts); err != nil {
 		return err
 	}
 
-	if err := LaunchSelfHostedControllerManager(cfg, client, volumes, volumeMounts); err != nil {
+	if err := launchSelfHostedControllerManager(cfg, client, volumes, volumeMounts); err != nil {
 		return err
 	}
 	return nil
 }
 
-func LaunchSelfHostedAPIServer(cfg *kubeadmapi.MasterConfiguration, client *clientset.Clientset, volumes []v1.Volume, volumeMounts []v1.VolumeMount) error {
+func launchSelfHostedAPIServer(cfg *kubeadmapi.MasterConfiguration, client *clientset.Clientset, volumes []v1.Volume, volumeMounts []v1.VolumeMount) error {
 	start := time.Now()
 
 	apiServer := getAPIServerDS(cfg, volumes, volumeMounts)
@@ -75,10 +75,10 @@ func LaunchSelfHostedAPIServer(cfg *kubeadmapi.MasterConfiguration, client *clie
 		apiDS, err := client.DaemonSets(api.NamespaceSystem).Get(kubeAPIServer,
 			metav1.GetOptions{})
 		if err != nil {
-			fmt.Println("[debug] error getting apiserver DaemonSet:", err)
+			fmt.Println("[self-hosted] error getting apiserver DaemonSet:", err)
 			return false, nil
 		}
-		fmt.Printf("[debug] %s DaemonSet current=%d, desired=%d\n",
+		fmt.Printf("[self-hosted] %s DaemonSet current=%d, desired=%d\n",
 			kubeAPIServer,
 			apiDS.Status.CurrentNumberScheduled,
 			apiDS.Status.DesiredNumberScheduled)
@@ -104,11 +104,11 @@ func LaunchSelfHostedAPIServer(cfg *kubeadmapi.MasterConfiguration, client *clie
 	// waiting?
 	WaitForAPI(client)
 
-	fmt.Printf("[debug] self-hosted kube-apiserver ready after %f seconds\n", time.Since(start).Seconds())
+	fmt.Printf("[self-hosted] self-hosted kube-apiserver ready after %f seconds\n", time.Since(start).Seconds())
 	return nil
 }
 
-func LaunchSelfHostedControllerManager(cfg *kubeadmapi.MasterConfiguration, client *clientset.Clientset, volumes []v1.Volume, volumeMounts []v1.VolumeMount) error {
+func launchSelfHostedControllerManager(cfg *kubeadmapi.MasterConfiguration, client *clientset.Clientset, volumes []v1.Volume, volumeMounts []v1.VolumeMount) error {
 	start := time.Now()
 
 	ctrlMgr := getControllerManagerDeployment(cfg, volumes, volumeMounts)
@@ -124,12 +124,12 @@ func LaunchSelfHostedControllerManager(cfg *kubeadmapi.MasterConfiguration, clie
 		return fmt.Errorf("unable to delete temporary controller manager manifest [%v]", err)
 	}
 
-	fmt.Printf("[debug] self-hosted kube-controller-manager ready after %f seconds\n", time.Since(start).Seconds())
+	fmt.Printf("[self-hosted] self-hosted kube-controller-manager ready after %f seconds\n", time.Since(start).Seconds())
 	return nil
 
 }
 
-func LaunchSelfHostedScheduler(cfg *kubeadmapi.MasterConfiguration, client *clientset.Clientset, volumes []v1.Volume, volumeMounts []v1.VolumeMount) error {
+func launchSelfHostedScheduler(cfg *kubeadmapi.MasterConfiguration, client *clientset.Clientset, volumes []v1.Volume, volumeMounts []v1.VolumeMount) error {
 
 	start := time.Now()
 	scheduler := getSchedulerDeployment(cfg)
@@ -145,7 +145,7 @@ func LaunchSelfHostedScheduler(cfg *kubeadmapi.MasterConfiguration, client *clie
 		return fmt.Errorf("unable to delete temporary scheduler manifest [%v]", err)
 	}
 
-	fmt.Printf("[debug] self-hosted kube-scheduler ready after %f seconds\n", time.Since(start).Seconds())
+	fmt.Printf("[self-hosted] self-hosted kube-scheduler ready after %f seconds\n", time.Since(start).Seconds())
 	return nil
 }
 
@@ -157,17 +157,17 @@ func waitForPodsWithLabel(client *clientset.Clientset, appLabel string) {
 		listOpts := v1.ListOptions{LabelSelector: fmt.Sprintf("k8s-app=%s", appLabel)}
 		apiPods, err := client.Pods(api.NamespaceSystem).List(listOpts)
 		if err != nil {
-			fmt.Printf("[debug] error getting %s pods [%v]\n", appLabel, err)
+			fmt.Printf("[self-hosted] error getting %s pods [%v]\n", appLabel, err)
 			return false, nil
 		}
-		fmt.Printf("[debug] Found %d %s pods\n", len(apiPods.Items), appLabel)
+		fmt.Printf("[self-hosted] Found %d %s pods\n", len(apiPods.Items), appLabel)
 
 		// TODO: HA
 		if int32(len(apiPods.Items)) != 1 {
 			return false, nil
 		}
 		for _, pod := range apiPods.Items {
-			fmt.Printf("[debug] Pod %s status: %s\n", pod.Name, pod.Status.Phase)
+			fmt.Printf("[self-hosted] Pod %s status: %s\n", pod.Name, pod.Status.Phase)
 			if pod.Status.Phase != "Running" {
 				return false, nil
 			}
@@ -210,7 +210,7 @@ func getAPIServerDS(cfg *kubeadmapi.MasterConfiguration,
 					HostNetwork:  true,
 					Volumes:      volumes,
 					Containers: []v1.Container{
-						v1.Container{
+						{
 							Name:          kubeAPIServer,
 							Image:         images.GetCoreImage(images.KubeAPIServerImage, cfg, kubeadmapi.GlobalEnvParams.HyperkubeImage),
 							Command:       getAPIServerCommand(cfg),
@@ -259,7 +259,7 @@ func getControllerManagerDeployment(cfg *kubeadmapi.MasterConfiguration,
 					Volumes:      volumes,
 
 					Containers: []v1.Container{
-						v1.Container{
+						{
 							Name:          kubeControllerManager,
 							Image:         images.GetCoreImage(images.KubeControllerManagerImage, cfg, kubeadmapi.GlobalEnvParams.HyperkubeImage),
 							Command:       getControllerManagerCommand(cfg),
@@ -280,7 +280,7 @@ func getMasterToleration() string {
 	// Tolerate the master taint we add to our master nodes, as this can and should
 	// run there.
 	// TODO: Duplicated above
-	masterToleration, _ := json.Marshal([]v1.Toleration{v1.Toleration{
+	masterToleration, _ := json.Marshal([]v1.Toleration{{
 		Key:      "dedicated",
 		Value:    "master",
 		Operator: v1.TolerationOpEqual,
@@ -317,7 +317,7 @@ func getSchedulerDeployment(cfg *kubeadmapi.MasterConfiguration) ext.Deployment 
 					HostNetwork:  true,
 
 					Containers: []v1.Container{
-						v1.Container{
+						{
 							Name:          kubeScheduler,
 							Image:         images.GetCoreImage(images.KubeSchedulerImage, cfg, kubeadmapi.GlobalEnvParams.HyperkubeImage),
 							Command:       getSchedulerCommand(cfg, 10251),
