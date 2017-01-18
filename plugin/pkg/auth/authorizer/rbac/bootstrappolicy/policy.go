@@ -220,6 +220,16 @@ func ClusterRoles() []rbac.ClusterRole {
 			},
 		},
 		{
+			// a role to use for node-problem-detector access.  It does not get bound to default location since
+			// deployment locations can reasonably vary.
+			ObjectMeta: metav1.ObjectMeta{Name: "system:node-problem-detector"},
+			Rules: []rbac.PolicyRule{
+				rbac.NewRule("get").Groups(legacyGroup).Resources("nodes").RuleOrDie(),
+				rbac.NewRule("patch").Groups(legacyGroup).Resources("nodes/status").RuleOrDie(),
+				eventsRule(),
+			},
+		},
+		{
 			// a role to use for setting up a proxy
 			ObjectMeta: metav1.ObjectMeta{Name: "system:node-proxier"},
 			Rules: []rbac.PolicyRule{
