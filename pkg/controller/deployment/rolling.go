@@ -55,8 +55,6 @@ func (dc *DeploymentController) rolloutRolling(deployment *extensions.Deployment
 		return dc.syncRolloutStatus(allRSs, newRS, deployment)
 	}
 
-	dc.cleanupDeployment(oldRSs, deployment)
-
 	// Sync deployment status
 	return dc.syncRolloutStatus(allRSs, newRS, deployment)
 }
