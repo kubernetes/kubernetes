@@ -189,7 +189,7 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 
 	// always show resources when getting by name or filename, or if the output
 	// is machine-consumable, or if multiple resource kinds were requested.
-	if len(options.Filenames) > 0 || argsHasNames || cmdutil.OutputsRawFormat(cmd) || resource.MultipleTypesRequested(args) {
+	if len(options.Filenames) > 0 || argsHasNames || cmdutil.OutputsRawFormat(cmd) {
 		if !cmd.Flag("show-all").Changed {
 			cmd.Flag("show-all").Value.Set("true")
 		}
