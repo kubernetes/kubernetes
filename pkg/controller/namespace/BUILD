@@ -20,6 +20,8 @@ go_library(
         "//pkg/api/v1:go_default_library",
         "//pkg/client/cache:go_default_library",
         "//pkg/client/clientset_generated/clientset:go_default_library",
+        "//pkg/client/informers/informers_generated/core/v1:go_default_library",
+        "//pkg/client/listers/core/v1:go_default_library",
         "//pkg/client/typed/discovery:go_default_library",
         "//pkg/client/typed/dynamic:go_default_library",
         "//pkg/controller:go_default_library",
@@ -29,12 +31,10 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/api/errors",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1/unstructured",
-        "//vendor:k8s.io/apimachinery/pkg/runtime",
         "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
         "//vendor:k8s.io/apimachinery/pkg/util/runtime",
         "//vendor:k8s.io/apimachinery/pkg/util/sets",
         "//vendor:k8s.io/apimachinery/pkg/util/wait",
-        "//vendor:k8s.io/apimachinery/pkg/watch",
     ],
 )
 

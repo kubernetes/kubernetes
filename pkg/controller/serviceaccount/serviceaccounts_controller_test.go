@@ -23,11 +23,10 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
+	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated"
 	"k8s.io/kubernetes/pkg/client/testing/core"
 	"k8s.io/kubernetes/pkg/controller"
-	"k8s.io/kubernetes/pkg/controller/informers"
 )
 
 type serverResponse struct {
@@ -158,17 +157,25 @@ func TestServiceAccountCreation(t *testing.T) {
 
 	for k, tc := range testcases {
 		client := fake.NewSimpleClientset(defaultServiceAccount, managedServiceAccount)
-		informers := informers.NewSharedInformerFactory(fake.NewSimpleClientset(), nil, controller.NoResyncPeriodFunc())
+		informers := informers.NewSharedInformerFactory(nil, fake.NewSimpleClientset(), controller.NoResyncPeriodFunc())
 		options := DefaultServiceAccountsControllerOptions()
 		options.ServiceAccounts = []v1.ServiceAccount{
 			{ObjectMeta: metav1.ObjectMeta{Name: defaultName}},
 			{ObjectMeta: metav1.ObjectMeta{Name: managedName}},
 		}
-		controller := NewServiceAccountsController(informers.ServiceAccounts(), informers.Namespaces(), client, options)
-		controller.saLister = &cache.StoreToServiceAccountLister{Indexer: cache.NewIndexer(cache.DeletionHandlingMetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})}
-		controller.nsLister = &cache.IndexerToNamespaceLister{Indexer: cache.NewIndexer(cache.DeletionHandlingMetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})}
+		saInformer := informers.Core().V1().ServiceAccounts()
+		nsInformer := informers.Core().V1().Namespaces()
+		controller := NewServiceAccountsController(
+			saInformer,
+			nsInformer,
+			client,
+			options,
+		)
 		controller.saSynced = alwaysReady
 		controller.nsSynced = alwaysReady
+
+		saStore := saInformer.Informer().GetStore()
+		nsStore := nsInformer.Informer().GetStore()
 
 		syncCalls := make(chan struct{})
 		controller.syncHandler = func(key string) error {
@@ -185,18 +192,18 @@ func TestServiceAccountCreation(t *testing.T) {
 		go controller.Run(1, stopCh)
 
 		if tc.ExistingNamespace != nil {
-			controller.nsLister.Add(tc.ExistingNamespace)
+			nsStore.Add(tc.ExistingNamespace)
 		}
 		for _, s := range tc.ExistingServiceAccounts {
-			controller.saLister.Indexer.Add(s)
+			saStore.Add(s)
 		}
 
 		if tc.AddedNamespace != nil {
-			controller.nsLister.Add(tc.AddedNamespace)
+			nsStore.Add(tc.AddedNamespace)
 			controller.namespaceAdded(tc.AddedNamespace)
 		}
 		if tc.UpdatedNamespace != nil {
-			controller.nsLister.Add(tc.UpdatedNamespace)
+			nsStore.Add(tc.UpdatedNamespace)
 			controller.namespaceUpdated(nil, tc.UpdatedNamespace)
 		}
 		if tc.DeletedServiceAccount != nil {

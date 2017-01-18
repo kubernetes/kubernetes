@@ -34,9 +34,9 @@ import (
 	"k8s.io/kubernetes/pkg/apis/policy/v1beta1"
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/controller/disruption"
-	"k8s.io/kubernetes/pkg/controller/informers"
 	"k8s.io/kubernetes/pkg/util/intstr"
 	"k8s.io/kubernetes/test/integration/framework"
 )

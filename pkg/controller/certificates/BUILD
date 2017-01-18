@@ -19,12 +19,13 @@ go_library(
     ],
     tags = ["automanaged"],
     deps = [
-        "//pkg/api/v1:go_default_library",
         "//pkg/apis/certificates/v1alpha1:go_default_library",
         "//pkg/client/cache:go_default_library",
         "//pkg/client/clientset_generated/clientset:go_default_library",
         "//pkg/client/clientset_generated/clientset/typed/certificates/v1alpha1:go_default_library",
         "//pkg/client/clientset_generated/clientset/typed/core/v1:go_default_library",
+        "//pkg/client/informers/informers_generated/certificates/v1alpha1:go_default_library",
+        "//pkg/client/listers/certificates/v1alpha1:go_default_library",
         "//pkg/client/record:go_default_library",
         "//pkg/controller:go_default_library",
         "//pkg/util/workqueue:go_default_library",
@@ -33,10 +34,9 @@ go_library(
         "//vendor:github.com/cloudflare/cfssl/signer",
         "//vendor:github.com/cloudflare/cfssl/signer/local",
         "//vendor:github.com/golang/glog",
-        "//vendor:k8s.io/apimachinery/pkg/runtime",
+        "//vendor:k8s.io/apimachinery/pkg/api/errors",
         "//vendor:k8s.io/apimachinery/pkg/util/runtime",
         "//vendor:k8s.io/apimachinery/pkg/util/wait",
-        "//vendor:k8s.io/apimachinery/pkg/watch",
     ],
 )
 

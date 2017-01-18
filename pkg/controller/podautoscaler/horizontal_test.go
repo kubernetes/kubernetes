@@ -37,9 +37,11 @@ import (
 	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
 	v1core "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/core/v1"
+	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/testing/core"
+	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/podautoscaler/metrics"
 
 	heapster "k8s.io/heapster/metrics/api/v1/types"
@@ -47,6 +49,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 )
+
+func alwaysReady() bool { return true }
 
 func (w fakeResponseWrapper) DoRaw() ([]byte, error) {
 	return w.raw, nil
@@ -477,12 +481,12 @@ func (tc *testCase) runTest(t *testing.T) {
 		hpaNamespacer:   testClient.Autoscaling(),
 	}
 
-	store, frameworkController := newInformer(hpaController, time.Minute)
-	hpaController.store = store
-	hpaController.controller = frameworkController
+	informerFactory := informers.NewSharedInformerFactory(nil, testClient, controller.NoResyncPeriodFunc())
+	setupInformer(hpaController, informerFactory.Autoscaling().V1().HorizontalPodAutoscalers())
 
 	stop := make(chan struct{})
 	defer close(stop)
+	informerFactory.Start(stop)
 	go hpaController.Run(stop)
 
 	tc.Lock()

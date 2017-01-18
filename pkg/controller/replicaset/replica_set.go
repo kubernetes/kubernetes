@@ -39,9 +39,12 @@ import (
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	v1core "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/core/v1"
+	coreinformers "k8s.io/kubernetes/pkg/client/informers/informers_generated/core/v1"
+	extensionsinformers "k8s.io/kubernetes/pkg/client/informers/informers_generated/extensions/v1beta1"
+	corelisters "k8s.io/kubernetes/pkg/client/listers/core/v1"
+	extensionslisters "k8s.io/kubernetes/pkg/client/listers/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/controller"
-	"k8s.io/kubernetes/pkg/controller/informers"
 	"k8s.io/kubernetes/pkg/util/metrics"
 	"k8s.io/kubernetes/pkg/util/workqueue"
 )
@@ -74,10 +77,14 @@ type ReplicaSetController struct {
 	// A TTLCache of pod creates/deletes each rc expects to see.
 	expectations *controller.UIDTrackingControllerExpectations
 
-	// A store of ReplicaSets, populated by the rsController
-	rsLister *cache.StoreToReplicaSetLister
-	// A store of pods, populated by the podController
-	podLister *cache.StoreToPodLister
+	// A store of ReplicaSets, populated by the shared informer passed to NewReplicaSetController
+	rsLister extensionslisters.ReplicaSetLister
+	// rsListerSynced returns true if the pod store has been synced at least once.
+	// Added as a member to the struct to allow injection for testing.
+	rsListerSynced cache.InformerSynced
+
+	// A store of pods, populated by the shared informer passed to NewReplicaSetController
+	podLister corelisters.PodLister
 	// podListerSynced returns true if the pod store has been synced at least once.
 	// Added as a member to the struct to allow injection for testing.
 	podListerSynced cache.InformerSynced
@@ -93,7 +100,7 @@ type ReplicaSetController struct {
 }
 
 // NewReplicaSetController configures a replica set controller with the specified event recorder
-func NewReplicaSetController(rsInformer informers.ReplicaSetInformer, podInformer informers.PodInformer, kubeClient clientset.Interface, burstReplicas int, lookupCacheSize int, garbageCollectorEnabled bool) *ReplicaSetController {
+func NewReplicaSetController(rsInformer extensionsinformers.ReplicaSetInformer, podInformer coreinformers.PodInformer, kubeClient clientset.Interface, burstReplicas int, lookupCacheSize int, garbageCollectorEnabled bool) *ReplicaSetController {
 	if kubeClient != nil && kubeClient.Core().RESTClient().GetRateLimiter() != nil {
 		metrics.RegisterMetricAndTrackRateLimiterUsage("replicaset_controller", kubeClient.Core().RESTClient().GetRateLimiter())
 	}
@@ -121,6 +128,9 @@ func NewReplicaSetController(rsInformer informers.ReplicaSetInformer, podInforme
 		// way of achieving this is by performing a `stop` operation on the replica set.
 		DeleteFunc: rsc.enqueueReplicaSet,
 	})
+	rsc.rsLister = rsInformer.Lister()
+	rsc.rsListerSynced = rsInformer.Informer().HasSynced
+
 	podInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: rsc.addPod,
 		// This invokes the ReplicaSet for every pod change, eg: host assignment. Though this might seem like
@@ -129,12 +139,12 @@ func NewReplicaSetController(rsInformer informers.ReplicaSetInformer, podInforme
 		UpdateFunc: rsc.updatePod,
 		DeleteFunc: rsc.deletePod,
 	})
-
-	rsc.syncHandler = rsc.syncReplicaSet
-	rsc.rsLister = rsInformer.Lister()
 	rsc.podLister = podInformer.Lister()
 	rsc.podListerSynced = podInformer.Informer().HasSynced
+
+	rsc.syncHandler = rsc.syncReplicaSet
 	rsc.lookupCache = controller.NewMatchingCache(lookupCacheSize)
+
 	return rsc
 }
 
@@ -153,7 +163,8 @@ func (rsc *ReplicaSetController) Run(workers int, stopCh <-chan struct{}) {
 
 	glog.Infof("Starting ReplicaSet controller")
 
-	if !cache.WaitForCacheSync(stopCh, rsc.podListerSynced) {
+	if !cache.WaitForCacheSync(stopCh, rsc.podListerSynced, rsc.rsListerSynced) {
+		utilruntime.HandleError(fmt.Errorf("timed out waiting for caches to sync"))
 		return
 	}
 
@@ -558,16 +569,19 @@ func (rsc *ReplicaSetController) syncReplicaSet(key string) error {
 		glog.V(4).Infof("Finished syncing replica set %q (%v)", key, time.Now().Sub(startTime))
 	}()
 
-	obj, exists, err := rsc.rsLister.Indexer.GetByKey(key)
+	namespace, name, err := cache.SplitMetaNamespaceKey(key)
 	if err != nil {
 		return err
 	}
-	if !exists {
-		glog.V(4).Infof("ReplicaSet has been deleted %v", key)
-		rsc.expectations.DeleteExpectations(key)
-		return nil
+	rs, err := rsc.rsLister.ReplicaSets(namespace).Get(name)
+	if err != nil {
+		if errors.IsNotFound(err) {
+			glog.V(4).Infof("ReplicaSet has been deleted %v", key)
+			rsc.expectations.DeleteExpectations(key)
+			return nil
+		}
+		return err
 	}
-	rs := *obj.(*extensions.ReplicaSet)
 
 	rsNeedsSync := rsc.expectations.SatisfiedExpectations(key)
 	selector, err := metav1.LabelSelectorAsSelector(rs.Spec.Selector)
@@ -630,7 +644,7 @@ func (rsc *ReplicaSetController) syncReplicaSet(key string) error {
 
 	var manageReplicasErr error
 	if rsNeedsSync && rs.DeletionTimestamp == nil {
-		manageReplicasErr = rsc.manageReplicas(filteredPods, &rs)
+		manageReplicasErr = rsc.manageReplicas(filteredPods, rs)
 	}
 
 	newStatus := calculateStatus(rs, filteredPods, manageReplicasErr)

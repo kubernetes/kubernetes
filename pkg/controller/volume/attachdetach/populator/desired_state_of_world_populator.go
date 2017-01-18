@@ -19,13 +19,16 @@ limitations under the License.
 package populator
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/golang/glog"
 
+	"k8s.io/apimachinery/pkg/api/errors"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/kubernetes/pkg/api/v1"
 	kcache "k8s.io/kubernetes/pkg/client/cache"
+	corelisters "k8s.io/kubernetes/pkg/client/listers/core/v1"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/cache"
 	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
 )
@@ -47,18 +50,18 @@ type DesiredStateOfWorldPopulator interface {
 // desiredStateOfWorld - the cache to populate
 func NewDesiredStateOfWorldPopulator(
 	loopSleepDuration time.Duration,
-	podInformer kcache.SharedInformer,
+	podLister corelisters.PodLister,
 	desiredStateOfWorld cache.DesiredStateOfWorld) DesiredStateOfWorldPopulator {
 	return &desiredStateOfWorldPopulator{
 		loopSleepDuration:   loopSleepDuration,
-		podInformer:         podInformer,
+		podLister:           podLister,
 		desiredStateOfWorld: desiredStateOfWorld,
 	}
 }
 
 type desiredStateOfWorldPopulator struct {
 	loopSleepDuration   time.Duration
-	podInformer         kcache.SharedInformer
+	podLister           corelisters.PodLister
 	desiredStateOfWorld cache.DesiredStateOfWorld
 }
 
@@ -83,39 +86,29 @@ func (dswp *desiredStateOfWorldPopulator) findAndRemoveDeletedPods() {
 		}
 
 		// Retrieve the pod object from pod informer with the namespace key
-		informerPodObj, exists, err :=
-			dswp.podInformer.GetStore().GetByKey(dswPodKey)
+		namespace, name, err := kcache.SplitMetaNamespaceKey(dswPodKey)
 		if err != nil {
+			utilruntime.HandleError(fmt.Errorf("error splitting dswPodKey %q: %v", dswPodKey, err))
+			continue
+		}
+		informerPod, err := dswp.podLister.Pods(namespace).Get(name)
+		if err != nil && !errors.IsNotFound(err) {
 			glog.Errorf(
-				"podInformer GetByKey failed for pod %q (UID %q) with %v",
+				"podLister Get failed for pod %q (UID %q) with %v",
 				dswPodKey,
 				dswPodUID,
 				err)
 			continue
 		}
-		if exists && informerPodObj == nil {
-			glog.Info(
-				"podInformer GetByKey found pod, but informerPodObj is nil for pod %q (UID %q)",
-				dswPodKey,
-				dswPodUID)
+
+		informerPodUID := volumehelper.GetUniquePodName(informerPod)
+		// Check whether the unique identifier of the pod from dsw matches the one retrieved from pod informer
+		if informerPodUID == dswPodUID {
+			glog.V(10).Infof(
+				"Verified pod %q (UID %q) from dsw exists in pod informer.", dswPodKey, dswPodUID)
 			continue
 		}
 
-		if exists {
-			informerPod, ok := informerPodObj.(*v1.Pod)
-			if !ok {
-				glog.Errorf("Failed to cast obj %#v to pod object for pod %q (UID %q)", informerPod, dswPodKey, dswPodUID)
-				continue
-			}
-			informerPodUID := volumehelper.GetUniquePodName(informerPod)
-			// Check whether the unique identifier of the pod from dsw matches the one retrieved from pod informer
-			if informerPodUID == dswPodUID {
-				glog.V(10).Infof(
-					"Verified pod %q (UID %q) from dsw exists in pod informer.", dswPodKey, dswPodUID)
-				continue
-
-			}
-		}
 		// the pod from dsw does not exist in pod informer, or it does not match the unique identifer retrieved
 		// from the informer, delete it from dsw
 		glog.V(1).Infof(

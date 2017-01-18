@@ -47,9 +47,10 @@ import (
 	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/capabilities"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated"
 	"k8s.io/kubernetes/pkg/cloudprovider"
-	"k8s.io/kubernetes/pkg/controller/informers"
 	serviceaccountcontroller "k8s.io/kubernetes/pkg/controller/serviceaccount"
 	generatedopenapi "k8s.io/kubernetes/pkg/generated/openapi"
 	"k8s.io/kubernetes/pkg/genericapiserver"
@@ -253,19 +254,31 @@ func Run(s *options.ServerRunOptions) error {
 	if err != nil {
 		return fmt.Errorf("failed to create clientset: %v", err)
 	}
-	client, err := internalclientset.NewForConfig(selfClientConfig)
+	internalClient, err := internalclientset.NewForConfig(selfClientConfig)
 	if err != nil {
 		kubeAPIVersions := os.Getenv("KUBE_API_VERSIONS")
 		if len(kubeAPIVersions) == 0 {
-			return fmt.Errorf("failed to create clientset: %v", err)
+			return fmt.Errorf("failed to create internal clientset: %v", err)
 		}
 
 		// KUBE_API_VERSIONS is used in test-update-storage-objects.sh, disabling a number of API
 		// groups. This leads to a nil client above and undefined behaviour further down.
 		// TODO: get rid of KUBE_API_VERSIONS or define sane behaviour if set
-		glog.Errorf("Failed to create clientset with KUBE_API_VERSIONS=%q. KUBE_API_VERSIONS is only for testing. Things will break.", kubeAPIVersions)
+		glog.Errorf("Failed to create internal clientset with KUBE_API_VERSIONS=%q. KUBE_API_VERSIONS is only for testing. Things will break.", kubeAPIVersions)
 	}
-	sharedInformers := informers.NewSharedInformerFactory(nil, client, 10*time.Minute)
+	versionedClient, err := clientset.NewForConfig(selfClientConfig)
+	if err != nil {
+		kubeAPIVersions := os.Getenv("KUBE_API_VERSIONS")
+		if len(kubeAPIVersions) == 0 {
+			return fmt.Errorf("failed to create versioned clientset: %v", err)
+		}
+
+		// KUBE_API_VERSIONS is used in test-update-storage-objects.sh, disabling a number of API
+		// groups. This leads to a nil client above and undefined behaviour further down.
+		// TODO: get rid of KUBE_API_VERSIONS or define sane behaviour if set
+		glog.Errorf("Failed to create versioned clientset with KUBE_API_VERSIONS=%q. KUBE_API_VERSIONS is only for testing. Things will break.", kubeAPIVersions)
+	}
+	sharedInformers := informers.NewSharedInformerFactory(internalClient, versionedClient, 10*time.Minute)
 
 	authorizationConfig := s.Authorization.ToAuthorizationConfig(sharedInformers)
 	apiAuthorizer, err := authorizationConfig.New()
@@ -274,7 +287,7 @@ func Run(s *options.ServerRunOptions) error {
 	}
 
 	admissionControlPluginNames := strings.Split(s.GenericServerRunOptions.AdmissionControl, ",")
-	pluginInitializer := kubeadmission.NewPluginInitializer(client, sharedInformers, apiAuthorizer)
+	pluginInitializer := kubeadmission.NewPluginInitializer(internalClient, sharedInformers, apiAuthorizer)
 	admissionConfigProvider, err := kubeadmission.ReadAdmissionConfiguration(admissionControlPluginNames, s.GenericServerRunOptions.AdmissionControlConfigFile)
 	if err != nil {
 		return fmt.Errorf("failed to read plugin config: %v", err)

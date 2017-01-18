@@ -31,6 +31,8 @@ import (
 	kcache "k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	v1core "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/core/v1"
+	coreinformers "k8s.io/kubernetes/pkg/client/informers/informers_generated/core/v1"
+	corelisters "k8s.io/kubernetes/pkg/client/listers/core/v1"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/cache"
@@ -69,10 +71,10 @@ type AttachDetachController interface {
 // NewAttachDetachController returns a new instance of AttachDetachController.
 func NewAttachDetachController(
 	kubeClient clientset.Interface,
-	podInformer kcache.SharedInformer,
-	nodeInformer kcache.SharedInformer,
-	pvcInformer kcache.SharedInformer,
-	pvInformer kcache.SharedInformer,
+	podInformer coreinformers.PodInformer,
+	nodeInformer coreinformers.NodeInformer,
+	pvcInformer coreinformers.PersistentVolumeClaimInformer,
+	pvInformer coreinformers.PersistentVolumeInformer,
 	cloud cloudprovider.Interface,
 	plugins []volume.VolumePlugin,
 	disableReconciliationSync bool,
@@ -92,23 +94,27 @@ func NewAttachDetachController(
 	// dropped pods so they are continuously processed until it is accepted or
 	// deleted (probably can't do this with sharedInformer), etc.
 	adc := &attachDetachController{
-		kubeClient:  kubeClient,
-		pvcInformer: pvcInformer,
-		pvInformer:  pvInformer,
-		cloud:       cloud,
+		kubeClient: kubeClient,
+		pvcLister:  pvcInformer.Lister(),
+		pvcsSynced: pvcInformer.Informer().HasSynced,
+		pvLister:   pvInformer.Lister(),
+		pvsSynced:  pvInformer.Informer().HasSynced,
+		cloud:      cloud,
 	}
 
-	podInformer.AddEventHandler(kcache.ResourceEventHandlerFuncs{
+	podInformer.Informer().AddEventHandler(kcache.ResourceEventHandlerFuncs{
 		AddFunc:    adc.podAdd,
 		UpdateFunc: adc.podUpdate,
 		DeleteFunc: adc.podDelete,
 	})
+	adc.podsSynced = podInformer.Informer().HasSynced
 
-	nodeInformer.AddEventHandler(kcache.ResourceEventHandlerFuncs{
+	nodeInformer.Informer().AddEventHandler(kcache.ResourceEventHandlerFuncs{
 		AddFunc:    adc.nodeAdd,
 		UpdateFunc: adc.nodeUpdate,
 		DeleteFunc: adc.nodeDelete,
 	})
+	adc.nodesSynced = nodeInformer.Informer().HasSynced
 
 	if err := adc.volumePluginMgr.InitPlugins(plugins, adc); err != nil {
 		return nil, fmt.Errorf("Could not initialize volume plugins for Attach/Detach Controller: %+v", err)
@@ -128,7 +134,7 @@ func NewAttachDetachController(
 			recorder,
 			false)) // flag for experimental binary check for volume mount
 	adc.nodeStatusUpdater = statusupdater.NewNodeStatusUpdater(
-		kubeClient, nodeInformer, adc.actualStateOfWorld)
+		kubeClient, nodeInformer.Lister(), adc.actualStateOfWorld)
 
 	// Default these to values in options
 	adc.reconciler = reconciler.NewReconciler(
@@ -143,7 +149,7 @@ func NewAttachDetachController(
 
 	adc.desiredStateOfWorldPopulator = populator.NewDesiredStateOfWorldPopulator(
 		desiredStateOfWorldPopulatorLoopSleepPeriod,
-		podInformer,
+		podInformer.Lister(),
 		adc.desiredStateOfWorld)
 
 	return adc, nil
@@ -154,15 +160,20 @@ type attachDetachController struct {
 	// the API server.
 	kubeClient clientset.Interface
 
-	// pvcInformer is the shared PVC informer used to fetch and store PVC
+	// pvcLister is the shared PVC lister used to fetch and store PVC
 	// objects from the API server. It is shared with other controllers and
 	// therefore the PVC objects in its store should be treated as immutable.
-	pvcInformer kcache.SharedInformer
+	pvcLister  corelisters.PersistentVolumeClaimLister
+	pvcsSynced kcache.InformerSynced
 
-	// pvInformer is the shared PV informer used to fetch and store PV objects
+	// pvLister is the shared PV lister used to fetch and store PV objects
 	// from the API server. It is shared with other controllers and therefore
 	// the PV objects in its store should be treated as immutable.
-	pvInformer kcache.SharedInformer
+	pvLister  corelisters.PersistentVolumeLister
+	pvsSynced kcache.InformerSynced
+
+	podsSynced  kcache.InformerSynced
+	nodesSynced kcache.InformerSynced
 
 	// cloud provider used by volume host
 	cloud cloudprovider.Interface
@@ -209,6 +220,11 @@ type attachDetachController struct {
 func (adc *attachDetachController) Run(stopCh <-chan struct{}) {
 	defer runtime.HandleCrash()
 	glog.Infof("Starting Attach Detach Controller")
+
+	if !kcache.WaitForCacheSync(stopCh, adc.podsSynced, adc.nodesSynced, adc.pvcsSynced, adc.pvsSynced) {
+		runtime.HandleError(fmt.Errorf("timed out waiting for caches to sync"))
+		return
+	}
 
 	go adc.reconciler.Run(stopCh)
 	go adc.desiredStateOfWorldPopulator.Run(stopCh)
@@ -455,33 +471,17 @@ func (adc *attachDetachController) createVolumeSpec(
 // This method returns an error if a PVC object does not exist in the cache
 // with the given namespace/name.
 // This method returns an error if the PVC object's phase is not "Bound".
-func (adc *attachDetachController) getPVCFromCacheExtractPV(
-	namespace string, name string) (string, types.UID, error) {
-	key := name
-	if len(namespace) > 0 {
-		key = namespace + "/" + name
-	}
-
-	pvcObj, exists, err := adc.pvcInformer.GetStore().GetByKey(key)
-	if pvcObj == nil || !exists || err != nil {
-		return "", "", fmt.Errorf(
-			"failed to find PVC %q in PVCInformer cache. %v",
-			key,
-			err)
-	}
-
-	pvc, ok := pvcObj.(*v1.PersistentVolumeClaim)
-	if !ok || pvc == nil {
-		return "", "", fmt.Errorf(
-			"failed to cast %q object %#v to PersistentVolumeClaim",
-			key,
-			pvcObj)
+func (adc *attachDetachController) getPVCFromCacheExtractPV(namespace string, name string) (string, types.UID, error) {
+	pvc, err := adc.pvcLister.PersistentVolumeClaims(namespace).Get(name)
+	if err != nil {
+		return "", "", fmt.Errorf("failed to find PVC %s/%s in PVCInformer cache: %v", namespace, name, err)
 	}
 
 	if pvc.Status.Phase != v1.ClaimBound || pvc.Spec.VolumeName == "" {
 		return "", "", fmt.Errorf(
-			"PVC %q has non-bound phase (%q) or empty pvc.Spec.VolumeName (%q)",
-			key,
+			"PVC %s/%s has non-bound phase (%q) or empty pvc.Spec.VolumeName (%q)",
+			namespace,
+			name,
 			pvc.Status.Phase,
 			pvc.Spec.VolumeName)
 	}
@@ -495,20 +495,10 @@ func (adc *attachDetachController) getPVCFromCacheExtractPV(
 // the given name.
 // This method deep copies the PV object so the caller may use the returned
 // volume.Spec object without worrying about it mutating unexpectedly.
-func (adc *attachDetachController) getPVSpecFromCache(
-	name string,
-	pvcReadOnly bool,
-	expectedClaimUID types.UID) (*volume.Spec, error) {
-	pvObj, exists, err := adc.pvInformer.GetStore().GetByKey(name)
-	if pvObj == nil || !exists || err != nil {
-		return nil, fmt.Errorf(
-			"failed to find PV %q in PVInformer cache. %v", name, err)
-	}
-
-	pv, ok := pvObj.(*v1.PersistentVolume)
-	if !ok || pv == nil {
-		return nil, fmt.Errorf(
-			"failed to cast %q object %#v to PersistentVolume", name, pvObj)
+func (adc *attachDetachController) getPVSpecFromCache(name string, pvcReadOnly bool, expectedClaimUID types.UID) (*volume.Spec, error) {
+	pv, err := adc.pvLister.Get(name)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find PV %q in PVInformer cache: %v", name, err)
 	}
 
 	if pv.Spec.ClaimRef == nil {
@@ -529,14 +519,12 @@ func (adc *attachDetachController) getPVSpecFromCache(
 	// may be mutated by another consumer.
 	clonedPVObj, err := api.Scheme.DeepCopy(pv)
 	if err != nil || clonedPVObj == nil {
-		return nil, fmt.Errorf(
-			"failed to deep copy %q PV object. err=%v", name, err)
+		return nil, fmt.Errorf("failed to deep copy %q PV object. err=%v", name, err)
 	}
 
 	clonedPV, ok := clonedPVObj.(*v1.PersistentVolume)
 	if !ok {
-		return nil, fmt.Errorf(
-			"failed to cast %q clonedPV %#v to PersistentVolume", name, pvObj)
+		return nil, fmt.Errorf("failed to cast %q clonedPV %#v to PersistentVolume", name, pv)
 	}
 
 	return volume.NewSpecFromPersistentVolume(clonedPV, pvcReadOnly), nil
