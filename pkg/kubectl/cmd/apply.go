@@ -245,7 +245,13 @@ func (p *patcher) patchSimple(obj runtime.Object, modified []byte, source, names
 	// Create the versioned struct from the type defined in the restmapping
 	// (which is the API version we'll be submitting the patch to)
 	versionedObject, err := api.Scheme.New(p.mapping.GroupVersionKind)
-	if err != nil {
+	switch {
+	case runtime.IsNotRegisteredError(err):
+		versionedObject, _, err = p.decoder.Decode(current, nil, nil)
+		if err != nil {
+			return nil, cmdutil.AddSourceToErr(fmt.Sprintf("converting encoded server-side object back to versioned struct:\n%v\nfor:", obj), source, err)
+		}
+	case err != nil:
 		return nil, cmdutil.AddSourceToErr(fmt.Sprintf("getting instance of versioned object for %v:", p.mapping.GroupVersionKind), source, err)
 	}
 
