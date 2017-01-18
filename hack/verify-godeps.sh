@@ -88,6 +88,9 @@ pushd "${_kubetmp}" 2>&1 > /dev/null
   pin-godep 'v74'
   "${GODEP}" version
 
+  # Remove once either godep works properly or we bump docker/distribution version
+  preload-dep github.com/aws aws-sdk-go 63ce630574a5ec05ecd8e8de5cea16332a5a684d
+
   # Fill out that nice clean place with the kube godeps
   echo "Starting to download all kubernetes godeps. This takes a while"
   "${GODEP}" restore
