@@ -24,13 +24,14 @@ from socket import gethostname
 from charms import layer
 from charms.reactive import hook
 from charms.reactive import set_state, remove_state
-from charms.reactive import when, when_not
+from charms.reactive import when, when_any, when_not
 from charms.reactive.helpers import data_changed
 from charms.kubernetes.flagmanager import FlagManager
 from charms.templating.jinja2 import render
 
 from charmhelpers.core import hookenv
 from charmhelpers.core.host import service_stop
+from charmhelpers.contrib.charmsupport import nrpe
 
 
 kubeconfig_path = '/srv/kubernetes/config'
@@ -445,6 +446,27 @@ def kubectl_manifest(operation, manifest):
         # Execute the requested command that did not match any of the special
         # cases above
         return kubectl_success(operation, '-f', manifest)
+
+
+@when('nrpe-external-master.available')
+@when_not('nrpe-external-master.initial-config')
+def initial_nrpe_config(nagios=None):
+    set_state('nrpe-external-master.initial-config')
+    update_nrpe_config(nagios)
+
+
+@when('kubernetes-worker.config.created')
+@when('nrpe-external-master.available')
+@when_any('config.changed.nagios_context',
+          'config.changed.nagios_servicegroups')
+def update_nrpe_config(unused=None):
+    services = ('kubelet', 'kube-proxy')
+
+    hostname = nrpe.get_nagios_hostname()
+    current_unit = nrpe.get_nagios_unit_name()
+    nrpe_setup = nrpe.NRPE(hostname=hostname)
+    nrpe.add_init_service_checks(nrpe_setup, services, current_unit)
+    nrpe_setup.write()
 
 
 def _systemctl_is_active(application):
