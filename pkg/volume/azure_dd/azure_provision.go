@@ -108,7 +108,8 @@ var _ volume.Provisioner = &azureDiskProvisioner{}
 func (a *azureDiskProvisioner) Provision() (*v1.PersistentVolume, error) {
 	var sku, location, account string
 
-	name := volume.GenerateVolumeName(a.options.ClusterName, a.options.PVName, 255)
+	// maxLength = 79 - (4 for ".vhd") = 75
+	name := volume.GenerateVolumeName(a.options.ClusterName, a.options.PVName, 75)
 	capacity := a.options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
 	requestBytes := capacity.Value()
 	requestGB := int(volume.RoundUpSize(requestBytes, 1024*1024*1024))
