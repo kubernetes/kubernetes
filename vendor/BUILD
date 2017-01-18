@@ -391,6 +391,7 @@ go_library(
     deps = [
         "//vendor:github.com/aws/aws-sdk-go/aws/awserr",
         "//vendor:github.com/aws/aws-sdk-go/aws/credentials",
+        "//vendor:github.com/aws/aws-sdk-go/aws/endpoints",
     ],
 )
 
@@ -446,6 +447,7 @@ go_library(
     deps = [
         "//vendor:github.com/aws/aws-sdk-go/aws",
         "//vendor:github.com/aws/aws-sdk-go/aws/awserr",
+        "//vendor:github.com/aws/aws-sdk-go/aws/credentials",
         "//vendor:github.com/aws/aws-sdk-go/aws/request",
     ],
 )
@@ -479,6 +481,32 @@ go_library(
 )
 
 go_library(
+    name = "github.com/aws/aws-sdk-go/aws/credentials/endpointcreds",
+    srcs = ["github.com/aws/aws-sdk-go/aws/credentials/endpointcreds/provider.go"],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/aws/aws-sdk-go/aws",
+        "//vendor:github.com/aws/aws-sdk-go/aws/awserr",
+        "//vendor:github.com/aws/aws-sdk-go/aws/client",
+        "//vendor:github.com/aws/aws-sdk-go/aws/client/metadata",
+        "//vendor:github.com/aws/aws-sdk-go/aws/credentials",
+        "//vendor:github.com/aws/aws-sdk-go/aws/request",
+    ],
+)
+
+go_library(
+    name = "github.com/aws/aws-sdk-go/aws/credentials/stscreds",
+    srcs = ["github.com/aws/aws-sdk-go/aws/credentials/stscreds/assume_role_provider.go"],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/aws/aws-sdk-go/aws",
+        "//vendor:github.com/aws/aws-sdk-go/aws/client",
+        "//vendor:github.com/aws/aws-sdk-go/aws/credentials",
+        "//vendor:github.com/aws/aws-sdk-go/service/sts",
+    ],
+)
+
+go_library(
     name = "github.com/aws/aws-sdk-go/aws/defaults",
     srcs = ["github.com/aws/aws-sdk-go/aws/defaults/defaults.go"],
     tags = ["automanaged"],
@@ -487,9 +515,10 @@ go_library(
         "//vendor:github.com/aws/aws-sdk-go/aws/corehandlers",
         "//vendor:github.com/aws/aws-sdk-go/aws/credentials",
         "//vendor:github.com/aws/aws-sdk-go/aws/credentials/ec2rolecreds",
+        "//vendor:github.com/aws/aws-sdk-go/aws/credentials/endpointcreds",
         "//vendor:github.com/aws/aws-sdk-go/aws/ec2metadata",
+        "//vendor:github.com/aws/aws-sdk-go/aws/endpoints",
         "//vendor:github.com/aws/aws-sdk-go/aws/request",
-        "//vendor:github.com/aws/aws-sdk-go/private/endpoints",
     ],
 )
 
@@ -510,12 +539,29 @@ go_library(
 )
 
 go_library(
+    name = "github.com/aws/aws-sdk-go/aws/endpoints",
+    srcs = [
+        "github.com/aws/aws-sdk-go/aws/endpoints/decode.go",
+        "github.com/aws/aws-sdk-go/aws/endpoints/defaults.go",
+        "github.com/aws/aws-sdk-go/aws/endpoints/doc.go",
+        "github.com/aws/aws-sdk-go/aws/endpoints/endpoints.go",
+        "github.com/aws/aws-sdk-go/aws/endpoints/v3model.go",
+    ],
+    tags = ["automanaged"],
+    deps = ["//vendor:github.com/aws/aws-sdk-go/aws/awserr"],
+)
+
+go_library(
     name = "github.com/aws/aws-sdk-go/aws/request",
     srcs = [
         "github.com/aws/aws-sdk-go/aws/request/handlers.go",
+        "github.com/aws/aws-sdk-go/aws/request/http_request.go",
+        "github.com/aws/aws-sdk-go/aws/request/offset_reader.go",
         "github.com/aws/aws-sdk-go/aws/request/request.go",
+        "github.com/aws/aws-sdk-go/aws/request/request_1_7.go",
         "github.com/aws/aws-sdk-go/aws/request/request_pagination.go",
         "github.com/aws/aws-sdk-go/aws/request/retryer.go",
+        "github.com/aws/aws-sdk-go/aws/request/validation.go",
     ],
     tags = ["automanaged"],
     deps = [
@@ -528,25 +574,51 @@ go_library(
 
 go_library(
     name = "github.com/aws/aws-sdk-go/aws/session",
-    srcs = ["github.com/aws/aws-sdk-go/aws/session/session.go"],
+    srcs = [
+        "github.com/aws/aws-sdk-go/aws/session/doc.go",
+        "github.com/aws/aws-sdk-go/aws/session/env_config.go",
+        "github.com/aws/aws-sdk-go/aws/session/session.go",
+        "github.com/aws/aws-sdk-go/aws/session/shared_config.go",
+    ],
     tags = ["automanaged"],
     deps = [
         "//vendor:github.com/aws/aws-sdk-go/aws",
+        "//vendor:github.com/aws/aws-sdk-go/aws/awserr",
         "//vendor:github.com/aws/aws-sdk-go/aws/client",
         "//vendor:github.com/aws/aws-sdk-go/aws/corehandlers",
+        "//vendor:github.com/aws/aws-sdk-go/aws/credentials",
+        "//vendor:github.com/aws/aws-sdk-go/aws/credentials/stscreds",
         "//vendor:github.com/aws/aws-sdk-go/aws/defaults",
+        "//vendor:github.com/aws/aws-sdk-go/aws/endpoints",
         "//vendor:github.com/aws/aws-sdk-go/aws/request",
-        "//vendor:github.com/aws/aws-sdk-go/private/endpoints",
+        "//vendor:github.com/go-ini/ini",
     ],
 )
 
 go_library(
-    name = "github.com/aws/aws-sdk-go/private/endpoints",
+    name = "github.com/aws/aws-sdk-go/aws/signer/v4",
     srcs = [
-        "github.com/aws/aws-sdk-go/private/endpoints/endpoints.go",
-        "github.com/aws/aws-sdk-go/private/endpoints/endpoints_map.go",
+        "github.com/aws/aws-sdk-go/aws/signer/v4/header_rules.go",
+        "github.com/aws/aws-sdk-go/aws/signer/v4/uri_path.go",
+        "github.com/aws/aws-sdk-go/aws/signer/v4/v4.go",
     ],
     tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/aws/aws-sdk-go/aws",
+        "//vendor:github.com/aws/aws-sdk-go/aws/credentials",
+        "//vendor:github.com/aws/aws-sdk-go/aws/request",
+        "//vendor:github.com/aws/aws-sdk-go/private/protocol/rest",
+    ],
+)
+
+go_library(
+    name = "github.com/aws/aws-sdk-go/private/protocol",
+    srcs = [
+        "github.com/aws/aws-sdk-go/private/protocol/idempotency.go",
+        "github.com/aws/aws-sdk-go/private/protocol/unmarshal.go",
+    ],
+    tags = ["automanaged"],
+    deps = ["//vendor:github.com/aws/aws-sdk-go/aws/request"],
 )
 
 go_library(
@@ -571,6 +643,7 @@ go_library(
         "github.com/aws/aws-sdk-go/private/protocol/json/jsonutil/unmarshal.go",
     ],
     tags = ["automanaged"],
+    deps = ["//vendor:github.com/aws/aws-sdk-go/private/protocol"],
 )
 
 go_library(
@@ -605,6 +678,7 @@ go_library(
     name = "github.com/aws/aws-sdk-go/private/protocol/query/queryutil",
     srcs = ["github.com/aws/aws-sdk-go/private/protocol/query/queryutil/queryutil.go"],
     tags = ["automanaged"],
+    deps = ["//vendor:github.com/aws/aws-sdk-go/private/protocol"],
 )
 
 go_library(
@@ -643,18 +717,7 @@ go_library(
         "github.com/aws/aws-sdk-go/private/protocol/xml/xmlutil/xml_to_struct.go",
     ],
     tags = ["automanaged"],
-)
-
-go_library(
-    name = "github.com/aws/aws-sdk-go/private/signer/v4",
-    srcs = ["github.com/aws/aws-sdk-go/private/signer/v4/v4.go"],
-    tags = ["automanaged"],
-    deps = [
-        "//vendor:github.com/aws/aws-sdk-go/aws",
-        "//vendor:github.com/aws/aws-sdk-go/aws/credentials",
-        "//vendor:github.com/aws/aws-sdk-go/aws/request",
-        "//vendor:github.com/aws/aws-sdk-go/private/protocol/rest",
-    ],
+    deps = ["//vendor:github.com/aws/aws-sdk-go/private/protocol"],
 )
 
 go_library(
@@ -674,6 +737,7 @@ go_library(
     srcs = [
         "github.com/aws/aws-sdk-go/service/autoscaling/api.go",
         "github.com/aws/aws-sdk-go/service/autoscaling/service.go",
+        "github.com/aws/aws-sdk-go/service/autoscaling/waiters.go",
     ],
     tags = ["automanaged"],
     deps = [
@@ -682,8 +746,10 @@ go_library(
         "//vendor:github.com/aws/aws-sdk-go/aws/client",
         "//vendor:github.com/aws/aws-sdk-go/aws/client/metadata",
         "//vendor:github.com/aws/aws-sdk-go/aws/request",
+        "//vendor:github.com/aws/aws-sdk-go/aws/signer/v4",
+        "//vendor:github.com/aws/aws-sdk-go/private/protocol",
         "//vendor:github.com/aws/aws-sdk-go/private/protocol/query",
-        "//vendor:github.com/aws/aws-sdk-go/private/signer/v4",
+        "//vendor:github.com/aws/aws-sdk-go/private/waiter",
     ],
 )
 
@@ -701,10 +767,11 @@ go_library(
         "//vendor:github.com/aws/aws-sdk-go/aws/awsutil",
         "//vendor:github.com/aws/aws-sdk-go/aws/client",
         "//vendor:github.com/aws/aws-sdk-go/aws/client/metadata",
+        "//vendor:github.com/aws/aws-sdk-go/aws/endpoints",
         "//vendor:github.com/aws/aws-sdk-go/aws/request",
-        "//vendor:github.com/aws/aws-sdk-go/private/endpoints",
+        "//vendor:github.com/aws/aws-sdk-go/aws/signer/v4",
+        "//vendor:github.com/aws/aws-sdk-go/private/protocol",
         "//vendor:github.com/aws/aws-sdk-go/private/protocol/ec2query",
-        "//vendor:github.com/aws/aws-sdk-go/private/signer/v4",
         "//vendor:github.com/aws/aws-sdk-go/private/waiter",
     ],
 )
@@ -722,8 +789,8 @@ go_library(
         "//vendor:github.com/aws/aws-sdk-go/aws/client",
         "//vendor:github.com/aws/aws-sdk-go/aws/client/metadata",
         "//vendor:github.com/aws/aws-sdk-go/aws/request",
+        "//vendor:github.com/aws/aws-sdk-go/aws/signer/v4",
         "//vendor:github.com/aws/aws-sdk-go/private/protocol/jsonrpc",
-        "//vendor:github.com/aws/aws-sdk-go/private/signer/v4",
     ],
 )
 
@@ -741,8 +808,8 @@ go_library(
         "//vendor:github.com/aws/aws-sdk-go/aws/client",
         "//vendor:github.com/aws/aws-sdk-go/aws/client/metadata",
         "//vendor:github.com/aws/aws-sdk-go/aws/request",
+        "//vendor:github.com/aws/aws-sdk-go/aws/signer/v4",
         "//vendor:github.com/aws/aws-sdk-go/private/protocol/query",
-        "//vendor:github.com/aws/aws-sdk-go/private/signer/v4",
         "//vendor:github.com/aws/aws-sdk-go/private/waiter",
     ],
 )
@@ -753,6 +820,29 @@ go_library(
         "github.com/aws/aws-sdk-go/service/route53/api.go",
         "github.com/aws/aws-sdk-go/service/route53/customizations.go",
         "github.com/aws/aws-sdk-go/service/route53/service.go",
+        "github.com/aws/aws-sdk-go/service/route53/unmarshal_error.go",
+        "github.com/aws/aws-sdk-go/service/route53/waiters.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/aws/aws-sdk-go/aws",
+        "//vendor:github.com/aws/aws-sdk-go/aws/awserr",
+        "//vendor:github.com/aws/aws-sdk-go/aws/awsutil",
+        "//vendor:github.com/aws/aws-sdk-go/aws/client",
+        "//vendor:github.com/aws/aws-sdk-go/aws/client/metadata",
+        "//vendor:github.com/aws/aws-sdk-go/aws/request",
+        "//vendor:github.com/aws/aws-sdk-go/aws/signer/v4",
+        "//vendor:github.com/aws/aws-sdk-go/private/protocol/restxml",
+        "//vendor:github.com/aws/aws-sdk-go/private/waiter",
+    ],
+)
+
+go_library(
+    name = "github.com/aws/aws-sdk-go/service/sts",
+    srcs = [
+        "github.com/aws/aws-sdk-go/service/sts/api.go",
+        "github.com/aws/aws-sdk-go/service/sts/customizations.go",
+        "github.com/aws/aws-sdk-go/service/sts/service.go",
     ],
     tags = ["automanaged"],
     deps = [
@@ -761,8 +851,8 @@ go_library(
         "//vendor:github.com/aws/aws-sdk-go/aws/client",
         "//vendor:github.com/aws/aws-sdk-go/aws/client/metadata",
         "//vendor:github.com/aws/aws-sdk-go/aws/request",
-        "//vendor:github.com/aws/aws-sdk-go/private/protocol/restxml",
-        "//vendor:github.com/aws/aws-sdk-go/private/signer/v4",
+        "//vendor:github.com/aws/aws-sdk-go/aws/signer/v4",
+        "//vendor:github.com/aws/aws-sdk-go/private/protocol/query",
     ],
 )
 
@@ -8619,6 +8709,37 @@ go_library(
     tags = ["automanaged"],
 )
 
+go_test(
+    name = "k8s.io/apiserver/pkg/admission_test",
+    srcs = ["k8s.io/apiserver/pkg/admission/chain_test.go"],
+    library = ":k8s.io/apiserver/pkg/admission",
+    tags = ["automanaged"],
+    deps = ["//vendor:k8s.io/apimachinery/pkg/runtime/schema"],
+)
+
+go_library(
+    name = "k8s.io/apiserver/pkg/admission",
+    srcs = [
+        "k8s.io/apiserver/pkg/admission/attributes.go",
+        "k8s.io/apiserver/pkg/admission/chain.go",
+        "k8s.io/apiserver/pkg/admission/errors.go",
+        "k8s.io/apiserver/pkg/admission/handler.go",
+        "k8s.io/apiserver/pkg/admission/interfaces.go",
+        "k8s.io/apiserver/pkg/admission/plugins.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/golang/glog",
+        "//vendor:k8s.io/apimachinery/pkg/api/errors",
+        "//vendor:k8s.io/apimachinery/pkg/api/meta",
+        "//vendor:k8s.io/apimachinery/pkg/runtime",
+        "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
+        "//vendor:k8s.io/apimachinery/pkg/util/errors",
+        "//vendor:k8s.io/apimachinery/pkg/util/sets",
+        "//vendor:k8s.io/apiserver/pkg/authentication/user",
+    ],
+)
+
 go_library(
     name = "k8s.io/apiserver/pkg/authentication/authenticator",
     srcs = ["k8s.io/apiserver/pkg/authentication/authenticator/interfaces.go"],
@@ -10004,6 +10125,21 @@ go_library(
 )
 
 go_library(
+    name = "k8s.io/client-go/_vendor/k8s.io/apimachinery/pkg/api/errors",
+    srcs = [
+        "k8s.io/client-go/_vendor/k8s.io/apimachinery/pkg/api/errors/doc.go",
+        "k8s.io/client-go/_vendor/k8s.io/apimachinery/pkg/api/errors/errors.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor:k8s.io/apimachinery/pkg/runtime",
+        "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
+        "//vendor:k8s.io/apimachinery/pkg/util/validation/field",
+    ],
+)
+
+go_library(
     name = "k8s.io/client-go/_vendor/k8s.io/apimachinery/pkg/api/meta",
     srcs = [
         "k8s.io/client-go/_vendor/k8s.io/apimachinery/pkg/api/meta/doc.go",
@@ -10143,6 +10279,19 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/selection",
         "//vendor:k8s.io/apimachinery/pkg/util/sets",
         "//vendor:k8s.io/apimachinery/pkg/util/validation",
+    ],
+)
+
+go_library(
+    name = "k8s.io/client-go/_vendor/k8s.io/apimachinery/pkg/openapi",
+    srcs = [
+        "k8s.io/client-go/_vendor/k8s.io/apimachinery/pkg/openapi/common.go",
+        "k8s.io/client-go/_vendor/k8s.io/apimachinery/pkg/openapi/doc.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/emicklei/go-restful",
+        "//vendor:github.com/go-openapi/spec",
     ],
 )
 
@@ -10339,6 +10488,12 @@ go_library(
 )
 
 go_library(
+    name = "k8s.io/client-go/_vendor/k8s.io/apimachinery/pkg/util/rand",
+    srcs = ["k8s.io/client-go/_vendor/k8s.io/apimachinery/pkg/util/rand/rand.go"],
+    tags = ["automanaged"],
+)
+
+go_library(
     name = "k8s.io/client-go/_vendor/k8s.io/apimachinery/pkg/util/runtime",
     srcs = ["k8s.io/client-go/_vendor/k8s.io/apimachinery/pkg/util/runtime/runtime.go"],
     tags = ["automanaged"],
@@ -10398,6 +10553,15 @@ go_library(
 )
 
 go_library(
+    name = "k8s.io/client-go/_vendor/k8s.io/apimachinery/pkg/version",
+    srcs = [
+        "k8s.io/client-go/_vendor/k8s.io/apimachinery/pkg/version/doc.go",
+        "k8s.io/client-go/_vendor/k8s.io/apimachinery/pkg/version/types.go",
+    ],
+    tags = ["automanaged"],
+)
+
+go_library(
     name = "k8s.io/client-go/_vendor/k8s.io/apimachinery/pkg/watch",
     srcs = [
         "k8s.io/client-go/_vendor/k8s.io/apimachinery/pkg/watch/doc.go",
@@ -10416,6 +10580,15 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/util/runtime",
         "//vendor:k8s.io/apimachinery/pkg/util/wait",
     ],
+)
+
+go_library(
+    name = "k8s.io/client-go/_vendor/k8s.io/apimachinery/third_party/forked/golang/reflect",
+    srcs = [
+        "k8s.io/client-go/_vendor/k8s.io/apimachinery/third_party/forked/golang/reflect/deep_equal.go",
+        "k8s.io/client-go/_vendor/k8s.io/apimachinery/third_party/forked/golang/reflect/type.go",
+    ],
+    tags = ["automanaged"],
 )
 
 go_test(
@@ -13380,87 +13553,4 @@ filegroup(
     name = "all-srcs",
     srcs = [":package-srcs"],
     tags = ["automanaged"],
-)
-
-go_library(
-    name = "k8s.io/client-go/_vendor/k8s.io/apimachinery/pkg/api/errors",
-    srcs = [
-        "k8s.io/client-go/_vendor/k8s.io/apimachinery/pkg/api/errors/doc.go",
-        "k8s.io/client-go/_vendor/k8s.io/apimachinery/pkg/api/errors/errors.go",
-    ],
-    tags = ["automanaged"],
-    deps = [
-        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
-        "//vendor:k8s.io/apimachinery/pkg/runtime",
-        "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
-        "//vendor:k8s.io/apimachinery/pkg/util/validation/field",
-    ],
-)
-
-go_library(
-    name = "k8s.io/client-go/_vendor/k8s.io/apimachinery/pkg/openapi",
-    srcs = [
-        "k8s.io/client-go/_vendor/k8s.io/apimachinery/pkg/openapi/common.go",
-        "k8s.io/client-go/_vendor/k8s.io/apimachinery/pkg/openapi/doc.go",
-    ],
-    tags = ["automanaged"],
-    deps = [
-        "//vendor:github.com/emicklei/go-restful",
-        "//vendor:github.com/go-openapi/spec",
-    ],
-)
-
-go_library(
-    name = "k8s.io/client-go/_vendor/k8s.io/apimachinery/pkg/util/rand",
-    srcs = ["k8s.io/client-go/_vendor/k8s.io/apimachinery/pkg/util/rand/rand.go"],
-    tags = ["automanaged"],
-)
-
-go_library(
-    name = "k8s.io/client-go/_vendor/k8s.io/apimachinery/pkg/version",
-    srcs = [
-        "k8s.io/client-go/_vendor/k8s.io/apimachinery/pkg/version/doc.go",
-        "k8s.io/client-go/_vendor/k8s.io/apimachinery/pkg/version/types.go",
-    ],
-    tags = ["automanaged"],
-)
-
-go_library(
-    name = "k8s.io/client-go/_vendor/k8s.io/apimachinery/third_party/forked/golang/reflect",
-    srcs = [
-        "k8s.io/client-go/_vendor/k8s.io/apimachinery/third_party/forked/golang/reflect/deep_equal.go",
-        "k8s.io/client-go/_vendor/k8s.io/apimachinery/third_party/forked/golang/reflect/type.go",
-    ],
-    tags = ["automanaged"],
-)
-
-go_test(
-    name = "k8s.io/apiserver/pkg/admission_test",
-    srcs = ["k8s.io/apiserver/pkg/admission/chain_test.go"],
-    library = ":k8s.io/apiserver/pkg/admission",
-    tags = ["automanaged"],
-    deps = ["//vendor:k8s.io/apimachinery/pkg/runtime/schema"],
-)
-
-go_library(
-    name = "k8s.io/apiserver/pkg/admission",
-    srcs = [
-        "k8s.io/apiserver/pkg/admission/attributes.go",
-        "k8s.io/apiserver/pkg/admission/chain.go",
-        "k8s.io/apiserver/pkg/admission/errors.go",
-        "k8s.io/apiserver/pkg/admission/handler.go",
-        "k8s.io/apiserver/pkg/admission/interfaces.go",
-        "k8s.io/apiserver/pkg/admission/plugins.go",
-    ],
-    tags = ["automanaged"],
-    deps = [
-        "//vendor:github.com/golang/glog",
-        "//vendor:k8s.io/apimachinery/pkg/api/errors",
-        "//vendor:k8s.io/apimachinery/pkg/api/meta",
-        "//vendor:k8s.io/apimachinery/pkg/runtime",
-        "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
-        "//vendor:k8s.io/apimachinery/pkg/util/errors",
-        "//vendor:k8s.io/apimachinery/pkg/util/sets",
-        "//vendor:k8s.io/apiserver/pkg/authentication/user",
-    ],
 )
