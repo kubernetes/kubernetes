@@ -14,5 +14,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package api contains the code that provides a rest.ful api service.
-package api // import "k8s.io/kubernetes/pkg/genericapiserver/api"
+package endpoints
+
+import (
+	"k8s.io/apiserver/pkg/metrics"
+)
+
+func init() {
+	metrics.Register()
+}

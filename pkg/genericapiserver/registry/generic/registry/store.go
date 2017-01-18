@@ -45,6 +45,11 @@ import (
 	"github.com/golang/glog"
 )
 
+// ObjectFunc is a function to act on a given object. An error may be returned
+// if the hook cannot be completed. An ObjectFunc may transform the provided
+// object.
+type ObjectFunc func(obj runtime.Object) error
+
 // Store implements pkg/api/rest.StandardStorage.
 // It's intended to be embeddable, so that you can implement any
 // non-generic functions if needed.
@@ -105,19 +110,19 @@ type Store struct {
 	// Decorator is intended for integrations that are above storage and
 	// should only be used for specific cases where storage of the value is
 	// not appropriate, since they cannot be watched.
-	Decorator rest.ObjectFunc
+	Decorator ObjectFunc
 	// Allows extended behavior during creation, required
 	CreateStrategy rest.RESTCreateStrategy
 	// On create of an object, attempt to run a further operation.
-	AfterCreate rest.ObjectFunc
+	AfterCreate ObjectFunc
 	// Allows extended behavior during updates, required
 	UpdateStrategy rest.RESTUpdateStrategy
 	// On update of an object, attempt to run a further operation.
-	AfterUpdate rest.ObjectFunc
+	AfterUpdate ObjectFunc
 	// Allows extended behavior during updates, optional
 	DeleteStrategy rest.RESTDeleteStrategy
 	// On deletion of an object, attempt to run a further operation.
-	AfterDelete rest.ObjectFunc
+	AfterDelete ObjectFunc
 	// If true, return the object that was deleted. Otherwise, return a generic
 	// success status response.
 	ReturnDeletedObject bool

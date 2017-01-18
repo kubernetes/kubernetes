@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,5 +14,5 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// package openapi holds shared codes and types between open API code generator and spec generator.
-package openapi
+// Package registry contains the generic implementation of the storage and system logic.
+package registry // import "k8s.io/kubernetes/pkg/genericapiserver/registry"
