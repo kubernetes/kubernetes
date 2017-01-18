@@ -43,10 +43,10 @@ func imageToRuntimeAPIImage(image *dockertypes.Image) (*runtimeapi.Image, error)
 
 	size := uint64(image.VirtualSize)
 	return &runtimeapi.Image{
-		Id:          &image.ID,
+		Id:          image.ID,
 		RepoTags:    image.RepoTags,
 		RepoDigests: image.RepoDigests,
-		Size_:       &size,
+		Size_:       size,
 	}, nil
 }
 
@@ -57,10 +57,10 @@ func imageInspectToRuntimeAPIImage(image *dockertypes.ImageInspect) (*runtimeapi
 
 	size := uint64(image.VirtualSize)
 	runtimeImage := &runtimeapi.Image{
-		Id:          &image.ID,
+		Id:          image.ID,
 		RepoTags:    image.RepoTags,
 		RepoDigests: image.RepoDigests,
-		Size_:       &size,
+		Size_:       size,
 	}
 
 	runtimeImage.Uid, runtimeImage.Username = getUserFromImageUser(image.Config.User)
@@ -91,13 +91,13 @@ func toRuntimeAPIContainer(c *dockertypes.Container) (*runtimeapi.Container, err
 	// The timestamp in dockertypes.Container is in seconds.
 	createdAt := c.Created * int64(time.Second)
 	return &runtimeapi.Container{
-		Id:           &c.ID,
-		PodSandboxId: &sandboxID,
+		Id:           c.ID,
+		PodSandboxId: sandboxID,
 		Metadata:     metadata,
-		Image:        &runtimeapi.ImageSpec{Image: &c.Image},
-		ImageRef:     &c.ImageID,
-		State:        &state,
-		CreatedAt:    &createdAt,
+		Image:        &runtimeapi.ImageSpec{Image: c.Image},
+		ImageRef:     c.ImageID,
+		State:        state,
+		CreatedAt:    createdAt,
 		Labels:       labels,
 		Annotations:  annotations,
 	}, nil
@@ -157,10 +157,10 @@ func toRuntimeAPISandbox(c *dockertypes.Container) (*runtimeapi.PodSandbox, erro
 	// The timestamp in dockertypes.Container is in seconds.
 	createdAt := c.Created * int64(time.Second)
 	return &runtimeapi.PodSandbox{
-		Id:          &c.ID,
+		Id:          c.ID,
 		Metadata:    metadata,
-		State:       &state,
-		CreatedAt:   &createdAt,
+		State:       state,
+		CreatedAt:   createdAt,
 		Labels:      labels,
 		Annotations: annotations,
 	}, nil
