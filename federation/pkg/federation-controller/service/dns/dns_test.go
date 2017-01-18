@@ -14,75 +14,148 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package service
+package dns
 
 import (
-	"sync"
-	"testing"
-
 	"fmt"
 	"reflect"
 	"sort"
+	"testing"
+	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	"k8s.io/kubernetes/federation/pkg/dnsprovider/providers/google/clouddns" // Only for unit testing purposes.
+	si "k8s.io/kubernetes/federation/pkg/federation-controller/service/ingress"
 	"k8s.io/kubernetes/pkg/api/v1"
 )
 
 func TestServiceController_ensureDnsRecords(t *testing.T) {
 	tests := []struct {
-		name          string
-		service       v1.Service
-		expected      []string
-		serviceStatus v1.LoadBalancerStatus
+		name     string
+		service  v1.Service
+		expected []string
 	}{
 		{
-			name: "withip",
+			name: "ServiceWithSingleIpEndpoint",
 			service: v1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "servicename",
 					Namespace: "servicenamespace",
+					Annotations: si.NewServiceIngressAnnotation(si.NewServiceIngress().
+						AddEndpoints("fooregion", "foozone", "c1", []string{"198.51.100.1"}, true).
+						GetJSONMarshalledBytes()),
 				},
 			},
-			serviceStatus: buildServiceStatus([][]string{{"198.51.100.1", ""}}),
 			expected: []string{
 				"example.com:servicename.servicenamespace.myfederation.svc.federation.example.com:A:180:[198.51.100.1]",
 				"example.com:servicename.servicenamespace.myfederation.svc.fooregion.federation.example.com:A:180:[198.51.100.1]",
 				"example.com:servicename.servicenamespace.myfederation.svc.foozone.fooregion.federation.example.com:A:180:[198.51.100.1]",
 			},
 		},
-		/*
-			TODO: getResolvedEndpoints preforms DNS lookup.
-			Mock and maybe look at error handling when some endpoints resolve, but also caching?
-			{
-				name: "withname",
-				service: v1.Service{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "servicename",
-						Namespace: "servicenamespace",
-					},
-				},
-				serviceStatus: buildServiceStatus([][]string{{"", "randomstring.amazonelb.example.com"}}),
-				expected: []string{
-					"example.com:servicename.servicenamespace.myfederation.svc.federation.example.com:A:180:[198.51.100.1]",
-					"example.com:servicename.servicenamespace.myfederation.svc.fooregion.federation.example.com:A:180:[198.51.100.1]",
-					"example.com:servicename.servicenamespace.myfederation.svc.foozone.fooregion.federation.example.com:A:180:[198.51.100.1]",
+		{
+			name: "ServiceWithMultipleIpEndpoints",
+			service: v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "servicename",
+					Namespace: "servicenamespace",
+					Annotations: si.NewServiceIngressAnnotation(si.NewServiceIngress().
+						AddEndpoints("fooregion", "foozone", "c1", []string{"198.51.100.1"}, true).
+						AddEndpoints("barregion", "barzone", "c2", []string{"198.51.200.1"}, true).
+						GetJSONMarshalledBytes()),
 				},
 			},
-		*/
+			expected: []string{
+				"example.com:servicename.servicenamespace.myfederation.svc.federation.example.com:A:180:[198.51.100.1 198.51.200.1]",
+				"example.com:servicename.servicenamespace.myfederation.svc.fooregion.federation.example.com:A:180:[198.51.100.1]",
+				"example.com:servicename.servicenamespace.myfederation.svc.foozone.fooregion.federation.example.com:A:180:[198.51.100.1]",
+				"example.com:servicename.servicenamespace.myfederation.svc.barregion.federation.example.com:A:180:[198.51.200.1]",
+				"example.com:servicename.servicenamespace.myfederation.svc.barzone.barregion.federation.example.com:A:180:[198.51.200.1]",
+			},
+		},
 		{
-			name: "noendpoints",
+			name: "ServiceWithNoEndpoints",
 			service: v1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "servicename",
 					Namespace: "servicenamespace",
 				},
 			},
+			expected: []string{},
+		},
+		{
+			name: "ServiceWithEndpointAndServiceDeleted",
+			service: v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "servicename",
+					Namespace:         "servicenamespace",
+					DeletionTimestamp: &metav1.Time{Time: time.Now()},
+					Annotations: si.NewServiceIngressAnnotation(si.NewServiceIngress().
+						AddEndpoints("fooregion", "foozone", "c1", []string{"198.51.100.1"}, true).
+						GetJSONMarshalledBytes()),
+				},
+			},
+			expected: []string{},
+		},
+		{
+			name: "ServiceWithMultipleIpEndpointsAndOneEndpointGettingRemoved",
+			service: v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "servicename",
+					Namespace: "servicenamespace",
+					Annotations: si.NewServiceIngressAnnotation(si.NewServiceIngress().
+						AddEndpoints("fooregion", "foozone", "c1", []string{"198.51.100.1"}, true).
+						AddEndpoints("barregion", "barzone", "c2", []string{"198.51.200.1"}, true).
+						RemoveEndpoint("barregion", "barzone", "c2", "198.51.200.1").
+						GetJSONMarshalledBytes()),
+				},
+			},
+			expected: []string{
+				"example.com:servicename.servicenamespace.myfederation.svc.federation.example.com:A:180:[198.51.100.1]",
+				"example.com:servicename.servicenamespace.myfederation.svc.fooregion.federation.example.com:A:180:[198.51.100.1]",
+				"example.com:servicename.servicenamespace.myfederation.svc.foozone.fooregion.federation.example.com:A:180:[198.51.100.1]",
+				"example.com:servicename.servicenamespace.myfederation.svc.barregion.federation.example.com:CNAME:180:[servicename.servicenamespace.myfederation.svc.federation.example.com]",
+				"example.com:servicename.servicenamespace.myfederation.svc.barzone.barregion.federation.example.com:CNAME:180:[servicename.servicenamespace.myfederation.svc.barregion.federation.example.com]",
+			},
+		},
+		{
+			name: "ServiceWithMultipleIpEndpointsAndOneEndpointIsUnhealthy",
+			service: v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "servicename",
+					Namespace: "servicenamespace",
+					Annotations: si.NewServiceIngressAnnotation(si.NewServiceIngress().
+						AddEndpoints("fooregion", "foozone", "c1", []string{"198.51.100.1"}, true).
+						AddEndpoints("barregion", "barzone", "c2", []string{"198.51.200.1"}, false).
+						GetJSONMarshalledBytes()),
+				},
+			},
+			expected: []string{
+				"example.com:servicename.servicenamespace.myfederation.svc.federation.example.com:A:180:[198.51.100.1]",
+				"example.com:servicename.servicenamespace.myfederation.svc.fooregion.federation.example.com:A:180:[198.51.100.1]",
+				"example.com:servicename.servicenamespace.myfederation.svc.foozone.fooregion.federation.example.com:A:180:[198.51.100.1]",
+				"example.com:servicename.servicenamespace.myfederation.svc.barregion.federation.example.com:CNAME:180:[servicename.servicenamespace.myfederation.svc.federation.example.com]",
+				"example.com:servicename.servicenamespace.myfederation.svc.barzone.barregion.federation.example.com:CNAME:180:[servicename.servicenamespace.myfederation.svc.barregion.federation.example.com]",
+			},
+		},
+		{
+			name: "ServiceWithMultipleIpEndpointsAndAllEndpointGettingRemoved",
+			service: v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "servicename",
+					Namespace: "servicenamespace",
+					Annotations: si.NewServiceIngressAnnotation(si.NewServiceIngress().
+						AddEndpoints("fooregion", "foozone", "c1", []string{"198.51.100.1"}, true).
+						AddEndpoints("barregion", "barzone", "c2", []string{"198.51.200.1"}, true).
+						RemoveEndpoint("fooregion", "foozone", "c1", "198.51.100.1").
+						RemoveEndpoint("barregion", "barzone", "c2", "198.51.200.1").
+						GetJSONMarshalledBytes()),
+				},
+			},
 			expected: []string{
 				"example.com:servicename.servicenamespace.myfederation.svc.fooregion.federation.example.com:CNAME:180:[servicename.servicenamespace.myfederation.svc.federation.example.com]",
 				"example.com:servicename.servicenamespace.myfederation.svc.foozone.fooregion.federation.example.com:CNAME:180:[servicename.servicenamespace.myfederation.svc.fooregion.federation.example.com]",
+				"example.com:servicename.servicenamespace.myfederation.svc.barregion.federation.example.com:CNAME:180:[servicename.servicenamespace.myfederation.svc.federation.example.com]",
+				"example.com:servicename.servicenamespace.myfederation.svc.barzone.barregion.federation.example.com:CNAME:180:[servicename.servicenamespace.myfederation.svc.barregion.federation.example.com]",
 			},
 		},
 	}
@@ -92,45 +165,21 @@ func TestServiceController_ensureDnsRecords(t *testing.T) {
 		if !ok {
 			t.Error("Unable to fetch zones")
 		}
-		serviceController := ServiceController{
+		d := ServiceDNSController{
 			dns:              fakedns,
 			dnsZones:         fakednsZones,
 			serviceDnsSuffix: "federation.example.com",
 			zoneName:         "example.com",
 			federationName:   "myfederation",
-			serviceCache:     &serviceCache{fedServiceMap: make(map[string]*cachedService)},
-			clusterCache: &clusterClientCache{
-				rwlock:    sync.Mutex{},
-				clientMap: make(map[string]*clusterCache),
-			},
-			knownClusterSet: make(sets.String),
 		}
 
-		clusterName := "testcluster"
-
-		serviceController.clusterCache.clientMap[clusterName] = &clusterCache{
-			cluster: &v1beta1.Cluster{
-				Status: v1beta1.ClusterStatus{
-					Zones:  []string{"foozone"},
-					Region: "fooregion",
-				},
-			},
-		}
-
-		cachedService := &cachedService{
-			lastState:        &test.service,
-			endpointMap:      make(map[string]int),
-			serviceStatusMap: make(map[string]v1.LoadBalancerStatus),
-		}
-		cachedService.endpointMap[clusterName] = 1
-		if !reflect.DeepEqual(&test.serviceStatus, &v1.LoadBalancerStatus{}) {
-			cachedService.serviceStatusMap[clusterName] = test.serviceStatus
-		}
-
-		err := serviceController.ensureDnsRecords(clusterName, cachedService)
+		dnsZone, err := getDnsZone(d.zoneName, d.zoneID, d.dnsZones)
 		if err != nil {
-			t.Errorf("Test failed for %s, unexpected error %v", test.name, err)
+			t.Errorf("Test failed for %s, Get DNS Zone failed: %v", test.name, err)
 		}
+		d.dnsZone = dnsZone
+
+		d.ensureDnsRecords(&test.service)
 
 		zones, err := fakednsZones.List()
 		if err != nil {
@@ -138,7 +187,7 @@ func TestServiceController_ensureDnsRecords(t *testing.T) {
 		}
 
 		// Dump every record to a testable-by-string-comparison form
-		var records []string
+		records := []string{}
 		for _, z := range zones {
 			zoneName := z.Name()
 
