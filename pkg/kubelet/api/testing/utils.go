@@ -24,11 +24,11 @@ import (
 
 func BuildContainerName(metadata *runtimeapi.ContainerMetadata, sandboxID string) string {
 	// include the sandbox ID to make the container ID unique.
-	return fmt.Sprintf("%s_%s_%d", sandboxID, metadata.GetName(), metadata.GetAttempt())
+	return fmt.Sprintf("%s_%s_%d", sandboxID, metadata.Name, metadata.Attempt)
 }
 
 func BuildSandboxName(metadata *runtimeapi.PodSandboxMetadata) string {
-	return fmt.Sprintf("%s_%s_%s_%d", metadata.GetName(), metadata.GetNamespace(), metadata.GetUid(), metadata.GetAttempt())
+	return fmt.Sprintf("%s_%s_%s_%d", metadata.Name, metadata.Namespace, metadata.Uid, metadata.Attempt)
 }
 
 func filterInLabels(filter, labels map[string]string) bool {
