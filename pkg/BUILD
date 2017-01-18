@@ -63,6 +63,7 @@ filegroup(
         "//pkg/client/listers/policy/v1beta1:all-srcs",
         "//pkg/client/listers/rbac/internalversion:all-srcs",
         "//pkg/client/listers/rbac/v1alpha1:all-srcs",
+        "//pkg/client/listers/rbac/v1beta1:all-srcs",
         "//pkg/client/listers/storage/internalversion:all-srcs",
         "//pkg/client/listers/storage/v1beta1:all-srcs",
         "//pkg/client/metrics:all-srcs",
