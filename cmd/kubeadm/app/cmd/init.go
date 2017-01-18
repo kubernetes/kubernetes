@@ -21,13 +21,12 @@ import (
 	"io"
 	"io/ioutil"
 	"path"
-	"strconv"
 
 	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
 
 	"k8s.io/apimachinery/pkg/runtime"
-	netutil "k8s.io/apimachinery/pkg/util/net"
+	setutil "k8s.io/apimachinery/pkg/util/sets"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiext "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
@@ -75,7 +74,7 @@ func NewCmdInit(out io.Writer) *cobra.Command {
 		Run: func(cmd *cobra.Command, args []string) {
 			i, err := NewInit(cfgPath, &cfg, skipPreFlight, deploymentType)
 			kubeadmutil.CheckErr(err)
-			kubeadmutil.CheckErr(Validate(i.Cfg()))
+			kubeadmutil.CheckErr(i.Validate())
 			kubeadmutil.CheckErr(i.Run(out))
 		},
 	}
@@ -134,7 +133,7 @@ func NewCmdInit(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func NewInit(cfgPath string, cfg *kubeadmapi.MasterConfiguration, skipPreFlight bool, deploymentType string) (Init, error) {
+func NewInit(cfgPath string, cfg *kubeadmapi.MasterConfiguration, skipPreFlight bool, deploymentType string) (*Init, error) {
 
 	fmt.Println("[kubeadm] WARNING: kubeadm is in alpha, please do not use it for production clusters.")
 
@@ -192,45 +191,27 @@ func NewInit(cfgPath string, cfg *kubeadmapi.MasterConfiguration, skipPreFlight 
 		fmt.Println("\t(/etc/systemd/system/kubelet.service.d/10-kubeadm.conf should be edited for this purpose)")
 	}
 
-	var deploymentTypeValid bool
-	for _, supportedDT := range deploymentTypes {
-		if deploymentType == supportedDT {
-			deploymentTypeValid = true
-		}
-	}
-	if !deploymentTypeValid {
-		return nil, fmt.Errorf("%s is not a valid deployment type, you can use any of %v or leave unset to accept the default", deploymentType, deploymentTypes)
-	}
-	if deploymentType == deploymentSelfHosted {
-		fmt.Println("[init] Creating self-hosted Kubernetes deployment...")
-		return &SelfHostedInit{cfg: cfg}, nil
+	// Validate deployment type
+	supportedDeploymentTypes := setutil.NewString(deploymentStaticPod, deploymentSelfHosted)
+	if !supportedDeploymentTypes.Has(deploymentType) {
+		return nil, fmt.Errorf("%s is not a valid deployment type, you can use any of %v or leave unset to accept the default", deploymentType, supportedDeploymentTypes.List())
 	}
 
-	fmt.Println("[init] Creating static pod Kubernetes deployment...")
-	return &StaticPodInit{cfg: cfg}, nil
+	return &Init{cfg: cfg, deploymentType: deploymentType}, nil
 }
 
-func Validate(cfg *kubeadmapi.MasterConfiguration) error {
-	return validation.ValidateMasterConfiguration(cfg).ToAggregate()
+type Init struct {
+	cfg            *kubeadmapi.MasterConfiguration
+	deploymentType string
 }
 
-// Init structs define implementations of the cluster setup for each supported
-// delpoyment type.
-type Init interface {
-	Cfg() *kubeadmapi.MasterConfiguration
-	Run(out io.Writer) error
-}
-
-type StaticPodInit struct {
-	cfg *kubeadmapi.MasterConfiguration
-}
-
-func (spi *StaticPodInit) Cfg() *kubeadmapi.MasterConfiguration {
-	return spi.cfg
+// Validate validates configuration passed to "kubeadm init"
+func (i *Init) Validate() error {
+	return validation.ValidateMasterConfiguration(i.cfg).ToAggregate()
 }
 
 // Run executes master node provisioning, including certificates, needed static pod manifests, etc.
-func (i *StaticPodInit) Run(out io.Writer) error {
+func (i *Init) Run(out io.Writer) error {
 
 	// PHASE 1: Generate certificates
 	caCert, err := certphase.CreatePKIAssets(i.cfg, kubeadmapi.GlobalEnvParams.HostPKIPath)
@@ -289,99 +270,14 @@ func (i *StaticPodInit) Run(out io.Writer) error {
 		return err
 	}
 
-	if i.cfg.Discovery.Token != nil {
-		fmt.Printf("[token-discovery] Using token: %s\n", kubeadmutil.BearerToken(i.cfg.Discovery.Token))
-		if err := kubemaster.CreateDiscoveryDeploymentAndSecret(i.cfg, client, caCert); err != nil {
+	// Is deployment type self-hosted?
+	if i.deploymentType == deploymentSelfHosted {
+		// Temporary control plane is up, now we create our self hosted control
+		// plane components and remove the static manifests:
+		fmt.Println("[init] Creating self-hosted control plane...")
+		if err := kubemaster.CreateSelfHostedControlPlane(i.cfg, client); err != nil {
 			return err
 		}
-		if err := kubeadmutil.UpdateOrCreateToken(client, i.cfg.Discovery.Token, kubeadmutil.DefaultTokenDuration); err != nil {
-			return err
-		}
-	}
-
-	if err := kubemaster.CreateEssentialAddons(i.cfg, client); err != nil {
-		return err
-	}
-
-	fmt.Fprintf(out, initDoneMsgf, generateJoinArgs(i.cfg))
-	return nil
-}
-
-// SelfHostedInit initializes a self-hosted cluster.
-type SelfHostedInit struct {
-	cfg *kubeadmapi.MasterConfiguration
-}
-
-func (spi *SelfHostedInit) Cfg() *kubeadmapi.MasterConfiguration {
-	return spi.cfg
-}
-
-// Run executes master node provisioning, including certificates, needed pod manifests, etc.
-func (i *SelfHostedInit) Run(out io.Writer) error {
-	// Validate token if any, otherwise generate
-	if i.cfg.Discovery.Token != nil {
-		if i.cfg.Discovery.Token.ID != "" && i.cfg.Discovery.Token.Secret != "" {
-			fmt.Printf("[token-discovery] A token has been provided, validating [%s]\n", kubeadmutil.BearerToken(i.cfg.Discovery.Token))
-			if valid, err := kubeadmutil.ValidateToken(i.cfg.Discovery.Token); valid == false {
-				return err
-			}
-		} else {
-			fmt.Println("[token-discovery] A token has not been provided, generating one")
-			if err := kubeadmutil.GenerateToken(i.cfg.Discovery.Token); err != nil {
-				return err
-			}
-		}
-
-		// Make sure there is at least one address
-		if len(i.cfg.Discovery.Token.Addresses) == 0 {
-			ip, err := netutil.ChooseHostInterface()
-			if err != nil {
-				return err
-			}
-			i.cfg.Discovery.Token.Addresses = []string{ip.String() + ":" + strconv.Itoa(kubeadmapiext.DefaultDiscoveryBindPort)}
-		}
-
-		if err := kubemaster.CreateTokenAuthFile(kubeadmutil.BearerToken(i.cfg.Discovery.Token)); err != nil {
-			return err
-		}
-	}
-
-	// PHASE 1: Generate certificates
-	caCert, err := certphase.CreatePKIAssets(i.cfg, kubeadmapi.GlobalEnvParams.HostPKIPath)
-	if err != nil {
-		return err
-	}
-
-	// PHASE 2: Generate kubeconfig files for the admin and the kubelet
-
-	// TODO this is not great, but there is only one address we can use here
-	// so we'll pick the first one, there is much of chance to have an empty
-	// slice by the time this gets called
-	masterEndpoint := fmt.Sprintf("https://%s:%d", i.cfg.API.AdvertiseAddresses[0], i.cfg.API.Port)
-	err = kubeconfigphase.CreateAdminAndKubeletKubeConfig(masterEndpoint, kubeadmapi.GlobalEnvParams.HostPKIPath, kubeadmapi.GlobalEnvParams.KubernetesDir)
-	if err != nil {
-		return err
-	}
-
-	// Phase 3: Bootstrap the control plane
-	if err := kubemaster.WriteStaticPodManifests(i.cfg); err != nil {
-		return err
-	}
-
-	client, err := kubemaster.CreateClientAndWaitForAPI(path.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, kubeconfigphase.AdminKubeConfigFileName))
-	if err != nil {
-		return err
-	}
-
-	if err := kubemaster.UpdateMasterRoleLabelsAndTaints(client, false); err != nil {
-		return err
-	}
-
-	// Temporary control plane is up, now we create our self hosted control
-	// plane components and remove the static manifests:
-	fmt.Println("[init] Creating self-hosted control plane...")
-	if err := kubemaster.CreateSelfHostedControlPlane(i.cfg, client); err != nil {
-		return err
 	}
 
 	if i.cfg.Discovery.Token != nil {
