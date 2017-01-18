@@ -17,13 +17,46 @@ limitations under the License.
 package unstructured
 
 import (
+	"bytes"
 	encodingjson "encoding/json"
 	"fmt"
 	"reflect"
 	"strings"
+	"sync"
+	"sync/atomic"
 
-	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util/json"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/json"
+)
+
+type structField struct {
+	structType reflect.Type
+	field      int
+}
+
+type fieldInfo struct {
+	name      string
+	nameValue reflect.Value
+}
+
+type fieldsCacheMap map[structField]*fieldInfo
+
+type fieldsCache struct {
+	sync.Mutex
+	value atomic.Value
+}
+
+func newFieldsCache() *fieldsCache {
+	cache := &fieldsCache{}
+	cache.value.Store(make(fieldsCacheMap))
+	return cache
+}
+
+var (
+	marshalerType          = reflect.TypeOf(new(encodingjson.Marshaler)).Elem()
+	unmarshalerType        = reflect.TypeOf(new(encodingjson.Unmarshaler)).Elem()
+	mapStringInterfaceType = reflect.TypeOf(map[string]interface{}{})
+	fieldCache             = newFieldsCache()
 )
 
 // Converter knows how to convert betweek runtime.Object and
@@ -36,10 +69,10 @@ func NewConverter() *Converter {
 }
 
 func (c *Converter) FromUnstructured(u map[string]interface{}, obj runtime.Object) error {
-	return c.fromUnstructured(reflect.ValueOf(u), reflect.ValueOf(obj).Elem())
+	return fromUnstructured(reflect.ValueOf(u), reflect.ValueOf(obj).Elem())
 }
 
-func (c *Converter) fromUnstructured(sv, dv reflect.Value) error {
+func fromUnstructured(sv, dv reflect.Value) error {
 	sv = unwrapInterface(sv)
 	st, dt := sv.Type(), dv.Type()
 
@@ -58,50 +91,60 @@ func (c *Converter) fromUnstructured(sv, dv reflect.Value) error {
 		}
 	}
 
-	// If the from value is string, check if there is custom marshaller
-	// for the out type and try to use it.
-	if dv.CanAddr() {
-		// Check if the object has a custom JSON marshaller/unmarshaller.
-		unmarshal := dv.Addr().MethodByName("UnmarshalJSON")
-		if unmarshal.IsValid() {
-			// UnmarshalJSON takes []byte as an argument. However, it assumes
-			// that this is json encoded, whereas here it isn't. We need to
-			// encode it first.
-			data, err := json.Marshal(sv.Interface())
-			if err != nil {
-				return fmt.Errorf("Error encoding to json")
-			}
-			ret := unmarshal.Call([]reflect.Value{reflect.ValueOf(data)})[0].Interface()
-			if ret != nil {
-				return ret.(error)
-			}
-			return nil
+	// Check if the object has a custom JSON marshaller/unmarshaller.
+	if reflect.PtrTo(dt).Implements(unmarshalerType) {
+		data, err := json.Marshal(sv.Interface())
+		if err != nil {
+			return fmt.Errorf("error encoding %s to json: %v", st.String(), err)
 		}
+		unmarshaler := dv.Addr().Interface().(encodingjson.Unmarshaler)
+		return unmarshaler.UnmarshalJSON(data)
 	}
 
 	switch dt.Kind() {
 	case reflect.Map:
-		return c.mapFromUnstructured(sv, dv)
+		return mapFromUnstructured(sv, dv)
 	case reflect.Slice:
-		return c.sliceFromUnstructured(sv, dv)
+		return sliceFromUnstructured(sv, dv)
 	case reflect.Ptr:
-		return c.pointerFromUnstructured(sv, dv)
+		return pointerFromUnstructured(sv, dv)
 	case reflect.Struct:
-		return c.structFromUnstructured(sv, dv)
+		return structFromUnstructured(sv, dv)
 	case reflect.Interface:
-		return c.interfaceFromUnstructured(sv, dv)
+		return interfaceFromUnstructured(sv, dv)
 	default:
-		return fmt.Errorf("Unrecognized type: %v", dt.Kind())
+		return fmt.Errorf("unrecognized type: %v", dt.Kind())
 	}
 }
 
-func fieldNameFromField(field *reflect.StructField) string {
-	jsonTag := field.Tag.Get("json")
+func fieldInfoFromField(structType reflect.Type, field int) *fieldInfo {
+	fieldCacheMap := fieldCache.value.Load().(fieldsCacheMap)
+	if info, ok := fieldCacheMap[structField{structType, field}]; ok {
+		return info
+	}
+
+	// Cache miss - we need to compute the field name.
+	info := &fieldInfo{}
+	typeField := structType.Field(field)
+	jsonTag := typeField.Tag.Get("json")
 	if len(jsonTag) == 0 {
 		// FIXME: This should start with small letter.
-		return field.Name
+		info.name = typeField.Name
+	} else {
+		info.name = strings.Split(jsonTag, ",")[0]
 	}
-	return strings.Split(jsonTag, ",")[0]
+	info.nameValue = reflect.ValueOf(info.name)
+
+	fieldCache.Lock()
+	defer fieldCache.Unlock()
+	fieldCacheMap = fieldCache.value.Load().(fieldsCacheMap)
+	newFieldCacheMap := make(fieldsCacheMap)
+	for k, v := range fieldCacheMap {
+		newFieldCacheMap[k] = v
+	}
+	newFieldCacheMap[structField{structType, field}] = info
+	fieldCache.value.Store(newFieldCacheMap)
+	return info
 }
 
 func unwrapInterface(v reflect.Value) reflect.Value {
@@ -111,14 +154,14 @@ func unwrapInterface(v reflect.Value) reflect.Value {
 	return v
 }
 
-func (c *Converter) mapFromUnstructured(sv, dv reflect.Value) error {
+func mapFromUnstructured(sv, dv reflect.Value) error {
 	st, dt := sv.Type(), dv.Type()
 	if st.Kind() != reflect.Map {
-		return fmt.Errorf("Cannot restore map from %v", st.Kind())
+		return fmt.Errorf("cannot restore map from %v", st.Kind())
 	}
 
 	if !st.Key().AssignableTo(dt.Key()) && !st.Key().ConvertibleTo(dt.Key()) {
-		return fmt.Errorf("Cannot copy map with non-assignable keys: %v %v", st.Key(), dt.Key())
+		return fmt.Errorf("cannot copy map with non-assignable keys: %v %v", st.Key(), dt.Key())
 	}
 
 	if sv.IsNil() {
@@ -129,7 +172,7 @@ func (c *Converter) mapFromUnstructured(sv, dv reflect.Value) error {
 	for _, key := range sv.MapKeys() {
 		value := reflect.New(dt.Elem()).Elem()
 		if val := unwrapInterface(sv.MapIndex(key)); val.IsValid() {
-			if err := c.fromUnstructured(val, value); err != nil {
+			if err := fromUnstructured(val, value); err != nil {
 				return err
 			}
 		} else {
@@ -144,7 +187,7 @@ func (c *Converter) mapFromUnstructured(sv, dv reflect.Value) error {
 	return nil
 }
 
-func (c *Converter) sliceFromUnstructured(sv, dv reflect.Value) error {
+func sliceFromUnstructured(sv, dv reflect.Value) error {
 	st, dt := sv.Type(), dv.Type()
 	if st.Kind() == reflect.String && dt.Elem().Kind() == reflect.Uint8 {
 		// We store original []byte representation as string.
@@ -153,12 +196,13 @@ func (c *Converter) sliceFromUnstructured(sv, dv reflect.Value) error {
 		if len(sv.Interface().(string)) > 0 {
 			marshalled, err := json.Marshal(sv.Interface())
 			if err != nil {
-				return fmt.Errorf("Error encoding to json: %v", err)
+				return fmt.Errorf("error encoding %s to json: %v", st, err)
 			}
+			// TODO: Is this Unmarshal needed?
 			var data []byte
 			err = json.Unmarshal(marshalled, &data)
 			if err != nil {
-				return fmt.Errorf("Error decoding from json: %v", err)
+				return fmt.Errorf("error decoding from json: %v", err)
 			}
 			dv.SetBytes(data)
 		} else {
@@ -167,7 +211,7 @@ func (c *Converter) sliceFromUnstructured(sv, dv reflect.Value) error {
 		return nil
 	}
 	if st.Kind() != reflect.Slice {
-		return fmt.Errorf("Cannot restore slice from %v", st.Kind())
+		return fmt.Errorf("cannot restore slice from %v", st.Kind())
 	}
 
 	if sv.IsNil() {
@@ -176,14 +220,14 @@ func (c *Converter) sliceFromUnstructured(sv, dv reflect.Value) error {
 	}
 	dv.Set(reflect.MakeSlice(dt, sv.Len(), sv.Cap()))
 	for i := 0; i < sv.Len(); i++ {
-		if err := c.fromUnstructured(sv.Index(i), dv.Index(i)); err != nil {
+		if err := fromUnstructured(sv.Index(i), dv.Index(i)); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (c *Converter) pointerFromUnstructured(sv, dv reflect.Value) error {
+func pointerFromUnstructured(sv, dv reflect.Value) error {
 	st, dt := sv.Type(), dv.Type()
 
 	if st.Kind() == reflect.Ptr && sv.IsNil() {
@@ -193,32 +237,31 @@ func (c *Converter) pointerFromUnstructured(sv, dv reflect.Value) error {
 	dv.Set(reflect.New(dt.Elem()))
 	switch st.Kind() {
 	case reflect.Ptr, reflect.Interface:
-		return c.fromUnstructured(sv.Elem(), dv.Elem())
+		return fromUnstructured(sv.Elem(), dv.Elem())
 	default:
-		return c.fromUnstructured(sv, dv.Elem())
+		return fromUnstructured(sv, dv.Elem())
 	}
 }
 
-func (c *Converter) structFromUnstructured(sv, dv reflect.Value) error {
+func structFromUnstructured(sv, dv reflect.Value) error {
 	st, dt := sv.Type(), dv.Type()
 	if st.Kind() != reflect.Map {
-		return fmt.Errorf("Cannot restore struct from: %v", st.Kind())
+		return fmt.Errorf("cannot restore struct from: %v", st.Kind())
 	}
 
 	for i := 0; i < dt.NumField(); i++ {
-		field := dt.Field(i)
-		fieldName := fieldNameFromField(&field)
+		fieldInfo := fieldInfoFromField(dt, i)
 		fv := dv.Field(i)
 
-		if len(fieldName) == 0 {
+		if len(fieldInfo.name) == 0 {
 			// This field is inlined.
-			if err := c.fromUnstructured(sv, fv); err != nil {
+			if err := fromUnstructured(sv, fv); err != nil {
 				return err
 			}
 		} else {
-			value := unwrapInterface(sv.MapIndex(reflect.ValueOf(fieldName)))
+			value := unwrapInterface(sv.MapIndex(fieldInfo.nameValue))
 			if value.IsValid() {
-				if err := c.fromUnstructured(value, fv); err != nil {
+				if err := fromUnstructured(value, fv); err != nil {
 					return err
 				}
 			} else {
@@ -229,57 +272,52 @@ func (c *Converter) structFromUnstructured(sv, dv reflect.Value) error {
 	return nil
 }
 
-func (c *Converter) interfaceFromUnstructured(sv, dv reflect.Value) error {
-	return fmt.Errorf("Interface conversion unsupported")
+func interfaceFromUnstructured(sv, dv reflect.Value) error {
+	return fmt.Errorf("interface conversion unsupported: %s -> %s", sv.Type().String(), dv.Type().String())
 }
-
-var (
-	marshalerType          = reflect.TypeOf(new(encodingjson.Marshaler)).Elem()
-	mapStringInterfaceType = reflect.TypeOf(map[string]interface{}{})
-)
 
 func (c *Converter) ToUnstructured(obj runtime.Object, u *map[string]interface{}) error {
-	return c.toUnstructured(reflect.ValueOf(obj).Elem(), reflect.ValueOf(u).Elem())
+	return toUnstructured(reflect.ValueOf(obj).Elem(), reflect.ValueOf(u).Elem())
 }
 
-func (c *Converter) toUnstructured(sv, dv reflect.Value) error {
+func toUnstructured(sv, dv reflect.Value) error {
 	st, dt := sv.Type(), dv.Type()
 
 	// Check if the object has a custom JSON marshaller/unmarshaller.
 	if st.Implements(marshalerType) {
-		var data []byte
-		var err error
 		if sv.Kind() == reflect.Ptr && sv.IsNil() {
-			data = []byte("null")
-		} else {
-			marshaler := sv.Interface().(encodingjson.Marshaler)
-			data, err = marshaler.MarshalJSON()
-			if err != nil {
-				return err
-			}
+			// We're done - we don't need to store anything.
+			return nil
 		}
-		if string(data) == "null" {
+
+		marshaler := sv.Interface().(encodingjson.Marshaler)
+		data, err := marshaler.MarshalJSON()
+		if err != nil {
+			return err
+		}
+		if bytes.Equal(data, []byte("null")) {
 			// We're done - we don't need to store anything.
 		} else {
-			if len(data) > 0 && data[0] == '"' {
+			switch {
+			case len(data) > 0 && data[0] == '"':
 				var result string
 				err := json.Unmarshal(data, &result)
 				if err != nil {
-					return fmt.Errorf("Error decoding from json: %v", err)
+					return fmt.Errorf("error decoding from json: %v", err)
 				}
 				dv.Set(reflect.ValueOf(result))
-			} else if len(data) > 0 && data[0] == '{' {
+			case len(data) > 0 && data[0] == '{':
 				result := make(map[string]interface{})
 				err := json.Unmarshal(data, &result)
 				if err != nil {
-					return fmt.Errorf("Error decoding from json: %v", err)
+					return fmt.Errorf("error decoding from json: %v", err)
 				}
 				dv.Set(reflect.ValueOf(result))
-			} else {
+			default:
 				var result int64
 				err := json.Unmarshal(data, &result)
 				if err != nil {
-					return fmt.Errorf("Error decoding from json: %v", err)
+					return fmt.Errorf("error decoding from json: %v", err)
 				}
 				dv.Set(reflect.ValueOf(result))
 			}
@@ -297,38 +335,49 @@ func (c *Converter) toUnstructured(sv, dv reflect.Value) error {
 		dv.Set(sv)
 		return nil
 	case reflect.Map:
-		return c.mapToUnstructured(sv, dv)
+		return mapToUnstructured(sv, dv)
 	case reflect.Slice:
-		return c.sliceToUnstructured(sv, dv)
+		return sliceToUnstructured(sv, dv)
 	case reflect.Ptr:
-		return c.pointerToUnstructured(sv, dv)
+		return pointerToUnstructured(sv, dv)
 	case reflect.Struct:
-		return c.structToUnstructured(sv, dv)
+		return structToUnstructured(sv, dv)
 	case reflect.Interface:
-		return c.interfaceToUnstructured(sv, dv)
+		return interfaceToUnstructured(sv, dv)
 	default:
 		return fmt.Errorf("unrecognized type: %v", st.Kind())
 	}
 }
 
-func (c *Converter) mapToUnstructured(sv, dv reflect.Value) error {
+func mapToUnstructured(sv, dv reflect.Value) error {
 	st, dt := sv.Type(), dv.Type()
 	if dt.Kind() == reflect.Interface && dv.NumMethod() == 0 {
+		if st.Key().Kind() == reflect.String {
+			switch st.Elem().Kind() {
+			case reflect.String, reflect.Bool,
+				reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
+				reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+				sv.Set(sv)
+				return nil
+			default:
+				// We need to do a proper conversion.
+			}
+		}
 		dv.Set(reflect.MakeMap(mapStringInterfaceType))
 		dv = dv.Elem()
 		dt = dv.Type()
 	}
 	if dt.Kind() != reflect.Map {
-		return fmt.Errorf("Cannot convert struct to: %v", dt.Kind())
+		return fmt.Errorf("cannot convert struct to: %v", dt.Kind())
 	}
 
 	if !st.Key().AssignableTo(dt.Key()) && !st.Key().ConvertibleTo(dt.Key()) {
-		return fmt.Errorf("Cannot copy map with non-assignable keys: %v %v", st.Key(), dt.Key())
+		return fmt.Errorf("cannot copy map with non-assignable keys: %v %v", st.Key(), dt.Key())
 	}
 
 	for _, key := range sv.MapKeys() {
 		value := reflect.New(dt.Elem()).Elem()
-		if err := c.toUnstructured(sv.MapIndex(key), value); err != nil {
+		if err := toUnstructured(sv.MapIndex(key), value); err != nil {
 			return err
 		}
 		if st.Key().AssignableTo(dt.Key()) {
@@ -340,33 +389,42 @@ func (c *Converter) mapToUnstructured(sv, dv reflect.Value) error {
 	return nil
 }
 
-func (c *Converter) sliceToUnstructured(sv, dv reflect.Value) error {
-	dt := dv.Type()
+func sliceToUnstructured(sv, dv reflect.Value) error {
+	st, dt := sv.Type(), dv.Type()
 	if dt.Kind() == reflect.Interface && dv.NumMethod() == 0 {
-		dv.Set(reflect.MakeSlice(reflect.SliceOf(dt), sv.Len(), sv.Cap()))
-		dv = dv.Elem()
-		dt = dv.Type()
+		switch st.Elem().Kind() {
+		case reflect.String, reflect.Bool,
+			reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
+			reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+			sv.Set(sv)
+			return nil
+		default:
+			// We need to do a proper conversion.
+			dv.Set(reflect.MakeSlice(reflect.SliceOf(dt), sv.Len(), sv.Cap()))
+			dv = dv.Elem()
+			dt = dv.Type()
+		}
 	}
 	if dt.Kind() != reflect.Slice {
-		return fmt.Errorf("Cannot convert slice to: %v", dt.Kind())
+		return fmt.Errorf("cannot convert slice to: %v", dt.Kind())
 	}
 	for i := 0; i < sv.Len(); i++ {
-		if err := c.toUnstructured(sv.Index(i), dv.Index(i)); err != nil {
+		if err := toUnstructured(sv.Index(i), dv.Index(i)); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (c *Converter) pointerToUnstructured(sv, dv reflect.Value) error {
+func pointerToUnstructured(sv, dv reflect.Value) error {
 	if sv.IsNil() {
 		// We're done - we don't need to store anything.
 		return nil
 	}
-	return c.toUnstructured(sv.Elem(), dv)
+	return toUnstructured(sv.Elem(), dv)
 }
 
-func (c *Converter) structToUnstructured(sv, dv reflect.Value) error {
+func structToUnstructured(sv, dv reflect.Value) error {
 	st, dt := sv.Type(), dv.Type()
 	if dt.Kind() == reflect.Interface && dv.NumMethod() == 0 {
 		dv.Set(reflect.MakeMap(mapStringInterfaceType))
@@ -374,34 +432,41 @@ func (c *Converter) structToUnstructured(sv, dv reflect.Value) error {
 		dt = dv.Type()
 	}
 	if dt.Kind() != reflect.Map {
-		return fmt.Errorf("Cannot convert struct to: %v", dt.Kind())
+		return fmt.Errorf("cannot convert struct to: %v", dt.Kind())
 	}
 
 	for i := 0; i < st.NumField(); i++ {
-		field := st.Field(i)
-		fieldName := fieldNameFromField(&field)
+		fieldInfo := fieldInfoFromField(st, i)
 		fv := sv.Field(i)
 
-		if len(fieldName) == 0 {
+		if len(fieldInfo.name) == 0 {
 			// This field is inlined.
-			if err := c.toUnstructured(fv, dv); err != nil {
+			if err := toUnstructured(fv, dv); err != nil {
 				return err
 			}
-		} else {
-			if fv.IsValid() {
-				subv := reflect.New(dt.Elem()).Elem()
-				if err := c.toUnstructured(fv, subv); err != nil {
-					return err
-				}
-				dv.SetMapIndex(reflect.ValueOf(fieldName), subv)
-			} else {
-				// We're done - we don't need to store anything.
+			continue
+		}
+		if !fv.IsValid() {
+			// No fource field, skip.
+			continue
+		}
+		var subv reflect.Value
+		switch fv.Type().Kind() {
+		case reflect.String, reflect.Bool,
+			reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
+			reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+			subv = fv
+		default:
+			subv = reflect.New(dt.Elem()).Elem()
+			if err := toUnstructured(fv, subv); err != nil {
+				return err
 			}
 		}
+		dv.SetMapIndex(fieldInfo.nameValue, subv)
 	}
 	return nil
 }
 
-func (c *Converter) interfaceToUnstructured(sv, dv reflect.Value) error {
-	return fmt.Errorf("Interface conversion unsupported")
+func interfaceToUnstructured(sv, dv reflect.Value) error {
+	return fmt.Errorf("interface conversion unsupported: %s -> %s", sv.Type().String(), dv.Type().String())
 }

@@ -22,13 +22,15 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
-	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/runtime/unstructured"
-	"k8s.io/kubernetes/pkg/util/diff"
-	"k8s.io/kubernetes/pkg/util/json"
-	"k8s.io/kubernetes/pkg/util/sets"
+
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/diff"
+	"k8s.io/apimachinery/pkg/util/json"
+	"k8s.io/apimachinery/pkg/util/sets"
 
 	"github.com/google/gofuzz"
 )
@@ -138,4 +140,62 @@ func TestRoundTrip(t *testing.T) {
 			}
 		}
 	}
+}
+
+func benchmarkItems() []v1.Pod {
+	fuzzer := apitesting.FuzzerFor(nil, api.SchemeGroupVersion, rand.NewSource(100))
+	items := make([]v1.Pod, 10)
+	for i := range items {
+		var pod api.Pod
+		fuzzer.Fuzz(&pod)
+		pod.Spec.InitContainers, pod.Status.InitContainerStatuses = nil, nil
+		out, err := api.Scheme.ConvertToVersion(&pod, v1.SchemeGroupVersion)
+		if err != nil {
+			panic(err)
+		}
+		items[i] = *out.(*v1.Pod)
+	}
+	return items
+}
+
+func BenchmarkToFromUnstructured(b *testing.B) {
+	items := benchmarkItems()
+	size := len(items)
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		unstr := map[string]interface{}{}
+		if err := unstructured.NewConverter().ToUnstructured(&items[i%size], &unstr); err != nil {
+			b.Fatalf("unexpected error: %v", err)
+		}
+		obj := v1.Pod{}
+		if err := unstructured.NewConverter().FromUnstructured(unstr, &obj); err != nil {
+			b.Fatalf("unexpected error: %v", err)
+		}
+	}
+	b.StopTimer()
+}
+
+func BenchmarkToFromUnstructuredViaJSON(b *testing.B) {
+	items := benchmarkItems()
+	size := len(items)
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		data, err := json.Marshal(&items[i%size])
+		if err != nil {
+			b.Fatalf("unexpected error: %v", err)
+		}
+		unstr := map[string]interface{}{}
+		if err := json.Unmarshal(data, &unstr); err != nil {
+			b.Fatalf("unexpected error: %v", err)
+		}
+		data, err = json.Marshal(unstr)
+		if err != nil {
+			b.Fatalf("unexpected error: %v", err)
+		}
+		obj := v1.Pod{}
+		if err := json.Unmarshal(data, &obj); err != nil {
+			b.Fatalf("unexpected error: %v", err)
+		}
+	}
+	b.StopTimer()
 }
