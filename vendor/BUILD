@@ -13402,4 +13402,5 @@ go_library(
         "k8s.io/client-go/pkg/third_party/forked/golang/reflect/type.go",
     ],
     tags = ["automanaged"],
+    deps = ["//pkg/util/wait:go_default_library"],
 )
