@@ -174,6 +174,7 @@ func SyncOne(sj batch.CronJob, js []batch.Job, now time.Time, jc jobControlInter
 	}
 	times, err := getRecentUnmetScheduleTimes(sj, now)
 	if err != nil {
+		recorder.Eventf(&sj, v1.EventTypeWarning, "FailedNeedsStart", "Cannot determine if job needs to be started: %v", err)
 		glog.Errorf("Cannot determine if %s needs to be started: %v", nameForLog, err)
 	}
 	// TODO: handle multiple unmet start times, from oldest to newest, updating status as needed.
