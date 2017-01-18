@@ -346,7 +346,7 @@ func (self *RealFsInfo) GetFsInfoForPath(mountSet map[string]struct{}) ([]Fs, er
 	return filesystems, nil
 }
 
-var partitionRegex = regexp.MustCompile(`^(?:(?:s|xv)d[a-z]+\d*|dm-\d+)$`)
+var partitionRegex = regexp.MustCompile(`^(?:(?:s|v|xv)d[a-z]+\d*|dm-\d+)$`)
 
 func getDiskStatsMap(diskStatsFile string) (map[string]DiskStats, error) {
 	diskStatsMap := make(map[string]DiskStats)
@@ -474,42 +474,24 @@ func (self *RealFsInfo) GetDirInodeUsage(dir string, timeout time.Duration) (uin
 	if dir == "" {
 		return 0, fmt.Errorf("invalid directory")
 	}
-	var stdout, stdwcerr, stdfinderr bytes.Buffer
-	var err error
+	var counter byteCounter
+	var stderr bytes.Buffer
 	claimToken()
 	defer releaseToken()
 	findCmd := exec.Command("find", dir, "-xdev", "-printf", ".")
-	wcCmd := exec.Command("wc", "-c")
-	if wcCmd.Stdin, err = findCmd.StdoutPipe(); err != nil {
-		return 0, fmt.Errorf("failed to setup stdout for cmd %v - %v", findCmd.Args, err)
-	}
-	wcCmd.Stdout, wcCmd.Stderr, findCmd.Stderr = &stdout, &stdwcerr, &stdfinderr
-	if err = findCmd.Start(); err != nil {
-		return 0, fmt.Errorf("failed to exec cmd %v - %v; stderr: %v", findCmd.Args, err, stdfinderr.String())
-	}
-
-	if err = wcCmd.Start(); err != nil {
-		return 0, fmt.Errorf("failed to exec cmd %v - %v; stderr %v", wcCmd.Args, err, stdwcerr.String())
+	findCmd.Stdout, findCmd.Stderr = &counter, &stderr
+	if err := findCmd.Start(); err != nil {
+		return 0, fmt.Errorf("failed to exec cmd %v - %v; stderr: %v", findCmd.Args, err, stderr.String())
 	}
 	timer := time.AfterFunc(timeout, func() {
-		glog.Infof("killing cmd %v, and cmd %v due to timeout(%s)", findCmd.Args, wcCmd.Args, timeout.String())
-		wcCmd.Process.Kill()
+		glog.Infof("killing cmd %v due to timeout(%s)", findCmd.Args, timeout.String())
 		findCmd.Process.Kill()
 	})
-	err = findCmd.Wait()
-	if err != nil {
-		return 0, fmt.Errorf("cmd %v failed. stderr: %s; err: %v", findCmd.Args, stdfinderr.String(), err)
-	}
-	err = wcCmd.Wait()
-	if err != nil {
-		return 0, fmt.Errorf("cmd %v failed. stderr: %s; err: %v", wcCmd.Args, stdwcerr.String(), err)
+	if err := findCmd.Wait(); err != nil {
+		return 0, fmt.Errorf("cmd %v failed. stderr: %s; err: %v", findCmd.Args, stderr.String(), err)
 	}
 	timer.Stop()
-	inodeUsage, err := strconv.ParseUint(strings.TrimSpace(stdout.String()), 10, 64)
-	if err != nil {
-		return 0, fmt.Errorf("cannot parse cmds: %v, %v output %s - %s", findCmd.Args, wcCmd.Args, stdout.String(), err)
-	}
-	return inodeUsage, nil
+	return counter.bytesWritten, nil
 }
 
 func getVfsStats(path string) (total uint64, free uint64, avail uint64, inodes uint64, inodesFree uint64, err error) {
@@ -620,4 +602,12 @@ func getZfstats(poolName string) (uint64, uint64, uint64, error) {
 	total := dataset.Used + dataset.Avail + dataset.Usedbydataset
 
 	return total, dataset.Avail, dataset.Avail, nil
+}
+
+// Simple io.Writer implementation that counts how many bytes were written.
+type byteCounter struct{ bytesWritten uint64 }
+
+func (b *byteCounter) Write(p []byte) (int, error) {
+	b.bytesWritten += uint64(len(p))
+	return len(p), nil
 }
