@@ -30,7 +30,6 @@ import (
 	"k8s.io/kubernetes/pkg/genericapiserver"
 	"k8s.io/kubernetes/pkg/genericapiserver/api/rest"
 	horizontalpodautoscalerstore "k8s.io/kubernetes/pkg/registry/autoscaling/horizontalpodautoscaler/storage"
-	jobstore "k8s.io/kubernetes/pkg/registry/batch/job/storage"
 	expcontrollerstore "k8s.io/kubernetes/pkg/registry/extensions/controller/storage"
 	daemonstore "k8s.io/kubernetes/pkg/registry/extensions/daemonset/storage"
 	deploymentstore "k8s.io/kubernetes/pkg/registry/extensions/deployment/storage"
@@ -87,11 +86,6 @@ func (p RESTStorageProvider) v1beta1Storage(apiResourceConfigSource genericapise
 		storage["deployments/status"] = deploymentStorage.Status
 		storage["deployments/rollback"] = deploymentStorage.Rollback
 		storage["deployments/scale"] = deploymentStorage.Scale
-	}
-	if apiResourceConfigSource.ResourceEnabled(version.WithResource("jobs")) {
-		jobsStorage, jobsStatusStorage := jobstore.NewREST(restOptionsGetter)
-		storage["jobs"] = jobsStorage
-		storage["jobs/status"] = jobsStatusStorage
 	}
 	if apiResourceConfigSource.ResourceEnabled(version.WithResource("ingresses")) {
 		ingressStorage, ingressStatusStorage := ingressstore.NewREST(restOptionsGetter)
