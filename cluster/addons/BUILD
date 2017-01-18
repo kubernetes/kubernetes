@@ -4,21 +4,14 @@ load("@bazel_tools//tools/build_defs/pkg:pkg.bzl", "pkg_tar")
 
 filegroup(
     name = "addon-srcs",
-    srcs = glob([
-        "calico-policy-controller/*",
-        "cluster-loadbalancing/*",
-        "cluster-monitoring/*",
-        "dashboard/*",
-        "dns/*",
-        "etcd-empty-dir-cleanup/*",
-        "fluentd-elasticsearch/*",
-        "fluentd-gcp/*",
-        "gci/*",
-        "node-problem-detector/*",
-        "podsecuritypolicies/*",
-        "python-image/*",
-        "registry/*",
-    ]),
+    srcs = glob(
+        [
+            "**/*.json",
+            "**/*.yaml",
+            "**/*.yaml.in",
+        ],
+        exclude = ["**/*demo*/**"],
+    ),
 )
 
 pkg_tar(
@@ -27,6 +20,7 @@ pkg_tar(
     files = [
         ":addon-srcs",
     ],
+    mode = "0644",
     strip_prefix = ".",
 )
 

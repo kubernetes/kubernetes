@@ -12,6 +12,7 @@ gcs_upload(
     name = "ci-artifacts",
     data = [
         "//build/debs",
+        "//build/release-tars",
     ],
 )
 
@@ -50,14 +51,4 @@ filegroup(
         "//vendor:all-srcs",
     ],
     tags = ["automanaged"],
-)
-
-pkg_tar(
-    name = "kubernetes-src",
-    extension = "tar.gz",
-    files = [
-        ":all-srcs",
-    ],
-    package_dir = "kubernetes",
-    strip_prefix = "//",
 )
