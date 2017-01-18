@@ -125,6 +125,6 @@ func (s *CMServer) AddFlags(fs *pflag.FlagSet) {
 	fs.Var(&s.Controllers, "controllers", ""+
 		"A set of key=value pairs that describe controller configuration that may be passed "+
 		"to controller manager to enable/disable specific controllers. Valid options are: \n"+
-		"ingress=true|false (default=true)")
+		"ingress=true|false(default=true),service-dns=true|false(default=true)")
 	leaderelection.BindFlags(&s.LeaderElection, fs)
 }
