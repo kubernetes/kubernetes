@@ -63,19 +63,19 @@ var (
 var testImgSpecs = map[string]imageTestCase{
 	"non-existent-image": {
 		&runtimeapi.ImageSpec{
-			Image: &gibberishStr,
+			Image: gibberishStr,
 		},
 		nil,
 	},
 	"busybox": {
 		&runtimeapi.ImageSpec{
-			Image: &busyboxStr,
+			Image: busyboxStr,
 		},
 		&runtimeapi.Image{
-			Id:          nil,
+			Id:          "",
 			RepoTags:    []string{},
 			RepoDigests: []string{},
-			Size_:       nil,
+			Size_:       0,
 		},
 	},
 }
@@ -201,7 +201,7 @@ func TestListsImages(t *testing.T) {
 	}
 
 	for _, img := range imgs {
-		expectedImg := *testImgSpecs[*img.Id].ExpectedStatus
+		expectedImg := *testImgSpecs[img.Id].ExpectedStatus
 
 		if err := compareContainerImages(img, expectedImg); err != nil {
 			t.Errorf("rktshim.ImageStore.List() for %q, %v", img.Id, err)
