@@ -247,7 +247,10 @@ func (adc *attachDetachController) populateActualStateOfWorld() error {
 				glog.Errorf("could not construct volume spec in plugin %s for volume %s: %v", pluginName, volumeName, err)
 				continue
 			}
-			adc.actualStateOfWorld.AddVolumeNode(volumeSpec, nodeName, attachedVolume.DevicePath)
+			_, err = adc.actualStateOfWorld.AddVolumeNode(volumeSpec, nodeName, attachedVolume.DevicePath)
+			if err != nil {
+				glog.Errorf("error adding node to ActualStateOfWorld: %v", err)
+			}
 		}
 	}
 	return nil
