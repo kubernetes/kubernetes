@@ -139,11 +139,6 @@ func DeepCopy_v1alpha1_PolicyRule(in interface{}, out interface{}, c *conversion
 			*out = make([]string, len(*in))
 			copy(*out, *in)
 		}
-		if newVal, err := c.DeepCopy(&in.AttributeRestrictions); err != nil {
-			return err
-		} else {
-			out.AttributeRestrictions = *newVal.(*runtime.RawExtension)
-		}
 		if in.APIGroups != nil {
 			in, out := &in.APIGroups, &out.APIGroups
 			*out = make([]string, len(*in))
