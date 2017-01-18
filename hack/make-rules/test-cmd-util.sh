@@ -221,6 +221,28 @@ setup() {
   kube::log::status "Setup complete"
 }
 
+########################################################
+# Kubectl version (--short, --client, --output) #
+########################################################
+kube::version::parse_to_file() {
+  name=$1
+  kubectl version | grep "$name Version:" | sed -e s/"$name Version: version.Info{"/'/' -e s/'}'/'/' -e s/', '/','/g -e s/':'/'=/g' | tr , '\n' > ${name}_version.sh
+}
+
+run_kubectl_version_tests() {
+  echo "alejandro"
+  kube::log::status "Testing kubectl version"
+  # create version files, one for the client, one for the server.
+  kube::version::parse_to_file "Client"
+  kube::version::parse_to_file "Server"
+  #kubectl version | grep 'Client Version:' | sed -e s/'Client Version: version.Info{'/'/' -e s/'}'/'/' -e s/', '/','/g -e s/':'/'=/g' | tr , '\n' > client_version.sh
+  #kubectl version | grep 'Server Version:' | sed -e s/'Server Version: version.Info{'/'/' -e s/'}'/'/' -e s/', '/','/g -e s/':'/'=/g' | tr , '\n' > server_version.sh 
+
+
+  
+  kube::log::status "Testing kubectl version complete"
+}
+
 # Runs all pod related tests.
 run_pod_tests() {
   kube::log::status "Testing kubectl(v1:pods)"
@@ -2463,6 +2485,12 @@ runTests() {
     fi
   fi
 
+
+  #########################
+  # Kubectl version #
+  #########################
+  run_kubectl_version_tests
+
   # Passing no arguments to create is an error
   ! kubectl create
 
@@ -3145,3 +3173,6 @@ __EOF__
 
   kube::test::clear_all
 }
+
+
+

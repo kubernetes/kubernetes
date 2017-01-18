@@ -246,3 +246,29 @@ kube::test::if_supports_resource() {
   done
   return 1
 }
+
+
+kube::test::version_assert() {
+  local flags=${1:-}
+  local expected=$2
+
+  res=$(eval kubectl version flags)
+
+  if [[ "$res" =~ ^$expected$ ]]; then
+      echo -n ${green}
+      echo "Successful"
+      echo -n ${reset}
+      return 0
+  else
+      echo ${bold}${red}
+      echo "FAIL!"
+      echo "version $flags"
+      echo "  Expected: $expected"
+      echo "  Got:      $res"
+      echo ${reset}${red}
+      caller
+      echo ${reset}
+      return 1
+  fi
+
+}
