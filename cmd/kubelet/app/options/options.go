@@ -39,11 +39,7 @@ const (
 	DefaultKubeletContainersDirName = "containers"
 )
 
-// KubeletServer encapsulates all of the parameters necessary for starting up
-// a kubelet. These can either be set via command line or directly.
-type KubeletServer struct {
-	componentconfig.KubeletConfiguration
-
+type KubeletFlags struct {
 	KubeConfig          flag.StringFlag
 	BootstrapKubeconfig string
 
@@ -65,6 +61,13 @@ type KubeletServer struct {
 	RunOnce bool
 }
 
+// KubeletServer encapsulates all of the parameters necessary for starting up
+// a kubelet. These can either be set via command line or directly.
+type KubeletServer struct {
+	KubeletFlags
+	componentconfig.KubeletConfiguration
+}
+
 // NewKubeletServer will create a new KubeletServer with default values.
 func NewKubeletServer() *KubeletServer {
 	versioned := &v1alpha1.KubeletConfiguration{}
@@ -72,8 +75,10 @@ func NewKubeletServer() *KubeletServer {
 	config := componentconfig.KubeletConfiguration{}
 	api.Scheme.Convert(versioned, &config, nil)
 	return &KubeletServer{
-		KubeConfig:           flag.NewStringFlag("/var/lib/kubelet/kubeconfig"),
-		RequireKubeConfig:    false, // in 1.5, default to true
+		KubeletFlags: KubeletFlags{
+			KubeConfig:        flag.NewStringFlag("/var/lib/kubelet/kubeconfig"),
+			RequireKubeConfig: false, // in 1.5, default to true
+		},
 		KubeletConfiguration: config,
 	}
 }
