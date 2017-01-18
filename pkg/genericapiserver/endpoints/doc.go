@@ -14,12 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package api
+// Package endpoints contains the generic code that provides a RESTful Kubernetes-style API service.
+package endpoints // import "k8s.io/kubernetes/pkg/genericapiserver/endpoints"
 
-import (
-	"k8s.io/apiserver/pkg/metrics"
-)
-
-func init() {
-	metrics.Register()
-}

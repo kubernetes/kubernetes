@@ -14,7 +14,5 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package request contains everything around extracting info from
-// a http request object.
-// TODO: this package is temporary. Handlers must move into pkg/apiserver/handlers to avoid dependency cycle
-package request // import "k8s.io/apiserver/pkg/request"
+// package common holds shared codes and types between open API code generator and spec generator.
+package common

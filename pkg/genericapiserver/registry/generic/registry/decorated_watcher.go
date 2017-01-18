@@ -28,12 +28,12 @@ import (
 
 type decoratedWatcher struct {
 	w         watch.Interface
-	decorator rest.ObjectFunc
+	decorator ObjectFunc
 	cancel    context.CancelFunc
 	resultCh  chan watch.Event
 }
 
-func newDecoratedWatcher(w watch.Interface, decorator rest.ObjectFunc) *decoratedWatcher {
+func newDecoratedWatcher(w watch.Interface, decorator ObjectFunc) *decoratedWatcher {
 	ctx, cancel := context.WithCancel(context.Background())
 	d := &decoratedWatcher{
 		w:         w,
