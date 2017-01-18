@@ -29,6 +29,8 @@ import (
 	"k8s.io/kubernetes/pkg/volume"
 )
 
+const TestPluginName = "kubernetes.io/testPlugin"
+
 // GetTestVolumeSpec returns a test volume spec
 func GetTestVolumeSpec(volumeName string, diskName v1.UniqueVolumeName) *volume.Spec {
 	return &volume.Spec{
@@ -91,9 +93,38 @@ func CreateTestClient() *fake.Clientset {
 							},
 						},
 					},
+					NodeName: "mynode",
 				},
 			}
 			obj.Items = append(obj.Items, pod)
+		}
+		return true, obj, nil
+	})
+	fakeClient.AddReactor("list", "nodes", func(action core.Action) (handled bool, ret runtime.Object, err error) {
+		obj := &v1.NodeList{}
+		nodeNamePrefix := "mynode"
+		namespace := "mynamespace"
+		for i := 0; i < 5; i++ {
+			nodeName := fmt.Sprintf("%s-%d", nodeNamePrefix, i)
+			node := v1.Node{
+				ObjectMeta: v1.ObjectMeta{
+					Name:      nodeName,
+					Namespace: namespace,
+					Labels: map[string]string{
+						"name": nodeName,
+					},
+				},
+				Status: v1.NodeStatus{
+					VolumesAttached: []v1.AttachedVolume{
+						{
+							Name:       TestPluginName + "/volumeName",
+							DevicePath: "fake/path",
+						},
+					},
+				},
+				Spec: v1.NodeSpec{ExternalID: string(nodeName)},
+			}
+			obj.Items = append(obj.Items, node)
 		}
 		return true, obj, nil
 	})
@@ -113,4 +144,63 @@ func NewPod(uid, name string) *v1.Pod {
 			Namespace: name,
 		},
 	}
+}
+
+type testPlugins struct {
+}
+
+func (plugin *testPlugins) Init(host volume.VolumeHost) error {
+	return nil
+}
+
+func (plugin *testPlugins) GetPluginName() string {
+	return TestPluginName
+}
+
+func (plugin *testPlugins) GetVolumeName(spec *volume.Spec) (string, error) {
+	return spec.Name(), nil
+}
+
+func (plugin *testPlugins) CanSupport(spec *volume.Spec) bool {
+	return true
+}
+
+func (plugin *testPlugins) RequiresRemount() bool {
+	return false
+}
+
+func (plugin *testPlugins) NewMounter(spec *volume.Spec, podRef *v1.Pod, opts volume.VolumeOptions) (volume.Mounter, error) {
+	return nil, nil
+}
+
+func (plugin *testPlugins) NewUnmounter(name string, podUID types.UID) (volume.Unmounter, error) {
+	return nil, nil
+}
+
+func (plugin *testPlugins) ConstructVolumeSpecFromName(volumeName string) (*volume.Spec, error) {
+	newVolume := &v1.Volume{
+		Name:         volumeName,
+		VolumeSource: v1.VolumeSource{},
+	}
+	return volume.NewSpecFromVolume(newVolume), nil
+}
+
+func (plugin *testPlugins) ConstructVolumeSpec(volumeName, mountPath string) (*volume.Spec, error) {
+	return nil, nil
+}
+
+func (plugin *testPlugins) NewAttacher() (volume.Attacher, error) {
+	return nil, nil
+}
+
+func (plugin *testPlugins) NewDetacher() (volume.Detacher, error) {
+	return nil, nil
+}
+
+func (plugin *testPlugins) GetDeviceMountRefs(deviceMountPath string) ([]string, error) {
+	return []string{}, nil
+}
+
+func CreateTestPlugin() []volume.VolumePlugin {
+	return []volume.VolumePlugin{&testPlugins{}}
 }
