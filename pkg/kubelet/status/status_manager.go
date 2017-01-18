@@ -66,6 +66,8 @@ type manager struct {
 	// Map from (mirror) pod UID to latest status version successfully sent to the API server.
 	// apiStatusVersions must only be accessed from the sync thread.
 	apiStatusVersions map[types.UID]uint64
+
+	canBeDeletedFunc func(pod *v1.Pod) bool
 }
 
 // PodStatusProvider knows how to provide status for a pod.  It's intended to be used by other components
@@ -102,13 +104,14 @@ type Manager interface {
 
 const syncPeriod = 10 * time.Second
 
-func NewManager(kubeClient clientset.Interface, podManager kubepod.Manager) Manager {
+func NewManager(kubeClient clientset.Interface, podManager kubepod.Manager, canBeDeletedFunc func(pod *v1.Pod) bool) Manager {
 	return &manager{
 		kubeClient:        kubeClient,
 		podManager:        podManager,
 		podStatuses:       make(map[types.UID]versionedPodStatus),
 		podStatusChannel:  make(chan podStatusSyncRequest, 1000), // Buffer up to 1000 statuses
 		apiStatusVersions: make(map[types.UID]uint64),
+		canBeDeletedFunc:  canBeDeletedFunc,
 	}
 }
 
@@ -429,15 +432,7 @@ func (m *manager) syncPod(uid types.UID, status versionedPodStatus) {
 		if err == nil {
 			glog.V(3).Infof("Status for pod %q updated successfully: %+v", format.Pod(pod), status)
 			m.apiStatusVersions[pod.UID] = status.version
-			if kubepod.IsMirrorPod(pod) {
-				// We don't handle graceful deletion of mirror pods.
-				return
-			}
-			if pod.DeletionTimestamp == nil {
-				return
-			}
-			if !notRunning(pod.Status.ContainerStatuses) {
-				glog.V(3).Infof("Pod %q is terminated, but some containers are still running", format.Pod(pod))
+			if !m.canBeDeletedFunc(pod) {
 				return
 			}
 			deleteOptions := v1.NewDeleteOptions(0)
@@ -553,17 +548,6 @@ func normalizeStatus(pod *v1.Pod, status *v1.PodStatus) *v1.PodStatus {
 	// Sort the container statuses, so that the order won't affect the result of comparison
 	kubetypes.SortInitContainerStatuses(pod, status.InitContainerStatuses)
 	return status
-}
-
-// notRunning returns true if every status is terminated or waiting, or the status list
-// is empty.
-func notRunning(statuses []v1.ContainerStatus) bool {
-	for _, status := range statuses {
-		if status.State.Terminated == nil && status.State.Waiting == nil {
-			return false
-		}
-	}
-	return true
 }
 
 func copyStatus(source *v1.PodStatus) (v1.PodStatus, error) {
