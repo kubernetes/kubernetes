@@ -122,7 +122,6 @@ func deletePersistentVolumeClaim(c clientset.Interface, pvcName string, ns strin
 	}
 }
 
-//TODO rewrite to reflect Retain policy
 // Delete the PVC and wait for the PV to enter its expected phase. Validate that the PV
 // has recycled (assumption here about reclaimPolicy). Caller tells this func which
 // phase value to expect for the pv bound to the to-be-deleted claim.
@@ -141,7 +140,7 @@ func deletePVCandValidatePV(c clientset.Interface, ns string, pvc *v1.Persistent
 	err = framework.WaitForPersistentVolumePhase(expectPVPhase, c, pv.Name, 1*time.Second, 300*time.Second)
 	Expect(err).NotTo(HaveOccurred())
 
-	// examine the pv's ClaimRef and UID and compa re to expected values
+	// examine the pv's ClaimRef and UID and compare to expected values
 	pv, err = c.Core().PersistentVolumes().Get(pv.Name, metav1.GetOptions{})
 	Expect(err).NotTo(HaveOccurred())
 	cr := pv.Spec.ClaimRef
@@ -645,13 +644,14 @@ var _ = framework.KubeDescribe("PersistentVolumes", func() {
 			})
 		})
 
+		// TODO note wait times involved w/ this context
 		Context("when invoking the Recycle reclaim policy [Jon]", func(){
-			var pv v1.PersistentVolume
-			var pvc v1.PersistentVolumeClaim
+			var pv *v1.PersistentVolume
+			var pvc *v1.PersistentVolumeClaim
 
 			BeforeEach(func(){
 				pvConfig.reclaimPolicy = v1.PersistentVolumeReclaimRecycle
-				pv, pvc := createPVPVC(c, pvConfig, ns, false)
+				pv, pvc = createPVPVC(c, pvConfig, ns, false)
 				waitOnPVandPVC(c, ns, pv, pvc)
 			})
 
@@ -661,14 +661,24 @@ var _ = framework.KubeDescribe("PersistentVolumes", func() {
 			})
 
 			It("should test that a PV becomes Available after the PVC is deleted.", func() {
-				err := c.Core().PersistentVolumeClaims(ns).Delete(pvc.Name, v1.DeleteOptions{})
+				pod := makeWritePod(ns, pvc.Name)
+				pod, err := c.Core().Pods(ns).Create(pod)
 				Expect(err).NotTo(HaveOccurred())
-				err = framework.WaitForPersistentVolumePhase(v1.VolumeAvailable, c, pv.Name, 1*time.Second, 1*time.Minute)
-				Expect(err).NotTo(HaveOccurred())
-
-				pod := makePod(ns, pvc.Name, []string{"[[ (ls -A | wc -l) -z ]]"})
-				pod, err = c.Core().Pods(ns).Create(pod)
 				framework.WaitForPodSuccessInNamespace(c, pod.Name, ns)
+
+				deletePVCandValidatePV(c, ns, pvc, pv, v1.VolumeAvailable)
+
+				pvc = makePersistentVolumeClaim(ns)
+				pvc = createPVC(c, ns, pvc)
+				err = framework.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, c, ns, pvc.Name, 2*time.Second, 60*time.Second)
+
+				pod = makePod(ns, pvc.Name, "[ $(ls -A /mnt | wc -l) -eq 0 ] && exit 0 || exit 1")
+				// If a file is detected in /mnt, cause the pod to fail and do not restart it.
+				pod.Spec.RestartPolicy = v1.RestartPolicyNever
+				pod, err = c.Core().Pods(ns).Create(pod)
+				Expect(err).NotTo(HaveOccurred())
+				err = framework.WaitForPodSuccessInNamespace(c, pod.Name, ns)
+				Expect(err).NotTo(HaveOccurred())
 			})
 		})
 	})
@@ -863,13 +873,13 @@ func makePersistentVolumeClaim(ns string) *v1.PersistentVolumeClaim {
 
 // Returns a pod definition based on the namespace. The pod references the PVC's
 // name.
-func makeWritePod(ns string, pvcName string) *v1.Pod {
+func makeWritePod(ns, pvcName string) *v1.Pod {
 	return makePod(ns, pvcName, "touch /mnt/SUCCESS && (id -G | grep -E '\\b777\\b')")
 }
 
 // Returns a pod definition based on the namespace. The pod references the PVC's
 // name.  A slice of BASH commands can be supplied as args to be run by the pod
-func makePod(ns string, pvcName string, command ...string) *v1.Pod {
+func makePod(ns, pvcName string, command ...string) *v1.Pod {
 
 	if len(command) == 0 {
 		command = []string{"while true; do sleep 1; done"}
