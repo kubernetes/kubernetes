@@ -22,6 +22,7 @@ import (
 	"reflect"
 	"strings"
 	"sync"
+	"sync/atomic"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/json"
@@ -37,13 +38,24 @@ type fieldInfo struct {
 	nameValue reflect.Value
 }
 
+type fieldsCacheMap map[structField]*fieldInfo
+
+type fieldsCache struct {
+	sync.Mutex
+	value atomic.Value
+}
+
+func newFieldsCache() *fieldsCache {
+	cache := &fieldsCache{}
+	cache.value.Store(make(fieldsCacheMap))
+	return cache
+}
+
 var (
 	marshalerType          = reflect.TypeOf(new(encodingjson.Marshaler)).Elem()
 	unmarshalerType        = reflect.TypeOf(new(encodingjson.Unmarshaler)).Elem()
 	mapStringInterfaceType = reflect.TypeOf(map[string]interface{}{})
-	// TODO: Can we somehow avoid locking?
-	fieldLock  = sync.Mutex{}
-	fieldCache = make(map[structField]*fieldInfo)
+	fieldCache             = newFieldsCache()
 )
 
 // Converter knows how to convert betweek runtime.Object and
@@ -105,15 +117,13 @@ func fromUnstructured(sv, dv reflect.Value) error {
 }
 
 func fieldInfoFromField(structType reflect.Type, field int) *fieldInfo {
-	fieldLock.Lock()
-	info, ok := fieldCache[structField{structType, field}]
-	fieldLock.Unlock()
-	if ok {
+	fieldCacheMap := fieldCache.value.Load().(fieldsCacheMap)
+	if info, ok := fieldCacheMap[structField{structType, field}]; ok {
 		return info
 	}
 
 	// Cache miss - we need to compute the field name.
-	info = &fieldInfo{}
+	info := &fieldInfo{}
 	typeField := structType.Field(field)
 	jsonTag := typeField.Tag.Get("json")
 	if len(jsonTag) == 0 {
@@ -124,9 +134,15 @@ func fieldInfoFromField(structType reflect.Type, field int) *fieldInfo {
 	}
 	info.nameValue = reflect.ValueOf(info.name)
 
-	fieldLock.Lock()
-	defer fieldLock.Unlock()
-	fieldCache[structField{structType, field}] = info
+	fieldCache.Lock()
+	defer fieldCache.Unlock()
+	fieldCacheMap = fieldCache.value.Load().(fieldsCacheMap)
+	newFieldCacheMap := make(fieldsCacheMap)
+	for k, v := range fieldCacheMap {
+		newFieldCacheMap[k] = v
+	}
+	newFieldCacheMap[structField{structType, field}] = info
+	fieldCache.value.Store(newFieldCacheMap)
 	return info
 }
 
@@ -181,6 +197,7 @@ func sliceFromUnstructured(sv, dv reflect.Value) error {
 			if err != nil {
 				return fmt.Errorf("error encoding %s to json: %v", st, err)
 			}
+			// TODO: Is this Unmarshal needed?
 			var data []byte
 			err = json.Unmarshal(marshalled, &data)
 			if err != nil {
