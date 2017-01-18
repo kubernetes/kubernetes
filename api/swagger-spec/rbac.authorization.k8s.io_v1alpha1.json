@@ -3177,10 +3177,6 @@
       },
       "description": "Verbs is a list of Verbs that apply to ALL the ResourceKinds and AttributeRestrictions contained in this rule.  VerbAll represents all kinds."
      },
-     "attributeRestrictions": {
-      "type": "string",
-      "description": "AttributeRestrictions will vary depending on what the Authorizer/AuthorizationAttributeBuilder pair supports. If the Authorizer does not recognize how to handle the AttributeRestrictions, the Authorizer should report an error."
-     },
      "apiGroups": {
       "type": "array",
       "items": {
