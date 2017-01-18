@@ -263,7 +263,7 @@ func (adc *attachDetachController) populateDesiredStateOfWorld() error {
 		return err
 	}
 	for _, pod := range pods.Items {
-		adc.podAdd(pod)
+		adc.podAdd(&pod)
 	}
 
 	return nil
