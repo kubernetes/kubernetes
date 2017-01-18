@@ -28,7 +28,6 @@ go_library(
         "//pkg/api:go_default_library",
         "//pkg/api/resource:go_default_library",
         "//pkg/api/v1:go_default_library",
-        "//pkg/apis/autoscaling:go_default_library",
         "//pkg/apis/extensions:go_default_library",
         "//pkg/util/intstr:go_default_library",
         "//vendor:github.com/gogo/protobuf/proto",

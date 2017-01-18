@@ -21,7 +21,6 @@ go_library(
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/resource:go_default_library",
-        "//pkg/apis/autoscaling:go_default_library",
         "//pkg/util/intstr:go_default_library",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/conversion",
