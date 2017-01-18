@@ -71,6 +71,7 @@ function save() {
 # save everything for which the staging directory is the source of truth
 save "transport"
 save "tools/clientcmd/api"
+save "rest/watch"
 
 
 
