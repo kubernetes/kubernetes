@@ -62,6 +62,9 @@ type KubeletServer struct {
 	// If runOnce is true, the Kubelet will check the API server once for pods,
 	// run those in addition to the pods specified by the local manifest, and exit.
 	RunOnce bool
+
+	// TODO(mtaufen): Whether to put this here or in the KubeletConfiguration...
+	Standalone bool
 }
 
 // NewKubeletServer will create a new KubeletServer with default values.
@@ -79,6 +82,8 @@ func NewKubeletServer() *KubeletServer {
 
 // AddFlags adds flags for a specific KubeletServer to the specified FlagSet
 func (s *KubeletServer) AddFlags(fs *pflag.FlagSet) {
+	fs.BoolVar(&s.Standalone, "standalone", s.Standalone, "Runs the Kubelet in 'standalone mode', e.g. without an API server. [default=false]")
+
 	// TODO(#34726:1.8.0): Remove the opt-in for failing when swap is enabled.
 	fs.BoolVar(&s.ExperimentalFailSwapOn, "experimental-fail-swap-on", s.ExperimentalFailSwapOn, "Makes the Kubelet fail to start if swap is enabled on the node. This is a temporary opton to maintain legacy behavior, failing due to swap enabled will happen by default in v1.6.")
 
@@ -88,6 +93,7 @@ func (s *KubeletServer) AddFlags(fs *pflag.FlagSet) {
 	// DEPRECATED: Remove these flags at the beginning of 1.5.
 	fs.Var(&s.AuthPath, "auth-path", "Path to .kubernetes_auth file, specifying how to authenticate to API server.")
 	fs.MarkDeprecated("auth-path", "will be removed in a future version")
+	// TODO(#40049:1.8.0): Remove APIServerList from the Kubelet
 	fs.StringSliceVar(&s.APIServerList, "api-servers", []string{}, "List of Kubernetes API servers for publishing events, and reading pods and services. (ip:port), comma separated.")
 	fs.MarkDeprecated("api-servers", "Use --kubeconfig instead. Will be removed in a future version.")
 

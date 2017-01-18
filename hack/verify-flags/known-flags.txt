@@ -576,6 +576,7 @@ ssh-env
 ssh-keyfile
 ssh-options
 ssh-user
+standalone
 start-services
 static-pods-config
 stats-port
