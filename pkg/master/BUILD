@@ -46,6 +46,7 @@ go_library(
         "//pkg/apis/rbac/v1alpha1:go_default_library",
         "//pkg/apis/rbac/v1beta1:go_default_library",
         "//pkg/apis/storage/install:go_default_library",
+        "//pkg/apis/storage/v1:go_default_library",
         "//pkg/apis/storage/v1beta1:go_default_library",
         "//pkg/client/clientset_generated/clientset/typed/core/v1:go_default_library",
         "//pkg/client/clientset_generated/internalclientset/typed/core/internalversion:go_default_library",

@@ -18,6 +18,7 @@ package rest
 
 import (
 	storageapi "k8s.io/kubernetes/pkg/apis/storage"
+	storageapiv1 "k8s.io/kubernetes/pkg/apis/storage/v1"
 	storageapiv1beta1 "k8s.io/kubernetes/pkg/apis/storage/v1beta1"
 	"k8s.io/kubernetes/pkg/genericapiserver/registry/generic"
 	"k8s.io/kubernetes/pkg/genericapiserver/registry/rest"
@@ -35,12 +36,29 @@ func (p RESTStorageProvider) NewRESTStorage(apiResourceConfigSource genericapise
 		apiGroupInfo.VersionedResourcesStorageMap[storageapiv1beta1.SchemeGroupVersion.Version] = p.v1beta1Storage(apiResourceConfigSource, restOptionsGetter)
 		apiGroupInfo.GroupMeta.GroupVersion = storageapiv1beta1.SchemeGroupVersion
 	}
+	if apiResourceConfigSource.AnyResourcesForVersionEnabled(storageapiv1.SchemeGroupVersion) {
+		apiGroupInfo.VersionedResourcesStorageMap[storageapiv1.SchemeGroupVersion.Version] = p.v1Storage(apiResourceConfigSource, restOptionsGetter)
+		apiGroupInfo.GroupMeta.GroupVersion = storageapiv1.SchemeGroupVersion
+	}
 
 	return apiGroupInfo, true
 }
 
 func (p RESTStorageProvider) v1beta1Storage(apiResourceConfigSource genericapiserver.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) map[string]rest.Storage {
 	version := storageapiv1beta1.SchemeGroupVersion
+
+	storage := map[string]rest.Storage{}
+
+	if apiResourceConfigSource.ResourceEnabled(version.WithResource("storageclasses")) {
+		storageClassStorage := storageclassstore.NewREST(restOptionsGetter)
+		storage["storageclasses"] = storageClassStorage
+	}
+
+	return storage
+}
+
+func (p RESTStorageProvider) v1Storage(apiResourceConfigSource genericapiserver.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) map[string]rest.Storage {
+	version := storageapiv1.SchemeGroupVersion
 
 	storage := map[string]rest.Storage{}
 

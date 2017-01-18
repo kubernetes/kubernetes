@@ -41,6 +41,7 @@ import (
 	policyapiv1beta1 "k8s.io/kubernetes/pkg/apis/policy/v1beta1"
 	rbacapi "k8s.io/kubernetes/pkg/apis/rbac/v1alpha1"
 	rbacv1beta1 "k8s.io/kubernetes/pkg/apis/rbac/v1beta1"
+	storageapiv1 "k8s.io/kubernetes/pkg/apis/storage/v1"
 	storageapiv1beta1 "k8s.io/kubernetes/pkg/apis/storage/v1beta1"
 	corev1client "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/core/v1"
 	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
@@ -399,6 +400,7 @@ func DefaultAPIResourceConfigSource() *genericapiserver.ResourceConfig {
 		rbacapi.SchemeGroupVersion,
 		storageapiv1beta1.SchemeGroupVersion,
 		certificatesapiv1beta1.SchemeGroupVersion,
+		storageapiv1.SchemeGroupVersion,
 		authorizationapiv1beta1.SchemeGroupVersion,
 	)
 
