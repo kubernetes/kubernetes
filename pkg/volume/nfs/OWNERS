@@ -1,26 +1,20 @@
 approvers:
 - rootfs
+- saad-ali
+- jingxu97
 reviewers:
+- sjenning
 - thockin
 - smarterclayton
 - deads2k
-- caesarxuchao
-- mikedanese
+- brendandburns
+- derekwaynecarr
+- bprashanth
 - pmorie
 - saad-ali
-- pwittrock
-- timstclair
-- eparis
+- justinsb
 - jsafrane
-- dims
-- krousey
 - rootfs
-- markturansky
-- fgrzadkowski
 - jingxu97
-- fabioy
-- resouer
-- david-mcmahon
-- ddysher
-- swagiaal
-- chakri-nelluri
+- rkouj
+- msau42
