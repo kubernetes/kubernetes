@@ -72,6 +72,9 @@ function save() {
 save "transport"
 save "tools/clientcmd/api"
 save "rest/watch"
+save "pkg/util/clock"
+save "pkg/util/integer"
+save "pkg/util/flowcontrol"
 
 
 

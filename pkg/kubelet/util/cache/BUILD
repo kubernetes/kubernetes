@@ -22,7 +22,7 @@ go_test(
     tags = ["automanaged"],
     deps = [
         "//pkg/client/cache:go_default_library",
-        "//pkg/util/clock:go_default_library",
+        "//vendor:k8s.io/client-go/pkg/util/clock",
     ],
 )
 

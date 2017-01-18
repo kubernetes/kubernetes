@@ -45,7 +45,6 @@ go_library(
         "//pkg/kubelet/util/cache:go_default_library",
         "//pkg/kubelet/util/format:go_default_library",
         "//pkg/securitycontext:go_default_library",
-        "//pkg/util/flowcontrol:go_default_library",
         "//pkg/util/parsers:go_default_library",
         "//pkg/util/selinux:go_default_library",
         "//pkg/util/version:go_default_library",
@@ -58,6 +57,7 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/util/errors",
         "//vendor:k8s.io/apimachinery/pkg/util/runtime",
         "//vendor:k8s.io/apimachinery/pkg/util/sets",
+        "//vendor:k8s.io/client-go/pkg/util/flowcontrol",
     ],
 )
 
@@ -84,7 +84,6 @@ go_test(
         "//pkg/kubelet/container/testing:go_default_library",
         "//pkg/kubelet/network:go_default_library",
         "//pkg/kubelet/network/testing:go_default_library",
-        "//pkg/util/flowcontrol:go_default_library",
         "//pkg/util/intstr:go_default_library",
         "//vendor:github.com/golang/mock/gomock",
         "//vendor:github.com/google/cadvisor/info/v1",
@@ -92,6 +91,7 @@ go_test(
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/types",
         "//vendor:k8s.io/apimachinery/pkg/util/sets",
+        "//vendor:k8s.io/client-go/pkg/util/flowcontrol",
     ],
 )
 

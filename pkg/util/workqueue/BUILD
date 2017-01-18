@@ -22,9 +22,9 @@ go_library(
     ],
     tags = ["automanaged"],
     deps = [
-        "//pkg/util/clock:go_default_library",
         "//vendor:github.com/juju/ratelimit",
         "//vendor:k8s.io/apimachinery/pkg/util/runtime",
+        "//vendor:k8s.io/client-go/pkg/util/clock",
     ],
 )
 
@@ -40,8 +40,8 @@ go_test(
     tags = ["automanaged"],
     deps = [
         "//pkg/api/v1:go_default_library",
-        "//pkg/util/clock:go_default_library",
         "//vendor:k8s.io/apimachinery/pkg/util/wait",
+        "//vendor:k8s.io/client-go/pkg/util/clock",
     ],
 )
 
