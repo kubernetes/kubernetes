@@ -110,7 +110,7 @@ func main() {
 		cadvisorInterface := new(cadvisortest.Fake)
 		containerManager := cm.NewStubContainerManager()
 
-		fakeDockerClient := dockertools.NewFakeDockerClient()
+		fakeDockerClient := dockertools.NewFakeDockerClient().WithTraceDisabled()
 		fakeDockerClient.EnableSleep = true
 
 		hollowKubelet := kubemark.NewHollowKubelet(

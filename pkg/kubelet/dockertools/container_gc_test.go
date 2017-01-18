@@ -31,7 +31,7 @@ import (
 )
 
 func newTestContainerGC(t *testing.T) (*containerGC, *FakeDockerClient) {
-	fakeDocker := new(FakeDockerClient)
+	fakeDocker := NewFakeDockerClient()
 	fakePodGetter := newFakePodGetter()
 	gc := NewContainerGC(fakeDocker, fakePodGetter, "")
 	return gc, fakeDocker

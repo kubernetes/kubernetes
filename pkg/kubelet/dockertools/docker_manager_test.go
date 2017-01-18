@@ -165,7 +165,7 @@ func newTestDockerManagerWithHTTPClient(fakeHTTPClient *fakeHTTP) (*DockerManage
 }
 
 func newTestDockerManagerWithVersion(version, apiVersion string) (*DockerManager, *FakeDockerClient) {
-	fakeDocker := NewFakeDockerClientWithVersion(version, apiVersion)
+	fakeDocker := NewFakeDockerClient().WithVersion(version, apiVersion)
 	return createTestDockerManagerWithFakeImageManager(nil, fakeDocker)
 }
 
