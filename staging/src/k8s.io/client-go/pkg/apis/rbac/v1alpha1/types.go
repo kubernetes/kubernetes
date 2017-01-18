@@ -18,7 +18,6 @@ package v1alpha1
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 )
 
 // Authorization is calculated against
@@ -47,10 +46,6 @@ const (
 type PolicyRule struct {
 	// Verbs is a list of Verbs that apply to ALL the ResourceKinds and AttributeRestrictions contained in this rule.  VerbAll represents all kinds.
 	Verbs []string `json:"verbs" protobuf:"bytes,1,rep,name=verbs"`
-	// AttributeRestrictions will vary depending on what the Authorizer/AuthorizationAttributeBuilder pair supports.
-	// If the Authorizer does not recognize how to handle the AttributeRestrictions, the Authorizer should report an error.
-	// +optional
-	AttributeRestrictions runtime.RawExtension `json:"attributeRestrictions,omitempty" protobuf:"bytes,2,opt,name=attributeRestrictions"`
 
 	// APIGroups is the name of the APIGroup that contains the resources.  If multiple API groups are specified, any action requested against one of
 	// the enumerated resources in any API group will be allowed.
