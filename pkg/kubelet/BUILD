@@ -87,12 +87,9 @@ go_library(
         "//pkg/securitycontext:go_default_library",
         "//pkg/util:go_default_library",
         "//pkg/util/bandwidth:go_default_library",
-        "//pkg/util/clock:go_default_library",
         "//pkg/util/config:go_default_library",
         "//pkg/util/dbus:go_default_library",
         "//pkg/util/exec:go_default_library",
-        "//pkg/util/flowcontrol:go_default_library",
-        "//pkg/util/integer:go_default_library",
         "//pkg/util/io:go_default_library",
         "//pkg/util/iptables:go_default_library",
         "//pkg/util/mount:go_default_library",
@@ -125,6 +122,9 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/util/validation/field",
         "//vendor:k8s.io/apimachinery/pkg/util/wait",
         "//vendor:k8s.io/client-go/kubernetes",
+        "//vendor:k8s.io/client-go/pkg/util/clock",
+        "//vendor:k8s.io/client-go/pkg/util/flowcontrol",
+        "//vendor:k8s.io/client-go/pkg/util/integer",
     ],
 )
 
@@ -181,8 +181,6 @@ go_test(
         "//pkg/kubelet/util/sliceutils:go_default_library",
         "//pkg/kubelet/volumemanager:go_default_library",
         "//pkg/util/bandwidth:go_default_library",
-        "//pkg/util/clock:go_default_library",
-        "//pkg/util/flowcontrol:go_default_library",
         "//pkg/util/mount:go_default_library",
         "//pkg/util/strategicpatch:go_default_library",
         "//pkg/util/testing:go_default_library",
@@ -206,6 +204,8 @@ go_test(
         "//vendor:k8s.io/apimachinery/pkg/util/runtime",
         "//vendor:k8s.io/apimachinery/pkg/util/sets",
         "//vendor:k8s.io/apimachinery/pkg/util/wait",
+        "//vendor:k8s.io/client-go/pkg/util/clock",
+        "//vendor:k8s.io/client-go/pkg/util/flowcontrol",
     ],
 )
 

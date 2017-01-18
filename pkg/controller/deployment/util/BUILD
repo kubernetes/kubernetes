@@ -29,7 +29,6 @@ go_library(
         "//pkg/client/retry:go_default_library",
         "//pkg/controller:go_default_library",
         "//pkg/util/hash:go_default_library",
-        "//pkg/util/integer:go_default_library",
         "//pkg/util/intstr:go_default_library",
         "//pkg/util/labels:go_default_library",
         "//vendor:github.com/golang/glog",
@@ -39,6 +38,7 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/runtime",
         "//vendor:k8s.io/apimachinery/pkg/util/errors",
         "//vendor:k8s.io/apimachinery/pkg/util/wait",
+        "//vendor:k8s.io/client-go/pkg/util/integer",
     ],
 )
 

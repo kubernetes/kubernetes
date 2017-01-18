@@ -28,7 +28,6 @@ go_library(
         "//pkg/client/cache:go_default_library",
         "//pkg/fields:go_default_library",
         "//pkg/util:go_default_library",
-        "//pkg/util/clock:go_default_library",
         "//vendor:github.com/golang/glog",
         "//vendor:golang.org/x/net/context",
         "//vendor:k8s.io/apimachinery/pkg/api/errors",
@@ -42,6 +41,7 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/util/validation/field",
         "//vendor:k8s.io/apimachinery/pkg/util/wait",
         "//vendor:k8s.io/apimachinery/pkg/watch",
+        "//vendor:k8s.io/client-go/pkg/util/clock",
     ],
 )
 
@@ -61,7 +61,6 @@ go_test(
         "//pkg/api/v1:go_default_library",
         "//pkg/client/cache:go_default_library",
         "//pkg/fields:go_default_library",
-        "//pkg/util/clock:go_default_library",
         "//vendor:k8s.io/apimachinery/pkg/api/errors",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/labels",
@@ -70,6 +69,7 @@ go_test(
         "//vendor:k8s.io/apimachinery/pkg/util/sets",
         "//vendor:k8s.io/apimachinery/pkg/util/wait",
         "//vendor:k8s.io/apimachinery/pkg/watch",
+        "//vendor:k8s.io/client-go/pkg/util/clock",
     ],
 )
 

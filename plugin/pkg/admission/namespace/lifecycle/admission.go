@@ -28,12 +28,12 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/admission"
 	utilcache "k8s.io/apiserver/pkg/util/cache"
+	"k8s.io/client-go/pkg/util/clock"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/controller/informers"
 	kubeapiserveradmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
-	"k8s.io/kubernetes/pkg/util/clock"
 )
 
 const (

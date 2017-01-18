@@ -18,13 +18,13 @@ package federation_clientset
 
 import (
 	"github.com/golang/glog"
+	"k8s.io/client-go/pkg/util/flowcontrol"
 	v1batch "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset/typed/batch/v1"
 	v1core "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset/typed/core/v1"
 	v1beta1extensions "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset/typed/extensions/v1beta1"
 	v1beta1federation "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset/typed/federation/v1beta1"
 	restclient "k8s.io/kubernetes/pkg/client/restclient"
 	discovery "k8s.io/kubernetes/pkg/client/typed/discovery"
-	"k8s.io/kubernetes/pkg/util/flowcontrol"
 	_ "k8s.io/kubernetes/plugin/pkg/client/auth"
 )
 

@@ -31,7 +31,6 @@ go_library(
         "//pkg/controller/informers:go_default_library",
         "//pkg/fields:go_default_library",
         "//pkg/kubelet/util/format:go_default_library",
-        "//pkg/util/flowcontrol:go_default_library",
         "//pkg/util/metrics:go_default_library",
         "//pkg/util/node:go_default_library",
         "//pkg/util/system:go_default_library",
@@ -46,6 +45,7 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/util/runtime",
         "//vendor:k8s.io/apimachinery/pkg/util/sets",
         "//vendor:k8s.io/apimachinery/pkg/util/wait",
+        "//vendor:k8s.io/client-go/pkg/util/flowcontrol",
     ],
 )
 
@@ -73,7 +73,6 @@ go_test(
         "//pkg/controller:go_default_library",
         "//pkg/controller/informers:go_default_library",
         "//pkg/controller/node/testutil:go_default_library",
-        "//pkg/util/flowcontrol:go_default_library",
         "//pkg/util/node:go_default_library",
         "//vendor:github.com/golang/glog",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
@@ -81,6 +80,7 @@ go_test(
         "//vendor:k8s.io/apimachinery/pkg/util/diff",
         "//vendor:k8s.io/apimachinery/pkg/util/sets",
         "//vendor:k8s.io/apimachinery/pkg/util/wait",
+        "//vendor:k8s.io/client-go/pkg/util/flowcontrol",
     ],
 )
 
