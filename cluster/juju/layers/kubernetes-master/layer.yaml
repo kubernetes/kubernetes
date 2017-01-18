@@ -1,13 +1,15 @@
 repo: https://github.com/kubernetes/kubernetes.git
 includes:
   - 'layer:basic'
-  - 'layer:tls-client'
   - 'layer:debug'
+  - 'layer:nagios'
+  - 'layer:tls-client'
+  - 'interface:ceph-admin'
   - 'interface:etcd'
   - 'interface:http'
   - 'interface:kubernetes-cni'
   - 'interface:kube-dns'
-  - 'interface:ceph-admin'
+  - 'interface:nrpe-external-master'
   - 'interface:public-address'
 options:
   basic:
