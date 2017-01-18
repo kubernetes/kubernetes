@@ -56,7 +56,6 @@ go_library(
         "//pkg/client/informers/informers_generated:go_default_library",
         "//pkg/client/listers/core/v1:go_default_library",
         "//pkg/client/restclient:go_default_library",
-        "//pkg/client/transport:go_default_library",
         "//pkg/controller:go_default_library",
         "//pkg/genericapiserver:go_default_library",
         "//pkg/genericapiserver/api/filters:go_default_library",
@@ -76,6 +75,7 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/util/runtime",
         "//vendor:k8s.io/apimachinery/pkg/util/wait",
         "//vendor:k8s.io/apiserver/pkg/request",
+        "//vendor:k8s.io/client-go/transport",
     ],
 )
 

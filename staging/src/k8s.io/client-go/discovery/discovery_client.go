@@ -30,9 +30,9 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
+	"k8s.io/apimachinery/pkg/version"
 	"k8s.io/client-go/pkg/api"
 	"k8s.io/client-go/pkg/api/v1"
-	"k8s.io/client-go/pkg/version"
 	"k8s.io/client-go/rest"
 )
 

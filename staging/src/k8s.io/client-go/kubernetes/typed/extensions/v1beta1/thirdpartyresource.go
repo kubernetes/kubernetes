@@ -18,6 +18,7 @@ package v1beta1
 
 import (
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	api "k8s.io/client-go/pkg/api"
 	v1 "k8s.io/client-go/pkg/api/v1"
@@ -40,7 +41,7 @@ type ThirdPartyResourceInterface interface {
 	Get(name string, options meta_v1.GetOptions) (*v1beta1.ThirdPartyResource, error)
 	List(opts v1.ListOptions) (*v1beta1.ThirdPartyResourceList, error)
 	Watch(opts v1.ListOptions) (watch.Interface, error)
-	Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *v1beta1.ThirdPartyResource, err error)
+	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1beta1.ThirdPartyResource, err error)
 	ThirdPartyResourceExpansion
 }
 
@@ -132,7 +133,7 @@ func (c *thirdPartyResources) Watch(opts v1.ListOptions) (watch.Interface, error
 }
 
 // Patch applies the patch and returns the patched thirdPartyResource.
-func (c *thirdPartyResources) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *v1beta1.ThirdPartyResource, err error) {
+func (c *thirdPartyResources) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1beta1.ThirdPartyResource, err error) {
 	result = &v1beta1.ThirdPartyResource{}
 	err = c.client.Patch(pt).
 		Resource("thirdpartyresources").

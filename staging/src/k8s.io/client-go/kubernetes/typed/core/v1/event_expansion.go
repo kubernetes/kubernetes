@@ -20,6 +20,7 @@ import (
 	"fmt"
 
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/pkg/api"
 	"k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/pkg/fields"
@@ -84,7 +85,7 @@ func (e *events) PatchWithEventNamespace(incompleteEvent *v1.Event, data []byte)
 		return nil, fmt.Errorf("can't patch an event with namespace '%v' in namespace '%v'", incompleteEvent.Namespace, e.ns)
 	}
 	result := &v1.Event{}
-	err := e.client.Patch(api.StrategicMergePatchType).
+	err := e.client.Patch(types.StrategicMergePatchType).
 		NamespaceIfScoped(incompleteEvent.Namespace, len(incompleteEvent.Namespace) > 0).
 		Resource("events").
 		Name(incompleteEvent.Name).

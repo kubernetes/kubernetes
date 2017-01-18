@@ -18,6 +18,7 @@ package v1
 
 import (
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	api "k8s.io/client-go/pkg/api"
 	api_v1 "k8s.io/client-go/pkg/api/v1"
@@ -41,7 +42,7 @@ type JobInterface interface {
 	Get(name string, options meta_v1.GetOptions) (*v1.Job, error)
 	List(opts api_v1.ListOptions) (*v1.JobList, error)
 	Watch(opts api_v1.ListOptions) (watch.Interface, error)
-	Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *v1.Job, err error)
+	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.Job, err error)
 	JobExpansion
 }
 
@@ -158,7 +159,7 @@ func (c *jobs) Watch(opts api_v1.ListOptions) (watch.Interface, error) {
 }
 
 // Patch applies the patch and returns the patched job.
-func (c *jobs) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *v1.Job, err error) {
+func (c *jobs) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.Job, err error) {
 	result = &v1.Job{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).
