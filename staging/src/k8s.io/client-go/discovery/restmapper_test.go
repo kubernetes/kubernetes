@@ -25,7 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/version"
 	"k8s.io/client-go/pkg/api"
-	"k8s.io/client-go/rest"
+	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
 
 	"github.com/emicklei/go-restful/swagger"
@@ -246,7 +246,7 @@ func (c *fakeCachedDiscoveryInterface) Invalidate() {
 	c.enabledA = true
 }
 
-func (c *fakeCachedDiscoveryInterface) RESTClient() rest.Interface {
+func (c *fakeCachedDiscoveryInterface) RESTClient() restclient.Interface {
 	return &fake.RESTClient{}
 }
 

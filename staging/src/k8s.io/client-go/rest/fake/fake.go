@@ -28,7 +28,7 @@ import (
 	"k8s.io/client-go/pkg/api"
 	"k8s.io/client-go/pkg/api/testapi"
 	"k8s.io/client-go/pkg/util/flowcontrol"
-	"k8s.io/client-go/rest"
+	restclient "k8s.io/client-go/rest"
 )
 
 func CreateHTTPClient(roundTripper func(*http.Request) (*http.Response, error)) *http.Client {
@@ -54,27 +54,27 @@ type RESTClient struct {
 	Err  error
 }
 
-func (c *RESTClient) Get() *rest.Request {
+func (c *RESTClient) Get() *restclient.Request {
 	return c.request("GET")
 }
 
-func (c *RESTClient) Put() *rest.Request {
+func (c *RESTClient) Put() *restclient.Request {
 	return c.request("PUT")
 }
 
-func (c *RESTClient) Patch(_ types.PatchType) *rest.Request {
+func (c *RESTClient) Patch(_ types.PatchType) *restclient.Request {
 	return c.request("PATCH")
 }
 
-func (c *RESTClient) Post() *rest.Request {
+func (c *RESTClient) Post() *restclient.Request {
 	return c.request("POST")
 }
 
-func (c *RESTClient) Delete() *rest.Request {
+func (c *RESTClient) Delete() *restclient.Request {
 	return c.request("DELETE")
 }
 
-func (c *RESTClient) Verb(verb string) *rest.Request {
+func (c *RESTClient) Verb(verb string) *restclient.Request {
 	return c.request(verb)
 }
 
@@ -86,8 +86,8 @@ func (c *RESTClient) GetRateLimiter() flowcontrol.RateLimiter {
 	return nil
 }
 
-func (c *RESTClient) request(verb string) *rest.Request {
-	config := rest.ContentConfig{
+func (c *RESTClient) request(verb string) *restclient.Request {
+	config := restclient.ContentConfig{
 		ContentType:          runtime.ContentTypeJSON,
 		GroupVersion:         &api.Registry.GroupOrDie(api.GroupName).GroupVersion,
 		NegotiatedSerializer: c.NegotiatedSerializer,
@@ -104,7 +104,7 @@ func (c *RESTClient) request(verb string) *rest.Request {
 		Version: runtime.APIVersionInternal,
 	}
 	internalVersion.Version = runtime.APIVersionInternal
-	serializers := rest.Serializers{
+	serializers := restclient.Serializers{
 		Encoder: ns.EncoderForVersion(info.Serializer, api.Registry.GroupOrDie(api.GroupName).GroupVersion),
 		Decoder: ns.DecoderToVersion(info.Serializer, internalVersion),
 	}
@@ -112,7 +112,7 @@ func (c *RESTClient) request(verb string) *rest.Request {
 		serializers.StreamingSerializer = info.StreamSerializer.Serializer
 		serializers.Framer = info.StreamSerializer.Framer
 	}
-	return rest.NewRequest(c, verb, &url.URL{Host: "localhost"}, "", config, serializers, nil, nil)
+	return restclient.NewRequest(c, verb, &url.URL{Host: "localhost"}, "", config, serializers, nil, nil)
 }
 
 func (c *RESTClient) Do(req *http.Request) (*http.Response, error) {
