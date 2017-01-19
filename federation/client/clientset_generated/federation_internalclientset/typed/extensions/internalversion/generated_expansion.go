@@ -23,5 +23,3 @@ type DeploymentExpansion interface{}
 type IngressExpansion interface{}
 
 type ReplicaSetExpansion interface{}
-
-type ScaleExpansion interface{}
