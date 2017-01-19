@@ -13,10 +13,10 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
-        "//pkg/apimachinery/announced:go_default_library",
         "//pkg/apis/rbac:go_default_library",
         "//pkg/apis/rbac/v1alpha1:go_default_library",
         "//pkg/apis/rbac/v1beta1:go_default_library",
+        "//vendor:k8s.io/apimachinery/pkg/apimachinery/announced",
         "//vendor:k8s.io/apimachinery/pkg/apimachinery/registered",
         "//vendor:k8s.io/apimachinery/pkg/runtime",
         "//vendor:k8s.io/apimachinery/pkg/util/sets",
