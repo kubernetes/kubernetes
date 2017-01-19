@@ -27,7 +27,7 @@ go_library(
         "//pkg/version/prometheus:go_default_library",
         "//pkg/version/verflag:go_default_library",
         "//vendor:github.com/spf13/pflag",
-        "//vendor:k8s.io/apiserver/pkg/healthz",
+        "//vendor:k8s.io/apiserver/pkg/server/healthz",
     ],
 )
 

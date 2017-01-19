@@ -13,12 +13,12 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//pkg/apis/certificates:go_default_library",
-        "//pkg/genericapiserver/api/rest:go_default_library",
+        "//pkg/genericapiserver/registry/generic:go_default_library",
+        "//pkg/genericapiserver/registry/generic/registry:go_default_library",
+        "//pkg/genericapiserver/registry/rest:go_default_library",
         "//pkg/registry/certificates/certificates:go_default_library",
-        "//pkg/registry/generic:go_default_library",
-        "//pkg/registry/generic/registry:go_default_library",
         "//vendor:k8s.io/apimachinery/pkg/runtime",
-        "//vendor:k8s.io/apiserver/pkg/request",
+        "//vendor:k8s.io/apiserver/pkg/endpoints/request",
     ],
 )
 

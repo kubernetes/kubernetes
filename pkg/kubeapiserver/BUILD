@@ -17,7 +17,7 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
-        "//pkg/genericapiserver:go_default_library",
+        "//pkg/genericapiserver/server:go_default_library",
         "//pkg/storage/storagebackend:go_default_library",
         "//pkg/util/config:go_default_library",
         "//vendor:k8s.io/apimachinery/pkg/runtime",
@@ -55,7 +55,7 @@ go_test(
         "//pkg/api/v1:go_default_library",
         "//pkg/apis/extensions/install:go_default_library",
         "//pkg/apis/extensions/v1beta1:go_default_library",
-        "//pkg/genericapiserver:go_default_library",
+        "//pkg/genericapiserver/server:go_default_library",
         "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
     ],
 )
