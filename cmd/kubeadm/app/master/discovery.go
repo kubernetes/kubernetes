@@ -20,12 +20,14 @@ import (
 	"crypto/x509"
 	"encoding/json"
 	"fmt"
+	"path"
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiext "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
+	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
@@ -121,7 +123,17 @@ func newKubeDiscovery(cfg *kubeadmapi.MasterConfiguration, caCert *x509.Certific
 	return kd
 }
 
-func CreateDiscoveryDeploymentAndSecret(cfg *kubeadmapi.MasterConfiguration, client *clientset.Clientset, caCert *x509.Certificate) error {
+func CreateDiscoveryDeploymentAndSecret(cfg *kubeadmapi.MasterConfiguration, client *clientset.Clientset) error {
+	caCertificatePath := path.Join(kubeadmapi.GlobalEnvParams.HostPKIPath, kubeadmconstants.CACertName)
+	caCerts, err := certutil.CertsFromFile(caCertificatePath)
+	if err != nil {
+		return fmt.Errorf("couldn't load the CA certificate file %s: %v", caCertificatePath, err)
+	}
+
+	// We are only putting one certificate in the certificate pem file, so it's safe to just pick the first one
+	// TODO: Support multiple certs here in order to be able to rotate certs
+	caCert := caCerts[0]
+
 	kd := newKubeDiscovery(cfg, caCert)
 
 	if _, err := client.Extensions().Deployments(api.NamespaceSystem).Create(kd.Deployment); err != nil {
