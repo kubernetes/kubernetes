@@ -20,7 +20,7 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/kubernetes/pkg/api"
 	// Import solely to initialize client auth plugins.
-	_ "k8s.io/kubernetes/plugin/pkg/client/auth"
+	_ "k8s.io/client-go/plugin/pkg/client/auth"
 )
 
 const (
