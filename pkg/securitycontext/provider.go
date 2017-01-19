@@ -28,12 +28,14 @@ import (
 )
 
 // NewSimpleSecurityContextProvider creates a new SimpleSecurityContextProvider.
-func NewSimpleSecurityContextProvider() SecurityContextProvider {
-	return SimpleSecurityContextProvider{}
+func NewSimpleSecurityContextProvider(securityOptSeparator string) SecurityContextProvider {
+	return SimpleSecurityContextProvider{securityOptSeparator}
 }
 
 // SimpleSecurityContextProvider is the default implementation of a SecurityContextProvider.
-type SimpleSecurityContextProvider struct{}
+type SimpleSecurityContextProvider struct {
+	securityOptSeparator string
+}
 
 // ModifyContainerConfig is called before the Docker createContainer call.
 // The security context provider can make changes to the Config with which
@@ -92,25 +94,25 @@ func (p SimpleSecurityContextProvider) ModifyHostConfig(pod *v1.Pod, container *
 	}
 
 	if effectiveSC.SELinuxOptions != nil {
-		hostConfig.SecurityOpt = ModifySecurityOptions(hostConfig.SecurityOpt, effectiveSC.SELinuxOptions)
+		hostConfig.SecurityOpt = ModifySecurityOptions(hostConfig.SecurityOpt, effectiveSC.SELinuxOptions, p.securityOptSeparator)
 	}
 }
 
 // ModifySecurityOptions adds SELinux options to config.
-func ModifySecurityOptions(config []string, selinuxOpts *v1.SELinuxOptions) []string {
-	config = modifySecurityOption(config, DockerLabelUser, selinuxOpts.User)
-	config = modifySecurityOption(config, DockerLabelRole, selinuxOpts.Role)
-	config = modifySecurityOption(config, DockerLabelType, selinuxOpts.Type)
-	config = modifySecurityOption(config, DockerLabelLevel, selinuxOpts.Level)
+func ModifySecurityOptions(config []string, selinuxOpts *v1.SELinuxOptions, separator string) []string {
+	config = modifySecurityOption(config, DockerLabelUser, selinuxOpts.User, separator)
+	config = modifySecurityOption(config, DockerLabelRole, selinuxOpts.Role, separator)
+	config = modifySecurityOption(config, DockerLabelType, selinuxOpts.Type, separator)
+	config = modifySecurityOption(config, DockerLabelLevel, selinuxOpts.Level, separator)
 
 	return config
 }
 
 // modifySecurityOption adds the security option of name to the config array with value in the form
 // of name:value
-func modifySecurityOption(config []string, name, value string) []string {
+func modifySecurityOption(config []string, name, value, separator string) []string {
 	if len(value) > 0 {
-		config = append(config, fmt.Sprintf("%s:%s", name, value))
+		config = append(config, fmt.Sprintf("%s%s%s", name, separator, value))
 	}
 	return config
 }

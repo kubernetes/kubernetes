@@ -785,8 +785,17 @@ func (dm *DockerManager) runContainer(
 
 	glog.V(3).Infof("Container %v/%v/%v: setting entrypoint \"%v\" and command \"%v\"", pod.Namespace, pod.Name, container.Name, dockerOpts.Config.Entrypoint, dockerOpts.Config.Cmd)
 
+	version, err := dm.APIVersion()
+	if err != nil {
+		return kubecontainer.ContainerID{}, err
+	}
+	sep, err := getDockerOptSeparator(apiVersion(version))
+	if err != nil {
+		return kubecontainer.ContainerID{}, err
+	}
+
 	supplementalGids := dm.runtimeHelper.GetExtraSupplementalGroupsForPod(pod)
-	securityContextProvider := securitycontext.NewSimpleSecurityContextProvider()
+	securityContextProvider := securitycontext.NewSimpleSecurityContextProvider(sep)
 	securityContextProvider.ModifyContainerConfig(pod, container, dockerOpts.Config)
 	securityContextProvider.ModifyHostConfig(pod, container, dockerOpts.HostConfig, supplementalGids)
 	createResp, err := dm.client.CreateContainer(dockerOpts)
@@ -1130,12 +1139,9 @@ func (dm *DockerManager) checkVersionCompatibility() error {
 	return nil
 }
 
-func (dm *DockerManager) fmtDockerOpts(opts []dockerOpt) ([]string, error) {
-	version, err := dm.APIVersion()
-	if err != nil {
-		return nil, err
-	}
-
+// getDockerOptSeparator returns the correct securityOpt separator to use for
+// the given docker version or an error.
+func getDockerOptSeparator(dockerApiVersion apiVersion) (string, error) {
 	const (
 		// Docker changed the API for specifying options in v1.11
 		optSeparatorChangeVersion = "1.23" // Corresponds to docker 1.11.x
@@ -1148,6 +1154,22 @@ func (dm *DockerManager) fmtDockerOpts(opts []dockerOpt) ([]string, error) {
 		return nil, fmt.Errorf("error parsing docker API version: %v", err)
 	} else if result < 0 {
 		sep = optSeparatorOld
+	}
+
+	return sep, nil
+}
+
+// fmtDockerOpts formats the given dockerOpts with the correct separator for
+// the docker API version or returns an error.
+func (dm *DockerManager) fmtDockerOpts(opts []dockerOpt) ([]string, error) {
+	version, err := dm.APIVersion()
+	if err != nil {
+		return nil, err
+	}
+
+	sep, err := getDockerOptSeparator(version)
+	if err != nil {
+		return nil, err
 	}
 
 	fmtOpts := make([]string, len(opts))
@@ -1833,11 +1855,11 @@ type versionInfo struct {
 // -1: older than expected version
 // 0 : same version
 func (dm *DockerManager) checkDockerAPIVersion(expectedVersion string) (int, error) {
-
 	value, err := dm.versionCache.Get(dm.machineInfo.MachineID)
 	if err != nil {
 		return 0, err
 	}
+
 	apiVersion := value.(versionInfo).apiVersion
 	result, err := apiVersion.Compare(expectedVersion)
 	if err != nil {
