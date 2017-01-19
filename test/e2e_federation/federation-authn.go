@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2e
+package e2e_federation
 
 import (
 	"fmt"
@@ -24,29 +24,30 @@ import (
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
 	"k8s.io/kubernetes/test/e2e/framework"
+	fedframework "k8s.io/kubernetes/test/e2e_federation/framework"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
 
 var _ = framework.KubeDescribe("[Feature:Federation]", func() {
-	f := framework.NewDefaultFederatedFramework("federation-apiserver-authn")
+	f := fedframework.NewDefaultFederatedFramework("federation-apiserver-authn")
 
 	var _ = Describe("Federation API server authentication", func() {
 		BeforeEach(func() {
-			framework.SkipUnlessFederated(f.ClientSet)
+			fedframework.SkipUnlessFederated(f.ClientSet)
 		})
 
 		It("should accept cluster resources when the client has right authentication credentials", func() {
-			framework.SkipUnlessFederated(f.ClientSet)
+			fedframework.SkipUnlessFederated(f.ClientSet)
 
 			nsName := f.FederationNamespace.Name
-			svc := createServiceOrFail(f.FederationClientset_1_5, nsName, FederatedServiceName)
-			deleteServiceOrFail(f.FederationClientset_1_5, nsName, svc.Name, nil)
+			svc := createServiceOrFail(f.FederationClientset, nsName, FederatedServiceName)
+			deleteServiceOrFail(f.FederationClientset, nsName, svc.Name, nil)
 		})
 
 		It("should not accept cluster resources when the client has invalid authentication credentials", func() {
-			framework.SkipUnlessFederated(f.ClientSet)
+			fedframework.SkipUnlessFederated(f.ClientSet)
 
 			contexts := f.GetUnderlyingFederatedContexts()
 
@@ -67,7 +68,7 @@ var _ = framework.KubeDescribe("[Feature:Federation]", func() {
 		})
 
 		It("should not accept cluster resources when the client has no authentication credentials", func() {
-			framework.SkipUnlessFederated(f.ClientSet)
+			fedframework.SkipUnlessFederated(f.ClientSet)
 
 			fcs, err := invalidAuthFederationClientSet(nil)
 			framework.ExpectNoError(err)
@@ -94,7 +95,7 @@ func invalidAuthFederationClientSet(user *framework.KubeUser) (*federation_clien
 		}
 	}
 
-	config, err := framework.LoadFederatedConfig(overrides)
+	config, err := fedframework.LoadFederatedConfig(overrides)
 	if err != nil {
 		return nil, err
 	}

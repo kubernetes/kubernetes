@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2e
+package e2e_federation
 
 import (
 	"fmt"
@@ -34,6 +34,7 @@ import (
 	kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/util/intstr"
 	"k8s.io/kubernetes/test/e2e/framework"
+	fedframework "k8s.io/kubernetes/test/e2e_federation/framework"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -47,8 +48,13 @@ const (
 	FederatedIngressServicePodName = "federated-ingress-service-test-pod"
 )
 
+const (
+	// timeout on a single http request.
+	reqTimeout = 10 * time.Second
+)
+
 var _ = framework.KubeDescribe("Federated ingresses [Feature:Federation]", func() {
-	f := framework.NewDefaultFederatedFramework("federated-ingress")
+	f := fedframework.NewDefaultFederatedFramework("federated-ingress")
 
 	// Create/delete ingress api objects
 	// Validate federation apiserver, does not rely on underlying clusters or federation ingress controller.
@@ -56,17 +62,17 @@ var _ = framework.KubeDescribe("Federated ingresses [Feature:Federation]", func(
 		AfterEach(func() {
 			nsName := f.FederationNamespace.Name
 			// Delete all ingresses.
-			deleteAllIngressesOrFail(f.FederationClientset_1_5, nsName)
+			deleteAllIngressesOrFail(f.FederationClientset, nsName)
 		})
 
 		It("should be created and deleted successfully", func() {
-			framework.SkipUnlessFederated(f.ClientSet)
+			fedframework.SkipUnlessFederated(f.ClientSet)
 			framework.SkipUnlessProviderIs("gce", "gke") // TODO: Federated ingress is not yet supported on non-GCP platforms.
 			nsName := f.FederationNamespace.Name
-			ingress := createIngressOrFail(f.FederationClientset_1_5, nsName)
+			ingress := createIngressOrFail(f.FederationClientset, nsName)
 			By(fmt.Sprintf("Creation of ingress %q in namespace %q succeeded.  Deleting ingress.", ingress.Name, nsName))
 			// Cleanup
-			err := f.FederationClientset_1_5.Extensions().Ingresses(nsName).Delete(ingress.Name, &v1.DeleteOptions{})
+			err := f.FederationClientset.Extensions().Ingresses(nsName).Delete(ingress.Name, &v1.DeleteOptions{})
 			framework.ExpectNoError(err, "Error deleting ingress %q in namespace %q", ingress.Name, ingress.Namespace)
 			By(fmt.Sprintf("Deletion of ingress %q in namespace %q succeeded.", ingress.Name, nsName))
 		})
@@ -82,12 +88,12 @@ var _ = framework.KubeDescribe("Federated ingresses [Feature:Federation]", func(
 
 		// register clusters in federation apiserver
 		BeforeEach(func() {
-			framework.SkipUnlessFederated(f.ClientSet)
+			fedframework.SkipUnlessFederated(f.ClientSet)
 			framework.SkipUnlessProviderIs("gce", "gke") // TODO: Federated ingress is not yet supported on non-GCP platforms.
 			if federationName = os.Getenv("FEDERATION_NAME"); federationName == "" {
 				federationName = DefaultFederationName
 			}
-			jig = newFederationTestJig(f.FederationClientset_1_5)
+			jig = newFederationTestJig(f.FederationClientset)
 			clusters = map[string]*cluster{}
 			primaryClusterName = registerClusters(clusters, UserAgentName, federationName, f)
 			ns = f.FederationNamespace.Name
@@ -96,38 +102,38 @@ var _ = framework.KubeDescribe("Federated ingresses [Feature:Federation]", func(
 		AfterEach(func() {
 			// Delete all ingresses.
 			nsName := f.FederationNamespace.Name
-			deleteAllIngressesOrFail(f.FederationClientset_1_5, nsName)
+			deleteAllIngressesOrFail(f.FederationClientset, nsName)
 			unregisterClusters(clusters, f)
 		})
 
 		It("should create and update matching ingresses in underlying clusters", func() {
-			ingress := createIngressOrFail(f.FederationClientset_1_5, ns)
+			ingress := createIngressOrFail(f.FederationClientset, ns)
 			// wait for ingress shards being created
 			waitForIngressShardsOrFail(ns, ingress, clusters)
-			ingress = updateIngressOrFail(f.FederationClientset_1_5, ns)
+			ingress = updateIngressOrFail(f.FederationClientset, ns)
 			waitForIngressShardsUpdatedOrFail(ns, ingress, clusters)
 		})
 
 		It("should be deleted from underlying clusters when OrphanDependents is false", func() {
-			framework.SkipUnlessFederated(f.ClientSet)
+			fedframework.SkipUnlessFederated(f.ClientSet)
 			nsName := f.FederationNamespace.Name
 			orphanDependents := false
-			verifyCascadingDeletionForIngress(f.FederationClientset_1_5, clusters, &orphanDependents, nsName)
+			verifyCascadingDeletionForIngress(f.FederationClientset, clusters, &orphanDependents, nsName)
 			By(fmt.Sprintf("Verified that ingresses were deleted from underlying clusters"))
 		})
 
 		It("should not be deleted from underlying clusters when OrphanDependents is true", func() {
-			framework.SkipUnlessFederated(f.ClientSet)
+			fedframework.SkipUnlessFederated(f.ClientSet)
 			nsName := f.FederationNamespace.Name
 			orphanDependents := true
-			verifyCascadingDeletionForIngress(f.FederationClientset_1_5, clusters, &orphanDependents, nsName)
+			verifyCascadingDeletionForIngress(f.FederationClientset, clusters, &orphanDependents, nsName)
 			By(fmt.Sprintf("Verified that ingresses were not deleted from underlying clusters"))
 		})
 
 		It("should not be deleted from underlying clusters when OrphanDependents is nil", func() {
-			framework.SkipUnlessFederated(f.ClientSet)
+			fedframework.SkipUnlessFederated(f.ClientSet)
 			nsName := f.FederationNamespace.Name
-			verifyCascadingDeletionForIngress(f.FederationClientset_1_5, clusters, nil, nsName)
+			verifyCascadingDeletionForIngress(f.FederationClientset, clusters, nil, nsName)
 			By(fmt.Sprintf("Verified that ingresses were not deleted from underlying clusters"))
 		})
 
@@ -138,13 +144,13 @@ var _ = framework.KubeDescribe("Federated ingresses [Feature:Federation]", func(
 			)
 
 			BeforeEach(func() {
-				framework.SkipUnlessFederated(f.ClientSet)
+				fedframework.SkipUnlessFederated(f.ClientSet)
 				// create backend pod
 				createBackendPodsOrFail(clusters, ns, FederatedIngressServicePodName)
 				// create backend service
-				service = createServiceOrFail(f.FederationClientset_1_5, ns, FederatedIngressServiceName)
+				service = createServiceOrFail(f.FederationClientset, ns, FederatedIngressServiceName)
 				// create ingress object
-				jig.ing = createIngressOrFail(f.FederationClientset_1_5, ns)
+				jig.ing = createIngressOrFail(f.FederationClientset, ns)
 				// wait for services objects sync
 				waitForServiceShardsOrFail(ns, service, clusters)
 				// wait for ingress objects sync
@@ -154,14 +160,14 @@ var _ = framework.KubeDescribe("Federated ingresses [Feature:Federation]", func(
 			AfterEach(func() {
 				deleteBackendPodsOrFail(clusters, ns)
 				if service != nil {
-					deleteServiceOrFail(f.FederationClientset_1_5, ns, service.Name, nil)
+					deleteServiceOrFail(f.FederationClientset, ns, service.Name, nil)
 					cleanupServiceShardsAndProviderResources(ns, service, clusters)
 					service = nil
 				} else {
 					By("No service to delete. Service is nil")
 				}
 				if jig.ing != nil {
-					deleteIngressOrFail(f.FederationClientset_1_5, ns, jig.ing.Name, nil)
+					deleteIngressOrFail(f.FederationClientset, ns, jig.ing.Name, nil)
 					for clusterName, cluster := range clusters {
 						deleteClusterIngressOrFail(clusterName, cluster.Clientset, ns, jig.ing.Name)
 					}
@@ -395,7 +401,7 @@ func updateIngressOrFail(clientset *fedclientset.Clientset, namespace string) (n
 	for i := 0; i < MaxRetriesOnFederatedApiserver; i++ {
 		newIng, err = clientset.Extensions().Ingresses(namespace).Update(ingress)
 		if err == nil {
-			describeIng(namespace)
+			framework.DescribeIng(namespace)
 			return newIng
 		}
 		if !errors.IsConflict(err) && !errors.IsServerTimeout(err) {
@@ -422,7 +428,7 @@ func (j *federationTestJig) waitForFederatedIngress() {
 		for _, p := range rules.IngressRuleValue.HTTP.Paths {
 			route := fmt.Sprintf("%v://%v%v", proto, address, p.Path)
 			framework.Logf("Testing route %v host %v with simple GET", route, rules.Host)
-			framework.ExpectNoError(pollURL(route, rules.Host, framework.LoadBalancerPollTimeout, framework.LoadBalancerPollInterval, timeoutClient, false))
+			framework.ExpectNoError(framework.PollURL(route, rules.Host, framework.LoadBalancerPollTimeout, framework.LoadBalancerPollInterval, timeoutClient, false))
 		}
 	}
 }

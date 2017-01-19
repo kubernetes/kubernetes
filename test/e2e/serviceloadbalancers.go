@@ -18,7 +18,6 @@ package e2e
 
 import (
 	"fmt"
-	"io/ioutil"
 	"net/http"
 
 	"k8s.io/apimachinery/pkg/labels"
@@ -197,7 +196,7 @@ func (s *ingManager) test(path string) error {
 	url := fmt.Sprintf("%v/hostName", path)
 	httpClient := &http.Client{}
 	return wait.Poll(pollInterval, framework.ServiceRespondingTimeout, func() (bool, error) {
-		body, err := simpleGET(httpClient, url, "")
+		body, err := framework.SimpleGET(httpClient, url, "")
 		if err != nil {
 			framework.Logf("%v\n%v\n%v", url, body, err)
 			return false, nil
@@ -238,30 +237,6 @@ var _ = framework.KubeDescribe("ServiceLoadBalancer [Feature:ServiceLoadBalancer
 		}
 	})
 })
-
-// simpleGET executes a get on the given url, returns error if non-200 returned.
-func simpleGET(c *http.Client, url, host string) (string, error) {
-	req, err := http.NewRequest("GET", url, nil)
-	if err != nil {
-		return "", err
-	}
-	req.Host = host
-	res, err := c.Do(req)
-	if err != nil {
-		return "", err
-	}
-	defer res.Body.Close()
-	rawBody, err := ioutil.ReadAll(res.Body)
-	if err != nil {
-		return "", err
-	}
-	body := string(rawBody)
-	if res.StatusCode != http.StatusOK {
-		err = fmt.Errorf(
-			"GET returned http error %v", res.StatusCode)
-	}
-	return body, err
-}
 
 // rcFromManifest reads a .json/yaml file and returns the rc in it.
 func rcFromManifest(fileName string) *v1.ReplicationController {

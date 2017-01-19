@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2e
+package e2e_federation
 
 import (
 	"fmt"
@@ -29,6 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/test/e2e/framework"
+	fedframework "k8s.io/kubernetes/test/e2e_federation/framework"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -42,25 +43,25 @@ const (
 
 // Create/delete deployment api objects
 var _ = framework.KubeDescribe("Federation deployments [Feature:Federation]", func() {
-	f := framework.NewDefaultFederatedFramework("federation-deployment")
+	f := fedframework.NewDefaultFederatedFramework("federation-deployment")
 
 	Describe("Deployment objects", func() {
 		AfterEach(func() {
-			framework.SkipUnlessFederated(f.ClientSet)
+			fedframework.SkipUnlessFederated(f.ClientSet)
 
 			// Delete all deployments.
 			nsName := f.FederationNamespace.Name
-			deleteAllDeploymentsOrFail(f.FederationClientset_1_5, nsName)
+			deleteAllDeploymentsOrFail(f.FederationClientset, nsName)
 		})
 
 		It("should be created and deleted successfully", func() {
-			framework.SkipUnlessFederated(f.ClientSet)
+			fedframework.SkipUnlessFederated(f.ClientSet)
 
 			nsName := f.FederationNamespace.Name
-			deployment := createDeploymentOrFail(f.FederationClientset_1_5, nsName)
+			deployment := createDeploymentOrFail(f.FederationClientset, nsName)
 			By(fmt.Sprintf("Creation of deployment %q in namespace %q succeeded.  Deleting deployment.", deployment.Name, nsName))
 			// Cleanup
-			err := f.FederationClientset_1_5.Extensions().Deployments(nsName).Delete(deployment.Name, &v1.DeleteOptions{})
+			err := f.FederationClientset.Extensions().Deployments(nsName).Delete(deployment.Name, &v1.DeleteOptions{})
 			framework.ExpectNoError(err, "Error deleting deployment %q in namespace %q", deployment.Name, deployment.Namespace)
 			By(fmt.Sprintf("Deletion of deployment %q in namespace %q succeeded.", deployment.Name, nsName))
 		})
@@ -74,7 +75,7 @@ var _ = framework.KubeDescribe("Federation deployments [Feature:Federation]", fu
 			federationName string
 		)
 		BeforeEach(func() {
-			framework.SkipUnlessFederated(f.ClientSet)
+			fedframework.SkipUnlessFederated(f.ClientSet)
 			if federationName = os.Getenv("FEDERATION_NAME"); federationName == "" {
 				federationName = DefaultFederationName
 			}
@@ -84,50 +85,50 @@ var _ = framework.KubeDescribe("Federation deployments [Feature:Federation]", fu
 
 		AfterEach(func() {
 			nsName := f.FederationNamespace.Name
-			deleteAllDeploymentsOrFail(f.FederationClientset_1_5, nsName)
+			deleteAllDeploymentsOrFail(f.FederationClientset, nsName)
 			unregisterClusters(clusters, f)
 		})
 
 		It("should create and update matching deployments in underling clusters", func() {
 			nsName := f.FederationNamespace.Name
-			dep := createDeploymentOrFail(f.FederationClientset_1_5, nsName)
+			dep := createDeploymentOrFail(f.FederationClientset, nsName)
 			defer func() {
 				// cleanup. deletion of deployments is not supported for underlying clusters
 				By(fmt.Sprintf("Preparing deployment %q/%q for deletion by setting replicas to zero", nsName, dep.Name))
 				replicas := int32(0)
 				dep.Spec.Replicas = &replicas
-				f.FederationClientset_1_5.Deployments(nsName).Update(dep)
-				waitForDeploymentOrFail(f.FederationClientset_1_5, nsName, dep.Name, clusters)
-				f.FederationClientset_1_5.Deployments(nsName).Delete(dep.Name, &v1.DeleteOptions{})
+				f.FederationClientset.Deployments(nsName).Update(dep)
+				waitForDeploymentOrFail(f.FederationClientset, nsName, dep.Name, clusters)
+				f.FederationClientset.Deployments(nsName).Delete(dep.Name, &v1.DeleteOptions{})
 			}()
 
-			waitForDeploymentOrFail(f.FederationClientset_1_5, nsName, dep.Name, clusters)
+			waitForDeploymentOrFail(f.FederationClientset, nsName, dep.Name, clusters)
 			By(fmt.Sprintf("Successfuly created and synced deployment %q/%q to clusters", nsName, dep.Name))
-			updateDeploymentOrFail(f.FederationClientset_1_5, nsName)
-			waitForDeploymentOrFail(f.FederationClientset_1_5, nsName, dep.Name, clusters)
+			updateDeploymentOrFail(f.FederationClientset, nsName)
+			waitForDeploymentOrFail(f.FederationClientset, nsName, dep.Name, clusters)
 			By(fmt.Sprintf("Successfuly updated and synced deployment %q/%q to clusters", nsName, dep.Name))
 		})
 
 		It("should be deleted from underlying clusters when OrphanDependents is false", func() {
-			framework.SkipUnlessFederated(f.ClientSet)
+			fedframework.SkipUnlessFederated(f.ClientSet)
 			nsName := f.FederationNamespace.Name
 			orphanDependents := false
-			verifyCascadingDeletionForDeployment(f.FederationClientset_1_5, clusters, &orphanDependents, nsName)
+			verifyCascadingDeletionForDeployment(f.FederationClientset, clusters, &orphanDependents, nsName)
 			By(fmt.Sprintf("Verified that deployments were deleted from underlying clusters"))
 		})
 
 		It("should not be deleted from underlying clusters when OrphanDependents is true", func() {
-			framework.SkipUnlessFederated(f.ClientSet)
+			fedframework.SkipUnlessFederated(f.ClientSet)
 			nsName := f.FederationNamespace.Name
 			orphanDependents := true
-			verifyCascadingDeletionForDeployment(f.FederationClientset_1_5, clusters, &orphanDependents, nsName)
+			verifyCascadingDeletionForDeployment(f.FederationClientset, clusters, &orphanDependents, nsName)
 			By(fmt.Sprintf("Verified that deployments were not deleted from underlying clusters"))
 		})
 
 		It("should not be deleted from underlying clusters when OrphanDependents is nil", func() {
-			framework.SkipUnlessFederated(f.ClientSet)
+			fedframework.SkipUnlessFederated(f.ClientSet)
 			nsName := f.FederationNamespace.Name
-			verifyCascadingDeletionForDeployment(f.FederationClientset_1_5, clusters, nil, nsName)
+			verifyCascadingDeletionForDeployment(f.FederationClientset, clusters, nil, nsName)
 			By(fmt.Sprintf("Verified that deployments were not deleted from underlying clusters"))
 		})
 

@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2e
+package e2e_federation
 
 import (
 	"fmt"
@@ -33,7 +33,9 @@ import (
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
+	"k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
+	fedframework "k8s.io/kubernetes/test/e2e_federation/framework"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -48,6 +50,8 @@ var (
 	DNSTTL = 180 * time.Second // TODO: make k8s.io/kubernetes/federation/pkg/federation-controller/service.minDnsTtl exported, and import it here.
 )
 
+var FederationSuite common.Suite
+
 /*
 cluster keeps track of the assorted objects and state related to each cluster
 in the federation
@@ -59,7 +63,7 @@ type cluster struct {
 	backendPod       *v1.Pod // The backend pod, if one's been created.
 }
 
-func createClusterObjectOrFail(f *framework.Framework, context *framework.E2EContext) {
+func createClusterObjectOrFail(f *fedframework.Framework, context *fedframework.E2EContext) {
 	framework.Logf("Creating cluster object: %s (%s, secret: %s)", context.Name, context.Cluster.Cluster.Server, context.Name)
 	cluster := federationapi.Cluster{
 		ObjectMeta: metav1.ObjectMeta{
@@ -80,29 +84,29 @@ func createClusterObjectOrFail(f *framework.Framework, context *framework.E2ECon
 			},
 		},
 	}
-	_, err := f.FederationClientset_1_5.Federation().Clusters().Create(&cluster)
+	_, err := f.FederationClientset.Federation().Clusters().Create(&cluster)
 	framework.ExpectNoError(err, fmt.Sprintf("creating cluster: %+v", err))
 	framework.Logf("Successfully created cluster object: %s (%s, secret: %s)", context.Name, context.Cluster.Cluster.Server, context.Name)
 }
 
-func clusterIsReadyOrFail(f *framework.Framework, context *framework.E2EContext) {
-	c, err := f.FederationClientset_1_5.Federation().Clusters().Get(context.Name, metav1.GetOptions{})
+func clusterIsReadyOrFail(f *fedframework.Framework, context *fedframework.E2EContext) {
+	c, err := f.FederationClientset.Federation().Clusters().Get(context.Name, metav1.GetOptions{})
 	framework.ExpectNoError(err, fmt.Sprintf("get cluster: %+v", err))
 	if c.ObjectMeta.Name != context.Name {
 		framework.Failf("cluster name does not match input context: actual=%+v, expected=%+v", c, context)
 	}
-	err = isReady(context.Name, f.FederationClientset_1_5)
+	err = isReady(context.Name, f.FederationClientset)
 	framework.ExpectNoError(err, fmt.Sprintf("unexpected error in verifying if cluster %s is ready: %+v", context.Name, err))
 	framework.Logf("Cluster %s is Ready", context.Name)
 }
 
 // waitForAllClustersReady wait for all clusters defined in e2e context to be created
 // return ClusterList until the listed cluster items equals clusterCount
-func waitForAllClustersReady(f *framework.Framework, clusterCount int) *federationapi.ClusterList {
+func waitForAllClustersReady(f *fedframework.Framework, clusterCount int) *federationapi.ClusterList {
 	var clusterList *federationapi.ClusterList
 	if err := wait.PollImmediate(framework.Poll, FederatedServiceTimeout, func() (bool, error) {
 		var err error
-		clusterList, err = f.FederationClientset_1_5.Federation().Clusters().List(v1.ListOptions{})
+		clusterList, err = f.FederationClientset.Federation().Clusters().List(v1.ListOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -136,7 +140,7 @@ func createClientsetForCluster(c federationapi.Cluster, i int, userAgentName str
 }
 
 // Creates the federation namespace in all underlying clusters.
-func createNamespaceInClusters(clusters map[string]*cluster, f *framework.Framework) {
+func createNamespaceInClusters(clusters map[string]*cluster, f *fedframework.Framework) {
 	nsName := f.FederationNamespace.Name
 	for name, c := range clusters {
 		// The e2e Framework created the required namespace in federation control plane, but we need to create it in all the others, if it doesn't yet exist.
@@ -161,7 +165,7 @@ func createNamespaceInClusters(clusters map[string]*cluster, f *framework.Framew
 
 // Unregisters the given clusters from federation control plane.
 // Also deletes the federation namespace from each cluster.
-func unregisterClusters(clusters map[string]*cluster, f *framework.Framework) {
+func unregisterClusters(clusters map[string]*cluster, f *fedframework.Framework) {
 	nsName := f.FederationNamespace.Name
 	for name, c := range clusters {
 		if c.namespaceCreated {
@@ -174,16 +178,16 @@ func unregisterClusters(clusters map[string]*cluster, f *framework.Framework) {
 	}
 
 	// Delete the registered clusters in the federation API server.
-	clusterList, err := f.FederationClientset_1_5.Federation().Clusters().List(v1.ListOptions{})
+	clusterList, err := f.FederationClientset.Federation().Clusters().List(v1.ListOptions{})
 	framework.ExpectNoError(err, "Error listing clusters")
 	for _, cluster := range clusterList.Items {
-		err := f.FederationClientset_1_5.Federation().Clusters().Delete(cluster.Name, &v1.DeleteOptions{})
+		err := f.FederationClientset.Federation().Clusters().Delete(cluster.Name, &v1.DeleteOptions{})
 		framework.ExpectNoError(err, "Error deleting cluster %q", cluster.Name)
 	}
 }
 
 // can not be moved to util, as By and Expect must be put in Ginkgo test unit
-func registerClusters(clusters map[string]*cluster, userAgentName, federationName string, f *framework.Framework) string {
+func registerClusters(clusters map[string]*cluster, userAgentName, federationName string, f *fedframework.Framework) string {
 	contexts := f.GetUnderlyingFederatedContexts()
 
 	for _, context := range contexts {
@@ -382,7 +386,7 @@ func cleanupServiceShardLoadBalancer(clusterName string, service *v1.Service, ti
 	return err
 }
 
-func podExitCodeDetector(f *framework.Framework, name, namespace string, code int32) func() error {
+func podExitCodeDetector(f *fedframework.Framework, name, namespace string, code int32) func() error {
 	// If we ever get any container logs, stash them here.
 	logs := ""
 
@@ -423,7 +427,7 @@ func podExitCodeDetector(f *framework.Framework, name, namespace string, code in
 	}
 }
 
-func discoverService(f *framework.Framework, name string, exists bool, podName string) {
+func discoverService(f *fedframework.Framework, name string, exists bool, podName string) {
 	command := []string{"sh", "-c", fmt.Sprintf("until nslookup '%s'; do sleep 10; done", name)}
 	By(fmt.Sprintf("Looking up %q", name))
 

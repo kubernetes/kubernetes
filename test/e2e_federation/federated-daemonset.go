@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2e
+package e2e_federation
 
 import (
 	"fmt"
@@ -32,6 +32,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/test/e2e/framework"
+	fedframework "k8s.io/kubernetes/test/e2e_federation/framework"
 )
 
 const (
@@ -44,58 +45,58 @@ const (
 var _ = framework.KubeDescribe("Federation daemonsets [Feature:Federation]", func() {
 	var clusters map[string]*cluster // All clusters, keyed by cluster name
 
-	f := framework.NewDefaultFederatedFramework("federated-daemonset")
+	f := fedframework.NewDefaultFederatedFramework("federated-daemonset")
 
 	Describe("DaemonSet objects", func() {
 
 		BeforeEach(func() {
-			framework.SkipUnlessFederated(f.ClientSet)
+			fedframework.SkipUnlessFederated(f.ClientSet)
 			clusters = map[string]*cluster{}
 			registerClusters(clusters, UserAgentName, "", f)
 		})
 
 		AfterEach(func() {
-			framework.SkipUnlessFederated(f.ClientSet)
+			fedframework.SkipUnlessFederated(f.ClientSet)
 			// Delete all daemonsets.
 			nsName := f.FederationNamespace.Name
-			deleteAllDaemonSetsOrFail(f.FederationClientset_1_5, nsName)
+			deleteAllDaemonSetsOrFail(f.FederationClientset, nsName)
 			unregisterClusters(clusters, f)
 		})
 
 		It("should be created and deleted successfully", func() {
-			framework.SkipUnlessFederated(f.ClientSet)
+			fedframework.SkipUnlessFederated(f.ClientSet)
 			nsName := f.FederationNamespace.Name
-			daemonset := createDaemonSetOrFail(f.FederationClientset_1_5, nsName)
+			daemonset := createDaemonSetOrFail(f.FederationClientset, nsName)
 			defer func() { // Cleanup
 				By(fmt.Sprintf("Deleting daemonset %q in namespace %q", daemonset.Name, nsName))
-				err := f.FederationClientset_1_5.Extensions().DaemonSets(nsName).Delete(daemonset.Name, &v1.DeleteOptions{})
+				err := f.FederationClientset.Extensions().DaemonSets(nsName).Delete(daemonset.Name, &v1.DeleteOptions{})
 				framework.ExpectNoError(err, "Error deleting daemonset %q in namespace %q", daemonset.Name, nsName)
 			}()
 			// wait for daemonset shards being created
 			waitForDaemonSetShardsOrFail(nsName, daemonset, clusters)
-			daemonset = updateDaemonSetOrFail(f.FederationClientset_1_5, nsName)
+			daemonset = updateDaemonSetOrFail(f.FederationClientset, nsName)
 			waitForDaemonSetShardsUpdatedOrFail(nsName, daemonset, clusters)
 		})
 
 		It("should be deleted from underlying clusters when OrphanDependents is false", func() {
-			framework.SkipUnlessFederated(f.ClientSet)
+			fedframework.SkipUnlessFederated(f.ClientSet)
 			nsName := f.FederationNamespace.Name
 			orphanDependents := false
-			verifyCascadingDeletionForDS(f.FederationClientset_1_5, clusters, &orphanDependents, nsName)
+			verifyCascadingDeletionForDS(f.FederationClientset, clusters, &orphanDependents, nsName)
 			By(fmt.Sprintf("Verified that daemonsets were deleted from underlying clusters"))
 		})
 
 		It("should not be deleted from underlying clusters when OrphanDependents is true", func() {
-			framework.SkipUnlessFederated(f.ClientSet)
+			fedframework.SkipUnlessFederated(f.ClientSet)
 			nsName := f.FederationNamespace.Name
 			orphanDependents := true
-			verifyCascadingDeletionForDS(f.FederationClientset_1_5, clusters, &orphanDependents, nsName)
+			verifyCascadingDeletionForDS(f.FederationClientset, clusters, &orphanDependents, nsName)
 			By(fmt.Sprintf("Verified that daemonsets were not deleted from underlying clusters"))
 		})
 		It("should not be deleted from underlying clusters when OrphanDependents is nil", func() {
-			framework.SkipUnlessFederated(f.ClientSet)
+			fedframework.SkipUnlessFederated(f.ClientSet)
 			nsName := f.FederationNamespace.Name
-			verifyCascadingDeletionForDS(f.FederationClientset_1_5, clusters, nil, nsName)
+			verifyCascadingDeletionForDS(f.FederationClientset, clusters, nil, nsName)
 			By(fmt.Sprintf("Verified that daemonsets were not deleted from underlying clusters"))
 		})
 	})
