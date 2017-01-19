@@ -16,10 +16,7 @@ limitations under the License.
 
 package v1alpha1
 
-import (
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/kubernetes/pkg/kubeapiserver/authorizer"
-)
+import "k8s.io/apimachinery/pkg/runtime"
 
 const (
 	DefaultServiceDNSDomain          = "cluster.local"
@@ -28,7 +25,7 @@ const (
 	DefaultKubernetesFallbackVersion = "v1.5.0"
 	DefaultAPIBindPort               = 6443
 	DefaultDiscoveryBindPort         = 9898
-	DefaultAuthorizationMode         = authorizer.ModeRBAC
+	DefaultAuthorizationMode         = "RBAC"
 )
 
 func addDefaultingFuncs(scheme *runtime.Scheme) error {
