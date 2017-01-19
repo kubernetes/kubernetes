@@ -78,7 +78,7 @@ func (s *GenericAPIServer) serveSecurely(stopCh <-chan struct{}) error {
 
 	glog.Infof("Serving securely on %s", s.SecureServingInfo.BindAddress)
 	var err error
-	s.effectiveSecurePort, err = runServer(secureServer, s.SecureServingInfo.BindNetwork, stopCh)
+	s.effectiveSecurePort, err = runServer(secureServer, s.SecureServingInfo.BindNetwork, &s.SecureServingInfo.ipLimit, stopCh)
 	return err
 }
 
@@ -93,13 +93,13 @@ func (s *GenericAPIServer) serveInsecurely(stopCh <-chan struct{}) error {
 	}
 	glog.Infof("Serving insecurely on %s", s.InsecureServingInfo.BindAddress)
 	var err error
-	s.effectiveInsecurePort, err = runServer(insecureServer, s.InsecureServingInfo.BindNetwork, stopCh)
+	s.effectiveInsecurePort, err = runServer(insecureServer, s.InsecureServingInfo.BindNetwork, &s.InsecureServingInfo.ipLimit, stopCh)
 	return err
 }
 
 // runServer listens on the given port, then spawns a go-routine continuously serving
 // until the stopCh is closed. The port is returned. This function does not block.
-func runServer(server *http.Server, network string, stopCh <-chan struct{}) (int, error) {
+func runServer(server *http.Server, network string, ipLimit *ipBasedLimit, stopCh <-chan struct{}) (int, error) {
 	if len(server.Addr) == 0 {
 		return 0, errors.New("address cannot be empty")
 	}
@@ -134,7 +134,11 @@ func runServer(server *http.Server, network string, stopCh <-chan struct{}) (int
 
 		for {
 			var listener net.Listener
-			listener = tcpKeepAliveListener{ln.(*net.TCPListener)}
+			chain := []tcpConnectionChainHandler{
+				tcpKeepAliveHandler{},
+				ipBasedLimitHandler{ipLimit},
+			}
+			listener = tcpConnectionChainListener{ln.(*net.TCPListener), chain}
 			if server.TLSConfig != nil {
 				listener = tls.NewListener(listener, server.TLSConfig)
 			}
@@ -224,22 +228,187 @@ func getNamedCertificateMap(certs []namedTlsCert) (map[string]*tls.Certificate, 
 	return byName, nil
 }
 
+// tcpConnectionChainListener is responsible to invoking any connection handling
+// code which is invoked after AcceptTCP() has been called but before the
+// connection is usable by the server for communicating with the client. We
+// assume if an error is returned from a chain handler that it will return a nil
+// conn and have already closed that conn.
+type tcpConnectionChainHandler interface {
+	init(*net.TCPConn) error
+	wrap(net.Conn) (net.Conn, error)
+}
+
+type tcpConnectionChainListener struct {
+	*net.TCPListener
+	chain []tcpConnectionChainHandler
+}
+
+func (l tcpConnectionChainListener) Accept() (net.Conn, error) {
+	tc, err := l.AcceptTCP()
+	if err != nil {
+		return nil, err
+	}
+	for _, handler := range l.chain {
+		err = handler.init(tc)
+		if err != nil {
+			return nil, err
+		}
+	}
+	var conn net.Conn = tc
+	for _, handler := range l.chain {
+		conn, err = handler.wrap(conn)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return tc, nil
+}
+
 // tcpKeepAliveListener sets TCP keep-alive timeouts on accepted
 // connections. It's used by ListenAndServe and ListenAndServeTLS so
 // dead TCP connections (e.g. closing laptop mid-download) eventually
 // go away.
 //
 // Copied from Go 1.7.2 net/http/server.go
-type tcpKeepAliveListener struct {
-	*net.TCPListener
+type tcpKeepAliveHandler struct {
 }
 
-func (ln tcpKeepAliveListener) Accept() (net.Conn, error) {
-	tc, err := ln.AcceptTCP()
+func (ln tcpKeepAliveHandler) init(conn *net.TCPConn) error {
+	conn.SetKeepAlive(true)
+	conn.SetKeepAlivePeriod(defaultKeepAlivePeriod)
+	return nil
+}
+
+func (ln tcpKeepAliveHandler) wrap(conn net.Conn) (net.Conn, error) {
+	return conn, nil
+}
+
+// ipBasedLimitListener accepts at most n simultaneous connections from a
+// given IP address. We also limit the total simultaneous connections.
+// None of this is applied to localhost/loopback connections.
+//
+// Based on Go 1.7.4 net/netutil/listen.go
+// TODO: (cheftako) : IPv6, CIDR Range rather than individual IP Addresses?
+// Considered using atomic for per IP limit value,
+// but problem initing map value safely
+type ipBasedLimit struct {
+	// Map in which we map the serialized ip to the current count
+	limits map[string]int
+
+	// Current total count of the connections in existance (no localhost)
+	total int
+
+	// Lock used to ensure the limits and total are updated atomicaly
+	mutex sync.Mutex
+
+	// The maximum concurent connections an IP is allowed to have open
+	ipMax int
+
+	// The total maximum concurrent connections allowed open (Except localhost)
+	max int
+}
+
+func (i *ipBasedLimit) incrementIp(ipser string) error {
+	if i.max <= 0 {
+		return nil
+	}
+	ip := net.ParseIP(ipser)
+	if ip == nil {
+		glog.Infof("Received request from client with invalid ip %s", ipser)
+		return limitedError{ip: ipser}
+	}
+	if ip.IsLoopback() {
+		return nil
+	}
+	i.mutex.Lock()
+	defer i.mutex.Unlock()
+	current := i.limits[ipser]
+	if current >= i.ipMax || i.total >= i.max {
+		return limitedError{ip: ipser}
+	}
+	i.total++
+	i.limits[ipser] = current + 1
+	return nil
+}
+
+func (i *ipBasedLimit) decrementIp(ipser string) {
+	if i.max <= 0 {
+		return
+	}
+	ip := net.ParseIP(ipser)
+	if ip == nil || ip.IsLoopback() {
+		return
+	}
+	i.mutex.Lock()
+	defer i.mutex.Unlock()
+	i.total--
+	current := i.limits[ipser]
+	if current > 1 {
+		i.limits[ipser] = current - 1
+	} else {
+		glog.Infof("Cleaned up all references for IP %s", ipser)
+		delete(i.limits, ipser)
+	}
+}
+
+// The actual structure/handler which attaches the limiting code to a connection
+type ipBasedLimitHandler struct {
+	// The limit structure for this connection type.
+	ipLimit *ipBasedLimit
+}
+
+func (h ipBasedLimitHandler) init(conn *net.TCPConn) error {
+	return nil
+}
+
+func (h ipBasedLimitHandler) wrap(conn net.Conn) (net.Conn, error) {
+	ip, _, err := net.SplitHostPort(conn.RemoteAddr().String())
 	if err != nil {
+		conn.Close() // Not decrementing as we have not yet incremented
+		glog.Infof("Something went wrong getting the remote address %v", err)
 		return nil, err
 	}
-	tc.SetKeepAlive(true)
-	tc.SetKeepAlivePeriod(defaultKeepAlivePeriod)
-	return tc, nil
+	local := conn.LocalAddr().String()
+	glog.Infof("Entered ip based limit Accept() for IP %s on %s", ip, local)
+	err = h.ipLimit.incrementIp(ip)
+	if err != nil {
+		conn.Close() // Not decrementing as we did not successfully increment
+		glog.Infof("Denied accept to IP %s", ip)
+		return nil, err
+	}
+	glog.Infof("Allowed accept to IP %s", ip)
+	return &ipBasedLimitListenerConn{Conn: conn, ipLimit: h.ipLimit, ip: ip}, nil
 }
+
+// The structure which is responsible for cleaning up/decrementing the related ip limit
+type ipBasedLimitListenerConn struct {
+	// The underlying connection used to for the request/response.
+	net.Conn
+
+	// Makes sure we do not decrement more than once for the given connection
+	releaseOnce sync.Once
+
+	// Reference to the relevant IP Limiting structure.
+	ipLimit *ipBasedLimit
+
+	// The IP addess used when reserving/incrementIp so we can clean up
+	ip string
+}
+
+func (c *ipBasedLimitListenerConn) Close() error {
+	err := c.Conn.Close()
+	c.releaseOnce.Do(func() { c.ipLimit.decrementIp(c.ip) })
+	return err
+}
+
+// A custom error which tells http/server.go Serve() to retry Accept() quickly
+type limitedError struct {
+	// Present for debugging - IP which saw the problem
+	ip string
+}
+
+func (l limitedError) Error() string {
+	return "Accept() Exceeded maximum concurrent requests for IP " + l.ip
+}
+func (l limitedError) Timeout() bool   { return true }
+func (l limitedError) Temporary() bool { return true }
