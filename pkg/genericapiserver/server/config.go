@@ -169,6 +169,9 @@ type ServingInfo struct {
 	// BindNetwork is the type of network to bind to - defaults to "tcp", accepts "tcp",
 	// "tcp4", and "tcp6".
 	BindNetwork string
+
+	// ipBasedLimit determines the maximum number of concurrent requests based on ip
+	ipLimit ipBasedLimit
 }
 
 type SecureServingInfo struct {
@@ -255,9 +258,15 @@ func (c *Config) ApplySecureServingOptions(secureServing *options.SecureServingO
 		return c, nil
 	}
 
+	ipMax := c.MaxRequestsInFlight / 2
+	if ipMax > c.MaxMutatingRequestsInFlight/2 {
+		ipMax = c.MaxMutatingRequestsInFlight / 2
+	}
+	max := c.MaxRequestsInFlight + c.MaxMutatingRequestsInFlight
 	secureServingInfo := &SecureServingInfo{
 		ServingInfo: ServingInfo{
 			BindAddress: net.JoinHostPort(secureServing.ServingOptions.BindAddress.String(), strconv.Itoa(secureServing.ServingOptions.BindPort)),
+			ipLimit:     ipBasedLimit{limits: make(map[string]int), ipMax: ipMax, max: max},
 		},
 	}
 

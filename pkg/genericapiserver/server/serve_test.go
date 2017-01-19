@@ -27,7 +27,9 @@ import (
 	"os"
 	"reflect"
 	"strconv"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 
@@ -562,6 +564,312 @@ NextTest:
 			t.Errorf("%q - loopback client didn't get correct version info: expected=%v got=%v", title, expected, got)
 		}
 	}
+}
+
+func TestBasicIpLimit(t *testing.T) {
+	var ipLimit ipBasedLimit
+	validateIpLimitState(t, &ipLimit, "Basic/raw IpBasedLimit", 0, 0, 0, 0)
+	ipLimit.incrementIp("1.2.3.4")
+	validateIpLimitState(t, &ipLimit, "Basic/raw IpBasedLimit increment", 0, 0, 0, 0)
+	ipLimit.decrementIp("1.2.3.4")
+	validateIpLimitState(t, &ipLimit, "Basic/raw IpBasedLimit decrement", 0, 0, 0, 0)
+	ipLimit.incrementIp("127.0.0.1")
+	validateIpLimitState(t, &ipLimit, "Basic/raw IpBasedLimit increment localhost", 0, 0, 0, 0)
+	ipLimit.decrementIp("127.0.0.1")
+	validateIpLimitState(t, &ipLimit, "Basic/raw IpBasedLimit decrement localhost", 0, 0, 0, 0)
+}
+
+func TestIpLimitInitialization(t *testing.T) {
+	ipLimit := ipBasedLimit{limits: make(map[string]int), ipMax: 10, max: 20}
+	validateIpLimitState(t, &ipLimit, "IpBasedLimit explicit initialization", 0, 10, 0, 20)
+}
+
+func TestIpLimitWithLocalHost(t *testing.T) {
+	ipLimit := ipBasedLimit{limits: make(map[string]int), ipMax: 10, max: 20}
+	ipLimit.incrementIp("127.0.0.1")
+	validateIpLimitState(t, &ipLimit, "IPv4 localhost increment call for ipBasedLimit", 0, 10, 0, 20)
+	ipLimit.decrementIp("127.0.0.1")
+	validateIpLimitState(t, &ipLimit, "IPv4 localhost decrement call for ipBasedLimit", 0, 10, 0, 20)
+	ipv6loopback := net.IPv6loopback.String()
+	ipLimit.incrementIp(ipv6loopback)
+	validateIpLimitState(t, &ipLimit, "IPv6 localhost increment call for ipBasedLimit", 0, 10, 0, 20)
+	ipLimit.decrementIp(ipv6loopback)
+	validateIpLimitState(t, &ipLimit, "IPv6 localhost decrement call for ipBasedLimit", 0, 10, 0, 20)
+}
+
+func TestIpLimitIncrementAndDecrement(t *testing.T) {
+	ipLimit := ipBasedLimit{limits: make(map[string]int), ipMax: 10, max: 20}
+	ipLimit.incrementIp("1.2.3.4")
+	validateIpLimitState(t, &ipLimit, "First increment call for ipBasedLimit", 1, 10, 1, 20)
+	val, ok := ipLimit.limits["1.2.3.4"]
+	assert.True(t, ok, "Increment call for ipBasedLimit had no val")
+	assert.EqualValues(t, val, 1, "Post increment ipBasedLimit has a max of %d", val)
+	ipLimit.incrementIp("1.2.3.4")
+	validateIpLimitState(t, &ipLimit, "Second increment call for ipBasedLimit", 1, 10, 2, 20)
+	val, ok = ipLimit.limits["1.2.3.4"]
+	assert.True(t, ok, "Increment call for ipBasedLimit had no val")
+	assert.EqualValues(t, val, 2, "Post increment ipBasedLimit has a max of %d", val)
+
+	ipLimit.incrementIp("4.3.2.1")
+	validateIpLimitState(t, &ipLimit, "First increment call for ipBasedLimit", 2, 10, 3, 20)
+	val, ok = ipLimit.limits["4.3.2.1"]
+	assert.True(t, ok, "Increment call for ipBasedLimit had no val")
+	assert.EqualValues(t, val, 1, "Post increment ipBasedLimit has a max of %d", val)
+	ipLimit.incrementIp("4.3.2.1")
+	validateIpLimitState(t, &ipLimit, "Second increment call for ipBasedLimit", 2, 10, 4, 20)
+	val, ok = ipLimit.limits["4.3.2.1"]
+	assert.True(t, ok, "Increment call for ipBasedLimit had no val")
+	assert.EqualValues(t, val, 2, "Post increment ipBasedLimit has a max of %d", val)
+
+	ipLimit.decrementIp("4.3.2.1")
+	validateIpLimitState(t, &ipLimit, "First decrement call for ipBasedLimit", 2, 10, 3, 20)
+	val, ok = ipLimit.limits["4.3.2.1"]
+	assert.True(t, ok, "Decrement call for ipBasedLimit had no val")
+	assert.EqualValues(t, val, 1, "Post increment ipBasedLimit has a max of %d", val)
+
+	ipLimit.decrementIp("4.3.2.1")
+	validateIpLimitState(t, &ipLimit, "Deleting decrement call for ipBasedLimit", 1, 10, 2, 20)
+	val, ok = ipLimit.limits["4.3.2.1"]
+	assert.EqualValues(t, val, 0, "Deleting decrement call for ipBasedLimit has a val of %d", 0)
+	assert.False(t, ok, "Deleting decrement call for ipBasedLimit had a val")
+	val, ok = ipLimit.limits["1.2.3.4"]
+	assert.True(t, ok, "Unmodified ip in ipBasedLimit had no val")
+	assert.EqualValues(t, val, 2, "Post increment ipBasedLimit has a max of %d", val)
+
+	ipLimit.decrementIp("1.2.3.4")
+	validateIpLimitState(t, &ipLimit, "First decrement call for ipBasedLimit", 1, 10, 1, 20)
+	val, ok = ipLimit.limits["1.2.3.4"]
+	assert.True(t, ok, "Decrement call for ipBasedLimit had no val")
+	assert.EqualValues(t, val, 1, "Post increment ipBasedLimit has a max of %d", val)
+
+	ipLimit.decrementIp("1.2.3.4")
+	validateIpLimitState(t, &ipLimit, "Deleting decrement call for ipBasedLimit", 0, 10, 0, 20)
+	val, ok = ipLimit.limits["1.2.3.4"]
+	assert.False(t, ok, "Deleting decrement call for ipBasedLimit had a val")
+	assert.EqualValues(t, val, 0, "Deleting decrement call for ipBasedLimit has a val of %d", 0)
+}
+
+func TestIpLimitIncrementFailOnIpLimit(t *testing.T) {
+	ipLimit := ipBasedLimit{limits: make(map[string]int), ipMax: 3, max: 6}
+	err := ipLimit.incrementIp("1.2.3.4")
+	assert.NoError(t, err)
+	validateIpLimitState(t, &ipLimit, "First increment call for ipBasedLimit", 1, 3, 1, 6)
+	val, ok := ipLimit.limits["1.2.3.4"]
+	assert.True(t, ok, "Increment call for ipBasedLimit had no val")
+	assert.EqualValues(t, val, 1, "Post increment ipBasedLimit has a max of %d", val)
+
+	err = ipLimit.incrementIp("1.2.3.4")
+	assert.NoError(t, err)
+	validateIpLimitState(t, &ipLimit, "Second increment call for ipBasedLimit", 1, 3, 2, 6)
+	val, ok = ipLimit.limits["1.2.3.4"]
+	assert.EqualValues(t, val, 2, "Post increment ipBasedLimit has a max of %d", val)
+
+	err = ipLimit.incrementIp("1.2.3.4")
+	assert.NoError(t, err)
+	validateIpLimitState(t, &ipLimit, "Third increment call for ipBasedLimit", 1, 3, 3, 6)
+	val, ok = ipLimit.limits["1.2.3.4"]
+	assert.True(t, ok, "Increment call for ipBasedLimit had no val")
+	assert.EqualValues(t, val, 3, "Post increment ipBasedLimit has a max of %d", val)
+
+	err = ipLimit.incrementIp("1.2.3.4")
+	assert.Error(t, err)
+	if limErr, ok := err.(limitedError); ok {
+		assert.True(t, limErr.Timeout(), "IpLimit limitedError should return timeout true")
+		assert.True(t, limErr.Temporary(), "IpLimit limitedError should return temporary true")
+	} else {
+		assert.Fail(t, "Expected a limitedError from incrementIp fail but got %T", err)
+	}
+	validateIpLimitState(t, &ipLimit, "Second increment call for ipBasedLimit", 1, 3, 3, 6)
+	val, ok = ipLimit.limits["1.2.3.4"]
+	assert.True(t, ok, "Increment call for ipBasedLimit had no val")
+	assert.EqualValues(t, val, 3, "Post increment ipBasedLimit has a max of %d", val)
+
+	ipLimit.decrementIp("1.2.3.4")
+	validateIpLimitState(t, &ipLimit, "Decrement call for ipBasedLimit", 1, 3, 2, 6)
+	val, ok = ipLimit.limits["1.2.3.4"]
+	assert.True(t, ok, "Decrement call for ipBasedLimit had no val")
+	assert.EqualValues(t, val, 2, "Post increment ipBasedLimit has a max of %d", val)
+
+	ipLimit.decrementIp("1.2.3.4")
+	validateIpLimitState(t, &ipLimit, "Decrement call for ipBasedLimit", 1, 3, 1, 6)
+	val, ok = ipLimit.limits["1.2.3.4"]
+	assert.True(t, ok, "Decrement call for ipBasedLimit had no val")
+	assert.EqualValues(t, val, 1, "Post increment ipBasedLimit has a max of %d", val)
+
+	ipLimit.decrementIp("1.2.3.4")
+	validateIpLimitState(t, &ipLimit, "Deleting decrement call for ipBasedLimit", 0, 3, 0, 6)
+	val, ok = ipLimit.limits["1.2.3.4"]
+	assert.False(t, ok, "Deleting decrement call for ipBasedLimit had a val")
+	assert.EqualValues(t, val, 0, "Deleting decrement call for ipBasedLimit has a val of %d", 0)
+}
+
+func TestIpLimitIncrementFailOnTotalLimit(t *testing.T) {
+	ipLimit := ipBasedLimit{limits: make(map[string]int), ipMax: 2, max: 3}
+	err := ipLimit.incrementIp("1.2.3.4")
+	assert.NoError(t, err)
+	validateIpLimitState(t, &ipLimit, "First increment call for ipBasedLimit", 1, 2, 1, 3)
+	val, ok := ipLimit.limits["1.2.3.4"]
+	assert.True(t, ok, "Increment call for ipBasedLimit had no val")
+	assert.EqualValues(t, val, 1, "Post increment ipBasedLimit has a max of %d", val)
+
+	err = ipLimit.incrementIp("1.2.3.4")
+	assert.NoError(t, err)
+	validateIpLimitState(t, &ipLimit, "Second increment call for ipBasedLimit", 1, 2, 2, 3)
+	val, ok = ipLimit.limits["1.2.3.4"]
+	assert.True(t, ok, "Increment call for ipBasedLimit had no val")
+	assert.EqualValues(t, val, 2, "Post increment ipBasedLimit has a max of %d", val)
+
+	err = ipLimit.incrementIp("4.3.2.1")
+	assert.NoError(t, err)
+	validateIpLimitState(t, &ipLimit, "First increment call for second ip ipBasedLimit", 2, 2, 3, 3)
+	val, ok = ipLimit.limits["4.3.2.1"]
+	assert.True(t, ok, "Increment call for ipBasedLimit had no val")
+	assert.EqualValues(t, val, 1, "Post increment ipBasedLimit has a max of %d", val)
+
+	err = ipLimit.incrementIp("4.3.2.1")
+	assert.Error(t, err)
+	if limErr, ok := err.(limitedError); ok {
+		assert.True(t, limErr.Timeout(), "IpLimit limitedError should return timeout true")
+		assert.True(t, limErr.Temporary(), "IpLimit limitedError should return temporary true")
+	} else {
+		assert.Fail(t, "Expected a limitedError from incrementIp fail but got %T", err)
+	}
+	validateIpLimitState(t, &ipLimit, "Second increment call for ipBasedLimit", 2, 2, 3, 3)
+	val, ok = ipLimit.limits["4.3.2.1"]
+	assert.True(t, ok, "Increment call for ipBasedLimit had no val")
+	assert.EqualValues(t, val, 1, "Post increment ipBasedLimit has a max of %d", val)
+
+	ipLimit.decrementIp("1.2.3.4")
+	validateIpLimitState(t, &ipLimit, "Decrement call for ipBasedLimit", 2, 2, 2, 3)
+	val, ok = ipLimit.limits["1.2.3.4"]
+	assert.True(t, ok, "Decrement call for ipBasedLimit had no val")
+	assert.EqualValues(t, val, 1, "Post increment ipBasedLimit has a max of %d", val)
+
+	ipLimit.decrementIp("1.2.3.4")
+	validateIpLimitState(t, &ipLimit, "Deleting decrement call for ipBasedLimit", 1, 2, 1, 3)
+	val, ok = ipLimit.limits["1.2.3.4"]
+	assert.False(t, ok, "Deleting decrement call for ipBasedLimit had a val")
+	assert.EqualValues(t, val, 0, "Deleting decrement call for ipBasedLimit has a val of %d", 0)
+	val, ok = ipLimit.limits["4.3.2.1"]
+	assert.True(t, ok, "Unmodified IP for ipBasedLimit had no val")
+	assert.EqualValues(t, val, 1, "Unmodified IP for ipBasedLimit has a max of %d", val)
+
+	ipLimit.decrementIp("4.3.2.1")
+	validateIpLimitState(t, &ipLimit, "Deleting decrement call for ipBasedLimit", 0, 2, 0, 3)
+	val, ok = ipLimit.limits["4.3.2.1"]
+	assert.False(t, ok, "Deleting decrement call for ipBasedLimit had a val")
+	assert.EqualValues(t, val, 0, "Deleting decrement call for ipBasedLimit has a val of %d", 0)
+}
+
+func TestParrallelIpLimitAccessNoLimit(t *testing.T) {
+	ipLimit := ipBasedLimit{limits: make(map[string]int), ipMax: 10, max: 100}
+	stop := time.Now().Add(time.Second * 10) // Long enough to prevent flaky ???
+	stateHolder := parrallelStateHolder{ipLimit: &ipLimit, waitSize: 100,
+		stop: stop, good: 0, limit: 0, count: 0}
+	ips := []string{"1.1.1.1", "2.2.2.2", "3.3.3.3", "4.4.4.4", "5.5.5.5",
+		"6.6.6.6", "7.7.7.7", "8.8.8.8", "9.9.9.9",
+		"1973:dead:beef:0121:1973:dead:beef:0121"}
+	done := make(chan struct{})
+	defer close(done)
+	for _, ip := range ips {
+		for i := 0; i < 10; i++ {
+			go stateHolder.accessIpLimit(ip, done)
+		}
+	}
+	for i := 0; i < 100; i++ {
+		<-done
+	}
+	validateIpLimitState(t, &ipLimit, "Deleting decrement call for ipBasedLimit", 0, 10, 0, 100)
+	assert.EqualValues(t, stateHolder.good, 100, "Concurrent increment count for ipBasedLimit %d successes", 0)
+	assert.EqualValues(t, stateHolder.limit, 0, "Concurrent increment count for ipBasedLimit %d limits", 0)
+}
+
+func TestParrallelIpLimitHitIpLimit(t *testing.T) {
+	ipLimit := ipBasedLimit{limits: make(map[string]int), ipMax: 8, max: 100}
+	stop := time.Now().Add(time.Second * 10) // Long enough to prevent flaky ???
+	stateHolder := parrallelStateHolder{ipLimit: &ipLimit, waitSize: 100,
+		stop: stop, good: 0, limit: 0, count: 0}
+	ips := []string{"1.1.1.1", "2.2.2.2", "3.3.3.3", "4.4.4.4", "5.5.5.5",
+		"6.6.6.6", "7.7.7.7", "8.8.8.8", "9.9.9.9",
+		"1973:dead:beef:0121:1973:dead:beef:0121"}
+	done := make(chan struct{})
+	defer close(done)
+	for _, ip := range ips {
+		for i := 0; i < 10; i++ {
+			go stateHolder.accessIpLimit(ip, done)
+		}
+	}
+	for i := 0; i < 100; i++ {
+		<-done
+	}
+	validateIpLimitState(t, &ipLimit, "Deleting decrement call for ipBasedLimit", 0, 8, 0, 100)
+	assert.EqualValues(t, stateHolder.good, 80, "Concurrent increment count for ipBasedLimit %d successes", 0)
+	assert.EqualValues(t, stateHolder.limit, 20, "Concurrent increment count for ipBasedLimit %d limits", 0)
+}
+
+func TestParrallelIpLimitHitTotalLimit(t *testing.T) {
+	ipLimit := ipBasedLimit{limits: make(map[string]int), ipMax: 10, max: 79}
+	stop := time.Now().Add(time.Second * 10) // Long enough to prevent flaky ???
+	stateHolder := parrallelStateHolder{ipLimit: &ipLimit, waitSize: 100,
+		stop: stop, good: 0, limit: 0, count: 0}
+	ips := []string{"1.1.1.1", "2.2.2.2", "3.3.3.3", "4.4.4.4", "5.5.5.5",
+		"6.6.6.6", "7.7.7.7", "8.8.8.8", "9.9.9.9",
+		"1977:dead:beef:0525:2015:dead:beef:1218"}
+	done := make(chan struct{})
+	defer close(done)
+	for _, ip := range ips {
+		for i := 0; i < 10; i++ {
+			go stateHolder.accessIpLimit(ip, done)
+		}
+	}
+	for i := 0; i < 100; i++ {
+		<-done
+	}
+	validateIpLimitState(t, &ipLimit, "Deleting decrement call for ipBasedLimit", 0, 10, 0, 79)
+	assert.EqualValues(t, stateHolder.good, 79, "Concurrent increment count for ipBasedLimit %d successes", 0)
+	assert.EqualValues(t, stateHolder.limit, 21, "Concurrent increment count for ipBasedLimit %d limits", 0)
+}
+
+func (sh *parrallelStateHolder) accessIpLimit(ip string, done chan<- struct{}) {
+	defer func() { done <- struct{}{} }()
+	err := sh.ipLimit.incrementIp(ip)
+	if err == nil {
+		atomic.AddUint64(&sh.good, 1)
+	} else {
+		atomic.AddUint64(&sh.limit, 1)
+	}
+	atomic.AddUint64(&sh.count, 1)
+	if err == nil {
+		sh.wait()
+		sh.ipLimit.decrementIp(ip)
+	}
+}
+
+func (sh *parrallelStateHolder) wait() {
+	var current uint64
+	for current < sh.waitSize {
+		time.Sleep(time.Millisecond * 100)
+		if time.Now().After(sh.stop) {
+			break
+		}
+		current = atomic.LoadUint64(&sh.count)
+	}
+}
+
+type parrallelStateHolder struct {
+	ipLimit  *ipBasedLimit
+	waitSize uint64
+	stop     time.Time
+	good     uint64
+	limit    uint64
+	count    uint64
+}
+
+func validateIpLimitState(t *testing.T, ipLimit *ipBasedLimit, base string, expMapSize, expIpMax, expTtl, expMax int) {
+	assert.EqualValues(t, len(ipLimit.limits), expMapSize, "%s map is size %d not %d", base, len(ipLimit.limits), expMapSize)
+	assert.EqualValues(t, ipLimit.ipMax, expIpMax, "%s ipMax is %d not %d", base, ipLimit.ipMax, expIpMax)
+	assert.EqualValues(t, ipLimit.total, expTtl, "%s count is %d not %d", base, ipLimit.total, expTtl)
+	assert.EqualValues(t, ipLimit.max, expMax, "%s max is %d not %d", base, ipLimit.max, expMax)
 }
 
 func parseIPList(ips []string) []net.IP {
