@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2e
+package e2e_federation
 
 import (
 	"fmt"
@@ -24,6 +24,7 @@ import (
 	"k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
+	fedframework "k8s.io/kubernetes/test/e2e_federation/framework"
 
 	. "github.com/onsi/gomega"
 )
@@ -34,30 +35,30 @@ const (
 
 // Create/delete event api objects.
 var _ = framework.KubeDescribe("Federation events [Feature:Federation]", func() {
-	f := framework.NewDefaultFederatedFramework("federation-event")
+	f := fedframework.NewDefaultFederatedFramework("federation-event")
 
 	Describe("Event objects", func() {
 		AfterEach(func() {
-			framework.SkipUnlessFederated(f.ClientSet)
+			fedframework.SkipUnlessFederated(f.ClientSet)
 
 			nsName := f.FederationNamespace.Name
 			// Delete registered events.
-			eventList, err := f.FederationClientset_1_5.Core().Events(nsName).List(v1.ListOptions{})
+			eventList, err := f.FederationClientset.Core().Events(nsName).List(v1.ListOptions{})
 			Expect(err).NotTo(HaveOccurred())
 			for _, event := range eventList.Items {
-				err := f.FederationClientset_1_5.Core().Events(nsName).Delete(event.Name, &v1.DeleteOptions{})
+				err := f.FederationClientset.Core().Events(nsName).Delete(event.Name, &v1.DeleteOptions{})
 				Expect(err).NotTo(HaveOccurred())
 			}
 		})
 
 		It("should be created and deleted successfully", func() {
-			framework.SkipUnlessFederated(f.ClientSet)
+			fedframework.SkipUnlessFederated(f.ClientSet)
 
 			nsName := f.FederationNamespace.Name
-			event := createEventOrFail(f.FederationClientset_1_5, nsName)
+			event := createEventOrFail(f.FederationClientset, nsName)
 			By(fmt.Sprintf("Creation of event %q in namespace %q succeeded.  Deleting event.", event.Name, nsName))
 			// Cleanup
-			err := f.FederationClientset_1_5.Core().Events(nsName).Delete(event.Name, &v1.DeleteOptions{})
+			err := f.FederationClientset.Core().Events(nsName).Delete(event.Name, &v1.DeleteOptions{})
 			framework.ExpectNoError(err, "Error deleting event %q in namespace %q", event.Name, event.Namespace)
 			By(fmt.Sprintf("Deletion of event %q in namespace %q succeeded.", event.Name, nsName))
 		})

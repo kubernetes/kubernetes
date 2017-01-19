@@ -23,6 +23,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"math/rand"
 	"net"
 	"net/http"
@@ -60,8 +61,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
-	federationapi "k8s.io/kubernetes/federation/apis/federation/v1beta1"
-	"k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	apps "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
@@ -357,23 +356,6 @@ func SkipUnlessServerVersionGTE(v *utilversion.Version, c discovery.ServerVersio
 	}
 	if !gte {
 		Skipf("Not supported for server versions before %q", v)
-	}
-}
-
-// Detects whether the federation namespace exists in the underlying cluster
-func SkipUnlessFederated(c clientset.Interface) {
-	federationNS := os.Getenv("FEDERATION_NAMESPACE")
-	if federationNS == "" {
-		federationNS = federationapi.FederationNamespaceSystem
-	}
-
-	_, err := c.Core().Namespaces().Get(federationNS, metav1.GetOptions{})
-	if err != nil {
-		if apierrs.IsNotFound(err) {
-			Skipf("Could not find federation namespace %s: skipping federated test", federationNS)
-		} else {
-			Failf("Unexpected error getting namespace: %v", err)
-		}
 	}
 }
 
@@ -798,18 +780,6 @@ func WaitForMatchPodsCondition(c clientset.Interface, opts v1.ListOptions, desc 
 // as a result, pods are not able to be provisioned in a namespace until the service account is provisioned
 func WaitForDefaultServiceAccountInNamespace(c clientset.Interface, namespace string) error {
 	return waitForServiceAccountInNamespace(c, namespace, "default", ServiceAccountProvisionTimeout)
-}
-
-// WaitForFederationApiserverReady waits for the federation apiserver to be ready.
-// It tests the readiness by sending a GET request and expecting a non error response.
-func WaitForFederationApiserverReady(c *federation_clientset.Clientset) error {
-	return wait.PollImmediate(time.Second, 1*time.Minute, func() (bool, error) {
-		_, err := c.Federation().Clusters().List(v1.ListOptions{})
-		if err != nil {
-			return false, nil
-		}
-		return true, nil
-	})
 }
 
 // WaitForPersistentVolumePhase waits for a PersistentVolume to be in a specific phase or until timeout occurs, whichever comes first.
@@ -1781,7 +1751,7 @@ func ServiceResponding(c clientset.Interface, ns, name string) error {
 	})
 }
 
-func restclientConfig(kubeContext string) (*clientcmdapi.Config, error) {
+func RestclientConfig(kubeContext string) (*clientcmdapi.Config, error) {
 	Logf(">>> kubeConfig: %s\n", TestContext.KubeConfig)
 	if TestContext.KubeConfig == "" {
 		return nil, fmt.Errorf("KubeConfig must be specified to load client config")
@@ -1804,43 +1774,13 @@ func LoadConfig() (*restclient.Config, error) {
 		// This is a node e2e test, apply the node e2e configuration
 		return &restclient.Config{Host: TestContext.Host}, nil
 	}
-	c, err := restclientConfig(TestContext.KubeContext)
+	c, err := RestclientConfig(TestContext.KubeContext)
 	if err != nil {
 		return nil, err
 	}
 
 	return clientcmd.NewDefaultClientConfig(*c, &clientcmd.ConfigOverrides{ClusterInfo: clientcmdapi.Cluster{Server: TestContext.Host}}).ClientConfig()
 }
-
-func LoadFederatedConfig(overrides *clientcmd.ConfigOverrides) (*restclient.Config, error) {
-	c, err := restclientConfig(federatedKubeContext)
-	if err != nil {
-		return nil, fmt.Errorf("error creating federation client config: %v", err.Error())
-	}
-	cfg, err := clientcmd.NewDefaultClientConfig(*c, overrides).ClientConfig()
-	if cfg != nil {
-		//TODO(colhom): this is only here because https://github.com/kubernetes/kubernetes/issues/25422
-		cfg.NegotiatedSerializer = api.Codecs
-	}
-	if err != nil {
-		return cfg, fmt.Errorf("error creating federation client config: %v", err.Error())
-	}
-	return cfg, nil
-}
-
-func LoadFederationClientset_1_5() (*federation_clientset.Clientset, error) {
-	config, err := LoadFederatedConfig(&clientcmd.ConfigOverrides{})
-	if err != nil {
-		return nil, err
-	}
-
-	c, err := federation_clientset.NewForConfig(config)
-	if err != nil {
-		return nil, fmt.Errorf("error creating federation clientset: %v", err.Error())
-	}
-	return c, nil
-}
-
 func LoadInternalClientset() (*internalclientset.Clientset, error) {
 	config, err := LoadConfig()
 	if err != nil {
@@ -5299,4 +5239,55 @@ func RcByNameContainer(name string, replicas int32, image string, labels map[str
 			},
 		},
 	}
+}
+
+// SimpleGET executes a get on the given url, returns error if non-200 returned.
+func SimpleGET(c *http.Client, url, host string) (string, error) {
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return "", err
+	}
+	req.Host = host
+	res, err := c.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer res.Body.Close()
+	rawBody, err := ioutil.ReadAll(res.Body)
+	if err != nil {
+		return "", err
+	}
+	body := string(rawBody)
+	if res.StatusCode != http.StatusOK {
+		err = fmt.Errorf(
+			"GET returned http error %v", res.StatusCode)
+	}
+	return body, err
+}
+
+// PollURL polls till the url responds with a healthy http code. If
+// expectUnreachable is true, it breaks on first non-healthy http code instead.
+func PollURL(route, host string, timeout time.Duration, interval time.Duration, httpClient *http.Client, expectUnreachable bool) error {
+	var lastBody string
+	pollErr := wait.PollImmediate(interval, timeout, func() (bool, error) {
+		var err error
+		lastBody, err = SimpleGET(httpClient, route, host)
+		if err != nil {
+			Logf("host %v path %v: %v unreachable", host, route, err)
+			return expectUnreachable, nil
+		}
+		return !expectUnreachable, nil
+	})
+	if pollErr != nil {
+		return fmt.Errorf("Failed to execute a successful GET within %v, Last response body for %v, host %v:\n%v\n\n%v\n",
+			timeout, route, host, lastBody, pollErr)
+	}
+	return nil
+}
+
+func DescribeIng(ns string) {
+	Logf("\nOutput of kubectl describe ing:\n")
+	desc, _ := RunKubectl(
+		"describe", "ing", fmt.Sprintf("--namespace=%v", ns))
+	Logf(desc)
 }
