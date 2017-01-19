@@ -22,8 +22,9 @@ KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
 # We need an absolute path to KUBE_ROOT
 ABSOLUTE_ROOT=$(readlink -f ${KUBE_ROOT})
 
-source ${KUBE_ROOT}/cluster/kubemark/util.sh
-source ${KUBE_ROOT}/cluster/kubemark/config-default.sh
+source "${KUBE_ROOT}/test/kubemark/cloud-provider-config.sh"
+source "${KUBE_ROOT}/cluster/kubemark/util.sh"
+source "${KUBE_ROOT}/cluster/kubemark/${CLOUD_PROVIDER}/config-default.sh"
 
 echo "Kubemark master name: ${MASTER_NAME}"
 
