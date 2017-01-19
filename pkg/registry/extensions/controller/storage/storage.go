@@ -27,8 +27,8 @@ import (
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	extvalidation "k8s.io/kubernetes/pkg/apis/extensions/validation"
 	"k8s.io/kubernetes/pkg/genericapiserver/api/rest"
-	"k8s.io/kubernetes/pkg/registry/core/controller"
-	controllerstore "k8s.io/kubernetes/pkg/registry/core/controller/storage"
+	"k8s.io/kubernetes/pkg/registry/core/replicationcontroller"
+	controllerstore "k8s.io/kubernetes/pkg/registry/core/replicationcontroller/storage"
 	"k8s.io/kubernetes/pkg/registry/generic"
 )
 
@@ -41,7 +41,7 @@ type ContainerStorage struct {
 func NewStorage(optsGetter generic.RESTOptionsGetter) ContainerStorage {
 	// scale does not set status, only updates spec so we ignore the status
 	controllerREST, _ := controllerstore.NewREST(optsGetter)
-	rcRegistry := controller.NewRegistry(controllerREST)
+	rcRegistry := replicationcontroller.NewRegistry(controllerREST)
 
 	return ContainerStorage{
 		ReplicationController: &RcREST{},
@@ -50,7 +50,7 @@ func NewStorage(optsGetter generic.RESTOptionsGetter) ContainerStorage {
 }
 
 type ScaleREST struct {
-	registry *controller.Registry
+	registry *replicationcontroller.Registry
 }
 
 // ScaleREST implements Patcher

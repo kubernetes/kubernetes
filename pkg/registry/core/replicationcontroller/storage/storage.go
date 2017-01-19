@@ -30,7 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	"k8s.io/kubernetes/pkg/apis/autoscaling/validation"
 	"k8s.io/kubernetes/pkg/genericapiserver/api/rest"
-	"k8s.io/kubernetes/pkg/registry/core/controller"
+	"k8s.io/kubernetes/pkg/registry/core/replicationcontroller"
 	"k8s.io/kubernetes/pkg/registry/generic"
 	genericregistry "k8s.io/kubernetes/pkg/registry/generic/registry"
 )
@@ -44,7 +44,7 @@ type ControllerStorage struct {
 
 func NewStorage(optsGetter generic.RESTOptionsGetter) ControllerStorage {
 	controllerREST, statusREST := NewREST(optsGetter)
-	controllerRegistry := controller.NewRegistry(controllerREST)
+	controllerRegistry := replicationcontroller.NewRegistry(controllerREST)
 
 	return ControllerStorage{
 		Controller: controllerREST,
@@ -65,20 +65,20 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST) {
 		ObjectNameFunc: func(obj runtime.Object) (string, error) {
 			return obj.(*api.ReplicationController).Name, nil
 		},
-		PredicateFunc:     controller.MatchController,
+		PredicateFunc:     replicationcontroller.MatchController,
 		QualifiedResource: api.Resource("replicationcontrollers"),
 
-		CreateStrategy: controller.Strategy,
-		UpdateStrategy: controller.Strategy,
-		DeleteStrategy: controller.Strategy,
+		CreateStrategy: replicationcontroller.Strategy,
+		UpdateStrategy: replicationcontroller.Strategy,
+		DeleteStrategy: replicationcontroller.Strategy,
 	}
-	options := &generic.StoreOptions{RESTOptions: optsGetter, AttrFunc: controller.GetAttrs}
+	options := &generic.StoreOptions{RESTOptions: optsGetter, AttrFunc: replicationcontroller.GetAttrs}
 	if err := store.CompleteWithOptions(options); err != nil {
 		panic(err) // TODO: Propagate error up
 	}
 
 	statusStore := *store
-	statusStore.UpdateStrategy = controller.StatusStrategy
+	statusStore.UpdateStrategy = replicationcontroller.StatusStrategy
 
 	return &REST{store}, &StatusREST{store: &statusStore}
 }
@@ -103,7 +103,7 @@ func (r *StatusREST) Update(ctx genericapirequest.Context, name string, objInfo 
 }
 
 type ScaleREST struct {
-	registry controller.Registry
+	registry replicationcontroller.Registry
 }
 
 // ScaleREST implements Patcher
