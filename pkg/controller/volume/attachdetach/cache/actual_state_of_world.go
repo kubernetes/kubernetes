@@ -452,25 +452,27 @@ func (asw *actualStateOfWorld) addVolumeToReportAsAttached(
 // needs to be updated again by the node status updater.
 // If the specifed node does not exist in the nodesToUpdateStatusFor list, log the error and return
 // This is an internal function and caller should acquire and release the lock
-func (asw *actualStateOfWorld) updateNodeStatusUpdateNeeded(nodeName types.NodeName, needed bool) {
+func (asw *actualStateOfWorld) updateNodeStatusUpdateNeeded(nodeName types.NodeName, needed bool) error {
 	nodeToUpdate, nodeToUpdateExists := asw.nodesToUpdateStatusFor[nodeName]
 	if !nodeToUpdateExists {
 		// should not happen
-		glog.Errorf(
+		return fmt.Errorf(
 			"Failed to set statusUpdateNeeded to needed %t because nodeName=%q  does not exist",
-			needed,
-			nodeName)
-		return
+			needed, nodeName)
 	}
 
 	nodeToUpdate.statusUpdateNeeded = needed
 	asw.nodesToUpdateStatusFor[nodeName] = nodeToUpdate
+
+	return nil
 }
 
 func (asw *actualStateOfWorld) SetNodeStatusUpdateNeeded(nodeName types.NodeName) {
 	asw.Lock()
 	defer asw.Unlock()
-	asw.updateNodeStatusUpdateNeeded(nodeName, true)
+	if err := asw.updateNodeStatusUpdateNeeded(nodeName, true); err != nil {
+		glog.Errorf("failed to update node status in actual world state: %v", err)
+	}
 }
 
 func (asw *actualStateOfWorld) DeleteVolumeNode(
@@ -589,7 +591,9 @@ func (asw *actualStateOfWorld) GetVolumesToReportAttached() map[types.NodeName][
 		// When GetVolumesToReportAttached is called by node status updater, the current status
 		// of this node will be updated, so set the flag statusUpdateNeeded to false indicating
 		// the current status is already updated.
-		asw.updateNodeStatusUpdateNeeded(nodeName, false)
+		if err := asw.updateNodeStatusUpdateNeeded(nodeName, false); err != nil {
+			glog.Errorf("failed to update node status when getting volumes: %v", err)
+		}
 	}
 
 	return volumesToReportAttached
