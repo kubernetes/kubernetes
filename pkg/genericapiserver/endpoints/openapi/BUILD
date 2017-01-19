@@ -12,8 +12,13 @@ go_library(
     srcs = ["openapi.go"],
     tags = ["automanaged"],
     deps = [
+        "//pkg/api:go_default_library",
         "//pkg/util:go_default_library",
         "//vendor:github.com/emicklei/go-restful",
+        "//vendor:github.com/go-openapi/spec",
+        "//vendor:k8s.io/apimachinery/pkg/openapi",
+        "//vendor:k8s.io/apimachinery/pkg/runtime",
+        "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
     ],
 )
 
