@@ -101,22 +101,36 @@ func TestClusterOperations(t *testing.T) {
 	federatedtypes.SetAnnotation(adapter, differingObj, "foo", "bar")
 
 	testCases := map[string]struct {
-		clusterObject pkgruntime.Object
-		expectedErr   bool
+		clusterObject   pkgruntime.Object
+		expectedErr     bool
+		expectedSendErr bool
+		sendToCluster   bool
+
 		operationType util.FederatedOperationType
 	}{
 		"Accessor error returned": {
 			expectedErr: true,
 		},
+		"sendToCluster error returned": {
+			expectedSendErr: true,
+		},
 		"Missing cluster object should result in add operation": {
 			operationType: util.OperationTypeAdd,
+			sendToCluster: true,
 		},
 		"Differing cluster object should result in update operation": {
 			clusterObject: differingObj,
 			operationType: util.OperationTypeUpdate,
+			sendToCluster: true,
+		},
+		"Matching object and not matching ClusterSelector should result in delete operation": {
+			clusterObject: obj,
+			operationType: util.OperationTypeDelete,
+			sendToCluster: false,
 		},
 		"Matching cluster object should not result in an operation": {
 			clusterObject: obj,
+			sendToCluster: true,
 		},
 	}
 	for testName, testCase := range testCases {
@@ -127,8 +141,13 @@ func TestClusterOperations(t *testing.T) {
 					return nil, false, awfulError
 				}
 				return testCase.clusterObject, (testCase.clusterObject != nil), nil
+			}, func(map[string]string, map[string]string) (bool, error) {
+				if testCase.expectedSendErr {
+					return false, awfulError
+				}
+				return testCase.sendToCluster, nil
 			})
-			if testCase.expectedErr {
+			if testCase.expectedErr || testCase.expectedSendErr {
 				require.Error(t, err, "An error was expected")
 			} else {
 				require.NoError(t, err, "An error was not expected")
