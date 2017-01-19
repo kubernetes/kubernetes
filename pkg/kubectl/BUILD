@@ -88,7 +88,6 @@ go_library(
         "//pkg/kubectl/resource:go_default_library",
         "//pkg/kubelet/qos:go_default_library",
         "//pkg/util:go_default_library",
-        "//pkg/util/integer:go_default_library",
         "//pkg/util/intstr:go_default_library",
         "//pkg/util/jsonpath:go_default_library",
         "//pkg/util/node:go_default_library",
@@ -112,6 +111,7 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/util/validation",
         "//vendor:k8s.io/apimachinery/pkg/util/wait",
         "//vendor:k8s.io/apimachinery/pkg/watch",
+        "//vendor:k8s.io/client-go/pkg/util/integer",
     ],
 )
 

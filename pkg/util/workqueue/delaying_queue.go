@@ -21,7 +21,7 @@ import (
 	"time"
 
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	"k8s.io/kubernetes/pkg/util/clock"
+	"k8s.io/client-go/pkg/util/clock"
 )
 
 // DelayingInterface is an Interface that can Add an item at a later time. This makes it easier to
