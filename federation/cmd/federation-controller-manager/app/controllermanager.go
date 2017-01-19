@@ -45,6 +45,7 @@ import (
 	servicecontroller "k8s.io/kubernetes/federation/pkg/federation-controller/service"
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util"
 	"k8s.io/kubernetes/pkg/util/configz"
+	utilflag "k8s.io/kubernetes/pkg/util/flag"
 	"k8s.io/kubernetes/pkg/version"
 
 	"github.com/golang/glog"
@@ -53,7 +54,6 @@ import (
 	"github.com/spf13/pflag"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/client/typed/discovery"
-	"k8s.io/kubernetes/pkg/util/config"
 )
 
 const (
@@ -222,7 +222,7 @@ func restClientConfigFromSecret(master string) (*restclient.Config, error) {
 	return restClientCfg, nil
 }
 
-func controllerEnabled(controllers config.ConfigurationMap, serverResources []*metav1.APIResourceList, controller string, requiredResources []schema.GroupVersionResource, defaultValue bool) bool {
+func controllerEnabled(controllers utilflag.ConfigurationMap, serverResources []*metav1.APIResourceList, controller string, requiredResources []schema.GroupVersionResource, defaultValue bool) bool {
 	controllerConfig, ok := controllers[controller]
 	if ok {
 		if controllerConfig == "false" {
