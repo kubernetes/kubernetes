@@ -38,7 +38,7 @@ spec:
         - proxy
         - --kubeconfig=/var/lib/kubelet/kubeconfig/kubeconfig.yaml
         - --v=2
-        - --resource-container=""
+        - --kubelet-cgroups=""
         securityContext:
           privileged: true
         volumeMounts:
