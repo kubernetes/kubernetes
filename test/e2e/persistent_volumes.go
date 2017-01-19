@@ -27,6 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"fmt"
 )
 
 // Validate PV/PVC, create and verify writer pod, delete the PVC, and validate the PV's
@@ -70,7 +71,7 @@ func completeMultiTest(f *framework.Framework, c clientset.Interface, ns string,
 		createWaitAndDeletePod(f, c, pvcKey.Namespace, pvcKey.Name)
 	}
 
-	// 2. delete each PVC, wait for its bound PV to become "Released"
+	// 2. delete each PVC, wait for its bound PV to reach `expectedPhase`
 	By("Deleting PVCs to invoke recycler")
 	deletePVCandValidatePVGroup(c, ns, pvols, claims, expectPhase)
 }
@@ -246,12 +247,14 @@ var _ = framework.KubeDescribe("PersistentVolumes [Volume][Serial]", func() {
 			})
 		})
 
-		// TODO note wait times involved w/ this context
-		Context("when invoking the Recycle reclaim policy [Jon]", func(){
+		// This Context isolates and tests the "Recycle" reclaim behavior.  On deprecation of the
+		// Recycler, this entire context can be removed without affecting the test suite or leaving behind
+		// dead code.
+		Context("when invoking the Recycle reclaim policy", func() {
 			var pv *v1.PersistentVolume
 			var pvc *v1.PersistentVolumeClaim
 
-			BeforeEach(func(){
+			BeforeEach(func() {
 				pvConfig.reclaimPolicy = v1.PersistentVolumeReclaimRecycle
 				pv, pvc = createPVPVC(c, pvConfig, ns, false)
 				waitOnPVandPVC(c, ns, pv, pvc)
@@ -262,7 +265,11 @@ var _ = framework.KubeDescribe("PersistentVolumes [Volume][Serial]", func() {
 				pvPvcCleanup(c, ns, pv, pvc)
 			})
 
-			It("should test that a PV becomes Available after the PVC is deleted.", func() {
+			// This It() tests a scenario where a PV is written to by a Pod, recycled, then the volume checked
+			// for files. If files are found, the checking Pod fails, failing the test.  Otherwise, the pod
+			// (and test) succeed.
+			It("should test that a PV becomes Available and is clean after the PVC is deleted. [Jon][Volume][Serial][Flaky]", func() {
+				By("Writing to the volume.")
 				pod := makeWritePod(ns, pvc.Name)
 				pod, err := c.Core().Pods(ns).Create(pod)
 				Expect(err).NotTo(HaveOccurred())
@@ -270,17 +277,21 @@ var _ = framework.KubeDescribe("PersistentVolumes [Volume][Serial]", func() {
 
 				deletePVCandValidatePV(c, ns, pvc, pv, v1.VolumeAvailable)
 
+				By("Re-mounting the volume.")
 				pvc = makePersistentVolumeClaim(ns)
 				pvc = createPVC(c, ns, pvc)
 				err = framework.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, c, ns, pvc.Name, 2*time.Second, 60*time.Second)
 
-				pod = makePod(ns, pvc.Name, "[ $(ls -A /mnt | wc -l) -eq 0 ] && exit 0 || exit 1")
-				// If a file is detected in /mnt, cause the pod to fail and do not restart it.
+				// If a file is detected in /mnt, fail the pod and do not restart it.
+				By("Verifying the mount has been cleaned.")
+				mount := pod.Spec.Containers[0].VolumeMounts[0].MountPath
+				pod = makePod(ns, pvc.Name, fmt.Sprintf("[ $(ls -A %s | wc -l) -eq 0 ] && exit 0 || exit 1", mount))
 				pod.Spec.RestartPolicy = v1.RestartPolicyNever
 				pod, err = c.Core().Pods(ns).Create(pod)
 				Expect(err).NotTo(HaveOccurred())
 				err = framework.WaitForPodSuccessInNamespace(c, pod.Name, ns)
 				Expect(err).NotTo(HaveOccurred())
+				framework.Logf("Pod exited without failure; the volume has been recycled.")
 			})
 		})
 	})
