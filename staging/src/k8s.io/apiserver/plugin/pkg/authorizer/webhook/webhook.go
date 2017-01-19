@@ -32,7 +32,6 @@ import (
 	"k8s.io/apiserver/pkg/util/webhook"
 
 	_ "k8s.io/client-go/pkg/apis/authorization/install"
-	_ "k8s.io/kubernetes/pkg/apis/authorization/install"
 )
 
 var (

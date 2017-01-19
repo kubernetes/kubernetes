@@ -22,7 +22,7 @@ import (
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	authorizationclient "k8s.io/client-go/kubernetes/typed/authorization/v1beta1"
 
-	webhooksar "k8s.io/kubernetes/plugin/pkg/auth/authorizer/webhook"
+	"k8s.io/apiserver/plugin/pkg/authorizer/webhook"
 )
 
 // DelegatingAuthorizerConfig is the minimal configuration needed to create an authenticator
@@ -39,7 +39,7 @@ type DelegatingAuthorizerConfig struct {
 }
 
 func (c DelegatingAuthorizerConfig) New() (authorizer.Authorizer, error) {
-	return webhooksar.NewFromInterface(
+	return webhook.NewFromInterface(
 		c.SubjectAccessReviewClient,
 		c.AllowCacheTTL,
 		c.DenyCacheTTL,

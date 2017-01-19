@@ -956,7 +956,7 @@ k8s.io/kubernetes/plugin/pkg/admission/serviceaccount,liggitt,0
 k8s.io/kubernetes/plugin/pkg/admission/storageclass/default,pmorie,1
 k8s.io/kubernetes/plugin/pkg/auth/authorizer/rbac,rrati,0
 k8s.io/kubernetes/plugin/pkg/auth/authorizer/rbac/bootstrappolicy,mml,1
-k8s.io/kubernetes/plugin/pkg/auth/authorizer/webhook,rrati,0
+k8s.io/apiserver/plugin/pkg/authorizer/webhook,rrati,0
 k8s.io/kubernetes/plugin/pkg/client/auth/gcp,jlowdermilk,0
 k8s.io/kubernetes/plugin/pkg/client/auth/oidc,cjcullen,1
 k8s.io/kubernetes/plugin/pkg/scheduler,fgrzadkowski,0
