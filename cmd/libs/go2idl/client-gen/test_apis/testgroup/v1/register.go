@@ -38,7 +38,6 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 	)
 
 	scheme.AddKnownTypes(SchemeGroupVersion,
-		&v1.ListOptions{},
 		&v1.DeleteOptions{},
 		&metav1.Status{},
 		&metav1.ExportOptions{},
