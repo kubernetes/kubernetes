@@ -21,10 +21,10 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	genericapirequest "k8s.io/apiserver/pkg/request"
+	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/registry/generic"
+	"k8s.io/kubernetes/pkg/genericapiserver/registry/generic"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
 	etcdtesting "k8s.io/kubernetes/pkg/storage/etcd/testing"
 )

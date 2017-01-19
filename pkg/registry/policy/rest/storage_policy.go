@@ -19,9 +19,9 @@ package rest
 import (
 	"k8s.io/kubernetes/pkg/apis/policy"
 	policyapiv1beta1 "k8s.io/kubernetes/pkg/apis/policy/v1beta1"
-	"k8s.io/kubernetes/pkg/genericapiserver"
-	"k8s.io/kubernetes/pkg/genericapiserver/api/rest"
-	"k8s.io/kubernetes/pkg/registry/generic"
+	"k8s.io/kubernetes/pkg/genericapiserver/registry/generic"
+	"k8s.io/kubernetes/pkg/genericapiserver/registry/rest"
+	genericapiserver "k8s.io/kubernetes/pkg/genericapiserver/server"
 	poddisruptionbudgetstore "k8s.io/kubernetes/pkg/registry/policy/poddisruptionbudget/storage"
 )
 

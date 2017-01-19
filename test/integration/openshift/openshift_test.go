@@ -19,7 +19,7 @@ package openshift
 import (
 	"testing"
 
-	"k8s.io/kubernetes/pkg/genericapiserver"
+	genericapiserver "k8s.io/kubernetes/pkg/genericapiserver/server"
 	"k8s.io/kubernetes/pkg/master"
 )
 

@@ -16,7 +16,7 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/util/runtime",
         "//vendor:k8s.io/apiserver/pkg/authentication/user",
         "//vendor:k8s.io/apiserver/pkg/authorization/authorizer",
-        "//vendor:k8s.io/apiserver/pkg/request",
+        "//vendor:k8s.io/apiserver/pkg/endpoints/request",
     ],
 )
 

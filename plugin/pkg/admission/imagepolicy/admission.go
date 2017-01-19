@@ -34,7 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/util/cache"
-	"k8s.io/apiserver/pkg/webhook"
+	"k8s.io/apiserver/pkg/util/webhook"
 	"k8s.io/client-go/pkg/apis/imagepolicy/v1alpha1"
 	"k8s.io/client-go/rest"
 

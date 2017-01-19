@@ -25,14 +25,14 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
-	genericapirequest "k8s.io/apiserver/pkg/request"
+	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	"k8s.io/kubernetes/pkg/apis/autoscaling/validation"
-	"k8s.io/kubernetes/pkg/genericapiserver/api/rest"
+	"k8s.io/kubernetes/pkg/genericapiserver/registry/generic"
+	genericregistry "k8s.io/kubernetes/pkg/genericapiserver/registry/generic/registry"
+	"k8s.io/kubernetes/pkg/genericapiserver/registry/rest"
 	"k8s.io/kubernetes/pkg/registry/core/controller"
-	"k8s.io/kubernetes/pkg/registry/generic"
-	genericregistry "k8s.io/kubernetes/pkg/registry/generic/registry"
 )
 
 // ControllerStorage includes dummy storage for Replication Controllers and for Scale subresource.

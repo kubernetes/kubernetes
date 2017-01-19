@@ -21,11 +21,11 @@ import (
 	"k8s.io/kubernetes/pkg/apis/batch"
 	batchapiv1 "k8s.io/kubernetes/pkg/apis/batch/v1"
 	batchapiv2alpha1 "k8s.io/kubernetes/pkg/apis/batch/v2alpha1"
-	"k8s.io/kubernetes/pkg/genericapiserver"
-	"k8s.io/kubernetes/pkg/genericapiserver/api/rest"
+	"k8s.io/kubernetes/pkg/genericapiserver/registry/generic"
+	"k8s.io/kubernetes/pkg/genericapiserver/registry/rest"
+	genericapiserver "k8s.io/kubernetes/pkg/genericapiserver/server"
 	cronjobstore "k8s.io/kubernetes/pkg/registry/batch/cronjob/storage"
 	jobstore "k8s.io/kubernetes/pkg/registry/batch/job/storage"
-	"k8s.io/kubernetes/pkg/registry/generic"
 )
 
 type RESTStorageProvider struct{}

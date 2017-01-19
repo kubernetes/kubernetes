@@ -20,7 +20,7 @@ package options
 import (
 	"time"
 
-	genericoptions "k8s.io/kubernetes/pkg/genericapiserver/options"
+	genericoptions "k8s.io/kubernetes/pkg/genericapiserver/server/options"
 	kubeoptions "k8s.io/kubernetes/pkg/kubeapiserver/options"
 
 	"github.com/spf13/pflag"

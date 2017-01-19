@@ -12,7 +12,7 @@ go_test(
     srcs = ["openshift_test.go"],
     tags = ["automanaged"],
     deps = [
-        "//pkg/genericapiserver:go_default_library",
+        "//pkg/genericapiserver/server:go_default_library",
         "//pkg/master:go_default_library",
     ],
 )

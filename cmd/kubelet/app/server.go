@@ -36,7 +36,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
-	"k8s.io/apiserver/pkg/healthz"
+	"k8s.io/apiserver/pkg/server/healthz"
 	clientgoclientset "k8s.io/client-go/kubernetes"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
