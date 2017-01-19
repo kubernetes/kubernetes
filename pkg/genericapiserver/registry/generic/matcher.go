@@ -18,7 +18,7 @@ package generic
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/fields"
+	"k8s.io/apimachinery/pkg/fields"
 )
 
 // ObjectMetaFieldsSet returns a fields that represent the ObjectMeta.

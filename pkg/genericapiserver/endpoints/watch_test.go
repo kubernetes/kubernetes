@@ -31,6 +31,7 @@ import (
 
 	"golang.org/x/net/websocket"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer/streaming"
@@ -38,7 +39,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/genericapiserver/endpoints/handlers"
 	apitesting "k8s.io/kubernetes/pkg/genericapiserver/endpoints/testing"
 	"k8s.io/kubernetes/pkg/genericapiserver/registry/rest"

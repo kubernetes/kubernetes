@@ -28,7 +28,6 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//pkg/api/resource:go_default_library",
-        "//pkg/fields:go_default_library",
         "//pkg/util/intstr:go_default_library",
         "//pkg/util/labels:go_default_library",
         "//vendor:github.com/davecgh/go-spew/spew",
@@ -36,6 +35,7 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/apimachinery/registered",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/conversion",
+        "//vendor:k8s.io/apimachinery/pkg/fields",
         "//vendor:k8s.io/apimachinery/pkg/labels",
         "//vendor:k8s.io/apimachinery/pkg/runtime",
         "//vendor:k8s.io/apimachinery/pkg/runtime/schema",

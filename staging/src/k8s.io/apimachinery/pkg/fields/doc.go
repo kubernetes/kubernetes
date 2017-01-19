@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,24 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package core
-
-import (
-	"k8s.io/apimachinery/pkg/fields"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/kubernetes/pkg/api"
-)
-
-func addDefaultingFuncs(scheme *runtime.Scheme) error {
-	return scheme.AddDefaultingFuncs(
-		func(obj *api.ListOptions) {
-			if obj.LabelSelector == nil {
-				obj.LabelSelector = labels.Everything()
-			}
-			if obj.FieldSelector == nil {
-				obj.FieldSelector = fields.Everything()
-			}
-		},
-	)
-}
+// Package fields implements a simple field system, parsing and matching
+// selectors with sets of fields.
+package fields // import "k8s.io/apimachinery/pkg/fields"
