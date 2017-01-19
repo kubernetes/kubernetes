@@ -58,10 +58,6 @@ type LimitRangeNamespaceListerExpansion interface{}
 // NamespaceLister.
 type NamespaceListerExpansion interface{}
 
-// NodeListerExpansion allows custom methods to be added to
-// NodeLister.
-type NodeListerExpansion interface{}
-
 // PersistentVolumeListerExpansion allows custom methods to be added to
 // PersistentVolumeLister.
 type PersistentVolumeListerExpansion interface{}
@@ -90,14 +86,6 @@ type PodTemplateListerExpansion interface{}
 // PodTemplateNamespaeLister.
 type PodTemplateNamespaceListerExpansion interface{}
 
-// ReplicationControllerListerExpansion allows custom methods to be added to
-// ReplicationControllerLister.
-type ReplicationControllerListerExpansion interface{}
-
-// ReplicationControllerNamespaceListerExpansion allows custom methods to be added to
-// ReplicationControllerNamespaeLister.
-type ReplicationControllerNamespaceListerExpansion interface{}
-
 // ResourceQuotaListerExpansion allows custom methods to be added to
 // ResourceQuotaLister.
 type ResourceQuotaListerExpansion interface{}
@@ -113,14 +101,6 @@ type SecretListerExpansion interface{}
 // SecretNamespaceListerExpansion allows custom methods to be added to
 // SecretNamespaeLister.
 type SecretNamespaceListerExpansion interface{}
-
-// ServiceListerExpansion allows custom methods to be added to
-// ServiceLister.
-type ServiceListerExpansion interface{}
-
-// ServiceNamespaceListerExpansion allows custom methods to be added to
-// ServiceNamespaeLister.
-type ServiceNamespaceListerExpansion interface{}
 
 // ServiceAccountListerExpansion allows custom methods to be added to
 // ServiceAccountLister.
