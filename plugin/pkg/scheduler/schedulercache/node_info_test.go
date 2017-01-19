@@ -1,19 +1,3 @@
-/*
-Copyright 2015 The Kubernetes Authors.
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-*/
-
 package schedulercache
 
 import (
@@ -69,13 +53,13 @@ func makenodeinfo(node *v1.Node, nodetaints []v1.Taint) NodeInfo {
 		allocatableResource:     &Resource{},
 	}
 }
-func makepod(podname string, podaffnity *v1.Affinity) *v1.Pod {
+func makepod(podname, nodename string, podaffnity *v1.Affinity) *v1.Pod {
 	return &v1.Pod{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Pod",
 			APIVersion: "v1",
 		},
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      podname,
 			Namespace: "default",
 			Labels: map[string]string{
@@ -83,14 +67,12 @@ func makepod(podname string, podaffnity *v1.Affinity) *v1.Pod {
 			},
 		},
 		Spec: v1.PodSpec{
+			NodeName: nodename,
 			Affinity: podaffnity,
 			Containers: []v1.Container{
 				v1.Container{
 					Name:  "testname",
 					Image: "testimage",
-					Resources: v1.ResourceRequirements{
-						Requests: v1.ResourceList{},
-					},
 				},
 			},
 		},
@@ -103,7 +85,7 @@ func makenode(nodename string, nodelables map[string]string) *v1.Node {
 			Kind:       "Node",
 			APIVersion: "v1",
 		},
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      nodename,
 			Namespace: "",
 			Labels:    nodelables,
@@ -125,7 +107,7 @@ func TestNode(t *testing.T) {
 func TestPod(t *testing.T) {
 	node := makenode("test", nodelabels)
 	nodeinfo := makenodeinfo(node, taints)
-	pod := makepod("foo", &v1.Affinity{})
+	pod := makepod("foo", "", &v1.Affinity{})
 	pods := []*v1.Pod{pod}
 	nodeinfo.pods = pods
 	if !reflect.DeepEqual(nodeinfo.Pods(), pods) {
@@ -136,8 +118,8 @@ func TestPod(t *testing.T) {
 func TestPodsWithAffinity(t *testing.T) {
 	node := makenode("test", nodelabels)
 	nodeinfo := makenodeinfo(node, taints)
-	podwithoutaffinity := makepod("foo", &v1.Affinity{})
-	podwithaffinity := makepod("foo", &affnity)
+	podwithoutaffinity := makepod("foo", "", &v1.Affinity{})
+	podwithaffinity := makepod("foo", "", &affnity)
 	nodeinfo.addPod(podwithaffinity)
 	nodeinfo.addPod(podwithoutaffinity)
 	if !reflect.DeepEqual(nodeinfo.PodsWithAffinity(), []*v1.Pod{podwithaffinity}) {
@@ -210,8 +192,8 @@ func TestClone(t *testing.T) {
 }
 
 func TesthasPodAffinityConstraints(t *testing.T) {
-	podwithaffinity := makepod("foo", &affnity)
-	podwithoutaffinity := makepod("foo", &v1.Affinity{})
+	podwithaffinity := makepod("foo", "", &affnity)
+	podwithoutaffinity := makepod("foo", "", &v1.Affinity{})
 	if !reflect.DeepEqual(hasPodAffinityConstraints(podwithaffinity), true) {
 		t.Fatalf("nodeinfo check pod has podaffinityconstraints error,expected: %v,got: %v", true, hasPodAffinityConstraints(podwithaffinity))
 	}
@@ -223,8 +205,8 @@ func TesthasPodAffinityConstraints(t *testing.T) {
 func TestaddPod(t *testing.T) {
 	node := makenode("test", nodelabels)
 	nodeinfo := makenodeinfo(node, taints)
-	podwithaffinity := makepod("foo", &affnity)
-	podwithoutaffinity := makepod("foo", &v1.Affinity{})
+	podwithaffinity := makepod("foo", "", &affnity)
+	podwithoutaffinity := makepod("foo", "", &v1.Affinity{})
 	nodeinfo.addPod(podwithaffinity)
 	nodeinfo.addPod(podwithoutaffinity)
 	if !reflect.DeepEqual(nodeinfo.podsWithAffinity, []*v1.Pod{podwithaffinity}) {
@@ -239,8 +221,8 @@ func TestaddPod(t *testing.T) {
 func TestremovePod(t *testing.T) {
 	node := makenode("test", nodelabels)
 	nodeinfo := makenodeinfo(node, taints)
-	podwithaffinity := makepod("foo", &affnity)
-	podwithoutaffinity := makepod("foo", &v1.Affinity{})
+	podwithaffinity := makepod("foo", "", &affnity)
+	podwithoutaffinity := makepod("foo", "", &v1.Affinity{})
 	nodeinfo.addPod(podwithaffinity)
 	nodeinfo.addPod(podwithoutaffinity)
 	err := nodeinfo.removePod(podwithaffinity)
