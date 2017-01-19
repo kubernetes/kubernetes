@@ -78,6 +78,10 @@ func (f *fakeRuntimeHelper) GetExtraSupplementalGroupsForPod(pod *v1.Pod) []int6
 	return nil
 }
 
+func (f *fakeRuntimeHelper) IsExperimentalUserNsEnabled() bool {
+	return false
+}
+
 type fakePodGetter struct {
 	pods map[types.UID]*v1.Pod
 }

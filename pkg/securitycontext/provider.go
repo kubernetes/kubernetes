@@ -51,7 +51,7 @@ func (p SimpleSecurityContextProvider) ModifyContainerConfig(pod *v1.Pod, contai
 // ModifyHostConfig is called before the Docker runContainer call. The
 // security context provider can make changes to the HostConfig, affecting
 // security options, whether the container is privileged, volume binds, etc.
-func (p SimpleSecurityContextProvider) ModifyHostConfig(pod *v1.Pod, container *v1.Container, hostConfig *dockercontainer.HostConfig, supplementalGids []int64) {
+func (p SimpleSecurityContextProvider) ModifyHostConfig(pod *v1.Pod, container *v1.Container, hostConfig *dockercontainer.HostConfig, supplementalGids []int64, isRemap bool) {
 	// Apply supplemental groups
 	if container.Name != leaky.PodInfraContainerName {
 		// TODO: We skip application of supplemental groups to the
@@ -65,7 +65,9 @@ func (p SimpleSecurityContextProvider) ModifyHostConfig(pod *v1.Pod, container *
 			for _, group := range pod.Spec.SecurityContext.SupplementalGroups {
 				hostConfig.GroupAdd = append(hostConfig.GroupAdd, strconv.Itoa(int(group)))
 			}
-			if pod.Spec.SecurityContext.FSGroup != nil {
+			// only add the FSGroup to the config if we are not in a remap environment.  For remap environments
+			// is is assumed that the root user is remapped to the FSGroup on the host.
+			if pod.Spec.SecurityContext.FSGroup != nil && !isRemap {
 				hostConfig.GroupAdd = append(hostConfig.GroupAdd, strconv.Itoa(int(*pod.Spec.SecurityContext.FSGroup)))
 			}
 		}

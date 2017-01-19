@@ -39,14 +39,16 @@ const (
 // fsGroup, and sets SetGid so that newly created files are owned by
 // fsGroup. If fsGroup is nil nothing is done.
 func SetVolumeOwnership(mounter Mounter, fsGroup *int64) error {
-
 	if fsGroup == nil {
 		return nil
 	}
+	return SetOwnershipForPath(mounter.GetPath(), mounter.GetAttributes().ReadOnly, int(*fsGroup))
+}
 
+func SetOwnershipForPath(path string, readOnly bool, gid int) error {
 	chownRunner := chown.New()
 	chmodRunner := chmod.New()
-	return filepath.Walk(mounter.GetPath(), func(path string, info os.FileInfo, err error) error {
+	return filepath.Walk(path, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
@@ -72,13 +74,13 @@ func SetVolumeOwnership(mounter Mounter, fsGroup *int64) error {
 			return nil
 		}
 
-		err = chownRunner.Chown(path, int(stat.Uid), int(*fsGroup))
+		err = chownRunner.Chown(path, int(stat.Uid), gid)
 		if err != nil {
 			glog.Errorf("Chown failed on %v: %v", path, err)
 		}
 
 		mask := rwMask
-		if mounter.GetAttributes().ReadOnly {
+		if readOnly {
 			mask = roMask
 		}
 
