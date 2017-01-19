@@ -101,6 +101,12 @@ func (o *openAPI) init(webServices []*restful.WebService) error {
 		o.swagger.SecurityDefinitions = *o.config.SecurityDefinitions
 		o.swagger.Security = o.config.DefaultSecurity
 	}
+	if o.config.PostProcessSpec != nil {
+		o.swagger, err = o.config.PostProcessSpec(o.swagger)
+		if err != nil {
+			return err
+		}
+	}
 	return nil
 }
 

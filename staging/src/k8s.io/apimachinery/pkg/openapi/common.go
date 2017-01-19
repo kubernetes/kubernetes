@@ -71,6 +71,9 @@ type Config struct {
 	// It is an optional function to customize model names.
 	GetDefinitionName func(servePath string, name string) (string, []string)
 
+	// PostProcessSpec runs after the spec is ready to serve. It allows a final modification to the spec before serving.
+	PostProcessSpec func(*spec.Swagger) (*spec.Swagger, error)
+
 	// SecurityDefinitions is list of all security definitions for OpenAPI service. If this is not nil, the user of config
 	// is responsible to provide DefaultSecurity and (maybe) add unauthorized response to CommonResponses.
 	SecurityDefinitions *spec.SecurityDefinitions
