@@ -19,10 +19,10 @@ package node
 import (
 	"testing"
 
+	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/kubernetes/pkg/api"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
-	"k8s.io/kubernetes/pkg/fields"
 )
 
 func TestMatchNode(t *testing.T) {

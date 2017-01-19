@@ -180,6 +180,7 @@ pkg/controller/volume/statusupdater
 pkg/conversion
 pkg/conversion/queryparams
 pkg/credentialprovider/aws
+pkg/fields
 pkg/genericapiserver
 pkg/genericapiserver/endpoints/audit
 pkg/genericapiserver/endpoints/handlers/responsewriters
