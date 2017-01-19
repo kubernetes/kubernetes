@@ -24,12 +24,12 @@ import (
 	"os"
 
 	"k8s.io/apimachinery/pkg/runtime"
+	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	fedclient "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset"
 	"k8s.io/kubernetes/federation/pkg/kubefed/util"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
-	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 )
 

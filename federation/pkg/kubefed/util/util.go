@@ -18,11 +18,11 @@ package util
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	fedclient "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset"
 	"k8s.io/kubernetes/pkg/api"
 	client "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
-	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
 	kubectlcmd "k8s.io/kubernetes/pkg/kubectl/cmd"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 

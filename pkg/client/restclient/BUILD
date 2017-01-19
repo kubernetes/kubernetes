@@ -27,7 +27,6 @@ go_library(
         "//pkg/api/validation/path:go_default_library",
         "//pkg/client/metrics:go_default_library",
         "//pkg/client/restclient/watch:go_default_library",
-        "//pkg/client/unversioned/clientcmd/api:go_default_library",
         "//pkg/fields:go_default_library",
         "//pkg/util/cert:go_default_library",
         "//pkg/util/flowcontrol:go_default_library",
@@ -43,6 +42,7 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/util/net",
         "//vendor:k8s.io/apimachinery/pkg/util/sets",
         "//vendor:k8s.io/apimachinery/pkg/watch",
+        "//vendor:k8s.io/client-go/tools/clientcmd/api",
         "//vendor:k8s.io/client-go/transport",
     ],
 )
@@ -64,7 +64,6 @@ go_test(
         "//pkg/api/testapi:go_default_library",
         "//pkg/api/v1:go_default_library",
         "//pkg/client/restclient/watch:go_default_library",
-        "//pkg/client/unversioned/clientcmd/api:go_default_library",
         "//pkg/util/clock:go_default_library",
         "//pkg/util/flowcontrol:go_default_library",
         "//pkg/util/httpstream:go_default_library",
@@ -80,6 +79,7 @@ go_test(
         "//vendor:k8s.io/apimachinery/pkg/types",
         "//vendor:k8s.io/apimachinery/pkg/util/diff",
         "//vendor:k8s.io/apimachinery/pkg/watch",
+        "//vendor:k8s.io/client-go/tools/clientcmd/api",
     ],
 )
 

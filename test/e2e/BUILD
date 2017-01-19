@@ -136,7 +136,6 @@ go_library(
         "//pkg/client/clientset_generated/internalclientset:go_default_library",
         "//pkg/client/restclient:go_default_library",
         "//pkg/client/unversioned/clientcmd:go_default_library",
-        "//pkg/client/unversioned/clientcmd/api:go_default_library",
         "//pkg/cloudprovider:go_default_library",
         "//pkg/cloudprovider/providers/aws:go_default_library",
         "//pkg/cloudprovider/providers/gce:go_default_library",
@@ -212,6 +211,7 @@ go_library(
         "//vendor:k8s.io/client-go/pkg/apis/extensions/v1beta1",
         "//vendor:k8s.io/client-go/pkg/apis/policy/v1beta1",
         "//vendor:k8s.io/client-go/pkg/util/intstr",
+        "//vendor:k8s.io/client-go/tools/clientcmd/api",
         "//vendor:k8s.io/client-go/transport",
     ],
 )

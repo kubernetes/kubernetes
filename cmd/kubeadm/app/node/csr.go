@@ -21,9 +21,9 @@ import (
 	"os"
 
 	"k8s.io/apimachinery/pkg/types"
+	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
-	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
 	"k8s.io/kubernetes/pkg/kubelet/util/csr"
 	certutil "k8s.io/kubernetes/pkg/util/cert"
 )
