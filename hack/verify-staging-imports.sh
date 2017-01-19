@@ -31,4 +31,9 @@ for dep in $(ls -1 ${KUBE_ROOT}/staging/src/k8s.io/); do
 	fi
 done
 
+if grep -rq '// import "k8s.io/kubernetes/' 'staging/'; then
+	echo 'file has "// import "k8s.io/kubernetes/"'
+	exit 1
+fi
+
 exit 0
