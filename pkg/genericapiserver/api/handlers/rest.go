@@ -45,7 +45,6 @@ import (
 	"k8s.io/kubernetes/pkg/util/strategicpatch"
 
 	"github.com/emicklei/go-restful"
-	"github.com/evanphx/json-patch"
 	"github.com/golang/glog"
 )
 
@@ -556,6 +555,8 @@ func patchResource(
 	var (
 		originalObjJS        []byte
 		originalPatchedObjJS []byte
+		originalObjMap       map[string]interface{}
+		originalPatchMap     map[string]interface{}
 		lastConflictErr      error
 	)
 
@@ -570,25 +571,30 @@ func patchResource(
 		}
 
 		switch {
-		case len(originalObjJS) == 0 || len(originalPatchedObjJS) == 0:
+		case originalObjJS == nil && originalObjMap == nil:
 			// first time through,
 			// 1. apply the patch
-			// 2. save the originalJS and patchedJS to detect whether there were conflicting changes on retries
-			if js, err := runtime.Encode(codec, currentObject); err != nil {
-				return nil, err
-			} else {
-				originalObjJS = js
-			}
-
-			if js, err := getPatchedJS(patchType, originalObjJS, patchJS, versionedObj); err != nil {
-				return nil, err
-			} else {
-				originalPatchedObjJS = js
-			}
+			// 2. save the original and patched to detect whether there were conflicting changes on retries
 
 			objToUpdate := patcher.New()
-			if err := runtime.DecodeInto(codec, originalPatchedObjJS, objToUpdate); err != nil {
-				return nil, err
+
+			// For performance reasons, in case of strategicpatch, we avoid json
+			// marshaling and unmarshaling and operate just on map[string]interface{}.
+			// In case of other patch types, we still have to operate on JSON
+			// representations.
+			switch patchType {
+			case types.JSONPatchType, types.MergePatchType:
+				originalJS, patchedJS, err := patchObjectJSON(patchType, codec, currentObject, patchJS, objToUpdate, versionedObj)
+				if err != nil {
+					return nil, err
+				}
+				originalObjJS, originalPatchedObjJS = originalJS, patchedJS
+			case types.StrategicMergePatchType:
+				originalMap, patchMap, err := strategicPatchObject(codec, currentObject, patchJS, objToUpdate, versionedObj)
+				if err != nil {
+					return nil, err
+				}
+				originalObjMap, originalPatchMap = originalMap, patchMap
 			}
 			if err := checkName(objToUpdate, name, namespace, namer); err != nil {
 				return nil, err
@@ -603,33 +609,62 @@ func patchResource(
 			// 2. build a strategic merge patch from originalJS and the currentJS
 			// 3. ensure no conflicts between the two patches
 			// 4. apply the #1 patch to the currentJS object
-			currentObjectJS, err := runtime.Encode(codec, currentObject)
+
+			// TODO: This should be one-step conversion that doesn't require
+			// json marshaling and unmarshaling once #39017 is fixed.
+			data, err := runtime.Encode(codec, currentObject)
 			if err != nil {
 				return nil, err
 			}
-			currentPatch, err := strategicpatch.CreateStrategicMergePatch(originalObjJS, currentObjectJS, versionedObj)
-			if err != nil {
-				return nil, err
-			}
-			originalPatch, err := strategicpatch.CreateStrategicMergePatch(originalObjJS, originalPatchedObjJS, versionedObj)
-			if err != nil {
+			currentObjMap := make(map[string]interface{})
+			if err := json.Unmarshal(data, &currentObjMap); err != nil {
 				return nil, err
 			}
 
-			diff1 := make(map[string]interface{})
-			if err := json.Unmarshal(originalPatch, &diff1); err != nil {
-				return nil, err
+			var currentPatchMap map[string]interface{}
+			if originalObjMap != nil {
+				var err error
+				currentPatchMap, err = strategicpatch.CreateTwoWayMergeMapPatch(originalObjMap, currentObjMap, versionedObj)
+				if err != nil {
+					return nil, err
+				}
+			} else {
+				if originalPatchMap == nil {
+					// Compute original patch, if we already didn't do this in previous retries.
+					originalPatch, err := strategicpatch.CreateTwoWayMergePatch(originalObjJS, originalPatchedObjJS, versionedObj)
+					if err != nil {
+						return nil, err
+					}
+					originalPatchMap = make(map[string]interface{})
+					if err := json.Unmarshal(originalPatch, &originalPatchMap); err != nil {
+						return nil, err
+					}
+				}
+				// Compute current patch.
+				currentObjJS, err := runtime.Encode(codec, currentObject)
+				if err != nil {
+					return nil, err
+				}
+				currentPatch, err := strategicpatch.CreateTwoWayMergePatch(originalObjJS, currentObjJS, versionedObj)
+				if err != nil {
+					return nil, err
+				}
+				currentPatchMap = make(map[string]interface{})
+				if err := json.Unmarshal(currentPatch, &currentPatchMap); err != nil {
+					return nil, err
+				}
 			}
-			diff2 := make(map[string]interface{})
-			if err := json.Unmarshal(currentPatch, &diff2); err != nil {
-				return nil, err
-			}
-			hasConflicts, err := strategicpatch.HasConflicts(diff1, diff2)
+
+			hasConflicts, err := strategicpatch.HasConflicts(originalPatchMap, currentPatchMap)
 			if err != nil {
 				return nil, err
 			}
 			if hasConflicts {
-				glog.V(4).Infof("patchResource failed for resource %s, because there is a meaningful conflict.\n diff1=%v\n, diff2=%v\n", name, diff1, diff2)
+				if glog.V(4) {
+					diff1, _ := json.Marshal(currentPatchMap)
+					diff2, _ := json.Marshal(originalPatchMap)
+					glog.Infof("patchResource failed for resource %s, because there is a meaningful conflict.\n diff1=%v\n, diff2=%v\n", name, diff1, diff2)
+				}
 				// Return the last conflict error we got if we have one
 				if lastConflictErr != nil {
 					return nil, lastConflictErr
@@ -638,14 +673,11 @@ func patchResource(
 				return nil, errors.NewConflict(resource.GroupResource(), name, nil)
 			}
 
-			newlyPatchedObjJS, err := getPatchedJS(types.StrategicMergePatchType, currentObjectJS, originalPatch, versionedObj)
-			if err != nil {
-				return nil, err
-			}
 			objToUpdate := patcher.New()
-			if err := runtime.DecodeInto(codec, newlyPatchedObjJS, objToUpdate); err != nil {
+			if err := applyPatchToObject(codec, currentObjMap, originalPatchMap, objToUpdate, versionedObj); err != nil {
 				return nil, err
 			}
+
 			return objToUpdate, nil
 		}
 	}
@@ -1077,24 +1109,6 @@ func setListSelfLink(obj runtime.Object, req *restful.Request, namer ScopeNamer)
 		return setSelfLink(obj, req, namer)
 	})
 	return count, err
-}
-
-func getPatchedJS(patchType types.PatchType, originalJS, patchJS []byte, obj runtime.Object) ([]byte, error) {
-	switch patchType {
-	case types.JSONPatchType:
-		patchObj, err := jsonpatch.DecodePatch(patchJS)
-		if err != nil {
-			return nil, err
-		}
-		return patchObj.Apply(originalJS)
-	case types.MergePatchType:
-		return jsonpatch.MergePatch(originalJS, patchJS)
-	case types.StrategicMergePatchType:
-		return strategicpatch.StrategicMergePatchData(originalJS, patchJS, obj)
-	default:
-		// only here as a safety net - go-restful filters content-type
-		return nil, fmt.Errorf("unknown Content-Type header for patch: %v", patchType)
-	}
 }
 
 func summarizeData(data []byte, maxLength int) string {

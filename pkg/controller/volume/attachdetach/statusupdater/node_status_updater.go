@@ -111,10 +111,10 @@ func (nsu *nodeStatusUpdater) UpdateNodeStatuses() error {
 		}
 
 		patchBytes, err :=
-			strategicpatch.CreateStrategicMergePatch(oldData, newData, node)
+			strategicpatch.CreateTwoWayMergePatch(oldData, newData, node)
 		if err != nil {
 			return fmt.Errorf(
-				"failed to CreateStrategicMergePatch for node %q. %v",
+				"failed to CreateTwoWayMergePatch for node %q. %v",
 				nodeName,
 				err)
 		}
