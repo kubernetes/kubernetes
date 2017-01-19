@@ -30,7 +30,6 @@ go_library(
         "//pkg/apis/extensions/v1beta1:go_default_library",
         "//pkg/client/clientset_generated/clientset:go_default_library",
         "//pkg/client/unversioned/clientcmd:go_default_library",
-        "//pkg/kubeapiserver/authorizer:go_default_library",
         "//pkg/kubectl/cmd/util:go_default_library",
         "//pkg/registry/core/service/ipallocator:go_default_library",
         "//pkg/util/cert:go_default_library",
