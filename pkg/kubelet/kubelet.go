@@ -83,9 +83,9 @@ import (
 	"k8s.io/kubernetes/pkg/security/apparmor"
 	"k8s.io/kubernetes/pkg/util/bandwidth"
 	"k8s.io/kubernetes/pkg/util/clock"
-	utilconfig "k8s.io/kubernetes/pkg/util/config"
 	utildbus "k8s.io/kubernetes/pkg/util/dbus"
 	utilexec "k8s.io/kubernetes/pkg/util/exec"
+	utilflag "k8s.io/kubernetes/pkg/util/flag"
 	"k8s.io/kubernetes/pkg/util/flowcontrol"
 	"k8s.io/kubernetes/pkg/util/integer"
 	kubeio "k8s.io/kubernetes/pkg/util/io"
@@ -465,7 +465,7 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 		makeIPTablesUtilChains:                  kubeCfg.MakeIPTablesUtilChains,
 		iptablesMasqueradeBit:                   int(kubeCfg.IPTablesMasqueradeBit),
 		iptablesDropBit:                         int(kubeCfg.IPTablesDropBit),
-		experimentalHostUserNamespaceDefaulting: utilconfig.DefaultFeatureGate.ExperimentalHostUserNamespaceDefaulting(),
+		experimentalHostUserNamespaceDefaulting: utilflag.DefaultFeatureGate.ExperimentalHostUserNamespaceDefaulting(),
 	}
 
 	if klet.experimentalHostUserNamespaceDefaulting {
@@ -2130,7 +2130,7 @@ func isSyncPodWorthy(event *pleg.PodLifecycleEvent) bool {
 
 // parseResourceList parses the given configuration map into an API
 // ResourceList or returns an error.
-func parseResourceList(m utilconfig.ConfigurationMap) (v1.ResourceList, error) {
+func parseResourceList(m utilflag.ConfigurationMap) (v1.ResourceList, error) {
 	rl := make(v1.ResourceList)
 	for k, v := range m {
 		switch v1.ResourceName(k) {
@@ -2154,7 +2154,7 @@ func parseResourceList(m utilconfig.ConfigurationMap) (v1.ResourceList, error) {
 // ParseReservation parses the given kubelet- and system- reservations
 // configuration maps into an internal Reservation instance or returns an
 // error.
-func ParseReservation(kubeReserved, systemReserved utilconfig.ConfigurationMap) (*kubetypes.Reservation, error) {
+func ParseReservation(kubeReserved, systemReserved utilflag.ConfigurationMap) (*kubetypes.Reservation, error) {
 	reservation := new(kubetypes.Reservation)
 	if rl, err := parseResourceList(kubeReserved); err != nil {
 		return nil, err

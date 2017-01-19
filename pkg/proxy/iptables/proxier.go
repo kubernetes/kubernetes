@@ -42,8 +42,8 @@ import (
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/proxy"
 	"k8s.io/kubernetes/pkg/proxy/healthcheck"
-	featuregate "k8s.io/kubernetes/pkg/util/config"
 	utilexec "k8s.io/kubernetes/pkg/util/exec"
+	utilflag "k8s.io/kubernetes/pkg/util/flag"
 	"k8s.io/kubernetes/pkg/util/flowcontrol"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
 	"k8s.io/kubernetes/pkg/util/slice"
@@ -154,7 +154,7 @@ type endpointsInfo struct {
 
 // returns a new serviceInfo struct
 func newServiceInfo(serviceName proxy.ServicePortName, port *api.ServicePort, service *api.Service) *serviceInfo {
-	onlyNodeLocalEndpoints := apiservice.NeedsHealthCheck(service) && featuregate.DefaultFeatureGate.ExternalTrafficLocalOnly() && (service.Spec.Type == api.ServiceTypeLoadBalancer || service.Spec.Type == api.ServiceTypeNodePort)
+	onlyNodeLocalEndpoints := apiservice.NeedsHealthCheck(service) && utilflag.DefaultFeatureGate.ExternalTrafficLocalOnly() && (service.Spec.Type == api.ServiceTypeLoadBalancer || service.Spec.Type == api.ServiceTypeNodePort)
 	info := &serviceInfo{
 		clusterIP: net.ParseIP(service.Spec.ClusterIP),
 		port:      int(port.Port),
@@ -606,7 +606,7 @@ func (proxier *Proxier) OnEndpointsUpdate(allEndpoints []api.Endpoints) {
 					var isLocalEndpoint bool
 					if addr.NodeName != nil {
 						isLocalEndpoint = *addr.NodeName == proxier.hostname
-						isLocalEndpoint = featuregate.DefaultFeatureGate.ExternalTrafficLocalOnly() && isLocalEndpoint
+						isLocalEndpoint = utilflag.DefaultFeatureGate.ExternalTrafficLocalOnly() && isLocalEndpoint
 					}
 					hostPortObject := hostPortInfo{
 						host:          addr.IP,

@@ -70,8 +70,8 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
 	"k8s.io/kubernetes/pkg/kubelet/server"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
-	utilconfig "k8s.io/kubernetes/pkg/util/config"
 	"k8s.io/kubernetes/pkg/util/configz"
+	utilflag "k8s.io/kubernetes/pkg/util/flag"
 	"k8s.io/kubernetes/pkg/util/flock"
 	kubeio "k8s.io/kubernetes/pkg/util/io"
 	"k8s.io/kubernetes/pkg/util/mount"
@@ -328,14 +328,14 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.KubeletDeps) (err error) {
 	}
 
 	// Set feature gates based on the value in KubeletConfiguration
-	err = utilconfig.DefaultFeatureGate.Set(s.KubeletConfiguration.FeatureGates)
+	err = utilflag.DefaultFeatureGate.Set(s.KubeletConfiguration.FeatureGates)
 	if err != nil {
 		return err
 	}
 
 	// Register current configuration with /configz endpoint
 	cfgz, cfgzErr := initConfigz(&s.KubeletConfiguration)
-	if utilconfig.DefaultFeatureGate.DynamicKubeletConfig() {
+	if utilflag.DefaultFeatureGate.DynamicKubeletConfig() {
 		// Look for config on the API server. If it exists, replace s.KubeletConfiguration
 		// with it and continue. initKubeletConfigSync also starts the background thread that checks for new config.
 
@@ -352,7 +352,7 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.KubeletDeps) (err error) {
 					setConfigz(cfgz, &s.KubeletConfiguration)
 				}
 				// Update feature gates from the new config
-				err = utilconfig.DefaultFeatureGate.Set(s.KubeletConfiguration.FeatureGates)
+				err = utilflag.DefaultFeatureGate.Set(s.KubeletConfiguration.FeatureGates)
 				if err != nil {
 					return err
 				}

@@ -32,7 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	utilconfig "k8s.io/kubernetes/pkg/util/config"
+	utilflag "k8s.io/kubernetes/pkg/util/flag"
 	"k8s.io/kubernetes/pkg/util/httpstream"
 	"k8s.io/kubernetes/pkg/util/proxy"
 
@@ -145,7 +145,7 @@ func (h *UpgradeAwareProxyHandler) tryUpgrade(w http.ResponseWriter, req *http.R
 		rawResponse []byte
 		err         error
 	)
-	if h.InterceptRedirects && utilconfig.DefaultFeatureGate.StreamingProxyRedirects() {
+	if h.InterceptRedirects && utilflag.DefaultFeatureGate.StreamingProxyRedirects() {
 		backendConn, rawResponse, err = h.connectBackendWithRedirects(req)
 	} else {
 		backendConn, err = h.connectBackend(req.Method, h.Location, req.Header, req.Body)

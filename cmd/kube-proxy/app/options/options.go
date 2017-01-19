@@ -27,7 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
 	"k8s.io/kubernetes/pkg/util"
-	"k8s.io/kubernetes/pkg/util/config"
+	utilflag "k8s.io/kubernetes/pkg/util/flag"
 
 	"github.com/spf13/pflag"
 )
@@ -101,5 +101,5 @@ func (s *ProxyServerConfig) AddFlags(fs *pflag.FlagSet) {
 		s.ConntrackTCPCloseWaitTimeout.Duration,
 		"NAT timeout for TCP connections in the CLOSE_WAIT state")
 
-	config.DefaultFeatureGate.AddFlag(fs)
+	utilflag.DefaultFeatureGate.AddFlag(fs)
 }

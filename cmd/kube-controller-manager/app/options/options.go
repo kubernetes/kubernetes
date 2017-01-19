@@ -29,7 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	"k8s.io/kubernetes/pkg/client/leaderelection"
 	"k8s.io/kubernetes/pkg/master/ports"
-	"k8s.io/kubernetes/pkg/util/config"
+	utilflag "k8s.io/kubernetes/pkg/util/flag"
 
 	"github.com/spf13/pflag"
 )
@@ -195,7 +195,7 @@ func (s *CMServer) AddFlags(fs *pflag.FlagSet, allControllers []string, disabled
 	fs.DurationVar(&s.ReconcilerSyncLoopPeriod.Duration, "attach-detach-reconcile-sync-period", s.ReconcilerSyncLoopPeriod.Duration, "The reconciler sync wait time between volume attach detach. This duration must be larger than one second, and increasing this value from the default may allow for volumes to be mismatched with pods.")
 
 	leaderelection.BindFlags(&s.LeaderElection, fs)
-	config.DefaultFeatureGate.AddFlag(fs)
+	utilflag.DefaultFeatureGate.AddFlag(fs)
 }
 
 // Validate is used to validate the options and config before launching the controller manager

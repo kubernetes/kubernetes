@@ -32,12 +32,12 @@ import (
 	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
 	"k8s.io/kubernetes/pkg/registry/core/service/portallocator"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
-	featuregate "k8s.io/kubernetes/pkg/util/config"
+	utilflag "k8s.io/kubernetes/pkg/util/flag"
 	"k8s.io/kubernetes/pkg/util/intstr"
 )
 
 func init() {
-	featuregate.DefaultFeatureGate.Set("AllowExtTrafficLocalEndpoints=true")
+	utilflag.DefaultFeatureGate.Set("AllowExtTrafficLocalEndpoints=true")
 }
 
 // TODO(wojtek-t): Cleanup this file.
