@@ -87,6 +87,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
+        "//federation/pkg/federation-controller/util/clusterselector:all-srcs",
         "//federation/pkg/federation-controller/util/deletionhelper:all-srcs",
         "//federation/pkg/federation-controller/util/eventsink:all-srcs",
         "//federation/pkg/federation-controller/util/finalizers:all-srcs",
