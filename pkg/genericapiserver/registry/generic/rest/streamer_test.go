@@ -28,7 +28,7 @@ import (
 	"testing"
 
 	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
 func TestInputStreamReader(t *testing.T) {
@@ -132,7 +132,7 @@ func TestInputStreamInternalServerErrorTransport(t *testing.T) {
 	streamer := &LocationStreamer{
 		Location:        location,
 		Transport:       fakeInternalServerErrorTransport("text/plain", message),
-		ResponseChecker: NewGenericHttpResponseChecker(api.Resource(""), ""),
+		ResponseChecker: NewGenericHttpResponseChecker(schema.GroupResource{}, ""),
 	}
 	expectedError := errors.NewInternalError(fmt.Errorf("%s", message))
 
