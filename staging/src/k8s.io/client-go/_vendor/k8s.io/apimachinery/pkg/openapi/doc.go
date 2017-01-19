@@ -14,23 +14,5 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package api
-
-import (
-	"k8s.io/apimachinery/pkg/fields"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/runtime"
-)
-
-func addDefaultingFuncs(scheme *runtime.Scheme) error {
-	return scheme.AddDefaultingFuncs(
-		func(obj *ListOptions) {
-			if obj.LabelSelector == nil {
-				obj.LabelSelector = labels.Everything()
-			}
-			if obj.FieldSelector == nil {
-				obj.FieldSelector = fields.Everything()
-			}
-		},
-	)
-}
+// package openapi holds shared codes and types between open API code generator and spec generator.
+package openapi
