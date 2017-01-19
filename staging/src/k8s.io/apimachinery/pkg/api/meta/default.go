@@ -14,28 +14,21 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package api
+package meta
 
 import (
 	"strings"
 
-	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 )
 
-// Instantiates a DefaultRESTMapper based on types registered in api.Scheme
-func NewDefaultRESTMapper(defaultGroupVersions []schema.GroupVersion, interfacesFunc meta.VersionInterfacesFunc,
-	importPathPrefix string, ignoredKinds, rootScoped sets.String) *meta.DefaultRESTMapper {
-	return NewDefaultRESTMapperFromScheme(defaultGroupVersions, interfacesFunc, importPathPrefix, ignoredKinds, rootScoped, Scheme)
-}
+// NewDefaultRESTMapperFromScheme instantiates a DefaultRESTMapper based on types registered in the given scheme.
+func NewDefaultRESTMapperFromScheme(defaultGroupVersions []schema.GroupVersion, interfacesFunc VersionInterfacesFunc,
+	importPathPrefix string, ignoredKinds, rootScoped sets.String, scheme *runtime.Scheme) *DefaultRESTMapper {
 
-// Instantiates a DefaultRESTMapper based on types registered in the given scheme.
-func NewDefaultRESTMapperFromScheme(defaultGroupVersions []schema.GroupVersion, interfacesFunc meta.VersionInterfacesFunc,
-	importPathPrefix string, ignoredKinds, rootScoped sets.String, scheme *runtime.Scheme) *meta.DefaultRESTMapper {
-
-	mapper := meta.NewDefaultRESTMapper(defaultGroupVersions, interfacesFunc)
+	mapper := NewDefaultRESTMapper(defaultGroupVersions, interfacesFunc)
 	// enumerate all supported versions, get the kinds, and register with the mapper how to address
 	// our resources.
 	for _, gv := range defaultGroupVersions {
@@ -47,9 +40,9 @@ func NewDefaultRESTMapperFromScheme(defaultGroupVersions []schema.GroupVersion, 
 			if !strings.Contains(oType.PkgPath(), importPathPrefix) || ignoredKinds.Has(kind) {
 				continue
 			}
-			scope := meta.RESTScopeNamespace
+			scope := RESTScopeNamespace
 			if rootScoped.Has(kind) {
-				scope = meta.RESTScopeRoot
+				scope = RESTScopeRoot
 			}
 			mapper.Add(gvk, scope)
 		}
