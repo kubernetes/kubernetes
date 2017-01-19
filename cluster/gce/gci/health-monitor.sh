@@ -55,7 +55,6 @@ function kubelet_monitoring {
   done
 }
 
-
 ############## Main Function ################
 if [[ "$#" -ne 1 ]]; then
   echo "Usage: health-monitor.sh <docker/kubelet>"

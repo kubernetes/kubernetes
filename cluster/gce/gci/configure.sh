@@ -130,6 +130,23 @@ function install-gci-mounter-tools {
     chmod a+x "${rkt_dst}/rkt"
 }
 
+# Install node problem detector binary.
+function install-node-problem-detector {
+  # FIXME: Change this to official release
+  local -r npd_version="v0.2.0-52-g457272c"
+  local -r npd_sha1="d59138ef52060dd3659f2820e989e05c3b04103e"
+  local -r npd_release_path="https://storage.googleapis.com/artifacts.noogler-kubernetes.google.com.a.appspot.com"
+  local -r npd_tar="node-problem-detector-${npd_version}.tar.gz"
+  download-or-bust "${npd_sha1}" "${npd_release_path}/node-problem-detector/${npd_tar}"
+  local -r npd_dir="${KUBE_HOME}/node-problem-detector"
+  mkdir -p "${npd_dir}"
+  tar xzf "${KUBE_HOME}/${npd_tar}" -C "${npd_dir}" --overwrite
+  mv "${npd_dir}/bin"/* "${KUBE_HOME}/bin"
+  chmod a+x "${KUBE_HOME}/bin/node-problem-detector"
+  rmdir "${npd_dir}/bin"
+  rm -f "${KUBE_HOME}/${npd_tar}"
+}
+
 # Downloads kubernetes binaries and kube-system manifest tarball, unpacks them,
 # and places them into suitable directories. Files are placed in /home/kubernetes.
 function install-kube-binary-config {
@@ -153,6 +170,9 @@ function install-kube-binary-config {
   cp "${src_dir}/"*.docker_tag "${dst_dir}"
   if [[ "${KUBERNETES_MASTER:-}" == "false" ]]; then
     cp "${src_dir}/kube-proxy.tar" "${dst_dir}"
+    if [[ "${ENABLE_NODE_PROBLEM_DETECTOR:-}" == "standalone" ]]; then
+      install-node-problem-detector
+    fi
   else
     cp "${src_dir}/kube-apiserver.tar" "${dst_dir}"
     cp "${src_dir}/kube-controller-manager.tar" "${dst_dir}"
