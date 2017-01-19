@@ -50,7 +50,7 @@ import (
 	"k8s.io/client-go/util/clock"
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/client-go/util/integer"
-	"k8s.io/kubernetes/cmd/kubelet/app/options"
+	"k8s.io/kubernetes/cmd/kubelet/app/options" // I'm sorry :(. Options considered: Add this (sort-of-cyclic) dep, add more args to NewMainKubelet, define flags for cmd somewhere outside cmd... I am open to suggestions.
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
