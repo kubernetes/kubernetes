@@ -26,7 +26,7 @@ import (
 	apiv1 "k8s.io/kubernetes/pkg/api/v1"
 	_ "k8s.io/kubernetes/pkg/apis/extensions/install"
 	extensionsapiv1beta1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
-	"k8s.io/kubernetes/pkg/genericapiserver"
+	genericapiserver "k8s.io/kubernetes/pkg/genericapiserver/server"
 )
 
 func TestParseRuntimeConfig(t *testing.T) {

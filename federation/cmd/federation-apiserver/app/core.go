@@ -31,14 +31,14 @@ import (
 	"k8s.io/kubernetes/federation/apis/core/v1"
 	"k8s.io/kubernetes/federation/cmd/federation-apiserver/app/options"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/genericapiserver"
-	"k8s.io/kubernetes/pkg/genericapiserver/api/rest"
+	"k8s.io/kubernetes/pkg/genericapiserver/registry/generic"
+	"k8s.io/kubernetes/pkg/genericapiserver/registry/rest"
+	genericapiserver "k8s.io/kubernetes/pkg/genericapiserver/server"
 	configmapstore "k8s.io/kubernetes/pkg/registry/core/configmap/storage"
 	eventstore "k8s.io/kubernetes/pkg/registry/core/event/storage"
 	namespacestore "k8s.io/kubernetes/pkg/registry/core/namespace/storage"
 	secretstore "k8s.io/kubernetes/pkg/registry/core/secret/storage"
 	servicestore "k8s.io/kubernetes/pkg/registry/core/service/storage"
-	"k8s.io/kubernetes/pkg/registry/generic"
 )
 
 func installCoreAPIs(s *options.ServerRunOptions, g *genericapiserver.GenericAPIServer, optsGetter generic.RESTOptionsGetter) {

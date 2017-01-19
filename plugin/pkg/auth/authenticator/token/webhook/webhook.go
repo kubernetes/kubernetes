@@ -27,7 +27,7 @@ import (
 	authenticationclient "k8s.io/client-go/kubernetes/typed/authentication/v1beta1"
 	authentication "k8s.io/client-go/pkg/apis/authentication/v1beta1"
 
-	"k8s.io/apiserver/pkg/webhook"
+	"k8s.io/apiserver/pkg/util/webhook"
 
 	_ "k8s.io/client-go/pkg/apis/authentication/install"
 	_ "k8s.io/kubernetes/pkg/apis/authentication/install"

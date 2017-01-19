@@ -100,7 +100,7 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/runtime/serializer",
         "//vendor:k8s.io/apimachinery/pkg/util/sets",
         "//vendor:k8s.io/apimachinery/pkg/util/wait",
-        "//vendor:k8s.io/apiserver/pkg/healthz",
+        "//vendor:k8s.io/apiserver/pkg/server/healthz",
     ],
 )
 

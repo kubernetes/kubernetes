@@ -21,7 +21,6 @@ go_library(
         "//pkg/proxy/healthcheck:go_default_library",
         "//pkg/util/config:go_default_library",
         "//pkg/util/exec:go_default_library",
-        "//pkg/util/flowcontrol:go_default_library",
         "//pkg/util/iptables:go_default_library",
         "//pkg/util/slice:go_default_library",
         "//pkg/util/sysctl:go_default_library",
@@ -30,6 +29,7 @@ go_library(
         "//vendor:github.com/golang/glog",
         "//vendor:k8s.io/apimachinery/pkg/types",
         "//vendor:k8s.io/apimachinery/pkg/util/sets",
+        "//vendor:k8s.io/client-go/pkg/util/flowcontrol",
     ],
 )
 

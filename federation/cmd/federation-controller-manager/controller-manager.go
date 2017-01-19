@@ -21,7 +21,7 @@ import (
 	"os"
 
 	"github.com/spf13/pflag"
-	"k8s.io/apiserver/pkg/healthz"
+	"k8s.io/apiserver/pkg/server/healthz"
 	"k8s.io/kubernetes/federation/cmd/federation-controller-manager/app"
 	"k8s.io/kubernetes/federation/cmd/federation-controller-manager/app/options"
 	"k8s.io/kubernetes/pkg/util/flag"

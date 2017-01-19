@@ -122,8 +122,7 @@ type KubeSchedulerConfiguration struct {
 	// kubeAPIBurst is the QPS burst to use while talking with kubernetes apiserver.
 	KubeAPIBurst int `json:"kubeAPIBurst"`
 	// schedulerName is name of the scheduler, used to select which pods
-	// will be processed by this scheduler, based on pod's annotation with
-	// key 'scheduler.alpha.kubernetes.io/name'.
+	// will be processed by this scheduler, based on pod's "spec.SchedulerName".
 	SchedulerName string `json:"schedulerName"`
 	// RequiredDuringScheduling affinity is not symmetric, but there is an implicit PreferredDuringScheduling affinity rule
 	// corresponding to every RequiredDuringScheduling affinity rule.

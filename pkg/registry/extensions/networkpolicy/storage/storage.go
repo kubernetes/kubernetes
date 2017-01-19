@@ -19,9 +19,9 @@ package storage
 import (
 	"k8s.io/apimachinery/pkg/runtime"
 	extensionsapi "k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/genericapiserver/registry/generic"
+	genericregistry "k8s.io/kubernetes/pkg/genericapiserver/registry/generic/registry"
 	"k8s.io/kubernetes/pkg/registry/extensions/networkpolicy"
-	"k8s.io/kubernetes/pkg/registry/generic"
-	genericregistry "k8s.io/kubernetes/pkg/registry/generic/registry"
 )
 
 // rest implements a RESTStorage for network policies
