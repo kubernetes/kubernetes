@@ -37,6 +37,7 @@ import (
 	federationclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset"
 	"k8s.io/kubernetes/federation/pkg/federatedtypes"
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util"
+	"k8s.io/kubernetes/federation/pkg/federation-controller/util/clusterselector"
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util/deletionhelper"
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util/eventsink"
 	"k8s.io/kubernetes/pkg/api"
@@ -341,6 +342,7 @@ func (s *FederationSyncController) reconcile(namespacedName types.NamespacedName
 		glog.Errorf("error in retrieving %s from store: %v", kind, err)
 		return statusError
 	}
+
 	if !s.adapter.IsExpectedType(copiedObj) {
 		glog.Errorf("object is not the expected type: %v", copiedObj)
 		return statusError
@@ -369,23 +371,75 @@ func (s *FederationSyncController) reconcile(namespacedName types.NamespacedName
 	}
 
 	glog.V(3).Infof("Syncing %s %s in underlying clusters", kind, namespacedName)
+	err, operations := s.getClusterOperations(obj)
+	if err != nil {
+		glog.Errorf("Error getting reconcile cluster operations for %s %s: %v",
+			kind, namespacedName, err)
+		return statusError
+	}
+
+	if len(operations) == 0 {
+		// Everything is in order
+		return statusAllOK
+	}
+
+	err = s.updater.Update(operations, s.updateTimeout)
+	if err != nil {
+		glog.Errorf("Failed to execute updates for %s: %v", key, err)
+		return statusError
+	}
+
+	// Evertyhing is in order but lets be double sure
+	s.deliver(namespacedName, s.reviewDelay, false)
+	return statusAllOK
+}
+
+// getClusterOperations produces the cluster changes required for reconciliation
+func (s *FederationSyncController) getClusterOperations(obj pkgruntime.Object) (error, []util.FederatedOperation) {
+	operations := make([]util.FederatedOperation, 0)
+	// The data should not be modified.
+	desiredObj := s.adapter.Copy(obj)
+	objMeta := s.adapter.ObjectMeta(desiredObj)
+	namespacedName := s.adapter.NamespacedName(desiredObj)
+	key := namespacedName.String()
+	kind := s.adapter.Kind()
 
 	clusters, err := s.informer.GetReadyClusters()
 	if err != nil {
 		glog.Errorf("failed to get cluster list: %v", err)
-		return statusNotSynced
+		return err, operations
 	}
 
-	operations := make([]util.FederatedOperation, 0)
 	for _, cluster := range clusters {
+		glog.V(3).Infof("Processing cluster: %s for %s: %s", cluster.Name, kind, key)
+
 		clusterObj, found, err := s.informer.GetTargetStore().GetByKey(cluster.Name, key)
 		if err != nil {
 			glog.Errorf("failed to get %s from %s: %v", key, cluster.Name, err)
-			return statusError
+			return err, operations
 		}
 
-		// The data should not be modified.
-		desiredObj := s.adapter.Copy(obj)
+		// Check to see if this should be sent to the cluster.
+		send, err := clusterselector.SendToCluster(cluster.Labels, objMeta.Annotations)
+		if err != nil {
+			glog.Errorf("Error processing FederationClusterSelector Annotations cluster: %s for %s map: %s error: %s", cluster.Name, kind, key, err.Error())
+			s.eventRecorder.Eventf(desiredObj, api.EventTypeWarning, "FedClusterSelectorError", "Error processing ClusterSelector Annotations cluster: %s for %s: %s error: %s", cluster.Name, kind, key, err.Error())
+			return err, operations
+		} else if !send {
+			glog.V(5).Infof("Skipping cluster: %s for %s: %s reason: cluster selectors do not match: %-v %-v", cluster.Name, kind, key, cluster.ObjectMeta.Labels, objMeta.Annotations[federationapi.FederationClusterSelector])
+
+			// Only delete objects from target clusters if they exist
+			if found {
+				s.eventRecorder.Eventf(desiredObj, api.EventTypeWarning, "DeleteInCluster", "Deleting %s %s from cluster %s", cluster.Name, namespacedName, kind)
+				operations = append(operations, util.FederatedOperation{
+					Type:        util.OperationTypeDelete,
+					Obj:         desiredObj,
+					ClusterName: cluster.Name,
+				})
+			}
+			// Skip further processing for this cluster.
+			continue
+		}
 
 		if !found {
 			operations = append(operations, util.FederatedOperation{
@@ -411,17 +465,17 @@ func (s *FederationSyncController) reconcile(namespacedName types.NamespacedName
 
 	if len(operations) == 0 {
 		// Everything is in order
-		return statusAllOK
+		return nil, operations
 	}
 
 	err = s.updater.Update(operations, s.updateTimeout)
 	if err != nil {
 		glog.Errorf("failed to execute updates for %s: %v", key, err)
-		return statusError
+		return err, operations
 	}
 
 	// Evertyhing is in order but let's be double sure
-	return statusNeedsRecheck
+	return nil, operations
 }
 
 // delete deletes the given resource or returns error if the deletion was not complete.
