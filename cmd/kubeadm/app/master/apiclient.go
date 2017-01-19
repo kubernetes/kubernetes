@@ -67,32 +67,10 @@ func CreateClientAndWaitForAPI(file string) (*clientset.Clientset, error) {
 	}
 	fmt.Println("[apiclient] Created API client, waiting for the control plane to become ready")
 
-	start := time.Now()
-	wait.PollInfinite(apiCallRetryInterval, func() (bool, error) {
-		cs, err := client.ComponentStatuses().List(v1.ListOptions{})
-		if err != nil {
-			return false, nil
-		}
-		// TODO(phase2) must revisit this when we implement HA
-		if len(cs.Items) < 3 {
-			fmt.Println("[apiclient] Not all control plane components are ready yet")
-			return false, nil
-		}
-		for _, item := range cs.Items {
-			for _, condition := range item.Conditions {
-				if condition.Type != v1.ComponentHealthy {
-					fmt.Printf("[apiclient] Control plane component %q is still unhealthy: %#v\n", item.ObjectMeta.Name, item.Conditions)
-					return false, nil
-				}
-			}
-		}
-
-		fmt.Printf("[apiclient] All control plane components are healthy after %f seconds\n", time.Since(start).Seconds())
-		return true, nil
-	})
+	WaitForAPI(client)
 
 	fmt.Println("[apiclient] Waiting for at least one node to register and become ready")
-	start = time.Now()
+	start := time.Now()
 	wait.PollInfinite(apiCallRetryInterval, func() (bool, error) {
 		nodeList, err := client.Nodes().List(v1.ListOptions{})
 		if err != nil {
@@ -122,6 +100,33 @@ func standardLabels(n string) map[string]string {
 		"component": n, "name": n, "k8s-app": n,
 		"kubernetes.io/cluster-service": "true", "tier": "node",
 	}
+}
+
+func WaitForAPI(client *clientset.Clientset) {
+	start := time.Now()
+	wait.PollInfinite(apiCallRetryInterval, func() (bool, error) {
+		cs, err := client.ComponentStatuses().List(v1.ListOptions{})
+		if err != nil {
+			return false, nil
+		}
+		// TODO(phase2) must revisit this when we implement HA
+		if len(cs.Items) < 3 {
+			return false, nil
+		}
+		for _, item := range cs.Items {
+			for _, condition := range item.Conditions {
+				if condition.Type != v1.ComponentHealthy {
+					fmt.Printf("[apiclient] Control plane component %q not yet healthy: %#v\n", item.ObjectMeta.Name, item.Conditions)
+					return false, nil
+				}
+			}
+		}
+
+		// In most cases this is the only output you will see, typically as soon as the API server
+		// is responding, the other components are ready.
+		fmt.Printf("[apiclient] All control plane components are healthy after %f seconds\n", time.Since(start).Seconds())
+		return true, nil
+	})
 }
 
 func NewDaemonSet(daemonName string, podSpec v1.PodSpec) *extensions.DaemonSet {

@@ -55,6 +55,9 @@ var (
 
 		kubeadm join --discovery %s
 		`)
+	deploymentStaticPod  = "static-pods"
+	deploymentSelfHosted = "self-hosted"
+	deploymentTypes      = []string{deploymentStaticPod, deploymentSelfHosted}
 )
 
 // NewCmdInit returns "kubeadm init" command.
@@ -66,13 +69,14 @@ func NewCmdInit(out io.Writer) *cobra.Command {
 
 	var cfgPath string
 	var skipPreFlight bool
+	var deploymentType string // static pods, self-hosted, etc.
 	cmd := &cobra.Command{
 		Use:   "init",
 		Short: "Run this in order to set up the Kubernetes master",
 		Run: func(cmd *cobra.Command, args []string) {
-			i, err := NewInit(cfgPath, &cfg, skipPreFlight)
+			i, err := NewInit(cfgPath, &cfg, skipPreFlight, deploymentType)
 			kubeadmutil.CheckErr(err)
-			kubeadmutil.CheckErr(i.Validate())
+			kubeadmutil.CheckErr(Validate(i.Cfg()))
 			kubeadmutil.CheckErr(i.Run(out))
 		},
 	}
@@ -123,14 +127,15 @@ func NewCmdInit(out io.Writer) *cobra.Command {
 		"The discovery method kubeadm will use for connecting nodes to the master",
 	)
 
+	cmd.PersistentFlags().StringVar(
+		&deploymentType, "deployment", deploymentType,
+		fmt.Sprintf("specify a deployment type from %v", deploymentTypes),
+	)
+
 	return cmd
 }
 
-type Init struct {
-	cfg *kubeadmapi.MasterConfiguration
-}
-
-func NewInit(cfgPath string, cfg *kubeadmapi.MasterConfiguration, skipPreFlight bool) (*Init, error) {
+func NewInit(cfgPath string, cfg *kubeadmapi.MasterConfiguration, skipPreFlight bool, deploymentType string) (Init, error) {
 
 	fmt.Println("[kubeadm] WARNING: kubeadm is in alpha, please do not use it for production clusters.")
 
@@ -190,15 +195,118 @@ func NewInit(cfgPath string, cfg *kubeadmapi.MasterConfiguration, skipPreFlight 
 		fmt.Println("\t(/etc/systemd/system/kubelet.service.d/10-kubeadm.conf should be edited for this purpose)")
 	}
 
-	return &Init{cfg: cfg}, nil
+	var deploymentTypeValid bool
+	for _, supportedDT := range deploymentTypes {
+		if deploymentType == supportedDT {
+			deploymentTypeValid = true
+		}
+	}
+	if !deploymentTypeValid {
+		return nil, fmt.Errorf("%s is not a valid deployment type, you can use any of %v or leave unset to accept the default", deploymentType, deploymentTypes)
+	}
+	if deploymentType == deploymentSelfHosted {
+		fmt.Println("[init] Creating self-hosted Kubernetes deployment...")
+		return &SelfHostedInit{cfg: cfg}, nil
+	}
+
+	fmt.Println("[init] Creating static pod Kubernetes deployment...")
+	return &StaticPodInit{cfg: cfg}, nil
 }
 
-func (i *Init) Validate() error {
-	return validation.ValidateMasterConfiguration(i.cfg).ToAggregate()
+func Validate(cfg *kubeadmapi.MasterConfiguration) error {
+	return validation.ValidateMasterConfiguration(cfg).ToAggregate()
+}
+
+// Init structs define implementations of the cluster setup for each supported
+// delpoyment type.
+type Init interface {
+	Cfg() *kubeadmapi.MasterConfiguration
+	Run(out io.Writer) error
+}
+
+type StaticPodInit struct {
+	cfg *kubeadmapi.MasterConfiguration
+}
+
+func (spi *StaticPodInit) Cfg() *kubeadmapi.MasterConfiguration {
+	return spi.cfg
 }
 
 // Run executes master node provisioning, including certificates, needed static pod manifests, etc.
-func (i *Init) Run(out io.Writer) error {
+func (i *StaticPodInit) Run(out io.Writer) error {
+
+	if i.cfg.Discovery.Token != nil {
+		if err := kubemaster.PrepareTokenDiscovery(i.cfg.Discovery.Token); err != nil {
+			return err
+		}
+		if err := kubemaster.CreateTokenAuthFile(kubeadmutil.BearerToken(i.cfg.Discovery.Token)); err != nil {
+			return err
+		}
+	}
+
+	if err := kubemaster.WriteStaticPodManifests(i.cfg); err != nil {
+		return err
+	}
+
+	caKey, caCert, err := kubemaster.CreatePKIAssets(i.cfg)
+	if err != nil {
+		return err
+	}
+
+	kubeconfigs, err := kubemaster.CreateCertsAndConfigForClients(i.cfg.API, []string{"kubelet", "admin"}, caKey, caCert)
+	if err != nil {
+		return err
+	}
+
+	// kubeadm is responsible for writing the following kubeconfig file, which
+	// kubelet should be waiting for. Help user avoid foot-shooting by refusing to
+	// write a file that has already been written (the kubelet will be up and
+	// running in that case - they'd need to stop the kubelet, remove the file, and
+	// start it again in that case).
+	// TODO(phase1+) this is no longer the right place to guard against foo-shooting,
+	// we need to decide how to handle existing files (it may be handy to support
+	// importing existing files, may be we could even make our command idempotant,
+	// or at least allow for external PKI and stuff)
+	for name, kubeconfig := range kubeconfigs {
+		if err := kubeadmutil.WriteKubeconfigIfNotExists(name, kubeconfig); err != nil {
+			return err
+		}
+	}
+
+	client, err := kubemaster.CreateClientAndWaitForAPI(kubeconfigs["admin"])
+	if err != nil {
+		return err
+	}
+
+	if err := kubemaster.UpdateMasterRoleLabelsAndTaints(client, false); err != nil {
+		return err
+	}
+
+	if i.cfg.Discovery.Token != nil {
+		if err := kubemaster.CreateDiscoveryDeploymentAndSecret(i.cfg, client, caCert); err != nil {
+			return err
+		}
+	}
+
+	if err := kubemaster.CreateEssentialAddons(i.cfg, client); err != nil {
+		return err
+	}
+
+	fmt.Fprintf(out, initDoneMsgf, generateJoinArgs(i.cfg))
+	return nil
+}
+
+// SelfHostedInit initializes a self-hosted cluster.
+type SelfHostedInit struct {
+	cfg *kubeadmapi.MasterConfiguration
+}
+
+func (spi *SelfHostedInit) Cfg() *kubeadmapi.MasterConfiguration {
+	return spi.cfg
+}
+
+// Run executes master node provisioning, including certificates, needed pod manifests, etc.
+func (i *SelfHostedInit) Run(out io.Writer) error {
 
 	// Validate token if any, otherwise generate
 	if i.cfg.Discovery.Token != nil {
@@ -256,6 +364,13 @@ func (i *Init) Run(out io.Writer) error {
 	}
 
 	if err := kubemaster.UpdateMasterRoleLabelsAndTaints(client, false); err != nil {
+		return err
+	}
+
+	// Temporary control plane is up, now we create our self hosted control
+	// plane components and remove the static manifests:
+	fmt.Println("[init] Creating self-hosted control plane...")
+	if err := kubemaster.CreateSelfHostedControlPlane(i.cfg, client); err != nil {
 		return err
 	}
 
