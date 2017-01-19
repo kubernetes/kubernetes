@@ -263,6 +263,7 @@ func getControllerManagerDeployment(cfg *kubeadmapi.MasterConfiguration, volumes
 							Env:           getProxyEnvVars(),
 						},
 					},
+					DNSPolicy: v1.DNSDefault,
 				},
 			},
 		},
