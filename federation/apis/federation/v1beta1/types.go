@@ -121,7 +121,30 @@ type ClusterList struct {
 	Items []Cluster `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
 
+// Expressed as value of annotation for selecting the clusters on which a resource is created.
+type ClusterSelector []ClusterSelectorRequirement
+
+// Req contains values, a key, and an operator that relates the key and values.
+// The zero value of Req is invalid.
+// Req implements both set based match and exact match
+// Req end up getting initialized via metav1.NewRequirement constructor for creating a valid Req.
+type ClusterSelectorRequirement struct {
+	Key string `json:"key" patchStrategy:"merge" patchMergeKey:"key" protobuf:"bytes,1,opt,name=key"`
+	// Matches the Operator in apimachinery
+	Operator string `json:"operator" protobuf:"bytes,2,opt,name=operator"`
+	// An array of string values. If the operator is "in" or "notin",
+	// the values array must be non-empty. If the operator is "exists" or "!",
+	// the values array must be empty. If the operator is "gt" or "lt", the values
+	// array must have a single element, which will be interpreted as an integer.
+	// This array is replaced during a strategic merge patch.
+	// +optional
+	Values []string `json:"values,omitempty" protobuf:"bytes,3,rep,name=values"`
+}
+
 const (
 	// FederationNamespaceSystem is the system namespace where we place federation control plane components.
 	FederationNamespaceSystem string = "federation-system"
+
+	// Annotation key used for specifying ClusterSelector
+	FederationClusterSelector string = "federation.alpha.kubernetes.io/cluster-selector"
 )

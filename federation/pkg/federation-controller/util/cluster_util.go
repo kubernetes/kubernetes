@@ -22,8 +22,11 @@ import (
 	"os"
 	"time"
 
+	"encoding/json"
 	"github.com/golang/glog"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/selection"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/wait"
 	restclient "k8s.io/client-go/rest"
@@ -145,4 +148,56 @@ func GetClientsetForCluster(cluster *federation_v1beta1.Cluster) (*fedclientset.
 		return clientset, nil
 	}
 	return nil, err
+}
+
+// Returns a bool to indicate if the object should be forwarded to a cluster
+func SendToCluster(cluster *federation_v1beta1.Cluster, objMeta metav1.ObjectMeta) bool {
+	forwardObject := true
+	// Check if there is an annotation for ClusterSelector
+	if val, ok := objMeta.Annotations[federation_v1beta1.FederationClusterSelector]; ok {
+		// Check if the Annotation contains valid data
+		selector := labels.NewSelector()
+		requirements := make([]federation_v1beta1.ClusterSelectorRequirement, 0)
+		if err := json.Unmarshal([]byte(val), &requirements); err == nil {
+			for _, requirement := range requirements {
+				r, err := labels.NewRequirement(requirement.Key, ConvertOperator(requirement.Operator), requirement.Values)
+				if err != nil {
+					glog.V(8).Infof("Unable to convert ClusterSelector Annotation to Requirement: %+v, %s", requirement, err.Error())
+				}
+				selector = selector.Add(*r)
+			}
+			if !selector.Matches(labels.Set(cluster.Labels)) {
+				glog.V(8).Infof("Object %s Selector: %+v does not match Cluster %s labels: %+v", objMeta.Name, selector.String(), cluster.ObjectMeta.Name, cluster.Labels)
+				forwardObject = false
+			}
+		} else {
+			glog.V(8).Infof("Unable to parse ClusterSelector Annotation: %s", err.Error())
+		}
+	}
+	return forwardObject
+}
+
+func ConvertOperator(source string) selection.Operator {
+	var op selection.Operator
+	switch source {
+	case "!", "DoesNotExist":
+		op = selection.DoesNotExist
+	case "=":
+		op = selection.Equals
+	case "==":
+		op = selection.DoubleEquals
+	case "in", "In":
+		op = selection.In
+	case "!=":
+		op = selection.NotEquals
+	case "notin", "NotIn":
+		op = selection.NotIn
+	case "exists", "Exists":
+		op = selection.Exists
+	case "gt", "Gt":
+		op = selection.GreaterThan
+	case "lt", "Lt":
+		op = selection.LessThan
+	}
+	return op
 }

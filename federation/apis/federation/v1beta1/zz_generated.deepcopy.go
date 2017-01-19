@@ -39,6 +39,7 @@ func RegisterDeepCopies(scheme *runtime.Scheme) error {
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_Cluster, InType: reflect.TypeOf(&Cluster{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_ClusterCondition, InType: reflect.TypeOf(&ClusterCondition{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_ClusterList, InType: reflect.TypeOf(&ClusterList{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_ClusterSelectorRequirement, InType: reflect.TypeOf(&ClusterSelectorRequirement{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_ClusterSpec, InType: reflect.TypeOf(&ClusterSpec{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_ClusterStatus, InType: reflect.TypeOf(&ClusterStatus{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_ServerAddressByClientCIDR, InType: reflect.TypeOf(&ServerAddressByClientCIDR{})},
@@ -89,6 +90,20 @@ func DeepCopy_v1beta1_ClusterList(in interface{}, out interface{}, c *conversion
 					return err
 				}
 			}
+		}
+		return nil
+	}
+}
+
+func DeepCopy_v1beta1_ClusterSelectorRequirement(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*ClusterSelectorRequirement)
+		out := out.(*ClusterSelectorRequirement)
+		*out = *in
+		if in.Values != nil {
+			in, out := &in.Values, &out.Values
+			*out = make([]string, len(*in))
+			copy(*out, *in)
 		}
 		return nil
 	}
