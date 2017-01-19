@@ -70,7 +70,6 @@ filegroup(
         "//pkg/client/clientset_generated/clientset/typed/certificates/v1beta1:all-srcs",
         "//pkg/client/clientset_generated/clientset/typed/core/v1:all-srcs",
         "//pkg/client/clientset_generated/clientset/typed/extensions/v1beta1:all-srcs",
-        "//pkg/client/clientset_generated/clientset/typed/policy/v1alpha1:all-srcs",
         "//pkg/client/clientset_generated/clientset/typed/policy/v1beta1:all-srcs",
         "//pkg/client/clientset_generated/clientset/typed/rbac/v1alpha1:all-srcs",
         "//pkg/client/clientset_generated/clientset/typed/rbac/v1beta1:all-srcs",

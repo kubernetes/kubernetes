@@ -28,7 +28,7 @@ import (
 	"time"
 
 	"github.com/golang/glog"
-	"k8s.io/kubernetes/pkg/client/restclient"
+	restclient "k8s.io/client-go/rest"
 	"k8s.io/kubernetes/pkg/util"
 )
 

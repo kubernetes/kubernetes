@@ -22,12 +22,12 @@ go_library(
         "//pkg/util/io:go_default_library",
         "//pkg/util/mount:go_default_library",
         "//pkg/util/strings:go_default_library",
-        "//pkg/util/testing:go_default_library",
         "//pkg/util/uuid:go_default_library",
         "//pkg/volume:go_default_library",
         "//vendor:github.com/stretchr/testify/mock",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/types",
+        "//vendor:k8s.io/client-go/pkg/util/testing",
     ],
 )
 

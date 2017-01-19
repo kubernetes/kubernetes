@@ -80,7 +80,6 @@ go_test(
         "//pkg/kubelet/network/mock_network:go_default_library",
         "//pkg/kubelet/types:go_default_library",
         "//pkg/util/exec:go_default_library",
-        "//pkg/util/testing:go_default_library",
         "//vendor:github.com/appc/spec/schema",
         "//vendor:github.com/appc/spec/schema/types",
         "//vendor:github.com/coreos/go-systemd/dbus",
@@ -92,6 +91,7 @@ go_test(
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/types",
         "//vendor:k8s.io/apimachinery/pkg/util/errors",
+        "//vendor:k8s.io/client-go/pkg/util/testing",
     ],
 )
 

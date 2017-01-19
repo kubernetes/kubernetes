@@ -31,6 +31,7 @@ go_library(
         "//vendor:google.golang.org/api/cloudmonitoring/v2beta2",
         "//vendor:k8s.io/apimachinery/pkg/api/errors",
         "//vendor:k8s.io/apiserver/pkg/admission",
+        "//vendor:k8s.io/client-go/rest",
     ],
 )
 

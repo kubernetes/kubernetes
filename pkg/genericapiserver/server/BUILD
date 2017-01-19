@@ -31,7 +31,6 @@ go_test(
         "//pkg/genericapiserver/server/options:go_default_library",
         "//pkg/storage/etcd/testing:go_default_library",
         "//pkg/storage/storagebackend:go_default_library",
-        "//pkg/util/cert:go_default_library",
         "//pkg/util/config:go_default_library",
         "//vendor:github.com/go-openapi/spec",
         "//vendor:github.com/stretchr/testify/assert",
@@ -46,6 +45,7 @@ go_test(
         "//vendor:k8s.io/apiserver/pkg/authentication/user",
         "//vendor:k8s.io/apiserver/pkg/authorization/authorizer",
         "//vendor:k8s.io/apiserver/pkg/endpoints/request",
+        "//vendor:k8s.io/client-go/pkg/util/cert",
     ],
 )
 
@@ -78,7 +78,6 @@ go_library(
         "//pkg/genericapiserver/server/options:go_default_library",
         "//pkg/genericapiserver/server/routes:go_default_library",
         "//pkg/storage/storagebackend:go_default_library",
-        "//pkg/util/cert:go_default_library",
         "//vendor:github.com/coreos/go-systemd/daemon",
         "//vendor:github.com/emicklei/go-restful",
         "//vendor:github.com/emicklei/go-restful/swagger",
@@ -106,6 +105,8 @@ go_library(
         "//vendor:k8s.io/apiserver/pkg/authorization/union",
         "//vendor:k8s.io/apiserver/pkg/endpoints/request",
         "//vendor:k8s.io/apiserver/pkg/server/healthz",
+        "//vendor:k8s.io/client-go/pkg/util/cert",
+        "//vendor:k8s.io/client-go/rest",
     ],
 )
 

@@ -22,7 +22,7 @@ import (
 	"fmt"
 	"path"
 
-	certutil "k8s.io/kubernetes/pkg/util/cert"
+	certutil "k8s.io/client-go/pkg/util/cert"
 )
 
 func newCertificateAuthority() (*rsa.PrivateKey, *x509.Certificate, error) {

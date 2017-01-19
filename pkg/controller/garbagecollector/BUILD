@@ -63,6 +63,7 @@ go_test(
         "//vendor:k8s.io/apimachinery/pkg/util/json",
         "//vendor:k8s.io/apimachinery/pkg/util/sets",
         "//vendor:k8s.io/client-go/pkg/util/clock",
+        "//vendor:k8s.io/client-go/rest",
     ],
 )
 

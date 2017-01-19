@@ -24,10 +24,10 @@ import (
 	"os"
 	"path"
 
+	certutil "k8s.io/client-go/pkg/util/cert"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	certphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
-	certutil "k8s.io/kubernetes/pkg/util/cert"
 )
 
 const (

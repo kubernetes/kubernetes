@@ -13666,3 +13666,49 @@ go_library(
     tags = ["automanaged"],
     deps = ["//vendor:k8s.io/apimachinery/pkg/selection"],
 )
+
+go_test(
+    name = "k8s.io/client-go/pkg/util/cert_test",
+    srcs = ["k8s.io/client-go/pkg/util/cert/csr_test.go"],
+    library = ":k8s.io/client-go/pkg/util/cert",
+    tags = ["automanaged"],
+)
+
+go_library(
+    name = "k8s.io/client-go/pkg/util/cert/triple",
+    srcs = ["k8s.io/client-go/pkg/util/cert/triple/triple.go"],
+    tags = ["automanaged"],
+    deps = ["//vendor:k8s.io/client-go/pkg/util/cert"],
+)
+
+go_test(
+    name = "k8s.io/client-go/pkg/util/clock_test",
+    srcs = ["k8s.io/client-go/pkg/util/clock/clock_test.go"],
+    library = ":k8s.io/client-go/pkg/util/clock",
+    tags = ["automanaged"],
+)
+
+go_test(
+    name = "k8s.io/client-go/pkg/util/flowcontrol_test",
+    srcs = [
+        "k8s.io/client-go/pkg/util/flowcontrol/backoff_test.go",
+        "k8s.io/client-go/pkg/util/flowcontrol/throttle_test.go",
+    ],
+    library = ":k8s.io/client-go/pkg/util/flowcontrol",
+    tags = ["automanaged"],
+    deps = ["//vendor:k8s.io/client-go/pkg/util/clock"],
+)
+
+go_test(
+    name = "k8s.io/client-go/pkg/util/integer_test",
+    srcs = ["k8s.io/client-go/pkg/util/integer/integer_test.go"],
+    library = ":k8s.io/client-go/pkg/util/integer",
+    tags = ["automanaged"],
+)
+
+go_test(
+    name = "k8s.io/client-go/pkg/util/testing_test",
+    srcs = ["k8s.io/client-go/pkg/util/testing/fake_handler_test.go"],
+    library = ":k8s.io/client-go/pkg/util/testing",
+    tags = ["automanaged"],
+)

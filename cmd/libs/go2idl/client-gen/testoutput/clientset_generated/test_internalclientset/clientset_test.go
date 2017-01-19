@@ -20,7 +20,7 @@ import (
 	"testing"
 
 	"k8s.io/client-go/pkg/util/flowcontrol"
-	restclient "k8s.io/kubernetes/pkg/client/restclient"
+	restclient "k8s.io/client-go/rest"
 )
 
 func ClientSetRateLimiterTest(t *testing.T) {

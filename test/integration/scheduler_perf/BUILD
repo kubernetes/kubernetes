@@ -23,6 +23,7 @@ go_library(
         "//plugin/pkg/scheduler/factory:go_default_library",
         "//test/integration/framework:go_default_library",
         "//vendor:github.com/golang/glog",
+        "//vendor:k8s.io/client-go/rest",
     ],
 )
 

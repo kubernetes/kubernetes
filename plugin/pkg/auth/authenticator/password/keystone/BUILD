@@ -15,12 +15,12 @@ go_library(
     ],
     tags = ["automanaged"],
     deps = [
-        "//pkg/util/cert:go_default_library",
         "//vendor:github.com/golang/glog",
         "//vendor:github.com/rackspace/gophercloud",
         "//vendor:github.com/rackspace/gophercloud/openstack",
         "//vendor:k8s.io/apimachinery/pkg/util/net",
         "//vendor:k8s.io/apiserver/pkg/authentication/user",
+        "//vendor:k8s.io/client-go/pkg/util/cert",
     ],
 )
 

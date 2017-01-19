@@ -12,6 +12,7 @@ go_library(
     name = "go_default_library",
     srcs = ["clientauth.go"],
     tags = ["automanaged"],
+    deps = ["//vendor:k8s.io/client-go/rest"],
 )
 
 go_test(

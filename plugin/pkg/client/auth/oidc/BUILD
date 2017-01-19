@@ -17,6 +17,7 @@ go_library(
         "//vendor:github.com/coreos/go-oidc/oauth2",
         "//vendor:github.com/coreos/go-oidc/oidc",
         "//vendor:github.com/golang/glog",
+        "//vendor:k8s.io/client-go/rest",
     ],
 )
 

@@ -23,6 +23,7 @@ go_library(
         "//pkg/client/clientset_generated/internalclientset:go_default_library",
         "//vendor:k8s.io/apimachinery/pkg/fields",
         "//vendor:k8s.io/apimachinery/pkg/labels",
+        "//vendor:k8s.io/client-go/rest",
     ],
 )
 

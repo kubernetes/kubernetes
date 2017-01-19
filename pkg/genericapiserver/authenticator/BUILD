@@ -16,7 +16,6 @@ go_library(
     ],
     tags = ["automanaged"],
     deps = [
-        "//pkg/util/cert:go_default_library",
         "//plugin/pkg/auth/authenticator/token/webhook:go_default_library",
         "//vendor:github.com/go-openapi/spec",
         "//vendor:k8s.io/apiserver/pkg/authentication/authenticator",
@@ -29,6 +28,7 @@ go_library(
         "//vendor:k8s.io/apiserver/pkg/authentication/token/tokenfile",
         "//vendor:k8s.io/apiserver/pkg/authentication/user",
         "//vendor:k8s.io/client-go/kubernetes/typed/authentication/v1beta1",
+        "//vendor:k8s.io/client-go/pkg/util/cert",
     ],
 )
 

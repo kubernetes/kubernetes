@@ -29,7 +29,7 @@ import (
 	"testing"
 
 	"k8s.io/apimachinery/pkg/util/sets"
-	utiltesting "k8s.io/kubernetes/pkg/util/testing"
+	utiltesting "k8s.io/client-go/pkg/util/testing"
 )
 
 func TestNewAtomicWriter(t *testing.T) {

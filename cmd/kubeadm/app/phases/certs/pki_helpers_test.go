@@ -24,7 +24,7 @@ import (
 	"os"
 	"testing"
 
-	certutil "k8s.io/kubernetes/pkg/util/cert"
+	certutil "k8s.io/client-go/pkg/util/cert"
 )
 
 func TestNewCertificateAuthority(t *testing.T) {

@@ -17,7 +17,7 @@ limitations under the License.
 package fake
 
 import (
-	"k8s.io/kubernetes/pkg/client/restclient"
+	restclient "k8s.io/client-go/rest"
 	"k8s.io/kubernetes/pkg/client/testing/core"
 )
 
