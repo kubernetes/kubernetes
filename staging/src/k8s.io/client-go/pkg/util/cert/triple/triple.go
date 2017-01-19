@@ -80,6 +80,7 @@ func NewServerKeyPair(ca *KeyPair, commonName, svcName, svcNamespace, dnsDomain 
 	config := certutil.Config{
 		CommonName: commonName,
 		AltNames:   altNames,
+		Usages:     []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
 	}
 	cert, err := certutil.NewSignedCert(config, key, ca.Cert, ca.Key)
 	if err != nil {
@@ -92,14 +93,16 @@ func NewServerKeyPair(ca *KeyPair, commonName, svcName, svcNamespace, dnsDomain 
 	}, nil
 }
 
-func NewClientKeyPair(ca *KeyPair, commonName string) (*KeyPair, error) {
+func NewClientKeyPair(ca *KeyPair, commonName string, organizations []string) (*KeyPair, error) {
 	key, err := certutil.NewPrivateKey()
 	if err != nil {
 		return nil, fmt.Errorf("unable to create a client private key: %v", err)
 	}
 
 	config := certutil.Config{
-		CommonName: commonName,
+		CommonName:   commonName,
+		Organization: organizations,
+		Usages:       []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
 	}
 	cert, err := certutil.NewSignedCert(config, key, ca.Cert, ca.Key)
 	if err != nil {
