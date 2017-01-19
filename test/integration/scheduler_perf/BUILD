@@ -41,7 +41,6 @@ go_test(
         "//test/integration/framework:go_default_library",
         "//test/utils:go_default_library",
         "//vendor:github.com/golang/glog",
-        "//vendor:github.com/renstrom/dedent",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
     ],
 )
