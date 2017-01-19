@@ -29,6 +29,7 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/images"
 	"k8s.io/kubernetes/pkg/api/resource"
 	api "k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/kubeapiserver/authorizer"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/util/intstr"
 
@@ -40,15 +41,17 @@ const (
 	DefaultClusterName     = "kubernetes"
 	DefaultCloudConfigPath = "/etc/kubernetes/cloud-config"
 
-	etcd                  = "etcd"
-	apiServer             = "apiserver"
-	controllerManager     = "controller-manager"
-	scheduler             = "scheduler"
-	proxy                 = "proxy"
-	kubeAPIServer         = "kube-apiserver"
-	kubeControllerManager = "kube-controller-manager"
-	kubeScheduler         = "kube-scheduler"
-	kubeProxy             = "kube-proxy"
+	etcd                           = "etcd"
+	apiServer                      = "apiserver"
+	controllerManager              = "controller-manager"
+	scheduler                      = "scheduler"
+	proxy                          = "proxy"
+	kubeAPIServer                  = "kube-apiserver"
+	kubeControllerManager          = "kube-controller-manager"
+	kubeScheduler                  = "kube-scheduler"
+	kubeProxy                      = "kube-proxy"
+	authorizationPolicyFile        = "abac_policy.json"
+	authorizationWebhookConfigFile = "webhook_authz.conf"
 )
 
 var (
@@ -296,6 +299,16 @@ func getAPIServerCommand(cfg *kubeadmapi.MasterConfiguration) []string {
 		"--allow-privileged",
 	)
 
+	if cfg.AuthorizationMode != "" {
+		command = append(command, "--authorization-mode="+cfg.AuthorizationMode)
+		switch cfg.AuthorizationMode {
+		case authorizer.ModeABAC:
+			command = append(command, "--authorization-policy-file="+path.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, authorizationPolicyFile))
+		case authorizer.ModeWebhook:
+			command = append(command, "--authorization-webhook-config-file="+path.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, authorizationWebhookConfigFile))
+		}
+	}
+
 	// Use first address we are given
 	if len(cfg.API.AdvertiseAddresses) > 0 {
 		command = append(command, fmt.Sprintf("--advertise-address=%s", cfg.API.AdvertiseAddresses[0]))
@@ -357,7 +370,7 @@ func getControllerManagerCommand(cfg *kubeadmapi.MasterConfiguration) []string {
 		"--service-account-private-key-file="+kubeadmapi.GlobalEnvParams.HostPKIPath+"/apiserver-key.pem",
 		"--cluster-signing-cert-file="+kubeadmapi.GlobalEnvParams.HostPKIPath+"/ca.pem",
 		"--cluster-signing-key-file="+kubeadmapi.GlobalEnvParams.HostPKIPath+"/ca-key.pem",
-		"--insecure-experimental-approve-all-kubelet-csrs-for-group=system:kubelet-bootstrap",
+		"--insecure-experimental-approve-all-kubelet-csrs-for-group=kubeadm:kubelet-bootstrap",
 	)
 
 	if cfg.CloudProvider != "" {
