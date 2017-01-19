@@ -48,9 +48,8 @@ import (
 )
 
 const (
-	SchedulerAnnotationKey = "scheduler.alpha.kubernetes.io/name"
-	initialGetBackoff      = 100 * time.Millisecond
-	maximalGetBackoff      = time.Minute
+	initialGetBackoff = 100 * time.Millisecond
+	maximalGetBackoff = time.Minute
 )
 
 // ConfigFactory is the default implementation of the scheduler.Configurator interface.
@@ -90,8 +89,7 @@ type ConfigFactory struct {
 	schedulerCache schedulercache.Cache
 
 	// SchedulerName of a scheduler is used to select which pods will be
-	// processed by this scheduler, based on pods's annotation key:
-	// 'scheduler.alpha.kubernetes.io/name'
+	// processed by this scheduler, based on pods's "spec.SchedulerName".
 	schedulerName string
 
 	// RequiredDuringScheduling affinity is not symmetric, but there is an implicit PreferredDuringScheduling affinity rule
@@ -514,11 +512,7 @@ func (f *ConfigFactory) getNextPod() *v1.Pod {
 }
 
 func (f *ConfigFactory) ResponsibleForPod(pod *v1.Pod) bool {
-	if f.schedulerName == v1.DefaultSchedulerName {
-		return pod.Annotations[SchedulerAnnotationKey] == f.schedulerName || pod.Annotations[SchedulerAnnotationKey] == ""
-	} else {
-		return pod.Annotations[SchedulerAnnotationKey] == f.schedulerName
-	}
+	return f.schedulerName == pod.Spec.SchedulerName
 }
 
 func getNodeConditionPredicate() cache.NodeConditionPredicate {

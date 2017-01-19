@@ -2553,6 +2553,11 @@ message PodSpec {
   // If specified, the pod's scheduling constraints
   // +optional
   optional Affinity affinity = 18;
+
+  // If specified, the pod will be dispatched by specified scheduler.
+  // If not specified, the pod will be dispatched by default scheduler.
+  // +optional
+  optional string schedulername = 19;
 }
 
 // PodStatus represents information about the status of a pod. Status may trail the actual

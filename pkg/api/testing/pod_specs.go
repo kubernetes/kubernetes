@@ -29,6 +29,7 @@ func DeepEqualSafePodSpec() api.PodSpec {
 		DNSPolicy:                     api.DNSClusterFirst,
 		TerminationGracePeriodSeconds: &grace,
 		SecurityContext:               &api.PodSecurityContext{},
+		SchedulerName:                 api.DefaultSchedulerName,
 	}
 }
 
