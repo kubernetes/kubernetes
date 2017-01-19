@@ -19,15 +19,24 @@ package openapi
 import (
 	"bytes"
 	"fmt"
+	"reflect"
 	"strings"
 	"unicode"
 
 	"github.com/emicklei/go-restful"
 
+	"k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/util/trie"
+	"k8s.io/kubernetes/pkg/api"
 )
 
 var verbs = trie.New([]string{"get", "log", "read", "replace", "patch", "delete", "deletecollection", "watch", "connect", "proxy", "list", "create", "patch"})
+
+const (
+	extensionGVK = "x-kubernetes-group-version-kind"
+)
 
 // ToValidOperationID makes an string a valid op ID (e.g. removing punctuations and whitespaces and make it camel case)
 func ToValidOperationID(s string, capitalizeFirstLetter bool) string {
@@ -84,4 +93,55 @@ func GetOperationIDAndTags(servePath string, r *restful.Route) (string, []string
 	default:
 		return op, tags, nil
 	}
+}
+
+// DefinitionNamer is the type to customize OpenAPI definition name.
+type DefinitionNamer struct {
+	typeGroupVersionKinds map[string][]v1.GroupVersionKind
+}
+
+func gvkConvert(gvk schema.GroupVersionKind) v1.GroupVersionKind {
+	return v1.GroupVersionKind{
+		Group:   gvk.Group,
+		Version: gvk.Version,
+		Kind:    gvk.Kind,
+	}
+}
+
+func friendlyName(name string) string {
+	nameParts := strings.Split(name, "/")
+	// Reverse first part. e.g., io.k8s... instead of k8s.io...
+	if len(nameParts) > 0 && strings.Contains(nameParts[0], ".") {
+		parts := strings.Split(nameParts[0], ".")
+		for i, j := 0, len(parts)-1; i < j; i, j = i+1, j-1 {
+			parts[i], parts[j] = parts[j], parts[i]
+		}
+		nameParts[0] = strings.Join(parts, ".")
+	}
+	return strings.Join(nameParts, ".")
+}
+
+func typeName(t reflect.Type) string {
+	return fmt.Sprintf("%s.%s", t.PkgPath(), t.Name())
+}
+
+// NewDefinitionNamer constructs a new DefinitionNamer to be used to customize OpenAPI spec.
+func NewDefinitionNamer(s *runtime.Scheme) DefinitionNamer {
+	ret := DefinitionNamer{
+		typeGroupVersionKinds: map[string][]v1.GroupVersionKind{},
+	}
+	for gvk, rtype := range api.Scheme.AllKnownTypes() {
+		ret.typeGroupVersionKinds[typeName(rtype)] = append(ret.typeGroupVersionKinds[typeName(rtype)], gvkConvert(gvk))
+	}
+	return ret
+}
+
+// GetDefinitionName returns the name and tags for a given definition
+func (d *DefinitionNamer) GetDefinitionName(servePath string, name string) (string, spec.Extensions) {
+	if groupVersionKinds, ok := d.typeGroupVersionKinds[name]; ok {
+		return friendlyName(name), spec.Extensions{
+			extensionGVK: groupVersionKinds,
+		}
+	}
+	return friendlyName(name), nil
 }
