@@ -26,8 +26,8 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
-	"k8s.io/kubernetes/pkg/api"
 )
 
 const globalTimeout = time.Minute
@@ -198,7 +198,7 @@ func (tw *baseTimeoutWriter) timeout(msg string) {
 			tw.w.Write([]byte(msg))
 		} else {
 			enc := json.NewEncoder(tw.w)
-			enc.Encode(errors.NewServerTimeout(api.Resource(""), "", 0))
+			enc.Encode(errors.NewServerTimeout(schema.GroupResource{}, "", 0))
 		}
 	} else {
 		// The timeout writer has been used by the inner handler. There is
