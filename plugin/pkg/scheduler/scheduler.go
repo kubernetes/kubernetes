@@ -78,6 +78,7 @@ type Configurator interface {
 	CreateFromKeys(predicateKeys, priorityKeys sets.String, extenders []algorithm.SchedulerExtender) (*Config, error)
 }
 
+// TODO jayunit100 over time we should make this struct a hidden implementation detail of the scheduler.
 type Config struct {
 	// It is expected that changes made via SchedulerCache will be observed
 	// by NodeLister and Algorithm.
@@ -100,20 +101,40 @@ type Config struct {
 	// question, and the error
 	Error func(*v1.Pod, error)
 
-	// Recorder is the EventRecorder to use
+	// recorder is the EventRecorder to use
 	Recorder record.EventRecorder
 
 	// Close this to shut down the scheduler.
 	StopEverything chan struct{}
 }
 
-// New returns a new scheduler.
+// New returns a new scheduler.  This can give way over time to the "NewFromConfigurator" function,
+// which is interface driven.
 func New(c *Config) *Scheduler {
 	s := &Scheduler{
 		config: c,
 	}
 	metrics.Register()
 	return s
+}
+
+// NewFromConfigurator returns a new scheduler that is created entirely by the Configurator.  Assumes Create() is implemented.
+// Supports intermediate Config mutation for now if you provide modifier functions which will run after Config is created.
+func NewFromConfigurator(c Configurator, modifiers ...func(c *Config)) (*Scheduler, error) {
+	cfg, err := c.Create()
+	if err != nil {
+		return nil, err
+	}
+	// Mutate it if any functions were provided, changes might be required for certain types of tests (i.e. change the recorder).
+	for _, modifier := range modifiers {
+		modifier(cfg)
+	}
+	// From this point on the config is immutable to the outside.
+	s := &Scheduler{
+		config: cfg,
+	}
+	metrics.Register()
+	return s, nil
 }
 
 // Run begins watching and scheduling. It starts a goroutine and returns immediately.
