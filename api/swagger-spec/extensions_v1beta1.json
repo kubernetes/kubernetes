@@ -8634,12 +8634,26 @@
      "configMapRef": {
       "$ref": "v1.ConfigMapEnvSource",
       "description": "The ConfigMap to select from"
+     },
+     "secretRef": {
+      "$ref": "v1.SecretEnvSource",
+      "description": "The Secret to select from"
      }
     }
    },
    "v1.ConfigMapEnvSource": {
     "id": "v1.ConfigMapEnvSource",
     "description": "ConfigMapEnvSource selects a ConfigMap to populate the environment variables with.\n\nThe contents of the target ConfigMap's Data field will represent the key-value pairs as environment variables.",
+    "properties": {
+     "name": {
+      "type": "string",
+      "description": "Name of the referent. More info: http://kubernetes.io/docs/user-guide/identifiers#names"
+     }
+    }
+   },
+   "v1.SecretEnvSource": {
+    "id": "v1.SecretEnvSource",
+    "description": "SecretEnvSource selects a Secret to populate the environment variables with.\n\nThe contents of the target Secret's Data field will represent the key-value pairs as environment variables.",
     "properties": {
      "name": {
       "type": "string",
