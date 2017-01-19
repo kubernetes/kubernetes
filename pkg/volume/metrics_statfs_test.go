@@ -20,7 +20,7 @@ import (
 	"os"
 	"testing"
 
-	utiltesting "k8s.io/kubernetes/pkg/util/testing"
+	utiltesting "k8s.io/client-go/pkg/util/testing"
 )
 
 func TestGetMetricsStatFS(t *testing.T) {

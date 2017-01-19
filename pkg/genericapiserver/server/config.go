@@ -49,8 +49,9 @@ import (
 	authorizerunion "k8s.io/apiserver/pkg/authorization/union"
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/server/healthz"
+	certutil "k8s.io/client-go/pkg/util/cert"
+	restclient "k8s.io/client-go/rest"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/client/restclient"
 	genericauthenticator "k8s.io/kubernetes/pkg/genericapiserver/authenticator"
 	genericauthorizer "k8s.io/kubernetes/pkg/genericapiserver/authorizer"
 	genericapifilters "k8s.io/kubernetes/pkg/genericapiserver/endpoints/filters"
@@ -59,7 +60,6 @@ import (
 	"k8s.io/kubernetes/pkg/genericapiserver/server/mux"
 	"k8s.io/kubernetes/pkg/genericapiserver/server/options"
 	"k8s.io/kubernetes/pkg/genericapiserver/server/routes"
-	certutil "k8s.io/kubernetes/pkg/util/cert"
 )
 
 const (

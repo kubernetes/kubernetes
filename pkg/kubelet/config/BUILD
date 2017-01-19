@@ -67,12 +67,12 @@ go_test(
         "//pkg/client/record:go_default_library",
         "//pkg/kubelet/types:go_default_library",
         "//pkg/securitycontext:go_default_library",
-        "//pkg/util/testing:go_default_library",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/runtime",
         "//vendor:k8s.io/apimachinery/pkg/types",
         "//vendor:k8s.io/apimachinery/pkg/util/wait",
         "//vendor:k8s.io/apimachinery/pkg/watch",
+        "//vendor:k8s.io/client-go/pkg/util/testing",
     ],
 )
 

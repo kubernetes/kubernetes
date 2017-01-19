@@ -30,7 +30,10 @@ go_test(
     srcs = ["clientset_test.go"],
     library = ":go_default_library",
     tags = ["automanaged"],
-    deps = ["//vendor:k8s.io/client-go/pkg/util/flowcontrol"],
+    deps = [
+        "//vendor:k8s.io/client-go/pkg/util/flowcontrol",
+        "//vendor:k8s.io/client-go/rest",
+    ],
 )
 
 filegroup(

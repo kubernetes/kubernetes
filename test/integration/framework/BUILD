@@ -61,6 +61,7 @@ go_library(
         "//vendor:k8s.io/apiserver/pkg/authentication/user",
         "//vendor:k8s.io/apiserver/pkg/authorization/authorizer",
         "//vendor:k8s.io/apiserver/pkg/authorization/union",
+        "//vendor:k8s.io/client-go/rest",
     ],
 )
 

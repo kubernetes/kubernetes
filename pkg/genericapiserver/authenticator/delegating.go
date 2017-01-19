@@ -33,7 +33,7 @@ import (
 	"k8s.io/apiserver/pkg/authentication/user"
 	authenticationclient "k8s.io/client-go/kubernetes/typed/authentication/v1beta1"
 
-	"k8s.io/kubernetes/pkg/util/cert"
+	"k8s.io/client-go/pkg/util/cert"
 	webhooktoken "k8s.io/kubernetes/plugin/pkg/auth/authenticator/token/webhook"
 )
 

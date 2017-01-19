@@ -24,7 +24,7 @@ import (
 	"fmt"
 	"net"
 
-	"k8s.io/kubernetes/pkg/client/restclient"
+	restclient "k8s.io/client-go/rest"
 
 	"github.com/golang/glog"
 )

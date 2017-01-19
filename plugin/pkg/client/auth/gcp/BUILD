@@ -19,6 +19,7 @@ go_library(
         "//vendor:golang.org/x/oauth2",
         "//vendor:golang.org/x/oauth2/google",
         "//vendor:k8s.io/apimachinery/pkg/util/yaml",
+        "//vendor:k8s.io/client-go/rest",
     ],
 )
 

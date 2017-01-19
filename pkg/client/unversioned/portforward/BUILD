@@ -33,6 +33,7 @@ go_test(
         "//pkg/kubelet/server/portforward:go_default_library",
         "//pkg/util/httpstream:go_default_library",
         "//vendor:k8s.io/apimachinery/pkg/types",
+        "//vendor:k8s.io/client-go/rest",
     ],
 )
 

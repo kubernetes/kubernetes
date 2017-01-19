@@ -41,6 +41,7 @@ go_test(
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/labels",
         "//vendor:k8s.io/apimachinery/pkg/runtime",
+        "//vendor:k8s.io/client-go/rest",
         "//vendor:k8s.io/heapster/metrics/api/v1/types",
         "//vendor:k8s.io/heapster/metrics/apis/metrics/v1alpha1",
     ],

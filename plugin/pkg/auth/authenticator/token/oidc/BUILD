@@ -13,13 +13,13 @@ go_library(
     srcs = ["oidc.go"],
     tags = ["automanaged"],
     deps = [
-        "//pkg/util/cert:go_default_library",
         "//vendor:github.com/coreos/go-oidc/jose",
         "//vendor:github.com/coreos/go-oidc/oidc",
         "//vendor:github.com/golang/glog",
         "//vendor:k8s.io/apimachinery/pkg/util/net",
         "//vendor:k8s.io/apimachinery/pkg/util/runtime",
         "//vendor:k8s.io/apiserver/pkg/authentication/user",
+        "//vendor:k8s.io/client-go/pkg/util/cert",
     ],
 )
 

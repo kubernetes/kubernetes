@@ -70,7 +70,6 @@ go_test(
         "//pkg/util/httpstream:go_default_library",
         "//pkg/util/httpstream/spdy:go_default_library",
         "//pkg/util/term:go_default_library",
-        "//pkg/util/testing:go_default_library",
         "//pkg/volume:go_default_library",
         "//vendor:github.com/google/cadvisor/info/v1",
         "//vendor:github.com/google/cadvisor/info/v2",
@@ -82,6 +81,7 @@ go_test(
         "//vendor:k8s.io/apimachinery/pkg/util/sets",
         "//vendor:k8s.io/apiserver/pkg/authentication/user",
         "//vendor:k8s.io/apiserver/pkg/authorization/authorizer",
+        "//vendor:k8s.io/client-go/pkg/util/testing",
     ],
 )
 

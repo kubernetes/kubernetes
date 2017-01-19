@@ -58,6 +58,7 @@ go_library(
         "//vendor:github.com/golang/glog",
         "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
         "//vendor:k8s.io/apimachinery/pkg/util/net",
+        "//vendor:k8s.io/client-go/rest",
     ],
 )
 
