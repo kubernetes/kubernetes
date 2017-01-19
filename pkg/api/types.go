@@ -2852,6 +2852,7 @@ type DeleteOptions struct {
 
 // ListOptions is the query options to a standard REST list call, and has future support for
 // watch calls.
+// DEPRECATED: This type has been moved to meta/v1 and will be removed soon.
 type ListOptions struct {
 	metav1.TypeMeta
 
