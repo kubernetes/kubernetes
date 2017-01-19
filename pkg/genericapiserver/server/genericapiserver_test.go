@@ -61,7 +61,7 @@ func setUp(t *testing.T) (*etcdtesting.EtcdTestServer, Config, *assert.Assertion
 	config.RequestContextMapper = genericapirequest.NewRequestContextMapper()
 	config.LegacyAPIGroupPrefixes = sets.NewString("/api")
 
-	config.OpenAPIConfig = DefaultOpenAPIConfig(openapigen.OpenAPIDefinitions)
+	config.OpenAPIConfig = DefaultOpenAPIConfig(openapigen.GetOpenAPIDefinitions)
 	config.OpenAPIConfig.Info = &spec.Info{
 		InfoProps: spec.InfoProps{
 			Title:   "Kubernetes",

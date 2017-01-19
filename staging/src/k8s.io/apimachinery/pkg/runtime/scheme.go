@@ -575,6 +575,24 @@ func (s *Scheme) generateConvertMeta(in interface{}) (conversion.FieldMatchingFl
 	return s.converter.DefaultMeta(reflect.TypeOf(in))
 }
 
+// Creates and returns a copy of Scheme.typeToGVK
+func (s *Scheme) ExportTypesToGVKMaps() map[reflect.Type][]schema.GroupVersionKind {
+	ret := map[reflect.Type][]schema.GroupVersionKind{}
+	for k, v := range s.typeToGVK {
+		ret[k] = v
+	}
+	return ret
+}
+
+// Creates and returns a copy of Scheme.unversionedTypes
+func (s *Scheme) ExportUnversionedTypesMap() map[reflect.Type]schema.GroupVersionKind {
+	ret := map[reflect.Type]schema.GroupVersionKind{}
+	for k, v := range s.unversionedTypes {
+		ret[k] = v
+	}
+	return ret
+}
+
 // copyAndSetTargetKind performs a conditional copy before returning the object, or an error if copy was not successful.
 func copyAndSetTargetKind(copy bool, copier ObjectCopier, obj Object, kind schema.GroupVersionKind) (Object, error) {
 	if copy {

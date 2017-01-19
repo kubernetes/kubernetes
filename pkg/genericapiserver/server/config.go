@@ -213,7 +213,8 @@ func NewConfig() *Config {
 	return config.ApplyOptions(defaultOptions)
 }
 
-func DefaultOpenAPIConfig(definitions *openapicommon.OpenAPIDefinitions) *openapicommon.Config {
+func DefaultOpenAPIConfig(getDefinitions openapicommon.GetOpenAPIDefinitions) *openapicommon.Config {
+	defNamer := apiopenapi.NewDefinitionNamer(api.Scheme)
 	return &openapicommon.Config{
 		ProtocolList:   []string{"https"},
 		IgnorePrefixes: []string{"/swaggerapi"},
@@ -229,7 +230,8 @@ func DefaultOpenAPIConfig(definitions *openapicommon.OpenAPIDefinitions) *openap
 			},
 		},
 		GetOperationIDAndTags: apiopenapi.GetOperationIDAndTags,
-		Definitions:           definitions,
+		GetDefinitionName:     defNamer.GetDefinitionName,
+		GetDefinitions:        getDefinitions,
 	}
 }
 

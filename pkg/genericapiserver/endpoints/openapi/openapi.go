@@ -19,11 +19,15 @@ package openapi
 import (
 	"bytes"
 	"fmt"
+	"reflect"
 	"strings"
 	"unicode"
 
 	"github.com/emicklei/go-restful"
 
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/util"
 )
 
@@ -84,4 +88,42 @@ func GetOperationIDAndTags(servePath string, r *restful.Route) (string, []string
 	default:
 		return op, tags, nil
 	}
+}
+
+// DefinitionNamer is the type to customize OpenAPI definition name.
+type DefinitionNamer struct {
+	typeTags map[string][]string
+}
+
+func gvkToTag(gvk schema.GroupVersionKind) string {
+	group := gvk.Group
+	if group == "" {
+		group = "core"
+	}
+	return fmt.Sprintf("%s/%s/%s", group, gvk.Version, gvk.Kind)
+}
+
+func typeName(t reflect.Type) string {
+	return fmt.Sprintf("%s.%s", t.PkgPath(), t.Name())
+}
+
+// NewDefinitionNamer constructs a new DefinitionNamer to be used to customize OpenAPI spec.
+func NewDefinitionNamer(s *runtime.Scheme) DefinitionNamer {
+	ret := DefinitionNamer{
+		typeTags: map[string][]string{},
+	}
+	for k, v := range api.Scheme.ExportTypesToGVKMaps() {
+		for _, gvk := range v {
+			ret.typeTags[typeName(k)] = append(ret.typeTags[typeName(k)], gvkToTag(gvk))
+		}
+	}
+	for k, gvk := range api.Scheme.ExportUnversionedTypesMap() {
+		ret.typeTags[typeName(k)] = append(ret.typeTags[typeName(k)], gvkToTag(gvk))
+	}
+	return ret
+}
+
+// GetDefinitionName returns the name and tags for a given definition
+func (d *DefinitionNamer) GetDefinitionName(servePath string, name string) (string, []string) {
+	return name, d.typeTags[name]
 }

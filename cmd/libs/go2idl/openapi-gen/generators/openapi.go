@@ -133,7 +133,7 @@ const (
 // openApiGen produces a file with auto-generated OpenAPI functions.
 type openAPIGen struct {
 	generator.DefaultGen
-	// TargetPackage is the package that will get OpenAPIDefinitions variable contains all open API definitions.
+	// TargetPackage is the package that will get GetOpenAPIDefinitions function returns all open API definitions.
 	targetPackage *types.Package
 	imports       namer.ImportTracker
 	context       *generator.Context
@@ -185,22 +185,23 @@ func (g *openAPIGen) Imports(c *generator.Context) []string {
 
 func argsFromType(t *types.Type) generator.Args {
 	return generator.Args{
-		"type":               t,
-		"OpenAPIDefinitions": types.Ref(openAPICommonPackagePath, "OpenAPIDefinitions"),
-		"OpenAPIDefinition":  types.Ref(openAPICommonPackagePath, "OpenAPIDefinition"),
-		"SpecSchemaType":     types.Ref(specPackagePath, "Schema"),
+		"type":              t,
+		"ReferenceCallback": types.Ref(openAPICommonPackagePath, "ReferenceCallback"),
+		"OpenAPIDefinition": types.Ref(openAPICommonPackagePath, "OpenAPIDefinition"),
+		"SpecSchemaType":    types.Ref(specPackagePath, "Schema"),
 	}
 }
 
 func (g *openAPIGen) Init(c *generator.Context, w io.Writer) error {
 	sw := generator.NewSnippetWriter(w, c, "$", "$")
-	sw.Do("var OpenAPIDefinitions *$.OpenAPIDefinitions|raw$ = ", argsFromType(nil))
-	sw.Do("&$.OpenAPIDefinitions|raw${\n", argsFromType(nil))
+	sw.Do("func GetOpenAPIDefinitions(ref $.ReferenceCallback|raw$) map[string]$.OpenAPIDefinition|raw$ {\n", argsFromType(nil))
+	sw.Do("return map[string]$.OpenAPIDefinition|raw${\n", argsFromType(nil))
 	return sw.Error()
 }
 
 func (g *openAPIGen) Finalize(c *generator.Context, w io.Writer) error {
 	sw := generator.NewSnippetWriter(w, c, "$", "$")
+	sw.Do("}\n", nil)
 	sw.Do("}\n", nil)
 	return sw.Error()
 }
@@ -308,9 +309,9 @@ func (g openAPITypeWriter) generate(t *types.Type) error {
 	switch t.Kind {
 	case types.Struct:
 		args := argsFromType(t)
-		g.Do("\"$.$\": ", typeShortName(t))
+		g.Do("\"$.$\": ", t.Name)
 		if hasOpenAPIDefinitionMethod(t) {
-			g.Do("$.type|raw${}.OpenAPIDefinition(),", args)
+			g.Do("$.type|raw${}.OpenAPIDefinition(),\n", args)
 			return nil
 		}
 		g.Do("{\nSchema: spec.Schema{\nSchemaProps: spec.SchemaProps{\n", nil)
@@ -437,14 +438,8 @@ func (g openAPITypeWriter) generateSimpleProperty(typeString, format string) {
 }
 
 func (g openAPITypeWriter) generateReferenceProperty(t *types.Type) {
-	var name string
-	if t.Name.Package == "" {
-		name = t.Name.Name
-	} else {
-		name = filepath.Base(t.Name.Package) + "." + t.Name.Name
-	}
-	g.refTypes[name] = t
-	g.Do("Ref: spec.MustCreateRef(\"#/definitions/$.$\"),\n", name)
+	g.refTypes[t.Name.String()] = t
+	g.Do("Ref: ref(\"$.$\"),\n", t.Name.String())
 }
 
 func resolveAliasAndPtrType(t *types.Type) *types.Type {
