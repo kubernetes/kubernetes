@@ -56,6 +56,7 @@ go_library(
         "//pkg/credentialprovider/aws:go_default_library",
         "//pkg/credentialprovider/azure:go_default_library",
         "//pkg/credentialprovider/gcp:go_default_library",
+        "//pkg/credentialprovider/rancher:go_default_library",
         "//pkg/genericapiserver/authenticator:go_default_library",
         "//pkg/genericapiserver/authorizer:go_default_library",
         "//pkg/kubelet:go_default_library",
