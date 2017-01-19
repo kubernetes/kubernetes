@@ -14,5 +14,5 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package password contains authenticator.Password implementations
-package password // import "k8s.io/kubernetes/plugin/pkg/auth/authenticator/password"
+// Package authenticator contains implementations for pkg/auth/authenticator interfaces
+package authenticator // import "k8s.io/apiserver/plugin/pkg/authenticator"

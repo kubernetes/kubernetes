@@ -31,10 +31,9 @@ import (
 	unionauth "k8s.io/apiserver/pkg/authentication/request/union"
 	"k8s.io/apiserver/pkg/authentication/request/x509"
 	"k8s.io/apiserver/pkg/authentication/user"
+	webhooktoken "k8s.io/apiserver/plugin/pkg/authenticator/token/webhook"
 	authenticationclient "k8s.io/client-go/kubernetes/typed/authentication/v1beta1"
-
 	"k8s.io/kubernetes/pkg/util/cert"
-	webhooktoken "k8s.io/kubernetes/plugin/pkg/auth/authenticator/token/webhook"
 )
 
 // DelegatingAuthenticatorConfig is the minimal configuration needed to create an authenticator
