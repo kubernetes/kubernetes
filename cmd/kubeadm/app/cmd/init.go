@@ -42,7 +42,6 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/kubeapiserver/authorizer"
 )
 
 var (
@@ -258,7 +257,7 @@ func (i *Init) Run(out io.Writer) error {
 		return err
 	}
 
-	if i.cfg.AuthorizationMode == authorizer.ModeRBAC {
+	if i.cfg.AuthorizationMode == "RBAC" {
 		err = apiconfig.CreateBootstrapRBACClusterRole(client)
 		if err != nil {
 			return err
