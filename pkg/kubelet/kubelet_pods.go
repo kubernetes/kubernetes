@@ -576,9 +576,8 @@ func containerResourceRuntimeValue(fs *v1.ResourceFieldSelector, pod *v1.Pod, co
 	containerName := fs.ContainerName
 	if len(containerName) == 0 {
 		return fieldpath.ExtractContainerResourceValue(fs, container)
-	} else {
-		return fieldpath.ExtractResourceValueByContainerName(fs, pod, containerName)
 	}
+	return fieldpath.ExtractResourceValueByContainerName(fs, pod, containerName)
 }
 
 // One of the following arguments must be non-nil: runningPod, status.

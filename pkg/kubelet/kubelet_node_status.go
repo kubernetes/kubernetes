@@ -470,12 +470,11 @@ func (kl *Kubelet) setNodeAddress(node *v1.Node) error {
 		if ipAddr == nil {
 			// We tried everything we could, but the IP address wasn't fetchable; error out
 			return fmt.Errorf("can't get ip address of node %s. error: %v", node.Name, err)
-		} else {
-			node.Status.Addresses = []v1.NodeAddress{
-				{Type: v1.NodeLegacyHostIP, Address: ipAddr.String()},
-				{Type: v1.NodeInternalIP, Address: ipAddr.String()},
-				{Type: v1.NodeHostName, Address: kl.GetHostname()},
-			}
+		}
+		node.Status.Addresses = []v1.NodeAddress{
+			{Type: v1.NodeLegacyHostIP, Address: ipAddr.String()},
+			{Type: v1.NodeInternalIP, Address: ipAddr.String()},
+			{Type: v1.NodeHostName, Address: kl.GetHostname()},
 		}
 	}
 	return nil

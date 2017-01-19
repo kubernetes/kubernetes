@@ -235,7 +235,7 @@ func createEndpointPortSpec(endpointPort int, endpointPortName string, extraEndp
 	return endpointPorts
 }
 
-// CreateMasterServiceIfNeeded will create the specified service if it
+// CreateOrUpdateMasterServiceIfNeeded will create the specified service if it
 // doesn't already exist.
 func (c *Controller) CreateOrUpdateMasterServiceIfNeeded(serviceName string, serviceIP net.IP, servicePorts []api.ServicePort, serviceType api.ServiceType, reconcile bool) error {
 	if s, err := c.ServiceClient.Services(api.NamespaceDefault).Get(serviceName, metav1.GetOptions{}); err == nil {
