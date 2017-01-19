@@ -115,7 +115,7 @@ function split-commas {
 }
 
 function install-gci-mounter-tools {
-    local -r rkt_version="v1.18.0"
+    local -r rkt_version="v1.22.0"
     local -r gci_mounter_version="v2"
     local -r rkt_binary_sha1="75fc8f29c79bc9e505f3e7f6e8fadf2425c21967"
     local -r rkt_stage1_fly_sha1="474df5a1f934960ba669b360ab713d0a54283091"

@@ -54,7 +54,8 @@ func (*NsenterExecHandler) ExecInContainer(client DockerInterface, container *do
 	args = append(args, cmd...)
 	command := exec.Command(nsenter, args...)
 	if tty {
-		p, err := kubecontainer.StartPty(command)
+		var p *os.File
+		p, err = kubecontainer.StartPty(command)
 		if err != nil {
 			return err
 		}
