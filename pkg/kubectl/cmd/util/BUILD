@@ -93,7 +93,6 @@ go_test(
         "//pkg/client/testing/core:go_default_library",
         "//pkg/client/typed/discovery:go_default_library",
         "//pkg/client/unversioned/clientcmd:go_default_library",
-        "//pkg/client/unversioned/clientcmd/api:go_default_library",
         "//pkg/controller:go_default_library",
         "//pkg/kubectl:go_default_library",
         "//pkg/kubectl/resource:go_default_library",
@@ -110,6 +109,7 @@ go_test(
         "//vendor:k8s.io/apimachinery/pkg/util/validation/field",
         "//vendor:k8s.io/apimachinery/pkg/version",
         "//vendor:k8s.io/apimachinery/pkg/watch",
+        "//vendor:k8s.io/client-go/tools/clientcmd/api",
     ],
 )
 

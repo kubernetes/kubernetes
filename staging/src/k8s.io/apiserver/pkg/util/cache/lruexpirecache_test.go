@@ -20,7 +20,7 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/kubernetes/pkg/util/clock"
+	"k8s.io/client-go/pkg/util/clock"
 
 	"github.com/golang/groupcache/lru"
 )

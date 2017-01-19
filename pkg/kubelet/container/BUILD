@@ -31,7 +31,6 @@ go_library(
         "//pkg/kubelet/api/v1alpha1/runtime:go_default_library",
         "//pkg/kubelet/util/format:go_default_library",
         "//pkg/kubelet/util/ioutils:go_default_library",
-        "//pkg/util/flowcontrol:go_default_library",
         "//pkg/util/hash:go_default_library",
         "//pkg/util/term:go_default_library",
         "//pkg/volume:go_default_library",
@@ -43,6 +42,7 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/types",
         "//vendor:k8s.io/apimachinery/pkg/util/errors",
         "//vendor:k8s.io/apimachinery/pkg/util/runtime",
+        "//vendor:k8s.io/client-go/pkg/util/flowcontrol",
     ],
 )
 

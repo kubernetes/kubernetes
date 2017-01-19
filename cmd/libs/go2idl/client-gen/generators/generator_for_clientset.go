@@ -62,7 +62,7 @@ func (g *genClientset) Imports(c *generator.Context) (imports []string) {
 		}
 	}
 	imports = append(imports, "github.com/golang/glog")
-	imports = append(imports, "k8s.io/kubernetes/pkg/util/flowcontrol")
+	imports = append(imports, "k8s.io/client-go/pkg/util/flowcontrol")
 	// import solely to initialize client auth plugins.
 	imports = append(imports, "_ \"k8s.io/kubernetes/plugin/pkg/client/auth\"")
 	return

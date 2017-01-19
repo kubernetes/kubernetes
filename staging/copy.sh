@@ -64,11 +64,17 @@ cd "${CLIENT_REPO}"
 # save copies code from client-go into the temp folder to make sure we don't lose it by accident
 # TODO this is temporary until everything in certain directories is authoritative
 function save() {
-    cp -r "${CLIENT_REPO}/$1" "${CLIENT_REPO_TEMP}"
+    mkdir -p "${CLIENT_REPO_TEMP}/$1"
+    cp -r "${CLIENT_REPO}/$1/"* "${CLIENT_REPO_TEMP}/$1"
 }
 
 # save everything for which the staging directory is the source of truth
-save "/transport"
+save "transport"
+save "tools/clientcmd/api"
+save "rest/watch"
+save "pkg/util/clock"
+save "pkg/util/integer"
+save "pkg/util/flowcontrol"
 
 
 
@@ -160,12 +166,9 @@ echo "rearranging directory layout"
 function mvfolder {
     local src=${1%/#/}
     local dst=${2%/#/}
-    # create the parent directory of dst
-    if [ "${dst%/*}" != "${dst}" ]; then
-        mkdir -p "${CLIENT_REPO_TEMP}/${dst%/*}"
-    fi
+    mkdir -p "${CLIENT_REPO_TEMP}/${dst}"
     # move
-    mv "${CLIENT_REPO_TEMP}/${src}" "${CLIENT_REPO_TEMP}/${dst}"
+    mv "${CLIENT_REPO_TEMP}/${src}"/* "${CLIENT_REPO_TEMP}/${dst}"
     # rewrite package
     local src_package="${src##*/}"
     local dst_package="${dst##*/}"

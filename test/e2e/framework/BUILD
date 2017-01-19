@@ -54,7 +54,6 @@ go_library(
         "//pkg/client/typed/discovery:go_default_library",
         "//pkg/client/typed/dynamic:go_default_library",
         "//pkg/client/unversioned/clientcmd:go_default_library",
-        "//pkg/client/unversioned/clientcmd/api:go_default_library",
         "//pkg/client/unversioned/remotecommand:go_default_library",
         "//pkg/cloudprovider:go_default_library",
         "//pkg/cloudprovider/providers/gce:go_default_library",
@@ -110,6 +109,7 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/watch",
         "//vendor:k8s.io/client-go/kubernetes",
         "//vendor:k8s.io/client-go/rest",
+        "//vendor:k8s.io/client-go/tools/clientcmd/api",
     ],
 )
 

@@ -78,12 +78,12 @@ go_test(
         "//pkg/kubelet/types:go_default_library",
         "//pkg/security/apparmor:go_default_library",
         "//pkg/securitycontext:go_default_library",
-        "//pkg/util/clock:go_default_library",
         "//vendor:github.com/docker/engine-api/types",
         "//vendor:github.com/docker/engine-api/types/container",
         "//vendor:github.com/golang/mock/gomock",
         "//vendor:github.com/stretchr/testify/assert",
         "//vendor:github.com/stretchr/testify/require",
+        "//vendor:k8s.io/client-go/pkg/util/clock",
     ],
 )
 

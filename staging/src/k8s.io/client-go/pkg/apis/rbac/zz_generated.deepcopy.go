@@ -139,14 +139,6 @@ func DeepCopy_rbac_PolicyRule(in interface{}, out interface{}, c *conversion.Clo
 			*out = make([]string, len(*in))
 			copy(*out, *in)
 		}
-		// in.AttributeRestrictions is kind 'Interface'
-		if in.AttributeRestrictions != nil {
-			if newVal, err := c.DeepCopy(&in.AttributeRestrictions); err != nil {
-				return err
-			} else {
-				out.AttributeRestrictions = *newVal.(*runtime.Object)
-			}
-		}
 		if in.APIGroups != nil {
 			in, out := &in.APIGroups, &out.APIGroups
 			*out = make([]string, len(*in))
