@@ -334,11 +334,11 @@ func genCerts(svcNamespace, name, svcName, localDNSZoneName string, ips, hostnam
 	if err != nil {
 		return nil, fmt.Errorf("failed to create federation API server key and certificate: %v", err)
 	}
-	cm, err := triple.NewClientKeyPair(ca, ControllerManagerCN)
+	cm, err := triple.NewClientKeyPair(ca, ControllerManagerCN, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create federation controller manager client key and certificate: %v", err)
 	}
-	admin, err := triple.NewClientKeyPair(ca, AdminCN)
+	admin, err := triple.NewClientKeyPair(ca, AdminCN, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create client key and certificate for an admin: %v", err)
 	}

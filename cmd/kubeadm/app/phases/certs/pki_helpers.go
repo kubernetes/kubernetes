@@ -51,6 +51,7 @@ func newServerKeyAndCert(caCert *x509.Certificate, caKey *rsa.PrivateKey, altNam
 	config := certutil.Config{
 		CommonName: "kube-apiserver",
 		AltNames:   altNames,
+		Usages:     []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
 	}
 	cert, err := certutil.NewSignedCert(config, key, caCert, caKey)
 	if err != nil {
@@ -65,7 +66,7 @@ func NewClientKeyAndCert(config *certutil.Config, caCert *x509.Certificate, caKe
 	if err != nil {
 		return nil, nil, fmt.Errorf("unable to create private key [%v]", err)
 	}
-
+	config.Usages = []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth}
 	cert, err := certutil.NewSignedCert(*config, key, caCert, caKey)
 	if err != nil {
 		return nil, nil, fmt.Errorf("unable to sign certificate [%v]", err)
