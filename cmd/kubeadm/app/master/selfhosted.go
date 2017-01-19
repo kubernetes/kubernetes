@@ -168,8 +168,6 @@ func waitForPodsWithLabel(client *clientset.Clientset, appLabel string) {
 
 		return true, nil
 	})
-
-	return
 }
 
 // Sources from bootkube templates.go

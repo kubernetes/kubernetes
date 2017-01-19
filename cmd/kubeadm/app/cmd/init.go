@@ -26,7 +26,6 @@ import (
 	"github.com/spf13/cobra"
 
 	"k8s.io/apimachinery/pkg/runtime"
-	setutil "k8s.io/apimachinery/pkg/util/sets"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiext "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
@@ -53,9 +52,6 @@ var (
 
 		kubeadm join --discovery %s
 		`)
-	deploymentStaticPod  = "static-pods"
-	deploymentSelfHosted = "self-hosted"
-	deploymentTypes      = []string{deploymentStaticPod, deploymentSelfHosted}
 )
 
 // NewCmdInit returns "kubeadm init" command.
@@ -67,12 +63,12 @@ func NewCmdInit(out io.Writer) *cobra.Command {
 
 	var cfgPath string
 	var skipPreFlight bool
-	var deploymentType string // static pods, self-hosted, etc.
+	var selfHosted bool
 	cmd := &cobra.Command{
 		Use:   "init",
 		Short: "Run this in order to set up the Kubernetes master",
 		Run: func(cmd *cobra.Command, args []string) {
-			i, err := NewInit(cfgPath, &cfg, skipPreFlight, deploymentType)
+			i, err := NewInit(cfgPath, &cfg, skipPreFlight, selfHosted)
 			kubeadmutil.CheckErr(err)
 			kubeadmutil.CheckErr(i.Validate())
 			kubeadmutil.CheckErr(i.Run(out))
@@ -117,7 +113,7 @@ func NewCmdInit(out io.Writer) *cobra.Command {
 
 	cmd.PersistentFlags().BoolVar(
 		&skipPreFlight, "skip-preflight-checks", skipPreFlight,
-		"skip preflight checks normally run before modifying the system",
+		"Skip preflight checks normally run before modifying the system",
 	)
 
 	cmd.PersistentFlags().Var(
@@ -125,15 +121,15 @@ func NewCmdInit(out io.Writer) *cobra.Command {
 		"The discovery method kubeadm will use for connecting nodes to the master",
 	)
 
-	cmd.PersistentFlags().StringVar(
-		&deploymentType, "deployment", deploymentType,
-		fmt.Sprintf("specify a deployment type from %v", deploymentTypes),
+	cmd.PersistentFlags().BoolVar(
+		&selfHosted, "self-hosted", selfHosted,
+		"Enable self-hosted control plane",
 	)
 
 	return cmd
 }
 
-func NewInit(cfgPath string, cfg *kubeadmapi.MasterConfiguration, skipPreFlight bool, deploymentType string) (*Init, error) {
+func NewInit(cfgPath string, cfg *kubeadmapi.MasterConfiguration, skipPreFlight bool, selfHosted bool) (*Init, error) {
 
 	fmt.Println("[kubeadm] WARNING: kubeadm is in alpha, please do not use it for production clusters.")
 
@@ -191,18 +187,12 @@ func NewInit(cfgPath string, cfg *kubeadmapi.MasterConfiguration, skipPreFlight 
 		fmt.Println("\t(/etc/systemd/system/kubelet.service.d/10-kubeadm.conf should be edited for this purpose)")
 	}
 
-	// Validate deployment type
-	supportedDeploymentTypes := setutil.NewString(deploymentStaticPod, deploymentSelfHosted)
-	if !supportedDeploymentTypes.Has(deploymentType) {
-		return nil, fmt.Errorf("%s is not a valid deployment type, you can use any of %v or leave unset to accept the default", deploymentType, supportedDeploymentTypes.List())
-	}
-
-	return &Init{cfg: cfg, deploymentType: deploymentType}, nil
+	return &Init{cfg: cfg, selfHosted: selfHosted}, nil
 }
 
 type Init struct {
-	cfg            *kubeadmapi.MasterConfiguration
-	deploymentType string
+	cfg        *kubeadmapi.MasterConfiguration
+	selfHosted bool
 }
 
 // Validate validates configuration passed to "kubeadm init"
@@ -271,7 +261,7 @@ func (i *Init) Run(out io.Writer) error {
 	}
 
 	// Is deployment type self-hosted?
-	if i.deploymentType == deploymentSelfHosted {
+	if i.selfHosted {
 		// Temporary control plane is up, now we create our self hosted control
 		// plane components and remove the static manifests:
 		fmt.Println("[init] Creating self-hosted control plane...")
