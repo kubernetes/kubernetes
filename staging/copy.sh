@@ -75,11 +75,14 @@ save "tools/clientcmd/api"
 save "rest"
 # remove the rest/fake until we're authoritative for it (need to update for registry)
 rm -rf ${CLIENT_REPO_TEMP}/rest/fake
+save "pkg/third_party"
 save "pkg/util/cert"
 save "pkg/util/clock"
 save "pkg/util/flowcontrol"
 save "pkg/util/integer"
+save "pkg/util/jsonpath"
 save "pkg/util/testing"
+save "plugin"
 
 
 
@@ -105,7 +108,6 @@ mkcp "/pkg/client/unversioned/auth" "/pkg/client/unversioned"
 mkcp "/pkg/client/unversioned/clientcmd" "/pkg/client/unversioned"
 mkcp "/pkg/client/unversioned/portforward" "/pkg/client/unversioned"
 
-mkcp "/plugin/pkg/client/auth" "/plugin/pkg/client"
 mkcp "/pkg/util/workqueue" "pkg/util"
 # remove this folder because it imports prometheus
 rm -rf "${CLIENT_REPO_TEMP}/pkg/util/workqueue/prometheus"
@@ -208,7 +210,6 @@ if [ "$(find "${CLIENT_REPO_TEMP}"/pkg/client -type f -name "*.go")" ]; then
 else
     rm -r "${CLIENT_REPO_TEMP}"/pkg/client
 fi
-mvfolder third_party pkg/third_party
 mvfolder federation pkg/federation
 
 echo "running gofmt"
