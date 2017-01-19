@@ -30,6 +30,8 @@ import (
 
 	"gopkg.in/gcfg.v1"
 
+	"golang.org/x/net/context"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
@@ -48,6 +50,7 @@ import (
 	"golang.org/x/oauth2/google"
 	compute "google.golang.org/api/compute/v1"
 	container "google.golang.org/api/container/v1"
+	"google.golang.org/api/gensupport"
 	"google.golang.org/api/googleapi"
 )
 
@@ -113,6 +116,12 @@ type Config struct {
 
 type DiskType string
 
+// ApiWithNamespace stores api and namespace in context
+type ApiWithNamespace struct {
+	namespace string
+	apiCall   string
+}
+
 const (
 	DiskTypeSSD      = "pd-ssd"
 	DiskTypeStandard = "pd-standard"
@@ -153,7 +162,25 @@ type Disks interface {
 }
 
 func init() {
+	registerMetrics()
 	cloudprovider.RegisterCloudProvider(ProviderName, func(config io.Reader) (cloudprovider.Interface, error) { return newGCECloud(config) })
+	gensupport.RegisterHook(trackAPILatency)
+}
+
+func trackAPILatency(ctx context.Context, req *http.Request) func(resp *http.Response) {
+	requestTime := time.Now()
+	t := ctx.Value("kube-api-namespace")
+	apiNamespace, ok := t.(ApiWithNamespace)
+
+	if ok {
+		apiResponseReceived := func(resp *http.Response) {
+			timeTaken := SinceInMicroseconds(requestTime)
+			gceMetricMap[apiNamespace.apiCall].
+				WithLabelValues("kube_namespace", apiNamespace.namespace).Observe(timeTaken)
+		}
+		return apiResponseReceived
+	}
+	return nil
 }
 
 // Raw access to the underlying GCE service, probably should only be used for e2e tests
@@ -530,7 +557,8 @@ func (gce *GCECloud) waitForZoneOp(op *compute.Operation, zone string) error {
 // GetLoadBalancer is an implementation of LoadBalancer.GetLoadBalancer
 func (gce *GCECloud) GetLoadBalancer(clusterName string, service *v1.Service) (*v1.LoadBalancerStatus, bool, error) {
 	loadBalancerName := cloudprovider.GetLoadBalancerName(service)
-	fwd, err := gce.service.ForwardingRules.Get(gce.projectID, gce.region, loadBalancerName).Do()
+	fwd, err := gce.service.ForwardingRules.
+		Get(gce.projectID, gce.region, loadBalancerName).Do()
 	if err == nil {
 		status := &v1.LoadBalancerStatus{}
 		status.Ingress = []v1.LoadBalancerIngress{{IP: fwd.IPAddress}}
@@ -546,6 +574,15 @@ func (gce *GCECloud) GetLoadBalancer(clusterName string, service *v1.Service) (*
 func isHTTPErrorCode(err error, code int) bool {
 	apiErr, ok := err.(*googleapi.Error)
 	return ok && apiErr.Code == code
+}
+
+func contextWithNamespace(namespace string, apiCall string) context.Context {
+	rootContext := context.Background()
+	apiNamespace := ApiWithNamespace{
+		namespace: namespace,
+		apiCall:   apiCall,
+	}
+	return context.WithValue(rootContext, "kube-api-namespace", apiNamespace)
 }
 
 func nodeNames(nodes []*v1.Node) []string {
@@ -900,7 +937,8 @@ func (gce *GCECloud) ensureHttpHealthCheck(name, path string, port int32) (hc *c
 // Returns whether the forwarding rule exists, whether it needs to be updated,
 // what its IP address is (if it exists), and any error we encountered.
 func (gce *GCECloud) forwardingRuleNeedsUpdate(name, region string, loadBalancerIP string, ports []v1.ServicePort) (exists bool, needsUpdate bool, ipAddress string, err error) {
-	fwd, err := gce.service.ForwardingRules.Get(gce.projectID, region, name).Do()
+	fwd, err := gce.service.ForwardingRules.
+		Get(gce.projectID, region, name).Do()
 	if err != nil {
 		if isHTTPErrorCode(err, http.StatusNotFound) {
 			return false, true, "", nil
@@ -2479,7 +2517,9 @@ func (gce *GCECloud) CreateDisk(name string, diskType string, zone string, sizeG
 		Type:        diskTypeUri,
 	}
 
-	createOp, err := gce.service.Disks.Insert(gce.projectID, zone, diskToCreate).Do()
+	dc := contextWithNamespace(name, "gce_disk_insert")
+
+	createOp, err := gce.service.Disks.Insert(gce.projectID, zone, diskToCreate).Context(dc).Do()
 	if err != nil {
 		return err
 	}
@@ -2493,7 +2533,9 @@ func (gce *GCECloud) doDeleteDisk(diskToDelete string) error {
 		return err
 	}
 
-	deleteOp, err := gce.service.Disks.Delete(gce.projectID, disk.Zone, disk.Name).Do()
+	dc := contextWithNamespace(diskToDelete, "gce_disk_delete")
+	deleteOp, err := gce.service.Disks.
+		Delete(gce.projectID, disk.Zone, disk.Name).Context(dc).Do()
 	if err != nil {
 		return err
 	}
@@ -2588,7 +2630,9 @@ func (gce *GCECloud) AttachDisk(diskName string, nodeName types.NodeName, readOn
 	}
 	attachedDisk := gce.convertDiskToAttachedDisk(disk, readWrite)
 
-	attachOp, err := gce.service.Instances.AttachDisk(gce.projectID, disk.Zone, instanceName, attachedDisk).Do()
+	dc := contextWithNamespace(diskName, "gce_attach_disk")
+	attachOp, err := gce.service.Instances.
+		AttachDisk(gce.projectID, disk.Zone, instanceName, attachedDisk).Context(dc).Do()
 	if err != nil {
 		return err
 	}
@@ -2612,7 +2656,10 @@ func (gce *GCECloud) DetachDisk(devicePath string, nodeName types.NodeName) erro
 		return fmt.Errorf("error getting instance %q", instanceName)
 	}
 
-	detachOp, err := gce.service.Instances.DetachDisk(gce.projectID, inst.Zone, inst.Name, devicePath).Do()
+	dc := contextWithNamespace(devicePath, "gce_detach_disk")
+
+	detachOp, err := gce.service.Instances.
+		DetachDisk(gce.projectID, inst.Zone, inst.Name, devicePath).Context(dc).Do()
 	if err != nil {
 		return err
 	}
@@ -2681,7 +2728,9 @@ func (gce *GCECloud) DisksAreAttached(diskNames []string, nodeName types.NodeNam
 // Returns a gceDisk for the disk, if it is found in the specified zone.
 // If not found, returns (nil, nil)
 func (gce *GCECloud) findDiskByName(diskName string, zone string) (*gceDisk, error) {
-	disk, err := gce.service.Disks.Get(gce.projectID, zone, diskName).Do()
+	dc := contextWithNamespace(diskName, "gce_list_disk")
+	disk, err := gce.service.Disks.
+		Get(gce.projectID, zone, diskName).Context(dc).Do()
 	if err == nil {
 		d := &gceDisk{
 			Zone: lastComponent(disk.Zone),
@@ -2892,7 +2941,9 @@ func (gce *GCECloud) getInstanceByName(name string) (*gceInstance, error) {
 	if len(gce.managedZones) == 1 {
 		name = canonicalizeInstanceName(name)
 		zone := gce.managedZones[0]
-		res, err := gce.service.Instances.Get(gce.projectID, zone, name).Do()
+		dc := contextWithNamespace(name, "gce_instance_list")
+		res, err := gce.service.Instances.
+			Get(gce.projectID, zone, name).Context(dc).Do()
 		if err != nil {
 			glog.Errorf("getInstanceByName/single-zone: failed to get instance %s; err: %v", name, err)
 			if isHTTPErrorCode(err, http.StatusNotFound) {
@@ -2929,4 +2980,9 @@ func lastComponent(s string) string {
 		s = s[lastSlash+1:]
 	}
 	return s
+}
+
+// Gets the time since the specified start in microseconds.
+func SinceInMicroseconds(start time.Time) float64 {
+	return float64(time.Since(start).Nanoseconds() / time.Microsecond.Nanoseconds())
 }
