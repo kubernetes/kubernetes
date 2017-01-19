@@ -18,13 +18,12 @@ package cache
 
 import (
 	"github.com/golang/glog"
-
-	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/_vendor/k8s.io/apimachinery/pkg/api/errors"
 )
 
 // AppendFunc is used to add a matching item to whatever list the caller is using

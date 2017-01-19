@@ -22,6 +22,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	selectors "k8s.io/apimachinery/pkg/selectors"
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util"
 	api_v1 "k8s.io/kubernetes/pkg/api/v1"
 )
@@ -46,7 +47,7 @@ const (
 // the meaningful (from the replica set perspective) states. This function is
 // a temporary workaround against the current lack of ownerRef in pods.
 func AnalysePods(selectorv1 *metav1.LabelSelector, allPods []util.FederatedObject, currentTime time.Time) (map[string]PodAnalysisResult, error) {
-	selector, err := metav1.LabelSelectorAsSelector(selectorv1)
+	selector, err := selectors.LabelSelectorAsSelector(selectorv1)
 	if err != nil {
 		return nil, fmt.Errorf("invalid selector: %v", err)
 	}

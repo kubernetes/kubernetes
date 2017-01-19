@@ -22,6 +22,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -167,6 +168,29 @@ func TestNewInvalid(t *testing.T) {
 			t.Errorf("%d: expected %#v, got %#v", i, expected, status.Details)
 		}
 	}
+}
+
+func TestFmtErrorToBadRequest(t *testing.T) {
+	badRequest := ErrorToBadRequest(fmt.Errorf("Sample error to bad request"))
+	assert.EqualValues(t, badRequest.ErrStatus.Code, 400, "Error code should be 400")
+	assert.EqualValues(t, badRequest.ErrStatus.Reason, "BadRequest", "Reason should be BadRequest")
+	assert.EqualValues(t, badRequest.ErrStatus.Message, "Sample error to bad request", "Message lost")
+}
+
+func TestBadRequestToBadRequest(t *testing.T) {
+	badRequest := ErrorToBadRequest(NewBadRequest("BadRequest pass through"))
+	assert.EqualValues(t, badRequest.ErrStatus.Code, 400, "Error code should be 400")
+	assert.EqualValues(t, badRequest.ErrStatus.Reason, "BadRequest", "Reason should be BadRequest")
+	assert.EqualValues(t, badRequest.ErrStatus.Message, "BadRequest pass through", "Message lost")
+}
+
+func TestPanicOnStatusErrorToBadRequest(t *testing.T) {
+	defer func() {
+		if err := recover(); err == nil {
+			t.Errorf("Panic on changing status error did not occur!")
+		}
+	}()
+	ErrorToBadRequest(NewUnauthorized("Panic on Unauthorized status error"))
 }
 
 func Test_reasonForError(t *testing.T) {

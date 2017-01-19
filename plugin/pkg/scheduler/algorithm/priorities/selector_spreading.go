@@ -20,8 +20,8 @@ import (
 	"sync"
 
 	"github.com/golang/glog"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	selectorhelper "k8s.io/apimachinery/pkg/selectors"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/kubernetes/pkg/api/v1"
 	utilnode "k8s.io/kubernetes/pkg/util/node"
@@ -71,7 +71,7 @@ func getSelectors(pod *v1.Pod, sl algorithm.ServiceLister, cl algorithm.Controll
 	}
 	if rss, err := rsl.GetPodReplicaSets(pod); err == nil {
 		for _, rs := range rss {
-			if selector, err := metav1.LabelSelectorAsSelector(rs.Spec.Selector); err == nil {
+			if selector, err := selectorhelper.LabelSelectorAsSelector(rs.Spec.Selector); err == nil {
 				selectors = append(selectors, selector)
 			}
 		}

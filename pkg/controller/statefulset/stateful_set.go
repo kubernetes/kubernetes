@@ -23,6 +23,7 @@ import (
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	selectors "k8s.io/apimachinery/pkg/selectors"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/pkg/api/v1"
 	apps "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
@@ -217,7 +218,7 @@ func (psc *StatefulSetController) deletePod(obj interface{}) {
 // getPodsForStatefulSets returns the pods that match the selectors of the given statefulset.
 func (psc *StatefulSetController) getPodsForStatefulSet(ps *apps.StatefulSet) ([]*v1.Pod, error) {
 	// TODO: Do we want the statefulset to fight with RCs? check parent statefulset annotation, or name prefix?
-	sel, err := metav1.LabelSelectorAsSelector(ps.Spec.Selector)
+	sel, err := selectors.LabelSelectorAsSelector(ps.Spec.Selector)
 	if err != nil {
 		return []*v1.Pod{}, err
 	}

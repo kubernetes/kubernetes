@@ -18,7 +18,10 @@ package fields
 
 import (
 	"reflect"
+	"strings"
 	"testing"
+
+	"k8s.io/apimachinery/pkg/api/errors"
 )
 
 func TestSplitTerms(t *testing.T) {
@@ -124,8 +127,8 @@ func TestEscapeValue(t *testing.T) {
 	}
 	for _, invalidValue := range invalidTestcases {
 		_, err := UnescapeValue(invalidValue)
-		if _, ok := err.(InvalidEscapeSequence); !ok || err == nil {
-			t.Errorf("UnescapeValue(%s): expected invalid escape sequence error, got %#v", invalidValue, err)
+		if status, ok := err.(*errors.StatusError); !ok || err == nil || !strings.Contains(status.Error(), "invalid escape sequence") {
+			t.Errorf("UnescapeValue(%s): expected invalid escape sequence status error, got %#v", invalidValue, err)
 		}
 	}
 }

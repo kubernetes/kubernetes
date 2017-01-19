@@ -34,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	klabels "k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	selectors "k8s.io/apimachinery/pkg/selectors"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -242,7 +243,7 @@ var _ = framework.KubeDescribe("StatefulSet", func() {
 			expectedPodName := ss.Name + "-1"
 			expectedPod, err := f.ClientSet.Core().Pods(ns).Get(expectedPodName, metav1.GetOptions{})
 			Expect(err).NotTo(HaveOccurred())
-			watcher, err := f.ClientSet.Core().Pods(ns).Watch(metav1.SingleObject(
+			watcher, err := f.ClientSet.Core().Pods(ns).Watch(selectors.SingleObject(
 				metav1.ObjectMeta{
 					Name:            expectedPod.Name,
 					ResourceVersion: expectedPod.ResourceVersion,
@@ -389,7 +390,7 @@ var _ = framework.KubeDescribe("StatefulSet", func() {
 
 			var initialStatefulPodUID types.UID
 			By("Waiting until stateful pod " + statefulPodName + " will be recreated and deleted at least once in namespace " + f.Namespace.Name)
-			w, err := f.ClientSet.Core().Pods(f.Namespace.Name).Watch(metav1.SingleObject(metav1.ObjectMeta{Name: statefulPodName}))
+			w, err := f.ClientSet.Core().Pods(f.Namespace.Name).Watch(selectors.SingleObject(metav1.ObjectMeta{Name: statefulPodName}))
 			framework.ExpectNoError(err)
 			// we need to get UID from pod in any state and wait until stateful set controller will remove pod atleast once
 			_, err = watch.Until(statefulPodTimeout, w, func(event watch.Event) (bool, error) {
@@ -847,7 +848,7 @@ func (s *statefulSetTester) update(ns, name string, update func(ss *apps.Statefu
 }
 
 func (s *statefulSetTester) getPodList(ss *apps.StatefulSet) *v1.PodList {
-	selector, err := metav1.LabelSelectorAsSelector(ss.Spec.Selector)
+	selector, err := selectors.LabelSelectorAsSelector(ss.Spec.Selector)
 	framework.ExpectNoError(err)
 	podList, err := s.c.Core().Pods(ss.Namespace).List(metav1.ListOptions{LabelSelector: selector.String()})
 	framework.ExpectNoError(err)

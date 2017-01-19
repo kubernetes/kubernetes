@@ -211,6 +211,19 @@ func NewBadRequest(reason string) *StatusError {
 	}}
 }
 
+func ErrorToBadRequest(err error) *StatusError {
+	switch err.(type) {
+	case *StatusError:
+		statusError := err.(*StatusError)
+		if statusError.ErrStatus.Code != http.StatusBadRequest {
+			panic(fmt.Sprintf("Attempt to convert StatusError %d to a 400", statusError.ErrStatus.Code))
+		}
+		return statusError
+	default:
+		return NewBadRequest(err.Error())
+	}
+}
+
 // NewServiceUnavailable creates an error that indicates that the requested service is unavailable.
 func NewServiceUnavailable(reason string) *StatusError {
 	return &StatusError{metav1.Status{

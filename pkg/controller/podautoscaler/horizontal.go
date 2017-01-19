@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	selectors "k8s.io/apimachinery/pkg/selectors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/tools/cache"
@@ -157,7 +158,7 @@ func (a *HorizontalController) computeReplicasForCPUUtilization(hpa *autoscaling
 		return 0, nil, time.Time{}, fmt.Errorf(errMsg)
 	}
 
-	selector, err := metav1.LabelSelectorAsSelector(&metav1.LabelSelector{MatchLabels: scale.Status.Selector})
+	selector, err := selectors.LabelSelectorAsSelector(&metav1.LabelSelector{MatchLabels: scale.Status.Selector})
 	if err != nil {
 		errMsg := fmt.Sprintf("couldn't convert selector string to a corresponding selector object: %v", err)
 		a.eventRecorder.Event(hpa, v1.EventTypeWarning, "InvalidSelector", errMsg)
@@ -220,7 +221,7 @@ func (a *HorizontalController) computeReplicasForCustomMetrics(hpa *autoscaling.
 			return 0, "", "", time.Time{}, fmt.Errorf("selector is required")
 		}
 
-		selector, err := metav1.LabelSelectorAsSelector(&metav1.LabelSelector{MatchLabels: scale.Status.Selector})
+		selector, err := selectors.LabelSelectorAsSelector(&metav1.LabelSelector{MatchLabels: scale.Status.Selector})
 		if err != nil {
 			errMsg := fmt.Sprintf("couldn't convert selector string to a corresponding selector object: %v", err)
 			a.eventRecorder.Event(hpa, v1.EventTypeWarning, "InvalidSelector", errMsg)

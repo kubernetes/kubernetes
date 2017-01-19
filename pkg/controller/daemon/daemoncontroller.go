@@ -25,6 +25,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	selectors "k8s.io/apimachinery/pkg/selectors"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -292,7 +293,7 @@ func isDaemonSetMatch(pod *v1.Pod, ds *extensions.DaemonSet) bool {
 	if ds.Namespace != pod.Namespace {
 		return false
 	}
-	selector, err := metav1.LabelSelectorAsSelector(ds.Spec.Selector)
+	selector, err := selectors.LabelSelectorAsSelector(ds.Spec.Selector)
 	if err != nil {
 		err = fmt.Errorf("invalid selector: %v", err)
 		return false
@@ -429,7 +430,7 @@ func (dsc *DaemonSetsController) updateNode(old, cur interface{}) {
 // getNodesToDaemonSetPods returns a map from nodes to daemon pods (corresponding to ds) running on the nodes.
 func (dsc *DaemonSetsController) getNodesToDaemonPods(ds *extensions.DaemonSet) (map[string][]*v1.Pod, error) {
 	nodeToDaemonPods := make(map[string][]*v1.Pod)
-	selector, err := metav1.LabelSelectorAsSelector(ds.Spec.Selector)
+	selector, err := selectors.LabelSelectorAsSelector(ds.Spec.Selector)
 	if err != nil {
 		return nil, err
 	}
