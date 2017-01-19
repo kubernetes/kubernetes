@@ -1661,6 +1661,44 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 			Dependencies: []string{
 				"k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta", "k8s.io/kubernetes/federation/apis/federation/v1beta1.Cluster"},
 		},
+		"k8s.io/kubernetes/federation/apis/federation/v1beta1.ClusterSelectorRequirement": {
+			Schema: spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Description: "ClusterSelectorRequirement contains values, a key, and an operator that relates the key and values. The zero value of ClusterSelectorRequirement is invalid. ClusterSelectorRequirement implements both set based match and exact match",
+					Properties: map[string]spec.Schema{
+						"key": {
+							SchemaProps: spec.SchemaProps{
+								Type:   []string{"string"},
+								Format: "",
+							},
+						},
+						"operator": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Matches the Operator in apimachinery",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+						"values": {
+							SchemaProps: spec.SchemaProps{
+								Description: "An array of string values. If the operator is \"in\" or \"notin\", the values array must be non-empty. If the operator is \"exists\" or \"!\", the values array must be empty. If the operator is \"gt\" or \"lt\", the values array must have a single element, which will be interpreted as an integer. This array is replaced during a strategic merge patch.",
+								Type:        []string{"array"},
+								Items: &spec.SchemaOrArray{
+									Schema: &spec.Schema{
+										SchemaProps: spec.SchemaProps{
+											Type:   []string{"string"},
+											Format: "",
+										},
+									},
+								},
+							},
+						},
+					},
+					Required: []string{"key", "operator"},
+				},
+			},
+			Dependencies: []string{},
+		},
 		"k8s.io/kubernetes/federation/apis/federation/v1beta1.ClusterSpec": {
 			Schema: spec.Schema{
 				SchemaProps: spec.SchemaProps{

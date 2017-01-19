@@ -366,6 +366,26 @@ func (configmapcontroller *ConfigMapController) reconcileConfigMap(configmap typ
 			Data:       baseConfigMap.Data,
 		}
 
+		// Check to see if this should be sent to the cluster.
+		send, err := util.SendToCluster(cluster.Labels, desiredConfigMap.ObjectMeta.Annotations)
+		if !send && err == nil {
+			glog.V(5).Infof("Skipping cluster: %s for config map: %s reason: cluster selectors do not match: %-v %-v", cluster.ObjectMeta.Name, key, cluster.ObjectMeta.Labels, desiredConfigMap.ObjectMeta.Annotations[federationapi.FederationClusterSelector])
+			configmapcontroller.eventRecorder.Eventf(baseConfigMap, api.EventTypeNormal, "RemoveFromCluster", "Removing configmap from cluster %s", cluster.Name)
+			operations = append(operations, util.FederatedOperation{
+				Type:        util.OperationTypeDelete,
+				Obj:         desiredConfigMap,
+				ClusterName: cluster.Name,
+			})
+			// Skip further processing for this cluster.
+			continue
+		}
+
+		if err != nil {
+			glog.Errorf("Error processing FederationClusterSelector Annotations cluster: %s for config map: %s error: %s", cluster.ObjectMeta.Name, key, err.Error())
+			configmapcontroller.eventRecorder.Eventf(baseConfigMap, api.EventTypeWarning, "FedClusterSelectorError", "Error processing ClusterSelector Annotations cluster: %s for config map: %s error: %s", cluster.ObjectMeta.Name, key, err.Error())
+			return
+		}
+
 		if !found {
 			configmapcontroller.eventRecorder.Eventf(baseConfigMap, api.EventTypeNormal, "CreateInCluster",
 				"Creating configmap in cluster %s", cluster.Name)

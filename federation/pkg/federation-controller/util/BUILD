@@ -34,7 +34,9 @@ go_library(
         "//pkg/controller/deployment/util:go_default_library",
         "//vendor:github.com/golang/glog",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor:k8s.io/apimachinery/pkg/labels",
         "//vendor:k8s.io/apimachinery/pkg/runtime",
+        "//vendor:k8s.io/apimachinery/pkg/selection",
         "//vendor:k8s.io/apimachinery/pkg/util/net",
         "//vendor:k8s.io/apimachinery/pkg/util/wait",
         "//vendor:k8s.io/apimachinery/pkg/watch",
@@ -49,6 +51,7 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = [
+        "cluster_util_test.go",
         "delaying_deliverer_test.go",
         "deployment_test.go",
         "federated_informer_test.go",

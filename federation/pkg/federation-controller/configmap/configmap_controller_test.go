@@ -48,6 +48,11 @@ func TestConfigMapController(t *testing.T) {
 	cluster1 := NewCluster("cluster1", apiv1.ConditionTrue)
 	cluster2 := NewCluster("cluster2", apiv1.ConditionTrue)
 
+	cluster1.ObjectMeta.Labels["location"] = "europe"
+	cluster1.ObjectMeta.Labels["environment"] = "prod"
+	cluster2.ObjectMeta.Labels["location"] = "europe"
+	cluster2.ObjectMeta.Labels["environment"] = "test"
+
 	fakeClient := &fakefedclientset.Clientset{}
 	RegisterFakeList(clusters, &fakeClient.Fake, &federationapi.ClusterList{Items: []federationapi.Cluster{*cluster1}})
 	RegisterFakeList(configmaps, &fakeClient.Fake, &apiv1.ConfigMapList{Items: []apiv1.ConfigMap{}})
@@ -122,6 +127,7 @@ func TestConfigMapController(t *testing.T) {
 	// Test update federated configmap.
 	configmap1.Annotations = map[string]string{
 		"A": "B",
+		federationapi.FederationClusterSelector: "[{\"key\": \"location\", \"operator\": \"=\", \"values\": [\"europe\"]}]",
 	}
 	configmapWatch.Modify(configmap1)
 	updatedConfigMap = GetConfigMapFromChan(cluster1UpdateChan)
@@ -149,6 +155,15 @@ func TestConfigMapController(t *testing.T) {
 	assert.Equal(t, configmap1.Namespace, updatedConfigMap.Namespace)
 	assert.True(t, util.ConfigMapEquivalent(configmap1, updatedConfigMap))
 
+	// Test update federated configmap to a non matching cluster selector.
+	configmap1.Annotations = map[string]string{
+		"A": "B",
+		federationapi.FederationClusterSelector: "[{\"key\": \"location\", \"operator\": \"in\", \"values\": [\"europe\"]}, {\"key\": \"environment\", \"operator\": \"==\", \"values\": [\"test\"]}]",
+	}
+	configmapWatch.Modify(configmap1)
+	updatedConfigMapDNE := GetConfigMapFromChanExpectNone(cluster1UpdateChan)
+	assert.Nil(t, updatedConfigMapDNE)
+
 	// Test add cluster
 	clusterWatch.Add(cluster2)
 	createdConfigMap2 := GetConfigMapFromChan(cluster2CreateChan)
@@ -166,6 +181,13 @@ func GetConfigMapFromChan(c chan runtime.Object) *apiv1.ConfigMap {
 	} else {
 		return configmap.(*apiv1.ConfigMap)
 	}
+}
+
+func GetConfigMapFromChanExpectNone(c chan runtime.Object) *apiv1.ConfigMap {
+	if configmap, ok := GetObjectFromChanExpectNone(c).(*apiv1.ConfigMap); ok {
+		return configmap
+	}
+	return nil
 }
 
 // Wait till the store is updated with latest configmap.
