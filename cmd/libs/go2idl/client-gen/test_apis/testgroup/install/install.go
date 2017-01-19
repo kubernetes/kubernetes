@@ -85,7 +85,7 @@ func newRESTMapper(externalVersions []schema.GroupVersion) meta.RESTMapper {
 
 	ignoredKinds := sets.NewString()
 
-	return api.NewDefaultRESTMapper(externalVersions, interfacesFor, importPrefix, ignoredKinds, rootScoped)
+	return api.NewDefaultRESTMapperFromScheme(externalVersions, interfacesFor, importPrefix, ignoredKinds, rootScoped, api.Scheme)
 }
 
 // InterfacesFor returns the default Codec and ResourceVersioner for a given version

@@ -99,7 +99,7 @@ func newRESTMapper(externalVersions []schema.GroupVersion) meta.RESTMapper {
 		"DeleteOptions",
 		"Status")
 
-	mapper := api.NewDefaultRESTMapperFromScheme(externalVersions, interfacesFor, importPrefix, ignoredKinds, rootScoped, core.Scheme)
+	mapper := meta.NewDefaultRESTMapperFromScheme(externalVersions, interfacesFor, importPrefix, ignoredKinds, rootScoped, core.Scheme)
 	// setup aliases for groups of resources
 	mapper.AddResourceAlias("all", userResources...)
 

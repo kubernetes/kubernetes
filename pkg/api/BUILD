@@ -17,7 +17,6 @@ go_library(
         "field_constants.go",
         "helpers.go",
         "json.go",
-        "mapper.go",
         "meta.go",
         "ref.go",
         "register.go",

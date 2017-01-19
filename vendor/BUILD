@@ -7910,6 +7910,7 @@ go_test(
 go_library(
     name = "k8s.io/apimachinery/pkg/api/meta",
     srcs = [
+        "k8s.io/apimachinery/pkg/api/meta/default.go",
         "k8s.io/apimachinery/pkg/api/meta/doc.go",
         "k8s.io/apimachinery/pkg/api/meta/errors.go",
         "k8s.io/apimachinery/pkg/api/meta/firsthit_restmapper.go",
