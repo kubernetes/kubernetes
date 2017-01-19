@@ -51,7 +51,7 @@ func newTestGenericPLEG() *TestGenericPLEG {
 		relistPeriod: time.Hour,
 		runtime:      fakeRuntime,
 		eventChannel: make(chan *PodLifecycleEvent, 100),
-		podRecords:   make(podRecords),
+		podRecords:   &podRecords{records: make(map[types.UID]*podRecord)},
 		clock:        clock,
 	}
 	return &TestGenericPLEG{pleg: pleg, runtime: fakeRuntime, clock: clock}
@@ -244,7 +244,7 @@ func newTestGenericPLEGWithRuntimeMock() (*GenericPLEG, *containertest.Mock) {
 		relistPeriod: time.Hour,
 		runtime:      runtimeMock,
 		eventChannel: make(chan *PodLifecycleEvent, 100),
-		podRecords:   make(podRecords),
+		podRecords:   &podRecords{records: make(map[types.UID]*podRecord)},
 		cache:        kubecontainer.NewCache(),
 		clock:        clock.RealClock{},
 	}
