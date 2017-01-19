@@ -25,7 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/storage/storagebackend/factory"
 )
 
-// Creates a cacher based given storageConfig.
+// Creates a cacher based on given storageConfig.
 func StorageWithCacher(
 	storageConfig *storagebackend.Config,
 	capacity int,

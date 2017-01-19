@@ -828,7 +828,7 @@ func (e *Store) finalizeDelete(obj runtime.Object, runHooks bool) (runtime.Objec
 }
 
 // Watch makes a matcher for the given label and field, and calls
-// WatchPredicate. If possible, you should customize PredicateFunc to produre a
+// WatchPredicate. If possible, you should customize PredicateFunc to produce a
 // matcher that matches by key. SelectionPredicate does this for you
 // automatically.
 func (e *Store) Watch(ctx genericapirequest.Context, options *api.ListOptions) (watch.Interface, error) {
