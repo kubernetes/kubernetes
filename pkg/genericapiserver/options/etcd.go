@@ -54,11 +54,11 @@ func (s *EtcdOptions) Validate() []error {
 	return allErrors
 }
 
-// AddEtcdFlags adds flags related to etcd storage for a specific APIServer to the specified FlagSet
+// AddFlags adds flags related to etcd storage for a specific APIServer to the specified FlagSet
 func (s *EtcdOptions) AddFlags(fs *pflag.FlagSet) {
-	fs.StringSliceVar(&s.EtcdServersOverrides, "etcd-servers-overrides", s.EtcdServersOverrides, ""+
+	fs.StringSliceVar(&s.EtcdServersOverrides, "etcd-servers-overrides", s.EtcdServersOverrides,
 		"Per-resource etcd servers overrides, comma separated. The individual override "+
-		"format: group/resource#servers, where servers are http://ip:port, semicolon separated.")
+			"format: group/resource#servers, where servers are http://ip:port, semicolon separated.")
 
 	fs.StringVar(&s.StorageConfig.Type, "storage-backend", s.StorageConfig.Type,
 		"The storage backend for persistence. Options: 'etcd3' (default), 'etcd2'.")
