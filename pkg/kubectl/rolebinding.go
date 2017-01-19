@@ -134,14 +134,14 @@ func (s RoleBindingGeneratorV1) StructuredGenerate() (runtime.Object, error) {
 	for _, user := range s.Users {
 		roleBinding.Subjects = append(roleBinding.Subjects, rbac.Subject{
 			Kind:       rbac.UserKind,
-			APIVersion: "rbac/v1alpha1",
+			APIVersion: "rbac.authorization.k8s.io/v1beta1",
 			Name:       user,
 		})
 	}
 	for _, group := range s.Groups {
 		roleBinding.Subjects = append(roleBinding.Subjects, rbac.Subject{
 			Kind:       rbac.GroupKind,
-			APIVersion: "rbac/v1alpha1",
+			APIVersion: "rbac.authorization.k8s.io/v1beta1",
 			Name:       group,
 		})
 	}
