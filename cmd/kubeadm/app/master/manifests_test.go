@@ -454,7 +454,7 @@ func TestGetAPIServerCommand(t *testing.T) {
 	}
 
 	for _, rt := range tests {
-		actual := getAPIServerCommand(rt.cfg)
+		actual := getAPIServerCommand(rt.cfg, false)
 		for i := range actual {
 			if actual[i] != rt.expected[i] {
 				t.Errorf(
