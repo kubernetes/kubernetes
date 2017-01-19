@@ -550,7 +550,7 @@ function start-kubelet {
   flags+=" --cloud-provider=gce"
   flags+=" --cluster-dns=${DNS_SERVER_IP}"
   flags+=" --cluster-domain=${DNS_DOMAIN}"
-  flags+=" --config=/etc/kubernetes/manifests"
+  flags+=" --pod-manifest-path=/etc/kubernetes/manifests"
   flags+=" --experimental-mounter-path=${KUBE_HOME}/bin/mounter"
   flags+=" --experimental-check-node-capabilities-before-mount=true"
 
