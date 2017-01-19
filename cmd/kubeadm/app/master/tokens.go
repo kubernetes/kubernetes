@@ -27,12 +27,19 @@ import (
 	"k8s.io/kubernetes/pkg/util/uuid"
 )
 
+const (
+	// TODO: prefix with kubeadm prefix
+	KubeletBootstrapUser = "kubeadm-node-csr"
+
+	KubeletBootstrapGroup = "kubeadm:kubelet-bootstrap"
+)
+
 func CreateTokenAuthFile(bt string) error {
 	tokenAuthFilePath := path.Join(kubeadmapi.GlobalEnvParams.HostPKIPath, "tokens.csv")
 	if err := os.MkdirAll(kubeadmapi.GlobalEnvParams.HostPKIPath, 0700); err != nil {
 		return fmt.Errorf("failed to create directory %q [%v]", kubeadmapi.GlobalEnvParams.HostPKIPath, err)
 	}
-	serialized := []byte(fmt.Sprintf("%s,kubeadm-node-csr,%s,kubeadm:kubelet-bootstrap\n", bt, uuid.NewUUID()))
+	serialized := []byte(fmt.Sprintf("%s,%s,%s,%s\n", bt, KubeletBootstrapUser, uuid.NewUUID(), KubeletBootstrapGroup))
 	// DumpReaderToFile create a file with mode 0600
 	if err := cmdutil.DumpReaderToFile(bytes.NewReader(serialized), tokenAuthFilePath); err != nil {
 		return fmt.Errorf("failed to save token auth file (%q) [%v]", tokenAuthFilePath, err)
