@@ -22,6 +22,7 @@ import (
 	"os"
 	"time"
 
+	"encoding/json"
 	"github.com/golang/glog"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
@@ -145,4 +146,24 @@ func GetClientsetForCluster(cluster *federation_v1beta1.Cluster) (*fedclientset.
 		return clientset, nil
 	}
 	return nil, err
+}
+
+// Returns a bool to indicate if the object should be forwarded to a cluster
+func SendToCluster (cluster *federation_v1beta1.Cluster, objMeta metav1.ObjectMeta) bool {
+	forwardObject := true
+	//if there is an annotation for ClusterSelector
+	if val, ok := objMeta.Annotations["federation.beta.kubernetes.io/cluster-selector"]; ok {
+		//and it contains a valid ClusterSelector
+		selector := federation_v1beta1.ClusterSelector{}
+		if err := json.Unmarshal([]byte(val), &selector); err == nil {
+			//for each ClusterSelector term
+			for k, v := range selector {
+				if !(v == cluster.ObjectMeta.Labels[k]) {
+					forwardObject = false
+					glog.V(8).Infof("cluster selector annotation %s=%s did not match cluster %s", k, v, cluster.ObjectMeta.Name)
+				}
+			}
+		}
+	}
+	return forwardObject
 }

@@ -271,6 +271,12 @@ func (configmapcontroller *ConfigMapController) reconcileConfigMap(configmap typ
 			Data:       baseConfigMap.Data,
 		}
 
+		// check to see if this should be sent to the cluster
+		if !util.SendToCluster(cluster, desiredConfigMap.ObjectMeta) {
+			glog.V(8).Infof("Skipping cluster: %s for config map: %s reason: cluster selectors do not match", cluster.ObjectMeta.Name, key)
+			continue
+		}
+
 		if !found {
 			configmapcontroller.eventRecorder.Eventf(baseConfigMap, api.EventTypeNormal, "CreateInCluster",
 				"Creating configmap in cluster %s", cluster.Name)

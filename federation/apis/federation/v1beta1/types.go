@@ -121,6 +121,8 @@ type ClusterList struct {
 	Items []Cluster `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
 
+type ClusterSelector map[string]string
+
 const (
 	// FederationNamespaceSystem is the system namespace where we place federation control plane components.
 	FederationNamespaceSystem string = "federation-system"

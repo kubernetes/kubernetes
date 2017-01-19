@@ -292,6 +292,7 @@ func NewCluster(name string, readyStatus apiv1.ConditionStatus) *federationapi.C
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        name,
 			Annotations: map[string]string{},
+			Labels: map[string]string{},
 		},
 		Status: federationapi.ClusterStatus{
 			Conditions: []federationapi.ClusterCondition{

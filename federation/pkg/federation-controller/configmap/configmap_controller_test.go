@@ -40,6 +40,11 @@ func TestConfigMapController(t *testing.T) {
 	cluster1 := NewCluster("cluster1", apiv1.ConditionTrue)
 	cluster2 := NewCluster("cluster2", apiv1.ConditionTrue)
 
+	cluster1.ObjectMeta.Labels["location"] = "europe"
+	cluster1.ObjectMeta.Labels["environment"] = "prod"
+	cluster2.ObjectMeta.Labels["location"] = "europe"
+	cluster2.ObjectMeta.Labels["environment"] = "test"
+
 	fakeClient := &fakefedclientset.Clientset{}
 	RegisterFakeList("clusters", &fakeClient.Fake, &federationapi.ClusterList{Items: []federationapi.Cluster{*cluster1}})
 	RegisterFakeList("configmaps", &fakeClient.Fake, &apiv1.ConfigMapList{Items: []apiv1.ConfigMap{}})
@@ -107,6 +112,7 @@ func TestConfigMapController(t *testing.T) {
 	// Test update federated configmap.
 	configmap1.Annotations = map[string]string{
 		"A": "B",
+		"federation.beta.kubernetes.io/cluster-selector": "{\"location\": \"europe\"}",
 	}
 	configmapWatch.Modify(configmap1)
 	updatedConfigMap := GetConfigMapFromChan(cluster1UpdateChan)
@@ -126,6 +132,15 @@ func TestConfigMapController(t *testing.T) {
 	assert.Equal(t, configmap1.Namespace, updatedConfigMap.Namespace)
 	assert.True(t, util.ConfigMapEquivalent(configmap1, updatedConfigMap2))
 
+	// Test update federated configmap to a non matching cluster selector.
+	configmap1.Annotations = map[string]string{
+		"A": "B",
+		"federation.beta.kubernetes.io/cluster-selector": "{\"location\": \"europe\", \"environment\": \"test\"}",
+	}
+	configmapWatch.Modify(configmap1)
+	updatedConfigMapDNE := GetConfigMapFromChan(cluster1UpdateChan)
+	assert.Nil(t, updatedConfigMapDNE)
+
 	// Test add cluster
 	clusterWatch.Add(cluster2)
 	createdConfigMap2 := GetConfigMapFromChan(cluster2CreateChan)
@@ -138,6 +153,8 @@ func TestConfigMapController(t *testing.T) {
 }
 
 func GetConfigMapFromChan(c chan runtime.Object) *apiv1.ConfigMap {
-	configmap := GetObjectFromChan(c).(*apiv1.ConfigMap)
-	return configmap
+	if configmap, ok := GetObjectFromChan(c).(*apiv1.ConfigMap); ok {
+		return configmap
+	}
+	return nil
 }
