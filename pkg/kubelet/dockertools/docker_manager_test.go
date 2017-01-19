@@ -1629,23 +1629,36 @@ func verifySyncResults(t *testing.T, expectedResults []*kubecontainer.SyncResult
 	}
 }
 
-func TestSecurityOptsOperator(t *testing.T) {
+func TestGetDockerOptSeparator(t *testing.T) {
 	dm110, _ := newTestDockerManagerWithVersion("1.10.1", "1.22")
 	dm111, _ := newTestDockerManagerWithVersion("1.11.0", "1.23")
 
-	secOpts := []dockerOpt{{"seccomp", "unconfined", ""}}
-	opts, err := dm110.fmtDockerOpts(secOpts)
+	separator, err := dm110.getDockerOptSeparator()
 	if err != nil {
-		t.Fatalf("error getting security opts for Docker 1.10: %v", err)
+		t.Fatalf("error getting docker opt separator for 1.10.1: %v", err)
 	}
+	if e, a := ':', separator; e != a {
+		t.Fatalf("Got unexpected docker opt separator for 1.10.1; expected %v, got %v", e, a)
+	}
+
+	separator, err = dm111.getDockerOptSeparator()
+	if err != nil {
+		t.Fatalf("error getting docker opt separator for 1.11.0: %v", err)
+	}
+	if e, a := '=', separator; e != a {
+		t.Fatalf("Got unexpected docker opt separator for 1.11.0; expected %v, got %v", e, a)
+	}
+}
+
+func TestFmtDockerOpts(t *testing.T) {
+	secOpts := []dockerOpt{{"seccomp", "unconfined", ""}}
+
+	opts := fmtDockerOpts(secOpts, ':')
 	if expected := []string{"seccomp:unconfined"}; len(opts) != 1 || opts[0] != expected[0] {
 		t.Fatalf("security opts for Docker 1.10: expected %v, got: %v", expected, opts)
 	}
 
-	opts, err = dm111.fmtDockerOpts(secOpts)
-	if err != nil {
-		t.Fatalf("error getting security opts for Docker 1.11: %v", err)
-	}
+	opts = fmtDockerOpts(secOpts, '=')
 	if expected := []string{"seccomp=unconfined"}; len(opts) != 1 || opts[0] != expected[0] {
 		t.Fatalf("security opts for Docker 1.11: expected %v, got: %v", expected, opts)
 	}
