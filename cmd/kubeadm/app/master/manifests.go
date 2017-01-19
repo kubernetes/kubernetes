@@ -98,12 +98,10 @@ func WriteStaticPodManifests(cfg *kubeadmapi.MasterConfiguration) error {
 			Env:           getProxyEnvVars(),
 		}, volumes...),
 		kubeScheduler: componentPod(api.Container{
-			Name:  kubeScheduler,
-			Image: images.GetCoreImage(images.KubeSchedulerImage, cfg, kubeadmapi.GlobalEnvParams.HyperkubeImage),
-			// TODO: Using non-standard port here so self-hosted scheduler can come up:
-			// Use the regular port if this is not going to be a self-hosted deployment.
-			Command:       getSchedulerCommand(cfg, 10260),
-			LivenessProbe: componentProbe(10260, "/healthz"),
+			Name:          kubeScheduler,
+			Image:         images.GetCoreImage(images.KubeSchedulerImage, cfg, kubeadmapi.GlobalEnvParams.HyperkubeImage),
+			Command:       getSchedulerCommand(cfg),
+			LivenessProbe: componentProbe(10251, "/healthz"),
 			Resources:     componentResources("100m"),
 			Env:           getProxyEnvVars(),
 		}),
@@ -391,12 +389,11 @@ func getControllerManagerCommand(cfg *kubeadmapi.MasterConfiguration) []string {
 	return command
 }
 
-func getSchedulerCommand(cfg *kubeadmapi.MasterConfiguration, schedulerPort int) []string {
+func getSchedulerCommand(cfg *kubeadmapi.MasterConfiguration) []string {
 	return append(getComponentBaseCommand(scheduler),
 		"--address=127.0.0.1",
 		"--leader-elect",
 		"--master=127.0.0.1:8080",
-		fmt.Sprintf("--port=%d", schedulerPort),
 	)
 }
 

@@ -548,13 +548,12 @@ func TestGetSchedulerCommand(t *testing.T) {
 				"--address=127.0.0.1",
 				"--leader-elect",
 				"--master=127.0.0.1:8080",
-				"--port=10260",
 			},
 		},
 	}
 
 	for _, rt := range tests {
-		actual := getSchedulerCommand(rt.cfg, 10260)
+		actual := getSchedulerCommand(rt.cfg)
 		for i := range actual {
 			if actual[i] != rt.expected[i] {
 				t.Errorf(

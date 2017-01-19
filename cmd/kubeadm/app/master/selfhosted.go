@@ -320,7 +320,7 @@ func getSchedulerDeployment(cfg *kubeadmapi.MasterConfiguration) ext.Deployment 
 						{
 							Name:          kubeScheduler,
 							Image:         images.GetCoreImage(images.KubeSchedulerImage, cfg, kubeadmapi.GlobalEnvParams.HyperkubeImage),
-							Command:       getSchedulerCommand(cfg, 10251),
+							Command:       getSchedulerCommand(cfg),
 							LivenessProbe: componentProbe(10251, "/healthz"),
 							Resources:     componentResources("100m"),
 							Env:           getProxyEnvVars(),
