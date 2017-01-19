@@ -37,7 +37,7 @@ type SecurityContextProvider interface {
 	// - pod: the pod to modify the docker hostconfig for
 	// - container: the container to modify the hostconfig for
 	// - supplementalGids: additional supplemental GIDs associated with the pod's volumes
-	ModifyHostConfig(pod *v1.Pod, container *v1.Container, hostConfig *dockercontainer.HostConfig, supplementalGids []int64)
+	ModifyHostConfig(pod *v1.Pod, container *v1.Container, hostConfig *dockercontainer.HostConfig, supplementalGids []int64, isRemap bool)
 }
 
 const (

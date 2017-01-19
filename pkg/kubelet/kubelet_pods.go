@@ -342,6 +342,12 @@ func (kl *Kubelet) GenerateRunContainerOptions(pod *v1.Pod, container *v1.Contai
 	return opts, nil
 }
 
+// IsExperimentalUserNsEnabled allows consumers of the RuntimeHelper determine if the kubelet
+// is using experimental user namespace behavior.
+func (kl *Kubelet) IsExperimentalUserNsEnabled() bool {
+	return kl.experimentalHostUserNamespaceDefaulting
+}
+
 var masterServices = sets.NewString("kubernetes")
 
 // getServiceEnvVarMap makes a map[string]string of env vars for services a

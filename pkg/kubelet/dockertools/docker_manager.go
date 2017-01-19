@@ -72,6 +72,7 @@ import (
 	utilstrings "k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/util/term"
 	utilversion "k8s.io/kubernetes/pkg/util/version"
+	"k8s.io/kubernetes/pkg/volume"
 )
 
 const (
@@ -788,7 +789,7 @@ func (dm *DockerManager) runContainer(
 	supplementalGids := dm.runtimeHelper.GetExtraSupplementalGroupsForPod(pod)
 	securityContextProvider := securitycontext.NewSimpleSecurityContextProvider()
 	securityContextProvider.ModifyContainerConfig(pod, container, dockerOpts.Config)
-	securityContextProvider.ModifyHostConfig(pod, container, dockerOpts.HostConfig, supplementalGids)
+	securityContextProvider.ModifyHostConfig(pod, container, dockerOpts.HostConfig, supplementalGids, dm.isRemapEnvironment())
 	createResp, err := dm.client.CreateContainer(dockerOpts)
 	if err != nil {
 		dm.recorder.Eventf(ref, v1.EventTypeWarning, events.FailedToCreateContainer, "Failed to create docker container %q of pod %q with error: %v", container.Name, format.Pod(pod), err)
@@ -2302,6 +2303,11 @@ func (dm *DockerManager) SyncPod(pod *v1.Pod, _ v1.PodStatus, podStatus *kubecon
 		return
 	}
 
+	// ensure containers will have access to the right directories before proceeding
+	if err := dm.ensureDirectoryAccess(pod); err != nil {
+		utilruntime.HandleError(err)
+	}
+
 	// Start regular containers
 	for idx := range containerChanges.ContainersToStart {
 		container := &pod.Spec.Containers[idx]
@@ -2326,6 +2332,31 @@ func (dm *DockerManager) SyncPod(pod *v1.Pod, _ v1.PodStatus, podStatus *kubecon
 		}
 	}
 	return
+}
+
+// ensureDirectoryAccess ensures that if we are in a remap environment and the pod has FSGroup set that
+// the directories of GetPodDir and below are owned by the FSGroup.
+func (dm *DockerManager) ensureDirectoryAccess(pod *v1.Pod) error {
+	if !dm.isRemapEnvironment() {
+		return nil
+	}
+	if pod.Spec.SecurityContext == nil {
+		return fmt.Errorf("found remapping environment but pod has nil security context, unable to ensure directory ownership")
+	}
+	if pod.Spec.SecurityContext.FSGroup == nil {
+		return fmt.Errorf("found remapping environment but pod has nil FSGroup, unable to ensure directory ownership")
+	}
+
+	glog.V(5).Infof("ensuring directory ownership for pod %s is set to FSGroup %d", pod.UID, *pod.Spec.SecurityContext.FSGroup)
+	return volume.SetOwnershipForPath(dm.runtimeHelper.GetPodDir(pod.UID), false, int(*pod.Spec.SecurityContext.FSGroup))
+}
+
+// isRemapEnvironment returns true if the experimental user namespace feature has been enabled in the
+// RuntimeHelper.
+// TODO: this can also be discovered via the /info endpoint with the dm.client.Info() call by insepcting
+// the SecurityOptions for userns.  As initial experimental support we will rely on the flag only.
+func (dm *DockerManager) isRemapEnvironment() bool {
+	return dm.runtimeHelper.IsExperimentalUserNsEnabled()
 }
 
 // tryContainerStart attempts to pull and start the container, returning an error and a reason string if the start
