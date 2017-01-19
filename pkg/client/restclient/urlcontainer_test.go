@@ -21,7 +21,7 @@ import (
 	"net/url"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/util/flowcontrol"
+	"k8s.io/client-go/pkg/util/flowcontrol"
 )
 
 func TestStickyURLContainer(t *testing.T) {

@@ -22,7 +22,7 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/kubernetes/pkg/util/flowcontrol"
+	"k8s.io/client-go/pkg/util/flowcontrol"
 )
 
 // NewURLContainer initialezes URLContainer instance and returns pointer,
