@@ -607,14 +607,17 @@ func (dm *DockerManager) runContainer(
 		ContainerName: container.Name,
 	}
 
+	optSeparator, err := dm.getDockerOptSeparator()
+	if err != nil {
+		return kubecontainer.ContainerID{}, err
+	}
+
+	// get and format the annotation-based security options.
 	securityOpts, err := dm.getSecurityOpts(pod, container.Name)
 	if err != nil {
 		return kubecontainer.ContainerID{}, err
 	}
-	fmtSecurityOpts, err := dm.fmtDockerOpts(securityOpts)
-	if err != nil {
-		return kubecontainer.ContainerID{}, err
-	}
+	fmtSecurityOpts := fmtDockerOpts(securityOpts, optSeparator)
 
 	// Pod information is recorded on the container as labels to preserve it in the event the pod is deleted
 	// while the Kubelet is down and there is no information available to recover the pod.
@@ -786,7 +789,7 @@ func (dm *DockerManager) runContainer(
 	glog.V(3).Infof("Container %v/%v/%v: setting entrypoint \"%v\" and command \"%v\"", pod.Namespace, pod.Name, container.Name, dockerOpts.Config.Entrypoint, dockerOpts.Config.Cmd)
 
 	supplementalGids := dm.runtimeHelper.GetExtraSupplementalGroupsForPod(pod)
-	securityContextProvider := securitycontext.NewSimpleSecurityContextProvider()
+	securityContextProvider := securitycontext.NewSimpleSecurityContextProvider(optSeparator)
 	securityContextProvider.ModifyContainerConfig(pod, container, dockerOpts.Config)
 	securityContextProvider.ModifyHostConfig(pod, container, dockerOpts.HostConfig, supplementalGids)
 	createResp, err := dm.client.CreateContainer(dockerOpts)
@@ -1130,10 +1133,12 @@ func (dm *DockerManager) checkVersionCompatibility() error {
 	return nil
 }
 
-func (dm *DockerManager) fmtDockerOpts(opts []dockerOpt) ([]string, error) {
-	version, err := dm.APIVersion()
+// getDockerOptSeparator returns the correct securityOpt separator to use for
+// the given docker version or an error.
+func (dm *DockerManager) getDockerOptSeparator() (rune, error) {
+	dockerApiVersion, err := dm.APIVersion()
 	if err != nil {
-		return nil, err
+		return ':', err
 	}
 
 	const (
@@ -1144,17 +1149,22 @@ func (dm *DockerManager) fmtDockerOpts(opts []dockerOpt) ([]string, error) {
 	)
 
 	sep := optSeparatorNew
-	if result, err := version.Compare(optSeparatorChangeVersion); err != nil {
-		return nil, fmt.Errorf("error parsing docker API version: %v", err)
+	if result, err := dockerApiVersion.Compare(optSeparatorChangeVersion); err != nil {
+		return optSeparatorOld, fmt.Errorf("error parsing docker API version: %v", err)
 	} else if result < 0 {
 		sep = optSeparatorOld
 	}
 
+	return sep, nil
+}
+
+// fmtDockerOpts formats the given dockerOpts with given option separator.
+func fmtDockerOpts(opts []dockerOpt, separator rune) []string {
 	fmtOpts := make([]string, len(opts))
 	for i, opt := range opts {
-		fmtOpts[i] = fmt.Sprintf("%s%c%s", opt.key, sep, opt.value)
+		fmtOpts[i] = fmt.Sprintf("%s%c%s", opt.key, separator, opt.value)
 	}
-	return fmtOpts, nil
+	return fmtOpts
 }
 
 type dockerOpt struct {
@@ -1833,11 +1843,11 @@ type versionInfo struct {
 // -1: older than expected version
 // 0 : same version
 func (dm *DockerManager) checkDockerAPIVersion(expectedVersion string) (int, error) {
-
 	value, err := dm.versionCache.Get(dm.machineInfo.MachineID)
 	if err != nil {
 		return 0, err
 	}
+
 	apiVersion := value.(versionInfo).apiVersion
 	result, err := apiVersion.Compare(expectedVersion)
 	if err != nil {

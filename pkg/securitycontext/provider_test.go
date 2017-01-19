@@ -74,7 +74,7 @@ func TestModifyContainerConfig(t *testing.T) {
 		},
 	}
 
-	provider := NewSimpleSecurityContextProvider()
+	provider := NewSimpleSecurityContextProvider('=')
 	dummyContainer := &v1.Container{}
 	for _, tc := range cases {
 		pod := &v1.Pod{Spec: v1.PodSpec{SecurityContext: tc.podSc}}
@@ -104,10 +104,10 @@ func TestModifyHostConfig(t *testing.T) {
 
 	setSELinuxHC := &dockercontainer.HostConfig{}
 	setSELinuxHC.SecurityOpt = []string{
-		fmt.Sprintf("%s:%s", DockerLabelUser, "user"),
-		fmt.Sprintf("%s:%s", DockerLabelRole, "role"),
-		fmt.Sprintf("%s:%s", DockerLabelType, "type"),
-		fmt.Sprintf("%s:%s", DockerLabelLevel, "level"),
+		fmt.Sprintf("%s:%s", DockerLabelUser(':'), "user"),
+		fmt.Sprintf("%s:%s", DockerLabelRole(':'), "role"),
+		fmt.Sprintf("%s:%s", DockerLabelType(':'), "type"),
+		fmt.Sprintf("%s:%s", DockerLabelLevel(':'), "level"),
 	}
 
 	// seLinuxLabelsSC := fullValidSecurityContext()
@@ -158,7 +158,7 @@ func TestModifyHostConfig(t *testing.T) {
 		},
 	}
 
-	provider := NewSimpleSecurityContextProvider()
+	provider := NewSimpleSecurityContextProvider(':')
 	dummyContainer := &v1.Container{}
 
 	for _, tc := range cases {
@@ -228,7 +228,7 @@ func TestModifyHostConfigPodSecurityContext(t *testing.T) {
 		},
 	}
 
-	provider := NewSimpleSecurityContextProvider()
+	provider := NewSimpleSecurityContextProvider(':')
 	dummyContainer := &v1.Container{}
 	dummyContainer.SecurityContext = fullValidSecurityContext()
 	dummyPod := &v1.Pod{
@@ -325,10 +325,10 @@ func fullValidHostConfig() *dockercontainer.HostConfig {
 		CapAdd:     []string{"addCapA", "addCapB"},
 		CapDrop:    []string{"dropCapA", "dropCapB"},
 		SecurityOpt: []string{
-			fmt.Sprintf("%s:%s", DockerLabelUser, "user"),
-			fmt.Sprintf("%s:%s", DockerLabelRole, "role"),
-			fmt.Sprintf("%s:%s", DockerLabelType, "type"),
-			fmt.Sprintf("%s:%s", DockerLabelLevel, "level"),
+			fmt.Sprintf("%s:%s", DockerLabelUser(':'), "user"),
+			fmt.Sprintf("%s:%s", DockerLabelRole(':'), "role"),
+			fmt.Sprintf("%s:%s", DockerLabelType(':'), "type"),
+			fmt.Sprintf("%s:%s", DockerLabelLevel(':'), "level"),
 		},
 	}
 }

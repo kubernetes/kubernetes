@@ -28,6 +28,14 @@ import (
 	"k8s.io/kubernetes/pkg/securitycontext"
 )
 
+const (
+	// optSeparator is the docker option separator to use; this is the
+	// separator which is supported in version 1.11+; older versions used `:`,
+	// but dockershim does not support those, so it is hard-coded in this
+	// package.
+	optSeparator = '='
+)
+
 // applySandboxSecurityContext updates docker sandbox options according to security context.
 func applySandboxSecurityContext(lc *runtimeapi.LinuxPodSandboxConfig, config *dockercontainer.Config, hc *dockercontainer.HostConfig, networkPlugin network.NetworkPlugin) {
 	if lc == nil {
@@ -107,6 +115,7 @@ func modifyHostConfig(sc *runtimeapi.LinuxContainerSecurityContext, hostConfig *
 				Type:  sc.SelinuxOptions.GetType(),
 				Level: sc.SelinuxOptions.GetLevel(),
 			},
+			optSeparator,
 		)
 	}
 }
