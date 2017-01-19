@@ -28,14 +28,21 @@ const (
 	TokenExpectedRegex = "^\\S{6}\\:\\S{16}\n$"
 )
 
-var kubeadmPath string
+var kubeadmPath = flag.String("kubeadm-path", filepath.Join(os.Getenv("KUBE_ROOT"), "cluster/kubeadm.sh"), "Location of kubeadm")
+var testCmd = true
 
 func init() {
-	flag.StringVar(&kubeadmPath, "kubeadm-path", filepath.Join(os.Getenv("KUBE_ROOT"), "cluster/kubeadm.sh"), "Location of kubeadm")
+	if _, err := os.Stat(*kubeadmPath); os.IsNotExist(err) {
+		testCmd = false
+	}
 }
 
 func TestCmdTokenGenerate(t *testing.T) {
-	stdout, _, err := RunCmd(kubeadmPath, "ex", "token", "generate")
+	if !testCmd {
+		t.Log("kubeadm not found, skipping")
+		t.Skip()
+	}
+	stdout, _, err := RunCmd(*kubeadmPath, "ex", "token", "generate")
 	if err != nil {
 		t.Fatalf("'kubeadm ex token generate' exited uncleanly: %v", err)
 	}
@@ -59,8 +66,12 @@ func TestCmdTokenGenerateTypoError(t *testing.T) {
 		with a non-zero status code after showing the command's usage, so that
 		the usage itself isn't captured as a token without the user noticing.
 	*/
+	if !testCmd {
+		t.Log("kubeadm not found, skipping")
+		t.Skip()
+	}
 
-	_, _, err := RunCmd(kubeadmPath, "ex", "token", "genorate") // subtle typo
+	_, _, err := RunCmd(*kubeadmPath, "ex", "token", "genorate") // subtle typo
 	if err == nil {
 		t.Error("'kubeadm ex token genorate' (a deliberate typo) exited without an error when we expected non-zero exit status")
 	}
