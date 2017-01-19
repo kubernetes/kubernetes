@@ -49,7 +49,6 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 	scheme.AddKnownTypes(SchemeGroupVersion,
 		&StatefulSet{},
 		&StatefulSetList{},
-		&api.ListOptions{},
 		&api.DeleteOptions{},
 	)
 	return nil

@@ -48,7 +48,6 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 	scheme.AddKnownTypes(SchemeGroupVersion,
 		&CertificateSigningRequest{},
 		&CertificateSigningRequestList{},
-		&api.ListOptions{},
 		&api.DeleteOptions{},
 	)
 	return nil
