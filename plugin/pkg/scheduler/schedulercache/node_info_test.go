@@ -213,7 +213,7 @@ func TestaddPod(t *testing.T) {
 		t.Fatalf("nodeinfo add pod with affinity error,expected: %v,got: %v", []*v1.Pod{podwithaffinity}, nodeinfo.podsWithAffinity)
 	}
 	if !reflect.DeepEqual(nodeinfo.pods, []*v1.Pod{podwithoutaffinity}) {
-		t.Fatalf("nodeinfo add pod without affinity error,expected: %v,got: %v", []*v1.Pod{podwithoutaffinity}, nodeinfo.podsWithAffinity)
+		t.Fatalf("nodeinfo add pod without affinity error,expected: %v,got: %v", []*v1.Pod{podwithoutaffinity}, nodeinfo.pods)
 	}
 
 }
@@ -229,8 +229,8 @@ func TestremovePod(t *testing.T) {
 	if err != nil {
 		t.Fatalf("nodeinfo remove pod with affinity  error:%s", err)
 	}
-	if !reflect.DeepEqual(nodeinfo.podsWithAffinity, &v1.Pod{}) {
-		t.Fatalf("nodeinfo remove pod with affinity error,expected: %v,got: %v", &v1.Pod{}, nodeinfo.podsWithAffinity)
+	if !reflect.DeepEqual(nodeinfo.podsWithAffinity, []&v1.Pod{}) {
+		t.Fatalf("nodeinfo remove pod with affinity error,expected: %v,got: %v", []&v1.Pod{}, nodeinfo.podsWithAffinity)
 	}
 	err = nodeinfo.removePod(podwithoutaffinity)
 	if err != nil {
