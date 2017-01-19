@@ -15,5 +15,6 @@
 # limitations under the License.
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
-source ${KUBE_ROOT}/cluster/gce/util.sh
-source ${KUBE_ROOT}/cluster/kubemark/config-default.sh
+source ${KUBE_ROOT}/test/kubemark/cloud-provider-config.sh
+source ${KUBE_ROOT}/cluster/${CLOUD_PROVIDER}/util.sh
+source ${KUBE_ROOT}/cluster/kubemark/${CLOUD_PROVIDER}/config-default.sh
