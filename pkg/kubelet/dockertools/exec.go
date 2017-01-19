@@ -53,6 +53,7 @@ func (*NsenterExecHandler) ExecInContainer(client DockerInterface, container *do
 	args = append(args, container.Config.Env...)
 	args = append(args, cmd...)
 	command := exec.Command(nsenter, args...)
+	var cmdErr error
 	if tty {
 		p, err := kubecontainer.StartPty(command)
 		if err != nil {
@@ -75,7 +76,7 @@ func (*NsenterExecHandler) ExecInContainer(client DockerInterface, container *do
 			go io.Copy(stdout, p)
 		}
 
-		err = command.Wait()
+		cmdErr = command.Wait()
 	} else {
 		if stdin != nil {
 			// Use an os.Pipe here as it returns true *os.File objects.
@@ -97,13 +98,13 @@ func (*NsenterExecHandler) ExecInContainer(client DockerInterface, container *do
 			command.Stderr = stderr
 		}
 
-		err = command.Run()
+		cmdErr = command.Run()
 	}
 
-	if exitErr, ok := err.(*exec.ExitError); ok {
+	if exitErr, ok := cmdErr.(*exec.ExitError); ok {
 		return &utilexec.ExitErrorWrapper{ExitError: exitErr}
 	}
-	return err
+	return cmdErr
 }
 
 // NativeExecHandler executes commands in Docker containers using Docker's exec API.
