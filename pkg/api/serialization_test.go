@@ -519,7 +519,7 @@ const benchmarkSeed = 100
 
 func benchmarkItems() []v1.Pod {
 	apiObjectFuzzer := apitesting.FuzzerFor(nil, api.SchemeGroupVersion, rand.NewSource(benchmarkSeed))
-	items := make([]v1.Pod, 2)
+	items := make([]v1.Pod, 10)
 	for i := range items {
 		var pod api.Pod
 		apiObjectFuzzer.Fuzz(&pod)

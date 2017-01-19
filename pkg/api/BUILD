@@ -75,6 +75,7 @@ go_test(
         "meta_test.go",
         "serialization_proto_test.go",
         "serialization_test.go",
+        "unstructured_test.go",
     ],
     tags = ["automanaged"],
     deps = [
@@ -100,6 +101,7 @@ go_test(
         "//vendor:k8s.io/apimachinery/pkg/runtime/serializer/streaming",
         "//vendor:k8s.io/apimachinery/pkg/types",
         "//vendor:k8s.io/apimachinery/pkg/util/diff",
+        "//vendor:k8s.io/apimachinery/pkg/util/json",
         "//vendor:k8s.io/apimachinery/pkg/util/sets",
         "//vendor:k8s.io/apimachinery/pkg/watch",
     ],
