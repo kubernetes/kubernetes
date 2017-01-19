@@ -19,7 +19,6 @@ package master
 import (
 	"encoding/json"
 	"fmt"
-	"runtime"
 	"time"
 
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
@@ -229,36 +228,15 @@ func SetMasterTaintTolerations(meta *metav1.ObjectMeta) {
 	meta.Annotations[v1.TolerationsAnnotationKey] = string(tolerationsAnnotation)
 }
 
-// SetNodeAffinity is a basic helper to set meta.Annotations[v1.AffinityAnnotationKey] for one or more v1.NodeSelectorRequirement(s)
-func SetNodeAffinity(meta *metav1.ObjectMeta, expr ...v1.NodeSelectorRequirement) {
-	nodeAffinity := &v1.NodeAffinity{
-		RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
-			NodeSelectorTerms: []v1.NodeSelectorTerm{{MatchExpressions: expr}},
-		},
-	}
-	affinityAnnotation, _ := json.Marshal(v1.Affinity{NodeAffinity: nodeAffinity})
-	if meta.Annotations == nil {
-		meta.Annotations = map[string]string{}
-	}
-	meta.Annotations[v1.AffinityAnnotationKey] = string(affinityAnnotation)
-}
-
 // MasterNodeAffinity returns v1.NodeSelectorRequirement to be used with SetNodeAffinity to set affinity to master node
-func MasterNodeAffinity() v1.NodeSelectorRequirement {
+// TODO - This should not be here, remove when Deployment issue is addressed.
+/*func MasterNodeAffinity() v1.NodeSelectorRequirement {
 	return v1.NodeSelectorRequirement{
 		Key:      metav1.NodeLabelKubeadmAlphaRole,
 		Operator: v1.NodeSelectorOpIn,
 		Values:   []string{metav1.NodeLabelRoleMaster},
 	}
-}
-
-// NativeArchitectureNodeAffinity returns v1.NodeSelectorRequirement to be used with SetNodeAffinity to nodes with CPU architecture
-// the same as master node
-func NativeArchitectureNodeAffinity() v1.NodeSelectorRequirement {
-	return v1.NodeSelectorRequirement{
-		Key: "beta.kubernetes.io/arch", Operator: v1.NodeSelectorOpIn, Values: []string{runtime.GOARCH},
-	}
-}
+}*/
 
 func createDummyDeployment(client *clientset.Clientset) {
 	fmt.Println("[apiclient] Creating a test deployment")

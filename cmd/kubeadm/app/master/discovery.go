@@ -116,7 +116,8 @@ func newKubeDiscovery(cfg *kubeadmapi.MasterConfiguration, caCert *x509.Certific
 	}
 
 	SetMasterTaintTolerations(&kd.Deployment.Spec.Template.ObjectMeta)
-	SetNodeAffinity(&kd.Deployment.Spec.Template.ObjectMeta, MasterNodeAffinity(), NativeArchitectureNodeAffinity())
+	// TODO: This does not make sense, deployments don't have "affinity"
+	//SetNodeAffinity(&kd.Deployment.Spec.Template.ObjectMeta, MasterNodeAffinity(), NativeArchitectureNodeAffinity())
 
 	return kd
 }
