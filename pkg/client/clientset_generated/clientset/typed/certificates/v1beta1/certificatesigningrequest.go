@@ -20,10 +20,10 @@ import (
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
+	rest "k8s.io/client-go/rest"
 	api "k8s.io/kubernetes/pkg/api"
 	v1 "k8s.io/kubernetes/pkg/api/v1"
 	v1beta1 "k8s.io/kubernetes/pkg/apis/certificates/v1beta1"
-	restclient "k8s.io/kubernetes/pkg/client/restclient"
 )
 
 // CertificateSigningRequestsGetter has a method to return a CertificateSigningRequestInterface.
@@ -48,7 +48,7 @@ type CertificateSigningRequestInterface interface {
 
 // certificateSigningRequests implements CertificateSigningRequestInterface
 type certificateSigningRequests struct {
-	client restclient.Interface
+	client rest.Interface
 }
 
 // newCertificateSigningRequests returns a CertificateSigningRequests

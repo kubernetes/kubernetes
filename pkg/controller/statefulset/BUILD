@@ -66,7 +66,6 @@ go_test(
         "//pkg/client/clientset_generated/clientset/fake:go_default_library",
         "//pkg/client/clientset_generated/clientset/typed/apps/v1beta1:go_default_library",
         "//pkg/client/clientset_generated/clientset/typed/apps/v1beta1/fake:go_default_library",
-        "//pkg/client/restclient:go_default_library",
         "//pkg/client/testing/core:go_default_library",
         "//pkg/controller:go_default_library",
         "//pkg/util/testing:go_default_library",

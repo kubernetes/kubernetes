@@ -29,7 +29,6 @@ go_test(
     library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
-        "//pkg/client/restclient:go_default_library",
         "//pkg/client/unversioned/remotecommand:go_default_library",
         "//pkg/kubelet/server/portforward:go_default_library",
         "//pkg/util/httpstream:go_default_library",

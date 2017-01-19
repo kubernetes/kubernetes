@@ -22,7 +22,6 @@ go_library(
         "//pkg/client/cache:go_default_library",
         "//pkg/client/clientset_generated/clientset:go_default_library",
         "//pkg/client/record:go_default_library",
-        "//pkg/client/restclient:go_default_library",
         "//pkg/util:go_default_library",
         "//pkg/util/hash:go_default_library",
         "//pkg/util/workqueue:go_default_library",

@@ -20,10 +20,10 @@ import (
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
+	rest "k8s.io/client-go/rest"
 	api "k8s.io/kubernetes/pkg/api"
 	v1 "k8s.io/kubernetes/pkg/api/v1"
 	v2alpha1 "k8s.io/kubernetes/pkg/apis/batch/v2alpha1"
-	restclient "k8s.io/kubernetes/pkg/client/restclient"
 )
 
 // CronJobsGetter has a method to return a CronJobInterface.
@@ -48,7 +48,7 @@ type CronJobInterface interface {
 
 // cronJobs implements CronJobInterface
 type cronJobs struct {
-	client restclient.Interface
+	client rest.Interface
 	ns     string
 }
 

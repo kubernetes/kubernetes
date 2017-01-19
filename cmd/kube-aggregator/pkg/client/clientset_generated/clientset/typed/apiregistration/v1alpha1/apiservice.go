@@ -20,10 +20,10 @@ import (
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
+	rest "k8s.io/client-go/rest"
 	v1alpha1 "k8s.io/kubernetes/cmd/kube-aggregator/pkg/apis/apiregistration/v1alpha1"
 	api "k8s.io/kubernetes/pkg/api"
 	v1 "k8s.io/kubernetes/pkg/api/v1"
-	restclient "k8s.io/kubernetes/pkg/client/restclient"
 )
 
 // APIServicesGetter has a method to return a APIServiceInterface.
@@ -48,7 +48,7 @@ type APIServiceInterface interface {
 
 // aPIServices implements APIServiceInterface
 type aPIServices struct {
-	client restclient.Interface
+	client rest.Interface
 }
 
 // newAPIServices returns a APIServices

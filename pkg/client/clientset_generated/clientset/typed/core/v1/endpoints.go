@@ -20,9 +20,9 @@ import (
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
+	rest "k8s.io/client-go/rest"
 	api "k8s.io/kubernetes/pkg/api"
 	v1 "k8s.io/kubernetes/pkg/api/v1"
-	restclient "k8s.io/kubernetes/pkg/client/restclient"
 )
 
 // EndpointsGetter has a method to return a EndpointsInterface.
@@ -46,7 +46,7 @@ type EndpointsInterface interface {
 
 // endpoints implements EndpointsInterface
 type endpoints struct {
-	client restclient.Interface
+	client rest.Interface
 	ns     string
 }
 

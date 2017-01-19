@@ -17,8 +17,8 @@ limitations under the License.
 package fake
 
 import (
+	rest "k8s.io/client-go/rest"
 	v2alpha1 "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/batch/v2alpha1"
-	restclient "k8s.io/kubernetes/pkg/client/restclient"
 	core "k8s.io/kubernetes/pkg/client/testing/core"
 )
 
@@ -36,7 +36,7 @@ func (c *FakeBatchV2alpha1) Jobs(namespace string) v2alpha1.JobInterface {
 
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
-func (c *FakeBatchV2alpha1) RESTClient() restclient.Interface {
-	var ret *restclient.RESTClient
+func (c *FakeBatchV2alpha1) RESTClient() rest.Interface {
+	var ret *rest.RESTClient
 	return ret
 }

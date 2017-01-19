@@ -12,7 +12,6 @@ go_library(
     name = "go_default_library",
     srcs = ["clientauth.go"],
     tags = ["automanaged"],
-    deps = ["//pkg/client/restclient:go_default_library"],
 )
 
 go_test(

@@ -20,18 +20,18 @@ import (
 	fmt "fmt"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	serializer "k8s.io/apimachinery/pkg/runtime/serializer"
+	rest "k8s.io/client-go/rest"
 	api "k8s.io/kubernetes/pkg/api"
-	restclient "k8s.io/kubernetes/pkg/client/restclient"
 )
 
 type AutoscalingV1Interface interface {
-	RESTClient() restclient.Interface
+	RESTClient() rest.Interface
 	HorizontalPodAutoscalersGetter
 }
 
 // AutoscalingV1Client is used to interact with features provided by the autoscaling group.
 type AutoscalingV1Client struct {
-	restClient restclient.Interface
+	restClient rest.Interface
 }
 
 func (c *AutoscalingV1Client) HorizontalPodAutoscalers(namespace string) HorizontalPodAutoscalerInterface {
@@ -39,12 +39,12 @@ func (c *AutoscalingV1Client) HorizontalPodAutoscalers(namespace string) Horizon
 }
 
 // NewForConfig creates a new AutoscalingV1Client for the given config.
-func NewForConfig(c *restclient.Config) (*AutoscalingV1Client, error) {
+func NewForConfig(c *rest.Config) (*AutoscalingV1Client, error) {
 	config := *c
 	if err := setConfigDefaults(&config); err != nil {
 		return nil, err
 	}
-	client, err := restclient.RESTClientFor(&config)
+	client, err := rest.RESTClientFor(&config)
 	if err != nil {
 		return nil, err
 	}
@@ -53,7 +53,7 @@ func NewForConfig(c *restclient.Config) (*AutoscalingV1Client, error) {
 
 // NewForConfigOrDie creates a new AutoscalingV1Client for the given config and
 // panics if there is an error in the config.
-func NewForConfigOrDie(c *restclient.Config) *AutoscalingV1Client {
+func NewForConfigOrDie(c *rest.Config) *AutoscalingV1Client {
 	client, err := NewForConfig(c)
 	if err != nil {
 		panic(err)
@@ -62,11 +62,11 @@ func NewForConfigOrDie(c *restclient.Config) *AutoscalingV1Client {
 }
 
 // New creates a new AutoscalingV1Client for the given RESTClient.
-func New(c restclient.Interface) *AutoscalingV1Client {
+func New(c rest.Interface) *AutoscalingV1Client {
 	return &AutoscalingV1Client{c}
 }
 
-func setConfigDefaults(config *restclient.Config) error {
+func setConfigDefaults(config *rest.Config) error {
 	gv, err := schema.ParseGroupVersion("autoscaling/v1")
 	if err != nil {
 		return err
@@ -77,7 +77,7 @@ func setConfigDefaults(config *restclient.Config) error {
 	}
 	config.APIPath = "/apis"
 	if config.UserAgent == "" {
-		config.UserAgent = restclient.DefaultKubernetesUserAgent()
+		config.UserAgent = rest.DefaultKubernetesUserAgent()
 	}
 	copyGroupVersion := gv
 	config.GroupVersion = &copyGroupVersion
@@ -89,7 +89,7 @@ func setConfigDefaults(config *restclient.Config) error {
 
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
-func (c *AutoscalingV1Client) RESTClient() restclient.Interface {
+func (c *AutoscalingV1Client) RESTClient() rest.Interface {
 	if c == nil {
 		return nil
 	}

@@ -67,7 +67,6 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
-        "//pkg/client/restclient:go_default_library",
         "//pkg/genericapiserver/authenticator:go_default_library",
         "//pkg/genericapiserver/authorizer:go_default_library",
         "//pkg/genericapiserver/endpoints:go_default_library",

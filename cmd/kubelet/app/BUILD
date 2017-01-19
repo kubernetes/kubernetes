@@ -17,7 +17,6 @@ go_test(
     library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
-        "//pkg/client/restclient:go_default_library",
         "//pkg/kubelet:go_default_library",
         "//pkg/util/config:go_default_library",
         "//vendor:k8s.io/apimachinery/pkg/util/diff",
@@ -47,7 +46,6 @@ go_library(
         "//pkg/client/clientset_generated/clientset/typed/certificates/v1beta1:go_default_library",
         "//pkg/client/clientset_generated/clientset/typed/core/v1:go_default_library",
         "//pkg/client/record:go_default_library",
-        "//pkg/client/restclient:go_default_library",
         "//pkg/client/unversioned/auth:go_default_library",
         "//pkg/client/unversioned/clientcmd:go_default_library",
         "//pkg/cloudprovider:go_default_library",

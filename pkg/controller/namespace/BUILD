@@ -48,7 +48,6 @@ go_test(
         "//pkg/api/v1:go_default_library",
         "//pkg/client/clientset_generated/clientset:go_default_library",
         "//pkg/client/clientset_generated/clientset/fake:go_default_library",
-        "//pkg/client/restclient:go_default_library",
         "//pkg/client/testing/core:go_default_library",
         "//pkg/client/typed/discovery:go_default_library",
         "//pkg/client/typed/dynamic:go_default_library",

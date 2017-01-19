@@ -17,8 +17,8 @@ limitations under the License.
 package fake
 
 import (
+	rest "k8s.io/client-go/rest"
 	v1 "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/core/v1"
-	restclient "k8s.io/kubernetes/pkg/client/restclient"
 	core "k8s.io/kubernetes/pkg/client/testing/core"
 )
 
@@ -92,7 +92,7 @@ func (c *FakeCoreV1) ServiceAccounts(namespace string) v1.ServiceAccountInterfac
 
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
-func (c *FakeCoreV1) RESTClient() restclient.Interface {
-	var ret *restclient.RESTClient
+func (c *FakeCoreV1) RESTClient() rest.Interface {
+	var ret *rest.RESTClient
 	return ret
 }

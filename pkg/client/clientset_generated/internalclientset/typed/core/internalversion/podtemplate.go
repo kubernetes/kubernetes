@@ -20,8 +20,8 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
+	rest "k8s.io/client-go/rest"
 	api "k8s.io/kubernetes/pkg/api"
-	restclient "k8s.io/kubernetes/pkg/client/restclient"
 )
 
 // PodTemplatesGetter has a method to return a PodTemplateInterface.
@@ -45,7 +45,7 @@ type PodTemplateInterface interface {
 
 // podTemplates implements PodTemplateInterface
 type podTemplates struct {
-	client restclient.Interface
+	client rest.Interface
 	ns     string
 }
 

@@ -13,7 +13,6 @@ go_library(
     srcs = ["gcp.go"],
     tags = ["automanaged"],
     deps = [
-        "//pkg/client/restclient:go_default_library",
         "//pkg/util/jsonpath:go_default_library",
         "//vendor:github.com/golang/glog",
         "//vendor:golang.org/x/net/context",

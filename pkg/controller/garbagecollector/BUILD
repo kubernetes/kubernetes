@@ -52,7 +52,6 @@ go_test(
         "//pkg/api:go_default_library",
         "//pkg/api/install:go_default_library",
         "//pkg/api/v1:go_default_library",
-        "//pkg/client/restclient:go_default_library",
         "//pkg/client/typed/dynamic:go_default_library",
         "//pkg/controller/garbagecollector/metaonly:go_default_library",
         "//pkg/util/workqueue:go_default_library",

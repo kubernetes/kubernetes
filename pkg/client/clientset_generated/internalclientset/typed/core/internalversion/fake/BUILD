@@ -38,7 +38,6 @@ go_library(
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/client/clientset_generated/internalclientset/typed/core/internalversion:go_default_library",
-        "//pkg/client/restclient:go_default_library",
         "//pkg/client/testing/core:go_default_library",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/fields",
@@ -47,6 +46,7 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
         "//vendor:k8s.io/apimachinery/pkg/types",
         "//vendor:k8s.io/apimachinery/pkg/watch",
+        "//vendor:k8s.io/client-go/rest",
     ],
 )
 

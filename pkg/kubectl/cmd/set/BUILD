@@ -52,7 +52,6 @@ go_test(
         "//pkg/api:go_default_library",
         "//pkg/apis/batch:go_default_library",
         "//pkg/apis/extensions:go_default_library",
-        "//pkg/client/restclient:go_default_library",
         "//pkg/client/restclient/fake:go_default_library",
         "//pkg/kubectl/cmd/testing:go_default_library",
         "//pkg/kubectl/cmd/util:go_default_library",

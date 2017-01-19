@@ -26,7 +26,6 @@ go_library(
         "//pkg/api:go_default_library",
         "//pkg/api/v1:go_default_library",
         "//pkg/client/clientset_generated/clientset:go_default_library",
-        "//pkg/client/restclient:go_default_library",
         "//pkg/client/typed/dynamic:go_default_library",
         "//pkg/controller/namespace:go_default_library",
         "//pkg/util/config:go_default_library",

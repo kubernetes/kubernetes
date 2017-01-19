@@ -13,7 +13,6 @@ go_library(
     srcs = ["oidc.go"],
     tags = ["automanaged"],
     deps = [
-        "//pkg/client/restclient:go_default_library",
         "//vendor:github.com/coreos/go-oidc/jose",
         "//vendor:github.com/coreos/go-oidc/oauth2",
         "//vendor:github.com/coreos/go-oidc/oidc",

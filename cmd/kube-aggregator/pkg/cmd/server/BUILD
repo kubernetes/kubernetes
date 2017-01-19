@@ -17,7 +17,6 @@ go_library(
         "//cmd/kube-aggregator/pkg/legacy:go_default_library",
         "//pkg/api:go_default_library",
         "//pkg/client/clientset_generated/clientset:go_default_library",
-        "//pkg/client/restclient:go_default_library",
         "//pkg/genericapiserver/registry/generic:go_default_library",
         "//pkg/genericapiserver/registry/generic/registry:go_default_library",
         "//pkg/genericapiserver/server:go_default_library",

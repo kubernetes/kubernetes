@@ -24,7 +24,6 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
-        "//pkg/client/restclient:go_default_library",
         "//pkg/client/unversioned/auth:go_default_library",
         "//pkg/util/homedir:go_default_library",
         "//vendor:github.com/golang/glog",
@@ -51,7 +50,6 @@ go_test(
     library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
-        "//pkg/client/restclient:go_default_library",
         "//vendor:github.com/ghodss/yaml",
         "//vendor:github.com/imdario/mergo",
         "//vendor:k8s.io/apimachinery/pkg/runtime",
