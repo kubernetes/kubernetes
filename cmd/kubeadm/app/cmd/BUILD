@@ -12,6 +12,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "cmd.go",
+        "defaults.go",
         "init.go",
         "join.go",
         "reset.go",
@@ -39,6 +40,7 @@ go_library(
         "//pkg/util/flag:go_default_library",
         "//pkg/util/initsystem:go_default_library",
         "//pkg/version:go_default_library",
+        "//vendor:github.com/blang/semver",
         "//vendor:github.com/renstrom/dedent",
         "//vendor:github.com/spf13/cobra",
         "//vendor:k8s.io/apimachinery/pkg/fields",
