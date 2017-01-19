@@ -734,10 +734,13 @@ func (r *Request) Stream() (io.ReadCloser, error) {
 	}
 	req.Header = r.headers
 	client := r.client
+        fmt.Println("=====================================before",client)
 	if client == nil {
+                fmt.Println("===================================client is nil")
 		client = http.DefaultClient
 	}
 	r.backoffMgr.Sleep(r.backoffMgr.CalculateBackoff(r.URL()))
+        fmt.Println("============================",client)
 	resp, err := client.Do(req)
 	updateURLMetrics(r, resp, err)
 	if r.baseURL != nil {
