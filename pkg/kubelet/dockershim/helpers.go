@@ -272,20 +272,20 @@ func (f *dockerFilter) AddLabel(key, value string) {
 
 // getUserFromImageUser gets uid or user name of the image user.
 // If user is numeric, it will be treated as uid; or else, it is treated as user name.
-func getUserFromImageUser(imageUser string) (int64, string) {
+func getUserFromImageUser(imageUser string) (*int64, string) {
 	user := dockertools.GetUserFromImageUser(imageUser)
 	// return both nil if user is not specified in the image.
 	if user == "" {
-		return 0, ""
+		return nil, ""
 	}
 	// user could be either uid or user name. Try to interpret as numeric uid.
 	uid, err := strconv.ParseInt(user, 10, 64)
 	if err != nil {
 		// If user is non numeric, assume it's user name.
-		return 0, user
+		return nil, user
 	}
 	// If user is a numeric uid.
-	return uid, ""
+	return &uid, ""
 }
 
 // See #33189. If the previous attempt to create a sandbox container name FOO

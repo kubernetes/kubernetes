@@ -25,7 +25,7 @@ import (
 )
 
 // determineEffectiveSecurityContext gets container's security context from v1.Pod and v1.Container.
-func (m *kubeGenericRuntimeManager) determineEffectiveSecurityContext(pod *v1.Pod, container *v1.Container, uid int64, username string) *runtimeapi.LinuxContainerSecurityContext {
+func (m *kubeGenericRuntimeManager) determineEffectiveSecurityContext(pod *v1.Pod, container *v1.Container, uid *int64, username string) *runtimeapi.LinuxContainerSecurityContext {
 	effectiveSc := securitycontext.DetermineEffectiveSecurityContext(pod, container)
 	synthesized := convertToRuntimeSecurityContext(effectiveSc)
 	if synthesized == nil {
@@ -33,8 +33,10 @@ func (m *kubeGenericRuntimeManager) determineEffectiveSecurityContext(pod *v1.Po
 	}
 
 	// set RunAsUser.
-	if synthesized.RunAsUser == 0 {
-		synthesized.RunAsUser = uid
+	if synthesized.RunAsUser == nil {
+		if uid != nil {
+			synthesized.RunAsUser = &runtimeapi.Int64Value{Value: *uid}
+		}
 		synthesized.RunAsUsername = username
 	}
 
@@ -93,7 +95,7 @@ func convertToRuntimeSecurityContext(securityContext *v1.SecurityContext) *runti
 		SelinuxOptions: convertToRuntimeSELinuxOption(securityContext.SELinuxOptions),
 	}
 	if securityContext.RunAsUser != nil {
-		sc.RunAsUser = *securityContext.RunAsUser
+		sc.RunAsUser = &runtimeapi.Int64Value{Value: *securityContext.RunAsUser}
 	}
 	if securityContext.Privileged != nil {
 		sc.Privileged = *securityContext.Privileged

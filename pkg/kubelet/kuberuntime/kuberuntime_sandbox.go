@@ -140,7 +140,7 @@ func (m *kubeGenericRuntimeManager) generatePodSandboxLinuxConfig(pod *v1.Pod, c
 	if pod.Spec.SecurityContext != nil {
 		sc := pod.Spec.SecurityContext
 		if sc.RunAsUser != nil {
-			lc.SecurityContext.RunAsUser = *sc.RunAsUser
+			lc.SecurityContext.RunAsUser = &runtimeapi.Int64Value{Value: *sc.RunAsUser}
 		}
 		lc.SecurityContext.NamespaceOptions = &runtimeapi.NamespaceOption{
 			HostNetwork: pod.Spec.HostNetwork,

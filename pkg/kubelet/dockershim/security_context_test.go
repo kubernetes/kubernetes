@@ -30,7 +30,7 @@ import (
 
 func TestModifyContainerConfig(t *testing.T) {
 	var uid int64 = 123
-	var username string = "testuser"
+	var username = "testuser"
 
 	cases := []struct {
 		name     string
@@ -40,7 +40,7 @@ func TestModifyContainerConfig(t *testing.T) {
 		{
 			name: "container.SecurityContext.RunAsUser set",
 			sc: &runtimeapi.LinuxContainerSecurityContext{
-				RunAsUser: uid,
+				RunAsUser: &runtimeapi.Int64Value{Value: uid},
 			},
 			expected: &dockercontainer.Config{
 				User: strconv.FormatInt(uid, 10),

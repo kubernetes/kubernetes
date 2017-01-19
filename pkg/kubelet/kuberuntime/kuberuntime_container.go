@@ -139,9 +139,9 @@ func (m *kubeGenericRuntimeManager) generateContainerConfig(container *v1.Contai
 	if err != nil {
 		return nil, err
 	}
-	if uid != 0 {
+	if uid != nil {
 		// Verify RunAsNonRoot. Non-root verification only supports numeric user.
-		if err := verifyRunAsNonRoot(pod, container, uid); err != nil {
+		if err := verifyRunAsNonRoot(pod, container, *uid); err != nil {
 			return nil, err
 		}
 	} else if username != "" {
@@ -186,7 +186,7 @@ func (m *kubeGenericRuntimeManager) generateContainerConfig(container *v1.Contai
 }
 
 // generateLinuxContainerConfig generates linux container config for kubelet runtime v1.
-func (m *kubeGenericRuntimeManager) generateLinuxContainerConfig(container *v1.Container, pod *v1.Pod, uid int64, username string) *runtimeapi.LinuxContainerConfig {
+func (m *kubeGenericRuntimeManager) generateLinuxContainerConfig(container *v1.Container, pod *v1.Pod, uid *int64, username string) *runtimeapi.LinuxContainerConfig {
 	lc := &runtimeapi.LinuxContainerConfig{
 		Resources:       &runtimeapi.LinuxContainerResources{},
 		SecurityContext: m.determineEffectiveSecurityContext(pod, container, uid, username),

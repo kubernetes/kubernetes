@@ -120,9 +120,9 @@ enum Protocol {
 message PortMapping {
     // Protocol of the port mapping.
     Protocol protocol = 1;
-    // Port number within the container.
+    // Port number within the container. Default: 0 (not specified).
     int32 container_port = 2;
-    // Port number on the host.
+    // Port number on the host. Default: 0 (not specified).
     int32 host_port = 3;
     // Host IP.
     string host_ip = 4;
@@ -150,6 +150,12 @@ message NamespaceOption {
     bool host_ipc = 3;
 }
 
+// Int64Value is the wrapper of int64.
+message Int64Value {
+    // The value.
+    int64 value = 1;
+}
+
 // LinuxSandboxSecurityContext holds linux security configuration that will be
 // applied to a sandbox. Note that:
 // 1) It does not apply to containers in the pods.
@@ -162,7 +168,7 @@ message LinuxSandboxSecurityContext {
     // Optional SELinux context to be applied.
     SELinuxOption selinux_options = 2;
     // UID to run sandbox processes as, when applicable.
-    int64 run_as_user = 3;
+    Int64Value run_as_user = 3;
     // If set, the root filesystem of the sandbox is read-only.
     bool readonly_rootfs = 4;
     // List of groups applied to the first process run in the sandbox, in
@@ -198,7 +204,7 @@ message PodSandboxMetadata {
     string uid = 2;
     // Pod namespace of the sandbox. Same as the pod namespace in the PodSpec.
     string namespace = 3;
-    // Attempt number of creating the sandbox.
+    // Attempt number of creating the sandbox. Default: 0.
     uint32 attempt = 4;
 }
 
@@ -345,8 +351,8 @@ message LinuxPodSandboxStatus {
 }
 
 enum PodSandboxState {
-    SANDBOX_READY        = 0;
-    SANDBOX_NOTREADY     = 1;
+    SANDBOX_READY    = 0;
+    SANDBOX_NOTREADY = 1;
 }
 
 // PodSandboxStatus contains the status of the PodSandbox.
@@ -357,7 +363,7 @@ message PodSandboxStatus {
     PodSandboxMetadata metadata = 2;
     // State of the sandbox.
     PodSandboxState state = 3;
-    // Creation timestamp of the sandbox in nanoseconds.
+    // Creation timestamp of the sandbox in nanoseconds. Must be > 0.
     int64 created_at = 4;
     // Network contains network status if network is handled by the runtime.
     PodSandboxNetworkStatus network = 5;
@@ -410,7 +416,7 @@ message PodSandbox {
     PodSandboxMetadata metadata = 2;
     // State of the PodSandbox.
     PodSandboxState state = 3;
-    // Creation timestamps of the PodSandbox in nanoseconds.
+    // Creation timestamps of the PodSandbox in nanoseconds. Must be > 0.
     int64 created_at = 4;
     // Labels of the PodSandbox.
     map<string, string> labels = 5;
@@ -443,15 +449,15 @@ message KeyValue {
 // TODO: Consider using Resources from opencontainers/runtime-spec/specs-go
 // directly.
 message LinuxContainerResources {
-    // CPU CFS (Completely Fair Scheduler) period.
+    // CPU CFS (Completely Fair Scheduler) period. Default: 0 (not specified).
     int64 cpu_period = 1;
-    // CPU CFS (Completely Fair Scheduler) quota.
+    // CPU CFS (Completely Fair Scheduler) quota. Default: 0 (not specified).
     int64 cpu_quota = 2;
-    // CPU shares (relative weight vs. other containers).
+    // CPU shares (relative weight vs. other containers). Default: 0 (not specified).
     int64 cpu_shares = 3;
-    // Memory limit in bytes.
+    // Memory limit in bytes. Default: 0 (not specified).
     int64 memory_limit_in_bytes = 4;
-    // OOMScoreAdj adjusts the oom-killer score.
+    // OOMScoreAdj adjusts the oom-killer score. Default: 0 (not specified).
     int64 oom_score_adj = 5;
 }
 
@@ -500,7 +506,7 @@ message LinuxContainerSecurityContext {
     SELinuxOption selinux_options = 4;
     // UID to run the container process as. Only one of run_as_user and
     // run_as_username can be specified at a time.
-    int64 run_as_user = 5;
+    Int64Value run_as_user = 5;
     // User name to run the container process as. If specified, the user MUST
     // exist in the container image (i.e. in the /etc/passwd inside the image),
     // and be resolved there by the runtime; otherwise, the runtime MUST error.
@@ -529,7 +535,7 @@ message LinuxContainerConfig {
 message ContainerMetadata {
     // Name of the container. Same as the container name in the PodSpec.
     string name = 1;
-    // Attempt number of creating the container.
+    // Attempt number of creating the container. Default: 0.
     uint32 attempt = 2;
 }
 
@@ -637,7 +643,7 @@ message StartContainerResponse {}
 message StopContainerRequest {
     // ID of the container to stop.
     string container_id = 1;
-    // Timeout, in seconds, to stop the container.
+    // Timeout in seconds to stop the container. Must be > 0.
     int64 timeout = 2;
 }
 
@@ -651,10 +657,10 @@ message RemoveContainerRequest {
 message RemoveContainerResponse {}
 
 enum ContainerState {
-    CONTAINER_CREATED      = 0;
-    CONTAINER_RUNNING      = 1;
-    CONTAINER_EXITED       = 2;
-    CONTAINER_UNKNOWN      = 3;
+    CONTAINER_CREATED = 0;
+    CONTAINER_RUNNING = 1;
+    CONTAINER_EXITED  = 2;
+    CONTAINER_UNKNOWN = 3;
 }
 
 // ContainerStateValue is the wrapper of ContainerState.
@@ -699,7 +705,7 @@ message Container {
     string image_ref = 5;
     // State of the container.
     ContainerState state = 6;
-    // Creation time of the container in nanoseconds.
+    // Creation time of the container in nanoseconds. Must be > 0.
     int64 created_at = 7;
     // Key-value pairs that may be used to scope and select individual resources.
     map<string, string> labels = 8;
@@ -728,13 +734,13 @@ message ContainerStatus {
     ContainerMetadata metadata = 2;
     // Status of the container.
     ContainerState state = 3;
-    // Creation time of the container in nanoseconds.
+    // Creation time of the container in nanoseconds. Must be > 0.
     int64 created_at = 4;
-    // Start time of the container in nanoseconds.
+    // Start time of the container in nanoseconds. Default: 0 (not specified).
     int64 started_at = 5;
-    // Finish time of the container in nanoseconds.
+    // Finish time of the container in nanoseconds. Default: 0 (not specified).
     int64 finished_at = 6;
-    // Exit code of the container.
+    // Exit code of the container. Only required when finished_at != 0. Default: 0.
     int32 exit_code = 7;
     // Spec of the image.
     ImageSpec image = 8;
@@ -767,7 +773,7 @@ message ExecSyncRequest {
     string container_id = 1;
     // Command to execute.
     repeated string cmd = 2;
-    // Timeout in seconds to stop the command. Default: run forever.
+    // Timeout in seconds to stop the command. Default: 0 (run forever).
     int64 timeout = 3;
 }
 
@@ -776,7 +782,7 @@ message ExecSyncResponse {
     bytes stdout = 1;
     // Captured command stderr output.
     bytes stderr = 2;
-    // Exit code the command finished with.
+    // Exit code the command finished with. Default: 0 (success).
     int32 exit_code = 3;
 }
 
@@ -814,7 +820,7 @@ message AttachResponse {
 message PortForwardRequest {
     // ID of the container to which to forward the port.
     string pod_sandbox_id = 1;
-    // Port to forward.
+    // Port to forward. Each port must be > 0 if provided.
     repeated int32 port = 2;
 }
 
@@ -841,12 +847,12 @@ message Image {
     repeated string repo_tags = 2;
     // Digests by which this image is known.
     repeated string repo_digests = 3;
-    // Size of the image in bytes.
+    // Size of the image in bytes. Must be > 0.
     uint64 size = 4;
     // UID that will run the command(s). This is used as a default if no user is
     // specified when creating the container. UID and the following user name
     // are mutually exclusive.
-    int64 uid = 5;
+    Int64Value uid = 5;
     // User name that will run the command(s). This is used if UID is not set
     // and no user is specified when creating container.
     string username = 6;
@@ -919,7 +925,7 @@ message UpdateRuntimeConfigResponse {}
 
 // RuntimeCondition contains condition information for the runtime.
 // There are 2 kinds of runtime conditions:
-// 1. Required condtitions: Conditions are required for kubelet to work
+// 1. Required conditions: Conditions are required for kubelet to work
 // properly. If any required condition is unmet, the node will be not ready.
 // The required conditions include:
 //   * RuntimeReady: RuntimeReady means the runtime is up and ready to accept
@@ -933,7 +939,7 @@ message UpdateRuntimeConfigResponse {}
 message RuntimeCondition {
     // Type of runtime condition.
     string type = 1;
-    // Status of the condition, one of true/false.
+    // Status of the condition, one of true/false. Default: false.
     bool status = 2;
     // Brief CamelCase string containing reason for the condition's last transition.
     string reason = 3;

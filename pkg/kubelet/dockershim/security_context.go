@@ -68,8 +68,8 @@ func modifyContainerConfig(sc *runtimeapi.LinuxContainerSecurityContext, config 
 	if sc == nil {
 		return
 	}
-	if sc.RunAsUser != 0 {
-		config.User = strconv.FormatInt(sc.RunAsUser, 10)
+	if sc.RunAsUser != nil {
+		config.User = strconv.FormatInt(sc.GetRunAsUser().Value, 10)
 	}
 	if sc.RunAsUsername != "" {
 		config.User = sc.RunAsUsername
