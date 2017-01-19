@@ -17,18 +17,18 @@ limitations under the License.
 package internalversion
 
 import (
+	rest "k8s.io/client-go/rest"
 	api "k8s.io/kubernetes/pkg/api"
-	restclient "k8s.io/kubernetes/pkg/client/restclient"
 )
 
 type ApiregistrationInterface interface {
-	RESTClient() restclient.Interface
+	RESTClient() rest.Interface
 	APIServicesGetter
 }
 
 // ApiregistrationClient is used to interact with features provided by the apiregistration.k8s.io group.
 type ApiregistrationClient struct {
-	restClient restclient.Interface
+	restClient rest.Interface
 }
 
 func (c *ApiregistrationClient) APIServices() APIServiceInterface {
@@ -36,12 +36,12 @@ func (c *ApiregistrationClient) APIServices() APIServiceInterface {
 }
 
 // NewForConfig creates a new ApiregistrationClient for the given config.
-func NewForConfig(c *restclient.Config) (*ApiregistrationClient, error) {
+func NewForConfig(c *rest.Config) (*ApiregistrationClient, error) {
 	config := *c
 	if err := setConfigDefaults(&config); err != nil {
 		return nil, err
 	}
-	client, err := restclient.RESTClientFor(&config)
+	client, err := rest.RESTClientFor(&config)
 	if err != nil {
 		return nil, err
 	}
@@ -50,7 +50,7 @@ func NewForConfig(c *restclient.Config) (*ApiregistrationClient, error) {
 
 // NewForConfigOrDie creates a new ApiregistrationClient for the given config and
 // panics if there is an error in the config.
-func NewForConfigOrDie(c *restclient.Config) *ApiregistrationClient {
+func NewForConfigOrDie(c *rest.Config) *ApiregistrationClient {
 	client, err := NewForConfig(c)
 	if err != nil {
 		panic(err)
@@ -59,11 +59,11 @@ func NewForConfigOrDie(c *restclient.Config) *ApiregistrationClient {
 }
 
 // New creates a new ApiregistrationClient for the given RESTClient.
-func New(c restclient.Interface) *ApiregistrationClient {
+func New(c rest.Interface) *ApiregistrationClient {
 	return &ApiregistrationClient{c}
 }
 
-func setConfigDefaults(config *restclient.Config) error {
+func setConfigDefaults(config *rest.Config) error {
 	// if apiregistration group is not registered, return an error
 	g, err := api.Registry.Group("apiregistration.k8s.io")
 	if err != nil {
@@ -71,7 +71,7 @@ func setConfigDefaults(config *restclient.Config) error {
 	}
 	config.APIPath = "/apis"
 	if config.UserAgent == "" {
-		config.UserAgent = restclient.DefaultKubernetesUserAgent()
+		config.UserAgent = rest.DefaultKubernetesUserAgent()
 	}
 	if config.GroupVersion == nil || config.GroupVersion.Group != g.GroupVersion.Group {
 		copyGroupVersion := g.GroupVersion
@@ -90,7 +90,7 @@ func setConfigDefaults(config *restclient.Config) error {
 
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
-func (c *ApiregistrationClient) RESTClient() restclient.Interface {
+func (c *ApiregistrationClient) RESTClient() rest.Interface {
 	if c == nil {
 		return nil
 	}

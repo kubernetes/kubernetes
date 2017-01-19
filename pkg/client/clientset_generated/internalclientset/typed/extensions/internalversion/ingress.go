@@ -20,9 +20,9 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
+	rest "k8s.io/client-go/rest"
 	api "k8s.io/kubernetes/pkg/api"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions"
-	restclient "k8s.io/kubernetes/pkg/client/restclient"
 )
 
 // IngressesGetter has a method to return a IngressInterface.
@@ -47,7 +47,7 @@ type IngressInterface interface {
 
 // ingresses implements IngressInterface
 type ingresses struct {
-	client restclient.Interface
+	client rest.Interface
 	ns     string
 }
 

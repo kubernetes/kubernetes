@@ -17,8 +17,8 @@ limitations under the License.
 package fake
 
 import (
+	rest "k8s.io/client-go/rest"
 	internalversion "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset/typed/federation/internalversion"
-	restclient "k8s.io/kubernetes/pkg/client/restclient"
 	core "k8s.io/kubernetes/pkg/client/testing/core"
 )
 
@@ -32,7 +32,7 @@ func (c *FakeFederation) Clusters() internalversion.ClusterInterface {
 
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
-func (c *FakeFederation) RESTClient() restclient.Interface {
-	var ret *restclient.RESTClient
+func (c *FakeFederation) RESTClient() rest.Interface {
+	var ret *rest.RESTClient
 	return ret
 }

@@ -14,7 +14,6 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//pkg/api/v1:go_default_library",
-        "//pkg/client/restclient:go_default_library",
         "//pkg/util/node:go_default_library",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/types",
@@ -31,10 +30,7 @@ go_test(
     tags = [
         "automanaged",
     ],
-    deps = [
-        "//pkg/client/clientset_generated/clientset/typed/core/v1:go_default_library",
-        "//pkg/client/restclient:go_default_library",
-    ],
+    deps = ["//pkg/client/clientset_generated/clientset/typed/core/v1:go_default_library"],
 )
 
 filegroup(

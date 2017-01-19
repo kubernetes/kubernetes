@@ -20,18 +20,18 @@ import (
 	fmt "fmt"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	serializer "k8s.io/apimachinery/pkg/runtime/serializer"
+	rest "k8s.io/client-go/rest"
 	api "k8s.io/kubernetes/pkg/api"
-	restclient "k8s.io/kubernetes/pkg/client/restclient"
 )
 
 type ApiregistrationV1alpha1Interface interface {
-	RESTClient() restclient.Interface
+	RESTClient() rest.Interface
 	APIServicesGetter
 }
 
 // ApiregistrationV1alpha1Client is used to interact with features provided by the apiregistration.k8s.io group.
 type ApiregistrationV1alpha1Client struct {
-	restClient restclient.Interface
+	restClient rest.Interface
 }
 
 func (c *ApiregistrationV1alpha1Client) APIServices() APIServiceInterface {
@@ -39,12 +39,12 @@ func (c *ApiregistrationV1alpha1Client) APIServices() APIServiceInterface {
 }
 
 // NewForConfig creates a new ApiregistrationV1alpha1Client for the given config.
-func NewForConfig(c *restclient.Config) (*ApiregistrationV1alpha1Client, error) {
+func NewForConfig(c *rest.Config) (*ApiregistrationV1alpha1Client, error) {
 	config := *c
 	if err := setConfigDefaults(&config); err != nil {
 		return nil, err
 	}
-	client, err := restclient.RESTClientFor(&config)
+	client, err := rest.RESTClientFor(&config)
 	if err != nil {
 		return nil, err
 	}
@@ -53,7 +53,7 @@ func NewForConfig(c *restclient.Config) (*ApiregistrationV1alpha1Client, error) 
 
 // NewForConfigOrDie creates a new ApiregistrationV1alpha1Client for the given config and
 // panics if there is an error in the config.
-func NewForConfigOrDie(c *restclient.Config) *ApiregistrationV1alpha1Client {
+func NewForConfigOrDie(c *rest.Config) *ApiregistrationV1alpha1Client {
 	client, err := NewForConfig(c)
 	if err != nil {
 		panic(err)
@@ -62,11 +62,11 @@ func NewForConfigOrDie(c *restclient.Config) *ApiregistrationV1alpha1Client {
 }
 
 // New creates a new ApiregistrationV1alpha1Client for the given RESTClient.
-func New(c restclient.Interface) *ApiregistrationV1alpha1Client {
+func New(c rest.Interface) *ApiregistrationV1alpha1Client {
 	return &ApiregistrationV1alpha1Client{c}
 }
 
-func setConfigDefaults(config *restclient.Config) error {
+func setConfigDefaults(config *rest.Config) error {
 	gv, err := schema.ParseGroupVersion("apiregistration.k8s.io/v1alpha1")
 	if err != nil {
 		return err
@@ -77,7 +77,7 @@ func setConfigDefaults(config *restclient.Config) error {
 	}
 	config.APIPath = "/apis"
 	if config.UserAgent == "" {
-		config.UserAgent = restclient.DefaultKubernetesUserAgent()
+		config.UserAgent = rest.DefaultKubernetesUserAgent()
 	}
 	copyGroupVersion := gv
 	config.GroupVersion = &copyGroupVersion
@@ -89,7 +89,7 @@ func setConfigDefaults(config *restclient.Config) error {
 
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
-func (c *ApiregistrationV1alpha1Client) RESTClient() restclient.Interface {
+func (c *ApiregistrationV1alpha1Client) RESTClient() rest.Interface {
 	if c == nil {
 		return nil
 	}

@@ -17,18 +17,18 @@ limitations under the License.
 package internalversion
 
 import (
+	rest "k8s.io/client-go/rest"
 	api "k8s.io/kubernetes/pkg/api"
-	restclient "k8s.io/kubernetes/pkg/client/restclient"
 )
 
 type AutoscalingInterface interface {
-	RESTClient() restclient.Interface
+	RESTClient() rest.Interface
 	HorizontalPodAutoscalersGetter
 }
 
 // AutoscalingClient is used to interact with features provided by the autoscaling group.
 type AutoscalingClient struct {
-	restClient restclient.Interface
+	restClient rest.Interface
 }
 
 func (c *AutoscalingClient) HorizontalPodAutoscalers(namespace string) HorizontalPodAutoscalerInterface {
@@ -36,12 +36,12 @@ func (c *AutoscalingClient) HorizontalPodAutoscalers(namespace string) Horizonta
 }
 
 // NewForConfig creates a new AutoscalingClient for the given config.
-func NewForConfig(c *restclient.Config) (*AutoscalingClient, error) {
+func NewForConfig(c *rest.Config) (*AutoscalingClient, error) {
 	config := *c
 	if err := setConfigDefaults(&config); err != nil {
 		return nil, err
 	}
-	client, err := restclient.RESTClientFor(&config)
+	client, err := rest.RESTClientFor(&config)
 	if err != nil {
 		return nil, err
 	}
@@ -50,7 +50,7 @@ func NewForConfig(c *restclient.Config) (*AutoscalingClient, error) {
 
 // NewForConfigOrDie creates a new AutoscalingClient for the given config and
 // panics if there is an error in the config.
-func NewForConfigOrDie(c *restclient.Config) *AutoscalingClient {
+func NewForConfigOrDie(c *rest.Config) *AutoscalingClient {
 	client, err := NewForConfig(c)
 	if err != nil {
 		panic(err)
@@ -59,11 +59,11 @@ func NewForConfigOrDie(c *restclient.Config) *AutoscalingClient {
 }
 
 // New creates a new AutoscalingClient for the given RESTClient.
-func New(c restclient.Interface) *AutoscalingClient {
+func New(c rest.Interface) *AutoscalingClient {
 	return &AutoscalingClient{c}
 }
 
-func setConfigDefaults(config *restclient.Config) error {
+func setConfigDefaults(config *rest.Config) error {
 	// if autoscaling group is not registered, return an error
 	g, err := api.Registry.Group("autoscaling")
 	if err != nil {
@@ -71,7 +71,7 @@ func setConfigDefaults(config *restclient.Config) error {
 	}
 	config.APIPath = "/apis"
 	if config.UserAgent == "" {
-		config.UserAgent = restclient.DefaultKubernetesUserAgent()
+		config.UserAgent = rest.DefaultKubernetesUserAgent()
 	}
 	if config.GroupVersion == nil || config.GroupVersion.Group != g.GroupVersion.Group {
 		copyGroupVersion := g.GroupVersion
@@ -90,7 +90,7 @@ func setConfigDefaults(config *restclient.Config) error {
 
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
-func (c *AutoscalingClient) RESTClient() restclient.Interface {
+func (c *AutoscalingClient) RESTClient() rest.Interface {
 	if c == nil {
 		return nil
 	}

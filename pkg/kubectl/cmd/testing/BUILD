@@ -17,7 +17,6 @@ go_library(
         "//pkg/api/testapi:go_default_library",
         "//pkg/api/validation:go_default_library",
         "//pkg/client/clientset_generated/internalclientset:go_default_library",
-        "//pkg/client/restclient:go_default_library",
         "//pkg/client/restclient/fake:go_default_library",
         "//pkg/client/typed/discovery:go_default_library",
         "//pkg/kubectl:go_default_library",

@@ -21,7 +21,6 @@ go_library(
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/resource:go_default_library",
-        "//pkg/client/restclient:go_default_library",
         "//pkg/client/unversioned/clientcmd:go_default_library",
         "//vendor:cloud.google.com/go/compute/metadata",
         "//vendor:github.com/golang/glog",

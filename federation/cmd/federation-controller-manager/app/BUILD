@@ -32,7 +32,6 @@ go_library(
         "//federation/pkg/federation-controller/secret:go_default_library",
         "//federation/pkg/federation-controller/service:go_default_library",
         "//federation/pkg/federation-controller/util:go_default_library",
-        "//pkg/client/restclient:go_default_library",
         "//pkg/client/typed/discovery:go_default_library",
         "//pkg/client/unversioned/clientcmd:go_default_library",
         "//pkg/util/config:go_default_library",
