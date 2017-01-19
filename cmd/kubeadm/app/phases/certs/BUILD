@@ -32,8 +32,11 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//cmd/kubeadm/app/apis/kubeadm:go_default_library",
+        "//cmd/kubeadm/app/constants:go_default_library",
+        "//cmd/kubeadm/app/phases/certs/pkiutil:go_default_library",
         "//pkg/registry/core/service/ipallocator:go_default_library",
         "//pkg/util/cert:go_default_library",
+        "//vendor:k8s.io/apimachinery/pkg/util/sets",
     ],
 )
 
@@ -46,6 +49,9 @@ filegroup(
 
 filegroup(
     name = "all-srcs",
-    srcs = [":package-srcs"],
+    srcs = [
+        ":package-srcs",
+        "//cmd/kubeadm/app/phases/certs/pkiutil:all-srcs",
+    ],
     tags = ["automanaged"],
 )
