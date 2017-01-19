@@ -25,10 +25,12 @@ import (
 	"k8s.io/kubernetes/pkg/util/flowcontrol"
 )
 
+// NewURLContainer initialezes URLContainer instance and returns pointer,
+// randomly selects URL that will be considered valid
 func NewURLContainer(urls []*url.URL) *URLContainer {
 	var errorps float32 = 5
 	burst := 10
-	return &URLContainer{
+	c := &URLContainer{
 		order:   urls,
 		errorps: errorps,
 		burst:   burst,
@@ -36,41 +38,68 @@ func NewURLContainer(urls []*url.URL) *URLContainer {
 			return flowcontrol.NewTokenBucketRateLimiter(errorps, burst)
 		},
 	}
+	c.renewRateLimiter()
+	c.renewStickyURL()
+	return c
 
 }
 
+// URLContainer tolerates burst of errors and sticks to currently selected url
 type URLContainer struct {
-	m           sync.Mutex
-	stickyURL   *url.URL
-	ratelimiter flowcontrol.RateLimiter
+	m            sync.Mutex
+	stickyURL    *url.URL
+	stickyURLnum int
+	ratelimiter  flowcontrol.RateLimiter
 
 	order   []*url.URL
 	errorps float32
 	burst   int
 
-	initializeRateLimiter func(errorps int32, burst int) flowcontrol.RateLimiter
+	initializeRateLimiter func(errorps float32, burst int) flowcontrol.RateLimiter
 }
 
-// Get currently valid URL
+// Get returns valid URL, if only single URL provided it will be returned
 func (c *URLContainer) Get() *url.URL {
+	if len(c.order) == 1 {
+		return c.order[0]
+	}
 	c.m.Lock()
 	defer c.m.Unlock()
-	if c.stickyURL == nil {
-		c.ratelimiter = c.initializeRateLimiter(c.errorps, c.burst)
-		rng := rand.New(rand.NewSource(time.Now().UnixNano()))
-		c.stickyURL = c.order[rng.Intn(len(c.order))]
-	}
 	return c.stickyURL
 }
 
-// Exclude invalidates currently valid url
+func (c *URLContainer) renewStickyURL() {
+	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
+	var urls []*url.URL
+	if c.stickyURL != nil {
+		urls = make([]*url.URL, 0, len(c.order)-1)
+		urls = append(urls, c.order[:c.stickyURLnum]...)
+		urls = append(urls, c.order[c.stickyURLnum+1:]...)
+	} else {
+		urls = c.order
+	}
+	c.stickyURLnum = rng.Intn(len(urls))
+	c.stickyURL = urls[c.stickyURLnum]
+}
+
+func (c *URLContainer) renewRateLimiter() {
+	c.ratelimiter = c.initializeRateLimiter(c.errorps, c.burst)
+}
+
+// Exclude updates rate limiter for given URL and will try to select another valid URL
+// incase given one will become invalid. If only single URL is provided to container - this method
+// will have no effect
 func (c *URLContainer) Exclude(u *url.URL) {
+	if len(c.order) == 1 {
+		return
+	}
 	c.m.Lock()
 	defer c.m.Unlock()
 	if c.stickyURL != u {
 		return
 	}
 	if !c.ratelimiter.TryAccept() {
-		c.stickyURL = nil
+		c.renewStickyURL()
+		c.renewRateLimiter()
 	}
 }

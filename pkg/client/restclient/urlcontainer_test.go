@@ -24,22 +24,31 @@ import (
 	"k8s.io/kubernetes/pkg/util/flowcontrol"
 )
 
-func TestURLContainerExclude(t *testing.T) {
+func TestStickyURLContainer(t *testing.T) {
 	urls := make([]*url.URL, 0, 2)
 	for i := 0; i < 2; i++ {
 		u, _ := url.Parse(fmt.Sprintf("http://localhost:808%d", i))
 		urls = append(urls, u)
 	}
-	container := NewURLContainer(urls)
-	container.initializeRateLimiter = func(_ float32, _ int) flowcontrol.RateLimiter {
-		return flowcontrol.NewFakeAlwaysRateLimiter()
+	container := &URLContainer{
+		order: urls,
+		initializeRateLimiter: func(_ float32, _ int) flowcontrol.RateLimiter {
+			return flowcontrol.NewFakeNeverRateLimiter()
+		},
 	}
-	container.Get()
-	if container.stickyURL == nil {
-		t.Errorf("After GET container should select some URL as valid")
+	container.renewRateLimiter()
+	container.renewStickyURL()
+	firstURL := container.Get()
+	container.Exclude(firstURL)
+	secondURL := container.Get()
+	if secondURL == firstURL {
+		t.Errorf("After first exclude container should change URL from first one")
 	}
-	container.Exclude(container.stickyURL)
-	if container.stickyURL != nil {
-		t.Errorf("After exclude container will invalidate currently selected URL")
+	if container.Get() != secondURL {
+		t.Errorf("After first exclude container should use second URL as valid ")
+	}
+	container.Exclude(secondURL)
+	if container.Get() != firstURL {
+		t.Errorf("After second exclude container should return back to first URL")
 	}
 }

@@ -126,7 +126,7 @@ func NewRequest(client HTTPClient, verb string, urlContainer *URLContainer, vers
 		glog.V(2).Infof("Not implementing request backoff strategy.")
 		backoff = &NoBackoff{}
 	}
-	baseURL := urlContainer.Get()[0]
+	baseURL := urlContainer.Get()
 	pathPrefix := "/"
 	if baseURL != nil {
 		pathPrefix = path.Join(pathPrefix, baseURL.Path)

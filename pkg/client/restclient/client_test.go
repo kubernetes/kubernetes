@@ -35,6 +35,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/util/flowcontrol"
 	utiltesting "k8s.io/kubernetes/pkg/util/testing"
 )
 
@@ -89,65 +90,76 @@ func TestDoRequestWithMultipleHosts(t *testing.T) {
 	invalidURL := "http://127.0.0.1:30767/"
 	validURL := successServer.URL + "/"
 	for _, test := range []struct {
-		msg             string
-		alternateURLs   []string
-		requests        int
-		successRequests int
-		validURLs       []string
+		msg           string
+		alternateURLs []string
+		requests      int
+		atMostFailed  int
+		validURL      string
 	}{
 		{
-			msg:             "client won't switch url without error",
-			alternateURLs:   []string{validURL, invalidURL},
-			requests:        3,
-			successRequests: 3,
-			validURLs:       []string{validURL, invalidURL},
+			msg:           "if there is valid url - client will find it and stick to it",
+			alternateURLs: []string{validURL, invalidURL},
+			requests:      3,
+			atMostFailed:  1,
+			validURL:      validURL,
 		},
 		{
-			msg:             "client will switch on error and stick with succesfull url",
-			alternateURLs:   []string{invalidURL, validURL},
-			requests:        3,
-			successRequests: 2,
-			validURLs:       []string{validURL},
-		},
-		{
-			msg:             "every url will be qualified as a unique one",
-			alternateURLs:   []string{invalidURL, invalidURL, validURL},
-			requests:        4,
-			successRequests: 2,
-			validURLs:       []string{validURL},
-		},
-		{
-			msg:             "in the absence of valid url - client will consider all of them as valid",
-			alternateURLs:   []string{invalidURL, invalidURL},
-			requests:        4,
-			successRequests: 0,
-			validURLs:       []string{invalidURL, invalidURL},
+			msg:           "in the absence of valid url - client will switch URL after each request",
+			alternateURLs: []string{invalidURL, invalidURL},
+			requests:      4,
+			atMostFailed:  4,
+			validURL:      invalidURL,
 		},
 	} {
 		t.Log("Running test: ", test.msg)
-		successRequests := 0
 		client, err := restClientWithAlternateURLs(test.alternateURLs...)
 		if err != nil {
-			t.Error(err)
+			t.Fatal(err)
 		}
+		client.base.initializeRateLimiter = func(_ float32, _ int) flowcontrol.RateLimiter {
+			return flowcontrol.NewFakeNeverRateLimiter()
+		}
+		client.base.renewRateLimiter()
+		var failed int
 		for i := 0; i < test.requests; i++ {
 			_, err := client.Get().Prefix("test").Do().Raw()
-			if err == nil {
-				successRequests++
-			} else {
+			if err != nil {
+				failed++
 				t.Log(err)
 			}
 		}
-		validURLs := []string{}
-		for _, u := range client.base.Get() {
-			validURLs = append(validURLs, u.String())
+		if failed > test.atMostFailed {
+			t.Errorf("%s: Unexpected number of failed requests: Expected %v, Got %v", test.msg, test.atMostFailed, failed)
 		}
-		if successRequests != test.successRequests {
-			t.Errorf("%s: Unexpected number of successfull requests: Expected %d != Got %d", test.msg, test.successRequests, successRequests)
+		if test.validURL != client.base.Get().String() {
+			t.Errorf("%s: Unexpected valid url list: Expected %v != Got %v", test.msg, test.validURL, validURL)
 		}
-		if !reflect.DeepEqual(test.validURLs, validURLs) {
-			t.Errorf("%s: Unexpected valid urls list: Expected %v != Got %v", test.msg, test.validURLs, validURLs)
+	}
+}
+
+func TestDoMultipleRequestsWithTokenBucketRateLimiter(t *testing.T) {
+	successServer, _, _ := testServerEnv(t, 200)
+	defer successServer.Close()
+	invalidURL := "http://127.0.0.1:30767/"
+	validURL := successServer.URL + "/"
+	client, err := restClientWithAlternateURLs(invalidURL, validURL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	client.base.initializeRateLimiter = func(errorps float32, burst int) flowcontrol.RateLimiter {
+		return flowcontrol.NewTokenBucketRateLimiter(errorps, burst)
+	}
+	client.base.errorps = float32(1)
+	client.base.burst = 10
+	client.base.renewRateLimiter()
+	for i := 0; i <= 20; i++ {
+		_, err := client.Get().Prefix("test").Do().Raw()
+		if err != nil {
+			t.Log(err)
 		}
+	}
+	if actualURL := client.base.Get().String(); actualURL != validURL {
+		t.Errorf("After amount of errors will surpass limits defined in RateLimiter - actual URL should be valid: %v", actualURL)
 	}
 }
 
@@ -410,7 +422,7 @@ func restClientWithAlternateURLs(alternateURLs ...string) (*RESTClient, error) {
 	return RESTClientFor(&Config{
 		AlternateHosts: alternateURLs,
 		ContentConfig: ContentConfig{
-			GroupVersion:         &registered.GroupOrDie(api.GroupName).GroupVersion,
+			GroupVersion:         &api.Registry.GroupOrDie(api.GroupName).GroupVersion,
 			NegotiatedSerializer: testapi.Default.NegotiatedSerializer(),
 		},
 		Username: "user",
