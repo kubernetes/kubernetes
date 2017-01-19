@@ -174,6 +174,8 @@ func (config *DirectClientConfig) ClientConfig() (*restclient.Config, error) {
 		mergo.Merge(clientConfig, serverAuthPartialConfig)
 	}
 
+	clientConfig.DebugConcurrent = config.overrides.DebugConcurrent
+
 	return clientConfig, nil
 }
 

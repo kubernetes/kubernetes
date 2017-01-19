@@ -165,9 +165,16 @@ func (s *SecureServingOptions) applyServingInfoTo(c *server.Config) error {
 		return nil
 	}
 
+	ipMax := c.MaxRequestsInFlight / 2
+	if ipMax > c.MaxMutatingRequestsInFlight/2 {
+		ipMax = c.MaxMutatingRequestsInFlight / 2
+	}
+	max := c.MaxRequestsInFlight + c.MaxMutatingRequestsInFlight
+	glog.V(1).Infof("Set maximum secure connections per IP to %d and overall maximum secure connections to %d.", ipMax, max)
 	secureServingInfo := &server.SecureServingInfo{
 		ServingInfo: server.ServingInfo{
 			BindAddress: net.JoinHostPort(s.ServingOptions.BindAddress.String(), strconv.Itoa(s.ServingOptions.BindPort)),
+			IPLimit:     server.IPBasedLimit{Limits: make(map[string]int), Decrementers: make(map[string]func()), MaxPerIP: ipMax, Max: max},
 		},
 	}
 

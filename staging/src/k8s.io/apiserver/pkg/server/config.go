@@ -169,6 +169,9 @@ type ServingInfo struct {
 	// BindNetwork is the type of network to bind to - defaults to "tcp", accepts "tcp",
 	// "tcp4", and "tcp6".
 	BindNetwork string
+
+	// IPBasedLimit determines the maximum number of concurrent requests based on ip
+	IPLimit IPBasedLimit
 }
 
 type SecureServingInfo struct {
@@ -452,7 +455,11 @@ func (s *GenericAPIServer) installAPI(c *Config) {
 		routes.SwaggerUI{}.Install(s.HandlerContainer)
 	}
 	if c.EnableProfiling {
-		routes.Profiling{}.Install(s.HandlerContainer)
+		if s.SecureServingInfo != nil {
+			routes.Profiling{}.Install(s.HandlerContainer, s.SecureServingInfo.ServingInfo.Profile)
+		} else {
+			routes.Profiling{}.Install(s.HandlerContainer, NoSecureHandler)
+		}
 		if c.EnableContentionProfiling {
 			goruntime.SetBlockProfileRate(1)
 		}

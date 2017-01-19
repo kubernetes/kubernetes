@@ -94,5 +94,6 @@ func (c *Config) TransportConfig() (*transport.Config, error) {
 			Groups:   c.Impersonate.Groups,
 			Extra:    c.Impersonate.Extra,
 		},
+		DebugConcurrent: c.DebugConcurrent,
 	}, nil
 }
