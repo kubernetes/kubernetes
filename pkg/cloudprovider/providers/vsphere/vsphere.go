@@ -702,6 +702,21 @@ func (vs *VSphere) AttachDisk(vmDiskPath string, nodeName k8stypes.NodeName) (di
 		vSphereInstance = nodeNameToVMName(nodeName)
 	}
 
+	nodeExist, err := vs.NodeExists(vs.client, nodeName)
+
+	if err != nil {
+		glog.Errorf("Failed to check whether node exist. err: %s.", err)
+		return "", "", err
+	}
+
+	if !nodeExist {
+		glog.Warningf(
+			"Node %q does not exist. AttachDisk will not attach the vmdk %q to it.",
+			vSphereInstance,
+			vmDiskPath)
+		return "", "", nil
+	}
+
 	// Get VM device list
 	vm, vmDevices, ds, dc, err := getVirtualMachineDevices(ctx, vs.cfg, vs.client, vSphereInstance)
 	if err != nil {
@@ -924,10 +939,13 @@ func (vs *VSphere) DiskIsAttached(volPath string, nodeName k8stypes.NodeName) (b
 	}
 
 	if !nodeExist {
-		glog.Warningf(
-			"Node %q does not exist. DiskIsAttached will assume vmdk %q is not attached to it.",
+		glog.Warningf("Node %q does not exist. DisksAreAttached will delete any vmdk %v attached to it.",
 			vSphereInstance,
 			volPath)
+		if err = vs.DetachDisk(volPath, nodeName); err != nil {
+			glog.V(1).Infof("Error detaching vsphere volume %s: %v", volPath, err)
+			return false, err
+		}
 		return false, nil
 	}
 
@@ -976,9 +994,15 @@ func (vs *VSphere) DisksAreAttached(volPaths []string, nodeName k8stypes.NodeNam
 
 	if !nodeExist {
 		glog.Warningf(
-			"Node %q does not exist. DisksAreAttached will assume vmdk %v are not attached to it.",
+			"Node %q does not exist. DisksAreAttached will delete any vmdk %v attached to it.",
 			vSphereInstance,
 			volPaths)
+		for _, volPath := range volPaths {
+			if err = vs.DetachDisk(volPath, nodeName); err != nil {
+				glog.V(1).Infof("Error deleting vsphere volume %s: %v", volPath, err)
+				return attached, err
+			}
+		}
 		return attached, nil
 	}
 
@@ -1143,21 +1167,6 @@ func (vs *VSphere) DetachDisk(volPath string, nodeName k8stypes.NodeName) error 
 		nodeName = vmNameToNodeName(vSphereInstance)
 	} else {
 		vSphereInstance = nodeNameToVMName(nodeName)
-	}
-
-	nodeExist, err := vs.NodeExists(vs.client, nodeName)
-
-	if err != nil {
-		glog.Errorf("Failed to check whether node exist. err: %s.", err)
-		return err
-	}
-
-	if !nodeExist {
-		glog.Warningf(
-			"Node %q does not exist. DetachDisk will assume vmdk %q is not attached to it.",
-			nodeName,
-			volPath)
-		return nil
 	}
 
 	vm, vmDevices, _, dc, err := getVirtualMachineDevices(ctx, vs.cfg, vs.client, vSphereInstance)
