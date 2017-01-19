@@ -107,7 +107,7 @@ func CreateTestClient() *fake.Clientset {
 		for i := 0; i < 5; i++ {
 			nodeName := fmt.Sprintf("%s-%d", nodeNamePrefix, i)
 			node := v1.Node{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:      nodeName,
 					Namespace: namespace,
 					Labels: map[string]string{
