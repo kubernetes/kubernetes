@@ -37,19 +37,19 @@ import (
 	"k8s.io/client-go/pkg/api"
 	"k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/pkg/util/flowcontrol"
-	"k8s.io/client-go/rest"
+	restclient "k8s.io/client-go/rest"
 )
 
 // Client is a Kubernetes client that allows you to access metadata
 // and manipulate metadata of a Kubernetes API group.
 type Client struct {
-	cl             *rest.RESTClient
+	cl             *restclient.RESTClient
 	parameterCodec runtime.ParameterCodec
 }
 
 // NewClient returns a new client based on the passed in config. The
 // codec is ignored, as the dynamic client uses it's own codec.
-func NewClient(conf *rest.Config) (*Client, error) {
+func NewClient(conf *restclient.Config) (*Client, error) {
 	// avoid changing the original config
 	confCopy := *conf
 	conf = &confCopy
@@ -66,10 +66,10 @@ func NewClient(conf *rest.Config) (*Client, error) {
 	}
 
 	if len(conf.UserAgent) == 0 {
-		conf.UserAgent = rest.DefaultKubernetesUserAgent()
+		conf.UserAgent = restclient.DefaultKubernetesUserAgent()
 	}
 
-	cl, err := rest.RESTClientFor(conf)
+	cl, err := restclient.RESTClientFor(conf)
 	if err != nil {
 		return nil, err
 	}
@@ -105,7 +105,7 @@ func (c *Client) ParameterCodec(parameterCodec runtime.ParameterCodec) *Client {
 // ResourceClient is an API interface to a specific resource under a
 // dynamic client.
 type ResourceClient struct {
-	cl             *rest.RESTClient
+	cl             *restclient.RESTClient
 	resource       *metav1.APIResource
 	ns             string
 	parameterCodec runtime.ParameterCodec
@@ -242,8 +242,8 @@ func (dynamicCodec) Encode(obj runtime.Object, w io.Writer) error {
 	return unstructured.UnstructuredJSONScheme.Encode(obj, w)
 }
 
-// ContentConfig returns a rest.ContentConfig for dynamic types.
-func ContentConfig() rest.ContentConfig {
+// ContentConfig returns a restclient.ContentConfig for dynamic types.
+func ContentConfig() restclient.ContentConfig {
 	var jsonInfo runtime.SerializerInfo
 	// TODO: api.Codecs here should become "pkg/apis/server/scheme" which is the minimal core you need
 	// to talk to a kubernetes server
@@ -256,7 +256,7 @@ func ContentConfig() rest.ContentConfig {
 
 	jsonInfo.Serializer = dynamicCodec{}
 	jsonInfo.PrettySerializer = nil
-	return rest.ContentConfig{
+	return restclient.ContentConfig{
 		AcceptContentTypes:   runtime.ContentTypeJSON,
 		ContentType:          runtime.ContentTypeJSON,
 		NegotiatedSerializer: serializer.NegotiatedSerializerWrapper(jsonInfo),

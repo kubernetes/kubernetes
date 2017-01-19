@@ -30,7 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/version"
 	"k8s.io/client-go/pkg/api/v1"
-	"k8s.io/client-go/rest"
+	restclient "k8s.io/client-go/rest"
 )
 
 func TestGetServerVersion(t *testing.T) {
@@ -50,7 +50,7 @@ func TestGetServerVersion(t *testing.T) {
 		w.Write(output)
 	}))
 	defer server.Close()
-	client := NewDiscoveryClientForConfigOrDie(&rest.Config{Host: server.URL})
+	client := NewDiscoveryClientForConfigOrDie(&restclient.Config{Host: server.URL})
 
 	got, err := client.ServerVersion()
 	if err != nil {
@@ -85,7 +85,7 @@ func TestGetServerGroupsWithV1Server(t *testing.T) {
 		w.Write(output)
 	}))
 	defer server.Close()
-	client := NewDiscoveryClientForConfigOrDie(&rest.Config{Host: server.URL})
+	client := NewDiscoveryClientForConfigOrDie(&restclient.Config{Host: server.URL})
 	// ServerGroups should not return an error even if server returns error at /api and /apis
 	apiGroupList, err := client.ServerGroups()
 	if err != nil {
@@ -103,7 +103,7 @@ func TestGetServerGroupsWithBrokenServer(t *testing.T) {
 			w.WriteHeader(statusCode)
 		}))
 		defer server.Close()
-		client := NewDiscoveryClientForConfigOrDie(&rest.Config{Host: server.URL})
+		client := NewDiscoveryClientForConfigOrDie(&restclient.Config{Host: server.URL})
 		// ServerGroups should not return an error even if server returns Not Found or Forbidden error at all end points
 		apiGroupList, err := client.ServerGroups()
 		if err != nil {
@@ -140,7 +140,7 @@ func TestGetServerResourcesWithV1Server(t *testing.T) {
 		w.Write(output)
 	}))
 	defer server.Close()
-	client := NewDiscoveryClientForConfigOrDie(&rest.Config{Host: server.URL})
+	client := NewDiscoveryClientForConfigOrDie(&restclient.Config{Host: server.URL})
 	// ServerResources should not return an error even if server returns error at /api/v1.
 	serverResources, err := client.ServerResources()
 	if err != nil {
@@ -232,7 +232,7 @@ func TestGetServerResources(t *testing.T) {
 		w.Write(output)
 	}))
 	defer server.Close()
-	client := NewDiscoveryClientForConfigOrDie(&rest.Config{Host: server.URL})
+	client := NewDiscoveryClientForConfigOrDie(&restclient.Config{Host: server.URL})
 	for _, test := range tests {
 		got, err := client.ServerResourcesForGroupVersion(test.request)
 		if test.expectErr {
@@ -295,7 +295,7 @@ func TestGetSwaggerSchema(t *testing.T) {
 	}
 	defer server.Close()
 
-	client := NewDiscoveryClientForConfigOrDie(&rest.Config{Host: server.URL})
+	client := NewDiscoveryClientForConfigOrDie(&restclient.Config{Host: server.URL})
 	got, err := client.SwaggerSchema(v1.SchemeGroupVersion)
 	if err != nil {
 		t.Fatalf("unexpected encoding error: %v", err)
@@ -314,7 +314,7 @@ func TestGetSwaggerSchemaFail(t *testing.T) {
 	}
 	defer server.Close()
 
-	client := NewDiscoveryClientForConfigOrDie(&rest.Config{Host: server.URL})
+	client := NewDiscoveryClientForConfigOrDie(&restclient.Config{Host: server.URL})
 	got, err := client.SwaggerSchema(schema.GroupVersion{Group: "api.group", Version: "v4"})
 	if got != nil {
 		t.Fatalf("unexpected response: %v", got)
@@ -427,7 +427,7 @@ func TestServerPreferredResources(t *testing.T) {
 		server := httptest.NewServer(http.HandlerFunc(test.response))
 		defer server.Close()
 
-		client := NewDiscoveryClientForConfigOrDie(&rest.Config{Host: server.URL})
+		client := NewDiscoveryClientForConfigOrDie(&restclient.Config{Host: server.URL})
 		resources, err := client.ServerPreferredResources()
 		if test.expectErr != nil {
 			if err == nil {
@@ -540,7 +540,7 @@ func TestServerPreferredResourcesRetries(t *testing.T) {
 		server := httptest.NewServer(http.HandlerFunc(response(tc.responseErrors)))
 		defer server.Close()
 
-		client := NewDiscoveryClientForConfigOrDie(&rest.Config{Host: server.URL})
+		client := NewDiscoveryClientForConfigOrDie(&restclient.Config{Host: server.URL})
 		resources, err := client.ServerPreferredResources()
 		if !tc.expectedError(err) {
 			t.Errorf("case %d: unexpected error: %v", i, err)
@@ -711,7 +711,7 @@ func TestServerPreferredNamespacedResources(t *testing.T) {
 		server := httptest.NewServer(http.HandlerFunc(test.response))
 		defer server.Close()
 
-		client := NewDiscoveryClientForConfigOrDie(&rest.Config{Host: server.URL})
+		client := NewDiscoveryClientForConfigOrDie(&restclient.Config{Host: server.URL})
 		resources, err := client.ServerPreferredNamespacedResources()
 		if err != nil {
 			t.Errorf("[%d] unexpected error: %v", i, err)

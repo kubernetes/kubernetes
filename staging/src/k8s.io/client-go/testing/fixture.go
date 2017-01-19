@@ -27,7 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/pkg/api"
-	"k8s.io/client-go/rest"
+	restclient "k8s.io/client-go/rest"
 )
 
 // ObjectTracker keeps track of objects. It is intended to be used to
@@ -511,6 +511,6 @@ func (r *SimpleProxyReactor) Handles(action Action) bool {
 	return true
 }
 
-func (r *SimpleProxyReactor) React(action Action) (bool, rest.ResponseWrapper, error) {
+func (r *SimpleProxyReactor) React(action Action) (bool, restclient.ResponseWrapper, error) {
 	return r.Reaction(action)
 }

@@ -22,7 +22,7 @@ import (
 
 	"github.com/golang/glog"
 
-	"k8s.io/client-go/rest"
+	restclient "k8s.io/client-go/rest"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 )
 
@@ -94,7 +94,7 @@ func (config *DeferredLoadingClientConfig) RawConfig() (clientcmdapi.Config, err
 }
 
 // ClientConfig implements ClientConfig
-func (config *DeferredLoadingClientConfig) ClientConfig() (*rest.Config, error) {
+func (config *DeferredLoadingClientConfig) ClientConfig() (*restclient.Config, error) {
 	mergedClientConfig, err := config.createClientConfig()
 	if err != nil {
 		return nil, err
