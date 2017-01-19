@@ -36,6 +36,7 @@ go_library(
     srcs = [
         "discovery.go",
         "doc.go",
+        "patch.go",
         "proxy.go",
         "rest.go",
         "watch.go",

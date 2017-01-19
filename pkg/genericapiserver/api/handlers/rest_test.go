@@ -55,16 +55,27 @@ type TestPatchSubType struct {
 func (obj *testPatchType) GetObjectKind() schema.ObjectKind { return &obj.TypeMeta }
 
 func TestPatchAnonymousField(t *testing.T) {
-	originalJS := `{"kind":"testPatchType","theField":"my-value"}`
-	patch := `{"theField": "changed!"}`
-	expectedJS := `{"kind":"testPatchType","theField":"changed!"}`
+	testGV := schema.GroupVersion{Group: "", Version: "v"}
+	api.Scheme.AddKnownTypes(testGV, &testPatchType{})
+	codec := api.Codecs.LegacyCodec(testGV)
 
-	actualBytes, err := getPatchedJS(types.StrategicMergePatchType, []byte(originalJS), []byte(patch), &testPatchType{})
+	original := &testPatchType{
+		TypeMeta:         metav1.TypeMeta{Kind: "testPatchType", APIVersion: "v"},
+		TestPatchSubType: TestPatchSubType{StringField: "my-value"},
+	}
+	patch := `{"theField": "changed!"}`
+	expected := &testPatchType{
+		TypeMeta:         metav1.TypeMeta{Kind: "testPatchType", APIVersion: "v"},
+		TestPatchSubType: TestPatchSubType{StringField: "changed!"},
+	}
+
+	actual := &testPatchType{}
+	_, _, err := strategicPatchObject(codec, original, []byte(patch), actual, &testPatchType{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if string(actualBytes) != expectedJS {
-		t.Errorf("expected %v, got %v", expectedJS, string(actualBytes))
+	if !api.Semantic.DeepEqual(actual, expected) {
+		t.Errorf("expected %#v, got %#v", expected, actual)
 	}
 }
 
@@ -215,7 +226,7 @@ func (tc *patchTestCase) Run(t *testing.T) {
 			continue
 
 		case types.StrategicMergePatchType:
-			patch, err = strategicpatch.CreateStrategicMergePatch(originalObjJS, changedJS, versionedObj)
+			patch, err = strategicpatch.CreateTwoWayMergePatch(originalObjJS, changedJS, versionedObj)
 			if err != nil {
 				t.Errorf("%s: unexpected error: %v", tc.name, err)
 				return

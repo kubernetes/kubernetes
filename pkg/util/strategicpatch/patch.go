@@ -48,6 +48,13 @@ const (
 	deleteFromPrimitiveListDirectivePrefix = "$deleteFromPrimitiveList"
 )
 
+// JSONMap is a representations of JSON object encoded as map[string]interface{}
+// where the children can be either map[string]interface{}, []interface{} or
+// primitive type).
+// Operating on JSONMap representation is much faster as it doesn't require any
+// json marshaling and/or unmarshaling operations.
+type JSONMap map[string]interface{}
+
 // IsPreconditionFailed returns true if the provided error indicates
 // a precondition failed.
 func IsPreconditionFailed(err error) bool {
@@ -136,11 +143,6 @@ func RequireMetadataKeyUnchanged(key string) PreconditionFunc {
 	}
 }
 
-// Deprecated: Use the synonym CreateTwoWayMergePatch, instead.
-func CreateStrategicMergePatch(original, modified []byte, dataStruct interface{}) ([]byte, error) {
-	return CreateTwoWayMergePatch(original, modified, dataStruct)
-}
-
 // CreateTwoWayMergePatch creates a patch that can be passed to StrategicMergePatch from an original
 // document and a modified document, which are passed to the method as json encoded content. It will
 // return a patch that yields the modified document when applied to the original document, or an error
@@ -160,12 +162,24 @@ func CreateTwoWayMergePatch(original, modified []byte, dataStruct interface{}, f
 		}
 	}
 
+	patchMap, err := CreateTwoWayMergeMapPatch(originalMap, modifiedMap, dataStruct, fns...)
+	if err != nil {
+		return nil, err
+	}
+
+	return json.Marshal(patchMap)
+}
+
+// CreateTwoWayMergeMapPatch creates a patch from an original and modified JSON objects,
+// encoded JSONMap.
+// The serialized version of the map can then be passed to StrategicMergeMapPatch.
+func CreateTwoWayMergeMapPatch(original, modified JSONMap, dataStruct interface{}, fns ...PreconditionFunc) (JSONMap, error) {
 	t, err := getTagStructType(dataStruct)
 	if err != nil {
 		return nil, err
 	}
 
-	patchMap, err := diffMaps(originalMap, modifiedMap, t, false, false)
+	patchMap, err := diffMaps(original, modified, t, false, false)
 	if err != nil {
 		return nil, err
 	}
@@ -177,7 +191,7 @@ func CreateTwoWayMergePatch(original, modified []byte, dataStruct interface{}, f
 		}
 	}
 
-	return json.Marshal(patchMap)
+	return patchMap, nil
 }
 
 // Returns a (recursive) strategic merge patch that yields modified when applied to original.
@@ -494,12 +508,6 @@ loopB:
 	return patch, nil
 }
 
-// Deprecated: StrategicMergePatchData is deprecated. Use the synonym StrategicMergePatch,
-// instead, which follows the naming convention of evanphx/json-patch.
-func StrategicMergePatchData(original, patch []byte, dataStruct interface{}) ([]byte, error) {
-	return StrategicMergePatch(original, patch, dataStruct)
-}
-
 // StrategicMergePatch applies a strategic merge patch. The patch and the original document
 // must be json encoded content. A patch can be created from an original and a modified document
 // by calling CreateStrategicMergePatch.
@@ -524,17 +532,23 @@ func StrategicMergePatch(original, patch []byte, dataStruct interface{}) ([]byte
 		return nil, errBadJSONDoc
 	}
 
-	t, err := getTagStructType(dataStruct)
-	if err != nil {
-		return nil, err
-	}
-
-	result, err := mergeMap(originalMap, patchMap, t, true)
+	result, err := StrategicMergeMapPatch(originalMap, patchMap, dataStruct)
 	if err != nil {
 		return nil, err
 	}
 
 	return json.Marshal(result)
+}
+
+// StrategicMergePatch applies a strategic merge patch. The original and patch documents
+// must be JSONMap. A patch can be created from an original and modified document by
+// calling CreateTwoWayMergeMapPatch.
+func StrategicMergeMapPatch(original, patch JSONMap, dataStruct interface{}) (JSONMap, error) {
+	t, err := getTagStructType(dataStruct)
+	if err != nil {
+		return nil, err
+	}
+	return mergeMap(original, patch, t, true)
 }
 
 func getTagStructType(dataStruct interface{}) (reflect.Type, error) {
