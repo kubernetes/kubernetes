@@ -41,7 +41,6 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&v1.Namespace{},
 		&v1.NamespaceList{},
 		&v1.ServiceList{},
-		&v1.ListOptions{},
 		&v1.DeleteOptions{},
 		&v1.Secret{},
 		&v1.SecretList{},
