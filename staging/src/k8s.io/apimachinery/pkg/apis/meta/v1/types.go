@@ -219,6 +219,17 @@ type ObjectMeta struct {
 	ClusterName string `json:"clusterName,omitempty" protobuf:"bytes,15,opt,name=clusterName"`
 }
 
+const (
+	// NamespaceDefault means the object is in the default namespace which is applied when not specified by clients
+	NamespaceDefault string = "default"
+	// NamespaceAll is the default argument to specify on a context when you want to list or filter resources across all namespaces
+	NamespaceAll string = ""
+	// NamespaceNone is the argument for a context when there is no namespace.
+	NamespaceNone string = ""
+	// NamespaceSystem is the system namespace where we place system components.
+	NamespaceSystem string = "kube-system"
+)
+
 // OwnerReference contains enough information to let you identify an owning
 // object. Currently, an owning object must be in the same namespace, so there
 // is no namespace field.
@@ -237,6 +248,35 @@ type OwnerReference struct {
 	// If true, this reference points to the managing controller.
 	// +optional
 	Controller *bool `json:"controller,omitempty" protobuf:"varint,6,opt,name=controller"`
+}
+
+// ListOptions is the query options to a standard REST list call.
+type ListOptions struct {
+	TypeMeta `json:",inline"`
+
+	// A selector to restrict the list of returned objects by their labels.
+	// Defaults to everything.
+	// +optional
+	LabelSelector string `json:"labelSelector,omitempty" protobuf:"bytes,1,opt,name=labelSelector"`
+	// A selector to restrict the list of returned objects by their fields.
+	// Defaults to everything.
+	// +optional
+	FieldSelector string `json:"fieldSelector,omitempty" protobuf:"bytes,2,opt,name=fieldSelector"`
+	// Watch for changes to the described resources and return them as a stream of
+	// add, update, and remove notifications. Specify resourceVersion.
+	// +optional
+	Watch bool `json:"watch,omitempty" protobuf:"varint,3,opt,name=watch"`
+	// When specified with a watch call, shows changes that occur after that particular version of a resource.
+	// Defaults to changes from the beginning of history.
+	// When specified for list:
+	// - if unset, then the result is returned from remote storage based on quorum-read flag;
+	// - if it's 0, then we simply return what we currently have in cache, no guarantee;
+	// - if set to non zero, then the result is at least as fresh as given rv.
+	// +optional
+	ResourceVersion string `json:"resourceVersion,omitempty" protobuf:"bytes,4,opt,name=resourceVersion"`
+	// Timeout for the list/watch call.
+	// +optional
+	TimeoutSeconds *int64 `json:"timeoutSeconds,omitempty" protobuf:"varint,5,opt,name=timeoutSeconds"`
 }
 
 // ExportOptions is the query options to the standard REST get call.
