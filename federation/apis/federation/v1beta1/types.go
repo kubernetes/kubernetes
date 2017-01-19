@@ -123,7 +123,32 @@ type ClusterList struct {
 	Items []Cluster `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
 
+// Expressed as value of annotation for selecting the clusters on which a resource is created.
+type ClusterSelector []ClusterSelectorRequirement
+
+// ClusterSelectorRequirement contains values, a key, and an operator that relates the key and values.
+// The zero value of ClusterSelectorRequirement is invalid.
+// ClusterSelectorRequirement implements both set based match and exact match
+type ClusterSelectorRequirement struct {
+	// +patchMergeKey=key
+	// +patchStrategy=merge
+	Key string `json:"key" patchStrategy:"merge" patchMergeKey:"key" protobuf:"bytes,1,opt,name=key"`
+	// The Operator defines how the Key is matched to the Values. One of "in", "notin",
+	// "exists", "!", "=", "!=", "gt" or "lt".
+	Operator string `json:"operator" protobuf:"bytes,2,opt,name=operator"`
+	// An array of string values. If the operator is "in" or "notin",
+	// the values array must be non-empty. If the operator is "exists" or "!",
+	// the values array must be empty. If the operator is "gt" or "lt", the values
+	// array must have a single element, which will be interpreted as an integer.
+	// This array is replaced during a strategic merge patch.
+	// +optional
+	Values []string `json:"values,omitempty" protobuf:"bytes,3,rep,name=values"`
+}
+
 const (
 	// FederationNamespaceSystem is the system namespace where we place federation control plane components.
 	FederationNamespaceSystem string = "federation-system"
+
+	// FederationClusterSelectorAnnotation is used to determine placement of objects on federated clusters
+	FederationClusterSelectorAnnotation string = "federation.alpha.kubernetes.io/cluster-selector"
 )

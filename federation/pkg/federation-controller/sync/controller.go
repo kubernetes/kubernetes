@@ -36,6 +36,7 @@ import (
 	federationclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset"
 	"k8s.io/kubernetes/federation/pkg/federatedtypes"
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util"
+	"k8s.io/kubernetes/federation/pkg/federation-controller/util/clusterselector"
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util/deletionhelper"
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util/eventsink"
 	"k8s.io/kubernetes/pkg/api"
@@ -357,9 +358,13 @@ func (s *FederationSyncController) reconcile(namespacedName types.NamespacedName
 	return syncToClusters(
 		s.informer.GetReadyClusters,
 		func(adapter federatedtypes.FederatedTypeAdapter, clusters []*federationapi.Cluster, obj pkgruntime.Object) ([]util.FederatedOperation, error) {
-			return clusterOperations(adapter, clusters, obj, func(clusterName string) (interface{}, bool, error) {
+			operations, err := clusterOperations(adapter, clusters, obj, func(clusterName string) (interface{}, bool, error) {
 				return s.informer.GetTargetStore().GetByKey(clusterName, key)
-			})
+			}, clusterselector.SendToCluster)
+			if err != nil {
+				s.eventRecorder.Eventf(obj, api.EventTypeWarning, "FedClusterOperationsError", "Error obtaining sync operations for %s: %s error: %s", kind, key, err.Error())
+			}
+			return operations, err
 		},
 		s.updater.Update,
 		s.adapter,
@@ -444,28 +449,45 @@ func syncToClusters(clustersAccessor clustersAccessorFunc, operationsAccessor op
 }
 
 type clusterObjectAccessorFunc func(clusterName string) (interface{}, bool, error)
+type clusterSelectorFunc func(map[string]string, map[string]string) (bool, error)
 
 // clusterOperations returns the list of operations needed to synchronize the state of the given object to the provided clusters
-func clusterOperations(adapter federatedtypes.FederatedTypeAdapter, clusters []*federationapi.Cluster, obj pkgruntime.Object, accessor clusterObjectAccessorFunc) ([]util.FederatedOperation, error) {
+func clusterOperations(adapter federatedtypes.FederatedTypeAdapter, clusters []*federationapi.Cluster, obj pkgruntime.Object, accessor clusterObjectAccessorFunc, selector clusterSelectorFunc) ([]util.FederatedOperation, error) {
 	key := federatedtypes.ObjectKey(adapter, obj)
+	// The data should not be modified.
+	desiredObj := adapter.Copy(obj)
+	objMeta := adapter.ObjectMeta(desiredObj)
+	kind := adapter.Kind()
+
 	operations := make([]util.FederatedOperation, 0)
+
 	for _, cluster := range clusters {
 		clusterObj, found, err := accessor(cluster.Name)
 		if err != nil {
-			return nil, fmt.Errorf("Failed to get %s %q from cluster %q: %v", adapter.Kind(), key, cluster.Name, err)
+			return nil, fmt.Errorf("failed to get %s %q from cluster %q: %v", adapter.Kind(), key, cluster.Name, err)
 		}
-		// The data should not be modified.
-		desiredObj := adapter.Copy(obj)
+
+		send, err := selector(cluster.Labels, objMeta.Annotations)
+		if err != nil {
+			glog.Errorf("Error processing ClusterSelector cluster: %s for %s map: %s error: %s", cluster.Name, kind, key, err.Error())
+			return nil, err
+		} else if !send {
+			glog.V(5).Infof("Skipping cluster: %s for %s: %s reason: cluster selectors do not match: %-v %-v", cluster.Name, kind, key, cluster.ObjectMeta.Labels, objMeta.Annotations[federationapi.FederationClusterSelectorAnnotation])
+		}
 
 		var operationType util.FederatedOperationType = ""
-		if found {
+		switch {
+		case found && send:
 			clusterObj := clusterObj.(pkgruntime.Object)
 			if !adapter.Equivalent(desiredObj, clusterObj) {
 				operationType = util.OperationTypeUpdate
 			}
-		} else {
+		case found && !send:
+			operationType = util.OperationTypeDelete
+		case !found && send:
 			operationType = util.OperationTypeAdd
 		}
+
 		if len(operationType) > 0 {
 			operations = append(operations, util.FederatedOperation{
 				Type:        operationType,
