@@ -179,62 +179,6 @@ func TestNodeSelectorRequirementsAsSelector(t *testing.T) {
 	}
 }
 
-func TestGetAffinityFromPod(t *testing.T) {
-	testCases := []struct {
-		pod       *Pod
-		expectErr bool
-	}{
-		{
-			pod:       &Pod{},
-			expectErr: false,
-		},
-		{
-			pod: &Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Annotations: map[string]string{
-						AffinityAnnotationKey: `
-						{"nodeAffinity": { "requiredDuringSchedulingIgnoredDuringExecution": {
-							"nodeSelectorTerms": [{
-								"matchExpressions": [{
-									"key": "foo",
-									"operator": "In",
-									"values": ["value1", "value2"]
-								}]
-							}]
-						}}}`,
-					},
-				},
-			},
-			expectErr: false,
-		},
-		{
-			pod: &Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Annotations: map[string]string{
-						AffinityAnnotationKey: `
-						{"nodeAffinity": { "requiredDuringSchedulingIgnoredDuringExecution": {
-							"nodeSelectorTerms": [{
-								"matchExpressions": [{
-									"key": "foo",
-						`,
-					},
-				},
-			},
-			expectErr: true,
-		},
-	}
-
-	for i, tc := range testCases {
-		_, err := GetAffinityFromPodAnnotations(tc.pod.Annotations)
-		if err == nil && tc.expectErr {
-			t.Errorf("[%v]expected error but got none.", i)
-		}
-		if err != nil && !tc.expectErr {
-			t.Errorf("[%v]did not expect error but got: %v", i, err)
-		}
-	}
-}
-
 func TestTaintToString(t *testing.T) {
 	testCases := []struct {
 		taint          *Taint

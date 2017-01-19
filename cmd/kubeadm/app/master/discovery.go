@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"path"
+	"runtime"
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -103,6 +104,23 @@ func newKubeDiscoveryPodSpec(cfg *kubeadmapi.MasterConfiguration) v1.PodSpec {
 				Secret: &v1.SecretVolumeSource{SecretName: kubeDiscoverySecretName},
 			}},
 		},
+		Affinity: &v1.Affinity{
+			NodeAffinity: &v1.NodeAffinity{
+				RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+					NodeSelectorTerms: []v1.NodeSelectorTerm{
+						{
+							MatchExpressions: []v1.NodeSelectorRequirement{
+								{
+									Key:      "beta.kubernetes.io/arch",
+									Operator: v1.NodeSelectorOpIn,
+									Values:   []string{runtime.GOARCH},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
 	}
 }
 
@@ -117,7 +135,6 @@ func newKubeDiscovery(cfg *kubeadmapi.MasterConfiguration, caCert *x509.Certific
 	}
 
 	SetMasterTaintTolerations(&kd.Deployment.Spec.Template.ObjectMeta)
-	SetNodeAffinity(&kd.Deployment.Spec.Template.ObjectMeta, MasterNodeAffinity(), NativeArchitectureNodeAffinity())
 
 	return kd
 }
