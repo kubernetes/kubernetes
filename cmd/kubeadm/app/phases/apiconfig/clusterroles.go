@@ -38,7 +38,7 @@ func CreateBootstrapRBACClusterRole(clientset *clientset.Clientset) error {
 			Name:     "system:node-bootstrapper",
 		},
 		Subjects: []rbac.Subject{
-			rbac.Subject{Kind: "Group", Name: "kubeadm:kubelet-bootstrap"},
+			{Kind: "Group", Name: master.KubeletBootstrapGroup},
 		},
 	}
 	if _, err := clientset.Rbac().ClusterRoleBindings().Create(&clusterRoleBinding); err != nil {
@@ -76,7 +76,7 @@ func CreateKubeDNSRBACClusterRole(clientset *clientset.Clientset) error {
 		RoleRef: rbac.RoleRef{
 			APIGroup: "rbac.authorization.k8s.io",
 			Kind:     "ClusterRole",
-			Name:     "kubeadm:" + master.KubeDNS,
+			Name:     clusterRole.Name,
 		},
 		Subjects: []rbac.Subject{subject},
 	}
@@ -88,32 +88,24 @@ func CreateKubeDNSRBACClusterRole(clientset *clientset.Clientset) error {
 	return nil
 }
 
-// CreateKubeProxyClusterRoleBinding creates the necessary ClusterRole for kube-dns
+// CreateKubeProxyClusterRoleBinding grants the system:node-proxier role to the nodes group,
+// since kubelet credentials are used to run the kube-proxy
+// TODO: give the kube-proxy its own credential and stop requiring this
 func CreateKubeProxyClusterRoleBinding(clientset *clientset.Clientset) error {
-	systemKubeProxySubject := rbac.Subject{
-		Kind:      "User",
-		Name:      "system:kube-proxy",
-		Namespace: api.NamespaceSystem,
-	}
-
-	systemNodesSubject := rbac.Subject{
-		Kind:      "Group",
-		Name:      "system:nodes",
-		Namespace: api.NamespaceSystem,
-	}
-
 	clusterRoleBinding := rbac.ClusterRoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "system:node-proxier",
+			Name: "kubeadm:node-proxier",
 		},
 		RoleRef: rbac.RoleRef{
 			APIGroup: "rbac.authorization.k8s.io",
 			Kind:     "ClusterRole",
 			Name:     "system:node-proxier",
 		},
-		Subjects: []rbac.Subject{systemKubeProxySubject, systemNodesSubject},
+		Subjects: []rbac.Subject{
+			{Kind: "Group", Name: "system:nodes"},
+		},
 	}
-	if _, err := clientset.Rbac().ClusterRoleBindings().Update(&clusterRoleBinding); err != nil {
+	if _, err := clientset.Rbac().ClusterRoleBindings().Create(&clusterRoleBinding); err != nil {
 		return err
 	}
 	fmt.Println("[apiconfig] Created kube-proxy RBAC rules")

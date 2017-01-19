@@ -369,7 +369,7 @@ func getControllerManagerCommand(cfg *kubeadmapi.MasterConfiguration) []string {
 		"--service-account-private-key-file="+kubeadmapi.GlobalEnvParams.HostPKIPath+"/apiserver-key.pem",
 		"--cluster-signing-cert-file="+kubeadmapi.GlobalEnvParams.HostPKIPath+"/ca.pem",
 		"--cluster-signing-key-file="+kubeadmapi.GlobalEnvParams.HostPKIPath+"/ca-key.pem",
-		"--insecure-experimental-approve-all-kubelet-csrs-for-group=kubeadm:kubelet-bootstrap",
+		"--insecure-experimental-approve-all-kubelet-csrs-for-group="+KubeletBootstrapGroup,
 	)
 
 	if cfg.CloudProvider != "" {
