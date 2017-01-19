@@ -17,12 +17,12 @@ go_library(
     ],
     tags = ["automanaged"],
     deps = [
-        "//pkg/fields:go_default_library",
         "//pkg/storage:go_default_library",
         "//pkg/storage/storagebackend:go_default_library",
         "//pkg/storage/storagebackend/factory:go_default_library",
         "//vendor:github.com/golang/glog",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor:k8s.io/apimachinery/pkg/fields",
         "//vendor:k8s.io/apimachinery/pkg/runtime",
         "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
     ],

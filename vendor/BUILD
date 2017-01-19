@@ -13641,3 +13641,25 @@ go_library(
         "//vendor:k8s.io/client-go/pkg/apis/rbac",
     ],
 )
+
+go_test(
+    name = "k8s.io/apimachinery/pkg/fields_test",
+    srcs = [
+        "k8s.io/apimachinery/pkg/fields/fields_test.go",
+        "k8s.io/apimachinery/pkg/fields/selector_test.go",
+    ],
+    library = ":k8s.io/apimachinery/pkg/fields",
+    tags = ["automanaged"],
+)
+
+go_library(
+    name = "k8s.io/apimachinery/pkg/fields",
+    srcs = [
+        "k8s.io/apimachinery/pkg/fields/doc.go",
+        "k8s.io/apimachinery/pkg/fields/fields.go",
+        "k8s.io/apimachinery/pkg/fields/requirements.go",
+        "k8s.io/apimachinery/pkg/fields/selector.go",
+    ],
+    tags = ["automanaged"],
+    deps = ["//vendor:k8s.io/apimachinery/pkg/selection"],
+)
