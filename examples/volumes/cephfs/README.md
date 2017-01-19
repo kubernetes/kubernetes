@@ -1,14 +1,23 @@
 # How to Use it?
 
-Install Ceph on the Kubernetes host. For example, on Fedora 21
+Check if the Ceph kernel module is available on the Kubernetes host. CoreOS has these by default.
+```
+$ lsmod | grep ceph
+ceph                  327680  1
+libceph               249856  1 ceph
+libcrc32c              16384  1 libceph
+fscache                57344  1 ceph
+```
 
-    # yum -y install ceph
+If they aren't available, install Ceph on the Kubernetes host. For example, on Fedora 21
+
+```
+$ yum -y install ceph
+```
 
 If you don't have a Ceph cluster, you can set up a [containerized Ceph cluster](https://github.com/ceph/ceph-docker/tree/master/examples/kubernetes)
 
-Then get the keyring from the Ceph cluster and copy it to */etc/ceph/keyring*.
-
-Once you have installed Ceph and a Kubernetes cluster, you can create a pod based on my examples [cephfs.yaml](cephfs.yaml)  and [cephfs-with-secret.yaml](cephfs-with-secret.yaml). In the pod yaml, you need to provide the following information.
+Once you have installed Ceph and a Kubernetes cluster, you can create a pod based on the examples [cephfs.yaml](cephfs.yaml) or [cephfs-with-secret.yaml](cephfs-with-secret.yaml). In the pod yaml, you need to provide the following information.
 
 - *monitors*:  Array of Ceph monitors.
 - *path*: Used as the mounted root, rather than the full Ceph tree. If not provided, default */* is used.
@@ -18,20 +27,20 @@ Once you have installed Ceph and a Kubernetes cluster, you can create a pod base
 - *readOnly*: Whether the filesystem is used as readOnly.
 
 
-Here are the commands:
+Here are the commands to deploy the pod and/or secret:
 
-```console
-    # kubectl create -f examples/volumes/cephfs/cephfs.yaml
+```
+# If you are using CephFS without authentication
+$ kubectl create -f examples/volumes/cephfs/cephfs.yaml
 
-    # create a secret if you want to use Ceph secret instead of secret file
-    # kubectl create -f examples/volumes/cephfs/secret/ceph-secret.yaml
-	
-    # kubectl create -f examples/volumes/cephfs/cephfs-with-secret.yaml
-    # kubectl get pods
+# Or if you are using a secret; create a secret and deploy a pod using that secret
+$ kubectl create -f examples/volumes/cephfs/cephfs-with-secret.yaml
+
+# See the pod running
+$ kubectl get pods
 ```
 
- If you ssh to that machine, you can run `docker ps` to see the actual pod and `docker inspect` to see the volumes used by the container.
-
+If you ssh to that machine, you can run `docker ps` to see the actual pod and `docker inspect` to see the volumes used by the container.
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/volumes/cephfs/README.md?pixel)]()
