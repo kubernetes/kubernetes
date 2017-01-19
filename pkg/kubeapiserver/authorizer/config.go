@@ -23,11 +23,11 @@ import (
 
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/authorization/union"
+	"k8s.io/apiserver/plugin/pkg/authorizer/webhook"
 	"k8s.io/kubernetes/pkg/auth/authorizer/abac"
 	"k8s.io/kubernetes/pkg/controller/informers"
 	genericauthorizer "k8s.io/kubernetes/pkg/genericapiserver/authorizer"
 	"k8s.io/kubernetes/plugin/pkg/auth/authorizer/rbac"
-	"k8s.io/kubernetes/plugin/pkg/auth/authorizer/webhook"
 )
 
 const (
