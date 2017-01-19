@@ -90,18 +90,14 @@ func launchSelfHostedAPIServer(cfg *kubeadmapi.MasterConfiguration, client *clie
 		return true, nil
 	})
 
-	waitForPodsWithLabel(client, kubeAPIServer)
-
-	apiServerStaticManifestPath := path.Join(kubeadmapi.GlobalEnvParams.KubernetesDir,
-		"manifests", kubeAPIServer+".json")
-	if err := os.Remove(apiServerStaticManifestPath); err != nil {
+	// Remove temporary API server
+	apiServerStaticManifestPath := buildStaticManifestFilepath(kubeAPIServer)
+	if err := os.RemoveAll(apiServerStaticManifestPath); err != nil {
 		return fmt.Errorf("unable to delete temporary API server manifest [%v]", err)
 	}
 
-	// Wait until kubernetes detects the static pod removal and our newly created
-	// API server comes online:
-	// TODO: Should we verify that either the API is down, or the static apiserver pod is gone before
-	// waiting?
+	// Wait for self-hosted API server to take ownership
+	waitForPodsWithLabel(client, kubeAPIServer)
 	WaitForAPI(client)
 
 	fmt.Printf("[self-hosted] self-hosted kube-apiserver ready after %f seconds\n", time.Since(start).Seconds())
@@ -118,9 +114,8 @@ func launchSelfHostedControllerManager(cfg *kubeadmapi.MasterConfiguration, clie
 
 	waitForPodsWithLabel(client, kubeControllerManager)
 
-	ctrlMgrStaticManifestPath := path.Join(kubeadmapi.GlobalEnvParams.KubernetesDir,
-		"manifests", kubeControllerManager+".json")
-	if err := os.Remove(ctrlMgrStaticManifestPath); err != nil {
+	ctrlMgrStaticManifestPath := buildStaticManifestFilepath(kubeControllerManager)
+	if err := os.RemoveAll(ctrlMgrStaticManifestPath); err != nil {
 		return fmt.Errorf("unable to delete temporary controller manager manifest [%v]", err)
 	}
 
@@ -130,7 +125,6 @@ func launchSelfHostedControllerManager(cfg *kubeadmapi.MasterConfiguration, clie
 }
 
 func launchSelfHostedScheduler(cfg *kubeadmapi.MasterConfiguration, client *clientset.Clientset, volumes []v1.Volume, volumeMounts []v1.VolumeMount) error {
-
 	start := time.Now()
 	scheduler := getSchedulerDeployment(cfg)
 	if _, err := client.Extensions().Deployments(api.NamespaceSystem).Create(&scheduler); err != nil {
@@ -139,9 +133,8 @@ func launchSelfHostedScheduler(cfg *kubeadmapi.MasterConfiguration, client *clie
 
 	waitForPodsWithLabel(client, kubeScheduler)
 
-	schedulerStaticManifestPath := path.Join(kubeadmapi.GlobalEnvParams.KubernetesDir,
-		"manifests", kubeScheduler+".json")
-	if err := os.Remove(schedulerStaticManifestPath); err != nil {
+	schedulerStaticManifestPath := buildStaticManifestFilepath(kubeScheduler)
+	if err := os.RemoveAll(schedulerStaticManifestPath); err != nil {
 		return fmt.Errorf("unable to delete temporary scheduler manifest [%v]", err)
 	}
 
@@ -254,7 +247,6 @@ func getControllerManagerDeployment(cfg *kubeadmapi.MasterConfiguration, volumes
 					// TODO: Make sure masters get this label
 					NodeSelector: map[string]string{metav1.NodeLabelKubeadmAlphaRole: metav1.NodeLabelRoleMaster},
 					Volumes:      volumes,
-
 					Containers: []v1.Container{
 						{
 							Name:          kubeControllerManager,
@@ -317,6 +309,9 @@ func getSchedulerDeployment(cfg *kubeadmapi.MasterConfiguration) ext.Deployment 
 	return d
 }
 
+func buildStaticManifestFilepath(name string) string {
+	return path.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, "manifests", name+".json")
+}
 
 func getMasterToleration() string {
 	// Tolerate the master taint we add to our master nodes, as this can and should
