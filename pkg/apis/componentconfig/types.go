@@ -20,7 +20,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/api"
-	utilconfig "k8s.io/kubernetes/pkg/util/config"
+	utilflag "k8s.io/kubernetes/pkg/util/flag"
 )
 
 type KubeProxyConfiguration struct {
@@ -445,12 +445,12 @@ type KubeletConfiguration struct {
 	// that describe resources reserved for non-kubernetes components.
 	// Currently only cpu and memory are supported. [default=none]
 	// See http://kubernetes.io/docs/user-guide/compute-resources for more detail.
-	SystemReserved utilconfig.ConfigurationMap
+	SystemReserved utilflag.ConfigurationMap
 	// A set of ResourceName=ResourceQuantity (e.g. cpu=200m,memory=150G) pairs
 	// that describe resources reserved for kubernetes system components.
 	// Currently only cpu and memory are supported. [default=none]
 	// See http://kubernetes.io/docs/user-guide/compute-resources for more detail.
-	KubeReserved utilconfig.ConfigurationMap
+	KubeReserved utilflag.ConfigurationMap
 	// Default behaviour for kernel tuning
 	ProtectKernelDefaults bool
 	// If true, Kubelet ensures a set of iptables rules are present on host.
