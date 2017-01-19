@@ -39,7 +39,6 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&APIService{},
 		&APIServiceList{},
 
-		&v1.ListOptions{},
 		&v1.DeleteOptions{},
 		&metav1.GetOptions{},
 	)

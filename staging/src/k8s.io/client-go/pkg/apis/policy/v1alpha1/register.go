@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,24 +14,20 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package autoscaling
+package v1alpha1
 
 import (
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/client-go/pkg/api/v1"
 )
 
 // GroupName is the group name use in this package
-const GroupName = "autoscaling"
+const GroupName = "policy"
 
 // SchemeGroupVersion is group version used to register these objects
-var SchemeGroupVersion = schema.GroupVersion{Group: GroupName, Version: runtime.APIVersionInternal}
-
-// Kind takes an unqualified kind and returns a Group qualified GroupKind
-func Kind(kind string) schema.GroupKind {
-	return SchemeGroupVersion.WithKind(kind).GroupKind()
-}
+var SchemeGroupVersion = schema.GroupVersion{Group: GroupName, Version: "v1alpha1"}
 
 // Resource takes an unqualified resource and returns a Group qualified GroupResource
 func Resource(resource string) schema.GroupResource {
@@ -46,10 +42,14 @@ var (
 // Adds the list of known types to api.Scheme.
 func addKnownTypes(scheme *runtime.Scheme) error {
 	scheme.AddKnownTypes(SchemeGroupVersion,
-		&Scale{},
-		&HorizontalPodAutoscaler{},
-		&HorizontalPodAutoscalerList{},
-		&api.DeleteOptions{},
+		&PodDisruptionBudget{},
+		&PodDisruptionBudgetList{},
+		&Eviction{},
+		&v1.DeleteOptions{},
+		&metav1.ExportOptions{},
+		&metav1.GetOptions{},
 	)
+	// Add the watch version that applies
+	metav1.AddToGroupVersion(scheme, SchemeGroupVersion)
 	return nil
 }

@@ -67,7 +67,6 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&api.Service{},
 		&api.Namespace{},
 		&api.NamespaceList{},
-		&api.ListOptions{},
 		&api.DeleteOptions{},
 		&api.Secret{},
 		&api.SecretList{},

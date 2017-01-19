@@ -45,7 +45,6 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&HorizontalPodAutoscaler{},
 		&HorizontalPodAutoscalerList{},
 		&Scale{},
-		&v1.ListOptions{},
 		&v1.DeleteOptions{},
 		&metav1.ExportOptions{},
 		&metav1.GetOptions{},

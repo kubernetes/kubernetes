@@ -57,7 +57,6 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&ThirdPartyResourceDataList{},
 		&Ingress{},
 		&IngressList{},
-		&v1.ListOptions{},
 		&v1.DeleteOptions{},
 		&metav1.ExportOptions{},
 		&metav1.GetOptions{},
