@@ -206,14 +206,12 @@ func TestaddPod(t *testing.T) {
 	node := makenode("test", nodelabels)
 	nodeinfo := makenodeinfo(node, taints)
 	podwithaffinity := makepod("foo", "", &affnity)
-	podwithoutaffinity := makepod("foo", "", &v1.Affinity{})
 	nodeinfo.addPod(podwithaffinity)
-	nodeinfo.addPod(podwithoutaffinity)
 	if !reflect.DeepEqual(nodeinfo.podsWithAffinity, []*v1.Pod{podwithaffinity}) {
 		t.Fatalf("nodeinfo add pod with affinity error,expected: %v,got: %v", []*v1.Pod{podwithaffinity}, nodeinfo.podsWithAffinity)
 	}
-	if !reflect.DeepEqual(nodeinfo.pods, []*v1.Pod{podwithoutaffinity}) {
-		t.Fatalf("nodeinfo add pod without affinity error,expected: %v,got: %v", []*v1.Pod{podwithoutaffinity}, nodeinfo.pods)
+	if !reflect.DeepEqual(nodeinfo.pods, []*v1.Pod{podwithaffinity}) {
+		t.Fatalf("nodeinfo add pod error,expected: %v,got: %v", []*v1.Pod{podwithaffinity}, nodeinfo.pods)
 	}
 
 }
