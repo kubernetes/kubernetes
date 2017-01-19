@@ -108,6 +108,9 @@ type ActualStateOfWorld interface {
 
 	GetAttachedVolumesPerNode() map[types.NodeName][]operationexecutor.AttachedVolume
 
+	// GetNodesForVolume returns the nodes which have the given volume attached
+	GetNodesForVolume(volumeName api.UniqueVolumeName) []types.NodeName
+
 	// GetVolumesToReportAttached returns a map containing the set of nodes for
 	// which the VolumesAttached Status field in the Node API object should be
 	// updated. The key in this map is the name of the node to update and the
@@ -564,6 +567,21 @@ func (asw *actualStateOfWorld) GetAttachedVolumesPerNode() map[types.NodeName][]
 	}
 
 	return attachedVolumesPerNode
+}
+
+func (asw *actualStateOfWorld) GetNodesForVolume(volumeName api.UniqueVolumeName) []types.NodeName {
+	asw.RLock()
+	defer asw.RUnlock()
+
+	nodes := []types.NodeName{}
+
+	volumeObj, volumeExists := asw.attachedVolumes[volumeName]
+	if volumeExists {
+		for nodeName := range volumeObj.nodesAttachedTo {
+			nodes = append(nodes, nodeName)
+		}
+	}
+	return nodes
 }
 
 func (asw *actualStateOfWorld) GetVolumesToReportAttached() map[types.NodeName][]v1.AttachedVolume {

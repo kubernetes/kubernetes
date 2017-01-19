@@ -206,6 +206,12 @@ func (rc *reconciler) reconcile() {
 			glog.V(5).Infof("Volume %q/Node %q is attached--touching.", volumeToAttach.VolumeName, volumeToAttach.NodeName)
 			rc.actualStateOfWorld.ResetDetachRequestTime(volumeToAttach.VolumeName, volumeToAttach.NodeName)
 		} else {
+			nodes := rc.actualStateOfWorld.GetNodesForVolume(volumeToAttach.VolumeName)
+			if len(nodes) > 0 {
+				glog.V(5).Infof("Volume %q is already attached to node %q and can't be attached to %q", volumeToAttach.VolumeName, nodes[0], volumeToAttach.NodeName)
+				continue
+			}
+
 			// Volume/Node doesn't exist, spawn a goroutine to attach it
 			glog.V(5).Infof("Attempting to start AttachVolume for volume %q to node %q", volumeToAttach.VolumeName, volumeToAttach.NodeName)
 			err := rc.attacherDetacher.AttachVolume(volumeToAttach.VolumeToAttach, rc.actualStateOfWorld)
