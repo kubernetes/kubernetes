@@ -30,7 +30,7 @@ import (
 	"github.com/coreos/go-oidc/oidc"
 
 	"k8s.io/apiserver/pkg/authentication/user"
-	oidctesting "k8s.io/kubernetes/plugin/pkg/auth/authenticator/token/oidc/testing"
+	oidctesting "k8s.io/apiserver/plugin/pkg/authenticator/token/oidc/testing"
 )
 
 func generateToken(t *testing.T, op *oidctesting.OIDCProvider, iss, sub, aud string, usernameClaim, value, groupsClaim string, groups interface{}, iat, exp time.Time, emailVerified bool) string {

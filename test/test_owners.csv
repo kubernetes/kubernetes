@@ -513,6 +513,17 @@ Volumes GlusterFS should be mountable,eparis,1
 Volumes NFS should be mountable,rrati,0
 Volumes PD should be mountable,caesarxuchao,1
 Volumes iSCSI should be mountable,jsafrane,1
+k8s.io/apiserver/plugin/pkg/authenticator/password/allow,liggitt,0
+k8s.io/apiserver/plugin/pkg/authenticator/password/passwordfile,liggitt,0
+k8s.io/apiserver/plugin/pkg/authenticator/request/anonymous,justinsb,1
+k8s.io/apiserver/plugin/pkg/authenticator/request/basicauth,liggitt,0
+k8s.io/apiserver/plugin/pkg/authenticator/request/headerrequest,deads2k,0
+k8s.io/apiserver/plugin/pkg/authenticator/request/union,liggitt,0
+k8s.io/apiserver/plugin/pkg/authenticator/request/x509,liggitt,0
+k8s.io/apiserver/plugin/pkg/authenticator/token/anytoken,krousey,1
+k8s.io/apiserver/plugin/pkg/authenticator/token/oidc,brendandburns,1
+k8s.io/apiserver/plugin/pkg/authenticator/token/tokenfile,liggitt,0
+k8s.io/apiserver/plugin/pkg/authenticator/token/webhook,rrati,0
 k8s.io/kubernetes/cmd/genutils,rmmh,1
 k8s.io/kubernetes/cmd/hyperkube,jbeda,0
 k8s.io/kubernetes/cmd/kube-aggregator/pkg/apiserver,brendandburns,0
@@ -943,17 +954,6 @@ k8s.io/kubernetes/plugin/pkg/admission/security/podsecuritypolicy,maisem,1
 k8s.io/kubernetes/plugin/pkg/admission/securitycontext/scdeny,rrati,0
 k8s.io/kubernetes/plugin/pkg/admission/serviceaccount,liggitt,0
 k8s.io/kubernetes/plugin/pkg/admission/storageclass/default,pmorie,1
-k8s.io/kubernetes/plugin/pkg/auth/authenticator/password/allow,liggitt,0
-k8s.io/kubernetes/plugin/pkg/auth/authenticator/password/passwordfile,liggitt,0
-k8s.io/kubernetes/plugin/pkg/auth/authenticator/request/anonymous,justinsb,1
-k8s.io/kubernetes/plugin/pkg/auth/authenticator/request/basicauth,liggitt,0
-k8s.io/kubernetes/plugin/pkg/auth/authenticator/request/headerrequest,deads2k,0
-k8s.io/kubernetes/plugin/pkg/auth/authenticator/request/union,liggitt,0
-k8s.io/kubernetes/plugin/pkg/auth/authenticator/request/x509,liggitt,0
-k8s.io/kubernetes/plugin/pkg/auth/authenticator/token/anytoken,krousey,1
-k8s.io/kubernetes/plugin/pkg/auth/authenticator/token/oidc,brendandburns,1
-k8s.io/kubernetes/plugin/pkg/auth/authenticator/token/tokenfile,liggitt,0
-k8s.io/kubernetes/plugin/pkg/auth/authenticator/token/webhook,rrati,0
 k8s.io/kubernetes/plugin/pkg/auth/authorizer/rbac,rrati,0
 k8s.io/kubernetes/plugin/pkg/auth/authorizer/rbac/bootstrappolicy,mml,1
 k8s.io/kubernetes/plugin/pkg/auth/authorizer/webhook,rrati,0
