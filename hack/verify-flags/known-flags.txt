@@ -27,8 +27,6 @@ audit-log-maxage
 audit-log-maxbackup
 audit-log-maxsize
 audit-log-path
-auth-path
-auth-path
 auth-provider
 auth-provider
 auth-provider-arg
@@ -515,7 +513,6 @@ requestheader-username-headers
 require-kubeconfig
 required-contexts
 resolv-conf
-resource-container
 resource-quota-sync-period
 resource-version
 results-dir
@@ -588,7 +585,6 @@ streaming-connection-idle-timeout
 suicide-timeout
 sync-frequency
 system-cgroups
-system-container
 system-pods-startup-timeout
 system-reserved
 system-validate-mode
