@@ -17,9 +17,9 @@ go_library(
     deps = [
         "//cmd/kube-aggregator/pkg/client/clientset_generated/clientset/typed/apiregistration/v1alpha1:go_default_library",
         "//pkg/client/typed/discovery:go_default_library",
-        "//plugin/pkg/client/auth:go_default_library",
         "//vendor:github.com/golang/glog",
         "//vendor:k8s.io/client-go/pkg/util/flowcontrol",
+        "//vendor:k8s.io/client-go/plugin/pkg/client/auth",
         "//vendor:k8s.io/client-go/rest",
     ],
 )

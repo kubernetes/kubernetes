@@ -12817,10 +12817,10 @@ go_test(
     library = ":k8s.io/client-go/plugin/pkg/client/auth/oidc",
     tags = ["automanaged"],
     deps = [
+        "//plugin/pkg/auth/authenticator/token/oidc/testing:go_default_library",
         "//vendor:github.com/coreos/go-oidc/jose",
         "//vendor:github.com/coreos/go-oidc/key",
         "//vendor:github.com/coreos/go-oidc/oauth2",
-        "//vendor:k8s.io/client-go/plugin/pkg/auth/authenticator/token/oidc/testing",
     ],
 )
 
@@ -13644,5 +13644,15 @@ go_test(
     name = "k8s.io/client-go/pkg/util/testing_test",
     srcs = ["k8s.io/client-go/pkg/util/testing/fake_handler_test.go"],
     library = ":k8s.io/client-go/pkg/util/testing",
+    tags = ["automanaged"],
+)
+
+go_test(
+    name = "k8s.io/client-go/pkg/util/jsonpath_test",
+    srcs = [
+        "k8s.io/client-go/pkg/util/jsonpath/jsonpath_test.go",
+        "k8s.io/client-go/pkg/util/jsonpath/parser_test.go",
+    ],
+    library = ":k8s.io/client-go/pkg/util/jsonpath",
     tags = ["automanaged"],
 )

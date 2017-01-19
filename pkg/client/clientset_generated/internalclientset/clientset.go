@@ -19,6 +19,7 @@ package internalclientset
 import (
 	"github.com/golang/glog"
 	"k8s.io/client-go/pkg/util/flowcontrol"
+	_ "k8s.io/client-go/plugin/pkg/client/auth"
 	rest "k8s.io/client-go/rest"
 	internalversionapps "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/apps/internalversion"
 	internalversionauthentication "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/authentication/internalversion"
@@ -32,7 +33,6 @@ import (
 	internalversionrbac "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/rbac/internalversion"
 	internalversionstorage "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/storage/internalversion"
 	discovery "k8s.io/kubernetes/pkg/client/typed/discovery"
-	_ "k8s.io/kubernetes/plugin/pkg/client/auth"
 )
 
 type Interface interface {

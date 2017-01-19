@@ -19,6 +19,7 @@ package clientset
 import (
 	"github.com/golang/glog"
 	"k8s.io/client-go/pkg/util/flowcontrol"
+	_ "k8s.io/client-go/plugin/pkg/client/auth"
 	rest "k8s.io/client-go/rest"
 	v1beta1apps "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/apps/v1beta1"
 	v1beta1authentication "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/authentication/v1beta1"
@@ -34,7 +35,6 @@ import (
 	v1beta1rbac "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/rbac/v1beta1"
 	v1beta1storage "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/storage/v1beta1"
 	discovery "k8s.io/kubernetes/pkg/client/typed/discovery"
-	_ "k8s.io/kubernetes/plugin/pkg/client/auth"
 )
 
 type Interface interface {
