@@ -807,3 +807,12 @@ func TestSetDefaultProbe(t *testing.T) {
 		t.Errorf("Expected probe: %+v\ngot: %+v\n", expectedProbe, actualProbe)
 	}
 }
+
+func TestSetDefaultSchedulerName(t *testing.T) {
+	pod := &v1.Pod{}
+
+	output := roundTrip(t, runtime.Object(pod)).(*v1.Pod)
+	if output.Spec.SchedulerName != v1.DefaultSchedulerName {
+		t.Errorf("Expected scheduler name: %+v\ngot: %+v\n", v1.DefaultSchedulerName, output.Spec.SchedulerName)
+	}
+}

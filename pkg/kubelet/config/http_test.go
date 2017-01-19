@@ -147,6 +147,7 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 					NodeName:        string(nodeName),
 					Containers:      []v1.Container{{Name: "1", Image: "foo", ImagePullPolicy: v1.PullAlways}},
 					SecurityContext: &v1.PodSecurityContext{},
+					SchedulerName:   api.DefaultSchedulerName,
 				},
 				Status: v1.PodStatus{
 					Phase: v1.PodPending,
@@ -168,6 +169,7 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 						DNSPolicy:                     v1.DNSClusterFirst,
 						SecurityContext:               &v1.PodSecurityContext{},
 						TerminationGracePeriodSeconds: &grace,
+						SchedulerName:                 api.DefaultSchedulerName,
 
 						Containers: []v1.Container{{
 							Name:  "1",
@@ -198,6 +200,7 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 							NodeName:        nodeName,
 							Containers:      []v1.Container{{Name: "1", Image: "foo", ImagePullPolicy: v1.PullAlways}},
 							SecurityContext: &v1.PodSecurityContext{},
+							SchedulerName:   api.DefaultSchedulerName,
 						},
 						Status: v1.PodStatus{
 							Phase: v1.PodPending,
@@ -212,6 +215,7 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 							NodeName:        nodeName,
 							Containers:      []v1.Container{{Name: "2", Image: "bar:bartag", ImagePullPolicy: ""}},
 							SecurityContext: &v1.PodSecurityContext{},
+							SchedulerName:   api.DefaultSchedulerName,
 						},
 						Status: v1.PodStatus{
 							Phase: v1.PodPending,
@@ -235,6 +239,7 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 						DNSPolicy:                     v1.DNSClusterFirst,
 						TerminationGracePeriodSeconds: &grace,
 						SecurityContext:               &v1.PodSecurityContext{},
+						SchedulerName:                 api.DefaultSchedulerName,
 
 						Containers: []v1.Container{{
 							Name:  "1",
@@ -261,6 +266,7 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 						DNSPolicy:                     v1.DNSClusterFirst,
 						TerminationGracePeriodSeconds: &grace,
 						SecurityContext:               &v1.PodSecurityContext{},
+						SchedulerName:                 api.DefaultSchedulerName,
 
 						Containers: []v1.Container{{
 							Name:  "2",

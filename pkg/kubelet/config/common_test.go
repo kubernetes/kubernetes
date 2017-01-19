@@ -53,6 +53,7 @@ func TestDecodeSinglePod(t *testing.T) {
 				SecurityContext:        securitycontext.ValidSecurityContextWithContainerDefaults(),
 			}},
 			SecurityContext: &v1.PodSecurityContext{},
+			SchedulerName:   api.DefaultSchedulerName,
 		},
 	}
 	json, err := runtime.Encode(testapi.Default.Codec(), pod)
@@ -113,6 +114,7 @@ func TestDecodePodList(t *testing.T) {
 				SecurityContext:        securitycontext.ValidSecurityContextWithContainerDefaults(),
 			}},
 			SecurityContext: &v1.PodSecurityContext{},
+			SchedulerName:   api.DefaultSchedulerName,
 		},
 	}
 	podList := &v1.PodList{

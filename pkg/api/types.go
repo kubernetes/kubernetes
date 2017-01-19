@@ -1856,6 +1856,10 @@ type PodSpec struct {
 	// If specified, the pod's scheduling constraints
 	// +optional
 	Affinity *Affinity
+	// If specified, the pod will be dispatched by specified scheduler.
+	// If not specified, the pod will be dispatched by default scheduler.
+	// +optional
+	SchedulerName string
 }
 
 // Sysctl defines a kernel parameter to be set
