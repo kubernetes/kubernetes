@@ -437,6 +437,7 @@ var map_EnvFromSource = map[string]string{
 	"":             "EnvFromSource represents the source of a set of ConfigMaps",
 	"prefix":       "An optional identifer to prepend to each key in the ConfigMap. Must be a C_IDENTIFIER.",
 	"configMapRef": "The ConfigMap to select from",
+	"secretRef":    "The Secret to select from",
 }
 
 func (EnvFromSource) SwaggerDoc() map[string]string {
@@ -1586,6 +1587,14 @@ var map_Secret = map[string]string{
 
 func (Secret) SwaggerDoc() map[string]string {
 	return map_Secret
+}
+
+var map_SecretEnvSource = map[string]string{
+	"": "SecretEnvSource selects a Secret to populate the environment variables with.\n\nThe contents of the target Secret's Data field will represent the key-value pairs as environment variables.",
+}
+
+func (SecretEnvSource) SwaggerDoc() map[string]string {
+	return map_SecretEnvSource
 }
 
 var map_SecretKeySelector = map[string]string{
