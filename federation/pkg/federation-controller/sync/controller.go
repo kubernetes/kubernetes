@@ -35,6 +35,7 @@ import (
 	federationclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset"
 	"k8s.io/kubernetes/federation/pkg/federatedtypes"
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util"
+	"k8s.io/kubernetes/federation/pkg/federation-controller/util/clusterselector"
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util/deletionhelper"
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util/eventsink"
 	"k8s.io/kubernetes/pkg/api"
@@ -273,10 +274,10 @@ func (s *FederationSyncController) reconcileOnClusterChange() {
 	}
 }
 
-func (s *FederationSyncController) reconcile(namespacedName types.NamespacedName) {
+func (s *FederationSyncController) reconcile(namespacedName types.NamespacedName) error {
 	if !s.isSynced() {
 		s.deliver(namespacedName, s.clusterAvailableDelay, false)
-		return
+		return nil
 	}
 
 	key := namespacedName.String()
@@ -285,12 +286,12 @@ func (s *FederationSyncController) reconcile(namespacedName types.NamespacedName
 	if err != nil {
 		glog.Errorf("Failed to query main %s store for %v: %v", kind, key, err)
 		s.deliver(namespacedName, 0, true)
-		return
+		return err
 	}
 
 	if !exist {
 		// Not federated, ignoring.
-		return
+		return nil
 	}
 
 	// Create a copy before modifying the resource to prevent racing
@@ -299,12 +300,14 @@ func (s *FederationSyncController) reconcile(namespacedName types.NamespacedName
 	if err != nil {
 		glog.Errorf("Error in retrieving %s from store: %v", kind, err)
 		s.deliver(namespacedName, 0, true)
-		return
+		return err
 	}
+
 	if !s.adapter.IsExpectedType(copiedObj) {
 		glog.Errorf("Object is not the expected type: %v", copiedObj)
 		s.deliver(namespacedName, 0, true)
-		return
+		// Is this the right return code?
+		return nil
 	}
 	obj := copiedObj.(pkgruntime.Object)
 	meta := s.adapter.ObjectMeta(obj)
@@ -316,7 +319,7 @@ func (s *FederationSyncController) reconcile(namespacedName types.NamespacedName
 				"%s delete failed: %v", strings.ToTitle(kind), err)
 			s.deliver(namespacedName, 0, true)
 		}
-		return
+		return err
 	}
 
 	glog.V(3).Infof("Ensuring delete object from underlying clusters finalizer for %s: %s",
@@ -327,32 +330,90 @@ func (s *FederationSyncController) reconcile(namespacedName types.NamespacedName
 		glog.Errorf("Failed to ensure delete object from underlying clusters finalizer in %s %s: %v",
 			kind, namespacedName, err)
 		s.deliver(namespacedName, 0, false)
-		return
+		return err
 	}
 
 	glog.V(3).Infof("Syncing %s %s in underlying clusters", kind, namespacedName)
+	err, operations := s.getClusterOperations(obj)
+	if err != nil {
+		glog.Errorf("Error getting reconcile cluster operations in %s %s: %v",
+			kind, namespacedName, err)
+		s.deliver(namespacedName, 0, false)
+		return err
+	}
+
+	if len(operations) == 0 {
+		// Everything is in order
+		return nil
+	}
+	err = s.updater.UpdateWithOnError(operations, s.updateTimeout,
+		func(op util.FederatedOperation, operror error) {
+			s.eventRecorder.Eventf(obj, api.EventTypeWarning, "UpdateInClusterFailed",
+				"%s update in cluster %s failed: %v", strings.ToTitle(kind), op.ClusterName, operror)
+		})
+
+	if err != nil {
+		glog.Errorf("Failed to execute updates for %s: %v", key, err)
+		s.deliver(namespacedName, 0, true)
+		return err
+	}
+
+	// Evertyhing is in order but lets be double sure
+	s.deliver(namespacedName, s.reviewDelay, false)
+	return nil
+}
+
+// This function produces the cluster changes required for reconciliation
+func (s *FederationSyncController) getClusterOperations(obj pkgruntime.Object) (error, []util.FederatedOperation) {
+	operations := make([]util.FederatedOperation, 0)
+	// The data should not be modified.
+	desiredObj := s.adapter.Copy(obj)
+	objMeta := s.adapter.ObjectMeta(desiredObj)
+	namespacedName := s.adapter.NamespacedName(desiredObj)
+	key := namespacedName.String()
+	kind := s.adapter.Kind()
 
 	clusters, err := s.informer.GetReadyClusters()
 	if err != nil {
 		glog.Errorf("Failed to get cluster list: %v", err)
 		s.deliver(namespacedName, s.clusterAvailableDelay, false)
-		return
+		return err, operations
 	}
 
-	operations := make([]util.FederatedOperation, 0)
 	for _, cluster := range clusters {
+		glog.V(3).Infof("Processing cluster: %s for %s: %s", cluster.Name, kind, key)
+
 		clusterObj, found, err := s.informer.GetTargetStore().GetByKey(cluster.Name, key)
 		if err != nil {
 			glog.Errorf("Failed to get %s from %s: %v", key, cluster.Name, err)
 			s.deliver(namespacedName, 0, true)
-			return
+			return err, operations
 		}
 
-		// The data should not be modified.
-		desiredObj := s.adapter.Copy(obj)
+		// Check to see if this should be sent to the cluster.
+		send, err := clusterselector.SendToCluster(cluster.Labels, objMeta.Annotations)
+		if err != nil {
+			glog.Errorf("Error processing FederationClusterSelector Annotations cluster: %s for %s map: %s error: %s", cluster.Name, kind, key, err.Error())
+			s.eventRecorder.Eventf(desiredObj, api.EventTypeNormal, "FedClusterSelectorError", "Error processing ClusterSelector Annotations cluster: %s for %s: %s error: %s", cluster.Name, kind, key, err.Error())
+			return err, operations
+		} else if !send {
+			glog.V(5).Infof("Skipping cluster: %s for %s: %s reason: cluster selectors do not match: %-v %-v", cluster.Name, kind, key, cluster.ObjectMeta.Labels, objMeta.Annotations[federationapi.FederationClusterSelector])
+
+			// Only delete objects from target clusters if they exist
+			if found {
+				s.eventRecorder.Eventf(desiredObj, api.EventTypeWarning, "DeleteInCluster", "Deleting %s %s from cluster %s", cluster.Name, namespacedName, kind)
+				operations = append(operations, util.FederatedOperation{
+					Type:        util.OperationTypeDelete,
+					Obj:         desiredObj,
+					ClusterName: cluster.Name,
+				})
+			}
+			// Skip further processing for this cluster.
+			continue
+		}
 
 		if !found {
-			s.eventRecorder.Eventf(obj, api.EventTypeNormal, "CreateInCluster",
+			s.eventRecorder.Eventf(desiredObj, api.EventTypeNormal, "CreateInCluster",
 				"Creating %s in cluster %s", kind, cluster.Name)
 
 			operations = append(operations, util.FederatedOperation{
@@ -365,7 +426,7 @@ func (s *FederationSyncController) reconcile(namespacedName types.NamespacedName
 
 			// Update existing resource, if needed.
 			if !s.adapter.Equivalent(desiredObj, clusterObj) {
-				s.eventRecorder.Eventf(obj, api.EventTypeNormal, "UpdateInCluster",
+				s.eventRecorder.Eventf(desiredObj, api.EventTypeNormal, "UpdateInCluster",
 					"Updating %s in cluster %s", kind, cluster.Name)
 				operations = append(operations, util.FederatedOperation{
 					Type:        util.OperationTypeUpdate,
@@ -375,25 +436,8 @@ func (s *FederationSyncController) reconcile(namespacedName types.NamespacedName
 			}
 		}
 	}
+	return err, operations
 
-	if len(operations) == 0 {
-		// Everything is in order
-		return
-	}
-	err = s.updater.UpdateWithOnError(operations, s.updateTimeout,
-		func(op util.FederatedOperation, operror error) {
-			s.eventRecorder.Eventf(obj, api.EventTypeWarning, "UpdateInClusterFailed",
-				"%s update in cluster %s failed: %v", strings.ToTitle(kind), op.ClusterName, operror)
-		})
-
-	if err != nil {
-		glog.Errorf("Failed to execute updates for %s: %v", key, err)
-		s.deliver(namespacedName, 0, true)
-		return
-	}
-
-	// Evertyhing is in order but lets be double sure
-	s.deliver(namespacedName, s.reviewDelay, false)
 }
 
 // delete deletes the given resource or returns error if the deletion was not complete.
