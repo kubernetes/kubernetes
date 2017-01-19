@@ -207,10 +207,14 @@ func nonResourceMatches(p api.Policy, a authorizer.Attributes) bool {
 }
 
 func resourceMatches(p api.Policy, a authorizer.Attributes) bool {
+	resource := a.GetResource()
+	if len(a.GetSubresource()) > 0 {
+		resource = a.GetResource() + "/" + a.GetSubresource()
+	}
 	// A resource policy cannot match a non-resource request
 	if a.IsResourceRequest() {
 		if p.Spec.Namespace == "*" || p.Spec.Namespace == a.GetNamespace() {
-			if p.Spec.Resource == "*" || p.Spec.Resource == a.GetResource() {
+			if p.Spec.Resource == "*" || p.Spec.Resource == resource {
 				if p.Spec.APIGroup == "*" || p.Spec.APIGroup == a.GetAPIGroup() {
 					return true
 				}
