@@ -37,6 +37,7 @@ import (
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	certutil "k8s.io/apimachinery/pkg/util/cert"
 	"k8s.io/apimachinery/pkg/util/wait"
 	kubeadmkubeconfigphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubeconfig"
 	"k8s.io/kubernetes/federation/pkg/kubefed/util"
@@ -48,8 +49,6 @@ import (
 	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
-	certutil "k8s.io/kubernetes/pkg/util/cert"
-	triple "k8s.io/kubernetes/pkg/util/cert/triple"
 	"k8s.io/kubernetes/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/version"
 
@@ -128,10 +127,10 @@ func NewCmdInit(cmdOut io.Writer, config util.AdminConfig) *cobra.Command {
 }
 
 type entityKeyPairs struct {
-	ca                *triple.KeyPair
-	server            *triple.KeyPair
-	controllerManager *triple.KeyPair
-	admin             *triple.KeyPair
+	ca                *KeyPair
+	server            *KeyPair
+	controllerManager *KeyPair
+	admin             *KeyPair
 }
 
 // initFederation initializes a federation control plane.
@@ -326,19 +325,19 @@ func waitForLoadBalancerAddress(clientset *client.Clientset, svc *api.Service, d
 }
 
 func genCerts(svcNamespace, name, svcName, localDNSZoneName string, ips, hostnames []string) (*entityKeyPairs, error) {
-	ca, err := triple.NewCA(name)
+	ca, err := NewCA(name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create CA key and certificate: %v", err)
 	}
-	server, err := triple.NewServerKeyPair(ca, APIServerCN, svcName, svcNamespace, localDNSZoneName, ips, hostnames)
+	server, err := NewServerKeyPair(ca, APIServerCN, svcName, svcNamespace, localDNSZoneName, ips, hostnames)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create federation API server key and certificate: %v", err)
 	}
-	cm, err := triple.NewClientKeyPair(ca, ControllerManagerCN)
+	cm, err := NewClientKeyPair(ca, ControllerManagerCN)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create federation controller manager client key and certificate: %v", err)
 	}
-	admin, err := triple.NewClientKeyPair(ca, AdminCN)
+	admin, err := NewClientKeyPair(ca, AdminCN)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create client key and certificate for an admin: %v", err)
 	}

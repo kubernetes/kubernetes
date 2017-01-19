@@ -14,9 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package triple generates key-certificate pairs for the
-// triple (CA, Server, Client).
-package triple
+package init
 
 import (
 	"crypto/rsa"
@@ -24,7 +22,7 @@ import (
 	"fmt"
 	"net"
 
-	certutil "k8s.io/kubernetes/pkg/util/cert"
+	certutil "k8s.io/apimachinery/pkg/util/cert"
 )
 
 type KeyPair struct {

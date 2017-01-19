@@ -22,12 +22,12 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	certutil "k8s.io/apimachinery/pkg/util/cert"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/kubernetes/pkg/api/v1"
 	certificates "k8s.io/kubernetes/pkg/apis/certificates/v1alpha1"
 	unversionedcertificates "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/certificates/v1alpha1"
 	"k8s.io/kubernetes/pkg/fields"
-	certutil "k8s.io/kubernetes/pkg/util/cert"
 )
 
 // RequestNodeCertificate will create a certificate signing request and send it to API server,

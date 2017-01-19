@@ -23,6 +23,7 @@ import (
 
 	"github.com/go-openapi/spec"
 
+	"k8s.io/apimachinery/pkg/util/cert"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/group"
 	"k8s.io/apiserver/pkg/authentication/request/anonymous"
@@ -33,7 +34,6 @@ import (
 	"k8s.io/apiserver/pkg/authentication/user"
 	webhooktoken "k8s.io/apiserver/plugin/pkg/authenticator/token/webhook"
 	authenticationclient "k8s.io/client-go/kubernetes/typed/authentication/v1beta1"
-	"k8s.io/kubernetes/pkg/util/cert"
 )
 
 // DelegatingAuthenticatorConfig is the minimal configuration needed to create an authenticator

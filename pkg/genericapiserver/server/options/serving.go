@@ -24,8 +24,8 @@ import (
 	"github.com/golang/glog"
 	"github.com/spf13/pflag"
 
+	certutil "k8s.io/apimachinery/pkg/util/cert"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
-	certutil "k8s.io/kubernetes/pkg/util/cert"
 	"k8s.io/kubernetes/pkg/util/config"
 )
 

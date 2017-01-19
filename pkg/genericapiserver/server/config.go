@@ -39,6 +39,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	openapicommon "k8s.io/apimachinery/pkg/openapi"
 	"k8s.io/apimachinery/pkg/runtime"
+	certutil "k8s.io/apimachinery/pkg/util/cert"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/version"
 	"k8s.io/apiserver/pkg/admission"
@@ -59,7 +60,6 @@ import (
 	"k8s.io/kubernetes/pkg/genericapiserver/server/mux"
 	"k8s.io/kubernetes/pkg/genericapiserver/server/options"
 	"k8s.io/kubernetes/pkg/genericapiserver/server/routes"
-	certutil "k8s.io/kubernetes/pkg/util/cert"
 )
 
 const (

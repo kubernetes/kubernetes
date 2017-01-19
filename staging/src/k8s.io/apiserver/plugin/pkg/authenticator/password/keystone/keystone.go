@@ -28,7 +28,7 @@ import (
 
 	netutil "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apiserver/pkg/authentication/user"
-	certutil "k8s.io/kubernetes/pkg/util/cert"
+	certutil "k8s.io/apimachinery/pkg/util/cert"
 )
 
 // KeystoneAuthenticator contacts openstack keystone to validate user's credentials passed in the request.

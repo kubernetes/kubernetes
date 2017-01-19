@@ -21,6 +21,7 @@ import (
 
 	"github.com/go-openapi/spec"
 
+	certutil "k8s.io/apimachinery/pkg/util/cert"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/group"
 	"k8s.io/apiserver/pkg/authentication/request/anonymous"
@@ -38,7 +39,6 @@ import (
 	"k8s.io/apiserver/plugin/pkg/authenticator/token/webhook"
 	genericauthenticator "k8s.io/kubernetes/pkg/genericapiserver/authenticator"
 	"k8s.io/kubernetes/pkg/serviceaccount"
-	certutil "k8s.io/kubernetes/pkg/util/cert"
 
 	// Initialize all known client auth plugins.
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
