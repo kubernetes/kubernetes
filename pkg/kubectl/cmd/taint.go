@@ -144,9 +144,9 @@ func reorganizeTaints(accessor metav1.Object, overwrite bool, taintsToAdd []v1.T
 	for _, taintToRemove := range taintsToRemove {
 		removed := false
 		if len(taintToRemove.Effect) > 0 {
-			newTaints, removed = api.DeleteTaint(newTaints, &taintToRemove)
+			newTaints, removed = v1.DeleteTaint(newTaints, &taintToRemove)
 		} else {
-			newTaints, removed = api.DeleteTaintsByKey(newTaints, taintToRemove.Key)
+			newTaints, removed = v1.DeleteTaintsByKey(newTaints, taintToRemove.Key)
 		}
 		if !removed {
 			allErrs = append(allErrs, fmt.Errorf("taint %q not found", taintToRemove.ToString()))

@@ -3379,7 +3379,7 @@ func TestValidatePod(t *testing.T) {
 			}),
 		},
 		{ // populate forgiveness tolerations with exists operator in annotations.
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:      "123",
 				Namespace: "ns",
 				Annotations: map[string]string{
@@ -3400,7 +3400,7 @@ func TestValidatePod(t *testing.T) {
 			},
 		},
 		{ // populate forgiveness tolerations with equal operator in annotations.
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:      "123",
 				Namespace: "ns",
 				Annotations: map[string]string{
@@ -3466,7 +3466,7 @@ func TestValidatePod(t *testing.T) {
 			Spec: validPodSpec(nil),
 		},
 		{ // empty operator is OK for toleration, defaults to Equal.
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:      "123",
 				Namespace: "ns",
 				Annotations: map[string]string{
@@ -3956,7 +3956,7 @@ func TestValidatePod(t *testing.T) {
 		},
 
 		"operator must be 'Exists' when `key` is empty": {
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:      "123",
 				Namespace: "ns",
 				Annotations: map[string]string{
@@ -3971,7 +3971,7 @@ func TestValidatePod(t *testing.T) {
 			Spec: validPodSpec(nil),
 		},
 		"effect must be 'NoExecute' when `TolerationSeconds` is set": {
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:      "pod-forgiveness-invalid",
 				Namespace: "ns",
 				Annotations: map[string]string{
@@ -3987,7 +3987,7 @@ func TestValidatePod(t *testing.T) {
 			Spec: validPodSpec(nil),
 		},
 		"tolerationSeconds must be greater than zero when set": {
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:      "pod-forgiveness-invalid",
 				Namespace: "ns",
 				Annotations: map[string]string{
