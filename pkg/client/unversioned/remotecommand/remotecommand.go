@@ -19,6 +19,7 @@ package remotecommand
 import (
 	"fmt"
 	"io"
+	"io/ioutil"
 	"net/http"
 	"net/url"
 
@@ -132,7 +133,10 @@ func (e *streamExecutor) Dial(protocols ...string) (httpstream.Connection, strin
 	if err != nil {
 		return nil, "", fmt.Errorf("error sending request: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		ioutil.ReadAll(resp.Body)
+		resp.Body.Close()
+	}()
 
 	conn, err := e.upgrader.NewConnection(resp)
 	if err != nil {

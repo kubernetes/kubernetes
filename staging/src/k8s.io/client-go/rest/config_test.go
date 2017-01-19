@@ -217,6 +217,7 @@ func TestAnonymousConfig(t *testing.T) {
 		expected.TLSClientConfig.CertFile = ""
 		expected.TLSClientConfig.KeyData = nil
 		expected.TLSClientConfig.KeyFile = ""
+		expected.DebugConcurrent = false
 
 		// The DeepEqual cannot handle the func comparison, so we just verify if the
 		// function return the expected object.

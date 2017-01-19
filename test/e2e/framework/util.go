@@ -1874,7 +1874,7 @@ func LoadConfig() (*restclient.Config, error) {
 		return nil, err
 	}
 
-	return clientcmd.NewDefaultClientConfig(*c, &clientcmd.ConfigOverrides{ClusterInfo: clientcmdapi.Cluster{Server: TestContext.Host}}).ClientConfig()
+	return clientcmd.NewDefaultClientConfig(*c, &clientcmd.ConfigOverrides{ClusterInfo: clientcmdapi.Cluster{Server: TestContext.Host}, DebugConcurrent: true}).ClientConfig()
 }
 func LoadInternalClientset() (*internalclientset.Clientset, error) {
 	config, err := LoadConfig()

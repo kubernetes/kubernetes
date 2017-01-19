@@ -10418,7 +10418,10 @@ go_library(
 
 go_test(
     name = "k8s.io/apiserver/pkg/server_test",
-    srcs = ["k8s.io/apiserver/pkg/server/genericapiserver_test.go"],
+    srcs = [
+        "k8s.io/apiserver/pkg/server/genericapiserver_test.go",
+        "k8s.io/apiserver/pkg/server/serve_test.go",
+    ],
     library = ":k8s.io/apiserver/pkg/server",
     tags = ["automanaged"],
     deps = [

@@ -176,12 +176,7 @@ func (s *SecureServingOptions) applyServingInfoTo(c *server.Config) error {
 	if s.ServingOptions.BindPort <= 0 {
 		return nil
 	}
-
-	secureServingInfo := &server.SecureServingInfo{
-		ServingInfo: server.ServingInfo{
-			BindAddress: net.JoinHostPort(s.ServingOptions.BindAddress.String(), strconv.Itoa(s.ServingOptions.BindPort)),
-		},
-	}
+	c.SecureServingInfo.BindAddress = net.JoinHostPort(s.ServingOptions.BindAddress.String(), strconv.Itoa(s.ServingOptions.BindPort))
 
 	serverCertFile, serverKeyFile := s.ServerCert.CertKey.CertFile, s.ServerCert.CertKey.KeyFile
 
@@ -191,7 +186,7 @@ func (s *SecureServingOptions) applyServingInfoTo(c *server.Config) error {
 		if err != nil {
 			return fmt.Errorf("unable to load server certificate: %v", err)
 		}
-		secureServingInfo.Cert = &tlsCert
+		c.SecureServingInfo.Cert = &tlsCert
 	}
 
 	// optionally load CA cert
@@ -207,7 +202,7 @@ func (s *SecureServingOptions) applyServingInfoTo(c *server.Config) error {
 		if block.Type != "CERTIFICATE" {
 			return fmt.Errorf("expected CERTIFICATE block in certiticate authority file %q, found: %s", s.ServerCert.CACertFile, block.Type)
 		}
-		secureServingInfo.CACert = &tls.Certificate{
+		c.SecureServingInfo.CACert = &tls.Certificate{
 			Certificate: [][]byte{block.Bytes},
 		}
 	}
@@ -225,12 +220,11 @@ func (s *SecureServingOptions) applyServingInfoTo(c *server.Config) error {
 		}
 	}
 	var err error
-	secureServingInfo.SNICerts, err = server.GetNamedCertificateMap(namedTLSCerts)
+	c.SecureServingInfo.SNICerts, err = server.GetNamedCertificateMap(namedTLSCerts)
 	if err != nil {
 		return err
 	}
 
-	c.SecureServingInfo = secureServingInfo
 	c.ReadWritePort = s.ServingOptions.BindPort
 
 	return nil
