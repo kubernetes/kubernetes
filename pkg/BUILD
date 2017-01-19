@@ -14,7 +14,6 @@ filegroup(
     srcs = [
         ":package-srcs",
         "//pkg/api:all-srcs",
-        "//pkg/apimachinery/announced:all-srcs",
         "//pkg/apimachinery/tests:all-srcs",
         "//pkg/apis/abac:all-srcs",
         "//pkg/apis/apps:all-srcs",
