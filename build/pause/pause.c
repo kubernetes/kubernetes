@@ -44,7 +44,6 @@ int main() {
                                              .sa_flags = SA_NOCLDSTOP},
                 NULL) < 0)
     return 3;
-  sigaction(SIGKILL, &(struct sigaction){.sa_handler = sigdown}, NULL);
 
   for (;;)
     pause();
