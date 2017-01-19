@@ -26,24 +26,8 @@ import (
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 )
 
-// CreateBootstrapRBACClusterRole creates the necessary ClusterRole for bootstrapping
+// CreateBootstrapRBACClusterRole grants the system:node-bootstrapper role to the group we created the bootstrap credential with
 func CreateBootstrapRBACClusterRole(clientset *clientset.Clientset) error {
-	clusterRole := rbac.ClusterRole{
-		ObjectMeta: metav1.ObjectMeta{Name: "kubeadm:kubelet-bootstrap"},
-		Rules: []rbac.PolicyRule{
-			rbac.NewRule("get").Groups("").Resources("nodes").RuleOrDie(),
-			rbac.NewRule("create", "watch").Groups("certificates.k8s.io").Resources("certificatesigningrequests").RuleOrDie(),
-		},
-	}
-	if _, err := clientset.Rbac().ClusterRoles().Create(&clusterRole); err != nil {
-		return err
-	}
-
-	subject := rbac.Subject{
-		Kind: "Group",
-		Name: "kubeadm:kubelet-bootstrap",
-	}
-
 	clusterRoleBinding := rbac.ClusterRoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "kubeadm:kubelet-bootstrap",
@@ -51,14 +35,16 @@ func CreateBootstrapRBACClusterRole(clientset *clientset.Clientset) error {
 		RoleRef: rbac.RoleRef{
 			APIGroup: "rbac.authorization.k8s.io",
 			Kind:     "ClusterRole",
-			Name:     "kubeadm:kubelet-bootstrap",
+			Name:     "system:node-bootstrapper",
 		},
-		Subjects: []rbac.Subject{subject},
+		Subjects: []rbac.Subject{
+			rbac.Subject{Kind: "Group", Name: "kubeadm:kubelet-bootstrap"},
+		},
 	}
 	if _, err := clientset.Rbac().ClusterRoleBindings().Create(&clusterRoleBinding); err != nil {
 		return err
 	}
-	fmt.Println("[apiconfig] Created kubelet-bootstrap RBAC rules")
+	fmt.Println("[apiconfig] Created node bootstrapper RBAC rules")
 
 	return nil
 }
