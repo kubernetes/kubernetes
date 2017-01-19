@@ -180,9 +180,7 @@ func waitForPodsWithLabel(client *clientset.Clientset, appLabel string) {
 }
 
 // Sources from bootkube templates.go
-func getAPIServerDS(cfg *kubeadmapi.MasterConfiguration,
-	volumes []v1.Volume, volumeMounts []v1.VolumeMount) ext.DaemonSet {
-
+func getAPIServerDS(cfg *kubeadmapi.MasterConfiguration, volumes []v1.Volume, volumeMounts []v1.VolumeMount) ext.DaemonSet {
 	ds := ext.DaemonSet{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: "extensions/v1beta1",
@@ -191,21 +189,18 @@ func getAPIServerDS(cfg *kubeadmapi.MasterConfiguration,
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      kubeAPIServer,
 			Namespace: "kube-system",
-			//Labels:    map[string]string{"k8s-app": "kube-apiserver"},
+			Labels:    map[string]string{"k8s-app": kubeAPIServer},
 		},
 		Spec: ext.DaemonSetSpec{
 			Template: v1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
-						// TODO: taken from bootkube, appears to be essential, without this
-						// we don't get an apiserver pod...
 						"k8s-app":   kubeAPIServer,
 						"component": kubeAPIServer,
 						"tier":      "control-plane",
 					},
 				},
 				Spec: v1.PodSpec{
-					// TODO: Make sure masters get this label
 					NodeSelector: map[string]string{metav1.NodeLabelKubeadmAlphaRole: metav1.NodeLabelRoleMaster},
 					HostNetwork:  true,
 					Volumes:      volumes,
@@ -227,10 +222,8 @@ func getAPIServerDS(cfg *kubeadmapi.MasterConfiguration,
 	return ds
 }
 
-func getControllerManagerDeployment(cfg *kubeadmapi.MasterConfiguration,
-	volumes []v1.Volume, volumeMounts []v1.VolumeMount) ext.Deployment {
-
-	cmDep := ext.Deployment{
+func getControllerManagerDeployment(cfg *kubeadmapi.MasterConfiguration, volumes []v1.Volume, volumeMounts []v1.VolumeMount) ext.Deployment {
+	d := ext.Deployment{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: "extensions/v1beta1",
 			Kind:       "Deployment",
@@ -238,8 +231,10 @@ func getControllerManagerDeployment(cfg *kubeadmapi.MasterConfiguration,
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      kubeControllerManager,
 			Namespace: "kube-system",
+			Labels:    map[string]string{"k8s-app": kubeControllerManager},
 		},
 		Spec: ext.DeploymentSpec{
+			// TODO bootkube uses 2 replicas
 			Template: v1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
@@ -272,25 +267,11 @@ func getControllerManagerDeployment(cfg *kubeadmapi.MasterConfiguration,
 			},
 		},
 	}
-	return cmDep
-}
-
-func getMasterToleration() string {
-	// Tolerate the master taint we add to our master nodes, as this can and should
-	// run there.
-	// TODO: Duplicated above
-	masterToleration, _ := json.Marshal([]v1.Toleration{{
-		Key:      "dedicated",
-		Value:    "master",
-		Operator: v1.TolerationOpEqual,
-		Effect:   v1.TaintEffectNoSchedule,
-	}})
-	return string(masterToleration)
+	return d
 }
 
 func getSchedulerDeployment(cfg *kubeadmapi.MasterConfiguration) ext.Deployment {
-
-	cmDep := ext.Deployment{
+	d := ext.Deployment{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: "extensions/v1beta1",
 			Kind:       "Deployment",
@@ -298,8 +279,10 @@ func getSchedulerDeployment(cfg *kubeadmapi.MasterConfiguration) ext.Deployment 
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      kubeScheduler,
 			Namespace: "kube-system",
+			Labels:    map[string]string{"k8s-app": kubeScheduler},
 		},
 		Spec: ext.DeploymentSpec{
+			// TODO bootkube uses 2 replicas
 			Template: v1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
@@ -327,5 +310,19 @@ func getSchedulerDeployment(cfg *kubeadmapi.MasterConfiguration) ext.Deployment 
 			},
 		},
 	}
-	return cmDep
+	return d
+}
+
+
+func getMasterToleration() string {
+	// Tolerate the master taint we add to our master nodes, as this can and should
+	// run there.
+	// TODO: Duplicated above
+	masterToleration, _ := json.Marshal([]v1.Toleration{{
+		Key:      "dedicated",
+		Value:    "master",
+		Operator: v1.TolerationOpEqual,
+		Effect:   v1.TaintEffectNoSchedule,
+	}})
+	return string(masterToleration)
 }
