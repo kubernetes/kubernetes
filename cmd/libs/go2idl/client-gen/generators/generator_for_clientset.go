@@ -73,7 +73,7 @@ func (g *genClientset) GenerateType(c *generator.Context, t *types.Type, w io.Wr
 	// perhaps we can adapt the go2ild framework to this kind of usage.
 	sw := generator.NewSnippetWriter(w, c, "$", "$")
 	const pkgDiscovery = "k8s.io/kubernetes/pkg/client/typed/discovery"
-	const pkgRESTClient = "k8s.io/kubernetes/pkg/client/restclient"
+	const pkgRESTClient = "k8s.io/client-go/rest"
 
 	allGroups := clientgentypes.ToGroupVersionPackages(g.groups)
 
