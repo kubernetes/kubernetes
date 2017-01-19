@@ -199,6 +199,9 @@ func getAPIServerDS(cfg *kubeadmapi.MasterConfiguration, volumes []v1.Volume, vo
 						"component": kubeAPIServer,
 						"tier":      "control-plane",
 					},
+					Annotations: map[string]string{
+						v1.TolerationsAnnotationKey: getMasterToleration(),
+					},
 				},
 				Spec: v1.PodSpec{
 					NodeSelector: map[string]string{metav1.NodeLabelKubeadmAlphaRole: metav1.NodeLabelRoleMaster},
