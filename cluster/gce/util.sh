@@ -371,6 +371,23 @@ function detect-master() {
   echo "Using master: $KUBE_MASTER (external IP: $KUBE_MASTER_IP)" >&2
 }
 
+# Detect a legacy ABAC policy file at /etc/srv/kubernetes/abac-authz-policy.jsonl
+# and set ABAC_AUTHZ_FILE if it exists
+#
+# Vars set:
+#   ABAC_AUTHZ_FILE
+function detect-legacy-abac-file() {
+  # This is the location GCE scripts wrote ABAC policy files to prior to 1.6
+  local -r legacy_abac_path="/etc/srv/kubernetes/abac-authz-policy.jsonl"
+  echo "Looking for existing ABAC policy file at '${legacy_abac_path}'" >&2
+  if [[ -e "${legacy_abac_path}" ]]; then
+    echo "Setting ABAC_AUTHZ_FILE=${legacy_abac_path}" >&2
+    ABAC_AUTHZ_FILE="${legacy_abac_path}"
+  else
+    echo "No ABAC file found" >&2
+  fi
+}
+
 # Reads kube-env metadata from master
 #
 # Assumed vars:

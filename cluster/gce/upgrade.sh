@@ -86,6 +86,9 @@ function upgrade-master() {
   get-kubeconfig-basicauth
   get-kubeconfig-bearertoken
 
+  # Sets ABAC_AUTHZ_FILE if an existing ABAC policy file is present
+  detect-legacy-abac-file
+
   detect-master
   parse-master-env
 
