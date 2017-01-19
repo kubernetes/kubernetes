@@ -210,7 +210,7 @@ function compute-kubelet-params {
 	params+=" --babysit-daemons=true"
 	params+=" --cgroup-root=/"
 	params+=" --cloud-provider=gce"
-	params+=" --config=/etc/kubernetes/manifests"
+	params+=" --pod-manifest-path=/etc/kubernetes/manifests"
 	if [[ -n "${KUBELET_PORT:-}" ]]; then
 		params+=" --port=${KUBELET_PORT}"
 	fi

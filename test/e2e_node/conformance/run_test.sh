@@ -156,7 +156,7 @@ start_kubelet --api-servers $apiserver \
   --volume-stats-agg-period $volume_stats_agg_period \
   --allow-privileged=$allow_privileged \
   --serialize-image-pulls=$serialize_image_pulls \
-  --config $config_dir \
+  --pod-manifest-path $config_dir \
   --file-check-frequency $file_check_frequency \
   --pod-cidr=$pod_cidr \
   --runtime-cgroups=/docker-daemon \

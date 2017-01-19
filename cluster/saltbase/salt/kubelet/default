@@ -55,7 +55,7 @@
   {% set cloud_config = "--cloud-config=" + grains.cloud_config -%}
 {% endif -%}
 
-{% set config = "--config=/etc/kubernetes/manifests" -%}
+{% set config = "--pod-manifest-path=/etc/kubernetes/manifests" -%}
 
 {% set manifest_url = "" -%}
 {% set manifest_url_header = "" -%}

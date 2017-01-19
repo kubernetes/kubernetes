@@ -18,7 +18,7 @@
 #         --allow-privileged=true \
 #         --enable-server \
 #         --api-servers=http://localhost:8080 \
-#         --config=/etc/kubernetes/manifests-multi \
+#         --pod-manifest-path=/etc/kubernetes/manifests-multi \
 #         --cluster-dns=10.0.0.10 \
 #         --cluster-domain=cluster.local \
 #         --containerized \
@@ -45,7 +45,7 @@ master:
     --api-servers=http://localhost:8080
     --cluster-dns={{ pillar['dns_server'] }}
     --cluster-domain={{ pillar['dns_domain'] }}
-    --config=/etc/kubernetes/manifests
+    --pod-manifest-path=/etc/kubernetes/manifests
     --containerized
     --hostname-override="{{ private_address }}"
     --tls-cert-file="/srv/kubernetes/server.crt"
