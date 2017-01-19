@@ -55,7 +55,8 @@ As of 1.5 [experimental support](https://github.com/kubernetes/kubernetes/pull/3
 has been added which will default the user namespace to host when 
 a pod is using features that require host namespaces (see defaulting scenarios
 described in the design below).  This proposal is 
-building on the experimental work.
+building on the experimental work as phase 2 experimental support with 
+the goal of fixing the current known issues.
 
 ### Known Issues
 
@@ -89,7 +90,7 @@ to the same value(s).
 * [Known restrictions when running in a remap environment](https://docs.docker.com/engine/reference/commandline/dockerd/#user-namespace-known-restrictions)
 * A cluster may be running with some nodes performing remapping and 
 some not.  Any runtime behavior should be isolated to the kubelet
-and information about remapping should come from the CRI.
+and the container runtime.
 
 ### Detecting and Driving Private User Namespaces Behavior
 
@@ -141,15 +142,24 @@ directories under the pod directory (available via injecting the
 their ability to provide the GID.  For Docker this is the value in
 `/etc/subgid`.
 
-TODO 
+There is movement towards being able to [specify](https://github.com/docker/docker/issues/28593) 
+or [lock ranges](https://github.com/coreos/rkt/issues/1090)
+of UIDs/GIDs in the runtime community.  As this work progresses it 
+makes sense that the ability to allocate a range should belong to the
+orchestration system.  This would allow Kuberenetes to know exactly
+what GID requires access to the directories and ensure the correct
+access is granted.  
 
-* are GIDs being remapped in the rkt implementation?  If not then
-  root group may be enough.
-* more specific information on mount types
-* can the remap GID be injected as an `fsGroup` for mount types that 
-support `chmod` (if `fsGroup` is not already set)
-* host mounts do not - and should not - chmod for remap 
-environments.  This is up to the administrator to manage.
+This proposal recommends that, as a next step in support, the system
+could assume that the `FSGroup` represents the correct GID.  When
+the node is in user namespace remap mode (known by the existing flag)
+the runtime can use the `FSGroup` to grant access to the 
+`/var/lib/kubelet/pods/{UID}/...` subdirectories.
+
+The `FSGroup` will still function normally for existing volume types
+that support it by changing the group ownership.  This will allow
+usage of those volume types in the remap environment.
+
 
 ### Escaping Private User Namespaces
 
