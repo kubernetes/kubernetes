@@ -119,7 +119,7 @@ func (j *JSONPath) FindResults(data interface{}) ([][]reflect.Value, error) {
 // PrintResults write the results into writer
 func (j *JSONPath) PrintResults(wr io.Writer, results []reflect.Value) error {
 	for i, r := range results {
-		text, err := j.evalToText(r)
+		text, err := j.EvalToText(r)
 		if err != nil {
 			return err
 		}
@@ -486,8 +486,8 @@ func (j *JSONPath) evalFilter(input []reflect.Value, node *FilterNode) ([]reflec
 	return results, nil
 }
 
-// evalToText translates reflect value to corresponding text
-func (j *JSONPath) evalToText(v reflect.Value) ([]byte, error) {
+// EvalToText translates reflect value to corresponding text
+func (j *JSONPath) EvalToText(v reflect.Value) ([]byte, error) {
 	iface, ok := template.PrintableValue(v)
 	if !ok {
 		return nil, fmt.Errorf("can't print type %s", v.Type())

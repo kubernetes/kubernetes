@@ -32,6 +32,7 @@ import (
 	_ "k8s.io/kubernetes/plugin/pkg/admission/gc"
 	_ "k8s.io/kubernetes/plugin/pkg/admission/imagepolicy"
 	_ "k8s.io/kubernetes/plugin/pkg/admission/initialresources"
+	_ "k8s.io/kubernetes/plugin/pkg/admission/jsonpath"
 	_ "k8s.io/kubernetes/plugin/pkg/admission/limitranger"
 	_ "k8s.io/kubernetes/plugin/pkg/admission/namespace/autoprovision"
 	_ "k8s.io/kubernetes/plugin/pkg/admission/namespace/exists"
