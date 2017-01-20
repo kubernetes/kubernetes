@@ -15,6 +15,7 @@
 # limitations under the License.
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
+LOCAL_KUBECONFIG_PATH=${LOCAL_KUBECONFIG_PATH:-""}
 
 # This command builds and runs a local kubernetes cluster.
 # You may need to run this as root to allow kubelet to open docker's socket,
@@ -687,8 +688,19 @@ fi
 
 if [[ "${START_MODE}" != "kubeletonly" ]]; then
   echo
-  cat <<EOF
-To start using your cluster, open up another terminal/tab and run:
+  if [[ -n "${LOCAL_KUBECONFIG_PATH}" ]]; then
+    ${KUBECTL} --kubeconfig=${LOCAL_KUBECONFIG_PATH} config set-cluster local --server=https://${API_HOST}:${API_SECURE_PORT} --certificate-authority=${ROOT_CA_FILE}
+    ${KUBECTL} --kubeconfig=${LOCAL_KUBECONFIG_PATH} config set-credentials myself ${AUTH_ARGS}
+    ${KUBECTL} --kubeconfig=${LOCAL_KUBECONFIG_PATH} config set-context local --cluster=local --user=myself
+    ${KUBECTL} --kubeconfig=${LOCAL_KUBECONFIG_PATH} config use-context local
+  else
+    cat <<EOF
+To start using your cluster, you can open up another terminal/tab and run:
+
+  export KUBECONFIG=${CERT_DIR}/admin.kubeconfig
+  cluster/kubectl.sh
+
+Alternatively, you can write to the default kubeconfig (For simplicity, LOCAL_KUBECONFIG_PATH can update the default kubeconfig):
 
   export KUBERNETES_PROVIDER=local
 
@@ -698,6 +710,7 @@ To start using your cluster, open up another terminal/tab and run:
   cluster/kubectl.sh config use-context local
   cluster/kubectl.sh
 EOF
+  fi
 else
   cat <<EOF
 The kubelet was started.
@@ -728,13 +741,13 @@ kube::util::test_cfssl_installed
 
 ### IF the user didn't supply an output/ for the build... Then we detect.
 if [ "$GO_OUT" == "" ]; then
-    detect_binary
+  detect_binary
 fi
 echo "Detected host and ready to start services.  Doing some housekeeping first..."
 echo "Using GO_OUT $GO_OUT"
 KUBELET_CIDFILE=/tmp/kubelet.cid
 if [[ "${ENABLE_DAEMON}" = false ]]; then
-trap cleanup EXIT
+  trap cleanup EXIT
 fi
 
 echo "Starting services now!"
@@ -752,11 +765,11 @@ if [[ "${START_MODE}" != "nokubelet" ]]; then
 fi
 
 if [[ -n "${PSP_ADMISSION}" && "${ENABLE_RBAC}" = true ]]; then
-    create_psp_policy
+  create_psp_policy
 fi
 
 print_success
 
 if [[ "${ENABLE_DAEMON}" = false ]]; then
-   while true; do sleep 1; done
+  while true; do sleep 1; done
 fi
