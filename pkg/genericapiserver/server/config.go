@@ -559,7 +559,7 @@ func DefaultBuildHandlerChain(apiHandler http.Handler, c *Config) (secure, insec
 	generic := func(handler http.Handler) http.Handler {
 		handler = genericfilters.WithCORS(handler, c.CorsAllowedOriginList, nil, nil, nil, "true")
 		handler = genericfilters.WithPanicRecovery(handler, c.RequestContextMapper)
-		handler = genericfilters.WithTimeoutForNonLongRunningRequests(handler, c.RequestContextMapper, c.LongRunningFunc)
+		handler = genericfilters.WithTimeoutForNonLongRunningRequests(handler, c.RequestContextMapper, c.Serializer, c.LongRunningFunc)
 		handler = genericfilters.WithMaxInFlightLimit(handler, c.MaxRequestsInFlight, c.MaxMutatingRequestsInFlight, c.RequestContextMapper, c.LongRunningFunc)
 		handler = genericapifilters.WithRequestInfo(handler, NewRequestInfoResolver(c), c.RequestContextMapper)
 		handler = apirequest.WithRequestContext(handler, c.RequestContextMapper)
