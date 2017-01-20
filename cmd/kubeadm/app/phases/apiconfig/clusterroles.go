@@ -26,24 +26,8 @@ import (
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 )
 
-// CreateBootstrapRBACClusterRole creates the necessary ClusterRole for bootstrapping
+// CreateBootstrapRBACClusterRole grants the system:node-bootstrapper role to the group we created the bootstrap credential with
 func CreateBootstrapRBACClusterRole(clientset *clientset.Clientset) error {
-	clusterRole := rbac.ClusterRole{
-		ObjectMeta: metav1.ObjectMeta{Name: "kubeadm:kubelet-bootstrap"},
-		Rules: []rbac.PolicyRule{
-			rbac.NewRule("get").Groups("").Resources("nodes").RuleOrDie(),
-			rbac.NewRule("create", "watch").Groups("certificates.k8s.io").Resources("certificatesigningrequests").RuleOrDie(),
-		},
-	}
-	if _, err := clientset.Rbac().ClusterRoles().Create(&clusterRole); err != nil {
-		return err
-	}
-
-	subject := rbac.Subject{
-		Kind: "Group",
-		Name: "kubeadm:kubelet-bootstrap",
-	}
-
 	clusterRoleBinding := rbac.ClusterRoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "kubeadm:kubelet-bootstrap",
@@ -51,14 +35,16 @@ func CreateBootstrapRBACClusterRole(clientset *clientset.Clientset) error {
 		RoleRef: rbac.RoleRef{
 			APIGroup: "rbac.authorization.k8s.io",
 			Kind:     "ClusterRole",
-			Name:     "kubeadm:kubelet-bootstrap",
+			Name:     "system:node-bootstrapper",
 		},
-		Subjects: []rbac.Subject{subject},
+		Subjects: []rbac.Subject{
+			{Kind: "Group", Name: master.KubeletBootstrapGroup},
+		},
 	}
 	if _, err := clientset.Rbac().ClusterRoleBindings().Create(&clusterRoleBinding); err != nil {
 		return err
 	}
-	fmt.Println("[apiconfig] Created kubelet-bootstrap RBAC rules")
+	fmt.Println("[apiconfig] Created node bootstrapper RBAC rules")
 
 	return nil
 }
@@ -90,7 +76,7 @@ func CreateKubeDNSRBACClusterRole(clientset *clientset.Clientset) error {
 		RoleRef: rbac.RoleRef{
 			APIGroup: "rbac.authorization.k8s.io",
 			Kind:     "ClusterRole",
-			Name:     "kubeadm:" + master.KubeDNS,
+			Name:     clusterRole.Name,
 		},
 		Subjects: []rbac.Subject{subject},
 	}
@@ -102,32 +88,24 @@ func CreateKubeDNSRBACClusterRole(clientset *clientset.Clientset) error {
 	return nil
 }
 
-// CreateKubeProxyClusterRoleBinding creates the necessary ClusterRole for kube-dns
+// CreateKubeProxyClusterRoleBinding grants the system:node-proxier role to the nodes group,
+// since kubelet credentials are used to run the kube-proxy
+// TODO: give the kube-proxy its own credential and stop requiring this
 func CreateKubeProxyClusterRoleBinding(clientset *clientset.Clientset) error {
-	systemKubeProxySubject := rbac.Subject{
-		Kind:      "User",
-		Name:      "system:kube-proxy",
-		Namespace: api.NamespaceSystem,
-	}
-
-	systemNodesSubject := rbac.Subject{
-		Kind:      "Group",
-		Name:      "system:nodes",
-		Namespace: api.NamespaceSystem,
-	}
-
 	clusterRoleBinding := rbac.ClusterRoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "system:node-proxier",
+			Name: "kubeadm:node-proxier",
 		},
 		RoleRef: rbac.RoleRef{
 			APIGroup: "rbac.authorization.k8s.io",
 			Kind:     "ClusterRole",
 			Name:     "system:node-proxier",
 		},
-		Subjects: []rbac.Subject{systemKubeProxySubject, systemNodesSubject},
+		Subjects: []rbac.Subject{
+			{Kind: "Group", Name: "system:nodes"},
+		},
 	}
-	if _, err := clientset.Rbac().ClusterRoleBindings().Update(&clusterRoleBinding); err != nil {
+	if _, err := clientset.Rbac().ClusterRoleBindings().Create(&clusterRoleBinding); err != nil {
 		return err
 	}
 	fmt.Println("[apiconfig] Created kube-proxy RBAC rules")
