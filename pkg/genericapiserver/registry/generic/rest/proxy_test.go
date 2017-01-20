@@ -42,7 +42,8 @@ import (
 	"golang.org/x/net/websocket"
 
 	utilnet "k8s.io/apimachinery/pkg/util/net"
-	utilconfig "k8s.io/kubernetes/pkg/util/config"
+	"k8s.io/apiserver/pkg/features"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/util/httpstream"
 	"k8s.io/kubernetes/pkg/util/proxy"
 )
@@ -402,8 +403,7 @@ func TestProxyUpgrade(t *testing.T) {
 	}
 
 	// Enable StreamingProxyRedirects for test.
-	utilconfig.DefaultFeatureGate.Set("StreamingProxyRedirects=true")
-
+	utilfeature.DefaultFeatureGate.Set(string(features.StreamingProxyRedirects) + "=true")
 	for k, tc := range testcases {
 		for _, redirect := range []bool{false, true} {
 			tcName := k

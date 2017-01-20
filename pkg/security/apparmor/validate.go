@@ -25,9 +25,10 @@ import (
 	"path"
 	"strings"
 
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/util"
-	utilflag "k8s.io/kubernetes/pkg/util/flag"
 )
 
 // Whether AppArmor should be disabled by default.
@@ -95,7 +96,7 @@ func (v *validator) ValidateHost() error {
 // Verify that the host and runtime is capable of enforcing AppArmor profiles.
 func validateHost(runtime string) error {
 	// Check feature-gates
-	if !utilflag.DefaultFeatureGate.AppArmor() {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.AppArmor) {
 		return errors.New("AppArmor disabled by feature-gate")
 	}
 
