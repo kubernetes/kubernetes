@@ -66,8 +66,7 @@ type manager struct {
 	// Map from (mirror) pod UID to latest status version successfully sent to the API server.
 	// apiStatusVersions must only be accessed from the sync thread.
 	apiStatusVersions map[types.UID]uint64
-	// A function which returns true if the pod can safely be deleted
-	safeToDeletePod func(pod *v1.Pod) bool
+	podDeletionSafety PodDeletionSafetyProvider
 }
 
 // PodStatusProvider knows how to provide status for a pod.  It's intended to be used by other components
@@ -76,6 +75,12 @@ type PodStatusProvider interface {
 	// GetPodStatus returns the cached status for the provided pod UID, as well as whether it
 	// was a cache hit.
 	GetPodStatus(uid types.UID) (v1.PodStatus, bool)
+}
+
+// An object which provides guarantees that a pod can be saftely deleted.
+type PodDeletionSafetyProvider interface {
+	// A function which returns true if the pod can safely be deleted
+	OkToDeletePod(pod *v1.Pod) bool
 }
 
 // Manager is the Source of truth for kubelet pod status, and should be kept up-to-date with
@@ -104,14 +109,14 @@ type Manager interface {
 
 const syncPeriod = 10 * time.Second
 
-func NewManager(kubeClient clientset.Interface, podManager kubepod.Manager, safeToDeletePodFunc func(pod *v1.Pod) bool) Manager {
+func NewManager(kubeClient clientset.Interface, podManager kubepod.Manager, podDeletionSafety PodDeletionSafetyProvider) Manager {
 	return &manager{
 		kubeClient:        kubeClient,
 		podManager:        podManager,
 		podStatuses:       make(map[types.UID]versionedPodStatus),
 		podStatusChannel:  make(chan podStatusSyncRequest, 1000), // Buffer up to 1000 statuses
 		apiStatusVersions: make(map[types.UID]uint64),
-		safeToDeletePod:   safeToDeletePodFunc,
+		podDeletionSafety: podDeletionSafety,
 	}
 }
 
@@ -432,7 +437,7 @@ func (m *manager) syncPod(uid types.UID, status versionedPodStatus) {
 		if err == nil {
 			glog.V(3).Infof("Status for pod %q updated successfully: %+v", format.Pod(pod), status)
 			m.apiStatusVersions[pod.UID] = status.version
-			if !m.safeToDeletePod(pod) {
+			if !m.podDeletionSafety.OkToDeletePod(pod) {
 				return
 			}
 			deleteOptions := v1.NewDeleteOptions(0)
