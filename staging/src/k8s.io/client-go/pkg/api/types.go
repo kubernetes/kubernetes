@@ -1142,6 +1142,9 @@ type EnvFromSource struct {
 	// The ConfigMap to select from.
 	//+optional
 	ConfigMapRef *ConfigMapEnvSource
+	// The Secret to select from.
+	//+optional
+	SecretRef *SecretEnvSource
 }
 
 // ConfigMapEnvSource selects a ConfigMap to populate the environment
@@ -1151,6 +1154,16 @@ type EnvFromSource struct {
 // key-value pairs as environment variables.
 type ConfigMapEnvSource struct {
 	// The ConfigMap to select from.
+	LocalObjectReference
+}
+
+// SecretEnvSource selects a Secret to populate the environment
+// variables with.
+//
+// The contents of the target Secret's Data field will represent the
+// key-value pairs as environment variables.
+type SecretEnvSource struct {
+	// The Secret to select from.
 	LocalObjectReference
 }
 

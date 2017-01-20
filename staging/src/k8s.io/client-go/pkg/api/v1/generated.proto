@@ -799,6 +799,10 @@ message EnvFromSource {
   // The ConfigMap to select from
   // +optional
   optional ConfigMapEnvSource configMapRef = 2;
+
+  // The Secret to select from
+  // +optional
+  optional SecretEnvSource secretRef = 3;
 }
 
 // EnvVar represents an environment variable present in a Container.
@@ -3065,6 +3069,16 @@ message Secret {
   // Used to facilitate programmatic handling of secret data.
   // +optional
   optional string type = 3;
+}
+
+// SecretEnvSource selects a Secret to populate the environment
+// variables with.
+// 
+// The contents of the target Secret's Data field will represent the
+// key-value pairs as environment variables.
+message SecretEnvSource {
+  // The Secret to select from.
+  optional LocalObjectReference localObjectReference = 1;
 }
 
 // SecretKeySelector selects a key of a Secret.
