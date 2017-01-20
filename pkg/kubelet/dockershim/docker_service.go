@@ -101,7 +101,7 @@ var internalLabelKeys []string = []string{containerTypeLabelKey, containerLogPat
 
 // NOTE: Anything passed to DockerService should be eventually handled in another way when we switch to running the shim as a different process.
 func NewDockerService(client dockertools.DockerInterface, seccompProfileRoot string, podSandboxImage string, streamingConfig *streaming.Config,
-	pluginSettings *NetworkPluginSettings, cgroupsName string, kubeCgroupDriver string) (DockerService, error) {
+	pluginSettings *NetworkPluginSettings, cgroupsName string, kubeCgroupDriver string, execHandler dockertools.ExecHandler) (DockerService, error) {
 	c := dockertools.NewInstrumentedDockerInterface(client)
 	ds := &dockerService{
 		seccompProfileRoot: seccompProfileRoot,
@@ -109,10 +109,8 @@ func NewDockerService(client dockertools.DockerInterface, seccompProfileRoot str
 		os:                 kubecontainer.RealOS{},
 		podSandboxImage:    podSandboxImage,
 		streamingRuntime: &streamingRuntime{
-			client: client,
-			// Only the native exec handling is supported for now.
-			// TODO(#35747) - Either deprecate nsenter exec handling, or add support for it here.
-			execHandler: &dockertools.NativeExecHandler{},
+			client:      client,
+			execHandler: execHandler,
 		},
 		containerManager: cm.NewContainerManager(cgroupsName, client),
 	}

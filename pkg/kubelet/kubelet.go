@@ -551,7 +551,7 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 			streamingConfig := getStreamingConfig(kubeCfg, kubeDeps)
 			// Use the new CRI shim for docker.
 			ds, err := dockershim.NewDockerService(klet.dockerClient, kubeCfg.SeccompProfileRoot, kubeCfg.PodInfraContainerImage,
-				streamingConfig, &pluginSettings, kubeCfg.RuntimeCgroups, kubeCfg.CgroupDriver)
+				streamingConfig, &pluginSettings, kubeCfg.RuntimeCgroups, kubeCfg.CgroupDriver, dockerExecHandler)
 			if err != nil {
 				return nil, err
 			}
