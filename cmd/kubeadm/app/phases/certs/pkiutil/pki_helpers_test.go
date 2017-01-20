@@ -74,6 +74,7 @@ func TestNewCertAndKey(t *testing.T) {
 		config := certutil.Config{
 			CommonName:   "test",
 			Organization: []string{"test"},
+			Usages:       []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
 		}
 		_, _, actual := NewCertAndKey(caCert, caKey, config)
 		if (actual == nil) != rt.expected {
