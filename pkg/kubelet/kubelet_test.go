@@ -175,7 +175,7 @@ func newTestKubeletWithImageList(
 	fakeMirrorClient := podtest.NewFakeMirrorClient()
 	fakeSecretManager := secret.NewFakeManager()
 	kubelet.podManager = kubepod.NewBasicPodManager(fakeMirrorClient, fakeSecretManager)
-	kubelet.statusManager = status.NewManager(fakeKubeClient, kubelet.podManager)
+	kubelet.statusManager = status.NewManager(fakeKubeClient, kubelet.podManager, nil)
 	kubelet.containerRefManager = kubecontainer.NewRefManager()
 	diskSpaceManager, err := newDiskSpaceManager(mockCadvisor, DiskSpacePolicy{})
 	if err != nil {
