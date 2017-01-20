@@ -454,7 +454,7 @@ func TestGetAPIServerCommand(t *testing.T) {
 	}
 
 	for _, rt := range tests {
-		actual := getAPIServerCommand(rt.cfg)
+		actual := getAPIServerCommand(rt.cfg, false)
 		for i := range actual {
 			if actual[i] != rt.expected[i] {
 				t.Errorf(
@@ -523,7 +523,7 @@ func TestGetControllerManagerCommand(t *testing.T) {
 	}
 
 	for _, rt := range tests {
-		actual := getControllerManagerCommand(rt.cfg)
+		actual := getControllerManagerCommand(rt.cfg, false)
 		for i := range actual {
 			if actual[i] != rt.expected[i] {
 				t.Errorf(
@@ -553,7 +553,7 @@ func TestGetSchedulerCommand(t *testing.T) {
 	}
 
 	for _, rt := range tests {
-		actual := getSchedulerCommand(rt.cfg)
+		actual := getSchedulerCommand(rt.cfg, false)
 		for i := range actual {
 			if actual[i] != rt.expected[i] {
 				t.Errorf(

@@ -82,7 +82,7 @@ func WriteStaticPodManifests(cfg *kubeadmapi.MasterConfiguration) error {
 		kubeAPIServer: componentPod(api.Container{
 			Name:          kubeAPIServer,
 			Image:         images.GetCoreImage(images.KubeAPIServerImage, cfg, kubeadmapi.GlobalEnvParams.HyperkubeImage),
-			Command:       getAPIServerCommand(cfg),
+			Command:       getAPIServerCommand(cfg, false),
 			VolumeMounts:  volumeMounts,
 			LivenessProbe: componentProbe(8080, "/healthz"),
 			Resources:     componentResources("250m"),
@@ -91,7 +91,7 @@ func WriteStaticPodManifests(cfg *kubeadmapi.MasterConfiguration) error {
 		kubeControllerManager: componentPod(api.Container{
 			Name:          kubeControllerManager,
 			Image:         images.GetCoreImage(images.KubeControllerManagerImage, cfg, kubeadmapi.GlobalEnvParams.HyperkubeImage),
-			Command:       getControllerManagerCommand(cfg),
+			Command:       getControllerManagerCommand(cfg, false),
 			VolumeMounts:  volumeMounts,
 			LivenessProbe: componentProbe(10252, "/healthz"),
 			Resources:     componentResources("200m"),
@@ -100,7 +100,7 @@ func WriteStaticPodManifests(cfg *kubeadmapi.MasterConfiguration) error {
 		kubeScheduler: componentPod(api.Container{
 			Name:          kubeScheduler,
 			Image:         images.GetCoreImage(images.KubeSchedulerImage, cfg, kubeadmapi.GlobalEnvParams.HyperkubeImage),
-			Command:       getSchedulerCommand(cfg),
+			Command:       getSchedulerCommand(cfg, false),
 			LivenessProbe: componentProbe(10251, "/healthz"),
 			Resources:     componentResources("100m"),
 			Env:           getProxyEnvVars(),
@@ -217,6 +217,23 @@ func pkiVolumeMount() api.VolumeMount {
 	}
 }
 
+func flockVolume() api.Volume {
+	return api.Volume{
+		Name: "var-lock",
+		VolumeSource: api.VolumeSource{
+			HostPath: &api.HostPathVolumeSource{Path: "/var/lock"},
+		},
+	}
+}
+
+func flockVolumeMount() api.VolumeMount {
+	return api.VolumeMount{
+		Name:      "var-lock",
+		MountPath: "/var/lock",
+		ReadOnly:  false,
+	}
+}
+
 func k8sVolume(cfg *kubeadmapi.MasterConfiguration) api.Volume {
 	return api.Volume{
 		Name: "k8s",
@@ -284,8 +301,15 @@ func getComponentBaseCommand(component string) []string {
 	return []string{"kube-" + component}
 }
 
-func getAPIServerCommand(cfg *kubeadmapi.MasterConfiguration) []string {
-	command := append(getComponentBaseCommand(apiServer),
+func getAPIServerCommand(cfg *kubeadmapi.MasterConfiguration, selfHosted bool) []string {
+	var command []string
+
+	// self-hosted apiserver needs to wait on a lock
+	if selfHosted {
+		command = []string{"/usr/bin/flock", "--exclusive", "--timeout=30", "/var/lock/api-server.lock"}
+	}
+
+	command = append(getComponentBaseCommand(apiServer),
 		"--insecure-bind-address=127.0.0.1",
 		"--admission-control=NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,ResourceQuota",
 		"--service-cluster-ip-range="+cfg.Networking.ServiceSubnet,
@@ -310,7 +334,11 @@ func getAPIServerCommand(cfg *kubeadmapi.MasterConfiguration) []string {
 
 	// Use first address we are given
 	if len(cfg.API.AdvertiseAddresses) > 0 {
-		command = append(command, fmt.Sprintf("--advertise-address=%s", cfg.API.AdvertiseAddresses[0]))
+		if selfHosted {
+			command = append(command, "--advertise-address=$(POD_IP)")
+		} else {
+			command = append(command, fmt.Sprintf("--advertise-address=%s", cfg.API.AdvertiseAddresses[0]))
+		}
 	}
 
 	if len(cfg.KubernetesVersion) != 0 {
@@ -359,8 +387,15 @@ func getAPIServerCommand(cfg *kubeadmapi.MasterConfiguration) []string {
 	return command
 }
 
-func getControllerManagerCommand(cfg *kubeadmapi.MasterConfiguration) []string {
-	command := append(getComponentBaseCommand(controllerManager),
+func getControllerManagerCommand(cfg *kubeadmapi.MasterConfiguration, selfHosted bool) []string {
+	var command []string
+
+	// self-hosted controller-manager needs to wait on a lock
+	if selfHosted {
+		command = []string{"/usr/bin/flock", "--exclusive", "--timeout=30", "/var/lock/controller-manager.lock"}
+	}
+
+	command = append(getComponentBaseCommand(controllerManager),
 		"--address=127.0.0.1",
 		"--leader-elect",
 		"--master=127.0.0.1:8080",
@@ -386,15 +421,25 @@ func getControllerManagerCommand(cfg *kubeadmapi.MasterConfiguration) []string {
 	if cfg.Networking.PodSubnet != "" {
 		command = append(command, "--allocate-node-cidrs=true", "--cluster-cidr="+cfg.Networking.PodSubnet)
 	}
+
 	return command
 }
 
-func getSchedulerCommand(cfg *kubeadmapi.MasterConfiguration) []string {
-	return append(getComponentBaseCommand(scheduler),
+func getSchedulerCommand(cfg *kubeadmapi.MasterConfiguration, selfHosted bool) []string {
+	var command []string
+
+	// self-hosted apiserver needs to wait on a lock
+	if selfHosted {
+		command = []string{"/usr/bin/flock", "--exclusive", "--timeout=30", "/var/lock/api-server.lock"}
+	}
+
+	command = append(getComponentBaseCommand(scheduler),
 		"--address=127.0.0.1",
 		"--leader-elect",
 		"--master=127.0.0.1:8080",
 	)
+
+	return command
 }
 
 func getProxyCommand(cfg *kubeadmapi.MasterConfiguration) []string {
@@ -417,4 +462,17 @@ func getProxyEnvVars() []api.EnvVar {
 		}
 	}
 	return envs
+}
+
+func getSelfHostedAPIServerEnv() []api.EnvVar {
+	podIPEnvVar := api.EnvVar{
+		Name: "POD_IP",
+		ValueFrom: &api.EnvVarSource{
+			FieldRef: &api.ObjectFieldSelector{
+				FieldPath: "status.podIP",
+			},
+		},
+	}
+
+	return append(getProxyEnvVars(), podIPEnvVar)
 }

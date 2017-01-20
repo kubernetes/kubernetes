@@ -543,6 +543,7 @@ seccomp-profile-root
 secondary-node-eviction-rate
 secret-name
 secure-port
+self-hosted
 serialize-image-pulls
 server-start-timeout
 service-account-key-file
