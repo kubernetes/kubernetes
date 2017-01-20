@@ -114,12 +114,12 @@ func (p *petSyncer) Sync(pet *pcb) error {
 		}
 	} else if exists {
 		if !p.isHealthy(realPet.pod) {
-			glog.V(4).Infof("StatefulSet %v waiting on unhealthy pet %v", pet.parent.Name, realPet.pod.Name)
+			glog.V(4).Infof("StatefulSet %v waiting on unhealthy pod %v", pet.parent.Name, realPet.pod.Name)
 		}
 		return p.Update(realPet, pet)
 	}
 	if p.blockingPet != nil {
-		message := errUnhealthyPet(fmt.Sprintf("Create of %v in StatefulSet %v blocked by unhealthy pet %v", pet.pod.Name, pet.parent.Name, p.blockingPet.pod.Name))
+		message := errUnhealthyPet(fmt.Sprintf("Create of %v in StatefulSet %v blocked by unhealthy pod %v", pet.pod.Name, pet.parent.Name, p.blockingPet.pod.Name))
 		glog.V(4).Infof(message.Error())
 		return message
 	}
@@ -150,17 +150,17 @@ func (p *petSyncer) Delete(pet *pcb) error {
 		return nil
 	}
 	if p.blockingPet != nil {
-		glog.V(4).Infof("Delete of %v in StatefulSet %v blocked by unhealthy pet %v", realPet.pod.Name, pet.parent.Name, p.blockingPet.pod.Name)
+		glog.V(4).Infof("Delete of %v in StatefulSet %v blocked by unhealthy pod %v", realPet.pod.Name, pet.parent.Name, p.blockingPet.pod.Name)
 		return nil
 	}
 	// This is counted as a delete, even if it fails.
 	// The returned error will force a requeue.
 	p.blockingPet = realPet
 	if !p.isDying(realPet.pod) {
-		glog.V(2).Infof("StatefulSet %v deleting pet %v/%v", pet.parent.Name, pet.pod.Namespace, pet.pod.Name)
+		glog.V(2).Infof("StatefulSet %v deleting pod %v/%v", pet.parent.Name, pet.pod.Namespace, pet.pod.Name)
 		return p.petClient.Delete(pet)
 	}
-	glog.V(4).Infof("StatefulSet %v waiting on pet %v to die in %v", pet.parent.Name, realPet.pod.Name, realPet.pod.DeletionTimestamp)
+	glog.V(4).Infof("StatefulSet %v waiting on pod %v to die in %v", pet.parent.Name, realPet.pod.Name, realPet.pod.DeletionTimestamp)
 	return nil
 }
 
@@ -202,14 +202,14 @@ func (p *apiServerPetClient) Delete(pet *pcb) error {
 	if errors.IsNotFound(err) {
 		err = nil
 	}
-	p.event(pet.parent, "Delete", fmt.Sprintf("pet: %v", pet.pod.Name), err)
+	p.event(pet.parent, "Delete", fmt.Sprintf("pod: %v", pet.pod.Name), err)
 	return err
 }
 
 // Create creates the pet in the pcb.
 func (p *apiServerPetClient) Create(pet *pcb) error {
 	_, err := p.c.Core().Pods(pet.parent.Namespace).Create(pet.pod)
-	p.event(pet.parent, "Create", fmt.Sprintf("pet: %v", pet.pod.Name), err)
+	p.event(pet.parent, "Create", fmt.Sprintf("pod: %v", pet.pod.Name), err)
 	return err
 }
 
@@ -224,7 +224,7 @@ func (p *apiServerPetClient) Update(pet *pcb, expectedPet *pcb) (updateErr error
 		if err != nil || !needsUpdate {
 			return err
 		}
-		glog.V(4).Infof("Resetting pet %v/%v to match StatefulSet %v spec", pet.pod.Namespace, pet.pod.Name, pet.parent.Name)
+		glog.V(4).Infof("Resetting pod %v/%v to match StatefulSet %v spec", pet.pod.Namespace, pet.pod.Name, pet.parent.Name)
 		_, updateErr = pc.Update(&updatePod)
 		if updateErr == nil || i >= updateRetries {
 			return updateErr
