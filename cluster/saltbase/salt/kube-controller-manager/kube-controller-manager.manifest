@@ -113,6 +113,12 @@
                  "-c",
                  "/usr/local/bin/kube-controller-manager {{params}} 1>>/var/log/kube-controller-manager.log 2>&1"
                ],
+    "env": [
+      {
+        "name": "KUBE_CACHE_MUTATION_DETECTOR",
+        "value": "true"
+      }
+    ],
     "livenessProbe": {
       "httpGet": {
         "host": "127.0.0.1",
