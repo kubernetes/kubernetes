@@ -101,50 +101,68 @@ We will introduce an "execute a debug container in a pod" pattern that parallels
     configured by the user. It is created by a debug operation on an existing
     pod and reported in `PodStatus`.
 
-The end user need not be aware of the two modes. They should feel like a unified
-debugging experience that has an option to create a copy (though initially a
-copy will be the only option) and doesn't allow modifying existing containers
-when not a copy (because they're immutable).
+The mode distinction is for the purposes of this proposal, and the end user need
+not be aware of them. They form a single debugging command that allows the user
+to modify a running pod if possible and create a copy otherwise. The
+determination is made based on container name, for example:
 
-While both modes are useful, the primary motivation behind two modes is that
-*Copy Debug* can be implemented client-side using existing APIs as part of a
-long-term troubleshooting strategy that provides users some functionality in one
-or two releases while the more complex *Running Debug* mode is implemented
-server-side. If no one would find *Copy Debug* useful, it could be abandoned to
-focus solely on *Running Debug*.
+```
+% kubectl run example --image=nginx --restart=Never
+pod "example" created
+
+# Container "shell" does not exist, add a new container to running pod
+kubectl debug -p example -c shell --image=debian
+# Container DNE, create a copy with an additional container
+kubectl debug -p example-copy --copy-of example -c shell --image=debian
+# Container name exists, create a copy with a different entrypoint
+kubectl debug -p example-copy --copy-of example -c example --command -- /bin/sh
+# ERROR: cannot modify entrypoint of running pod (pod spec is immutable)
+kubectl debug -p example -c example --command -- /bin/sh # ERROR!
+```
+
+*Copy Debug* can be implemented relatively quickly on the client-side using
+existing APIs while *Running Debug* mode requires server-side changes. We will
+likely be able to release *Copy Debug* in the short term while *Running Debug*
+will take longer.
 
 ### Copy Debug Mode
 
-*Copy Debug* mode works by fetching the spec of a running pod, modifying it
-based on command line arguments, and creating a new pod. A common use might be
-to modify the entrypoint of a pod that's crash looping:
+*Copy Debug* works by fetching the spec of a running pod, modifying it based on
+command line arguments, and creating a new pod. A common use might be to modify
+the entrypoint of a pod that's crash looping:
 
 ```
-% kubectl debug --copy-of=target-pod --pod=target-pod-copy -it --attach --container=crashing-container --command -- sh
+kubectl debug --copy-of=target-pod --pod=target-pod-copy -it --attach --container=crashing-container --command -- sh
 ```
 
 The `--container` and `--attach` arguments would follow established conventions
 for choosing a default container (kubectl exec) and attaching if stdin was
-specified (kubectl run) and so are purely illustrative in the above example.
-When `--copy-of` is provided, we can construct a reasonable default for
-`--pod`(e.g. "${copy-of}-copy"), making the minimal form of this command:
+specified (kubectl run) and so are redundant in the above example. When
+`--copy-of` is provided, we can construct a reasonable default for `--pod`(e.g.
+`${copy-of}-copy`), making the minimal form of this command:
 
 ```
-% kubectl debug --copy-of=target-pod -it --command -- sh
+kubectl debug --copy-of=target-pod -it --command -- sh
 ```
 
-One can also specify a container that doesn't currently exist in the pod spec to
+One can specify a container that doesn't currently exist in the pod spec to
 create a new one:
 
 ```
-% kubectl debug --copy-of=target-pod -it -c shell --image=debian
+kubectl debug --copy-of=target-pod -it -c shell --image=debian
 ```
 
-For more complex changes, such as modifying volume mounts, we can provide an
-`--edit` workflow to fine tune the generated pod sec:
+Command line arguments allow simple, single-container changes but are
+insufficient for tasks like modifying volumes and their mount points. For more
+complex changes, we can provide an `--edit` workflow to adjust the generated pod
+spec before creation:
 
 ```
-% kubectl debug --copy-of=target-pod -it -c shell --image=debian --edit
+# Similar to the following workflow:
+#   kubectl debug --dry-run -o yaml ... > $temp_file
+#   $EDITOR $temp_file
+#   kubectl create -f $temp_file
+kubectl debug --copy-of=target-pod -it -c shell --image=debian --edit
 ```
 
 #### Scheduling conflicts
@@ -156,7 +174,7 @@ scaling a deployment, so one way to provide a better user experience is to
 validate the generated config similar to `ValidatePodTemplateSpecForRC()` with
 replicas > 1 as `kubectl scale` does.
 
-Validating client side is not optimal, and currently on gcePersistentDisk
+Validating client side is not optimal, and currently only gcePersistentDisk
 provides a check in `ValidatePodTemplateSpecForRC()`. Since *Running Debug* must
 be implemented server-side, a better long term strategy may be to migrate *Copy
 Debug* server-side as well to take advantage of easier validation against
@@ -172,9 +190,9 @@ immediately by a replication controller. It would be trivial to provide a
 ### Running Debug Mode
 
 *Running Debug* mode is a `kubectl debug` invocation that results in a new
-container being introduced in the running container. This *debug container* is
-not part of the pod spec, which remains immutable, and is not restarted
-according to the pod's restartPolicy.
+container being introduced in the running pod. This *debug container* is not
+part of the pod spec, which remains immutable, and is not restarted according to
+the pod's `restartPolicy`.
 
 The status of a *debug container* is reported in a new `DebugContainerStatuses`
 field of `PodStatus`, which is a read-only list of `ContainerStatus` that
@@ -185,28 +203,28 @@ other operations which change a pod to a non-pristine state, such as `kubectl
 exec`. A transition of `Tainted` from true to false is not possible.
 
 Debug operations will generate an event so auditing utilities can reconstruct
-what commands are run, an improvement over `kubectl exec`. A *Debug Containers*
-section will display all debug containers in the output of `kubectl describe`
-similar to the *Init Containers* section, and the status of `Tainted` will be
-displayed in the *Conditions* section.
+what commands are run, though `kubectl exec` does not do this. A *Debug
+Containers* section will display all debug containers in the output of `kubectl
+describe` similar to the *Init Containers* section, and the status of `Tainted`
+will be displayed in the *Conditions* section.
 
 The following command would attach to a newly created container in a pod:
 
 ```
-% kubectl debug -p target-pod -it -c debug-shell --image=debian -- bash
+kubectl debug -p target-pod -it -c debug-shell --image=debian -- bash
 ```
 
 It would be reasonable to provide a default container name and image which,
 combined with a default entrypoint, makes the minimal debug command:
 
 ```
-% kubectl debug -p target-pod -it
+kubectl debug -p target-pod -it
 ```
 
 If the specified container name already exists, `kubectl debug` will either
-attach to the already running container or restart a container that has exited.
-Specifying arguments is not allowed in the first case but is allowed in the
-latter to support remote shell uses cases such as `kubectl debug -p
+attach to an already running container or restart and attach a container that
+has exited. Specifying arguments is not allowed in the first case but is allowed
+in the latter to support remote shell uses cases such as `kubectl debug -p
 target-pod -- netstat`.
 
 #### Additional kubelet complexity
@@ -222,10 +240,10 @@ responsibilities include:
 1.  Report status on the debug container.
 1.  Stop and delete the container when the pod is deleted.
 
-Of these, preventing SyncPod() from killing the container is the most complex,
+Of these, preventing `SyncPod()` from killing the container is the most complex,
 but most of this complexity has already been implemented by *init containers*.
-For *debug containers* we need only amend computePodContainerChanges() to ignore
-containers labeled
+For *debug containers* we need only amend `computePodContainerChanges()` to
+ignore containers labeled as debug.
 
 Additional implementation details, including prerequisites, are detailed in
 Implementation Plan below.
@@ -244,11 +262,9 @@ command that fetches the config of a current pod, modifies it, and creates a new
 pod. This is automating the following manual workflow:
 
 1.  `kubectl get -o yaml --export pod *pod-name* > pod.yaml`
-1.  Remove `status` from `pod.yaml` and strip all values
-    from `metadata`
+1.  Remove `status` from `pod.yaml` and strip all values from `metadata`
 1.  Add a `metadata.name`
-1.  Modify `spec` to suit debugging needs (e.g. change
-    `command` to `sh`)
+1.  Modify `spec` to suit debugging needs (e.g. change `command` to `sh`)
 1.  `kubectl create -f pod.yaml`
 1.  `kubectl attach -it pod-copy-name`
 
@@ -292,9 +308,9 @@ containers.
 #### kubelet changes
 
 *Running Debug* will be implemented in the kubelet's generic runtime manager.
-When the CRI is not enabled, performing this operation will result in a not
-implemented error. State for pods is stored as labels in the container runtime,
-so we will add a new label to differentiate a *debug container* from containers
+Performing this operation with a legacy runtime will result in a not implemented
+error. State for pods is currently stored as labels in the container runtime, so
+we will add a new label to differentiate a *debug container* from containers
 that are part of the pod spec.
 
 The `debug` handler for the kublet will create and start a new container with an
@@ -306,7 +322,7 @@ separate `PodStatus.DebugContainerStatuses` as it does currently for
 
 `DEBUG` containers will be excluded from calculation of pod phase and condition.
 All containers will continue to be killed by `KillPod()`, which operates on
-containers returned by the runtime and will not discriminate on type.
+containers returned by the runtime and does not discriminate on type.
 
 #### API changes
 
@@ -325,25 +341,20 @@ inspect `PodStatus.DebugContainerStatuses`.
 
 ### Mounting Pod Volumes
 
-When adding a container to the pod in either mode we can support an option to
-mount all pod volumes by name to a user-configurable mount point defaulting to
-`/mnt/volumes`. For *Copy Debug* this can be done when generating the new pod
-spec. The kubelet's debug handler would perform a similar action for *Running
-Debug*.
+When debugging an application it's frequently useful to be able to inspect
+volumes shared within a pod. We can support an option to mount all pod volumes
+by name to a user-configurable mount point defaulting to `/mnt/volumes`. For
+*Copy Debug* this can be done when generating the new pod spec. The kubelet's
+debug handler would perform a similar action for *Running Debug*.
 
 ### Cross Mounting Container Images
 
-Depending on resolution of [#831](https://issues.k8s.io/831), the last step will
-be to implement cross-container filesystem image mounts. Implementing that
-feature would almost certainly require amending the Container Runtime Interface.
-Once implemented it should be easy to amend the debug handler to mount the other
-container filesystems by name in (e.g.) `/mnt/containers`.
-
-### Open Questions
-
-*   How will affect SELinux labels and user namespace segregation?
-*   what security context is used by the new container? how does that interact
-    with PodSecurityPolicy?
+Depending on resolution of [#831](https://issues.k8s.io/831), the final step
+will be to implement cross-container filesystem image mounts. Implementing that
+feature would almost certainly require amending the Container Runtime Interface
+to support mounting the filesystem of a different container. Once implemented it
+should be easy to amend the debug handler to mount the other container
+filesystems by name in (e.g.) `/mnt/containers`.
 
 ## User Stories
 
@@ -357,7 +368,7 @@ service. Her troubleshooting session might resemble:
 % kubectl get pods
 NAME          READY     STATUS    RESTARTS   AGE
 neato-5thn0   1/1       Running   0          1d
-% kubectl debug -it -m gcr.io/neato/debug-image -p neato-5thn0 -- bash
+% kubectl debug -it -m debian -p neato-5thn0 -- bash
 root@debug-image-neato-5thn0:/# cat /etc/resolv.conf
 search default.svc.cluster.local svc.cluster.local cluster.local
 nameserver 10.155.240.10
