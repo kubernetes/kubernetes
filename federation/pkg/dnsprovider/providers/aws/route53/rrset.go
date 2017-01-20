@@ -51,3 +51,12 @@ func (rrset ResourceRecordSet) Ttl() int64 {
 func (rrset ResourceRecordSet) Type() rrstype.RrsType {
 	return rrstype.RrsType(*rrset.impl.Type)
 }
+
+// Route53ResourceRecordSet returns the route53 ResourceRecordSet object for the ResourceRecordSet
+// This is a "back door" that allows for limited access to the ResourceRecordSet,
+// without having to requery it, so that we can expose AWS specific functionality.
+// Using this method should be avoided where possible; instead prefer to add functionality
+// to the cross-provider ResourceRecordSet interface.
+func (rrset ResourceRecordSet) Route53ResourceRecordSet() *route53.ResourceRecordSet {
+	return rrset.impl
+}
