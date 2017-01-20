@@ -15,8 +15,8 @@ go_library(
         "doc.go",
         "longrunning.go",
         "maxinflight.go",
-        "panics.go",
         "timeout.go",
+        "wrap.go",
     ],
     tags = ["automanaged"],
     deps = [
