@@ -21,12 +21,12 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	restclient "k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/clientcmd"
 	fedclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/typed/discovery"
 	oldclient "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 )
 
 func NewClientCache(loader clientcmd.ClientConfig, discoveryClientFactory DiscoveryClientFactory) *ClientCache {

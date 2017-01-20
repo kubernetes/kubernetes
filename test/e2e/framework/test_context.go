@@ -23,8 +23,8 @@ import (
 
 	"github.com/onsi/ginkgo/config"
 	"github.com/spf13/viper"
+	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
-	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 )
 

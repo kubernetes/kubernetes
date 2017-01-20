@@ -47,8 +47,6 @@ go_library(
         "//pkg/client/clientset_generated/clientset/typed/certificates/v1beta1:go_default_library",
         "//pkg/client/clientset_generated/clientset/typed/core/v1:go_default_library",
         "//pkg/client/record:go_default_library",
-        "//pkg/client/unversioned/auth:go_default_library",
-        "//pkg/client/unversioned/clientcmd:go_default_library",
         "//pkg/cloudprovider:go_default_library",
         "//pkg/cloudprovider/providers:go_default_library",
         "//pkg/credentialprovider:go_default_library",

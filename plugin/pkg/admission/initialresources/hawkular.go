@@ -32,7 +32,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 
 	restclient "k8s.io/client-go/rest"
-	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
+	"k8s.io/client-go/tools/clientcmd"
 )
 
 type hawkularSource struct {

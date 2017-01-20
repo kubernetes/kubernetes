@@ -18,7 +18,6 @@ go_library(
         "//pkg/client/leaderelection:go_default_library",
         "//pkg/client/leaderelection/resourcelock:go_default_library",
         "//pkg/client/record:go_default_library",
-        "//pkg/client/unversioned/clientcmd:go_default_library",
         "//pkg/util/configz:go_default_library",
         "//plugin/cmd/kube-scheduler/app/options:go_default_library",
         "//plugin/pkg/scheduler:go_default_library",
@@ -34,6 +33,7 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/runtime",
         "//vendor:k8s.io/apiserver/pkg/server/healthz",
         "//vendor:k8s.io/client-go/rest",
+        "//vendor:k8s.io/client-go/tools/clientcmd",
     ],
 )
 

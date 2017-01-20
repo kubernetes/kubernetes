@@ -49,10 +49,10 @@ go_test(
         "//federation/pkg/federation-controller/util:go_default_library",
         "//pkg/api/testapi:go_default_library",
         "//pkg/api/v1:go_default_library",
-        "//pkg/client/unversioned/clientcmd:go_default_library",
         "//pkg/util/uuid:go_default_library",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/client-go/rest",
+        "//vendor:k8s.io/client-go/tools/clientcmd",
         "//vendor:k8s.io/client-go/tools/clientcmd/api",
     ],
 )

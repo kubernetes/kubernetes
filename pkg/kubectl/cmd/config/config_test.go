@@ -27,9 +27,9 @@ import (
 	"testing"
 
 	"k8s.io/apimachinery/pkg/util/diff"
+	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 )
 

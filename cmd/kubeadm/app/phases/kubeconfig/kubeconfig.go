@@ -26,10 +26,10 @@ import (
 	"path/filepath"
 
 	certutil "k8s.io/client-go/pkg/util/cert"
+	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/certs/pkiutil"
-	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 )
 
 const (
