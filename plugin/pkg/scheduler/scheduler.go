@@ -51,6 +51,10 @@ type Scheduler struct {
 	config *Config
 }
 
+func (sched *Scheduler) StopEverything() {
+	close(sched.config.StopEverything)
+}
+
 // These are the functions which need to be provided in order to build a Scheduler configuration.
 // An implementation of this can be seen in factory.go.
 type Configurator interface {
@@ -78,6 +82,7 @@ type Configurator interface {
 	CreateFromKeys(predicateKeys, priorityKeys sets.String, extenders []algorithm.SchedulerExtender) (*Config, error)
 }
 
+// TODO over time we should make this struct a hidden implementation detail of the scheduler.
 type Config struct {
 	// It is expected that changes made via SchedulerCache will be observed
 	// by NodeLister and Algorithm.
@@ -108,12 +113,32 @@ type Config struct {
 }
 
 // New returns a new scheduler.
+// TODO replace this with NewFromConfigurator.
 func New(c *Config) *Scheduler {
 	s := &Scheduler{
 		config: c,
 	}
 	metrics.Register()
 	return s
+}
+
+// NewFromConfigurator returns a new scheduler that is created entirely by the Configurator.  Assumes Create() is implemented.
+// Supports intermediate Config mutation for now if you provide modifier functions which will run after Config is created.
+func NewFromConfigurator(c Configurator, modifiers ...func(c *Config)) (*Scheduler, error) {
+	cfg, err := c.Create()
+	if err != nil {
+		return nil, err
+	}
+	// Mutate it if any functions were provided, changes might be required for certain types of tests (i.e. change the recorder).
+	for _, modifier := range modifiers {
+		modifier(cfg)
+	}
+	// From this point on the config is immutable to the outside.
+	s := &Scheduler{
+		config: cfg,
+	}
+	metrics.Register()
+	return s, nil
 }
 
 // Run begins watching and scheduling. It starts a goroutine and returns immediately.
