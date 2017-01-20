@@ -273,7 +273,7 @@ func (configmapcontroller *ConfigMapController) reconcileConfigMap(configmap typ
 
 		// check to see if this should be sent to the cluster
 		if !util.SendToCluster(cluster, desiredConfigMap.ObjectMeta) {
-			glog.V(8).Infof("Skipping cluster: %s for config map: %s reason: cluster selectors do not match", cluster.ObjectMeta.Name, key)
+			glog.V(5).Infof("Skipping cluster: %s for config map: %s reason: cluster selectors do not match: %-v %-v", cluster.ObjectMeta.Name, key, cluster.ObjectMeta.Labels, desiredConfigMap.ObjectMeta.Annotations["federation.beta.kubernetes.io/cluster-selector"])
 			continue
 		}
 

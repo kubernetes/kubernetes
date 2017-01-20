@@ -149,7 +149,7 @@ func GetClientsetForCluster(cluster *federation_v1beta1.Cluster) (*fedclientset.
 }
 
 // Returns a bool to indicate if the object should be forwarded to a cluster
-func SendToCluster (cluster *federation_v1beta1.Cluster, objMeta metav1.ObjectMeta) bool {
+func SendToCluster(cluster *federation_v1beta1.Cluster, objMeta metav1.ObjectMeta) bool {
 	forwardObject := true
 	//if there is an annotation for ClusterSelector
 	if val, ok := objMeta.Annotations["federation.beta.kubernetes.io/cluster-selector"]; ok {

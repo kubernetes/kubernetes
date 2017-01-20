@@ -138,7 +138,7 @@ func TestConfigMapController(t *testing.T) {
 		"federation.beta.kubernetes.io/cluster-selector": "{\"location\": \"europe\", \"environment\": \"test\"}",
 	}
 	configmapWatch.Modify(configmap1)
-	updatedConfigMapDNE := GetConfigMapFromChan(cluster1UpdateChan)
+	updatedConfigMapDNE := GetConfigMapFromChanExpectNone(cluster1UpdateChan)
 	assert.Nil(t, updatedConfigMapDNE)
 
 	// Test add cluster
@@ -154,6 +154,13 @@ func TestConfigMapController(t *testing.T) {
 
 func GetConfigMapFromChan(c chan runtime.Object) *apiv1.ConfigMap {
 	if configmap, ok := GetObjectFromChan(c).(*apiv1.ConfigMap); ok {
+		return configmap
+	}
+	return nil
+}
+
+func GetConfigMapFromChanExpectNone(c chan runtime.Object) *apiv1.ConfigMap {
+	if configmap, ok := GetObjectFromChanExpectNone(c).(*apiv1.ConfigMap); ok {
 		return configmap
 	}
 	return nil

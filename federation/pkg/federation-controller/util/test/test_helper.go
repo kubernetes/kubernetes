@@ -39,6 +39,7 @@ import (
 
 const (
 	pushTimeout = 5 * time.Second
+	expectNoEventTimeout = 2 * time.Second
 )
 
 // A structure that distributes events to multiple watchers.
@@ -238,6 +239,17 @@ func GetObjectFromChan(c chan runtime.Object) runtime.Object {
 	}
 }
 
+// GetObjectFromChanExpectNone tries to get an api object from the given channel
+// within a short time window where it's expected that there will not be an event.
+func GetObjectFromChanExpectNone(c chan runtime.Object) runtime.Object {
+	select {
+	case obj := <-c:
+		return obj
+	case <-time.After(expectNoEventTimeout):
+		return nil
+	}
+}
+
 type CheckingFunction func(runtime.Object) error
 
 // CheckObjectFromChan tries to get an object matching the given check function
@@ -292,7 +304,7 @@ func NewCluster(name string, readyStatus apiv1.ConditionStatus) *federationapi.C
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        name,
 			Annotations: map[string]string{},
-			Labels: map[string]string{},
+			Labels:      map[string]string{},
 		},
 		Status: federationapi.ClusterStatus{
 			Conditions: []federationapi.ClusterCondition{
