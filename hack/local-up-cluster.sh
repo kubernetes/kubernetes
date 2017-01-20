@@ -423,7 +423,7 @@ function start_apiserver {
       --v=${LOG_LEVEL} \
       --cert-dir="${CERT_DIR}" \
       --client-ca-file="${CERT_DIR}/client-ca.crt" \
-      --basic-auth-file=${BASIC_AUTH_CSV} \
+      --basic-auth-file="${BASIC_AUTH_CSV}" \
       --service-account-key-file="${SERVICE_ACCOUNT_KEY}" \
       --service-account-lookup="${SERVICE_ACCOUNT_LOOKUP}" \
       --admission-control="${ADMISSION_CONTROL}" \
@@ -697,7 +697,12 @@ fi
 if [[ "${START_MODE}" != "kubeletonly" ]]; then
   echo
   cat <<EOF
-To start using your cluster, open up another terminal/tab and run:
+To start using your cluster, you can open up another terminal/tab and run:
+
+  export KUBECONFIG=${CERT_DIR}/admin.kubeconfig
+  cluster/kubectl.sh
+
+Alternatively, you can write to the default kubeconfig:
 
   export KUBERNETES_PROVIDER=local
 
@@ -737,13 +742,13 @@ kube::util::test_cfssl_installed
 
 ### IF the user didn't supply an output/ for the build... Then we detect.
 if [ "$GO_OUT" == "" ]; then
-    detect_binary
+  detect_binary
 fi
 echo "Detected host and ready to start services.  Doing some housekeeping first..."
 echo "Using GO_OUT $GO_OUT"
 KUBELET_CIDFILE=/tmp/kubelet.cid
 if [[ "${ENABLE_DAEMON}" = false ]]; then
-trap cleanup EXIT
+  trap cleanup EXIT
 fi
 
 echo "Starting services now!"
@@ -774,13 +779,13 @@ if [[ "${START_MODE}" != "nokubelet" ]]; then
 fi
 
 if [[ -n "${PSP_ADMISSION}" && "${ENABLE_RBAC}" = true ]]; then
-    create_psp_policy
+  create_psp_policy
 fi
 
 print_success
 
 if [[ "${ENABLE_DAEMON}" = false ]]; then
-   while true; do sleep 1; done
+  while true; do sleep 1; done
 fi
 
 
