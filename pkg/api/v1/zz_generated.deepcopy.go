@@ -143,6 +143,7 @@ func RegisterDeepCopies(scheme *runtime.Scheme) error {
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_PodExecOptions, InType: reflect.TypeOf(&PodExecOptions{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_PodList, InType: reflect.TypeOf(&PodList{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_PodLogOptions, InType: reflect.TypeOf(&PodLogOptions{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_PodPortForwardOptions, InType: reflect.TypeOf(&PodPortForwardOptions{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_PodProxyOptions, InType: reflect.TypeOf(&PodProxyOptions{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_PodSecurityContext, InType: reflect.TypeOf(&PodSecurityContext{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_PodSignature, InType: reflect.TypeOf(&PodSignature{})},
@@ -2174,6 +2175,20 @@ func DeepCopy_v1_PodLogOptions(in interface{}, out interface{}, c *conversion.Cl
 			in, out := &in.LimitBytes, &out.LimitBytes
 			*out = new(int64)
 			**out = **in
+		}
+		return nil
+	}
+}
+
+func DeepCopy_v1_PodPortForwardOptions(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*PodPortForwardOptions)
+		out := out.(*PodPortForwardOptions)
+		*out = *in
+		if in.Ports != nil {
+			in, out := &in.Ports, &out.Ports
+			*out = make([]int32, len(*in))
+			copy(*out, *in)
 		}
 		return nil
 	}

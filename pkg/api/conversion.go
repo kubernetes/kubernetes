@@ -18,6 +18,8 @@ package api
 
 import (
 	"fmt"
+	"strconv"
+	"strings"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/conversion"
@@ -67,6 +69,8 @@ func addConversionFuncs(scheme *runtime.Scheme) error {
 
 		Convert_map_to_unversioned_LabelSelector,
 		Convert_unversioned_LabelSelector_to_map,
+
+		Convert_Slice_string_To_Slice_int32,
 	)
 }
 
@@ -247,4 +251,20 @@ func Convert_unversioned_LabelSelector_to_map(in *metav1.LabelSelector, out *map
 		err = field.Invalid(field.NewPath("labelSelector"), *in, fmt.Sprintf("cannot convert to old selector: %v", err))
 	}
 	return err
+}
+
+// Convert_Slice_string_To_Slice_int32 converts multiple query parameters or
+// a single query parameter with a comma delimited value to multiple int32.
+// This is used for port forwarding which needs the ports as int32.
+func Convert_Slice_string_To_Slice_int32(in *[]string, out *[]int32, s conversion.Scope) error {
+	for _, s := range *in {
+		for _, v := range strings.Split(s, ",") {
+			x, err := strconv.ParseUint(v, 10, 16)
+			if err != nil {
+				return fmt.Errorf("cannot convert to []int32: %v", err)
+			}
+			*out = append(*out, int32(x))
+		}
+	}
+	return nil
 }
