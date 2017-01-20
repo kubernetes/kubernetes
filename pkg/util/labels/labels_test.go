@@ -20,7 +20,7 @@ import (
 	"reflect"
 	"testing"
 
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func TestCloneAndAddLabel(t *testing.T) {
@@ -33,7 +33,7 @@ func TestCloneAndAddLabel(t *testing.T) {
 	cases := []struct {
 		labels     map[string]string
 		labelKey   string
-		labelValue uint32
+		labelValue string
 		want       map[string]string
 	}{
 		{
@@ -43,7 +43,7 @@ func TestCloneAndAddLabel(t *testing.T) {
 		{
 			labels:     labels,
 			labelKey:   "foo4",
-			labelValue: uint32(42),
+			labelValue: "42",
 			want: map[string]string{
 				"foo1": "bar1",
 				"foo2": "bar2",
@@ -122,7 +122,7 @@ func TestCloneSelectorAndAddLabel(t *testing.T) {
 	cases := []struct {
 		labels     map[string]string
 		labelKey   string
-		labelValue uint32
+		labelValue string
 		want       map[string]string
 	}{
 		{
@@ -132,7 +132,7 @@ func TestCloneSelectorAndAddLabel(t *testing.T) {
 		{
 			labels:     labels,
 			labelKey:   "foo4",
-			labelValue: 89,
+			labelValue: "89",
 			want: map[string]string{
 				"foo1": "bar1",
 				"foo2": "bar2",
@@ -143,7 +143,7 @@ func TestCloneSelectorAndAddLabel(t *testing.T) {
 		{
 			labels:     nil,
 			labelKey:   "foo4",
-			labelValue: 12,
+			labelValue: "12",
 			want: map[string]string{
 				"foo4": "12",
 			},

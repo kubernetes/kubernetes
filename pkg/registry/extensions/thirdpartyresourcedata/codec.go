@@ -24,18 +24,16 @@ import (
 	"net/url"
 	"strings"
 
+	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/meta"
 	apiutil "k8s.io/kubernetes/pkg/api/util"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/runtime/schema"
-	"k8s.io/kubernetes/pkg/util/yaml"
-	"k8s.io/kubernetes/pkg/watch/versioned"
 )
 
 type thirdPartyObjectConverter struct {
@@ -144,7 +142,7 @@ func (t *thirdPartyResourceDataMapper) RESTMapping(gk schema.GroupKind, versions
 	// TODO figure out why we're doing this rewriting
 	extensionGK := schema.GroupKind{Group: extensions.GroupName, Kind: "ThirdPartyResourceData"}
 
-	mapping, err := t.mapper.RESTMapping(extensionGK, registered.GroupOrDie(extensions.GroupName).GroupVersion.Version)
+	mapping, err := t.mapper.RESTMapping(extensionGK, api.Registry.GroupOrDie(extensions.GroupName).GroupVersion.Version)
 	if err != nil {
 		return nil, err
 	}
@@ -335,7 +333,7 @@ func IsThirdPartyObject(rawData []byte, gvk *schema.GroupVersionKind) (isThirdPa
 		gv = gvk.GroupVersion()
 		gvkOut = gvk
 	}
-	return registered.IsThirdPartyAPIGroupVersion(gv), gvkOut, nil
+	return api.Registry.IsThirdPartyAPIGroupVersion(gv), gvkOut, nil
 }
 
 func (t *thirdPartyResourceDataDecoder) Decode(data []byte, gvk *schema.GroupVersionKind, into runtime.Object) (runtime.Object, *schema.GroupVersionKind, error) {
@@ -370,7 +368,7 @@ func (t *thirdPartyResourceDataDecoder) Decode(data []byte, gvk *schema.GroupVer
 		}
 		return o, outGVK, nil
 	default:
-		if gvk != nil && registered.IsThirdPartyAPIGroupVersion(gvk.GroupVersion()) {
+		if gvk != nil && api.Registry.IsThirdPartyAPIGroupVersion(gvk.GroupVersion()) {
 			// delegate won't recognize a thirdparty group version
 			gvk = nil
 		}
@@ -481,13 +479,7 @@ func encodeToJSON(obj *extensions.ThirdPartyResourceData, stream io.Writer) erro
 		return fmt.Errorf("unexpected type: %v", objOut)
 	}
 
-	// Convert to a serializable type
-	versionedObjectMeta := &v1.ObjectMeta{}
-	if err := v1.Convert_api_ObjectMeta_To_v1_ObjectMeta(&obj.ObjectMeta, versionedObjectMeta, nil); err != nil {
-		return err
-	}
-
-	objMap["metadata"] = versionedObjectMeta
+	objMap["metadata"] = &obj.ObjectMeta
 	encoder := json.NewEncoder(stream)
 	return encoder.Encode(objMap)
 }
@@ -535,9 +527,9 @@ func (t *thirdPartyResourceDataEncoder) Encode(obj runtime.Object, stream io.Wri
 
 		_, err = stream.Write(encBytes)
 		return err
-	case *versioned.InternalEvent:
-		event := &versioned.Event{}
-		err := versioned.Convert_versioned_InternalEvent_to_versioned_Event(obj, event, nil)
+	case *metav1.InternalEvent:
+		event := &metav1.WatchEvent{}
+		err := metav1.Convert_versioned_InternalEvent_to_versioned_Event(obj, event, nil)
 		if err != nil {
 			return err
 		}
@@ -582,7 +574,7 @@ func (t *thirdPartyResourceDataCreator) New(kind schema.GroupVersionKind) (out r
 	case "ListOptions", "WatchEvent":
 		if apiutil.GetGroupVersion(t.group, t.version) == kind.GroupVersion().String() {
 			// Translate third party group to external group.
-			gvk := registered.EnabledVersionsForGroup(api.GroupName)[0].WithKind(kind.Kind)
+			gvk := api.Registry.EnabledVersionsForGroup(api.GroupName)[0].WithKind(kind.Kind)
 			return t.delegate.New(gvk)
 		}
 		return t.delegate.New(kind)

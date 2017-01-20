@@ -22,6 +22,8 @@ import (
 	"reflect"
 	"testing"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	apiserverserviceaccount "k8s.io/apiserver/pkg/authentication/serviceaccount"
 	"k8s.io/kubernetes/pkg/api/v1"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
@@ -165,20 +167,20 @@ func TestTokenGenerateAndValidate(t *testing.T) {
 
 	// Related API objects
 	serviceAccount := &v1.ServiceAccount{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      "my-service-account",
 			UID:       "12345",
 			Namespace: "test",
 		},
 	}
 	rsaSecret := &v1.Secret{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      "my-rsa-secret",
 			Namespace: "test",
 		},
 	}
 	ecdsaSecret := &v1.Secret{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      "my-ecdsa-secret",
 			Namespace: "test",
 		},
@@ -349,8 +351,8 @@ func TestTokenGenerateAndValidate(t *testing.T) {
 }
 
 func TestMakeSplitUsername(t *testing.T) {
-	username := serviceaccount.MakeUsername("ns", "name")
-	ns, name, err := serviceaccount.SplitUsername(username)
+	username := apiserverserviceaccount.MakeUsername("ns", "name")
+	ns, name, err := apiserverserviceaccount.SplitUsername(username)
 	if err != nil {
 		t.Errorf("Unexpected error %v", err)
 	}
@@ -360,7 +362,7 @@ func TestMakeSplitUsername(t *testing.T) {
 
 	invalid := []string{"test", "system:serviceaccount", "system:serviceaccount:", "system:serviceaccount:ns", "system:serviceaccount:ns:name:extra"}
 	for _, n := range invalid {
-		_, _, err := serviceaccount.SplitUsername("test")
+		_, _, err := apiserverserviceaccount.SplitUsername("test")
 		if err == nil {
 			t.Errorf("Expected error for %s", n)
 		}

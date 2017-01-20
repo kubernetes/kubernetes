@@ -13,3 +13,16 @@ go_library(
     tags = ["automanaged"],
     deps = ["//vendor:github.com/prometheus/client_golang/prometheus"],
 )
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [":package-srcs"],
+    tags = ["automanaged"],
+)

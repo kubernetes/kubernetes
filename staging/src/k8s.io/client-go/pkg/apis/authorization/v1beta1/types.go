@@ -19,8 +19,7 @@ package v1beta1
 import (
 	"fmt"
 
-	"k8s.io/client-go/pkg/api/v1"
-	metav1 "k8s.io/client-go/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // +genclient=true
@@ -31,7 +30,7 @@ import (
 type SubjectAccessReview struct {
 	metav1.TypeMeta `json:",inline"`
 	// +optional
-	v1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// Spec holds information about the request being evaluated
 	Spec SubjectAccessReviewSpec `json:"spec" protobuf:"bytes,2,opt,name=spec"`
@@ -51,7 +50,7 @@ type SubjectAccessReview struct {
 type SelfSubjectAccessReview struct {
 	metav1.TypeMeta `json:",inline"`
 	// +optional
-	v1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// Spec holds information about the request being evaluated.  user and groups must be empty
 	Spec SelfSubjectAccessReviewSpec `json:"spec" protobuf:"bytes,2,opt,name=spec"`
@@ -70,7 +69,7 @@ type SelfSubjectAccessReview struct {
 type LocalSubjectAccessReview struct {
 	metav1.TypeMeta `json:",inline"`
 	// +optional
-	v1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// Spec holds information about the request being evaluated.  spec.namespace must be equal to the namespace
 	// you made the request against.  If empty, it is defaulted.

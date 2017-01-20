@@ -24,7 +24,6 @@ go_library(
         "//pkg/api/v1:go_default_library",
         "//pkg/api/v1/service:go_default_library",
         "//pkg/cloudprovider:go_default_library",
-        "//pkg/types:go_default_library",
         "//pkg/util/exec:go_default_library",
         "//pkg/util/mount:go_default_library",
         "//pkg/volume:go_default_library",
@@ -54,6 +53,7 @@ go_library(
         "//vendor:github.com/rackspace/gophercloud/openstack/networking/v2/ports",
         "//vendor:github.com/rackspace/gophercloud/pagination",
         "//vendor:gopkg.in/gcfg.v1",
+        "//vendor:k8s.io/apimachinery/pkg/types",
     ],
 )
 
@@ -69,9 +69,23 @@ go_test(
     deps = [
         "//pkg/api/v1:go_default_library",
         "//pkg/cloudprovider:go_default_library",
-        "//pkg/types:go_default_library",
-        "//pkg/util/rand:go_default_library",
         "//vendor:github.com/rackspace/gophercloud",
         "//vendor:github.com/rackspace/gophercloud/openstack/compute/v2/servers",
+        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor:k8s.io/apimachinery/pkg/types",
+        "//vendor:k8s.io/apimachinery/pkg/util/rand",
     ],
+)
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [":package-srcs"],
+    tags = ["automanaged"],
 )

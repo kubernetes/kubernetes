@@ -17,11 +17,12 @@ limitations under the License.
 package internalversion
 
 import (
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	types "k8s.io/apimachinery/pkg/types"
+	watch "k8s.io/apimachinery/pkg/watch"
 	api "k8s.io/kubernetes/pkg/api"
-	v1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	rbac "k8s.io/kubernetes/pkg/apis/rbac"
 	restclient "k8s.io/kubernetes/pkg/client/restclient"
-	watch "k8s.io/kubernetes/pkg/watch"
 )
 
 // RolesGetter has a method to return a RoleInterface.
@@ -39,7 +40,7 @@ type RoleInterface interface {
 	Get(name string, options v1.GetOptions) (*rbac.Role, error)
 	List(opts api.ListOptions) (*rbac.RoleList, error)
 	Watch(opts api.ListOptions) (watch.Interface, error)
-	Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *rbac.Role, err error)
+	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *rbac.Role, err error)
 	RoleExpansion
 }
 
@@ -140,7 +141,7 @@ func (c *roles) Watch(opts api.ListOptions) (watch.Interface, error) {
 }
 
 // Patch applies the patch and returns the patched role.
-func (c *roles) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *rbac.Role, err error) {
+func (c *roles) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *rbac.Role, err error) {
 	result = &rbac.Role{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).

@@ -17,24 +17,25 @@ limitations under the License.
 package resourcequota
 
 import (
+	"fmt"
 	"io"
 	"time"
 
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-
-	"k8s.io/kubernetes/pkg/admission"
+	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	kubeapiserveradmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
 	"k8s.io/kubernetes/pkg/quota"
 	"k8s.io/kubernetes/pkg/quota/install"
 )
 
 func init() {
 	admission.RegisterPlugin("ResourceQuota",
-		func(client clientset.Interface, config io.Reader) (admission.Interface, error) {
+		func(config io.Reader) (admission.Interface, error) {
 			// NOTE: we do not provide informers to the registry because admission level decisions
 			// does not require us to open watches for all items tracked by quota.
 			registry := install.NewRegistry(nil, nil)
-			return NewResourceQuota(client, registry, 5, make(chan struct{}))
+			return NewResourceQuota(registry, 5, make(chan struct{}))
 		})
 }
 
@@ -42,8 +43,13 @@ func init() {
 type quotaAdmission struct {
 	*admission.Handler
 
-	evaluator Evaluator
+	stopCh        <-chan struct{}
+	registry      quota.Registry
+	numEvaluators int
+	evaluator     Evaluator
 }
+
+var _ = kubeapiserveradmission.WantsInternalClientSet(&quotaAdmission{})
 
 type liveLookupEntry struct {
 	expiry time.Time
@@ -53,19 +59,33 @@ type liveLookupEntry struct {
 // NewResourceQuota configures an admission controller that can enforce quota constraints
 // using the provided registry.  The registry must have the capability to handle group/kinds that
 // are persisted by the server this admission controller is intercepting
-func NewResourceQuota(client clientset.Interface, registry quota.Registry, numEvaluators int, stopCh <-chan struct{}) (admission.Interface, error) {
+func NewResourceQuota(registry quota.Registry, numEvaluators int, stopCh <-chan struct{}) (admission.Interface, error) {
+	return &quotaAdmission{
+		Handler:       admission.NewHandler(admission.Create, admission.Update),
+		stopCh:        stopCh,
+		registry:      registry,
+		numEvaluators: numEvaluators,
+	}, nil
+}
+
+func (a *quotaAdmission) SetInternalClientSet(client internalclientset.Interface) {
+	var err error
 	quotaAccessor, err := newQuotaAccessor(client)
 	if err != nil {
-		return nil, err
+		// TODO handle errors more cleanly
+		panic(err)
 	}
-	go quotaAccessor.Run(stopCh)
+	go quotaAccessor.Run(a.stopCh)
 
-	evaluator := NewQuotaEvaluator(quotaAccessor, registry, nil, numEvaluators, stopCh)
+	a.evaluator = NewQuotaEvaluator(quotaAccessor, a.registry, nil, a.numEvaluators, a.stopCh)
+}
 
-	return &quotaAdmission{
-		Handler:   admission.NewHandler(admission.Create, admission.Update),
-		evaluator: evaluator,
-	}, nil
+// Validate ensures an authorizer is set.
+func (a *quotaAdmission) Validate() error {
+	if a.evaluator == nil {
+		return fmt.Errorf("missing evaluator")
+	}
+	return nil
 }
 
 // Admit makes admission decisions while enforcing quota

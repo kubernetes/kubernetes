@@ -90,7 +90,7 @@ func NewSignedCert(cfg Config, key *rsa.PrivateKey, caCert *x509.Certificate, ca
 	certTmpl := x509.Certificate{
 		Subject: pkix.Name{
 			CommonName:   cfg.CommonName,
-			Organization: caCert.Subject.Organization,
+			Organization: cfg.Organization,
 		},
 		DNSNames:     cfg.AltNames.DNSNames,
 		IPAddresses:  cfg.AltNames.IPs,

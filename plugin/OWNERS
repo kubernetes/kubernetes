@@ -1,4 +1,10 @@
-assignees:
+reviewers:
+  - brendandburns
+  - davidopp
+  - dchen1107
+  - lavalamp
+  - thockin
+approvers:
   - brendandburns
   - davidopp
   - dchen1107

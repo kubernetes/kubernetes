@@ -21,6 +21,21 @@ items:
     creationTimestamp: null
     labels:
       kubernetes.io/bootstrapping: rbac-defaults
+    name: system:controller:certificate-controller
+  roleRef:
+    apiGroup: rbac.authorization.k8s.io
+    kind: ClusterRole
+    name: system:controller:certificate-controller
+  subjects:
+  - kind: ServiceAccount
+    name: certificate-controller
+    namespace: kube-system
+- apiVersion: rbac.authorization.k8s.io/v1alpha1
+  kind: ClusterRoleBinding
+  metadata:
+    creationTimestamp: null
+    labels:
+      kubernetes.io/bootstrapping: rbac-defaults
     name: system:controller:cronjob-controller
   roleRef:
     apiGroup: rbac.authorization.k8s.io
@@ -186,14 +201,14 @@ items:
     creationTimestamp: null
     labels:
       kubernetes.io/bootstrapping: rbac-defaults
-    name: system:controller:pod-garbage-controller
+    name: system:controller:pod-garbage-collector
   roleRef:
     apiGroup: rbac.authorization.k8s.io
     kind: ClusterRole
-    name: system:controller:pod-garbage-controller
+    name: system:controller:pod-garbage-collector
   subjects:
   - kind: ServiceAccount
-    name: pod-garbage-controller
+    name: pod-garbage-collector
     namespace: kube-system
 - apiVersion: rbac.authorization.k8s.io/v1alpha1
   kind: ClusterRoleBinding

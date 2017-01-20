@@ -24,10 +24,11 @@ import (
 	"reflect"
 	"sort"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	"k8s.io/kubernetes/federation/pkg/dnsprovider/providers/google/clouddns" // Only for unit testing purposes.
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 func TestServiceController_ensureDnsRecords(t *testing.T) {
@@ -40,7 +41,7 @@ func TestServiceController_ensureDnsRecords(t *testing.T) {
 		{
 			name: "withip",
 			service: v1.Service{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:      "servicename",
 					Namespace: "servicenamespace",
 				},
@@ -58,7 +59,7 @@ func TestServiceController_ensureDnsRecords(t *testing.T) {
 			{
 				name: "withname",
 				service: v1.Service{
-					ObjectMeta: v1.ObjectMeta{
+					ObjectMeta: metav1.ObjectMeta{
 						Name: "servicename",
 						Namespace: "servicenamespace",
 					},
@@ -74,7 +75,7 @@ func TestServiceController_ensureDnsRecords(t *testing.T) {
 		{
 			name: "noendpoints",
 			service: v1.Service{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:      "servicename",
 					Namespace: "servicenamespace",
 				},

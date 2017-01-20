@@ -19,22 +19,24 @@ limitations under the License.
 package install
 
 import (
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/apimachinery/announced"
 	"k8s.io/kubernetes/pkg/apis/rbac"
 	"k8s.io/kubernetes/pkg/apis/rbac/v1alpha1"
-	"k8s.io/kubernetes/pkg/util/sets"
+	"k8s.io/kubernetes/pkg/apis/rbac/v1beta1"
 )
 
 func init() {
 	if err := announced.NewGroupMetaFactory(
 		&announced.GroupMetaFactoryArgs{
 			GroupName:                  rbac.GroupName,
-			VersionPreferenceOrder:     []string{v1alpha1.SchemeGroupVersion.Version},
+			VersionPreferenceOrder:     []string{v1beta1.SchemeGroupVersion.Version, v1alpha1.SchemeGroupVersion.Version},
 			ImportPrefix:               "k8s.io/kubernetes/pkg/apis/rbac",
 			RootScopedKinds:            sets.NewString("ClusterRole", "ClusterRoleBinding"),
 			AddInternalObjectsToScheme: rbac.AddToScheme,
 		},
 		announced.VersionToSchemeFunc{
+			v1beta1.SchemeGroupVersion.Version:  v1beta1.AddToScheme,
 			v1alpha1.SchemeGroupVersion.Version: v1alpha1.AddToScheme,
 		},
 	).Announce().RegisterAndEnable(); err != nil {

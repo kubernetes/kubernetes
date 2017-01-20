@@ -28,16 +28,16 @@ import (
 	"github.com/coreos/etcd/clientv3"
 	"github.com/coreos/etcd/integration"
 	"golang.org/x/net/context"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/labels"
-	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/storage"
-	"k8s.io/kubernetes/pkg/util/wait"
-	"k8s.io/kubernetes/pkg/watch"
 )
 
 func TestWatch(t *testing.T) {
@@ -55,8 +55,8 @@ func TestWatchList(t *testing.T) {
 func testWatch(t *testing.T, recursive bool) {
 	ctx, store, cluster := testSetup(t)
 	defer cluster.Terminate(t)
-	podFoo := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
-	podBar := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "bar"}}
+	podFoo := &api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}
+	podBar := &api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "bar"}}
 
 	tests := []struct {
 		key        string
@@ -130,7 +130,7 @@ func testWatch(t *testing.T, recursive bool) {
 func TestDeleteTriggerWatch(t *testing.T) {
 	ctx, store, cluster := testSetup(t)
 	defer cluster.Terminate(t)
-	key, storedObj := testPropogateStore(ctx, t, store, &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}})
+	key, storedObj := testPropogateStore(ctx, t, store, &api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}})
 	w, err := store.Watch(ctx, key, storedObj.ResourceVersion, storage.Everything)
 	if err != nil {
 		t.Fatalf("Watch failed: %v", err)
@@ -147,7 +147,7 @@ func TestDeleteTriggerWatch(t *testing.T) {
 func TestWatchFromZero(t *testing.T) {
 	ctx, store, cluster := testSetup(t)
 	defer cluster.Terminate(t)
-	key, storedObj := testPropogateStore(ctx, t, store, &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "ns"}})
+	key, storedObj := testPropogateStore(ctx, t, store, &api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "ns"}})
 
 	w, err := store.Watch(ctx, key, "0", storage.Everything)
 	if err != nil {
@@ -160,7 +160,7 @@ func TestWatchFromZero(t *testing.T) {
 	out := &api.Pod{}
 	err = store.GuaranteedUpdate(ctx, key, out, true, nil, storage.SimpleUpdate(
 		func(runtime.Object) (runtime.Object, error) {
-			return &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "ns", Annotations: map[string]string{"a": "1"}}}, nil
+			return &api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "ns", Annotations: map[string]string{"a": "1"}}}, nil
 		}))
 	if err != nil {
 		t.Fatalf("GuaranteedUpdate failed: %v", err)
@@ -178,7 +178,7 @@ func TestWatchFromZero(t *testing.T) {
 	out = &api.Pod{}
 	err = store.GuaranteedUpdate(ctx, key, out, true, nil, storage.SimpleUpdate(
 		func(runtime.Object) (runtime.Object, error) {
-			return &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "ns"}}, nil
+			return &api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "ns"}}, nil
 		}))
 	if err != nil {
 		t.Fatalf("GuaranteedUpdate failed: %v", err)
@@ -207,7 +207,7 @@ func TestWatchFromZero(t *testing.T) {
 func TestWatchFromNoneZero(t *testing.T) {
 	ctx, store, cluster := testSetup(t)
 	defer cluster.Terminate(t)
-	key, storedObj := testPropogateStore(ctx, t, store, &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}})
+	key, storedObj := testPropogateStore(ctx, t, store, &api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}})
 
 	w, err := store.Watch(ctx, key, storedObj.ResourceVersion, storage.Everything)
 	if err != nil {
@@ -216,7 +216,7 @@ func TestWatchFromNoneZero(t *testing.T) {
 	out := &api.Pod{}
 	store.GuaranteedUpdate(ctx, key, out, true, nil, storage.SimpleUpdate(
 		func(runtime.Object) (runtime.Object, error) {
-			return &api.Pod{ObjectMeta: api.ObjectMeta{Name: "bar"}}, err
+			return &api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "bar"}}, err
 		}))
 	testCheckResult(t, 0, watch.Modified, w, out)
 }
@@ -233,7 +233,7 @@ func TestWatchError(t *testing.T) {
 	validStore := newStore(cluster.RandClient(), false, testapi.Default.Codec(), "")
 	validStore.GuaranteedUpdate(ctx, "/abc", &api.Pod{}, true, nil, storage.SimpleUpdate(
 		func(runtime.Object) (runtime.Object, error) {
-			return &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}, nil
+			return &api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}, nil
 		}))
 	testCheckEventType(t, watch.Error, w)
 }
@@ -286,7 +286,7 @@ func TestWatchErrResultNotBlockAfterCancel(t *testing.T) {
 func TestWatchDeleteEventObjectHaveLatestRV(t *testing.T) {
 	ctx, store, cluster := testSetup(t)
 	defer cluster.Terminate(t)
-	key, storedObj := testPropogateStore(ctx, t, store, &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}})
+	key, storedObj := testPropogateStore(ctx, t, store, &api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}})
 
 	w, err := store.Watch(ctx, key, storedObj.ResourceVersion, storage.Everything)
 	if err != nil {

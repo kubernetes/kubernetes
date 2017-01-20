@@ -26,9 +26,9 @@ import (
 	"io/ioutil"
 	"log"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/apimachinery/registered"
-	"k8s.io/kubernetes/pkg/runtime"
 
 	// This installs the legacy v1 API
 	_ "k8s.io/kubernetes/pkg/api/install"
@@ -58,7 +58,7 @@ func main() {
 	nginxCrt := read(*crt)
 	nginxKey := read(*key)
 	secret := &api.Secret{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: "nginxsecret",
 		},
 		Data: map[string][]byte{
@@ -66,5 +66,5 @@ func main() {
 			"nginx.key": nginxKey,
 		},
 	}
-	fmt.Printf(runtime.EncodeOrDie(api.Codecs.LegacyCodec(registered.EnabledVersions()...), secret))
+	fmt.Printf(runtime.EncodeOrDie(api.Codecs.LegacyCodec(api.Registry.EnabledVersions()...), secret))
 }

@@ -12,7 +12,20 @@ go_library(
     srcs = ["uuid.go"],
     tags = ["automanaged"],
     deps = [
-        "//pkg/types:go_default_library",
         "//vendor:github.com/pborman/uuid",
+        "//vendor:k8s.io/apimachinery/pkg/types",
     ],
+)
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [":package-srcs"],
+    tags = ["automanaged"],
 )

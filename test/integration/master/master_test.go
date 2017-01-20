@@ -33,16 +33,15 @@ import (
 
 	"github.com/ghodss/yaml"
 
+	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/apimachinery/registered"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	clienttypedv1 "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/core/v1"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/restclient"
-	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/test/integration"
 	"k8s.io/kubernetes/test/integration/framework"
 )
@@ -74,6 +73,34 @@ func TestAppsPrefix(t *testing.T) {
 
 func TestExtensionsPrefix(t *testing.T) {
 	testPrefix(t, "/apis/extensions/")
+}
+
+func TestEmptyList(t *testing.T) {
+	_, s := framework.RunAMaster(nil)
+	defer s.Close()
+
+	u := s.URL + "/api/v1/namespaces/default/pods"
+	resp, err := http.Get(u)
+	if err != nil {
+		t.Fatalf("unexpected error getting %s: %v", u, err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("got status %v instead of 200 OK", resp.StatusCode)
+	}
+	defer resp.Body.Close()
+	data, _ := ioutil.ReadAll(resp.Body)
+	decodedData := map[string]interface{}{}
+	if err := json.Unmarshal(data, &decodedData); err != nil {
+		t.Logf("body: %s", string(data))
+		t.Fatalf("got error decoding data: %v", err)
+	}
+	if items, ok := decodedData["items"]; !ok {
+		t.Logf("body: %s", string(data))
+		t.Fatalf("missing items field in empty list (all lists should return an items field)")
+	} else if items == nil {
+		t.Logf("body: %s", string(data))
+		t.Fatalf("nil items field from empty list (all lists should return non-nil empty items lists)")
+	}
 }
 
 func TestWatchSucceedsWithoutArgs(t *testing.T) {
@@ -251,7 +278,7 @@ func TestMasterService(t *testing.T) {
 	_, s := framework.RunAMaster(framework.NewIntegrationTestMasterConfig())
 	defer s.Close()
 
-	client := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(api.GroupName).GroupVersion}})
+	client := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(api.GroupName).GroupVersion}})
 
 	err := wait.Poll(time.Second, time.Minute, func() (bool, error) {
 		svcList, err := client.Core().Services(api.NamespaceDefault).List(api.ListOptions{})
@@ -293,11 +320,11 @@ func TestServiceAlloc(t *testing.T) {
 	_, s := framework.RunAMaster(cfg)
 	defer s.Close()
 
-	client := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(api.GroupName).GroupVersion}})
+	client := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(api.GroupName).GroupVersion}})
 
 	svc := func(i int) *api.Service {
 		return &api.Service{
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name: fmt.Sprintf("svc-%v", i),
 			},
 			Spec: api.ServiceSpec{
@@ -381,7 +408,7 @@ func TestUpdateNodeObjects(t *testing.T) {
 	for i := 0; i < nodes*6; i++ {
 		c.Nodes().Delete(fmt.Sprintf("node-%d", i), nil)
 		_, err := c.Nodes().Create(&v1.Node{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name: fmt.Sprintf("node-%d", i),
 			},
 		})

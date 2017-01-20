@@ -17,8 +17,8 @@ limitations under the License.
 package policy
 
 import (
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/util/intstr"
 )
 
@@ -77,7 +77,7 @@ type PodDisruptionBudgetStatus struct {
 type PodDisruptionBudget struct {
 	metav1.TypeMeta
 	// +optional
-	api.ObjectMeta
+	metav1.ObjectMeta
 
 	// Specification of the desired behavior of the PodDisruptionBudget.
 	// +optional
@@ -106,7 +106,7 @@ type Eviction struct {
 
 	// ObjectMeta describes the pod that is being evicted.
 	// +optional
-	api.ObjectMeta
+	metav1.ObjectMeta
 
 	// DeleteOptions may be provided
 	// +optional

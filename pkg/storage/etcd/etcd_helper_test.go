@@ -25,28 +25,25 @@ import (
 
 	etcd "github.com/coreos/etcd/client"
 	"golang.org/x/net/context"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/conversion"
+	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
-	apiv1 "k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/apimachinery/registered"
-	"k8s.io/kubernetes/pkg/conversion"
-	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/labels"
-	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/runtime/serializer"
 	"k8s.io/kubernetes/pkg/storage"
 	"k8s.io/kubernetes/pkg/storage/etcd/etcdtest"
 	etcdtesting "k8s.io/kubernetes/pkg/storage/etcd/testing"
 	storagetesting "k8s.io/kubernetes/pkg/storage/testing"
 )
 
-const validEtcdVersion = "etcd 2.0.9"
-
 func testScheme(t *testing.T) (*runtime.Scheme, runtime.Codec) {
 	scheme := runtime.NewScheme()
 	scheme.Log(t)
-	scheme.AddKnownTypes(registered.GroupOrDie(api.GroupName).GroupVersion, &storagetesting.TestResource{})
+	scheme.AddKnownTypes(api.Registry.GroupOrDie(api.GroupName).GroupVersion, &storagetesting.TestResource{})
 	scheme.AddKnownTypes(testapi.Default.InternalGroupVersion(), &storagetesting.TestResource{})
 	if err := scheme.AddConversionFuncs(
 		func(in *storagetesting.TestResource, out *storagetesting.TestResource, s conversion.Scope) error {
@@ -60,7 +57,7 @@ func testScheme(t *testing.T) (*runtime.Scheme, runtime.Codec) {
 	); err != nil {
 		panic(err)
 	}
-	codec := serializer.NewCodecFactory(scheme).LegacyCodec(registered.GroupOrDie(api.GroupName).GroupVersion)
+	codec := serializer.NewCodecFactory(scheme).LegacyCodec(api.Registry.GroupOrDie(api.GroupName).GroupVersion)
 	return scheme, codec
 }
 
@@ -71,7 +68,7 @@ func newEtcdHelper(client etcd.Client, codec runtime.Codec, prefix string) etcdH
 // Returns an encoded version of api.Pod with the given name.
 func getEncodedPod(name string) string {
 	pod, _ := runtime.Encode(testapi.Default.Codec(), &api.Pod{
-		ObjectMeta: api.ObjectMeta{Name: name},
+		ObjectMeta: metav1.ObjectMeta{Name: name},
 	})
 	return string(pod)
 }
@@ -104,15 +101,15 @@ func TestList(t *testing.T) {
 	list := api.PodList{
 		Items: []api.Pod{
 			{
-				ObjectMeta: api.ObjectMeta{Name: "bar"},
+				ObjectMeta: metav1.ObjectMeta{Name: "bar"},
 				Spec:       apitesting.DeepEqualSafePodSpec(),
 			},
 			{
-				ObjectMeta: api.ObjectMeta{Name: "baz"},
+				ObjectMeta: metav1.ObjectMeta{Name: "baz"},
 				Spec:       apitesting.DeepEqualSafePodSpec(),
 			},
 			{
-				ObjectMeta: api.ObjectMeta{Name: "foo"},
+				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
 				Spec:       apitesting.DeepEqualSafePodSpec(),
 			},
 		},
@@ -140,15 +137,15 @@ func TestListFiltered(t *testing.T) {
 	list := api.PodList{
 		Items: []api.Pod{
 			{
-				ObjectMeta: api.ObjectMeta{Name: "bar"},
+				ObjectMeta: metav1.ObjectMeta{Name: "bar"},
 				Spec:       apitesting.DeepEqualSafePodSpec(),
 			},
 			{
-				ObjectMeta: api.ObjectMeta{Name: "baz"},
+				ObjectMeta: metav1.ObjectMeta{Name: "baz"},
 				Spec:       apitesting.DeepEqualSafePodSpec(),
 			},
 			{
-				ObjectMeta: api.ObjectMeta{Name: "foo"},
+				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
 				Spec:       apitesting.DeepEqualSafePodSpec(),
 			},
 		},
@@ -187,15 +184,15 @@ func TestListAcrossDirectories(t *testing.T) {
 	list := api.PodList{
 		Items: []api.Pod{
 			{
-				ObjectMeta: api.ObjectMeta{Name: "baz"},
+				ObjectMeta: metav1.ObjectMeta{Name: "baz"},
 				Spec:       apitesting.DeepEqualSafePodSpec(),
 			},
 			{
-				ObjectMeta: api.ObjectMeta{Name: "foo"},
+				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
 				Spec:       apitesting.DeepEqualSafePodSpec(),
 			},
 			{
-				ObjectMeta: api.ObjectMeta{Name: "bar"},
+				ObjectMeta: metav1.ObjectMeta{Name: "bar"},
 				Spec:       apitesting.DeepEqualSafePodSpec(),
 			},
 		},
@@ -227,7 +224,7 @@ func TestGet(t *testing.T) {
 	key := "/some/key"
 	helper := newEtcdHelper(server.Client, testapi.Default.Codec(), etcdtest.PathPrefix())
 	expect := api.Pod{
-		ObjectMeta: api.ObjectMeta{Name: "foo"},
+		ObjectMeta: metav1.ObjectMeta{Name: "foo"},
 		Spec:       apitesting.DeepEqualSafePodSpec(),
 	}
 	var got api.Pod
@@ -257,7 +254,7 @@ func TestGetNotFoundErr(t *testing.T) {
 }
 
 func TestCreate(t *testing.T) {
-	obj := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
+	obj := &api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}
 	server := etcdtesting.NewEtcdTestClientServer(t)
 	defer server.Terminate(t)
 	helper := newEtcdHelper(server.Client, testapi.Default.Codec(), etcdtest.PathPrefix())
@@ -284,7 +281,7 @@ func TestCreate(t *testing.T) {
 }
 
 func TestCreateNilOutParam(t *testing.T) {
-	obj := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
+	obj := &api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}
 	server := etcdtesting.NewEtcdTestClientServer(t)
 	defer server.Terminate(t)
 	helper := newEtcdHelper(server.Client, testapi.Default.Codec(), etcdtest.PathPrefix())
@@ -301,7 +298,7 @@ func TestGuaranteedUpdate(t *testing.T) {
 	key := "/some/key"
 	helper := newEtcdHelper(server.Client, codec, etcdtest.PathPrefix())
 
-	obj := &storagetesting.TestResource{ObjectMeta: apiv1.ObjectMeta{Name: "foo"}, Value: 1}
+	obj := &storagetesting.TestResource{ObjectMeta: metav1.ObjectMeta{Name: "foo"}, Value: 1}
 	err := helper.GuaranteedUpdate(context.TODO(), key, &storagetesting.TestResource{}, true, nil, storage.SimpleUpdate(func(in runtime.Object) (runtime.Object, error) {
 		return obj, nil
 	}))
@@ -311,7 +308,7 @@ func TestGuaranteedUpdate(t *testing.T) {
 
 	// Update an existing node.
 	callbackCalled := false
-	objUpdate := &storagetesting.TestResource{ObjectMeta: apiv1.ObjectMeta{Name: "foo"}, Value: 2}
+	objUpdate := &storagetesting.TestResource{ObjectMeta: metav1.ObjectMeta{Name: "foo"}, Value: 2}
 	err = helper.GuaranteedUpdate(context.TODO(), key, &storagetesting.TestResource{}, true, nil, storage.SimpleUpdate(func(in runtime.Object) (runtime.Object, error) {
 		callbackCalled = true
 
@@ -346,7 +343,7 @@ func TestGuaranteedUpdateNoChange(t *testing.T) {
 	key := "/some/key"
 	helper := newEtcdHelper(server.Client, codec, etcdtest.PathPrefix())
 
-	obj := &storagetesting.TestResource{ObjectMeta: apiv1.ObjectMeta{Name: "foo"}, Value: 1}
+	obj := &storagetesting.TestResource{ObjectMeta: metav1.ObjectMeta{Name: "foo"}, Value: 1}
 	err := helper.GuaranteedUpdate(context.TODO(), key, &storagetesting.TestResource{}, true, nil, storage.SimpleUpdate(func(in runtime.Object) (runtime.Object, error) {
 		return obj, nil
 	}))
@@ -356,7 +353,7 @@ func TestGuaranteedUpdateNoChange(t *testing.T) {
 
 	// Update an existing node with the same data
 	callbackCalled := false
-	objUpdate := &storagetesting.TestResource{ObjectMeta: apiv1.ObjectMeta{Name: "foo"}, Value: 1}
+	objUpdate := &storagetesting.TestResource{ObjectMeta: metav1.ObjectMeta{Name: "foo"}, Value: 1}
 	err = helper.GuaranteedUpdate(context.TODO(), key, &storagetesting.TestResource{}, true, nil, storage.SimpleUpdate(func(in runtime.Object) (runtime.Object, error) {
 		callbackCalled = true
 		return objUpdate, nil
@@ -377,7 +374,7 @@ func TestGuaranteedUpdateKeyNotFound(t *testing.T) {
 	helper := newEtcdHelper(server.Client, codec, etcdtest.PathPrefix())
 
 	// Create a new node.
-	obj := &storagetesting.TestResource{ObjectMeta: apiv1.ObjectMeta{Name: "foo"}, Value: 1}
+	obj := &storagetesting.TestResource{ObjectMeta: metav1.ObjectMeta{Name: "foo"}, Value: 1}
 
 	f := storage.SimpleUpdate(func(in runtime.Object) (runtime.Object, error) {
 		return obj, nil
@@ -425,7 +422,7 @@ func TestGuaranteedUpdate_CreateCollision(t *testing.T) {
 				}
 
 				currValue := in.(*storagetesting.TestResource).Value
-				obj := &storagetesting.TestResource{ObjectMeta: apiv1.ObjectMeta{Name: "foo"}, Value: currValue + 1}
+				obj := &storagetesting.TestResource{ObjectMeta: metav1.ObjectMeta{Name: "foo"}, Value: currValue + 1}
 				return obj, nil
 			}))
 			if err != nil {
@@ -451,7 +448,7 @@ func TestGuaranteedUpdateUIDMismatch(t *testing.T) {
 	prefix := path.Join("/", etcdtest.PathPrefix())
 	helper := newEtcdHelper(server.Client, testapi.Default.Codec(), prefix)
 
-	obj := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo", UID: "A"}}
+	obj := &api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", UID: "A"}}
 	podPtr := &api.Pod{}
 	err := helper.Create(context.TODO(), "/some/key", obj, podPtr, 0)
 	if err != nil {
@@ -471,7 +468,7 @@ func TestDeleteUIDMismatch(t *testing.T) {
 	prefix := path.Join("/", etcdtest.PathPrefix())
 	helper := newEtcdHelper(server.Client, testapi.Default.Codec(), prefix)
 
-	obj := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo", UID: "A"}}
+	obj := &api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", UID: "A"}}
 	podPtr := &api.Pod{}
 	err := helper.Create(context.TODO(), "/some/key", obj, podPtr, 0)
 	if err != nil {
@@ -510,7 +507,7 @@ func TestDeleteWithRetry(t *testing.T) {
 	defer server.Terminate(t)
 	prefix := path.Join("/", etcdtest.PathPrefix())
 
-	obj := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo", UID: "A"}}
+	obj := &api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", UID: "A"}}
 	// fakeGet returns a large ModifiedIndex to emulate the case that another
 	// party has updated the object.
 	fakeGet := func(ctx context.Context, key string, opts *etcd.GetOptions) (*etcd.Response, error) {

@@ -20,9 +20,9 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/kubernetes/pkg/runtime"
-	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
-	"k8s.io/kubernetes/pkg/util/wait"
+	"k8s.io/apimachinery/pkg/runtime"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/wait"
 )
 
 // Config contains all the settings for a Controller.
@@ -61,21 +61,21 @@ type Config struct {
 type ProcessFunc func(obj interface{}) error
 
 // Controller is a generic controller framework.
-type Controller struct {
+type controller struct {
 	config         Config
 	reflector      *Reflector
 	reflectorMutex sync.RWMutex
 }
 
-// TODO make the "Controller" private, and convert all references to use ControllerInterface instead
-type ControllerInterface interface {
+type Controller interface {
 	Run(stopCh <-chan struct{})
 	HasSynced() bool
+	LastSyncResourceVersion() string
 }
 
 // New makes a new Controller from the given Config.
-func New(c *Config) *Controller {
-	ctlr := &Controller{
+func New(c *Config) Controller {
+	ctlr := &controller{
 		config: *c,
 	}
 	return ctlr
@@ -84,7 +84,7 @@ func New(c *Config) *Controller {
 // Run begins processing items, and will continue until a value is sent down stopCh.
 // It's an error to call Run more than once.
 // Run blocks; call via go.
-func (c *Controller) Run(stopCh <-chan struct{}) {
+func (c *controller) Run(stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 	r := NewReflector(
 		c.config.ListerWatcher,
@@ -103,18 +103,15 @@ func (c *Controller) Run(stopCh <-chan struct{}) {
 }
 
 // Returns true once this controller has completed an initial resource listing
-func (c *Controller) HasSynced() bool {
+func (c *controller) HasSynced() bool {
 	return c.config.Queue.HasSynced()
 }
 
-// Requeue adds the provided object back into the queue if it does not already exist.
-func (c *Controller) Requeue(obj interface{}) error {
-	return c.config.Queue.AddIfNotPresent(Deltas{
-		Delta{
-			Type:   Sync,
-			Object: obj,
-		},
-	})
+func (c *controller) LastSyncResourceVersion() string {
+	if c.reflector == nil {
+		return ""
+	}
+	return c.reflector.LastSyncResourceVersion()
 }
 
 // processLoop drains the work queue.
@@ -126,7 +123,7 @@ func (c *Controller) Requeue(obj interface{}) error {
 // actually exit when the controller is stopped. Or just give up on this stuff
 // ever being stoppable. Converting this whole package to use Context would
 // also be helpful.
-func (c *Controller) processLoop() {
+func (c *controller) processLoop() {
 	for {
 		obj, err := c.config.Queue.Pop(PopProcessFunc(c.config.Process))
 		if err != nil {
@@ -218,7 +215,7 @@ func NewInformer(
 	objType runtime.Object,
 	resyncPeriod time.Duration,
 	h ResourceEventHandler,
-) (Store, *Controller) {
+) (Store, Controller) {
 	// This will hold the client state, as we know it.
 	clientState := NewStore(DeletionHandlingMetaNamespaceKeyFunc)
 
@@ -284,7 +281,7 @@ func NewIndexerInformer(
 	resyncPeriod time.Duration,
 	h ResourceEventHandler,
 	indexers Indexers,
-) (Indexer, *Controller) {
+) (Indexer, Controller) {
 	// This will hold the client state, as we know it.
 	clientState := NewIndexer(DeletionHandlingMetaNamespaceKeyFunc, indexers)
 

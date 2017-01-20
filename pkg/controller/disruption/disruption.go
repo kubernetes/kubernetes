@@ -21,24 +21,25 @@ import (
 	"reflect"
 	"time"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
+	apps "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	policy "k8s.io/kubernetes/pkg/apis/policy/v1beta1"
 	"k8s.io/kubernetes/pkg/client/cache"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	v1core "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/core/v1"
 	policyclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/policy/v1beta1"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/controller"
-	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/intstr"
-	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
-	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/util/workqueue"
-	"k8s.io/kubernetes/pkg/watch"
 
 	"github.com/golang/glog"
 )
@@ -51,7 +52,7 @@ const statusUpdateRetries = 2
 // all and the corresponding entry can be removed from pdb.Status.DisruptedPods. It is assumed that
 // pod/pdb apiserver to controller latency is relatively small (like 1-2sec) so the below value should
 // be more than enough.
-// If the cotroller is running on a different node it is important that the two nodes have synced
+// If the controller is running on a different node it is important that the two nodes have synced
 // clock (via ntp for example). Otherwise PodDisruptionBudget controller may not provide enough
 // protection against unwanted pod disruptions.
 const DeletionTimeout = 2 * 60 * time.Second
@@ -62,23 +63,27 @@ type DisruptionController struct {
 	kubeClient clientset.Interface
 
 	pdbStore      cache.Store
-	pdbController *cache.Controller
+	pdbController cache.Controller
 	pdbLister     cache.StoreToPodDisruptionBudgetLister
 
-	podController cache.ControllerInterface
+	podController cache.Controller
 	podLister     cache.StoreToPodLister
 
 	rcIndexer    cache.Indexer
-	rcController *cache.Controller
+	rcController cache.Controller
 	rcLister     cache.StoreToReplicationControllerLister
 
 	rsStore      cache.Store
-	rsController *cache.Controller
+	rsController cache.Controller
 	rsLister     cache.StoreToReplicaSetLister
 
 	dIndexer    cache.Indexer
-	dController *cache.Controller
+	dController cache.Controller
 	dLister     cache.StoreToDeploymentLister
+
+	ssStore      cache.Store
+	ssController cache.Controller
+	ssLister     cache.StoreToStatefulSetLister
 
 	// PodDisruptionBudget keys that need to be synced.
 	queue        workqueue.RateLimitingInterface
@@ -187,8 +192,22 @@ func NewDisruptionController(podInformer cache.SharedIndexInformer, kubeClient c
 		cache.ResourceEventHandlerFuncs{},
 		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
 	)
-
 	dc.dLister.Indexer = dc.dIndexer
+
+	dc.ssStore, dc.ssController = cache.NewInformer(
+		&cache.ListWatch{
+			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
+				return dc.kubeClient.Apps().StatefulSets(v1.NamespaceAll).List(options)
+			},
+			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
+				return dc.kubeClient.Apps().StatefulSets(v1.NamespaceAll).Watch(options)
+			},
+		},
+		&apps.StatefulSet{},
+		30*time.Second,
+		cache.ResourceEventHandlerFuncs{},
+	)
+	dc.ssLister.Store = dc.ssStore
 
 	return dc
 }
@@ -201,7 +220,8 @@ func NewDisruptionController(podInformer cache.SharedIndexInformer, kubeClient c
 // and we may well need further tweaks just to be able to access scale
 // subresources.
 func (dc *DisruptionController) finders() []podControllerFinder {
-	return []podControllerFinder{dc.getPodReplicationControllers, dc.getPodDeployments, dc.getPodReplicaSets}
+	return []podControllerFinder{dc.getPodReplicationControllers, dc.getPodDeployments, dc.getPodReplicaSets,
+		dc.getPodStatefulSets}
 }
 
 // getPodReplicaSets finds replicasets which have no matching deployments.
@@ -222,6 +242,29 @@ func (dc *DisruptionController) getPodReplicaSets(pod *v1.Pod) ([]controllerAndS
 			continue
 		}
 		controllerScale[rs.UID] = *(rs.Spec.Replicas)
+	}
+
+	for uid, scale := range controllerScale {
+		cas = append(cas, controllerAndScale{UID: uid, scale: scale})
+	}
+
+	return cas, nil
+}
+
+// getPodStatefulSet returns the statefulset managing the given pod.
+func (dc *DisruptionController) getPodStatefulSets(pod *v1.Pod) ([]controllerAndScale, error) {
+	cas := []controllerAndScale{}
+	ss, err := dc.ssLister.GetPodStatefulSets(pod)
+
+	// GetPodStatefulSets returns an error only if no StatefulSets are found. We
+	// don't return that as an error to the caller.
+	if err != nil {
+		return cas, nil
+	}
+
+	controllerScale := map[types.UID]int32{}
+	for _, s := range ss {
+		controllerScale[s.UID] = *(s.Spec.Replicas)
 	}
 
 	for uid, scale := range controllerScale {
@@ -284,6 +327,7 @@ func (dc *DisruptionController) Run(stopCh <-chan struct{}) {
 	go dc.rcController.Run(stopCh)
 	go dc.rsController.Run(stopCh)
 	go dc.dController.Run(stopCh)
+	go dc.ssController.Run(stopCh)
 	go wait.Until(dc.worker, time.Second, stopCh)
 	go wait.Until(dc.recheckWorker, time.Second, stopCh)
 

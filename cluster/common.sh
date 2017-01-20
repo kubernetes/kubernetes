@@ -308,6 +308,17 @@ function load-or-gen-kube-bearertoken() {
   fi
 }
 
+# Create a temp dir that'll be deleted at the end of this bash session.
+#
+# Vars set:
+#   KUBE_TEMP
+function ensure-temp-dir {
+  if [[ -z ${KUBE_TEMP-} ]]; then
+    KUBE_TEMP=$(mktemp -d -t kubernetes.XXXXXX)
+    trap 'rm -rf "${KUBE_TEMP}"' EXIT
+  fi
+}
+
 # Get the master IP for the current-context in kubeconfig if one exists.
 #
 # Assumed vars:
@@ -412,6 +423,30 @@ function tars_from_version() {
   fi
 }
 
+# Search for the specified tarball in the various known output locations,
+# echoing the location if found.
+#
+# Assumed vars:
+#   KUBE_ROOT
+#
+# Args:
+#   $1 name of tarball to search for
+function find-tar() {
+  local -r tarball=$1
+  locations=(
+    "${KUBE_ROOT}/server/${tarball}"
+    "${KUBE_ROOT}/_output/release-tars/${tarball}"
+    "${KUBE_ROOT}/bazel-bin/build/release-tars/${tarball}"
+  )
+  location=$( (ls -t "${locations[@]}" 2>/dev/null || true) | head -1 )
+
+  if [[ ! -f "${location}" ]]; then
+    echo "!!! Cannot find ${tarball}" >&2
+    exit 1
+  fi
+  echo "${location}"
+}
+
 # Verify and find the various tar files that we are going to use on the server.
 #
 # Assumed vars:
@@ -421,36 +456,14 @@ function tars_from_version() {
 #   SALT_TAR
 #   KUBE_MANIFESTS_TAR
 function find-release-tars() {
-  SERVER_BINARY_TAR="${KUBE_ROOT}/server/kubernetes-server-linux-amd64.tar.gz"
-  if [[ ! -f "${SERVER_BINARY_TAR}" ]]; then
-    SERVER_BINARY_TAR="${KUBE_ROOT}/_output/release-tars/kubernetes-server-linux-amd64.tar.gz"
-  fi
-  if [[ ! -f "${SERVER_BINARY_TAR}" ]]; then
-    echo "!!! Cannot find kubernetes-server-linux-amd64.tar.gz" >&2
-    exit 1
-  fi
-
-  SALT_TAR="${KUBE_ROOT}/server/kubernetes-salt.tar.gz"
-  if [[ ! -f "${SALT_TAR}" ]]; then
-    SALT_TAR="${KUBE_ROOT}/_output/release-tars/kubernetes-salt.tar.gz"
-  fi
-  if [[ ! -f "${SALT_TAR}" ]]; then
-    echo "!!! Cannot find kubernetes-salt.tar.gz" >&2
-    exit 1
-  fi
+  SERVER_BINARY_TAR=$(find-tar kubernetes-server-linux-amd64.tar.gz)
+  SALT_TAR=$(find-tar kubernetes-salt.tar.gz)
 
   # This tarball is used by GCI, Ubuntu Trusty, and Container Linux.
   KUBE_MANIFESTS_TAR=
   if [[ "${MASTER_OS_DISTRIBUTION:-}" == "trusty" || "${MASTER_OS_DISTRIBUTION:-}" == "gci" || "${MASTER_OS_DISTRIBUTION:-}" == "container-linux" ]] || \
      [[ "${NODE_OS_DISTRIBUTION:-}" == "trusty" || "${NODE_OS_DISTRIBUTION:-}" == "gci" || "${NODE_OS_DISTRIBUTION:-}" == "container-linux" ]] ; then
-    KUBE_MANIFESTS_TAR="${KUBE_ROOT}/server/kubernetes-manifests.tar.gz"
-    if [[ ! -f "${KUBE_MANIFESTS_TAR}" ]]; then
-      KUBE_MANIFESTS_TAR="${KUBE_ROOT}/_output/release-tars/kubernetes-manifests.tar.gz"
-    fi
-    if [[ ! -f "${KUBE_MANIFESTS_TAR}" ]]; then
-      echo "!!! Cannot find kubernetes-manifests.tar.gz" >&2
-      exit 1
-    fi
+    KUBE_MANIFESTS_TAR=$(find-tar kubernetes-manifests.tar.gz)
   fi
 }
 
@@ -555,6 +568,7 @@ function write-master-env {
   fi
 
   build-kube-env true "${KUBE_TEMP}/master-kube-env.yaml"
+  build-kube-master-certs "${KUBE_TEMP}/kube-master-certs.yaml"
 }
 
 function write-node-env {
@@ -563,6 +577,16 @@ function write-node-env {
   fi
 
   build-kube-env false "${KUBE_TEMP}/node-kube-env.yaml"
+}
+
+function build-kube-master-certs {
+  local file=$1
+  rm -f ${file}
+  cat >$file <<EOF
+KUBEAPISERVER_CERT: $(yaml-quote ${KUBEAPISERVER_CERT_BASE64:-})
+KUBEAPISERVER_KEY: $(yaml-quote ${KUBEAPISERVER_KEY_BASE64:-})
+KUBELET_AUTH_CA_CERT: $(yaml-quote ${KUBELET_AUTH_CA_CERT_BASE64:-})
+EOF
 }
 
 # $1: if 'true', we're building a master yaml, else a node
@@ -708,7 +732,7 @@ ENABLE_MANIFEST_URL: $(yaml-quote ${ENABLE_MANIFEST_URL:-false})
 MANIFEST_URL: $(yaml-quote ${MANIFEST_URL:-})
 MANIFEST_URL_HEADER: $(yaml-quote ${MANIFEST_URL_HEADER:-})
 NUM_NODES: $(yaml-quote ${NUM_NODES})
-STORAGE_BACKEND: $(yaml-quote ${STORAGE_BACKEND:-etcd2})
+STORAGE_BACKEND: $(yaml-quote ${STORAGE_BACKEND:-etcd3})
 ENABLE_GARBAGE_COLLECTOR: $(yaml-quote ${ENABLE_GARBAGE_COLLECTOR:-})
 MASTER_ADVERTISE_ADDRESS: $(yaml-quote ${MASTER_ADVERTISE_ADDRESS:-})
 ETCD_CA_KEY: $(yaml-quote ${ETCD_CA_KEY_BASE64:-})
@@ -777,6 +801,7 @@ EOF
 KUBERNETES_MASTER: $(yaml-quote "false")
 ZONE: $(yaml-quote ${ZONE})
 EXTRA_DOCKER_OPTS: $(yaml-quote ${EXTRA_DOCKER_OPTS:-})
+KUBELET_AUTH_CA_CERT: $(yaml-quote ${KUBELET_AUTH_CA_CERT_BASE64:-})
 EOF
     if [ -n "${KUBEPROXY_TEST_ARGS:-}" ]; then
       cat >>$file <<EOF
@@ -852,6 +877,38 @@ function sha1sum-file() {
   fi
 }
 
+# Downloads cfssl into ${KUBE_TEMP}/cfssl directory
+#
+# Assumed vars:
+#   KUBE_TEMP: temporary directory
+#
+function download-cfssl {
+  mkdir -p "${KUBE_TEMP}/cfssl"
+  pushd "${KUBE_TEMP}/cfssl"
+
+  kernel=$(uname -s)
+  case "${kernel}" in
+    Linux)
+      curl -s -L -o cfssl https://pkg.cfssl.org/R1.2/cfssl_linux-amd64
+      curl -s -L -o cfssljson https://pkg.cfssl.org/R1.2/cfssljson_linux-amd64
+      ;;
+    Darwin)
+      curl -s -L -o cfssl https://pkg.cfssl.org/R1.2/cfssl_darwin-amd64
+      curl -s -L -o cfssljson https://pkg.cfssl.org/R1.2/cfssljson_darwin-amd64
+      ;;
+    *)
+      echo "Unknown, unsupported platform: ${kernel}." >&2
+      echo "Supported platforms: Linux, Darwin." >&2
+      exit 2
+  esac
+
+  chmod +x cfssl
+  chmod +x cfssljson
+
+  popd
+}
+
+
 # Create certificate pairs for the cluster.
 # $1: The public IP for the master.
 #
@@ -911,6 +968,9 @@ function create-certs {
   KUBELET_KEY_BASE64=$(cat "${CERT_DIR}/pki/private/kubelet.key" | base64 | tr -d '\r\n')
   KUBECFG_CERT_BASE64=$(cat "${CERT_DIR}/pki/issued/kubecfg.crt" | base64 | tr -d '\r\n')
   KUBECFG_KEY_BASE64=$(cat "${CERT_DIR}/pki/private/kubecfg.key" | base64 | tr -d '\r\n')
+  KUBELET_AUTH_CA_CERT_BASE64=$(cat "${KUBE_TEMP}/easy-rsa-master/kubelet/pki/ca.crt" | base64 | tr -d '\r\n')
+  KUBEAPISERVER_CERT_BASE64=$(cat "${KUBE_TEMP}/easy-rsa-master/kubelet/pki/issued/kube-apiserver.crt" | base64 | tr -d '\r\n')
+  KUBEAPISERVER_KEY_BASE64=$(cat "${KUBE_TEMP}/easy-rsa-master/kubelet/pki/private/kube-apiserver.key" | base64 | tr -d '\r\n')
 }
 
 # Runs the easy RSA commands to generate certificate files.
@@ -930,6 +990,8 @@ function generate-certs {
     cd "${KUBE_TEMP}"
     curl -L -O --connect-timeout 20 --retry 6 --retry-delay 2 https://storage.googleapis.com/kubernetes-release/easy-rsa/easy-rsa.tar.gz
     tar xzf easy-rsa.tar.gz
+    mkdir easy-rsa-master/kubelet
+    cp -r easy-rsa-master/easyrsa3/* easy-rsa-master/kubelet
     cd easy-rsa-master/easyrsa3
     ./easyrsa init-pki
     # this puts the cert into pki/ca.crt and the key into pki/private/ca.key
@@ -946,7 +1008,11 @@ function generate-certs {
     mv "kubelet.pem" "pki/issued/kubelet.crt"
     rm -f "kubelet.csr"
 
-    ./easyrsa build-client-full kubecfg nopass) &>${cert_create_debug_output} || {
+    ./easyrsa build-client-full kubecfg nopass
+    cd ../kubelet
+    ./easyrsa init-pki
+    ./easyrsa --batch "--req-cn=kubelet@$(date +%s)" build-ca nopass
+    ./easyrsa build-client-full kube-apiserver nopass) &>${cert_create_debug_output} || {
     # If there was an error in the subshell, just die.
     # TODO(roberthbailey): add better error handling here
     cat "${cert_create_debug_output}" >&2

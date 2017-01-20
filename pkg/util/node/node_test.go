@@ -19,8 +19,8 @@ package node
 import (
 	"testing"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 )
 
 func TestGetPreferredAddress(t *testing.T) {
@@ -72,7 +72,7 @@ func TestGetPreferredAddress(t *testing.T) {
 
 	for k, tc := range testcases {
 		node := &v1.Node{
-			ObjectMeta: v1.ObjectMeta{Labels: tc.Labels},
+			ObjectMeta: metav1.ObjectMeta{Labels: tc.Labels},
 			Status:     v1.NodeStatus{Addresses: tc.Addresses},
 		}
 		address, err := GetPreferredNodeAddress(node, tc.Preferences)

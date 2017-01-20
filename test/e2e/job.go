@@ -19,16 +19,16 @@ package e2e
 import (
 	"time"
 
+	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/v1"
 	batchinternal "k8s.io/kubernetes/pkg/apis/batch"
 	batch "k8s.io/kubernetes/pkg/apis/batch/v1"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/kubectl"
-	"k8s.io/kubernetes/pkg/labels"
-	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
@@ -216,7 +216,7 @@ var _ = framework.KubeDescribe("Job", func() {
 // newTestJob returns a job which does one of several testing behaviors.
 func newTestJob(behavior, name string, rPol v1.RestartPolicy, parallelism, completions int32) *batch.Job {
 	job := &batch.Job{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 		},
 		Spec: batch.JobSpec{
@@ -224,7 +224,7 @@ func newTestJob(behavior, name string, rPol v1.RestartPolicy, parallelism, compl
 			Completions:    &completions,
 			ManualSelector: newBool(false),
 			Template: v1.PodTemplateSpec{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{jobSelectorKey: name},
 				},
 				Spec: v1.PodSpec{

@@ -27,25 +27,28 @@ import (
 	"os/exec"
 	"path"
 
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	"k8s.io/kubernetes/cmd/kubeadm/app/phases/kubeconfig"
 	"k8s.io/kubernetes/pkg/api/validation"
-	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/util/initsystem"
 	"k8s.io/kubernetes/pkg/util/node"
 	"k8s.io/kubernetes/test/e2e_node/system"
 )
 
-type PreFlightError struct {
+const bridgenf string = "/proc/sys/net/bridge/bridge-nf-call-iptables"
+
+type Error struct {
 	Msg string
 }
 
-func (e *PreFlightError) Error() string {
+func (e *Error) Error() string {
 	return fmt.Sprintf("[preflight] Some fatal errors occurred:\n%s%s", e.Msg, "[preflight] If you know what you are doing, you can skip pre-flight checks with `--skip-preflight-checks`")
 }
 
-// PreFlightCheck validates the state of the system to ensure kubeadm will be
+// Checker validates the state of the system to ensure kubeadm will be
 // successful as often as possilble.
-type PreFlightCheck interface {
+type Checker interface {
 	Check() (warnings, errors []error)
 }
 
@@ -182,6 +185,34 @@ func (fac FileAvailableCheck) Check() (warnings, errors []error) {
 	return nil, errors
 }
 
+// FileContentCheck checks that the given file contains the string Content.
+type FileContentCheck struct {
+	Path    string
+	Content []byte
+}
+
+func (fcc FileContentCheck) Check() (warnings, errors []error) {
+	f, err := os.Open(fcc.Path)
+	if err != nil {
+		return nil, []error{fmt.Errorf("%s does not exist", fcc.Path)}
+	}
+
+	lr := io.LimitReader(f, int64(len(fcc.Content)))
+	defer f.Close()
+
+	buf := &bytes.Buffer{}
+	_, err = io.Copy(buf, lr)
+	if err != nil {
+		return nil, []error{fmt.Errorf("%s could not be read", fcc.Path)}
+	}
+
+	if !bytes.Equal(buf.Bytes(), fcc.Content) {
+		return nil, []error{fmt.Errorf("%s contents are not set to %s", fcc.Path, fcc.Content)}
+	}
+	return nil, []error{}
+
+}
+
 // InPathCheck checks if the given executable is present in the path.
 type InPathCheck struct {
 	executable string
@@ -274,7 +305,7 @@ func (sysver SystemVerificationCheck) Check() (warnings, errors []error) {
 }
 
 func RunInitMasterChecks(cfg *kubeadmapi.MasterConfiguration) error {
-	checks := []PreFlightCheck{
+	checks := []Checker{
 		SystemVerificationCheck{},
 		IsRootCheck{},
 		HostnameCheck{},
@@ -290,8 +321,9 @@ func RunInitMasterChecks(cfg *kubeadmapi.MasterConfiguration) error {
 		DirAvailableCheck{Path: path.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, "manifests")},
 		DirAvailableCheck{Path: kubeadmapi.GlobalEnvParams.HostPKIPath},
 		DirAvailableCheck{Path: "/var/lib/kubelet"},
-		FileAvailableCheck{Path: path.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, "admin.conf")},
-		FileAvailableCheck{Path: path.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, "kubelet.conf")},
+		FileAvailableCheck{Path: path.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, kubeconfig.AdminKubeConfigFileName)},
+		FileAvailableCheck{Path: path.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, kubeconfig.KubeletKubeConfigFileName)},
+		FileContentCheck{Path: bridgenf, Content: []byte{'1'}},
 		InPathCheck{executable: "ip", mandatory: true},
 		InPathCheck{executable: "iptables", mandatory: true},
 		InPathCheck{executable: "mount", mandatory: true},
@@ -315,7 +347,7 @@ func RunInitMasterChecks(cfg *kubeadmapi.MasterConfiguration) error {
 }
 
 func RunJoinNodeChecks(cfg *kubeadmapi.NodeConfiguration) error {
-	checks := []PreFlightCheck{
+	checks := []Checker{
 		SystemVerificationCheck{},
 		IsRootCheck{},
 		HostnameCheck{},
@@ -324,7 +356,8 @@ func RunJoinNodeChecks(cfg *kubeadmapi.NodeConfiguration) error {
 		PortOpenCheck{port: 10250},
 		DirAvailableCheck{Path: path.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, "manifests")},
 		DirAvailableCheck{Path: "/var/lib/kubelet"},
-		FileAvailableCheck{Path: path.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, "kubelet.conf")},
+		FileAvailableCheck{Path: path.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, kubeconfig.KubeletKubeConfigFileName)},
+		FileContentCheck{Path: bridgenf, Content: []byte{'1'}},
 		InPathCheck{executable: "ip", mandatory: true},
 		InPathCheck{executable: "iptables", mandatory: true},
 		InPathCheck{executable: "mount", mandatory: true},
@@ -340,7 +373,7 @@ func RunJoinNodeChecks(cfg *kubeadmapi.NodeConfiguration) error {
 }
 
 func RunRootCheckOnly() error {
-	checks := []PreFlightCheck{
+	checks := []Checker{
 		IsRootCheck{},
 	}
 
@@ -349,7 +382,7 @@ func RunRootCheckOnly() error {
 
 // RunChecks runs each check, displays it's warnings/errors, and once all
 // are processed will exit if any errors occurred.
-func RunChecks(checks []PreFlightCheck, ww io.Writer) error {
+func RunChecks(checks []Checker, ww io.Writer) error {
 	found := []error{}
 	for _, c := range checks {
 		warnings, errs := c.Check()
@@ -363,7 +396,7 @@ func RunChecks(checks []PreFlightCheck, ww io.Writer) error {
 		for _, i := range found {
 			errs.WriteString("\t" + i.Error() + "\n")
 		}
-		return &PreFlightError{Msg: errs.String()}
+		return &Error{Msg: errs.String()}
 	}
 	return nil
 }

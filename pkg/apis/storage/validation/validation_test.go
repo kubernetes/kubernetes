@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/api"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/apis/storage"
 )
 
@@ -28,18 +28,18 @@ func TestValidateStorageClass(t *testing.T) {
 	successCases := []storage.StorageClass{
 		{
 			// empty parameters
-			ObjectMeta:  api.ObjectMeta{Name: "foo"},
+			ObjectMeta:  metav1.ObjectMeta{Name: "foo"},
 			Provisioner: "kubernetes.io/foo-provisioner",
 			Parameters:  map[string]string{},
 		},
 		{
 			// nil parameters
-			ObjectMeta:  api.ObjectMeta{Name: "foo"},
+			ObjectMeta:  metav1.ObjectMeta{Name: "foo"},
 			Provisioner: "kubernetes.io/foo-provisioner",
 		},
 		{
 			// some parameters
-			ObjectMeta:  api.ObjectMeta{Name: "foo"},
+			ObjectMeta:  metav1.ObjectMeta{Name: "foo"},
 			Provisioner: "kubernetes.io/foo-provisioner",
 			Parameters: map[string]string{
 				"kubernetes.io/foo-parameter": "free/form/string",
@@ -68,26 +68,26 @@ func TestValidateStorageClass(t *testing.T) {
 
 	errorCases := map[string]storage.StorageClass{
 		"namespace is present": {
-			ObjectMeta:  api.ObjectMeta{Name: "foo", Namespace: "bar"},
+			ObjectMeta:  metav1.ObjectMeta{Name: "foo", Namespace: "bar"},
 			Provisioner: "kubernetes.io/foo-provisioner",
 		},
 		"invalid provisioner": {
-			ObjectMeta:  api.ObjectMeta{Name: "foo"},
+			ObjectMeta:  metav1.ObjectMeta{Name: "foo"},
 			Provisioner: "kubernetes.io/invalid/provisioner",
 		},
 		"invalid empty parameter name": {
-			ObjectMeta:  api.ObjectMeta{Name: "foo"},
+			ObjectMeta:  metav1.ObjectMeta{Name: "foo"},
 			Provisioner: "kubernetes.io/foo",
 			Parameters: map[string]string{
 				"": "value",
 			},
 		},
 		"provisioner: Required value": {
-			ObjectMeta:  api.ObjectMeta{Name: "foo"},
+			ObjectMeta:  metav1.ObjectMeta{Name: "foo"},
 			Provisioner: "",
 		},
 		"too long parameters": {
-			ObjectMeta:  api.ObjectMeta{Name: "foo"},
+			ObjectMeta:  metav1.ObjectMeta{Name: "foo"},
 			Provisioner: "kubernetes.io/foo",
 			Parameters:  longParameters,
 		},

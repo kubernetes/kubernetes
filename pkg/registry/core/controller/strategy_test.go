@@ -19,13 +19,14 @@ package controller
 import (
 	"testing"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/kubernetes/pkg/api"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
-	"k8s.io/kubernetes/pkg/apimachinery/registered"
 )
 
 func TestControllerStrategy(t *testing.T) {
-	ctx := api.NewDefaultContext()
+	ctx := genericapirequest.NewDefaultContext()
 	if !Strategy.NamespaceScoped() {
 		t.Errorf("ReplicationController must be namespace scoped")
 	}
@@ -36,7 +37,7 @@ func TestControllerStrategy(t *testing.T) {
 	validSelector := map[string]string{"a": "b"}
 	validPodTemplate := api.PodTemplate{
 		Template: api.PodTemplateSpec{
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Labels: validSelector,
 			},
 			Spec: api.PodSpec{
@@ -47,7 +48,7 @@ func TestControllerStrategy(t *testing.T) {
 		},
 	}
 	rc := &api.ReplicationController{
-		ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
+		ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
 		Spec: api.ReplicationControllerSpec{
 			Selector: validSelector,
 			Template: &validPodTemplate.Template,
@@ -71,7 +72,7 @@ func TestControllerStrategy(t *testing.T) {
 	}
 
 	invalidRc := &api.ReplicationController{
-		ObjectMeta: api.ObjectMeta{Name: "bar", ResourceVersion: "4"},
+		ObjectMeta: metav1.ObjectMeta{Name: "bar", ResourceVersion: "4"},
 	}
 	Strategy.PrepareForUpdate(ctx, invalidRc, rc)
 	errs = Strategy.ValidateUpdate(ctx, invalidRc, rc)
@@ -84,7 +85,7 @@ func TestControllerStrategy(t *testing.T) {
 }
 
 func TestControllerStatusStrategy(t *testing.T) {
-	ctx := api.NewDefaultContext()
+	ctx := genericapirequest.NewDefaultContext()
 	if !StatusStrategy.NamespaceScoped() {
 		t.Errorf("ReplicationController must be namespace scoped")
 	}
@@ -94,7 +95,7 @@ func TestControllerStatusStrategy(t *testing.T) {
 	validSelector := map[string]string{"a": "b"}
 	validPodTemplate := api.PodTemplate{
 		Template: api.PodTemplateSpec{
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Labels: validSelector,
 			},
 			Spec: api.PodSpec{
@@ -105,7 +106,7 @@ func TestControllerStatusStrategy(t *testing.T) {
 		},
 	}
 	oldController := &api.ReplicationController{
-		ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault, ResourceVersion: "10"},
+		ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault, ResourceVersion: "10"},
 		Spec: api.ReplicationControllerSpec{
 			Replicas: 3,
 			Selector: validSelector,
@@ -117,7 +118,7 @@ func TestControllerStatusStrategy(t *testing.T) {
 		},
 	}
 	newController := &api.ReplicationController{
-		ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault, ResourceVersion: "9"},
+		ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault, ResourceVersion: "9"},
 		Spec: api.ReplicationControllerSpec{
 			Replicas: 1,
 			Selector: validSelector,
@@ -143,7 +144,7 @@ func TestControllerStatusStrategy(t *testing.T) {
 
 func TestSelectableFieldLabelConversions(t *testing.T) {
 	apitesting.TestSelectableFieldLabelConversionsOfKind(t,
-		registered.GroupOrDie(api.GroupName).GroupVersion.String(),
+		api.Registry.GroupOrDie(api.GroupName).GroupVersion.String(),
 		"ReplicationController",
 		ControllerToSelectableFields(&api.ReplicationController{}),
 		nil,

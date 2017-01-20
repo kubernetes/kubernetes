@@ -20,15 +20,24 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/api/v1"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	gcecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
-	"k8s.io/kubernetes/pkg/util/sets"
 
 	. "github.com/onsi/gomega"
 	compute "google.golang.org/api/compute/v1"
+)
+
+const (
+	FirewallTimeoutDefault = 3 * time.Minute
+	FirewallTestTcpTimeout = time.Duration(1 * time.Second)
+	// Set ports outside of 30000-32767, 80 and 8080 to avoid being whitelisted by the e2e cluster
+	FirewallTestHttpPort = int32(29999)
+	FirewallTestUdpPort  = int32(29998)
 )
 
 // MakeFirewallNameForLBService return the expected firewall name for a LB service.

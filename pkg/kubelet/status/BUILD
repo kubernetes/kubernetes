@@ -17,19 +17,19 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
-        "//pkg/api/errors:go_default_library",
         "//pkg/api/v1:go_default_library",
         "//pkg/api/v1/pod:go_default_library",
-        "//pkg/apis/meta/v1:go_default_library",
         "//pkg/client/clientset_generated/clientset:go_default_library",
         "//pkg/kubelet/container:go_default_library",
         "//pkg/kubelet/pod:go_default_library",
         "//pkg/kubelet/types:go_default_library",
         "//pkg/kubelet/util/format:go_default_library",
-        "//pkg/types:go_default_library",
-        "//pkg/util/diff:go_default_library",
-        "//pkg/util/wait:go_default_library",
         "//vendor:github.com/golang/glog",
+        "//vendor:k8s.io/apimachinery/pkg/api/errors",
+        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor:k8s.io/apimachinery/pkg/types",
+        "//vendor:k8s.io/apimachinery/pkg/util/diff",
+        "//vendor:k8s.io/apimachinery/pkg/util/wait",
     ],
 )
 
@@ -43,18 +43,32 @@ go_test(
     tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
-        "//pkg/api/errors:go_default_library",
         "//pkg/api/v1:go_default_library",
-        "//pkg/apis/meta/v1:go_default_library",
         "//pkg/client/clientset_generated/clientset:go_default_library",
         "//pkg/client/clientset_generated/clientset/fake:go_default_library",
         "//pkg/client/testing/core:go_default_library",
         "//pkg/kubelet/container:go_default_library",
         "//pkg/kubelet/pod:go_default_library",
         "//pkg/kubelet/pod/testing:go_default_library",
+        "//pkg/kubelet/secret:go_default_library",
         "//pkg/kubelet/types:go_default_library",
-        "//pkg/runtime:go_default_library",
-        "//pkg/runtime/schema:go_default_library",
         "//vendor:github.com/stretchr/testify/assert",
+        "//vendor:k8s.io/apimachinery/pkg/api/errors",
+        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor:k8s.io/apimachinery/pkg/runtime",
+        "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
     ],
+)
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [":package-srcs"],
+    tags = ["automanaged"],
 )

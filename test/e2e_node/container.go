@@ -19,9 +19,9 @@ package e2e_node
 import (
 	"fmt"
 
-	"k8s.io/kubernetes/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
@@ -46,7 +46,7 @@ func (cc *ConformanceContainer) Create() {
 		imagePullSecrets = append(imagePullSecrets, v1.LocalObjectReference{Name: s})
 	}
 	pod := &v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: cc.podName,
 		},
 		Spec: v1.PodSpec{

@@ -103,7 +103,7 @@ func TestEtcdVolumeMount(t *testing.T) {
 		{
 			expected: api.VolumeMount{
 				Name:      "etcd",
-				MountPath: "/var/etcd",
+				MountPath: "/var/lib/etcd",
 			},
 		},
 	}
@@ -484,7 +484,7 @@ func TestGetControllerManagerCommand(t *testing.T) {
 				"--service-account-private-key-file=" + kubeadmapi.GlobalEnvParams.HostPKIPath + "/apiserver-key.pem",
 				"--cluster-signing-cert-file=" + kubeadmapi.GlobalEnvParams.HostPKIPath + "/ca.pem",
 				"--cluster-signing-key-file=" + kubeadmapi.GlobalEnvParams.HostPKIPath + "/ca-key.pem",
-				"--insecure-experimental-approve-all-kubelet-csrs-for-group=system:kubelet-bootstrap",
+				"--insecure-experimental-approve-all-kubelet-csrs-for-group=kubeadm:kubelet-bootstrap",
 			},
 		},
 		{
@@ -499,7 +499,7 @@ func TestGetControllerManagerCommand(t *testing.T) {
 				"--service-account-private-key-file=" + kubeadmapi.GlobalEnvParams.HostPKIPath + "/apiserver-key.pem",
 				"--cluster-signing-cert-file=" + kubeadmapi.GlobalEnvParams.HostPKIPath + "/ca.pem",
 				"--cluster-signing-key-file=" + kubeadmapi.GlobalEnvParams.HostPKIPath + "/ca-key.pem",
-				"--insecure-experimental-approve-all-kubelet-csrs-for-group=system:kubelet-bootstrap",
+				"--insecure-experimental-approve-all-kubelet-csrs-for-group=kubeadm:kubelet-bootstrap",
 				"--cloud-provider=foo",
 			},
 		},
@@ -515,7 +515,7 @@ func TestGetControllerManagerCommand(t *testing.T) {
 				"--service-account-private-key-file=" + kubeadmapi.GlobalEnvParams.HostPKIPath + "/apiserver-key.pem",
 				"--cluster-signing-cert-file=" + kubeadmapi.GlobalEnvParams.HostPKIPath + "/ca.pem",
 				"--cluster-signing-key-file=" + kubeadmapi.GlobalEnvParams.HostPKIPath + "/ca-key.pem",
-				"--insecure-experimental-approve-all-kubelet-csrs-for-group=system:kubelet-bootstrap",
+				"--insecure-experimental-approve-all-kubelet-csrs-for-group=kubeadm:kubelet-bootstrap",
 				"--allocate-node-cidrs=true",
 				"--cluster-cidr=bar",
 			},

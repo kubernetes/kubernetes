@@ -19,8 +19,8 @@ package authorizer
 import (
 	"testing"
 
-	"k8s.io/kubernetes/pkg/auth/authorizer"
-	"k8s.io/kubernetes/pkg/auth/user"
+	"k8s.io/apiserver/pkg/authentication/user"
+	"k8s.io/apiserver/pkg/authorization/authorizer"
 )
 
 // NewAlwaysAllowAuthorizer must return a struct which implements authorizer.Authorizer

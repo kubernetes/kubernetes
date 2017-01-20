@@ -19,9 +19,9 @@ package etcd
 import (
 	"strconv"
 
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/meta"
-	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage"
 )
 
@@ -45,7 +45,7 @@ func (a APIObjectVersioner) UpdateObject(obj runtime.Object, resourceVersion uin
 
 // UpdateList implements Versioner
 func (a APIObjectVersioner) UpdateList(obj runtime.Object, resourceVersion uint64) error {
-	listMeta, err := api.ListMetaFor(obj)
+	listMeta, err := metav1.ListMetaFor(obj)
 	if err != nil || listMeta == nil {
 		return err
 	}

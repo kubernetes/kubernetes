@@ -27,22 +27,22 @@ go_library(
         "//pkg/kubelet/cadvisor:go_default_library",
         "//pkg/kubelet/cm/util:go_default_library",
         "//pkg/kubelet/qos:go_default_library",
-        "//pkg/types:go_default_library",
         "//pkg/util:go_default_library",
-        "//pkg/util/errors:go_default_library",
         "//pkg/util/mount:go_default_library",
         "//pkg/util/oom:go_default_library",
         "//pkg/util/procfs:go_default_library",
-        "//pkg/util/runtime:go_default_library",
-        "//pkg/util/sets:go_default_library",
         "//pkg/util/sysctl:go_default_library",
         "//pkg/util/version:go_default_library",
-        "//pkg/util/wait:go_default_library",
         "//vendor:github.com/golang/glog",
         "//vendor:github.com/opencontainers/runc/libcontainer/cgroups",
         "//vendor:github.com/opencontainers/runc/libcontainer/cgroups/fs",
         "//vendor:github.com/opencontainers/runc/libcontainer/cgroups/systemd",
         "//vendor:github.com/opencontainers/runc/libcontainer/configs",
+        "//vendor:k8s.io/apimachinery/pkg/types",
+        "//vendor:k8s.io/apimachinery/pkg/util/errors",
+        "//vendor:k8s.io/apimachinery/pkg/util/runtime",
+        "//vendor:k8s.io/apimachinery/pkg/util/sets",
+        "//vendor:k8s.io/apimachinery/pkg/util/wait",
     ],
 )
 
@@ -62,4 +62,20 @@ go_test(
         "//vendor:github.com/stretchr/testify/assert",
         "//vendor:github.com/stretchr/testify/require",
     ],
+)
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [
+        ":package-srcs",
+        "//pkg/kubelet/cm/util:all-srcs",
+    ],
+    tags = ["automanaged"],
 )

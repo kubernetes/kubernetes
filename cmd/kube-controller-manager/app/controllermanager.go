@@ -31,9 +31,14 @@ import (
 	"strconv"
 	"time"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apiserver/pkg/server/healthz"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/app/options"
 	"k8s.io/kubernetes/pkg/api/v1"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	v1core "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/core/v1"
 	"k8s.io/kubernetes/pkg/client/leaderelection"
 	"k8s.io/kubernetes/pkg/client/leaderelection/resourcelock"
@@ -50,12 +55,9 @@ import (
 	serviceaccountcontroller "k8s.io/kubernetes/pkg/controller/serviceaccount"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach"
 	persistentvolumecontroller "k8s.io/kubernetes/pkg/controller/volume/persistentvolume"
-	"k8s.io/kubernetes/pkg/healthz"
-	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/serviceaccount"
 	certutil "k8s.io/kubernetes/pkg/util/cert"
 	"k8s.io/kubernetes/pkg/util/configz"
-	"k8s.io/kubernetes/pkg/util/wait"
 
 	"github.com/golang/glog"
 	"github.com/prometheus/client_golang/prometheus"
@@ -71,7 +73,7 @@ const (
 // NewControllerManagerCommand creates a *cobra.Command object with default parameters
 func NewControllerManagerCommand() *cobra.Command {
 	s := options.NewCMServer()
-	s.AddFlags(pflag.CommandLine)
+	s.AddFlags(pflag.CommandLine, KnownControllers(), ControllersDisabledByDefault.List())
 	cmd := &cobra.Command{
 		Use: "kube-controller-manager",
 		Long: `The Kubernetes controller manager is a daemon that embeds
@@ -98,6 +100,10 @@ func ResyncPeriod(s *options.CMServer) func() time.Duration {
 
 // Run runs the CMServer.  This should never exit.
 func Run(s *options.CMServer) error {
+	if err := s.Validate(KnownControllers(), ControllersDisabledByDefault.List()); err != nil {
+		return err
+	}
+
 	if c, err := configz.New("componentconfig"); err == nil {
 		c.Set(s.KubeControllerManagerConfiguration)
 	} else {
@@ -173,7 +179,7 @@ func Run(s *options.CMServer) error {
 
 	// TODO: enable other lock types
 	rl := resourcelock.EndpointsLock{
-		EndpointsMeta: v1.ObjectMeta{
+		EndpointsMeta: metav1.ObjectMeta{
 			Namespace: "kube-system",
 			Name:      "kube-controller-manager",
 		},
@@ -216,10 +222,45 @@ type ControllerContext struct {
 	Stop <-chan struct{}
 }
 
+func (c ControllerContext) IsControllerEnabled(name string) bool {
+	return IsControllerEnabled(name, ControllersDisabledByDefault, c.Options.Controllers...)
+}
+
+func IsControllerEnabled(name string, disabledByDefaultControllers sets.String, controllers ...string) bool {
+	hasStar := false
+	for _, controller := range controllers {
+		if controller == name {
+			return true
+		}
+		if controller == "-"+name {
+			return false
+		}
+		if controller == "*" {
+			hasStar = true
+		}
+	}
+	// if we get here, there was no explicit choice
+	if !hasStar {
+		// nothing on by default
+		return false
+	}
+	if disabledByDefaultControllers.Has(name) {
+		return false
+	}
+
+	return true
+}
+
 // InitFunc is used to launch a particular controller.  It may run additional "should I activate checks".
 // Any error returned will cause the controller process to `Fatal`
 // The bool indicates whether the controller was enabled.
 type InitFunc func(ctx ControllerContext) (bool, error)
+
+func KnownControllers() []string {
+	return sets.StringKeySet(newControllerInitializers()).List()
+}
+
+var ControllersDisabledByDefault = sets.NewString()
 
 func newControllerInitializers() map[string]InitFunc {
 	controllers := map[string]InitFunc{}
@@ -330,6 +371,11 @@ func StartControllers(controllers map[string]InitFunc, s *options.CMServer, root
 	}
 
 	for controllerName, initFn := range controllers {
+		if !ctx.IsControllerEnabled(controllerName) {
+			glog.Warningf("%q is disabled", controllerName)
+			continue
+		}
+
 		time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
 
 		glog.V(1).Infof("Starting %q", controllerName)
@@ -340,6 +386,7 @@ func StartControllers(controllers map[string]InitFunc, s *options.CMServer, root
 		}
 		if !started {
 			glog.Warningf("Skipping %q", controllerName)
+			continue
 		}
 		glog.Infof("Started %q", controllerName)
 	}
@@ -408,6 +455,10 @@ func StartControllers(controllers map[string]InitFunc, s *options.CMServer, root
 	go volumeController.Run(stop)
 	time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
 
+	if s.ReconcilerSyncLoopPeriod.Duration < time.Second {
+		return fmt.Errorf("Duration time must be greater than one second as set via command line option reconcile-sync-loop-period.")
+	}
+
 	attachDetachController, attachDetachControllerErr :=
 		attachdetach.NewAttachDetachController(
 			clientBuilder.ClientOrDie("attachdetach-controller"),
@@ -416,7 +467,10 @@ func StartControllers(controllers map[string]InitFunc, s *options.CMServer, root
 			sharedInformers.PersistentVolumeClaims().Informer(),
 			sharedInformers.PersistentVolumes().Informer(),
 			cloud,
-			ProbeAttachableVolumePlugins(s.VolumeConfiguration))
+			ProbeAttachableVolumePlugins(s.VolumeConfiguration),
+			s.DisableAttachDetachReconcilerSync,
+			s.ReconcilerSyncLoopPeriod.Duration,
+		)
 	if attachDetachControllerErr != nil {
 		return fmt.Errorf("failed to start attach/detach controller: %v", attachDetachControllerErr)
 	}

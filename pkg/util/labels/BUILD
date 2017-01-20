@@ -15,7 +15,7 @@ go_library(
         "labels.go",
     ],
     tags = ["automanaged"],
-    deps = ["//pkg/apis/meta/v1:go_default_library"],
+    deps = ["//vendor:k8s.io/apimachinery/pkg/apis/meta/v1"],
 )
 
 go_test(
@@ -23,5 +23,18 @@ go_test(
     srcs = ["labels_test.go"],
     library = ":go_default_library",
     tags = ["automanaged"],
-    deps = ["//pkg/apis/meta/v1:go_default_library"],
+    deps = ["//vendor:k8s.io/apimachinery/pkg/apis/meta/v1"],
+)
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [":package-srcs"],
+    tags = ["automanaged"],
 )

@@ -17,7 +17,7 @@ limitations under the License.
 package container
 
 import (
-	"k8s.io/kubernetes/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/term"
 )
 

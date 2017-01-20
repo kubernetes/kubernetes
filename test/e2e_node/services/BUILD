@@ -23,8 +23,8 @@ go_library(
     deps = [
         "//cmd/kube-apiserver/app:go_default_library",
         "//cmd/kube-apiserver/app/options:go_default_library",
+        "//pkg/api:go_default_library",
         "//pkg/api/v1:go_default_library",
-        "//pkg/apimachinery/registered:go_default_library",
         "//pkg/client/clientset_generated/clientset:go_default_library",
         "//pkg/client/restclient:go_default_library",
         "//pkg/client/typed/dynamic:go_default_library",
@@ -40,4 +40,17 @@ go_library(
         "//vendor:github.com/golang/glog",
         "//vendor:github.com/kardianos/osext",
     ],
+)
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [":package-srcs"],
+    tags = ["automanaged"],
 )

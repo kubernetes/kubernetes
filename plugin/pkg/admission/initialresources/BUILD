@@ -19,11 +19,8 @@ go_library(
     ],
     tags = ["automanaged"],
     deps = [
-        "//pkg/admission:go_default_library",
         "//pkg/api:go_default_library",
-        "//pkg/api/errors:go_default_library",
         "//pkg/api/resource:go_default_library",
-        "//pkg/client/clientset_generated/internalclientset:go_default_library",
         "//pkg/client/restclient:go_default_library",
         "//pkg/client/unversioned/clientcmd:go_default_library",
         "//vendor:cloud.google.com/go/compute/metadata",
@@ -33,6 +30,8 @@ go_library(
         "//vendor:golang.org/x/oauth2",
         "//vendor:golang.org/x/oauth2/google",
         "//vendor:google.golang.org/api/cloudmonitoring/v2beta2",
+        "//vendor:k8s.io/apimachinery/pkg/api/errors",
+        "//vendor:k8s.io/apiserver/pkg/admission",
     ],
 )
 
@@ -45,9 +44,23 @@ go_test(
     library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
-        "//pkg/admission:go_default_library",
         "//pkg/api:go_default_library",
         "//pkg/api/resource:go_default_library",
         "//vendor:github.com/stretchr/testify/require",
+        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor:k8s.io/apiserver/pkg/admission",
     ],
+)
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [":package-srcs"],
+    tags = ["automanaged"],
 )

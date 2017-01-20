@@ -22,18 +22,16 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/kubernetes/pkg/api"
-	apierrors "k8s.io/kubernetes/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apiserver/pkg/authentication/serviceaccount"
 	"k8s.io/kubernetes/pkg/api/v1"
-	legacyv1 "k8s.io/kubernetes/pkg/api/v1"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
-	rbacv1alpha1 "k8s.io/kubernetes/pkg/apis/rbac/v1alpha1"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	rbacv1beta1 "k8s.io/kubernetes/pkg/apis/rbac/v1beta1"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	coreclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/core/v1"
-	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/labels"
-	"k8s.io/kubernetes/pkg/runtime/schema"
-	"k8s.io/kubernetes/pkg/serviceaccount"
 	"k8s.io/kubernetes/pkg/util/system"
 	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -65,33 +63,10 @@ var _ = framework.KubeDescribe("NodeProblemDetector", func() {
 
 		// this test wants extra permissions.  Since the namespace names are unique, we can leave this
 		// lying around so we don't have to race any caches
-		_, err := f.ClientSet.Rbac().ClusterRoleBindings().Create(&rbacv1alpha1.ClusterRoleBinding{
-			ObjectMeta: legacyv1.ObjectMeta{
-				Name: f.Namespace.Name + "--cluster-admin",
-			},
-			RoleRef: rbacv1alpha1.RoleRef{
-				APIGroup: "rbac.authorization.k8s.io",
-				Kind:     "ClusterRole",
-				Name:     "cluster-admin",
-			},
-			Subjects: []rbacv1alpha1.Subject{
-				{
-					Kind:      rbacv1alpha1.ServiceAccountKind,
-					Namespace: f.Namespace.Name,
-					Name:      "default",
-				},
-			},
-		})
-		if apierrors.IsForbidden(err) {
-			// The user is not allowed to create ClusterRoleBindings. This
-			// probably means that RBAC is not being used. If RBAC is being
-			// used, this test will probably fail later.
-			framework.Logf("Attempt to create ClusterRoleBinding was forbidden: %v.", err)
-			return
-		}
-		framework.ExpectNoError(err)
+		framework.BindClusterRole(f.ClientSet.Rbac(), "cluster-admin", f.Namespace.Name,
+			rbacv1beta1.Subject{Kind: rbacv1beta1.ServiceAccountKind, Namespace: f.Namespace.Name, Name: "default"})
 
-		err = framework.WaitForAuthorizationUpdate(f.ClientSet.Authorization(),
+		err := framework.WaitForAuthorizationUpdate(f.ClientSet.Authorization(),
 			serviceaccount.MakeUsername(f.Namespace.Name, "default"),
 			"", "create", schema.GroupResource{Resource: "pods"}, true)
 		framework.ExpectNoError(err)
@@ -196,7 +171,7 @@ var _ = framework.KubeDescribe("NodeProblemDetector", func() {
 			Expect(framework.IssueSSHCommand(cmd, framework.TestContext.Provider, node)).To(Succeed())
 			By("Create config map for the node problem detector")
 			_, err = c.Core().ConfigMaps(ns).Create(&v1.ConfigMap{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name: configName,
 				},
 				Data: map[string]string{configFile: config},
@@ -204,7 +179,7 @@ var _ = framework.KubeDescribe("NodeProblemDetector", func() {
 			Expect(err).NotTo(HaveOccurred())
 			By("Create the node problem detector")
 			_, err = c.Core().Pods(ns).Create(&v1.Pod{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name: name,
 				},
 				Spec: v1.PodSpec{
@@ -410,7 +385,7 @@ var _ = framework.KubeDescribe("NodeProblemDetector", func() {
 			Expect(c.Core().Events(eventNamespace).DeleteCollection(v1.NewDeleteOptions(0), eventListOptions)).To(Succeed())
 			By("Clean up the node condition")
 			patch := []byte(fmt.Sprintf(`{"status":{"conditions":[{"$patch":"delete","type":"%s"}]}}`, condition))
-			c.Core().RESTClient().Patch(api.StrategicMergePatchType).Resource("nodes").Name(node.Name).SubResource("status").Body(patch).Do()
+			c.Core().RESTClient().Patch(types.StrategicMergePatchType).Resource("nodes").Name(node.Name).SubResource("status").Body(patch).Do()
 			By("Clean up the temporary directory")
 			framework.IssueSSHCommand(fmt.Sprintf("rm -r %s", tmpDir), framework.TestContext.Provider, node)
 		})

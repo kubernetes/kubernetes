@@ -20,12 +20,12 @@ import (
 	"fmt"
 	"time"
 
-	apierrors "k8s.io/kubernetes/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/api/v1"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/util/uuid"
 	utilversion "k8s.io/kubernetes/pkg/util/version"
-	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/plugin/pkg/admission/serviceaccount"
 	"k8s.io/kubernetes/test/e2e/framework"
 
@@ -191,7 +191,7 @@ var _ = framework.KubeDescribe("ServiceAccounts", func() {
 		}))
 
 		pod := &v1.Pod{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				GenerateName: "pod-service-account-" + string(uuid.NewUUID()) + "-",
 			},
 			Spec: v1.PodSpec{

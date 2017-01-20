@@ -22,12 +22,13 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/pkg/util/clock"
+	"k8s.io/client-go/pkg/util/flowcontrol"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/record"
 	. "k8s.io/kubernetes/pkg/kubelet/container"
 	ctest "k8s.io/kubernetes/pkg/kubelet/container/testing"
-	"k8s.io/kubernetes/pkg/util/clock"
-	"k8s.io/kubernetes/pkg/util/flowcontrol"
 )
 
 type pullerTestCase struct {
@@ -111,7 +112,7 @@ func pullerTestEnv(c pullerTestCase, serialized bool) (puller ImageManager, fake
 
 func TestParallelPuller(t *testing.T) {
 	pod := &v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:            "test_pod",
 			Namespace:       "test-ns",
 			UID:             "bar",
@@ -135,7 +136,7 @@ func TestParallelPuller(t *testing.T) {
 
 func TestSerializedPuller(t *testing.T) {
 	pod := &v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:            "test_pod",
 			Namespace:       "test-ns",
 			UID:             "bar",

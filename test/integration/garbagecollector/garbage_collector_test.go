@@ -30,19 +30,18 @@ import (
 	"github.com/golang/glog"
 	dto "github.com/prometheus/client_model/go"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/serializer"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/apimachinery/registered"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/typed/discovery"
 	"k8s.io/kubernetes/pkg/client/typed/dynamic"
 	"k8s.io/kubernetes/pkg/controller/garbagecollector"
 	"k8s.io/kubernetes/pkg/controller/garbagecollector/metaonly"
-	"k8s.io/kubernetes/pkg/runtime/serializer"
-	"k8s.io/kubernetes/pkg/types"
-	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/test/integration"
 	"k8s.io/kubernetes/test/integration/framework"
 )
@@ -75,7 +74,7 @@ func newPod(podName, podNamespace string, ownerReferences []metav1.OwnerReferenc
 			Kind:       "Pod",
 			APIVersion: "v1",
 		},
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:            podName,
 			Namespace:       podNamespace,
 			OwnerReferences: ownerReferences,
@@ -97,14 +96,14 @@ func newOwnerRC(name, namespace string) *v1.ReplicationController {
 			Kind:       "ReplicationController",
 			APIVersion: "v1",
 		},
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Namespace: namespace,
 			Name:      name,
 		},
 		Spec: v1.ReplicationControllerSpec{
 			Selector: map[string]string{"name": "test"},
 			Template: &v1.PodTemplateSpec{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{"name": "test"},
 				},
 				Spec: v1.PodSpec{
@@ -141,10 +140,10 @@ func setup(t *testing.T) (*httptest.Server, *garbagecollector.GarbageCollector, 
 	}
 	config := &restclient.Config{Host: s.URL}
 	config.ContentConfig.NegotiatedSerializer = serializer.DirectCodecFactory{CodecFactory: metaonly.NewMetadataCodecFactory()}
-	metaOnlyClientPool := dynamic.NewClientPool(config, registered.RESTMapper(), dynamic.LegacyAPIPathResolverFunc)
+	metaOnlyClientPool := dynamic.NewClientPool(config, api.Registry.RESTMapper(), dynamic.LegacyAPIPathResolverFunc)
 	config.ContentConfig.NegotiatedSerializer = nil
-	clientPool := dynamic.NewClientPool(config, registered.RESTMapper(), dynamic.LegacyAPIPathResolverFunc)
-	gc, err := garbagecollector.NewGarbageCollector(metaOnlyClientPool, clientPool, registered.RESTMapper(), deletableGroupVersionResources)
+	clientPool := dynamic.NewClientPool(config, api.Registry.RESTMapper(), dynamic.LegacyAPIPathResolverFunc)
+	gc, err := garbagecollector.NewGarbageCollector(metaOnlyClientPool, clientPool, api.Registry.RESTMapper(), deletableGroupVersionResources)
 	if err != nil {
 		t.Fatalf("Failed to create garbage collector")
 	}

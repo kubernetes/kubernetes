@@ -30,16 +30,15 @@ go_library(
         "//pkg/api/v1:go_default_library",
         "//pkg/apis/autoscaling:go_default_library",
         "//pkg/apis/extensions:go_default_library",
-        "//pkg/apis/meta/v1:go_default_library",
-        "//pkg/conversion:go_default_library",
-        "//pkg/runtime:go_default_library",
-        "//pkg/runtime/schema:go_default_library",
-        "//pkg/types:go_default_library",
         "//pkg/util/intstr:go_default_library",
-        "//pkg/watch/versioned:go_default_library",
         "//vendor:github.com/gogo/protobuf/proto",
         "//vendor:github.com/gogo/protobuf/sortkeys",
         "//vendor:github.com/ugorji/go/codec",
+        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor:k8s.io/apimachinery/pkg/conversion",
+        "//vendor:k8s.io/apimachinery/pkg/runtime",
+        "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
+        "//vendor:k8s.io/apimachinery/pkg/types",
     ],
 )
 
@@ -54,8 +53,21 @@ go_test(
         "//pkg/api/v1:go_default_library",
         "//pkg/apis/extensions/install:go_default_library",
         "//pkg/apis/extensions/v1beta1:go_default_library",
-        "//pkg/apis/meta/v1:go_default_library",
-        "//pkg/runtime:go_default_library",
         "//pkg/util/intstr:go_default_library",
+        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor:k8s.io/apimachinery/pkg/runtime",
     ],
+)
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [":package-srcs"],
+    tags = ["automanaged"],
 )

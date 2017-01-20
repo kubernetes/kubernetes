@@ -21,11 +21,11 @@ limitations under the License.
 package v1
 
 import (
+	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	conversion "k8s.io/apimachinery/pkg/conversion"
+	runtime "k8s.io/apimachinery/pkg/runtime"
+	types "k8s.io/apimachinery/pkg/types"
 	api "k8s.io/kubernetes/pkg/api"
-	meta_v1 "k8s.io/kubernetes/pkg/apis/meta/v1"
-	conversion "k8s.io/kubernetes/pkg/conversion"
-	runtime "k8s.io/kubernetes/pkg/runtime"
-	types "k8s.io/kubernetes/pkg/types"
 	unsafe "unsafe"
 )
 
@@ -65,6 +65,8 @@ func RegisterConversions(scheme *runtime.Scheme) error {
 		Convert_api_ComponentStatusList_To_v1_ComponentStatusList,
 		Convert_v1_ConfigMap_To_api_ConfigMap,
 		Convert_api_ConfigMap_To_v1_ConfigMap,
+		Convert_v1_ConfigMapEnvSource_To_api_ConfigMapEnvSource,
+		Convert_api_ConfigMapEnvSource_To_v1_ConfigMapEnvSource,
 		Convert_v1_ConfigMapKeySelector_To_api_ConfigMapKeySelector,
 		Convert_api_ConfigMapKeySelector_To_v1_ConfigMapKeySelector,
 		Convert_v1_ConfigMapList_To_api_ConfigMapList,
@@ -107,6 +109,8 @@ func RegisterConversions(scheme *runtime.Scheme) error {
 		Convert_api_Endpoints_To_v1_Endpoints,
 		Convert_v1_EndpointsList_To_api_EndpointsList,
 		Convert_api_EndpointsList_To_v1_EndpointsList,
+		Convert_v1_EnvFromSource_To_api_EnvFromSource,
+		Convert_api_EnvFromSource_To_v1_EnvFromSource,
 		Convert_v1_EnvVar_To_api_EnvVar,
 		Convert_api_EnvVar_To_v1_EnvVar,
 		Convert_v1_EnvVarSource_To_api_EnvVarSource,
@@ -305,6 +309,8 @@ func RegisterConversions(scheme *runtime.Scheme) error {
 		Convert_api_SELinuxOptions_To_v1_SELinuxOptions,
 		Convert_v1_Secret_To_api_Secret,
 		Convert_api_Secret_To_v1_Secret,
+		Convert_v1_SecretEnvSource_To_api_SecretEnvSource,
+		Convert_api_SecretEnvSource_To_v1_SecretEnvSource,
 		Convert_v1_SecretKeySelector_To_api_SecretKeySelector,
 		Convert_api_SecretKeySelector_To_v1_SecretKeySelector,
 		Convert_v1_SecretList_To_api_SecretList,
@@ -485,9 +491,7 @@ func Convert_api_AzureFileVolumeSource_To_v1_AzureFileVolumeSource(in *api.Azure
 }
 
 func autoConvert_v1_Binding_To_api_Binding(in *Binding, out *api.Binding, s conversion.Scope) error {
-	if err := Convert_v1_ObjectMeta_To_api_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
-		return err
-	}
+	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_v1_ObjectReference_To_api_ObjectReference(&in.Target, &out.Target, s); err != nil {
 		return err
 	}
@@ -499,9 +503,7 @@ func Convert_v1_Binding_To_api_Binding(in *Binding, out *api.Binding, s conversi
 }
 
 func autoConvert_api_Binding_To_v1_Binding(in *api.Binding, out *Binding, s conversion.Scope) error {
-	if err := Convert_api_ObjectMeta_To_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
-		return err
-	}
+	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_api_ObjectReference_To_v1_ObjectReference(&in.Target, &out.Target, s); err != nil {
 		return err
 	}
@@ -607,9 +609,7 @@ func Convert_api_ComponentCondition_To_v1_ComponentCondition(in *api.ComponentCo
 }
 
 func autoConvert_v1_ComponentStatus_To_api_ComponentStatus(in *ComponentStatus, out *api.ComponentStatus, s conversion.Scope) error {
-	if err := Convert_v1_ObjectMeta_To_api_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
-		return err
-	}
+	out.ObjectMeta = in.ObjectMeta
 	out.Conditions = *(*[]api.ComponentCondition)(unsafe.Pointer(&in.Conditions))
 	return nil
 }
@@ -619,9 +619,7 @@ func Convert_v1_ComponentStatus_To_api_ComponentStatus(in *ComponentStatus, out 
 }
 
 func autoConvert_api_ComponentStatus_To_v1_ComponentStatus(in *api.ComponentStatus, out *ComponentStatus, s conversion.Scope) error {
-	if err := Convert_api_ObjectMeta_To_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
-		return err
-	}
+	out.ObjectMeta = in.ObjectMeta
 	out.Conditions = *(*[]ComponentCondition)(unsafe.Pointer(&in.Conditions))
 	return nil
 }
@@ -651,9 +649,7 @@ func Convert_api_ComponentStatusList_To_v1_ComponentStatusList(in *api.Component
 }
 
 func autoConvert_v1_ConfigMap_To_api_ConfigMap(in *ConfigMap, out *api.ConfigMap, s conversion.Scope) error {
-	if err := Convert_v1_ObjectMeta_To_api_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
-		return err
-	}
+	out.ObjectMeta = in.ObjectMeta
 	out.Data = *(*map[string]string)(unsafe.Pointer(&in.Data))
 	return nil
 }
@@ -663,15 +659,35 @@ func Convert_v1_ConfigMap_To_api_ConfigMap(in *ConfigMap, out *api.ConfigMap, s 
 }
 
 func autoConvert_api_ConfigMap_To_v1_ConfigMap(in *api.ConfigMap, out *ConfigMap, s conversion.Scope) error {
-	if err := Convert_api_ObjectMeta_To_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
-		return err
-	}
+	out.ObjectMeta = in.ObjectMeta
 	out.Data = *(*map[string]string)(unsafe.Pointer(&in.Data))
 	return nil
 }
 
 func Convert_api_ConfigMap_To_v1_ConfigMap(in *api.ConfigMap, out *ConfigMap, s conversion.Scope) error {
 	return autoConvert_api_ConfigMap_To_v1_ConfigMap(in, out, s)
+}
+
+func autoConvert_v1_ConfigMapEnvSource_To_api_ConfigMapEnvSource(in *ConfigMapEnvSource, out *api.ConfigMapEnvSource, s conversion.Scope) error {
+	if err := Convert_v1_LocalObjectReference_To_api_LocalObjectReference(&in.LocalObjectReference, &out.LocalObjectReference, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+func Convert_v1_ConfigMapEnvSource_To_api_ConfigMapEnvSource(in *ConfigMapEnvSource, out *api.ConfigMapEnvSource, s conversion.Scope) error {
+	return autoConvert_v1_ConfigMapEnvSource_To_api_ConfigMapEnvSource(in, out, s)
+}
+
+func autoConvert_api_ConfigMapEnvSource_To_v1_ConfigMapEnvSource(in *api.ConfigMapEnvSource, out *ConfigMapEnvSource, s conversion.Scope) error {
+	if err := Convert_api_LocalObjectReference_To_v1_LocalObjectReference(&in.LocalObjectReference, &out.LocalObjectReference, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+func Convert_api_ConfigMapEnvSource_To_v1_ConfigMapEnvSource(in *api.ConfigMapEnvSource, out *ConfigMapEnvSource, s conversion.Scope) error {
+	return autoConvert_api_ConfigMapEnvSource_To_v1_ConfigMapEnvSource(in, out, s)
 }
 
 func autoConvert_v1_ConfigMapKeySelector_To_api_ConfigMapKeySelector(in *ConfigMapKeySelector, out *api.ConfigMapKeySelector, s conversion.Scope) error {
@@ -751,6 +767,7 @@ func autoConvert_v1_Container_To_api_Container(in *Container, out *api.Container
 	out.Args = *(*[]string)(unsafe.Pointer(&in.Args))
 	out.WorkingDir = in.WorkingDir
 	out.Ports = *(*[]api.ContainerPort)(unsafe.Pointer(&in.Ports))
+	out.EnvFrom = *(*[]api.EnvFromSource)(unsafe.Pointer(&in.EnvFrom))
 	out.Env = *(*[]api.EnvVar)(unsafe.Pointer(&in.Env))
 	if err := Convert_v1_ResourceRequirements_To_api_ResourceRequirements(&in.Resources, &out.Resources, s); err != nil {
 		return err
@@ -779,6 +796,7 @@ func autoConvert_api_Container_To_v1_Container(in *api.Container, out *Container
 	out.Args = *(*[]string)(unsafe.Pointer(&in.Args))
 	out.WorkingDir = in.WorkingDir
 	out.Ports = *(*[]ContainerPort)(unsafe.Pointer(&in.Ports))
+	out.EnvFrom = *(*[]EnvFromSource)(unsafe.Pointer(&in.EnvFrom))
 	out.Env = *(*[]EnvVar)(unsafe.Pointer(&in.Env))
 	if err := Convert_api_ResourceRequirements_To_v1_ResourceRequirements(&in.Resources, &out.Resources, s); err != nil {
 		return err
@@ -1147,9 +1165,7 @@ func Convert_api_EndpointSubset_To_v1_EndpointSubset(in *api.EndpointSubset, out
 }
 
 func autoConvert_v1_Endpoints_To_api_Endpoints(in *Endpoints, out *api.Endpoints, s conversion.Scope) error {
-	if err := Convert_v1_ObjectMeta_To_api_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
-		return err
-	}
+	out.ObjectMeta = in.ObjectMeta
 	out.Subsets = *(*[]api.EndpointSubset)(unsafe.Pointer(&in.Subsets))
 	return nil
 }
@@ -1159,9 +1175,7 @@ func Convert_v1_Endpoints_To_api_Endpoints(in *Endpoints, out *api.Endpoints, s 
 }
 
 func autoConvert_api_Endpoints_To_v1_Endpoints(in *api.Endpoints, out *Endpoints, s conversion.Scope) error {
-	if err := Convert_api_ObjectMeta_To_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
-		return err
-	}
+	out.ObjectMeta = in.ObjectMeta
 	out.Subsets = *(*[]EndpointSubset)(unsafe.Pointer(&in.Subsets))
 	return nil
 }
@@ -1188,6 +1202,28 @@ func autoConvert_api_EndpointsList_To_v1_EndpointsList(in *api.EndpointsList, ou
 
 func Convert_api_EndpointsList_To_v1_EndpointsList(in *api.EndpointsList, out *EndpointsList, s conversion.Scope) error {
 	return autoConvert_api_EndpointsList_To_v1_EndpointsList(in, out, s)
+}
+
+func autoConvert_v1_EnvFromSource_To_api_EnvFromSource(in *EnvFromSource, out *api.EnvFromSource, s conversion.Scope) error {
+	out.Prefix = in.Prefix
+	out.ConfigMapRef = (*api.ConfigMapEnvSource)(unsafe.Pointer(in.ConfigMapRef))
+	out.SecretRef = (*api.SecretEnvSource)(unsafe.Pointer(in.SecretRef))
+	return nil
+}
+
+func Convert_v1_EnvFromSource_To_api_EnvFromSource(in *EnvFromSource, out *api.EnvFromSource, s conversion.Scope) error {
+	return autoConvert_v1_EnvFromSource_To_api_EnvFromSource(in, out, s)
+}
+
+func autoConvert_api_EnvFromSource_To_v1_EnvFromSource(in *api.EnvFromSource, out *EnvFromSource, s conversion.Scope) error {
+	out.Prefix = in.Prefix
+	out.ConfigMapRef = (*ConfigMapEnvSource)(unsafe.Pointer(in.ConfigMapRef))
+	out.SecretRef = (*SecretEnvSource)(unsafe.Pointer(in.SecretRef))
+	return nil
+}
+
+func Convert_api_EnvFromSource_To_v1_EnvFromSource(in *api.EnvFromSource, out *EnvFromSource, s conversion.Scope) error {
+	return autoConvert_api_EnvFromSource_To_v1_EnvFromSource(in, out, s)
 }
 
 func autoConvert_v1_EnvVar_To_api_EnvVar(in *EnvVar, out *api.EnvVar, s conversion.Scope) error {
@@ -1237,9 +1273,7 @@ func Convert_api_EnvVarSource_To_v1_EnvVarSource(in *api.EnvVarSource, out *EnvV
 }
 
 func autoConvert_v1_Event_To_api_Event(in *Event, out *api.Event, s conversion.Scope) error {
-	if err := Convert_v1_ObjectMeta_To_api_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
-		return err
-	}
+	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_v1_ObjectReference_To_api_ObjectReference(&in.InvolvedObject, &out.InvolvedObject, s); err != nil {
 		return err
 	}
@@ -1260,9 +1294,7 @@ func Convert_v1_Event_To_api_Event(in *Event, out *api.Event, s conversion.Scope
 }
 
 func autoConvert_api_Event_To_v1_Event(in *api.Event, out *Event, s conversion.Scope) error {
-	if err := Convert_api_ObjectMeta_To_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
-		return err
-	}
+	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_api_ObjectReference_To_v1_ObjectReference(&in.InvolvedObject, &out.InvolvedObject, s); err != nil {
 		return err
 	}
@@ -1635,9 +1667,7 @@ func Convert_api_Lifecycle_To_v1_Lifecycle(in *api.Lifecycle, out *Lifecycle, s 
 }
 
 func autoConvert_v1_LimitRange_To_api_LimitRange(in *LimitRange, out *api.LimitRange, s conversion.Scope) error {
-	if err := Convert_v1_ObjectMeta_To_api_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
-		return err
-	}
+	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_v1_LimitRangeSpec_To_api_LimitRangeSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
 	}
@@ -1649,9 +1679,7 @@ func Convert_v1_LimitRange_To_api_LimitRange(in *LimitRange, out *api.LimitRange
 }
 
 func autoConvert_api_LimitRange_To_v1_LimitRange(in *api.LimitRange, out *LimitRange, s conversion.Scope) error {
-	if err := Convert_api_ObjectMeta_To_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
-		return err
-	}
+	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_api_LimitRangeSpec_To_v1_LimitRangeSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
 	}
@@ -1881,9 +1909,7 @@ func Convert_api_NFSVolumeSource_To_v1_NFSVolumeSource(in *api.NFSVolumeSource, 
 }
 
 func autoConvert_v1_Namespace_To_api_Namespace(in *Namespace, out *api.Namespace, s conversion.Scope) error {
-	if err := Convert_v1_ObjectMeta_To_api_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
-		return err
-	}
+	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_v1_NamespaceSpec_To_api_NamespaceSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
 	}
@@ -1898,9 +1924,7 @@ func Convert_v1_Namespace_To_api_Namespace(in *Namespace, out *api.Namespace, s 
 }
 
 func autoConvert_api_Namespace_To_v1_Namespace(in *api.Namespace, out *Namespace, s conversion.Scope) error {
-	if err := Convert_api_ObjectMeta_To_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
-		return err
-	}
+	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_api_NamespaceSpec_To_v1_NamespaceSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
 	}
@@ -1971,9 +1995,7 @@ func Convert_api_NamespaceStatus_To_v1_NamespaceStatus(in *api.NamespaceStatus, 
 }
 
 func autoConvert_v1_Node_To_api_Node(in *Node, out *api.Node, s conversion.Scope) error {
-	if err := Convert_v1_ObjectMeta_To_api_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
-		return err
-	}
+	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_v1_NodeSpec_To_api_NodeSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
 	}
@@ -1988,9 +2010,7 @@ func Convert_v1_Node_To_api_Node(in *Node, out *api.Node, s conversion.Scope) er
 }
 
 func autoConvert_api_Node_To_v1_Node(in *api.Node, out *Node, s conversion.Scope) error {
-	if err := Convert_api_ObjectMeta_To_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
-		return err
-	}
+	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_api_NodeSpec_To_v1_NodeSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
 	}
@@ -2409,9 +2429,7 @@ func Convert_api_ObjectReference_To_v1_ObjectReference(in *api.ObjectReference, 
 }
 
 func autoConvert_v1_PersistentVolume_To_api_PersistentVolume(in *PersistentVolume, out *api.PersistentVolume, s conversion.Scope) error {
-	if err := Convert_v1_ObjectMeta_To_api_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
-		return err
-	}
+	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_v1_PersistentVolumeSpec_To_api_PersistentVolumeSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
 	}
@@ -2426,9 +2444,7 @@ func Convert_v1_PersistentVolume_To_api_PersistentVolume(in *PersistentVolume, o
 }
 
 func autoConvert_api_PersistentVolume_To_v1_PersistentVolume(in *api.PersistentVolume, out *PersistentVolume, s conversion.Scope) error {
-	if err := Convert_api_ObjectMeta_To_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
-		return err
-	}
+	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_api_PersistentVolumeSpec_To_v1_PersistentVolumeSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
 	}
@@ -2443,9 +2459,7 @@ func Convert_api_PersistentVolume_To_v1_PersistentVolume(in *api.PersistentVolum
 }
 
 func autoConvert_v1_PersistentVolumeClaim_To_api_PersistentVolumeClaim(in *PersistentVolumeClaim, out *api.PersistentVolumeClaim, s conversion.Scope) error {
-	if err := Convert_v1_ObjectMeta_To_api_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
-		return err
-	}
+	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_v1_PersistentVolumeClaimSpec_To_api_PersistentVolumeClaimSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
 	}
@@ -2460,9 +2474,7 @@ func Convert_v1_PersistentVolumeClaim_To_api_PersistentVolumeClaim(in *Persisten
 }
 
 func autoConvert_api_PersistentVolumeClaim_To_v1_PersistentVolumeClaim(in *api.PersistentVolumeClaim, out *PersistentVolumeClaim, s conversion.Scope) error {
-	if err := Convert_api_ObjectMeta_To_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
-		return err
-	}
+	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_api_PersistentVolumeClaimSpec_To_v1_PersistentVolumeClaimSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
 	}
@@ -2729,9 +2741,7 @@ func Convert_api_PhotonPersistentDiskVolumeSource_To_v1_PhotonPersistentDiskVolu
 }
 
 func autoConvert_v1_Pod_To_api_Pod(in *Pod, out *api.Pod, s conversion.Scope) error {
-	if err := Convert_v1_ObjectMeta_To_api_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
-		return err
-	}
+	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_v1_PodSpec_To_api_PodSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
 	}
@@ -2742,9 +2752,7 @@ func autoConvert_v1_Pod_To_api_Pod(in *Pod, out *api.Pod, s conversion.Scope) er
 }
 
 func autoConvert_api_Pod_To_v1_Pod(in *api.Pod, out *Pod, s conversion.Scope) error {
-	if err := Convert_api_ObjectMeta_To_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
-		return err
-	}
+	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_api_PodSpec_To_v1_PodSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
 	}
@@ -3065,6 +3073,7 @@ func autoConvert_v1_PodSpec_To_api_PodSpec(in *PodSpec, out *api.PodSpec, s conv
 	out.Hostname = in.Hostname
 	out.Subdomain = in.Subdomain
 	out.Affinity = (*api.Affinity)(unsafe.Pointer(in.Affinity))
+	out.SchedulerName = in.SchedulerName
 	return nil
 }
 
@@ -3102,6 +3111,7 @@ func autoConvert_api_PodSpec_To_v1_PodSpec(in *api.PodSpec, out *PodSpec, s conv
 	out.Hostname = in.Hostname
 	out.Subdomain = in.Subdomain
 	out.Affinity = (*Affinity)(unsafe.Pointer(in.Affinity))
+	out.SchedulerName = in.SchedulerName
 	return nil
 }
 
@@ -3142,9 +3152,7 @@ func Convert_api_PodStatus_To_v1_PodStatus(in *api.PodStatus, out *PodStatus, s 
 }
 
 func autoConvert_v1_PodStatusResult_To_api_PodStatusResult(in *PodStatusResult, out *api.PodStatusResult, s conversion.Scope) error {
-	if err := Convert_v1_ObjectMeta_To_api_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
-		return err
-	}
+	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_v1_PodStatus_To_api_PodStatus(&in.Status, &out.Status, s); err != nil {
 		return err
 	}
@@ -3152,9 +3160,7 @@ func autoConvert_v1_PodStatusResult_To_api_PodStatusResult(in *PodStatusResult, 
 }
 
 func autoConvert_api_PodStatusResult_To_v1_PodStatusResult(in *api.PodStatusResult, out *PodStatusResult, s conversion.Scope) error {
-	if err := Convert_api_ObjectMeta_To_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
-		return err
-	}
+	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_api_PodStatus_To_v1_PodStatus(&in.Status, &out.Status, s); err != nil {
 		return err
 	}
@@ -3162,9 +3168,7 @@ func autoConvert_api_PodStatusResult_To_v1_PodStatusResult(in *api.PodStatusResu
 }
 
 func autoConvert_v1_PodTemplate_To_api_PodTemplate(in *PodTemplate, out *api.PodTemplate, s conversion.Scope) error {
-	if err := Convert_v1_ObjectMeta_To_api_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
-		return err
-	}
+	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_v1_PodTemplateSpec_To_api_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
 		return err
 	}
@@ -3176,9 +3180,7 @@ func Convert_v1_PodTemplate_To_api_PodTemplate(in *PodTemplate, out *api.PodTemp
 }
 
 func autoConvert_api_PodTemplate_To_v1_PodTemplate(in *api.PodTemplate, out *PodTemplate, s conversion.Scope) error {
-	if err := Convert_api_ObjectMeta_To_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
-		return err
-	}
+	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_api_PodTemplateSpec_To_v1_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
 		return err
 	}
@@ -3230,9 +3232,7 @@ func Convert_api_PodTemplateList_To_v1_PodTemplateList(in *api.PodTemplateList, 
 }
 
 func autoConvert_v1_PodTemplateSpec_To_api_PodTemplateSpec(in *PodTemplateSpec, out *api.PodTemplateSpec, s conversion.Scope) error {
-	if err := Convert_v1_ObjectMeta_To_api_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
-		return err
-	}
+	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_v1_PodSpec_To_api_PodSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
 	}
@@ -3240,9 +3240,7 @@ func autoConvert_v1_PodTemplateSpec_To_api_PodTemplateSpec(in *PodTemplateSpec, 
 }
 
 func autoConvert_api_PodTemplateSpec_To_v1_PodTemplateSpec(in *api.PodTemplateSpec, out *PodTemplateSpec, s conversion.Scope) error {
-	if err := Convert_api_ObjectMeta_To_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
-		return err
-	}
+	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_api_PodSpec_To_v1_PodSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
 	}
@@ -3410,9 +3408,7 @@ func Convert_api_RBDVolumeSource_To_v1_RBDVolumeSource(in *api.RBDVolumeSource, 
 }
 
 func autoConvert_v1_RangeAllocation_To_api_RangeAllocation(in *RangeAllocation, out *api.RangeAllocation, s conversion.Scope) error {
-	if err := Convert_v1_ObjectMeta_To_api_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
-		return err
-	}
+	out.ObjectMeta = in.ObjectMeta
 	out.Range = in.Range
 	out.Data = *(*[]byte)(unsafe.Pointer(&in.Data))
 	return nil
@@ -3423,9 +3419,7 @@ func Convert_v1_RangeAllocation_To_api_RangeAllocation(in *RangeAllocation, out 
 }
 
 func autoConvert_api_RangeAllocation_To_v1_RangeAllocation(in *api.RangeAllocation, out *RangeAllocation, s conversion.Scope) error {
-	if err := Convert_api_ObjectMeta_To_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
-		return err
-	}
+	out.ObjectMeta = in.ObjectMeta
 	out.Range = in.Range
 	out.Data = *(*[]byte)(unsafe.Pointer(&in.Data))
 	return nil
@@ -3436,9 +3430,7 @@ func Convert_api_RangeAllocation_To_v1_RangeAllocation(in *api.RangeAllocation, 
 }
 
 func autoConvert_v1_ReplicationController_To_api_ReplicationController(in *ReplicationController, out *api.ReplicationController, s conversion.Scope) error {
-	if err := Convert_v1_ObjectMeta_To_api_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
-		return err
-	}
+	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_v1_ReplicationControllerSpec_To_api_ReplicationControllerSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
 	}
@@ -3453,9 +3445,7 @@ func Convert_v1_ReplicationController_To_api_ReplicationController(in *Replicati
 }
 
 func autoConvert_api_ReplicationController_To_v1_ReplicationController(in *api.ReplicationController, out *ReplicationController, s conversion.Scope) error {
-	if err := Convert_api_ObjectMeta_To_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
-		return err
-	}
+	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_api_ReplicationControllerSpec_To_v1_ReplicationControllerSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
 	}
@@ -3622,9 +3612,7 @@ func Convert_api_ResourceFieldSelector_To_v1_ResourceFieldSelector(in *api.Resou
 }
 
 func autoConvert_v1_ResourceQuota_To_api_ResourceQuota(in *ResourceQuota, out *api.ResourceQuota, s conversion.Scope) error {
-	if err := Convert_v1_ObjectMeta_To_api_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
-		return err
-	}
+	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_v1_ResourceQuotaSpec_To_api_ResourceQuotaSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
 	}
@@ -3639,9 +3627,7 @@ func Convert_v1_ResourceQuota_To_api_ResourceQuota(in *ResourceQuota, out *api.R
 }
 
 func autoConvert_api_ResourceQuota_To_v1_ResourceQuota(in *api.ResourceQuota, out *ResourceQuota, s conversion.Scope) error {
-	if err := Convert_api_ObjectMeta_To_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
-		return err
-	}
+	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_api_ResourceQuotaSpec_To_v1_ResourceQuotaSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
 	}
@@ -3760,9 +3746,7 @@ func Convert_api_SELinuxOptions_To_v1_SELinuxOptions(in *api.SELinuxOptions, out
 }
 
 func autoConvert_v1_Secret_To_api_Secret(in *Secret, out *api.Secret, s conversion.Scope) error {
-	if err := Convert_v1_ObjectMeta_To_api_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
-		return err
-	}
+	out.ObjectMeta = in.ObjectMeta
 	out.Data = *(*map[string][]byte)(unsafe.Pointer(&in.Data))
 	// INFO: in.StringData opted out of conversion generation
 	out.Type = api.SecretType(in.Type)
@@ -3770,9 +3754,7 @@ func autoConvert_v1_Secret_To_api_Secret(in *Secret, out *api.Secret, s conversi
 }
 
 func autoConvert_api_Secret_To_v1_Secret(in *api.Secret, out *Secret, s conversion.Scope) error {
-	if err := Convert_api_ObjectMeta_To_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
-		return err
-	}
+	out.ObjectMeta = in.ObjectMeta
 	out.Data = *(*map[string][]byte)(unsafe.Pointer(&in.Data))
 	out.Type = SecretType(in.Type)
 	return nil
@@ -3780,6 +3762,28 @@ func autoConvert_api_Secret_To_v1_Secret(in *api.Secret, out *Secret, s conversi
 
 func Convert_api_Secret_To_v1_Secret(in *api.Secret, out *Secret, s conversion.Scope) error {
 	return autoConvert_api_Secret_To_v1_Secret(in, out, s)
+}
+
+func autoConvert_v1_SecretEnvSource_To_api_SecretEnvSource(in *SecretEnvSource, out *api.SecretEnvSource, s conversion.Scope) error {
+	if err := Convert_v1_LocalObjectReference_To_api_LocalObjectReference(&in.LocalObjectReference, &out.LocalObjectReference, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+func Convert_v1_SecretEnvSource_To_api_SecretEnvSource(in *SecretEnvSource, out *api.SecretEnvSource, s conversion.Scope) error {
+	return autoConvert_v1_SecretEnvSource_To_api_SecretEnvSource(in, out, s)
+}
+
+func autoConvert_api_SecretEnvSource_To_v1_SecretEnvSource(in *api.SecretEnvSource, out *SecretEnvSource, s conversion.Scope) error {
+	if err := Convert_api_LocalObjectReference_To_v1_LocalObjectReference(&in.LocalObjectReference, &out.LocalObjectReference, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+func Convert_api_SecretEnvSource_To_v1_SecretEnvSource(in *api.SecretEnvSource, out *SecretEnvSource, s conversion.Scope) error {
+	return autoConvert_api_SecretEnvSource_To_v1_SecretEnvSource(in, out, s)
 }
 
 func autoConvert_v1_SecretKeySelector_To_api_SecretKeySelector(in *SecretKeySelector, out *api.SecretKeySelector, s conversion.Scope) error {
@@ -3919,9 +3923,7 @@ func Convert_api_SerializedReference_To_v1_SerializedReference(in *api.Serialize
 }
 
 func autoConvert_v1_Service_To_api_Service(in *Service, out *api.Service, s conversion.Scope) error {
-	if err := Convert_v1_ObjectMeta_To_api_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
-		return err
-	}
+	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_v1_ServiceSpec_To_api_ServiceSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
 	}
@@ -3936,9 +3938,7 @@ func Convert_v1_Service_To_api_Service(in *Service, out *api.Service, s conversi
 }
 
 func autoConvert_api_Service_To_v1_Service(in *api.Service, out *Service, s conversion.Scope) error {
-	if err := Convert_api_ObjectMeta_To_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
-		return err
-	}
+	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_api_ServiceSpec_To_v1_ServiceSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
 	}
@@ -3953,9 +3953,7 @@ func Convert_api_Service_To_v1_Service(in *api.Service, out *Service, s conversi
 }
 
 func autoConvert_v1_ServiceAccount_To_api_ServiceAccount(in *ServiceAccount, out *api.ServiceAccount, s conversion.Scope) error {
-	if err := Convert_v1_ObjectMeta_To_api_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
-		return err
-	}
+	out.ObjectMeta = in.ObjectMeta
 	out.Secrets = *(*[]api.ObjectReference)(unsafe.Pointer(&in.Secrets))
 	out.ImagePullSecrets = *(*[]api.LocalObjectReference)(unsafe.Pointer(&in.ImagePullSecrets))
 	return nil
@@ -3966,9 +3964,7 @@ func Convert_v1_ServiceAccount_To_api_ServiceAccount(in *ServiceAccount, out *ap
 }
 
 func autoConvert_api_ServiceAccount_To_v1_ServiceAccount(in *api.ServiceAccount, out *ServiceAccount, s conversion.Scope) error {
-	if err := Convert_api_ObjectMeta_To_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
-		return err
-	}
+	out.ObjectMeta = in.ObjectMeta
 	out.Secrets = *(*[]ObjectReference)(unsafe.Pointer(&in.Secrets))
 	out.ImagePullSecrets = *(*[]LocalObjectReference)(unsafe.Pointer(&in.ImagePullSecrets))
 	return nil

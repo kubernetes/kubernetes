@@ -24,11 +24,11 @@ import (
 	"path"
 	"strings"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/images"
 	"k8s.io/kubernetes/pkg/api/resource"
 	api "k8s.io/kubernetes/pkg/api/v1"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/util/intstr"
 
@@ -40,15 +40,17 @@ const (
 	DefaultClusterName     = "kubernetes"
 	DefaultCloudConfigPath = "/etc/kubernetes/cloud-config"
 
-	etcd                  = "etcd"
-	apiServer             = "apiserver"
-	controllerManager     = "controller-manager"
-	scheduler             = "scheduler"
-	proxy                 = "proxy"
-	kubeAPIServer         = "kube-apiserver"
-	kubeControllerManager = "kube-controller-manager"
-	kubeScheduler         = "kube-scheduler"
-	kubeProxy             = "kube-proxy"
+	etcd                           = "etcd"
+	apiServer                      = "apiserver"
+	controllerManager              = "controller-manager"
+	scheduler                      = "scheduler"
+	proxy                          = "proxy"
+	kubeAPIServer                  = "kube-apiserver"
+	kubeControllerManager          = "kube-controller-manager"
+	kubeScheduler                  = "kube-scheduler"
+	kubeProxy                      = "kube-proxy"
+	authorizationPolicyFile        = "abac_policy.json"
+	authorizationWebhookConfigFile = "webhook_authz.conf"
 )
 
 var (
@@ -113,7 +115,7 @@ func WriteStaticPodManifests(cfg *kubeadmapi.MasterConfiguration) error {
 				"etcd",
 				"--listen-client-urls=http://127.0.0.1:2379",
 				"--advertise-client-urls=http://127.0.0.1:2379",
-				"--data-dir=/var/etcd/data",
+				"--data-dir=/var/lib/etcd",
 			},
 			VolumeMounts:  []api.VolumeMount{certsVolumeMount(), etcdVolumeMount(), k8sVolumeMount()},
 			Image:         images.GetCoreImage(images.KubeEtcdImage, cfg, kubeadmapi.GlobalEnvParams.EtcdImage),
@@ -161,7 +163,7 @@ func etcdVolume(cfg *kubeadmapi.MasterConfiguration) api.Volume {
 func etcdVolumeMount() api.VolumeMount {
 	return api.VolumeMount{
 		Name:      "etcd",
-		MountPath: "/var/etcd",
+		MountPath: "/var/lib/etcd",
 	}
 }
 
@@ -261,7 +263,7 @@ func componentPod(container api.Container, volumes ...api.Volume) api.Pod {
 			APIVersion: "v1",
 			Kind:       "Pod",
 		},
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      container.Name,
 			Namespace: "kube-system",
 			Labels:    map[string]string{"component": container.Name, "tier": "control-plane"},
@@ -295,6 +297,16 @@ func getAPIServerCommand(cfg *kubeadmapi.MasterConfiguration) []string {
 		fmt.Sprintf("--secure-port=%d", cfg.API.Port),
 		"--allow-privileged",
 	)
+
+	if cfg.AuthorizationMode != "" {
+		command = append(command, "--authorization-mode="+cfg.AuthorizationMode)
+		switch cfg.AuthorizationMode {
+		case "ABAC":
+			command = append(command, "--authorization-policy-file="+path.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, authorizationPolicyFile))
+		case "Webhook":
+			command = append(command, "--authorization-webhook-config-file="+path.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, authorizationWebhookConfigFile))
+		}
+	}
 
 	// Use first address we are given
 	if len(cfg.API.AdvertiseAddresses) > 0 {
@@ -357,7 +369,7 @@ func getControllerManagerCommand(cfg *kubeadmapi.MasterConfiguration) []string {
 		"--service-account-private-key-file="+kubeadmapi.GlobalEnvParams.HostPKIPath+"/apiserver-key.pem",
 		"--cluster-signing-cert-file="+kubeadmapi.GlobalEnvParams.HostPKIPath+"/ca.pem",
 		"--cluster-signing-key-file="+kubeadmapi.GlobalEnvParams.HostPKIPath+"/ca-key.pem",
-		"--insecure-experimental-approve-all-kubelet-csrs-for-group=system:kubelet-bootstrap",
+		"--insecure-experimental-approve-all-kubelet-csrs-for-group=kubeadm:kubelet-bootstrap",
 	)
 
 	if cfg.CloudProvider != "" {

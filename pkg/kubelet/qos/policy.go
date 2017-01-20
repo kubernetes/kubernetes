@@ -49,10 +49,10 @@ func GetContainerOOMScoreAdjust(pod *v1.Pod, container *v1.Container, memoryCapa
 	}
 
 	switch GetPodQOS(pod) {
-	case Guaranteed:
+	case v1.PodQOSGuaranteed:
 		// Guaranteed containers should be the last to get killed.
 		return guaranteedOOMScoreAdj
-	case BestEffort:
+	case v1.PodQOSBestEffort:
 		return besteffortOOMScoreAdj
 	}
 

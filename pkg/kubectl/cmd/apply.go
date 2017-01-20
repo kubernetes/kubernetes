@@ -25,22 +25,22 @@ import (
 	"github.com/jonboulle/clockwork"
 	"github.com/spf13/cobra"
 
+	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/annotations"
-	"k8s.io/kubernetes/pkg/api/errors"
-	"k8s.io/kubernetes/pkg/api/meta"
-	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
-	"k8s.io/kubernetes/pkg/labels"
-	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/runtime/schema"
-	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/strategicpatch"
-	"k8s.io/kubernetes/pkg/util/wait"
 )
 
 type ApplyOptions struct {
@@ -100,7 +100,6 @@ func NewCmdApply(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
 		Example: apply_example,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(validateArgs(cmd, args))
-			cmdutil.CheckErr(cmdutil.ValidateOutputArgs(cmd))
 			cmdutil.CheckErr(validatePruneAll(options.Prune, cmdutil.GetFlagBool(cmd, "all"), options.Selector))
 			cmdutil.CheckErr(RunApply(f, cmd, out, errOut, &options))
 		},
@@ -164,7 +163,6 @@ func parsePruneResources(gvks []string) ([]pruneResource, error) {
 }
 
 func RunApply(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer, options *ApplyOptions) error {
-	shortOutput := cmdutil.GetFlagString(cmd, "output") == "name"
 	schema, err := f.Validator(cmdutil.GetFlagBool(cmd, "validate"), cmdutil.GetFlagString(cmd, "schema-cache-dir"))
 	if err != nil {
 		return err
@@ -197,6 +195,8 @@ func RunApply(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer, opti
 	}
 
 	dryRun := cmdutil.GetFlagBool(cmd, "dry-run")
+	output := cmdutil.GetFlagString(cmd, "output")
+	shortOutput := output == "name"
 
 	encoder := f.JSONEncoder()
 	decoder := f.Decoder(false)
@@ -253,6 +253,9 @@ func RunApply(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer, opti
 			}
 
 			count++
+			if len(output) > 0 && !shortOutput {
+				return cmdutil.PrintResourceInfoForCommand(cmd, info, f, out)
+			}
 			cmdutil.PrintSuccess(mapper, shortOutput, out, info.Mapping.Resource, info.Name, dryRun, "created")
 			return nil
 		}
@@ -291,7 +294,7 @@ func RunApply(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer, opti
 				if err != nil {
 					return err
 				}
-				_, err = helper.Patch(info.Namespace, info.Name, api.StrategicMergePatchType, patch)
+				_, err = helper.Patch(info.Namespace, info.Name, types.StrategicMergePatchType, patch)
 				if err != nil {
 					return cmdutil.AddSourceToErr(fmt.Sprintf("applying patch:\n%s\nto:\n%v\nfor:", patch, info), info.Source, err)
 				}
@@ -304,6 +307,9 @@ func RunApply(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer, opti
 			}
 		}
 		count++
+		if len(output) > 0 && !shortOutput {
+			return cmdutil.PrintResourceInfoForCommand(cmd, info, f, out)
+		}
 		cmdutil.PrintSuccess(mapper, shortOutput, out, info.Mapping.Resource, info.Name, dryRun, "configured")
 		return nil
 	})
@@ -393,7 +399,7 @@ func getRESTMappings(pruneResources *[]pruneResource) (namespaced, nonNamespaced
 			{"apps", "v1beta1", "StatefulSet", true},
 		}
 	}
-	registeredMapper := registered.RESTMapper()
+	registeredMapper := api.Registry.RESTMapper()
 	for _, resource := range *pruneResources {
 		addedMapping, err := registeredMapper.RESTMapping(schema.GroupKind{Group: resource.group, Kind: resource.kind}, resource.version)
 		if err != nil {
@@ -550,7 +556,7 @@ func (p *patcher) patchSimple(obj runtime.Object, modified []byte, source, names
 		return nil, cmdutil.AddSourceToErr(fmt.Sprintf(format, original, modified, current), source, err)
 	}
 
-	_, err = p.helper.Patch(namespace, name, api.StrategicMergePatchType, patch)
+	_, err = p.helper.Patch(namespace, name, types.StrategicMergePatchType, patch)
 	return patch, err
 }
 

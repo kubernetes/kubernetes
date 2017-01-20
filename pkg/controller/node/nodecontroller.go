@@ -24,25 +24,25 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/types"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/pkg/util/flowcontrol"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/client/cache"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	v1core "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/core/v1"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/controller/informers"
-	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/labels"
-	"k8s.io/kubernetes/pkg/types"
-	"k8s.io/kubernetes/pkg/util/flowcontrol"
 	"k8s.io/kubernetes/pkg/util/metrics"
 	utilnode "k8s.io/kubernetes/pkg/util/node"
-	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/system"
 	utilversion "k8s.io/kubernetes/pkg/util/version"
-	"k8s.io/kubernetes/pkg/util/wait"
 )
 
 func init() {
@@ -449,24 +449,24 @@ func (nc *NodeController) monitorNodeStatus() error {
 			continue
 		}
 		node := nodeCopy.(*v1.Node)
-		for rep := 0; rep < nodeStatusUpdateRetry; rep++ {
+		if err := wait.PollImmediate(retrySleepTime, retrySleepTime*nodeStatusUpdateRetry, func() (bool, error) {
 			gracePeriod, observedReadyCondition, currentReadyCondition, err = nc.tryUpdateNodeStatus(node)
 			if err == nil {
-				break
+				return true, nil
 			}
 			name := node.Name
 			node, err = nc.kubeClient.Core().Nodes().Get(name, metav1.GetOptions{})
 			if err != nil {
 				glog.Errorf("Failed while getting a Node to retry updating NodeStatus. Probably Node %s was deleted.", name)
-				break
+				return false, err
 			}
-			time.Sleep(retrySleepTime)
-		}
-		if err != nil {
-			glog.Errorf("Update status  of Node %v from NodeController exceeds retry count."+
-				"Skipping - no pods will be evicted.", node.Name)
+			return false, nil
+		}); err != nil {
+			glog.Errorf("Update status  of Node %v from NodeController error : %v. "+
+				"Skipping - no pods will be evicted.", node.Name, err)
 			continue
 		}
+
 		// We do not treat a master node as a part of the cluster for network disruption checking.
 		if !system.IsMasterNode(node.Name) {
 			zoneToNodeConditions[utilnode.GetZoneKey(node)] = append(zoneToNodeConditions[utilnode.GetZoneKey(node)], currentReadyCondition)

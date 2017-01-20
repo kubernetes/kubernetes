@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/v1"
@@ -31,7 +32,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/qos"
 	"k8s.io/kubernetes/pkg/kubelet/server/stats"
 	"k8s.io/kubernetes/pkg/quota/evaluator/core"
-	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 const (
@@ -493,12 +493,12 @@ func qosComparator(p1, p2 *v1.Pod) int {
 		return 0
 	}
 	// if p1 is best effort, we know p2 is burstable or guaranteed
-	if qosP1 == qos.BestEffort {
+	if qosP1 == v1.PodQOSBestEffort {
 		return -1
 	}
 	// we know p1 and p2 are not besteffort, so if p1 is burstable, p2 must be guaranteed
-	if qosP1 == qos.Burstable {
-		if qosP2 == qos.Guaranteed {
+	if qosP1 == v1.PodQOSBurstable {
+		if qosP2 == v1.PodQOSGuaranteed {
 			return -1
 		}
 		return 1

@@ -18,11 +18,10 @@ package v1
 
 import (
 	fmt "fmt"
+	schema "k8s.io/apimachinery/pkg/runtime/schema"
+	serializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	api "k8s.io/kubernetes/pkg/api"
-	registered "k8s.io/kubernetes/pkg/apimachinery/registered"
 	restclient "k8s.io/kubernetes/pkg/client/restclient"
-	schema "k8s.io/kubernetes/pkg/runtime/schema"
-	serializer "k8s.io/kubernetes/pkg/runtime/serializer"
 )
 
 type BatchV1Interface interface {
@@ -30,7 +29,7 @@ type BatchV1Interface interface {
 	JobsGetter
 }
 
-// BatchV1Client is used to interact with features provided by the k8s.io/kubernetes/pkg/apimachinery/registered.Group group.
+// BatchV1Client is used to interact with features provided by the batch group.
 type BatchV1Client struct {
 	restClient restclient.Interface
 }
@@ -73,7 +72,7 @@ func setConfigDefaults(config *restclient.Config) error {
 		return err
 	}
 	// if batch/v1 is not enabled, return an error
-	if !registered.IsEnabledVersion(gv) {
+	if !api.Registry.IsEnabledVersion(gv) {
 		return fmt.Errorf("batch/v1 is not enabled")
 	}
 	config.APIPath = "/apis"

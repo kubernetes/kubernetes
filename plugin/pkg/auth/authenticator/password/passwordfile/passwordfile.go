@@ -21,9 +21,10 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 
 	"github.com/golang/glog"
-	"k8s.io/kubernetes/pkg/auth/user"
+	"k8s.io/apiserver/pkg/authentication/user"
 )
 
 type PasswordAuthenticator struct {
@@ -47,6 +48,7 @@ func NewCSV(path string) (*PasswordAuthenticator, error) {
 	recordNum := 0
 	users := make(map[string]*userPasswordInfo)
 	reader := csv.NewReader(file)
+	reader.FieldsPerRecord = -1
 	for {
 		record, err := reader.Read()
 		if err == io.EOF {
@@ -61,6 +63,9 @@ func NewCSV(path string) (*PasswordAuthenticator, error) {
 		obj := &userPasswordInfo{
 			info:     &user.DefaultInfo{Name: record[1], UID: record[2]},
 			password: record[0],
+		}
+		if len(record) >= 4 {
+			obj.info.Groups = strings.Split(record[3], ",")
 		}
 		recordNum++
 		if _, exist := users[obj.info.Name]; exist {

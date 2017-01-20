@@ -19,12 +19,12 @@ package e2e
 import (
 	"time"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/v1"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	storage "k8s.io/kubernetes/pkg/apis/storage/v1beta1"
 	storageutil "k8s.io/kubernetes/pkg/apis/storage/v1beta1/util"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
@@ -79,26 +79,13 @@ func testDynamicProvisioning(client clientset.Interface, claim *v1.PersistentVol
 	By("checking the created volume is readable and retains data")
 	runInPodWithVolume(client, claim.Namespace, claim.Name, "grep 'hello world' /mnt/test/data")
 
-	// Ugly hack: if we delete the AWS/GCE/OpenStack volume here, it will
-	// probably collide with destruction of the pods above - the pods
-	// still have the volume attached (kubelet is slow...) and deletion
-	// of attached volume is not allowed by AWS/GCE/OpenStack.
-	// Kubernetes *will* retry deletion several times in
-	// pvclaimbinder-sync-period.
-	// So, technically, this sleep is not needed. On the other hand,
-	// the sync perion is 10 minutes and we really don't want to wait
-	// 10 minutes here. There is no way how to see if kubelet is
-	// finished with cleaning volumes. A small sleep here actually
-	// speeds up the test!
-	// Three minutes should be enough to clean up the pods properly.
-	// We've seen GCE PD detach to take more than 1 minute.
-	By("Sleeping to let kubelet destroy all pods")
-	time.Sleep(3 * time.Minute)
-
 	By("deleting the claim")
 	framework.ExpectNoError(client.Core().PersistentVolumeClaims(claim.Namespace).Delete(claim.Name, nil))
 
-	// Wait for the PV to get deleted too.
+	// Wait for the PV to get deleted. Technically, the first few delete
+	// attempts may fail, as the volume is still attached to a node because
+	// kubelet is slowly cleaning up a pod, however it should succeed in a
+	// couple of minutes. Wait 20 minutes to recover from random cloud hiccups.
 	framework.ExpectNoError(framework.WaitForPersistentVolumeDeleted(client, pv.Name, 5*time.Second, 20*time.Minute))
 }
 
@@ -115,7 +102,7 @@ var _ = framework.KubeDescribe("Dynamic provisioning", func() {
 	})
 
 	framework.KubeDescribe("DynamicProvisioner", func() {
-		It("should create and delete persistent volumes [Slow]", func() {
+		It("should create and delete persistent volumes [Slow] [Volume]", func() {
 			framework.SkipUnlessProviderIs("openstack", "gce", "aws", "gke")
 
 			By("creating a StorageClass")
@@ -137,7 +124,7 @@ var _ = framework.KubeDescribe("Dynamic provisioning", func() {
 	})
 
 	framework.KubeDescribe("DynamicProvisioner Alpha", func() {
-		It("should create and delete alpha persistent volumes [Slow]", func() {
+		It("should create and delete alpha persistent volumes [Slow] [Volume]", func() {
 			framework.SkipUnlessProviderIs("openstack", "gce", "aws", "gke")
 
 			By("creating a claim with an alpha dynamic provisioning annotation")
@@ -155,7 +142,7 @@ var _ = framework.KubeDescribe("Dynamic provisioning", func() {
 
 func newClaim(ns string, alpha bool) *v1.PersistentVolumeClaim {
 	claim := v1.PersistentVolumeClaim{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: "pvc-",
 			Namespace:    ns,
 		},
@@ -192,7 +179,7 @@ func runInPodWithVolume(c clientset.Interface, ns, claimName, command string) {
 			Kind:       "Pod",
 			APIVersion: "v1",
 		},
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: "pvc-volume-tester-",
 		},
 		Spec: v1.PodSpec{
@@ -248,7 +235,7 @@ func newStorageClass() *storage.StorageClass {
 		TypeMeta: metav1.TypeMeta{
 			Kind: "StorageClass",
 		},
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: "fast",
 		},
 		Provisioner: pluginName,

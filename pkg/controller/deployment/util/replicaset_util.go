@@ -21,13 +21,13 @@ import (
 
 	"github.com/golang/glog"
 
+	errorsutil "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/client/cache"
 	unversionedextensions "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/client/retry"
-	errorsutil "k8s.io/kubernetes/pkg/util/errors"
 	labelsutil "k8s.io/kubernetes/pkg/util/labels"
 )
 
@@ -73,6 +73,16 @@ func GetReplicaSetHash(rs *extensions.ReplicaSet) string {
 	meta := rs.Spec.Template.ObjectMeta
 	meta.Labels = labelsutil.CloneAndRemoveLabel(meta.Labels, extensions.DefaultDeploymentUniqueLabelKey)
 	return fmt.Sprintf("%d", GetPodTemplateSpecHash(v1.PodTemplateSpec{
+		ObjectMeta: meta,
+		Spec:       rs.Spec.Template.Spec,
+	}))
+}
+
+// GetReplicaSetHashFnv returns the pod template hash of a ReplicaSet's pod template spec.
+func GetReplicaSetHashFnv(rs *extensions.ReplicaSet) string {
+	meta := rs.Spec.Template.ObjectMeta
+	meta.Labels = labelsutil.CloneAndRemoveLabel(meta.Labels, extensions.DefaultDeploymentUniqueLabelKey)
+	return fmt.Sprintf("%d", GetPodTemplateSpecHashFnv(v1.PodTemplateSpec{
 		ObjectMeta: meta,
 		Spec:       rs.Spec.Template.Spec,
 	}))

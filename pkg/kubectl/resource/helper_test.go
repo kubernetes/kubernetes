@@ -26,14 +26,13 @@ import (
 	"strings"
 	"testing"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
-	"k8s.io/kubernetes/pkg/apimachinery/registered"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/client/restclient/fake"
-	"k8s.io/kubernetes/pkg/labels"
-	"k8s.io/kubernetes/pkg/runtime"
 )
 
 func objBody(obj runtime.Object) io.ReadCloser {
@@ -167,25 +166,25 @@ func TestHelperCreate(t *testing.T) {
 				Header:     header(),
 				Body:       objBody(&metav1.Status{Status: metav1.StatusSuccess}),
 			},
-			Object:       &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}},
-			ExpectObject: &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}},
+			Object:       &api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}},
+			ExpectObject: &api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}},
 			Req:          expectPost,
 		},
 		{
 			Modify:       false,
-			Object:       &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "10"}},
-			ExpectObject: &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "10"}},
+			Object:       &api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", ResourceVersion: "10"}},
+			ExpectObject: &api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", ResourceVersion: "10"}},
 			Resp:         &http.Response{StatusCode: http.StatusOK, Header: header(), Body: objBody(&metav1.Status{Status: metav1.StatusSuccess})},
 			Req:          expectPost,
 		},
 		{
 			Modify: true,
 			Object: &api.Pod{
-				ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "10"},
+				ObjectMeta: metav1.ObjectMeta{Name: "foo", ResourceVersion: "10"},
 				Spec:       apitesting.DeepEqualSafePodSpec(),
 			},
 			ExpectObject: &api.Pod{
-				ObjectMeta: api.ObjectMeta{Name: "foo"},
+				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
 				Spec:       apitesting.DeepEqualSafePodSpec(),
 			},
 			Resp: &http.Response{StatusCode: http.StatusOK, Header: header(), Body: objBody(&metav1.Status{Status: metav1.StatusSuccess})},
@@ -252,7 +251,7 @@ func TestHelperGet(t *testing.T) {
 			Resp: &http.Response{
 				StatusCode: http.StatusOK,
 				Header:     header(),
-				Body:       objBody(&api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}),
+				Body:       objBody(&api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}),
 			},
 			Req: func(req *http.Request) bool {
 				if req.Method != "GET" {
@@ -323,7 +322,7 @@ func TestHelperList(t *testing.T) {
 				Header:     header(),
 				Body: objBody(&api.PodList{
 					Items: []api.Pod{{
-						ObjectMeta: api.ObjectMeta{Name: "foo"},
+						ObjectMeta: metav1.ObjectMeta{Name: "foo"},
 					},
 					},
 				}),
@@ -337,7 +336,7 @@ func TestHelperList(t *testing.T) {
 					t.Errorf("url doesn't contain name: %#v", req.URL)
 					return false
 				}
-				if req.URL.Query().Get(metav1.LabelSelectorQueryParam(registered.GroupOrDie(api.GroupName).GroupVersion.String())) != labels.SelectorFromSet(labels.Set{"foo": "baz"}).String() {
+				if req.URL.Query().Get(metav1.LabelSelectorQueryParam(api.Registry.GroupOrDie(api.GroupName).GroupVersion.String())) != labels.SelectorFromSet(labels.Set{"foo": "baz"}).String() {
 					t.Errorf("url doesn't contain query parameters: %#v", req.URL)
 					return false
 				}
@@ -355,7 +354,7 @@ func TestHelperList(t *testing.T) {
 			RESTClient:      client,
 			NamespaceScoped: true,
 		}
-		obj, err := modifier.List("bar", registered.GroupOrDie(api.GroupName).GroupVersion.String(), labels.SelectorFromSet(labels.Set{"foo": "baz"}), false)
+		obj, err := modifier.List("bar", api.Registry.GroupOrDie(api.GroupName).GroupVersion.String(), labels.SelectorFromSet(labels.Set{"foo": "baz"}), false)
 		if (err != nil) != test.Err {
 			t.Errorf("unexpected error: %t %v", test.Err, err)
 		}
@@ -407,7 +406,7 @@ func TestHelperReplace(t *testing.T) {
 		{
 			Namespace:       "bar",
 			NamespaceScoped: true,
-			Object:          &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}},
+			Object:          &api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}},
 			Resp: &http.Response{
 				StatusCode: http.StatusNotFound,
 				Header:     header(),
@@ -418,9 +417,9 @@ func TestHelperReplace(t *testing.T) {
 		{
 			Namespace:       "bar",
 			NamespaceScoped: true,
-			Object:          &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}},
+			Object:          &api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}},
 			ExpectPath:      "/namespaces/bar/foo",
-			ExpectObject:    &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}},
+			ExpectObject:    &api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}},
 			Resp: &http.Response{
 				StatusCode: http.StatusOK,
 				Header:     header(),
@@ -433,12 +432,12 @@ func TestHelperReplace(t *testing.T) {
 			Namespace:       "bar",
 			NamespaceScoped: true,
 			Object: &api.Pod{
-				ObjectMeta: api.ObjectMeta{Name: "foo"},
+				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
 				Spec:       apitesting.DeepEqualSafePodSpec(),
 			},
 			ExpectPath: "/namespaces/bar/foo",
 			ExpectObject: &api.Pod{
-				ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "10"},
+				ObjectMeta: metav1.ObjectMeta{Name: "foo", ResourceVersion: "10"},
 				Spec:       apitesting.DeepEqualSafePodSpec(),
 			},
 			Overwrite: true,
@@ -446,17 +445,17 @@ func TestHelperReplace(t *testing.T) {
 				if req.Method == "PUT" {
 					return &http.Response{StatusCode: http.StatusOK, Header: header(), Body: objBody(&metav1.Status{Status: metav1.StatusSuccess})}, nil
 				}
-				return &http.Response{StatusCode: http.StatusOK, Header: header(), Body: objBody(&api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "10"}})}, nil
+				return &http.Response{StatusCode: http.StatusOK, Header: header(), Body: objBody(&api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", ResourceVersion: "10"}})}, nil
 			}),
 			Req: expectPut,
 		},
 		// cluster scoped resource
 		{
 			Object: &api.Node{
-				ObjectMeta: api.ObjectMeta{Name: "foo"},
+				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
 			},
 			ExpectObject: &api.Node{
-				ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "10"},
+				ObjectMeta: metav1.ObjectMeta{Name: "foo", ResourceVersion: "10"},
 			},
 			Overwrite:  true,
 			ExpectPath: "/foo",
@@ -464,16 +463,16 @@ func TestHelperReplace(t *testing.T) {
 				if req.Method == "PUT" {
 					return &http.Response{StatusCode: http.StatusOK, Header: header(), Body: objBody(&metav1.Status{Status: metav1.StatusSuccess})}, nil
 				}
-				return &http.Response{StatusCode: http.StatusOK, Header: header(), Body: objBody(&api.Node{ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "10"}})}, nil
+				return &http.Response{StatusCode: http.StatusOK, Header: header(), Body: objBody(&api.Node{ObjectMeta: metav1.ObjectMeta{Name: "foo", ResourceVersion: "10"}})}, nil
 			}),
 			Req: expectPut,
 		},
 		{
 			Namespace:       "bar",
 			NamespaceScoped: true,
-			Object:          &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "10"}},
+			Object:          &api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", ResourceVersion: "10"}},
 			ExpectPath:      "/namespaces/bar/foo",
-			ExpectObject:    &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "10"}},
+			ExpectObject:    &api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", ResourceVersion: "10"}},
 			Resp:            &http.Response{StatusCode: http.StatusOK, Header: header(), Body: objBody(&metav1.Status{Status: metav1.StatusSuccess})},
 			Req:             expectPut,
 		},

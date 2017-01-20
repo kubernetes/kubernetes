@@ -20,17 +20,18 @@ import (
 	"reflect"
 	"testing"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
 	fakecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/fake"
-	"k8s.io/kubernetes/pkg/types"
 )
 
 const region = "us-central"
 
 func newService(name string, uid types.UID, serviceType v1.ServiceType) *v1.Service {
-	return &v1.Service{ObjectMeta: v1.ObjectMeta{Name: name, Namespace: "namespace", UID: uid, SelfLink: testapi.Default.SelfLink("services", name)}, Spec: v1.ServiceSpec{Type: serviceType}}
+	return &v1.Service{ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: "namespace", UID: uid, SelfLink: testapi.Default.SelfLink("services", name)}, Spec: v1.ServiceSpec{Type: serviceType}}
 }
 
 func TestCreateExternalLoadBalancer(t *testing.T) {
@@ -41,7 +42,7 @@ func TestCreateExternalLoadBalancer(t *testing.T) {
 	}{
 		{
 			service: &v1.Service{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:      "no-external-balancer",
 					Namespace: "default",
 				},
@@ -54,7 +55,7 @@ func TestCreateExternalLoadBalancer(t *testing.T) {
 		},
 		{
 			service: &v1.Service{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:      "udp-service",
 					Namespace: "default",
 					SelfLink:  testapi.Default.SelfLink("services", "udp-service"),
@@ -72,7 +73,7 @@ func TestCreateExternalLoadBalancer(t *testing.T) {
 		},
 		{
 			service: &v1.Service{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:      "basic-service1",
 					Namespace: "default",
 					SelfLink:  testapi.Default.SelfLink("services", "basic-service1"),
@@ -146,9 +147,9 @@ func TestCreateExternalLoadBalancer(t *testing.T) {
 // TODO: Finish converting and update comments
 func TestUpdateNodesInExternalLoadBalancer(t *testing.T) {
 	nodes := []*v1.Node{
-		{ObjectMeta: v1.ObjectMeta{Name: "node0"}},
-		{ObjectMeta: v1.ObjectMeta{Name: "node1"}},
-		{ObjectMeta: v1.ObjectMeta{Name: "node73"}},
+		{ObjectMeta: metav1.ObjectMeta{Name: "node0"}},
+		{ObjectMeta: metav1.ObjectMeta{Name: "node1"}},
+		{ObjectMeta: metav1.ObjectMeta{Name: "node73"}},
 	}
 	table := []struct {
 		services            []*v1.Service

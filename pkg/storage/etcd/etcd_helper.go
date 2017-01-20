@@ -23,16 +23,17 @@ import (
 	"reflect"
 	"time"
 
+	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/conversion"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/apiserver/pkg/storage/etcd/metrics"
+	utilcache "k8s.io/apiserver/pkg/util/cache"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/meta"
-	"k8s.io/kubernetes/pkg/conversion"
-	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage"
-	"k8s.io/kubernetes/pkg/storage/etcd/metrics"
 	etcdutil "k8s.io/kubernetes/pkg/storage/etcd/util"
 	"k8s.io/kubernetes/pkg/util"
-	utilcache "k8s.io/kubernetes/pkg/util/cache"
-	"k8s.io/kubernetes/pkg/watch"
 
 	etcd "github.com/coreos/etcd/client"
 	"github.com/golang/glog"
@@ -131,7 +132,7 @@ func checkPreconditions(key string, preconditions *storage.Preconditions, out ru
 	if preconditions == nil {
 		return nil
 	}
-	objMeta, err := api.ObjectMetaFor(out)
+	objMeta, err := metav1.ObjectMetaFor(out)
 	if err != nil {
 		return storage.NewInternalErrorf("can't enforce preconditions %v on un-introspectable object %v, got error: %v", *preconditions, out, err)
 	}

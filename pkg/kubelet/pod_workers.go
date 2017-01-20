@@ -22,16 +22,17 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/record"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/eviction"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
+	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"k8s.io/kubernetes/pkg/kubelet/util/queue"
-	"k8s.io/kubernetes/pkg/types"
-	"k8s.io/kubernetes/pkg/util/runtime"
-	"k8s.io/kubernetes/pkg/util/wait"
 )
 
 // OnCompleteFunc is a function that is invoked when an operation completes.
@@ -171,17 +172,14 @@ func (p *podWorkers) managePodLoop(podUpdates <-chan UpdatePodOptions) {
 				updateType:     update.UpdateType,
 			})
 			lastSyncTime = time.Now()
-			if err != nil {
-				return err
-			}
-			return nil
+			return err
 		}()
 		// notify the call-back function if the operation succeeded or not
 		if update.OnCompleteFunc != nil {
 			update.OnCompleteFunc(err)
 		}
 		if err != nil {
-			glog.Errorf("Error syncing pod %s, skipping: %v", update.Pod.UID, err)
+			glog.Errorf("Error syncing pod %s (%q), skipping: %v", update.Pod.UID, format.Pod(update.Pod), err)
 			p.recorder.Eventf(update.Pod, v1.EventTypeWarning, events.FailedSync, "Error syncing pod, skipping: %v", err)
 		}
 		p.wrapUp(update.Pod.UID, err)

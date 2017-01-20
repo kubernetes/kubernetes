@@ -17,15 +17,15 @@ go_library(
         "types.go",
         "zz_generated.conversion.go",
         "zz_generated.deepcopy.go",
+        "zz_generated.defaults.go",
     ],
     tags = ["automanaged"],
     deps = [
         "//pkg/apis/abac:go_default_library",
-        "//pkg/apis/meta/v1:go_default_library",
-        "//pkg/auth/user:go_default_library",
-        "//pkg/conversion:go_default_library",
-        "//pkg/runtime:go_default_library",
-        "//pkg/runtime/schema:go_default_library",
+        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor:k8s.io/apimachinery/pkg/conversion",
+        "//vendor:k8s.io/apimachinery/pkg/runtime",
+        "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
     ],
 )
 
@@ -36,6 +36,19 @@ go_test(
     deps = [
         "//pkg/apis/abac:go_default_library",
         "//pkg/apis/abac/v1beta1:go_default_library",
-        "//pkg/auth/user:go_default_library",
+        "//vendor:k8s.io/apiserver/pkg/authentication/user",
     ],
+)
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [":package-srcs"],
+    tags = ["automanaged"],
 )

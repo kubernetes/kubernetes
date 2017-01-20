@@ -21,13 +21,13 @@ import (
 	"net"
 	"time"
 
+	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/validation"
-	genericoptions "k8s.io/kubernetes/pkg/genericapiserver/options"
+	genericoptions "k8s.io/kubernetes/pkg/genericapiserver/server/options"
 	kubeoptions "k8s.io/kubernetes/pkg/kubeapiserver/options"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/master/ports"
-	utilnet "k8s.io/kubernetes/pkg/util/net"
 
 	"github.com/spf13/pflag"
 )
@@ -43,6 +43,7 @@ type ServerRunOptions struct {
 	InsecureServing         *genericoptions.ServingOptions
 	Authentication          *kubeoptions.BuiltInAuthenticationOptions
 	Authorization           *kubeoptions.BuiltInAuthorizationOptions
+	CloudProvider           *kubeoptions.CloudProviderOptions
 
 	AllowPrivileged           bool
 	EventTTL                  time.Duration
@@ -65,11 +66,13 @@ func NewServerRunOptions() *ServerRunOptions {
 		InsecureServing: genericoptions.NewInsecureServingOptions(),
 		Authentication:  kubeoptions.NewBuiltInAuthenticationOptions().WithAll(),
 		Authorization:   kubeoptions.NewBuiltInAuthorizationOptions(),
+		CloudProvider:   kubeoptions.NewCloudProviderOptions(),
 
 		EventTTL:    1 * time.Hour,
 		MasterCount: 1,
 		KubeletConfig: kubeletclient.KubeletClientConfig{
-			Port: ports.KubeletPort,
+			Port:         ports.KubeletPort,
+			ReadOnlyPort: ports.KubeletReadOnlyPort,
 			PreferredAddressTypes: []string{
 				string(api.NodeHostName),
 				string(api.NodeInternalIP),
@@ -96,6 +99,7 @@ func (s *ServerRunOptions) AddFlags(fs *pflag.FlagSet) {
 	s.InsecureServing.AddDeprecatedFlags(fs)
 	s.Authentication.AddFlags(fs)
 	s.Authorization.AddFlags(fs)
+	s.CloudProvider.AddFlags(fs)
 
 	// Note: the weird ""+ in below lines seems to be the only way to get gofmt to
 	// arrange these text blocks sensibly. Grrr.
@@ -117,7 +121,7 @@ func (s *ServerRunOptions) AddFlags(fs *pflag.FlagSet) {
 		"Currently only applies to long-running requests.")
 
 	fs.IntVar(&s.MasterCount, "apiserver-count", s.MasterCount,
-		"The number of apiservers running in the cluster.")
+		"The number of apiservers running in the cluster, must be a positive number.")
 
 	// See #14282 for details on how to test/try this option out.
 	// TODO: remove this comment once this option is tested in CI.
@@ -150,6 +154,9 @@ func (s *ServerRunOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.UintVar(&s.KubeletConfig.Port, "kubelet-port", s.KubeletConfig.Port,
 		"DEPRECATED: kubelet port.")
 	fs.MarkDeprecated("kubelet-port", "kubelet-port is deprecated and will be removed.")
+
+	fs.UintVar(&s.KubeletConfig.ReadOnlyPort, "kubelet-read-only-port", s.KubeletConfig.ReadOnlyPort,
+		"DEPRECATED: kubelet port.")
 
 	fs.DurationVar(&s.KubeletConfig.HTTPTimeout, "kubelet-timeout", s.KubeletConfig.HTTPTimeout,
 		"Timeout for kubelet operations.")

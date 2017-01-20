@@ -17,8 +17,8 @@ limitations under the License.
 package v1alpha1
 
 import (
-	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
 // GroupName is the group name use in this package
@@ -37,6 +37,7 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&KubeProxyConfiguration{},
 		&KubeSchedulerConfiguration{},
 		&KubeletConfiguration{},
+		&AdmissionConfiguration{},
 	)
 	return nil
 }
@@ -44,3 +45,4 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 func (obj *KubeProxyConfiguration) GetObjectKind() schema.ObjectKind     { return &obj.TypeMeta }
 func (obj *KubeSchedulerConfiguration) GetObjectKind() schema.ObjectKind { return &obj.TypeMeta }
 func (obj *KubeletConfiguration) GetObjectKind() schema.ObjectKind       { return &obj.TypeMeta }
+func (obj *AdmissionConfiguration) GetObjectKind() schema.ObjectKind     { return &obj.TypeMeta }

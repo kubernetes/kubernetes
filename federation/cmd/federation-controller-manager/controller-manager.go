@@ -21,9 +21,9 @@ import (
 	"os"
 
 	"github.com/spf13/pflag"
+	"k8s.io/apiserver/pkg/server/healthz"
 	"k8s.io/kubernetes/federation/cmd/federation-controller-manager/app"
 	"k8s.io/kubernetes/federation/cmd/federation-controller-manager/app/options"
-	"k8s.io/kubernetes/pkg/healthz"
 	"k8s.io/kubernetes/pkg/util/flag"
 	"k8s.io/kubernetes/pkg/util/logs"
 	_ "k8s.io/kubernetes/pkg/util/workqueue/prometheus" // for workqueue metric registration

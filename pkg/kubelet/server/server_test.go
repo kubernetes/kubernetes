@@ -38,21 +38,22 @@ import (
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	apierrs "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apiserver/pkg/authentication/user"
+	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/kubernetes/pkg/api"
-	apierrs "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/auth/authorizer"
-	"k8s.io/kubernetes/pkg/auth/user"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	kubecontainertesting "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/server/remotecommand"
 	"k8s.io/kubernetes/pkg/kubelet/server/stats"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
-	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/httpstream"
 	"k8s.io/kubernetes/pkg/util/httpstream/spdy"
-	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/term"
 	utiltesting "k8s.io/kubernetes/pkg/util/testing"
 	"k8s.io/kubernetes/pkg/volume"
@@ -159,8 +160,6 @@ func (fk *fakeKubelet) StreamingConnectionIdleTimeout() time.Duration {
 	return fk.streamingConnectionIdleTimeoutFunc()
 }
 
-func (fk *fakeKubelet) PLEGHealthCheck() (bool, error) { return fk.plegHealth, nil }
-
 // Unused functions
 func (_ *fakeKubelet) GetContainerInfoV2(_ string, _ cadvisorapiv2.RequestOptions) (map[string]cadvisorapiv2.ContainerInfo, error) {
 	return nil, nil
@@ -213,7 +212,7 @@ func newServerTest() *serverTestFramework {
 		},
 		podByNameFunc: func(namespace, name string) (*v1.Pod, bool) {
 			return &v1.Pod{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Namespace: namespace,
 					Name:      name,
 					UID:       testUID,
@@ -869,18 +868,6 @@ func TestSyncLoopCheck(t *testing.T) {
 	assertHealthFails(t, fw.testHTTPServer.URL+"/healthz", http.StatusInternalServerError)
 }
 
-func TestPLEGHealthCheck(t *testing.T) {
-	fw := newServerTest()
-	defer fw.testHTTPServer.Close()
-	fw.fakeKubelet.hostnameFunc = func() string {
-		return "127.0.0.1"
-	}
-
-	// Test with failed pleg health check.
-	fw.fakeKubelet.plegHealth = false
-	assertHealthFails(t, fw.testHTTPServer.URL+"/healthz", http.StatusInternalServerError)
-}
-
 // returns http response status code from the HTTP GET
 func assertHealthIsOk(t *testing.T, httpURL string) {
 	resp, err := http.Get(httpURL)
@@ -905,7 +892,7 @@ func assertHealthIsOk(t *testing.T, httpURL string) {
 func setPodByNameFunc(fw *serverTestFramework, namespace, pod, container string) {
 	fw.fakeKubelet.podByNameFunc = func(namespace, name string) (*v1.Pod, bool) {
 		return &v1.Pod{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Namespace: namespace,
 				Name:      pod,
 			},

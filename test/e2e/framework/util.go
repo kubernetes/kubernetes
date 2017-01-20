@@ -18,10 +18,12 @@ package framework
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"math/rand"
 	"net"
 	"net/http"
@@ -49,47 +51,44 @@ import (
 	. "github.com/onsi/gomega"
 	gomegatypes "github.com/onsi/gomega/types"
 
-	federationapi "k8s.io/kubernetes/federation/apis/federation/v1beta1"
-	"k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset"
+	apierrs "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apimachinery/pkg/watch"
+	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/kubernetes/pkg/api"
-	apierrs "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	apps "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
 	batchinternal "k8s.io/kubernetes/pkg/apis/batch"
 	batch "k8s.io/kubernetes/pkg/apis/batch/v1"
 	extensionsinternal "k8s.io/kubernetes/pkg/apis/extensions"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/apis/meta/v1/unstructured"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/conditions"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/typed/discovery"
 	"k8s.io/kubernetes/pkg/client/typed/dynamic"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
-	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
 	gcecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
 	"k8s.io/kubernetes/pkg/controller"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
-	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
-	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/master/ports"
-	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/runtime/schema"
 	sshutil "k8s.io/kubernetes/pkg/ssh"
-	"k8s.io/kubernetes/pkg/types"
 	uexec "k8s.io/kubernetes/pkg/util/exec"
 	labelsutil "k8s.io/kubernetes/pkg/util/labels"
-	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/system"
 	"k8s.io/kubernetes/pkg/util/uuid"
 	utilversion "k8s.io/kubernetes/pkg/util/version"
-	"k8s.io/kubernetes/pkg/util/wait"
-	"k8s.io/kubernetes/pkg/watch"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/predicates"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
 	testutils "k8s.io/kubernetes/test/utils"
@@ -357,23 +356,6 @@ func SkipUnlessServerVersionGTE(v *utilversion.Version, c discovery.ServerVersio
 	}
 	if !gte {
 		Skipf("Not supported for server versions before %q", v)
-	}
-}
-
-// Detects whether the federation namespace exists in the underlying cluster
-func SkipUnlessFederated(c clientset.Interface) {
-	federationNS := os.Getenv("FEDERATION_NAMESPACE")
-	if federationNS == "" {
-		federationNS = federationapi.FederationNamespaceSystem
-	}
-
-	_, err := c.Core().Namespaces().Get(federationNS, metav1.GetOptions{})
-	if err != nil {
-		if apierrs.IsNotFound(err) {
-			Skipf("Could not find federation namespace %s: skipping federated test", federationNS)
-		} else {
-			Failf("Unexpected error getting namespace: %v", err)
-		}
 	}
 }
 
@@ -733,7 +715,7 @@ func WaitForNamespacesDeleted(c clientset.Interface, namespaces []string, timeou
 }
 
 func waitForServiceAccountInNamespace(c clientset.Interface, ns, serviceAccountName string, timeout time.Duration) error {
-	w, err := c.Core().ServiceAccounts(ns).Watch(v1.SingleObject(v1.ObjectMeta{Name: serviceAccountName}))
+	w, err := c.Core().ServiceAccounts(ns).Watch(v1.SingleObject(metav1.ObjectMeta{Name: serviceAccountName}))
 	if err != nil {
 		return err
 	}
@@ -798,18 +780,6 @@ func WaitForMatchPodsCondition(c clientset.Interface, opts v1.ListOptions, desc 
 // as a result, pods are not able to be provisioned in a namespace until the service account is provisioned
 func WaitForDefaultServiceAccountInNamespace(c clientset.Interface, namespace string) error {
 	return waitForServiceAccountInNamespace(c, namespace, "default", ServiceAccountProvisionTimeout)
-}
-
-// WaitForFederationApiserverReady waits for the federation apiserver to be ready.
-// It tests the readiness by sending a GET request and expecting a non error response.
-func WaitForFederationApiserverReady(c *federation_clientset.Clientset) error {
-	return wait.PollImmediate(time.Second, 1*time.Minute, func() (bool, error) {
-		_, err := c.Federation().Clusters().List(v1.ListOptions{})
-		if err != nil {
-			return false, nil
-		}
-		return true, nil
-	})
 }
 
 // WaitForPersistentVolumePhase waits for a PersistentVolume to be in a specific phase or until timeout occurs, whichever comes first.
@@ -881,7 +851,7 @@ func CreateTestingNS(baseName string, c clientset.Interface, labels map[string]s
 	labels["e2e-run"] = string(RunId)
 
 	namespaceObj := &v1.Namespace{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: fmt.Sprintf("e2e-tests-%v-", baseName),
 			Namespace:    "",
 			Labels:       labels,
@@ -1261,7 +1231,7 @@ func waitForPodRunningInNamespaceSlow(c clientset.Interface, podName, namespace,
 }
 
 func waitTimeoutForPodRunningInNamespace(c clientset.Interface, podName, namespace, resourceVersion string, timeout time.Duration) error {
-	w, err := c.Core().Pods(namespace).Watch(v1.SingleObject(v1.ObjectMeta{Name: podName, ResourceVersion: resourceVersion}))
+	w, err := c.Core().Pods(namespace).Watch(v1.SingleObject(metav1.ObjectMeta{Name: podName, ResourceVersion: resourceVersion}))
 	if err != nil {
 		return err
 	}
@@ -1276,7 +1246,7 @@ func WaitForPodNoLongerRunningInNamespace(c clientset.Interface, podName, namesp
 }
 
 func WaitTimeoutForPodNoLongerRunningInNamespace(c clientset.Interface, podName, namespace, resourceVersion string, timeout time.Duration) error {
-	w, err := c.Core().Pods(namespace).Watch(v1.SingleObject(v1.ObjectMeta{Name: podName, ResourceVersion: resourceVersion}))
+	w, err := c.Core().Pods(namespace).Watch(v1.SingleObject(metav1.ObjectMeta{Name: podName, ResourceVersion: resourceVersion}))
 	if err != nil {
 		return err
 	}
@@ -1285,7 +1255,7 @@ func WaitTimeoutForPodNoLongerRunningInNamespace(c clientset.Interface, podName,
 }
 
 func waitTimeoutForPodReadyInNamespace(c clientset.Interface, podName, namespace, resourceVersion string, timeout time.Duration) error {
-	w, err := c.Core().Pods(namespace).Watch(v1.SingleObject(v1.ObjectMeta{Name: podName, ResourceVersion: resourceVersion}))
+	w, err := c.Core().Pods(namespace).Watch(v1.SingleObject(metav1.ObjectMeta{Name: podName, ResourceVersion: resourceVersion}))
 	if err != nil {
 		return err
 	}
@@ -1297,7 +1267,7 @@ func waitTimeoutForPodReadyInNamespace(c clientset.Interface, podName, namespace
 // The resourceVersion is used when Watching object changes, it tells since when we care
 // about changes to the pod.
 func WaitForPodNotPending(c clientset.Interface, ns, podName, resourceVersion string) error {
-	w, err := c.Core().Pods(ns).Watch(v1.SingleObject(v1.ObjectMeta{Name: podName, ResourceVersion: resourceVersion}))
+	w, err := c.Core().Pods(ns).Watch(v1.SingleObject(metav1.ObjectMeta{Name: podName, ResourceVersion: resourceVersion}))
 	if err != nil {
 		return err
 	}
@@ -1556,9 +1526,14 @@ func (r podProxyResponseChecker) CheckAllResponses() (done bool, err error) {
 		if err != nil {
 			return false, err
 		}
+
+		ctx, cancel := context.WithTimeout(context.Background(), SingleCallTimeout)
+		defer cancel()
+
 		var body []byte
 		if subResourceProxyAvailable {
 			body, err = r.c.Core().RESTClient().Get().
+				Context(ctx).
 				Namespace(r.ns).
 				Resource("pods").
 				SubResource("proxy").
@@ -1567,6 +1542,7 @@ func (r podProxyResponseChecker) CheckAllResponses() (done bool, err error) {
 				Raw()
 		} else {
 			body, err = r.c.Core().RESTClient().Get().
+				Context(ctx).
 				Prefix("proxy").
 				Namespace(r.ns).
 				Resource("pods").
@@ -1575,6 +1551,10 @@ func (r podProxyResponseChecker) CheckAllResponses() (done bool, err error) {
 				Raw()
 		}
 		if err != nil {
+			if ctx.Err() != nil {
+				Failf("Controller %s: Failed to Get from replica %d [%s]: %v\n pod status: %#v", r.controllerName, i+1, pod.Name, err, pod.Status)
+				return false, err
+			}
 			Logf("Controller %s: Failed to GET from replica %d [%s]: %v\npod status: %#v", r.controllerName, i+1, pod.Name, err, pod.Status)
 			continue
 		}
@@ -1744,11 +1724,20 @@ func ServiceResponding(c clientset.Interface, ns, name string) error {
 			Logf("Failed to get services proxy request: %v:", errProxy)
 			return false, nil
 		}
+
+		ctx, cancel := context.WithTimeout(context.Background(), SingleCallTimeout)
+		defer cancel()
+
 		body, err := proxyRequest.Namespace(ns).
+			Context(ctx).
 			Name(name).
 			Do().
 			Raw()
 		if err != nil {
+			if ctx.Err() != nil {
+				Failf("Failed to GET from service %s: %v", name, err)
+				return true, err
+			}
 			Logf("Failed to GET from service %s: %v:", name, err)
 			return false, nil
 		}
@@ -1762,7 +1751,7 @@ func ServiceResponding(c clientset.Interface, ns, name string) error {
 	})
 }
 
-func restclientConfig(kubeContext string) (*clientcmdapi.Config, error) {
+func RestclientConfig(kubeContext string) (*clientcmdapi.Config, error) {
 	Logf(">>> kubeConfig: %s\n", TestContext.KubeConfig)
 	if TestContext.KubeConfig == "" {
 		return nil, fmt.Errorf("KubeConfig must be specified to load client config")
@@ -1785,43 +1774,13 @@ func LoadConfig() (*restclient.Config, error) {
 		// This is a node e2e test, apply the node e2e configuration
 		return &restclient.Config{Host: TestContext.Host}, nil
 	}
-	c, err := restclientConfig(TestContext.KubeContext)
+	c, err := RestclientConfig(TestContext.KubeContext)
 	if err != nil {
 		return nil, err
 	}
 
 	return clientcmd.NewDefaultClientConfig(*c, &clientcmd.ConfigOverrides{ClusterInfo: clientcmdapi.Cluster{Server: TestContext.Host}}).ClientConfig()
 }
-
-func LoadFederatedConfig(overrides *clientcmd.ConfigOverrides) (*restclient.Config, error) {
-	c, err := restclientConfig(federatedKubeContext)
-	if err != nil {
-		return nil, fmt.Errorf("error creating federation client config: %v", err.Error())
-	}
-	cfg, err := clientcmd.NewDefaultClientConfig(*c, overrides).ClientConfig()
-	if cfg != nil {
-		//TODO(colhom): this is only here because https://github.com/kubernetes/kubernetes/issues/25422
-		cfg.NegotiatedSerializer = api.Codecs
-	}
-	if err != nil {
-		return cfg, fmt.Errorf("error creating federation client config: %v", err.Error())
-	}
-	return cfg, nil
-}
-
-func LoadFederationClientset_1_5() (*federation_clientset.Clientset, error) {
-	config, err := LoadFederatedConfig(&clientcmd.ConfigOverrides{})
-	if err != nil {
-		return nil, err
-	}
-
-	c, err := federation_clientset.NewForConfig(config)
-	if err != nil {
-		return nil, fmt.Errorf("error creating federation clientset: %v", err.Error())
-	}
-	return c, nil
-}
-
 func LoadInternalClientset() (*internalclientset.Clientset, error) {
 	config, err := LoadConfig()
 	if err != nil {
@@ -2380,9 +2339,9 @@ func isNodeUntainted(node *v1.Node) bool {
 	fakePod := &v1.Pod{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Pod",
-			APIVersion: registered.GroupOrDie(v1.GroupName).GroupVersion.String(),
+			APIVersion: api.Registry.GroupOrDie(v1.GroupName).GroupVersion.String(),
 		},
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      "fake-not-scheduled",
 			Namespace: "fake-not-scheduled",
 		},
@@ -3297,7 +3256,7 @@ func WatchRecreateDeployment(c clientset.Interface, d *extensions.Deployment) er
 		return fmt.Errorf("deployment %q does not use a Recreate strategy: %s", d.Name, d.Spec.Strategy.Type)
 	}
 
-	w, err := c.Extensions().Deployments(d.Namespace).Watch(v1.SingleObject(v1.ObjectMeta{Name: d.Name, ResourceVersion: d.ResourceVersion}))
+	w, err := c.Extensions().Deployments(d.Namespace).Watch(v1.SingleObject(metav1.ObjectMeta{Name: d.Name, ResourceVersion: d.ResourceVersion}))
 	if err != nil {
 		return err
 	}
@@ -3785,7 +3744,7 @@ func IssueSSHCommand(cmd, provider string, node *v1.Node) error {
 // NewHostExecPodSpec returns the pod spec of hostexec pod
 func NewHostExecPodSpec(ns, name string) *v1.Pod {
 	pod := &v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: ns,
 		},
@@ -3827,6 +3786,80 @@ func LaunchHostExecPod(client clientset.Interface, ns, name string) *v1.Pod {
 	err = WaitForPodRunningInNamespace(client, pod)
 	ExpectNoError(err)
 	return pod
+}
+
+// newExecPodSpec returns the pod spec of exec pod
+func newExecPodSpec(ns, generateName string) *v1.Pod {
+	immediate := int64(0)
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			GenerateName: generateName,
+			Namespace:    ns,
+		},
+		Spec: v1.PodSpec{
+			TerminationGracePeriodSeconds: &immediate,
+			Containers: []v1.Container{
+				{
+					Name:    "exec",
+					Image:   "gcr.io/google_containers/busybox:1.24",
+					Command: []string{"sh", "-c", "while true; do sleep 5; done"},
+				},
+			},
+		},
+	}
+	return pod
+}
+
+// CreateExecPodOrFail creates a simple busybox pod in a sleep loop used as a
+// vessel for kubectl exec commands.
+// Returns the name of the created pod.
+func CreateExecPodOrFail(client clientset.Interface, ns, generateName string, tweak func(*v1.Pod)) string {
+	Logf("Creating new exec pod")
+	execPod := newExecPodSpec(ns, generateName)
+	if tweak != nil {
+		tweak(execPod)
+	}
+	created, err := client.Core().Pods(ns).Create(execPod)
+	Expect(err).NotTo(HaveOccurred())
+	err = wait.PollImmediate(Poll, 5*time.Minute, func() (bool, error) {
+		retrievedPod, err := client.Core().Pods(execPod.Namespace).Get(created.Name, metav1.GetOptions{})
+		if err != nil {
+			return false, nil
+		}
+		return retrievedPod.Status.Phase == v1.PodRunning, nil
+	})
+	Expect(err).NotTo(HaveOccurred())
+	return created.Name
+}
+
+func CreatePodOrFail(c clientset.Interface, ns, name string, labels map[string]string, containerPorts []v1.ContainerPort) {
+	By(fmt.Sprintf("Creating pod %s in namespace %s", name, ns))
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:   name,
+			Labels: labels,
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:  "pause",
+					Image: GetPauseImageName(c),
+					Ports: containerPorts,
+					// Add a dummy environment variable to work around a docker issue.
+					// https://github.com/docker/docker/issues/14203
+					Env: []v1.EnvVar{{Name: "FOO", Value: " "}},
+				},
+			},
+		},
+	}
+	_, err := c.Core().Pods(ns).Create(pod)
+	Expect(err).NotTo(HaveOccurred())
+}
+
+func DeletePodOrFail(c clientset.Interface, ns, name string) {
+	By(fmt.Sprintf("Deleting pod %s in namespace %s", name, ns))
+	err := c.Core().Pods(ns).Delete(name, nil)
+	Expect(err).NotTo(HaveOccurred())
 }
 
 // GetSigner returns an ssh.Signer for the provider ("gce", etc.) that can be
@@ -4754,7 +4787,7 @@ func LaunchWebserverPod(f *Framework, podName, nodeName string) (ip string) {
 	containerName := fmt.Sprintf("%s-container", podName)
 	port := 8080
 	pod := &v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: podName,
 		},
 		Spec: v1.PodSpec{
@@ -4787,7 +4820,7 @@ func LaunchWebserverPod(f *Framework, podName, nodeName string) (ip string) {
 func CheckConnectivityToHost(f *Framework, nodeName, podName, host string, timeout int) error {
 	contName := fmt.Sprintf("%s-container", podName)
 	pod := &v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: podName,
 		},
 		Spec: v1.PodSpec{
@@ -5158,4 +5191,103 @@ func GetNodeExternalIP(node *v1.Node) string {
 		Failf("Couldn't get the external IP of host %s with addresses %v", node.Name, node.Status.Addresses)
 	}
 	return host
+}
+
+// RcByNamePort returns a ReplicationController with specified name and port
+func RcByNamePort(name string, replicas int32, image string, port int, protocol v1.Protocol,
+	labels map[string]string, gracePeriod *int64) *v1.ReplicationController {
+
+	return RcByNameContainer(name, replicas, image, labels, v1.Container{
+		Name:  name,
+		Image: image,
+		Ports: []v1.ContainerPort{{ContainerPort: int32(port), Protocol: protocol}},
+	}, gracePeriod)
+}
+
+// RcByNameContainer returns a ReplicationControoler with specified name and container
+func RcByNameContainer(name string, replicas int32, image string, labels map[string]string, c v1.Container,
+	gracePeriod *int64) *v1.ReplicationController {
+
+	zeroGracePeriod := int64(0)
+
+	// Add "name": name to the labels, overwriting if it exists.
+	labels["name"] = name
+	if gracePeriod == nil {
+		gracePeriod = &zeroGracePeriod
+	}
+	return &v1.ReplicationController{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "ReplicationController",
+			APIVersion: api.Registry.GroupOrDie(v1.GroupName).GroupVersion.String(),
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+		},
+		Spec: v1.ReplicationControllerSpec{
+			Replicas: func(i int32) *int32 { return &i }(replicas),
+			Selector: map[string]string{
+				"name": name,
+			},
+			Template: &v1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: labels,
+				},
+				Spec: v1.PodSpec{
+					Containers:                    []v1.Container{c},
+					TerminationGracePeriodSeconds: gracePeriod,
+				},
+			},
+		},
+	}
+}
+
+// SimpleGET executes a get on the given url, returns error if non-200 returned.
+func SimpleGET(c *http.Client, url, host string) (string, error) {
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return "", err
+	}
+	req.Host = host
+	res, err := c.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer res.Body.Close()
+	rawBody, err := ioutil.ReadAll(res.Body)
+	if err != nil {
+		return "", err
+	}
+	body := string(rawBody)
+	if res.StatusCode != http.StatusOK {
+		err = fmt.Errorf(
+			"GET returned http error %v", res.StatusCode)
+	}
+	return body, err
+}
+
+// PollURL polls till the url responds with a healthy http code. If
+// expectUnreachable is true, it breaks on first non-healthy http code instead.
+func PollURL(route, host string, timeout time.Duration, interval time.Duration, httpClient *http.Client, expectUnreachable bool) error {
+	var lastBody string
+	pollErr := wait.PollImmediate(interval, timeout, func() (bool, error) {
+		var err error
+		lastBody, err = SimpleGET(httpClient, route, host)
+		if err != nil {
+			Logf("host %v path %v: %v unreachable", host, route, err)
+			return expectUnreachable, nil
+		}
+		return !expectUnreachable, nil
+	})
+	if pollErr != nil {
+		return fmt.Errorf("Failed to execute a successful GET within %v, Last response body for %v, host %v:\n%v\n\n%v\n",
+			timeout, route, host, lastBody, pollErr)
+	}
+	return nil
+}
+
+func DescribeIng(ns string) {
+	Logf("\nOutput of kubectl describe ing:\n")
+	desc, _ := RunKubectl(
+		"describe", "ing", fmt.Sprintf("--namespace=%v", ns))
+	Logf(desc)
 }

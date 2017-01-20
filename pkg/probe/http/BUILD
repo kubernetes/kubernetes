@@ -14,8 +14,8 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//pkg/probe:go_default_library",
-        "//pkg/util/net:go_default_library",
         "//vendor:github.com/golang/glog",
+        "//vendor:k8s.io/apimachinery/pkg/util/net",
     ],
 )
 
@@ -25,4 +25,17 @@ go_test(
     library = ":go_default_library",
     tags = ["automanaged"],
     deps = ["//pkg/probe:go_default_library"],
+)
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [":package-srcs"],
+    tags = ["automanaged"],
 )

@@ -33,21 +33,21 @@ import (
 	"github.com/opencontainers/runc/libcontainer/cgroups"
 	"github.com/opencontainers/runc/libcontainer/cgroups/fs"
 	"github.com/opencontainers/runc/libcontainer/configs"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	cmutil "k8s.io/kubernetes/pkg/kubelet/cm/util"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
 	"k8s.io/kubernetes/pkg/util"
-	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/util/oom"
 	"k8s.io/kubernetes/pkg/util/procfs"
-	"k8s.io/kubernetes/pkg/util/runtime"
-	"k8s.io/kubernetes/pkg/util/sets"
 	utilsysctl "k8s.io/kubernetes/pkg/util/sysctl"
 	utilversion "k8s.io/kubernetes/pkg/util/version"
-	"k8s.io/kubernetes/pkg/util/wait"
 )
 
 const (
@@ -276,7 +276,7 @@ func InitQOS(cgroupDriver, rootContainer string, subsystems *CgroupSubsystems) (
 	cm := NewCgroupManager(subsystems, cgroupDriver)
 	// Top level for Qos containers are created only for Burstable
 	// and Best Effort classes
-	qosClasses := [2]qos.QOSClass{qos.Burstable, qos.BestEffort}
+	qosClasses := [2]v1.PodQOSClass{v1.PodQOSBurstable, v1.PodQOSBestEffort}
 
 	// Create containers for both qos classes
 	for _, qosClass := range qosClasses {
@@ -297,8 +297,8 @@ func InitQOS(cgroupDriver, rootContainer string, subsystems *CgroupSubsystems) (
 	// Store the top level qos container names
 	qosContainersInfo := QOSContainersInfo{
 		Guaranteed: rootContainer,
-		Burstable:  path.Join(rootContainer, string(qos.Burstable)),
-		BestEffort: path.Join(rootContainer, string(qos.BestEffort)),
+		Burstable:  path.Join(rootContainer, string(v1.PodQOSBurstable)),
+		BestEffort: path.Join(rootContainer, string(v1.PodQOSBestEffort)),
 	}
 	return qosContainersInfo, nil
 }

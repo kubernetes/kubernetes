@@ -25,5 +25,19 @@ go_test(
     deps = [
         "//pkg/api/v1:go_default_library",
         "//pkg/kubelet/envvars:go_default_library",
+        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
     ],
+)
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [":package-srcs"],
+    tags = ["automanaged"],
 )

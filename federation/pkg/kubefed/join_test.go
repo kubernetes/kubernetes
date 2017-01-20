@@ -23,18 +23,18 @@ import (
 	"net/http"
 	"testing"
 
-	"k8s.io/client-go/pkg/util/diff"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/diff"
+	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	federationapi "k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	kubefedtesting "k8s.io/kubernetes/federation/pkg/kubefed/testing"
 	"k8s.io/kubernetes/federation/pkg/kubefed/util"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/v1"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/client/restclient/fake"
 	"k8s.io/kubernetes/pkg/client/typed/dynamic"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
-	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 )
@@ -237,7 +237,7 @@ func fakeJoinHostFactory(clusterName, clusterCtx, secretName, server, token stri
 			Kind:       "Secret",
 			APIVersion: "v1",
 		},
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      secretName,
 			Namespace: util.DefaultFederationSystemNamespace,
 		},
@@ -277,7 +277,7 @@ func fakeJoinHostFactory(clusterName, clusterCtx, secretName, server, token stri
 
 func fakeCluster(clusterName, secretName, server string) federationapi.Cluster {
 	return federationapi.Cluster{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: clusterName,
 		},
 		Spec: federationapi.ClusterSpec{

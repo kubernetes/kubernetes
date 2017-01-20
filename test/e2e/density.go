@@ -25,23 +25,23 @@ import (
 	"sync"
 	"time"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/extensions"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/client/cache"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/labels"
-	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/runtime/schema"
-	"k8s.io/kubernetes/pkg/util/sets"
 	utiluuid "k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/pkg/util/workqueue"
-	"k8s.io/kubernetes/pkg/watch"
 	"k8s.io/kubernetes/test/e2e/framework"
 	testutils "k8s.io/kubernetes/test/utils"
 
@@ -395,20 +395,33 @@ var _ = framework.KubeDescribe("Density", func() {
 		{podsPerNode: 50, runLatencyTest: false, kind: api.Kind("ReplicationController")},
 		{podsPerNode: 95, runLatencyTest: true, kind: api.Kind("ReplicationController")},
 		{podsPerNode: 100, runLatencyTest: false, kind: api.Kind("ReplicationController")},
+		// Tests for other resource types:
+		{podsPerNode: 30, runLatencyTest: true, kind: extensions.Kind("Deployment")},
+		{podsPerNode: 30, runLatencyTest: true, kind: batch.Kind("Job")},
+		// Test scheduling when daemons are preset
+		{podsPerNode: 30, runLatencyTest: true, kind: api.Kind("ReplicationController"), daemonsPerNode: 2},
+		// Test with secrets
+		{podsPerNode: 30, runLatencyTest: true, kind: extensions.Kind("Deployment"), secretsPerPod: 2},
 	}
 
 	for _, testArg := range densityTests {
 		feature := "ManualPerformance"
 		switch testArg.podsPerNode {
 		case 30:
-			if testArg.kind == api.Kind("ReplicationController") {
+			if testArg.kind == api.Kind("ReplicationController") && testArg.daemonsPerNode == 0 && testArg.secretsPerPod == 0 {
 				feature = "Performance"
 			}
 		case 95:
 			feature = "HighDensityPerformance"
 		}
 
-		name := fmt.Sprintf("[Feature:%s] should allow starting %d pods per node using %v with %v secrets", feature, testArg.podsPerNode, testArg.kind, testArg.secretsPerPod)
+		name := fmt.Sprintf("[Feature:%s] should allow starting %d pods per node using %v with %v secrets and %v daemons",
+			feature,
+			testArg.podsPerNode,
+			testArg.kind,
+			testArg.secretsPerPod,
+			testArg.daemonsPerNode,
+		)
 		itArg := testArg
 		It(name, func() {
 			nodePreparer := framework.NewE2ETestNodePreparer(
@@ -772,7 +785,7 @@ func createRunningPodFromRC(wg *sync.WaitGroup, c clientset.Interface, name, ns,
 		"name": name,
 	}
 	rc := &v1.ReplicationController{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:   name,
 			Labels: labels,
 		},
@@ -780,7 +793,7 @@ func createRunningPodFromRC(wg *sync.WaitGroup, c clientset.Interface, name, ns,
 			Replicas: func(i int) *int32 { x := int32(i); return &x }(1),
 			Selector: labels,
 			Template: &v1.PodTemplateSpec{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Labels: labels,
 				},
 				Spec: v1.PodSpec{

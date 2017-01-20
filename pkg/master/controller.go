@@ -22,21 +22,21 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utilnet "k8s.io/apimachinery/pkg/util/net"
+	"k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/endpoints"
-	"k8s.io/kubernetes/pkg/api/errors"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
-	"k8s.io/kubernetes/pkg/genericapiserver"
+	genericapiserver "k8s.io/kubernetes/pkg/genericapiserver/server"
 	"k8s.io/kubernetes/pkg/registry/core/rangeallocation"
 	corerest "k8s.io/kubernetes/pkg/registry/core/rest"
 	servicecontroller "k8s.io/kubernetes/pkg/registry/core/service/ipallocator/controller"
 	portallocatorcontroller "k8s.io/kubernetes/pkg/registry/core/service/portallocator/controller"
 	"k8s.io/kubernetes/pkg/util/async"
 	"k8s.io/kubernetes/pkg/util/intstr"
-	utilnet "k8s.io/kubernetes/pkg/util/net"
-	"k8s.io/kubernetes/pkg/util/runtime"
-	"k8s.io/kubernetes/pkg/util/wait"
 )
 
 const kubernetesServiceName = "kubernetes"
@@ -191,7 +191,7 @@ func (c *Controller) CreateNamespaceIfNeeded(ns string) error {
 		return nil
 	}
 	newNs := &api.Namespace{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      ns,
 			Namespace: "",
 		},
@@ -250,7 +250,7 @@ func (c *Controller) CreateOrUpdateMasterServiceIfNeeded(serviceName string, ser
 		return nil
 	}
 	svc := &api.Service{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      serviceName,
 			Namespace: api.NamespaceDefault,
 			Labels:    map[string]string{"provider": "kubernetes", "component": "apiserver"},
@@ -321,7 +321,7 @@ func (r *masterCountEndpointReconciler) ReconcileEndpoints(serviceName string, i
 	e, err := r.endpointClient.Endpoints(api.NamespaceDefault).Get(serviceName, metav1.GetOptions{})
 	if err != nil {
 		e = &api.Endpoints{
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:      serviceName,
 				Namespace: api.NamespaceDefault,
 			},

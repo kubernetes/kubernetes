@@ -20,19 +20,19 @@ import (
 	"fmt"
 	"strings"
 
+	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/types"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/cache"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/cloudprovider"
-	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
-	"k8s.io/kubernetes/pkg/types"
-	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/util/node"
-	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
 	utilversion "k8s.io/kubernetes/pkg/util/version"
 
 	"github.com/golang/glog"
@@ -180,7 +180,7 @@ func (nc *NodeController) maybeDeleteTerminatingPod(obj interface{}) {
 	node := nodeObj.(*v1.Node)
 	v, err := utilversion.ParseSemantic(node.Status.NodeInfo.KubeletVersion)
 	if err != nil {
-		glog.V(0).Infof("couldn't parse verions %q of node: %v", node.Status.NodeInfo.KubeletVersion, err)
+		glog.V(0).Infof("Couldn't parse version %q of node: %v", node.Status.NodeInfo.KubeletVersion, err)
 		utilruntime.HandleError(nc.forcefullyDeletePod(pod))
 		return
 	}

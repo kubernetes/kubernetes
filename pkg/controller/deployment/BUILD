@@ -21,10 +21,8 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
-        "//pkg/api/errors:go_default_library",
         "//pkg/api/v1:go_default_library",
         "//pkg/apis/extensions/v1beta1:go_default_library",
-        "//pkg/apis/meta/v1:go_default_library",
         "//pkg/client/cache:go_default_library",
         "//pkg/client/clientset_generated/clientset:go_default_library",
         "//pkg/client/clientset_generated/clientset/typed/core/v1:go_default_library",
@@ -32,16 +30,18 @@ go_library(
         "//pkg/controller:go_default_library",
         "//pkg/controller/deployment/util:go_default_library",
         "//pkg/controller/informers:go_default_library",
-        "//pkg/labels:go_default_library",
-        "//pkg/runtime/schema:go_default_library",
-        "//pkg/util/errors:go_default_library",
-        "//pkg/util/integer:go_default_library",
         "//pkg/util/labels:go_default_library",
         "//pkg/util/metrics:go_default_library",
-        "//pkg/util/runtime:go_default_library",
-        "//pkg/util/wait:go_default_library",
         "//pkg/util/workqueue:go_default_library",
         "//vendor:github.com/golang/glog",
+        "//vendor:k8s.io/apimachinery/pkg/api/errors",
+        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor:k8s.io/apimachinery/pkg/labels",
+        "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
+        "//vendor:k8s.io/apimachinery/pkg/util/errors",
+        "//vendor:k8s.io/apimachinery/pkg/util/runtime",
+        "//vendor:k8s.io/apimachinery/pkg/util/wait",
+        "//vendor:k8s.io/client-go/pkg/util/integer",
     ],
 )
 
@@ -58,18 +58,33 @@ go_test(
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/v1:go_default_library",
-        "//pkg/apimachinery/registered:go_default_library",
         "//pkg/apis/extensions/v1beta1:go_default_library",
-        "//pkg/apis/meta/v1:go_default_library",
         "//pkg/client/clientset_generated/clientset/fake:go_default_library",
         "//pkg/client/record:go_default_library",
         "//pkg/client/testing/core:go_default_library",
         "//pkg/controller:go_default_library",
         "//pkg/controller/deployment/util:go_default_library",
         "//pkg/controller/informers:go_default_library",
-        "//pkg/runtime:go_default_library",
-        "//pkg/runtime/schema:go_default_library",
         "//pkg/util/intstr:go_default_library",
         "//pkg/util/uuid:go_default_library",
+        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor:k8s.io/apimachinery/pkg/runtime",
+        "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
     ],
+)
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [
+        ":package-srcs",
+        "//pkg/controller/deployment/util:all-srcs",
+    ],
+    tags = ["automanaged"],
 )

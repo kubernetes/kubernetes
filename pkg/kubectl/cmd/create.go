@@ -23,12 +23,12 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"k8s.io/kubernetes/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
-	"k8s.io/kubernetes/pkg/runtime/schema"
 )
 
 var (
@@ -131,6 +131,7 @@ func RunCreate(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer, opt
 	}
 
 	dryRun := cmdutil.GetFlagBool(cmd, "dry-run")
+	output := cmdutil.GetFlagString(cmd, "output")
 
 	count := 0
 	err = r.Visit(func(info *resource.Info, err error) error {
@@ -154,7 +155,11 @@ func RunCreate(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer, opt
 		}
 
 		count++
-		shortOutput := cmdutil.GetFlagString(cmd, "output") == "name"
+
+		shortOutput := output == "name"
+		if len(output) > 0 && !shortOutput {
+			return cmdutil.PrintResourceInfoForCommand(cmd, info, f, out)
+		}
 		if !shortOutput {
 			f.PrintObjectSpecificMessage(info.Object, out)
 		}

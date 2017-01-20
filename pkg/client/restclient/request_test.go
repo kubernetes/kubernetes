@@ -18,6 +18,7 @@ package restclient
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -33,24 +34,23 @@ import (
 	"testing"
 	"time"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/runtime/serializer/streaming"
+	"k8s.io/apimachinery/pkg/util/diff"
+	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/client-go/pkg/util/clock"
+	"k8s.io/client-go/pkg/util/flowcontrol"
+	restclientwatch "k8s.io/client-go/rest/watch"
 	"k8s.io/kubernetes/pkg/api"
-	apierrors "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/apimachinery/registered"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/labels"
-	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/runtime/schema"
-	"k8s.io/kubernetes/pkg/runtime/serializer/streaming"
-	"k8s.io/kubernetes/pkg/util/clock"
-	"k8s.io/kubernetes/pkg/util/diff"
-	"k8s.io/kubernetes/pkg/util/flowcontrol"
 	"k8s.io/kubernetes/pkg/util/httpstream"
 	"k8s.io/kubernetes/pkg/util/intstr"
 	utiltesting "k8s.io/kubernetes/pkg/util/testing"
-	"k8s.io/kubernetes/pkg/watch"
-	"k8s.io/kubernetes/pkg/watch/versioned"
 )
 
 func TestNewRequestSetsAccept(t *testing.T) {
@@ -94,7 +94,7 @@ func TestRequestSetsHeaders(t *testing.T) {
 func TestRequestWithErrorWontChange(t *testing.T) {
 	original := Request{
 		err:     errors.New("test"),
-		content: ContentConfig{GroupVersion: &registered.GroupOrDie(api.GroupName).GroupVersion},
+		content: ContentConfig{GroupVersion: &api.Registry.GroupOrDie(api.GroupName).GroupVersion},
 	}
 	r := original
 	changed := r.Param("foo", "bar").
@@ -278,7 +278,7 @@ func (obj NotAnAPIObject) SetGroupVersionKind(gvk *schema.GroupVersionKind) {}
 
 func defaultContentConfig() ContentConfig {
 	return ContentConfig{
-		GroupVersion:         &registered.GroupOrDie(api.GroupName).GroupVersion,
+		GroupVersion:         &api.Registry.GroupOrDie(api.GroupName).GroupVersion,
 		NegotiatedSerializer: testapi.Default.NegotiatedSerializer(),
 	}
 }
@@ -868,6 +868,7 @@ func TestRequestStream(t *testing.T) {
 	testCases := []struct {
 		Request *Request
 		Err     bool
+		ErrFn   func(error) bool
 	}{
 		{
 			Request: &Request{err: errors.New("bail")},
@@ -903,6 +904,26 @@ func TestRequestStream(t *testing.T) {
 			},
 			Err: true,
 		},
+		{
+			Request: &Request{
+				client: clientFunc(func(req *http.Request) (*http.Response, error) {
+					return &http.Response{
+						StatusCode: http.StatusBadRequest,
+						Body:       ioutil.NopCloser(bytes.NewReader([]byte(`{"kind":"Status","apiVersion":"v1","metadata":{},"status":"Failure","message":"a container name must be specified for pod kube-dns-v20-mz5cv, choose one of: [kubedns dnsmasq healthz]","reason":"BadRequest","code":400}`))),
+					}, nil
+				}),
+				content:     defaultContentConfig(),
+				serializers: defaultSerializers(),
+				baseURL:     &url.URL{},
+			},
+			Err: true,
+			ErrFn: func(err error) bool {
+				if err.Error() == "a container name must be specified for pod kube-dns-v20-mz5cv, choose one of: [kubedns dnsmasq healthz]" {
+					return true
+				}
+				return false
+			},
+		},
 	}
 	for i, testCase := range testCases {
 		testCase.Request.backoffMgr = &NoBackoff{}
@@ -913,6 +934,12 @@ func TestRequestStream(t *testing.T) {
 		}
 		if hasErr && body != nil {
 			t.Errorf("%d: body should be nil when error is returned", i)
+		}
+
+		if hasErr {
+			if testCase.ErrFn != nil && !testCase.ErrFn(err) {
+				t.Errorf("unexpected error: %v", err)
+			}
 		}
 	}
 }
@@ -1218,7 +1245,7 @@ func BenchmarkCheckRetryClosesBody(b *testing.B) {
 }
 
 func TestDoRequestNewWayReader(t *testing.T) {
-	reqObj := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
+	reqObj := &api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}
 	reqBodyExpected, _ := runtime.Encode(testapi.Default.Codec(), reqObj)
 	expectedObj := &api.Service{Spec: api.ServiceSpec{Ports: []api.ServicePort{{
 		Protocol:   "TCP",
@@ -1253,12 +1280,12 @@ func TestDoRequestNewWayReader(t *testing.T) {
 	}
 	tmpStr := string(reqBodyExpected)
 	requestURL := testapi.Default.ResourcePathWithPrefix("foo", "bar", "", "baz")
-	requestURL += "?" + metav1.LabelSelectorQueryParam(registered.GroupOrDie(api.GroupName).GroupVersion.String()) + "=name%3Dfoo&timeout=1s"
+	requestURL += "?" + metav1.LabelSelectorQueryParam(api.Registry.GroupOrDie(api.GroupName).GroupVersion.String()) + "=name%3Dfoo&timeout=1s"
 	fakeHandler.ValidateRequest(t, requestURL, "POST", &tmpStr)
 }
 
 func TestDoRequestNewWayObj(t *testing.T) {
-	reqObj := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
+	reqObj := &api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}
 	reqBodyExpected, _ := runtime.Encode(testapi.Default.Codec(), reqObj)
 	expectedObj := &api.Service{Spec: api.ServiceSpec{Ports: []api.ServicePort{{
 		Protocol:   "TCP",
@@ -1293,12 +1320,12 @@ func TestDoRequestNewWayObj(t *testing.T) {
 	}
 	tmpStr := string(reqBodyExpected)
 	requestURL := testapi.Default.ResourcePath("foo", "", "bar/baz")
-	requestURL += "?" + metav1.LabelSelectorQueryParam(registered.GroupOrDie(api.GroupName).GroupVersion.String()) + "=name%3Dfoo&timeout=1s"
+	requestURL += "?" + metav1.LabelSelectorQueryParam(api.Registry.GroupOrDie(api.GroupName).GroupVersion.String()) + "=name%3Dfoo&timeout=1s"
 	fakeHandler.ValidateRequest(t, requestURL, "POST", &tmpStr)
 }
 
 func TestDoRequestNewWayFile(t *testing.T) {
-	reqObj := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
+	reqObj := &api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}
 	reqBodyExpected, err := runtime.Encode(testapi.Default.Codec(), reqObj)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -1355,7 +1382,7 @@ func TestDoRequestNewWayFile(t *testing.T) {
 }
 
 func TestWasCreated(t *testing.T) {
-	reqObj := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
+	reqObj := &api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}
 	reqBodyExpected, err := runtime.Encode(testapi.Default.Codec(), reqObj)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -1492,7 +1519,7 @@ func TestUnacceptableParamNames(t *testing.T) {
 func TestBody(t *testing.T) {
 	const data = "test payload"
 
-	obj := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
+	obj := &api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}
 	bodyExpected, _ := runtime.Encode(testapi.Default.Codec(), obj)
 
 	f, err := ioutil.TempFile("", "test_body")
@@ -1556,9 +1583,9 @@ func TestWatch(t *testing.T) {
 		t   watch.EventType
 		obj runtime.Object
 	}{
-		{watch.Added, &api.Pod{ObjectMeta: api.ObjectMeta{Name: "first"}}},
-		{watch.Modified, &api.Pod{ObjectMeta: api.ObjectMeta{Name: "second"}}},
-		{watch.Deleted, &api.Pod{ObjectMeta: api.ObjectMeta{Name: "last"}}},
+		{watch.Added, &api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "first"}}},
+		{watch.Modified, &api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "second"}}},
+		{watch.Deleted, &api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "last"}}},
 	}
 
 	testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -1571,7 +1598,7 @@ func TestWatch(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 		flusher.Flush()
 
-		encoder := versioned.NewEncoder(streaming.NewEncoder(w, testapi.Default.Codec()), testapi.Default.Codec())
+		encoder := restclientwatch.NewEncoder(streaming.NewEncoder(w, testapi.Default.Codec()), testapi.Default.Codec())
 		for _, item := range table {
 			if err := encoder.Encode(&watch.Event{Type: item.t, Object: item.obj}); err != nil {
 				panic(err)
@@ -1651,4 +1678,33 @@ func testRESTClient(t testing.TB, srv *httptest.Server) *RESTClient {
 		t.Fatalf("failed to create a client: %v", err)
 	}
 	return client
+}
+
+func TestDoContext(t *testing.T) {
+	receivedCh := make(chan struct{})
+	block := make(chan struct{})
+	testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		close(receivedCh)
+		<-block
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer testServer.Close()
+	defer close(block)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	go func() {
+		<-receivedCh
+		cancel()
+	}()
+
+	c := testRESTClient(t, testServer)
+	_, err := c.Verb("GET").
+		Context(ctx).
+		Prefix("foo").
+		DoRaw()
+	if err == nil {
+		t.Fatal("Expected context cancellation error")
+	}
 }

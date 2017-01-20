@@ -20,8 +20,8 @@ import (
 	"net"
 	"testing"
 
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 func TestAllocate(t *testing.T) {

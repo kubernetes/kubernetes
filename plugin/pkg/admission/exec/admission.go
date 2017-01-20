@@ -20,24 +20,24 @@ import (
 	"fmt"
 	"io"
 
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-
-	"k8s.io/kubernetes/pkg/admission"
+	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/errors"
-	"k8s.io/kubernetes/pkg/api/rest"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	"k8s.io/kubernetes/pkg/genericapiserver/registry/rest"
+	kubeapiserveradmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
 )
 
 func init() {
-	admission.RegisterPlugin("DenyEscalatingExec", func(client clientset.Interface, config io.Reader) (admission.Interface, error) {
-		return NewDenyEscalatingExec(client), nil
+	admission.RegisterPlugin("DenyEscalatingExec", func(config io.Reader) (admission.Interface, error) {
+		return NewDenyEscalatingExec(), nil
 	})
 
 	// This is for legacy support of the DenyExecOnPrivileged admission controller.  Most
 	// of the time DenyEscalatingExec should be preferred.
-	admission.RegisterPlugin("DenyExecOnPrivileged", func(client clientset.Interface, config io.Reader) (admission.Interface, error) {
-		return NewDenyExecOnPrivileged(client), nil
+	admission.RegisterPlugin("DenyExecOnPrivileged", func(config io.Reader) (admission.Interface, error) {
+		return NewDenyExecOnPrivileged(), nil
 	})
 }
 
@@ -45,7 +45,7 @@ func init() {
 // a pod using host based configurations.
 type denyExec struct {
 	*admission.Handler
-	client clientset.Interface
+	client internalclientset.Interface
 
 	// these flags control which items will be checked to deny exec/attach
 	hostIPC    bool
@@ -53,12 +53,13 @@ type denyExec struct {
 	privileged bool
 }
 
+var _ = kubeapiserveradmission.WantsInternalClientSet(&denyExec{})
+
 // NewDenyEscalatingExec creates a new admission controller that denies an exec operation on a pod
 // using host based configurations.
-func NewDenyEscalatingExec(client clientset.Interface) admission.Interface {
+func NewDenyEscalatingExec() admission.Interface {
 	return &denyExec{
 		Handler:    admission.NewHandler(admission.Connect),
-		client:     client,
 		hostIPC:    true,
 		hostPID:    true,
 		privileged: true,
@@ -68,10 +69,9 @@ func NewDenyEscalatingExec(client clientset.Interface) admission.Interface {
 // NewDenyExecOnPrivileged creates a new admission controller that is only checking the privileged
 // option.  This is for legacy support of the DenyExecOnPrivileged admission controller.  Most
 // of the time NewDenyEscalatingExec should be preferred.
-func NewDenyExecOnPrivileged(client clientset.Interface) admission.Interface {
+func NewDenyExecOnPrivileged() admission.Interface {
 	return &denyExec{
 		Handler:    admission.NewHandler(admission.Connect),
-		client:     client,
 		hostIPC:    false,
 		hostPID:    false,
 		privileged: true,
@@ -126,4 +126,15 @@ func isPrivileged(pod *api.Pod) bool {
 		}
 	}
 	return false
+}
+
+func (d *denyExec) SetInternalClientSet(client internalclientset.Interface) {
+	d.client = client
+}
+
+func (d *denyExec) Validate() error {
+	if d.client == nil {
+		return fmt.Errorf("missing client")
+	}
+	return nil
 }

@@ -23,15 +23,16 @@ import (
 
 	"github.com/golang/glog"
 
-	"k8s.io/kubernetes/pkg/admission"
+	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/util/yaml"
+	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/errors"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/client/cache"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/controller/informers"
-	"k8s.io/kubernetes/pkg/labels"
-	"k8s.io/kubernetes/pkg/util/yaml"
+	kubeapiserveradmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
 )
 
 // The annotation key scheduler.alpha.kubernetes.io/node-selector is for assigning
@@ -39,9 +40,10 @@ import (
 var NamespaceNodeSelectors = []string{"scheduler.alpha.kubernetes.io/node-selector"}
 
 func init() {
-	admission.RegisterPlugin("PodNodeSelector", func(client clientset.Interface, config io.Reader) (admission.Interface, error) {
+	admission.RegisterPlugin("PodNodeSelector", func(config io.Reader) (admission.Interface, error) {
+		// TODO move this to a versioned configuration file format.
 		pluginConfig := readConfig(config)
-		plugin := NewPodNodeSelector(client, pluginConfig.PodNodeSelectorPluginConfig)
+		plugin := NewPodNodeSelector(pluginConfig.PodNodeSelectorPluginConfig)
 		return plugin, nil
 	})
 }
@@ -49,11 +51,13 @@ func init() {
 // podNodeSelector is an implementation of admission.Interface.
 type podNodeSelector struct {
 	*admission.Handler
-	client            clientset.Interface
+	client            internalclientset.Interface
 	namespaceInformer cache.SharedIndexInformer
 	// global default node selector and namespace whitelists in a cluster.
 	clusterNodeSelectors map[string]string
 }
+
+var _ = kubeapiserveradmission.WantsInternalClientSet(&podNodeSelector{})
 
 type pluginConfig struct {
 	PodNodeSelectorPluginConfig map[string]string
@@ -111,7 +115,7 @@ func (p *podNodeSelector) Admit(a admission.Attributes) error {
 	var namespace *api.Namespace
 
 	namespaceObj, exists, err := p.namespaceInformer.GetStore().Get(&api.Namespace{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      nsName,
 			Namespace: "",
 		},
@@ -157,12 +161,15 @@ func (p *podNodeSelector) Admit(a admission.Attributes) error {
 	return nil
 }
 
-func NewPodNodeSelector(client clientset.Interface, clusterNodeSelectors map[string]string) *podNodeSelector {
+func NewPodNodeSelector(clusterNodeSelectors map[string]string) *podNodeSelector {
 	return &podNodeSelector{
 		Handler:              admission.NewHandler(admission.Create),
-		client:               client,
 		clusterNodeSelectors: clusterNodeSelectors,
 	}
+}
+
+func (a *podNodeSelector) SetInternalClientSet(client internalclientset.Interface) {
+	a.client = client
 }
 
 func (p *podNodeSelector) SetInformerFactory(f informers.SharedInformerFactory) {
@@ -173,6 +180,9 @@ func (p *podNodeSelector) SetInformerFactory(f informers.SharedInformerFactory) 
 func (p *podNodeSelector) Validate() error {
 	if p.namespaceInformer == nil {
 		return fmt.Errorf("missing namespaceInformer")
+	}
+	if p.client == nil {
+		return fmt.Errorf("missing client")
 	}
 	return nil
 }

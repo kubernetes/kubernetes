@@ -24,10 +24,12 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	kcache "k8s.io/kubernetes/pkg/client/cache"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	v1core "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/core/v1"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/cloudprovider"
@@ -35,10 +37,8 @@ import (
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/populator"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/reconciler"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/statusupdater"
-	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/io"
 	"k8s.io/kubernetes/pkg/util/mount"
-	"k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util/operationexecutor"
 	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
@@ -58,10 +58,6 @@ const (
 	// desiredStateOfWorldPopulatorLoopSleepPeriod is the amount of time the
 	// DesiredStateOfWorldPopulator loop waits between successive executions
 	desiredStateOfWorldPopulatorLoopSleepPeriod time.Duration = 1 * time.Minute
-
-	// reconcilerSyncDuration is the amount of time the reconciler sync states loop
-	// wait between successive executions
-	reconcilerSyncDuration time.Duration = 5 * time.Second
 )
 
 // AttachDetachController defines the operations supported by this controller.
@@ -78,7 +74,9 @@ func NewAttachDetachController(
 	pvcInformer kcache.SharedInformer,
 	pvInformer kcache.SharedInformer,
 	cloud cloudprovider.Interface,
-	plugins []volume.VolumePlugin) (AttachDetachController, error) {
+	plugins []volume.VolumePlugin,
+	disableReconciliationSync bool,
+	reconcilerSyncDuration time.Duration) (AttachDetachController, error) {
 	// TODO: The default resyncPeriod for shared informers is 12 hours, this is
 	// unacceptable for the attach/detach controller. For example, if a pod is
 	// skipped because the node it is scheduled to didn't set its annotation in
@@ -131,10 +129,13 @@ func NewAttachDetachController(
 			false)) // flag for experimental binary check for volume mount
 	adc.nodeStatusUpdater = statusupdater.NewNodeStatusUpdater(
 		kubeClient, nodeInformer, adc.actualStateOfWorld)
+
+	// Default these to values in options
 	adc.reconciler = reconciler.NewReconciler(
 		reconcilerLoopPeriod,
 		reconcilerMaxWaitForUnmountDuration,
 		reconcilerSyncDuration,
+		disableReconciliationSync,
 		adc.desiredStateOfWorld,
 		adc.actualStateOfWorld,
 		adc.attacherDetacher,

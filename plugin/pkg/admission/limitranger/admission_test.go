@@ -22,16 +22,17 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/kubernetes/pkg/admission"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
 	"k8s.io/kubernetes/pkg/client/testing/core"
 	"k8s.io/kubernetes/pkg/controller/informers"
-	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util/wait"
+	kubeadmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
 )
 
 func getComputeResourceList(cpu, memory string) api.ResourceList {
@@ -63,7 +64,7 @@ func getResourceRequirements(requests, limits api.ResourceList) api.ResourceRequ
 // createLimitRange creates a limit range with the specified data
 func createLimitRange(limitType api.LimitType, min, max, defaultLimit, defaultRequest, maxLimitRequestRatio api.ResourceList) api.LimitRange {
 	return api.LimitRange{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      "abc",
 			Namespace: "test",
 		},
@@ -84,7 +85,7 @@ func createLimitRange(limitType api.LimitType, min, max, defaultLimit, defaultRe
 
 func validLimitRange() api.LimitRange {
 	return api.LimitRange{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      "abc",
 			Namespace: "test",
 		},
@@ -109,7 +110,7 @@ func validLimitRange() api.LimitRange {
 
 func validLimitRangeNoDefaults() api.LimitRange {
 	return api.LimitRange{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      "abc",
 			Namespace: "test",
 		},
@@ -132,7 +133,7 @@ func validLimitRangeNoDefaults() api.LimitRange {
 
 func validPod(name string, numContainers int, resources api.ResourceRequirements) api.Pod {
 	pod := api.Pod{
-		ObjectMeta: api.ObjectMeta{Name: name, Namespace: "test"},
+		ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: "test"},
 		Spec:       api.PodSpec{},
 	}
 	pod.Spec.Containers = make([]api.Container, 0, numContainers)
@@ -589,20 +590,19 @@ func newMockClientForTest(limitRanges []api.LimitRange) *fake.Clientset {
 // newHandlerForTest returns a handler configured for testing.
 func newHandlerForTest(c clientset.Interface) (admission.Interface, informers.SharedInformerFactory, error) {
 	f := informers.NewSharedInformerFactory(nil, c, 5*time.Minute)
-	handler, err := NewLimitRanger(c, &DefaultLimitRangerActions{})
+	handler, err := NewLimitRanger(&DefaultLimitRangerActions{})
 	if err != nil {
 		return nil, f, err
 	}
-	plugins := []admission.Interface{handler}
-	pluginInitializer := admission.NewPluginInitializer(f, nil)
-	pluginInitializer.Initialize(plugins)
-	err = admission.Validate(plugins)
+	pluginInitializer := kubeadmission.NewPluginInitializer(c, f, nil)
+	pluginInitializer.Initialize(handler)
+	err = admission.Validate(handler)
 	return handler, f, err
 }
 
 func validPersistentVolumeClaim(name string, resources api.ResourceRequirements) api.PersistentVolumeClaim {
 	pvc := api.PersistentVolumeClaim{
-		ObjectMeta: api.ObjectMeta{Name: name, Namespace: "test"},
+		ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: "test"},
 		Spec: api.PersistentVolumeClaimSpec{
 			Resources: resources,
 		},

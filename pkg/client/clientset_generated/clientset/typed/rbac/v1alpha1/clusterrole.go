@@ -17,12 +17,13 @@ limitations under the License.
 package v1alpha1
 
 import (
+	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	types "k8s.io/apimachinery/pkg/types"
+	watch "k8s.io/apimachinery/pkg/watch"
 	api "k8s.io/kubernetes/pkg/api"
 	v1 "k8s.io/kubernetes/pkg/api/v1"
-	meta_v1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	v1alpha1 "k8s.io/kubernetes/pkg/apis/rbac/v1alpha1"
 	restclient "k8s.io/kubernetes/pkg/client/restclient"
-	watch "k8s.io/kubernetes/pkg/watch"
 )
 
 // ClusterRolesGetter has a method to return a ClusterRoleInterface.
@@ -40,7 +41,7 @@ type ClusterRoleInterface interface {
 	Get(name string, options meta_v1.GetOptions) (*v1alpha1.ClusterRole, error)
 	List(opts v1.ListOptions) (*v1alpha1.ClusterRoleList, error)
 	Watch(opts v1.ListOptions) (watch.Interface, error)
-	Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *v1alpha1.ClusterRole, err error)
+	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1alpha1.ClusterRole, err error)
 	ClusterRoleExpansion
 }
 
@@ -132,7 +133,7 @@ func (c *clusterRoles) Watch(opts v1.ListOptions) (watch.Interface, error) {
 }
 
 // Patch applies the patch and returns the patched clusterRole.
-func (c *clusterRoles) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *v1alpha1.ClusterRole, err error) {
+func (c *clusterRoles) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1alpha1.ClusterRole, err error) {
 	result = &v1alpha1.ClusterRole{}
 	err = c.client.Patch(pt).
 		Resource("clusterroles").

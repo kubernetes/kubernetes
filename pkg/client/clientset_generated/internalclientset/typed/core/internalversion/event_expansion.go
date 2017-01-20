@@ -19,10 +19,11 @@ package internalversion
 import (
 	"fmt"
 
+	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/runtime"
 )
 
 // The EventExpansion interface allows manually adding extra methods to the EventInterface.
@@ -84,7 +85,7 @@ func (e *events) PatchWithEventNamespace(incompleteEvent *api.Event, data []byte
 		return nil, fmt.Errorf("can't patch an event with namespace '%v' in namespace '%v'", incompleteEvent.Namespace, e.ns)
 	}
 	result := &api.Event{}
-	err := e.client.Patch(api.StrategicMergePatchType).
+	err := e.client.Patch(types.StrategicMergePatchType).
 		NamespaceIfScoped(incompleteEvent.Namespace, len(incompleteEvent.Namespace) > 0).
 		Resource("events").
 		Name(incompleteEvent.Name).

@@ -13,8 +13,8 @@ go_library(
     srcs = ["basicauth.go"],
     tags = ["automanaged"],
     deps = [
-        "//pkg/auth/authenticator:go_default_library",
-        "//pkg/auth/user:go_default_library",
+        "//vendor:k8s.io/apiserver/pkg/authentication/authenticator",
+        "//vendor:k8s.io/apiserver/pkg/authentication/user",
     ],
 )
 
@@ -24,7 +24,20 @@ go_test(
     library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
-        "//pkg/auth/authenticator:go_default_library",
-        "//pkg/auth/user:go_default_library",
+        "//vendor:k8s.io/apiserver/pkg/authentication/authenticator",
+        "//vendor:k8s.io/apiserver/pkg/authentication/user",
     ],
+)
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [":package-srcs"],
+    tags = ["automanaged"],
 )

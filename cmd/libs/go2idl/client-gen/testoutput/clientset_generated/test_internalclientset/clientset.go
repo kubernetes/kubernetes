@@ -18,10 +18,10 @@ package test_internalclientset
 
 import (
 	"github.com/golang/glog"
+	"k8s.io/client-go/pkg/util/flowcontrol"
 	internalversiontestgroup "k8s.io/kubernetes/cmd/libs/go2idl/client-gen/testoutput/clientset_generated/test_internalclientset/typed/testgroup/internalversion"
 	restclient "k8s.io/kubernetes/pkg/client/restclient"
 	discovery "k8s.io/kubernetes/pkg/client/typed/discovery"
-	"k8s.io/kubernetes/pkg/util/flowcontrol"
 	_ "k8s.io/kubernetes/plugin/pkg/client/auth"
 )
 
@@ -47,6 +47,9 @@ func (c *Clientset) Testgroup() internalversiontestgroup.TestgroupInterface {
 
 // Discovery retrieves the DiscoveryClient
 func (c *Clientset) Discovery() discovery.DiscoveryInterface {
+	if c == nil {
+		return nil
+	}
 	return c.DiscoveryClient
 }
 

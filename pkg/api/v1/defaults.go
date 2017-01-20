@@ -17,7 +17,7 @@ limitations under the License.
 package v1
 
 import (
-	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/util/parsers"
@@ -174,8 +174,8 @@ func SetDefaults_PodSpec(obj *PodSpec) {
 		period := int64(DefaultTerminationGracePeriodSeconds)
 		obj.TerminationGracePeriodSeconds = &period
 	}
-	if obj.Affinity == nil {
-		obj.Affinity = &Affinity{}
+	if obj.SchedulerName == "" {
+		obj.SchedulerName = DefaultSchedulerName
 	}
 }
 func SetDefaults_Probe(obj *Probe) {

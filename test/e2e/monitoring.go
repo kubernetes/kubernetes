@@ -18,15 +18,16 @@ package e2e
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"time"
 
 	influxdb "github.com/influxdata/influxdb/client"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
-	"k8s.io/kubernetes/pkg/labels"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
@@ -63,6 +64,10 @@ var (
 
 // Query sends a command to the server and returns the Response
 func Query(c clientset.Interface, query string) (*influxdb.Response, error) {
+
+	ctx, cancel := context.WithTimeout(context.Background(), framework.SingleCallTimeout)
+	defer cancel()
+
 	result, err := c.Core().RESTClient().Get().
 		Prefix("proxy").
 		Namespace("kube-system").
@@ -76,6 +81,9 @@ func Query(c clientset.Interface, query string) (*influxdb.Response, error) {
 		Raw()
 
 	if err != nil {
+		if ctx.Err() != nil {
+			framework.Failf("Failed to query influx db: %v", err)
+		}
 		return nil, err
 	}
 

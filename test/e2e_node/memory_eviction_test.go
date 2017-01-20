@@ -22,9 +22,9 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/v1"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
@@ -106,7 +106,7 @@ var _ = framework.KubeDescribe("MemoryEviction [Slow] [Serial] [Disruptive]", fu
 				// This is the final check to try to prevent interference with subsequent tests.
 				podName := "admit-best-effort-pod"
 				f.PodClient().CreateSync(&v1.Pod{
-					ObjectMeta: v1.ObjectMeta{
+					ObjectMeta: metav1.ObjectMeta{
 						Name: podName,
 					},
 					Spec: v1.PodSpec{
@@ -245,7 +245,7 @@ func createMemhogPod(f *framework.Framework, genName string, ctnName string, res
 	}
 
 	pod := &v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: genName,
 		},
 		Spec: v1.PodSpec{

@@ -22,13 +22,13 @@ import (
 	"testing"
 	"time"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/v1"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	statsapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/stats"
 	"k8s.io/kubernetes/pkg/quota"
-	"k8s.io/kubernetes/pkg/types"
 )
 
 func quantityMustParse(value string) *resource.Quantity {
@@ -1573,7 +1573,7 @@ func newVolume(name string, volumeSource v1.VolumeSource) v1.Volume {
 // newPod uses the name as the uid.  Make names unique for testing.
 func newPod(name string, containers []v1.Container, volumes []v1.Volume) *v1.Pod {
 	return &v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 			UID:  types.UID(name),
 		},

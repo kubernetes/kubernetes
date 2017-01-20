@@ -17,9 +17,10 @@ limitations under the License.
 package policy
 
 import (
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/runtime/schema"
 )
 
 // GroupName is the group name use in this package
@@ -47,9 +48,13 @@ var (
 func addKnownTypes(scheme *runtime.Scheme) error {
 	// TODO this gets cleaned up when the types are fixed
 	scheme.AddKnownTypes(SchemeGroupVersion,
+		&api.ListOptions{},
+		&api.DeleteOptions{},
+		&metav1.ExportOptions{},
+		&metav1.GetOptions{},
+
 		&PodDisruptionBudget{},
 		&PodDisruptionBudgetList{},
-		&api.ListOptions{},
 		&Eviction{},
 	)
 	return nil

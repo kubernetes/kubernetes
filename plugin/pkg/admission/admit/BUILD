@@ -12,15 +12,25 @@ go_library(
     name = "go_default_library",
     srcs = ["admission.go"],
     tags = ["automanaged"],
-    deps = [
-        "//pkg/admission:go_default_library",
-        "//pkg/client/clientset_generated/internalclientset:go_default_library",
-    ],
+    deps = ["//vendor:k8s.io/apiserver/pkg/admission"],
 )
 
 go_test(
     name = "go_default_test",
     srcs = ["admission_test.go"],
     library = ":go_default_library",
+    tags = ["automanaged"],
+)
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [":package-srcs"],
     tags = ["automanaged"],
 )

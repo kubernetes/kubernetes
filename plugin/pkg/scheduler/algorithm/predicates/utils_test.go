@@ -19,8 +19,9 @@ package predicates
 import (
 	"fmt"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/labels"
 )
 
 // ExampleUtils is a https://blog.golang.org/examples styled unit test.
@@ -32,7 +33,7 @@ func ExampleFindLabelsInSet() {
 	// Utility functions will inspect their labels, filter them, and so on.
 	nsPods := []*v1.Pod{
 		{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:      "pod1",
 				Namespace: "ns1",
 				Labels: map[string]string{
@@ -43,14 +44,14 @@ func ExampleFindLabelsInSet() {
 			},
 		}, // first pod which will be used via the utilities
 		{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:      "pod2",
 				Namespace: "ns1",
 			},
 		},
 
 		{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name: "pod3ThatWeWontSee",
 			},
 		},

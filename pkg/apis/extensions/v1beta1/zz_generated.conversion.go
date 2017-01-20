@@ -21,13 +21,13 @@ limitations under the License.
 package v1beta1
 
 import (
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	conversion "k8s.io/apimachinery/pkg/conversion"
+	runtime "k8s.io/apimachinery/pkg/runtime"
 	api "k8s.io/kubernetes/pkg/api"
 	api_v1 "k8s.io/kubernetes/pkg/api/v1"
 	autoscaling "k8s.io/kubernetes/pkg/apis/autoscaling"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions"
-	v1 "k8s.io/kubernetes/pkg/apis/meta/v1"
-	conversion "k8s.io/kubernetes/pkg/conversion"
-	runtime "k8s.io/kubernetes/pkg/runtime"
 	intstr "k8s.io/kubernetes/pkg/util/intstr"
 	unsafe "unsafe"
 )
@@ -258,10 +258,7 @@ func Convert_extensions_CustomMetricTargetList_To_v1beta1_CustomMetricTargetList
 }
 
 func autoConvert_v1beta1_DaemonSet_To_extensions_DaemonSet(in *DaemonSet, out *extensions.DaemonSet, s conversion.Scope) error {
-	// TODO: Inefficient conversion - can we improve it?
-	if err := s.Convert(&in.ObjectMeta, &out.ObjectMeta, 0); err != nil {
-		return err
-	}
+	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_v1beta1_DaemonSetSpec_To_extensions_DaemonSetSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
 	}
@@ -276,10 +273,7 @@ func Convert_v1beta1_DaemonSet_To_extensions_DaemonSet(in *DaemonSet, out *exten
 }
 
 func autoConvert_extensions_DaemonSet_To_v1beta1_DaemonSet(in *extensions.DaemonSet, out *DaemonSet, s conversion.Scope) error {
-	// TODO: Inefficient conversion - can we improve it?
-	if err := s.Convert(&in.ObjectMeta, &out.ObjectMeta, 0); err != nil {
-		return err
-	}
+	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_extensions_DaemonSetSpec_To_v1beta1_DaemonSetSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
 	}
@@ -384,10 +378,7 @@ func Convert_extensions_DaemonSetStatus_To_v1beta1_DaemonSetStatus(in *extension
 }
 
 func autoConvert_v1beta1_Deployment_To_extensions_Deployment(in *Deployment, out *extensions.Deployment, s conversion.Scope) error {
-	// TODO: Inefficient conversion - can we improve it?
-	if err := s.Convert(&in.ObjectMeta, &out.ObjectMeta, 0); err != nil {
-		return err
-	}
+	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_v1beta1_DeploymentSpec_To_extensions_DeploymentSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
 	}
@@ -402,10 +393,7 @@ func Convert_v1beta1_Deployment_To_extensions_Deployment(in *Deployment, out *ex
 }
 
 func autoConvert_extensions_Deployment_To_v1beta1_Deployment(in *extensions.Deployment, out *Deployment, s conversion.Scope) error {
-	// TODO: Inefficient conversion - can we improve it?
-	if err := s.Convert(&in.ObjectMeta, &out.ObjectMeta, 0); err != nil {
-		return err
-	}
+	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_extensions_DeploymentSpec_To_v1beta1_DeploymentSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
 	}
@@ -672,10 +660,7 @@ func Convert_extensions_HTTPIngressRuleValue_To_v1beta1_HTTPIngressRuleValue(in 
 }
 
 func autoConvert_v1beta1_HorizontalPodAutoscaler_To_autoscaling_HorizontalPodAutoscaler(in *HorizontalPodAutoscaler, out *autoscaling.HorizontalPodAutoscaler, s conversion.Scope) error {
-	// TODO: Inefficient conversion - can we improve it?
-	if err := s.Convert(&in.ObjectMeta, &out.ObjectMeta, 0); err != nil {
-		return err
-	}
+	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_v1beta1_HorizontalPodAutoscalerSpec_To_autoscaling_HorizontalPodAutoscalerSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
 	}
@@ -690,10 +675,7 @@ func Convert_v1beta1_HorizontalPodAutoscaler_To_autoscaling_HorizontalPodAutosca
 }
 
 func autoConvert_autoscaling_HorizontalPodAutoscaler_To_v1beta1_HorizontalPodAutoscaler(in *autoscaling.HorizontalPodAutoscaler, out *HorizontalPodAutoscaler, s conversion.Scope) error {
-	// TODO: Inefficient conversion - can we improve it?
-	if err := s.Convert(&in.ObjectMeta, &out.ObjectMeta, 0); err != nil {
-		return err
-	}
+	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_autoscaling_HorizontalPodAutoscalerSpec_To_v1beta1_HorizontalPodAutoscalerSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
 	}
@@ -830,10 +812,7 @@ func Convert_extensions_IDRange_To_v1beta1_IDRange(in *extensions.IDRange, out *
 }
 
 func autoConvert_v1beta1_Ingress_To_extensions_Ingress(in *Ingress, out *extensions.Ingress, s conversion.Scope) error {
-	// TODO: Inefficient conversion - can we improve it?
-	if err := s.Convert(&in.ObjectMeta, &out.ObjectMeta, 0); err != nil {
-		return err
-	}
+	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_v1beta1_IngressSpec_To_extensions_IngressSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
 	}
@@ -848,10 +827,7 @@ func Convert_v1beta1_Ingress_To_extensions_Ingress(in *Ingress, out *extensions.
 }
 
 func autoConvert_extensions_Ingress_To_v1beta1_Ingress(in *extensions.Ingress, out *Ingress, s conversion.Scope) error {
-	// TODO: Inefficient conversion - can we improve it?
-	if err := s.Convert(&in.ObjectMeta, &out.ObjectMeta, 0); err != nil {
-		return err
-	}
+	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_extensions_IngressSpec_To_v1beta1_IngressSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
 	}
@@ -1014,10 +990,7 @@ func Convert_extensions_IngressTLS_To_v1beta1_IngressTLS(in *extensions.IngressT
 }
 
 func autoConvert_v1beta1_NetworkPolicy_To_extensions_NetworkPolicy(in *NetworkPolicy, out *extensions.NetworkPolicy, s conversion.Scope) error {
-	// TODO: Inefficient conversion - can we improve it?
-	if err := s.Convert(&in.ObjectMeta, &out.ObjectMeta, 0); err != nil {
-		return err
-	}
+	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_v1beta1_NetworkPolicySpec_To_extensions_NetworkPolicySpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
 	}
@@ -1029,10 +1002,7 @@ func Convert_v1beta1_NetworkPolicy_To_extensions_NetworkPolicy(in *NetworkPolicy
 }
 
 func autoConvert_extensions_NetworkPolicy_To_v1beta1_NetworkPolicy(in *extensions.NetworkPolicy, out *NetworkPolicy, s conversion.Scope) error {
-	// TODO: Inefficient conversion - can we improve it?
-	if err := s.Convert(&in.ObjectMeta, &out.ObjectMeta, 0); err != nil {
-		return err
-	}
+	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_extensions_NetworkPolicySpec_To_v1beta1_NetworkPolicySpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
 	}
@@ -1144,10 +1114,7 @@ func Convert_extensions_NetworkPolicySpec_To_v1beta1_NetworkPolicySpec(in *exten
 }
 
 func autoConvert_v1beta1_PodSecurityPolicy_To_extensions_PodSecurityPolicy(in *PodSecurityPolicy, out *extensions.PodSecurityPolicy, s conversion.Scope) error {
-	// TODO: Inefficient conversion - can we improve it?
-	if err := s.Convert(&in.ObjectMeta, &out.ObjectMeta, 0); err != nil {
-		return err
-	}
+	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_v1beta1_PodSecurityPolicySpec_To_extensions_PodSecurityPolicySpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
 	}
@@ -1159,10 +1126,7 @@ func Convert_v1beta1_PodSecurityPolicy_To_extensions_PodSecurityPolicy(in *PodSe
 }
 
 func autoConvert_extensions_PodSecurityPolicy_To_v1beta1_PodSecurityPolicy(in *extensions.PodSecurityPolicy, out *PodSecurityPolicy, s conversion.Scope) error {
-	// TODO: Inefficient conversion - can we improve it?
-	if err := s.Convert(&in.ObjectMeta, &out.ObjectMeta, 0); err != nil {
-		return err
-	}
+	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_extensions_PodSecurityPolicySpec_To_v1beta1_PodSecurityPolicySpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
 	}
@@ -1294,10 +1258,7 @@ func Convert_extensions_PodSecurityPolicySpec_To_v1beta1_PodSecurityPolicySpec(i
 }
 
 func autoConvert_v1beta1_ReplicaSet_To_extensions_ReplicaSet(in *ReplicaSet, out *extensions.ReplicaSet, s conversion.Scope) error {
-	// TODO: Inefficient conversion - can we improve it?
-	if err := s.Convert(&in.ObjectMeta, &out.ObjectMeta, 0); err != nil {
-		return err
-	}
+	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_v1beta1_ReplicaSetSpec_To_extensions_ReplicaSetSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
 	}
@@ -1312,10 +1273,7 @@ func Convert_v1beta1_ReplicaSet_To_extensions_ReplicaSet(in *ReplicaSet, out *ex
 }
 
 func autoConvert_extensions_ReplicaSet_To_v1beta1_ReplicaSet(in *extensions.ReplicaSet, out *ReplicaSet, s conversion.Scope) error {
-	// TODO: Inefficient conversion - can we improve it?
-	if err := s.Convert(&in.ObjectMeta, &out.ObjectMeta, 0); err != nil {
-		return err
-	}
+	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_extensions_ReplicaSetSpec_To_v1beta1_ReplicaSetSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
 	}
@@ -1534,10 +1492,7 @@ func Convert_extensions_SELinuxStrategyOptions_To_v1beta1_SELinuxStrategyOptions
 }
 
 func autoConvert_v1beta1_Scale_To_extensions_Scale(in *Scale, out *extensions.Scale, s conversion.Scope) error {
-	// TODO: Inefficient conversion - can we improve it?
-	if err := s.Convert(&in.ObjectMeta, &out.ObjectMeta, 0); err != nil {
-		return err
-	}
+	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_v1beta1_ScaleSpec_To_extensions_ScaleSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
 	}
@@ -1552,10 +1507,7 @@ func Convert_v1beta1_Scale_To_extensions_Scale(in *Scale, out *extensions.Scale,
 }
 
 func autoConvert_extensions_Scale_To_v1beta1_Scale(in *extensions.Scale, out *Scale, s conversion.Scope) error {
-	// TODO: Inefficient conversion - can we improve it?
-	if err := s.Convert(&in.ObjectMeta, &out.ObjectMeta, 0); err != nil {
-		return err
-	}
+	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_extensions_ScaleSpec_To_v1beta1_ScaleSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
 	}
@@ -1589,14 +1541,14 @@ func Convert_extensions_ScaleSpec_To_v1beta1_ScaleSpec(in *extensions.ScaleSpec,
 
 func autoConvert_v1beta1_ScaleStatus_To_extensions_ScaleStatus(in *ScaleStatus, out *extensions.ScaleStatus, s conversion.Scope) error {
 	out.Replicas = in.Replicas
-	// WARNING: in.Selector requires manual conversion: inconvertible types (map[string]string vs *k8s.io/kubernetes/pkg/apis/meta/v1.LabelSelector)
+	// WARNING: in.Selector requires manual conversion: inconvertible types (map[string]string vs *k8s.io/apimachinery/pkg/apis/meta/v1.LabelSelector)
 	// WARNING: in.TargetSelector requires manual conversion: does not exist in peer-type
 	return nil
 }
 
 func autoConvert_extensions_ScaleStatus_To_v1beta1_ScaleStatus(in *extensions.ScaleStatus, out *ScaleStatus, s conversion.Scope) error {
 	out.Replicas = in.Replicas
-	// WARNING: in.Selector requires manual conversion: inconvertible types (*k8s.io/kubernetes/pkg/apis/meta/v1.LabelSelector vs map[string]string)
+	// WARNING: in.Selector requires manual conversion: inconvertible types (*k8s.io/apimachinery/pkg/apis/meta/v1.LabelSelector vs map[string]string)
 	return nil
 }
 
@@ -1621,10 +1573,7 @@ func Convert_extensions_SupplementalGroupsStrategyOptions_To_v1beta1_Supplementa
 }
 
 func autoConvert_v1beta1_ThirdPartyResource_To_extensions_ThirdPartyResource(in *ThirdPartyResource, out *extensions.ThirdPartyResource, s conversion.Scope) error {
-	// TODO: Inefficient conversion - can we improve it?
-	if err := s.Convert(&in.ObjectMeta, &out.ObjectMeta, 0); err != nil {
-		return err
-	}
+	out.ObjectMeta = in.ObjectMeta
 	out.Description = in.Description
 	out.Versions = *(*[]extensions.APIVersion)(unsafe.Pointer(&in.Versions))
 	return nil
@@ -1635,10 +1584,7 @@ func Convert_v1beta1_ThirdPartyResource_To_extensions_ThirdPartyResource(in *Thi
 }
 
 func autoConvert_extensions_ThirdPartyResource_To_v1beta1_ThirdPartyResource(in *extensions.ThirdPartyResource, out *ThirdPartyResource, s conversion.Scope) error {
-	// TODO: Inefficient conversion - can we improve it?
-	if err := s.Convert(&in.ObjectMeta, &out.ObjectMeta, 0); err != nil {
-		return err
-	}
+	out.ObjectMeta = in.ObjectMeta
 	out.Description = in.Description
 	out.Versions = *(*[]APIVersion)(unsafe.Pointer(&in.Versions))
 	return nil
@@ -1649,10 +1595,7 @@ func Convert_extensions_ThirdPartyResource_To_v1beta1_ThirdPartyResource(in *ext
 }
 
 func autoConvert_v1beta1_ThirdPartyResourceData_To_extensions_ThirdPartyResourceData(in *ThirdPartyResourceData, out *extensions.ThirdPartyResourceData, s conversion.Scope) error {
-	// TODO: Inefficient conversion - can we improve it?
-	if err := s.Convert(&in.ObjectMeta, &out.ObjectMeta, 0); err != nil {
-		return err
-	}
+	out.ObjectMeta = in.ObjectMeta
 	out.Data = *(*[]byte)(unsafe.Pointer(&in.Data))
 	return nil
 }
@@ -1662,10 +1605,7 @@ func Convert_v1beta1_ThirdPartyResourceData_To_extensions_ThirdPartyResourceData
 }
 
 func autoConvert_extensions_ThirdPartyResourceData_To_v1beta1_ThirdPartyResourceData(in *extensions.ThirdPartyResourceData, out *ThirdPartyResourceData, s conversion.Scope) error {
-	// TODO: Inefficient conversion - can we improve it?
-	if err := s.Convert(&in.ObjectMeta, &out.ObjectMeta, 0); err != nil {
-		return err
-	}
+	out.ObjectMeta = in.ObjectMeta
 	out.Data = *(*[]byte)(unsafe.Pointer(&in.Data))
 	return nil
 }

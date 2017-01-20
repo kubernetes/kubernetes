@@ -66,8 +66,8 @@
     "description": "get information of a group"
    },
    {
-    "path": "/apis/certificates.k8s.io/v1alpha1",
-    "description": "API at /apis/certificates.k8s.io/v1alpha1"
+    "path": "/apis/certificates.k8s.io/v1beta1",
+    "description": "API at /apis/certificates.k8s.io/v1beta1"
    },
    {
     "path": "/apis/certificates.k8s.io",
@@ -88,6 +88,10 @@
    {
     "path": "/apis/policy",
     "description": "get information of a group"
+   },
+   {
+    "path": "/apis/rbac.authorization.k8s.io/v1beta1",
+    "description": "API at /apis/rbac.authorization.k8s.io/v1beta1"
    },
    {
     "path": "/apis/rbac.authorization.k8s.io/v1alpha1",

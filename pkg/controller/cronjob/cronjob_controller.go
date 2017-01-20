@@ -34,18 +34,19 @@ import (
 
 	"github.com/golang/glog"
 
-	"k8s.io/kubernetes/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/api/v1"
 	batch "k8s.io/kubernetes/pkg/apis/batch/v2alpha1"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	v1core "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/core/v1"
 	"k8s.io/kubernetes/pkg/client/record"
-	"k8s.io/kubernetes/pkg/runtime"
-	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/util/metrics"
-	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
-	"k8s.io/kubernetes/pkg/util/wait"
 )
 
 // Utilities for dealing with Jobs and CronJobs and time.
@@ -127,8 +128,10 @@ func (jm *CronJobController) SyncAll() {
 func SyncOne(sj batch.CronJob, js []batch.Job, now time.Time, jc jobControlInterface, sjc sjControlInterface, pc podControlInterface, recorder record.EventRecorder) {
 	nameForLog := fmt.Sprintf("%s/%s", sj.Namespace, sj.Name)
 
+	childrenJobs := make(map[types.UID]bool)
 	for i := range js {
 		j := js[i]
+		childrenJobs[j.ObjectMeta.UID] = true
 		found := inActiveList(sj, j.ObjectMeta.UID)
 		if !found && !IsJobFinished(&j) {
 			recorder.Eventf(&sj, v1.EventTypeWarning, "UnexpectedJob", "Saw a job that the controller did not create or forgot: %v", j.Name)
@@ -148,6 +151,17 @@ func SyncOne(sj batch.CronJob, js []batch.Job, now time.Time, jc jobControlInter
 			recorder.Eventf(&sj, v1.EventTypeNormal, "SawCompletedJob", "Saw completed job: %v", j.Name)
 		}
 	}
+
+	// Remove any job reference from the active list if the corresponding job does not exist any more.
+	// Otherwise, the cronjob may be stuck in active mode forever even though there is no matching
+	// job running.
+	for _, j := range sj.Status.Active {
+		if found := childrenJobs[j.UID]; !found {
+			recorder.Eventf(&sj, v1.EventTypeNormal, "MissingJob", "Active job went missing: %v", j.Name)
+			deleteFromActiveList(&sj, j.UID)
+		}
+	}
+
 	updatedSJ, err := sjc.UpdateStatus(&sj)
 	if err != nil {
 		glog.Errorf("Unable to update status for %s (rv = %s): %v", nameForLog, sj.ResourceVersion, err)

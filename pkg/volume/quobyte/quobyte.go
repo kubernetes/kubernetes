@@ -24,9 +24,10 @@ import (
 
 	"github.com/golang/glog"
 	"github.com/pborman/uuid"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/util/strings"
@@ -182,7 +183,7 @@ func (plugin *quobytePlugin) newUnmounterInternal(volName string, podUID types.U
 		&quobyte{
 			volName: volName,
 			mounter: mounter,
-			pod:     &v1.Pod{ObjectMeta: v1.ObjectMeta{UID: podUID}},
+			pod:     &v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: podUID}},
 			plugin:  plugin,
 		},
 	}, nil

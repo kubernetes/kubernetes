@@ -18,7 +18,7 @@ TAG = e2e
 PREFIX = gcr.io/google_containers/zookeeper-install-3.5.0-alpha
 
 container:
-	docker build -t $(PREFIX):$(TAG) .
+	docker build --pull -t $(PREFIX):$(TAG) .
 
 push: container
 	gcloud docker -- push $(PREFIX):$(TAG)

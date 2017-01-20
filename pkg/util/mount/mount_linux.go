@@ -30,8 +30,8 @@ import (
 	"syscall"
 
 	"github.com/golang/glog"
+	"k8s.io/apimachinery/pkg/util/sets"
 	utilexec "k8s.io/kubernetes/pkg/util/exec"
-	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 const (
@@ -359,7 +359,7 @@ func (mounter *SafeFormatAndMount) formatAndMount(source string, target string, 
 				fstype = "ext4"
 			}
 			if fstype == "ext4" || fstype == "ext3" {
-				args = []string{"-E", "lazy_itable_init=0,lazy_journal_init=0", "-F", source}
+				args = []string{"-F", source}
 			}
 			glog.Infof("Disk %q appears to be unformatted, attempting to format as type: %q with options: %v", source, fstype, args)
 			cmd := mounter.Runner.Command("mkfs."+fstype, args...)

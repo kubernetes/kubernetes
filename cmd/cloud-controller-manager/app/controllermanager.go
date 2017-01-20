@@ -25,9 +25,12 @@ import (
 	"strconv"
 	"time"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apiserver/pkg/server/healthz"
 	"k8s.io/kubernetes/cmd/cloud-controller-manager/app/options"
 	"k8s.io/kubernetes/pkg/api/v1"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	v1core "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/core/v1"
 	"k8s.io/kubernetes/pkg/client/leaderelection"
 	"k8s.io/kubernetes/pkg/client/leaderelection/resourcelock"
@@ -40,9 +43,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller/informers"
 	routecontroller "k8s.io/kubernetes/pkg/controller/route"
 	servicecontroller "k8s.io/kubernetes/pkg/controller/service"
-	"k8s.io/kubernetes/pkg/healthz"
 	"k8s.io/kubernetes/pkg/util/configz"
-	"k8s.io/kubernetes/pkg/util/wait"
 
 	"github.com/golang/glog"
 	"github.com/prometheus/client_golang/prometheus"
@@ -70,8 +71,8 @@ the cloud specific control loops shipped with Kubernetes.`,
 	return cmd
 }
 
-// ResyncPeriod computes the time interval a shared informer waits before resyncing with the api server
-func ResyncPeriod(s *options.CloudControllerManagerServer) func() time.Duration {
+// resyncPeriod computes the time interval a shared informer waits before resyncing with the api server
+func resyncPeriod(s *options.CloudControllerManagerServer) func() time.Duration {
 	return func() time.Duration {
 		factor := rand.Float64() + 1
 		return time.Duration(float64(s.MinResyncPeriod.Nanoseconds()) * factor)
@@ -158,7 +159,7 @@ func Run(s *options.CloudControllerManagerServer, cloud cloudprovider.Interface)
 
 	// Lock required for leader election
 	rl := resourcelock.EndpointsLock{
-		EndpointsMeta: v1.ObjectMeta{
+		EndpointsMeta: metav1.ObjectMeta{
 			Namespace: "kube-system",
 			Name:      "cloud-controller-manager",
 		},
@@ -191,7 +192,7 @@ func StartControllers(s *options.CloudControllerManagerServer, kubeconfig *restc
 	client := func(serviceAccountName string) clientset.Interface {
 		return rootClientBuilder.ClientOrDie(serviceAccountName)
 	}
-	sharedInformers := informers.NewSharedInformerFactory(client("shared-informers"), nil, ResyncPeriod(s)())
+	sharedInformers := informers.NewSharedInformerFactory(client("shared-informers"), nil, resyncPeriod(s)())
 
 	_, clusterCIDR, err := net.ParseCIDR(s.ClusterCIDR)
 	if err != nil {

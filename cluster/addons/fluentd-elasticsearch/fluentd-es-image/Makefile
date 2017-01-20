@@ -16,10 +16,10 @@
 
 PREFIX = gcr.io/google_containers
 IMAGE = fluentd-elasticsearch
-TAG = 1.20
+TAG = 1.22
 
 build:
-	docker build -t $(PREFIX)/$(IMAGE):$(TAG) .
+	docker build --pull -t $(PREFIX)/$(IMAGE):$(TAG) .
 
 push:
 	gcloud docker --server=gcr.io -- push $(PREFIX)/$(IMAGE):$(TAG)

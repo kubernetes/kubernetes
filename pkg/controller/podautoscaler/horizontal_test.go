@@ -27,21 +27,20 @@ import (
 	"testing"
 	"time"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
-	_ "k8s.io/kubernetes/pkg/apimachinery/registered"
 	autoscaling "k8s.io/kubernetes/pkg/apis/autoscaling/v1"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
 	v1core "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/core/v1"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/testing/core"
 	"k8s.io/kubernetes/pkg/controller/podautoscaler/metrics"
-	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/watch"
 
 	heapster "k8s.io/heapster/metrics/api/v1/types"
 	metricsapi "k8s.io/heapster/metrics/apis/metrics/v1alpha1"
@@ -154,7 +153,7 @@ func (tc *testCase) prepareTestClient(t *testing.T) *fake.Clientset {
 		obj := &autoscaling.HorizontalPodAutoscalerList{
 			Items: []autoscaling.HorizontalPodAutoscaler{
 				{
-					ObjectMeta: v1.ObjectMeta{
+					ObjectMeta: metav1.ObjectMeta{
 						Name:      hpaName,
 						Namespace: namespace,
 						SelfLink:  "experimental/v1/namespaces/" + namespace + "/horizontalpodautoscalers/" + hpaName,
@@ -195,7 +194,7 @@ func (tc *testCase) prepareTestClient(t *testing.T) *fake.Clientset {
 		defer tc.Unlock()
 
 		obj := &extensions.Scale{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:      tc.resource.name,
 				Namespace: namespace,
 			},
@@ -215,7 +214,7 @@ func (tc *testCase) prepareTestClient(t *testing.T) *fake.Clientset {
 		defer tc.Unlock()
 
 		obj := &extensions.Scale{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:      tc.resource.name,
 				Namespace: namespace,
 			},
@@ -235,7 +234,7 @@ func (tc *testCase) prepareTestClient(t *testing.T) *fake.Clientset {
 		defer tc.Unlock()
 
 		obj := &extensions.Scale{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:      tc.resource.name,
 				Namespace: namespace,
 			},
@@ -271,7 +270,7 @@ func (tc *testCase) prepareTestClient(t *testing.T) *fake.Clientset {
 						},
 					},
 				},
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:      podName,
 					Namespace: namespace,
 					Labels: map[string]string{

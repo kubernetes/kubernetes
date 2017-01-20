@@ -20,10 +20,10 @@ go_library(
     deps = [
         "//pkg/api/v1:go_default_library",
         "//pkg/apis/extensions/v1beta1:go_default_library",
-        "//pkg/apis/meta/v1:go_default_library",
-        "//pkg/labels:go_default_library",
         "//plugin/pkg/scheduler/api:go_default_library",
         "//plugin/pkg/scheduler/schedulercache:go_default_library",
+        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor:k8s.io/apimachinery/pkg/labels",
     ],
 )
 
@@ -33,4 +33,21 @@ go_test(
     library = ":go_default_library",
     tags = ["automanaged"],
     deps = ["//pkg/api/v1:go_default_library"],
+)
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [
+        ":package-srcs",
+        "//plugin/pkg/scheduler/algorithm/predicates:all-srcs",
+        "//plugin/pkg/scheduler/algorithm/priorities:all-srcs",
+    ],
+    tags = ["automanaged"],
 )

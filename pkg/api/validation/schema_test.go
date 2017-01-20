@@ -24,20 +24,19 @@ import (
 	"strings"
 	"testing"
 
+	"k8s.io/apimachinery/pkg/runtime"
+	k8syaml "k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
-	"k8s.io/kubernetes/pkg/runtime"
-	k8syaml "k8s.io/kubernetes/pkg/util/yaml"
 
 	"github.com/ghodss/yaml"
 )
 
 func readPod(filename string) ([]byte, error) {
-	data, err := ioutil.ReadFile("testdata/" + registered.GroupOrDie(api.GroupName).GroupVersion.Version + "/" + filename)
+	data, err := ioutil.ReadFile("testdata/" + api.Registry.GroupOrDie(api.GroupName).GroupVersion.Version + "/" + filename)
 	if err != nil {
 		return nil, err
 	}

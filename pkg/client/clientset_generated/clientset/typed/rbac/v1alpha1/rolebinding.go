@@ -17,12 +17,13 @@ limitations under the License.
 package v1alpha1
 
 import (
+	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	types "k8s.io/apimachinery/pkg/types"
+	watch "k8s.io/apimachinery/pkg/watch"
 	api "k8s.io/kubernetes/pkg/api"
 	v1 "k8s.io/kubernetes/pkg/api/v1"
-	meta_v1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	v1alpha1 "k8s.io/kubernetes/pkg/apis/rbac/v1alpha1"
 	restclient "k8s.io/kubernetes/pkg/client/restclient"
-	watch "k8s.io/kubernetes/pkg/watch"
 )
 
 // RoleBindingsGetter has a method to return a RoleBindingInterface.
@@ -40,7 +41,7 @@ type RoleBindingInterface interface {
 	Get(name string, options meta_v1.GetOptions) (*v1alpha1.RoleBinding, error)
 	List(opts v1.ListOptions) (*v1alpha1.RoleBindingList, error)
 	Watch(opts v1.ListOptions) (watch.Interface, error)
-	Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *v1alpha1.RoleBinding, err error)
+	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1alpha1.RoleBinding, err error)
 	RoleBindingExpansion
 }
 
@@ -141,7 +142,7 @@ func (c *roleBindings) Watch(opts v1.ListOptions) (watch.Interface, error) {
 }
 
 // Patch applies the patch and returns the patched roleBinding.
-func (c *roleBindings) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *v1alpha1.RoleBinding, err error) {
+func (c *roleBindings) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1alpha1.RoleBinding, err error) {
 	result = &v1alpha1.RoleBinding{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).

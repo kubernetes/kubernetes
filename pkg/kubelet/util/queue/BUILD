@@ -13,8 +13,8 @@ go_library(
     srcs = ["work_queue.go"],
     tags = ["automanaged"],
     deps = [
-        "//pkg/types:go_default_library",
-        "//pkg/util/clock:go_default_library",
+        "//vendor:k8s.io/apimachinery/pkg/types",
+        "//vendor:k8s.io/client-go/pkg/util/clock",
     ],
 )
 
@@ -24,8 +24,21 @@ go_test(
     library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
-        "//pkg/types:go_default_library",
-        "//pkg/util/clock:go_default_library",
-        "//pkg/util/sets:go_default_library",
+        "//vendor:k8s.io/apimachinery/pkg/types",
+        "//vendor:k8s.io/apimachinery/pkg/util/sets",
+        "//vendor:k8s.io/client-go/pkg/util/clock",
     ],
+)
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [":package-srcs"],
+    tags = ["automanaged"],
 )

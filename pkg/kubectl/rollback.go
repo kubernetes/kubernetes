@@ -23,16 +23,16 @@ import (
 	"os/signal"
 	"syscall"
 
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	externalextensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
-	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/runtime/schema"
 	sliceutil "k8s.io/kubernetes/pkg/util/slice"
-	"k8s.io/kubernetes/pkg/watch"
 )
 
 // Rollbacker provides an interface for resources that can be rolled back.
@@ -155,8 +155,8 @@ func simpleDryRun(deployment *extensions.Deployment, c clientset.Interface, toRe
 		revisionToSpec[v] = &rs.Spec.Template
 	}
 
-	if len(revisionToSpec) == 0 {
-		return "No rollout history found.", nil
+	if len(revisionToSpec) < 2 {
+		return "", fmt.Errorf("no rollout history found for deployment %q", deployment.Name)
 	}
 
 	if toRevision > 0 {
@@ -180,7 +180,7 @@ func simpleDryRun(deployment *extensions.Deployment, c clientset.Interface, toRe
 	}
 	sliceutil.SortInts64(revisions)
 
-	template, _ := revisionToSpec[revisions[len(revisions)-1]]
+	template, _ := revisionToSpec[revisions[len(revisions)-2]]
 	buf := bytes.NewBuffer([]byte{})
 	buf.WriteString("\n")
 	internalTemplate := &api.PodTemplateSpec{}

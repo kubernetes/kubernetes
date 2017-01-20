@@ -17,10 +17,6 @@ go_library(
         "pem.go",
     ],
     tags = ["automanaged"],
-    deps = [
-        "//pkg/apis/certificates:go_default_library",
-        "//pkg/apis/certificates/v1alpha1:go_default_library",
-    ],
 )
 
 go_test(
@@ -30,5 +26,21 @@ go_test(
         "testdata/dontUseThisKey.pem",
     ],
     library = ":go_default_library",
+    tags = ["automanaged"],
+)
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [
+        ":package-srcs",
+        "//pkg/util/cert/triple:all-srcs",
+    ],
     tags = ["automanaged"],
 )

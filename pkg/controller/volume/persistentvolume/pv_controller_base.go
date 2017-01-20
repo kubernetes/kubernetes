@@ -21,23 +21,24 @@ import (
 	"strconv"
 	"time"
 
+	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/errors"
-	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/v1"
 	storage "k8s.io/kubernetes/pkg/apis/storage/v1beta1"
 	"k8s.io/kubernetes/pkg/client/cache"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	unversionedcore "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/core/v1"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/controller"
-	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/goroutinemap"
-	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/util/workqueue"
 	vol "k8s.io/kubernetes/pkg/volume"
-	"k8s.io/kubernetes/pkg/watch"
 
 	"github.com/golang/glog"
 )
@@ -510,7 +511,7 @@ func (ctrl *PersistentVolumeController) setClaimProvisioner(claim *v1.Persistent
 	if !ok {
 		return nil, fmt.Errorf("Unexpected claim cast error : %v", claimClone)
 	}
-	v1.SetMetaDataAnnotation(&claimClone.ObjectMeta, annStorageProvisioner, class.Provisioner)
+	metav1.SetMetaDataAnnotation(&claimClone.ObjectMeta, annStorageProvisioner, class.Provisioner)
 	newClaim, err := ctrl.kubeClient.Core().PersistentVolumeClaims(claim.Namespace).Update(claimClone)
 	if err != nil {
 		return newClaim, err
@@ -525,14 +526,14 @@ func (ctrl *PersistentVolumeController) setClaimProvisioner(claim *v1.Persistent
 // Stateless functions
 
 func getClaimStatusForLogging(claim *v1.PersistentVolumeClaim) string {
-	bound := v1.HasAnnotation(claim.ObjectMeta, annBindCompleted)
-	boundByController := v1.HasAnnotation(claim.ObjectMeta, annBoundByController)
+	bound := metav1.HasAnnotation(claim.ObjectMeta, annBindCompleted)
+	boundByController := metav1.HasAnnotation(claim.ObjectMeta, annBoundByController)
 
 	return fmt.Sprintf("phase: %s, bound to: %q, bindCompleted: %v, boundByController: %v", claim.Status.Phase, claim.Spec.VolumeName, bound, boundByController)
 }
 
 func getVolumeStatusForLogging(volume *v1.PersistentVolume) string {
-	boundByController := v1.HasAnnotation(volume.ObjectMeta, annBoundByController)
+	boundByController := metav1.HasAnnotation(volume.ObjectMeta, annBoundByController)
 	claimName := ""
 	if volume.Spec.ClaimRef != nil {
 		claimName = fmt.Sprintf("%s/%s (uid: %s)", volume.Spec.ClaimRef.Namespace, volume.Spec.ClaimRef.Name, volume.Spec.ClaimRef.UID)

@@ -19,19 +19,18 @@ package apiserver
 import (
 	"fmt"
 
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/kubernetes/cmd/libs/go2idl/client-gen/test_apis/testgroup/v1"
 	testgroupetcd "k8s.io/kubernetes/examples/apiserver/rest"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/rest"
-	"k8s.io/kubernetes/pkg/apimachinery/registered"
-	"k8s.io/kubernetes/pkg/genericapiserver"
 	"k8s.io/kubernetes/pkg/genericapiserver/authorizer"
-	genericoptions "k8s.io/kubernetes/pkg/genericapiserver/options"
+	"k8s.io/kubernetes/pkg/genericapiserver/registry/generic"
+	"k8s.io/kubernetes/pkg/genericapiserver/registry/rest"
+	genericapiserver "k8s.io/kubernetes/pkg/genericapiserver/server"
+	genericoptions "k8s.io/kubernetes/pkg/genericapiserver/server/options"
 	kubeoptions "k8s.io/kubernetes/pkg/kubeapiserver/options"
-	"k8s.io/kubernetes/pkg/registry/generic"
-	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/storage/storagebackend"
-	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 
 	// Install the testgroup API
 	_ "k8s.io/kubernetes/cmd/libs/go2idl/client-gen/test_apis/testgroup/install"
@@ -62,6 +61,7 @@ type ServerRunOptions struct {
 	SecureServing           *genericoptions.SecureServingOptions
 	InsecureServing         *genericoptions.ServingOptions
 	Authentication          *kubeoptions.BuiltInAuthenticationOptions
+	CloudProvider           *kubeoptions.CloudProviderOptions
 }
 
 func NewServerRunOptions() *ServerRunOptions {
@@ -71,6 +71,7 @@ func NewServerRunOptions() *ServerRunOptions {
 		SecureServing:   genericoptions.NewSecureServingOptions(),
 		InsecureServing: genericoptions.NewInsecureServingOptions(),
 		Authentication:  kubeoptions.NewBuiltInAuthenticationOptions().WithAll(),
+		CloudProvider:   kubeoptions.NewCloudProviderOptions(),
 	}
 	s.InsecureServing.BindPort = InsecurePort
 	s.SecureServing.ServingOptions.BindPort = SecurePort
@@ -82,7 +83,7 @@ func (serverOptions *ServerRunOptions) Run(stopCh <-chan struct{}) error {
 	serverOptions.Etcd.StorageConfig.ServerList = []string{"http://127.0.0.1:2379"}
 
 	// set defaults
-	if err := serverOptions.GenericServerRunOptions.DefaultExternalHost(); err != nil {
+	if err := serverOptions.CloudProvider.DefaultExternalHost(serverOptions.GenericServerRunOptions); err != nil {
 		return err
 	}
 	if err := serverOptions.SecureServing.MaybeDefaultWithSelfSignedCerts(serverOptions.GenericServerRunOptions.AdvertiseAddress.String()); err != nil {
@@ -122,7 +123,7 @@ func (serverOptions *ServerRunOptions) Run(stopCh <-chan struct{}) error {
 
 	groupVersion := v1.SchemeGroupVersion
 	groupName := groupVersion.Group
-	groupMeta, err := registered.Group(groupName)
+	groupMeta, err := api.Registry.Group(groupName)
 	if err != nil {
 		return fmt.Errorf("%v", err)
 	}

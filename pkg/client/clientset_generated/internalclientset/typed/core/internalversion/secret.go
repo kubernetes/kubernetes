@@ -17,10 +17,11 @@ limitations under the License.
 package internalversion
 
 import (
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	types "k8s.io/apimachinery/pkg/types"
+	watch "k8s.io/apimachinery/pkg/watch"
 	api "k8s.io/kubernetes/pkg/api"
-	v1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	restclient "k8s.io/kubernetes/pkg/client/restclient"
-	watch "k8s.io/kubernetes/pkg/watch"
 )
 
 // SecretsGetter has a method to return a SecretInterface.
@@ -38,7 +39,7 @@ type SecretInterface interface {
 	Get(name string, options v1.GetOptions) (*api.Secret, error)
 	List(opts api.ListOptions) (*api.SecretList, error)
 	Watch(opts api.ListOptions) (watch.Interface, error)
-	Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *api.Secret, err error)
+	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *api.Secret, err error)
 	SecretExpansion
 }
 
@@ -139,7 +140,7 @@ func (c *secrets) Watch(opts api.ListOptions) (watch.Interface, error) {
 }
 
 // Patch applies the patch and returns the patched secret.
-func (c *secrets) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *api.Secret, err error) {
+func (c *secrets) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *api.Secret, err error) {
 	result = &api.Secret{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).

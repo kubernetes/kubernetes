@@ -17,9 +17,9 @@ limitations under the License.
 package main
 
 import (
+	"k8s.io/apiserver/pkg/server/healthz"
 	"k8s.io/kubernetes/cmd/kube-proxy/app"
 	"k8s.io/kubernetes/cmd/kube-proxy/app/options"
-	"k8s.io/kubernetes/pkg/healthz"
 )
 
 func init() {

@@ -18,6 +18,7 @@ package framework
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"sort"
@@ -29,16 +30,16 @@ import (
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	"github.com/prometheus/common/model"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/api/v1"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/stats"
 	kubeletmetrics "k8s.io/kubernetes/pkg/kubelet/metrics"
 	kubeletstats "k8s.io/kubernetes/pkg/kubelet/server/stats"
 	"k8s.io/kubernetes/pkg/master/ports"
 	"k8s.io/kubernetes/pkg/metrics"
-	utilerrors "k8s.io/kubernetes/pkg/util/errors"
-	"k8s.io/kubernetes/pkg/util/sets"
-	"k8s.io/kubernetes/pkg/util/wait"
 )
 
 // KubeletMetric stores metrics scraped from the kubelet server's /metric endpoint.
@@ -288,9 +289,13 @@ func getContainerInfo(c clientset.Interface, nodeName string, req *kubeletstats.
 		return nil, err
 	}
 
+	ctx, cancel := context.WithTimeout(context.Background(), SingleCallTimeout)
+	defer cancel()
+
 	var data []byte
 	if subResourceProxyAvailable {
 		data, err = c.Core().RESTClient().Post().
+			Context(ctx).
 			Resource("nodes").
 			SubResource("proxy").
 			Name(fmt.Sprintf("%v:%v", nodeName, ports.KubeletPort)).
@@ -301,6 +306,7 @@ func getContainerInfo(c clientset.Interface, nodeName string, req *kubeletstats.
 
 	} else {
 		data, err = c.Core().RESTClient().Post().
+			Context(ctx).
 			Prefix("proxy").
 			Resource("nodes").
 			Name(fmt.Sprintf("%v:%v", nodeName, ports.KubeletPort)).

@@ -12,14 +12,31 @@ go_library(
     srcs = [
         "authentication.go",
         "authorization.go",
+        "cloudprovider.go",
     ],
     tags = ["automanaged"],
     deps = [
+        "//pkg/api/v1:go_default_library",
+        "//pkg/cloudprovider:go_default_library",
         "//pkg/controller/informers:go_default_library",
-        "//pkg/genericapiserver:go_default_library",
-        "//pkg/genericapiserver/options:go_default_library",
+        "//pkg/genericapiserver/server:go_default_library",
+        "//pkg/genericapiserver/server/options:go_default_library",
         "//pkg/kubeapiserver/authenticator:go_default_library",
         "//pkg/kubeapiserver/authorizer:go_default_library",
+        "//vendor:github.com/golang/glog",
         "//vendor:github.com/spf13/pflag",
     ],
+)
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [":package-srcs"],
+    tags = ["automanaged"],
 )

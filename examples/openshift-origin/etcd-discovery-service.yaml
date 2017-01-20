@@ -2,7 +2,6 @@ kind: Service
 apiVersion: v1
 metadata:
   name: etcd-discovery
-  creationTimestamp: 
   labels:
     name: etcd-discovery
 spec:

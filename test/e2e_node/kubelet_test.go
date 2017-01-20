@@ -21,8 +21,8 @@ import (
 	"fmt"
 	"time"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
 
@@ -40,7 +40,7 @@ var _ = framework.KubeDescribe("Kubelet", func() {
 		podName := "busybox-scheduling-" + string(uuid.NewUUID())
 		It("it should print the output to logs [Conformance]", func() {
 			podClient.CreateSync(&v1.Pod{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name: podName,
 				},
 				Spec: v1.PodSpec{
@@ -74,7 +74,7 @@ var _ = framework.KubeDescribe("Kubelet", func() {
 		BeforeEach(func() {
 			podName = "bin-false" + string(uuid.NewUUID())
 			podClient.Create(&v1.Pod{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name: podName,
 				},
 				Spec: v1.PodSpec{
@@ -121,7 +121,7 @@ var _ = framework.KubeDescribe("Kubelet", func() {
 		It("it should not write to root filesystem [Conformance]", func() {
 			isReadOnly := true
 			podClient.CreateSync(&v1.Pod{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name: podName,
 				},
 				Spec: v1.PodSpec{

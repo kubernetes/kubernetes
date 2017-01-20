@@ -18,6 +18,7 @@ package restclient
 
 import (
 	"bytes"
+	"context"
 	"encoding/hex"
 	"fmt"
 	"io"
@@ -32,21 +33,21 @@ import (
 	"time"
 
 	"github.com/golang/glog"
-	"k8s.io/kubernetes/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/runtime/serializer/streaming"
+	"k8s.io/apimachinery/pkg/util/net"
+	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/client-go/pkg/util/flowcontrol"
+	restclientwatch "k8s.io/client-go/rest/watch"
 	"k8s.io/kubernetes/pkg/api/v1"
 	pathvalidation "k8s.io/kubernetes/pkg/api/validation/path"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/client/metrics"
-	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/labels"
-	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/runtime/schema"
-	"k8s.io/kubernetes/pkg/runtime/serializer/streaming"
-	"k8s.io/kubernetes/pkg/util/flowcontrol"
-	"k8s.io/kubernetes/pkg/util/net"
-	"k8s.io/kubernetes/pkg/util/sets"
-	"k8s.io/kubernetes/pkg/watch"
-	"k8s.io/kubernetes/pkg/watch/versioned"
 )
 
 var (
@@ -105,16 +106,14 @@ type Request struct {
 	resource     string
 	resourceName string
 	subresource  string
-	selector     labels.Selector
 	timeout      time.Duration
 
 	// output
 	err  error
 	body io.Reader
 
-	// The constructed request and the response
-	req  *http.Request
-	resp *http.Response
+	// This is only used for per-request timeouts, deadlines, and cancellations.
+	ctx context.Context
 
 	backoffMgr BackoffManager
 	throttle   flowcontrol.RateLimiter
@@ -566,6 +565,13 @@ func (r *Request) Body(obj interface{}) *Request {
 	return r
 }
 
+// Context adds a context to the request. Contexts are only used for
+// timeouts, deadlines, and cancellations.
+func (r *Request) Context(ctx context.Context) *Request {
+	r.ctx = ctx
+	return r
+}
+
 // URL returns the current working URL.
 func (r *Request) URL() *url.URL {
 	p := r.pathPrefix
@@ -651,6 +657,9 @@ func (r *Request) Watch() (watch.Interface, error) {
 	if err != nil {
 		return nil, err
 	}
+	if r.ctx != nil {
+		req = req.WithContext(r.ctx)
+	}
 	req.Header = r.headers
 	client := r.client
 	if client == nil {
@@ -683,7 +692,7 @@ func (r *Request) Watch() (watch.Interface, error) {
 	}
 	framer := r.serializers.Framer.NewFrameReader(resp.Body)
 	decoder := streaming.NewDecoder(framer, r.serializers.StreamingSerializer)
-	return watch.NewStreamWatcher(versioned.NewDecoder(decoder, r.serializers.Decoder)), nil
+	return watch.NewStreamWatcher(restclientwatch.NewDecoder(decoder, r.serializers.Decoder)), nil
 }
 
 // updateURLMetrics is a convenience function for pushing metrics.
@@ -720,6 +729,9 @@ func (r *Request) Stream() (io.ReadCloser, error) {
 	if err != nil {
 		return nil, err
 	}
+	if r.ctx != nil {
+		req = req.WithContext(r.ctx)
+	}
 	req.Header = r.headers
 	client := r.client
 	if client == nil {
@@ -748,10 +760,11 @@ func (r *Request) Stream() (io.ReadCloser, error) {
 		defer resp.Body.Close()
 
 		result := r.transformResponse(resp, req)
-		if result.err != nil {
-			return nil, result.err
+		err := result.Error()
+		if err == nil {
+			err = fmt.Errorf("%d while accessing %v: %s", result.statusCode, url, string(result.body))
 		}
-		return nil, fmt.Errorf("%d while accessing %v: %s", result.statusCode, url, string(result.body))
+		return nil, err
 	}
 }
 
@@ -793,6 +806,9 @@ func (r *Request) request(fn func(*http.Request, *http.Response)) error {
 		req, err := http.NewRequest(r.verb, url, r.body)
 		if err != nil {
 			return err
+		}
+		if r.ctx != nil {
+			req = req.WithContext(r.ctx)
 		}
 		req.Header = r.headers
 

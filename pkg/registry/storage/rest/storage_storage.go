@@ -17,12 +17,12 @@ limitations under the License.
 package rest
 
 import (
-	"k8s.io/kubernetes/pkg/api/rest"
 	storageapi "k8s.io/kubernetes/pkg/apis/storage"
 	storageapiv1beta1 "k8s.io/kubernetes/pkg/apis/storage/v1beta1"
-	"k8s.io/kubernetes/pkg/genericapiserver"
-	"k8s.io/kubernetes/pkg/registry/generic"
-	storageclassetcd "k8s.io/kubernetes/pkg/registry/storage/storageclass/etcd"
+	"k8s.io/kubernetes/pkg/genericapiserver/registry/generic"
+	"k8s.io/kubernetes/pkg/genericapiserver/registry/rest"
+	genericapiserver "k8s.io/kubernetes/pkg/genericapiserver/server"
+	storageclassstore "k8s.io/kubernetes/pkg/registry/storage/storageclass/storage"
 )
 
 type RESTStorageProvider struct {
@@ -45,7 +45,7 @@ func (p RESTStorageProvider) v1beta1Storage(apiResourceConfigSource genericapise
 	storage := map[string]rest.Storage{}
 
 	if apiResourceConfigSource.ResourceEnabled(version.WithResource("storageclasses")) {
-		storageClassStorage := storageclassetcd.NewREST(restOptionsGetter)
+		storageClassStorage := storageclassstore.NewREST(restOptionsGetter)
 		storage["storageclasses"] = storageClassStorage
 	}
 

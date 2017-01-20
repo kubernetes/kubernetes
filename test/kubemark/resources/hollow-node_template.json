@@ -27,9 +27,9 @@
 						}
 					},
 					{
-						"name": "npdconfig-volume",
+						"name": "kernelmonitorconfig-volume",
 						"configMap": {
-							"name": "node-problem-detector-config"
+							"name": "node-configmap"
 						}
 					},
 					{
@@ -43,6 +43,10 @@
 						"hostPath": {
 							"path": "/var/log"
 						}
+					},
+					{
+						"name": "no-serviceaccount-access-to-real-master",
+						"emptyDir": {}
 					}
 				],
 				"containers": [
@@ -65,7 +69,7 @@
 							}
 						},
 						{
-							"name": "MY_POD_NAME",
+							"name": "NODE_NAME",
 							"valueFrom": {
 								"fieldRef": {
 									"fieldPath": "metadata.name"
@@ -76,12 +80,13 @@
 					"command": [
 						"/bin/sh",
 						"-c",
-						"./kubemark.sh --morph=kubelet $(CONTENT_TYPE) --v=2 1>>/var/logs/kubelet_$(MY_POD_NAME).log 2>&1"
+						"./kubemark.sh --morph=kubelet --name=$(NODE_NAME) --kubeconfig=/kubeconfig/kubelet.kubeconfig $(CONTENT_TYPE) --v=2 1>>/var/logs/kubelet_$(MY_POD_NAME).log 2>&1"
 					],
 					"volumeMounts": [
 						{
 							"name": "kubeconfig-volume",
-							"mountPath": "/kubeconfig"
+							"mountPath": "/kubeconfig",
+							"readOnly": true
 						},
 						{
 							"name": "logs-volume",
@@ -113,7 +118,7 @@
 							}
 						},
 						{
-							"name": "MY_POD_NAME",
+							"name": "NODE_NAME",
 							"valueFrom": {
 								"fieldRef": {
 									"fieldPath": "metadata.name"
@@ -124,12 +129,13 @@
 					"command": [
 						"/bin/sh",
 						"-c",
-						"./kubemark.sh --morph=proxy $(CONTENT_TYPE) --v=2 1>>/var/logs/kube_proxy_$(MY_POD_NAME).log 2>&1"
+						"./kubemark.sh --morph=proxy --name=$(NODE_NAME) --kubeconfig=/kubeconfig/kubeproxy.kubeconfig $(CONTENT_TYPE) --v=2 1>>/var/logs/kube_proxy_$(MY_POD_NAME).log 2>&1"
 					],
 					"volumeMounts": [
 						{
 							"name": "kubeconfig-volume",
-							"mountPath": "/kubeconfig"
+							"mountPath": "/kubeconfig",
+							"readOnly": true
 						},
 						{
 							"name": "logs-volume",
@@ -145,20 +151,32 @@
 				},
 				{
 					"name": "hollow-node-problem-detector",
-					"image": "gcr.io/google_containers/node-problem-detector:v0.2",
+					"image": "gcr.io/google_containers/node-problem-detector:v0.3",
 					"env": [
 						{
 							"name": "NODE_NAME",
 							"valueFrom": {
 								"fieldRef": {
-									"fieldPath": "spec.nodeName"
+									"fieldPath": "metadata.name"
 								}
 							}
 						}
 					],
+					"command": [
+						"/node-problem-detector",
+						"--kernel-monitor=/config/kernel.monitor",
+						"--apiserver-override=https://{{master_ip}}:443?inClusterConfig=false&auth=/kubeconfig/npd.kubeconfig",
+						"--alsologtostderr",
+						"1>>/var/logs/npd_$(NODE_NAME).log 2>&1"
+					],
 					"volumeMounts": [
 						{
-							"name": "npdconfig-volume",
+							"name": "kubeconfig-volume",
+							"mountPath": "/kubeconfig",
+							"readOnly": true
+						},
+						{
+							"name": "kernelmonitorconfig-volume",
 							"mountPath": "/config",
 							"readOnly": true
 						},
@@ -166,6 +184,15 @@
 							"name": "kernellog-volume",
 							"mountPath": "/log",
 							"readOnly": true
+						},
+						{
+							"name": "no-serviceaccount-access-to-real-master",
+							"mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+							"readOnly": true
+						},
+						{
+							"name": "logs-volume",
+							"mountPath": "/var/logs"
 						}
 					],
 					"resources": {

@@ -17,70 +17,18 @@ limitations under the License.
 package serviceaccount
 
 import (
-	"fmt"
-	"strings"
-
+	apiserverserviceaccount "k8s.io/apiserver/pkg/authentication/serviceaccount"
+	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/api/validation"
-	"k8s.io/kubernetes/pkg/auth/user"
 )
-
-const (
-	ServiceAccountUsernamePrefix    = "system:serviceaccount:"
-	ServiceAccountUsernameSeparator = ":"
-	ServiceAccountGroupPrefix       = "system:serviceaccounts:"
-	AllServiceAccountsGroup         = "system:serviceaccounts"
-)
-
-// MakeUsername generates a username from the given namespace and ServiceAccount name.
-// The resulting username can be passed to SplitUsername to extract the original namespace and ServiceAccount name.
-func MakeUsername(namespace, name string) string {
-	return ServiceAccountUsernamePrefix + namespace + ServiceAccountUsernameSeparator + name
-}
-
-var invalidUsernameErr = fmt.Errorf("Username must be in the form %s", MakeUsername("namespace", "name"))
-
-// SplitUsername returns the namespace and ServiceAccount name embedded in the given username,
-// or an error if the username is not a valid name produced by MakeUsername
-func SplitUsername(username string) (string, string, error) {
-	if !strings.HasPrefix(username, ServiceAccountUsernamePrefix) {
-		return "", "", invalidUsernameErr
-	}
-	trimmed := strings.TrimPrefix(username, ServiceAccountUsernamePrefix)
-	parts := strings.Split(trimmed, ServiceAccountUsernameSeparator)
-	if len(parts) != 2 {
-		return "", "", invalidUsernameErr
-	}
-	namespace, name := parts[0], parts[1]
-	if len(validation.ValidateNamespaceName(namespace, false)) != 0 {
-		return "", "", invalidUsernameErr
-	}
-	if len(validation.ValidateServiceAccountName(name, false)) != 0 {
-		return "", "", invalidUsernameErr
-	}
-	return namespace, name, nil
-}
-
-// MakeGroupNames generates service account group names for the given namespace and ServiceAccount name
-func MakeGroupNames(namespace, name string) []string {
-	return []string{
-		AllServiceAccountsGroup,
-		MakeNamespaceGroupName(namespace),
-	}
-}
-
-// MakeNamespaceGroupName returns the name of the group all service accounts in the namespace are included in
-func MakeNamespaceGroupName(namespace string) string {
-	return ServiceAccountGroupPrefix + namespace
-}
 
 // UserInfo returns a user.Info interface for the given namespace, service account name and UID
 func UserInfo(namespace, name, uid string) user.Info {
 	return &user.DefaultInfo{
-		Name:   MakeUsername(namespace, name),
+		Name:   apiserverserviceaccount.MakeUsername(namespace, name),
 		UID:    uid,
-		Groups: MakeGroupNames(namespace, name),
+		Groups: apiserverserviceaccount.MakeGroupNames(namespace, name),
 	}
 }
 

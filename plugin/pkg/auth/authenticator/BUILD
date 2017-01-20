@@ -12,3 +12,24 @@ go_library(
     srcs = ["doc.go"],
     tags = ["automanaged"],
 )
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [
+        ":package-srcs",
+        "//plugin/pkg/auth/authenticator/password:all-srcs",
+        "//plugin/pkg/auth/authenticator/request/basicauth:all-srcs",
+        "//plugin/pkg/auth/authenticator/token/anytoken:all-srcs",
+        "//plugin/pkg/auth/authenticator/token/oidc:all-srcs",
+        "//plugin/pkg/auth/authenticator/token/tokentest:all-srcs",
+        "//plugin/pkg/auth/authenticator/token/webhook:all-srcs",
+    ],
+    tags = ["automanaged"],
+)

@@ -19,13 +19,13 @@ package validation
 import (
 	"github.com/robfig/cron"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	unversionedvalidation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/kubernetes/pkg/api"
 	apivalidation "k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/apis/batch"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
-	unversionedvalidation "k8s.io/kubernetes/pkg/apis/meta/v1/validation"
-	"k8s.io/kubernetes/pkg/labels"
-	"k8s.io/kubernetes/pkg/util/validation/field"
 )
 
 // TODO: generalize for other controller objects that will follow the same pattern, such as ReplicaSet and DaemonSet, and

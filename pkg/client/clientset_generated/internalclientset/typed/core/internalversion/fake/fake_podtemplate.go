@@ -17,12 +17,13 @@ limitations under the License.
 package fake
 
 import (
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	labels "k8s.io/apimachinery/pkg/labels"
+	schema "k8s.io/apimachinery/pkg/runtime/schema"
+	types "k8s.io/apimachinery/pkg/types"
+	watch "k8s.io/apimachinery/pkg/watch"
 	api "k8s.io/kubernetes/pkg/api"
-	v1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	core "k8s.io/kubernetes/pkg/client/testing/core"
-	labels "k8s.io/kubernetes/pkg/labels"
-	schema "k8s.io/kubernetes/pkg/runtime/schema"
-	watch "k8s.io/kubernetes/pkg/watch"
 )
 
 // FakePodTemplates implements PodTemplateInterface
@@ -106,7 +107,7 @@ func (c *FakePodTemplates) Watch(opts api.ListOptions) (watch.Interface, error) 
 }
 
 // Patch applies the patch and returns the patched podTemplate.
-func (c *FakePodTemplates) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *api.PodTemplate, err error) {
+func (c *FakePodTemplates) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *api.PodTemplate, err error) {
 	obj, err := c.Fake.
 		Invokes(core.NewPatchSubresourceAction(podtemplatesResource, c.ns, name, data, subresources...), &api.PodTemplate{})
 

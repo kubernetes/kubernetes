@@ -59,10 +59,11 @@ authorization.k8s.io/v1beta1 \
 autoscaling/v1 \
 batch/v1 \
 batch/v2alpha1 \
-certificates.k8s.io/v1alpha1 \
+certificates.k8s.io/v1beta1 \
 extensions/v1beta1 \
 imagepolicy.k8s.io/v1alpha1 \
 policy/v1beta1 \
+rbac.authorization.k8s.io/v1beta1 \
 rbac.authorization.k8s.io/v1alpha1 \
 storage.k8s.io/v1beta1\
 }"

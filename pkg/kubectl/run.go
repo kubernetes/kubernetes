@@ -21,13 +21,13 @@ import (
 	"strconv"
 	"strings"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	batch "k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/extensions"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util/validation"
 )
 
 type DeploymentV1Beta1 struct{}
@@ -100,7 +100,7 @@ func (DeploymentV1Beta1) Generate(genericParams map[string]interface{}) (runtime
 	// TODO: use versioned types for generators so that we don't need to
 	// set default values manually (see issue #17384)
 	deployment := extensions.Deployment{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:   name,
 			Labels: labels,
 		},
@@ -108,7 +108,7 @@ func (DeploymentV1Beta1) Generate(genericParams map[string]interface{}) (runtime
 			Replicas: int32(count),
 			Selector: &metav1.LabelSelector{MatchLabels: labels},
 			Template: api.PodTemplateSpec{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Labels: labels,
 				},
 				Spec: *podSpec,
@@ -266,13 +266,13 @@ func (JobV1) Generate(genericParams map[string]interface{}) (runtime.Object, err
 	podSpec.RestartPolicy = restartPolicy
 
 	job := batch.Job{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:   name,
 			Labels: labels,
 		},
 		Spec: batch.JobSpec{
 			Template: api.PodTemplateSpec{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Labels: labels,
 				},
 				Spec: *podSpec,
@@ -360,7 +360,7 @@ func (CronJobV2Alpha1) Generate(genericParams map[string]interface{}) (runtime.O
 	podSpec.RestartPolicy = restartPolicy
 
 	cronJob := batch.CronJob{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:   name,
 			Labels: labels,
 		},
@@ -370,7 +370,7 @@ func (CronJobV2Alpha1) Generate(genericParams map[string]interface{}) (runtime.O
 			JobTemplate: batch.JobTemplateSpec{
 				Spec: batch.JobSpec{
 					Template: api.PodTemplateSpec{
-						ObjectMeta: api.ObjectMeta{
+						ObjectMeta: metav1.ObjectMeta{
 							Labels: labels,
 						},
 						Spec: *podSpec,
@@ -521,7 +521,7 @@ func (BasicReplicationController) Generate(genericParams map[string]interface{})
 	}
 
 	controller := api.ReplicationController{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:   name,
 			Labels: labels,
 		},
@@ -529,7 +529,7 @@ func (BasicReplicationController) Generate(genericParams map[string]interface{})
 			Replicas: int32(count),
 			Selector: labels,
 			Template: &api.PodTemplateSpec{
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Labels: labels,
 				},
 				Spec: *podSpec,
@@ -672,7 +672,7 @@ func (BasicPod) Generate(genericParams map[string]interface{}) (runtime.Object, 
 	// TODO: Figure out why we set ImagePullPolicy here, whether we can make it
 	// consistent with the other places imagePullPolicy is set using flag.
 	pod := api.Pod{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:   name,
 			Labels: labels,
 		},

@@ -180,6 +180,14 @@ func (ConfigMap) SwaggerDoc() map[string]string {
 	return map_ConfigMap
 }
 
+var map_ConfigMapEnvSource = map[string]string{
+	"": "ConfigMapEnvSource selects a ConfigMap to populate the environment variables with.\n\nThe contents of the target ConfigMap's Data field will represent the key-value pairs as environment variables.",
+}
+
+func (ConfigMapEnvSource) SwaggerDoc() map[string]string {
+	return map_ConfigMapEnvSource
+}
+
 var map_ConfigMapKeySelector = map[string]string{
 	"":    "Selects a key from a ConfigMap.",
 	"key": "The key to select.",
@@ -217,6 +225,7 @@ var map_Container = map[string]string{
 	"args":                   "Arguments to the entrypoint. The docker image's CMD is used if this is not provided. Variable references $(VAR_NAME) are expanded using the container's environment. If a variable cannot be resolved, the reference in the input string will be unchanged. The $(VAR_NAME) syntax can be escaped with a double $$, ie: $$(VAR_NAME). Escaped references will never be expanded, regardless of whether the variable exists or not. Cannot be updated. More info: http://kubernetes.io/docs/user-guide/containers#containers-and-commands",
 	"workingDir":             "Container's working directory. If not specified, the container runtime's default will be used, which might be configured in the container image. Cannot be updated.",
 	"ports":                  "List of ports to expose from the container. Exposing a port here gives the system additional information about the network connections a container uses, but is primarily informational. Not specifying a port here DOES NOT prevent that port from being exposed. Any port which is listening on the default \"0.0.0.0\" address inside a container will be accessible from the network. Cannot be updated.",
+	"envFrom":                "List of sources to populate environment variables in the container. The keys defined within a source must be a C_IDENTIFIER. An invalid key will prevent the container from starting. When a key exists in multiple sources, the value associated with the last source will take precedence. Values defined by an Env with a duplicate key will take precedence. Cannot be updated.",
 	"env":                    "List of environment variables to set in the container. Cannot be updated.",
 	"resources":              "Compute Resources required by this container. Cannot be updated. More info: http://kubernetes.io/docs/user-guide/persistent-volumes#resources",
 	"volumeMounts":           "Pod volumes to mount into the container's filesystem. Cannot be updated.",
@@ -422,6 +431,17 @@ var map_EndpointsList = map[string]string{
 
 func (EndpointsList) SwaggerDoc() map[string]string {
 	return map_EndpointsList
+}
+
+var map_EnvFromSource = map[string]string{
+	"":             "EnvFromSource represents the source of a set of ConfigMaps",
+	"prefix":       "An optional identifer to prepend to each key in the ConfigMap. Must be a C_IDENTIFIER.",
+	"configMapRef": "The ConfigMap to select from",
+	"secretRef":    "The Secret to select from",
+}
+
+func (EnvFromSource) SwaggerDoc() map[string]string {
+	return map_EnvFromSource
 }
 
 var map_EnvVar = map[string]string{
@@ -945,7 +965,7 @@ func (ObjectFieldSelector) SwaggerDoc() map[string]string {
 }
 
 var map_ObjectMeta = map[string]string{
-	"":                           "ObjectMeta is metadata that all persisted resources must have, which includes all objects users must create.",
+	"":                           "ObjectMeta is metadata that all persisted resources must have, which includes all objects users must create. DEPRECATED: Use k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta instead - this type will be removed soon.",
 	"name":                       "Name must be unique within a namespace. Is required when creating resources, although some resources may allow a client to request the generation of an appropriate name automatically. Name is primarily intended for creation idempotence and configuration definition. Cannot be updated. More info: http://kubernetes.io/docs/user-guide/identifiers#names",
 	"generateName":               "GenerateName is an optional prefix, used by the server, to generate a unique name ONLY IF the Name field has not been provided. If this field is used, the name returned to the client will be different than the name passed. This value will also be combined with a unique suffix. The provided value has the same validation rules as the Name field, and may be truncated by the length of the suffix required to make the value unique on the server.\n\nIf this field is specified and the generated name exists, the server will NOT return a 409 - instead, it will either return 201 Created or 500 with Reason ServerTimeout indicating a unique name could not be found in the time allotted, and the client should retry (optionally after the time indicated in the Retry-After header).\n\nApplied only if Name is not specified. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#idempotency",
 	"namespace":                  "Namespace defines the space within each name must be unique. An empty namespace is equivalent to the \"default\" namespace, but \"default\" is the canonical representation. Not all objects are required to be scoped to a namespace - the value of this field for those objects will be empty.\n\nMust be a DNS_LABEL. Cannot be updated. More info: http://kubernetes.io/docs/user-guide/namespaces",
@@ -1275,6 +1295,7 @@ var map_PodSpec = map[string]string{
 	"hostname":                      "Specifies the hostname of the Pod If not specified, the pod's hostname will be set to a system-defined value.",
 	"subdomain":                     "If specified, the fully qualified Pod hostname will be \"<hostname>.<subdomain>.<pod namespace>.svc.<cluster domain>\". If not specified, the pod will not have a domainname at all.",
 	"affinity":                      "If specified, the pod's scheduling constraints",
+	"schedulername":                 "If specified, the pod will be dispatched by specified scheduler. If not specified, the pod will be dispatched by default scheduler.",
 }
 
 func (PodSpec) SwaggerDoc() map[string]string {
@@ -1566,6 +1587,14 @@ var map_Secret = map[string]string{
 
 func (Secret) SwaggerDoc() map[string]string {
 	return map_Secret
+}
+
+var map_SecretEnvSource = map[string]string{
+	"": "SecretEnvSource selects a Secret to populate the environment variables with.\n\nThe contents of the target Secret's Data field will represent the key-value pairs as environment variables.",
+}
+
+func (SecretEnvSource) SwaggerDoc() map[string]string {
+	return map_SecretEnvSource
 }
 
 var map_SecretKeySelector = map[string]string{

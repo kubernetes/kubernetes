@@ -20,7 +20,7 @@ import (
 	"strings"
 
 	"k8s.io/kubernetes/pkg/api/v1"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/metrics"
 	"k8s.io/kubernetes/test/e2e/framework"
 
@@ -69,7 +69,7 @@ var _ = framework.KubeDescribe("MetricsGrabber", func() {
 			}
 		}
 		if !masterRegistered {
-			framework.Logf("Master is node registered. Skipping testing Scheduler metrics.")
+			framework.Logf("Master is node api.Registry. Skipping testing Scheduler metrics.")
 			return
 		}
 		response, err := grabber.GrabFromScheduler()
@@ -90,7 +90,7 @@ var _ = framework.KubeDescribe("MetricsGrabber", func() {
 			}
 		}
 		if !masterRegistered {
-			framework.Logf("Master is node registered. Skipping testing ControllerManager metrics.")
+			framework.Logf("Master is node api.Registry. Skipping testing ControllerManager metrics.")
 			return
 		}
 		response, err := grabber.GrabFromControllerManager()

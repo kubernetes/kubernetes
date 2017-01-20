@@ -21,16 +21,16 @@ import (
 	"strconv"
 	"time"
 
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/cache"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
-	"k8s.io/kubernetes/pkg/labels"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/master/ports"
-	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/uuid"
-	"k8s.io/kubernetes/pkg/util/wait"
-	"k8s.io/kubernetes/pkg/watch"
 	"k8s.io/kubernetes/test/e2e/framework"
 	testutils "k8s.io/kubernetes/test/utils"
 
@@ -192,7 +192,7 @@ var _ = framework.KubeDescribe("DaemonRestart [Disruptive]", func() {
 	existingPods := cache.NewStore(cache.MetaNamespaceKeyFunc)
 	var ns string
 	var config testutils.RCConfig
-	var controller *cache.Controller
+	var controller cache.Controller
 	var newPods cache.Store
 	var stopCh chan struct{}
 	var tracker *podTracker
@@ -302,7 +302,7 @@ var _ = framework.KubeDescribe("DaemonRestart [Disruptive]", func() {
 
 	It("Kubelet should not restart containers across restart", func() {
 
-		nodeIPs, err := getNodePublicIps(f.ClientSet)
+		nodeIPs, err := framework.GetNodePublicIps(f.ClientSet)
 		framework.ExpectNoError(err)
 		preRestarts, badNodes := getContainerRestarts(f.ClientSet, ns, labelSelector)
 		if preRestarts != 0 {

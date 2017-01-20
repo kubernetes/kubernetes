@@ -16,7 +16,7 @@ limitations under the License.
 
 package storagebackend
 
-import "k8s.io/kubernetes/pkg/runtime"
+import "k8s.io/apimachinery/pkg/runtime"
 
 const (
 	StorageTypeUnset = ""
@@ -26,7 +26,7 @@ const (
 
 // Config is configuration for creating a storage backend.
 type Config struct {
-	// Type defines the type of storage backend, e.g. "etcd2", etcd3". Default ("") is "etcd2".
+	// Type defines the type of storage backend, e.g. "etcd2", etcd3". Default ("") is "etcd3".
 	Type string
 	// Prefix is the prefix to all keys passed to storage.Interface methods.
 	Prefix string

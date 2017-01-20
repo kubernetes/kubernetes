@@ -47,11 +47,19 @@ if [[ "${NODE_OS_DISTRIBUTION}" == "coreos" ]]; then
     NODE_OS_DISTRIBUTION="container-linux"
 fi
 
+if [[ "${MASTER_OS_DISTRIBUTION}" == "cos" ]]; then
+    MASTER_OS_DISTRIBUTION="gci"
+fi
+
+if [[ "${NODE_OS_DISTRIBUTION}" == "cos" ]]; then
+    NODE_OS_DISTRIBUTION="gci"
+fi
+
 # By default a cluster will be started with the master on GCI and nodes on
 # containervm. If you are updating the containervm version, update this
 # variable. Also please update corresponding image for node e2e at:
 # https://github.com/kubernetes/kubernetes/blob/master/test/e2e_node/jenkins/image-config.yaml
-CVM_VERSION=container-vm-v20161208
+CVM_VERSION=${CVM_VERSION:-container-vm-v20170117}
 GCI_VERSION=${KUBE_GCI_VERSION:-gci-dev-56-8977-0-0}
 MASTER_IMAGE=${KUBE_GCE_MASTER_IMAGE:-}
 MASTER_IMAGE_PROJECT=${KUBE_GCE_MASTER_PROJECT:-google-containers}

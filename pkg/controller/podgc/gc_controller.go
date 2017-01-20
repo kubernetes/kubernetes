@@ -21,16 +21,16 @@ import (
 	"sync"
 	"time"
 
+	"k8s.io/apimachinery/pkg/labels"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/cache"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/informers"
-	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util/metrics"
-	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
-	"k8s.io/kubernetes/pkg/util/sets"
-	"k8s.io/kubernetes/pkg/util/wait"
 
 	"github.com/golang/glog"
 )
@@ -50,7 +50,7 @@ type PodGCController struct {
 	internalPodInformer cache.SharedIndexInformer
 
 	podStore      cache.StoreToPodLister
-	podController cache.ControllerInterface
+	podController cache.Controller
 
 	deletePod              func(namespace, name string) error
 	terminatedPodThreshold int

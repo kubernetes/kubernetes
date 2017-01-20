@@ -15,5 +15,24 @@ go_library(
         "//pkg/client/informers/informers_generated/internalinterfaces:go_default_library",
         "//pkg/client/informers/informers_generated/rbac/internalversion:go_default_library",
         "//pkg/client/informers/informers_generated/rbac/v1alpha1:go_default_library",
+        "//pkg/client/informers/informers_generated/rbac/v1beta1:go_default_library",
     ],
+)
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [
+        ":package-srcs",
+        "//pkg/client/informers/informers_generated/rbac/internalversion:all-srcs",
+        "//pkg/client/informers/informers_generated/rbac/v1alpha1:all-srcs",
+        "//pkg/client/informers/informers_generated/rbac/v1beta1:all-srcs",
+    ],
+    tags = ["automanaged"],
 )

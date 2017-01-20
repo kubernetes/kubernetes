@@ -24,15 +24,14 @@ import (
 	"strings"
 	"testing"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/apimachinery/registered"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/restclient"
-	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/labels"
-	"k8s.io/kubernetes/pkg/runtime"
 	utiltesting "k8s.io/kubernetes/pkg/util/testing"
 )
 
@@ -141,9 +140,9 @@ func (c *Client) ValidateCommon(t *testing.T, err error) {
 		validator, ok := c.QueryValidator[key]
 		if !ok {
 			switch key {
-			case metav1.LabelSelectorQueryParam(registered.GroupOrDie(api.GroupName).GroupVersion.String()):
+			case metav1.LabelSelectorQueryParam(api.Registry.GroupOrDie(api.GroupName).GroupVersion.String()):
 				validator = ValidateLabels
-			case metav1.FieldSelectorQueryParam(registered.GroupOrDie(api.GroupName).GroupVersion.String()):
+			case metav1.FieldSelectorQueryParam(api.Registry.GroupOrDie(api.GroupName).GroupVersion.String()):
 				validator = validateFields
 			default:
 				validator = func(a, b string) bool { return a == b }

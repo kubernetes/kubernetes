@@ -17,8 +17,8 @@ limitations under the License.
 package apps
 
 import (
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 )
 
 // +genclient=true
@@ -32,7 +32,7 @@ import (
 type StatefulSet struct {
 	metav1.TypeMeta
 	// +optional
-	api.ObjectMeta
+	metav1.ObjectMeta
 
 	// Spec defines the desired identities of pods in this set.
 	// +optional

@@ -21,12 +21,13 @@ import (
 
 	"github.com/emicklei/go-restful/swagger"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/version"
 	"k8s.io/kubernetes/pkg/api/v1"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/testing/core"
-	"k8s.io/kubernetes/pkg/runtime/schema"
-	"k8s.io/kubernetes/pkg/version"
+	kubeversion "k8s.io/kubernetes/pkg/version"
 )
 
 type FakeDiscovery struct {
@@ -74,7 +75,7 @@ func (c *FakeDiscovery) ServerVersion() (*version.Info, error) {
 	action.Resource = schema.GroupVersionResource{Resource: "version"}
 
 	c.Invokes(action, nil)
-	versionInfo := version.Get()
+	versionInfo := kubeversion.Get()
 	return &versionInfo, nil
 }
 

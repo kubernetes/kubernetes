@@ -18,6 +18,7 @@ package framework
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -27,12 +28,12 @@ import (
 	"strings"
 	"time"
 
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/master/ports"
 	"k8s.io/kubernetes/pkg/metrics"
-	"k8s.io/kubernetes/pkg/util/sets"
 
 	"github.com/prometheus/common/expfmt"
 	"github.com/prometheus/common/model"
@@ -335,7 +336,11 @@ func getSchedulingLatency(c clientset.Interface) (SchedulingLatency, error) {
 		}
 	}
 	if masterRegistered {
+		ctx, cancel := context.WithTimeout(context.Background(), SingleCallTimeout)
+		defer cancel()
+
 		rawData, err := c.Core().RESTClient().Get().
+			Context(ctx).
 			Prefix("proxy").
 			Namespace(api.NamespaceSystem).
 			Resource("pods").

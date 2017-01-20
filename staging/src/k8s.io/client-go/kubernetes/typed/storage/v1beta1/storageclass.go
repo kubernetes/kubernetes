@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors.
+Copyright 2017 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,11 +17,12 @@ limitations under the License.
 package v1beta1
 
 import (
+	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	types "k8s.io/apimachinery/pkg/types"
+	watch "k8s.io/apimachinery/pkg/watch"
 	api "k8s.io/client-go/pkg/api"
 	v1 "k8s.io/client-go/pkg/api/v1"
-	meta_v1 "k8s.io/client-go/pkg/apis/meta/v1"
 	v1beta1 "k8s.io/client-go/pkg/apis/storage/v1beta1"
-	watch "k8s.io/client-go/pkg/watch"
 	rest "k8s.io/client-go/rest"
 )
 
@@ -40,7 +41,7 @@ type StorageClassInterface interface {
 	Get(name string, options meta_v1.GetOptions) (*v1beta1.StorageClass, error)
 	List(opts v1.ListOptions) (*v1beta1.StorageClassList, error)
 	Watch(opts v1.ListOptions) (watch.Interface, error)
-	Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *v1beta1.StorageClass, err error)
+	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1beta1.StorageClass, err error)
 	StorageClassExpansion
 }
 
@@ -132,7 +133,7 @@ func (c *storageClasses) Watch(opts v1.ListOptions) (watch.Interface, error) {
 }
 
 // Patch applies the patch and returns the patched storageClass.
-func (c *storageClasses) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *v1beta1.StorageClass, err error) {
+func (c *storageClasses) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1beta1.StorageClass, err error) {
 	result = &v1beta1.StorageClass{}
 	err = c.client.Patch(pt).
 		Resource("storageclasses").

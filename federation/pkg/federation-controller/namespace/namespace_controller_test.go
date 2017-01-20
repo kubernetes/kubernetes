@@ -21,6 +21,9 @@ import (
 	"testing"
 	"time"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/wait"
 	federationapi "k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	fakefedclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset/fake"
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util"
@@ -28,12 +31,9 @@ import (
 	. "k8s.io/kubernetes/federation/pkg/federation-controller/util/test"
 	apiv1 "k8s.io/kubernetes/pkg/api/v1"
 	extensionsv1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	fakekubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
 	"k8s.io/kubernetes/pkg/client/testing/core"
-	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util/wait"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -42,7 +42,7 @@ func TestNamespaceController(t *testing.T) {
 	cluster1 := NewCluster("cluster1", apiv1.ConditionTrue)
 	cluster2 := NewCluster("cluster2", apiv1.ConditionTrue)
 	ns1 := apiv1.Namespace{
-		ObjectMeta: apiv1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:     "test-namespace",
 			SelfLink: "/api/v1/namespaces/test-namespace",
 		},
@@ -71,19 +71,19 @@ func TestNamespaceController(t *testing.T) {
 
 	RegisterFakeList("replicasets", &fakeClient.Fake, &extensionsv1.ReplicaSetList{Items: []extensionsv1.ReplicaSet{
 		{
-			ObjectMeta: apiv1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:      "test-rs",
 				Namespace: ns1.Namespace,
 			}}}})
 	RegisterFakeList("secrets", &fakeClient.Fake, &apiv1.SecretList{Items: []apiv1.Secret{
 		{
-			ObjectMeta: apiv1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:      "test-secret",
 				Namespace: ns1.Namespace,
 			}}}})
 	RegisterFakeList("services", &fakeClient.Fake, &apiv1.ServiceList{Items: []apiv1.Service{
 		{
-			ObjectMeta: apiv1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:      "test-service",
 				Namespace: ns1.Namespace,
 			}}}})

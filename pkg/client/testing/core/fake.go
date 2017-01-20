@@ -20,12 +20,13 @@ import (
 	"fmt"
 	"sync"
 
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/version"
+	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/kubernetes/pkg/client/restclient"
-	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/runtime/schema"
-	"k8s.io/kubernetes/pkg/version"
-	"k8s.io/kubernetes/pkg/watch"
+	kubeversion "k8s.io/kubernetes/pkg/version"
 )
 
 // Fake implements client.Interface. Meant to be embedded into a struct to get
@@ -253,6 +254,6 @@ func (c *FakeDiscovery) ServerVersion() (*version.Info, error) {
 	action.Resource = schema.GroupVersionResource{Resource: "version"}
 
 	c.Invokes(action, nil)
-	versionInfo := version.Get()
+	versionInfo := kubeversion.Get()
 	return &versionInfo, nil
 }

@@ -25,12 +25,12 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/api/v1"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
-	"k8s.io/kubernetes/pkg/labels"
-	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/workqueue"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 	priorityutil "k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/priorities/util"
@@ -78,7 +78,7 @@ type CachedNodeInfo struct {
 
 // GetNodeInfo returns cached data for the node 'id'.
 func (c *CachedNodeInfo) GetNodeInfo(id string) (*v1.Node, error) {
-	node, exists, err := c.Get(&v1.Node{ObjectMeta: v1.ObjectMeta{Name: id}})
+	node, exists, err := c.Get(&v1.Node{ObjectMeta: metav1.ObjectMeta{Name: id}})
 
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving node '%v' from cache: %v", id, err)
@@ -904,10 +904,7 @@ func (c *PodAffinityChecker) InterPodAffinityMatches(pod *v1.Pod, meta interface
 	}
 
 	// Now check if <pod> requirements will be satisfied on this node.
-	affinity, err := v1.GetAffinityFromPodAnnotations(pod.Annotations)
-	if err != nil {
-		return false, nil, err
-	}
+	affinity := pod.Spec.Affinity
 	if affinity == nil || (affinity.PodAffinity == nil && affinity.PodAntiAffinity == nil) {
 		return true, nil, nil
 	}
@@ -1008,11 +1005,7 @@ func getMatchingAntiAffinityTerms(pod *v1.Pod, nodeInfoMap map[string]*scheduler
 		}
 		var nodeResult []matchingPodAntiAffinityTerm
 		for _, existingPod := range nodeInfo.PodsWithAffinity() {
-			affinity, err := v1.GetAffinityFromPodAnnotations(existingPod.Annotations)
-			if err != nil {
-				catchError(err)
-				return
-			}
+			affinity := existingPod.Spec.Affinity
 			if affinity == nil {
 				continue
 			}
@@ -1040,10 +1033,7 @@ func getMatchingAntiAffinityTerms(pod *v1.Pod, nodeInfoMap map[string]*scheduler
 func (c *PodAffinityChecker) getMatchingAntiAffinityTerms(pod *v1.Pod, allPods []*v1.Pod) ([]matchingPodAntiAffinityTerm, error) {
 	var result []matchingPodAntiAffinityTerm
 	for _, existingPod := range allPods {
-		affinity, err := v1.GetAffinityFromPodAnnotations(existingPod.Annotations)
-		if err != nil {
-			return nil, err
-		}
+		affinity := existingPod.Spec.Affinity
 		if affinity != nil && affinity.PodAntiAffinity != nil {
 			existingPodNode, err := c.info.GetNodeInfo(existingPod.Spec.NodeName)
 			if err != nil {
@@ -1180,11 +1170,6 @@ func tolerationsToleratesTaints(tolerations []v1.Toleration, taints []v1.Taint) 
 		return true
 	}
 
-	// The taint list isn't nil/empty, a nil/empty toleration list can't tolerate them.
-	if len(tolerations) == 0 {
-		return false
-	}
-
 	for i := range taints {
 		taint := &taints[i]
 		// skip taints that have effect PreferNoSchedule, since it is for priorities
@@ -1192,7 +1177,7 @@ func tolerationsToleratesTaints(tolerations []v1.Toleration, taints []v1.Taint) 
 			continue
 		}
 
-		if !v1.TaintToleratedByTolerations(taint, tolerations) {
+		if len(tolerations) == 0 || !v1.TaintToleratedByTolerations(taint, tolerations) {
 			return false
 		}
 	}
@@ -1202,7 +1187,7 @@ func tolerationsToleratesTaints(tolerations []v1.Toleration, taints []v1.Taint) 
 
 // Determine if a pod is scheduled with best-effort QoS
 func isPodBestEffort(pod *v1.Pod) bool {
-	return qos.GetPodQOS(pod) == qos.BestEffort
+	return qos.GetPodQOS(pod) == v1.PodQOSBestEffort
 }
 
 // CheckNodeMemoryPressurePredicate checks if a pod can be scheduled on a node

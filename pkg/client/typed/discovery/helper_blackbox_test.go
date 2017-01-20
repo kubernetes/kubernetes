@@ -26,17 +26,16 @@ import (
 	"strings"
 	"testing"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	uapi "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/apimachinery/registered"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
-	uapi "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/restclient/fake"
 	"k8s.io/kubernetes/pkg/client/typed/discovery"
-	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/runtime/schema"
-	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 func objBody(object interface{}) io.ReadCloser {
@@ -60,23 +59,23 @@ func TestNegotiateVersion(t *testing.T) {
 	}{
 		{
 			name:            "server supports client default",
-			serverVersions:  []string{"version1", registered.GroupOrDie(api.GroupName).GroupVersion.String()},
-			clientVersions:  []schema.GroupVersion{{Version: "version1"}, registered.GroupOrDie(api.GroupName).GroupVersion},
+			serverVersions:  []string{"version1", api.Registry.GroupOrDie(api.GroupName).GroupVersion.String()},
+			clientVersions:  []schema.GroupVersion{{Version: "version1"}, api.Registry.GroupOrDie(api.GroupName).GroupVersion},
 			expectedVersion: &schema.GroupVersion{Version: "version1"},
 			statusCode:      http.StatusOK,
 		},
 		{
 			name:            "server falls back to client supported",
 			serverVersions:  []string{"version1"},
-			clientVersions:  []schema.GroupVersion{{Version: "version1"}, registered.GroupOrDie(api.GroupName).GroupVersion},
+			clientVersions:  []schema.GroupVersion{{Version: "version1"}, api.Registry.GroupOrDie(api.GroupName).GroupVersion},
 			expectedVersion: &schema.GroupVersion{Version: "version1"},
 			statusCode:      http.StatusOK,
 		},
 		{
 			name:            "explicit version supported",
 			requiredVersion: &schema.GroupVersion{Version: "v1"},
-			serverVersions:  []string{"/version1", registered.GroupOrDie(api.GroupName).GroupVersion.String()},
-			clientVersions:  []schema.GroupVersion{{Version: "version1"}, registered.GroupOrDie(api.GroupName).GroupVersion},
+			serverVersions:  []string{"/version1", api.Registry.GroupOrDie(api.GroupName).GroupVersion.String()},
+			clientVersions:  []schema.GroupVersion{{Version: "version1"}, api.Registry.GroupOrDie(api.GroupName).GroupVersion},
 			expectedVersion: &schema.GroupVersion{Version: "v1"},
 			statusCode:      http.StatusOK,
 		},
@@ -84,7 +83,7 @@ func TestNegotiateVersion(t *testing.T) {
 			name:            "explicit version not supported on server",
 			requiredVersion: &schema.GroupVersion{Version: "v1"},
 			serverVersions:  []string{"version1"},
-			clientVersions:  []schema.GroupVersion{{Version: "version1"}, registered.GroupOrDie(api.GroupName).GroupVersion},
+			clientVersions:  []schema.GroupVersion{{Version: "version1"}, api.Registry.GroupOrDie(api.GroupName).GroupVersion},
 			expectErr:       func(err error) bool { return strings.Contains(err.Error(), `server does not support API version "v1"`) },
 			statusCode:      http.StatusOK,
 		},
@@ -99,21 +98,21 @@ func TestNegotiateVersion(t *testing.T) {
 		{
 			name:           "connection refused error",
 			serverVersions: []string{"version1"},
-			clientVersions: []schema.GroupVersion{{Version: "version1"}, registered.GroupOrDie(api.GroupName).GroupVersion},
+			clientVersions: []schema.GroupVersion{{Version: "version1"}, api.Registry.GroupOrDie(api.GroupName).GroupVersion},
 			sendErr:        errors.New("connection refused"),
 			expectErr:      func(err error) bool { return strings.Contains(err.Error(), "connection refused") },
 			statusCode:     http.StatusOK,
 		},
 		{
 			name:            "discovery fails due to 403 Forbidden errors and thus serverVersions is empty, use default GroupVersion",
-			clientVersions:  []schema.GroupVersion{{Version: "version1"}, registered.GroupOrDie(api.GroupName).GroupVersion},
+			clientVersions:  []schema.GroupVersion{{Version: "version1"}, api.Registry.GroupOrDie(api.GroupName).GroupVersion},
 			expectedVersion: &schema.GroupVersion{Version: "version1"},
 			statusCode:      http.StatusForbidden,
 		},
 		{
 			name:            "discovery fails due to 404 Not Found errors and thus serverVersions is empty, use requested GroupVersion",
 			requiredVersion: &schema.GroupVersion{Version: "version1"},
-			clientVersions:  []schema.GroupVersion{{Version: "version1"}, registered.GroupOrDie(api.GroupName).GroupVersion},
+			clientVersions:  []schema.GroupVersion{{Version: "version1"}, api.Registry.GroupOrDie(api.GroupName).GroupVersion},
 			expectedVersion: &schema.GroupVersion{Version: "version1"},
 			statusCode:      http.StatusNotFound,
 		},

@@ -38,6 +38,24 @@ func TestParseURL(t *testing.T) {
 			},
 		},
 		{
+			url: "token://c05de9:ab224260fb3cd718",
+			expect: kubeadm.Discovery{
+				Token: &kubeadm.TokenDiscovery{
+					ID:     "c05de9",
+					Secret: "ab224260fb3cd718",
+				},
+			},
+		},
+		{
+			url: "token://c05de9:ab224260fb3cd718@",
+			expect: kubeadm.Discovery{
+				Token: &kubeadm.TokenDiscovery{
+					ID:     "c05de9",
+					Secret: "ab224260fb3cd718",
+				},
+			},
+		},
+		{
 			url: "token://c05de9:ab224260fb3cd718@192.168.0.1:6555,191.168.0.2:6443",
 			expect: kubeadm.Discovery{
 				Token: &kubeadm.TokenDiscovery{
@@ -76,7 +94,7 @@ func TestParseURL(t *testing.T) {
 			continue
 		}
 		if !reflect.DeepEqual(d, c.expect) {
-			t.Errorf("expected discovery config to be equeal but got:\n\ta: %s\n\tb: %s", spew.Sdump(d), spew.Sdump(c.expect))
+			t.Errorf("expected discovery config to be equal but got:\n\tactual: %s\n\texpected: %s", spew.Sdump(d), spew.Sdump(c.expect))
 		}
 
 	}

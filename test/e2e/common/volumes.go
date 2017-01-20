@@ -47,10 +47,10 @@ import (
 	"strings"
 	"time"
 
-	apierrs "k8s.io/kubernetes/pkg/api/errors"
+	apierrs "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	"github.com/golang/glog"
@@ -122,7 +122,7 @@ func startVolumeServer(f *framework.Framework, config VolumeTestConfig) *v1.Pod 
 			Kind:       "Pod",
 			APIVersion: "v1",
 		},
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: config.prefix + "-server",
 			Labels: map[string]string{
 				"role": config.prefix + "-server",
@@ -198,7 +198,7 @@ func testVolumeClient(f *framework.Framework, config VolumeTestConfig, volume v1
 			Kind:       "Pod",
 			APIVersion: "v1",
 		},
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: config.prefix + "-client",
 			Labels: map[string]string{
 				"role": config.prefix + "-client",
@@ -274,7 +274,7 @@ func injectHtml(client clientset.Interface, config VolumeTestConfig, volume v1.V
 			Kind:       "Pod",
 			APIVersion: "v1",
 		},
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: config.prefix + "-injector",
 			Labels: map[string]string{
 				"role": config.prefix + "-injector",
@@ -364,7 +364,7 @@ var _ = framework.KubeDescribe("GCP Volumes", func() {
 	////////////////////////////////////////////////////////////////////////
 
 	framework.KubeDescribe("NFSv4", func() {
-		It("should be mountable for NFSv4", func() {
+		It("should be mountable for NFSv4 [Volume]", func() {
 			config := VolumeTestConfig{
 				namespace:   namespace.Name,
 				prefix:      "nfs",
@@ -398,7 +398,7 @@ var _ = framework.KubeDescribe("GCP Volumes", func() {
 	////////////////////////////////////////////////////////////////////////
 
 	framework.KubeDescribe("GlusterFS", func() {
-		It("should be mountable", func() {
+		It("should be mountable [Volume]", func() {
 			config := VolumeTestConfig{
 				namespace:   namespace.Name,
 				prefix:      "gluster",
@@ -421,7 +421,7 @@ var _ = framework.KubeDescribe("GCP Volumes", func() {
 					Kind:       "Endpoints",
 					APIVersion: "v1",
 				},
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name: config.prefix + "-server",
 				},
 				Subsets: []v1.EndpointSubset{

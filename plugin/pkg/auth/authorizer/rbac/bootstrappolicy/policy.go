@@ -17,9 +17,9 @@ limitations under the License.
 package bootstrappolicy
 
 import (
-	"k8s.io/kubernetes/pkg/api"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apiserver/pkg/authentication/user"
 	rbac "k8s.io/kubernetes/pkg/apis/rbac"
-	"k8s.io/kubernetes/pkg/auth/user"
 )
 
 var (
@@ -72,7 +72,7 @@ func ClusterRoles() []rbac.ClusterRole {
 	roles := []rbac.ClusterRole{
 		{
 			// a "root" role which can do absolutely anything
-			ObjectMeta: api.ObjectMeta{Name: "cluster-admin"},
+			ObjectMeta: metav1.ObjectMeta{Name: "cluster-admin"},
 			Rules: []rbac.PolicyRule{
 				rbac.NewRule("*").Groups("*").Resources("*").RuleOrDie(),
 				rbac.NewRule("*").URLs("*").RuleOrDie(),
@@ -80,14 +80,14 @@ func ClusterRoles() []rbac.ClusterRole {
 		},
 		{
 			// a role which provides just enough power to discovery API versions for negotiation
-			ObjectMeta: api.ObjectMeta{Name: "system:discovery"},
+			ObjectMeta: metav1.ObjectMeta{Name: "system:discovery"},
 			Rules: []rbac.PolicyRule{
-				rbac.NewRule("get").URLs("/version", "/api", "/api/*", "/apis", "/apis/*").RuleOrDie(),
+				rbac.NewRule("get").URLs("/version", "/swaggerapi", "/swaggerapi/*", "/api", "/api/*", "/apis", "/apis/*").RuleOrDie(),
 			},
 		},
 		{
 			// a role which provides minimal resource access to allow a "normal" user to learn information about themselves
-			ObjectMeta: api.ObjectMeta{Name: "system:basic-user"},
+			ObjectMeta: metav1.ObjectMeta{Name: "system:basic-user"},
 			Rules: []rbac.PolicyRule{
 				// TODO add future selfsubjectrulesreview, project request APIs, project listing APIs
 				rbac.NewRule("create").Groups(authorizationGroup).Resources("selfsubjectaccessreviews").RuleOrDie(),
@@ -96,7 +96,7 @@ func ClusterRoles() []rbac.ClusterRole {
 
 		{
 			// a role for a namespace level admin.  It is `edit` plus the power to grant permissions to other users.
-			ObjectMeta: api.ObjectMeta{Name: "admin"},
+			ObjectMeta: metav1.ObjectMeta{Name: "admin"},
 			Rules: []rbac.PolicyRule{
 				rbac.NewRule(ReadWrite...).Groups(legacyGroup).Resources("pods", "pods/attach", "pods/proxy", "pods/exec", "pods/portforward").RuleOrDie(),
 				rbac.NewRule(ReadWrite...).Groups(legacyGroup).Resources("replicationcontrollers", "replicationcontrollers/scale", "serviceaccounts",
@@ -114,8 +114,8 @@ func ClusterRoles() []rbac.ClusterRole {
 
 				rbac.NewRule(ReadWrite...).Groups(batchGroup).Resources("jobs", "cronjobs", "scheduledjobs").RuleOrDie(),
 
-				rbac.NewRule(ReadWrite...).Groups(extensionsGroup).Resources("daemonsets", "horizontalpodautoscalers",
-					"replicationcontrollers/scale", "replicasets", "replicasets/scale", "deployments", "deployments/scale").RuleOrDie(),
+				rbac.NewRule(ReadWrite...).Groups(extensionsGroup).Resources("daemonsets", "deployments", "deployments/scale",
+					"horizontalpodautoscalers", "ingresses", "replicasets", "replicasets/scale", "replicationcontrollers/scale").RuleOrDie(),
 
 				// additional admin powers
 				rbac.NewRule("create").Groups(authorizationGroup).Resources("localsubjectaccessreviews").RuleOrDie(),
@@ -126,7 +126,7 @@ func ClusterRoles() []rbac.ClusterRole {
 			// a role for a namespace level editor.  It grants access to all user level actions in a namespace.
 			// It does not grant powers for "privileged" resources which are domain of the system: `/status`
 			// subresources or `quota`/`limits` which are used to control namespaces
-			ObjectMeta: api.ObjectMeta{Name: "edit"},
+			ObjectMeta: metav1.ObjectMeta{Name: "edit"},
 			Rules: []rbac.PolicyRule{
 				rbac.NewRule(ReadWrite...).Groups(legacyGroup).Resources("pods", "pods/attach", "pods/proxy", "pods/exec", "pods/portforward").RuleOrDie(),
 				rbac.NewRule(ReadWrite...).Groups(legacyGroup).Resources("replicationcontrollers", "replicationcontrollers/scale", "serviceaccounts",
@@ -144,14 +144,14 @@ func ClusterRoles() []rbac.ClusterRole {
 
 				rbac.NewRule(ReadWrite...).Groups(batchGroup).Resources("jobs", "cronjobs", "scheduledjobs").RuleOrDie(),
 
-				rbac.NewRule(ReadWrite...).Groups(extensionsGroup).Resources("daemonsets", "horizontalpodautoscalers",
-					"replicationcontrollers/scale", "replicasets", "replicasets/scale", "deployments", "deployments/scale").RuleOrDie(),
+				rbac.NewRule(ReadWrite...).Groups(extensionsGroup).Resources("daemonsets", "deployments", "deployments/scale",
+					"horizontalpodautoscalers", "ingresses", "replicasets", "replicasets/scale", "replicationcontrollers/scale").RuleOrDie(),
 			},
 		},
 		{
 			// a role for namespace level viewing.  It grants Read-only access to non-escalating resources in
 			// a namespace.
-			ObjectMeta: api.ObjectMeta{Name: "view"},
+			ObjectMeta: metav1.ObjectMeta{Name: "view"},
 			Rules: []rbac.PolicyRule{
 				rbac.NewRule(Read...).Groups(legacyGroup).Resources("pods", "replicationcontrollers", "replicationcontrollers/scale", "serviceaccounts",
 					"services", "endpoints", "persistentvolumeclaims", "configmaps").RuleOrDie(),
@@ -167,13 +167,20 @@ func ClusterRoles() []rbac.ClusterRole {
 
 				rbac.NewRule(Read...).Groups(batchGroup).Resources("jobs", "cronjobs", "scheduledjobs").RuleOrDie(),
 
-				rbac.NewRule(Read...).Groups(extensionsGroup).Resources("daemonsets", "horizontalpodautoscalers",
-					"replicationcontrollers/scale", "replicasets", "replicasets/scale", "deployments", "deployments/scale").RuleOrDie(),
+				rbac.NewRule(Read...).Groups(extensionsGroup).Resources("daemonsets", "deployments", "deployments/scale",
+					"horizontalpodautoscalers", "ingresses", "replicasets", "replicasets/scale", "replicationcontrollers/scale").RuleOrDie(),
+			},
+		},
+		{
+			// a role to use for heapster's connections back to the API server
+			ObjectMeta: metav1.ObjectMeta{Name: "system:heapster"},
+			Rules: []rbac.PolicyRule{
+				rbac.NewRule(Read...).Groups(legacyGroup).Resources("events", "pods", "nodes", "namespaces").RuleOrDie(),
 			},
 		},
 		{
 			// a role for nodes to use to have the access they need for running pods
-			ObjectMeta: api.ObjectMeta{Name: "system:node"},
+			ObjectMeta: metav1.ObjectMeta{Name: "system:node"},
 			Rules: []rbac.PolicyRule{
 				// Needed to check API access.  These creates are non-mutating
 				rbac.NewRule("create").Groups(authenticationGroup).Resources("tokenreviews").RuleOrDie(),
@@ -213,17 +220,39 @@ func ClusterRoles() []rbac.ClusterRole {
 			},
 		},
 		{
+			// a role to use for node-problem-detector access.  It does not get bound to default location since
+			// deployment locations can reasonably vary.
+			ObjectMeta: metav1.ObjectMeta{Name: "system:node-problem-detector"},
+			Rules: []rbac.PolicyRule{
+				rbac.NewRule("get").Groups(legacyGroup).Resources("nodes").RuleOrDie(),
+				rbac.NewRule("patch").Groups(legacyGroup).Resources("nodes/status").RuleOrDie(),
+				eventsRule(),
+			},
+		},
+		{
 			// a role to use for setting up a proxy
-			ObjectMeta: api.ObjectMeta{Name: "system:node-proxier"},
+			ObjectMeta: metav1.ObjectMeta{Name: "system:node-proxier"},
 			Rules: []rbac.PolicyRule{
 				// Used to build serviceLister
 				rbac.NewRule("list", "watch").Groups(legacyGroup).Resources("services", "endpoints").RuleOrDie(),
 				rbac.NewRule("get").Groups(legacyGroup).Resources("nodes").RuleOrDie(),
+
+				eventsRule(),
+			},
+		},
+		{
+			// a role to use for bootstrapping a node's client certificates
+			ObjectMeta: metav1.ObjectMeta{Name: "system:node-bootstrapper"},
+			Rules: []rbac.PolicyRule{
+				// used to check if the node already exists
+				rbac.NewRule("get").Groups(legacyGroup).Resources("nodes").RuleOrDie(),
+				// used to create a certificatesigningrequest for a node-specific client certificate, and watch for it to be signed
+				rbac.NewRule("create", "get", "list", "watch").Groups(certificatesGroup).Resources("certificatesigningrequests").RuleOrDie(),
 			},
 		},
 		{
 			// a role to use for allowing authentication and authorization delegation
-			ObjectMeta: api.ObjectMeta{Name: "system:auth-delegator"},
+			ObjectMeta: metav1.ObjectMeta{Name: "system:auth-delegator"},
 			Rules: []rbac.PolicyRule{
 				// These creates are non-mutating
 				rbac.NewRule("create").Groups(authenticationGroup).Resources("tokenreviews").RuleOrDie(),
@@ -232,7 +261,7 @@ func ClusterRoles() []rbac.ClusterRole {
 		},
 		{
 			// a role to use for the API registry, summarization, and proxy handling
-			ObjectMeta: api.ObjectMeta{Name: "system:kubernetes-discovery"},
+			ObjectMeta: metav1.ObjectMeta{Name: "system:kube-aggregator"},
 			Rules: []rbac.PolicyRule{
 				// it needs to see all services so that it knows whether the ones it points to exist or not
 				rbac.NewRule(Read...).Groups(legacyGroup).Resources("services", "endpoints").RuleOrDie(),
@@ -241,7 +270,7 @@ func ClusterRoles() []rbac.ClusterRole {
 		{
 			// a role to use for bootstrapping the kube-controller-manager so it can create the shared informers
 			// service accounts, and secrets that we need to create separate identities for other controllers
-			ObjectMeta: api.ObjectMeta{Name: "system:kube-controller-manager"},
+			ObjectMeta: metav1.ObjectMeta{Name: "system:kube-controller-manager"},
 			Rules: []rbac.PolicyRule{
 				eventsRule(),
 				rbac.NewRule("create").Groups(legacyGroup).Resources("endpoints", "secrets", "serviceaccounts").RuleOrDie(),
@@ -250,7 +279,7 @@ func ClusterRoles() []rbac.ClusterRole {
 				rbac.NewRule("update").Groups(legacyGroup).Resources("endpoints", "serviceaccounts").RuleOrDie(),
 
 				rbac.NewRule("list", "watch").Groups("*").Resources("namespaces", "nodes", "persistentvolumeclaims",
-					"persistentvolumes", "pods", "secrets", "serviceaccounts").RuleOrDie(),
+					"persistentvolumes", "pods", "secrets", "serviceaccounts", "replicationcontrollers").RuleOrDie(),
 				rbac.NewRule("list", "watch").Groups(extensionsGroup).Resources("daemonsets", "deployments", "replicasets").RuleOrDie(),
 				rbac.NewRule("list", "watch").Groups(batchGroup).Resources("jobs", "cronjobs").RuleOrDie(),
 			},

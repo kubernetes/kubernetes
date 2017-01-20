@@ -29,15 +29,15 @@ import (
 	"testing"
 	"time"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/apimachinery/registered"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	v1core "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/core/v1"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/client/restclient"
-	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/plugin/pkg/scheduler"
 	_ "k8s.io/kubernetes/plugin/pkg/scheduler/algorithmprovider"
 	schedulerapi "k8s.io/kubernetes/plugin/pkg/scheduler/api"
@@ -196,7 +196,7 @@ func TestSchedulerExtender(t *testing.T) {
 	ns := framework.CreateTestingNamespace("scheduler-extender", s, t)
 	defer framework.DeleteTestingNamespace(ns, s, t)
 
-	clientSet := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(v1.GroupName).GroupVersion}})
+	clientSet := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(v1.GroupName).GroupVersion}})
 
 	extender1 := &Extender{
 		name:         "extender1",
@@ -236,7 +236,7 @@ func TestSchedulerExtender(t *testing.T) {
 			},
 		},
 	}
-	policy.APIVersion = registered.GroupOrDie(v1.GroupName).GroupVersion.String()
+	policy.APIVersion = api.Registry.GroupOrDie(v1.GroupName).GroupVersion.String()
 
 	schedulerConfigFactory := factory.NewConfigFactory(clientSet, v1.DefaultSchedulerName, v1.DefaultHardPodAffinitySymmetricWeight, v1.DefaultFailureDomains)
 	schedulerConfig, err := schedulerConfigFactory.CreateFromConfig(policy)
@@ -282,7 +282,7 @@ func DoTestPodScheduling(ns *v1.Namespace, t *testing.T, cs clientset.Interface)
 	}
 
 	pod := &v1.Pod{
-		ObjectMeta: v1.ObjectMeta{Name: "extender-test-pod"},
+		ObjectMeta: metav1.ObjectMeta{Name: "extender-test-pod"},
 		Spec: v1.PodSpec{
 			Containers: []v1.Container{{Name: "container", Image: e2e.GetPauseImageName(cs)}},
 		},

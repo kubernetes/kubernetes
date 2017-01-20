@@ -17,11 +17,12 @@ limitations under the License.
 package internalversion
 
 import (
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	types "k8s.io/apimachinery/pkg/types"
+	watch "k8s.io/apimachinery/pkg/watch"
 	api "k8s.io/kubernetes/pkg/api"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions"
-	v1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	restclient "k8s.io/kubernetes/pkg/client/restclient"
-	watch "k8s.io/kubernetes/pkg/watch"
 )
 
 // NetworkPoliciesGetter has a method to return a NetworkPolicyInterface.
@@ -39,7 +40,7 @@ type NetworkPolicyInterface interface {
 	Get(name string, options v1.GetOptions) (*extensions.NetworkPolicy, error)
 	List(opts api.ListOptions) (*extensions.NetworkPolicyList, error)
 	Watch(opts api.ListOptions) (watch.Interface, error)
-	Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *extensions.NetworkPolicy, err error)
+	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *extensions.NetworkPolicy, err error)
 	NetworkPolicyExpansion
 }
 
@@ -140,7 +141,7 @@ func (c *networkPolicies) Watch(opts api.ListOptions) (watch.Interface, error) {
 }
 
 // Patch applies the patch and returns the patched networkPolicy.
-func (c *networkPolicies) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *extensions.NetworkPolicy, err error) {
+func (c *networkPolicies) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *extensions.NetworkPolicy, err error) {
 	result = &extensions.NetworkPolicy{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).

@@ -28,13 +28,13 @@ import (
 
 	"github.com/aws/aws-sdk-go/service/autoscaling"
 	"github.com/golang/glog"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/api/v1"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/util/sets"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
-	"k8s.io/kubernetes/pkg/types"
+	"k8s.io/apimachinery/pkg/types"
 )
 
 const TestClusterId = "clusterid.test"
@@ -1106,7 +1106,7 @@ func TestDescribeLoadBalancerOnDelete(t *testing.T) {
 	c, _ := newAWSCloud(strings.NewReader("[global]"), awsServices)
 	awsServices.elb.expectDescribeLoadBalancers("aid")
 
-	c.EnsureLoadBalancerDeleted(TestClusterName, &v1.Service{ObjectMeta: v1.ObjectMeta{Name: "myservice", UID: "id"}})
+	c.EnsureLoadBalancerDeleted(TestClusterName, &v1.Service{ObjectMeta: metav1.ObjectMeta{Name: "myservice", UID: "id"}})
 }
 
 func TestDescribeLoadBalancerOnUpdate(t *testing.T) {
@@ -1114,7 +1114,7 @@ func TestDescribeLoadBalancerOnUpdate(t *testing.T) {
 	c, _ := newAWSCloud(strings.NewReader("[global]"), awsServices)
 	awsServices.elb.expectDescribeLoadBalancers("aid")
 
-	c.UpdateLoadBalancer(TestClusterName, &v1.Service{ObjectMeta: v1.ObjectMeta{Name: "myservice", UID: "id"}}, []*v1.Node{})
+	c.UpdateLoadBalancer(TestClusterName, &v1.Service{ObjectMeta: metav1.ObjectMeta{Name: "myservice", UID: "id"}}, []*v1.Node{})
 }
 
 func TestDescribeLoadBalancerOnGet(t *testing.T) {
@@ -1122,7 +1122,7 @@ func TestDescribeLoadBalancerOnGet(t *testing.T) {
 	c, _ := newAWSCloud(strings.NewReader("[global]"), awsServices)
 	awsServices.elb.expectDescribeLoadBalancers("aid")
 
-	c.GetLoadBalancer(TestClusterName, &v1.Service{ObjectMeta: v1.ObjectMeta{Name: "myservice", UID: "id"}})
+	c.GetLoadBalancer(TestClusterName, &v1.Service{ObjectMeta: metav1.ObjectMeta{Name: "myservice", UID: "id"}})
 }
 
 func TestDescribeLoadBalancerOnEnsure(t *testing.T) {
@@ -1130,7 +1130,7 @@ func TestDescribeLoadBalancerOnEnsure(t *testing.T) {
 	c, _ := newAWSCloud(strings.NewReader("[global]"), awsServices)
 	awsServices.elb.expectDescribeLoadBalancers("aid")
 
-	c.EnsureLoadBalancer(TestClusterName, &v1.Service{ObjectMeta: v1.ObjectMeta{Name: "myservice", UID: "id"}}, []*v1.Node{})
+	c.EnsureLoadBalancer(TestClusterName, &v1.Service{ObjectMeta: metav1.ObjectMeta{Name: "myservice", UID: "id"}}, []*v1.Node{})
 }
 
 func TestBuildListener(t *testing.T) {

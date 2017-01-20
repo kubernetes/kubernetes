@@ -20,10 +20,10 @@ import (
 	"reflect"
 	"testing"
 
+	"k8s.io/apiserver/pkg/authentication/user"
+	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/kubernetes/pkg/apis/rbac"
-	"k8s.io/kubernetes/pkg/apis/rbac/validation"
-	"k8s.io/kubernetes/pkg/auth/authorizer"
-	"k8s.io/kubernetes/pkg/auth/user"
+	rbacregistryvalidation "k8s.io/kubernetes/pkg/registry/rbac/validation"
 )
 
 func TestSubjectLocator(t *testing.T) {
@@ -136,7 +136,7 @@ func TestSubjectLocator(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		ruleResolver, lister := validation.NewTestRuleResolver(tt.roles, tt.roleBindings, tt.clusterRoles, tt.clusterRoleBindings)
+		ruleResolver, lister := rbacregistryvalidation.NewTestRuleResolver(tt.roles, tt.roleBindings, tt.clusterRoles, tt.clusterRoleBindings)
 		a := SubjectAccessEvaluator{tt.superUser, lister, lister, ruleResolver}
 		for i, action := range tt.actionsToSubjects {
 			actualSubjects, err := a.AllowedSubjects(action.action)

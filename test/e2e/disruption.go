@@ -22,21 +22,24 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/pkg/api/v1"
 	extensions "k8s.io/client-go/pkg/apis/extensions/v1beta1"
-	metav1 "k8s.io/client-go/pkg/apis/meta/v1"
 	policy "k8s.io/client-go/pkg/apis/policy/v1beta1"
 	"k8s.io/client-go/pkg/util/intstr"
-	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
 
 // schedulingTimeout is longer specifically because sometimes we need to wait
 // awhile to guarantee that we've been patient waiting for something ordinary
 // to happen: a pod to get scheduled and move into Ready
-const schedulingTimeout = 10 * time.Minute
-const bigClusterSize = 7
+const (
+	bigClusterSize    = 7
+	schedulingTimeout = 10 * time.Minute
+	timeout           = 60 * time.Second
+)
 
 var _ = framework.KubeDescribe("DisruptionController", func() {
 	f := framework.NewDefaultFramework("disruption")
@@ -150,7 +153,7 @@ var _ = framework.KubeDescribe("DisruptionController", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			e := &policy.Eviction{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:      pod.Name,
 					Namespace: ns,
 				},
@@ -188,7 +191,7 @@ var _ = framework.KubeDescribe("DisruptionController", func() {
 
 func createPodDisruptionBudgetOrDie(cs *kubernetes.Clientset, ns string, minAvailable intstr.IntOrString) {
 	pdb := policy.PodDisruptionBudget{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      "foo",
 			Namespace: ns,
 		},
@@ -204,7 +207,7 @@ func createPodDisruptionBudgetOrDie(cs *kubernetes.Clientset, ns string, minAvai
 func createPodsOrDie(cs *kubernetes.Clientset, ns string, n int) {
 	for i := 0; i < n; i++ {
 		pod := &v1.Pod{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:      fmt.Sprintf("pod-%d", i),
 				Namespace: ns,
 				Labels:    map[string]string{"foo": "bar"},
@@ -266,7 +269,7 @@ func createReplicaSetOrDie(cs *kubernetes.Clientset, ns string, size int32, excl
 	}
 
 	rs := &extensions.ReplicaSet{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      "rs",
 			Namespace: ns,
 		},
@@ -276,7 +279,7 @@ func createReplicaSetOrDie(cs *kubernetes.Clientset, ns string, size int32, excl
 				MatchLabels: map[string]string{"foo": "bar"},
 			},
 			Template: v1.PodTemplateSpec{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{"foo": "bar"},
 				},
 				Spec: v1.PodSpec{

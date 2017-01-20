@@ -40,9 +40,9 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"golang.org/x/crypto/ssh"
 
-	utilnet "k8s.io/kubernetes/pkg/util/net"
-	"k8s.io/kubernetes/pkg/util/runtime"
-	"k8s.io/kubernetes/pkg/util/wait"
+	utilnet "k8s.io/apimachinery/pkg/util/net"
+	"k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/wait"
 )
 
 var (

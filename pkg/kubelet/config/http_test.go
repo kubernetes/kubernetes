@@ -23,15 +23,14 @@ import (
 	"testing"
 	"time"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/api/validation"
-	"k8s.io/kubernetes/pkg/apimachinery/registered"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
-	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/types"
 	utiltesting "k8s.io/kubernetes/pkg/util/testing"
 )
 
@@ -70,7 +69,7 @@ func TestExtractInvalidPods(t *testing.T) {
 		{
 			desc: "Invalid volume name",
 			pod: &v1.Pod{
-				TypeMeta: metav1.TypeMeta{APIVersion: registered.GroupOrDie(v1.GroupName).GroupVersion.String()},
+				TypeMeta: metav1.TypeMeta{APIVersion: api.Registry.GroupOrDie(v1.GroupName).GroupVersion.String()},
 				Spec: v1.PodSpec{
 					Volumes: []v1.Volume{{Name: "_INVALID_"}},
 				},
@@ -79,7 +78,7 @@ func TestExtractInvalidPods(t *testing.T) {
 		{
 			desc: "Duplicate volume names",
 			pod: &v1.Pod{
-				TypeMeta: metav1.TypeMeta{APIVersion: registered.GroupOrDie(v1.GroupName).GroupVersion.String()},
+				TypeMeta: metav1.TypeMeta{APIVersion: api.Registry.GroupOrDie(v1.GroupName).GroupVersion.String()},
 				Spec: v1.PodSpec{
 					Volumes: []v1.Volume{{Name: "repeated"}, {Name: "repeated"}},
 				},
@@ -88,7 +87,7 @@ func TestExtractInvalidPods(t *testing.T) {
 		{
 			desc: "Unspecified container name",
 			pod: &v1.Pod{
-				TypeMeta: metav1.TypeMeta{APIVersion: registered.GroupOrDie(v1.GroupName).GroupVersion.String()},
+				TypeMeta: metav1.TypeMeta{APIVersion: api.Registry.GroupOrDie(v1.GroupName).GroupVersion.String()},
 				Spec: v1.PodSpec{
 					Containers: []v1.Container{{Name: ""}},
 				},
@@ -97,7 +96,7 @@ func TestExtractInvalidPods(t *testing.T) {
 		{
 			desc: "Invalid container name",
 			pod: &v1.Pod{
-				TypeMeta: metav1.TypeMeta{APIVersion: registered.GroupOrDie(v1.GroupName).GroupVersion.String()},
+				TypeMeta: metav1.TypeMeta{APIVersion: api.Registry.GroupOrDie(v1.GroupName).GroupVersion.String()},
 				Spec: v1.PodSpec{
 					Containers: []v1.Container{{Name: "_INVALID_"}},
 				},
@@ -139,7 +138,7 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 					Kind:       "Pod",
 					APIVersion: "",
 				},
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:      "foo",
 					UID:       "111",
 					Namespace: "mynamespace",
@@ -148,7 +147,7 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 					NodeName:        string(nodeName),
 					Containers:      []v1.Container{{Name: "1", Image: "foo", ImagePullPolicy: v1.PullAlways}},
 					SecurityContext: &v1.PodSecurityContext{},
-					Affinity:        &v1.Affinity{},
+					SchedulerName:   api.DefaultSchedulerName,
 				},
 				Status: v1.PodStatus{
 					Phase: v1.PodPending,
@@ -157,7 +156,7 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 			expected: CreatePodUpdate(kubetypes.SET,
 				kubetypes.HTTPSource,
 				&v1.Pod{
-					ObjectMeta: v1.ObjectMeta{
+					ObjectMeta: metav1.ObjectMeta{
 						UID:         "111",
 						Name:        "foo" + "-" + nodeName,
 						Namespace:   "mynamespace",
@@ -170,7 +169,7 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 						DNSPolicy:                     v1.DNSClusterFirst,
 						SecurityContext:               &v1.PodSecurityContext{},
 						TerminationGracePeriodSeconds: &grace,
-						Affinity:                      &v1.Affinity{},
+						SchedulerName:                 api.DefaultSchedulerName,
 
 						Containers: []v1.Container{{
 							Name:  "1",
@@ -193,7 +192,7 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 				},
 				Items: []v1.Pod{
 					{
-						ObjectMeta: v1.ObjectMeta{
+						ObjectMeta: metav1.ObjectMeta{
 							Name: "foo",
 							UID:  "111",
 						},
@@ -201,14 +200,14 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 							NodeName:        nodeName,
 							Containers:      []v1.Container{{Name: "1", Image: "foo", ImagePullPolicy: v1.PullAlways}},
 							SecurityContext: &v1.PodSecurityContext{},
-							Affinity:        &v1.Affinity{},
+							SchedulerName:   api.DefaultSchedulerName,
 						},
 						Status: v1.PodStatus{
 							Phase: v1.PodPending,
 						},
 					},
 					{
-						ObjectMeta: v1.ObjectMeta{
+						ObjectMeta: metav1.ObjectMeta{
 							Name: "bar",
 							UID:  "222",
 						},
@@ -216,7 +215,7 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 							NodeName:        nodeName,
 							Containers:      []v1.Container{{Name: "2", Image: "bar:bartag", ImagePullPolicy: ""}},
 							SecurityContext: &v1.PodSecurityContext{},
-							Affinity:        &v1.Affinity{},
+							SchedulerName:   api.DefaultSchedulerName,
 						},
 						Status: v1.PodStatus{
 							Phase: v1.PodPending,
@@ -227,7 +226,7 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 			expected: CreatePodUpdate(kubetypes.SET,
 				kubetypes.HTTPSource,
 				&v1.Pod{
-					ObjectMeta: v1.ObjectMeta{
+					ObjectMeta: metav1.ObjectMeta{
 						UID:         "111",
 						Name:        "foo" + "-" + nodeName,
 						Namespace:   "default",
@@ -240,7 +239,7 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 						DNSPolicy:                     v1.DNSClusterFirst,
 						TerminationGracePeriodSeconds: &grace,
 						SecurityContext:               &v1.PodSecurityContext{},
-						Affinity:                      &v1.Affinity{},
+						SchedulerName:                 api.DefaultSchedulerName,
 
 						Containers: []v1.Container{{
 							Name:  "1",
@@ -254,7 +253,7 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 					},
 				},
 				&v1.Pod{
-					ObjectMeta: v1.ObjectMeta{
+					ObjectMeta: metav1.ObjectMeta{
 						UID:         "222",
 						Name:        "bar" + "-" + nodeName,
 						Namespace:   "default",
@@ -267,7 +266,7 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 						DNSPolicy:                     v1.DNSClusterFirst,
 						TerminationGracePeriodSeconds: &grace,
 						SecurityContext:               &v1.PodSecurityContext{},
-						Affinity:                      &v1.Affinity{},
+						SchedulerName:                 api.DefaultSchedulerName,
 
 						Containers: []v1.Container{{
 							Name:  "2",
@@ -326,10 +325,10 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 func TestURLWithHeader(t *testing.T) {
 	pod := &v1.Pod{
 		TypeMeta: metav1.TypeMeta{
-			APIVersion: registered.GroupOrDie(v1.GroupName).GroupVersion.String(),
+			APIVersion: api.Registry.GroupOrDie(v1.GroupName).GroupVersion.String(),
 			Kind:       "Pod",
 		},
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      "foo",
 			UID:       "111",
 			Namespace: "mynamespace",

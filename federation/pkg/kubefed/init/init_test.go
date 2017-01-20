@@ -30,16 +30,16 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/client-go/pkg/util/diff"
+	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/diff"
 	kubefedtesting "k8s.io/kubernetes/federation/pkg/kubefed/testing"
 	"k8s.io/kubernetes/federation/pkg/kubefed/util"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/client/restclient/fake"
 	"k8s.io/kubernetes/pkg/client/typed/dynamic"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
@@ -79,6 +79,7 @@ func TestInitFederation(t *testing.T) {
 		etcdPVCapacity     string
 		expectedErr        string
 		dnsProvider        string
+		storageBackend     string
 		dryRun             string
 	}{
 		{
@@ -91,6 +92,7 @@ func TestInitFederation(t *testing.T) {
 			etcdPVCapacity:     "5Gi",
 			expectedErr:        "",
 			dnsProvider:        "test-dns-provider",
+			storageBackend:     "etcd2",
 			dryRun:             "",
 		},
 		{
@@ -103,6 +105,7 @@ func TestInitFederation(t *testing.T) {
 			etcdPVCapacity:     "", //test for default value of pvc-size
 			expectedErr:        "",
 			dnsProvider:        "", //test for default value of dns provider
+			storageBackend:     "etcd2",
 			dryRun:             "",
 		},
 		{
@@ -115,7 +118,21 @@ func TestInitFederation(t *testing.T) {
 			etcdPVCapacity:     "",
 			expectedErr:        "",
 			dnsProvider:        "test-dns-provider",
+			storageBackend:     "etcd2",
 			dryRun:             "valid-run",
+		},
+		{
+			federation:         "union",
+			kubeconfigGlobal:   fakeKubeFiles[0],
+			kubeconfigExplicit: "",
+			dnsZoneName:        "example.test.",
+			lbIP:               "10.20.30.40",
+			image:              "example.test/foo:bar",
+			etcdPVCapacity:     "5Gi",
+			expectedErr:        "",
+			dnsProvider:        "test-dns-provider",
+			storageBackend:     "etcd3",
+			dryRun:             "",
 		},
 	}
 
@@ -131,7 +148,7 @@ func TestInitFederation(t *testing.T) {
 		} else {
 			dnsProvider = "google-clouddns" //default value of dns-provider
 		}
-		hostFactory, err := fakeInitHostFactory(tc.federation, util.DefaultFederationSystemNamespace, tc.lbIP, tc.dnsZoneName, tc.image, dnsProvider, tc.etcdPVCapacity)
+		hostFactory, err := fakeInitHostFactory(tc.federation, util.DefaultFederationSystemNamespace, tc.lbIP, tc.dnsZoneName, tc.image, dnsProvider, tc.etcdPVCapacity, tc.storageBackend)
 		if err != nil {
 			t.Fatalf("[%d] unexpected error: %v", i, err)
 		}
@@ -147,6 +164,9 @@ func TestInitFederation(t *testing.T) {
 		cmd.Flags().Set("host-cluster-context", "substrate")
 		cmd.Flags().Set("dns-zone-name", tc.dnsZoneName)
 		cmd.Flags().Set("image", tc.image)
+		if tc.storageBackend != "" {
+			cmd.Flags().Set("storage-backend", tc.storageBackend)
+		}
 		if tc.dnsProvider != "" {
 			cmd.Flags().Set("dns-provider", tc.dnsProvider)
 		}
@@ -423,7 +443,7 @@ func TestCertsHTTPS(t *testing.T) {
 	}
 }
 
-func fakeInitHostFactory(federationName, namespaceName, ip, dnsZoneName, image, dnsProvider, etcdPVCapacity string) (cmdutil.Factory, error) {
+func fakeInitHostFactory(federationName, namespaceName, ip, dnsZoneName, image, dnsProvider, etcdPVCapacity, storageProvider string) (cmdutil.Factory, error) {
 	svcName := federationName + "-apiserver"
 	svcUrlPrefix := "/api/v1/namespaces/federation-system/services"
 	credSecretName := svcName + "-credentials"
@@ -445,7 +465,7 @@ func fakeInitHostFactory(federationName, namespaceName, ip, dnsZoneName, image, 
 			Kind:       "Namespace",
 			APIVersion: testapi.Default.GroupVersion().String(),
 		},
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: namespaceName,
 		},
 	}
@@ -455,7 +475,7 @@ func fakeInitHostFactory(federationName, namespaceName, ip, dnsZoneName, image, 
 			Kind:       "Service",
 			APIVersion: testapi.Default.GroupVersion().String(),
 		},
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Namespace: namespaceName,
 			Name:      svcName,
 			Labels:    componentLabel,
@@ -490,7 +510,7 @@ func fakeInitHostFactory(federationName, namespaceName, ip, dnsZoneName, image, 
 			Kind:       "Secret",
 			APIVersion: testapi.Default.GroupVersion().String(),
 		},
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      credSecretName,
 			Namespace: namespaceName,
 		},
@@ -502,7 +522,7 @@ func fakeInitHostFactory(federationName, namespaceName, ip, dnsZoneName, image, 
 			Kind:       "Secret",
 			APIVersion: testapi.Default.GroupVersion().String(),
 		},
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      cmKubeconfigSecretName,
 			Namespace: namespaceName,
 		},
@@ -514,7 +534,7 @@ func fakeInitHostFactory(federationName, namespaceName, ip, dnsZoneName, image, 
 			Kind:       "PersistentVolumeClaim",
 			APIVersion: testapi.Default.GroupVersion().String(),
 		},
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      pvcName,
 			Namespace: namespaceName,
 			Labels:    componentLabel,
@@ -539,7 +559,7 @@ func fakeInitHostFactory(federationName, namespaceName, ip, dnsZoneName, image, 
 			Kind:       "Deployment",
 			APIVersion: testapi.Extensions.GroupVersion().String(),
 		},
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      svcName,
 			Namespace: namespaceName,
 			Labels:    componentLabel,
@@ -548,7 +568,7 @@ func fakeInitHostFactory(federationName, namespaceName, ip, dnsZoneName, image, 
 			Replicas: &replicas,
 			Selector: nil,
 			Template: v1.PodTemplateSpec{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:   svcName,
 					Labels: apiserverPodLabels,
 				},
@@ -562,11 +582,11 @@ func fakeInitHostFactory(federationName, namespaceName, ip, dnsZoneName, image, 
 								"federation-apiserver",
 								"--bind-address=0.0.0.0",
 								"--etcd-servers=http://localhost:2379",
-								"--service-cluster-ip-range=10.0.0.0/16",
 								"--secure-port=443",
 								"--client-ca-file=/etc/federation/apiserver/ca.crt",
 								"--tls-cert-file=/etc/federation/apiserver/server.crt",
 								"--tls-private-key-file=/etc/federation/apiserver/server.key",
+								fmt.Sprintf("--storage-backend=%s", storageProvider),
 								"--advertise-address=" + ip,
 							},
 							Ports: []v1.ContainerPort{
@@ -589,9 +609,9 @@ func fakeInitHostFactory(federationName, namespaceName, ip, dnsZoneName, image, 
 						},
 						{
 							Name:  "etcd",
-							Image: "quay.io/coreos/etcd:v2.3.3",
+							Image: "gcr.io/google_containers/etcd:3.0.14-alpha.1",
 							Command: []string{
-								"/etcd",
+								"/usr/local/bin/etcd",
 								"--data-dir",
 								"/var/etcd/data",
 							},
@@ -632,7 +652,7 @@ func fakeInitHostFactory(federationName, namespaceName, ip, dnsZoneName, image, 
 			Kind:       "Deployment",
 			APIVersion: testapi.Extensions.GroupVersion().String(),
 		},
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      cmName,
 			Namespace: namespaceName,
 			Labels:    componentLabel,
@@ -641,7 +661,7 @@ func fakeInitHostFactory(federationName, namespaceName, ip, dnsZoneName, image, 
 			Replicas: &replicas,
 			Selector: nil,
 			Template: v1.PodTemplateSpec{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:   cmName,
 					Labels: controllerManagerPodLabels,
 				},
@@ -694,6 +714,38 @@ func fakeInitHostFactory(federationName, namespaceName, ip, dnsZoneName, image, 
 		},
 	}
 
+	podList := v1.PodList{}
+	apiServerPod := v1.Pod{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Pod",
+			APIVersion: testapi.Extensions.GroupVersion().String(),
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      svcName,
+			Namespace: namespaceName,
+		},
+		Status: v1.PodStatus{
+			Phase: "Running",
+		},
+	}
+
+	cmPod := v1.Pod{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Pod",
+			APIVersion: testapi.Extensions.GroupVersion().String(),
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      cmName,
+			Namespace: namespaceName,
+		},
+		Status: v1.PodStatus{
+			Phase: "Running",
+		},
+	}
+
+	podList.Items = append(podList.Items, apiServerPod)
+	podList.Items = append(podList.Items, cmPod)
+
 	f, tf, codec, _ := cmdtesting.NewAPIFactory()
 	extCodec := testapi.Extensions.Codec()
 	ns := dynamic.ContentConfig().NegotiatedSerializer
@@ -702,6 +754,8 @@ func fakeInitHostFactory(federationName, namespaceName, ip, dnsZoneName, image, 
 		NegotiatedSerializer: ns,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
+			case p == "/healthz":
+				return &http.Response{StatusCode: http.StatusOK, Header: kubefedtesting.DefaultHeader(), Body: ioutil.NopCloser(bytes.NewReader([]byte("ok")))}, nil
 			case p == "/api/v1/namespaces" && m == http.MethodPost:
 				body, err := ioutil.ReadAll(req.Body)
 				if err != nil {
@@ -795,6 +849,8 @@ func fakeInitHostFactory(federationName, namespaceName, ip, dnsZoneName, image, 
 					return nil, fmt.Errorf("Unexpected deployment object\n\tDiff: %s", diff.ObjectGoPrintDiff(got, want))
 				}
 				return &http.Response{StatusCode: http.StatusCreated, Header: kubefedtesting.DefaultHeader(), Body: kubefedtesting.ObjBody(extCodec, &want)}, nil
+			case p == "/api/v1/namespaces/federation-system/pods" && m == http.MethodGet:
+				return &http.Response{StatusCode: http.StatusOK, Header: kubefedtesting.DefaultHeader(), Body: kubefedtesting.ObjBody(codec, &podList)}, nil
 			default:
 				return nil, fmt.Errorf("unexpected request: %#v\n%#v", req.URL, req)
 			}

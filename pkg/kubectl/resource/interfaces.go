@@ -17,8 +17,8 @@ limitations under the License.
 package resource
 
 import (
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/types"
 	client "k8s.io/kubernetes/pkg/client/restclient"
 )
 
@@ -27,7 +27,7 @@ import (
 type RESTClient interface {
 	Get() *client.Request
 	Post() *client.Request
-	Patch(api.PatchType) *client.Request
+	Patch(types.PatchType) *client.Request
 	Delete() *client.Request
 	Put() *client.Request
 }

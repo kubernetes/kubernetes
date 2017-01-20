@@ -26,8 +26,8 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
@@ -233,7 +233,7 @@ func kubeletCommand(kOp kubeletOpt, c clientset.Interface, pod *v1.Pod) {
 	nodeIP, err := framework.GetHostExternalAddress(c, pod)
 	Expect(err).NotTo(HaveOccurred())
 	nodeIP = nodeIP + ":22"
-	sshResult, err := framework.SSH("/etc/init.d/kubelet "+string(kOp), nodeIP, framework.TestContext.Provider)
+	sshResult, err := framework.SSH("sudo /etc/init.d/kubelet "+string(kOp), nodeIP, framework.TestContext.Provider)
 	Expect(err).NotTo(HaveOccurred())
 	framework.LogSSHResult(sshResult)
 

@@ -12,6 +12,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "cmd.go",
+        "defaults.go",
         "init.go",
         "join.go",
         "reset.go",
@@ -27,21 +28,24 @@ go_library(
         "//cmd/kubeadm/app/discovery:go_default_library",
         "//cmd/kubeadm/app/master:go_default_library",
         "//cmd/kubeadm/app/node:go_default_library",
+        "//cmd/kubeadm/app/phases/apiconfig:go_default_library",
+        "//cmd/kubeadm/app/phases/certs:go_default_library",
+        "//cmd/kubeadm/app/phases/kubeconfig:go_default_library",
         "//cmd/kubeadm/app/preflight:go_default_library",
         "//cmd/kubeadm/app/util:go_default_library",
         "//pkg/api:go_default_library",
         "//pkg/api/v1:go_default_library",
-        "//pkg/client/unversioned/clientcmd/api:go_default_library",
-        "//pkg/fields:go_default_library",
         "//pkg/kubectl:go_default_library",
         "//pkg/kubectl/cmd/util:go_default_library",
-        "//pkg/runtime:go_default_library",
         "//pkg/util/flag:go_default_library",
         "//pkg/util/initsystem:go_default_library",
-        "//pkg/util/net:go_default_library",
         "//pkg/version:go_default_library",
+        "//vendor:github.com/blang/semver",
         "//vendor:github.com/renstrom/dedent",
         "//vendor:github.com/spf13/cobra",
+        "//vendor:k8s.io/apimachinery/pkg/fields",
+        "//vendor:k8s.io/apimachinery/pkg/runtime",
+        "//vendor:k8s.io/apimachinery/pkg/util/net",
     ],
 )
 
@@ -53,5 +57,24 @@ go_test(
     ],
     library = ":go_default_library",
     tags = ["automanaged"],
-    deps = ["//cmd/kubeadm/app/preflight:go_default_library"],
+    deps = [
+        "//cmd/kubeadm/app/phases/kubeconfig:go_default_library",
+        "//cmd/kubeadm/app/preflight:go_default_library",
+    ],
+)
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [
+        ":package-srcs",
+        "//cmd/kubeadm/app/cmd/flags:all-srcs",
+    ],
+    tags = ["automanaged"],
 )

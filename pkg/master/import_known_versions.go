@@ -20,8 +20,8 @@ package master
 import (
 	"fmt"
 
+	"k8s.io/kubernetes/pkg/api"
 	_ "k8s.io/kubernetes/pkg/api/install"
-	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	_ "k8s.io/kubernetes/pkg/apis/apps/install"
 	_ "k8s.io/kubernetes/pkg/apis/authentication/install"
 	_ "k8s.io/kubernetes/pkg/apis/authorization/install"
@@ -37,7 +37,7 @@ import (
 )
 
 func init() {
-	if missingVersions := registered.ValidateEnvRequestedVersions(); len(missingVersions) != 0 {
+	if missingVersions := api.Registry.ValidateEnvRequestedVersions(); len(missingVersions) != 0 {
 		panic(fmt.Sprintf("KUBE_API_VERSIONS contains versions that are not installed: %q.", missingVersions))
 	}
 }

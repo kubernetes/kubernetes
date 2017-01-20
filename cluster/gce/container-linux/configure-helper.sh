@@ -127,6 +127,20 @@ function mount-master-pd {
   chgrp -R etcd "${mount_point}/var/etcd"
 }
 
+# replace_prefixed_line ensures:
+# 1. the specified file exists
+# 2. existing lines with the specified ${prefix} are removed
+# 3. a new line with the specified ${prefix}${suffix} is appended
+function replace_prefixed_line {
+  local -r file="${1:-}"
+  local -r prefix="${2:-}"
+  local -r suffix="${3:-}"
+
+  touch "${file}"
+  awk "substr(\$0,0,length(\"${prefix}\")) != \"${prefix}\" { print }" "${file}" > "${file}.filtered"  && mv "${file}.filtered" "${file}"
+  echo "${prefix}${suffix}" >> "${file}"
+}
+
 # After the first boot and on upgrade, these files exist on the master-pd
 # and should never be touched again (except perhaps an additional service
 # account, see NB below.)
@@ -139,14 +153,21 @@ function create-master-auth {
     echo "${MASTER_KEY}" | base64 --decode > "${auth_dir}/server.key"
   fi
   local -r basic_auth_csv="${auth_dir}/basic_auth.csv"
-  if [[ ! -e "${basic_auth_csv}" && -n "${KUBE_PASSWORD:-}" && -n "${KUBE_USER:-}" ]]; then
-    echo "${KUBE_PASSWORD},${KUBE_USER},admin" > "${basic_auth_csv}"
+  if [[ -n "${KUBE_PASSWORD:-}" && -n "${KUBE_USER:-}" ]]; then
+    replace_prefixed_line "${basic_auth_csv}" "${KUBE_PASSWORD},${KUBE_USER}," "admin,system:masters"
   fi
   local -r known_tokens_csv="${auth_dir}/known_tokens.csv"
-  if [[ ! -e "${known_tokens_csv}" ]]; then
-    echo "${KUBE_BEARER_TOKEN},admin,admin" > "${known_tokens_csv}"
-    echo "${KUBELET_TOKEN},kubelet,kubelet" >> "${known_tokens_csv}"
-    echo "${KUBE_PROXY_TOKEN},kube_proxy,kube_proxy" >> "${known_tokens_csv}"
+  if [[ -n "${KUBE_BEARER_TOKEN:-}" ]]; then
+    replace_prefixed_line "${known_tokens_csv}" "${KUBE_BEARER_TOKEN},"             "admin,admin,system:masters"
+  fi
+  if [[ -n "${KUBE_CONTROLLER_MANAGER_TOKEN:-}" ]]; then
+    replace_prefixed_line "${known_tokens_csv}" "${KUBE_CONTROLLER_MANAGER_TOKEN}," "system:kube-controller-manager,uid:system:kube-controller-manager"
+  fi
+  if [[ -n "${KUBELET_TOKEN:-}" ]]; then
+    replace_prefixed_line "${known_tokens_csv}" "${KUBELET_TOKEN},"                 "system:node:node-name,uid:kubelet,system:nodes"
+  fi
+  if [[ -n "${KUBE_PROXY_TOKEN:-}" ]]; then
+    replace_prefixed_line "${known_tokens_csv}" "${KUBE_PROXY_TOKEN},"              "system:kube-proxy,uid:kube_proxy"
   fi
   local use_cloud_config="false"
   cat <<EOF >/etc/gce.conf
@@ -310,6 +331,30 @@ contexts:
 - context:
     cluster: local
     user: kube-proxy
+  name: service-account-context
+current-context: service-account-context
+EOF
+}
+
+function create-kubecontrollermanager-kubeconfig {
+  echo "Creating kube-controller-manager kubeconfig file"
+  mkdir -p /etc/srv/kubernetes/kube-controller-manager
+  cat <<EOF >/etc/srv/kubernetes/kube-controller-manager/kubeconfig
+apiVersion: v1
+kind: Config
+users:
+- name: kube-controller-manager
+  user:
+    token: ${KUBE_CONTROLLER_MANAGER_TOKEN}
+clusters:
+- name: local
+  cluster:
+    insecure-skip-tls-verify: true
+    server: https://localhost:443
+contexts:
+- context:
+    cluster: local
+    user: kube-controller-manager
   name: service-account-context
 current-context: service-account-context
 EOF
@@ -712,7 +757,6 @@ function start-kube-apiserver {
   local params="${API_SERVER_TEST_LOG_LEVEL:-"--v=2"} ${APISERVER_TEST_ARGS:-} ${CLOUD_CONFIG_OPT}"
   params+=" --address=127.0.0.1"
   params+=" --allow-privileged=true"
-  params+=" --authorization-policy-file=/etc/srv/kubernetes/abac-authz-policy.jsonl"
   params+=" --cloud-provider=gce"
   params+=" --client-ca-file=/etc/srv/kubernetes/ca.crt"
   params+=" --etcd-servers=http://127.0.0.1:2379"
@@ -790,27 +834,22 @@ function start-kube-apiserver {
     webhook_authn_config_volume="{\"name\": \"webhookauthnconfigmount\",\"hostPath\": {\"path\": \"/etc/gcp_authn.config\"}},"
   fi
 
-  params+=" --authorization-mode=ABAC"
+  local authorization_mode="RBAC"
+  if [[ -n "${ABAC_AUTHZ_FILE:-}" && -e "${ABAC_AUTHZ_FILE}" ]]; then
+    params+=" --authorization-policy-file=${ABAC_AUTHZ_FILE}"
+    authorization_mode+=",ABAC"
+  fi
   local webhook_config_mount=""
   local webhook_config_volume=""
   if [[ -n "${GCP_AUTHZ_URL:-}" ]]; then
-    params+=",Webhook --authorization-webhook-config-file=/etc/gcp_authz.config"
+    authorization_mode+=",Webhook"
+    params+=" --authorization-webhook-config-file=/etc/gcp_authz.config"
     webhook_config_mount="{\"name\": \"webhookconfigmount\",\"mountPath\": \"/etc/gcp_authz.config\", \"readOnly\": false},"
     webhook_config_volume="{\"name\": \"webhookconfigmount\",\"hostPath\": {\"path\": \"/etc/gcp_authz.config\"}},"
   fi
   local -r src_dir="${KUBE_HOME}/kube-manifests/kubernetes/gci-trusty"
-
-  if [[ -n "${KUBE_USER:-}" || ! -e /etc/srv/kubernetes/abac-authz-policy.jsonl ]]; then
-    local -r abac_policy_json="${src_dir}/abac-authz-policy.jsonl"
-    remove-salt-config-comments "${abac_policy_json}"
-    if [[ -n "${KUBE_USER:-}" ]]; then
-      sed -i -e "s/{{kube_user}}/${KUBE_USER}/g" "${abac_policy_json}"
-    else
-      sed -i -e "/{{kube_user}}/d" "${abac_policy_json}"
-    fi
-    cp "${abac_policy_json}" /etc/srv/kubernetes/
-  fi
-
+  params+=" --authorization-mode=${authorization_mode}"
+  
   src_file="${src_dir}/kube-apiserver.manifest"
   remove-salt-config-comments "${src_file}"
   # Evaluate variables.
@@ -849,11 +888,13 @@ function start-kube-apiserver {
 #   DOCKER_REGISTRY
 function start-kube-controller-manager {
   echo "Start kubernetes controller-manager"
+  create-kubecontrollermanager-kubeconfig
   prepare-log-file /var/log/kube-controller-manager.log
   # Calculate variables and assemble the command line.
   local params="${CONTROLLER_MANAGER_TEST_LOG_LEVEL:-"--v=2"} ${CONTROLLER_MANAGER_TEST_ARGS:-} ${CLOUD_CONFIG_OPT}"
+  params+=" --use-service-account-credentials"
   params+=" --cloud-provider=gce"
-  params+=" --master=127.0.0.1:8080"
+  params+=" --kubeconfig=/etc/srv/kubernetes/kube-controller-manager/kubeconfig"
   params+=" --root-ca-file=/etc/srv/kubernetes/ca.crt"
   params+=" --service-account-private-key-file=/etc/srv/kubernetes/server.key"
   if [[ -n "${ENABLE_GARBAGE_COLLECTOR:-}" ]]; then
@@ -982,6 +1023,10 @@ function start-kube-addons {
   echo "Prepare kube-addons manifests and start kube addon manager"
   local -r src_dir="${KUBE_HOME}/kube-manifests/kubernetes/gci-trusty"
   local -r dst_dir="/etc/kubernetes/addons"
+
+  # prep the additional bindings that are particular to e2e users and groups
+  setup-addon-manifests "addons" "e2e-rbac-bindings"
+
   # Set up manifests of other addons.
   if [[ "${ENABLE_CLUSTER_MONITORING:-}" == "influxdb" ]] || \
      [[ "${ENABLE_CLUSTER_MONITORING:-}" == "google" ]] || \
@@ -1172,6 +1217,7 @@ After=network.target
 
 [Service]
 ExecStart=${RKT_BIN} api-service --listen=127.0.0.1:15441
+Restart=on-failure
 
 [Install]
 WantedBy=multi-user.target
@@ -1215,6 +1261,9 @@ if [[ -n "${KUBE_USER:-}" ]]; then
     exit 1
   fi
 fi
+
+# generate the controller manager token here since its only used on the master.
+KUBE_CONTROLLER_MANAGER_TOKEN=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)
 
 # KUBERNETES_CONTAINER_RUNTIME is set by the `kube-env` file, but it's a bit of a mouthful
 if [[ "${CONTAINER_RUNTIME:-}" == "" ]]; then

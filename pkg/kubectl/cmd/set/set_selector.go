@@ -22,13 +22,15 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/meta"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
-	"k8s.io/kubernetes/pkg/runtime"
 )
 
 // SelectorOptions is the start of the data required to perform the operation.  As new fields are added, add them here instead of
@@ -64,7 +66,7 @@ var (
         Note: currently selectors can only be set on Service objects.`)
 	selectorExample = templates.Examples(`
         # set the labels and selector before creating a deployment/service pair.
-        kubectl create service clusterip my-svc -o yaml --dry-run | kubectl set selector --local -f - 'environment=qa' -o yaml | kubectl create -f -
+        kubectl create service clusterip my-svc --clusterip="None" -o yaml --dry-run | kubectl set selector --local -f - 'environment=qa' -o yaml | kubectl create -f -
         kubectl create deployment my-dep -o yaml --dry-run | kubectl label --local -f - environment=qa -o yaml | kubectl create -f -`)
 )
 
@@ -77,7 +79,7 @@ func NewCmdSelector(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "selector (-f FILENAME | TYPE NAME) EXPRESSIONS [--resource-version=version]",
 		Short:   "Set the selector on a resource",
-		Long:    fmt.Sprintf(selectorLong),
+		Long:    fmt.Sprintf(selectorLong, validation.LabelValueMaxLength),
 		Example: selectorExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(options.Complete(f, cmd, args, out))
@@ -136,6 +138,9 @@ func (o *SelectorOptions) Validate() error {
 	if len(o.resources) < 1 && cmdutil.IsFilenameEmpty(o.fileOptions.Filenames) {
 		return fmt.Errorf("one or more resources must be specified as <resource> <name> or <resource>/<name>")
 	}
+	if o.selector == nil {
+		return fmt.Errorf("one selector is required")
+	}
 	return nil
 }
 
@@ -171,7 +176,7 @@ func (o *SelectorOptions) RunSelector() error {
 			return nil
 		}
 
-		patched, err := resource.NewHelper(info.Client, info.Mapping).Patch(info.Namespace, info.Name, api.StrategicMergePatchType, patch.Patch)
+		patched, err := resource.NewHelper(info.Client, info.Mapping).Patch(info.Namespace, info.Name, types.StrategicMergePatchType, patch.Patch)
 		if err != nil {
 			return err
 		}
@@ -213,9 +218,10 @@ func updateSelectorForObject(obj runtime.Object, selector metav1.LabelSelector) 
 
 // getResourcesAndSelector retrieves resources and the selector expression from the given args (assuming selectors the last arg)
 func getResourcesAndSelector(args []string) (resources []string, selector *metav1.LabelSelector, err error) {
-	if len(args) > 1 {
-		resources = args[:len(args)-1]
+	if len(args) == 0 {
+		return []string{}, nil, nil
 	}
+	resources = args[:len(args)-1]
 	selector, err = metav1.ParseToLabelSelector(args[len(args)-1])
 	return resources, selector, err
 }

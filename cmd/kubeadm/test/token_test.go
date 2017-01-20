@@ -25,7 +25,7 @@ import (
 )
 
 const (
-	TokenExpectedRegex = "^\\S{6}\\.\\S{16}\n$"
+	TokenExpectedRegex = "^\\S{6}\\:\\S{16}\n$"
 )
 
 var kubeadmPath string
@@ -37,7 +37,7 @@ func init() {
 func TestCmdTokenGenerate(t *testing.T) {
 	stdout, _, err := RunCmd(kubeadmPath, "ex", "token", "generate")
 	if err != nil {
-		t.Errorf("'kubeadm ex token generate' exited uncleanly: %v", err)
+		t.Fatalf("'kubeadm ex token generate' exited uncleanly: %v", err)
 	}
 
 	matched, err := regexp.MatchString(TokenExpectedRegex, stdout)
@@ -45,7 +45,7 @@ func TestCmdTokenGenerate(t *testing.T) {
 		t.Fatalf("encountered an error while trying to match 'kubeadm ex token generate' stdout: %v", err)
 	}
 	if !matched {
-		t.Errorf("'kubeadm ex token generate' stdout did not match expected regex; wanted: [%s], got: [%s]", TokenExpectedRegex, stdout)
+		t.Errorf("'kubeadm ex token generate' stdout did not match expected regex; wanted: [%q], got: [%s]", TokenExpectedRegex, stdout)
 	}
 }
 

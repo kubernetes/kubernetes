@@ -19,13 +19,13 @@ package scdeny
 import (
 	"testing"
 
-	"k8s.io/kubernetes/pkg/admission"
+	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
 )
 
 // ensures the SecurityContext is denied if it defines anything more than Caps or Privileged
 func TestAdmission(t *testing.T) {
-	handler := NewSecurityContextDeny(nil)
+	handler := NewSecurityContextDeny()
 
 	var runAsUser int64 = 1
 	priv := true
@@ -106,7 +106,7 @@ func TestAdmission(t *testing.T) {
 }
 
 func TestPodSecurityContextAdmission(t *testing.T) {
-	handler := NewSecurityContextDeny(nil)
+	handler := NewSecurityContextDeny()
 	pod := api.Pod{
 		Spec: api.PodSpec{
 			Containers: []api.Container{
@@ -153,7 +153,7 @@ func TestPodSecurityContextAdmission(t *testing.T) {
 }
 
 func TestHandles(t *testing.T) {
-	handler := NewSecurityContextDeny(nil)
+	handler := NewSecurityContextDeny()
 	tests := map[admission.Operation]bool{
 		admission.Update:  true,
 		admission.Create:  true,

@@ -17,7 +17,7 @@ limitations under the License.
 package v1alpha1
 
 import (
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 type MasterConfiguration struct {
@@ -29,6 +29,7 @@ type MasterConfiguration struct {
 	Networking        Networking `json:"networking"`
 	KubernetesVersion string     `json:"kubernetesVersion"`
 	CloudProvider     string     `json:"cloudProvider"`
+	AuthorizationMode string     `json:"authorizationMode"`
 }
 
 type API struct {
@@ -68,13 +69,6 @@ type Etcd struct {
 	CAFile    string   `json:"caFile"`
 	CertFile  string   `json:"certFile"`
 	KeyFile   string   `json:"keyFile"`
-}
-
-type Secrets struct {
-	GivenToken  string `json:"givenToken"`  // dot-separated `<TokenID>.<Token>` set by the user
-	TokenID     string `json:"tokenID"`     // optional on master side, will be generated if not specified
-	Token       []byte `json:"token"`       // optional on master side, will be generated if not specified
-	BearerToken string `json:"bearerToken"` // set based on Token
 }
 
 type NodeConfiguration struct {

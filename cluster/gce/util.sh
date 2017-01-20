@@ -116,17 +116,6 @@ function verify-prereqs() {
   update-or-verify-gcloud
 }
 
-# Create a temp dir that'll be deleted at the end of this bash session.
-#
-# Vars set:
-#   KUBE_TEMP
-function ensure-temp-dir() {
-  if [[ -z ${KUBE_TEMP-} ]]; then
-    KUBE_TEMP=$(mktemp -d -t kubernetes.XXXXXX)
-    trap 'rm -rf "${KUBE_TEMP}"' EXIT
-  fi
-}
-
 # Use the gcloud defaults to find the project.  If it is already set in the
 # environment then go with that.
 #
@@ -724,37 +713,6 @@ function get-master-disk-size() {
   else
     export MASTER_DISK_SIZE="100GB"
   fi
-}
-
-# Downloads cfssl into ${KUBE_TEMP}/cfssl directory
-#
-# Assumed vars:
-#   KUBE_TEMP: temporary directory
-#
-function download-cfssl {
-  mkdir -p "${KUBE_TEMP}/cfssl"
-  pushd "${KUBE_TEMP}/cfssl"
-
-  kernel=$(uname -s)
-  case "${kernel}" in
-    Linux)
-      curl -s -L -o cfssl https://pkg.cfssl.org/R1.2/cfssl_linux-amd64
-      curl -s -L -o cfssljson https://pkg.cfssl.org/R1.2/cfssljson_linux-amd64
-      ;;
-    Darwin)
-      curl -s -L -o cfssl https://pkg.cfssl.org/R1.2/cfssl_darwin-amd64
-      curl -s -L -o cfssljson https://pkg.cfssl.org/R1.2/cfssljson_darwin-amd64
-      ;;
-    *)
-      echo "Unknown, unsupported platform: ${kernel}." >&2
-      echo "Supported platforms: Linux, Darwin." >&2
-      exit 2
-  esac
-
-  chmod +x cfssl
-  chmod +x cfssljson
-
-  popd
 }
 
 

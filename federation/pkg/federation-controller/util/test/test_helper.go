@@ -24,14 +24,15 @@ import (
 	"sync"
 	"time"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apimachinery/pkg/watch"
 	federationapi "k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util"
 	"k8s.io/kubernetes/pkg/api"
 	apiv1 "k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/testing/core"
-	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util/wait"
-	"k8s.io/kubernetes/pkg/watch"
 
 	"github.com/golang/glog"
 )
@@ -264,7 +265,7 @@ func CheckObjectFromChan(c chan runtime.Object, checkFunction CheckingFunction) 
 }
 
 // CompareObjectMeta returns an error when the given objects are not equivalent.
-func CompareObjectMeta(a, b apiv1.ObjectMeta) error {
+func CompareObjectMeta(a, b metav1.ObjectMeta) error {
 	if a.Namespace != b.Namespace {
 		return fmt.Errorf("Different namespace expected:%s observed:%s", a.Namespace, b.Namespace)
 	}
@@ -288,7 +289,7 @@ func ToFederatedInformerForTestOnly(informer util.FederatedInformer) util.Federa
 // NewCluster builds a new cluster object.
 func NewCluster(name string, readyStatus apiv1.ConditionStatus) *federationapi.Cluster {
 	return &federationapi.Cluster{
-		ObjectMeta: apiv1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:        name,
 			Annotations: map[string]string{},
 		},

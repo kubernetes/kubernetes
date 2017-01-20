@@ -15,8 +15,6 @@ go_library(
     deps = [
         "//pkg/api/v1:go_default_library",
         "//pkg/cloudprovider:go_default_library",
-        "//pkg/types:go_default_library",
-        "//pkg/util/runtime:go_default_library",
         "//vendor:github.com/golang/glog",
         "//vendor:github.com/vmware/govmomi",
         "//vendor:github.com/vmware/govmomi/find",
@@ -29,6 +27,8 @@ go_library(
         "//vendor:github.com/vmware/govmomi/vim25/types",
         "//vendor:golang.org/x/net/context",
         "//vendor:gopkg.in/gcfg.v1",
+        "//vendor:k8s.io/apimachinery/pkg/types",
+        "//vendor:k8s.io/apimachinery/pkg/util/runtime",
     ],
 )
 
@@ -39,8 +39,21 @@ go_test(
     tags = ["automanaged"],
     deps = [
         "//pkg/cloudprovider:go_default_library",
-        "//pkg/types:go_default_library",
-        "//pkg/util/rand:go_default_library",
         "//vendor:golang.org/x/net/context",
+        "//vendor:k8s.io/apimachinery/pkg/types",
+        "//vendor:k8s.io/apimachinery/pkg/util/rand",
     ],
+)
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [":package-srcs"],
+    tags = ["automanaged"],
 )

@@ -16,8 +16,7 @@
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 
-# This command builds and runs a local kubernetes cluster. It's just like
-# local-up.sh, but this one launches the three separate binaries.
+# This command builds and runs a local kubernetes cluster.
 # You may need to run this as root to allow kubelet to open docker's socket,
 # and to write the test CA in /var/run/kubernetes.
 DOCKER_OPTS=${DOCKER_OPTS:-""}
@@ -78,7 +77,7 @@ if [ "${CLOUD_PROVIDER}" == "openstack" ]; then
         exit 1
     fi
     if [ ! -f "${CLOUD_CONFIG}" ]; then
-        echo "Cloud config ${CLOUD_CONFIG} doesn't exit"
+        echo "Cloud config ${CLOUD_CONFIG} doesn't exist"
         exit 1
     fi
 fi
@@ -139,7 +138,7 @@ do
 done
 
 if [ "x$GO_OUT" == "x" ]; then
-    make -C "${KUBE_ROOT}" WHAT="cmd/kubectl cmd/hyperkube cmd/kubernetes-discovery"
+    make -C "${KUBE_ROOT}" WHAT="cmd/kubectl cmd/hyperkube cmd/kube-aggregator"
 else
     echo "skipped the build."
 fi
@@ -418,7 +417,10 @@ function start_apiserver {
 
     # Wait for kube-apiserver to come up before launching the rest of the components.
     echo "Waiting for apiserver to come up"
-    kube::util::wait_for_url "https://${API_HOST}:${API_SECURE_PORT}/version" "apiserver: " 1 ${WAIT_FOR_URL_API_SERVER} || exit 1
+    # this uses the API port because if you don't have any authenticator, you can't seem to use the secure port at all.
+    # this matches what happened with the combination in 1.4.
+    # TODO change this conditionally based on whether API_PORT is on or off
+    kube::util::wait_for_url "http://${API_HOST}:${API_PORT}/version" "apiserver: " 1 ${WAIT_FOR_URL_API_SERVER} || exit 1
 
     # Create kubeconfigs for all components, using client certs
     kube::util::write_client_kubeconfig "${CONTROLPLANE_SUDO}" "${CERT_DIR}" "${ROOT_CA_FILE}" "${API_HOST}" "${API_SECURE_PORT}" admin
@@ -625,10 +627,10 @@ function start_kubedns {
         
         # TODO update to dns role once we have one.
         ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" create clusterrolebinding system:kube-dns --clusterrole=cluster-admin --serviceaccount=kube-system:default
-        # use kubectl to create kubedns rc and service
+        # use kubectl to create kubedns deployment and service
         ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" --namespace=kube-system create -f kubedns-deployment.yaml
         ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" --namespace=kube-system create -f kubedns-svc.yaml
-        echo "Kube-dns rc and service successfully deployed."
+        echo "Kube-dns deployment and service successfully deployed."
         rm  kubedns-deployment.yaml kubedns-svc.yaml
     fi
 }

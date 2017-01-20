@@ -14,6 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+export NODE_NAME=${NODE_NAME:-${HOSTNAME}}
 export NODE_MASTER=${NODE_MASTER:-true}
 export NODE_DATA=${NODE_DATA:-true}
 export HTTP_PORT=${HTTP_PORT:-9200}

@@ -25,12 +25,12 @@ import (
 
 	"testing"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	metricsapi "k8s.io/heapster/metrics/apis/metrics/v1alpha1"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	v1 "k8s.io/kubernetes/pkg/api/v1"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 )
 
@@ -92,7 +92,7 @@ func testNodeMetricsData() (*metricsapi.NodeMetricsList, *api.NodeList) {
 		},
 		Items: []api.Node{
 			{
-				ObjectMeta: api.ObjectMeta{Name: "node1", ResourceVersion: "10"},
+				ObjectMeta: metav1.ObjectMeta{Name: "node1", ResourceVersion: "10"},
 				Status: api.NodeStatus{
 					Allocatable: api.ResourceList{
 						api.ResourceCPU:     *resource.NewMilliQuantity(10, resource.DecimalSI),
@@ -102,7 +102,7 @@ func testNodeMetricsData() (*metricsapi.NodeMetricsList, *api.NodeList) {
 				},
 			},
 			{
-				ObjectMeta: api.ObjectMeta{Name: "node2", ResourceVersion: "11"},
+				ObjectMeta: metav1.ObjectMeta{Name: "node2", ResourceVersion: "11"},
 				Status: api.NodeStatus{
 					Allocatable: api.ResourceList{
 						api.ResourceCPU:     *resource.NewMilliQuantity(50, resource.DecimalSI),

@@ -22,18 +22,19 @@ import (
 	"sync"
 	"time"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/client-go/pkg/util/clock"
 	"k8s.io/kubernetes/pkg/api"
-	apierrors "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/v1"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
 	v1core "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/core/v1"
-	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util/clock"
 	utilnode "k8s.io/kubernetes/pkg/util/node"
-	"k8s.io/kubernetes/pkg/util/sets"
-	"k8s.io/kubernetes/pkg/watch"
 )
 
 // FakeNodeHandler is a fake implementation of NodesInterface and NodeInterface. It
@@ -219,7 +220,7 @@ func (m *FakeNodeHandler) Watch(opts v1.ListOptions) (watch.Interface, error) {
 }
 
 // Patch patches a Node in the fake store.
-func (m *FakeNodeHandler) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (*v1.Node, error) {
+func (m *FakeNodeHandler) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (*v1.Node, error) {
 	return nil, nil
 }
 
@@ -265,7 +266,7 @@ func (f *FakeRecorder) makeEvent(ref *v1.ObjectReference, eventtype, reason, mes
 		namespace = v1.NamespaceDefault
 	}
 	return &v1.Event{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      fmt.Sprintf("%v.%x", ref.Name, t.UnixNano()),
 			Namespace: namespace,
 		},
@@ -291,7 +292,7 @@ func NewFakeRecorder() *FakeRecorder {
 // NewNode is a helper function for creating Nodes for testing.
 func NewNode(name string) *v1.Node {
 	return &v1.Node{
-		ObjectMeta: v1.ObjectMeta{Name: name},
+		ObjectMeta: metav1.ObjectMeta{Name: name},
 		Spec: v1.NodeSpec{
 			ExternalID: name,
 		},
@@ -307,7 +308,7 @@ func NewNode(name string) *v1.Node {
 // NewPod is a helper function for creating Pods for testing.
 func NewPod(name, host string) *v1.Pod {
 	pod := &v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Namespace: "default",
 			Name:      name,
 		},

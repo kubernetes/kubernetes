@@ -27,24 +27,24 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/v1"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/client/cache"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	v1core "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/core/v1"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/deployment/util"
 	"k8s.io/kubernetes/pkg/controller/informers"
-	"k8s.io/kubernetes/pkg/labels"
-	"k8s.io/kubernetes/pkg/runtime/schema"
-	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/util/metrics"
-	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
-	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/util/workqueue"
 )
 
@@ -73,6 +73,8 @@ type DeploymentController struct {
 
 	// To allow injection of syncDeployment for testing.
 	syncHandler func(dKey string) error
+	// used for unit testing
+	enqueueDeployment func(deployment *extensions.Deployment)
 
 	// A store of deployments, populated by the dController
 	dLister *cache.StoreToDeploymentLister
@@ -134,6 +136,8 @@ func NewDeploymentController(dInformer informers.DeploymentInformer, rsInformer 
 	})
 
 	dc.syncHandler = dc.syncDeployment
+	dc.enqueueDeployment = dc.enqueue
+
 	dc.dLister = dInformer.Lister()
 	dc.rsLister = rsInformer.Lister()
 	dc.podLister = podInformer.Lister()
@@ -343,7 +347,7 @@ func (dc *DeploymentController) deletePod(obj interface{}) {
 	}
 }
 
-func (dc *DeploymentController) enqueueDeployment(deployment *extensions.Deployment) {
+func (dc *DeploymentController) enqueue(deployment *extensions.Deployment) {
 	key, err := controller.KeyFunc(deployment)
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("Couldn't get key for object %#v: %v", deployment, err))
@@ -539,7 +543,26 @@ func (dc *DeploymentController) syncDeployment(key string) error {
 		return dc.syncStatusOnly(d)
 	}
 
-	err = dc.classifyReplicaSets(deployment)
+	// Why run the cleanup policy only when there is no rollback request?
+	// The thing with the cleanup policy currently is that it is far from smart because it takes into account
+	// the latest replica sets while it should instead retain the latest *working* replica sets. This means that
+	// you can have a cleanup policy of 1 but your last known working replica set may be 2 or 3 versions back
+	// in the history.
+	// Eventually we will want to find a way to recognize replica sets that have worked at some point in time
+	// (and chances are higher that they will work again as opposed to others that didn't) for candidates to
+	// automatically roll back to (#23211) and the cleanup policy should help.
+	if d.Spec.RollbackTo == nil {
+		_, oldRSs, err := dc.getAllReplicaSetsAndSyncRevision(d, false)
+		if err != nil {
+			return err
+		}
+		// So far the cleanup policy was executed once a deployment was paused, scaled up/down, or it
+		// succesfully completed deploying a replica set. Decouple it from the strategies and have it
+		// run almost unconditionally - cleanupDeployment is safe by default.
+		dc.cleanupDeployment(oldRSs, d)
+	}
+
+	err = dc.classifyReplicaSets(d)
 	if err != nil {
 		return err
 	}
@@ -608,14 +631,27 @@ func (dc *DeploymentController) handleOverlap(d *extensions.Deployment, deployme
 		// deployments if this one has been marked deleted, we only update its status as long
 		// as it is not actually deleted.
 		if foundOverlaps && d.DeletionTimestamp == nil {
+			overlapping = true
+			// Look at the overlapping annotation in both deployments. If one of them has it and points
+			// to the other one then we don't need to compare their timestamps.
+			otherOverlapsWith := otherD.Annotations[util.OverlapAnnotation]
+			currentOverlapsWith := d.Annotations[util.OverlapAnnotation]
+			// The other deployment is already marked as overlapping with the current one.
+			if otherOverlapsWith == d.Name {
+				var err error
+				if d, err = dc.clearDeploymentOverlap(d, otherD.Name); err != nil {
+					errs = append(errs, err)
+				}
+				continue
+			}
+
 			otherCopy, err := util.DeploymentDeepCopy(otherD)
 			if err != nil {
 				return false, err
 			}
-			overlapping = true
 
 			// Skip syncing this one if older overlapping one is found.
-			if util.SelectorUpdatedBefore(otherCopy, d) {
+			if currentOverlapsWith == otherCopy.Name || util.SelectorUpdatedBefore(otherCopy, d) {
 				if _, err = dc.markDeploymentOverlap(d, otherCopy.Name); err != nil {
 					return false, err
 				}

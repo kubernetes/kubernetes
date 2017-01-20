@@ -21,16 +21,16 @@ import (
 	"strings"
 	"time"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/client/cache"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
-	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/labels"
-	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util/wait"
-	"k8s.io/kubernetes/pkg/watch"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/test/e2e/framework"
 	testutils "k8s.io/kubernetes/test/utils"
 
@@ -93,7 +93,7 @@ func expectNodeReadiness(isReady bool, newNode chan *v1.Node) {
 
 func podOnNode(podName, nodeName string, image string) *v1.Pod {
 	return &v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: podName,
 			Labels: map[string]string{
 				"name": podName,
@@ -188,7 +188,7 @@ var _ = framework.KubeDescribe("Network Partition [Disruptive] [Slow]", func() {
 				nodeSelector := fields.OneTermEqualSelector("metadata.name", node.Name)
 				stopCh := make(chan struct{})
 				newNode := make(chan *v1.Node)
-				var controller *cache.Controller
+				var controller cache.Controller
 				_, controller = cache.NewInformer(
 					&cache.ListWatch{
 						ListFunc: func(options v1.ListOptions) (runtime.Object, error) {

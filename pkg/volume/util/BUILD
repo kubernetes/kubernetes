@@ -23,12 +23,12 @@ go_library(
     deps = [
         "//pkg/api/resource:go_default_library",
         "//pkg/api/v1:go_default_library",
-        "//pkg/apis/meta/v1:go_default_library",
         "//pkg/apis/storage/v1beta1:go_default_library",
         "//pkg/client/clientset_generated/clientset:go_default_library",
         "//pkg/util/mount:go_default_library",
-        "//pkg/util/sets:go_default_library",
         "//vendor:github.com/golang/glog",
+        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor:k8s.io/apimachinery/pkg/util/sets",
     ],
 )
 
@@ -41,7 +41,26 @@ go_test(
     library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
-        "//pkg/util/sets:go_default_library",
         "//pkg/util/testing:go_default_library",
+        "//vendor:k8s.io/apimachinery/pkg/util/sets",
     ],
+)
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [
+        ":package-srcs",
+        "//pkg/volume/util/nestedpendingoperations:all-srcs",
+        "//pkg/volume/util/operationexecutor:all-srcs",
+        "//pkg/volume/util/types:all-srcs",
+        "//pkg/volume/util/volumehelper:all-srcs",
+    ],
+    tags = ["automanaged"],
 )

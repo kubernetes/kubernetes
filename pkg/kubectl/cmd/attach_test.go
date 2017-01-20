@@ -27,12 +27,12 @@ import (
 
 	"github.com/spf13/cobra"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/restclient/fake"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
-	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/util/term"
 )
 
@@ -127,7 +127,7 @@ func TestPodAndContainerAttach(t *testing.T) {
 }
 
 func TestAttach(t *testing.T) {
-	version := registered.GroupOrDie(api.GroupName).GroupVersion.Version
+	version := api.Registry.GroupOrDie(api.GroupName).GroupVersion.Version
 	tests := []struct {
 		name, version, podPath, attachPath, container string
 		pod                                           *api.Pod
@@ -226,7 +226,7 @@ func TestAttach(t *testing.T) {
 }
 
 func TestAttachWarnings(t *testing.T) {
-	version := registered.GroupOrDie(api.GroupName).GroupVersion.Version
+	version := api.Registry.GroupOrDie(api.GroupName).GroupVersion.Version
 	tests := []struct {
 		name, container, version, podPath, expectedErr, expectedOut string
 		pod                                                         *api.Pod
@@ -295,7 +295,7 @@ func TestAttachWarnings(t *testing.T) {
 
 func attachPod() *api.Pod {
 	return &api.Pod{
-		ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "test", ResourceVersion: "10"},
+		ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "test", ResourceVersion: "10"},
 		Spec: api.PodSpec{
 			RestartPolicy: api.RestartPolicyAlways,
 			DNSPolicy:     api.DNSClusterFirst,

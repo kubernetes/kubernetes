@@ -22,10 +22,10 @@ import (
 	"testing"
 	"time"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/diff"
+	"k8s.io/client-go/pkg/util/clock"
 	"k8s.io/kubernetes/pkg/api/v1"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/util/clock"
-	"k8s.io/kubernetes/pkg/util/diff"
 )
 
 func makeObjectReference(kind, name, namespace string) v1.ObjectReference {

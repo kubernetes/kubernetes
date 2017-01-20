@@ -17,13 +17,14 @@ limitations under the License.
 package fake
 
 import (
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	labels "k8s.io/apimachinery/pkg/labels"
+	schema "k8s.io/apimachinery/pkg/runtime/schema"
+	types "k8s.io/apimachinery/pkg/types"
+	watch "k8s.io/apimachinery/pkg/watch"
 	api "k8s.io/kubernetes/pkg/api"
 	batch "k8s.io/kubernetes/pkg/apis/batch"
-	v1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	core "k8s.io/kubernetes/pkg/client/testing/core"
-	labels "k8s.io/kubernetes/pkg/labels"
-	schema "k8s.io/kubernetes/pkg/runtime/schema"
-	watch "k8s.io/kubernetes/pkg/watch"
 )
 
 // FakeCronJobs implements CronJobInterface
@@ -117,7 +118,7 @@ func (c *FakeCronJobs) Watch(opts api.ListOptions) (watch.Interface, error) {
 }
 
 // Patch applies the patch and returns the patched cronJob.
-func (c *FakeCronJobs) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *batch.CronJob, err error) {
+func (c *FakeCronJobs) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *batch.CronJob, err error) {
 	obj, err := c.Fake.
 		Invokes(core.NewPatchSubresourceAction(cronjobsResource, c.ns, name, data, subresources...), &batch.CronJob{})
 

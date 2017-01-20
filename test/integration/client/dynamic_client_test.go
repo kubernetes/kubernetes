@@ -22,15 +22,15 @@ import (
 	"reflect"
 	"testing"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/apimachinery/registered"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/apis/meta/v1/unstructured"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/typed/dynamic"
-	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
@@ -41,7 +41,7 @@ func TestDynamicClient(t *testing.T) {
 	ns := framework.CreateTestingNamespace("dynamic-client", s, t)
 	defer framework.DeleteTestingNamespace(ns, s, t)
 
-	gv := &registered.GroupOrDie(v1.GroupName).GroupVersion
+	gv := &api.Registry.GroupOrDie(v1.GroupName).GroupVersion
 	config := &restclient.Config{
 		Host:          s.URL,
 		ContentConfig: restclient.ContentConfig{GroupVersion: gv},
@@ -74,7 +74,7 @@ func TestDynamicClient(t *testing.T) {
 
 	// Create a Pod with the normal client
 	pod := &v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: "test",
 		},
 		Spec: v1.PodSpec{

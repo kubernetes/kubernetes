@@ -41,13 +41,14 @@ import (
 	"github.com/aws/aws-sdk-go/service/elb"
 	"github.com/golang/glog"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/api/v1/service"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	awscredentials "k8s.io/kubernetes/pkg/credentialprovider/aws"
-	"k8s.io/kubernetes/pkg/types"
-	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/volume"
 )
 
@@ -136,16 +137,25 @@ const ServiceAnnotationLoadBalancerSSLPorts = "service.beta.kubernetes.io/aws-lo
 const ServiceAnnotationLoadBalancerBEProtocol = "service.beta.kubernetes.io/aws-load-balancer-backend-protocol"
 
 const (
-	// volumeAttachmentStatusTimeout is the maximum time to wait for a volume attach/detach to complete
-	volumeAttachmentStatusTimeout = 30 * time.Minute
 	// volumeAttachmentConsecutiveErrorLimit is the number of consecutive errors we will ignore when waiting for a volume to attach/detach
 	volumeAttachmentStatusConsecutiveErrorLimit = 10
-	// volumeAttachmentErrorDelay is the amount of time we wait before retrying after encountering an error,
-	// while waiting for a volume attach/detach to complete
-	volumeAttachmentStatusErrorDelay = 20 * time.Second
-	// volumeAttachmentStatusPollInterval is the interval at which we poll the volume,
-	// while waiting for a volume attach/detach to complete
-	volumeAttachmentStatusPollInterval = 10 * time.Second
+	// volumeAttachmentStatus* is configuration of exponential backoff for
+	// waiting for attach/detach operation to complete. Starting with 10
+	// seconds, multiplying by 1.2 with each step and taking 21 steps at maximum
+	// it will time out after 31.11 minutes, which roughly corresponds to GCE
+	// timeout (30 minutes).
+	volumeAttachmentStatusInitialDelay = 10 * time.Second
+	volumeAttachmentStatusFactor       = 1.2
+	volumeAttachmentStatusSteps        = 21
+
+	// createTag* is configuration of exponential backoff for CreateTag call. We
+	// retry mainly because if we create an object, we cannot tag it until it is
+	// "fully created" (eventual consistency). Starting with 1 second, doubling
+	// it every step and taking 9 steps results in 255 second total waiting
+	// time.
+	createTagInitialDelay = 1 * time.Second
+	createTagFactor       = 2.0
+	createTagSteps        = 9
 )
 
 // Maps from backend protocol to ELB protocol
@@ -1165,16 +1175,16 @@ func (i *awsInstance) describeInstance() (*ec2.Instance, error) {
 // Gets the mountDevice already assigned to the volume, or assigns an unused mountDevice.
 // If the volume is already assigned, this will return the existing mountDevice with alreadyAttached=true.
 // Otherwise the mountDevice is assigned by finding the first available mountDevice, and it is returned with alreadyAttached=false.
-func (c *Cloud) getMountDevice(i *awsInstance, volumeID awsVolumeID, assign bool) (assigned mountDevice, alreadyAttached bool, err error) {
+func (c *Cloud) getMountDevice(
+	i *awsInstance,
+	info *ec2.Instance,
+	volumeID awsVolumeID,
+	assign bool) (assigned mountDevice, alreadyAttached bool, err error) {
 	instanceType := i.getInstanceType()
 	if instanceType == nil {
 		return "", false, fmt.Errorf("could not get instance type for instance: %s", i.awsID)
 	}
 
-	info, err := i.describeInstance()
-	if err != nil {
-		return "", false, err
-	}
 	deviceMappings := map[mountDevice]awsVolumeID{}
 	for _, blockDevice := range info.BlockDeviceMappings {
 		name := aws.StringValue(blockDevice.DeviceName)
@@ -1304,25 +1314,28 @@ func (d *awsDisk) describeVolume() (*ec2.Volume, error) {
 // waitForAttachmentStatus polls until the attachment status is the expected value
 // On success, it returns the last attachment state.
 func (d *awsDisk) waitForAttachmentStatus(status string) (*ec2.VolumeAttachment, error) {
-	// We wait up to 30 minutes for the attachment to complete.
-	// This mirrors the GCE timeout.
-	timeoutAt := time.Now().UTC().Add(volumeAttachmentStatusTimeout).Unix()
+	backoff := wait.Backoff{
+		Duration: volumeAttachmentStatusInitialDelay,
+		Factor:   volumeAttachmentStatusFactor,
+		Steps:    volumeAttachmentStatusSteps,
+	}
 
 	// Because of rate limiting, we often see errors from describeVolume
 	// So we tolerate a limited number of failures.
 	// But once we see more than 10 errors in a row, we return the error
 	describeErrorCount := 0
+	var attachment *ec2.VolumeAttachment
 
-	for {
+	err := wait.ExponentialBackoff(backoff, func() (bool, error) {
 		info, err := d.describeVolume()
 		if err != nil {
 			describeErrorCount++
 			if describeErrorCount > volumeAttachmentStatusConsecutiveErrorLimit {
-				return nil, err
+				// report the error
+				return false, err
 			} else {
 				glog.Warningf("Ignoring error from describe volume; will retry: %q", err)
-				time.Sleep(volumeAttachmentStatusErrorDelay)
-				continue
+				return false, nil
 			}
 		} else {
 			describeErrorCount = 0
@@ -1331,7 +1344,6 @@ func (d *awsDisk) waitForAttachmentStatus(status string) (*ec2.VolumeAttachment,
 			// Shouldn't happen; log so we know if it is
 			glog.Warningf("Found multiple attachments for volume %q: %v", d.awsID, info)
 		}
-		var attachment *ec2.VolumeAttachment
 		attachmentStatus := ""
 		for _, a := range info.Attachments {
 			if attachmentStatus != "" {
@@ -1350,18 +1362,15 @@ func (d *awsDisk) waitForAttachmentStatus(status string) (*ec2.VolumeAttachment,
 			attachmentStatus = "detached"
 		}
 		if attachmentStatus == status {
-			return attachment, nil
+			// Attachment is in requested state, finish waiting
+			return true, nil
 		}
-
-		if time.Now().Unix() > timeoutAt {
-			glog.Warningf("Timeout waiting for volume %q state: actual=%s, desired=%s", d.awsID, attachmentStatus, status)
-			return nil, fmt.Errorf("Timeout waiting for volume %q state: actual=%s, desired=%s", d.awsID, attachmentStatus, status)
-		}
-
+		// continue waiting
 		glog.V(2).Infof("Waiting for volume %q state: actual=%s, desired=%s", d.awsID, attachmentStatus, status)
+		return false, nil
+	})
 
-		time.Sleep(volumeAttachmentStatusPollInterval)
-	}
+	return attachment, err
 }
 
 // Deletes the EBS disk
@@ -1432,7 +1441,7 @@ func (c *Cloud) AttachDisk(diskName KubernetesVolumeID, nodeName types.NodeName,
 		return "", err
 	}
 
-	awsInstance, err := c.getAwsInstance(nodeName)
+	awsInstance, info, err := c.getFullInstance(nodeName)
 	if err != nil {
 		return "", fmt.Errorf("error finding instance %s: %v", nodeName, err)
 	}
@@ -1459,7 +1468,7 @@ func (c *Cloud) AttachDisk(diskName KubernetesVolumeID, nodeName types.NodeName,
 		}
 	}()
 
-	mountDevice, alreadyAttached, err = c.getMountDevice(awsInstance, disk.awsID, true)
+	mountDevice, alreadyAttached, err = c.getMountDevice(awsInstance, info, disk.awsID, true)
 	if err != nil {
 		return "", err
 	}
@@ -1519,7 +1528,7 @@ func (c *Cloud) DetachDisk(diskName KubernetesVolumeID, nodeName types.NodeName)
 		return "", err
 	}
 
-	awsInstance, err := c.getAwsInstance(nodeName)
+	awsInstance, info, err := c.getFullInstance(nodeName)
 	if err != nil {
 		if err == cloudprovider.InstanceNotFound {
 			// If instance no longer exists, safe to assume volume is not attached.
@@ -1533,7 +1542,7 @@ func (c *Cloud) DetachDisk(diskName KubernetesVolumeID, nodeName types.NodeName)
 		return "", err
 	}
 
-	mountDevice, alreadyAttached, err := c.getMountDevice(awsInstance, disk.awsID, false)
+	mountDevice, alreadyAttached, err := c.getMountDevice(awsInstance, info, disk.awsID, false)
 	if err != nil {
 		return "", err
 	}
@@ -1717,7 +1726,7 @@ func (c *Cloud) GetDiskPath(volumeName KubernetesVolumeID) (string, error) {
 
 // DiskIsAttached implements Volumes.DiskIsAttached
 func (c *Cloud) DiskIsAttached(diskName KubernetesVolumeID, nodeName types.NodeName) (bool, error) {
-	awsInstance, err := c.getAwsInstance(nodeName)
+	_, instance, err := c.getFullInstance(nodeName)
 	if err != nil {
 		if err == cloudprovider.InstanceNotFound {
 			// If instance no longer exists, safe to assume volume is not attached.
@@ -1736,11 +1745,7 @@ func (c *Cloud) DiskIsAttached(diskName KubernetesVolumeID, nodeName types.NodeN
 		return false, fmt.Errorf("error mapping volume spec %q to aws id: %v", diskName, err)
 	}
 
-	info, err := awsInstance.describeInstance()
-	if err != nil {
-		return false, err
-	}
-	for _, blockDevice := range info.BlockDeviceMappings {
+	for _, blockDevice := range instance.BlockDeviceMappings {
 		id := awsVolumeID(aws.StringValue(blockDevice.Ebs.VolumeId))
 		if id == diskID {
 			return true, nil
@@ -1760,7 +1765,7 @@ func (c *Cloud) DisksAreAttached(diskNames []KubernetesVolumeID, nodeName types.
 		idToDiskName[volumeID] = diskName
 		attached[diskName] = false
 	}
-	awsInstance, err := c.getAwsInstance(nodeName)
+	_, instance, err := c.getFullInstance(nodeName)
 	if err != nil {
 		if err == cloudprovider.InstanceNotFound {
 			// If instance no longer exists, safe to assume volume is not attached.
@@ -1773,11 +1778,7 @@ func (c *Cloud) DisksAreAttached(diskNames []KubernetesVolumeID, nodeName types.
 
 		return attached, err
 	}
-	info, err := awsInstance.describeInstance()
-	if err != nil {
-		return attached, err
-	}
-	for _, blockDevice := range info.BlockDeviceMappings {
+	for _, blockDevice := range instance.BlockDeviceMappings {
 		volumeID := awsVolumeID(aws.StringValue(blockDevice.Ebs.VolumeId))
 		diskName, found := idToDiskName[volumeID]
 		if found {
@@ -2242,30 +2243,33 @@ func (c *Cloud) createTags(resourceID string, tags map[string]string) error {
 		awsTags = append(awsTags, tag)
 	}
 
+	backoff := wait.Backoff{
+		Duration: createTagInitialDelay,
+		Factor:   createTagFactor,
+		Steps:    createTagSteps,
+	}
 	request := &ec2.CreateTagsInput{}
 	request.Resources = []*string{&resourceID}
 	request.Tags = awsTags
 
-	// TODO: We really should do exponential backoff here
-	attempt := 0
-	maxAttempts := 60
-
-	for {
+	var lastErr error
+	err := wait.ExponentialBackoff(backoff, func() (bool, error) {
 		_, err := c.ec2.CreateTags(request)
 		if err == nil {
-			return nil
+			return true, nil
 		}
 
 		// We could check that the error is retryable, but the error code changes based on what we are tagging
 		// SecurityGroup: InvalidGroup.NotFound
-		attempt++
-		if attempt > maxAttempts {
-			glog.Warningf("Failed to create tags (too many attempts): %v", err)
-			return err
-		}
 		glog.V(2).Infof("Failed to create tags; will retry.  Error was %v", err)
-		time.Sleep(1 * time.Second)
+		lastErr = err
+		return false, nil
+	})
+	if err == wait.ErrWaitTimeout {
+		// return real CreateTags error instead of timeout
+		err = lastErr
 	}
+	return err
 }
 
 // Finds the value for a given tag.
@@ -3124,7 +3128,7 @@ func (c *Cloud) getInstanceByID(instanceID string) (*ec2.Instance, error) {
 	}
 
 	if len(instances) == 0 {
-		return nil, fmt.Errorf("no instances found for instance: %s", instanceID)
+		return nil, cloudprovider.InstanceNotFound
 	}
 	if len(instances) > 1 {
 		return nil, fmt.Errorf("multiple instances found for instance: %s", instanceID)
@@ -3253,6 +3257,19 @@ func (c *Cloud) getInstanceByNodeName(nodeName types.NodeName) (*ec2.Instance, e
 		return nil, cloudprovider.InstanceNotFound
 	}
 	return instance, err
+}
+
+func (c *Cloud) getFullInstance(nodeName types.NodeName) (*awsInstance, *ec2.Instance, error) {
+	if nodeName == "" {
+		instance, err := c.getInstanceByID(c.selfAWSInstance.awsID)
+		return c.selfAWSInstance, instance, err
+	}
+	instance, err := c.getInstanceByNodeName(nodeName)
+	if err != nil {
+		return nil, nil, err
+	}
+	awsInstance := newAWSInstance(c.ec2, instance)
+	return awsInstance, instance, err
 }
 
 // Add additional filters, to match on our tags

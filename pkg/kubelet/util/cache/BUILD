@@ -22,6 +22,19 @@ go_test(
     tags = ["automanaged"],
     deps = [
         "//pkg/client/cache:go_default_library",
-        "//pkg/util/clock:go_default_library",
+        "//vendor:k8s.io/client-go/pkg/util/clock",
     ],
+)
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [":package-srcs"],
+    tags = ["automanaged"],
 )

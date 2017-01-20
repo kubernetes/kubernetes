@@ -20,14 +20,17 @@ package webhook
 import (
 	"time"
 
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apiserver/pkg/authentication/authenticator"
+	"k8s.io/apiserver/pkg/authentication/user"
+	"k8s.io/apiserver/pkg/util/cache"
+	authenticationclient "k8s.io/client-go/kubernetes/typed/authentication/v1beta1"
+	authentication "k8s.io/client-go/pkg/apis/authentication/v1beta1"
+
+	"k8s.io/apiserver/pkg/util/webhook"
+
+	_ "k8s.io/client-go/pkg/apis/authentication/install"
 	_ "k8s.io/kubernetes/pkg/apis/authentication/install"
-	authentication "k8s.io/kubernetes/pkg/apis/authentication/v1beta1"
-	"k8s.io/kubernetes/pkg/auth/authenticator"
-	"k8s.io/kubernetes/pkg/auth/user"
-	authenticationclient "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/authentication/v1beta1"
-	"k8s.io/kubernetes/pkg/runtime/schema"
-	"k8s.io/kubernetes/pkg/util/cache"
-	"k8s.io/kubernetes/plugin/pkg/webhook"
 )
 
 var (

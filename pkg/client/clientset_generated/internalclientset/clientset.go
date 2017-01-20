@@ -18,6 +18,7 @@ package internalclientset
 
 import (
 	"github.com/golang/glog"
+	"k8s.io/client-go/pkg/util/flowcontrol"
 	internalversionapps "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/apps/internalversion"
 	internalversionauthentication "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/authentication/internalversion"
 	internalversionauthorization "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/authorization/internalversion"
@@ -31,7 +32,6 @@ import (
 	internalversionstorage "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/storage/internalversion"
 	restclient "k8s.io/kubernetes/pkg/client/restclient"
 	discovery "k8s.io/kubernetes/pkg/client/typed/discovery"
-	"k8s.io/kubernetes/pkg/util/flowcontrol"
 	_ "k8s.io/kubernetes/plugin/pkg/client/auth"
 )
 
@@ -167,6 +167,9 @@ func (c *Clientset) Storage() internalversionstorage.StorageInterface {
 
 // Discovery retrieves the DiscoveryClient
 func (c *Clientset) Discovery() discovery.DiscoveryInterface {
+	if c == nil {
+		return nil
+	}
 	return c.DiscoveryClient
 }
 

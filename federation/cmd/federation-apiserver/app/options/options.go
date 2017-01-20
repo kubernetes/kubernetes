@@ -20,7 +20,7 @@ package options
 import (
 	"time"
 
-	genericoptions "k8s.io/kubernetes/pkg/genericapiserver/options"
+	genericoptions "k8s.io/kubernetes/pkg/genericapiserver/server/options"
 	kubeoptions "k8s.io/kubernetes/pkg/kubeapiserver/options"
 
 	"github.com/spf13/pflag"
@@ -34,6 +34,7 @@ type ServerRunOptions struct {
 	InsecureServing         *genericoptions.ServingOptions
 	Authentication          *kubeoptions.BuiltInAuthenticationOptions
 	Authorization           *kubeoptions.BuiltInAuthorizationOptions
+	CloudProvider           *kubeoptions.CloudProviderOptions
 
 	EventTTL time.Duration
 }
@@ -47,6 +48,7 @@ func NewServerRunOptions() *ServerRunOptions {
 		InsecureServing: genericoptions.NewInsecureServingOptions(),
 		Authentication:  kubeoptions.NewBuiltInAuthenticationOptions().WithAll(),
 		Authorization:   kubeoptions.NewBuiltInAuthorizationOptions(),
+		CloudProvider:   kubeoptions.NewCloudProviderOptions(),
 
 		EventTTL: 1 * time.Hour,
 	}
@@ -62,6 +64,7 @@ func (s *ServerRunOptions) AddFlags(fs *pflag.FlagSet) {
 	s.InsecureServing.AddFlags(fs)
 	s.Authentication.AddFlags(fs)
 	s.Authorization.AddFlags(fs)
+	s.CloudProvider.AddFlags(fs)
 
 	fs.DurationVar(&s.EventTTL, "event-ttl", s.EventTTL,
 		"Amount of time to retain events. Default is 1h.")

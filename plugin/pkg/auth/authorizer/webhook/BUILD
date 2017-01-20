@@ -14,13 +14,14 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//pkg/apis/authorization/install:go_default_library",
-        "//pkg/apis/authorization/v1beta1:go_default_library",
-        "//pkg/auth/authorizer:go_default_library",
-        "//pkg/client/clientset_generated/clientset/typed/authorization/v1beta1:go_default_library",
-        "//pkg/runtime/schema:go_default_library",
-        "//pkg/util/cache:go_default_library",
-        "//plugin/pkg/webhook:go_default_library",
         "//vendor:github.com/golang/glog",
+        "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
+        "//vendor:k8s.io/apiserver/pkg/authorization/authorizer",
+        "//vendor:k8s.io/apiserver/pkg/util/cache",
+        "//vendor:k8s.io/apiserver/pkg/util/webhook",
+        "//vendor:k8s.io/client-go/kubernetes/typed/authorization/v1beta1",
+        "//vendor:k8s.io/client-go/pkg/apis/authorization/install",
+        "//vendor:k8s.io/client-go/pkg/apis/authorization/v1beta1",
     ],
 )
 
@@ -34,10 +35,23 @@ go_test(
     tags = ["automanaged"],
     deps = [
         "//pkg/apis/authorization/v1beta1:go_default_library",
-        "//pkg/apis/meta/v1:go_default_library",
-        "//pkg/auth/authorizer:go_default_library",
-        "//pkg/auth/user:go_default_library",
-        "//pkg/client/unversioned/clientcmd/api/v1:go_default_library",
-        "//pkg/util/diff:go_default_library",
+        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor:k8s.io/apimachinery/pkg/util/diff",
+        "//vendor:k8s.io/apiserver/pkg/authentication/user",
+        "//vendor:k8s.io/apiserver/pkg/authorization/authorizer",
+        "//vendor:k8s.io/client-go/tools/clientcmd/api/v1",
     ],
+)
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [":package-srcs"],
+    tags = ["automanaged"],
 )

@@ -24,30 +24,28 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	kadmission "k8s.io/kubernetes/pkg/admission"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/diff"
+	"k8s.io/apimachinery/pkg/util/sets"
+	kadmission "k8s.io/apiserver/pkg/admission"
+	"k8s.io/apiserver/pkg/authentication/user"
+	"k8s.io/apiserver/pkg/authorization/authorizer"
 	kapi "k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/extensions"
-	"k8s.io/kubernetes/pkg/auth/authorizer"
-	"k8s.io/kubernetes/pkg/auth/user"
 	"k8s.io/kubernetes/pkg/client/cache"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	clientsetfake "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
 	"k8s.io/kubernetes/pkg/security/apparmor"
 	kpsp "k8s.io/kubernetes/pkg/security/podsecuritypolicy"
 	"k8s.io/kubernetes/pkg/security/podsecuritypolicy/seccomp"
 	psputil "k8s.io/kubernetes/pkg/security/podsecuritypolicy/util"
-	"k8s.io/kubernetes/pkg/util/diff"
-	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 const defaultContainerName = "test-c"
 
 // NewTestAdmission provides an admission plugin with test implementations of internal structs.  It uses
 // an authorizer that always returns true.
-func NewTestAdmission(store cache.Store, kclient clientset.Interface) kadmission.Interface {
+func NewTestAdmission(store cache.Store) kadmission.Interface {
 	return &podSecurityPolicyPlugin{
 		Handler:         kadmission.NewHandler(kadmission.Create),
-		client:          kclient,
 		store:           store,
 		strategyFactory: kpsp.NewSimpleStrategyFactory(),
 		pspMatcher:      getMatchingPolicies,
@@ -175,7 +173,7 @@ func TestAdmitSeccomp(t *testing.T) {
 		psp := restrictivePSP()
 		psp.Annotations = v.pspAnnotations
 		pod := &kapi.Pod{
-			ObjectMeta: kapi.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Annotations: v.podAnnotations,
 			},
 			Spec: kapi.PodSpec{
@@ -1339,16 +1337,13 @@ func TestAdmitSysctls(t *testing.T) {
 }
 
 func testPSPAdmit(testCaseName string, psps []*extensions.PodSecurityPolicy, pod *kapi.Pod, shouldPass bool, expectedPSP string, t *testing.T) {
-	namespace := createNamespaceForTest()
-	serviceAccount := createSAForTest()
-	tc := clientsetfake.NewSimpleClientset(namespace, serviceAccount)
 	store := cache.NewStore(cache.MetaNamespaceKeyFunc)
 
 	for _, psp := range psps {
 		store.Add(psp)
 	}
 
-	plugin := NewTestAdmission(store, tc)
+	plugin := NewTestAdmission(store)
 
 	attrs := kadmission.NewAttributesRecord(pod, nil, kapi.Kind("Pod").WithVersion("version"), "namespace", "", kapi.Resource("pods").WithVersion("version"), "", kadmission.Create, &user.DefaultInfo{})
 	err := plugin.Admit(attrs)
@@ -1463,7 +1458,7 @@ func TestCreateProvidersFromConstraints(t *testing.T) {
 		"valid psp": {
 			psp: func() *extensions.PodSecurityPolicy {
 				return &extensions.PodSecurityPolicy{
-					ObjectMeta: kapi.ObjectMeta{
+					ObjectMeta: metav1.ObjectMeta{
 						Name: "valid psp",
 					},
 					Spec: extensions.PodSecurityPolicySpec{
@@ -1486,7 +1481,7 @@ func TestCreateProvidersFromConstraints(t *testing.T) {
 		"bad psp strategy options": {
 			psp: func() *extensions.PodSecurityPolicy {
 				return &extensions.PodSecurityPolicy{
-					ObjectMeta: kapi.ObjectMeta{
+					ObjectMeta: metav1.ObjectMeta{
 						Name: "bad psp user options",
 					},
 					Spec: extensions.PodSecurityPolicySpec{
@@ -1512,10 +1507,8 @@ func TestCreateProvidersFromConstraints(t *testing.T) {
 	for k, v := range testCases {
 		store := cache.NewStore(cache.MetaNamespaceKeyFunc)
 
-		tc := clientsetfake.NewSimpleClientset()
 		admit := &podSecurityPolicyPlugin{
 			Handler:         kadmission.NewHandler(kadmission.Create, kadmission.Update),
-			client:          tc,
 			store:           store,
 			strategyFactory: kpsp.NewSimpleStrategyFactory(),
 		}
@@ -1658,7 +1651,7 @@ func TestGetMatchingPolicies(t *testing.T) {
 
 func restrictivePSP() *extensions.PodSecurityPolicy {
 	return &extensions.PodSecurityPolicy{
-		ObjectMeta: kapi.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:        "restrictive",
 			Annotations: map[string]string{},
 		},
@@ -1693,7 +1686,7 @@ func restrictivePSP() *extensions.PodSecurityPolicy {
 
 func createNamespaceForTest() *kapi.Namespace {
 	return &kapi.Namespace{
-		ObjectMeta: kapi.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: "default",
 		},
 	}
@@ -1701,7 +1694,7 @@ func createNamespaceForTest() *kapi.Namespace {
 
 func createSAForTest() *kapi.ServiceAccount {
 	return &kapi.ServiceAccount{
-		ObjectMeta: kapi.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Namespace: "default",
 			Name:      "default",
 		},
@@ -1713,7 +1706,7 @@ func createSAForTest() *kapi.ServiceAccount {
 // psp when defaults are filled in.
 func goodPod() *kapi.Pod {
 	return &kapi.Pod{
-		ObjectMeta: kapi.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Annotations: map[string]string{},
 		},
 		Spec: kapi.PodSpec{

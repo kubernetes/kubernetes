@@ -85,10 +85,13 @@ function kube::release::package_tarballs() {
   mkdir -p "${RELEASE_DIR}"
   kube::release::package_src_tarball &
   kube::release::package_client_tarballs &
-  kube::release::package_node_tarballs &
-  kube::release::package_server_tarballs &
   kube::release::package_salt_tarball &
   kube::release::package_kube_manifests_tarball &
+  kube::util::wait-for-jobs || { kube::log::error "previous tarball phase failed"; return 1; }
+
+  # _node and _server tarballs depend on _src tarball
+  kube::release::package_node_tarballs &
+  kube::release::package_server_tarballs &
   kube::util::wait-for-jobs || { kube::log::error "previous tarball phase failed"; return 1; }
 
   kube::release::package_final_tarball & # _final depends on some of the previous phases
@@ -295,7 +298,7 @@ function kube::release::create_docker_images_for_server() {
           local docker_image_tag=gcr.io/google_containers/${binary_name}-${arch}:${md5_sum}
         fi
 
-        "${DOCKER[@]}" build -q -t "${docker_image_tag}" ${docker_build_path} >/dev/null
+        "${DOCKER[@]}" build --pull -q -t "${docker_image_tag}" ${docker_build_path} >/dev/null
         "${DOCKER[@]}" save ${docker_image_tag} > ${binary_dir}/${binary_name}.tar
         echo $md5_sum > ${binary_dir}/${binary_name}.docker_tag
 
@@ -353,34 +356,37 @@ function kube::release::package_salt_tarball() {
 function kube::release::package_kube_manifests_tarball() {
   kube::log::status "Building tarball: manifests"
 
+  local salt_dir="${KUBE_ROOT}/cluster/saltbase/salt"
+
   local release_stage="${RELEASE_STAGE}/manifests/kubernetes"
   rm -rf "${release_stage}"
-  local dst_dir="${release_stage}/gci-trusty"
-  mkdir -p "${dst_dir}"
 
-  local salt_dir="${KUBE_ROOT}/cluster/saltbase/salt"
-  cp "${salt_dir}/cluster-autoscaler/cluster-autoscaler.manifest" "${dst_dir}/"
+  mkdir -p "${release_stage}"
   cp "${salt_dir}/fluentd-gcp/fluentd-gcp.yaml" "${release_stage}/"
   cp "${salt_dir}/kube-registry-proxy/kube-registry-proxy.yaml" "${release_stage}/"
   cp "${salt_dir}/kube-proxy/kube-proxy.manifest" "${release_stage}/"
-  cp "${salt_dir}/etcd/etcd.manifest" "${dst_dir}"
-  cp "${salt_dir}/kube-scheduler/kube-scheduler.manifest" "${dst_dir}"
-  cp "${salt_dir}/kube-apiserver/kube-apiserver.manifest" "${dst_dir}"
-  cp "${salt_dir}/kube-apiserver/abac-authz-policy.jsonl" "${dst_dir}"
-  cp "${salt_dir}/kube-controller-manager/kube-controller-manager.manifest" "${dst_dir}"
-  cp "${salt_dir}/kube-addons/kube-addon-manager.yaml" "${dst_dir}"
-  cp "${salt_dir}/l7-gcp/glbc.manifest" "${dst_dir}"
-  cp "${salt_dir}/rescheduler/rescheduler.manifest" "${dst_dir}/"
-  cp "${salt_dir}/e2e-image-puller/e2e-image-puller.manifest" "${dst_dir}/"
-  cp "${KUBE_ROOT}/cluster/gce/trusty/configure-helper.sh" "${dst_dir}/trusty-configure-helper.sh"
-  cp "${KUBE_ROOT}/cluster/gce/gci/configure-helper.sh" "${dst_dir}/gci-configure-helper.sh"
-  cp "${KUBE_ROOT}/cluster/gce/gci/mounter/mounter" "${dst_dir}/gci-mounter"
-  cp "${KUBE_ROOT}/cluster/gce/gci/health-monitor.sh" "${dst_dir}/health-monitor.sh"
-  cp "${KUBE_ROOT}/cluster/gce/container-linux/configure-helper.sh" "${dst_dir}/container-linux-configure-helper.sh"
-  cp -r "${salt_dir}/kube-admission-controls/limit-range" "${dst_dir}"
+
+  local gci_dst_dir="${release_stage}/gci-trusty"
+  mkdir -p "${gci_dst_dir}"
+  cp "${salt_dir}/cluster-autoscaler/cluster-autoscaler.manifest" "${gci_dst_dir}/"
+  cp "${salt_dir}/etcd/etcd.manifest" "${gci_dst_dir}"
+  cp "${salt_dir}/kube-scheduler/kube-scheduler.manifest" "${gci_dst_dir}"
+  cp "${salt_dir}/kube-apiserver/kube-apiserver.manifest" "${gci_dst_dir}"
+  cp "${salt_dir}/kube-apiserver/abac-authz-policy.jsonl" "${gci_dst_dir}"
+  cp "${salt_dir}/kube-controller-manager/kube-controller-manager.manifest" "${gci_dst_dir}"
+  cp "${salt_dir}/kube-addons/kube-addon-manager.yaml" "${gci_dst_dir}"
+  cp "${salt_dir}/l7-gcp/glbc.manifest" "${gci_dst_dir}"
+  cp "${salt_dir}/rescheduler/rescheduler.manifest" "${gci_dst_dir}/"
+  cp "${salt_dir}/e2e-image-puller/e2e-image-puller.manifest" "${gci_dst_dir}/"
+  cp "${KUBE_ROOT}/cluster/gce/trusty/configure-helper.sh" "${gci_dst_dir}/trusty-configure-helper.sh"
+  cp "${KUBE_ROOT}/cluster/gce/gci/configure-helper.sh" "${gci_dst_dir}/gci-configure-helper.sh"
+  cp "${KUBE_ROOT}/cluster/gce/gci/mounter/mounter" "${gci_dst_dir}/gci-mounter"
+  cp "${KUBE_ROOT}/cluster/gce/gci/health-monitor.sh" "${gci_dst_dir}/health-monitor.sh"
+  cp "${KUBE_ROOT}/cluster/gce/container-linux/configure-helper.sh" "${gci_dst_dir}/container-linux-configure-helper.sh"
+  cp -r "${salt_dir}/kube-admission-controls/limit-range" "${gci_dst_dir}"
   local objects
   objects=$(cd "${KUBE_ROOT}/cluster/addons" && find . \( -name \*.yaml -or -name \*.yaml.in -or -name \*.json \) | grep -v demo)
-  tar c -C "${KUBE_ROOT}/cluster/addons" ${objects} | tar x -C "${dst_dir}"
+  tar c -C "${KUBE_ROOT}/cluster/addons" ${objects} | tar x -C "${gci_dst_dir}"
 
   kube::release::clean_cruft
 

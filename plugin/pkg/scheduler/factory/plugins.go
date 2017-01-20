@@ -23,7 +23,7 @@ import (
 	"strings"
 	"sync"
 
-	"k8s.io/kubernetes/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/predicates"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/priorities"
@@ -82,7 +82,7 @@ var (
 	predicateMetadataProducer MetadataProducerFactory
 
 	// get equivalence pod function
-	getEquivalencePodFunc algorithm.GetEquivalencePodFunc = nil
+	getEquivalencePodFunc algorithm.GetEquivalencePodFunc
 )
 
 const (
@@ -110,7 +110,7 @@ func RegisterFitPredicateFactory(name string, predicateFactory FitPredicateFacto
 	return name
 }
 
-// Registers a custom fit predicate with the algorithm registry.
+// RegisterCustomFitPredicate registers a custom fit predicate with the algorithm registry.
 // Returns the name, with which the predicate was registered.
 func RegisterCustomFitPredicate(policy schedulerapi.PredicatePolicy) string {
 	var predicateFactory FitPredicateFactory
@@ -154,7 +154,7 @@ func RegisterCustomFitPredicate(policy schedulerapi.PredicatePolicy) string {
 	return RegisterFitPredicateFactory(policy.Name, predicateFactory)
 }
 
-// This check is useful for testing providers.
+// IsFitPredicateRegistered is useful for testing providers.
 func IsFitPredicateRegistered(name string) bool {
 	schedulerFactoryMutex.Lock()
 	defer schedulerFactoryMutex.Unlock()
@@ -187,7 +187,7 @@ func RegisterPriorityFunction(name string, function algorithm.PriorityFunction, 
 	})
 }
 
-// Registers a priority function with the algorithm registry. Returns the name,
+// RegisterPriorityFunction2 registers a priority function with the algorithm registry. Returns the name,
 // with which the function was registered.
 // FIXME: Rename to PriorityFunctionFactory.
 func RegisterPriorityFunction2(
@@ -211,7 +211,7 @@ func RegisterPriorityConfigFactory(name string, pcf PriorityConfigFactory) strin
 	return name
 }
 
-// Registers a custom priority function with the algorithm registry.
+// RegisterCustomPriorityFunction registers a custom priority function with the algorithm registry.
 // Returns the name, with which the priority function was registered.
 func RegisterCustomPriorityFunction(policy schedulerapi.PriorityPolicy) string {
 	var pcf *PriorityConfigFactory
@@ -242,12 +242,12 @@ func RegisterCustomPriorityFunction(policy schedulerapi.PriorityPolicy) string {
 				Weight: policy.Weight,
 			}
 		}
-	} else if existing_pcf, ok := priorityFunctionMap[policy.Name]; ok {
+	} else if existingPcf, ok := priorityFunctionMap[policy.Name]; ok {
 		glog.V(2).Infof("Priority type %s already registered, reusing.", policy.Name)
 		// set/update the weight based on the policy
 		pcf = &PriorityConfigFactory{
-			Function:          existing_pcf.Function,
-			MapReduceFunction: existing_pcf.MapReduceFunction,
+			Function:          existingPcf.Function,
+			MapReduceFunction: existingPcf.MapReduceFunction,
 			Weight:            policy.Weight,
 		}
 	}
@@ -263,7 +263,7 @@ func RegisterGetEquivalencePodFunction(equivalenceFunc algorithm.GetEquivalenceP
 	getEquivalencePodFunc = equivalenceFunc
 }
 
-// This check is useful for testing providers.
+// IsPriorityFunctionRegistered is useful for testing providers.
 func IsPriorityFunctionRegistered(name string) bool {
 	schedulerFactoryMutex.Lock()
 	defer schedulerFactoryMutex.Unlock()
@@ -271,7 +271,7 @@ func IsPriorityFunctionRegistered(name string) bool {
 	return ok
 }
 
-// Registers a new algorithm provider with the algorithm registry. This should
+// RegisterAlgorithmProvider registers a new algorithm provider with the algorithm registry. This should
 // be called from the init function in a provider plugin.
 func RegisterAlgorithmProvider(name string, predicateKeys, priorityKeys sets.String) string {
 	schedulerFactoryMutex.Lock()
@@ -284,12 +284,11 @@ func RegisterAlgorithmProvider(name string, predicateKeys, priorityKeys sets.Str
 	return name
 }
 
-// This function should not be used to modify providers. It is publicly visible for testing.
+// GetAlgorithmProvider should not be used to modify providers. It is publicly visible for testing.
 func GetAlgorithmProvider(name string) (*AlgorithmProviderConfig, error) {
 	schedulerFactoryMutex.Lock()
 	defer schedulerFactoryMutex.Unlock()
 
-	var provider AlgorithmProviderConfig
 	provider, ok := algorithmProviderMap[name]
 	if !ok {
 		return nil, fmt.Errorf("plugin %q has not been registered", name)

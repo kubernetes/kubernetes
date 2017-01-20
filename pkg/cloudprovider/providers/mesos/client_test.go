@@ -30,7 +30,7 @@ import (
 	"github.com/mesos/mesos-go/mesosutil"
 	"golang.org/x/net/context"
 
-	utilnet "k8s.io/kubernetes/pkg/util/net"
+	utilnet "k8s.io/apimachinery/pkg/util/net"
 )
 
 // Test data

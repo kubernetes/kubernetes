@@ -20,13 +20,11 @@ import (
 	"errors"
 	"io"
 
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-
-	"k8s.io/kubernetes/pkg/admission"
+	"k8s.io/apiserver/pkg/admission"
 )
 
 func init() {
-	admission.RegisterPlugin("AlwaysDeny", func(client clientset.Interface, config io.Reader) (admission.Interface, error) {
+	admission.RegisterPlugin("AlwaysDeny", func(config io.Reader) (admission.Interface, error) {
 		return NewAlwaysDeny(), nil
 	})
 }

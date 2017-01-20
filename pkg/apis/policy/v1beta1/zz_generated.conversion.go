@@ -21,12 +21,12 @@ limitations under the License.
 package v1beta1
 
 import (
+	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	conversion "k8s.io/apimachinery/pkg/conversion"
+	runtime "k8s.io/apimachinery/pkg/runtime"
 	api "k8s.io/kubernetes/pkg/api"
 	v1 "k8s.io/kubernetes/pkg/api/v1"
-	meta_v1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	policy "k8s.io/kubernetes/pkg/apis/policy"
-	conversion "k8s.io/kubernetes/pkg/conversion"
-	runtime "k8s.io/kubernetes/pkg/runtime"
 	unsafe "unsafe"
 )
 
@@ -52,10 +52,7 @@ func RegisterConversions(scheme *runtime.Scheme) error {
 }
 
 func autoConvert_v1beta1_Eviction_To_policy_Eviction(in *Eviction, out *policy.Eviction, s conversion.Scope) error {
-	// TODO: Inefficient conversion - can we improve it?
-	if err := s.Convert(&in.ObjectMeta, &out.ObjectMeta, 0); err != nil {
-		return err
-	}
+	out.ObjectMeta = in.ObjectMeta
 	out.DeleteOptions = (*api.DeleteOptions)(unsafe.Pointer(in.DeleteOptions))
 	return nil
 }
@@ -65,10 +62,7 @@ func Convert_v1beta1_Eviction_To_policy_Eviction(in *Eviction, out *policy.Evict
 }
 
 func autoConvert_policy_Eviction_To_v1beta1_Eviction(in *policy.Eviction, out *Eviction, s conversion.Scope) error {
-	// TODO: Inefficient conversion - can we improve it?
-	if err := s.Convert(&in.ObjectMeta, &out.ObjectMeta, 0); err != nil {
-		return err
-	}
+	out.ObjectMeta = in.ObjectMeta
 	out.DeleteOptions = (*v1.DeleteOptions)(unsafe.Pointer(in.DeleteOptions))
 	return nil
 }
@@ -78,10 +72,7 @@ func Convert_policy_Eviction_To_v1beta1_Eviction(in *policy.Eviction, out *Evict
 }
 
 func autoConvert_v1beta1_PodDisruptionBudget_To_policy_PodDisruptionBudget(in *PodDisruptionBudget, out *policy.PodDisruptionBudget, s conversion.Scope) error {
-	// TODO: Inefficient conversion - can we improve it?
-	if err := s.Convert(&in.ObjectMeta, &out.ObjectMeta, 0); err != nil {
-		return err
-	}
+	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_v1beta1_PodDisruptionBudgetSpec_To_policy_PodDisruptionBudgetSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
 	}
@@ -96,10 +87,7 @@ func Convert_v1beta1_PodDisruptionBudget_To_policy_PodDisruptionBudget(in *PodDi
 }
 
 func autoConvert_policy_PodDisruptionBudget_To_v1beta1_PodDisruptionBudget(in *policy.PodDisruptionBudget, out *PodDisruptionBudget, s conversion.Scope) error {
-	// TODO: Inefficient conversion - can we improve it?
-	if err := s.Convert(&in.ObjectMeta, &out.ObjectMeta, 0); err != nil {
-		return err
-	}
+	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_policy_PodDisruptionBudgetSpec_To_v1beta1_PodDisruptionBudgetSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
 	}

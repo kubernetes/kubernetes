@@ -20,12 +20,13 @@ import (
 	"reflect"
 	"testing"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	"k8s.io/kubernetes/pkg/apis/batch"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/types"
 )
 
 func newBool(a bool) *bool {
@@ -35,7 +36,7 @@ func newBool(a bool) *bool {
 }
 
 func TestJobStrategy(t *testing.T) {
-	ctx := api.NewDefaultContext()
+	ctx := genericapirequest.NewDefaultContext()
 	if !Strategy.NamespaceScoped() {
 		t.Errorf("Job must be namespace scoped")
 	}
@@ -47,7 +48,7 @@ func TestJobStrategy(t *testing.T) {
 		MatchLabels: map[string]string{"a": "b"},
 	}
 	validPodTemplateSpec := api.PodTemplateSpec{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Labels: validSelector.MatchLabels,
 		},
 		Spec: api.PodSpec{
@@ -57,7 +58,7 @@ func TestJobStrategy(t *testing.T) {
 		},
 	}
 	job := &batch.Job{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      "myjob",
 			Namespace: api.NamespaceDefault,
 		},
@@ -81,7 +82,7 @@ func TestJobStrategy(t *testing.T) {
 	}
 	parallelism := int32(10)
 	updatedJob := &batch.Job{
-		ObjectMeta: api.ObjectMeta{Name: "bar", ResourceVersion: "4"},
+		ObjectMeta: metav1.ObjectMeta{Name: "bar", ResourceVersion: "4"},
 		Spec: batch.JobSpec{
 			Parallelism: &parallelism,
 		},
@@ -102,7 +103,7 @@ func TestJobStrategy(t *testing.T) {
 }
 
 func TestJobStrategyWithGeneration(t *testing.T) {
-	ctx := api.NewDefaultContext()
+	ctx := genericapirequest.NewDefaultContext()
 
 	theUID := types.UID("1a2b3c4d5e6f7g8h9i0k")
 
@@ -114,7 +115,7 @@ func TestJobStrategyWithGeneration(t *testing.T) {
 		},
 	}
 	job := &batch.Job{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      "myjob2",
 			Namespace: api.NamespaceDefault,
 			UID:       theUID,
@@ -152,7 +153,7 @@ func TestJobStrategyWithGeneration(t *testing.T) {
 }
 
 func TestJobStatusStrategy(t *testing.T) {
-	ctx := api.NewDefaultContext()
+	ctx := genericapirequest.NewDefaultContext()
 	if !StatusStrategy.NamespaceScoped() {
 		t.Errorf("Job must be namespace scoped")
 	}
@@ -163,7 +164,7 @@ func TestJobStatusStrategy(t *testing.T) {
 		MatchLabels: map[string]string{"a": "b"},
 	}
 	validPodTemplateSpec := api.PodTemplateSpec{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Labels: validSelector.MatchLabels,
 		},
 		Spec: api.PodSpec{
@@ -175,7 +176,7 @@ func TestJobStatusStrategy(t *testing.T) {
 	oldParallelism := int32(10)
 	newParallelism := int32(11)
 	oldJob := &batch.Job{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:            "myjob",
 			Namespace:       api.NamespaceDefault,
 			ResourceVersion: "10",
@@ -190,7 +191,7 @@ func TestJobStatusStrategy(t *testing.T) {
 		},
 	}
 	newJob := &batch.Job{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:            "myjob",
 			Namespace:       api.NamespaceDefault,
 			ResourceVersion: "9",

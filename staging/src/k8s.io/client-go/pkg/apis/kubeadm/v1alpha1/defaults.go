@@ -17,7 +17,7 @@ limitations under the License.
 package v1alpha1
 
 import (
-	"k8s.io/client-go/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 const (
@@ -51,5 +51,9 @@ func SetDefaults_MasterConfiguration(obj *MasterConfiguration) {
 
 	if obj.Networking.DNSDomain == "" {
 		obj.Networking.DNSDomain = DefaultServiceDNSDomain
+	}
+
+	if obj.Discovery.Token == nil && obj.Discovery.File == nil && obj.Discovery.HTTPS == nil {
+		obj.Discovery.Token = &TokenDiscovery{}
 	}
 }

@@ -31,9 +31,9 @@ import (
 
 	"gopkg.in/gcfg.v1"
 
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/cloudprovider"
-	"k8s.io/kubernetes/pkg/types"
 )
 
 const ProviderName = "ovirt"

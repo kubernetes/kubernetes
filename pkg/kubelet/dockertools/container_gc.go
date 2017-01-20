@@ -26,8 +26,8 @@ import (
 
 	dockertypes "github.com/docker/engine-api/types"
 	"github.com/golang/glog"
+	"k8s.io/apimachinery/pkg/types"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
-	"k8s.io/kubernetes/pkg/types"
 )
 
 type containerGC struct {

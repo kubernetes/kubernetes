@@ -167,12 +167,19 @@ kube::util::host_platform() {
 kube::util::find-binary-for-platform() {
   local -r lookfor="$1"
   local -r platform="$2"
-  local -r locations=(
+  local locations=(
     "${KUBE_ROOT}/_output/bin/${lookfor}"
     "${KUBE_ROOT}/_output/dockerized/bin/${platform}/${lookfor}"
     "${KUBE_ROOT}/_output/local/bin/${platform}/${lookfor}"
     "${KUBE_ROOT}/platforms/${platform}/${lookfor}"
   )
+  # Also search for binary in bazel build tree.
+  # In some cases we have to name the binary $BINARY_bin, since there was a
+  # directory named $BINARY next to it.
+  locations+=($(find "${KUBE_ROOT}/bazel-bin/" -type f -executable \
+    \( -name "${lookfor}" -o -name "${lookfor}_bin" \) 2>/dev/null || true) )
+
+  # List most recently-updated location.
   local -r bin=$( (ls -t "${locations[@]}" 2>/dev/null || true) | head -1 )
   echo -n "${bin}"
 }
@@ -313,22 +320,31 @@ kube::util::group-version-to-pkg-path() {
   case "${group_version}" in
     # both group and version are "", this occurs when we generate deep copies for internal objects of the legacy v1 API.
     __internal)
-      echo "api"
+      echo "pkg/api"
       ;;
     v1)
-      echo "api/v1"
+      echo "pkg/api/v1"
+      ;;
+    federation/v1beta1)
+      echo "federation/apis/federation/v1beta1"
+      ;;
+    meta/v1)
+      echo "vendor/k8s.io/apimachinery/pkg/apis/meta/v1"
+      ;;
+    meta/v1)
+      echo "../vendor/k8s.io/apimachinery/pkg/apis/meta/v1"
       ;;
     unversioned)
-      echo "api/unversioned"
+      echo "pkg/api/unversioned"
       ;;
     *.k8s.io)
-      echo "apis/${group_version%.*k8s.io}"
+      echo "pkg/apis/${group_version%.*k8s.io}"
       ;;
     *.k8s.io/*)
-      echo "apis/${group_version/.*k8s.io/}"
+      echo "pkg/apis/${group_version/.*k8s.io/}"
       ;;
     *)
-      echo "apis/${group_version%__internal}"
+      echo "pkg/apis/${group_version%__internal}"
       ;;
   esac
 }
@@ -402,6 +418,7 @@ kube::util::git_upstream_remote_name() {
 kube::util::has_changes_against_upstream_branch() {
   local -r git_branch=$1
   local -r pattern=$2
+  local -r not_pattern=${3:-totallyimpossiblepattern}
   local full_branch
 
   full_branch="$(kube::util::git_upstream_remote_name)/${git_branch}"
@@ -412,11 +429,11 @@ kube::util::has_changes_against_upstream_branch() {
     exit 1
   fi
   # notice this uses ... to find the first shared ancestor
-  if git diff --name-only "${full_branch}...HEAD" | grep "${pattern}" > /dev/null; then
+  if git diff --name-only "${full_branch}...HEAD" | grep -v -E "${not_pattern}" | grep "${pattern}" > /dev/null; then
     return 0
   fi
   # also check for pending changes
-  if git status --porcelain | grep "${pattern}" > /dev/null; then
+  if git status --porcelain | grep -v -E "${not_pattern}" | grep "${pattern}" > /dev/null; then
     echo "Detected '${pattern}' uncommitted changes."
     return 0
   fi

@@ -21,10 +21,10 @@ import (
 	"os"
 	"strconv"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/api/v1"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/aws"
-	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/plugin/pkg/scheduler"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/predicates"
@@ -238,7 +238,7 @@ func GetEquivalencePod(pod *v1.Pod) interface{} {
 	// to be equivalent
 	if len(pod.OwnerReferences) != 0 {
 		for _, ref := range pod.OwnerReferences {
-			if *ref.Controller && isValidControllerKind(ref.Kind) {
+			if *ref.Controller {
 				equivalencePod.ControllerRef = ref
 				// a pod can only belongs to one controller
 				break
@@ -246,17 +246,6 @@ func GetEquivalencePod(pod *v1.Pod) interface{} {
 		}
 	}
 	return &equivalencePod
-}
-
-// isValidControllerKind checks if a given controller's kind can be applied to equivalence pod algorithm.
-func isValidControllerKind(kind string) bool {
-	switch kind {
-	// list of kinds that we cannot handle
-	case StatefulSetKind:
-		return false
-	default:
-		return true
-	}
 }
 
 // EquivalencePod is a group of pod attributes which can be reused as equivalence to schedule other pods.

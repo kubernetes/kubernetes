@@ -21,9 +21,9 @@ import (
 	"path"
 	"strings"
 
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/api/v1"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
-	"k8s.io/kubernetes/pkg/util/wait"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/test/e2e/chaosmonkey"
 	"k8s.io/kubernetes/test/e2e/framework"
 
@@ -146,8 +146,8 @@ func testService(f *framework.Framework, sem *chaosmonkey.Semaphore, testDuringD
 	// Setup
 	serviceName := "service-test"
 
-	jig := NewServiceTestJig(f.ClientSet, serviceName)
-	// nodeIP := pickNodeIP(jig.Client) // for later
+	jig := framework.NewServiceTestJig(f.ClientSet, serviceName)
+	// nodeIP := framework.PickNodeIP(jig.Client) // for later
 
 	By("creating a TCP service " + serviceName + " with type=LoadBalancer in namespace " + f.Namespace.Name)
 	// TODO it's weird that we have to do this and then wait WaitForLoadBalancer which changes
@@ -155,11 +155,11 @@ func testService(f *framework.Framework, sem *chaosmonkey.Semaphore, testDuringD
 	tcpService := jig.CreateTCPServiceOrFail(f.Namespace.Name, func(s *v1.Service) {
 		s.Spec.Type = v1.ServiceTypeLoadBalancer
 	})
-	tcpService = jig.WaitForLoadBalancerOrFail(f.Namespace.Name, tcpService.Name, loadBalancerCreateTimeoutDefault)
+	tcpService = jig.WaitForLoadBalancerOrFail(f.Namespace.Name, tcpService.Name, framework.LoadBalancerCreateTimeoutDefault)
 	jig.SanityCheckService(tcpService, v1.ServiceTypeLoadBalancer)
 
 	// Get info to hit it with
-	tcpIngressIP := getIngressPoint(&tcpService.Status.LoadBalancer.Ingress[0])
+	tcpIngressIP := framework.GetIngressPoint(&tcpService.Status.LoadBalancer.Ingress[0])
 	svcPort := int(tcpService.Spec.Ports[0].Port)
 
 	By("creating pod to be part of service " + serviceName)
@@ -169,7 +169,7 @@ func testService(f *framework.Framework, sem *chaosmonkey.Semaphore, testDuringD
 
 	// Hit it once before considering ourselves ready
 	By("hitting the pod through the service's LoadBalancer")
-	jig.TestReachableHTTP(tcpIngressIP, svcPort, loadBalancerLagTimeoutDefault)
+	jig.TestReachableHTTP(tcpIngressIP, svcPort, framework.LoadBalancerLagTimeoutDefault)
 
 	sem.Ready()
 
@@ -187,7 +187,7 @@ func testService(f *framework.Framework, sem *chaosmonkey.Semaphore, testDuringD
 
 	// Sanity check and hit it once more
 	By("hitting the pod through the service's LoadBalancer")
-	jig.TestReachableHTTP(tcpIngressIP, svcPort, loadBalancerLagTimeoutDefault)
+	jig.TestReachableHTTP(tcpIngressIP, svcPort, framework.LoadBalancerLagTimeoutDefault)
 	jig.SanityCheckService(tcpService, v1.ServiceTypeLoadBalancer)
 }
 

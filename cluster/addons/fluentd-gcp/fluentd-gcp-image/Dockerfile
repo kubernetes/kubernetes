@@ -20,7 +20,7 @@
 # scope and that the Logging API has been enabled for the project
 # in the Google Developer Console.
 
-FROM gcr.io/google_containers/ubuntu-slim:0.4
+FROM gcr.io/google_containers/ubuntu-slim:0.6
 
 
 # Disable prompts from apt
@@ -36,6 +36,7 @@ RUN apt-get -qq update && \
     td-agent-gem install --no-document fluent-plugin-record-reformer -v 0.8.2 && \
     td-agent-gem install --no-document fluent-plugin-systemd -v 0.0.5 && \
     td-agent-gem install --no-document fluent-plugin-google-cloud -v 0.5.2 && \
+    td-agent-gem install --no-document fluent-plugin-detect-exceptions -v 0.0.4 && \
     # Remove build tools
     apt-get remove -y -qq gcc make && \
     apt-get autoremove -y -qq && \

@@ -25,13 +25,14 @@ go_library(
         "//pkg/apis/batch/v1:go_default_library",
         "//pkg/apis/batch/v2alpha1:go_default_library",
         "//pkg/apis/certificates:go_default_library",
-        "//pkg/apis/certificates/v1alpha1:go_default_library",
+        "//pkg/apis/certificates/v1beta1:go_default_library",
         "//pkg/apis/extensions:go_default_library",
         "//pkg/apis/extensions/v1beta1:go_default_library",
         "//pkg/apis/policy:go_default_library",
         "//pkg/apis/policy/v1beta1:go_default_library",
         "//pkg/apis/rbac:go_default_library",
         "//pkg/apis/rbac/v1alpha1:go_default_library",
+        "//pkg/apis/rbac/v1beta1:go_default_library",
         "//pkg/apis/storage:go_default_library",
         "//pkg/apis/storage/v1beta1:go_default_library",
         "//pkg/client/cache:go_default_library",
@@ -47,7 +48,32 @@ go_library(
         "//pkg/client/informers/informers_generated/policy:go_default_library",
         "//pkg/client/informers/informers_generated/rbac:go_default_library",
         "//pkg/client/informers/informers_generated/storage:go_default_library",
-        "//pkg/runtime:go_default_library",
-        "//pkg/runtime/schema:go_default_library",
+        "//vendor:k8s.io/apimachinery/pkg/runtime",
+        "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
     ],
+)
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [
+        ":package-srcs",
+        "//pkg/client/informers/informers_generated/apps:all-srcs",
+        "//pkg/client/informers/informers_generated/autoscaling:all-srcs",
+        "//pkg/client/informers/informers_generated/batch:all-srcs",
+        "//pkg/client/informers/informers_generated/certificates:all-srcs",
+        "//pkg/client/informers/informers_generated/core:all-srcs",
+        "//pkg/client/informers/informers_generated/extensions:all-srcs",
+        "//pkg/client/informers/informers_generated/internalinterfaces:all-srcs",
+        "//pkg/client/informers/informers_generated/policy:all-srcs",
+        "//pkg/client/informers/informers_generated/rbac:all-srcs",
+        "//pkg/client/informers/informers_generated/storage:all-srcs",
+    ],
+    tags = ["automanaged"],
 )

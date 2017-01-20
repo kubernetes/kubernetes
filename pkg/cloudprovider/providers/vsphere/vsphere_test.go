@@ -24,9 +24,9 @@ import (
 	"testing"
 
 	"golang.org/x/net/context"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/kubernetes/pkg/cloudprovider"
-	"k8s.io/kubernetes/pkg/types"
-	"k8s.io/kubernetes/pkg/util/rand"
 )
 
 func configFromEnv() (cfg VSphereConfig, ok bool) {

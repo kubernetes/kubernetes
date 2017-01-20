@@ -18,15 +18,16 @@ package util
 
 import (
 	"hash/adler32"
+	"hash/fnv"
 
 	"github.com/golang/glog"
 
+	errorsutil "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/cache"
 	v1core "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/core/v1"
 	"k8s.io/kubernetes/pkg/client/retry"
-	errorsutil "k8s.io/kubernetes/pkg/util/errors"
 	hashutil "k8s.io/kubernetes/pkg/util/hash"
 )
 
@@ -39,6 +40,12 @@ func GetPodTemplateSpecHash(template v1.PodTemplateSpec) uint32 {
 // TODO: remove the duplicate
 func GetInternalPodTemplateSpecHash(template api.PodTemplateSpec) uint32 {
 	podTemplateSpecHasher := adler32.New()
+	hashutil.DeepHashObject(podTemplateSpecHasher, template)
+	return podTemplateSpecHasher.Sum32()
+}
+
+func GetPodTemplateSpecHashFnv(template v1.PodTemplateSpec) uint32 {
+	podTemplateSpecHasher := fnv.New32a()
 	hashutil.DeepHashObject(podTemplateSpecHasher, template)
 	return podTemplateSpecHasher.Sum32()
 }

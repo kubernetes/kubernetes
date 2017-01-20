@@ -17,12 +17,12 @@ limitations under the License.
 package fake
 
 import (
-	api "k8s.io/client-go/pkg/api"
+	labels "k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
+	watch "k8s.io/apimachinery/pkg/watch"
 	v1 "k8s.io/client-go/pkg/api/v1"
 	v1alpha1 "k8s.io/client-go/pkg/apis/policy/v1alpha1"
-	labels "k8s.io/client-go/pkg/labels"
-	"k8s.io/client-go/pkg/runtime/schema"
-	watch "k8s.io/client-go/pkg/watch"
 	testing "k8s.io/client-go/testing"
 )
 
@@ -117,7 +117,7 @@ func (c *FakePodDisruptionBudgets) Watch(opts v1.ListOptions) (watch.Interface, 
 }
 
 // Patch applies the patch and returns the patched podDisruptionBudget.
-func (c *FakePodDisruptionBudgets) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *v1alpha1.PodDisruptionBudget, err error) {
+func (c *FakePodDisruptionBudgets) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1alpha1.PodDisruptionBudget, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewPatchSubresourceAction(poddisruptionbudgetsResource, c.ns, name, data, subresources...), &v1alpha1.PodDisruptionBudget{})
 

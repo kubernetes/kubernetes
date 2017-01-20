@@ -27,7 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	kcache "k8s.io/kubernetes/pkg/client/cache"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/cache"
 	"k8s.io/kubernetes/pkg/util/strategicpatch"
 )
@@ -111,10 +111,10 @@ func (nsu *nodeStatusUpdater) UpdateNodeStatuses() error {
 		}
 
 		patchBytes, err :=
-			strategicpatch.CreateStrategicMergePatch(oldData, newData, node)
+			strategicpatch.CreateTwoWayMergePatch(oldData, newData, node)
 		if err != nil {
 			return fmt.Errorf(
-				"failed to CreateStrategicMergePatch for node %q. %v",
+				"failed to CreateTwoWayMergePatch for node %q. %v",
 				nodeName,
 				err)
 		}

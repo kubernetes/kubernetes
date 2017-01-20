@@ -19,8 +19,21 @@ go_library(
     srcs = ["swagger_type_docs.go"],
     tags = ["automanaged"],
     deps = [
-        "//pkg/runtime:go_default_library",
         "//vendor:github.com/golang/glog",
         "//vendor:github.com/spf13/pflag",
+        "//vendor:k8s.io/apimachinery/pkg/runtime",
     ],
+)
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [":package-srcs"],
+    tags = ["automanaged"],
 )

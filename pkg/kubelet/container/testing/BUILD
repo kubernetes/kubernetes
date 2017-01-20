@@ -20,11 +20,24 @@ go_library(
     deps = [
         "//pkg/api/v1:go_default_library",
         "//pkg/kubelet/container:go_default_library",
-        "//pkg/types:go_default_library",
-        "//pkg/util/flowcontrol:go_default_library",
         "//pkg/util/term:go_default_library",
         "//pkg/volume:go_default_library",
         "//vendor:github.com/golang/mock/gomock",
         "//vendor:github.com/stretchr/testify/mock",
+        "//vendor:k8s.io/apimachinery/pkg/types",
+        "//vendor:k8s.io/client-go/pkg/util/flowcontrol",
     ],
+)
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [":package-srcs"],
+    tags = ["automanaged"],
 )

@@ -17,8 +17,8 @@ limitations under the License.
 package allow
 
 import (
-	"k8s.io/kubernetes/pkg/auth/authenticator"
-	"k8s.io/kubernetes/pkg/auth/user"
+	"k8s.io/apiserver/pkg/authentication/authenticator"
+	"k8s.io/apiserver/pkg/authentication/user"
 )
 
 type allowAuthenticator struct{}

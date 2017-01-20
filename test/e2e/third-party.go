@@ -22,13 +22,12 @@ import (
 	"net/http"
 	"time"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
@@ -45,8 +44,8 @@ var data = `{
 }`
 
 type Foo struct {
-	metav1.TypeMeta `json:",inline"`
-	v1.ObjectMeta   `json:"metadata,omitempty" description:"standard object metadata"`
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty" description:"standard object metadata"`
 
 	SomeField  string `json:"someField"`
 	OtherField int    `json:"otherField"`
@@ -65,7 +64,7 @@ var _ = Describe("ThirdParty resources [Flaky] [Disruptive]", func() {
 	f := framework.NewDefaultFramework("thirdparty")
 
 	rsrc := &extensions.ThirdPartyResource{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: "foo.company.com",
 		},
 		Versions: []extensions.APIVersion{
@@ -97,7 +96,7 @@ var _ = Describe("ThirdParty resources [Flaky] [Disruptive]", func() {
 					return true, nil
 				}
 				status := metav1.Status{}
-				if err := runtime.DecodeInto(api.Codecs.LegacyCodec(registered.EnabledVersions()...), data, &status); err != nil {
+				if err := runtime.DecodeInto(api.Codecs.LegacyCodec(api.Registry.EnabledVersions()...), data, &status); err != nil {
 					return false, err
 				}
 				if status.Code != http.StatusNotFound {
@@ -121,7 +120,7 @@ var _ = Describe("ThirdParty resources [Flaky] [Disruptive]", func() {
 				TypeMeta: metav1.TypeMeta{
 					Kind: "Foo",
 				},
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
 				},
 				SomeField:  "bar",

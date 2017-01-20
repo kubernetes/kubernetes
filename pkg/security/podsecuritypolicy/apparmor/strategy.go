@@ -20,10 +20,10 @@ import (
 	"fmt"
 	"strings"
 
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/security/apparmor"
 	"k8s.io/kubernetes/pkg/util/maps"
-	"k8s.io/kubernetes/pkg/util/validation/field"
 )
 
 // Strategy defines the interface for all AppArmor constraint strategies.

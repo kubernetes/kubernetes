@@ -17,23 +17,22 @@ limitations under the License.
 package exists
 
 import (
+	"fmt"
 	"io"
 
-	"k8s.io/kubernetes/pkg/client/cache"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-
-	"fmt"
-
-	"k8s.io/kubernetes/pkg/admission"
+	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/errors"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
+	"k8s.io/kubernetes/pkg/client/cache"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/controller/informers"
+	kubeapiserveradmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
 )
 
 func init() {
-	admission.RegisterPlugin("NamespaceExists", func(client clientset.Interface, config io.Reader) (admission.Interface, error) {
-		return NewExists(client), nil
+	admission.RegisterPlugin("NamespaceExists", func(config io.Reader) (admission.Interface, error) {
+		return NewExists(), nil
 	})
 }
 
@@ -42,11 +41,12 @@ func init() {
 // It is useful in deployments that want to enforce pre-declaration of a Namespace resource.
 type exists struct {
 	*admission.Handler
-	client            clientset.Interface
+	client            internalclientset.Interface
 	namespaceInformer cache.SharedIndexInformer
 }
 
-var _ = admission.WantsInformerFactory(&exists{})
+var _ = kubeapiserveradmission.WantsInformerFactory(&exists{})
+var _ = kubeapiserveradmission.WantsInternalClientSet(&exists{})
 
 func (e *exists) Admit(a admission.Attributes) (err error) {
 	// if we're here, then we've already passed authentication, so we're allowed to do what we're trying to do
@@ -61,7 +61,7 @@ func (e *exists) Admit(a admission.Attributes) (err error) {
 		return admission.NewForbidden(a, fmt.Errorf("not yet ready to handle request"))
 	}
 	namespace := &api.Namespace{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      a.GetNamespace(),
 			Namespace: "",
 		},
@@ -88,11 +88,14 @@ func (e *exists) Admit(a admission.Attributes) (err error) {
 }
 
 // NewExists creates a new namespace exists admission control handler
-func NewExists(c clientset.Interface) admission.Interface {
+func NewExists() admission.Interface {
 	return &exists{
-		client:  c,
 		Handler: admission.NewHandler(admission.Create, admission.Update, admission.Delete),
 	}
+}
+
+func (e *exists) SetInternalClientSet(client internalclientset.Interface) {
+	e.client = client
 }
 
 func (e *exists) SetInformerFactory(f informers.SharedInformerFactory) {
@@ -103,6 +106,9 @@ func (e *exists) SetInformerFactory(f informers.SharedInformerFactory) {
 func (e *exists) Validate() error {
 	if e.namespaceInformer == nil {
 		return fmt.Errorf("missing namespaceInformer")
+	}
+	if e.client == nil {
+		return fmt.Errorf("missing client")
 	}
 	return nil
 }

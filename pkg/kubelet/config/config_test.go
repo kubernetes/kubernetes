@@ -24,13 +24,13 @@ import (
 	"testing"
 	"time"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/client/record"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/securitycontext"
-	"k8s.io/kubernetes/pkg/types"
 )
 
 const (
@@ -59,7 +59,7 @@ func (s sortedPods) Less(i, j int) bool {
 
 func CreateValidPod(name, namespace string) *v1.Pod {
 	return &v1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			UID:       types.UID(name), // for the purpose of testing, this is unique enough
 			Name:      name,
 			Namespace: namespace,
@@ -186,7 +186,7 @@ func TestInvalidPodFiltered(t *testing.T) {
 	expectPodUpdate(t, ch, CreatePodUpdate(kubetypes.ADD, TestSource, CreateValidPod("foo", "new")))
 
 	// add an invalid update
-	podUpdate = CreatePodUpdate(kubetypes.UPDATE, TestSource, &v1.Pod{ObjectMeta: v1.ObjectMeta{Name: "foo"}})
+	podUpdate = CreatePodUpdate(kubetypes.UPDATE, TestSource, &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}})
 	channel <- podUpdate
 	expectNoPodUpdate(t, ch)
 }
@@ -245,7 +245,7 @@ func TestNewPodAddedUpdatedRemoved(t *testing.T) {
 	channel <- podUpdate
 	expectPodUpdate(t, ch, CreatePodUpdate(kubetypes.UPDATE, TestSource, pod))
 
-	podUpdate = CreatePodUpdate(kubetypes.REMOVE, TestSource, &v1.Pod{ObjectMeta: v1.ObjectMeta{Name: "foo", Namespace: "new"}})
+	podUpdate = CreatePodUpdate(kubetypes.REMOVE, TestSource, &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "new"}})
 	channel <- podUpdate
 	expectPodUpdate(t, ch, CreatePodUpdate(kubetypes.REMOVE, TestSource, pod))
 }

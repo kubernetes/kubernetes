@@ -17,14 +17,13 @@ limitations under the License.
 package v1
 
 import (
-	"k8s.io/client-go/pkg/api/meta"
-	metav1 "k8s.io/client-go/pkg/apis/meta/v1"
-	"k8s.io/client-go/pkg/types"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 )
 
-func (obj *ObjectMeta) GetObjectMeta() meta.Object { return obj }
+func (obj *ObjectMeta) GetObjectMeta() metav1.Object { return obj }
 
-// Namespace implements meta.Object for any object with an ObjectMeta typed field. Allows
+// Namespace implements metav1.Object for any object with an ObjectMeta typed field. Allows
 // fast, direct access to metadata fields for API objects.
 func (meta *ObjectMeta) GetNamespace() string                { return meta.Namespace }
 func (meta *ObjectMeta) SetNamespace(namespace string)       { meta.Namespace = namespace }

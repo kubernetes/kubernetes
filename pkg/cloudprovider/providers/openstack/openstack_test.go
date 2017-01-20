@@ -27,8 +27,9 @@ import (
 	"github.com/rackspace/gophercloud"
 	"github.com/rackspace/gophercloud/openstack/compute/v2/servers"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/util/rand"
 )
 
 const volumeAvailableStatus = "available"
@@ -294,7 +295,7 @@ func TestLoadBalancer(t *testing.T) {
 			t.Fatalf("LoadBalancer() returned false - perhaps your stack doesn't support Neutron?")
 		}
 
-		_, exists, err := lb.GetLoadBalancer(testClusterName, &v1.Service{ObjectMeta: v1.ObjectMeta{Name: "noexist"}})
+		_, exists, err := lb.GetLoadBalancer(testClusterName, &v1.Service{ObjectMeta: metav1.ObjectMeta{Name: "noexist"}})
 		if err != nil {
 			t.Fatalf("GetLoadBalancer(\"noexist\") returned error: %s", err)
 		}

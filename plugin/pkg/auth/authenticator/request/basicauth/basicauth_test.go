@@ -21,8 +21,8 @@ import (
 	"net/http"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/auth/authenticator"
-	"k8s.io/kubernetes/pkg/auth/user"
+	"k8s.io/apiserver/pkg/authentication/authenticator"
+	"k8s.io/apiserver/pkg/authentication/user"
 )
 
 type testPassword struct {

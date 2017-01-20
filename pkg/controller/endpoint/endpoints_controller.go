@@ -22,26 +22,24 @@ import (
 	"strconv"
 	"time"
 
-	"encoding/json"
-
-	"k8s.io/kubernetes/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/api/v1/endpoints"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	utilpod "k8s.io/kubernetes/pkg/api/v1/pod"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/client/cache"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/informers"
-	"k8s.io/kubernetes/pkg/labels"
-	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/metrics"
-	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
-	"k8s.io/kubernetes/pkg/util/sets"
-	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/util/workqueue"
-	"k8s.io/kubernetes/pkg/watch"
 
 	"github.com/golang/glog"
 )
@@ -59,9 +57,13 @@ const (
 	// An annotation on the Service denoting if the endpoints controller should
 	// go ahead and create endpoints for unready pods. This annotation is
 	// currently only used by StatefulSets, where we need the pod to be DNS
-	// resolvable during initialization. In this situation we create a headless
-	// service just for the StatefulSet, and clients shouldn't be using this Service
-	// for anything so unready endpoints don't matter.
+	// resolvable during initialization and termination. In this situation we
+	// create a headless Service just for the StatefulSet, and clients shouldn't
+	// be using this Service for anything so unready endpoints don't matter.
+	// Endpoints of these Services retain their DNS records and continue
+	// receiving traffic for the Service from the moment the kubelet starts all
+	// containers in the pod and marks it "Running", till the kubelet stops all
+	// containers and deletes the pod from the apiserver.
 	TolerateUnreadyEndpointsAnnotation = "service.alpha.kubernetes.io/tolerate-unready-endpoints"
 )
 
@@ -145,8 +147,8 @@ type EndpointController struct {
 
 	// Since we join two objects, we'll watch both of them with
 	// controllers.
-	serviceController *cache.Controller
-	podController     cache.ControllerInterface
+	serviceController cache.Controller
+	podController     cache.Controller
 	// podStoreSynced returns true if the pod store has been synced at least once.
 	// Added as a member to the struct to allow injection for testing.
 	podStoreSynced func() bool
@@ -371,7 +373,6 @@ func (e *EndpointController) syncService(key string) error {
 	}
 
 	subsets := []v1.EndpointSubset{}
-	podHostNames := map[string]endpoints.HostRecord{}
 
 	var tolerateUnreadyEndpoints bool
 	if v, ok := service.Annotations[TolerateUnreadyEndpointsAnnotation]; ok {
@@ -403,7 +404,7 @@ func (e *EndpointController) syncService(key string) error {
 				glog.V(5).Infof("Failed to find an IP for pod %s/%s", pod.Namespace, pod.Name)
 				continue
 			}
-			if pod.DeletionTimestamp != nil {
+			if !tolerateUnreadyEndpoints && pod.DeletionTimestamp != nil {
 				glog.V(5).Infof("Pod is being deleted %s/%s", pod.Namespace, pod.Name)
 				continue
 			}
@@ -424,11 +425,6 @@ func (e *EndpointController) syncService(key string) error {
 			if len(hostname) > 0 &&
 				getSubdomain(pod) == service.Name &&
 				service.Namespace == pod.Namespace {
-				hostRecord := endpoints.HostRecord{
-					HostName: hostname,
-				}
-				// TODO: stop populating podHostNames annotation in 1.4
-				podHostNames[string(pod.Status.PodIP)] = hostRecord
 				epa.Hostname = hostname
 			}
 
@@ -455,7 +451,7 @@ func (e *EndpointController) syncService(key string) error {
 	if err != nil {
 		if errors.IsNotFound(err) {
 			currentEndpoints = &v1.Endpoints{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:   service.Name,
 					Labels: service.Labels,
 				},
@@ -465,17 +461,6 @@ func (e *EndpointController) syncService(key string) error {
 		}
 	}
 
-	serializedPodHostNames := ""
-	if len(podHostNames) > 0 {
-		b, err := json.Marshal(podHostNames)
-		if err != nil {
-			return err
-		}
-		serializedPodHostNames = string(b)
-	}
-
-	newAnnotations := make(map[string]string)
-	newAnnotations[endpoints.PodHostnamesAnnotation] = serializedPodHostNames
 	if reflect.DeepEqual(currentEndpoints.Subsets, subsets) &&
 		reflect.DeepEqual(currentEndpoints.Labels, service.Labels) {
 		glog.V(5).Infof("endpoints are equal for %s/%s, skipping update", service.Namespace, service.Name)
@@ -486,11 +471,6 @@ func (e *EndpointController) syncService(key string) error {
 	newEndpoints.Labels = service.Labels
 	if newEndpoints.Annotations == nil {
 		newEndpoints.Annotations = make(map[string]string)
-	}
-	if len(serializedPodHostNames) == 0 {
-		delete(newEndpoints.Annotations, endpoints.PodHostnamesAnnotation)
-	} else {
-		newEndpoints.Annotations[endpoints.PodHostnamesAnnotation] = serializedPodHostNames
 	}
 
 	glog.V(4).Infof("Update endpoints for %v/%v, ready: %d not ready: %d", service.Namespace, service.Name, readyEps, notReadyEps)

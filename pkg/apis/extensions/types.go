@@ -29,9 +29,9 @@ support is experimental.
 package extensions
 
 import (
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/util/intstr"
 )
 
@@ -68,7 +68,7 @@ type Scale struct {
 	metav1.TypeMeta
 	// Standard object metadata; More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata.
 	// +optional
-	api.ObjectMeta
+	metav1.ObjectMeta
 
 	// defines the behavior of the scale. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status.
 	// +optional
@@ -117,7 +117,7 @@ type ThirdPartyResource struct {
 
 	// Standard object metadata
 	// +optional
-	api.ObjectMeta
+	metav1.ObjectMeta
 
 	// Description is the description of this object.
 	// +optional
@@ -150,7 +150,7 @@ type ThirdPartyResourceData struct {
 	metav1.TypeMeta
 	// Standard object metadata.
 	// +optional
-	api.ObjectMeta
+	metav1.ObjectMeta
 
 	// Data is the raw JSON data for this data.
 	// +optional
@@ -162,7 +162,7 @@ type ThirdPartyResourceData struct {
 type Deployment struct {
 	metav1.TypeMeta
 	// +optional
-	api.ObjectMeta
+	metav1.ObjectMeta
 
 	// Specification of the desired behavior of the Deployment.
 	// +optional
@@ -492,7 +492,7 @@ type DaemonSet struct {
 	// Standard object's metadata.
 	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
 	// +optional
-	api.ObjectMeta
+	metav1.ObjectMeta
 
 	// Spec defines the desired behavior of this daemon set.
 	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status
@@ -541,7 +541,7 @@ type Ingress struct {
 	// Standard object's metadata.
 	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
 	// +optional
-	api.ObjectMeta
+	metav1.ObjectMeta
 
 	// Spec is the desired state of the Ingress.
 	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status
@@ -702,7 +702,7 @@ type IngressBackend struct {
 type ReplicaSet struct {
 	metav1.TypeMeta
 	// +optional
-	api.ObjectMeta
+	metav1.ObjectMeta
 
 	// Spec defines the desired behavior of this ReplicaSet.
 	// +optional
@@ -810,7 +810,7 @@ type ReplicaSetCondition struct {
 type PodSecurityPolicy struct {
 	metav1.TypeMeta
 	// +optional
-	api.ObjectMeta
+	metav1.ObjectMeta
 
 	// Spec defines the policy enforced.
 	// +optional
@@ -1017,7 +1017,7 @@ type PodSecurityPolicyList struct {
 type NetworkPolicy struct {
 	metav1.TypeMeta
 	// +optional
-	api.ObjectMeta
+	metav1.ObjectMeta
 
 	// Specification of the desired behavior for this NetworkPolicy.
 	// +optional

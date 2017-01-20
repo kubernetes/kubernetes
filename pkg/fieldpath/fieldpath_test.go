@@ -22,6 +22,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/v1"
 )
@@ -44,7 +45,7 @@ func TestExtractFieldPathAsString(t *testing.T) {
 			name:      "ok - namespace",
 			fieldPath: "metadata.namespace",
 			obj: &v1.Pod{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Namespace: "object-namespace",
 				},
 			},
@@ -54,7 +55,7 @@ func TestExtractFieldPathAsString(t *testing.T) {
 			name:      "ok - name",
 			fieldPath: "metadata.name",
 			obj: &v1.Pod{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name: "object-name",
 				},
 			},
@@ -64,7 +65,7 @@ func TestExtractFieldPathAsString(t *testing.T) {
 			name:      "ok - labels",
 			fieldPath: "metadata.labels",
 			obj: &v1.Pod{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{"key": "value"},
 				},
 			},
@@ -74,7 +75,7 @@ func TestExtractFieldPathAsString(t *testing.T) {
 			name:      "ok - labels bslash n",
 			fieldPath: "metadata.labels",
 			obj: &v1.Pod{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{"key": "value\n"},
 				},
 			},
@@ -84,7 +85,7 @@ func TestExtractFieldPathAsString(t *testing.T) {
 			name:      "ok - annotations",
 			fieldPath: "metadata.annotations",
 			obj: &v1.Pod{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{"builder": "john-doe"},
 				},
 			},
@@ -95,7 +96,7 @@ func TestExtractFieldPathAsString(t *testing.T) {
 			name:      "invalid expression",
 			fieldPath: "metadata.whoops",
 			obj: &v1.Pod{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Namespace: "object-namespace",
 				},
 			},

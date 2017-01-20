@@ -16,7 +16,7 @@
 
 REGISTRY?="gcr.io/google_containers"
 IMAGE=debian-iptables
-TAG=v4
+TAG=v5
 ARCH?=amd64
 TEMP_DIR:=$(shell mktemp -d)
 
@@ -56,7 +56,7 @@ else
 	cd $(TEMP_DIR) && sed -i "s/CROSS_BUILD_//g" Dockerfile
 endif
 
-	docker build -t $(REGISTRY)/$(IMAGE)-$(ARCH):$(TAG) $(TEMP_DIR)
+	docker build --pull -t $(REGISTRY)/$(IMAGE)-$(ARCH):$(TAG) $(TEMP_DIR)
 
 push: build
 	gcloud docker -- push $(REGISTRY)/$(IMAGE)-$(ARCH):$(TAG)

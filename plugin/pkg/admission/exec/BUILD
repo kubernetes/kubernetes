@@ -13,12 +13,13 @@ go_library(
     srcs = ["admission.go"],
     tags = ["automanaged"],
     deps = [
-        "//pkg/admission:go_default_library",
         "//pkg/api:go_default_library",
-        "//pkg/api/errors:go_default_library",
-        "//pkg/api/rest:go_default_library",
-        "//pkg/apis/meta/v1:go_default_library",
         "//pkg/client/clientset_generated/internalclientset:go_default_library",
+        "//pkg/genericapiserver/registry/rest:go_default_library",
+        "//pkg/kubeapiserver/admission:go_default_library",
+        "//vendor:k8s.io/apimachinery/pkg/api/errors",
+        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor:k8s.io/apiserver/pkg/admission",
     ],
 )
 
@@ -28,11 +29,25 @@ go_test(
     library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
-        "//pkg/admission:go_default_library",
         "//pkg/api:go_default_library",
-        "//pkg/api/rest:go_default_library",
         "//pkg/client/clientset_generated/internalclientset/fake:go_default_library",
         "//pkg/client/testing/core:go_default_library",
-        "//pkg/runtime:go_default_library",
+        "//pkg/genericapiserver/registry/rest:go_default_library",
+        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor:k8s.io/apimachinery/pkg/runtime",
+        "//vendor:k8s.io/apiserver/pkg/admission",
     ],
+)
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [":package-srcs"],
+    tags = ["automanaged"],
 )

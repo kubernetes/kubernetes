@@ -33,6 +33,6 @@ func NewKubeControllerManager() *Server {
 			return app.Run(s)
 		},
 	}
-	s.AddFlags(hks.Flags())
+	s.AddFlags(hks.Flags(), app.KnownControllers(), app.ControllersDisabledByDefault.List())
 	return &hks
 }

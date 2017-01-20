@@ -35,8 +35,13 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	utilnet "k8s.io/apimachinery/pkg/util/net"
+	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
-	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	"k8s.io/kubernetes/pkg/apis/batch"
@@ -47,16 +52,14 @@ import (
 	"k8s.io/kubernetes/pkg/controller/informers"
 	serviceaccountcontroller "k8s.io/kubernetes/pkg/controller/serviceaccount"
 	generatedopenapi "k8s.io/kubernetes/pkg/generated/openapi"
-	"k8s.io/kubernetes/pkg/genericapiserver"
-	"k8s.io/kubernetes/pkg/genericapiserver/filters"
+	genericapiserver "k8s.io/kubernetes/pkg/genericapiserver/server"
+	"k8s.io/kubernetes/pkg/genericapiserver/server/filters"
+	"k8s.io/kubernetes/pkg/kubeapiserver"
+	kubeadmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
 	kubeauthenticator "k8s.io/kubernetes/pkg/kubeapiserver/authenticator"
 	"k8s.io/kubernetes/pkg/master"
+	"k8s.io/kubernetes/pkg/master/tunneler"
 	"k8s.io/kubernetes/pkg/registry/cachesize"
-	"k8s.io/kubernetes/pkg/runtime/schema"
-	utilerrors "k8s.io/kubernetes/pkg/util/errors"
-	utilnet "k8s.io/kubernetes/pkg/util/net"
-	"k8s.io/kubernetes/pkg/util/sets"
-	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/version"
 )
 
@@ -90,9 +93,11 @@ func Run(s *options.ServerRunOptions) error {
 	if err := s.SecureServing.MaybeDefaultWithSelfSignedCerts(s.GenericServerRunOptions.AdvertiseAddress.String(), apiServerServiceIP); err != nil {
 		return fmt.Errorf("error creating self-signed certificates: %v", err)
 	}
-	if err := s.GenericServerRunOptions.DefaultExternalHost(); err != nil {
+	if err := s.CloudProvider.DefaultExternalHost(s.GenericServerRunOptions); err != nil {
 		return fmt.Errorf("error setting the external host value: %v", err)
 	}
+
+	s.Authentication.ApplyAuthorization(s.Authorization)
 
 	// validate options
 	if errs := s.Validate(); len(errs) != 0 {
@@ -122,38 +127,41 @@ func Run(s *options.ServerRunOptions) error {
 		PerConnectionBandwidthLimitBytesPerSec: s.MaxConnectionBytesPerSec,
 	})
 
-	// Setup tunneler if needed
-	var tunneler genericapiserver.Tunneler
+	// Setup nodeTunneler if needed
+	var nodeTunneler tunneler.Tunneler
 	var proxyDialerFn utilnet.DialFunc
 	if len(s.SSHUser) > 0 {
 		// Get ssh key distribution func, if supported
-		var installSSH genericapiserver.InstallSSHKey
-		cloud, err := cloudprovider.InitCloudProvider(s.GenericServerRunOptions.CloudProvider, s.GenericServerRunOptions.CloudConfigFile)
+		var installSSHKey tunneler.InstallSSHKey
+		cloud, err := cloudprovider.InitCloudProvider(s.CloudProvider.CloudProvider, s.CloudProvider.CloudConfigFile)
 		if err != nil {
 			return fmt.Errorf("cloud provider could not be initialized: %v", err)
 		}
 		if cloud != nil {
 			if instances, supported := cloud.Instances(); supported {
-				installSSH = instances.AddSSHKeyToAllInstances
+				installSSHKey = instances.AddSSHKeyToAllInstances
 			}
 		}
 		if s.KubeletConfig.Port == 0 {
 			return fmt.Errorf("must enable kubelet port if proxy ssh-tunneling is specified")
 		}
-		// Set up the tunneler
+		if s.KubeletConfig.ReadOnlyPort == 0 {
+			return fmt.Errorf("must enable kubelet readonly port if proxy ssh-tunneling is specified")
+		}
+		// Set up the nodeTunneler
 		// TODO(cjcullen): If we want this to handle per-kubelet ports or other
 		// kubelet listen-addresses, we need to plumb through options.
 		healthCheckPath := &url.URL{
-			Scheme: "https",
-			Host:   net.JoinHostPort("127.0.0.1", strconv.FormatUint(uint64(s.KubeletConfig.Port), 10)),
+			Scheme: "http",
+			Host:   net.JoinHostPort("127.0.0.1", strconv.FormatUint(uint64(s.KubeletConfig.ReadOnlyPort), 10)),
 			Path:   "healthz",
 		}
-		tunneler = genericapiserver.NewSSHTunneler(s.SSHUser, s.SSHKeyfile, healthCheckPath, installSSH)
+		nodeTunneler = tunneler.New(s.SSHUser, s.SSHKeyfile, healthCheckPath, installSSHKey)
 
-		// Use the tunneler's dialer to connect to the kubelet
-		s.KubeletConfig.Dial = tunneler.Dial
-		// Use the tunneler's dialer when proxying to pods, services, and nodes
-		proxyDialerFn = tunneler.Dial
+		// Use the nodeTunneler's dialer to connect to the kubelet
+		s.KubeletConfig.Dial = nodeTunneler.Dial
+		// Use the nodeTunneler's dialer when proxying to pods, services, and nodes
+		proxyDialerFn = nodeTunneler.Dial
 	}
 
 	// Proxying to pods and services is IP-based... don't expect to be able to verify the hostname
@@ -162,7 +170,7 @@ func Run(s *options.ServerRunOptions) error {
 	if s.Etcd.StorageConfig.DeserializationCacheSize == 0 {
 		// When size of cache is not explicitly set, estimate its size based on
 		// target memory usage.
-		glog.V(2).Infof("Initalizing deserialization cache size based on %dMB limit", s.GenericServerRunOptions.TargetRAMMB)
+		glog.V(2).Infof("Initializing deserialization cache size based on %dMB limit", s.GenericServerRunOptions.TargetRAMMB)
 
 		// This is the heuristics that from memory capacity is trying to infer
 		// the maximum number of nodes in the cluster and set cache sizes based
@@ -185,7 +193,7 @@ func Run(s *options.ServerRunOptions) error {
 	if err != nil {
 		return fmt.Errorf("error generating storage version map: %s", err)
 	}
-	storageFactory, err := genericapiserver.BuildDefaultStorageFactory(
+	storageFactory, err := kubeapiserver.BuildDefaultStorageFactory(
 		s.Etcd.StorageConfig, s.GenericServerRunOptions.DefaultStorageMediaType, api.Codecs,
 		genericapiserver.NewDefaultResourceEncodingConfig(), storageGroupsToEncodingVersion,
 		// FIXME: this GroupVersionResource override should be configurable
@@ -266,8 +274,12 @@ func Run(s *options.ServerRunOptions) error {
 	}
 
 	admissionControlPluginNames := strings.Split(s.GenericServerRunOptions.AdmissionControl, ",")
-	pluginInitializer := admission.NewPluginInitializer(sharedInformers, apiAuthorizer)
-	admissionController, err := admission.NewFromPlugins(client, admissionControlPluginNames, s.GenericServerRunOptions.AdmissionControlConfigFile, pluginInitializer)
+	pluginInitializer := kubeadmission.NewPluginInitializer(client, sharedInformers, apiAuthorizer)
+	admissionConfigProvider, err := kubeadmission.ReadAdmissionConfiguration(admissionControlPluginNames, s.GenericServerRunOptions.AdmissionControlConfigFile)
+	if err != nil {
+		return fmt.Errorf("failed to read plugin config: %v", err)
+	}
+	admissionController, err := admission.NewFromPlugins(admissionControlPluginNames, admissionConfigProvider, pluginInitializer)
 	if err != nil {
 		return fmt.Errorf("failed to initialize plugins: %v", err)
 	}
@@ -307,7 +319,7 @@ func Run(s *options.ServerRunOptions) error {
 		EnableLogsSupport:       true,
 		ProxyTransport:          proxyTransport,
 
-		Tunneler: tunneler,
+		Tunneler: nodeTunneler,
 
 		ServiceIPRange:       serviceIPRange,
 		APIServerServiceIP:   apiServerServiceIP,
@@ -320,7 +332,7 @@ func Run(s *options.ServerRunOptions) error {
 	}
 
 	if s.GenericServerRunOptions.EnableWatchCache {
-		glog.V(2).Infof("Initalizing cache sizes based on %dMB limit", s.GenericServerRunOptions.TargetRAMMB)
+		glog.V(2).Infof("Initializing cache sizes based on %dMB limit", s.GenericServerRunOptions.TargetRAMMB)
 		cachesize.InitializeWatchCacheSizes(s.GenericServerRunOptions.TargetRAMMB)
 		cachesize.SetWatchCacheSizes(s.GenericServerRunOptions.WatchCacheSizes)
 	}

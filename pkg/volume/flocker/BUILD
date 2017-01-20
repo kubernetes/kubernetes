@@ -20,15 +20,16 @@ go_library(
     deps = [
         "//pkg/api/resource:go_default_library",
         "//pkg/api/v1:go_default_library",
-        "//pkg/types:go_default_library",
         "//pkg/util/env:go_default_library",
         "//pkg/util/mount:go_default_library",
-        "//pkg/util/rand:go_default_library",
         "//pkg/util/strings:go_default_library",
         "//pkg/volume:go_default_library",
         "//pkg/volume/util:go_default_library",
         "//vendor:github.com/clusterhq/flocker-go",
         "//vendor:github.com/golang/glog",
+        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor:k8s.io/apimachinery/pkg/types",
+        "//vendor:k8s.io/apimachinery/pkg/util/rand",
     ],
 )
 
@@ -43,13 +44,26 @@ go_test(
     tags = ["automanaged"],
     deps = [
         "//pkg/api/v1:go_default_library",
-        "//pkg/apis/meta/v1:go_default_library",
-        "//pkg/types:go_default_library",
         "//pkg/util/mount:go_default_library",
         "//pkg/util/testing:go_default_library",
         "//pkg/volume:go_default_library",
         "//pkg/volume/testing:go_default_library",
         "//vendor:github.com/clusterhq/flocker-go",
         "//vendor:github.com/stretchr/testify/assert",
+        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
+        "//vendor:k8s.io/apimachinery/pkg/types",
     ],
+)
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [":package-srcs"],
+    tags = ["automanaged"],
 )
