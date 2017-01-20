@@ -33,8 +33,8 @@ import (
 	fakev1batch "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/batch/v1/fake"
 	v2alpha1batch "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/batch/v2alpha1"
 	fakev2alpha1batch "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/batch/v2alpha1/fake"
-	v1alpha1certificates "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/certificates/v1alpha1"
-	fakev1alpha1certificates "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/certificates/v1alpha1/fake"
+	v1beta1certificates "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/certificates/v1beta1"
+	fakev1beta1certificates "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/certificates/v1beta1/fake"
 	v1core "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/core/v1"
 	fakev1core "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/core/v1/fake"
 	v1beta1extensions "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/extensions/v1beta1"
@@ -150,14 +150,14 @@ func (c *Clientset) BatchV2alpha1() v2alpha1batch.BatchV2alpha1Interface {
 	return &fakev2alpha1batch.FakeBatchV2alpha1{Fake: &c.Fake}
 }
 
-// CertificatesV1alpha1 retrieves the CertificatesV1alpha1Client
-func (c *Clientset) CertificatesV1alpha1() v1alpha1certificates.CertificatesV1alpha1Interface {
-	return &fakev1alpha1certificates.FakeCertificatesV1alpha1{Fake: &c.Fake}
+// CertificatesV1beta1 retrieves the CertificatesV1beta1Client
+func (c *Clientset) CertificatesV1beta1() v1beta1certificates.CertificatesV1beta1Interface {
+	return &fakev1beta1certificates.FakeCertificatesV1beta1{Fake: &c.Fake}
 }
 
-// Certificates retrieves the CertificatesV1alpha1Client
-func (c *Clientset) Certificates() v1alpha1certificates.CertificatesV1alpha1Interface {
-	return &fakev1alpha1certificates.FakeCertificatesV1alpha1{Fake: &c.Fake}
+// Certificates retrieves the CertificatesV1beta1Client
+func (c *Clientset) Certificates() v1beta1certificates.CertificatesV1beta1Interface {
+	return &fakev1beta1certificates.FakeCertificatesV1beta1{Fake: &c.Fake}
 }
 
 // ExtensionsV1beta1 retrieves the ExtensionsV1beta1Client
