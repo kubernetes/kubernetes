@@ -924,11 +924,10 @@ func (vs *VSphere) DiskIsAttached(volPath string, nodeName k8stypes.NodeName) (b
 	}
 
 	if !nodeExist {
-		glog.Warningf(
-			"Node %q does not exist. DiskIsAttached will assume vmdk %q is not attached to it.",
-			vSphereInstance,
-			volPath)
-		return false, nil
+		glog.Errorf("Node %q does not exist. DiskIsAttached will throw an error as node doesn't exist.",
+			vSphereInstance)
+		return false, errors.New(fmt.Sprintf("Node %q does not exist. DiskIsAttached will throw an error as node doesn't exist.",
+			vSphereInstance))
 	}
 
 	// Get VM device list
@@ -975,11 +974,10 @@ func (vs *VSphere) DisksAreAttached(volPaths []string, nodeName k8stypes.NodeNam
 	}
 
 	if !nodeExist {
-		glog.Warningf(
-			"Node %q does not exist. DisksAreAttached will assume vmdk %v are not attached to it.",
-			vSphereInstance,
-			volPaths)
-		return attached, nil
+		glog.Errorf("Node %q does not exist. DisksAreAttached will throw an error as node doesn't exist.",
+                        vSphereInstance)
+                return attached, errors.New(fmt.Sprintf("Node %q does not exist. DisksAreAttached will throw an error as node doesn't exist.",
+			vSphereInstance))
 	}
 
 	// Get VM device list
@@ -1143,21 +1141,6 @@ func (vs *VSphere) DetachDisk(volPath string, nodeName k8stypes.NodeName) error 
 		nodeName = vmNameToNodeName(vSphereInstance)
 	} else {
 		vSphereInstance = nodeNameToVMName(nodeName)
-	}
-
-	nodeExist, err := vs.NodeExists(vs.client, nodeName)
-
-	if err != nil {
-		glog.Errorf("Failed to check whether node exist. err: %s.", err)
-		return err
-	}
-
-	if !nodeExist {
-		glog.Warningf(
-			"Node %q does not exist. DetachDisk will assume vmdk %q is not attached to it.",
-			nodeName,
-			volPath)
-		return nil
 	}
 
 	vm, vmDevices, _, dc, err := getVirtualMachineDevices(ctx, vs.cfg, vs.client, vSphereInstance)
