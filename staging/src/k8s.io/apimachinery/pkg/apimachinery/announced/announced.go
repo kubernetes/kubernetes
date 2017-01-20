@@ -28,14 +28,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
-var (
-	DefaultGroupFactoryRegistry = make(APIGroupFactoryRegistry)
-
-	// These functions will announce your group or version.
-	AnnounceGroupVersion = DefaultGroupFactoryRegistry.AnnounceGroupVersion
-	AnnounceGroup        = DefaultGroupFactoryRegistry.AnnounceGroup
-)
-
 // APIGroupFactoryRegistry allows for groups and versions to announce themselves,
 // which simply makes them available and doesn't take other actions. Later,
 // users of the registry can select which groups and versions they'd actually
