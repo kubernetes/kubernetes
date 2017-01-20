@@ -82,6 +82,10 @@ if [[ "${USE_KUBEFED}" == "true" ]]; then
   init
   create_cluster_secrets
 else
-  export FEDERATION_IMAGE_TAG="$(echo ${KUBERNETES_RELEASE:-} | tr + _)"
+  # Read the version back from the versions file if no version is given.
+  readonly kube_version="$(cat ${KUBE_ROOT}/_output/federation/versions | python -c '\
+import json, sys;\
+print json.load(sys.stdin)["KUBE_VERSION"]')"
+  export FEDERATION_IMAGE_TAG="$(echo ${KUBERNETES_RELEASE:-${kube_version}} | tr + _)"
   create-federation-api-objects
 fi
