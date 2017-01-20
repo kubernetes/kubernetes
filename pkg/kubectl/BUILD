@@ -78,7 +78,6 @@ go_library(
         "//pkg/client/clientset_generated/internalclientset/typed/batch/internalversion:go_default_library",
         "//pkg/client/clientset_generated/internalclientset/typed/core/internalversion:go_default_library",
         "//pkg/client/clientset_generated/internalclientset/typed/extensions/internalversion:go_default_library",
-        "//pkg/client/restclient:go_default_library",
         "//pkg/client/retry:go_default_library",
         "//pkg/client/unversioned:go_default_library",
         "//pkg/controller/deployment/util:go_default_library",
@@ -88,7 +87,6 @@ go_library(
         "//pkg/kubelet/qos:go_default_library",
         "//pkg/util:go_default_library",
         "//pkg/util/intstr:go_default_library",
-        "//pkg/util/jsonpath:go_default_library",
         "//pkg/util/node:go_default_library",
         "//pkg/util/slice:go_default_library",
         "//pkg/util/uuid:go_default_library",
@@ -112,6 +110,8 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/util/wait",
         "//vendor:k8s.io/apimachinery/pkg/watch",
         "//vendor:k8s.io/client-go/pkg/util/integer",
+        "//vendor:k8s.io/client-go/pkg/util/jsonpath",
+        "//vendor:k8s.io/client-go/rest",
     ],
 )
 
@@ -165,14 +165,12 @@ go_test(
         "//pkg/client/clientset_generated/internalclientset/typed/batch/internalversion:go_default_library",
         "//pkg/client/clientset_generated/internalclientset/typed/core/internalversion:go_default_library",
         "//pkg/client/clientset_generated/internalclientset/typed/extensions/internalversion:go_default_library",
-        "//pkg/client/restclient:go_default_library",
         "//pkg/client/restclient/fake:go_default_library",
         "//pkg/client/testing/core:go_default_library",
         "//pkg/controller/deployment/util:go_default_library",
         "//pkg/kubectl/testing:go_default_library",
         "//pkg/util:go_default_library",
         "//pkg/util/intstr:go_default_library",
-        "//pkg/util/testing:go_default_library",
         "//vendor:github.com/ghodss/yaml",
         "//vendor:github.com/spf13/cobra",
         "//vendor:k8s.io/apimachinery/pkg/api/errors",
@@ -183,6 +181,8 @@ go_test(
         "//vendor:k8s.io/apimachinery/pkg/util/diff",
         "//vendor:k8s.io/apimachinery/pkg/util/sets",
         "//vendor:k8s.io/apimachinery/pkg/watch",
+        "//vendor:k8s.io/client-go/pkg/util/testing",
+        "//vendor:k8s.io/client-go/rest",
     ],
 )
 

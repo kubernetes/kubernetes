@@ -24,7 +24,6 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
-        "//pkg/client/restclient:go_default_library",
         "//pkg/client/unversioned/auth:go_default_library",
         "//pkg/util/homedir:go_default_library",
         "//vendor:github.com/golang/glog",
@@ -35,6 +34,7 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
         "//vendor:k8s.io/apimachinery/pkg/util/errors",
         "//vendor:k8s.io/apimachinery/pkg/util/validation",
+        "//vendor:k8s.io/client-go/rest",
         "//vendor:k8s.io/client-go/tools/clientcmd/api",
         "//vendor:k8s.io/client-go/tools/clientcmd/api/latest",
     ],
@@ -51,11 +51,11 @@ go_test(
     library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
-        "//pkg/client/restclient:go_default_library",
         "//vendor:github.com/ghodss/yaml",
         "//vendor:github.com/imdario/mergo",
         "//vendor:k8s.io/apimachinery/pkg/runtime",
         "//vendor:k8s.io/apimachinery/pkg/util/errors",
+        "//vendor:k8s.io/client-go/rest",
         "//vendor:k8s.io/client-go/tools/clientcmd/api",
         "//vendor:k8s.io/client-go/tools/clientcmd/api/latest",
     ],

@@ -28,7 +28,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util/jsonpath"
+	"k8s.io/client-go/pkg/util/jsonpath"
 )
 
 const (

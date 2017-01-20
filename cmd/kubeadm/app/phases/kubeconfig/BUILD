@@ -26,7 +26,7 @@ go_library(
     deps = [
         "//cmd/kubeadm/app/phases/certs:go_default_library",
         "//pkg/client/unversioned/clientcmd:go_default_library",
-        "//pkg/util/cert:go_default_library",
+        "//vendor:k8s.io/client-go/pkg/util/cert",
         "//vendor:k8s.io/client-go/tools/clientcmd/api",
     ],
 )

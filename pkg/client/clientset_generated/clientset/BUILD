@@ -41,11 +41,11 @@ go_library(
         "//pkg/client/clientset_generated/clientset/typed/rbac/v1alpha1:go_default_library",
         "//pkg/client/clientset_generated/clientset/typed/rbac/v1beta1:go_default_library",
         "//pkg/client/clientset_generated/clientset/typed/storage/v1beta1:go_default_library",
-        "//pkg/client/restclient:go_default_library",
         "//pkg/client/typed/discovery:go_default_library",
-        "//plugin/pkg/client/auth:go_default_library",
         "//vendor:github.com/golang/glog",
         "//vendor:k8s.io/client-go/pkg/util/flowcontrol",
+        "//vendor:k8s.io/client-go/plugin/pkg/client/auth",
+        "//vendor:k8s.io/client-go/rest",
     ],
 )
 
@@ -70,7 +70,6 @@ filegroup(
         "//pkg/client/clientset_generated/clientset/typed/certificates/v1beta1:all-srcs",
         "//pkg/client/clientset_generated/clientset/typed/core/v1:all-srcs",
         "//pkg/client/clientset_generated/clientset/typed/extensions/v1beta1:all-srcs",
-        "//pkg/client/clientset_generated/clientset/typed/policy/v1alpha1:all-srcs",
         "//pkg/client/clientset_generated/clientset/typed/policy/v1beta1:all-srcs",
         "//pkg/client/clientset_generated/clientset/typed/rbac/v1alpha1:all-srcs",
         "//pkg/client/clientset_generated/clientset/typed/rbac/v1beta1:all-srcs",

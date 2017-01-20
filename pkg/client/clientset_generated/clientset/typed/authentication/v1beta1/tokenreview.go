@@ -17,7 +17,7 @@ limitations under the License.
 package v1beta1
 
 import (
-	restclient "k8s.io/kubernetes/pkg/client/restclient"
+	rest "k8s.io/client-go/rest"
 )
 
 // TokenReviewsGetter has a method to return a TokenReviewInterface.
@@ -33,7 +33,7 @@ type TokenReviewInterface interface {
 
 // tokenReviews implements TokenReviewInterface
 type tokenReviews struct {
-	client restclient.Interface
+	client rest.Interface
 }
 
 // newTokenReviews returns a TokenReviews

@@ -20,9 +20,9 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
+	rest "k8s.io/client-go/rest"
 	api "k8s.io/kubernetes/pkg/api"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions"
-	restclient "k8s.io/kubernetes/pkg/client/restclient"
 )
 
 // ThirdPartyResourcesGetter has a method to return a ThirdPartyResourceInterface.
@@ -46,7 +46,7 @@ type ThirdPartyResourceInterface interface {
 
 // thirdPartyResources implements ThirdPartyResourceInterface
 type thirdPartyResources struct {
-	client restclient.Interface
+	client rest.Interface
 }
 
 // newThirdPartyResources returns a ThirdPartyResources

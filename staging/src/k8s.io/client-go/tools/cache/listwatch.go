@@ -20,12 +20,12 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/pkg/api"
 	"k8s.io/client-go/pkg/api/v1"
-	"k8s.io/client-go/pkg/fields"
-	"k8s.io/client-go/rest"
+	restclient "k8s.io/client-go/rest"
 )
 
 // ListerWatcher is any object that knows how to perform an initial list and start a watch on a resource.
@@ -53,7 +53,7 @@ type ListWatch struct {
 
 // Getter interface knows how to access Get method from RESTClient.
 type Getter interface {
-	Get() *rest.Request
+	Get() *restclient.Request
 }
 
 // NewListWatchFromClient creates a new ListWatch from the specified client, resource, namespace and field selector.

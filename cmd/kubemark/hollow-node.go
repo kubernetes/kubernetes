@@ -20,12 +20,12 @@ import (
 	"fmt"
 
 	"k8s.io/apimachinery/pkg/util/sets"
+	restclient "k8s.io/client-go/rest"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	_ "k8s.io/kubernetes/pkg/client/metrics/prometheus" // for client metric registration
 	"k8s.io/kubernetes/pkg/client/record"
-	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	cadvisortest "k8s.io/kubernetes/pkg/kubelet/cadvisor/testing"
 	"k8s.io/kubernetes/pkg/kubelet/cm"

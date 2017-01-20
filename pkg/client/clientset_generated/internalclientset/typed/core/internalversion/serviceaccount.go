@@ -20,8 +20,8 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
+	rest "k8s.io/client-go/rest"
 	api "k8s.io/kubernetes/pkg/api"
-	restclient "k8s.io/kubernetes/pkg/client/restclient"
 )
 
 // ServiceAccountsGetter has a method to return a ServiceAccountInterface.
@@ -45,7 +45,7 @@ type ServiceAccountInterface interface {
 
 // serviceAccounts implements ServiceAccountInterface
 type serviceAccounts struct {
-	client restclient.Interface
+	client rest.Interface
 	ns     string
 }
 

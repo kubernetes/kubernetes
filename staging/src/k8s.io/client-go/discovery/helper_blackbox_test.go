@@ -34,7 +34,7 @@ import (
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/pkg/api"
 	"k8s.io/client-go/pkg/api/testapi"
-	"k8s.io/client-go/rest"
+	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
 )
 
@@ -139,8 +139,8 @@ func TestNegotiateVersion(t *testing.T) {
 				return &http.Response{StatusCode: test.statusCode, Header: header, Body: objBody(&uapi.APIVersions{Versions: test.serverVersions})}, nil
 			}),
 		}
-		c := discovery.NewDiscoveryClientForConfigOrDie(&rest.Config{})
-		c.RESTClient().(*rest.RESTClient).Client = fakeClient.Client
+		c := discovery.NewDiscoveryClientForConfigOrDie(&restclient.Config{})
+		c.RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
 		response, err := discovery.NegotiateVersion(c, test.requiredVersion, test.clientVersions)
 		if err == nil && test.expectErr != nil {
 			t.Errorf("expected error, got nil for [%s].", test.name)

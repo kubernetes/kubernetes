@@ -17,8 +17,8 @@ limitations under the License.
 package fake
 
 import (
+	rest "k8s.io/client-go/rest"
 	internalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/authentication/internalversion"
-	restclient "k8s.io/kubernetes/pkg/client/restclient"
 	core "k8s.io/kubernetes/pkg/client/testing/core"
 )
 
@@ -32,7 +32,7 @@ func (c *FakeAuthentication) TokenReviews() internalversion.TokenReviewInterface
 
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
-func (c *FakeAuthentication) RESTClient() restclient.Interface {
-	var ret *restclient.RESTClient
+func (c *FakeAuthentication) RESTClient() rest.Interface {
+	var ret *rest.RESTClient
 	return ret
 }

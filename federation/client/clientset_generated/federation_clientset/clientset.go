@@ -19,13 +19,13 @@ package federation_clientset
 import (
 	"github.com/golang/glog"
 	"k8s.io/client-go/pkg/util/flowcontrol"
+	_ "k8s.io/client-go/plugin/pkg/client/auth"
+	rest "k8s.io/client-go/rest"
 	v1batch "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset/typed/batch/v1"
 	v1core "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset/typed/core/v1"
 	v1beta1extensions "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset/typed/extensions/v1beta1"
 	v1beta1federation "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset/typed/federation/v1beta1"
-	restclient "k8s.io/kubernetes/pkg/client/restclient"
 	discovery "k8s.io/kubernetes/pkg/client/typed/discovery"
-	_ "k8s.io/kubernetes/plugin/pkg/client/auth"
 )
 
 type Interface interface {
@@ -131,7 +131,7 @@ func (c *Clientset) Discovery() discovery.DiscoveryInterface {
 }
 
 // NewForConfig creates a new Clientset for the given config.
-func NewForConfig(c *restclient.Config) (*Clientset, error) {
+func NewForConfig(c *rest.Config) (*Clientset, error) {
 	configShallowCopy := *c
 	if configShallowCopy.RateLimiter == nil && configShallowCopy.QPS > 0 {
 		configShallowCopy.RateLimiter = flowcontrol.NewTokenBucketRateLimiter(configShallowCopy.QPS, configShallowCopy.Burst)
@@ -165,7 +165,7 @@ func NewForConfig(c *restclient.Config) (*Clientset, error) {
 
 // NewForConfigOrDie creates a new Clientset for the given config and
 // panics if there is an error in the config.
-func NewForConfigOrDie(c *restclient.Config) *Clientset {
+func NewForConfigOrDie(c *rest.Config) *Clientset {
 	var cs Clientset
 	cs.CoreV1Client = v1core.NewForConfigOrDie(c)
 	cs.BatchV1Client = v1batch.NewForConfigOrDie(c)
@@ -177,7 +177,7 @@ func NewForConfigOrDie(c *restclient.Config) *Clientset {
 }
 
 // New creates a new Clientset for the given RESTClient.
-func New(c restclient.Interface) *Clientset {
+func New(c rest.Interface) *Clientset {
 	var cs Clientset
 	cs.CoreV1Client = v1core.New(c)
 	cs.BatchV1Client = v1batch.New(c)

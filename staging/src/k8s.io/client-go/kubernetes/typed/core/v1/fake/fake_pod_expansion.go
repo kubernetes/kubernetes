@@ -19,7 +19,7 @@ package fake
 import (
 	"k8s.io/client-go/pkg/api/v1"
 	policy "k8s.io/client-go/pkg/apis/policy/v1beta1"
-	"k8s.io/client-go/rest"
+	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/testing"
 )
 
@@ -34,7 +34,7 @@ func (c *FakePods) Bind(binding *v1.Binding) error {
 	return err
 }
 
-func (c *FakePods) GetLogs(name string, opts *v1.PodLogOptions) *rest.Request {
+func (c *FakePods) GetLogs(name string, opts *v1.PodLogOptions) *restclient.Request {
 	action := testing.GenericActionImpl{}
 	action.Verb = "get"
 	action.Namespace = c.ns
@@ -43,7 +43,7 @@ func (c *FakePods) GetLogs(name string, opts *v1.PodLogOptions) *rest.Request {
 	action.Value = opts
 
 	_, _ = c.Fake.Invokes(action, &v1.Pod{})
-	return &rest.Request{}
+	return &restclient.Request{}
 }
 
 func (c *FakePods) Evict(eviction *policy.Eviction) error {

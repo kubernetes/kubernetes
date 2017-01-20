@@ -52,7 +52,6 @@ go_test(
         "//pkg/api:go_default_library",
         "//pkg/apis/batch:go_default_library",
         "//pkg/apis/extensions:go_default_library",
-        "//pkg/client/restclient:go_default_library",
         "//pkg/client/restclient/fake:go_default_library",
         "//pkg/kubectl/cmd/testing:go_default_library",
         "//pkg/kubectl/cmd/util:go_default_library",
@@ -61,6 +60,7 @@ go_test(
         "//vendor:github.com/stretchr/testify/assert",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/runtime",
+        "//vendor:k8s.io/client-go/rest",
     ],
 )
 

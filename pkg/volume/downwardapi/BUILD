@@ -34,12 +34,12 @@ go_test(
         "//pkg/client/clientset_generated/clientset:go_default_library",
         "//pkg/client/clientset_generated/clientset/fake:go_default_library",
         "//pkg/fieldpath:go_default_library",
-        "//pkg/util/testing:go_default_library",
         "//pkg/volume:go_default_library",
         "//pkg/volume/empty_dir:go_default_library",
         "//pkg/volume/testing:go_default_library",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/types",
+        "//vendor:k8s.io/client-go/pkg/util/testing",
     ],
 )
 

@@ -22,11 +22,11 @@ import (
 	pkgruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
+	restclient "k8s.io/client-go/rest"
 	v1beta1 "k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	v1 "k8s.io/kubernetes/pkg/api/v1"
 	cache "k8s.io/kubernetes/pkg/client/cache"
 	kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
-	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/util/workqueue"
 
 	"reflect"

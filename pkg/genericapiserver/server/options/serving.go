@@ -25,7 +25,7 @@ import (
 	"github.com/spf13/pflag"
 
 	utilnet "k8s.io/apimachinery/pkg/util/net"
-	certutil "k8s.io/kubernetes/pkg/util/cert"
+	certutil "k8s.io/client-go/pkg/util/cert"
 	"k8s.io/kubernetes/pkg/util/config"
 )
 

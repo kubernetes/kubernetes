@@ -32,7 +32,7 @@ import (
 	"k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/pkg/util/clock"
 	"k8s.io/client-go/pkg/util/strategicpatch"
-	"k8s.io/client-go/rest"
+	restclient "k8s.io/client-go/rest"
 )
 
 type testEventSink struct {
@@ -387,7 +387,7 @@ func TestWriteEventError(t *testing.T) {
 		"giveUp1": {
 			timesToSendError: 1000,
 			attemptsWanted:   1,
-			err:              &rest.RequestConstructionError{},
+			err:              &restclient.RequestConstructionError{},
 		},
 		"giveUp2": {
 			timesToSendError: 1000,

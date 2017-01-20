@@ -20,9 +20,9 @@ import (
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
+	rest "k8s.io/client-go/rest"
 	api "k8s.io/kubernetes/pkg/api"
 	v1 "k8s.io/kubernetes/pkg/api/v1"
-	restclient "k8s.io/kubernetes/pkg/client/restclient"
 )
 
 // NodesGetter has a method to return a NodeInterface.
@@ -47,7 +47,7 @@ type NodeInterface interface {
 
 // nodes implements NodeInterface
 type nodes struct {
-	client restclient.Interface
+	client rest.Interface
 }
 
 // newNodes returns a Nodes

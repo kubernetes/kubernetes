@@ -30,7 +30,7 @@ import (
 	"github.com/coreos/go-oidc/key"
 	"github.com/coreos/go-oidc/oauth2"
 
-	oidctesting "k8s.io/client-go/plugin/pkg/auth/authenticator/token/oidc/testing"
+	oidctesting "k8s.io/kubernetes/plugin/pkg/auth/authenticator/token/oidc/testing"
 )
 
 func clearCache() {

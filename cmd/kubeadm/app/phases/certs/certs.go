@@ -22,9 +22,9 @@ import (
 	"net"
 	"os"
 
+	certutil "k8s.io/client-go/pkg/util/cert"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
-	certutil "k8s.io/kubernetes/pkg/util/cert"
 )
 
 // CreatePKIAssets will create and write to disk all PKI assets necessary to establish the control plane.

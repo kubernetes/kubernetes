@@ -20,10 +20,10 @@ import (
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
+	rest "k8s.io/client-go/rest"
 	v1beta1 "k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	api "k8s.io/kubernetes/pkg/api"
 	v1 "k8s.io/kubernetes/pkg/api/v1"
-	restclient "k8s.io/kubernetes/pkg/client/restclient"
 )
 
 // ClustersGetter has a method to return a ClusterInterface.
@@ -48,7 +48,7 @@ type ClusterInterface interface {
 
 // clusters implements ClusterInterface
 type clusters struct {
-	client restclient.Interface
+	client rest.Interface
 }
 
 // newClusters returns a Clusters

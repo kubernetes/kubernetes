@@ -23,10 +23,10 @@ package api
 import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
+	fields "k8s.io/apimachinery/pkg/fields"
 	labels "k8s.io/apimachinery/pkg/labels"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	types "k8s.io/apimachinery/pkg/types"
-	fields "k8s.io/client-go/pkg/fields"
 	reflect "reflect"
 )
 

@@ -70,11 +70,19 @@ function save() {
 
 # save everything for which the staging directory is the source of truth
 save "transport"
+save "tools/metrics"
 save "tools/clientcmd/api"
-save "rest/watch"
+save "rest"
+# remove the rest/fake until we're authoritative for it (need to update for registry)
+rm -rf ${CLIENT_REPO_TEMP}/rest/fake
+save "pkg/third_party"
+save "pkg/util/cert"
 save "pkg/util/clock"
-save "pkg/util/integer"
 save "pkg/util/flowcontrol"
+save "pkg/util/integer"
+save "pkg/util/jsonpath"
+save "pkg/util/testing"
+save "plugin"
 
 
 
@@ -90,7 +98,7 @@ mkcp "/pkg/client/record" "/pkg/client"
 mkcp "/pkg/client/cache" "/pkg/client"
 # TODO: make this test file not depending on pkg/client/unversioned
 rm "${CLIENT_REPO_TEMP}"/pkg/client/cache/listwatch_test.go
-mkcp "/pkg/client/restclient" "/pkg/client"
+mkcp "/pkg/client/restclient/fake" "/pkg/client/restclient"
 mkcp "/pkg/client/testing" "/pkg/client"
 # remove this test because it imports the internal clientset
 rm "${CLIENT_REPO_TEMP}"/pkg/client/testing/core/fake_test.go
@@ -100,7 +108,6 @@ mkcp "/pkg/client/unversioned/auth" "/pkg/client/unversioned"
 mkcp "/pkg/client/unversioned/clientcmd" "/pkg/client/unversioned"
 mkcp "/pkg/client/unversioned/portforward" "/pkg/client/unversioned"
 
-mkcp "/plugin/pkg/client/auth" "/plugin/pkg/client"
 mkcp "/pkg/util/workqueue" "pkg/util"
 # remove this folder because it imports prometheus
 rm -rf "${CLIENT_REPO_TEMP}/pkg/util/workqueue/prometheus"
@@ -147,8 +154,6 @@ find "${CLIENT_REPO_TEMP}"/pkg/client/record -type f -name "*.go" -print0 | xarg
 # gofmt the changed files
 
 echo "rewrite conflicting Prometheus registration"
-sed -i "s/request_latency_microseconds/request_latency_microseconds_copy/g" "${CLIENT_REPO_TEMP}"/pkg/client/metrics/metrics.go
-sed -i "s/request_status_codes/request_status_codes_copy/g" "${CLIENT_REPO_TEMP}"/pkg/client/metrics/metrics.go
 sed -i "s/kubernetes_build_info/kubernetes_build_info_copy/g" "${CLIENT_REPO_TEMP}"/pkg/version/version.go
 
 echo "rewrite proto names in proto.RegisterType"
@@ -191,12 +196,11 @@ mvfolder "pkg/client/clientset_generated/${CLIENTSET}" kubernetes
 mvfolder pkg/client/typed/discovery discovery
 mvfolder pkg/client/typed/dynamic dynamic
 mvfolder pkg/client/record tools/record
-mvfolder pkg/client/restclient rest
+mvfolder pkg/client/restclient/fake rest/fake
 mvfolder pkg/client/cache tools/cache
 mvfolder pkg/client/unversioned/auth tools/auth
 mvfolder pkg/client/unversioned/clientcmd tools/clientcmd
 mvfolder pkg/client/unversioned/portforward tools/portforward
-mvfolder pkg/client/metrics tools/metrics
 mvfolder pkg/client/testing/core testing
 mvfolder pkg/client/testing/cache tools/cache/testing
 mvfolder cmd/kubeadm/app/apis/kubeadm pkg/apis/kubeadm
@@ -206,7 +210,6 @@ if [ "$(find "${CLIENT_REPO_TEMP}"/pkg/client -type f -name "*.go")" ]; then
 else
     rm -r "${CLIENT_REPO_TEMP}"/pkg/client
 fi
-mvfolder third_party pkg/third_party
 mvfolder federation pkg/federation
 
 echo "running gofmt"

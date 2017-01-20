@@ -13,13 +13,13 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//pkg/api/v1:go_default_library",
-        "//pkg/client/restclient:go_default_library",
         "//pkg/client/testing/core:go_default_library",
         "//pkg/version:go_default_library",
         "//vendor:github.com/emicklei/go-restful/swagger",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
         "//vendor:k8s.io/apimachinery/pkg/version",
+        "//vendor:k8s.io/client-go/rest",
     ],
 )
 

@@ -18,7 +18,7 @@ go_test(
     tags = ["automanaged"],
     deps = [
         "//cmd/kubeadm/app/apis/kubeadm:go_default_library",
-        "//pkg/util/cert:go_default_library",
+        "//vendor:k8s.io/client-go/pkg/util/cert",
     ],
 )
 
@@ -33,7 +33,7 @@ go_library(
     deps = [
         "//cmd/kubeadm/app/apis/kubeadm:go_default_library",
         "//pkg/registry/core/service/ipallocator:go_default_library",
-        "//pkg/util/cert:go_default_library",
+        "//vendor:k8s.io/client-go/pkg/util/cert",
     ],
 )
 

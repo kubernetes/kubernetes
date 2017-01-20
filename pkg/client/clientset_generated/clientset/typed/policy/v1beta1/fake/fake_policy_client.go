@@ -17,8 +17,8 @@ limitations under the License.
 package fake
 
 import (
+	rest "k8s.io/client-go/rest"
 	v1beta1 "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/policy/v1beta1"
-	restclient "k8s.io/kubernetes/pkg/client/restclient"
 	core "k8s.io/kubernetes/pkg/client/testing/core"
 )
 
@@ -36,7 +36,7 @@ func (c *FakePolicyV1beta1) PodDisruptionBudgets(namespace string) v1beta1.PodDi
 
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
-func (c *FakePolicyV1beta1) RESTClient() restclient.Interface {
-	var ret *restclient.RESTClient
+func (c *FakePolicyV1beta1) RESTClient() rest.Interface {
+	var ret *rest.RESTClient
 	return ret
 }

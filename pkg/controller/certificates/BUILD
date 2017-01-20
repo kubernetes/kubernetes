@@ -68,6 +68,6 @@ go_test(
     tags = ["automanaged"],
     deps = [
         "//pkg/apis/certificates/v1beta1:go_default_library",
-        "//pkg/util/cert:go_default_library",
+        "//vendor:k8s.io/client-go/pkg/util/cert",
     ],
 )

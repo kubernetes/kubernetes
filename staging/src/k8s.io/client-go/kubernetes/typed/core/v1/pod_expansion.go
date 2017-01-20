@@ -20,14 +20,14 @@ import (
 	"k8s.io/client-go/pkg/api"
 	"k8s.io/client-go/pkg/api/v1"
 	policy "k8s.io/client-go/pkg/apis/policy/v1beta1"
-	"k8s.io/client-go/rest"
+	restclient "k8s.io/client-go/rest"
 )
 
 // The PodExpansion interface allows manually adding extra methods to the PodInterface.
 type PodExpansion interface {
 	Bind(binding *v1.Binding) error
 	Evict(eviction *policy.Eviction) error
-	GetLogs(name string, opts *v1.PodLogOptions) *rest.Request
+	GetLogs(name string, opts *v1.PodLogOptions) *restclient.Request
 }
 
 // Bind applies the provided binding to the named pod in the current namespace (binding.Namespace is ignored).
@@ -40,6 +40,6 @@ func (c *pods) Evict(eviction *policy.Eviction) error {
 }
 
 // Get constructs a request for getting the logs for a pod
-func (c *pods) GetLogs(name string, opts *v1.PodLogOptions) *rest.Request {
+func (c *pods) GetLogs(name string, opts *v1.PodLogOptions) *restclient.Request {
 	return c.client.Get().Namespace(c.ns).Name(name).Resource("pods").SubResource("log").VersionedParams(opts, api.ParameterCodec)
 }

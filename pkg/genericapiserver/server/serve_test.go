@@ -31,9 +31,9 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	utilcert "k8s.io/client-go/pkg/util/cert"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/genericapiserver/server/options"
-	utilcert "k8s.io/kubernetes/pkg/util/cert"
 	"k8s.io/kubernetes/pkg/util/config"
 )
 
