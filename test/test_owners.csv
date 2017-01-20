@@ -672,7 +672,7 @@ k8s.io/kubernetes/pkg/credentialprovider/azure,brendandburns,0
 k8s.io/kubernetes/pkg/credentialprovider/gcp,mml,1
 k8s.io/kubernetes/pkg/fieldpath,childsb,1
 k8s.io/kubernetes/pkg/fields,jsafrane,1
-k8s.io/kubernetes/pkg/genericapiserver/servernikhiljindal,0
+k8s.io/kubernetes/pkg/genericapiserver/server,nikhiljindal,0
 k8s.io/kubernetes/pkg/genericapiserver/endpoints,nikhiljindal,0
 k8s.io/kubernetes/pkg/genericapiserver/endpoints/filters,dchen1107,1
 k8s.io/kubernetes/pkg/genericapiserver/endpoints/handlers,rkouj,0
