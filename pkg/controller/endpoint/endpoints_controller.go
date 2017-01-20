@@ -35,6 +35,7 @@ import (
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	utilpod "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/client/cache"
+	"k8s.io/kubernetes/pkg/client/cache/listers"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/informers"
@@ -128,8 +129,8 @@ func NewEndpointControllerFromClient(client *clientset.Clientset, resyncPeriod c
 type EndpointController struct {
 	client clientset.Interface
 
-	serviceStore cache.StoreToServiceLister
-	podStore     cache.StoreToPodLister
+	serviceStore listers.StoreToServiceLister
+	podStore     listers.StoreToPodLister
 
 	// internalPodInformer is used to hold a personal informer.  If we're using
 	// a normal shared informer, then the informer will be started for us.  If

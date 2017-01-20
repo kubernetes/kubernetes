@@ -30,6 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 	batch "k8s.io/kubernetes/pkg/apis/batch/v1"
 	"k8s.io/kubernetes/pkg/client/cache"
+	"k8s.io/kubernetes/pkg/client/cache/listers"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	v1core "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/core/v1"
 	batchv1listers "k8s.io/kubernetes/pkg/client/listers/batch/v1"
@@ -63,7 +64,7 @@ type JobController struct {
 	jobLister batchv1listers.JobLister
 
 	// A store of pods, populated by the podController
-	podStore cache.StoreToPodLister
+	podStore listers.StoreToPodLister
 
 	// Jobs that need to be updated
 	queue workqueue.RateLimitingInterface

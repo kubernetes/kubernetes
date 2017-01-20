@@ -44,6 +44,7 @@ go_library(
         "//pkg/apis/componentconfig/v1alpha1:go_default_library",
         "//pkg/capabilities:go_default_library",
         "//pkg/client/cache:go_default_library",
+        "//pkg/client/cache/listers:go_default_library",
         "//pkg/client/clientset_generated/clientset:go_default_library",
         "//pkg/client/record:go_default_library",
         "//pkg/cloudprovider:go_default_library",

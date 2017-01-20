@@ -29,6 +29,7 @@ go_library(
         "//pkg/apis/rbac:go_default_library",
         "//pkg/apis/storage/v1beta1:go_default_library",
         "//pkg/client/cache:go_default_library",
+        "//pkg/client/cache/listers:go_default_library",
         "//pkg/client/clientset_generated/clientset:go_default_library",
         "//pkg/client/clientset_generated/internalclientset:go_default_library",
         "//pkg/client/listers/batch/v1:go_default_library",

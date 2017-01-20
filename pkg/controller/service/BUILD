@@ -18,6 +18,7 @@ go_library(
     deps = [
         "//pkg/api/v1:go_default_library",
         "//pkg/client/cache:go_default_library",
+        "//pkg/client/cache/listers:go_default_library",
         "//pkg/client/clientset_generated/clientset:go_default_library",
         "//pkg/client/clientset_generated/clientset/typed/core/v1:go_default_library",
         "//pkg/client/record:go_default_library",

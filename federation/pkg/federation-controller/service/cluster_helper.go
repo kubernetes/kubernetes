@@ -26,6 +26,7 @@ import (
 	v1beta1 "k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	v1 "k8s.io/kubernetes/pkg/api/v1"
 	cache "k8s.io/kubernetes/pkg/client/cache"
+	"k8s.io/kubernetes/pkg/client/cache/listers"
 	kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/util/workqueue"
 
@@ -39,11 +40,11 @@ type clusterCache struct {
 	clientset *kubeclientset.Clientset
 	cluster   *v1beta1.Cluster
 	// A store of services, populated by the serviceController
-	serviceStore cache.StoreToServiceLister
+	serviceStore listers.StoreToServiceLister
 	// Watches changes to all services
 	serviceController cache.Controller
 	// A store of endpoint, populated by the serviceController
-	endpointStore cache.StoreToEndpointsLister
+	endpointStore listers.StoreToEndpointsLister
 	// Watches changes to all endpoints
 	endpointController cache.Controller
 	// services that need to be synced

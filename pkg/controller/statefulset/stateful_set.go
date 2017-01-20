@@ -26,6 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 	apps "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
 	"k8s.io/kubernetes/pkg/client/cache"
+	"k8s.io/kubernetes/pkg/client/cache/listers"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	v1core "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/core/v1"
 	"k8s.io/kubernetes/pkg/client/record"
@@ -59,7 +60,7 @@ type StatefulSetController struct {
 	newSyncer func(*pcb) *petSyncer
 
 	// podStore is a cache of watched pods.
-	podStore cache.StoreToPodLister
+	podStore listers.StoreToPodLister
 
 	// podStoreSynced returns true if the pod store has synced at least once.
 	podStoreSynced func() bool
@@ -67,7 +68,7 @@ type StatefulSetController struct {
 	podController cache.Controller
 
 	// A store of StatefulSets, populated by the psController.
-	psStore cache.StoreToStatefulSetLister
+	psStore listers.StoreToStatefulSetLister
 	// Watches changes to all StatefulSets.
 	psController cache.Controller
 

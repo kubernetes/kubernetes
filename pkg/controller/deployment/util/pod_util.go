@@ -25,7 +25,7 @@ import (
 	errorsutil "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/client/cache"
+	"k8s.io/kubernetes/pkg/client/cache/listers"
 	v1core "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/core/v1"
 	"k8s.io/kubernetes/pkg/client/retry"
 	hashutil "k8s.io/kubernetes/pkg/util/hash"
@@ -56,7 +56,7 @@ type updatePodFunc func(pod *v1.Pod) error
 
 // UpdatePodWithRetries updates a pod with given applyUpdate function. Note that pod not found error is ignored.
 // The returned bool value can be used to tell if the pod is actually updated.
-func UpdatePodWithRetries(podClient v1core.PodInterface, podLister *cache.StoreToPodLister, namespace, name string, applyUpdate updatePodFunc) (*v1.Pod, error) {
+func UpdatePodWithRetries(podClient v1core.PodInterface, podLister *listers.StoreToPodLister, namespace, name string, applyUpdate updatePodFunc) (*v1.Pod, error) {
 	var pod *v1.Pod
 
 	retryErr := retry.RetryOnConflict(retry.DefaultBackoff, func() error {

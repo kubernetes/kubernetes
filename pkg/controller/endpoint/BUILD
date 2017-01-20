@@ -20,6 +20,7 @@ go_library(
         "//pkg/api/v1/endpoints:go_default_library",
         "//pkg/api/v1/pod:go_default_library",
         "//pkg/client/cache:go_default_library",
+        "//pkg/client/cache/listers:go_default_library",
         "//pkg/client/clientset_generated/clientset:go_default_library",
         "//pkg/controller:go_default_library",
         "//pkg/controller/informers:go_default_library",

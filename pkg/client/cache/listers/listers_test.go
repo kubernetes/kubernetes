@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package cache
+package listers
 
 import (
 	"testing"
@@ -25,10 +25,11 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/api/v1"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
+	"k8s.io/kubernetes/pkg/client/cache"
 )
 
 func TestStoreToNodeLister(t *testing.T) {
-	store := NewStore(MetaNamespaceKeyFunc)
+	store := cache.NewStore(cache.MetaNamespaceKeyFunc)
 	ids := sets.NewString("foo", "bar", "baz")
 	for id := range ids {
 		store.Add(&v1.Node{ObjectMeta: metav1.ObjectMeta{Name: id}})
@@ -49,7 +50,7 @@ func TestStoreToNodeLister(t *testing.T) {
 }
 
 func TestStoreToNodeConditionLister(t *testing.T) {
-	store := NewStore(MetaNamespaceKeyFunc)
+	store := cache.NewStore(cache.MetaNamespaceKeyFunc)
 	nodes := []*v1.Node{
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: "foo"},
@@ -246,11 +247,11 @@ func TestStoreToReplicationControllerLister(t *testing.T) {
 			if c.onlyIfIndexedByNamespace && !withIndex {
 				continue
 			}
-			var store Indexer
+			var store cache.Indexer
 			if withIndex {
-				store = NewIndexer(MetaNamespaceKeyFunc, Indexers{NamespaceIndex: MetaNamespaceIndexFunc})
+				store = cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 			} else {
-				store = NewIndexer(MetaNamespaceKeyFunc, Indexers{})
+				store = cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{})
 			}
 
 			for _, r := range c.inRCs {
@@ -279,7 +280,7 @@ func TestStoreToReplicationControllerLister(t *testing.T) {
 }
 
 func TestStoreToReplicaSetLister(t *testing.T) {
-	store := NewIndexer(MetaNamespaceKeyFunc, Indexers{NamespaceIndex: MetaNamespaceIndexFunc})
+	store := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 	lister := StoreToReplicaSetLister{store}
 	testCases := []struct {
 		inRSs      []*extensions.ReplicaSet
@@ -391,7 +392,7 @@ func TestStoreToReplicaSetLister(t *testing.T) {
 }
 
 func TestStoreToDaemonSetLister(t *testing.T) {
-	store := NewStore(MetaNamespaceKeyFunc)
+	store := cache.NewStore(cache.MetaNamespaceKeyFunc)
 	lister := StoreToDaemonSetLister{store}
 	testCases := []struct {
 		inDSs             []*extensions.DaemonSet
@@ -520,9 +521,9 @@ func TestStoreToPodLister(t *testing.T) {
 	// We test with and without a namespace index, because StoreToPodLister has
 	// special logic to work on namespaces even when no namespace index is
 	// present.
-	stores := []Indexer{
-		NewIndexer(MetaNamespaceKeyFunc, Indexers{NamespaceIndex: MetaNamespaceIndexFunc}),
-		NewIndexer(MetaNamespaceKeyFunc, Indexers{}),
+	stores := []cache.Indexer{
+		cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}),
+		cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{}),
 	}
 	for _, store := range stores {
 		ids := []string{"foo", "bar", "baz"}
@@ -582,7 +583,7 @@ func TestStoreToPodLister(t *testing.T) {
 }
 
 func TestStoreToServiceLister(t *testing.T) {
-	store := NewIndexer(MetaNamespaceKeyFunc, Indexers{NamespaceIndex: MetaNamespaceIndexFunc})
+	store := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 	store.Add(&v1.Service{
 		ObjectMeta: metav1.ObjectMeta{Name: "foo"},
 		Spec: v1.ServiceSpec{
