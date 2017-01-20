@@ -38,7 +38,7 @@ filegroup(
     srcs = [
         ":package-srcs",
         "//pkg/apis/certificates/install:all-srcs",
-        "//pkg/apis/certificates/v1alpha1:all-srcs",
+        "//pkg/apis/certificates/v1beta1:all-srcs",
         "//pkg/apis/certificates/validation:all-srcs",
     ],
     tags = ["automanaged"],

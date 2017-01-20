@@ -22,8 +22,8 @@ import (
 	"strings"
 
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	certificates "k8s.io/kubernetes/pkg/apis/certificates/v1alpha1"
-	clientcertificates "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/certificates/v1alpha1"
+	certificates "k8s.io/kubernetes/pkg/apis/certificates/v1beta1"
+	clientcertificates "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/certificates/v1beta1"
 )
 
 // groupApprover implements AutoApprover for signing Kubelet certificates.
