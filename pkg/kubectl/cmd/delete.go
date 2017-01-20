@@ -82,9 +82,6 @@ var (
 		# Force delete a pod on a dead node
 		kubectl delete pod foo --grace-period=0 --force
 
-		# Delete a pod with UID 1234-56-7890-234234-456456.
-		kubectl delete pod 1234-56-7890-234234-456456
-
 		# Delete all pods
 		kubectl delete pods --all`)
 )
