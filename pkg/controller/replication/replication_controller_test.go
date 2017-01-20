@@ -647,7 +647,7 @@ func TestControllerUpdateStatusWithFailure(t *testing.T) {
 	fakeRCClient := c.Core().ReplicationControllers("default")
 	numReplicas := int32(10)
 	status := v1.ReplicationControllerStatus{Replicas: numReplicas}
-	updateReplicationControllerStatus(fakeRCClient, *rc, status)
+	updateReplicationControllerStatus(fakeRCClient, rc, status)
 	updates, gets := 0, 0
 	for _, a := range c.Actions() {
 		if a.GetResource().Resource != "replicationcontrollers" {

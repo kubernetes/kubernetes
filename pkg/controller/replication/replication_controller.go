@@ -33,6 +33,7 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
@@ -668,10 +669,15 @@ func (rm *ReplicationManager) syncReplicationController(key string) error {
 	}
 	trace.Step("manageReplicas done")
 
+	copy, err := api.Scheme.DeepCopy(rc)
+	if err != nil {
+		return err
+	}
+	rc = copy.(*v1.ReplicationController)
 	newStatus := calculateStatus(rc, filteredPods, manageReplicasErr)
 
 	// Always updates status as pods come up or die.
-	if err := updateReplicationControllerStatus(rm.kubeClient.Core().ReplicationControllers(rc.Namespace), *rc, newStatus); err != nil {
+	if err := updateReplicationControllerStatus(rm.kubeClient.Core().ReplicationControllers(rc.Namespace), rc, newStatus); err != nil {
 		// Multiple things could lead to this update failing.  Returning an error causes a requeue without forcing a hotloop
 		return err
 	}

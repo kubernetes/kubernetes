@@ -30,7 +30,7 @@ import (
 )
 
 // updateReplicationControllerStatus attempts to update the Status.Replicas of the given controller, with a single GET/PUT retry.
-func updateReplicationControllerStatus(c v1core.ReplicationControllerInterface, rc v1.ReplicationController, newStatus v1.ReplicationControllerStatus) (updateErr error) {
+func updateReplicationControllerStatus(c v1core.ReplicationControllerInterface, rc *v1.ReplicationController, newStatus v1.ReplicationControllerStatus) (updateErr error) {
 	// This is the steady state. It happens when the rc doesn't have any expectations, since
 	// we do a periodic relist every 30s. If the generations differ but the replicas are
 	// the same, a caller might've resized to the same replica count.
@@ -49,7 +49,7 @@ func updateReplicationControllerStatus(c v1core.ReplicationControllerInterface, 
 	newStatus.ObservedGeneration = rc.Generation
 
 	var getErr error
-	for i, rc := 0, &rc; ; i++ {
+	for i := 0; ; i++ {
 		glog.V(4).Infof(fmt.Sprintf("Updating replica count for rc: %s/%s, ", rc.Namespace, rc.Name) +
 			fmt.Sprintf("replicas %d->%d (need %d), ", rc.Status.Replicas, newStatus.Replicas, *(rc.Spec.Replicas)) +
 			fmt.Sprintf("fullyLabeledReplicas %d->%d, ", rc.Status.FullyLabeledReplicas, newStatus.FullyLabeledReplicas) +
