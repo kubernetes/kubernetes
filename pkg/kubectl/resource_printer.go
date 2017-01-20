@@ -1588,10 +1588,22 @@ func getNodeExternalIP(node *api.Node) string {
 
 // findNodeRole returns the role of a given node, or "" if none found.
 // The role is determined by looking in order for:
-// * a kubernetes.io/role label
-// * a kubeadm.alpha.kubernetes.io/role label
+// * a node-role.kubernetes.io/{node,master} label (v1.6+)
+// * a kubernetes.io/role label (v1.5)
+// * a kubeadm.alpha.kubernetes.io/role label (pre-v1.5)
 // If no role is found, ("", nil) is returned
 func findNodeRole(node *api.Node) string {
+	var roles []string
+	if role := node.Labels[metav1.LabelNodeRoleMaster]; role == "true" {
+		roles = append(roles, "master")
+	}
+	if role := node.Labels[metav1.LabelNodeRoleNode]; role == "true" {
+		roles = append(roles, "node")
+	}
+	if len(roles) > 0 {
+		return fmt.Sprintf("[%s]", strings.Join(roles, ","))
+	}
+
 	if role := node.Labels[metav1.NodeLabelRole]; role != "" {
 		return role
 	}
