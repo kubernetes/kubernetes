@@ -67,7 +67,6 @@ cluster/saltbase/salt/kubelet/default:{% if grains['feature_gates'] is defined -
 cluster/saltbase/salt/kubelet/default:{% if pillar.get('non_masquerade_cidr','') -%}
 cluster/saltbase/salt/opencontrail-networking-master/init.sls:      - 'SERVICE_CLUSTER_IP_RANGE': '{{ pillar.get('service_cluster_ip_range') }}'
 cluster/saltbase/salt/opencontrail-networking-minion/init.sls:      - 'SERVICE_CLUSTER_IP_RANGE': '{{ pillar.get('service_cluster_ip_range') }}'
-cluster/saltbase/salt/supervisor/kubelet-checker.sh:	{% set kubelet_port = pillar['kubelet_port'] -%}
 cluster/saltbase/salt/supervisor/supervisor_watcher.sh:# Apply oom_score_adj: -901 to processes
 cluster/ubuntu/util.sh:  local node_ip=${1}
 cluster/vagrant/provision-utils.sh:  api_servers: '$(echo "$MASTER_IP" | sed -e "s/'/''/g")'
@@ -105,14 +104,14 @@ hack/test-update-storage-objects.sh:  local storage_media_type=${3:-""}
 hack/test-update-storage-objects.sh:  local storage_versions=${2:-""}
 hack/test-update-storage-objects.sh:  source_file=${test_data[0]}
 hack/test-update-storage-objects.sh:# source_file,resource,namespace,name,old_version,new_version
-pkg/kubelet/api/v1alpha1/runtime/api.pb.go:	ContainerPort *int32 `protobuf:"varint,2,opt,name=container_port,json=containerPort" json:"container_port,omitempty"`
-pkg/kubelet/api/v1alpha1/runtime/api.pb.go:	OomScoreAdj      *int64 `protobuf:"varint,5,opt,name=oom_score_adj,json=oomScoreAdj" json:"oom_score_adj,omitempty"`
-pkg/kubelet/api/v1alpha1/runtime/api.pb.go:	PodCidr          *string `protobuf:"bytes,1,opt,name=pod_cidr,json=podCidr" json:"pod_cidr,omitempty"`
-pkg/kubelet/api/v1alpha1/runtime/api.pb.go:	RuntimeConfig    *RuntimeConfig `protobuf:"bytes,1,opt,name=runtime_config,json=runtimeConfig" json:"runtime_config,omitempty"`
-pkg/kubelet/api/v1alpha1/runtime/api.proto:    optional RuntimeConfig runtime_config = 1;
-pkg/kubelet/api/v1alpha1/runtime/api.proto:    optional int32 container_port = 2;
-pkg/kubelet/api/v1alpha1/runtime/api.proto:    optional int64 oom_score_adj = 5;
-pkg/kubelet/api/v1alpha1/runtime/api.proto:    optional string pod_cidr = 1;
+pkg/kubelet/api/v1alpha1/runtime/api.pb.go:	ContainerPort int32 `protobuf:"varint,2,opt,name=container_port,json=containerPort,proto3" json:"container_port,omitempty"`
+pkg/kubelet/api/v1alpha1/runtime/api.pb.go:	OomScoreAdj int64 `protobuf:"varint,5,opt,name=oom_score_adj,json=oomScoreAdj,proto3" json:"oom_score_adj,omitempty"`
+pkg/kubelet/api/v1alpha1/runtime/api.pb.go:	PodCidr string `protobuf:"bytes,1,opt,name=pod_cidr,json=podCidr,proto3" json:"pod_cidr,omitempty"`
+pkg/kubelet/api/v1alpha1/runtime/api.pb.go:	RuntimeConfig *RuntimeConfig `protobuf:"bytes,1,opt,name=runtime_config,json=runtimeConfig" json:"runtime_config,omitempty"`
+pkg/kubelet/api/v1alpha1/runtime/api.proto:    RuntimeConfig runtime_config = 1;
+pkg/kubelet/api/v1alpha1/runtime/api.proto:    int32 container_port = 2;
+pkg/kubelet/api/v1alpha1/runtime/api.proto:    int64 oom_score_adj = 5;
+pkg/kubelet/api/v1alpha1/runtime/api.proto:    string pod_cidr = 1;
 pkg/kubelet/cm/container_manager_linux.go:		glog.V(3).Infof("Failed to apply oom_score_adj %d for pid %d: %v", oomScoreAdj, pid, err)
 pkg/kubelet/cm/container_manager_linux.go:	glog.V(5).Infof("attempting to apply oom_score_adj of %d to pid %d", oomScoreAdj, pid)
 pkg/kubelet/network/hairpin/hairpin.go:	hairpinModeRelativePath = "hairpin_mode"
