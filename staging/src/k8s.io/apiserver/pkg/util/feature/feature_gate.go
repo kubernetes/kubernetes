@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package flag
+package feature
 
 import (
 	"fmt"
@@ -26,69 +26,48 @@ import (
 	"github.com/spf13/pflag"
 )
 
+type Feature string
+
 const (
 	flagName = "feature-gates"
-
-	// All known feature keys
-	// To add a new feature, define a key for it below and add
-	// a featureSpec entry to knownFeatures.
 
 	// allAlphaGate is a global toggle for alpha features. Per-feature key
 	// values override the default set by allAlphaGate. Examples:
 	//   AllAlpha=false,NewFeature=true  will result in newFeature=true
 	//   AllAlpha=true,NewFeature=false  will result in newFeature=false
-	allAlphaGate              = "AllAlpha"
-	externalTrafficLocalOnly  = "AllowExtTrafficLocalEndpoints"
-	appArmor                  = "AppArmor"
-	dynamicKubeletConfig      = "DynamicKubeletConfig"
-	dynamicVolumeProvisioning = "DynamicVolumeProvisioning"
-	streamingProxyRedirects   = "StreamingProxyRedirects"
-
-	// experimentalHostUserNamespaceDefaulting Default userns=host for containers
-	// that are using other host namespaces, host mounts, the pod contains a privileged container,
-	// or specific non-namespaced capabilities
-	// (MKNOD, SYS_MODULE, SYS_TIME). This should only be enabled if user namespace remapping is enabled
-	// in the docker daemon.
-	experimentalHostUserNamespaceDefaultingGate = "ExperimentalHostUserNamespaceDefaulting"
+	allAlphaGate Feature = "AllAlpha"
 )
 
 var (
-	// Default values for recorded features.  Every new feature gate should be
-	// represented here.
-	knownFeatures = map[string]featureSpec{
-		allAlphaGate:                                {false, alpha},
-		externalTrafficLocalOnly:                    {true, beta},
-		appArmor:                                    {true, beta},
-		dynamicKubeletConfig:                        {false, alpha},
-		dynamicVolumeProvisioning:                   {true, alpha},
-		streamingProxyRedirects:                     {true, beta},
-		experimentalHostUserNamespaceDefaultingGate: {false, alpha},
+	// The generic features.
+	defaultFeatures = map[Feature]FeatureSpec{
+		allAlphaGate: {Default: false, PreRelease: Alpha},
 	}
 
 	// Special handling for a few gates.
-	specialFeatures = map[string]func(f *featureGate, val bool){
+	specialFeatures = map[Feature]func(f *featureGate, val bool){
 		allAlphaGate: setUnsetAlphaGates,
 	}
 
 	// DefaultFeatureGate is a shared global FeatureGate.
 	DefaultFeatureGate = &featureGate{
-		known:   knownFeatures,
+		known:   defaultFeatures,
 		special: specialFeatures,
 	}
 )
 
-type featureSpec struct {
-	enabled    bool
-	prerelease prerelease
+type FeatureSpec struct {
+	Default    bool
+	PreRelease prerelease
 }
 
 type prerelease string
 
 const (
-	// Values for prerelease.
-	alpha = prerelease("ALPHA")
-	beta  = prerelease("BETA")
-	ga    = prerelease("")
+	// Values for PreRelease.
+	Alpha = prerelease("ALPHA")
+	Beta  = prerelease("BETA")
+	GA = prerelease("")
 )
 
 // FeatureGate parses and stores flag gates for known features from
@@ -96,6 +75,7 @@ const (
 type FeatureGate interface {
 	AddFlag(fs *pflag.FlagSet)
 	Set(value string) error
+	Add(features map[Feature]FeatureSpec)
 	KnownFeatures() []string
 
 	// Every feature gate should add method here following this template:
@@ -131,14 +111,17 @@ type FeatureGate interface {
 
 // featureGate implements FeatureGate as well as pflag.Value for flag parsing.
 type featureGate struct {
-	known   map[string]featureSpec
-	special map[string]func(*featureGate, bool)
-	enabled map[string]bool
+	known   map[Feature]FeatureSpec
+	special map[Feature]func(*featureGate, bool)
+	enabled map[Feature]bool
+
+	// is set to true when AddFlag is called. Note: initialization is not go-routine safe, lookup is
+	closed bool
 }
 
 func setUnsetAlphaGates(f *featureGate, val bool) {
 	for k, v := range f.known {
-		if v.prerelease == alpha {
+		if v.PreRelease == Alpha {
 			if _, found := f.enabled[k]; !found {
 				f.enabled[k] = val
 			}
@@ -147,18 +130,19 @@ func setUnsetAlphaGates(f *featureGate, val bool) {
 }
 
 // Set, String, and Type implement pflag.Value
+var _ pflag.Value = &featureGate{}
 
 // Set Parses a string of the form // "key1=value1,key2=value2,..." into a
 // map[string]bool of known keys or returns an error.
 func (f *featureGate) Set(value string) error {
-	f.enabled = make(map[string]bool)
+	f.enabled = make(map[Feature]bool)
 	for _, s := range strings.Split(value, ",") {
 		if len(s) == 0 {
 			continue
 		}
 		arr := strings.SplitN(s, "=", 2)
-		k := strings.TrimSpace(arr[0])
-		_, ok := f.known[k]
+		k := Feature(strings.TrimSpace(arr[0]))
+		_, ok := f.known[Feature(k)]
 		if !ok {
 			return fmt.Errorf("unrecognized key: %s", k)
 		}
@@ -195,50 +179,38 @@ func (f *featureGate) Type() string {
 	return "mapStringBool"
 }
 
-// ExternalTrafficLocalOnly returns value for AllowExtTrafficLocalEndpoints
-func (f *featureGate) ExternalTrafficLocalOnly() bool {
-	return f.lookup(externalTrafficLocalOnly)
+func (f *featureGate) Add(features map[Feature]FeatureSpec) error {
+	if f.closed {
+		return fmt.Errorf("cannot add a feature gate after adding it to the flag set")
+	}
+
+	for name, spec := range features {
+		if existingSpec, found := f.known[name]; found {
+			if existingSpec == spec {
+				continue
+			}
+			return fmt.Errorf("feature gate %q with different spec already exists: %v", name, existingSpec)
+		}
+
+		f.known[name] = spec
+	}
+	return nil
 }
 
-// AppArmor returns the value for the AppArmor feature gate.
-func (f *featureGate) AppArmor() bool {
-	return f.lookup(appArmor)
-}
-
-// DynamicKubeletConfig returns value for dynamicKubeletConfig
-func (f *featureGate) DynamicKubeletConfig() bool {
-	return f.lookup(dynamicKubeletConfig)
-}
-
-// DynamicVolumeProvisioning returns value for dynamicVolumeProvisioning
-func (f *featureGate) DynamicVolumeProvisioning() bool {
-	return f.lookup(dynamicVolumeProvisioning)
-}
-
-// StreamingProxyRedirects controls whether the apiserver should intercept (and follow)
-// redirects from the backend (Kubelet) for streaming requests (exec/attach/port-forward).
-func (f *featureGate) StreamingProxyRedirects() bool {
-	return f.lookup(streamingProxyRedirects)
-}
-
-// ExperimentalHostUserNamespaceDefaulting returns value for experimentalHostUserNamespaceDefaulting
-func (f *featureGate) ExperimentalHostUserNamespaceDefaulting() bool {
-	return f.lookup(experimentalHostUserNamespaceDefaultingGate)
-}
-
-func (f *featureGate) lookup(key string) bool {
-	defaultValue := f.known[key].enabled
+func (f *featureGate) Enabled(key Feature) bool {
+	defaultValue := f.known[key].Default
 	if f.enabled != nil {
 		if v, ok := f.enabled[key]; ok {
 			return v
 		}
 	}
 	return defaultValue
-
 }
 
 // AddFlag adds a flag for setting global feature gates to the specified FlagSet.
 func (f *featureGate) AddFlag(fs *pflag.FlagSet) {
+	f.closed = true
+
 	known := f.KnownFeatures()
 	fs.Var(f, flagName, ""+
 		"A set of key=value pairs that describe feature gates for alpha/experimental features. "+
@@ -250,10 +222,10 @@ func (f *featureGate) KnownFeatures() []string {
 	var known []string
 	for k, v := range f.known {
 		pre := ""
-		if v.prerelease != ga {
-			pre = fmt.Sprintf("%s - ", v.prerelease)
+		if v.PreRelease != GA {
+			pre = fmt.Sprintf("%s - ", v.PreRelease)
 		}
-		known = append(known, fmt.Sprintf("%s=true|false (%sdefault=%t)", k, pre, v.enabled))
+		known = append(known, fmt.Sprintf("%s=true|false (%sdefault=%t)", k, pre, v.Default))
 	}
 	sort.Strings(known)
 	return known
