@@ -19,7 +19,6 @@ go_library(
         "//pkg/client/leaderelection:go_default_library",
         "//pkg/client/leaderelection/resourcelock:go_default_library",
         "//pkg/client/record:go_default_library",
-        "//pkg/client/restclient:go_default_library",
         "//pkg/client/unversioned/clientcmd:go_default_library",
         "//pkg/cloudprovider:go_default_library",
         "//pkg/controller:go_default_library",
@@ -35,6 +34,7 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/util/wait",
         "//vendor:k8s.io/apiserver/pkg/server/healthz",
+        "//vendor:k8s.io/client-go/rest",
     ],
 )
 

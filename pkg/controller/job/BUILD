@@ -51,7 +51,6 @@ go_test(
         "//pkg/client/cache:go_default_library",
         "//pkg/client/clientset_generated/clientset:go_default_library",
         "//pkg/client/clientset_generated/clientset/fake:go_default_library",
-        "//pkg/client/restclient:go_default_library",
         "//pkg/client/testing/core:go_default_library",
         "//pkg/controller:go_default_library",
         "//pkg/controller/informers:go_default_library",
@@ -59,6 +58,7 @@ go_test(
         "//vendor:k8s.io/apimachinery/pkg/util/rand",
         "//vendor:k8s.io/apimachinery/pkg/util/wait",
         "//vendor:k8s.io/apimachinery/pkg/watch",
+        "//vendor:k8s.io/client-go/rest",
     ],
 )
 

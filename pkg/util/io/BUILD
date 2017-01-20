@@ -30,10 +30,10 @@ go_test(
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/util/io:go_default_library",
-        "//pkg/util/testing:go_default_library",
         "//pkg/volume:go_default_library",
         "//vendor:github.com/pborman/uuid",
         "//vendor:k8s.io/apimachinery/pkg/runtime",
+        "//vendor:k8s.io/client-go/pkg/util/testing",
     ],
 )
 

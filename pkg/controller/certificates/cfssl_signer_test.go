@@ -22,8 +22,8 @@ import (
 	"reflect"
 	"testing"
 
+	"k8s.io/client-go/pkg/util/cert"
 	capi "k8s.io/kubernetes/pkg/apis/certificates/v1beta1"
-	"k8s.io/kubernetes/pkg/util/cert"
 )
 
 func TestSigner(t *testing.T) {

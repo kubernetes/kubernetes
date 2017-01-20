@@ -38,6 +38,8 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
+	certutil "k8s.io/client-go/pkg/util/cert"
+	triple "k8s.io/client-go/pkg/util/cert/triple"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	kubeadmkubeconfigphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubeconfig"
 	"k8s.io/kubernetes/federation/pkg/kubefed/util"
@@ -48,8 +50,6 @@ import (
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
-	certutil "k8s.io/kubernetes/pkg/util/cert"
-	triple "k8s.io/kubernetes/pkg/util/cert/triple"
 	"k8s.io/kubernetes/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/version"
 

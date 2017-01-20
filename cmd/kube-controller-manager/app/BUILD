@@ -34,7 +34,6 @@ go_library(
         "//pkg/client/leaderelection:go_default_library",
         "//pkg/client/leaderelection/resourcelock:go_default_library",
         "//pkg/client/record:go_default_library",
-        "//pkg/client/restclient:go_default_library",
         "//pkg/client/typed/discovery:go_default_library",
         "//pkg/client/typed/dynamic:go_default_library",
         "//pkg/client/unversioned/clientcmd:go_default_library",
@@ -73,7 +72,6 @@ go_library(
         "//pkg/controller/volume/persistentvolume:go_default_library",
         "//pkg/quota/install:go_default_library",
         "//pkg/serviceaccount:go_default_library",
-        "//pkg/util/cert:go_default_library",
         "//pkg/util/config:go_default_library",
         "//pkg/util/configz:go_default_library",
         "//pkg/util/io:go_default_library",
@@ -101,6 +99,8 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/util/sets",
         "//vendor:k8s.io/apimachinery/pkg/util/wait",
         "//vendor:k8s.io/apiserver/pkg/server/healthz",
+        "//vendor:k8s.io/client-go/pkg/util/cert",
+        "//vendor:k8s.io/client-go/rest",
     ],
 )
 

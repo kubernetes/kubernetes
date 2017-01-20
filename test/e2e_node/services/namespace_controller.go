@@ -19,10 +19,10 @@ package services
 import (
 	"time"
 
+	restclient "k8s.io/client-go/rest"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
-	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/typed/dynamic"
 	namespacecontroller "k8s.io/kubernetes/pkg/controller/namespace"
 	"k8s.io/kubernetes/test/e2e/framework"

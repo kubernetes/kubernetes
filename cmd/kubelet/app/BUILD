@@ -17,10 +17,10 @@ go_test(
     library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
-        "//pkg/client/restclient:go_default_library",
         "//pkg/kubelet:go_default_library",
         "//pkg/util/config:go_default_library",
         "//vendor:k8s.io/apimachinery/pkg/util/diff",
+        "//vendor:k8s.io/client-go/rest",
     ],
 )
 
@@ -47,7 +47,6 @@ go_library(
         "//pkg/client/clientset_generated/clientset/typed/certificates/v1beta1:go_default_library",
         "//pkg/client/clientset_generated/clientset/typed/core/v1:go_default_library",
         "//pkg/client/record:go_default_library",
-        "//pkg/client/restclient:go_default_library",
         "//pkg/client/unversioned/auth:go_default_library",
         "//pkg/client/unversioned/clientcmd:go_default_library",
         "//pkg/cloudprovider:go_default_library",
@@ -70,7 +69,6 @@ go_library(
         "//pkg/kubelet/server:go_default_library",
         "//pkg/kubelet/types:go_default_library",
         "//pkg/kubelet/util/csr:go_default_library",
-        "//pkg/util/cert:go_default_library",
         "//pkg/util/config:go_default_library",
         "//pkg/util/configz:go_default_library",
         "//pkg/util/flock:go_default_library",
@@ -118,6 +116,7 @@ go_library(
         "//vendor:k8s.io/client-go/kubernetes",
         "//vendor:k8s.io/client-go/kubernetes/typed/authentication/v1beta1",
         "//vendor:k8s.io/client-go/kubernetes/typed/authorization/v1beta1",
+        "//vendor:k8s.io/client-go/pkg/util/cert",
         "//vendor:k8s.io/client-go/rest",
         "//vendor:k8s.io/client-go/tools/auth",
         "//vendor:k8s.io/client-go/tools/clientcmd",

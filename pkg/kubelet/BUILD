@@ -185,7 +185,6 @@ go_test(
         "//pkg/util/bandwidth:go_default_library",
         "//pkg/util/mount:go_default_library",
         "//pkg/util/strategicpatch:go_default_library",
-        "//pkg/util/testing:go_default_library",
         "//pkg/util/uuid:go_default_library",
         "//pkg/version:go_default_library",
         "//pkg/volume:go_default_library",
@@ -208,6 +207,7 @@ go_test(
         "//vendor:k8s.io/apimachinery/pkg/util/wait",
         "//vendor:k8s.io/client-go/pkg/util/clock",
         "//vendor:k8s.io/client-go/pkg/util/flowcontrol",
+        "//vendor:k8s.io/client-go/pkg/util/testing",
     ],
 )
 

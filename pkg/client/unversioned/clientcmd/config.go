@@ -26,8 +26,8 @@ import (
 
 	"github.com/golang/glog"
 
+	restclient "k8s.io/client-go/rest"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
-	"k8s.io/kubernetes/pkg/client/restclient"
 )
 
 // ConfigAccess is used by subcommands and methods in this package to load and modify the appropriate config files

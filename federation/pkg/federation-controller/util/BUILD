@@ -33,7 +33,6 @@ go_library(
         "//pkg/client/cache:go_default_library",
         "//pkg/client/clientset_generated/clientset:go_default_library",
         "//pkg/client/clientset_generated/internalclientset:go_default_library",
-        "//pkg/client/restclient:go_default_library",
         "//pkg/client/unversioned/clientcmd:go_default_library",
         "//pkg/controller/deployment/util:go_default_library",
         "//vendor:github.com/golang/glog",
@@ -43,6 +42,7 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/util/wait",
         "//vendor:k8s.io/apimachinery/pkg/watch",
         "//vendor:k8s.io/client-go/pkg/util/flowcontrol",
+        "//vendor:k8s.io/client-go/rest",
         "//vendor:k8s.io/client-go/tools/clientcmd/api",
     ],
 )

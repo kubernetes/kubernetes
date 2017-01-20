@@ -35,6 +35,7 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -43,8 +44,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/pkg/api/v1"
-	pathvalidation "k8s.io/client-go/pkg/api/validation/path"
-	"k8s.io/client-go/pkg/fields"
 	"k8s.io/client-go/pkg/util/flowcontrol"
 	restclientwatch "k8s.io/client-go/rest/watch"
 	"k8s.io/client-go/tools/metrics"
@@ -179,7 +178,7 @@ func (r *Request) Resource(resource string) *Request {
 		r.err = fmt.Errorf("resource already set to %q, cannot change to %q", r.resource, resource)
 		return r
 	}
-	if msgs := pathvalidation.IsValidPathSegmentName(resource); len(msgs) != 0 {
+	if msgs := IsValidPathSegmentName(resource); len(msgs) != 0 {
 		r.err = fmt.Errorf("invalid resource %q: %v", resource, msgs)
 		return r
 	}
@@ -199,7 +198,7 @@ func (r *Request) SubResource(subresources ...string) *Request {
 		return r
 	}
 	for _, s := range subresources {
-		if msgs := pathvalidation.IsValidPathSegmentName(s); len(msgs) != 0 {
+		if msgs := IsValidPathSegmentName(s); len(msgs) != 0 {
 			r.err = fmt.Errorf("invalid subresource %q: %v", s, msgs)
 			return r
 		}
@@ -221,7 +220,7 @@ func (r *Request) Name(resourceName string) *Request {
 		r.err = fmt.Errorf("resource name already set to %q, cannot change to %q", r.resourceName, resourceName)
 		return r
 	}
-	if msgs := pathvalidation.IsValidPathSegmentName(resourceName); len(msgs) != 0 {
+	if msgs := IsValidPathSegmentName(resourceName); len(msgs) != 0 {
 		r.err = fmt.Errorf("invalid resource name %q: %v", resourceName, msgs)
 		return r
 	}
@@ -238,7 +237,7 @@ func (r *Request) Namespace(namespace string) *Request {
 		r.err = fmt.Errorf("namespace already set to %q, cannot change to %q", r.namespace, namespace)
 		return r
 	}
-	if msgs := pathvalidation.IsValidPathSegmentName(namespace); len(msgs) != 0 {
+	if msgs := IsValidPathSegmentName(namespace); len(msgs) != 0 {
 		r.err = fmt.Errorf("invalid namespace %q: %v", namespace, msgs)
 		return r
 	}
@@ -760,10 +759,11 @@ func (r *Request) Stream() (io.ReadCloser, error) {
 		defer resp.Body.Close()
 
 		result := r.transformResponse(resp, req)
-		if result.err != nil {
-			return nil, result.err
+		err := result.Error()
+		if err == nil {
+			err = fmt.Errorf("%d while accessing %v: %s", result.statusCode, url, string(result.body))
 		}
-		return nil, fmt.Errorf("%d while accessing %v: %s", result.statusCode, url, string(result.body))
+		return nil, err
 	}
 }
 
@@ -1196,4 +1196,50 @@ func (r Result) Error() error {
 		}
 	}
 	return r.err
+}
+
+// NameMayNotBe specifies strings that cannot be used as names specified as path segments (like the REST API or etcd store)
+var NameMayNotBe = []string{".", ".."}
+
+// NameMayNotContain specifies substrings that cannot be used in names specified as path segments (like the REST API or etcd store)
+var NameMayNotContain = []string{"/", "%"}
+
+// IsValidPathSegmentName validates the name can be safely encoded as a path segment
+func IsValidPathSegmentName(name string) []string {
+	for _, illegalName := range NameMayNotBe {
+		if name == illegalName {
+			return []string{fmt.Sprintf(`may not be '%s'`, illegalName)}
+		}
+	}
+
+	var errors []string
+	for _, illegalContent := range NameMayNotContain {
+		if strings.Contains(name, illegalContent) {
+			errors = append(errors, fmt.Sprintf(`may not contain '%s'`, illegalContent))
+		}
+	}
+
+	return errors
+}
+
+// IsValidPathSegmentPrefix validates the name can be used as a prefix for a name which will be encoded as a path segment
+// It does not check for exact matches with disallowed names, since an arbitrary suffix might make the name valid
+func IsValidPathSegmentPrefix(name string) []string {
+	var errors []string
+	for _, illegalContent := range NameMayNotContain {
+		if strings.Contains(name, illegalContent) {
+			errors = append(errors, fmt.Sprintf(`may not contain '%s'`, illegalContent))
+		}
+	}
+
+	return errors
+}
+
+// ValidatePathSegmentName validates the name can be safely encoded as a path segment
+func ValidatePathSegmentName(name string, prefix bool) []string {
+	if prefix {
+		return IsValidPathSegmentPrefix(name)
+	} else {
+		return IsValidPathSegmentName(name)
+	}
 }

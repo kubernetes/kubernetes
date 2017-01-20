@@ -24,9 +24,9 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	restclient "k8s.io/client-go/rest"
 	"k8s.io/kubernetes/pkg/api"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	"k8s.io/kubernetes/pkg/client/restclient"
 )
 
 func flattenSubsets(subsets []api.EndpointSubset) []string {

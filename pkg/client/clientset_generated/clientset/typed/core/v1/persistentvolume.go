@@ -20,9 +20,9 @@ import (
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
+	rest "k8s.io/client-go/rest"
 	api "k8s.io/kubernetes/pkg/api"
 	v1 "k8s.io/kubernetes/pkg/api/v1"
-	restclient "k8s.io/kubernetes/pkg/client/restclient"
 )
 
 // PersistentVolumesGetter has a method to return a PersistentVolumeInterface.
@@ -47,7 +47,7 @@ type PersistentVolumeInterface interface {
 
 // persistentVolumes implements PersistentVolumeInterface
 type persistentVolumes struct {
-	client restclient.Interface
+	client rest.Interface
 }
 
 // newPersistentVolumes returns a PersistentVolumes

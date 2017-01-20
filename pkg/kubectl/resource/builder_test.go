@@ -37,6 +37,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer/streaming"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/watch"
+	utiltesting "k8s.io/client-go/pkg/util/testing"
 	restclientwatch "k8s.io/client-go/rest/watch"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
@@ -44,7 +45,6 @@ import (
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/restclient/fake"
-	utiltesting "k8s.io/kubernetes/pkg/util/testing"
 )
 
 func stringBody(body string) io.ReadCloser {

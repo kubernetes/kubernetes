@@ -33,7 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/pkg/api/v1"
-	"k8s.io/client-go/rest"
+	restclient "k8s.io/client-go/rest"
 	restclientwatch "k8s.io/client-go/rest/watch"
 )
 
@@ -61,9 +61,9 @@ func getObject(version, kind, name string) *unstructured.Unstructured {
 
 func getClientServer(gv *schema.GroupVersion, h func(http.ResponseWriter, *http.Request)) (*Client, *httptest.Server, error) {
 	srv := httptest.NewServer(http.HandlerFunc(h))
-	cl, err := NewClient(&rest.Config{
+	cl, err := NewClient(&restclient.Config{
 		Host:          srv.URL,
-		ContentConfig: rest.ContentConfig{GroupVersion: gv},
+		ContentConfig: restclient.ContentConfig{GroupVersion: gv},
 	})
 	if err != nil {
 		srv.Close()

@@ -24,7 +24,7 @@ import (
 	"testing"
 
 	"github.com/imdario/mergo"
-	"k8s.io/client-go/rest"
+	restclient "k8s.io/client-go/rest"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 )
 
@@ -448,11 +448,11 @@ func TestInClusterClientConfigPrecedence(t *testing.T) {
 		expectedCAFile := "/path/to/ca-from-cluster.crt"
 
 		icc := &inClusterClientConfig{
-			inClusterConfigProvider: func() (*rest.Config, error) {
-				return &rest.Config{
+			inClusterConfigProvider: func() (*restclient.Config, error) {
+				return &restclient.Config{
 					Host:        expectedServer,
 					BearerToken: expectedToken,
-					TLSClientConfig: rest.TLSClientConfig{
+					TLSClientConfig: restclient.TLSClientConfig{
 						CAFile: expectedCAFile,
 					},
 				}, nil

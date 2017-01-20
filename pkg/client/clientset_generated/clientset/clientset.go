@@ -19,6 +19,8 @@ package clientset
 import (
 	"github.com/golang/glog"
 	"k8s.io/client-go/pkg/util/flowcontrol"
+	_ "k8s.io/client-go/plugin/pkg/client/auth"
+	rest "k8s.io/client-go/rest"
 	v1beta1apps "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/apps/v1beta1"
 	v1beta1authentication "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/authentication/v1beta1"
 	v1beta1authorization "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/authorization/v1beta1"
@@ -32,9 +34,7 @@ import (
 	v1alpha1rbac "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/rbac/v1alpha1"
 	v1beta1rbac "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/rbac/v1beta1"
 	v1beta1storage "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/storage/v1beta1"
-	restclient "k8s.io/kubernetes/pkg/client/restclient"
 	discovery "k8s.io/kubernetes/pkg/client/typed/discovery"
-	_ "k8s.io/kubernetes/plugin/pkg/client/auth"
 )
 
 type Interface interface {
@@ -309,7 +309,7 @@ func (c *Clientset) Discovery() discovery.DiscoveryInterface {
 }
 
 // NewForConfig creates a new Clientset for the given config.
-func NewForConfig(c *restclient.Config) (*Clientset, error) {
+func NewForConfig(c *rest.Config) (*Clientset, error) {
 	configShallowCopy := *c
 	if configShallowCopy.RateLimiter == nil && configShallowCopy.QPS > 0 {
 		configShallowCopy.RateLimiter = flowcontrol.NewTokenBucketRateLimiter(configShallowCopy.QPS, configShallowCopy.Burst)
@@ -379,7 +379,7 @@ func NewForConfig(c *restclient.Config) (*Clientset, error) {
 
 // NewForConfigOrDie creates a new Clientset for the given config and
 // panics if there is an error in the config.
-func NewForConfigOrDie(c *restclient.Config) *Clientset {
+func NewForConfigOrDie(c *rest.Config) *Clientset {
 	var cs Clientset
 	cs.CoreV1Client = v1core.NewForConfigOrDie(c)
 	cs.AppsV1beta1Client = v1beta1apps.NewForConfigOrDie(c)
@@ -400,7 +400,7 @@ func NewForConfigOrDie(c *restclient.Config) *Clientset {
 }
 
 // New creates a new Clientset for the given RESTClient.
-func New(c restclient.Interface) *Clientset {
+func New(c rest.Interface) *Clientset {
 	var cs Clientset
 	cs.CoreV1Client = v1core.New(c)
 	cs.AppsV1beta1Client = v1beta1apps.New(c)

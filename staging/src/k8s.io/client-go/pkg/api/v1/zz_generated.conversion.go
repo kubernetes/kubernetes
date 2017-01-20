@@ -3069,6 +3069,7 @@ func autoConvert_v1_PodSpec_To_api_PodSpec(in *PodSpec, out *api.PodSpec, s conv
 	out.Hostname = in.Hostname
 	out.Subdomain = in.Subdomain
 	out.Affinity = (*api.Affinity)(unsafe.Pointer(in.Affinity))
+	out.SchedulerName = in.SchedulerName
 	return nil
 }
 
@@ -3106,6 +3107,7 @@ func autoConvert_api_PodSpec_To_v1_PodSpec(in *api.PodSpec, out *PodSpec, s conv
 	out.Hostname = in.Hostname
 	out.Subdomain = in.Subdomain
 	out.Affinity = (*Affinity)(unsafe.Pointer(in.Affinity))
+	out.SchedulerName = in.SchedulerName
 	return nil
 }
 

@@ -50,7 +50,6 @@ go_library(
         "//pkg/client/clientset_generated/clientset/typed/rbac/v1beta1:go_default_library",
         "//pkg/client/clientset_generated/internalclientset:go_default_library",
         "//pkg/client/conditions:go_default_library",
-        "//pkg/client/restclient:go_default_library",
         "//pkg/client/typed/discovery:go_default_library",
         "//pkg/client/typed/dynamic:go_default_library",
         "//pkg/client/unversioned/clientcmd:go_default_library",

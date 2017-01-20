@@ -24,8 +24,8 @@ import (
 
 	"github.com/golang/glog"
 
+	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/transport"
-	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/kubelet/server/remotecommand"
 	"k8s.io/kubernetes/pkg/util/httpstream"
 	"k8s.io/kubernetes/pkg/util/httpstream/spdy"

@@ -42,7 +42,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apiserver/pkg/authentication/user"
-	certutil "k8s.io/kubernetes/pkg/util/cert"
+	certutil "k8s.io/client-go/pkg/util/cert"
 )
 
 type OIDCOptions struct {

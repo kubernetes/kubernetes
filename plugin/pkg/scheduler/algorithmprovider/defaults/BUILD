@@ -35,13 +35,13 @@ go_test(
         "//pkg/api:go_default_library",
         "//pkg/api/v1:go_default_library",
         "//pkg/client/clientset_generated/clientset:go_default_library",
-        "//pkg/client/restclient:go_default_library",
-        "//pkg/util/testing:go_default_library",
         "//plugin/pkg/scheduler/api:go_default_library",
         "//plugin/pkg/scheduler/api/latest:go_default_library",
         "//plugin/pkg/scheduler/factory:go_default_library",
         "//vendor:k8s.io/apimachinery/pkg/runtime",
         "//vendor:k8s.io/apimachinery/pkg/util/sets",
+        "//vendor:k8s.io/client-go/pkg/util/testing",
+        "//vendor:k8s.io/client-go/rest",
     ],
 )
 

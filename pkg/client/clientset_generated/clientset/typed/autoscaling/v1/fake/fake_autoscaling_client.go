@@ -17,8 +17,8 @@ limitations under the License.
 package fake
 
 import (
+	rest "k8s.io/client-go/rest"
 	v1 "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/autoscaling/v1"
-	restclient "k8s.io/kubernetes/pkg/client/restclient"
 	core "k8s.io/kubernetes/pkg/client/testing/core"
 )
 
@@ -32,7 +32,7 @@ func (c *FakeAutoscalingV1) HorizontalPodAutoscalers(namespace string) v1.Horizo
 
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
-func (c *FakeAutoscalingV1) RESTClient() restclient.Interface {
-	var ret *restclient.RESTClient
+func (c *FakeAutoscalingV1) RESTClient() rest.Interface {
+	var ret *rest.RESTClient
 	return ret
 }

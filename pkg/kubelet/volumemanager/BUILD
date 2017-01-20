@@ -52,13 +52,13 @@ go_test(
         "//pkg/kubelet/pod/testing:go_default_library",
         "//pkg/kubelet/secret:go_default_library",
         "//pkg/util/mount:go_default_library",
-        "//pkg/util/testing:go_default_library",
         "//pkg/volume:go_default_library",
         "//pkg/volume/testing:go_default_library",
         "//pkg/volume/util/types:go_default_library",
         "//pkg/volume/util/volumehelper:go_default_library",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/util/sets",
+        "//vendor:k8s.io/client-go/pkg/util/testing",
     ],
 )
 

@@ -26,7 +26,6 @@ go_library(
         "//pkg/api:go_default_library",
         "//pkg/api/v1:go_default_library",
         "//pkg/client/clientset_generated/clientset:go_default_library",
-        "//pkg/client/restclient:go_default_library",
         "//pkg/client/typed/dynamic:go_default_library",
         "//pkg/controller/namespace:go_default_library",
         "//pkg/util/config:go_default_library",
@@ -39,6 +38,7 @@ go_library(
         "//vendor:github.com/coreos/pkg/capnslog",
         "//vendor:github.com/golang/glog",
         "//vendor:github.com/kardianos/osext",
+        "//vendor:k8s.io/client-go/rest",
     ],
 )
 

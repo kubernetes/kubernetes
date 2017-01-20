@@ -17,8 +17,8 @@ limitations under the License.
 package internalversion
 
 import (
+	restclient "k8s.io/client-go/rest"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/client/restclient"
 )
 
 // The PodExpansion interface allows manually adding extra methods to the PodInterface.

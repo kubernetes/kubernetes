@@ -113,7 +113,6 @@ go_test(
         "//pkg/apis/rbac:go_default_library",
         "//pkg/client/clientset_generated/clientset/fake:go_default_library",
         "//pkg/client/clientset_generated/internalclientset/fake:go_default_library",
-        "//pkg/client/restclient:go_default_library",
         "//pkg/client/testing/core:go_default_library",
         "//pkg/generated/openapi:go_default_library",
         "//pkg/genericapiserver/server:go_default_library",
@@ -133,6 +132,7 @@ go_test(
         "//vendor:k8s.io/apimachinery/pkg/util/sets",
         "//vendor:k8s.io/apimachinery/pkg/version",
         "//vendor:k8s.io/apiserver/pkg/endpoints/request",
+        "//vendor:k8s.io/client-go/rest",
     ],
 )
 
