@@ -74,6 +74,8 @@ var _ = framework.KubeDescribe("NodeOutOfDisk [Serial] [Flaky] [Disruptive]", fu
 	BeforeEach(func() {
 		c = f.ClientSet
 
+		framework.Skipf("test is broken. #40249")
+
 		nodelist := framework.GetReadySchedulableNodesOrDie(c)
 
 		// Skip this test on small clusters.  No need to fail since it is not a use
