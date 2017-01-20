@@ -224,23 +224,47 @@ setup() {
 ########################################################
 # Kubectl version (--short, --client, --output) #
 ########################################################
-kube::version::parse_to_file() {
-  name=$1
-  kubectl version | grep "$name Version:" | sed -e s/"$name Version: version.Info{"/'/' -e s/'}'/'/' -e s/', '/','/g -e s/':'/'=/g' | tr , '\n' > ${name}_version.sh
-}
-
 run_kubectl_version_tests() {
-  echo "alejandro"
   kube::log::status "Testing kubectl version"
+
   # create version files, one for the client, one for the server.
-  kube::version::parse_to_file "Client"
-  kube::version::parse_to_file "Server"
-  #kubectl version | grep 'Client Version:' | sed -e s/'Client Version: version.Info{'/'/' -e s/'}'/'/' -e s/', '/','/g -e s/':'/'=/g' | tr , '\n' > client_version.sh
-  #kubectl version | grep 'Server Version:' | sed -e s/'Server Version: version.Info{'/'/' -e s/'}'/'/' -e s/', '/','/g -e s/':'/'=/g' | tr , '\n' > server_version.sh 
+  # these are the files we will use to ensure that the remainder output is correct
+  kube::test::version::parse_to_file "Client" "" "client_version_test"
+  kube::test::version::parse_to_file "Server" "" "server_version_test"
 
-
+  # check client only output matches expected output
+  kube::test::version::parse_to_file "Client" "--client" "client_only_version_test"
+  kube::test::version::parse_to_file "Server" "--client" "server_client_only_version_test"
+  kube::test::version::diff_assert "client_version_test.sh" "eq" "client_only_version_test.sh" "--client shows client info"
+  kube::test::version::diff_assert "server_version_test.sh" "!eq" "server_client_only_version_test.sh" "--client has no server version info"
   
-  kube::log::status "Testing kubectl version complete"
+  # verify json output
+  kube::test::version::parse_partial_json_to_file "" "clientVersion" "client_json_version_test"
+  kube::test::version::parse_partial_json_to_file "" "serverVersion" "server_json_version_test"
+  kube::test::version::diff_assert "client_version_test.sh" "eq" "client_json_version_test.sh" "--output json has correct client info"
+  kube::test::version::diff_assert "server_version_test.sh" "eq" "server_json_version_test.sh" "--output json has correct server info"
+
+  # verify json output using additional --client flag does not contain serverVersion
+  kube::test::version::parse_partial_json_to_file "--client" "clientVersion" "client_only_json_version_test"
+  kube::test::version::parse_partial_json_to_file "--client" "serverVersion" "server_client_only_json_version_test"
+  kube::test::version::diff_assert "client_version_test.sh" "eq" "client_only_json_version_test.sh" "--client --output json has correct client info"
+  kube::test::version::diff_assert "server_version_test.sh" "!eq" "server_client_only_json_version_test.sh" "--client --output json has no server info"
+  
+  # compare json output using additional --short flag
+  kube::test::version::parse_partial_json_to_file "--short" "clientVersion" "client_short_json_version_test"
+  kube::test::version::parse_partial_json_to_file "--short" "serverVersion" "server_short_json_version_test"
+  kube::test::version::diff_assert "client_version_test.sh" "eq" "client_short_json_version_test.sh" "--short --output client json info is equal to non short result"
+  kube::test::version::diff_assert "server_version_test.sh" "eq" "server_short_json_version_test.sh" "--short --output server json info is equal to non short result"
+
+  # compare json output with yaml output
+  kube::test::version::parse_full_json_to_file "" "client_server_json_version_test"
+  kube::test::version::parse_yaml_to_file "" "client_server_yaml_version_test"
+  kube::test::version::diff_assert "client_server_json_version_test.sh" "eq" "client_server_yaml_version_test.sh" "--output json/yaml has identical information"
+
+  # clean files.
+  rm *_version_test.sh
+
+  kube::log::status "Testing kubectl version complete... cleaned all test files ending with _version_test.sh"
 }
 
 # Runs all pod related tests.
