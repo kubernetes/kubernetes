@@ -247,14 +247,14 @@ func getControllerManagerDeployment(cfg *kubeadmapi.MasterConfiguration, volumes
 					},
 				},
 				Spec: v1.PodSpec{
-					// TODO: Make sure masters get this label
 					NodeSelector: map[string]string{metav1.NodeLabelKubeadmAlphaRole: metav1.NodeLabelRoleMaster},
+					HostNetwork:  true,
 					Volumes:      volumes,
 					Containers: []v1.Container{
 						{
 							Name:          "self-hosted-" + kubeControllerManager,
 							Image:         images.GetCoreImage(images.KubeControllerManagerImage, cfg, kubeadmapi.GlobalEnvParams.HyperkubeImage),
-							Command:       getControllerManagerCommand(cfg),
+							Command:       getControllerManagerCommand(cfg, true),
 							VolumeMounts:  volumeMounts,
 							LivenessProbe: componentProbe(10252, "/healthz"),
 							Resources:     componentResources("200m"),
@@ -295,11 +295,12 @@ func getSchedulerDeployment(cfg *kubeadmapi.MasterConfiguration) ext.Deployment 
 				},
 				Spec: v1.PodSpec{
 					NodeSelector: map[string]string{metav1.NodeLabelKubeadmAlphaRole: metav1.NodeLabelRoleMaster},
+					HostNetwork:  true,
 					Containers: []v1.Container{
 						{
 							Name:          "self-hosted-" + kubeScheduler,
 							Image:         images.GetCoreImage(images.KubeSchedulerImage, cfg, kubeadmapi.GlobalEnvParams.HyperkubeImage),
-							Command:       getSchedulerCommand(cfg),
+							Command:       getSchedulerCommand(cfg, true),
 							LivenessProbe: componentProbe(10251, "/healthz"),
 							Resources:     componentResources("100m"),
 							Env:           getProxyEnvVars(),
