@@ -960,7 +960,7 @@ func verifyReplicasResult(c clientset.Interface, expectedScheduled int, expected
 
 func getPodsByLabels(c clientset.Interface, ns string, labelsMap map[string]string) *v1.PodList {
 	selector := labels.SelectorFromSet(labels.Set(labelsMap))
-	allPods, err := c.Core().Pods(ns).List(v1.ListOptions{LabelSelector: selector.String()})
+	allPods, err := c.Core().Pods(ns).List(metav1.ListOptions{LabelSelector: selector.String()})
 	framework.ExpectNoError(err)
 	return allPods
 }
