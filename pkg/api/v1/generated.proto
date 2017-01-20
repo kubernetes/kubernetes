@@ -2384,6 +2384,19 @@ message PodLogOptions {
   optional int64 limitBytes = 8;
 }
 
+// PodPortForwardOptions is the query options to a Pod's port forward call
+// when using WebSockets.
+// The `port` query parameter must specify the port or
+// ports (comma separated) to forward over.
+// Port forwarding over SPDY does not use these options. It requires the port
+// to be passed in the `port` header as part of request.
+message PodPortForwardOptions {
+  // List of ports to forward
+  // Required when using WebSockets
+  // +optional
+  repeated int32 ports = 1;
+}
+
 // PodProxyOptions is the query options to a Pod's proxy call.
 message PodProxyOptions {
   // Path is the URL path to use for the current proxy request to pod.
