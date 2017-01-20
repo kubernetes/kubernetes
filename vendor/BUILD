@@ -7910,6 +7910,7 @@ go_test(
 go_library(
     name = "k8s.io/apimachinery/pkg/api/meta",
     srcs = [
+        "k8s.io/apimachinery/pkg/api/meta/default.go",
         "k8s.io/apimachinery/pkg/api/meta/doc.go",
         "k8s.io/apimachinery/pkg/api/meta/errors.go",
         "k8s.io/apimachinery/pkg/api/meta/firsthit_restmapper.go",
@@ -13655,4 +13656,30 @@ go_test(
     ],
     library = ":k8s.io/client-go/pkg/util/jsonpath",
     tags = ["automanaged"],
+)
+
+go_test(
+    name = "k8s.io/apimachinery/pkg/apimachinery/announced_test",
+    srcs = ["k8s.io/apimachinery/pkg/apimachinery/announced/announced_test.go"],
+    library = ":k8s.io/apimachinery/pkg/apimachinery/announced",
+    tags = ["automanaged"],
+    deps = ["//vendor:k8s.io/apimachinery/pkg/util/sets"],
+)
+
+go_library(
+    name = "k8s.io/apimachinery/pkg/apimachinery/announced",
+    srcs = [
+        "k8s.io/apimachinery/pkg/apimachinery/announced/announced.go",
+        "k8s.io/apimachinery/pkg/apimachinery/announced/group_factory.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/golang/glog",
+        "//vendor:k8s.io/apimachinery/pkg/api/meta",
+        "//vendor:k8s.io/apimachinery/pkg/apimachinery",
+        "//vendor:k8s.io/apimachinery/pkg/apimachinery/registered",
+        "//vendor:k8s.io/apimachinery/pkg/runtime",
+        "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
+        "//vendor:k8s.io/apimachinery/pkg/util/sets",
+    ],
 )
