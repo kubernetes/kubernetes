@@ -20,10 +20,10 @@ import (
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
-	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
@@ -116,22 +116,26 @@ var _ = framework.KubeDescribe("EquivalenceCache [Serial]", func() {
 		labelsMap := map[string]string{
 			"name": affinityRCName,
 		}
-		affinityString := `{
-				"podAffinity": {
-					"requiredDuringSchedulingIgnoredDuringExecution": [{
-						"labelSelector": {
-							"matchExpressions": [{
-								"key": "security",
-								"operator": "In",
-								"values": ["S1"]
-							}]
+		affinity := &v1.Affinity{
+			PodAffinity: &v1.PodAffinity{
+				RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
+					{
+						LabelSelector: &metav1.LabelSelector{
+							MatchExpressions: []metav1.LabelSelectorRequirement{
+								{
+									Key:      "security",
+									Operator: metav1.LabelSelectorOpIn,
+									Values:   []string{"S1"},
+								},
+							},
 						},
-						"topologyKey": "` + k + `",
-						"namespaces":["` + ns + `"]
-					}]
-				}
-			}`
-		rc := getRCWithInterPodAffinity(affinityRCName, labelsMap, replica, affinityString, framework.GetPauseImageName(f.ClientSet))
+						TopologyKey: k,
+						Namespaces:  []string{ns},
+					},
+				},
+			},
+		}
+		rc := getRCWithInterPodAffinity(affinityRCName, labelsMap, replica, affinity, framework.GetPauseImageName(f.ClientSet))
 		defer framework.DeleteRCAndPods(f.ClientSet, f.InternalClientset, ns, affinityRCName)
 
 		_, err := cs.Core().ReplicationControllers(ns).Create(rc)
@@ -156,7 +160,7 @@ var _ = framework.KubeDescribe("EquivalenceCache [Serial]", func() {
 		By("Launching two pods on two distinct nodes to get two node names")
 		CreateHostPortPods(f, "host-port", 2, true)
 		defer framework.DeleteRCAndPods(f.ClientSet, f.InternalClientset, ns, "host-port")
-		podList, err := cs.Core().Pods(ns).List(v1.ListOptions{})
+		podList, err := cs.Core().Pods(ns).List(metav1.ListOptions{})
 		framework.ExpectNoError(err)
 		Expect(len(podList.Items)).To(Equal(2))
 		nodeNames := []string{podList.Items[0].Spec.NodeName, podList.Items[1].Spec.NodeName}
@@ -185,22 +189,26 @@ var _ = framework.KubeDescribe("EquivalenceCache [Serial]", func() {
 		labelsMap := map[string]string{
 			"name": labelRCName,
 		}
-		affinityString := `{
-				"podAntiAffinity": {
-					"requiredDuringSchedulingIgnoredDuringExecution": [{
-						"labelSelector":{
-							"matchExpressions": [{
-								"key": "service",
-								"operator": "In",
-								"values": ["S1"]
-							}]
+		affinity := &v1.Affinity{
+			PodAntiAffinity: &v1.PodAntiAffinity{
+				RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
+					{
+						LabelSelector: &metav1.LabelSelector{
+							MatchExpressions: []metav1.LabelSelectorRequirement{
+								{
+									Key:      "service",
+									Operator: metav1.LabelSelectorOpIn,
+									Values:   []string{"S1"},
+								},
+							},
 						},
-						"topologyKey": "` + k + `",
-						"namespaces": ["` + ns + `"]
-					}]
-				}
-			}`
-		rc := getRCWithInterPodAffinityNodeSelector(labelRCName, labelsMap, replica, affinityString,
+						TopologyKey: k,
+						Namespaces:  []string{ns},
+					},
+				},
+			},
+		}
+		rc := getRCWithInterPodAffinityNodeSelector(labelRCName, labelsMap, replica, affinity,
 			framework.GetPauseImageName(f.ClientSet), map[string]string{k: v})
 		defer framework.DeleteRCAndPods(f.ClientSet, f.InternalClientset, ns, labelRCName)
 
@@ -214,16 +222,13 @@ var _ = framework.KubeDescribe("EquivalenceCache [Serial]", func() {
 })
 
 // getRCWithInterPodAffinity returns RC with given affinity rules.
-func getRCWithInterPodAffinity(name string, labelsMap map[string]string, replica int, affinityString string, image string) *v1.ReplicationController {
-	return getRCWithInterPodAffinityNodeSelector(name, labelsMap, replica, affinityString, image, map[string]string{})
+func getRCWithInterPodAffinity(name string, labelsMap map[string]string, replica int, affinity *v1.Affinity, image string) *v1.ReplicationController {
+	return getRCWithInterPodAffinityNodeSelector(name, labelsMap, replica, affinity, image, map[string]string{})
 }
 
 // getRCWithInterPodAffinity returns RC with given affinity rules and node selector.
-func getRCWithInterPodAffinityNodeSelector(name string, labelsMap map[string]string, replica int, affinityString string, image string, nodeSelector map[string]string) *v1.ReplicationController {
+func getRCWithInterPodAffinityNodeSelector(name string, labelsMap map[string]string, replica int, affinity *v1.Affinity, image string, nodeSelector map[string]string) *v1.ReplicationController {
 	replicaInt32 := int32(replica)
-	annotations := map[string]string{
-		v1.AffinityAnnotationKey: affinityString,
-	}
 	return &v1.ReplicationController{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
@@ -233,10 +238,10 @@ func getRCWithInterPodAffinityNodeSelector(name string, labelsMap map[string]str
 			Selector: labelsMap,
 			Template: &v1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
-					Labels:      labelsMap,
-					Annotations: annotations,
+					Labels: labelsMap,
 				},
 				Spec: v1.PodSpec{
+					Affinity: affinity,
 					Containers: []v1.Container{
 						{
 							Name:  name,
