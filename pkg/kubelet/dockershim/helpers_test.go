@@ -192,11 +192,10 @@ func TestGetSystclsFromAnnotations(t *testing.T) {
 // TestGetUserFromImageUser tests the logic of getting image uid or user name of image user.
 func TestGetUserFromImageUser(t *testing.T) {
 	newI64 := func(i int64) *int64 { return &i }
-	newStr := func(s string) *string { return &s }
 	for c, test := range map[string]struct {
 		user string
 		uid  *int64
-		name *string
+		name string
 	}{
 		"no gid": {
 			user: "0",
@@ -215,11 +214,11 @@ func TestGetUserFromImageUser(t *testing.T) {
 		},
 		"root username": {
 			user: "root:root",
-			name: newStr("root"),
+			name: "root",
 		},
 		"username": {
 			user: "test:test",
-			name: newStr("test"),
+			name: "test",
 		},
 	} {
 		t.Logf("TestCase - %q", c)

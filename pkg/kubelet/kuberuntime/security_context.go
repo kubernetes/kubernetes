@@ -25,7 +25,7 @@ import (
 )
 
 // determineEffectiveSecurityContext gets container's security context from v1.Pod and v1.Container.
-func (m *kubeGenericRuntimeManager) determineEffectiveSecurityContext(pod *v1.Pod, container *v1.Container, uid *int64, username *string) *runtimeapi.LinuxContainerSecurityContext {
+func (m *kubeGenericRuntimeManager) determineEffectiveSecurityContext(pod *v1.Pod, container *v1.Container, uid *int64, username string) *runtimeapi.LinuxContainerSecurityContext {
 	effectiveSc := securitycontext.DetermineEffectiveSecurityContext(pod, container)
 	synthesized := convertToRuntimeSecurityContext(effectiveSc)
 	if synthesized == nil {
@@ -34,7 +34,9 @@ func (m *kubeGenericRuntimeManager) determineEffectiveSecurityContext(pod *v1.Po
 
 	// set RunAsUser.
 	if synthesized.RunAsUser == nil {
-		synthesized.RunAsUser = uid
+		if uid != nil {
+			synthesized.RunAsUser = &runtimeapi.Int64Value{Value: *uid}
+		}
 		synthesized.RunAsUsername = username
 	}
 
@@ -44,9 +46,9 @@ func (m *kubeGenericRuntimeManager) determineEffectiveSecurityContext(pod *v1.Po
 		return synthesized
 	}
 	synthesized.NamespaceOptions = &runtimeapi.NamespaceOption{
-		HostNetwork: &pod.Spec.HostNetwork,
-		HostIpc:     &pod.Spec.HostIPC,
-		HostPid:     &pod.Spec.HostPID,
+		HostNetwork: pod.Spec.HostNetwork,
+		HostIpc:     pod.Spec.HostIPC,
+		HostPid:     pod.Spec.HostPID,
 	}
 	if podSc.FSGroup != nil {
 		synthesized.SupplementalGroups = append(synthesized.SupplementalGroups, *podSc.FSGroup)
@@ -88,13 +90,21 @@ func convertToRuntimeSecurityContext(securityContext *v1.SecurityContext) *runti
 		return nil
 	}
 
-	return &runtimeapi.LinuxContainerSecurityContext{
-		RunAsUser:      securityContext.RunAsUser,
-		Privileged:     securityContext.Privileged,
-		ReadonlyRootfs: securityContext.ReadOnlyRootFilesystem,
+	sc := &runtimeapi.LinuxContainerSecurityContext{
 		Capabilities:   convertToRuntimeCapabilities(securityContext.Capabilities),
 		SelinuxOptions: convertToRuntimeSELinuxOption(securityContext.SELinuxOptions),
 	}
+	if securityContext.RunAsUser != nil {
+		sc.RunAsUser = &runtimeapi.Int64Value{Value: *securityContext.RunAsUser}
+	}
+	if securityContext.Privileged != nil {
+		sc.Privileged = *securityContext.Privileged
+	}
+	if securityContext.ReadOnlyRootFilesystem != nil {
+		sc.ReadonlyRootfs = *securityContext.ReadOnlyRootFilesystem
+	}
+
+	return sc
 }
 
 // convertToRuntimeSELinuxOption converts v1.SELinuxOptions to runtimeapi.SELinuxOption.
@@ -104,10 +114,10 @@ func convertToRuntimeSELinuxOption(opts *v1.SELinuxOptions) *runtimeapi.SELinuxO
 	}
 
 	return &runtimeapi.SELinuxOption{
-		User:  &opts.User,
-		Role:  &opts.Role,
-		Type:  &opts.Type,
-		Level: &opts.Level,
+		User:  opts.User,
+		Role:  opts.Role,
+		Type:  opts.Type,
+		Level: opts.Level,
 	}
 }
 

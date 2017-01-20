@@ -32,10 +32,10 @@ import (
 func makeContainerConfig(sConfig *runtimeapi.PodSandboxConfig, name, image string, attempt uint32, labels, annotations map[string]string) *runtimeapi.ContainerConfig {
 	return &runtimeapi.ContainerConfig{
 		Metadata: &runtimeapi.ContainerMetadata{
-			Name:    &name,
-			Attempt: &attempt,
+			Name:    name,
+			Attempt: attempt,
 		},
-		Image:       &runtimeapi.ImageSpec{Image: &image},
+		Image:       &runtimeapi.ImageSpec{Image: image},
 		Labels:      labels,
 		Annotations: annotations,
 	}
@@ -77,12 +77,12 @@ func TestListContainers(t *testing.T) {
 		// the most recent containers first.
 		expected = append([]*runtimeapi.Container{{
 			Metadata:     configs[i].Metadata,
-			Id:           &id,
-			PodSandboxId: &sandboxID,
-			State:        &state,
-			CreatedAt:    &createdAt,
+			Id:           id,
+			PodSandboxId: sandboxID,
+			State:        state,
+			CreatedAt:    createdAt,
 			Image:        configs[i].Image,
-			ImageRef:     &imageRef,
+			ImageRef:     imageRef,
 			Labels:       configs[i].Labels,
 			Annotations:  configs[i].Annotations,
 		}}, expected...)
@@ -112,16 +112,16 @@ func TestContainerStatus(t *testing.T) {
 	var reason, message string
 
 	expected := &runtimeapi.ContainerStatus{
-		State:       &state,
-		CreatedAt:   &ct,
-		StartedAt:   &st,
-		FinishedAt:  &ft,
+		State:       state,
+		CreatedAt:   ct,
+		StartedAt:   st,
+		FinishedAt:  ft,
 		Metadata:    config.Metadata,
 		Image:       config.Image,
-		ImageRef:    &imageRef,
-		ExitCode:    &exitCode,
-		Reason:      &reason,
-		Message:     &message,
+		ImageRef:    imageRef,
+		ExitCode:    exitCode,
+		Reason:      reason,
+		Message:     message,
 		Mounts:      []*runtimeapi.Mount{},
 		Labels:      config.Labels,
 		Annotations: config.Annotations,
@@ -129,7 +129,7 @@ func TestContainerStatus(t *testing.T) {
 
 	// Create the container.
 	fClock.SetTime(time.Now().Add(-1 * time.Hour))
-	*expected.CreatedAt = fClock.Now().UnixNano()
+	expected.CreatedAt = fClock.Now().UnixNano()
 	const sandboxId = "sandboxid"
 	id, err := ds.CreateContainer(sandboxId, config, sConfig)
 
@@ -140,7 +140,7 @@ func TestContainerStatus(t *testing.T) {
 	assert.Equal(t, c.Config.Labels[sandboxIDLabelKey], sandboxId)
 
 	// Set the id manually since we don't know the id until it's created.
-	expected.Id = &id
+	expected.Id = id
 	assert.NoError(t, err)
 	status, err := ds.ContainerStatus(id)
 	assert.NoError(t, err)
@@ -148,8 +148,8 @@ func TestContainerStatus(t *testing.T) {
 
 	// Advance the clock and start the container.
 	fClock.SetTime(time.Now())
-	*expected.StartedAt = fClock.Now().UnixNano()
-	*expected.State = runtimeapi.ContainerState_CONTAINER_RUNNING
+	expected.StartedAt = fClock.Now().UnixNano()
+	expected.State = runtimeapi.ContainerState_CONTAINER_RUNNING
 
 	err = ds.StartContainer(id)
 	assert.NoError(t, err)
@@ -158,9 +158,9 @@ func TestContainerStatus(t *testing.T) {
 
 	// Advance the clock and stop the container.
 	fClock.SetTime(time.Now().Add(1 * time.Hour))
-	*expected.FinishedAt = fClock.Now().UnixNano()
-	*expected.State = runtimeapi.ContainerState_CONTAINER_EXITED
-	*expected.Reason = "Completed"
+	expected.FinishedAt = fClock.Now().UnixNano()
+	expected.State = runtimeapi.ContainerState_CONTAINER_EXITED
+	expected.Reason = "Completed"
 
 	err = ds.StopContainer(id, 0)
 	assert.NoError(t, err)
@@ -181,9 +181,9 @@ func TestContainerLogPath(t *testing.T) {
 	containerLogPath := "0"
 	kubeletContainerLogPath := filepath.Join(podLogPath, containerLogPath)
 	sConfig := makeSandboxConfig("foo", "bar", "1", 0)
-	sConfig.LogDirectory = &podLogPath
+	sConfig.LogDirectory = podLogPath
 	config := makeContainerConfig(sConfig, "pause", "iamimage", 0, nil, nil)
-	config.LogPath = &containerLogPath
+	config.LogPath = containerLogPath
 
 	const sandboxId = "sandboxid"
 	id, err := ds.CreateContainer(sandboxId, config, sConfig)

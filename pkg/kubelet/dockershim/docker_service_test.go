@@ -53,8 +53,8 @@ func TestStatus(t *testing.T) {
 		assert.Equal(t, len(expected), len(conditions))
 		for k, v := range expected {
 			for _, c := range conditions {
-				if k == c.GetType() {
-					assert.Equal(t, v, c.GetStatus())
+				if k == c.Type {
+					assert.Equal(t, v, c.Status)
 				}
 			}
 		}
