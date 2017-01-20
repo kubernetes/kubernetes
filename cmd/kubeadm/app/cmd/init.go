@@ -173,18 +173,6 @@ func NewInit(cfgPath string, cfg *kubeadmapi.MasterConfiguration, skipPreFlight 
 	// Try to start the kubelet service in case it's inactive
 	preflight.TryStartKubelet()
 
-	// validate version argument
-	ver, err := kubeadmutil.KubernetesReleaseVersion(cfg.KubernetesVersion)
-	if err != nil {
-		if cfg.KubernetesVersion != kubeadmapiext.DefaultKubernetesVersion {
-			return nil, err
-		} else {
-			ver = kubeadmapiext.DefaultKubernetesFallbackVersion
-		}
-	}
-	cfg.KubernetesVersion = ver
-	fmt.Println("[init] Using Kubernetes version:", ver)
-	fmt.Println("[init] Using Authorization mode:", cfg.AuthorizationMode)
 
 	// Warn about the limitations with the current cloudprovider solution.
 	if cfg.CloudProvider != "" {
