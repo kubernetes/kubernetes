@@ -536,6 +536,7 @@ function start_kubelet {
         --experimental-cgroups-per-qos=${EXPERIMENTAL_CGROUPS_PER_QOS} \
         --cgroup-driver=${CGROUP_DRIVER} \
         --cgroup-root=${CGROUP_ROOT} \
+        --keep-terminated-pod-volumes=true \
         ${auth_args} \
         ${dns_args} \
         ${net_plugin_dir_args} \

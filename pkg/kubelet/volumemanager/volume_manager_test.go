@@ -198,7 +198,8 @@ func newTestVolumeManager(
 		&mount.FakeMounter{},
 		"",
 		fakeRecorder,
-		false /* experimentalCheckNodeCapabilitiesBeforeMount */)
+		false, /* experimentalCheckNodeCapabilitiesBeforeMount */
+		false /* keepTerminatedPodVolumes */)
 
 	return vm, err
 }
