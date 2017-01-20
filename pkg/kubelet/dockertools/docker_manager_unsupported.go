@@ -19,10 +19,20 @@ limitations under the License.
 package dockertools
 
 import (
-	"k8s.io/kubernetes/pkg/api"
-
 	dockertypes "github.com/docker/engine-api/types"
+	dockercontainer "github.com/docker/engine-api/types/container"
+
+	"k8s.io/kubernetes/pkg/api"
+	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
+
+// These two functions are OS specific (for now at least)
+func updateHostConfig(hc *dockercontainer.HostConfig, opts *kubecontainer.RunContainerOptions) {
+}
+
+func DefaultMemorySwap() int64 {
+	return -1
+}
 
 func getContainerIP(container *dockertypes.ContainerJSON) string {
 	return ""

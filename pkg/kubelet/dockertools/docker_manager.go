@@ -28,7 +28,6 @@ import (
 	"os/exec"
 	"path"
 	"path/filepath"
-	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -703,11 +702,7 @@ func (dm *DockerManager) runContainer(
 		SecurityOpt: fmtSecurityOpts,
 	}
 
-	// There is no /etc/resolv.conf in Windows, DNS and DNSSearch options would have to be passed to Docker runtime instead
-	if runtime.GOOS == "windows" {
-		hc.DNS = opts.DNS
-		hc.DNSSearch = opts.DNSSearch
-	}
+	updateHostConfig(hc, opts)
 
 	// Set sysctls if requested
 	if container.Name == PodInfraContainerName {
