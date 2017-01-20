@@ -58,9 +58,13 @@ const (
 	// An annotation on the Service denoting if the endpoints controller should
 	// go ahead and create endpoints for unready pods. This annotation is
 	// currently only used by StatefulSets, where we need the pod to be DNS
-	// resolvable during initialization. In this situation we create a headless
-	// service just for the StatefulSet, and clients shouldn't be using this Service
-	// for anything so unready endpoints don't matter.
+	// resolvable during initialization and termination. In this situation we
+	// create a headless Service just for the StatefulSet, and clients shouldn't
+	// be using this Service for anything so unready endpoints don't matter.
+	// Endpoints of these Services retain their DNS records and continue
+	// receiving traffic for the Service from the moment the kubelet starts all
+	// containers in the pod and marks it "Running", till the kubelet stops all
+	// containers and deletes the pod from the apiserver.
 	TolerateUnreadyEndpointsAnnotation = "service.alpha.kubernetes.io/tolerate-unready-endpoints"
 )
 
@@ -402,7 +406,7 @@ func (e *EndpointController) syncService(key string) error {
 				glog.V(5).Infof("Failed to find an IP for pod %s/%s", pod.Namespace, pod.Name)
 				continue
 			}
-			if pod.DeletionTimestamp != nil {
+			if !tolerateUnreadyEndpoints && pod.DeletionTimestamp != nil {
 				glog.V(5).Infof("Pod is being deleted %s/%s", pod.Namespace, pod.Name)
 				continue
 			}
