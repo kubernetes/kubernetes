@@ -498,7 +498,7 @@ endef
 	@echo "$$BAZEL_TEST_HELP_INFO"
 else
 bazel-test:
-	bazel test  --test_output=errors //cmd/... //pkg/... //federation/... //plugin/... //build/... //third_party/... //hack/... //hack:verify-all
+	bazel test  //cmd/... //pkg/... //federation/... //plugin/... //build/... //third_party/... //hack/... //hack:verify-all
 endif
 
 ifeq ($(PRINT_HELP),y)
