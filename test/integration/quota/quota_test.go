@@ -84,9 +84,9 @@ func TestQuota(t *testing.T) {
 	controllerCh := make(chan struct{})
 	defer close(controllerCh)
 
-	informers := informers.NewSharedInformerFactory(clientset, nil, controller.NoResyncPeriodFunc())
-	podInformer := informers.Pods().Informer()
-	rcInformer := informers.ReplicationControllers().Informer()
+	informers := informers.NewSharedInformerFactory(nil, clientset, controller.NoResyncPeriodFunc())
+	podInformer := informers.Core().V1().Pods()
+	rcInformer := informers.Core().V1().ReplicationControllers()
 	rm := replicationcontroller.NewReplicationManager(podInformer, rcInformer, clientset, replicationcontroller.BurstReplicas, 4096, false)
 	rm.SetEventRecorder(&record.FakeRecorder{})
 	informers.Start(controllerCh)
@@ -102,7 +102,7 @@ func TestQuota(t *testing.T) {
 		Registry:                  resourceQuotaRegistry,
 		GroupKindsToReplenish:     groupKindsToReplenish,
 		ReplenishmentResyncPeriod: controller.NoResyncPeriodFunc,
-		ControllerFactory:         resourcequotacontroller.NewReplenishmentControllerFactoryFromClient(clientset),
+		ControllerFactory:         resourcequotacontroller.NewReplenishmentControllerFactory(informers, clientset),
 	}
 	go resourcequotacontroller.NewResourceQuotaController(resourceQuotaControllerOptions).Run(2, controllerCh)
 

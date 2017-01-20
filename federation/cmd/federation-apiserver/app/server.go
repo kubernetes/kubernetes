@@ -36,8 +36,9 @@ import (
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/kubernetes/federation/cmd/federation-apiserver/app/options"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	"k8s.io/kubernetes/pkg/controller/informers"
+	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated"
 	"k8s.io/kubernetes/pkg/generated/openapi"
 	"k8s.io/kubernetes/pkg/genericapiserver/registry/generic"
 	genericregistry "k8s.io/kubernetes/pkg/genericapiserver/registry/generic/registry"
@@ -146,11 +147,15 @@ func Run(s *options.ServerRunOptions) error {
 	if err != nil {
 		return fmt.Errorf("failed to create clientset: %v", err)
 	}
-	client, err := internalclientset.NewForConfig(selfClientConfig)
+	internalClient, err := internalclientset.NewForConfig(selfClientConfig)
 	if err != nil {
-		return fmt.Errorf("failed to create clientset: %v", err)
+		return fmt.Errorf("failed to create internal clientset: %v", err)
 	}
-	sharedInformers := informers.NewSharedInformerFactory(nil, client, 10*time.Minute)
+	versionedClient, err := clientset.NewForConfig(selfClientConfig)
+	if err != nil {
+		return fmt.Errorf("failed to create versioned clientset: %v", err)
+	}
+	sharedInformers := informers.NewSharedInformerFactory(internalClient, versionedClient, 10*time.Minute)
 
 	authorizationConfig := s.Authorization.ToAuthorizationConfig(sharedInformers)
 	apiAuthorizer, err := authorizationConfig.New()
@@ -159,7 +164,7 @@ func Run(s *options.ServerRunOptions) error {
 	}
 
 	admissionControlPluginNames := strings.Split(s.GenericServerRunOptions.AdmissionControl, ",")
-	pluginInitializer := kubeapiserveradmission.NewPluginInitializer(client, sharedInformers, apiAuthorizer)
+	pluginInitializer := kubeapiserveradmission.NewPluginInitializer(internalClient, sharedInformers, apiAuthorizer)
 	admissionConfigProvider, err := kubeapiserveradmission.ReadAdmissionConfiguration(admissionControlPluginNames, s.GenericServerRunOptions.AdmissionControlConfigFile)
 	if err != nil {
 		return fmt.Errorf("failed to read plugin config: %v", err)

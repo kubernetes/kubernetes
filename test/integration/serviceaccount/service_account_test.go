@@ -416,11 +416,16 @@ func startServiceAccountTestServer(t *testing.T) (*clientset.Clientset, restclie
 
 	// Start the service account and service account token controllers
 	stopCh := make(chan struct{})
-	tokenController := serviceaccountcontroller.NewTokensController(rootClientset, serviceaccountcontroller.TokensControllerOptions{TokenGenerator: serviceaccount.JWTTokenGenerator(serviceAccountKey)})
+	tokenController := serviceaccountcontroller.NewTokensController(serviceaccountcontroller.TokensControllerOptions{Client: rootClientset, TokenGenerator: serviceaccount.JWTTokenGenerator(serviceAccountKey)})
 	go tokenController.Run(1, stopCh)
 
-	informers := informers.NewSharedInformerFactory(rootClientset, nil, controller.NoResyncPeriodFunc())
-	serviceAccountController := serviceaccountcontroller.NewServiceAccountsController(informers.ServiceAccounts(), informers.Namespaces(), rootClientset, serviceaccountcontroller.DefaultServiceAccountsControllerOptions())
+	informers := informers.NewSharedInformerFactory(nil, rootClientset, controller.NoResyncPeriodFunc())
+	serviceAccountController := serviceaccountcontroller.NewServiceAccountsController(
+		informers.Core().V1().ServiceAccounts(),
+		informers.Core().V1().Namespaces(),
+		rootClientset,
+		serviceaccountcontroller.DefaultServiceAccountsControllerOptions(),
+	)
 	informers.Start(stopCh)
 	go serviceAccountController.Run(5, stopCh)
 	// Start the admission plugin reflectors
