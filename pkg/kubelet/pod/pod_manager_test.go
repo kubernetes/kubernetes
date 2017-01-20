@@ -24,13 +24,15 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/api/v1"
 	podtest "k8s.io/kubernetes/pkg/kubelet/pod/testing"
+	"k8s.io/kubernetes/pkg/kubelet/secret"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 )
 
 // Stub out mirror client for testing purpose.
 func newTestManager() (*basicManager, *podtest.FakeMirrorClient) {
 	fakeMirrorClient := podtest.NewFakeMirrorClient()
-	manager := NewBasicPodManager(fakeMirrorClient).(*basicManager)
+	secretManager := secret.NewFakeManager()
+	manager := NewBasicPodManager(fakeMirrorClient, secretManager).(*basicManager)
 	return manager, fakeMirrorClient
 }
 
