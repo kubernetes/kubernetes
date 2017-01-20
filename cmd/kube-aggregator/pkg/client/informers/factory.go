@@ -20,6 +20,7 @@ package informers
 
 import (
 	runtime "k8s.io/apimachinery/pkg/runtime"
+	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	clientset "k8s.io/kubernetes/cmd/kube-aggregator/pkg/client/clientset_generated/clientset"
 	internalclientset "k8s.io/kubernetes/cmd/kube-aggregator/pkg/client/clientset_generated/internalclientset"
 	apiregistration "k8s.io/kubernetes/cmd/kube-aggregator/pkg/client/informers/apiregistration"
@@ -104,6 +105,7 @@ func (f *sharedInformerFactory) VersionedInformerFor(obj runtime.Object, newFunc
 // API group versions.
 type SharedInformerFactory interface {
 	internalinterfaces.SharedInformerFactory
+	ForResource(resource schema.GroupVersionResource) (GenericInformer, error)
 
 	Apiregistration() apiregistration.Interface
 }

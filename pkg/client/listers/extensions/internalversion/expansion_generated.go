@@ -18,22 +18,6 @@ limitations under the License.
 
 package internalversion
 
-// DaemonSetListerExpansion allows custom methods to be added to
-// DaemonSetLister.
-type DaemonSetListerExpansion interface{}
-
-// DaemonSetNamespaceListerExpansion allows custom methods to be added to
-// DaemonSetNamespaeLister.
-type DaemonSetNamespaceListerExpansion interface{}
-
-// DeploymentListerExpansion allows custom methods to be added to
-// DeploymentLister.
-type DeploymentListerExpansion interface{}
-
-// DeploymentNamespaceListerExpansion allows custom methods to be added to
-// DeploymentNamespaeLister.
-type DeploymentNamespaceListerExpansion interface{}
-
 // IngressListerExpansion allows custom methods to be added to
 // IngressLister.
 type IngressListerExpansion interface{}
@@ -53,14 +37,6 @@ type NetworkPolicyNamespaceListerExpansion interface{}
 // PodSecurityPolicyListerExpansion allows custom methods to be added to
 // PodSecurityPolicyLister.
 type PodSecurityPolicyListerExpansion interface{}
-
-// ReplicaSetListerExpansion allows custom methods to be added to
-// ReplicaSetLister.
-type ReplicaSetListerExpansion interface{}
-
-// ReplicaSetNamespaceListerExpansion allows custom methods to be added to
-// ReplicaSetNamespaeLister.
-type ReplicaSetNamespaceListerExpansion interface{}
 
 // ScaleListerExpansion allows custom methods to be added to
 // ScaleLister.
