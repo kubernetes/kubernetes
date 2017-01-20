@@ -85,6 +85,19 @@ type LoadBalancerOpts struct {
 	ManageSecurityGroups bool       `gcfg:"manage-security-groups"`
 	NodeSecurityGroupID  string     `gcfg:"node-security-group"`
 	Provider             string     `gcfg:"provider"`
+
+	// Optional settings that allow a cluster admin to prevent his users from setting LB parameters through Service Annotations
+	DisableAnnotationLBVersion            bool `gcfg:"disable-annotation-lb-version"`
+	DisableAnnotationSubnetId             bool `gcfg:"disable-annotation-subnet-id"`
+	DisableAnnotationFloatingNetworkId    bool `gcfg:"disable-annotation-floating-network-id"`
+	DisableAnnotationLBMethod             bool `gcfg:"disable-annotation-lb-method"`
+	DisableAnnotationCreateMonitor        bool `gcfg:"disable-annotation-create-monitor"`
+	DisableAnnotationMonitorDelay         bool `gcfg:"disable-annotation-monitor-delay"`
+	DisableAnnotationMonitorTimeout       bool `gcfg:"disable-annotation-monitor-timeout"`
+	DisableAnnotationMonitorMaxRetries    bool `gcfg:"disable-annotation-monitor-max-retries"`
+	DisableAnnotationManageSecurityGroups bool `gcfg:"disable-annotation-manage-security-groups"`
+	DisableAnnotationNodeSecurityGroupID  bool `gcfg:"disable-annotation-node-security-group"`
+	DisableAnnotationProvider             bool `gcfg:"disable-annotation-provider"`
 }
 
 type BlockStorageOpts struct {
