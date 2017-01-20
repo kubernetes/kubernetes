@@ -966,6 +966,10 @@ type PortworxVolumeSource struct {
 	// Ex. "ext4", "xfs". Implicitly inferred to be "ext4" if unspecified.
 	// +optional
 	FSType string
+	// Defaults to false (read/write). ReadOnly here will force
+	// the ReadOnly setting in VolumeMounts.
+	// +optional
+	ReadOnly bool
 }
 
 type AzureDataDiskCachingMode string

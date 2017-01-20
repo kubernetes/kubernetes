@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors.
+Copyright 2017 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -40,8 +40,7 @@ type PortworxVolumeUtil struct {
 
 // CreateVolume creates a Portworx volume.
 func (util *PortworxVolumeUtil) CreateVolume(p *portworxVolumeProvisioner) (string, int, map[string]string, error) {
-	hostName := p.plugin.host.GetHostName()
-	client, err := util.osdClient(hostName)
+	client, err := util.osdClient()
 	if err != nil {
 		return "", 0, nil, err
 	}
@@ -49,13 +48,6 @@ func (util *PortworxVolumeUtil) CreateVolume(p *portworxVolumeProvisioner) (stri
 	capacity := p.options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
 	// Portworx Volumes are specified in GB
 	requestGB := int(volume.RoundUpSize(capacity.Value(), 1024*1024*1024))
-
-	var labels map[string]string
-	if p.options.CloudTags == nil {
-		labels = make(map[string]string)
-	} else {
-		labels = *p.options.CloudTags
-	}
 
 	specHandler := osdspec.NewSpecHandler()
 	spec, err := specHandler.SpecFromOpts(p.options.Parameters)
@@ -65,8 +57,7 @@ func (util *PortworxVolumeUtil) CreateVolume(p *portworxVolumeProvisioner) (stri
 	spec.Size = uint64(requestGB * 1024 * 1024 * 1024)
 	source := osdapi.Source{}
 	locator := osdapi.VolumeLocator{
-		Name:         p.options.PVName,
-		VolumeLabels: labels,
+		Name: p.options.PVName,
 	}
 	volumeID, err := client.Create(&locator, &source, spec)
 	if err != nil {
@@ -77,8 +68,7 @@ func (util *PortworxVolumeUtil) CreateVolume(p *portworxVolumeProvisioner) (stri
 
 // DeleteVolume deletes a Portworx volume
 func (util *PortworxVolumeUtil) DeleteVolume(d *portworxVolumeDeleter) error {
-	hostName := d.plugin.host.GetHostName()
-	client, err := util.osdClient(hostName)
+	client, err := util.osdClient()
 	if err != nil {
 		return err
 	}
@@ -93,8 +83,7 @@ func (util *PortworxVolumeUtil) DeleteVolume(d *portworxVolumeDeleter) error {
 
 // AttachVolume attaches a Portworx Volume
 func (util *PortworxVolumeUtil) AttachVolume(m *portworxVolumeMounter) (string, error) {
-	hostName := m.plugin.host.GetHostName()
-	client, err := util.osdClient(hostName)
+	client, err := util.osdClient()
 	if err != nil {
 		return "", err
 	}
@@ -109,8 +98,7 @@ func (util *PortworxVolumeUtil) AttachVolume(m *portworxVolumeMounter) (string, 
 
 // DetachVolume detaches a Portworx Volume
 func (util *PortworxVolumeUtil) DetachVolume(u *portworxVolumeUnmounter) error {
-	hostName := u.plugin.host.GetHostName()
-	client, err := util.osdClient(hostName)
+	client, err := util.osdClient()
 	if err != nil {
 		return err
 	}
@@ -125,8 +113,7 @@ func (util *PortworxVolumeUtil) DetachVolume(u *portworxVolumeUnmounter) error {
 
 // MountVolume mounts a Portworx Volume on the specified mountPath
 func (util *PortworxVolumeUtil) MountVolume(m *portworxVolumeMounter, mountPath string) error {
-	hostName := m.plugin.host.GetHostName()
-	client, err := util.osdClient(hostName)
+	client, err := util.osdClient()
 	if err != nil {
 		return err
 	}
@@ -141,8 +128,7 @@ func (util *PortworxVolumeUtil) MountVolume(m *portworxVolumeMounter, mountPath 
 
 // UnmountVolume unmounts a Portworx Volume
 func (util *PortworxVolumeUtil) UnmountVolume(u *portworxVolumeUnmounter, mountPath string) error {
-	hostName := u.plugin.host.GetHostName()
-	client, err := util.osdClient(hostName)
+	client, err := util.osdClient()
 	if err != nil {
 		return err
 	}
@@ -155,9 +141,11 @@ func (util *PortworxVolumeUtil) UnmountVolume(u *portworxVolumeUnmounter, mountP
 	return nil
 }
 
-func (util *PortworxVolumeUtil) osdClient(hostName string) (osdvolume.VolumeDriver, error) {
+func (util *PortworxVolumeUtil) osdClient() (osdvolume.VolumeDriver, error) {
+	// emptyHostname will enable the client to talk over a unix socket.
+	emptyHostname := ""
 	if util.portworxClient == nil {
-		driverClient, err := volumeclient.NewDriverClient("", pxdDriverName, osdDriverVersion)
+		driverClient, err := volumeclient.NewDriverClient(emptyHostname, pxdDriverName, osdDriverVersion)
 		if err != nil {
 			return nil, err
 		}

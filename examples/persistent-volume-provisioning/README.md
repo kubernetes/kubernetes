@@ -83,8 +83,8 @@ parameters:
 *  `repl`: replication factor [1..3] (default: `1`)
 *  `io_priority`: IO Priority: [high|medium|low] (default: `low`)
 *  `snap_interval`: snapshot interval in minutes, 0 disables snaps (default: `0`)
-*  `aggregation_level`: specifies the number of parts the volume can be aggregated from (default: `0`)
-* `ephemeral`: ephemeral storage [true|false] (default `false`)
+*  `aggregation_level`: specifies the number of chunks the volume would be distributed into, 0 indicates a non-aggregated volume (default: `0`)
+*  `ephemeral`: ephemeral storage [true|false] (default `false`)
 
 For a complete example refer ([Portworx Volume docs](../../volumes/portworx/README.md))
 

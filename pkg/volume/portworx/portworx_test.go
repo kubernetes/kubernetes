@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors.
+Copyright 2017 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -22,12 +22,16 @@ import (
 	"path"
 	"testing"
 
+	"k8s.io/apimachinery/pkg/types"
+	utiltesting "k8s.io/client-go/pkg/util/testing"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/mount"
-	utiltesting "k8s.io/kubernetes/pkg/util/testing"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
+)
+
+const (
+	PortworxTestVolume = "portworx-test-vol"
 )
 
 func TestCanSupport(t *testing.T) {
@@ -71,6 +75,9 @@ func TestGetAccessModes(t *testing.T) {
 	if !contains(plug.GetAccessModes(), v1.ReadWriteOnce) {
 		t.Errorf("Expected to support AccessModeTypes:  %s", v1.ReadWriteOnce)
 	}
+	if !contains(plug.GetAccessModes(), v1.ReadWriteMany) {
+		t.Errorf("Expected to support AccessModeTypes:  %s", v1.ReadWriteMany)
+	}
 	if contains(plug.GetAccessModes(), v1.ReadOnlyMany) {
 		t.Errorf("Expected not to support AccessModeTypes:  %s", v1.ReadOnlyMany)
 	}
@@ -111,11 +118,11 @@ func (fake *fakePortworxManager) UnmountVolume(c *portworxVolumeUnmounter, mount
 func (fake *fakePortworxManager) CreateVolume(c *portworxVolumeProvisioner) (volumeID string, volumeSizeGB int, labels map[string]string, err error) {
 	labels = make(map[string]string)
 	labels["fakeportworxmanager"] = "yes"
-	return "portworx-test-vol", 100, labels, nil
+	return PortworxTestVolume, 100, labels, nil
 }
 
 func (fake *fakePortworxManager) DeleteVolume(cd *portworxVolumeDeleter) error {
-	if cd.volumeID != "portworx-test-vol" {
+	if cd.volumeID != PortworxTestVolume {
 		return fmt.Errorf("Deleter got unexpected volume name: %s", cd.volumeID)
 	}
 	return nil
@@ -138,7 +145,7 @@ func TestPlugin(t *testing.T) {
 		Name: "vol1",
 		VolumeSource: v1.VolumeSource{
 			PortworxVolume: &v1.PortworxVolumeSource{
-				VolumeID: "portworx-test-vol",
+				VolumeID: PortworxTestVolume,
 				FSType:   "ext4",
 			},
 		},
@@ -186,7 +193,7 @@ func TestPlugin(t *testing.T) {
 
 	// Test Provisioner
 	options := volume.VolumeOptions{
-		PVC: volumetest.CreateTestPVC("100Mi", []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}),
+		PVC: volumetest.CreateTestPVC("100Gi", []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}),
 		PersistentVolumeReclaimPolicy: v1.PersistentVolumeReclaimDelete,
 	}
 
@@ -196,12 +203,12 @@ func TestPlugin(t *testing.T) {
 		t.Errorf("Provision() failed: %v", err)
 	}
 
-	if persistentSpec.Spec.PersistentVolumeSource.PortworxVolume.VolumeID != "portworx-test-vol" {
+	if persistentSpec.Spec.PersistentVolumeSource.PortworxVolume.VolumeID != PortworxTestVolume {
 		t.Errorf("Provision() returned unexpected volume ID: %s", persistentSpec.Spec.PersistentVolumeSource.PortworxVolume.VolumeID)
 	}
 	cap := persistentSpec.Spec.Capacity[v1.ResourceStorage]
 	size := cap.Value()
-	if size != 1024*1024*1024*100 {
+	if size != 100*1024*1024*1024 {
 		t.Errorf("Provision() returned unexpected volume size: %v", size)
 	}
 

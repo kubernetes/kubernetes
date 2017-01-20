@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors.
+Copyright 2017 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -21,13 +21,15 @@ import (
 	"os"
 
 	"github.com/golang/glog"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/util/mount"
 	kstrings "k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
+	"k8s.io/kubernetes/pkg/volume/util"
 )
 
 // This is the primary entrypoint for volume plugins.
@@ -82,6 +84,7 @@ func (plugin *portworxVolumePlugin) RequiresRemount() bool {
 func (plugin *portworxVolumePlugin) GetAccessModes() []v1.PersistentVolumeAccessMode {
 	return []v1.PersistentVolumeAccessMode{
 		v1.ReadWriteOnce,
+		v1.ReadWriteMany,
 	}
 }
 
@@ -175,7 +178,7 @@ func (plugin *portworxVolumePlugin) ConstructVolumeSpec(volumeName, mountPath st
 func getVolumeSource(
 	spec *volume.Spec) (*v1.PortworxVolumeSource, bool, error) {
 	if spec.Volume != nil && spec.Volume.PortworxVolume != nil {
-		return spec.Volume.PortworxVolume, spec.ReadOnly, nil
+		return spec.Volume.PortworxVolume, spec.Volume.PortworxVolume.ReadOnly, nil
 	} else if spec.PersistentVolume != nil &&
 		spec.PersistentVolume.Spec.PortworxVolume != nil {
 		return spec.PersistentVolume.Spec.PortworxVolume, spec.ReadOnly, nil
@@ -250,7 +253,6 @@ func (b *portworxVolumeMounter) SetUp(fsGroup *int64) error {
 
 // SetUpAt attaches the disk and bind mounts to the volume path.
 func (b *portworxVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
-
 	notMnt, err := b.mounter.IsLikelyNotMountPoint(dir)
 	glog.V(4).Infof("Portworx Volume set up: %s %v %v", dir, !notMnt, err)
 	if err != nil && !os.IsNotExist(err) {
@@ -274,7 +276,7 @@ func (b *portworxVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 	if err := b.manager.MountVolume(b, dir); err != nil {
 		return err
 	}
-
+	volume.SetVolumeOwnership(b, fsGroup)
 	glog.V(4).Infof("Portworx Volume %s mounted to %s", b.volumeID, dir)
 	return nil
 }
@@ -299,19 +301,19 @@ func (c *portworxVolumeUnmounter) TearDown() error {
 // resource was the last reference to that disk on the kubelet.
 func (c *portworxVolumeUnmounter) TearDownAt(dir string) error {
 	glog.V(4).Infof("Portworx Volume TearDown of %s", dir)
-	notMnt, err := c.mounter.IsLikelyNotMountPoint(dir)
-	if err != nil {
-		glog.V(2).Info("Error checking if mountpoint ", dir, ": ", err)
-		return err
-	}
-	if notMnt {
-		glog.V(2).Info("Not mountpoint, deleting")
-		return os.Remove(dir)
-	}
+	// Unmount the bind mount inside the pod
+	util.UnmountPath(dir, c.mounter)
 
-	// Unmount the bind-mount inside this pod
+	// Call Portworx Unmount for Portworx's book-keeping.
 	if err := c.manager.UnmountVolume(c, dir); err != nil {
 		return err
+	}
+
+	// Double check if the volume is unmounted
+	notMnt, _ := c.mounter.IsLikelyNotMountPoint(dir)
+	if !notMnt {
+		// Mountpoint still exists
+		return fmt.Errorf("Failed to unmount Portworx Volume at %s", dir)
 	}
 
 	if err := c.manager.DetachVolume(c); err != nil {
@@ -350,7 +352,7 @@ func (c *portworxVolumeProvisioner) Provision() (*v1.PersistentVolume, error) {
 	}
 
 	pv := &v1.PersistentVolume{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:   c.options.PVName,
 			Labels: map[string]string{},
 			Annotations: map[string]string{

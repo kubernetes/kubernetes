@@ -678,7 +678,7 @@ func printQuobyteVolumeSource(quobyte *api.QuobyteVolumeSource, w *PrefixWriter)
 }
 
 func printPortworxVolumeSource(pwxVolume *api.PortworxVolumeSource, w *PrefixWriter) {
-	w.Write(LEVEL_2, "Type:\tPortworxVolume (a Portworx Persistent Volume resource)\n"+
+	w.Write(LEVEL_2, "Type:\tPortworxVolume (a Portworx Volume resource)\n"+
 		"    VolumeID:\t%v\n",
 		pwxVolume.VolumeID)
 }

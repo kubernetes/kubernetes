@@ -96,7 +96,7 @@ The following examples assumes that you already have a running Kubernetes cluste
         persistentVolumeReclaimPolicy: Retain
         portworxVolume:
           volumeID: "<vol-id>"
-	  fsType:   "<fs-type>"
+          fsType:   "<fs-type>"
       ```
 
       Make sure to replace <vol-id>, <size> and <fs-type> in the above spec with
