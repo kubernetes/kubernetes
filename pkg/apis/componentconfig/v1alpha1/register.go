@@ -38,6 +38,7 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&KubeSchedulerConfiguration{},
 		&KubeletConfiguration{},
 		&AdmissionConfiguration{},
+		&ResourceQuotaConfiguration{},
 	)
 	return nil
 }
@@ -46,3 +47,4 @@ func (obj *KubeProxyConfiguration) GetObjectKind() schema.ObjectKind     { retur
 func (obj *KubeSchedulerConfiguration) GetObjectKind() schema.ObjectKind { return &obj.TypeMeta }
 func (obj *KubeletConfiguration) GetObjectKind() schema.ObjectKind       { return &obj.TypeMeta }
 func (obj *AdmissionConfiguration) GetObjectKind() schema.ObjectKind     { return &obj.TypeMeta }
+func (obj *ResourceQuotaConfiguration) GetObjectKind() schema.ObjectKind { return &obj.TypeMeta }
