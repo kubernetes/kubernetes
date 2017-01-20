@@ -146,7 +146,7 @@ func (o *ConvertOptions) Complete(f cmdutil.Factory, out io.Writer, cmd *cobra.C
 		}
 	}
 	o.encoder = f.JSONEncoder()
-	o.printer, _, err = kubectl.GetPrinter(outputFormat, templateFile, false)
+	o.printer, _, err = kubectl.GetPrinter(outputFormat, templateFile, false, cmdutil.GetFlagBool(cmd, "allow-missing-template-keys"))
 	if err != nil {
 		return err
 	}
@@ -162,8 +162,8 @@ func (o *ConvertOptions) RunConvert() error {
 		return err
 	}
 
-	singular := false
-	infos, err := r.IntoSingular(&singular).Infos()
+	singleItemImplied := false
+	infos, err := r.IntoSingleItemImplied(&singleItemImplied).Infos()
 	if err != nil {
 		return err
 	}
@@ -172,7 +172,7 @@ func (o *ConvertOptions) RunConvert() error {
 		return fmt.Errorf("no objects passed to convert")
 	}
 
-	objects, err := resource.AsVersionedObject(infos, !singular, o.outputVersion, o.encoder)
+	objects, err := resource.AsVersionedObject(infos, !singleItemImplied, o.outputVersion, o.encoder)
 	if err != nil {
 		return err
 	}

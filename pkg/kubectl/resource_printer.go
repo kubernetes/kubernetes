@@ -69,7 +69,7 @@ const (
 // is agnostic to schema versions, so you must send arguments to PrintObj in the
 // version you wish them to be shown using a VersionedPrinter (typically when
 // generic is true).
-func GetPrinter(format, formatArgument string, noHeaders bool) (ResourcePrinter, bool, error) {
+func GetPrinter(format, formatArgument string, noHeaders, allowMissingTemplateKeys bool) (ResourcePrinter, bool, error) {
 	var printer ResourcePrinter
 	switch format {
 	case "json":
@@ -86,11 +86,12 @@ func GetPrinter(format, formatArgument string, noHeaders bool) (ResourcePrinter,
 		if len(formatArgument) == 0 {
 			return nil, false, fmt.Errorf("template format specified but no template given")
 		}
-		var err error
-		printer, err = NewTemplatePrinter([]byte(formatArgument))
+		templatePrinter, err := NewTemplatePrinter([]byte(formatArgument))
 		if err != nil {
 			return nil, false, fmt.Errorf("error parsing template %s, %v\n", formatArgument, err)
 		}
+		templatePrinter.AllowMissingKeys(allowMissingTemplateKeys)
+		printer = templatePrinter
 	case "templatefile", "go-template-file":
 		if len(formatArgument) == 0 {
 			return nil, false, fmt.Errorf("templatefile format specified but no template file given")
@@ -99,19 +100,22 @@ func GetPrinter(format, formatArgument string, noHeaders bool) (ResourcePrinter,
 		if err != nil {
 			return nil, false, fmt.Errorf("error reading template %s, %v\n", formatArgument, err)
 		}
-		printer, err = NewTemplatePrinter(data)
+		templatePrinter, err := NewTemplatePrinter(data)
 		if err != nil {
 			return nil, false, fmt.Errorf("error parsing template %s, %v\n", string(data), err)
 		}
+		templatePrinter.AllowMissingKeys(allowMissingTemplateKeys)
+		printer = templatePrinter
 	case "jsonpath":
 		if len(formatArgument) == 0 {
 			return nil, false, fmt.Errorf("jsonpath template format specified but no template given")
 		}
-		var err error
-		printer, err = NewJSONPathPrinter(formatArgument)
+		jsonpathPrinter, err := NewJSONPathPrinter(formatArgument)
 		if err != nil {
 			return nil, false, fmt.Errorf("error parsing jsonpath %s, %v\n", formatArgument, err)
 		}
+		jsonpathPrinter.AllowMissingKeys(allowMissingTemplateKeys)
+		printer = jsonpathPrinter
 	case "jsonpath-file":
 		if len(formatArgument) == 0 {
 			return nil, false, fmt.Errorf("jsonpath file format specified but no template file file given")
@@ -120,10 +124,12 @@ func GetPrinter(format, formatArgument string, noHeaders bool) (ResourcePrinter,
 		if err != nil {
 			return nil, false, fmt.Errorf("error reading template %s, %v\n", formatArgument, err)
 		}
-		printer, err = NewJSONPathPrinter(string(data))
+		jsonpathPrinter, err := NewJSONPathPrinter(string(data))
 		if err != nil {
 			return nil, false, fmt.Errorf("error parsing template %s, %v\n", string(data), err)
 		}
+		jsonpathPrinter.AllowMissingKeys(allowMissingTemplateKeys)
+		printer = jsonpathPrinter
 	case "custom-columns":
 		var err error
 		if printer, err = NewCustomColumnsPrinterFromSpec(formatArgument, api.Codecs.UniversalDecoder(), noHeaders); err != nil {
@@ -2435,6 +2441,15 @@ func NewTemplatePrinter(tmpl []byte) (*TemplatePrinter, error) {
 		rawTemplate: string(tmpl),
 		template:    t,
 	}, nil
+}
+
+// AllowMissingKeys tells the template engine if missing keys are allowed.
+func (p *TemplatePrinter) AllowMissingKeys(allow bool) {
+	if allow {
+		p.template.Option("missingkey=default")
+	} else {
+		p.template.Option("missingkey=error")
+	}
 }
 
 func (p *TemplatePrinter) AfterPrint(w io.Writer, res string) error {

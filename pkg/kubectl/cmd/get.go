@@ -310,10 +310,10 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 		// 2. if there is a single item and that item is a list, leave it as its specific list
 		// 3. if there is a single item and it is not a a list, leave it as a single item
 		var errs []error
-		singular := false
-		infos, err := r.IntoSingular(&singular).Infos()
+		singleItemImplied := false
+		infos, err := r.IntoSingleItemImplied(&singleItemImplied).Infos()
 		if err != nil {
-			if singular {
+			if singleItemImplied {
 				return err
 			}
 			errs = append(errs, err)
@@ -328,9 +328,7 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 		}
 
 		var obj runtime.Object
-		if singular {
-			obj = infos[0].Object
-		} else {
+		if !singleItemImplied || len(infos) > 1 {
 			// we have more than one item, so coerce all items into a list
 			list := &runtime.UnstructuredList{
 				Object: map[string]interface{}{
@@ -343,6 +341,8 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 				list.Items = append(list.Items, info.Object.(*runtime.Unstructured))
 			}
 			obj = list
+		} else {
+			obj = infos[0].Object
 		}
 
 		isList := meta.IsListType(obj)

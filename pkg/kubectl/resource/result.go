@@ -39,8 +39,8 @@ type Result struct {
 	err     error
 	visitor Visitor
 
-	sources  []Visitor
-	singular bool
+	sources           []Visitor
+	singleItemImplied bool
 
 	ignoreErrors []utilerrors.Matcher
 
@@ -81,10 +81,10 @@ func (r *Result) Visit(fn VisitorFunc) error {
 	return utilerrors.FilterOut(err, r.ignoreErrors...)
 }
 
-// IntoSingular sets the provided boolean pointer to true if the Builder input
-// reflected a single item, or multiple.
-func (r *Result) IntoSingular(b *bool) *Result {
-	*b = r.singular
+// IntoSingleItemImplied sets the provided boolean pointer to true if the Builder input
+// implies a single item, or multiple.
+func (r *Result) IntoSingleItemImplied(b *bool) *Result {
+	*b = r.singleItemImplied
 	return r
 }
 
@@ -135,7 +135,7 @@ func (r *Result) Object() (runtime.Object, error) {
 	}
 
 	if len(objects) == 1 {
-		if r.singular {
+		if r.singleItemImplied {
 			return objects[0], nil
 		}
 		// if the item is a list already, don't create another list

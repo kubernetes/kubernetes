@@ -257,11 +257,11 @@ func TestPathBuilderAndVersionedObjectNotDefaulted(t *testing.T) {
 		FilenameParam(false, &FilenameOptions{Recursive: false, Filenames: []string{"../../../test/fixtures/pkg/kubectl/builder/kitten-rc.yaml"}})
 
 	test := &testVisitor{}
-	singular := false
+	singleItemImplied := false
 
-	err := b.Do().IntoSingular(&singular).Visit(test.Handle)
-	if err != nil || !singular || len(test.Infos) != 1 {
-		t.Fatalf("unexpected response: %v %t %#v", err, singular, test.Infos)
+	err := b.Do().IntoSingleItemImplied(&singleItemImplied).Visit(test.Handle)
+	if err != nil || !singleItemImplied || len(test.Infos) != 1 {
+		t.Fatalf("unexpected response: %v %t %#v", err, singleItemImplied, test.Infos)
 	}
 
 	info := test.Infos[0]
@@ -361,11 +361,11 @@ func TestPathBuilderWithMultiple(t *testing.T) {
 			NamespaceParam("test").DefaultNamespace()
 
 		testVisitor := &testVisitor{}
-		singular := false
+		singleItemImplied := false
 
-		err := b.Do().IntoSingular(&singular).Visit(testVisitor.Handle)
+		err := b.Do().IntoSingleItemImplied(&singleItemImplied).Visit(testVisitor.Handle)
 		if err != nil {
-			t.Fatalf("unexpected response: %v %t %#v %s", err, singular, testVisitor.Infos, test.name)
+			t.Fatalf("unexpected response: %v %t %#v %s", err, singleItemImplied, testVisitor.Infos, test.name)
 		}
 
 		info := testVisitor.Infos
@@ -420,11 +420,11 @@ func TestPathBuilderWithMultipleInvalid(t *testing.T) {
 			NamespaceParam("test").DefaultNamespace()
 
 		testVisitor := &testVisitor{}
-		singular := false
+		singleItemImplied := false
 
-		err := b.Do().IntoSingular(&singular).Visit(testVisitor.Handle)
+		err := b.Do().IntoSingleItemImplied(&singleItemImplied).Visit(testVisitor.Handle)
 		if err == nil {
-			t.Fatalf("unexpected response: %v %t %#v %s", err, singular, testVisitor.Infos, test.name)
+			t.Fatalf("unexpected response: %v %t %#v %s", err, singleItemImplied, testVisitor.Infos, test.name)
 		}
 	}
 }
@@ -435,11 +435,11 @@ func TestDirectoryBuilder(t *testing.T) {
 		NamespaceParam("test").DefaultNamespace()
 
 	test := &testVisitor{}
-	singular := false
+	singleItemImplied := false
 
-	err := b.Do().IntoSingular(&singular).Visit(test.Handle)
-	if err != nil || singular || len(test.Infos) < 3 {
-		t.Fatalf("unexpected response: %v %t %#v", err, singular, test.Infos)
+	err := b.Do().IntoSingleItemImplied(&singleItemImplied).Visit(test.Handle)
+	if err != nil || singleItemImplied || len(test.Infos) < 3 {
+		t.Fatalf("unexpected response: %v %t %#v", err, singleItemImplied, test.Infos)
 	}
 
 	found := false
@@ -526,11 +526,11 @@ func TestURLBuilderRequireNamespace(t *testing.T) {
 		NamespaceParam("test").RequireNamespace()
 
 	test := &testVisitor{}
-	singular := false
+	singleItemImplied := false
 
-	err := b.Do().IntoSingular(&singular).Visit(test.Handle)
-	if err == nil || !singular || len(test.Infos) != 0 {
-		t.Fatalf("unexpected response: %v %t %#v", err, singular, test.Infos)
+	err := b.Do().IntoSingleItemImplied(&singleItemImplied).Visit(test.Handle)
+	if err == nil || !singleItemImplied || len(test.Infos) != 0 {
+		t.Fatalf("unexpected response: %v %t %#v", err, singleItemImplied, test.Infos)
 	}
 }
 
@@ -542,7 +542,7 @@ func TestResourceByName(t *testing.T) {
 		NamespaceParam("test")
 
 	test := &testVisitor{}
-	singular := false
+	singleItemImplied := false
 
 	if b.Do().Err() == nil {
 		t.Errorf("unexpected non-error")
@@ -550,9 +550,9 @@ func TestResourceByName(t *testing.T) {
 
 	b.ResourceTypeOrNameArgs(true, "pods", "foo")
 
-	err := b.Do().IntoSingular(&singular).Visit(test.Handle)
-	if err != nil || !singular || len(test.Infos) != 1 {
-		t.Fatalf("unexpected response: %v %t %#v", err, singular, test.Infos)
+	err := b.Do().IntoSingleItemImplied(&singleItemImplied).Visit(test.Handle)
+	if err != nil || !singleItemImplied || len(test.Infos) != 1 {
+		t.Fatalf("unexpected response: %v %t %#v", err, singleItemImplied, test.Infos)
 	}
 	if !reflect.DeepEqual(&pods.Items[0], test.Objects()[0]) {
 		t.Errorf("unexpected object: %#v", test.Objects()[0])
@@ -578,7 +578,7 @@ func TestMultipleResourceByTheSameName(t *testing.T) {
 		NamespaceParam("test")
 
 	test := &testVisitor{}
-	singular := false
+	singleItemImplied := false
 
 	if b.Do().Err() == nil {
 		t.Errorf("unexpected non-error")
@@ -586,9 +586,9 @@ func TestMultipleResourceByTheSameName(t *testing.T) {
 
 	b.ResourceTypeOrNameArgs(true, "pods,services", "foo", "baz")
 
-	err := b.Do().IntoSingular(&singular).Visit(test.Handle)
-	if err != nil || singular || len(test.Infos) != 4 {
-		t.Fatalf("unexpected response: %v %t %#v", err, singular, test.Infos)
+	err := b.Do().IntoSingleItemImplied(&singleItemImplied).Visit(test.Handle)
+	if err != nil || singleItemImplied || len(test.Infos) != 4 {
+		t.Fatalf("unexpected response: %v %t %#v", err, singleItemImplied, test.Infos)
 	}
 	if !api.Semantic.DeepDerivative([]runtime.Object{&pods.Items[0], &pods.Items[1], &svcs.Items[0], &svcs.Items[0]}, test.Objects()) {
 		t.Errorf("unexpected visited objects: %#v", test.Objects())
@@ -654,7 +654,7 @@ func TestResourceByNameWithoutRequireObject(t *testing.T) {
 		NamespaceParam("test")
 
 	test := &testVisitor{}
-	singular := false
+	singleItemImplied := false
 
 	if b.Do().Err() == nil {
 		t.Errorf("unexpected non-error")
@@ -662,9 +662,9 @@ func TestResourceByNameWithoutRequireObject(t *testing.T) {
 
 	b.ResourceTypeOrNameArgs(true, "pods", "foo").RequireObject(false)
 
-	err := b.Do().IntoSingular(&singular).Visit(test.Handle)
-	if err != nil || !singular || len(test.Infos) != 1 {
-		t.Fatalf("unexpected response: %v %t %#v", err, singular, test.Infos)
+	err := b.Do().IntoSingleItemImplied(&singleItemImplied).Visit(test.Handle)
+	if err != nil || !singleItemImplied || len(test.Infos) != 1 {
+		t.Fatalf("unexpected response: %v %t %#v", err, singleItemImplied, test.Infos)
 	}
 	if test.Infos[0].Name != "foo" {
 		t.Errorf("unexpected name: %#v", test.Infos[0].Name)
@@ -691,10 +691,10 @@ func TestResourceByNameAndEmptySelector(t *testing.T) {
 		SelectorParam("").
 		ResourceTypeOrNameArgs(true, "pods", "foo")
 
-	singular := false
-	infos, err := b.Do().IntoSingular(&singular).Infos()
-	if err != nil || !singular || len(infos) != 1 {
-		t.Fatalf("unexpected response: %v %t %#v", err, singular, infos)
+	singleItemImplied := false
+	infos, err := b.Do().IntoSingleItemImplied(&singleItemImplied).Infos()
+	if err != nil || !singleItemImplied || len(infos) != 1 {
+		t.Fatalf("unexpected response: %v %t %#v", err, singleItemImplied, infos)
 	}
 	if !reflect.DeepEqual(&pods.Items[0], infos[0].Object) {
 		t.Errorf("unexpected object: %#v", infos[0])
@@ -721,7 +721,7 @@ func TestSelector(t *testing.T) {
 		Flatten()
 
 	test := &testVisitor{}
-	singular := false
+	singleItemImplied := false
 
 	if b.Do().Err() == nil {
 		t.Errorf("unexpected non-error")
@@ -729,9 +729,9 @@ func TestSelector(t *testing.T) {
 
 	b.ResourceTypeOrNameArgs(true, "pods,service")
 
-	err := b.Do().IntoSingular(&singular).Visit(test.Handle)
-	if err != nil || singular || len(test.Infos) != 3 {
-		t.Fatalf("unexpected response: %v %t %#v", err, singular, test.Infos)
+	err := b.Do().IntoSingleItemImplied(&singleItemImplied).Visit(test.Handle)
+	if err != nil || singleItemImplied || len(test.Infos) != 3 {
+		t.Fatalf("unexpected response: %v %t %#v", err, singleItemImplied, test.Infos)
 	}
 	if !api.Semantic.DeepDerivative([]runtime.Object{&pods.Items[0], &pods.Items[1], &svc.Items[0]}, test.Objects()) {
 		t.Errorf("unexpected visited objects: %#v", test.Objects())
@@ -837,9 +837,9 @@ func TestResourceTuple(t *testing.T) {
 				continue
 			}
 			switch {
-			case (r.singular && len(testCase.args) != 1),
-				(!r.singular && len(testCase.args) == 1):
-				t.Errorf("%s: result had unexpected singular value", k)
+			case (r.singleItemImplied && len(testCase.args) != 1),
+				(!r.singleItemImplied && len(testCase.args) == 1):
+				t.Errorf("%s: result had unexpected singleItemImplied value", k)
 			}
 			info, err := r.Infos()
 			if err != nil {
@@ -859,11 +859,11 @@ func TestStream(t *testing.T) {
 		NamespaceParam("test").Stream(r, "STDIN").Flatten()
 
 	test := &testVisitor{}
-	singular := false
+	singleItemImplied := false
 
-	err := b.Do().IntoSingular(&singular).Visit(test.Handle)
-	if err != nil || singular || len(test.Infos) != 3 {
-		t.Fatalf("unexpected response: %v %t %#v", err, singular, test.Infos)
+	err := b.Do().IntoSingleItemImplied(&singleItemImplied).Visit(test.Handle)
+	if err != nil || singleItemImplied || len(test.Infos) != 3 {
+		t.Fatalf("unexpected response: %v %t %#v", err, singleItemImplied, test.Infos)
 	}
 	if !api.Semantic.DeepDerivative([]runtime.Object{&pods.Items[0], &pods.Items[1], &rc.Items[0]}, test.Objects()) {
 		t.Errorf("unexpected visited objects: %#v", test.Objects())
@@ -876,11 +876,11 @@ func TestYAMLStream(t *testing.T) {
 		NamespaceParam("test").Stream(r, "STDIN").Flatten()
 
 	test := &testVisitor{}
-	singular := false
+	singleItemImplied := false
 
-	err := b.Do().IntoSingular(&singular).Visit(test.Handle)
-	if err != nil || singular || len(test.Infos) != 3 {
-		t.Fatalf("unexpected response: %v %t %#v", err, singular, test.Infos)
+	err := b.Do().IntoSingleItemImplied(&singleItemImplied).Visit(test.Handle)
+	if err != nil || singleItemImplied || len(test.Infos) != 3 {
+		t.Fatalf("unexpected response: %v %t %#v", err, singleItemImplied, test.Infos)
 	}
 	if !api.Semantic.DeepDerivative([]runtime.Object{&pods.Items[0], &pods.Items[1], &rc.Items[0]}, test.Objects()) {
 		t.Errorf("unexpected visited objects: %#v", test.Objects())
@@ -939,7 +939,7 @@ func TestContinueOnErrorVisitor(t *testing.T) {
 	}
 }
 
-func TestSingularObject(t *testing.T) {
+func TestSingleItemImpliedObject(t *testing.T) {
 	obj, err := NewBuilder(testapi.Default.RESTMapper(), api.Scheme, fakeClient(), testapi.Default.Codec()).
 		NamespaceParam("test").DefaultNamespace().
 		FilenameParam(false, &FilenameOptions{Recursive: false, Filenames: []string{"../../../examples/guestbook/legacy/redis-master-controller.yaml"}}).
@@ -959,7 +959,7 @@ func TestSingularObject(t *testing.T) {
 	}
 }
 
-func TestSingularObjectNoExtension(t *testing.T) {
+func TestSingleItemImpliedObjectNoExtension(t *testing.T) {
 	obj, err := NewBuilder(testapi.Default.RESTMapper(), api.Scheme, fakeClient(), testapi.Default.Codec()).
 		NamespaceParam("test").DefaultNamespace().
 		FilenameParam(false, &FilenameOptions{Recursive: false, Filenames: []string{"../../../examples/pod"}}).
@@ -979,7 +979,7 @@ func TestSingularObjectNoExtension(t *testing.T) {
 	}
 }
 
-func TestSingularRootScopedObject(t *testing.T) {
+func TestSingleItemImpliedRootScopedObject(t *testing.T) {
 	node := &api.Node{ObjectMeta: api.ObjectMeta{Name: "test"}, Spec: api.NodeSpec{ExternalID: "test"}}
 	r := streamTestObject(node)
 	infos, err := NewBuilder(testapi.Default.RESTMapper(), api.Scheme, fakeClient(), testapi.Default.Codec()).
@@ -1129,11 +1129,11 @@ func TestLatest(t *testing.T) {
 		NamespaceParam("other").Stream(r, "STDIN").Flatten().Latest()
 
 	test := &testVisitor{}
-	singular := false
+	singleItemImplied := false
 
-	err := b.Do().IntoSingular(&singular).Visit(test.Handle)
-	if err != nil || singular || len(test.Infos) != 3 {
-		t.Fatalf("unexpected response: %v %t %#v", err, singular, test.Infos)
+	err := b.Do().IntoSingleItemImplied(&singleItemImplied).Visit(test.Handle)
+	if err != nil || singleItemImplied || len(test.Infos) != 3 {
+		t.Fatalf("unexpected response: %v %t %#v", err, singleItemImplied, test.Infos)
 	}
 	if !api.Semantic.DeepDerivative([]runtime.Object{newPod, newPod2, newSvc}, test.Objects()) {
 		t.Errorf("unexpected visited objects: %#v", test.Objects())
@@ -1162,11 +1162,11 @@ func TestReceiveMultipleErrors(t *testing.T) {
 		ContinueOnError()
 
 	test := &testVisitor{}
-	singular := false
+	singleItemImplied := false
 
-	err := b.Do().IntoSingular(&singular).Visit(test.Handle)
-	if err == nil || singular || len(test.Infos) != 2 {
-		t.Fatalf("unexpected response: %v %t %#v", err, singular, test.Infos)
+	err := b.Do().IntoSingleItemImplied(&singleItemImplied).Visit(test.Handle)
+	if err == nil || singleItemImplied || len(test.Infos) != 2 {
+		t.Fatalf("unexpected response: %v %t %#v", err, singleItemImplied, test.Infos)
 	}
 
 	errs, ok := err.(utilerrors.Aggregate)

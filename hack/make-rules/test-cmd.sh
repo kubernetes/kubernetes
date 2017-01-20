@@ -1251,6 +1251,47 @@ __EOF__
   kube::test::if_has_string "${output_message}" "/apis/extensions/v1beta1/namespaces/default/deployments 200 OK"
   kube::test::if_has_string "${output_message}" "/apis/extensions/v1beta1/namespaces/default/replicasets 200 OK"
 
+  ### Test --allow-missing-template-keys
+  # Pre-condition: no POD exists
+  create_and_use_new_namespace
+  kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
+  # Command
+  kubectl create -f test/fixtures/doc-yaml/admin/limitrange/valid-pod.yaml "${kube_flags[@]}"
+  # Post-condition: valid-pod POD is created
+  kubectl get "${kube_flags[@]}" pods -o json
+  kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" 'valid-pod:'
+
+  ## check --allow-missing-template-keys defaults to true for jsonpath templates
+  kubectl get "${kube_flags[@]}" pod valid-pod -o jsonpath='{.missing}'
+
+  ## check --allow-missing-template-keys defaults to true for go templates
+  kubectl get "${kube_flags[@]}" pod valid-pod -o go-template='{{.missing}}'
+
+  ## check --allow-missing-template-keys=false results in an error for a missing key with jsonpath
+  output_message=$(! kubectl get pod valid-pod --allow-missing-template-keys=false -o jsonpath='{.missing}' "${kube_flags[@]}")
+  kube::test::if_has_string "${output_message}" 'missing is not found'
+
+  ## check --allow-missing-template-keys=false results in an error for a missing key with go
+  output_message=$(! kubectl get pod valid-pod --allow-missing-template-keys=false -o go-template='{{.missing}}' "${kube_flags[@]}")
+  kube::test::if_has_string "${output_message}" 'map has no entry for key "missing"'
+
+  # cleanup
+  kubectl delete pods valid-pod "${kube_flags[@]}"
+
+  ### Test 'kubectl get -f <file> -o <non default printer>' prints all the items in the file's list
+  # Pre-condition: no POD exists
+  kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
+  # Command
+  kubectl create -f test/fixtures/doc-yaml/user-guide/multi-pod.yaml "${kube_flags[@]}"
+  # Post-condition: PODs redis-master and redis-proxy exist
+
+  # Check that all items in the list are printed
+  output_message=$(kubectl get -f test/fixtures/doc-yaml/user-guide/multi-pod.yaml -o jsonpath="{..metadata.name}" "${kube_flags[@]}")
+  kube::test::if_has_string "${output_message}" "redis-master redis-proxy"
+
+  # cleanup
+  kubectl delete pods redis-master redis-proxy "${kube_flags[@]}"
+
 
   ##################
   # Global timeout #
