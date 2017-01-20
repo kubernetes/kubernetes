@@ -10101,6 +10101,10 @@
      "prefix": {
       "description": "An optional identifer to prepend to each key in the ConfigMap. Must be a C_IDENTIFIER.",
       "type": "string"
+     },
+     "secretRef": {
+      "description": "The Secret to select from",
+      "$ref": "#/definitions/v1.SecretEnvSource"
      }
     }
    },
@@ -11594,6 +11598,15 @@
      },
      "type": {
       "description": "Used to facilitate programmatic handling of secret data.",
+      "type": "string"
+     }
+    }
+   },
+   "v1.SecretEnvSource": {
+    "description": "SecretEnvSource selects a Secret to populate the environment variables with.\n\nThe contents of the target Secret's Data field will represent the key-value pairs as environment variables.",
+    "properties": {
+     "name": {
+      "description": "Name of the referent. More info: http://kubernetes.io/docs/user-guide/identifiers#names",
       "type": "string"
      }
     }

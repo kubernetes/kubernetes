@@ -386,10 +386,15 @@ func FuzzerFor(t *testing.T, version schema.GroupVersion, src rand.Source) *fuzz
 			}
 			if c.RandBool() {
 				c.Fuzz(&ev.ConfigMapRef)
+			} else {
+				c.Fuzz(&ev.SecretRef)
 			}
 		},
 		func(cm *api.ConfigMapEnvSource, c fuzz.Continue) {
 			c.FuzzNoCustom(cm) // fuzz self without calling this function again
+		},
+		func(s *api.SecretEnvSource, c fuzz.Continue) {
+			c.FuzzNoCustom(s) // fuzz self without calling this function again
 		},
 		func(sc *api.SecurityContext, c fuzz.Continue) {
 			c.FuzzNoCustom(sc) // fuzz self without calling this function again
