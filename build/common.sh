@@ -30,15 +30,6 @@ KUBE_ROOT=$(cd $(dirname "${BASH_SOURCE}")/.. && pwd -P)
 
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
-# Set KUBE_BUILD_PPC64LE to y to build for ppc64le in addition to other
-# platforms.
-# TODO(IBM): remove KUBE_BUILD_PPC64LE and reenable ppc64le compilation by
-# default when
-# https://github.com/kubernetes/kubernetes/issues/30384 and
-# https://github.com/kubernetes/kubernetes/issues/25886 are fixed.
-# The majority of the logic is in hack/lib/golang.sh.
-readonly KUBE_BUILD_PPC64LE="${KUBE_BUILD_PPC64LE:-n}"
-
 # Constants
 readonly KUBE_BUILD_IMAGE_REPO=kube-build
 readonly KUBE_BUILD_IMAGE_CROSS_TAG="$(cat ${KUBE_ROOT}/build/build-image/cross/VERSION)"
@@ -91,6 +82,7 @@ readonly KUBE_CONTAINER_RSYNC_PORT=8730
 #
 # $1 - server architecture
 kube::build::get_docker_wrapped_binaries() {
+  debian_iptables_version=v6
   case $1 in
     "amd64")
         local targets=(
@@ -98,7 +90,7 @@ kube::build::get_docker_wrapped_binaries() {
           kube-controller-manager,busybox
           kube-scheduler,busybox
           kube-aggregator,busybox
-          kube-proxy,gcr.io/google_containers/debian-iptables-amd64:v5
+          kube-proxy,gcr.io/google_containers/debian-iptables-amd64:${debian_iptables_version}
         );;
     "arm")
         local targets=(
@@ -106,7 +98,7 @@ kube::build::get_docker_wrapped_binaries() {
           kube-controller-manager,armel/busybox
           kube-scheduler,armel/busybox
           kube-aggregator,armel/busybox
-          kube-proxy,gcr.io/google_containers/debian-iptables-arm:v5
+          kube-proxy,gcr.io/google_containers/debian-iptables-arm:${debian_iptables_version}
         );;
     "arm64")
         local targets=(
@@ -114,7 +106,7 @@ kube::build::get_docker_wrapped_binaries() {
           kube-controller-manager,aarch64/busybox
           kube-scheduler,aarch64/busybox
           kube-aggregator,aarch64/busybox
-          kube-proxy,gcr.io/google_containers/debian-iptables-arm64:v5
+          kube-proxy,gcr.io/google_containers/debian-iptables-arm64:${debian_iptables_version}
         );;
     "ppc64le")
         local targets=(
@@ -122,7 +114,7 @@ kube::build::get_docker_wrapped_binaries() {
           kube-controller-manager,ppc64le/busybox
           kube-scheduler,ppc64le/busybox
           kube-aggregator,ppc64le/busybox
-          kube-proxy,gcr.io/google_containers/debian-iptables-ppc64le:v5
+          kube-proxy,gcr.io/google_containers/debian-iptables-ppc64le:${debian_iptables_version}
         );;
     "s390x")
         local targets=(
@@ -130,7 +122,7 @@ kube::build::get_docker_wrapped_binaries() {
           kube-controller-manager,s390x/busybox
           kube-scheduler,s390x/busybox
           kube-aggregator,s390x/busybox
-          kube-proxy,gcr.io/google_containers/debian-iptables-s390x:v5
+          kube-proxy,gcr.io/google_containers/debian-iptables-s390x:${debian_iptables_version}
         );;		
   esac
 
@@ -553,7 +545,6 @@ function kube::build::run_build_command_ex() {
   docker_run_opts+=(
     --env "KUBE_FASTBUILD=${KUBE_FASTBUILD:-false}"
     --env "KUBE_BUILDER_OS=${OSTYPE:-notdetected}"
-    --env "KUBE_BUILD_PPC64LE=${KUBE_BUILD_PPC64LE}"  # TODO(IBM): remove
     --env "KUBE_VERBOSE=${KUBE_VERBOSE}"
   )
 
