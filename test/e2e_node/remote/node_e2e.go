@@ -100,8 +100,8 @@ func updateGCIMounterPath(args, host, workspace string) (string, error) {
 	if err != nil {
 		return args, fmt.Errorf("issue detecting node's OS via node's /etc/os-release. Err: %v, Output:\n%s", err, output)
 	}
-	if !strings.Contains(output, "ID=gci") {
-		// This is not a GCI image
+	if !strings.Contains(output, "ID=gci") && !strings.Contains(output, "ID=cos") {
+		// This is not a GCI/COS image
 		return args, nil
 	}
 
