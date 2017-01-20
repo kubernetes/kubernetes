@@ -33,7 +33,6 @@ go_library(
         "//federation/pkg/federation-controller/service:go_default_library",
         "//federation/pkg/federation-controller/util:go_default_library",
         "//pkg/client/typed/discovery:go_default_library",
-        "//pkg/client/unversioned/clientcmd:go_default_library",
         "//pkg/util/config:go_default_library",
         "//pkg/util/configz:go_default_library",
         "//pkg/version:go_default_library",
@@ -46,6 +45,7 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/util/wait",
         "//vendor:k8s.io/apiserver/pkg/server/healthz",
         "//vendor:k8s.io/client-go/rest",
+        "//vendor:k8s.io/client-go/tools/clientcmd",
     ],
 )
 

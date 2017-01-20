@@ -74,7 +74,6 @@ go_library(
         "//pkg/client/clientset_generated/internalclientset/typed/core/internalversion:go_default_library",
         "//pkg/client/typed/discovery:go_default_library",
         "//pkg/client/unversioned:go_default_library",
-        "//pkg/client/unversioned/clientcmd:go_default_library",
         "//pkg/client/unversioned/portforward:go_default_library",
         "//pkg/client/unversioned/remotecommand:go_default_library",
         "//pkg/kubectl:go_default_library",
@@ -124,6 +123,7 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/util/yaml",
         "//vendor:k8s.io/apimachinery/pkg/watch",
         "//vendor:k8s.io/client-go/rest",
+        "//vendor:k8s.io/client-go/tools/clientcmd",
     ],
 )
 
