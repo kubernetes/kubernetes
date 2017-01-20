@@ -24,13 +24,14 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/client/cache"
+	"k8s.io/kubernetes/pkg/client/legacylisters"
 )
 
 // DaemonSetInformer is type of SharedIndexInformer which watches and lists all pods.
 // Interface provides constructor for informer and lister for pods
 type DaemonSetInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() *cache.StoreToDaemonSetLister
+	Lister() *listers.StoreToDaemonSetLister
 }
 
 type daemonSetInformer struct {
@@ -64,15 +65,15 @@ func (f *daemonSetInformer) Informer() cache.SharedIndexInformer {
 	return informer
 }
 
-func (f *daemonSetInformer) Lister() *cache.StoreToDaemonSetLister {
+func (f *daemonSetInformer) Lister() *listers.StoreToDaemonSetLister {
 	informer := f.Informer()
-	return &cache.StoreToDaemonSetLister{Store: informer.GetIndexer()}
+	return &listers.StoreToDaemonSetLister{Store: informer.GetIndexer()}
 }
 
 // DeploymentInformer is a type of SharedIndexInformer which watches and lists all deployments.
 type DeploymentInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() *cache.StoreToDeploymentLister
+	Lister() *listers.StoreToDeploymentLister
 }
 
 type deploymentInformer struct {
@@ -106,15 +107,15 @@ func (f *deploymentInformer) Informer() cache.SharedIndexInformer {
 	return informer
 }
 
-func (f *deploymentInformer) Lister() *cache.StoreToDeploymentLister {
+func (f *deploymentInformer) Lister() *listers.StoreToDeploymentLister {
 	informer := f.Informer()
-	return &cache.StoreToDeploymentLister{Indexer: informer.GetIndexer()}
+	return &listers.StoreToDeploymentLister{Indexer: informer.GetIndexer()}
 }
 
 // ReplicaSetInformer is a type of SharedIndexInformer which watches and lists all replicasets.
 type ReplicaSetInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() *cache.StoreToReplicaSetLister
+	Lister() *listers.StoreToReplicaSetLister
 }
 
 type replicaSetInformer struct {
@@ -148,7 +149,7 @@ func (f *replicaSetInformer) Informer() cache.SharedIndexInformer {
 	return informer
 }
 
-func (f *replicaSetInformer) Lister() *cache.StoreToReplicaSetLister {
+func (f *replicaSetInformer) Lister() *listers.StoreToReplicaSetLister {
 	informer := f.Informer()
-	return &cache.StoreToReplicaSetLister{Indexer: informer.GetIndexer()}
+	return &listers.StoreToReplicaSetLister{Indexer: informer.GetIndexer()}
 }

@@ -25,8 +25,8 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
-	"k8s.io/kubernetes/pkg/client/cache"
 	unversionedextensions "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/extensions/v1beta1"
+	"k8s.io/kubernetes/pkg/client/legacylisters"
 	"k8s.io/kubernetes/pkg/client/retry"
 	labelsutil "k8s.io/kubernetes/pkg/util/labels"
 )
@@ -37,7 +37,7 @@ type updateRSFunc func(rs *extensions.ReplicaSet) error
 
 // UpdateRSWithRetries updates a RS with given applyUpdate function. Note that RS not found error is ignored.
 // The returned bool value can be used to tell if the RS is actually updated.
-func UpdateRSWithRetries(rsClient unversionedextensions.ReplicaSetInterface, rsLister *cache.StoreToReplicaSetLister, namespace, name string, applyUpdate updateRSFunc) (*extensions.ReplicaSet, error) {
+func UpdateRSWithRetries(rsClient unversionedextensions.ReplicaSetInterface, rsLister *listers.StoreToReplicaSetLister, namespace, name string, applyUpdate updateRSFunc) (*extensions.ReplicaSet, error) {
 	var rs *extensions.ReplicaSet
 
 	retryErr := retry.RetryOnConflict(retry.DefaultBackoff, func() error {

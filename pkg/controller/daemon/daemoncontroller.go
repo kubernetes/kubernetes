@@ -35,6 +35,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	v1core "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/core/v1"
 	unversionedextensions "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/extensions/v1beta1"
+	"k8s.io/kubernetes/pkg/client/legacylisters"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/informers"
@@ -74,11 +75,11 @@ type DaemonSetsController struct {
 	// A TTLCache of pod creates/deletes each ds expects to see
 	expectations controller.ControllerExpectationsInterface
 	// A store of daemon sets
-	dsStore *cache.StoreToDaemonSetLister
+	dsStore *listers.StoreToDaemonSetLister
 	// A store of pods
-	podStore *cache.StoreToPodLister
+	podStore *listers.StoreToPodLister
 	// A store of nodes
-	nodeStore *cache.StoreToNodeLister
+	nodeStore *listers.StoreToNodeLister
 	// dsStoreSynced returns true if the daemonset store has been synced at least once.
 	// Added as a member to the struct to allow injection for testing.
 	dsStoreSynced cache.InformerSynced

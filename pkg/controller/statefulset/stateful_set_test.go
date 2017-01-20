@@ -29,6 +29,7 @@ import (
 	fakeinternal "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/apps/v1beta1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/apps/v1beta1/fake"
+	"k8s.io/kubernetes/pkg/client/legacylisters"
 	"k8s.io/kubernetes/pkg/controller"
 )
 
@@ -38,8 +39,8 @@ func newFakeStatefulSetController() (*StatefulSetController, *fakePetClient) {
 		kubeClient:       nil,
 		blockingPetStore: newUnHealthyPetTracker(fpc),
 		podStoreSynced:   func() bool { return true },
-		psStore:          cache.StoreToStatefulSetLister{Store: cache.NewStore(controller.KeyFunc)},
-		podStore:         cache.StoreToPodLister{Indexer: cache.NewIndexer(controller.KeyFunc, cache.Indexers{})},
+		psStore:          listers.StoreToStatefulSetLister{Store: cache.NewStore(controller.KeyFunc)},
+		podStore:         listers.StoreToPodLister{Indexer: cache.NewIndexer(controller.KeyFunc, cache.Indexers{})},
 		newSyncer: func(blockingPet *pcb) *petSyncer {
 			return &petSyncer{fpc, blockingPet}
 		},

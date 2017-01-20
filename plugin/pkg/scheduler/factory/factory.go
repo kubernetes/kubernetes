@@ -34,6 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	"k8s.io/kubernetes/pkg/client/legacylisters"
 	"k8s.io/kubernetes/pkg/controller/informers"
 	"k8s.io/kubernetes/plugin/pkg/scheduler"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
@@ -59,21 +60,21 @@ type ConfigFactory struct {
 	// queue for pods that need scheduling
 	podQueue *cache.FIFO
 	// a means to list all known scheduled pods.
-	scheduledPodLister *cache.StoreToPodLister
+	scheduledPodLister *listers.StoreToPodLister
 	// a means to list all known scheduled pods and pods assumed to have been scheduled.
 	podLister algorithm.PodLister
 	// a means to list all nodes
-	nodeLister *cache.StoreToNodeLister
+	nodeLister *listers.StoreToNodeLister
 	// a means to list all PersistentVolumes
-	pVLister *cache.StoreToPVFetcher
+	pVLister *listers.StoreToPVFetcher
 	// a means to list all PersistentVolumeClaims
-	pVCLister *cache.StoreToPersistentVolumeClaimLister
+	pVCLister *listers.StoreToPersistentVolumeClaimLister
 	// a means to list all services
-	serviceLister *cache.StoreToServiceLister
+	serviceLister *listers.StoreToServiceLister
 	// a means to list all controllers
-	controllerLister *cache.StoreToReplicationControllerLister
+	controllerLister *listers.StoreToReplicationControllerLister
 	// a means to list all replicasets
-	replicaSetLister *cache.StoreToReplicaSetLister
+	replicaSetLister *listers.StoreToReplicaSetLister
 
 	// Close this to stop all reflectors
 	StopEverything chan struct{}
@@ -117,16 +118,16 @@ func NewConfigFactory(client clientset.Interface, schedulerName string, hardPodA
 	c := &ConfigFactory{
 		client:             client,
 		podQueue:           cache.NewFIFO(cache.MetaNamespaceKeyFunc),
-		scheduledPodLister: &cache.StoreToPodLister{},
+		scheduledPodLister: &listers.StoreToPodLister{},
 		informerFactory:    informerFactory,
 		// Only nodes in the "Ready" condition with status == "True" are schedulable
-		nodeLister:                     &cache.StoreToNodeLister{},
-		pVLister:                       &cache.StoreToPVFetcher{Store: cache.NewStore(cache.MetaNamespaceKeyFunc)},
+		nodeLister:                     &listers.StoreToNodeLister{},
+		pVLister:                       &listers.StoreToPVFetcher{Store: cache.NewStore(cache.MetaNamespaceKeyFunc)},
 		pVCLister:                      pvcInformer.Lister(),
 		pvcPopulator:                   pvcInformer.Informer().GetController(),
-		serviceLister:                  &cache.StoreToServiceLister{Indexer: cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})},
-		controllerLister:               &cache.StoreToReplicationControllerLister{Indexer: cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})},
-		replicaSetLister:               &cache.StoreToReplicaSetLister{Indexer: cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})},
+		serviceLister:                  &listers.StoreToServiceLister{Indexer: cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})},
+		controllerLister:               &listers.StoreToReplicationControllerLister{Indexer: cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})},
+		replicaSetLister:               &listers.StoreToReplicaSetLister{Indexer: cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})},
 		schedulerCache:                 schedulerCache,
 		StopEverything:                 stopEverything,
 		schedulerName:                  schedulerName,
@@ -515,7 +516,7 @@ func (f *ConfigFactory) ResponsibleForPod(pod *v1.Pod) bool {
 	return f.schedulerName == pod.Spec.SchedulerName
 }
 
-func getNodeConditionPredicate() cache.NodeConditionPredicate {
+func getNodeConditionPredicate() listers.NodeConditionPredicate {
 	return func(node *v1.Node) bool {
 		for i := range node.Status.Conditions {
 			cond := &node.Status.Conditions[i]

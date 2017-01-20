@@ -20,6 +20,7 @@ go_library(
         "//pkg/client/cache:go_default_library",
         "//pkg/client/clientset_generated/clientset:go_default_library",
         "//pkg/client/clientset_generated/clientset/typed/core/v1:go_default_library",
+        "//pkg/client/legacylisters:go_default_library",
         "//pkg/client/record:go_default_library",
         "//pkg/cloudprovider:go_default_library",
         "//pkg/controller:go_default_library",

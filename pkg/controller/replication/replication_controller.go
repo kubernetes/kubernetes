@@ -36,6 +36,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	v1core "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/core/v1"
+	"k8s.io/kubernetes/pkg/client/legacylisters"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/informers"
@@ -82,9 +83,9 @@ type ReplicationManager struct {
 	expectations *controller.UIDTrackingControllerExpectations
 
 	// A store of replication controllers, populated by the rcController
-	rcLister cache.StoreToReplicationControllerLister
+	rcLister listers.StoreToReplicationControllerLister
 	// A store of pods, populated by the podController
-	podLister cache.StoreToPodLister
+	podLister listers.StoreToPodLister
 	// Watches changes to all pods
 	podController cache.Controller
 	// podListerSynced returns true if the pod store has been synced at least once.

@@ -30,6 +30,7 @@ import (
 	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	policy "k8s.io/kubernetes/pkg/apis/policy/v1beta1"
 	"k8s.io/kubernetes/pkg/client/cache"
+	"k8s.io/kubernetes/pkg/client/legacylisters"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/util/intstr"
@@ -87,12 +88,12 @@ func newFakeDisruptionController() (*DisruptionController, *pdbStates) {
 	ps := &pdbStates{}
 
 	dc := &DisruptionController{
-		pdbLister:   cache.StoreToPodDisruptionBudgetLister{Store: cache.NewStore(controller.KeyFunc)},
-		podLister:   cache.StoreToPodLister{Indexer: cache.NewIndexer(controller.KeyFunc, cache.Indexers{})},
-		rcLister:    cache.StoreToReplicationControllerLister{Indexer: cache.NewIndexer(controller.KeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})},
-		rsLister:    cache.StoreToReplicaSetLister{Indexer: cache.NewIndexer(controller.KeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})},
-		dLister:     cache.StoreToDeploymentLister{Indexer: cache.NewIndexer(controller.KeyFunc, cache.Indexers{})},
-		ssLister:    cache.StoreToStatefulSetLister{Store: cache.NewStore(controller.KeyFunc)},
+		pdbLister:   listers.StoreToPodDisruptionBudgetLister{Store: cache.NewStore(controller.KeyFunc)},
+		podLister:   listers.StoreToPodLister{Indexer: cache.NewIndexer(controller.KeyFunc, cache.Indexers{})},
+		rcLister:    listers.StoreToReplicationControllerLister{Indexer: cache.NewIndexer(controller.KeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})},
+		rsLister:    listers.StoreToReplicaSetLister{Indexer: cache.NewIndexer(controller.KeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})},
+		dLister:     listers.StoreToDeploymentLister{Indexer: cache.NewIndexer(controller.KeyFunc, cache.Indexers{})},
+		ssLister:    listers.StoreToStatefulSetLister{Store: cache.NewStore(controller.KeyFunc)},
 		getUpdater:  func() updater { return ps.Set },
 		broadcaster: record.NewBroadcaster(),
 	}

@@ -43,6 +43,7 @@ import (
 	v1 "k8s.io/kubernetes/pkg/api/v1"
 	cache "k8s.io/kubernetes/pkg/client/cache"
 	kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	"k8s.io/kubernetes/pkg/client/legacylisters"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/util/workqueue"
@@ -119,7 +120,7 @@ type ServiceController struct {
 	serviceCache *serviceCache
 	clusterCache *clusterClientCache
 	// A store of services, populated by the serviceController
-	serviceStore cache.StoreToServiceLister
+	serviceStore listers.StoreToServiceLister
 	// Watches changes to all services
 	serviceController cache.Controller
 	federatedInformer fedutil.FederatedInformer

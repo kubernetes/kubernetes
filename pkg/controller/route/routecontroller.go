@@ -32,6 +32,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	"k8s.io/kubernetes/pkg/client/legacylisters"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/util/metrics"
@@ -55,7 +56,7 @@ type RouteController struct {
 	clusterCIDR *net.IPNet
 	// Node framework and store
 	nodeController cache.Controller
-	nodeStore      cache.StoreToNodeLister
+	nodeStore      listers.StoreToNodeLister
 }
 
 func New(routes cloudprovider.Routes, kubeClient clientset.Interface, clusterName string, clusterCIDR *net.IPNet) *RouteController {
