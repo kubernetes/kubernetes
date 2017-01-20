@@ -82,25 +82,25 @@ func TestGetExec(t *testing.T) {
 	assertRequestToken := func(test testcase, cache *requestCache, token string) {
 		req, ok := cache.Consume(token)
 		require.True(t, ok, "token %s not found! testcase=%+v", token, test)
-		assert.Equal(t, testContainerID, req.(*runtimeapi.ExecRequest).GetContainerId(), "testcase=%+v", test)
-		assert.Equal(t, test.cmd, req.(*runtimeapi.ExecRequest).GetCmd(), "testcase=%+v", test)
-		assert.Equal(t, test.tty, req.(*runtimeapi.ExecRequest).GetTty(), "testcase=%+v", test)
-		assert.Equal(t, test.stdin, req.(*runtimeapi.ExecRequest).GetStdin(), "testcase=%+v", test)
+		assert.Equal(t, testContainerID, req.(*runtimeapi.ExecRequest).ContainerId, "testcase=%+v", test)
+		assert.Equal(t, test.cmd, req.(*runtimeapi.ExecRequest).Cmd, "testcase=%+v", test)
+		assert.Equal(t, test.tty, req.(*runtimeapi.ExecRequest).Tty, "testcase=%+v", test)
+		assert.Equal(t, test.stdin, req.(*runtimeapi.ExecRequest).Stdin, "testcase=%+v", test)
 	}
 	containerID := testContainerID
 	for _, test := range testcases {
 		request := &runtimeapi.ExecRequest{
-			ContainerId: &containerID,
+			ContainerId: containerID,
 			Cmd:         test.cmd,
-			Tty:         &test.tty,
-			Stdin:       &test.stdin,
+			Tty:         test.tty,
+			Stdin:       test.stdin,
 		}
 		{ // Non-TLS
 			resp, err := serv.GetExec(request)
 			assert.NoError(t, err, "testcase=%+v", test)
 			expectedURL := "http://" + testAddr + "/exec/"
-			assert.Contains(t, resp.GetUrl(), expectedURL, "testcase=%+v", test)
-			token := strings.TrimPrefix(resp.GetUrl(), expectedURL)
+			assert.Contains(t, resp.Url, expectedURL, "testcase=%+v", test)
+			token := strings.TrimPrefix(resp.Url, expectedURL)
 			assertRequestToken(test, serv.(*server).cache, token)
 		}
 
@@ -108,8 +108,8 @@ func TestGetExec(t *testing.T) {
 			resp, err := tlsServer.GetExec(request)
 			assert.NoError(t, err, "testcase=%+v", test)
 			expectedURL := "https://" + testAddr + "/exec/"
-			assert.Contains(t, resp.GetUrl(), expectedURL, "testcase=%+v", test)
-			token := strings.TrimPrefix(resp.GetUrl(), expectedURL)
+			assert.Contains(t, resp.Url, expectedURL, "testcase=%+v", test)
+			token := strings.TrimPrefix(resp.Url, expectedURL)
 			assertRequestToken(test, tlsServer.(*server).cache, token)
 		}
 
@@ -117,8 +117,8 @@ func TestGetExec(t *testing.T) {
 			resp, err := prefixServer.GetExec(request)
 			assert.NoError(t, err, "testcase=%+v", test)
 			expectedURL := "http://" + testAddr + "/" + pathPrefix + "/exec/"
-			assert.Contains(t, resp.GetUrl(), expectedURL, "testcase=%+v", test)
-			token := strings.TrimPrefix(resp.GetUrl(), expectedURL)
+			assert.Contains(t, resp.Url, expectedURL, "testcase=%+v", test)
+			token := strings.TrimPrefix(resp.Url, expectedURL)
 			assertRequestToken(test, prefixServer.(*server).cache, token)
 		}
 	}
@@ -149,23 +149,23 @@ func TestGetAttach(t *testing.T) {
 	assertRequestToken := func(test testcase, cache *requestCache, token string) {
 		req, ok := cache.Consume(token)
 		require.True(t, ok, "token %s not found! testcase=%+v", token, test)
-		assert.Equal(t, testContainerID, req.(*runtimeapi.AttachRequest).GetContainerId(), "testcase=%+v", test)
-		assert.Equal(t, test.tty, req.(*runtimeapi.AttachRequest).GetTty(), "testcase=%+v", test)
-		assert.Equal(t, test.stdin, req.(*runtimeapi.AttachRequest).GetStdin(), "testcase=%+v", test)
+		assert.Equal(t, testContainerID, req.(*runtimeapi.AttachRequest).ContainerId, "testcase=%+v", test)
+		assert.Equal(t, test.tty, req.(*runtimeapi.AttachRequest).Tty, "testcase=%+v", test)
+		assert.Equal(t, test.stdin, req.(*runtimeapi.AttachRequest).Stdin, "testcase=%+v", test)
 	}
 	containerID := testContainerID
 	for _, test := range testcases {
 		request := &runtimeapi.AttachRequest{
-			ContainerId: &containerID,
-			Stdin:       &test.stdin,
-			Tty:         &test.tty,
+			ContainerId: containerID,
+			Stdin:       test.stdin,
+			Tty:         test.tty,
 		}
 		{ // Non-TLS
 			resp, err := serv.GetAttach(request)
 			assert.NoError(t, err, "testcase=%+v", test)
 			expectedURL := "http://" + testAddr + "/attach/"
-			assert.Contains(t, resp.GetUrl(), expectedURL, "testcase=%+v", test)
-			token := strings.TrimPrefix(resp.GetUrl(), expectedURL)
+			assert.Contains(t, resp.Url, expectedURL, "testcase=%+v", test)
+			token := strings.TrimPrefix(resp.Url, expectedURL)
 			assertRequestToken(test, serv.(*server).cache, token)
 		}
 
@@ -173,8 +173,8 @@ func TestGetAttach(t *testing.T) {
 			resp, err := tlsServer.GetAttach(request)
 			assert.NoError(t, err, "testcase=%+v", test)
 			expectedURL := "https://" + testAddr + "/attach/"
-			assert.Contains(t, resp.GetUrl(), expectedURL, "testcase=%+v", test)
-			token := strings.TrimPrefix(resp.GetUrl(), expectedURL)
+			assert.Contains(t, resp.Url, expectedURL, "testcase=%+v", test)
+			token := strings.TrimPrefix(resp.Url, expectedURL)
 			assertRequestToken(test, tlsServer.(*server).cache, token)
 		}
 	}
@@ -183,7 +183,7 @@ func TestGetAttach(t *testing.T) {
 func TestGetPortForward(t *testing.T) {
 	podSandboxID := testPodSandboxID
 	request := &runtimeapi.PortForwardRequest{
-		PodSandboxId: &podSandboxID,
+		PodSandboxId: podSandboxID,
 		Port:         []int32{1, 2, 3, 4},
 	}
 
@@ -195,11 +195,11 @@ func TestGetPortForward(t *testing.T) {
 		resp, err := serv.GetPortForward(request)
 		assert.NoError(t, err)
 		expectedURL := "http://" + testAddr + "/portforward/"
-		assert.True(t, strings.HasPrefix(resp.GetUrl(), expectedURL))
-		token := strings.TrimPrefix(resp.GetUrl(), expectedURL)
+		assert.True(t, strings.HasPrefix(resp.Url, expectedURL))
+		token := strings.TrimPrefix(resp.Url, expectedURL)
 		req, ok := serv.(*server).cache.Consume(token)
 		require.True(t, ok, "token %s not found!", token)
-		assert.Equal(t, testPodSandboxID, req.(*runtimeapi.PortForwardRequest).GetPodSandboxId())
+		assert.Equal(t, testPodSandboxID, req.(*runtimeapi.PortForwardRequest).PodSandboxId)
 	}
 
 	{ // TLS
@@ -211,11 +211,11 @@ func TestGetPortForward(t *testing.T) {
 		resp, err := tlsServer.GetPortForward(request)
 		assert.NoError(t, err)
 		expectedURL := "https://" + testAddr + "/portforward/"
-		assert.True(t, strings.HasPrefix(resp.GetUrl(), expectedURL))
-		token := strings.TrimPrefix(resp.GetUrl(), expectedURL)
+		assert.True(t, strings.HasPrefix(resp.Url, expectedURL))
+		token := strings.TrimPrefix(resp.Url, expectedURL)
 		req, ok := tlsServer.(*server).cache.Consume(token)
 		require.True(t, ok, "token %s not found!", token)
-		assert.Equal(t, testPodSandboxID, req.(*runtimeapi.PortForwardRequest).GetPodSandboxId())
+		assert.Equal(t, testPodSandboxID, req.(*runtimeapi.PortForwardRequest).PodSandboxId)
 	}
 }
 
@@ -231,12 +231,11 @@ func TestServePortForward(t *testing.T) {
 	s, testServer := startTestServer(t)
 	defer testServer.Close()
 
-	podSandboxID := testPodSandboxID
 	resp, err := s.GetPortForward(&runtimeapi.PortForwardRequest{
-		PodSandboxId: &podSandboxID,
+		PodSandboxId: testPodSandboxID,
 	})
 	require.NoError(t, err)
-	reqURL, err := url.Parse(resp.GetUrl())
+	reqURL, err := url.Parse(resp.Url)
 	require.NoError(t, err)
 
 	exec, err := remotecommand.NewExecutor(&restclient.Config{}, "POST", reqURL)
@@ -273,20 +272,20 @@ func runRemoteCommandTest(t *testing.T, commandType string) {
 	switch commandType {
 	case "exec":
 		resp, err := s.GetExec(&runtimeapi.ExecRequest{
-			ContainerId: &containerID,
+			ContainerId: containerID,
 			Cmd:         []string{"echo"},
-			Stdin:       &stdin,
+			Stdin:       stdin,
 		})
 		require.NoError(t, err)
-		reqURL, err = url.Parse(resp.GetUrl())
+		reqURL, err = url.Parse(resp.Url)
 		require.NoError(t, err)
 	case "attach":
 		resp, err := s.GetAttach(&runtimeapi.AttachRequest{
-			ContainerId: &containerID,
-			Stdin:       &stdin,
+			ContainerId: containerID,
+			Stdin:       stdin,
 		})
 		require.NoError(t, err)
-		reqURL, err = url.Parse(resp.GetUrl())
+		reqURL, err = url.Parse(resp.Url)
 		require.NoError(t, err)
 	}
 
