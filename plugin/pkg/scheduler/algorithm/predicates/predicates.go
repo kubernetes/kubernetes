@@ -463,11 +463,7 @@ func GetResourceRequest(pod *v1.Pod) *schedulercache.Resource {
 				result.NvidiaGPU += rQuantity.Value()
 			default:
 				if v1.IsOpaqueIntResourceName(rName) {
-					// Lazily allocate this map only if required.
-					if result.OpaqueIntResources == nil {
-						result.OpaqueIntResources = map[v1.ResourceName]int64{}
-					}
-					result.OpaqueIntResources[rName] += rQuantity.Value()
+					result.AddOpaque(rName, rQuantity.Value())
 				}
 			}
 		}
@@ -490,11 +486,9 @@ func GetResourceRequest(pod *v1.Pod) *schedulercache.Resource {
 				}
 			default:
 				if v1.IsOpaqueIntResourceName(rName) {
-					// Lazily allocate this map only if required.
-					if result.OpaqueIntResources == nil {
-						result.OpaqueIntResources = map[v1.ResourceName]int64{}
-					}
 					value := rQuantity.Value()
+					// Ensure the opaque resource map is initialized in the result.
+					result.AddOpaque(rName, int64(0))
 					if value > result.OpaqueIntResources[rName] {
 						result.OpaqueIntResources[rName] = value
 					}
