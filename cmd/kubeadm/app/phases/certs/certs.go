@@ -17,21 +17,30 @@ limitations under the License.
 package certs
 
 import (
+	"crypto/rsa"
 	"crypto/x509"
 	"fmt"
 	"net"
 	"os"
 
+	setutil "k8s.io/apimachinery/pkg/util/sets"
 	certutil "k8s.io/client-go/pkg/util/cert"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	"k8s.io/kubernetes/cmd/kubeadm/app/phases/certs/pkiutil"
 	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
 )
 
+// TODO: Integration test cases
+// no files exist => create all four files
+// valid ca.{crt,key} exists => create apiserver.{crt,key}
+// valid ca.{crt,key} and apiserver.{crt,key} exists => do nothing
+// invalid ca.{crt,key} exists => error
+// only one of the .crt or .key file exists => error
+
 // CreatePKIAssets will create and write to disk all PKI assets necessary to establish the control plane.
-// It first generates a self-signed CA certificate, a server certificate (signed by the CA) and a key for
-// signing service account tokens. It returns CA key and certificate, which is convenient for use with
-// client config funcs.
-func CreatePKIAssets(cfg *kubeadmapi.MasterConfiguration, pkiPath string) (*x509.Certificate, error) {
+// It generates a self-signed CA certificate and a server certificate (signed by the CA)
+func CreatePKIAssets(cfg *kubeadmapi.MasterConfiguration, pkiDir string) error {
 	altNames := certutil.AltNames{}
 
 	// First, define all domains this cert should be signed for
@@ -43,7 +52,7 @@ func CreatePKIAssets(cfg *kubeadmapi.MasterConfiguration, pkiPath string) (*x509
 	}
 	hostname, err := os.Hostname()
 	if err != nil {
-		return nil, fmt.Errorf("couldn't get the hostname: %v", err)
+		return fmt.Errorf("couldn't get the hostname: %v", err)
 	}
 	altNames.DNSNames = append(cfg.API.ExternalDNSNames, hostname)
 	altNames.DNSNames = append(altNames.DNSNames, internalAPIServerFQDN...)
@@ -53,50 +62,107 @@ func CreatePKIAssets(cfg *kubeadmapi.MasterConfiguration, pkiPath string) (*x509
 		if ip := net.ParseIP(a); ip != nil {
 			altNames.IPs = append(altNames.IPs, ip)
 		} else {
-			return nil, fmt.Errorf("could not parse ip %q", a)
+			return fmt.Errorf("could not parse ip %q", a)
 		}
 	}
 	// and lastly, extract the internal IP address for the API server
 	_, n, err := net.ParseCIDR(cfg.Networking.ServiceSubnet)
 	if err != nil {
-		return nil, fmt.Errorf("error parsing CIDR %q: %v", cfg.Networking.ServiceSubnet, err)
+		return fmt.Errorf("error parsing CIDR %q: %v", cfg.Networking.ServiceSubnet, err)
 	}
 	internalAPIServerVirtualIP, err := ipallocator.GetIndexedIP(n, 1)
 	if err != nil {
-		return nil, fmt.Errorf("unable to allocate IP address for the API server from the given CIDR (%q) [%v]", &cfg.Networking.ServiceSubnet, err)
+		return fmt.Errorf("unable to allocate IP address for the API server from the given CIDR (%q) [%v]", &cfg.Networking.ServiceSubnet, err)
 	}
 
 	altNames.IPs = append(altNames.IPs, internalAPIServerVirtualIP)
 
-	caKey, caCert, err := newCertificateAuthority()
-	if err != nil {
-		return nil, fmt.Errorf("failure while creating CA keys and certificate [%v]", err)
+	var caCert *x509.Certificate
+	var caKey *rsa.PrivateKey
+	// If at least one of them exists, we should try to load them
+	// In the case that only one exists, there will most likely be an error anyway
+	if pkiutil.CertOrKeyExist(pkiDir, kubeadmconstants.CACertAndKeyBaseName) {
+		// Try to load ca.crt and ca.key from the PKI directory
+		caCert, caKey, err = pkiutil.TryLoadCertAndKeyFromDisk(pkiDir, kubeadmconstants.CACertAndKeyBaseName)
+		if err != nil || caCert == nil || caKey == nil {
+			return fmt.Errorf("certificate and/or key existed but they could not be loaded properly")
+		}
+
+		// The certificate and key could be loaded, but the certificate is not a CA
+		if !caCert.IsCA {
+			return fmt.Errorf("certificate and key could be loaded but the certificate is not a CA")
+		}
+
+		fmt.Println("[certificates] Using the existing CA certificate and key.")
+	} else {
+		// The certificate and the key did NOT exist, let's generate them now
+		caCert, caKey, err = pkiutil.NewCertificateAuthority()
+		if err != nil {
+			return fmt.Errorf("failure while generating CA certificate and key [%v]", err)
+		}
+
+		if err = pkiutil.WriteCertAndKey(pkiDir, kubeadmconstants.CACertAndKeyBaseName, caCert, caKey); err != nil {
+			return fmt.Errorf("failure while saving CA certificate and key [%v]", err)
+		}
+		fmt.Println("[certificates] Generated CA certificate and key.")
 	}
 
-	if err := writeKeysAndCert(pkiPath, "ca", caKey, caCert); err != nil {
-		return nil, fmt.Errorf("failure while saving CA keys and certificate [%v]", err)
-	}
-	fmt.Println("[certificates] Generated Certificate Authority key and certificate.")
+	// If at least one of them exists, we should try to load them
+	// In the case that only one exists, there will most likely be an error anyway
+	if pkiutil.CertOrKeyExist(pkiDir, kubeadmconstants.APIServerCertAndKeyBaseName) {
+		// Try to load ca.crt and ca.key from the PKI directory
+		apiCert, apiKey, err := pkiutil.TryLoadCertAndKeyFromDisk(pkiDir, kubeadmconstants.APIServerCertAndKeyBaseName)
+		if err != nil || apiCert == nil || apiKey == nil {
+			return fmt.Errorf("certificate and/or key existed but they could not be loaded properly")
+		}
 
-	apiKey, apiCert, err := newServerKeyAndCert(caCert, caKey, altNames)
-	if err != nil {
-		return nil, fmt.Errorf("failure while creating API server keys and certificate [%v]", err)
+		fmt.Println("[certificates] Using the existing API Server certificate and key.")
+	} else {
+		// The certificate and the key did NOT exist, let's generate them now
+		// TODO: Add a test case to verify that this cert has the x509.ExtKeyUsageServerAuth flag
+		config := certutil.Config{
+			CommonName: "kube-apiserver",
+			AltNames:   altNames,
+			Usages:     []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
+		}
+		apiCert, apiKey, err := pkiutil.NewCertAndKey(caCert, caKey, config)
+		if err != nil {
+			return fmt.Errorf("failure while creating API server key and certificate [%v]", err)
+		}
+
+		if err = pkiutil.WriteCertAndKey(pkiDir, kubeadmconstants.APIServerCertAndKeyBaseName, apiCert, apiKey); err != nil {
+			return fmt.Errorf("failure while saving API server certificate and key [%v]", err)
+		}
+		fmt.Println("[certificates] Generated API server certificate and key.")
 	}
 
-	if err := writeKeysAndCert(pkiPath, "apiserver", apiKey, apiCert); err != nil {
-		return nil, fmt.Errorf("failure while saving API server keys and certificate [%v]", err)
-	}
-	fmt.Println("[certificates] Generated API Server key and certificate")
+	fmt.Printf("[certificates] Valid certificates and keys now exist in %q\n", pkiDir)
 
-	// Generate a private key for service accounts
-	saKey, err := certutil.NewPrivateKey()
-	if err != nil {
-		return nil, fmt.Errorf("failure while creating service account signing keys [%v]", err)
+	return nil
+}
+
+// Verify that the cert is valid for all IPs and DNS names it should be valid for
+func checkAltNamesExist(IPs []net.IP, DNSNames []string, altNames certutil.AltNames) bool {
+	dnsset := setutil.NewString(DNSNames...)
+
+	for _, dnsNameThatShouldExist := range altNames.DNSNames {
+		if !dnsset.Has(dnsNameThatShouldExist) {
+			return false
+		}
 	}
-	if err := writeKeysAndCert(pkiPath, "sa", saKey, nil); err != nil {
-		return nil, fmt.Errorf("failure while saving service account signing keys [%v]", err)
+
+	for _, ipThatShouldExist := range altNames.IPs {
+		found := false
+		for _, ip := range IPs {
+			if ip.Equal(ipThatShouldExist) {
+				found = true
+				break
+			}
+		}
+
+		if !found {
+			return false
+		}
 	}
-	fmt.Println("[certificates] Generated Service Account signing keys")
-	fmt.Printf("[certificates] Created keys and certificates in %q\n", pkiPath)
-	return caCert, nil
+	return true
 }

@@ -191,7 +191,7 @@ func (i *Init) Validate() error {
 func (i *Init) Run(out io.Writer) error {
 
 	// PHASE 1: Generate certificates
-	caCert, err := certphase.CreatePKIAssets(i.cfg, kubeadmapi.GlobalEnvParams.HostPKIPath)
+	err := certphase.CreatePKIAssets(i.cfg, kubeadmapi.GlobalEnvParams.HostPKIPath)
 	if err != nil {
 		return err
 	}
@@ -249,7 +249,7 @@ func (i *Init) Run(out io.Writer) error {
 
 	if i.cfg.Discovery.Token != nil {
 		fmt.Printf("[token-discovery] Using token: %s\n", kubeadmutil.BearerToken(i.cfg.Discovery.Token))
-		if err := kubemaster.CreateDiscoveryDeploymentAndSecret(i.cfg, client, caCert); err != nil {
+		if err := kubemaster.CreateDiscoveryDeploymentAndSecret(i.cfg, client); err != nil {
 			return err
 		}
 		if err := kubeadmutil.UpdateOrCreateToken(client, i.cfg.Discovery.Token, kubeadmutil.DefaultTokenDuration); err != nil {
