@@ -18,7 +18,9 @@ package main
 
 import (
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/examples/apiserver"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/util/flag"
 
 	"github.com/golang/glog"

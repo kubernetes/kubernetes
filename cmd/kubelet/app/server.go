@@ -46,6 +46,7 @@ import (
 	certutil "k8s.io/apimachinery/pkg/util/cert"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/cmd/kubelet/app/options"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
@@ -62,6 +63,7 @@ import (
 	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/credentialprovider"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
@@ -71,7 +73,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/server"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/util/configz"
-	utilflag "k8s.io/kubernetes/pkg/util/flag"
 	"k8s.io/kubernetes/pkg/util/flock"
 	kubeio "k8s.io/kubernetes/pkg/util/io"
 	"k8s.io/kubernetes/pkg/util/mount"
@@ -328,14 +329,14 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.KubeletDeps) (err error) {
 	}
 
 	// Set feature gates based on the value in KubeletConfiguration
-	err = utilflag.DefaultFeatureGate.Set(s.KubeletConfiguration.FeatureGates)
+	err = utilfeature.DefaultFeatureGate.Set(s.KubeletConfiguration.FeatureGates)
 	if err != nil {
 		return err
 	}
 
 	// Register current configuration with /configz endpoint
 	cfgz, cfgzErr := initConfigz(&s.KubeletConfiguration)
-	if utilflag.DefaultFeatureGate.DynamicKubeletConfig() {
+	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicKubeletConfig) {
 		// Look for config on the API server. If it exists, replace s.KubeletConfiguration
 		// with it and continue. initKubeletConfigSync also starts the background thread that checks for new config.
 
@@ -352,7 +353,7 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.KubeletDeps) (err error) {
 					setConfigz(cfgz, &s.KubeletConfiguration)
 				}
 				// Update feature gates from the new config
-				err = utilflag.DefaultFeatureGate.Set(s.KubeletConfiguration.FeatureGates)
+				err = utilfeature.DefaultFeatureGate.Set(s.KubeletConfiguration.FeatureGates)
 				if err != nil {
 					return err
 				}

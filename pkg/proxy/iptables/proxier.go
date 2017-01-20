@@ -36,14 +36,15 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api"
 	apiservice "k8s.io/kubernetes/pkg/api/service"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/record"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/proxy"
 	"k8s.io/kubernetes/pkg/proxy/healthcheck"
 	utilexec "k8s.io/kubernetes/pkg/util/exec"
-	utilflag "k8s.io/kubernetes/pkg/util/flag"
 	"k8s.io/kubernetes/pkg/util/flowcontrol"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
 	"k8s.io/kubernetes/pkg/util/slice"
@@ -154,7 +155,7 @@ type endpointsInfo struct {
 
 // returns a new serviceInfo struct
 func newServiceInfo(serviceName proxy.ServicePortName, port *api.ServicePort, service *api.Service) *serviceInfo {
-	onlyNodeLocalEndpoints := apiservice.NeedsHealthCheck(service) && utilflag.DefaultFeatureGate.ExternalTrafficLocalOnly() && (service.Spec.Type == api.ServiceTypeLoadBalancer || service.Spec.Type == api.ServiceTypeNodePort)
+	onlyNodeLocalEndpoints := apiservice.NeedsHealthCheck(service) && utilfeature.DefaultFeatureGate.Enabled(features.ExternalTrafficLocalOnly) && (service.Spec.Type == api.ServiceTypeLoadBalancer || service.Spec.Type == api.ServiceTypeNodePort)
 	info := &serviceInfo{
 		clusterIP: net.ParseIP(service.Spec.ClusterIP),
 		port:      int(port.Port),
@@ -606,7 +607,7 @@ func (proxier *Proxier) OnEndpointsUpdate(allEndpoints []api.Endpoints) {
 					var isLocalEndpoint bool
 					if addr.NodeName != nil {
 						isLocalEndpoint = *addr.NodeName == proxier.hostname
-						isLocalEndpoint = utilflag.DefaultFeatureGate.ExternalTrafficLocalOnly() && isLocalEndpoint
+						isLocalEndpoint = utilfeature.DefaultFeatureGate.Enabled(features.ExternalTrafficLocalOnly) && isLocalEndpoint
 					}
 					hostPortObject := hostPortInfo{
 						host:          addr.IP,

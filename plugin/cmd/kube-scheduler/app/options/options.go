@@ -18,11 +18,11 @@ limitations under the License.
 package options
 
 import (
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	"k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1"
 	"k8s.io/kubernetes/pkg/client/leaderelection"
-	utilflag "k8s.io/kubernetes/pkg/util/flag"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/factory"
 
 	"github.com/spf13/pflag"
@@ -72,5 +72,6 @@ func (s *SchedulerServer) AddFlags(fs *pflag.FlagSet) {
 			"to every RequiredDuringScheduling affinity rule. --hard-pod-affinity-symmetric-weight represents the weight of implicit PreferredDuringScheduling affinity rule.")
 	fs.StringVar(&s.FailureDomains, "failure-domains", api.DefaultFailureDomains, "Indicate the \"all topologies\" set for an empty topologyKey when it's used for PreferredDuringScheduling pod anti-affinity.")
 	leaderelection.BindFlags(&s.LeaderElection, fs)
-	utilflag.DefaultFeatureGate.AddFlag(fs)
+
+	utilfeature.DefaultFeatureGate.AddFlag(fs)
 }

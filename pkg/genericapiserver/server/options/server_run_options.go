@@ -23,6 +23,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/admission"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api"
 	utilflag "k8s.io/kubernetes/pkg/util/flag"
 
@@ -263,5 +264,5 @@ func (s *ServerRunOptions) AddUniversalFlags(fs *pflag.FlagSet) {
 		"The individual override format: resource#size, where size is a number. It takes effect "+
 		"when watch-cache is enabled.")
 
-	utilflag.DefaultFeatureGate.AddFlag(fs)
+	utilfeature.DefaultFeatureGate.AddFlag(fs)
 }

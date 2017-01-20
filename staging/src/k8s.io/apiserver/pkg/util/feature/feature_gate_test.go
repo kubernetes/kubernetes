@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package flag
+package feature
 
 import (
 	"fmt"
@@ -26,17 +26,17 @@ import (
 
 func TestFeatureGateFlag(t *testing.T) {
 	// gates for testing
-	const testAlphaGate = "TestAlpha"
-	const testBetaGate = "TestBeta"
+	const testAlphaGate Feature = "TestAlpha"
+	const testBetaGate Feature = "TestBeta"
 
 	tests := []struct {
 		arg        string
-		expect     map[string]bool
+		expect     map[Feature]bool
 		parseError string
 	}{
 		{
 			arg: "",
-			expect: map[string]bool{
+			expect: map[Feature]bool{
 				allAlphaGate:  false,
 				testAlphaGate: false,
 				testBetaGate:  false,
@@ -44,7 +44,7 @@ func TestFeatureGateFlag(t *testing.T) {
 		},
 		{
 			arg: "fooBarBaz=maybeidk",
-			expect: map[string]bool{
+			expect: map[Feature]bool{
 				allAlphaGate:  false,
 				testAlphaGate: false,
 				testBetaGate:  false,
@@ -53,7 +53,7 @@ func TestFeatureGateFlag(t *testing.T) {
 		},
 		{
 			arg: "AllAlpha=false",
-			expect: map[string]bool{
+			expect: map[Feature]bool{
 				allAlphaGate:  false,
 				testAlphaGate: false,
 				testBetaGate:  false,
@@ -61,7 +61,7 @@ func TestFeatureGateFlag(t *testing.T) {
 		},
 		{
 			arg: "AllAlpha=true",
-			expect: map[string]bool{
+			expect: map[Feature]bool{
 				allAlphaGate:  true,
 				testAlphaGate: true,
 				testBetaGate:  false,
@@ -69,7 +69,7 @@ func TestFeatureGateFlag(t *testing.T) {
 		},
 		{
 			arg: "AllAlpha=banana",
-			expect: map[string]bool{
+			expect: map[Feature]bool{
 				allAlphaGate:  false,
 				testAlphaGate: false,
 				testBetaGate:  false,
@@ -78,7 +78,7 @@ func TestFeatureGateFlag(t *testing.T) {
 		},
 		{
 			arg: "AllAlpha=false,TestAlpha=true",
-			expect: map[string]bool{
+			expect: map[Feature]bool{
 				allAlphaGate:  false,
 				testAlphaGate: true,
 				testBetaGate:  false,
@@ -86,7 +86,7 @@ func TestFeatureGateFlag(t *testing.T) {
 		},
 		{
 			arg: "TestAlpha=true,AllAlpha=false",
-			expect: map[string]bool{
+			expect: map[Feature]bool{
 				allAlphaGate:  false,
 				testAlphaGate: true,
 				testBetaGate:  false,
@@ -94,7 +94,7 @@ func TestFeatureGateFlag(t *testing.T) {
 		},
 		{
 			arg: "AllAlpha=true,TestAlpha=false",
-			expect: map[string]bool{
+			expect: map[Feature]bool{
 				allAlphaGate:  true,
 				testAlphaGate: false,
 				testBetaGate:  false,
@@ -102,7 +102,7 @@ func TestFeatureGateFlag(t *testing.T) {
 		},
 		{
 			arg: "TestAlpha=false,AllAlpha=true",
-			expect: map[string]bool{
+			expect: map[Feature]bool{
 				allAlphaGate:  true,
 				testAlphaGate: false,
 				testBetaGate:  false,
@@ -110,7 +110,7 @@ func TestFeatureGateFlag(t *testing.T) {
 		},
 		{
 			arg: "TestBeta=true,AllAlpha=false",
-			expect: map[string]bool{
+			expect: map[Feature]bool{
 				allAlphaGate:  false,
 				testAlphaGate: false,
 				testBetaGate:  true,
@@ -120,8 +120,8 @@ func TestFeatureGateFlag(t *testing.T) {
 	for i, test := range tests {
 		fs := pflag.NewFlagSet("testfeaturegateflag", pflag.ContinueOnError)
 		f := DefaultFeatureGate
-		f.known[testAlphaGate] = featureSpec{false, alpha}
-		f.known[testBetaGate] = featureSpec{false, beta}
+		f.known[testAlphaGate] = FeatureSpec{false, alpha}
+		f.known[testBetaGate] = FeatureSpec{false, beta}
 		f.AddFlag(fs)
 
 		err := fs.Parse([]string{fmt.Sprintf("--%s=%s", flagName, test.arg)})
@@ -142,18 +142,18 @@ func TestFeatureGateFlag(t *testing.T) {
 
 func TestFeatureGateFlagDefaults(t *testing.T) {
 	// gates for testing
-	const testAlphaGate = "TestAlpha"
-	const testBetaGate = "TestBeta"
+	const testAlphaGate Feature = "TestAlpha"
+	const testBetaGate Feature = "TestBeta"
 
 	// Don't parse the flag, assert defaults are used.
 	f := DefaultFeatureGate
-	f.known[testAlphaGate] = featureSpec{false, alpha}
-	f.known[testBetaGate] = featureSpec{true, beta}
+	f.known[testAlphaGate] = FeatureSpec{false, alpha}
+	f.known[testBetaGate] = FeatureSpec{true, beta}
 
-	if f.lookup(testAlphaGate) != false {
+	if f.Enabled(testAlphaGate) != false {
 		t.Errorf("Expected false")
 	}
-	if f.lookup(testBetaGate) != true {
+	if f.Enabled(testBetaGate) != true {
 		t.Errorf("Expected true")
 	}
 }

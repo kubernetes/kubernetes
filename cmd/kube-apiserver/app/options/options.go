@@ -91,7 +91,6 @@ func NewServerRunOptions() *ServerRunOptions {
 func (s *ServerRunOptions) AddFlags(fs *pflag.FlagSet) {
 	// Add the generic flags.
 	s.GenericServerRunOptions.AddUniversalFlags(fs)
-
 	s.Etcd.AddFlags(fs)
 	s.SecureServing.AddFlags(fs)
 	s.SecureServing.AddDeprecatedFlags(fs)

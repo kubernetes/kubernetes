@@ -39,6 +39,7 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/v1"
@@ -48,6 +49,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/cloudprovider"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/fields"
 	internalapi "k8s.io/kubernetes/pkg/kubelet/api"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
@@ -465,7 +467,7 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 		makeIPTablesUtilChains:                  kubeCfg.MakeIPTablesUtilChains,
 		iptablesMasqueradeBit:                   int(kubeCfg.IPTablesMasqueradeBit),
 		iptablesDropBit:                         int(kubeCfg.IPTablesDropBit),
-		experimentalHostUserNamespaceDefaulting: utilflag.DefaultFeatureGate.ExperimentalHostUserNamespaceDefaulting(),
+		experimentalHostUserNamespaceDefaulting: utilfeature.DefaultFeatureGate.Enabled(features.ExperimentalHostUserNamespaceDefaultingGate),
 	}
 
 	if klet.experimentalHostUserNamespaceDefaulting {

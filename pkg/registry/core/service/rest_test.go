@@ -26,18 +26,19 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/service"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/genericapiserver/registry/rest"
 	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
 	"k8s.io/kubernetes/pkg/registry/core/service/portallocator"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
-	utilflag "k8s.io/kubernetes/pkg/util/flag"
 	"k8s.io/kubernetes/pkg/util/intstr"
 )
 
 func init() {
-	utilflag.DefaultFeatureGate.Set("AllowExtTrafficLocalEndpoints=true")
+	utilfeature.DefaultFeatureGate.Set(string(features.ExternalTrafficLocalOnly) + "=true")
 }
 
 // TODO(wojtek-t): Cleanup this file.
