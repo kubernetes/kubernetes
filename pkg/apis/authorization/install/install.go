@@ -29,11 +29,11 @@ import (
 )
 
 func init() {
-	Install(api.Registry, api.Scheme)
+	Install(api.GroupFactoryRegistry, api.Registry, api.Scheme)
 }
 
 // Install registers the API group and adds types to a scheme
-func Install(registry *registered.APIRegistrationManager, scheme *runtime.Scheme) {
+func Install(groupFactoryRegistry announced.APIGroupFactoryRegistry, registry *registered.APIRegistrationManager, scheme *runtime.Scheme) {
 	if err := announced.NewGroupMetaFactory(
 		&announced.GroupMetaFactoryArgs{
 			GroupName:                  authorization.GroupName,
@@ -45,7 +45,7 @@ func Install(registry *registered.APIRegistrationManager, scheme *runtime.Scheme
 		announced.VersionToSchemeFunc{
 			v1beta1.SchemeGroupVersion.Version: v1beta1.AddToScheme,
 		},
-	).Announce().RegisterAndEnable(registry, scheme); err != nil {
+	).Announce(groupFactoryRegistry).RegisterAndEnable(registry, scheme); err != nil {
 		panic(err)
 	}
 }
