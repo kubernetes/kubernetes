@@ -49,7 +49,6 @@ go_library(
         "//vendor:github.com/docker/engine-api/types/versions",
         "//vendor:github.com/docker/go-connections/nat",
         "//vendor:github.com/golang/glog",
-        "//vendor:github.com/golang/protobuf/proto",
     ],
 )
 

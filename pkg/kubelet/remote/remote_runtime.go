@@ -55,7 +55,7 @@ func (r *RemoteRuntimeService) Version(apiVersion string) (*runtimeapi.VersionRe
 	defer cancel()
 
 	typedVersion, err := r.runtimeClient.Version(ctx, &runtimeapi.VersionRequest{
-		Version: &apiVersion,
+		Version: apiVersion,
 	})
 	if err != nil {
 		glog.Errorf("Version from runtime service failed: %v", err)
@@ -79,7 +79,7 @@ func (r *RemoteRuntimeService) RunPodSandbox(config *runtimeapi.PodSandboxConfig
 		return "", err
 	}
 
-	return resp.GetPodSandboxId(), nil
+	return resp.PodSandboxId, nil
 }
 
 // StopPodSandbox stops the sandbox. If there are any running containers in the
@@ -89,7 +89,7 @@ func (r *RemoteRuntimeService) StopPodSandbox(podSandBoxID string) error {
 	defer cancel()
 
 	_, err := r.runtimeClient.StopPodSandbox(ctx, &runtimeapi.StopPodSandboxRequest{
-		PodSandboxId: &podSandBoxID,
+		PodSandboxId: podSandBoxID,
 	})
 	if err != nil {
 		glog.Errorf("StopPodSandbox %q from runtime service failed: %v", podSandBoxID, err)
@@ -106,7 +106,7 @@ func (r *RemoteRuntimeService) RemovePodSandbox(podSandBoxID string) error {
 	defer cancel()
 
 	_, err := r.runtimeClient.RemovePodSandbox(ctx, &runtimeapi.RemovePodSandboxRequest{
-		PodSandboxId: &podSandBoxID,
+		PodSandboxId: podSandBoxID,
 	})
 	if err != nil {
 		glog.Errorf("RemovePodSandbox %q from runtime service failed: %v", podSandBoxID, err)
@@ -122,7 +122,7 @@ func (r *RemoteRuntimeService) PodSandboxStatus(podSandBoxID string) (*runtimeap
 	defer cancel()
 
 	resp, err := r.runtimeClient.PodSandboxStatus(ctx, &runtimeapi.PodSandboxStatusRequest{
-		PodSandboxId: &podSandBoxID,
+		PodSandboxId: podSandBoxID,
 	})
 	if err != nil {
 		glog.Errorf("PodSandboxStatus %q from runtime service failed: %v", podSandBoxID, err)
@@ -154,7 +154,7 @@ func (r *RemoteRuntimeService) CreateContainer(podSandBoxID string, config *runt
 	defer cancel()
 
 	resp, err := r.runtimeClient.CreateContainer(ctx, &runtimeapi.CreateContainerRequest{
-		PodSandboxId:  &podSandBoxID,
+		PodSandboxId:  podSandBoxID,
 		Config:        config,
 		SandboxConfig: sandboxConfig,
 	})
@@ -163,7 +163,7 @@ func (r *RemoteRuntimeService) CreateContainer(podSandBoxID string, config *runt
 		return "", err
 	}
 
-	return resp.GetContainerId(), nil
+	return resp.ContainerId, nil
 }
 
 // StartContainer starts the container.
@@ -172,7 +172,7 @@ func (r *RemoteRuntimeService) StartContainer(containerID string) error {
 	defer cancel()
 
 	_, err := r.runtimeClient.StartContainer(ctx, &runtimeapi.StartContainerRequest{
-		ContainerId: &containerID,
+		ContainerId: containerID,
 	})
 	if err != nil {
 		glog.Errorf("StartContainer %q from runtime service failed: %v", containerID, err)
@@ -188,8 +188,8 @@ func (r *RemoteRuntimeService) StopContainer(containerID string, timeout int64) 
 	defer cancel()
 
 	_, err := r.runtimeClient.StopContainer(ctx, &runtimeapi.StopContainerRequest{
-		ContainerId: &containerID,
-		Timeout:     &timeout,
+		ContainerId: containerID,
+		Timeout:     timeout,
 	})
 	if err != nil {
 		glog.Errorf("StopContainer %q from runtime service failed: %v", containerID, err)
@@ -206,7 +206,7 @@ func (r *RemoteRuntimeService) RemoveContainer(containerID string) error {
 	defer cancel()
 
 	_, err := r.runtimeClient.RemoveContainer(ctx, &runtimeapi.RemoveContainerRequest{
-		ContainerId: &containerID,
+		ContainerId: containerID,
 	})
 	if err != nil {
 		glog.Errorf("RemoveContainer %q from runtime service failed: %v", containerID, err)
@@ -238,7 +238,7 @@ func (r *RemoteRuntimeService) ContainerStatus(containerID string) (*runtimeapi.
 	defer cancel()
 
 	resp, err := r.runtimeClient.ContainerStatus(ctx, &runtimeapi.ContainerStatusRequest{
-		ContainerId: &containerID,
+		ContainerId: containerID,
 	})
 	if err != nil {
 		glog.Errorf("ContainerStatus %q from runtime service failed: %v", containerID, err)
@@ -256,9 +256,9 @@ func (r *RemoteRuntimeService) ExecSync(containerID string, cmd []string, timeou
 
 	timeoutSeconds := int64(timeout.Seconds())
 	req := &runtimeapi.ExecSyncRequest{
-		ContainerId: &containerID,
+		ContainerId: containerID,
 		Cmd:         cmd,
-		Timeout:     &timeoutSeconds,
+		Timeout:     timeoutSeconds,
 	}
 	resp, err := r.runtimeClient.ExecSync(ctx, req)
 	if err != nil {
@@ -267,14 +267,14 @@ func (r *RemoteRuntimeService) ExecSync(containerID string, cmd []string, timeou
 	}
 
 	err = nil
-	if resp.GetExitCode() != 0 {
+	if resp.ExitCode != 0 {
 		err = utilexec.CodeExitError{
-			Err:  fmt.Errorf("command '%s' exited with %d: %s", strings.Join(cmd, " "), resp.GetExitCode(), resp.GetStderr()),
-			Code: int(resp.GetExitCode()),
+			Err:  fmt.Errorf("command '%s' exited with %d: %s", strings.Join(cmd, " "), resp.ExitCode, resp.Stderr),
+			Code: int(resp.ExitCode),
 		}
 	}
 
-	return resp.GetStdout(), resp.GetStderr(), err
+	return resp.Stdout, resp.Stderr, err
 }
 
 // Exec prepares a streaming endpoint to execute a command in the container, and returns the address.
@@ -284,7 +284,7 @@ func (r *RemoteRuntimeService) Exec(req *runtimeapi.ExecRequest) (*runtimeapi.Ex
 
 	resp, err := r.runtimeClient.Exec(ctx, req)
 	if err != nil {
-		glog.Errorf("Exec %s '%s' from runtime service failed: %v", req.GetContainerId(), strings.Join(req.GetCmd(), " "), err)
+		glog.Errorf("Exec %s '%s' from runtime service failed: %v", req.ContainerId, strings.Join(req.Cmd, " "), err)
 		return nil, err
 	}
 
@@ -298,7 +298,7 @@ func (r *RemoteRuntimeService) Attach(req *runtimeapi.AttachRequest) (*runtimeap
 
 	resp, err := r.runtimeClient.Attach(ctx, req)
 	if err != nil {
-		glog.Errorf("Attach %s from runtime service failed: %v", req.GetContainerId(), err)
+		glog.Errorf("Attach %s from runtime service failed: %v", req.ContainerId, err)
 		return nil, err
 	}
 
@@ -312,7 +312,7 @@ func (r *RemoteRuntimeService) PortForward(req *runtimeapi.PortForwardRequest) (
 
 	resp, err := r.runtimeClient.PortForward(ctx, req)
 	if err != nil {
-		glog.Errorf("PortForward %s from runtime service failed: %v", req.GetPodSandboxId(), err)
+		glog.Errorf("PortForward %s from runtime service failed: %v", req.PodSandboxId, err)
 		return nil, err
 	}
 
