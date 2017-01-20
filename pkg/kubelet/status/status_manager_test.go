@@ -71,10 +71,16 @@ func (m *manager) testSyncBatch() {
 	m.syncBatch()
 }
 
+type fakePodDeletionSafetyProvider struct{}
+
+func (f *fakePodDeletionSafetyProvider) OkToDeletePod(pod *v1.Pod) bool {
+	return !kubepod.IsMirrorPod(pod) && pod.DeletionTimestamp != nil
+}
+
 func newTestManager(kubeClient clientset.Interface) *manager {
 	podManager := kubepod.NewBasicPodManager(podtest.NewFakeMirrorClient(), kubesecret.NewFakeManager())
 	podManager.AddPod(getTestPod())
-	return NewManager(kubeClient, podManager, func(pod *v1.Pod) bool { return !kubepod.IsMirrorPod(pod) && pod.DeletionTimestamp != nil }).(*manager)
+	return NewManager(kubeClient, podManager, &fakePodDeletionSafetyProvider{}).(*manager)
 }
 
 func generateRandomMessage() string {
