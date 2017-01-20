@@ -21,7 +21,6 @@ go_library(
     deps = [
         "//pkg/apis/certificates/v1beta1:go_default_library",
         "//pkg/client/clientset_generated/clientset:go_default_library",
-        "//pkg/client/clientset_generated/clientset/typed/certificates/v1beta1:go_default_library",
         "//pkg/client/legacylisters:go_default_library",
         "//pkg/controller:go_default_library",
         "//vendor:github.com/cloudflare/cfssl/config",
