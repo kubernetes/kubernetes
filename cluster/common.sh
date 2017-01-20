@@ -1008,7 +1008,12 @@ function generate-certs {
     mv "kubelet.pem" "pki/issued/kubelet.crt"
     rm -f "kubelet.csr"
 
-    ./easyrsa build-client-full kubecfg nopass
+    # Make a superuser client cert with subject "O=system:masters, CN=kubecfg"
+    ./easyrsa --dn-mode=org \
+      --req-cn=kubecfg --req-org=system:masters \
+      --req-c= --req-st= --req-city= --req-email= --req-ou= \
+      build-client-full kubecfg nopass
+
     cd ../kubelet
     ./easyrsa init-pki
     ./easyrsa --batch "--req-cn=kubelet@$(date +%s)" build-ca nopass
