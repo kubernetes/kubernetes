@@ -253,7 +253,7 @@ func (s *SwaggerSchema) ValidateObject(obj interface{}, fieldName, typeName stri
 	if !ok && s.delegate != nil {
 		fields, mapOk := obj.(map[string]interface{})
 		if !mapOk {
-			return append(allErrs, fmt.Errorf("field %s: expected object of type map[string]interface{}, but the actual type is %T", fieldName, obj))
+			return append(allErrs, fmt.Errorf("field %s for %s: expected object of type map[string]interface{}, but the actual type is %T", fieldName, typeName, obj))
 		}
 		if delegated, err := s.delegateIfDifferentApiVersion(&unstructured.Unstructured{Object: fields}); delegated {
 			if err != nil {
@@ -273,7 +273,7 @@ func (s *SwaggerSchema) ValidateObject(obj interface{}, fieldName, typeName stri
 	}
 	fields, ok := obj.(map[string]interface{})
 	if !ok {
-		return append(allErrs, fmt.Errorf("field %s: expected object of type map[string]interface{}, but the actual type is %T", fieldName, obj))
+		return append(allErrs, fmt.Errorf("field %s for %s: expected object of type map[string]interface{}, but the actual type is %T", fieldName, typeName, obj))
 	}
 	if len(fieldName) > 0 {
 		fieldName = fieldName + "."
@@ -281,7 +281,7 @@ func (s *SwaggerSchema) ValidateObject(obj interface{}, fieldName, typeName stri
 	// handle required fields
 	for _, requiredKey := range model.Required {
 		if _, ok := fields[requiredKey]; !ok {
-			allErrs = append(allErrs, fmt.Errorf("field %s: is required", requiredKey))
+			allErrs = append(allErrs, fmt.Errorf("field %s for %s: is required", requiredKey, typeName))
 		}
 	}
 	for key, value := range fields {
