@@ -1,5 +1,9 @@
-assignees:
-  - quinton-hoole
+reviewers:
+  - madhusudancs
+  - mml
+  - nikhiljindal
+  - colhom
+approvers:
   - madhusudancs
   - mml
   - nikhiljindal
