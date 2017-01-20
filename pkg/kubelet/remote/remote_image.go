@@ -17,10 +17,13 @@ limitations under the License.
 package remote
 
 import (
+	"errors"
+	"fmt"
 	"time"
 
 	"github.com/golang/glog"
 	"google.golang.org/grpc"
+
 	internalapi "k8s.io/kubernetes/pkg/kubelet/api"
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 )
@@ -90,6 +93,12 @@ func (r *RemoteImageService) PullImage(image *runtimeapi.ImageSpec, auth *runtim
 	if err != nil {
 		glog.Errorf("PullImage %q from image service failed: %v", image.GetImage(), err)
 		return "", err
+	}
+
+	if resp.GetImageRef() == "" {
+		errorMessage := fmt.Sprintf("imageRef of image %q is null", image.GetImage())
+		glog.Errorf("PullImage failed: %s", errorMessage)
+		return "", errors.New(errorMessage)
 	}
 
 	return resp.GetImageRef(), nil
