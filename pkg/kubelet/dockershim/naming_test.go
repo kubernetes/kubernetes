@@ -55,8 +55,8 @@ func TestContainerNameRoundTrip(t *testing.T) {
 	name, attempt := "pause", uint32(5)
 	config := &runtimeapi.ContainerConfig{
 		Metadata: &runtimeapi.ContainerMetadata{
-			Name:    &name,
-			Attempt: &attempt,
+			Name:    name,
+			Attempt: attempt,
 		},
 	}
 	actualName := makeContainerName(sConfig, config)
