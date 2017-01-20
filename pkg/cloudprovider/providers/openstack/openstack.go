@@ -86,6 +86,7 @@ type LoadBalancerOpts struct {
 	MonitorMaxRetries    uint       `gcfg:"monitor-max-retries"`
 	ManageSecurityGroups bool       `gcfg:"manage-security-groups"`
 	NodeSecurityGroupID  string     `gcfg:"node-security-group"`
+	Provider             string     `gcfg:"provider"`
 }
 
 type BlockStorageOpts struct {
