@@ -747,7 +747,8 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 		kubeDeps.Mounter,
 		klet.getPodsDir(),
 		kubeDeps.Recorder,
-		kubeCfg.ExperimentalCheckNodeCapabilitiesBeforeMount)
+		kubeCfg.ExperimentalCheckNodeCapabilitiesBeforeMount,
+		kubeCfg.KeepTerminatedPodVolumes)
 
 	runtimeCache, err := kubecontainer.NewRuntimeCache(klet.containerRuntime)
 	if err != nil {
