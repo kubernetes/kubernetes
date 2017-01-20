@@ -125,7 +125,7 @@ func TestWriteKeysAndCert(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Couldn't create tmpdir")
 	}
-	defer os.Remove(tmpdir)
+	defer os.RemoveAll(tmpdir)
 
 	caKey, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {

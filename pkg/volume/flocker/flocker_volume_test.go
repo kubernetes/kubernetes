@@ -18,6 +18,7 @@ package flocker
 
 import (
 	"fmt"
+	"os"
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -29,7 +30,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func newTestableProvisioner(assert *assert.Assertions, options volume.VolumeOptions) volume.Provisioner {
+func newTestableProvisioner(assert *assert.Assertions, options volume.VolumeOptions) (string, volume.Provisioner) {
 	tmpDir, err := utiltesting.MkTmpdir("flockervolumeTest")
 	assert.NoError(err, fmt.Sprintf("can't make a temp dir: %v", err))
 
@@ -41,7 +42,7 @@ func newTestableProvisioner(assert *assert.Assertions, options volume.VolumeOpti
 
 	provisioner, err := plug.(*flockerPlugin).newProvisionerInternal(options, &fakeFlockerUtil{})
 
-	return provisioner
+	return tmpDir, provisioner
 }
 
 func TestProvision(t *testing.T) {
@@ -53,7 +54,8 @@ func TestProvision(t *testing.T) {
 		PersistentVolumeReclaimPolicy: v1.PersistentVolumeReclaimDelete,
 	}
 
-	provisioner := newTestableProvisioner(assert, options)
+	dir, provisioner := newTestableProvisioner(assert, options)
+	defer os.RemoveAll(dir)
 
 	persistentSpec, err := provisioner.Provision()
 	assert.NoError(err, "Provision() failed: ", err)
@@ -81,7 +83,8 @@ func TestProvision(t *testing.T) {
 		},
 	}
 
-	provisioner = newTestableProvisioner(assert, options)
+	dir, provisioner = newTestableProvisioner(assert, options)
+	defer os.RemoveAll(dir)
 	persistentSpec, err = provisioner.Provision()
 	assert.Error(err, "Provision() did not fail with Parameters specified")
 
@@ -92,8 +95,8 @@ func TestProvision(t *testing.T) {
 		PersistentVolumeReclaimPolicy: v1.PersistentVolumeReclaimDelete,
 	}
 
-	provisioner = newTestableProvisioner(assert, options)
+	dir, provisioner = newTestableProvisioner(assert, options)
+	defer os.RemoveAll(dir)
 	persistentSpec, err = provisioner.Provision()
 	assert.Error(err, "Provision() did not fail with Selector specified")
-
 }

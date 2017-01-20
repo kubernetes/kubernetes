@@ -114,6 +114,7 @@ func TestUpdateNewNodeStatus(t *testing.T) {
 	inputImageList, expectedImageList := generateTestingImageList(maxImagesInNodeStatus + 1)
 	testKubelet := newTestKubeletWithImageList(
 		t, inputImageList, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
 	kubeClient := testKubelet.fakeKubeClient
 	existingNode := v1.Node{ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname}}
@@ -253,6 +254,7 @@ func TestUpdateNewNodeStatus(t *testing.T) {
 
 func TestUpdateNewNodeOutOfDiskStatusWithTransitionFrequency(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
 	kubeClient := testKubelet.fakeKubeClient
 	existingNode := v1.Node{ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname}}
@@ -328,6 +330,7 @@ func TestUpdateNewNodeOutOfDiskStatusWithTransitionFrequency(t *testing.T) {
 
 func TestUpdateExistingNodeStatus(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
 	kubeClient := testKubelet.fakeKubeClient
 	existingNode := v1.Node{
@@ -523,6 +526,7 @@ func TestUpdateExistingNodeStatus(t *testing.T) {
 
 func TestUpdateExistingNodeOutOfDiskStatusWithTransitionFrequency(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
 	clock := testKubelet.fakeClock
 	// Do not set nano second, because apiserver function doesn't support nano second. (Only support
@@ -681,6 +685,7 @@ func TestUpdateExistingNodeOutOfDiskStatusWithTransitionFrequency(t *testing.T) 
 
 func TestUpdateNodeStatusWithRuntimeStateError(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
 	clock := testKubelet.fakeClock
 	kubeClient := testKubelet.fakeKubeClient
@@ -900,6 +905,7 @@ func TestUpdateNodeStatusWithRuntimeStateError(t *testing.T) {
 
 func TestUpdateNodeStatusError(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
 	// No matching node for the kubelet
 	testKubelet.fakeKubeClient.ReactionChain = fake.NewSimpleClientset(&v1.NodeList{Items: []v1.Node{}}).ReactionChain
@@ -914,6 +920,7 @@ func TestUpdateNodeStatusError(t *testing.T) {
 
 func TestRegisterWithApiServer(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
 	kubeClient := testKubelet.fakeKubeClient
 	kubeClient.AddReactor("create", "nodes", func(action core.Action) (bool, runtime.Object, error) {
@@ -1094,6 +1101,7 @@ func TestTryRegisterWithApiServer(t *testing.T) {
 
 	for _, tc := range cases {
 		testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled is a don't-care for this test */)
+		defer testKubelet.Cleanup()
 		kubelet := testKubelet.kubelet
 		kubeClient := testKubelet.fakeKubeClient
 
