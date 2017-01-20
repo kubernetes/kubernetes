@@ -66,7 +66,7 @@ type manager struct {
 	// Map from (mirror) pod UID to latest status version successfully sent to the API server.
 	// apiStatusVersions must only be accessed from the sync thread.
 	apiStatusVersions map[types.UID]uint64
-	// A function which returns true if the pod can saftely be deleted
+	// A function which returns true if the pod can safely be deleted
 	safeToDeletePod func(pod *v1.Pod) bool
 }
 
