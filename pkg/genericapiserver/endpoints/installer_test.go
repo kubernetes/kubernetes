@@ -82,8 +82,6 @@ func TestIsVowel(t *testing.T) {
 }
 
 func TestGetArticleForNoun(t *testing.T) {
-	type args struct {
-	}
 	tests := []struct {
 		noun    string
 		padding string
