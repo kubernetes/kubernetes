@@ -1,4 +1,8 @@
-assignees:
+reviewers:
+  - brendandburns
+  - thockin
+  - zmerlynn
+approvers:
   - bgrant0607
   - brendandburns
   - thockin
