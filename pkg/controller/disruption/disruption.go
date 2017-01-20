@@ -36,6 +36,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	v1core "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/core/v1"
 	policyclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/policy/v1beta1"
+	"k8s.io/kubernetes/pkg/client/legacylisters"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/util/intstr"
@@ -64,26 +65,26 @@ type DisruptionController struct {
 
 	pdbStore      cache.Store
 	pdbController cache.Controller
-	pdbLister     cache.StoreToPodDisruptionBudgetLister
+	pdbLister     listers.StoreToPodDisruptionBudgetLister
 
 	podController cache.Controller
-	podLister     cache.StoreToPodLister
+	podLister     listers.StoreToPodLister
 
 	rcIndexer    cache.Indexer
 	rcController cache.Controller
-	rcLister     cache.StoreToReplicationControllerLister
+	rcLister     listers.StoreToReplicationControllerLister
 
 	rsStore      cache.Store
 	rsController cache.Controller
-	rsLister     cache.StoreToReplicaSetLister
+	rsLister     listers.StoreToReplicaSetLister
 
 	dIndexer    cache.Indexer
 	dController cache.Controller
-	dLister     cache.StoreToDeploymentLister
+	dLister     listers.StoreToDeploymentLister
 
 	ssStore      cache.Store
 	ssController cache.Controller
-	ssLister     cache.StoreToStatefulSetLister
+	ssLister     listers.StoreToStatefulSetLister
 
 	// PodDisruptionBudget keys that need to be synced.
 	queue        workqueue.RateLimitingInterface

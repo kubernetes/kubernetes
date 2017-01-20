@@ -28,6 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	"k8s.io/kubernetes/pkg/client/legacylisters"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/informers"
 	"k8s.io/kubernetes/pkg/util/metrics"
@@ -49,7 +50,7 @@ type PodGCController struct {
 	// will be null
 	internalPodInformer cache.SharedIndexInformer
 
-	podStore      cache.StoreToPodLister
+	podStore      listers.StoreToPodLister
 	podController cache.Controller
 
 	deletePod              func(namespace, name string) error

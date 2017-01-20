@@ -36,6 +36,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	v1core "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/core/v1"
+	"k8s.io/kubernetes/pkg/client/legacylisters"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/controller/informers"
@@ -135,9 +136,9 @@ type NodeController struct {
 	nodeInformer       informers.NodeInformer
 	daemonSetInformer  informers.DaemonSetInformer
 
-	podStore       cache.StoreToPodLister
-	nodeStore      cache.StoreToNodeLister
-	daemonSetStore cache.StoreToDaemonSetLister
+	podStore       listers.StoreToPodLister
+	nodeStore      listers.StoreToNodeLister
+	daemonSetStore listers.StoreToDaemonSetLister
 	// allocate/recycle CIDRs for node if allocateNodeCIDRs == true
 	cidrAllocator CIDRAllocator
 

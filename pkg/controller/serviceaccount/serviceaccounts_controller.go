@@ -30,6 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	"k8s.io/kubernetes/pkg/client/legacylisters"
 	"k8s.io/kubernetes/pkg/controller/informers"
 	"k8s.io/kubernetes/pkg/util/metrics"
 	"k8s.io/kubernetes/pkg/util/workqueue"
@@ -105,8 +106,8 @@ type ServiceAccountsController struct {
 	// To allow injection for testing.
 	syncHandler func(key string) error
 
-	saLister *cache.StoreToServiceAccountLister
-	nsLister *cache.IndexerToNamespaceLister
+	saLister *listers.StoreToServiceAccountLister
+	nsLister *listers.IndexerToNamespaceLister
 
 	saSynced cache.InformerSynced
 	nsSynced cache.InformerSynced

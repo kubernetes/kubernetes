@@ -29,6 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	v1core "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/core/v1"
+	"k8s.io/kubernetes/pkg/client/legacylisters"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/util/workqueue"
@@ -49,7 +50,7 @@ type CertificateController struct {
 
 	// CSR framework and store
 	csrController cache.Controller
-	csrStore      cache.StoreToCertificateRequestLister
+	csrStore      listers.StoreToCertificateRequestLister
 
 	syncHandler func(csrKey string) error
 

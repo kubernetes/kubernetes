@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package cache
+package listers
 
 import (
 	"fmt"
@@ -24,6 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/client/cache"
 )
 
 //  TODO: generate these classes and methods for all resources of interest using
@@ -39,11 +40,11 @@ import (
 
 // StoreToPodLister helps list pods
 type StoreToPodLister struct {
-	Indexer Indexer
+	Indexer cache.Indexer
 }
 
 func (s *StoreToPodLister) List(selector labels.Selector) (ret []*v1.Pod, err error) {
-	err = ListAll(s.Indexer, selector, func(m interface{}) {
+	err = cache.ListAll(s.Indexer, selector, func(m interface{}) {
 		ret = append(ret, m.(*v1.Pod))
 	})
 	return ret, err
@@ -54,12 +55,12 @@ func (s *StoreToPodLister) Pods(namespace string) storePodsNamespacer {
 }
 
 type storePodsNamespacer struct {
-	Indexer   Indexer
+	Indexer   cache.Indexer
 	namespace string
 }
 
 func (s storePodsNamespacer) List(selector labels.Selector) (ret []*v1.Pod, err error) {
-	err = ListAllByNamespace(s.Indexer, s.namespace, selector, func(m interface{}) {
+	err = cache.ListAllByNamespace(s.Indexer, s.namespace, selector, func(m interface{}) {
 		ret = append(ret, m.(*v1.Pod))
 	})
 	return ret, err
@@ -78,11 +79,11 @@ func (s storePodsNamespacer) Get(name string) (*v1.Pod, error) {
 
 // StoreToServiceLister helps list services
 type StoreToServiceLister struct {
-	Indexer Indexer
+	Indexer cache.Indexer
 }
 
 func (s *StoreToServiceLister) List(selector labels.Selector) (ret []*v1.Service, err error) {
-	err = ListAll(s.Indexer, selector, func(m interface{}) {
+	err = cache.ListAll(s.Indexer, selector, func(m interface{}) {
 		ret = append(ret, m.(*v1.Service))
 	})
 	return ret, err
@@ -93,12 +94,12 @@ func (s *StoreToServiceLister) Services(namespace string) storeServicesNamespace
 }
 
 type storeServicesNamespacer struct {
-	indexer   Indexer
+	indexer   cache.Indexer
 	namespace string
 }
 
 func (s storeServicesNamespacer) List(selector labels.Selector) (ret []*v1.Service, err error) {
-	err = ListAllByNamespace(s.indexer, s.namespace, selector, func(m interface{}) {
+	err = cache.ListAllByNamespace(s.indexer, s.namespace, selector, func(m interface{}) {
 		ret = append(ret, m.(*v1.Service))
 	})
 	return ret, err
@@ -140,11 +141,11 @@ func (s *StoreToServiceLister) GetPodServices(pod *v1.Pod) (services []*v1.Servi
 
 // StoreToReplicationControllerLister helps list rcs
 type StoreToReplicationControllerLister struct {
-	Indexer Indexer
+	Indexer cache.Indexer
 }
 
 func (s *StoreToReplicationControllerLister) List(selector labels.Selector) (ret []*v1.ReplicationController, err error) {
-	err = ListAll(s.Indexer, selector, func(m interface{}) {
+	err = cache.ListAll(s.Indexer, selector, func(m interface{}) {
 		ret = append(ret, m.(*v1.ReplicationController))
 	})
 	return ret, err
@@ -155,12 +156,12 @@ func (s *StoreToReplicationControllerLister) ReplicationControllers(namespace st
 }
 
 type storeReplicationControllersNamespacer struct {
-	indexer   Indexer
+	indexer   cache.Indexer
 	namespace string
 }
 
 func (s storeReplicationControllersNamespacer) List(selector labels.Selector) (ret []*v1.ReplicationController, err error) {
-	err = ListAllByNamespace(s.indexer, s.namespace, selector, func(m interface{}) {
+	err = cache.ListAllByNamespace(s.indexer, s.namespace, selector, func(m interface{}) {
 		ret = append(ret, m.(*v1.ReplicationController))
 	})
 	return ret, err
@@ -185,7 +186,7 @@ func (s *StoreToReplicationControllerLister) GetPodControllers(pod *v1.Pod) (con
 	}
 
 	key := &v1.ReplicationController{ObjectMeta: metav1.ObjectMeta{Namespace: pod.Namespace}}
-	items, err := s.Indexer.Index(NamespaceIndex, key)
+	items, err := s.Indexer.Index(cache.NamespaceIndex, key)
 	if err != nil {
 		return
 	}
@@ -208,11 +209,11 @@ func (s *StoreToReplicationControllerLister) GetPodControllers(pod *v1.Pod) (con
 
 // StoreToServiceAccountLister helps list service accounts
 type StoreToServiceAccountLister struct {
-	Indexer Indexer
+	Indexer cache.Indexer
 }
 
 func (s *StoreToServiceAccountLister) List(selector labels.Selector) (ret []*v1.ServiceAccount, err error) {
-	err = ListAll(s.Indexer, selector, func(m interface{}) {
+	err = cache.ListAll(s.Indexer, selector, func(m interface{}) {
 		ret = append(ret, m.(*v1.ServiceAccount))
 	})
 	return ret, err
@@ -223,12 +224,12 @@ func (s *StoreToServiceAccountLister) ServiceAccounts(namespace string) storeSer
 }
 
 type storeServiceAccountsNamespacer struct {
-	indexer   Indexer
+	indexer   cache.Indexer
 	namespace string
 }
 
 func (s storeServiceAccountsNamespacer) List(selector labels.Selector) (ret []*v1.ServiceAccount, err error) {
-	err = ListAllByNamespace(s.indexer, s.namespace, selector, func(m interface{}) {
+	err = cache.ListAllByNamespace(s.indexer, s.namespace, selector, func(m interface{}) {
 		ret = append(ret, m.(*v1.ServiceAccount))
 	})
 	return ret, err
@@ -247,11 +248,11 @@ func (s storeServiceAccountsNamespacer) Get(name string) (*v1.ServiceAccount, er
 
 // StoreToLimitRangeLister helps list limit ranges
 type StoreToLimitRangeLister struct {
-	Indexer Indexer
+	Indexer cache.Indexer
 }
 
 func (s *StoreToLimitRangeLister) List(selector labels.Selector) (ret []*v1.LimitRange, err error) {
-	err = ListAll(s.Indexer, selector, func(m interface{}) {
+	err = cache.ListAll(s.Indexer, selector, func(m interface{}) {
 		ret = append(ret, m.(*v1.LimitRange))
 	})
 	return ret, err
@@ -259,12 +260,12 @@ func (s *StoreToLimitRangeLister) List(selector labels.Selector) (ret []*v1.Limi
 
 // StoreToPersistentVolumeClaimLister helps list pvcs
 type StoreToPersistentVolumeClaimLister struct {
-	Indexer Indexer
+	Indexer cache.Indexer
 }
 
 // List returns all persistentvolumeclaims that match the specified selector
 func (s *StoreToPersistentVolumeClaimLister) List(selector labels.Selector) (ret []*v1.PersistentVolumeClaim, err error) {
-	err = ListAll(s.Indexer, selector, func(m interface{}) {
+	err = cache.ListAll(s.Indexer, selector, func(m interface{}) {
 		ret = append(ret, m.(*v1.PersistentVolumeClaim))
 	})
 	return ret, err
@@ -275,12 +276,12 @@ func (s *StoreToLimitRangeLister) LimitRanges(namespace string) storeLimitRanges
 }
 
 type storeLimitRangesNamespacer struct {
-	indexer   Indexer
+	indexer   cache.Indexer
 	namespace string
 }
 
 func (s storeLimitRangesNamespacer) List(selector labels.Selector) (ret []*v1.LimitRange, err error) {
-	err = ListAllByNamespace(s.indexer, s.namespace, selector, func(m interface{}) {
+	err = cache.ListAllByNamespace(s.indexer, s.namespace, selector, func(m interface{}) {
 		ret = append(ret, m.(*v1.LimitRange))
 	})
 	return ret, err
@@ -303,12 +304,12 @@ func (s *StoreToPersistentVolumeClaimLister) PersistentVolumeClaims(namespace st
 }
 
 type storePersistentVolumeClaimsNamespacer struct {
-	Indexer   Indexer
+	Indexer   cache.Indexer
 	namespace string
 }
 
 func (s storePersistentVolumeClaimsNamespacer) List(selector labels.Selector) (ret []*v1.PersistentVolumeClaim, err error) {
-	err = ListAllByNamespace(s.Indexer, s.namespace, selector, func(m interface{}) {
+	err = cache.ListAllByNamespace(s.Indexer, s.namespace, selector, func(m interface{}) {
 		ret = append(ret, m.(*v1.PersistentVolumeClaim))
 	})
 	return ret, err
@@ -327,12 +328,12 @@ func (s storePersistentVolumeClaimsNamespacer) Get(name string) (*v1.PersistentV
 
 // IndexerToNamespaceLister gives an Indexer List method
 type IndexerToNamespaceLister struct {
-	Indexer
+	cache.Indexer
 }
 
 // List returns a list of namespaces
 func (i *IndexerToNamespaceLister) List(selector labels.Selector) (ret []*v1.Namespace, err error) {
-	err = ListAll(i.Indexer, selector, func(m interface{}) {
+	err = cache.ListAll(i.Indexer, selector, func(m interface{}) {
 		ret = append(ret, m.(*v1.Namespace))
 	})
 	return ret, err

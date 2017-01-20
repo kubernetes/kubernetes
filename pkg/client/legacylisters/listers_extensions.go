@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package cache
+package listers
 
 import (
 	"fmt"
@@ -25,6 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 	extensionsinternal "k8s.io/kubernetes/pkg/apis/extensions"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
+	"k8s.io/kubernetes/pkg/client/cache"
 )
 
 //  TODO: generate these classes and methods for all resources of interest using
@@ -40,11 +41,11 @@ import (
 
 // StoreToDeploymentLister helps list deployments
 type StoreToDeploymentLister struct {
-	Indexer Indexer
+	Indexer cache.Indexer
 }
 
 func (s *StoreToDeploymentLister) List(selector labels.Selector) (ret []*extensions.Deployment, err error) {
-	err = ListAll(s.Indexer, selector, func(m interface{}) {
+	err = cache.ListAll(s.Indexer, selector, func(m interface{}) {
 		ret = append(ret, m.(*extensions.Deployment))
 	})
 	return ret, err
@@ -55,12 +56,12 @@ func (s *StoreToDeploymentLister) Deployments(namespace string) storeDeployments
 }
 
 type storeDeploymentsNamespacer struct {
-	Indexer   Indexer
+	Indexer   cache.Indexer
 	namespace string
 }
 
 func (s storeDeploymentsNamespacer) List(selector labels.Selector) (ret []*extensions.Deployment, err error) {
-	err = ListAllByNamespace(s.Indexer, s.namespace, selector, func(m interface{}) {
+	err = cache.ListAllByNamespace(s.Indexer, s.namespace, selector, func(m interface{}) {
 		ret = append(ret, m.(*extensions.Deployment))
 	})
 	return ret, err
@@ -141,11 +142,11 @@ func (s *StoreToDeploymentLister) GetDeploymentsForPod(pod *v1.Pod) (deployments
 
 // StoreToReplicaSetLister helps list replicasets
 type StoreToReplicaSetLister struct {
-	Indexer Indexer
+	Indexer cache.Indexer
 }
 
 func (s *StoreToReplicaSetLister) List(selector labels.Selector) (ret []*extensions.ReplicaSet, err error) {
-	err = ListAll(s.Indexer, selector, func(m interface{}) {
+	err = cache.ListAll(s.Indexer, selector, func(m interface{}) {
 		ret = append(ret, m.(*extensions.ReplicaSet))
 	})
 	return ret, err
@@ -156,12 +157,12 @@ func (s *StoreToReplicaSetLister) ReplicaSets(namespace string) storeReplicaSets
 }
 
 type storeReplicaSetsNamespacer struct {
-	Indexer   Indexer
+	Indexer   cache.Indexer
 	namespace string
 }
 
 func (s storeReplicaSetsNamespacer) List(selector labels.Selector) (ret []*extensions.ReplicaSet, err error) {
-	err = ListAllByNamespace(s.Indexer, s.namespace, selector, func(m interface{}) {
+	err = cache.ListAllByNamespace(s.Indexer, s.namespace, selector, func(m interface{}) {
 		ret = append(ret, m.(*extensions.ReplicaSet))
 	})
 	return ret, err
