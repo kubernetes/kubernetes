@@ -508,6 +508,7 @@ func FindEmptyDirectoryUsageOnTmpfs() (*resource.Quantity, error) {
 	if err != nil {
 		return nil, err
 	}
+	defer os.RemoveAll(tmpDir)
 	out, err := exec.Command("nice", "-n", "19", "du", "-s", "-B", "1", tmpDir).CombinedOutput()
 	if err != nil {
 		return nil, fmt.Errorf("failed command 'du' on %s with error %v", tmpDir, err)

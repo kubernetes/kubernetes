@@ -114,6 +114,7 @@ func TestMakeMounts(t *testing.T) {
 
 func TestRunInContainerNoSuchPod(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
 	fakeRuntime := testKubelet.fakeRuntime
 	fakeRuntime.PodList = []*containertest.FakePod{}
@@ -133,6 +134,7 @@ func TestRunInContainerNoSuchPod(t *testing.T) {
 func TestRunInContainer(t *testing.T) {
 	for _, testError := range []error{nil, errors.New("bar")} {
 		testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+		defer testKubelet.Cleanup()
 		kubelet := testKubelet.kubelet
 		fakeRuntime := testKubelet.fakeRuntime
 		fakeCommandRunner := containertest.FakeContainerCommandRunner{
@@ -166,6 +168,7 @@ func TestRunInContainer(t *testing.T) {
 
 func TestGenerateRunContainerOptions_DNSConfigurationParams(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
 
 	clusterNS := "203.0.113.1"
@@ -925,6 +928,7 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 
 	for _, tc := range testCases {
 		testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+		defer testKubelet.Cleanup()
 		kl := testKubelet.kubelet
 		kl.masterServiceNamespace = tc.masterServiceNs
 		if tc.nilLister {
@@ -1398,6 +1402,7 @@ func TestExec(t *testing.T) {
 
 	for _, tc := range testcases {
 		testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+		defer testKubelet.Cleanup()
 		kubelet := testKubelet.kubelet
 		testKubelet.fakeRuntime.PodList = []*containertest.FakePod{
 			{Pod: &kubecontainer.Pod{
@@ -1488,6 +1493,7 @@ func TestPortForward(t *testing.T) {
 
 	for _, tc := range testcases {
 		testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+		defer testKubelet.Cleanup()
 		kubelet := testKubelet.kubelet
 		testKubelet.fakeRuntime.PodList = []*containertest.FakePod{
 			{Pod: &kubecontainer.Pod{
@@ -1635,6 +1641,7 @@ func TestHasHostMountPVC(t *testing.T) {
 
 	for k, v := range tests {
 		testKubelet := newTestKubelet(t, false)
+		defer testKubelet.Cleanup()
 		pod := &v1.Pod{
 			Spec: v1.PodSpec{},
 		}

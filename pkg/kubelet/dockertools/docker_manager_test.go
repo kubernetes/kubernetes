@@ -17,6 +17,7 @@ limitations under the License.
 package dockertools
 
 import (
+	"flag"
 	"fmt"
 	"io/ioutil"
 	"net"
@@ -59,6 +60,21 @@ import (
 	"k8s.io/kubernetes/pkg/util/intstr"
 )
 
+var testTempDir string
+
+func TestMain(m *testing.M) {
+	dir, err := ioutil.TempDir("", "dockertools")
+	if err != nil {
+		panic(err)
+	}
+	testTempDir = dir
+
+	flag.Parse()
+	status := m.Run()
+	os.RemoveAll(testTempDir)
+	os.Exit(status)
+}
+
 type fakeHTTP struct {
 	url string
 	err error
@@ -81,7 +97,7 @@ func (f *fakeRuntimeHelper) GenerateRunContainerOptions(pod *v1.Pod, container *
 	var opts kubecontainer.RunContainerOptions
 	var err error
 	if len(container.TerminationMessagePath) != 0 {
-		testPodContainerDir, err = ioutil.TempDir("", "fooPodContainerDir")
+		testPodContainerDir, err = ioutil.TempDir(testTempDir, "fooPodContainerDir")
 		if err != nil {
 			return nil, err
 		}

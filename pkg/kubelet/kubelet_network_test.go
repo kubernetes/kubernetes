@@ -30,6 +30,7 @@ import (
 
 func TestNodeIPParam(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
 	tests := []struct {
 		nodeIP   string
@@ -98,6 +99,7 @@ func TestParseResolvConf(t *testing.T) {
 		{"#comment\nnameserver 1.2.3.4\n#comment\nsearch foo\ncomment", []string{"1.2.3.4"}, []string{"foo"}},
 	}
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
 	for i, tc := range testCases {
 		ns, srch, err := kubelet.parseResolvConf(strings.NewReader(tc.data))
@@ -258,6 +260,7 @@ func TestCleanupBandwidthLimits(t *testing.T) {
 		}
 
 		testKube := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+		defer testKube.Cleanup()
 		testKube.kubelet.shaper = shaper
 
 		for _, pod := range test.pods {
