@@ -34,7 +34,8 @@ import (
 )
 
 func TestTLSConnection(t *testing.T) {
-	certFile, keyFile, caFile := configureTLSCerts(t)
+	tempDir, certFile, keyFile, caFile := configureTLSCerts(t)
+	defer os.RemoveAll(tempDir)
 
 	tlsInfo := &transport.TLSInfo{
 		CertFile: certFile,
@@ -67,23 +68,25 @@ func TestTLSConnection(t *testing.T) {
 	}
 }
 
-func configureTLSCerts(t *testing.T) (certFile, keyFile, caFile string) {
+func configureTLSCerts(t *testing.T) (tempDir, certFile, keyFile, caFile string) {
+	var err error
+
 	baseDir := os.TempDir()
-	tempDir, err := ioutil.TempDir(baseDir, "etcd_certificates")
+	tempDir, err = ioutil.TempDir(baseDir, "etcd_certificates")
 	if err != nil {
 		t.Fatal(err)
 	}
 	certFile = path.Join(tempDir, "etcdcert.pem")
-	if err := ioutil.WriteFile(certFile, []byte(testingcert.CertFileContent), 0644); err != nil {
+	if err = ioutil.WriteFile(certFile, []byte(testingcert.CertFileContent), 0644); err != nil {
 		t.Fatal(err)
 	}
 	keyFile = path.Join(tempDir, "etcdkey.pem")
-	if err := ioutil.WriteFile(keyFile, []byte(testingcert.KeyFileContent), 0644); err != nil {
+	if err = ioutil.WriteFile(keyFile, []byte(testingcert.KeyFileContent), 0644); err != nil {
 		t.Fatal(err)
 	}
 	caFile = path.Join(tempDir, "ca.pem")
-	if err := ioutil.WriteFile(caFile, []byte(testingcert.CAFileContent), 0644); err != nil {
+	if err = ioutil.WriteFile(caFile, []byte(testingcert.CAFileContent), 0644); err != nil {
 		t.Fatal(err)
 	}
-	return certFile, keyFile, caFile
+	return tempDir, certFile, keyFile, caFile
 }
