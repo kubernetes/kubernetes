@@ -25,26 +25,30 @@ import (
 	"k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/api/v1"
 	apps "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
-	"k8s.io/kubernetes/pkg/client/cache"
 	fakeinternal "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/apps/v1beta1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/apps/v1beta1/fake"
-	"k8s.io/kubernetes/pkg/client/legacylisters"
+	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated"
 	"k8s.io/kubernetes/pkg/controller"
 )
 
+func alwaysReady() bool {
+	return true
+}
+
 func newFakeStatefulSetController() (*StatefulSetController, *fakePetClient) {
+	client := fakeinternal.NewSimpleClientset()
+	informerFactory := informers.NewSharedInformerFactory(nil, client, controller.NoResyncPeriodFunc())
 	fpc := newFakePetClient()
-	return &StatefulSetController{
-		kubeClient:       nil,
-		blockingPetStore: newUnHealthyPetTracker(fpc),
-		podStoreSynced:   func() bool { return true },
-		psStore:          listers.StoreToStatefulSetLister{Store: cache.NewStore(controller.KeyFunc)},
-		podStore:         listers.StoreToPodLister{Indexer: cache.NewIndexer(controller.KeyFunc, cache.Indexers{})},
-		newSyncer: func(blockingPet *pcb) *petSyncer {
-			return &petSyncer{fpc, blockingPet}
-		},
-	}, fpc
+	fpc.statefulSetStore = informerFactory.Apps().V1beta1().StatefulSets().Informer().GetStore()
+	c := NewStatefulSetController(informerFactory.Core().V1().Pods(), informerFactory.Apps().V1beta1().StatefulSets(), client)
+	c.blockingPetStore = newUnHealthyPetTracker(fpc)
+	c.newSyncer = func(blockingPet *pcb) *petSyncer {
+		return &petSyncer{fpc, blockingPet}
+	}
+	c.psStoreSynced = alwaysReady
+	c.podStoreSynced = alwaysReady
+	return c, fpc
 }
 
 func checkPets(ps *apps.StatefulSet, creates, deletes int, fc *fakePetClient, t *testing.T) {
@@ -252,7 +256,7 @@ func TestStatefulSetBlockingPetIsCleared(t *testing.T) {
 	}
 
 	// Deleting the statefulset should clear the blocking pet
-	if err := psc.psStore.Store.Delete(ps); err != nil {
+	if err := fc.statefulSetStore.Delete(ps); err != nil {
 		t.Fatalf("Unable to delete pod %v from statefulset controller store.", ps.Name)
 	}
 	if err := psc.Sync(fmt.Sprintf("%v/%v", ps.Namespace, ps.Name)); err != nil {
@@ -313,14 +317,14 @@ func (f *fakeStatefulSetClient) UpdateStatus(statefulset *apps.StatefulSet) (*ap
 
 func TestStatefulSetReplicaCount(t *testing.T) {
 	fpsc := &fakeStatefulSetClient{}
-	psc, _ := newFakeStatefulSetController()
+	psc, fc := newFakeStatefulSetController()
 	psc.kubeClient = &fakeClient{
 		statefulsetClient: fpsc,
 	}
 
 	ps := newStatefulSet(3)
 	psKey := fmt.Sprintf("%v/%v", ps.Namespace, ps.Name)
-	psc.psStore.Store.Add(ps)
+	fc.statefulSetStore.Add(ps)
 
 	if err := psc.Sync(psKey); err != nil {
 		t.Errorf("Error during sync of deleted statefulset %v", err)

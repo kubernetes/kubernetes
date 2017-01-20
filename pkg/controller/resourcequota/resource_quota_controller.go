@@ -17,20 +17,24 @@ limitations under the License.
 package resourcequota
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/golang/glog"
 
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	coreinformers "k8s.io/kubernetes/pkg/client/informers/informers_generated/core/v1"
+	corelisters "k8s.io/kubernetes/pkg/client/listers/core/v1"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/quota"
 	"k8s.io/kubernetes/pkg/util/metrics"
@@ -41,6 +45,8 @@ import (
 type ResourceQuotaControllerOptions struct {
 	// Must have authority to list all quotas, and update quota status
 	KubeClient clientset.Interface
+	// Shared informer for resource quota
+	ResourceQuotaInformer coreinformers.ResourceQuotaInformer
 	// Controls full recalculation of quota usage
 	ResyncPeriod controller.ResyncPeriodFunc
 	// Knows how to calculate usage
@@ -59,9 +65,9 @@ type ResourceQuotaController struct {
 	// Must have authority to list all resources in the system, and update quota status
 	kubeClient clientset.Interface
 	// An index of resource quota objects by namespace
-	rqIndexer cache.Indexer
-	// Watches changes to all resource quota
-	rqController cache.Controller
+	rqLister corelisters.ResourceQuotaLister
+	// A function that returns true when the rqLister's data source is ready
+	rqsSynced cache.InformerSynced
 	// ResourceQuota objects that need to be synchronized
 	queue workqueue.RateLimitingInterface
 	// missingUsageQueue holds objects that are missing the initial usage information
@@ -80,6 +86,8 @@ func NewResourceQuotaController(options *ResourceQuotaControllerOptions) *Resour
 	// build the resource quota controller
 	rq := &ResourceQuotaController{
 		kubeClient:               options.KubeClient,
+		rqLister:                 options.ResourceQuotaInformer.Lister(),
+		rqsSynced:                options.ResourceQuotaInformer.Informer().HasSynced,
 		queue:                    workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "resourcequota_primary"),
 		missingUsageQueue:        workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "resourcequota_priority"),
 		resyncPeriod:             options.ResyncPeriod,
@@ -93,42 +101,29 @@ func NewResourceQuotaController(options *ResourceQuotaControllerOptions) *Resour
 	rq.syncHandler = rq.syncResourceQuotaFromKey
 
 	// build the controller that observes quota
-	rq.rqIndexer, rq.rqController = cache.NewIndexerInformer(
-		&cache.ListWatch{
-			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
-				return rq.kubeClient.Core().ResourceQuotas(v1.NamespaceAll).List(options)
-			},
-			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
-				return rq.kubeClient.Core().ResourceQuotas(v1.NamespaceAll).Watch(options)
-			},
+	options.ResourceQuotaInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+		AddFunc: rq.addQuota,
+		UpdateFunc: func(old, cur interface{}) {
+			// We are only interested in observing updates to quota.spec to drive updates to quota.status.
+			// We ignore all updates to quota.Status because they are all driven by this controller.
+			// IMPORTANT:
+			// We do not use this function to queue up a full quota recalculation.  To do so, would require
+			// us to enqueue all quota.Status updates, and since quota.Status updates involve additional queries
+			// that cannot be backed by a cache and result in a full query of a namespace's content, we do not
+			// want to pay the price on spurious status updates.  As a result, we have a separate routine that is
+			// responsible for enqueue of all resource quotas when doing a full resync (enqueueAll)
+			oldResourceQuota := old.(*v1.ResourceQuota)
+			curResourceQuota := cur.(*v1.ResourceQuota)
+			if quota.V1Equals(oldResourceQuota.Spec.Hard, curResourceQuota.Spec.Hard) {
+				return
+			}
+			rq.addQuota(curResourceQuota)
 		},
-		&v1.ResourceQuota{},
-		rq.resyncPeriod(),
-		cache.ResourceEventHandlerFuncs{
-			AddFunc: rq.addQuota,
-			UpdateFunc: func(old, cur interface{}) {
-				// We are only interested in observing updates to quota.spec to drive updates to quota.status.
-				// We ignore all updates to quota.Status because they are all driven by this controller.
-				// IMPORTANT:
-				// We do not use this function to queue up a full quota recalculation.  To do so, would require
-				// us to enqueue all quota.Status updates, and since quota.Status updates involve additional queries
-				// that cannot be backed by a cache and result in a full query of a namespace's content, we do not
-				// want to pay the price on spurious status updates.  As a result, we have a separate routine that is
-				// responsible for enqueue of all resource quotas when doing a full resync (enqueueAll)
-				oldResourceQuota := old.(*v1.ResourceQuota)
-				curResourceQuota := cur.(*v1.ResourceQuota)
-				if quota.V1Equals(oldResourceQuota.Spec.Hard, curResourceQuota.Spec.Hard) {
-					return
-				}
-				rq.addQuota(curResourceQuota)
-			},
-			// This will enter the sync loop and no-op, because the controller has been deleted from the store.
-			// Note that deleting a controller immediately after scaling it to 0 will not work. The recommended
-			// way of achieving this is by performing a `stop` operation on the controller.
-			DeleteFunc: rq.enqueueResourceQuota,
-		},
-		cache.Indexers{"namespace": cache.MetaNamespaceIndexFunc},
-	)
+		// This will enter the sync loop and no-op, because the controller has been deleted from the store.
+		// Note that deleting a controller immediately after scaling it to 0 will not work. The recommended
+		// way of achieving this is by performing a `stop` operation on the controller.
+		DeleteFunc: rq.enqueueResourceQuota,
+	})
 
 	for _, groupKindToReplenish := range options.GroupKindsToReplenish {
 		controllerOptions := &ReplenishmentControllerOptions{
@@ -149,8 +144,18 @@ func NewResourceQuotaController(options *ResourceQuotaControllerOptions) *Resour
 // enqueueAll is called at the fullResyncPeriod interval to force a full recalculation of quota usage statistics
 func (rq *ResourceQuotaController) enqueueAll() {
 	defer glog.V(4).Infof("Resource quota controller queued all resource quota for full calculation of usage")
-	for _, k := range rq.rqIndexer.ListKeys() {
-		rq.queue.Add(k)
+	rqs, err := rq.rqLister.List(labels.Everything())
+	if err != nil {
+		utilruntime.HandleError(fmt.Errorf("unable to enqueue all - error listing resource quotas: %v", err))
+		return
+	}
+	for i := range rqs {
+		key, err := controller.KeyFunc(rqs[i])
+		if err != nil {
+			utilruntime.HandleError(fmt.Errorf("Couldn't get key for object %+v: %v", rqs[i], err))
+			continue
+		}
+		rq.queue.Add(key)
 	}
 }
 
@@ -227,7 +232,12 @@ func (rq *ResourceQuotaController) worker(queue workqueue.RateLimitingInterface)
 // Run begins quota controller using the specified number of workers
 func (rq *ResourceQuotaController) Run(workers int, stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
-	go rq.rqController.Run(stopCh)
+
+	if !cache.WaitForCacheSync(stopCh, rq.rqsSynced) {
+		utilruntime.HandleError(fmt.Errorf("timed out waiting for caches to sync"))
+		return
+	}
+
 	// the controllers that replenish other resources to respond rapidly to state changes
 	for _, replenishmentController := range rq.replenishmentControllers {
 		go replenishmentController.Run(stopCh)
@@ -251,27 +261,31 @@ func (rq *ResourceQuotaController) syncResourceQuotaFromKey(key string) (err err
 		glog.V(4).Infof("Finished syncing resource quota %q (%v)", key, time.Now().Sub(startTime))
 	}()
 
-	obj, exists, err := rq.rqIndexer.GetByKey(key)
-	if !exists {
-		glog.Infof("Resource quota has been deleted %v", key)
-		return nil
-	}
+	namespace, name, err := cache.SplitMetaNamespaceKey(key)
 	if err != nil {
+		return err
+	}
+	quota, err := rq.rqLister.ResourceQuotas(namespace).Get(name)
+	if err != nil {
+		if errors.IsNotFound(err) {
+			glog.Infof("Resource quota has been deleted %v", key)
+			return nil
+		}
 		glog.Infof("Unable to retrieve resource quota %v from store: %v", key, err)
 		rq.queue.Add(key)
 		return err
 	}
-	quota := *obj.(*v1.ResourceQuota)
+
 	return rq.syncResourceQuota(quota)
 }
 
 // syncResourceQuota runs a complete sync of resource quota status across all known kinds
-func (rq *ResourceQuotaController) syncResourceQuota(v1ResourceQuota v1.ResourceQuota) (err error) {
+func (rq *ResourceQuotaController) syncResourceQuota(v1ResourceQuota *v1.ResourceQuota) (err error) {
 	// quota is dirty if any part of spec hard limits differs from the status hard limits
 	dirty := !api.Semantic.DeepEqual(v1ResourceQuota.Spec.Hard, v1ResourceQuota.Status.Hard)
 
 	resourceQuota := api.ResourceQuota{}
-	if err := v1.Convert_v1_ResourceQuota_To_api_ResourceQuota(&v1ResourceQuota, &resourceQuota, nil); err != nil {
+	if err := v1.Convert_v1_ResourceQuota_To_api_ResourceQuota(v1ResourceQuota, &resourceQuota, nil); err != nil {
 		return err
 	}
 
@@ -337,19 +351,23 @@ func (rq *ResourceQuotaController) replenishQuota(groupKind schema.GroupKind, na
 	}
 
 	// check if this namespace even has a quota...
-	indexKey := &v1.ResourceQuota{}
-	indexKey.Namespace = namespace
-	resourceQuotas, err := rq.rqIndexer.Index("namespace", indexKey)
+	resourceQuotas, err := rq.rqLister.ResourceQuotas(namespace).List(labels.Everything())
 	if err != nil {
-		glog.Errorf("quota controller could not find ResourceQuota associated with namespace: %s, could take up to %v before a quota replenishes", namespace, rq.resyncPeriod())
+		if errors.IsNotFound(err) {
+			utilruntime.HandleError(fmt.Errorf("quota controller could not find ResourceQuota associated with namespace: %s, could take up to %v before a quota replenishes", namespace, rq.resyncPeriod()))
+		} else {
+			utilruntime.HandleError(fmt.Errorf("error checking to see if namespace %s has any ResourceQuota associated with it: %v", namespace, err))
+		}
+		return
 	}
+
 	if len(resourceQuotas) == 0 {
 		return
 	}
 
 	// only queue those quotas that are tracking a resource associated with this kind.
 	for i := range resourceQuotas {
-		resourceQuota := resourceQuotas[i].(*v1.ResourceQuota)
+		resourceQuota := resourceQuotas[i]
 		internalResourceQuota := &api.ResourceQuota{}
 		if err := v1.Convert_v1_ResourceQuota_To_api_ResourceQuota(resourceQuota, internalResourceQuota, nil); err != nil {
 			glog.Error(err)

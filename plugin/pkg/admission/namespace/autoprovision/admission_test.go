@@ -29,14 +29,14 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
+	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated"
 	"k8s.io/kubernetes/pkg/client/testing/core"
-	"k8s.io/kubernetes/pkg/controller/informers"
 	kubeadmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
 )
 
 // newHandlerForTest returns the admission controller configured for testing.
 func newHandlerForTest(c clientset.Interface) (admission.Interface, informers.SharedInformerFactory, error) {
-	f := informers.NewSharedInformerFactory(nil, c, 5*time.Minute)
+	f := informers.NewSharedInformerFactory(c, nil, 5*time.Minute)
 	handler := NewProvision()
 	pluginInitializer := kubeadmission.NewPluginInitializer(c, f, nil)
 	pluginInitializer.Initialize(handler)

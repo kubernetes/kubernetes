@@ -29,6 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 	apipod "k8s.io/kubernetes/pkg/api/v1/pod"
 	apps "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
+	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/client/record"
 )
 
@@ -151,13 +152,14 @@ func newFakePetClient() *fakePetClient {
 }
 
 type fakePetClient struct {
-	pets          []*pcb
-	claims        []v1.PersistentVolumeClaim
-	petsCreated   int
-	petsDeleted   int
-	claimsCreated int
-	claimsDeleted int
-	recorder      record.EventRecorder
+	statefulSetStore cache.Store
+	pets             []*pcb
+	claims           []v1.PersistentVolumeClaim
+	petsCreated      int
+	petsDeleted      int
+	claimsCreated    int
+	claimsDeleted    int
+	recorder         record.EventRecorder
 	petHealthChecker
 }
 

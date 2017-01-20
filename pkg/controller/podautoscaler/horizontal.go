@@ -24,9 +24,8 @@ import (
 
 	"github.com/golang/glog"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/v1"
 	autoscaling "k8s.io/kubernetes/pkg/apis/autoscaling/v1"
@@ -35,6 +34,8 @@ import (
 	unversionedautoscaling "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/autoscaling/v1"
 	v1core "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/core/v1"
 	unversionedextensions "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/extensions/v1beta1"
+	autoscalinginformers "k8s.io/kubernetes/pkg/client/informers/informers_generated/autoscaling/v1"
+	autoscalinglisters "k8s.io/kubernetes/pkg/client/listers/autoscaling/v1"
 	"k8s.io/kubernetes/pkg/client/record"
 )
 
@@ -63,53 +64,48 @@ type HorizontalController struct {
 	replicaCalc   *ReplicaCalculator
 	eventRecorder record.EventRecorder
 
-	// A store of HPA objects, populated by the controller.
-	store cache.Store
-	// Watches changes to all HPA objects.
-	controller cache.Controller
+	// A lister of HPA objects, populated by a shared informer
+	hpaLister  autoscalinglisters.HorizontalPodAutoscalerLister
+	hpasSynced cache.InformerSynced
 }
 
 var downscaleForbiddenWindow = 5 * time.Minute
 var upscaleForbiddenWindow = 3 * time.Minute
 
-func newInformer(controller *HorizontalController, resyncPeriod time.Duration) (cache.Store, cache.Controller) {
-	return cache.NewInformer(
-		&cache.ListWatch{
-			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
-				return controller.hpaNamespacer.HorizontalPodAutoscalers(v1.NamespaceAll).List(options)
-			},
-			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
-				return controller.hpaNamespacer.HorizontalPodAutoscalers(v1.NamespaceAll).Watch(options)
-			},
+func setupInformer(controller *HorizontalController, informer autoscalinginformers.HorizontalPodAutoscalerInformer) {
+	informer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+		AddFunc: func(obj interface{}) {
+			hpa := obj.(*autoscaling.HorizontalPodAutoscaler)
+			hasCPUPolicy := hpa.Spec.TargetCPUUtilizationPercentage != nil
+			_, hasCustomMetricsPolicy := hpa.Annotations[HpaCustomMetricsTargetAnnotationName]
+			if !hasCPUPolicy && !hasCustomMetricsPolicy {
+				controller.eventRecorder.Event(hpa, v1.EventTypeNormal, "DefaultPolicy", "No scaling policy specified - will use default one. See documentation for details")
+			}
+			err := controller.reconcileAutoscaler(hpa)
+			if err != nil {
+				glog.Warningf("Failed to reconcile %s: %v", hpa.Name, err)
+			}
 		},
-		&autoscaling.HorizontalPodAutoscaler{},
-		resyncPeriod,
-		cache.ResourceEventHandlerFuncs{
-			AddFunc: func(obj interface{}) {
-				hpa := obj.(*autoscaling.HorizontalPodAutoscaler)
-				hasCPUPolicy := hpa.Spec.TargetCPUUtilizationPercentage != nil
-				_, hasCustomMetricsPolicy := hpa.Annotations[HpaCustomMetricsTargetAnnotationName]
-				if !hasCPUPolicy && !hasCustomMetricsPolicy {
-					controller.eventRecorder.Event(hpa, v1.EventTypeNormal, "DefaultPolicy", "No scaling policy specified - will use default one. See documentation for details")
-				}
-				err := controller.reconcileAutoscaler(hpa)
-				if err != nil {
-					glog.Warningf("Failed to reconcile %s: %v", hpa.Name, err)
-				}
-			},
-			UpdateFunc: func(old, cur interface{}) {
-				hpa := cur.(*autoscaling.HorizontalPodAutoscaler)
-				err := controller.reconcileAutoscaler(hpa)
-				if err != nil {
-					glog.Warningf("Failed to reconcile %s: %v", hpa.Name, err)
-				}
-			},
-			// We are not interested in deletions.
+		UpdateFunc: func(old, cur interface{}) {
+			hpa := cur.(*autoscaling.HorizontalPodAutoscaler)
+			err := controller.reconcileAutoscaler(hpa)
+			if err != nil {
+				glog.Warningf("Failed to reconcile %s: %v", hpa.Name, err)
+			}
 		},
-	)
+		// We are not interested in deletions.
+	})
+	controller.hpaLister = informer.Lister()
+	controller.hpasSynced = informer.Informer().HasSynced
 }
 
-func NewHorizontalController(evtNamespacer v1core.EventsGetter, scaleNamespacer unversionedextensions.ScalesGetter, hpaNamespacer unversionedautoscaling.HorizontalPodAutoscalersGetter, replicaCalc *ReplicaCalculator, resyncPeriod time.Duration) *HorizontalController {
+func NewHorizontalController(
+	evtNamespacer v1core.EventsGetter,
+	scaleNamespacer unversionedextensions.ScalesGetter,
+	hpaNamespacer unversionedautoscaling.HorizontalPodAutoscalersGetter,
+	hpaInformer autoscalinginformers.HorizontalPodAutoscalerInformer,
+	replicaCalc *ReplicaCalculator,
+) *HorizontalController {
 	broadcaster := record.NewBroadcaster()
 	broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: evtNamespacer.Events("")})
 	recorder := broadcaster.NewRecorder(v1.EventSource{Component: "horizontal-pod-autoscaler"})
@@ -120,17 +116,20 @@ func NewHorizontalController(evtNamespacer v1core.EventsGetter, scaleNamespacer 
 		scaleNamespacer: scaleNamespacer,
 		hpaNamespacer:   hpaNamespacer,
 	}
-	store, frameworkController := newInformer(controller, resyncPeriod)
-	controller.store = store
-	controller.controller = frameworkController
+	setupInformer(controller, hpaInformer)
 
 	return controller
 }
 
 func (a *HorizontalController) Run(stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
+
+	if !cache.WaitForCacheSync(stopCh, a.hpasSynced) {
+		utilruntime.HandleError(fmt.Errorf("timed out waiting for caches to sync"))
+		return
+	}
+
 	glog.Infof("Starting HPA Controller")
-	go a.controller.Run(stopCh)
 	<-stopCh
 	glog.Infof("Shutting down HPA Controller")
 }
@@ -415,26 +414,31 @@ func (a *HorizontalController) updateCurrentReplicasInStatus(hpa *autoscaling.Ho
 }
 
 func (a *HorizontalController) updateStatus(hpa *autoscaling.HorizontalPodAutoscaler, currentReplicas, desiredReplicas int32, cpuCurrentUtilization *int32, cmStatus string, rescale bool) error {
-	hpa.Status = autoscaling.HorizontalPodAutoscalerStatus{
+	// Modify a copy so we don't mutate the hpa in the shared cache
+	copyObj, err := api.Scheme.DeepCopy(hpa)
+	if err != nil {
+		return err
+	}
+	copy := copyObj.(*autoscaling.HorizontalPodAutoscaler)
+	copy.Status = autoscaling.HorizontalPodAutoscalerStatus{
 		CurrentReplicas:                 currentReplicas,
 		DesiredReplicas:                 desiredReplicas,
 		CurrentCPUUtilizationPercentage: cpuCurrentUtilization,
-		LastScaleTime:                   hpa.Status.LastScaleTime,
+		LastScaleTime:                   copy.Status.LastScaleTime,
 	}
 	if cmStatus != "" {
-		hpa.Annotations[HpaCustomMetricsStatusAnnotationName] = cmStatus
+		copy.Annotations[HpaCustomMetricsStatusAnnotationName] = cmStatus
 	}
 
 	if rescale {
 		now := metav1.NewTime(time.Now())
-		hpa.Status.LastScaleTime = &now
+		copy.Status.LastScaleTime = &now
 	}
 
-	_, err := a.hpaNamespacer.HorizontalPodAutoscalers(hpa.Namespace).UpdateStatus(hpa)
-	if err != nil {
-		a.eventRecorder.Event(hpa, v1.EventTypeWarning, "FailedUpdateStatus", err.Error())
-		return fmt.Errorf("failed to update status for %s: %v", hpa.Name, err)
+	if _, err = a.hpaNamespacer.HorizontalPodAutoscalers(copy.Namespace).UpdateStatus(copy); err != nil {
+		a.eventRecorder.Event(copy, v1.EventTypeWarning, "FailedUpdateStatus", err.Error())
+		return fmt.Errorf("failed to update status for %s: %v", copy.Name, err)
 	}
-	glog.V(2).Infof("Successfully updated status for %s", hpa.Name)
+	glog.V(2).Infof("Successfully updated status for %s", copy.Name)
 	return nil
 }
