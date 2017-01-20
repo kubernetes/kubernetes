@@ -27,7 +27,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/kubernetes/pkg/api"
 )
 
 type SchemeFunc func(*runtime.Scheme) error
@@ -171,7 +170,7 @@ func (gmf *GroupMetaFactory) newRESTMapper(scheme *runtime.Scheme, externalVersi
 		ignoredKinds = gmf.GroupArgs.IgnoredKinds
 	}
 
-	return api.NewDefaultRESTMapperFromScheme(
+	return meta.NewDefaultRESTMapperFromScheme(
 		externalVersions,
 		groupMeta.InterfacesFor,
 		gmf.GroupArgs.ImportPrefix,
@@ -235,11 +234,11 @@ func (gmf *GroupMetaFactory) Enable(m *registered.APIRegistrationManager, scheme
 // RegisterAndEnable is provided only to allow this code to get added in multiple steps.
 // It's really bad that this is called in init() methods, but supporting this
 // temporarily lets us do the change incrementally.
-func (gmf *GroupMetaFactory) RegisterAndEnable() error {
-	if err := gmf.Register(api.Registry); err != nil {
+func (gmf *GroupMetaFactory) RegisterAndEnable(registry *registered.APIRegistrationManager, scheme *runtime.Scheme) error {
+	if err := gmf.Register(registry); err != nil {
 		return err
 	}
-	if err := gmf.Enable(api.Registry, api.Scheme); err != nil {
+	if err := gmf.Enable(registry, scheme); err != nil {
 		return err
 	}
 
