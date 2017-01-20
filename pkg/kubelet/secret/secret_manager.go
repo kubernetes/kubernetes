@@ -218,6 +218,11 @@ func getSecretNames(pod *v1.Pod) sets.String {
 		result.Insert(reference.Name)
 	}
 	for i := range pod.Spec.Containers {
+		for _, env := range pod.Spec.Containers[i].EnvFrom {
+			if env.SecretRef != nil {
+				result.Insert(env.SecretRef.Name)
+			}
+		}
 		for _, envVar := range pod.Spec.Containers[i].Env {
 			if envVar.ValueFrom != nil && envVar.ValueFrom.SecretKeyRef != nil {
 				result.Insert(envVar.ValueFrom.SecretKeyRef.Name)
