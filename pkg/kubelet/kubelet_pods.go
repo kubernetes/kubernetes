@@ -691,6 +691,8 @@ func (kl *Kubelet) podIsTerminated(pod *v1.Pod) bool {
 	return false
 }
 
+// Returns true if all required node-level resources that a pod was consuming have been reclaimed by the kubelet.
+// Reclaiming resources is a prerequisite to deleting a pod from the API server.
 func (kl *Kubelet) safeToDeletePod(pod *v1.Pod) bool {
 	if kubepod.IsMirrorPod(pod) {
 		// We don't handle graceful deletion of mirror pods.
@@ -709,6 +711,9 @@ func (kl *Kubelet) safeToDeletePod(pod *v1.Pod) bool {
 		// We shouldnt delete pods whose volumes have not been cleaned up if we are not keeping terminated pod volumes
 		return false
 	}
+	// if kl.containerManager.NewPodContainerManager().Exists(pod) {
+	// 	return false
+	// }
 	return true
 }
 
