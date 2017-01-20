@@ -251,6 +251,8 @@ func RegisterConversions(scheme *runtime.Scheme) error {
 		Convert_api_PodList_To_v1_PodList,
 		Convert_v1_PodLogOptions_To_api_PodLogOptions,
 		Convert_api_PodLogOptions_To_v1_PodLogOptions,
+		Convert_v1_PodPortForwardOptions_To_api_PodPortForwardOptions,
+		Convert_api_PodPortForwardOptions_To_v1_PodPortForwardOptions,
 		Convert_v1_PodProxyOptions_To_api_PodProxyOptions,
 		Convert_api_PodProxyOptions_To_v1_PodProxyOptions,
 		Convert_v1_PodSecurityContext_To_api_PodSecurityContext,
@@ -2976,6 +2978,24 @@ func autoConvert_api_PodLogOptions_To_v1_PodLogOptions(in *api.PodLogOptions, ou
 
 func Convert_api_PodLogOptions_To_v1_PodLogOptions(in *api.PodLogOptions, out *PodLogOptions, s conversion.Scope) error {
 	return autoConvert_api_PodLogOptions_To_v1_PodLogOptions(in, out, s)
+}
+
+func autoConvert_v1_PodPortForwardOptions_To_api_PodPortForwardOptions(in *PodPortForwardOptions, out *api.PodPortForwardOptions, s conversion.Scope) error {
+	out.Ports = *(*[]int32)(unsafe.Pointer(&in.Ports))
+	return nil
+}
+
+func Convert_v1_PodPortForwardOptions_To_api_PodPortForwardOptions(in *PodPortForwardOptions, out *api.PodPortForwardOptions, s conversion.Scope) error {
+	return autoConvert_v1_PodPortForwardOptions_To_api_PodPortForwardOptions(in, out, s)
+}
+
+func autoConvert_api_PodPortForwardOptions_To_v1_PodPortForwardOptions(in *api.PodPortForwardOptions, out *PodPortForwardOptions, s conversion.Scope) error {
+	out.Ports = *(*[]int32)(unsafe.Pointer(&in.Ports))
+	return nil
+}
+
+func Convert_api_PodPortForwardOptions_To_v1_PodPortForwardOptions(in *api.PodPortForwardOptions, out *PodPortForwardOptions, s conversion.Scope) error {
+	return autoConvert_api_PodPortForwardOptions_To_v1_PodPortForwardOptions(in, out, s)
 }
 
 func autoConvert_v1_PodProxyOptions_To_api_PodProxyOptions(in *PodProxyOptions, out *api.PodProxyOptions, s conversion.Scope) error {

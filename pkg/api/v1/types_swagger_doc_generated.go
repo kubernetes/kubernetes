@@ -1244,6 +1244,15 @@ func (PodLogOptions) SwaggerDoc() map[string]string {
 	return map_PodLogOptions
 }
 
+var map_PodPortForwardOptions = map[string]string{
+	"":      "PodPortForwardOptions is the query options to a Pod's port forward call when using WebSockets. The `port` query parameter must specify the port or ports (comma separated) to forward over. Port forwarding over SPDY does not use these options. It requires the port to be passed in the `port` header as part of request.",
+	"ports": "List of ports to forward Required when using WebSockets",
+}
+
+func (PodPortForwardOptions) SwaggerDoc() map[string]string {
+	return map_PodPortForwardOptions
+}
+
 var map_PodProxyOptions = map[string]string{
 	"":     "PodProxyOptions is the query options to a Pod's proxy call.",
 	"path": "Path is the URL path to use for the current proxy request to pod.",
