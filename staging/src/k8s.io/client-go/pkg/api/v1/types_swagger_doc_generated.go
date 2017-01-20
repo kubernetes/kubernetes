@@ -437,6 +437,7 @@ var map_EnvFromSource = map[string]string{
 	"":             "EnvFromSource represents the source of a set of ConfigMaps",
 	"prefix":       "An optional identifer to prepend to each key in the ConfigMap. Must be a C_IDENTIFIER.",
 	"configMapRef": "The ConfigMap to select from",
+	"secretRef":    "The Secret to select from",
 }
 
 func (EnvFromSource) SwaggerDoc() map[string]string {
@@ -1294,6 +1295,7 @@ var map_PodSpec = map[string]string{
 	"hostname":                      "Specifies the hostname of the Pod If not specified, the pod's hostname will be set to a system-defined value.",
 	"subdomain":                     "If specified, the fully qualified Pod hostname will be \"<hostname>.<subdomain>.<pod namespace>.svc.<cluster domain>\". If not specified, the pod will not have a domainname at all.",
 	"affinity":                      "If specified, the pod's scheduling constraints",
+	"schedulername":                 "If specified, the pod will be dispatched by specified scheduler. If not specified, the pod will be dispatched by default scheduler.",
 }
 
 func (PodSpec) SwaggerDoc() map[string]string {
@@ -1585,6 +1587,14 @@ var map_Secret = map[string]string{
 
 func (Secret) SwaggerDoc() map[string]string {
 	return map_Secret
+}
+
+var map_SecretEnvSource = map[string]string{
+	"": "SecretEnvSource selects a Secret to populate the environment variables with.\n\nThe contents of the target Secret's Data field will represent the key-value pairs as environment variables.",
+}
+
+func (SecretEnvSource) SwaggerDoc() map[string]string {
+	return map_SecretEnvSource
 }
 
 var map_SecretKeySelector = map[string]string{

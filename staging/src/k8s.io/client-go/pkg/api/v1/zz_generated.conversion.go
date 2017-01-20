@@ -309,6 +309,8 @@ func RegisterConversions(scheme *runtime.Scheme) error {
 		Convert_api_SELinuxOptions_To_v1_SELinuxOptions,
 		Convert_v1_Secret_To_api_Secret,
 		Convert_api_Secret_To_v1_Secret,
+		Convert_v1_SecretEnvSource_To_api_SecretEnvSource,
+		Convert_api_SecretEnvSource_To_v1_SecretEnvSource,
 		Convert_v1_SecretKeySelector_To_api_SecretKeySelector,
 		Convert_api_SecretKeySelector_To_v1_SecretKeySelector,
 		Convert_v1_SecretList_To_api_SecretList,
@@ -1205,6 +1207,7 @@ func Convert_api_EndpointsList_To_v1_EndpointsList(in *api.EndpointsList, out *E
 func autoConvert_v1_EnvFromSource_To_api_EnvFromSource(in *EnvFromSource, out *api.EnvFromSource, s conversion.Scope) error {
 	out.Prefix = in.Prefix
 	out.ConfigMapRef = (*api.ConfigMapEnvSource)(unsafe.Pointer(in.ConfigMapRef))
+	out.SecretRef = (*api.SecretEnvSource)(unsafe.Pointer(in.SecretRef))
 	return nil
 }
 
@@ -1215,6 +1218,7 @@ func Convert_v1_EnvFromSource_To_api_EnvFromSource(in *EnvFromSource, out *api.E
 func autoConvert_api_EnvFromSource_To_v1_EnvFromSource(in *api.EnvFromSource, out *EnvFromSource, s conversion.Scope) error {
 	out.Prefix = in.Prefix
 	out.ConfigMapRef = (*ConfigMapEnvSource)(unsafe.Pointer(in.ConfigMapRef))
+	out.SecretRef = (*SecretEnvSource)(unsafe.Pointer(in.SecretRef))
 	return nil
 }
 
@@ -3069,6 +3073,7 @@ func autoConvert_v1_PodSpec_To_api_PodSpec(in *PodSpec, out *api.PodSpec, s conv
 	out.Hostname = in.Hostname
 	out.Subdomain = in.Subdomain
 	out.Affinity = (*api.Affinity)(unsafe.Pointer(in.Affinity))
+	out.SchedulerName = in.SchedulerName
 	return nil
 }
 
@@ -3106,6 +3111,7 @@ func autoConvert_api_PodSpec_To_v1_PodSpec(in *api.PodSpec, out *PodSpec, s conv
 	out.Hostname = in.Hostname
 	out.Subdomain = in.Subdomain
 	out.Affinity = (*Affinity)(unsafe.Pointer(in.Affinity))
+	out.SchedulerName = in.SchedulerName
 	return nil
 }
 
@@ -3756,6 +3762,28 @@ func autoConvert_api_Secret_To_v1_Secret(in *api.Secret, out *Secret, s conversi
 
 func Convert_api_Secret_To_v1_Secret(in *api.Secret, out *Secret, s conversion.Scope) error {
 	return autoConvert_api_Secret_To_v1_Secret(in, out, s)
+}
+
+func autoConvert_v1_SecretEnvSource_To_api_SecretEnvSource(in *SecretEnvSource, out *api.SecretEnvSource, s conversion.Scope) error {
+	if err := Convert_v1_LocalObjectReference_To_api_LocalObjectReference(&in.LocalObjectReference, &out.LocalObjectReference, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+func Convert_v1_SecretEnvSource_To_api_SecretEnvSource(in *SecretEnvSource, out *api.SecretEnvSource, s conversion.Scope) error {
+	return autoConvert_v1_SecretEnvSource_To_api_SecretEnvSource(in, out, s)
+}
+
+func autoConvert_api_SecretEnvSource_To_v1_SecretEnvSource(in *api.SecretEnvSource, out *SecretEnvSource, s conversion.Scope) error {
+	if err := Convert_api_LocalObjectReference_To_v1_LocalObjectReference(&in.LocalObjectReference, &out.LocalObjectReference, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+func Convert_api_SecretEnvSource_To_v1_SecretEnvSource(in *api.SecretEnvSource, out *SecretEnvSource, s conversion.Scope) error {
+	return autoConvert_api_SecretEnvSource_To_v1_SecretEnvSource(in, out, s)
 }
 
 func autoConvert_v1_SecretKeySelector_To_api_SecretKeySelector(in *SecretKeySelector, out *api.SecretKeySelector, s conversion.Scope) error {

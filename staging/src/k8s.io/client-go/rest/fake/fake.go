@@ -112,7 +112,8 @@ func (c *RESTClient) request(verb string) *rest.Request {
 		serializers.StreamingSerializer = info.StreamSerializer.Serializer
 		serializers.Framer = info.StreamSerializer.Framer
 	}
-	return rest.NewRequest(c, verb, &url.URL{Host: "localhost"}, "", config, serializers, nil, nil)
+	u := &url.URL{Host: "localhost"}
+	return rest.NewRequest(c, verb, rest.NewURLContainer([]*url.URL{u}), "", config, serializers, nil, nil)
 }
 
 func (c *RESTClient) Do(req *http.Request) (*http.Response, error) {

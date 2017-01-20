@@ -18,11 +18,11 @@ package api
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/pkg/api/resource"
-	"k8s.io/client-go/pkg/fields"
 	"k8s.io/client-go/pkg/util/intstr"
 )
 
@@ -1142,6 +1142,9 @@ type EnvFromSource struct {
 	// The ConfigMap to select from.
 	//+optional
 	ConfigMapRef *ConfigMapEnvSource
+	// The Secret to select from.
+	//+optional
+	SecretRef *SecretEnvSource
 }
 
 // ConfigMapEnvSource selects a ConfigMap to populate the environment
@@ -1151,6 +1154,16 @@ type EnvFromSource struct {
 // key-value pairs as environment variables.
 type ConfigMapEnvSource struct {
 	// The ConfigMap to select from.
+	LocalObjectReference
+}
+
+// SecretEnvSource selects a Secret to populate the environment
+// variables with.
+//
+// The contents of the target Secret's Data field will represent the
+// key-value pairs as environment variables.
+type SecretEnvSource struct {
+	// The Secret to select from.
 	LocalObjectReference
 }
 
@@ -1856,6 +1869,10 @@ type PodSpec struct {
 	// If specified, the pod's scheduling constraints
 	// +optional
 	Affinity *Affinity
+	// If specified, the pod will be dispatched by specified scheduler.
+	// If not specified, the pod will be dispatched by default scheduler.
+	// +optional
+	SchedulerName string
 }
 
 // Sysctl defines a kernel parameter to be set
