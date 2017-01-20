@@ -820,10 +820,12 @@ func (r *Request) request(fn func(*http.Request, *http.Response)) error {
 		}
 		resp, err := client.Do(req)
 		updateURLMetrics(r, resp, err)
-		if err != nil {
-			r.backoffMgr.UpdateBackoff(r.URL(), err, 0)
-		} else {
-			r.backoffMgr.UpdateBackoff(r.URL(), err, resp.StatusCode)
+                if r.baseURL != nil {
+			if err != nil {
+				r.backoffMgr.UpdateBackoff(r.URL(), err, 0)
+			} else {
+				r.backoffMgr.UpdateBackoff(r.URL(), err, resp.StatusCode)
+			}
 		}
 		if err != nil {
 			// "Connection reset by peer" is usually a transient error.
