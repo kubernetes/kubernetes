@@ -43,6 +43,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/secret"
 	"k8s.io/kubernetes/pkg/kubelet/server/stats"
 	"k8s.io/kubernetes/pkg/kubelet/status"
+	statustest "k8s.io/kubernetes/pkg/kubelet/status/testing"
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
@@ -75,7 +76,7 @@ func TestRunOnce(t *testing.T) {
 		cadvisor:            cadvisor,
 		nodeLister:          testNodeLister{},
 		nodeInfo:            testNodeInfo{},
-		statusManager:       status.NewManager(nil, podManager, nil),
+		statusManager:       status.NewManager(nil, podManager, &statustest.FakePodDeletionSafetyProvider{}),
 		containerRefManager: kubecontainer.NewRefManager(),
 		podManager:          podManager,
 		os:                  &containertest.FakeOS{},
