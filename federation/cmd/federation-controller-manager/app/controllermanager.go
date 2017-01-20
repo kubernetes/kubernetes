@@ -24,12 +24,14 @@ import (
 	"net"
 	"net/http"
 	"net/http/pprof"
+	"os"
 	"strconv"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/server/healthz"
 	federationclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset"
+	v1core "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset/typed/core/v1"
 	"k8s.io/kubernetes/federation/cmd/federation-controller-manager/app/options"
 	"k8s.io/kubernetes/federation/pkg/dnsprovider"
 	clustercontroller "k8s.io/kubernetes/federation/pkg/federation-controller/cluster"
@@ -42,6 +44,10 @@ import (
 	secretcontroller "k8s.io/kubernetes/federation/pkg/federation-controller/secret"
 	servicecontroller "k8s.io/kubernetes/federation/pkg/federation-controller/service"
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util"
+        "k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/client/leaderelection"
+	"k8s.io/kubernetes/pkg/client/leaderelection/resourcelock"
+	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	"k8s.io/kubernetes/pkg/util/configz"
@@ -123,6 +129,21 @@ func Run(s *options.CMServer) error {
 	restClientCfg.QPS = s.APIServerQPS
 	restClientCfg.Burst = s.APIServerBurst
 
+        kubeconfig, err := clientcmd.BuildConfigFromFlags(s.Master, s.Kubeconfig)
+        if err != nil {
+                return err
+        }
+ 
+        kubeconfig.ContentConfig.ContentType = s.ContentType
+        // Override kubeconfig qps/burst settings from flags
+        kubeconfig.QPS = s.APIServerQPS
+        kubeconfig.Burst = s.APIServerBurst
+	eventKubeClient, err := federationclientset.NewForConfig(restclient.AddUserAgent(kubeconfig, "federation-controller-manager"))
+	if err != nil {
+		glog.Fatalf("Invalid API configuration: %v", err)
+	}
+        leaderElectionClient := federationclientset.NewForConfigOrDie(restclient.AddUserAgent(kubeconfig, "leader-election"))
+
 	go func() {
 		mux := http.NewServeMux()
 		healthz.InstallHandler(mux)
@@ -140,12 +161,51 @@ func Run(s *options.CMServer) error {
 		glog.Fatal(server.ListenAndServe())
 	}()
 
-	run := func() {
+	eventBroadcaster := record.NewBroadcaster()
+	eventBroadcaster.StartLogging(glog.Infof)
+	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: eventKubeClient.Core().Events("")})
+	recorder := eventBroadcaster.NewRecorder(v1.EventSource{Component: "federation-controller-manager"})
+
+        run := func(stop <-chan struct{}) {
 		err := StartControllers(s, restClientCfg)
 		glog.Fatalf("error running controllers: %v", err)
 		panic("unreachable")
 	}
-	run()
+
+        if !s.LeaderElection.LeaderElect {
+                run(nil)
+                panic("unreachable")
+        }
+ 
+        id, err := os.Hostname()
+        if err != nil {
+                return err
+        }
+ 
+        rl := resourcelock.SecretsLock{
+                SecretsMeta: v1.ObjectMeta{
+                        Namespace: "federation",
+                        Name:      DeprecatedKubeconfigSecretName,
+                },
+                Client: leaderElectionClient,
+                LockConfig: resourcelock.ResourceLockConfig{
+                        Identity:      id,
+			EventRecorder: recorder,
+                },
+        }
+        leaderelection.RunOrDie(leaderelection.LeaderElectionConfig{
+                Lock:          &rl,
+                LeaseDuration: s.LeaderElection.LeaseDuration.Duration,
+                RenewDeadline: s.LeaderElection.RenewDeadline.Duration,
+                RetryPeriod:   s.LeaderElection.RetryPeriod.Duration,
+                Callbacks: leaderelection.LeaderCallbacks{
+                        OnStartedLeading: run,
+                        OnStoppedLeading: func() {
+                                glog.Fatalf("leaderelection lost")
+                        },
+                },
+        })
+ 
 	panic("unreachable")
 }
 
