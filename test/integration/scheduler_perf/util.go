@@ -40,7 +40,7 @@ import (
 // remove resources after finished.
 // Notes on rate limiter:
 //   - client rate limit is set to 5000.
-func mustSetupScheduler() (schedulerConfigFactory scheduler.Configurator, destroyFunc func()) {
+func mustSetupScheduler() (schedulerConfigurator scheduler.Configurator, destroyFunc func()) {
 
 	h := &framework.MasterHolder{Initialized: make(chan struct{})}
 	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
@@ -57,20 +57,23 @@ func mustSetupScheduler() (schedulerConfigFactory scheduler.Configurator, destro
 		Burst:         5000,
 	})
 
-	schedulerConfigFactory = factory.NewConfigFactory(clientSet, v1.DefaultSchedulerName, v1.DefaultHardPodAffinitySymmetricWeight, v1.DefaultFailureDomains)
+	schedulerConfigurator = factory.NewConfigFactory(clientSet, v1.DefaultSchedulerName, v1.DefaultHardPodAffinitySymmetricWeight, v1.DefaultFailureDomains)
 
-	schedulerConfig, err := schedulerConfigFactory.Create()
-	if err != nil {
-		panic("Couldn't create scheduler config")
-	}
 	eventBroadcaster := record.NewBroadcaster()
-	schedulerConfig.Recorder = eventBroadcaster.NewRecorder(v1.EventSource{Component: "scheduler"})
 	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: clientSet.Core().Events("")})
-	scheduler.New(schedulerConfig).Run()
+
+	sched, err := scheduler.NewFromConfigurator(schedulerConfigurator, func(conf *scheduler.Config) {
+		conf.Recorder = eventBroadcaster.NewRecorder(v1.EventSource{Component: "scheduler"})
+	})
+	if err != nil {
+		glog.Fatalf("Error creating scheduler: %v", err)
+	}
+
+	sched.Run()
 
 	destroyFunc = func() {
 		glog.Infof("destroying")
-		close(schedulerConfig.StopEverything)
+		sched.StopEverything()
 		s.Close()
 		glog.Infof("destroyed")
 	}
