@@ -25,6 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
+	"k8s.io/kubernetes/pkg/client/legacylisters"
 	"k8s.io/kubernetes/pkg/client/testing/core"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/informers"
@@ -165,8 +166,8 @@ func TestServiceAccountCreation(t *testing.T) {
 			{ObjectMeta: metav1.ObjectMeta{Name: managedName}},
 		}
 		controller := NewServiceAccountsController(informers.ServiceAccounts(), informers.Namespaces(), client, options)
-		controller.saLister = &cache.StoreToServiceAccountLister{Indexer: cache.NewIndexer(cache.DeletionHandlingMetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})}
-		controller.nsLister = &cache.IndexerToNamespaceLister{Indexer: cache.NewIndexer(cache.DeletionHandlingMetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})}
+		controller.saLister = &listers.StoreToServiceAccountLister{Indexer: cache.NewIndexer(cache.DeletionHandlingMetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})}
+		controller.nsLister = &listers.IndexerToNamespaceLister{Indexer: cache.NewIndexer(cache.DeletionHandlingMetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})}
 		controller.saSynced = alwaysReady
 		controller.nsSynced = alwaysReady
 

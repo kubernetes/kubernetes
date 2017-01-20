@@ -20,6 +20,7 @@ go_library(
         "//pkg/apis/extensions/v1beta1:go_default_library",
         "//pkg/client/cache:go_default_library",
         "//pkg/client/clientset_generated/clientset:go_default_library",
+        "//pkg/client/legacylisters:go_default_library",
         "//pkg/controller/informers:go_default_library",
         "//plugin/pkg/scheduler:go_default_library",
         "//plugin/pkg/scheduler/algorithm:go_default_library",

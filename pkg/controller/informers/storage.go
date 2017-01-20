@@ -24,13 +24,14 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 	storage "k8s.io/kubernetes/pkg/apis/storage/v1beta1"
 	"k8s.io/kubernetes/pkg/client/cache"
+	"k8s.io/kubernetes/pkg/client/legacylisters"
 )
 
 // StorageClassInformer is type of SharedIndexInformer which watches and lists all storage classes.
 // Interface provides constructor for informer and lister for storage classes
 type StorageClassInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() cache.StorageClassLister
+	Lister() listers.StorageClassLister
 }
 
 type storageClassInformer struct {
@@ -64,7 +65,7 @@ func (f *storageClassInformer) Informer() cache.SharedIndexInformer {
 	return informer
 }
 
-func (f *storageClassInformer) Lister() cache.StorageClassLister {
+func (f *storageClassInformer) Lister() listers.StorageClassLister {
 	informer := f.Informer()
-	return cache.NewStorageClassLister(informer.GetIndexer())
+	return listers.NewStorageClassLister(informer.GetIndexer())
 }

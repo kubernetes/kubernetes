@@ -27,6 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	"k8s.io/kubernetes/pkg/client/legacylisters"
 	coreinternallisters "k8s.io/kubernetes/pkg/client/listers/core/internalversion"
 )
 
@@ -34,7 +35,7 @@ import (
 // Interface provides constructor for informer and lister for pods
 type PodInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() *cache.StoreToPodLister
+	Lister() *listers.StoreToPodLister
 }
 
 type podInformer struct {
@@ -59,9 +60,9 @@ func (f *podInformer) Informer() cache.SharedIndexInformer {
 }
 
 // Lister returns lister for podInformer
-func (f *podInformer) Lister() *cache.StoreToPodLister {
+func (f *podInformer) Lister() *listers.StoreToPodLister {
 	informer := f.Informer()
-	return &cache.StoreToPodLister{Indexer: informer.GetIndexer()}
+	return &listers.StoreToPodLister{Indexer: informer.GetIndexer()}
 }
 
 //*****************************************************************************
@@ -70,7 +71,7 @@ func (f *podInformer) Lister() *cache.StoreToPodLister {
 // Interface provides constructor for informer and lister for namsespaces
 type NamespaceInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() *cache.IndexerToNamespaceLister
+	Lister() *listers.IndexerToNamespaceLister
 }
 
 type namespaceInformer struct {
@@ -95,9 +96,9 @@ func (f *namespaceInformer) Informer() cache.SharedIndexInformer {
 }
 
 // Lister returns lister for namespaceInformer
-func (f *namespaceInformer) Lister() *cache.IndexerToNamespaceLister {
+func (f *namespaceInformer) Lister() *listers.IndexerToNamespaceLister {
 	informer := f.Informer()
-	return &cache.IndexerToNamespaceLister{Indexer: informer.GetIndexer()}
+	return &listers.IndexerToNamespaceLister{Indexer: informer.GetIndexer()}
 }
 
 //*****************************************************************************
@@ -142,7 +143,7 @@ func (f *internalNamespaceInformer) Lister() coreinternallisters.NamespaceLister
 // Interface provides constructor for informer and lister for nodes
 type NodeInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() *cache.StoreToNodeLister
+	Lister() *listers.StoreToNodeLister
 }
 
 type nodeInformer struct {
@@ -167,9 +168,9 @@ func (f *nodeInformer) Informer() cache.SharedIndexInformer {
 }
 
 // Lister returns lister for nodeInformer
-func (f *nodeInformer) Lister() *cache.StoreToNodeLister {
+func (f *nodeInformer) Lister() *listers.StoreToNodeLister {
 	informer := f.Informer()
-	return &cache.StoreToNodeLister{Store: informer.GetStore()}
+	return &listers.StoreToNodeLister{Store: informer.GetStore()}
 }
 
 //*****************************************************************************
@@ -178,7 +179,7 @@ func (f *nodeInformer) Lister() *cache.StoreToNodeLister {
 // Interface provides constructor for informer and lister for persistent volume claims
 type PVCInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() *cache.StoreToPersistentVolumeClaimLister
+	Lister() *listers.StoreToPersistentVolumeClaimLister
 }
 
 type pvcInformer struct {
@@ -203,9 +204,9 @@ func (f *pvcInformer) Informer() cache.SharedIndexInformer {
 }
 
 // Lister returns lister for pvcInformer
-func (f *pvcInformer) Lister() *cache.StoreToPersistentVolumeClaimLister {
+func (f *pvcInformer) Lister() *listers.StoreToPersistentVolumeClaimLister {
 	informer := f.Informer()
-	return &cache.StoreToPersistentVolumeClaimLister{Indexer: informer.GetIndexer()}
+	return &listers.StoreToPersistentVolumeClaimLister{Indexer: informer.GetIndexer()}
 }
 
 //*****************************************************************************
@@ -214,7 +215,7 @@ func (f *pvcInformer) Lister() *cache.StoreToPersistentVolumeClaimLister {
 // Interface provides constructor for informer and lister for persistent volumes
 type PVInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() *cache.StoreToPVFetcher
+	Lister() *listers.StoreToPVFetcher
 }
 
 type pvInformer struct {
@@ -239,9 +240,9 @@ func (f *pvInformer) Informer() cache.SharedIndexInformer {
 }
 
 // Lister returns lister for pvInformer
-func (f *pvInformer) Lister() *cache.StoreToPVFetcher {
+func (f *pvInformer) Lister() *listers.StoreToPVFetcher {
 	informer := f.Informer()
-	return &cache.StoreToPVFetcher{Store: informer.GetStore()}
+	return &listers.StoreToPVFetcher{Store: informer.GetStore()}
 }
 
 //*****************************************************************************
@@ -250,7 +251,7 @@ func (f *pvInformer) Lister() *cache.StoreToPVFetcher {
 // Interface provides constructor for informer and lister for limit ranges.
 type LimitRangeInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() *cache.StoreToLimitRangeLister
+	Lister() *listers.StoreToLimitRangeLister
 }
 
 type limitRangeInformer struct {
@@ -275,9 +276,9 @@ func (f *limitRangeInformer) Informer() cache.SharedIndexInformer {
 }
 
 // Lister returns lister for limitRangeInformer
-func (f *limitRangeInformer) Lister() *cache.StoreToLimitRangeLister {
+func (f *limitRangeInformer) Lister() *listers.StoreToLimitRangeLister {
 	informer := f.Informer()
-	return &cache.StoreToLimitRangeLister{Indexer: informer.GetIndexer()}
+	return &listers.StoreToLimitRangeLister{Indexer: informer.GetIndexer()}
 }
 
 //*****************************************************************************
@@ -322,7 +323,7 @@ func (f *internalLimitRangeInformer) Lister() coreinternallisters.LimitRangeList
 // Interface provides constructor for informer and lister for replication controllers.
 type ReplicationControllerInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() *cache.StoreToReplicationControllerLister
+	Lister() *listers.StoreToReplicationControllerLister
 }
 
 type replicationControllerInformer struct {
@@ -347,9 +348,9 @@ func (f *replicationControllerInformer) Informer() cache.SharedIndexInformer {
 }
 
 // Lister returns lister for replicationControllerInformer
-func (f *replicationControllerInformer) Lister() *cache.StoreToReplicationControllerLister {
+func (f *replicationControllerInformer) Lister() *listers.StoreToReplicationControllerLister {
 	informer := f.Informer()
-	return &cache.StoreToReplicationControllerLister{Indexer: informer.GetIndexer()}
+	return &listers.StoreToReplicationControllerLister{Indexer: informer.GetIndexer()}
 }
 
 //*****************************************************************************
@@ -533,7 +534,7 @@ func NewReplicationControllerInformer(client clientset.Interface, resyncPeriod t
 // Interface provides constructor for informer and lister for ServiceAccounts
 type ServiceAccountInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() *cache.StoreToServiceAccountLister
+	Lister() *listers.StoreToServiceAccountLister
 }
 
 type serviceAccountInformer struct {
@@ -558,9 +559,9 @@ func (f *serviceAccountInformer) Informer() cache.SharedIndexInformer {
 }
 
 // Lister returns lister for ServiceAccountInformer
-func (f *serviceAccountInformer) Lister() *cache.StoreToServiceAccountLister {
+func (f *serviceAccountInformer) Lister() *listers.StoreToServiceAccountLister {
 	informer := f.Informer()
-	return &cache.StoreToServiceAccountLister{Indexer: informer.GetIndexer()}
+	return &listers.StoreToServiceAccountLister{Indexer: informer.GetIndexer()}
 }
 
 // NewServiceAccountInformer returns a SharedIndexInformer that lists and watches all ServiceAccounts

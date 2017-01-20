@@ -25,11 +25,12 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/rbac"
 	"k8s.io/kubernetes/pkg/client/cache"
+	"k8s.io/kubernetes/pkg/client/legacylisters"
 )
 
 type ClusterRoleInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() cache.ClusterRoleLister
+	Lister() listers.ClusterRoleLister
 }
 
 type clusterRoleInformer struct {
@@ -63,13 +64,13 @@ func (f *clusterRoleInformer) Informer() cache.SharedIndexInformer {
 	return informer
 }
 
-func (f *clusterRoleInformer) Lister() cache.ClusterRoleLister {
-	return cache.NewClusterRoleLister(f.Informer().GetIndexer())
+func (f *clusterRoleInformer) Lister() listers.ClusterRoleLister {
+	return listers.NewClusterRoleLister(f.Informer().GetIndexer())
 }
 
 type ClusterRoleBindingInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() cache.ClusterRoleBindingLister
+	Lister() listers.ClusterRoleBindingLister
 }
 
 type clusterRoleBindingInformer struct {
@@ -103,13 +104,13 @@ func (f *clusterRoleBindingInformer) Informer() cache.SharedIndexInformer {
 	return informer
 }
 
-func (f *clusterRoleBindingInformer) Lister() cache.ClusterRoleBindingLister {
-	return cache.NewClusterRoleBindingLister(f.Informer().GetIndexer())
+func (f *clusterRoleBindingInformer) Lister() listers.ClusterRoleBindingLister {
+	return listers.NewClusterRoleBindingLister(f.Informer().GetIndexer())
 }
 
 type RoleInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() cache.RoleLister
+	Lister() listers.RoleLister
 }
 
 type roleInformer struct {
@@ -143,13 +144,13 @@ func (f *roleInformer) Informer() cache.SharedIndexInformer {
 	return informer
 }
 
-func (f *roleInformer) Lister() cache.RoleLister {
-	return cache.NewRoleLister(f.Informer().GetIndexer())
+func (f *roleInformer) Lister() listers.RoleLister {
+	return listers.NewRoleLister(f.Informer().GetIndexer())
 }
 
 type RoleBindingInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() cache.RoleBindingLister
+	Lister() listers.RoleBindingLister
 }
 
 type roleBindingInformer struct {
@@ -183,8 +184,8 @@ func (f *roleBindingInformer) Informer() cache.SharedIndexInformer {
 	return informer
 }
 
-func (f *roleBindingInformer) Lister() cache.RoleBindingLister {
-	return cache.NewRoleBindingLister(f.Informer().GetIndexer())
+func (f *roleBindingInformer) Lister() listers.RoleBindingLister {
+	return listers.NewRoleBindingLister(f.Informer().GetIndexer())
 }
 
 func convertListOptionsOrDie(in v1.ListOptions) api.ListOptions {

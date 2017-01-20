@@ -35,6 +35,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	unversionedcore "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/core/v1"
+	"k8s.io/kubernetes/pkg/client/legacylisters"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/controller"
@@ -85,12 +86,12 @@ type ServiceController struct {
 	zone             cloudprovider.Zone
 	cache            *serviceCache
 	// A store of services, populated by the serviceController
-	serviceStore cache.StoreToServiceLister
+	serviceStore listers.StoreToServiceLister
 	// Watches changes to all services
 	serviceController cache.Controller
 	eventBroadcaster  record.EventBroadcaster
 	eventRecorder     record.EventRecorder
-	nodeLister        cache.StoreToNodeLister
+	nodeLister        listers.StoreToNodeLister
 	// services that need to be synced
 	workingQueue workqueue.DelayingInterface
 }
@@ -114,7 +115,7 @@ func New(cloud cloudprovider.Interface, kubeClient clientset.Interface, clusterN
 		cache:            &serviceCache{serviceMap: make(map[string]*cachedService)},
 		eventBroadcaster: broadcaster,
 		eventRecorder:    recorder,
-		nodeLister: cache.StoreToNodeLister{
+		nodeLister: listers.StoreToNodeLister{
 			Store: cache.NewStore(cache.MetaNamespaceKeyFunc),
 		},
 		workingQueue: workqueue.NewDelayingQueue(),
@@ -600,7 +601,7 @@ func includeNodeFromNodeList(node *v1.Node) bool {
 	return !node.Spec.Unschedulable
 }
 
-func getNodeConditionPredicate() cache.NodeConditionPredicate {
+func getNodeConditionPredicate() listers.NodeConditionPredicate {
 	return func(node *v1.Node) bool {
 		// We add the master to the node list, but its unschedulable.  So we use this to filter
 		// the master.

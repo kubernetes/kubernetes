@@ -14,12 +14,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package cache
+package listers
 
 import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
 	rbac "k8s.io/kubernetes/pkg/apis/rbac"
+	"k8s.io/kubernetes/pkg/client/cache"
 )
 
 //  TODO: generate these classes and methods for all resources of interest using
@@ -33,16 +34,16 @@ import (
 // l := clusterRoleLister{s}
 // l.List()
 
-func NewClusterRoleLister(indexer Indexer) ClusterRoleLister {
+func NewClusterRoleLister(indexer cache.Indexer) ClusterRoleLister {
 	return &clusterRoleLister{indexer: indexer}
 }
-func NewClusterRoleBindingLister(indexer Indexer) ClusterRoleBindingLister {
+func NewClusterRoleBindingLister(indexer cache.Indexer) ClusterRoleBindingLister {
 	return &clusterRoleBindingLister{indexer: indexer}
 }
-func NewRoleLister(indexer Indexer) RoleLister {
+func NewRoleLister(indexer cache.Indexer) RoleLister {
 	return &roleLister{indexer: indexer}
 }
-func NewRoleBindingLister(indexer Indexer) RoleBindingLister {
+func NewRoleBindingLister(indexer cache.Indexer) RoleBindingLister {
 	return &roleBindingLister{indexer: indexer}
 }
 
@@ -70,11 +71,11 @@ type ClusterRoleLister interface {
 }
 
 type clusterRoleLister struct {
-	indexer Indexer
+	indexer cache.Indexer
 }
 
 func (s *clusterRoleLister) List(selector labels.Selector) (ret []*rbac.ClusterRole, err error) {
-	err = ListAll(s.indexer, selector, func(m interface{}) {
+	err = cache.ListAll(s.indexer, selector, func(m interface{}) {
 		ret = append(ret, m.(*rbac.ClusterRole))
 	})
 	return ret, err
@@ -102,11 +103,11 @@ type ClusterRoleBindingLister interface {
 }
 
 type clusterRoleBindingLister struct {
-	indexer Indexer
+	indexer cache.Indexer
 }
 
 func (s *clusterRoleBindingLister) List(selector labels.Selector) (ret []*rbac.ClusterRoleBinding, err error) {
-	err = ListAll(s.indexer, selector, func(m interface{}) {
+	err = cache.ListAll(s.indexer, selector, func(m interface{}) {
 		ret = append(ret, m.(*rbac.ClusterRoleBinding))
 	})
 	return ret, err
@@ -139,11 +140,11 @@ type RoleNamespaceLister interface {
 }
 
 type roleLister struct {
-	indexer Indexer
+	indexer cache.Indexer
 }
 
 func (s *roleLister) List(selector labels.Selector) (ret []*rbac.Role, err error) {
-	err = ListAll(s.indexer, selector, func(m interface{}) {
+	err = cache.ListAll(s.indexer, selector, func(m interface{}) {
 		ret = append(ret, m.(*rbac.Role))
 	})
 	return ret, err
@@ -158,12 +159,12 @@ func (s roleLister) GetRole(namespace, name string) (*rbac.Role, error) {
 }
 
 type roleNamespaceLister struct {
-	indexer   Indexer
+	indexer   cache.Indexer
 	namespace string
 }
 
 func (s roleNamespaceLister) List(selector labels.Selector) (ret []*rbac.Role, err error) {
-	err = ListAllByNamespace(s.indexer, s.namespace, selector, func(m interface{}) {
+	err = cache.ListAllByNamespace(s.indexer, s.namespace, selector, func(m interface{}) {
 		ret = append(ret, m.(*rbac.Role))
 	})
 	return ret, err
@@ -192,11 +193,11 @@ type RoleBindingNamespaceLister interface {
 }
 
 type roleBindingLister struct {
-	indexer Indexer
+	indexer cache.Indexer
 }
 
 func (s *roleBindingLister) List(selector labels.Selector) (ret []*rbac.RoleBinding, err error) {
-	err = ListAll(s.indexer, selector, func(m interface{}) {
+	err = cache.ListAll(s.indexer, selector, func(m interface{}) {
 		ret = append(ret, m.(*rbac.RoleBinding))
 	})
 	return ret, err
@@ -211,12 +212,12 @@ func (s roleBindingLister) ListRoleBindings(namespace string) ([]*rbac.RoleBindi
 }
 
 type roleBindingNamespaceLister struct {
-	indexer   Indexer
+	indexer   cache.Indexer
 	namespace string
 }
 
 func (s roleBindingNamespaceLister) List(selector labels.Selector) (ret []*rbac.RoleBinding, err error) {
-	err = ListAllByNamespace(s.indexer, s.namespace, selector, func(m interface{}) {
+	err = cache.ListAllByNamespace(s.indexer, s.namespace, selector, func(m interface{}) {
 		ret = append(ret, m.(*rbac.RoleBinding))
 	})
 	return ret, err
