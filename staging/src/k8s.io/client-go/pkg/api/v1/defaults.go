@@ -174,6 +174,9 @@ func SetDefaults_PodSpec(obj *PodSpec) {
 		period := int64(DefaultTerminationGracePeriodSeconds)
 		obj.TerminationGracePeriodSeconds = &period
 	}
+	if obj.SchedulerName == "" {
+		obj.SchedulerName = DefaultSchedulerName
+	}
 }
 func SetDefaults_Probe(obj *Probe) {
 	if obj.TimeoutSeconds == 0 {

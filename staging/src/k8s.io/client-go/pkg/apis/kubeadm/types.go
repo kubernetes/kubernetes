@@ -39,6 +39,7 @@ type MasterConfiguration struct {
 	Networking        Networking
 	KubernetesVersion string
 	CloudProvider     string
+	AuthorizationMode string
 }
 
 type API struct {
