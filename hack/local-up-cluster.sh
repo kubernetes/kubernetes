@@ -62,6 +62,9 @@ ENABLE_RBAC=${ENABLE_RBAC:-false}
 KUBECONFIG_TOKEN=${KUBECONFIG_TOKEN:-""}
 AUTH_ARGS=${AUTH_ARGS:-""}
 
+KUBE_USER=${KUBE_USER:-"admin"}
+KUBE_PASSWORD=${KUBE_PASSWORD:-"admin"}
+
 # start the cache mutation detector by default so that cache mutators will be found
 KUBE_CACHE_MUTATION_DETECTOR="${KUBE_CACHE_MUTATION_DETECTOR:-true}"
 export KUBE_CACHE_MUTATION_DETECTOR
@@ -186,6 +189,7 @@ ENABLE_CONTROLLER_ATTACH_DETACH=${ENABLE_CONTROLLER_ATTACH_DETACH:-"true"} # cur
 # This is the default dir and filename where the apiserver will generate a self-signed cert
 # which should be able to be used as the CA to verify itself
 CERT_DIR=${CERT_DIR:-"/var/run/kubernetes"}
+BASIC_AUTH_CSV=${BASIC_AUTH_CSV:-$CERT_DIR/basic_auth.csv}
 ROOT_CA_FILE=$CERT_DIR/apiserver.crt
 EXPERIMENTAL_CRI=${EXPERIMENTAL_CRI:-"false"}
 
@@ -333,6 +337,20 @@ function set_service_accounts {
     fi
 }
 
+# replace_prefixed_line ensures:
+# 1. the specified file exists
+# 2. existing lines with the specified ${prefix} are removed
+# 3. a new line with the specified ${prefix}${suffix} is appended
+function replace_prefixed_line {
+  local -r file="${1:-}"
+  local -r prefix="${2:-}"
+  local -r suffix="${3:-}"
+
+  touch "${file}"
+  awk "substr(\$0,0,length(\"${prefix}\")) != \"${prefix}\" { print }" "${file}" > "${file}.filtered"  && mv "${file}.filtered" "${file}"
+  echo "${prefix}${suffix}" >> "${file}"
+}
+
 function start_apiserver {
     security_admission=""
     if [[ -z "${ALLOW_SECURITY_CONTEXT}" ]]; then
@@ -344,6 +362,9 @@ function start_apiserver {
 
     # Admission Controllers to invoke prior to persisting objects in cluster
     ADMISSION_CONTROL=NamespaceLifecycle,LimitRanger,ServiceAccount${security_admission},ResourceQuota,DefaultStorageClass
+
+    # create basic auth file
+    replace_prefixed_line "${BASIC_AUTH_CSV}" "${KUBE_PASSWORD},${KUBE_USER}," "admin,system:masters"
 
     # This is the default dir and filename where the apiserver will generate a self-signed cert
     # which should be able to be used as the CA to verify itself
@@ -394,6 +415,7 @@ function start_apiserver {
       --v=${LOG_LEVEL} \
       --cert-dir="${CERT_DIR}" \
       --client-ca-file="${CERT_DIR}/client-ca.crt" \
+      --basic-auth-file=${BASIC_AUTH_CSV} \
       --service-account-key-file="${SERVICE_ACCOUNT_KEY}" \
       --service-account-lookup="${SERVICE_ACCOUNT_LOOKUP}" \
       --admission-control="${ADMISSION_CONTROL}" \
@@ -439,7 +461,7 @@ function start_apiserver {
             fi
         else
             # default to use basic authentication
-            AUTH_ARGS="--username=admin --password=admin"
+            AUTH_ARGS="--username=${KUBE_USER} --password=${KUBE_PASSWORD}"
         fi
     fi
 }
