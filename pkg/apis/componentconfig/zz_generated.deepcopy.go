@@ -50,8 +50,10 @@ func RegisterDeepCopies(scheme *runtime.Scheme) error {
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_componentconfig_KubeletWebhookAuthorization, InType: reflect.TypeOf(&KubeletWebhookAuthorization{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_componentconfig_KubeletX509Authentication, InType: reflect.TypeOf(&KubeletX509Authentication{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_componentconfig_LeaderElectionConfiguration, InType: reflect.TypeOf(&LeaderElectionConfiguration{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_componentconfig_LimitedResource, InType: reflect.TypeOf(&LimitedResource{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_componentconfig_PersistentVolumeRecyclerConfiguration, InType: reflect.TypeOf(&PersistentVolumeRecyclerConfiguration{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_componentconfig_PortRangeVar, InType: reflect.TypeOf(&PortRangeVar{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_componentconfig_ResourceQuotaConfiguration, InType: reflect.TypeOf(&ResourceQuotaConfiguration{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_componentconfig_VolumeConfiguration, InType: reflect.TypeOf(&VolumeConfiguration{})},
 	)
 }
@@ -267,6 +269,15 @@ func DeepCopy_componentconfig_LeaderElectionConfiguration(in interface{}, out in
 	}
 }
 
+func DeepCopy_componentconfig_LimitedResource(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*LimitedResource)
+		out := out.(*LimitedResource)
+		*out = *in
+		return nil
+	}
+}
+
 func DeepCopy_componentconfig_PersistentVolumeRecyclerConfiguration(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*PersistentVolumeRecyclerConfiguration)
@@ -285,6 +296,22 @@ func DeepCopy_componentconfig_PortRangeVar(in interface{}, out interface{}, c *c
 			in, out := &in.Val, &out.Val
 			*out = new(string)
 			**out = **in
+		}
+		return nil
+	}
+}
+
+func DeepCopy_componentconfig_ResourceQuotaConfiguration(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*ResourceQuotaConfiguration)
+		out := out.(*ResourceQuotaConfiguration)
+		*out = *in
+		if in.LimitedResources != nil {
+			in, out := &in.LimitedResources, &out.LimitedResources
+			*out = make([]LimitedResource, len(*in))
+			for i := range *in {
+				(*out)[i] = (*in)[i]
+			}
 		}
 		return nil
 	}

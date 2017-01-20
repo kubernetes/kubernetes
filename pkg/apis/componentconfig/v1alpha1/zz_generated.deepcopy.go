@@ -47,6 +47,8 @@ func RegisterDeepCopies(scheme *runtime.Scheme) error {
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_KubeletWebhookAuthorization, InType: reflect.TypeOf(&KubeletWebhookAuthorization{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_KubeletX509Authentication, InType: reflect.TypeOf(&KubeletX509Authentication{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_LeaderElectionConfiguration, InType: reflect.TypeOf(&LeaderElectionConfiguration{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_LimitedResource, InType: reflect.TypeOf(&LimitedResource{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_ResourceQuotaConfiguration, InType: reflect.TypeOf(&ResourceQuotaConfiguration{})},
 	)
 }
 
@@ -372,6 +374,31 @@ func DeepCopy_v1alpha1_LeaderElectionConfiguration(in interface{}, out interface
 			in, out := &in.LeaderElect, &out.LeaderElect
 			*out = new(bool)
 			**out = **in
+		}
+		return nil
+	}
+}
+
+func DeepCopy_v1alpha1_LimitedResource(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*LimitedResource)
+		out := out.(*LimitedResource)
+		*out = *in
+		return nil
+	}
+}
+
+func DeepCopy_v1alpha1_ResourceQuotaConfiguration(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*ResourceQuotaConfiguration)
+		out := out.(*ResourceQuotaConfiguration)
+		*out = *in
+		if in.LimitedResources != nil {
+			in, out := &in.LimitedResources, &out.LimitedResources
+			*out = make([]LimitedResource, len(*in))
+			for i := range *in {
+				(*out)[i] = (*in)[i]
+			}
 		}
 		return nil
 	}

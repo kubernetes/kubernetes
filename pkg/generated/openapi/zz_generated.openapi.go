@@ -10546,6 +10546,38 @@ var OpenAPIDefinitions *openapi.OpenAPIDefinitions = &openapi.OpenAPIDefinitions
 		Dependencies: []string{
 			"v1.Duration"},
 	},
+	"v1alpha1.LimitedResource": {
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "LimitedResource matches a resource whose consumption is limited by default. To consume the resource, there must exist an associated quota that limits its consumption.",
+				Properties: map[string]spec.Schema{
+					"apiGroup": {
+						SchemaProps: spec.SchemaProps{
+							Description: "API group of the object.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"apiResource": {
+						SchemaProps: spec.SchemaProps{
+							Description: "API resource of the object.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"matchExpression": {
+						SchemaProps: spec.SchemaProps{
+							Description: "If a resource name tracked by quota for this entity matches this expression, and there is no associated quota for that resource name defined, the request will be denied by the quota system.  The MatchExpression is a regular expression value according to https://golang.org/pkg/regexp/",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
+				Required: []string{"apiResource", "matchExpression"},
+			},
+		},
+		Dependencies: []string{},
+	},
 	"v1alpha1.PolicyRule": {
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -10643,6 +10675,44 @@ var OpenAPIDefinitions *openapi.OpenAPIDefinitions = &openapi.OpenAPIDefinitions
 		},
 		Dependencies: []string{
 			"v1alpha1.PolicyRule"},
+	},
+	"v1alpha1.ResourceQuotaConfiguration": {
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "ResourceQuotaConfiguration provides configuration for the ResourceQuota admission controller.",
+				Properties: map[string]spec.Schema{
+					"kind": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"apiVersion": {
+						SchemaProps: spec.SchemaProps{
+							Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"limitedResources": {
+						SchemaProps: spec.SchemaProps{
+							Description: "LimitedResources whose consumption is limited by default.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: spec.MustCreateRef("#/definitions/v1alpha1.LimitedResource"),
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			"v1alpha1.LimitedResource"},
 	},
 	"v1alpha1.Role": {
 		Schema: spec.Schema{

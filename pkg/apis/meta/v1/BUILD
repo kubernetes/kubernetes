@@ -9,12 +9,19 @@ load(
 
 go_library(
     name = "go_default_library",
-    srcs = ["time.go"],
+    srcs = [
+        "time.go",
+        "zz_generated.deepcopy.go",
+        "zz_generated.defaults.go",
+    ],
     tags = ["automanaged"],
     deps = [
+        "//pkg/runtime:go_default_library",
         "//vendor:github.com/go-openapi/spec",
         "//vendor:github.com/google/gofuzz",
+        "//vendor:k8s.io/apimachinery/pkg/conversion",
         "//vendor:k8s.io/apimachinery/pkg/openapi",
+        "//vendor:k8s.io/apimachinery/pkg/runtime",
     ],
 )
 

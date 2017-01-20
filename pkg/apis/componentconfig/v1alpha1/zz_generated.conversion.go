@@ -62,6 +62,10 @@ func RegisterConversions(scheme *runtime.Scheme) error {
 		Convert_componentconfig_KubeletX509Authentication_To_v1alpha1_KubeletX509Authentication,
 		Convert_v1alpha1_LeaderElectionConfiguration_To_componentconfig_LeaderElectionConfiguration,
 		Convert_componentconfig_LeaderElectionConfiguration_To_v1alpha1_LeaderElectionConfiguration,
+		Convert_v1alpha1_LimitedResource_To_componentconfig_LimitedResource,
+		Convert_componentconfig_LimitedResource_To_v1alpha1_LimitedResource,
+		Convert_v1alpha1_ResourceQuotaConfiguration_To_componentconfig_ResourceQuotaConfiguration,
+		Convert_componentconfig_ResourceQuotaConfiguration_To_v1alpha1_ResourceQuotaConfiguration,
 	)
 }
 
@@ -749,4 +753,44 @@ func autoConvert_componentconfig_LeaderElectionConfiguration_To_v1alpha1_LeaderE
 
 func Convert_componentconfig_LeaderElectionConfiguration_To_v1alpha1_LeaderElectionConfiguration(in *componentconfig.LeaderElectionConfiguration, out *LeaderElectionConfiguration, s conversion.Scope) error {
 	return autoConvert_componentconfig_LeaderElectionConfiguration_To_v1alpha1_LeaderElectionConfiguration(in, out, s)
+}
+
+func autoConvert_v1alpha1_LimitedResource_To_componentconfig_LimitedResource(in *LimitedResource, out *componentconfig.LimitedResource, s conversion.Scope) error {
+	out.APIGroup = in.APIGroup
+	out.APIResource = in.APIResource
+	out.MatchExpression = in.MatchExpression
+	return nil
+}
+
+func Convert_v1alpha1_LimitedResource_To_componentconfig_LimitedResource(in *LimitedResource, out *componentconfig.LimitedResource, s conversion.Scope) error {
+	return autoConvert_v1alpha1_LimitedResource_To_componentconfig_LimitedResource(in, out, s)
+}
+
+func autoConvert_componentconfig_LimitedResource_To_v1alpha1_LimitedResource(in *componentconfig.LimitedResource, out *LimitedResource, s conversion.Scope) error {
+	out.APIGroup = in.APIGroup
+	out.APIResource = in.APIResource
+	out.MatchExpression = in.MatchExpression
+	return nil
+}
+
+func Convert_componentconfig_LimitedResource_To_v1alpha1_LimitedResource(in *componentconfig.LimitedResource, out *LimitedResource, s conversion.Scope) error {
+	return autoConvert_componentconfig_LimitedResource_To_v1alpha1_LimitedResource(in, out, s)
+}
+
+func autoConvert_v1alpha1_ResourceQuotaConfiguration_To_componentconfig_ResourceQuotaConfiguration(in *ResourceQuotaConfiguration, out *componentconfig.ResourceQuotaConfiguration, s conversion.Scope) error {
+	out.LimitedResources = *(*[]componentconfig.LimitedResource)(unsafe.Pointer(&in.LimitedResources))
+	return nil
+}
+
+func Convert_v1alpha1_ResourceQuotaConfiguration_To_componentconfig_ResourceQuotaConfiguration(in *ResourceQuotaConfiguration, out *componentconfig.ResourceQuotaConfiguration, s conversion.Scope) error {
+	return autoConvert_v1alpha1_ResourceQuotaConfiguration_To_componentconfig_ResourceQuotaConfiguration(in, out, s)
+}
+
+func autoConvert_componentconfig_ResourceQuotaConfiguration_To_v1alpha1_ResourceQuotaConfiguration(in *componentconfig.ResourceQuotaConfiguration, out *ResourceQuotaConfiguration, s conversion.Scope) error {
+	out.LimitedResources = *(*[]LimitedResource)(unsafe.Pointer(&in.LimitedResources))
+	return nil
+}
+
+func Convert_componentconfig_ResourceQuotaConfiguration_To_v1alpha1_ResourceQuotaConfiguration(in *componentconfig.ResourceQuotaConfiguration, out *ResourceQuotaConfiguration, s conversion.Scope) error {
+	return autoConvert_componentconfig_ResourceQuotaConfiguration_To_v1alpha1_ResourceQuotaConfiguration(in, out, s)
 }
