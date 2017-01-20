@@ -2065,28 +2065,37 @@ func (r *Runtime) ExecInContainer(containerID kubecontainer.ContainerID, cmd []s
 		if stdout != nil {
 			go io.Copy(stdout, p)
 		}
-		return newRktExitError(command.Wait())
-	}
-	if stdin != nil {
-		// Use an os.Pipe here as it returns true *os.File objects.
-		// This way, if you run 'kubectl exec <pod> -i bash' (no tty) and type 'exit',
-		// the call below to command.Run() can unblock because its Stdin is the read half
-		// of the pipe.
-		r, w, err := r.os.Pipe()
-		if err != nil {
-			return newRktExitError(err)
-		}
-		go io.Copy(w, stdin)
+	} else {
+		if stdin != nil {
+			// Use an os.Pipe here as it returns true *os.File objects.
+			// This way, if you run 'kubectl exec <pod> -i bash' (no tty) and type 'exit',
+			// the call below to command.Run() can unblock because its Stdin is the read half
+			// of the pipe.
+			r, w, err := r.os.Pipe()
+			if err != nil {
+				return newRktExitError(err)
+			}
+			go io.Copy(w, stdin)
 
-		command.Stdin = r
+			command.Stdin = r
+		}
+		if stdout != nil {
+			command.Stdout = stdout
+		}
+		if stderr != nil {
+			command.Stderr = stderr
+		}
+		if err := command.Start(); err != nil {
+			return err
+		}
 	}
-	if stdout != nil {
-		command.Stdout = stdout
+	if timeout > 0 {
+		t := time.AfterFunc(timeout, func() {
+			command.Process.Kill()
+		})
+		defer t.Stop()
 	}
-	if stderr != nil {
-		command.Stderr = stderr
-	}
-	return newRktExitError(command.Run())
+	return newRktExitError(command.Wait())
 }
 
 // PortForward executes socat in the pod's network namespace and copies
