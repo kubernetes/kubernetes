@@ -64,7 +64,7 @@ func (v apiVersion) Compare(other string) (int, error) {
 // '<key>=<value>', which can be understood by docker.
 func generateEnvList(envs []*runtimeapi.KeyValue) (result []string) {
 	for _, env := range envs {
-		result = append(result, fmt.Sprintf("%s=%s", env.GetKey(), env.GetValue()))
+		result = append(result, fmt.Sprintf("%s=%s", env.Key, env.Value))
 	}
 	return
 }
@@ -129,8 +129,8 @@ func extractLabels(input map[string]string) (map[string]string, map[string]strin
 // relabeling and the pod provides an SELinux label
 func generateMountBindings(mounts []*runtimeapi.Mount) (result []string) {
 	for _, m := range mounts {
-		bind := fmt.Sprintf("%s:%s", m.GetHostPath(), m.GetContainerPath())
-		readOnly := m.GetReadonly()
+		bind := fmt.Sprintf("%s:%s", m.HostPath, m.ContainerPath)
+		readOnly := m.Readonly
 		if readOnly {
 			bind += ":ro"
 		}
@@ -138,7 +138,7 @@ func generateMountBindings(mounts []*runtimeapi.Mount) (result []string) {
 		// does not provide an SELinux context relabeling will label the volume with
 		// the container's randomly allocated MCS label. This would restrict access
 		// to the volume to the container which mounts it first.
-		if m.GetSelinuxRelabel() {
+		if m.SelinuxRelabel {
 			if readOnly {
 				bind += ",Z"
 			} else {
@@ -154,16 +154,16 @@ func makePortsAndBindings(pm []*runtimeapi.PortMapping) (map[dockernat.Port]stru
 	exposedPorts := map[dockernat.Port]struct{}{}
 	portBindings := map[dockernat.Port][]dockernat.PortBinding{}
 	for _, port := range pm {
-		exteriorPort := port.GetHostPort()
+		exteriorPort := port.HostPort
 		if exteriorPort == 0 {
 			// No need to do port binding when HostPort is not specified
 			continue
 		}
-		interiorPort := port.GetContainerPort()
+		interiorPort := port.ContainerPort
 		// Some of this port stuff is under-documented voodoo.
 		// See http://stackoverflow.com/questions/20428302/binding-a-port-to-a-host-interface-using-the-rest-api
 		var protocol string
-		switch strings.ToUpper(string(port.GetProtocol())) {
+		switch strings.ToUpper(string(port.Protocol)) {
 		case "UDP":
 			protocol = "/udp"
 		case "TCP":
@@ -178,7 +178,7 @@ func makePortsAndBindings(pm []*runtimeapi.PortMapping) (map[dockernat.Port]stru
 
 		hostBinding := dockernat.PortBinding{
 			HostPort: strconv.Itoa(int(exteriorPort)),
-			HostIP:   port.GetHostIp(),
+			HostIP:   port.HostIp,
 		}
 
 		// Allow multiple host ports bind to same docker port
@@ -272,20 +272,20 @@ func (f *dockerFilter) AddLabel(key, value string) {
 
 // getUserFromImageUser gets uid or user name of the image user.
 // If user is numeric, it will be treated as uid; or else, it is treated as user name.
-func getUserFromImageUser(imageUser string) (*int64, *string) {
+func getUserFromImageUser(imageUser string) (*int64, string) {
 	user := dockertools.GetUserFromImageUser(imageUser)
 	// return both nil if user is not specified in the image.
 	if user == "" {
-		return nil, nil
+		return nil, ""
 	}
 	// user could be either uid or user name. Try to interpret as numeric uid.
 	uid, err := strconv.ParseInt(user, 10, 64)
 	if err != nil {
 		// If user is non numeric, assume it's user name.
-		return nil, &user
+		return nil, user
 	}
 	// If user is a numeric uid.
-	return &uid, nil
+	return &uid, ""
 }
 
 // See #33189. If the previous attempt to create a sandbox container name FOO
