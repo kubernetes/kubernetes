@@ -1924,11 +1924,17 @@ var OpenAPIDefinitions *openapi.OpenAPIDefinitions = &openapi.OpenAPIDefinitions
 							Ref:         spec.MustCreateRef("#/definitions/v1.ConfigMapEnvSource"),
 						},
 					},
+					"secretRef": {
+						SchemaProps: spec.SchemaProps{
+							Description: "The Secret to select from",
+							Ref:         spec.MustCreateRef("#/definitions/v1.SecretEnvSource"),
+						},
+					},
 				},
 			},
 		},
 		Dependencies: []string{
-			"v1.ConfigMapEnvSource"},
+			"v1.ConfigMapEnvSource", "v1.SecretEnvSource"},
 	},
 	"v1.EnvVar": {
 		Schema: spec.Schema{
@@ -7366,6 +7372,23 @@ var OpenAPIDefinitions *openapi.OpenAPIDefinitions = &openapi.OpenAPIDefinitions
 		},
 		Dependencies: []string{
 			"v1.ObjectMeta"},
+	},
+	"v1.SecretEnvSource": {
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "SecretEnvSource selects a Secret to populate the environment variables with.\n\nThe contents of the target Secret's Data field will represent the key-value pairs as environment variables.",
+				Properties: map[string]spec.Schema{
+					"name": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Name of the referent. More info: http://kubernetes.io/docs/user-guide/identifiers#names",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{},
 	},
 	"v1.SecretKeySelector": {
 		Schema: spec.Schema{
