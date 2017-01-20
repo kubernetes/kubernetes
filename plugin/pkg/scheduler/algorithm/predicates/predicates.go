@@ -29,7 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/client/cache"
+	"k8s.io/kubernetes/pkg/client/legacylisters"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
 	"k8s.io/kubernetes/pkg/util/workqueue"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
@@ -64,7 +64,7 @@ type PersistentVolumeClaimInfo interface {
 
 // CachedPersistentVolumeClaimInfo implements PersistentVolumeClaimInfo
 type CachedPersistentVolumeClaimInfo struct {
-	*cache.StoreToPersistentVolumeClaimLister
+	*listers.StoreToPersistentVolumeClaimLister
 }
 
 // GetPersistentVolumeClaimInfo fetches the claim in specified namespace with specified name
@@ -73,7 +73,7 @@ func (c *CachedPersistentVolumeClaimInfo) GetPersistentVolumeClaimInfo(namespace
 }
 
 type CachedNodeInfo struct {
-	*cache.StoreToNodeLister
+	*listers.StoreToNodeLister
 }
 
 // GetNodeInfo returns cached data for the node 'id'.

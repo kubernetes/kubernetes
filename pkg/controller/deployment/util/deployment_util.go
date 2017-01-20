@@ -37,8 +37,8 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 	internalextensions "k8s.io/kubernetes/pkg/apis/extensions"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
-	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	"k8s.io/kubernetes/pkg/client/legacylisters"
 	"k8s.io/kubernetes/pkg/controller"
 	intstrutil "k8s.io/kubernetes/pkg/util/intstr"
 	labelsutil "k8s.io/kubernetes/pkg/util/labels"
@@ -684,7 +684,7 @@ func WaitForPodsHashPopulated(c clientset.Interface, desiredGeneration int64, na
 
 // LabelPodsWithHash labels all pods in the given podList with the new hash label.
 // The returned bool value can be used to tell if all pods are actually labeled.
-func LabelPodsWithHash(podList *v1.PodList, c clientset.Interface, podLister *cache.StoreToPodLister, namespace, name, hash string) error {
+func LabelPodsWithHash(podList *v1.PodList, c clientset.Interface, podLister *listers.StoreToPodLister, namespace, name, hash string) error {
 	for _, pod := range podList.Items {
 		// Only label the pod that doesn't already have the new hash
 		if pod.Labels[extensions.DefaultDeploymentUniqueLabelKey] != hash {

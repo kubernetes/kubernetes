@@ -50,6 +50,7 @@ import (
 	componentconfigv1alpha1 "k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1"
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	"k8s.io/kubernetes/pkg/client/legacylisters"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	internalapi "k8s.io/kubernetes/pkg/kubelet/api"
@@ -383,7 +384,7 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 		serviceLW := cache.NewListWatchFromClient(kubeClient.Core().RESTClient(), "services", v1.NamespaceAll, fields.Everything())
 		cache.NewReflector(serviceLW, &v1.Service{}, serviceStore, 0).Run()
 	}
-	serviceLister := &cache.StoreToServiceLister{Indexer: serviceStore}
+	serviceLister := &listers.StoreToServiceLister{Indexer: serviceStore}
 
 	nodeStore := cache.NewStore(cache.MetaNamespaceKeyFunc)
 	if kubeClient != nil {
@@ -391,7 +392,7 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 		nodeLW := cache.NewListWatchFromClient(kubeClient.Core().RESTClient(), "nodes", v1.NamespaceAll, fieldSelector)
 		cache.NewReflector(nodeLW, &v1.Node{}, nodeStore, 0).Run()
 	}
-	nodeLister := &cache.StoreToNodeLister{Store: nodeStore}
+	nodeLister := &listers.StoreToNodeLister{Store: nodeStore}
 	nodeInfo := &predicates.CachedNodeInfo{StoreToNodeLister: nodeLister}
 
 	// TODO: get the real node object of ourself,

@@ -39,6 +39,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	v1core "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/core/v1"
+	"k8s.io/kubernetes/pkg/client/legacylisters"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/informers"
@@ -75,9 +76,9 @@ type ReplicaSetController struct {
 	expectations *controller.UIDTrackingControllerExpectations
 
 	// A store of ReplicaSets, populated by the rsController
-	rsLister *cache.StoreToReplicaSetLister
+	rsLister *listers.StoreToReplicaSetLister
 	// A store of pods, populated by the podController
-	podLister *cache.StoreToPodLister
+	podLister *listers.StoreToPodLister
 	// podListerSynced returns true if the pod store has been synced at least once.
 	// Added as a member to the struct to allow injection for testing.
 	podListerSynced cache.InformerSynced

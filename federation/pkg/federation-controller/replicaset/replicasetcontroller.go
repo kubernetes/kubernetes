@@ -43,6 +43,7 @@ import (
 	extensionsv1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/client/cache"
 	kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	"k8s.io/kubernetes/pkg/client/legacylisters"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/util/workqueue"
@@ -81,7 +82,7 @@ type ReplicaSetController struct {
 	fedClient fedclientset.Interface
 
 	replicaSetController cache.Controller
-	replicaSetStore      cache.StoreToReplicaSetLister
+	replicaSetStore      listers.StoreToReplicaSetLister
 
 	fedReplicaSetInformer fedutil.FederatedInformer
 	fedPodInformer        fedutil.FederatedInformer
