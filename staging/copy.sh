@@ -107,6 +107,7 @@ mkcp "/pkg/client/typed" "/pkg/client"
 mkcp "/pkg/client/unversioned/auth" "/pkg/client/unversioned"
 mkcp "/pkg/client/unversioned/clientcmd" "/pkg/client/unversioned"
 mkcp "/pkg/client/unversioned/portforward" "/pkg/client/unversioned"
+mkcp "/pkg/client/unversioned/remotecommand" "/pkg/client/unversioned"
 
 mkcp "/pkg/util/workqueue" "pkg/util"
 # remove this folder because it imports prometheus
@@ -125,6 +126,8 @@ rm -rf "${CLIENT_REPO_TEMP}"/vendor/k8s.io/kubernetes
 # client-go will share the vendor of the main repo for now. When client-go
 # becomes a standalone repo, it will have its own vendor
 mv "${CLIENT_REPO_TEMP}"/vendor "${CLIENT_REPO_TEMP}"/_vendor
+# remove this directory cause it contains only symlink to not copied file
+rm -rf "${CLIENT_REPO_TEMP}"/_vendor/github.com/docker/docker/project
 
 echo "rewriting Godeps.json"
 go run "${DIR}/godeps-json-updater.go" --godeps-file="${CLIENT_REPO_TEMP}/Godeps/Godeps.json" --client-go-import-path="${CLIENT_REPO_FROM_SRC}"
@@ -201,6 +204,7 @@ mvfolder pkg/client/cache tools/cache
 mvfolder pkg/client/unversioned/auth tools/auth
 mvfolder pkg/client/unversioned/clientcmd tools/clientcmd
 mvfolder pkg/client/unversioned/portforward tools/portforward
+mvfolder pkg/client/unversioned/remotecommand tools/remotecommand
 mvfolder pkg/client/testing/core testing
 mvfolder pkg/client/testing/cache tools/cache/testing
 mvfolder cmd/kubeadm/app/apis/kubeadm pkg/apis/kubeadm
