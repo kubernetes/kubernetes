@@ -60,6 +60,7 @@ func (n *NamespaceController) Start() error {
 	informerFactory := informers.NewSharedInformerFactory(nil, client, ncResyncPeriod)
 	discoverResourcesFn := client.Discovery().ServerPreferredNamespacedResources
 	nc := namespacecontroller.NewNamespaceController(client, clientPool, informerFactory.Core().V1().Namespaces(), discoverResourcesFn, v1.FinalizerKubernetes)
+	informerFactory.Start(n.stopCh)
 	go nc.Run(ncConcurrency, n.stopCh)
 	return nil
 }
