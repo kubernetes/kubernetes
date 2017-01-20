@@ -86,18 +86,18 @@ type LoadBalancerOpts struct {
 	NodeSecurityGroupID  string     `gcfg:"node-security-group"`
 	Provider             string     `gcfg:"provider"`
 
-	// Optional settings that allow a cluster admin to prevent his users from setting LB parameters through Service Annotations
-	DisableAnnotationLBVersion            bool `gcfg:"disable-annotation-lb-version"`
-	DisableAnnotationSubnetId             bool `gcfg:"disable-annotation-subnet-id"`
-	DisableAnnotationFloatingNetworkId    bool `gcfg:"disable-annotation-floating-network-id"`
-	DisableAnnotationLBMethod             bool `gcfg:"disable-annotation-lb-method"`
-	DisableAnnotationCreateMonitor        bool `gcfg:"disable-annotation-create-monitor"`
-	DisableAnnotationMonitorDelay         bool `gcfg:"disable-annotation-monitor-delay"`
-	DisableAnnotationMonitorTimeout       bool `gcfg:"disable-annotation-monitor-timeout"`
-	DisableAnnotationMonitorMaxRetries    bool `gcfg:"disable-annotation-monitor-max-retries"`
-	DisableAnnotationManageSecurityGroups bool `gcfg:"disable-annotation-manage-security-groups"`
-	DisableAnnotationNodeSecurityGroupID  bool `gcfg:"disable-annotation-node-security-group"`
-	DisableAnnotationProvider             bool `gcfg:"disable-annotation-provider"`
+	// Optional settings that allow a cluster admin to allow his users to set specific LB parameters through Service Annotations
+	EnableAnnotationLBVersion            bool `gcfg:"disable-annotation-lb-version"`
+	EnableAnnotationSubnetId             bool `gcfg:"disable-annotation-subnet-id"`
+	EnableAnnotationFloatingNetworkId    bool `gcfg:"disable-annotation-floating-network-id"`
+	EnableAnnotationLBMethod             bool `gcfg:"disable-annotation-lb-method"`
+	EnableAnnotationCreateMonitor        bool `gcfg:"disable-annotation-create-monitor"`
+	EnableAnnotationMonitorDelay         bool `gcfg:"disable-annotation-monitor-delay"`
+	EnableAnnotationMonitorTimeout       bool `gcfg:"disable-annotation-monitor-timeout"`
+	EnableAnnotationMonitorMaxRetries    bool `gcfg:"disable-annotation-monitor-max-retries"`
+	EnableAnnotationManageSecurityGroups bool `gcfg:"disable-annotation-manage-security-groups"`
+	EnableAnnotationNodeSecurityGroupID  bool `gcfg:"disable-annotation-node-security-group"`
+	EnableAnnotationProvider             bool `gcfg:"disable-annotation-provider"`
 }
 
 type BlockStorageOpts struct {
