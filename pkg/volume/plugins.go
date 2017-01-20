@@ -213,8 +213,11 @@ type VolumeHost interface {
 	// Returns host IP or nil in the case of error.
 	GetHostIP() (net.IP, error)
 
-	// Returns node allocatable
+	// Returns node allocatable.
 	GetNodeAllocatable() (v1.ResourceList, error)
+
+	// Returns a function that returns a secret.
+	GetSecretFunc() func(namespace, name string) (*v1.Secret, error)
 }
 
 // VolumePluginMgr tracks registered plugins.

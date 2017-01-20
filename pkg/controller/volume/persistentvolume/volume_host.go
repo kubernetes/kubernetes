@@ -80,3 +80,7 @@ func (ctrl *PersistentVolumeController) GetHostIP() (net.IP, error) {
 func (ctrl *PersistentVolumeController) GetNodeAllocatable() (v1.ResourceList, error) {
 	return v1.ResourceList{}, nil
 }
+
+func (adc *PersistentVolumeController) GetSecretFunc() func(namespace, name string) (*v1.Secret, error) {
+	return nil
+}

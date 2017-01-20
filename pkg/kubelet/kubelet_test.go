@@ -243,7 +243,7 @@ func newTestKubeletWithImageList(
 
 	plug := &volumetest.FakeVolumePlugin{PluginName: "fake", Host: nil}
 	kubelet.volumePluginMgr, err =
-		NewInitializedVolumePluginMgr(kubelet, []volume.VolumePlugin{plug})
+		NewInitializedVolumePluginMgr(kubelet, fakeSecretManager, []volume.VolumePlugin{plug})
 	require.NoError(t, err, "Failed to initialize VolumePluginMgr")
 
 	kubelet.mounter = &mount.FakeMounter{}
