@@ -23,11 +23,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
+	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated"
 	"k8s.io/kubernetes/pkg/client/record"
 	testclient "k8s.io/kubernetes/pkg/client/testing/core"
 	"k8s.io/kubernetes/pkg/controller"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
-	"k8s.io/kubernetes/pkg/controller/informers"
 	"k8s.io/kubernetes/pkg/util/intstr"
 )
 
@@ -371,15 +371,15 @@ func TestDeploymentController_cleanupDeployment(t *testing.T) {
 	for i := range tests {
 		test := tests[i]
 		fake := &fake.Clientset{}
-		informers := informers.NewSharedInformerFactory(fake, nil, controller.NoResyncPeriodFunc())
-		controller := NewDeploymentController(informers.Deployments(), informers.ReplicaSets(), informers.Pods(), fake)
+		informers := informers.NewSharedInformerFactory(nil, fake, controller.NoResyncPeriodFunc())
+		controller := NewDeploymentController(informers.Extensions().V1beta1().Deployments(), informers.Extensions().V1beta1().ReplicaSets(), informers.Core().V1().Pods(), fake)
 
 		controller.eventRecorder = &record.FakeRecorder{}
 		controller.dListerSynced = alwaysReady
 		controller.rsListerSynced = alwaysReady
 		controller.podListerSynced = alwaysReady
 		for _, rs := range test.oldRSs {
-			controller.rsLister.Indexer.Add(rs)
+			informers.Extensions().V1beta1().ReplicaSets().Informer().GetIndexer().Add(rs)
 		}
 
 		stopCh := make(chan struct{})

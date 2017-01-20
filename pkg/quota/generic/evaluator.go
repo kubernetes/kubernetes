@@ -26,18 +26,18 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/controller/informers"
+	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated"
 	"k8s.io/kubernetes/pkg/quota"
 )
 
 // ListResourceUsingInformerFunc returns a listing function based on the shared informer factory for the specified resource.
-func ListResourceUsingInformerFunc(f informers.SharedInformerFactory, groupResource schema.GroupResource) ListFuncByNamespace {
+func ListResourceUsingInformerFunc(f informers.SharedInformerFactory, resource schema.GroupVersionResource) ListFuncByNamespace {
 	return func(namespace string, options v1.ListOptions) ([]runtime.Object, error) {
 		labelSelector, err := labels.Parse(options.LabelSelector)
 		if err != nil {
 			return nil, err
 		}
-		informer, err := f.ForResource(groupResource)
+		informer, err := f.ForResource(resource)
 		if err != nil {
 			return nil, err
 		}

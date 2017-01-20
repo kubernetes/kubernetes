@@ -26,8 +26,8 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
-	kcache "k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	corelisters "k8s.io/kubernetes/pkg/client/listers/core/v1"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/cache"
 	"k8s.io/kubernetes/pkg/util/strategicpatch"
 )
@@ -43,18 +43,18 @@ type NodeStatusUpdater interface {
 // NewNodeStatusUpdater returns a new instance of NodeStatusUpdater.
 func NewNodeStatusUpdater(
 	kubeClient clientset.Interface,
-	nodeInformer kcache.SharedInformer,
+	nodeLister corelisters.NodeLister,
 	actualStateOfWorld cache.ActualStateOfWorld) NodeStatusUpdater {
 	return &nodeStatusUpdater{
 		actualStateOfWorld: actualStateOfWorld,
-		nodeInformer:       nodeInformer,
+		nodeLister:         nodeLister,
 		kubeClient:         kubeClient,
 	}
 }
 
 type nodeStatusUpdater struct {
 	kubeClient         clientset.Interface
-	nodeInformer       kcache.SharedInformer
+	nodeLister         corelisters.NodeLister
 	actualStateOfWorld cache.ActualStateOfWorld
 }
 
@@ -63,8 +63,8 @@ func (nsu *nodeStatusUpdater) UpdateNodeStatuses() error {
 	// kubernetes/kubernetes/issues/37777
 	nodesToUpdate := nsu.actualStateOfWorld.GetVolumesToReportAttached()
 	for nodeName, attachedVolumes := range nodesToUpdate {
-		nodeObj, exists, err := nsu.nodeInformer.GetStore().GetByKey(string(nodeName))
-		if nodeObj == nil || !exists || err != nil {
+		nodeObj, err := nsu.nodeLister.Get(string(nodeName))
+		if nodeObj == nil || err != nil {
 			// If node does not exist, its status cannot be updated, log error and
 			// reset flag statusUpdateNeeded back to true to indicate this node status
 			// needs to be updated again
