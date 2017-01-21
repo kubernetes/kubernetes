@@ -1484,13 +1484,41 @@ func (kl *Kubelet) getPullSecretsForPod(pod *api.Pod) ([]api.Secret, error) {
 	return pullSecrets, nil
 }
 
+// Return name of a volume. When the volume is a PersistentVolumeClaim,
+// it returns name of the real PersistentVolume bound to the claim.
+// It returns errror when the clam is not bound yet.
+func (kl *Kubelet) resolveVolumeName(pod *api.Pod, volume *api.Volume) (string, error) {
+	claimSource := volume.VolumeSource.PersistentVolumeClaim
+	if claimSource != nil {
+		// resolve real volume behind the claim
+		claim, err := kl.kubeClient.Legacy().PersistentVolumeClaims(pod.Namespace).Get(claimSource.ClaimName)
+		if err != nil {
+			return "", fmt.Errorf("Cannot find claim %s/%s for volume %s", pod.Namespace, claimSource.ClaimName, volume.Name)
+		}
+		if claim.Status.Phase != api.ClaimBound {
+			return "", fmt.Errorf("Claim for volume %s/%s is not bound yet", pod.Namespace, claimSource.ClaimName)
+		}
+		// Use the real bound volume instead of PersistentVolume.Name
+		return claim.Spec.VolumeName, nil
+	}
+	return volume.Name, nil
+}
+
 // Stores all volumes defined by the set of pods into a map.
+// It stores real volumes there, i.e. persistent volume claims are resolved
+// to volumes that are bound to them.
 // Keys for each entry are in the format (POD_ID)/(VOLUME_NAME)
-func getDesiredVolumes(pods []*api.Pod) map[string]api.Volume {
+func (kl *Kubelet) getDesiredVolumes(pods []*api.Pod) map[string]api.Volume {
 	desiredVolumes := make(map[string]api.Volume)
 	for _, pod := range pods {
 		for _, volume := range pod.Spec.Volumes {
-			identifier := path.Join(string(pod.UID), volume.Name)
+			volumeName, err := kl.resolveVolumeName(pod, &volume)
+			if err != nil {
+				glog.V(3).Infof("%v", err)
+				// Ignore the error and hope it's resolved next time
+				continue
+			}
+			identifier := path.Join(string(pod.UID), volumeName)
 			desiredVolumes[identifier] = volume
 		}
 	}
@@ -1574,8 +1602,11 @@ func (kl *Kubelet) cleanupBandwidthLimits(allPods []*api.Pod) error {
 
 // Compares the map of current volumes to the map of desired volumes.
 // If an active volume does not have a respective desired volume, clean it up.
+// This method is blocking:
+// 1) it talks to API server to find volumes bound to persistent volume claims
+// 2) it talks to cloud to detach volumes
 func (kl *Kubelet) cleanupOrphanedVolumes(pods []*api.Pod, runningPods []*kubecontainer.Pod) error {
-	desiredVolumes := getDesiredVolumes(pods)
+	desiredVolumes := kl.getDesiredVolumes(pods)
 	currentVolumes := kl.getPodVolumesFromDisk()
 
 	runningSet := sets.String{}
