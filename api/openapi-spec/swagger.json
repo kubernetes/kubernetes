@@ -37250,6 +37250,10 @@
       "description": "PhotonPersistentDisk represents a PhotonController persistent disk attached and mounted on kubelets host machine",
       "$ref": "#/definitions/v1.PhotonPersistentDiskVolumeSource"
      },
+     "portworxVolume": {
+      "description": "PortworxVolume represents a portworx volume attached and mounted on kubelets host machine",
+      "$ref": "#/definitions/v1.PortworxVolumeSource"
+     },
      "quobyte": {
       "description": "Quobyte represents a Quobyte mount on the host that shares a pod's lifetime",
       "$ref": "#/definitions/v1.QuobyteVolumeSource"
@@ -37677,6 +37681,26 @@
      "spec": {
       "description": "Specification of the desired behavior of the pod. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status",
       "$ref": "#/definitions/v1.PodSpec"
+     }
+    }
+   },
+   "v1.PortworxVolumeSource": {
+    "description": "PortworxVolumeSource represents a Portworx volume resource.",
+    "required": [
+     "volumeID"
+    ],
+    "properties": {
+     "fsType": {
+      "description": "FSType represents the filesystem type to mount Must be a filesystem type supported by the host operating system. Ex. \"ext4\", \"xfs\". Implicitly inferred to be \"ext4\" if unspecified.",
+      "type": "string"
+     },
+     "readOnly": {
+      "description": "Defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts.",
+      "type": "boolean"
+     },
+     "volumeID": {
+      "description": "VolumeID uniquely identifies a Portworx volume",
+      "type": "string"
      }
     }
    },
@@ -38721,6 +38745,10 @@
      "photonPersistentDisk": {
       "description": "PhotonPersistentDisk represents a PhotonController persistent disk attached and mounted on kubelets host machine",
       "$ref": "#/definitions/v1.PhotonPersistentDiskVolumeSource"
+     },
+     "portworxVolume": {
+      "description": "PortworxVolume represents a portworx volume attached and mounted on kubelets host machine",
+      "$ref": "#/definitions/v1.PortworxVolumeSource"
      },
      "quobyte": {
       "description": "Quobyte represents a Quobyte mount on the host that shares a pod's lifetime",

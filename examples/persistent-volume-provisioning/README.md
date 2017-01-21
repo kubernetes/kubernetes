@@ -86,7 +86,7 @@ parameters:
 *  `aggregation_level`: specifies the number of chunks the volume would be distributed into, 0 indicates a non-aggregated volume (default: `0`)
 *  `ephemeral`: ephemeral storage [true|false] (default `false`)
 
-For a complete example refer ([Portworx Volume docs](../../volumes/portworx/README.md))
+For a complete example refer ([Portworx Volume docs](../volumes/portworx/README.md))
 
 #### GLUSTERFS
 
