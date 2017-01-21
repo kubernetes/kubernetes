@@ -1069,7 +1069,7 @@ function update-or-verify-gcloud() {
     ${sudo_prefix} gcloud ${gcloud_prompt:-} components install beta
     ${sudo_prefix} gcloud ${gcloud_prompt:-} components update
   else
-    local version=$(${sudo_prefix} gcloud version --format=json)
+    local version=$(gcloud version --format=json)
     python -c'
 import json,sys
 from distutils import version
