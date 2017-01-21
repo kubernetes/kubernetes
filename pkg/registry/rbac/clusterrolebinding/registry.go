@@ -17,6 +17,7 @@ limitations under the License.
 package clusterrolebinding
 
 import (
+	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/watch"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
@@ -27,12 +28,12 @@ import (
 
 // Registry is an interface for things that know how to store ClusterRoleBindings.
 type Registry interface {
-	ListClusterRoleBindings(ctx genericapirequest.Context, options *api.ListOptions) (*rbac.ClusterRoleBindingList, error)
+	ListClusterRoleBindings(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (*rbac.ClusterRoleBindingList, error)
 	CreateClusterRoleBinding(ctx genericapirequest.Context, clusterRoleBinding *rbac.ClusterRoleBinding) error
 	UpdateClusterRoleBinding(ctx genericapirequest.Context, clusterRoleBinding *rbac.ClusterRoleBinding) error
 	GetClusterRoleBinding(ctx genericapirequest.Context, name string, options *metav1.GetOptions) (*rbac.ClusterRoleBinding, error)
 	DeleteClusterRoleBinding(ctx genericapirequest.Context, name string) error
-	WatchClusterRoleBindings(ctx genericapirequest.Context, options *api.ListOptions) (watch.Interface, error)
+	WatchClusterRoleBindings(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (watch.Interface, error)
 }
 
 // storage puts strong typing around storage calls
@@ -46,7 +47,7 @@ func NewRegistry(s rest.StandardStorage) Registry {
 	return &storage{s}
 }
 
-func (s *storage) ListClusterRoleBindings(ctx genericapirequest.Context, options *api.ListOptions) (*rbac.ClusterRoleBindingList, error) {
+func (s *storage) ListClusterRoleBindings(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (*rbac.ClusterRoleBindingList, error) {
 	obj, err := s.List(ctx, options)
 	if err != nil {
 		return nil, err
@@ -65,7 +66,7 @@ func (s *storage) UpdateClusterRoleBinding(ctx genericapirequest.Context, cluste
 	return err
 }
 
-func (s *storage) WatchClusterRoleBindings(ctx genericapirequest.Context, options *api.ListOptions) (watch.Interface, error) {
+func (s *storage) WatchClusterRoleBindings(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (watch.Interface, error) {
 	return s.Watch(ctx, options)
 }
 
@@ -88,7 +89,7 @@ type AuthorizerAdapter struct {
 }
 
 func (a AuthorizerAdapter) ListClusterRoleBindings() ([]*rbac.ClusterRoleBinding, error) {
-	list, err := a.Registry.ListClusterRoleBindings(genericapirequest.NewContext(), &api.ListOptions{})
+	list, err := a.Registry.ListClusterRoleBindings(genericapirequest.NewContext(), &metainternalversion.ListOptions{})
 	if err != nil {
 		return nil, err
 	}

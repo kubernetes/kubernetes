@@ -17,6 +17,7 @@ limitations under the License.
 package certificates
 
 import (
+	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/watch"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
@@ -27,12 +28,12 @@ import (
 
 // Registry is an interface for things that know how to store CSRs.
 type Registry interface {
-	ListCSRs(ctx genericapirequest.Context, options *api.ListOptions) (*certificates.CertificateSigningRequestList, error)
+	ListCSRs(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (*certificates.CertificateSigningRequestList, error)
 	CreateCSR(ctx genericapirequest.Context, csr *certificates.CertificateSigningRequest) error
 	UpdateCSR(ctx genericapirequest.Context, csr *certificates.CertificateSigningRequest) error
 	GetCSR(ctx genericapirequest.Context, csrID string, options *metav1.GetOptions) (*certificates.CertificateSigningRequest, error)
 	DeleteCSR(ctx genericapirequest.Context, csrID string) error
-	WatchCSRs(ctx genericapirequest.Context, options *api.ListOptions) (watch.Interface, error)
+	WatchCSRs(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (watch.Interface, error)
 }
 
 // storage puts strong typing around storage calls
@@ -46,7 +47,7 @@ func NewRegistry(s rest.StandardStorage) Registry {
 	return &storage{s}
 }
 
-func (s *storage) ListCSRs(ctx genericapirequest.Context, options *api.ListOptions) (*certificates.CertificateSigningRequestList, error) {
+func (s *storage) ListCSRs(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (*certificates.CertificateSigningRequestList, error) {
 	obj, err := s.List(ctx, options)
 	if err != nil {
 		return nil, err
@@ -65,7 +66,7 @@ func (s *storage) UpdateCSR(ctx genericapirequest.Context, csr *certificates.Cer
 	return err
 }
 
-func (s *storage) WatchCSRs(ctx genericapirequest.Context, options *api.ListOptions) (watch.Interface, error) {
+func (s *storage) WatchCSRs(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (watch.Interface, error) {
 	return s.Watch(ctx, options)
 }
 

@@ -19,6 +19,7 @@ package deployment
 import (
 	"fmt"
 
+	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/kubernetes/pkg/api"
@@ -28,7 +29,7 @@ import (
 
 // Registry is an interface for things that know how to store Deployments.
 type Registry interface {
-	ListDeployments(ctx genericapirequest.Context, options *api.ListOptions) (*extensions.DeploymentList, error)
+	ListDeployments(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (*extensions.DeploymentList, error)
 	GetDeployment(ctx genericapirequest.Context, deploymentID string, options *metav1.GetOptions) (*extensions.Deployment, error)
 	CreateDeployment(ctx genericapirequest.Context, deployment *extensions.Deployment) (*extensions.Deployment, error)
 	UpdateDeployment(ctx genericapirequest.Context, deployment *extensions.Deployment) (*extensions.Deployment, error)
@@ -45,7 +46,7 @@ func NewRegistry(s rest.StandardStorage) Registry {
 	return &storage{s}
 }
 
-func (s *storage) ListDeployments(ctx genericapirequest.Context, options *api.ListOptions) (*extensions.DeploymentList, error) {
+func (s *storage) ListDeployments(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (*extensions.DeploymentList, error) {
 	if options != nil && options.FieldSelector != nil && !options.FieldSelector.Empty() {
 		return nil, fmt.Errorf("field selector not supported yet")
 	}
