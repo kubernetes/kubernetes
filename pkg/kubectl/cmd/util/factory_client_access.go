@@ -49,7 +49,6 @@ import (
 	"k8s.io/kubernetes/pkg/client/typed/discovery"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
-	"k8s.io/kubernetes/pkg/registry/extensions/thirdpartyresourcedata"
 )
 
 type ring0Factory struct {
@@ -209,7 +208,7 @@ func (f *ring0Factory) Decoder(toInternal bool) runtime.Decoder {
 	} else {
 		decoder = api.Codecs.UniversalDeserializer()
 	}
-	return thirdpartyresourcedata.NewDecoder(decoder, "")
+	return decoder
 }
 
 func (f *ring0Factory) JSONEncoder() runtime.Encoder {
