@@ -288,6 +288,7 @@ func TestHammerController(t *testing.T) {
 	// down cleanly.
 
 	outputSetLock.Lock()
+	defer outputSetLock.Unlock()
 	t.Logf("got: %#v", outputSet)
 }
 
