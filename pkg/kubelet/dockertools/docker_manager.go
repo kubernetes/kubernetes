@@ -78,8 +78,10 @@ const (
 	DockerType = "docker"
 
 	// https://docs.docker.com/engine/reference/api/docker_remote_api/
-	// docker version should be at least 1.9.x
+	// Docker API version is used to determine compatibility.
 	minimumDockerAPIVersion = "1.21"
+	// Docker runtime version is required to provide user-friendly message.
+	minimumDockerVersion = "1.9"
 
 	// Remote API version for docker daemon versions
 	// https://docs.docker.com/engine/reference/api/docker_remote_api/
@@ -1122,10 +1124,10 @@ func (dm *DockerManager) checkVersionCompatibility() error {
 	// Verify the docker version.
 	result, err := version.Compare(minimumDockerAPIVersion)
 	if err != nil {
-		return fmt.Errorf("failed to compare current docker version %v with minimum support Docker version %q - %v", version, minimumDockerAPIVersion, err)
+		return fmt.Errorf("failed to compare current docker version %v with minimum support docker version %q - %v", version, minimumDockerAPIVersion, err)
 	}
 	if result < 0 {
-		return fmt.Errorf("container runtime version is older than %s", minimumDockerAPIVersion)
+		return fmt.Errorf("docker API version is older than %s, use docker version %s or newer", minimumDockerAPIVersion, minimumDockerVersion)
 	}
 	return nil
 }
