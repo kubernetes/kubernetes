@@ -15,6 +15,14 @@ filegroup(
     tags = ["automanaged"],
 )
 
+config_setting(
+    name = "embed_license_targets",
+    values = {
+        "define": "EMBED_LICENSE_TARGETS=true",
+    },
+    visibility = ["//visibility:private"],
+)
+
 pkg_tar(
     name = "kubernetes-src",
     extension = "tar.gz",
@@ -116,7 +124,10 @@ pkg_tar(
 pkg_tar(
     name = "kubernetes-node-%s" % PLATFORM_ARCH_STRING,
     extension = "tar.gz",
-    files = LICENSE_TARGETS,
+    files = select({
+        ":embed_license_targets": LICENSE_TARGETS,
+        "//conditions:default": [],
+    }),
     mode = "0644",
     package_dir = "kubernetes",
     deps = [
@@ -153,7 +164,10 @@ pkg_tar(
 pkg_tar(
     name = "kubernetes-server-%s" % PLATFORM_ARCH_STRING,
     extension = "tar.gz",
-    files = LICENSE_TARGETS,
+    files = select({
+        ":embed_license_targets": LICENSE_TARGETS,
+        "//conditions:default": [],
+    }),
     mode = "0644",
     package_dir = "kubernetes",
     deps = [
@@ -197,14 +211,17 @@ pkg_tar(
     name = "kubernetes",
     extension = "tar.gz",
     files = [
-        "//:Godeps/LICENSES",
+        # TODO: the version file
         "//:README.md",
         "//:Vagrantfile",
         "//cluster:all-srcs",
         "//docs:all-srcs",
         "//examples:all-srcs",
         "//third_party/htpasswd:all-srcs",
-    ],
+    ] + select({
+        ":embed_license_targets": ["//:Godeps/LICENSES"],
+        "//conditions:default": [],
+    }),
     package_dir = "kubernetes",
     strip_prefix = "//",
     deps = [
