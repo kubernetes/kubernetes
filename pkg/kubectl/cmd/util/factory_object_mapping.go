@@ -47,7 +47,6 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
-	"k8s.io/kubernetes/pkg/registry/extensions/thirdpartyresourcedata"
 )
 
 type ring1Factory struct {
@@ -127,9 +126,6 @@ func (f *ring1Factory) ClientForMapping(mapping *meta.RESTMapping) (resource.RES
 	}
 	gv := gvk.GroupVersion()
 	cfg.GroupVersion = &gv
-	if api.Registry.IsThirdPartyAPIGroupVersion(gvk.GroupVersion()) {
-		cfg.NegotiatedSerializer = thirdpartyresourcedata.NewNegotiatedSerializer(api.Codecs, gvk.Kind, gv, gv)
-	}
 	return restclient.RESTClientFor(cfg)
 }
 
