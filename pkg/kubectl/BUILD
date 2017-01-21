@@ -109,6 +109,7 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/util/validation",
         "//vendor:k8s.io/apimachinery/pkg/util/wait",
         "//vendor:k8s.io/apimachinery/pkg/watch",
+        "//vendor:k8s.io/client-go/dynamic",
         "//vendor:k8s.io/client-go/rest",
         "//vendor:k8s.io/client-go/util/integer",
         "//vendor:k8s.io/client-go/util/jsonpath",
