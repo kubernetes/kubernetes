@@ -43,5 +43,8 @@ explain why.
 **How to reproduce it** (as minimally and precisely as possible):
 
 
+**Do you think this issue has SECURITY impact?** (Yes/No/Unsure)
+
+
 **Anything else do we need to know**:
 
