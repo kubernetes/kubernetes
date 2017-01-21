@@ -31,6 +31,16 @@ type UnstructuredObjectTyper struct {
 
 // NewUnstructuredObjectTyper returns a runtime.ObjectTyper for
 // unstructred objects based on discovery information.
+func NewUnstructuredObjectTyperFromGVKs(gvks []unversioned.GroupVersionKind) *UnstructuredObjectTyper {
+	dot := &UnstructuredObjectTyper{registered: make(map[unversioned.GroupVersionKind]bool)}
+	for _, gvk := range gvks {
+		dot.registered[gvk] = true
+	}
+	return dot
+}
+
+// NewUnstructuredObjectTyper returns a runtime.ObjectTyper for
+// unstructred objects based on discovery information.
 func NewUnstructuredObjectTyper(groupResources []*APIGroupResources) *UnstructuredObjectTyper {
 	dot := &UnstructuredObjectTyper{registered: make(map[unversioned.GroupVersionKind]bool)}
 	for _, group := range groupResources {
