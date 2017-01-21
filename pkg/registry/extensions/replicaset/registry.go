@@ -21,6 +21,7 @@ package replicaset
 import (
 	"fmt"
 
+	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/watch"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
@@ -31,8 +32,8 @@ import (
 
 // Registry is an interface for things that know how to store ReplicaSets.
 type Registry interface {
-	ListReplicaSets(ctx genericapirequest.Context, options *api.ListOptions) (*extensions.ReplicaSetList, error)
-	WatchReplicaSets(ctx genericapirequest.Context, options *api.ListOptions) (watch.Interface, error)
+	ListReplicaSets(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (*extensions.ReplicaSetList, error)
+	WatchReplicaSets(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (watch.Interface, error)
 	GetReplicaSet(ctx genericapirequest.Context, replicaSetID string, options *metav1.GetOptions) (*extensions.ReplicaSet, error)
 	CreateReplicaSet(ctx genericapirequest.Context, replicaSet *extensions.ReplicaSet) (*extensions.ReplicaSet, error)
 	UpdateReplicaSet(ctx genericapirequest.Context, replicaSet *extensions.ReplicaSet) (*extensions.ReplicaSet, error)
@@ -50,7 +51,7 @@ func NewRegistry(s rest.StandardStorage) Registry {
 	return &storage{s}
 }
 
-func (s *storage) ListReplicaSets(ctx genericapirequest.Context, options *api.ListOptions) (*extensions.ReplicaSetList, error) {
+func (s *storage) ListReplicaSets(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (*extensions.ReplicaSetList, error) {
 	if options != nil && options.FieldSelector != nil && !options.FieldSelector.Empty() {
 		return nil, fmt.Errorf("field selector not supported yet")
 	}
@@ -61,7 +62,7 @@ func (s *storage) ListReplicaSets(ctx genericapirequest.Context, options *api.Li
 	return obj.(*extensions.ReplicaSetList), err
 }
 
-func (s *storage) WatchReplicaSets(ctx genericapirequest.Context, options *api.ListOptions) (watch.Interface, error) {
+func (s *storage) WatchReplicaSets(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (watch.Interface, error) {
 	return s.Watch(ctx, options)
 }
 

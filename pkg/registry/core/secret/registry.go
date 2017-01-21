@@ -17,6 +17,7 @@ limitations under the License.
 package secret
 
 import (
+	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/watch"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
@@ -26,8 +27,8 @@ import (
 
 // Registry is an interface implemented by things that know how to store Secret objects.
 type Registry interface {
-	ListSecrets(ctx genericapirequest.Context, options *api.ListOptions) (*api.SecretList, error)
-	WatchSecrets(ctx genericapirequest.Context, options *api.ListOptions) (watch.Interface, error)
+	ListSecrets(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (*api.SecretList, error)
+	WatchSecrets(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (watch.Interface, error)
 	GetSecret(ctx genericapirequest.Context, name string, options *metav1.GetOptions) (*api.Secret, error)
 	CreateSecret(ctx genericapirequest.Context, Secret *api.Secret) (*api.Secret, error)
 	UpdateSecret(ctx genericapirequest.Context, Secret *api.Secret) (*api.Secret, error)
@@ -45,7 +46,7 @@ func NewRegistry(s rest.StandardStorage) Registry {
 	return &storage{s}
 }
 
-func (s *storage) ListSecrets(ctx genericapirequest.Context, options *api.ListOptions) (*api.SecretList, error) {
+func (s *storage) ListSecrets(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (*api.SecretList, error) {
 	obj, err := s.List(ctx, options)
 	if err != nil {
 		return nil, err
@@ -53,7 +54,7 @@ func (s *storage) ListSecrets(ctx genericapirequest.Context, options *api.ListOp
 	return obj.(*api.SecretList), nil
 }
 
-func (s *storage) WatchSecrets(ctx genericapirequest.Context, options *api.ListOptions) (watch.Interface, error) {
+func (s *storage) WatchSecrets(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (watch.Interface, error) {
 	return s.Watch(ctx, options)
 }
 
