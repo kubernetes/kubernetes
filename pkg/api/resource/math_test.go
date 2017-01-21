@@ -209,3 +209,24 @@ func TestNegativeScaleInt64(t *testing.T) {
 		}
 	}
 }
+
+func TestPowInt64(t *testing.T) {
+	table := []struct {
+		a      int64
+		b      int64
+		expect int64
+	}{
+		{0, 2, 0},
+		{-2, 2, 4},
+		{1, 2, 1},
+		{2, 62, 4611686018427387904},
+		{-2, 62, 4611686018427387904},
+		{9223372036854775807, 1, 9223372036854775807},
+		{-9223372036854775808, 1, -9223372036854775808},
+	}
+	for _, testCase := range table {
+		if result := powInt64(testCase.a, testCase.b); result != testCase.expect {
+			t.Errorf("a: %v, b: %v, Expected: %v, Actual: %v", testCase.a, testCase.b, testCase.expect, result)
+		}
+	}
+}

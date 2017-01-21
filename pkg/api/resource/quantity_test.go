@@ -79,6 +79,17 @@ func TestQuantityParseZero(t *testing.T) {
 	}
 }
 
+// TestQuantityParseNonNumericError ensures that when a non-numeric string is parsed
+// it panics
+func TestQuantityParseNonNumericPanic(t *testing.T) {
+	defer func() {
+		if r := recover(); r == nil {
+			t.Errorf("MustParse did not panic")
+		}
+	}()
+	_ = MustParse("Non-Numeric")
+}
+
 // TestQuantityAddZeroPreservesSuffix verifies that a suffix is preserved
 // independent of the order of operations when adding a zero and non-zero val
 func TestQuantityAddZeroPreservesSuffix(t *testing.T) {
@@ -798,6 +809,28 @@ var fuzzer = fuzz.New().Funcs(
 		dec.SetUnscaled(c.Int63n(1000))
 	},
 )
+
+func TestQuantityDeepCopy(t *testing.T) {
+	slice := []string{"0", "100m", "50m", "10000T"}
+	for _, testCase := range slice {
+		q := MustParse(testCase)
+		if result := q.DeepCopy(); result != q {
+			t.Errorf("Expected: %v, Actual: %v", q, result)
+		}
+	}
+	nils := []*inf.Dec{
+		dec(0, 0).Dec,
+		dec(10, 0).Dec,
+		dec(-10, 0).Dec,
+	}
+	for _, nilCase := range nils {
+		q := Quantity{d: infDecAmount{nilCase}, Format: DecimalSI}
+		result := q.DeepCopy()
+		if q.d.Cmp(result.AsDec()) != 0 {
+			t.Errorf("Expected: %v, Actual: %v", q.String(), result.String())
+		}
+	}
+}
 
 func TestJSON(t *testing.T) {
 	for i := 0; i < 500; i++ {
