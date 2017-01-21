@@ -17,6 +17,7 @@ limitations under the License.
 package thirdpartyresourcedata
 
 import (
+	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/watch"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
@@ -27,8 +28,8 @@ import (
 
 // Registry is an interface implemented by things that know how to store ThirdPartyResourceData objects.
 type Registry interface {
-	ListThirdPartyResourceData(ctx genericapirequest.Context, options *api.ListOptions) (*extensions.ThirdPartyResourceDataList, error)
-	WatchThirdPartyResourceData(ctx genericapirequest.Context, options *api.ListOptions) (watch.Interface, error)
+	ListThirdPartyResourceData(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (*extensions.ThirdPartyResourceDataList, error)
+	WatchThirdPartyResourceData(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (watch.Interface, error)
 	GetThirdPartyResourceData(ctx genericapirequest.Context, name string, options *metav1.GetOptions) (*extensions.ThirdPartyResourceData, error)
 	CreateThirdPartyResourceData(ctx genericapirequest.Context, resource *extensions.ThirdPartyResourceData) (*extensions.ThirdPartyResourceData, error)
 	UpdateThirdPartyResourceData(ctx genericapirequest.Context, resource *extensions.ThirdPartyResourceData) (*extensions.ThirdPartyResourceData, error)
@@ -46,7 +47,7 @@ func NewRegistry(s rest.StandardStorage) Registry {
 	return &storage{s}
 }
 
-func (s *storage) ListThirdPartyResourceData(ctx genericapirequest.Context, options *api.ListOptions) (*extensions.ThirdPartyResourceDataList, error) {
+func (s *storage) ListThirdPartyResourceData(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (*extensions.ThirdPartyResourceDataList, error) {
 	obj, err := s.List(ctx, options)
 	if err != nil {
 		return nil, err
@@ -54,7 +55,7 @@ func (s *storage) ListThirdPartyResourceData(ctx genericapirequest.Context, opti
 	return obj.(*extensions.ThirdPartyResourceDataList), nil
 }
 
-func (s *storage) WatchThirdPartyResourceData(ctx genericapirequest.Context, options *api.ListOptions) (watch.Interface, error) {
+func (s *storage) WatchThirdPartyResourceData(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (watch.Interface, error) {
 	return s.Watch(ctx, options)
 }
 
