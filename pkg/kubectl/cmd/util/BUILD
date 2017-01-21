@@ -40,7 +40,6 @@ go_library(
         "//pkg/controller:go_default_library",
         "//pkg/kubectl:go_default_library",
         "//pkg/kubectl/resource:go_default_library",
-        "//pkg/registry/extensions/thirdpartyresourcedata:go_default_library",
         "//pkg/util/exec:go_default_library",
         "//pkg/util/strategicpatch:go_default_library",
         "//vendor:github.com/emicklei/go-restful/swagger",
