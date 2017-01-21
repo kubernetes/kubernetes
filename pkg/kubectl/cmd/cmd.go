@@ -172,6 +172,7 @@ __custom_func() {
 	valid_resources = `Valid resource types include:
 
     * all
+    * certificatesigningrequests (aka 'csr')
     * clusters (valid only for federation apiservers)
     * clusterrolebindings
     * clusterroles
