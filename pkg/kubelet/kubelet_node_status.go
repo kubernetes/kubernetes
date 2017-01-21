@@ -149,7 +149,7 @@ func (kl *Kubelet) tryRegisterWithApiServer(node *v1.Node) bool {
 	if err := kl.kubeClient.Core().Nodes().Delete(node.Name, nil); err != nil {
 		glog.Errorf("Unable to register node %q with API server: error deleting old node: %v", kl.nodeName, err)
 	} else {
-		glog.Info("Deleted old node object %q", kl.nodeName)
+		glog.Infof("Deleted old node object %q", kl.nodeName)
 	}
 
 	return false
