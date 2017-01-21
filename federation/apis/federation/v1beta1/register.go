@@ -40,6 +40,7 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&ClusterList{},
 		&v1.ListOptions{},
 		&v1.DeleteOptions{},
+		&metav1.GetOptions{},
 		&metav1.ExportOptions{},
 		&metav1.GetOptions{},
 	)
