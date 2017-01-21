@@ -36,6 +36,7 @@ import (
 
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
+	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
@@ -117,20 +118,11 @@ func newMapper() *meta.DefaultRESTMapper {
 }
 
 func addGrouplessTypes() {
-	type ListOptions struct {
-		Object          runtime.Object
-		metav1.TypeMeta `json:",inline"`
-		LabelSelector   string `json:"labelSelector,omitempty"`
-		FieldSelector   string `json:"fieldSelector,omitempty"`
-		Watch           bool   `json:"watch,omitempty"`
-		ResourceVersion string `json:"resourceVersion,omitempty"`
-		TimeoutSeconds  *int64 `json:"timeoutSeconds,omitempty"`
-	}
 	api.Scheme.AddKnownTypes(grouplessGroupVersion,
-		&genericapitesting.Simple{}, &genericapitesting.SimpleList{}, &ListOptions{}, &metav1.ExportOptions{},
+		&genericapitesting.Simple{}, &genericapitesting.SimpleList{}, &metav1.ListOptions{}, &metav1.ExportOptions{},
 		&v1.DeleteOptions{}, &genericapitesting.SimpleGetOptions{}, &genericapitesting.SimpleRoot{})
 	api.Scheme.AddKnownTypes(grouplessInternalGroupVersion,
-		&genericapitesting.Simple{}, &genericapitesting.SimpleList{}, &api.ListOptions{}, &metav1.ExportOptions{},
+		&genericapitesting.Simple{}, &genericapitesting.SimpleList{}, &metav1.ExportOptions{},
 		&genericapitesting.SimpleGetOptions{}, &genericapitesting.SimpleRoot{})
 }
 
@@ -145,12 +137,12 @@ func addTestTypes() {
 		TimeoutSeconds  *int64 `json:"timeoutSeconds,omitempty"`
 	}
 	api.Scheme.AddKnownTypes(testGroupVersion,
-		&genericapitesting.Simple{}, &genericapitesting.SimpleList{}, &ListOptions{}, &metav1.ExportOptions{},
+		&genericapitesting.Simple{}, &genericapitesting.SimpleList{}, &metav1.ExportOptions{},
 		&v1.DeleteOptions{}, &genericapitesting.SimpleGetOptions{}, &genericapitesting.SimpleRoot{},
 		&SimpleXGSubresource{})
 	api.Scheme.AddKnownTypes(testGroupVersion, &v1.Pod{})
 	api.Scheme.AddKnownTypes(testInternalGroupVersion,
-		&genericapitesting.Simple{}, &genericapitesting.SimpleList{}, &api.ListOptions{}, &metav1.ExportOptions{},
+		&genericapitesting.Simple{}, &genericapitesting.SimpleList{}, &metav1.ExportOptions{},
 		&genericapitesting.SimpleGetOptions{}, &genericapitesting.SimpleRoot{},
 		&SimpleXGSubresource{})
 	api.Scheme.AddKnownTypes(testInternalGroupVersion, &api.Pod{})
@@ -163,17 +155,8 @@ func addTestTypes() {
 }
 
 func addNewTestTypes() {
-	type ListOptions struct {
-		Object          runtime.Object
-		metav1.TypeMeta `json:",inline"`
-		LabelSelector   string `json:"labelSelector,omitempty"`
-		FieldSelector   string `json:"fieldSelector,omitempty"`
-		Watch           bool   `json:"watch,omitempty"`
-		ResourceVersion string `json:"resourceVersion,omitempty"`
-		TimeoutSeconds  *int64 `json:"timeoutSeconds,omitempty"`
-	}
 	api.Scheme.AddKnownTypes(newGroupVersion,
-		&genericapitesting.Simple{}, &genericapitesting.SimpleList{}, &ListOptions{}, &metav1.ExportOptions{},
+		&genericapitesting.Simple{}, &genericapitesting.SimpleList{}, &metav1.ExportOptions{},
 		&api.DeleteOptions{}, &genericapitesting.SimpleGetOptions{}, &genericapitesting.SimpleRoot{},
 		&v1.Pod{},
 	)
@@ -393,7 +376,7 @@ func (storage *SimpleRESTStorage) Export(ctx request.Context, name string, opts 
 	return obj, storage.errors["export"]
 }
 
-func (storage *SimpleRESTStorage) List(ctx request.Context, options *api.ListOptions) (runtime.Object, error) {
+func (storage *SimpleRESTStorage) List(ctx request.Context, options *metainternalversion.ListOptions) (runtime.Object, error) {
 	storage.checkContext(ctx)
 	result := &genericapitesting.SimpleList{
 		Items: storage.list,
@@ -509,7 +492,7 @@ func (storage *SimpleRESTStorage) Update(ctx request.Context, name string, objIn
 }
 
 // Implement ResourceWatcher.
-func (storage *SimpleRESTStorage) Watch(ctx request.Context, options *api.ListOptions) (watch.Interface, error) {
+func (storage *SimpleRESTStorage) Watch(ctx request.Context, options *metainternalversion.ListOptions) (watch.Interface, error) {
 	storage.lock.Lock()
 	defer storage.lock.Unlock()
 	storage.checkContext(ctx)
