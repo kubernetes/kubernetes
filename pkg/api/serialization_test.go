@@ -28,7 +28,7 @@ import (
 	"testing"
 
 	"github.com/davecgh/go-spew/spew"
-	proto "github.com/golang/protobuf/proto"
+	"github.com/golang/protobuf/proto"
 	flag "github.com/spf13/pflag"
 	"github.com/ugorji/go/codec"
 
