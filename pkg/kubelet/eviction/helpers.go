@@ -146,6 +146,10 @@ func parseThresholdStatements(expr string) ([]Threshold, error) {
 		if err != nil {
 			return nil, err
 		}
+		if result.Signal == "" {
+			// Ignore unknown signals.
+			continue
+		}
 		if signalsFound.Has(string(result.Signal)) {
 			return nil, fmt.Errorf("found duplicate eviction threshold for signal %v", result.Signal)
 		}
@@ -177,7 +181,8 @@ func parseThresholdStatement(statement string) (Threshold, error) {
 	}
 	signal := Signal(parts[0])
 	if !validSignal(signal) {
-		return Threshold{}, fmt.Errorf(unsupportedEvictionSignal, signal)
+		glog.Warningf(unsupportedEvictionSignal, signal)
+		return Threshold{}, nil
 	}
 
 	quantityValue := parts[1]
@@ -236,7 +241,8 @@ func parseGracePeriods(expr string) (map[Signal]time.Duration, error) {
 		}
 		signal := Signal(parts[0])
 		if !validSignal(signal) {
-			return nil, fmt.Errorf(unsupportedEvictionSignal, signal)
+			glog.Warningf(unsupportedEvictionSignal, signal)
+			continue
 		}
 
 		gracePeriod, err := time.ParseDuration(parts[1])
@@ -270,7 +276,8 @@ func parseMinimumReclaims(expr string) (map[Signal]ThresholdValue, error) {
 		}
 		signal := Signal(parts[0])
 		if !validSignal(signal) {
-			return nil, fmt.Errorf(unsupportedEvictionSignal, signal)
+			glog.Warningf(unsupportedEvictionSignal, signal)
+			continue
 		}
 
 		quantityValue := parts[1]
