@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/api/errors"
+	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/fields"
@@ -1196,7 +1197,7 @@ func (t *Tester) testListMatchLabels(obj runtime.Object, assignFn AssignFunc) {
 	filtered := []runtime.Object{objs[1]}
 
 	selector := labels.SelectorFromSet(labels.Set(testLabels))
-	options := &api.ListOptions{LabelSelector: selector}
+	options := &metainternalversion.ListOptions{LabelSelector: selector}
 	listObj, err := t.storage.(rest.Lister).List(ctx, options)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -1238,7 +1239,7 @@ func (t *Tester) testWatchFields(obj runtime.Object, emitFn EmitFunc, fieldsPass
 
 	for _, field := range fieldsPass {
 		for _, action := range actions {
-			options := &api.ListOptions{FieldSelector: field.AsSelector(), ResourceVersion: "1"}
+			options := &metainternalversion.ListOptions{FieldSelector: field.AsSelector(), ResourceVersion: "1"}
 			watcher, err := t.storage.(rest.Watcher).Watch(ctx, options)
 			if err != nil {
 				t.Errorf("unexpected error: %v, %v", err, action)
@@ -1262,7 +1263,7 @@ func (t *Tester) testWatchFields(obj runtime.Object, emitFn EmitFunc, fieldsPass
 
 	for _, field := range fieldsFail {
 		for _, action := range actions {
-			options := &api.ListOptions{FieldSelector: field.AsSelector(), ResourceVersion: "1"}
+			options := &metainternalversion.ListOptions{FieldSelector: field.AsSelector(), ResourceVersion: "1"}
 			watcher, err := t.storage.(rest.Watcher).Watch(ctx, options)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
@@ -1287,7 +1288,7 @@ func (t *Tester) testWatchLabels(obj runtime.Object, emitFn EmitFunc, labelsPass
 
 	for _, label := range labelsPass {
 		for _, action := range actions {
-			options := &api.ListOptions{LabelSelector: label.AsSelector(), ResourceVersion: "1"}
+			options := &metainternalversion.ListOptions{LabelSelector: label.AsSelector(), ResourceVersion: "1"}
 			watcher, err := t.storage.(rest.Watcher).Watch(ctx, options)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
@@ -1310,7 +1311,7 @@ func (t *Tester) testWatchLabels(obj runtime.Object, emitFn EmitFunc, labelsPass
 
 	for _, label := range labelsFail {
 		for _, action := range actions {
-			options := &api.ListOptions{LabelSelector: label.AsSelector(), ResourceVersion: "1"}
+			options := &metainternalversion.ListOptions{LabelSelector: label.AsSelector(), ResourceVersion: "1"}
 			watcher, err := t.storage.(rest.Watcher).Watch(ctx, options)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
