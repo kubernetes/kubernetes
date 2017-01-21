@@ -53,6 +53,10 @@ type APIGroupVersion struct {
 	// define a version "v1beta1" but want to use the Kubernetes "v1" internal objects. If
 	// empty, defaults to GroupVersion.
 	OptionsExternalVersion *schema.GroupVersion
+	// MetaGroupVersion defaults to "meta.k8s.io/v1" and is the scheme group version used to decode
+	// common API implementations like ListOptions. Future changes will allow this to vary by group
+	// version (for when the inevitable meta/v2 group emerges).
+	MetaGroupVersion *schema.GroupVersion
 
 	Mapper meta.RESTMapper
 

@@ -25,6 +25,7 @@ import (
 
 	kubeerr "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
+	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
@@ -188,7 +189,7 @@ func (e *Store) NewList() runtime.Object {
 }
 
 // List returns a list of items matching labels and field
-func (e *Store) List(ctx genericapirequest.Context, options *api.ListOptions) (runtime.Object, error) {
+func (e *Store) List(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (runtime.Object, error) {
 	label := labels.Everything()
 	if options != nil && options.LabelSelector != nil {
 		label = options.LabelSelector
@@ -210,10 +211,10 @@ func (e *Store) List(ctx genericapirequest.Context, options *api.ListOptions) (r
 }
 
 // ListPredicate returns a list of all the items matching m.
-func (e *Store) ListPredicate(ctx genericapirequest.Context, p storage.SelectionPredicate, options *api.ListOptions) (runtime.Object, error) {
+func (e *Store) ListPredicate(ctx genericapirequest.Context, p storage.SelectionPredicate, options *metainternalversion.ListOptions) (runtime.Object, error) {
 	if options == nil {
 		// By default we should serve the request from etcd.
-		options = &api.ListOptions{ResourceVersion: ""}
+		options = &metainternalversion.ListOptions{ResourceVersion: ""}
 	}
 	list := e.NewListFunc()
 	if name, ok := p.MatchesSingle(); ok {
@@ -747,7 +748,7 @@ func (e *Store) Delete(ctx genericapirequest.Context, name string, options *api.
 // are removing all objects of a given type) with the current API (it's technically
 // possibly with storage API, but watch is not delivered correctly then).
 // It will be possible to fix it with v3 etcd API.
-func (e *Store) DeleteCollection(ctx genericapirequest.Context, options *api.DeleteOptions, listOptions *api.ListOptions) (runtime.Object, error) {
+func (e *Store) DeleteCollection(ctx genericapirequest.Context, options *api.DeleteOptions, listOptions *metainternalversion.ListOptions) (runtime.Object, error) {
 	listObj, err := e.List(ctx, listOptions)
 	if err != nil {
 		return nil, err
@@ -836,7 +837,7 @@ func (e *Store) finalizeDelete(obj runtime.Object, runHooks bool) (runtime.Objec
 // WatchPredicate. If possible, you should customize PredicateFunc to produre a
 // matcher that matches by key. SelectionPredicate does this for you
 // automatically.
-func (e *Store) Watch(ctx genericapirequest.Context, options *api.ListOptions) (watch.Interface, error) {
+func (e *Store) Watch(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (watch.Interface, error) {
 	label := labels.Everything()
 	if options != nil && options.LabelSelector != nil {
 		label = options.LabelSelector
