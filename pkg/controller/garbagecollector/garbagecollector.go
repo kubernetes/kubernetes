@@ -625,7 +625,9 @@ func (gc *GarbageCollector) deleteObject(item objectReference) error {
 	}
 	uid := item.UID
 	preconditions := v1.Preconditions{UID: &uid}
-	deleteOptions := v1.DeleteOptions{Preconditions: &preconditions}
+	// when GC deletes an object, it's always a cascading deletion.
+	falseVar := false
+	deleteOptions := v1.DeleteOptions{Preconditions: &preconditions, OrphanDependents: &falseVar}
 	return client.Resource(resource, item.Namespace).Delete(item.Name, &deleteOptions)
 }
 
