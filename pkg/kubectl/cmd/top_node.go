@@ -151,8 +151,8 @@ func (o TopNodeOptions) RunTopNode() error {
 		}
 		nodes = append(nodes, *node)
 	} else {
-		nodeList, err := o.NodeClient.Nodes().List(api.ListOptions{
-			LabelSelector: selector,
+		nodeList, err := o.NodeClient.Nodes().List(metav1.ListOptions{
+			LabelSelector: selector.String(),
 		})
 		if err != nil {
 			return err

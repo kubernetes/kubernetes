@@ -171,7 +171,7 @@ func density30AddonResourceVerifier(numNodes int) map[string]framework.ResourceC
 
 func logPodStartupStatus(c clientset.Interface, expectedPods int, observedLabels map[string]string, period time.Duration, stopCh chan struct{}) {
 	label := labels.SelectorFromSet(labels.Set(observedLabels))
-	podStore := testutils.NewPodStore(c, v1.NamespaceAll, label, fields.Everything())
+	podStore := testutils.NewPodStore(c, metav1.NamespaceAll, label, fields.Everything())
 	defer podStore.Stop()
 	ticker := time.NewTicker(period)
 	defer ticker.Stop()
@@ -228,12 +228,12 @@ func runDensityTest(dtc DensityTestConfig) time.Duration {
 
 	// Print some data about Pod to Node allocation
 	By("Printing Pod to Node allocation data")
-	podList, err := dtc.ClientSet.Core().Pods(v1.NamespaceAll).List(v1.ListOptions{})
+	podList, err := dtc.ClientSet.Core().Pods(metav1.NamespaceAll).List(metav1.ListOptions{})
 	framework.ExpectNoError(err)
 	pausePodAllocation := make(map[string]int)
 	systemPodAllocation := make(map[string][]string)
 	for _, pod := range podList.Items {
-		if pod.Namespace == api.NamespaceSystem {
+		if pod.Namespace == metav1.NamespaceSystem {
 			systemPodAllocation[pod.Spec.NodeName] = append(systemPodAllocation[pod.Spec.NodeName], pod.Name)
 		} else {
 			pausePodAllocation[pod.Spec.NodeName]++
@@ -565,12 +565,12 @@ var _ = framework.KubeDescribe("Density", func() {
 					nsName := namespaces[i].Name
 					latencyPodsStore, controller := cache.NewInformer(
 						&cache.ListWatch{
-							ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
+							ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 								options.LabelSelector = labels.SelectorFromSet(labels.Set{"type": additionalPodsPrefix}).String()
 								obj, err := c.Core().Pods(nsName).List(options)
 								return runtime.Object(obj), err
 							},
-							WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
+							WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 								options.LabelSelector = labels.SelectorFromSet(labels.Set{"type": additionalPodsPrefix}).String()
 								return c.Core().Pods(nsName).Watch(options)
 							},
@@ -655,7 +655,7 @@ var _ = framework.KubeDescribe("Density", func() {
 						"involvedObject.namespace": nsName,
 						"source":                   v1.DefaultSchedulerName,
 					}.AsSelector().String()
-					options := v1.ListOptions{FieldSelector: selector}
+					options := metav1.ListOptions{FieldSelector: selector}
 					schedEvents, err := c.Core().Events(nsName).List(options)
 					framework.ExpectNoError(err)
 					for k := range createTimes {

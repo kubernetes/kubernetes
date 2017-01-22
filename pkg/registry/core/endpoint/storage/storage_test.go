@@ -44,7 +44,7 @@ func validNewEndpoints() *api.Endpoints {
 	return &api.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "foo",
-			Namespace: api.NamespaceDefault,
+			Namespace: metav1.NamespaceDefault,
 		},
 		Subsets: []api.EndpointSubset{{
 			Addresses: []api.EndpointAddress{{IP: "1.2.3.4"}},

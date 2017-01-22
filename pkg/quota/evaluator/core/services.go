@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"strings"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -42,7 +43,7 @@ var serviceResources = []api.ResourceName{
 // NewServiceEvaluator returns an evaluator that can evaluate service quotas
 func NewServiceEvaluator(kubeClient clientset.Interface) quota.Evaluator {
 	return &serviceEvaluator{
-		listFuncByNamespace: func(namespace string, options v1.ListOptions) ([]runtime.Object, error) {
+		listFuncByNamespace: func(namespace string, options metav1.ListOptions) ([]runtime.Object, error) {
 			itemList, err := kubeClient.Core().Services(namespace).List(options)
 			if err != nil {
 				return nil, err

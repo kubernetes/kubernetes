@@ -144,7 +144,7 @@ func TestStoreToReplicationControllerLister(t *testing.T) {
 				},
 			},
 			list: func(lister StoreToReplicationControllerLister) ([]*v1.ReplicationController, error) {
-				return lister.ReplicationControllers(v1.NamespaceAll).List(labels.Set{}.AsSelectorPreValidated())
+				return lister.ReplicationControllers(metav1.NamespaceAll).List(labels.Set{}.AsSelectorPreValidated())
 			},
 			outRCNames: sets.NewString("hmm", "foo"),
 		},
@@ -539,14 +539,14 @@ func TestStoreToPodLister(t *testing.T) {
 		store.Add(&v1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "quux",
-				Namespace: v1.NamespaceDefault,
+				Namespace: metav1.NamespaceDefault,
 				Labels:    map[string]string{"name": "quux"},
 			},
 		})
 		spl := StoreToPodLister{store}
 
 		// Verify that we can always look up by Namespace.
-		defaultPods, err := spl.Pods(v1.NamespaceDefault).List(labels.Set{}.AsSelectorPreValidated())
+		defaultPods, err := spl.Pods(metav1.NamespaceDefault).List(labels.Set{}.AsSelectorPreValidated())
 		if err != nil {
 			t.Errorf("Unexpected error: %v", err)
 		} else if e, a := 1, len(defaultPods); e != a {

@@ -91,7 +91,7 @@ func (t *Tester) ReturnDeletedObject() *Tester {
 // Returns NamespaceNone for cluster-scoped objects.
 func (t *Tester) TestNamespace() string {
 	if t.clusterScope {
-		return api.NamespaceNone
+		return metav1.NamespaceNone
 	}
 	return "test"
 }
@@ -117,7 +117,7 @@ func (t *Tester) setObjectMeta(obj runtime.Object, name string) {
 	meta := t.getObjectMetaOrFail(obj)
 	meta.Name = name
 	if t.clusterScope {
-		meta.Namespace = api.NamespaceNone
+		meta.Namespace = metav1.NamespaceNone
 	} else {
 		meta.Namespace = genericapirequest.NamespaceValue(t.TestContext())
 	}
@@ -294,7 +294,7 @@ func (t *Tester) testCreateDiscardsObjectNamespace(valid runtime.Object) {
 	}
 	defer t.delete(t.TestContext(), created)
 	createdObjectMeta := t.getObjectMetaOrFail(created)
-	if createdObjectMeta.Namespace != api.NamespaceNone {
+	if createdObjectMeta.Namespace != metav1.NamespaceNone {
 		t.Errorf("Expected empty namespace on created object, got '%v'", createdObjectMeta.Namespace)
 	}
 }
@@ -343,7 +343,7 @@ func (t *Tester) testCreateIgnoresContextNamespace(valid runtime.Object) {
 	}
 	defer t.delete(ctx, created)
 	createdObjectMeta := t.getObjectMetaOrFail(created)
-	if createdObjectMeta.Namespace != api.NamespaceNone {
+	if createdObjectMeta.Namespace != metav1.NamespaceNone {
 		t.Errorf("Expected empty namespace on created object, got '%v'", createdObjectMeta.Namespace)
 	}
 }
@@ -362,7 +362,7 @@ func (t *Tester) testCreateIgnoresMismatchedNamespace(valid runtime.Object) {
 	}
 	defer t.delete(ctx, created)
 	createdObjectMeta := t.getObjectMetaOrFail(created)
-	if createdObjectMeta.Namespace != api.NamespaceNone {
+	if createdObjectMeta.Namespace != metav1.NamespaceNone {
 		t.Errorf("Expected empty namespace on created object, got '%v'", createdObjectMeta.Namespace)
 	}
 }

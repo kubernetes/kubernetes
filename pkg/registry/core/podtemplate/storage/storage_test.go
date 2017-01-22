@@ -44,7 +44,7 @@ func validNewPodTemplate(name string) *api.PodTemplate {
 	return &api.PodTemplate{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
-			Namespace: api.NamespaceDefault,
+			Namespace: metav1.NamespaceDefault,
 		},
 		Template: api.PodTemplateSpec{
 			ObjectMeta: metav1.ObjectMeta{

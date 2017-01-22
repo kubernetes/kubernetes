@@ -36,6 +36,7 @@ import (
 	"testing"
 	"time"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/group"
 	"k8s.io/apiserver/pkg/authentication/request/bearertoken"
@@ -968,10 +969,10 @@ func TestNamespaceAuthorization(t *testing.T) {
 		{"GET", path("pods", "foo", "a"), "bar", "", integration.Code403},
 		{"DELETE", timeoutPath("pods", "foo", "a"), "bar", "", integration.Code403},
 
-		{"POST", timeoutPath("pods", api.NamespaceDefault, ""), "", aPod, integration.Code403},
+		{"POST", timeoutPath("pods", metav1.NamespaceDefault, ""), "", aPod, integration.Code403},
 		{"GET", path("pods", "", ""), "", "", integration.Code403},
-		{"GET", path("pods", api.NamespaceDefault, "a"), "", "", integration.Code403},
-		{"DELETE", timeoutPath("pods", api.NamespaceDefault, "a"), "", "", integration.Code403},
+		{"GET", path("pods", metav1.NamespaceDefault, "a"), "", "", integration.Code403},
+		{"DELETE", timeoutPath("pods", metav1.NamespaceDefault, "a"), "", "", integration.Code403},
 	}
 
 	for _, r := range requests {
@@ -1139,7 +1140,7 @@ func TestReadOnlyAuthorization(t *testing.T) {
 	}{
 		{"POST", path("pods", ns.Name, ""), aPod, integration.Code403},
 		{"GET", path("pods", ns.Name, ""), "", integration.Code200},
-		{"GET", path("pods", api.NamespaceDefault, "a"), "", integration.Code404},
+		{"GET", path("pods", metav1.NamespaceDefault, "a"), "", integration.Code404},
 	}
 
 	for _, r := range requests {

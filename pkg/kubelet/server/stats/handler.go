@@ -29,6 +29,7 @@ import (
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
 
 	"github.com/emicklei/go-restful"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
@@ -197,7 +198,7 @@ func (h *handler) handlePodContainer(request *restful.Request, response *restful
 
 	// Default parameters.
 	params := map[string]string{
-		"namespace": v1.NamespaceDefault,
+		"namespace": metav1.NamespaceDefault,
 		"uid":       "",
 	}
 	for k, v := range request.PathParameters() {

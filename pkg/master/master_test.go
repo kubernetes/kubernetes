@@ -188,14 +188,14 @@ func TestGetNodeAddresses(t *testing.T) {
 	addressProvider := nodeAddressProvider{fakeNodeClient}
 
 	// Fail case (no addresses associated with nodes)
-	nodes, _ := fakeNodeClient.List(apiv1.ListOptions{})
+	nodes, _ := fakeNodeClient.List(metav1.ListOptions{})
 	addrs, err := addressProvider.externalAddresses()
 
 	assert.Error(err, "addresses should have caused an error as there are no addresses.")
 	assert.Equal([]string(nil), addrs)
 
 	// Pass case with External type IP
-	nodes, _ = fakeNodeClient.List(apiv1.ListOptions{})
+	nodes, _ = fakeNodeClient.List(metav1.ListOptions{})
 	for index := range nodes.Items {
 		nodes.Items[index].Status.Addresses = []apiv1.NodeAddress{{Type: apiv1.NodeExternalIP, Address: "127.0.0.1"}}
 		fakeNodeClient.Update(&nodes.Items[index])
@@ -205,7 +205,7 @@ func TestGetNodeAddresses(t *testing.T) {
 	assert.Equal([]string{"127.0.0.1", "127.0.0.1"}, addrs)
 
 	// Pass case with LegacyHost type IP
-	nodes, _ = fakeNodeClient.List(apiv1.ListOptions{})
+	nodes, _ = fakeNodeClient.List(metav1.ListOptions{})
 	for index := range nodes.Items {
 		nodes.Items[index].Status.Addresses = []apiv1.NodeAddress{{Type: apiv1.NodeLegacyHostIP, Address: "127.0.0.2"}}
 		fakeNodeClient.Update(&nodes.Items[index])

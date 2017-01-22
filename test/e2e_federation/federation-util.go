@@ -106,7 +106,7 @@ func waitForAllClustersReady(f *fedframework.Framework, clusterCount int) *feder
 	var clusterList *federationapi.ClusterList
 	if err := wait.PollImmediate(framework.Poll, FederatedServiceTimeout, func() (bool, error) {
 		var err error
-		clusterList, err = f.FederationClientset.Federation().Clusters().List(v1.ListOptions{})
+		clusterList, err = f.FederationClientset.Federation().Clusters().List(metav1.ListOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -178,7 +178,7 @@ func unregisterClusters(clusters map[string]*cluster, f *fedframework.Framework)
 	}
 
 	// Delete the registered clusters in the federation API server.
-	clusterList, err := f.FederationClientset.Federation().Clusters().List(v1.ListOptions{})
+	clusterList, err := f.FederationClientset.Federation().Clusters().List(metav1.ListOptions{})
 	framework.ExpectNoError(err, "Error listing clusters")
 	for _, cluster := range clusterList.Items {
 		err := f.FederationClientset.Federation().Clusters().Delete(cluster.Name, &v1.DeleteOptions{})

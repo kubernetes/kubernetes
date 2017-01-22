@@ -48,7 +48,7 @@ func TestControllerStrategy(t *testing.T) {
 		},
 	}
 	rc := &api.ReplicationController{
-		ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
+		ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
 		Spec: api.ReplicationControllerSpec{
 			Selector: validSelector,
 			Template: &validPodTemplate.Template,
@@ -106,7 +106,7 @@ func TestControllerStatusStrategy(t *testing.T) {
 		},
 	}
 	oldController := &api.ReplicationController{
-		ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault, ResourceVersion: "10"},
+		ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault, ResourceVersion: "10"},
 		Spec: api.ReplicationControllerSpec{
 			Replicas: 3,
 			Selector: validSelector,
@@ -118,7 +118,7 @@ func TestControllerStatusStrategy(t *testing.T) {
 		},
 	}
 	newController := &api.ReplicationController{
-		ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault, ResourceVersion: "9"},
+		ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault, ResourceVersion: "9"},
 		Spec: api.ReplicationControllerSpec{
 			Replicas: 1,
 			Selector: validSelector,

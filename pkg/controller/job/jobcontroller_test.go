@@ -43,7 +43,7 @@ func newJob(parallelism, completions int32) *batch.Job {
 	j := &batch.Job{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "foobar",
-			Namespace: v1.NamespaceDefault,
+			Namespace: metav1.NamespaceDefault,
 		},
 		Spec: batch.JobSpec{
 			Selector: &metav1.LabelSelector{
@@ -526,7 +526,7 @@ func TestJobPodLookup(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{Name: "basic"},
 			},
 			pod: &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "foo1", Namespace: v1.NamespaceAll},
+				ObjectMeta: metav1.ObjectMeta{Name: "foo1", Namespace: metav1.NamespaceAll},
 			},
 			expectedName: "",
 		},

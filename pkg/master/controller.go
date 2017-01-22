@@ -84,7 +84,7 @@ func (c *Config) NewBootstrapController(legacyRESTStorage corerest.LegacyRESTSto
 		EndpointReconciler: c.EndpointReconcilerConfig.Reconciler,
 		EndpointInterval:   c.EndpointReconcilerConfig.Interval,
 
-		SystemNamespaces:         []string{api.NamespaceSystem},
+		SystemNamespaces:         []string{metav1.NamespaceSystem},
 		SystemNamespacesInterval: 1 * time.Minute,
 
 		ServiceClusterIPRegistry: legacyRESTStorage.ServiceClusterIPAllocator,
@@ -169,7 +169,7 @@ func (c *Controller) UpdateKubernetesService(reconcile bool) error {
 	// TODO: when it becomes possible to change this stuff,
 	// stop polling and start watching.
 	// TODO: add endpoints of all replicas, not just the elected master.
-	if err := c.CreateNamespaceIfNeeded(api.NamespaceDefault); err != nil {
+	if err := c.CreateNamespaceIfNeeded(metav1.NamespaceDefault); err != nil {
 		return err
 	}
 
@@ -238,12 +238,12 @@ func createEndpointPortSpec(endpointPort int, endpointPortName string, extraEndp
 // CreateMasterServiceIfNeeded will create the specified service if it
 // doesn't already exist.
 func (c *Controller) CreateOrUpdateMasterServiceIfNeeded(serviceName string, serviceIP net.IP, servicePorts []api.ServicePort, serviceType api.ServiceType, reconcile bool) error {
-	if s, err := c.ServiceClient.Services(api.NamespaceDefault).Get(serviceName, metav1.GetOptions{}); err == nil {
+	if s, err := c.ServiceClient.Services(metav1.NamespaceDefault).Get(serviceName, metav1.GetOptions{}); err == nil {
 		// The service already exists.
 		if reconcile {
 			if svc, updated := getMasterServiceUpdateIfNeeded(s, servicePorts, serviceType); updated {
 				glog.Warningf("Resetting master service %q to %#v", serviceName, svc)
-				_, err := c.ServiceClient.Services(api.NamespaceDefault).Update(svc)
+				_, err := c.ServiceClient.Services(metav1.NamespaceDefault).Update(svc)
 				return err
 			}
 		}
@@ -252,7 +252,7 @@ func (c *Controller) CreateOrUpdateMasterServiceIfNeeded(serviceName string, ser
 	svc := &api.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      serviceName,
-			Namespace: api.NamespaceDefault,
+			Namespace: metav1.NamespaceDefault,
 			Labels:    map[string]string{"provider": "kubernetes", "component": "apiserver"},
 		},
 		Spec: api.ServiceSpec{
@@ -265,7 +265,7 @@ func (c *Controller) CreateOrUpdateMasterServiceIfNeeded(serviceName string, ser
 		},
 	}
 
-	_, err := c.ServiceClient.Services(api.NamespaceDefault).Create(svc)
+	_, err := c.ServiceClient.Services(metav1.NamespaceDefault).Create(svc)
 	if errors.IsAlreadyExists(err) {
 		return c.CreateOrUpdateMasterServiceIfNeeded(serviceName, serviceIP, servicePorts, serviceType, reconcile)
 	}
@@ -318,12 +318,12 @@ func NewMasterCountEndpointReconciler(masterCount int, endpointClient coreclient
 //      to be running (c.masterCount).
 //  * ReconcileEndpoints is called periodically from all apiservers.
 func (r *masterCountEndpointReconciler) ReconcileEndpoints(serviceName string, ip net.IP, endpointPorts []api.EndpointPort, reconcilePorts bool) error {
-	e, err := r.endpointClient.Endpoints(api.NamespaceDefault).Get(serviceName, metav1.GetOptions{})
+	e, err := r.endpointClient.Endpoints(metav1.NamespaceDefault).Get(serviceName, metav1.GetOptions{})
 	if err != nil {
 		e = &api.Endpoints{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      serviceName,
-				Namespace: api.NamespaceDefault,
+				Namespace: metav1.NamespaceDefault,
 			},
 		}
 	}
@@ -333,7 +333,7 @@ func (r *masterCountEndpointReconciler) ReconcileEndpoints(serviceName string, i
 			Addresses: []api.EndpointAddress{{IP: ip.String()}},
 			Ports:     endpointPorts,
 		}}
-		_, err = r.endpointClient.Endpoints(api.NamespaceDefault).Create(e)
+		_, err = r.endpointClient.Endpoints(metav1.NamespaceDefault).Create(e)
 		return err
 	}
 
@@ -347,7 +347,7 @@ func (r *masterCountEndpointReconciler) ReconcileEndpoints(serviceName string, i
 			Ports:     endpointPorts,
 		}}
 		glog.Warningf("Resetting endpoints for master service %q to %#v", serviceName, e)
-		_, err = r.endpointClient.Endpoints(api.NamespaceDefault).Update(e)
+		_, err = r.endpointClient.Endpoints(metav1.NamespaceDefault).Update(e)
 		return err
 	}
 	if ipCorrect && portsCorrect {
@@ -383,7 +383,7 @@ func (r *masterCountEndpointReconciler) ReconcileEndpoints(serviceName string, i
 		e.Subsets[0].Ports = endpointPorts
 	}
 	glog.Warningf("Resetting endpoints for master service %q to %v", serviceName, e)
-	_, err = r.endpointClient.Endpoints(api.NamespaceDefault).Update(e)
+	_, err = r.endpointClient.Endpoints(metav1.NamespaceDefault).Update(e)
 	return err
 }
 

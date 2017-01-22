@@ -46,7 +46,7 @@ func validService() *api.Service {
 	return &api.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "foo",
-			Namespace: api.NamespaceDefault,
+			Namespace: metav1.NamespaceDefault,
 		},
 		Spec: api.ServiceSpec{
 			Selector:        map[string]string{"bar": "baz"},

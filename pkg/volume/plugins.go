@@ -532,7 +532,7 @@ func NewPersistentVolumeRecyclerPodTemplate() *v1.Pod {
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: "pv-recycler-",
-			Namespace:    v1.NamespaceDefault,
+			Namespace:    metav1.NamespaceDefault,
 		},
 		Spec: v1.PodSpec{
 			ActiveDeadlineSeconds: &timeout,

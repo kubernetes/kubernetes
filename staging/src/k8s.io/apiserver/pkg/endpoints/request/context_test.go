@@ -19,10 +19,10 @@ package request_test
 import (
 	"testing"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apiserver/pkg/authentication/user"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
-	"k8s.io/kubernetes/pkg/api"
 )
 
 // TestNamespaceContext validates that a namespace can be get/set on a context object
@@ -32,8 +32,8 @@ func TestNamespaceContext(t *testing.T) {
 	if !ok {
 		t.Fatalf("Error getting namespace")
 	}
-	if api.NamespaceDefault != result {
-		t.Fatalf("Expected: %s, Actual: %s", api.NamespaceDefault, result)
+	if metav1.NamespaceDefault != result {
+		t.Fatalf("Expected: %s, Actual: %s", metav1.NamespaceDefault, result)
 	}
 
 	ctx = genericapirequest.NewContext()

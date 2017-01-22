@@ -27,9 +27,9 @@ import (
 	"github.com/golang/glog"
 	"github.com/imdario/mergo"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	restclient "k8s.io/client-go/rest"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
-	"k8s.io/kubernetes/pkg/api"
 	clientauth "k8s.io/kubernetes/pkg/client/unversioned/auth"
 )
 
@@ -298,7 +298,7 @@ func (config *DirectClientConfig) Namespace() (string, bool, error) {
 	}
 
 	if len(configContext.Namespace) == 0 {
-		return api.NamespaceDefault, false, nil
+		return metav1.NamespaceDefault, false, nil
 	}
 
 	overridden := false

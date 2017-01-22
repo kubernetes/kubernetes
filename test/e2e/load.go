@@ -484,7 +484,7 @@ func scaleResource(wg *sync.WaitGroup, config testutils.RunObjectConfig, scaling
 		fmt.Sprintf("scaling rc %s for the first time", config.GetName()))
 
 	selector := labels.SelectorFromSet(labels.Set(map[string]string{"name": config.GetName()}))
-	options := v1.ListOptions{
+	options := metav1.ListOptions{
 		LabelSelector:   selector.String(),
 		ResourceVersion: "0",
 	}

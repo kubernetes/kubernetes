@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"strings"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -52,7 +53,7 @@ func listPodsByNamespaceFuncUsingClient(kubeClient clientset.Interface) generic.
 	// TODO: ideally, we could pass dynamic client pool down into this code, and have one way of doing this.
 	// unfortunately, dynamic client works with Unstructured objects, and when we calculate Usage, we require
 	// structured objects.
-	return func(namespace string, options v1.ListOptions) ([]runtime.Object, error) {
+	return func(namespace string, options metav1.ListOptions) ([]runtime.Object, error) {
 		itemList, err := kubeClient.Core().Pods(namespace).List(options)
 		if err != nil {
 			return nil, err

@@ -69,7 +69,7 @@ var _ = framework.KubeDescribe("DNS config map", func() {
 func (t *dnsConfigMapTest) init() {
 	By("Finding a DNS pod")
 	label := labels.SelectorFromSet(labels.Set(map[string]string{"k8s-app": "kube-dns"}))
-	options := v1.ListOptions{LabelSelector: label.String()}
+	options := metav1.ListOptions{LabelSelector: label.String()}
 
 	pods, err := t.f.ClientSet.Core().Pods("kube-system").List(options)
 	Expect(err).NotTo(HaveOccurred())
@@ -218,7 +218,7 @@ func (t *dnsConfigMapTest) setConfigMap(cm *v1.ConfigMap, fedMap map[string]stri
 	cm.ObjectMeta.Namespace = t.ns
 	cm.ObjectMeta.Name = t.name
 
-	options := v1.ListOptions{
+	options := metav1.ListOptions{
 		FieldSelector: fields.Set{
 			"metadata.namespace": t.ns,
 			"metadata.name":      t.name,

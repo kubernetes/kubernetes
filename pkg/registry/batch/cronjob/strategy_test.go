@@ -51,7 +51,7 @@ func TestCronJobStrategy(t *testing.T) {
 	scheduledJob := &batch.CronJob{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "mycronjob",
-			Namespace: api.NamespaceDefault,
+			Namespace: metav1.NamespaceDefault,
 		},
 		Spec: batch.CronJobSpec{
 			Schedule:          "* * * * ?",
@@ -113,7 +113,7 @@ func TestCronJobStatusStrategy(t *testing.T) {
 	oldCronJob := &batch.CronJob{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            "mycronjob",
-			Namespace:       api.NamespaceDefault,
+			Namespace:       metav1.NamespaceDefault,
 			ResourceVersion: "10",
 		},
 		Spec: batch.CronJobSpec{
@@ -130,7 +130,7 @@ func TestCronJobStatusStrategy(t *testing.T) {
 	newCronJob := &batch.CronJob{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            "mycronjob",
-			Namespace:       api.NamespaceDefault,
+			Namespace:       metav1.NamespaceDefault,
 			ResourceVersion: "9",
 		},
 		Spec: batch.CronJobSpec{

@@ -592,7 +592,7 @@ func createControllerManager(clientset *client.Clientset, namespace, name, svcNa
 func waitForPods(clientset *client.Clientset, fedPods []string, namespace string) error {
 	err := wait.PollInfinite(podWaitInterval, func() (bool, error) {
 		podCheck := len(fedPods)
-		podList, err := clientset.Core().Pods(namespace).List(api.ListOptions{})
+		podList, err := clientset.Core().Pods(namespace).List(metav1.ListOptions{})
 		if err != nil {
 			return false, nil
 		}

@@ -46,7 +46,7 @@ var _ = framework.KubeDescribe("Opaque resources [Feature:OpaqueResources]", fun
 	BeforeEach(func() {
 		if node == nil {
 			// Priming invocation; select the first non-master node.
-			nodes, err := f.ClientSet.Core().Nodes().List(v1.ListOptions{})
+			nodes, err := f.ClientSet.Core().Nodes().List(metav1.ListOptions{})
 			Expect(err).NotTo(HaveOccurred())
 			for _, n := range nodes.Items {
 				if !system.IsMasterNode(n.Name) {
@@ -275,12 +275,12 @@ func observeNodeUpdateAfterAction(f *framework.Framework, nodeName string, nodeP
 
 	_, controller := cache.NewInformer(
 		&cache.ListWatch{
-			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
+			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 				options.FieldSelector = nodeSelector.String()
 				ls, err := f.ClientSet.Core().Nodes().List(options)
 				return ls, err
 			},
-			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
+			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 				options.FieldSelector = nodeSelector.String()
 				w, err := f.ClientSet.Core().Nodes().Watch(options)
 				// Signal parent goroutine that watching has begun.
@@ -331,11 +331,11 @@ func observeEventAfterAction(f *framework.Framework, eventPredicate func(*v1.Eve
 	// Create an informer to list/watch events from the test framework namespace.
 	_, controller := cache.NewInformer(
 		&cache.ListWatch{
-			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
+			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 				ls, err := f.ClientSet.Core().Events(f.Namespace.Name).List(options)
 				return ls, err
 			},
-			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
+			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 				w, err := f.ClientSet.Core().Events(f.Namespace.Name).Watch(options)
 				return w, err
 			},

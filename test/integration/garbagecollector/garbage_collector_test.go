@@ -172,7 +172,7 @@ func TestCascadingDeletion(t *testing.T) {
 		t.Fatalf("Failed to create replication controller: %v", err)
 	}
 
-	rcs, err := rcClient.List(v1.ListOptions{})
+	rcs, err := rcClient.List(metav1.ListOptions{})
 	if err != nil {
 		t.Fatalf("Failed to list replication controllers: %v", err)
 	}
@@ -205,7 +205,7 @@ func TestCascadingDeletion(t *testing.T) {
 	}
 
 	// set up watch
-	pods, err := podClient.List(v1.ListOptions{})
+	pods, err := podClient.List(metav1.ListOptions{})
 	if err != nil {
 		t.Fatalf("Failed to list pods: %v", err)
 	}
@@ -257,7 +257,7 @@ func TestCreateWithNonExistentOwner(t *testing.T) {
 	}
 
 	// set up watch
-	pods, err := podClient.List(v1.ListOptions{})
+	pods, err := podClient.List(metav1.ListOptions{})
 	if err != nil {
 		t.Fatalf("Failed to list pods: %v", err)
 	}
@@ -313,7 +313,7 @@ func setupRCsPods(t *testing.T, gc *garbagecollector.GarbageCollector, clientSet
 func verifyRemainingObjects(t *testing.T, clientSet clientset.Interface, namespace string, rcNum, podNum int) (bool, error) {
 	rcClient := clientSet.Core().ReplicationControllers(namespace)
 	podClient := clientSet.Core().Pods(namespace)
-	pods, err := podClient.List(v1.ListOptions{})
+	pods, err := podClient.List(metav1.ListOptions{})
 	if err != nil {
 		return false, fmt.Errorf("Failed to list pods: %v", err)
 	}
@@ -322,7 +322,7 @@ func verifyRemainingObjects(t *testing.T, clientSet clientset.Interface, namespa
 		ret = false
 		t.Logf("expect %d pods, got %d pods", podNum, len(pods.Items))
 	}
-	rcs, err := rcClient.List(v1.ListOptions{})
+	rcs, err := rcClient.List(metav1.ListOptions{})
 	if err != nil {
 		return false, fmt.Errorf("Failed to list replication controllers: %v", err)
 	}
@@ -377,7 +377,7 @@ func TestStressingCascadingDeletion(t *testing.T) {
 
 	// verify the remaining pods all have "orphan" in their names.
 	podClient := clientSet.Core().Pods(ns.Name)
-	pods, err := podClient.List(v1.ListOptions{})
+	pods, err := podClient.List(metav1.ListOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -454,7 +454,7 @@ func TestOrphaning(t *testing.T) {
 	}
 	// verify the toBeDeleteRC is deleted
 	if err := wait.PollImmediate(5*time.Second, 30*time.Second, func() (bool, error) {
-		rcs, err := rcClient.List(v1.ListOptions{})
+		rcs, err := rcClient.List(metav1.ListOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -468,7 +468,7 @@ func TestOrphaning(t *testing.T) {
 	}
 
 	// verify pods don't have the ownerPod as an owner anymore
-	pods, err := podClient.List(v1.ListOptions{})
+	pods, err := podClient.List(metav1.ListOptions{})
 	if err != nil {
 		t.Fatalf("Failed to list pods: %v", err)
 	}

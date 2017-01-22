@@ -71,7 +71,7 @@ func TestCreate(t *testing.T) {
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
 	test := registrytest.New(t, storage.Store)
-	pv := validNewPersistentVolumeClaim("foo", api.NamespaceDefault)
+	pv := validNewPersistentVolumeClaim("foo", metav1.NamespaceDefault)
 	pv.ObjectMeta = metav1.ObjectMeta{}
 	test.TestCreate(
 		// valid
@@ -90,7 +90,7 @@ func TestUpdate(t *testing.T) {
 	test := registrytest.New(t, storage.Store)
 	test.TestUpdate(
 		// valid
-		validNewPersistentVolumeClaim("foo", api.NamespaceDefault),
+		validNewPersistentVolumeClaim("foo", metav1.NamespaceDefault),
 		// updateFunc
 		func(obj runtime.Object) runtime.Object {
 			object := obj.(*api.PersistentVolumeClaim)
@@ -105,7 +105,7 @@ func TestDelete(t *testing.T) {
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
 	test := registrytest.New(t, storage.Store).ReturnDeletedObject()
-	test.TestDelete(validNewPersistentVolumeClaim("foo", api.NamespaceDefault))
+	test.TestDelete(validNewPersistentVolumeClaim("foo", metav1.NamespaceDefault))
 }
 
 func TestGet(t *testing.T) {
@@ -113,7 +113,7 @@ func TestGet(t *testing.T) {
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
 	test := registrytest.New(t, storage.Store)
-	test.TestGet(validNewPersistentVolumeClaim("foo", api.NamespaceDefault))
+	test.TestGet(validNewPersistentVolumeClaim("foo", metav1.NamespaceDefault))
 }
 
 func TestList(t *testing.T) {
@@ -121,7 +121,7 @@ func TestList(t *testing.T) {
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
 	test := registrytest.New(t, storage.Store)
-	test.TestList(validNewPersistentVolumeClaim("foo", api.NamespaceDefault))
+	test.TestList(validNewPersistentVolumeClaim("foo", metav1.NamespaceDefault))
 }
 
 func TestWatch(t *testing.T) {
@@ -130,7 +130,7 @@ func TestWatch(t *testing.T) {
 	defer storage.Store.DestroyFunc()
 	test := registrytest.New(t, storage.Store)
 	test.TestWatch(
-		validNewPersistentVolumeClaim("foo", api.NamespaceDefault),
+		validNewPersistentVolumeClaim("foo", metav1.NamespaceDefault),
 		// matching labels
 		[]labels.Set{},
 		// not matching labels
@@ -156,13 +156,13 @@ func TestUpdateStatus(t *testing.T) {
 	ctx := genericapirequest.NewDefaultContext()
 
 	key, _ := storage.KeyFunc(ctx, "foo")
-	pvcStart := validNewPersistentVolumeClaim("foo", api.NamespaceDefault)
+	pvcStart := validNewPersistentVolumeClaim("foo", metav1.NamespaceDefault)
 	err := storage.Storage.Create(ctx, key, pvcStart, nil, 0)
 
 	pvc := &api.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "foo",
-			Namespace: api.NamespaceDefault,
+			Namespace: metav1.NamespaceDefault,
 		},
 		Spec: api.PersistentVolumeClaimSpec{
 			AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce},

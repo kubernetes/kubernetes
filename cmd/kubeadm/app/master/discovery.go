@@ -28,7 +28,6 @@ import (
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiext "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
@@ -124,10 +123,10 @@ func newKubeDiscovery(cfg *kubeadmapi.MasterConfiguration, caCert *x509.Certific
 func CreateDiscoveryDeploymentAndSecret(cfg *kubeadmapi.MasterConfiguration, client *clientset.Clientset, caCert *x509.Certificate) error {
 	kd := newKubeDiscovery(cfg, caCert)
 
-	if _, err := client.Extensions().Deployments(api.NamespaceSystem).Create(kd.Deployment); err != nil {
+	if _, err := client.Extensions().Deployments(metav1.NamespaceSystem).Create(kd.Deployment); err != nil {
 		return fmt.Errorf("failed to create %q deployment [%v]", kubeDiscoveryName, err)
 	}
-	if _, err := client.Secrets(api.NamespaceSystem).Create(kd.Secret); err != nil {
+	if _, err := client.Secrets(metav1.NamespaceSystem).Create(kd.Secret); err != nil {
 		return fmt.Errorf("failed to create %q secret [%v]", kubeDiscoverySecretName, err)
 	}
 
@@ -135,7 +134,7 @@ func CreateDiscoveryDeploymentAndSecret(cfg *kubeadmapi.MasterConfiguration, cli
 
 	start := time.Now()
 	wait.PollInfinite(apiCallRetryInterval, func() (bool, error) {
-		d, err := client.Extensions().Deployments(api.NamespaceSystem).Get(kubeDiscoveryName, metav1.GetOptions{})
+		d, err := client.Extensions().Deployments(metav1.NamespaceSystem).Get(kubeDiscoveryName, metav1.GetOptions{})
 		if err != nil {
 			return false, nil
 		}

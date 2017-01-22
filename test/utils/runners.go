@@ -689,8 +689,8 @@ func (config *RCConfig) start() error {
 
 	if oldRunning != config.Replicas {
 		// List only pods from a given replication controller.
-		options := v1.ListOptions{LabelSelector: label.String()}
-		if pods, err := config.Client.Core().Pods(v1.NamespaceAll).List(options); err == nil {
+		options := metav1.ListOptions{LabelSelector: label.String()}
+		if pods, err := config.Client.Core().Pods(metav1.NamespaceAll).List(options); err == nil {
 
 			for _, pod := range pods.Items {
 				config.RCConfigLog("Pod %s\t%s\t%s\t%s", pod.Name, pod.Spec.NodeName, pod.Status.Phase, pod.DeletionTimestamp)
@@ -1116,7 +1116,7 @@ func (config *DaemonConfig) Run() error {
 	var nodes *v1.NodeList
 	for i := 0; i < retries; i++ {
 		// Wait for all daemons to be running
-		nodes, err = config.Client.Core().Nodes().List(v1.ListOptions{ResourceVersion: "0"})
+		nodes, err = config.Client.Core().Nodes().List(metav1.ListOptions{ResourceVersion: "0"})
 		if err == nil {
 			break
 		} else if i+1 == retries {

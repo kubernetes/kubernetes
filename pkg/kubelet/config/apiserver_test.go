@@ -33,11 +33,11 @@ type fakePodLW struct {
 	watchResp watch.Interface
 }
 
-func (lw fakePodLW) List(options v1.ListOptions) (runtime.Object, error) {
+func (lw fakePodLW) List(options metav1.ListOptions) (runtime.Object, error) {
 	return lw.listResp, nil
 }
 
-func (lw fakePodLW) Watch(options v1.ListOptions) (watch.Interface, error) {
+func (lw fakePodLW) Watch(options metav1.ListOptions) (watch.Interface, error) {
 	return lw.watchResp, nil
 }
 

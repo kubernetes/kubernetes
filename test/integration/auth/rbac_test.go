@@ -508,7 +508,7 @@ func TestBootstrapping(t *testing.T) {
 
 	clientset := clientset.NewForConfigOrDie(&restclient.Config{BearerToken: superUser, Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(api.GroupName).GroupVersion}})
 
-	watcher, err := clientset.Rbac().ClusterRoles().Watch(api.ListOptions{ResourceVersion: "0"})
+	watcher, err := clientset.Rbac().ClusterRoles().Watch(metav1.ListOptions{ResourceVersion: "0"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -522,7 +522,7 @@ func TestBootstrapping(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	clusterRoles, err := clientset.Rbac().ClusterRoles().List(api.ListOptions{})
+	clusterRoles, err := clientset.Rbac().ClusterRoles().List(metav1.ListOptions{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

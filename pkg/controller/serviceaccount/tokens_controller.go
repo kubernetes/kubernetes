@@ -93,11 +93,11 @@ func NewTokensController(cl clientset.Interface, options TokensControllerOptions
 
 	e.serviceAccounts, e.serviceAccountController = cache.NewInformer(
 		&cache.ListWatch{
-			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
-				return e.client.Core().ServiceAccounts(v1.NamespaceAll).List(options)
+			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+				return e.client.Core().ServiceAccounts(metav1.NamespaceAll).List(options)
 			},
-			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
-				return e.client.Core().ServiceAccounts(v1.NamespaceAll).Watch(options)
+			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+				return e.client.Core().ServiceAccounts(metav1.NamespaceAll).Watch(options)
 			},
 		},
 		&v1.ServiceAccount{},
@@ -112,13 +112,13 @@ func NewTokensController(cl clientset.Interface, options TokensControllerOptions
 	tokenSelector := fields.SelectorFromSet(map[string]string{api.SecretTypeField: string(v1.SecretTypeServiceAccountToken)})
 	e.secrets, e.secretController = cache.NewIndexerInformer(
 		&cache.ListWatch{
-			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
+			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 				options.FieldSelector = tokenSelector.String()
-				return e.client.Core().Secrets(v1.NamespaceAll).List(options)
+				return e.client.Core().Secrets(metav1.NamespaceAll).List(options)
 			},
-			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
+			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 				options.FieldSelector = tokenSelector.String()
-				return e.client.Core().Secrets(v1.NamespaceAll).Watch(options)
+				return e.client.Core().Secrets(metav1.NamespaceAll).Watch(options)
 			},
 		},
 		&v1.Secret{},
