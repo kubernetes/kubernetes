@@ -93,6 +93,60 @@ func NewInternalType(kind, apiversion, name string) *InternalType {
 	return &item
 }
 
+type InternalNamespacedType struct {
+	Kind       string
+	APIVersion string
+
+	Name      string
+	Namespace string
+}
+
+type ExternalNamespacedType struct {
+	Kind       string `json:"kind"`
+	APIVersion string `json:"apiVersion"`
+
+	Name      string `json:"name"`
+	Namespace string `json:"namespace"`
+}
+
+type ExternalNamespacedType2 struct {
+	Kind       string `json:"kind"`
+	APIVersion string `json:"apiVersion"`
+
+	Name      string `json:"name"`
+	Namespace string `json:"namespace"`
+}
+
+func (obj *InternalNamespacedType) GetObjectKind() schema.ObjectKind { return obj }
+func (obj *InternalNamespacedType) SetGroupVersionKind(gvk schema.GroupVersionKind) {
+	obj.APIVersion, obj.Kind = gvk.ToAPIVersionAndKind()
+}
+func (obj *InternalNamespacedType) GroupVersionKind() schema.GroupVersionKind {
+	return schema.FromAPIVersionAndKind(obj.APIVersion, obj.Kind)
+}
+func (obj *ExternalNamespacedType) GetObjectKind() schema.ObjectKind { return obj }
+func (obj *ExternalNamespacedType) SetGroupVersionKind(gvk schema.GroupVersionKind) {
+	obj.APIVersion, obj.Kind = gvk.ToAPIVersionAndKind()
+}
+func (obj *ExternalNamespacedType) GroupVersionKind() schema.GroupVersionKind {
+	return schema.FromAPIVersionAndKind(obj.APIVersion, obj.Kind)
+}
+func (obj *ExternalNamespacedType2) GetObjectKind() schema.ObjectKind { return obj }
+func (obj *ExternalNamespacedType2) SetGroupVersionKind(gvk schema.GroupVersionKind) {
+	obj.APIVersion, obj.Kind = gvk.ToAPIVersionAndKind()
+}
+func (obj *ExternalNamespacedType2) GroupVersionKind() schema.GroupVersionKind {
+	return schema.FromAPIVersionAndKind(obj.APIVersion, obj.Kind)
+}
+
+func NewInternalNamespacedType(kind, apiversion, name, namespace string) *InternalNamespacedType {
+	item := InternalNamespacedType{Kind: kind,
+		APIVersion: apiversion,
+		Name:       name,
+		Namespace:  namespace}
+	return &item
+}
+
 var versionErr = errors.New("not a version")
 
 func versionErrIfFalse(b bool) error {
@@ -109,10 +163,16 @@ var ValidVersionGV = schema.GroupVersion{Group: "apitest", Version: ValidVersion
 
 func newExternalScheme() (*runtime.Scheme, meta.RESTMapper, runtime.Codec) {
 	scheme := runtime.NewScheme()
+
 	scheme.AddKnownTypeWithName(InternalGV.WithKind("Type"), &InternalType{})
 	scheme.AddKnownTypeWithName(UnlikelyGV.WithKind("Type"), &ExternalType{})
 	//This tests that kubectl will not confuse the external scheme with the internal scheme, even when they accidentally have versions of the same name.
 	scheme.AddKnownTypeWithName(ValidVersionGV.WithKind("Type"), &ExternalType2{})
+
+	scheme.AddKnownTypeWithName(InternalGV.WithKind("NamespacedType"), &InternalNamespacedType{})
+	scheme.AddKnownTypeWithName(UnlikelyGV.WithKind("NamespacedType"), &ExternalNamespacedType{})
+	//This tests that kubectl will not confuse the external scheme with the internal scheme, even when they accidentally have versions of the same name.
+	scheme.AddKnownTypeWithName(ValidVersionGV.WithKind("NamespacedType"), &ExternalNamespacedType2{})
 
 	codecs := serializer.NewCodecFactory(scheme)
 	codec := codecs.LegacyCodec(UnlikelyGV)
@@ -603,6 +663,7 @@ func testDynamicResources() []*discovery.APIGroupResources {
 					{Name: "componentstatuses", Namespaced: false, Kind: "ComponentStatus"},
 					{Name: "nodes", Namespaced: false, Kind: "Node"},
 					{Name: "type", Namespaced: false, Kind: "Type"},
+					{Name: "namespacedtype", Namespaced: true, Kind: "NamespacedType"},
 				},
 			},
 		},
