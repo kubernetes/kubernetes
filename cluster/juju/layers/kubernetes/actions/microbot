@@ -1,0 +1,18 @@
+#!/bin/bash
+
+set -ex
+
+REPLICAS=$(action-get replicas)
+DELETE=$(action-get delete)
+
+if [ -z "${REPLICAS}" ]; then
+  # Defaults to 3 in the yaml, assume default if nothing is provided
+  replicas=3
+fi
+
+if [ ! -z "${DELETE}" ]; then
+  kubectl --kubeconfig=/root/.kube/config delete deployment microbot
+  exit 0
+fi
+
+kubectl --kubeconfig=/root/.kube/config run microbot --image=dontrebootme/microbot:v1 --port=80 --replicas=$REPLICAS

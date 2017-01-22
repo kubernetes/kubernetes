@@ -1,0 +1,6 @@
+#!/bin/bash
+
+set -ex
+
+kubectl --kubeconfig=/root/.kube/config uncordon $(unit-get private-address)
+status-set 'active' 'Kubernetes unit resumed'

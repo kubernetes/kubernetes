@@ -74,6 +74,22 @@ change the `mount-point` value in layer.yaml before the charms is deployed.
 To avoid data loss you must attach the storage before making the connection to
 the etcd cluster.
 
+## Operational Actions
+
+**Microbot** - Deploys mini containers that serve up static webpages and
+identify the container ID that's serving the request. Useful to deploy a
+phaux workload for visualizations quickly, or to test reverse proxy that
+does not depend on session affinity.
+
+**Pause** - Cordon the unit by marking it as unscheduleable. It also drains
+the workloads from the unit, making it feesible to perform maintenance tasks
+without disrupting end user experience.
+
+**Resume** - UnCordon the unit. No workload balancing is done at this time,
+the kubernetes scheduler will being filling the unit back up with workloads
+depending on unit-pressure, which is based on resource allocation/uitilization.
+
+
 ## State Events
 While this charm is meant to be a top layer, it can be used to build other
 solutions.  This charm sets or removes states from the reactive framework that
