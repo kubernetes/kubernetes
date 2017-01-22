@@ -630,9 +630,28 @@ func mergeMap(original, patch map[string]interface{}, t reflect.Type, mergeDelet
 
 		_, ok := original[k]
 		if !ok {
-			// If it's not in the original document, just take the patch value.
-			original[k] = patchV
-			continue
+			// If it's not in the original document, and t is not a struct, just take the patch value.
+			if t.Kind() != reflect.Struct {
+				original[k] = patchV
+				continue
+			}
+			// If it's not in the original document, and t is a struct, verify k is a valid field of
+			// t.
+			found := false
+			for i := 0; i < t.NumField(); i++ {
+				tag := t.Field(i).Tag.Get("json")
+				jsonName := strings.Split(tag, ",")[0]
+				if jsonName == k || strings.ToLower(t.Field(i).Name) == strings.ToLower(k) {
+					found = true
+					break
+				}
+			}
+			if found {
+				original[k] = patchV
+				continue
+			} else {
+				return nil, fmt.Errorf("There is no field named %q in type %q", k, t.Name())
+			}
 		}
 
 		// If the data type is a pointer, resolve the element.
