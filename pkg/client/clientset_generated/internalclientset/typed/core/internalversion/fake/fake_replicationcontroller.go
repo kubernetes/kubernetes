@@ -71,7 +71,7 @@ func (c *FakeReplicationControllers) Delete(name string, options *api.DeleteOpti
 	return err
 }
 
-func (c *FakeReplicationControllers) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
+func (c *FakeReplicationControllers) DeleteCollection(options *api.DeleteOptions, listOptions v1.ListOptions) error {
 	action := core.NewDeleteCollectionAction(replicationcontrollersResource, c.ns, listOptions)
 
 	_, err := c.Fake.Invokes(action, &api.ReplicationControllerList{})
@@ -88,7 +88,7 @@ func (c *FakeReplicationControllers) Get(name string, options v1.GetOptions) (re
 	return obj.(*api.ReplicationController), err
 }
 
-func (c *FakeReplicationControllers) List(opts api.ListOptions) (result *api.ReplicationControllerList, err error) {
+func (c *FakeReplicationControllers) List(opts v1.ListOptions) (result *api.ReplicationControllerList, err error) {
 	obj, err := c.Fake.
 		Invokes(core.NewListAction(replicationcontrollersResource, c.ns, opts), &api.ReplicationControllerList{})
 
@@ -110,7 +110,7 @@ func (c *FakeReplicationControllers) List(opts api.ListOptions) (result *api.Rep
 }
 
 // Watch returns a watch.Interface that watches the requested replicationControllers.
-func (c *FakeReplicationControllers) Watch(opts api.ListOptions) (watch.Interface, error) {
+func (c *FakeReplicationControllers) Watch(opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(core.NewWatchAction(replicationcontrollersResource, c.ns, opts))
 

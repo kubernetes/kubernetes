@@ -19,10 +19,9 @@ limitations under the License.
 package internalversion
 
 import (
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
-	api "k8s.io/kubernetes/pkg/api"
-	v1 "k8s.io/kubernetes/pkg/api/v1"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions"
 	cache "k8s.io/kubernetes/pkg/client/cache"
 	internalclientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
@@ -46,18 +45,10 @@ func newDaemonSetInformer(client internalclientset.Interface, resyncPeriod time.
 	sharedIndexInformer := cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
-				var internalOptions api.ListOptions
-				if err := api.Scheme.Convert(&options, &internalOptions, nil); err != nil {
-					return nil, err
-				}
-				return client.Extensions().DaemonSets(api.NamespaceAll).List(internalOptions)
+				return client.Extensions().DaemonSets(v1.NamespaceAll).List(options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
-				var internalOptions api.ListOptions
-				if err := api.Scheme.Convert(&options, &internalOptions, nil); err != nil {
-					return nil, err
-				}
-				return client.Extensions().DaemonSets(api.NamespaceAll).Watch(internalOptions)
+				return client.Extensions().DaemonSets(v1.NamespaceAll).Watch(options)
 			},
 		},
 		&extensions.DaemonSet{},

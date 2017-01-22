@@ -36,10 +36,10 @@ type EndpointsInterface interface {
 	Create(*v1.Endpoints) (*v1.Endpoints, error)
 	Update(*v1.Endpoints) (*v1.Endpoints, error)
 	Delete(name string, options *v1.DeleteOptions) error
-	DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error
+	DeleteCollection(options *v1.DeleteOptions, listOptions meta_v1.ListOptions) error
 	Get(name string, options meta_v1.GetOptions) (*v1.Endpoints, error)
-	List(opts v1.ListOptions) (*v1.EndpointsList, error)
-	Watch(opts v1.ListOptions) (watch.Interface, error)
+	List(opts meta_v1.ListOptions) (*v1.EndpointsList, error)
+	Watch(opts meta_v1.ListOptions) (watch.Interface, error)
 	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.Endpoints, err error)
 	EndpointsExpansion
 }
@@ -95,7 +95,7 @@ func (c *endpoints) Delete(name string, options *v1.DeleteOptions) error {
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *endpoints) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
+func (c *endpoints) DeleteCollection(options *v1.DeleteOptions, listOptions meta_v1.ListOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("endpoints").
@@ -119,7 +119,7 @@ func (c *endpoints) Get(name string, options meta_v1.GetOptions) (result *v1.End
 }
 
 // List takes label and field selectors, and returns the list of Endpoints that match those selectors.
-func (c *endpoints) List(opts v1.ListOptions) (result *v1.EndpointsList, err error) {
+func (c *endpoints) List(opts meta_v1.ListOptions) (result *v1.EndpointsList, err error) {
 	result = &v1.EndpointsList{}
 	err = c.client.Get().
 		Namespace(c.ns).
@@ -131,7 +131,7 @@ func (c *endpoints) List(opts v1.ListOptions) (result *v1.EndpointsList, err err
 }
 
 // Watch returns a watch.Interface that watches the requested endpoints.
-func (c *endpoints) Watch(opts v1.ListOptions) (watch.Interface, error) {
+func (c *endpoints) Watch(opts meta_v1.ListOptions) (watch.Interface, error) {
 	return c.client.Get().
 		Prefix("watch").
 		Namespace(c.ns).

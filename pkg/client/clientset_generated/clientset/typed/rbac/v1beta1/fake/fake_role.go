@@ -62,7 +62,7 @@ func (c *FakeRoles) Delete(name string, options *v1.DeleteOptions) error {
 	return err
 }
 
-func (c *FakeRoles) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
+func (c *FakeRoles) DeleteCollection(options *v1.DeleteOptions, listOptions meta_v1.ListOptions) error {
 	action := core.NewDeleteCollectionAction(rolesResource, c.ns, listOptions)
 
 	_, err := c.Fake.Invokes(action, &v1beta1.RoleList{})
@@ -79,7 +79,7 @@ func (c *FakeRoles) Get(name string, options meta_v1.GetOptions) (result *v1beta
 	return obj.(*v1beta1.Role), err
 }
 
-func (c *FakeRoles) List(opts v1.ListOptions) (result *v1beta1.RoleList, err error) {
+func (c *FakeRoles) List(opts meta_v1.ListOptions) (result *v1beta1.RoleList, err error) {
 	obj, err := c.Fake.
 		Invokes(core.NewListAction(rolesResource, c.ns, opts), &v1beta1.RoleList{})
 
@@ -101,7 +101,7 @@ func (c *FakeRoles) List(opts v1.ListOptions) (result *v1beta1.RoleList, err err
 }
 
 // Watch returns a watch.Interface that watches the requested roles.
-func (c *FakeRoles) Watch(opts v1.ListOptions) (watch.Interface, error) {
+func (c *FakeRoles) Watch(opts meta_v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(core.NewWatchAction(rolesResource, c.ns, opts))
 

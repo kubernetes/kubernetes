@@ -71,7 +71,7 @@ func (c *FakePods) Delete(name string, options *api.DeleteOptions) error {
 	return err
 }
 
-func (c *FakePods) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
+func (c *FakePods) DeleteCollection(options *api.DeleteOptions, listOptions v1.ListOptions) error {
 	action := core.NewDeleteCollectionAction(podsResource, c.ns, listOptions)
 
 	_, err := c.Fake.Invokes(action, &api.PodList{})
@@ -88,7 +88,7 @@ func (c *FakePods) Get(name string, options v1.GetOptions) (result *api.Pod, err
 	return obj.(*api.Pod), err
 }
 
-func (c *FakePods) List(opts api.ListOptions) (result *api.PodList, err error) {
+func (c *FakePods) List(opts v1.ListOptions) (result *api.PodList, err error) {
 	obj, err := c.Fake.
 		Invokes(core.NewListAction(podsResource, c.ns, opts), &api.PodList{})
 
@@ -110,7 +110,7 @@ func (c *FakePods) List(opts api.ListOptions) (result *api.PodList, err error) {
 }
 
 // Watch returns a watch.Interface that watches the requested pods.
-func (c *FakePods) Watch(opts api.ListOptions) (watch.Interface, error) {
+func (c *FakePods) Watch(opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(core.NewWatchAction(podsResource, c.ns, opts))
 

@@ -37,6 +37,7 @@ go_library(
         "//pkg/util/hash:go_default_library",
         "//vendor:github.com/golang/glog",
         "//vendor:golang.org/x/exp/inotify",
+        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/fields",
         "//vendor:k8s.io/apimachinery/pkg/runtime",
         "//vendor:k8s.io/apimachinery/pkg/types",

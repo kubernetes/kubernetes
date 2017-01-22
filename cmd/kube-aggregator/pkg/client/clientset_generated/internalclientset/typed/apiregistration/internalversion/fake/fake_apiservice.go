@@ -67,7 +67,7 @@ func (c *FakeAPIServices) Delete(name string, options *api.DeleteOptions) error 
 	return err
 }
 
-func (c *FakeAPIServices) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
+func (c *FakeAPIServices) DeleteCollection(options *api.DeleteOptions, listOptions v1.ListOptions) error {
 	action := core.NewRootDeleteCollectionAction(apiservicesResource, listOptions)
 
 	_, err := c.Fake.Invokes(action, &apiregistration.APIServiceList{})
@@ -83,7 +83,7 @@ func (c *FakeAPIServices) Get(name string, options v1.GetOptions) (result *apire
 	return obj.(*apiregistration.APIService), err
 }
 
-func (c *FakeAPIServices) List(opts api.ListOptions) (result *apiregistration.APIServiceList, err error) {
+func (c *FakeAPIServices) List(opts v1.ListOptions) (result *apiregistration.APIServiceList, err error) {
 	obj, err := c.Fake.
 		Invokes(core.NewRootListAction(apiservicesResource, opts), &apiregistration.APIServiceList{})
 	if obj == nil {
@@ -104,7 +104,7 @@ func (c *FakeAPIServices) List(opts api.ListOptions) (result *apiregistration.AP
 }
 
 // Watch returns a watch.Interface that watches the requested aPIServices.
-func (c *FakeAPIServices) Watch(opts api.ListOptions) (watch.Interface, error) {
+func (c *FakeAPIServices) Watch(opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(core.NewRootWatchAction(apiservicesResource, opts))
 }
