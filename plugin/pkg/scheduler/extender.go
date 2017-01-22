@@ -155,12 +155,18 @@ func (h *HTTPExtender) Prioritize(pod *v1.Pod, nodes []*v1.Node) (*schedulerapi.
 
 // Helper function to send messages to the extender
 func (h *HTTPExtender) send(action string, args interface{}, result interface{}) error {
+	var url string
+
 	out, err := json.Marshal(args)
 	if err != nil {
 		return err
 	}
 
-	url := h.extenderURL + "/" + h.apiVersion + "/" + action
+	if h.apiVersion != "" {
+		url = h.extenderURL + "/" + h.apiVersion + "/" + action
+	} else {
+		url = h.extenderURL + "/" + action
+	}
 
 	req, err := http.NewRequest("POST", url, bytes.NewReader(out))
 	if err != nil {
