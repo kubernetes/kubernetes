@@ -677,7 +677,6 @@ func TestWriteWithUnixPathBadPath(t *testing.T) {
 			},
 		},
 	}
-
 	pod := &api.Pod{ObjectMeta: api.ObjectMeta{UID: testPodUID, Labels: labels}}
 	builder, err := plugin.NewBuilder(volume.NewSpecFromVolume(volumeSpec), pod, volume.VolumeOptions{})
 	if err != nil {
