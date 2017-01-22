@@ -19,7 +19,6 @@ package generators
 import "k8s.io/gengo/types"
 
 var (
-	apiNamespaceAll             = types.Name{Package: "k8s.io/kubernetes/pkg/api", Name: "NamespaceAll"}
 	apiScheme                   = types.Name{Package: "k8s.io/kubernetes/pkg/api", Name: "Scheme"}
 	cacheGenericLister          = types.Name{Package: "k8s.io/kubernetes/pkg/client/cache", Name: "GenericLister"}
 	cacheIndexers               = types.Name{Package: "k8s.io/kubernetes/pkg/client/cache", Name: "Indexers"}
@@ -36,7 +35,7 @@ var (
 	schemaGroupVersionResource  = types.Name{Package: "k8s.io/apimachinery/pkg/runtime/schema", Name: "GroupVersionResource"}
 	syncMutex                   = types.Name{Package: "sync", Name: "Mutex"}
 	timeDuration                = types.Name{Package: "time", Name: "Duration"}
-	v1ListOptions               = types.Name{Package: "k8s.io/kubernetes/pkg/api/v1", Name: "ListOptions"}
-	v1NamespaceAll              = types.Name{Package: "k8s.io/kubernetes/pkg/api/v1", Name: "NamespaceAll"}
+	v1ListOptions               = types.Name{Package: "k8s.io/apimachinery/pkg/apis/meta/v1", Name: "ListOptions"}
+	metav1NamespaceAll          = types.Name{Package: "k8s.io/apimachinery/pkg/apis/meta/v1", Name: "NamespaceAll"}
 	watchInterface              = types.Name{Package: "k8s.io/apimachinery/pkg/watch", Name: "Interface"}
 )
