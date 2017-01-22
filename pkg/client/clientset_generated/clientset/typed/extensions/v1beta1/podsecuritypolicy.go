@@ -37,10 +37,10 @@ type PodSecurityPolicyInterface interface {
 	Create(*v1beta1.PodSecurityPolicy) (*v1beta1.PodSecurityPolicy, error)
 	Update(*v1beta1.PodSecurityPolicy) (*v1beta1.PodSecurityPolicy, error)
 	Delete(name string, options *v1.DeleteOptions) error
-	DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error
+	DeleteCollection(options *v1.DeleteOptions, listOptions meta_v1.ListOptions) error
 	Get(name string, options meta_v1.GetOptions) (*v1beta1.PodSecurityPolicy, error)
-	List(opts v1.ListOptions) (*v1beta1.PodSecurityPolicyList, error)
-	Watch(opts v1.ListOptions) (watch.Interface, error)
+	List(opts meta_v1.ListOptions) (*v1beta1.PodSecurityPolicyList, error)
+	Watch(opts meta_v1.ListOptions) (watch.Interface, error)
 	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1beta1.PodSecurityPolicy, err error)
 	PodSecurityPolicyExpansion
 }
@@ -91,7 +91,7 @@ func (c *podSecurityPolicies) Delete(name string, options *v1.DeleteOptions) err
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *podSecurityPolicies) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
+func (c *podSecurityPolicies) DeleteCollection(options *v1.DeleteOptions, listOptions meta_v1.ListOptions) error {
 	return c.client.Delete().
 		Resource("podsecuritypolicies").
 		VersionedParams(&listOptions, api.ParameterCodec).
@@ -113,7 +113,7 @@ func (c *podSecurityPolicies) Get(name string, options meta_v1.GetOptions) (resu
 }
 
 // List takes label and field selectors, and returns the list of PodSecurityPolicies that match those selectors.
-func (c *podSecurityPolicies) List(opts v1.ListOptions) (result *v1beta1.PodSecurityPolicyList, err error) {
+func (c *podSecurityPolicies) List(opts meta_v1.ListOptions) (result *v1beta1.PodSecurityPolicyList, err error) {
 	result = &v1beta1.PodSecurityPolicyList{}
 	err = c.client.Get().
 		Resource("podsecuritypolicies").
@@ -124,7 +124,7 @@ func (c *podSecurityPolicies) List(opts v1.ListOptions) (result *v1beta1.PodSecu
 }
 
 // Watch returns a watch.Interface that watches the requested podSecurityPolicies.
-func (c *podSecurityPolicies) Watch(opts v1.ListOptions) (watch.Interface, error) {
+func (c *podSecurityPolicies) Watch(opts meta_v1.ListOptions) (watch.Interface, error) {
 	return c.client.Get().
 		Prefix("watch").
 		Resource("podsecuritypolicies").

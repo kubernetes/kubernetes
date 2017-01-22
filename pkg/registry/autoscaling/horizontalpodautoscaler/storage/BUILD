@@ -14,7 +14,6 @@ go_test(
     library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
-        "//pkg/api:go_default_library",
         "//pkg/apis/autoscaling:go_default_library",
         "//pkg/apis/autoscaling/v1:go_default_library",
         "//pkg/genericapiserver/registry/generic:go_default_library",

@@ -61,7 +61,7 @@ func (c *FakeLimitRanges) Delete(name string, options *api.DeleteOptions) error 
 	return err
 }
 
-func (c *FakeLimitRanges) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
+func (c *FakeLimitRanges) DeleteCollection(options *api.DeleteOptions, listOptions v1.ListOptions) error {
 	action := core.NewDeleteCollectionAction(limitrangesResource, c.ns, listOptions)
 
 	_, err := c.Fake.Invokes(action, &api.LimitRangeList{})
@@ -78,7 +78,7 @@ func (c *FakeLimitRanges) Get(name string, options v1.GetOptions) (result *api.L
 	return obj.(*api.LimitRange), err
 }
 
-func (c *FakeLimitRanges) List(opts api.ListOptions) (result *api.LimitRangeList, err error) {
+func (c *FakeLimitRanges) List(opts v1.ListOptions) (result *api.LimitRangeList, err error) {
 	obj, err := c.Fake.
 		Invokes(core.NewListAction(limitrangesResource, c.ns, opts), &api.LimitRangeList{})
 
@@ -100,7 +100,7 @@ func (c *FakeLimitRanges) List(opts api.ListOptions) (result *api.LimitRangeList
 }
 
 // Watch returns a watch.Interface that watches the requested limitRanges.
-func (c *FakeLimitRanges) Watch(opts api.ListOptions) (watch.Interface, error) {
+func (c *FakeLimitRanges) Watch(opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(core.NewWatchAction(limitrangesResource, c.ns, opts))
 

@@ -38,10 +38,10 @@ type JobInterface interface {
 	Update(*v1.Job) (*v1.Job, error)
 	UpdateStatus(*v1.Job) (*v1.Job, error)
 	Delete(name string, options *api_v1.DeleteOptions) error
-	DeleteCollection(options *api_v1.DeleteOptions, listOptions api_v1.ListOptions) error
+	DeleteCollection(options *api_v1.DeleteOptions, listOptions meta_v1.ListOptions) error
 	Get(name string, options meta_v1.GetOptions) (*v1.Job, error)
-	List(opts api_v1.ListOptions) (*v1.JobList, error)
-	Watch(opts api_v1.ListOptions) (watch.Interface, error)
+	List(opts meta_v1.ListOptions) (*v1.JobList, error)
+	Watch(opts meta_v1.ListOptions) (watch.Interface, error)
 	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.Job, err error)
 	JobExpansion
 }
@@ -113,7 +113,7 @@ func (c *jobs) Delete(name string, options *api_v1.DeleteOptions) error {
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *jobs) DeleteCollection(options *api_v1.DeleteOptions, listOptions api_v1.ListOptions) error {
+func (c *jobs) DeleteCollection(options *api_v1.DeleteOptions, listOptions meta_v1.ListOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("jobs").
@@ -137,7 +137,7 @@ func (c *jobs) Get(name string, options meta_v1.GetOptions) (result *v1.Job, err
 }
 
 // List takes label and field selectors, and returns the list of Jobs that match those selectors.
-func (c *jobs) List(opts api_v1.ListOptions) (result *v1.JobList, err error) {
+func (c *jobs) List(opts meta_v1.ListOptions) (result *v1.JobList, err error) {
 	result = &v1.JobList{}
 	err = c.client.Get().
 		Namespace(c.ns).
@@ -149,7 +149,7 @@ func (c *jobs) List(opts api_v1.ListOptions) (result *v1.JobList, err error) {
 }
 
 // Watch returns a watch.Interface that watches the requested jobs.
-func (c *jobs) Watch(opts api_v1.ListOptions) (watch.Interface, error) {
+func (c *jobs) Watch(opts meta_v1.ListOptions) (watch.Interface, error) {
 	return c.client.Get().
 		Prefix("watch").
 		Namespace(c.ns).

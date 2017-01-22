@@ -61,7 +61,7 @@ func (c *FakeConfigMaps) Delete(name string, options *api.DeleteOptions) error {
 	return err
 }
 
-func (c *FakeConfigMaps) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
+func (c *FakeConfigMaps) DeleteCollection(options *api.DeleteOptions, listOptions v1.ListOptions) error {
 	action := core.NewDeleteCollectionAction(configmapsResource, c.ns, listOptions)
 
 	_, err := c.Fake.Invokes(action, &api.ConfigMapList{})
@@ -78,7 +78,7 @@ func (c *FakeConfigMaps) Get(name string, options v1.GetOptions) (result *api.Co
 	return obj.(*api.ConfigMap), err
 }
 
-func (c *FakeConfigMaps) List(opts api.ListOptions) (result *api.ConfigMapList, err error) {
+func (c *FakeConfigMaps) List(opts v1.ListOptions) (result *api.ConfigMapList, err error) {
 	obj, err := c.Fake.
 		Invokes(core.NewListAction(configmapsResource, c.ns, opts), &api.ConfigMapList{})
 
@@ -100,7 +100,7 @@ func (c *FakeConfigMaps) List(opts api.ListOptions) (result *api.ConfigMapList, 
 }
 
 // Watch returns a watch.Interface that watches the requested configMaps.
-func (c *FakeConfigMaps) Watch(opts api.ListOptions) (watch.Interface, error) {
+func (c *FakeConfigMaps) Watch(opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(core.NewWatchAction(configmapsResource, c.ns, opts))
 

@@ -61,7 +61,7 @@ func (c *FakePodTemplates) Delete(name string, options *api.DeleteOptions) error
 	return err
 }
 
-func (c *FakePodTemplates) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
+func (c *FakePodTemplates) DeleteCollection(options *api.DeleteOptions, listOptions v1.ListOptions) error {
 	action := core.NewDeleteCollectionAction(podtemplatesResource, c.ns, listOptions)
 
 	_, err := c.Fake.Invokes(action, &api.PodTemplateList{})
@@ -78,7 +78,7 @@ func (c *FakePodTemplates) Get(name string, options v1.GetOptions) (result *api.
 	return obj.(*api.PodTemplate), err
 }
 
-func (c *FakePodTemplates) List(opts api.ListOptions) (result *api.PodTemplateList, err error) {
+func (c *FakePodTemplates) List(opts v1.ListOptions) (result *api.PodTemplateList, err error) {
 	obj, err := c.Fake.
 		Invokes(core.NewListAction(podtemplatesResource, c.ns, opts), &api.PodTemplateList{})
 
@@ -100,7 +100,7 @@ func (c *FakePodTemplates) List(opts api.ListOptions) (result *api.PodTemplateLi
 }
 
 // Watch returns a watch.Interface that watches the requested podTemplates.
-func (c *FakePodTemplates) Watch(opts api.ListOptions) (watch.Interface, error) {
+func (c *FakePodTemplates) Watch(opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(core.NewWatchAction(podtemplatesResource, c.ns, opts))
 

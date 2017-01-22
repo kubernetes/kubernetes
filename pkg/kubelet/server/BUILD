@@ -66,7 +66,6 @@ go_test(
         "//pkg/kubelet/container/testing:go_default_library",
         "//pkg/kubelet/server/remotecommand:go_default_library",
         "//pkg/kubelet/server/stats:go_default_library",
-        "//pkg/kubelet/types:go_default_library",
         "//pkg/util/httpstream:go_default_library",
         "//pkg/util/httpstream/spdy:go_default_library",
         "//pkg/util/term:go_default_library",

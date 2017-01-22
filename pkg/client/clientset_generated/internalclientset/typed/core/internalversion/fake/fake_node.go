@@ -66,7 +66,7 @@ func (c *FakeNodes) Delete(name string, options *api.DeleteOptions) error {
 	return err
 }
 
-func (c *FakeNodes) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
+func (c *FakeNodes) DeleteCollection(options *api.DeleteOptions, listOptions v1.ListOptions) error {
 	action := core.NewRootDeleteCollectionAction(nodesResource, listOptions)
 
 	_, err := c.Fake.Invokes(action, &api.NodeList{})
@@ -82,7 +82,7 @@ func (c *FakeNodes) Get(name string, options v1.GetOptions) (result *api.Node, e
 	return obj.(*api.Node), err
 }
 
-func (c *FakeNodes) List(opts api.ListOptions) (result *api.NodeList, err error) {
+func (c *FakeNodes) List(opts v1.ListOptions) (result *api.NodeList, err error) {
 	obj, err := c.Fake.
 		Invokes(core.NewRootListAction(nodesResource, opts), &api.NodeList{})
 	if obj == nil {
@@ -103,7 +103,7 @@ func (c *FakeNodes) List(opts api.ListOptions) (result *api.NodeList, err error)
 }
 
 // Watch returns a watch.Interface that watches the requested nodes.
-func (c *FakeNodes) Watch(opts api.ListOptions) (watch.Interface, error) {
+func (c *FakeNodes) Watch(opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(core.NewRootWatchAction(nodesResource, opts))
 }

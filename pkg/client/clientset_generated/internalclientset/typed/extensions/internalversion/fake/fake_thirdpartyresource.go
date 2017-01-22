@@ -58,7 +58,7 @@ func (c *FakeThirdPartyResources) Delete(name string, options *api.DeleteOptions
 	return err
 }
 
-func (c *FakeThirdPartyResources) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
+func (c *FakeThirdPartyResources) DeleteCollection(options *api.DeleteOptions, listOptions v1.ListOptions) error {
 	action := core.NewRootDeleteCollectionAction(thirdpartyresourcesResource, listOptions)
 
 	_, err := c.Fake.Invokes(action, &extensions.ThirdPartyResourceList{})
@@ -74,7 +74,7 @@ func (c *FakeThirdPartyResources) Get(name string, options v1.GetOptions) (resul
 	return obj.(*extensions.ThirdPartyResource), err
 }
 
-func (c *FakeThirdPartyResources) List(opts api.ListOptions) (result *extensions.ThirdPartyResourceList, err error) {
+func (c *FakeThirdPartyResources) List(opts v1.ListOptions) (result *extensions.ThirdPartyResourceList, err error) {
 	obj, err := c.Fake.
 		Invokes(core.NewRootListAction(thirdpartyresourcesResource, opts), &extensions.ThirdPartyResourceList{})
 	if obj == nil {
@@ -95,7 +95,7 @@ func (c *FakeThirdPartyResources) List(opts api.ListOptions) (result *extensions
 }
 
 // Watch returns a watch.Interface that watches the requested thirdPartyResources.
-func (c *FakeThirdPartyResources) Watch(opts api.ListOptions) (watch.Interface, error) {
+func (c *FakeThirdPartyResources) Watch(opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(core.NewRootWatchAction(thirdpartyresourcesResource, opts))
 }

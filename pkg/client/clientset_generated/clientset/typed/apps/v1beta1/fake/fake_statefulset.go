@@ -72,7 +72,7 @@ func (c *FakeStatefulSets) Delete(name string, options *v1.DeleteOptions) error 
 	return err
 }
 
-func (c *FakeStatefulSets) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
+func (c *FakeStatefulSets) DeleteCollection(options *v1.DeleteOptions, listOptions meta_v1.ListOptions) error {
 	action := core.NewDeleteCollectionAction(statefulsetsResource, c.ns, listOptions)
 
 	_, err := c.Fake.Invokes(action, &v1beta1.StatefulSetList{})
@@ -89,7 +89,7 @@ func (c *FakeStatefulSets) Get(name string, options meta_v1.GetOptions) (result 
 	return obj.(*v1beta1.StatefulSet), err
 }
 
-func (c *FakeStatefulSets) List(opts v1.ListOptions) (result *v1beta1.StatefulSetList, err error) {
+func (c *FakeStatefulSets) List(opts meta_v1.ListOptions) (result *v1beta1.StatefulSetList, err error) {
 	obj, err := c.Fake.
 		Invokes(core.NewListAction(statefulsetsResource, c.ns, opts), &v1beta1.StatefulSetList{})
 
@@ -111,7 +111,7 @@ func (c *FakeStatefulSets) List(opts v1.ListOptions) (result *v1beta1.StatefulSe
 }
 
 // Watch returns a watch.Interface that watches the requested statefulSets.
-func (c *FakeStatefulSets) Watch(opts v1.ListOptions) (watch.Interface, error) {
+func (c *FakeStatefulSets) Watch(opts meta_v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(core.NewWatchAction(statefulsetsResource, c.ns, opts))
 

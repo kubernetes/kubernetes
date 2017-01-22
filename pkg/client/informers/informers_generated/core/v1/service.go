@@ -19,6 +19,7 @@ limitations under the License.
 package v1
 
 import (
+	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
 	api_v1 "k8s.io/kubernetes/pkg/api/v1"
@@ -43,11 +44,11 @@ type serviceInformer struct {
 func newServiceInformer(client clientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
 	sharedIndexInformer := cache.NewSharedIndexInformer(
 		&cache.ListWatch{
-			ListFunc: func(options api_v1.ListOptions) (runtime.Object, error) {
-				return client.CoreV1().Services(api_v1.NamespaceAll).List(options)
+			ListFunc: func(options meta_v1.ListOptions) (runtime.Object, error) {
+				return client.CoreV1().Services(meta_v1.NamespaceAll).List(options)
 			},
-			WatchFunc: func(options api_v1.ListOptions) (watch.Interface, error) {
-				return client.CoreV1().Services(api_v1.NamespaceAll).Watch(options)
+			WatchFunc: func(options meta_v1.ListOptions) (watch.Interface, error) {
+				return client.CoreV1().Services(meta_v1.NamespaceAll).Watch(options)
 			},
 		},
 		&api_v1.Service{},

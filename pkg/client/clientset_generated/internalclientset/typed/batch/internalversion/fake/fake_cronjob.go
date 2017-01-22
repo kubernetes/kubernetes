@@ -72,7 +72,7 @@ func (c *FakeCronJobs) Delete(name string, options *api.DeleteOptions) error {
 	return err
 }
 
-func (c *FakeCronJobs) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
+func (c *FakeCronJobs) DeleteCollection(options *api.DeleteOptions, listOptions v1.ListOptions) error {
 	action := core.NewDeleteCollectionAction(cronjobsResource, c.ns, listOptions)
 
 	_, err := c.Fake.Invokes(action, &batch.CronJobList{})
@@ -89,7 +89,7 @@ func (c *FakeCronJobs) Get(name string, options v1.GetOptions) (result *batch.Cr
 	return obj.(*batch.CronJob), err
 }
 
-func (c *FakeCronJobs) List(opts api.ListOptions) (result *batch.CronJobList, err error) {
+func (c *FakeCronJobs) List(opts v1.ListOptions) (result *batch.CronJobList, err error) {
 	obj, err := c.Fake.
 		Invokes(core.NewListAction(cronjobsResource, c.ns, opts), &batch.CronJobList{})
 
@@ -111,7 +111,7 @@ func (c *FakeCronJobs) List(opts api.ListOptions) (result *batch.CronJobList, er
 }
 
 // Watch returns a watch.Interface that watches the requested cronJobs.
-func (c *FakeCronJobs) Watch(opts api.ListOptions) (watch.Interface, error) {
+func (c *FakeCronJobs) Watch(opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(core.NewWatchAction(cronjobsResource, c.ns, opts))
 
