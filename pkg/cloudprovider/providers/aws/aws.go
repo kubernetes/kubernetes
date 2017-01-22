@@ -352,14 +352,13 @@ type InstanceGroupInfo interface {
 
 // Cloud is an implementation of Interface, LoadBalancer and Instances for Amazon Web Services.
 type Cloud struct {
-	ec2              EC2
-	elb              ELB
-	asg              ASG
-	metadata         EC2Metadata
-	cfg              *CloudConfig
-	region           string
-	availabilityZone string
-	vpcID            string
+	ec2      EC2
+	elb      ELB
+	asg      ASG
+	metadata EC2Metadata
+	cfg      *CloudConfig
+	region   string
+	vpcID    string
 
 	filterTags map[string]string
 
@@ -390,7 +389,7 @@ type CloudConfig struct {
 		// Maybe if we're not running on AWS, e.g. bootstrap; for now it is not very useful
 		Zone string
 
-		// The aws VPC flag enables the possibility to run the master components
+		// The AWS VPC flag enables the possibility to run the master components
 		// on a different aws account, on a different cloud provider or on-premise.
 		// If the flag is set also the KubernetesClusterTag must be provided
 		VPCID string
@@ -827,14 +826,12 @@ func newAWSCloud(config io.Reader, awsServices Services) (*Cloud, error) {
 		// build up and dummy instance and use the vpcID from the nodes account
 		glog.Warningf("Cannot detect an AWS Instance")
 		selfAWSInstance = &awsInstance{
-			nodeName:         "master-dummy",
-			vpcID:            cfg.Global.VPCID,
-			availabilityZone: "dummy",
+			nodeName: "master-dummy",
+			vpcID:    cfg.Global.VPCID,
 		}
 	}
 	awsCloud.selfAWSInstance = selfAWSInstance
 	awsCloud.vpcID = selfAWSInstance.vpcID
-	awsCloud.availabilityZone = selfAWSInstance.availabilityZone
 
 	if cfg.Global.VPCID != "" {
 		// When the master is running on a different AWS account use the vpcID from the nodes account
