@@ -469,6 +469,7 @@ func (w *etcdWatcher) ResultChan() <-chan watch.Event {
 }
 
 // Stop implements watch.Interface.
+// TODO: Determine if this should block until everything is cleaned up.
 func (w *etcdWatcher) Stop() {
 	w.stopLock.Lock()
 	if w.cancel != nil {

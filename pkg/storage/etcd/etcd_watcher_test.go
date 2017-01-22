@@ -316,6 +316,8 @@ func TestWatch(t *testing.T) {
 	}
 
 	watching.Stop()
+	// give the other routines a chance to cleanup.
+	rt.Gosched()
 
 	// There is a race in etcdWatcher so that after calling Stop() one of
 	// two things can happen:
