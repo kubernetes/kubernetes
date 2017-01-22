@@ -318,7 +318,7 @@ func (r *Reflector) ListAndWatch(stopCh <-chan struct{}) error {
 			if err != errorStopRequested {
 				glog.Warningf("%s: watch of %v ended with: %v", r.name, r.expectedType, err)
 			}
-			return nil
+			return err
 		}
 	}
 }
