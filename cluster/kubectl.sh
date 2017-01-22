@@ -90,6 +90,7 @@ if [[ -z "${KUBECTL_PATH:-}" ]]; then
     "${KUBE_ROOT}/_output/local/bin/${host_os}/${host_arch}/kubectl"
     "${KUBE_ROOT}/bazel-bin/cmd/kubectl/kubectl"
     "${KUBE_ROOT}/platforms/${host_os}/${host_arch}/kubectl"
+    "/usr/local/bin/kubectl"
   )
   kubectl=$( (ls -t "${locations[@]}" 2>/dev/null || true) | head -1 )
 
