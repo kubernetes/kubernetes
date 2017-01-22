@@ -302,14 +302,24 @@ func (s *serviceAccount) getServiceAccount(namespace string, name string) (*api.
 }
 
 // getReferencedServiceAccountToken returns the name of the first referenced secret which is a ServiceAccountToken for the service account
-func (s *serviceAccount) getReferencedServiceAccountToken(serviceAccount *api.ServiceAccount) (string, error) {
+func (s *serviceAccount) getReferencedServiceAccountToken(serviceAccount *api.ServiceAccount, errIfTokenNotFound bool) (string, error) {
 	if len(serviceAccount.Secrets) == 0 {
+		if errIfTokenNotFound {
+			return "", fmt.Errorf("no secrets found for service account  %s/%s", serviceAccount.Namespace, serviceAccount.Name)
+		}
 		return "", nil
 	}
 
 	tokens, err := s.getServiceAccountTokens(serviceAccount)
 	if err != nil {
 		return "", err
+	}
+
+	if len(tokens) == 0 {
+		if errIfTokenNotFound {
+			return "", fmt.Errorf("no service account token found for service account  %s/%s", serviceAccount.Namespace, serviceAccount.Name)
+		}
+		return "", nil
 	}
 
 	references := sets.NewString()
@@ -322,6 +332,10 @@ func (s *serviceAccount) getReferencedServiceAccountToken(serviceAccount *api.Se
 		}
 	}
 
+	if errIfTokenNotFound {
+		return "", fmt.Errorf("no secret found which is a service acount token for service account  %s/%s, secrets: %v, service account tokens: %v",
+			serviceAccount.Namespace, serviceAccount.Name, references, tokens)
+	}
 	return "", nil
 }
 
@@ -396,7 +410,7 @@ func (s *serviceAccount) limitSecretReferences(serviceAccount *api.ServiceAccoun
 
 func (s *serviceAccount) mountServiceAccountToken(serviceAccount *api.ServiceAccount, pod *api.Pod) error {
 	// Find the name of a referenced ServiceAccountToken secret we can mount
-	serviceAccountToken, err := s.getReferencedServiceAccountToken(serviceAccount)
+	serviceAccountToken, err := s.getReferencedServiceAccountToken(serviceAccount, s.RequireAPIToken)
 	if err != nil {
 		return fmt.Errorf("Error looking up service account token for %s/%s: %v", serviceAccount.Namespace, serviceAccount.Name, err)
 	}
