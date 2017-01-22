@@ -50,3 +50,15 @@ func AddToGroupVersion(scheme *runtime.Scheme, groupVersion schema.GroupVersion)
 		Convert_versioned_Event_to_versioned_InternalEvent,
 	)
 }
+
+// scheme is the registry for the common types that adhere to the meta v1 API spec.
+var scheme = runtime.NewScheme()
+
+// ParameterCodec knows about query parameters used with the meta v1 API spec.
+var ParameterCodec = runtime.NewParameterCodec(scheme)
+
+func init() {
+	scheme.AddUnversionedTypes(SchemeGroupVersion,
+		&ListOptions{},
+	)
+}
