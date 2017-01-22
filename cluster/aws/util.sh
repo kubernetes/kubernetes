@@ -94,9 +94,9 @@ load_distro_utils
 
 # This removes the final character in bash (somehow)
 re='[a-zA-Z]'
-if [[ ${ZONE: -1} =~ $re  ]]; then 
+if [[ ${ZONE: -1} =~ $re  ]]; then
   AWS_REGION=${ZONE%?}
-else 
+else
   AWS_REGION=$ZONE
 fi
 
@@ -134,6 +134,18 @@ EPHEMERAL_BLOCK_DEVICE_MAPPINGS=",{\"DeviceName\": \"/dev/sdc\",\"VirtualName\":
 # storage available for other purposes)
 if [[ "${KUBE_AWS_STORAGE:-}" == "ebs" ]]; then
   EPHEMERAL_BLOCK_DEVICE_MAPPINGS=""
+fi
+
+# Verfiy cluster autoscaler configuration.
+if [[ "${ENABLE_CLUSTER_AUTOSCALER}" == "true" ]]; then
+  if [ -z $AUTOSCALER_MIN_NODES ]; then
+    echo "AUTOSCALER_MIN_NODES not set."
+    exit 1
+  fi
+  if [ -z $AUTOSCALER_MAX_NODES ]; then
+    echo "AUTOSCALER_MAX_NODES not set."
+    exit 1
+  fi
 fi
 
 # TODO (bburns) Parameterize this for multiple cluster per project
@@ -1184,16 +1196,51 @@ function start-minions() {
       --block-device-mappings "${NODE_BLOCK_DEVICE_MAPPINGS}" \
       --user-data "fileb://${KUBE_TEMP}/node-user-data.gz"
 
+  if [[ "${ENABLE_CLUSTER_AUTOSCALER}" == "true" ]]; then
+     MIN_NODES=$AUTOSCALER_MIN_NODES
+     MAX_NODES=$AUTOSCALER_MAX_NODES
+     push-cluster-autoscaler-manifest
+  else
+    MIN_NODES=$NUM_NODES
+    MAX_NODES=$NUM_NODES
+  fi
+
   echo "Creating autoscaling group"
   ${AWS_ASG_CMD} create-auto-scaling-group \
       --auto-scaling-group-name ${ASG_NAME} \
       --launch-configuration-name ${ASG_NAME} \
-      --min-size ${NUM_NODES} \
-      --max-size ${NUM_NODES} \
+      --desired-capacity ${MIN_NODES} \
+      --min-size ${MIN_NODES} \
+      --max-size ${MAX_NODES} \
       --vpc-zone-identifier ${SUBNET_ID} \
       --tags ResourceId=${ASG_NAME},ResourceType=auto-scaling-group,Key=Name,Value=${NODE_INSTANCE_PREFIX} \
              ResourceId=${ASG_NAME},ResourceType=auto-scaling-group,Key=Role,Value=${NODE_TAG} \
              ResourceId=${ASG_NAME},ResourceType=auto-scaling-group,Key=KubernetesCluster,Value=${CLUSTER_ID}
+}
+
+function create-temp-cluster-autoscaler-manifest {
+  echo "Creating cluster autoscaler config"
+
+  local CLUSTER_AUTOSCALER_PARAMS=--nodes=${AUTOSCALER_MIN_NODES}:${AUTOSCALER_MIN_NODES}:${ASG_NAME}
+
+  cp ${KUBE_HOME}/cluster/aws/templates/manifests/cluster-autoscaler.yaml ${KUBE_TEMP}/
+  local -r src_file="${KUBE_TEMP}/cluster-autoscaler.yaml"
+
+  sed -i -e "s@{{params}}@${CLUSTER_AUTOSCALER_PARAMS}@g" "${src_file}"
+  sed -i -e "s@{{region}}@${AWS_REGION}@g" "${src_file}"
+}
+
+function push-cluster-autoscaler-manifest {
+  create-temp-cluster-autoscaler-config
+
+  (
+    echo "#! /bin/bash"
+    echo "cd /var/cache/kubernetes-install"
+    echo "cat > cluster-autoscaler.yaml << __EOF"
+    cat ${KUBE_TEMP}/cluster-autoscaler.yaml
+    echo "__EOF"
+    echo "cp cluster-autoscaler.yaml /etc/kubernetes/manifests"
+  ) | ssh -oStrictHostKeyChecking=no -i "${AWS_SSH_KEY}" ${SSH_USER}@${KUBE_MASTER_IP} sudo bash
 }
 
 function wait-minions {
@@ -1207,7 +1254,8 @@ function wait-minions {
   fi
   while true; do
     detect-node-names > $LOG
-    if [[ ${#NODE_IDS[@]} == ${NUM_NODES} ]]; then
+    # when cluster autoscaler is enabled, we assume the ASG's desired capacity is set to the min of the ASG
+    if [[ ${#NODE_IDS[@]} == ${NUM_NODES} ]] || [[ ${ENABLE_CLUSTER_AUTOSCALER} == "true" && ${#NODE_IDS[@]} == ${AUTOSCALER_MIN_NODES} ]] ; then
       echo -e " ${color_green}${#NODE_IDS[@]} minions started; ready${color_norm}"
       break
     fi
