@@ -347,10 +347,10 @@ func TestLabelErrors(t *testing.T) {
 
 func TestLabelForResourceFromFile(t *testing.T) {
 	pods, _, _ := testData()
-	f, tf, codec, ns := cmdtesting.NewAPIFactory()
-	tf.Client = &fake.RESTClient{
+	f, tf, codec, _ := cmdtesting.NewAPIFactory()
+	tf.UnstructuredClient = &fake.RESTClient{
 		APIRegistry:          api.Registry,
-		NegotiatedSerializer: ns,
+		NegotiatedSerializer: unstructuredSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch req.Method {
 			case "GET":
@@ -398,10 +398,10 @@ func TestLabelForResourceFromFile(t *testing.T) {
 }
 
 func TestLabelLocal(t *testing.T) {
-	f, tf, _, ns := cmdtesting.NewAPIFactory()
-	tf.Client = &fake.RESTClient{
+	f, tf, _, _ := cmdtesting.NewAPIFactory()
+	tf.UnstructuredClient = &fake.RESTClient{
 		APIRegistry:          api.Registry,
-		NegotiatedSerializer: ns,
+		NegotiatedSerializer: unstructuredSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			t.Fatalf("unexpected request: %s %#v\n%#v", req.Method, req.URL, req)
 			return nil, nil
@@ -432,10 +432,10 @@ func TestLabelLocal(t *testing.T) {
 
 func TestLabelMultipleObjects(t *testing.T) {
 	pods, _, _ := testData()
-	f, tf, codec, ns := cmdtesting.NewAPIFactory()
-	tf.Client = &fake.RESTClient{
+	f, tf, codec, _ := cmdtesting.NewAPIFactory()
+	tf.UnstructuredClient = &fake.RESTClient{
 		APIRegistry:          api.Registry,
-		NegotiatedSerializer: ns,
+		NegotiatedSerializer: unstructuredSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch req.Method {
 			case "GET":
