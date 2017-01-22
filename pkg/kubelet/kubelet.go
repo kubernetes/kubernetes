@@ -2264,6 +2264,18 @@ func (kl *Kubelet) generatePodStatus(pod *api.Pod) (api.PodStatus, error) {
 	podFullName := kubecontainer.GetPodFullName(pod)
 	glog.V(3).Infof("Generating status for %q", podFullName)
 
+	if existingStatus, ok := kl.statusManager.GetPodStatus(podFullName); ok {
+		// This is a hacky fix to ensure container restart counts increment
+		// monotonically. Normally, we should not modify given pod. In this
+		// case, we check if there are cached status for this pod, and update
+		// the pod so that we update restart count appropriately.
+		// TODO(yujuhong): We will not need to count dead containers every time
+		// once we add the runtime pod cache.
+		// Note that kubelet restarts may still cause temporarily setback of
+		// restart counts.
+		pod.Status = existingStatus
+	}
+
 	// TODO: Consider include the container information.
 	if kl.pastActiveDeadline(pod) {
 		reason := "DeadlineExceeded"
