@@ -34,6 +34,11 @@ kube::util::ensure-temp-dir
 
 kube::util::gen-analytics "${KUBE_ROOT}"
 
+if [[ `git remote` != *${KUBE_GIT_UPSTREAM}* ]]; then
+  echo "ERROR: There is no '${KUBE_GIT_UPSTREAM}' Git remote. Please specify the correct name of the upstream Git remote to pull from via KUBE_GIT_UPSTREAM environment variable."
+  exit 1
+fi
+
 mungedocs=$(kube::util::find-binary "mungedocs")
 
 "${mungedocs}" "--upstream=${git_upstream}" "--root-dir=${KUBE_ROOT}/docs/" \
