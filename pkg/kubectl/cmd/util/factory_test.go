@@ -439,7 +439,7 @@ func newPodList(count, isUnready, isUnhealthy int, labels map[string]string) *ap
 		newPod := api.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:              fmt.Sprintf("pod-%d", i+1),
-				Namespace:         api.NamespaceDefault,
+				Namespace:         metav1.NamespaceDefault,
 				CreationTimestamp: metav1.Date(2016, time.April, 1, 1, 0, i, 0, time.UTC),
 				Labels:            labels,
 			},
@@ -485,7 +485,7 @@ func TestGetFirstPod(t *testing.T) {
 			expected: &api.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:              "pod-1",
-					Namespace:         api.NamespaceDefault,
+					Namespace:         metav1.NamespaceDefault,
 					CreationTimestamp: metav1.Date(2016, time.April, 1, 1, 0, 0, 0, time.UTC),
 					Labels:            map[string]string{"test": "selector"},
 				},
@@ -507,7 +507,7 @@ func TestGetFirstPod(t *testing.T) {
 			expected: &api.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:              "pod-2",
-					Namespace:         api.NamespaceDefault,
+					Namespace:         metav1.NamespaceDefault,
 					CreationTimestamp: metav1.Date(2016, time.April, 1, 1, 0, 1, 0, time.UTC),
 					Labels:            map[string]string{"test": "selector"},
 				},
@@ -530,7 +530,7 @@ func TestGetFirstPod(t *testing.T) {
 			expected: &api.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:              "pod-1",
-					Namespace:         api.NamespaceDefault,
+					Namespace:         metav1.NamespaceDefault,
 					CreationTimestamp: metav1.Date(2016, time.April, 1, 1, 0, 0, 0, time.UTC),
 					Labels:            map[string]string{"test": "selector"},
 				},
@@ -554,7 +554,7 @@ func TestGetFirstPod(t *testing.T) {
 					Object: &api.Pod{
 						ObjectMeta: metav1.ObjectMeta{
 							Name:              "pod-1",
-							Namespace:         api.NamespaceDefault,
+							Namespace:         metav1.NamespaceDefault,
 							CreationTimestamp: metav1.Date(2016, time.April, 1, 1, 0, 0, 0, time.UTC),
 							Labels:            map[string]string{"test": "selector"},
 						},
@@ -573,7 +573,7 @@ func TestGetFirstPod(t *testing.T) {
 			expected: &api.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:              "pod-1",
-					Namespace:         api.NamespaceDefault,
+					Namespace:         metav1.NamespaceDefault,
 					CreationTimestamp: metav1.Date(2016, time.April, 1, 1, 0, 0, 0, time.UTC),
 					Labels:            map[string]string{"test": "selector"},
 				},
@@ -607,7 +607,7 @@ func TestGetFirstPod(t *testing.T) {
 		}
 		selector := labels.Set(labelSet).AsSelector()
 
-		pod, numPods, err := GetFirstPod(fake.Core(), api.NamespaceDefault, selector, 1*time.Minute, test.sortBy)
+		pod, numPods, err := GetFirstPod(fake.Core(), metav1.NamespaceDefault, selector, 1*time.Minute, test.sortBy)
 		pod.Spec.SecurityContext = nil
 		if !test.expectedErr && err != nil {
 			t.Errorf("%s: unexpected error: %v", test.name, err)

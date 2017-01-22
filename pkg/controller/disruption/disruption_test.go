@@ -122,7 +122,7 @@ func newPodDisruptionBudget(t *testing.T, minAvailable intstr.IntOrString) (*pol
 		ObjectMeta: metav1.ObjectMeta{
 			UID:             uuid.NewUUID(),
 			Name:            "foobar",
-			Namespace:       v1.NamespaceDefault,
+			Namespace:       metav1.NamespaceDefault,
 			ResourceVersion: "18",
 		},
 		Spec: policy.PodDisruptionBudgetSpec{
@@ -146,7 +146,7 @@ func newPod(t *testing.T, name string) (*v1.Pod, string) {
 			UID:             uuid.NewUUID(),
 			Annotations:     make(map[string]string),
 			Name:            name,
-			Namespace:       v1.NamespaceDefault,
+			Namespace:       metav1.NamespaceDefault,
 			ResourceVersion: "18",
 			Labels:          fooBar(),
 		},
@@ -172,7 +172,7 @@ func newReplicationController(t *testing.T, size int32) (*v1.ReplicationControll
 		ObjectMeta: metav1.ObjectMeta{
 			UID:             uuid.NewUUID(),
 			Name:            "foobar",
-			Namespace:       v1.NamespaceDefault,
+			Namespace:       metav1.NamespaceDefault,
 			ResourceVersion: "18",
 			Labels:          fooBar(),
 		},
@@ -196,7 +196,7 @@ func newDeployment(t *testing.T, size int32) (*extensions.Deployment, string) {
 		ObjectMeta: metav1.ObjectMeta{
 			UID:             uuid.NewUUID(),
 			Name:            "foobar",
-			Namespace:       v1.NamespaceDefault,
+			Namespace:       metav1.NamespaceDefault,
 			ResourceVersion: "18",
 			Labels:          fooBar(),
 		},
@@ -220,7 +220,7 @@ func newReplicaSet(t *testing.T, size int32) (*extensions.ReplicaSet, string) {
 		ObjectMeta: metav1.ObjectMeta{
 			UID:             uuid.NewUUID(),
 			Name:            "foobar",
-			Namespace:       v1.NamespaceDefault,
+			Namespace:       metav1.NamespaceDefault,
 			ResourceVersion: "18",
 			Labels:          fooBar(),
 		},
@@ -244,7 +244,7 @@ func newStatefulSet(t *testing.T, size int32) (*apps.StatefulSet, string) {
 		ObjectMeta: metav1.ObjectMeta{
 			UID:             uuid.NewUUID(),
 			Name:            "foobar",
-			Namespace:       v1.NamespaceDefault,
+			Namespace:       metav1.NamespaceDefault,
 			ResourceVersion: "18",
 			Labels:          fooBar(),
 		},

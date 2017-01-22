@@ -75,11 +75,11 @@ var upscaleForbiddenWindow = 3 * time.Minute
 func newInformer(controller *HorizontalController, resyncPeriod time.Duration) (cache.Store, cache.Controller) {
 	return cache.NewInformer(
 		&cache.ListWatch{
-			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
-				return controller.hpaNamespacer.HorizontalPodAutoscalers(v1.NamespaceAll).List(options)
+			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+				return controller.hpaNamespacer.HorizontalPodAutoscalers(metav1.NamespaceAll).List(options)
 			},
-			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
-				return controller.hpaNamespacer.HorizontalPodAutoscalers(v1.NamespaceAll).Watch(options)
+			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+				return controller.hpaNamespacer.HorizontalPodAutoscalers(metav1.NamespaceAll).Watch(options)
 			},
 		},
 		&autoscaling.HorizontalPodAutoscaler{},

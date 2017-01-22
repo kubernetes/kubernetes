@@ -202,7 +202,7 @@ func (d *NamespaceDescriber) Describe(namespace, name string, describerSettings 
 	if err != nil {
 		return "", err
 	}
-	resourceQuotaList, err := d.Core().ResourceQuotas(name).List(api.ListOptions{})
+	resourceQuotaList, err := d.Core().ResourceQuotas(name).List(metav1.ListOptions{})
 	if err != nil {
 		if errors.IsNotFound(err) {
 			// Server does not support resource quotas.
@@ -212,7 +212,7 @@ func (d *NamespaceDescriber) Describe(namespace, name string, describerSettings 
 			return "", err
 		}
 	}
-	limitRangeList, err := d.Core().LimitRanges(name).List(api.ListOptions{})
+	limitRangeList, err := d.Core().LimitRanges(name).List(metav1.ListOptions{})
 	if err != nil {
 		if errors.IsNotFound(err) {
 			// Server does not support limit ranges.
@@ -472,7 +472,7 @@ func (d *PodDescriber) Describe(namespace, name string, describerSettings Descri
 		if describerSettings.ShowEvents {
 			eventsInterface := d.Core().Events(namespace)
 			selector := eventsInterface.GetFieldSelector(&name, &namespace, nil, nil)
-			options := api.ListOptions{FieldSelector: selector}
+			options := metav1.ListOptions{FieldSelector: selector.String()}
 			events, err2 := eventsInterface.List(options)
 			if describerSettings.ShowEvents && err2 == nil && len(events.Items) > 0 {
 				return tabbedString(func(out io.Writer) error {
@@ -1559,7 +1559,7 @@ func (i *IngressDescriber) describeIngress(ing *extensions.Ingress, describerSet
 				ServiceName: "default-http-backend",
 				ServicePort: intstr.IntOrString{Type: intstr.Int, IntVal: 80},
 			}
-			ns = api.NamespaceSystem
+			ns = metav1.NamespaceSystem
 		}
 		w.Write(LEVEL_0, "Default backend:\t%s (%s)\n", backendStringer(def), i.describeBackend(ns, def))
 		if len(ing.Spec.TLS) != 0 {
@@ -1795,7 +1795,7 @@ func (d *ServiceAccountDescriber) Describe(namespace, name string, describerSett
 	// missingSecrets is the set of all secrets present in the
 	// serviceAccount but not present in the set of existing secrets.
 	missingSecrets := sets.NewString()
-	secrets, err := d.Core().Secrets(namespace).List(api.ListOptions{})
+	secrets, err := d.Core().Secrets(namespace).List(metav1.ListOptions{})
 
 	// errors are tolerated here in order to describe the serviceAccount with all
 	// of the secrets that it references, even if those secrets cannot be fetched.
@@ -1904,7 +1904,7 @@ func (d *NodeDescriber) Describe(namespace, name string, describerSettings Descr
 	// in a policy aware setting, users may have access to a node, but not all pods
 	// in that case, we note that the user does not have access to the pods
 	canViewPods := true
-	nodeNonTerminatedPodsList, err := d.Core().Pods(namespace).List(api.ListOptions{FieldSelector: fieldSelector})
+	nodeNonTerminatedPodsList, err := d.Core().Pods(namespace).List(metav1.ListOptions{FieldSelector: fieldSelector.String()})
 	if err != nil {
 		if !errors.IsForbidden(err) {
 			return "", err
@@ -2346,7 +2346,7 @@ func (dd *DeploymentDescriber) Describe(namespace, name string, describerSetting
 func getDaemonSetsForLabels(c extensionsclient.DaemonSetInterface, labelsToMatch labels.Labels) ([]extensions.DaemonSet, error) {
 	// Get all daemon sets
 	// TODO: this needs a namespace scope as argument
-	dss, err := c.List(api.ListOptions{})
+	dss, err := c.List(metav1.ListOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("error getting daemon set: %v", err)
 	}
@@ -2395,7 +2395,7 @@ func printReplicaSetsByLabels(matchingRSs []*versionedextension.ReplicaSet) stri
 }
 
 func getPodStatusForController(c coreclient.PodInterface, selector labels.Selector) (running, waiting, succeeded, failed int, err error) {
-	options := api.ListOptions{LabelSelector: selector}
+	options := metav1.ListOptions{LabelSelector: selector.String()}
 	rcPods, err := c.List(options)
 	if err != nil {
 		return

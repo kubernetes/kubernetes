@@ -142,7 +142,7 @@ type objInterface interface {
 
 // getOverlappingControllers finds rcs that this controller overlaps, as well as rcs overlapping this controller.
 func getOverlappingControllers(rcClient coreclient.ReplicationControllerInterface, rc *api.ReplicationController) ([]api.ReplicationController, error) {
-	rcs, err := rcClient.List(api.ListOptions{})
+	rcs, err := rcClient.List(metav1.ListOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("error getting replication controllers: %v", err)
 	}
@@ -346,7 +346,7 @@ func (reaper *StatefulSetReaper) Stop(namespace, name string, timeout time.Durat
 	// StatefulSet should track generation number.
 	pods := reaper.podClient.Pods(namespace)
 	selector, _ := metav1.LabelSelectorAsSelector(ps.Spec.Selector)
-	options := api.ListOptions{LabelSelector: selector}
+	options := metav1.ListOptions{LabelSelector: selector.String()}
 	podList, err := pods.List(options)
 	if err != nil {
 		return err
@@ -391,7 +391,7 @@ func (reaper *JobReaper) Stop(namespace, name string, timeout time.Duration, gra
 	}
 	// at this point only dead pods are left, that should be removed
 	selector, _ := metav1.LabelSelectorAsSelector(job.Spec.Selector)
-	options := api.ListOptions{LabelSelector: selector}
+	options := metav1.ListOptions{LabelSelector: selector.String()}
 	podList, err := pods.List(options)
 	if err != nil {
 		return err
@@ -446,7 +446,7 @@ func (reaper *DeploymentReaper) Stop(namespace, name string, timeout time.Durati
 		return err
 	}
 
-	options := api.ListOptions{LabelSelector: selector}
+	options := metav1.ListOptions{LabelSelector: selector.String()}
 	rsList, err := replicaSets.List(options)
 	if err != nil {
 		return err

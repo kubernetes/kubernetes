@@ -130,13 +130,13 @@ var _ = framework.KubeDescribe("Generated release_1_5 clientset", func() {
 		pod := &podCopy
 		By("setting up watch")
 		selector := labels.SelectorFromSet(labels.Set(map[string]string{"time": value})).String()
-		options := v1.ListOptions{LabelSelector: selector}
+		options := metav1.ListOptions{LabelSelector: selector}
 		pods, err := podClient.List(options)
 		if err != nil {
 			framework.Failf("Failed to query for pods: %v", err)
 		}
 		Expect(len(pods.Items)).To(Equal(0))
-		options = v1.ListOptions{
+		options = metav1.ListOptions{
 			LabelSelector:   selector,
 			ResourceVersion: pods.ListMeta.ResourceVersion,
 		}
@@ -152,7 +152,7 @@ var _ = framework.KubeDescribe("Generated release_1_5 clientset", func() {
 		}
 
 		By("verifying the pod is in kubernetes")
-		options = v1.ListOptions{
+		options = metav1.ListOptions{
 			LabelSelector:   selector,
 			ResourceVersion: pod.ResourceVersion,
 		}
@@ -180,7 +180,7 @@ var _ = framework.KubeDescribe("Generated release_1_5 clientset", func() {
 		Expect(lastPod.DeletionTimestamp).ToNot(BeNil())
 		Expect(lastPod.Spec.TerminationGracePeriodSeconds).ToNot(BeZero())
 
-		options = v1.ListOptions{LabelSelector: selector}
+		options = metav1.ListOptions{LabelSelector: selector}
 		pods, err = podClient.List(options)
 		if err != nil {
 			framework.Failf("Failed to list pods to verify deletion: %v", err)
@@ -264,13 +264,13 @@ var _ = framework.KubeDescribe("Generated release_1_5 clientset", func() {
 		cronJob := newTestingCronJob(name, value)
 		By("setting up watch")
 		selector := labels.SelectorFromSet(labels.Set(map[string]string{"time": value})).String()
-		options := v1.ListOptions{LabelSelector: selector}
+		options := metav1.ListOptions{LabelSelector: selector}
 		cronJobs, err := cronJobClient.List(options)
 		if err != nil {
 			framework.Failf("Failed to query for cronJobs: %v", err)
 		}
 		Expect(len(cronJobs.Items)).To(Equal(0))
-		options = v1.ListOptions{
+		options = metav1.ListOptions{
 			LabelSelector:   selector,
 			ResourceVersion: cronJobs.ListMeta.ResourceVersion,
 		}
@@ -286,7 +286,7 @@ var _ = framework.KubeDescribe("Generated release_1_5 clientset", func() {
 		}
 
 		By("verifying the cronJob is in kubernetes")
-		options = v1.ListOptions{
+		options = metav1.ListOptions{
 			LabelSelector:   selector,
 			ResourceVersion: cronJob.ResourceVersion,
 		}
@@ -304,7 +304,7 @@ var _ = framework.KubeDescribe("Generated release_1_5 clientset", func() {
 			framework.Failf("Failed to delete cronJob: %v", err)
 		}
 
-		options = v1.ListOptions{LabelSelector: selector}
+		options = metav1.ListOptions{LabelSelector: selector}
 		cronJobs, err = cronJobClient.List(options)
 		if err != nil {
 			framework.Failf("Failed to list cronJobs to verify deletion: %v", err)

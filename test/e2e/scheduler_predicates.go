@@ -23,7 +23,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
@@ -91,7 +90,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 			}
 		}
 
-		err = framework.WaitForPodsRunningReady(cs, api.NamespaceSystem, int32(systemPodsNo), framework.PodReadyBeforeTimeout, ignoreLabels, true)
+		err = framework.WaitForPodsRunningReady(cs, metav1.NamespaceSystem, int32(systemPodsNo), framework.PodReadyBeforeTimeout, ignoreLabels, true)
 		Expect(err).NotTo(HaveOccurred())
 
 		for _, node := range nodeList.Items {
@@ -158,7 +157,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		}
 		framework.WaitForStableCluster(cs, masterNodes)
 
-		pods, err := cs.Core().Pods(v1.NamespaceAll).List(v1.ListOptions{})
+		pods, err := cs.Core().Pods(metav1.NamespaceAll).List(metav1.ListOptions{})
 		framework.ExpectNoError(err)
 		for _, pod := range pods.Items {
 			_, found := nodeToCapacityMap[pod.Spec.NodeName]
@@ -506,7 +505,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		By("Launching two pods on two distinct nodes to get two node names")
 		CreateHostPortPods(f, "host-port", 2, true)
 		defer framework.DeleteRCAndPods(f.ClientSet, f.InternalClientset, ns, "host-port")
-		podList, err := cs.Core().Pods(ns).List(v1.ListOptions{})
+		podList, err := cs.Core().Pods(ns).List(metav1.ListOptions{})
 		framework.ExpectNoError(err)
 		Expect(len(podList.Items)).To(Equal(2))
 		nodeNames := []string{podList.Items[0].Spec.NodeName, podList.Items[1].Spec.NodeName}
@@ -917,7 +916,7 @@ func waitForScheduler() {
 
 // TODO: upgrade calls in PodAffinity tests when we're able to run them
 func verifyResult(c clientset.Interface, expectedScheduled int, expectedNotScheduled int, ns string) {
-	allPods, err := c.Core().Pods(ns).List(v1.ListOptions{})
+	allPods, err := c.Core().Pods(ns).List(metav1.ListOptions{})
 	framework.ExpectNoError(err)
 	scheduledPods, notScheduledPods := framework.GetPodsScheduled(masterNodes, allPods)
 

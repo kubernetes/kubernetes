@@ -65,7 +65,7 @@ func newReplicationController(replicas int) *v1.ReplicationController {
 		ObjectMeta: metav1.ObjectMeta{
 			UID:             uuid.NewUUID(),
 			Name:            "foobar",
-			Namespace:       v1.NamespaceDefault,
+			Namespace:       metav1.NamespaceDefault,
 			ResourceVersion: "18",
 		},
 		Spec: v1.ReplicationControllerSpec{
@@ -398,7 +398,7 @@ func TestPodControllerLookup(t *testing.T) {
 		{
 			inRCs: []*v1.ReplicationController{
 				{ObjectMeta: metav1.ObjectMeta{Name: "basic"}}},
-			pod:       &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo1", Namespace: v1.NamespaceAll}},
+			pod:       &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo1", Namespace: metav1.NamespaceAll}},
 			outRCName: "",
 		},
 		// Matching labels, not namespace

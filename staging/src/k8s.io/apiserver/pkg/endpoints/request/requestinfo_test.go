@@ -31,7 +31,7 @@ func (f fakeRL) TryAccept() bool { return bool(f) }
 func (f fakeRL) Accept()         {}
 
 func TestGetAPIRequestInfo(t *testing.T) {
-	namespaceAll := "" // TODO(sttts): solve import cycle when using api.NamespaceAll
+	namespaceAll := "" // TODO(sttts): solve import cycle when using metav1.NamespaceAll
 	successCases := []struct {
 		method              string
 		url                 string

@@ -26,7 +26,6 @@ import (
 
 	"golang.org/x/crypto/ssh"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/test/e2e/framework"
 
@@ -206,7 +205,7 @@ spec:
 const (
 	addonTestPollInterval = 3 * time.Second
 	addonTestPollTimeout  = 5 * time.Minute
-	defaultNsName         = v1.NamespaceDefault
+	defaultNsName         = metav1.NamespaceDefault
 	addonNsName           = "kube-system"
 )
 

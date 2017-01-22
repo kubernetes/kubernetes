@@ -84,11 +84,11 @@ func NewEndpointController(podInformer cache.SharedIndexInformer, client clients
 
 	e.serviceStore.Indexer, e.serviceController = cache.NewIndexerInformer(
 		&cache.ListWatch{
-			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
-				return e.client.Core().Services(v1.NamespaceAll).List(options)
+			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+				return e.client.Core().Services(metav1.NamespaceAll).List(options)
 			},
-			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
-				return e.client.Core().Services(v1.NamespaceAll).Watch(options)
+			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+				return e.client.Core().Services(metav1.NamespaceAll).Watch(options)
 			},
 		},
 		&v1.Service{},
@@ -503,7 +503,7 @@ func (e *EndpointController) syncService(key string) error {
 // some stragglers could have been left behind if the endpoint controller
 // reboots).
 func (e *EndpointController) checkLeftoverEndpoints() {
-	list, err := e.client.Core().Endpoints(v1.NamespaceAll).List(v1.ListOptions{})
+	list, err := e.client.Core().Endpoints(metav1.NamespaceAll).List(metav1.ListOptions{})
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("Unable to list endpoints (%v); orphaned endpoints will not be cleaned up. (They're pretty harmless, but you can restart this component if you want another attempt made.)", err))
 		return

@@ -26,6 +26,7 @@ import (
 	"github.com/golang/glog"
 
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
@@ -122,11 +123,11 @@ func NewDeploymentController(federationClient fedclientset.Interface) *Deploymen
 	deploymentFedInformerFactory := func(cluster *fedv1.Cluster, clientset kubeclientset.Interface) (cache.Store, cache.Controller) {
 		return cache.NewInformer(
 			&cache.ListWatch{
-				ListFunc: func(options apiv1.ListOptions) (runtime.Object, error) {
-					return clientset.Extensions().Deployments(apiv1.NamespaceAll).List(options)
+				ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+					return clientset.Extensions().Deployments(metav1.NamespaceAll).List(options)
 				},
-				WatchFunc: func(options apiv1.ListOptions) (watch.Interface, error) {
-					return clientset.Extensions().Deployments(apiv1.NamespaceAll).Watch(options)
+				WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+					return clientset.Extensions().Deployments(metav1.NamespaceAll).Watch(options)
 				},
 			},
 			&extensionsv1.Deployment{},
@@ -149,11 +150,11 @@ func NewDeploymentController(federationClient fedclientset.Interface) *Deploymen
 	podFedInformerFactory := func(cluster *fedv1.Cluster, clientset kubeclientset.Interface) (cache.Store, cache.Controller) {
 		return cache.NewInformer(
 			&cache.ListWatch{
-				ListFunc: func(options apiv1.ListOptions) (runtime.Object, error) {
-					return clientset.Core().Pods(apiv1.NamespaceAll).List(options)
+				ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+					return clientset.Core().Pods(metav1.NamespaceAll).List(options)
 				},
-				WatchFunc: func(options apiv1.ListOptions) (watch.Interface, error) {
-					return clientset.Core().Pods(apiv1.NamespaceAll).Watch(options)
+				WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+					return clientset.Core().Pods(metav1.NamespaceAll).Watch(options)
 				},
 			},
 			&apiv1.Pod{},
@@ -169,11 +170,11 @@ func NewDeploymentController(federationClient fedclientset.Interface) *Deploymen
 
 	fdc.deploymentStore, fdc.deploymentController = cache.NewInformer(
 		&cache.ListWatch{
-			ListFunc: func(options apiv1.ListOptions) (runtime.Object, error) {
-				return fdc.fedClient.Extensions().Deployments(apiv1.NamespaceAll).List(options)
+			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+				return fdc.fedClient.Extensions().Deployments(metav1.NamespaceAll).List(options)
 			},
-			WatchFunc: func(options apiv1.ListOptions) (watch.Interface, error) {
-				return fdc.fedClient.Extensions().Deployments(apiv1.NamespaceAll).Watch(options)
+			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+				return fdc.fedClient.Extensions().Deployments(metav1.NamespaceAll).Watch(options)
 			},
 		},
 		&extensionsv1.Deployment{},

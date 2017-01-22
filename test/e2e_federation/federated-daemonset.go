@@ -104,7 +104,7 @@ var _ = framework.KubeDescribe("Federation daemonsets [Feature:Federation]", fun
 
 // deleteAllDaemonSetsOrFail deletes all DaemonSets in the given namespace name.
 func deleteAllDaemonSetsOrFail(clientset *fedclientset.Clientset, nsName string) {
-	DaemonSetList, err := clientset.Extensions().DaemonSets(nsName).List(v1.ListOptions{})
+	DaemonSetList, err := clientset.Extensions().DaemonSets(nsName).List(metav1.ListOptions{})
 	Expect(err).NotTo(HaveOccurred())
 	orphanDependents := false
 	for _, daemonSet := range DaemonSetList.Items {

@@ -49,7 +49,7 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&MasterConfiguration{},
 		&NodeConfiguration{},
 		&ClusterInfo{},
-		&api.ListOptions{},
+		&metav1.ListOptions{},
 		&api.DeleteOptions{},
 		&metav1.ExportOptions{},
 	)

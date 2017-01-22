@@ -100,7 +100,7 @@ var _ = framework.KubeDescribe("Federation secrets [Feature:Federation]", func()
 
 // deleteAllSecretsOrFail deletes all secrets in the given namespace name.
 func deleteAllSecretsOrFail(clientset *fedclientset.Clientset, nsName string) {
-	SecretList, err := clientset.Core().Secrets(nsName).List(v1.ListOptions{})
+	SecretList, err := clientset.Core().Secrets(nsName).List(metav1.ListOptions{})
 	Expect(err).NotTo(HaveOccurred())
 	orphanDependents := false
 	for _, Secret := range SecretList.Items {

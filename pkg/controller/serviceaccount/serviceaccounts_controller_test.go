@@ -37,7 +37,7 @@ type serverResponse struct {
 }
 
 func TestServiceAccountCreation(t *testing.T) {
-	ns := v1.NamespaceDefault
+	ns := metav1.NamespaceDefault
 
 	defaultName := "default"
 	managedName := "managed"

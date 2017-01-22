@@ -126,7 +126,7 @@ func (f *Framework) FederationAfterEach() {
 			framework.Logf("Warning: framework is marked federated, but has no federation 1.5 clientset")
 			return
 		}
-		if err := f.FederationClientset.Federation().Clusters().DeleteCollection(nil, v1.ListOptions{}); err != nil {
+		if err := f.FederationClientset.Federation().Clusters().DeleteCollection(nil, metav1.ListOptions{}); err != nil {
 			framework.Logf("Error: failed to delete Clusters: %+v", err)
 		}
 	}()
@@ -134,7 +134,7 @@ func (f *Framework) FederationAfterEach() {
 	// Print events if the test failed.
 	if CurrentGinkgoTestDescription().Failed && framework.TestContext.DumpLogsOnFailure {
 		// Dump federation events in federation namespace.
-		framework.DumpEventsInNamespace(func(opts v1.ListOptions, ns string) (*v1.EventList, error) {
+		framework.DumpEventsInNamespace(func(opts metav1.ListOptions, ns string) (*v1.EventList, error) {
 			return f.FederationClientset.Core().Events(ns).List(opts)
 		}, f.FederationNamespace.Name)
 		// Print logs of federation control plane pods (federation-apiserver and federation-controller-manager)

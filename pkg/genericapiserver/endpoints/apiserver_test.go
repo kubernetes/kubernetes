@@ -2169,7 +2169,7 @@ func TestPatch(t *testing.T) {
 		t:           t,
 		expectedSet: "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple/" + ID,
 		name:        ID,
-		namespace:   api.NamespaceDefault,
+		namespace:   metav1.NamespaceDefault,
 	}
 	handler := handleLinker(storage, selfLinker)
 	server := httptest.NewServer(handler)
@@ -2229,7 +2229,7 @@ func TestUpdate(t *testing.T) {
 		t:           t,
 		expectedSet: "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple/" + ID,
 		name:        ID,
-		namespace:   api.NamespaceDefault,
+		namespace:   metav1.NamespaceDefault,
 	}
 	handler := handleLinker(storage, selfLinker)
 	server := httptest.NewServer(handler)
@@ -2275,7 +2275,7 @@ func TestUpdateInvokesAdmissionControl(t *testing.T) {
 	item := &genericapitesting.Simple{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      ID,
-			Namespace: api.NamespaceDefault,
+			Namespace: metav1.NamespaceDefault,
 		},
 		Other: "bar",
 	}
@@ -2446,7 +2446,7 @@ func TestUpdateMissing(t *testing.T) {
 	item := &genericapitesting.Simple{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      ID,
-			Namespace: api.NamespaceDefault,
+			Namespace: metav1.NamespaceDefault,
 		},
 		Other: "bar",
 	}

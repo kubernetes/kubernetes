@@ -52,7 +52,6 @@ import (
 	kubecontainertesting "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/server/remotecommand"
 	"k8s.io/kubernetes/pkg/kubelet/server/stats"
-	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/util/httpstream"
 	"k8s.io/kubernetes/pkg/util/httpstream/spdy"
 	"k8s.io/kubernetes/pkg/util/term"
@@ -265,7 +264,7 @@ func readResp(resp *http.Response) (string, error) {
 // A helper function to return the correct pod name.
 func getPodName(name, namespace string) string {
 	if namespace == "" {
-		namespace = kubetypes.NamespaceDefault
+		namespace = metav1.NamespaceDefault
 	}
 	return name + "_" + namespace
 }

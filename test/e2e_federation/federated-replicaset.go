@@ -139,7 +139,7 @@ var _ = framework.KubeDescribe("Federation replicasets [Feature:Federation]", fu
 
 // deleteAllReplicaSetsOrFail deletes all replicasets in the given namespace name.
 func deleteAllReplicaSetsOrFail(clientset *fedclientset.Clientset, nsName string) {
-	replicasetList, err := clientset.Extensions().ReplicaSets(nsName).List(v1.ListOptions{})
+	replicasetList, err := clientset.Extensions().ReplicaSets(nsName).List(metav1.ListOptions{})
 	Expect(err).NotTo(HaveOccurred())
 	orphanDependents := false
 	for _, replicaset := range replicasetList.Items {

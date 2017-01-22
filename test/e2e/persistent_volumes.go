@@ -507,7 +507,7 @@ var _ = framework.KubeDescribe("PersistentVolumes", func() {
 
 		// config for the nfs-server pod in the default namespace
 		NFSconfig = VolumeTestConfig{
-			namespace:   v1.NamespaceDefault,
+			namespace:   metav1.NamespaceDefault,
 			prefix:      "nfs",
 			serverImage: NfsServerImage,
 			serverPorts: []int{2049},

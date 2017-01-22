@@ -205,7 +205,7 @@ var _ = framework.KubeDescribe("Federated ingresses [Feature:Federation]", func(
 // Deletes all Ingresses in the given namespace name.
 func deleteAllIngressesOrFail(clientset *fedclientset.Clientset, nsName string) {
 	orphanDependents := false
-	err := clientset.Extensions().Ingresses(nsName).DeleteCollection(&v1.DeleteOptions{OrphanDependents: &orphanDependents}, v1.ListOptions{})
+	err := clientset.Extensions().Ingresses(nsName).DeleteCollection(&v1.DeleteOptions{OrphanDependents: &orphanDependents}, metav1.ListOptions{})
 	Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("Error in deleting ingresses in namespace: %s", nsName))
 }
 

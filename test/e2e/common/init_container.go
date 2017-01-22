@@ -82,7 +82,7 @@ var _ = framework.KubeDescribe("InitContainer", func() {
 			Expect(err).To(BeNil())
 		}
 		startedPod := podClient.Create(pod)
-		w, err := podClient.Watch(v1.SingleObject(startedPod.ObjectMeta))
+		w, err := podClient.Watch(metav1.SingleObject(startedPod.ObjectMeta))
 		Expect(err).NotTo(HaveOccurred(), "error watching a pod")
 		wr := watch.NewRecorder(w)
 		event, err := watch.Until(framework.PodStartTimeout, wr, conditions.PodCompleted)
@@ -151,7 +151,7 @@ var _ = framework.KubeDescribe("InitContainer", func() {
 			Expect(err).To(BeNil())
 		}
 		startedPod := podClient.Create(pod)
-		w, err := podClient.Watch(v1.SingleObject(startedPod.ObjectMeta))
+		w, err := podClient.Watch(metav1.SingleObject(startedPod.ObjectMeta))
 		Expect(err).NotTo(HaveOccurred(), "error watching a pod")
 		wr := watch.NewRecorder(w)
 		event, err := watch.Until(framework.PodStartTimeout, wr, conditions.PodRunning)
@@ -221,7 +221,7 @@ var _ = framework.KubeDescribe("InitContainer", func() {
 			Expect(err).To(BeNil())
 		}
 		startedPod := podClient.Create(pod)
-		w, err := podClient.Watch(v1.SingleObject(startedPod.ObjectMeta))
+		w, err := podClient.Watch(metav1.SingleObject(startedPod.ObjectMeta))
 		Expect(err).NotTo(HaveOccurred(), "error watching a pod")
 
 		wr := watch.NewRecorder(w)
@@ -345,7 +345,7 @@ var _ = framework.KubeDescribe("InitContainer", func() {
 		}
 		startedPod := podClient.Create(pod)
 
-		w, err := podClient.Watch(v1.SingleObject(startedPod.ObjectMeta))
+		w, err := podClient.Watch(metav1.SingleObject(startedPod.ObjectMeta))
 		Expect(err).NotTo(HaveOccurred(), "error watching a pod")
 
 		wr := watch.NewRecorder(w)

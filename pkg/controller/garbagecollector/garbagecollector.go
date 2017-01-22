@@ -450,24 +450,24 @@ type GarbageCollector struct {
 
 func gcListWatcher(client *dynamic.Client, resource schema.GroupVersionResource) *cache.ListWatch {
 	return &cache.ListWatch{
-		ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
+		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 			// APIResource.Kind is not used by the dynamic client, so
 			// leave it empty. We want to list this resource in all
 			// namespaces if it's namespace scoped, so leave
 			// APIResource.Namespaced as false is all right.
 			apiResource := metav1.APIResource{Name: resource.Resource}
 			return client.ParameterCodec(dynamic.VersionedParameterEncoderWithV1Fallback).
-				Resource(&apiResource, v1.NamespaceAll).
+				Resource(&apiResource, metav1.NamespaceAll).
 				List(&options)
 		},
-		WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
+		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 			// APIResource.Kind is not used by the dynamic client, so
 			// leave it empty. We want to list this resource in all
 			// namespaces if it's namespace scoped, so leave
 			// APIResource.Namespaced as false is all right.
 			apiResource := metav1.APIResource{Name: resource.Resource}
 			return client.ParameterCodec(dynamic.VersionedParameterEncoderWithV1Fallback).
-				Resource(&apiResource, v1.NamespaceAll).
+				Resource(&apiResource, metav1.NamespaceAll).
 				Watch(&options)
 		},
 	}

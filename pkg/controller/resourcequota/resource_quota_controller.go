@@ -95,11 +95,11 @@ func NewResourceQuotaController(options *ResourceQuotaControllerOptions) *Resour
 	// build the controller that observes quota
 	rq.rqIndexer, rq.rqController = cache.NewIndexerInformer(
 		&cache.ListWatch{
-			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
-				return rq.kubeClient.Core().ResourceQuotas(v1.NamespaceAll).List(options)
+			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+				return rq.kubeClient.Core().ResourceQuotas(metav1.NamespaceAll).List(options)
 			},
-			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
-				return rq.kubeClient.Core().ResourceQuotas(v1.NamespaceAll).Watch(options)
+			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+				return rq.kubeClient.Core().ResourceQuotas(metav1.NamespaceAll).Watch(options)
 			},
 		},
 		&v1.ResourceQuota{},

@@ -21,6 +21,7 @@ import (
 	"strings"
 
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
@@ -49,8 +50,8 @@ const (
 func deletePods(kubeClient clientset.Interface, recorder record.EventRecorder, nodeName, nodeUID string, daemonStore listers.StoreToDaemonSetLister) (bool, error) {
 	remaining := false
 	selector := fields.OneTermEqualSelector(api.PodHostField, nodeName).String()
-	options := v1.ListOptions{FieldSelector: selector}
-	pods, err := kubeClient.Core().Pods(v1.NamespaceAll).List(options)
+	options := metav1.ListOptions{FieldSelector: selector}
+	pods, err := kubeClient.Core().Pods(metav1.NamespaceAll).List(options)
 	var updateErrList []error
 
 	if err != nil {
@@ -203,8 +204,8 @@ func markAllPodsNotReady(kubeClient clientset.Interface, node *v1.Node) error {
 	}
 	nodeName := node.Name
 	glog.V(2).Infof("Update ready status of pods on node [%v]", nodeName)
-	opts := v1.ListOptions{FieldSelector: fields.OneTermEqualSelector(api.PodHostField, nodeName).String()}
-	pods, err := kubeClient.Core().Pods(v1.NamespaceAll).List(opts)
+	opts := metav1.ListOptions{FieldSelector: fields.OneTermEqualSelector(api.PodHostField, nodeName).String()}
+	pods, err := kubeClient.Core().Pods(metav1.NamespaceAll).List(opts)
 	if err != nil {
 		return err
 	}

@@ -203,7 +203,7 @@ func TestBind(t *testing.T) {
 	}{
 		{binding: &v1.Binding{
 			ObjectMeta: metav1.ObjectMeta{
-				Namespace: v1.NamespaceDefault,
+				Namespace: metav1.NamespaceDefault,
 				Name:      "foo",
 			},
 			Target: v1.ObjectReference{
@@ -228,7 +228,7 @@ func TestBind(t *testing.T) {
 			continue
 		}
 		expectedBody := runtime.EncodeOrDie(testapi.Default.Codec(), item.binding)
-		handler.ValidateRequest(t, testapi.Default.ResourcePath("bindings", v1.NamespaceDefault, ""), "POST", &expectedBody)
+		handler.ValidateRequest(t, testapi.Default.ResourcePath("bindings", metav1.NamespaceDefault, ""), "POST", &expectedBody)
 	}
 }
 

@@ -59,12 +59,12 @@ var _ = framework.KubeDescribe("Daemon set [Serial]", func() {
 	var f *framework.Framework
 
 	AfterEach(func() {
-		if daemonsets, err := f.ClientSet.Extensions().DaemonSets(f.Namespace.Name).List(v1.ListOptions{}); err == nil {
+		if daemonsets, err := f.ClientSet.Extensions().DaemonSets(f.Namespace.Name).List(metav1.ListOptions{}); err == nil {
 			framework.Logf("daemonset: %s", runtime.EncodeOrDie(api.Codecs.LegacyCodec(api.Registry.EnabledVersions()...), daemonsets))
 		} else {
 			framework.Logf("unable to dump daemonsets: %v", err)
 		}
-		if pods, err := f.ClientSet.Core().Pods(f.Namespace.Name).List(v1.ListOptions{}); err == nil {
+		if pods, err := f.ClientSet.Core().Pods(f.Namespace.Name).List(metav1.ListOptions{}); err == nil {
 			framework.Logf("pods: %s", runtime.EncodeOrDie(api.Codecs.LegacyCodec(api.Registry.EnabledVersions()...), pods))
 		} else {
 			framework.Logf("unable to dump pods: %v", err)
@@ -136,7 +136,7 @@ var _ = framework.KubeDescribe("Daemon set [Serial]", func() {
 		podClient := c.Core().Pods(ns)
 
 		selector := labels.Set(label).AsSelector()
-		options := v1.ListOptions{LabelSelector: selector.String()}
+		options := metav1.ListOptions{LabelSelector: selector.String()}
 		podList, err := podClient.List(options)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(len(podList.Items)).To(BeNumerically(">", 0))
@@ -345,7 +345,7 @@ func setDaemonSetNodeLabels(c clientset.Interface, nodeName string, labels map[s
 func checkDaemonPodOnNodes(f *framework.Framework, selector map[string]string, nodeNames []string) func() (bool, error) {
 	return func() (bool, error) {
 		selector := labels.Set(selector).AsSelector()
-		options := v1.ListOptions{LabelSelector: selector.String()}
+		options := metav1.ListOptions{LabelSelector: selector.String()}
 		podList, err := f.ClientSet.Core().Pods(f.Namespace.Name).List(options)
 		if err != nil {
 			return false, nil
@@ -374,7 +374,7 @@ func checkDaemonPodOnNodes(f *framework.Framework, selector map[string]string, n
 
 func checkRunningOnAllNodes(f *framework.Framework, selector map[string]string) func() (bool, error) {
 	return func() (bool, error) {
-		nodeList, err := f.ClientSet.Core().Nodes().List(v1.ListOptions{})
+		nodeList, err := f.ClientSet.Core().Nodes().List(metav1.ListOptions{})
 		framework.ExpectNoError(err)
 		nodeNames := make([]string, 0)
 		for _, node := range nodeList.Items {
