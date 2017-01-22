@@ -146,15 +146,16 @@ func (d *fakeCachedDiscoveryClient) Invalidate() {
 }
 
 type TestFactory struct {
-	Mapper       meta.RESTMapper
-	Typer        runtime.ObjectTyper
-	Client       kubectl.RESTClient
-	Describer    kubectl.Describer
-	Printer      kubectl.ResourcePrinter
-	Validator    validation.Schema
-	Namespace    string
-	ClientConfig *restclient.Config
-	Err          error
+	Mapper             meta.RESTMapper
+	Typer              runtime.ObjectTyper
+	Client             kubectl.RESTClient
+	UnstructuredClient kubectl.RESTClient
+	Describer          kubectl.Describer
+	Printer            kubectl.ResourcePrinter
+	Validator          validation.Schema
+	Namespace          string
+	ClientConfig       *restclient.Config
+	Err                error
 }
 
 type FakeFactory struct {
@@ -251,7 +252,7 @@ func (f *FakeFactory) ClientConfigForVersion(requiredVersion *schema.GroupVersio
 }
 
 func (f *FakeFactory) UnstructuredClientForMapping(*meta.RESTMapping) (resource.RESTClient, error) {
-	return nil, nil
+	return f.tf.UnstructuredClient, f.tf.Err
 }
 
 func (f *FakeFactory) Describer(*meta.RESTMapping) (kubectl.Describer, error) {
@@ -497,7 +498,7 @@ func (f *fakeAPIFactory) ClientForMapping(*meta.RESTMapping) (resource.RESTClien
 }
 
 func (f *fakeAPIFactory) UnstructuredClientForMapping(*meta.RESTMapping) (resource.RESTClient, error) {
-	return f.tf.Client, f.tf.Err
+	return f.tf.UnstructuredClient, f.tf.Err
 }
 
 func (f *fakeAPIFactory) Describer(*meta.RESTMapping) (kubectl.Describer, error) {
