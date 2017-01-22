@@ -293,7 +293,7 @@ func TestServiceRegistryUpdate(t *testing.T) {
 	ctx := genericapirequest.NewDefaultContext()
 	storage, registry := NewTestREST(t, nil)
 	svc, err := registry.CreateService(ctx, &api.Service{
-		ObjectMeta: metav1.ObjectMeta{Name: "foo", ResourceVersion: "1", Namespace: api.NamespaceDefault},
+		ObjectMeta: metav1.ObjectMeta{Name: "foo", ResourceVersion: "1", Namespace: metav1.NamespaceDefault},
 		Spec: api.ServiceSpec{
 			Selector: map[string]string{"bar": "baz1"},
 			Ports: []api.ServicePort{{
@@ -560,7 +560,7 @@ func TestServiceRegistryResourceLocation(t *testing.T) {
 			{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "foo",
-					Namespace: api.NamespaceDefault,
+					Namespace: metav1.NamespaceDefault,
 				},
 				Subsets: []api.EndpointSubset{{
 					Addresses: []api.EndpointAddress{{IP: "1.2.3.4"}},
@@ -570,7 +570,7 @@ func TestServiceRegistryResourceLocation(t *testing.T) {
 			{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "foo",
-					Namespace: api.NamespaceDefault,
+					Namespace: metav1.NamespaceDefault,
 				},
 				Subsets: []api.EndpointSubset{{
 					Addresses: []api.EndpointAddress{},
@@ -678,13 +678,13 @@ func TestServiceRegistryList(t *testing.T) {
 	ctx := genericapirequest.NewDefaultContext()
 	storage, registry := NewTestREST(t, nil)
 	registry.CreateService(ctx, &api.Service{
-		ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: api.NamespaceDefault},
+		ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: metav1.NamespaceDefault},
 		Spec: api.ServiceSpec{
 			Selector: map[string]string{"bar": "baz"},
 		},
 	})
 	registry.CreateService(ctx, &api.Service{
-		ObjectMeta: metav1.ObjectMeta{Name: "foo2", Namespace: api.NamespaceDefault},
+		ObjectMeta: metav1.ObjectMeta{Name: "foo2", Namespace: metav1.NamespaceDefault},
 		Spec: api.ServiceSpec{
 			Selector: map[string]string{"bar2": "baz2"},
 		},

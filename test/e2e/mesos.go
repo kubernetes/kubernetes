@@ -45,7 +45,7 @@ var _ = framework.KubeDescribe("Mesos", func() {
 		nodeClient := f.ClientSet.Core().Nodes()
 
 		rackA := labels.SelectorFromSet(map[string]string{"k8s.mesosphere.io/attribute-rack": "1"})
-		options := v1.ListOptions{LabelSelector: rackA.String()}
+		options := metav1.ListOptions{LabelSelector: rackA.String()}
 		nodes, err := nodeClient.List(options)
 		if err != nil {
 			framework.Failf("Failed to query for node: %v", err)
@@ -110,7 +110,7 @@ var _ = framework.KubeDescribe("Mesos", func() {
 		rack2 := labels.SelectorFromSet(map[string]string{
 			"k8s.mesosphere.io/attribute-rack": "2",
 		})
-		options := v1.ListOptions{LabelSelector: rack2.String()}
+		options := metav1.ListOptions{LabelSelector: rack2.String()}
 		nodes, err := nodeClient.List(options)
 		framework.ExpectNoError(err)
 

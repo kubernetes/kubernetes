@@ -59,7 +59,7 @@ func (r *ServiceRegistry) ListServices(ctx genericapirequest.Context, options *m
 	res.TypeMeta = r.List.TypeMeta
 	res.ListMeta = r.List.ListMeta
 
-	if ns != api.NamespaceAll {
+	if ns != metav1.NamespaceAll {
 		for _, service := range r.List.Items {
 			if ns == service.Namespace {
 				res.Items = append(res.Items, service)

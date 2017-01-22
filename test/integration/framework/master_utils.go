@@ -267,7 +267,7 @@ func startMasterOrDie(masterConfig *master.Config, incomingServer *httptest.Serv
 	if masterConfig.EnableCoreControllers {
 		// TODO Once /healthz is updated for posthooks, we'll wait for good health
 		coreClient := coreclient.NewForConfigOrDie(&cfg)
-		svcWatch, err := coreClient.Services(v1.NamespaceDefault).Watch(v1.ListOptions{})
+		svcWatch, err := coreClient.Services(metav1.NamespaceDefault).Watch(metav1.ListOptions{})
 		if err != nil {
 			glog.Fatal(err)
 		}

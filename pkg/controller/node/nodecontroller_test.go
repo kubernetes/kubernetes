@@ -80,7 +80,7 @@ func NewNodeControllerFromClient(
 }
 
 func syncNodeStore(nc *NodeController, fakeNodeHandler *testutil.FakeNodeHandler) error {
-	nodes, err := fakeNodeHandler.List(v1.ListOptions{})
+	nodes, err := fakeNodeHandler.List(metav1.ListOptions{})
 	if err != nil {
 		return err
 	}

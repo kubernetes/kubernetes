@@ -349,8 +349,8 @@ func TestGCListWatcher(t *testing.T) {
 		t.Fatal(err)
 	}
 	lw := gcListWatcher(client, podResource)
-	lw.Watch(v1.ListOptions{ResourceVersion: "1"})
-	lw.List(v1.ListOptions{ResourceVersion: "1"})
+	lw.Watch(metav1.ListOptions{ResourceVersion: "1"})
+	lw.List(metav1.ListOptions{ResourceVersion: "1"})
 	if e, a := 2, len(testHandler.actions); e != a {
 		t.Errorf("expect %d requests, got %d", e, a)
 	}

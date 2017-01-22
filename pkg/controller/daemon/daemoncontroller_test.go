@@ -58,7 +58,7 @@ func newDaemonSet(name string) *extensions.DaemonSet {
 		TypeMeta: metav1.TypeMeta{APIVersion: testapi.Extensions.GroupVersion().String()},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
-			Namespace: v1.NamespaceDefault,
+			Namespace: metav1.NamespaceDefault,
 		},
 		Spec: extensions.DaemonSetSpec{
 			Selector: &metav1.LabelSelector{MatchLabels: simpleDaemonSetLabel},
@@ -88,7 +88,7 @@ func newNode(name string, label map[string]string) *v1.Node {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Labels:    label,
-			Namespace: v1.NamespaceDefault,
+			Namespace: metav1.NamespaceDefault,
 		},
 		Status: v1.NodeStatus{
 			Conditions: []v1.NodeCondition{
@@ -113,7 +113,7 @@ func newPod(podName string, nodeName string, label map[string]string) *v1.Pod {
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: podName,
 			Labels:       label,
-			Namespace:    v1.NamespaceDefault,
+			Namespace:    metav1.NamespaceDefault,
 		},
 		Spec: v1.PodSpec{
 			NodeName: nodeName,
@@ -377,7 +377,7 @@ func TestPortConflictWithSameDaemonPodDoesNotDeletePod(t *testing.T) {
 	manager.podStore.Indexer.Add(&v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Labels:    simpleDaemonSetLabel,
-			Namespace: v1.NamespaceDefault,
+			Namespace: metav1.NamespaceDefault,
 		},
 		Spec: podSpec,
 	})
@@ -427,7 +427,7 @@ func TestPodIsNotDeletedByDaemonsetWithEmptyLabelSelector(t *testing.T) {
 	manager.podStore.Indexer.Add(&v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Labels:    map[string]string{"bang": "boom"},
-			Namespace: v1.NamespaceDefault,
+			Namespace: metav1.NamespaceDefault,
 		},
 		Spec: v1.PodSpec{
 			NodeName: "node1",

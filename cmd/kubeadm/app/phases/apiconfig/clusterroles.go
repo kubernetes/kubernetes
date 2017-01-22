@@ -21,7 +21,6 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/master"
-	"k8s.io/kubernetes/pkg/api"
 	rbac "k8s.io/kubernetes/pkg/apis/rbac/v1beta1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 )
@@ -66,7 +65,7 @@ func CreateKubeDNSRBACClusterRole(clientset *clientset.Clientset) error {
 	subject := rbac.Subject{
 		Kind:      "ServiceAccount",
 		Name:      master.KubeDNS,
-		Namespace: api.NamespaceSystem,
+		Namespace: metav1.NamespaceSystem,
 	}
 
 	clusterRoleBinding := rbac.ClusterRoleBinding{

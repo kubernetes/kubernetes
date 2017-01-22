@@ -33,7 +33,6 @@ import (
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	kubeapiserveradmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
@@ -108,15 +107,11 @@ func (a *serviceAccount) SetInternalClientSet(cl internalclientset.Interface) {
 	a.client = cl
 	a.serviceAccounts, a.serviceAccountsReflector = cache.NewNamespaceKeyedIndexerAndReflector(
 		&cache.ListWatch{
-			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
-				internalOptions := api.ListOptions{}
-				v1.Convert_v1_ListOptions_To_api_ListOptions(&options, &internalOptions, nil)
-				return cl.Core().ServiceAccounts(api.NamespaceAll).List(internalOptions)
+			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+				return cl.Core().ServiceAccounts(metav1.NamespaceAll).List(options)
 			},
-			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
-				internalOptions := api.ListOptions{}
-				v1.Convert_v1_ListOptions_To_api_ListOptions(&options, &internalOptions, nil)
-				return cl.Core().ServiceAccounts(api.NamespaceAll).Watch(internalOptions)
+			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+				return cl.Core().ServiceAccounts(metav1.NamespaceAll).Watch(options)
 			},
 		},
 		&api.ServiceAccount{},
@@ -126,17 +121,13 @@ func (a *serviceAccount) SetInternalClientSet(cl internalclientset.Interface) {
 	tokenSelector := fields.SelectorFromSet(map[string]string{api.SecretTypeField: string(api.SecretTypeServiceAccountToken)})
 	a.secrets, a.secretsReflector = cache.NewNamespaceKeyedIndexerAndReflector(
 		&cache.ListWatch{
-			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
-				internalOptions := api.ListOptions{}
-				v1.Convert_v1_ListOptions_To_api_ListOptions(&options, &internalOptions, nil)
-				internalOptions.FieldSelector = tokenSelector
-				return cl.Core().Secrets(api.NamespaceAll).List(internalOptions)
+			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+				options.FieldSelector = tokenSelector.String()
+				return cl.Core().Secrets(metav1.NamespaceAll).List(options)
 			},
-			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
-				internalOptions := api.ListOptions{}
-				v1.Convert_v1_ListOptions_To_api_ListOptions(&options, &internalOptions, nil)
-				internalOptions.FieldSelector = tokenSelector
-				return cl.Core().Secrets(api.NamespaceAll).Watch(internalOptions)
+			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+				options.FieldSelector = tokenSelector.String()
+				return cl.Core().Secrets(metav1.NamespaceAll).Watch(options)
 			},
 		},
 		&api.Secret{},

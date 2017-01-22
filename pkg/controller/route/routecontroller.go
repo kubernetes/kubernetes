@@ -72,10 +72,10 @@ func New(routes cloudprovider.Routes, kubeClient clientset.Interface, clusterNam
 
 	rc.nodeStore.Store, rc.nodeController = cache.NewInformer(
 		&cache.ListWatch{
-			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
+			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 				return rc.kubeClient.Core().Nodes().List(options)
 			},
-			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
+			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 				return rc.kubeClient.Core().Nodes().Watch(options)
 			},
 		},

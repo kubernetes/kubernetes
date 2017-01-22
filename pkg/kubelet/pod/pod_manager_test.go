@@ -118,7 +118,7 @@ func TestDeletePods(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			UID:       types.UID("mirror-pod-uid"),
 			Name:      "mirror-static-pod-name",
-			Namespace: v1.NamespaceDefault,
+			Namespace: metav1.NamespaceDefault,
 			Annotations: map[string]string{
 				kubetypes.ConfigSourceAnnotationKey: "api",
 				kubetypes.ConfigMirrorAnnotationKey: "mirror",
@@ -129,7 +129,7 @@ func TestDeletePods(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			UID:         types.UID("static-pod-uid"),
 			Name:        "mirror-static-pod-name",
-			Namespace:   v1.NamespaceDefault,
+			Namespace:   metav1.NamespaceDefault,
 			Annotations: map[string]string{kubetypes.ConfigSourceAnnotationKey: "file"},
 		},
 	}
@@ -139,7 +139,7 @@ func TestDeletePods(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{
 				UID:         types.UID("extra-pod-uid"),
 				Name:        "extra-pod-name",
-				Namespace:   v1.NamespaceDefault,
+				Namespace:   metav1.NamespaceDefault,
 				Annotations: map[string]string{kubetypes.ConfigSourceAnnotationKey: "api"},
 			},
 		},

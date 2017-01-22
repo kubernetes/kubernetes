@@ -48,7 +48,7 @@ func validNewResourceQuota() *api.ResourceQuota {
 	return &api.ResourceQuota{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "foo",
-			Namespace: api.NamespaceDefault,
+			Namespace: metav1.NamespaceDefault,
 		},
 		Spec: api.ResourceQuotaSpec{
 			Hard: api.ResourceList{
@@ -168,7 +168,7 @@ func TestUpdateStatus(t *testing.T) {
 	resourcequotaIn := &api.ResourceQuota{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "foo",
-			Namespace: api.NamespaceDefault,
+			Namespace: metav1.NamespaceDefault,
 		},
 		Status: api.ResourceQuotaStatus{
 			Used: api.ResourceList{

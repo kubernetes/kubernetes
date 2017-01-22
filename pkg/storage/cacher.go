@@ -35,7 +35,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/util"
 
@@ -692,7 +691,7 @@ func newCacherListerWatcher(storage Interface, resourcePrefix string, newListFun
 }
 
 // Implements cache.ListerWatcher interface.
-func (lw *cacherListerWatcher) List(options v1.ListOptions) (runtime.Object, error) {
+func (lw *cacherListerWatcher) List(options metav1.ListOptions) (runtime.Object, error) {
 	list := lw.newListFunc()
 	if err := lw.storage.List(context.TODO(), lw.resourcePrefix, "", Everything, list); err != nil {
 		return nil, err
@@ -701,7 +700,7 @@ func (lw *cacherListerWatcher) List(options v1.ListOptions) (runtime.Object, err
 }
 
 // Implements cache.ListerWatcher interface.
-func (lw *cacherListerWatcher) Watch(options v1.ListOptions) (watch.Interface, error) {
+func (lw *cacherListerWatcher) Watch(options metav1.ListOptions) (watch.Interface, error) {
 	return lw.storage.WatchList(context.TODO(), lw.resourcePrefix, options.ResourceVersion, Everything)
 }
 

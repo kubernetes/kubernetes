@@ -35,7 +35,7 @@ import (
 )
 
 const (
-	namespace = api.NamespaceDefault
+	namespace = metav1.NamespaceDefault
 	name      = "foo"
 )
 

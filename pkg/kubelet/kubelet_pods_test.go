@@ -258,7 +258,7 @@ func buildService(name, namespace, clusterIP, protocol string, port int) *v1.Ser
 
 func TestMakeEnvironmentVariables(t *testing.T) {
 	services := []*v1.Service{
-		buildService("kubernetes", v1.NamespaceDefault, "1.2.3.1", "TCP", 8081),
+		buildService("kubernetes", metav1.NamespaceDefault, "1.2.3.1", "TCP", 8081),
 		buildService("test", "test1", "1.2.3.3", "TCP", 8083),
 		buildService("kubernetes", "test2", "1.2.3.4", "TCP", 8084),
 		buildService("test", "test2", "1.2.3.5", "TCP", 8085),
@@ -296,7 +296,7 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 					{Name: "TEST_PORT_8083_TCP_ADDR", Value: "1.2.3.3"},
 				},
 			},
-			masterServiceNs: v1.NamespaceDefault,
+			masterServiceNs: metav1.NamespaceDefault,
 			nilLister:       false,
 			expectedEnvs: []kubecontainer.EnvVar{
 				{Name: "FOO", Value: "BAR"},
@@ -331,7 +331,7 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 					{Name: "TEST_PORT_8083_TCP_ADDR", Value: "1.2.3.3"},
 				},
 			},
-			masterServiceNs: v1.NamespaceDefault,
+			masterServiceNs: metav1.NamespaceDefault,
 			nilLister:       true,
 			expectedEnvs: []kubecontainer.EnvVar{
 				{Name: "FOO", Value: "BAR"},
@@ -352,7 +352,7 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 					{Name: "FOO", Value: "BAZ"},
 				},
 			},
-			masterServiceNs: v1.NamespaceDefault,
+			masterServiceNs: metav1.NamespaceDefault,
 			nilLister:       false,
 			expectedEnvs: []kubecontainer.EnvVar{
 				{Name: "FOO", Value: "BAZ"},

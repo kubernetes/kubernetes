@@ -62,7 +62,7 @@ var _ = framework.KubeDescribe("Pod garbage collector [Feature:PodGarbageCollect
 
 		By(fmt.Sprintf("Waiting for gc controller to gc all but %d pods", gcThreshold))
 		pollErr := wait.Poll(1*time.Minute, timeout, func() (bool, error) {
-			pods, err = f.ClientSet.Core().Pods(f.Namespace.Name).List(v1.ListOptions{})
+			pods, err = f.ClientSet.Core().Pods(f.Namespace.Name).List(metav1.ListOptions{})
 			if err != nil {
 				framework.Logf("Failed to list pod %v", err)
 				return false, nil

@@ -41,7 +41,7 @@ var _ = framework.KubeDescribe("Federation apiserver [Feature:Federation]", func
 
 			// Delete registered clusters.
 			// This is if a test failed, it should not affect other tests.
-			clusterList, err := f.FederationClientset.Federation().Clusters().List(v1.ListOptions{})
+			clusterList, err := f.FederationClientset.Federation().Clusters().List(metav1.ListOptions{})
 			Expect(err).NotTo(HaveOccurred())
 			for _, cluster := range clusterList.Items {
 				err := f.FederationClientset.Federation().Clusters().Delete(cluster.Name, &v1.DeleteOptions{})
@@ -76,7 +76,7 @@ var _ = framework.KubeDescribe("Federation apiserver [Feature:Federation]", func
 
 			// There should not be any remaining cluster.
 			framework.Logf("Verifying that zero clusters remain")
-			clusterList, err := f.FederationClientset.Federation().Clusters().List(v1.ListOptions{})
+			clusterList, err := f.FederationClientset.Federation().Clusters().List(metav1.ListOptions{})
 			Expect(err).NotTo(HaveOccurred())
 			if len(clusterList.Items) != 0 {
 				framework.Failf("there should not have been any remaining clusters. Found: %+v", clusterList)

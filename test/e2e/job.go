@@ -296,7 +296,7 @@ func deleteJob(c clientset.Interface, ns, name string) error {
 func waitForAllPodsRunning(c clientset.Interface, ns, jobName string, parallelism int32) error {
 	label := labels.SelectorFromSet(labels.Set(map[string]string{jobSelectorKey: jobName}))
 	return wait.Poll(framework.Poll, jobTimeout, func() (bool, error) {
-		options := v1.ListOptions{LabelSelector: label.String()}
+		options := metav1.ListOptions{LabelSelector: label.String()}
 		pods, err := c.Core().Pods(ns).List(options)
 		if err != nil {
 			return false, err

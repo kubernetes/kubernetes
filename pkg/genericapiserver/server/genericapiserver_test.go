@@ -120,7 +120,7 @@ func TestInstallAPIGroups(t *testing.T) {
 		scheme.AddKnownTypeWithName(gv.WithKind("Getter"), getter.New())
 		scheme.AddKnownTypeWithName(gv.WithKind("NoVerb"), noVerbs.New())
 		scheme.AddKnownTypes(v1.SchemeGroupVersion,
-			&v1.ListOptions{},
+			&metav1.ListOptions{},
 			&v1.DeleteOptions{},
 			&metav1.ExportOptions{},
 			&metav1.Status{},

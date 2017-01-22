@@ -298,7 +298,7 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 			label := labels.SelectorFromSet(labels.Set(map[string]string{"app": "cassandra"}))
 			err = wait.PollImmediate(statefulsetPoll, statefulsetTimeout,
 				func() (bool, error) {
-					podList, err := c.Core().Pods(ns).List(v1.ListOptions{LabelSelector: label.String()})
+					podList, err := c.Core().Pods(ns).List(metav1.ListOptions{LabelSelector: label.String()})
 					if err != nil {
 						return false, fmt.Errorf("Unable to get list of pods in statefulset %s", label)
 					}

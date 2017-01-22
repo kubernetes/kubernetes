@@ -60,7 +60,7 @@ func TestJobStrategy(t *testing.T) {
 	job := &batch.Job{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "myjob",
-			Namespace: api.NamespaceDefault,
+			Namespace: metav1.NamespaceDefault,
 		},
 		Spec: batch.JobSpec{
 			Selector:       validSelector,
@@ -117,7 +117,7 @@ func TestJobStrategyWithGeneration(t *testing.T) {
 	job := &batch.Job{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "myjob2",
-			Namespace: api.NamespaceDefault,
+			Namespace: metav1.NamespaceDefault,
 			UID:       theUID,
 		},
 		Spec: batch.JobSpec{
@@ -178,7 +178,7 @@ func TestJobStatusStrategy(t *testing.T) {
 	oldJob := &batch.Job{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            "myjob",
-			Namespace:       api.NamespaceDefault,
+			Namespace:       metav1.NamespaceDefault,
 			ResourceVersion: "10",
 		},
 		Spec: batch.JobSpec{
@@ -193,7 +193,7 @@ func TestJobStatusStrategy(t *testing.T) {
 	newJob := &batch.Job{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            "myjob",
-			Namespace:       api.NamespaceDefault,
+			Namespace:       metav1.NamespaceDefault,
 			ResourceVersion: "9",
 		},
 		Spec: batch.JobSpec{

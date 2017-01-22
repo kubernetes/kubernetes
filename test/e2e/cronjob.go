@@ -68,7 +68,7 @@ var _ = framework.KubeDescribe("CronJob", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Ensuring at least two running jobs exists by listing jobs explicitly")
-		jobs, err := f.ClientSet.Batch().Jobs(f.Namespace.Name).List(v1.ListOptions{})
+		jobs, err := f.ClientSet.Batch().Jobs(f.Namespace.Name).List(metav1.ListOptions{})
 		Expect(err).NotTo(HaveOccurred())
 		activeJobs := filterActiveJobs(jobs)
 		Expect(len(activeJobs) >= 2).To(BeTrue())
@@ -91,7 +91,7 @@ var _ = framework.KubeDescribe("CronJob", func() {
 		Expect(err).To(HaveOccurred())
 
 		By("Ensuring no job exists by listing jobs explicitly")
-		jobs, err := f.ClientSet.Batch().Jobs(f.Namespace.Name).List(v1.ListOptions{})
+		jobs, err := f.ClientSet.Batch().Jobs(f.Namespace.Name).List(metav1.ListOptions{})
 		Expect(err).NotTo(HaveOccurred())
 		Expect(jobs.Items).To(HaveLen(0))
 
@@ -117,7 +117,7 @@ var _ = framework.KubeDescribe("CronJob", func() {
 		Expect(cronJob.Status.Active).Should(HaveLen(1))
 
 		By("Ensuring exaclty one running job exists by listing jobs explicitly")
-		jobs, err := f.ClientSet.Batch().Jobs(f.Namespace.Name).List(v1.ListOptions{})
+		jobs, err := f.ClientSet.Batch().Jobs(f.Namespace.Name).List(metav1.ListOptions{})
 		Expect(err).NotTo(HaveOccurred())
 		activeJobs := filterActiveJobs(jobs)
 		Expect(activeJobs).To(HaveLen(1))
@@ -148,7 +148,7 @@ var _ = framework.KubeDescribe("CronJob", func() {
 		Expect(cronJob.Status.Active).Should(HaveLen(1))
 
 		By("Ensuring exaclty one running job exists by listing jobs explicitly")
-		jobs, err := f.ClientSet.Batch().Jobs(f.Namespace.Name).List(v1.ListOptions{})
+		jobs, err := f.ClientSet.Batch().Jobs(f.Namespace.Name).List(metav1.ListOptions{})
 		Expect(err).NotTo(HaveOccurred())
 		activeJobs := filterActiveJobs(jobs)
 		Expect(activeJobs).To(HaveLen(1))
@@ -322,7 +322,7 @@ func waitForNoJobs(c clientset.Interface, ns, jobName string, failIfNonEmpty boo
 // Wait for a job to be replaced with a new one.
 func waitForJobReplaced(c clientset.Interface, ns, previousJobName string) error {
 	return wait.Poll(framework.Poll, cronJobTimeout, func() (bool, error) {
-		jobs, err := c.Batch().Jobs(ns).List(v1.ListOptions{})
+		jobs, err := c.Batch().Jobs(ns).List(metav1.ListOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -339,7 +339,7 @@ func waitForJobReplaced(c clientset.Interface, ns, previousJobName string) error
 // waitForJobsAtLeast waits for at least a number of jobs to appear.
 func waitForJobsAtLeast(c clientset.Interface, ns string, atLeast int) error {
 	return wait.Poll(framework.Poll, cronJobTimeout, func() (bool, error) {
-		jobs, err := c.Batch().Jobs(ns).List(v1.ListOptions{})
+		jobs, err := c.Batch().Jobs(ns).List(metav1.ListOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -350,7 +350,7 @@ func waitForJobsAtLeast(c clientset.Interface, ns string, atLeast int) error {
 // waitForAnyFinishedJob waits for any completed job to appear.
 func waitForAnyFinishedJob(c clientset.Interface, ns string) error {
 	return wait.Poll(framework.Poll, cronJobTimeout, func() (bool, error) {
-		jobs, err := c.Batch().Jobs(ns).List(v1.ListOptions{})
+		jobs, err := c.Batch().Jobs(ns).List(metav1.ListOptions{})
 		if err != nil {
 			return false, err
 		}

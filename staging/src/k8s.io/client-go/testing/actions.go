@@ -25,7 +25,6 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/client-go/pkg/api"
 	"k8s.io/client-go/pkg/api/v1"
 )
 
@@ -224,7 +223,7 @@ func NewRootWatchAction(resource schema.GroupVersionResource, opts interface{}) 
 func ExtractFromListOptions(opts interface{}) (labelSelector labels.Selector, fieldSelector fields.Selector, resourceVersion string) {
 	var err error
 	switch t := opts.(type) {
-	case api.ListOptions:
+	case metav1.ListOptions:
 		labelSelector = t.LabelSelector
 		fieldSelector = t.FieldSelector
 		resourceVersion = t.ResourceVersion

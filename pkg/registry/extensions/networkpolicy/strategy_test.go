@@ -21,7 +21,6 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 )
 
@@ -36,7 +35,7 @@ func TestNetworkPolicyStrategy(t *testing.T) {
 
 	validMatchLabels := map[string]string{"a": "b"}
 	np := &extensions.NetworkPolicy{
-		ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
+		ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
 		Spec: extensions.NetworkPolicySpec{
 			PodSelector: metav1.LabelSelector{MatchLabels: validMatchLabels},
 			Ingress:     []extensions.NetworkPolicyIngressRule{},

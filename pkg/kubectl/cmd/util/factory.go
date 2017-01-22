@@ -34,6 +34,7 @@ import (
 	"github.com/spf13/pflag"
 
 	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -279,7 +280,7 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) Factory {
 // GetFirstPod returns a pod matching the namespace and label selector
 // and the number of all pods that match the label selector.
 func GetFirstPod(client coreclient.PodsGetter, namespace string, selector labels.Selector, timeout time.Duration, sortBy func([]*v1.Pod) sort.Interface) (*api.Pod, int, error) {
-	options := api.ListOptions{LabelSelector: selector}
+	options := metav1.ListOptions{LabelSelector: selector.String()}
 
 	podList, err := client.Pods(namespace).List(options)
 	if err != nil {

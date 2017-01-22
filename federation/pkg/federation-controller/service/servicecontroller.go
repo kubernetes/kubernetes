@@ -181,11 +181,11 @@ func New(federationClient fedclientset.Interface, dns dnsprovider.Interface,
 	s.clusterDeliverer = util.NewDelayingDeliverer()
 	s.serviceStore.Indexer, s.serviceController = cache.NewIndexerInformer(
 		&cache.ListWatch{
-			ListFunc: func(options v1.ListOptions) (pkgruntime.Object, error) {
-				return s.federationClient.Core().Services(v1.NamespaceAll).List(options)
+			ListFunc: func(options metav1.ListOptions) (pkgruntime.Object, error) {
+				return s.federationClient.Core().Services(metav1.NamespaceAll).List(options)
 			},
-			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
-				return s.federationClient.Core().Services(v1.NamespaceAll).Watch(options)
+			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+				return s.federationClient.Core().Services(metav1.NamespaceAll).Watch(options)
 			},
 		},
 		&v1.Service{},
@@ -204,10 +204,10 @@ func New(federationClient fedclientset.Interface, dns dnsprovider.Interface,
 	)
 	s.clusterStore.Store, s.clusterController = cache.NewInformer(
 		&cache.ListWatch{
-			ListFunc: func(options v1.ListOptions) (pkgruntime.Object, error) {
+			ListFunc: func(options metav1.ListOptions) (pkgruntime.Object, error) {
 				return s.federationClient.Federation().Clusters().List(options)
 			},
-			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
+			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 				return s.federationClient.Federation().Clusters().Watch(options)
 			},
 		},
@@ -249,11 +249,11 @@ func New(federationClient fedclientset.Interface, dns dnsprovider.Interface,
 	fedInformerFactory := func(cluster *v1beta1.Cluster, targetClient kubeclientset.Interface) (cache.Store, cache.Controller) {
 		return cache.NewInformer(
 			&cache.ListWatch{
-				ListFunc: func(options v1.ListOptions) (pkgruntime.Object, error) {
-					return targetClient.Core().Services(v1.NamespaceAll).List(options)
+				ListFunc: func(options metav1.ListOptions) (pkgruntime.Object, error) {
+					return targetClient.Core().Services(metav1.NamespaceAll).List(options)
 				},
-				WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
-					return targetClient.Core().Services(v1.NamespaceAll).Watch(options)
+				WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+					return targetClient.Core().Services(metav1.NamespaceAll).Watch(options)
 				},
 			},
 			&v1.Service{},

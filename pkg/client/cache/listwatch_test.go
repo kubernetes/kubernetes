@@ -70,18 +70,18 @@ func TestListWatchesCanList(t *testing.T) {
 	}{
 		// Node
 		{
-			location:      testapi.Default.ResourcePath("nodes", v1.NamespaceAll, ""),
+			location:      testapi.Default.ResourcePath("nodes", metav1.NamespaceAll, ""),
 			resource:      "nodes",
-			namespace:     v1.NamespaceAll,
+			namespace:     metav1.NamespaceAll,
 			fieldSelector: parseSelectorOrDie(""),
 		},
 		// pod with "assigned" field selector.
 		{
 			location: buildLocation(
-				testapi.Default.ResourcePath("pods", v1.NamespaceAll, ""),
+				testapi.Default.ResourcePath("pods", metav1.NamespaceAll, ""),
 				buildQueryValues(url.Values{fieldSelectorQueryParamName: []string{"spec.host="}})),
 			resource:      "pods",
-			namespace:     v1.NamespaceAll,
+			namespace:     metav1.NamespaceAll,
 			fieldSelector: fields.Set{"spec.host": ""}.AsSelector(),
 		},
 		// pod in namespace "foo"
@@ -105,7 +105,7 @@ func TestListWatchesCanList(t *testing.T) {
 		client := clientset.NewForConfigOrDie(&restclient.Config{Host: server.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(v1.GroupName).GroupVersion}})
 		lw := NewListWatchFromClient(client.Core().RESTClient(), item.resource, item.namespace, item.fieldSelector)
 		// This test merely tests that the correct request is made.
-		lw.List(v1.ListOptions{})
+		lw.List(metav1.ListOptions{})
 		handler.ValidateRequest(t, item.location, "GET", nil)
 	}
 }
@@ -122,30 +122,30 @@ func TestListWatchesCanWatch(t *testing.T) {
 		// Node
 		{
 			location: buildLocation(
-				testapi.Default.ResourcePathWithPrefix("watch", "nodes", v1.NamespaceAll, ""),
+				testapi.Default.ResourcePathWithPrefix("watch", "nodes", metav1.NamespaceAll, ""),
 				buildQueryValues(url.Values{})),
 			rv:            "",
 			resource:      "nodes",
-			namespace:     v1.NamespaceAll,
+			namespace:     metav1.NamespaceAll,
 			fieldSelector: parseSelectorOrDie(""),
 		},
 		{
 			location: buildLocation(
-				testapi.Default.ResourcePathWithPrefix("watch", "nodes", v1.NamespaceAll, ""),
+				testapi.Default.ResourcePathWithPrefix("watch", "nodes", metav1.NamespaceAll, ""),
 				buildQueryValues(url.Values{"resourceVersion": []string{"42"}})),
 			rv:            "42",
 			resource:      "nodes",
-			namespace:     v1.NamespaceAll,
+			namespace:     metav1.NamespaceAll,
 			fieldSelector: parseSelectorOrDie(""),
 		},
 		// pod with "assigned" field selector.
 		{
 			location: buildLocation(
-				testapi.Default.ResourcePathWithPrefix("watch", "pods", v1.NamespaceAll, ""),
+				testapi.Default.ResourcePathWithPrefix("watch", "pods", metav1.NamespaceAll, ""),
 				buildQueryValues(url.Values{fieldSelectorQueryParamName: []string{"spec.host="}, "resourceVersion": []string{"0"}})),
 			rv:            "0",
 			resource:      "pods",
-			namespace:     v1.NamespaceAll,
+			namespace:     metav1.NamespaceAll,
 			fieldSelector: fields.Set{"spec.host": ""}.AsSelector(),
 		},
 		// pod with namespace foo and assigned field selector
@@ -171,7 +171,7 @@ func TestListWatchesCanWatch(t *testing.T) {
 		client := clientset.NewForConfigOrDie(&restclient.Config{Host: server.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(v1.GroupName).GroupVersion}})
 		lw := NewListWatchFromClient(client.Core().RESTClient(), item.resource, item.namespace, item.fieldSelector)
 		// This test merely tests that the correct request is made.
-		lw.Watch(v1.ListOptions{ResourceVersion: item.rv})
+		lw.Watch(metav1.ListOptions{ResourceVersion: item.rv})
 		handler.ValidateRequest(t, item.location, "GET", nil)
 	}
 }
@@ -181,11 +181,11 @@ type lw struct {
 	watch watch.Interface
 }
 
-func (w lw) List(options v1.ListOptions) (runtime.Object, error) {
+func (w lw) List(options metav1.ListOptions) (runtime.Object, error) {
 	return w.list, nil
 }
 
-func (w lw) Watch(options v1.ListOptions) (watch.Interface, error) {
+func (w lw) Watch(options metav1.ListOptions) (watch.Interface, error) {
 	return w.watch, nil
 }
 

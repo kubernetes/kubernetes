@@ -418,7 +418,7 @@ func TestNoOpUpdates(t *testing.T) {
 	newPod := func() *api.Pod {
 		return &api.Pod{
 			ObjectMeta: metav1.ObjectMeta{
-				Namespace: api.NamespaceDefault,
+				Namespace: metav1.NamespaceDefault,
 				Name:      "foo",
 				Labels:    map[string]string{"prepare_create": "true"},
 			},
