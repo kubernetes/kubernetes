@@ -270,6 +270,7 @@ func (c *threadSafeMap) deleteFromIndices(obj interface{}, key string) error {
 				set.Delete(key)
 			}
 		}
+		
 	}
 	return nil
 }
