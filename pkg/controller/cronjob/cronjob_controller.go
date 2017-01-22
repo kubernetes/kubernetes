@@ -97,7 +97,7 @@ func (jm *CronJobController) Run(stopCh <-chan struct{}) {
 
 // SyncAll lists all the CronJobs and Jobs and reconciles them.
 func (jm *CronJobController) SyncAll() {
-	sjl, err := jm.kubeClient.BatchV2alpha1().CronJobs(v1.NamespaceAll).List(v1.ListOptions{})
+	sjl, err := jm.kubeClient.BatchV2alpha1().CronJobs(metav1.NamespaceAll).List(metav1.ListOptions{})
 	if err != nil {
 		glog.Errorf("Error listing cronjobs: %v", err)
 		return
@@ -105,7 +105,7 @@ func (jm *CronJobController) SyncAll() {
 	sjs := sjl.Items
 	glog.V(4).Infof("Found %d cronjobs", len(sjs))
 
-	jl, err := jm.kubeClient.BatchV2alpha1().Jobs(v1.NamespaceAll).List(v1.ListOptions{})
+	jl, err := jm.kubeClient.BatchV2alpha1().Jobs(metav1.NamespaceAll).List(metav1.ListOptions{})
 	if err != nil {
 		glog.Errorf("Error listing jobs")
 		return
@@ -238,7 +238,7 @@ func SyncOne(sj batch.CronJob, js []batch.Job, now time.Time, jc jobControlInter
 			}
 			// remove all pods...
 			selector, _ := metav1.LabelSelectorAsSelector(job.Spec.Selector)
-			options := v1.ListOptions{LabelSelector: selector.String()}
+			options := metav1.ListOptions{LabelSelector: selector.String()}
 			podList, err := pc.ListPods(job.Namespace, options)
 			if err != nil {
 				recorder.Eventf(&sj, v1.EventTypeWarning, "FailedList", "List job-pods: %v", err)

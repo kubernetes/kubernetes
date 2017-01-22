@@ -70,7 +70,7 @@ func RequestNodeCertificate(client certificatesclient.CertificateSigningRequestI
 
 	// Make a default timeout = 3600s.
 	var defaultTimeoutSeconds int64 = 3600
-	resultCh, err := client.Watch(v1.ListOptions{
+	resultCh, err := client.Watch(metav1.ListOptions{
 		Watch:          true,
 		TimeoutSeconds: &defaultTimeoutSeconds,
 		FieldSelector:  fields.OneTermEqualSelector("metadata.name", req.Name).String(),
