@@ -79,6 +79,7 @@ filegroup(
         "//pkg/client/unversioned:all-srcs",
         "//pkg/cloudprovider:all-srcs",
         "//pkg/controller:all-srcs",
+        "//pkg/conversion:all-srcs",
         "//pkg/credentialprovider:all-srcs",
         "//pkg/fieldpath:all-srcs",
         "//pkg/fields:all-srcs",
