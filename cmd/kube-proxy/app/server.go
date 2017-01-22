@@ -26,6 +26,7 @@ import (
 	_ "net/http/pprof"
 	"runtime"
 	"strconv"
+	"strings"
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -76,6 +77,25 @@ const (
 	proxyModeIPTables               = "iptables"
 	experimentalProxyModeAnnotation = options.ExperimentalProxyModeAnnotation
 	betaProxyModeAnnotation         = "net.beta.kubernetes.io/proxy-mode"
+	iptables_kmod_err               = "Check if iptables has been enabled in the kernel. " +
+		"Make sure the following kernel modules (or in kernel features) are compiled and loaded:\n" +
+		"xt_conntrack\n" +
+		"xt_addrtype\n" +
+		"iptable_nat\n" +
+		"nf_conntrack_ipv4\n" +
+		"nf_defrag_ipv4\n" +
+		"nf_nat_ipv4\n" +
+		"ipt_MASQUERADE\n" +
+		"nf_nat_masquerade_ipv4\n" +
+		"nft_reject_ipv4\n" +
+		"nft_reject\n" +
+		"nf_tables\n" +
+		"xt_conntrack\n" +
+		"xt_comment\n" +
+		"xt_nat" +
+		"xt_REDIRECT\n" +
+		"nf_nat\n" +
+		"nf_conntrack\n"
 )
 
 func checkKnownProxyMode(proxyMode string) bool {
@@ -233,7 +253,15 @@ func NewProxyServerDefault(config *options.ProxyServerConfig) (*ProxyServer, err
 			recorder,
 		)
 		if err != nil {
-			glog.Fatalf("Unable to create proxier: %v", err)
+			iptables_err := err.Error()
+			iptables_err_str := ""
+			if strings.Contains(iptables_err, "iptables") {
+				//	Error is most probably caused by lack of iptables
+				// configuration
+				iptables_err_str = iptables_kmod_err
+
+			}
+			glog.Fatalf("Unable to create proxer: %v.%s", err, iptables_err_str)
 		}
 		proxier = proxierIPTables
 		endpointsHandler = proxierIPTables
@@ -272,7 +300,14 @@ func NewProxyServerDefault(config *options.ProxyServerConfig) (*ProxyServer, err
 			)
 		}
 		if err != nil {
-			glog.Fatalf("Unable to create proxier: %v", err)
+			iptables_err := err.Error()
+			iptables_err_str := ""
+			if strings.Contains(iptables_err, "iptables") {
+				//	Error is most probably caused by lack of iptables
+				// configuration
+				iptables_err_str = iptables_kmod_err
+			}
+			glog.Fatalf("Unable to create proxer: %v.%s", err, iptables_err_str)
 		}
 		proxier = proxierUserspace
 		// Remove artifacts from the pure-iptables Proxier, if not on Windows.
