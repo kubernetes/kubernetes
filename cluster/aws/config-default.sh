@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-ZONE=${KUBE_AWS_ZONE:-us-west-2a}
+ZONE=${KUBE_AWS_ZONE:-cn-north-1b}
 MASTER_SIZE=${MASTER_SIZE:-}
 NODE_SIZE=${NODE_SIZE:-}
 NUM_NODES=${NUM_NODES:-4}
