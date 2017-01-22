@@ -134,7 +134,7 @@ func (s *endpointsStore) Merge(source string, change interface{}) error {
 		glog.V(5).Infof("Adding new endpoint from source %s : %s", source, spew.Sdump(update.Endpoints))
 		for _, value := range update.Endpoints {
 			name := types.NamespacedName{Namespace: value.Namespace, Name: value.Name}
-			endpoints[name] = value
+			endpoints[name] = api.Endpoints{Subsets: value.Subsets}
 		}
 	case REMOVE:
 		glog.V(5).Infof("Removing an endpoint %s", spew.Sdump(update))
@@ -148,7 +148,7 @@ func (s *endpointsStore) Merge(source string, change interface{}) error {
 		endpoints = make(map[types.NamespacedName]api.Endpoints)
 		for _, value := range update.Endpoints {
 			name := types.NamespacedName{Namespace: value.Namespace, Name: value.Name}
-			endpoints[name] = value
+			endpoints[name] = api.Endpoints{Subsets: value.Subsets}
 		}
 	default:
 		glog.V(4).Infof("Received invalid update type: %s", spew.Sdump(update))
@@ -242,7 +242,7 @@ func (s *serviceStore) Merge(source string, change interface{}) error {
 		glog.V(5).Infof("Adding new service from source %s : %s", source, spew.Sdump(update.Services))
 		for _, value := range update.Services {
 			name := types.NamespacedName{Namespace: value.Namespace, Name: value.Name}
-			services[name] = value
+			services[name] = api.Service{ Spec:value.Spec, Status:value.Status}
 		}
 	case REMOVE:
 		glog.V(5).Infof("Removing a service %s", spew.Sdump(update))
@@ -256,7 +256,7 @@ func (s *serviceStore) Merge(source string, change interface{}) error {
 		services = make(map[types.NamespacedName]api.Service)
 		for _, value := range update.Services {
 			name := types.NamespacedName{Namespace: value.Namespace, Name: value.Name}
-			services[name] = value
+			services[name] = api.Service{ Spec:value.Spec, Status:value.Status}
 		}
 	default:
 		glog.V(4).Infof("Received invalid update type: %s", spew.Sdump(update))
