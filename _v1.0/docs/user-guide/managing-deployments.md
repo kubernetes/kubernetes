@@ -151,7 +151,7 @@ my-nginx-svc   app=nginx   app=nginx   10.0.152.174   80/TCP
 
 ## Using labels effectively
 
-The examples we’ve used so far apply at most a single label to any resource. There are many scenarios where multiple labels should be used to distinguish sets from one another. 
+The examples we’ve used so far apply at most a single label to any resource. There are many scenarios where multiple labels should be used to distinguish sets from one another.
 
 For instance, different applications would use different values for the `app` label, but a multi-tier application, such as the [guestbook example](../../examples/guestbook/), would additionally need to distinguish each tier. The frontend could carry the following labels:
 
@@ -291,7 +291,7 @@ my-nginx-o0ef1   1/1       Running   0          1h
 
 At some point, you’ll eventually need to update your deployed application, typically by specifying a new image or image tag, as in the canary deployment scenario above. `kubectl` supports several update operations, each of which is applicable to different scenarios.
 
-To update a service without an outage, `kubectl` supports what is called [“rolling update”](kubectl/kubectl_rolling-update.html), which updates one pod at a time, rather than taking down the entire service at the same time. See the [rolling update design document](../design/simple-rolling-update.html) and the [example of rolling update](update-demo/) for more information. 
+To update a service without an outage, `kubectl` supports what is called [“rolling update”](kubectl/kubectl_rolling-update.html), which updates one pod at a time, rather than taking down the entire service at the same time. See the [rolling update design document](../design/simple-rolling-update.html) and the [example of rolling update](update-demo/) for more information.
 
 Let’s say you were running version 1.7.9 of nginx:
 
@@ -401,7 +401,7 @@ spec:
       containers:
       - name: nginx
         image: nginx:1.9.2
-        args: [“nginx”,”-T”]
+        args: ["nginx","-T"]
         ports:
         - containerPort: 80
 {% endraw %}
@@ -441,7 +441,7 @@ Sometimes it’s necessary to make narrow, non-disruptive updates to resources y
 
 {% highlight console %}
 {% raw %}
-$ kubectl patch rc my-nginx-v4 -p '{"metadata": {"annotations": {"description": "my frontend running nginx"}}}' 
+$ kubectl patch rc my-nginx-v4 -p '{"metadata": {"annotations": {"description": "my frontend running nginx"}}}'
 my-nginx-v4
 $ kubectl get rc my-nginx-v4 -o yaml
 apiVersion: v1
@@ -495,4 +495,3 @@ replicationcontrollers/my-nginx-v4
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/user-guide/managing-deployments.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
-

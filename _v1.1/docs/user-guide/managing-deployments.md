@@ -401,7 +401,7 @@ spec:
       containers:
       - name: nginx
         image: nginx:1.9.2
-        args: [“nginx”,”-T”]
+        args: ["nginx","-T"]
         ports:
         - containerPort: 80
 {% endraw %}
@@ -441,7 +441,7 @@ Sometimes it’s necessary to make narrow, non-disruptive updates to resources y
 
 {% highlight console %}
 {% raw %}
-$ kubectl patch rc my-nginx-v4 -p '{"metadata": {"annotations": {"description": "my frontend running nginx"}}}' 
+$ kubectl patch rc my-nginx-v4 -p '{"metadata": {"annotations": {"description": "my frontend running nginx"}}}'
 my-nginx-v4
 $ kubectl get rc my-nginx-v4 -o yaml
 apiVersion: v1
@@ -497,4 +497,3 @@ replicationcontrollers/my-nginx-v4
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/user-guide/managing-deployments.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
-

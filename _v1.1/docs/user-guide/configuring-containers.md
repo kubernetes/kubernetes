@@ -45,7 +45,7 @@ spec:  # specification of the pod’s contents
   containers:
   - name: hello
     image: "ubuntu:14.04"
-    command: ["/bin/echo","hello”,”world"]
+    command: ["/bin/echo","hello","world"]
 {% endraw %}
 {% endhighlight %}
 
@@ -220,4 +220,3 @@ On the other hand, containers and their logs are eventually deleted automaticall
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/user-guide/configuring-containers.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
-
