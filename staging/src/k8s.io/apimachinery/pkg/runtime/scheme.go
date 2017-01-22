@@ -240,13 +240,19 @@ func (s *Scheme) ObjectKinds(obj Object) ([]schema.GroupVersionKind, bool, error
 	}
 	t := v.Type()
 
-	gvks, ok := s.typeToGVK[t]
-	if !ok {
-		return nil, false, NewNotRegisteredErr(schema.GroupVersionKind{}, t)
+	// If we have gvks registered for this go type, use them
+	if gvks, ok := s.typeToGVK[t]; ok {
+		_, unversionedType := s.unversionedTypes[t]
+		return gvks, unversionedType, nil
 	}
-	_, unversionedType := s.unversionedTypes[t]
 
-	return gvks, unversionedType, nil
+	// Otherwise, ask the object what it is
+	if gvk := obj.GetObjectKind().GroupVersionKind(); !gvk.Empty() {
+		return []schema.GroupVersionKind{gvk}, false, nil
+	}
+
+	// Otherwise, return a NotRegistered error
+	return nil, false, NewNotRegisteredErr(schema.GroupVersionKind{}, t)
 }
 
 // Recognizes returns true if the scheme is able to handle the provided group,version,kind
