@@ -46,6 +46,7 @@ MINION_TAG="${INSTANCE_PREFIX}-minion"
 MINION_SCOPES=""
 POLL_SLEEP_INTERVAL=3
 SERVICE_CLUSTER_IP_RANGE="10.0.0.0/16"  # formerly PORTAL_NET
+SERVICE_CLUSTER_IP_GW="10.0.0.1"
 CLUSTER_IP_RANGE="${CLUSTER_IP_RANGE:-10.244.0.0/16}"
 MASTER_IP_RANGE="${MASTER_IP_RANGE:-10.246.0.0/24}"
 # If set to Elastic IP, master instance will be associated with this IP.
@@ -74,8 +75,10 @@ fi
 # Optional: Install cluster DNS.
 ENABLE_CLUSTER_DNS=true
 DNS_SERVER_IP="10.0.0.10"
+DNS_SERVER_IP_PUBLIC="10.1.4.53"
 DNS_DOMAIN="cluster.local"
 DNS_REPLICAS=1
+KUBE_UI_IP_PUBLIC="10.1.4.80"
 
 # Admission Controllers to invoke prior to persisting objects in cluster
 ADMISSION_CONTROL=NamespaceLifecycle,NamespaceExists,LimitRanger,SecurityContextDeny,ServiceAccount,ResourceQuota
