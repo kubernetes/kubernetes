@@ -40,6 +40,7 @@ function prepare-e2e() {
   return
 }
 
+# We use resource manager api in bring up cluster
 function azure_call {
     local -a params=()
     local param
@@ -89,6 +90,13 @@ function verify-prereqs {
         AZ_HSH=$(echo -n "$account" | md5sum)
     fi
 
+# check if azure resource group exist
+    if [[ -z "$(azure_call group show $AZ_RMG 2>/dev/null | \
+            grep Name)" ]]; then
+        echo $AZ_LOCATION
+        azure group create -n "$AZ_RMG" -l "$AZ_LOCATION"
+    fi
+
     AZ_HSH=${AZ_HSH:0:7}
     AZ_STG=kube$AZ_HSH
     echo "==> AZ_STG: $AZ_STG"
@@ -127,15 +135,16 @@ function upload-server-tars() {
     echo "==> SALT_TAR_URL: $SALT_TAR_URL"
 
     echo "--> Checking storage exists..."
-    if [[ -z "$(azure_call storage account show $AZ_STG 2>/dev/null | \
+    if [[ -z "$(azure_call storage account show $AZ_STG -g $AZ_RMG 2>/dev/null | \
     grep data)" ]]; then
         echo "--> Creating storage..."
-        azure_call storage account create -l "$AZ_LOCATION" $AZ_STG --type LRS
+        azure_call storage account create -g $AZ_RMG -l "$AZ_LOCATION" $AZ_STG --type LRS
     fi
 
     echo "--> Getting storage key..."
-    stg_key=$(azure_call storage account keys list $AZ_STG --json | \
-        json_val '["primaryKey"]')
+    stg_key=$(azure_call storage account keys list $AZ_STG -g $AZ_RMG --json | \
+        json_val '["key1"]')
+    echo ${stg_key}
 
     echo "--> Checking storage container exists..."
     if [[ -z "$(azure_call storage container show -a $AZ_STG -k "$stg_key" \
@@ -196,11 +205,10 @@ function upload-server-tars() {
 #
 function detect-minions () {
     if [[ -z "$AZ_CS" ]]; then
-        verify-prereqs-local
+        verify-prereqs
     fi
-    ssh_ports=($(eval echo "2200{1..$NUM_MINIONS}"))
     for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
-        MINION_NAMES[$i]=$(ssh -oStrictHostKeyChecking=no -i $AZ_SSH_KEY -p ${ssh_ports[$i]} $AZ_CS.cloudapp.net hostname -f)
+        MINION_NAMES[$i]=$(ssh -oStrictHostKeyChecking=no -i $AZ_SSH_KEY ${AZ_CS}-minion-{i}.${AZ_LOCATION}.cloudapp.azure.com hostname -f)
     done
 }
 
@@ -214,11 +222,11 @@ function detect-minions () {
 #   KUBE_MASTER_IP
 function detect-master () {
     if [[ -z "$AZ_CS" ]]; then
-        verify-prereqs-local
+        verify-prereqs
     fi
 
     KUBE_MASTER=${MASTER_NAME}
-    KUBE_MASTER_IP="${AZ_CS}.cloudapp.net"
+    KUBE_MASTER_IP="${AZ_CS}-master.${AZ_LOCATION}.cloudapp.azure.com"
     echo "Using master: $KUBE_MASTER (external IP: $KUBE_MASTER_IP)"
 }
 
@@ -273,7 +281,7 @@ function kube-up {
             -out ${KUBE_TEMP}/${MINION_NAMES[$i]}.crt
     done
 
-    KUBE_MASTER_IP="${AZ_CS}.cloudapp.net"
+    KUBE_MASTER_IP="${AZ_CS}-master.${AZ_LOCATION}.cloudapp.azure.com"
 
     # Build up start up script for master
     echo "--> Building up start up script for master"
@@ -311,24 +319,26 @@ function kube-up {
             -subj "/CN=azure-ssh-key"
     fi
 
-    if [[ -z "$(azure_call network vnet show "$AZ_VNET" 2>/dev/null | grep data)" ]]; then
-        echo error create vnet $AZ_VNET with subnet $AZ_SUBNET
-        exit 1
-    fi
 
-    echo "--> Starting VM"
+    echo "--> Starting VM using Azure Manager API"
     azure_call vm create \
-        -z "$MASTER_SIZE" \
-        -w "$AZ_VNET" \
+        -z $MASTER_SIZE \
+        -M $AZ_SSH_CERT \
+        -F $AZ_VNET \
+        -g $AZ_RMG \
+        -P $AZ_VNET_PREFIX \
+        -k $AZ_SUBNET_PREFIX \
+        -j $AZ_SUBNET \
+        -C ${KUBE_TEMP}/master-start.sh \
+        -Q $AZ_IMAGE \
+        -u $USER \
+        -i "public-master" \
+        -w ${AZ_CS}-master \
         -n $MASTER_NAME \
-        -l "$AZ_LOCATION" \
-        -t $AZ_SSH_CERT \
-        -e 22000 -P \
-        -d ${KUBE_TEMP}/master-start.sh \
-        -b $AZ_SUBNET \
-        $AZ_CS $AZ_IMAGE $USER
+        -l $AZ_LOCATION \
+        -y Linux \
+        -f "master-nic"
 
-    ssh_ports=($(eval echo "2200{1..$NUM_MINIONS}"))
 
     #Build up start up script for minions
     echo "--> Building up start up script for minions"
@@ -348,17 +358,23 @@ function kube-up {
             grep -v "^#" "${KUBE_ROOT}/cluster/azure-legacy/templates/salt-minion.sh"
         ) > "${KUBE_TEMP}/minion-start-${i}.sh"
 
-        echo "--> Starting VM"
+        echo "--> Starting VM using Azure Manager API"
         azure_call vm create \
-            -z "$MINION_SIZE" \
-            -c -w "$AZ_VNET" \
+            -z $MINION_SIZE \
+            -M $AZ_SSH_CERT \
+            -F $AZ_VNET \
+            -g $AZ_RMG \
+            -j $AZ_SUBNET \
+            -C ${KUBE_TEMP}/minion-start-${i}.sh \
+            -Q $AZ_IMAGE \
+            -u $USER \
+            -i "public-minion"-${i} \
+            -w ${AZ_CS}-minion-${i} \
             -n ${MINION_NAMES[$i]} \
-            -l "$AZ_LOCATION" \
-            -t $AZ_SSH_CERT \
-            -e ${ssh_ports[$i]} -P \
-            -d ${KUBE_TEMP}/minion-start-${i}.sh \
-            -b $AZ_SUBNET \
-            $AZ_CS $AZ_IMAGE $USER
+            -l $AZ_LOCATION \
+            -y Linux \
+            -f "minion-nic"-$i
+
     done
 
     echo "--> Creating endpoint"
@@ -393,11 +409,11 @@ function kube-up {
     # TODO: generate ADMIN (and KUBELET) tokens and put those in the master's
     # config file.  Distribute the same way the htpasswd is done.
 (umask 077
-    ssh -oStrictHostKeyChecking=no -i $AZ_SSH_KEY -p 22000 $AZ_CS.cloudapp.net \
+    ssh -oStrictHostKeyChecking=no -i $AZ_SSH_KEY $AZ_CS-master.${AZ_LOCATION}.cloudapp.azure.com \
         sudo cat /srv/kubernetes/kubecfg.crt >"${KUBE_CERT}" 2>/dev/null
-    ssh -oStrictHostKeyChecking=no -i $AZ_SSH_KEY -p 22000 $AZ_CS.cloudapp.net \
+    ssh -oStrictHostKeyChecking=no -i $AZ_SSH_KEY $AZ_CS-master.${AZ_LOCATION}.cloudapp.azure.com \
         sudo cat /srv/kubernetes/kubecfg.key >"${KUBE_KEY}" 2>/dev/null
-    ssh -oStrictHostKeyChecking=no -i $AZ_SSH_KEY -p 22000 $AZ_CS.cloudapp.net \
+    ssh -oStrictHostKeyChecking=no -i $AZ_SSH_KEY $AZ_CS-master.${AZ_LOCATION}.cloudapp.azure.com \
         sudo cat /srv/kubernetes/ca.crt >"${CA_CERT}" 2>/dev/null
 )
 
@@ -412,8 +428,8 @@ function kube-up {
     for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
         # Make sure docker is installed
         echo "--> Making sure docker is installed on ${MINION_NAMES[$i]}."
-        until ssh -oStrictHostKeyChecking=no -i $AZ_SSH_KEY -p ${ssh_ports[$i]} \
-            $AZ_CS.cloudapp.net which docker > /dev/null 2>&1; do
+        until ssh -oStrictHostKeyChecking=no -i $AZ_SSH_KEY \
+            $AZ_CS-minion-${i}.${AZ_LOCATION}.cloudapp.azure.com which docker > /dev/null 2>&1; do
             printf "."
             sleep 2
         done
@@ -423,24 +439,24 @@ function kube-up {
     KUBECONFIG_NAME="kubeconfig"
     KUBECONFIG="${HOME}/.kube/config"
     echo "Distributing kubeconfig for kubelet to master kubelet"
-    scp -oStrictHostKeyChecking=no -i $AZ_SSH_KEY -P 22000 ${KUBECONFIG} \
-        $AZ_CS.cloudapp.net:${KUBECONFIG_NAME}
-    ssh -oStrictHostKeyChecking=no -i $AZ_SSH_KEY -p 22000 $AZ_CS.cloudapp.net \
+    scp -oStrictHostKeyChecking=no -i $AZ_SSH_KEY ${KUBECONFIG} \
+        $AZ_CS-master.${AZ_LOCATION}.cloudapp.azure.com:${KUBECONFIG_NAME}
+    ssh -oStrictHostKeyChecking=no -i $AZ_SSH_KEY $AZ_CS-master.${AZ_LOCATION}.cloudapp.azure.com \
         sudo cp ${KUBECONFIG_NAME} /var/lib/kubelet/${KUBECONFIG_NAME}
-    ssh -oStrictHostKeyChecking=no -i $AZ_SSH_KEY -p 22000 $AZ_CS.cloudapp.net \
+    ssh -oStrictHostKeyChecking=no -i $AZ_SSH_KEY $AZ_CS-master.${AZ_LOCATION}.cloudapp.azure.com \
         sudo service kubelet restart
 
     echo "Distributing kubeconfig for kubelet to all minions"
     for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
-        scp -oStrictHostKeyChecking=no -i $AZ_SSH_KEY -P ${ssh_ports[$i]} ${KUBECONFIG} \
-            $AZ_CS.cloudapp.net:${KUBECONFIG_NAME}
-        ssh -oStrictHostKeyChecking=no -i $AZ_SSH_KEY -p ${ssh_ports[$i]} $AZ_CS.cloudapp.net \
+        scp -oStrictHostKeyChecking=no -i $AZ_SSH_KEY ${KUBECONFIG} \
+            $AZ_CS-minion-${i}.${AZ_LOCATION}.cloudapp.azure.com:${KUBECONFIG_NAME}
+        ssh -oStrictHostKeyChecking=no -i $AZ_SSH_KEY $AZ_CS-minion-${i}.${AZ_LOCATION}.cloudapp.azure.com \
             sudo cp ${KUBECONFIG_NAME} /var/lib/kubelet/${KUBECONFIG_NAME}
-        ssh -oStrictHostKeyChecking=no -i $AZ_SSH_KEY -p ${ssh_ports[$i]} $AZ_CS.cloudapp.net \
+        ssh -oStrictHostKeyChecking=no -i $AZ_SSH_KEY $AZ_CS-minion-${i}.${AZ_LOCATION}.cloudapp.azure.com \
             sudo cp ${KUBECONFIG_NAME} /var/lib/kube-proxy/${KUBECONFIG_NAME}
-        ssh -oStrictHostKeyChecking=no -i $AZ_SSH_KEY -p ${ssh_ports[$i]} $AZ_CS.cloudapp.net \
+        ssh -oStrictHostKeyChecking=no -i $AZ_SSH_KEY $AZ_CS-minion-${i}.${AZ_LOCATION}.cloudapp.azure.com \
             sudo service kubelet restart
-        ssh -oStrictHostKeyChecking=no -i $AZ_SSH_KEY -p ${ssh_ports[$i]} $AZ_CS.cloudapp.net \
+        ssh -oStrictHostKeyChecking=no -i $AZ_SSH_KEY $AZ_CS-minion-${i}.${AZ_LOCATION}.cloudapp.azure.com \
             sudo killall kube-proxy
     done
 
@@ -457,13 +473,10 @@ function kube-up {
 
 # Delete a kubernetes cluster
 function kube-down {
-    echo "Bringing down cluster"
+    echo "Bringing down cluster and Resource group"
 
     set +e
-    azure_call vm delete $MASTER_NAME -b -q
-    for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
-        azure_call vm delete ${MINION_NAMES[$i]} -b -q
-    done
+    azure_call group delete -q ${AZ_RMG}
 
     wait
 }
