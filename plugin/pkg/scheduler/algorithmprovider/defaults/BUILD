@@ -28,7 +28,10 @@ go_library(
 
 go_test(
     name = "go_default_test",
-    srcs = ["compatibility_test.go"],
+    srcs = [
+        "compatibility_test.go",
+        "defaults_test.go",
+    ],
     library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
