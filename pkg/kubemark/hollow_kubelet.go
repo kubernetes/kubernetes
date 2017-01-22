@@ -159,6 +159,8 @@ func GetHollowKubeletConfig(
 	c.SerializeImagePulls = true
 	c.SystemCgroups = ""
 	c.ProtectKernelDefaults = false
+	// TESTING
+	c.EnableCRI = true
 
 	// TODO(mtaufen): Note that PodInfraContainerImage was being set to the empty value before,
 	//                but this may not have been intentional. (previous code (SimpleKubelet)

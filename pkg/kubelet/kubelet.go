@@ -536,6 +536,9 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 	var nl *noOpLegacyHost
 	pluginSettings.LegacyRuntimeHost = nl
 
+	// TESTING: Turn on CRI by default.
+	kubeCfg.EnableCRI = true
+
 	if kubeCfg.EnableCRI {
 		// kubelet defers to the runtime shim to setup networking. Setting
 		// this to nil will prevent it from trying to invoke the plugin.
