@@ -43,7 +43,7 @@ func TestDeleteObjectByTuple(t *testing.T) {
 
 	f, tf, codec, _ := cmdtesting.NewAPIFactory()
 	tf.Printer = &testPrinter{}
-	tf.Client = &fake.RESTClient{
+	tf.UnstructuredClient = &fake.RESTClient{
 		APIRegistry:          api.Registry,
 		NegotiatedSerializer: unstructuredSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
@@ -76,7 +76,7 @@ func TestDeleteNamedObject(t *testing.T) {
 
 	f, tf, codec, _ := cmdtesting.NewAPIFactory()
 	tf.Printer = &testPrinter{}
-	tf.Client = &fake.RESTClient{
+	tf.UnstructuredClient = &fake.RESTClient{
 		APIRegistry:          api.Registry,
 		NegotiatedSerializer: unstructuredSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
@@ -109,7 +109,7 @@ func TestDeleteObject(t *testing.T) {
 
 	f, tf, codec, _ := cmdtesting.NewAPIFactory()
 	tf.Printer = &testPrinter{}
-	tf.Client = &fake.RESTClient{
+	tf.UnstructuredClient = &fake.RESTClient{
 		APIRegistry:          api.Registry,
 		NegotiatedSerializer: unstructuredSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
@@ -167,7 +167,7 @@ func TestDeleteObjectGraceZero(t *testing.T) {
 	count := 0
 	f, tf, codec, _ := cmdtesting.NewAPIFactory()
 	tf.Printer = &testPrinter{}
-	tf.Client = &fake.RESTClient{
+	tf.UnstructuredClient = &fake.RESTClient{
 		APIRegistry:          api.Registry,
 		NegotiatedSerializer: unstructuredSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
@@ -216,7 +216,7 @@ func TestDeleteObjectGraceZero(t *testing.T) {
 func TestDeleteObjectNotFound(t *testing.T) {
 	f, tf, _, _ := cmdtesting.NewAPIFactory()
 	tf.Printer = &testPrinter{}
-	tf.Client = &fake.RESTClient{
+	tf.UnstructuredClient = &fake.RESTClient{
 		APIRegistry:          api.Registry,
 		NegotiatedSerializer: unstructuredSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
@@ -253,7 +253,7 @@ func TestDeleteObjectNotFound(t *testing.T) {
 func TestDeleteObjectIgnoreNotFound(t *testing.T) {
 	f, tf, _, _ := cmdtesting.NewAPIFactory()
 	tf.Printer = &testPrinter{}
-	tf.Client = &fake.RESTClient{
+	tf.UnstructuredClient = &fake.RESTClient{
 		APIRegistry:          api.Registry,
 		NegotiatedSerializer: unstructuredSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
@@ -290,7 +290,7 @@ func TestDeleteAllNotFound(t *testing.T) {
 	f, tf, codec, _ := cmdtesting.NewAPIFactory()
 
 	tf.Printer = &testPrinter{}
-	tf.Client = &fake.RESTClient{
+	tf.UnstructuredClient = &fake.RESTClient{
 		APIRegistry:          api.Registry,
 		NegotiatedSerializer: unstructuredSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
@@ -339,7 +339,7 @@ func TestDeleteAllIgnoreNotFound(t *testing.T) {
 	notFoundError := &errors.NewNotFound(api.Resource("services"), "foo").ErrStatus
 
 	tf.Printer = &testPrinter{}
-	tf.Client = &fake.RESTClient{
+	tf.UnstructuredClient = &fake.RESTClient{
 		APIRegistry:          api.Registry,
 		NegotiatedSerializer: unstructuredSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
@@ -375,7 +375,7 @@ func TestDeleteMultipleObject(t *testing.T) {
 
 	f, tf, codec, _ := cmdtesting.NewAPIFactory()
 	tf.Printer = &testPrinter{}
-	tf.Client = &fake.RESTClient{
+	tf.UnstructuredClient = &fake.RESTClient{
 		APIRegistry:          api.Registry,
 		NegotiatedSerializer: unstructuredSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
@@ -410,7 +410,7 @@ func TestDeleteMultipleObjectContinueOnMissing(t *testing.T) {
 
 	f, tf, codec, _ := cmdtesting.NewAPIFactory()
 	tf.Printer = &testPrinter{}
-	tf.Client = &fake.RESTClient{
+	tf.UnstructuredClient = &fake.RESTClient{
 		APIRegistry:          api.Registry,
 		NegotiatedSerializer: unstructuredSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
@@ -454,7 +454,7 @@ func TestDeleteMultipleResourcesWithTheSameName(t *testing.T) {
 	_, svc, rc := testData()
 	f, tf, codec, _ := cmdtesting.NewAPIFactory()
 	tf.Printer = &testPrinter{}
-	tf.Client = &fake.RESTClient{
+	tf.UnstructuredClient = &fake.RESTClient{
 		APIRegistry:          api.Registry,
 		NegotiatedSerializer: unstructuredSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
@@ -492,7 +492,7 @@ func TestDeleteDirectory(t *testing.T) {
 
 	f, tf, codec, _ := cmdtesting.NewAPIFactory()
 	tf.Printer = &testPrinter{}
-	tf.Client = &fake.RESTClient{
+	tf.UnstructuredClient = &fake.RESTClient{
 		APIRegistry:          api.Registry,
 		NegotiatedSerializer: unstructuredSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
@@ -524,7 +524,7 @@ func TestDeleteMultipleSelector(t *testing.T) {
 
 	f, tf, codec, _ := cmdtesting.NewAPIFactory()
 	tf.Printer = &testPrinter{}
-	tf.Client = &fake.RESTClient{
+	tf.UnstructuredClient = &fake.RESTClient{
 		APIRegistry:          api.Registry,
 		NegotiatedSerializer: unstructuredSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
