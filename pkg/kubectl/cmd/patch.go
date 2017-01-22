@@ -23,6 +23,7 @@ import (
 	"strings"
 
 	jsonpatch "github.com/evanphx/json-patch"
+	"github.com/golang/glog"
 	"github.com/spf13/cobra"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -185,10 +186,33 @@ func RunPatch(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []strin
 				// don't bother checking for failures of this replace, because a failure to indicate the hint doesn't fail the command
 				// also, don't force the replacement.  If the replacement fails on a resourceVersion conflict, then it means this
 				// record hint is likely to be invalid anyway, so avoid the bad hint
-				patch, err := cmdutil.ChangeResourcePatch(info, f.Command())
-				if err == nil {
-					helper.Patch(info.Namespace, info.Name, types.StrategicMergePatchType, patch)
-				}
+				func() {
+					oldData, err := json.Marshal(patchedObj)
+					if err != nil {
+						glog.V(4).Infof("error marshaling patched obj to record reason: %v", err)
+						return
+					}
+					if err := cmdutil.RecordChangeCause(patchedObj, f.Command()); err != nil {
+						glog.V(4).Infof("error recording reason: %v", err)
+						return
+					}
+					newData, err := json.Marshal(patchedObj)
+					if err != nil {
+						glog.V(4).Infof("error marshaling patched obj to record reason: %v", err)
+						return
+					}
+					recordPatch, err := jsonpatch.CreateMergePatch(oldData, newData)
+					if err != nil {
+						glog.V(4).Infof("error creating record patch: %v", err)
+						return
+					}
+					recordedObj, err := helper.Patch(info.Namespace, info.Name, types.MergePatchType, recordPatch)
+					if err != nil {
+						glog.V(4).Infof("error recording reason: %v", err)
+						return
+					}
+					patchedObj = recordedObj
+				}()
 			}
 			count++
 
