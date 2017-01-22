@@ -744,7 +744,7 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 				// events are delayed, and instead kubectl
 				// prints "No events." This string will match
 				// either way.
-				{"vents"}}
+				{"Events"}}
 			checkOutput(output, requiredStrings)
 
 			// Service
