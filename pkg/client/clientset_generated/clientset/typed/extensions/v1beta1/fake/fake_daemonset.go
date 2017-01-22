@@ -72,7 +72,7 @@ func (c *FakeDaemonSets) Delete(name string, options *v1.DeleteOptions) error {
 	return err
 }
 
-func (c *FakeDaemonSets) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
+func (c *FakeDaemonSets) DeleteCollection(options *v1.DeleteOptions, listOptions meta_v1.ListOptions) error {
 	action := core.NewDeleteCollectionAction(daemonsetsResource, c.ns, listOptions)
 
 	_, err := c.Fake.Invokes(action, &v1beta1.DaemonSetList{})
@@ -89,7 +89,7 @@ func (c *FakeDaemonSets) Get(name string, options meta_v1.GetOptions) (result *v
 	return obj.(*v1beta1.DaemonSet), err
 }
 
-func (c *FakeDaemonSets) List(opts v1.ListOptions) (result *v1beta1.DaemonSetList, err error) {
+func (c *FakeDaemonSets) List(opts meta_v1.ListOptions) (result *v1beta1.DaemonSetList, err error) {
 	obj, err := c.Fake.
 		Invokes(core.NewListAction(daemonsetsResource, c.ns, opts), &v1beta1.DaemonSetList{})
 
@@ -111,7 +111,7 @@ func (c *FakeDaemonSets) List(opts v1.ListOptions) (result *v1beta1.DaemonSetLis
 }
 
 // Watch returns a watch.Interface that watches the requested daemonSets.
-func (c *FakeDaemonSets) Watch(opts v1.ListOptions) (watch.Interface, error) {
+func (c *FakeDaemonSets) Watch(opts meta_v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(core.NewWatchAction(daemonsetsResource, c.ns, opts))
 

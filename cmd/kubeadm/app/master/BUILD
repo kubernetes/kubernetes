@@ -26,7 +26,6 @@ go_library(
         "//cmd/kubeadm/app/images:go_default_library",
         "//cmd/kubeadm/app/phases/kubeconfig:go_default_library",
         "//cmd/kubeadm/app/util:go_default_library",
-        "//pkg/api:go_default_library",
         "//pkg/api/resource:go_default_library",
         "//pkg/api/v1:go_default_library",
         "//pkg/apis/extensions/v1beta1:go_default_library",

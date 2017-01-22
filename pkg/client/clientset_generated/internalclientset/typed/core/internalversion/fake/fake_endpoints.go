@@ -61,7 +61,7 @@ func (c *FakeEndpoints) Delete(name string, options *api.DeleteOptions) error {
 	return err
 }
 
-func (c *FakeEndpoints) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
+func (c *FakeEndpoints) DeleteCollection(options *api.DeleteOptions, listOptions v1.ListOptions) error {
 	action := core.NewDeleteCollectionAction(endpointsResource, c.ns, listOptions)
 
 	_, err := c.Fake.Invokes(action, &api.EndpointsList{})
@@ -78,7 +78,7 @@ func (c *FakeEndpoints) Get(name string, options v1.GetOptions) (result *api.End
 	return obj.(*api.Endpoints), err
 }
 
-func (c *FakeEndpoints) List(opts api.ListOptions) (result *api.EndpointsList, err error) {
+func (c *FakeEndpoints) List(opts v1.ListOptions) (result *api.EndpointsList, err error) {
 	obj, err := c.Fake.
 		Invokes(core.NewListAction(endpointsResource, c.ns, opts), &api.EndpointsList{})
 
@@ -100,7 +100,7 @@ func (c *FakeEndpoints) List(opts api.ListOptions) (result *api.EndpointsList, e
 }
 
 // Watch returns a watch.Interface that watches the requested endpoints.
-func (c *FakeEndpoints) Watch(opts api.ListOptions) (watch.Interface, error) {
+func (c *FakeEndpoints) Watch(opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(core.NewWatchAction(endpointsResource, c.ns, opts))
 

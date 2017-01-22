@@ -72,7 +72,7 @@ func (c *FakeJobs) Delete(name string, options *api.DeleteOptions) error {
 	return err
 }
 
-func (c *FakeJobs) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
+func (c *FakeJobs) DeleteCollection(options *api.DeleteOptions, listOptions v1.ListOptions) error {
 	action := core.NewDeleteCollectionAction(jobsResource, c.ns, listOptions)
 
 	_, err := c.Fake.Invokes(action, &batch.JobList{})
@@ -89,7 +89,7 @@ func (c *FakeJobs) Get(name string, options v1.GetOptions) (result *batch.Job, e
 	return obj.(*batch.Job), err
 }
 
-func (c *FakeJobs) List(opts api.ListOptions) (result *batch.JobList, err error) {
+func (c *FakeJobs) List(opts v1.ListOptions) (result *batch.JobList, err error) {
 	obj, err := c.Fake.
 		Invokes(core.NewListAction(jobsResource, c.ns, opts), &batch.JobList{})
 
@@ -111,7 +111,7 @@ func (c *FakeJobs) List(opts api.ListOptions) (result *batch.JobList, err error)
 }
 
 // Watch returns a watch.Interface that watches the requested jobs.
-func (c *FakeJobs) Watch(opts api.ListOptions) (watch.Interface, error) {
+func (c *FakeJobs) Watch(opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(core.NewWatchAction(jobsResource, c.ns, opts))
 

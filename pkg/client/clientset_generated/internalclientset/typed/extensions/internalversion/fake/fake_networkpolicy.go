@@ -62,7 +62,7 @@ func (c *FakeNetworkPolicies) Delete(name string, options *api.DeleteOptions) er
 	return err
 }
 
-func (c *FakeNetworkPolicies) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
+func (c *FakeNetworkPolicies) DeleteCollection(options *api.DeleteOptions, listOptions v1.ListOptions) error {
 	action := core.NewDeleteCollectionAction(networkpoliciesResource, c.ns, listOptions)
 
 	_, err := c.Fake.Invokes(action, &extensions.NetworkPolicyList{})
@@ -79,7 +79,7 @@ func (c *FakeNetworkPolicies) Get(name string, options v1.GetOptions) (result *e
 	return obj.(*extensions.NetworkPolicy), err
 }
 
-func (c *FakeNetworkPolicies) List(opts api.ListOptions) (result *extensions.NetworkPolicyList, err error) {
+func (c *FakeNetworkPolicies) List(opts v1.ListOptions) (result *extensions.NetworkPolicyList, err error) {
 	obj, err := c.Fake.
 		Invokes(core.NewListAction(networkpoliciesResource, c.ns, opts), &extensions.NetworkPolicyList{})
 
@@ -101,7 +101,7 @@ func (c *FakeNetworkPolicies) List(opts api.ListOptions) (result *extensions.Net
 }
 
 // Watch returns a watch.Interface that watches the requested networkPolicies.
-func (c *FakeNetworkPolicies) Watch(opts api.ListOptions) (watch.Interface, error) {
+func (c *FakeNetworkPolicies) Watch(opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(core.NewWatchAction(networkpoliciesResource, c.ns, opts))
 

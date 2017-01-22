@@ -36,10 +36,10 @@ type RoleBindingInterface interface {
 	Create(*rbac.RoleBinding) (*rbac.RoleBinding, error)
 	Update(*rbac.RoleBinding) (*rbac.RoleBinding, error)
 	Delete(name string, options *api.DeleteOptions) error
-	DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error
+	DeleteCollection(options *api.DeleteOptions, listOptions v1.ListOptions) error
 	Get(name string, options v1.GetOptions) (*rbac.RoleBinding, error)
-	List(opts api.ListOptions) (*rbac.RoleBindingList, error)
-	Watch(opts api.ListOptions) (watch.Interface, error)
+	List(opts v1.ListOptions) (*rbac.RoleBindingList, error)
+	Watch(opts v1.ListOptions) (watch.Interface, error)
 	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *rbac.RoleBinding, err error)
 	RoleBindingExpansion
 }
@@ -95,7 +95,7 @@ func (c *roleBindings) Delete(name string, options *api.DeleteOptions) error {
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *roleBindings) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
+func (c *roleBindings) DeleteCollection(options *api.DeleteOptions, listOptions v1.ListOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("rolebindings").
@@ -119,7 +119,7 @@ func (c *roleBindings) Get(name string, options v1.GetOptions) (result *rbac.Rol
 }
 
 // List takes label and field selectors, and returns the list of RoleBindings that match those selectors.
-func (c *roleBindings) List(opts api.ListOptions) (result *rbac.RoleBindingList, err error) {
+func (c *roleBindings) List(opts v1.ListOptions) (result *rbac.RoleBindingList, err error) {
 	result = &rbac.RoleBindingList{}
 	err = c.client.Get().
 		Namespace(c.ns).
@@ -131,7 +131,7 @@ func (c *roleBindings) List(opts api.ListOptions) (result *rbac.RoleBindingList,
 }
 
 // Watch returns a watch.Interface that watches the requested roleBindings.
-func (c *roleBindings) Watch(opts api.ListOptions) (watch.Interface, error) {
+func (c *roleBindings) Watch(opts v1.ListOptions) (watch.Interface, error) {
 	return c.client.Get().
 		Prefix("watch").
 		Namespace(c.ns).

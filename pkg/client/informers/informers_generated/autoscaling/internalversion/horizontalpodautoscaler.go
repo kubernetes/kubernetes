@@ -19,10 +19,9 @@ limitations under the License.
 package internalversion
 
 import (
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
-	api "k8s.io/kubernetes/pkg/api"
-	v1 "k8s.io/kubernetes/pkg/api/v1"
 	autoscaling "k8s.io/kubernetes/pkg/apis/autoscaling"
 	cache "k8s.io/kubernetes/pkg/client/cache"
 	internalclientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
@@ -46,18 +45,10 @@ func newHorizontalPodAutoscalerInformer(client internalclientset.Interface, resy
 	sharedIndexInformer := cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
-				var internalOptions api.ListOptions
-				if err := api.Scheme.Convert(&options, &internalOptions, nil); err != nil {
-					return nil, err
-				}
-				return client.Autoscaling().HorizontalPodAutoscalers(api.NamespaceAll).List(internalOptions)
+				return client.Autoscaling().HorizontalPodAutoscalers(v1.NamespaceAll).List(options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
-				var internalOptions api.ListOptions
-				if err := api.Scheme.Convert(&options, &internalOptions, nil); err != nil {
-					return nil, err
-				}
-				return client.Autoscaling().HorizontalPodAutoscalers(api.NamespaceAll).Watch(internalOptions)
+				return client.Autoscaling().HorizontalPodAutoscalers(v1.NamespaceAll).Watch(options)
 			},
 		},
 		&autoscaling.HorizontalPodAutoscaler{},

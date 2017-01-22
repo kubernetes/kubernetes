@@ -67,7 +67,7 @@ func (c *FakeAPIServices) Delete(name string, options *v1.DeleteOptions) error {
 	return err
 }
 
-func (c *FakeAPIServices) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
+func (c *FakeAPIServices) DeleteCollection(options *v1.DeleteOptions, listOptions meta_v1.ListOptions) error {
 	action := core.NewRootDeleteCollectionAction(apiservicesResource, listOptions)
 
 	_, err := c.Fake.Invokes(action, &v1alpha1.APIServiceList{})
@@ -83,7 +83,7 @@ func (c *FakeAPIServices) Get(name string, options meta_v1.GetOptions) (result *
 	return obj.(*v1alpha1.APIService), err
 }
 
-func (c *FakeAPIServices) List(opts v1.ListOptions) (result *v1alpha1.APIServiceList, err error) {
+func (c *FakeAPIServices) List(opts meta_v1.ListOptions) (result *v1alpha1.APIServiceList, err error) {
 	obj, err := c.Fake.
 		Invokes(core.NewRootListAction(apiservicesResource, opts), &v1alpha1.APIServiceList{})
 	if obj == nil {
@@ -104,7 +104,7 @@ func (c *FakeAPIServices) List(opts v1.ListOptions) (result *v1alpha1.APIService
 }
 
 // Watch returns a watch.Interface that watches the requested aPIServices.
-func (c *FakeAPIServices) Watch(opts v1.ListOptions) (watch.Interface, error) {
+func (c *FakeAPIServices) Watch(opts meta_v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(core.NewRootWatchAction(apiservicesResource, opts))
 }

@@ -37,10 +37,10 @@ type ClusterInterface interface {
 	Update(*federation.Cluster) (*federation.Cluster, error)
 	UpdateStatus(*federation.Cluster) (*federation.Cluster, error)
 	Delete(name string, options *api.DeleteOptions) error
-	DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error
+	DeleteCollection(options *api.DeleteOptions, listOptions v1.ListOptions) error
 	Get(name string, options v1.GetOptions) (*federation.Cluster, error)
-	List(opts api.ListOptions) (*federation.ClusterList, error)
-	Watch(opts api.ListOptions) (watch.Interface, error)
+	List(opts v1.ListOptions) (*federation.ClusterList, error)
+	Watch(opts v1.ListOptions) (watch.Interface, error)
 	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *federation.Cluster, err error)
 	ClusterExpansion
 }
@@ -106,7 +106,7 @@ func (c *clusters) Delete(name string, options *api.DeleteOptions) error {
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *clusters) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
+func (c *clusters) DeleteCollection(options *api.DeleteOptions, listOptions v1.ListOptions) error {
 	return c.client.Delete().
 		Resource("clusters").
 		VersionedParams(&listOptions, api.ParameterCodec).
@@ -128,7 +128,7 @@ func (c *clusters) Get(name string, options v1.GetOptions) (result *federation.C
 }
 
 // List takes label and field selectors, and returns the list of Clusters that match those selectors.
-func (c *clusters) List(opts api.ListOptions) (result *federation.ClusterList, err error) {
+func (c *clusters) List(opts v1.ListOptions) (result *federation.ClusterList, err error) {
 	result = &federation.ClusterList{}
 	err = c.client.Get().
 		Resource("clusters").
@@ -139,7 +139,7 @@ func (c *clusters) List(opts api.ListOptions) (result *federation.ClusterList, e
 }
 
 // Watch returns a watch.Interface that watches the requested clusters.
-func (c *clusters) Watch(opts api.ListOptions) (watch.Interface, error) {
+func (c *clusters) Watch(opts v1.ListOptions) (watch.Interface, error) {
 	return c.client.Get().
 		Prefix("watch").
 		Resource("clusters").

@@ -38,10 +38,10 @@ type CertificateSigningRequestInterface interface {
 	Update(*v1beta1.CertificateSigningRequest) (*v1beta1.CertificateSigningRequest, error)
 	UpdateStatus(*v1beta1.CertificateSigningRequest) (*v1beta1.CertificateSigningRequest, error)
 	Delete(name string, options *v1.DeleteOptions) error
-	DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error
+	DeleteCollection(options *v1.DeleteOptions, listOptions meta_v1.ListOptions) error
 	Get(name string, options meta_v1.GetOptions) (*v1beta1.CertificateSigningRequest, error)
-	List(opts v1.ListOptions) (*v1beta1.CertificateSigningRequestList, error)
-	Watch(opts v1.ListOptions) (watch.Interface, error)
+	List(opts meta_v1.ListOptions) (*v1beta1.CertificateSigningRequestList, error)
+	Watch(opts meta_v1.ListOptions) (watch.Interface, error)
 	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1beta1.CertificateSigningRequest, err error)
 	CertificateSigningRequestExpansion
 }
@@ -107,7 +107,7 @@ func (c *certificateSigningRequests) Delete(name string, options *v1.DeleteOptio
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *certificateSigningRequests) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
+func (c *certificateSigningRequests) DeleteCollection(options *v1.DeleteOptions, listOptions meta_v1.ListOptions) error {
 	return c.client.Delete().
 		Resource("certificatesigningrequests").
 		VersionedParams(&listOptions, api.ParameterCodec).
@@ -129,7 +129,7 @@ func (c *certificateSigningRequests) Get(name string, options meta_v1.GetOptions
 }
 
 // List takes label and field selectors, and returns the list of CertificateSigningRequests that match those selectors.
-func (c *certificateSigningRequests) List(opts v1.ListOptions) (result *v1beta1.CertificateSigningRequestList, err error) {
+func (c *certificateSigningRequests) List(opts meta_v1.ListOptions) (result *v1beta1.CertificateSigningRequestList, err error) {
 	result = &v1beta1.CertificateSigningRequestList{}
 	err = c.client.Get().
 		Resource("certificatesigningrequests").
@@ -140,7 +140,7 @@ func (c *certificateSigningRequests) List(opts v1.ListOptions) (result *v1beta1.
 }
 
 // Watch returns a watch.Interface that watches the requested certificateSigningRequests.
-func (c *certificateSigningRequests) Watch(opts v1.ListOptions) (watch.Interface, error) {
+func (c *certificateSigningRequests) Watch(opts meta_v1.ListOptions) (watch.Interface, error) {
 	return c.client.Get().
 		Prefix("watch").
 		Resource("certificatesigningrequests").

@@ -102,9 +102,7 @@ func DeepCopy_v1beta1_ClusterSpec(in interface{}, out interface{}, c *conversion
 		if in.ServerAddressByClientCIDRs != nil {
 			in, out := &in.ServerAddressByClientCIDRs, &out.ServerAddressByClientCIDRs
 			*out = make([]ServerAddressByClientCIDR, len(*in))
-			for i := range *in {
-				(*out)[i] = (*in)[i]
-			}
+			copy(*out, *in)
 		}
 		if in.SecretRef != nil {
 			in, out := &in.SecretRef, &out.SecretRef

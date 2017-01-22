@@ -72,7 +72,7 @@ func (c *FakeIngresses) Delete(name string, options *v1.DeleteOptions) error {
 	return err
 }
 
-func (c *FakeIngresses) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
+func (c *FakeIngresses) DeleteCollection(options *v1.DeleteOptions, listOptions meta_v1.ListOptions) error {
 	action := core.NewDeleteCollectionAction(ingressesResource, c.ns, listOptions)
 
 	_, err := c.Fake.Invokes(action, &v1beta1.IngressList{})
@@ -89,7 +89,7 @@ func (c *FakeIngresses) Get(name string, options meta_v1.GetOptions) (result *v1
 	return obj.(*v1beta1.Ingress), err
 }
 
-func (c *FakeIngresses) List(opts v1.ListOptions) (result *v1beta1.IngressList, err error) {
+func (c *FakeIngresses) List(opts meta_v1.ListOptions) (result *v1beta1.IngressList, err error) {
 	obj, err := c.Fake.
 		Invokes(core.NewListAction(ingressesResource, c.ns, opts), &v1beta1.IngressList{})
 
@@ -111,7 +111,7 @@ func (c *FakeIngresses) List(opts v1.ListOptions) (result *v1beta1.IngressList, 
 }
 
 // Watch returns a watch.Interface that watches the requested ingresses.
-func (c *FakeIngresses) Watch(opts v1.ListOptions) (watch.Interface, error) {
+func (c *FakeIngresses) Watch(opts meta_v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(core.NewWatchAction(ingressesResource, c.ns, opts))
 

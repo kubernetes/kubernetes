@@ -36,10 +36,10 @@ type ResourceQuotaInterface interface {
 	Update(*api.ResourceQuota) (*api.ResourceQuota, error)
 	UpdateStatus(*api.ResourceQuota) (*api.ResourceQuota, error)
 	Delete(name string, options *api.DeleteOptions) error
-	DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error
+	DeleteCollection(options *api.DeleteOptions, listOptions v1.ListOptions) error
 	Get(name string, options v1.GetOptions) (*api.ResourceQuota, error)
-	List(opts api.ListOptions) (*api.ResourceQuotaList, error)
-	Watch(opts api.ListOptions) (watch.Interface, error)
+	List(opts v1.ListOptions) (*api.ResourceQuotaList, error)
+	Watch(opts v1.ListOptions) (watch.Interface, error)
 	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *api.ResourceQuota, err error)
 	ResourceQuotaExpansion
 }
@@ -111,7 +111,7 @@ func (c *resourceQuotas) Delete(name string, options *api.DeleteOptions) error {
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *resourceQuotas) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
+func (c *resourceQuotas) DeleteCollection(options *api.DeleteOptions, listOptions v1.ListOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("resourcequotas").
@@ -135,7 +135,7 @@ func (c *resourceQuotas) Get(name string, options v1.GetOptions) (result *api.Re
 }
 
 // List takes label and field selectors, and returns the list of ResourceQuotas that match those selectors.
-func (c *resourceQuotas) List(opts api.ListOptions) (result *api.ResourceQuotaList, err error) {
+func (c *resourceQuotas) List(opts v1.ListOptions) (result *api.ResourceQuotaList, err error) {
 	result = &api.ResourceQuotaList{}
 	err = c.client.Get().
 		Namespace(c.ns).
@@ -147,7 +147,7 @@ func (c *resourceQuotas) List(opts api.ListOptions) (result *api.ResourceQuotaLi
 }
 
 // Watch returns a watch.Interface that watches the requested resourceQuotas.
-func (c *resourceQuotas) Watch(opts api.ListOptions) (watch.Interface, error) {
+func (c *resourceQuotas) Watch(opts v1.ListOptions) (watch.Interface, error) {
 	return c.client.Get().
 		Prefix("watch").
 		Namespace(c.ns).

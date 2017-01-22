@@ -72,7 +72,7 @@ func (c *FakeTestTypes) Delete(name string, options *api.DeleteOptions) error {
 	return err
 }
 
-func (c *FakeTestTypes) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
+func (c *FakeTestTypes) DeleteCollection(options *api.DeleteOptions, listOptions v1.ListOptions) error {
 	action := core.NewDeleteCollectionAction(testtypesResource, c.ns, listOptions)
 
 	_, err := c.Fake.Invokes(action, &testgroup.TestTypeList{})
@@ -89,7 +89,7 @@ func (c *FakeTestTypes) Get(name string, options v1.GetOptions) (result *testgro
 	return obj.(*testgroup.TestType), err
 }
 
-func (c *FakeTestTypes) List(opts api.ListOptions) (result *testgroup.TestTypeList, err error) {
+func (c *FakeTestTypes) List(opts v1.ListOptions) (result *testgroup.TestTypeList, err error) {
 	obj, err := c.Fake.
 		Invokes(core.NewListAction(testtypesResource, c.ns, opts), &testgroup.TestTypeList{})
 
@@ -111,7 +111,7 @@ func (c *FakeTestTypes) List(opts api.ListOptions) (result *testgroup.TestTypeLi
 }
 
 // Watch returns a watch.Interface that watches the requested testTypes.
-func (c *FakeTestTypes) Watch(opts api.ListOptions) (watch.Interface, error) {
+func (c *FakeTestTypes) Watch(opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(core.NewWatchAction(testtypesResource, c.ns, opts))
 

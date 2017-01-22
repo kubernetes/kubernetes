@@ -28,7 +28,6 @@ go_test(
     library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
-        "//pkg/api:go_default_library",
         "//pkg/apis/autoscaling:go_default_library",
         "//pkg/controller/podautoscaler:go_default_library",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",

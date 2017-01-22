@@ -57,7 +57,7 @@ func (c *FakeComponentStatuses) Delete(name string, options *api.DeleteOptions) 
 	return err
 }
 
-func (c *FakeComponentStatuses) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
+func (c *FakeComponentStatuses) DeleteCollection(options *api.DeleteOptions, listOptions v1.ListOptions) error {
 	action := core.NewRootDeleteCollectionAction(componentstatusesResource, listOptions)
 
 	_, err := c.Fake.Invokes(action, &api.ComponentStatusList{})
@@ -73,7 +73,7 @@ func (c *FakeComponentStatuses) Get(name string, options v1.GetOptions) (result 
 	return obj.(*api.ComponentStatus), err
 }
 
-func (c *FakeComponentStatuses) List(opts api.ListOptions) (result *api.ComponentStatusList, err error) {
+func (c *FakeComponentStatuses) List(opts v1.ListOptions) (result *api.ComponentStatusList, err error) {
 	obj, err := c.Fake.
 		Invokes(core.NewRootListAction(componentstatusesResource, opts), &api.ComponentStatusList{})
 	if obj == nil {
@@ -94,7 +94,7 @@ func (c *FakeComponentStatuses) List(opts api.ListOptions) (result *api.Componen
 }
 
 // Watch returns a watch.Interface that watches the requested componentStatuses.
-func (c *FakeComponentStatuses) Watch(opts api.ListOptions) (watch.Interface, error) {
+func (c *FakeComponentStatuses) Watch(opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(core.NewRootWatchAction(componentstatusesResource, opts))
 }

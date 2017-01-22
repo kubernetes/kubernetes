@@ -26,6 +26,7 @@ go_library(
         "//pkg/util/config:go_default_library",
         "//vendor:github.com/golang/glog",
         "//vendor:github.com/spf13/pflag",
+        "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/runtime/schema",
         "//vendor:k8s.io/apimachinery/pkg/util/net",
         "//vendor:k8s.io/apiserver/pkg/admission",

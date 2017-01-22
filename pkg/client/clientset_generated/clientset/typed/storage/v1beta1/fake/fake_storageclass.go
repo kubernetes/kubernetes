@@ -58,7 +58,7 @@ func (c *FakeStorageClasses) Delete(name string, options *v1.DeleteOptions) erro
 	return err
 }
 
-func (c *FakeStorageClasses) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
+func (c *FakeStorageClasses) DeleteCollection(options *v1.DeleteOptions, listOptions meta_v1.ListOptions) error {
 	action := core.NewRootDeleteCollectionAction(storageclassesResource, listOptions)
 
 	_, err := c.Fake.Invokes(action, &v1beta1.StorageClassList{})
@@ -74,7 +74,7 @@ func (c *FakeStorageClasses) Get(name string, options meta_v1.GetOptions) (resul
 	return obj.(*v1beta1.StorageClass), err
 }
 
-func (c *FakeStorageClasses) List(opts v1.ListOptions) (result *v1beta1.StorageClassList, err error) {
+func (c *FakeStorageClasses) List(opts meta_v1.ListOptions) (result *v1beta1.StorageClassList, err error) {
 	obj, err := c.Fake.
 		Invokes(core.NewRootListAction(storageclassesResource, opts), &v1beta1.StorageClassList{})
 	if obj == nil {
@@ -95,7 +95,7 @@ func (c *FakeStorageClasses) List(opts v1.ListOptions) (result *v1beta1.StorageC
 }
 
 // Watch returns a watch.Interface that watches the requested storageClasses.
-func (c *FakeStorageClasses) Watch(opts v1.ListOptions) (watch.Interface, error) {
+func (c *FakeStorageClasses) Watch(opts meta_v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(core.NewRootWatchAction(storageclassesResource, opts))
 }
