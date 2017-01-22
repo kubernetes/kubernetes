@@ -61,3 +61,8 @@ function copy-files() {
 function delete-master-instance-and-resources {
 	echo "Deleting master instance and its allocated resources" 1>&2
 }
+
+if [ -z $MASTER_IP ]; then
+    echo "Please set MASTER_IP to the address of an existing Kubernetes cluster"
+    exit 1
+fi

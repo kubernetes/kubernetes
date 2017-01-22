@@ -22,10 +22,9 @@ KUBECTL="${KUBE_ROOT}/cluster/kubectl.sh"
 KUBEMARK_DIRECTORY="${KUBE_ROOT}/test/kubemark"
 RESOURCE_DIRECTORY="${KUBEMARK_DIRECTORY}/resources"
 
-source "${KUBE_ROOT}/test/kubemark/skeleton/util.sh"
 source "${KUBE_ROOT}/test/kubemark/cloud-provider-config.sh"
-source "${KUBE_ROOT}/test/kubemark/${CLOUD_PROVIDER}/util.sh"
 source "${KUBE_ROOT}/cluster/kubemark/${CLOUD_PROVIDER}/config-default.sh"
+source "${KUBE_ROOT}/test/kubemark/${CLOUD_PROVIDER}/util.sh"
 
 # hack/lib/init.sh will ovewrite ETCD_VERSION if this is unset
 # to what is default in hack/lib/etcd.sh
@@ -92,7 +91,7 @@ function wait-for-master-reachability {
 
 # Write all the relevant certs/keys/tokens to the master.
 function write-pki-config-to-master {
-  PKI_SETUP_CMD="sudo mkdir /home/kubernetes -p && sudo mkdir /etc/srv/kubernetes -p && \
+  PKI_SETUP_CMD="sudo mkdir ${COPY_DIR} -p && sudo mkdir /etc/srv/kubernetes -p && \
     sudo bash -c \"echo ${CA_CERT_BASE64} | base64 --decode > /etc/srv/kubernetes/ca.crt\" && \
     sudo bash -c \"echo ${MASTER_CERT_BASE64} | base64 --decode > /etc/srv/kubernetes/server.cert\" && \
     sudo bash -c \"echo ${MASTER_KEY_BASE64} | base64 --decode > /etc/srv/kubernetes/server.key\" && \
@@ -122,16 +121,16 @@ function copy-resource-files-to-master {
   "${RESOURCE_DIRECTORY}/manifests/kube-controller-manager.yaml" \
   "${RESOURCE_DIRECTORY}/manifests/kube-addon-manager.yaml" \
   "${RESOURCE_DIRECTORY}/manifests/addons/kubemark-rbac-bindings" \
-  "kubernetes@${MASTER_NAME}":/home/kubernetes/
+  "${VM_USER}@${MASTER_NAME}":"${COPY_DIR}"
   echo "Copied server binary, master startup scripts, configs and resource manifests to master."
 }
 
 # Make startup scripts executable and run start-kubemark-master.sh.
 function start-master-components {
   echo ""
-  MASTER_STARTUP_CMD="sudo chmod a+x /home/kubernetes/configure-kubectl.sh && \
-    sudo chmod a+x /home/kubernetes/start-kubemark-master.sh && \
-    sudo bash /home/kubernetes/start-kubemark-master.sh"
+  MASTER_STARTUP_CMD="sudo chmod a+x ${COPY_DIR}/configure-kubectl.sh && \
+    sudo chmod a+x ${COPY_DIR}/start-kubemark-master.sh && \
+    sudo bash ${COPY_DIR}/start-kubemark-master.sh"
   execute-cmd-on-master-with-retries "${MASTER_STARTUP_CMD}"
   echo "The master has started and is now live."
 }
@@ -181,7 +180,6 @@ function create-and-upload-hollow-node-image {
   cp "${KUBEMARK_BIN}" "${MAKE_DIR}"
   CURR_DIR=`pwd`
   cd "${MAKE_DIR}"
-  RETRIES=3
   for attempt in $(seq 1 ${RETRIES}); do
     if ! make; then
       if [[ $((attempt)) -eq "${RETRIES}" ]]; then
