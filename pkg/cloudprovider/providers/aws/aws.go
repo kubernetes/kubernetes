@@ -386,15 +386,13 @@ var _ Volumes = &Cloud{}
 // CloudConfig wraps the settings for the AWS cloud provider.
 type CloudConfig struct {
 	Global struct {
-		// This flag enables the possibility to run the master components on a different
-		// aws account, on a different cloud provider or on premise.
-		// If the flag is set also Zone, VPCID and KubernetesClusterTag must be provided
-		ExternalMaster bool
-
-		// The aws Availability Zone
+		// TODO: Is there any use for this?  We can get it from the instance metadata service
+		// Maybe if we're not running on AWS, e.g. bootstrap; for now it is not very useful
 		Zone string
 
-		// The aws VPC
+		// The aws VPC flag enables the possibility to run the master components
+		// on a different aws account, on a different cloud provider or on-premise.
+		// If the flag is set also the KubernetesClusterTag must be provided
 		VPCID string
 
 		KubernetesClusterTag string
@@ -820,26 +818,26 @@ func newAWSCloud(config io.Reader, awsServices Services) (*Cloud, error) {
 		attaching:        make(map[types.NodeName]map[mountDevice]awsVolumeID),
 		deviceAllocators: make(map[types.NodeName]DeviceAllocator),
 	}
-	var selfAWSInstance *awsInstance
-	// Check if the master runs on the same account as the nodes or if we have an external master
-	if cfg.Global.ExternalMaster != true {
-		selfAWSInstance, err := awsCloud.buildSelfAWSInstance()
-		if err != nil {
-			return nil, err
-		}
-		awsCloud.selfAWSInstance = selfAWSInstance
-		awsCloud.vpcID = selfAWSInstance.vpcID
-		awsCloud.availabilityZone = selfAWSInstance.availabilityZone
-	} else if cfg.Global.ExternalMaster == true && (cfg.Global.VPCID == "" || cfg.Global.Zone == "" || cfg.Global.KubernetesClusterTag == "") {
-		// For the external master the Zone, VPCID and KubernetesClusterTag must be set.
-		// It is not possible to detect it
-		return nil, fmt.Errorf("Run with eternal Master but Zone: %s or VPCID: %s or KubernetesClusterTag: %s is not set", cfg.Global.Zone, cfg.Global.VPCID, cfg.Global.KubernetesClusterTag)
-	}
 
-	if cfg.Global.Zone != "" {
-		awsCloud.availabilityZone = cfg.Global.Zone
+	selfAWSInstance, err := awsCloud.buildSelfAWSInstance()
+	if err != nil && (cfg.Global.VPCID == "" || cfg.Global.KubernetesClusterTag == "") {
+		return nil, err
+	} else if err != nil {
+		// When the master is running on a different cloud provider or on-premise
+		// build up and dummy instance and use the vpcID from the nodes account
+		glog.Warningf("Cannot detect an AWS Instance")
+		selfAWSInstance = &awsInstance{
+			nodeName:         "master-dummy",
+			vpcID:            cfg.Global.VPCID,
+			availabilityZone: "dummy",
+		}
 	}
+	awsCloud.selfAWSInstance = selfAWSInstance
+	awsCloud.vpcID = selfAWSInstance.vpcID
+	awsCloud.availabilityZone = selfAWSInstance.availabilityZone
+
 	if cfg.Global.VPCID != "" {
+		// When the master is running on a different AWS account use the vpcID from the nodes account
 		awsCloud.vpcID = cfg.Global.VPCID
 	}
 
@@ -1112,7 +1110,7 @@ func (c *Cloud) getAllZones() (sets.String, error) {
 // GetZone implements Zones.GetZone
 func (c *Cloud) GetZone() (cloudprovider.Zone, error) {
 	return cloudprovider.Zone{
-		FailureDomain: c.availabilityZone,
+		FailureDomain: c.selfAWSInstance.availabilityZone,
 		Region:        c.region,
 	}, nil
 }
