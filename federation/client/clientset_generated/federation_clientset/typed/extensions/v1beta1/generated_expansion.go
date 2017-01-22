@@ -21,3 +21,5 @@ type DaemonSetExpansion interface{}
 type IngressExpansion interface{}
 
 type ReplicaSetExpansion interface{}
+
+type ScaleExpansion interface{}

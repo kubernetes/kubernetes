@@ -18,6 +18,7 @@ go_library(
         "generated_expansion.go",
         "ingress.go",
         "replicaset.go",
+        "scale.go",
     ],
     tags = ["automanaged"],
     deps = [
