@@ -17,6 +17,7 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//federation/apis/federation/install:go_default_library",
+        "//federation/client/clientset_generated/federation_clientset/typed/autoscaling/v1:go_default_library",
         "//federation/client/clientset_generated/federation_clientset/typed/batch/v1:go_default_library",
         "//federation/client/clientset_generated/federation_clientset/typed/core/v1:go_default_library",
         "//federation/client/clientset_generated/federation_clientset/typed/extensions/v1beta1:go_default_library",
@@ -41,6 +42,7 @@ filegroup(
     srcs = [
         ":package-srcs",
         "//federation/client/clientset_generated/federation_clientset/fake:all-srcs",
+        "//federation/client/clientset_generated/federation_clientset/typed/autoscaling/v1:all-srcs",
         "//federation/client/clientset_generated/federation_clientset/typed/batch/v1:all-srcs",
         "//federation/client/clientset_generated/federation_clientset/typed/core/v1:all-srcs",
         "//federation/client/clientset_generated/federation_clientset/typed/extensions/v1beta1:all-srcs",

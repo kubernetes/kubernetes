@@ -20,6 +20,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	clientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset"
+	internalversionautoscaling "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset/typed/autoscaling/internalversion"
+	fakeinternalversionautoscaling "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset/typed/autoscaling/internalversion/fake"
 	internalversionbatch "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset/typed/batch/internalversion"
 	fakeinternalversionbatch "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset/typed/batch/internalversion/fake"
 	internalversioncore "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset/typed/core/internalversion"
@@ -70,6 +72,11 @@ var _ clientset.Interface = &Clientset{}
 // Core retrieves the CoreClient
 func (c *Clientset) Core() internalversioncore.CoreInterface {
 	return &fakeinternalversioncore.FakeCore{Fake: &c.Fake}
+}
+
+// Autoscaling retrieves the AutoscalingClient
+func (c *Clientset) Autoscaling() internalversionautoscaling.AutoscalingInterface {
+	return &fakeinternalversionautoscaling.FakeAutoscaling{Fake: &c.Fake}
 }
 
 // Batch retrieves the BatchClient
