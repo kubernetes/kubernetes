@@ -90,7 +90,7 @@ func NewCmdRollingUpdate(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	usage := "Filename or URL to file to use to create the new replication controller."
 	kubectl.AddJsonFilenameFlag(cmd, &options.Filenames, usage)
 	cmd.MarkFlagRequired("filename")
-	cmd.Flags().String("image", "", "Image to use for upgrading the replication controller.  Can not be used with --filename/-f")
+	cmd.Flags().String("image", "", "Image to use for upgrading the replication controller. Must be distinct from the existing image (either new image or new image tag).  Can not be used with --filename/-f")
 	cmd.MarkFlagRequired("image")
 	cmd.Flags().String("deployment-label-key", "deployment", "The key to use to differentiate between two different controllers, default 'deployment'.  Only relevant when --image is specified, ignored otherwise")
 	cmd.Flags().Bool("dry-run", false, "If true, print out the changes that would be made, but don't actually make them.")
@@ -220,8 +220,14 @@ func RunRollingUpdate(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, arg
 			return err
 		}
 		if newRc != nil {
+			if inProgressImage := newRc.Spec.Template.Spec.Containers[0].Image; inProgressImage != image {
+				return cmdutil.UsageError(cmd, "Found existing in-progress update to image (%s).\nEither continue in-progress update with --image=%s or rollback with --rollback", inProgressImage, inProgressImage)
+			}
 			fmt.Fprintf(out, "Found existing update in progress (%s), resuming.\n", newRc.Name)
 		} else {
+			if oldRc.Spec.Template.Spec.Containers[0].Image == image {
+				return cmdutil.UsageError(cmd, "Specified --image must be distinct from existing container image")
+			}
 			newRc, err = kubectl.CreateNewControllerFromCurrentController(client, cmdNamespace, oldName, newName, image, deploymentKey)
 			if err != nil {
 				return err
