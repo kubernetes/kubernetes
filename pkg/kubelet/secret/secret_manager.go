@@ -58,8 +58,8 @@ type simpleSecretManager struct {
 	kubeClient clientset.Interface
 }
 
-func NewSimpleSecretManager(kubeClient clientset.Interface) (Manager, error) {
-	return &simpleSecretManager{kubeClient: kubeClient}, nil
+func NewSimpleSecretManager(kubeClient clientset.Interface) Manager {
+	return &simpleSecretManager{kubeClient: kubeClient}
 }
 
 func (s *simpleSecretManager) GetSecret(namespace, name string) (*v1.Secret, error) {
@@ -247,12 +247,12 @@ type cachingSecretManager struct {
 	registeredPods map[objectKey]*v1.Pod
 }
 
-func NewCachingSecretManager(kubeClient clientset.Interface, getTTL GetObjectTTLFunc) (Manager, error) {
+func NewCachingSecretManager(kubeClient clientset.Interface, getTTL GetObjectTTLFunc) Manager {
 	csm := &cachingSecretManager{
 		secretStore:    newSecretStore(kubeClient, clock.RealClock{}, getTTL, defaultTTL),
 		registeredPods: make(map[objectKey]*v1.Pod),
 	}
-	return csm, nil
+	return csm
 }
 
 func (c *cachingSecretManager) GetSecret(namespace, name string) (*v1.Secret, error) {
