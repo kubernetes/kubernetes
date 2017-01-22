@@ -50,8 +50,15 @@ remove-docker-artifacts() {
   :
 }
 
+install-extra-master-packages() {
+  # Install swapspace to ensure we don't run out of memory
+  apt-get-install swapspace
+}
+
 # Finds the master PD device
 find-master-pd() {
+  install-extra-master-packages
+
   if ( grep "/mnt/master-pd" /proc/mounts ); then
     echo "Master PD already mounted; won't remount"
     MASTER_PD_DEVICE=""
