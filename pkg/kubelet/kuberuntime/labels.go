@@ -29,7 +29,6 @@ import (
 )
 
 const (
-	// TODO: move those label definitions to kubelet/types/labels.go
 	// TODO: change those label names to follow kubernetes's format
 	podDeletionGracePeriodLabel    = "io.kubernetes.pod.deletionGracePeriod"
 	podTerminationGracePeriodLabel = "io.kubernetes.pod.terminationGracePeriod"
