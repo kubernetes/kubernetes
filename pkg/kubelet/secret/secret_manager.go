@@ -52,8 +52,8 @@ type simpleSecretManager struct {
 	kubeClient clientset.Interface
 }
 
-func NewSimpleSecretManager(kubeClient clientset.Interface) (Manager, error) {
-	return &simpleSecretManager{kubeClient: kubeClient}, nil
+func NewSimpleSecretManager(kubeClient clientset.Interface) Manager {
+	return &simpleSecretManager{kubeClient: kubeClient}
 }
 
 func (s *simpleSecretManager) GetSecret(namespace, name string) (*v1.Secret, error) {
