@@ -2172,6 +2172,11 @@ func (d *HorizontalPodAutoscalerDescriber) Describe(namespace, name string, desc
 				DescribeEvents(events, w)
 			}
 		}
+
+		events, _ := d.client.Events(namespace).Search(hpa)
+		if events != nil {
+			DescribeEvents(events, out)
+		}
 		return nil
 	})
 }
