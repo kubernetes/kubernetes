@@ -19,6 +19,9 @@ package json
 import (
 	"encoding/json"
 	"io"
+	"net/http"
+	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -80,10 +83,35 @@ func TestDecoder(t *testing.T) {
 	}
 }
 
+func pipeViaHTTP() (client io.ReadCloser, server io.Writer, cleanup func()) {
+	done := make(chan struct{}, 1)
+	serverChan := make(chan http.ResponseWriter)
+	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		flusher, ok := w.(http.Flusher)
+		if !ok {
+			panic("not a flusher?")
+		}
+		w.Header().Set("Transfer-Encoding", "chunked")
+		w.WriteHeader(http.StatusOK)
+		flusher.Flush()
+		serverChan <- w
+		<-done
+	}))
+
+	resp, err := http.Get(s.URL)
+	if err != nil {
+		panic("unexpected error " + err.Error())
+	}
+
+	return resp.Body, <-serverChan, func() {
+		close(done)
+		s.Close()
+	}
+}
+
 func TestDecoder_SourceClose(t *testing.T) {
 	out, in := io.Pipe()
 	decoder := NewDecoder(out, testapi.Default.Codec())
-
 	done := make(chan struct{})
 
 	go func() {
@@ -102,4 +130,83 @@ func TestDecoder_SourceClose(t *testing.T) {
 	case <-time.After(util.ForeverTestTimeout):
 		t.Error("Timeout")
 	}
+}
+
+func TestDecoder_DestClose(t *testing.T) {
+	out, _, cleanup := pipeViaHTTP()
+	defer cleanup()
+	decoder := NewDecoder(out, testapi.Default.Codec())
+
+	done := make(chan struct{})
+
+	go func() {
+		_, _, err := decoder.Decode()
+		if err == nil {
+			t.Errorf("Unexpected nil error")
+		}
+		close(done)
+	}()
+
+	out.Close()
+
+	select {
+	case <-done:
+		break
+	case <-time.After(util.ForeverTestTimeout):
+		t.Error("Timeout")
+	}
+}
+
+func TestDecoder_Blocked(t *testing.T) {
+	out, in, cleanup := pipeViaHTTP()
+	inFlusher := in.(http.Flusher)
+	inCN := in.(http.CloseNotifier)
+	defer cleanup()
+	encoder := NewEncoder(in, testapi.Default.Codec())
+
+	wrote := make(chan struct{}, 1)
+
+	go func() {
+		defer func() {
+			if x := recover(); x != nil {
+				close(wrote)
+				t.Logf("Got panic: %v", x)
+			}
+		}()
+		for {
+			err := encoder.Encode(&watch.Event{watch.Added, &api.Pod{ObjectMeta: api.ObjectMeta{Name: strings.Repeat("a", 1024)}}})
+			if err != nil {
+				t.Errorf("Write error %v", err)
+				return
+			}
+			select {
+			case <-inCN.CloseNotify():
+				t.Logf("Got close")
+				return
+			default:
+				inFlusher.Flush()
+				wrote <- struct{}{}
+			}
+		}
+	}()
+
+	count := 0
+loop:
+	for {
+		select {
+		case _, open := <-wrote:
+			if !open {
+				t.Logf("'wrote' channel closed")
+				break loop
+			}
+			count++
+			t.Logf("wrote %v", count)
+
+		case <-time.After(5 * time.Second):
+			t.Error("Timeout")
+			break loop
+		}
+	}
+	t.Logf("about to close")
+	out.Close()
 }
