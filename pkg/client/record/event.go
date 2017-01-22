@@ -193,7 +193,11 @@ func recordEvent(sink EventSink, event *v1.Event, patch []byte, updateExistingEv
 		glog.Errorf("Unable to construct event '%#v': '%v' (will not retry!)", event, err)
 		return true
 	case *errors.StatusError:
-		if errors.IsAlreadyExists(err) {
+		// if the event already exists, or if the event is forbidden by the server, we do not
+		// log an error.  forbidden events happen most frequently when a client attempts to create
+		// an event in a namespace that is undergoing termination.  it's rejection is part of normal
+		// server activity, and having error log for normal system behavior causes confusion.
+		if errors.IsAlreadyExists(err) || errors.IsForbidden(err) {
 			glog.V(5).Infof("Server rejected event '%#v': '%v' (will not retry!)", event, err)
 		} else {
 			glog.Errorf("Server rejected event '%#v': '%v' (will not retry!)", event, err)
