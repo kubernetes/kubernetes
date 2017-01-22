@@ -177,7 +177,7 @@ func (f *fakeJobControl) Clear() {
 // created as an interface to allow testing.
 type podControlInterface interface {
 	// ListPods list pods
-	ListPods(namespace string, opts v1.ListOptions) (*v1.PodList, error)
+	ListPods(namespace string, opts metav1.ListOptions) (*v1.PodList, error)
 	// DeleteJob deletes the pod identified by name.
 	// TODO: delete by UID?
 	DeletePod(namespace string, name string) error
@@ -191,7 +191,7 @@ type realPodControl struct {
 
 var _ podControlInterface = &realPodControl{}
 
-func (r realPodControl) ListPods(namespace string, opts v1.ListOptions) (*v1.PodList, error) {
+func (r realPodControl) ListPods(namespace string, opts metav1.ListOptions) (*v1.PodList, error) {
 	return r.KubeClient.Core().Pods(namespace).List(opts)
 }
 
@@ -208,7 +208,7 @@ type fakePodControl struct {
 
 var _ podControlInterface = &fakePodControl{}
 
-func (f *fakePodControl) ListPods(namespace string, opts v1.ListOptions) (*v1.PodList, error) {
+func (f *fakePodControl) ListPods(namespace string, opts metav1.ListOptions) (*v1.PodList, error) {
 	f.Lock()
 	defer f.Unlock()
 	return &v1.PodList{Items: f.Pods}, nil

@@ -36,11 +36,11 @@ import (
 	"github.com/golang/glog"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/kubernetes/pkg/api/v1"
 )
 
 // Reflector watches a specified resource and causes all changes to be reflected in the given store.
@@ -239,7 +239,7 @@ func (r *Reflector) ListAndWatch(stopCh <-chan struct{}) error {
 	// Explicitly set "0" as resource version - it's fine for the List()
 	// to be served from cache and potentially be delayed relative to
 	// etcd contents. Reflector framework will catch up via Watch() eventually.
-	options := v1.ListOptions{ResourceVersion: "0"}
+	options := metav1.ListOptions{ResourceVersion: "0"}
 	list, err := r.listerWatcher.List(options)
 	if err != nil {
 		return fmt.Errorf("%s: Failed to list %v: %v", r.name, r.expectedType, err)
@@ -282,7 +282,7 @@ func (r *Reflector) ListAndWatch(stopCh <-chan struct{}) error {
 
 	for {
 		timemoutseconds := int64(minWatchTimeout.Seconds() * (rand.Float64() + 1.0))
-		options = v1.ListOptions{
+		options = metav1.ListOptions{
 			ResourceVersion: resourceVersion,
 			// We want to avoid situations of hanging watchers. Stop any wachers that do not
 			// receive any events within the timeout window.
