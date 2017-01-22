@@ -21,6 +21,18 @@ const (
 	KubernetesPodNamespaceLabel  = "io.kubernetes.pod.namespace"
 	KubernetesPodUIDLabel        = "io.kubernetes.pod.uid"
 	KubernetesContainerNameLabel = "io.kubernetes.container.name"
+
+	PodDeletionGracePeriodLabel    = "io.kubernetes.pod.deletionGracePeriod"
+	PodTerminationGracePeriodLabel = "io.kubernetes.pod.terminationGracePeriod"
+
+	ContainerHashLabel                   = "io.kubernetes.container.hash"
+	ContainerRestartCountLabel           = "io.kubernetes.container.restartCount"
+	ContainerTerminationMessagePathLabel = "io.kubernetes.container.terminationMessagePath"
+	ContainerPreStopHandlerLabel         = "io.kubernetes.container.preStopHandler"
+	ContainerPortsLabel                  = "io.kubernetes.container.ports"
+
+	// KubernetesManagedLabel is used to distinguish whether a container/sandbox is managed by kubelet or not
+	KubernetesManagedLabel = "io.kubernetes.managed"
 )
 
 func GetContainerName(labels map[string]string) string {
