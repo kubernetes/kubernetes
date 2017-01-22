@@ -184,10 +184,18 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 
 		if pkgNeedsGeneration {
 			glog.V(3).Infof("Package %q needs generation", i)
+			path := pkg.Path
+			if strings.HasPrefix(pkg.SourcePath, arguments.OutputBase) {
+				expandedPath := strings.TrimPrefix(pkg.SourcePath, arguments.OutputBase)
+				if strings.Contains(expandedPath, "/vendor/") {
+					path = expandedPath
+					glog.V(3).Infof("  %s", path)
+				}
+			}
 			packages = append(packages,
 				&generator.DefaultPackage{
 					PackageName: strings.Split(filepath.Base(pkg.Path), ".")[0],
-					PackagePath: pkg.Path,
+					PackagePath: path,
 					HeaderText:  header,
 					GeneratorFunc: func(c *generator.Context) (generators []generator.Generator) {
 						return []generator.Generator{
