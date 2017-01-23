@@ -93,16 +93,27 @@ var _ = framework.KubeDescribe("ResourceQuota", func() {
 
 	It("should create a ResourceQuota and capture the life of a secret.", func() {
 		By("Discovering how many secrets are in namespace by default")
-		secrets, err := f.ClientSet.Core().Secrets(f.Namespace.Name).List(metav1.ListOptions{})
-		Expect(err).NotTo(HaveOccurred())
-		defaultSecrets := fmt.Sprintf("%d", len(secrets.Items))
-		hardSecrets := fmt.Sprintf("%d", len(secrets.Items)+1)
+		found, unchanged := 0, 0
+		wait.Poll(1*time.Second, 30*time.Second, func() (bool, error) {
+			secrets, err := f.ClientSet.Core().Secrets(f.Namespace.Name).List(metav1.ListOptions{})
+			Expect(err).NotTo(HaveOccurred())
+			if len(secrets.Items) == found {
+				// loop until the number of secrets has stabilized for 5 seconds
+				unchanged++
+				return unchanged > 4, nil
+			}
+			unchanged = 0
+			found = len(secrets.Items)
+			return false, nil
+		})
+		defaultSecrets := fmt.Sprintf("%d", found)
+		hardSecrets := fmt.Sprintf("%d", found+1)
 
 		By("Creating a ResourceQuota")
 		quotaName := "test-quota"
 		resourceQuota := newTestResourceQuota(quotaName)
 		resourceQuota.Spec.Hard[v1.ResourceSecrets] = resource.MustParse(hardSecrets)
-		resourceQuota, err = createResourceQuota(f.ClientSet, f.Namespace.Name, resourceQuota)
+		resourceQuota, err := createResourceQuota(f.ClientSet, f.Namespace.Name, resourceQuota)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Ensuring resource quota status is calculated")
