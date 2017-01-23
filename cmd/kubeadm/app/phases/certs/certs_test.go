@@ -19,9 +19,11 @@ package certs
 import (
 	"fmt"
 	"io/ioutil"
+	"net"
 	"os"
 	"testing"
 
+	certutil "k8s.io/client-go/pkg/util/cert"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 )
 
@@ -65,12 +67,61 @@ func TestCreatePKIAssets(t *testing.T) {
 		},
 	}
 	for _, rt := range tests {
-		_, actual := CreatePKIAssets(rt.cfg, fmt.Sprintf("%s/etc/kubernetes/pki", tmpdir))
+		actual := CreatePKIAssets(rt.cfg, fmt.Sprintf("%s/etc/kubernetes/pki", tmpdir))
 		if (actual == nil) != rt.expected {
 			t.Errorf(
 				"failed CreatePKIAssets with an error:\n\texpected: %t\n\t  actual: %t",
 				rt.expected,
 				(actual == nil),
+			)
+		}
+	}
+}
+
+func TestCheckAltNamesExist(t *testing.T) {
+	var tests = []struct {
+		IPs              []net.IP
+		DNSNames         []string
+		requiredAltNames certutil.AltNames
+		succeed          bool
+	}{
+		{
+			// equal
+			requiredAltNames: certutil.AltNames{IPs: []net.IP{net.ParseIP("1.1.1.1"), net.ParseIP("192.168.1.2")}, DNSNames: []string{"foo", "bar", "baz"}},
+			IPs:              []net.IP{net.ParseIP("1.1.1.1"), net.ParseIP("192.168.1.2")},
+			DNSNames:         []string{"foo", "bar", "baz"},
+			succeed:          true,
+		},
+		{
+			// the loaded cert has more ips than required, ok
+			requiredAltNames: certutil.AltNames{IPs: []net.IP{net.ParseIP("1.1.1.1"), net.ParseIP("192.168.1.2")}, DNSNames: []string{"foo", "bar", "baz"}},
+			IPs:              []net.IP{net.ParseIP("192.168.2.5"), net.ParseIP("1.1.1.1"), net.ParseIP("192.168.1.2")},
+			DNSNames:         []string{"a", "foo", "b", "bar", "baz"},
+			succeed:          true,
+		},
+		{
+			// the loaded cert doesn't have all ips
+			requiredAltNames: certutil.AltNames{IPs: []net.IP{net.ParseIP("1.1.1.1"), net.ParseIP("192.168.2.5"), net.ParseIP("192.168.1.2")}, DNSNames: []string{"foo", "bar", "baz"}},
+			IPs:              []net.IP{net.ParseIP("1.1.1.1"), net.ParseIP("192.168.1.2")},
+			DNSNames:         []string{"foo", "bar", "baz"},
+			succeed:          false,
+		},
+		{
+			// the loaded cert doesn't have all ips
+			requiredAltNames: certutil.AltNames{IPs: []net.IP{net.ParseIP("1.1.1.1"), net.ParseIP("192.168.1.2")}, DNSNames: []string{"foo", "bar", "b", "baz"}},
+			IPs:              []net.IP{net.ParseIP("1.1.1.1"), net.ParseIP("192.168.1.2")},
+			DNSNames:         []string{"foo", "bar", "baz"},
+			succeed:          false,
+		},
+	}
+
+	for _, rt := range tests {
+		succeeded := checkAltNamesExist(rt.IPs, rt.DNSNames, rt.requiredAltNames)
+		if succeeded != rt.succeed {
+			t.Errorf(
+				"failed checkAltNamesExist:\n\texpected: %t\n\t  actual: %t",
+				rt.succeed,
+				succeeded,
 			)
 		}
 	}

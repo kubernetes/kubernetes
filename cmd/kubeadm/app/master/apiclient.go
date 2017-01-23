@@ -36,6 +36,7 @@ import (
 
 const apiCallRetryInterval = 500 * time.Millisecond
 
+// TODO: This method shouldn't exist as a standalone function but be integrated into CreateClientFromFile
 func createAPIClient(adminKubeconfig *clientcmdapi.Config) (*clientset.Clientset, error) {
 	adminClientConfig, err := clientcmd.NewDefaultClientConfig(
 		*adminKubeconfig,
