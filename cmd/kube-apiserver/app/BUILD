@@ -39,6 +39,7 @@ go_library(
         "//plugin/pkg/admission/admit:go_default_library",
         "//plugin/pkg/admission/alwayspullimages:go_default_library",
         "//plugin/pkg/admission/antiaffinity:go_default_library",
+        "//plugin/pkg/admission/cloudprovider/node:go_default_library",
         "//plugin/pkg/admission/deny:go_default_library",
         "//plugin/pkg/admission/exec:go_default_library",
         "//plugin/pkg/admission/gc:go_default_library",
