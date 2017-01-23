@@ -408,8 +408,7 @@ func (e *Store) Update(ctx genericapirequest.Context, name string, objInfo rest.
 		if err := rest.BeforeUpdate(e.UpdateStrategy, ctx, obj, existing); err != nil {
 			return nil, nil, err
 		}
-		delete := e.shouldDelete(ctx, key, obj, existing)
-		if delete {
+		if e.shouldDelete(ctx, key, obj, existing) {
 			deleteObj = obj
 			return nil, nil, errEmptiedFinalizers
 		}
