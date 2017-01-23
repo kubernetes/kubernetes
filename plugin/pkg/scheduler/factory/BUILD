@@ -64,8 +64,8 @@ go_test(
         "//plugin/pkg/scheduler/util:go_default_library",
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/runtime",
-        "//vendor:k8s.io/client-go/pkg/util/testing",
         "//vendor:k8s.io/client-go/rest",
+        "//vendor:k8s.io/client-go/util/testing",
     ],
 )
 

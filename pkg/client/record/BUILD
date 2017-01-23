@@ -28,8 +28,8 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/util/runtime",
         "//vendor:k8s.io/apimachinery/pkg/util/sets",
         "//vendor:k8s.io/apimachinery/pkg/watch",
-        "//vendor:k8s.io/client-go/pkg/util/clock",
         "//vendor:k8s.io/client-go/rest",
+        "//vendor:k8s.io/client-go/util/clock",
     ],
 )
 
@@ -49,8 +49,8 @@ go_test(
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/runtime",
         "//vendor:k8s.io/apimachinery/pkg/util/diff",
-        "//vendor:k8s.io/client-go/pkg/util/clock",
         "//vendor:k8s.io/client-go/rest",
+        "//vendor:k8s.io/client-go/util/clock",
     ],
 )
 

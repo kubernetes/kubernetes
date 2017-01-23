@@ -124,9 +124,9 @@ go_library(
         "//vendor:k8s.io/apimachinery/pkg/util/validation/field",
         "//vendor:k8s.io/apimachinery/pkg/util/wait",
         "//vendor:k8s.io/client-go/kubernetes",
-        "//vendor:k8s.io/client-go/pkg/util/clock",
-        "//vendor:k8s.io/client-go/pkg/util/flowcontrol",
-        "//vendor:k8s.io/client-go/pkg/util/integer",
+        "//vendor:k8s.io/client-go/util/clock",
+        "//vendor:k8s.io/client-go/util/flowcontrol",
+        "//vendor:k8s.io/client-go/util/integer",
     ],
 )
 
@@ -206,9 +206,9 @@ go_test(
         "//vendor:k8s.io/apimachinery/pkg/util/runtime",
         "//vendor:k8s.io/apimachinery/pkg/util/sets",
         "//vendor:k8s.io/apimachinery/pkg/util/wait",
-        "//vendor:k8s.io/client-go/pkg/util/clock",
-        "//vendor:k8s.io/client-go/pkg/util/flowcontrol",
-        "//vendor:k8s.io/client-go/pkg/util/testing",
+        "//vendor:k8s.io/client-go/util/clock",
+        "//vendor:k8s.io/client-go/util/flowcontrol",
+        "//vendor:k8s.io/client-go/util/testing",
     ],
 )
 

@@ -63,7 +63,7 @@ go_test(
         "//vendor:k8s.io/apimachinery/pkg/apis/meta/v1",
         "//vendor:k8s.io/apimachinery/pkg/types",
         "//vendor:k8s.io/apimachinery/pkg/watch",
-        "//vendor:k8s.io/client-go/pkg/util/testing",
+        "//vendor:k8s.io/client-go/util/testing",
     ],
 )
 
@@ -74,7 +74,7 @@ go_test(
     deps = [
         "//pkg/volume:go_default_library",
         "//pkg/volume/testing:go_default_library",
-        "//vendor:k8s.io/client-go/pkg/util/testing",
+        "//vendor:k8s.io/client-go/util/testing",
     ],
 )
 

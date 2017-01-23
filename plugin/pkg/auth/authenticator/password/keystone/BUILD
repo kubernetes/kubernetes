@@ -20,7 +20,7 @@ go_library(
         "//vendor:github.com/rackspace/gophercloud/openstack",
         "//vendor:k8s.io/apimachinery/pkg/util/net",
         "//vendor:k8s.io/apiserver/pkg/authentication/user",
-        "//vendor:k8s.io/client-go/pkg/util/cert",
+        "//vendor:k8s.io/client-go/util/cert",
     ],
 )
 

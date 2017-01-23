@@ -194,10 +194,10 @@ go_library(
         "//vendor:k8s.io/client-go/pkg/api/v1",
         "//vendor:k8s.io/client-go/pkg/apis/extensions/v1beta1",
         "//vendor:k8s.io/client-go/pkg/apis/policy/v1beta1",
-        "//vendor:k8s.io/client-go/pkg/util/flowcontrol",
         "//vendor:k8s.io/client-go/pkg/util/intstr",
         "//vendor:k8s.io/client-go/rest",
         "//vendor:k8s.io/client-go/transport",
+        "//vendor:k8s.io/client-go/util/flowcontrol",
     ],
 )
 
