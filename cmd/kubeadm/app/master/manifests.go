@@ -325,6 +325,7 @@ func getAPIServerCommand(cfg *kubeadmapi.MasterConfiguration, selfHosted bool) [
 		"--token-auth-file="+kubeadmapi.GlobalEnvParams.HostPKIPath+"/tokens.csv",
 		fmt.Sprintf("--secure-port=%d", cfg.API.Port),
 		"--allow-privileged",
+		"--storage-backend=etcd3",
 	)
 
 	if cfg.AuthorizationMode != "" {
