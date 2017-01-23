@@ -467,20 +467,34 @@ func (dsc *DaemonSetsController) manage(ds *extensions.DaemonSet) error {
 			continue
 		}
 
-		daemonPods, isRunning := nodeToDaemonPods[node.Name]
+		daemonPods, exists := nodeToDaemonPods[node.Name]
 
 		switch {
-		case shouldSchedule && !isRunning:
+		case shouldSchedule && !exists:
 			// If daemon pod is supposed to be running on node, but isn't, create daemon pod.
 			nodesNeedingDaemonPods = append(nodesNeedingDaemonPods, node.Name)
-		case shouldContinueRunning && len(daemonPods) > 1:
-			// If daemon pod is supposed to be running on node, but more than 1 daemon pod is running, delete the excess daemon pods.
-			// Sort the daemon pods by creation time, so the the oldest is preserved.
-			sort.Sort(podByCreationTimestamp(daemonPods))
-			for i := 1; i < len(daemonPods); i++ {
-				podsToDelete = append(podsToDelete, daemonPods[i].Name)
+		case shouldContinueRunning:
+			// If a daemon pod failed, delete it
+			// TODO: handle the case when the daemon pods fail consistently and causes kill-recreate hot loop
+			var daemonPodsRunning []*v1.Pod
+			for i := range daemonPods {
+				daemon := daemonPods[i]
+				if daemon.Status.Phase == v1.PodFailed {
+					glog.V(2).Infof("Found failed daemon pod %s/%s, will try to kill it", daemon.Namespace, daemon.Name)
+					podsToDelete = append(podsToDelete, daemon.Name)
+				} else {
+					daemonPodsRunning = append(daemonPodsRunning, daemon)
+				}
 			}
-		case !shouldContinueRunning && isRunning:
+			// If daemon pod is supposed to be running on node, but more than 1 daemon pod is running, delete the excess daemon pods.
+			// Sort the daemon pods by creation time, so the oldest is preserved.
+			if len(daemonPodsRunning) > 1 {
+				sort.Sort(podByCreationTimestamp(daemonPodsRunning))
+				for i := 1; i < len(daemonPodsRunning); i++ {
+					podsToDelete = append(podsToDelete, daemonPods[i].Name)
+				}
+			}
+		case !shouldContinueRunning && exists:
 			// If daemon pod isn't supposed to run on node, but it is, delete all daemon pods on node.
 			for i := range daemonPods {
 				podsToDelete = append(podsToDelete, daemonPods[i].Name)
