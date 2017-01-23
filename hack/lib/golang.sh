@@ -27,6 +27,7 @@ kube::golang::server_targets() {
     cmd/kube-proxy
     cmd/kube-apiserver
     cmd/kube-controller-manager
+    cmd/cloud-controller-manager
     cmd/kubelet
     cmd/kubeadm
     cmd/hyperkube
@@ -192,6 +193,7 @@ readonly KUBE_ALL_TARGETS=(
 readonly KUBE_ALL_BINARIES=("${KUBE_ALL_TARGETS[@]##*/}")
 
 readonly KUBE_STATIC_LIBRARIES=(
+  cloud-controller-manager
   kube-apiserver
   kube-controller-manager
   kube-scheduler
