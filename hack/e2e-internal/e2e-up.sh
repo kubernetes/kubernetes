@@ -37,6 +37,7 @@ if [[ "${FEDERATION:-}" == "true" ]]; then
     # select each one and call federated-up
     for zone in ${E2E_ZONES};do
         (
+        export CLUSTER_NAME="${zone}"
         export CLUSTER_IP_RANGE="10.${cur_ip_octet2}.0.0/16"
         set-federation-zone-vars "$zone"
         test-setup
