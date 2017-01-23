@@ -141,6 +141,8 @@ type NodeController struct {
 	daemonSetStore listers.StoreToDaemonSetLister
 	// allocate/recycle CIDRs for node if allocateNodeCIDRs == true
 	cidrAllocator CIDRAllocator
+	// manages taints
+	taintManager *TaintController
 
 	forcefullyDeletePod        func(*v1.Pod) error
 	nodeExistsInCloudProvider  func(types.NodeName) (bool, error)
@@ -241,8 +243,34 @@ func NewNodeController(
 	nc.computeZoneStateFunc = nc.ComputeZoneState
 
 	podInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc:    nc.maybeDeleteTerminatingPod,
-		UpdateFunc: func(_, obj interface{}) { nc.maybeDeleteTerminatingPod(obj) },
+		AddFunc: func(obj interface{}) {
+			nc.maybeDeleteTerminatingPod(obj)
+			pod := obj.(*v1.Pod)
+			nc.taintManager.PodUpdated(nil, pod)
+		},
+		UpdateFunc: func(prev, obj interface{}) {
+			nc.maybeDeleteTerminatingPod(obj)
+			prevPod := prev.(*v1.Pod)
+			newPod := obj.(*v1.Pod)
+			nc.taintManager.PodUpdated(prevPod, newPod)
+		},
+		DeleteFunc: func(obj interface{}) {
+			pod, isPod := obj.(*v1.Pod)
+			// We can get DeletedFinalStateUnknown instead of *v1.Node here and we need to handle that correctly. #34692
+			if !isPod {
+				deletedState, ok := obj.(cache.DeletedFinalStateUnknown)
+				if !ok {
+					glog.Errorf("Received unexpected object: %v", obj)
+					return
+				}
+				pod, ok = deletedState.Obj.(*v1.Pod)
+				if !ok {
+					glog.Errorf("DeletedFinalStateUnknown contained non-Node object: %v", deletedState.Obj)
+					return
+				}
+			}
+			nc.taintManager.PodUpdated(pod, nil)
+		},
 	})
 	nc.podStore = *podInformer.Lister()
 
@@ -270,6 +298,8 @@ func NewNodeController(
 			return nil, err
 		}
 
+		nc.taintManager = NewTaintController(kubeClient)
+
 		nodeEventHandlerFuncs = cache.ResourceEventHandlerFuncs{
 			AddFunc: func(originalObj interface{}) {
 				obj, err := api.Scheme.DeepCopy(originalObj)
@@ -282,9 +312,11 @@ func NewNodeController(
 				if err := nc.cidrAllocator.AllocateOrOccupyCIDR(node); err != nil {
 					utilruntime.HandleError(fmt.Errorf("Error allocating CIDR: %v", err))
 				}
+				nc.taintManager.NodeUpdated(nil, node)
 			},
-			UpdateFunc: func(_, obj interface{}) {
-				node := obj.(*v1.Node)
+			UpdateFunc: func(oldNode, newNode interface{}) {
+				node := newNode.(*v1.Node)
+				prevNode := oldNode.(*v1.Node)
 				// If the PodCIDR is not empty we either:
 				// - already processed a Node that already had a CIDR after NC restarted
 				//   (cidr is marked as used),
@@ -315,6 +347,7 @@ func NewNodeController(
 						utilruntime.HandleError(fmt.Errorf("Error allocating CIDR: %v", err))
 					}
 				}
+				nc.taintManager.NodeUpdated(prevNode, node)
 			},
 			DeleteFunc: func(originalObj interface{}) {
 				obj, err := api.Scheme.DeepCopy(originalObj)
@@ -337,6 +370,7 @@ func NewNodeController(
 						return
 					}
 				}
+				nc.taintManager.NodeUpdated(node, nil)
 				if err := nc.cidrAllocator.ReleaseCIDR(node); err != nil {
 					glog.Errorf("Error releasing CIDR: %v", err)
 				}
@@ -356,7 +390,6 @@ func NewNodeController(
 func (nc *NodeController) Run() {
 	go func() {
 		defer utilruntime.HandleCrash()
-
 		if !cache.WaitForCacheSync(wait.NeverStop, nc.nodeInformer.Informer().HasSynced, nc.podInformer.Informer().HasSynced, nc.daemonSetInformer.Informer().HasSynced) {
 			utilruntime.HandleError(errors.New("NodeController timed out while waiting for informers to sync..."))
 			return
@@ -368,6 +401,8 @@ func (nc *NodeController) Run() {
 				glog.Errorf("Error monitoring node status: %v", err)
 			}
 		}, nc.nodeMonitorPeriod, wait.NeverStop)
+
+		go nc.taintManager.Run(wait.NeverStop)
 
 		// Managing eviction of nodes:
 		// When we delete pods off a node, if the node was not empty at the time we then
