@@ -593,12 +593,12 @@ func (rm *ReplicationManager) syncReplicationController(key string) error {
 		return err
 	}
 	rc, err := rm.rcLister.ReplicationControllers(namespace).Get(name)
+	if errors.IsNotFound(err) {
+		glog.Infof("Replication Controller has been deleted %v", key)
+		rm.expectations.DeleteExpectations(key)
+		return nil
+	}
 	if err != nil {
-		if errors.IsNotFound(err) {
-			glog.Infof("Replication Controller has been deleted %v", key)
-			rm.expectations.DeleteExpectations(key)
-			return nil
-		}
 		return err
 	}
 
