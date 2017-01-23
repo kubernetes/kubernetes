@@ -78,8 +78,8 @@ func NewGroupMetaFactory(groupArgs *GroupMetaFactoryArgs, versions VersionToSche
 // programmer importing the wrong set of packages. If this assumption doesn't
 // work for you, just call DefaultGroupFactoryRegistry.AnnouncePreconstructedFactory
 // yourself.
-func (gmf *GroupMetaFactory) Announce() *GroupMetaFactory {
-	if err := DefaultGroupFactoryRegistry.AnnouncePreconstructedFactory(gmf); err != nil {
+func (gmf *GroupMetaFactory) Announce(groupFactoryRegistry APIGroupFactoryRegistry) *GroupMetaFactory {
+	if err := groupFactoryRegistry.AnnouncePreconstructedFactory(gmf); err != nil {
 		panic(err)
 	}
 	return gmf
