@@ -22,6 +22,8 @@ import (
 	"strings"
 	"time"
 
+	jsonpatch "github.com/evanphx/json-patch"
+	"github.com/golang/glog"
 	"github.com/jonboulle/clockwork"
 	"github.com/spf13/cobra"
 
@@ -33,6 +35,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -295,14 +298,36 @@ func RunApply(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer, opti
 			}
 
 			if cmdutil.ShouldRecord(cmd, info) {
-				patch, err := cmdutil.ChangeResourcePatch(info, f.Command())
-				if err != nil {
-					return err
-				}
-				_, err = helper.Patch(info.Namespace, info.Name, types.StrategicMergePatchType, patch)
-				if err != nil {
-					return cmdutil.AddSourceToErr(fmt.Sprintf("applying patch:\n%s\nto:\n%v\nfor:", patch, info), info.Source, err)
-				}
+				// don't return an error on failure.  The patch itself succeeded, its only the hint for that change that failed
+				// don't bother checking for failures of this replace, because a failure to indicate the hint doesn't fail the command
+				// also, don't force the replacement.  If the replacement fails on a resourceVersion conflict, then it means this
+				// record hint is likely to be invalid anyway, so avoid the bad hint
+				func() {
+					oldData, err := json.Marshal(info.Object)
+					if err != nil {
+						glog.V(4).Infof("error marshaling patched obj to record reason: %v", err)
+						return
+					}
+					if err := cmdutil.RecordChangeCause(info.Object, f.Command()); err != nil {
+						glog.V(4).Infof("error recording reason: %v", err)
+						return
+					}
+					newData, err := json.Marshal(info.Object)
+					if err != nil {
+						glog.V(4).Infof("error marshaling patched obj to record reason: %v", err)
+						return
+					}
+					recordPatch, err := jsonpatch.CreateMergePatch(oldData, newData)
+					if err != nil {
+						glog.V(4).Infof("error creating record patch: %v", err)
+						return
+					}
+					_, err = helper.Patch(info.Namespace, info.Name, types.MergePatchType, recordPatch)
+					if err != nil {
+						glog.V(4).Infof("error recording reason: %v", err)
+						return
+					}
+				}()
 			}
 
 			if uid, err := info.Mapping.UID(info.Object); err != nil {
