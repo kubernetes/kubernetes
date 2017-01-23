@@ -298,7 +298,7 @@ func (s *BuiltInAuthenticationOptions) ToAuthenticationConfig() authenticator.Au
 }
 
 func (o *BuiltInAuthenticationOptions) Apply(c *genericapiserver.Config) error {
-	if o == nil || o.PasswordFile == nil {
+	if o == nil {
 		return nil
 	}
 
@@ -316,7 +316,8 @@ func (o *BuiltInAuthenticationOptions) Apply(c *genericapiserver.Config) error {
 		}
 	}
 
-	c.SupportsBasicAuth = len(o.PasswordFile.BasicAuthFile) > 0
+	c.SupportsBasicAuth = o.PasswordFile != nil && len(o.PasswordFile.BasicAuthFile) > 0
+
 	return nil
 }
 
