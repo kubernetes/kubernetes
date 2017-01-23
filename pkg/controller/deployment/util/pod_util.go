@@ -17,6 +17,7 @@ limitations under the License.
 package util
 
 import (
+	"hash/adler32"
 	"hash/fnv"
 
 	"github.com/golang/glog"
@@ -30,16 +31,24 @@ import (
 	hashutil "k8s.io/kubernetes/pkg/util/hash"
 )
 
-func GetPodTemplateSpecHashFnv(template v1.PodTemplateSpec) uint32 {
-	podTemplateSpecHasher := fnv.New32a()
+// TODO(harry) should we remove this function?
+func GetPodTemplateSpecHash(template v1.PodTemplateSpec) uint32 {
+	podTemplateSpecHasher := adler32.New()
 	hashutil.DeepHashObject(podTemplateSpecHasher, template)
 	return podTemplateSpecHasher.Sum32()
 }
 
-// TODO: remove the duplicate
+func GetPodTemplateSpecHashFnv(template v1.PodTemplateSpec) uint32 {
+	return hashPodTemplateObject(template)
+}
+
 func GetInternalPodTemplateSpecHashFnv(template api.PodTemplateSpec) uint32 {
+	return hashPodTemplateObject(template)
+}
+
+func hashPodTemplateObject(objectToHash interface{}) uint32 {
 	podTemplateSpecHasher := fnv.New32a()
-	hashutil.DeepHashObject(podTemplateSpecHasher, template)
+	hashutil.DeepHashObject(podTemplateSpecHasher, objectToHash)
 	return podTemplateSpecHasher.Sum32()
 }
 

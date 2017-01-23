@@ -109,7 +109,7 @@ func TestPodTemplateSpecHash(t *testing.T) {
 		specJson := strings.Replace(podSpec, "@@VERSION@@", strconv.Itoa(i), 1)
 		spec := v1.PodTemplateSpec{}
 		json.Unmarshal([]byte(specJson), &spec)
-		hash := GetPodTemplateSpecHashFnv(spec)
+		hash := GetPodTemplateSpecHash(spec)
 		if v, ok := seenHashes[hash]; ok {
 			broken = true
 			t.Logf("Hash collision, old: %d new: %d", v, i)
