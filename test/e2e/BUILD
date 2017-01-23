@@ -183,6 +183,7 @@ go_library(
         "//test/e2e/chaosmonkey:go_default_library",
         "//test/e2e/common:go_default_library",
         "//test/e2e/framework:go_default_library",
+        "//test/e2e/upgrades:go_default_library",
         "//test/images/net/nat:go_default_library",
         "//test/utils:go_default_library",
         "//vendor:github.com/aws/aws-sdk-go/aws",
@@ -234,3 +235,37 @@ go_library(
         "//vendor:github.com/onsi/gomega",
     ],
 )
+<<<<<<< HEAD
+=======
+
+genrule(
+    name = "gen_e2e.test",
+    testonly = 1,
+    srcs = [":go_default_test"],
+    outs = ["e2e.test"],
+    cmd = "srcs=($(SRCS)); cp $$(dirname $${srcs[0]})/go_default_test $@;",
+    output_to_bindir = 1,
+)
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [
+        ":package-srcs",
+        "//test/e2e/chaosmonkey:all-srcs",
+        "//test/e2e/common:all-srcs",
+        "//test/e2e/framework:all-srcs",
+        "//test/e2e/generated:all-srcs",
+        "//test/e2e/perftype:all-srcs",
+        "//test/e2e/testing-manifests:all-srcs",
+        "//test/e2e/upgrades:all-srcs",
+    ],
+    tags = ["automanaged"],
+)
+>>>>>>> Adding framework to allow multiple upgrade tests
