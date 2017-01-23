@@ -1,4 +1,8 @@
-assignees:
-  - lavalamp
-  - wojtek-t
-  - caesarxuchao
+approvers:
+- lavalamp
+- wojtek-t
+- caesarxuchao
+reviewers:
+- lavalamp
+- wojtek-t
+- caesarxuchao
