@@ -19,7 +19,6 @@ limitations under the License.
 package mount
 
 import (
-	"fmt"
 	"path"
 	"path/filepath"
 	"strings"
@@ -178,8 +177,8 @@ func GetDeviceNameFromMount(mounter Interface, mountPath string) (string, int, e
 }
 
 // getDeviceNameFromMount find the device name from /proc/mounts in which
-// the mount path reference should match the given plugin directory. In case no mount path reference
-// matches, returns the volume name taken from its given mountPath
+// the mount path reference should match the given plugin directory. In case no mount path
+// reference matches, returns the volume name taken from its given mountPath
 func getDeviceNameFromMount(mounter Interface, mountPath, pluginDir string) (string, error) {
 	refs, err := GetMountRefs(mounter, mountPath)
 	if err != nil {
@@ -188,7 +187,7 @@ func getDeviceNameFromMount(mounter Interface, mountPath, pluginDir string) (str
 	}
 	if len(refs) == 0 {
 		glog.V(4).Infof("Directory %s is not mounted", mountPath)
-		return "", fmt.Errorf("directory %s is not mounted", mountPath)
+		return path.Base(mountPath), nil
 	}
 	basemountPath := path.Join(pluginDir, MountsInGlobalPDPath)
 	for _, ref := range refs {
