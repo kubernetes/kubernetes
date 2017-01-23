@@ -20,8 +20,8 @@ import (
 	"io/ioutil"
 	"strings"
 
+	"k8s.io/apiserver/pkg/util/flag"
 	"k8s.io/kubernetes/pkg/util"
-	"k8s.io/kubernetes/pkg/util/flag"
 
 	"github.com/spf13/pflag"
 )

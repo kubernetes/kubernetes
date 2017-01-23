@@ -25,8 +25,8 @@ import (
 	"github.com/spf13/pflag"
 
 	utilnet "k8s.io/apimachinery/pkg/util/net"
+	utilflag "k8s.io/apiserver/pkg/util/flag"
 	certutil "k8s.io/client-go/util/cert"
-	utilflag "k8s.io/kubernetes/pkg/util/flag"
 )
 
 type ServingOptions struct {
