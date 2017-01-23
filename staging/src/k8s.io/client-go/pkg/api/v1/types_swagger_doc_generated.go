@@ -437,6 +437,7 @@ var map_EnvFromSource = map[string]string{
 	"":             "EnvFromSource represents the source of a set of ConfigMaps",
 	"prefix":       "An optional identifer to prepend to each key in the ConfigMap. Must be a C_IDENTIFIER.",
 	"configMapRef": "The ConfigMap to select from",
+	"secretRef":    "The Secret to select from",
 }
 
 func (EnvFromSource) SwaggerDoc() map[string]string {
@@ -1243,6 +1244,15 @@ func (PodLogOptions) SwaggerDoc() map[string]string {
 	return map_PodLogOptions
 }
 
+var map_PodPortForwardOptions = map[string]string{
+	"":      "PodPortForwardOptions is the query options to a Pod's port forward call when using WebSockets. The `port` query parameter must specify the port or ports (comma separated) to forward over. Port forwarding over SPDY does not use these options. It requires the port to be passed in the `port` header as part of request.",
+	"ports": "List of ports to forward Required when using WebSockets",
+}
+
+func (PodPortForwardOptions) SwaggerDoc() map[string]string {
+	return map_PodPortForwardOptions
+}
+
 var map_PodProxyOptions = map[string]string{
 	"":     "PodProxyOptions is the query options to a Pod's proxy call.",
 	"path": "Path is the URL path to use for the current proxy request to pod.",
@@ -1586,6 +1596,14 @@ var map_Secret = map[string]string{
 
 func (Secret) SwaggerDoc() map[string]string {
 	return map_Secret
+}
+
+var map_SecretEnvSource = map[string]string{
+	"": "SecretEnvSource selects a Secret to populate the environment variables with.\n\nThe contents of the target Secret's Data field will represent the key-value pairs as environment variables.",
+}
+
+func (SecretEnvSource) SwaggerDoc() map[string]string {
+	return map_SecretEnvSource
 }
 
 var map_SecretKeySelector = map[string]string{

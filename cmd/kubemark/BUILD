@@ -24,7 +24,6 @@ go_library(
         "//pkg/client/clientset_generated/internalclientset:go_default_library",
         "//pkg/client/metrics/prometheus:go_default_library",
         "//pkg/client/record:go_default_library",
-        "//pkg/client/unversioned/clientcmd:go_default_library",
         "//pkg/kubelet/cadvisor/testing:go_default_library",
         "//pkg/kubelet/cm:go_default_library",
         "//pkg/kubelet/dockertools:go_default_library",
@@ -37,6 +36,7 @@ go_library(
         "//vendor:github.com/spf13/pflag",
         "//vendor:k8s.io/apimachinery/pkg/util/sets",
         "//vendor:k8s.io/client-go/rest",
+        "//vendor:k8s.io/client-go/tools/clientcmd",
     ],
 )
 

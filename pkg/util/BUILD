@@ -64,7 +64,6 @@ filegroup(
         "//pkg/util/framer:all-srcs",
         "//pkg/util/goroutinemap:all-srcs",
         "//pkg/util/hash:all-srcs",
-        "//pkg/util/homedir:all-srcs",
         "//pkg/util/httpstream:all-srcs",
         "//pkg/util/i18n:all-srcs",
         "//pkg/util/initsystem:all-srcs",

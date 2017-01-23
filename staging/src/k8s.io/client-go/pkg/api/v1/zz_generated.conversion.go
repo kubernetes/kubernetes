@@ -251,6 +251,8 @@ func RegisterConversions(scheme *runtime.Scheme) error {
 		Convert_api_PodList_To_v1_PodList,
 		Convert_v1_PodLogOptions_To_api_PodLogOptions,
 		Convert_api_PodLogOptions_To_v1_PodLogOptions,
+		Convert_v1_PodPortForwardOptions_To_api_PodPortForwardOptions,
+		Convert_api_PodPortForwardOptions_To_v1_PodPortForwardOptions,
 		Convert_v1_PodProxyOptions_To_api_PodProxyOptions,
 		Convert_api_PodProxyOptions_To_v1_PodProxyOptions,
 		Convert_v1_PodSecurityContext_To_api_PodSecurityContext,
@@ -309,6 +311,8 @@ func RegisterConversions(scheme *runtime.Scheme) error {
 		Convert_api_SELinuxOptions_To_v1_SELinuxOptions,
 		Convert_v1_Secret_To_api_Secret,
 		Convert_api_Secret_To_v1_Secret,
+		Convert_v1_SecretEnvSource_To_api_SecretEnvSource,
+		Convert_api_SecretEnvSource_To_v1_SecretEnvSource,
 		Convert_v1_SecretKeySelector_To_api_SecretKeySelector,
 		Convert_api_SecretKeySelector_To_v1_SecretKeySelector,
 		Convert_v1_SecretList_To_api_SecretList,
@@ -1205,6 +1209,7 @@ func Convert_api_EndpointsList_To_v1_EndpointsList(in *api.EndpointsList, out *E
 func autoConvert_v1_EnvFromSource_To_api_EnvFromSource(in *EnvFromSource, out *api.EnvFromSource, s conversion.Scope) error {
 	out.Prefix = in.Prefix
 	out.ConfigMapRef = (*api.ConfigMapEnvSource)(unsafe.Pointer(in.ConfigMapRef))
+	out.SecretRef = (*api.SecretEnvSource)(unsafe.Pointer(in.SecretRef))
 	return nil
 }
 
@@ -1215,6 +1220,7 @@ func Convert_v1_EnvFromSource_To_api_EnvFromSource(in *EnvFromSource, out *api.E
 func autoConvert_api_EnvFromSource_To_v1_EnvFromSource(in *api.EnvFromSource, out *EnvFromSource, s conversion.Scope) error {
 	out.Prefix = in.Prefix
 	out.ConfigMapRef = (*ConfigMapEnvSource)(unsafe.Pointer(in.ConfigMapRef))
+	out.SecretRef = (*SecretEnvSource)(unsafe.Pointer(in.SecretRef))
 	return nil
 }
 
@@ -2974,6 +2980,24 @@ func Convert_api_PodLogOptions_To_v1_PodLogOptions(in *api.PodLogOptions, out *P
 	return autoConvert_api_PodLogOptions_To_v1_PodLogOptions(in, out, s)
 }
 
+func autoConvert_v1_PodPortForwardOptions_To_api_PodPortForwardOptions(in *PodPortForwardOptions, out *api.PodPortForwardOptions, s conversion.Scope) error {
+	out.Ports = *(*[]int32)(unsafe.Pointer(&in.Ports))
+	return nil
+}
+
+func Convert_v1_PodPortForwardOptions_To_api_PodPortForwardOptions(in *PodPortForwardOptions, out *api.PodPortForwardOptions, s conversion.Scope) error {
+	return autoConvert_v1_PodPortForwardOptions_To_api_PodPortForwardOptions(in, out, s)
+}
+
+func autoConvert_api_PodPortForwardOptions_To_v1_PodPortForwardOptions(in *api.PodPortForwardOptions, out *PodPortForwardOptions, s conversion.Scope) error {
+	out.Ports = *(*[]int32)(unsafe.Pointer(&in.Ports))
+	return nil
+}
+
+func Convert_api_PodPortForwardOptions_To_v1_PodPortForwardOptions(in *api.PodPortForwardOptions, out *PodPortForwardOptions, s conversion.Scope) error {
+	return autoConvert_api_PodPortForwardOptions_To_v1_PodPortForwardOptions(in, out, s)
+}
+
 func autoConvert_v1_PodProxyOptions_To_api_PodProxyOptions(in *PodProxyOptions, out *api.PodProxyOptions, s conversion.Scope) error {
 	out.Path = in.Path
 	return nil
@@ -3758,6 +3782,28 @@ func autoConvert_api_Secret_To_v1_Secret(in *api.Secret, out *Secret, s conversi
 
 func Convert_api_Secret_To_v1_Secret(in *api.Secret, out *Secret, s conversion.Scope) error {
 	return autoConvert_api_Secret_To_v1_Secret(in, out, s)
+}
+
+func autoConvert_v1_SecretEnvSource_To_api_SecretEnvSource(in *SecretEnvSource, out *api.SecretEnvSource, s conversion.Scope) error {
+	if err := Convert_v1_LocalObjectReference_To_api_LocalObjectReference(&in.LocalObjectReference, &out.LocalObjectReference, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+func Convert_v1_SecretEnvSource_To_api_SecretEnvSource(in *SecretEnvSource, out *api.SecretEnvSource, s conversion.Scope) error {
+	return autoConvert_v1_SecretEnvSource_To_api_SecretEnvSource(in, out, s)
+}
+
+func autoConvert_api_SecretEnvSource_To_v1_SecretEnvSource(in *api.SecretEnvSource, out *SecretEnvSource, s conversion.Scope) error {
+	if err := Convert_api_LocalObjectReference_To_v1_LocalObjectReference(&in.LocalObjectReference, &out.LocalObjectReference, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+func Convert_api_SecretEnvSource_To_v1_SecretEnvSource(in *api.SecretEnvSource, out *SecretEnvSource, s conversion.Scope) error {
+	return autoConvert_api_SecretEnvSource_To_v1_SecretEnvSource(in, out, s)
 }
 
 func autoConvert_v1_SecretKeySelector_To_api_SecretKeySelector(in *SecretKeySelector, out *api.SecretKeySelector, s conversion.Scope) error {
