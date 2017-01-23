@@ -19,7 +19,7 @@ package container
 import (
 	"bytes"
 	"fmt"
-	"hash/adler32"
+	"hash/fnv"
 	"strings"
 	"time"
 
@@ -91,7 +91,7 @@ func ShouldContainerBeRestarted(container *v1.Container, pod *v1.Pod, podStatus 
 // HashContainer returns the hash of the container. It is used to compare
 // the running container with its desired spec.
 func HashContainer(container *v1.Container) uint64 {
-	hash := adler32.New()
+	hash := fnv.New32a()
 	hashutil.DeepHashObject(hash, *container)
 	return uint64(hash.Sum32())
 }

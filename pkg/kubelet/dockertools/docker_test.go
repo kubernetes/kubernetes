@@ -19,7 +19,7 @@ package dockertools
 import (
 	"encoding/json"
 	"fmt"
-	"hash/adler32"
+	"hash/fnv"
 	"math/rand"
 	"path"
 	"reflect"
@@ -119,7 +119,7 @@ func TestGetContainerID(t *testing.T) {
 
 func verifyPackUnpack(t *testing.T, podNamespace, podUID, podName, containerName string) {
 	container := &v1.Container{Name: containerName}
-	hasher := adler32.New()
+	hasher := fnv.New32a()
 	hashutil.DeepHashObject(hasher, *container)
 	computedHash := uint64(hasher.Sum32())
 	podFullName := fmt.Sprintf("%s_%s", podName, podNamespace)
