@@ -20,7 +20,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"net/http"
 	"os"
@@ -37,7 +36,6 @@ import (
 	"k8s.io/kubernetes/pkg/api/annotations"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/apis/extensions"
-	"k8s.io/kubernetes/pkg/client/restclient/fake"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 )
@@ -452,33 +450,8 @@ const (
 	filenameDeployObjClientside = "../../../test/fixtures/pkg/kubectl/cmd/apply/deploy-clientside.yaml"
 )
 
-// validateNULLPatchApplication retrieves the StrategicMergePatch created by kubectl apply and checks that this patch
-// contains the null value defined by the user.
-func validateNULLPatchApplication(t *testing.T, req *http.Request) {
-	patch, err := ioutil.ReadAll(req.Body)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	patchMap := map[string]interface{}{}
-	if err := json.Unmarshal(patch, &patchMap); err != nil {
-		t.Fatal(err)
-	}
-
-	annotationsMap := walkMapPath(t, patchMap, []string{"metadata", "annotations"})
-	if _, ok := annotationsMap[annotations.LastAppliedConfigAnnotation]; !ok {
-		t.Fatalf("patch does not contain annotation:\n%s\n", patch)
-	}
-
-	labelMap := walkMapPath(t, patchMap, []string{"spec", "strategy"})
-	// Checks if `rollingUpdate = null` exists in the patch
-	if deleteMe, ok := labelMap["rollingUpdate"]; !ok || deleteMe != nil {
-		t.Fatalf("patch did not retain null value in key: rollingUpdate:\n%s\n", patch)
-	}
-}
-
-func getServersideObject(t *testing.T) io.ReadCloser {
-	raw := readBytesFromFile(t, filenameDeployObjServerside)
+func readDeploymentFromFile(t *testing.T, file string) []byte {
+	raw := readBytesFromFile(t, file)
 	obj := &extensions.Deployment{}
 	if err := runtime.DecodeInto(testapi.Extensions.Codec(), raw, obj); err != nil {
 		t.Fatal(err)
@@ -487,27 +460,51 @@ func getServersideObject(t *testing.T) io.ReadCloser {
 	if err != nil {
 		t.Fatal(err)
 	}
-	return ioutil.NopCloser(bytes.NewReader(objJSON))
+	return objJSON
 }
 
 func TestApplyNULLPreservation(t *testing.T) {
+	initTestErrorHandler(t)
 	deploymentName := "nginx-deployment"
 	deploymentPath := "/namespaces/test/deployments/" + deploymentName
 
-	f, tf, _, ns := cmdtesting.NewExtensionsAPIFactory()
-	tf.Client = &fake.RESTClient{
-		NegotiatedSerializer: ns,
-		GroupName:            "extensions",
+	verifiedPatch := false
+	deploymentBytes := readDeploymentFromFile(t, filenameDeployObjServerside)
+
+	f, tf, _, _ := cmdtesting.NewTestFactory()
+	tf.UnstructuredClient = &fake.RESTClient{
+		APIRegistry:          api.Registry,
+		NegotiatedSerializer: unstructuredSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
 			case p == deploymentPath && m == "GET":
-				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: getServersideObject(t)}, nil
+				body := ioutil.NopCloser(bytes.NewReader(deploymentBytes))
+				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: body}, nil
 			case p == deploymentPath && m == "PATCH":
-				validateNULLPatchApplication(t, req)
+				patch, err := ioutil.ReadAll(req.Body)
+				if err != nil {
+					t.Fatal(err)
+				}
+
+				patchMap := map[string]interface{}{}
+				if err := json.Unmarshal(patch, &patchMap); err != nil {
+					t.Fatal(err)
+				}
+				annotationMap := walkMapPath(t, patchMap, []string{"metadata", "annotations"})
+				if _, ok := annotationMap[annotations.LastAppliedConfigAnnotation]; !ok {
+					t.Fatalf("patch does not contain annotation:\n%s\n", patch)
+				}
+				strategy := walkMapPath(t, patchMap, []string{"spec", "strategy"})
+				if value, ok := strategy["rollingUpdate"]; !ok || value != nil {
+					t.Fatalf("patch did not retain null value in key: rollingUpdate:\n%s\n", patch)
+				}
+				verifiedPatch = true
+
 				// The real API server would had returned the patched object but Kubectl
 				// is ignoring the actual return object.
 				// TODO: Make this match actual server behavior by returning the patched object.
-				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: getServersideObject(t)}, nil
+				body := ioutil.NopCloser(bytes.NewReader(deploymentBytes))
+				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: body}, nil
 			default:
 				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
 				return nil, nil
@@ -528,5 +525,9 @@ func TestApplyNULLPreservation(t *testing.T) {
 	expected := "deployment/" + deploymentName + "\n"
 	if buf.String() != expected {
 		t.Fatalf("unexpected output: %s\nexpected: %s", buf.String(), expected)
+	}
+
+	if !verifiedPatch {
+		t.Fatal("No server-side patch call detected")
 	}
 }
