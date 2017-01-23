@@ -2484,11 +2484,11 @@ func TestValidatePullPolicy(t *testing.T) {
 	}
 	testCases := map[string]T{
 		"NotPresent1": {
-			api.Container{Name: "abc", Image: "image:latest", ImagePullPolicy: "IfNotPresent"},
+			api.Container{Name: "abc", Image: "image:latest", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"},
 			api.PullIfNotPresent,
 		},
 		"NotPresent2": {
-			api.Container{Name: "abc1", Image: "image", ImagePullPolicy: "IfNotPresent"},
+			api.Container{Name: "abc1", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"},
 			api.PullIfNotPresent,
 		},
 		"Always1": {
@@ -2534,9 +2534,9 @@ func TestValidateContainers(t *testing.T) {
 	})
 
 	successCase := []api.Container{
-		{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent"},
-		{Name: "123", Image: "image", ImagePullPolicy: "IfNotPresent"},
-		{Name: "abc-123", Image: "image", ImagePullPolicy: "IfNotPresent"},
+		{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"},
+		{Name: "123", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"},
+		{Name: "abc-123", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"},
 		{
 			Name:  "life-123",
 			Image: "image",
@@ -2545,7 +2545,8 @@ func TestValidateContainers(t *testing.T) {
 					Exec: &api.ExecAction{Command: []string{"ls", "-l"}},
 				},
 			},
-			ImagePullPolicy: "IfNotPresent",
+			ImagePullPolicy:          "IfNotPresent",
+			TerminationMessagePolicy: "File",
 		},
 		{
 			Name:  "resources-test",
@@ -2557,7 +2558,8 @@ func TestValidateContainers(t *testing.T) {
 					api.ResourceName("my.org/resource"):  resource.MustParse("10m"),
 				},
 			},
-			ImagePullPolicy: "IfNotPresent",
+			ImagePullPolicy:          "IfNotPresent",
+			TerminationMessagePolicy: "File",
 		},
 		{
 			Name:  "resources-test-with-gpu-with-request",
@@ -2574,7 +2576,8 @@ func TestValidateContainers(t *testing.T) {
 					api.ResourceName(api.ResourceNvidiaGPU): resource.MustParse("1"),
 				},
 			},
-			ImagePullPolicy: "IfNotPresent",
+			ImagePullPolicy:          "IfNotPresent",
+			TerminationMessagePolicy: "File",
 		},
 		{
 			Name:  "resources-test-with-gpu-without-request",
@@ -2590,7 +2593,8 @@ func TestValidateContainers(t *testing.T) {
 					api.ResourceName(api.ResourceNvidiaGPU): resource.MustParse("1"),
 				},
 			},
-			ImagePullPolicy: "IfNotPresent",
+			ImagePullPolicy:          "IfNotPresent",
+			TerminationMessagePolicy: "File",
 		},
 		{
 			Name:  "resources-request-limit-simple",
@@ -2603,7 +2607,8 @@ func TestValidateContainers(t *testing.T) {
 					api.ResourceName(api.ResourceCPU): resource.MustParse("10"),
 				},
 			},
-			ImagePullPolicy: "IfNotPresent",
+			ImagePullPolicy:          "IfNotPresent",
+			TerminationMessagePolicy: "File",
 		},
 		{
 			Name:  "resources-request-limit-edge",
@@ -2620,7 +2625,8 @@ func TestValidateContainers(t *testing.T) {
 					api.ResourceName("my.org/resource"):  resource.MustParse("10m"),
 				},
 			},
-			ImagePullPolicy: "IfNotPresent",
+			ImagePullPolicy:          "IfNotPresent",
+			TerminationMessagePolicy: "File",
 		},
 		{
 			Name:  "resources-request-limit-partials",
@@ -2635,7 +2641,8 @@ func TestValidateContainers(t *testing.T) {
 					api.ResourceName("my.org/resource"): resource.MustParse("10m"),
 				},
 			},
-			ImagePullPolicy: "IfNotPresent",
+			ImagePullPolicy:          "IfNotPresent",
+			TerminationMessagePolicy: "File",
 		},
 		{
 			Name:  "resources-request",
@@ -2646,7 +2653,8 @@ func TestValidateContainers(t *testing.T) {
 					api.ResourceName(api.ResourceMemory): resource.MustParse("10G"),
 				},
 			},
-			ImagePullPolicy: "IfNotPresent",
+			ImagePullPolicy:          "IfNotPresent",
+			TerminationMessagePolicy: "File",
 		},
 		{
 			Name:  "same-host-port-different-protocol",
@@ -2655,9 +2663,22 @@ func TestValidateContainers(t *testing.T) {
 				{ContainerPort: 80, HostPort: 80, Protocol: "TCP"},
 				{ContainerPort: 80, HostPort: 80, Protocol: "UDP"},
 			},
-			ImagePullPolicy: "IfNotPresent",
+			ImagePullPolicy:          "IfNotPresent",
+			TerminationMessagePolicy: "File",
 		},
-		{Name: "abc-1234", Image: "image", ImagePullPolicy: "IfNotPresent", SecurityContext: fakeValidSecurityContext(true)},
+		{
+			Name:                     "fallback-to-logs-termination-message",
+			Image:                    "image",
+			ImagePullPolicy:          "IfNotPresent",
+			TerminationMessagePolicy: "FallbackToLogsOnError",
+		},
+		{
+			Name:                     "file-termination-message",
+			Image:                    "image",
+			ImagePullPolicy:          "IfNotPresent",
+			TerminationMessagePolicy: "File",
+		},
+		{Name: "abc-1234", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File", SecurityContext: fakeValidSecurityContext(true)},
 	}
 	if errs := validateContainers(successCase, volumes, field.NewPath("field")); len(errs) != 0 {
 		t.Errorf("expected success: %v", errs)
@@ -2667,26 +2688,26 @@ func TestValidateContainers(t *testing.T) {
 		AllowPrivileged: false,
 	})
 	errorCases := map[string][]api.Container{
-		"zero-length name":     {{Name: "", Image: "image", ImagePullPolicy: "IfNotPresent"}},
-		"name > 63 characters": {{Name: strings.Repeat("a", 64), Image: "image", ImagePullPolicy: "IfNotPresent"}},
-		"name not a DNS label": {{Name: "a.b.c", Image: "image", ImagePullPolicy: "IfNotPresent"}},
+		"zero-length name":     {{Name: "", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
+		"name > 63 characters": {{Name: strings.Repeat("a", 64), Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
+		"name not a DNS label": {{Name: "a.b.c", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
 		"name not unique": {
-			{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent"},
-			{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent"},
+			{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"},
+			{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"},
 		},
-		"zero-length image": {{Name: "abc", Image: "", ImagePullPolicy: "IfNotPresent"}},
+		"zero-length image": {{Name: "abc", Image: "", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
 		"host port not unique": {
 			{Name: "abc", Image: "image", Ports: []api.ContainerPort{{ContainerPort: 80, HostPort: 80, Protocol: "TCP"}},
-				ImagePullPolicy: "IfNotPresent"},
+				ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"},
 			{Name: "def", Image: "image", Ports: []api.ContainerPort{{ContainerPort: 81, HostPort: 80, Protocol: "TCP"}},
-				ImagePullPolicy: "IfNotPresent"},
+				ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"},
 		},
 		"invalid env var name": {
-			{Name: "abc", Image: "image", Env: []api.EnvVar{{Name: "ev.1"}}, ImagePullPolicy: "IfNotPresent"},
+			{Name: "abc", Image: "image", Env: []api.EnvVar{{Name: "ev.1"}}, ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"},
 		},
 		"unknown volume name": {
 			{Name: "abc", Image: "image", VolumeMounts: []api.VolumeMount{{Name: "anything", MountPath: "/foo"}},
-				ImagePullPolicy: "IfNotPresent"},
+				ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"},
 		},
 		"invalid lifecycle, no exec command.": {
 			{
@@ -2697,7 +2718,8 @@ func TestValidateContainers(t *testing.T) {
 						Exec: &api.ExecAction{},
 					},
 				},
-				ImagePullPolicy: "IfNotPresent",
+				ImagePullPolicy:          "IfNotPresent",
+				TerminationMessagePolicy: "File",
 			},
 		},
 		"invalid lifecycle, no http path.": {
@@ -2709,7 +2731,8 @@ func TestValidateContainers(t *testing.T) {
 						HTTPGet: &api.HTTPGetAction{},
 					},
 				},
-				ImagePullPolicy: "IfNotPresent",
+				ImagePullPolicy:          "IfNotPresent",
+				TerminationMessagePolicy: "File",
 			},
 		},
 		"invalid lifecycle, no tcp socket port.": {
@@ -2721,7 +2744,8 @@ func TestValidateContainers(t *testing.T) {
 						TCPSocket: &api.TCPSocketAction{},
 					},
 				},
-				ImagePullPolicy: "IfNotPresent",
+				ImagePullPolicy:          "IfNotPresent",
+				TerminationMessagePolicy: "File",
 			},
 		},
 		"invalid lifecycle, zero tcp socket port.": {
@@ -2735,7 +2759,8 @@ func TestValidateContainers(t *testing.T) {
 						},
 					},
 				},
-				ImagePullPolicy: "IfNotPresent",
+				ImagePullPolicy:          "IfNotPresent",
+				TerminationMessagePolicy: "File",
 			},
 		},
 		"invalid lifecycle, no action.": {
@@ -2745,7 +2770,8 @@ func TestValidateContainers(t *testing.T) {
 				Lifecycle: &api.Lifecycle{
 					PreStop: &api.Handler{},
 				},
-				ImagePullPolicy: "IfNotPresent",
+				ImagePullPolicy:          "IfNotPresent",
+				TerminationMessagePolicy: "File",
 			},
 		},
 		"invalid liveness probe, no tcp socket port.": {
@@ -2757,7 +2783,8 @@ func TestValidateContainers(t *testing.T) {
 						TCPSocket: &api.TCPSocketAction{},
 					},
 				},
-				ImagePullPolicy: "IfNotPresent",
+				ImagePullPolicy:          "IfNotPresent",
+				TerminationMessagePolicy: "File",
 			},
 		},
 		"invalid liveness probe, no action.": {
@@ -2767,7 +2794,24 @@ func TestValidateContainers(t *testing.T) {
 				LivenessProbe: &api.Probe{
 					Handler: api.Handler{},
 				},
-				ImagePullPolicy: "IfNotPresent",
+				ImagePullPolicy:          "IfNotPresent",
+				TerminationMessagePolicy: "File",
+			},
+		},
+		"invalid message termination policy": {
+			{
+				Name:                     "life-123",
+				Image:                    "image",
+				ImagePullPolicy:          "IfNotPresent",
+				TerminationMessagePolicy: "Unknown",
+			},
+		},
+		"empty message termination policy": {
+			{
+				Name:                     "life-123",
+				Image:                    "image",
+				ImagePullPolicy:          "IfNotPresent",
+				TerminationMessagePolicy: "",
 			},
 		},
 		"privilege disabled": {
@@ -2782,7 +2826,8 @@ func TestValidateContainers(t *testing.T) {
 						"disk": resource.MustParse("10G"),
 					},
 				},
-				ImagePullPolicy: "IfNotPresent",
+				ImagePullPolicy:          "IfNotPresent",
+				TerminationMessagePolicy: "File",
 			},
 		},
 		"Resource CPU invalid": {
@@ -2792,7 +2837,8 @@ func TestValidateContainers(t *testing.T) {
 				Resources: api.ResourceRequirements{
 					Limits: getResourceLimits("-10", "0"),
 				},
-				ImagePullPolicy: "IfNotPresent",
+				ImagePullPolicy:          "IfNotPresent",
+				TerminationMessagePolicy: "File",
 			},
 		},
 		"Resource Requests CPU invalid": {
@@ -2802,7 +2848,8 @@ func TestValidateContainers(t *testing.T) {
 				Resources: api.ResourceRequirements{
 					Requests: getResourceLimits("-10", "0"),
 				},
-				ImagePullPolicy: "IfNotPresent",
+				ImagePullPolicy:          "IfNotPresent",
+				TerminationMessagePolicy: "File",
 			},
 		},
 		"Resource Memory invalid": {
@@ -2812,7 +2859,8 @@ func TestValidateContainers(t *testing.T) {
 				Resources: api.ResourceRequirements{
 					Limits: getResourceLimits("0", "-10"),
 				},
-				ImagePullPolicy: "IfNotPresent",
+				ImagePullPolicy:          "IfNotPresent",
+				TerminationMessagePolicy: "File",
 			},
 		},
 		"Resource GPU limit must match request": {
@@ -2831,7 +2879,8 @@ func TestValidateContainers(t *testing.T) {
 						api.ResourceName(api.ResourceNvidiaGPU): resource.MustParse("1"),
 					},
 				},
-				ImagePullPolicy: "IfNotPresent",
+				TerminationMessagePolicy: "File",
+				ImagePullPolicy:          "IfNotPresent",
 			},
 		},
 		"Request limit simple invalid": {
@@ -2842,7 +2891,8 @@ func TestValidateContainers(t *testing.T) {
 					Limits:   getResourceLimits("5", "3"),
 					Requests: getResourceLimits("6", "3"),
 				},
-				ImagePullPolicy: "IfNotPresent",
+				ImagePullPolicy:          "IfNotPresent",
+				TerminationMessagePolicy: "File",
 			},
 		},
 		"Request limit multiple invalid": {
@@ -2853,7 +2903,8 @@ func TestValidateContainers(t *testing.T) {
 					Limits:   getResourceLimits("5", "3"),
 					Requests: getResourceLimits("6", "4"),
 				},
-				ImagePullPolicy: "IfNotPresent",
+				ImagePullPolicy:          "IfNotPresent",
+				TerminationMessagePolicy: "File",
 			},
 		},
 	}
@@ -2908,7 +2959,7 @@ func TestValidatePodSpec(t *testing.T) {
 	successCases := []api.PodSpec{
 		{ // Populate basic fields, leave defaults for most.
 			Volumes:       []api.Volume{{Name: "vol", VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}}},
-			Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
+			Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
 			RestartPolicy: api.RestartPolicyAlways,
 			DNSPolicy:     api.DNSClusterFirst,
 		},
@@ -2916,8 +2967,8 @@ func TestValidatePodSpec(t *testing.T) {
 			Volumes: []api.Volume{
 				{Name: "vol", VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}},
 			},
-			Containers:     []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
-			InitContainers: []api.Container{{Name: "ictr", Image: "iimage", ImagePullPolicy: "IfNotPresent"}},
+			Containers:     []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
+			InitContainers: []api.Container{{Name: "ictr", Image: "iimage", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
 			RestartPolicy:  api.RestartPolicyAlways,
 			NodeSelector: map[string]string{
 				"key": "value",
@@ -2929,8 +2980,9 @@ func TestValidatePodSpec(t *testing.T) {
 		},
 		{ // Populate HostNetwork.
 			Containers: []api.Container{
-				{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", Ports: []api.ContainerPort{
-					{HostPort: 8080, ContainerPort: 8080, Protocol: "TCP"}},
+				{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File",
+					Ports: []api.ContainerPort{
+						{HostPort: 8080, ContainerPort: 8080, Protocol: "TCP"}},
 				},
 			},
 			SecurityContext: &api.PodSecurityContext{
@@ -2940,7 +2992,7 @@ func TestValidatePodSpec(t *testing.T) {
 			DNSPolicy:     api.DNSClusterFirst,
 		},
 		{ // Populate RunAsUser SupplementalGroups FSGroup with minID 0
-			Containers: []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
+			Containers: []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
 			SecurityContext: &api.PodSecurityContext{
 				SupplementalGroups: []int64{minID},
 				RunAsUser:          &minID,
@@ -2950,7 +3002,7 @@ func TestValidatePodSpec(t *testing.T) {
 			DNSPolicy:     api.DNSClusterFirst,
 		},
 		{ // Populate RunAsUser SupplementalGroups FSGroup with maxID 2147483647
-			Containers: []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
+			Containers: []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
 			SecurityContext: &api.PodSecurityContext{
 				SupplementalGroups: []int64{maxID},
 				RunAsUser:          &maxID,
@@ -2964,7 +3016,7 @@ func TestValidatePodSpec(t *testing.T) {
 				HostIPC: true,
 			},
 			Volumes:       []api.Volume{{Name: "vol", VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}}},
-			Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
+			Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
 			RestartPolicy: api.RestartPolicyAlways,
 			DNSPolicy:     api.DNSClusterFirst,
 		},
@@ -2973,13 +3025,13 @@ func TestValidatePodSpec(t *testing.T) {
 				HostPID: true,
 			},
 			Volumes:       []api.Volume{{Name: "vol", VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}}},
-			Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
+			Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
 			RestartPolicy: api.RestartPolicyAlways,
 			DNSPolicy:     api.DNSClusterFirst,
 		},
 		{ // Populate Affinity.
 			Volumes:       []api.Volume{{Name: "vol", VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}}},
-			Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
+			Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
 			RestartPolicy: api.RestartPolicyAlways,
 			DNSPolicy:     api.DNSClusterFirst,
 		},
@@ -2998,7 +3050,7 @@ func TestValidatePodSpec(t *testing.T) {
 			Volumes:       []api.Volume{{}},
 			RestartPolicy: api.RestartPolicyAlways,
 			DNSPolicy:     api.DNSClusterFirst,
-			Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
+			Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
 		},
 		"no containers": {
 			RestartPolicy: api.RestartPolicyAlways,
@@ -3010,7 +3062,7 @@ func TestValidatePodSpec(t *testing.T) {
 			DNSPolicy:     api.DNSClusterFirst,
 		},
 		"bad init container": {
-			Containers:     []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
+			Containers:     []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
 			InitContainers: []api.Container{{}},
 			RestartPolicy:  api.RestartPolicyAlways,
 			DNSPolicy:      api.DNSClusterFirst,
@@ -3018,10 +3070,10 @@ func TestValidatePodSpec(t *testing.T) {
 		"bad DNS policy": {
 			DNSPolicy:     api.DNSPolicy("invalid"),
 			RestartPolicy: api.RestartPolicyAlways,
-			Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
+			Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
 		},
 		"bad service account name": {
-			Containers:         []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
+			Containers:         []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
 			RestartPolicy:      api.RestartPolicyAlways,
 			DNSPolicy:          api.DNSClusterFirst,
 			ServiceAccountName: "invalidName",
@@ -3029,7 +3081,7 @@ func TestValidatePodSpec(t *testing.T) {
 		"bad restart policy": {
 			RestartPolicy: "UnknowPolicy",
 			DNSPolicy:     api.DNSClusterFirst,
-			Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
+			Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
 		},
 		"with hostNetwork hostPort not equal to containerPort": {
 			Containers: []api.Container{
@@ -3044,7 +3096,7 @@ func TestValidatePodSpec(t *testing.T) {
 			DNSPolicy:     api.DNSClusterFirst,
 		},
 		"bad supplementalGroups large than math.MaxInt32": {
-			Containers: []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
+			Containers: []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
 			SecurityContext: &api.PodSecurityContext{
 				HostNetwork:        false,
 				SupplementalGroups: []int64{maxID, 1234},
@@ -3053,7 +3105,7 @@ func TestValidatePodSpec(t *testing.T) {
 			DNSPolicy:     api.DNSClusterFirst,
 		},
 		"bad supplementalGroups less than 0": {
-			Containers: []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
+			Containers: []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
 			SecurityContext: &api.PodSecurityContext{
 				HostNetwork:        false,
 				SupplementalGroups: []int64{minID, 1234},
@@ -3062,7 +3114,7 @@ func TestValidatePodSpec(t *testing.T) {
 			DNSPolicy:     api.DNSClusterFirst,
 		},
 		"bad runAsUser large than math.MaxInt32": {
-			Containers: []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
+			Containers: []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
 			SecurityContext: &api.PodSecurityContext{
 				HostNetwork: false,
 				RunAsUser:   &maxID,
@@ -3071,7 +3123,7 @@ func TestValidatePodSpec(t *testing.T) {
 			DNSPolicy:     api.DNSClusterFirst,
 		},
 		"bad runAsUser less than 0": {
-			Containers: []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
+			Containers: []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
 			SecurityContext: &api.PodSecurityContext{
 				HostNetwork: false,
 				RunAsUser:   &minID,
@@ -3080,7 +3132,7 @@ func TestValidatePodSpec(t *testing.T) {
 			DNSPolicy:     api.DNSClusterFirst,
 		},
 		"bad fsGroup large than math.MaxInt32": {
-			Containers: []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
+			Containers: []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
 			SecurityContext: &api.PodSecurityContext{
 				HostNetwork: false,
 				FSGroup:     &maxID,
@@ -3089,7 +3141,7 @@ func TestValidatePodSpec(t *testing.T) {
 			DNSPolicy:     api.DNSClusterFirst,
 		},
 		"bad fsGroup less than 0": {
-			Containers: []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
+			Containers: []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
 			SecurityContext: &api.PodSecurityContext{
 				HostNetwork: false,
 				FSGroup:     &minID,
@@ -3101,7 +3153,7 @@ func TestValidatePodSpec(t *testing.T) {
 			Volumes: []api.Volume{
 				{Name: "vol", VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}},
 			},
-			Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
+			Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
 			RestartPolicy: api.RestartPolicyAlways,
 			NodeSelector: map[string]string{
 				"key": "value",
@@ -3113,7 +3165,7 @@ func TestValidatePodSpec(t *testing.T) {
 		"bad nodeName": {
 			NodeName:      "node name",
 			Volumes:       []api.Volume{{Name: "vol", VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}}},
-			Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
+			Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
 			RestartPolicy: api.RestartPolicyAlways,
 			DNSPolicy:     api.DNSClusterFirst,
 		},
@@ -3128,7 +3180,7 @@ func TestValidatePodSpec(t *testing.T) {
 func TestValidatePod(t *testing.T) {
 	validPodSpec := func(affinity *api.Affinity) api.PodSpec {
 		spec := api.PodSpec{
-			Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
+			Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
 			RestartPolicy: api.RestartPolicyAlways,
 			DNSPolicy:     api.DNSClusterFirst,
 		}
@@ -3143,7 +3195,7 @@ func TestValidatePod(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{Name: "123", Namespace: "ns"},
 			Spec: api.PodSpec{
 				Volumes:       []api.Volume{{Name: "vol", VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}}},
-				Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
+				Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
 				RestartPolicy: api.RestartPolicyAlways,
 				DNSPolicy:     api.DNSClusterFirst,
 			},
@@ -3154,7 +3206,7 @@ func TestValidatePod(t *testing.T) {
 				Volumes: []api.Volume{
 					{Name: "vol", VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}},
 				},
-				Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
+				Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
 				RestartPolicy: api.RestartPolicyAlways,
 				DNSPolicy:     api.DNSClusterFirst,
 				NodeSelector: map[string]string{
@@ -3446,8 +3498,8 @@ func TestValidatePod(t *testing.T) {
 				},
 			},
 			Spec: api.PodSpec{
-				InitContainers: []api.Container{{Name: "init-ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
-				Containers:     []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
+				InitContainers: []api.Container{{Name: "init-ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
+				Containers:     []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
 				RestartPolicy:  api.RestartPolicyAlways,
 				DNSPolicy:      api.DNSClusterFirst,
 			},
@@ -3489,9 +3541,10 @@ func TestValidatePod(t *testing.T) {
 								api.OpaqueIntResourceName("A"): resource.MustParse("20"),
 							},
 						},
+						TerminationMessagePolicy: "File",
 					},
 				},
-				Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
+				Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
 				RestartPolicy: api.RestartPolicyAlways,
 				DNSPolicy:     api.DNSClusterFirst,
 			},
@@ -3499,7 +3552,7 @@ func TestValidatePod(t *testing.T) {
 		{ // valid opaque integer resources for regular container
 			ObjectMeta: metav1.ObjectMeta{Name: "valid-opaque-int", Namespace: "ns"},
 			Spec: api.PodSpec{
-				InitContainers: []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
+				InitContainers: []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
 				Containers: []api.Container{
 					{
 						Name:            "valid-opaque-int",
@@ -3513,6 +3566,7 @@ func TestValidatePod(t *testing.T) {
 								api.OpaqueIntResourceName("A"): resource.MustParse("20"),
 							},
 						},
+						TerminationMessagePolicy: "File",
 					},
 				},
 				RestartPolicy: api.RestartPolicyAlways,
@@ -3532,7 +3586,7 @@ func TestValidatePod(t *testing.T) {
 			Spec: api.PodSpec{
 				RestartPolicy: api.RestartPolicyAlways,
 				DNSPolicy:     api.DNSClusterFirst,
-				Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
+				Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
 			},
 		},
 		"bad namespace": {
@@ -3540,7 +3594,7 @@ func TestValidatePod(t *testing.T) {
 			Spec: api.PodSpec{
 				RestartPolicy: api.RestartPolicyAlways,
 				DNSPolicy:     api.DNSClusterFirst,
-				Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
+				Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
 			},
 		},
 		"bad spec": {
@@ -3560,7 +3614,7 @@ func TestValidatePod(t *testing.T) {
 			Spec: api.PodSpec{
 				RestartPolicy: api.RestartPolicyAlways,
 				DNSPolicy:     api.DNSClusterFirst,
-				Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
+				Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
 			},
 		},
 		"invalid node selector requirement in node affinity, operator can't be null": {
@@ -3575,7 +3629,6 @@ func TestValidatePod(t *testing.T) {
 							{
 								MatchExpressions: []api.NodeSelectorRequirement{
 									{
-
 										Key: "key1",
 									},
 								},
@@ -3916,8 +3969,8 @@ func TestValidatePod(t *testing.T) {
 				},
 			},
 			Spec: api.PodSpec{
-				InitContainers: []api.Container{{Name: "init-ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
-				Containers:     []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
+				InitContainers: []api.Container{{Name: "init-ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
+				Containers:     []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
 				RestartPolicy:  api.RestartPolicyAlways,
 				DNSPolicy:      api.DNSClusterFirst,
 			},
@@ -4039,7 +4092,7 @@ func TestValidatePod(t *testing.T) {
 						},
 					},
 				},
-				Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
+				Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
 				RestartPolicy: api.RestartPolicyAlways,
 				DNSPolicy:     api.DNSClusterFirst,
 			},
@@ -4084,7 +4137,7 @@ func TestValidatePod(t *testing.T) {
 						},
 					},
 				},
-				Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
+				Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
 				RestartPolicy: api.RestartPolicyAlways,
 				DNSPolicy:     api.DNSClusterFirst,
 			},
@@ -5179,7 +5232,7 @@ func TestValidateReplicationControllerStatusUpdate(t *testing.T) {
 			Spec: api.PodSpec{
 				RestartPolicy: api.RestartPolicyAlways,
 				DNSPolicy:     api.DNSClusterFirst,
-				Containers:    []api.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent"}},
+				Containers:    []api.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
 			},
 		},
 	}
@@ -5262,7 +5315,7 @@ func TestValidateReplicationControllerUpdate(t *testing.T) {
 			Spec: api.PodSpec{
 				RestartPolicy: api.RestartPolicyAlways,
 				DNSPolicy:     api.DNSClusterFirst,
-				Containers:    []api.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent"}},
+				Containers:    []api.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
 			},
 		},
 	}
@@ -5274,7 +5327,7 @@ func TestValidateReplicationControllerUpdate(t *testing.T) {
 			Spec: api.PodSpec{
 				RestartPolicy: api.RestartPolicyAlways,
 				DNSPolicy:     api.DNSClusterFirst,
-				Containers:    []api.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent"}},
+				Containers:    []api.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
 				Volumes:       []api.Volume{{Name: "gcepd", VolumeSource: api.VolumeSource{GCEPersistentDisk: &api.GCEPersistentDiskVolumeSource{PDName: "my-PD", FSType: "ext4", Partition: 1, ReadOnly: false}}}},
 			},
 		},
@@ -5425,7 +5478,7 @@ func TestValidateReplicationController(t *testing.T) {
 			Spec: api.PodSpec{
 				RestartPolicy: api.RestartPolicyAlways,
 				DNSPolicy:     api.DNSClusterFirst,
-				Containers:    []api.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent"}},
+				Containers:    []api.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
 			},
 		},
 	}
@@ -5438,7 +5491,7 @@ func TestValidateReplicationController(t *testing.T) {
 				Volumes:       []api.Volume{{Name: "gcepd", VolumeSource: api.VolumeSource{GCEPersistentDisk: &api.GCEPersistentDiskVolumeSource{PDName: "my-PD", FSType: "ext4", Partition: 1, ReadOnly: false}}}},
 				RestartPolicy: api.RestartPolicyAlways,
 				DNSPolicy:     api.DNSClusterFirst,
-				Containers:    []api.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent"}},
+				Containers:    []api.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
 			},
 		},
 	}
@@ -5582,7 +5635,7 @@ func TestValidateReplicationController(t *testing.T) {
 					Spec: api.PodSpec{
 						RestartPolicy: api.RestartPolicyOnFailure,
 						DNSPolicy:     api.DNSClusterFirst,
-						Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
+						Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
 					},
 					ObjectMeta: metav1.ObjectMeta{
 						Labels: validSelector,
@@ -5601,7 +5654,7 @@ func TestValidateReplicationController(t *testing.T) {
 					Spec: api.PodSpec{
 						RestartPolicy: api.RestartPolicyNever,
 						DNSPolicy:     api.DNSClusterFirst,
-						Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
+						Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
 					},
 					ObjectMeta: metav1.ObjectMeta{
 						Labels: validSelector,

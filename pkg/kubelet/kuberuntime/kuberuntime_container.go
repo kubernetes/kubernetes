@@ -19,7 +19,6 @@ package kuberuntime
 import (
 	"fmt"
 	"io"
-	"io/ioutil"
 	"math/rand"
 	"net/url"
 	"os"
@@ -28,7 +27,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/armon/circbuf"
 	"github.com/golang/glog"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubetypes "k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -41,6 +42,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"k8s.io/kubernetes/pkg/util/selinux"
+	"k8s.io/kubernetes/pkg/util/tail"
 )
 
 // startContainer starts a container and returns a message indicates why it is failed on error.
@@ -272,9 +274,18 @@ func (m *kubeGenericRuntimeManager) makeMounts(opts *kubecontainer.RunContainerO
 		containerLogPath := filepath.Join(opts.PodContainerDir, cid)
 		fs, err := m.osInterface.Create(containerLogPath)
 		if err != nil {
-			glog.Errorf("Error on creating termination-log file %q: %v", containerLogPath, err)
+			utilruntime.HandleError(fmt.Errorf("error on creating termination-log file %q: %v", containerLogPath, err))
 		} else {
 			fs.Close()
+
+			// Chmod is needed because ioutil.WriteFile() ends up calling
+			// open(2) to create the file, so the final mode used is "mode &
+			// ~umask". But we want to make sure the specified mode is used
+			// in the file no matter what the umask is.
+			if err := m.osInterface.Chmod(containerLogPath, 0666); err != nil {
+				utilruntime.HandleError(fmt.Errorf("unable to set termination-log file permissions %q: %v", containerLogPath, err))
+			}
+
 			selinuxRelabel := selinux.SELinuxEnabled()
 			volumeMounts = append(volumeMounts, &runtimeapi.Mount{
 				HostPath:       containerLogPath,
@@ -325,29 +336,36 @@ func makeUID() string {
 	return fmt.Sprintf("%08x", rand.Uint32())
 }
 
-// getTerminationMessage gets termination message of the container.
-func getTerminationMessage(status *runtimeapi.ContainerStatus, kubeStatus *kubecontainer.ContainerStatus, terminationMessagePath string) string {
-	message := ""
-
-	if !kubeStatus.FinishedAt.IsZero() || kubeStatus.ExitCode != 0 {
-		if terminationMessagePath == "" {
-			return ""
-		}
-
+// getTerminationMessage looks on the filesystem for the provided termination message path, returning a limited
+// amount of those bytes, or returns true if the logs should be checked.
+func getTerminationMessage(status *runtimeapi.ContainerStatus, terminationMessagePath string, fallbackToLogs bool) (string, bool) {
+	if len(terminationMessagePath) != 0 {
 		for _, mount := range status.Mounts {
-			if mount.ContainerPath == terminationMessagePath {
-				path := mount.HostPath
-				if data, err := ioutil.ReadFile(path); err != nil {
-					message = fmt.Sprintf("Error on reading termination-log %s: %v", path, err)
-				} else {
-					message = string(data)
-				}
-				break
+			if mount.ContainerPath != terminationMessagePath {
+				continue
+			}
+			path := mount.HostPath
+			data, _, err := tail.ReadAtMost(path, kubecontainer.MaxContainerTerminationMessageLength)
+			if err != nil {
+				return fmt.Sprintf("Error on reading termination log %s: %v", path, err), false
+			}
+			if !fallbackToLogs || len(data) != 0 {
+				return string(data), false
 			}
 		}
 	}
+	return "", fallbackToLogs
+}
 
-	return message
+// readLastStringFromContainerLogs attempts to read up to the max log length from the end of the CRI log represented
+// by path. It reads up to max log lines.
+func readLastStringFromContainerLogs(path string) string {
+	value := int64(kubecontainer.MaxContainerTerminationMessageLogLines)
+	buf, _ := circbuf.NewBuffer(kubecontainer.MaxContainerTerminationMessageLogLength)
+	if err := ReadLogs(path, &v1.PodLogOptions{TailLines: &value}, buf, buf); err != nil {
+		return fmt.Sprintf("Error on reading termination message from logs: %v", err)
+	}
+	return buf.String()
 }
 
 // getPodContainerStatuses gets all containers' statuses for the pod.
@@ -393,13 +411,19 @@ func (m *kubeGenericRuntimeManager) getPodContainerStatuses(uid kubetypes.UID, n
 			cStatus.Message = status.Message
 			cStatus.ExitCode = int(status.ExitCode)
 			cStatus.FinishedAt = time.Unix(0, status.FinishedAt)
+
+			fallbackToLogs := annotatedInfo.TerminationMessagePolicy == v1.TerminationMessageFallbackToLogsOnError && (cStatus.ExitCode != 0 || cStatus.Reason == "OOMKilled")
+			tMessage, checkLogs := getTerminationMessage(status, annotatedInfo.TerminationMessagePath, fallbackToLogs)
+			if checkLogs {
+				path := buildFullContainerLogsPath(uid, labeledInfo.ContainerName, annotatedInfo.RestartCount)
+				tMessage = readLastStringFromContainerLogs(path)
+			}
+			// Use the termination message written by the application is not empty
+			if len(tMessage) != 0 {
+				cStatus.Message = tMessage
+			}
 		}
 
-		tMessage := getTerminationMessage(status, cStatus, annotatedInfo.TerminationMessagePath)
-		// Use the termination message written by the application is not empty
-		if len(tMessage) != 0 {
-			cStatus.Message = tMessage
-		}
 		statuses[i] = cStatus
 	}
 
