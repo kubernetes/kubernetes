@@ -53,6 +53,10 @@ type RuntimeHelper interface {
 	// supplemental groups for the Pod. These extra supplemental groups come
 	// from annotations on persistent volumes that the pod depends on.
 	GetExtraSupplementalGroupsForPod(pod *v1.Pod) []int64
+	// IsExperimentalUserNsEnabled returns true if the experimental user namespace behavior has
+	// been enabled for the Kubelet.  This can be used to drive runtime specific user namespace
+	// behaviors.
+	IsExperimentalUserNsEnabled() bool
 }
 
 // ShouldContainerBeRestarted checks whether a container needs to be restarted.

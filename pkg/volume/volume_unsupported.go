@@ -21,3 +21,7 @@ package volume
 func SetVolumeOwnership(mounter Mounter, fsGroup *int64) error {
 	return nil
 }
+
+func SetOwnershipForPath(path string, readOnly bool, gid int) error {
+	return nil
+}

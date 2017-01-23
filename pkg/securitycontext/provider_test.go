@@ -166,7 +166,7 @@ func TestModifyHostConfig(t *testing.T) {
 		dummyContainer.SecurityContext = tc.sc
 		dockerCfg := &dockercontainer.HostConfig{}
 
-		provider.ModifyHostConfig(pod, dummyContainer, dockerCfg, nil)
+		provider.ModifyHostConfig(pod, dummyContainer, dockerCfg, nil, false)
 
 		if e, a := tc.expected, dockerCfg; !reflect.DeepEqual(e, a) {
 			t.Errorf("%v: unexpected modification of host config\nExpected:\n\n%#v\n\nGot:\n\n%#v", tc.name, e, a)
@@ -187,11 +187,14 @@ func TestModifyHostConfigPodSecurityContext(t *testing.T) {
 	bothHC.GroupAdd = []string{"2222", "1234"}
 	fsGroup := int64(1234)
 	extraSupplementalGroup := []int64{1234}
+	remapSupGroupHC := fullValidHostConfig()
+	remapSupGroupHC.GroupAdd = []string{"2222"}
 
 	testCases := map[string]struct {
 		securityContext         *v1.PodSecurityContext
 		expected                *dockercontainer.HostConfig
 		extraSupplementalGroups []int64
+		remap                   bool
 	}{
 		"nil": {
 			securityContext:         nil,
@@ -226,6 +229,19 @@ func TestModifyHostConfigPodSecurityContext(t *testing.T) {
 			expected:                bothHC,
 			extraSupplementalGroups: extraSupplementalGroup,
 		},
+		"FSGroup + Remap": {
+			securityContext: &v1.PodSecurityContext{FSGroup: &fsGroup},
+			expected:        fullValidHostConfig(),
+			remap:           true,
+		},
+		"FSGroup + SupplementalGroups + Remap": {
+			securityContext: &v1.PodSecurityContext{
+				SupplementalGroups: []int64{2222},
+				FSGroup:            &fsGroup,
+			},
+			expected: remapSupGroupHC,
+			remap:    true,
+		},
 	}
 
 	provider := NewSimpleSecurityContextProvider()
@@ -238,7 +254,7 @@ func TestModifyHostConfigPodSecurityContext(t *testing.T) {
 	for k, v := range testCases {
 		dummyPod.Spec.SecurityContext = v.securityContext
 		dockerCfg := &dockercontainer.HostConfig{}
-		provider.ModifyHostConfig(dummyPod, dummyContainer, dockerCfg, v.extraSupplementalGroups)
+		provider.ModifyHostConfig(dummyPod, dummyContainer, dockerCfg, v.extraSupplementalGroups, v.remap)
 		if !reflect.DeepEqual(v.expected, dockerCfg) {
 			t.Errorf("unexpected modification of host config for %s.  Expected: %#v Got: %#v", k, v.expected, dockerCfg)
 		}

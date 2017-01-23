@@ -123,6 +123,10 @@ func (f *fakeRuntimeHelper) GetExtraSupplementalGroupsForPod(pod *v1.Pod) []int6
 	return nil
 }
 
+func (f *fakeRuntimeHelper) IsExperimentalUserNsEnabled() bool {
+	return false
+}
+
 type fakeImageManager struct{}
 
 func newFakeImageManager() images.ImageManager {

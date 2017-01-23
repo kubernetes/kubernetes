@@ -137,9 +137,14 @@ type featureGate struct {
 }
 
 func setUnsetAlphaGates(f *featureGate, val bool) {
+	// don't turn these on unless they are explicitly requested to be turned on.
+	mustExplicitlyRequestFeature := map[string]bool{
+		experimentalHostUserNamespaceDefaultingGate: true,
+	}
 	for k, v := range f.known {
 		if v.prerelease == alpha {
-			if _, found := f.enabled[k]; !found {
+			_, requiresExplicitEnablement := mustExplicitlyRequestFeature[k]
+			if _, found := f.enabled[k]; !found && !requiresExplicitEnablement {
 				f.enabled[k] = val
 			}
 		}

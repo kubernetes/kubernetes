@@ -1121,10 +1121,10 @@ type Kubelet struct {
 // 3.  the plugins directory
 func (kl *Kubelet) setupDataDirs() error {
 	kl.rootDirectory = path.Clean(kl.rootDirectory)
-	if err := os.MkdirAll(kl.getRootDir(), 0750); err != nil {
+	if err := os.MkdirAll(kl.getRootDir(), 0755); err != nil {
 		return fmt.Errorf("error creating root directory: %v", err)
 	}
-	if err := os.MkdirAll(kl.getPodsDir(), 0750); err != nil {
+	if err := os.MkdirAll(kl.getPodsDir(), 0755); err != nil {
 		return fmt.Errorf("error creating pods directory: %v", err)
 	}
 	if err := os.MkdirAll(kl.getPluginsDir(), 0750); err != nil {

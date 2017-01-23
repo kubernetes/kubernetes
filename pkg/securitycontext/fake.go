@@ -42,7 +42,7 @@ type FakeSecurityContextProvider struct{}
 
 func (p FakeSecurityContextProvider) ModifyContainerConfig(pod *v1.Pod, container *v1.Container, config *dockercontainer.Config) {
 }
-func (p FakeSecurityContextProvider) ModifyHostConfig(pod *v1.Pod, container *v1.Container, hostConfig *dockercontainer.HostConfig, supplementalGids []int64) {
+func (p FakeSecurityContextProvider) ModifyHostConfig(pod *v1.Pod, container *v1.Container, hostConfig *dockercontainer.HostConfig, supplementalGids []int64, isRemap bool) {
 }
 
 // ValidInternalSecurityContextWithContainerDefaults creates a valid security context provider based on
