@@ -17,7 +17,7 @@ limitations under the License.
 package scheduler
 
 import (
-	"hash/adler32"
+	"hash/fnv"
 
 	"github.com/golang/groupcache/lru"
 
@@ -128,7 +128,7 @@ func (ec *EquivalenceCache) SendClearAllCacheReq() {
 // hashEquivalencePod returns the hash of equivalence pod.
 func (ec *EquivalenceCache) hashEquivalencePod(pod *v1.Pod) uint64 {
 	equivalencePod := ec.getEquivalencePod(pod)
-	hash := adler32.New()
+	hash := fnv.New32a()
 	hashutil.DeepHashObject(hash, equivalencePod)
 	return uint64(hash.Sum32())
 }
