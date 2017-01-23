@@ -790,6 +790,9 @@ type KubeControllerManagerConfiguration struct {
 	// ReconcilerSyncLoopPeriod is the amount of time the reconciler sync states loop
 	// wait between successive executions. Is set to 5 sec by default.
 	ReconcilerSyncLoopPeriod metav1.Duration
+	// If set to true enables NoExecute Taints and will evict all not-tolerating
+	// Pod running on Nodes tainted with this kind of Taints.
+	EnableTaintManager bool
 }
 
 // VolumeConfiguration contains *all* enumerated flags meant to configure all volume
