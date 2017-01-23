@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"reflect"
 	"strconv"
+	"strings"
 
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
@@ -102,9 +103,31 @@ func (rcStrategy) AllowCreateOnUpdate() bool {
 
 // ValidateUpdate is the default update validation for an end user.
 func (rcStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
-	validationErrorList := validation.ValidateReplicationController(obj.(*api.ReplicationController))
-	updateErrorList := validation.ValidateReplicationControllerUpdate(obj.(*api.ReplicationController), old.(*api.ReplicationController))
-	return append(validationErrorList, updateErrorList...)
+	oldRc := old.(*api.ReplicationController)
+	newRc := obj.(*api.ReplicationController)
+
+	validationErrorList := validation.ValidateReplicationController(newRc)
+	updateErrorList := validation.ValidateReplicationControllerUpdate(newRc, oldRc)
+	errs := append(validationErrorList, updateErrorList...)
+
+	for key, value := range api.NonConvertibleFields(oldRc.Annotations) {
+		parts := strings.Split(key, "/")
+		if len(parts) != 2 {
+			continue
+		}
+		brokenField := parts[1]
+
+		switch {
+		case strings.Contains(brokenField, "selector"):
+			if !reflect.DeepEqual(oldRc.Spec.Selector, newRc.Spec.Selector) {
+				errs = append(errs, field.Invalid(field.NewPath("spec").Child("selector"), newRc.Spec.Selector, "cannot update non-convertible selector"))
+			}
+		default:
+			errs = append(errs, &field.Error{Type: field.ErrorTypeNotFound, BadValue: value, Field: brokenField, Detail: "unknown non-convertible field"})
+		}
+	}
+
+	return errs
 }
 
 func (rcStrategy) AllowUnconditionalUpdate() bool {

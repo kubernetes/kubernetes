@@ -17,6 +17,7 @@ limitations under the License.
 package controller
 
 import (
+	"strings"
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -149,4 +150,68 @@ func TestSelectableFieldLabelConversions(t *testing.T) {
 		ControllerToSelectableFields(&api.ReplicationController{}),
 		nil,
 	)
+}
+
+func TestValidateUpdate(t *testing.T) {
+	ctx := genericapirequest.NewDefaultContext()
+	validSelector := map[string]string{"a": "b"}
+	validPodTemplate := api.PodTemplate{
+		Template: api.PodTemplateSpec{
+			ObjectMeta: metav1.ObjectMeta{
+				Labels: validSelector,
+			},
+			Spec: api.PodSpec{
+				RestartPolicy: api.RestartPolicyAlways,
+				DNSPolicy:     api.DNSClusterFirst,
+				Containers:    []api.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent"}},
+			},
+		},
+	}
+	oldController := &api.ReplicationController{
+		ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault, ResourceVersion: "10", Annotations: make(map[string]string)},
+		Spec: api.ReplicationControllerSpec{
+			Replicas: 3,
+			Selector: validSelector,
+			Template: &validPodTemplate.Template,
+		},
+		Status: api.ReplicationControllerStatus{
+			Replicas:           1,
+			ObservedGeneration: int64(10),
+		},
+	}
+	// Conversion sets this annotation
+	oldController.Annotations[api.NonConvertibleAnnotationPrefix+"/"+"spec.selector"] = "no way"
+
+	// Deep-copy so we won't mutate both selectors.
+	objCopy, err := api.Scheme.DeepCopy(oldController)
+	if err != nil {
+		t.Fatalf("unexpected deep-copy error: %v", err)
+	}
+	newController, ok := objCopy.(*api.ReplicationController)
+	if !ok {
+		t.Fatalf("unexpected object: %#v", objCopy)
+	}
+	// Irrelevant (to the selector) update for the replication controller.
+	newController.Spec.Replicas = 5
+
+	// If they didn't try to update the selector then we should not return any error.
+	errs := Strategy.ValidateUpdate(ctx, newController, oldController)
+	if len(errs) > 0 {
+		t.Fatalf("unexpected errors: %v", errs)
+	}
+
+	// Update the selector - validation should return an error.
+	newController.Spec.Selector["shiny"] = "newlabel"
+	newController.Spec.Template.Labels["shiny"] = "newlabel"
+
+	errs = Strategy.ValidateUpdate(ctx, newController, oldController)
+	for _, err := range errs {
+		t.Logf("%#v\n", err)
+	}
+	if len(errs) != 1 {
+		t.Fatalf("expected a validation error")
+	}
+	if !strings.Contains(errs[0].Error(), "selector") {
+		t.Fatalf("expected error related to the selector")
+	}
 }
