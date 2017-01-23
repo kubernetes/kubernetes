@@ -110,7 +110,7 @@ func CreatePKIAssets(cfg *kubeadmapi.MasterConfiguration, pkiDir string) error {
 	// If at least one of them exists, we should try to load them
 	// In the case that only one exists, there will most likely be an error anyway
 	if pkiutil.CertOrKeyExist(pkiDir, kubeadmconstants.APIServerCertAndKeyBaseName) {
-		// Try to load ca.crt and ca.key from the PKI directory
+		// Try to load apiserver.crt and apiserver.key from the PKI directory
 		apiCert, apiKey, err := pkiutil.TryLoadCertAndKeyFromDisk(pkiDir, kubeadmconstants.APIServerCertAndKeyBaseName)
 		if err != nil || apiCert == nil || apiKey == nil {
 			return fmt.Errorf("certificate and/or key existed but they could not be loaded properly")
@@ -123,9 +123,7 @@ func CreatePKIAssets(cfg *kubeadmapi.MasterConfiguration, pkiDir string) error {
 		config := certutil.Config{
 			CommonName: "kube-apiserver",
 			AltNames:   altNames,
-			// This makes the apiserver allowed to talk to the kubelets in the cluster
-			Organization: []string{"system:masters"},
-			Usages:       []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
+			Usages:     []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
 		}
 		apiCert, apiKey, err := pkiutil.NewCertAndKey(caCert, caKey, config)
 		if err != nil {
@@ -136,6 +134,35 @@ func CreatePKIAssets(cfg *kubeadmapi.MasterConfiguration, pkiDir string) error {
 			return fmt.Errorf("failure while saving API server certificate and key [%v]", err)
 		}
 		fmt.Println("[certificates] Generated API server certificate and key.")
+	}
+
+	// If at least one of them exists, we should try to load them
+	// In the case that only one exists, there will most likely be an error anyway
+	if pkiutil.CertOrKeyExist(pkiDir, kubeadmconstants.APIServerKubeletClientCertAndKeyBaseName) {
+		// Try to load apiserver-kubelet-client.crt and apiserver-kubelet-client.key from the PKI directory
+		apiCert, apiKey, err := pkiutil.TryLoadCertAndKeyFromDisk(pkiDir, kubeadmconstants.APIServerKubeletClientCertAndKeyBaseName)
+		if err != nil || apiCert == nil || apiKey == nil {
+			return fmt.Errorf("certificate and/or key existed but they could not be loaded properly")
+		}
+
+		fmt.Println("[certificates] Using the existing API Server kubelet client certificate and key.")
+	} else {
+		// The certificate and the key did NOT exist, let's generate them now
+		// TODO: Add a test case to verify that this cert has the x509.ExtKeyUsageClientAuth flag
+		config := certutil.Config{
+			CommonName:   "kube-apiserver-kubelet-client",
+			Organization: []string{"system:masters"},
+			Usages:       []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
+		}
+		apiClientCert, apiClientKey, err := pkiutil.NewCertAndKey(caCert, caKey, config)
+		if err != nil {
+			return fmt.Errorf("failure while creating API server kubelet client key and certificate [%v]", err)
+		}
+
+		if err = pkiutil.WriteCertAndKey(pkiDir, kubeadmconstants.APIServerKubeletClientCertAndKeyBaseName, apiClientCert, apiClientKey); err != nil {
+			return fmt.Errorf("failure while saving API server kubelet client certificate and key [%v]", err)
+		}
+		fmt.Println("[certificates] Generated API server kubelet client certificate and key.")
 	}
 
 	fmt.Printf("[certificates] Valid certificates and keys now exist in %q\n", pkiDir)
