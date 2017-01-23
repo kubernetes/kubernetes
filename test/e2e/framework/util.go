@@ -376,10 +376,10 @@ func SkipIfMissingResource(clientPool dynamic.ClientPool, gvr schema.GroupVersio
 }
 
 // ProvidersWithSSH are those providers where each node is accessible with SSH
-var ProvidersWithSSH = []string{"gce", "gke", "aws"}
+var ProvidersWithSSH = []string{"gce", "gke", "aws", "local"}
 
 // providersWithMasterSSH are those providers where master node is accessible with SSH
-var providersWithMasterSSH = []string{"gce", "gke", "kubemark", "aws"}
+var providersWithMasterSSH = []string{"gce", "gke", "kubemark", "aws", "local"}
 
 type podCondition func(pod *v1.Pod) (bool, error)
 
@@ -3872,6 +3872,7 @@ func GetSigner(provider string) (ssh.Signer, error) {
 	// please also add them to any SSH tests that are disabled because of signer
 	// support.
 	keyfile := ""
+	key := ""
 	switch provider {
 	case "gce", "gke", "kubemark":
 		keyfile = "google_compute_engine"
@@ -3884,15 +3885,29 @@ func GetSigner(provider string) (ssh.Signer, error) {
 		// Otherwise revert to home dir
 		keyfile = "kube_aws_rsa"
 	case "vagrant":
-		keyfile := os.Getenv("VAGRANT_SSH_KEY")
+		keyfile = os.Getenv("VAGRANT_SSH_KEY")
 		if len(keyfile) != 0 {
 			return sshutil.MakePrivateKeySignerFromFile(keyfile)
 		}
 		return nil, fmt.Errorf("VAGRANT_SSH_KEY env variable should be provided")
+	case "local":
+		keyfile = os.Getenv("LOCAL_SSH_KEY") // maybe?
+		if len(keyfile) == 0 {
+			keyfile = "id_rsa"
+		}
+		// make sure keyfile exists on this host
+		key = filepath.Join(keydir, keyfile)
+		_, _, err := RunCmd("ls", key)
+		if err != nil {
+			return nil, fmt.Errorf("error accessing local key file %q: %v", key, err)
+		}
 	default:
 		return nil, fmt.Errorf("GetSigner(...) not implemented for %s", provider)
 	}
-	key := filepath.Join(keydir, keyfile)
+
+	if len(key) == 0 {
+		key = filepath.Join(keydir, keyfile)
+	}
 
 	return sshutil.MakePrivateKeySignerFromFile(key)
 }
