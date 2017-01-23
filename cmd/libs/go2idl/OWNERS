@@ -1,3 +1,6 @@
-assignees:
-  - lavalamp
-  - wojtek-t
+approvers:
+- lavalamp
+- wojtek-t
+reviewers:
+- lavalamp
+- wojtek-t

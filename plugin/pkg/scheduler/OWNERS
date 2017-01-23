@@ -1,9 +1,8 @@
-assignees:
-  - davidopp
-  - timothysc
-  - wojtek-t
+approvers:
+- davidopp
+- timothysc
+- wojtek-t
 reviewers:
-  - davidopp
-  - timothysc
-  - wojtek-t
-  - jayunit100
+- davidopp
+- timothysc
+- wojtek-t
