@@ -481,6 +481,7 @@ func autoConvert_v1alpha1_KubeletConfiguration_To_componentconfig_KubeletConfigu
 	out.EnableCRI = in.EnableCRI
 	out.ExperimentalFailSwapOn = in.ExperimentalFailSwapOn
 	out.ExperimentalCheckNodeCapabilitiesBeforeMount = in.ExperimentalCheckNodeCapabilitiesBeforeMount
+	out.KeepTerminatedPodVolumes = in.KeepTerminatedPodVolumes
 	return nil
 }
 
@@ -652,6 +653,7 @@ func autoConvert_componentconfig_KubeletConfiguration_To_v1alpha1_KubeletConfigu
 	out.EnableCRI = in.EnableCRI
 	out.ExperimentalFailSwapOn = in.ExperimentalFailSwapOn
 	out.ExperimentalCheckNodeCapabilitiesBeforeMount = in.ExperimentalCheckNodeCapabilitiesBeforeMount
+	out.KeepTerminatedPodVolumes = in.KeepTerminatedPodVolumes
 	return nil
 }
 
