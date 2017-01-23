@@ -118,9 +118,7 @@ func DeepCopy_federation_ClusterSpec(in interface{}, out interface{}, c *convers
 		if in.ServerAddressByClientCIDRs != nil {
 			in, out := &in.ServerAddressByClientCIDRs, &out.ServerAddressByClientCIDRs
 			*out = make([]ServerAddressByClientCIDR, len(*in))
-			for i := range *in {
-				(*out)[i] = (*in)[i]
-			}
+			copy(*out, *in)
 		}
 		if in.SecretRef != nil {
 			in, out := &in.SecretRef, &out.SecretRef

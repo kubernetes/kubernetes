@@ -37,10 +37,10 @@ type ThirdPartyResourceInterface interface {
 	Create(*v1beta1.ThirdPartyResource) (*v1beta1.ThirdPartyResource, error)
 	Update(*v1beta1.ThirdPartyResource) (*v1beta1.ThirdPartyResource, error)
 	Delete(name string, options *v1.DeleteOptions) error
-	DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error
+	DeleteCollection(options *v1.DeleteOptions, listOptions meta_v1.ListOptions) error
 	Get(name string, options meta_v1.GetOptions) (*v1beta1.ThirdPartyResource, error)
-	List(opts v1.ListOptions) (*v1beta1.ThirdPartyResourceList, error)
-	Watch(opts v1.ListOptions) (watch.Interface, error)
+	List(opts meta_v1.ListOptions) (*v1beta1.ThirdPartyResourceList, error)
+	Watch(opts meta_v1.ListOptions) (watch.Interface, error)
 	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1beta1.ThirdPartyResource, err error)
 	ThirdPartyResourceExpansion
 }
@@ -91,7 +91,7 @@ func (c *thirdPartyResources) Delete(name string, options *v1.DeleteOptions) err
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *thirdPartyResources) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
+func (c *thirdPartyResources) DeleteCollection(options *v1.DeleteOptions, listOptions meta_v1.ListOptions) error {
 	return c.client.Delete().
 		Resource("thirdpartyresources").
 		VersionedParams(&listOptions, api.ParameterCodec).
@@ -113,7 +113,7 @@ func (c *thirdPartyResources) Get(name string, options meta_v1.GetOptions) (resu
 }
 
 // List takes label and field selectors, and returns the list of ThirdPartyResources that match those selectors.
-func (c *thirdPartyResources) List(opts v1.ListOptions) (result *v1beta1.ThirdPartyResourceList, err error) {
+func (c *thirdPartyResources) List(opts meta_v1.ListOptions) (result *v1beta1.ThirdPartyResourceList, err error) {
 	result = &v1beta1.ThirdPartyResourceList{}
 	err = c.client.Get().
 		Resource("thirdpartyresources").
@@ -124,7 +124,7 @@ func (c *thirdPartyResources) List(opts v1.ListOptions) (result *v1beta1.ThirdPa
 }
 
 // Watch returns a watch.Interface that watches the requested thirdPartyResources.
-func (c *thirdPartyResources) Watch(opts v1.ListOptions) (watch.Interface, error) {
+func (c *thirdPartyResources) Watch(opts meta_v1.ListOptions) (watch.Interface, error) {
 	return c.client.Get().
 		Prefix("watch").
 		Resource("thirdpartyresources").

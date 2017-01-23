@@ -19,6 +19,7 @@ package fake
 import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/pkg/api"
 	"k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/testing"
 )
@@ -66,9 +67,9 @@ func (c *FakeEvents) PatchWithEventNamespace(event *v1.Event, data []byte) (*v1.
 
 // Search returns a list of events matching the specified object.
 func (c *FakeEvents) Search(objOrRef runtime.Object) (*v1.EventList, error) {
-	action := testing.NewRootListAction(eventsResource, metav1.ListOptions{})
+	action := testing.NewRootListAction(eventsResource, api.ListOptions{})
 	if c.ns != "" {
-		action = testing.NewListAction(eventsResource, c.ns, metav1.ListOptions{})
+		action = testing.NewListAction(eventsResource, c.ns, api.ListOptions{})
 	}
 	obj, err := c.Fake.Invokes(action, &v1.EventList{})
 	if obj == nil {

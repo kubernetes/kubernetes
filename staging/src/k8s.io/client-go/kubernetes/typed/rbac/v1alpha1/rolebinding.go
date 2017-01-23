@@ -37,10 +37,10 @@ type RoleBindingInterface interface {
 	Create(*v1alpha1.RoleBinding) (*v1alpha1.RoleBinding, error)
 	Update(*v1alpha1.RoleBinding) (*v1alpha1.RoleBinding, error)
 	Delete(name string, options *v1.DeleteOptions) error
-	DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error
+	DeleteCollection(options *v1.DeleteOptions, listOptions meta_v1.ListOptions) error
 	Get(name string, options meta_v1.GetOptions) (*v1alpha1.RoleBinding, error)
-	List(opts v1.ListOptions) (*v1alpha1.RoleBindingList, error)
-	Watch(opts v1.ListOptions) (watch.Interface, error)
+	List(opts meta_v1.ListOptions) (*v1alpha1.RoleBindingList, error)
+	Watch(opts meta_v1.ListOptions) (watch.Interface, error)
 	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1alpha1.RoleBinding, err error)
 	RoleBindingExpansion
 }
@@ -96,7 +96,7 @@ func (c *roleBindings) Delete(name string, options *v1.DeleteOptions) error {
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *roleBindings) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
+func (c *roleBindings) DeleteCollection(options *v1.DeleteOptions, listOptions meta_v1.ListOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("rolebindings").
@@ -120,7 +120,7 @@ func (c *roleBindings) Get(name string, options meta_v1.GetOptions) (result *v1a
 }
 
 // List takes label and field selectors, and returns the list of RoleBindings that match those selectors.
-func (c *roleBindings) List(opts v1.ListOptions) (result *v1alpha1.RoleBindingList, err error) {
+func (c *roleBindings) List(opts meta_v1.ListOptions) (result *v1alpha1.RoleBindingList, err error) {
 	result = &v1alpha1.RoleBindingList{}
 	err = c.client.Get().
 		Namespace(c.ns).
@@ -132,7 +132,7 @@ func (c *roleBindings) List(opts v1.ListOptions) (result *v1alpha1.RoleBindingLi
 }
 
 // Watch returns a watch.Interface that watches the requested roleBindings.
-func (c *roleBindings) Watch(opts v1.ListOptions) (watch.Interface, error) {
+func (c *roleBindings) Watch(opts meta_v1.ListOptions) (watch.Interface, error) {
 	return c.client.Get().
 		Prefix("watch").
 		Namespace(c.ns).

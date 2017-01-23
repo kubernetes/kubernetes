@@ -104,9 +104,7 @@ func DeepCopy_v1beta1_CertificateSigningRequestSpec(in interface{}, out interfac
 		if in.Usages != nil {
 			in, out := &in.Usages, &out.Usages
 			*out = make([]KeyUsage, len(*in))
-			for i := range *in {
-				(*out)[i] = (*in)[i]
-			}
+			copy(*out, *in)
 		}
 		if in.Groups != nil {
 			in, out := &in.Groups, &out.Groups

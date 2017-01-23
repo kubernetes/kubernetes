@@ -37,10 +37,10 @@ type ReplicationControllerInterface interface {
 	Update(*v1.ReplicationController) (*v1.ReplicationController, error)
 	UpdateStatus(*v1.ReplicationController) (*v1.ReplicationController, error)
 	Delete(name string, options *v1.DeleteOptions) error
-	DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error
+	DeleteCollection(options *v1.DeleteOptions, listOptions meta_v1.ListOptions) error
 	Get(name string, options meta_v1.GetOptions) (*v1.ReplicationController, error)
-	List(opts v1.ListOptions) (*v1.ReplicationControllerList, error)
-	Watch(opts v1.ListOptions) (watch.Interface, error)
+	List(opts meta_v1.ListOptions) (*v1.ReplicationControllerList, error)
+	Watch(opts meta_v1.ListOptions) (watch.Interface, error)
 	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.ReplicationController, err error)
 	ReplicationControllerExpansion
 }
@@ -112,7 +112,7 @@ func (c *replicationControllers) Delete(name string, options *v1.DeleteOptions) 
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *replicationControllers) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
+func (c *replicationControllers) DeleteCollection(options *v1.DeleteOptions, listOptions meta_v1.ListOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("replicationcontrollers").
@@ -136,7 +136,7 @@ func (c *replicationControllers) Get(name string, options meta_v1.GetOptions) (r
 }
 
 // List takes label and field selectors, and returns the list of ReplicationControllers that match those selectors.
-func (c *replicationControllers) List(opts v1.ListOptions) (result *v1.ReplicationControllerList, err error) {
+func (c *replicationControllers) List(opts meta_v1.ListOptions) (result *v1.ReplicationControllerList, err error) {
 	result = &v1.ReplicationControllerList{}
 	err = c.client.Get().
 		Namespace(c.ns).
@@ -148,7 +148,7 @@ func (c *replicationControllers) List(opts v1.ListOptions) (result *v1.Replicati
 }
 
 // Watch returns a watch.Interface that watches the requested replicationControllers.
-func (c *replicationControllers) Watch(opts v1.ListOptions) (watch.Interface, error) {
+func (c *replicationControllers) Watch(opts meta_v1.ListOptions) (watch.Interface, error) {
 	return c.client.Get().
 		Prefix("watch").
 		Namespace(c.ns).

@@ -47,6 +47,8 @@ func GetGeneratedDeepCopyFuncs() []conversion.GeneratedDeepCopyFunc {
 		{Fn: DeepCopy_v1_LabelSelector, InType: reflect.TypeOf(&LabelSelector{})},
 		{Fn: DeepCopy_v1_LabelSelectorRequirement, InType: reflect.TypeOf(&LabelSelectorRequirement{})},
 		{Fn: DeepCopy_v1_ListMeta, InType: reflect.TypeOf(&ListMeta{})},
+		{Fn: DeepCopy_v1_ListOptions, InType: reflect.TypeOf(&ListOptions{})},
+		{Fn: DeepCopy_v1_ObjectMeta, InType: reflect.TypeOf(&ObjectMeta{})},
 		{Fn: DeepCopy_v1_OwnerReference, InType: reflect.TypeOf(&OwnerReference{})},
 		{Fn: DeepCopy_v1_Patch, InType: reflect.TypeOf(&Patch{})},
 		{Fn: DeepCopy_v1_RootPaths, InType: reflect.TypeOf(&RootPaths{})},
@@ -93,8 +95,10 @@ func DeepCopy_v1_APIGroupList(in interface{}, out interface{}, c *conversion.Clo
 			in, out := &in.Groups, &out.Groups
 			*out = make([]APIGroup, len(*in))
 			for i := range *in {
-				if err := DeepCopy_v1_APIGroup(&(*in)[i], &(*out)[i], c); err != nil {
+				if newVal, err := c.DeepCopy(&(*in)[i]); err != nil {
 					return err
+				} else {
+					(*out)[i] = *newVal.(*APIGroup)
 				}
 			}
 		}
@@ -125,8 +129,10 @@ func DeepCopy_v1_APIResourceList(in interface{}, out interface{}, c *conversion.
 			in, out := &in.APIResources, &out.APIResources
 			*out = make([]APIResource, len(*in))
 			for i := range *in {
-				if err := DeepCopy_v1_APIResource(&(*in)[i], &(*out)[i], c); err != nil {
+				if newVal, err := c.DeepCopy(&(*in)[i]); err != nil {
 					return err
+				} else {
+					(*out)[i] = *newVal.(*APIResource)
 				}
 			}
 		}
@@ -269,8 +275,10 @@ func DeepCopy_v1_LabelSelector(in interface{}, out interface{}, c *conversion.Cl
 			in, out := &in.MatchExpressions, &out.MatchExpressions
 			*out = make([]LabelSelectorRequirement, len(*in))
 			for i := range *in {
-				if err := DeepCopy_v1_LabelSelectorRequirement(&(*in)[i], &(*out)[i], c); err != nil {
+				if newVal, err := c.DeepCopy(&(*in)[i]); err != nil {
 					return err
+				} else {
+					(*out)[i] = *newVal.(*LabelSelectorRequirement)
 				}
 			}
 		}
@@ -297,6 +305,70 @@ func DeepCopy_v1_ListMeta(in interface{}, out interface{}, c *conversion.Cloner)
 		in := in.(*ListMeta)
 		out := out.(*ListMeta)
 		*out = *in
+		return nil
+	}
+}
+
+func DeepCopy_v1_ListOptions(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*ListOptions)
+		out := out.(*ListOptions)
+		*out = *in
+		if in.TimeoutSeconds != nil {
+			in, out := &in.TimeoutSeconds, &out.TimeoutSeconds
+			*out = new(int64)
+			**out = **in
+		}
+		return nil
+	}
+}
+
+func DeepCopy_v1_ObjectMeta(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*ObjectMeta)
+		out := out.(*ObjectMeta)
+		*out = *in
+		out.CreationTimestamp = in.CreationTimestamp.DeepCopy()
+		if in.DeletionTimestamp != nil {
+			in, out := &in.DeletionTimestamp, &out.DeletionTimestamp
+			*out = new(Time)
+			**out = (*in).DeepCopy()
+		}
+		if in.DeletionGracePeriodSeconds != nil {
+			in, out := &in.DeletionGracePeriodSeconds, &out.DeletionGracePeriodSeconds
+			*out = new(int64)
+			**out = **in
+		}
+		if in.Labels != nil {
+			in, out := &in.Labels, &out.Labels
+			*out = make(map[string]string)
+			for key, val := range *in {
+				(*out)[key] = val
+			}
+		}
+		if in.Annotations != nil {
+			in, out := &in.Annotations, &out.Annotations
+			*out = make(map[string]string)
+			for key, val := range *in {
+				(*out)[key] = val
+			}
+		}
+		if in.OwnerReferences != nil {
+			in, out := &in.OwnerReferences, &out.OwnerReferences
+			*out = make([]OwnerReference, len(*in))
+			for i := range *in {
+				if newVal, err := c.DeepCopy(&(*in)[i]); err != nil {
+					return err
+				} else {
+					(*out)[i] = *newVal.(*OwnerReference)
+				}
+			}
+		}
+		if in.Finalizers != nil {
+			in, out := &in.Finalizers, &out.Finalizers
+			*out = make([]string, len(*in))
+			copy(*out, *in)
+		}
 		return nil
 	}
 }
@@ -354,9 +426,10 @@ func DeepCopy_v1_Status(in interface{}, out interface{}, c *conversion.Cloner) e
 		*out = *in
 		if in.Details != nil {
 			in, out := &in.Details, &out.Details
-			*out = new(StatusDetails)
-			if err := DeepCopy_v1_StatusDetails(*in, *out, c); err != nil {
+			if newVal, err := c.DeepCopy(*in); err != nil {
 				return err
+			} else {
+				*out = newVal.(*StatusDetails)
 			}
 		}
 		return nil
@@ -420,8 +493,10 @@ func DeepCopy_v1_WatchEvent(in interface{}, out interface{}, c *conversion.Clone
 		in := in.(*WatchEvent)
 		out := out.(*WatchEvent)
 		*out = *in
-		if err := runtime.DeepCopy_runtime_RawExtension(&in.Object, &out.Object, c); err != nil {
+		if newVal, err := c.DeepCopy(&in.Object); err != nil {
 			return err
+		} else {
+			out.Object = *newVal.(*runtime.RawExtension)
 		}
 		return nil
 	}
