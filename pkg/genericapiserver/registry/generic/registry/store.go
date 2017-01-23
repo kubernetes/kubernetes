@@ -50,94 +50,124 @@ import (
 // object.
 type ObjectFunc func(obj runtime.Object) error
 
-// Store implements pkg/api/rest.StandardStorage.
-// It's intended to be embeddable, so that you can implement any
-// non-generic functions if needed.
-// You must supply a value for every field below before use; these are
-// left public as it's meant to be overridable if need be.
-// This object is intended to be copyable so that it can be used in
-// different ways but share the same underlying behavior.
+// Store implements pkg/api/rest.StandardStorage. It's intended to be
+// embeddable and allows the consumer to implement any non-generic functions
+// that are required. This object is intended to be copyable so that it can be
+// used in different ways but share the same underlying behavior.
+//
+// All fields are required unless specified.
 //
 // The intended use of this type is embedding within a Kind specific
-// RESTStorage implementation. This type provides CRUD semantics on
-// a Kubelike resource, handling details like conflict detection with
-// ResourceVersion and semantics. The RESTCreateStrategy and
-// RESTUpdateStrategy are generic across all backends, and encapsulate
-// logic specific to the API.
+// RESTStorage implementation. This type provides CRUD semantics on a Kubelike
+// resource, handling details like conflict detection with ResourceVersion and
+// semantics. The RESTCreateStrategy, RESTUpdateStrategy, and
+// RESTDeleteStrategy are generic across all backends, and encapsulate logic
+// specific to the API.
 //
 // TODO: make the default exposed methods exactly match a generic RESTStorage
 type Store struct {
-	// Called to make a new object, should return e.g., &api.Pod{}
+	// NewFunc returns a new instance of the type this registry returns for a
+	// GET of a single object, e.g.:
+	//
+	// curl GET /apis/group/version/namespaces/my-ns/myresource/name-of-object
 	NewFunc func() runtime.Object
 
-	// Called to make a new listing object, should return e.g., &api.PodList{}
+	// NewListFunc returns a new list of the type this registry; it is the
+	// type returned when the resource is listed, e.g.:
+	//
+	// curl GET /apis/group/version/namespaces/my-ns/myresource
 	NewListFunc func() runtime.Object
 
-	// Used for error reporting
+	// QualifiedResource is the pluralized name of the resource.
 	QualifiedResource schema.GroupResource
 
-	// Used for listing/watching; should not include trailing "/"
+	// KeyRootFunc returns the root etcd key for this resource; should not
+	// include trailing "/".  This is used for operations that work on the
+	// entire collection (listing and watching).
+	//
+	// KeyRootFunc and KeyFunc must be supplied together or not at all.
 	KeyRootFunc func(ctx genericapirequest.Context) string
 
-	// Called for Create/Update/Get/Delete. Note that 'namespace' can be
-	// gotten from ctx.
+	// KeyFunc returns the key for a specific object in the collection.
+	// KeyFund is dalled for Create/Update/Get/Delete. Note that 'namespace'
+	// can be gotten from ctx.
+	//
+	// KeyFunc and KeyRootFunc must be supplied together or not at all.
 	KeyFunc func(ctx genericapirequest.Context, name string) (string, error)
 
-	// Called to get the name of an object
+	// ObjectNameFunc returns the name of an object or an error.
 	ObjectNameFunc func(obj runtime.Object) (string, error)
 
-	// Return the TTL objects should be persisted with. Update is true if this
-	// is an operation against an existing object. Existing is the current TTL
-	// or the default for this operation.
+	// TTLFunc returns the TTL (time to live) that objects should be persisted
+	// with. The existing parameter is the current TTL or the default for this
+	// operation. The update parameter indicates whether this is an operation
+	// against an existing object.
+	//
+	// Objects that are persisted with a TTL are evicted once the TTL expires.
 	TTLFunc func(obj runtime.Object, existing uint64, update bool) (uint64, error)
 
-	// Returns a matcher corresponding to the provided labels and fields.
+	// PredicateFunc returns a matcher corresponding to the provided labels
+	// and fields. The SelectionPredicate returned should return true if the
+	// object matches the given field and label selectors.
 	PredicateFunc func(label labels.Selector, field fields.Selector) storage.SelectionPredicate
 
-	// Called to cleanup storage clients.
-	DestroyFunc func()
-
-	// EnableGarbageCollection affects the handling of Update and Delete requests. It
-	// must be synced with the corresponding flag in kube-controller-manager.
+	// EnableGarbageCollection affects the handling of Update and Delete
+	// requests. Enabling garbage collection allows finalizers to do work to
+	// finalize this object before the store deletes it.
+	//
+	// If any store has garbage collection enabled, it must also be enabled in
+	// the kube-controller-manager.
 	EnableGarbageCollection bool
 
 	// DeleteCollectionWorkers is the maximum number of workers in a single
-	// DeleteCollection call.
+	// DeleteCollection call. Delete requests for the items in a collection
+	// are issued in parallel.
 	DeleteCollectionWorkers int
 
-	// Decorator is called as exit hook on object returned from the underlying storage.
-	// The returned object could be individual object (e.g. Pod) or the list type (e.g. PodList).
-	// Decorator is intended for integrations that are above storage and
-	// should only be used for specific cases where storage of the value is
-	// not appropriate, since they cannot be watched.
+	// Decorator is an optional exit hook on an object returned from the
+	// underlying storage. The returned object could be an individual object
+	// (e.g. Pod) or a list type (e.g. PodList). Decorator is intended for
+	// integrations that are above storage and should only be used for
+	// specific cases where storage of the value is not appropriate, since
+	// they cannot be watched.
 	Decorator ObjectFunc
-	// Allows extended behavior during creation, required
+	// CreateStrategy implements resource-specific behavior during creation.
 	CreateStrategy rest.RESTCreateStrategy
-	// On create of an object, attempt to run a further operation.
+	// AfterCreate implements a further operation to run after a resource is
+	// created and before it is decorated, optional.
 	AfterCreate ObjectFunc
-	// Allows extended behavior during updates, required
+	// UpdateStrategy implements resource-specific behavior during updates.
 	UpdateStrategy rest.RESTUpdateStrategy
-	// On update of an object, attempt to run a further operation.
+	// AfterUpdate implements a further operation to run after a resource is
+	// updated and before it is decorated, optional.
 	AfterUpdate ObjectFunc
-	// Allows extended behavior during updates, optional
+	// DeleteStrategy implements resource-specific behavior during deletion,
+	// optional.
 	DeleteStrategy rest.RESTDeleteStrategy
-	// On deletion of an object, attempt to run a further operation.
+	// AfterDelete implements a further operation to run after a resource is
+	// deleted and before it is decorated, optional.
 	AfterDelete ObjectFunc
-	// If true, return the object that was deleted. Otherwise, return a generic
-	// success status response.
+	// ReturnDeletedObject determines whether the Store returns the object
+	// that was deleted. Otherwise, return a generic success status response.
 	ReturnDeletedObject bool
-	// Allows extended behavior during export, optional
+	// ExportStrategy implements resource-specific behavior during export,
+	// optional. Exported objects are not decorated.
 	ExportStrategy rest.RESTExportStrategy
 
-	// Used for all storage access functions
+	// Storage is the interface for the underlying storage for the resource.
 	Storage storage.Interface
+	// Called to cleanup clients used by the underlying Storage; optional.
+	DestroyFunc func()
 }
 
+// Note: the rest.StandardStorage interface aggregates the common REST verbs
 var _ rest.StandardStorage = &Store{}
+var _ rest.Exporter = &Store{}
 
 const OptimisticLockErrorMsg = "the object has been modified; please apply your changes to the latest version and try again"
 
-// NamespaceKeyRootFunc is the default function for constructing storage paths to resource directories enforcing namespace rules.
+// NamespaceKeyRootFunc is the default function for constructing storage paths
+// to resource directories enforcing namespace rules.
 func NamespaceKeyRootFunc(ctx genericapirequest.Context, prefix string) string {
 	key := prefix
 	ns, ok := genericapirequest.NamespaceFrom(ctx)
@@ -147,8 +177,9 @@ func NamespaceKeyRootFunc(ctx genericapirequest.Context, prefix string) string {
 	return key
 }
 
-// NamespaceKeyFunc is the default function for constructing storage paths to a resource relative to prefix enforcing namespace rules.
-// If no namespace is on context, it errors.
+// NamespaceKeyFunc is the default function for constructing storage paths to
+// a resource relative to the given prefix enforcing namespace rules. If the
+// context does not contain a namespace, it errors.
 func NamespaceKeyFunc(ctx genericapirequest.Context, prefix string, name string) (string, error) {
 	key := NamespaceKeyRootFunc(ctx, prefix)
 	ns, ok := genericapirequest.NamespaceFrom(ctx)
@@ -165,7 +196,8 @@ func NamespaceKeyFunc(ctx genericapirequest.Context, prefix string, name string)
 	return key, nil
 }
 
-// NoNamespaceKeyFunc is the default function for constructing storage paths to a resource relative to prefix without a namespace
+// NoNamespaceKeyFunc is the default function for constructing storage paths
+// to a resource relative to the given prefix without a namespace.
 func NoNamespaceKeyFunc(ctx genericapirequest.Context, prefix string, name string) (string, error) {
 	if len(name) == 0 {
 		return "", kubeerr.NewBadRequest("Name parameter required.")
@@ -177,17 +209,18 @@ func NoNamespaceKeyFunc(ctx genericapirequest.Context, prefix string, name strin
 	return key, nil
 }
 
-// New implements RESTStorage
+// New implements RESTStorage.New.
 func (e *Store) New() runtime.Object {
 	return e.NewFunc()
 }
 
-// NewList implements RESTLister
+// NewList implements rest.Lister.
 func (e *Store) NewList() runtime.Object {
 	return e.NewListFunc()
 }
 
-// List returns a list of items matching labels and field
+// List returns a list of items matching labels and field according to the
+// store's PredicateFunc.
 func (e *Store) List(ctx genericapirequest.Context, options *api.ListOptions) (runtime.Object, error) {
 	label := labels.Everything()
 	if options != nil && options.LabelSelector != nil {
@@ -209,7 +242,8 @@ func (e *Store) List(ctx genericapirequest.Context, options *api.ListOptions) (r
 	return out, nil
 }
 
-// ListPredicate returns a list of all the items matching m.
+// ListPredicate returns a list of all the items matching the given
+// SelectionPredicate.
 func (e *Store) ListPredicate(ctx genericapirequest.Context, p storage.SelectionPredicate, options *api.ListOptions) (runtime.Object, error) {
 	if options == nil {
 		// By default we should serve the request from etcd.
@@ -278,10 +312,13 @@ func (e *Store) Create(ctx genericapirequest.Context, obj runtime.Object) (runti
 	return out, nil
 }
 
-// shouldDelete checks if a Update is removing all the object's finalizers. If so,
-// it further checks if the object's DeletionGracePeriodSeconds is 0. If so, it
-// returns true.
-func (e *Store) shouldDelete(ctx genericapirequest.Context, key string, obj, existing runtime.Object) bool {
+// shouldDeleteDuringUpdate checks if a Update is removing all the object's
+// finalizers. If so, it further checks if the object's
+// DeletionGracePeriodSeconds is 0. If so, it returns true.
+//
+// If the store does not have garbage collection enabled,
+// shouldDeleteDuringUpdate will always return false.
+func (e *Store) shouldDeleteDuringUpdate(ctx genericapirequest.Context, key string, obj, existing runtime.Object) bool {
 	if !e.EnableGarbageCollection {
 		return false
 	}
@@ -298,6 +335,8 @@ func (e *Store) shouldDelete(ctx genericapirequest.Context, key string, obj, exi
 	return len(newMeta.Finalizers) == 0 && oldMeta.DeletionGracePeriodSeconds != nil && *oldMeta.DeletionGracePeriodSeconds == 0
 }
 
+// deleteForEmptyFinalizers handles deleting an object once its finalizer list
+// becomes empty due to an update.
 func (e *Store) deleteForEmptyFinalizers(ctx genericapirequest.Context, name, key string, obj runtime.Object, preconditions *storage.Preconditions) (runtime.Object, bool, error) {
 	out := e.NewFunc()
 	glog.V(6).Infof("going to delete %s from registry, triggered by update", name)
@@ -350,9 +389,10 @@ func (e *Store) Update(ctx genericapirequest.Context, name string, objInfo rest.
 			return nil, nil, err
 		}
 
-		// If AllowUnconditionalUpdate() is true and the object specified by the user does not have a resource version,
-		// then we populate it with the latest version.
-		// Else, we check that the version specified by the user matches the version of latest storage object.
+		// If AllowUnconditionalUpdate() is true and the object specified by
+		// the user does not have a resource version, then we populate it with
+		// the latest version. Else, we check that the version specified by
+		// the user matches the version of latest storage object.
 		resourceVersion, err := e.Storage.Versioner().ObjectResourceVersion(obj)
 		if err != nil {
 			return nil, nil, err
@@ -382,19 +422,21 @@ func (e *Store) Update(ctx genericapirequest.Context, name string, objInfo rest.
 		creating = false
 		creatingObj = nil
 		if doUnconditionalUpdate {
-			// Update the object's resource version to match the latest storage object's resource version.
+			// Update the object's resource version to match the latest
+			// storage object's resource version.
 			err = e.Storage.Versioner().UpdateObject(obj, res.ResourceVersion)
 			if err != nil {
 				return nil, nil, err
 			}
 		} else {
-			// Check if the object's resource version matches the latest resource version.
+			// Check if the object's resource version matches the latest
+			// resource version.
 			newVersion, err := e.Storage.Versioner().ObjectResourceVersion(obj)
 			if err != nil {
 				return nil, nil, err
 			}
 			if newVersion == 0 {
-				// TODO: The Invalid error should has a field for Resource.
+				// TODO: The Invalid error should have a field for Resource.
 				// After that field is added, we should fill the Resource and
 				// leave the Kind field empty. See the discussion in #18526.
 				qualifiedKind := schema.GroupKind{Group: e.QualifiedResource.Group, Kind: e.QualifiedResource.Resource}
@@ -408,7 +450,7 @@ func (e *Store) Update(ctx genericapirequest.Context, name string, objInfo rest.
 		if err := rest.BeforeUpdate(e.UpdateStrategy, ctx, obj, existing); err != nil {
 			return nil, nil, err
 		}
-		if e.shouldDelete(ctx, key, obj, existing) {
+		if e.shouldDeleteDuringUpdate(ctx, key, obj, existing) {
 			deleteObj = obj
 			return nil, nil, errEmptiedFinalizers
 		}
@@ -481,10 +523,13 @@ var (
 )
 
 // shouldUpdateFinalizers returns if we need to update the finalizers of the
-// object, and the desired list of finalizers.
-// When deciding whether to add the OrphanDependent finalizer, factors in the
-// order of highest to lowest priority are: options.OrphanDependents, existing
-// finalizers of the object, e.DeleteStrategy.DefaultGarbageCollectionPolicy.
+// object, and the desired list of finalizers. When deciding whether to add
+// the OrphanDependent finalizer, factors in the order of highest to lowest
+// priority are:
+//
+// - options.OrphanDependents,
+// - existing finalizers of the object
+// - e.DeleteStrategy.DefaultGarbageCollectionPolicy
 func shouldUpdateFinalizers(e *Store, accessor metav1.Object, options *api.DeleteOptions) (shouldUpdate bool, newFinalizers []string) {
 	shouldOrphan := false
 	// Get default orphan policy from this REST object type
@@ -534,7 +579,9 @@ func markAsDeleting(obj runtime.Object) (err error) {
 		return kerr
 	}
 	now := metav1.NewTime(time.Now())
-	// This handles Generation bump for resources that don't support graceful deletion. For resources that support graceful deletion is handle in pkg/api/rest/delete.go
+	// This handles Generation bump for resources that don't support graceful
+	// deletion. For resources that support graceful deletion is handle in
+	// pkg/api/rest/delete.go
 	if objectMeta.DeletionTimestamp == nil && objectMeta.Generation > 0 {
 		objectMeta.Generation++
 	}
@@ -544,12 +591,31 @@ func markAsDeleting(obj runtime.Object) (err error) {
 	return nil
 }
 
-// this functions need to be kept synced with updateForGracefulDeletionAndFinalizers.
+// updateForGracefulDeletion and updateForGracefulDeletionAndFinalizers both
+// implement deletion flows for graceful deletion.  Graceful deletion is
+// implemented as setting the deletion timestamp in an update.  If the
+// implementation of graceful deletion is changed, both of these methods
+// should be changed together.
+
+// updateForGracefulDeletion updates the given object for graceful deletion by
+// setting the deletion timestamp and grace period seconds and returns:
+//
+// 1. an error
+// 2. a boolean indicating that the object was not found, but it should be
+//    ignored
+// 3. a boolean indicating that the object's grace period is exhausted and it
+//    should be deleted immediately
+// 4. a new output object with the state that was updated
+// 5. a copy of the last existing state of the object
 func (e *Store) updateForGracefulDeletion(ctx genericapirequest.Context, name, key string, options *api.DeleteOptions, preconditions storage.Preconditions, in runtime.Object) (err error, ignoreNotFound, deleteImmediately bool, out, lastExisting runtime.Object) {
 	lastGraceful := int64(0)
 	out = e.NewFunc()
 	err = e.Storage.GuaranteedUpdate(
-		ctx, key, out, false, &preconditions,
+		ctx,
+		key,
+		out,
+		false, /* ignoreNotFound */
+		&preconditions,
 		storage.SimpleUpdate(func(existing runtime.Object) (runtime.Object, error) {
 			graceful, pendingGraceful, err := rest.BeforeDelete(e.DeleteStrategy, ctx, existing, options)
 			if err != nil {
@@ -591,13 +657,28 @@ func (e *Store) updateForGracefulDeletion(ctx genericapirequest.Context, name, k
 	}
 }
 
-// this functions need to be kept synced with updateForGracefulDeletion.
+// updateForGracefulDeletionAndFinalizers updates the given object for
+// graceful deletion and finalization by setting the deletion timestamp and
+// grace period seconds (graceful deletion) and updating the list of
+// finalizers (finalization); it returns:
+//
+// 1. an error
+// 2. a boolean indicating that the object was not found, but it should be
+//    ignored
+// 3. a boolean indicating that the object's grace period is exhausted and it
+//    should be deleted immediately
+// 4. a new output object with the state that was updated
+// 5. a copy of the last existing state of the object
 func (e *Store) updateForGracefulDeletionAndFinalizers(ctx genericapirequest.Context, name, key string, options *api.DeleteOptions, preconditions storage.Preconditions, in runtime.Object) (err error, ignoreNotFound, deleteImmediately bool, out, lastExisting runtime.Object) {
 	lastGraceful := int64(0)
 	var pendingFinalizers bool
 	out = e.NewFunc()
 	err = e.Storage.GuaranteedUpdate(
-		ctx, key, out, false, &preconditions,
+		ctx,
+		key,
+		out,
+		false, /* ignoreNotFound */
+		&preconditions,
 		storage.SimpleUpdate(func(existing runtime.Object) (runtime.Object, error) {
 			graceful, pendingGraceful, err := rest.BeforeDelete(e.DeleteStrategy, ctx, existing, options)
 			if err != nil {
@@ -703,16 +784,19 @@ func (e *Store) Delete(ctx genericapirequest.Context, name string, options *api.
 	var ignoreNotFound bool
 	var deleteImmediately bool = true
 	var lastExisting, out runtime.Object
-	if !e.EnableGarbageCollection {
-		// TODO: remove the check on graceful, because we support no-op updates now.
-		if graceful {
-			err, ignoreNotFound, deleteImmediately, out, lastExisting = e.updateForGracefulDeletion(ctx, name, key, options, preconditions, obj)
-		}
-	} else {
+
+	// Handle combinations of graceful deletion and finalization by issuing
+	// the correct updates.
+	if e.EnableGarbageCollection {
 		shouldUpdateFinalizers, _ := shouldUpdateFinalizers(e, accessor, options)
 		// TODO: remove the check, because we support no-op updates now.
 		if graceful || pendingFinalizers || shouldUpdateFinalizers {
 			err, ignoreNotFound, deleteImmediately, out, lastExisting = e.updateForGracefulDeletionAndFinalizers(ctx, name, key, options, preconditions, obj)
+		}
+	} else {
+		// TODO: remove the check on graceful, because we support no-op updates now.
+		if graceful {
+			err, ignoreNotFound, deleteImmediately, out, lastExisting = e.updateForGracefulDeletion(ctx, name, key, options, preconditions, obj)
 		}
 	}
 	// !deleteImmediately covers all cases where err != nil. We keep both to be future-proof.
@@ -736,7 +820,7 @@ func (e *Store) Delete(ctx genericapirequest.Context, name string, options *api.
 	return e.finalizeDelete(out, true)
 }
 
-// DeleteCollection remove all items returned by List with a given ListOptions from storage.
+// DeleteCollection removes all items returned by List with a given ListOptions from storage.
 //
 // DeleteCollection is currently NOT atomic. It can happen that only subset of objects
 // will be deleted from storage, and then an error will be returned.
@@ -814,6 +898,8 @@ func (e *Store) DeleteCollection(ctx genericapirequest.Context, options *api.Del
 	}
 }
 
+// finalizeDelete runs the Store's AfterDelete hook if runHooks is set and
+// returns the decorated deleted object if appropriate.
 func (e *Store) finalizeDelete(obj runtime.Object, runHooks bool) (runtime.Object, error) {
 	if runHooks && e.AfterDelete != nil {
 		if err := e.AfterDelete(obj); err != nil {
@@ -832,8 +918,8 @@ func (e *Store) finalizeDelete(obj runtime.Object, runHooks bool) (runtime.Objec
 }
 
 // Watch makes a matcher for the given label and field, and calls
-// WatchPredicate. If possible, you should customize PredicateFunc to produre a
-// matcher that matches by key. SelectionPredicate does this for you
+// WatchPredicate. If possible, you should customize PredicateFunc to produce
+// a matcher that matches by key. SelectionPredicate does this for you
 // automatically.
 func (e *Store) Watch(ctx genericapirequest.Context, options *api.ListOptions) (watch.Interface, error) {
 	label := labels.Everything()
@@ -864,7 +950,8 @@ func (e *Store) WatchPredicate(ctx genericapirequest.Context, p storage.Selectio
 			}
 			return w, nil
 		}
-		// if we cannot extract a key based on the current context, the optimization is skipped
+		// if we cannot extract a key based on the current context, the
+		// optimization is skipped
 	}
 
 	w, err := e.Storage.WatchList(ctx, e.KeyRootFunc(ctx), resourceVersion, p)
@@ -877,13 +964,15 @@ func (e *Store) WatchPredicate(ctx genericapirequest.Context, p storage.Selectio
 	return w, nil
 }
 
-// calculateTTL is a helper for retrieving the updated TTL for an object or returning an error
-// if the TTL cannot be calculated. The defaultTTL is changed to 1 if less than zero. Zero means
-// no TTL, not expire immediately.
+// calculateTTL is a helper for retrieving the updated TTL for an object or
+// returning an error if the TTL cannot be calculated. The defaultTTL is
+// changed to 1 if less than zero. Zero means no TTL, not expire immediately.
 func (e *Store) calculateTTL(obj runtime.Object, defaultTTL int64, update bool) (ttl uint64, err error) {
 	// TODO: validate this is assertion is still valid.
-	// etcd may return a negative TTL for a node if the expiration has not occurred due
-	// to server lag - we will ensure that the value is at least set.
+
+	// etcd may return a negative TTL for a node if the expiration has not
+	// occurred due to server lag - we will ensure that the value is at least
+	// set.
 	if defaultTTL < 0 {
 		defaultTTL = 1
 	}
@@ -894,6 +983,8 @@ func (e *Store) calculateTTL(obj runtime.Object, defaultTTL int64, update bool) 
 	return ttl, err
 }
 
+// exportObjectMeta unsets the fields on the given object that should not be
+// present when the object is exported.
 func exportObjectMeta(accessor metav1.Object, exact bool) {
 	accessor.SetUID("")
 	if !exact {
@@ -908,7 +999,7 @@ func exportObjectMeta(accessor metav1.Object, exact bool) {
 	}
 }
 
-// Implements the rest.Exporter interface
+// Export implements the rest.Exporter interface
 func (e *Store) Export(ctx genericapirequest.Context, name string, opts metav1.ExportOptions) (runtime.Object, error) {
 	obj, err := e.Get(ctx, name, &metav1.GetOptions{})
 	if err != nil {
@@ -930,7 +1021,8 @@ func (e *Store) Export(ctx genericapirequest.Context, name string, opts metav1.E
 	return obj, nil
 }
 
-// CompleteWithOptions updates the store with the provided options and defaults common fields
+// CompleteWithOptions updates the store with the provided options and
+// defaults common fields.
 func (e *Store) CompleteWithOptions(options *generic.StoreOptions) error {
 	if e.QualifiedResource.Empty() {
 		return fmt.Errorf("store %#v must have a non-empty qualified resource", e)
