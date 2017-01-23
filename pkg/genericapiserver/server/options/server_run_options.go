@@ -25,11 +25,11 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/admission"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	utilflag "k8s.io/apiserver/pkg/util/flag"
 	"k8s.io/kubernetes/pkg/api"
 
 	// add the kubernetes feature gates
 	_ "k8s.io/kubernetes/pkg/features"
-	utilflag "k8s.io/kubernetes/pkg/util/flag"
 
 	"github.com/spf13/pflag"
 )

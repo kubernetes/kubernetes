@@ -19,8 +19,8 @@ package app
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	utilflag "k8s.io/apiserver/pkg/util/flag"
 	ingresscontroller "k8s.io/kubernetes/federation/pkg/federation-controller/ingress"
-	utilflag "k8s.io/kubernetes/pkg/util/flag"
 	"testing"
 )
 

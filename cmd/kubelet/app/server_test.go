@@ -19,8 +19,8 @@ package app
 import (
 	"testing"
 
+	utilflag "k8s.io/apiserver/pkg/util/flag"
 	"k8s.io/kubernetes/pkg/kubelet"
-	utilflag "k8s.io/kubernetes/pkg/util/flag"
 )
 
 func TestValueOfAllocatableResources(t *testing.T) {

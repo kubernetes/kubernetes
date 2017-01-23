@@ -19,8 +19,8 @@ package componentconfig
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
+	utilflag "k8s.io/apiserver/pkg/util/flag"
 	"k8s.io/kubernetes/pkg/api"
-	utilflag "k8s.io/kubernetes/pkg/util/flag"
 )
 
 type KubeProxyConfiguration struct {
