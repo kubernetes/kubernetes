@@ -101,12 +101,20 @@ func NewCmdEdit(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
 		Long:    editLong,
 		Example: fmt.Sprintf(editExample),
 		Run: func(cmd *cobra.Command, args []string) {
+			args = append([]string{"configmap"}, args...)
 			err := RunEdit(f, out, errOut, cmd, args, options)
 			cmdutil.CheckErr(err)
 		},
 		ValidArgs:  validArgs,
 		ArgAliases: argAliases,
 	}
+	addEditFlags(cmd, options)
+
+	cmd.AddCommand(NewCmdEditConfigMap(f, out, errOut))
+	return cmd
+}
+
+func addEditFlags(cmd *cobra.Command, options *resource.FilenameOptions) {
 	usage := "to use to edit the resource"
 	cmdutil.AddFilenameOptionFlags(cmd, options, usage)
 	cmdutil.AddValidateFlags(cmd)
@@ -116,7 +124,6 @@ func NewCmdEdit(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
 	cmdutil.AddApplyAnnotationFlags(cmd)
 	cmdutil.AddRecordFlag(cmd)
 	cmdutil.AddInclude3rdPartyFlags(cmd)
-	return cmd
 }
 
 func RunEdit(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args []string, options *resource.FilenameOptions) error {
