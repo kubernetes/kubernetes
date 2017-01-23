@@ -27,6 +27,27 @@ import (
 	storageutil "k8s.io/kubernetes/pkg/apis/storage/v1beta1/util"
 )
 
+func makePVC(size string, modfn func(*v1.PersistentVolumeClaim)) *v1.PersistentVolumeClaim {
+	pvc := v1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "claim01",
+			Namespace: "myns",
+		},
+		Spec: v1.PersistentVolumeClaimSpec{
+			AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadOnlyMany, v1.ReadWriteOnce},
+			Resources: v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					v1.ResourceName(v1.ResourceStorage): resource.MustParse(size),
+				},
+			},
+		},
+	}
+	if modfn != nil {
+		modfn(&pvc)
+	}
+	return &pvc
+}
+
 func TestMatchVolume(t *testing.T) {
 	volList := newPersistentVolumeOrderedIndex()
 	for _, pv := range createTestVolumes() {
@@ -39,182 +60,76 @@ func TestMatchVolume(t *testing.T) {
 	}{
 		"successful-match-gce-10": {
 			expectedMatch: "gce-pd-10",
-			claim: &v1.PersistentVolumeClaim{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "claim01",
-					Namespace: "myns",
-				},
-				Spec: v1.PersistentVolumeClaimSpec{
-					AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadOnlyMany, v1.ReadWriteOnce},
-					Resources: v1.ResourceRequirements{
-						Requests: v1.ResourceList{
-							v1.ResourceName(v1.ResourceStorage): resource.MustParse("8G"),
-						},
-					},
-				},
-			},
+			claim:         makePVC("8G", nil),
 		},
 		"successful-match-nfs-5": {
 			expectedMatch: "nfs-5",
-			claim: &v1.PersistentVolumeClaim{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "claim01",
-					Namespace: "myns",
-				},
-				Spec: v1.PersistentVolumeClaimSpec{
-					AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadOnlyMany, v1.ReadWriteOnce, v1.ReadWriteMany},
-					Resources: v1.ResourceRequirements{
-						Requests: v1.ResourceList{
-							v1.ResourceName(v1.ResourceStorage): resource.MustParse("5G"),
-						},
-					},
-				},
-			},
+			claim: makePVC("5G", func(pvc *v1.PersistentVolumeClaim) {
+				pvc.Spec.AccessModes = []v1.PersistentVolumeAccessMode{v1.ReadOnlyMany, v1.ReadWriteOnce, v1.ReadWriteMany}
+			}),
 		},
 		"successful-skip-1g-bound-volume": {
 			expectedMatch: "gce-pd-5",
-			claim: &v1.PersistentVolumeClaim{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "claim01",
-					Namespace: "myns",
-				},
-				Spec: v1.PersistentVolumeClaimSpec{
-					AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadOnlyMany, v1.ReadWriteOnce},
-					Resources: v1.ResourceRequirements{
-						Requests: v1.ResourceList{
-							v1.ResourceName(v1.ResourceStorage): resource.MustParse("1G"),
-						},
-					},
-				},
-			},
+			claim:         makePVC("1G", nil),
 		},
 		"successful-no-match": {
 			expectedMatch: "",
-			claim: &v1.PersistentVolumeClaim{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "claim01",
-					Namespace: "myns",
-				},
-				Spec: v1.PersistentVolumeClaimSpec{
-					AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadOnlyMany, v1.ReadWriteOnce},
-					Resources: v1.ResourceRequirements{
-						Requests: v1.ResourceList{
-							v1.ResourceName(v1.ResourceStorage): resource.MustParse("999G"),
-						},
-					},
-				},
-			},
+			claim:         makePVC("999G", nil),
 		},
 		"successful-no-match-due-to-label": {
 			expectedMatch: "",
-			claim: &v1.PersistentVolumeClaim{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "claim01",
-					Namespace: "myns",
-				},
-				Spec: v1.PersistentVolumeClaimSpec{
-					Selector: &metav1.LabelSelector{
-						MatchLabels: map[string]string{
-							"should-not-exist": "true",
-						},
+			claim: makePVC("999G", func(pvc *v1.PersistentVolumeClaim) {
+				pvc.Spec.Selector = &metav1.LabelSelector{
+					MatchLabels: map[string]string{
+						"should-not-exist": "true",
 					},
-					AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadOnlyMany, v1.ReadWriteOnce},
-					Resources: v1.ResourceRequirements{
-						Requests: v1.ResourceList{
-							v1.ResourceName(v1.ResourceStorage): resource.MustParse("999G"),
-						},
-					},
-				},
-			},
+				}
+			}),
 		},
 		"successful-no-match-due-to-size-constraint-with-label-selector": {
 			expectedMatch: "",
-			claim: &v1.PersistentVolumeClaim{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "claim01",
-					Namespace: "myns",
-				},
-				Spec: v1.PersistentVolumeClaimSpec{
-					Selector: &metav1.LabelSelector{
-						MatchLabels: map[string]string{
-							"should-exist": "true",
-						},
+			claim: makePVC("20000G", func(pvc *v1.PersistentVolumeClaim) {
+				pvc.Spec.Selector = &metav1.LabelSelector{
+					MatchLabels: map[string]string{
+						"should-exist": "true",
 					},
-					AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadOnlyMany, v1.ReadWriteOnce},
-					Resources: v1.ResourceRequirements{
-						Requests: v1.ResourceList{
-							v1.ResourceName(v1.ResourceStorage): resource.MustParse("20000G"),
-						},
-					},
-				},
-			},
+				}
+				pvc.Spec.AccessModes = []v1.PersistentVolumeAccessMode{v1.ReadOnlyMany, v1.ReadWriteOnce}
+			}),
 		},
 		"successful-match-due-with-constraint-and-label-selector": {
 			expectedMatch: "gce-pd-2",
-			claim: &v1.PersistentVolumeClaim{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "claim01",
-					Namespace: "myns",
-				},
-				Spec: v1.PersistentVolumeClaimSpec{
-					Selector: &metav1.LabelSelector{
-						MatchLabels: map[string]string{
-							"should-exist": "true",
-						},
+			claim: makePVC("20000G", func(pvc *v1.PersistentVolumeClaim) {
+				pvc.Spec.Selector = &metav1.LabelSelector{
+					MatchLabels: map[string]string{
+						"should-exist": "true",
 					},
-					AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
-					Resources: v1.ResourceRequirements{
-						Requests: v1.ResourceList{
-							v1.ResourceName(v1.ResourceStorage): resource.MustParse("20000G"),
-						},
-					},
-				},
-			},
+				}
+				pvc.Spec.AccessModes = []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}
+			}),
 		},
 		"successful-match-with-class": {
 			expectedMatch: "gce-pd-silver1",
-			claim: &v1.PersistentVolumeClaim{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "claim01",
-					Namespace: "myns",
-					Annotations: map[string]string{
-						storageutil.StorageClassAnnotation: "silver",
+			claim: makePVC("1G", func(pvc *v1.PersistentVolumeClaim) {
+				pvc.ObjectMeta.Annotations = map[string]string{
+					storageutil.StorageClassAnnotation: "silver",
+				}
+				pvc.Spec.Selector = &metav1.LabelSelector{
+					MatchLabels: map[string]string{
+						"should-exist": "true",
 					},
-				},
-				Spec: v1.PersistentVolumeClaimSpec{
-					AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
-					Selector: &metav1.LabelSelector{
-						MatchLabels: map[string]string{
-							"should-exist": "true",
-						},
-					},
-					Resources: v1.ResourceRequirements{
-						Requests: v1.ResourceList{
-							v1.ResourceName(v1.ResourceStorage): resource.MustParse("1G"),
-						},
-					},
-				},
-			},
+				}
+				pvc.Spec.AccessModes = []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}
+			}),
 		},
 		"successful-match-with-class-and-labels": {
 			expectedMatch: "gce-pd-silver2",
-			claim: &v1.PersistentVolumeClaim{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "claim01",
-					Namespace: "myns",
-					Annotations: map[string]string{
-						storageutil.StorageClassAnnotation: "silver",
-					},
-				},
-				Spec: v1.PersistentVolumeClaimSpec{
-					AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
-					Resources: v1.ResourceRequirements{
-						Requests: v1.ResourceList{
-							v1.ResourceName(v1.ResourceStorage): resource.MustParse("1G"),
-						},
-					},
-				},
-			},
+			claim: makePVC("1G", func(pvc *v1.PersistentVolumeClaim) {
+				pvc.ObjectMeta.Annotations = map[string]string{
+					storageutil.StorageClassAnnotation: "silver",
+				}
+				pvc.Spec.AccessModes = []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}
+			}),
 		},
 	}
 
