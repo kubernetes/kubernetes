@@ -7,7 +7,7 @@ import (
 	"strings"
 )
 
-func merge(cur, patch *lazyNode) *lazyNode {
+func merge(cur, patch *lazyNode, mergeMerge bool) *lazyNode {
 	curDoc, err := cur.intoDoc()
 
 	if err != nil {
@@ -21,16 +21,20 @@ func merge(cur, patch *lazyNode) *lazyNode {
 		return patch
 	}
 
-	mergeDocs(curDoc, patchDoc)
+	mergeDocs(curDoc, patchDoc, mergeMerge)
 
 	return cur
 }
 
-func mergeDocs(doc, patch *partialDoc) {
+func mergeDocs(doc, patch *partialDoc, mergeMerge bool) {
 	for k, v := range *patch {
 		k := decodePatchKey(k)
 		if v == nil {
-			delete(*doc, k)
+			if mergeMerge {
+				(*doc)[k] = nil
+			} else {
+				delete(*doc, k)
+			}
 		} else {
 			cur, ok := (*doc)[k]
 
@@ -38,7 +42,7 @@ func mergeDocs(doc, patch *partialDoc) {
 				pruneNulls(v)
 				(*doc)[k] = v
 			} else {
-				(*doc)[k] = merge(cur, v)
+				(*doc)[k] = merge(cur, v, mergeMerge)
 			}
 		}
 	}
@@ -88,8 +92,19 @@ func pruneAryNulls(ary *partialArray) *partialArray {
 var errBadJSONDoc = fmt.Errorf("Invalid JSON Document")
 var errBadJSONPatch = fmt.Errorf("Invalid JSON Patch")
 
+// MergeMergePatches merges two merge patches together, such that
+// applying this resulting merged merge patch to a document yields the same
+// as merging each merge patch to the document in succession.
+func MergeMergePatches(patch1Data, patch2Data []byte) ([]byte, error) {
+	return doMergePatch(patch1Data, patch2Data, true)
+}
+
 // MergePatch merges the patchData into the docData.
 func MergePatch(docData, patchData []byte) ([]byte, error) {
+	return doMergePatch(docData, patchData, false)
+}
+
+func doMergePatch(docData, patchData []byte, mergeMerge bool) ([]byte, error) {
 	doc := &partialDoc{}
 
 	docErr := json.Unmarshal(docData, doc)
@@ -117,7 +132,11 @@ func MergePatch(docData, patchData []byte) ([]byte, error) {
 	if docErr != nil || patchErr != nil {
 		// Not an error, just not a doc, so we turn straight into the patch
 		if patchErr == nil {
-			doc = pruneDocNulls(patch)
+			if mergeMerge {
+				doc = patch
+			} else {
+				doc = pruneDocNulls(patch)
+			}
 		} else {
 			patchAry := &partialArray{}
 			patchErr = json.Unmarshal(patchData, patchAry)
@@ -137,7 +156,7 @@ func MergePatch(docData, patchData []byte) ([]byte, error) {
 			return out, nil
 		}
 	} else {
-		mergeDocs(doc, patch)
+		mergeDocs(doc, patch, mergeMerge)
 	}
 
 	return json.Marshal(doc)
