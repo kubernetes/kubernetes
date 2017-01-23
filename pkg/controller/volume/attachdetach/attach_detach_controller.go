@@ -221,11 +221,6 @@ func (adc *attachDetachController) Run(stopCh <-chan struct{}) {
 	defer runtime.HandleCrash()
 	glog.Infof("Starting Attach Detach Controller")
 
-	if !kcache.WaitForCacheSync(stopCh, adc.podsSynced, adc.nodesSynced, adc.pvcsSynced, adc.pvsSynced) {
-		runtime.HandleError(fmt.Errorf("timed out waiting for caches to sync"))
-		return
-	}
-
 	go adc.reconciler.Run(stopCh)
 	go adc.desiredStateOfWorldPopulator.Run(stopCh)
 

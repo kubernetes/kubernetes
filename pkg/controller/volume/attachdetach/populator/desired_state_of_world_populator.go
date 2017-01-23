@@ -19,13 +19,11 @@ limitations under the License.
 package populator
 
 import (
-	"fmt"
 	"time"
 
 	"github.com/golang/glog"
 
 	"k8s.io/apimachinery/pkg/api/errors"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	kcache "k8s.io/kubernetes/pkg/client/cache"
 	corelisters "k8s.io/kubernetes/pkg/client/listers/core/v1"
@@ -85,13 +83,8 @@ func (dswp *desiredStateOfWorldPopulator) findAndRemoveDeletedPods() {
 			continue
 		}
 
-		// Retrieve the pod object from pod informer with the namespace key
-		namespace, name, err := kcache.SplitMetaNamespaceKey(dswPodKey)
-		if err != nil {
-			utilruntime.HandleError(fmt.Errorf("error splitting dswPodKey %q: %v", dswPodKey, err))
-			continue
-		}
-		informerPod, err := dswp.podLister.Pods(namespace).Get(name)
+		// Retrieve the pod object from pod lister
+		informerPod, err := dswp.podLister.Pods(dswPodToAdd.Pod.Namespace).Get(dswPodToAdd.Pod.Name)
 		switch {
 		case errors.IsNotFound(err):
 			// if we can't find the pod, we need to delete it below
