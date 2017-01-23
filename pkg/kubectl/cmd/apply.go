@@ -22,6 +22,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/golang/glog"
 	"github.com/jonboulle/clockwork"
 	"github.com/spf13/cobra"
 
@@ -295,13 +296,10 @@ func RunApply(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer, opti
 			}
 
 			if cmdutil.ShouldRecord(cmd, info) {
-				patch, err := cmdutil.ChangeResourcePatch(info, f.Command())
-				if err != nil {
-					return err
-				}
-				_, err = helper.Patch(info.Namespace, info.Name, types.StrategicMergePatchType, patch)
-				if err != nil {
-					return cmdutil.AddSourceToErr(fmt.Sprintf("applying patch:\n%s\nto:\n%v\nfor:", patch, info), info.Source, err)
+				if patch, patchType, err := cmdutil.ChangeResourcePatch(info, f.Command()); err == nil {
+					if _, err = helper.Patch(info.Namespace, info.Name, patchType, patch); err != nil {
+						glog.V(4).Infof("error recording reason: %v", err)
+					}
 				}
 			}
 

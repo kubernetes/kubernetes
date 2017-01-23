@@ -238,8 +238,8 @@ func (o *ImageOptions) Run() error {
 
 		// record this change (for rollout history)
 		if o.Record || cmdutil.ContainsChangeCause(info) {
-			if patch, err := cmdutil.ChangeResourcePatch(info, o.ChangeCause); err == nil {
-				if obj, err = resource.NewHelper(info.Client, info.Mapping).Patch(info.Namespace, info.Name, types.StrategicMergePatchType, patch); err != nil {
+			if patch, patchType, err := cmdutil.ChangeResourcePatch(info, o.ChangeCause); err == nil {
+				if obj, err = resource.NewHelper(info.Client, info.Mapping).Patch(info.Namespace, info.Name, patchType, patch); err != nil {
 					fmt.Fprintf(o.Err, "WARNING: changes to %s/%s can't be recorded: %v\n", info.Mapping.Resource, info.Name, err)
 				}
 			}
