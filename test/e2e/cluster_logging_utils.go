@@ -19,51 +19,198 @@ package e2e
 import (
 	"errors"
 	"fmt"
+	"strconv"
+	"strings"
 	"time"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/api/resource"
+	api_v1 "k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
 
 const (
-	// ingestionTimeout is how long to keep retrying to wait for all the
-	// logs to be ingested.
-	ingestionTimeout = 10 * time.Minute
-	// ingestionRetryDelay is how long test should wait between
-	// two attempts to check for ingestion
-	ingestionRetryDelay = 25 * time.Second
+	// Duration of delay between any two attempts to check if all logs are ingested
+	ingestionRetryDelay = 10 * time.Second
 
-	synthLoggerPodName = "synthlogger"
+	// Assuming format is
+	// I1103 00:00:00.000000       0 logs_generator.go:67] <log_number> GET /api/v1/namespaces/ns/pods/XXX 000
+	logPrefixLength = 52
 
-	// expectedLinesCount is the number of log lines emitted (and checked) for each synthetic logging pod.
-	expectedLinesCount = 100
+	// Amount of requested cores for logging container in millicores
+	loggingContainerCpu = 10
+
+	// Amount of requested memory for logging container in bytes
+	loggingContainerMemory = 10 * 1024 * 1024
 )
 
-func createSynthLogger(f *framework.Framework, linesCount int) {
-	f.PodClient().Create(&v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      synthLoggerPodName,
-			Namespace: f.Namespace.Name,
+// Type to track the progress of logs generating pod
+type loggingPod struct {
+	// Name of the pod
+	Name string
+	// If we didn't read some log entries, their
+	// timestamps should be no less than this timestamp.
+	// Effectively, timestamp of the last ingested entry
+	// for which there's no missing entry before it
+	LastTimestamp time.Time
+	// Cache of ingested and read entries
+	Occurrences map[int]*logEntry
+	// Number of lines expected to be ingested from this pod
+	ExpectedLinesNumber int
+}
+
+type logEntry struct {
+	Payload   string
+	Timestamp time.Time
+}
+
+type logsProvider interface {
+	EnsureWorking() error
+	ReadEntries(*loggingPod) []*logEntry
+}
+
+func (entry *logEntry) getLogEntryNumber() (int, bool) {
+	if len(entry.Payload) < logPrefixLength {
+		return 0, false
+	}
+	chunks := strings.Split(entry.Payload[logPrefixLength:], " ")
+	lineNumber, err := strconv.Atoi(strings.TrimSpace(chunks[0]))
+	return lineNumber, err == nil
+}
+
+func createLoggingPod(f *framework.Framework, podName string, totalLines int, loggingDuration time.Duration) *loggingPod {
+	framework.Logf("Starting pod %s", podName)
+	createLogsGeneratorPod(f, podName, totalLines, loggingDuration)
+
+	return &loggingPod{
+		Name: podName,
+		// It's used to avoid querying logs from before the pod was started
+		LastTimestamp:       time.Now(),
+		Occurrences:         make(map[int]*logEntry),
+		ExpectedLinesNumber: totalLines,
+	}
+}
+
+func createLogsGeneratorPod(f *framework.Framework, podName string, linesCount int, duration time.Duration) {
+	f.PodClient().Create(&api_v1.Pod{
+		ObjectMeta: meta_v1.ObjectMeta{
+			Name: podName,
 		},
-		Spec: v1.PodSpec{
-			RestartPolicy: v1.RestartPolicyOnFailure,
-			Containers: []v1.Container{
+		Spec: api_v1.PodSpec{
+			RestartPolicy: api_v1.RestartPolicyNever,
+			Containers: []api_v1.Container{
 				{
-					Name:  synthLoggerPodName,
-					Image: "gcr.io/google_containers/busybox:1.24",
-					// notice: the subshell syntax is escaped with `$$`
-					Command: []string{"/bin/sh", "-c", fmt.Sprintf("i=0; while [ $i -lt %d ]; do echo $i; i=`expr $i + 1`; done", linesCount)},
+					Name:  podName,
+					Image: "gcr.io/google_containers/logs-generator:v0.1.0",
+					Env: []api_v1.EnvVar{
+						{
+							Name:  "LOGS_GENERATOR_LINES_TOTAL",
+							Value: strconv.Itoa(linesCount),
+						},
+						{
+							Name:  "LOGS_GENERATOR_DURATION",
+							Value: duration.String(),
+						},
+					},
+					Resources: api_v1.ResourceRequirements{
+						Requests: api_v1.ResourceList{
+							api_v1.ResourceCPU: *resource.NewMilliQuantity(
+								loggingContainerCpu,
+								resource.DecimalSI),
+							api_v1.ResourceMemory: *resource.NewQuantity(
+								loggingContainerMemory,
+								resource.BinarySI),
+						},
+					},
 				},
 			},
 		},
 	})
 }
 
-func reportLogsFromFluentdPod(f *framework.Framework) error {
-	synthLoggerPod, err := f.PodClient().Get(synthLoggerPodName, metav1.GetOptions{})
+func waitForLogsIngestion(logsProvider logsProvider, pods []*loggingPod, ingestionTimeout time.Duration) error {
+	totalMissing := 0
+	for _, pod := range pods {
+		totalMissing = pod.ExpectedLinesNumber
+	}
+
+	missingByPod := make([]int, len(pods))
+	for podIdx, pod := range pods {
+		missingByPod[podIdx] = pod.ExpectedLinesNumber
+	}
+
+	for start := time.Now(); totalMissing > 0 && time.Since(start) < ingestionTimeout; time.Sleep(ingestionRetryDelay) {
+		missing := 0
+		for podIdx, pod := range pods {
+			if missingByPod[podIdx] == 0 {
+				continue
+			}
+
+			missingByPod[podIdx] = pullMissingLogsCount(logsProvider, pod)
+			missing += missingByPod[podIdx]
+		}
+
+		totalMissing = missing
+		if totalMissing > 0 {
+			framework.Logf("Still missing %d lines in total", totalMissing)
+		}
+	}
+
+	if totalMissing > 0 {
+		return fmt.Errorf("After %v still missing %d lines", ingestionTimeout, totalMissing)
+	}
+
+	return nil
+}
+
+func pullMissingLogsCount(logsProvider logsProvider, pod *loggingPod) int {
+	missingOnPod, err := getMissingLinesCount(logsProvider, pod)
+	if err != nil {
+		framework.Logf("Failed to get missing lines count from pod %s due to %v", pod.Name, err)
+		return pod.ExpectedLinesNumber
+	} else if missingOnPod > 0 {
+		framework.Logf("Pod %s is missing %d lines", pod.Name, missingOnPod)
+	} else {
+		framework.Logf("All logs from pod %s are ingested", pod.Name)
+	}
+	return missingOnPod
+}
+
+func getMissingLinesCount(logsProvider logsProvider, pod *loggingPod) (int, error) {
+	entries := logsProvider.ReadEntries(pod)
+
+	for _, entry := range entries {
+		lineNumber, ok := entry.getLogEntryNumber()
+		if !ok {
+			continue
+		}
+
+		if lineNumber < 0 || lineNumber >= pod.ExpectedLinesNumber {
+			framework.Logf("Unexpected line number: %d", lineNumber)
+		} else {
+
+			pod.Occurrences[lineNumber] = entry
+		}
+	}
+
+	for i := 0; i < pod.ExpectedLinesNumber; i++ {
+		entry, ok := pod.Occurrences[i]
+		if !ok {
+			break
+		}
+
+		if entry.Timestamp.After(pod.LastTimestamp) {
+			pod.LastTimestamp = entry.Timestamp
+		}
+	}
+
+	return pod.ExpectedLinesNumber - len(pod.Occurrences), nil
+}
+
+func reportLogsFromFluentdPod(f *framework.Framework, pod *loggingPod) error {
+	synthLoggerPod, err := f.PodClient().Get(pod.Name, meta_v1.GetOptions{})
 	if err != nil {
 		return fmt.Errorf("Failed to get synth logger pod due to %v", err)
 	}
@@ -74,7 +221,7 @@ func reportLogsFromFluentdPod(f *framework.Framework) error {
 	}
 
 	label := labels.SelectorFromSet(labels.Set(map[string]string{"k8s-app": "fluentd-logging"}))
-	options := v1.ListOptions{LabelSelector: label.String()}
+	options := api_v1.ListOptions{LabelSelector: label.String()}
 	fluentdPods, err := f.ClientSet.Core().Pods(api.NamespaceSystem).List(options)
 
 	for _, fluentdPod := range fluentdPods.Items {

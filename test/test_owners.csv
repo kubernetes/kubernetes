@@ -11,6 +11,8 @@ Cassandra should create and scale cassandra,fabioy,1
 CassandraStatefulSet should create statefulset,wojtek-t,1
 Cluster level logging using Elasticsearch should check that logs from containers are ingested into Elasticsearch,crassirostris,0
 Cluster level logging using GCL should check that logs from containers are ingested in GCL,crassirostris,0
+Cluster level logging using GCL should create a constant load with long-living pods and ensure logs delivery,crassirostris,0
+Cluster level logging using GCL should create a constant load with short-living pods and ensure logs delivery,crassirostris,0
 Cluster size autoscaling should add node to the particular mig,spxtr,1
 Cluster size autoscaling should correctly scale down after a node is not needed,pmorie,1
 Cluster size autoscaling should correctly scale down after a node is not needed when there is non autoscaled pool,krousey,1
