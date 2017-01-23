@@ -24,8 +24,8 @@ import (
 	"k8s.io/kubernetes/pkg/storage/storagebackend/factory"
 )
 
-// StorageDecorator is a function signature for producing
-// a storage.Interface from given parameters.
+// StorageDecorator is a function signature for producing a storage.Interface
+// and an associated DestroyFunc from given parameters.
 type StorageDecorator func(
 	config *storagebackend.Config,
 	capacity int,
@@ -36,7 +36,8 @@ type StorageDecorator func(
 	getAttrsFunc storage.AttrFunc,
 	trigger storage.TriggerPublisherFunc) (storage.Interface, factory.DestroyFunc)
 
-// Returns given 'storageInterface' without any decoration.
+// UndecoratedStorage returns the given a new storage from the given config
+// without any decoration.
 func UndecoratedStorage(
 	config *storagebackend.Config,
 	capacity int,
