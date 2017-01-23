@@ -415,11 +415,17 @@ func startServiceAccountTestServer(t *testing.T) (*clientset.Clientset, restclie
 	framework.RunAMasterUsingServer(masterConfig, apiServer, h)
 
 	// Start the service account and service account token controllers
+	informers := informers.NewSharedInformerFactory(nil, rootClientset, controller.NoResyncPeriodFunc())
 	stopCh := make(chan struct{})
-	tokenController := serviceaccountcontroller.NewTokensController(serviceaccountcontroller.TokensControllerOptions{Client: rootClientset, TokenGenerator: serviceaccount.JWTTokenGenerator(serviceAccountKey)})
+	tokenController := serviceaccountcontroller.NewTokensController(
+		serviceaccountcontroller.TokensControllerOptions{
+			Client:                 rootClientset,
+			ServiceAccountInformer: informers.Core().V1().ServiceAccounts(),
+			TokenGenerator:         serviceaccount.JWTTokenGenerator(serviceAccountKey),
+		},
+	)
 	go tokenController.Run(1, stopCh)
 
-	informers := informers.NewSharedInformerFactory(nil, rootClientset, controller.NoResyncPeriodFunc())
 	serviceAccountController := serviceaccountcontroller.NewServiceAccountsController(
 		informers.Core().V1().ServiceAccounts(),
 		informers.Core().V1().Namespaces(),
