@@ -23,6 +23,7 @@ import (
 	"strings"
 
 	jsonpatch "github.com/evanphx/json-patch"
+	"github.com/golang/glog"
 	"github.com/spf13/cobra"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -181,14 +182,16 @@ func RunPatch(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []strin
 			if err != nil {
 				return err
 			}
+			// Record the change as a second patch to avoid trying to merge with a user's patch data
 			if cmdutil.ShouldRecord(cmd, info) {
-				// don't return an error on failure.  The patch itself succeeded, its only the hint for that change that failed
-				// don't bother checking for failures of this replace, because a failure to indicate the hint doesn't fail the command
-				// also, don't force the replacement.  If the replacement fails on a resourceVersion conflict, then it means this
-				// record hint is likely to be invalid anyway, so avoid the bad hint
-				patch, err := cmdutil.ChangeResourcePatch(info, f.Command())
-				if err == nil {
-					helper.Patch(info.Namespace, info.Name, types.StrategicMergePatchType, patch)
+				// Copy the resource info and update with the result of applying the user's patch
+				infoCopy := *info
+				infoCopy.Object = patchedObj
+				infoCopy.VersionedObject = patchedObj
+				if patch, patchType, err := cmdutil.ChangeResourcePatch(&infoCopy, f.Command()); err == nil {
+					if _, err = helper.Patch(info.Namespace, info.Name, patchType, patch); err != nil {
+						glog.V(4).Infof("error recording reason: %v", err)
+					}
 				}
 			}
 			count++
