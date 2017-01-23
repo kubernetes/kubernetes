@@ -22,6 +22,10 @@ import (
 	"net/http/httptest"
 	"testing"
 	"time"
+
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"strings"
 )
 
 func TestTimeout(t *testing.T) {
@@ -29,7 +33,7 @@ func TestTimeout(t *testing.T) {
 	writeErrors := make(chan error, 1)
 	timeout := make(chan time.Time, 1)
 	resp := "test response"
-	timeoutResp := "test timeout"
+	timeoutErr := apierrors.NewServerTimeout(schema.GroupResource{Group: "foo", Resource: "bar"}, "get", 0)
 
 	ts := httptest.NewServer(WithTimeout(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
@@ -37,8 +41,8 @@ func TestTimeout(t *testing.T) {
 			_, err := w.Write([]byte(resp))
 			writeErrors <- err
 		}),
-		func(*http.Request) (<-chan time.Time, string) {
-			return timeout, timeoutResp
+		func(*http.Request) (<-chan time.Time, *apierrors.StatusError) {
+			return timeout, timeoutErr
 		}))
 	defer ts.Close()
 
@@ -69,8 +73,8 @@ func TestTimeout(t *testing.T) {
 		t.Errorf("got res.StatusCode %d; expected %d", res.StatusCode, http.StatusServiceUnavailable)
 	}
 	body, _ = ioutil.ReadAll(res.Body)
-	if string(body) != timeoutResp {
-		t.Errorf("got body %q; expected %q", string(body), timeoutResp)
+	if !strings.Contains(string(body), timeoutErr.Error()) {
+		t.Errorf("got body %q; expected it to contain %q", string(body), timeoutErr.Error())
 	}
 
 	// Now try to send a response
