@@ -20,15 +20,17 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"path"
+	"path/filepath"
 
 	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
 
 	"k8s.io/apimachinery/pkg/runtime"
+	certutil "k8s.io/client-go/pkg/util/cert"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiext "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
+	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/discovery"
 	kubenode "k8s.io/kubernetes/cmd/kubeadm/app/node"
 	kubeconfigphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubeconfig"
@@ -136,8 +138,18 @@ func (j *Join) Run(out io.Writer) error {
 	if err := kubenode.PerformTLSBootstrap(cfg); err != nil {
 		return err
 	}
-	if err := kubeconfigphase.WriteKubeconfigToDisk(path.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, kubeconfigphase.KubeletKubeConfigFileName), cfg); err != nil {
+
+	kubeconfigFile := filepath.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, kubeconfigphase.KubeletKubeConfigFileName)
+	if err := kubeconfigphase.WriteKubeconfigToDisk(kubeconfigFile, cfg); err != nil {
 		return err
+	}
+
+	// Write the ca certificate to disk so kubelet can use it for authentication
+	cluster := cfg.Contexts[cfg.CurrentContext].Cluster
+	caCertFile := filepath.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, kubeadmconstants.CACertName)
+	err = certutil.WriteCert(caCertFile, cfg.Clusters[cluster].CertificateAuthorityData)
+	if err != nil {
+		return fmt.Errorf("couldn't save the CA certificate to disk: %v", err)
 	}
 
 	fmt.Fprintf(out, joinDoneMsgf)
