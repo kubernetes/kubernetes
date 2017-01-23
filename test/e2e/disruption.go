@@ -136,7 +136,7 @@ var _ = framework.KubeDescribe("DisruptionController", func() {
 			// Locate a running pod.
 			var pod v1.Pod
 			err := wait.PollImmediate(framework.Poll, schedulingTimeout, func() (bool, error) {
-				podList, err := cs.Pods(ns).List(v1.ListOptions{})
+				podList, err := cs.Pods(ns).List(metav1.ListOptions{})
 				if err != nil {
 					return false, err
 				}
@@ -231,7 +231,7 @@ func createPodsOrDie(cs *kubernetes.Clientset, ns string, n int) {
 func waitForPodsOrDie(cs *kubernetes.Clientset, ns string, n int) {
 	By("Waiting for all pods to be running")
 	err := wait.PollImmediate(framework.Poll, schedulingTimeout, func() (bool, error) {
-		pods, err := cs.Core().Pods(ns).List(v1.ListOptions{LabelSelector: "foo=bar"})
+		pods, err := cs.Core().Pods(ns).List(metav1.ListOptions{LabelSelector: "foo=bar"})
 		if err != nil {
 			return false, err
 		}
